@@ -1,0 +1,50 @@
+name: E2E Preview
+
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    if: >
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment_status.environment_url != '' &&
+      (github.event.deployment.environment == 'Preview' || github.event.deployment.environment == 'preview')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install E2E dependencies
+        run: bun install --frozen-lockfile
+        working-directory: tests/e2e
+
+      - name: Run E2E scenarios
+        env:
+          STAGEHAND_TARGET_URL: ${{ github.event.deployment_status.environment_url }}
+          STAGEHAND_ENV: BROWSERBASE
+          STAGEHAND_HEADLESS: "true"
+          BROWSERBASE_API_KEY: ${{ secrets.BROWSERBASE_API_KEY }}
+          BROWSERBASE_PROJECT_ID: ${{ secrets.BROWSERBASE_PROJECT_ID }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MODEL_NAME: ${{ secrets.MODEL_NAME }}
+          VISION_MODEL_NAME: ${{ secrets.VISION_MODEL_NAME }}
+          STAGEHAND_VISUAL_STRICT: "true"
+        run: bun run tests/e2e/scripts/run-scenarios.ts visual-sanity
+
+      - name: Upload E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts-${{ github.run_id }}
+          path: tests/e2e/artifacts
+          if-no-files-found: warn
+          retention-days: 7

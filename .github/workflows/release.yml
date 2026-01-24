@@ -1,0 +1,112 @@
+name: Release and Version Bump
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # Skip if commit message contains [skip-release] or is a version bump commit
+    if: |
+      !contains(github.event.head_commit.message, '[skip-release]') &&
+      !contains(github.event.head_commit.message, 'chore: bump version')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Configure Git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Get current version
+        id: current_version
+        run: echo "version=$(bun -e "console.log(require('./package.json').version)")" >> $GITHUB_OUTPUT
+
+      - name: Determine version bump type
+        id: bump_type
+        run: |
+          # Default to patch bump
+          BUMP_TYPE="patch"
+
+          # Check commit messages for version bump indicators
+          LAST_COMMIT_MSG=$(git log -1 --pretty=%B)
+
+          if echo "$LAST_COMMIT_MSG" | grep -qiE "(BREAKING CHANGE|major|!:)"; then
+            BUMP_TYPE="major"
+          elif echo "$LAST_COMMIT_MSG" | grep -qiE "(feat|feature|minor)"; then
+            BUMP_TYPE="minor"
+          fi
+
+          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+          echo "Detected bump type: $BUMP_TYPE"
+
+      - name: Bump version
+        id: bump_version
+        run: |
+          npm version ${{ steps.bump_type.outputs.bump_type }} --no-git-tag-version
+          NEW_VERSION=$(bun -e "console.log(require('./package.json').version)")
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Bumped version from ${{ steps.current_version.outputs.version }} to $NEW_VERSION"
+
+      - name: Commit version bump
+        run: |
+          git add package.json
+          git commit -m "chore: bump version to ${{ steps.bump_version.outputs.new_version }} [skip-release]"
+          git push
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          # Get the latest tag (if any)
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          # Generate release notes
+          if [ -z "$LATEST_TAG" ]; then
+            NOTES="## Initial Release"
+            echo "Initial release - no previous tags found"
+          else
+            echo "Generating notes from $LATEST_TAG to HEAD"
+            # Get commit messages since last tag, excluding version bump commits
+            COMMITS=$(git log $LATEST_TAG..HEAD --pretty=format:"- %s" --no-merges | grep -v "chore: bump version" | grep -v "\[skip-release\]")
+
+            if [ -z "$COMMITS" ]; then
+              NOTES="## Release v${{ steps.bump_version.outputs.new_version }}"
+            else
+              printf -v NOTES "## Release v${{ steps.bump_version.outputs.new_version }}\n\n### Changes\n%s" "$COMMITS"
+            fi
+          fi
+
+          # Save to file for multiline support
+          echo "$NOTES" > release_notes.md
+          echo "Release notes generated"
+
+      - name: Create GitHub Release
+        run: |
+          gh release create v${{ steps.bump_version.outputs.new_version }} \
+            --title "Release v${{ steps.bump_version.outputs.new_version }}" \
+            --notes-file release_notes.md \
+            --target main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean up
+        if: always()
+        run: |
+          rm -f release_notes.md

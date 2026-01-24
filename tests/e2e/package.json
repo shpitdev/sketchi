@@ -1,0 +1,16 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "visual-sanity": "bun run src/scenarios/unauthenticated/visual-sanity.ts"
+  },
+  "dependencies": {
+    "@browserbasehq/stagehand": "^3.0.7",
+    "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/bun": "latest",
+    "rrweb-player": "1.0.0-alpha.4"
+  }
+}
