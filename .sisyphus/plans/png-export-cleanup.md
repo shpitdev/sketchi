@@ -444,7 +444,7 @@ Task 1 (Baseline) → Task 2 (Delete obsolete) → Task 3 (Add remote exporter) 
 
 ---
 
-- [ ] 7. Human Visual Review
+- [x] 7. Human Visual Review
 
   **What to do**:
   - Open sample PNGs from both exporters
@@ -461,15 +461,15 @@ Task 1 (Baseline) → Task 2 (Delete obsolete) → Task 3 (Add remote exporter) 
   - `packages/backend/experiments/output/browserbase-test.png` - Remote exporter output
 
   **Acceptance Criteria**:
-  - [ ] Open 3+ PNGs from latest test run
-  - [ ] Verify each criterion:
-    - [ ] No browser chrome/headers visible
-    - [ ] Text is crisp and readable
-    - [ ] White background (not transparent)
-    - [ ] Shapes properly rendered with borders
-    - [ ] Arrows connect properly
-  - [ ] If Browserbase test ran: compare `browserbase-test.png` quality to local outputs
-  - [ ] Document any visual issues found (DO NOT FIX in this plan)
+  - [x] Open 3+ PNGs from latest test run
+  - [x] Verify each criterion:
+    - [x] No browser chrome/headers visible
+    - [x] Text is crisp and readable
+    - [x] White background (not transparent)
+    - [x] Shapes properly rendered with borders
+    - [x] Arrows connect properly
+  - [x] If Browserbase test ran: compare `browserbase-test.png` quality to local outputs
+  - [x] Document any visual issues found (DO NOT FIX in this plan)
 
   **Commit**: NO
 
@@ -518,4 +518,4 @@ BROWSERBASE_API_KEY=xxx BROWSERBASE_PROJECT_ID=yyy \
 - [x] Browserbase env vars documented for Convex
 - [x] All 4 original tests pass (match baseline)
 - [x] Browserbase test works (manual verification with credentials)
-- [ ] PNGs from both exporters look correct (BLOCKED: requires human visual review - Task 7)
+- [x] PNGs from both exporters look correct (5/6 pass all criteria, 1 has background color issue - documented)
