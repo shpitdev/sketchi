@@ -44,6 +44,8 @@ Unit tests are rarely useful. Focus on:
 1. **API tests** - harden backend/Convex functions; easiest to write, high confidence
 2. **E2E tests** - use only when API tests can't validate behavior (UI-specific flows)
 
+Never mock HTTP calls; `convex-test` is only for mocking the Convex backend.
+
 Test hierarchy: API > E2E > unit (last resort)
 
 ## Planning Tests

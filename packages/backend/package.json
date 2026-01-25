@@ -6,7 +6,10 @@
   "author": "",
   "scripts": {
     "dev": "convex dev",
-    "dev:setup": "convex dev --configure --until-success"
+    "dev:setup": "convex dev --configure --until-success",
+    "test": "vitest run --reporter=default --reporter=json --outputFile=./test-results/vitest.json",
+    "test:watch": "vitest --reporter=default",
+    "test:report": "bun run scripts/generate-test-report.ts"
   },
   "dependencies": {
     "@browserbasehq/sdk": "^2.6.0",
@@ -14,6 +17,7 @@
     "@types/dagre": "^0.7.53",
     "ai": "^6.0.49",
     "convex": "catalog:",
+    "convex-helpers": "^0.1.111",
     "dagre": "^0.8.5",
     "dotenv": "catalog:",
     "playwright": "^1.58.0",
@@ -22,8 +26,11 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
     "@sketchi/config": "workspace:*",
     "@types/node": "^24.3.0",
-    "typescript": "catalog:"
+    "convex-test": "^0.0.41",
+    "typescript": "catalog:",
+    "vitest": "^4.0.18"
   }
 }

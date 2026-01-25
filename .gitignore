@@ -1,5 +1,7 @@
 # Dependencies
 node_modules
+.DS_Store
+packages/backend/test-results/
 .pnp
 .pnp.js
 
