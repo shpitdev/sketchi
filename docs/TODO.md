@@ -14,7 +14,8 @@
 - [ ] **0.5 Arrow Optimization** - no artifacts on disk; move to deterministic module + add artifact or convert to Convex test + delete experiment
 - [x] **Optimization suite** - artifacts in `packages/backend/experiments/output/optimization_*`
 - [x] **Visual grading** - artifacts in `packages/backend/experiments/output/visual-grading_*` with summary.json
-- [ ] **Browserbase export** - artifact name mismatch (`spike-browserbase-export.png` vs expected `browserbase-test.png`); re-run or update script
+- [ ] **Visual grading (Convex test)** - migrate to Convex test, call vision LLM, run concurrently, keep artifacts + summary
+- [ ] **Browserbase export** - artifact name mismatch (`spike-browserbase-export.png` vs expected `browserbase-test.png`); re-run or update script; output name derived from test name (no "spike")
 
 ### Unify + simplify (delete, don’t rename)
 - [ ] Delete duplicate schema: keep ONE diagram schema and remove the other
