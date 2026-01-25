@@ -1,4 +1,6 @@
+import Browserbase from "@browserbasehq/sdk";
 import { type Browser, chromium } from "playwright";
+import { chromium as chromiumCore } from "playwright-core";
 import { applyLayout, type LayoutedDiagram } from "./layout";
 import type { Diagram } from "./schemas";
 
@@ -306,6 +308,80 @@ export async function renderDiagramToPng(
     };
   } finally {
     await context.close();
+  }
+}
+
+export async function renderDiagramToPngRemote(
+  diagram: Diagram,
+  options: RenderOptions = {}
+): Promise<RenderResult> {
+  const {
+    chartType = "flowchart",
+    scale = 2,
+    padding = 20,
+    background = true,
+  } = options;
+
+  const apiKey = process.env.BROWSERBASE_API_KEY;
+  const projectId = process.env.BROWSERBASE_PROJECT_ID;
+  if (!(apiKey && projectId)) {
+    throw new Error("Missing BROWSERBASE_API_KEY or BROWSERBASE_PROJECT_ID");
+  }
+
+  const bb = new Browserbase({ apiKey });
+  const session = await bb.sessions.create({ projectId });
+
+  const browser = await chromiumCore.connectOverCDP(session.connectUrl, {
+    timeout: 30_000,
+  });
+
+  // CRITICAL: Use existing context, do NOT create new context
+  // Browserbase sessions always provide a default context per their documentation
+  // https://docs.browserbase.com/introduction/playwright (default context usage)
+  // https://docs.browserbase.com/fundamentals/using-browser-session (connectOverCDP pattern)
+  const contexts = browser.contexts();
+  if (contexts.length === 0) {
+    await browser.close();
+    throw new Error(
+      "Browserbase session did not provide a default context. This is unexpected - check Browserbase status."
+    );
+  }
+  const context = contexts[0];
+
+  // Handle edge case: page may not exist yet in the context
+  const page = context.pages()[0] ?? (await context.newPage());
+
+  try {
+    const start = Date.now();
+    const layouted = applyLayout(diagram, chartType);
+    const elements = convertLayoutedToExcalidraw(layouted);
+
+    await page.setContent(EXPORT_HARNESS_HTML);
+    await page.waitForFunction("window.exportReady === true", {
+      timeout: 30_000,
+    });
+
+    const base64Png = (await page.evaluate(
+      async ({ elements, options }) => {
+        // biome-ignore lint/suspicious/noExplicitAny: window.exportPng is injected by harness
+        return await (window as any).exportPng(elements, options);
+      },
+      {
+        elements,
+        options: { scale, padding, background, backgroundColor: "#ffffff" },
+      }
+    )) as string;
+
+    const png = Buffer.from(base64Png, "base64");
+
+    return {
+      png,
+      durationMs: Date.now() - start,
+      shareUrl: "",
+    };
+  } finally {
+    // Only close browser, session ends automatically
+    await browser.close();
   }
 }
 
