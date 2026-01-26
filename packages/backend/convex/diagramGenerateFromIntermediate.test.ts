@@ -321,7 +321,9 @@ describe.sequential("diagramGenerateFromIntermediate", () => {
         expect(result.stats.nodeCount).toBeGreaterThanOrEqual(10);
         expect(result.stats.edgeCount).toBeGreaterThanOrEqual(12);
 
-        const shapeIds = new Set(result.diagram.shapes.map((shape) => shape.id));
+        const shapeIds = new Set(
+          result.diagram.shapes.map((shape) => shape.id)
+        );
         for (const arrow of result.diagram.arrows) {
           expect(shapeIds.has(arrow.fromId)).toBe(true);
           expect(shapeIds.has(arrow.toId)).toBe(true);
