@@ -1,4 +1,7 @@
 {
+  "node": {
+    "externalPackages": ["*"]
+  },
   "authKit": {
     "dev": {
       "configure": {

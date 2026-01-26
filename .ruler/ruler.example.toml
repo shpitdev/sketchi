@@ -1,0 +1,153 @@
+# Ruler Configuration Reference
+# Complete example of all available configuration options
+# Documentation: https://okigu.com/ruler
+# GitHub: https://github.com/intellectronica/ruler
+
+# =============================================================================
+# TOP-LEVEL SETTINGS
+# =============================================================================
+
+# Default agents to run when --agents flag is not specified
+# Uses case-insensitive substring matching
+# Type: Array of strings
+# Default: [] (empty - all agents)
+default_agents = ["claude", "copilot", "aider", "cursor"]
+
+# Enable nested rule loading for monorepos and complex project structures
+# When enabled, loads rules from multiple .ruler/ directories in project hierarchy
+# Type: Boolean
+# Default: false
+nested = false
+
+# =============================================================================
+# GLOBAL MCP (Model Context Protocol) CONFIGURATION
+# =============================================================================
+
+[mcp]
+# Enable/disable MCP server propagation globally
+# Type: Boolean
+# Default: true
+enabled = true
+
+# Strategy for combining MCP configurations with existing agent configs
+# Options:
+#   - "merge": Combine with existing MCP servers (default)
+#   - "overwrite": Replace existing MCP configurations entirely
+# Type: String
+# Default: "merge"
+merge_strategy = "merge"
+
+# =============================================================================
+# MCP SERVER DEFINITIONS
+# =============================================================================
+# Two types of MCP servers are supported:
+#   1. Local/Stdio servers (command + args)
+#   2. Remote servers (url + optional headers)
+
+# --- Example: Local Stdio Server ---
+[mcp_servers.convex]
+command = "npx"
+args = ["-y", "convex@latest", "mcp", "start"]
+
+# --- Example: Local Server with Environment Variables ---
+[mcp_servers.database]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-postgres"]
+
+[mcp_servers.database.env]
+DATABASE_URL = "${DATABASE_URL}"
+PGPASSWORD = "${PGPASSWORD}"
+
+# --- Example: Remote Server with Authentication ---
+[mcp_servers.remote_api]
+url = "https://api.example.com/mcp"
+
+[mcp_servers.remote_api.headers]
+Authorization = "Bearer ${API_TOKEN}"
+X-Custom-Header = "custom-value"
+
+# --- Example: Filesystem Server ---
+[mcp_servers.filesystem]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed/directory"]
+
+# --- Example: GitHub Server ---
+[mcp_servers.github]
+command = "npx"
+args = ["-y", "@github/github-mcp-server"]
+
+[mcp_servers.github.env]
+GITHUB_TOKEN = "${GITHUB_TOKEN}"
+
+# =============================================================================
+# GITIGNORE CONFIGURATION
+# =============================================================================
+
+[gitignore]
+# Enable/disable automatic .gitignore updates
+# When enabled, generated agent configuration files are automatically added to .gitignore
+# Type: Boolean
+# Default: true
+enabled = true
+
+# =============================================================================
+# SKILLS CONFIGURATION
+# =============================================================================
+
+[skills]
+# Enable/disable specialized knowledge packages propagation
+# Applies to agents with native skills support
+# Type: Boolean
+# Default: true
+enabled = true
+
+# =============================================================================
+# AGENT-SPECIFIC CONFIGURATIONS
+# =============================================================================
+# Override settings for individual agents
+# See agents.example.toml for comprehensive agent configurations
+
+# --- Claude Configuration ---
+[agents.claude]
+enabled = true
+output_path = "CLAUDE.md"
+
+[agents.claude.mcp]
+enabled = true
+merge_strategy = "merge"
+
+# --- GitHub Copilot Configuration ---
+[agents.copilot]
+enabled = true
+output_path = ".github/copilot-instructions.md"
+
+# --- Cursor Configuration ---
+[agents.cursor]
+enabled = true
+output_path = ".cursor/rules/ruler_cursor_instructions.mdc"
+
+# --- Aider Configuration ---
+[agents.aider]
+enabled = true
+output_path_instructions = "AGENTS.md"
+output_path_config = ".aider.conf.yml"
+
+# --- Codex Configuration ---
+[agents.codex]
+enabled = true
+output_path = "AGENTS.md"
+output_path_config = ".codex/config.toml"
+
+# --- Windsurf Configuration ---
+[agents.windsurf]
+enabled = true
+output_path = ".windsurf/rules/ruler_windsurf_instructions.md"
+
+# --- Cline Configuration ---
+[agents.cline]
+enabled = true
+output_path = ".clinerules"
+
+# --- Disable an Agent Example ---
+[agents.zed]
+enabled = false

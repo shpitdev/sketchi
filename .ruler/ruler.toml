@@ -2,7 +2,7 @@
 # See https://okigu.com/ruler for documentation.
 
 # Default agents to run when --agents is not specified
-default_agents = ["agentsmd", "codex", "opencode"]
+default_agents = ["codex", "opencode"]
 
 # --- Global MCP Server Configuration ---
 [mcp]
@@ -12,23 +12,23 @@ enabled = true
 merge_strategy = "merge"
 
 # --- MCP Server Definitions ---
-[mcp_servers.context7]
-command = "npx"
-args = ["-y", "@upstash/context7-mcp"]
+# Disabled MCPs (commented out for now):
+# [mcp_servers.context7]
+# command = "npx"
+# args = ["-y", "@upstash/context7-mcp"]
 
+# [mcp_servers.shadcn]
+# command = "npx"
+# args = ["shadcn@latest", "mcp"]
 
+# [mcp_servers.next-devtools]
+# command = "npx"
+# args = ["-y", "next-devtools-mcp@latest"]
+
+# Active MCP servers:
 [mcp_servers.convex]
 command = "npx"
 args = ["-y", "convex@latest", "mcp", "start"]
-
-[mcp_servers.shadcn]
-command = "npx"
-args = ["shadcn@latest", "mcp"]
-
-
-[mcp_servers.next-devtools]
-command = "npx"
-args = ["-y", "next-devtools-mcp@latest"]
 
 # --- Global .gitignore Configuration ---
 [gitignore]

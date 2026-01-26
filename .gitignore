@@ -1,5 +1,7 @@
 # Dependencies
 node_modules
+.DS_Store
+packages/backend/test-results/
 .pnp
 .pnp.js
 
@@ -49,6 +51,7 @@ coverage
 .cache
 tmp
 temp
+.sisyphus/
 
 # START Ruler Generated Files
 /.codex/config.json
@@ -60,3 +63,9 @@ temp
 /opencode.json
 /opencode.json.bak
 # END Ruler Generated Files
+
+#override auto generated exclude
+!AGENTS.md
+/.claude/settings.json
+/.claude/settings.json.bak
+/.claude/settings.local.json

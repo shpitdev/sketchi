@@ -1,0 +1,231 @@
+# MCP Server Configuration Examples
+# This file contains examples of various MCP server configurations
+# Copy the servers you need to your ruler.toml file
+# Documentation: https://okigu.com/ruler
+
+# =============================================================================
+# LOCAL STDIO SERVERS
+# =============================================================================
+# These run locally using npx or another command
+
+# --- Convex Database ---
+[mcp_servers.convex]
+command = "npx"
+args = ["-y", "convex@latest", "mcp", "start"]
+
+# --- PostgreSQL Database ---
+[mcp_servers.postgres]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-postgres"]
+
+[mcp_servers.postgres.env]
+DATABASE_URL = "postgresql://user:password@localhost:5432/dbname"
+
+# --- SQLite Database ---
+[mcp_servers.sqlite]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-sqlite", "/path/to/database.db"]
+
+# --- Filesystem Access ---
+[mcp_servers.filesystem]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/project"]
+
+# --- GitHub ---
+[mcp_servers.github]
+command = "npx"
+args = ["-y", "@github/github-mcp-server"]
+
+[mcp_servers.github.env]
+GITHUB_TOKEN = "${GITHUB_TOKEN}"
+
+# --- Brave Search ---
+[mcp_servers.brave-search]
+command = "npx"
+args = ["-y", "@anthropic/mcp-server-brave-search"]
+
+[mcp_servers.brave-search.env]
+BRAVE_API_KEY = "${BRAVE_API_KEY}"
+
+# --- Google Search ---
+[mcp_servers.google-search]
+command = "npx"
+args = ["-y", "@anthropic/mcp-server-google-search"]
+
+[mcp_servers.google-search.env]
+GOOGLE_API_KEY = "${GOOGLE_API_KEY}"
+GOOGLE_CSE_ID = "${GOOGLE_CSE_ID}"
+
+# --- Puppeteer (Browser Automation) ---
+[mcp_servers.puppeteer]
+command = "npx"
+args = ["-y", "@anthropic/mcp-server-puppeteer"]
+
+# --- Sentry Error Tracking ---
+[mcp_servers.sentry]
+command = "npx"
+args = ["-y", "@anthropic/mcp-server-sentry"]
+
+[mcp_servers.sentry.env]
+SENTRY_AUTH_TOKEN = "${SENTRY_AUTH_TOKEN}"
+SENTRY_ORG = "your-org"
+SENTRY_PROJECT = "your-project"
+
+# --- Slack ---
+[mcp_servers.slack]
+command = "npx"
+args = ["-y", "@anthropic/mcp-server-slack"]
+
+[mcp_servers.slack.env]
+SLACK_BOT_TOKEN = "${SLACK_BOT_TOKEN}"
+SLACK_TEAM_ID = "${SLACK_TEAM_ID}"
+
+# --- Memory (Persistent Knowledge Graph) ---
+[mcp_servers.memory]
+command = "npx"
+args = ["-y", "@anthropic/mcp-server-memory"]
+
+# --- Fetch (HTTP Requests) ---
+[mcp_servers.fetch]
+command = "npx"
+args = ["-y", "@anthropic/mcp-server-fetch"]
+
+# --- Cloudflare ---
+[mcp_servers.cloudflare]
+command = "npx"
+args = ["-y", "@cloudflare/mcp-server-cloudflare"]
+
+[mcp_servers.cloudflare.env]
+CLOUDFLARE_API_TOKEN = "${CLOUDFLARE_API_TOKEN}"
+
+# --- Linear Issue Tracking ---
+[mcp_servers.linear]
+command = "npx"
+args = ["-y", "@linear/mcp-server"]
+
+[mcp_servers.linear.env]
+LINEAR_API_KEY = "${LINEAR_API_KEY}"
+
+# --- Notion ---
+[mcp_servers.notion]
+command = "npx"
+args = ["-y", "@notionhq/mcp-server"]
+
+[mcp_servers.notion.env]
+NOTION_API_KEY = "${NOTION_API_KEY}"
+
+# --- shadcn/ui Components ---
+[mcp_servers.shadcn]
+command = "npx"
+args = ["shadcn@latest", "mcp"]
+
+# --- Next.js DevTools ---
+[mcp_servers.next-devtools]
+command = "npx"
+args = ["-y", "next-devtools-mcp@latest"]
+
+# --- Context7 (Upstash) ---
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]
+
+# --- Supabase ---
+[mcp_servers.supabase]
+command = "npx"
+args = ["-y", "@supabase/mcp-server"]
+
+[mcp_servers.supabase.env]
+SUPABASE_URL = "${SUPABASE_URL}"
+SUPABASE_SERVICE_ROLE_KEY = "${SUPABASE_SERVICE_ROLE_KEY}"
+
+# --- Vercel ---
+[mcp_servers.vercel]
+command = "npx"
+args = ["-y", "@vercel/mcp-server"]
+
+[mcp_servers.vercel.env]
+VERCEL_TOKEN = "${VERCEL_TOKEN}"
+
+# --- AWS ---
+[mcp_servers.aws]
+command = "npx"
+args = ["-y", "@aws/mcp-server"]
+
+[mcp_servers.aws.env]
+AWS_ACCESS_KEY_ID = "${AWS_ACCESS_KEY_ID}"
+AWS_SECRET_ACCESS_KEY = "${AWS_SECRET_ACCESS_KEY}"
+AWS_REGION = "us-east-1"
+
+# --- Docker ---
+[mcp_servers.docker]
+command = "npx"
+args = ["-y", "@docker/mcp-server"]
+
+# --- Kubernetes ---
+[mcp_servers.kubernetes]
+command = "npx"
+args = ["-y", "@kubernetes/mcp-server"]
+
+[mcp_servers.kubernetes.env]
+KUBECONFIG = "${HOME}/.kube/config"
+
+# =============================================================================
+# REMOTE SERVERS
+# =============================================================================
+# These connect to remote endpoints via HTTP/HTTPS
+
+# --- Basic Remote Server ---
+[mcp_servers.remote_basic]
+url = "https://api.example.com/mcp"
+
+# --- Remote Server with Bearer Token ---
+[mcp_servers.remote_auth]
+url = "https://api.example.com/mcp"
+
+[mcp_servers.remote_auth.headers]
+Authorization = "Bearer ${API_TOKEN}"
+
+# --- Remote Server with Multiple Headers ---
+[mcp_servers.remote_custom]
+url = "https://api.example.com/mcp"
+
+[mcp_servers.remote_custom.headers]
+Authorization = "Bearer ${API_TOKEN}"
+X-API-Key = "${X_API_KEY}"
+X-Tenant-ID = "your-tenant-id"
+Content-Type = "application/json"
+
+# --- Remote Server with API Key Header ---
+[mcp_servers.remote_apikey]
+url = "https://api.example.com/mcp"
+
+[mcp_servers.remote_apikey.headers]
+X-API-Key = "${API_KEY}"
+
+# =============================================================================
+# CUSTOM LOCAL SERVERS
+# =============================================================================
+# Examples of custom scripts or binaries
+
+# --- Python Script ---
+[mcp_servers.custom_python]
+command = "python"
+args = ["-m", "my_mcp_server"]
+
+[mcp_servers.custom_python.env]
+PYTHONPATH = "${PWD}/scripts"
+
+# --- Node.js Script ---
+[mcp_servers.custom_node]
+command = "node"
+args = ["./scripts/mcp-server.js"]
+
+# --- Binary Executable ---
+[mcp_servers.custom_binary]
+command = "./bin/my-mcp-server"
+args = ["--port", "3000", "--verbose"]
+
+# --- Deno Script ---
+[mcp_servers.custom_deno]
+command = "deno"
+args = ["run", "--allow-all", "./scripts/mcp-server.ts"]
