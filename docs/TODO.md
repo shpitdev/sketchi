@@ -11,7 +11,7 @@
 - [x] **0.2 AI Generation Quality** - migrated to Convex test + artifacts; experiment removed
 - [ ] **0.3 Diagram Modification** - no artifacts on disk; decide format + add artifact or convert to Convex test + delete experiment
 - [x] **0.4 Auto-Layout** - migrated to deterministic layout module + Convex test + artifacts; experiment removed
-- [ ] **0.5 Arrow Optimization** - no artifacts on disk; move to deterministic module + add artifact or convert to Convex test + delete experiment
+- [x] **0.5 Arrow Optimization** - migrated to lib module + Convex test + artifacts
 - [x] **Optimization suite** - artifacts in `packages/backend/experiments/output/optimization_*`
 - [x] **Visual grading (experiment)** - artifacts in `packages/backend/experiments/output/visual-grading_*` with summary.json (legacy)
 - [x] **Visual grading (Convex test)** - migrated to `packages/backend/convex/visualGrading.test.ts`; artifacts in `packages/backend/test-results/visual-grading.*`
