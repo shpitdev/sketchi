@@ -102,7 +102,7 @@ async function runScenario(
     };
     layouted: {
       shapes: { id: string; x: number; y: number }[];
-      arrows: { elbowed: boolean }[];
+      arrows: { elbowed: boolean; points: [number, number][] }[];
     };
     elements: Record<string, unknown>[];
   }) => void
