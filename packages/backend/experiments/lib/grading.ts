@@ -173,7 +173,9 @@ export async function gradeByChartType(
   prompt: string,
   pngPath: string
 ): Promise<{ grading: Record<string, unknown>; tokens?: number }> {
-  const visionModel = process.env.VISION_MODEL_NAME ?? DEFAULT_VISION_MODEL;
+  const envModel = process.env.VISION_MODEL_NAME?.trim();
+  const visionModel =
+    envModel && envModel.length > 0 ? envModel : DEFAULT_VISION_MODEL;
   const pngBuffer = await readFile(pngPath);
   const base64Png = pngBuffer.toString("base64");
 

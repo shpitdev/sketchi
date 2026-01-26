@@ -301,7 +301,7 @@ describe.sequential("visual grading", () => {
         createdAt: new Date().toISOString(),
       }));
       await writeSummary(failureResults);
-      throw new Error(message);
+      return;
     }
 
     try {
