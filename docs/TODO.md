@@ -8,7 +8,7 @@
 
 ### Evidence + completion tracking
 - [x] **0.1 Share Link Round-Trip** - migrated to Convex + tested; experiment removed
-- [ ] **0.2 AI Generation Quality** - no artifacts on disk; decide schema + add artifact or convert to Convex test + delete experiment
+- [x] **0.2 AI Generation Quality** - migrated to Convex test + artifacts; experiment removed
 - [ ] **0.3 Diagram Modification** - no artifacts on disk; decide format + add artifact or convert to Convex test + delete experiment
 - [ ] **0.4 Auto-Layout** - no artifacts on disk; standardize arrow format + add artifact or convert to Convex test + delete experiment
 - [ ] **0.5 Arrow Optimization** - no artifacts on disk; move to deterministic module + add artifact or convert to Convex test + delete experiment
@@ -18,12 +18,12 @@
 - [x] **Browserbase export** - Convex test writes PNG + report in `packages/backend/test-results/` (output name derived from test name)
 
 ### Unify + simplify (delete, don’t rename)
-- [ ] Delete duplicate schema: keep ONE diagram schema and remove the other
+- [x] Delete duplicate schema: keep ONE diagram schema and remove the other
 - [ ] Delete unused prompt formats that target the removed schema
 - [ ] Two-stage pipeline: LLM **only** for domain analysis → `IntermediateFormat`; deterministic renderer **only** for diagram elements
 - [ ] Delete direct LLM-to-diagram element generation path
 - [ ] Standardize arrow format to LLM-friendly relation-only input + deterministic layout/edges
-- [ ] Define `IntermediateFormat` for Excalidraw agent:
+- [x] Define `IntermediateFormat` for Excalidraw agent:
   - nodes: id, label, kind, description?, metadata?
   - edges: fromId, toId, label?
   - graphOptions: diagramType + optional global edge/style overrides (apply to whole graph)
@@ -55,7 +55,7 @@
 
 ### Core Libraries
 - [ ] `lib/excalidraw-share.ts` - encrypt/upload/parse share links (LLM-friendly schema only)
-- [ ] `lib/json-repair.ts` - repair LLM JSON output
+- [x] `lib/json-repair.ts` - repair LLM JSON output
 - [ ] `lib/diagram-layout.ts` - deterministic layout + arrow routing (single source of truth)
 - [ ] `lib/diagram-simplify.ts` - simplify diagram for agent consumption
 - [ ] `lib/prompt-registry.ts` - consume `packages/backend/prompts/` exports

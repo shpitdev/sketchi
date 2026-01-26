@@ -20,8 +20,10 @@ export function createLoggedAction<Args extends object, Result>(
   const { formatArgs, formatResult } = options;
 
   return (definition: ActionDefinition<Args, Result>) => {
-    const handler =
-      definition.handler as (ctx: ActionCtx, args: Args) => Promise<Result>;
+    const handler = definition.handler as (
+      ctx: ActionCtx,
+      args: Args
+    ) => Promise<Result>;
 
     return action({
       ...definition,

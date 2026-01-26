@@ -31,9 +31,9 @@ function buildValidExcalidrawElements() {
     frameId: null,
     index: "a0",
     roundness: { type: 3 },
-    seed: 10101,
+    seed: 10_101,
     version: 1,
-    versionNonce: 30101,
+    versionNonce: 30_101,
     isDeleted: false,
     boundElements: [
       { id: "rect-1-text", type: "text" },
@@ -63,9 +63,9 @@ function buildValidExcalidrawElements() {
     frameId: null,
     index: "a1",
     roundness: null,
-    seed: 10102,
+    seed: 10_102,
     version: 1,
-    versionNonce: 30102,
+    versionNonce: 30_102,
     isDeleted: false,
     boundElements: null,
     updated,
@@ -101,9 +101,9 @@ function buildValidExcalidrawElements() {
     frameId: null,
     index: "a2",
     roundness: { type: 3 },
-    seed: 10103,
+    seed: 10_103,
     version: 1,
-    versionNonce: 30103,
+    versionNonce: 30_103,
     isDeleted: false,
     boundElements: [{ id: "arrow-1", type: "arrow" }],
     updated,
@@ -130,9 +130,9 @@ function buildValidExcalidrawElements() {
     frameId: null,
     index: "a3",
     roundness: { type: 2 },
-    seed: 10104,
+    seed: 10_104,
     version: 1,
-    versionNonce: 30104,
+    versionNonce: 30_104,
     isDeleted: false,
     boundElements: null,
     updated,
@@ -176,7 +176,9 @@ function assertValidExcalidrawElements(elements: unknown[]): void {
     expect(typeof base.roughness).toBe("number");
     expect(typeof base.opacity).toBe("number");
     expect(Array.isArray(base.groupIds)).toBe(true);
-    expect(base.frameId === null || typeof base.frameId === "string").toBe(true);
+    expect(base.frameId === null || typeof base.frameId === "string").toBe(
+      true
+    );
     expect(base.index === null || typeof base.index === "string").toBe(true);
     expect(typeof base.seed).toBe("number");
     expect(typeof base.version).toBe("number");
