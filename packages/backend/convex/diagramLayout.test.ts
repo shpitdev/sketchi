@@ -272,4 +272,41 @@ describe.sequential("diagramLayout", () => {
       }
     );
   });
+
+  test("architecture fan-out elbow", async () => {
+    const intermediate: IntermediateFormat = {
+      nodes: [
+        { id: "client", label: "Client", kind: "external" },
+        { id: "lb", label: "Load Balancer", kind: "process" },
+        { id: "api-1", label: "API Service 1", kind: "process" },
+        { id: "api-2", label: "API Service 2", kind: "process" },
+        { id: "db", label: "Database", kind: "database" },
+      ],
+      edges: [
+        { fromId: "client", toId: "lb" },
+        { fromId: "lb", toId: "api-1" },
+        { fromId: "lb", toId: "api-2" },
+        { fromId: "api-1", toId: "db" },
+        { fromId: "api-2", toId: "db" },
+      ],
+      graphOptions: {
+        diagramType: "architecture",
+        layout: { direction: "TB" },
+      },
+    };
+
+    await runScenario("Architecture fan-out elbow", intermediate, (result) => {
+      expect(result.layouted.arrows.length).toBeGreaterThanOrEqual(5);
+      expect(result.layouted.arrows.some((arrow) => arrow.elbowed)).toBe(true);
+
+      const hasHorizontalElbow = result.layouted.arrows.some((arrow) => {
+        if (!arrow.elbowed || arrow.points.length < 3) {
+          return false;
+        }
+        const mid = arrow.points[2];
+        return Boolean(mid) && mid[0] !== 0;
+      });
+      expect(hasHorizontalElbow).toBe(true);
+    });
+  });
 });
