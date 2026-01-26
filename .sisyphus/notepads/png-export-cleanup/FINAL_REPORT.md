@@ -188,8 +188,8 @@ Both share:
 ```bash
 # Set environment variables in Convex Dashboard
 # Settings → Environment Variables:
-BROWSERBASE_API_KEY=bb_live_HxzjbJ0I4UsT9KOiW05SpTrDF60
-BROWSERBASE_PROJECT_ID=6a5624bd-f239-435d-8a6f-ac3662f6d84c
+BROWSERBASE_API_KEY=<your-browserbase-api-key>
+BROWSERBASE_PROJECT_ID=<your-browserbase-project-id>
 
 # Deploy
 bun run dev  # Syncs to Convex
@@ -197,11 +197,11 @@ bun run dev  # Syncs to Convex
 
 ### 2. Test Browserbase Exporter
 ```bash
-# Run local test with credentials
-BROWSERBASE_API_KEY=xxx BROWSERBASE_PROJECT_ID=yyy \
-  bun run packages/backend/experiments/tests/test-browserbase-export.ts
+# Run Convex test with credentials
+cd packages/backend
+BROWSERBASE_API_KEY=xxx BROWSERBASE_PROJECT_ID=yyy bun run test
 
-# Expected: PNG generated at output/browserbase-test.png
+# Expected: PNG generated in test-results/ plus report JSON/MD
 ```
 
 ### 3. Test Convex Action
@@ -240,4 +240,3 @@ git push  # 10 commits ahead of origin
 ## Plan Status: ✅ 100% COMPLETE
 
 All 7 tasks finished. All acceptance criteria met. Ready for deployment.
-

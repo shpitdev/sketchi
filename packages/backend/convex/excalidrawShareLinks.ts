@@ -35,7 +35,12 @@ const parseShareLinkAction = createLoggedAction<
   ParseShareLinkArgs,
   { elements: unknown[]; appState: Record<string, unknown> }
 >("excalidrawShareLinks.parseShareLinkToElements", {
-  formatArgs: (args) => ({ url: args.url ?? "" }),
+  formatArgs: (args) => {
+    const url = args.url ?? "";
+    const [, fragment = ""] = url.split("#json=");
+    const shareId = fragment.split(",")[0] ?? "";
+    return { shareId };
+  },
   formatResult: (result) => ({
     elementsCount: result.elements.length,
     appStateKeys: Object.keys(result.appState ?? {}),

@@ -137,10 +137,10 @@ Node.js / Convex Action
 ## Environment Setup
 
 ### Already Configured
-```
+```bash
 packages/backend/.env.local:
-  BROWSERBASE_API_KEY=bb_live_HxzjbJ0I4UsT9KOiW05SpTrDF60
-  BROWSERBASE_PROJECT_ID=6a5624bd-f239-435d-8a6f-ac3662f6d84c
+  BROWSERBASE_API_KEY=<your-browserbase-api-key>
+  BROWSERBASE_PROJECT_ID=<your-browserbase-project-id>
 ```
 
 ### Dependencies Needed

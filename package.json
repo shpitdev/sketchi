@@ -32,7 +32,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.3.11",
     "@sketchi/config": "workspace:*",
-    "@types/node": "^25.0.10",
+    "@types/node": "^22.0.0",
     "turbo": "^2.6.3",
     "typescript": "catalog:",
     "ultracite": "7.0.12"

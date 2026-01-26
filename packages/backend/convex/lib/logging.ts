@@ -28,9 +28,12 @@ export function createLoggedAction<Args extends object, Result>(
       handler: async (ctx, args) => {
         const start = Date.now();
         const safeArgs = (args ?? {}) as Args;
+        const loggedArgs = formatArgs
+          ? formatArgs(safeArgs)
+          : { _redacted: true, keys: Object.keys(safeArgs) };
         console.log("[convex.action.start]", {
           name,
-          args: formatArgs ? formatArgs(safeArgs) : safeArgs,
+          args: loggedArgs,
         });
 
         try {
