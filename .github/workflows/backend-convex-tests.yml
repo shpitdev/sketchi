@@ -39,6 +39,11 @@ jobs:
         working-directory: packages/backend
         run: bun run test:report
 
+      - name: Set artifact name
+        if: always()
+        run: |
+          echo "BACKEND_ARTIFACT_NAME=test-results-packages-backend-convex-$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
+
       - name: Publish test summary
         if: always()
         run: |
@@ -51,6 +56,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: backend-test-results
+          name: ${{ env.BACKEND_ARTIFACT_NAME }}
           path: packages/backend/test-results
           if-no-files-found: warn

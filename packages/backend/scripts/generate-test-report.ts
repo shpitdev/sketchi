@@ -26,10 +26,13 @@ const diagramGeneratePath = join(
   outputDir,
   "diagram-generate-from-intermediate.json"
 );
+const visualGradingPath = join(outputDir, "visual-grading.json");
 const summaryPath = join(outputDir, "summary.md");
 
 function formatDuration(ms?: number) {
-  if (!ms || Number.isNaN(ms)) return "-";
+  if (!ms || Number.isNaN(ms)) {
+    return "-";
+  }
   return `${ms.toFixed(0)}ms`;
 }
 
@@ -78,6 +81,29 @@ const diagramGenerate = await readJsonIfExists<{
     createdAt: string;
   }>;
 }>(diagramGeneratePath);
+const visualGrading = await readJsonIfExists<{
+  createdAt: string;
+  passRate: string;
+  scenarios: Array<{
+    scenario: string;
+    status: string;
+    durationMs: number;
+    chartType: string;
+    minScore: number;
+    score?: number;
+    issues?: string[];
+    strengths?: string[];
+    analysisTokens?: number;
+    gradingTokens?: number;
+    renderDurationMs?: number;
+    intermediateFile?: string;
+    diagramFile?: string;
+    pngFile?: string;
+    gradingFile?: string;
+    error?: string;
+    createdAt: string;
+  }>;
+}>(visualGradingPath);
 
 await mkdir(outputDir, { recursive: true });
 
@@ -157,7 +183,42 @@ if (diagramGenerate) {
   lines.push("");
 }
 
-if (!(vitest || shareLinks || browserbase || diagramGenerate)) {
+if (visualGrading) {
+  lines.push("## Visual Grading");
+  lines.push("");
+  lines.push(`- Pass rate: ${visualGrading.passRate}`);
+  lines.push(`- Created: ${visualGrading.createdAt}`);
+  lines.push("");
+
+  for (const scenario of visualGrading.scenarios ?? []) {
+    lines.push(`- Scenario: ${scenario.scenario}`);
+    lines.push(`  - Status: ${scenario.status}`);
+    lines.push(`  - Chart type: ${scenario.chartType}`);
+    lines.push(
+      `  - Score: ${scenario.score ?? "n/a"} (min ${scenario.minScore})`
+    );
+    lines.push(`  - Duration: ${scenario.durationMs}ms`);
+    lines.push(`  - Render: ${scenario.renderDurationMs ?? "n/a"}ms`);
+    lines.push(`  - Analysis tokens: ${scenario.analysisTokens ?? "n/a"}`);
+    lines.push(`  - Grading tokens: ${scenario.gradingTokens ?? "n/a"}`);
+    lines.push(`  - PNG: ${scenario.pngFile ?? "n/a"}`);
+    lines.push(`  - Grading: ${scenario.gradingFile ?? "n/a"}`);
+    lines.push(
+      `  - Issues: ${scenario.issues?.length ? scenario.issues.join("; ") : "none"}`
+    );
+    lines.push(
+      `  - Strengths: ${scenario.strengths?.length ? scenario.strengths.join("; ") : "none"}`
+    );
+    lines.push(`  - Error: ${scenario.error ?? "none"}`);
+    lines.push(`  - Created: ${scenario.createdAt}`);
+  }
+
+  lines.push("");
+}
+
+if (
+  !(vitest || shareLinks || browserbase || diagramGenerate || visualGrading)
+) {
   lines.push("No test results found.");
   lines.push("");
 }
