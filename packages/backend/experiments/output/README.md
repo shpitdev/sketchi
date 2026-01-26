@@ -1,3 +1,4 @@
 # Output Experiment
 
-## This should have the generated images as well + visual llm grading results. we MUST have visual grading
+## Visual grading now writes to `packages/backend/test-results/` via Convex tests.
+## Legacy experiment runs remain under this folder for reference only.
