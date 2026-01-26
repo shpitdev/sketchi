@@ -51,6 +51,7 @@ coverage
 .cache
 tmp
 temp
+.sisyphus/
 
 # START Ruler Generated Files
 /.codex/config.json
