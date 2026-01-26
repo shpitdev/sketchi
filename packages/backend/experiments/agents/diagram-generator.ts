@@ -1,11 +1,8 @@
+import type { IntermediateFormat } from "../../lib/diagram-intermediate";
+import { convertIntermediateToDiagram } from "../../lib/diagram-renderer";
+import { type Diagram, DiagramSchema } from "../../lib/diagram-structure";
 import { generateObjectWithRetry, getModel } from "../lib/ai-utils";
 import { CHART_VISUAL_SPECS } from "../lib/prompts";
-import {
-  convertIntermediateToDiagram,
-  type Diagram,
-  DiagramSchema,
-  type IntermediateFormat,
-} from "../lib/schemas";
 
 const DEFAULT_CHART_PROMPT = `Generate a diagram:
 - Use rectangles for main components
@@ -36,7 +33,8 @@ export async function generateDiagram(
   const { timeoutMs = 60_000, maxRetries = 2 } = options;
   const start = Date.now();
 
-  const chartPrompt = getChartPrompt(intermediate.chartType);
+  const chartType = intermediate.graphOptions?.diagramType ?? "flowchart";
+  const chartPrompt = getChartPrompt(chartType);
 
   const systemPrompt = `You are a diagram element generator. Convert the provided components and relationships into precise diagram elements.
 
@@ -51,14 +49,14 @@ Rules:
 
   const userPrompt = `Convert this to diagram elements:
 
-Chart Type: ${intermediate.chartType}
-Layout: ${intermediate.layout?.direction || "TB"}
+Chart Type: ${chartType}
+Layout: ${intermediate.graphOptions?.layout?.direction || "TB"}
 
 Components:
-${intermediate.components.map((c) => `- ${c.id}: "${c.label}" (shape: ${c.shape || "rectangle"}, color: ${c.color || "none"})`).join("\n")}
+${intermediate.nodes.map((n) => `- ${n.id}: "${n.label}" (kind: ${n.kind || "default"})`).join("\n")}
 
 Relationships:
-${intermediate.relationships.map((r) => `- ${r.from} -> ${r.to}${r.label ? ` [${r.label}]` : ""}`).join("\n")}`;
+${intermediate.edges.map((r) => `- ${r.fromId} -> ${r.toId}${r.label ? ` [${r.label}]` : ""}`).join("\n")}`;
 
   const result = await generateObjectWithRetry({
     model: getModel(),

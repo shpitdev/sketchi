@@ -1,5 +1,9 @@
 import dagre from "dagre";
-import type { ArrowElement, Diagram, ShapeElement } from "./schemas";
+import type {
+  ArrowElement,
+  Diagram,
+  ShapeElement,
+} from "../../lib/diagram-structure";
 
 type ChartType =
   | "flowchart"
@@ -273,15 +277,30 @@ function createElbowPoints(
   ];
 }
 
+export interface LayoutOverrides {
+  direction?: LayoutConfig["rankdir"];
+  nodesep?: number;
+  ranksep?: number;
+  edgesep?: number;
+}
+
 export function applyLayout(
   diagram: Diagram,
-  chartType: ChartType
+  chartType: ChartType,
+  overrides?: LayoutOverrides
 ): LayoutedDiagram {
   if (chartType === "mindmap") {
     return applyRadialLayout(diagram);
   }
 
-  const config = LAYOUT_CONFIGS[chartType] ?? DEFAULT_CONFIG;
+  const baseConfig = LAYOUT_CONFIGS[chartType] ?? DEFAULT_CONFIG;
+  const config: LayoutConfig = {
+    ...baseConfig,
+    rankdir: overrides?.direction ?? baseConfig.rankdir,
+    nodesep: overrides?.nodesep ?? baseConfig.nodesep,
+    ranksep: overrides?.ranksep ?? baseConfig.ranksep,
+    edgesep: overrides?.edgesep ?? baseConfig.edgesep,
+  };
   const useElbow =
     chartType === "architecture" || chartType === "decision-tree";
 

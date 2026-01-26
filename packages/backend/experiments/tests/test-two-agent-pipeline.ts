@@ -42,9 +42,9 @@ async function testSimpleFlowchart(): Promise<TestResult> {
       durationMs: Date.now() - start,
       tokens: (analysis.tokens ?? 0) + (result.tokens ?? 0),
       metadata: {
-        chartType: analysis.intermediate.chartType,
-        components: analysis.intermediate.components.length,
-        relationships: analysis.intermediate.relationships.length,
+        chartType: analysis.intermediate.graphOptions?.diagramType ?? "unknown",
+        components: analysis.intermediate.nodes.length,
+        relationships: analysis.intermediate.edges.length,
         shapes: result.diagram.shapes.length,
         arrows: result.diagram.arrows.length,
         allArrowsValid,
@@ -81,8 +81,8 @@ async function testArchitectureDiagram(): Promise<TestResult> {
       durationMs: Date.now() - start,
       tokens: (analysis.tokens ?? 0) + (result.tokens ?? 0),
       metadata: {
-        chartType: analysis.intermediate.chartType,
-        components: analysis.intermediate.components.map((c) => c.label),
+        chartType: analysis.intermediate.graphOptions?.diagramType ?? "unknown",
+        components: analysis.intermediate.nodes.map((c) => c.label),
         shapes: result.diagram.shapes.length,
         arrows: result.diagram.arrows.length,
       },
@@ -106,10 +106,9 @@ async function testDirectConversion(): Promise<TestResult> {
     const directDiagram = generateDiagramDirect(analysis.intermediate);
 
     const matchesComponents =
-      directDiagram.shapes.length === analysis.intermediate.components.length;
+      directDiagram.shapes.length === analysis.intermediate.nodes.length;
     const matchesRelationships =
-      directDiagram.arrows.length ===
-      analysis.intermediate.relationships.length;
+      directDiagram.arrows.length === analysis.intermediate.edges.length;
 
     return {
       name: "Direct conversion (no second AI call)",
@@ -117,10 +116,10 @@ async function testDirectConversion(): Promise<TestResult> {
       durationMs: Date.now() - start,
       tokens: analysis.tokens,
       metadata: {
-        chartType: analysis.intermediate.chartType,
-        inputComponents: analysis.intermediate.components.length,
+        chartType: analysis.intermediate.graphOptions?.diagramType ?? "unknown",
+        inputComponents: analysis.intermediate.nodes.length,
         outputShapes: directDiagram.shapes.length,
-        inputRelationships: analysis.intermediate.relationships.length,
+        inputRelationships: analysis.intermediate.edges.length,
         outputArrows: directDiagram.arrows.length,
       },
     };
@@ -149,9 +148,11 @@ async function testComplexDecisionTree(): Promise<TestResult> {
     const analysis = await analyzeContent(prompt);
     const result = await generateDiagram(analysis.intermediate);
 
-    const hasDecisionPoints = analysis.intermediate.components.some(
-      (c) => c.shape === "diamond" || c.label.toLowerCase().includes("?")
-    );
+    const hasDecisionPoints = analysis.intermediate.nodes.some((c) => {
+      const label = c.label.toLowerCase();
+      const kind = c.kind?.toLowerCase() ?? "";
+      return label.includes("?") || kind.includes("decision");
+    });
     const hasMultiplePaths = result.diagram.arrows.length >= 5;
 
     return {
@@ -160,9 +161,9 @@ async function testComplexDecisionTree(): Promise<TestResult> {
       durationMs: Date.now() - start,
       tokens: (analysis.tokens ?? 0) + (result.tokens ?? 0),
       metadata: {
-        chartType: analysis.intermediate.chartType,
+        chartType: analysis.intermediate.graphOptions?.diagramType ?? "unknown",
         hasDecisionPoints,
-        components: analysis.intermediate.components.length,
+        components: analysis.intermediate.nodes.length,
         shapes: result.diagram.shapes.length,
         arrows: result.diagram.arrows.length,
       },
@@ -189,8 +190,9 @@ async function testMindMap(): Promise<TestResult> {
     const analysis = await analyzeContent(prompt);
     const result = await generateDiagram(analysis.intermediate);
 
-    const isMindmap = analysis.intermediate.chartType === "mindmap";
-    const hasCentralTopic = analysis.intermediate.components.some((c) =>
+    const isMindmap =
+      analysis.intermediate.graphOptions?.diagramType === "mindmap";
+    const hasCentralTopic = analysis.intermediate.nodes.some((c) =>
       c.label.toLowerCase().includes("machine learning")
     );
 
@@ -201,7 +203,7 @@ async function testMindMap(): Promise<TestResult> {
       durationMs: Date.now() - start,
       tokens: (analysis.tokens ?? 0) + (result.tokens ?? 0),
       metadata: {
-        chartType: analysis.intermediate.chartType,
+        chartType: analysis.intermediate.graphOptions?.diagramType ?? "unknown",
         isMindmap,
         hasCentralTopic,
         shapes: result.diagram.shapes.length,

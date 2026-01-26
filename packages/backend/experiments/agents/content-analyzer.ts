@@ -1,9 +1,9 @@
-import { generateObjectWithRetry, getModel } from "../lib/ai-utils";
-import { CHART_TYPE_NAMES } from "../lib/prompts";
 import {
   type IntermediateFormat,
   IntermediateFormatSchema,
-} from "../lib/schemas";
+} from "../../lib/diagram-intermediate";
+import { generateObjectWithRetry, getModel } from "../lib/ai-utils";
+import { CHART_TYPE_NAMES } from "../lib/prompts";
 
 const chartTypeList = Object.entries(CHART_TYPE_NAMES)
   .filter(([key]) => key !== "auto")
@@ -11,15 +11,22 @@ const chartTypeList = Object.entries(CHART_TYPE_NAMES)
   .join("\n");
 
 const CONTENT_ANALYZER_PROMPT = `You are a diagram structure analyzer. Your job is to:
-1. Identify the best chart type for the user's request
-2. Extract all components/nodes that should appear in the diagram
-3. Identify relationships/connections between components
+1. Identify the best diagramType for the user's request
+2. Extract all nodes that should appear in the diagram
+3. Identify relationships/connections between nodes
 4. Suggest layout direction based on content flow
+
+Output JSON that matches this shape:
+{
+  "nodes": [{ "id": "...", "label": "...", "kind": "...", "description": "...", "metadata": { ... } }],
+  "edges": [{ "fromId": "...", "toId": "...", "label": "..." }],
+  "graphOptions": { "diagramType": "...", "layout": { "direction": "TB|LR|BT|RL" } }
+}
 
 Available chart types:
 ${chartTypeList}
 
-Chart type selection guidelines:
+Diagram type selection guidelines:
 - flowchart: processes, workflows, decision trees, algorithms
 - architecture: system components, services, infrastructure
 - orgchart: hierarchies, reporting structures

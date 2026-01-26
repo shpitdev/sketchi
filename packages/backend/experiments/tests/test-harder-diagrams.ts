@@ -31,9 +31,10 @@ async function testSequenceDiagram(): Promise<TestResult> {
     const analysis = await analyzeContent(prompt);
     const diagram = generateDiagramDirect(analysis.intermediate);
 
-    const isSequence = analysis.intermediate.chartType === "sequence";
-    const hasParticipants = analysis.intermediate.components.length >= 4;
-    const hasMessages = analysis.intermediate.relationships.length >= 6;
+    const isSequence =
+      analysis.intermediate.graphOptions?.diagramType === "sequence";
+    const hasParticipants = analysis.intermediate.nodes.length >= 4;
+    const hasMessages = analysis.intermediate.edges.length >= 6;
 
     return {
       name: "Sequence diagram - auth flow",
@@ -41,10 +42,10 @@ async function testSequenceDiagram(): Promise<TestResult> {
       durationMs: Date.now() - start,
       tokens: analysis.tokens,
       metadata: {
-        chartType: analysis.intermediate.chartType,
+        chartType: analysis.intermediate.graphOptions?.diagramType,
         isSequence,
-        participants: analysis.intermediate.components.map((c) => c.label),
-        messageCount: analysis.intermediate.relationships.length,
+        participants: analysis.intermediate.nodes.map((c) => c.label),
+        messageCount: analysis.intermediate.edges.length,
         shapes: diagram.shapes.length,
         arrows: diagram.arrows.length,
       },
@@ -78,28 +79,28 @@ Each main branch should have its sub-topics listed.`;
     const analysis = await analyzeContent(prompt);
     const diagram = generateDiagramDirect(analysis.intermediate);
 
-    const isMindmap = analysis.intermediate.chartType === "mindmap";
-    const hasCentralTopic = analysis.intermediate.components.some(
+    const isMindmap =
+      analysis.intermediate.graphOptions?.diagramType === "mindmap";
+    const hasCentralTopic = analysis.intermediate.nodes.some(
       (c) =>
         c.label.toLowerCase().includes("software") ||
         c.label.toLowerCase().includes("development")
     );
-    const hasMainBranches = analysis.intermediate.components.length >= 6;
-    const hasSubTopics = analysis.intermediate.components.length >= 15;
+    const hasMainBranches = analysis.intermediate.nodes.length >= 6;
+    const hasSubTopics = analysis.intermediate.nodes.length >= 15;
 
     return {
       name: "Mind map - software development (radial)",
-      success:
-        hasMainBranches && analysis.intermediate.relationships.length >= 5,
+      success: hasMainBranches && analysis.intermediate.edges.length >= 5,
       durationMs: Date.now() - start,
       tokens: analysis.tokens,
       metadata: {
-        chartType: analysis.intermediate.chartType,
+        chartType: analysis.intermediate.graphOptions?.diagramType,
         isMindmap,
         hasCentralTopic,
         hasSubTopics,
-        componentCount: analysis.intermediate.components.length,
-        relationshipCount: analysis.intermediate.relationships.length,
+        componentCount: analysis.intermediate.nodes.length,
+        relationshipCount: analysis.intermediate.edges.length,
         shapes: diagram.shapes.length,
         arrows: diagram.arrows.length,
       },
@@ -145,10 +146,10 @@ Transitions:
     const analysis = await analyzeContent(prompt);
     const diagram = generateDiagramDirect(analysis.intermediate);
 
-    const isState = analysis.intermediate.chartType === "state";
-    const hasAllStates = analysis.intermediate.components.length >= 8;
-    const hasTransitions = analysis.intermediate.relationships.length >= 8;
-    const hasLabels = analysis.intermediate.relationships.some((r) => r.label);
+    const isState = analysis.intermediate.graphOptions?.diagramType === "state";
+    const hasAllStates = analysis.intermediate.nodes.length >= 8;
+    const hasTransitions = analysis.intermediate.edges.length >= 8;
+    const hasLabels = analysis.intermediate.edges.some((r) => r.label);
 
     return {
       name: "State machine - order lifecycle",
@@ -156,10 +157,10 @@ Transitions:
       durationMs: Date.now() - start,
       tokens: analysis.tokens,
       metadata: {
-        chartType: analysis.intermediate.chartType,
+        chartType: analysis.intermediate.graphOptions?.diagramType,
         isState,
-        stateCount: analysis.intermediate.components.length,
-        transitionCount: analysis.intermediate.relationships.length,
+        stateCount: analysis.intermediate.nodes.length,
+        transitionCount: analysis.intermediate.edges.length,
         hasLabels,
         shapes: diagram.shapes.length,
         arrows: diagram.arrows.length,
@@ -218,10 +219,9 @@ Show connections between all related components.`;
     const analysis = await analyzeContent(prompt);
     const diagram = generateDiagramDirect(analysis.intermediate);
 
-    const hasLargeComponentCount =
-      analysis.intermediate.components.length >= 20;
-    const hasManyConnections = analysis.intermediate.relationships.length >= 15;
-    const hasLayers = analysis.intermediate.components.some(
+    const hasLargeComponentCount = analysis.intermediate.nodes.length >= 20;
+    const hasManyConnections = analysis.intermediate.edges.length >= 15;
+    const hasLayers = analysis.intermediate.nodes.some(
       (c) =>
         c.group ||
         c.label.toLowerCase().includes("layer") ||
@@ -234,13 +234,13 @@ Show connections between all related components.`;
       durationMs: Date.now() - start,
       tokens: analysis.tokens,
       metadata: {
-        chartType: analysis.intermediate.chartType,
-        componentCount: analysis.intermediate.components.length,
-        relationshipCount: analysis.intermediate.relationships.length,
+        chartType: analysis.intermediate.graphOptions?.diagramType,
+        componentCount: analysis.intermediate.nodes.length,
+        relationshipCount: analysis.intermediate.edges.length,
         hasLayers,
         shapes: diagram.shapes.length,
         arrows: diagram.arrows.length,
-        components: analysis.intermediate.components.map((c) => c.label),
+        components: analysis.intermediate.nodes.map((c) => c.label),
       },
     };
   } catch (err) {
@@ -270,26 +270,27 @@ Main categories (bones):
     const analysis = await analyzeContent(prompt);
     const diagram = generateDiagramDirect(analysis.intermediate);
 
-    const isFishbone = analysis.intermediate.chartType === "fishbone";
-    const hasMainProblem = analysis.intermediate.components.some(
+    const isFishbone =
+      analysis.intermediate.graphOptions?.diagramType === "fishbone";
+    const hasMainProblem = analysis.intermediate.nodes.some(
       (c) =>
         c.label.toLowerCase().includes("slow") ||
         c.label.toLowerCase().includes("performance") ||
         c.label.toLowerCase().includes("load")
     );
-    const hasCategories = analysis.intermediate.components.length >= 6;
+    const hasCategories = analysis.intermediate.nodes.length >= 6;
 
     return {
       name: "Fishbone diagram - performance analysis",
-      success: hasCategories && analysis.intermediate.relationships.length >= 5,
+      success: hasCategories && analysis.intermediate.edges.length >= 5,
       durationMs: Date.now() - start,
       tokens: analysis.tokens,
       metadata: {
-        chartType: analysis.intermediate.chartType,
+        chartType: analysis.intermediate.graphOptions?.diagramType,
         isFishbone,
         hasMainProblem,
-        componentCount: analysis.intermediate.components.length,
-        relationshipCount: analysis.intermediate.relationships.length,
+        componentCount: analysis.intermediate.nodes.length,
+        relationshipCount: analysis.intermediate.edges.length,
         shapes: diagram.shapes.length,
         arrows: diagram.arrows.length,
       },
@@ -336,9 +337,9 @@ Threats:
     const analysis = await analyzeContent(prompt);
     const diagram = generateDiagramDirect(analysis.intermediate);
 
-    const isSWOT = analysis.intermediate.chartType === "swot";
-    const hasFourQuadrants = analysis.intermediate.components.length >= 4;
-    const hasItems = analysis.intermediate.components.length >= 10;
+    const isSWOT = analysis.intermediate.graphOptions?.diagramType === "swot";
+    const hasFourQuadrants = analysis.intermediate.nodes.length >= 4;
+    const hasItems = analysis.intermediate.nodes.length >= 10;
 
     return {
       name: "SWOT analysis - AI startup",
@@ -346,9 +347,9 @@ Threats:
       durationMs: Date.now() - start,
       tokens: analysis.tokens,
       metadata: {
-        chartType: analysis.intermediate.chartType,
+        chartType: analysis.intermediate.graphOptions?.diagramType,
         isSWOT,
-        componentCount: analysis.intermediate.components.length,
+        componentCount: analysis.intermediate.nodes.length,
         hasItems,
         shapes: diagram.shapes.length,
         arrows: diagram.arrows.length,
