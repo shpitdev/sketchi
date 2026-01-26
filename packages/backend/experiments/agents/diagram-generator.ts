@@ -1,5 +1,5 @@
 import type { IntermediateFormat } from "../../lib/diagram-intermediate";
-import { convertIntermediateToDiagram } from "../../lib/diagram-renderer";
+import { convertIntermediateToDiagram } from "../../lib/diagram-layout";
 import { type Diagram, DiagramSchema } from "../../lib/diagram-structure";
 import { generateObjectWithRetry, getModel } from "../lib/ai-utils";
 import { CHART_VISUAL_SPECS } from "../lib/prompts";

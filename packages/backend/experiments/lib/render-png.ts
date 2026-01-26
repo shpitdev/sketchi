@@ -1,9 +1,9 @@
 import Browserbase from "@browserbasehq/sdk";
 import { type Browser, chromium, type Page } from "playwright";
 import { chromium as chromiumCore } from "playwright-core";
+import { applyLayout } from "../../lib/diagram-layout";
 import type { Diagram } from "../../lib/diagram-structure";
 import { convertLayoutedToExcalidraw } from "../../lib/excalidraw-elements";
-import { applyLayout } from "./layout";
 
 const RENDER_TIMEOUT_MS = 60_000;
 

@@ -30,6 +30,9 @@ export type DiagramType = z.infer<typeof DiagramTypeSchema>;
 export const LayoutDirectionSchema = z.enum(["TB", "LR", "BT", "RL"]);
 export type LayoutDirection = z.infer<typeof LayoutDirectionSchema>;
 
+export const EdgeRoutingSchema = z.enum(["straight", "elbow"]);
+export type EdgeRouting = z.infer<typeof EdgeRoutingSchema>;
+
 export const NodeSchema = z
   .object({
     id: z.string().describe("Unique node identifier"),
@@ -88,6 +91,7 @@ export const GraphLayoutSchema = z
     nodesep: z.number().optional().describe("Node separation"),
     ranksep: z.number().optional().describe("Rank separation"),
     edgesep: z.number().optional().describe("Edge separation"),
+    edgeRouting: EdgeRoutingSchema.optional().describe("Edge routing style"),
   })
   .strict();
 export type GraphLayout = z.infer<typeof GraphLayoutSchema>;
