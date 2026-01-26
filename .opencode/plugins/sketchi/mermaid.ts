@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { tool } from "@opencode-ai/plugin";
-import { JSDOM } from "jsdom";
 import createDOMPurify from "dompurify";
+import { JSDOM } from "jsdom";
 import sharp from "sharp";
 
 const DEFAULT_THEME = "default";
@@ -10,19 +10,21 @@ let domInitialized = false;
 let mermaidInstance: typeof import("mermaid").default | null = null;
 
 function ensureDom(): void {
-  if (domInitialized) return;
+  if (domInitialized) {
+    return;
+  }
 
   const dom = new JSDOM("<!doctype html><html><body></body></html>");
   (globalThis as unknown as { window: Window }).window =
     dom.window as unknown as Window;
-  (globalThis as unknown as { document: Document }).document =
-    dom.window.document as unknown as Document;
-  (globalThis as unknown as { navigator: Navigator }).navigator =
-    dom.window.navigator as unknown as Navigator;
+  (globalThis as unknown as { document: Document }).document = dom.window
+    .document as unknown as Document;
+  (globalThis as unknown as { navigator: Navigator }).navigator = dom.window
+    .navigator as unknown as Navigator;
   (globalThis as unknown as { HTMLElement: typeof HTMLElement }).HTMLElement =
     dom.window.HTMLElement as unknown as typeof HTMLElement;
-  (globalThis as unknown as { SVGElement: typeof SVGElement }).SVGElement =
-    dom.window.SVGElement as unknown as typeof SVGElement;
+  (globalThis as unknown as { SVGElement: typeof SVGElement }).SVGElement = dom
+    .window.SVGElement as unknown as typeof SVGElement;
   const dompurifyInstance = createDOMPurify(dom.window as unknown as Window);
   Object.assign(createDOMPurify, dompurifyInstance);
   (globalThis as unknown as { DOMPurify: typeof createDOMPurify }).DOMPurify =
@@ -34,7 +36,9 @@ function ensureDom(): void {
 }
 
 async function getMermaid(): Promise<typeof import("mermaid").default> {
-  if (mermaidInstance) return mermaidInstance;
+  if (mermaidInstance) {
+    return mermaidInstance;
+  }
   ensureDom();
   const { default: mermaid } = await import("mermaid");
   mermaidInstance = mermaid;
@@ -81,10 +85,7 @@ async function renderSvg(
   return { svg };
 }
 
-async function svgToPng(
-  svg: string,
-  backgroundColor?: string
-): Promise<Buffer> {
+function svgToPng(svg: string, backgroundColor?: string): Promise<Buffer> {
   let pipeline = sharp(Buffer.from(svg));
 
   if (backgroundColor) {
@@ -94,7 +95,7 @@ async function svgToPng(
   return pipeline.png().toBuffer();
 }
 
-export const MermaidPlugin = async () => {
+export const MermaidPlugin = () => {
   return {
     tool: {
       mermaid_validate: tool({
