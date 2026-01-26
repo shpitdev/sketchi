@@ -83,20 +83,12 @@ export interface RenderOptions {
   background?: boolean;
 }
 
-export async function renderDiagramToPng(
-  diagram: Diagram,
-  options: RenderOptions = {}
+async function exportElementsToPng(
+  elements: Record<string, unknown>[],
+  options: RenderOptions
 ): Promise<RenderResult> {
-  const {
-    chartType = "flowchart",
-    scale = 2,
-    padding = 20,
-    background = true,
-  } = options;
+  const { scale = 2, padding = 20, background = true } = options;
   const start = Date.now();
-
-  const layouted = applyLayout(diagram, chartType);
-  const elements = convertLayoutedToExcalidraw(layouted);
 
   const browser = await getBrowser();
   const context = await browser.newContext();
@@ -129,6 +121,25 @@ export async function renderDiagramToPng(
   } finally {
     await context.close();
   }
+}
+
+export async function renderDiagramToPng(
+  diagram: Diagram,
+  options: RenderOptions = {}
+): Promise<RenderResult> {
+  const { chartType = "flowchart" } = options;
+
+  const layouted = applyLayout(diagram, chartType);
+  const elements = convertLayoutedToExcalidraw(layouted);
+
+  return exportElementsToPng(elements, options);
+}
+
+export async function renderElementsToPng(
+  elements: Record<string, unknown>[],
+  options: RenderOptions = {}
+): Promise<RenderResult> {
+  return exportElementsToPng(elements, options);
 }
 
 export async function renderDiagramToPngRemote(

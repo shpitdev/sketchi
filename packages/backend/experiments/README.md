@@ -47,11 +47,11 @@ Mermaid pre-flight
 - notes: arrow routing controlled by diagram type + `graphOptions.layout.edgeRouting`
 
 ### 0.5 Arrow optimization
-- experiment files: `packages/backend/experiments/arrow-optimization.ts`
-- test files: none
-- convex migration: no
-- evidence: none found on disk
-- unknowns/risks: assumes arrows are in Excalidraw element format, not the internal diagram format
+- experiment files: none (migrated)
+- test files: `packages/backend/convex/arrowOptimization.test.ts`
+- convex migration: yes (`packages/backend/lib/diagram-layout.ts`)
+- evidence: `packages/backend/test-results/arrow-optimization.json` + `packages/backend/test-results/arrow-optimization.md` + `packages/backend/test-results/arrow-optimization-*-before.png` + `packages/backend/test-results/arrow-optimization-*-after.png`
+- unknowns/risks: relies on deterministic layout positions (dagre) for routing decisions
 
 ## Experiment test suites
 
