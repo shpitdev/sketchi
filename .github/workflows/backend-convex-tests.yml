@@ -26,6 +26,10 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Install Playwright browsers
+        working-directory: packages/backend
+        run: bunx playwright install --with-deps
+
       - name: Run Convex tests
         working-directory: packages/backend
         run: bun run test
