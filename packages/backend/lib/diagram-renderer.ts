@@ -1,16 +1,12 @@
 import type {
-  LayoutedDiagram,
-  LayoutOverrides,
-} from "../experiments/lib/layout";
-import { applyLayout } from "../experiments/lib/layout";
-import {
-  DEFAULT_DIAGRAM_TYPE,
-  type GraphStyle,
-  type IntermediateEdge,
-  type IntermediateFormat,
-  type IntermediateNode,
+  GraphStyle,
+  IntermediateEdge,
+  IntermediateFormat,
+  IntermediateNode,
 } from "./diagram-intermediate";
-import type { Diagram, ShapeElement, ShapeType } from "./diagram-structure";
+import type { LayoutedDiagram } from "./diagram-layout";
+import { layoutIntermediateDiagram } from "./diagram-layout";
+import type { Diagram } from "./diagram-structure";
 import type { ExcalidrawStyleOverrides } from "./excalidraw-elements";
 import { convertLayoutedToExcalidraw } from "./excalidraw-elements";
 
@@ -23,75 +19,6 @@ export interface RenderedDiagramResult {
     edgeCount: number;
     shapeCount: number;
     arrowCount: number;
-  };
-}
-
-function normalizeShapeOverride(value: unknown): ShapeType | undefined {
-  if (value === "rectangle" || value === "ellipse" || value === "diamond") {
-    return value;
-  }
-  return undefined;
-}
-
-function resolveShapeType(node: IntermediateNode): ShapeType {
-  const override = normalizeShapeOverride(node.metadata?.shape);
-  if (override) {
-    return override;
-  }
-
-  const kind = node.kind?.toLowerCase() ?? "";
-  if (kind.includes("decision")) {
-    return "diamond";
-  }
-  if (
-    kind.includes("start") ||
-    kind.includes("end") ||
-    kind.includes("actor") ||
-    kind.includes("external")
-  ) {
-    return "ellipse";
-  }
-  return "rectangle";
-}
-
-function resolveNodeColor(node: IntermediateNode): string | undefined {
-  const color = node.metadata?.color ?? node.metadata?.backgroundColor;
-  return typeof color === "string" ? color : undefined;
-}
-
-export function convertIntermediateToDiagram(
-  intermediate: IntermediateFormat
-): Diagram {
-  const shapes: ShapeElement[] = intermediate.nodes.map((node) => ({
-    type: resolveShapeType(node),
-    id: node.id,
-    label: { text: node.label },
-    backgroundColor: resolveNodeColor(node),
-  }));
-
-  const arrows = intermediate.edges.map((edge, index) => ({
-    id: edge.id ?? `edge_${index}`,
-    fromId: edge.fromId,
-    toId: edge.toId,
-    label: edge.label ? { text: edge.label } : undefined,
-  }));
-
-  return { shapes, arrows };
-}
-
-function toLayoutOverrides(
-  intermediate: IntermediateFormat
-): LayoutOverrides | undefined {
-  const layout = intermediate.graphOptions?.layout;
-  if (!layout) {
-    return undefined;
-  }
-
-  return {
-    direction: layout.direction,
-    nodesep: layout.nodesep,
-    ranksep: layout.ranksep,
-    edgesep: layout.edgesep,
   };
 }
 
@@ -115,14 +42,7 @@ function toExcalidrawStyleOverrides(
 export function renderIntermediateDiagram(
   intermediate: IntermediateFormat
 ): RenderedDiagramResult {
-  const diagram = convertIntermediateToDiagram(intermediate);
-  const diagramType =
-    intermediate.graphOptions?.diagramType ?? DEFAULT_DIAGRAM_TYPE;
-  const layouted = applyLayout(
-    diagram,
-    diagramType,
-    toLayoutOverrides(intermediate)
-  );
+  const { diagram, layouted } = layoutIntermediateDiagram(intermediate);
   const elements = convertLayoutedToExcalidraw(
     layouted,
     toExcalidrawStyleOverrides(intermediate.graphOptions?.style)

@@ -26,6 +26,7 @@ const diagramGeneratePath = join(
   outputDir,
   "diagram-generate-from-intermediate.json"
 );
+const diagramLayoutPath = join(outputDir, "diagram-layout.json");
 const visualGradingPath = join(outputDir, "visual-grading.json");
 const summaryPath = join(outputDir, "summary.md");
 
@@ -81,6 +82,24 @@ const diagramGenerate = await readJsonIfExists<{
     createdAt: string;
   }>;
 }>(diagramGeneratePath);
+const diagramLayout = await readJsonIfExists<{
+  scenarios: Array<{
+    scenario: string;
+    status: string;
+    durationMs: number;
+    diagramType?: string;
+    layoutDirection?: string;
+    edgeRouting?: string;
+    nodeCount?: number;
+    edgeCount?: number;
+    shapeCount?: number;
+    arrowCount?: number;
+    elementCount?: number;
+    artifactFile?: string;
+    error?: string;
+    createdAt: string;
+  }>;
+}>(diagramLayoutPath);
 const visualGrading = await readJsonIfExists<{
   createdAt: string;
   passRate: string;
@@ -183,6 +202,30 @@ if (diagramGenerate) {
   lines.push("");
 }
 
+if (diagramLayout) {
+  lines.push("## Diagram Layout");
+  lines.push("");
+
+  for (const scenario of diagramLayout.scenarios ?? []) {
+    lines.push(`- Scenario: ${scenario.scenario}`);
+    lines.push(`  - Status: ${scenario.status}`);
+    lines.push(`  - Duration: ${scenario.durationMs}ms`);
+    lines.push(`  - Diagram type: ${scenario.diagramType ?? "n/a"}`);
+    lines.push(`  - Layout direction: ${scenario.layoutDirection ?? "n/a"}`);
+    lines.push(`  - Edge routing: ${scenario.edgeRouting ?? "n/a"}`);
+    lines.push(`  - Nodes: ${scenario.nodeCount ?? "n/a"}`);
+    lines.push(`  - Edges: ${scenario.edgeCount ?? "n/a"}`);
+    lines.push(`  - Shapes: ${scenario.shapeCount ?? "n/a"}`);
+    lines.push(`  - Arrows: ${scenario.arrowCount ?? "n/a"}`);
+    lines.push(`  - Elements: ${scenario.elementCount ?? "n/a"}`);
+    lines.push(`  - Artifact: ${scenario.artifactFile ?? "n/a"}`);
+    lines.push(`  - Error: ${scenario.error ?? "none"}`);
+    lines.push(`  - Created: ${scenario.createdAt}`);
+  }
+
+  lines.push("");
+}
+
 if (visualGrading) {
   lines.push("## Visual Grading");
   lines.push("");
@@ -217,7 +260,14 @@ if (visualGrading) {
 }
 
 if (
-  !(vitest || shareLinks || browserbase || diagramGenerate || visualGrading)
+  !(
+    vitest ||
+    shareLinks ||
+    browserbase ||
+    diagramGenerate ||
+    diagramLayout ||
+    visualGrading
+  )
 ) {
   lines.push("No test results found.");
   lines.push("");

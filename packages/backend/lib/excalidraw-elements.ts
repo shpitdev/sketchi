@@ -1,4 +1,4 @@
-import type { LayoutedDiagram } from "../experiments/lib/layout";
+import type { LayoutedDiagram } from "./diagram-layout";
 
 export interface ExcalidrawStyleOverrides {
   shapeFill?: string;

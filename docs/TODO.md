@@ -10,7 +10,7 @@
 - [x] **0.1 Share Link Round-Trip** - migrated to Convex + tested; experiment removed
 - [x] **0.2 AI Generation Quality** - migrated to Convex test + artifacts; experiment removed
 - [ ] **0.3 Diagram Modification** - no artifacts on disk; decide format + add artifact or convert to Convex test + delete experiment
-- [ ] **0.4 Auto-Layout** - no artifacts on disk; standardize arrow format + add artifact or convert to Convex test + delete experiment
+- [x] **0.4 Auto-Layout** - migrated to deterministic layout module + Convex test + artifacts; experiment removed
 - [ ] **0.5 Arrow Optimization** - no artifacts on disk; move to deterministic module + add artifact or convert to Convex test + delete experiment
 - [x] **Optimization suite** - artifacts in `packages/backend/experiments/output/optimization_*`
 - [x] **Visual grading (experiment)** - artifacts in `packages/backend/experiments/output/visual-grading_*` with summary.json (legacy)
@@ -56,7 +56,7 @@
 ### Core Libraries
 - [ ] `lib/excalidraw-share.ts` - encrypt/upload/parse share links (LLM-friendly schema only)
 - [x] `lib/json-repair.ts` - repair LLM JSON output
-- [ ] `lib/diagram-layout.ts` - deterministic layout + arrow routing (single source of truth)
+- [x] `lib/diagram-layout*.ts` - deterministic layout + arrow routing (single source of truth)
 - [ ] `lib/diagram-simplify.ts` - simplify diagram for agent consumption
 - [ ] `lib/prompt-registry.ts` - consume `packages/backend/prompts/` exports
 

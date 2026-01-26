@@ -41,11 +41,20 @@ interface ScenarioSummary {
 }
 
 async function readJsonIfExists<T>(path: string): Promise<T | null> {
+  let raw: string;
   try {
-    const raw = await readFile(path, "utf-8");
+    raw = await readFile(path, "utf-8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+
+  try {
     return JSON.parse(raw) as T;
-  } catch {
-    return null;
+  } catch (error) {
+    throw error;
   }
 }
 
@@ -321,7 +330,9 @@ describe.sequential("diagramGenerateFromIntermediate", () => {
         expect(result.stats.nodeCount).toBeGreaterThanOrEqual(10);
         expect(result.stats.edgeCount).toBeGreaterThanOrEqual(12);
 
-        const shapeIds = new Set(result.diagram.shapes.map((shape) => shape.id));
+        const shapeIds = new Set(
+          result.diagram.shapes.map((shape) => shape.id)
+        );
         for (const arrow of result.diagram.arrows) {
           expect(shapeIds.has(arrow.fromId)).toBe(true);
           expect(shapeIds.has(arrow.toId)).toBe(true);

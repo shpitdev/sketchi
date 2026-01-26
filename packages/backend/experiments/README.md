@@ -8,6 +8,7 @@ Convex usage today
 
 Evidence on disk (artifacts)
 - optimization runs: `packages/backend/experiments/output/optimization_2026-01-24_17-00-50`, `packages/backend/experiments/output/optimization_2026-01-24_17-30-14`, `packages/backend/experiments/output/optimization_2026-01-25_06-29-42`, `packages/backend/experiments/output/optimization_2026-01-25_06-53-18`
+- diagram layout (Convex): `packages/backend/test-results/diagram-layout.json` + `packages/backend/test-results/diagram-layout.md`
 - visual grading (Convex): `packages/backend/test-results/visual-grading.json` + `packages/backend/test-results/visual-grading.md` + `packages/backend/test-results/visual-grading-*.png`
 - visual grading (legacy runs): `packages/backend/experiments/output/visual-grading_2026-01-25_02-15-21`, `packages/backend/experiments/output/visual-grading_2026-01-25_06-33-38`, `packages/backend/experiments/output/visual-grading_2026-01-25_06-53-19` (includes `summary.json` with 3/3 pass)
 - Browserbase export evidence: Convex test writes PNG + report in `packages/backend/test-results/` (file name derived from test name)
@@ -39,11 +40,11 @@ Mermaid pre-flight
 - unknowns/risks: modification format (add/remove/modify) is not used anywhere else; no tests/artifacts
 
 ### 0.4 Auto-layout (dagre)
-- experiment files: `packages/backend/experiments/auto-layout.ts`
-- test files: none
-- convex migration: no
-- evidence: none found on disk
-- unknowns/risks: uses `start/end` arrow bindings, not `fromId/toId` used by `packages/backend/lib/diagram-structure.ts`
+- experiment files: none (migrated)
+- test files: `packages/backend/convex/diagramLayout.test.ts`
+- convex migration: yes (`packages/backend/lib/diagram-layout.ts`)
+- evidence: `packages/backend/test-results/diagram-layout.json` + `.md`
+- notes: arrow routing controlled by diagram type + `graphOptions.layout.edgeRouting`
 
 ### 0.5 Arrow optimization
 - experiment files: `packages/backend/experiments/arrow-optimization.ts`
@@ -74,7 +75,7 @@ Mermaid pre-flight
 - unknowns/risks: two generation paths (`generateDiagram` vs `generateDiagramDirect`) could confuse migration
 
 ### PNG render/export (local + Browserbase)
-- experiment files: `packages/backend/experiments/lib/render-png.ts`, `packages/backend/experiments/lib/layout.ts`, `packages/backend/lib/diagram-structure.ts`
+- experiment files: `packages/backend/experiments/lib/render-png.ts`, `packages/backend/lib/diagram-layout.ts`, `packages/backend/lib/diagram-structure.ts`
 - test files: `packages/backend/convex/export.test.ts`
 - convex migration: yes (`renderDiagramToPngRemote` used by `packages/backend/convex/export.ts`)
 - evidence: `packages/backend/test-results/browserbase-export.json` + PNG output
