@@ -133,14 +133,36 @@ function normalizeIntermediate(
 function ensureEdgeNodes(intermediate: IntermediateFormat): IntermediateFormat {
   const nodeIds = new Set(intermediate.nodes.map((node) => node.id));
   const missingIds = new Set<string>();
+  const blankEdges: Array<{
+    index: number;
+    fromId: string;
+    toId: string;
+  }> = [];
 
-  for (const edge of intermediate.edges) {
-    if (!nodeIds.has(edge.fromId)) {
-      missingIds.add(edge.fromId);
+  for (const [index, edge] of intermediate.edges.entries()) {
+    const fromId = edge.fromId ?? "";
+    const toId = edge.toId ?? "";
+    if (fromId.trim().length === 0 || toId.trim().length === 0) {
+      blankEdges.push({ index, fromId, toId });
+      continue;
     }
-    if (!nodeIds.has(edge.toId)) {
-      missingIds.add(edge.toId);
+    if (!nodeIds.has(fromId)) {
+      missingIds.add(fromId);
     }
+    if (!nodeIds.has(toId)) {
+      missingIds.add(toId);
+    }
+  }
+
+  if (blankEdges.length > 0) {
+    throw new Error(
+      `Invalid edge ids in ensureEdgeNodes: ${blankEdges
+        .map(
+          (edge) =>
+            `edges[${edge.index}] fromId=${JSON.stringify(edge.fromId)} toId=${JSON.stringify(edge.toId)}`
+        )
+        .join(", ")}`
+    );
   }
 
   if (missingIds.size === 0) {
