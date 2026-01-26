@@ -5,4 +5,6 @@ export const modules = {
   "./excalidrawShareLinks.ts": () => import("./excalidrawShareLinks"),
   "./healthCheck.ts": () => import("./healthCheck"),
   "./export.ts": () => import("./export"),
+  "./diagramGenerateFromIntermediate.ts": () =>
+    import("./diagramGenerateFromIntermediate"),
 };

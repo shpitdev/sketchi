@@ -1,9 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { convexTest } from "convex-test";
 import { config as loadEnv } from "dotenv";
 import sharp from "sharp";
-import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
@@ -47,9 +47,7 @@ async function writeReport(report: Record<string, unknown>) {
   );
 }
 
-test(
-  "browserbase exportDiagramPng returns valid PNG",
-  async () => {
+test("browserbase exportDiagramPng returns valid PNG", async () => {
   const apiKey = process.env.BROWSERBASE_API_KEY;
   const projectId = process.env.BROWSERBASE_PROJECT_ID;
 
@@ -137,6 +135,4 @@ test(
     await writeReport(report);
     throw error;
   }
-  },
-  120_000
-);
+}, 120_000);

@@ -11,18 +11,17 @@
  */
 
 import {
+  type IntermediateFormat,
+  IntermediateFormatSchema,
+} from "../../lib/diagram-intermediate";
+import { convertIntermediateToDiagram } from "../../lib/diagram-renderer";
+import { type Diagram, DiagramSchema } from "../../lib/diagram-structure";
+import {
   generateObjectWithRetry,
   getModel,
   printTestResults,
   type TestResult,
 } from "../lib/ai-utils";
-import {
-  convertIntermediateToDiagram,
-  type Diagram,
-  DiagramSchema,
-  type IntermediateFormat,
-  IntermediateFormatSchema,
-} from "../lib/schemas";
 
 const AI_GATEWAY_API_KEY = process.env.AI_GATEWAY_API_KEY;
 if (!AI_GATEWAY_API_KEY) {
@@ -137,10 +136,11 @@ Identify all components and their relationships.`,
     });
 
     const format = result.object as IntermediateFormat;
-    const hasComponents = format.components.length >= 4;
-    const hasRelationships = format.relationships.length >= 3;
+    const hasComponents = format.nodes.length >= 4;
+    const hasRelationships = format.edges.length >= 3;
     const hasValidChartType =
-      typeof format.chartType === "string" && format.chartType.length > 0;
+      typeof format.graphOptions?.diagramType === "string" &&
+      format.graphOptions.diagramType.length > 0;
 
     return {
       name: "IntermediateFormat - system analysis",
@@ -148,10 +148,10 @@ Identify all components and their relationships.`,
       durationMs: Date.now() - start,
       tokens: result.usage?.totalTokens,
       metadata: {
-        chartType: format.chartType,
-        componentCount: format.components.length,
-        relationshipCount: format.relationships.length,
-        components: format.components.map((c) => c.label),
+        chartType: format.graphOptions?.diagramType ?? "unknown",
+        componentCount: format.nodes.length,
+        relationshipCount: format.edges.length,
+        components: format.nodes.map((c) => c.label),
       },
     };
   } catch (err) {
@@ -181,24 +181,26 @@ This should be a flowchart with decision points.`,
     });
 
     const format = result.object as IntermediateFormat;
-    const isFlowchart = format.chartType === "flowchart";
-    const hasDecision = format.components.some(
-      (c) =>
-        c.label.toLowerCase().includes("valid") ||
-        c.label.toLowerCase().includes("check") ||
-        c.shape === "diamond"
-    );
+    const isFlowchart = format.graphOptions?.diagramType === "flowchart";
+    const hasDecision = format.nodes.some((n) => {
+      const label = n.label.toLowerCase();
+      const kind = n.kind?.toLowerCase() ?? "";
+      return (
+        label.includes("valid") ||
+        label.includes("check") ||
+        kind.includes("decision")
+      );
+    });
 
     return {
       name: "IntermediateFormat - flowchart with decision",
-      success:
-        format.components.length >= 4 && format.relationships.length >= 3,
+      success: format.nodes.length >= 4 && format.edges.length >= 3,
       durationMs: Date.now() - start,
       tokens: result.usage?.totalTokens,
       metadata: {
-        chartType: format.chartType,
-        componentCount: format.components.length,
-        relationshipCount: format.relationships.length,
+        chartType: format.graphOptions?.diagramType ?? "unknown",
+        componentCount: format.nodes.length,
+        relationshipCount: format.edges.length,
         isFlowchart,
         hasDecision,
       },
@@ -228,9 +230,8 @@ async function testConversionPipeline(): Promise<TestResult> {
     const intermediate = analyzeResult.object as IntermediateFormat;
     const diagram = convertIntermediateToDiagram(intermediate);
 
-    const hasShapes = diagram.shapes.length === intermediate.components.length;
-    const hasArrows =
-      diagram.arrows.length === intermediate.relationships.length;
+    const hasShapes = diagram.shapes.length === intermediate.nodes.length;
+    const hasArrows = diagram.arrows.length === intermediate.edges.length;
     const allShapesHaveLabels = diagram.shapes.every((s) => s.label?.text);
 
     return {
@@ -239,7 +240,7 @@ async function testConversionPipeline(): Promise<TestResult> {
       durationMs: Date.now() - start,
       tokens: analyzeResult.usage?.totalTokens,
       metadata: {
-        intermediateComponents: intermediate.components.length,
+        intermediateComponents: intermediate.nodes.length,
         diagramShapes: diagram.shapes.length,
         diagramArrows: diagram.arrows.length,
       },

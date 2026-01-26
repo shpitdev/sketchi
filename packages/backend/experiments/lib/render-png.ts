@@ -1,8 +1,9 @@
 import Browserbase from "@browserbasehq/sdk";
 import { type Browser, chromium, type Page } from "playwright";
 import { chromium as chromiumCore } from "playwright-core";
-import { applyLayout, type LayoutedDiagram } from "./layout";
-import type { Diagram } from "./schemas";
+import type { Diagram } from "../../lib/diagram-structure";
+import { convertLayoutedToExcalidraw } from "../../lib/excalidraw-elements";
+import { applyLayout } from "./layout";
 
 const RENDER_TIMEOUT_MS = 60_000;
 
@@ -46,10 +47,6 @@ const EXPORT_HARNESS_HTML = `
 
 let browser: Browser | null = null;
 
-function generateSeed(): number {
-  return Math.floor(Math.random() * 2_000_000_000);
-}
-
 async function getBrowser(): Promise<Browser> {
   if (!browser) {
     browser = await chromium.launch({ headless: true });
@@ -71,192 +68,6 @@ export async function closeBrowser(): Promise<void> {
     await browser.close();
     browser = null;
   }
-}
-
-function convertLayoutedToExcalidraw(
-  layouted: LayoutedDiagram
-): Record<string, unknown>[] {
-  const elements: Record<string, unknown>[] = [];
-  let idx = 0;
-
-  for (const shape of layouted.shapes) {
-    const base = {
-      id: shape.id,
-      type: shape.type,
-      x: shape.x,
-      y: shape.y,
-      width: shape.width,
-      height: shape.height,
-      angle: 0,
-      strokeColor: "#1971c2",
-      backgroundColor: shape.backgroundColor ?? "#a5d8ff",
-      fillStyle: "solid",
-      strokeWidth: 2,
-      strokeStyle: "solid",
-      roughness: 1,
-      opacity: 100,
-      groupIds: [],
-      frameId: null,
-      index: `a${idx++}`,
-      roundness: { type: 3 },
-      seed: generateSeed(),
-      version: 1,
-      versionNonce: generateSeed(),
-      isDeleted: false,
-      boundElements: null as { id: string; type: string }[] | null,
-      updated: Date.now(),
-      link: null,
-      locked: false,
-    };
-
-    if (shape.label?.text) {
-      base.boundElements = [{ id: `${shape.id}_text`, type: "text" }];
-      elements.push(base);
-
-      elements.push({
-        id: `${shape.id}_text`,
-        type: "text",
-        x: shape.x + 10,
-        y: shape.y + shape.height / 2 - 10,
-        width: shape.width - 20,
-        height: 20,
-        angle: 0,
-        strokeColor: "#1e1e1e",
-        backgroundColor: "transparent",
-        fillStyle: "solid",
-        strokeWidth: 2,
-        strokeStyle: "solid",
-        roughness: 1,
-        opacity: 100,
-        groupIds: [],
-        frameId: null,
-        index: `a${idx++}`,
-        roundness: null,
-        seed: generateSeed(),
-        version: 1,
-        versionNonce: generateSeed(),
-        isDeleted: false,
-        boundElements: null,
-        updated: Date.now(),
-        link: null,
-        locked: false,
-        text: shape.label.text,
-        fontSize: 16,
-        fontFamily: 5,
-        textAlign: "center",
-        verticalAlign: "middle",
-        containerId: shape.id,
-        originalText: shape.label.text,
-        autoResize: true,
-        lineHeight: 1.25,
-      });
-    } else {
-      elements.push(base);
-    }
-  }
-
-  for (const arrow of layouted.arrows) {
-    const textId = `${arrow.id}_label`;
-    const hasLabel = arrow.label?.text;
-
-    const arrowElement: Record<string, unknown> = {
-      id: arrow.id,
-      type: "arrow",
-      x: arrow.x,
-      y: arrow.y,
-      width: arrow.width,
-      height: arrow.height,
-      angle: 0,
-      strokeColor: "#1971c2",
-      backgroundColor: "transparent",
-      fillStyle: "solid",
-      strokeWidth: 2,
-      strokeStyle: "solid",
-      roughness: 1,
-      opacity: 100,
-      groupIds: [],
-      frameId: null,
-      index: `a${idx++}`,
-      roundness: arrow.elbowed ? null : { type: 2 },
-      seed: generateSeed(),
-      version: 1,
-      versionNonce: generateSeed(),
-      isDeleted: false,
-      boundElements: hasLabel ? [{ type: "text", id: textId }] : null,
-      updated: Date.now(),
-      link: null,
-      locked: false,
-      points: arrow.points,
-      elbowed: arrow.elbowed,
-      startBinding: {
-        elementId: arrow.fromId,
-        focus: 0,
-        gap: 5,
-        fixedPoint: null,
-      },
-      endBinding: {
-        elementId: arrow.toId,
-        focus: 0,
-        gap: 5,
-        fixedPoint: null,
-      },
-      startArrowhead: null,
-      endArrowhead: "arrow",
-    };
-
-    if (arrow.elbowed) {
-      arrowElement.fixedSegments = [];
-      arrowElement.startIsSpecial = false;
-      arrowElement.endIsSpecial = false;
-    }
-
-    elements.push(arrowElement);
-
-    if (hasLabel) {
-      const midX = arrow.x + arrow.width / 2;
-      const midY = arrow.y + arrow.height / 2;
-
-      elements.push({
-        id: textId,
-        type: "text",
-        x: midX - 30,
-        y: midY - 10,
-        width: 60,
-        height: 20,
-        angle: 0,
-        strokeColor: "#1e1e1e",
-        backgroundColor: "transparent",
-        fillStyle: "solid",
-        strokeWidth: 2,
-        strokeStyle: "solid",
-        roughness: 1,
-        opacity: 100,
-        groupIds: [],
-        frameId: null,
-        index: `a${idx++}`,
-        roundness: null,
-        seed: generateSeed(),
-        version: 1,
-        versionNonce: generateSeed(),
-        isDeleted: false,
-        boundElements: null,
-        updated: Date.now(),
-        link: null,
-        locked: false,
-        text: arrow.label?.text ?? "",
-        fontSize: 14,
-        fontFamily: 5,
-        textAlign: "center",
-        verticalAlign: "middle",
-        containerId: arrow.id,
-        originalText: arrow.label?.text ?? "",
-        autoResize: true,
-        lineHeight: 1.25,
-      });
-    }
-  }
-
-  return elements;
 }
 
 export interface RenderResult {
@@ -284,12 +95,12 @@ export async function renderDiagramToPng(
   } = options;
   const start = Date.now();
 
-    const layouted = applyLayout(diagram, chartType);
-    const elements = convertLayoutedToExcalidraw(layouted);
+  const layouted = applyLayout(diagram, chartType);
+  const elements = convertLayoutedToExcalidraw(layouted);
 
-    const browser = await getBrowser();
-    const context = await browser.newContext();
-    const page = await context.newPage();
+  const browser = await getBrowser();
+  const context = await browser.newContext();
+  const page = await context.newPage();
 
   try {
     await loadExportHarness(page);

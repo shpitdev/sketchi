@@ -2,7 +2,7 @@
 // Run: AI_GATEWAY_API_KEY=xxx bun run packages/backend/experiments/diagram-modification.ts
 
 import { gateway, generateText } from "ai";
-import { repairJsonClosure } from "./json-repair";
+import { repairJsonClosure } from "../lib/json-repair";
 
 const AI_GATEWAY_API_KEY = process.env.AI_GATEWAY_API_KEY;
 if (!AI_GATEWAY_API_KEY) {

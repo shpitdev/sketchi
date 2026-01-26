@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 interface VitestSummary {
@@ -22,6 +22,10 @@ const outputDir = join(process.cwd(), "test-results");
 const vitestPath = join(outputDir, "vitest.json");
 const shareLinksPath = join(outputDir, "excalidraw-share-links.json");
 const browserbasePath = join(outputDir, "browserbase-export.json");
+const diagramGeneratePath = join(
+  outputDir,
+  "diagram-generate-from-intermediate.json"
+);
 const summaryPath = join(outputDir, "summary.md");
 
 function formatDuration(ms?: number) {
@@ -59,6 +63,21 @@ const browserbase = await readJsonIfExists<{
   error?: string;
   createdAt: string;
 }>(browserbasePath);
+const diagramGenerate = await readJsonIfExists<{
+  scenarios: Array<{
+    scenario: string;
+    status: string;
+    durationMs: number;
+    artifactFile?: string;
+    nodeCount?: number;
+    edgeCount?: number;
+    shapeCount?: number;
+    arrowCount?: number;
+    elementCount?: number;
+    error?: string;
+    createdAt: string;
+  }>;
+}>(diagramGeneratePath);
 
 await mkdir(outputDir, { recursive: true });
 
@@ -117,7 +136,28 @@ if (browserbase) {
   lines.push("");
 }
 
-if (!vitest && !shareLinks && !browserbase) {
+if (diagramGenerate) {
+  lines.push("## Diagram Generate From Intermediate");
+  lines.push("");
+
+  for (const scenario of diagramGenerate.scenarios ?? []) {
+    lines.push(`- Scenario: ${scenario.scenario}`);
+    lines.push(`  - Status: ${scenario.status}`);
+    lines.push(`  - Duration: ${scenario.durationMs}ms`);
+    lines.push(`  - Nodes: ${scenario.nodeCount ?? "n/a"}`);
+    lines.push(`  - Edges: ${scenario.edgeCount ?? "n/a"}`);
+    lines.push(`  - Shapes: ${scenario.shapeCount ?? "n/a"}`);
+    lines.push(`  - Arrows: ${scenario.arrowCount ?? "n/a"}`);
+    lines.push(`  - Elements: ${scenario.elementCount ?? "n/a"}`);
+    lines.push(`  - Artifact: ${scenario.artifactFile ?? "n/a"}`);
+    lines.push(`  - Error: ${scenario.error ?? "none"}`);
+    lines.push(`  - Created: ${scenario.createdAt}`);
+  }
+
+  lines.push("");
+}
+
+if (!(vitest || shareLinks || browserbase || diagramGenerate)) {
   lines.push("No test results found.");
   lines.push("");
 }
