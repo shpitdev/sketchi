@@ -27,6 +27,7 @@ const diagramGeneratePath = join(
   "diagram-generate-from-intermediate.json"
 );
 const diagramLayoutPath = join(outputDir, "diagram-layout.json");
+const arrowOptimizationPath = join(outputDir, "arrow-optimization.json");
 const visualGradingPath = join(outputDir, "visual-grading.json");
 const summaryPath = join(outputDir, "summary.md");
 
@@ -100,6 +101,20 @@ const diagramLayout = await readJsonIfExists<{
     createdAt: string;
   }>;
 }>(diagramLayoutPath);
+const arrowOptimization = await readJsonIfExists<{
+  scenarios: Array<{
+    scenario: string;
+    status: string;
+    durationMs: number;
+    startEdge?: string;
+    endEdge?: string;
+    beforePng?: string;
+    afterPng?: string;
+    artifactFile?: string;
+    error?: string;
+    createdAt: string;
+  }>;
+}>(arrowOptimizationPath);
 const visualGrading = await readJsonIfExists<{
   createdAt: string;
   passRate: string;
@@ -218,6 +233,26 @@ if (diagramLayout) {
     lines.push(`  - Shapes: ${scenario.shapeCount ?? "n/a"}`);
     lines.push(`  - Arrows: ${scenario.arrowCount ?? "n/a"}`);
     lines.push(`  - Elements: ${scenario.elementCount ?? "n/a"}`);
+    lines.push(`  - Artifact: ${scenario.artifactFile ?? "n/a"}`);
+    lines.push(`  - Error: ${scenario.error ?? "none"}`);
+    lines.push(`  - Created: ${scenario.createdAt}`);
+  }
+
+  lines.push("");
+}
+
+if (arrowOptimization) {
+  lines.push("## Arrow Optimization");
+  lines.push("");
+
+  for (const scenario of arrowOptimization.scenarios ?? []) {
+    lines.push(`- Scenario: ${scenario.scenario}`);
+    lines.push(`  - Status: ${scenario.status}`);
+    lines.push(`  - Duration: ${scenario.durationMs}ms`);
+    lines.push(`  - Start edge: ${scenario.startEdge ?? "n/a"}`);
+    lines.push(`  - End edge: ${scenario.endEdge ?? "n/a"}`);
+    lines.push(`  - Before PNG: ${scenario.beforePng ?? "n/a"}`);
+    lines.push(`  - After PNG: ${scenario.afterPng ?? "n/a"}`);
     lines.push(`  - Artifact: ${scenario.artifactFile ?? "n/a"}`);
     lines.push(`  - Error: ${scenario.error ?? "none"}`);
     lines.push(`  - Created: ${scenario.createdAt}`);

@@ -82,58 +82,76 @@ const LAYOUT_CONFIGS: Record<string, LayoutConfig> = {
   },
 };
 
-function getEdgeConnectionPoint(
+type Edge = "left" | "right" | "top" | "bottom";
+
+function determineEdges(
+  startShape: PositionedShape,
+  endShape: PositionedShape
+): { startEdge: Edge; endEdge: Edge } {
+  const startCenter = {
+    x: startShape.x + startShape.width / 2,
+    y: startShape.y + startShape.height / 2,
+  };
+  const endCenter = {
+    x: endShape.x + endShape.width / 2,
+    y: endShape.y + endShape.height / 2,
+  };
+
+  const dx = startCenter.x - endCenter.x;
+  const dy = startCenter.y - endCenter.y;
+
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx > 0
+      ? { startEdge: "left", endEdge: "right" }
+      : { startEdge: "right", endEdge: "left" };
+  }
+  return dy > 0
+    ? { startEdge: "top", endEdge: "bottom" }
+    : { startEdge: "bottom", endEdge: "top" };
+}
+
+function getEdgeCenter(
   shape: PositionedShape,
-  targetShape: PositionedShape,
-  isStart: boolean,
-  rankdir: LayoutDirection
+  edge: Edge
 ): { x: number; y: number } {
-  const cx = shape.x + shape.width / 2;
-  const cy = shape.y + shape.height / 2;
-  const tcx = targetShape.x + targetShape.width / 2;
-  const tcy = targetShape.y + targetShape.height / 2;
-
-  if (rankdir === "TB" || rankdir === "BT") {
-    if (isStart) {
-      return tcy > cy
-        ? { x: cx, y: shape.y + shape.height }
-        : { x: cx, y: shape.y };
-    }
-    return tcy < cy
-      ? { x: cx, y: shape.y }
-      : { x: cx, y: shape.y + shape.height };
+  switch (edge) {
+    case "left":
+      return { x: shape.x, y: shape.y + shape.height / 2 };
+    case "right":
+      return { x: shape.x + shape.width, y: shape.y + shape.height / 2 };
+    case "top":
+      return { x: shape.x + shape.width / 2, y: shape.y };
+    case "bottom":
+      return { x: shape.x + shape.width / 2, y: shape.y + shape.height };
+    default:
+      return { x: shape.x + shape.width, y: shape.y + shape.height / 2 };
   }
-
-  if (isStart) {
-    return tcx > cx
-      ? { x: shape.x + shape.width, y: cy }
-      : { x: shape.x, y: cy };
-  }
-  return tcx < cx ? { x: shape.x, y: cy } : { x: shape.x + shape.width, y: cy };
 }
 
 function createElbowPoints(
   start: { x: number; y: number },
   end: { x: number; y: number },
-  rankdir: LayoutDirection
+  horizontalFirst: boolean
 ): [number, number][] {
-  const midX = (start.x + end.x) / 2;
-  const midY = (start.y + end.y) / 2;
+  const deltaX = end.x - start.x;
+  const deltaY = end.y - start.y;
+  const midX = deltaX / 2;
+  const midY = deltaY / 2;
 
-  if (rankdir === "TB" || rankdir === "BT") {
+  if (horizontalFirst) {
     return [
       [0, 0],
-      [0, midY - start.y],
-      [end.x - start.x, midY - start.y],
-      [end.x - start.x, end.y - start.y],
+      [midX, 0],
+      [midX, deltaY],
+      [deltaX, deltaY],
     ];
   }
 
   return [
     [0, 0],
-    [midX - start.x, 0],
-    [midX - start.x, end.y - start.y],
-    [end.x - start.x, end.y - start.y],
+    [0, midY],
+    [deltaX, midY],
+    [deltaX, deltaY],
   ];
 }
 
@@ -225,21 +243,13 @@ export function applyLayout(
       };
     }
 
-    const startPoint = getEdgeConnectionPoint(
-      startShape,
-      endShape,
-      true,
-      config.rankdir
-    );
-    const endPoint = getEdgeConnectionPoint(
-      endShape,
-      startShape,
-      false,
-      config.rankdir
-    );
+    const { startEdge, endEdge } = determineEdges(startShape, endShape);
+    const startPoint = getEdgeCenter(startShape, startEdge);
+    const endPoint = getEdgeCenter(endShape, endEdge);
 
+    const horizontalFirst = startEdge === "left" || startEdge === "right";
     const points = useElbow
-      ? createElbowPoints(startPoint, endPoint, config.rankdir)
+      ? createElbowPoints(startPoint, endPoint, horizontalFirst)
       : ([
           [0, 0],
           [endPoint.x - startPoint.x, endPoint.y - startPoint.y],

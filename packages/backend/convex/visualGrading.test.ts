@@ -127,7 +127,40 @@ function normalizeIntermediate(
     },
   };
 
-  return { ...intermediate, graphOptions };
+  return ensureEdgeNodes({ ...intermediate, graphOptions });
+}
+
+function ensureEdgeNodes(intermediate: IntermediateFormat): IntermediateFormat {
+  const nodeIds = new Set(intermediate.nodes.map((node) => node.id));
+  const missingIds = new Set<string>();
+
+  for (const edge of intermediate.edges) {
+    if (!nodeIds.has(edge.fromId)) {
+      missingIds.add(edge.fromId);
+    }
+    if (!nodeIds.has(edge.toId)) {
+      missingIds.add(edge.toId);
+    }
+  }
+
+  if (missingIds.size === 0) {
+    return intermediate;
+  }
+
+  const addedNodes = [...missingIds]
+    .filter((id) => id.trim().length > 0)
+    .map((id) => ({
+      id,
+      label: id
+        .replace(/[_-]+/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase()),
+      kind: "process" as const,
+    }));
+
+  return {
+    ...intermediate,
+    nodes: [...intermediate.nodes, ...addedNodes],
+  };
 }
 
 function readScore(grading: Record<string, unknown>): number | undefined {
