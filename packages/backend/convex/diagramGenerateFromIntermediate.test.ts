@@ -3,6 +3,7 @@
  *
  * - Simple flowchart IntermediateFormat renders to diagram + Excalidraw elements
  * - Architecture IntermediateFormat honors graphOptions style overrides
+ * - Harder architecture IntermediateFormat renders without missing refs
  */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -266,6 +267,73 @@ describe.sequential("diagramGenerateFromIntermediate", () => {
 
         expect(shapeFillApplied).toBe(true);
         expect(arrowStrokeApplied).toBe(true);
+      }
+    );
+  });
+
+  test("harder architecture scenario", async () => {
+    const intermediate: IntermediateFormat = {
+      nodes: [
+        { id: "clients", label: "Clients", kind: "actor" },
+        { id: "cdn", label: "CDN", kind: "external" },
+        { id: "lb", label: "Load Balancer", kind: "process" },
+        { id: "api", label: "API Gateway", kind: "process" },
+        { id: "auth", label: "Auth Service", kind: "service" },
+        { id: "catalog", label: "Catalog Service", kind: "service" },
+        { id: "orders", label: "Order Service", kind: "service" },
+        { id: "payments", label: "Payment Service", kind: "service" },
+        { id: "db", label: "Postgres", kind: "database" },
+        { id: "cache", label: "Redis", kind: "cache" },
+        { id: "queue", label: "Event Queue", kind: "infrastructure" },
+      ],
+      edges: [
+        { fromId: "clients", toId: "cdn" },
+        { fromId: "cdn", toId: "lb" },
+        { fromId: "lb", toId: "api" },
+        { fromId: "api", toId: "auth" },
+        { fromId: "api", toId: "catalog" },
+        { fromId: "api", toId: "orders" },
+        { fromId: "orders", toId: "payments" },
+        { fromId: "auth", toId: "db" },
+        { fromId: "catalog", toId: "db" },
+        { fromId: "orders", toId: "db" },
+        { fromId: "api", toId: "cache" },
+        { fromId: "orders", toId: "queue" },
+      ],
+      graphOptions: {
+        diagramType: "architecture",
+        layout: { direction: "TB", nodesep: 140, ranksep: 180 },
+        style: {
+          shapeFill: "#f1f3f5",
+          shapeStroke: "#343a40",
+          arrowStroke: "#495057",
+          textColor: "#212529",
+          fontSize: 14,
+          fontFamily: 5,
+        },
+      },
+    };
+
+    await runScenario(
+      "Harder architecture IntermediateFormat",
+      intermediate,
+      (result) => {
+        expect(result.stats.nodeCount).toBeGreaterThanOrEqual(10);
+        expect(result.stats.edgeCount).toBeGreaterThanOrEqual(12);
+
+        const shapeIds = new Set(result.diagram.shapes.map((shape) => shape.id));
+        for (const arrow of result.diagram.arrows) {
+          expect(shapeIds.has(arrow.fromId)).toBe(true);
+          expect(shapeIds.has(arrow.toId)).toBe(true);
+        }
+
+        const shapeElements = result.elements.filter(
+          (element) =>
+            element.type === "rectangle" ||
+            element.type === "ellipse" ||
+            element.type === "diamond"
+        );
+        expect(shapeElements.length).toBeGreaterThanOrEqual(10);
       }
     );
   });
