@@ -8,9 +8,13 @@ Convex usage today
 
 Evidence on disk (artifacts)
 - optimization runs: `packages/backend/experiments/output/optimization_2026-01-24_17-00-50`, `packages/backend/experiments/output/optimization_2026-01-24_17-30-14`, `packages/backend/experiments/output/optimization_2026-01-25_06-29-42`, `packages/backend/experiments/output/optimization_2026-01-25_06-53-18`
-- visual grading runs: `packages/backend/experiments/output/visual-grading_2026-01-25_02-15-21`, `packages/backend/experiments/output/visual-grading_2026-01-25_06-33-38`, `packages/backend/experiments/output/visual-grading_2026-01-25_06-53-19` (includes `summary.json` with 3/3 pass)
+- visual grading (Convex): `packages/backend/test-results/visual-grading.json` + `packages/backend/test-results/visual-grading.md` + `packages/backend/test-results/visual-grading-*.png`
+- visual grading (legacy runs): `packages/backend/experiments/output/visual-grading_2026-01-25_02-15-21`, `packages/backend/experiments/output/visual-grading_2026-01-25_06-33-38`, `packages/backend/experiments/output/visual-grading_2026-01-25_06-53-19` (includes `summary.json` with 3/3 pass)
 - Browserbase export evidence: Convex test writes PNG + report in `packages/backend/test-results/` (file name derived from test name)
 - no `summary.json` under any `optimization_*` folder (expected by `packages/backend/experiments/tests/test-diagram-optimization.ts`)
+
+Mermaid pre-flight
+- Use `.opencode/plugins/sketchi/mermaid.ts` tool `mermaid_validate` before committing Mermaid diagrams to GitHub issues/PRs
 
 ## Standalone experiment scripts
 
@@ -77,9 +81,11 @@ Evidence on disk (artifacts)
 
 ### Visual grading (PNG + LLM)
 - experiment files: `packages/backend/experiments/lib/grading.ts`, `packages/backend/experiments/lib/render-png.ts`, `packages/backend/experiments/lib/output.ts`, `packages/backend/experiments/lib/ai-utils.ts`, `packages/backend/experiments/agents/content-analyzer.ts`, `packages/backend/experiments/agents/diagram-generator.ts`, `packages/backend/lib/diagram-intermediate.ts`, `packages/backend/lib/diagram-renderer.ts`, `packages/backend/experiments/lib/prompts.ts`
-- test files: `packages/backend/experiments/tests/test-visual-grading.ts`
-- convex migration: no
-- evidence: `packages/backend/experiments/output/visual-grading_2026-01-25_06-53-19/summary.json` (3/3 pass)
+- test files: `packages/backend/convex/visualGrading.test.ts`
+- convex migration: yes
+- evidence: `packages/backend/test-results/visual-grading.json` + `packages/backend/test-results/visual-grading.md` + `packages/backend/test-results/visual-grading-*.png`
+- local tools: `.opencode/plugins/sketchi/excalidraw-to-png-local.ts` (`excalidraw_png_local`, `visual_grade_local`)
+- CLI: `bun run .opencode/plugins/sketchi/excalidraw-to-png-local.ts png <diagram.json> [output.png] [chartType]`
 
 ### Diagram optimization suite
 - experiment files: `packages/backend/experiments/lib/grading.ts`, `packages/backend/experiments/lib/render-png.ts`, `packages/backend/experiments/lib/output.ts`, `packages/backend/experiments/agents/content-analyzer.ts`, `packages/backend/experiments/agents/diagram-generator.ts`, `packages/backend/experiments/lib/ai-utils.ts`, `packages/backend/lib/diagram-intermediate.ts`, `packages/backend/lib/diagram-renderer.ts`, `packages/backend/experiments/lib/prompts.ts`

@@ -13,8 +13,8 @@
 - [ ] **0.4 Auto-Layout** - no artifacts on disk; standardize arrow format + add artifact or convert to Convex test + delete experiment
 - [ ] **0.5 Arrow Optimization** - no artifacts on disk; move to deterministic module + add artifact or convert to Convex test + delete experiment
 - [x] **Optimization suite** - artifacts in `packages/backend/experiments/output/optimization_*`
-- [x] **Visual grading** - artifacts in `packages/backend/experiments/output/visual-grading_*` with summary.json
-- [ ] **Visual grading (Convex test)** - migrate to Convex test, call vision LLM, run concurrently, keep artifacts + summary
+- [x] **Visual grading (experiment)** - artifacts in `packages/backend/experiments/output/visual-grading_*` with summary.json (legacy)
+- [x] **Visual grading (Convex test)** - migrated to `packages/backend/convex/visualGrading.test.ts`; artifacts in `packages/backend/test-results/visual-grading.*`
 - [x] **Browserbase export** - Convex test writes PNG + report in `packages/backend/test-results/` (output name derived from test name)
 
 ### Unify + simplify (delete, don’t rename)
@@ -80,7 +80,7 @@
 - [ ] Implement `diagram_modify` tool
 - [ ] Implement `diagram_parse` tool
 - [ ] Publish to npm as `@sketchi/opencode-plugin`
-- [ ] Add local PNG exporter: `.opencode/plugins/sketchi/excalidraw-to-png-local.ts` (invokable; optimization later)
+- [x] Add local PNG exporter: `.opencode/plugins/sketchi/excalidraw-to-png-local.ts` (invokable; optimization later)
 
 ## Phase 3: Tech Stack Schemas
 

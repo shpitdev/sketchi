@@ -10,6 +10,8 @@ jobs:
   convex-tests:
     runs-on: ubuntu-latest
     env:
+      AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+      VISION_MODEL_NAME: ${{ secrets.VISION_MODEL_NAME }}
       BROWSERBASE_API_KEY: ${{ secrets.BROWSERBASE_API_KEY }}
       BROWSERBASE_PROJECT_ID: ${{ secrets.BROWSERBASE_PROJECT_ID }}
     steps:
@@ -24,6 +26,10 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Install Playwright browsers
+        working-directory: packages/backend
+        run: bunx playwright install --with-deps
+
       - name: Run Convex tests
         working-directory: packages/backend
         run: bun run test
@@ -32,6 +38,11 @@ jobs:
         if: always()
         working-directory: packages/backend
         run: bun run test:report
+
+      - name: Set artifact name
+        if: always()
+        run: |
+          echo "BACKEND_ARTIFACT_NAME=test-results-packages-backend-convex-$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
 
       - name: Publish test summary
         if: always()
@@ -45,6 +56,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: backend-test-results
+          name: ${{ env.BACKEND_ARTIFACT_NAME }}
           path: packages/backend/test-results
           if-no-files-found: warn

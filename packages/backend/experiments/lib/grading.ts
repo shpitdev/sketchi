@@ -166,11 +166,16 @@ function getSchemaForType(chartType: ChartType) {
   }
 }
 
+const DEFAULT_VISION_MODEL = "google/gemini-2.5-flash";
+
 export async function gradeByChartType(
   chartType: ChartType,
   prompt: string,
   pngPath: string
 ): Promise<{ grading: Record<string, unknown>; tokens?: number }> {
+  const envModel = process.env.VISION_MODEL_NAME?.trim();
+  const visionModel =
+    envModel && envModel.length > 0 ? envModel : DEFAULT_VISION_MODEL;
   const pngBuffer = await readFile(pngPath);
   const base64Png = pngBuffer.toString("base64");
 
@@ -178,7 +183,7 @@ export async function gradeByChartType(
   const gradingPrompt = GRADING_PROMPTS[chartType];
 
   const result = await generateObjectWithRetry({
-    model: getModel("google/gemini-2.5-flash"),
+    model: getModel(visionModel),
     schema,
     messages: [
       {
