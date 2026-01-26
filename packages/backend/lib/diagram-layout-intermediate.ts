@@ -50,6 +50,15 @@ function normalizeEdgeRouting(value: unknown): EdgeRouting | undefined {
   return undefined;
 }
 
+function compareStringsDeterministic(a?: string | null, b?: string | null): number {
+  const left = a ?? "";
+  const right = b ?? "";
+  if (left === right) {
+    return 0;
+  }
+  return left < right ? -1 : 1;
+}
+
 export function toLayoutOverrides(
   intermediate: IntermediateFormat
 ): LayoutOverrides | undefined {
@@ -71,22 +80,22 @@ export function convertIntermediateToDiagram(
   intermediate: IntermediateFormat
 ): Diagram {
   const sortedNodes = [...intermediate.nodes].sort((a, b) =>
-    a.id.localeCompare(b.id)
+    compareStringsDeterministic(a.id, b.id)
   );
   const sortedEdges = [...intermediate.edges].sort((a, b) => {
-    const from = a.fromId.localeCompare(b.fromId);
+    const from = compareStringsDeterministic(a.fromId, b.fromId);
     if (from !== 0) {
       return from;
     }
-    const to = a.toId.localeCompare(b.toId);
+    const to = compareStringsDeterministic(a.toId, b.toId);
     if (to !== 0) {
       return to;
     }
-    const label = (a.label ?? "").localeCompare(b.label ?? "");
+    const label = compareStringsDeterministic(a.label, b.label);
     if (label !== 0) {
       return label;
     }
-    return (a.id ?? "").localeCompare(b.id ?? "");
+    return compareStringsDeterministic(a.id, b.id);
   });
 
   const shapes: ShapeElement[] = sortedNodes.map((node) => ({

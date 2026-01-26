@@ -166,7 +166,7 @@ export function applyLayout(
   const arrows = sortArrows(diagram.arrows);
   const useElbow = config.edgeRouting === "elbow";
 
-  const g = new dagre.graphlib.Graph();
+  const g = new dagre.graphlib.Graph({ multigraph: true });
   g.setGraph({
     rankdir: config.rankdir,
     nodesep: config.nodesep,
@@ -182,8 +182,9 @@ export function applyLayout(
     });
   }
 
-  for (const arrow of arrows) {
-    g.setEdge(arrow.fromId, arrow.toId);
+  for (const [index, arrow] of arrows.entries()) {
+    const edgeName = arrow.id ?? `edge_${index}`;
+    g.setEdge(arrow.fromId, arrow.toId, {}, edgeName);
   }
 
   dagre.layout(g);

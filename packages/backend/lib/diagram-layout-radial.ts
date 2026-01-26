@@ -43,13 +43,28 @@ function buildTree(
     return null;
   }
   const rootId = rootShape.id;
+  const visited = new Set<string>();
 
-  function buildNode(id: string, depth: number): TreeNode {
+  function buildNode(id: string, depth: number): TreeNode | null {
+    if (visited.has(id)) {
+      return null;
+    }
+    visited.add(id);
     const childIds = childMap.get(id) ?? [];
+    const children: TreeNode[] = [];
+
+    for (const childId of childIds) {
+      const child = buildNode(childId, depth + 1);
+      if (!child) {
+        return null;
+      }
+      children.push(child);
+    }
+
     return {
       id,
       depth,
-      children: childIds.map((childId) => buildNode(childId, depth + 1)),
+      children,
       angle: 0,
       startAngle: 0,
       endAngle: 0,

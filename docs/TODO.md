@@ -56,7 +56,7 @@
 ### Core Libraries
 - [ ] `lib/excalidraw-share.ts` - encrypt/upload/parse share links (LLM-friendly schema only)
 - [x] `lib/json-repair.ts` - repair LLM JSON output
-- [x] `lib/diagram-layout.ts` - deterministic layout + arrow routing (single source of truth)
+- [x] `lib/diagram-layout*.ts` - deterministic layout + arrow routing (single source of truth)
 - [ ] `lib/diagram-simplify.ts` - simplify diagram for agent consumption
 - [ ] `lib/prompt-registry.ts` - consume `packages/backend/prompts/` exports
 

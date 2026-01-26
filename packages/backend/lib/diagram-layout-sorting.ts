@@ -1,19 +1,28 @@
 import type { ArrowElement, ShapeElement } from "./diagram-structure";
 
+function compareStringsDeterministic(a: string, b: string): number {
+  if (a === b) {
+    return 0;
+  }
+  return a < b ? -1 : 1;
+}
+
 export function sortShapes(shapes: ShapeElement[]): ShapeElement[] {
-  return [...shapes].sort((a, b) => a.id.localeCompare(b.id));
+  return [...shapes].sort((a, b) =>
+    compareStringsDeterministic(a.id, b.id)
+  );
 }
 
 export function sortArrows(arrows: ArrowElement[]): ArrowElement[] {
   return [...arrows].sort((a, b) => {
-    const from = a.fromId.localeCompare(b.fromId);
+    const from = compareStringsDeterministic(a.fromId, b.fromId);
     if (from !== 0) {
       return from;
     }
-    const to = a.toId.localeCompare(b.toId);
+    const to = compareStringsDeterministic(a.toId, b.toId);
     if (to !== 0) {
       return to;
     }
-    return a.id.localeCompare(b.id);
+    return compareStringsDeterministic(a.id, b.id);
   });
 }
