@@ -56,6 +56,84 @@ async function waitForThemeClass(
   );
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
+async function applyTheme(page: any, theme: "light" | "dark"): Promise<void> {
+  const toggleSelector = '[data-testid="theme-toggle"]';
+  const toggleVisible = await waitForVisible(page, toggleSelector, {
+    timeoutMs: 2000,
+  });
+
+  if (toggleVisible) {
+    const isDark = await page.evaluate(
+      () =>
+        document.documentElement.classList.contains("dark") ||
+        document.body.classList.contains("dark")
+    );
+    const shouldBeDark = theme === "dark";
+    if (isDark !== shouldBeDark) {
+      await page.locator(toggleSelector).click();
+      await sleep(300);
+    }
+  } else {
+    await page.evaluate((value: string) => {
+      localStorage.setItem("theme", value);
+    }, theme);
+    await page.reload({ waitUntil: "domcontentloaded" });
+  }
+}
+
+function checkThemeApplied(
+  theme: "light" | "dark",
+  isDark: boolean,
+  isLocal: boolean,
+  warnings: string[],
+  visualIssues: string[]
+): void {
+  const shouldBeDark = theme === "dark";
+
+  if (shouldBeDark && !isDark) {
+    const message = "dark mode did not apply";
+    warnings.push(message);
+    if (!isLocal) {
+      visualIssues.push(message);
+    }
+  }
+  if (!shouldBeDark && isDark) {
+    const message = "light mode did not apply";
+    warnings.push(message);
+    if (!isLocal) {
+      visualIssues.push(message);
+    }
+  }
+}
+
+async function reviewThemeVisuals(
+  // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
+  page: any,
+  // biome-ignore lint/suspicious/noExplicitAny: config type
+  cfg: any,
+  theme: "light" | "dark",
+  strict: boolean,
+  warnings: string[],
+  visualIssues: string[]
+): Promise<void> {
+  const homeReview = await captureScreenshot(
+    page,
+    cfg,
+    `visual-${theme}-home`,
+    { prompt: visualPrompt }
+  );
+
+  if (homeReview?.hasIssues) {
+    const summary = homeReview.summary.replace(/\s+/g, " ").trim();
+    visualIssues.push(summary);
+    if (strict) {
+      throw new Error(`visual review failed: ${summary}`);
+    }
+    warnings.push(`visual review: ${summary}`);
+  }
+}
+
 async function main() {
   const cfg = loadConfig();
   const stagehand = await createStagehand(cfg);
@@ -79,63 +157,23 @@ async function main() {
         waitUntil: "domcontentloaded",
       });
 
-      const toggleSelector = '[data-testid="theme-toggle"]';
-      const toggleVisible = await waitForVisible(page, toggleSelector, {
-        timeoutMs: 2000,
-      });
-
-      if (toggleVisible) {
-        const isDark = await page.evaluate(
-          () =>
-            document.documentElement.classList.contains("dark") ||
-            document.body.classList.contains("dark")
-        );
-        const shouldBeDark = theme === "dark";
-        if (isDark !== shouldBeDark) {
-          await page.locator(toggleSelector).click();
-          await sleep(300);
-        }
-      } else {
-        await page.evaluate((value) => {
-          localStorage.setItem("theme", value);
-        }, theme);
-        await page.reload({ waitUntil: "domcontentloaded" });
-      }
+      // biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
+      await applyTheme(page as any, theme);
 
       const shouldBeDark = theme === "dark";
       const isDark = await waitForThemeClass(page, shouldBeDark);
 
-      if (shouldBeDark && !isDark) {
-        const message = "dark mode did not apply";
-        warnings.push(message);
-        if (!isLocal) {
-          visualIssues.push(message);
-        }
-      }
-      if (!shouldBeDark && isDark) {
-        const message = "light mode did not apply";
-        warnings.push(message);
-        if (!isLocal) {
-          visualIssues.push(message);
-        }
-      }
+      checkThemeApplied(theme, isDark, isLocal, warnings, visualIssues);
 
-      const homeReview = await captureScreenshot(
-        // biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
+      await reviewThemeVisuals(
+        // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
         page as any,
         cfg,
-        `visual-${theme}-home`,
-        { prompt: visualPrompt }
+        theme,
+        strict,
+        warnings,
+        visualIssues
       );
-
-      if (homeReview?.hasIssues) {
-        const summary = homeReview.summary.replace(/\s+/g, " ").trim();
-        visualIssues.push(summary);
-        if (strict) {
-          throw new Error(`visual review failed: ${summary}`);
-        }
-        warnings.push(`visual review: ${summary}`);
-      }
     }
 
     if (warnings.length > 0) {
