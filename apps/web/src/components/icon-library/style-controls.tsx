@@ -1,5 +1,4 @@
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { StyleSettings } from "@/lib/icon-library/svg-to-excalidraw";
 
@@ -21,34 +20,40 @@ export default function StyleControls({ value, onChange }: StyleControlsProps) {
   return (
     <div className="grid gap-2">
       <div className="grid gap-2">
-        <Label className="text-xs" htmlFor="roughness">
-          Roughness
-        </Label>
-        <Input
+        <div className="flex items-center justify-between">
+          <Label className="text-xs" htmlFor="roughness">
+            Roughness
+          </Label>
+          <span className="text-muted-foreground text-xs">
+            {value.roughness}
+          </span>
+        </div>
+        <input
+          className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-muted"
           id="roughness"
-          max={10}
-          min={0}
-          onChange={(event) =>
-            update("roughness", Number(event.target.value) || 0)
-          }
-          step={0.5}
-          type="number"
+          max="10"
+          min="0"
+          onChange={(e) => update("roughness", Number(e.target.value))}
+          step="0.5"
+          type="range"
           value={value.roughness}
         />
       </div>
       <div className="grid gap-2">
-        <Label className="text-xs" htmlFor="bowing">
-          Bowing
-        </Label>
-        <Input
+        <div className="flex items-center justify-between">
+          <Label className="text-xs" htmlFor="bowing">
+            Bowing
+          </Label>
+          <span className="text-muted-foreground text-xs">{value.bowing}</span>
+        </div>
+        <input
+          className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-muted"
           id="bowing"
-          max={10}
-          min={0}
-          onChange={(event) =>
-            update("bowing", Number(event.target.value) || 0)
-          }
-          step={0.5}
-          type="number"
+          max="10"
+          min="0"
+          onChange={(e) => update("bowing", Number(e.target.value))}
+          step="0.5"
+          type="range"
           value={value.bowing}
         />
       </div>
