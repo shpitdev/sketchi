@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24px" height="24px" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Object Explorer</title>
+    <metadata>{"backgroundColor":"#a7b6c2"}</metadata>
+    <g id="Artboard" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Group-2" transform="translate(-1.000000, -1.000000)">
+            <g id="Group" transform="translate(0.428571, 0.428571)" fill="#738694" fill-opacity="0.250858">
+                <rect id="Combined-Shape" x="0.571428571" y="0.571428571" width="24" height="5"></rect>
+                <rect id="Combined-Shape" x="0.571428571" y="9.57142857" width="12" height="6"></rect>
+                <rect id="Combined-Shape-Copy" x="0.571428571" y="19.5714286" width="12" height="5"></rect>
+            </g>
+            <g id="pt-icon-search" transform="translate(4.000000, 4.000000)" fill-rule="nonzero">
+                <path d="M19.56,17.44 L14.62,12.5 C15.49,11.21 16,9.67 16,8 C16,3.58 12.42,0 8,0 C3.58,0 0,3.58 0,8 C0,12.42 3.58,16 8,16 C9.67,16 11.21,15.49 12.5,14.62 L17.44,19.56 C17.71,19.83 18.09,20 18.5,20 C19.33,20 20,19.33 20,18.5 C20,18.09 19.83,17.71 19.56,17.44 Z M8,14 C4.69,14 2,11.31 2,8 C2,4.69 4.69,2 8,2 C11.31,2 14,4.69 14,8 C14,11.31 11.31,14 8,14 Z" fill="#9179F2"></path>
+                <circle id="Oval" fill-opacity="0.18" fill="#AD99FF" cx="8" cy="8" r="6"></circle>
+            </g>
+        </g>
+    </g>
+</svg>

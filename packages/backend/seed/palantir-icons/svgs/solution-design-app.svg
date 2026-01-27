@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <title>Solution Design app</title>
+    <metadata>{"backgroundColor":"#3fa6da"}</metadata>
+    <g clip-path="url(#clip0_313_12433)">
+        <g clip-path="url(#clip1_313_12433)">
+            <rect x="0.5" y="0.5" width="23" height="23" rx="0.5" fill="white"/>
+            <rect x="0.5" y="0.5" width="23" height="23" rx="0.5" stroke="#8F99A8"/>
+        </g>
+        <rect opacity="0.3" x="5" y="1" width="1" height="22" fill="#8F99A8"/>
+        <rect opacity="0.3" x="18" y="1" width="1" height="22" fill="#8F99A8"/>
+        <rect opacity="0.3" x="1" y="6" width="1" height="22" transform="rotate(-90 1 6)" fill="#8F99A8"/>
+        <rect opacity="0.3" x="1" y="19" width="1" height="22" transform="rotate(-90 1 19)" fill="#8F99A8"/>
+        <g opacity="0.8">
+            <rect x="5" y="5" width="14" height="14" fill="#97DAFC"/>
+            <rect x="5.5" y="5.5" width="13" height="13" stroke="#1888BF" stroke-opacity="0.7"/>
+        </g>
+        <mask id="path-8-inside-1_313_12433" fill="white">
+            <rect x="4" y="4" width="3" height="3" rx="0.5"/>
+        </mask>
+        <rect x="4" y="4" width="3" height="3" rx="0.5" fill="#3FA6DA" stroke="#147EB3" stroke-width="2" mask="url(#path-8-inside-1_313_12433)"/>
+        <mask id="path-9-inside-2_313_12433" fill="white">
+            <rect x="17" y="4" width="3" height="3" rx="0.5"/>
+        </mask>
+        <rect x="17" y="4" width="3" height="3" rx="0.5" fill="#3FA6DA" stroke="#147EB3" stroke-width="2" mask="url(#path-9-inside-2_313_12433)"/>
+        <mask id="path-10-inside-3_313_12433" fill="white">
+            <rect x="17" y="17" width="3" height="3" rx="0.5"/>
+        </mask>
+        <rect x="17" y="17" width="3" height="3" rx="0.5" fill="#3FA6DA" stroke="#10161A" stroke-opacity="0.3" stroke-width="2" mask="url(#path-10-inside-3_313_12433)"/>
+        <mask id="path-11-inside-4_313_12433" fill="white">
+            <rect x="4" y="17" width="3" height="3" rx="0.5"/>
+        </mask>
+        <rect x="4" y="17" width="3" height="3" rx="0.5" fill="#3FA6DA" stroke="#147EB3" stroke-width="2" mask="url(#path-11-inside-4_313_12433)"/>
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M10.0616 7.82127L19.7661 11.8219C19.7661 11.8219 22.5 22 11.8219 19.7661L7.82129 10.0616L10.0616 7.82127ZM17.4312 20.0254C18.587 24.6486 23.3503 18.2624 20.0254 17.4312L20.0038 13.6652C20.0015 13.2623 19.7575 12.9 19.385 12.7464L10.2971 9L10.0021 9.295L14.8533 14.1461C15.4108 13.8798 16.0989 13.9775 16.5607 14.4393C17.1465 15.0251 17.1465 15.9749 16.5607 16.5607C15.9749 17.1464 15.0251 17.1464 14.4394 16.5607C13.9775 16.0988 13.8798 15.4108 14.1461 14.8533L9.295 10.0021L9.00001 10.2971L12.7465 19.385C12.9001 19.7575 13.2623 20.0015 13.6653 20.0038L17.4312 20.0254Z" fill="white"/>
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M9 10.2971L9.29499 10.0021L14.1461 14.8533C13.8798 15.4108 13.9775 16.0988 14.4393 16.5607C15.0251 17.1464 15.9749 17.1464 16.5607 16.5607C17.1464 15.9749 17.1464 15.0251 16.5607 14.4393C16.0988 13.9775 15.4108 13.8798 14.8532 14.1461L10.0021 9.295L10.2971 9L19.385 12.7464C19.7575 12.9 20.0015 13.2623 20.0038 13.6652L20.0254 17.4312L21.5083 17.8019C21.9974 17.9242 22.1661 18.5332 21.8096 18.8897L18.8897 21.8096C18.5332 22.1661 17.9242 21.9974 17.8019 21.5083L17.4312 20.0254L13.6652 20.0038C13.2623 20.0015 12.9 19.7575 12.7464 19.385L9 10.2971Z" fill="#147EB3"/>
+    </g>
+    <defs>
+        <clipPath id="clip0_313_12433">
+            <rect width="24" height="24" fill="white"/>
+        </clipPath>
+        <clipPath id="clip1_313_12433">
+            <rect width="24" height="24" fill="white"/>
+        </clipPath>
+    </defs>
+</svg>

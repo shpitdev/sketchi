@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24" height="24" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <title>Foundry Rules</title>
+    <metadata>{"backgroundColor":"#a7b6c2"}</metadata>
+    <rect x="1" y="2" width="14" height="12" fill="white"/>
+    <g opacity="0.5">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M1 1H15C15.55 1 16 1.45 16 2V14C16 14.55 15.55 15 15 15H1C0.45 15 0 14.55 0 14V2C0 1.45 0.45 1 1 1ZM15 14V2H1V14H15Z" fill="#111418"/>
+    </g>
+    <rect x="1" y="2" width="14" height="1" fill="#8ABBFF"/>
+    <rect x="1" y="3" width="14" height="1" fill="#4C90F0"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M8 8H11C11.5523 8 12 8.44772 12 9V11.5H11V9H8V8Z" fill="#ABB3BF"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M4 9C4 8.44772 4.44772 8 5 8H8V9H5V11.5H4V9Z" fill="#ABB3BF"/>
+    <path d="M10 11C10 10.4477 10.4477 10 11 10H13C13.5523 10 14 10.4477 14 11V12C14 12.5523 13.5523 13 13 13H11C10.4477 13 10 12.5523 10 12V11Z" fill="#FBB360"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M13 11H11V12H13V11ZM11 10C10.4477 10 10 10.4477 10 11V12C10 12.5523 10.4477 13 11 13H13C13.5523 13 14 12.5523 14 12V11C14 10.4477 13.5523 10 13 10H11Z" fill="#EC9A3C"/>
+    <path d="M2 11C2 10.4477 2.44772 10 3 10H5C5.55228 10 6 10.4477 6 11V12C6 12.5523 5.55228 13 5 13H3C2.44772 13 2 12.5523 2 12V11Z" fill="#FBB360"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M5 11H3V12H5V11ZM3 10C2.44772 10 2 10.4477 2 11V12C2 12.5523 2.44772 13 3 13H5C5.55228 13 6 12.5523 6 12V11C6 10.4477 5.55228 10 5 10H3Z" fill="#EC9A3C"/>
+    <path d="M5.15731 7.62023L7.62023 5.15731C7.82997 4.94756 8.17003 4.94756 8.37977 5.15731L10.8427 7.62023C11.0524 7.82997 11.0524 8.17003 10.8427 8.37977L8.37977 10.8427C8.17003 11.0524 7.82997 11.0524 7.62023 10.8427L5.15731 8.37977C4.94756 8.17003 4.94756 7.82997 5.15731 7.62023Z" fill="#8ABAFF"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M6.29662 8L8 9.70338L9.70338 8L8 6.29662L6.29662 8ZM7.62023 5.15731L5.15731 7.62023C4.94756 7.82997 4.94756 8.17003 5.15731 8.37977L7.62023 10.8427C7.82997 11.0524 8.17003 11.0524 8.37977 10.8427L10.8427 8.37977C11.0524 8.17003 11.0524 7.82997 10.8427 7.62023L8.37977 5.15731C8.17003 4.94756 7.82997 4.94756 7.62023 5.15731Z" fill="#4C90F0"/>
+</svg>

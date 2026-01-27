@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<title>deployed-application-app</title>
+<metadata>{"backgroundColor": "#CED9E0" }</metadata>
+<path d="M2 2H22V22H2V2Z" fill="white"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M1 2C1 1.44772 1.44772 1 2 1H22C22.5523 1 23 1.44772 23 2V22C23 22.5523 22.5523 23 22 23H2C1.44772 23 1 22.5523 1 22V2ZM2 2V22H22V2H2Z" fill="#8F99A8"/>
+<path d="M11 20V10L20 14.9944L11 20Z" fill="#FBB360"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M10 10C10 9.23774 10.8187 8.75575 11.4852 9.12563L20.4852 14.12C21.1712 14.5007 21.1717 15.487 20.4861 15.8683L11.4861 20.8739C10.8195 21.2447 10 20.7627 10 20V10ZM11 20L20 14.9944L11 10V20Z" fill="#EC9A3C"/>
+<rect x="17" y="7" width="5" height="1" fill="#8F99A8"/>
+<rect x="2" y="7" width="11" height="1" fill="#8F99A8"/>
+<path d="M17 8V7C17 5.89543 16.1046 5 15 5C13.8954 5 13 5.89543 13 7V8H12V7C12 5.34315 13.3431 4 15 4C16.6569 4 18 5.34315 18 7V8H17Z" fill="#8F99A8"/>
+<path d="M8 13L7 13C5.89543 13 5 13.8954 5 15C5 16.1046 5.89543 17 7 17L8 17L8 18L7 18C5.34315 18 4 16.6569 4 15C4 13.3431 5.34315 12 7 12L8 12L8 13Z" fill="#8F99A8"/>
+<rect x="7" y="2" width="1" height="11" fill="#8F99A8"/>
+<rect x="7" y="17" width="1" height="5" fill="#8F99A8"/>
+</svg>

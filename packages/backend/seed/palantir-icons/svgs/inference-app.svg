@@ -1,0 +1,30 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<title>inference-app</title>
+<metadata>{"backgroundColor":"#DB3737"}</metadata>
+<path d="M23 9H1V23H23V9Z" fill="url(#paint0_linear)"/>
+<path d="M8 10H12V12H8V10Z" fill="#DB3737"/>
+<path d="M8 19H12V21H8V19Z" fill="#DB3737"/>
+<path d="M13 14H17V16H13V14Z" fill="#DB3737"/>
+<path d="M13 17H17V19H13V17Z" fill="#DB3737"/>
+<path d="M18 11H22V13H18V11Z" fill="#DB3737"/>
+<path opacity="0.2" fill-rule="evenodd" clip-rule="evenodd" d="M1 9H7V23H1V9Z" fill="#137CBD"/>
+<path d="M8 9H7V22H8V9Z" fill="#ABBFCC"/>
+<path opacity="0.5" d="M13 9H12V22H13V9Z" fill="#ABBFCC"/>
+<path opacity="0.5" d="M18 9H17V22H18V9Z" fill="#ABBFCC"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M1 8H23V23H1V8ZM2 9V22H22V9H2Z" fill="#ABBFCC"/>
+<path d="M23 1H1V9H23V1Z" fill="url(#paint1_linear)"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M1 1H23V9H1V1ZM2 2V8H22V2H2Z" fill="black" fill-opacity="0.15"/>
+<defs>
+<linearGradient id="paint0_linear" x1="19.1729" y1="24.5143" x2="12.4735" y2="4.87707" gradientUnits="userSpaceOnUse">
+<stop stop-color="#F5F8FA"/>
+<stop offset="0.9535" stop-color="#FEFFFF"/>
+<stop offset="1" stop-color="white"/>
+</linearGradient>
+<linearGradient id="paint1_linear" x1="12.7315" y1="12.0396" x2="12.5374" y2="-2.08895" gradientUnits="userSpaceOnUse">
+<stop stop-color="#2B95D6"/>
+<stop offset="0.4318" stop-color="#349DDE"/>
+<stop offset="1" stop-color="#48AFF0"/>
+</linearGradient>
+</defs>
+</svg>
+

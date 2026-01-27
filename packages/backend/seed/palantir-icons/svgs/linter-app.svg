@@ -1,0 +1,18 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <title>linter-app</title>
+    <metadata>{"backgroundColor":"#a7b6c2"}</metadata>
+    <path d="M13.5 11L13.5 2C13.5 1.17157 14.1716 0.5 15 0.5V0.5C15.8284 0.5 16.5 1.17157 16.5 2V11" stroke="#2D72D2" stroke-linecap="round"/>
+    <rect x="13" y="11" width="4" height="1" fill="#8ABBFF"/>
+    <rect x="14" y="1" width="2" height="10" rx="1" fill="#8ABBFF"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M3.5 23.5C6.5 21.5 8.5 19 8.5 16.5L21.5 16.5C21.4999 21.5 20 23.5 17.5 23.5L14.98 23.5C15.4749 23.1547 15.9119 22.7288 16.2855 22.1918C16.8357 21.4009 17.2312 20.3935 17.4903 19.0981C17.5444 18.8273 17.3688 18.5639 17.0981 18.5097C16.8273 18.4556 16.5639 18.6312 16.5097 18.902C16.2688 20.1065 15.9143 20.9741 15.4645 21.6207C15.0185 22.262 14.4618 22.7101 13.7764 23.0528C13.6013 23.1403 13.5 23.3167 13.4999 23.5L10.4385 23.5C11.7185 22.5246 12.5475 20.8715 12.9851 19.1213C13.052 18.8534 12.8892 18.5819 12.6213 18.5149C12.3534 18.448 12.0819 18.6109 12.0149 18.8788C11.5292 20.8218 10.584 22.399 9.27639 23.0528C9.10132 23.1403 9.00004 23.3167 8.99989 23.5L3.5 23.5Z" fill="white"/>
+    <path d="M12.5 12.25V11.5C12.5 10.9477 12.9477 10.5 13.5 10.5H16.5C17.0523 10.5 17.5 10.9477 17.5 11.5V12" stroke="#2D72D2" stroke-linecap="round"/>
+    <path d="M8.5 16C8.5 20 5.5 22 3.5 23.5" stroke="#2D72D2" stroke-linecap="round"/>
+    <path d="M21.5 16C21.5 21 19.5 23.5 18 23.5H3.5" stroke="#2D72D2" stroke-linecap="round"/>
+    <path d="M9 3.5H4.5" stroke="#2D72D2" stroke-linecap="round"/>
+    <path d="M9 5.5L1.5 5.5" stroke="#2D72D2" stroke-linecap="round"/>
+    <path d="M9 9.5L3.5 9.5" stroke="#2D72D2" stroke-linecap="round"/>
+    <path d="M9 7.5L7.25 7.5L6 7.5" stroke="#2D72D2" stroke-linecap="round"/>
+    <path d="M9.5 23.5C11 22.75 12 21 12.5 19" stroke="#2D72D2" stroke-linecap="round"/>
+    <path d="M14 23.5C15.5 22.75 16.5 21.5 17 19" stroke="#2D72D2" stroke-linecap="round"/>
+    <path d="M20.5 12.5H9.5C8.94772 12.5 8.5 12.9477 8.5 13.5V16C8.5 16.2761 8.72386 16.5 9 16.5H21C21.2761 16.5 21.5 16.2761 21.5 16V13.5C21.5 12.9477 21.0523 12.5 20.5 12.5Z" fill="#8ABBFF" stroke="#2D72D2" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24px" height="24px" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>vertex-app</title>
+    <metadata>{"backgroundColor":"#48aff0"}</metadata>
+    <defs></defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="vertex-app">
+            <g id="Shapes">
+                <circle id="Oval-2" fill="#4A90E2" fill-rule="nonzero" cx="3.5" cy="3.5" r="3.5"></circle>
+                <circle id="Oval-2-Copy" fill="#4A90E2" fill-rule="nonzero" cx="7.5" cy="20.5" r="3.5"></circle>
+                <circle id="Oval-2-Copy-2" fill="#4A90E2" fill-rule="nonzero" cx="20.5" cy="7.5" r="3.5"></circle>
+                <circle id="Oval-2-Copy-3" fill="#4A90E2" fill-rule="nonzero" cx="11.5" cy="11.5" r="3.5"></circle>
+                <path d="M11.4870605,11.5067139 L3.45092773,3.54370117" id="Path-3" stroke="#4A90E2" stroke-width="2"></path>
+                <path d="M12,11.036377 L20,8" id="Path-2" stroke="#4A90E2" stroke-width="2"></path>
+                <path d="M11.4614258,11.5457764 L7.50634766,20.5883789" id="Path-4" stroke="#4A90E2" stroke-width="2"></path>
+            </g>
+        </g>
+    </g>
+</svg>

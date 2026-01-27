@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <title>Ontology management app</title>
+    <metadata>{"backgroundColor":"#669EFF"}</metadata>
+    <g id="App Icon &#226;&#128;&#147; 24x24 (updated)">
+    <path id="Combined-Shape-path" opacity="0.75" fill-rule="evenodd" clip-rule="evenodd" d="M2.16498 5.11017L11.2203 0.196606C11.7034 -0.0655352 12.2965 -0.0655352 12.7796 0.196606L21.835 5.11017L12 10.9019L2.16498 5.11017Z" fill="#8ABBFF"/>
+    <path id="Combined-Shape-path_2" fill-rule="evenodd" clip-rule="evenodd" d="M1.16618 5.9404L11.3889 11.9604V23.3047C11.3315 23.2817 11.2752 23.2553 11.2203 23.2255L1.79178 18.1094C1.30216 17.8438 1 17.3493 1 16.8139V6.60826C1 6.37232 1.05866 6.14434 1.16618 5.9404Z" fill="#215DB0"/>
+    <path id="Combined-Shape-path_3" fill-rule="evenodd" clip-rule="evenodd" d="M22.8338 5.9404C22.9414 6.14434 23 6.37232 23 6.60826V16.8139C23 17.3493 22.6979 17.8438 22.2082 18.1094L12.7797 23.2255C12.7248 23.2553 12.6685 23.2817 12.6111 23.3047V11.9604L22.8338 5.9404Z" fill="#4C90F0"/>
+    </g>
+</svg>

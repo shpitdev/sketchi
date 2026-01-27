@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <title>code-workspace-app</title>
+    <metadata>{"backgroundColor":"#fbb360"}</metadata>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M1 4H21V18H12V21H15V22H7V21H10V18H1V4Z" fill="white"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M21 3C21.5523 3 22 3.44772 22 4V18C22 18.5523 21.5523 19 21 19H13V20H15C15.5523 20 16 20.4477 16 21V22C16 22.5523 15.5523 23 15 23H7C6.44772 23 6 22.5523 6 22V21C6 20.4477 6.44772 20 7 20H9V19H1C0.447715 19 0 18.5523 0 18V4C0 3.44772 0.447716 3 1 3H21ZM10 18V21H7V22H15V21H12V18H21V4H1V18H10Z" fill="#8F99A8"/>
+    <path d="M6 3C6 1.89543 6.89543 1 8 1H22C23.1046 1 24 1.89543 24 3V13C24 14.1046 23.1046 15 22 15H8C6.89543 15 6 14.1046 6 13V3Z" fill="#EC9A3C"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M22 2H8C7.44772 2 7 2.44772 7 3V13C7 13.5523 7.44772 14 8 14H22C22.5523 14 23 13.5523 23 13V3C23 2.44772 22.5523 2 22 2ZM8 1C6.89543 1 6 1.89543 6 3V13C6 14.1046 6.89543 15 8 15H22C23.1046 15 24 14.1046 24 13V3C24 1.89543 23.1046 1 22 1H8Z" fill="#C87619"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M14 4L9 7.44V8.56L14 12V10.5333L10.3333 8L14 5.46667V4ZM16 12L21 8.56V7.44L16 4V5.46667L19.6667 8L16 10.5333V12Z" fill="white"/>
+    <path d="M10 18H12V19H10V18Z" fill="#1C2127" fill-opacity="0.2"/>
+</svg>

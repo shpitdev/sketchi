@@ -1,0 +1,19 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <title>machinery-app</title>
+    <metadata>{"backgroundColor": "#147EB3" }</metadata>
+<g clip-path="url(#clip0_514_105)">
+<path d="M1 3H23V23C23 23.5523 22.5523 24 22 24H2C1.44772 24 1 23.5523 1 23V3Z" fill="white"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M22 4H2V23H22V4ZM1 3V23C1 23.5523 1.44772 24 2 24H22C22.5523 24 23 23.5523 23 23V3H1Z" fill="#ABB3BF"/>
+<rect x="7.5" y="4.5" width="9" height="6" rx="1" fill="#0F6894" stroke="white"/>
+<rect x="7.5" y="10.5" width="9" height="6" rx="1" fill="#147EB3" stroke="white"/>
+<rect x="7.5" y="16.5" width="9" height="6" rx="1" fill="#3FA6DA" stroke="white"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 9C2.15311 9 2.70873 8.5826 2.91465 8H8V7H2.91465C2.70873 6.4174 2.15311 6 1.5 6C0.671573 6 0 6.67157 0 7.5C0 8.32843 0.671573 9 1.5 9ZM16 19V20H21.0854C21.2913 20.5826 21.8469 21 22.5 21C23.3284 21 24 20.3284 24 19.5C24 18.6716 23.3284 18 22.5 18C21.8469 18 21.2913 18.4174 21.0854 19H16ZM19 8H16V7H20V14H16V13H19V8ZM8 14H5V19H8V20H4V13H8V14Z" fill="#0C5174"/>
+<path d="M1 1C1 0.447715 1.44772 0 2 0H22C22.5523 0 23 0.447715 23 1V4H1V1Z" fill="#147EB3" fill-opacity="0.3"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M22 1H2V3H22V1ZM2 0C1.44772 0 1 0.447715 1 1V4H23V1C23 0.447715 22.5523 0 22 0H2Z" fill="#6DAFD0"/>
+</g>
+<defs>
+<clipPath id="clip0_514_105">
+<rect width="24" height="24" rx="1" fill="white"/>
+</clipPath>
+</defs>
+</svg>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <title>automation-app</title>
+    <metadata>{"backgroundColor":"#D1980B"}</metadata>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M10.8 13.2H7C6.44772 13.2 6 12.7523 6 12.2V12L7.10995 0.900496C7.16107 0.389294 7.59124 0 8.10499 0H15.8C16.3523 0 16.8 0.453935 16.8 1.00622C16.8 1.13344 16.7757 1.26069 16.7285 1.37881L13.44 9.6H17.0137C17.5584 9.6 18 10.0416 18 10.5863C18 10.7271 17.9699 10.8663 17.9116 10.9945L12.1945 23.5721C12.0761 23.8327 11.8162 24 11.53 24C11.1268 24 10.8 23.6732 10.8 23.27V13.2Z" fill="#D1980B"/>
+</svg>

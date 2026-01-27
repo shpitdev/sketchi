@@ -1,0 +1,19 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+	<title>carbon-app</title>
+    <metadata>{"backgroundColor":"#6A6A6A"}</metadata>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M0 1C0 0.447715 0.447715 0 1 0H23C23.5523 0 24 0.447715 24 1V19C24 19.5523 23.5523 20 23 20H14V21H19C19.5523 21 20 21.4477 20 22V23C20 23.5523 19.5523 24 19 24H5C4.44772 24 4 23.5523 4 23V22C4 21.4477 4.44772 21 5 21H10V20H1C0.447716 20 0 19.5523 0 19V1Z" fill="#1C2127" fill-opacity="0.5"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M23 1H1V19H11V22H5V23H19V22H13V19H23V1Z" fill="url(#paint0_linear_1215_4459)"/>
+    <path d="M11 19H13V20H11V19Z" fill="#1C2127" fill-opacity="0.2"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M21 6H3V17H21V6Z" fill="#1C2127" fill-opacity="0.5"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M2 5H22V18H2V5ZM3 17H21V6H3V17Z" fill="#1C2127" fill-opacity="0.8"/>
+    <rect x="2" y="2" width="4" height="2" fill="#1C2127" fill-opacity="0.8"/>
+    <rect x="7" y="2" width="4" height="2" fill="#1C2127" fill-opacity="0.8"/>
+    <rect x="12" y="2" width="4" height="2" fill="#1C2127" fill-opacity="0.8"/>
+    <defs>
+        <linearGradient id="paint0_linear_1215_4459" x1="18.8328" y1="17.5622" x2="8.47473" y2="0.437294" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#F5F8FA"/>
+            <stop offset="0.9535" stop-color="#FEFFFF"/>
+            <stop offset="1" stop-color="white"/>
+        </linearGradient>
+    </defs>
+</svg>

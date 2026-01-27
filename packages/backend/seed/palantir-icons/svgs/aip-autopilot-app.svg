@@ -1,0 +1,108 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <title>AIP Autopilot App</title>
+    <metadata>{"backgroundColor": "#7AE1D8" }</metadata>
+    <g clip-path="url(#clip0_1_63)">
+        <mask id="mask0_1_63" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="16" y="0"
+            width="8" height="24">
+            <path
+                d="M22.8 0H18C17.3372 0 16.8 0.537258 16.8 1.2V22.8C16.8 23.4627 17.3372 24 18 24H22.8C23.4627 24 24 23.4627 24 22.8V1.2C24 0.537258 23.4627 0 22.8 0Z"
+                fill="white" />
+        </mask>
+        <g mask="url(#mask0_1_63)">
+            <path
+                d="M22.8 0H18C17.3372 0 16.8 0.537258 16.8 1.2V22.8C16.8 23.4627 17.3372 24 18 24H22.8C23.4627 24 24 23.4627 24 22.8V1.2C24 0.537258 23.4627 0 22.8 0Z"
+                fill="#7ECDBA" fill-opacity="0.4" />
+            <g filter="url(#filter0_d_1_63)">
+                <path
+                    d="M22.8003 2.3999H18.0003C17.3376 2.3999 16.8003 2.93716 16.8003 3.5999V5.9999C16.8003 6.66264 17.3376 7.1999 18.0003 7.1999H22.8003C23.463 7.1999 24.0003 6.66264 24.0003 5.9999V3.5999C24.0003 2.93716 23.463 2.3999 22.8003 2.3999Z"
+                    fill="#6FC8B2" />
+                <path
+                    d="M22.8003 2.8999H18.0003C17.6137 2.8999 17.3003 3.2133 17.3003 3.5999V5.9999C17.3003 6.3865 17.6137 6.6999 18.0003 6.6999H22.8003C23.1869 6.6999 23.5003 6.3865 23.5003 5.9999V3.5999C23.5003 3.2133 23.1869 2.8999 22.8003 2.8999Z"
+                    stroke="black" stroke-opacity="0.1" />
+            </g>
+        </g>
+        <mask id="mask1_1_63" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0"
+            width="8" height="24">
+            <path
+                d="M6 0H1.2C0.537258 0 0 0.537258 0 1.2V22.8C0 23.4627 0.537258 24 1.2 24H6C6.66274 24 7.2 23.4627 7.2 22.8V1.2C7.2 0.537258 6.66274 0 6 0Z"
+                fill="white" />
+        </mask>
+        <g mask="url(#mask1_1_63)">
+            <path
+                d="M6 0H1.2C0.537258 0 0 0.537258 0 1.2V22.8C0 23.4627 0.537258 24 1.2 24H6C6.66274 24 7.2 23.4627 7.2 22.8V1.2C7.2 0.537258 6.66274 0 6 0Z"
+                fill="#7ECDBA" fill-opacity="0.4" />
+            <g filter="url(#filter1_d_1_63)">
+                <path
+                    d="M6 16.8H1.2C0.537258 16.8 0 17.3373 0 18V20.4C0 21.0627 0.537258 21.6 1.2 21.6H6C6.66274 21.6 7.2 21.0627 7.2 20.4V18C7.2 17.3373 6.66274 16.8 6 16.8Z"
+                    fill="#6FC8B2" />
+                <path
+                    d="M6 17.3H1.2C0.8134 17.3 0.5 17.6134 0.5 18V20.4C0.5 20.7866 0.8134 21.1 1.2 21.1H6C6.3866 21.1 6.7 20.7866 6.7 20.4V18C6.7 17.6134 6.3866 17.3 6 17.3Z"
+                    stroke="black" stroke-opacity="0.1" />
+            </g>
+        </g>
+        <mask id="mask2_1_63" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="8" y="0"
+            width="8" height="24">
+            <path
+                d="M14.4 0H9.59999C8.93725 0 8.39999 0.537258 8.39999 1.2V22.8C8.39999 23.4627 8.93725 24 9.59999 24H14.4C15.0627 24 15.6 23.4627 15.6 22.8V1.2C15.6 0.537258 15.0627 0 14.4 0Z"
+                fill="white" />
+        </mask>
+        <g mask="url(#mask2_1_63)">
+            <path
+                d="M14.4 0H9.59999C8.93725 0 8.39999 0.537258 8.39999 1.2V22.8C8.39999 23.4627 8.93725 24 9.59999 24H14.4C15.0627 24 15.6 23.4627 15.6 22.8V1.2C15.6 0.537258 15.0627 0 14.4 0Z"
+                fill="#7ECDBA" fill-opacity="0.4" />
+            <g filter="url(#filter2_d_1_63)">
+                <path
+                    d="M14.3997 9.6001H9.59969C8.93695 9.6001 8.39969 10.1374 8.39969 10.8001V13.2001C8.39969 13.8628 8.93695 14.4001 9.59969 14.4001H14.3997C15.0624 14.4001 15.5997 13.8628 15.5997 13.2001V10.8001C15.5997 10.1374 15.0624 9.6001 14.3997 9.6001Z"
+                    fill="#6FC8B2" />
+                <path
+                    d="M14.3997 10.1001H9.59969C9.21309 10.1001 8.89969 10.4135 8.89969 10.8001V13.2001C8.89969 13.5867 9.21309 13.9001 9.59969 13.9001H14.3997C14.7863 13.9001 15.0997 13.5867 15.0997 13.2001V10.8001C15.0997 10.4135 14.7863 10.1001 14.3997 10.1001Z"
+                    stroke="black" stroke-opacity="0.1" />
+            </g>
+        </g>
+        <path d="M15 10.5L17.5 6.5" stroke="#6FC8B2" stroke-width="1.2" />
+        <path d="M15 10.5L17.5 6.5" stroke="black" stroke-opacity="0.1" stroke-width="1.2" />
+        <path d="M6.5 17.5L9 13.5" stroke="#6FC8B2" stroke-width="1.2" />
+        <path d="M6.5 17.5L9 13.5" stroke="black" stroke-opacity="0.1" stroke-width="1.2" />
+    </g>
+    <defs>
+        <filter id="filter0_d_1_63" x="15.8003" y="2.3999" width="9.20001" height="6.8"
+            filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+            <feFlood flood-opacity="0" result="BackgroundImageFix" />
+            <feColorMatrix in="SourceAlpha" type="matrix"
+                values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+            <feOffset dy="1" />
+            <feGaussianBlur stdDeviation="0.5" />
+            <feComposite in2="hardAlpha" operator="out" />
+            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.04 0" />
+            <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_63" />
+            <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_63" result="shape" />
+        </filter>
+        <filter id="filter1_d_1_63" x="-1" y="16.8" width="9.20001" height="6.8"
+            filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+            <feFlood flood-opacity="0" result="BackgroundImageFix" />
+            <feColorMatrix in="SourceAlpha" type="matrix"
+                values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+            <feOffset dy="1" />
+            <feGaussianBlur stdDeviation="0.5" />
+            <feComposite in2="hardAlpha" operator="out" />
+            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.04 0" />
+            <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_63" />
+            <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_63" result="shape" />
+        </filter>
+        <filter id="filter2_d_1_63" x="7.39969" y="9.6001" width="9.20001" height="6.8"
+            filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+            <feFlood flood-opacity="0" result="BackgroundImageFix" />
+            <feColorMatrix in="SourceAlpha" type="matrix"
+                values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+            <feOffset dy="1" />
+            <feGaussianBlur stdDeviation="0.5" />
+            <feComposite in2="hardAlpha" operator="out" />
+            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.04 0" />
+            <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_63" />
+            <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_63" result="shape" />
+        </filter>
+        <clipPath id="clip0_1_63">
+            <rect width="24" height="24" fill="white" />
+        </clipPath>
+    </defs>
+</svg>

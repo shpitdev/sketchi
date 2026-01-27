@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<metadata>{"backgroundColor":"#FF9980"}</metadata>
+<g clip-path="url(#clip0_95_1827)">
+<path d="M8 3H20C21.1046 3 22 3.89543 22 5V7H8V3Z" fill="#D0B090"/>
+<path d="M24 22C24 22.5523 23.5523 23 23 23H17C16.4477 23 16 22.5523 16 22V15C16 14.4477 16.4477 14 17 14H23C23.5523 14 24 14.4477 24 15V22Z" fill="#FF9980"/>
+<path d="M24 23C24 23.5523 23.5523 24 23 24H17C16.4477 24 16 23.5523 16 23V17C16 16.4477 16.4477 16 17 16H23C23.5523 16 24 16.4477 24 17V23Z" fill="#EB6847"/>
+<path d="M1 0.5H7C7.27614 0.5 7.5 0.723858 7.5 1V7C7.5 7.27614 7.27614 7.5 7 7.5H1C0.723858 7.5 0.5 7.27614 0.5 7V1C0.5 0.723858 0.723858 0.5 1 0.5Z" fill="#D0B090" stroke="#D0B090"/>
+<path d="M0 3C0 2.44772 0.447715 2 1 2H7C7.55228 2 8 2.44772 8 3V9C8 9.55228 7.55228 10 7 10H1C0.447715 10 0 9.55228 0 9V3Z" fill="#AF855A"/>
+<path d="M2 19H16V21H4C2.89543 21 2 20.1046 2 19V19Z" fill="#EB6847"/>
+<path d="M2 19H16V21H4C2.89543 21 2 20.1046 2 19V19Z" fill="#EB6847"/>
+<path d="M8 5H20C21.1046 5 22 5.89543 22 7V7H8V5Z" fill="#AF855A"/>
+<rect x="2" y="10" width="4" height="9" fill="#EB6847"/>
+<rect x="6" y="17" width="10" height="2" fill="#FF9980"/>
+<rect x="18" y="7" width="4" height="9" fill="#AF855A"/>
+</g>
+<defs>
+<clipPath id="clip0_95_1827">
+<rect width="24" height="24" fill="white"/>
+</clipPath>
+</defs>
+</svg>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24px" height="24px" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Restricted View App</title>
+    <metadata>{"backgroundColor":"#a7b6c2"}</metadata>
+    <defs>
+        <linearGradient x1="82.6042857%" y1="74.6280292%" x2="17.3957143%" y2="25.3719708%" id="linearGradient-1">
+            <stop stop-color="#F5F8FA" offset="0%"></stop>
+            <stop stop-color="#FEFFFF" offset="95.35%"></stop>
+            <stop stop-color="#FFFFFF" offset="100%"></stop>
+        </linearGradient>
+        <linearGradient x1="53.343%" y1="304.566024%" x2="46.657%" y2="-204.566024%" id="linearGradient-2">
+            <stop stop-color="#BF7326" offset="0%"></stop>
+            <stop stop-color="#E48A30" offset="49.6%"></stop>
+            <stop stop-color="#F29D49" offset="100%"></stop>
+        </linearGradient>
+    </defs>
+    <g id="Icons" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="restricted-view-dataset-app" transform="translate(-14.000000, -14.000000)">
+            <g id="Group-11" transform="translate(14.000000, 14.000000)">
+                <rect id="Rectangle-path" fill="url(#linearGradient-1)" x="0" y="8" width="22" height="14"></rect>
+                <polygon id="column" fill-opacity="0.5" fill="#D9822B" points="1 12 21 12 21 16 1 16"></polygon>
+                <polygon id="column" fill="#8A9BA8" opacity="0.3" points="0 8 5 8 5 22 0 22"></polygon>
+                <rect id="divider_3_" fill="#A7B6C2" opacity="0.800000012" x="5" y="8" width="1" height="13"></rect>
+                <rect id="divider_2_" fill="#ABBFCC" opacity="0.5" x="9" y="8" width="1" height="13"></rect>
+                <rect id="divider_1_" fill="#ABBFCC" opacity="0.5" x="13" y="8" width="1" height="13"></rect>
+                <rect id="divider_1_-copy" fill="#ABBFCC" opacity="0.5" x="17" y="8" width="1" height="13"></rect>
+                <rect id="Rectangle-path-Copy" stroke="#A7B6C2" x="0.5" y="7.5" width="21" height="14"></rect>
+                <rect id="Rectangle-path" stroke="#B86C1F" fill="url(#linearGradient-2)" fill-rule="nonzero" x="0.5" y="0.5" width="21" height="7"></rect>
+            </g>
+        </g>
+    </g>
+</svg>
