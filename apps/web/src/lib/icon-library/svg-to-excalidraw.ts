@@ -130,7 +130,6 @@ interface ExcalidrawBaseElement {
 export interface ExcalidrawFreedrawElement extends ExcalidrawBaseElement {
   type: "freedraw";
   points: [number, number][];
-  lastCommittedPoint: [number, number] | null;
   simulatePressure: boolean;
   pressures: number[];
 }
@@ -227,7 +226,7 @@ export const svgToExcalidrawElements = (
     const scaledHeight = height * scale;
 
     const freedrawElements: ExcalidrawFreedrawElement[] = pathPoints.map(
-      (points) => {
+      (points, index) => {
         const scaledPoints = points.map((point) => ({
           x: (point.x - bounds.minX) * scale,
           y: (point.y - bounds.minY) * scale,
@@ -270,9 +269,8 @@ export const svgToExcalidrawElements = (
           updated,
           link: null,
           locked: false,
-          index: null,
+          index: `a${index}`,
           points: elementPoints,
-          lastCommittedPoint: null,
           simulatePressure: true,
           pressures: [],
         } satisfies ExcalidrawFreedrawElement;
