@@ -1,5 +1,6 @@
 "use client";
 import { Wand2 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,15 @@ import { Button } from "@/components/ui/button";
 export default function Home() {
   return (
     <div className="container mx-auto max-w-3xl px-4 py-8">
-      <div className="mx-auto mb-8 h-20 w-20 rounded-lg border-2 border-muted" />
+      <div className="mx-auto mb-8 flex justify-center">
+        <Image
+          alt="Sketchi"
+          height={80}
+          priority
+          src="/icons/logo-wide.svg"
+          width={240}
+        />
+      </div>
 
       <div className="grid gap-6">
         <section className="rounded-lg border p-4">
