@@ -299,4 +299,4 @@ sketchi/
 
 MIT License - see [LICENSE](LICENSE) for details.
 
-Copyright (c) 2025 Anand Pant
+Copyright (c) 2025-2026 Anand Pant
