@@ -1,0 +1,243 @@
+const MIN_POINTS = 8;
+const MAX_POINTS = 240;
+const SAMPLE_STEP = 6;
+const TARGET_SIZE = 100;
+
+const randomId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).slice(2, 10);
+};
+
+const randomInt = () => Math.floor(Math.random() * 2 ** 31);
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, value));
+
+const transformPoint = (
+  svg: SVGSVGElement,
+  ctm: DOMMatrix | null,
+  x: number,
+  y: number
+) => {
+  if (!ctm) {
+    return { x, y };
+  }
+
+  const svgPoint = svg.createSVGPoint();
+  svgPoint.x = x;
+  svgPoint.y = y;
+  const transformed = svgPoint.matrixTransform(ctm);
+  return { x: transformed.x, y: transformed.y };
+};
+
+const sampleGeometryPoints = (
+  element: SVGGeometryElement,
+  svg: SVGSVGElement
+) => {
+  let length = 0;
+  try {
+    length = element.getTotalLength();
+  } catch {
+    length = 0;
+  }
+
+  const ctm = element.getCTM();
+
+  if (!Number.isFinite(length) || length <= 0) {
+    try {
+      const bounds = element.getBBox();
+      if (bounds.width <= 0 || bounds.height <= 0) {
+        return [];
+      }
+
+      const boxPoints = [
+        { x: bounds.x, y: bounds.y },
+        { x: bounds.x + bounds.width, y: bounds.y },
+        { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+        { x: bounds.x, y: bounds.y + bounds.height },
+        { x: bounds.x, y: bounds.y },
+      ];
+
+      return boxPoints.map((point) =>
+        transformPoint(svg, ctm, point.x, point.y)
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  const samples = clamp(
+    Math.ceil(length / SAMPLE_STEP),
+    MIN_POINTS,
+    MAX_POINTS
+  );
+  const points: { x: number; y: number }[] = [];
+
+  for (let i = 0; i <= samples; i += 1) {
+    const point = element.getPointAtLength((length * i) / samples);
+    points.push(transformPoint(svg, ctm, point.x, point.y));
+  }
+
+  return points;
+};
+
+const computeBounds = (points: { x: number; y: number }[]) => {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const point of points) {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+  }
+
+  return { minX, minY, maxX, maxY };
+};
+
+export interface ExcalidrawElement {
+  type: "freedraw";
+  version: number;
+  versionNonce: number;
+  isDeleted: boolean;
+  id: string;
+  fillStyle: "solid" | "hachure" | "cross-hatch" | "zigzag";
+  strokeWidth: number;
+  strokeStyle: "solid" | "dashed" | "dotted";
+  roughness: number;
+  opacity: number;
+  angle: number;
+  x: number;
+  y: number;
+  strokeColor: string;
+  backgroundColor: string;
+  width: number;
+  height: number;
+  seed: number;
+  groupIds: string[];
+  strokeSharpness: "sharp" | "round";
+  boundElements: unknown[];
+  updated: number;
+  link: string | null;
+  points: [number, number][];
+  lastCommittedPoint: [number, number] | null;
+  simulatePressure: boolean;
+  pressures: number[];
+}
+
+export interface StyleSettings {
+  strokeColor: string;
+  backgroundColor: string;
+  strokeWidth: number;
+  strokeStyle: "solid" | "dashed" | "dotted";
+  fillStyle: "solid" | "hachure" | "cross-hatch" | "zigzag";
+  roughness: number;
+  opacity: number;
+}
+
+export const svgToExcalidrawElements = (
+  svgText: string,
+  styleSettings: StyleSettings
+) => {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgText, "image/svg+xml");
+  const parsedSvg = doc.querySelector("svg") as SVGSVGElement | null;
+  const parseError = doc.querySelector("parsererror");
+
+  if (!parsedSvg || parseError) {
+    throw new Error("Unable to parse SVG.");
+  }
+
+  let container: HTMLDivElement | null = null;
+  let svg = parsedSvg;
+
+  if (typeof document !== "undefined" && document.body) {
+    container = document.createElement("div");
+    container.style.cssText =
+      "position:absolute;left:-99999px;top:-99999px;width:0;height:0;overflow:hidden;visibility:hidden;";
+    container.appendChild(document.importNode(parsedSvg, true));
+    document.body.appendChild(container);
+    const attached = container.querySelector("svg") as SVGSVGElement | null;
+    if (attached) {
+      svg = attached;
+    }
+  }
+
+  try {
+    const geometryElements = Array.from(
+      svg.querySelectorAll("path,rect,circle,ellipse,line,polyline,polygon")
+    ).filter((element) => "getTotalLength" in element) as SVGGeometryElement[];
+
+    const pathPoints = geometryElements
+      .map((element) => sampleGeometryPoints(element, svg))
+      .filter((points) => points.length > 1);
+
+    if (pathPoints.length === 0) {
+      throw new Error("SVG has no usable geometry.");
+    }
+
+    const flattened = pathPoints.flat();
+    const bounds = computeBounds(flattened);
+    const width = bounds.maxX - bounds.minX;
+    const height = bounds.maxY - bounds.minY;
+    const scale =
+      width > 0 || height > 0 ? TARGET_SIZE / Math.max(width, height) : 1;
+
+    const groupId = randomId();
+    const updated = Date.now();
+
+    return pathPoints.map((points) => {
+      const scaledPoints = points.map((point) => ({
+        x: (point.x - bounds.minX) * scale,
+        y: (point.y - bounds.minY) * scale,
+      }));
+
+      const localBounds = computeBounds(scaledPoints);
+      const elementX = localBounds.minX;
+      const elementY = localBounds.minY;
+      const elementPoints = scaledPoints.map(
+        (point) =>
+          [point.x - localBounds.minX, point.y - localBounds.minY] as [
+            number,
+            number,
+          ]
+      );
+
+      return {
+        type: "freedraw",
+        version: 1,
+        versionNonce: randomInt(),
+        isDeleted: false,
+        id: randomId(),
+        fillStyle: styleSettings.fillStyle,
+        strokeWidth: styleSettings.strokeWidth,
+        strokeStyle: styleSettings.strokeStyle,
+        roughness: styleSettings.roughness,
+        opacity: styleSettings.opacity,
+        angle: 0,
+        x: elementX,
+        y: elementY,
+        strokeColor: styleSettings.strokeColor,
+        backgroundColor: styleSettings.backgroundColor,
+        width: localBounds.maxX - localBounds.minX,
+        height: localBounds.maxY - localBounds.minY,
+        seed: randomInt(),
+        groupIds: [groupId],
+        strokeSharpness: "sharp",
+        boundElements: [],
+        updated,
+        link: null,
+        points: elementPoints,
+        lastCommittedPoint: null,
+        simulatePressure: true,
+        pressures: [],
+      } satisfies ExcalidrawElement;
+    });
+  } finally {
+    container?.remove();
+  }
+};
