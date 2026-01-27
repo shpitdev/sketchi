@@ -111,9 +111,12 @@ export default function SketchyIconPreview({
         fill: undefined,
         fillStyle: debouncedSettings.fillStyle,
         roughness: debouncedSettings.roughness,
+        bowing: debouncedSettings.bowing,
         stroke: "#000000",
         strokeWidth: 2,
       };
+      converterRef.current.randomize = debouncedSettings.randomize;
+      converterRef.current.pencilFilter = debouncedSettings.pencilFilter;
 
       converterRef.current.sketch();
       setError(null);
