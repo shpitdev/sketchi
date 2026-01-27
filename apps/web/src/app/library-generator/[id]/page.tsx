@@ -142,13 +142,17 @@ export default function LibraryEditorPage({ params }: PageProps) {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteSelected = async (ids: string[]) => {
     try {
-      await deleteIcon({ iconId: id as Id<"iconItems"> });
-      toast.success("Icon deleted.");
+      for (const id of ids) {
+        await deleteIcon({ iconId: id as Id<"iconItems"> });
+      }
+      toast.success(
+        ids.length === 1 ? "Icon deleted." : `${ids.length} icons deleted.`
+      );
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Failed to delete icon.";
+        error instanceof Error ? error.message : "Failed to delete icons.";
       toast.error(message);
     }
   };
@@ -245,8 +249,9 @@ export default function LibraryEditorPage({ params }: PageProps) {
           <IconGrid
             icons={icons}
             isBusy={isUploading}
-            onDelete={handleDelete}
+            onDeleteSelected={handleDeleteSelected}
             onMove={handleMove}
+            styleSettings={styleSettings}
           />
         </div>
       </main>
