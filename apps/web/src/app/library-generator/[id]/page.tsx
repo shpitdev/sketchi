@@ -243,14 +243,6 @@ export default function LibraryEditorPage({ params }: PageProps) {
           <h2 className="font-semibold text-sm">Upload</h2>
           <SvgUploader isUploading={isUploading} onUpload={handleUpload} />
         </div>
-
-        <div className="mt-auto">
-          <ExportButton
-            icons={icons.map((icon) => ({ name: icon.name, url: icon.url }))}
-            libraryName={libraryName}
-            styleSettings={styleSettings}
-          />
-        </div>
       </aside>
 
       <main className="flex flex-1 flex-col overflow-hidden">
@@ -261,6 +253,11 @@ export default function LibraryEditorPage({ params }: PageProps) {
               {icons.length} icons
             </span>
           </div>
+          <ExportButton
+            icons={icons.map((icon) => ({ name: icon.name, url: icon.url }))}
+            libraryName={libraryName}
+            styleSettings={styleSettings}
+          />
         </div>
         <div className="flex-1 overflow-y-auto p-4">
           <IconGrid
