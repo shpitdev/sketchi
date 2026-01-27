@@ -5,29 +5,31 @@ import {
   type GraphLayout,
   type IntermediateFormat,
 } from "./diagram-intermediate";
-import type { Diagram } from "./diagram-structure";
-import type {
-  LayoutConfig,
-  LayoutDirection,
-  LayoutOverrides,
-  LayoutedDiagram,
-  PositionedArrow,
-  PositionedShape,
-} from "./diagram-layout-types";
-import { applyRadialLayout } from "./diagram-layout-radial";
 import {
   convertIntermediateToDiagram,
   toLayoutOverrides,
 } from "./diagram-layout-intermediate";
+import { applyRadialLayout } from "./diagram-layout-radial";
 import { sortArrows, sortShapes } from "./diagram-layout-sorting";
+import type {
+  LayoutConfig,
+  LayoutedDiagram,
+  LayoutOverrides,
+  PositionedArrow,
+  PositionedShape,
+} from "./diagram-layout-types";
+import type { Diagram } from "./diagram-structure";
 
+export {
+  convertIntermediateToDiagram,
+  toLayoutOverrides,
+} from "./diagram-layout-intermediate";
 export type {
   EdgeRouting,
   LayoutDirection,
-  LayoutOverrides,
   LayoutedDiagram,
+  LayoutOverrides,
 } from "./diagram-layout-types";
-export { convertIntermediateToDiagram, toLayoutOverrides } from "./diagram-layout-intermediate";
 
 const DEFAULT_CONFIG: LayoutConfig = {
   rankdir: "TB",

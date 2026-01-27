@@ -2,13 +2,13 @@ import type {
   IntermediateFormat,
   IntermediateNode,
 } from "./diagram-intermediate";
+import type { EdgeRouting, LayoutOverrides } from "./diagram-layout-types";
 import type {
   ArrowElement,
   Diagram,
   ShapeElement,
   ShapeType,
 } from "./diagram-structure";
-import type { EdgeRouting, LayoutOverrides } from "./diagram-layout-types";
 
 function normalizeShapeOverride(value: unknown): ShapeType | undefined {
   if (value === "rectangle" || value === "ellipse" || value === "diamond") {
@@ -50,7 +50,10 @@ function normalizeEdgeRouting(value: unknown): EdgeRouting | undefined {
   return undefined;
 }
 
-function compareStringsDeterministic(a?: string | null, b?: string | null): number {
+function compareStringsDeterministic(
+  a?: string | null,
+  b?: string | null
+): number {
   const left = a ?? "";
   const right = b ?? "";
   if (left === right) {

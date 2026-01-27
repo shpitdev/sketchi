@@ -12,6 +12,8 @@ import type * as diagramGenerateFromIntermediate from "../diagramGenerateFromInt
 import type * as excalidrawShareLinks from "../excalidrawShareLinks.js";
 import type * as export_ from "../export.js";
 import type * as healthCheck from "../healthCheck.js";
+import type * as iconLibraries from "../iconLibraries.js";
+import type * as iconLibrariesActions from "../iconLibrariesActions.js";
 import type * as lib_excalidrawShareLinks from "../lib/excalidrawShareLinks.js";
 import type * as lib_logging from "../lib/logging.js";
 
@@ -26,6 +28,8 @@ declare const fullApi: ApiFromModules<{
   excalidrawShareLinks: typeof excalidrawShareLinks;
   export: typeof export_;
   healthCheck: typeof healthCheck;
+  iconLibraries: typeof iconLibraries;
+  iconLibrariesActions: typeof iconLibrariesActions;
   "lib/excalidrawShareLinks": typeof lib_excalidrawShareLinks;
   "lib/logging": typeof lib_logging;
 }>;

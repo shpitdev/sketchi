@@ -10,6 +10,10 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
+import {
+  closeBrowser,
+  renderElementsToPng,
+} from "../experiments/lib/render-png";
 import type { IntermediateFormat } from "../lib/diagram-intermediate";
 import { layoutIntermediateDiagram } from "../lib/diagram-layout";
 import type {
@@ -18,10 +22,6 @@ import type {
   PositionedShape,
 } from "../lib/diagram-layout-types";
 import { convertLayoutedToExcalidraw } from "../lib/excalidraw-elements";
-import {
-  closeBrowser,
-  renderElementsToPng,
-} from "../experiments/lib/render-png";
 
 type Edge = "left" | "right" | "top" | "bottom";
 
@@ -177,7 +177,10 @@ function determineEdges(
     : { startEdge: "bottom", endEdge: "top" };
 }
 
-function getEdgeCenter(shape: PositionedShape, edge: Edge): { x: number; y: number } {
+function getEdgeCenter(
+  shape: PositionedShape,
+  edge: Edge
+): { x: number; y: number } {
   switch (edge) {
     case "left":
       return { x: shape.x, y: shape.y + shape.height / 2 };
@@ -265,7 +268,10 @@ function expectArrowOptimized(
   expect(arrow.height).toBe(endPoint.y - startPoint.y);
 
   const lastPoint = arrow.points[arrow.points.length - 1];
-  expect(lastPoint).toEqual([endPoint.x - startPoint.x, endPoint.y - startPoint.y]);
+  expect(lastPoint).toEqual([
+    endPoint.x - startPoint.x,
+    endPoint.y - startPoint.y,
+  ]);
 }
 
 async function runScenario(scenario: Scenario) {
@@ -334,9 +340,7 @@ async function runScenario(scenario: Scenario) {
     ];
     await writeSummary(merged);
 
-    const shapeMap = new Map(
-      layouted.shapes.map((shape) => [shape.id, shape])
-    );
+    const shapeMap = new Map(layouted.shapes.map((shape) => [shape.id, shape]));
     for (const arrow of layouted.arrows) {
       expectArrowOptimized(arrow, shapeMap);
     }
@@ -363,17 +367,13 @@ async function runScenario(scenario: Scenario) {
 }
 
 describe.sequential("arrow optimization", () => {
-  test(
-    "deterministic routing snaps arrow endpoints to edges",
-    async () => {
-      try {
-        for (const scenario of SCENARIOS) {
-          await runScenario(scenario);
-        }
-      } finally {
-        await closeBrowser();
+  test("deterministic routing snaps arrow endpoints to edges", async () => {
+    try {
+      for (const scenario of SCENARIOS) {
+        await runScenario(scenario);
       }
-    },
-    120_000
-  );
+    } finally {
+      await closeBrowser();
+    }
+  }, 120_000);
 });

@@ -8,9 +8,7 @@ function compareStringsDeterministic(a: string, b: string): number {
 }
 
 export function sortShapes(shapes: ShapeElement[]): ShapeElement[] {
-  return [...shapes].sort((a, b) =>
-    compareStringsDeterministic(a.id, b.id)
-  );
+  return [...shapes].sort((a, b) => compareStringsDeterministic(a.id, b.id));
 }
 
 export function sortArrows(arrows: ArrowElement[]): ArrowElement[] {

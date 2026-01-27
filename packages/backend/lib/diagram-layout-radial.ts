@@ -1,10 +1,10 @@
-import type { ArrowElement, Diagram, ShapeElement } from "./diagram-structure";
+import { sortArrows, sortShapes } from "./diagram-layout-sorting";
 import type {
   LayoutedDiagram,
   PositionedArrow,
   PositionedShape,
 } from "./diagram-layout-types";
-import { sortArrows, sortShapes } from "./diagram-layout-sorting";
+import type { ArrowElement, Diagram, ShapeElement } from "./diagram-structure";
 
 interface TreeNode {
   id: string;
