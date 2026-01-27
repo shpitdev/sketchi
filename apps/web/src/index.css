@@ -125,4 +125,33 @@
   html {
     @apply font-sans;
   }
+
+  /* Range input thumb styling - light mode */
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: oklch(0.4 0 0);
+    cursor: pointer;
+    border: none;
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: oklch(0.4 0 0);
+    cursor: pointer;
+    border: none;
+  }
+
+  /* Range input thumb styling - dark mode */
+  .dark input[type="range"]::-webkit-slider-thumb {
+    background-color: oklch(0.85 0 0);
+  }
+
+  .dark input[type="range"]::-moz-range-thumb {
+    background-color: oklch(0.85 0 0);
+  }
 }
