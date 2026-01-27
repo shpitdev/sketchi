@@ -145,7 +145,7 @@ export default function SketchyIconPreview({
       )}
       <div
         aria-label={`Sketchy preview of ${name}`}
-        className="flex h-full w-full items-center justify-center [&>svg]:max-h-full [&>svg]:max-w-full"
+        className="flex h-full w-full items-center justify-center p-2 [&>svg]:h-full [&>svg]:w-full"
         ref={containerRef}
         role="img"
       />
