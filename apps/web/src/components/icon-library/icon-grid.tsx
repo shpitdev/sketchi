@@ -1,5 +1,6 @@
 "use client";
 
+import { Minus, Plus } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,10 @@ export default function IconGrid({
 }: IconGridProps) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [iconSize, setIconSize] = useState(80);
+
+  const handleZoomIn = () => setIconSize((prev) => Math.min(prev + 20, 200));
+  const handleZoomOut = () => setIconSize((prev) => Math.max(prev - 20, 40));
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -64,6 +69,28 @@ export default function IconGrid({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-end gap-2">
+        <div className="mr-auto flex items-center gap-1">
+          <Button
+            aria-label="Zoom out"
+            disabled={iconSize <= 40}
+            onClick={handleZoomOut}
+            size="icon-sm"
+            type="button"
+            variant="outline"
+          >
+            <Minus />
+          </Button>
+          <Button
+            aria-label="Zoom in"
+            disabled={iconSize >= 200}
+            onClick={handleZoomIn}
+            size="icon-sm"
+            type="button"
+            variant="outline"
+          >
+            <Plus />
+          </Button>
+        </div>
         {isEditMode ? (
           <>
             <Button
@@ -97,7 +124,12 @@ export default function IconGrid({
         )}
       </div>
 
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-3">
+      <div
+        className="grid gap-3"
+        style={{
+          gridTemplateColumns: `repeat(auto-fill, minmax(${iconSize}px, 1fr))`,
+        }}
+      >
         {icons.map((icon, index) => {
           const canMoveLeft = index > 0;
           const canMoveRight = index < icons.length - 1;
