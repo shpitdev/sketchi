@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { StyleSettings } from "@/lib/icon-library/svg-to-excalidraw";
+import SketchyIconPreview from "./sketchy-icon-preview";
 
 export interface IconGridItem {
   id: string;
@@ -61,8 +61,6 @@ export default function IconGrid({
     );
   }
 
-  const opacityValue = styleSettings.opacity / 100;
-
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-end gap-2">
@@ -110,25 +108,12 @@ export default function IconGrid({
               className="flex flex-col gap-2 rounded border bg-muted/10 p-2"
               key={icon.id}
             >
-              <div
-                className="relative flex aspect-square items-center justify-center rounded border bg-muted/30"
-                style={{ opacity: opacityValue }}
-              >
-                {icon.url ? (
-                  <Image
-                    alt={icon.name}
-                    className="object-contain"
-                    fill
-                    sizes="96px"
-                    src={icon.url}
-                    unoptimized
-                  />
-                ) : (
-                  <span className="text-[10px] text-muted-foreground">
-                    preview
-                  </span>
-                )}
-
+              <div className="relative">
+                <SketchyIconPreview
+                  name={icon.name}
+                  styleSettings={styleSettings}
+                  svgUrl={icon.url}
+                />
                 {isEditMode && (
                   <button
                     aria-label={isSelected ? "Deselect icon" : "Select icon"}
