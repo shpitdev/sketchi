@@ -4,20 +4,41 @@
   <img src="apps/web/public/icons/logo.svg" alt="Sketchi" width="120" height="120" />
 </p>
 
-[![Next.js](https://img.shields.io/badge/Next.js-16.1.1-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+<!-- Core Stack -->
+[![Next.js](https://img.shields.io/badge/Next.js-16.1.1-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/docs)
 [![React](https://img.shields.io/badge/React-19.2.3-61DAFB?logo=react&logoColor=white)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Convex](https://img.shields.io/badge/Convex-1.31.2-F3694C?logo=convex&logoColor=white)](https://convex.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.1.10-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![Turborepo](https://img.shields.io/badge/Turborepo-2.6.3-EF4444?logo=turborepo&logoColor=white)](https://turbo.build/)
-[![Bun](https://img.shields.io/badge/Bun-1.3.5-FBF0DF?logo=bun&logoColor=black)](https://bun.sh/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/docs/)
+[![Zod](https://img.shields.io/badge/Zod-4.1.13-3E67B1?logo=zod&logoColor=white)](https://zod.dev/)
+[![Convex](https://img.shields.io/badge/Convex-1.31.2-F3694C?logo=convex&logoColor=white)](https://docs.convex.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.1.10-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/docs)
 
-[![Vercel AI SDK](https://img.shields.io/badge/Vercel_AI_SDK-6.0.49-000000?logo=vercel&logoColor=white)](https://sdk.vercel.ai/)
-[![Playwright](https://img.shields.io/badge/Playwright-1.58.0-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/)
-[![Biome](https://img.shields.io/badge/Biome-2.3.11-60A5FA?logo=biome&logoColor=white)](https://biomejs.dev/)
+<!-- Tooling -->
+[![Turborepo](https://img.shields.io/badge/Turborepo-2.6.3-EF4444?logo=turborepo&logoColor=white)](https://turbo.build/repo/docs)
+[![Better T Stack](https://img.shields.io/badge/Better_T_Stack-Scaffold-FF6B6B?logo=npm&logoColor=white)](https://github.com/AmanVarshney01/create-better-t-stack)
+[![Bun](https://img.shields.io/badge/Bun-1.3.5-FBF0DF?logo=bun&logoColor=black)](https://bun.sh/docs)
+[![Biome](https://img.shields.io/badge/Biome-2.3.11-60A5FA?logo=biome&logoColor=white)](https://biomejs.dev/guides/getting-started/)
+[![OpenCode](https://img.shields.io/badge/OpenCode-CLI-10B981?logo=terminal&logoColor=white)](https://github.com/opencode-ai/opencode)
 
-[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+<!-- AI Stack -->
+[![Vercel AI SDK](https://img.shields.io/badge/Vercel_AI_SDK-6.0.49-000000?logo=vercel&logoColor=white)](https://sdk.vercel.ai/docs)
+[![OpenRouter](https://img.shields.io/badge/OpenRouter-API-6366F1?logo=openai&logoColor=white)](https://openrouter.ai/docs)
+
+<!-- Drawing Libraries -->
+[![Excalidraw](https://img.shields.io/badge/Excalidraw-0.18.0-6965DB?logo=excalidraw&logoColor=white)](https://docs.excalidraw.com/)
+[![svg2roughjs](https://img.shields.io/badge/svg2roughjs-3.2.1-FF6B6B?logo=svg&logoColor=white)](https://github.com/nickreese/svg2roughjs)
+[![dagre](https://img.shields.io/badge/dagre-0.8.5-4ECDC4?logo=graphql&logoColor=white)](https://github.com/dagrejs/dagre/wiki)
+
+<!-- Testing & CI/CD -->
+[![Stagehand](https://img.shields.io/badge/Stagehand-3.0.7-8B5CF6?logo=playwright&logoColor=white)](https://docs.stagehand.dev/)
+[![Browserbase](https://img.shields.io/badge/Browserbase-2.6.0-FF4785?logo=google-chrome&logoColor=white)](https://docs.browserbase.com/)
+[![Venom](https://img.shields.io/badge/Venom-API_Testing-FF9500?logo=go&logoColor=white)](https://github.com/ovh/venom)
+[![Playwright](https://img.shields.io/badge/Playwright-1.58.0-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/docs/intro)
+[![Vitest](https://img.shields.io/badge/Vitest-4.0.18-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/guide/)
+[![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?logo=githubactions&logoColor=white)](https://docs.github.com/en/actions)
+
+<!-- Deployment & License -->
 [![Deployed on Vercel](https://img.shields.io/badge/Deployed_on-Vercel-000000?logo=vercel&logoColor=white)](https://sketchi.app/)
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
 
