@@ -17,11 +17,17 @@ export interface GenerateOptions {
   profileId?: string;
 }
 
+/**
+ * Local getProfile to avoid circular dependency with index.ts.
+ * Falls back to 'general' profile with warning for unknown profiles.
+ */
 function getProfile(profileId: string): PromptAgentProfile {
   if (profileId === "general") {
     return generalProfile;
   }
-  throw new Error(`Unknown profile: ${profileId}`);
+  // Graceful fallback - matches registry behavior in index.ts
+  console.warn(`Profile '${profileId}' not found, falling back to 'general'`);
+  return generalProfile;
 }
 
 const ValidationInputSchema = z.object({

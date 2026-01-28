@@ -259,36 +259,26 @@ async function writeSummary(results: ScenarioResult[]) {
   await writeFile(summaryMdPath, lines.join("\n"));
 }
 
+const hasRequiredEnv = requiredEnv.every((key) => process.env[key]);
+
 describe.sequential("prompt to intermediate E2E", () => {
-  test("full pipeline across prompts", async () => {
-    const missingEnv = requiredEnv.filter((key) => !process.env[key]);
+  test.skipIf(!hasRequiredEnv)(
+    "full pipeline across prompts",
+    async () => {
+      try {
+        const results = await Promise.all(
+          SCENARIOS.map((scenario) => runScenario(scenario))
+        );
 
-    if (missingEnv.length > 0) {
-      const message = `Missing required env: ${missingEnv.join(", ")}`;
-      const failureResults = SCENARIOS.map((scenario) => ({
-        scenario: scenario.name,
-        slug: scenario.slug,
-        status: "failed" as const,
-        durationMs: 0,
-        error: message,
-        createdAt: new Date().toISOString(),
-      }));
-      await writeSummary(failureResults);
-      return;
-    }
+        await writeSummary(results);
 
-    try {
-      const results = await Promise.all(
-        SCENARIOS.map((scenario) => runScenario(scenario))
-      );
-
-      await writeSummary(results);
-
-      const failures = results.filter((result) => result.status !== "passed");
-      // Allow up to 1 failure - LLM-based generation has inherent variance
-      expect(failures.length).toBeLessThanOrEqual(1);
-    } finally {
-      await closeBrowser();
-    }
-  }, 300_000);
+        const failures = results.filter((result) => result.status !== "passed");
+        // Allow up to 1 failure - LLM-based generation has inherent variance
+        expect(failures.length).toBeLessThanOrEqual(1);
+      } finally {
+        await closeBrowser();
+      }
+    },
+    300_000
+  );
 });
