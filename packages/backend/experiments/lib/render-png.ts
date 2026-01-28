@@ -123,7 +123,7 @@ async function exportElementsToPng(
   }
 }
 
-export async function renderDiagramToPng(
+export function renderDiagramToPng(
   diagram: Diagram,
   options: RenderOptions = {}
 ): Promise<RenderResult> {
@@ -135,7 +135,7 @@ export async function renderDiagramToPng(
   return exportElementsToPng(elements, options);
 }
 
-export async function renderElementsToPng(
+export function renderElementsToPng(
   elements: Record<string, unknown>[],
   options: RenderOptions = {}
 ): Promise<RenderResult> {

@@ -184,7 +184,7 @@ export const update = mutation({
 });
 
 export const generateUploadUrl = mutation({
-  handler: async (ctx) => {
+  handler: (ctx) => {
     return ctx.storage.generateUploadUrl();
   },
 });

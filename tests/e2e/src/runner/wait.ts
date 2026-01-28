@@ -7,7 +7,7 @@ export interface WaitOptions {
   label?: string;
 }
 
-export async function sleep(ms: number) {
+export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -44,7 +44,7 @@ export async function isVisible(
   }
 }
 
-export async function waitForVisible(
+export function waitForVisible(
   pageOrFrame: {
     locator: (selector: string) => { isVisible: () => Promise<boolean> };
   },
@@ -91,7 +91,7 @@ export async function fillWhenVisible(
   await pageOrFrame.locator(selector).fill(value);
 }
 
-export async function waitForUrl(
+export function waitForUrl(
   page: { url: () => string },
   predicate: (url: string) => boolean,
   options: WaitOptions = {}
