@@ -1,0 +1,43 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "context7": {
+      "type": "local",
+      "enabled": false,
+      "command": [
+        "npx",
+        "-y",
+        "@upstash/context7-mcp"
+      ]
+    },
+    "convex": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "npx",
+        "-y",
+        "convex@latest",
+        "mcp",
+        "start"
+      ]
+    },
+    "shadcn": {
+      "type": "local",
+      "enabled": false,
+      "command": [
+        "npx",
+        "shadcn@latest",
+        "mcp"
+      ]
+    },
+    "next-devtools": {
+      "type": "local",
+      "enabled": false,
+      "command": [
+        "npx",
+        "-y",
+        "next-devtools-mcp@latest"
+      ]
+    }
+  }
+}
