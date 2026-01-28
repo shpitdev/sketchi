@@ -43,6 +43,7 @@ export default function SvgUploader({
       <input
         accept="image/svg+xml"
         className="hidden"
+        data-testid="svg-file-input"
         multiple
         onChange={handleChange}
         ref={inputRef}
