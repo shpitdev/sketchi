@@ -83,17 +83,35 @@ async function waitForUploadInput(
   }
 }
 
+async function waitForConvexUrl(
+  // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
+  page: any,
+  timeoutMs = 10_000
+): Promise<string | undefined> {
+  const startedAt = Date.now();
+  for (;;) {
+    const url = await page.evaluate(
+      () =>
+        (window as Window & { __SKETCHI_CONVEX_URL?: string })
+          .__SKETCHI_CONVEX_URL
+    );
+    if (url) {
+      return url;
+    }
+    if (Date.now() - startedAt > timeoutMs) {
+      return undefined;
+    }
+    await sleep(250);
+  }
+}
+
 async function createLibraryViaApi(
   // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
   page: any,
   baseUrl: string,
   libraryName: string
 ) {
-  const convexUrl = await page.evaluate(
-    () =>
-      (window as Window & { __SKETCHI_CONVEX_URL?: string })
-        .__SKETCHI_CONVEX_URL
-  );
+  const convexUrl = await waitForConvexUrl(page, 15_000);
   if (!convexUrl) {
     throw new Error("Missing Convex URL from app runtime.");
   }

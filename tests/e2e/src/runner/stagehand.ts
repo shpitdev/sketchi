@@ -113,23 +113,39 @@ export async function getActivePage(stagehand: Stagehand) {
   if (pages.length > 0) {
     const page = pages[0];
     await attachPopupBlocker(page);
+    await applyVercelBypassHeadersToPage(page);
     return page;
   }
   if ("awaitActivePage" in stagehand.context) {
     const active = await stagehand.context.awaitActivePage();
     if (active) {
       await attachPopupBlocker(active);
+      await applyVercelBypassHeadersToPage(active);
       return active;
     }
   }
   const page = await stagehand.context.newPage();
   await attachPopupBlocker(page);
+  await applyVercelBypassHeadersToPage(page);
   return page;
 }
 
 export function isSoftCompletion(result?: ActResult) {
   const message = result?.message?.toLowerCase() ?? "";
   return message.includes("task execution completed");
+}
+
+async function applyVercelBypassHeadersToPage(page: {
+  setExtraHTTPHeaders?: (headers: Record<string, string>) => Promise<void>;
+}) {
+  const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (!bypassSecret || typeof page.setExtraHTTPHeaders !== "function") {
+    return;
+  }
+  await page.setExtraHTTPHeaders({
+    "x-vercel-protection-bypass": bypassSecret,
+    "x-vercel-set-bypass-cookie": "true",
+  });
 }
 
 export async function captureScreenshot(
