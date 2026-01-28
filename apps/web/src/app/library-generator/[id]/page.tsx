@@ -57,6 +57,12 @@ export default function LibraryEditorPage({ params }: PageProps) {
         string,
         unknown
       >;
+      // Session-only settings - persistence deferred until user auth is implemented.
+      // The following settings reset to defaults on page reload:
+      // - bowing: 1 (hardcoded, not persisted)
+      // - randomize: true (hardcoded, not persisted)
+      // - pencilFilter: false (hardcoded, not persisted)
+      // These are intentionally excluded from the backend schema and handleSave.
       setStyleSettings({
         fillStyle: (dbSettings.fillStyle ||
           "hachure") as StyleSettings["fillStyle"],
@@ -221,6 +227,7 @@ export default function LibraryEditorPage({ params }: PageProps) {
         <div className="flex flex-col gap-3">
           <h1 className="font-semibold text-lg">Library editor</h1>
           <Input
+            aria-label="Library name"
             onChange={(event) => setLibraryName(event.target.value)}
             value={libraryName}
           />
@@ -266,7 +273,7 @@ export default function LibraryEditorPage({ params }: PageProps) {
         <div className="flex-1 overflow-y-auto p-4">
           <IconGrid
             icons={icons}
-            isBusy={isUploading}
+            isBusy={isUploading || isSaving}
             onDeleteSelected={handleDeleteSelected}
             onMove={handleMove}
             styleSettings={styleSettings}
