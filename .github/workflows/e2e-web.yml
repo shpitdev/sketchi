@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   e2e:
@@ -20,19 +21,72 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Check for doc-only changes
+        id: doc_check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const sha =
+              context.payload.deployment?.sha ??
+              context.payload.deployment_status?.deployment?.sha;
+            if (!sha) {
+              core.warning("No deployment SHA found; running tests.");
+              core.setOutput("run_tests", "true");
+              return;
+            }
+            let prs = [];
+            try {
+              const response =
+                await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                  owner,
+                  repo,
+                  commit_sha: sha,
+                });
+              prs = response.data ?? [];
+            } catch (error) {
+              core.warning(`Failed to resolve PR for ${sha}: ${error.message}`);
+              core.setOutput("run_tests", "true");
+              return;
+            }
+            if (!prs.length) {
+              core.notice(`No PR found for ${sha}; running tests.`);
+              core.setOutput("run_tests", "true");
+              return;
+            }
+            const prNumber = prs[0].number;
+            const files = await github.paginate(
+              github.rest.pulls.listFiles,
+              { owner, repo, pull_number: prNumber, per_page: 100 }
+            );
+            const docOnly = files.every(
+              (file) =>
+                file.filename === "README.md" ||
+                file.filename.startsWith("docs/") ||
+                file.filename.startsWith(".ruler/")
+            );
+            core.setOutput("run_tests", docOnly ? "false" : "true");
+            if (docOnly) {
+              core.notice("Docs-only change; skipping E2E web tests.");
+            }
+
       - name: Checkout
+        if: steps.doc_check.outputs.run_tests == 'true'
         uses: actions/checkout@v4
 
       - name: Setup Bun
+        if: steps.doc_check.outputs.run_tests == 'true'
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
       - name: Install E2E dependencies
+        if: steps.doc_check.outputs.run_tests == 'true'
         run: bun install --frozen-lockfile
         working-directory: tests/e2e
 
       - name: Run E2E scenarios
+        if: steps.doc_check.outputs.run_tests == 'true'
         env:
           STAGEHAND_TARGET_URL: ${{ github.event.deployment_status.environment_url }}
           STAGEHAND_ENV: BROWSERBASE
@@ -50,7 +104,7 @@ jobs:
           bun run icon-library-generator-happy-path
 
       - name: Upload E2E artifacts
-        if: always()
+        if: always() && steps.doc_check.outputs.run_tests == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: e2e-artifacts-${{ github.run_id }}

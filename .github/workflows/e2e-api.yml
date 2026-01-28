@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   api-tests:
@@ -20,16 +21,68 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Check for doc-only changes
+        id: doc_check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const sha =
+              context.payload.deployment?.sha ??
+              context.payload.deployment_status?.deployment?.sha;
+            if (!sha) {
+              core.warning("No deployment SHA found; running tests.");
+              core.setOutput("run_tests", "true");
+              return;
+            }
+            let prs = [];
+            try {
+              const response =
+                await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                  owner,
+                  repo,
+                  commit_sha: sha,
+                });
+              prs = response.data ?? [];
+            } catch (error) {
+              core.warning(`Failed to resolve PR for ${sha}: ${error.message}`);
+              core.setOutput("run_tests", "true");
+              return;
+            }
+            if (!prs.length) {
+              core.notice(`No PR found for ${sha}; running tests.`);
+              core.setOutput("run_tests", "true");
+              return;
+            }
+            const prNumber = prs[0].number;
+            const files = await github.paginate(
+              github.rest.pulls.listFiles,
+              { owner, repo, pull_number: prNumber, per_page: 100 }
+            );
+            const docOnly = files.every(
+              (file) =>
+                file.filename === "README.md" ||
+                file.filename.startsWith("docs/") ||
+                file.filename.startsWith(".ruler/")
+            );
+            core.setOutput("run_tests", docOnly ? "false" : "true");
+            if (docOnly) {
+              core.notice("Docs-only change; skipping E2E API tests.");
+            }
+
       - name: Checkout
+        if: steps.doc_check.outputs.run_tests == 'true'
         uses: actions/checkout@v4
 
       - name: Install Venom
+        if: steps.doc_check.outputs.run_tests == 'true'
         run: |
           curl -L -o venom https://github.com/ovh/venom/releases/download/v1.3.0/venom.linux-amd64
           chmod +x venom
           sudo mv venom /usr/local/bin/
 
       - name: Run API tests
+        if: steps.doc_check.outputs.run_tests == 'true'
         run: |
           venom run tests/api/*.yml \
             --var target_url=${{ github.event.deployment_status.environment_url }} \
@@ -39,7 +92,7 @@ jobs:
             --format json
 
       - name: Upload API test artifacts
-        if: always()
+        if: always() && steps.doc_check.outputs.run_tests == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: api-test-results-${{ github.run_id }}

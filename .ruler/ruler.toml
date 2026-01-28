@@ -1,12 +1,15 @@
 # Ruler config - https://okigu.com/ruler
 
-default_agents = ["codex", "opencode", "copilot"]
+default_agents = ["codex", "opencode"]
 
 [mcp]
 enabled = true
 merge_strategy = "merge"
 
 [gitignore]
+enabled = true
+
+[skills]
 enabled = true
 
 # MCP Servers
@@ -37,14 +40,6 @@ output_path = "AGENTS.md"
 output_path_config = ".codex/config.toml"
 
 [agents.codex.mcp]
-enabled = true
-merge_strategy = "merge"
-
-[agents.copilot]
-enabled = true
-output_path = ".github/copilot-instructions.md"
-
-[agents.copilot.mcp]
 enabled = true
 merge_strategy = "merge"
 

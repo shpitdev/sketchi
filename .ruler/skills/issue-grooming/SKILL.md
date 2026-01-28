@@ -1,9 +1,4 @@
----
-name: issue-groomer
-description: Transforms raw issues into actionable specs with dependencies, test strategy, and acceptance criteria
-tools: ["read", "search", "web", "github/*"]
-infer: false
----
+# Issue Grooming Agent
 
 ## Your Role
 

@@ -47,8 +47,8 @@ async function waitForLibraryInput(
 ): Promise<boolean> {
   const startedAt = Date.now();
   for (;;) {
-    const exists = await page.evaluate(
-      () => Boolean(document.querySelector('input[placeholder="Library name"]'))
+    const exists = await page.evaluate(() =>
+      Boolean(document.querySelector('input[placeholder="Library name"]'))
     );
     if (exists) {
       return true;
@@ -87,8 +87,8 @@ async function waitForUploadInput(
 ): Promise<boolean> {
   const startedAt = Date.now();
   for (;;) {
-    const exists = await page.evaluate(
-      () => Boolean(document.querySelector('[data-testid="svg-file-input"]'))
+    const exists = await page.evaluate(() =>
+      Boolean(document.querySelector('[data-testid="svg-file-input"]'))
     );
     if (exists) {
       return true;

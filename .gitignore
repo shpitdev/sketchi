@@ -55,14 +55,21 @@ temp
 .sisyphus/
 
 # START Ruler Generated Files
+/.agent/skills
+/.agents/skills
+/.claude/skills
 /.codex/config.json
 /.codex/config.json.bak
 /.codex/config.toml
 /.codex/config.toml.bak
-/.github/copilot-instructions.md
-/.github/copilot-instructions.md.bak
-/.vscode/mcp.json
-/.vscode/mcp.json.bak
+/.codex/skills
+/.cursor/skills
+/.factory/skills
+/.gemini/skills
+/.opencode/skill
+/.pi/skills
+/.roo/skills
+/.vibe/skills
 /AGENTS.md
 /AGENTS.md.bak
 /opencode.json

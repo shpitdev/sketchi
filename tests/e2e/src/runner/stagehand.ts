@@ -52,7 +52,9 @@ const popupBlockerAttached = new WeakSet<object>();
 async function applyVercelBypassHeaders(
   context: {
     setExtraHTTPHeaders?: (headers: Record<string, string>) => Promise<void>;
-    pages?: () => Array<{ setExtraHTTPHeaders?: (headers: Record<string, string>) => Promise<void> }>;
+    pages?: () => Array<{
+      setExtraHTTPHeaders?: (headers: Record<string, string>) => Promise<void>;
+    }>;
   },
   cfg: StagehandRunConfig
 ) {

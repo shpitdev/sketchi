@@ -12,8 +12,9 @@ const convex = new ConvexReactClient(env.NEXT_PUBLIC_CONVEX_URL);
 export default function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     document.documentElement.dataset.hydrated = "true";
-    (window as Window & { __SKETCHI_CONVEX_URL?: string }).__SKETCHI_CONVEX_URL =
-      env.NEXT_PUBLIC_CONVEX_URL;
+    (
+      window as Window & { __SKETCHI_CONVEX_URL?: string }
+    ).__SKETCHI_CONVEX_URL = env.NEXT_PUBLIC_CONVEX_URL;
   }, []);
 
   return (

@@ -5,9 +5,17 @@ name: ci-tests
 
 on:
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - ".ruler/**"
+      - "README.md"
   push:
     branches:
       - main
+    paths-ignore:
+      - "docs/**"
+      - ".ruler/**"
+      - "README.md"
 
 jobs:
   convex-tests:
