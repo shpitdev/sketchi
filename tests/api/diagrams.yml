@@ -1,6 +1,6 @@
 name: Diagram API Endpoints
 vars:
-  target_url: "{{.VENOM_TARGET_URL}}"
+  target_url: "http://localhost:3001"
 
 testcases:
   - name: POST /api/diagrams/generate returns 404 (not implemented)

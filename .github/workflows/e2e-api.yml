@@ -23,15 +23,14 @@ jobs:
 
       - name: Install Venom
         run: |
-          curl -L -o venom https://github.com/ovh/venom/releases/download/v1.2.0/venom.linux-amd64
+          curl -L -o venom https://github.com/ovh/venom/releases/download/v1.3.0/venom.linux-amd64
           chmod +x venom
           sudo mv venom /usr/local/bin/
 
       - name: Run API tests
-        env:
-          VENOM_TARGET_URL: ${{ github.event.deployment_status.environment_url }}
         run: |
           venom run tests/api/*.yml \
+            --var target_url=${{ github.event.deployment_status.environment_url }} \
             --output-dir tests/api/results \
             --format xml \
             --format json
