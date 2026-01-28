@@ -20,8 +20,6 @@ Success:
 
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ConvexHttpClient } from "convex/browser";
-import { makeFunctionReference } from "convex/server";
 import { loadConfig } from "../../runner/config";
 import {
   captureScreenshot,
@@ -41,7 +39,6 @@ import { sleep } from "../../runner/wait";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const fixturesDir = join(__dirname, "../../../fixtures/svgs");
-const createLibraryMutation = makeFunctionReference("iconLibraries:create");
 
 async function waitForLibraryInput(
   // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
@@ -54,6 +51,26 @@ async function waitForLibraryInput(
       () => Boolean(document.querySelector('input[placeholder="Library name"]'))
     );
     if (exists) {
+      return true;
+    }
+    if (Date.now() - startedAt > timeoutMs) {
+      return false;
+    }
+    await sleep(250);
+  }
+}
+
+async function waitForHydration(
+  // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
+  page: any,
+  timeoutMs = 20_000
+): Promise<boolean> {
+  const startedAt = Date.now();
+  for (;;) {
+    const hydrated = await page.evaluate(
+      () => document.documentElement.dataset.hydrated === "true"
+    );
+    if (hydrated) {
       return true;
     }
     if (Date.now() - startedAt > timeoutMs) {
@@ -83,81 +100,47 @@ async function waitForUploadInput(
   }
 }
 
-async function waitForConvexUrl(
+async function waitForEditorOrToastError(
   // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
   page: any,
-  timeoutMs = 30_000
-): Promise<string | undefined> {
+  timeoutMs = 45_000
+): Promise<{ ok: boolean; toast?: string }> {
   const startedAt = Date.now();
   for (;;) {
-    const url = await page.evaluate(
-      () =>
-        (window as Window & { __SKETCHI_CONVEX_URL?: string })
-          .__SKETCHI_CONVEX_URL
-    );
-    if (url) {
-      return url;
+    const result = await page.evaluate(() => {
+      const hasUpload = Boolean(
+        document.querySelector('[data-testid="svg-file-input"]')
+      );
+      const toast = document.querySelector("[data-sonner-toast]")?.textContent;
+      return { hasUpload, toast: toast?.trim() ?? "" };
+    });
+    if (result.hasUpload) {
+      return { ok: true };
+    }
+    if (result.toast) {
+      return { ok: false, toast: result.toast };
     }
     if (Date.now() - startedAt > timeoutMs) {
-      return undefined;
+      return { ok: false };
     }
     await sleep(250);
   }
 }
 
-async function createLibraryViaApi(
-  // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
-  page: any,
-  baseUrl: string,
-  libraryName: string
-) {
-  const convexUrl = await waitForConvexUrl(page, 30_000);
-  if (!convexUrl) {
-    throw new Error("Missing Convex URL from app runtime.");
-  }
-  const client = new ConvexHttpClient(convexUrl);
-  const id = await client.mutation(createLibraryMutation, {
-    name: libraryName,
-  });
-  await page.goto(resolveUrl(baseUrl, `/library-generator/${id}`), {
-    waitUntil: "domcontentloaded",
-  });
-}
-
 // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
 async function createLibraryWithName(page: any, libraryName: string) {
-  const actionResult = await page.evaluate((name: string) => {
-    const input = document.querySelector<HTMLInputElement>(
-      'input[placeholder="Library name"]'
-    );
-    if (!input) {
-      return { ok: false, reason: "missing input" };
-    }
-    const setter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype,
-      "value"
-    )?.set;
-    if (!setter) {
-      return { ok: false, reason: "missing input setter" };
-    }
-    input.focus();
-    setter.call(input, name);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.blur();
-
-    const button = Array.from(document.querySelectorAll("button")).find(
-      (element) => element.textContent?.trim() === "Create"
-    );
-    if (!button) {
-      return { ok: false, reason: "missing create button" };
-    }
-    button.dispatchEvent(
-      new MouseEvent("click", { bubbles: true, cancelable: true })
-    );
-    return { ok: true };
-  }, libraryName);
-
-  return actionResult?.ok === true;
+  await page.waitForSelector('input[placeholder="Library name"]', {
+    state: "visible",
+    timeout: 20_000,
+  });
+  await page.locator('input[placeholder="Library name"]').fill(libraryName);
+  const createSelector =
+    'xpath=//section[.//input[@placeholder="Library name"]]//button[normalize-space()="Create"]';
+  await page.waitForSelector(createSelector, {
+    state: "visible",
+    timeout: 20_000,
+  });
+  await page.locator(createSelector).click();
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
@@ -228,27 +211,27 @@ async function main() {
       waitUntil: "domcontentloaded",
     });
 
+    const hydrated = await waitForHydration(page as any, 20_000);
+    if (!hydrated) {
+      throw new Error("App hydration did not complete in time.");
+    }
+
     const libraryName = `test-lib-${Date.now()}`;
     const libraryInputReady = await waitForLibraryInput(page as any, 20_000);
     if (!libraryInputReady) {
-      warnings.push("Library create form did not load in time.");
-    } else {
-      const created = await createLibraryWithName(page as any, libraryName);
-      if (!created) {
-        warnings.push("Create library UI interaction failed.");
-      }
+      throw new Error("Library create form did not load in time.");
     }
 
-    const editorReady = await waitForUploadInput(page as any, 10_000);
-    if (!editorReady) {
-      warnings.push(
-        "Create UI did not navigate to editor; creating library via API fallback."
-      );
-      await createLibraryViaApi(page as any, cfg.baseUrl, libraryName);
-      const fallbackReady = await waitForUploadInput(page as any, 20_000);
-      if (!fallbackReady) {
-        throw new Error("Upload input not found after API fallback.");
+    await createLibraryWithName(page as any, libraryName);
+
+    const editorResult = await waitForEditorOrToastError(page as any, 45_000);
+    if (!editorResult.ok) {
+      if (editorResult.toast) {
+        throw new Error(
+          `Create UI failed before navigation: ${editorResult.toast}`
+        );
       }
+      throw new Error("Create UI did not navigate to editor.");
     }
 
     await uploadSvgFiles(page as any);
