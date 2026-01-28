@@ -59,14 +59,17 @@ temp
 /.codex/config.json.bak
 /.codex/config.toml
 /.codex/config.toml.bak
+/.github/copilot-instructions.md
+/.github/copilot-instructions.md.bak
+/.vscode/mcp.json
+/.vscode/mcp.json.bak
 /AGENTS.md
 /AGENTS.md.bak
 /opencode.json
 /opencode.json.bak
 # END Ruler Generated Files
 
-#override auto generated exclude
-!AGENTS.md
+#additional exclude
 /.claude/settings.json
 /.claude/settings.json.bak
 /.claude/settings.local.json

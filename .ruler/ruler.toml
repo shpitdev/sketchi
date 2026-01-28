@@ -1,18 +1,20 @@
-# Ruler Configuration File
-# See https://okigu.com/ruler for documentation.
+# Ruler config - https://okigu.com/ruler
 
-# Default agents to run when --agents is not specified
-default_agents = ["codex", "opencode"]
+default_agents = ["codex", "opencode", "copilot"]
 
-# --- Global MCP Server Configuration ---
 [mcp]
-# Enable/disable MCP propagation globally (default: true)
 enabled = true
-# Global merge strategy: 'merge' or 'overwrite' (default: 'merge')
 merge_strategy = "merge"
 
-# --- MCP Server Definitions ---
-# Disabled MCPs (commented out for now):
+[gitignore]
+enabled = true
+
+# MCP Servers
+[mcp_servers.convex]
+command = "npx"
+args = ["-y", "convex@latest", "mcp", "start"]
+
+# Optional MCPs:
 # [mcp_servers.context7]
 # command = "npx"
 # args = ["-y", "@upstash/context7-mcp"]
@@ -21,16 +23,36 @@ merge_strategy = "merge"
 # command = "npx"
 # args = ["shadcn@latest", "mcp"]
 
-# [mcp_servers.next-devtools]
-# command = "npx"
-# args = ["-y", "next-devtools-mcp@latest"]
-
-# Active MCP servers:
-[mcp_servers.convex]
-command = "npx"
-args = ["-y", "convex@latest", "mcp", "start"]
-
-# --- Global .gitignore Configuration ---
-[gitignore]
-# Enable/disable automatic .gitignore updates (default: true)
+# Agent configs
+[agents.opencode]
 enabled = true
+
+[agents.opencode.mcp]
+enabled = true
+merge_strategy = "merge"
+
+[agents.codex]
+enabled = true
+output_path = "AGENTS.md"
+output_path_config = ".codex/config.toml"
+
+[agents.codex.mcp]
+enabled = true
+merge_strategy = "merge"
+
+[agents.copilot]
+enabled = true
+output_path = ".github/copilot-instructions.md"
+
+[agents.copilot.mcp]
+enabled = true
+merge_strategy = "merge"
+
+# Optional agents (uncomment to enable):
+# [agents.claude]
+# enabled = true
+# output_path = "CLAUDE.md"
+
+# [agents.cursor]
+# enabled = true
+# output_path = ".cursor/rules/ruler_cursor_instructions.mdc"
