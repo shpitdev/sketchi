@@ -217,6 +217,7 @@ export default function ExportButton({
 
     try {
       const zip = new JSZip();
+      const usedNames = new Set<string>();
 
       for (const icon of icons) {
         if (!icon.url) {
@@ -230,8 +231,17 @@ export default function ExportButton({
         if (!validateAndLogSvg(svgText, icon.name)) {
           continue;
         }
-        const safeName = sanitizeFileName(icon.name);
-        zip.file(`${safeName}.svg`, svgText);
+        const baseName = sanitizeFileName(icon.name);
+        let finalName = baseName;
+        let counter = 1;
+
+        while (usedNames.has(finalName)) {
+          finalName = `${baseName}-${counter}`;
+          counter++;
+        }
+
+        usedNames.add(finalName);
+        zip.file(`${finalName}.svg`, svgText);
       }
 
       const blob = await zip.generateAsync({ type: "blob" });
@@ -266,6 +276,7 @@ export default function ExportButton({
 
     try {
       const zip = new JSZip();
+      const usedNames = new Set<string>();
 
       for (const icon of icons) {
         if (!icon.url) {
@@ -278,8 +289,17 @@ export default function ExportButton({
         const svgText = await response.text();
 
         const renderedSvg = renderSketchySvg(svgText, icon.name, styleSettings);
-        const safeName = sanitizeFileName(icon.name);
-        zip.file(`${safeName}.svg`, renderedSvg);
+        const baseName = sanitizeFileName(icon.name);
+        let finalName = baseName;
+        let counter = 1;
+
+        while (usedNames.has(finalName)) {
+          finalName = `${baseName}-${counter}`;
+          counter++;
+        }
+
+        usedNames.add(finalName);
+        zip.file(`${finalName}.svg`, renderedSvg);
       }
 
       const blob = await zip.generateAsync({ type: "blob" });
