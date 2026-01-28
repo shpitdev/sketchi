@@ -7,15 +7,19 @@ on:
   pull_request:
     paths-ignore:
       - "docs/**"
-      - ".ruler/**"
       - "README.md"
+      - "AGENTS.md"
+      - ".codex/**"
+      - ".opencode/**"
   push:
     branches:
       - main
     paths-ignore:
       - "docs/**"
-      - ".ruler/**"
       - "README.md"
+      - "AGENTS.md"
+      - ".codex/**"
+      - ".opencode/**"
 
 jobs:
   convex-tests:

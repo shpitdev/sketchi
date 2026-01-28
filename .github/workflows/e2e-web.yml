@@ -62,8 +62,10 @@ jobs:
             const docOnly = files.every(
               (file) =>
                 file.filename === "README.md" ||
+                file.filename === "AGENTS.md" ||
                 file.filename.startsWith("docs/") ||
-                file.filename.startsWith(".ruler/")
+                file.filename.startsWith(".codex/") ||
+                file.filename.startsWith(".opencode/")
             );
             core.setOutput("run_tests", docOnly ? "false" : "true");
             if (docOnly) {
