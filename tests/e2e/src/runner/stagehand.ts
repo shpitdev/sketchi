@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { AISdkClient, Stagehand } from "@browserbasehq/stagehand";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { CustomOpenAIClient, Stagehand } from "@browserbasehq/stagehand";
+import OpenAI from "openai";
 import type { StagehandRunConfig } from "./config";
 import {
   persistReviewReport,
@@ -16,9 +16,12 @@ export interface ActResult {
 }
 
 export async function createStagehand(cfg: StagehandRunConfig) {
-  const openrouter = createOpenRouter({ apiKey: cfg.openrouterApiKey });
-  const llmClient = new AISdkClient({
-    model: openrouter.chat(cfg.modelName),
+  const llmClient = new CustomOpenAIClient({
+    modelName: cfg.modelName,
+    client: new OpenAI({
+      apiKey: cfg.openrouterApiKey,
+      baseURL: "https://openrouter.ai/api/v1",
+    }),
   });
   const stagehand = new Stagehand({
     env: cfg.env,
