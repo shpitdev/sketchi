@@ -30,7 +30,7 @@ Mermaid pre-flight
 - test files: `packages/backend/convex/diagramGenerateFromIntermediate.test.ts`
 - convex migration: yes (`packages/backend/convex/diagramGenerateFromIntermediate.ts`)
 - evidence: `packages/backend/test-results/diagram-generate-from-intermediate.json` + `.md`
-- unknowns/risks: prompt → IntermediateFormat remains experimental (`packages/backend/experiments/agents/content-analyzer.ts`)
+- notes: prompt → IntermediateFormat migrated to production (see section below)
 
 ### 0.3 Diagram modification
 - experiment files: `packages/backend/experiments/diagram-modification.ts`, `packages/backend/lib/json-repair.ts`
@@ -52,6 +52,14 @@ Mermaid pre-flight
 - convex migration: yes (`packages/backend/lib/diagram-layout.ts`)
 - evidence: `packages/backend/test-results/arrow-optimization.json` + `packages/backend/test-results/arrow-optimization.md` + `packages/backend/test-results/arrow-optimization-*-before.png` + `packages/backend/test-results/arrow-optimization-*-after.png`
 - unknowns/risks: relies on deterministic layout positions (dagre) for routing decisions
+
+### 0.6 Prompt to IntermediateFormat
+- experiment files: `packages/backend/experiments/agents/content-analyzer.ts` (superseded)
+- test files: `packages/backend/convex/diagramGenerateIntermediateFromPrompt.test.ts`
+- convex migration: yes (`packages/backend/convex/diagramGenerateIntermediateFromPrompt.ts`)
+- evidence: `packages/backend/test-results/prompt-intermediate-*.json` + `packages/backend/test-results/prompt-intermediate-*.png` + `packages/backend/test-results/prompt-intermediate-summary.md`
+- status: COMPLETED - production ready with ToolLoopAgent pattern
+- notes: Migrated from two-agent pipeline to single ToolLoopAgent with validation loop; all 3 test scenarios passed
 
 ## Experiment test suites
 
