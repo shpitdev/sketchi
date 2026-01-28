@@ -58,7 +58,7 @@ const modifyOutputSchema = z.object({
   status: z.enum(["success", "failed"]),
   reason: z.string().optional(),
   elements: z.array(z.any()).optional(),
-  appState: z.record(z.any()).optional(),
+  appState: z.record(z.string(), z.any()).optional(),
   changes: z
     .object({
       diff: z.any().optional(),
@@ -87,7 +87,7 @@ const modifyOutputSchema = z.object({
 
 const parseOutputSchema = z.object({
   elements: z.array(z.any()),
-  appState: z.record(z.any()),
+  appState: z.record(z.string(), z.any()),
   intermediate: z.any(),
   stats: z.object({
     elementCount: z.number(),
@@ -139,7 +139,7 @@ export const appRouter = {
     .input(
       z.object({
         elements: z.array(z.any()),
-        appState: z.record(z.any()).optional(),
+          appState: z.record(z.string(), z.any()).optional(),
       })
     )
     .output(shareLinkSchema)
