@@ -155,60 +155,96 @@ function buildValidExcalidrawElements() {
 
 function assertValidExcalidrawElements(elements: unknown[]): void {
   for (const element of elements) {
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(element).toBeTruthy();
     if (!element || typeof element !== "object") {
       throw new Error("Element is not an object");
     }
 
     const base = element as Record<string, unknown>;
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.id).toBe("string");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.type).toBe("string");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.x).toBe("number");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.y).toBe("number");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.width).toBe("number");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.height).toBe("number");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.angle).toBe("number");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.strokeColor).toBe("string");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.backgroundColor).toBe("string");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.fillStyle).toBe("string");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.strokeWidth).toBe("number");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.strokeStyle).toBe("string");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.roughness).toBe("number");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.opacity).toBe("number");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(Array.isArray(base.groupIds)).toBe(true);
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(base.frameId === null || typeof base.frameId === "string").toBe(
       true
     );
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(base.index === null || typeof base.index === "string").toBe(true);
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.seed).toBe("number");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.version).toBe("number");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.versionNonce).toBe("number");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.isDeleted).toBe("boolean");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.updated).toBe("number");
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(base.link === null || typeof base.link === "string").toBe(true);
+    // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
     expect(typeof base.locked).toBe("boolean");
 
     if (base.boundElements !== null) {
+      // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
       expect(Array.isArray(base.boundElements)).toBe(true);
       for (const bound of base.boundElements as unknown[]) {
+        // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
         expect(bound && typeof bound === "object").toBe(true);
         const boundRecord = bound as Record<string, unknown>;
+        // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
         expect(typeof boundRecord.id).toBe("string");
+        // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
         expect(typeof boundRecord.type).toBe("string");
       }
     }
 
     if (base.type === "arrow" || base.type === "line") {
+      // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
       expect(Array.isArray(base.points)).toBe(true);
       const points = base.points as unknown[];
+      // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
       expect(points.length).toBeGreaterThanOrEqual(2);
       for (const point of points) {
+        // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
         expect(Array.isArray(point)).toBe(true);
         const coords = point as unknown[];
+        // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
         expect(coords.length).toBe(2);
+        // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
         expect(typeof coords[0]).toBe("number");
+        // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
         expect(typeof coords[1]).toBe("number");
       }
+      // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
       expect(
         base.lastCommittedPoint === null ||
           Array.isArray(base.lastCommittedPoint)
@@ -216,12 +252,19 @@ function assertValidExcalidrawElements(elements: unknown[]): void {
     }
 
     if (base.type === "text") {
+      // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
       expect(typeof base.text).toBe("string");
+      // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
       expect(typeof base.fontSize).toBe("number");
+      // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
       expect(typeof base.fontFamily).toBe("number");
+      // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
       expect(typeof base.textAlign).toBe("string");
+      // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
       expect(typeof base.verticalAlign).toBe("string");
+      // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
       expect(typeof base.lineHeight).toBe("number");
+      // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
       expect(
         base.containerId === null || typeof base.containerId === "string"
       ).toBe(true);
