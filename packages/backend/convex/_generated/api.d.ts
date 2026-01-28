@@ -12,6 +12,7 @@ import type * as diagramGenerateFromIntermediate from "../diagramGenerateFromInt
 import type * as diagramGenerateIntermediateFromPrompt from "../diagramGenerateIntermediateFromPrompt.js";
 import type * as diagramModifyElements from "../diagramModifyElements.js";
 import type * as diagramModifyFromShareLink from "../diagramModifyFromShareLink.js";
+import type * as diagrams from "../diagrams.js";
 import type * as excalidrawShareLinks from "../excalidrawShareLinks.js";
 import type * as export_ from "../export.js";
 import type * as healthCheck from "../healthCheck.js";
@@ -31,6 +32,7 @@ declare const fullApi: ApiFromModules<{
   diagramGenerateIntermediateFromPrompt: typeof diagramGenerateIntermediateFromPrompt;
   diagramModifyElements: typeof diagramModifyElements;
   diagramModifyFromShareLink: typeof diagramModifyFromShareLink;
+  diagrams: typeof diagrams;
   excalidrawShareLinks: typeof excalidrawShareLinks;
   export: typeof export_;
   healthCheck: typeof healthCheck;

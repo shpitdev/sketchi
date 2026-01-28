@@ -2,9 +2,50 @@ name: Diagram API Endpoints
 vars:
   target_url: "http://localhost:3001"
   bypass_secret: ""
+  encoded_share_prefix: "https%3A%2F%2Fexcalidraw.com%2F%23json%3D"
+  test_intermediate:
+    nodes:
+      - id: "node-1"
+        label: "Start"
+      - id: "node-2"
+        label: "End"
+    edges:
+      - fromId: "node-1"
+        toId: "node-2"
+        label: "next"
+    graphOptions:
+      diagramType: "flowchart"
+  share_elements:
+    - id: "node-1"
+      type: "rectangle"
+      x: 0
+      y: 0
+      width: 120
+      height: 60
+      angle: 0
+      strokeColor: "#1971c2"
+      backgroundColor: "#a5d8ff"
+      fillStyle: "solid"
+      strokeWidth: 2
+      strokeStyle: "solid"
+      roughness: 1
+      opacity: 100
+      groupIds: []
+      frameId: null
+      index: "a0"
+      roundness:
+        type: 3
+      seed: 101
+      version: 1
+      versionNonce: 30101
+      isDeleted: false
+      boundElements: null
+      updated: 1725000000000
+      link: null
+      locked: false
 
 testcases:
-  - name: POST /api/diagrams/generate returns 404 (not implemented)
+  - name: generate_parse_flow
     steps:
       - type: http
         method: POST
@@ -12,27 +53,87 @@ testcases:
         headers:
           Content-Type: application/json
           x-vercel-protection-bypass: "{{.bypass_secret}}"
-        body: '{}'
+        body: |
+          {
+            "intermediate": {
+              "nodes": [
+                { "id": "node-1", "label": "Start" },
+                { "id": "node-2", "label": "End" }
+              ],
+              "edges": [
+                { "fromId": "node-1", "toId": "node-2", "label": "next" }
+              ],
+              "graphOptions": { "diagramType": "flowchart" }
+            }
+          }
+        vars:
+          share_url:
+            from: result.bodyjson.shareLink.url
+          share_id:
+            from: result.bodyjson.shareLink.shareId
+          encryption_key:
+            from: result.bodyjson.shareLink.encryptionKey
         assertions:
-          - result.statuscode ShouldEqual 404
-          - result.bodyjson.error ShouldEqual "Not implemented"
-          - result.bodyjson.endpoint ShouldEqual "/api/diagrams/generate"
+          - result.statuscode ShouldEqual 200
+          - result.bodyjson.status ShouldEqual "success"
+          - result.bodyjson.shareLink.url ShouldContainSubstring "https://excalidraw.com/#json="
 
-  - name: POST /api/diagrams/modify returns 404 (not implemented)
+      - type: http
+        method: GET
+        url: "{{.target_url}}/api/diagrams/parse?shareUrl={{.encoded_share_prefix}}{{.generate_parse_flow.share_id}}%2C{{.generate_parse_flow.encryption_key}}"
+        headers:
+          x-vercel-protection-bypass: "{{.bypass_secret}}"
+        assertions:
+          - result.statuscode ShouldEqual 200
+          - result.bodyjson.stats.nodeCount ShouldEqual 2
+          - result.bodyjson.stats.edgeCount ShouldEqual 1
+
+  - name: modify_flow
     steps:
+      - type: http
+        method: POST
+        url: "{{.target_url}}/api/diagrams/generate"
+        headers:
+          Content-Type: application/json
+          x-vercel-protection-bypass: "{{.bypass_secret}}"
+        body: |
+          {
+            "intermediate": {
+              "nodes": [
+                { "id": "node-1", "label": "Start" },
+                { "id": "node-2", "label": "End" }
+              ],
+              "edges": [
+                { "fromId": "node-1", "toId": "node-2", "label": "next" }
+              ],
+              "graphOptions": { "diagramType": "flowchart" }
+            }
+          }
+        vars:
+          share_url:
+            from: result.bodyjson.shareLink.url
+        assertions:
+          - result.statuscode ShouldEqual 200
+          - result.bodyjson.status ShouldEqual "success"
+
       - type: http
         method: POST
         url: "{{.target_url}}/api/diagrams/modify"
         headers:
           Content-Type: application/json
           x-vercel-protection-bypass: "{{.bypass_secret}}"
-        body: '{}'
+        body: |
+          {
+            "shareUrl": "{{.modify_flow.share_url}}",
+            "request": "node-1_text text = 'Updated Start' node-1_text originalText = 'Updated Start'",
+            "options": { "preferExplicitEdits": true }
+          }
         assertions:
-          - result.statuscode ShouldEqual 404
-          - result.bodyjson.error ShouldEqual "Not implemented"
-          - result.bodyjson.endpoint ShouldEqual "/api/diagrams/modify"
+          - result.statuscode ShouldEqual 200
+          - result.bodyjson.status ShouldEqual "success"
+          - result.bodyjson.shareLink.url ShouldContainSubstring "https://excalidraw.com/#json="
 
-  - name: POST /api/diagrams/share returns 404 (not implemented)
+  - name: share_flow
     steps:
       - type: http
         method: POST
@@ -40,20 +141,41 @@ testcases:
         headers:
           Content-Type: application/json
           x-vercel-protection-bypass: "{{.bypass_secret}}"
-        body: '{}'
+        body: |
+          {
+            "elements": [
+              {
+                "id": "node-1",
+                "type": "rectangle",
+                "x": 0,
+                "y": 0,
+                "width": 120,
+                "height": 60,
+                "angle": 0,
+                "strokeColor": "#1971c2",
+                "backgroundColor": "#a5d8ff",
+                "fillStyle": "solid",
+                "strokeWidth": 2,
+                "strokeStyle": "solid",
+                "roughness": 1,
+                "opacity": 100,
+                "groupIds": [],
+                "frameId": null,
+                "index": "a0",
+                "roundness": { "type": 3 },
+                "seed": 101,
+                "version": 1,
+                "versionNonce": 30101,
+                "isDeleted": false,
+                "boundElements": null,
+                "updated": 1725000000000,
+                "link": null,
+                "locked": false
+              }
+            ],
+            "appState": {}
+          }
         assertions:
-          - result.statuscode ShouldEqual 404
-          - result.bodyjson.error ShouldEqual "Not implemented"
-          - result.bodyjson.endpoint ShouldEqual "/api/diagrams/share"
-
-  - name: GET /api/diagrams/parse returns 404 (not implemented)
-    steps:
-      - type: http
-        method: GET
-        url: "{{.target_url}}/api/diagrams/parse"
-        headers:
-          x-vercel-protection-bypass: "{{.bypass_secret}}"
-        assertions:
-          - result.statuscode ShouldEqual 404
-          - result.bodyjson.error ShouldEqual "Not implemented"
-          - result.bodyjson.endpoint ShouldEqual "/api/diagrams/parse"
+          - result.statuscode ShouldEqual 200
+          - result.bodyjson.url ShouldContainSubstring "https://excalidraw.com/#json="
+          - result.bodyjson.shareId ShouldNotBeEmpty

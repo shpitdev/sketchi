@@ -9,6 +9,10 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",
+    "@orpc/openapi": "^1.13.4",
+    "@orpc/server": "^1.13.4",
+    "@orpc/zod": "^1.13.4",
+    "@scalar/nextjs-api-reference": "^0.9.16",
     "@sketchi/backend": "workspace:*",
     "@sketchi/env": "workspace:*",
     "@tanstack/react-form": "^1.27.3",
