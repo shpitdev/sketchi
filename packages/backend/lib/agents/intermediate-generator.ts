@@ -56,6 +56,14 @@ const ValidationInputSchema = z.object({
 
 type ValidationInput = z.infer<typeof ValidationInputSchema>;
 
+/**
+ * Generate an IntermediateFormat diagram from a natural language prompt.
+ * Uses a ToolLoopAgent with validation to iteratively refine the diagram structure.
+ *
+ * @param prompt - Natural language description of the desired diagram
+ * @param options - Configuration options (e.g., profileId for agent profile selection)
+ * @returns Promise resolving to GenerateIntermediateResult with diagram, metadata, and trace info
+ */
 export async function generateIntermediate(
   prompt: string,
   options: GenerateOptions = {}
