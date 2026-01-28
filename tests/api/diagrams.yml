@@ -1,6 +1,7 @@
 name: Diagram API Endpoints
 vars:
   target_url: "http://localhost:3001"
+  bypass_secret: ""
 
 testcases:
   - name: POST /api/diagrams/generate returns 404 (not implemented)
@@ -10,6 +11,7 @@ testcases:
         url: "{{.target_url}}/api/diagrams/generate"
         headers:
           Content-Type: application/json
+          x-vercel-protection-bypass: "{{.bypass_secret}}"
         body: '{}'
         assertions:
           - result.statuscode ShouldEqual 404
@@ -23,6 +25,7 @@ testcases:
         url: "{{.target_url}}/api/diagrams/modify"
         headers:
           Content-Type: application/json
+          x-vercel-protection-bypass: "{{.bypass_secret}}"
         body: '{}'
         assertions:
           - result.statuscode ShouldEqual 404
@@ -36,6 +39,7 @@ testcases:
         url: "{{.target_url}}/api/diagrams/share"
         headers:
           Content-Type: application/json
+          x-vercel-protection-bypass: "{{.bypass_secret}}"
         body: '{}'
         assertions:
           - result.statuscode ShouldEqual 404
@@ -47,6 +51,8 @@ testcases:
       - type: http
         method: GET
         url: "{{.target_url}}/api/diagrams/parse"
+        headers:
+          x-vercel-protection-bypass: "{{.bypass_secret}}"
         assertions:
           - result.statuscode ShouldEqual 404
           - result.bodyjson.error ShouldEqual "Not implemented"

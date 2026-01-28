@@ -14,6 +14,8 @@ jobs:
     if: >
       github.event.deployment_status.state == 'success' &&
       github.event.deployment_status.environment_url != '' &&
+      (startsWith(github.event.deployment_status.environment_url, 'https://') ||
+       startsWith(github.event.deployment_status.environment_url, 'http://')) &&
       (github.event.deployment.environment == 'Preview' || github.event.deployment.environment == 'preview')
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -31,6 +33,7 @@ jobs:
         run: |
           venom run tests/api/*.yml \
             --var target_url=${{ github.event.deployment_status.environment_url }} \
+            --var bypass_secret=${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }} \
             --output-dir tests/api/results \
             --format xml \
             --format json
