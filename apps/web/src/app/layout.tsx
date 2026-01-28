@@ -31,11 +31,19 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL ?? "";
   return (
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${caveat.variable} antialiased`}
       >
+        {convexUrl ? (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `window.__SKETCHI_CONVEX_URL=${JSON.stringify(convexUrl)};`,
+            }}
+          />
+        ) : null}
         <Providers>
           <div className="grid h-svh grid-rows-[auto_1fr]">
             <Header />

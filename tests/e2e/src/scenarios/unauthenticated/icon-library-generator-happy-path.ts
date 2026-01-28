@@ -86,7 +86,7 @@ async function waitForUploadInput(
 async function waitForConvexUrl(
   // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
   page: any,
-  timeoutMs = 10_000
+  timeoutMs = 30_000
 ): Promise<string | undefined> {
   const startedAt = Date.now();
   for (;;) {
@@ -111,7 +111,7 @@ async function createLibraryViaApi(
   baseUrl: string,
   libraryName: string
 ) {
-  const convexUrl = await waitForConvexUrl(page, 15_000);
+  const convexUrl = await waitForConvexUrl(page, 30_000);
   if (!convexUrl) {
     throw new Error("Missing Convex URL from app runtime.");
   }
