@@ -14,6 +14,7 @@ import {
   type StyleSettings,
   svgToExcalidrawElements,
 } from "@/lib/icon-library/svg-to-excalidraw";
+import { validateSvgText } from "@/lib/icon-library/svg-validate";
 
 export interface ExportIconItem {
   name: string;
@@ -61,6 +62,19 @@ function makeSvgScalable(container: HTMLElement): void {
   svg.removeAttribute("width");
   svg.removeAttribute("height");
   svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+}
+
+function validateAndLogSvg(svgText: string, iconName: string): boolean {
+  try {
+    validateSvgText(svgText);
+    return true;
+  } catch (error) {
+    console.warn(
+      `Skipping invalid SVG ${iconName}:`,
+      error instanceof Error ? error.message : error
+    );
+    return false;
+  }
 }
 
 function renderSketchySvg(
@@ -145,6 +159,9 @@ export default function ExportButton({
           throw new Error(`Failed to load ${icon.name}.`);
         }
         const svgText = await response.text();
+        if (!validateAndLogSvg(svgText, icon.name)) {
+          continue;
+        }
         const elements = svgToExcalidrawElements(
           svgText,
           styleSettings,
@@ -210,6 +227,9 @@ export default function ExportButton({
           throw new Error(`Failed to load ${icon.name}.`);
         }
         const svgText = await response.text();
+        if (!validateAndLogSvg(svgText, icon.name)) {
+          continue;
+        }
         const safeName = sanitizeFileName(icon.name);
         zip.file(`${safeName}.svg`, svgText);
       }
