@@ -43,10 +43,41 @@ export async function createStagehand(cfg: StagehandRunConfig) {
   });
 
   await stagehand.init();
+  await applyVercelBypassHeaders(stagehand.context, cfg);
   return stagehand;
 }
 
 const popupBlockerAttached = new WeakSet<object>();
+
+async function applyVercelBypassHeaders(
+  context: {
+    setExtraHTTPHeaders?: (headers: Record<string, string>) => Promise<void>;
+    pages?: () => Array<{ setExtraHTTPHeaders?: (headers: Record<string, string>) => Promise<void> }>;
+  },
+  cfg: StagehandRunConfig
+) {
+  if (!cfg.vercelBypassSecret) {
+    return;
+  }
+  const headers = {
+    "x-vercel-protection-bypass": cfg.vercelBypassSecret,
+    "x-vercel-set-bypass-cookie": "true",
+  };
+  if (typeof context.setExtraHTTPHeaders === "function") {
+    await context.setExtraHTTPHeaders(headers);
+    return;
+  }
+  if (typeof context.pages === "function") {
+    const pages = context.pages();
+    await Promise.all(
+      pages.map((page) =>
+        typeof page.setExtraHTTPHeaders === "function"
+          ? page.setExtraHTTPHeaders(headers)
+          : Promise.resolve()
+      )
+    );
+  }
+}
 
 async function attachPopupBlocker(page: {
   addInitScript?: (script: () => void) => Promise<void>;

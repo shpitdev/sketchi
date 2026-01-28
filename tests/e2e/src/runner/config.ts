@@ -11,6 +11,7 @@ export interface StagehandRunConfig {
   env: StagehandEnv;
   modelName: string;
   openrouterApiKey: string;
+  vercelBypassSecret?: string;
   browserbaseApiKey?: string;
   browserbaseProjectId?: string;
   headless: boolean;
@@ -52,6 +53,7 @@ export function loadConfig(): StagehandRunConfig {
   const modelName = firstEnv("MODEL_NAME") || DEFAULT_MODEL;
   const visionModelName = firstEnv("VISION_MODEL_NAME") || DEFAULT_VISION_MODEL;
   const openrouterApiKey = firstEnv("OPENROUTER_API_KEY");
+  const vercelBypassSecret = firstEnv("VERCEL_AUTOMATION_BYPASS_SECRET");
 
   if (!openrouterApiKey) {
     throw new Error("Missing required env var: OPENROUTER_API_KEY");
@@ -65,6 +67,7 @@ export function loadConfig(): StagehandRunConfig {
     env: browserEnv,
     modelName,
     openrouterApiKey,
+    vercelBypassSecret,
     visionModelName,
     browserbaseApiKey: firstEnv("BROWSERBASE_API_KEY"),
     browserbaseProjectId: firstEnv("BROWSERBASE_PROJECT_ID"),
