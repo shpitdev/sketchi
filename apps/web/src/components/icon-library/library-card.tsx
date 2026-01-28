@@ -35,13 +35,13 @@ export default function LibraryCard({
                   key={key}
                 />
               ))
-            : previewUrls.map((url) => (
+            : previewUrls.map((url, idx) => (
                 <div
                   className="relative flex aspect-square items-center justify-center rounded border bg-muted/30"
                   key={url}
                 >
                   <Image
-                    alt=""
+                    alt={`${name} preview ${idx + 1}`}
                     className="object-contain"
                     fill
                     sizes="96px"
