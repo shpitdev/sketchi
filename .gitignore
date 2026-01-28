@@ -54,28 +54,6 @@ tmp
 temp
 .sisyphus/
 
-# START Ruler Generated Files
-/.agent/skills
-/.agents/skills
-/.claude/skills
-/.codex/config.json
-/.codex/config.json.bak
-/.codex/config.toml
-/.codex/config.toml.bak
-/.codex/skills
-/.cursor/skills
-/.factory/skills
-/.gemini/skills
-/.opencode/skill
-/.pi/skills
-/.roo/skills
-/.vibe/skills
-/AGENTS.md
-/AGENTS.md.bak
-/opencode.json
-/opencode.json.bak
-# END Ruler Generated Files
-
 #additional exclude
 /.claude/settings.json
 /.claude/settings.json.bak
