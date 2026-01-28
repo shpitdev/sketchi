@@ -21,7 +21,7 @@ Success:
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ConvexHttpClient } from "convex/browser";
-import { api } from "../../../../../packages/backend/convex/_generated/api.js";
+import { makeFunctionReference } from "convex/server";
 import { loadConfig } from "../../runner/config";
 import {
   captureScreenshot,
@@ -41,6 +41,7 @@ import { sleep } from "../../runner/wait";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const fixturesDir = join(__dirname, "../../../fixtures/svgs");
+const createLibraryMutation = makeFunctionReference("iconLibraries:create");
 
 async function waitForUploadInput(
   // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
@@ -77,7 +78,7 @@ async function createLibraryViaApi(
     throw new Error("Missing Convex URL from app runtime.");
   }
   const client = new ConvexHttpClient(convexUrl);
-  const id = await client.mutation(api.iconLibraries.create, {
+  const id = await client.mutation(createLibraryMutation, {
     name: libraryName,
   });
   await page.goto(resolveUrl(baseUrl, `/library-generator/${id}`), {
