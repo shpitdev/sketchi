@@ -71,6 +71,9 @@ export const DiagramElementDiffSchema = z
   .passthrough();
 
 export type DiagramElementDiff = z.infer<typeof DiagramElementDiffSchema>;
+export type ExcalidrawElementPatch = z.infer<
+  typeof ExcalidrawElementPatchSchema
+>;
 
 export interface DiagramModificationIssue {
   code: string;
@@ -283,7 +286,7 @@ export function applyDiagramDiff(
 function autoFlipArrowPoints(
   before: ExcalidrawElementLike,
   after: ExcalidrawElementLike,
-  modification: { changes: ExcalidrawElementLike }
+  modification: { changes: ExcalidrawElementPatch }
 ): ExcalidrawElementLike {
   if (before.type !== "arrow" || after.type !== "arrow") {
     return after;
