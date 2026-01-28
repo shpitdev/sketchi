@@ -237,8 +237,8 @@ export const deleteIcon = mutation({
       throw new Error("Icon not found.");
     }
 
-    await ctx.db.delete(iconId);
     await ctx.storage.delete(icon.storageId);
+    await ctx.db.delete(iconId);
   },
 });
 
