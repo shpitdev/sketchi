@@ -10,6 +10,7 @@ Evidence on disk (artifacts)
 - optimization runs: `packages/backend/experiments/output/optimization_2026-01-24_17-00-50`, `packages/backend/experiments/output/optimization_2026-01-24_17-30-14`, `packages/backend/experiments/output/optimization_2026-01-25_06-29-42`, `packages/backend/experiments/output/optimization_2026-01-25_06-53-18`
 - diagram layout (Convex): `packages/backend/test-results/diagram-layout.json` + `packages/backend/test-results/diagram-layout.md`
 - visual grading (Convex): `packages/backend/test-results/visual-grading.json` + `packages/backend/test-results/visual-grading.md` + `packages/backend/test-results/visual-grading-*.png`
+- diagram modification (Convex): `packages/backend/test-results/diagram-modify.json` + `packages/backend/test-results/diagram-modify.md` + `packages/backend/test-results/diagram-modify-*.json`
 - visual grading (legacy runs): `packages/backend/experiments/output/visual-grading_2026-01-25_02-15-21`, `packages/backend/experiments/output/visual-grading_2026-01-25_06-33-38`, `packages/backend/experiments/output/visual-grading_2026-01-25_06-53-19` (includes `summary.json` with 3/3 pass)
 - Browserbase export evidence: Convex test writes PNG + report in `packages/backend/test-results/` (file name derived from test name)
 - no `summary.json` under any `optimization_*` folder (expected by `packages/backend/experiments/tests/test-diagram-optimization.ts`)
@@ -33,11 +34,11 @@ Mermaid pre-flight
 - notes: prompt → IntermediateFormat migrated to production (see section below)
 
 ### 0.3 Diagram modification
-- experiment files: `packages/backend/experiments/diagram-modification.ts`, `packages/backend/lib/json-repair.ts`
-- test files: none
-- convex migration: no
-- evidence: none found on disk
-- unknowns/risks: modification format (add/remove/modify) is not used anywhere else; no tests/artifacts
+- experiment files: none (migrated)
+- test files: `packages/backend/convex/diagramModifyElements.test.ts`
+- convex migration: yes (`packages/backend/convex/diagramModifyElements.ts`, `packages/backend/convex/diagramModifyFromShareLink.ts`)
+- evidence: `packages/backend/test-results/diagram-modify.json` + `packages/backend/test-results/diagram-modify.md` + per-scenario artifacts
+- notes: element-level diff schema in `packages/backend/lib/diagram-modification.ts` with ToolLoopAgent validation loop
 
 ### 0.4 Auto-layout (dagre)
 - experiment files: none (migrated)

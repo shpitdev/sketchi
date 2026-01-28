@@ -9,7 +9,7 @@
 ### Evidence + completion tracking
 - [x] **0.1 Share Link Round-Trip** - migrated to Convex + tested; experiment removed
 - [x] **0.2 AI Generation Quality** - migrated to Convex test + artifacts; experiment removed
-- [ ] **0.3 Diagram Modification** - no artifacts on disk; decide format + add artifact or convert to Convex test + delete experiment
+- [x] **0.3 Diagram Modification** - migrated to Convex actions + tests + artifacts; experiment removed
 - [x] **0.4 Auto-Layout** - migrated to deterministic layout module + Convex test + artifacts; experiment removed
 - [x] **0.5 Arrow Optimization** - migrated to lib module + Convex test + artifacts
 - [x] **Optimization suite** - artifacts in `packages/backend/experiments/output/optimization_*`

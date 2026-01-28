@@ -6,7 +6,13 @@
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
-      "env": ["CONVEX_DEPLOY_KEY", "NEXT_PUBLIC_CONVEX_URL"]
+      "env": [
+        "CONVEX_DEPLOY_KEY",
+        "NEXT_PUBLIC_CONVEX_URL",
+        "WORKOS_API_KEY",
+        "WORKOS_CLIENT_ID",
+        "WORKOS_COOKIE_PASSWORD"
+      ]
     },
     "lint": {
       "dependsOn": ["^lint"]

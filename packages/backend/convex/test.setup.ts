@@ -9,4 +9,7 @@ export const modules = {
     import("./diagramGenerateFromIntermediate"),
   "./diagramGenerateIntermediateFromPrompt.ts": () =>
     import("./diagramGenerateIntermediateFromPrompt"),
+  "./diagramModifyElements.ts": () => import("./diagramModifyElements"),
+  "./diagramModifyFromShareLink.ts": () =>
+    import("./diagramModifyFromShareLink"),
 };

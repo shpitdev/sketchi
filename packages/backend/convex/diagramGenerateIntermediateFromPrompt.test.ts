@@ -227,7 +227,9 @@ async function writeSummary(results: ScenarioResult[]) {
     const pngSize = result.pngSizeBytes
       ? `${Math.round(result.pngSizeBytes / 1024)}KB`
       : "n/a";
-    const shareUrl = result.shareUrl ? `[link](${result.shareUrl})` : "n/a";
+    const shareUrl = result.shareUrl
+      ? `[${result.scenario} diagram](${result.shareUrl})`
+      : "n/a";
 
     lines.push(
       `| ${result.scenario} | ${status} | ${tokens} | ${duration} | ${nodes} | ${edges} | ${pngSize} | ${shareUrl} |`
@@ -250,7 +252,13 @@ async function writeSummary(results: ScenarioResult[]) {
     );
     lines.push(`- JSON: ${result.jsonFile ?? "n/a"}`);
     lines.push(`- PNG: ${result.pngFile ?? "n/a"}`);
-    lines.push(`- Share URL: ${result.shareUrl ?? "n/a"}`);
+    lines.push(
+      `- Share URL: ${
+        result.shareUrl
+          ? `[${result.scenario} diagram](${result.shareUrl})`
+          : "n/a"
+      }`
+    );
     lines.push(`- Error: ${result.error ?? "none"}`);
     lines.push(`- Created: ${result.createdAt}`);
     lines.push("");

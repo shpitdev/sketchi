@@ -29,6 +29,7 @@ const diagramGeneratePath = join(
 const diagramLayoutPath = join(outputDir, "diagram-layout.json");
 const arrowOptimizationPath = join(outputDir, "arrow-optimization.json");
 const visualGradingPath = join(outputDir, "visual-grading.json");
+const diagramModifyPath = join(outputDir, "diagram-modify.json");
 const summaryPath = join(outputDir, "summary.md");
 
 function formatDuration(ms?: number) {
@@ -138,6 +139,27 @@ const visualGrading = await readJsonIfExists<{
     createdAt: string;
   }>;
 }>(visualGradingPath);
+
+const diagramModify = await readJsonIfExists<{
+  scenarios: Array<{
+    scenario: string;
+    status: string;
+    durationMs: number;
+    request: string;
+    artifactFile?: string;
+    beforePng?: string;
+    afterPng?: string;
+    visionStatus?: string;
+    visionTokens?: number;
+    shareUrl?: string;
+    elementCount?: number;
+    issues?: string[];
+    tokens?: number;
+    iterations?: number;
+    error?: string;
+    createdAt: string;
+  }>;
+}>(diagramModifyPath);
 
 await mkdir(outputDir, { recursive: true });
 
@@ -287,6 +309,32 @@ if (visualGrading) {
     lines.push(
       `  - Strengths: ${scenario.strengths?.length ? scenario.strengths.join("; ") : "none"}`
     );
+    lines.push(`  - Error: ${scenario.error ?? "none"}`);
+    lines.push(`  - Created: ${scenario.createdAt}`);
+  }
+
+  lines.push("");
+}
+
+if (diagramModify) {
+  lines.push("## Diagram Modification");
+  lines.push("");
+
+  for (const scenario of diagramModify.scenarios ?? []) {
+    lines.push(`- Scenario: ${scenario.scenario}`);
+    lines.push(`  - Status: ${scenario.status}`);
+    lines.push(`  - Duration: ${scenario.durationMs}ms`);
+    lines.push(`  - Elements: ${scenario.elementCount ?? "n/a"}`);
+    lines.push(`  - Iterations: ${scenario.iterations ?? "n/a"}`);
+    lines.push(`  - Tokens: ${scenario.tokens ?? "n/a"}`);
+    lines.push(`  - Request: ${scenario.request}`);
+    lines.push(`  - Share URL: ${scenario.shareUrl ?? "n/a"}`);
+    lines.push(`  - Before PNG: ${scenario.beforePng ?? "n/a"}`);
+    lines.push(`  - After PNG: ${scenario.afterPng ?? "n/a"}`);
+    lines.push(`  - Vision: ${scenario.visionStatus ?? "n/a"}`);
+    lines.push(`  - Vision tokens: ${scenario.visionTokens ?? "n/a"}`);
+    lines.push(`  - Artifact: ${scenario.artifactFile ?? "n/a"}`);
+    lines.push(`  - Issues: ${scenario.issues?.join("; ") ?? "none"}`);
     lines.push(`  - Error: ${scenario.error ?? "none"}`);
     lines.push(`  - Created: ${scenario.createdAt}`);
   }
