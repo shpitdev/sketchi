@@ -262,12 +262,17 @@ function expectArrowOptimized(
   const startPoint = getEdgeCenter(startShape, startEdge);
   const endPoint = getEdgeCenter(endShape, endEdge);
 
+  // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
   expect(arrow.x).toBe(startPoint.x);
+  // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
   expect(arrow.y).toBe(startPoint.y);
+  // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
   expect(arrow.width).toBe(endPoint.x - startPoint.x);
+  // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
   expect(arrow.height).toBe(endPoint.y - startPoint.y);
 
   const lastPoint = arrow.points[arrow.points.length - 1];
+  // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
   expect(lastPoint).toEqual([
     endPoint.x - startPoint.x,
     endPoint.y - startPoint.y,
