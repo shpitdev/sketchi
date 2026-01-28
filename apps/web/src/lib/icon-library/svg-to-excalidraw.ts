@@ -175,6 +175,11 @@ export const svgToExcalidrawElements = (
   styleSettings: StyleSettings,
   iconName?: string
 ): ExcalidrawElement[] => {
+  if (typeof window === "undefined") {
+    throw new Error(
+      "svgToExcalidrawElements must be called in a browser environment"
+    );
+  }
   const parser = new DOMParser();
   const doc = parser.parseFromString(svgText, "image/svg+xml");
   const parsedSvg = doc.querySelector("svg") as SVGSVGElement | null;
