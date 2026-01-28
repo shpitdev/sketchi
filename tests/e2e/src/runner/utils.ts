@@ -104,12 +104,15 @@ export async function resetBrowserState(
 }
 
 export function finalizeScenario(status: "passed" | "failed") {
-  if (status === "passed") {
-    if (process.exitCode && process.exitCode !== 0) {
-      console.log(`Normalizing exit code ${process.exitCode} to 0.`);
-    }
-    process.exitCode = 0;
-    return;
+  const exitCode = status === "passed" ? 0 : 1;
+
+  if (status === "passed" && process.exitCode && process.exitCode !== 0) {
+    console.log(`Normalizing exit code ${process.exitCode} to 0.`);
   }
-  process.exitCode = 1;
+
+  // Force exit after a short delay to allow cleanup
+  // This prevents hanging due to lingering event loop references from Stagehand/Browserbase
+  setTimeout(() => {
+    process.exit(exitCode);
+  }, 500);
 }
