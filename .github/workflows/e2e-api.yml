@@ -91,7 +91,8 @@ jobs:
             --var bypass_secret=${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }} \
             --output-dir tests/api/results \
             --format xml \
-            --format json
+            --format json \
+            --html-report
 
       - name: Upload API test artifacts
         if: always() && steps.doc_check.outputs.run_tests == 'true'

@@ -16,6 +16,14 @@ export default function Header() {
           <Image alt="Sketchi" height={24} src="/icons/logo.svg" width={24} />
         </Link>
         <div className="flex items-center gap-2">
+          <Link
+            className="rounded-md border border-transparent px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground"
+            href="/api/docs"
+            rel="noreferrer"
+            target="_blank"
+          >
+            API Docs
+          </Link>
           <ModeToggle />
         </div>
       </div>

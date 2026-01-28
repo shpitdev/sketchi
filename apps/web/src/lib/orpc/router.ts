@@ -1,4 +1,5 @@
 import { os } from "@orpc/server";
+import { oz } from "@orpc/zod";
 import { api } from "@sketchi/backend/convex/_generated/api";
 import { ConvexHttpClient } from "convex/browser";
 import { z } from "zod";
@@ -26,15 +27,66 @@ const shareLinkSchema = z.object({
   encryptionKey: z.string(),
 });
 
-const generateInputSchema = z
-  .object({
-    prompt: z.string().min(1).max(10_000).optional(),
-    profileId: z.string().optional(),
-    intermediate: z.any().optional(),
-  })
-  .refine((value) => Boolean(value.prompt || value.intermediate), {
-    message: "prompt or intermediate is required",
-  });
+const exampleShareUrl =
+  "https://excalidraw.com/#json=exampleShareId,exampleKey";
+
+const exampleIntermediate = {
+  nodes: [
+    { id: "node-1", label: "Start" },
+    { id: "node-2", label: "Finish" },
+  ],
+  edges: [{ fromId: "node-1", toId: "node-2", label: "next" }],
+  graphOptions: { diagramType: "flowchart" },
+};
+
+const exampleElements = [
+  {
+    id: "node-1",
+    type: "rectangle",
+    x: 0,
+    y: 0,
+    width: 120,
+    height: 60,
+    angle: 0,
+    strokeColor: "#1971c2",
+    backgroundColor: "#a5d8ff",
+    fillStyle: "solid",
+    strokeWidth: 2,
+    strokeStyle: "solid",
+    roughness: 1,
+    opacity: 100,
+    groupIds: [],
+    frameId: null,
+    index: "a0",
+    roundness: { type: 3 },
+    seed: 101,
+    version: 1,
+    versionNonce: 30101,
+    isDeleted: false,
+    boundElements: null,
+    updated: 1725000000000,
+    link: null,
+    locked: false,
+  },
+];
+
+const generateInputSchema = oz.openapi(
+  z
+    .object({
+      prompt: z.string().min(1).max(10_000).optional(),
+      profileId: z.string().optional(),
+      intermediate: z.any().optional(),
+    })
+    .refine((value) => Boolean(value.prompt || value.intermediate), {
+      message: "prompt or intermediate is required",
+    }),
+  {
+    examples: [
+      { prompt: "Create a flowchart for user onboarding." },
+      { intermediate: exampleIntermediate },
+    ],
+  }
+);
 
 const generateOutputSchema = z.object({
   status: z.literal("success"),
@@ -107,17 +159,27 @@ export const appRouter = {
   diagramsModify: orpc
     .route({ method: "POST", path: "/diagrams/modify" })
     .input(
-      z.object({
-        shareUrl: z.string().url(),
-        request: z.string().min(1),
-        options: z
-          .object({
-            maxSteps: z.number().optional(),
-            timeoutMs: z.number().optional(),
-            preferExplicitEdits: z.boolean().optional(),
-          })
-          .optional(),
-      })
+      oz.openapi(
+        z.object({
+          shareUrl: z.string().url(),
+          request: z.string().min(1),
+          options: z
+            .object({
+              maxSteps: z.number().optional(),
+              timeoutMs: z.number().optional(),
+              preferExplicitEdits: z.boolean().optional(),
+            })
+            .optional(),
+        }),
+        {
+          examples: [
+            {
+              shareUrl: exampleShareUrl,
+              request: "Rename node-1 to 'Start' and update label colors.",
+            },
+          ],
+        }
+      )
     )
     .output(modifyOutputSchema)
     .handler(async ({ input, context }) => {
@@ -126,9 +188,14 @@ export const appRouter = {
   diagramsParse: orpc
     .route({ method: "GET", path: "/diagrams/parse" })
     .input(
-      z.object({
-        shareUrl: z.string().url(),
-      })
+      oz.openapi(
+        z.object({
+          shareUrl: z.string().url(),
+        }),
+        {
+          examples: [{ shareUrl: exampleShareUrl }],
+        }
+      )
     )
     .output(parseOutputSchema)
     .handler(async ({ input, context }) => {
@@ -137,10 +204,15 @@ export const appRouter = {
   diagramsShare: orpc
     .route({ method: "POST", path: "/diagrams/share" })
     .input(
-      z.object({
-        elements: z.array(z.any()),
+      oz.openapi(
+        z.object({
+          elements: z.array(z.any()),
           appState: z.record(z.string(), z.any()).optional(),
-      })
+        }),
+        {
+          examples: [{ elements: exampleElements, appState: {} }],
+        }
+      )
     )
     .output(shareLinkSchema)
     .handler(async ({ input, context }) => {
