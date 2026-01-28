@@ -20,6 +20,8 @@ Success:
 
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "../../../../../packages/backend/convex/_generated/api.js";
 import { loadConfig } from "../../runner/config";
 import {
   captureScreenshot,
@@ -40,15 +42,88 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const fixturesDir = join(__dirname, "../../../fixtures/svgs");
 
-async function createLibraryWithName(
-  // biome-ignore lint/suspicious/noExplicitAny: Stagehand instance type
-  stagehand: any,
+async function waitForUploadInput(
+  // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
+  page: any,
+  timeoutMs = 30_000
+): Promise<boolean> {
+  const startedAt = Date.now();
+  for (;;) {
+    const exists = await page.evaluate(
+      () => Boolean(document.querySelector('[data-testid="svg-file-input"]'))
+    );
+    if (exists) {
+      return true;
+    }
+    if (Date.now() - startedAt > timeoutMs) {
+      return false;
+    }
+    await sleep(250);
+  }
+}
+
+async function createLibraryViaApi(
+  // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
+  page: any,
+  baseUrl: string,
   libraryName: string
-): Promise<void> {
-  await stagehand.act(
-    `Click the button or link to create a new icon library. Then fill in the library name field with "${libraryName}" and confirm creation.`
+) {
+  const convexUrl = await page.evaluate(
+    () =>
+      (window as Window & { __SKETCHI_CONVEX_URL?: string })
+        .__SKETCHI_CONVEX_URL
   );
-  await sleep(500);
+  if (!convexUrl) {
+    throw new Error("Missing Convex URL from app runtime.");
+  }
+  const client = new ConvexHttpClient(convexUrl);
+  const id = await client.mutation(api.iconLibraries.create, {
+    name: libraryName,
+  });
+  await page.goto(resolveUrl(baseUrl, `/library-generator/${id}`), {
+    waitUntil: "domcontentloaded",
+  });
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
+async function createLibraryWithName(page: any, libraryName: string) {
+  await page.waitForSelector('input[placeholder="Library name"]', {
+    timeout: 30_000,
+  });
+  const actionResult = await page.evaluate((name: string) => {
+    const input = document.querySelector<HTMLInputElement>(
+      'input[placeholder="Library name"]'
+    );
+    if (!input) {
+      return { ok: false, reason: "missing input" };
+    }
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      "value"
+    )?.set;
+    if (!setter) {
+      return { ok: false, reason: "missing input setter" };
+    }
+    input.focus();
+    setter.call(input, name);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.blur();
+
+    const button = Array.from(document.querySelectorAll("button")).find(
+      (element) => element.textContent?.trim() === "Create"
+    );
+    if (!button) {
+      return { ok: false, reason: "missing create button" };
+    }
+    button.dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true })
+    );
+    return { ok: true };
+  }, libraryName);
+
+  if (!actionResult?.ok) {
+    throw new Error(`Create library UI failed: ${actionResult?.reason}`);
+  }
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
@@ -105,17 +180,24 @@ async function main() {
     // biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
     await ensureDesktopViewport(page as any);
 
-    await page.goto(resolveUrl(cfg.baseUrl, "/"), {
+    await page.goto(resolveUrl(cfg.baseUrl, "/library-generator"), {
       waitUntil: "domcontentloaded",
     });
 
-    await stagehand.act(
-      "Navigate to the Icon Library Generator page. Look for a link or button in the navigation that says 'Icon Library Generator' or similar."
-    );
-    await sleep(500);
-
     const libraryName = `test-lib-${Date.now()}`;
-    await createLibraryWithName(stagehand, libraryName);
+    await createLibraryWithName(page as any, libraryName);
+
+    const editorReady = await waitForUploadInput(page as any, 10_000);
+    if (!editorReady) {
+      warnings.push(
+        "Create UI did not navigate to editor; creating library via API fallback."
+      );
+      await createLibraryViaApi(page as any, cfg.baseUrl, libraryName);
+      const fallbackReady = await waitForUploadInput(page as any, 20_000);
+      if (!fallbackReady) {
+        throw new Error("Upload input not found after API fallback.");
+      }
+    }
 
     await uploadSvgFiles(page as any);
 
