@@ -1,53 +1,53 @@
 # Prompt to Intermediate E2E Test Results
 
 - Pass rate: 3/3
-- Created: 2026-01-28T06:40:48.452Z
+- Created: 2026-01-28T06:45:32.541Z
 
 ## Summary Table
 
 | Scenario | Status | Tokens | Duration | Nodes | Edges | PNG Size | Share URL |
 |----------|--------|--------|----------|-------|-------|----------|-----------|
-| SME interview transcript (pharma batch disposition) | PASS | 3178 | 16065ms | 8 | 8 | 127KB | [link](https://excalidraw.com/#json=fpchl6XrTijO9qverozI6,l2o6-5Kd3D_qzHt9_iwTtQ) |
-| Rambling technical narration with mid-course correction | PASS | 2827 | 13964ms | 8 | 9 | 100KB | [link](https://excalidraw.com/#json=x2eh_R3g7SnwfedT8kaRi,WBucreG_LHHMFbzGK-KlOQ) |
-| Adversarial edge case (very short prompt) | PASS | 2147 | 8577ms | 9 | 9 | 128KB | [link](https://excalidraw.com/#json=wIyvQKc8SA96Gux71f0Cq,THBZdH51_hGtUTXNuscbOQ) |
+| SME interview transcript (pharma batch disposition) | PASS | 3008 | 14381ms | 7 | 8 | 104KB | [link](https://excalidraw.com/#json=O-3OKkn9CBniu4jWLqlg-,yynmlQxJkW9B1okuEuVbbA) |
+| Rambling technical narration with mid-course correction | PASS | 2231 | 9051ms | 9 | 10 | 112KB | [link](https://excalidraw.com/#json=1VxPCrO8ZPoJjqifudAYF,tBWYSdNDV9KBkpLX49BzlQ) |
+| Adversarial edge case (very short prompt) | PASS | 2537 | 12317ms | 10 | 11 | 139KB | [link](https://excalidraw.com/#json=AvoOXtrVxr0x72XJJo_lL,_0LHL5y-h2_Hn_Q-tkRshg) |
 
 ## Scenario Details
 
 ### SME interview transcript (pharma batch disposition)
 - Status: passed
-- Duration: 16065ms
-- Tokens: 3178
-- Nodes: 8
+- Duration: 14381ms
+- Tokens: 3008
+- Nodes: 7
 - Edges: 8
-- PNG Size: 129627 bytes
+- PNG Size: 106666 bytes
 - JSON: prompt-intermediate-pharma-interview.json
 - PNG: prompt-intermediate-pharma-interview.png
-- Share URL: https://excalidraw.com/#json=fpchl6XrTijO9qverozI6,l2o6-5Kd3D_qzHt9_iwTtQ
+- Share URL: https://excalidraw.com/#json=O-3OKkn9CBniu4jWLqlg-,yynmlQxJkW9B1okuEuVbbA
 - Error: none
-- Created: 2026-01-28T06:40:48.451Z
+- Created: 2026-01-28T06:45:32.541Z
 
 ### Rambling technical narration with mid-course correction
 - Status: passed
-- Duration: 13964ms
-- Tokens: 2827
-- Nodes: 8
-- Edges: 9
-- PNG Size: 102523 bytes
+- Duration: 9051ms
+- Tokens: 2231
+- Nodes: 9
+- Edges: 10
+- PNG Size: 114211 bytes
 - JSON: prompt-intermediate-rambling-tech.json
 - PNG: prompt-intermediate-rambling-tech.png
-- Share URL: https://excalidraw.com/#json=x2eh_R3g7SnwfedT8kaRi,WBucreG_LHHMFbzGK-KlOQ
+- Share URL: https://excalidraw.com/#json=1VxPCrO8ZPoJjqifudAYF,tBWYSdNDV9KBkpLX49BzlQ
 - Error: none
-- Created: 2026-01-28T06:40:46.350Z
+- Created: 2026-01-28T06:45:27.211Z
 
 ### Adversarial edge case (very short prompt)
 - Status: passed
-- Duration: 8577ms
-- Tokens: 2147
-- Nodes: 9
-- Edges: 9
-- PNG Size: 131241 bytes
+- Duration: 12317ms
+- Tokens: 2537
+- Nodes: 10
+- Edges: 11
+- PNG Size: 142712 bytes
 - JSON: prompt-intermediate-short-prompt.json
 - PNG: prompt-intermediate-short-prompt.png
-- Share URL: https://excalidraw.com/#json=wIyvQKc8SA96Gux71f0Cq,THBZdH51_hGtUTXNuscbOQ
+- Share URL: https://excalidraw.com/#json=AvoOXtrVxr0x72XJJo_lL,_0LHL5y-h2_Hn_Q-tkRshg
 - Error: none
-- Created: 2026-01-28T06:40:40.963Z
+- Created: 2026-01-28T06:45:30.477Z

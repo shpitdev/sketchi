@@ -1,46 +1,46 @@
 {
   "scenario": "SME interview transcript (pharma batch disposition)",
   "prompt": "I'm interviewing a pharma manufacturing SME about their batch disposition process. \nSME: First, we receive the batch from production with all the test data. \nThen QA reviews the Certificate of Analysis. \nIf it passes specs, we move to final review. \nIf it fails, we either investigate for retesting or reject the batch outright. \nFinal review is done by QA Manager who makes the disposition decision. \nAfter approval, it goes to packaging.",
-  "shareUrl": "https://excalidraw.com/#json=fpchl6XrTijO9qverozI6,l2o6-5Kd3D_qzHt9_iwTtQ",
+  "shareUrl": "https://excalidraw.com/#json=O-3OKkn9CBniu4jWLqlg-,yynmlQxJkW9B1okuEuVbbA",
   "intermediate": {
     "edges": [
       {
         "fromId": "receive-batch",
-        "toId": "qa-review-coa"
+        "toId": "review-coa"
       },
       {
-        "fromId": "qa-review-coa",
-        "toId": "specs-decision"
+        "fromId": "review-coa",
+        "toId": "check-specs"
       },
       {
-        "fromId": "specs-decision",
-        "label": "Pass",
+        "fromId": "check-specs",
+        "label": "Yes",
         "toId": "final-review"
       },
       {
-        "fromId": "specs-decision",
+        "fromId": "check-specs",
         "label": "Fail",
-        "toId": "failure-action"
+        "toId": "investigation"
       },
       {
-        "fromId": "failure-action",
-        "label": "Investigate",
-        "toId": "investigate-retesting"
-      },
-      {
-        "fromId": "failure-action",
-        "label": "Reject",
+        "fromId": "check-specs",
+        "label": "Fail (Outright)",
         "toId": "reject-batch"
       },
       {
-        "fromId": "investigate-retesting",
-        "label": "Re-submit",
-        "toId": "qa-review-coa"
+        "fromId": "investigation",
+        "label": "Retest Data",
+        "toId": "review-coa"
       },
       {
         "fromId": "final-review",
         "label": "Approved",
         "toId": "packaging"
+      },
+      {
+        "fromId": "final-review",
+        "label": "Rejected",
+        "toId": "reject-batch"
       }
     ],
     "graphOptions": {
@@ -53,29 +53,23 @@
       {
         "id": "receive-batch",
         "kind": "start",
-        "label": "Receive Batch from Production",
+        "label": "Receive Batch & Test Data",
         "metadata": {}
       },
       {
-        "id": "qa-review-coa",
+        "id": "review-coa",
         "kind": "process",
         "label": "QA Review of CoA",
         "metadata": {}
       },
       {
-        "id": "specs-decision",
+        "id": "check-specs",
         "kind": "decision",
-        "label": "Passes Specifications?",
+        "label": "Passes Specs?",
         "metadata": {}
       },
       {
-        "id": "failure-action",
-        "kind": "decision",
-        "label": "Determine Path",
-        "metadata": {}
-      },
-      {
-        "id": "investigate-retesting",
+        "id": "investigation",
         "kind": "process",
         "label": "Investigate for Retesting",
         "metadata": {}
@@ -83,24 +77,24 @@
       {
         "id": "reject-batch",
         "kind": "end",
-        "label": "Reject Batch Outright",
+        "label": "Reject Batch",
         "metadata": {}
       },
       {
         "id": "final-review",
         "kind": "process",
-        "label": "Final Review by QA Manager",
+        "label": "Final Review (QA Manager)",
         "metadata": {}
       },
       {
         "id": "packaging",
         "kind": "end",
-        "label": "Release to Packaging",
+        "label": "Packaging",
         "metadata": {}
       }
     ]
   },
-  "tokens": 3178,
-  "durationMs": 15320,
-  "traceId": "09b62370-d4e4-42c6-a629-c9b3c8368fe0"
+  "tokens": 3008,
+  "durationMs": 13553,
+  "traceId": "d8e4c54a-05ec-47e2-b6ce-255db0825421"
 }

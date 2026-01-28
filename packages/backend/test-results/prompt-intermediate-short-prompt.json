@@ -1,48 +1,59 @@
 {
   "scenario": "Adversarial edge case (very short prompt)",
   "prompt": "user login flow",
-  "shareUrl": "https://excalidraw.com/#json=wIyvQKc8SA96Gux71f0Cq,THBZdH51_hGtUTXNuscbOQ",
+  "shareUrl": "https://excalidraw.com/#json=AvoOXtrVxr0x72XJJo_lL,_0LHL5y-h2_Hn_Q-tkRshg",
   "intermediate": {
     "edges": [
       {
         "fromId": "start",
-        "toId": "enter-credentials"
+        "toId": "enter-creds"
       },
       {
-        "fromId": "enter-credentials",
-        "toId": "click-login"
-      },
-      {
-        "fromId": "click-login",
+        "fromId": "enter-creds",
         "toId": "validate"
       },
       {
         "fromId": "validate",
-        "label": "Yes",
-        "toId": "generate-session"
+        "toId": "check-valid"
       },
       {
-        "fromId": "generate-session",
+        "fromId": "check-valid",
+        "label": "Yes",
+        "toId": "mfa-check"
+      },
+      {
+        "fromId": "mfa-check",
+        "label": "Yes",
+        "toId": "mfa-challenge"
+      },
+      {
+        "fromId": "mfa-check",
+        "label": "No",
         "toId": "dashboard"
       },
       {
-        "fromId": "validate",
-        "label": "No",
-        "toId": "check-attempts"
+        "fromId": "mfa-challenge",
+        "label": "Verified",
+        "toId": "dashboard"
       },
       {
-        "fromId": "check-attempts",
+        "fromId": "check-valid",
         "label": "No",
+        "toId": "failed-attempts"
+      },
+      {
+        "fromId": "failed-attempts",
+        "label": "Yes",
         "toId": "show-error"
       },
       {
-        "fromId": "show-error",
-        "toId": "enter-credentials"
+        "fromId": "failed-attempts",
+        "label": "No",
+        "toId": "account-lock"
       },
       {
-        "fromId": "check-attempts",
-        "label": "Yes",
-        "toId": "lock-account"
+        "fromId": "show-error",
+        "toId": "enter-creds"
       }
     ],
     "graphOptions": {
@@ -55,31 +66,37 @@
       {
         "id": "start",
         "kind": "start",
-        "label": "Start Login",
+        "label": "Login Page",
         "metadata": {}
       },
       {
-        "id": "enter-credentials",
+        "id": "enter-creds",
         "kind": "process",
         "label": "Enter Credentials",
         "metadata": {}
       },
       {
-        "id": "click-login",
-        "kind": "process",
-        "label": "Click Login",
-        "metadata": {}
-      },
-      {
         "id": "validate",
-        "kind": "decision",
-        "label": "Valid Credentials?",
+        "kind": "service",
+        "label": "Authenticate User",
         "metadata": {}
       },
       {
-        "id": "generate-session",
+        "id": "check-valid",
+        "kind": "decision",
+        "label": "Valid?",
+        "metadata": {}
+      },
+      {
+        "id": "mfa-check",
+        "kind": "decision",
+        "label": "MFA Enabled?",
+        "metadata": {}
+      },
+      {
+        "id": "mfa-challenge",
         "kind": "process",
-        "label": "Generate Session/Token",
+        "label": "Enter MFA Code",
         "metadata": {}
       },
       {
@@ -89,9 +106,9 @@
         "metadata": {}
       },
       {
-        "id": "check-attempts",
+        "id": "failed-attempts",
         "kind": "decision",
-        "label": "Max Attempts Exceeded?",
+        "label": "Attempts < Limit?",
         "metadata": {}
       },
       {
@@ -101,14 +118,14 @@
         "metadata": {}
       },
       {
-        "id": "lock-account",
+        "id": "account-lock",
         "kind": "end",
-        "label": "Lock Account",
+        "label": "Account Locked",
         "metadata": {}
       }
     ]
   },
-  "tokens": 2147,
-  "durationMs": 7487,
-  "traceId": "478c8d1d-9a71-4203-960e-586443c2f09f"
+  "tokens": 2537,
+  "durationMs": 11089,
+  "traceId": "c26d9819-83a0-4cab-b4ca-2e4ce6976e75"
 }
