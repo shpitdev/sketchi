@@ -172,15 +172,25 @@ async function uploadSvgFiles(page: any): Promise<void> {
   await sleep(1500); // Wait for uploads to process
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Stagehand instance type
-async function verifyIconsLoaded(stagehand: any): Promise<boolean> {
-  const result = await stagehand.act(
-    "Check if the library now displays 3 icons in a grid. Count the visible icon thumbnails and report the count."
-  );
-  return (
-    result?.message?.toLowerCase().includes("3") ||
-    result?.message?.toLowerCase().includes("three")
-  );
+async function waitForIconCount(
+  // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
+  page: any,
+  expected: number,
+  timeoutMs = 30_000
+): Promise<boolean> {
+  const startedAt = Date.now();
+  for (;;) {
+    const count = await page.evaluate(
+      () => document.querySelectorAll('[data-testid="icon-grid-item"]').length
+    );
+    if (count === expected) {
+      return true;
+    }
+    if (Date.now() - startedAt > timeoutMs) {
+      return false;
+    }
+    await sleep(250);
+  }
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: Stagehand instance type
@@ -243,7 +253,7 @@ async function main() {
 
     await uploadSvgFiles(page as any);
 
-    const iconsLoaded = await verifyIconsLoaded(stagehand);
+    const iconsLoaded = await waitForIconCount(page as any, 3, 20_000);
     if (!iconsLoaded) {
       warnings.push("Failed to verify 3 icons loaded after upload");
     }

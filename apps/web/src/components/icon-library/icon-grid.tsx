@@ -126,6 +126,7 @@ export default function IconGrid({
 
       <div
         className="grid gap-3"
+        data-testid="icon-grid"
         style={{
           gridTemplateColumns: `repeat(auto-fit, minmax(${iconSize}px, ${iconSize * 2}px))`,
         }}
@@ -138,6 +139,7 @@ export default function IconGrid({
           return (
             <div
               className="flex flex-col gap-2 rounded border bg-muted/10 p-2"
+              data-testid="icon-grid-item"
               key={icon.id}
             >
               <div className="relative">
