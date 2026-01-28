@@ -210,7 +210,7 @@ async function main() {
   try {
     const page = await getActivePage(stagehand);
     // biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
-    await resetBrowserState(page as any, cfg.baseUrl);
+    await resetBrowserState(page as any, cfg.baseUrl, cfg.vercelBypassSecret);
     // biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
     await ensureDesktopViewport(page as any);
 

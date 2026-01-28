@@ -10,6 +10,16 @@ export function resolveUrl(baseUrl: string, pathname: string): string {
   return `${baseUrl}/${pathname.replace(LEADING_SLASH_REGEX, "")}`;
 }
 
+export function withVercelBypass(url: string, bypassSecret?: string): string {
+  if (!bypassSecret) {
+    return url;
+  }
+  const parsed = new URL(url);
+  parsed.searchParams.set("x-vercel-protection-bypass", bypassSecret);
+  parsed.searchParams.set("x-vercel-set-bypass-cookie", "true");
+  return parsed.toString();
+}
+
 export function toInt(value: number | undefined) {
   if (!value) {
     return 0;
@@ -59,7 +69,8 @@ export async function resetBrowserState(
     ) => Promise<unknown>;
     evaluate?: <T>(fn: () => T) => Promise<T>;
   },
-  baseUrl: string
+  baseUrl: string,
+  bypassSecret?: string
 ) {
   try {
     await page.context?.().clearCookies?.();
@@ -68,7 +79,9 @@ export async function resetBrowserState(
   }
 
   try {
-    await page.goto?.(baseUrl, { waitUntil: "domcontentloaded" });
+    await page.goto?.(withVercelBypass(baseUrl, bypassSecret), {
+      waitUntil: "domcontentloaded",
+    });
   } catch {
     // ignore navigation failures
   }
