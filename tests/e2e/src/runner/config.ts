@@ -157,11 +157,7 @@ function resolvePath(
 function findRepoRoot(): string | undefined {
   let current = process.cwd();
   for (;;) {
-    if (
-      fs.existsSync(path.join(current, "bun.lockb")) ||
-      fs.existsSync(path.join(current, "bun.lock")) ||
-      fs.existsSync(path.join(current, ".git"))
-    ) {
+    if (fs.existsSync(path.join(current, ".git"))) {
       return current;
     }
     const next = path.dirname(current);
