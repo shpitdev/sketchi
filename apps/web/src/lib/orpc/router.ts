@@ -1,5 +1,5 @@
 import { os } from "@orpc/server";
-import { oz } from "@orpc/zod";
+import { JSON_SCHEMA_REGISTRY } from "@orpc/zod/zod4";
 import { api } from "@sketchi/backend/convex/_generated/api";
 import { ConvexHttpClient } from "convex/browser";
 import { z } from "zod";
@@ -70,23 +70,22 @@ const exampleElements = [
   },
 ];
 
-const generateInputSchema = oz.openapi(
-  z
-    .object({
-      prompt: z.string().min(1).max(10_000).optional(),
-      profileId: z.string().optional(),
-      intermediate: z.any().optional(),
-    })
-    .refine((value) => Boolean(value.prompt || value.intermediate), {
-      message: "prompt or intermediate is required",
-    }),
-  {
-    examples: [
-      { prompt: "Create a flowchart for user onboarding." },
-      { intermediate: exampleIntermediate },
-    ],
-  }
-);
+const generateInputSchema = z
+  .object({
+    prompt: z.string().min(1).max(10_000).optional(),
+    profileId: z.string().optional(),
+    intermediate: z.any().optional(),
+  })
+  .refine((value) => Boolean(value.prompt || value.intermediate), {
+    message: "prompt or intermediate is required",
+  });
+
+JSON_SCHEMA_REGISTRY.add(generateInputSchema, {
+  examples: [
+    { prompt: "Create a flowchart for user onboarding." },
+    { intermediate: exampleIntermediate },
+  ],
+});
 
 const generateOutputSchema = z.object({
   status: z.literal("success"),
@@ -148,6 +147,44 @@ const parseOutputSchema = z.object({
   }),
 });
 
+const modifyInputSchema = z.object({
+  shareUrl: z.string().url(),
+  request: z.string().min(1),
+  options: z
+    .object({
+      maxSteps: z.number().optional(),
+      timeoutMs: z.number().optional(),
+      preferExplicitEdits: z.boolean().optional(),
+    })
+    .optional(),
+});
+
+JSON_SCHEMA_REGISTRY.add(modifyInputSchema, {
+  examples: [
+    {
+      shareUrl: exampleShareUrl,
+      request: "Rename node-1 to 'Start' and update label colors.",
+    },
+  ],
+});
+
+const parseInputSchema = z.object({
+  shareUrl: z.string().url(),
+});
+
+JSON_SCHEMA_REGISTRY.add(parseInputSchema, {
+  examples: [{ shareUrl: exampleShareUrl }],
+});
+
+const shareInputSchema = z.object({
+  elements: z.array(z.any()),
+  appState: z.record(z.string(), z.any()).optional(),
+});
+
+JSON_SCHEMA_REGISTRY.add(shareInputSchema, {
+  examples: [{ elements: exampleElements, appState: {} }],
+});
+
 export const appRouter = {
   diagramsGenerate: orpc
     .route({ method: "POST", path: "/diagrams/generate" })
@@ -158,62 +195,21 @@ export const appRouter = {
     }),
   diagramsModify: orpc
     .route({ method: "POST", path: "/diagrams/modify" })
-    .input(
-      oz.openapi(
-        z.object({
-          shareUrl: z.string().url(),
-          request: z.string().min(1),
-          options: z
-            .object({
-              maxSteps: z.number().optional(),
-              timeoutMs: z.number().optional(),
-              preferExplicitEdits: z.boolean().optional(),
-            })
-            .optional(),
-        }),
-        {
-          examples: [
-            {
-              shareUrl: exampleShareUrl,
-              request: "Rename node-1 to 'Start' and update label colors.",
-            },
-          ],
-        }
-      )
-    )
+    .input(modifyInputSchema)
     .output(modifyOutputSchema)
     .handler(async ({ input, context }) => {
       return await context.convex.action(api.diagrams.modifyDiagram, input);
     }),
   diagramsParse: orpc
     .route({ method: "GET", path: "/diagrams/parse" })
-    .input(
-      oz.openapi(
-        z.object({
-          shareUrl: z.string().url(),
-        }),
-        {
-          examples: [{ shareUrl: exampleShareUrl }],
-        }
-      )
-    )
+    .input(parseInputSchema)
     .output(parseOutputSchema)
     .handler(async ({ input, context }) => {
       return await context.convex.action(api.diagrams.parseDiagram, input);
     }),
   diagramsShare: orpc
     .route({ method: "POST", path: "/diagrams/share" })
-    .input(
-      oz.openapi(
-        z.object({
-          elements: z.array(z.any()),
-          appState: z.record(z.string(), z.any()).optional(),
-        }),
-        {
-          examples: [{ elements: exampleElements, appState: {} }],
-        }
-      )
-    )
+    .input(shareInputSchema)
     .output(shareLinkSchema)
     .handler(async ({ input, context }) => {
       return await context.convex.action(api.diagrams.shareDiagram, input);

@@ -42,28 +42,17 @@ jobs:
         id: current_version
         run: echo "version=$(bun -e "console.log(require('./package.json').version)")" >> $GITHUB_OUTPUT
 
-      - name: Determine version bump type
-        id: bump_type
+      - name: Create bump branch
+        id: bump_branch
         run: |
-          # Default to patch bump
-          BUMP_TYPE="patch"
-
-          # Check commit messages for version bump indicators
-          LAST_COMMIT_MSG=$(git log -1 --pretty=%B)
-
-          if echo "$LAST_COMMIT_MSG" | grep -qiE "(BREAKING CHANGE|major|!:)"; then
-            BUMP_TYPE="major"
-          elif echo "$LAST_COMMIT_MSG" | grep -qiE "(feat|feature|minor)"; then
-            BUMP_TYPE="minor"
-          fi
-
-          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
-          echo "Detected bump type: $BUMP_TYPE"
+          BRANCH="chore/bump-version-${GITHUB_SHA::7}"
+          git checkout -b "$BRANCH"
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
       - name: Bump version
         id: bump_version
         run: |
-          npm version ${{ steps.bump_type.outputs.bump_type }} --no-git-tag-version
+          npm version patch --no-git-tag-version
           NEW_VERSION=$(bun -e "console.log(require('./package.json').version)")
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Bumped version from ${{ steps.current_version.outputs.version }} to $NEW_VERSION"
@@ -72,7 +61,54 @@ jobs:
         run: |
           git add package.json
           git commit -m "chore: bump version to ${{ steps.bump_version.outputs.new_version }} [skip-release]"
-          git push
+          git push --set-upstream origin "${{ steps.bump_branch.outputs.branch }}"
+
+      - name: Create or update PR
+        id: bump_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_TITLE="chore: bump version to ${{ steps.bump_version.outputs.new_version }}"
+          PR_BODY="Automated patch version bump."
+          BRANCH="${{ steps.bump_branch.outputs.branch }}"
+          if gh pr view "$BRANCH" --repo "$GITHUB_REPOSITORY" --json url -q .url > /dev/null 2>&1; then
+            PR_URL=$(gh pr view "$BRANCH" --repo "$GITHUB_REPOSITORY" --json url -q .url)
+          else
+            PR_URL=$(gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$BRANCH" \
+              --title "$PR_TITLE" \
+              --body "$PR_BODY")
+          fi
+          echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr merge "${{ steps.bump_pr.outputs.pr_url }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --squash \
+            --auto
+      - name: Wait for PR merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_URL="${{ steps.bump_pr.outputs.pr_url }}"
+          for _ in {1..30}; do
+            MERGED_AT=$(gh pr view "$PR_URL" --repo "$GITHUB_REPOSITORY" --json mergedAt -q .mergedAt)
+            if [ -n "$MERGED_AT" ] && [ "$MERGED_AT" != "null" ]; then
+              echo "PR merged at $MERGED_AT"
+              git fetch origin main
+              git checkout main
+              git reset --hard origin/main
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "PR did not merge in time."
+          exit 1
 
       - name: Generate release notes
         id: release_notes
