@@ -1,3 +1,5 @@
+const LEADING_SLASH_REGEX = /^\//;
+
 export function resolveUrl(baseUrl: string, pathname: string): string {
   if (!pathname || pathname === "/") {
     return `${baseUrl}/`;
@@ -5,7 +7,7 @@ export function resolveUrl(baseUrl: string, pathname: string): string {
   if (pathname.startsWith("http://") || pathname.startsWith("https://")) {
     return pathname;
   }
-  return `${baseUrl}/${pathname.replace(/^\//, "")}`;
+  return `${baseUrl}/${pathname.replace(LEADING_SLASH_REGEX, "")}`;
 }
 
 export function toInt(value: number | undefined) {

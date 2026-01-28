@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import dotenv from "dotenv";
 
+const TRAILING_SLASH_REGEX = /\/$/;
+
 export type StagehandEnv = "LOCAL" | "BROWSERBASE";
 
 export interface StagehandRunConfig {
@@ -115,7 +117,7 @@ function normalizeBaseUrl(value: string): string {
   if (!trimmed) {
     return "http://localhost:3001";
   }
-  return trimmed.replace(/\/$/, "");
+  return trimmed.replace(TRAILING_SLASH_REGEX, "");
 }
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {

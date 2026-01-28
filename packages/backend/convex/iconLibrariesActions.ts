@@ -10,6 +10,12 @@ const externalRefPattern =
   /(?:xlink:href|href)\s*=\s*["']\s*(?:https?:|data:|\/\/)/i;
 const externalUrlPattern = /url\(\s*["']?\s*(?:https?:|data:|\/\/)/i;
 
+const FILE_EXTENSION_REGEX = /\.[^/.]+$/;
+const FILE_STEM_CLEANUP_REGEX = /[^a-z0-9]+/g;
+const FILE_STEM_TRIM_REGEX = /^-+|-+$/g;
+const SVG_OPEN_TAG_REGEX = /<\s*svg[\s>]/i;
+const SVG_CLOSE_TAG_REGEX = /<\s*\/\s*svg\s*>/i;
+
 const hashText = async (value: string) => {
   const bytes = new TextEncoder().encode(value);
   const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
@@ -20,15 +26,17 @@ const hashText = async (value: string) => {
 
 const sanitizeFileStem = (value: string) =>
   value
-    .replace(/\.[^/.]+$/, "")
+    .replace(FILE_EXTENSION_REGEX, "")
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(FILE_STEM_CLEANUP_REGEX, "-")
+    .replace(FILE_STEM_TRIM_REGEX, "")
     .slice(0, 80) || "icon";
 
 const validateSvgText = (svgText: string) => {
-  if (!(/<\s*svg[\s>]/i.test(svgText) && /<\s*\/\s*svg\s*>/i.test(svgText))) {
+  if (
+    !(SVG_OPEN_TAG_REGEX.test(svgText) && SVG_CLOSE_TAG_REGEX.test(svgText))
+  ) {
     throw new Error("Invalid SVG: missing <svg> root element.");
   }
   if (invalidTagPattern.test(svgText)) {
