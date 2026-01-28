@@ -7,4 +7,6 @@ export const modules = {
   "./export.ts": () => import("./export"),
   "./diagramGenerateFromIntermediate.ts": () =>
     import("./diagramGenerateFromIntermediate"),
+  "./diagramGenerateIntermediateFromPrompt.ts": () =>
+    import("./diagramGenerateIntermediateFromPrompt"),
 };
