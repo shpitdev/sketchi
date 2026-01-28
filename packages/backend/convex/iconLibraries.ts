@@ -248,19 +248,21 @@ export const reorderIcons = mutation({
     orderedIds: v.array(v.id("iconItems")),
   },
   handler: async (ctx, { libraryId, orderedIds }) => {
-    const now = Date.now();
+    // Phase 1: Validate ALL icons exist and belong to library
+    for (const iconId of orderedIds) {
+      const icon = await ctx.db.get(iconId);
+      if (!icon || icon.libraryId !== libraryId) {
+        throw new Error("Invalid icon reorder request.");
+      }
+    }
 
-    await Promise.all(
-      orderedIds.map(async (iconId, index) => {
-        const icon = await ctx.db.get(iconId);
-        if (!icon || icon.libraryId !== libraryId) {
-          throw new Error("Invalid icon reorder request.");
-        }
-        await ctx.db.patch(iconId, {
-          sortOrder: index,
-          updatedAt: now,
-        });
-      })
-    );
+    // Phase 2: Apply ALL patches (only if all validation passed)
+    const now = Date.now();
+    for (let index = 0; index < orderedIds.length; index++) {
+      await ctx.db.patch(orderedIds[index], {
+        sortOrder: index,
+        updatedAt: now,
+      });
+    }
   },
 });
