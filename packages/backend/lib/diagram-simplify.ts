@@ -71,13 +71,10 @@ function resolveLabel(
   return fallback;
 }
 
-export function simplifyDiagramElements(
-  elements: unknown[]
-): SimplifyDiagramResult {
-  const elementList = Array.isArray(elements) ? elements : [];
+function buildTextByContainer(elements: unknown[]): Map<string, string> {
   const textByContainer = new Map<string, string>();
 
-  for (const element of elementList) {
+  for (const element of elements) {
     if (!element || typeof element !== "object") {
       continue;
     }
@@ -91,9 +88,16 @@ export function simplifyDiagramElements(
     }
   }
 
+  return textByContainer;
+}
+
+function buildNodes(
+  elements: unknown[],
+  textByContainer: Map<string, string>
+): Map<string, IntermediateNode> {
   const nodes = new Map<string, IntermediateNode>();
 
-  for (const element of elementList) {
+  for (const element of elements) {
     if (!element || typeof element !== "object") {
       continue;
     }
@@ -117,9 +121,17 @@ export function simplifyDiagramElements(
     });
   }
 
+  return nodes;
+}
+
+function buildEdges(
+  elements: unknown[],
+  textByContainer: Map<string, string>,
+  nodes: Map<string, IntermediateNode>
+): IntermediateEdge[] {
   const edges: IntermediateEdge[] = [];
 
-  for (const element of elementList) {
+  for (const element of elements) {
     if (!element || typeof element !== "object") {
       continue;
     }
@@ -142,7 +154,6 @@ export function simplifyDiagramElements(
     }
 
     const label = resolveLabel(base, textByContainer, "");
-
     edges.push({
       id: typeof base.id === "string" ? base.id : undefined,
       fromId,
@@ -150,6 +161,17 @@ export function simplifyDiagramElements(
       label: label || undefined,
     });
   }
+
+  return edges;
+}
+
+export function simplifyDiagramElements(
+  elements: unknown[]
+): SimplifyDiagramResult {
+  const elementList = Array.isArray(elements) ? elements : [];
+  const textByContainer = buildTextByContainer(elementList);
+  const nodes = buildNodes(elementList, textByContainer);
+  const edges = buildEdges(elementList, textByContainer, nodes);
 
   return {
     intermediate: {

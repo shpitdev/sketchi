@@ -20,6 +20,7 @@ import type {
 } from "./diagram-layout-types";
 import type { Diagram } from "./diagram-structure";
 
+// biome-ignore lint/performance/noBarrelFile: shared layout entrypoint
 export {
   convertIntermediateToDiagram,
   toLayoutOverrides,

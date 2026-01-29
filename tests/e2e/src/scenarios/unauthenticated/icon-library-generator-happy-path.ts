@@ -39,10 +39,11 @@ import { sleep } from "../../runner/wait";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const fixturesDir = join(__dirname, "../../../fixtures/svgs");
+type PageLike = Awaited<ReturnType<typeof getActivePage>>;
+type StagehandLike = Awaited<ReturnType<typeof createStagehand>>;
 
 async function waitForLibraryInput(
-  // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
-  page: any,
+  page: PageLike,
   timeoutMs = 30_000
 ): Promise<boolean> {
   const startedAt = Date.now();
@@ -61,8 +62,7 @@ async function waitForLibraryInput(
 }
 
 async function waitForHydration(
-  // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
-  page: any,
+  page: PageLike,
   timeoutMs = 20_000
 ): Promise<boolean> {
   const startedAt = Date.now();
@@ -80,29 +80,8 @@ async function waitForHydration(
   }
 }
 
-async function waitForUploadInput(
-  // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
-  page: any,
-  timeoutMs = 30_000
-): Promise<boolean> {
-  const startedAt = Date.now();
-  for (;;) {
-    const exists = await page.evaluate(() =>
-      Boolean(document.querySelector('[data-testid="svg-file-input"]'))
-    );
-    if (exists) {
-      return true;
-    }
-    if (Date.now() - startedAt > timeoutMs) {
-      return false;
-    }
-    await sleep(250);
-  }
-}
-
 async function waitForEditorOrToastError(
-  // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
-  page: any,
+  page: PageLike,
   timeoutMs = 45_000
 ): Promise<{ ok: boolean; toast?: string }> {
   const startedAt = Date.now();
@@ -127,8 +106,7 @@ async function waitForEditorOrToastError(
   }
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
-async function createLibraryWithName(page: any, libraryName: string) {
+async function createLibraryWithName(page: PageLike, libraryName: string) {
   await page.waitForSelector('input[placeholder="Library name"]', {
     state: "visible",
     timeout: 20_000,
@@ -143,8 +121,7 @@ async function createLibraryWithName(page: any, libraryName: string) {
   await page.locator(createSelector).click();
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
-async function uploadSvgFiles(page: any): Promise<void> {
+async function uploadSvgFiles(page: PageLike): Promise<void> {
   const fixtures = [
     join(fixturesDir, "palantir-workshop.svg"),
     join(fixturesDir, "palantir-pipeline.svg"),
@@ -156,8 +133,7 @@ async function uploadSvgFiles(page: any): Promise<void> {
 }
 
 async function waitForIconCount(
-  // biome-ignore lint/suspicious/noExplicitAny: Playwright Page type
-  page: any,
+  page: PageLike,
   expected: number,
   timeoutMs = 30_000
 ): Promise<boolean> {
@@ -176,16 +152,14 @@ async function waitForIconCount(
   }
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Stagehand instance type
-async function exportAsExcalidrawLib(stagehand: any): Promise<void> {
+async function exportAsExcalidrawLib(stagehand: StagehandLike): Promise<void> {
   await stagehand.act(
     "Find and click the export button or menu. Select the option to export as .excalidrawlib format. Confirm the export action."
   );
   await sleep(500);
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Stagehand instance type
-async function exportAsSketchyZip(stagehand: any): Promise<void> {
+async function exportAsSketchyZip(stagehand: StagehandLike): Promise<void> {
   await stagehand.act(
     "Find and click the export button or menu. Select the option to export as Sketchy SVGs (ZIP). Confirm the export action."
   );
@@ -202,29 +176,27 @@ async function main() {
 
   try {
     const page = await getActivePage(stagehand);
-    // biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
-    await resetBrowserState(page as any, cfg.baseUrl, cfg.vercelBypassSecret);
-    // biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
-    await ensureDesktopViewport(page as any);
+    await resetBrowserState(page, cfg.baseUrl, cfg.vercelBypassSecret);
+    await ensureDesktopViewport(page);
 
     await page.goto(resolveUrl(cfg.baseUrl, "/library-generator"), {
       waitUntil: "domcontentloaded",
     });
 
-    const hydrated = await waitForHydration(page as any, 20_000);
+    const hydrated = await waitForHydration(page, 20_000);
     if (!hydrated) {
       throw new Error("App hydration did not complete in time.");
     }
 
     const libraryName = `test-lib-${Date.now()}`;
-    const libraryInputReady = await waitForLibraryInput(page as any, 20_000);
+    const libraryInputReady = await waitForLibraryInput(page, 20_000);
     if (!libraryInputReady) {
       throw new Error("Library create form did not load in time.");
     }
 
-    await createLibraryWithName(page as any, libraryName);
+    await createLibraryWithName(page, libraryName);
 
-    const editorResult = await waitForEditorOrToastError(page as any, 45_000);
+    const editorResult = await waitForEditorOrToastError(page, 45_000);
     if (!editorResult.ok) {
       if (editorResult.toast) {
         throw new Error(
@@ -234,17 +206,16 @@ async function main() {
       throw new Error("Create UI did not navigate to editor.");
     }
 
-    await uploadSvgFiles(page as any);
+    await uploadSvgFiles(page);
 
-    const iconsLoaded = await waitForIconCount(page as any, 3, 20_000);
+    const iconsLoaded = await waitForIconCount(page, 3, 20_000);
     if (!iconsLoaded) {
       warnings.push("Failed to verify 3 icons loaded after upload");
     }
 
     await exportAsExcalidrawLib(stagehand);
     const excalidrawExport = await captureScreenshot(
-      // biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
-      page as any,
+      page,
       cfg,
       "export-excalidrawlib",
       {
@@ -260,8 +231,7 @@ async function main() {
 
     await exportAsSketchyZip(stagehand);
     const sketchyExport = await captureScreenshot(
-      // biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
-      page as any,
+      page,
       cfg,
       "export-sketchy-zip",
       {

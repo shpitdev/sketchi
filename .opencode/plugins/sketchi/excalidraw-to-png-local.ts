@@ -7,6 +7,8 @@ import { gradeByChartType } from "../../../packages/backend/experiments/lib/grad
 import {
   closeBrowser,
   renderDiagramToPng,
+  validateExcalidrawImageDataUrls,
+  validateExcalidrawSceneJson,
 } from "../../../packages/backend/experiments/lib/render-png";
 import {
   type Diagram,
@@ -43,6 +45,19 @@ interface GradeResult {
   outputPath?: string;
 }
 
+interface ValidationResult {
+  totalImages: number;
+  failedImages: Array<{ id: string; label?: string | null }>;
+  loadOk: boolean;
+  loadError?: string | null;
+  svgErrors: Array<{ id: string; label?: string | null; error: string }>;
+  harnessErrors?: string[];
+  harnessLogs?: string[];
+  imageValidationMs: number;
+  sceneValidationMs: number;
+  outputPath?: string;
+}
+
 function resolveOutputPath(path: string): string {
   return resolve(process.cwd(), path);
 }
@@ -61,6 +76,112 @@ function parseDiagram(value: unknown): Diagram {
     );
   }
   return parsed.data;
+}
+
+function getImageLabels(scene: {
+  elements?: Array<Record<string, unknown>>;
+}): Map<string, string> {
+  const elements = scene.elements ?? [];
+  const labelsByGroup = new Map<string, string>();
+
+  for (const element of elements) {
+    if (element.type === "text" && Array.isArray(element.groupIds)) {
+      const text = typeof element.text === "string" ? element.text : "";
+      for (const groupId of element.groupIds) {
+        if (!labelsByGroup.has(groupId) && text) {
+          labelsByGroup.set(groupId, text);
+        }
+      }
+    }
+  }
+
+  return labelsByGroup;
+}
+
+async function validateExcalidrawScene(
+  scenePath: string,
+  outputPath?: string
+): Promise<ValidationResult> {
+  const raw = await readFile(resolveOutputPath(scenePath), "utf-8");
+  const scene = JSON.parse(raw) as {
+    elements?: Array<Record<string, unknown>>;
+    files?: Record<string, { id: string; dataURL: string }>;
+  };
+
+  const files = scene.files ?? {};
+  const fileEntries = Object.values(files).map((file) => ({
+    id: file.id,
+    dataURL: file.dataURL,
+  }));
+
+  const labelsByGroup = getImageLabels(scene);
+  const labelByFileId = new Map<string, string>();
+  for (const element of scene.elements ?? []) {
+    if (element.type === "image" && typeof element.fileId === "string") {
+      const groupIds = Array.isArray(element.groupIds)
+        ? (element.groupIds as string[])
+        : [];
+      const label = groupIds.find((id) => labelsByGroup.has(id))
+        ? labelsByGroup.get(groupIds.find((id) => labelsByGroup.has(id))!)
+        : undefined;
+      if (label) {
+        labelByFileId.set(element.fileId, label);
+      }
+    }
+  }
+
+  const imageValidation = await validateExcalidrawImageDataUrls(fileEntries);
+  const sceneValidation = await validateExcalidrawSceneJson(raw);
+
+  const failedImages = imageValidation.results
+    .filter((result) => !result.ok)
+    .map((result) => ({
+      id: result.id,
+      label: labelByFileId.get(result.id) ?? null,
+    }));
+
+  const svgErrors = sceneValidation.svgErrors.map((error) => ({
+    id: error.id,
+    label: labelByFileId.get(error.id) ?? null,
+    error: error.error,
+  }));
+
+  let resolvedOutputPath: string | undefined;
+  if (outputPath) {
+    resolvedOutputPath = resolveOutputPath(outputPath);
+    await ensureDir(resolvedOutputPath);
+    await writeFile(
+      resolvedOutputPath,
+      JSON.stringify(
+        {
+          totalImages: fileEntries.length,
+          failedImages,
+          loadOk: sceneValidation.loadOk,
+          loadError: sceneValidation.loadError,
+          svgErrors,
+          harnessErrors: sceneValidation.harnessErrors,
+          harnessLogs: sceneValidation.harnessLogs,
+          imageValidationMs: imageValidation.durationMs,
+          sceneValidationMs: sceneValidation.durationMs,
+        },
+        null,
+        2
+      )
+    );
+  }
+
+  return {
+    totalImages: fileEntries.length,
+    failedImages,
+    loadOk: sceneValidation.loadOk,
+    loadError: sceneValidation.loadError,
+    svgErrors,
+    harnessErrors: sceneValidation.harnessErrors,
+    harnessLogs: sceneValidation.harnessLogs,
+    imageValidationMs: imageValidation.durationMs,
+    sceneValidationMs: sceneValidation.durationMs,
+    outputPath: resolvedOutputPath,
+  };
 }
 
 async function renderDiagram(
@@ -238,6 +359,26 @@ export const ExcalidrawLocalPlugin = () => {
           return JSON.stringify(result, null, 2);
         },
       }),
+      excalidraw_validate_local: tool({
+        description:
+          "Validate Excalidraw scene file (load + SVG normalize + image decode).",
+        args: {
+          scenePath: tool.schema
+            .string()
+            .describe("Path to .excalidraw scene JSON file"),
+          outputPath: tool.schema
+            .string()
+            .optional()
+            .describe("Optional path to write validation JSON"),
+        },
+        async execute(args) {
+          const result = await validateExcalidrawScene(
+            args.scenePath,
+            args.outputPath
+          );
+          return JSON.stringify(result, null, 2);
+        },
+      }),
     },
   };
 };
@@ -251,6 +392,7 @@ async function runCli() {
         "Usage:",
         "  bun run .opencode/plugins/sketchi/excalidraw-to-png-local.ts png <diagram.json> [output.png] [chartType]",
         "  bun run .opencode/plugins/sketchi/excalidraw-to-png-local.ts grade <chartType> <prompt.txt> <pngPath> [output.json]",
+        "  bun run .opencode/plugins/sketchi/excalidraw-to-png-local.ts validate <scene.excalidraw> [output.json]",
         "",
       ].join("\n")
     );
@@ -292,6 +434,17 @@ async function runCli() {
       outputPath: outputPath ? resolveOutputPath(outputPath) : undefined,
     });
 
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (command === "validate") {
+    const [scenePath, outputPath] = rest;
+    if (!scenePath) {
+      throw new Error("Usage: validate <scene.excalidraw> [output.json]");
+    }
+
+    const result = await validateExcalidrawScene(scenePath, outputPath);
     console.log(JSON.stringify(result, null, 2));
     return;
   }

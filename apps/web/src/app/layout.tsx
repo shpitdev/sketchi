@@ -32,6 +32,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL ?? "";
+  const convexScript = {
+    __html: `window.__SKETCHI_CONVEX_URL=${JSON.stringify(convexUrl)};`,
+  };
   return (
     <html lang="en" suppressHydrationWarning>
       <body
@@ -39,9 +42,8 @@ export default function RootLayout({
       >
         {convexUrl ? (
           <script
-            dangerouslySetInnerHTML={{
-              __html: `window.__SKETCHI_CONVEX_URL=${JSON.stringify(convexUrl)};`,
-            }}
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: required to pass env config to client
+            dangerouslySetInnerHTML={convexScript}
           />
         ) : null}
         <Providers>

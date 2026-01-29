@@ -17,7 +17,7 @@ export default function Header() {
         </Link>
         <div className="flex items-center gap-2">
           <Link
-            className="rounded-md border border-transparent px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground"
+            className="rounded-md border border-transparent px-2 py-1 text-muted-foreground text-xs transition-colors hover:border-foreground/20 hover:text-foreground"
             href="/api/docs"
             rel="noreferrer"
             target="_blank"
