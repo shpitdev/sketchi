@@ -23,28 +23,74 @@ export async function createStagehand(cfg: StagehandRunConfig) {
       baseURL: "https://openrouter.ai/api/v1",
     }),
   });
-  const stagehand = new Stagehand({
-    env: cfg.env,
-    apiKey: cfg.browserbaseApiKey,
-    projectId: cfg.browserbaseProjectId,
-    cacheDir: cfg.cacheDir,
-    verbose: cfg.verbose,
-    model: {
-      modelName: cfg.modelName,
-    },
-    llmClient,
-    localBrowserLaunchOptions:
-      cfg.env === "LOCAL"
-        ? {
-            headless: cfg.headless,
-            executablePath: cfg.chromePath || undefined,
-          }
-        : undefined,
-  });
+  const browserbaseSessionCreateParams = cfg.browserbaseRegion
+    ? { region: cfg.browserbaseRegion }
+    : undefined;
+  const maxAttempts = cfg.env === "BROWSERBASE" ? 3 : 1;
+  let lastError: unknown;
 
-  await stagehand.init();
-  await applyVercelBypassHeaders(stagehand.context, cfg);
-  return stagehand;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const stagehand = new Stagehand({
+      env: cfg.env,
+      apiKey: cfg.browserbaseApiKey,
+      projectId: cfg.browserbaseProjectId,
+      browserbaseSessionCreateParams,
+      cacheDir: cfg.cacheDir,
+      verbose: cfg.verbose,
+      model: {
+        modelName: cfg.modelName,
+      },
+      llmClient,
+      localBrowserLaunchOptions:
+        cfg.env === "LOCAL"
+          ? {
+              headless: cfg.headless,
+              executablePath: cfg.chromePath || undefined,
+            }
+          : undefined,
+    });
+
+    try {
+      await stagehand.init();
+      await applyVercelBypassHeaders(stagehand.context, cfg);
+      return stagehand;
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        cfg.env !== "BROWSERBASE" ||
+        attempt === maxAttempts ||
+        !isRetryableBrowserbaseError(message)
+      ) {
+        await shutdown(stagehand);
+        throw error;
+      }
+      console.log(
+        `Stagehand init failed (attempt ${attempt}/${maxAttempts}): ${message}`
+      );
+      await shutdown(stagehand);
+      await delay(1000 * attempt);
+    }
+  }
+
+  if (lastError instanceof Error) {
+    throw lastError;
+  }
+  throw new Error(String(lastError ?? "Stagehand init failed"));
+}
+
+function isRetryableBrowserbaseError(message: string) {
+  return (
+    message.includes("Expected 101 status code") ||
+    message.includes("WebSocket connection") ||
+    message.toLowerCase().includes("browserbase")
+  );
+}
+
+function delay(durationMs: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, durationMs);
+  });
 }
 
 const popupBlockerAttached = new WeakSet<object>();
