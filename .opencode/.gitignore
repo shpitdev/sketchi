@@ -1,2 +1,4 @@
 node_modules
 sketchi/
+!plugins/sketchi/
+!plugins/sketchi/**
