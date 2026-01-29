@@ -79,14 +79,6 @@ jobs:
         if: steps.skip_release.outputs.skip != 'true'
         run: echo "version=$(bun -e "console.log(require('./package.json').version)")" >> $GITHUB_OUTPUT
 
-      - name: Create bump branch
-        id: bump_branch
-        if: steps.skip_release.outputs.skip != 'true'
-        run: |
-          BRANCH="chore/bump-version"
-          git checkout -B "$BRANCH"
-          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-
       - name: Bump version
         id: bump_version
         if: steps.skip_release.outputs.skip != 'true'
@@ -110,59 +102,7 @@ jobs:
         run: |
           git add package.json
           git commit -m "chore: bump version to ${{ steps.bump_version.outputs.new_version }} [skip-release] [skip ci]"
-          git push --force --set-upstream origin "${{ steps.bump_branch.outputs.branch }}"
-
-      - name: Create or update PR
-        id: bump_pr
-        if: steps.skip_release.outputs.skip != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          PR_TITLE="chore: bump version to ${{ steps.bump_version.outputs.new_version }}"
-          PR_BODY="Automated patch version bump."
-          BRANCH="${{ steps.bump_branch.outputs.branch }}"
-          if gh pr view "$BRANCH" --repo "$GITHUB_REPOSITORY" --json url -q .url > /dev/null 2>&1; then
-            PR_URL=$(gh pr view "$BRANCH" --repo "$GITHUB_REPOSITORY" --json url -q .url)
-            gh pr edit "$PR_URL" --title "$PR_TITLE" --body "$PR_BODY"
-          else
-            PR_URL=$(gh pr create \
-              --repo "$GITHUB_REPOSITORY" \
-              --base main \
-              --head "$BRANCH" \
-              --title "$PR_TITLE" \
-              --body "$PR_BODY")
-          fi
-          echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
-
-      - name: Enable auto-merge
-        if: steps.skip_release.outputs.skip != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr merge "${{ steps.bump_pr.outputs.pr_url }}" \
-            --repo "$GITHUB_REPOSITORY" \
-            --squash \
-            --auto
-
-      - name: Wait for PR merge
-        if: steps.skip_release.outputs.skip != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          PR_URL="${{ steps.bump_pr.outputs.pr_url }}"
-          for _ in {1..30}; do
-            MERGED_AT=$(gh pr view "$PR_URL" --repo "$GITHUB_REPOSITORY" --json mergedAt -q .mergedAt)
-            if [ -n "$MERGED_AT" ] && [ "$MERGED_AT" != "null" ]; then
-              echo "PR merged at $MERGED_AT"
-              git fetch origin main
-              git checkout main
-              git reset --hard origin/main
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "PR did not merge in time."
-          exit 1
+          git push origin HEAD:main
 
       - name: Generate release notes
         id: release_notes
