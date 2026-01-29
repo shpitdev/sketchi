@@ -3,9 +3,6 @@ vars:
   target_url: "http://localhost:3001"
   bypass_secret: ""
   encoded_share_prefix: "https%3A%2F%2Fexcalidraw.com%2F%23json%3D"
-  # Mask secrets in logs and reports
-  venom.secrets:
-    - "{{.bypass_secret}}"
   test_intermediate:
     nodes:
       - id: "node-1"
