@@ -4,8 +4,8 @@
   "workspaces": {
     "": {
       "dependencies": {
-        "@opencode-ai/plugin": "1.1.41",
-        "@opencode-ai/sdk": "1.1.41",
+        "@opencode-ai/plugin": "1.1.42",
+        "@opencode-ai/sdk": "1.1.42",
         "parquetjs-lite": "^0.8.7",
       },
       "devDependencies": {
@@ -16,9 +16,9 @@
     },
   },
   "packages": {
-    "@opencode-ai/plugin": ["@opencode-ai/plugin@1.1.41", "", { "dependencies": { "@opencode-ai/sdk": "1.1.41", "zod": "4.1.8" } }, "sha512-zpp/3gFrhIzpTFuTgdbu332INaBD8UaS2P2Uqn8QhYlzkLmpptIaGe+W+mTpZhtmsLOeo5XQmLwfcCdMTLMheA=="],
+    "@opencode-ai/plugin": ["@opencode-ai/plugin@1.1.42", "", { "dependencies": { "@opencode-ai/sdk": "1.1.42", "zod": "4.1.8" } }, "sha512-pKPGUSo980tlpfkeK1heKi+FyY5uAa8CffQ8CEvfmTiHkHhZaw0Cz79cSi2iWYxLzGgx4pQWUoq2YdVBiMWYHw=="],
 
-    "@opencode-ai/sdk": ["@opencode-ai/sdk@1.1.41", "", {}, "sha512-RXTyLl/2O/TM3Oag6JtGHVbK+SKb123szFm6JhvFuF1KCe4+86zjIjISYsaMKzgrd/fnkG0KEKUQxP8Y6xfrVw=="],
+    "@opencode-ai/sdk": ["@opencode-ai/sdk@1.1.42", "", {}, "sha512-QuTJgnzmsQ+CF/mr9nu+FQGv2cMwGMsnWd7eOF0YLuXKOzpx+xlBkUGdZz8l0n3I+7ix8iiMZbTw4laAG8vIqA=="],
 
     "@types/node": ["@types/node@25.1.0", "", { "dependencies": { "undici-types": "~7.16.0" } }, "sha512-t7frlewr6+cbx+9Ohpl0NOTKXZNV9xHRmNOvql47BFJKcEG1CxtxlPEEe+gR9uhVWM4DwhnvTF110mIL4yP9RA=="],
 
