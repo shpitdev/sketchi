@@ -22,7 +22,8 @@
     "dev:web": "turbo -F web dev",
     "dev:server": "turbo -F @sketchi/backend dev",
     "dev:setup": "turbo -F @sketchi/backend dev:setup",
-    "seed:palantir-icons": "bun --cwd packages/backend run seed:palantir-icons"
+    "seed:palantir-icons": "bun --cwd packages/backend run seed:palantir-icons",
+    "opencode:serve": "bun --cwd .opencode scripts/opencode-serve.ts --project-dir .."
   },
   "dependencies": {
     "@sketchi/env": "workspace:*",

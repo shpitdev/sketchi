@@ -1,0 +1,16 @@
+{
+  "name": "@sketchi/opencode-plugin-dev",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@opencode-ai/plugin": "1.1.41",
+    "@opencode-ai/sdk": "1.1.41",
+    "parquetjs-lite": "^0.8.7",
+    "playwright": "^1.58.0"
+  },
+  "devDependencies": {
+    "bun-types": "latest",
+    "typescript": "^5.8.2"
+  }
+}

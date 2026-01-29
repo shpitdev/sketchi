@@ -18,6 +18,7 @@
 [![Bun](https://img.shields.io/badge/Bun-1.3.5-FBF0DF?logo=bun&logoColor=black)](https://bun.sh/docs)
 [![Biome](https://img.shields.io/badge/Biome-2.3.11-60A5FA?logo=biome&logoColor=white)](https://biomejs.dev/guides/getting-started/)
 [![OpenCode](https://img.shields.io/badge/OpenCode-CLI-10B981?logo=terminal&logoColor=white)](https://github.com/opencode-ai/opencode)
+[![DuckDB](https://img.shields.io/badge/DuckDB-Data%20Analytics-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org/)
 
 <!-- AI Stack -->
 [![Vercel AI SDK](https://img.shields.io/badge/Vercel_AI_SDK-6.0.49-000000?logo=vercel&logoColor=white)](https://sdk.vercel.ai/docs)
@@ -206,6 +207,24 @@ NEXT_PUBLIC_CONVEX_URL=<your-convex-deployment-url>
 ```
 
 For AI features and testing, see `.env.e2e.example` for additional variables.
+
+---
+
+## OpenCode Plugin
+
+The OpenCode plugin lives under `.opencode/plugins/sketchi` and calls the production API by default (`https://www.sketchi.app`).
+
+Notes:
+- OpenCode runs `bun install` in `.opencode`, but you still need Playwright browsers once per machine:
+  - `bunx playwright install`
+- PNG outputs default to `./sketchi/png` in the directory where OpenCode is run.
+- Override API base with `SKETCHI_API_URL`.
+- Tools exposed: `diagram_from_prompt`, `diagram_modify`, `diagram_to_png`, `diagram_grade`.
+- Start OpenCode web UI + event logging: `bun run opencode:serve` (logs to `./sketchi/opencode-logs/*.parquet`).
+- DuckDB example (explicit column list, newest log file):
+```bash
+duckdb -c "SELECT receivedAt, directory, eventType, eventStream, sessionID, messageID, parentMessageID, partID, partType, kind, toolName, toolStatus, toolCallID, toolStartMs, toolEndMs, toolDurationMs, role, providerID, modelID, messageCreatedMs, messageCompletedMs, stepCost, stepStartMs, stepEndMs, stepDurationMs, tokensInput, tokensOutput, tokensReasoning, tokensCacheRead, tokensCacheWrite, traceId, data FROM read_parquet('$(ls -t sketchi/opencode-logs/*.parquet | head -n 1)') ORDER BY receivedAt DESC LIMIT 200;"
+```
 
 ---
 
