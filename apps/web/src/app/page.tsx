@@ -126,7 +126,7 @@ function FeatureCard(props: FeatureCardProps) {
 
   const contentProps = { ...props, isClickable: !!isClickable, isExternal };
 
-  if (isExternal && externalHref) {
+  if (isClickable && isExternal && externalHref) {
     return (
       <a
         className={cardClassName}
@@ -139,7 +139,7 @@ function FeatureCard(props: FeatureCardProps) {
     );
   }
 
-  if (href) {
+  if (isClickable && href) {
     return (
       <Link className={cardClassName} href={href}>
         <FeatureCardContent {...contentProps} />
