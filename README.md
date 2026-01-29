@@ -221,8 +221,10 @@ Notes:
 - Override API base with `SKETCHI_API_URL`.
 - Tools exposed: `diagram_from_prompt`, `diagram_modify`, `diagram_to_png`, `diagram_grade`.
 - Start OpenCode web UI + event logging: `bun run opencode:serve` (logs to `./sketchi/opencode-logs/*.parquet`).
-- DuckDB example (explicit column list):
-  - `duckdb -c "SELECT receivedAt, directory, eventType, eventStream, sessionID, messageID, parentMessageID, partID, partType, kind, toolName, toolStatus, toolCallID, toolStartMs, toolEndMs, toolDurationMs, role, providerID, modelID, messageCreatedMs, messageCompletedMs, stepCost, stepStartMs, stepEndMs, stepDurationMs, tokensInput, tokensOutput, tokensReasoning, tokensCacheRead, tokensCacheWrite, traceId, data FROM read_parquet('sketchi/opencode-logs/*.parquet') ORDER BY receivedAt DESC LIMIT 200;"`
+- DuckDB example (explicit column list, newest log file):
+```bash
+duckdb -c "SELECT receivedAt, directory, eventType, eventStream, sessionID, messageID, parentMessageID, partID, partType, kind, toolName, toolStatus, toolCallID, toolStartMs, toolEndMs, toolDurationMs, role, providerID, modelID, messageCreatedMs, messageCompletedMs, stepCost, stepStartMs, stepEndMs, stepDurationMs, tokensInput, tokensOutput, tokensReasoning, tokensCacheRead, tokensCacheWrite, traceId, data FROM read_parquet('$(ls -t sketchi/opencode-logs/*.parquet | head -n 1)') ORDER BY receivedAt DESC LIMIT 200;"
+```
 
 ---
 
