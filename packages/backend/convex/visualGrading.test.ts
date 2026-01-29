@@ -12,13 +12,10 @@ import { fileURLToPath } from "node:url";
 import { convexTest } from "convex-test";
 import { config as loadEnv } from "dotenv";
 import { describe, expect, test } from "vitest";
-import { analyzeContent } from "../experiments/agents/content-analyzer";
-import { gradeByChartType } from "../experiments/lib/grading";
-import {
-  closeBrowser,
-  renderDiagramToPng,
-} from "../experiments/lib/render-png";
+import { analyzeContent } from "../lib/agents/content-analyzer";
 import type { IntermediateFormat } from "../lib/diagram-intermediate";
+import { gradeByChartType } from "../lib/grading";
+import { closeBrowser, renderDiagramToPng } from "../lib/render-png";
 import { api } from "./_generated/api";
 import schema from "./schema";
 import { modules } from "./test.setup";

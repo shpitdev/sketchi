@@ -1,9 +1,9 @@
+import { generateObjectWithRetry, getModel } from "../ai-utils";
 import {
   type IntermediateFormat,
   IntermediateFormatSchema,
-} from "../../lib/diagram-intermediate";
-import { generateObjectWithRetry, getModel } from "../lib/ai-utils";
-import { CHART_TYPE_NAMES } from "../lib/prompts";
+} from "../diagram-intermediate";
+import { CHART_TYPE_NAMES } from "../prompts/chart-specs";
 
 const chartTypeList = Object.entries(CHART_TYPE_NAMES)
   .filter(([key]) => key !== "auto")

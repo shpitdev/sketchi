@@ -1,7 +1,7 @@
 "use node";
 import { v } from "convex/values";
-import { renderDiagramToPngRemote } from "../experiments/lib/render-png";
 import type { Diagram } from "../lib/diagram-structure";
+import { renderDiagramToPngRemote } from "../lib/render-png";
 import { action } from "./_generated/server";
 
 export const exportDiagramPng = action({

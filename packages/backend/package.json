@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "convex dev",
     "dev:setup": "convex dev --configure --until-success",
+    "prompts:generate": "bun run scripts/generate-prompts.ts",
     "seed:palantir-icons": "bun run scripts/seed-palantir-icons.ts",
     "test": "vitest run --reporter=default --reporter=json --outputFile=./test-results/vitest.json",
     "test:watch": "vitest --reporter=default",
@@ -21,6 +22,7 @@
     "convex-helpers": "^0.1.111",
     "dagre": "^0.8.5",
     "dotenv": "catalog:",
+    "gray-matter": "^4.0.3",
     "playwright": "^1.58.0",
     "playwright-core": "^1.58.0",
     "sharp": "^0.34.2",

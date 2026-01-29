@@ -6,9 +6,9 @@ import { fileURLToPath } from "node:url";
 import Browserbase from "@browserbasehq/sdk";
 import { type Browser, chromium, type Page } from "playwright";
 import { chromium as chromiumCore } from "playwright-core";
-import { applyLayout } from "../../lib/diagram-layout";
-import type { Diagram } from "../../lib/diagram-structure";
-import { convertLayoutedToExcalidraw } from "../../lib/excalidraw-elements";
+import { applyLayout } from "./diagram-layout";
+import type { Diagram } from "./diagram-structure";
+import { convertLayoutedToExcalidraw } from "./excalidraw-elements";
 
 const RENDER_TIMEOUT_MS = 60_000;
 const LEADING_SLASH_REGEX = /^\/+/;

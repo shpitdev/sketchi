@@ -14,10 +14,7 @@ import { fileURLToPath } from "node:url";
 import { convexTest } from "convex-test";
 import { config as loadEnv } from "dotenv";
 import { describe, expect, test } from "vitest";
-import {
-  closeBrowser,
-  renderDiagramToPng,
-} from "../experiments/lib/render-png";
+import { closeBrowser, renderDiagramToPng } from "../lib/render-png";
 import { api } from "./_generated/api";
 import { createExcalidrawShareLink } from "./lib/excalidrawShareLinks";
 import schema from "./schema";

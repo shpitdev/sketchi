@@ -10,10 +10,6 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
-import {
-  closeBrowser,
-  renderElementsToPng,
-} from "../experiments/lib/render-png";
 import type { IntermediateFormat } from "../lib/diagram-intermediate";
 import { layoutIntermediateDiagram } from "../lib/diagram-layout";
 import type {
@@ -22,6 +18,7 @@ import type {
   PositionedShape,
 } from "../lib/diagram-layout-types";
 import { convertLayoutedToExcalidraw } from "../lib/excalidraw-elements";
+import { closeBrowser, renderElementsToPng } from "../lib/render-png";
 
 type Edge = "left" | "right" | "top" | "bottom";
 

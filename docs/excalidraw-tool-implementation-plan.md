@@ -93,7 +93,7 @@
 
 **Goal**: Validate core behaviors before building the API layer. Run experiments in isolation, then copy proven logic to the real app.
 
-**Location**: `packages/backend/experiments/` - standalone scripts runnable with `bun run`
+**Location**: `packages/backend/convex/` tests + shared logic in `packages/backend/lib/` (experiments folder removed)
 
 **Environment**: `AI_GATEWAY_API_KEY` is already configured in Convex. For local experiments, ensure this env var is available.
 
@@ -116,7 +116,7 @@ const MODELS = {
 };
 ```
 
-Implemented experiments live in `packages/backend/experiments/` (see `packages/backend/experiments/README.md`).
+Legacy experiments removed; see `packages/backend/convex/*.test.ts` and artifacts in `packages/backend/test-results/`.
 
 ## Phase 1: Core API
 
