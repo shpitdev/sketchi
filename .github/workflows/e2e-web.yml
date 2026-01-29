@@ -54,7 +54,16 @@ jobs:
               core.setOutput("run_tests", "true");
               return;
             }
-            const prNumber = prs[0].number;
+            const pr = prs[0];
+            const prNumber = pr.number;
+            const isBumpPr =
+              pr.title?.startsWith("chore: bump version") ||
+              pr.head?.ref?.startsWith("chore/bump-version");
+            if (isBumpPr) {
+              core.notice("Bump PR detected; skipping E2E web tests.");
+              core.setOutput("run_tests", "false");
+              return;
+            }
             const files = await github.paginate(
               github.rest.pulls.listFiles,
               { owner, repo, pull_number: prNumber, per_page: 100 }
