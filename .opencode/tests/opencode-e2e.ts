@@ -119,8 +119,7 @@ async function parquetHasTool(
 }
 
 async function run() {
-  const repoRoot = resolve(process.cwd(), "..");
-  const logDir = resolve(repoRoot, "sketchi", "opencode-logs-test");
+  const logDir = resolve(process.cwd(), "sketchi", "opencode-logs");
   const port = await findOpenPort();
   const baseUrl = `http://${HOST}:${port}`;
 
@@ -130,12 +129,12 @@ async function run() {
       "bun",
       "scripts/opencode-serve.ts",
       "--project-dir",
-      "..",
+      ".",
       "--no-open",
       "--port",
       String(port),
       "--log-dir",
-      "opencode-logs-test",
+      "opencode-logs",
     ],
     cwd: process.cwd(),
     stdout: "inherit",

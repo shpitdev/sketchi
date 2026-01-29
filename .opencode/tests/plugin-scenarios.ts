@@ -15,7 +15,7 @@ type ToolContext = Parameters<
 >[1];
 
 function createContext(): ToolContext {
-  const directory = resolve(process.cwd(), "..");
+  const directory = resolve(process.cwd());
   return {
     sessionID: "test-session",
     messageID: "test-message",
@@ -29,7 +29,7 @@ function createContext(): ToolContext {
 }
 
 async function assertPngPath(path: string) {
-  assert.ok(path.includes(`${resolve(process.cwd(), "..")}/sketchi/png/`));
+  assert.ok(path.includes(`${resolve(process.cwd())}/sketchi/png/`));
   assert.ok(existsSync(path));
   const info = await stat(path);
   assert.ok(info.size > 0);
@@ -40,7 +40,7 @@ async function wait(ms: number) {
 }
 
 async function run() {
-  const directory = resolve(process.cwd(), "..");
+  const directory = resolve(process.cwd());
   const plugin = await SketchiPlugin({
     client: {} as never,
     project: { id: "test", name: "test", root: directory } as never,
