@@ -1,5 +1,6 @@
-import { gateway, Output, stepCountIs, ToolLoopAgent, tool } from "ai";
+import { Output, stepCountIs, ToolLoopAgent, tool } from "ai";
 import { z } from "zod";
+import { createOpenRouterChatModel } from "../ai/openrouter";
 import type {
   IntermediateEdge,
   IntermediateNode,
@@ -15,6 +16,11 @@ import type {
 
 export interface GenerateOptions {
   profileId?: string;
+  /**
+   * Correlation id for logs/tracing across systems.
+   * If not provided, a new UUID is generated.
+   */
+  traceId?: string;
 }
 
 /**
@@ -74,8 +80,9 @@ export async function generateIntermediate(
   prompt: string,
   options: GenerateOptions = {}
 ): Promise<GenerateIntermediateResult> {
-  const traceId = crypto.randomUUID();
-  const profile = getProfile(options.profileId ?? "general");
+  const traceId = options.traceId ?? crypto.randomUUID();
+  const resolvedProfileId = options.profileId ?? "general";
+  const profile = getProfile(resolvedProfileId);
 
   const validateTool = tool({
     description:
@@ -117,8 +124,16 @@ export async function generateIntermediate(
     },
   });
 
+  const modelId =
+    process.env.MODEL_NAME?.trim() || "google/gemini-3-flash-preview";
+
   const agent = new ToolLoopAgent({
-    model: gateway("google/gemini-3-flash"),
+    model: createOpenRouterChatModel({
+      modelId,
+      traceId,
+      profileId: resolvedProfileId,
+    }),
+    temperature: 0,
     instructions: profile.instructions,
     output: Output.object({ schema: IntermediateFormatSchema }),
     tools: {
@@ -126,9 +141,11 @@ export async function generateIntermediate(
     },
     stopWhen: stepCountIs(5),
     onStepFinish: ({ usage, toolCalls }) => {
-      console.log(
-        `[${traceId}] Step: tools=${toolCalls?.length ?? 0}, tokens=${usage.totalTokens}`
-      );
+      console.log("[ai.generateIntermediate.step]", {
+        traceId,
+        toolCalls: toolCalls?.length ?? 0,
+        totalTokens: usage.totalTokens,
+      });
     },
   });
 
@@ -143,9 +160,14 @@ export async function generateIntermediate(
     );
   }
 
+  console.log("[ai.generateIntermediate.completed]", {
+    traceId,
+    responseId: result.response.id,
+  });
+
   return {
     intermediate: result.output,
-    profileId: options.profileId ?? "general",
+    profileId: resolvedProfileId,
     iterations: result.steps.length,
     tokens: result.usage.totalTokens ?? 0,
     durationMs: Date.now() - start,

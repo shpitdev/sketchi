@@ -28,7 +28,7 @@ const t = convexTest(schema, modules);
 const outputDir = fileURLToPath(new URL("../test-results", import.meta.url));
 const summaryMdPath = join(outputDir, "prompt-intermediate-summary.md");
 
-const requiredEnv = ["AI_GATEWAY_API_KEY"] as const;
+const requiredEnv = ["OPENROUTER_API_KEY"] as const;
 
 interface Scenario {
   name: string;

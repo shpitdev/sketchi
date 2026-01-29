@@ -95,7 +95,7 @@
 
 **Location**: `packages/backend/convex/` tests + shared logic in `packages/backend/lib/` (experiments folder removed)
 
-**Environment**: `AI_GATEWAY_API_KEY` is already configured in Convex. For local experiments, ensure this env var is available.
+**Environment**: `OPENROUTER_API_KEY` is already configured in Convex. For local experiments, ensure this env var is available.
 
 **Models to Test**:
 - `google/gemini-3-flash` - Primary model (fast, good structured output)

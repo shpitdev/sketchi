@@ -21,7 +21,7 @@ import { modules } from "./test.setup";
 const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
 loadEnv({ path: join(repoRoot, ".env.e2e") });
 
-const requiredEnv = ["AI_GATEWAY_API_KEY"] as const;
+const requiredEnv = ["OPENROUTER_API_KEY"] as const;
 const hasRequiredEnv = requiredEnv.every((key) => process.env[key]);
 
 const outputDir = fileURLToPath(new URL("../test-results", import.meta.url));

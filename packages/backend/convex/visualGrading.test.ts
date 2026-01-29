@@ -30,7 +30,7 @@ const outputDir = fileURLToPath(new URL("../test-results", import.meta.url));
 const summaryJsonPath = join(outputDir, "visual-grading.json");
 const summaryMdPath = join(outputDir, "visual-grading.md");
 
-const requiredEnv = ["AI_GATEWAY_API_KEY"] as const;
+const requiredEnv = ["OPENROUTER_API_KEY"] as const;
 
 type ChartType = "flowchart" | "architecture" | "decision-tree";
 

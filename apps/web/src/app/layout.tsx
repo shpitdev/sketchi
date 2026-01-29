@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/react";
 import type { Metadata } from "next";
 
 import { Caveat, Geist, Geist_Mono } from "next/font/google";
@@ -21,9 +22,36 @@ const caveat = Caveat({
   subsets: ["latin"],
 });
 
+const siteUrl = "https://sketchi.app";
+const ogImage = "/og-image.png";
+const description =
+  "Sketchi is a diagram and icon library toolkit that transforms SVGs into hand-drawn Excalidraw assets. Build icon libraries, generate AI-powered diagrams, and export production-ready .excalidrawlib files.";
+
 export const metadata: Metadata = {
-  title: "sketchi",
-  description: "sketchi",
+  title: "Sketchi",
+  description,
+  metadataBase: new URL(siteUrl),
+  openGraph: {
+    title: "Sketchi",
+    description,
+    url: siteUrl,
+    siteName: "Sketchi",
+    type: "website",
+    images: [
+      {
+        url: ogImage,
+        width: 1280,
+        height: 800,
+        alt: "Sketchi Home",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Sketchi",
+    description,
+    images: [ogImage],
+  },
 };
 
 const safeSerialize = (value: string) =>
@@ -55,6 +83,7 @@ export default function RootLayout({
             {children}
           </div>
         </Providers>
+        <Analytics />
       </body>
     </html>
   );

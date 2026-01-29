@@ -1,12 +1,13 @@
-import { gateway, generateObject, generateText, type LanguageModel } from "ai";
+import { generateObject, generateText, type LanguageModel } from "ai";
 import type { z } from "zod";
+import { createOpenRouterChatModel } from "./ai/openrouter";
 
 export const AI_CONFIG = {
   DEFAULT_TIMEOUT_MS: 60_000,
   MAX_RETRIES: 3,
   BASE_DELAY_MS: 1000,
   MAX_DELAY_MS: 30_000,
-  DEFAULT_MODEL: "google/gemini-3-flash",
+  DEFAULT_MODEL: "google/gemini-3-flash-preview",
 } as const;
 
 export interface AICallOptions {
@@ -127,7 +128,9 @@ export async function withRetry<T>(
 }
 
 export function getModel(modelId?: string): LanguageModel {
-  return gateway(modelId ?? AI_CONFIG.DEFAULT_MODEL);
+  return createOpenRouterChatModel({
+    modelId: modelId ?? AI_CONFIG.DEFAULT_MODEL,
+  });
 }
 
 export function generateTextWithRetry(

@@ -1,5 +1,6 @@
-import { gateway, Output, stepCountIs, ToolLoopAgent, tool } from "ai";
+import { Output, stepCountIs, ToolLoopAgent, tool } from "ai";
 import { v } from "convex/values";
+import { createOpenRouterChatModel } from "../lib/ai/openrouter";
 import type { DiagramElementDiff } from "../lib/diagram-modification";
 import {
   applyDiagramDiff,
@@ -11,9 +12,7 @@ import { action } from "./_generated/server";
 const DEFAULT_MAX_STEPS = 5;
 const MAX_TIMEOUT_MS = 240_000;
 const DEFAULT_MODEL =
-  process.env.MODEL_NAME?.includes("gemini-3") === true
-    ? process.env.MODEL_NAME
-    : "google/gemini-3-flash";
+  process.env.MODEL_NAME?.trim() || "google/gemini-3-flash-preview";
 
 const MODIFICATION_SYSTEM_PROMPT = `You modify existing Excalidraw diagrams by producing an element-level diff.
 
@@ -364,6 +363,7 @@ function resolveAgentOutcome(params: {
     output: DiagramElementDiff;
     totalUsage: { totalTokens?: number };
   };
+  elements: Record<string, unknown>[];
   appState?: Record<string, unknown>;
   startedAt: number;
   traceId: string;
@@ -381,6 +381,23 @@ function resolveAgentOutcome(params: {
     params.result.steps.length,
     params.result.totalUsage.totalTokens ?? 0
   );
+
+  if (!lastToolOutput) {
+    const applied = applyDiagramDiff(
+      params.elements as unknown as Parameters<typeof applyDiagramDiff>[0],
+      params.result.output
+    );
+    if (applied.ok) {
+      return buildSuccessResult({
+        elements: applied.elements,
+        appState: params.appState,
+        diff: params.result.output,
+        changes: applied.changes,
+        stats,
+      });
+    }
+    return buildFailureResult("invalid-diff", applied.issues, stats);
+  }
 
   if (lastToolOutput?.ok && lastToolOutput.elements) {
     return buildSuccessResult({
@@ -505,7 +522,11 @@ function createModificationAgent(params: {
   maxSteps?: number;
 }) {
   return new ToolLoopAgent({
-    model: gateway(DEFAULT_MODEL),
+    model: createOpenRouterChatModel({
+      modelId: DEFAULT_MODEL,
+      traceId: params.traceId,
+    }),
+    temperature: 0,
     instructions: MODIFICATION_SYSTEM_PROMPT,
     output: Output.object({ schema: DiagramElementDiffSchema }),
     tools: {
@@ -518,15 +539,18 @@ function createModificationAgent(params: {
     onStepFinish: ({ usage, toolCalls }) => {
       params.tracking.stepCount += 1;
       params.tracking.tokenCount += usage.totalTokens ?? 0;
-      console.log(
-        `[${params.traceId}] Step: tools=${toolCalls?.length ?? 0}, tokens=${usage.totalTokens}`
-      );
+      console.log("[ai.modifyDiagram.step]", {
+        traceId: params.traceId,
+        toolCalls: toolCalls?.length ?? 0,
+        totalTokens: usage.totalTokens,
+      });
     },
   });
 }
 
 async function runAgentAttempts(params: {
   agent: ReturnType<typeof createModificationAgent>;
+  elements: Record<string, unknown>[];
   prompt: string;
   deadline: number;
   startedAt: number;
@@ -546,9 +570,14 @@ async function runAgentAttempts(params: {
         prompt: params.prompt,
         timeout: remaining,
       });
+      console.log("[ai.modifyDiagram.completed]", {
+        traceId: params.traceId,
+        responseId: result.response.id,
+      });
       return {
         outcome: resolveAgentOutcome({
           result,
+          elements: params.elements,
           appState: params.appState,
           startedAt: params.startedAt,
           traceId: params.traceId,
@@ -627,6 +656,7 @@ export async function modifyElementsWithAgent(
 
   const { outcome, lastError } = await runAgentAttempts({
     agent,
+    elements,
     prompt,
     deadline,
     startedAt,
