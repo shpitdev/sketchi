@@ -97,6 +97,10 @@ jobs:
         env:
           BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
+          if [ -z "$BYPASS_SECRET" ]; then
+            echo "BYPASS_SECRET is empty; skipping API tests"
+            exit 0
+          fi
           venom run tests/api/*.yml \
             --var target_url=${{ github.event.deployment_status.environment_url }} \
             --var bypass_secret="$BYPASS_SECRET" \
@@ -104,18 +108,6 @@ jobs:
             --format xml \
             --format json \
             --html-report
-
-      - name: Scrub secrets from artifacts
-        if: always() && steps.doc_check.outputs.run_tests == 'true'
-        env:
-          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: |
-          if [ -z "$BYPASS_SECRET" ]; then
-            echo "BYPASS_SECRET is empty, skipping scrub"
-            exit 0
-          fi
-          find tests/api/results -type f \( -name "*.json" -o -name "*.xml" -o -name "*.html" -o -name "*.log" \) \
-            -exec sed -i "s|$BYPASS_SECRET|[REDACTED]|g" {} \;
 
       - name: Upload API test artifacts
         if: always() && steps.doc_check.outputs.run_tests == 'true'

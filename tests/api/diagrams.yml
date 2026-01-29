@@ -1,7 +1,7 @@
 name: Diagram API Endpoints
 vars:
   target_url: "http://localhost:3001"
-  bypass_secret: ""
+  bypass_secret: "local-dev"
   encoded_share_prefix: "https%3A%2F%2Fexcalidraw.com%2F%23json%3D"
   test_intermediate:
     nodes:
@@ -43,6 +43,9 @@ vars:
       updated: 1725000000000
       link: null
       locked: false
+
+secrets:
+  - bypass_secret
 
 testcases:
   - name: generate_parse_flow
