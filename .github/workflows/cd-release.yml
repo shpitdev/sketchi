@@ -12,6 +12,10 @@ permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: cd-release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -79,8 +83,8 @@ jobs:
         id: bump_branch
         if: steps.skip_release.outputs.skip != 'true'
         run: |
-          BRANCH="chore/bump-version-${GITHUB_SHA::7}"
-          git checkout -b "$BRANCH"
+          BRANCH="chore/bump-version"
+          git checkout -B "$BRANCH"
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
       - name: Bump version
@@ -106,7 +110,7 @@ jobs:
         run: |
           git add package.json
           git commit -m "chore: bump version to ${{ steps.bump_version.outputs.new_version }} [skip-release]"
-          git push --set-upstream origin "${{ steps.bump_branch.outputs.branch }}"
+          git push --force --set-upstream origin "${{ steps.bump_branch.outputs.branch }}"
 
       - name: Create or update PR
         id: bump_pr
@@ -119,6 +123,7 @@ jobs:
           BRANCH="${{ steps.bump_branch.outputs.branch }}"
           if gh pr view "$BRANCH" --repo "$GITHUB_REPOSITORY" --json url -q .url > /dev/null 2>&1; then
             PR_URL=$(gh pr view "$BRANCH" --repo "$GITHUB_REPOSITORY" --json url -q .url)
+            gh pr edit "$PR_URL" --title "$PR_TITLE" --body "$PR_BODY"
           else
             PR_URL=$(gh pr create \
               --repo "$GITHUB_REPOSITORY" \
