@@ -1,8 +1,8 @@
-import type { IntermediateFormat } from "../../lib/diagram-intermediate";
-import { convertIntermediateToDiagram } from "../../lib/diagram-layout";
-import { type Diagram, DiagramSchema } from "../../lib/diagram-structure";
-import { generateObjectWithRetry, getModel } from "../lib/ai-utils";
-import { CHART_VISUAL_SPECS } from "../lib/prompts";
+import { generateObjectWithRetry, getModel } from "../ai-utils";
+import type { IntermediateFormat } from "../diagram-intermediate";
+import { convertIntermediateToDiagram } from "../diagram-layout";
+import { type Diagram, DiagramSchema } from "../diagram-structure";
+import { CHART_VISUAL_SPECS } from "../prompts/chart-specs";
 
 const DEFAULT_CHART_PROMPT = `Generate a diagram:
 - Use rectangles for main components

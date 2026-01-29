@@ -7,12 +7,9 @@ import { convexTest } from "convex-test";
 import { config as loadEnv } from "dotenv";
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
-import { generateObjectWithRetry, getModel } from "../experiments/lib/ai-utils";
-import {
-  closeBrowser,
-  renderElementsToPng,
-} from "../experiments/lib/render-png";
+import { generateObjectWithRetry, getModel } from "../lib/ai-utils";
 import { validateElements } from "../lib/diagram-modification";
+import { closeBrowser, renderElementsToPng } from "../lib/render-png";
 import { api } from "./_generated/api";
 import {
   createExcalidrawShareLink,

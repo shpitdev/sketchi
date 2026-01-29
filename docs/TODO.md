@@ -12,8 +12,8 @@
 - [x] **0.3 Diagram Modification** - migrated to Convex actions + tests + artifacts; experiment removed
 - [x] **0.4 Auto-Layout** - migrated to deterministic layout module + Convex test + artifacts; experiment removed
 - [x] **0.5 Arrow Optimization** - migrated to lib module + Convex test + artifacts
-- [x] **Optimization suite** - artifacts in `packages/backend/experiments/output/optimization_*`
-- [x] **Visual grading (experiment)** - artifacts in `packages/backend/experiments/output/visual-grading_*` with summary.json (legacy)
+- [x] **Optimization suite** - artifacts in `packages/backend/test-results/arrow-optimization.*`
+- [x] **Visual grading (experiment)** - legacy experiments removed; artifacts now in `packages/backend/test-results/visual-grading.*`
 - [x] **Visual grading (Convex test)** - migrated to `packages/backend/convex/visualGrading.test.ts`; artifacts in `packages/backend/test-results/visual-grading.*`
 - [x] **Browserbase export** - Convex test writes PNG + report in `packages/backend/test-results/` (output name derived from test name)
 
@@ -29,8 +29,8 @@
   - graphOptions: diagramType + optional global edge/style overrides (apply to whole graph)
 
 ### Prompt library
-- [ ] Create `packages/backend/prompts/` with per-domain prompt files (Palantir, GCP, etc.)
-- [ ] Add `packages/backend/prompts/index.ts` to export all prompts
+- [ ] Create `packages/backend/lib/prompts/library/` with per-domain prompt files (Palantir, GCP, etc.)
+- [ ] Add `packages/backend/lib/prompts/index.ts` to export prompt registry + helpers
 - [ ] Remove giant prompt strings from experiment code once migrated
 
 ### Migration policy (per experiment)
