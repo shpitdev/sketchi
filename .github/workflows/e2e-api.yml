@@ -94,14 +94,24 @@ jobs:
 
       - name: Run API tests
         if: steps.doc_check.outputs.run_tests == 'true'
+        env:
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           venom run tests/api/*.yml \
             --var target_url=${{ github.event.deployment_status.environment_url }} \
-            --var bypass_secret=${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }} \
+            --var bypass_secret="$BYPASS_SECRET" \
             --output-dir tests/api/results \
             --format xml \
             --format json \
             --html-report
+
+      - name: Scrub secrets from artifacts
+        if: always() && steps.doc_check.outputs.run_tests == 'true'
+        env:
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          find tests/api/results -type f \( -name "*.json" -o -name "*.xml" -o -name "*.html" -o -name "*.log" \) \
+            -exec sed -i "s|$BYPASS_SECRET|[REDACTED]|g" {} \;
 
       - name: Upload API test artifacts
         if: always() && steps.doc_check.outputs.run_tests == 'true'
