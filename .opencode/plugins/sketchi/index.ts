@@ -1,0 +1,422 @@
+import { tool, type Plugin } from "@opencode-ai/plugin";
+import { fetchJson, shareElements } from "./lib/api";
+import {
+  extractShareLink,
+  parseExcalidrawShareLink,
+  readExcalidrawFile,
+} from "./lib/excalidraw";
+import { buildDefaultPngPath, resolveOutputPath, writePng } from "./lib/output";
+import { closeBrowser, renderElementsToPng } from "./lib/render";
+import { gradeDiagram } from "./lib/grade";
+
+const DEFAULT_API_BASE = "https://www.sketchi.app";
+
+function normalizeApiBase(value: string): string {
+  return value.replace(/\/$/, "");
+}
+
+export const SketchiPlugin: Plugin = async (input) => {
+  const apiBase = normalizeApiBase(
+    process.env.SKETCHI_API_URL ?? DEFAULT_API_BASE
+  );
+
+  return {
+    tool: {
+      diagram_from_prompt: tool({
+        description:
+          "Generate an Excalidraw diagram from a prompt, returning a share link and local PNG.",
+        args: {
+          prompt: tool.schema.string().describe("What to diagram"),
+          outputPath: tool.schema
+            .string()
+            .optional()
+            .describe("Optional PNG output path"),
+          scale: tool.schema
+            .number()
+            .optional()
+            .describe("PNG export scale factor"),
+          padding: tool.schema
+            .number()
+            .optional()
+            .describe("PNG export padding in pixels"),
+          background: tool.schema
+            .boolean()
+            .optional()
+            .describe("Include white background in PNG"),
+        },
+        async execute(args, context) {
+          const response = await fetchJson<{
+            shareLink: { url: string; shareId: string; encryptionKey: string };
+            elements: Record<string, unknown>[];
+            intermediate: unknown;
+            stats: Record<string, unknown>;
+          }>(
+            `${apiBase}/api/diagrams/generate`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                prompt: args.prompt,
+              }),
+            },
+            context.abort
+          );
+
+          const outputPath = args.outputPath
+            ? resolveOutputPath(args.outputPath, context.directory)
+            : buildDefaultPngPath("diagram-generate", context.directory);
+
+          try {
+            const pngResult = await renderElementsToPng(response.elements, {
+              scale: args.scale,
+              padding: args.padding,
+              background: args.background,
+            });
+
+            const pngPath = await writePng(outputPath, pngResult.png);
+
+            return JSON.stringify(
+              {
+                shareLink: response.shareLink,
+                pngPath,
+                pngBytes: pngResult.png.length,
+                pngDurationMs: pngResult.durationMs,
+                stats: response.stats,
+              },
+              null,
+              2
+            );
+          } finally {
+            await closeBrowser();
+          }
+        },
+      }),
+      diagram_modify: tool({
+        description:
+          "Modify a diagram (share link or .excalidraw) via Sketchi API, returning a new share link and local PNG.",
+        args: {
+          shareUrl: tool.schema
+            .string()
+            .optional()
+            .describe("Excalidraw share URL to modify"),
+          excalidrawPath: tool.schema
+            .string()
+            .optional()
+            .describe("Path to .excalidraw JSON file"),
+          excalidraw: tool.schema
+            .object({
+              elements: tool.schema.array(tool.schema.any()),
+              appState: tool.schema.object({}).passthrough().optional(),
+            })
+            .optional()
+            .describe("Excalidraw JSON blob"),
+          request: tool.schema
+            .string()
+            .describe("Modification request to apply"),
+          options: tool.schema
+            .object({
+              maxSteps: tool.schema.number().optional(),
+              timeoutMs: tool.schema.number().optional(),
+              preferExplicitEdits: tool.schema.boolean().optional(),
+            })
+            .optional()
+            .describe("Optional modify options"),
+          outputPath: tool.schema
+            .string()
+            .optional()
+            .describe("Optional PNG output path"),
+          scale: tool.schema
+            .number()
+            .optional()
+            .describe("PNG export scale factor"),
+          padding: tool.schema
+            .number()
+            .optional()
+            .describe("PNG export padding in pixels"),
+          background: tool.schema
+            .boolean()
+            .optional()
+            .describe("Include white background in PNG"),
+        },
+        async execute(args, context) {
+          const requestTimeoutMs = 60_000;
+          let shareUrl = args.shareUrl;
+          if (!shareUrl) {
+            const excalidraw =
+              args.excalidraw ??
+              (args.excalidrawPath
+                ? await readExcalidrawFile(
+                    args.excalidrawPath,
+                    context.directory
+                  )
+                : undefined);
+
+            if (!excalidraw) {
+              throw new Error("Provide shareUrl or excalidraw input");
+            }
+
+            const shared = await shareElements(
+              apiBase,
+              {
+                elements: excalidraw.elements,
+                appState: excalidraw.appState,
+              },
+              context.abort,
+              requestTimeoutMs
+            );
+
+            shareUrl = shared.url;
+          }
+
+          const response = await fetchJson<{
+            status: "success" | "failed";
+            reason?: string;
+            elements?: Record<string, unknown>[];
+            shareLink?: { url: string; shareId: string; encryptionKey: string };
+            stats: Record<string, unknown>;
+          }>(
+            `${apiBase}/api/diagrams/modify`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                shareUrl,
+                request: args.request,
+                options: args.options,
+              }),
+            },
+            context.abort,
+            requestTimeoutMs
+          );
+
+          if (response.status !== "success") {
+            throw new Error(response.reason ?? "Diagram modification failed");
+          }
+
+          if (!response.shareLink?.url) {
+            throw new Error("Missing shareLink in modify response");
+          }
+
+          const outputPath = args.outputPath
+            ? resolveOutputPath(args.outputPath, context.directory)
+            : buildDefaultPngPath("diagram-modify", context.directory);
+
+          try {
+            const elements =
+              response.elements?.length
+                ? response.elements
+                : (await parseExcalidrawShareLink(response.shareLink.url))
+                    .elements;
+            const pngResult = await renderElementsToPng(elements, {
+              scale: args.scale,
+              padding: args.padding,
+              background: args.background,
+            });
+
+            const pngPath = await writePng(outputPath, pngResult.png);
+
+            return JSON.stringify(
+              {
+                shareLink: response.shareLink,
+                pngPath,
+                pngBytes: pngResult.png.length,
+                pngDurationMs: pngResult.durationMs,
+                stats: response.stats,
+              },
+              null,
+              2
+            );
+          } finally {
+            await closeBrowser();
+          }
+        },
+      }),
+      diagram_to_png: tool({
+        description:
+          "Render a PNG locally from an Excalidraw share link or file.",
+        args: {
+          shareUrl: tool.schema
+            .string()
+            .optional()
+            .describe("Excalidraw share URL to render"),
+          excalidrawPath: tool.schema
+            .string()
+            .optional()
+            .describe("Path to .excalidraw JSON file"),
+          excalidraw: tool.schema
+            .object({
+              elements: tool.schema.array(tool.schema.any()),
+              appState: tool.schema.object({}).passthrough().optional(),
+            })
+            .optional()
+            .describe("Excalidraw JSON blob"),
+          outputPath: tool.schema
+            .string()
+            .optional()
+            .describe("Optional PNG output path"),
+          scale: tool.schema
+            .number()
+            .optional()
+            .describe("PNG export scale factor"),
+          padding: tool.schema
+            .number()
+            .optional()
+            .describe("PNG export padding in pixels"),
+          background: tool.schema
+            .boolean()
+            .optional()
+            .describe("Include white background in PNG"),
+        },
+        async execute(args, context) {
+          const excalidraw =
+            args.excalidraw ??
+            (args.excalidrawPath
+              ? await readExcalidrawFile(
+                  args.excalidrawPath,
+                  context.directory
+                )
+              : undefined);
+
+          if (!(args.shareUrl || excalidraw)) {
+            throw new Error("Provide shareUrl or excalidraw input");
+          }
+
+          const outputPath = args.outputPath
+            ? resolveOutputPath(args.outputPath, context.directory)
+            : buildDefaultPngPath("diagram-to-png", context.directory);
+
+          try {
+            let shareLink:
+              | { url: string; shareId?: string; encryptionKey?: string }
+              | undefined;
+            let elements: Record<string, unknown>[] = [];
+
+            if (args.shareUrl) {
+              shareLink = extractShareLink(args.shareUrl);
+              const parsed = await parseExcalidrawShareLink(args.shareUrl);
+              elements = parsed.elements as Record<string, unknown>[];
+            } else if (excalidraw) {
+              const shared = await shareElements(
+                apiBase,
+                {
+                  elements: excalidraw.elements,
+                  appState: excalidraw.appState,
+                },
+                context.abort
+              );
+              shareLink = shared;
+              elements = excalidraw.elements;
+            }
+
+            const pngResult = await renderElementsToPng(elements, {
+              scale: args.scale,
+              padding: args.padding,
+              background: args.background,
+            });
+
+            const pngPath = await writePng(outputPath, pngResult.png);
+
+            return JSON.stringify(
+              {
+                shareLink,
+                pngPath,
+                pngBytes: pngResult.png.length,
+                pngDurationMs: pngResult.durationMs,
+              },
+              null,
+              2
+            );
+          } finally {
+            await closeBrowser();
+          }
+        },
+      }),
+      diagram_grade: tool({
+        description:
+          "Grade a diagram for type, layout, directionality, visual quality, accuracy, and completeness.",
+        args: {
+          prompt: tool.schema
+            .string()
+            .describe("Original prompt or requirement for the diagram"),
+          expectedDiagramType: tool.schema
+            .string()
+            .optional()
+            .describe("Expected diagram type (optional)"),
+          shareUrl: tool.schema
+            .string()
+            .optional()
+            .describe("Excalidraw share URL to grade"),
+          excalidrawPath: tool.schema
+            .string()
+            .optional()
+            .describe("Path to .excalidraw JSON file"),
+          excalidraw: tool.schema
+            .object({
+              elements: tool.schema.array(tool.schema.any()),
+              appState: tool.schema.object({}).passthrough().optional(),
+            })
+            .optional()
+            .describe("Excalidraw JSON blob"),
+          pngPath: tool.schema
+            .string()
+            .optional()
+            .describe("Optional existing PNG path to grade"),
+          outputPath: tool.schema
+            .string()
+            .optional()
+            .describe("Optional path to write PNG (if generated)"),
+          scale: tool.schema
+            .number()
+            .optional()
+            .describe("PNG export scale factor"),
+          padding: tool.schema
+            .number()
+            .optional()
+            .describe("PNG export padding in pixels"),
+          background: tool.schema
+            .boolean()
+            .optional()
+            .describe("Include white background in PNG"),
+        },
+        async execute(args, context) {
+          const excalidraw = args.excalidraw
+            ? {
+                elements: args.excalidraw.elements,
+                appState: args.excalidraw.appState ?? {},
+              }
+            : undefined;
+
+          const result = await gradeDiagram(
+            input.client,
+            {
+              sessionID: context.sessionID,
+              agent: context.agent,
+              messageID: context.messageID,
+            },
+            {
+              prompt: args.prompt,
+              expectedDiagramType: args.expectedDiagramType,
+              shareUrl: args.shareUrl,
+              excalidrawPath: args.excalidrawPath,
+              excalidraw,
+              pngPath: args.pngPath,
+              outputPath: args.outputPath,
+              renderOptions: {
+                scale: args.scale,
+                padding: args.padding,
+                background: args.background,
+              },
+              apiBase,
+              baseDir: context.directory,
+              abort: context.abort,
+            }
+          );
+
+          return JSON.stringify(result, null, 2);
+        },
+      }),
+    },
+  };
+};
+
+export default SketchiPlugin;
