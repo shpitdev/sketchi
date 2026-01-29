@@ -19,6 +19,7 @@ export async function getOpenApiSpec() {
       version: "1.0.0",
       description: "Generate, modify, parse, and share Excalidraw diagrams.",
     },
+    servers: [{ url: "/api" }],
   });
 
   return cachedSpec;
