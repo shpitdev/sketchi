@@ -212,7 +212,7 @@ For AI features and testing, see `.env.e2e.example` for additional variables.
 
 ## OpenCode Plugin
 
-The OpenCode plugin lives under `.opencode/plugins/sketchi` and calls the production API by default (`https://www.sketchi.app`).
+The OpenCode plugin lives under `.opencode/plugins/sketchi` and calls the production API by default (`https://sketchi.app`).
 
 Notes:
 - OpenCode runs `bun install` in `.opencode`, but you still need Playwright browsers once per machine:
@@ -223,6 +223,7 @@ Notes:
 - Start OpenCode web UI + event logging: `bun run opencode:serve` (logs to `./sketchi/opencode-logs/*.parquet`).
 - DuckDB example (explicit column list, newest log file):
 ```bash
+# Run at least once to generate logs: bun run opencode:serve
 duckdb -c "SELECT receivedAt, directory, eventType, eventStream, sessionID, messageID, parentMessageID, partID, partType, kind, toolName, toolStatus, toolCallID, toolStartMs, toolEndMs, toolDurationMs, role, providerID, modelID, messageCreatedMs, messageCompletedMs, stepCost, stepStartMs, stepEndMs, stepDurationMs, tokensInput, tokensOutput, tokensReasoning, tokensCacheRead, tokensCacheWrite, traceId, data FROM read_parquet('$(ls -t sketchi/opencode-logs/*.parquet | head -n 1)') ORDER BY receivedAt DESC LIMIT 200;"
 ```
 

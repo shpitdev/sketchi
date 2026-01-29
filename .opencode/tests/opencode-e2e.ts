@@ -3,6 +3,7 @@ import { createServer } from "node:net";
 import { existsSync } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 
 const HOST = "127.0.0.1";
@@ -122,12 +123,15 @@ async function run() {
   const logDir = resolve(process.cwd(), "sketchi", "opencode-logs");
   const port = await findOpenPort();
   const baseUrl = `http://${HOST}:${port}`;
+  const serveScript = fileURLToPath(
+    new URL("../scripts/opencode-serve.ts", import.meta.url)
+  );
 
   console.log("Starting OpenCode server...");
   const serveProcess = Bun.spawn({
     cmd: [
       "bun",
-      "scripts/opencode-serve.ts",
+      serveScript,
       "--project-dir",
       ".",
       "--no-open",

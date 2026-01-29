@@ -29,9 +29,11 @@ function createContext(): ToolContext {
 }
 
 async function assertPngPath(path: string) {
-  assert.ok(path.includes(`${resolve(process.cwd())}/sketchi/png/`));
-  assert.ok(existsSync(path));
-  const info = await stat(path);
+  const pngRoot = resolve(process.cwd(), "sketchi", "png");
+  const normalized = resolve(path);
+  assert.ok(normalized.startsWith(pngRoot));
+  assert.ok(existsSync(normalized));
+  const info = await stat(normalized);
   assert.ok(info.size > 0);
 }
 

@@ -66,9 +66,17 @@ async function waitForServer(baseUrl: string): Promise<void> {
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(`${baseUrl}/config`);
-      if (response.ok) {
-        return;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 1000);
+      try {
+        const response = await fetch(`${baseUrl}/config`, {
+          signal: controller.signal,
+        });
+        if (response.ok) {
+          return;
+        }
+      } finally {
+        clearTimeout(timeout);
       }
     } catch {
       // keep waiting
@@ -303,7 +311,7 @@ function extractMeta(payload: Record<string, unknown>): {
         const time = state.time as Record<string, unknown> | undefined;
         toolStartMs = typeof time?.start === "number" ? time.start : undefined;
         toolEndMs = typeof time?.end === "number" ? time.end : undefined;
-        if (toolStartMs && toolEndMs) {
+        if (typeof toolStartMs === "number" && typeof toolEndMs === "number") {
           toolDurationMs = toolEndMs - toolStartMs;
         }
         if (!traceId && toolStatus === "completed") {
@@ -332,7 +340,7 @@ function extractMeta(payload: Record<string, unknown>): {
       const time = part.time as Record<string, unknown> | undefined;
       stepStartMs = typeof time?.start === "number" ? time.start : undefined;
       stepEndMs = typeof time?.end === "number" ? time.end : undefined;
-      if (stepStartMs && stepEndMs) {
+      if (typeof stepStartMs === "number" && typeof stepEndMs === "number") {
         stepDurationMs = stepEndMs - stepStartMs;
       }
     }
