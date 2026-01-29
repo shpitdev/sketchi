@@ -1,61 +1,273 @@
 "use client";
-import { Wand2 } from "lucide-react";
+import { ArrowUpRight, Sparkles, Terminal, Wand2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
-export default function Home() {
+type FeatureStatus = "available" | "alpha" | "coming-soon";
+
+interface FeatureCardProps {
+  title: string;
+  description: string;
+  status: FeatureStatus;
+  href?: "/library-generator";
+  externalHref?: string;
+  icon: React.ReactNode;
+  screenshot: {
+    light: string;
+    dark?: string;
+    alt: string;
+  };
+}
+
+function StatusBadge({ status }: { status: FeatureStatus }) {
+  if (status === "available") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 font-medium text-primary text-xs dark:bg-primary/20">
+        <span className="size-1.5 rounded-full bg-primary" />
+        Available
+      </span>
+    );
+  }
+  if (status === "alpha") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-chart-3/15 px-2.5 py-0.5 font-medium text-chart-3 text-xs dark:bg-chart-3/25">
+        <span className="size-1.5 rounded-full bg-chart-3" />
+        Alpha
+      </span>
+    );
+  }
   return (
-    <div className="container mx-auto max-w-5xl px-4 py-8">
-      <div className="mx-auto mb-12 flex justify-center">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 font-medium text-muted-foreground text-xs">
+      <span className="size-1.5 rounded-full bg-muted-foreground/50" />
+      Coming soon
+    </span>
+  );
+}
+
+function FeatureCardContent({
+  title,
+  description,
+  status,
+  icon,
+  screenshot,
+  isClickable,
+  isExternal,
+}: FeatureCardProps & { isClickable: boolean; isExternal: boolean }) {
+  return (
+    <>
+      <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted/30">
+        <Image
+          alt={screenshot.alt}
+          className={`object-cover object-top transition-transform duration-500 ${
+            isClickable ? "group-hover:scale-[1.02]" : ""
+          } ${screenshot.dark ? "dark:hidden" : ""}`}
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          src={screenshot.light}
+        />
+        {screenshot.dark && (
+          <Image
+            alt={screenshot.alt}
+            className="hidden object-cover object-top transition-transform duration-500 group-hover:scale-[1.02] dark:block"
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            src={screenshot.dark}
+          />
+        )}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card/80 via-transparent to-transparent" />
+      </div>
+
+      <div className="flex flex-1 flex-col gap-4 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-9 items-center justify-center rounded-lg bg-foreground/5 text-foreground/70 transition-colors group-hover:bg-foreground/10 group-hover:text-foreground">
+              {icon}
+            </div>
+            <h2 className="font-medium text-base tracking-tight">{title}</h2>
+          </div>
+          <StatusBadge status={status} />
+        </div>
+
+        <p className="flex-1 text-muted-foreground text-sm leading-relaxed">
+          {description}
+        </p>
+
+        {isClickable && (
+          <div className="flex items-center gap-2 pt-1">
+            <span className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 font-[family-name:var(--font-caveat)] text-lg text-primary-foreground shadow-sm transition-all group-hover:gap-3 group-hover:bg-primary/90 group-hover:shadow-md">
+              {isExternal ? "Learn more" : "Open"}
+              {isExternal && <ArrowUpRight className="size-4" />}
+            </span>
+          </div>
+        )}
+
+        {status === "coming-soon" && (
+          <div className="flex items-center gap-2 pt-1">
+            <span className="inline-flex items-center gap-2 rounded-lg bg-muted px-4 py-2.5 font-[family-name:var(--font-caveat)] text-lg text-muted-foreground">
+              Coming soon
+            </span>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function FeatureCard(props: FeatureCardProps) {
+  const { status, href, externalHref } = props;
+  const isClickable = status !== "coming-soon" && (href || externalHref);
+  const isExternal = !!externalHref;
+
+  const cardClassName = `group relative flex flex-col overflow-hidden rounded-xl border bg-card transition-all duration-300 ${
+    isClickable
+      ? "cursor-pointer hover:-translate-y-1 hover:border-foreground/20 hover:shadow-xl hover:shadow-foreground/5"
+      : "border-dashed opacity-75"
+  }`;
+
+  const contentProps = { ...props, isClickable: !!isClickable, isExternal };
+
+  if (isExternal && externalHref) {
+    return (
+      <a
+        className={cardClassName}
+        href={externalHref}
+        rel="noopener noreferrer"
+        target="_blank"
+      >
+        <FeatureCardContent {...contentProps} />
+      </a>
+    );
+  }
+
+  if (href) {
+    return (
+      <Link className={cardClassName} href={href}>
+        <FeatureCardContent {...contentProps} />
+      </Link>
+    );
+  }
+
+  return (
+    <div className={cardClassName}>
+      <FeatureCardContent {...contentProps} />
+    </div>
+  );
+}
+
+export default function Home() {
+  const features: FeatureCardProps[] = [
+    {
+      title: "Icon Library Generator",
+      description:
+        "Transform SVG icons into hand-drawn Excalidraw assets. Upload, customize styles, and export production-ready .excalidrawlib files.",
+      status: "available",
+      href: "/library-generator",
+      icon: <Wand2 className="size-5" />,
+      screenshot: {
+        light: "/screenshots/library-generator.png",
+        alt: "Icon Library Generator interface",
+      },
+    },
+    {
+      title: "AI Diagram Generation",
+      description:
+        "Convert natural language into flowcharts, architecture diagrams, and more. Powered by AI with automatic layout and hand-drawn aesthetics.",
+      status: "coming-soon",
+      icon: <Sparkles className="size-5" />,
+      screenshot: {
+        light: "/screenshots/excalidraw-w-icons-white.png",
+        dark: "/screenshots/excalidraw-w-icons.png",
+        alt: "AI-generated Excalidraw diagram",
+      },
+    },
+    {
+      title: "OpenCode Plugin",
+      description:
+        "Bi-directional human-in-the-loop diagramming for AI agents. Create, modify, and grade diagrams directly from your development workflow.",
+      status: "alpha",
+      externalHref:
+        "https://github.com/anand-testcompare/sketchi#opencode-plugin",
+      icon: <Terminal className="size-5" />,
+      screenshot: {
+        light: "/screenshots/opencode-preview-white.png",
+        dark: "/screenshots/opencode-preview.png",
+        alt: "OpenCode plugin preview",
+      },
+    },
+  ];
+
+  return (
+    <div className="container mx-auto max-w-6xl px-4 py-8 sm:py-12">
+      <div className="mx-auto mb-12 flex flex-col items-center gap-4 sm:mb-16">
         <Image
           alt="Sketchi"
           className="h-auto w-auto"
-          height={160}
+          height={140}
           priority
           src="/icons/logo-wide.svg"
-          width={480}
+          width={420}
         />
+        <p className="max-w-lg text-center text-muted-foreground text-sm leading-relaxed">
+          Transform SVGs into hand-drawn Excalidraw assets. Build icon
+          libraries, generate diagrams, and export production-ready files.
+        </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <Link
-          className="group rounded-lg border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md"
-          href="/library-generator"
-        >
-          <h2 className="mb-2 font-medium text-sm">Icon Library Generator</h2>
-          <p className="mb-4 text-muted-foreground text-xs">
-            Create icon libraries and export .excalidrawlib files.
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {features.map((feature) => (
+          <FeatureCard key={feature.title} {...feature} />
+        ))}
+      </div>
+
+      <section aria-label="More screenshots" className="mt-10 sm:mt-14">
+        <div className="mb-3 flex items-baseline justify-between gap-4">
+          <h2 className="font-medium text-foreground/90 text-sm">
+            More screenshots
+          </h2>
+          <p className="hidden text-muted-foreground text-xs sm:block">
+            Scroll to explore
           </p>
-          <span className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 font-[family-name:var(--font-caveat)] text-lg text-primary-foreground shadow-sm transition-colors group-hover:bg-primary/90">
-            <Wand2 className="size-5" />
-            Open
-          </span>
-        </Link>
+        </div>
 
-        <section className="flex flex-col gap-3 rounded-lg border border-dashed p-4">
-          <div>
-            <h2 className="mb-2 font-medium text-sm">
-              AI generated Excalidraw diagrams
-            </h2>
-            <p className="text-muted-foreground text-xs">Coming soon</p>
-          </div>
-          <span className="inline-flex items-center justify-center gap-2 rounded-md bg-muted px-4 py-2 font-[family-name:var(--font-caveat)] text-lg text-muted-foreground">
-            Coming soon
-          </span>
-        </section>
+        <div className="relative">
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-background to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-background to-transparent" />
 
-        <section className="flex flex-col gap-3 rounded-lg border border-dashed p-4">
-          <div>
-            <h2 className="mb-2 font-medium text-sm">
-              Opencode plugin for bi-directional HITL
-            </h2>
-            <p className="text-muted-foreground text-xs">Coming soon</p>
+          <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2">
+            {[
+              {
+                src: "/screenshots/editable-excalidraw.png",
+                alt: "Editable Excalidraw canvas",
+              },
+              {
+                src: "/screenshots/palantir-foundry-icon-set-white.png",
+                alt: "Icon set preview",
+              },
+              {
+                src: "/screenshots/excalidraw-w-icons-white.png",
+                alt: "Excalidraw diagram with icons",
+              },
+              {
+                src: "/screenshots/opencode-preview-white.png",
+                alt: "OpenCode plugin preview",
+              },
+            ].map((shot) => (
+              <div
+                className="relative h-[220px] w-[360px] shrink-0 snap-start overflow-hidden rounded-xl border bg-card shadow-sm"
+                key={shot.src}
+              >
+                <Image
+                  alt={shot.alt}
+                  className="object-cover"
+                  fill
+                  sizes="(max-width: 640px) 90vw, 360px"
+                  src={shot.src}
+                />
+              </div>
+            ))}
           </div>
-          <span className="inline-flex items-center justify-center gap-2 rounded-md bg-muted px-4 py-2 font-[family-name:var(--font-caveat)] text-lg text-muted-foreground">
-            Coming soon
-          </span>
-        </section>
-      </div>
+        </div>
+      </section>
     </div>
   );
 }
