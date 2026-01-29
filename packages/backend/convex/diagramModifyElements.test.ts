@@ -305,8 +305,7 @@ const ModificationVisionSchema = z.object({
 async function gradeModificationPng(png: Buffer) {
   const base64 = png.toString("base64");
   const modelName =
-    process.env.VISION_MODEL_NAME?.trim() ||
-    "google/gemini-2.5-flash";
+    process.env.VISION_MODEL_NAME?.trim() || "google/gemini-2.5-flash";
 
   const result = await generateObjectWithRetry({
     model: getModel(modelName),
@@ -419,7 +418,7 @@ describe.sequential("diagramModifyElements scenarios", () => {
           throw new Error("Modification failed");
         }
 
-        const updatedElements = result.elements as Array<Record<string, unknown>>;
+        const updatedElements = result.elements as Record<string, unknown>[];
         const afterRender = await renderElementsToPng(updatedElements);
         const afterPng = await writePng(
           "diagram-modify-targeted-fixes-after",

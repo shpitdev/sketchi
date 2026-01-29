@@ -1,3 +1,4 @@
+import { generateNKeysBetween } from "fractional-indexing";
 import JSZip from "jszip";
 import { ChevronDown, Download } from "lucide-react";
 import { useState } from "react";
@@ -33,6 +34,8 @@ const randomId = () => {
   }
   return Math.random().toString(36).slice(2, 10);
 };
+
+const randomInt = () => Math.floor(Math.random() * 2 ** 31);
 
 const sanitizeFileName = (name: string) =>
   name
@@ -78,6 +81,19 @@ function getUniqueFileName(baseName: string, usedNames: Set<string>): string {
 }
 
 const FIXED_SEED = 12_345;
+const DEFAULT_ICON_SIZE = 120;
+const GRID_GAP = 32;
+const LABEL_PADDING = 8;
+
+const SVG_EXTENSION_REGEX = /\.svg$/i;
+const SEPARATOR_REGEX = /[-_]/g;
+const VIEWBOX_SPLIT_REGEX = /\s+/;
+
+const formatLabelText = (filename: string) =>
+  filename
+    .replace(SVG_EXTENSION_REGEX, "")
+    .replace(SEPARATOR_REGEX, " ")
+    .trim();
 
 function makeSvgScalable(container: HTMLElement): void {
   const svg = container.querySelector("svg");
@@ -117,7 +133,8 @@ function validateAndLogSvg(svgText: string, iconName: string): boolean {
 function renderSketchySvg(
   svgText: string,
   iconName: string,
-  styleSettings: StyleSettings
+  styleSettings: StyleSettings,
+  strokeWidth = 2
 ): string {
   const parser = new DOMParser();
   const doc = parser.parseFromString(svgText, "image/svg+xml");
@@ -149,7 +166,7 @@ function renderSketchySvg(
       roughness: styleSettings.roughness,
       bowing: styleSettings.bowing,
       stroke: "#000000",
-      strokeWidth: 2,
+      strokeWidth,
     };
     converter.randomize = styleSettings.randomize;
     converter.pencilFilter = styleSettings.pencilFilter;
@@ -163,12 +180,358 @@ function renderSketchySvg(
   }
 }
 
+function svgToDataUrl(svgText: string): string {
+  const bytes = new TextEncoder().encode(svgText);
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  const encoded = btoa(binary);
+  return `data:image/svg+xml;base64,${encoded}`;
+}
+
+function getSvgDimensions(svgText: string): { width: number; height: number } {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgText, "image/svg+xml");
+  const svg = doc.querySelector("svg");
+
+  if (!svg) {
+    return { width: DEFAULT_ICON_SIZE, height: DEFAULT_ICON_SIZE };
+  }
+
+  const viewBox = svg.getAttribute("viewBox");
+  if (viewBox) {
+    const parts = viewBox
+      .split(VIEWBOX_SPLIT_REGEX)
+      .map((value) => Number.parseFloat(value));
+    if (parts.length === 4 && parts.every((value) => Number.isFinite(value))) {
+      return { width: Math.abs(parts[2]), height: Math.abs(parts[3]) };
+    }
+  }
+
+  const width = Number.parseFloat(svg.getAttribute("width") ?? "");
+  const height = Number.parseFloat(svg.getAttribute("height") ?? "");
+  if (Number.isFinite(width) && Number.isFinite(height)) {
+    return { width, height };
+  }
+
+  return { width: DEFAULT_ICON_SIZE, height: DEFAULT_ICON_SIZE };
+}
+
+interface SceneIconPayload {
+  name: string;
+  svgText: string;
+}
+
+interface SkippedIcon {
+  name: string;
+  reason: string;
+}
+
+interface SceneImageFile {
+  id: string;
+  dataURL: string;
+  mimeType: "image/svg+xml";
+  created: number;
+  lastRetrieved: number;
+  status: "saved";
+}
+
+interface SceneBuildResult {
+  elements: Record<string, unknown>[];
+  files: Record<string, SceneImageFile>;
+  exportedIconCount: number;
+  skipped: SkippedIcon[];
+}
+
+interface SceneExportOutcome {
+  status: "empty" | "ready";
+  message?: string;
+  payload?: {
+    type: "excalidraw";
+    version: 2;
+    source: "https://excalidraw.com";
+    elements: Record<string, unknown>[];
+    appState: {
+      viewBackgroundColor: "#ffffff";
+      gridSize: null;
+    };
+    files: Record<string, SceneImageFile>;
+  };
+  skipped: SkippedIcon[];
+  exportedIconCount: number;
+}
+
+async function collectScenePayloads(
+  icons: ExportIconItem[]
+): Promise<{ payloads: SceneIconPayload[]; skipped: SkippedIcon[] }> {
+  const payloads: SceneIconPayload[] = [];
+  const skipped: SkippedIcon[] = [];
+
+  for (const icon of icons) {
+    try {
+      const svgText = await fetchIconSvg(icon);
+      if (!svgText) {
+        skipped.push({ name: icon.name, reason: "Invalid SVG" });
+        continue;
+      }
+      payloads.push({ name: icon.name, svgText });
+    } catch (error) {
+      skipped.push({
+        name: icon.name,
+        reason: error instanceof Error ? error.message : "Failed to fetch SVG",
+      });
+    }
+  }
+
+  return { payloads, skipped };
+}
+
+function buildSceneFromPayloads(
+  payloads: SceneIconPayload[],
+  styleSettings: StyleSettings
+): SceneBuildResult {
+  const columns = Math.ceil(Math.sqrt(payloads.length));
+  const showLabel = styleSettings.showLabel;
+  const fontSize = styleSettings.labelSize;
+  const lineHeight = 1.25;
+  const textHeight = fontSize * lineHeight;
+  const labelBlockHeight = showLabel ? textHeight + LABEL_PADDING : 0;
+
+  const elements: Record<string, unknown>[] = [];
+  const files: Record<string, SceneImageFile> = {};
+  const skipped: SkippedIcon[] = [];
+  let exportedIconCount = 0;
+
+  for (const [index, icon] of payloads.entries()) {
+    let renderedSvg: string;
+    let rawWidth: number;
+    let rawHeight: number;
+
+    try {
+      renderedSvg = renderSketchySvg(icon.svgText, icon.name, styleSettings, 1);
+      ({ width: rawWidth, height: rawHeight } = getSvgDimensions(icon.svgText));
+    } catch (error) {
+      skipped.push({
+        name: icon.name,
+        reason:
+          error instanceof Error ? error.message : "Failed to render sketch",
+      });
+      continue;
+    }
+
+    const scale = DEFAULT_ICON_SIZE / Math.max(rawWidth, rawHeight, 1);
+    const imageWidth = rawWidth * scale;
+    const imageHeight = rawHeight * scale;
+
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    const cellX = column * (DEFAULT_ICON_SIZE + GRID_GAP);
+    const cellY = row * (DEFAULT_ICON_SIZE + GRID_GAP + labelBlockHeight);
+    const imageX = cellX + (DEFAULT_ICON_SIZE - imageWidth) / 2;
+    const imageY = cellY + (DEFAULT_ICON_SIZE - imageHeight) / 2;
+
+    const groupId = randomId();
+    const imageId = randomId();
+    const fileId = randomId();
+    const updated = Date.now();
+
+    elements.push({
+      type: "image",
+      version: 1,
+      versionNonce: randomInt(),
+      isDeleted: false,
+      id: imageId,
+      fillStyle: "solid",
+      strokeWidth: 1,
+      strokeStyle: "solid",
+      roughness: 0,
+      opacity: 100,
+      angle: 0,
+      x: imageX,
+      y: imageY,
+      strokeColor: "transparent",
+      backgroundColor: "transparent",
+      width: imageWidth,
+      height: imageHeight,
+      seed: randomInt(),
+      groupIds: [groupId],
+      roundness: null,
+      frameId: null,
+      boundElements: null,
+      updated,
+      link: null,
+      locked: false,
+      index: "",
+      fileId,
+      scale: [1, 1],
+      status: "saved",
+    });
+
+    files[fileId] = {
+      id: fileId,
+      dataURL: svgToDataUrl(renderedSvg),
+      mimeType: "image/svg+xml",
+      created: updated,
+      lastRetrieved: updated,
+      status: "saved",
+    };
+
+    if (showLabel) {
+      const labelText = formatLabelText(icon.name);
+      const labelWidth = labelText.length * fontSize * 0.5;
+      elements.push({
+        type: "text",
+        version: 1,
+        versionNonce: randomInt(),
+        isDeleted: false,
+        id: randomId(),
+        fillStyle: "solid",
+        strokeWidth: 1,
+        strokeStyle: "solid",
+        roughness: 0,
+        opacity: 100,
+        angle: 0,
+        x: cellX + DEFAULT_ICON_SIZE / 2 - labelWidth / 2,
+        y: cellY + DEFAULT_ICON_SIZE + LABEL_PADDING,
+        strokeColor: "#000000",
+        backgroundColor: "transparent",
+        width: labelWidth,
+        height: textHeight,
+        seed: randomInt(),
+        groupIds: [groupId],
+        roundness: null,
+        frameId: null,
+        boundElements: null,
+        updated,
+        link: null,
+        locked: false,
+        index: "",
+        text: labelText,
+        fontSize,
+        fontFamily: 1,
+        textAlign: "center",
+        verticalAlign: "top",
+        containerId: null,
+        originalText: labelText,
+        autoResize: true,
+        lineHeight: lineHeight as number & { _brand: "unitlessLineHeight" },
+      });
+    }
+
+    exportedIconCount += 1;
+  }
+
+  if (elements.length > 0) {
+    const indices = generateNKeysBetween(null, null, elements.length);
+    for (let i = 0; i < elements.length; i += 1) {
+      elements[i].index = indices[i];
+    }
+  }
+
+  return { elements, files, exportedIconCount, skipped };
+}
+
+async function createSceneExportOutcome(
+  icons: ExportIconItem[],
+  styleSettings: StyleSettings
+): Promise<SceneExportOutcome> {
+  const { payloads, skipped: fetchSkipped } = await collectScenePayloads(icons);
+
+  if (payloads.length === 0) {
+    return {
+      status: "empty",
+      message: "No valid SVGs to export.",
+      skipped: fetchSkipped,
+      exportedIconCount: 0,
+    };
+  }
+
+  const scene = buildSceneFromPayloads(payloads, styleSettings);
+  const skipped = [...fetchSkipped, ...scene.skipped];
+
+  if (scene.elements.length === 0) {
+    return {
+      status: "empty",
+      message: "No icons could be rendered for export.",
+      skipped,
+      exportedIconCount: 0,
+    };
+  }
+
+  return {
+    status: "ready",
+    payload: {
+      type: "excalidraw",
+      version: 2,
+      source: "https://excalidraw.com",
+      elements: scene.elements,
+      appState: {
+        viewBackgroundColor: "#ffffff",
+        gridSize: null,
+      },
+      files: scene.files,
+    },
+    skipped,
+    exportedIconCount: scene.exportedIconCount,
+  };
+}
+
 export default function ExportButton({
   libraryName,
   icons,
   styleSettings,
 }: ExportButtonProps) {
   const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportExcalidrawScene = async () => {
+    if (icons.length === 0) {
+      toast.error("Add at least one icon before exporting.");
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      const outcome = await createSceneExportOutcome(icons, styleSettings);
+
+      if (outcome.status === "empty") {
+        if (outcome.skipped.length > 0) {
+          console.warn("Excalidraw export skipped icons:", outcome.skipped);
+        }
+        toast.error(outcome.message ?? "No valid SVGs to export.");
+        return;
+      }
+
+      const payload = outcome.payload;
+      if (!payload) {
+        toast.error("Export failed unexpectedly.");
+        return;
+      }
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+      });
+      const fileName = `${sanitizeFileName(libraryName)}.excalidraw`;
+      triggerBlobDownload(blob, fileName);
+
+      if (outcome.skipped.length > 0) {
+        console.warn("Excalidraw export skipped icons:", outcome.skipped);
+      }
+      const skippedCount = outcome.skipped.length;
+      toast.success(
+        skippedCount > 0
+          ? `Downloaded ${outcome.exportedIconCount} icons. Skipped ${skippedCount}.`
+          : `Downloaded ${outcome.exportedIconCount} icons as Excalidraw.`
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Export failed unexpectedly.";
+      toast.error(message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleExportExcalidraw = async () => {
     if (icons.length === 0) {
@@ -351,8 +714,14 @@ export default function ExportButton({
         <ChevronDown className="size-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          disabled={disabled}
+          onClick={handleExportExcalidrawScene}
+        >
+          Export as .excalidraw (SVGs + text)
+        </DropdownMenuItem>
         <DropdownMenuItem disabled={disabled} onClick={handleExportExcalidraw}>
-          Export as .excalidrawlib
+          Export as .excalidrawlib (trace)
         </DropdownMenuItem>
         <DropdownMenuItem disabled={disabled} onClick={handleExportZip}>
           Export as ZIP (SVGs)

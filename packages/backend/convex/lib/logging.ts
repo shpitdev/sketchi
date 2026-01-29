@@ -7,11 +7,11 @@ export interface LoggingOptions<Args, Result> {
   formatResult?: (result: Result) => Record<string, unknown>;
 }
 
-type ActionDefinition<Args extends object, Result> = {
-  args?: PropertyValidators | Validator<any, "required", any> | void;
-  returns?: PropertyValidators | Validator<any, "required", any> | void;
+interface ActionDefinition<Args extends object, Result> {
+  args?: PropertyValidators | Validator<unknown, "required", string>;
+  returns?: PropertyValidators | Validator<unknown, "required", string>;
   handler: (ctx: ActionCtx, args: Args) => Promise<Result> | Result;
-};
+}
 
 export function createLoggedAction<Args extends object, Result>(
   name: string,

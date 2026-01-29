@@ -38,7 +38,6 @@ export function listProfiles(): string[] {
   return Array.from(profiles.keys());
 }
 
-// Re-export the generateIntermediate function
+// biome-ignore lint/performance/noBarrelFile: public API re-export
 export { generateIntermediate } from "./intermediate-generator";
-// Re-export all types from the types module
 export * from "./types";

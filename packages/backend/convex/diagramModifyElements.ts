@@ -56,8 +56,40 @@ interface DiagramModifyResult {
     removedIds?: string[];
     modifiedIds?: string[];
   };
-  issues?: Array<{ code: string; message: string; elementId?: string }>;
+  issues?: DiagramIssue[];
   stats: DiagramModifyStats;
+}
+
+interface DiagramIssue {
+  code: string;
+  message: string;
+  elementId?: string;
+}
+
+interface DiagramChangeSet {
+  addedIds: string[];
+  removedIds: string[];
+  modifiedIds: string[];
+}
+
+interface LastSuccessfulDiff {
+  elements: unknown[];
+  changes: DiagramChangeSet;
+  diff: DiagramElementDiff;
+}
+
+interface ValidationToolOutput {
+  ok: boolean;
+  issues?: DiagramIssue[];
+  elements?: unknown[];
+  changes?: DiagramChangeSet;
+}
+
+interface ModificationTracking {
+  lastSuccessful: LastSuccessfulDiff | null;
+  lastIssues: DiagramIssue[];
+  stepCount: number;
+  tokenCount: number;
 }
 
 function summarizeElements(elements: Record<string, unknown>[]) {
@@ -118,13 +150,14 @@ function extractExplicitEdits(request: string): Array<{
 }> {
   const edits: Array<{ id: string; path: string; value: string }> = [];
   const regex = /([a-zA-Z0-9_-]+)\s+([a-zA-Z0-9_.]+)\s*=\s*'([^']+)'/g;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(request)) !== null) {
+  let match: RegExpExecArray | null = regex.exec(request);
+  while (match !== null) {
     edits.push({
       id: match[1] ?? "",
       path: match[2] ?? "",
       value: match[3] ?? "",
     });
+    match = regex.exec(request);
   }
   return edits.filter((edit) => edit.id && edit.path);
 }
@@ -132,9 +165,8 @@ function extractExplicitEdits(request: string): Array<{
 function findMissingEdits(
   diff: DiagramElementDiff,
   edits: Array<{ id: string; path: string; value: string }>
-): Array<{ code: string; message: string; elementId?: string }> {
-  const issues: Array<{ code: string; message: string; elementId?: string }> =
-    [];
+): DiagramIssue[] {
+  const issues: DiagramIssue[] = [];
   const modifyList = diff.modify ?? [];
 
   for (const edit of edits) {
@@ -216,6 +248,307 @@ function setValueAtPath(
   }
 }
 
+function buildStatsResult(
+  startedAt: number,
+  traceId: string,
+  iterations: number,
+  tokens: number
+): DiagramModifyStats {
+  return {
+    iterations,
+    tokens,
+    durationMs: Date.now() - startedAt,
+    traceId,
+  };
+}
+
+function buildFailureResult(
+  reason: DiagramModifyResult["reason"],
+  issues: DiagramIssue[],
+  stats: DiagramModifyStats
+): DiagramModifyResult {
+  return {
+    status: "failed",
+    reason,
+    issues,
+    stats,
+  };
+}
+
+function buildSuccessResult(params: {
+  elements: unknown[];
+  appState?: Record<string, unknown>;
+  diff?: DiagramElementDiff;
+  changes?: DiagramChangeSet;
+  stats: DiagramModifyStats;
+}): DiagramModifyResult {
+  let changes:
+    | {
+        diff?: DiagramElementDiff;
+        addedIds?: string[];
+        removedIds?: string[];
+        modifiedIds?: string[];
+      }
+    | undefined;
+
+  if (params.changes) {
+    changes = {
+      diff: params.diff,
+      addedIds: params.changes.addedIds,
+      removedIds: params.changes.removedIds,
+      modifiedIds: params.changes.modifiedIds,
+    };
+  } else if (params.diff) {
+    changes = { diff: params.diff };
+  }
+
+  return {
+    status: "success",
+    elements: params.elements,
+    appState: params.appState,
+    changes,
+    stats: params.stats,
+  };
+}
+
+function buildModificationPrompt(
+  request: string,
+  elements: Record<string, unknown>[]
+): string {
+  const summary = summarizeElements(elements);
+  const labels = summarizeLabels(elements);
+  return [
+    `Modification request: ${request}`,
+    "",
+    "Elements summary (for reasoning):",
+    JSON.stringify(summary),
+    "",
+    "Label elements (text bindings):",
+    JSON.stringify(labels),
+    "",
+    "Full elements (for reference):",
+    JSON.stringify(elements),
+  ].join("\n");
+}
+
+function collectToolOutputs(result: {
+  steps: Array<{
+    toolResults?: Array<{ toolName?: string; output?: unknown }>;
+  }>;
+}): ValidationToolOutput[] {
+  return result.steps.flatMap((step) =>
+    (step.toolResults ?? [])
+      .filter((toolResult) => toolResult.toolName === "validateAndApplyDiff")
+      .map((toolResult) => toolResult.output as ValidationToolOutput)
+  );
+}
+
+function resolveAgentOutcome(params: {
+  result: {
+    steps: Array<{
+      toolResults?: Array<{ toolName?: string; output?: unknown }>;
+    }>;
+    output: DiagramElementDiff;
+    totalUsage: { totalTokens?: number };
+  };
+  appState?: Record<string, unknown>;
+  startedAt: number;
+  traceId: string;
+}): DiagramModifyResult {
+  const toolOutputs = collectToolOutputs(params.result);
+  const lastToolOutput =
+    // biome-ignore lint/style/useAtIndex: Array.at not available in Convex tsconfig
+    toolOutputs.length > 0 ? toolOutputs[toolOutputs.length - 1] : undefined;
+  const failedIssues = toolOutputs
+    .filter((output) => !output.ok)
+    .flatMap((output) => output.issues ?? []);
+  const stats = buildStatsResult(
+    params.startedAt,
+    params.traceId,
+    params.result.steps.length,
+    params.result.totalUsage.totalTokens ?? 0
+  );
+
+  if (lastToolOutput?.ok && lastToolOutput.elements) {
+    return buildSuccessResult({
+      elements: lastToolOutput.elements,
+      appState: params.appState,
+      diff: params.result.output,
+      changes: lastToolOutput.changes,
+      stats,
+    });
+  }
+
+  return buildFailureResult(
+    "invalid-diff",
+    failedIssues.length > 0
+      ? failedIssues
+      : [
+          {
+            code: "invalid-diff",
+            message: "No valid diff produced before the tool loop ended",
+          },
+        ],
+    stats
+  );
+}
+
+function applyExplicitEditsIfPreferred(params: {
+  preferExplicitEdits?: boolean;
+  explicitEdits: Array<{ id: string; path: string; value: string }>;
+  elements: Record<string, unknown>[];
+  appState?: Record<string, unknown>;
+  startedAt: number;
+  traceId: string;
+}): DiagramModifyResult | null {
+  if (!params.preferExplicitEdits || params.explicitEdits.length === 0) {
+    return null;
+  }
+
+  const diff = buildDiffFromExplicitEdits(params.explicitEdits);
+  const applied = applyDiagramDiff(
+    params.elements as unknown as Parameters<typeof applyDiagramDiff>[0],
+    diff
+  );
+  const stats = buildStatsResult(params.startedAt, params.traceId, 0, 0);
+
+  if (!applied.ok) {
+    return buildFailureResult("invalid-diff", applied.issues, stats);
+  }
+
+  return buildSuccessResult({
+    elements: applied.elements,
+    appState: params.appState,
+    diff,
+    changes: applied.changes,
+    stats,
+  });
+}
+
+function createValidationTool(params: {
+  elements: Record<string, unknown>[];
+  explicitEdits: Array<{ id: string; path: string; value: string }>;
+  tracking: ModificationTracking;
+}) {
+  return tool({
+    description:
+      "Validate the proposed diff, apply it to the current elements, and return issues (if any).",
+    inputSchema: DiagramElementDiffSchema,
+    execute: (diff: DiagramElementDiff) => {
+      if (params.explicitEdits.length > 0) {
+        const missingEdits = findMissingEdits(diff, params.explicitEdits);
+        if (missingEdits.length > 0) {
+          params.tracking.lastIssues = missingEdits;
+          return { ok: false as const, issues: missingEdits };
+        }
+      }
+      const result = applyDiagramDiff(
+        params.elements as unknown as Parameters<typeof applyDiagramDiff>[0],
+        diff
+      );
+      if (!result.ok) {
+        params.tracking.lastIssues = result.issues;
+        return { ok: false as const, issues: result.issues };
+      }
+      params.tracking.lastSuccessful = {
+        elements: result.elements,
+        changes: result.changes,
+        diff,
+      };
+      return {
+        ok: true as const,
+        elements: result.elements,
+        changes: result.changes,
+      };
+    },
+  });
+}
+
+function stopOnSuccess({
+  steps,
+}: {
+  steps: Array<{
+    toolResults?: Array<{ toolName?: string; output?: unknown }>;
+  }>;
+}) {
+  for (const step of steps) {
+    for (const result of step.toolResults ?? []) {
+      if (result.toolName !== "validateAndApplyDiff") {
+        continue;
+      }
+      const output = result.output as { ok?: boolean } | undefined;
+      if (output?.ok === true) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function createModificationAgent(params: {
+  validationTool: ReturnType<typeof createValidationTool>;
+  traceId: string;
+  tracking: ModificationTracking;
+  maxSteps?: number;
+}) {
+  return new ToolLoopAgent({
+    model: gateway(DEFAULT_MODEL),
+    instructions: MODIFICATION_SYSTEM_PROMPT,
+    output: Output.object({ schema: DiagramElementDiffSchema }),
+    tools: {
+      validateAndApplyDiff: params.validationTool,
+    },
+    stopWhen: [
+      stepCountIs(params.maxSteps ?? DEFAULT_MAX_STEPS),
+      stopOnSuccess,
+    ],
+    onStepFinish: ({ usage, toolCalls }) => {
+      params.tracking.stepCount += 1;
+      params.tracking.tokenCount += usage.totalTokens ?? 0;
+      console.log(
+        `[${params.traceId}] Step: tools=${toolCalls?.length ?? 0}, tokens=${usage.totalTokens}`
+      );
+    },
+  });
+}
+
+async function runAgentAttempts(params: {
+  agent: ReturnType<typeof createModificationAgent>;
+  prompt: string;
+  deadline: number;
+  startedAt: number;
+  traceId: string;
+  appState?: Record<string, unknown>;
+}): Promise<{ outcome?: DiagramModifyResult; lastError?: unknown }> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const remaining = params.deadline - Date.now();
+    if (remaining <= 0) {
+      break;
+    }
+
+    try {
+      const result = await params.agent.generate({
+        prompt: params.prompt,
+        timeout: remaining,
+      });
+      return {
+        outcome: resolveAgentOutcome({
+          result,
+          appState: params.appState,
+          startedAt: params.startedAt,
+          traceId: params.traceId,
+        }),
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  return { lastError };
+}
+
 export async function modifyElementsWithAgent(
   args: {
     elements: unknown[];
@@ -236,312 +569,97 @@ export async function modifyElementsWithAgent(
   const elementIssues = validateElements(
     elements as unknown as Parameters<typeof validateElements>[0]
   );
-  const stats: DiagramModifyStats = {
-    iterations: 0,
-    tokens: 0,
-    durationMs: 0,
-    traceId,
-  };
 
   if (elementIssues.length > 0) {
-    return {
-      status: "failed",
-      reason: "invalid-elements",
-      issues: elementIssues,
-      stats: {
-        ...stats,
-        durationMs: Date.now() - startedAt,
-      },
-    };
+    const stats = buildStatsResult(startedAt, traceId, 0, 0);
+    return buildFailureResult("invalid-elements", elementIssues, stats);
   }
 
-  let lastSuccessful: {
-    elements: unknown[];
-    changes: {
-      addedIds: string[];
-      removedIds: string[];
-      modifiedIds: string[];
-    };
-    diff: DiagramElementDiff;
-  } | null = null;
-  let lastIssues: Array<{ code: string; message: string; elementId?: string }> =
-    [];
-  let stepCount = 0;
-  let tokenCount = 0;
   const elementIds = new Set(elements.map((element) => String(element.id)));
   const explicitEdits = extractExplicitEdits(args.request).filter((edit) =>
     elementIds.has(edit.id)
   );
 
-  if (args.options?.preferExplicitEdits && explicitEdits.length > 0) {
-    const diff = buildDiffFromExplicitEdits(explicitEdits);
-    const applied = applyDiagramDiff(
-      elements as unknown as Parameters<typeof applyDiagramDiff>[0],
-      diff
-    );
-    if (!applied.ok) {
-      return {
-        status: "failed",
-        reason: "invalid-diff",
-        issues: applied.issues,
-        stats: {
-          iterations: 0,
-          tokens: 0,
-          durationMs: Date.now() - startedAt,
-          traceId,
-        },
-      };
-    }
-
-    return {
-      status: "success",
-      elements: applied.elements,
-      appState: args.appState,
-      changes: {
-        diff,
-        addedIds: applied.changes.addedIds,
-        removedIds: applied.changes.removedIds,
-        modifiedIds: applied.changes.modifiedIds,
-      },
-      stats: {
-        iterations: 0,
-        tokens: 0,
-        durationMs: Date.now() - startedAt,
-        traceId,
-      },
-    };
-  }
-
-  const validationTool = tool({
-    description:
-      "Validate the proposed diff, apply it to the current elements, and return issues (if any).",
-    inputSchema: DiagramElementDiffSchema,
-    execute: (diff: DiagramElementDiff) => {
-      if (explicitEdits.length > 0) {
-        const missingEdits = findMissingEdits(diff, explicitEdits);
-        if (missingEdits.length > 0) {
-          lastIssues = missingEdits;
-          return { ok: false as const, issues: missingEdits };
-        }
-      }
-      const result = applyDiagramDiff(
-        elements as unknown as Parameters<typeof applyDiagramDiff>[0],
-        diff
-      );
-      if (!result.ok) {
-        lastIssues = result.issues;
-        return { ok: false as const, issues: result.issues };
-      }
-      lastSuccessful = {
-        elements: result.elements,
-        changes: result.changes,
-        diff,
-      };
-      return {
-        ok: true as const,
-        elements: result.elements,
-        changes: result.changes,
-      };
-    },
+  const explicitResult = applyExplicitEditsIfPreferred({
+    preferExplicitEdits: args.options?.preferExplicitEdits,
+    explicitEdits,
+    elements,
+    appState: args.appState,
+    startedAt,
+    traceId,
   });
-
-  const stopOnSuccess = ({
-    steps,
-  }: {
-    steps: Array<{ toolResults?: unknown[] }>;
-  }) =>
-    steps.some((step) =>
-      (step.toolResults ?? []).some((result) => {
-        if (
-          typeof result === "object" &&
-          result &&
-          "toolName" in result &&
-          (result as { toolName?: string }).toolName ===
-            "validateAndApplyDiff" &&
-          "output" in result
-        ) {
-          const output = (result as { output?: { ok?: boolean } }).output;
-          return output?.ok === true;
-        }
-        return false;
-      })
-    );
-
-  const agent = new ToolLoopAgent({
-    model: gateway(DEFAULT_MODEL),
-    instructions: MODIFICATION_SYSTEM_PROMPT,
-    output: Output.object({ schema: DiagramElementDiffSchema }),
-    tools: {
-      validateAndApplyDiff: validationTool,
-    },
-    stopWhen: [
-      stepCountIs(args.options?.maxSteps ?? DEFAULT_MAX_STEPS),
-      stopOnSuccess,
-    ],
-    onStepFinish: ({ usage, toolCalls }) => {
-      stepCount += 1;
-      tokenCount += usage.totalTokens ?? 0;
-      console.log(
-        `[${traceId}] Step: tools=${toolCalls?.length ?? 0}, tokens=${usage.totalTokens}`
-      );
-    },
-  });
-
-  const summary = summarizeElements(elements);
-  const labels = summarizeLabels(elements);
-  const prompt = [
-    `Modification request: ${args.request}`,
-    "",
-    "Elements summary (for reasoning):",
-    JSON.stringify(summary),
-    "",
-    "Label elements (text bindings):",
-    JSON.stringify(labels),
-    "",
-    "Full elements (for reference):",
-    JSON.stringify(elements),
-  ].join("\n");
-
-  const totalTimeoutMs = args.options?.timeoutMs ?? MAX_TIMEOUT_MS;
-  const deadline = Date.now() + totalTimeoutMs;
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const remaining = deadline - Date.now();
-    if (remaining <= 0) {
-      break;
-    }
-
-    try {
-      const result = await agent.generate({
-        prompt,
-        timeout: remaining,
-      });
-
-      const toolOutputs = result.steps.flatMap((step) =>
-        (step.toolResults ?? [])
-          .filter(
-            (toolResult) => toolResult.toolName === "validateAndApplyDiff"
-          )
-          .map(
-            (toolResult) =>
-              toolResult.output as {
-                ok: boolean;
-                issues?: Array<{
-                  code: string;
-                  message: string;
-                  elementId?: string;
-                }>;
-                elements?: unknown[];
-                changes?: {
-                  addedIds: string[];
-                  removedIds: string[];
-                  modifiedIds: string[];
-                };
-              }
-          )
-      );
-
-      const lastToolOutput =
-        toolOutputs.length > 0
-          ? toolOutputs[toolOutputs.length - 1]
-          : undefined;
-      const failedIssues = toolOutputs
-        .filter((output) => !output.ok)
-        .flatMap((output) => output.issues ?? []);
-
-      const statsResult: DiagramModifyStats = {
-        iterations: result.steps.length,
-        tokens: result.totalUsage.totalTokens ?? 0,
-        durationMs: Date.now() - startedAt,
-        traceId,
-      };
-
-      if (lastToolOutput?.ok && lastToolOutput.elements) {
-        return {
-          status: "success",
-          elements: lastToolOutput.elements,
-          appState: args.appState,
-          changes: {
-            diff: result.output as DiagramElementDiff,
-            addedIds: lastToolOutput.changes?.addedIds,
-            removedIds: lastToolOutput.changes?.removedIds,
-            modifiedIds: lastToolOutput.changes?.modifiedIds,
-          },
-          stats: statsResult,
-        };
-      }
-
-      return {
-        status: "failed",
-        reason: "invalid-diff",
-        issues:
-          failedIssues.length > 0
-            ? failedIssues
-            : [
-                {
-                  code: "invalid-diff",
-                  message: "No valid diff produced before the tool loop ended",
-                },
-              ],
-        stats: statsResult,
-      };
-    } catch (error) {
-      lastError = error;
-    }
+  if (explicitResult) {
+    return explicitResult;
   }
 
-  if (lastSuccessful) {
-    const success = lastSuccessful as {
-      elements: unknown[];
-      changes: {
-        addedIds: string[];
-        removedIds: string[];
-        modifiedIds: string[];
-      };
-      diff: DiagramElementDiff;
-    };
-    return {
-      status: "success",
-      elements: success.elements,
-      appState: args.appState,
-      changes: {
-        diff: success.diff,
-        addedIds: success.changes.addedIds,
-        removedIds: success.changes.removedIds,
-        modifiedIds: success.changes.modifiedIds,
-      },
-      stats: {
-        iterations: stepCount,
-        tokens: tokenCount,
-        durationMs: Date.now() - startedAt,
-        traceId,
-      },
-    };
-  }
-
-  return {
-    status: "failed",
-    reason: "error",
-    issues:
-      lastIssues.length > 0
-        ? lastIssues
-        : [
-            {
-              code: "error",
-              message:
-                lastError instanceof Error
-                  ? lastError.message
-                  : String(lastError),
-            },
-          ],
-    stats: {
-      iterations: stepCount,
-      tokens: tokenCount,
-      durationMs: Date.now() - startedAt,
-      traceId,
-    },
+  const tracking: ModificationTracking = {
+    lastSuccessful: null,
+    lastIssues: [],
+    stepCount: 0,
+    tokenCount: 0,
   };
+  const validationTool = createValidationTool({
+    elements,
+    explicitEdits,
+    tracking,
+  });
+  const agent = createModificationAgent({
+    validationTool,
+    traceId,
+    tracking,
+    maxSteps: args.options?.maxSteps,
+  });
+  const prompt = buildModificationPrompt(args.request, elements);
+  const deadline = Date.now() + (args.options?.timeoutMs ?? MAX_TIMEOUT_MS);
+
+  const { outcome, lastError } = await runAgentAttempts({
+    agent,
+    prompt,
+    deadline,
+    startedAt,
+    traceId,
+    appState: args.appState,
+  });
+
+  if (outcome) {
+    return outcome;
+  }
+
+  if (tracking.lastSuccessful) {
+    const stats = buildStatsResult(
+      startedAt,
+      traceId,
+      tracking.stepCount,
+      tracking.tokenCount
+    );
+    return buildSuccessResult({
+      elements: tracking.lastSuccessful.elements,
+      appState: args.appState,
+      diff: tracking.lastSuccessful.diff,
+      changes: tracking.lastSuccessful.changes,
+      stats,
+    });
+  }
+
+  const errorIssues =
+    tracking.lastIssues.length > 0
+      ? tracking.lastIssues
+      : [
+          {
+            code: "error",
+            message:
+              lastError instanceof Error
+                ? lastError.message
+                : String(lastError ?? "Unknown error"),
+          },
+        ];
+  const stats = buildStatsResult(
+    startedAt,
+    traceId,
+    tracking.stepCount,
+    tracking.tokenCount
+  );
+  return buildFailureResult("error", errorIssues, stats);
 }
 
 export const diagramModifyElements = action({
