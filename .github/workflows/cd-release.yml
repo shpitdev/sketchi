@@ -26,25 +26,58 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
+      - name: Skip bump merges
+        id: skip_release
+        run: |
+          MSG=$(git log -1 --pretty=%B)
+          if echo "$MSG" | grep -q "chore: bump version"; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Skipping release for bump commit."
+            exit 0
+          fi
+
+          if echo "$MSG" | grep -q "chore/bump-version"; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Skipping release for bump merge."
+            exit 0
+          fi
+
+          PARENTS=$(git show -s --pretty=%P HEAD)
+          PARENT_COUNT=$(echo "$PARENTS" | wc -w | tr -d ' ')
+          if [ "$PARENT_COUNT" -gt 1 ]; then
+            MERGED_HEAD=$(echo "$PARENTS" | awk '{print $2}')
+            MERGED_MSG=$(git show -s --pretty=%B "$MERGED_HEAD")
+            if echo "$MERGED_MSG" | grep -q "chore: bump version"; then
+              echo "skip=true" >> $GITHUB_OUTPUT
+              echo "Skipping release for bump merge."
+              exit 0
+            fi
+          fi
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
+        if: steps.skip_release.outputs.skip != 'true'
         with:
           bun-version: latest
 
       - name: Install dependencies
+        if: steps.skip_release.outputs.skip != 'true'
         run: bun install
 
       - name: Configure Git
+        if: steps.skip_release.outputs.skip != 'true'
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
 
       - name: Get current version
         id: current_version
+        if: steps.skip_release.outputs.skip != 'true'
         run: echo "version=$(bun -e "console.log(require('./package.json').version)")" >> $GITHUB_OUTPUT
 
       - name: Create bump branch
         id: bump_branch
+        if: steps.skip_release.outputs.skip != 'true'
         run: |
           BRANCH="chore/bump-version-${GITHUB_SHA::7}"
           git checkout -b "$BRANCH"
@@ -52,13 +85,24 @@ jobs:
 
       - name: Bump version
         id: bump_version
+        if: steps.skip_release.outputs.skip != 'true'
         run: |
           npm version patch --no-git-tag-version
           NEW_VERSION=$(bun -e "console.log(require('./package.json').version)")
+          CUR_VERSION="${{ steps.current_version.outputs.version }}"
+          CUR_VERSION="${CUR_VERSION%%-*}"
+          NEW_VERSION_BASE="${NEW_VERSION%%-*}"
+          IFS='.' read -r CUR_MAJOR CUR_MINOR CUR_PATCH <<< "$CUR_VERSION"
+          IFS='.' read -r NEW_MAJOR NEW_MINOR NEW_PATCH <<< "$NEW_VERSION_BASE"
+          if [ "$CUR_MAJOR" != "$NEW_MAJOR" ] || [ "$CUR_MINOR" != "$NEW_MINOR" ]; then
+            echo "Refusing to bump major/minor; patch-only enforced."
+            exit 1
+          fi
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Bumped version from ${{ steps.current_version.outputs.version }} to $NEW_VERSION"
 
       - name: Commit version bump
+        if: steps.skip_release.outputs.skip != 'true'
         run: |
           git add package.json
           git commit -m "chore: bump version to ${{ steps.bump_version.outputs.new_version }} [skip-release]"
@@ -66,6 +110,7 @@ jobs:
 
       - name: Create or update PR
         id: bump_pr
+        if: steps.skip_release.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -85,6 +130,7 @@ jobs:
           echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
 
       - name: Enable auto-merge
+        if: steps.skip_release.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -93,6 +139,7 @@ jobs:
             --squash \
             --auto
       - name: Wait for PR merge
+        if: steps.skip_release.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -113,6 +160,7 @@ jobs:
 
       - name: Generate release notes
         id: release_notes
+        if: steps.skip_release.outputs.skip != 'true'
         run: |
           # Get the latest tag (if any)
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
@@ -138,6 +186,7 @@ jobs:
           echo "Release notes generated"
 
       - name: Create GitHub Release
+        if: steps.skip_release.outputs.skip != 'true'
         run: |
           gh release create v${{ steps.bump_version.outputs.new_version }} \
             --title "Release v${{ steps.bump_version.outputs.new_version }}" \
@@ -147,6 +196,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Clean up
-        if: always()
+        if: always() && steps.skip_release.outputs.skip != 'true'
         run: |
           rm -f release_notes.md
