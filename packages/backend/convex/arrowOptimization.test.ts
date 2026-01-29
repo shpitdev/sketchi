@@ -271,6 +271,7 @@ function expectArrowOptimized(
   // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
   expect(arrow.height).toBe(endPoint.y - startPoint.y);
 
+  // biome-ignore lint/style/useAtIndex: Array.at not available in Convex tsconfig
   const lastPoint = arrow.points[arrow.points.length - 1];
   // biome-ignore lint/suspicious/noMisplacedAssertion: assertions in helper called from test()
   expect(lastPoint).toEqual([

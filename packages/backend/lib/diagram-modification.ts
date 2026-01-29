@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const INDEX_NUMBER_REGEX = /(\d+)/;
+
 export const ExcalidrawElementReferenceSchema = z
   .object({
     id: z.string(),
@@ -103,11 +105,11 @@ export type DiagramModificationApplyResult =
   | DiagramModificationApplySuccess
   | DiagramModificationApplyFailure;
 
-export type ExcalidrawElementLike = {
+export interface ExcalidrawElementLike {
   id: string;
   type: string;
   [key: string]: unknown;
-};
+}
 
 export function validateElements(
   elements: ExcalidrawElementLike[]
@@ -158,13 +160,117 @@ export function validateElements(
   return issues;
 }
 
+function collectDiffIssues(params: {
+  existingIds: Set<string>;
+  addList: ExcalidrawElementLike[];
+  removeList: string[];
+  modifyList: Array<{ id: string; changes: ExcalidrawElementPatch }>;
+}): DiagramModificationIssue[] {
+  const issues: DiagramModificationIssue[] = [];
+  const addedIds = new Set<string>();
+
+  for (const removeId of params.removeList) {
+    if (!params.existingIds.has(removeId)) {
+      issues.push({
+        code: "missing-element",
+        message: `Cannot remove missing element '${removeId}'`,
+        elementId: removeId,
+      });
+    }
+  }
+
+  for (const modification of params.modifyList) {
+    if (!params.existingIds.has(modification.id)) {
+      issues.push({
+        code: "missing-element",
+        message: `Cannot modify missing element '${modification.id}'`,
+        elementId: modification.id,
+      });
+    }
+
+    if (
+      modification.changes.id &&
+      modification.changes.id !== modification.id
+    ) {
+      issues.push({
+        code: "immutable-id",
+        message: `Cannot change id '${modification.id}' to '${modification.changes.id}'`,
+        elementId: modification.id,
+      });
+    }
+  }
+
+  for (const element of params.addList) {
+    if (params.existingIds.has(element.id)) {
+      issues.push({
+        code: "duplicate-id",
+        message: `Cannot add element '${element.id}' because it already exists`,
+        elementId: element.id,
+      });
+    }
+    if (addedIds.has(element.id)) {
+      issues.push({
+        code: "duplicate-id",
+        message: `Duplicate add element id '${element.id}'`,
+        elementId: element.id,
+      });
+    }
+    addedIds.add(element.id);
+  }
+
+  return issues;
+}
+
+function applyRemovals(
+  elementMap: Map<string, ExcalidrawElementLike>,
+  removeList: string[]
+) {
+  for (const removeId of removeList) {
+    elementMap.delete(removeId);
+  }
+}
+
+function applyModifications(
+  elementMap: Map<string, ExcalidrawElementLike>,
+  modifyList: Array<{ id: string; changes: ExcalidrawElementPatch }>
+) {
+  for (const modification of modifyList) {
+    const current = elementMap.get(modification.id);
+    if (!current) {
+      continue;
+    }
+    const merged = {
+      ...current,
+      ...modification.changes,
+      id: current.id,
+      type: current.type,
+    } as ExcalidrawElementLike;
+
+    const maybeFlipped = autoFlipArrowPoints(current, merged, modification);
+    elementMap.set(modification.id, maybeFlipped);
+  }
+}
+
+function applyAdditions(
+  elementMap: Map<string, ExcalidrawElementLike>,
+  addList: ExcalidrawElementLike[],
+  indexGenerator: { next: () => string }
+) {
+  for (const element of addList) {
+    elementMap.set(
+      element.id,
+      buildDefaultElement(element, indexGenerator.next())
+    );
+  }
+}
+
 export function applyDiagramDiff(
   elements: ExcalidrawElementLike[],
   diff: DiagramElementDiff
 ): DiagramModificationApplyResult {
-  const issues: DiagramModificationIssue[] = [];
   const validated = DiagramElementDiffSchema.safeParse(diff);
   if (!validated.success) {
+    const issues: DiagramModificationIssue[] = [];
     for (const error of validated.error.issues) {
       issues.push({
         code: "invalid-diff",
@@ -185,86 +291,20 @@ export function applyDiagramDiff(
   const modifyList = validated.data.modify ?? [];
 
   const existingIds = new Set(elementMap.keys());
-  const addedIds = new Set<string>();
-
-  for (const removeId of removeList) {
-    if (!existingIds.has(removeId)) {
-      issues.push({
-        code: "missing-element",
-        message: `Cannot remove missing element '${removeId}'`,
-        elementId: removeId,
-      });
-    }
-  }
-
-  for (const modification of modifyList) {
-    if (!existingIds.has(modification.id)) {
-      issues.push({
-        code: "missing-element",
-        message: `Cannot modify missing element '${modification.id}'`,
-        elementId: modification.id,
-      });
-    }
-
-    if (
-      modification.changes.id &&
-      modification.changes.id !== modification.id
-    ) {
-      issues.push({
-        code: "immutable-id",
-        message: `Cannot change id '${modification.id}' to '${modification.changes.id}'`,
-        elementId: modification.id,
-      });
-    }
-  }
-
-  for (const element of addList) {
-    if (existingIds.has(element.id)) {
-      issues.push({
-        code: "duplicate-id",
-        message: `Cannot add element '${element.id}' because it already exists`,
-        elementId: element.id,
-      });
-    }
-    if (addedIds.has(element.id)) {
-      issues.push({
-        code: "duplicate-id",
-        message: `Duplicate add element id '${element.id}'`,
-        elementId: element.id,
-      });
-    }
-    addedIds.add(element.id);
-  }
-
+  const issues = collectDiffIssues({
+    existingIds,
+    addList,
+    removeList,
+    modifyList,
+  });
   if (issues.length > 0) {
     return { ok: false, issues };
   }
 
-  for (const removeId of removeList) {
-    elementMap.delete(removeId);
-  }
-
-  for (const modification of modifyList) {
-    const current = elementMap.get(modification.id);
-    if (!current) {
-      continue;
-    }
-    const merged = {
-      ...current,
-      ...modification.changes,
-      id: current.id,
-      type: current.type,
-    } as ExcalidrawElementLike;
-
-    const maybeFlipped = autoFlipArrowPoints(current, merged, modification);
-
-    elementMap.set(modification.id, maybeFlipped);
-  }
-
+  applyRemovals(elementMap, removeList);
+  applyModifications(elementMap, modifyList);
   const nextIndex = createIndexGenerator(Array.from(elementMap.values()));
-  for (const element of addList) {
-    elementMap.set(element.id, buildDefaultElement(element, nextIndex.next()));
-  }
+  applyAdditions(elementMap, addList, nextIndex);
 
   const merged = Array.from(elementMap.values());
   const postIssues = validateElements(merged);
@@ -314,10 +354,7 @@ function autoFlipArrowPoints(
     null;
 
   if (
-    !beforeStart ||
-    !beforeEnd ||
-    !afterStart ||
-    !afterEnd ||
+    !(beforeStart && beforeEnd && afterStart && afterEnd) ||
     beforeStart !== afterEnd ||
     beforeEnd !== afterStart
   ) {
@@ -422,7 +459,7 @@ function createIndexGenerator(elements: ExcalidrawElementLike[]) {
   let max = 0;
   for (const element of elements) {
     if (typeof element.index === "string") {
-      const match = element.index.match(/(\d+)/);
+      const match = element.index.match(INDEX_NUMBER_REGEX);
       if (match) {
         const value = Number.parseInt(match[1] ?? "0", 10);
         if (value > max) {
@@ -440,31 +477,113 @@ function createIndexGenerator(elements: ExcalidrawElementLike[]) {
   };
 }
 
+function resolveDefaultDimensions(element: ExcalidrawElementLike): {
+  width: number;
+  height: number;
+} {
+  let width = element.type === "text" ? 100 : 160;
+  if (typeof element.width === "number") {
+    width = element.width;
+  }
+
+  let height = element.type === "text" ? 24 : 100;
+  if (typeof element.height === "number") {
+    height = element.height;
+  }
+
+  return { width, height };
+}
+
+function resolveBackgroundColor(element: ExcalidrawElementLike): string {
+  if (typeof element.backgroundColor === "string") {
+    return element.backgroundColor;
+  }
+  return element.type === "text" ? "transparent" : "#a5d8ff";
+}
+
+function resolveStrokeColor(element: ExcalidrawElementLike): string {
+  if (typeof element.strokeColor === "string") {
+    return element.strokeColor;
+  }
+  return "#1971c2";
+}
+
+function resolveTextContent(element: ExcalidrawElementLike): string {
+  if (typeof element.text === "string") {
+    return element.text;
+  }
+  if (
+    typeof element.label === "object" &&
+    element.label &&
+    "text" in element.label
+  ) {
+    return String((element.label as { text?: unknown }).text ?? "");
+  }
+  return "";
+}
+
+function resolveArrowPoints(
+  element: ExcalidrawElementLike,
+  width: number,
+  height: number
+): number[][] {
+  if (Array.isArray(element.points) && element.points.length >= 2) {
+    return element.points as number[][];
+  }
+  return [
+    [0, 0],
+    [width, height],
+  ];
+}
+
+function buildArrowElement(
+  base: ExcalidrawElementLike,
+  element: ExcalidrawElementLike,
+  width: number,
+  height: number
+): ExcalidrawElementLike {
+  const points = resolveArrowPoints(element, width, height);
+  return {
+    ...base,
+    ...element,
+    points,
+    backgroundColor: element.backgroundColor ?? "transparent",
+    startArrowhead: element.startArrowhead ?? null,
+    endArrowhead: element.endArrowhead ?? "arrow",
+    elbowed: element.elbowed ?? false,
+  };
+}
+
+function buildTextElement(
+  base: ExcalidrawElementLike,
+  element: ExcalidrawElementLike
+): ExcalidrawElementLike {
+  const text = resolveTextContent(element);
+  return {
+    ...base,
+    ...element,
+    text,
+    fontSize: element.fontSize ?? 16,
+    fontFamily: element.fontFamily ?? 5,
+    textAlign: element.textAlign ?? "center",
+    verticalAlign: element.verticalAlign ?? "middle",
+    containerId: element.containerId ?? null,
+    originalText: element.originalText ?? text,
+    autoResize: element.autoResize ?? true,
+    lineHeight: element.lineHeight ?? 1.25,
+    backgroundColor: element.backgroundColor ?? "transparent",
+  };
+}
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: default element normalization
 function buildDefaultElement(
   element: ExcalidrawElementLike,
   index: string
 ): ExcalidrawElementLike {
   const now = Date.now();
-  const width =
-    typeof element.width === "number"
-      ? element.width
-      : element.type === "text"
-        ? 100
-        : 160;
-  const height =
-    typeof element.height === "number"
-      ? element.height
-      : element.type === "text"
-        ? 24
-        : 100;
-  const backgroundColor =
-    typeof element.backgroundColor === "string"
-      ? element.backgroundColor
-      : element.type === "text"
-        ? "transparent"
-        : "#a5d8ff";
-  const strokeColor =
-    typeof element.strokeColor === "string" ? element.strokeColor : "#1971c2";
+  const { width, height } = resolveDefaultDimensions(element);
+  const backgroundColor = resolveBackgroundColor(element);
+  const strokeColor = resolveStrokeColor(element);
 
   const base: ExcalidrawElementLike = {
     id: element.id,
@@ -497,47 +616,11 @@ function buildDefaultElement(
   };
 
   if (element.type === "arrow") {
-    const points =
-      Array.isArray(element.points) && element.points.length >= 2
-        ? element.points
-        : [
-            [0, 0],
-            [width, height],
-          ];
-    return {
-      ...base,
-      ...element,
-      points,
-      backgroundColor: element.backgroundColor ?? "transparent",
-      startArrowhead: element.startArrowhead ?? null,
-      endArrowhead: element.endArrowhead ?? "arrow",
-      elbowed: element.elbowed ?? false,
-    };
+    return buildArrowElement(base, element, width, height);
   }
 
   if (element.type === "text") {
-    const text =
-      typeof element.text === "string"
-        ? element.text
-        : typeof element.label === "object" &&
-            element.label &&
-            "text" in element.label
-          ? String((element.label as { text?: unknown }).text ?? "")
-          : "";
-    return {
-      ...base,
-      ...element,
-      text,
-      fontSize: element.fontSize ?? 16,
-      fontFamily: element.fontFamily ?? 5,
-      textAlign: element.textAlign ?? "center",
-      verticalAlign: element.verticalAlign ?? "middle",
-      containerId: element.containerId ?? null,
-      originalText: element.originalText ?? text,
-      autoResize: element.autoResize ?? true,
-      lineHeight: element.lineHeight ?? 1.25,
-      backgroundColor: element.backgroundColor ?? "transparent",
-    };
+    return buildTextElement(base, element);
   }
 
   return { ...base, ...element };

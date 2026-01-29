@@ -119,7 +119,8 @@ async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
       api.diagramGenerateIntermediateFromPrompt.generateIntermediateFromPrompt,
       { prompt: scenario.prompt }
     );
-    stepDurationsMs.generateIntermediate = Date.now() - generateIntermediateStart;
+    stepDurationsMs.generateIntermediate =
+      Date.now() - generateIntermediateStart;
 
     // Validate intermediate has nodes and edges
     if (

@@ -1,3 +1,8 @@
+import { readFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+import { dirname, extname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import Browserbase from "@browserbasehq/sdk";
 import { type Browser, chromium, type Page } from "playwright";
 import { chromium as chromiumCore } from "playwright-core";
@@ -6,6 +11,7 @@ import type { Diagram } from "../../lib/diagram-structure";
 import { convertLayoutedToExcalidraw } from "../../lib/excalidraw-elements";
 
 const RENDER_TIMEOUT_MS = 60_000;
+const LEADING_SLASH_REGEX = /^\/+/;
 
 const EXPORT_HARNESS_HTML = `
 <!DOCTYPE html>
@@ -45,6 +51,109 @@ const EXPORT_HARNESS_HTML = `
 </html>
 `;
 
+const VALIDATE_HARNESS_HTML = `
+<!DOCTYPE html>
+<html>
+<head></head>
+<body>
+  <div id="status">Loading...</div>
+  <script>
+    window.validateImages = async function(files) {
+      const results = [];
+      for (const file of files) {
+        const { id, dataURL } = file;
+        const result = await new Promise((resolve) => {
+          const image = new Image();
+          image.onload = () => resolve({ id, ok: true });
+          image.onerror = () => resolve({ id, ok: false });
+          image.src = dataURL;
+        });
+        results.push(result);
+      }
+      return results;
+    };
+    window.validateReady = true;
+    document.getElementById('status').textContent = 'Ready';
+  </script>
+</body>
+</html>
+`;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const EXCALIDRAW_DEV_DIR = resolve(
+  __dirname,
+  "..",
+  "..",
+  "node_modules",
+  "@excalidraw",
+  "excalidraw",
+  "dist",
+  "dev"
+);
+
+const buildValidateSceneHarnessHtml = (moduleUrl: string) => `
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+  <div id="status">Loading...</div>
+  <script type="module">
+    import { restore } from "${moduleUrl}";
+
+    window.validateScene = async function(sceneJson) {
+      const result = {
+        loadOk: false,
+        loadError: null,
+        svgErrors: [],
+      };
+
+      let data = null;
+      try {
+        data = JSON.parse(sceneJson);
+      } catch (error) {
+        result.loadError = error?.message ?? String(error);
+        return result;
+      }
+
+      const hasValidType = data?.type === "excalidraw";
+      const elementsOk =
+        !data.elements || Array.isArray(data.elements);
+      const appStateOk =
+        !data.appState || typeof data.appState === "object";
+
+      if (!(hasValidType && elementsOk && appStateOk)) {
+        result.loadError = "Invalid excalidraw scene shape";
+        return result;
+      }
+
+      try {
+        restore(
+          {
+            elements: data.elements || [],
+            appState: data.appState || {},
+            files: data.files || {},
+          },
+          null,
+          null,
+          { repairBindings: true, refreshDimensions: false }
+        );
+        result.loadOk = true;
+      } catch (error) {
+        result.loadError = error?.message ?? String(error);
+      }
+
+      return result;
+    };
+
+    window.validateSceneReady = true;
+    document.getElementById('status').textContent = 'Ready';
+  </script>
+</body>
+</html>
+`;
+
 let browser: Browser | null = null;
 
 async function getBrowser(): Promise<Browser> {
@@ -61,6 +170,80 @@ async function loadExportHarness(page: Page): Promise<void> {
     document.write(html);
     document.close();
   }, EXPORT_HARNESS_HTML);
+}
+
+async function loadValidateHarness(page: Page): Promise<void> {
+  await page.goto("about:blank");
+  await page.evaluate((html) => {
+    document.open();
+    document.write(html);
+    document.close();
+  }, VALIDATE_HARNESS_HTML);
+}
+
+async function loadValidateSceneHarness(
+  page: Page,
+  baseUrl: string
+): Promise<void> {
+  await page.goto(`${baseUrl}/validate.html`);
+}
+
+function getContentType(filePath: string): string {
+  const ext = extname(filePath);
+  if (ext === ".js") {
+    return "application/javascript";
+  }
+  if (ext === ".css") {
+    return "text/css";
+  }
+  if (ext === ".map") {
+    return "application/json";
+  }
+  return "application/octet-stream";
+}
+
+async function withLocalExcalidrawServer<T>(
+  handler: (baseUrl: string) => Promise<T>
+): Promise<T> {
+  const validateHtml = buildValidateSceneHarnessHtml(
+    "https://esm.sh/@excalidraw/excalidraw@0.18.0?bundle"
+  );
+  const server = createServer(async (req, res) => {
+    try {
+      const requestUrl = new URL(req.url ?? "/", "http://localhost");
+      if (requestUrl.pathname === "/validate.html") {
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end(validateHtml);
+        return;
+      }
+      const rawPath = requestUrl.pathname.replace(LEADING_SLASH_REGEX, "");
+      const filePath = join(EXCALIDRAW_DEV_DIR, rawPath || "index.js");
+      if (!filePath.startsWith(EXCALIDRAW_DEV_DIR)) {
+        res.writeHead(403);
+        res.end();
+        return;
+      }
+      const contents = await readFile(filePath);
+      res.writeHead(200, { "Content-Type": getContentType(filePath) });
+      res.end(contents);
+    } catch {
+      res.writeHead(404);
+      res.end();
+    }
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
+
+  const { port } = server.address() as AddressInfo;
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  try {
+    return await handler(baseUrl);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 }
 
 export async function closeBrowser(): Promise<void> {
@@ -81,6 +264,25 @@ export interface RenderOptions {
   scale?: number;
   padding?: number;
   background?: boolean;
+}
+
+export interface ImageValidationResult {
+  id: string;
+  ok: boolean;
+}
+
+export interface ImageValidationSummary {
+  results: ImageValidationResult[];
+  durationMs: number;
+}
+
+export interface SceneValidationResult {
+  loadOk: boolean;
+  loadError: string | null;
+  svgErrors: Array<{ id: string; error: string }>;
+  harnessErrors?: string[];
+  harnessLogs?: string[];
+  durationMs: number;
 }
 
 async function exportElementsToPng(
@@ -248,4 +450,85 @@ export async function renderExcalidrawUrlToPng(
   } finally {
     await context.close();
   }
+}
+
+export async function validateExcalidrawImageDataUrls(
+  files: Array<{ id: string; dataURL: string }>
+): Promise<ImageValidationSummary> {
+  const start = Date.now();
+  const browser = await getBrowser();
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  try {
+    await loadValidateHarness(page);
+    await page.waitForFunction("window.validateReady === true", {
+      timeout: RENDER_TIMEOUT_MS,
+    });
+
+    const results = (await page.evaluate(async (input) => {
+      // biome-ignore lint/suspicious/noExplicitAny: validateImages injected by harness
+      return await (window as any).validateImages(input);
+    }, files)) as ImageValidationResult[];
+
+    return { results, durationMs: Date.now() - start };
+  } finally {
+    await context.close();
+  }
+}
+
+export function validateExcalidrawSceneJson(
+  sceneJson: string
+): Promise<SceneValidationResult> {
+  const start = Date.now();
+  return withLocalExcalidrawServer(async (baseUrl) => {
+    const browser = await getBrowser();
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const harnessErrors: string[] = [];
+    const harnessLogs: string[] = [];
+
+    page.on("pageerror", (error) => {
+      harnessErrors.push(error?.message ?? String(error));
+    });
+    page.on("console", (message) => {
+      harnessLogs.push(message.text());
+    });
+
+    try {
+      await loadValidateSceneHarness(page, baseUrl);
+      try {
+        await page.waitForFunction("window.validateSceneReady === true", {
+          timeout: RENDER_TIMEOUT_MS,
+        });
+      } catch (error) {
+        return {
+          loadOk: false,
+          loadError: error instanceof Error ? error.message : String(error),
+          svgErrors: [],
+          harnessErrors: harnessErrors.length ? harnessErrors : undefined,
+          harnessLogs: harnessLogs.length ? harnessLogs : undefined,
+          durationMs: Date.now() - start,
+        };
+      }
+
+      const result = (await page.evaluate(async (input) => {
+        // biome-ignore lint/suspicious/noExplicitAny: validateScene injected by harness
+        return await (window as any).validateScene(input);
+      }, sceneJson)) as {
+        loadOk: boolean;
+        loadError: string | null;
+        svgErrors: Array<{ id: string; error: string }>;
+      };
+
+      return {
+        ...result,
+        harnessErrors: harnessErrors.length ? harnessErrors : undefined,
+        harnessLogs: harnessLogs.length ? harnessLogs : undefined,
+        durationMs: Date.now() - start,
+      };
+    } finally {
+      await context.close();
+    }
+  });
 }
