@@ -111,7 +111,7 @@ Below are required/optional properties. Actual elements are auto-completed by th
 ### 4) Arrow
 - **Required**: `type`, `x`, `y`
 - **Optional**: `width`, `height` (default 100x0), `strokeColor`, `strokeWidth`, `strokeStyle`, `elbowed` (elbow arrow)
-- **Arrowheads**: `startArrowhead`/`endArrowhead`: arrow, bar, circle, circle_outline, triangle, triangle_outline, diamond, diamond_outline (default end=arrow, start=none)
+- **Arrowheads**: `startArrowhead`/`endArrowhead`: arrow, bar, dot, triangle (default end=arrow, start=none)
 - **Binding** (arrow only): `start`/`end` optional; if provided, must include `type` or `id`
   - Via `type` auto-create: supports rectangle/ellipse/diamond/text (text needs `text`)
   - Via `id` bind existing element

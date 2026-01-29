@@ -51,6 +51,8 @@ export const OUTPUT_SCHEMA_REGISTRY = {
 
 export type OutputSchemaId = keyof typeof OUTPUT_SCHEMA_REGISTRY;
 
-export function getOutputSchema(id: string) {
+export type OutputSchemaEntry = (typeof OUTPUT_SCHEMA_REGISTRY)[OutputSchemaId];
+
+export function getOutputSchema(id: string): OutputSchemaEntry | undefined {
   return OUTPUT_SCHEMA_REGISTRY[id as OutputSchemaId];
 }

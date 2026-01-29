@@ -28,4 +28,4 @@ Mindmap-specific guidance:
 - Use a single central root node that represents the main topic
 - Branch subtopics directly from the root
 - Keep labels short and consistent (2-5 words)
-- Prefer radial or left-to-right layouts for clarity
+- Prefer graphOptions.layout.direction of LR or TB for clarity

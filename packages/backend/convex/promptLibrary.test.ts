@@ -12,5 +12,6 @@ describe("prompt library", () => {
     expect(result.errors).toEqual([]);
     expect(result.warnings).toEqual([]);
     expect(result.prompts.length).toBeGreaterThan(0);
+    expect(result.resolvedPrompts.length).toBe(result.prompts.length);
   });
 });

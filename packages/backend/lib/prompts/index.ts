@@ -24,6 +24,16 @@ export function renderPrompt(
   variables: PromptVariables = {}
 ): string {
   const prompt = resolvePrompt(id);
+  const requiredVariables =
+    prompt.variables?.filter((variable) => variable.required) ?? [];
+  const missing = requiredVariables
+    .filter((variable) => variables[variable.name] == null)
+    .map((variable) => variable.name);
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required variables for prompt ${id}: ${missing.join(", ")}`
+    );
+  }
   return prompt.body.replace(/\{\{\s*([a-zA-Z0-9_-]+)\s*\}\}/g, (_, key) => {
     const value = variables[key];
     if (value === undefined) {

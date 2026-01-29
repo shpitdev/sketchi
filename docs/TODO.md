@@ -29,8 +29,8 @@
   - graphOptions: diagramType + optional global edge/style overrides (apply to whole graph)
 
 ### Prompt library
-- [ ] Create `packages/backend/lib/prompts/library/` with per-domain prompt files (Palantir, GCP, etc.)
-- [ ] Add `packages/backend/lib/prompts/index.ts` to export prompt registry + helpers
+- [x] Create `packages/backend/lib/prompts/library/` with per-domain prompt files (Palantir, GCP, etc.)
+- [x] Add `packages/backend/lib/prompts/index.ts` to export prompt registry + helpers
 - [ ] Remove giant prompt strings from experiment code once migrated
 
 ### Migration policy (per experiment)

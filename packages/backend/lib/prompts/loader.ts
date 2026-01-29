@@ -36,7 +36,18 @@ export interface PromptLibraryLoadResult {
 }
 
 export function loadPromptLibrary(baseDir: string): PromptLibraryLoadResult {
-  const files = listMarkdownFiles(baseDir);
+  let files: string[] = [];
+  try {
+    files = listMarkdownFiles(baseDir);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      prompts: [],
+      resolvedPrompts: [],
+      errors: [`loadPromptLibrary failed to scan ${baseDir}: ${message}`],
+      warnings: [],
+    };
+  }
   const { prompts, errors: parseErrors, idCounts } = parsePromptFiles(files);
   const duplicateErrors = validateDuplicateIds(idCounts);
   const {
@@ -178,16 +189,15 @@ function validatePlaceholders(prompt: PromptDefinition): {
   const errors: string[] = [];
   const warnings: string[] = [];
   const placeholders = findPlaceholders(prompt.body);
-  if (placeholders.length === 0) {
-    return { errors, warnings };
-  }
 
   const declared = new Set(prompt.variables?.map((v) => v.name) ?? []);
-  for (const placeholder of placeholders) {
-    if (!declared.has(placeholder)) {
-      errors.push(
-        `Prompt ${prompt.id} uses {{${placeholder}}} without declaring variable`
-      );
+  if (placeholders.length > 0) {
+    for (const placeholder of placeholders) {
+      if (!declared.has(placeholder)) {
+        errors.push(
+          `Prompt ${prompt.id} uses {{${placeholder}}} without declaring variable`
+        );
+      }
     }
   }
 
