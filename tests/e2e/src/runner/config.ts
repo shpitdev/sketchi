@@ -14,6 +14,7 @@ export interface StagehandRunConfig {
   vercelBypassSecret?: string;
   browserbaseApiKey?: string;
   browserbaseProjectId?: string;
+  browserbaseRegion?: string;
   headless: boolean;
   chromePath?: string;
   screenshotsEnabled: boolean;
@@ -71,6 +72,9 @@ export function loadConfig(): StagehandRunConfig {
     visionModelName,
     browserbaseApiKey: firstEnv("BROWSERBASE_API_KEY"),
     browserbaseProjectId: firstEnv("BROWSERBASE_PROJECT_ID"),
+    browserbaseRegion:
+      firstEnv("BROWSERBASE_REGION", "STAGEHAND_BROWSERBASE_REGION") ||
+      undefined,
     headless: parseBoolean(firstEnv("STAGEHAND_HEADLESS"), true),
     chromePath,
     screenshotsEnabled: parseBoolean(firstEnv("STAGEHAND_SCREENSHOTS"), true),
