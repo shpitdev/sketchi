@@ -9,6 +9,7 @@ export default function Home() {
       <div className="mx-auto mb-12 flex justify-center">
         <Image
           alt="Sketchi"
+          className="h-auto w-auto"
           height={160}
           priority
           src="/icons/logo-wide.svg"

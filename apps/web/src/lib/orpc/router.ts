@@ -50,7 +50,7 @@ const exampleElements = [
     angle: 0,
     strokeColor: "#1971c2",
     backgroundColor: "#a5d8ff",
-    fillStyle: "solid",
+    fillStyle: "hachure",
     strokeWidth: 2,
     strokeStyle: "solid",
     roughness: 1,
