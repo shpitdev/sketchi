@@ -234,6 +234,60 @@ function buildArrowElements(
   ];
 }
 
+/**
+ * Normalizes bidirectional arrow-shape bindings.
+ *
+ * Excalidraw requires shapes to list arrows in boundElements for drag behavior.
+ * This function scans all arrows and adds their IDs to connected shapes.
+ */
+function normalizeArrowBindings(
+  elements: Record<string, unknown>[]
+): Record<string, unknown>[] {
+  const arrowsByShape = new Map<string, Set<string>>();
+
+  for (const element of elements) {
+    if (element.type !== "arrow") continue;
+
+    const startBinding = element.startBinding as { elementId: string } | null;
+    const endBinding = element.endBinding as { elementId: string } | null;
+
+    if (startBinding?.elementId) {
+      if (!arrowsByShape.has(startBinding.elementId)) {
+        arrowsByShape.set(startBinding.elementId, new Set());
+      }
+      arrowsByShape.get(startBinding.elementId)!.add(element.id as string);
+    }
+
+    if (endBinding?.elementId) {
+      if (!arrowsByShape.has(endBinding.elementId)) {
+        arrowsByShape.set(endBinding.elementId, new Set());
+      }
+      arrowsByShape.get(endBinding.elementId)!.add(element.id as string);
+    }
+  }
+
+  for (const element of elements) {
+    const isShape = ["rectangle", "ellipse", "diamond"].includes(
+      element.type as string
+    );
+    if (!isShape) continue;
+
+    const arrowIds = arrowsByShape.get(element.id as string);
+    if (!arrowIds || arrowIds.size === 0) continue;
+
+    const existingBounds =
+      (element.boundElements as Array<{ id: string; type: string }>) ?? [];
+    const arrowBindings = Array.from(arrowIds).map((id) => ({
+      id,
+      type: "arrow",
+    }));
+
+    element.boundElements = [...existingBounds, ...arrowBindings];
+  }
+
+  return elements;
+}
+
 export function convertLayoutedToExcalidraw(
   layouted: LayoutedDiagram,
   style?: ExcalidrawStyleOverrides
@@ -250,5 +304,5 @@ export function convertLayoutedToExcalidraw(
     elements.push(...buildArrowElements(arrow, resolvedStyle, idx));
   }
 
-  return elements;
+  return normalizeArrowBindings(elements);
 }
