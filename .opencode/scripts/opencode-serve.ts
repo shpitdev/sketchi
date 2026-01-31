@@ -13,6 +13,7 @@ type CliOptions = {
   logDir?: string;
   projectDir?: string;
   open?: boolean;
+  agent?: string;
 };
 
 function parseArgs(args: string[]): CliOptions {
@@ -33,6 +34,12 @@ function parseArgs(args: string[]): CliOptions {
       i += 1;
     } else if (arg === "--no-open") {
       options.open = false;
+    } else if (arg === "--agent") {
+      const value = args[i + 1];
+      if (value) {
+        options.agent = value;
+      }
+      i += 1;
     }
   }
   return options;
@@ -414,13 +421,40 @@ async function main() {
   );
 
   const command = options.open ? "web" : "serve";
-  console.log(`OpenCode command: opencode ${command} --port ${port}`);
+  const opencodeCmd = [
+    "opencode",
+    command,
+    "--port",
+    String(port),
+    "--hostname",
+    HOST,
+  ];
+  const env = { ...process.env };
+  if (options.agent) {
+    let baseConfig: Record<string, unknown> = {};
+    if (env.OPENCODE_CONFIG_CONTENT) {
+      try {
+        baseConfig = JSON.parse(env.OPENCODE_CONFIG_CONTENT);
+      } catch {
+        baseConfig = {};
+      }
+    }
+    env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
+      ...baseConfig,
+      default_agent: options.agent,
+    });
+  }
+  console.log(`OpenCode command: ${opencodeCmd.join(" ")}`);
+  if (options.agent) {
+    console.log(`OpenCode default agent: ${options.agent}`);
+  }
   console.log(`OpenCode URL: ${baseUrl}`);
   console.log(`Parquet log: ${logPath}`);
   const child = Bun.spawn({
-    cmd: ["opencode", command, "--port", String(port), "--hostname", HOST],
+    cmd: opencodeCmd,
     stdout: "inherit",
     stderr: "inherit",
+    env,
     cwd: projectDir,
   });
 

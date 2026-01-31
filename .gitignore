@@ -66,3 +66,7 @@ temp
 opencode-logs/
 opencode-logs*/
 .vercel
+
+# Generated diagram exports
+/diagram-*.png
+/docs/architecture-diagram.png
