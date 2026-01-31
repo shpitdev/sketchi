@@ -47,6 +47,135 @@ function getStyleConfig(style?: ExcalidrawStyleOverrides): StyleConfig {
   };
 }
 
+const TEXT_WIDTH_FACTOR = 0.7;
+const TEXT_WIDTH_FUDGE = 1.08;
+const TEXT_LINE_HEIGHT = 1.25;
+const BOUND_TEXT_PADDING = 5;
+const ARROW_LABEL_WIDTH_FRACTION = 0.7;
+const ARROW_LABEL_FONT_SIZE_TO_MIN_WIDTH_RATIO = 11;
+
+function estimateTextWidth(text: string, fontSize: number): number {
+  const lines = text.split("\n");
+  let max = 0;
+  for (const line of lines) {
+    const width = line.length * fontSize * TEXT_WIDTH_FACTOR;
+    if (width > max) {
+      max = width;
+    }
+  }
+  return Math.ceil(max * TEXT_WIDTH_FUDGE);
+}
+
+function splitLongWord(word: string, maxChars: number): string[] {
+  if (word.length <= maxChars) {
+    return [word];
+  }
+  const chunks: string[] = [];
+  for (let i = 0; i < word.length; i += maxChars) {
+    chunks.push(word.slice(i, i + maxChars));
+  }
+  return chunks;
+}
+
+function wrapLine(line: string, maxChars: number): string[] {
+  if (line.length === 0) {
+    return [""];
+  }
+  if (line.length <= maxChars) {
+    return [line];
+  }
+  const words = line.split(" ");
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    if (word.length > maxChars) {
+      if (current.length > 0) {
+        lines.push(current);
+        current = "";
+      }
+      lines.push(...splitLongWord(word, maxChars));
+      continue;
+    }
+    if (current.length === 0) {
+      current = word;
+      continue;
+    }
+    if (current.length + 1 + word.length <= maxChars) {
+      current = `${current} ${word}`;
+      continue;
+    }
+    lines.push(current);
+    current = word;
+  }
+  if (current.length > 0) {
+    lines.push(current);
+  }
+  return lines;
+}
+
+function wrapTextToWidth(
+  text: string,
+  fontSize: number,
+  maxWidth: number
+): { text: string; lineCount: number } {
+  const maxChars = Math.max(
+    1,
+    Math.floor(maxWidth / (fontSize * TEXT_WIDTH_FACTOR))
+  );
+  const lines = text.split("\n");
+  const wrappedLines: string[] = [];
+  for (const line of lines) {
+    wrappedLines.push(...wrapLine(line, maxChars));
+  }
+  return { text: wrappedLines.join("\n"), lineCount: wrappedLines.length };
+}
+
+function getShapeBoundTextMaxWidth(
+  shapeType: string,
+  shapeWidth: number
+): number {
+  if (shapeType === "ellipse") {
+    return Math.round((shapeWidth / 2) * Math.sqrt(2)) - BOUND_TEXT_PADDING * 2;
+  }
+  if (shapeType === "diamond") {
+    return Math.round(shapeWidth / 2) - BOUND_TEXT_PADDING * 2;
+  }
+  return shapeWidth - BOUND_TEXT_PADDING * 2;
+}
+
+function getArrowLabelMaxWidth(arrowWidth: number, fontSize: number): number {
+  const minWidth = fontSize * ARROW_LABEL_FONT_SIZE_TO_MIN_WIDTH_RATIO;
+  return Math.max(ARROW_LABEL_WIDTH_FRACTION * arrowWidth, minWidth);
+}
+
+function computeTextMetrics(options: {
+  text: string;
+  fontSize: number;
+  maxWidth?: number;
+}): { text: string; width: number; height: number; lineCount: number } {
+  const { fontSize } = options;
+  const lineHeight = TEXT_LINE_HEIGHT;
+  if (typeof options.maxWidth === "number" && options.maxWidth > 0) {
+    const wrapped = wrapTextToWidth(options.text, fontSize, options.maxWidth);
+    const width = Math.min(
+      options.maxWidth,
+      Math.max(1, estimateTextWidth(wrapped.text, fontSize))
+    );
+    const height = Math.ceil(fontSize * lineHeight * wrapped.lineCount);
+    return {
+      text: wrapped.text,
+      width,
+      height,
+      lineCount: wrapped.lineCount,
+    };
+  }
+
+  const width = Math.max(1, estimateTextWidth(options.text, fontSize));
+  const lineCount = options.text.split("\n").length;
+  const height = Math.ceil(fontSize * lineHeight * lineCount);
+  return { text: options.text, width, height, lineCount };
+}
+
 function buildShapeElements(
   shape: LayoutedDiagram["shapes"][number],
   style: StyleConfig,
@@ -86,16 +215,27 @@ function buildShapeElements(
   }
 
   base.boundElements = [{ id: `${shape.id}_text`, type: "text" }];
+  const maxTextWidth = Math.max(
+    40,
+    getShapeBoundTextMaxWidth(shape.type, shape.width) - BOUND_TEXT_PADDING
+  );
+  const textMetrics = computeTextMetrics({
+    text: shape.label.text,
+    fontSize: style.fontSize,
+    maxWidth: maxTextWidth,
+  });
+  const textX = shape.x + (shape.width - textMetrics.width) / 2;
+  const textY = shape.y + (shape.height - textMetrics.height) / 2;
 
   return [
     base,
     {
       id: `${shape.id}_text`,
       type: "text",
-      x: shape.x + 10,
-      y: shape.y + shape.height / 2 - 10,
-      width: shape.width - 20,
-      height: 20,
+      x: textX,
+      y: textY,
+      width: textMetrics.width,
+      height: textMetrics.height,
       angle: 0,
       strokeColor: style.textColor,
       backgroundColor: "transparent",
@@ -116,7 +256,7 @@ function buildShapeElements(
       updated: Date.now(),
       link: null,
       locked: false,
-      text: shape.label.text,
+      text: textMetrics.text,
       fontSize: style.fontSize,
       fontFamily: style.fontFamily,
       textAlign: "center",
@@ -124,7 +264,7 @@ function buildShapeElements(
       containerId: shape.id,
       originalText: shape.label.text,
       autoResize: true,
-      lineHeight: 1.25,
+      lineHeight: TEXT_LINE_HEIGHT,
     },
   ];
 }
@@ -194,16 +334,22 @@ function buildArrowElements(
 
   const midX = arrow.x + arrow.width / 2;
   const midY = arrow.y + arrow.height / 2;
+  const maxLabelWidth = getArrowLabelMaxWidth(arrow.width, style.fontSize);
+  const textMetrics = computeTextMetrics({
+    text: arrow.label?.text ?? "",
+    fontSize: style.fontSize,
+    maxWidth: maxLabelWidth,
+  });
 
   return [
     arrowElement,
     {
       id: textId,
       type: "text",
-      x: midX - 30,
-      y: midY - 10,
-      width: 60,
-      height: 20,
+      x: midX - textMetrics.width / 2,
+      y: midY - textMetrics.height / 2,
+      width: textMetrics.width,
+      height: textMetrics.height,
       angle: 0,
       strokeColor: style.textColor,
       backgroundColor: "transparent",
@@ -224,7 +370,7 @@ function buildArrowElements(
       updated: Date.now(),
       link: null,
       locked: false,
-      text: arrow.label?.text ?? "",
+      text: textMetrics.text,
       fontSize: style.fontSize,
       fontFamily: style.fontFamily,
       textAlign: "center",
@@ -232,7 +378,7 @@ function buildArrowElements(
       containerId: arrow.id,
       originalText: arrow.label?.text ?? "",
       autoResize: true,
-      lineHeight: 1.25,
+      lineHeight: TEXT_LINE_HEIGHT,
     },
   ];
 }
