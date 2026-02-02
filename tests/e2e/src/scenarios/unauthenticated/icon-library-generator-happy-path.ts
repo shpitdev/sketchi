@@ -39,8 +39,8 @@ import { sleep } from "../../runner/wait";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const fixturesDir = join(__dirname, "../../../fixtures/svgs");
+const TRAILING_SUMMARY_REGEX = /[\s.]+$/;
 type PageLike = Awaited<ReturnType<typeof getActivePage>>;
-type StagehandLike = Awaited<ReturnType<typeof createStagehand>>;
 
 async function waitForLibraryInput(
   page: PageLike,
@@ -152,18 +152,124 @@ async function waitForIconCount(
   }
 }
 
-async function exportAsExcalidrawLib(stagehand: StagehandLike): Promise<void> {
-  await stagehand.act(
-    "Find and click the export button or menu. Select the option to export as .excalidrawlib format. Confirm the export action."
-  );
-  await sleep(500);
+async function selectExportOption(
+  page: PageLike,
+  label: string
+): Promise<void> {
+  await page.evaluate(() => {
+    const button = Array.from(document.querySelectorAll("button")).find(
+      (element) => element.textContent?.trim().startsWith("Export")
+    );
+    if (!button) {
+      throw new Error("Export button not found.");
+    }
+    (button as HTMLButtonElement).click();
+  });
+  await page.evaluate((optionLabel: string) => {
+    const menuItem = Array.from(
+      document.querySelectorAll('[role="menuitem"]')
+    ).find((element) => element.textContent?.trim() === optionLabel);
+    if (!menuItem) {
+      throw new Error(`Export option not found: ${optionLabel}`);
+    }
+    (menuItem as HTMLElement).click();
+  }, label);
+  await sleep(300);
 }
 
-async function exportAsSketchyZip(stagehand: StagehandLike): Promise<void> {
-  await stagehand.act(
-    "Find and click the export button or menu. Select the option to export as Sketchy SVGs (ZIP). Confirm the export action."
+function summarizeExportReview(
+  review: Awaited<ReturnType<typeof captureScreenshot>>
+): string {
+  if (!review) {
+    return "(no visual review)";
+  }
+  const summary = review.summary.trim();
+  const normalized = summary.toLowerCase().replace(TRAILING_SUMMARY_REGEX, "");
+  if (normalized === "all looks ok" || normalized === "all looks okay") {
+    return summary;
+  }
+  return summary;
+}
+
+async function initExportTracker(page: PageLike) {
+  await page.evaluate(() => {
+    const win = window as Window & {
+      __exportTracker?: { count: number };
+      __exportTrackerOriginal?: typeof URL.createObjectURL;
+    };
+    if (win.__exportTracker) {
+      return;
+    }
+    win.__exportTracker = { count: 0 };
+    const original = URL.createObjectURL;
+    win.__exportTrackerOriginal = original;
+    URL.createObjectURL = function (...args) {
+      if (win.__exportTracker) {
+        win.__exportTracker.count += 1;
+      }
+      return original.apply(this, args as [Blob]);
+    };
+  });
+}
+
+function getExportCount(page: PageLike) {
+  return page.evaluate(() => {
+    const win = window as Window & { __exportTracker?: { count: number } };
+    return win.__exportTracker?.count ?? 0;
+  });
+}
+
+async function waitForExportCount(
+  page: PageLike,
+  targetCount: number,
+  label: string,
+  timeoutMs = 20_000
+) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if ((await getExportCount(page)) >= targetCount) {
+      return;
+    }
+    await sleep(200);
+  }
+  throw new Error(`${label} export did not trigger a download signal.`);
+}
+
+async function runExportFlow(params: {
+  page: PageLike;
+  reviewPage: {
+    screenshot: PageLike["screenshot"];
+    evaluate?: PageLike["evaluate"];
+  };
+  cfg: ReturnType<typeof loadConfig>;
+  label: string;
+  screenshotName: string;
+  prompt: string;
+  runExport: () => Promise<void>;
+  warnings: string[];
+}) {
+  const startCount = await getExportCount(params.page);
+  await params.runExport();
+  await waitForExportCount(params.page, startCount + 1, params.label);
+  const review = await captureScreenshot(
+    params.reviewPage,
+    params.cfg,
+    params.screenshotName,
+    { prompt: params.prompt }
   );
-  await sleep(500);
+  const reviewSummary = summarizeExportReview(review);
+
+  if (!review) {
+    throw new Error(
+      `${params.label} export review was not generated. Visual review: ${reviewSummary}`
+    );
+  }
+
+  if (review?.hasIssues) {
+    params.warnings.push(
+      `${params.label} export may have issues: ${review.summary}`
+    );
+  }
 }
 
 async function main() {
@@ -176,6 +282,10 @@ async function main() {
 
   try {
     const page = await getActivePage(stagehand);
+    const reviewPage = {
+      screenshot: page.screenshot.bind(page),
+      evaluate: page.evaluate?.bind(page),
+    };
     await resetBrowserState(page, cfg.baseUrl, cfg.vercelBypassSecret);
     await ensureDesktopViewport(page);
 
@@ -213,35 +323,32 @@ async function main() {
       warnings.push("Failed to verify 3 icons loaded after upload");
     }
 
-    await exportAsExcalidrawLib(stagehand);
-    const excalidrawExport = await captureScreenshot(
-      page,
-      cfg,
-      "export-excalidrawlib",
-      {
-        prompt:
-          "Did the .excalidrawlib export complete? Look for a download notification or success message.",
-      }
-    );
-    if (excalidrawExport?.hasIssues) {
-      warnings.push(
-        `Excalidraw export may have issues: ${excalidrawExport.summary}`
-      );
-    }
+    await initExportTracker(page);
 
-    await exportAsSketchyZip(stagehand);
-    const sketchyExport = await captureScreenshot(
+    await runExportFlow({
       page,
+      reviewPage,
       cfg,
-      "export-sketchy-zip",
-      {
-        prompt:
-          "Did the Sketchy SVGs ZIP export complete? Look for a download notification or success message.",
-      }
-    );
-    if (sketchyExport?.hasIssues) {
-      warnings.push(`Sketchy export may have issues: ${sketchyExport.summary}`);
-    }
+      label: "Excalidrawlib",
+      screenshotName: "export-excalidrawlib",
+      prompt:
+        "Did the .excalidrawlib export complete? Look for a download notification or success message.",
+      runExport: () =>
+        selectExportOption(page, "Export as .excalidrawlib (trace)"),
+      warnings,
+    });
+
+    await runExportFlow({
+      page,
+      reviewPage,
+      cfg,
+      label: "Sketchy ZIP",
+      screenshotName: "export-sketchy-zip",
+      prompt:
+        "Did the Sketchy SVGs ZIP export complete? Look for a download notification or success message.",
+      runExport: () => selectExportOption(page, "Export as Sketchy SVGs (ZIP)"),
+      warnings,
+    });
 
     if (warnings.length > 0) {
       console.log(`Happy path warnings:\n- ${warnings.join("\n- ")}`);
