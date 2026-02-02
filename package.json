@@ -5,6 +5,7 @@
     "packages": [
       "apps/*",
       "packages/*",
+      "tests/*",
       ".opencode"
     ],
     "catalog": {

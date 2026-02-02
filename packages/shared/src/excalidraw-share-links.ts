@@ -1,5 +1,8 @@
 import { inflate } from "pako";
 
+// NOTE(sync): Convex deploys can't import workspace packages; keep parsing logic in sync with
+// `packages/backend/convex/lib/excalidrawShareLinks.ts`.
+
 // Constants matching Excalidraw encode.ts:161-168
 const CONCAT_BUFFERS_VERSION = 1;
 const VERSION_DATAVIEW_BYTES = 4;

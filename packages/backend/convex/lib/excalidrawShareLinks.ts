@@ -1,6 +1,9 @@
 // biome-ignore lint/performance/noNamespaceImport: required for UMD module in Convex runtime
 import * as pako from "pako";
 
+// NOTE(sync): This file contains a Convex-compatible copy of the share-link parsing logic.
+// Keep in sync with `packages/shared/src/excalidraw-share-links.ts`.
+
 const CONCAT_BUFFERS_VERSION = 1;
 const VERSION_DATAVIEW_BYTES = 4;
 const NEXT_CHUNK_SIZE_DATAVIEW_BYTES = 4;
