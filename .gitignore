@@ -47,6 +47,7 @@ coverage
 .nyc_output
 tests/e2e/artifacts/
 tests/output/
+preview-artifacts/
 
 # Misc
 *.tgz

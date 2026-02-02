@@ -10,7 +10,7 @@ import { modules } from "./test.setup";
 const t = convexTest(schema, modules);
 const shareLinksApi = api.excalidrawShareLinks;
 const DECRYPTION_ERROR_PATTERN =
-  /Decryption failed|invalid key|corrupted|Invalid character/i;
+  /Decryption failed|invalid key|corrupted|Invalid character|encryption key length/i;
 
 function buildValidExcalidrawElements() {
   const updated = 1_725_000_000_000;
@@ -380,14 +380,7 @@ test("V2 parsing error message is meaningful", async () => {
   const [shareId] = created.url.split("#json=")[1]?.split(",") ?? [];
   const corruptedUrl = `https://excalidraw.com/#json=${shareId},AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=`;
 
-  try {
-    await t.action(shareLinksApi.parseShareLinkToElements, {
-      url: corruptedUrl,
-    });
-    throw new Error("Expected error to be thrown");
-  } catch (error) {
-    expect(error).toBeInstanceOf(Error);
-    const errorMessage = (error as Error).message;
-    expect(errorMessage).toMatch(DECRYPTION_ERROR_PATTERN);
-  }
+  await expect(
+    t.action(shareLinksApi.parseShareLinkToElements, { url: corruptedUrl })
+  ).rejects.toThrow(DECRYPTION_ERROR_PATTERN);
 });

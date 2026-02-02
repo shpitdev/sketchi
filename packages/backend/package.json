@@ -34,7 +34,7 @@
     "@edge-runtime/vm": "^5.0.0",
     "@sketchi/config": "workspace:*",
     "@types/node": "^24.3.0",
-    "@types/pako": "^2.0.4",
+    "@types/pako": "^1.0.7",
     "convex-test": "^0.0.41",
     "typescript": "catalog:",
     "vitest": "^4.0.18"

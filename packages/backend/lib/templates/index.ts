@@ -17,7 +17,6 @@ const TEMPLATES: Record<string, DiagramTemplate> = {
   sequence: SequenceTemplate,
 };
 
-// biome-ignore lint/performance/noBarrelFile: shared template entrypoint
 export function getTemplateForType(diagramType?: string): DiagramTemplate {
   if (!diagramType) {
     return FlowchartTemplate;

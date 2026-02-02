@@ -1,4 +1,4 @@
-import { inflate } from "pako";
+import { Inflate } from "pako";
 
 // NOTE(sync): Convex deploys can't import workspace packages; keep parsing logic in sync with
 // `packages/backend/convex/lib/excalidrawShareLinks.ts`.
@@ -8,6 +8,8 @@ const CONCAT_BUFFERS_VERSION = 1;
 const VERSION_DATAVIEW_BYTES = 4;
 const NEXT_CHUNK_SIZE_DATAVIEW_BYTES = 4;
 const IV_LENGTH_BYTES = 12;
+const MAX_COMPRESSED_BYTES = 5 * 1024 * 1024;
+const MAX_DECOMPRESSED_BYTES = 20 * 1024 * 1024;
 
 const EXCALIDRAW_SHARE_URL_PATTERN = /#json=([^,]+),(.+)$/;
 const EXCALIDRAW_GET_URL = "https://json.excalidraw.com/api/v2/";
@@ -29,6 +31,9 @@ function splitBuffers(concatenatedBuffer: Uint8Array): Uint8Array[] {
   const buffers: Uint8Array[] = [];
   let cursor = 0;
 
+  if (concatenatedBuffer.byteLength < VERSION_DATAVIEW_BYTES) {
+    throw new Error("V2 parsing failed: truncated buffer header");
+  }
   const version = new DataView(
     concatenatedBuffer.buffer,
     concatenatedBuffer.byteOffset,
@@ -43,12 +48,21 @@ function splitBuffers(concatenatedBuffer: Uint8Array): Uint8Array[] {
   cursor += VERSION_DATAVIEW_BYTES;
 
   while (cursor < concatenatedBuffer.byteLength) {
+    if (
+      cursor + NEXT_CHUNK_SIZE_DATAVIEW_BYTES >
+      concatenatedBuffer.byteLength
+    ) {
+      throw new Error("V2 parsing failed: truncated chunk header");
+    }
     const chunkSize = new DataView(
       concatenatedBuffer.buffer,
       concatenatedBuffer.byteOffset,
       concatenatedBuffer.byteLength
     ).getUint32(cursor);
     cursor += NEXT_CHUNK_SIZE_DATAVIEW_BYTES;
+    if (cursor + chunkSize > concatenatedBuffer.byteLength) {
+      throw new Error("V2 parsing failed: chunk size exceeds remaining buffer");
+    }
     buffers.push(concatenatedBuffer.slice(cursor, cursor + chunkSize));
     cursor += chunkSize;
   }
@@ -57,8 +71,33 @@ function splitBuffers(concatenatedBuffer: Uint8Array): Uint8Array[] {
 }
 
 function decompressBuffer(data: Uint8Array): Uint8Array {
+  if (data.byteLength > MAX_COMPRESSED_BYTES) {
+    throw new Error("V2 decompression failed: compressed payload too large");
+  }
   try {
-    return inflate(data);
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    const inflator = new Inflate();
+    inflator.onData = (chunk: Uint8Array) => {
+      total += chunk.length;
+      if (total > MAX_DECOMPRESSED_BYTES) {
+        inflator.err = 1;
+        inflator.msg = "decompressed payload too large";
+        return;
+      }
+      chunks.push(chunk);
+    };
+    inflator.push(data, true);
+    if (inflator.err) {
+      throw new Error(inflator.msg || "invalid compressed payload");
+    }
+    const output = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      output.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return output;
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "invalid compressed payload";
@@ -198,7 +237,22 @@ function base64UrlToBytes(str: string): Uint8Array {
 
 async function importKey(keyString: string): Promise<CryptoKey> {
   const keyBytes = base64UrlToBytes(keyString);
-  const alg = keyBytes.length === 32 ? "A256GCM" : "A128GCM";
+  let alg: "A128GCM" | "A192GCM" | "A256GCM";
+  switch (keyBytes.length) {
+    case 16:
+      alg = "A128GCM";
+      break;
+    case 24:
+      alg = "A192GCM";
+      break;
+    case 32:
+      alg = "A256GCM";
+      break;
+    default:
+      throw new Error(
+        `Invalid encryption key length: ${keyBytes.length} bytes`
+      );
+  }
   return await crypto.subtle.importKey(
     "jwk",
     { kty: "oct", k: keyString, alg },
@@ -213,7 +267,7 @@ function isBase64EncodedData(str: string): boolean {
     return false;
   }
   try {
-    const decoded = Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
+    const decoded = base64UrlToBytes(str);
     return isV2Format(decoded);
   } catch {
     return false;
@@ -238,7 +292,7 @@ export async function parseExcalidrawShareLink(
   let encryptedBuffer: Uint8Array;
 
   if (isBase64EncodedData(idOrData)) {
-    encryptedBuffer = Uint8Array.from(atob(idOrData), (c) => c.charCodeAt(0));
+    encryptedBuffer = base64UrlToBytes(idOrData);
   } else {
     const response = await fetch(`${EXCALIDRAW_GET_URL}${idOrData}`);
     if (!response.ok) {
