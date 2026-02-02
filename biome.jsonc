@@ -23,6 +23,20 @@
           }
         }
       }
+    },
+    {
+      "includes": [
+        "packages/shared/**",
+        "packages/backend/lib/templates/**",
+        "packages/backend/convex/lib/excalidrawShareLinks.ts"
+      ],
+      "linter": {
+        "rules": {
+          "performance": {
+            "noBarrelFile": "off"
+          }
+        }
+      }
     }
   ]
 }
