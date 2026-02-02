@@ -1,2 +1,2 @@
-// Shared utilities for Excalidraw share link parsing
-// Exports will be added in Task 3
+export type { ExcalidrawShareLinkPayload } from "./excalidraw-share-links";
+export { parseExcalidrawShareLink } from "./excalidraw-share-links";
