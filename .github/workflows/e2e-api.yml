@@ -106,9 +106,7 @@ jobs:
           echo "::add-mask::$BYPASS_SECRET"
           venom run tests/api/*.yml \
             --output-dir tests/api/results \
-            --format xml \
-            --format json \
-            --html-report
+            --format xml
 
       - name: Upload API test artifacts
         if: always() && steps.doc_check.outputs.run_tests == 'true'
