@@ -31,6 +31,7 @@ const generateDiagramAction = createLoggedAction<
     prompt?: string;
     profileId?: string;
     intermediate?: unknown;
+    traceId?: string;
   },
   {
     status: "success";
@@ -61,6 +62,7 @@ const modifyDiagramAction = createLoggedAction<
   {
     shareUrl: string;
     request: string;
+    traceId?: string;
     options?: {
       maxSteps?: number;
       timeoutMs?: number;
@@ -93,6 +95,7 @@ const modifyDiagramAction = createLoggedAction<
   }
 >("diagrams.modifyDiagram", {
   formatArgs: (args) => ({
+    traceId: args.traceId ?? null,
     requestLength: args.request.length,
     shareUrl: args.shareUrl,
     options: args.options ?? null,
@@ -106,6 +109,7 @@ const modifyDiagramAction = createLoggedAction<
 const parseDiagramAction = createLoggedAction<
   {
     shareUrl: string;
+    traceId?: string;
   },
   {
     elements: unknown[];
@@ -118,7 +122,10 @@ const parseDiagramAction = createLoggedAction<
     };
   }
 >("diagrams.parseDiagram", {
-  formatArgs: (args) => ({ shareUrl: args.shareUrl }),
+  formatArgs: (args) => ({
+    shareUrl: args.shareUrl,
+    traceId: args.traceId ?? null,
+  }),
   formatResult: (result) => ({
     elementCount: result.stats.elementCount,
     nodeCount: result.stats.nodeCount,
@@ -130,6 +137,7 @@ const shareDiagramAction = createLoggedAction<
   {
     elements: unknown[];
     appState?: Record<string, unknown>;
+    traceId?: string;
   },
   {
     url: string;
@@ -140,6 +148,7 @@ const shareDiagramAction = createLoggedAction<
   formatArgs: (args) => ({
     elementsCount: Array.isArray(args.elements) ? args.elements.length : 0,
     appStateKeys: Object.keys(args.appState ?? {}),
+    traceId: args.traceId ?? null,
   }),
   formatResult: (result) => ({ shareId: result.shareId }),
 });
@@ -149,6 +158,7 @@ export const generateDiagram = generateDiagramAction({
     prompt: v.optional(v.string()),
     profileId: v.optional(v.string()),
     intermediate: v.optional(v.any()),
+    traceId: v.optional(v.string()),
   },
   handler: async (_ctx, args) => {
     if (!(args.prompt || args.intermediate)) {
@@ -156,7 +166,7 @@ export const generateDiagram = generateDiagramAction({
     }
 
     const startedAt = Date.now();
-    let traceId: string = crypto.randomUUID();
+    let traceId: string = args.traceId ?? crypto.randomUUID();
 
     let intermediate = args.intermediate;
     let iterations = 0;
@@ -165,6 +175,7 @@ export const generateDiagram = generateDiagramAction({
     if (!intermediate) {
       const result = await generateIntermediate(args.prompt ?? "", {
         profileId: args.profileId,
+        traceId,
       });
       intermediate = result.intermediate;
       iterations = result.iterations;
@@ -216,6 +227,7 @@ export const modifyDiagram = modifyDiagramAction({
   args: {
     shareUrl: v.string(),
     request: v.string(),
+    traceId: v.optional(v.string()),
     options: v.optional(
       v.object({
         maxSteps: v.optional(v.number()),
@@ -225,7 +237,7 @@ export const modifyDiagram = modifyDiagramAction({
     ),
   },
   handler: async (_ctx, args) => {
-    const traceId = crypto.randomUUID();
+    const traceId = args.traceId ?? crypto.randomUUID();
     const parsed = await parseExcalidrawShareLink(args.shareUrl);
     const modified = await modifyElementsWithAgent(
       {
@@ -256,6 +268,7 @@ export const modifyDiagram = modifyDiagramAction({
 export const parseDiagram = parseDiagramAction({
   args: {
     shareUrl: v.string(),
+    traceId: v.optional(v.string()),
   },
   handler: async (_ctx, args) => {
     const parsed = await parseExcalidrawShareLink(args.shareUrl);
@@ -274,6 +287,7 @@ export const shareDiagram = shareDiagramAction({
   args: {
     elements: v.array(v.any()),
     appState: v.optional(v.any()),
+    traceId: v.optional(v.string()),
   },
   handler: async (_ctx, args) => {
     return await createExcalidrawShareLink(

@@ -1,4 +1,4 @@
-import { os } from "@orpc/server";
+import { ORPCError, os } from "@orpc/server";
 import { JSON_SCHEMA_REGISTRY } from "@orpc/zod/zod4";
 import { api } from "@sketchi/backend/convex/_generated/api";
 import { ConvexHttpClient } from "convex/browser";
@@ -13,13 +13,102 @@ const convex = new ConvexHttpClient(convexUrl);
 
 export interface OrpcContext {
   convex: ConvexHttpClient;
+  traceId: string;
 }
 
-export function createOrpcContext(): OrpcContext {
-  return { convex };
+function createTraceId(): string {
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  );
+}
+
+export function createOrpcContext(_request: Request): OrpcContext {
+  return { convex, traceId: createTraceId() };
 }
 
 const orpc = os.$context<OrpcContext>();
+
+type PublicErrorReason =
+  | "AI_NO_OUTPUT"
+  | "AI_PROVIDER_ERROR"
+  | "AI_PARSE_ERROR"
+  | "AI_VALIDATION_FAILED"
+  | "UPSTREAM_ERROR"
+  | "UNKNOWN";
+
+function classifyError(error: unknown): {
+  reason: PublicErrorReason;
+  message: string;
+  name?: string;
+} {
+  if (error instanceof Error) {
+    const message = error.message;
+    const name = error.name;
+    const lower = message.toLowerCase();
+
+    if (lower.includes("no output generated")) {
+      return { reason: "AI_NO_OUTPUT", message, name };
+    }
+    if (
+      lower.includes("failed to process successful response") ||
+      lower.includes("invalid json") ||
+      lower.includes("json parse")
+    ) {
+      return { reason: "AI_PARSE_ERROR", message, name };
+    }
+    if (lower.includes("validation failed after")) {
+      return { reason: "AI_VALIDATION_FAILED", message, name };
+    }
+    if (
+      lower.includes("provider returned error") ||
+      lower.includes("openrouter") ||
+      lower.includes("cloudflare") ||
+      lower.includes("502") ||
+      lower.includes("503") ||
+      lower.includes("504") ||
+      lower.includes("timeout") ||
+      lower.includes("rate limit") ||
+      lower.includes("429")
+    ) {
+      return { reason: "AI_PROVIDER_ERROR", message, name };
+    }
+
+    if (
+      lower.includes("excalidraw") ||
+      lower.includes("json.excalidraw.com") ||
+      lower.includes("failed to fetch")
+    ) {
+      return { reason: "UPSTREAM_ERROR", message, name };
+    }
+
+    return { reason: "UNKNOWN", message, name };
+  }
+
+  return { reason: "UNKNOWN", message: String(error) };
+}
+
+function throwInternalError(params: {
+  traceId: string;
+  stage: string;
+  action: string;
+  error: unknown;
+  hint?: string;
+}): never {
+  const { reason, message, name } = classifyError(params.error);
+  throw new ORPCError("INTERNAL_SERVER_ERROR", {
+    message: `${params.action} failed (${reason}). traceId=${params.traceId}`,
+    data: {
+      traceId: params.traceId,
+      stage: params.stage,
+      action: params.action,
+      reason,
+      errorName: name,
+      errorMessage: message.slice(0, 600),
+      hint: params.hint,
+    },
+  });
+}
 
 const shareLinkSchema = z.object({
   url: z.string().url(),
@@ -75,6 +164,7 @@ const generateInputSchema = z
     prompt: z.string().min(1).max(10_000).optional(),
     profileId: z.string().optional(),
     intermediate: z.any().optional(),
+    traceId: z.string().optional(),
   })
   .refine((value) => Boolean(value.prompt || value.intermediate), {
     message: "prompt or intermediate is required",
@@ -150,6 +240,7 @@ const parseOutputSchema = z.object({
 const modifyInputSchema = z.object({
   shareUrl: z.string().url(),
   request: z.string().min(1),
+  traceId: z.string().optional(),
   options: z
     .object({
       maxSteps: z.number().optional(),
@@ -170,6 +261,7 @@ JSON_SCHEMA_REGISTRY.add(modifyInputSchema, {
 
 const parseInputSchema = z.object({
   shareUrl: z.string().url(),
+  traceId: z.string().optional(),
 });
 
 JSON_SCHEMA_REGISTRY.add(parseInputSchema, {
@@ -179,6 +271,7 @@ JSON_SCHEMA_REGISTRY.add(parseInputSchema, {
 const shareInputSchema = z.object({
   elements: z.array(z.any()),
   appState: z.record(z.string(), z.any()).optional(),
+  traceId: z.string().optional(),
 });
 
 JSON_SCHEMA_REGISTRY.add(shareInputSchema, {
@@ -191,28 +284,81 @@ export const appRouter = {
     .input(generateInputSchema)
     .output(generateOutputSchema)
     .handler(async ({ input, context }) => {
-      return await context.convex.action(api.diagrams.generateDiagram, input);
+      const traceId = input.traceId ?? context.traceId;
+      try {
+        return await context.convex.action(api.diagrams.generateDiagram, {
+          ...input,
+          traceId,
+        });
+      } catch (error) {
+        throwInternalError({
+          traceId,
+          stage: "convex.action",
+          action: "diagrams.generateDiagram",
+          error,
+          hint: "If this is intermittent, retry; if persistent, switch model or check upstream/provider status.",
+        });
+      }
     }),
   diagramsModify: orpc
     .route({ method: "POST", path: "/diagrams/modify" })
     .input(modifyInputSchema)
     .output(modifyOutputSchema)
     .handler(async ({ input, context }) => {
-      return await context.convex.action(api.diagrams.modifyDiagram, input);
+      const traceId = input.traceId ?? context.traceId;
+      try {
+        return await context.convex.action(api.diagrams.modifyDiagram, {
+          ...input,
+          traceId,
+        });
+      } catch (error) {
+        throwInternalError({
+          traceId,
+          stage: "convex.action",
+          action: "diagrams.modifyDiagram",
+          error,
+        });
+      }
     }),
   diagramsParse: orpc
     .route({ method: "GET", path: "/diagrams/parse" })
     .input(parseInputSchema)
     .output(parseOutputSchema)
     .handler(async ({ input, context }) => {
-      return await context.convex.action(api.diagrams.parseDiagram, input);
+      const traceId = input.traceId ?? context.traceId;
+      try {
+        return await context.convex.action(api.diagrams.parseDiagram, {
+          ...input,
+          traceId,
+        });
+      } catch (error) {
+        throwInternalError({
+          traceId,
+          stage: "convex.action",
+          action: "diagrams.parseDiagram",
+          error,
+        });
+      }
     }),
   diagramsShare: orpc
     .route({ method: "POST", path: "/diagrams/share" })
     .input(shareInputSchema)
     .output(shareLinkSchema)
     .handler(async ({ input, context }) => {
-      return await context.convex.action(api.diagrams.shareDiagram, input);
+      const traceId = input.traceId ?? context.traceId;
+      try {
+        return await context.convex.action(api.diagrams.shareDiagram, {
+          ...input,
+          traceId,
+        });
+      } catch (error) {
+        throwInternalError({
+          traceId,
+          stage: "convex.action",
+          action: "diagrams.shareDiagram",
+          error,
+        });
+      }
     }),
 };
 

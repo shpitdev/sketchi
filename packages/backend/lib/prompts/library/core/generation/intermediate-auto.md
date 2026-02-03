@@ -21,6 +21,12 @@ Output JSON that matches this shape:
   "graphOptions": { "diagramType": "...", "layout": { "direction": "TB|LR|BT|RL" } }
 }
 
+Strict output requirements:
+- Your final response must be a single valid JSON object (no markdown, no backticks, no extra text).
+- After drafting the JSON object, call the validateIntermediate tool with it.
+- If validateIntermediate returns ok=false, fix the issues and call validateIntermediate again.
+- If validateIntermediate returns ok=true, respond with the same JSON object as your final output (no tool call).
+
 Available diagram types:
 - flowchart: processes, workflows, decision trees, algorithms
 - mindmap: brainstorming, idea organization, topic breakdown

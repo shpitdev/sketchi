@@ -6,7 +6,7 @@ const handler = new OpenAPIHandler(appRouter);
 async function handleRequest(request: Request) {
   const { response } = await handler.handle(request, {
     prefix: "/api",
-    context: createOrpcContext(),
+    context: createOrpcContext(request),
   });
 
   return response ?? new Response("Not Found", { status: 404 });
