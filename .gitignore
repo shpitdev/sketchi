@@ -60,9 +60,11 @@ temp
 /.claude/settings.json
 /.claude/settings.json.bak
 /.claude/settings.local.json
+/.codex/environments/
 
 # Opencode plugin
 /sketchi/png/
+/sketchi/*.png
 /sketchi/opencode-logs/
 /sketchi/opencode-logs*/
 opencode-logs/
