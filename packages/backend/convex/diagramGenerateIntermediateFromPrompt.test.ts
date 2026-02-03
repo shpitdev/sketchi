@@ -299,9 +299,10 @@ describe.sequential("prompt to intermediate E2E", () => {
     "full pipeline across prompts",
     async () => {
       try {
-        const results = await Promise.all(
-          SCENARIOS.map((scenario) => runScenario(scenario))
-        );
+        const results: ScenarioResult[] = [];
+        for (const scenario of SCENARIOS) {
+          results.push(await runScenario(scenario));
+        }
 
         await writeSummary(results);
 

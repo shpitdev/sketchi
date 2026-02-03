@@ -12,7 +12,7 @@ import { action } from "./_generated/server";
 const DEFAULT_MAX_STEPS = 5;
 const MAX_TIMEOUT_MS = 240_000;
 const DEFAULT_MODEL =
-  process.env.MODEL_NAME?.trim() || "google/gemini-2.5-flash";
+  process.env.MODEL_NAME?.trim() || "google/gemini-3-flash-preview";
 
 const MODIFICATION_SYSTEM_PROMPT = `You modify existing Excalidraw diagrams by producing an element-level diff.
 

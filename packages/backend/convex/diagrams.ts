@@ -31,6 +31,7 @@ const generateDiagramAction = createLoggedAction<
     prompt?: string;
     profileId?: string;
     intermediate?: unknown;
+    traceId?: string;
   },
   {
     status: "success";
@@ -149,6 +150,7 @@ export const generateDiagram = generateDiagramAction({
     prompt: v.optional(v.string()),
     profileId: v.optional(v.string()),
     intermediate: v.optional(v.any()),
+    traceId: v.optional(v.string()),
   },
   handler: async (_ctx, args) => {
     if (!(args.prompt || args.intermediate)) {
@@ -156,7 +158,7 @@ export const generateDiagram = generateDiagramAction({
     }
 
     const startedAt = Date.now();
-    let traceId: string = crypto.randomUUID();
+    let traceId: string = args.traceId ?? crypto.randomUUID();
 
     let intermediate = args.intermediate;
     let iterations = 0;
@@ -165,6 +167,7 @@ export const generateDiagram = generateDiagramAction({
     if (!intermediate) {
       const result = await generateIntermediate(args.prompt ?? "", {
         profileId: args.profileId,
+        traceId,
       });
       intermediate = result.intermediate;
       iterations = result.iterations;
