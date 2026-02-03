@@ -82,6 +82,17 @@ testcases:
           - result.bodyjson.status ShouldEqual "success"
           - result.bodyjson.shareLink.url ShouldContainSubstring "https://excalidraw.com/#json="
 
+      - type: exec
+        script: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --retry-all-errors "https://json.excalidraw.com/api/v2/{{.generate_parse_flow.share_id}}" | head -c 4 | od -An -t x1 | tr -d ' \n'
+        vars:
+          v2_magic:
+            from: result.systemout
+        assertions:
+          - result.code ShouldEqual 0
+          - result.systemout ShouldEqual "00000001"
+
       - type: http
         method: GET
         url: "{{.target_url}}/api/diagrams/parse?shareUrl={{.encoded_share_prefix}}{{.generate_parse_flow.share_id}}%2C{{.generate_parse_flow.encryption_key}}"
@@ -132,10 +143,24 @@ testcases:
             "request": "node-1_text text = 'Updated Start' node-1_text originalText = 'Updated Start'",
             "options": { "preferExplicitEdits": true }
           }
+        vars:
+          modified_share_id:
+            from: result.bodyjson.shareLink.shareId
         assertions:
           - result.statuscode ShouldEqual 200
           - result.bodyjson.status ShouldEqual "success"
           - result.bodyjson.shareLink.url ShouldContainSubstring "https://excalidraw.com/#json="
+
+      - type: exec
+        script: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --retry-all-errors "https://json.excalidraw.com/api/v2/{{.modify_flow.modified_share_id}}" | head -c 4 | od -An -t x1 | tr -d ' \n'
+        vars:
+          v2_magic:
+            from: result.systemout
+        assertions:
+          - result.code ShouldEqual 0
+          - result.systemout ShouldEqual "00000001"
 
   - name: share_flow
     steps:
@@ -179,10 +204,24 @@ testcases:
             ],
             "appState": {}
           }
+        vars:
+          share_id:
+            from: result.bodyjson.shareId
         assertions:
           - result.statuscode ShouldEqual 200
           - result.bodyjson.url ShouldContainSubstring "https://excalidraw.com/#json="
           - result.bodyjson.shareId ShouldNotBeEmpty
+
+      - type: exec
+        script: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --retry-all-errors "https://json.excalidraw.com/api/v2/{{.share_flow.share_id}}" | head -c 4 | od -An -t x1 | tr -d ' \n'
+        vars:
+          v2_magic:
+            from: result.systemout
+        assertions:
+          - result.code ShouldEqual 0
+          - result.systemout ShouldEqual "00000001"
 
   - name: parse_v2_share_link_regression
     steps:

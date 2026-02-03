@@ -293,6 +293,10 @@ test("share link actions round-trip elements", async () => {
     `https://json.excalidraw.com/api/v2/${created.shareId}`
   );
   expect(rawFetch.ok).toBe(true);
+  const bytes = new Uint8Array(await rawFetch.arrayBuffer());
+  expect(
+    new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0)
+  ).toBe(1);
 
   const parsed = await t.action(shareLinksApi.parseShareLinkToElements, {
     url: created.url,
@@ -355,6 +359,15 @@ test("parses V2 format share link", async () => {
     elements,
     appState,
   });
+
+  const rawFetch = await fetch(
+    `https://json.excalidraw.com/api/v2/${created.shareId}`
+  );
+  expect(rawFetch.ok).toBe(true);
+  const bytes = new Uint8Array(await rawFetch.arrayBuffer());
+  expect(
+    new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0)
+  ).toBe(1);
 
   const result = await t.action(shareLinksApi.parseShareLinkToElements, {
     url: created.url,
