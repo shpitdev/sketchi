@@ -1,4 +1,4 @@
-import { Inflate } from "pako";
+import pako from "pako";
 
 // NOTE(sync): This file contains a Convex-compatible copy of the share-link parsing logic.
 // Keep in sync with `packages/shared/src/excalidraw-share-links.ts`.
@@ -82,7 +82,7 @@ function decompressBuffer(data: Uint8Array): Uint8Array {
   try {
     const chunks: Uint8Array[] = [];
     let total = 0;
-    const inflator = new Inflate();
+    const inflator = new pako.Inflate();
     inflator.onData = (chunk: Uint8Array) => {
       total += chunk.length;
       if (total > MAX_DECOMPRESSED_BYTES) {
