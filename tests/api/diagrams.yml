@@ -84,8 +84,11 @@ testcases:
 
       - type: exec
         script: |
-          set -euo pipefail
-          curl -fsSL --retry 3 --retry-all-errors "https://json.excalidraw.com/api/v2/{{.generate_parse_flow.share_id}}" | head -c 4 | od -An -t x1 | tr -d ' \n'
+          set -e
+          tmpfile="$(mktemp)"
+          curl -fsSL --retry 3 --retry-all-errors -o "$tmpfile" "https://json.excalidraw.com/api/v2/{{.generate_parse_flow.share_id}}"
+          od -An -t x1 -N 4 "$tmpfile" | tr -d ' \n'
+          rm -f "$tmpfile"
         vars:
           v2_magic:
             from: result.systemout
@@ -153,8 +156,11 @@ testcases:
 
       - type: exec
         script: |
-          set -euo pipefail
-          curl -fsSL --retry 3 --retry-all-errors "https://json.excalidraw.com/api/v2/{{.modify_flow.modified_share_id}}" | head -c 4 | od -An -t x1 | tr -d ' \n'
+          set -e
+          tmpfile="$(mktemp)"
+          curl -fsSL --retry 3 --retry-all-errors -o "$tmpfile" "https://json.excalidraw.com/api/v2/{{.modify_flow.modified_share_id}}"
+          od -An -t x1 -N 4 "$tmpfile" | tr -d ' \n'
+          rm -f "$tmpfile"
         vars:
           v2_magic:
             from: result.systemout
@@ -214,8 +220,11 @@ testcases:
 
       - type: exec
         script: |
-          set -euo pipefail
-          curl -fsSL --retry 3 --retry-all-errors "https://json.excalidraw.com/api/v2/{{.share_flow.share_id}}" | head -c 4 | od -An -t x1 | tr -d ' \n'
+          set -e
+          tmpfile="$(mktemp)"
+          curl -fsSL --retry 3 --retry-all-errors -o "$tmpfile" "https://json.excalidraw.com/api/v2/{{.share_flow.share_id}}"
+          od -An -t x1 -N 4 "$tmpfile" | tr -d ' \n'
+          rm -f "$tmpfile"
         vars:
           v2_magic:
             from: result.systemout
