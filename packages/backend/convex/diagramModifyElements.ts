@@ -8,6 +8,7 @@ import {
   validateElements,
 } from "../lib/diagram-modification";
 import { action } from "./_generated/server";
+import { hashString, logEvent } from "./lib/observability";
 
 const DEFAULT_MAX_STEPS = 5;
 const MAX_TIMEOUT_MS = 240_000;
@@ -101,6 +102,15 @@ interface ModificationTracking {
   lastIssues: DiagramIssue[];
   stepCount: number;
   tokenCount: number;
+  lastStepAt: number;
+}
+
+type LogEventArgs = Parameters<typeof logEvent>;
+
+function logEventSafely(event: LogEventArgs[0], options?: LogEventArgs[1]) {
+  logEvent(event, options).catch(() => {
+    // Ignore logging failures to avoid breaking the main flow.
+  });
 }
 
 function summarizeElements(elements: Record<string, unknown>[]) {
@@ -537,8 +547,26 @@ function createModificationAgent(params: {
       stopOnSuccess,
     ],
     onStepFinish: ({ usage, toolCalls }) => {
-      params.tracking.stepCount += 1;
+      const now = Date.now();
+      const stepIndex = params.tracking.stepCount + 1;
+      const stepDurationMs = now - params.tracking.lastStepAt;
+      params.tracking.lastStepAt = now;
+      params.tracking.stepCount = stepIndex;
       params.tracking.tokenCount += usage.totalTokens ?? 0;
+      logEventSafely({
+        traceId: params.traceId,
+        actionName: "diagramModifyElements",
+        component: "ai",
+        op: "ai.step",
+        stage: "modify.step",
+        status: "success",
+        modelId: DEFAULT_MODEL,
+        provider: "openrouter",
+        step: stepIndex,
+        stepDurationMs,
+        toolCalls: toolCalls?.length ?? 0,
+        tokens: usage.totalTokens ?? 0,
+      });
       console.log("[ai.modifyDiagram.step]", {
         traceId: params.traceId,
         toolCalls: toolCalls?.length ?? 0,
@@ -566,6 +594,19 @@ async function runAgentAttempts(params: {
     }
 
     try {
+      await logEvent({
+        traceId: params.traceId,
+        actionName: "diagramModifyElements",
+        component: "ai",
+        op: "ai.attempt",
+        stage: "modify.attempt",
+        status: "success",
+        attempt: attempt + 1,
+        maxAttempts: 2,
+        timeoutMs: remaining,
+        modelId: DEFAULT_MODEL,
+        provider: "openrouter",
+      });
       const result = await params.agent.generate({
         prompt: params.prompt,
         timeout: remaining,
@@ -585,10 +626,183 @@ async function runAgentAttempts(params: {
       };
     } catch (error) {
       lastError = error;
+      await logEvent(
+        {
+          traceId: params.traceId,
+          actionName: "diagramModifyElements",
+          component: "ai",
+          op: "ai.attempt",
+          stage: "modify.attempt",
+          status: "failed",
+          attempt: attempt + 1,
+          maxAttempts: 2,
+          modelId: DEFAULT_MODEL,
+          provider: "openrouter",
+          errorName: error instanceof Error ? error.name : undefined,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        { level: "warning" }
+      );
     }
   }
 
   return { lastError };
+}
+
+async function logExplicitResult(
+  traceId: string,
+  explicitResult: DiagramModifyResult | null
+): Promise<DiagramModifyResult | null> {
+  if (!explicitResult) {
+    return null;
+  }
+
+  const level = explicitResult.status === "success" ? "info" : "error";
+  await logEvent(
+    {
+      traceId,
+      actionName: "diagramModifyElements",
+      op: "pipeline.complete",
+      stage: "explicit",
+      status: explicitResult.status === "success" ? "success" : "failed",
+      durationMs: explicitResult.stats.durationMs,
+      iterations: explicitResult.stats.iterations,
+      tokens: explicitResult.stats.tokens,
+      elementCount: explicitResult.elements?.length ?? 0,
+      issuesCount: explicitResult.issues?.length ?? 0,
+    },
+    { level }
+  );
+
+  return explicitResult;
+}
+
+async function logOutcomeResult(
+  traceId: string,
+  outcome?: DiagramModifyResult
+): Promise<DiagramModifyResult | null> {
+  if (!outcome) {
+    return null;
+  }
+
+  const level = outcome.status === "success" ? "info" : "error";
+  await logEvent(
+    {
+      traceId,
+      actionName: "diagramModifyElements",
+      op: "pipeline.complete",
+      stage: "complete",
+      status: outcome.status === "success" ? "success" : "failed",
+      durationMs: outcome.stats.durationMs,
+      iterations: outcome.stats.iterations,
+      tokens: outcome.stats.tokens,
+      issuesCount: outcome.issues?.length ?? 0,
+      elementCount: outcome.elements?.length ?? 0,
+    },
+    { level }
+  );
+
+  return outcome;
+}
+
+async function logInvalidElementsFailure(
+  traceId: string,
+  issues: DiagramIssue[],
+  startedAt: number
+): Promise<DiagramModifyResult> {
+  const stats = buildStatsResult(startedAt, traceId, 0, 0);
+  await logEvent(
+    {
+      traceId,
+      actionName: "diagramModifyElements",
+      op: "pipeline.complete",
+      stage: "validate",
+      status: "failed",
+      durationMs: stats.durationMs,
+      issuesCount: issues.length,
+    },
+    { level: "error" }
+  );
+  return buildFailureResult("invalid-elements", issues, stats);
+}
+
+async function logFallbackSuccess(params: {
+  traceId: string;
+  startedAt: number;
+  tracking: ModificationTracking;
+  appState?: Record<string, unknown>;
+}): Promise<DiagramModifyResult> {
+  const stats = buildStatsResult(
+    params.startedAt,
+    params.traceId,
+    params.tracking.stepCount,
+    params.tracking.tokenCount
+  );
+  await logEvent({
+    traceId: params.traceId,
+    actionName: "diagramModifyElements",
+    op: "pipeline.complete",
+    stage: "complete",
+    status: "success",
+    durationMs: stats.durationMs,
+    iterations: stats.iterations,
+    tokens: stats.tokens,
+    elementCount: params.tracking.lastSuccessful?.elements.length ?? 0,
+  });
+  return buildSuccessResult({
+    elements: params.tracking.lastSuccessful?.elements ?? [],
+    appState: params.appState,
+    diff: params.tracking.lastSuccessful?.diff,
+    changes: params.tracking.lastSuccessful?.changes,
+    stats,
+  });
+}
+
+function buildErrorIssues(
+  tracking: ModificationTracking,
+  lastError?: unknown
+): DiagramIssue[] {
+  if (tracking.lastIssues.length > 0) {
+    return tracking.lastIssues;
+  }
+  return [
+    {
+      code: "error",
+      message:
+        lastError instanceof Error
+          ? lastError.message
+          : String(lastError ?? "Unknown error"),
+    },
+  ];
+}
+
+async function logTerminalFailure(params: {
+  traceId: string;
+  startedAt: number;
+  tracking: ModificationTracking;
+  issues: DiagramIssue[];
+}): Promise<DiagramModifyResult> {
+  const stats = buildStatsResult(
+    params.startedAt,
+    params.traceId,
+    params.tracking.stepCount,
+    params.tracking.tokenCount
+  );
+  await logEvent(
+    {
+      traceId: params.traceId,
+      actionName: "diagramModifyElements",
+      op: "pipeline.complete",
+      stage: "complete",
+      status: "failed",
+      durationMs: stats.durationMs,
+      iterations: stats.iterations,
+      tokens: stats.tokens,
+      issuesCount: params.issues.length,
+    },
+    { level: "error" }
+  );
+  return buildFailureResult("error", params.issues, stats);
 }
 
 export async function modifyElementsWithAgent(
@@ -608,13 +822,25 @@ export async function modifyElementsWithAgent(
   const elements = Array.isArray(args.elements)
     ? (args.elements as Record<string, unknown>[])
     : [];
+  const requestLength = args.request.length;
+  const requestHash = hashString(args.request);
+
+  await logEvent({
+    traceId,
+    actionName: "diagramModifyElements",
+    op: "pipeline.start",
+    stage: "input",
+    status: "success",
+    requestLength,
+    requestHash,
+    elementCount: elements.length,
+  });
   const elementIssues = validateElements(
     elements as unknown as Parameters<typeof validateElements>[0]
   );
 
   if (elementIssues.length > 0) {
-    const stats = buildStatsResult(startedAt, traceId, 0, 0);
-    return buildFailureResult("invalid-elements", elementIssues, stats);
+    return await logInvalidElementsFailure(traceId, elementIssues, startedAt);
   }
 
   const elementIds = new Set(elements.map((element) => String(element.id)));
@@ -630,8 +856,9 @@ export async function modifyElementsWithAgent(
     startedAt,
     traceId,
   });
-  if (explicitResult) {
-    return explicitResult;
+  const explicitLogged = await logExplicitResult(traceId, explicitResult);
+  if (explicitLogged) {
+    return explicitLogged;
   }
 
   const tracking: ModificationTracking = {
@@ -639,6 +866,7 @@ export async function modifyElementsWithAgent(
     lastIssues: [],
     stepCount: 0,
     tokenCount: 0,
+    lastStepAt: Date.now(),
   };
   const validationTool = createValidationTool({
     elements,
@@ -664,45 +892,27 @@ export async function modifyElementsWithAgent(
     appState: args.appState,
   });
 
-  if (outcome) {
-    return outcome;
+  const outcomeLogged = await logOutcomeResult(traceId, outcome);
+  if (outcomeLogged) {
+    return outcomeLogged;
   }
 
   if (tracking.lastSuccessful) {
-    const stats = buildStatsResult(
-      startedAt,
+    return await logFallbackSuccess({
       traceId,
-      tracking.stepCount,
-      tracking.tokenCount
-    );
-    return buildSuccessResult({
-      elements: tracking.lastSuccessful.elements,
+      startedAt,
+      tracking,
       appState: args.appState,
-      diff: tracking.lastSuccessful.diff,
-      changes: tracking.lastSuccessful.changes,
-      stats,
     });
   }
 
-  const errorIssues =
-    tracking.lastIssues.length > 0
-      ? tracking.lastIssues
-      : [
-          {
-            code: "error",
-            message:
-              lastError instanceof Error
-                ? lastError.message
-                : String(lastError ?? "Unknown error"),
-          },
-        ];
-  const stats = buildStatsResult(
-    startedAt,
+  const errorIssues = buildErrorIssues(tracking, lastError);
+  return await logTerminalFailure({
     traceId,
-    tracking.stepCount,
-    tracking.tokenCount
-  );
-  return buildFailureResult("error", errorIssues, stats);
+    startedAt,
+    tracking,
+    issues: errorIssues,
+  });
 }
 
 export const diagramModifyElements = action({

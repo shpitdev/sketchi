@@ -1,10 +1,13 @@
+import { createTraceId } from "@sketchi/shared";
 import type { PropertyValidators, Validator } from "convex/values";
 import type { ActionCtx } from "../_generated/server";
 import { action } from "../_generated/server";
+import { logEvent } from "./observability";
 
 export interface LoggingOptions<Args, Result> {
   formatArgs?: (args: Args) => Record<string, unknown>;
   formatResult?: (result: Result) => Record<string, unknown>;
+  getTraceId?: (args: Args, result?: Result) => string | undefined;
 }
 
 interface ActionDefinition<Args extends object, Result> {
@@ -13,11 +16,43 @@ interface ActionDefinition<Args extends object, Result> {
   handler: (ctx: ActionCtx, args: Args) => Promise<Result> | Result;
 }
 
+function resolveTraceId<Args extends object>(
+  args: Args,
+  getTraceId?: (args: Args, result?: unknown) => string | undefined
+): string {
+  const fromCallback = getTraceId?.(args);
+  if (fromCallback) {
+    return fromCallback;
+  }
+  const direct = (args as { traceId?: unknown }).traceId;
+  if (typeof direct === "string") {
+    return direct;
+  }
+  return createTraceId();
+}
+
+function formatArgsForLog<Args extends object>(
+  args: Args,
+  formatArgs?: (args: Args) => Record<string, unknown>
+): Record<string, unknown> {
+  if (formatArgs) {
+    return formatArgs(args);
+  }
+  return { _redacted: true, keys: Object.keys(args ?? {}) };
+}
+
+function formatResultForLog<Result>(
+  result: Result,
+  formatResult?: (result: Result) => Record<string, unknown>
+): Record<string, unknown> | undefined {
+  return formatResult ? formatResult(result) : undefined;
+}
+
 export function createLoggedAction<Args extends object, Result>(
   name: string,
   options: LoggingOptions<Args, Result> = {}
 ) {
-  const { formatArgs, formatResult } = options;
+  const { formatArgs, formatResult, getTraceId } = options;
 
   return (definition: ActionDefinition<Args, Result>) => {
     const handler = definition.handler as (
@@ -30,28 +65,45 @@ export function createLoggedAction<Args extends object, Result>(
       handler: async (ctx, args) => {
         const start = Date.now();
         const safeArgs = (args ?? {}) as Args;
-        const loggedArgs = formatArgs
-          ? formatArgs(safeArgs)
-          : { _redacted: true, keys: Object.keys(safeArgs) };
-        console.log("[convex.action.start]", {
-          name,
-          args: loggedArgs,
+        const loggedArgs = formatArgsForLog(safeArgs, formatArgs);
+        const traceId = resolveTraceId(safeArgs, getTraceId);
+        await logEvent({
+          traceId,
+          actionName: name,
+          op: "action.start",
+          stage: "convex.action",
+          ...loggedArgs,
         });
 
         try {
           const result = (await handler(ctx, args as Args)) as Result;
-          console.log("[convex.action.success]", {
-            name,
+          const loggedResult = formatResultForLog(result, formatResult);
+          await logEvent({
+            traceId,
+            actionName: name,
+            op: "action.complete",
+            stage: "convex.action",
+            status: "success",
             durationMs: Date.now() - start,
-            result: formatResult ? formatResult(result) : undefined,
+            ...(loggedResult ?? {}),
           });
           return result;
         } catch (error) {
-          console.error("[convex.action.error]", {
-            name,
-            durationMs: Date.now() - start,
-            error: error instanceof Error ? error.message : String(error),
-          });
+          const message =
+            error instanceof Error ? error.message : String(error);
+          await logEvent(
+            {
+              traceId,
+              actionName: name,
+              op: "action.error",
+              stage: "convex.action",
+              status: "failed",
+              durationMs: Date.now() - start,
+              errorName: error instanceof Error ? error.name : undefined,
+              errorMessage: message,
+            },
+            { level: "error" }
+          );
           throw error;
         }
       },

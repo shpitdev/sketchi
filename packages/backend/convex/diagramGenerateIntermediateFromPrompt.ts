@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { generateIntermediate } from "../lib/agents";
 import { createLoggedAction } from "./lib/logging";
+import { hashString, logEvent } from "./lib/observability";
 
 interface GenerateIntermediateFromPromptArgs {
   prompt: string;
@@ -38,10 +39,33 @@ export const generateIntermediateFromPrompt =
     },
     handler: async (_ctx, args) => {
       const traceId = args.traceId ?? crypto.randomUUID();
+      await logEvent({
+        traceId,
+        actionName: "diagramGenerateIntermediateFromPrompt",
+        op: "pipeline.start",
+        stage: "input",
+        status: "success",
+        promptLength: args.prompt.length,
+        promptHash: hashString(args.prompt),
+        profileId: args.profileId ?? null,
+      });
 
       const result = await generateIntermediate(args.prompt, {
         profileId: args.profileId,
         traceId,
+      });
+
+      await logEvent({
+        traceId: result.traceId,
+        actionName: "diagramGenerateIntermediateFromPrompt",
+        op: "pipeline.complete",
+        stage: "intermediate",
+        status: "success",
+        durationMs: result.durationMs,
+        iterations: result.iterations,
+        tokens: result.tokens,
+        intermediateNodeCount: result.intermediate.nodes.length,
+        intermediateEdgeCount: result.intermediate.edges.length,
       });
 
       console.log(

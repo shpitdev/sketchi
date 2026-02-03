@@ -11,9 +11,11 @@ import { simplifyDiagramElements } from "../lib/diagram-simplify";
 import { modifyElementsWithAgent } from "./diagramModifyElements";
 import {
   createExcalidrawShareLink,
-  parseExcalidrawShareLink,
+  detectShareUrlType,
+  parseExcalidrawShareLinkWithMetadata,
 } from "./lib/excalidrawShareLinks";
 import { createLoggedAction } from "./lib/logging";
+import { hashString, logEvent } from "./lib/observability";
 
 interface GenerateStats {
   traceId: string;
@@ -119,6 +121,7 @@ const parseDiagramAction = createLoggedAction<
       elementCount: number;
       nodeCount: number;
       edgeCount: number;
+      traceId: string;
     };
   }
 >("diagrams.parseDiagram", {
@@ -130,6 +133,7 @@ const parseDiagramAction = createLoggedAction<
     elementCount: result.stats.elementCount,
     nodeCount: result.stats.nodeCount,
     edgeCount: result.stats.edgeCount,
+    traceId: result.stats.traceId,
   }),
 });
 
@@ -167,6 +171,19 @@ export const generateDiagram = generateDiagramAction({
 
     const startedAt = Date.now();
     let traceId: string = args.traceId ?? crypto.randomUUID();
+    const promptLength = args.prompt?.length ?? 0;
+    const promptHash = hashString(args.prompt ?? undefined);
+
+    await logEvent({
+      traceId,
+      actionName: "diagrams.generateDiagram",
+      op: "pipeline.start",
+      stage: "input",
+      status: "success",
+      promptLength,
+      promptHash,
+      hasIntermediate: Boolean(args.intermediate),
+    });
 
     let intermediate = args.intermediate;
     let iterations = 0;
@@ -185,6 +202,18 @@ export const generateDiagram = generateDiagramAction({
 
     const parsed = IntermediateFormatSchema.safeParse(intermediate);
     if (!parsed.success) {
+      await logEvent(
+        {
+          traceId,
+          actionName: "diagrams.generateDiagram",
+          op: "pipeline.intermediate",
+          stage: "intermediate.validate",
+          status: "failed",
+          errorName: "IntermediateValidationError",
+          errorMessage: parsed.error.message,
+        },
+        { level: "error" }
+      );
       throw new Error(
         `Invalid IntermediateFormat: ${parsed.error.issues
           .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
@@ -197,11 +226,79 @@ export const generateDiagram = generateDiagramAction({
       parsed.data.edges
     );
     if (edgeErrors.length > 0) {
+      await logEvent(
+        {
+          traceId,
+          actionName: "diagrams.generateDiagram",
+          op: "pipeline.intermediate",
+          stage: "intermediate.validate",
+          status: "failed",
+          errorName: "InvalidEdgeReferences",
+          errorMessage: edgeErrors.join(", "),
+        },
+        { level: "error" }
+      );
       throw new Error(`Invalid edge references: ${edgeErrors.join(", ")}`);
     }
 
     const rendered = renderIntermediateDiagram(parsed.data);
-    const shareLink = await createExcalidrawShareLink(rendered.elements, {});
+    await logEvent({
+      traceId,
+      actionName: "diagrams.generateDiagram",
+      op: "pipeline.render",
+      stage: "render",
+      status: "success",
+      intermediateNodeCount: rendered.stats.nodeCount,
+      intermediateEdgeCount: rendered.stats.edgeCount,
+      elementCount: rendered.elements.length,
+      shapeCount: rendered.stats.shapeCount,
+      arrowCount: rendered.stats.arrowCount,
+    });
+    let shareLink: {
+      url: string;
+      shareId: string;
+      encryptionKey: string;
+    };
+    try {
+      shareLink = await createExcalidrawShareLink(rendered.elements, {});
+      await logEvent({
+        traceId,
+        actionName: "diagrams.generateDiagram",
+        op: "pipeline.share",
+        stage: "share",
+        status: "success",
+        shareUrlType: "v2",
+        elementCount: rendered.elements.length,
+      });
+    } catch (error) {
+      await logEvent(
+        {
+          traceId,
+          actionName: "diagrams.generateDiagram",
+          op: "pipeline.share",
+          stage: "share",
+          status: "failed",
+          errorName: error instanceof Error ? error.name : undefined,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        { level: "error" }
+      );
+      throw error;
+    }
+    await logEvent({
+      traceId,
+      actionName: "diagrams.generateDiagram",
+      op: "pipeline.complete",
+      stage: "complete",
+      status: "success",
+      durationMs: Date.now() - startedAt,
+      iterations,
+      tokens,
+      intermediateNodeCount: rendered.stats.nodeCount,
+      intermediateEdgeCount: rendered.stats.edgeCount,
+      shapeCount: rendered.stats.shapeCount,
+      arrowCount: rendered.stats.arrowCount,
+    });
 
     return {
       status: "success",
@@ -238,11 +335,54 @@ export const modifyDiagram = modifyDiagramAction({
   },
   handler: async (_ctx, args) => {
     const traceId = args.traceId ?? crypto.randomUUID();
-    const parsed = await parseExcalidrawShareLink(args.shareUrl);
+    const requestLength = args.request.length;
+    const requestHash = hashString(args.request);
+
+    await logEvent({
+      traceId,
+      actionName: "diagrams.modifyDiagram",
+      op: "pipeline.start",
+      stage: "input",
+      status: "success",
+      requestLength,
+      requestHash,
+    });
+
+    let parsed: Awaited<
+      ReturnType<typeof parseExcalidrawShareLinkWithMetadata>
+    >;
+    try {
+      parsed = await parseExcalidrawShareLinkWithMetadata(args.shareUrl);
+      await logEvent({
+        traceId,
+        actionName: "diagrams.modifyDiagram",
+        op: "pipeline.parseShareLink",
+        stage: "share.parse",
+        status: "success",
+        shareUrlType: parsed.shareUrlType,
+        elementCount: parsed.payload.elements.length,
+      });
+    } catch (error) {
+      await logEvent(
+        {
+          traceId,
+          actionName: "diagrams.modifyDiagram",
+          op: "pipeline.parseShareLink",
+          stage: "share.parse",
+          status: "failed",
+          shareUrlType: detectShareUrlType(args.shareUrl),
+          errorName: error instanceof Error ? error.name : undefined,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        { level: "error" }
+      );
+      throw error;
+    }
+
     const modified = await modifyElementsWithAgent(
       {
-        elements: parsed.elements,
-        appState: parsed.appState,
+        elements: parsed.payload.elements,
+        appState: parsed.payload.appState,
         request: args.request,
         options: args.options ?? undefined,
       },
@@ -250,13 +390,67 @@ export const modifyDiagram = modifyDiagramAction({
     );
 
     if (modified.status !== "success") {
+      await logEvent(
+        {
+          traceId,
+          actionName: "diagrams.modifyDiagram",
+          op: "pipeline.complete",
+          stage: "complete",
+          status: "failed",
+          durationMs: modified.stats.durationMs,
+          iterations: modified.stats.iterations,
+          tokens: modified.stats.tokens,
+          issuesCount: modified.issues?.length ?? 0,
+        },
+        { level: "error" }
+      );
       return modified;
     }
 
-    const shareLink = await createExcalidrawShareLink(
-      modified.elements ?? [],
-      modified.appState ?? {}
-    );
+    let shareLink: {
+      url: string;
+      shareId: string;
+      encryptionKey: string;
+    };
+    try {
+      shareLink = await createExcalidrawShareLink(
+        modified.elements ?? [],
+        modified.appState ?? {}
+      );
+      await logEvent({
+        traceId,
+        actionName: "diagrams.modifyDiagram",
+        op: "pipeline.share",
+        stage: "share",
+        status: "success",
+        shareUrlType: "v2",
+        elementCount: modified.elements?.length ?? 0,
+      });
+    } catch (error) {
+      await logEvent(
+        {
+          traceId,
+          actionName: "diagrams.modifyDiagram",
+          op: "pipeline.share",
+          stage: "share",
+          status: "failed",
+          errorName: error instanceof Error ? error.name : undefined,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        { level: "error" }
+      );
+      throw error;
+    }
+    await logEvent({
+      traceId,
+      actionName: "diagrams.modifyDiagram",
+      op: "pipeline.complete",
+      stage: "complete",
+      status: "success",
+      durationMs: modified.stats.durationMs,
+      iterations: modified.stats.iterations,
+      tokens: modified.stats.tokens,
+    });
 
     return {
       ...modified,
@@ -271,14 +465,63 @@ export const parseDiagram = parseDiagramAction({
     traceId: v.optional(v.string()),
   },
   handler: async (_ctx, args) => {
-    const parsed = await parseExcalidrawShareLink(args.shareUrl);
-    const simplified = simplifyDiagramElements(parsed.elements);
+    const traceId = args.traceId ?? crypto.randomUUID();
+    await logEvent({
+      traceId,
+      actionName: "diagrams.parseDiagram",
+      op: "pipeline.start",
+      stage: "input",
+      status: "success",
+    });
+
+    let parsed: Awaited<
+      ReturnType<typeof parseExcalidrawShareLinkWithMetadata>
+    >;
+    try {
+      parsed = await parseExcalidrawShareLinkWithMetadata(args.shareUrl);
+      await logEvent({
+        traceId,
+        actionName: "diagrams.parseDiagram",
+        op: "pipeline.parseShareLink",
+        stage: "share.parse",
+        status: "success",
+        shareUrlType: parsed.shareUrlType,
+        elementCount: parsed.payload.elements.length,
+      });
+    } catch (error) {
+      await logEvent(
+        {
+          traceId,
+          actionName: "diagrams.parseDiagram",
+          op: "pipeline.parseShareLink",
+          stage: "share.parse",
+          status: "failed",
+          shareUrlType: detectShareUrlType(args.shareUrl),
+          errorName: error instanceof Error ? error.name : undefined,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        { level: "error" }
+      );
+      throw error;
+    }
+
+    const simplified = simplifyDiagramElements(parsed.payload.elements);
+    await logEvent({
+      traceId,
+      actionName: "diagrams.parseDiagram",
+      op: "pipeline.complete",
+      stage: "complete",
+      status: "success",
+      elementCount: simplified.stats.elementCount,
+      intermediateNodeCount: simplified.stats.nodeCount,
+      intermediateEdgeCount: simplified.stats.edgeCount,
+    });
 
     return {
-      elements: parsed.elements,
-      appState: parsed.appState ?? {},
+      elements: parsed.payload.elements,
+      appState: parsed.payload.appState ?? {},
       intermediate: simplified.intermediate,
-      stats: simplified.stats,
+      stats: { ...simplified.stats, traceId },
     };
   },
 });
@@ -290,9 +533,48 @@ export const shareDiagram = shareDiagramAction({
     traceId: v.optional(v.string()),
   },
   handler: async (_ctx, args) => {
-    return await createExcalidrawShareLink(
-      args.elements,
-      (args.appState as Record<string, unknown> | undefined) ?? {}
-    );
+    const traceId = args.traceId ?? crypto.randomUUID();
+    const elementCount = Array.isArray(args.elements)
+      ? args.elements.length
+      : 0;
+    await logEvent({
+      traceId,
+      actionName: "diagrams.shareDiagram",
+      op: "pipeline.start",
+      stage: "input",
+      status: "success",
+      elementCount,
+    });
+
+    try {
+      const shareLink = await createExcalidrawShareLink(
+        args.elements,
+        (args.appState as Record<string, unknown> | undefined) ?? {}
+      );
+      await logEvent({
+        traceId,
+        actionName: "diagrams.shareDiagram",
+        op: "pipeline.share",
+        stage: "share",
+        status: "success",
+        shareUrlType: "v2",
+        elementCount,
+      });
+      return shareLink;
+    } catch (error) {
+      await logEvent(
+        {
+          traceId,
+          actionName: "diagrams.shareDiagram",
+          op: "pipeline.share",
+          stage: "share",
+          status: "failed",
+          errorName: error instanceof Error ? error.name : undefined,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        { level: "error" }
+      );
+      throw error;
+    }
   },
 });

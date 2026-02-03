@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import type { Diagram } from "../lib/diagram-structure";
 import { renderDiagramToPngRemote } from "../lib/render-png";
 import { action } from "./_generated/server";
+import { logEvent } from "./lib/observability";
 
 export const exportDiagramPng = action({
   args: {
@@ -17,15 +18,51 @@ export const exportDiagramPng = action({
     ),
   },
   handler: async (_ctx, args) => {
-    const result = await renderDiagramToPngRemote(
-      args.diagram as Diagram,
-      args.options ?? {}
-    );
+    const traceId = crypto.randomUUID();
+    await logEvent({
+      traceId,
+      actionName: "exportDiagramPng",
+      op: "pipeline.start",
+      stage: "render",
+      status: "success",
+      chartType: args.options?.chartType,
+      scale: args.options?.scale,
+      padding: args.options?.padding,
+    });
 
-    // Return PNG as base64 (can't return raw Buffer from action)
-    return {
-      pngBase64: result.png.toString("base64"),
-      durationMs: result.durationMs,
-    };
+    try {
+      const result = await renderDiagramToPngRemote(
+        args.diagram as Diagram,
+        args.options ?? {}
+      );
+      await logEvent({
+        traceId,
+        actionName: "exportDiagramPng",
+        op: "pipeline.complete",
+        stage: "render",
+        status: "success",
+        durationMs: result.durationMs,
+      });
+
+      // Return PNG as base64 (can't return raw Buffer from action)
+      return {
+        pngBase64: result.png.toString("base64"),
+        durationMs: result.durationMs,
+      };
+    } catch (error) {
+      await logEvent(
+        {
+          traceId,
+          actionName: "exportDiagramPng",
+          op: "pipeline.complete",
+          stage: "render",
+          status: "failed",
+          errorName: error instanceof Error ? error.name : undefined,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        { level: "error" }
+      );
+      throw error;
+    }
   },
 });

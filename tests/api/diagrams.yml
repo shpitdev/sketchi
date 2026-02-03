@@ -2,6 +2,11 @@ name: Diagram API Endpoints
 vars:
   target_url: "http://localhost:3001"
   bypass_secret: "local-dev"
+  trace_id_generate: "00000000-0000-4000-8000-000000000101"
+  trace_id_parse: "00000000-0000-4000-8000-000000000102"
+  trace_id_modify: "00000000-0000-4000-8000-000000000103"
+  trace_id_share: "00000000-0000-4000-8000-000000000104"
+  trace_id_error: "00000000-0000-4000-8000-000000000105"
   encoded_share_prefix: "https%3A%2F%2Fexcalidraw.com%2F%23json%3D"
   encoded_v2_share_url: "https%3A%2F%2Fexcalidraw.com%2F%23json%3Du124S5epdCKEF07WlyRT7%2C_gQTcjl4lABzz__Fcytufg"
   test_intermediate:
@@ -57,6 +62,7 @@ testcases:
         headers:
           Content-Type: application/json
           x-vercel-protection-bypass: "{{.bypass_secret}}"
+          x-trace-id: "{{.trace_id_generate}}"
         body: |
           {
             "intermediate": {
@@ -79,8 +85,10 @@ testcases:
             from: result.bodyjson.shareLink.encryptionKey
         assertions:
           - result.statuscode ShouldEqual 200
+          - result.headers ShouldContainKey x-trace-id
           - result.bodyjson.status ShouldEqual "success"
           - result.bodyjson.shareLink.url ShouldContainSubstring "https://excalidraw.com/#json="
+          - result.bodyjson.stats.traceId ShouldEqual "{{.trace_id_generate}}"
 
       - type: exec
         script: |
@@ -101,10 +109,13 @@ testcases:
         url: "{{.target_url}}/api/diagrams/parse?shareUrl={{.encoded_share_prefix}}{{.generate_parse_flow.share_id}}%2C{{.generate_parse_flow.encryption_key}}"
         headers:
           x-vercel-protection-bypass: "{{.bypass_secret}}"
+          x-trace-id: "{{.trace_id_parse}}"
         assertions:
           - result.statuscode ShouldEqual 200
+          - result.headers ShouldContainKey x-trace-id
           - result.bodyjson.stats.nodeCount ShouldEqual 2
           - result.bodyjson.stats.edgeCount ShouldEqual 1
+          - result.bodyjson.stats.traceId ShouldEqual "{{.trace_id_parse}}"
 
   - name: modify_flow
     steps:
@@ -114,6 +125,7 @@ testcases:
         headers:
           Content-Type: application/json
           x-vercel-protection-bypass: "{{.bypass_secret}}"
+          x-trace-id: "{{.trace_id_modify}}"
         body: |
           {
             "intermediate": {
@@ -132,6 +144,7 @@ testcases:
             from: result.bodyjson.shareLink.url
         assertions:
           - result.statuscode ShouldEqual 200
+          - result.headers ShouldContainKey x-trace-id
           - result.bodyjson.status ShouldEqual "success"
 
       - type: http
@@ -140,6 +153,7 @@ testcases:
         headers:
           Content-Type: application/json
           x-vercel-protection-bypass: "{{.bypass_secret}}"
+          x-trace-id: "{{.trace_id_modify}}"
         body: |
           {
             "shareUrl": "{{.modify_flow.share_url}}",
@@ -151,8 +165,10 @@ testcases:
             from: result.bodyjson.shareLink.shareId
         assertions:
           - result.statuscode ShouldEqual 200
+          - result.headers ShouldContainKey x-trace-id
           - result.bodyjson.status ShouldEqual "success"
           - result.bodyjson.shareLink.url ShouldContainSubstring "https://excalidraw.com/#json="
+          - result.bodyjson.stats.traceId ShouldEqual "{{.trace_id_modify}}"
 
       - type: exec
         script: |
@@ -176,6 +192,7 @@ testcases:
         headers:
           Content-Type: application/json
           x-vercel-protection-bypass: "{{.bypass_secret}}"
+          x-trace-id: "{{.trace_id_share}}"
         body: |
           {
             "elements": [
@@ -215,6 +232,7 @@ testcases:
             from: result.bodyjson.shareId
         assertions:
           - result.statuscode ShouldEqual 200
+          - result.headers ShouldContainKey x-trace-id
           - result.bodyjson.url ShouldContainSubstring "https://excalidraw.com/#json="
           - result.bodyjson.shareId ShouldNotBeEmpty
 
@@ -244,3 +262,15 @@ testcases:
           - result.bodyjson.stats.nodeCount ShouldEqual 3
           - result.bodyjson.stats.edgeCount ShouldEqual 0
           - result.bodyjson.stats.elementCount ShouldEqual 6
+  - name: error_trace
+    steps:
+      - type: http
+        method: GET
+        url: "{{.target_url}}/api/diagrams/parse?shareUrl=https://example.com"
+        headers:
+          x-vercel-protection-bypass: "{{.bypass_secret}}"
+          x-trace-id: "{{.trace_id_error}}"
+        assertions:
+          - result.statuscode ShouldBeGreaterThan 399
+          - result.headers ShouldContainKey x-trace-id
+          - result.bodyjson.data.traceId ShouldEqual "{{.trace_id_error}}"
