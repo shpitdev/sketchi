@@ -1,5 +1,4 @@
-// biome-ignore lint/performance/noNamespaceImport: required for UMD module in Convex runtime
-import * as pako from "pako";
+import { Inflate } from "pako";
 
 // NOTE(sync): This file contains a Convex-compatible copy of the share-link parsing logic.
 // Keep in sync with `packages/shared/src/excalidraw-share-links.ts`.
@@ -83,7 +82,7 @@ function decompressBuffer(data: Uint8Array): Uint8Array {
   try {
     const chunks: Uint8Array[] = [];
     let total = 0;
-    const inflator = new pako.Inflate();
+    const inflator = new Inflate();
     inflator.onData = (chunk: Uint8Array) => {
       total += chunk.length;
       if (total > MAX_DECOMPRESSED_BYTES) {
