@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin";
+import { pathToFileURL } from "node:url";
 import { buildDefaultPngPath, resolveOutputPath, writePng } from "./output";
 import {
   extractShareLink,
@@ -34,6 +35,18 @@ export type DiagramGradeResult = {
   grade: Record<string, unknown>;
   raw: string;
 };
+
+function toAttachmentUrl(value: string): string {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:" || parsed.protocol === "file:") {
+      return parsed.href;
+    }
+  } catch {
+    // Fall through to treat as a file path.
+  }
+  return pathToFileURL(value).href;
+}
 
 function buildGradePrompt(input: {
   prompt: string;
@@ -205,7 +218,7 @@ export async function gradeDiagram(
     if (pngPath) {
       parts.push({
         type: "file",
-        url: pngPath,
+        url: toAttachmentUrl(pngPath),
         mime: "image/png",
         filename: "diagram.png",
       });
