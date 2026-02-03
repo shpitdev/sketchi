@@ -325,7 +325,7 @@ export async function createExcalidrawShareLink(
 
   const response = await fetch(EXCALIDRAW_POST_URL, {
     method: "POST",
-    body,
+    body: new Uint8Array(body),
   });
 
   if (!response.ok) {

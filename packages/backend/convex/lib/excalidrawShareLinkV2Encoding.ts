@@ -6,7 +6,7 @@ const NEXT_CHUNK_SIZE_DATAVIEW_BYTES = 4;
 const IV_LENGTH_BYTES = 12;
 const AES_GCM_KEY_LENGTH = 128;
 
-function concatBuffers(...buffers: Uint8Array[]): Uint8Array {
+function concatBuffers(...buffers: Uint8Array[]): Uint8Array<ArrayBuffer> {
   const totalBytes =
     VERSION_DATAVIEW_BYTES +
     NEXT_CHUNK_SIZE_DATAVIEW_BYTES * buffers.length +
@@ -32,7 +32,7 @@ function concatBuffers(...buffers: Uint8Array[]): Uint8Array {
 export async function buildV2UploadBody(args: {
   elements: unknown[];
   appState: Record<string, unknown>;
-}): Promise<{ body: Uint8Array; encryptionKey: string }> {
+}): Promise<{ body: Uint8Array<ArrayBuffer>; encryptionKey: string }> {
   const sceneJson = JSON.stringify({
     elements: args.elements,
     appState: args.appState,
@@ -43,6 +43,7 @@ export async function buildV2UploadBody(args: {
   const inner = concatBuffers(contentsMetadataBuffer, contentsBuffer);
 
   const compressed = pako.deflate(inner);
+  const compressedBytes = new Uint8Array(compressed);
 
   const key = await crypto.subtle.generateKey(
     { name: "AES-GCM", length: AES_GCM_KEY_LENGTH },
@@ -54,7 +55,7 @@ export async function buildV2UploadBody(args: {
   const encrypted = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
     key,
-    compressed
+    compressedBytes
   );
 
   const encodingMetadataBuffer = new TextEncoder().encode(
