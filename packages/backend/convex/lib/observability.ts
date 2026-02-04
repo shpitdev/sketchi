@@ -150,7 +150,7 @@ async function sendToTelemetryProxy(
 ): Promise<void> {
   const telemetryUrl =
     process.env.SKETCHI_TELEMETRY_URL ?? `${appUrl}/api/telemetry`;
-  await fetch(telemetryUrl, {
+  const response = await fetch(telemetryUrl, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -158,6 +158,13 @@ async function sendToTelemetryProxy(
     },
     body: JSON.stringify({ level, ...event }),
   });
+  if (!response.ok) {
+    console.warn(
+      "Telemetry proxy returned non-2xx:",
+      response.status,
+      event.traceId
+    );
+  }
 }
 
 function sendToSentry(event: LogEvent, level: LogLevel): void {
@@ -177,34 +184,52 @@ export async function logEvent(
   event: LogEvent,
   options: { level?: LogLevel } = {}
 ): Promise<void> {
-  const level = options.level ?? "info";
-  const normalized = buildLogEvent(event, level);
-
-  console.log(JSON.stringify(normalized));
-
-  if (!(SENTRY_CONVEX_ENABLED && normalized.sampled)) {
-    return;
-  }
-
   try {
-    if (SENTRY_CONVEX_MODE === "proxy") {
-      await sendToTelemetryProxy(normalized, level);
+    const level = options.level ?? "info";
+    const normalized = buildLogEvent(event, level);
+
+    try {
+      console.log(JSON.stringify(normalized));
+    } catch {
+      console.log(
+        "[logEvent] Failed to serialize event",
+        event?.op,
+        event?.traceId
+      );
+    }
+
+    if (!(SENTRY_CONVEX_ENABLED && normalized.sampled)) {
       return;
     }
 
-    sendToSentry(normalized, level);
+    try {
+      if (SENTRY_CONVEX_MODE === "proxy") {
+        await sendToTelemetryProxy(normalized, level);
+        return;
+      }
+
+      sendToSentry(normalized, level);
+    } catch (error) {
+      console.warn(
+        JSON.stringify({
+          service: "convex",
+          component: "observability",
+          op: "logEvent.error",
+          traceId: normalized.traceId,
+          errorName: error instanceof Error ? error.name : undefined,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
   } catch (error) {
-    console.warn(
-      JSON.stringify({
-        service: "convex",
-        component: "observability",
-        op: "logEvent.error",
-        traceId: normalized.traceId,
-        errorName: error instanceof Error ? error.name : undefined,
-        errorMessage: error instanceof Error ? error.message : String(error),
-      })
-    );
+    console.warn("logEvent failed silently:", error);
   }
+}
+
+export function logEventSafely(...args: Parameters<typeof logEvent>): void {
+  logEvent(...args).catch(() => {
+    // Ignore logging failures to avoid breaking the main flow.
+  });
 }
 
 export async function startSentrySpan<T>(
