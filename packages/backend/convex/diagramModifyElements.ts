@@ -11,6 +11,7 @@ import {
 } from "../lib/diagram-modification";
 import { action } from "./_generated/server";
 import { hashString, logEventSafely } from "./lib/observability";
+import { createTraceId } from "./lib/trace";
 
 const DEFAULT_MAX_STEPS = 5;
 const MAX_TIMEOUT_MS = 240_000;
@@ -833,7 +834,7 @@ export async function modifyElementsWithAgent(
   );
 
   if (elementIssues.length > 0) {
-    return await logInvalidElementsFailure(traceId, elementIssues, startedAt);
+    return logInvalidElementsFailure(traceId, elementIssues, startedAt);
   }
 
   const elementIds = new Set(elements.map((element) => String(element.id)));
@@ -849,7 +850,7 @@ export async function modifyElementsWithAgent(
     startedAt,
     traceId,
   });
-  const explicitLogged = await logExplicitResult(traceId, explicitResult);
+  const explicitLogged = logExplicitResult(traceId, explicitResult);
   if (explicitLogged) {
     return explicitLogged;
   }
@@ -885,13 +886,13 @@ export async function modifyElementsWithAgent(
     appState: args.appState,
   });
 
-  const outcomeLogged = await logOutcomeResult(traceId, outcome);
+  const outcomeLogged = logOutcomeResult(traceId, outcome);
   if (outcomeLogged) {
     return outcomeLogged;
   }
 
   if (tracking.lastSuccessful) {
-    return await logFallbackSuccess({
+    return logFallbackSuccess({
       traceId,
       startedAt,
       tracking,
@@ -900,7 +901,7 @@ export async function modifyElementsWithAgent(
   }
 
   const errorIssues = buildErrorIssues(tracking, lastError);
-  return await logTerminalFailure({
+  return logTerminalFailure({
     traceId,
     startedAt,
     tracking,
@@ -922,7 +923,7 @@ export const diagramModifyElements = action({
     ),
   },
   handler: async (_ctx, args) => {
-    const traceId = crypto.randomUUID();
+    const traceId = createTraceId();
     const appState =
       (args.appState as Record<string, unknown> | undefined) ?? undefined;
 

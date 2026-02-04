@@ -197,6 +197,7 @@ export const generateDiagram = generateDiagramAction({
       intermediate = result.intermediate;
       iterations = result.iterations;
       tokens = result.tokens;
+      // Use the traceId from generation to keep downstream logs aligned.
       traceId = result.traceId;
     }
 
@@ -394,7 +395,7 @@ export const modifyDiagram = modifyDiagramAction({
         {
           traceId,
           actionName: "diagrams.modifyDiagram",
-          op: "pipeline.complete",
+          op: "pipeline.failed",
           stage: "complete",
           status: "failed",
           durationMs: modified.stats.durationMs,
