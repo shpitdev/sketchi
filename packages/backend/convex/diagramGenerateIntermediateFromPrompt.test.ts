@@ -1,11 +1,9 @@
 /**
- * E2E Test: Prompt → Intermediate → Diagram → Share Link → PNG
+ * E2E Test: Prompt → Diagram → Share Link → PNG
  *
  * Tests the full pipeline from natural language prompt to rendered PNG:
- * 1. generateIntermediateFromPrompt - converts prompt to IntermediateFormat
- * 2. generateDiagramFromIntermediate - converts intermediate to Excalidraw elements
- * 3. createExcalidrawShareLink - creates shareable link
- * 4. renderDiagramToPng - renders to PNG via Playwright
+ * 1. diagrams.generateDiagram - converts prompt to diagram + share link
+ * 2. renderDiagramToPng - renders to PNG via Playwright
  */
 
 import { mkdir, writeFile } from "node:fs/promises";
@@ -16,7 +14,6 @@ import { config as loadEnv } from "dotenv";
 import { describe, expect, test } from "vitest";
 import { closeBrowser, renderDiagramToPng } from "../lib/render-png";
 import { api } from "./_generated/api";
-import { createExcalidrawShareLink } from "./lib/excalidrawShareLinks";
 import schema from "./schema";
 import { modules } from "./test.setup";
 
@@ -71,9 +68,7 @@ interface ScenarioResult {
   status: "passed" | "failed";
   durationMs: number;
   stepDurationsMs?: {
-    generateIntermediate?: number;
     generateDiagram?: number;
-    createShareLink?: number;
     renderPng?: number;
   };
   tokens?: number;
@@ -110,55 +105,37 @@ async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
   const stepDurationsMs: NonNullable<ScenarioResult["stepDurationsMs"]> = {};
 
   try {
-    const generateIntermediateStart = Date.now();
-    // Step 1: Generate intermediate from prompt
-    const genResult = await t.action(
-      api.diagramGenerateIntermediateFromPrompt.generateIntermediateFromPrompt,
-      { prompt: scenario.prompt }
-    );
-    stepDurationsMs.generateIntermediate =
-      Date.now() - generateIntermediateStart;
+    const generateDiagramStart = Date.now();
+    // Step 1: Generate diagram (includes intermediate + share link)
+    const diagResult = await t.action(api.diagrams.generateDiagram, {
+      prompt: scenario.prompt,
+    });
+    stepDurationsMs.generateDiagram = Date.now() - generateDiagramStart;
 
     // Validate intermediate has nodes and edges
     if (
-      !genResult.intermediate.nodes ||
-      genResult.intermediate.nodes.length === 0
+      !diagResult.intermediate.nodes ||
+      diagResult.intermediate.nodes.length === 0
     ) {
       throw new Error("Intermediate has no nodes");
     }
 
-    const generateDiagramStart = Date.now();
-    // Step 2: Generate diagram from intermediate
-    const diagResult = await t.action(
-      api.diagramGenerateFromIntermediate.generateDiagramFromIntermediate,
-      { intermediate: genResult.intermediate }
-    );
-    stepDurationsMs.generateDiagram = Date.now() - generateDiagramStart;
-
-    const shareLinkStart = Date.now();
-    // Step 3: Create share link
-    const shareResult = await createExcalidrawShareLink(
-      diagResult.elements,
-      {}
-    );
-    stepDurationsMs.createShareLink = Date.now() - shareLinkStart;
-
     // Validate share URL format
-    if (!shareResult.url.startsWith("https://excalidraw.com/#json=")) {
-      throw new Error(`Invalid share URL format: ${shareResult.url}`);
+    if (!diagResult.shareLink.url.startsWith("https://excalidraw.com/#json=")) {
+      throw new Error(`Invalid share URL format: ${diagResult.shareLink.url}`);
     }
 
     const renderPngStart = Date.now();
-    // Step 4: Render PNG
+    // Step 2: Render PNG
     const chartType =
-      genResult.intermediate.graphOptions?.diagramType ?? "flowchart";
+      diagResult.intermediate.graphOptions?.diagramType ?? "flowchart";
     const pngResult = await renderDiagramToPng(diagResult.diagram, {
       chartType: chartType as "flowchart" | "architecture" | "decision-tree",
     });
     stepDurationsMs.renderPng = Date.now() - renderPngStart;
 
     console.log(
-      `[${scenario.slug}] timings(ms): intermediate=${stepDurationsMs.generateIntermediate}, diagram=${stepDurationsMs.generateDiagram}, share=${stepDurationsMs.createShareLink}, png=${stepDurationsMs.renderPng}`
+      `[${scenario.slug}] timings(ms): diagram=${stepDurationsMs.generateDiagram}, png=${stepDurationsMs.renderPng}`
     );
 
     // Validate PNG size
@@ -173,12 +150,12 @@ async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
     await writeJson(jsonPath, {
       scenario: scenario.name,
       prompt: scenario.prompt,
-      shareUrl: shareResult.url,
-      intermediate: genResult.intermediate,
-      tokens: genResult.tokens,
-      durationMs: genResult.durationMs,
+      shareUrl: diagResult.shareLink.url,
+      intermediate: diagResult.intermediate,
+      tokens: diagResult.stats.tokens,
+      durationMs: diagResult.stats.durationMs,
       stepDurationsMs,
-      traceId: genResult.traceId,
+      traceId: diagResult.stats.traceId,
     });
 
     await writePng(pngPath, pngResult.png);
@@ -189,10 +166,10 @@ async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
       status: "passed",
       durationMs: Date.now() - startedAt,
       stepDurationsMs,
-      tokens: genResult.tokens,
-      nodeCount: genResult.intermediate.nodes.length,
-      edgeCount: genResult.intermediate.edges.length,
-      shareUrl: shareResult.url,
+      tokens: diagResult.stats.tokens,
+      nodeCount: diagResult.intermediate.nodes.length,
+      edgeCount: diagResult.intermediate.edges.length,
+      shareUrl: diagResult.shareLink.url,
       pngSizeBytes: pngResult.png.length,
       jsonFile,
       pngFile,
@@ -227,7 +204,7 @@ async function writeSummary(results: ScenarioResult[]) {
   const createdAt = new Date().toISOString();
 
   const lines: string[] = [
-    "# Prompt to Intermediate E2E Test Results",
+    "# Prompt to Diagram E2E Test Results",
     "",
     `- Pass rate: ${passed}/${total}`,
     `- Created: ${createdAt}`,
@@ -266,7 +243,7 @@ async function writeSummary(results: ScenarioResult[]) {
     lines.push(`- Duration: ${result.durationMs}ms`);
     if (result.stepDurationsMs) {
       lines.push(
-        `- Step durations: intermediate=${result.stepDurationsMs.generateIntermediate ?? "n/a"}ms, diagram=${result.stepDurationsMs.generateDiagram ?? "n/a"}ms, share=${result.stepDurationsMs.createShareLink ?? "n/a"}ms, png=${result.stepDurationsMs.renderPng ?? "n/a"}ms`
+        `- Step durations: diagram=${result.stepDurationsMs.generateDiagram ?? "n/a"}ms, png=${result.stepDurationsMs.renderPng ?? "n/a"}ms`
       );
     }
     lines.push(`- Tokens: ${result.tokens ?? "n/a"}`);
@@ -294,7 +271,7 @@ async function writeSummary(results: ScenarioResult[]) {
 
 const hasRequiredEnv = requiredEnv.every((key) => process.env[key]);
 
-describe.sequential("prompt to intermediate E2E", () => {
+describe.sequential("prompt to diagram E2E", () => {
   test.skipIf(!hasRequiredEnv)(
     "full pipeline across prompts",
     async () => {
