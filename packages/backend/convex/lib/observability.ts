@@ -17,6 +17,9 @@ export type LogLevel = "info" | "warning" | "error";
 export interface LogEvent extends Record<string, unknown> {
   traceId: string;
   requestId?: string;
+  message?: string;
+  severity?: "info" | "warn" | "error";
+  level?: "info" | "warn" | "error";
   service?: string;
   component?: string;
   op: string;
@@ -147,7 +150,9 @@ function buildLogEvent(event: LogEvent, level: LogLevel): LogEvent {
   const sampled =
     level === "info" ? shouldSample(traceId, SENTRY_LOG_SAMPLE_RATE) : true;
 
-  return {
+  const normalizedSeverity = level === "warning" ? "warn" : level;
+
+  const base: LogEvent = {
     service: "convex",
     component: event.component ?? "convex-action",
     env: envLabel,
@@ -157,6 +162,13 @@ function buildLogEvent(event: LogEvent, level: LogLevel): LogEvent {
     traceId,
     errorMessage: clampMessage(event.errorMessage),
     sampled,
+    severity: normalizedSeverity,
+    level: normalizedSeverity,
+  };
+
+  return {
+    ...base,
+    message: base.message ?? formatSentryMessage(base),
   };
 }
 
@@ -204,6 +216,7 @@ function sendToSentry(event: LogEvent, level: LogLevel): void {
   if (!sentryInitialized) {
     return;
   }
+  const message = formatSentryMessage(event);
   withScope((scope) => {
     scope.setLevel(level);
     scope.setTag("traceId", event.traceId);
@@ -224,7 +237,7 @@ function sendToSentry(event: LogEvent, level: LogLevel): void {
       scope.setTag("status", event.status);
     }
     scope.setContext("telemetry", event);
-    captureMessage(formatSentryMessage(event));
+    captureMessage(message);
   });
 }
 

@@ -404,9 +404,13 @@ export async function generateIntermediate(
   const envFallbackModelId = process.env.MODEL_FALLBACK_NAME?.trim();
   const fallbackModelId = envFallbackModelId || "z-ai/glm-4.7";
   const fallbackEnabled =
-    Boolean(envFallbackModelId) || primaryModelId === DEFAULT_PRIMARY_MODEL_ID;
+    process.env.SKETCHI_DISABLE_MODEL_FALLBACK !== "1" &&
+    fallbackModelId !== primaryModelId;
 
-  const GENERATE_TIMEOUT_MS = 120_000;
+  const rawTimeoutMs = Number(process.env.SKETCHI_AI_INTERMEDIATE_TIMEOUT_MS);
+  const GENERATE_TIMEOUT_MS = Number.isFinite(rawTimeoutMs)
+    ? Math.max(5000, rawTimeoutMs)
+    : 60_000;
 
   const createAgent = (modelId: string) => {
     let stepIndex = 0;

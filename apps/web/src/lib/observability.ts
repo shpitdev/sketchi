@@ -5,6 +5,9 @@ export type LogLevel = "info" | "warning" | "error";
 
 export interface ApiLogEvent extends Record<string, unknown> {
   traceId: string;
+  message?: string;
+  severity?: "info" | "warn" | "error";
+  level?: "info" | "warn" | "error";
   service?: string;
   component?: string;
   op: string;
@@ -128,7 +131,9 @@ function buildLogEvent(event: ApiLogEvent, level: LogLevel): ApiLogEvent {
   const traceId = event.traceId || createTraceId();
   const sampled = level === "info" ? shouldSample(traceId, SAMPLE_RATE) : true;
 
-  return {
+  const normalizedSeverity = level === "warning" ? "warn" : level;
+
+  const base: ApiLogEvent = {
     service: "web",
     component: event.component ?? "orpc",
     env: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "dev",
@@ -138,10 +143,18 @@ function buildLogEvent(event: ApiLogEvent, level: LogLevel): ApiLogEvent {
     traceId,
     errorMessage: clampMessage(event.errorMessage),
     sampled,
+    severity: normalizedSeverity,
+    level: normalizedSeverity,
+  };
+
+  return {
+    ...base,
+    message: base.message ?? formatSentryMessage(base),
   };
 }
 
 function sendToSentry(event: ApiLogEvent, level: LogLevel) {
+  const message = formatSentryMessage(event);
   withScope((scope) => {
     scope.setLevel(level);
     scope.setTag("traceId", event.traceId);
@@ -165,7 +178,7 @@ function sendToSentry(event: ApiLogEvent, level: LogLevel) {
       scope.setTag("status", event.status);
     }
     scope.setContext("telemetry", event);
-    captureMessage(formatSentryMessage(event));
+    captureMessage(message);
   });
 }
 
