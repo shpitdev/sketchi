@@ -16,6 +16,7 @@
     "@sentry/nextjs": "^10.37.0",
     "@sketchi/backend": "workspace:*",
     "@sketchi/env": "workspace:*",
+    "@sketchi/shared": "workspace:*",
     "@tanstack/react-form": "^1.27.3",
     "@vercel/analytics": "^1.6.1",
     "babel-plugin-react-compiler": "^1.0.0",

@@ -1,6 +1,8 @@
 import { ORPCError, os } from "@orpc/server";
 import { JSON_SCHEMA_REGISTRY } from "@orpc/zod/zod4";
+import { captureException, withScope } from "@sentry/nextjs";
 import { api } from "@sketchi/backend/convex/_generated/api";
+import { createTraceId, normalizeTraceId } from "@sketchi/shared";
 import { ConvexHttpClient } from "convex/browser";
 import { z } from "zod";
 
@@ -16,15 +18,13 @@ export interface OrpcContext {
   traceId: string;
 }
 
-function createTraceId(): string {
-  return (
-    globalThis.crypto?.randomUUID?.() ??
-    `${Date.now()}-${Math.random().toString(16).slice(2)}`
-  );
-}
-
-export function createOrpcContext(_request: Request): OrpcContext {
-  return { convex, traceId: createTraceId() };
+export function createOrpcContext(
+  request: Request,
+  traceIdOverride?: string
+): OrpcContext {
+  const headerTraceId = normalizeTraceId(request.headers.get("x-trace-id"));
+  const traceId = traceIdOverride ?? headerTraceId ?? createTraceId();
+  return { convex, traceId };
 }
 
 const orpc = os.$context<OrpcContext>();
@@ -96,6 +96,19 @@ function throwInternalError(params: {
   hint?: string;
 }): never {
   const { reason, message, name } = classifyError(params.error);
+  withScope((scope) => {
+    scope.setTag("traceId", params.traceId);
+    scope.setTag("orpc.route", params.action);
+    scope.setTag("orpc.stage", params.stage);
+    scope.setTag("orpc.reason", reason);
+    scope.setContext("orpc.error", {
+      traceId: params.traceId,
+      stage: params.stage,
+      action: params.action,
+      reason,
+    });
+    captureException(params.error);
+  });
   throw new ORPCError("INTERNAL_SERVER_ERROR", {
     message: `${params.action} failed (${reason}). traceId=${params.traceId}`,
     data: {
@@ -234,6 +247,7 @@ const parseOutputSchema = z.object({
     elementCount: z.number(),
     nodeCount: z.number(),
     edgeCount: z.number(),
+    traceId: z.string(),
   }),
 });
 

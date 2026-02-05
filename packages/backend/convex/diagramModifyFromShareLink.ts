@@ -5,8 +5,10 @@ import { action } from "./_generated/server";
 import { modifyElementsWithAgent } from "./diagramModifyElements";
 import {
   createExcalidrawShareLink,
-  parseExcalidrawShareLink,
+  detectShareUrlType,
+  parseExcalidrawShareLinkWithMetadata,
 } from "./lib/excalidrawShareLinks";
+import { hashString, logEventSafely } from "./lib/observability";
 
 type OutputMode = "elements" | "shareLink" | "both";
 
@@ -34,12 +36,52 @@ export const diagramModifyFromShareLink = action({
     const traceId = crypto.randomUUID();
     const outputMode = normalizeOutputMode(args.output);
 
-    const parsed = await parseExcalidrawShareLink(args.url);
+    logEventSafely({
+      traceId,
+      actionName: "diagramModifyFromShareLink",
+      op: "pipeline.start",
+      stage: "input",
+      status: "success",
+      requestLength: args.request.length,
+      requestHash: hashString(args.request),
+      outputMode,
+    });
+
+    let parsed: Awaited<
+      ReturnType<typeof parseExcalidrawShareLinkWithMetadata>
+    >;
+    try {
+      parsed = await parseExcalidrawShareLinkWithMetadata(args.url);
+      logEventSafely({
+        traceId,
+        actionName: "diagramModifyFromShareLink",
+        op: "pipeline.parseShareLink",
+        stage: "share.parse",
+        status: "success",
+        shareUrlType: parsed.shareUrlType,
+        elementCount: parsed.payload.elements.length,
+      });
+    } catch (error) {
+      logEventSafely(
+        {
+          traceId,
+          actionName: "diagramModifyFromShareLink",
+          op: "pipeline.parseShareLink",
+          stage: "share.parse",
+          status: "failed",
+          shareUrlType: detectShareUrlType(args.url),
+          errorName: error instanceof Error ? error.name : undefined,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        { level: "error" }
+      );
+      throw error;
+    }
 
     const modified = await modifyElementsWithAgent(
       {
-        elements: parsed.elements,
-        appState: parsed.appState,
+        elements: parsed.payload.elements,
+        appState: parsed.payload.appState,
         request: args.request,
         options: args.options ?? undefined,
       },
@@ -47,19 +89,83 @@ export const diagramModifyFromShareLink = action({
     );
 
     if (modified.status !== "success") {
+      logEventSafely(
+        {
+          traceId,
+          actionName: "diagramModifyFromShareLink",
+          op: "pipeline.complete",
+          stage: "complete",
+          status: "failed",
+          durationMs: modified.stats.durationMs,
+          iterations: modified.stats.iterations,
+          tokens: modified.stats.tokens,
+          issuesCount: modified.issues?.length ?? 0,
+        },
+        { level: "error" }
+      );
       return modified;
     }
 
     if (outputMode === "elements") {
+      logEventSafely({
+        traceId,
+        actionName: "diagramModifyFromShareLink",
+        op: "pipeline.complete",
+        stage: "complete",
+        status: "success",
+        durationMs: modified.stats.durationMs,
+        iterations: modified.stats.iterations,
+        tokens: modified.stats.tokens,
+      });
       return modified;
     }
 
-    const shareLink = await createExcalidrawShareLink(
-      modified.elements ?? [],
-      modified.appState ?? {}
-    );
+    let shareLink: {
+      url: string;
+      shareId: string;
+      encryptionKey: string;
+    };
+    try {
+      shareLink = await createExcalidrawShareLink(
+        modified.elements ?? [],
+        modified.appState ?? {}
+      );
+      logEventSafely({
+        traceId,
+        actionName: "diagramModifyFromShareLink",
+        op: "pipeline.share",
+        stage: "share",
+        status: "success",
+        shareUrlType: "v2",
+        elementCount: modified.elements?.length ?? 0,
+      });
+    } catch (error) {
+      logEventSafely(
+        {
+          traceId,
+          actionName: "diagramModifyFromShareLink",
+          op: "pipeline.share",
+          stage: "share",
+          status: "failed",
+          errorName: error instanceof Error ? error.name : undefined,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        { level: "error" }
+      );
+      throw error;
+    }
 
     if (outputMode === "shareLink") {
+      logEventSafely({
+        traceId,
+        actionName: "diagramModifyFromShareLink",
+        op: "pipeline.complete",
+        stage: "complete",
+        status: "success",
+        durationMs: modified.stats.durationMs,
+        iterations: modified.stats.iterations,
+        tokens: modified.stats.tokens,
+      });
       return {
         ...modified,
         elements: undefined,
@@ -68,6 +174,16 @@ export const diagramModifyFromShareLink = action({
       };
     }
 
+    logEventSafely({
+      traceId,
+      actionName: "diagramModifyFromShareLink",
+      op: "pipeline.complete",
+      stage: "complete",
+      status: "success",
+      durationMs: modified.stats.durationMs,
+      iterations: modified.stats.iterations,
+      tokens: modified.stats.tokens,
+    });
     return {
       ...modified,
       shareLink,

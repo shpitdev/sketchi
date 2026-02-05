@@ -19,6 +19,8 @@ export interface ExcalidrawShareLinkPayload {
   appState: Record<string, unknown>;
 }
 
+export type ShareUrlType = "v1" | "v2" | "base64" | "unknown";
+
 interface FileEncodingInfo {
   version: number;
   compression: string;
@@ -274,9 +276,27 @@ function isBase64EncodedData(str: string): boolean {
   }
 }
 
-export async function parseExcalidrawShareLink(
+export function detectShareUrlType(url: string): ShareUrlType {
+  const match = url.match(EXCALIDRAW_SHARE_URL_PATTERN);
+  if (!match) {
+    return "unknown";
+  }
+  const idOrData = match[1];
+  if (!idOrData) {
+    return "unknown";
+  }
+  if (isBase64EncodedData(idOrData)) {
+    return "base64";
+  }
+  return "unknown";
+}
+
+export async function parseExcalidrawShareLinkWithMetadata(
   url: string
-): Promise<ExcalidrawShareLinkPayload> {
+): Promise<{
+  payload: ExcalidrawShareLinkPayload;
+  shareUrlType: ShareUrlType;
+}> {
   const match = url.match(EXCALIDRAW_SHARE_URL_PATTERN);
   if (!match) {
     throw new Error("Invalid Excalidraw share URL format");
@@ -290,9 +310,11 @@ export async function parseExcalidrawShareLink(
   }
 
   let encryptedBuffer: Uint8Array;
+  let shareUrlType: ShareUrlType = "unknown";
 
   if (isBase64EncodedData(idOrData)) {
     encryptedBuffer = base64UrlToBytes(idOrData);
+    shareUrlType = "base64";
   } else {
     const response = await fetch(`${EXCALIDRAW_GET_URL}${idOrData}`);
     if (!response.ok) {
@@ -304,8 +326,22 @@ export async function parseExcalidrawShareLink(
   const key = await importKey(keyString);
 
   if (isV2Format(encryptedBuffer)) {
-    return parseV2(encryptedBuffer, key);
+    if (shareUrlType !== "base64") {
+      shareUrlType = "v2";
+    }
+    return { payload: await parseV2(encryptedBuffer, key), shareUrlType };
   }
 
-  return parseV1(encryptedBuffer, key);
+  if (shareUrlType !== "base64") {
+    shareUrlType = "v1";
+  }
+
+  return { payload: await parseV1(encryptedBuffer, key), shareUrlType };
+}
+
+export async function parseExcalidrawShareLink(
+  url: string
+): Promise<ExcalidrawShareLinkPayload> {
+  const { payload } = await parseExcalidrawShareLinkWithMetadata(url);
+  return payload;
 }

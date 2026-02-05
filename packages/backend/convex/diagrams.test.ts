@@ -118,6 +118,7 @@ describe.sequential("diagrams actions", () => {
     expect(result.shareLink.url).toContain("https://excalidraw.com/#json=");
     expect(result.stats.nodeCount).toBe(2);
     expect(result.stats.edgeCount).toBe(1);
+    expect(result.stats.traceId).toBe("trace-mocked");
   });
 
   test("modifyDiagram applies explicit edits", async () => {
@@ -132,6 +133,7 @@ describe.sequential("diagrams actions", () => {
 
     expect(result.status).toBe("success");
     expect(result.shareLink?.url).toContain("https://excalidraw.com/#json=");
+    expect(result.stats.traceId).toBeTruthy();
     const updatedText = result.elements?.find(
       (element: unknown) =>
         typeof element === "object" &&
@@ -171,11 +173,13 @@ describe.sequential("diagrams actions", () => {
   test("parseDiagram extracts IntermediateFormat", async () => {
     const result = await t.action(api.diagrams.parseDiagram, {
       shareUrl: baseShareLink.url,
+      traceId: "trace-parse",
     });
 
     expect(Array.isArray(result.elements)).toBe(true);
     expect(result.stats.nodeCount).toBe(2);
     expect(result.stats.edgeCount).toBe(1);
+    expect(result.stats.traceId).toBe("trace-parse");
     const nodeIds = result.intermediate.nodes.map(
       (node: { id: string }) => node.id
     );

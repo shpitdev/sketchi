@@ -21,6 +21,9 @@ import type * as iconLibrariesActions from "../iconLibrariesActions.js";
 import type * as lib_excalidrawShareLinkV2Encoding from "../lib/excalidrawShareLinkV2Encoding.js";
 import type * as lib_excalidrawShareLinks from "../lib/excalidrawShareLinks.js";
 import type * as lib_logging from "../lib/logging.js";
+import type * as lib_observability from "../lib/observability.js";
+import type * as lib_trace from "../lib/trace.js";
+import type * as observability from "../observability.js";
 
 import type {
   ApiFromModules,
@@ -42,6 +45,9 @@ declare const fullApi: ApiFromModules<{
   "lib/excalidrawShareLinkV2Encoding": typeof lib_excalidrawShareLinkV2Encoding;
   "lib/excalidrawShareLinks": typeof lib_excalidrawShareLinks;
   "lib/logging": typeof lib_logging;
+  "lib/observability": typeof lib_observability;
+  "lib/trace": typeof lib_trace;
+  observability: typeof observability;
 }>;
 
 /**

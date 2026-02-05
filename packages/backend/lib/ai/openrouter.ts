@@ -1,27 +1,6 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { LanguageModel } from "ai";
-
-const DEFAULT_PROD_URL = "https://sketchi.app";
-const DEFAULT_DEV_URL = "http://localhost:3001";
-
-const resolvedEnv = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "dev";
-let envLabel = resolvedEnv;
-if (resolvedEnv === "production") {
-  envLabel = "prod";
-} else if (resolvedEnv === "development") {
-  envLabel = "dev";
-}
-
-const appUrl = (() => {
-  const explicit = process.env.SKETCHI_APP_URL ?? process.env.APP_URL;
-  if (explicit) {
-    return explicit;
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  return envLabel === "prod" ? DEFAULT_PROD_URL : DEFAULT_DEV_URL;
-})();
+import { appUrl, envLabel } from "../app-url";
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,

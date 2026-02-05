@@ -1,5 +1,6 @@
 import { Output, stepCountIs, ToolLoopAgent, tool } from "ai";
 import { z } from "zod";
+import { hashString, logEventSafely } from "../../convex/lib/observability";
 import { createOpenRouterChatModel } from "../ai/openrouter";
 import type {
   IntermediateEdge,
@@ -248,11 +249,34 @@ function decideNextAfterIntermediateFailure(params: {
       modelId,
       reason,
     });
+    logEventSafely({
+      traceId,
+      actionName: "generateIntermediate",
+      component: "ai",
+      op: "ai.retry",
+      stage: "intermediate.retry",
+      status: "warning",
+      modelId,
+      provider: "openrouter",
+      reason,
+    });
   } else {
     console.log("[ai.generateIntermediate.fallback]", {
       traceId,
       fromModelId: modelId,
       toModelId: nextModelId,
+      reason,
+    });
+    logEventSafely({
+      traceId,
+      actionName: "generateIntermediate",
+      component: "ai",
+      op: "ai.fallback",
+      stage: "intermediate.fallback",
+      status: "warning",
+      modelId: nextModelId,
+      provider: "openrouter",
+      fromModelId: modelId,
       reason,
     });
   }
@@ -296,6 +320,18 @@ async function runWithRetryAndOptionalFallback<T>(params: {
     }
 
     try {
+      logEventSafely({
+        traceId,
+        actionName: "generateIntermediate",
+        component: "ai",
+        op: "ai.attempt",
+        stage: "intermediate.attempt",
+        status: "success",
+        attempt: attemptIndex + 1,
+        maxAttempts: attemptPlan.length,
+        modelId,
+        provider: "openrouter",
+      });
       const result = await runAttempt(modelId);
       return { result, usedModelId: modelId, attempts };
     } catch (error) {
@@ -309,6 +345,23 @@ async function runWithRetryAndOptionalFallback<T>(params: {
         modelId,
         error,
       });
+      logEventSafely(
+        {
+          traceId,
+          actionName: "generateIntermediate",
+          component: "ai",
+          op: "ai.attempt",
+          stage: "intermediate.attempt",
+          status: "failed",
+          attempt: attemptIndex + 1,
+          maxAttempts: attemptPlan.length,
+          modelId,
+          provider: "openrouter",
+          errorName: error instanceof Error ? error.name : undefined,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        { level: "warning" }
+      );
       if (!decision.shouldContinue) {
         throw decision.error;
       }
@@ -341,6 +394,8 @@ export async function generateIntermediate(
   const resolvedProfileId = options.profileId ?? "general";
   const profile = getProfile(resolvedProfileId);
   const validateTool = createValidateIntermediateTool(profile);
+  const promptLength = prompt.length;
+  const promptHash = hashString(prompt);
 
   const DEFAULT_PRIMARY_MODEL_ID = "google/gemini-3-flash-preview";
   const primaryModelId =
@@ -353,8 +408,11 @@ export async function generateIntermediate(
 
   const GENERATE_TIMEOUT_MS = 120_000;
 
-  const createAgent = (modelId: string) =>
-    new ToolLoopAgent({
+  const createAgent = (modelId: string) => {
+    let stepIndex = 0;
+    let lastStepAt = Date.now();
+
+    return new ToolLoopAgent({
       model: createOpenRouterChatModel({
         modelId,
         traceId,
@@ -368,6 +426,24 @@ export async function generateIntermediate(
       },
       stopWhen: stepCountIs(5),
       onStepFinish: ({ usage, toolCalls }) => {
+        const now = Date.now();
+        stepIndex += 1;
+        const stepDurationMs = now - lastStepAt;
+        lastStepAt = now;
+        logEventSafely({
+          traceId,
+          actionName: "generateIntermediate",
+          component: "ai",
+          op: "ai.step",
+          stage: "intermediate.step",
+          status: "success",
+          modelId,
+          provider: "openrouter",
+          step: stepIndex,
+          stepDurationMs,
+          toolCalls: toolCalls?.length ?? 0,
+          tokens: usage.totalTokens ?? 0,
+        });
         console.log("[ai.generateIntermediate.step]", {
           traceId,
           modelId,
@@ -376,6 +452,7 @@ export async function generateIntermediate(
         });
       },
     });
+  };
 
   type Agent = ReturnType<typeof createAgent>;
   type AgentGenerateResult = Awaited<ReturnType<Agent["generate"]>>;
@@ -383,6 +460,19 @@ export async function generateIntermediate(
   const start = Date.now();
 
   const runAttempt = async (modelId: string): Promise<AgentGenerateResult> => {
+    logEventSafely({
+      traceId,
+      actionName: "generateIntermediate",
+      component: "ai",
+      op: "ai.start",
+      stage: "intermediate.start",
+      status: "success",
+      modelId,
+      provider: "openrouter",
+      promptLength,
+      promptHash,
+      profileId: resolvedProfileId,
+    });
     console.log("[ai.generateIntermediate.start]", {
       traceId,
       modelId,
@@ -406,19 +496,54 @@ export async function generateIntermediate(
     return result;
   };
 
-  const { result, usedModelId } =
-    await runWithRetryAndOptionalFallback<AgentGenerateResult>({
-      traceId,
-      primaryModelId,
-      fallbackModelId,
-      fallbackEnabled,
-      runAttempt,
-    });
+  let result: AgentGenerateResult;
+  let usedModelId: string;
+  try {
+    ({ result, usedModelId } =
+      await runWithRetryAndOptionalFallback<AgentGenerateResult>({
+        traceId,
+        primaryModelId,
+        fallbackModelId,
+        fallbackEnabled,
+        runAttempt,
+      }));
+  } catch (error) {
+    logEventSafely(
+      {
+        traceId,
+        actionName: "generateIntermediate",
+        component: "ai",
+        op: "ai.complete",
+        stage: "intermediate.complete",
+        status: "failed",
+        durationMs: Date.now() - start,
+        modelId: primaryModelId,
+        provider: "openrouter",
+        errorName: error instanceof Error ? error.name : undefined,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      },
+      { level: "error" }
+    );
+    throw error;
+  }
 
   console.log("[ai.generateIntermediate.completed]", {
     traceId,
     modelId: usedModelId,
     responseId: result.response.id,
+  });
+  logEventSafely({
+    traceId,
+    actionName: "generateIntermediate",
+    component: "ai",
+    op: "ai.complete",
+    stage: "intermediate.complete",
+    status: "success",
+    durationMs: Date.now() - start,
+    modelId: usedModelId,
+    provider: "openrouter",
+    iterations: result.steps.length,
+    tokens: result.usage.totalTokens ?? 0,
   });
 
   return {
