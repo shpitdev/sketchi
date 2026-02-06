@@ -5,6 +5,7 @@ vars:
   trace_id_generate: "00000000-0000-4000-8000-000000000101"
   trace_id_parse: "00000000-0000-4000-8000-000000000102"
   trace_id_modify: "00000000-0000-4000-8000-000000000103"
+  trace_id_modify_plus_link: "00000000-0000-4000-8000-000000000106"
   trace_id_share: "00000000-0000-4000-8000-000000000104"
   trace_id_error: "00000000-0000-4000-8000-000000000105"
   encoded_share_prefix: "https%3A%2F%2Fexcalidraw.com%2F%23json%3D"
@@ -286,7 +287,7 @@ testcases:
         headers:
           Content-Type: application/json
           x-vercel-protection-bypass: "{{.bypass_secret}}"
-          x-trace-id: "{{.trace_id_modify}}"
+          x-trace-id: "{{.trace_id_modify_plus_link}}"
         body: |
           {
             "shareUrl": "{{.plus_link_share_url}}",
@@ -298,9 +299,10 @@ testcases:
             from: result.bodyjson.shareLink.shareId
         assertions:
           - result.statuscode ShouldEqual 200
-          - result.headers.X-Trace-Id ShouldEqual "{{.trace_id_modify}}"
+          - result.headers.X-Trace-Id ShouldEqual "{{.trace_id_modify_plus_link}}"
           - result.bodyjson.status ShouldEqual "success"
           - result.bodyjson.shareLink.url ShouldContainSubstring "https://excalidraw.com/#json="
+          - result.bodyjson.stats.traceId ShouldEqual "{{.trace_id_modify_plus_link}}"
 
       - type: exec
         script: |
