@@ -19,6 +19,9 @@ describe("Excalidraw+ URL parsing", () => {
     );
 
     expect(result.source).toBe("excalidraw-plus-link");
+    if (result.source !== "excalidraw-plus-link") {
+      throw new Error(`unexpected source: ${result.source}`);
+    }
     expect(result.permission).toBe("read-only");
     expect(result.metadata.workspaceId).toBe("9e01NdVniGv");
     expect(result.metadata.sceneId).toBe("40KFTlwYlBD");
@@ -33,6 +36,9 @@ describe("Excalidraw+ URL parsing", () => {
     );
 
     expect(result.source).toBe("excalidraw-plus-link");
+    if (result.source !== "excalidraw-plus-link") {
+      throw new Error(`unexpected source: ${result.source}`);
+    }
     expect(result.permission).toBe("view-and-edit");
     expect(result.metadata.workspaceId).toBe("9e01NdVniGv");
     expect(result.metadata.sceneId).toBe("2EWXQ7ykXgY");
@@ -47,6 +53,9 @@ describe("Excalidraw+ URL parsing", () => {
     );
 
     expect(result.source).toBe("excalidraw-plus-readonly");
+    if (result.source !== "excalidraw-plus-readonly") {
+      throw new Error(`unexpected source: ${result.source}`);
+    }
     expect(result.metadata.token).toBe("QSslwW7dHXMgR8eNDfTW");
     expect(Array.isArray(result.payload.elements)).toBe(true);
     expect(result.payload.elements.length).toBeGreaterThan(0);
