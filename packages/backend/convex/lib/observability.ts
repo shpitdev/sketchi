@@ -9,7 +9,11 @@ import {
   withScope,
 } from "@sentry/node";
 import { appUrl, envLabel } from "../../lib/app-url";
-import type { ShareUrlType } from "./excalidrawShareLinks";
+import type {
+  ExcalidrawPermission,
+  ExcalidrawUrlSource,
+  ShareUrlType,
+} from "./excalidrawShareLinks";
 import { createTraceId } from "./trace";
 
 export type LogLevel = "info" | "warning" | "error";
@@ -37,6 +41,8 @@ export interface LogEvent extends Record<string, unknown> {
   shapeCount?: number;
   arrowCount?: number;
   shareUrlType?: ShareUrlType;
+  excalidrawSource?: ExcalidrawUrlSource;
+  excalidrawPermission?: ExcalidrawPermission;
   modelId?: string;
   provider?: string;
   tokens?: number;

@@ -77,6 +77,12 @@ function classifyError(error: unknown): {
     if (
       lower.includes("excalidraw") ||
       lower.includes("json.excalidraw.com") ||
+      lower.includes("export.excalidraw.com") ||
+      lower.includes("link.excalidraw.com") ||
+      lower.includes("app.excalidraw.com") ||
+      lower.includes("firestore.googleapis.com") ||
+      lower.includes("export fetch failed") ||
+      lower.includes("readonly fetch failed") ||
       lower.includes("failed to fetch")
     ) {
       return { reason: "UPSTREAM_ERROR", message, name };
@@ -242,6 +248,13 @@ const modifyOutputSchema = z.object({
 const parseOutputSchema = z.object({
   elements: z.array(z.any()),
   appState: z.record(z.string(), z.any()),
+  source: z.enum([
+    "excalidraw-share",
+    "excalidraw-plus-link",
+    "excalidraw-plus-readonly",
+  ]),
+  permission: z.enum(["read-only", "view-and-edit", "unknown"]),
+  metadata: z.any(),
   intermediate: z.any(),
   stats: z.object({
     elementCount: z.number(),

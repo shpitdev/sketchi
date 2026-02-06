@@ -12,7 +12,7 @@ import { modifyElementsWithAgent } from "./diagramModifyElements";
 import {
   createExcalidrawShareLink,
   detectShareUrlType,
-  parseExcalidrawShareLinkWithMetadata,
+  parseExcalidrawUrl,
 } from "./lib/excalidrawShareLinks";
 import { createLoggedAction } from "./lib/logging";
 import { hashString, logEventSafely } from "./lib/observability";
@@ -116,6 +116,9 @@ const parseDiagramAction = createLoggedAction<
   {
     elements: unknown[];
     appState: Record<string, unknown>;
+    source: string;
+    permission: string;
+    metadata: unknown;
     intermediate: unknown;
     stats: {
       elementCount: number;
@@ -349,18 +352,21 @@ export const modifyDiagram = modifyDiagramAction({
       requestHash,
     });
 
-    let parsed: Awaited<
-      ReturnType<typeof parseExcalidrawShareLinkWithMetadata>
-    >;
+    let parsed: Awaited<ReturnType<typeof parseExcalidrawUrl>>;
     try {
-      parsed = await parseExcalidrawShareLinkWithMetadata(args.shareUrl);
+      parsed = await parseExcalidrawUrl(args.shareUrl);
       logEventSafely({
         traceId,
         actionName: "diagrams.modifyDiagram",
         op: "pipeline.parseShareLink",
         stage: "share.parse",
         status: "success",
-        shareUrlType: parsed.shareUrlType,
+        shareUrlType:
+          parsed.source === "excalidraw-share"
+            ? parsed.metadata.shareUrlType
+            : undefined,
+        excalidrawSource: parsed.source,
+        excalidrawPermission: parsed.permission,
         elementCount: parsed.payload.elements.length,
       });
     } catch (error) {
@@ -475,18 +481,21 @@ export const parseDiagram = parseDiagramAction({
       status: "success",
     });
 
-    let parsed: Awaited<
-      ReturnType<typeof parseExcalidrawShareLinkWithMetadata>
-    >;
+    let parsed: Awaited<ReturnType<typeof parseExcalidrawUrl>>;
     try {
-      parsed = await parseExcalidrawShareLinkWithMetadata(args.shareUrl);
+      parsed = await parseExcalidrawUrl(args.shareUrl);
       logEventSafely({
         traceId,
         actionName: "diagrams.parseDiagram",
         op: "pipeline.parseShareLink",
         stage: "share.parse",
         status: "success",
-        shareUrlType: parsed.shareUrlType,
+        shareUrlType:
+          parsed.source === "excalidraw-share"
+            ? parsed.metadata.shareUrlType
+            : undefined,
+        excalidrawSource: parsed.source,
+        excalidrawPermission: parsed.permission,
         elementCount: parsed.payload.elements.length,
       });
     } catch (error) {
@@ -521,6 +530,9 @@ export const parseDiagram = parseDiagramAction({
     return {
       elements: parsed.payload.elements,
       appState: parsed.payload.appState ?? {},
+      source: parsed.source,
+      permission: parsed.permission,
+      metadata: parsed.metadata,
       intermediate: simplified.intermediate,
       stats: { ...simplified.stats, traceId },
     };

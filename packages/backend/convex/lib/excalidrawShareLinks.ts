@@ -10,10 +10,16 @@ const NEXT_CHUNK_SIZE_DATAVIEW_BYTES = 4;
 const IV_LENGTH_BYTES = 12;
 const MAX_COMPRESSED_BYTES = 5 * 1024 * 1024;
 const MAX_DECOMPRESSED_BYTES = 20 * 1024 * 1024;
+const MAX_UPSTREAM_BYTES = 25 * 1024 * 1024;
+const DEFAULT_FETCH_TIMEOUT_MS = 10_000;
 
 const EXCALIDRAW_SHARE_URL_PATTERN = /#json=([^,]+),(.+)$/;
 const EXCALIDRAW_GET_URL = "https://json.excalidraw.com/api/v2/";
 const EXCALIDRAW_POST_URL = "https://json.excalidraw.com/api/v2/post/";
+const EXCALIDRAW_PLUS_EXPORT_URL =
+  "https://export.excalidraw.com/api/v1/export/s/";
+const EXCALIDRAW_PLUS_FIRESTORE_URL =
+  "https://firestore.googleapis.com/v1/projects/quickstart-1595168317408/databases/(default)/documents/scenes/";
 
 export interface ExcalidrawShareLinkPayload {
   elements: unknown[];
@@ -27,6 +33,46 @@ export interface ExcalidrawShareLinkResult {
 }
 
 export type ShareUrlType = "v1" | "v2" | "base64" | "unknown";
+
+export type ExcalidrawUrlSource =
+  | "excalidraw-share"
+  | "excalidraw-plus-link"
+  | "excalidraw-plus-readonly";
+
+export type ExcalidrawPermission = "read-only" | "view-and-edit" | "unknown";
+
+export type ParseExcalidrawUrlResult =
+  | {
+      source: "excalidraw-share";
+      permission: "unknown";
+      payload: ExcalidrawShareLinkPayload;
+      metadata: {
+        shareId: string;
+        encryptionKey: string;
+        shareUrlType: ShareUrlType;
+      };
+    }
+  | {
+      source: "excalidraw-plus-link";
+      permission: ExcalidrawPermission;
+      payload: ExcalidrawShareLinkPayload;
+      metadata: {
+        workspaceId: string;
+        sceneId: string;
+        linkSharing?: number;
+      };
+    }
+  | {
+      source: "excalidraw-plus-readonly";
+      permission: ExcalidrawPermission;
+      payload: ExcalidrawShareLinkPayload;
+      metadata: {
+        token: string;
+        workspaceId?: string;
+        sceneId?: string;
+        linkSharing?: number;
+      };
+    };
 
 interface FileEncodingInfo {
   version: number;
@@ -241,6 +287,39 @@ function base64UrlToBytes(str: string): Uint8Array {
   return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
 }
 
+async function fetchWithTimeout(
+  url: string,
+  options?: RequestInit & { timeoutMs?: number }
+): Promise<Response> {
+  const { timeoutMs = DEFAULT_FETCH_TIMEOUT_MS, ...init } = options ?? {};
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function readResponseBytesWithLimit(
+  response: Response,
+  maxBytes: number
+): Promise<Uint8Array> {
+  const contentLength = Number(response.headers.get("content-length") ?? "NaN");
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    throw new Error(
+      `Upstream response too large: ${contentLength} bytes (max ${maxBytes})`
+    );
+  }
+  const buffer = new Uint8Array(await response.arrayBuffer());
+  if (buffer.byteLength > maxBytes) {
+    throw new Error(
+      `Upstream response too large: ${buffer.byteLength} bytes (max ${maxBytes})`
+    );
+  }
+  return buffer;
+}
+
 async function importKey(keyString: string): Promise<CryptoKey> {
   const keyBytes = base64UrlToBytes(keyString);
   let alg: "A128GCM" | "A192GCM" | "A256GCM";
@@ -300,6 +379,8 @@ export async function parseExcalidrawShareLinkWithMetadata(
 ): Promise<{
   payload: ExcalidrawShareLinkPayload;
   shareUrlType: ShareUrlType;
+  shareId: string;
+  encryptionKey: string;
 }> {
   const match = url.match(EXCALIDRAW_SHARE_URL_PATTERN);
   if (!match) {
@@ -320,11 +401,14 @@ export async function parseExcalidrawShareLinkWithMetadata(
     encryptedBuffer = base64UrlToBytes(idOrData);
     shareUrlType = "base64";
   } else {
-    const response = await fetch(`${EXCALIDRAW_GET_URL}${idOrData}`);
+    const response = await fetchWithTimeout(`${EXCALIDRAW_GET_URL}${idOrData}`);
     if (!response.ok) {
       throw new Error(`Fetch failed: ${response.status}`);
     }
-    encryptedBuffer = new Uint8Array(await response.arrayBuffer());
+    encryptedBuffer = await readResponseBytesWithLimit(
+      response,
+      MAX_UPSTREAM_BYTES
+    );
   }
 
   const key = await importKey(keyString);
@@ -333,14 +417,24 @@ export async function parseExcalidrawShareLinkWithMetadata(
     if (shareUrlType !== "base64") {
       shareUrlType = "v2";
     }
-    return { payload: await parseV2(encryptedBuffer, key), shareUrlType };
+    return {
+      payload: await parseV2(encryptedBuffer, key),
+      shareUrlType,
+      shareId: idOrData,
+      encryptionKey: keyString,
+    };
   }
 
   if (shareUrlType !== "base64") {
     shareUrlType = "v1";
   }
 
-  return { payload: await parseV1(encryptedBuffer, key), shareUrlType };
+  return {
+    payload: await parseV1(encryptedBuffer, key),
+    shareUrlType,
+    shareId: idOrData,
+    encryptionKey: keyString,
+  };
 }
 
 export async function parseExcalidrawShareLink(
@@ -348,6 +442,242 @@ export async function parseExcalidrawShareLink(
 ): Promise<ExcalidrawShareLinkPayload> {
   const { payload } = await parseExcalidrawShareLinkWithMetadata(url);
   return payload;
+}
+
+function permissionFromLinkSharing(
+  linkSharing: number | undefined
+): ExcalidrawPermission {
+  if (typeof linkSharing !== "number" || !Number.isFinite(linkSharing)) {
+    return "unknown";
+  }
+  const value = Math.trunc(linkSharing);
+  if (!Number.isFinite(value)) {
+    return "unknown";
+  }
+  // Excalidraw+ linkSharing is a bitfield; observed values: 1 (read-only), 3 (view+edit).
+  const canEdit = Math.trunc(value / 2) % 2 === 1;
+  return canEdit ? "view-and-edit" : "read-only";
+}
+
+function parsePlusLinkParts(
+  parsedUrl: URL
+): { workspaceId: string; sceneId: string } | null {
+  const hostname = parsedUrl.hostname.toLowerCase();
+  if (hostname !== "link.excalidraw.com" && hostname !== "app.excalidraw.com") {
+    return null;
+  }
+  const parts = parsedUrl.pathname.split("/").filter(Boolean);
+  if (parts[0] !== "l") {
+    return null;
+  }
+  const workspaceId = parts[1];
+  const sceneId = parts[2];
+  if (!(workspaceId && sceneId)) {
+    throw new Error("Invalid Excalidraw+ link URL format");
+  }
+  return { workspaceId, sceneId };
+}
+
+function parseReadonlyToken(parsedUrl: URL): string | null {
+  const hostname = parsedUrl.hostname.toLowerCase();
+  if (hostname !== "link.excalidraw.com") {
+    return null;
+  }
+  const parts = parsedUrl.pathname.split("/").filter(Boolean);
+  if (parts[0] !== "readonly") {
+    return null;
+  }
+  const token = parts.slice(1).join("/");
+  if (!token) {
+    throw new Error("Invalid Excalidraw+ readonly URL format");
+  }
+  return token;
+}
+
+function extractNextDataJson(html: string): unknown {
+  const marker = '<script id="__NEXT_DATA__" type="application/json">';
+  const start = html.indexOf(marker);
+  if (start < 0) {
+    throw new Error(
+      "Failed to parse readonly link HTML: __NEXT_DATA__ missing"
+    );
+  }
+  const jsonStart = start + marker.length;
+  const end = html.indexOf("</script>", jsonStart);
+  if (end < 0) {
+    throw new Error(
+      "Failed to parse readonly link HTML: __NEXT_DATA__ truncated"
+    );
+  }
+  const jsonStr = html.slice(jsonStart, end);
+  try {
+    return JSON.parse(jsonStr) as unknown;
+  } catch {
+    throw new Error(
+      "Failed to parse readonly link HTML: invalid __NEXT_DATA__ JSON"
+    );
+  }
+}
+
+async function fetchExportedScene(params: { sceneId: string }): Promise<{
+  payload: ExcalidrawShareLinkPayload;
+}> {
+  const response = await fetchWithTimeout(
+    `${EXCALIDRAW_PLUS_EXPORT_URL}${params.sceneId}/format/json/scene`
+  );
+  if (!response.ok) {
+    throw new Error(`Export fetch failed: ${response.status}`);
+  }
+  const bytes = await readResponseBytesWithLimit(response, MAX_UPSTREAM_BYTES);
+  const text = new TextDecoder().decode(bytes);
+  let json: unknown;
+  try {
+    json = JSON.parse(text) as unknown;
+  } catch {
+    throw new Error("Export fetch failed: invalid JSON");
+  }
+
+  const scene = json as {
+    elements?: unknown;
+    appState?: unknown;
+  };
+
+  if (!Array.isArray(scene.elements)) {
+    throw new Error("Export fetch failed: missing elements array");
+  }
+  if (!scene.appState || typeof scene.appState !== "object") {
+    throw new Error("Export fetch failed: missing appState");
+  }
+
+  return {
+    payload: {
+      elements: scene.elements,
+      appState: scene.appState as Record<string, unknown>,
+    },
+  };
+}
+
+async function fetchLinkSharing(sceneId: string): Promise<number | undefined> {
+  const response = await fetchWithTimeout(
+    `${EXCALIDRAW_PLUS_FIRESTORE_URL}${sceneId}`
+  );
+  if (!response.ok) {
+    return undefined;
+  }
+  const bytes = await readResponseBytesWithLimit(response, MAX_UPSTREAM_BYTES);
+  const text = new TextDecoder().decode(bytes);
+  try {
+    const json = JSON.parse(text) as {
+      fields?: { linkSharing?: { integerValue?: string } };
+    };
+    const raw = json.fields?.linkSharing?.integerValue;
+    const value = raw != null ? Number(raw) : Number.NaN;
+    return Number.isFinite(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function parseExcalidrawUrl(
+  url: string
+): Promise<ParseExcalidrawUrlResult> {
+  if (EXCALIDRAW_SHARE_URL_PATTERN.test(url)) {
+    const parsed = await parseExcalidrawShareLinkWithMetadata(url);
+    return {
+      source: "excalidraw-share",
+      permission: "unknown",
+      payload: parsed.payload,
+      metadata: {
+        shareId: parsed.shareId,
+        encryptionKey: parsed.encryptionKey,
+        shareUrlType: parsed.shareUrlType,
+      },
+    };
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    throw new Error("Invalid Excalidraw URL format");
+  }
+
+  const plusLink = parsePlusLinkParts(parsedUrl);
+  if (plusLink) {
+    const exported = await fetchExportedScene({ sceneId: plusLink.sceneId });
+    const linkSharing = await fetchLinkSharing(plusLink.sceneId);
+    return {
+      source: "excalidraw-plus-link",
+      permission: permissionFromLinkSharing(linkSharing),
+      payload: exported.payload,
+      metadata: {
+        workspaceId: plusLink.workspaceId,
+        sceneId: plusLink.sceneId,
+        linkSharing,
+      },
+    };
+  }
+
+  const readonlyToken = parseReadonlyToken(parsedUrl);
+  if (readonlyToken) {
+    const response = await fetchWithTimeout(parsedUrl.toString());
+    if (!response.ok) {
+      throw new Error(`Readonly fetch failed: ${response.status}`);
+    }
+    const bytes = await readResponseBytesWithLimit(
+      response,
+      MAX_UPSTREAM_BYTES
+    );
+    const html = new TextDecoder().decode(bytes);
+    const nextData = extractNextDataJson(html) as {
+      props?: {
+        pageProps?: {
+          sceneContents?: { elements?: unknown; appState?: unknown };
+          sceneMetadata?: {
+            linkSharing?: number;
+            workspace?: string;
+            id?: string;
+          };
+          readOnlyLink?: { workspace?: string; scene?: string };
+        };
+      };
+    };
+
+    const pageProps = nextData.props?.pageProps;
+    const sceneContents = pageProps?.sceneContents;
+    if (!Array.isArray(sceneContents?.elements)) {
+      throw new Error("Readonly fetch failed: missing elements array");
+    }
+    if (
+      !sceneContents?.appState ||
+      typeof sceneContents.appState !== "object"
+    ) {
+      throw new Error("Readonly fetch failed: missing appState");
+    }
+
+    const linkSharing = pageProps?.sceneMetadata?.linkSharing;
+    const workspaceId =
+      pageProps?.readOnlyLink?.workspace ?? pageProps?.sceneMetadata?.workspace;
+    const sceneId =
+      pageProps?.readOnlyLink?.scene ?? pageProps?.sceneMetadata?.id;
+
+    return {
+      source: "excalidraw-plus-readonly",
+      permission: permissionFromLinkSharing(linkSharing),
+      payload: {
+        elements: sceneContents.elements,
+        appState: sceneContents.appState as Record<string, unknown>,
+      },
+      metadata: {
+        token: readonlyToken,
+        workspaceId,
+        sceneId,
+        linkSharing,
+      },
+    };
+  }
+
+  throw new Error("Unsupported Excalidraw URL format");
 }
 
 export async function createExcalidrawShareLink(
@@ -359,7 +689,7 @@ export async function createExcalidrawShareLink(
     appState,
   });
 
-  const response = await fetch(EXCALIDRAW_POST_URL, {
+  const response = await fetchWithTimeout(EXCALIDRAW_POST_URL, {
     method: "POST",
     body: new Uint8Array(body),
   });
