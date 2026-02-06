@@ -9,7 +9,7 @@ const DEFAULT_STYLE_SETTINGS = {
   strokeWidth: 1,
   strokeStyle: "solid",
   fillStyle: "hachure",
-  roughness: 1,
+  roughness: 0.4,
   opacity: 100,
 } as const;
 
@@ -176,7 +176,11 @@ export const update = mutation({
       updates.description = description;
     }
     if (styleSettings !== undefined) {
-      updates.styleSettings = styleSettings;
+      const clampedRoughness = Math.max(
+        0,
+        Math.min(2, styleSettings.roughness)
+      );
+      updates.styleSettings = { ...styleSettings, roughness: clampedRoughness };
     }
 
     await ctx.db.patch(id, updates);
