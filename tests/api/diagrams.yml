@@ -9,6 +9,8 @@ vars:
   trace_id_error: "00000000-0000-4000-8000-000000000105"
   encoded_share_prefix: "https%3A%2F%2Fexcalidraw.com%2F%23json%3D"
   encoded_v2_share_url: "https%3A%2F%2Fexcalidraw.com%2F%23json%3Du124S5epdCKEF07WlyRT7%2C_gQTcjl4lABzz__Fcytufg"
+  plus_link_share_url: "https://link.excalidraw.com/l/9e01NdVniGv/40KFTlwYlBD"
+  encoded_plus_link_share_url: "https%3A%2F%2Flink.excalidraw.com%2Fl%2F9e01NdVniGv%2F40KFTlwYlBD"
   test_intermediate:
     nodes:
       - id: "node-1"
@@ -262,6 +264,57 @@ testcases:
           - result.bodyjson.stats.nodeCount ShouldEqual 3
           - result.bodyjson.stats.edgeCount ShouldEqual 0
           - result.bodyjson.stats.elementCount ShouldEqual 6
+
+  - name: parse_plus_link_share_regression
+    steps:
+      - type: http
+        method: GET
+        url: "{{.target_url}}/api/diagrams/parse?shareUrl={{.encoded_plus_link_share_url}}"
+        headers:
+          x-vercel-protection-bypass: "{{.bypass_secret}}"
+        assertions:
+          - result.statuscode ShouldEqual 200
+          - result.bodyjson.source ShouldEqual "excalidraw-plus-link"
+          - result.bodyjson.permission ShouldEqual "read-only"
+          - result.bodyjson.stats.elementCount ShouldBeGreaterThan 0
+
+  - name: modify_plus_link_share_explicit_edits
+    steps:
+      - type: http
+        method: POST
+        url: "{{.target_url}}/api/diagrams/modify"
+        headers:
+          Content-Type: application/json
+          x-vercel-protection-bypass: "{{.bypass_secret}}"
+          x-trace-id: "{{.trace_id_modify}}"
+        body: |
+          {
+            "shareUrl": "{{.plus_link_share_url}}",
+            "request": "browserbase-playwright_text text = 'Browserbase Playwright UPDATED' browserbase-playwright_text originalText = 'Browserbase Playwright UPDATED'",
+            "options": { "preferExplicitEdits": true }
+          }
+        vars:
+          modified_share_id:
+            from: result.bodyjson.shareLink.shareId
+        assertions:
+          - result.statuscode ShouldEqual 200
+          - result.headers.X-Trace-Id ShouldEqual "{{.trace_id_modify}}"
+          - result.bodyjson.status ShouldEqual "success"
+          - result.bodyjson.shareLink.url ShouldContainSubstring "https://excalidraw.com/#json="
+
+      - type: exec
+        script: |
+          set -e
+          tmpfile="$(mktemp)"
+          curl -fsSL --retry 3 --retry-all-errors -o "$tmpfile" "https://json.excalidraw.com/api/v2/{{.modify_plus_link_share_explicit_edits.modified_share_id}}"
+          od -An -t x1 -N 4 "$tmpfile" | tr -d ' \n'
+          rm -f "$tmpfile"
+        vars:
+          v2_magic:
+            from: result.systemout
+        assertions:
+          - result.code ShouldEqual 0
+          - result.systemout ShouldEqual "00000001"
   - name: error_trace
     steps:
       - type: http
