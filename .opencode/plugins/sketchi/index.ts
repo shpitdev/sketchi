@@ -2,12 +2,13 @@ import { tool, type Plugin } from "@opencode-ai/plugin";
 import { fetchJson, shareElements } from "./lib/api";
 import {
   extractShareLink,
-  parseExcalidrawShareLink,
   readExcalidrawFile,
 } from "./lib/excalidraw";
 import { buildDefaultPngPath, resolveOutputPath, writePng } from "./lib/output";
 import { closeBrowser, renderElementsToPng } from "./lib/render";
 import { gradeDiagram } from "./lib/grade";
+import { resolveExcalidrawFromShareUrl } from "./lib/resolve-share-url";
+import { createToolTraceId } from "./lib/trace";
 
 const DEFAULT_API_BASE = "https://www.sketchi.app";
 
@@ -45,6 +46,7 @@ export const SketchiPlugin: Plugin = async (input) => {
             .describe("Include white background in PNG"),
         },
         async execute(args, context) {
+          const traceId = createToolTraceId();
           const response = await fetchJson<{
             shareLink: { url: string; shareId: string; encryptionKey: string };
             elements: Record<string, unknown>[];
@@ -54,7 +56,10 @@ export const SketchiPlugin: Plugin = async (input) => {
             `${apiBase}/api/diagrams/generate`,
             {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                "x-trace-id": traceId,
+              },
               body: JSON.stringify({
                 prompt: args.prompt,
               }),
@@ -140,6 +145,7 @@ export const SketchiPlugin: Plugin = async (input) => {
         },
         async execute(args, context) {
           const requestTimeoutMs = 60_000;
+          const traceId = createToolTraceId();
           let shareUrl = args.shareUrl;
           if (!shareUrl) {
             const excalidraw =
@@ -162,7 +168,8 @@ export const SketchiPlugin: Plugin = async (input) => {
                 appState: excalidraw.appState,
               },
               context.abort,
-              requestTimeoutMs
+              requestTimeoutMs,
+              traceId
             );
 
             shareUrl = shared.url;
@@ -178,7 +185,10 @@ export const SketchiPlugin: Plugin = async (input) => {
             `${apiBase}/api/diagrams/modify`,
             {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                "x-trace-id": traceId,
+              },
               body: JSON.stringify({
                 shareUrl,
                 request: args.request,
@@ -205,8 +215,14 @@ export const SketchiPlugin: Plugin = async (input) => {
             const elements =
               response.elements?.length
                 ? response.elements
-                : (await parseExcalidrawShareLink(response.shareLink.url))
-                    .elements;
+                : (
+                    await resolveExcalidrawFromShareUrl({
+                      shareUrl: response.shareLink.url,
+                      apiBase,
+                      traceId,
+                      abort: context.abort,
+                    })
+                  ).elements;
             const pngResult = await renderElementsToPng(elements, {
               scale: args.scale,
               padding: args.padding,
@@ -268,6 +284,7 @@ export const SketchiPlugin: Plugin = async (input) => {
             .describe("Include white background in PNG"),
         },
         async execute(args, context) {
+          const traceId = createToolTraceId();
           const excalidraw =
             args.excalidraw ??
             (args.excalidrawPath
@@ -293,8 +310,13 @@ export const SketchiPlugin: Plugin = async (input) => {
 
             if (args.shareUrl) {
               shareLink = extractShareLink(args.shareUrl);
-              const parsed = await parseExcalidrawShareLink(args.shareUrl);
-              elements = parsed.elements as Record<string, unknown>[];
+              const resolved = await resolveExcalidrawFromShareUrl({
+                shareUrl: args.shareUrl,
+                apiBase,
+                traceId,
+                abort: context.abort,
+              });
+              elements = resolved.elements;
             } else if (excalidraw) {
               const shared = await shareElements(
                 apiBase,
@@ -302,7 +324,9 @@ export const SketchiPlugin: Plugin = async (input) => {
                   elements: excalidraw.elements,
                   appState: excalidraw.appState,
                 },
-                context.abort
+                context.abort,
+                undefined,
+                traceId
               );
               shareLink = shared;
               elements = excalidraw.elements;
@@ -379,6 +403,7 @@ export const SketchiPlugin: Plugin = async (input) => {
             .describe("Include white background in PNG"),
         },
         async execute(args, context) {
+          const traceId = createToolTraceId();
           const excalidraw = args.excalidraw
             ? {
                 elements: args.excalidraw.elements,
@@ -409,6 +434,7 @@ export const SketchiPlugin: Plugin = async (input) => {
               apiBase,
               baseDir: context.directory,
               abort: context.abort,
+              traceId,
             }
           );
 

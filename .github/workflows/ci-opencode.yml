@@ -1,0 +1,41 @@
+# CI OpenCode - Typecheck + unit tests for .opencode workspace
+# Trigger: PR, main push (only when .opencode/** changes)
+name: ci-opencode
+
+on:
+  pull_request:
+    paths:
+      - ".opencode/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".opencode/**"
+
+jobs:
+  opencode:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.5
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile || (
+            echo "bun install failed; clearing Bun cache and retrying" >&2
+            bun pm cache rm
+            bun install --frozen-lockfile
+          )
+
+      - name: Typecheck .opencode
+        run: bun x tsc -p .opencode/tsconfig.ci.json
+
+      - name: Run .opencode unit tests
+        working-directory: .opencode
+        run: bun test plugins/sketchi/lib/resolve-share-url.test.ts

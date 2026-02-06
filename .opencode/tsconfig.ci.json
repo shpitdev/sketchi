@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["plugins/sketchi/index.ts", "plugins/sketchi/lib/**/*.ts"],
+  "exclude": ["node_modules/**"]
+}
+

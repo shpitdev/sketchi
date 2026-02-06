@@ -35,13 +35,17 @@ export async function shareElements(
     appState?: Record<string, unknown>;
   },
   abort?: AbortSignal,
-  timeoutMs?: number
+  timeoutMs?: number,
+  traceId?: string
 ): Promise<{ url: string; shareId: string; encryptionKey: string }> {
   return await fetchJson<{ url: string; shareId: string; encryptionKey: string }>(
     `${apiBase}/api/diagrams/share`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(traceId ? { "x-trace-id": traceId } : {}),
+      },
       body: JSON.stringify({
         elements: input.elements,
         appState: input.appState ?? {},

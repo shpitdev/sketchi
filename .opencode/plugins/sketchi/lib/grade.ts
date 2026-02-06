@@ -3,7 +3,6 @@ import { pathToFileURL } from "node:url";
 import { buildDefaultPngPath, resolveOutputPath, writePng } from "./output";
 import {
   extractShareLink,
-  parseExcalidrawShareLink,
   readExcalidrawFile,
   summarizeElements,
   type ExcalidrawFile,
@@ -11,6 +10,7 @@ import {
 } from "./excalidraw";
 import { closeBrowser, renderElementsToPng, type RenderOptions } from "./render";
 import { shareElements } from "./api";
+import { resolveExcalidrawFromShareUrl } from "./resolve-share-url";
 
 export type DiagramGradeInput = {
   prompt: string;
@@ -24,6 +24,7 @@ export type DiagramGradeInput = {
   apiBase: string;
   baseDir: string;
   abort?: AbortSignal;
+  traceId?: string;
 };
 
 export type DiagramGradeResult = {
@@ -114,13 +115,18 @@ async function resolveExcalidraw(
 ): Promise<{
   excalidraw: ExcalidrawFile | null;
   shareLink?: { url: string; shareId?: string; encryptionKey?: string };
-}> {
+  }> {
   if (input.shareUrl) {
-    const parsed = await parseExcalidrawShareLink(input.shareUrl);
+    const resolved = await resolveExcalidrawFromShareUrl({
+      shareUrl: input.shareUrl,
+      apiBase: input.apiBase,
+      traceId: input.traceId,
+      abort: input.abort,
+    });
     return {
       excalidraw: {
-        elements: parsed.elements,
-        appState: parsed.appState ?? {},
+        elements: resolved.elements,
+        appState: resolved.appState ?? {},
       },
       shareLink: extractShareLink(input.shareUrl),
     };
@@ -189,7 +195,9 @@ export async function gradeDiagram(
         elements: resolved.excalidraw.elements,
         appState: resolved.excalidraw.appState,
       },
-      input.abort
+      input.abort,
+      undefined,
+      input.traceId
     );
     shareLink = shared;
   }
@@ -211,9 +219,10 @@ export async function gradeDiagram(
       summary,
     });
 
-    const parts: Array<{ type: "text" | "file"; text?: string; url?: string; mime?: string; filename?: string }> = [
-      { type: "text", text: prompt },
-    ];
+    const parts: Array<
+      | { type: "text"; text: string }
+      | { type: "file"; url: string; mime: string; filename: string }
+    > = [{ type: "text", text: prompt }];
 
     if (pngPath) {
       parts.push({
@@ -235,8 +244,8 @@ export async function gradeDiagram(
       throwOnError: true,
     });
 
-    const text = Array.isArray(response?.parts)
-      ? response.parts
+    const text = Array.isArray(response.data.parts)
+      ? response.data.parts
           .map((part: { type?: string; text?: string }) =>
             part.type === "text" ? part.text ?? "" : ""
           )
