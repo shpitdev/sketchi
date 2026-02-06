@@ -6,7 +6,7 @@ import { modifyElementsWithAgent } from "./diagramModifyElements";
 import {
   createExcalidrawShareLink,
   detectShareUrlType,
-  parseExcalidrawShareLinkWithMetadata,
+  parseExcalidrawUrl,
 } from "./lib/excalidrawShareLinks";
 import { hashString, logEventSafely } from "./lib/observability";
 
@@ -23,6 +23,7 @@ export const diagramModifyFromShareLink = action({
   args: {
     url: v.string(),
     request: v.string(),
+    traceId: v.optional(v.string()),
     output: v.optional(v.string()),
     options: v.optional(
       v.object({
@@ -33,7 +34,7 @@ export const diagramModifyFromShareLink = action({
     ),
   },
   handler: async (_ctx, args) => {
-    const traceId = crypto.randomUUID();
+    const traceId = args.traceId ?? crypto.randomUUID();
     const outputMode = normalizeOutputMode(args.output);
 
     logEventSafely({
@@ -47,18 +48,21 @@ export const diagramModifyFromShareLink = action({
       outputMode,
     });
 
-    let parsed: Awaited<
-      ReturnType<typeof parseExcalidrawShareLinkWithMetadata>
-    >;
+    let parsed: Awaited<ReturnType<typeof parseExcalidrawUrl>>;
     try {
-      parsed = await parseExcalidrawShareLinkWithMetadata(args.url);
+      parsed = await parseExcalidrawUrl(args.url);
       logEventSafely({
         traceId,
         actionName: "diagramModifyFromShareLink",
         op: "pipeline.parseShareLink",
         stage: "share.parse",
         status: "success",
-        shareUrlType: parsed.shareUrlType,
+        shareUrlType:
+          parsed.source === "excalidraw-share"
+            ? parsed.metadata.shareUrlType
+            : undefined,
+        excalidrawSource: parsed.source,
+        excalidrawPermission: parsed.permission,
         elementCount: parsed.payload.elements.length,
       });
     } catch (error) {
