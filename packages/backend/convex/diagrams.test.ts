@@ -1,14 +1,15 @@
 /**
  * TEST SCENARIO: Convex diagrams actions
  * - generateDiagram uses mocked intermediate and produces a share link
- * - modifyDiagram applies explicit edits and returns updated elements + share link
+ * - tweakDiagram applies explicit edits and returns updated elements + share link
+ * - restructureDiagram applies intermediate changes and returns updated elements + share link
  * - parseDiagram converts share link elements into IntermediateFormat
  * - shareDiagram returns a valid Excalidraw share link
  */
 
 import { convexTest } from "convex-test";
 import { beforeAll, describe, expect, test, vi } from "vitest";
-import { generateIntermediate } from "../lib/agents";
+import { generateIntermediate, modifyIntermediate } from "../lib/agents";
 import type { IntermediateFormat } from "../lib/diagram-intermediate";
 import { renderIntermediateDiagram } from "../lib/diagram-renderer";
 import { api } from "./_generated/api";
@@ -18,6 +19,7 @@ import { modules } from "./test.setup";
 
 vi.mock("../lib/agents", () => ({
   generateIntermediate: vi.fn(),
+  modifyIntermediate: vi.fn(),
 }));
 
 const t = convexTest(schema, modules);
@@ -121,8 +123,8 @@ describe.sequential("diagrams actions", () => {
     expect(result.stats.traceId).toBe("trace-mocked");
   });
 
-  test("modifyDiagram applies explicit edits", async () => {
-    const result = await t.action(api.diagrams.modifyDiagram, {
+  test("tweakDiagram applies explicit edits", async () => {
+    const result = await t.action(api.diagrams.tweakDiagram, {
       shareUrl: baseShareLink.url,
       request:
         "node-1_text text = 'Updated Start' node-1_text originalText = 'Updated Start'",
@@ -134,6 +136,7 @@ describe.sequential("diagrams actions", () => {
     expect(result.status).toBe("success");
     expect(result.shareLink?.url).toContain("https://excalidraw.com/#json=");
     expect(result.stats.traceId).toBeTruthy();
+    expect(result.stats.strategy).toBe("tweak");
     const updatedText = result.elements?.find(
       (element: unknown) =>
         typeof element === "object" &&
@@ -144,10 +147,10 @@ describe.sequential("diagrams actions", () => {
     expect(updatedText?.text).toBe("Updated Start");
   });
 
-  test("modifyDiagram returns V2 share link for V1 input", async () => {
+  test("tweakDiagram returns V2 share link for V1 input", async () => {
     const v1ShareUrl = await createV1ShareLink(RENDERED.elements, {});
 
-    const result = await t.action(api.diagrams.modifyDiagram, {
+    const result = await t.action(api.diagrams.tweakDiagram, {
       shareUrl: v1ShareUrl,
       request:
         "node-1_text text = 'Updated Start' node-1_text originalText = 'Updated Start'",
@@ -158,6 +161,7 @@ describe.sequential("diagrams actions", () => {
 
     expect(result.status).toBe("success");
     expect(result.shareLink?.shareId).toBeTruthy();
+    expect(result.stats.strategy).toBe("tweak");
 
     const shareId = result.shareLink?.shareId ?? "";
     const rawFetch = await fetch(`${EXCALIDRAW_GET_URL}${shareId}`);
@@ -168,6 +172,47 @@ describe.sequential("diagrams actions", () => {
         0
       )
     ).toBe(1);
+  });
+
+  test("restructureDiagram returns new share link + elements (mocked intermediate)", async () => {
+    const mockedModify = vi.mocked(modifyIntermediate);
+    mockedModify.mockResolvedValue({
+      intermediate: {
+        nodes: [
+          { id: "node-1", label: "Start" },
+          { id: "node-qa", label: "QA" },
+          { id: "node-2", label: "End" },
+        ],
+        edges: [
+          { fromId: "node-1", toId: "node-qa", label: "review" },
+          { fromId: "node-qa", toId: "node-2", label: "approve" },
+        ],
+        graphOptions: { diagramType: "flowchart" },
+      },
+      profileId: "general",
+      iterations: 2,
+      tokens: 50,
+      durationMs: 100,
+      traceId: "trace-restructure",
+    });
+
+    const result = await t.action(api.diagrams.restructureDiagram, {
+      shareUrl: baseShareLink.url,
+      prompt: "Insert a QA step between Start and End.",
+      traceId: "trace-restructure",
+      options: { timeoutMs: 60_000, maxSteps: 3 },
+    });
+
+    expect(result.status).toBe("success");
+    expect(result.shareLink?.url).toContain("https://excalidraw.com/#json=");
+    expect(Array.isArray(result.elements)).toBe(true);
+    expect(result.stats.traceId).toBe("trace-restructure");
+    expect(result.stats.strategy).toBe("restructure");
+    expect(result.stats.nodeCount).toBeGreaterThanOrEqual(3);
+    // Ensure restructure response does not expose intermediate payload.
+    expect(
+      "intermediate" in (result as unknown as Record<string, unknown>)
+    ).toBe(false);
   });
 
   test("parseDiagram extracts IntermediateFormat", async () => {

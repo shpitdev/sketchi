@@ -18,28 +18,35 @@ const MAX_TIMEOUT_MS = 240_000;
 const DEFAULT_MODEL =
   process.env.MODEL_NAME?.trim() || "google/gemini-3-flash-preview";
 
-const MODIFICATION_SYSTEM_PROMPT = `You modify existing Excalidraw diagrams by producing an element-level diff.
+const GEOMETRY_FIELD_ASSIGNMENT_RE = /\b(x|y|width|height)\s*=/i;
 
-You must return a JSON object that matches the schema:
-{
-  "add": [ExcalidrawElementSkeleton...],
-  "remove": [elementId...],
-  "modify": [{ "id": "...", "changes": { ... } }]
-}
+const MODIFICATION_SYSTEM_PROMPT = `You apply tactical tweaks to existing Excalidraw diagrams by producing an element-level diff.
 
-Rules:
-- Only change what the request asks.
-- Keep existing element ids unchanged.
-- Never include an id field inside changes; only use modify.id to select the element.
-- Use existing ids for bindings (startBinding/endBinding/containerId/boundElements).
-- If you change arrow bindings, ensure references remain valid.
-- If you remove an element that others reference, you must also update those references.
-- When updating labels, edit the bound text element and set both text + originalText.
-- Omit empty arrays (do not include add/remove/modify when empty).
-
-After drafting the diff, call the validateAndApplyDiff tool.
-If it returns ok=false, fix the issues and call it again.
-If it returns ok=true, respond with the same diff as your final output (no tool call).`;
+This tool is for small, safe edits only:
+- Allowed: update text labels, change colors/styles, flip an existing arrow direction between existing nodes.
+- Forbidden: add/remove nodes/edges/elements, change geometry/layout (x/y/width/height/points/angle), "make it prettier"/re-layout/align/spacing.
+If the request is out of scope, do not attempt a workaround; the request should be handled by restructure or in the Excalidraw UI.
+	
+	You must return a JSON object that matches the schema:
+	{
+	  "add": [ExcalidrawElementSkeleton...],
+	  "remove": [elementId...],
+	  "modify": [{ "id": "...", "changes": { ... } }]
+	}
+	
+	Rules:
+	- Only change what the request asks.
+	- Keep existing element ids unchanged.
+	- Never include an id field inside changes; only use modify.id to select the element.
+	- Use existing ids for bindings (startBinding/endBinding/containerId/boundElements).
+	- If you change arrow bindings, ensure references remain valid.
+	- Never use add/remove in this tool; only modify existing elements.
+	- When updating labels, edit the bound text element and set both text + originalText.
+	- Omit empty arrays (do not include add/remove/modify when empty).
+	
+	After drafting the diff, call the validateAndApplyDiff tool.
+	If it returns ok=false, fix the issues and call it again.
+	If it returns ok=true, respond with the same diff as your final output (no tool call).`;
 
 interface DiagramModifyStats {
   iterations: number;
@@ -50,7 +57,11 @@ interface DiagramModifyStats {
 
 interface DiagramModifyResult {
   status: "success" | "failed";
-  reason?: "invalid-elements" | "invalid-diff" | "error";
+  reason?:
+    | "invalid-elements"
+    | "invalid-diff"
+    | "unsupported-request"
+    | "error";
   elements?: unknown[];
   appState?: Record<string, unknown>;
   changes?: {
@@ -67,6 +78,123 @@ interface DiagramIssue {
   code: string;
   message: string;
   elementId?: string;
+}
+
+const DISALLOWED_TWEAK_CHANGE_KEYS = new Set([
+  "x",
+  "y",
+  "width",
+  "height",
+  "points",
+  "angle",
+  "isDeleted",
+  "type",
+]);
+
+function validateTweakDiffConstraints(
+  diff: DiagramElementDiff
+): DiagramIssue[] {
+  const issues: DiagramIssue[] = [];
+
+  if (Array.isArray(diff.add) && diff.add.length > 0) {
+    issues.push({
+      code: "unsupported-add",
+      message:
+        "tweak cannot add new elements (nodes/edges). Use restructure or edit in Excalidraw UI.",
+    });
+  }
+
+  if (Array.isArray(diff.remove) && diff.remove.length > 0) {
+    issues.push({
+      code: "unsupported-remove",
+      message:
+        "tweak cannot remove elements (nodes/edges). Use restructure or edit in Excalidraw UI.",
+    });
+  }
+
+  for (const entry of diff.modify ?? []) {
+    if (!entry) {
+      continue;
+    }
+    const changes = entry.changes;
+    if (!changes || typeof changes !== "object") {
+      continue;
+    }
+    for (const key of Object.keys(changes)) {
+      if (!DISALLOWED_TWEAK_CHANGE_KEYS.has(key)) {
+        continue;
+      }
+      issues.push({
+        code: "unsupported-geometry",
+        elementId: entry.id,
+        message: `tweak cannot change '${key}'. Layout/geometry changes belong in the Excalidraw UI.`,
+      });
+    }
+  }
+
+  return issues;
+}
+
+function detectUnsupportedTweakRequest(request: string): DiagramIssue[] | null {
+  const normalized = request.toLowerCase();
+  const reasons: string[] = [];
+
+  const structuralHints = [
+    "add ",
+    "remove ",
+    "delete ",
+    "create ",
+    "insert ",
+    "new node",
+    "new edge",
+    "new arrow",
+    "connect ",
+    "disconnect ",
+    "restructure",
+  ];
+  if (structuralHints.some((hint) => normalized.includes(hint))) {
+    reasons.push(
+      "structural change requested (add/remove/connect/restructure)"
+    );
+  }
+
+  const layoutHints = [
+    "layout",
+    "re-layout",
+    "relayout",
+    "align",
+    "center",
+    "spacing",
+    "space out",
+    "move ",
+    "position",
+    "resize",
+    "bigger",
+    "smaller",
+    "prettier",
+    "beautify",
+    "tidy",
+    "organize",
+  ];
+  if (layoutHints.some((hint) => normalized.includes(hint))) {
+    reasons.push("layout/geometry requested");
+  }
+
+  const geometryFieldEdit = GEOMETRY_FIELD_ASSIGNMENT_RE.test(request);
+  if (geometryFieldEdit) {
+    reasons.push("explicit geometry edits (x/y/width/height) requested");
+  }
+
+  if (reasons.length === 0) {
+    return null;
+  }
+
+  return [
+    {
+      code: "unsupported-request",
+      message: `tweak only supports tactical edits (text/colors/flip existing arrow direction). Use restructure for structural changes. Detected: ${reasons.join(", ")}.`,
+    },
+  ];
 }
 
 interface DiagramChangeSet {
@@ -441,11 +569,15 @@ function applyExplicitEditsIfPreferred(params: {
   }
 
   const diff = buildDiffFromExplicitEdits(params.explicitEdits);
+  const stats = buildStatsResult(params.startedAt, params.traceId, 0, 0);
+  const constraintIssues = validateTweakDiffConstraints(diff);
+  if (constraintIssues.length > 0) {
+    return buildFailureResult("unsupported-request", constraintIssues, stats);
+  }
   const applied = applyDiagramDiff(
     params.elements as unknown as Parameters<typeof applyDiagramDiff>[0],
     diff
   );
-  const stats = buildStatsResult(params.startedAt, params.traceId, 0, 0);
 
   if (!applied.ok) {
     return buildFailureResult("invalid-diff", applied.issues, stats);
@@ -476,6 +608,11 @@ function createValidationTool(params: {
           params.tracking.lastIssues = missingEdits;
           return { ok: false as const, issues: missingEdits };
         }
+      }
+      const constraintIssues = validateTweakDiffConstraints(diff);
+      if (constraintIssues.length > 0) {
+        params.tracking.lastIssues = constraintIssues;
+        return { ok: false as const, issues: constraintIssues };
       }
       const result = applyDiagramDiff(
         params.elements as unknown as Parameters<typeof applyDiagramDiff>[0],
@@ -562,7 +699,7 @@ function createModificationAgent(params: {
         toolCalls: toolCalls?.length ?? 0,
         tokens: usage.totalTokens ?? 0,
       });
-      console.log("[ai.modifyDiagram.step]", {
+      console.log("[ai.diagramModifyElements.step]", {
         traceId: params.traceId,
         toolCalls: toolCalls?.length ?? 0,
         totalTokens: usage.totalTokens,
@@ -605,7 +742,7 @@ async function runAgentAttempts(params: {
         prompt: params.prompt,
         timeout: remaining,
       });
-      console.log("[ai.modifyDiagram.completed]", {
+      console.log("[ai.diagramModifyElements.completed]", {
         traceId: params.traceId,
         responseId: result.response.id,
       });
@@ -841,6 +978,31 @@ export async function modifyElementsWithAgent(
   const explicitEdits = extractExplicitEdits(args.request).filter((edit) =>
     elementIds.has(edit.id)
   );
+
+  const explicitPreferred =
+    args.options?.preferExplicitEdits === true && explicitEdits.length > 0;
+  if (!explicitPreferred) {
+    const unsupportedIssues = detectUnsupportedTweakRequest(args.request);
+    if (unsupportedIssues) {
+      const stats = buildStatsResult(startedAt, traceId, 0, 0);
+      logEventSafely(
+        {
+          traceId,
+          actionName: "diagramModifyElements",
+          op: "pipeline.scope",
+          stage: "request.classify",
+          status: "failed",
+          issuesCount: unsupportedIssues.length,
+        },
+        { level: "warning" }
+      );
+      return buildFailureResult(
+        "unsupported-request",
+        unsupportedIssues,
+        stats
+      );
+    }
+  }
 
   const explicitResult = applyExplicitEditsIfPreferred({
     preferExplicitEdits: args.options?.preferExplicitEdits,

@@ -152,7 +152,7 @@ testcases:
 
       - type: http
         method: POST
-        url: "{{.target_url}}/api/diagrams/modify"
+        url: "{{.target_url}}/api/diagrams/tweak"
         headers:
           Content-Type: application/json
           x-vercel-protection-bypass: "{{.bypass_secret}}"
@@ -172,6 +172,7 @@ testcases:
           - result.bodyjson.status ShouldEqual "success"
           - result.bodyjson.shareLink.url ShouldContainSubstring "https://excalidraw.com/#json="
           - result.bodyjson.stats.traceId ShouldEqual "{{.trace_id_modify}}"
+          - result.bodyjson.stats.strategy ShouldEqual "tweak"
 
       - type: exec
         script: |
@@ -279,11 +280,11 @@ testcases:
           - result.bodyjson.permission ShouldEqual "read-only"
           - result.bodyjson.stats.elementCount ShouldBeGreaterThan 0
 
-  - name: modify_plus_link_share_explicit_edits
+  - name: tweak_plus_link_share_explicit_edits
     steps:
       - type: http
         method: POST
-        url: "{{.target_url}}/api/diagrams/modify"
+        url: "{{.target_url}}/api/diagrams/tweak"
         headers:
           Content-Type: application/json
           x-vercel-protection-bypass: "{{.bypass_secret}}"
@@ -303,12 +304,13 @@ testcases:
           - result.bodyjson.status ShouldEqual "success"
           - result.bodyjson.shareLink.url ShouldContainSubstring "https://excalidraw.com/#json="
           - result.bodyjson.stats.traceId ShouldEqual "{{.trace_id_modify_plus_link}}"
+          - result.bodyjson.stats.strategy ShouldEqual "tweak"
 
       - type: exec
         script: |
           set -e
           tmpfile="$(mktemp)"
-          curl -fsSL --retry 3 --retry-all-errors -o "$tmpfile" "https://json.excalidraw.com/api/v2/{{.modify_plus_link_share_explicit_edits.modified_share_id}}"
+          curl -fsSL --retry 3 --retry-all-errors -o "$tmpfile" "https://json.excalidraw.com/api/v2/{{.tweak_plus_link_share_explicit_edits.modified_share_id}}"
           od -An -t x1 -N 4 "$tmpfile" | tr -d ' \n'
           rm -f "$tmpfile"
         vars:

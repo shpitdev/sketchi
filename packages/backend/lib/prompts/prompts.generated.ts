@@ -6,6 +6,7 @@ export const PROMPT_IDS = [
   "core/generation/intermediate-auto",
   "core/generation/mindmap-compact",
   "core/generation/mindmap-default",
+  "core/modification/intermediate-modify",
   "core/render/excalidraw-elements",
 ] as const;
 
@@ -56,6 +57,19 @@ const PROMPTS_DATA = {
     ],
     sourcePath: "core/generation/mindmap-default.md",
     body: 'You are a diagram structure analyzer. Generate a mindmap in IntermediateFormat.\n\nInput:\n{{input}}\n\nOutput JSON that matches this shape:\n{\n  "nodes": [{ "id": "...", "label": "...", "kind": "...", "description": "...", "metadata": { ... } }],\n  "edges": [{ "fromId": "...", "toId": "...", "label": "..." }],\n  "graphOptions": { "diagramType": "mindmap", "layout": { "direction": "TB|LR|BT|RL" } }\n}\n\nMindmap-specific guidance:\n- Use a single central root node that represents the main topic\n- Branch subtopics directly from the root\n- Keep labels short and consistent (2-5 words)\n- Prefer graphOptions.layout.direction of LR or TB for clarity',
+  },
+  "core/modification/intermediate-modify": {
+    id: "core/modification/intermediate-modify",
+    title: "Intermediate modifier (existing diagram)",
+    version: 1,
+    role: "system",
+    purpose:
+      "Modify an existing IntermediateFormat diagram based on a user request",
+    tags: ["modification", "intermediate"],
+    diagramType: "auto",
+    outputSchemaId: "intermediate/auto-v1",
+    sourcePath: "core/modification/intermediate-modify.md",
+    body: 'You are a diagram structure editor. You are given:\n- An existing diagram in IntermediateFormat JSON (nodes, edges, optional graphOptions)\n- A user request describing changes\n\nYour job: produce an updated IntermediateFormat JSON.\n\nRules:\n- Make the smallest set of changes required to satisfy the request.\n- Prefer preserving existing node IDs and edge IDs. Only introduce new IDs when adding new nodes/edges.\n- If you rename a node label, keep the same node id.\n- If you remove a node, also remove/repair edges that reference it.\n- Keep ids lowercase and hyphenated (e.g. "qa-review", "payment-service").\n- If the request implies a different diagram type, set graphOptions.diagramType accordingly; otherwise keep existing.\n- Suggest a graphOptions.layout.direction (TB/LR/BT/RL) when helpful; otherwise keep existing.\n\nStrict output requirements:\n- Your final response must be a single valid JSON object (no markdown, no backticks, no extra text).\n- After drafting the JSON object, call the validateIntermediate tool with it.\n- If validateIntermediate returns ok=false, fix the issues and call validateIntermediate again.\n- If validateIntermediate returns ok=true, respond with the same JSON object as your final output (no tool call).',
   },
   "core/render/excalidraw-elements": {
     id: "core/render/excalidraw-elements",

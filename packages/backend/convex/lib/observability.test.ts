@@ -91,14 +91,14 @@ describe("convex observability", () => {
       op: "action.complete",
       stage: "convex.action",
       status: "success",
-      actionName: "diagrams:modifyDiagram",
+      actionName: "diagrams:tweakDiagram",
     });
 
     expect(mockSetTag).toHaveBeenCalledWith("traceId", "trace-test-2");
     expect(mockSetTag).toHaveBeenCalledWith("op", "action.complete");
     expect(mockSetTag).toHaveBeenCalledWith("stage", "convex.action");
     expect(mockSetTag).toHaveBeenCalledWith("status", "success");
-    expect(mockSetTag).toHaveBeenCalledWith("action", "diagrams:modifyDiagram");
+    expect(mockSetTag).toHaveBeenCalledWith("action", "diagrams:tweakDiagram");
 
     expect(mockConsoleLog).toHaveBeenCalledTimes(1);
   });

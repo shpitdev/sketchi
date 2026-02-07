@@ -607,7 +607,7 @@ describe.sequential("diagramModifyElements scenarios", () => {
   );
 
   test.skipIf(!hasRequiredEnv)(
-    "Invalid output handling",
+    "Out-of-scope request handling",
     async () => {
       const startedAt = Date.now();
       const elements = buildBaseElements();
@@ -631,9 +631,9 @@ describe.sequential("diagramModifyElements scenarios", () => {
 
       const status = result.status === "failed" ? "passed" : "failed";
       const artifactFile = await writeScenarioArtifact(
-        "diagram-modify-timeout",
+        "diagram-modify-out-of-scope-request",
         {
-          scenario: "Invalid output handling",
+          scenario: "Out-of-scope request handling",
           status,
           request,
           result,
@@ -642,7 +642,7 @@ describe.sequential("diagramModifyElements scenarios", () => {
       );
 
       scenarioSummaries.push({
-        scenario: "Invalid output handling",
+        scenario: "Out-of-scope request handling",
         status,
         durationMs,
         request,
@@ -660,8 +660,13 @@ describe.sequential("diagramModifyElements scenarios", () => {
       await writeSummary();
 
       expect(result.status).toBe("failed");
-      expect(result.reason).toBe("invalid-diff");
+      expect(result.reason).toBe("unsupported-request");
       expect(result.issues?.length ?? 0).toBeGreaterThan(0);
+      expect(
+        result.issues?.some((issue: { code?: string }) =>
+          issue.code?.includes("unsupported")
+        )
+      ).toBe(true);
     },
     240_000
   );

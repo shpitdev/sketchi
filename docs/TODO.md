@@ -48,7 +48,8 @@
 ### Convex Backend
 - [ ] Define schema (diagrams, techStacks tables)
 - [ ] Implement `diagrams.generate` action
-- [ ] Implement `diagrams.modify` action
+- [ ] Implement `diagrams.tweak` action
+- [ ] Implement `diagrams.restructure` action
 - [ ] Implement `diagrams.parse` action
 - [ ] Implement `diagrams.share` action
 - [ ] Rename `packages/backend/convex/export.ts` to a hyper-descriptive action file (and update imports)
@@ -62,7 +63,8 @@
 
 ### oRPC Endpoints
 - [ ] `POST /api/diagrams/generate`
-- [ ] `POST /api/diagrams/modify`
+- [ ] `POST /api/diagrams/tweak`
+- [ ] `POST /api/diagrams/restructure`
 - [ ] `POST /api/diagrams/share`
 - [ ] `GET /api/diagrams/parse`
 
@@ -70,14 +72,16 @@
 - [ ] Convex tests colocated with code (`*.test.ts` next to actions)
 - [ ] API tests in `tests/api/` only for HTTP protocol behavior
 - [ ] End-to-end API test: prompt → share link
-- [ ] End-to-end API test: share link → modify → new share link
+- [ ] End-to-end API test: share link → tweak → new share link
+- [ ] End-to-end API test: share link → restructure → new share link
 - [ ] Scalar docs render correctly
 
 ## Phase 2: OpenCode Plugin
 
 - [ ] Create `packages/opencode-plugin` workspace
 - [ ] Implement `diagram_generate` tool
-- [ ] Implement `diagram_modify` tool
+- [ ] Implement `diagram_tweak` tool
+- [ ] Implement `diagram_restructure` tool
 - [ ] Implement `diagram_parse` tool
 - [ ] Publish to npm as `@sketchi/opencode-plugin`
 - [x] Add local PNG exporter: `.opencode/plugins/sketchi/excalidraw-to-png-local.ts` (invokable; optimization later)

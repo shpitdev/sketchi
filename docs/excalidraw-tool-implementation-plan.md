@@ -48,7 +48,8 @@
 │  oRPC API Layer (Vercel Functions)                                          │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │  POST /api/diagrams/generate    - Prompt → Diagram + Share link     │   │
-│  │  POST /api/diagrams/modify      - Share link + Prompt → Updated     │   │
+│  │  POST /api/diagrams/tweak       - Share link + Request → Updated    │   │
+│  │  POST /api/diagrams/restructure - Share link + Prompt → Updated     │   │
 │  │  POST /api/diagrams/share       - JSON → Share link                 │   │
 │  │  GET  /api/diagrams/parse       - Share link → JSON                 │   │
 │  │  GET  /api/docs                 - Scalar API documentation          │   │
@@ -61,7 +62,8 @@
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │  Actions (AI generation, external API calls)                        │   │
 │  │  ├─ generateDiagram: AI SDK → Excalidraw JSON                       │   │
-│  │  ├─ modifyDiagram: Parse + AI SDK → Modified JSON                   │   │
+│  │  ├─ tweakDiagram: Parse + AI SDK → Tactical tweak JSON              │   │
+│  │  ├─ restructureDiagram: Parse + AI SDK → Intermediate → JSON        │   │
 │  │  ├─ shareToExcalidraw: AES-GCM encrypt → json.excalidraw.com        │   │
 │  │  └─ parseExcalidrawLink: Fetch + decrypt → JSON                     │   │
 │  ├─────────────────────────────────────────────────────────────────────┤   │
@@ -829,30 +831,52 @@ export default definePlugin({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt, techStackId: techStack }),
         });
-        const { url, elements } = await res.json();
-        return { url, elementCount: elements.length };
+        const { shareLink, elements } = await res.json();
+        return { url: shareLink.url, elementCount: elements.length };
       },
     }),
     
     defineTool({
-      name: "diagram_modify",
-      description: "Modify an existing Excalidraw diagram",
+      name: "diagram_tweak",
+      description: "Tactical tweak of an existing Excalidraw diagram (text/colors; no layout/add/remove)",
       parameters: {
         type: "object",
         properties: {
           shareUrl: { type: "string", description: "Excalidraw share URL" },
-          prompt: { type: "string", description: "What changes to make" },
+          request: { type: "string", description: "What changes to make" },
+        },
+        required: ["shareUrl", "request"],
+      },
+      execute: async ({ shareUrl, request }) => {
+        const res = await fetch(`${API_BASE}/api/diagrams/tweak`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ shareUrl, request }),
+        });
+        const { shareLink } = await res.json();
+        return { url: shareLink.url };
+      },
+    }),
+
+    defineTool({
+      name: "diagram_restructure",
+      description: "Restructure an existing Excalidraw diagram (structural changes; re-layout expected)",
+      parameters: {
+        type: "object",
+        properties: {
+          shareUrl: { type: "string", description: "Excalidraw share URL" },
+          prompt: { type: "string", description: "What the new structure should be" },
         },
         required: ["shareUrl", "prompt"],
       },
       execute: async ({ shareUrl, prompt }) => {
-        const res = await fetch(`${API_BASE}/api/diagrams/modify`, {
+        const res = await fetch(`${API_BASE}/api/diagrams/restructure`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ shareUrl, prompt }),
         });
-        const { url } = await res.json();
-        return { url };
+        const { shareLink } = await res.json();
+        return { url: shareLink.url };
       },
     }),
     
@@ -881,7 +905,7 @@ export default definePlugin({
 | Deliverable | Description |
 |-------------|-------------|
 | OpenCode plugin | @sketchi/opencode-plugin npm package |
-| Tools | diagram_generate, diagram_modify, diagram_parse |
+| Tools | diagram_generate, diagram_tweak, diagram_restructure, diagram_parse |
 | Documentation | Usage examples in plugin README |
 
 ---

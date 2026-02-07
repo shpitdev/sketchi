@@ -96,14 +96,14 @@ export const SketchiPlugin: Plugin = async (input) => {
           }
         },
       }),
-      diagram_modify: tool({
+      diagram_tweak: tool({
         description:
-          "Modify a diagram (share link or .excalidraw) via Sketchi API, returning a new share link and local PNG.",
+          "Apply a tactical tweak to an existing diagram (text/colors/flip existing arrow direction). No add/remove or layout control; for structural changes use diagram_restructure or the Excalidraw UI.",
         args: {
           shareUrl: tool.schema
             .string()
             .optional()
-            .describe("Excalidraw share URL to modify"),
+            .describe("Excalidraw share URL to tweak"),
           excalidrawPath: tool.schema
             .string()
             .optional()
@@ -115,9 +115,7 @@ export const SketchiPlugin: Plugin = async (input) => {
             })
             .optional()
             .describe("Excalidraw JSON blob"),
-          request: tool.schema
-            .string()
-            .describe("Modification request to apply"),
+          request: tool.schema.string().describe("Tweak request to apply"),
           options: tool.schema
             .object({
               maxSteps: tool.schema.number().optional(),
@@ -125,7 +123,7 @@ export const SketchiPlugin: Plugin = async (input) => {
               preferExplicitEdits: tool.schema.boolean().optional(),
             })
             .optional()
-            .describe("Optional modify options"),
+            .describe("Optional tweak options (server-side)"),
           outputPath: tool.schema
             .string()
             .optional()
@@ -144,8 +142,10 @@ export const SketchiPlugin: Plugin = async (input) => {
             .describe("Include white background in PNG"),
         },
         async execute(args, context) {
-          const requestTimeoutMs = 60_000;
+          const serverTimeoutMs = args.options?.timeoutMs ?? 60_000;
+          const requestTimeoutMs = Math.max(5000, serverTimeoutMs + 5000);
           const traceId = createToolTraceId();
+
           let shareUrl = args.shareUrl;
           if (!shareUrl) {
             const excalidraw =
@@ -182,7 +182,7 @@ export const SketchiPlugin: Plugin = async (input) => {
             shareLink?: { url: string; shareId: string; encryptionKey: string };
             stats: Record<string, unknown>;
           }>(
-            `${apiBase}/api/diagrams/modify`,
+            `${apiBase}/api/diagrams/tweak`,
             {
               method: "POST",
               headers: {
@@ -192,6 +192,7 @@ export const SketchiPlugin: Plugin = async (input) => {
               body: JSON.stringify({
                 shareUrl,
                 request: args.request,
+                traceId,
                 options: args.options,
               }),
             },
@@ -200,16 +201,170 @@ export const SketchiPlugin: Plugin = async (input) => {
           );
 
           if (response.status !== "success") {
-            throw new Error(response.reason ?? "Diagram modification failed");
+            throw new Error(response.reason ?? "Diagram tweak failed");
           }
 
           if (!response.shareLink?.url) {
-            throw new Error("Missing shareLink in modify response");
+            throw new Error("Missing shareLink in tweak response");
           }
 
           const outputPath = args.outputPath
             ? resolveOutputPath(args.outputPath, context.directory)
-            : buildDefaultPngPath("diagram-modify", context.directory);
+            : buildDefaultPngPath("diagram-tweak", context.directory);
+
+          try {
+            const elements =
+              response.elements?.length
+                ? response.elements
+                : (
+                    await resolveExcalidrawFromShareUrl({
+                      shareUrl: response.shareLink.url,
+                      apiBase,
+                      traceId,
+                      abort: context.abort,
+                    })
+                  ).elements;
+            const pngResult = await renderElementsToPng(elements, {
+              scale: args.scale,
+              padding: args.padding,
+              background: args.background,
+            });
+
+            const pngPath = await writePng(outputPath, pngResult.png);
+
+            return JSON.stringify(
+              {
+                shareLink: response.shareLink,
+                pngPath,
+                pngBytes: pngResult.png.length,
+                pngDurationMs: pngResult.durationMs,
+                stats: response.stats,
+              },
+              null,
+              2
+            );
+          } finally {
+            await closeBrowser();
+          }
+        },
+      }),
+      diagram_restructure: tool({
+        description:
+          "Restructure a diagram (add/remove nodes/edges, change flow). This re-renders with automatic layout; use for structural changes.",
+        args: {
+          shareUrl: tool.schema
+            .string()
+            .optional()
+            .describe("Excalidraw share URL to restructure"),
+          excalidrawPath: tool.schema
+            .string()
+            .optional()
+            .describe("Path to .excalidraw JSON file"),
+          excalidraw: tool.schema
+            .object({
+              elements: tool.schema.array(tool.schema.any()),
+              appState: tool.schema.object({}).passthrough().optional(),
+            })
+            .optional()
+            .describe("Excalidraw JSON blob"),
+          prompt: tool.schema
+            .string()
+            .describe("Structural request (what the new diagram should be)"),
+          options: tool.schema
+            .object({
+              profileId: tool.schema.string().optional(),
+              timeoutMs: tool.schema.number().optional(),
+              maxSteps: tool.schema.number().optional(),
+            })
+            .optional()
+            .describe("Optional restructure options (client + server)"),
+          outputPath: tool.schema
+            .string()
+            .optional()
+            .describe("Optional PNG output path"),
+          scale: tool.schema
+            .number()
+            .optional()
+            .describe("PNG export scale factor"),
+          padding: tool.schema
+            .number()
+            .optional()
+            .describe("PNG export padding in pixels"),
+          background: tool.schema
+            .boolean()
+            .optional()
+            .describe("Include white background in PNG"),
+        },
+        async execute(args, context) {
+          const serverTimeoutMs = args.options?.timeoutMs ?? 240_000;
+          const requestTimeoutMs = Math.max(5000, serverTimeoutMs + 5000);
+          const traceId = createToolTraceId();
+
+          let shareUrl = args.shareUrl;
+          if (!shareUrl) {
+            const excalidraw =
+              args.excalidraw ??
+              (args.excalidrawPath
+                ? await readExcalidrawFile(
+                    args.excalidrawPath,
+                    context.directory
+                  )
+                : undefined);
+
+            if (!excalidraw) {
+              throw new Error("Provide shareUrl or excalidraw input");
+            }
+
+            const shared = await shareElements(
+              apiBase,
+              {
+                elements: excalidraw.elements,
+                appState: excalidraw.appState,
+              },
+              context.abort,
+              requestTimeoutMs,
+              traceId
+            );
+
+            shareUrl = shared.url;
+          }
+
+          const response = await fetchJson<{
+            status: "success" | "failed";
+            reason?: string;
+            elements?: Record<string, unknown>[];
+            shareLink?: { url: string; shareId: string; encryptionKey: string };
+            stats: Record<string, unknown>;
+          }>(
+            `${apiBase}/api/diagrams/restructure`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-trace-id": traceId,
+              },
+              body: JSON.stringify({
+                shareUrl,
+                prompt: args.prompt,
+                traceId,
+                options: args.options,
+              }),
+            },
+            context.abort,
+            requestTimeoutMs
+          );
+
+          if (response.status !== "success") {
+            throw new Error(response.reason ?? "Diagram restructure failed");
+          }
+
+          if (!response.shareLink?.url) {
+            throw new Error("Missing shareLink in restructure response");
+          }
+
+          const outputPath = args.outputPath
+            ? resolveOutputPath(args.outputPath, context.directory)
+            : buildDefaultPngPath("diagram-restructure", context.directory);
 
           try {
             const elements =

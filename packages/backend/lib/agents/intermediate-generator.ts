@@ -1,19 +1,10 @@
-import { Output, stepCountIs, ToolLoopAgent, tool } from "ai";
-import { z } from "zod";
+import { Output, stepCountIs, ToolLoopAgent } from "ai";
 import { hashString, logEventSafely } from "../../convex/lib/observability";
 import { createOpenRouterChatModel } from "../ai/openrouter";
-import type {
-  IntermediateEdge,
-  IntermediateNode,
-} from "../diagram-intermediate";
 import { IntermediateFormatSchema } from "../diagram-intermediate";
-import { validateEdgeReferences } from "../diagram-renderer";
-import { generalProfile } from "./profiles/general";
-import type {
-  GenerateIntermediateResult,
-  PromptAgentProfile,
-  ValidationError,
-} from "./types";
+import { createValidateIntermediateTool } from "./intermediate-validation";
+import { getProfile } from "./profile-registry";
+import type { GenerateIntermediateResult } from "./types";
 
 export interface GenerateOptions {
   profileId?: string;
@@ -23,50 +14,6 @@ export interface GenerateOptions {
    */
   traceId?: string;
 }
-
-/**
- * Local getProfile to avoid circular dependency with index.ts.
- * Falls back to 'general' profile with warning for unknown profiles.
- */
-function getProfile(profileId: string): PromptAgentProfile {
-  if (profileId === "general") {
-    return generalProfile;
-  }
-  console.warn(`Profile '${profileId}' not found, falling back to 'general'`);
-  return generalProfile;
-}
-
-const ValidationInputSchema = z.object({
-  nodes: z.array(
-    z.object({
-      id: z.string(),
-      label: z.string(),
-      kind: z.string().optional(),
-      description: z.string().optional(),
-      metadata: z.record(z.string(), z.unknown()).optional(),
-    })
-  ),
-  edges: z.array(
-    z.object({
-      fromId: z.string(),
-      toId: z.string(),
-      label: z.string().optional(),
-    })
-  ),
-  graphOptions: z
-    .object({
-      diagramType: z.string().optional(),
-      layout: z
-        .object({
-          direction: z.enum(["TB", "LR", "BT", "RL"]).optional(),
-        })
-        .optional(),
-      style: z.record(z.string(), z.unknown()).optional(),
-    })
-    .optional(),
-});
-
-type ValidationInput = z.infer<typeof ValidationInputSchema>;
 
 type IntermediateGenerationFailureReason =
   | "AI_NO_OUTPUT"
@@ -141,48 +88,6 @@ function wrapIntermediateGenerationFailure(params: {
   );
   wrapped.cause = params.cause;
   return wrapped;
-}
-
-function createValidateIntermediateTool(profile: PromptAgentProfile) {
-  return tool({
-    description:
-      "Validate the generated IntermediateFormat. Call this after generating to check for errors.",
-    inputSchema: ValidationInputSchema,
-    execute: (intermediate: ValidationInput) => {
-      const errors: ValidationError[] = [];
-
-      const refErrors = validateEdgeReferences(
-        intermediate.nodes as IntermediateNode[],
-        intermediate.edges as IntermediateEdge[]
-      );
-      for (const msg of refErrors) {
-        errors.push({ type: "reference", message: msg });
-      }
-
-      if (intermediate.nodes.length === 0) {
-        errors.push({
-          type: "semantic",
-          message: "At least one node required",
-        });
-      }
-
-      if (profile.validate) {
-        const profileResult = profile.validate(
-          intermediate as unknown as import("../diagram-intermediate").IntermediateFormat
-        );
-        if (!profileResult.ok && profileResult.errors) {
-          errors.push(...profileResult.errors);
-        }
-      }
-
-      return errors.length === 0
-        ? { ok: true as const }
-        : {
-            ok: false as const,
-            errors: errors.map((e) => `${e.type}: ${e.message}`),
-          };
-    },
-  });
 }
 
 function decideNextAfterIntermediateFailure(params: {

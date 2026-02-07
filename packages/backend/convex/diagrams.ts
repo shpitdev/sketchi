@@ -1,7 +1,7 @@
 "use node";
 
 import { v } from "convex/values";
-import { generateIntermediate } from "../lib/agents";
+import { generateIntermediate, modifyIntermediate } from "../lib/agents";
 import { IntermediateFormatSchema } from "../lib/diagram-intermediate";
 import {
   renderIntermediateDiagram,
@@ -26,6 +26,10 @@ interface GenerateStats {
   edgeCount: number;
   shapeCount: number;
   arrowCount: number;
+}
+
+interface RestructureStats extends GenerateStats {
+  strategy: "restructure";
 }
 
 const generateDiagramAction = createLoggedAction<
@@ -60,7 +64,7 @@ const generateDiagramAction = createLoggedAction<
   }),
 });
 
-const modifyDiagramAction = createLoggedAction<
+const tweakDiagramAction = createLoggedAction<
   {
     shareUrl: string;
     request: string;
@@ -73,7 +77,11 @@ const modifyDiagramAction = createLoggedAction<
   },
   {
     status: "success" | "failed";
-    reason?: "invalid-elements" | "invalid-diff" | "error";
+    reason?:
+      | "invalid-elements"
+      | "invalid-diff"
+      | "unsupported-request"
+      | "error";
     elements?: unknown[];
     appState?: Record<string, unknown>;
     changes?: {
@@ -84,6 +92,7 @@ const modifyDiagramAction = createLoggedAction<
     };
     issues?: Array<{ code: string; message: string; elementId?: string }>;
     stats: {
+      strategy: "tweak";
       iterations: number;
       tokens: number;
       durationMs: number;
@@ -95,10 +104,47 @@ const modifyDiagramAction = createLoggedAction<
       encryptionKey: string;
     };
   }
->("diagrams.modifyDiagram", {
+>("diagrams.tweakDiagram", {
   formatArgs: (args) => ({
     traceId: args.traceId ?? null,
     requestLength: args.request.length,
+    shareUrl: args.shareUrl,
+    options: args.options ?? null,
+  }),
+  formatResult: (result) => ({
+    status: result.status,
+    shareId: result.shareLink?.shareId ?? null,
+  }),
+});
+
+const restructureDiagramAction = createLoggedAction<
+  {
+    shareUrl: string;
+    prompt: string;
+    traceId?: string;
+    options?: {
+      profileId?: string;
+      timeoutMs?: number;
+      maxSteps?: number;
+    };
+  },
+  {
+    status: "success" | "failed";
+    reason?: "invalid-elements" | "invalid-intermediate" | "error";
+    elements?: unknown[];
+    appState?: Record<string, unknown>;
+    issues?: Array<{ code: string; message: string; elementId?: string }>;
+    stats: RestructureStats;
+    shareLink?: {
+      url: string;
+      shareId: string;
+      encryptionKey: string;
+    };
+  }
+>("diagrams.restructureDiagram", {
+  formatArgs: (args) => ({
+    traceId: args.traceId ?? null,
+    promptLength: args.prompt.length,
     shareUrl: args.shareUrl,
     options: args.options ?? null,
   }),
@@ -324,7 +370,7 @@ export const generateDiagram = generateDiagramAction({
   },
 });
 
-export const modifyDiagram = modifyDiagramAction({
+const tweakDiagramImpl = tweakDiagramAction({
   args: {
     shareUrl: v.string(),
     request: v.string(),
@@ -344,12 +390,13 @@ export const modifyDiagram = modifyDiagramAction({
 
     logEventSafely({
       traceId,
-      actionName: "diagrams.modifyDiagram",
+      actionName: "diagrams.tweakDiagram",
       op: "pipeline.start",
       stage: "input",
       status: "success",
       requestLength,
       requestHash,
+      strategy: "tweak",
     });
 
     let parsed: Awaited<ReturnType<typeof parseExcalidrawUrl>>;
@@ -357,7 +404,7 @@ export const modifyDiagram = modifyDiagramAction({
       parsed = await parseExcalidrawUrl(args.shareUrl);
       logEventSafely({
         traceId,
-        actionName: "diagrams.modifyDiagram",
+        actionName: "diagrams.tweakDiagram",
         op: "pipeline.parseShareLink",
         stage: "share.parse",
         status: "success",
@@ -368,18 +415,20 @@ export const modifyDiagram = modifyDiagramAction({
         excalidrawSource: parsed.source,
         excalidrawPermission: parsed.permission,
         elementCount: parsed.payload.elements.length,
+        strategy: "tweak",
       });
     } catch (error) {
       logEventSafely(
         {
           traceId,
-          actionName: "diagrams.modifyDiagram",
+          actionName: "diagrams.tweakDiagram",
           op: "pipeline.parseShareLink",
           stage: "share.parse",
           status: "failed",
           shareUrlType: detectShareUrlType(args.shareUrl),
           errorName: error instanceof Error ? error.name : undefined,
           errorMessage: error instanceof Error ? error.message : String(error),
+          strategy: "tweak",
         },
         { level: "error" }
       );
@@ -396,11 +445,16 @@ export const modifyDiagram = modifyDiagramAction({
       traceId
     );
 
+    const modifiedWithStrategy = {
+      ...modified,
+      stats: { ...modified.stats, strategy: "tweak" as const },
+    };
+
     if (modified.status !== "success") {
       logEventSafely(
         {
           traceId,
-          actionName: "diagrams.modifyDiagram",
+          actionName: "diagrams.tweakDiagram",
           op: "pipeline.failed",
           stage: "complete",
           status: "failed",
@@ -408,10 +462,11 @@ export const modifyDiagram = modifyDiagramAction({
           iterations: modified.stats.iterations,
           tokens: modified.stats.tokens,
           issuesCount: modified.issues?.length ?? 0,
+          strategy: "tweak",
         },
         { level: "error" }
       );
-      return modified;
+      return modifiedWithStrategy;
     }
 
     let shareLink: {
@@ -426,23 +481,25 @@ export const modifyDiagram = modifyDiagramAction({
       );
       logEventSafely({
         traceId,
-        actionName: "diagrams.modifyDiagram",
+        actionName: "diagrams.tweakDiagram",
         op: "pipeline.share",
         stage: "share",
         status: "success",
         shareUrlType: "v2",
         elementCount: modified.elements?.length ?? 0,
+        strategy: "tweak",
       });
     } catch (error) {
       logEventSafely(
         {
           traceId,
-          actionName: "diagrams.modifyDiagram",
+          actionName: "diagrams.tweakDiagram",
           op: "pipeline.share",
           stage: "share",
           status: "failed",
           errorName: error instanceof Error ? error.name : undefined,
           errorMessage: error instanceof Error ? error.message : String(error),
+          strategy: "tweak",
         },
         { level: "error" }
       );
@@ -450,18 +507,281 @@ export const modifyDiagram = modifyDiagramAction({
     }
     logEventSafely({
       traceId,
-      actionName: "diagrams.modifyDiagram",
+      actionName: "diagrams.tweakDiagram",
       op: "pipeline.complete",
       stage: "complete",
       status: "success",
       durationMs: modified.stats.durationMs,
       iterations: modified.stats.iterations,
       tokens: modified.stats.tokens,
+      strategy: "tweak",
     });
 
     return {
-      ...modified,
+      ...modifiedWithStrategy,
       shareLink,
+    };
+  },
+});
+
+export const tweakDiagram = tweakDiagramImpl;
+
+async function parseShareUrlForRestructure(params: {
+  traceId: string;
+  shareUrl: string;
+}): Promise<Awaited<ReturnType<typeof parseExcalidrawUrl>>> {
+  try {
+    const parsed = await parseExcalidrawUrl(params.shareUrl);
+    logEventSafely({
+      traceId: params.traceId,
+      actionName: "diagrams.restructureDiagram",
+      op: "pipeline.parseShareLink",
+      stage: "share.parse",
+      status: "success",
+      shareUrlType:
+        parsed.source === "excalidraw-share"
+          ? parsed.metadata.shareUrlType
+          : undefined,
+      excalidrawSource: parsed.source,
+      excalidrawPermission: parsed.permission,
+      elementCount: parsed.payload.elements.length,
+      strategy: "restructure",
+    });
+    return parsed;
+  } catch (error) {
+    logEventSafely(
+      {
+        traceId: params.traceId,
+        actionName: "diagrams.restructureDiagram",
+        op: "pipeline.parseShareLink",
+        stage: "share.parse",
+        status: "failed",
+        shareUrlType: detectShareUrlType(params.shareUrl),
+        errorName: error instanceof Error ? error.name : undefined,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        strategy: "restructure",
+      },
+      { level: "error" }
+    );
+    throw error;
+  }
+}
+
+export const restructureDiagram = restructureDiagramAction({
+  args: {
+    shareUrl: v.string(),
+    prompt: v.string(),
+    traceId: v.optional(v.string()),
+    options: v.optional(
+      v.object({
+        profileId: v.optional(v.string()),
+        timeoutMs: v.optional(v.number()),
+        maxSteps: v.optional(v.number()),
+      })
+    ),
+  },
+  handler: async (_ctx, args) => {
+    const startedAt = Date.now();
+    const traceId = args.traceId ?? crypto.randomUUID();
+    const promptLength = args.prompt.length;
+    const promptHash = hashString(args.prompt);
+
+    logEventSafely({
+      traceId,
+      actionName: "diagrams.restructureDiagram",
+      op: "pipeline.start",
+      stage: "input",
+      status: "success",
+      promptLength,
+      promptHash,
+      strategy: "restructure",
+    });
+
+    const parsed = await parseShareUrlForRestructure({
+      traceId,
+      shareUrl: args.shareUrl,
+    });
+
+    const simplified = simplifyDiagramElements(parsed.payload.elements);
+    logEventSafely({
+      traceId,
+      actionName: "diagrams.restructureDiagram",
+      op: "pipeline.simplify",
+      stage: "intermediate.simplify",
+      status: "success",
+      elementCount: simplified.stats.elementCount,
+      intermediateNodeCount: simplified.stats.nodeCount,
+      intermediateEdgeCount: simplified.stats.edgeCount,
+      strategy: "restructure",
+    });
+
+    let modifiedIntermediate: Awaited<ReturnType<typeof modifyIntermediate>>;
+    try {
+      modifiedIntermediate = await modifyIntermediate(
+        simplified.intermediate,
+        args.prompt,
+        {
+          profileId: args.options?.profileId,
+          traceId,
+          timeoutMs: args.options?.timeoutMs,
+          maxSteps: args.options?.maxSteps,
+        }
+      );
+    } catch (error) {
+      logEventSafely(
+        {
+          traceId,
+          actionName: "diagrams.restructureDiagram",
+          op: "pipeline.modifyIntermediate",
+          stage: "intermediate.modify",
+          status: "failed",
+          errorName: error instanceof Error ? error.name : undefined,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          strategy: "restructure",
+        },
+        { level: "error" }
+      );
+      return {
+        status: "failed",
+        reason: "error",
+        issues: [
+          {
+            code: "ai-error",
+            message: error instanceof Error ? error.message : String(error),
+          },
+        ],
+        stats: {
+          strategy: "restructure",
+          traceId,
+          iterations: 0,
+          tokens: 0,
+          durationMs: Date.now() - startedAt,
+          nodeCount: simplified.stats.nodeCount,
+          edgeCount: simplified.stats.edgeCount,
+          shapeCount: 0,
+          arrowCount: 0,
+        },
+      };
+    }
+
+    const edgeErrors = validateEdgeReferences(
+      modifiedIntermediate.intermediate.nodes,
+      modifiedIntermediate.intermediate.edges
+    );
+    if (edgeErrors.length > 0) {
+      logEventSafely(
+        {
+          traceId,
+          actionName: "diagrams.restructureDiagram",
+          op: "pipeline.intermediate",
+          stage: "intermediate.validate",
+          status: "failed",
+          errorName: "InvalidEdgeReferences",
+          errorMessage: edgeErrors.join(", "),
+          strategy: "restructure",
+        },
+        { level: "error" }
+      );
+      return {
+        status: "failed",
+        reason: "invalid-intermediate",
+        issues: edgeErrors.map((message) => ({
+          code: "invalid-edge-reference",
+          message,
+        })),
+        stats: {
+          strategy: "restructure",
+          traceId,
+          iterations: modifiedIntermediate.iterations,
+          tokens: modifiedIntermediate.tokens,
+          durationMs: modifiedIntermediate.durationMs,
+          nodeCount: modifiedIntermediate.intermediate.nodes.length,
+          edgeCount: modifiedIntermediate.intermediate.edges.length,
+          shapeCount: 0,
+          arrowCount: 0,
+        },
+      };
+    }
+
+    const rendered = renderIntermediateDiagram(
+      modifiedIntermediate.intermediate
+    );
+    logEventSafely({
+      traceId,
+      actionName: "diagrams.restructureDiagram",
+      op: "pipeline.render",
+      stage: "render",
+      status: "success",
+      intermediateNodeCount: rendered.stats.nodeCount,
+      intermediateEdgeCount: rendered.stats.edgeCount,
+      elementCount: rendered.elements.length,
+      shapeCount: rendered.stats.shapeCount,
+      arrowCount: rendered.stats.arrowCount,
+      strategy: "restructure",
+    });
+
+    let shareLink: {
+      url: string;
+      shareId: string;
+      encryptionKey: string;
+    };
+    try {
+      shareLink = await createExcalidrawShareLink(rendered.elements, {});
+      logEventSafely({
+        traceId,
+        actionName: "diagrams.restructureDiagram",
+        op: "pipeline.share",
+        stage: "share",
+        status: "success",
+        shareUrlType: "v2",
+        elementCount: rendered.elements.length,
+        strategy: "restructure",
+      });
+    } catch (error) {
+      logEventSafely(
+        {
+          traceId,
+          actionName: "diagrams.restructureDiagram",
+          op: "pipeline.share",
+          stage: "share",
+          status: "failed",
+          errorName: error instanceof Error ? error.name : undefined,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          strategy: "restructure",
+        },
+        { level: "error" }
+      );
+      throw error;
+    }
+
+    logEventSafely({
+      traceId,
+      actionName: "diagrams.restructureDiagram",
+      op: "pipeline.complete",
+      stage: "complete",
+      status: "success",
+      durationMs: Date.now() - startedAt,
+      iterations: modifiedIntermediate.iterations,
+      tokens: modifiedIntermediate.tokens,
+      strategy: "restructure",
+    });
+
+    return {
+      status: "success",
+      elements: rendered.elements,
+      appState: parsed.payload.appState ?? {},
+      shareLink,
+      stats: {
+        strategy: "restructure",
+        traceId,
+        iterations: modifiedIntermediate.iterations,
+        tokens: modifiedIntermediate.tokens,
+        durationMs: Date.now() - startedAt,
+        nodeCount: rendered.stats.nodeCount,
+        edgeCount: rendered.stats.edgeCount,
+        shapeCount: rendered.stats.shapeCount,
+        arrowCount: rendered.stats.arrowCount,
+      },
     };
   },
 });

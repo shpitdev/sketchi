@@ -59,8 +59,8 @@ describe("web observability", () => {
       traceId: "trace-test-3",
       op: "request.complete",
       method: "POST",
-      path: "/api/diagrams/modify",
-      orpcRoute: "diagrams.modify",
+      path: "/api/diagrams/tweak",
+      orpcRoute: "diagrams.tweak",
       responseStatus: 200,
       durationMs: 50,
     });
@@ -90,15 +90,15 @@ describe("web observability", () => {
       traceId: "trace-test-4",
       op: "request.complete",
       method: "POST",
-      path: "/api/diagrams/modify",
-      orpcRoute: "diagrams.modify",
+      path: "/api/diagrams/tweak",
+      orpcRoute: "diagrams.tweak",
       responseStatus: 200,
       durationMs: 50,
     });
 
     expect(mockSetTag).toHaveBeenCalledWith("traceId", "trace-test-4");
     expect(mockSetTag).toHaveBeenCalledWith("op", "request.complete");
-    expect(mockSetTag).toHaveBeenCalledWith("orpc.route", "diagrams.modify");
+    expect(mockSetTag).toHaveBeenCalledWith("orpc.route", "diagrams.tweak");
     expect(mockSetTag).toHaveBeenCalledWith("http.method", "POST");
     expect(mockSetTag).toHaveBeenCalledWith("http.status_code", "200");
   });

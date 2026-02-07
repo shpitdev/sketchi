@@ -4,14 +4,14 @@ Scenario: Excalidraw+ link-share + readonly parsing (Issue #95)
 Intent:
 - Ensure Sketchi API can parse Excalidraw+ `/l/<workspace>/<scene>` URLs (export service)
   and surface permission metadata.
-- Ensure modify flow accepts Excalidraw+ URLs and returns a new `excalidraw.com/#json=` share link
+- Ensure tweak flow accepts Excalidraw+ URLs and returns a new `excalidraw.com/#json=` share link
   without requiring an LLM (explicit edits path).
 
 Steps:
 1) Call Sketchi parse endpoint with a known Excalidraw+ `/l/...` URL.
 2) Verify `source`, `permission`, and non-empty `elements`.
 3) Ensure a known element id exists (guards against upstream scene changes).
-4) Call Sketchi modify endpoint with explicit edits + preferExplicitEdits.
+4) Call Sketchi tweak endpoint with explicit edits + preferExplicitEdits.
 5) Parse returned Excalidraw share link and verify the explicit edit was applied.
 */
 
@@ -152,10 +152,10 @@ async function main() {
   }
   console.log(`  Elements: ${parsedBody.elements.length}`);
 
-  // Step 2: Modify via Sketchi API (explicit edits path, no LLM)
-  console.log("\n[2/3] Modifying via Sketchi API (explicit edits)...");
-  const modifyUrl = new URL("/api/diagrams/modify", BASE_URL);
-  const modify = await fetchJson(modifyUrl.toString(), {
+  // Step 2: Tweak via Sketchi API (explicit edits path, no LLM)
+  console.log("\n[2/3] Tweaking via Sketchi API (explicit edits)...");
+  const tweakUrl = new URL("/api/diagrams/tweak", BASE_URL);
+  const tweak = await fetchJson(tweakUrl.toString(), {
     method: "POST",
     timeoutMs: REQUEST_TIMEOUT_MS,
     headers: { "content-type": "application/json" },
@@ -166,21 +166,21 @@ async function main() {
     }),
   });
 
-  if (modify.status !== 200) {
+  if (tweak.status !== 200) {
     throw new Error(
-      `modify failed: status=${modify.status} body=${JSON.stringify(modify.json).slice(0, 500)}`
+      `tweak failed: status=${tweak.status} body=${JSON.stringify(tweak.json).slice(0, 500)}`
     );
   }
-  const modifyBody = modify.json as {
+  const tweakBody = tweak.json as {
     status?: string;
     shareLink?: { url?: string };
   };
-  if (modifyBody.status !== "success") {
-    throw new Error(`modify returned status=${String(modifyBody.status)}`);
+  if (tweakBody.status !== "success") {
+    throw new Error(`tweak returned status=${String(tweakBody.status)}`);
   }
-  const shareUrl = modifyBody.shareLink?.url;
+  const shareUrl = tweakBody.shareLink?.url;
   if (!shareUrl?.includes("#json=")) {
-    throw new Error("modify response missing shareLink.url");
+    throw new Error("tweak response missing shareLink.url");
   }
   console.log(`  Share URL: ${shareUrl.slice(0, 80)}...`);
 
@@ -202,9 +202,7 @@ async function main() {
     );
   }
 
-  console.log(
-    "\nTEST PASSED: Excalidraw+ URL parsed and modified successfully"
-  );
+  console.log("\nTEST PASSED: Excalidraw+ URL parsed and tweaked successfully");
 }
 
 main().catch((error) => {

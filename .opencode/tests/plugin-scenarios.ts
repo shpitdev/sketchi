@@ -1,6 +1,6 @@
 // Scenarios:
 // 1) diagram_from_prompt -> expect shareLink + PNG under ./sketchi/png
-// 2) diagram_modify (shareUrl + request) -> expect new shareLink + PNG
+// 2) diagram_tweak (shareUrl + request) -> expect new shareLink + PNG
 // 3) diagram_to_png (shareUrl) -> expect PNG under ./sketchi/png
 import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
@@ -55,11 +55,11 @@ async function run() {
   const context = createContext();
 
   const fromPrompt = tools.diagram_from_prompt;
-  const modify = tools.diagram_modify;
+  const tweak = tools.diagram_tweak;
   const toPng = tools.diagram_to_png;
 
   assert.ok(fromPrompt, "diagram_from_prompt tool missing");
-  assert.ok(modify, "diagram_modify tool missing");
+  assert.ok(tweak, "diagram_tweak tool missing");
   assert.ok(toPng, "diagram_to_png tool missing");
 
   console.log("Scenario 1: diagram_from_prompt");
@@ -74,54 +74,54 @@ async function run() {
   assert.ok(generate.shareLink?.url?.includes("https://excalidraw.com/#json="));
   await assertPngPath(generate.pngPath);
 
-  console.log("Scenario 2: diagram_modify");
-  let modifyRaw: string | undefined;
-  let modifyError: unknown;
-  const modifyRequests = [
+  console.log("Scenario 2: diagram_tweak");
+  let tweakRaw: string | undefined;
+  let tweakError: unknown;
+  const tweakRequests = [
     {
-      request: "Add a node labeled 'QA' connected from 'End'.",
+      request: "Rename 'End' to 'Finish'.",
       options: { timeoutMs: 60000, maxSteps: 3 },
     },
     {
-      request: "Rename 'End' to 'Finish'.",
+      request: "Change the label colors for better contrast.",
       options: { timeoutMs: 60000, maxSteps: 2 },
     },
   ];
 
-  for (const payload of modifyRequests) {
+  for (const payload of tweakRequests) {
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
-        modifyRaw = await modify.execute(
+        tweakRaw = await tweak.execute(
           {
             shareUrl: generate.shareLink.url,
             ...payload,
           },
           context
         );
-        modifyError = undefined;
+        tweakError = undefined;
         break;
       } catch (error) {
-        modifyError = error;
+        tweakError = error;
         await wait(1000 * attempt);
       }
     }
-    if (modifyRaw) {
+    if (tweakRaw) {
       break;
     }
   }
-  if (!modifyRaw) {
-    throw modifyError;
+  if (!tweakRaw) {
+    throw tweakError;
   }
-  const modified = JSON.parse(modifyRaw) as {
+  const tweaked = JSON.parse(tweakRaw) as {
     shareLink: { url: string };
     pngPath: string;
   };
-  assert.ok(modified.shareLink?.url?.includes("https://excalidraw.com/#json="));
-  await assertPngPath(modified.pngPath);
+  assert.ok(tweaked.shareLink?.url?.includes("https://excalidraw.com/#json="));
+  await assertPngPath(tweaked.pngPath);
 
   console.log("Scenario 3: diagram_to_png");
   const toPngRaw = await toPng.execute(
-    { shareUrl: modified.shareLink.url },
+    { shareUrl: tweaked.shareLink.url },
     context
   );
   const toPngResult = JSON.parse(toPngRaw) as { pngPath: string };

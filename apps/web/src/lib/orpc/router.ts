@@ -214,7 +214,7 @@ const generateOutputSchema = z.object({
   }),
 });
 
-const modifyOutputSchema = z.object({
+const tweakOutputSchema = z.object({
   status: z.enum(["success", "failed"]),
   reason: z.string().optional(),
   elements: z.array(z.any()).optional(),
@@ -237,10 +237,39 @@ const modifyOutputSchema = z.object({
     )
     .optional(),
   stats: z.object({
+    strategy: z.literal("tweak"),
     iterations: z.number(),
     tokens: z.number(),
     durationMs: z.number(),
     traceId: z.string(),
+  }),
+  shareLink: shareLinkSchema.optional(),
+});
+
+const restructureOutputSchema = z.object({
+  status: z.enum(["success", "failed"]),
+  reason: z.string().optional(),
+  elements: z.array(z.any()).optional(),
+  appState: z.record(z.string(), z.any()).optional(),
+  issues: z
+    .array(
+      z.object({
+        code: z.string(),
+        message: z.string(),
+        elementId: z.string().optional(),
+      })
+    )
+    .optional(),
+  stats: z.object({
+    strategy: z.literal("restructure"),
+    traceId: z.string(),
+    iterations: z.number(),
+    tokens: z.number(),
+    durationMs: z.number(),
+    nodeCount: z.number(),
+    edgeCount: z.number(),
+    shapeCount: z.number(),
+    arrowCount: z.number(),
   }),
   shareLink: shareLinkSchema.optional(),
 });
@@ -264,7 +293,7 @@ const parseOutputSchema = z.object({
   }),
 });
 
-const modifyInputSchema = z.object({
+const tweakInputSchema = z.object({
   shareUrl: z.string().url(),
   request: z.string().min(1),
   traceId: z.string().optional(),
@@ -277,11 +306,35 @@ const modifyInputSchema = z.object({
     .optional(),
 });
 
-JSON_SCHEMA_REGISTRY.add(modifyInputSchema, {
+JSON_SCHEMA_REGISTRY.add(tweakInputSchema, {
   examples: [
     {
       shareUrl: exampleShareUrl,
       request: "Rename node-1 to 'Start' and update label colors.",
+    },
+  ],
+});
+
+const restructureInputSchema = z.object({
+  shareUrl: z.string().url(),
+  prompt: z.string().min(1),
+  traceId: z.string().optional(),
+  options: z
+    .object({
+      profileId: z.string().optional(),
+      timeoutMs: z.number().optional(),
+      maxSteps: z.number().optional(),
+    })
+    .optional(),
+});
+
+JSON_SCHEMA_REGISTRY.add(restructureInputSchema, {
+  examples: [
+    {
+      shareUrl: exampleShareUrl,
+      prompt:
+        "Restructure this into a 3-step flow with an explicit QA decision branch.",
+      options: { timeoutMs: 240_000 },
     },
   ],
 });
@@ -327,14 +380,14 @@ export const appRouter = {
         });
       }
     }),
-  diagramsModify: orpc
-    .route({ method: "POST", path: "/diagrams/modify" })
-    .input(modifyInputSchema)
-    .output(modifyOutputSchema)
+  diagramsTweak: orpc
+    .route({ method: "POST", path: "/diagrams/tweak" })
+    .input(tweakInputSchema)
+    .output(tweakOutputSchema)
     .handler(async ({ input, context }) => {
       const traceId = input.traceId ?? context.traceId;
       try {
-        return await context.convex.action(api.diagrams.modifyDiagram, {
+        return await context.convex.action(api.diagrams.tweakDiagram, {
           ...input,
           traceId,
         });
@@ -342,7 +395,27 @@ export const appRouter = {
         throwInternalError({
           traceId,
           stage: "convex.action",
-          action: "diagrams.modifyDiagram",
+          action: "diagrams.tweakDiagram",
+          error,
+        });
+      }
+    }),
+  diagramsRestructure: orpc
+    .route({ method: "POST", path: "/diagrams/restructure" })
+    .input(restructureInputSchema)
+    .output(restructureOutputSchema)
+    .handler(async ({ input, context }) => {
+      const traceId = input.traceId ?? context.traceId;
+      try {
+        return await context.convex.action(api.diagrams.restructureDiagram, {
+          ...input,
+          traceId,
+        });
+      } catch (error) {
+        throwInternalError({
+          traceId,
+          stage: "convex.action",
+          action: "diagrams.restructureDiagram",
           error,
         });
       }
