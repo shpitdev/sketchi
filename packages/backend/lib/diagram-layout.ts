@@ -73,10 +73,12 @@ const LAYOUT_CONFIGS: Record<string, LayoutConfig> = {
     edgesep: 20,
     edgeRouting: "straight",
   },
+  // NOTE: Sequence diagrams use a custom layout (see diagram-layout-sequence.ts).
+  // This config is kept so helpers like getLayoutDirection("sequence") stay accurate.
   sequence: {
     rankdir: "LR",
-    nodesep: 120,
-    ranksep: 80,
+    nodesep: 200,
+    ranksep: 110,
     edgesep: 20,
     edgeRouting: "straight",
   },

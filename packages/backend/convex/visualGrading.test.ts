@@ -262,19 +262,19 @@ async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
     const passed = typeof score === "number" && score >= scenario.minScore;
     const hasParticipants =
       typeof grading.hasParticipants === "boolean"
-        ? (grading.hasParticipants as boolean)
+        ? grading.hasParticipants
         : undefined;
     const hasLifelines =
       typeof grading.hasLifelines === "boolean"
-        ? (grading.hasLifelines as boolean)
+        ? grading.hasLifelines
         : undefined;
     const messagesLeftToRight =
       typeof grading.messagesLeftToRight === "boolean"
-        ? (grading.messagesLeftToRight as boolean)
+        ? grading.messagesLeftToRight
         : undefined;
     const chronologicalOrder =
       typeof grading.chronologicalOrder === "boolean"
-        ? (grading.chronologicalOrder as boolean)
+        ? grading.chronologicalOrder
         : undefined;
 
     await writeJson(join(outputDir, intermediateFile), {
