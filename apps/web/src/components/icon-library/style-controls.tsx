@@ -31,10 +31,10 @@ export default function StyleControls({ value, onChange }: StyleControlsProps) {
         <input
           className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-muted"
           id="roughness"
-          max="10"
+          max="2"
           min="0"
           onChange={(e) => update("roughness", Number(e.target.value))}
-          step="0.5"
+          step="0.1"
           type="range"
           value={value.roughness}
         />

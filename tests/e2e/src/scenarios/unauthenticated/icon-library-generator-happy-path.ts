@@ -152,6 +152,42 @@ async function waitForIconCount(
   }
 }
 
+async function assertNewLibraryRoughnessDefaults(page: PageLike) {
+  await page.waitForSelector("#roughness", {
+    state: "visible",
+    timeout: 20_000,
+  });
+
+  const { max, step, valueRaw } = await page.evaluate(() => {
+    const input = document.querySelector<HTMLInputElement>("#roughness");
+    if (!input) {
+      throw new Error("#roughness input not found");
+    }
+    return {
+      max: input.max,
+      step: input.step,
+      valueRaw: input.value,
+    };
+  });
+
+  if (max !== "2") {
+    throw new Error(`Expected #roughness max="2", got ${JSON.stringify(max)}`);
+  }
+
+  if (step !== "0.1") {
+    throw new Error(
+      `Expected #roughness step="0.1", got ${JSON.stringify(step)}`
+    );
+  }
+
+  const value = Number(valueRaw);
+  if (!Number.isFinite(value) || Math.abs(value - 0.4) > 1e-6) {
+    throw new Error(
+      `Expected #roughness value=0.4 for new library, got ${JSON.stringify(valueRaw)}`
+    );
+  }
+}
+
 async function selectExportOption(
   page: PageLike,
   label: string
@@ -316,6 +352,7 @@ async function main() {
       throw new Error("Create UI did not navigate to editor.");
     }
 
+    await assertNewLibraryRoughnessDefaults(page);
     await uploadSvgFiles(page);
 
     const iconsLoaded = await waitForIconCount(page, 3, 20_000);

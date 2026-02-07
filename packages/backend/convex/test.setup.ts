@@ -2,6 +2,7 @@
 export const modules = {
   "./_generated/api.js": () => import("./_generated/api.js"),
   "./_generated/server.js": () => import("./_generated/server.js"),
+  "./iconLibraries.ts": () => import("./iconLibraries"),
   "./excalidrawShareLinks.ts": () => import("./excalidrawShareLinks"),
   "./healthCheck.ts": () => import("./healthCheck"),
   "./export.ts": () => import("./export"),

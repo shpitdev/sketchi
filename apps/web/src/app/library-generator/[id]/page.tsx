@@ -20,7 +20,7 @@ import {
 
 const defaultStyleSettings: StyleSettings = {
   fillStyle: "hachure",
-  roughness: 1,
+  roughness: 0.4,
   bowing: 1,
   randomize: true,
   pencilFilter: false,
@@ -66,7 +66,7 @@ export default function LibraryEditorPage({ params }: PageProps) {
       setStyleSettings({
         fillStyle: (dbSettings.fillStyle ||
           "hachure") as StyleSettings["fillStyle"],
-        roughness: (dbSettings.roughness as number) ?? 1,
+        roughness: (dbSettings.roughness as number) ?? 0.4,
         bowing: 1,
         randomize: true,
         pencilFilter: false,
