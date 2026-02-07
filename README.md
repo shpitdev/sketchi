@@ -219,7 +219,7 @@ Notes:
   - `bunx playwright install`
 - PNG outputs default to `./sketchi/png` in the directory where OpenCode is run.
 - Override API base with `SKETCHI_API_URL`.
-- Tools exposed: `diagram_from_prompt`, `diagram_modify`, `diagram_to_png`, `diagram_grade`.
+- Tools exposed: `diagram_from_prompt`, `diagram_tweak`, `diagram_restructure`, `diagram_to_png`, `diagram_grade`.
 - Start OpenCode web UI + event logging: `bun run opencode:serve` (logs to `./sketchi/opencode-logs/*.parquet`).
 - DuckDB example (explicit column list, newest log file):
 ```bash
