@@ -26,13 +26,17 @@ This tool is for small, safe edits only:
 - Allowed: update text labels, change colors/styles, flip an existing arrow direction between existing nodes.
 - Forbidden: add/remove nodes/edges/elements, change geometry/layout (x/y/width/height/points/angle), "make it prettier"/re-layout/align/spacing.
 If the request is out of scope, do not attempt a workaround; the request should be handled by restructure or in the Excalidraw UI.
-	
-	You must return a JSON object that matches the schema:
-	{
-	  "add": [ExcalidrawElementSkeleton...],
-	  "remove": [elementId...],
-	  "modify": [{ "id": "...", "changes": { ... } }]
-	}
+  
+Color/style keys:
+- Rectangles/ellipses/etc: use backgroundColor (fill) and strokeColor (outline).
+- Text: use color.
+		
+		You must return a JSON object that matches the schema:
+		{
+		  "add": [ExcalidrawElementSkeleton...],
+		  "remove": [elementId...],
+		  "modify": [{ "id": "...", "changes": { ... } }]
+		}
 	
 	Rules:
 	- Only change what the request asks.
@@ -40,13 +44,26 @@ If the request is out of scope, do not attempt a workaround; the request should 
 	- Never include an id field inside changes; only use modify.id to select the element.
 	- Use existing ids for bindings (startBinding/endBinding/containerId/boundElements).
 	- If you change arrow bindings, ensure references remain valid.
-	- Never use add/remove in this tool; only modify existing elements.
-	- When updating labels, edit the bound text element and set both text + originalText.
-	- Omit empty arrays (do not include add/remove/modify when empty).
-	
-	After drafting the diff, call the validateAndApplyDiff tool.
-	If it returns ok=false, fix the issues and call it again.
-	If it returns ok=true, respond with the same diff as your final output (no tool call).`;
+		- Never use add/remove in this tool; only modify existing elements.
+		- When updating labels, edit the bound text element and set both text + originalText.
+		- Omit empty arrays (do not include add/remove/modify when empty).
+
+Example (recolor a rectangle):
+{
+  "modify": [
+    {
+      "id": "some-rectangle-id",
+      "changes": {
+        "backgroundColor": "#40c057",
+        "strokeColor": "#40c057"
+      }
+    }
+  ]
+}
+		
+		After drafting the diff, call the validateAndApplyDiff tool.
+		If it returns ok=false, fix the issues and call it again.
+		If it returns ok=true, respond with the same diff as your final output (no tool call).`;
 
 interface DiagramModifyStats {
   iterations: number;
@@ -583,6 +600,22 @@ function applyExplicitEditsIfPreferred(params: {
     return buildFailureResult("invalid-diff", applied.issues, stats);
   }
 
+  if (isNoOpChangeSet(applied.changes)) {
+    logEventSafely(
+      {
+        traceId: params.traceId,
+        actionName: "diagramModifyElements",
+        op: "validate.noopDiff",
+        stage: "explicit",
+        status: "failed",
+        requestedModifyCount: diff.modify?.length ?? 0,
+        effectiveModifiedCount: applied.changes.modifiedIds.length,
+      },
+      { level: "warning" }
+    );
+    return buildFailureResult("invalid-diff", buildNoOpIssues(), stats);
+  }
+
   return buildSuccessResult({
     elements: applied.elements,
     appState: params.appState,
@@ -593,6 +626,7 @@ function applyExplicitEditsIfPreferred(params: {
 }
 
 function createValidationTool(params: {
+  traceId: string;
   elements: Record<string, unknown>[];
   explicitEdits: Array<{ id: string; path: string; value: string }>;
   tracking: ModificationTracking;
@@ -622,6 +656,25 @@ function createValidationTool(params: {
         params.tracking.lastIssues = result.issues;
         return { ok: false as const, issues: result.issues };
       }
+
+      if (isNoOpChangeSet(result.changes)) {
+        const issues = buildNoOpIssues();
+        params.tracking.lastIssues = issues;
+        logEventSafely(
+          {
+            traceId: params.traceId,
+            actionName: "diagramModifyElements",
+            op: "validate.noopDiff",
+            stage: "validate",
+            status: "failed",
+            requestedModifyCount: diff.modify?.length ?? 0,
+            effectiveModifiedCount: result.changes.modifiedIds.length,
+          },
+          { level: "warning" }
+        );
+        return { ok: false as const, issues };
+      }
+
       params.tracking.lastSuccessful = {
         elements: result.elements,
         changes: result.changes,
@@ -655,6 +708,27 @@ function stopOnSuccess({
     }
   }
   return false;
+}
+
+function buildNoOpIssues(): DiagramIssue[] {
+  return [
+    {
+      code: "no-op-diff",
+      message:
+        "Diff produced no effective changes. Provide at least one real value change.",
+    },
+  ];
+}
+
+function isNoOpChangeSet(changes?: DiagramChangeSet): boolean {
+  if (!changes) {
+    return true;
+  }
+  return (
+    changes.addedIds.length === 0 &&
+    changes.removedIds.length === 0 &&
+    changes.modifiedIds.length === 0
+  );
 }
 
 function createModificationAgent(params: {
@@ -1025,6 +1099,7 @@ export async function modifyElementsWithAgent(
     lastStepAt: Date.now(),
   };
   const validationTool = createValidationTool({
+    traceId,
     elements,
     explicitEdits,
     tracking,
