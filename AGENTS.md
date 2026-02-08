@@ -1,7 +1,7 @@
 ## Repo CI / Deploy Note
 - Vercel Preview/Prod: `NEXT_PUBLIC_CONVEX_URL` is set automatically by the Convex deploy step. If it's undefined, the Convex deploy is failing (debug that first).
 - Pre-push sanity: `bun x ultracite fix`, `bun x ultracite check`, `bun run check-types`, `bun run build`, and `cd packages/backend && bunx convex codegen && bun run test`.
-
+- don't create new branches unless asked
 ---
 
 # Working Preferences

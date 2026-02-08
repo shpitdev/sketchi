@@ -335,6 +335,28 @@ Return booleans only.`,
 }
 
 describe.sequential("diagramModifyElements scenarios", () => {
+  test("Explicit edits: no-op diffs fail with no-op-diff", async () => {
+    const elements = buildBaseElements();
+    const request = "api backgroundColor = '#a5d8ff'";
+
+    const result = await t.action(
+      api.diagramModifyElements.diagramModifyElements,
+      {
+        elements,
+        request,
+        options: { preferExplicitEdits: true },
+      }
+    );
+
+    expect(result.status).toBe("failed");
+    expect(result.reason).toBe("invalid-diff");
+    expect(
+      result.issues?.some(
+        (issue: { code?: string }) => issue.code === "no-op-diff"
+      )
+    ).toBe(true);
+  });
+
   test.skipIf(!hasRequiredEnv)(
     "Targeted tweaks (elements input)",
     async () => {

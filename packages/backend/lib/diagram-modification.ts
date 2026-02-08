@@ -233,7 +233,9 @@ function applyRemovals(
 function applyModifications(
   elementMap: Map<string, ExcalidrawElementLike>,
   modifyList: Array<{ id: string; changes: ExcalidrawElementPatch }>
-) {
+): string[] {
+  const modifiedIds: string[] = [];
+
   for (const modification of modifyList) {
     const current = elementMap.get(modification.id);
     if (!current) {
@@ -247,8 +249,13 @@ function applyModifications(
     } as ExcalidrawElementLike;
 
     const maybeFlipped = autoFlipArrowPoints(current, merged, modification);
-    elementMap.set(modification.id, maybeFlipped);
+    if (!deepEqualJson(current, maybeFlipped)) {
+      elementMap.set(modification.id, maybeFlipped);
+      modifiedIds.push(modification.id);
+    }
   }
+
+  return modifiedIds;
 }
 
 function applyAdditions(
@@ -302,7 +309,7 @@ export function applyDiagramDiff(
   }
 
   applyRemovals(elementMap, removeList);
-  applyModifications(elementMap, modifyList);
+  const modifiedIds = applyModifications(elementMap, modifyList);
   const nextIndex = createIndexGenerator(Array.from(elementMap.values()));
   applyAdditions(elementMap, addList, nextIndex);
 
@@ -318,9 +325,73 @@ export function applyDiagramDiff(
     changes: {
       addedIds: addList.map((element) => element.id),
       removedIds: [...removeList],
-      modifiedIds: modifyList.map((entry) => entry.id),
+      modifiedIds,
     },
   };
+}
+
+function deepEqualJson(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) {
+    return true;
+  }
+
+  if (typeof a !== typeof b) {
+    return false;
+  }
+
+  if (a === null || b === null) {
+    return a === b;
+  }
+
+  if (typeof a !== "object") {
+    return false;
+  }
+
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && deepEqualArray(a, b);
+  }
+
+  return deepEqualRecord(
+    a as Record<string, unknown>,
+    b as Record<string, unknown>
+  );
+}
+
+function deepEqualArray(a: unknown[], b: unknown[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  for (let i = 0; i < a.length; i += 1) {
+    if (!deepEqualJson(a[i], b[i])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function deepEqualRecord(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>
+): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+
+  for (const key of aKeys) {
+    if (!Object.hasOwn(b, key)) {
+      return false;
+    }
+    if (!deepEqualJson(a[key], b[key])) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function autoFlipArrowPoints(

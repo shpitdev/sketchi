@@ -147,6 +147,25 @@ describe.sequential("diagrams actions", () => {
     expect(updatedText?.text).toBe("Updated Start");
   });
 
+  test("tweakDiagram rejects no-op explicit edits (no share link)", async () => {
+    const result = await t.action(api.diagrams.tweakDiagram, {
+      shareUrl: baseShareLink.url,
+      request: "node-1_text text = 'Start'",
+      options: {
+        preferExplicitEdits: true,
+      },
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.reason).toBe("invalid-diff");
+    expect(
+      result.issues?.some(
+        (issue: { code?: string }) => issue.code === "no-op-diff"
+      )
+    ).toBe(true);
+    expect(result.shareLink).toBeUndefined();
+  });
+
   test("tweakDiagram returns V2 share link for V1 input", async () => {
     const v1ShareUrl = await createV1ShareLink(RENDERED.elements, {});
 
