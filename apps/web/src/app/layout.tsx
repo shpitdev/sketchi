@@ -1,4 +1,5 @@
 import { Analytics } from "@vercel/analytics/react";
+import { AuthKitProvider } from "@workos-inc/authkit-nextjs/components";
 import type { Metadata } from "next";
 
 import { Caveat, Geist, Geist_Mono } from "next/font/google";
@@ -77,12 +78,14 @@ export default function RootLayout({
             dangerouslySetInnerHTML={convexScript}
           />
         ) : null}
-        <Providers>
-          <div className="grid h-svh grid-rows-[auto_1fr]">
-            <Header />
-            {children}
-          </div>
-        </Providers>
+        <AuthKitProvider>
+          <Providers>
+            <div className="grid h-svh grid-rows-[auto_1fr]">
+              <Header />
+              {children}
+            </div>
+          </Providers>
+        </AuthKitProvider>
         <Analytics />
       </body>
     </html>

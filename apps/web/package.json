@@ -20,6 +20,7 @@
     "@sketchi/shared": "workspace:*",
     "@tanstack/react-form": "^1.27.3",
     "@vercel/analytics": "^1.6.1",
+    "@workos-inc/authkit-nextjs": "^2.13.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

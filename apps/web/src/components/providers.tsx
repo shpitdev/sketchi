@@ -1,13 +1,38 @@
 "use client";
 
 import { env } from "@sketchi/env/web";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
-import { useEffect } from "react";
+import { useAccessToken } from "@workos-inc/authkit-nextjs/components";
+import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
+import { useCallback, useEffect } from "react";
 
 import { ThemeProvider } from "./theme-provider";
 import { Toaster } from "./ui/sonner";
 
 const convex = new ConvexReactClient(env.NEXT_PUBLIC_CONVEX_URL);
+
+const useWorkosConvexAuth = () => {
+  const { accessToken, loading, refresh } = useAccessToken();
+
+  const fetchAccessToken = useCallback(
+    async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
+      try {
+        if (forceRefreshToken) {
+          return (await refresh()) ?? null;
+        }
+        return accessToken ?? null;
+      } catch {
+        return null;
+      }
+    },
+    [accessToken, refresh]
+  );
+
+  return {
+    isLoading: loading,
+    isAuthenticated: Boolean(accessToken),
+    fetchAccessToken,
+  };
+};
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -24,7 +49,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       disableTransitionOnChange
       enableSystem
     >
-      <ConvexProvider client={convex}>{children}</ConvexProvider>
+      <ConvexProviderWithAuth client={convex} useAuth={useWorkosConvexAuth}>
+        {children}
+      </ConvexProviderWithAuth>
       <Toaster richColors />
     </ThemeProvider>
   );
