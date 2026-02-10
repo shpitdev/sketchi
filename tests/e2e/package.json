@@ -7,7 +7,9 @@
     "icon-library-generator-happy-path": "bun run src/scenarios/unauthenticated/icon-library-generator-happy-path.ts",
     "arrow-binding-drag": "bun run src/scenarios/unauthenticated/arrow-binding-drag.ts",
     "mcp-v2-share-link": "bun run src/scenarios/unauthenticated/mcp-v2-share-link.ts",
-    "excalidraw-plus-links": "bun run src/scenarios/unauthenticated/excalidraw-plus-links.ts"
+    "excalidraw-plus-links": "bun run src/scenarios/unauthenticated/excalidraw-plus-links.ts",
+    "diagram-studio-happy-path": "bun run src/scenarios/unauthenticated/diagram-studio-happy-path.ts",
+    "diagram-studio-occ-conflict": "bun run src/scenarios/unauthenticated/diagram-studio-occ-conflict.ts"
   },
   "dependencies": {
     "@browserbasehq/stagehand": "^3.0.7",
