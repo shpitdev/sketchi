@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import type { ChatMessage } from "@/components/diagram-studio/chat-sidebar";
 import { ChatSidebar } from "@/components/diagram-studio/chat-sidebar";
 import { ImportExportToolbar } from "@/components/diagram-studio/import-export-toolbar";
+import { sanitizeAppState } from "@/components/diagram-studio/sanitize-app-state";
 import { Button } from "@/components/ui/button";
 
 const AUTOSAVE_DELAY_MS = 2000;
@@ -60,6 +61,7 @@ export default function DiagramStudioPage() {
   const initialLoadApplied = useRef(false);
   const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const knownVersionRef = useRef(0);
+  const lastElementsHashRef = useRef("");
   const pendingSceneRef = useRef<{
     elements: readonly Record<string, unknown>[];
     appState: Record<string, unknown>;
@@ -82,7 +84,7 @@ export default function DiagramStudioPage() {
           sessionId,
           expectedVersion: overrideVersion ?? knownVersionRef.current,
           elements: elements as Record<string, unknown>[],
-          appState,
+          appState: sanitizeAppState(appState),
         });
 
         if (result.status === "success") {
@@ -127,9 +129,20 @@ export default function DiagramStudioPage() {
       elements: readonly Record<string, unknown>[],
       appState: Record<string, unknown>
     ) => {
-      if (autosaveDisabled) {
+      if (autosaveDisabled || suppressOnChangeRef.current || isRestructuring) {
         return;
       }
+
+      const hash = elements
+        .map(
+          (e) =>
+            `${e.id}:${e.version}:${e.versionNonce}:${e.isDeleted ?? false}`
+        )
+        .join("|");
+      if (hash === lastElementsHashRef.current) {
+        return;
+      }
+      lastElementsHashRef.current = hash;
 
       if (autosaveTimeoutRef.current) {
         clearTimeout(autosaveTimeoutRef.current);
@@ -139,7 +152,7 @@ export default function DiagramStudioPage() {
         saveScene(elements, appState);
       }, AUTOSAVE_DELAY_MS);
     },
-    [autosaveDisabled, saveScene]
+    [autosaveDisabled, isRestructuring, saveScene]
   );
 
   const handleReady = useCallback(
@@ -148,6 +161,16 @@ export default function DiagramStudioPage() {
 
       if (session?.latestScene && !initialLoadApplied.current) {
         initialLoadApplied.current = true;
+        const els = session.latestScene.elements as readonly Record<
+          string,
+          unknown
+        >[];
+        lastElementsHashRef.current = els
+          .map(
+            (e) =>
+              `${e.id}:${e.version}:${e.versionNonce}:${e.isDeleted ?? false}`
+          )
+          .join("|");
       }
 
       knownVersionRef.current = session?.latestSceneVersion ?? 0;
@@ -206,28 +229,25 @@ export default function DiagramStudioPage() {
       setIsRestructuring(true);
 
       try {
-        // 1. Snapshot current scene
         const elements =
           excalidrawApi.getSceneElements() as unknown as readonly Record<
             string,
             unknown
           >[];
-        const appState = excalidrawApi.getAppState() as unknown as Record<
+        const rawAppState = excalidrawApi.getAppState() as unknown as Record<
           string,
           unknown
         >;
+        const appState = sanitizeAppState(rawAppState);
 
-        // 2. Persist snapshot before restructure
         await saveScene(elements, appState);
 
-        // 3. Suppress autosave during restructure
         suppressOnChangeRef.current = true;
         if (autosaveTimeoutRef.current) {
           clearTimeout(autosaveTimeoutRef.current);
           autosaveTimeoutRef.current = null;
         }
 
-        // 4. Call restructure action
         const result = await restructureFromScene({
           elements: [...elements] as unknown[],
           appState,

@@ -16,6 +16,7 @@ import {
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { sanitizeAppState } from "@/components/diagram-studio/sanitize-app-state";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -123,12 +124,15 @@ export function ImportExportToolbar({
       const elements = [
         ...excalidrawApi.getSceneElements(),
       ] as unknown as unknown[];
-      const appState = excalidrawApi.getAppState() as unknown as Record<
+      const rawAppState = excalidrawApi.getAppState() as unknown as Record<
         string,
         unknown
       >;
 
-      const result = await shareDiagram({ elements, appState });
+      const result = await shareDiagram({
+        elements,
+        appState: sanitizeAppState(rawAppState),
+      });
 
       setShareUrl(result.url);
       await navigator.clipboard.writeText(result.url);
