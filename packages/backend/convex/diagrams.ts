@@ -567,6 +567,41 @@ async function parseShareUrlForRestructure(params: {
   }
 }
 
+const restructureFromSceneAction = createLoggedAction<
+  {
+    elements: unknown[];
+    appState?: Record<string, unknown>;
+    prompt: string;
+    traceId?: string;
+    options?: {
+      profileId?: string;
+      timeoutMs?: number;
+      maxSteps?: number;
+    };
+    sessionId?: string;
+  },
+  {
+    status: "success" | "failed";
+    reason?: "invalid-elements" | "invalid-intermediate" | "error";
+    elements?: unknown[];
+    appState?: Record<string, unknown>;
+    issues?: Array<{ code: string; message: string; elementId?: string }>;
+    stats: RestructureStats;
+  }
+>("diagrams.restructureFromScene", {
+  formatArgs: (args) => ({
+    traceId: args.traceId ?? null,
+    promptLength: args.prompt.length,
+    elementCount: Array.isArray(args.elements) ? args.elements.length : 0,
+    options: args.options ?? null,
+    sessionId: args.sessionId ?? null,
+  }),
+  formatResult: (result) => ({
+    status: result.status,
+    elementCount: result.elements?.length ?? 0,
+  }),
+});
+
 export const restructureDiagram = restructureDiagramAction({
   args: {
     shareUrl: v.string(),
@@ -776,6 +811,186 @@ export const restructureDiagram = restructureDiagramAction({
         traceId,
         iterations: modifiedIntermediate.iterations,
         tokens: modifiedIntermediate.tokens,
+        durationMs: Date.now() - startedAt,
+        nodeCount: rendered.stats.nodeCount,
+        edgeCount: rendered.stats.edgeCount,
+        shapeCount: rendered.stats.shapeCount,
+        arrowCount: rendered.stats.arrowCount,
+      },
+    };
+  },
+});
+
+export const restructureFromScene = restructureFromSceneAction({
+  args: {
+    elements: v.array(v.any()),
+    appState: v.optional(v.any()),
+    prompt: v.string(),
+    traceId: v.optional(v.string()),
+    options: v.optional(
+      v.object({
+        profileId: v.optional(v.string()),
+        timeoutMs: v.optional(v.number()),
+        maxSteps: v.optional(v.number()),
+      })
+    ),
+    sessionId: v.optional(v.string()),
+  },
+  handler: async (_ctx, args) => {
+    const startedAt = Date.now();
+    const traceId = args.traceId ?? crypto.randomUUID();
+    const promptLength = args.prompt.length;
+    const promptHash = hashString(args.prompt);
+
+    logEventSafely({
+      traceId,
+      actionName: "diagrams.restructureFromScene",
+      op: "pipeline.start",
+      stage: "input",
+      status: "success",
+      promptLength,
+      promptHash,
+      elementCount: Array.isArray(args.elements) ? args.elements.length : 0,
+      strategy: "restructure-from-scene",
+    });
+
+    const simplified = simplifyDiagramElements(args.elements);
+    logEventSafely({
+      traceId,
+      actionName: "diagrams.restructureFromScene",
+      op: "pipeline.simplify",
+      stage: "intermediate.simplify",
+      status: "success",
+      elementCount: simplified.stats.elementCount,
+      intermediateNodeCount: simplified.stats.nodeCount,
+      intermediateEdgeCount: simplified.stats.edgeCount,
+      strategy: "restructure-from-scene",
+    });
+
+    let modifiedResult: Awaited<ReturnType<typeof modifyIntermediate>>;
+    try {
+      modifiedResult = await modifyIntermediate(
+        simplified.intermediate,
+        args.prompt,
+        {
+          profileId: args.options?.profileId,
+          traceId,
+          timeoutMs: args.options?.timeoutMs,
+          maxSteps: args.options?.maxSteps,
+        }
+      );
+    } catch (error) {
+      logEventSafely(
+        {
+          traceId,
+          actionName: "diagrams.restructureFromScene",
+          op: "pipeline.modifyIntermediate",
+          stage: "intermediate.modify",
+          status: "failed",
+          errorName: error instanceof Error ? error.name : undefined,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          strategy: "restructure-from-scene",
+        },
+        { level: "error" }
+      );
+      return {
+        status: "failed",
+        reason: "error",
+        issues: [
+          {
+            code: "ai-error",
+            message: error instanceof Error ? error.message : String(error),
+          },
+        ],
+        stats: {
+          strategy: "restructure",
+          traceId,
+          iterations: 0,
+          tokens: 0,
+          durationMs: Date.now() - startedAt,
+          nodeCount: simplified.stats.nodeCount,
+          edgeCount: simplified.stats.edgeCount,
+          shapeCount: 0,
+          arrowCount: 0,
+        },
+      };
+    }
+
+    const edgeErrors = validateEdgeReferences(
+      modifiedResult.intermediate.nodes,
+      modifiedResult.intermediate.edges
+    );
+    if (edgeErrors.length > 0) {
+      logEventSafely(
+        {
+          traceId,
+          actionName: "diagrams.restructureFromScene",
+          op: "pipeline.intermediate",
+          stage: "intermediate.validate",
+          status: "failed",
+          errorName: "InvalidEdgeReferences",
+          errorMessage: edgeErrors.join(", "),
+          strategy: "restructure-from-scene",
+        },
+        { level: "error" }
+      );
+      return {
+        status: "failed",
+        reason: "invalid-intermediate",
+        issues: edgeErrors.map((message) => ({
+          code: "invalid-edge-reference",
+          message,
+        })),
+        stats: {
+          strategy: "restructure",
+          traceId,
+          iterations: modifiedResult.iterations,
+          tokens: modifiedResult.tokens,
+          durationMs: modifiedResult.durationMs,
+          nodeCount: modifiedResult.intermediate.nodes.length,
+          edgeCount: modifiedResult.intermediate.edges.length,
+          shapeCount: 0,
+          arrowCount: 0,
+        },
+      };
+    }
+
+    const rendered = renderIntermediateDiagram(modifiedResult.intermediate);
+    logEventSafely({
+      traceId,
+      actionName: "diagrams.restructureFromScene",
+      op: "pipeline.render",
+      stage: "render",
+      status: "success",
+      intermediateNodeCount: rendered.stats.nodeCount,
+      intermediateEdgeCount: rendered.stats.edgeCount,
+      elementCount: rendered.elements.length,
+      shapeCount: rendered.stats.shapeCount,
+      arrowCount: rendered.stats.arrowCount,
+      strategy: "restructure-from-scene",
+    });
+
+    logEventSafely({
+      traceId,
+      actionName: "diagrams.restructureFromScene",
+      op: "pipeline.complete",
+      stage: "complete",
+      status: "success",
+      durationMs: Date.now() - startedAt,
+      iterations: modifiedResult.iterations,
+      tokens: modifiedResult.tokens,
+      strategy: "restructure-from-scene",
+    });
+
+    return {
+      status: "success",
+      elements: rendered.elements,
+      appState: (args.appState as Record<string, unknown> | undefined) ?? {},
+      stats: {
+        strategy: "restructure",
+        traceId,
+        iterations: modifiedResult.iterations,
+        tokens: modifiedResult.tokens,
         durationMs: Date.now() - startedAt,
         nodeCount: rendered.stats.nodeCount,
         edgeCount: rendered.stats.edgeCount,
