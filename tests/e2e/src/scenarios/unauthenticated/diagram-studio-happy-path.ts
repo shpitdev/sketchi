@@ -414,14 +414,9 @@ async function generateFromBlankCanvas(
   reviewPage: Parameters<typeof captureScreenshot>[0],
   cfg: import("../../runner/config").StagehandRunConfig
 ): Promise<void> {
-  await page.evaluate(() => {
-    const input = document.querySelector(
-      '[data-testid="diagram-chat-input"]'
-    ) as HTMLTextAreaElement;
-    if (input) {
-      input.value = "Flowchart: Start -> Process -> End";
-    }
-  });
+  await page
+    .locator(testIdSelector("diagram-chat-input"))
+    .fill("Flowchart: Start -> Process -> End");
   await clickWhenVisible(page, testIdSelector("diagram-chat-send"), {
     timeoutMs: 5000,
   });
