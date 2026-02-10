@@ -86,12 +86,18 @@ function waitForSaveStatus(
 
 async function createSessionAndNavigate(
   page: PageLike,
-  baseUrl: string
+  baseUrl: string,
+  cfg: import("../../runner/config").StagehandRunConfig
 ): Promise<string> {
   await page.goto(resolveUrl(baseUrl, "/diagrams"), {
     waitUntil: "domcontentloaded",
   });
   await sleep(3000);
+
+  // biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
+  await captureScreenshot(page as any, cfg, "diagram-studio-landing", {
+    prompt: "Capture /diagrams landing page with recents list",
+  });
 
   await clickWhenVisible(page, testIdSelector("diagram-new-session"), {
     timeoutMs: 15_000,
@@ -375,6 +381,75 @@ async function testExportExcalidraw(page: PageLike): Promise<void> {
   }
 }
 
+async function verifyEmptyCanvasAssertions(page: PageLike): Promise<void> {
+  const headerText = await getTestIdText(page, "diagram-chat-header");
+  if (headerText.includes("Restructure")) {
+    throw new Error(
+      "Header still says 'Restructure' - should be 'AI Assistant'"
+    );
+  }
+
+  const placeholder = await page.evaluate(() => {
+    const input = document.querySelector(
+      '[data-testid="diagram-chat-placeholder"]'
+    );
+    return input?.textContent?.trim() ?? "";
+  });
+  if (!placeholder.includes("Describe your diagram")) {
+    throw new Error(`Wrong placeholder: ${placeholder}`);
+  }
+
+  const warningWhenEmpty = await page.evaluate(() => {
+    return Boolean(
+      document.querySelector('[data-testid="diagram-restructure-warning"]')
+    );
+  });
+  if (warningWhenEmpty) {
+    throw new Error("Warning should not show on empty canvas");
+  }
+}
+
+async function generateFromBlankCanvas(
+  page: PageLike,
+  reviewPage: Parameters<typeof captureScreenshot>[0],
+  cfg: import("../../runner/config").StagehandRunConfig
+): Promise<void> {
+  await page.evaluate(() => {
+    const input = document.querySelector(
+      '[data-testid="diagram-chat-input"]'
+    ) as HTMLTextAreaElement;
+    if (input) {
+      input.value = "Flowchart: Start -> Process -> End";
+    }
+  });
+  await clickWhenVisible(page, testIdSelector("diagram-chat-send"), {
+    timeoutMs: 5000,
+  });
+  const statusRowAppeared = await waitForTestId(
+    page,
+    "diagram-status-row",
+    10_000
+  );
+  if (statusRowAppeared) {
+    await captureScreenshot(reviewPage, cfg, "diagram-studio-generating", {
+      prompt: "Capture status row showing generating state",
+    });
+  }
+  await waitForSaveStatus(page, "Saved", 60_000);
+}
+
+function catchWarning(
+  fn: () => Promise<void>,
+  warnings: string[],
+  fallbackMsg: string
+): Promise<void> {
+  return fn().catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : fallbackMsg;
+    warnings.push(msg);
+    console.log(`  Warning: ${msg}`);
+  });
+}
+
 async function main() {
   const cfg = loadConfig();
   const stagehand = await createStagehand(cfg);
@@ -395,20 +470,34 @@ async function main() {
     await ensureDesktopViewport(page as any);
 
     // Step 1: Create session
-    console.log("[1/8] Creating new diagram session...");
-    const sessionUrl = await createSessionAndNavigate(page, cfg.baseUrl);
+    console.log("[1/12] Creating new diagram session...");
+    const sessionUrl = await createSessionAndNavigate(page, cfg.baseUrl, cfg);
     console.log(`  Session URL: ${sessionUrl}`);
 
     // Step 2: Wait for canvas
-    console.log("[2/8] Waiting for Excalidraw canvas...");
+    console.log("[2/12] Waiting for Excalidraw canvas...");
     await waitForCanvas(page);
 
-    // Step 3: Add text element
-    console.log("[3/8] Adding text element...");
+    // Step 3: Empty canvas screenshot + assertions
+    console.log(
+      "[3/12] Capturing empty canvas and verifying AI Assistant UI..."
+    );
+    await captureScreenshot(reviewPage, cfg, "diagram-studio-empty-canvas", {
+      prompt: "Capture empty canvas with AI Assistant sidebar",
+    });
+    await verifyEmptyCanvasAssertions(page);
+
+    // Step 4: Generate from blank canvas via chat
+    console.log("[4/12] Sending prompt to generate from blank canvas...");
+    await generateFromBlankCanvas(page, reviewPage, cfg);
+    console.log("  Generation complete and saved.");
+
+    // Step 5: Add text element
+    console.log("[5/12] Adding text element...");
     await addTextElement(page);
 
-    // Step 4: Wait for autosave
-    console.log("[4/8] Waiting for autosave...");
+    // Step 6: Wait for autosave
+    console.log("[6/12] Waiting for autosave...");
     await verifyAutosave(page);
 
     const { version, elementCount } = await getVersionAndElementCount(page);
@@ -418,58 +507,76 @@ async function main() {
       prompt: "Does the diagram canvas show a text element with 'hello'?",
     });
 
-    // Step 5: Reload and verify persistence
-    console.log("[5/8] Reloading and verifying persistence...");
+    // Step 7: Reload and verify persistence
+    console.log("[7/12] Reloading and verifying persistence...");
     await verifyReloadPersistence(page, sessionUrl, version);
     console.log("  Persistence verified.");
 
-    // Step 6: Verify restructure warning
-    console.log("[6/8] Verifying restructure warning...");
-    try {
-      await verifyRestructureWarning(page);
-      console.log("  Restructure warning present.");
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "restructure-warning check failed";
-      warnings.push(msg);
-      console.log(`  Warning: ${msg}`);
-    }
+    // Step 8: Verify restructure warning
+    console.log("[8/12] Verifying restructure warning...");
+    await catchWarning(
+      async () => {
+        await verifyRestructureWarning(page);
+        console.log("  Restructure warning present.");
+      },
+      warnings,
+      "restructure-warning check failed"
+    );
 
-    // Step 7: Import share link
-    console.log("[7/8] Testing import share link...");
-    try {
-      await testImportShareLink(page);
-      console.log("  Import completed.");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "import test failed";
-      warnings.push(msg);
-      console.log(`  Warning: ${msg}`);
-    }
+    // Step 9: Import share link
+    console.log("[9/12] Testing import share link...");
+    await catchWarning(
+      async () => {
+        await testImportShareLink(page);
+        // biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
+        await captureScreenshot(page as any, cfg, "diagram-studio-import", {
+          prompt: "Capture import UI state",
+        });
+        console.log("  Import completed.");
+      },
+      warnings,
+      "import test failed"
+    );
 
-    // Step 8: Export share link + .excalidraw
-    console.log("[8/8] Testing export flows...");
-    try {
-      const exportedUrl = await testExportShareLink(page);
-      if (exportedUrl) {
-        console.log(`  Share link: ${exportedUrl}`);
-      }
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "export share test failed";
-      warnings.push(msg);
-      console.log(`  Warning: ${msg}`);
-    }
+    // Step 10: Export share link + .excalidraw
+    console.log("[10/12] Testing export flows...");
+    await catchWarning(
+      async () => {
+        const exportedUrl = await testExportShareLink(page);
+        // biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
+        await captureScreenshot(page as any, cfg, "diagram-studio-export", {
+          prompt: "Capture export menu state",
+        });
+        if (exportedUrl) {
+          console.log(`  Share link: ${exportedUrl}`);
+        }
+      },
+      warnings,
+      "export share test failed"
+    );
 
-    try {
-      await testExportExcalidraw(page);
-      console.log("  .excalidraw export completed.");
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "export excalidraw test failed";
-      warnings.push(msg);
-      console.log(`  Warning: ${msg}`);
-    }
+    await catchWarning(
+      async () => {
+        await testExportExcalidraw(page);
+        console.log("  .excalidraw export completed.");
+      },
+      warnings,
+      "export excalidraw test failed"
+    );
 
+    // Step 11: Recents screenshot
+    console.log("[11/12] Capturing recents list...");
+    await page.goto(resolveUrl(cfg.baseUrl, "/diagrams"), {
+      waitUntil: "domcontentloaded",
+    });
+    await sleep(2000);
+    // biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
+    await captureScreenshot(page as any, cfg, "diagram-studio-recents", {
+      prompt: "Capture recents list showing visited session",
+    });
+
+    // Step 12: Final screenshot
+    console.log("[12/12] Final capture...");
     await captureScreenshot(reviewPage, cfg, "diagram-studio-final", {
       prompt:
         "Does the diagram studio page look correct with canvas, toolbar, and chat sidebar?",

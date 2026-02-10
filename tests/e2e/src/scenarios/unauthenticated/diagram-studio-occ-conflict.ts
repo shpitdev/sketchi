@@ -19,6 +19,7 @@ Success:
 
 import { loadConfig } from "../../runner/config";
 import {
+  captureScreenshot,
   createStagehand,
   getActivePage,
   shutdown,
@@ -227,6 +228,16 @@ async function main() {
 
     if (conflictBanner) {
       console.log("  Conflict banner appeared on tab B.");
+      await captureScreenshot(
+        // biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
+        pageB as any,
+        cfg,
+        "diagram-studio-conflict-banner",
+        {
+          prompt:
+            "Diagram studio with OCC conflict banner visible. Verify the banner warns about conflicting changes.",
+        }
+      );
     } else if (saveStatusB.includes("Conflict")) {
       console.log(
         "  Conflict detected via save status (banner may not be visible)."
@@ -267,6 +278,16 @@ async function main() {
 
       if (conflictResolved) {
         console.log("  Conflict resolved after reload.");
+        await captureScreenshot(
+          // biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
+          pageB as any,
+          cfg,
+          "diagram-studio-conflict-resolved",
+          {
+            prompt:
+              "Diagram studio after OCC conflict resolved. Verify the conflict banner is gone and the canvas is usable.",
+          }
+        );
       } else {
         warnings.push("Conflict banner still visible after reload.");
       }
