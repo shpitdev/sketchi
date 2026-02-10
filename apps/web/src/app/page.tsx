@@ -9,7 +9,7 @@ interface FeatureCardProps {
   title: string;
   description: string;
   status: FeatureStatus;
-  href?: "/library-generator";
+  href?: string;
   externalHref?: string;
   icon: React.ReactNode;
   screenshot: {
@@ -141,7 +141,7 @@ function FeatureCard(props: FeatureCardProps) {
 
   if (isClickable && href) {
     return (
-      <Link className={cardClassName} href={href}>
+      <Link className={cardClassName} href={href as never}>
         <FeatureCardContent {...contentProps} />
       </Link>
     );
@@ -172,7 +172,8 @@ export default function Home() {
       title: "AI Diagram Generation",
       description:
         "Convert natural language into flowcharts, architecture diagrams, and more. Powered by AI with automatic layout and hand-drawn aesthetics.",
-      status: "coming-soon",
+      status: "alpha",
+      href: "/diagrams",
       icon: <Sparkles className="size-5" />,
       screenshot: {
         light: "/screenshots/excalidraw-w-icons-white.png",
