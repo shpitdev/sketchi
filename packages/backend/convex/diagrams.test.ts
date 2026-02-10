@@ -234,6 +234,70 @@ describe.sequential("diagrams actions", () => {
     ).toBe(false);
   });
 
+  test("restructureFromScene returns elements without share link (mocked intermediate)", async () => {
+    const mockedModify = vi.mocked(modifyIntermediate);
+    mockedModify.mockResolvedValue({
+      intermediate: {
+        nodes: [
+          { id: "node-1", label: "Start" },
+          { id: "node-qa", label: "QA" },
+          { id: "node-2", label: "End" },
+        ],
+        edges: [
+          { fromId: "node-1", toId: "node-qa", label: "review" },
+          { fromId: "node-qa", toId: "node-2", label: "approve" },
+        ],
+        graphOptions: { diagramType: "flowchart" },
+      },
+      profileId: "general",
+      iterations: 2,
+      tokens: 50,
+      durationMs: 100,
+      traceId: "trace-restructure-scene",
+    });
+
+    const result = await t.action(api.diagrams.restructureFromScene, {
+      elements: RENDERED.elements,
+      prompt: "Insert a QA step between Start and End.",
+      traceId: "trace-restructure-scene",
+      options: { timeoutMs: 60_000, maxSteps: 3 },
+    });
+
+    expect(result.status).toBe("success");
+    expect(Array.isArray(result.elements)).toBe(true);
+    expect((result.elements ?? []).length).toBeGreaterThan(0);
+    expect(result.stats.traceId).toBe("trace-restructure-scene");
+    expect(result.stats.strategy).toBe("restructure");
+    expect(result.stats.nodeCount).toBeGreaterThanOrEqual(3);
+    // Must NOT contain share link or intermediate payload
+    const raw = result as unknown as Record<string, unknown>;
+    expect("shareLink" in raw).toBe(false);
+    expect("intermediate" in raw).toBe(false);
+  });
+
+  test("restructureFromScene returns failed status on AI error", async () => {
+    const mockedModify = vi.mocked(modifyIntermediate);
+    mockedModify.mockRejectedValue(new Error("AI service unavailable"));
+
+    const result = await t.action(api.diagrams.restructureFromScene, {
+      elements: RENDERED.elements,
+      prompt: "This should fail.",
+      traceId: "trace-restructure-scene-fail",
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.reason).toBe("error");
+    expect(result.issues).toBeDefined();
+    expect(
+      result.issues?.some((i: { code: string }) => i.code === "ai-error")
+    ).toBe(true);
+    expect(result.stats.traceId).toBe("trace-restructure-scene-fail");
+    expect(result.stats.strategy).toBe("restructure");
+    // Still no share link
+    const raw = result as unknown as Record<string, unknown>;
+    expect("shareLink" in raw).toBe(false);
+  });
+
   test("parseDiagram extracts IntermediateFormat", async () => {
     const result = await t.action(api.diagrams.parseDiagram, {
       shareUrl: baseShareLink.url,

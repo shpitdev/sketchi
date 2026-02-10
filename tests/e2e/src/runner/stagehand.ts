@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { CustomOpenAIClient, Stagehand } from "@browserbasehq/stagehand";
-import OpenAI from "openai";
+import { Stagehand } from "@browserbasehq/stagehand";
 import type { StagehandRunConfig } from "./config";
 import {
   persistReviewReport,
@@ -16,13 +15,6 @@ export interface ActResult {
 }
 
 export async function createStagehand(cfg: StagehandRunConfig) {
-  const llmClient = new CustomOpenAIClient({
-    modelName: cfg.modelName,
-    client: new OpenAI({
-      apiKey: cfg.openrouterApiKey,
-      baseURL: "https://openrouter.ai/api/v1",
-    }),
-  });
   const browserbaseSessionCreateParams = cfg.browserbaseRegion
     ? { region: cfg.browserbaseRegion }
     : undefined;
@@ -39,8 +31,9 @@ export async function createStagehand(cfg: StagehandRunConfig) {
       verbose: cfg.verbose,
       model: {
         modelName: cfg.modelName,
+        apiKey: cfg.openrouterApiKey,
+        baseURL: "https://openrouter.ai/api/v1",
       },
-      llmClient,
       localBrowserLaunchOptions:
         cfg.env === "LOCAL"
           ? {
@@ -52,7 +45,7 @@ export async function createStagehand(cfg: StagehandRunConfig) {
 
     try {
       await stagehand.init();
-      await applyVercelBypassHeaders(stagehand.context, cfg);
+      await applyVercelBypassCookie(stagehand.context, cfg);
       return stagehand;
     } catch (error) {
       lastError = error;
@@ -95,36 +88,20 @@ function delay(durationMs: number) {
 
 const popupBlockerAttached = new WeakSet<object>();
 
-async function applyVercelBypassHeaders(
-  context: {
-    setExtraHTTPHeaders?: (headers: Record<string, string>) => Promise<void>;
-    pages?: () => Array<{
-      setExtraHTTPHeaders?: (headers: Record<string, string>) => Promise<void>;
-    }>;
-  },
+async function applyVercelBypassCookie(
+  context: Stagehand["context"],
   cfg: StagehandRunConfig
 ) {
   if (!cfg.vercelBypassSecret) {
     return;
   }
-  const headers = {
-    "x-vercel-protection-bypass": cfg.vercelBypassSecret,
-    "x-vercel-set-bypass-cookie": "true",
-  };
-  if (typeof context.setExtraHTTPHeaders === "function") {
-    await context.setExtraHTTPHeaders(headers);
-    return;
-  }
-  if (typeof context.pages === "function") {
-    const pages = context.pages();
-    await Promise.all(
-      pages.map((page) =>
-        typeof page.setExtraHTTPHeaders === "function"
-          ? page.setExtraHTTPHeaders(headers)
-          : Promise.resolve()
-      )
-    );
-  }
+  // Stagehand 3 uses CDP-based pages without setExtraHTTPHeaders.
+  // Instead, inject the Vercel bypass cookie via init script so it's
+  // sent automatically on every request.
+  await context.addInitScript((secret: string) => {
+    // biome-ignore lint/suspicious/noDocumentCookie: runs in browser context via CDP
+    document.cookie = `x-vercel-protection-bypass=${secret}; path=/`;
+  }, cfg.vercelBypassSecret);
 }
 
 async function attachPopupBlocker(page: {
@@ -161,39 +138,23 @@ export async function getActivePage(stagehand: Stagehand) {
   if (pages.length > 0) {
     const page = pages[0];
     await attachPopupBlocker(page);
-    await applyVercelBypassHeadersToPage(page);
     return page;
   }
   if ("awaitActivePage" in stagehand.context) {
     const active = await stagehand.context.awaitActivePage();
     if (active) {
       await attachPopupBlocker(active);
-      await applyVercelBypassHeadersToPage(active);
       return active;
     }
   }
   const page = await stagehand.context.newPage();
   await attachPopupBlocker(page);
-  await applyVercelBypassHeadersToPage(page);
   return page;
 }
 
 export function isSoftCompletion(result?: ActResult) {
   const message = result?.message?.toLowerCase() ?? "";
   return message.includes("task execution completed");
-}
-
-async function applyVercelBypassHeadersToPage(page: {
-  setExtraHTTPHeaders?: (headers: Record<string, string>) => Promise<void>;
-}) {
-  const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-  if (!bypassSecret || typeof page.setExtraHTTPHeaders !== "function") {
-    return;
-  }
-  await page.setExtraHTTPHeaders({
-    "x-vercel-protection-bypass": bypassSecret,
-    "x-vercel-set-bypass-cookie": "true",
-  });
 }
 
 export async function captureScreenshot(

@@ -42,4 +42,17 @@ export default defineSchema({
   })
     .index("by_library", ["libraryId"])
     .index("by_library_order", ["libraryId", "sortOrder"]),
+  diagramSessions: defineTable({
+    sessionId: v.string(),
+    latestScene: v.optional(
+      v.object({
+        elements: v.array(v.any()),
+        appState: v.any(),
+      })
+    ),
+    latestSceneVersion: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    threadId: v.optional(v.string()),
+  }).index("by_sessionId", ["sessionId"]),
 });

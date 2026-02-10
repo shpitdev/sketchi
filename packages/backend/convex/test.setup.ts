@@ -14,4 +14,5 @@ export const modules = {
   "./diagramModifyFromShareLink.ts": () =>
     import("./diagramModifyFromShareLink"),
   "./diagrams.ts": () => import("./diagrams"),
+  "./diagramSessions.ts": () => import("./diagramSessions"),
 };
