@@ -18,6 +18,7 @@ import { toast } from "sonner";
 
 import type { ChatMessage } from "@/components/diagram-studio/chat-sidebar";
 import { ChatSidebar } from "@/components/diagram-studio/chat-sidebar";
+import { ImportExportToolbar } from "@/components/diagram-studio/import-export-toolbar";
 import { Button } from "@/components/ui/button";
 
 const AUTOSAVE_DELAY_MS = 2000;
@@ -356,6 +357,15 @@ export default function DiagramStudioPage() {
         </span>
         <div className="h-3 w-px bg-border" />
         <SaveStatus saveState={saveState} />
+        <div className="ml-auto">
+          <ImportExportToolbar
+            excalidrawApi={excalidrawApi}
+            knownVersionRef={knownVersionRef}
+            saveScene={saveScene}
+            sessionId={sessionId}
+            suppressOnChangeRef={suppressOnChangeRef}
+          />
+        </div>
       </div>
 
       {saveState.status === "conflict" && (
