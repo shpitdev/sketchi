@@ -98,7 +98,7 @@ export const setLatestScene = mutation({
     sessionId: v.string(),
     expectedVersion: v.number(),
     elements: v.array(v.any()),
-    appState: v.any(),
+    appState: v.record(v.string(), v.any()),
   },
   handler: async (ctx, { sessionId, expectedVersion, elements, appState }) => {
     const session = await ctx.db

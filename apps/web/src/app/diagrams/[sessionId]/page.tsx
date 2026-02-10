@@ -89,6 +89,7 @@ export default function DiagramStudioPage() {
 
         if (result.status === "success") {
           knownVersionRef.current = result.latestSceneVersion;
+          setAutosaveDisabled(false);
           setSaveState({ status: "saved", savedAt: result.savedAt });
           pendingSceneRef.current = null;
         } else if (result.status === "conflict") {
@@ -193,6 +194,9 @@ export default function DiagramStudioPage() {
       elements: session.latestScene.elements as unknown as Parameters<
         typeof excalidrawApi.updateScene
       >[0]["elements"],
+      appState: session.latestScene.appState as Parameters<
+        typeof excalidrawApi.updateScene
+      >[0]["appState"],
     });
 
     knownVersionRef.current = session.latestSceneVersion;
@@ -261,6 +265,9 @@ export default function DiagramStudioPage() {
             elements: result.elements as unknown as Parameters<
               typeof excalidrawApi.updateScene
             >[0]["elements"],
+            appState: (result.appState ?? appState) as Parameters<
+              typeof excalidrawApi.updateScene
+            >[0]["appState"],
           });
 
           // 6. Persist updated scene

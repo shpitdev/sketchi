@@ -105,77 +105,32 @@ async function waitForCanvas(page: PageLike): Promise<void> {
 }
 
 async function addCanvasElement(page: PageLike): Promise<void> {
-  await page.evaluate(() => {
-    const canvas = document.querySelector("canvas");
-    if (!canvas) {
-      return;
-    }
-    canvas.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "r", code: "KeyR", bubbles: true })
-    );
-  });
+  await page.locator("canvas").click();
   await sleep(300);
 
-  await page.evaluate(() => {
+  await page.keyPress("r");
+  await sleep(300);
+
+  const canvasBounds = await page.evaluate(() => {
     const container = document.querySelector('[data-testid="diagram-canvas"]');
     if (!container) {
-      return;
+      return { x: 400, y: 300, width: 800, height: 600 };
     }
     const rect = container.getBoundingClientRect();
-    const cx = rect.x + rect.width / 2;
-    const cy = rect.y + rect.height / 2;
-    const target = container.querySelector("canvas") ?? container;
-
-    target.dispatchEvent(
-      new PointerEvent("pointerdown", {
-        bubbles: true,
-        clientX: cx - 40,
-        clientY: cy - 40,
-        buttons: 1,
-        pointerType: "mouse",
-      })
-    );
-    target.dispatchEvent(
-      new PointerEvent("pointermove", {
-        bubbles: true,
-        clientX: cx + 40,
-        clientY: cy + 40,
-        buttons: 1,
-        pointerType: "mouse",
-      })
-    );
-    target.dispatchEvent(
-      new PointerEvent("pointerup", {
-        bubbles: true,
-        clientX: cx + 40,
-        clientY: cy + 40,
-        buttons: 0,
-        pointerType: "mouse",
-      })
-    );
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
   });
+  const cx = canvasBounds.x + canvasBounds.width / 2;
+  const cy = canvasBounds.y + canvasBounds.height / 2;
+
+  await page.dragAndDrop(cx - 40, cy - 40, cx + 40, cy + 40);
   await sleep(500);
 }
 
 async function triggerManualSave(page: PageLike): Promise<void> {
-  await page.evaluate(() => {
-    const canvas = document.querySelector("canvas");
-    if (!canvas) {
-      return;
-    }
-    canvas.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        key: "Escape",
-        code: "Escape",
-        bubbles: true,
-      })
-    );
-  });
+  await page.keyPress("Escape");
   await sleep(500);
 
-  await page.evaluate(() => {
-    document.querySelector("canvas")?.click();
-  });
+  await page.locator("canvas").click();
   await sleep(300);
 }
 

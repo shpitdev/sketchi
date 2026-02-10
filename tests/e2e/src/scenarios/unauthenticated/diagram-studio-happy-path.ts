@@ -117,70 +117,33 @@ async function waitForCanvas(page: PageLike): Promise<void> {
 }
 
 async function addTextElement(page: PageLike): Promise<void> {
-  await page.evaluate(() => {
-    const canvas = document.querySelector("canvas");
-    if (!canvas) {
-      return;
-    }
-    canvas.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        key: "t",
-        code: "KeyT",
-        bubbles: true,
-      })
-    );
-  });
-  await sleep(500);
-
-  await page.evaluate(() => {
-    const container = document.querySelector('[data-testid="diagram-canvas"]');
-    if (!container) {
-      return;
-    }
-    const rect = container.getBoundingClientRect();
-    const cx = rect.x + rect.width / 2;
-    const cy = rect.y + rect.height / 2;
-    const target = container.querySelector("canvas") ?? container;
-    for (const eventType of ["pointerdown", "pointerup"] as const) {
-      target.dispatchEvent(
-        new PointerEvent(eventType, {
-          bubbles: true,
-          clientX: cx,
-          clientY: cy,
-          buttons: eventType === "pointerdown" ? 1 : 0,
-          pointerType: "mouse",
-        })
-      );
-    }
-  });
-  await sleep(500);
-
-  await page.evaluate(() => {
-    const active = document.activeElement;
-    if (active && "value" in active) {
-      const input = active as HTMLTextAreaElement;
-      const nativeSet = Object.getOwnPropertyDescriptor(
-        HTMLTextAreaElement.prototype,
-        "value"
-      )?.set;
-      if (nativeSet) {
-        nativeSet.call(input, "hello");
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-    }
-  });
+  await page.locator("canvas").click();
   await sleep(300);
 
-  await page.evaluate(() => {
-    document.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        key: "Escape",
-        code: "Escape",
-        bubbles: true,
-      })
-    );
-  });
+  await page.keyPress("t");
   await sleep(500);
+
+  const canvasBounds = await page.evaluate(() => {
+    const container = document.querySelector('[data-testid="diagram-canvas"]');
+    if (!container) {
+      return { x: 400, y: 300, width: 800, height: 600 };
+    }
+    const rect = container.getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+  });
+  const cx = canvasBounds.x + canvasBounds.width / 2;
+  const cy = canvasBounds.y + canvasBounds.height / 2;
+  await page.click(cx, cy);
+  await sleep(500);
+
+  await page.type("hello", { delay: 50 });
+  await sleep(300);
+
+  await page.keyPress("Escape");
+  await sleep(500);
+
+  await page.click(cx + 50, cy + 50);
+  await sleep(300);
 }
 
 async function verifyAutosave(page: PageLike): Promise<void> {

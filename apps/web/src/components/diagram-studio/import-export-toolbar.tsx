@@ -91,10 +91,6 @@ export function ImportExportToolbar({
       const appState = (result.appState ?? {}) as Record<string, unknown>;
       await saveScene(elements, appState);
 
-      requestAnimationFrame(() => {
-        suppressOnChangeRef.current = false;
-      });
-
       setImportState({ status: "success" });
       setImportUrl("");
       toast.success(
@@ -110,6 +106,10 @@ export function ImportExportToolbar({
       const message =
         err instanceof Error ? err.message : "Failed to parse share link";
       toast.error(message);
+    } finally {
+      requestAnimationFrame(() => {
+        suppressOnChangeRef.current = false;
+      });
     }
   }, [importUrl, excalidrawApi, parseDiagram, saveScene, suppressOnChangeRef]);
 
