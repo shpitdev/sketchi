@@ -2,7 +2,7 @@
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { api } from "@sketchi/backend/convex/_generated/api";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import {
   AlertTriangle,
   Check,
@@ -16,6 +16,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import type { ChatMessage } from "@/components/diagram-studio/chat-sidebar";
+import { ChatSidebar } from "@/components/diagram-studio/chat-sidebar";
 import { Button } from "@/components/ui/button";
 
 const AUTOSAVE_DELAY_MS = 2000;
@@ -43,12 +45,15 @@ export default function DiagramStudioPage() {
 
   const createSession = useMutation(api.diagramSessions.create);
   const setLatestScene = useMutation(api.diagramSessions.setLatestScene);
+  const restructureFromScene = useAction(api.diagrams.restructureFromScene);
   const [isCreating, setIsCreating] = useState(false);
 
   const [excalidrawApi, setExcalidrawApi] =
     useState<ExcalidrawImperativeAPI | null>(null);
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
   const [autosaveDisabled, setAutosaveDisabled] = useState(false);
+  const [isRestructuring, setIsRestructuring] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
   const suppressOnChangeRef = useRef(true);
   const initialLoadApplied = useRef(false);
@@ -190,6 +195,98 @@ export default function DiagramStudioPage() {
     );
   }, [saveState, saveScene]);
 
+  const handleRestructure = useCallback(
+    async (prompt: string) => {
+      if (!(excalidrawApi && sessionId) || isRestructuring) {
+        return;
+      }
+
+      setChatMessages((prev) => [...prev, { role: "user", content: prompt }]);
+      setIsRestructuring(true);
+
+      try {
+        // 1. Snapshot current scene
+        const elements =
+          excalidrawApi.getSceneElements() as unknown as readonly Record<
+            string,
+            unknown
+          >[];
+        const appState = excalidrawApi.getAppState() as unknown as Record<
+          string,
+          unknown
+        >;
+
+        // 2. Persist snapshot before restructure
+        await saveScene(elements, appState);
+
+        // 3. Suppress autosave during restructure
+        suppressOnChangeRef.current = true;
+        if (autosaveTimeoutRef.current) {
+          clearTimeout(autosaveTimeoutRef.current);
+          autosaveTimeoutRef.current = null;
+        }
+
+        // 4. Call restructure action
+        const result = await restructureFromScene({
+          elements: [...elements] as unknown[],
+          appState,
+          prompt,
+          sessionId,
+        });
+
+        if (result.status === "success" && result.elements) {
+          // 5. Apply returned scene to Excalidraw
+          excalidrawApi.updateScene({
+            elements: result.elements as unknown as Parameters<
+              typeof excalidrawApi.updateScene
+            >[0]["elements"],
+          });
+
+          // 6. Persist updated scene
+          const newElements = result.elements as Record<string, unknown>[];
+          const newAppState = (result.appState ?? appState) as Record<
+            string,
+            unknown
+          >;
+          await saveScene(newElements, newAppState);
+
+          setChatMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: "Restructured diagram" },
+          ]);
+        } else {
+          const reason =
+            result.issues
+              ?.map((issue: { message: string }) => issue.message)
+              .join("; ") ??
+            result.reason ??
+            "Unknown error";
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: `Restructure failed: ${reason}`,
+            },
+          ]);
+          toast.error(`Restructure failed: ${reason}`);
+        }
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Restructure failed";
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: message },
+        ]);
+        toast.error(message);
+      } finally {
+        setIsRestructuring(false);
+        // Restore autosave after restructure completes
+        suppressOnChangeRef.current = false;
+      }
+    },
+    [excalidrawApi, sessionId, isRestructuring, saveScene, restructureFromScene]
+  );
+
   const handleCreateNew = async () => {
     if (isCreating) {
       return;
@@ -296,25 +393,32 @@ export default function DiagramStudioPage() {
         </div>
       )}
 
-      <div className="relative flex-1">
-        <ExcalidrawEditor
-          initialScene={
-            session.latestScene
-              ? {
-                  elements: session.latestScene.elements as readonly Record<
-                    string,
-                    unknown
-                  >[],
-                  appState: session.latestScene.appState as Record<
-                    string,
-                    unknown
-                  >,
-                }
-              : null
-          }
-          onChange={handleChange}
-          onReady={handleReady}
-          suppressOnChangeRef={suppressOnChangeRef}
+      <div className="flex flex-1 overflow-hidden">
+        <div className="relative flex-1">
+          <ExcalidrawEditor
+            initialScene={
+              session.latestScene
+                ? {
+                    elements: session.latestScene.elements as readonly Record<
+                      string,
+                      unknown
+                    >[],
+                    appState: session.latestScene.appState as Record<
+                      string,
+                      unknown
+                    >,
+                  }
+                : null
+            }
+            onChange={handleChange}
+            onReady={handleReady}
+            suppressOnChangeRef={suppressOnChangeRef}
+          />
+        </div>
+        <ChatSidebar
+          isRestructuring={isRestructuring}
+          messages={chatMessages}
+          onSendPrompt={handleRestructure}
         />
       </div>
     </div>
