@@ -10,18 +10,22 @@ interface ChatMessage {
   content: string;
 }
 
+type ProcessingMode = "generating" | "updating" | null;
+
 interface ChatSidebarProps {
-  isRestructuring: boolean;
   messages: ChatMessage[];
   nonDeletedElementCount: number;
   onSendPrompt: (prompt: string) => void;
+  processingMode: ProcessingMode;
+  showCompletionPulse: boolean;
 }
 
 export function ChatSidebar({
-  isRestructuring,
   messages,
   nonDeletedElementCount,
   onSendPrompt,
+  processingMode,
+  showCompletionPulse,
 }: ChatSidebarProps) {
   const [input, setInput] = useState("");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -29,16 +33,17 @@ export function ChatSidebar({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isCanvasEmpty = nonDeletedElementCount === 0;
+  const isProcessing = processingMode !== null;
 
   const handleSend = useCallback(() => {
     const prompt = input.trim();
-    if (!prompt || isRestructuring) {
+    if (!prompt || isProcessing) {
       return;
     }
 
     setInput("");
     onSendPrompt(prompt);
-  }, [input, isRestructuring, onSendPrompt]);
+  }, [input, isProcessing, onSendPrompt]);
 
   const messageCount = messages.length;
   useEffect(() => {
@@ -48,7 +53,7 @@ export function ChatSidebar({
   }, [messageCount]);
 
   useEffect(() => {
-    if (isRestructuring) {
+    if (isProcessing) {
       setElapsedSeconds(0);
       timerRef.current = setInterval(() => {
         setElapsedSeconds((prev) => prev + 1);
@@ -67,7 +72,7 @@ export function ChatSidebar({
         timerRef.current = null;
       }
     };
-  }, [isRestructuring]);
+  }, [isProcessing]);
 
   return (
     <div
@@ -121,16 +126,25 @@ export function ChatSidebar({
         )}
       </div>
 
-      {isRestructuring && (
+      {isProcessing && (
         <div
           className="flex items-center gap-2 border-t bg-muted/30 px-4 py-2"
           data-testid="diagram-status-row"
         >
           <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
           <span className="text-muted-foreground text-xs">
-            {isCanvasEmpty ? "Generating" : "Updating"}
+            {processingMode === "generating" ? "Generating" : "Updating"}
             {elapsedSeconds >= 2 ? ` (${elapsedSeconds}s)` : "..."}
           </span>
+        </div>
+      )}
+
+      {showCompletionPulse && (
+        <div
+          className="border-emerald-500/30 border-t bg-emerald-500/10 px-4 py-1.5 text-center text-emerald-600 text-xs transition-opacity duration-700 dark:text-emerald-400"
+          data-testid="diagram-completion-pulse"
+        >
+          Done
         </div>
       )}
 
@@ -139,7 +153,7 @@ export function ChatSidebar({
           <input
             className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
             data-testid="diagram-chat-input"
-            disabled={isRestructuring}
+            disabled={isProcessing}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -157,12 +171,12 @@ export function ChatSidebar({
           />
           <Button
             data-testid="diagram-chat-send"
-            disabled={isRestructuring || !input.trim()}
+            disabled={isProcessing || !input.trim()}
             onClick={handleSend}
             size="sm"
             type="button"
           >
-            {isRestructuring ? (
+            {isProcessing ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
               <Send className="size-4" />

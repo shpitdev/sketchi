@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import type { ChatMessage } from "@/components/diagram-studio/chat-sidebar";
@@ -23,6 +23,8 @@ import { sanitizeAppState } from "@/components/diagram-studio/sanitize-app-state
 import { Button } from "@/components/ui/button";
 
 const AUTOSAVE_DELAY_MS = 2000;
+const RECENTS_KEY = "sketchi.diagramRecents.v1";
+const RECENTS_MAX = 10;
 
 const ExcalidrawEditor = dynamic(
   () => import("@/components/diagram-studio/excalidraw-wrapper"),
@@ -36,6 +38,46 @@ type SaveState =
   | { status: "conflict"; serverVersion: number }
   | { status: "error"; message: string };
 
+type ProcessingMode = "generating" | "updating" | null;
+
+function writeDiagramRecent(sessionId: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    let recents: Array<{ sessionId: string; visitedAt: number }> = [];
+    try {
+      const raw = localStorage.getItem(RECENTS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          recents = parsed.filter(
+            (item): item is { sessionId: string; visitedAt: number } =>
+              typeof item === "object" &&
+              item !== null &&
+              typeof item.sessionId === "string" &&
+              typeof item.visitedAt === "number"
+          );
+        }
+      }
+    } catch {
+      recents = [];
+    }
+
+    const filtered = recents.filter((r) => r.sessionId !== sessionId);
+    filtered.unshift({ sessionId, visitedAt: Date.now() });
+    const capped = filtered.slice(0, RECENTS_MAX);
+
+    try {
+      localStorage.setItem(RECENTS_KEY, JSON.stringify(capped));
+    } catch {
+      /* quota exceeded */
+    }
+  } catch {
+    /* localStorage unavailable */
+  }
+}
+
 export default function DiagramStudioPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const router = useRouter();
@@ -48,14 +90,19 @@ export default function DiagramStudioPage() {
   const createSession = useMutation(api.diagramSessions.create);
   const setLatestScene = useMutation(api.diagramSessions.setLatestScene);
   const restructureFromScene = useAction(api.diagrams.restructureFromScene);
+  const generateFromPrompt = useAction(
+    api.diagrams.generateFromPromptForStudio
+  );
   const [isCreating, setIsCreating] = useState(false);
 
   const [excalidrawApi, setExcalidrawApi] =
     useState<ExcalidrawImperativeAPI | null>(null);
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
   const [autosaveDisabled, setAutosaveDisabled] = useState(false);
-  const [isRestructuring, setIsRestructuring] = useState(false);
+  const [processingMode, setProcessingMode] = useState<ProcessingMode>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [liveNonDeletedCount, setLiveNonDeletedCount] = useState(0);
+  const [showCompletionPulse, setShowCompletionPulse] = useState(false);
 
   const suppressOnChangeRef = useRef(true);
   const initialLoadApplied = useRef(false);
@@ -66,6 +113,14 @@ export default function DiagramStudioPage() {
     elements: readonly Record<string, unknown>[];
     appState: Record<string, unknown>;
   } | null>(null);
+
+  useEffect(() => {
+    if (sessionId) {
+      writeDiagramRecent(sessionId);
+    }
+  }, [sessionId]);
+
+  const isProcessing = processingMode !== null;
 
   const saveScene = useCallback(
     async (
@@ -130,7 +185,10 @@ export default function DiagramStudioPage() {
       elements: readonly Record<string, unknown>[],
       appState: Record<string, unknown>
     ) => {
-      if (autosaveDisabled || suppressOnChangeRef.current || isRestructuring) {
+      const nonDeleted = elements.filter((el) => el.isDeleted !== true).length;
+      setLiveNonDeletedCount(nonDeleted);
+
+      if (autosaveDisabled || suppressOnChangeRef.current || isProcessing) {
         return;
       }
 
@@ -153,7 +211,7 @@ export default function DiagramStudioPage() {
         saveScene(elements, appState);
       }, AUTOSAVE_DELAY_MS);
     },
-    [autosaveDisabled, isRestructuring, saveScene]
+    [autosaveDisabled, isProcessing, saveScene]
   );
 
   const handleReady = useCallback(
@@ -172,6 +230,9 @@ export default function DiagramStudioPage() {
               `${e.id}:${e.version}:${e.versionNonce}:${e.isDeleted ?? false}`
           )
           .join("|");
+
+        const nonDeleted = els.filter((el) => el.isDeleted !== true).length;
+        setLiveNonDeletedCount(nonDeleted);
       }
 
       knownVersionRef.current = session?.latestSceneVersion ?? 0;
@@ -223,96 +284,169 @@ export default function DiagramStudioPage() {
     );
   }, [saveState, saveScene]);
 
-  const handleRestructure = useCallback(
+  const triggerCompletionPulse = useCallback(() => {
+    setShowCompletionPulse(true);
+    setTimeout(() => setShowCompletionPulse(false), 1500);
+  }, []);
+
+  const pauseAutosave = useCallback(() => {
+    suppressOnChangeRef.current = true;
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current);
+      autosaveTimeoutRef.current = null;
+    }
+  }, []);
+
+  const applyResultScene = useCallback(
+    async (
+      api: ExcalidrawImperativeAPI,
+      result: {
+        elements: unknown[] | undefined;
+        appState?: Record<string, unknown> | null;
+      },
+      fallbackAppState: Record<string, unknown>
+    ) => {
+      const elements = result.elements as unknown as Parameters<
+        typeof api.updateScene
+      >[0]["elements"];
+      const appState = (result.appState ?? fallbackAppState) as Parameters<
+        typeof api.updateScene
+      >[0]["appState"];
+      api.updateScene({ elements, appState });
+
+      await saveScene(
+        result.elements as Record<string, unknown>[],
+        (result.appState ?? fallbackAppState) as Record<string, unknown>
+      );
+      triggerCompletionPulse();
+    },
+    [saveScene, triggerCompletionPulse]
+  );
+
+  const reportFailure = useCallback(
+    (
+      label: string,
+      result: { issues?: Array<{ message: string }>; reason?: string }
+    ) => {
+      const reason =
+        result.issues?.map((i) => i.message).join("; ") ??
+        result.reason ??
+        "Unknown error";
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: `${label}: ${reason}` },
+      ]);
+      toast.error(`${label}: ${reason}`);
+    },
+    []
+  );
+
+  const executeGenerate = useCallback(
+    async (
+      api: ExcalidrawImperativeAPI,
+      prompt: string,
+      sid: string,
+      appState: Record<string, unknown>
+    ) => {
+      const result = await generateFromPrompt({ prompt, sessionId: sid });
+      pauseAutosave();
+      if (result.status === "success" && result.elements) {
+        await applyResultScene(api, result, appState);
+      } else {
+        reportFailure("Generation failed", result);
+      }
+    },
+    [generateFromPrompt, pauseAutosave, applyResultScene, reportFailure]
+  );
+
+  const executeRestructure = useCallback(
+    async (
+      api: ExcalidrawImperativeAPI,
+      prompt: string,
+      sid: string,
+      currentElements: readonly Record<string, unknown>[],
+      appState: Record<string, unknown>
+    ) => {
+      await saveScene(currentElements, appState);
+      pauseAutosave();
+      const result = await restructureFromScene({
+        elements: [...currentElements] as unknown[],
+        appState,
+        prompt,
+        sessionId: sid,
+      });
+      if (result.status === "success" && result.elements) {
+        await applyResultScene(api, result, appState);
+      } else {
+        reportFailure("Restructure failed", result);
+      }
+    },
+    [
+      saveScene,
+      restructureFromScene,
+      pauseAutosave,
+      applyResultScene,
+      reportFailure,
+    ]
+  );
+
+  const handlePrompt = useCallback(
     async (prompt: string) => {
-      if (!(excalidrawApi && sessionId) || isRestructuring) {
+      if (!(excalidrawApi && sessionId) || isProcessing) {
         return;
       }
 
       setChatMessages((prev) => [...prev, { role: "user", content: prompt }]);
-      setIsRestructuring(true);
+
+      const currentElements =
+        excalidrawApi.getSceneElements() as unknown as readonly Record<
+          string,
+          unknown
+        >[];
+      const nonDeletedCount = currentElements.filter(
+        (el) => el.isDeleted !== true
+      ).length;
+      const isBlankCanvas = nonDeletedCount === 0;
+
+      setProcessingMode(isBlankCanvas ? "generating" : "updating");
 
       try {
-        const elements =
-          excalidrawApi.getSceneElements() as unknown as readonly Record<
-            string,
-            unknown
-          >[];
         const rawAppState = excalidrawApi.getAppState() as unknown as Record<
           string,
           unknown
         >;
         const appState = sanitizeAppState(rawAppState);
 
-        await saveScene(elements, appState);
-
-        suppressOnChangeRef.current = true;
-        if (autosaveTimeoutRef.current) {
-          clearTimeout(autosaveTimeoutRef.current);
-          autosaveTimeoutRef.current = null;
-        }
-
-        const result = await restructureFromScene({
-          elements: [...elements] as unknown[],
-          appState,
-          prompt,
-          sessionId,
-        });
-
-        if (result.status === "success" && result.elements) {
-          // 5. Apply returned scene to Excalidraw
-          excalidrawApi.updateScene({
-            elements: result.elements as unknown as Parameters<
-              typeof excalidrawApi.updateScene
-            >[0]["elements"],
-            appState: (result.appState ?? appState) as Parameters<
-              typeof excalidrawApi.updateScene
-            >[0]["appState"],
-          });
-
-          // 6. Persist updated scene
-          const newElements = result.elements as Record<string, unknown>[];
-          const newAppState = (result.appState ?? appState) as Record<
-            string,
-            unknown
-          >;
-          await saveScene(newElements, newAppState);
-
-          setChatMessages((prev) => [
-            ...prev,
-            { role: "assistant", content: "Restructured diagram" },
-          ]);
+        if (isBlankCanvas) {
+          await executeGenerate(excalidrawApi, prompt, sessionId, appState);
         } else {
-          const reason =
-            result.issues
-              ?.map((issue: { message: string }) => issue.message)
-              .join("; ") ??
-            result.reason ??
-            "Unknown error";
-          setChatMessages((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content: `Restructure failed: ${reason}`,
-            },
-          ]);
-          toast.error(`Restructure failed: ${reason}`);
+          await executeRestructure(
+            excalidrawApi,
+            prompt,
+            sessionId,
+            currentElements,
+            appState
+          );
         }
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Restructure failed";
+        const message = err instanceof Error ? err.message : "Operation failed";
         setChatMessages((prev) => [
           ...prev,
           { role: "assistant", content: message },
         ]);
         toast.error(message);
       } finally {
-        setIsRestructuring(false);
-        // Restore autosave after restructure completes
+        setProcessingMode(null);
         suppressOnChangeRef.current = false;
       }
     },
-    [excalidrawApi, sessionId, isRestructuring, saveScene, restructureFromScene]
+    [
+      excalidrawApi,
+      sessionId,
+      isProcessing,
+      executeGenerate,
+      executeRestructure,
+    ]
   );
 
   const handleCreateNew = async () => {
@@ -332,8 +466,42 @@ export default function DiagramStudioPage() {
 
   if (session === undefined) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      <div
+        className="flex h-full flex-col overflow-hidden"
+        data-testid="diagram-studio-skeleton"
+      >
+        <div className="flex items-center gap-4 border-b px-4 py-2">
+          <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+          <div className="h-3 w-px bg-border" />
+          <div className="h-4 w-8 animate-pulse rounded bg-muted" />
+          <div className="h-3 w-px bg-border" />
+          <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+          <div className="ml-auto h-7 w-24 animate-pulse rounded bg-muted" />
+        </div>
+        <div className="flex flex-1 overflow-hidden">
+          <div className="relative flex-1 bg-muted/20">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="h-10 w-10 animate-pulse rounded-lg bg-muted" />
+                <div className="h-3 w-32 animate-pulse rounded bg-muted" />
+              </div>
+            </div>
+          </div>
+          <div className="flex h-full w-80 flex-col border-l bg-background">
+            <div className="border-b px-4 py-3">
+              <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+            </div>
+            <div className="flex-1 px-4 py-3">
+              <div className="mx-auto h-3 w-40 animate-pulse rounded bg-muted" />
+            </div>
+            <div className="border-t px-4 py-3">
+              <div className="flex gap-2">
+                <div className="h-8 flex-1 animate-pulse rounded-md bg-muted" />
+                <div className="h-8 w-10 animate-pulse rounded-md bg-muted" />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -365,9 +533,6 @@ export default function DiagramStudioPage() {
     unknown
   >[];
   const elementCount = allElements.length;
-  const nonDeletedElementCount = allElements.filter(
-    (el) => !el.isDeleted
-  ).length;
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -460,10 +625,11 @@ export default function DiagramStudioPage() {
           />
         </div>
         <ChatSidebar
-          isRestructuring={isRestructuring}
           messages={chatMessages}
-          nonDeletedElementCount={nonDeletedElementCount}
-          onSendPrompt={handleRestructure}
+          nonDeletedElementCount={liveNonDeletedCount}
+          onSendPrompt={handlePrompt}
+          processingMode={processingMode}
+          showCompletionPulse={showCompletionPulse}
         />
       </div>
     </div>
