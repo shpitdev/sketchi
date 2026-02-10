@@ -298,6 +298,56 @@ describe.sequential("diagrams actions", () => {
     expect("shareLink" in raw).toBe(false);
   });
 
+  test("generateFromPromptForStudio returns elements without share link (mocked intermediate)", async () => {
+    const mockedGenerate = vi.mocked(generateIntermediate);
+    mockedGenerate.mockResolvedValue({
+      intermediate: BASE_INTERMEDIATE,
+      profileId: "general",
+      iterations: 2,
+      tokens: 42,
+      durationMs: 120,
+      traceId: "trace-studio-gen",
+    });
+
+    const result = await t.action(api.diagrams.generateFromPromptForStudio, {
+      prompt: "Generate a simple flowchart",
+      traceId: "trace-studio-gen",
+      sessionId: "session-123",
+    });
+
+    expect(result.status).toBe("success");
+    expect(Array.isArray(result.elements)).toBe(true);
+    expect((result.elements ?? []).length).toBeGreaterThan(0);
+    expect(result.stats.traceId).toBe("trace-studio-gen");
+    expect(result.stats.nodeCount).toBe(2);
+    expect(result.stats.edgeCount).toBe(1);
+    // Must NOT contain share link or intermediate payload
+    const raw = result as unknown as Record<string, unknown>;
+    expect("shareLink" in raw).toBe(false);
+    expect("intermediate" in raw).toBe(false);
+  });
+
+  test("generateFromPromptForStudio returns failed status on AI error", async () => {
+    const mockedGenerate = vi.mocked(generateIntermediate);
+    mockedGenerate.mockRejectedValue(new Error("AI service unavailable"));
+
+    const result = await t.action(api.diagrams.generateFromPromptForStudio, {
+      prompt: "This should fail.",
+      traceId: "trace-studio-gen-fail",
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.reason).toBe("error");
+    expect(result.issues).toBeDefined();
+    expect(
+      result.issues?.some((i: { code: string }) => i.code === "ai-error")
+    ).toBe(true);
+    expect(result.stats.traceId).toBe("trace-studio-gen-fail");
+    // Still no share link
+    const raw = result as unknown as Record<string, unknown>;
+    expect("shareLink" in raw).toBe(false);
+  });
+
   test("parseDiagram extracts IntermediateFormat", async () => {
     const result = await t.action(api.diagrams.parseDiagram, {
       shareUrl: baseShareLink.url,

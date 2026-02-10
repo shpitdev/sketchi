@@ -1001,6 +1001,212 @@ export const restructureFromScene = restructureFromSceneAction({
   },
 });
 
+const generateFromPromptForStudioAction = createLoggedAction<
+  {
+    prompt: string;
+    traceId?: string;
+    sessionId?: string;
+  },
+  {
+    status: "success" | "failed";
+    reason?: "invalid-intermediate" | "error";
+    elements?: unknown[];
+    appState?: Record<string, unknown>;
+    issues?: Array<{ code: string; message: string; elementId?: string }>;
+    stats: GenerateStats;
+  }
+>("diagrams.generateFromPromptForStudio", {
+  formatArgs: (args) => ({
+    promptLength: args.prompt.length,
+    traceId: args.traceId ?? null,
+    sessionId: args.sessionId ?? null,
+  }),
+  formatResult: (result) => ({
+    status: result.status,
+    elementCount: result.elements?.length ?? 0,
+  }),
+});
+
+export const generateFromPromptForStudio = generateFromPromptForStudioAction({
+  args: {
+    prompt: v.string(),
+    traceId: v.optional(v.string()),
+    sessionId: v.optional(v.string()),
+  },
+  handler: async (_ctx, args) => {
+    const startedAt = Date.now();
+    let traceId: string = args.traceId ?? crypto.randomUUID();
+    const promptLength = args.prompt.length;
+    const promptHash = hashString(args.prompt);
+
+    logEventSafely({
+      traceId,
+      actionName: "diagrams.generateFromPromptForStudio",
+      op: "pipeline.start",
+      stage: "input",
+      status: "success",
+      promptLength,
+      promptHash,
+      sessionId: args.sessionId ?? undefined,
+    });
+
+    let generationResult: Awaited<ReturnType<typeof generateIntermediate>>;
+    try {
+      generationResult = await generateIntermediate(args.prompt, {
+        traceId,
+      });
+    } catch (error) {
+      logEventSafely(
+        {
+          traceId,
+          actionName: "diagrams.generateFromPromptForStudio",
+          op: "pipeline.generateIntermediate",
+          stage: "intermediate.generate",
+          status: "failed",
+          errorName: error instanceof Error ? error.name : undefined,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        { level: "error" }
+      );
+      return {
+        status: "failed",
+        reason: "error",
+        issues: [
+          {
+            code: "ai-error",
+            message: error instanceof Error ? error.message : String(error),
+          },
+        ],
+        stats: {
+          traceId,
+          iterations: 0,
+          tokens: 0,
+          durationMs: Date.now() - startedAt,
+          nodeCount: 0,
+          edgeCount: 0,
+          shapeCount: 0,
+          arrowCount: 0,
+        },
+      };
+    }
+
+    const intermediate = generationResult.intermediate;
+    traceId = generationResult.traceId;
+
+    const parsed = IntermediateFormatSchema.safeParse(intermediate);
+    if (!parsed.success) {
+      logEventSafely(
+        {
+          traceId,
+          actionName: "diagrams.generateFromPromptForStudio",
+          op: "pipeline.intermediate",
+          stage: "intermediate.validate",
+          status: "failed",
+          errorName: "IntermediateValidationError",
+          errorMessage: parsed.error.message,
+        },
+        { level: "error" }
+      );
+      return {
+        status: "failed",
+        reason: "invalid-intermediate",
+        issues: parsed.error.issues.map((issue) => ({
+          code: "invalid-intermediate",
+          message: `${issue.path.join(".")}: ${issue.message}`,
+        })),
+        stats: {
+          traceId,
+          iterations: generationResult.iterations,
+          tokens: generationResult.tokens,
+          durationMs: Date.now() - startedAt,
+          nodeCount: 0,
+          edgeCount: 0,
+          shapeCount: 0,
+          arrowCount: 0,
+        },
+      };
+    }
+
+    const edgeErrors = validateEdgeReferences(
+      parsed.data.nodes,
+      parsed.data.edges
+    );
+    if (edgeErrors.length > 0) {
+      logEventSafely(
+        {
+          traceId,
+          actionName: "diagrams.generateFromPromptForStudio",
+          op: "pipeline.intermediate",
+          stage: "intermediate.validate",
+          status: "failed",
+          errorName: "InvalidEdgeReferences",
+          errorMessage: edgeErrors.join(", "),
+        },
+        { level: "error" }
+      );
+      return {
+        status: "failed",
+        reason: "invalid-intermediate",
+        issues: edgeErrors.map((message) => ({
+          code: "invalid-edge-reference",
+          message,
+        })),
+        stats: {
+          traceId,
+          iterations: generationResult.iterations,
+          tokens: generationResult.tokens,
+          durationMs: Date.now() - startedAt,
+          nodeCount: parsed.data.nodes.length,
+          edgeCount: parsed.data.edges.length,
+          shapeCount: 0,
+          arrowCount: 0,
+        },
+      };
+    }
+
+    const rendered = renderIntermediateDiagram(parsed.data);
+    logEventSafely({
+      traceId,
+      actionName: "diagrams.generateFromPromptForStudio",
+      op: "pipeline.render",
+      stage: "render",
+      status: "success",
+      intermediateNodeCount: rendered.stats.nodeCount,
+      intermediateEdgeCount: rendered.stats.edgeCount,
+      elementCount: rendered.elements.length,
+      shapeCount: rendered.stats.shapeCount,
+      arrowCount: rendered.stats.arrowCount,
+    });
+
+    logEventSafely({
+      traceId,
+      actionName: "diagrams.generateFromPromptForStudio",
+      op: "pipeline.complete",
+      stage: "complete",
+      status: "success",
+      durationMs: Date.now() - startedAt,
+      iterations: generationResult.iterations,
+      tokens: generationResult.tokens,
+    });
+
+    return {
+      status: "success",
+      elements: rendered.elements,
+      appState: {},
+      stats: {
+        traceId,
+        iterations: generationResult.iterations,
+        tokens: generationResult.tokens,
+        durationMs: Date.now() - startedAt,
+        nodeCount: rendered.stats.nodeCount,
+        edgeCount: rendered.stats.edgeCount,
+        shapeCount: rendered.stats.shapeCount,
+        arrowCount: rendered.stats.arrowCount,
+      },
+    };
+  },
+});
+
 export const parseDiagram = parseDiagramAction({
   args: {
     shareUrl: v.string(),
