@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@sketchi-app/opencode-excalidraw": "file:../packages/opencode-excalidraw",
     "@opencode-ai/sdk": "1.1.53",
     "parquetjs-lite": "^0.8.7"
   },

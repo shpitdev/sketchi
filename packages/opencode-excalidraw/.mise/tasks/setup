@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+#MISE description="Install workspace dependencies"
+
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+bun install --frozen-lockfile || (
+  echo "bun install failed; clearing Bun cache and retrying" >&2
+  bun pm cache rm
+  bun install --frozen-lockfile
+)

@@ -1,19 +1,23 @@
-# CI - @sketchi-app/opencode-excalidraw (typecheck + unit tests + build + pack dry-run)
 name: opencode-excalidraw-pr
 
 on:
   pull_request:
     paths:
       - "packages/opencode-excalidraw/**"
-      - ".opencode/**"
       - ".github/workflows/opencode-excalidraw-*.yml"
-  push:
-    branches:
-      - main
+  pull_request_target:
     paths:
       - "packages/opencode-excalidraw/**"
-      - ".opencode/**"
       - ".github/workflows/opencode-excalidraw-*.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
 
 jobs:
   opencode-excalidraw:
@@ -23,39 +27,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
         with:
-          node-version: 20
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Tooling
+        uses: jdx/mise-action@d6e32c1796099e0f1f3ac741c220a8b7eae9e5dd
         with:
-          bun-version: 1.3.5
+          install: true
+          cache: true
+          experimental: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install dependencies
+      - name: Run Checks
         run: |
-          set -euo pipefail
-          bun install --frozen-lockfile || (
-            echo "bun install failed; clearing Bun cache and retrying" >&2
-            bun pm cache rm
-            bun install --frozen-lockfile
-          )
-
-      - name: Typecheck
-        working-directory: packages/opencode-excalidraw
-        run: bun run typecheck
-
-      - name: Unit tests
-        working-directory: packages/opencode-excalidraw
-        run: bun run test
-
-      - name: Build
-        working-directory: packages/opencode-excalidraw
-        run: bun run build
-
-      - name: Validate npm pack (dry run)
-        working-directory: packages/opencode-excalidraw
-        run: npm pack --dry-run
-
+          mise run -C packages/opencode-excalidraw setup
+          mise run -C packages/opencode-excalidraw lint
+          mise run -C packages/opencode-excalidraw typecheck
+          mise run -C packages/opencode-excalidraw test
+          mise run -C packages/opencode-excalidraw build
+          (cd packages/opencode-excalidraw && npm pack --dry-run)

@@ -4,11 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "npm tag (latest)"
+        description: "npm tag (latest or next)"
         required: true
         type: choice
         options:
           - latest
+          - next
   repository_dispatch:
     types: [publish-opencode-excalidraw]
 
@@ -19,66 +20,42 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    env:
-      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Setup Tooling
+        uses: jdx/mise-action@d6e32c1796099e0f1f3ac741c220a8b7eae9e5dd
         with:
-          node-version: 20
-          registry-url: "https://registry.npmjs.org"
+          install: true
+          cache: true
+          experimental: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.5
-
-      - name: Install dependencies
-        run: |
-          set -euo pipefail
-          bun install --frozen-lockfile || (
-            echo "bun install failed; clearing Bun cache and retrying" >&2
-            bun pm cache rm
-            bun install --frozen-lockfile
-          )
+      - name: Setup
+        run: mise run -C packages/opencode-excalidraw setup
 
       - name: Test
-        working-directory: packages/opencode-excalidraw
-        run: bun run test
-
-      - name: Build
-        working-directory: packages/opencode-excalidraw
-        run: bun run build
+        run: mise run -C packages/opencode-excalidraw test
 
       - id: inputs
         uses: simenandre/setup-inputs@v1
 
       - name: Publish to npm with OIDC
-        working-directory: packages/opencode-excalidraw
         run: |
           set -euo pipefail
+
           TAG="${{ steps.inputs.outputs.tag }}"
           if [ -z "$TAG" ]; then
             TAG="latest"
           fi
 
-          NAME="$(node -p 'require("./package.json").name')"
-          VERSION="$(node -p 'require("./package.json").version')"
-
-          if npm view "${NAME}@${VERSION}" version >/dev/null 2>&1; then
-            echo "${NAME}@${VERSION} already exists on npm; skipping publish"
-            exit 0
-          fi
-
-          echo "Publishing ${NAME}@${VERSION} with tag: ${TAG}"
-          npm publish --tag "${TAG}" --provenance
+          echo "Publishing with tag: ${TAG}"
+          mise run -C packages/opencode-excalidraw publish --tag "${TAG}"
 
       - name: Verify published version
-        working-directory: packages/opencode-excalidraw
         run: |
           set -euo pipefail
 
@@ -87,8 +64,8 @@ jobs:
             TAG="latest"
           fi
 
-          NAME="$(node -p 'require("./package.json").name')"
-          VERSION="$(node -p 'require("./package.json").version')"
+          NAME="$(node -p 'require("./packages/opencode-excalidraw/package.json").name')"
+          VERSION="$(node -p 'require("./packages/opencode-excalidraw/package.json").version')"
           echo "Checking npm dist-tag '$TAG' for ${NAME}@${VERSION}..."
 
           # npm registry can be eventually consistent right after publish.
@@ -223,4 +200,3 @@ jobs:
           done
 
           echo "✓ npm publish verification passed"
-

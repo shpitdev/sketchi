@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+#MISE description="Publish plugin package to npm registry"
+#MISE depends=["setup", "build"]
+#USAGE flag "-t --tag <tag>" "Tag to publish with" default="latest"
+#USAGE flag "-d --dry-run" "Perform a dry run of the publish process"
+#USAGE flag "--otp <otp>" "One-time password for npm two-factor authentication" default=""
+
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+PKG_DIR="${ROOT}/packages/opencode-excalidraw"
+
+cd "${PKG_DIR}"
+
+echo "Publishing to npm"
+echo " > with tag: ${usage_tag}"
+echo " > npm version: $(npm --version)"
+
+# Mirror the palantir template behavior for next-tag prereleases.
+if [ "${usage_tag}" = "next" ]; then
+  LAST_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+  if [ -n "${LAST_TAG}" ]; then
+    BUILD_NUMBER="$(git rev-list "${LAST_TAG}..HEAD" --count)"
+    echo " > last tag: ${LAST_TAG}"
+    echo " > commits since last tag: ${BUILD_NUMBER}"
+  else
+    BUILD_NUMBER="$(git rev-list HEAD --count)"
+    echo " > no previous tag found"
+    echo " > total commits: ${BUILD_NUMBER}"
+  fi
+
+  CURRENT_VERSION="$(node -p 'require("./package.json").version')"
+  BASE_VERSION="${CURRENT_VERSION%%-*}"
+  PRERELEASE_VERSION="${BASE_VERSION}-next.${BUILD_NUMBER}"
+  echo " > bumping version: ${CURRENT_VERSION} -> ${PRERELEASE_VERSION}"
+
+  if [ "${usage_dry_run}" != "true" ]; then
+    npm version "${PRERELEASE_VERSION}" --no-git-tag-version --allow-same-version
+  fi
+fi
+
+NAME="$(node -p 'require("./package.json").name')"
+VERSION="$(node -p 'require("./package.json").version')"
+if npm view "${NAME}@${VERSION}" version >/dev/null 2>&1; then
+  echo " > ${NAME}@${VERSION} already exists on npm; skipping publish"
+  exit 0
+fi
+
+args=(--access public --tag "${usage_tag}")
+if [ -n "${usage_otp}" ]; then
+  args+=(--otp "${usage_otp}")
+  echo " > using provided OTP for 2FA"
+fi
+if [ -n "${GITHUB_ACTIONS:-}" ]; then
+  args+=(--provenance)
+  echo " > adding provenance flag for CI publish"
+fi
+if [ "${usage_dry_run}" = "true" ]; then
+  args+=(--dry-run)
+  echo " > dry run mode enabled"
+fi
+
+npm publish "${args[@]}"

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+#MISE description="Build plugin package"
+
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+bun run --cwd packages/opencode-excalidraw build

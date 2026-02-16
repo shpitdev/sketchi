@@ -44,6 +44,7 @@
   },
   "scripts": {
     "build": "bash scripts/build.sh",
+    "smoke": "bun run scripts/smoke-test.ts",
     "typecheck": "bun x tsc -p tsconfig.ci.json --noEmit",
     "test": "bun test"
   }
