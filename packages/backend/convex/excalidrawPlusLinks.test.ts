@@ -28,7 +28,7 @@ describe("Excalidraw+ URL parsing", () => {
     expect(Array.isArray(result.payload.elements)).toBe(true);
     expect(result.payload.elements.length).toBeGreaterThan(0);
     expect(result.payload.appState).toBeTruthy();
-  }, 20_000);
+  }, 45_000);
 
   test("parses app.excalidraw.com /l/<workspace>/<scene> and returns view-and-edit for linkSharing=3", async () => {
     const result = await parseExcalidrawUrl(
@@ -45,7 +45,7 @@ describe("Excalidraw+ URL parsing", () => {
     expect(Array.isArray(result.payload.elements)).toBe(true);
     expect(result.payload.elements.length).toBeGreaterThan(0);
     expect(result.payload.appState).toBeTruthy();
-  }, 20_000);
+  }, 45_000);
 
   test("parses /readonly/<token> via readonly metadata + export service", async () => {
     const result = await parseExcalidrawUrl(
@@ -63,5 +63,5 @@ describe("Excalidraw+ URL parsing", () => {
 
     // Stable for this public example.
     expect(result.payload.appState.viewBackgroundColor).toBe("#ffffff");
-  }, 20_000);
+  }, 45_000);
 });

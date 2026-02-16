@@ -11,7 +11,9 @@ const IV_LENGTH_BYTES = 12;
 const MAX_COMPRESSED_BYTES = 5 * 1024 * 1024;
 const MAX_DECOMPRESSED_BYTES = 20 * 1024 * 1024;
 const MAX_UPSTREAM_BYTES = 25 * 1024 * 1024;
-const DEFAULT_FETCH_TIMEOUT_MS = 10_000;
+// Excalidraw+ upstream endpoints can be slower than json.excalidraw.com in CI.
+// Use a slightly longer default timeout to reduce flaky aborts.
+const DEFAULT_FETCH_TIMEOUT_MS = 20_000;
 
 const EXCALIDRAW_SHARE_URL_PATTERN = /#json=([^,]+),(.+)$/;
 const EXCALIDRAW_GET_URL = "https://json.excalidraw.com/api/v2/";
