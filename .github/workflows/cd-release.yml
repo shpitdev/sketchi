@@ -58,6 +58,34 @@ jobs:
             fi
           fi
 
+          # Skip releases when changes are limited to non-runtime paths (docs, OpenCode, CI, or the npm plugin package).
+          # This prevents bumping the app version when only publishing/iterating on the OpenCode plugin.
+          BEFORE_SHA="${{ github.event.before }}"
+          AFTER_SHA="${{ github.sha }}"
+          CHANGED_FILES="$(git diff --name-only "${BEFORE_SHA}..${AFTER_SHA}" || true)"
+          if [ -n "$CHANGED_FILES" ]; then
+            ONLY_IGNORED="true"
+            while IFS= read -r file; do
+              [ -z "$file" ] && continue
+              case "$file" in
+                README.md|AGENTS.md|bun.lock) ;;
+                docs/*|.codex/*|.opencode/*) ;;
+                packages/opencode-excalidraw/*) ;;
+                .github/workflows/*) ;;
+                *)
+                  ONLY_IGNORED="false"
+                  break
+                  ;;
+              esac
+            done <<< "$CHANGED_FILES"
+
+            if [ "$ONLY_IGNORED" = "true" ]; then
+              echo "skip=true" >> $GITHUB_OUTPUT
+              echo "Skipping release: only non-runtime paths changed."
+              exit 0
+            fi
+          fi
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         if: steps.skip_release.outputs.skip != 'true'

@@ -4,14 +4,12 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@opencode-ai/plugin": "1.1.53",
+    "@sketchi-app/opencode-excalidraw": "file:../packages/opencode-excalidraw",
     "@opencode-ai/sdk": "1.1.53",
-    "@sketchi/shared": "workspace:*",
     "parquetjs-lite": "^0.8.7"
   },
   "devDependencies": {
     "bun-types": "1.3.9",
-    "playwright": "^1.58.2",
     "typescript": "^5.8.2"
   }
 }

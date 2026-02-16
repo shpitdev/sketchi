@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    "packages/opencode-excalidraw": {
+      "release-type": "node",
+      "package-name": "@sketchi-app/opencode-excalidraw",
+      "component": "opencode-excalidraw",
+      "changelog-path": "CHANGELOG.md"
+    }
+  },
+  "include-v-in-tag": true,
+  "include-component-in-tag": true,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "initial-version": "0.1.0"
+}

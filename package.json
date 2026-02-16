@@ -5,8 +5,7 @@
     "packages": [
       "apps/*",
       "packages/*",
-      "tests/*",
-      ".opencode"
+      "tests/*"
     ],
     "catalog": {
       "dotenv": "^17.2.4",

@@ -1,4 +1,4 @@
-import { chromium, type Browser, type Page } from "playwright";
+import { type Browser, chromium, type Page } from "playwright";
 
 const RENDER_TIMEOUT_MS = 60_000;
 
@@ -40,12 +40,12 @@ const EXPORT_HARNESS_HTML = `
 </html>
 `;
 
-export type RenderOptions = {
+export interface RenderOptions {
   scale?: number;
   padding?: number;
   background?: boolean;
   backgroundColor?: string;
-};
+}
 
 let browser: Browser | null = null;
 

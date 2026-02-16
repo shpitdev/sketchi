@@ -1,5 +1,5 @@
-import { mkdir, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 export const DEFAULT_OUTPUT_DIR = "sketchi/png";
@@ -22,7 +22,10 @@ async function ensureDir(path: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
 }
 
-export async function writePng(outputPath: string, png: Buffer): Promise<string> {
+export async function writePng(
+  outputPath: string,
+  png: Buffer
+): Promise<string> {
   await ensureDir(outputPath);
   await writeFile(outputPath, png);
   return outputPath;

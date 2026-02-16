@@ -1,27 +1,26 @@
-import { tool, type Plugin } from "@opencode-ai/plugin";
+import { type Plugin, tool } from "@opencode-ai/plugin";
+
 import { fetchJson, shareElements } from "./lib/api";
-import {
-  extractShareLink,
-  readExcalidrawFile,
-} from "./lib/excalidraw";
+import { extractShareLink, readExcalidrawFile } from "./lib/excalidraw";
+import { gradeDiagram } from "./lib/grade";
 import { buildDefaultPngPath, resolveOutputPath, writePng } from "./lib/output";
 import { closeBrowser, renderElementsToPng } from "./lib/render";
-import { gradeDiagram } from "./lib/grade";
 import { resolveExcalidrawFromShareUrl } from "./lib/resolve-share-url";
 import { createToolTraceId } from "./lib/trace";
 
-const DEFAULT_API_BASE = "https://www.sketchi.app";
+const DEFAULT_API_BASE = "https://sketchi.app";
+const TRAILING_SLASH_PATTERN = /\/$/;
 
 function normalizeApiBase(value: string): string {
-  return value.replace(/\/$/, "");
+  return value.replace(TRAILING_SLASH_PATTERN, "");
 }
 
-export const SketchiPlugin: Plugin = async (input) => {
+export const SketchiPlugin: Plugin = (input) => {
   const apiBase = normalizeApiBase(
     process.env.SKETCHI_API_URL ?? DEFAULT_API_BASE
   );
 
-  return {
+  return Promise.resolve({
     tool: {
       diagram_from_prompt: tool({
         description:
@@ -72,7 +71,17 @@ export const SketchiPlugin: Plugin = async (input) => {
             : buildDefaultPngPath("diagram-generate", context.directory);
 
           try {
-            const pngResult = await renderElementsToPng(response.elements, {
+            const elements = response.elements?.length
+              ? response.elements
+              : (
+                  await resolveExcalidrawFromShareUrl({
+                    shareUrl: response.shareLink.url,
+                    apiBase,
+                    traceId,
+                    abort: context.abort,
+                  })
+                ).elements;
+            const pngResult = await renderElementsToPng(elements, {
               scale: args.scale,
               padding: args.padding,
               background: args.background,
@@ -179,7 +188,11 @@ export const SketchiPlugin: Plugin = async (input) => {
             status: "success" | "failed";
             reason?: string;
             elements?: Record<string, unknown>[];
-            shareLink?: { url: string; shareId: string; encryptionKey: string };
+            shareLink?: {
+              url: string;
+              shareId: string;
+              encryptionKey: string;
+            };
             stats: Record<string, unknown>;
           }>(
             `${apiBase}/api/diagrams/tweak`,
@@ -213,17 +226,16 @@ export const SketchiPlugin: Plugin = async (input) => {
             : buildDefaultPngPath("diagram-tweak", context.directory);
 
           try {
-            const elements =
-              response.elements?.length
-                ? response.elements
-                : (
-                    await resolveExcalidrawFromShareUrl({
-                      shareUrl: response.shareLink.url,
-                      apiBase,
-                      traceId,
-                      abort: context.abort,
-                    })
-                  ).elements;
+            const elements = response.elements?.length
+              ? response.elements
+              : (
+                  await resolveExcalidrawFromShareUrl({
+                    shareUrl: response.shareLink.url,
+                    apiBase,
+                    traceId,
+                    abort: context.abort,
+                  })
+                ).elements;
             const pngResult = await renderElementsToPng(elements, {
               scale: args.scale,
               padding: args.padding,
@@ -333,7 +345,11 @@ export const SketchiPlugin: Plugin = async (input) => {
             status: "success" | "failed";
             reason?: string;
             elements?: Record<string, unknown>[];
-            shareLink?: { url: string; shareId: string; encryptionKey: string };
+            shareLink?: {
+              url: string;
+              shareId: string;
+              encryptionKey: string;
+            };
             stats: Record<string, unknown>;
           }>(
             `${apiBase}/api/diagrams/restructure`,
@@ -367,17 +383,16 @@ export const SketchiPlugin: Plugin = async (input) => {
             : buildDefaultPngPath("diagram-restructure", context.directory);
 
           try {
-            const elements =
-              response.elements?.length
-                ? response.elements
-                : (
-                    await resolveExcalidrawFromShareUrl({
-                      shareUrl: response.shareLink.url,
-                      apiBase,
-                      traceId,
-                      abort: context.abort,
-                    })
-                  ).elements;
+            const elements = response.elements?.length
+              ? response.elements
+              : (
+                  await resolveExcalidrawFromShareUrl({
+                    shareUrl: response.shareLink.url,
+                    apiBase,
+                    traceId,
+                    abort: context.abort,
+                  })
+                ).elements;
             const pngResult = await renderElementsToPng(elements, {
               scale: args.scale,
               padding: args.padding,
@@ -443,10 +458,7 @@ export const SketchiPlugin: Plugin = async (input) => {
           const excalidraw =
             args.excalidraw ??
             (args.excalidrawPath
-              ? await readExcalidrawFile(
-                  args.excalidrawPath,
-                  context.directory
-                )
+              ? await readExcalidrawFile(args.excalidrawPath, context.directory)
               : undefined);
 
           if (!(args.shareUrl || excalidraw)) {
@@ -597,7 +609,7 @@ export const SketchiPlugin: Plugin = async (input) => {
         },
       }),
     },
-  };
+  });
 };
 
 export default SketchiPlugin;

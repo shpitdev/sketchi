@@ -1,3 +1,3 @@
-import SketchiPlugin from "./sketchi/index";
+import SketchiPlugin from "@sketchi-app/opencode-excalidraw";
 
 export default SketchiPlugin;

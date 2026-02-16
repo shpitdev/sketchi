@@ -1,4 +1,4 @@
-# CI OpenCode - Typecheck + unit tests for .opencode workspace
+# CI OpenCode - Typecheck for .opencode workspace
 # Trigger: PR, main push (only when .opencode/** changes)
 name: ci-opencode
 
@@ -25,6 +25,7 @@ jobs:
           bun-version: 1.3.5
 
       - name: Install dependencies
+        working-directory: .opencode
         run: |
           set -euo pipefail
           bun install --frozen-lockfile || (
@@ -34,8 +35,5 @@ jobs:
           )
 
       - name: Typecheck .opencode
-        run: bun x tsc -p .opencode/tsconfig.ci.json
-
-      - name: Run .opencode unit tests
         working-directory: .opencode
-        run: bun test plugins/sketchi/lib/resolve-share-url.test.ts
+        run: bun x tsc -p tsconfig.ci.json

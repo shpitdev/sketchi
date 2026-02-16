@@ -8,6 +8,7 @@ packages/backend/test-results/
 # Build outputs
 dist
 build
+!packages/opencode-excalidraw/.mise/tasks/build
 *.tsbuildinfo
 
 # Environment variables

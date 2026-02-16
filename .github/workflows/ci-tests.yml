@@ -11,6 +11,8 @@ on:
       - "AGENTS.md"
       - ".codex/**"
       - ".opencode/**"
+      - "packages/opencode-excalidraw/**"
+      - ".github/workflows/opencode-excalidraw-*.yml"
   push:
     branches:
       - main
@@ -20,6 +22,8 @@ on:
       - "AGENTS.md"
       - ".codex/**"
       - ".opencode/**"
+      - "packages/opencode-excalidraw/**"
+      - ".github/workflows/opencode-excalidraw-*.yml"
 
 jobs:
   convex-tests:

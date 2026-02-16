@@ -14,7 +14,10 @@ export async function fetchJson<T>(
     }
   }
   try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
     const text = await response.text();
     if (!response.ok) {
       throw new Error(`Request failed (${response.status}): ${text}`);
@@ -38,7 +41,11 @@ export async function shareElements(
   timeoutMs?: number,
   traceId?: string
 ): Promise<{ url: string; shareId: string; encryptionKey: string }> {
-  return await fetchJson<{ url: string; shareId: string; encryptionKey: string }>(
+  return await fetchJson<{
+    url: string;
+    shareId: string;
+    encryptionKey: string;
+  }>(
     `${apiBase}/api/diagrams/share`,
     {
       method: "POST",

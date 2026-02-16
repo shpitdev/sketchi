@@ -6,7 +6,7 @@ import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import assert from "node:assert/strict";
-import SketchiPlugin from "../plugins/sketchi/index";
+import SketchiPlugin from "../plugins/sketchi";
 
 type ToolContext = Parameters<
   NonNullable<

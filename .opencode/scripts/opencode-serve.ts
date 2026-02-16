@@ -154,17 +154,25 @@ function normalizeEvent(event: unknown): {
 }
 
 function extractTraceId(payload: Record<string, unknown>): string | undefined {
+  const properties =
+    payload.properties && typeof payload.properties === "object"
+      ? (payload.properties as Record<string, unknown>)
+      : undefined;
+  const info =
+    properties?.info && typeof properties.info === "object"
+      ? (properties.info as Record<string, unknown>)
+      : undefined;
+
   const candidates = [
     payload.traceId,
     payload.traceID,
     payload.trace_id,
-    payload.properties && (payload.properties as Record<string, unknown>).traceId,
-    payload.properties &&
-      (payload.properties as Record<string, unknown>).trace_id,
-    payload.properties &&
-      (payload.properties as Record<string, unknown>).info &&
-      (payload.properties as Record<string, unknown>).info &&
-      (payload.properties as Record<string, unknown>).info?.traceId,
+    properties?.traceId,
+    properties?.traceID,
+    properties?.trace_id,
+    info?.traceId,
+    info?.traceID,
+    info?.trace_id,
   ];
   for (const candidate of candidates) {
     if (typeof candidate === "string" && candidate.length > 0) {

@@ -11,7 +11,9 @@ const IV_LENGTH_BYTES = 12;
 const MAX_COMPRESSED_BYTES = 5 * 1024 * 1024;
 const MAX_DECOMPRESSED_BYTES = 20 * 1024 * 1024;
 const MAX_UPSTREAM_BYTES = 25 * 1024 * 1024;
-const DEFAULT_FETCH_TIMEOUT_MS = 10_000;
+// Excalidraw+ upstream endpoints can be slower than json.excalidraw.com in CI.
+// Use a slightly longer default timeout to reduce flaky aborts.
+const DEFAULT_FETCH_TIMEOUT_MS = 20_000;
 
 const EXCALIDRAW_SHARE_URL_PATTERN = /#json=([^,]+),(.+)$/;
 const EXCALIDRAW_GET_URL = "https://json.excalidraw.com/api/v2/";
@@ -20,6 +22,18 @@ const EXCALIDRAW_PLUS_EXPORT_URL =
   "https://export.excalidraw.com/api/v1/export/s/";
 const EXCALIDRAW_PLUS_FIRESTORE_URL =
   "https://firestore.googleapis.com/v1/projects/quickstart-1595168317408/databases/(default)/documents/scenes/";
+const READONLY_SCENE_ID_FROM_PATH_PATTERN =
+  /\/scene\/([^/]+)\/scene_links\/[^/]+\//;
+const READONLY_WORKSPACE_PATTERNS: RegExp[] = [
+  /\\"readOnlyLink\\":\{[\s\S]*?\\"workspace\\":\\"([^"\\]+)\\"/,
+  /\\"sceneMetadata\\":\{[\s\S]*?\\"workspace\\":\\"([^"\\]+)\\"/,
+  /"readOnlyLink":\{[\s\S]*?"workspace":"([^"]+)"/,
+  /"sceneMetadata":\{[\s\S]*?"workspace":"([^"]+)"/,
+];
+const READONLY_LINK_SHARING_PATTERNS: RegExp[] = [
+  /\\"sceneMetadata\\":\{[\s\S]*?\\"linkSharing\\":(-?\d+)/,
+  /"sceneMetadata":\{[\s\S]*?"linkSharing":(-?\d+)/,
+];
 
 export interface ExcalidrawShareLinkPayload {
   elements: unknown[];
@@ -494,6 +508,10 @@ function parseReadonlyToken(parsedUrl: URL): string | null {
   return token;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function extractNextDataJson(html: string): unknown {
   const marker = '<script id="__NEXT_DATA__" type="application/json">';
   const start = html.indexOf(marker);
@@ -517,6 +535,46 @@ function extractNextDataJson(html: string): unknown {
       "Failed to parse readonly link HTML: invalid __NEXT_DATA__ JSON"
     );
   }
+}
+
+function extractReadonlySceneIdFromHtml(
+  html: string,
+  readonlyToken: string
+): string | undefined {
+  const exactTokenPattern = new RegExp(
+    `/scene/([^/]+)/scene_links/${escapeRegExp(readonlyToken)}/`
+  );
+  const exactTokenMatch = html.match(exactTokenPattern);
+  if (exactTokenMatch?.[1]) {
+    return exactTokenMatch[1];
+  }
+
+  const fallbackMatch = html.match(READONLY_SCENE_ID_FROM_PATH_PATTERN);
+  return fallbackMatch?.[1];
+}
+
+function extractReadonlyWorkspaceIdFromHtml(html: string): string | undefined {
+  for (const pattern of READONLY_WORKSPACE_PATTERNS) {
+    const match = html.match(pattern);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+  return undefined;
+}
+
+function extractReadonlyLinkSharingFromHtml(html: string): number | undefined {
+  for (const pattern of READONLY_LINK_SHARING_PATTERNS) {
+    const match = html.match(pattern);
+    if (!match?.[1]) {
+      continue;
+    }
+    const parsed = Number.parseInt(match[1], 10);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
 }
 
 async function fetchExportedScene(params: { sceneId: string }): Promise<{
@@ -629,45 +687,70 @@ export async function parseExcalidrawUrl(
       MAX_UPSTREAM_BYTES
     );
     const html = new TextDecoder().decode(bytes);
-    const nextData = extractNextDataJson(html) as {
-      props?: {
-        pageProps?: {
-          sceneContents?: { elements?: unknown; appState?: unknown };
-          sceneMetadata?: {
-            linkSharing?: number;
-            workspace?: string;
-            id?: string;
+
+    try {
+      const nextData = extractNextDataJson(html) as {
+        props?: {
+          pageProps?: {
+            sceneContents?: { elements?: unknown; appState?: unknown };
+            sceneMetadata?: {
+              linkSharing?: number;
+              workspace?: string;
+              id?: string;
+            };
+            readOnlyLink?: { workspace?: string; scene?: string };
           };
-          readOnlyLink?: { workspace?: string; scene?: string };
         };
       };
-    };
 
-    const pageProps = nextData.props?.pageProps;
-    const sceneContents = pageProps?.sceneContents;
-    if (!Array.isArray(sceneContents?.elements)) {
-      throw new Error("Readonly fetch failed: missing elements array");
-    }
-    if (
-      !sceneContents?.appState ||
-      typeof sceneContents.appState !== "object"
-    ) {
-      throw new Error("Readonly fetch failed: missing appState");
+      const pageProps = nextData.props?.pageProps;
+      const sceneContents = pageProps?.sceneContents;
+      if (
+        Array.isArray(sceneContents?.elements) &&
+        sceneContents?.appState &&
+        typeof sceneContents.appState === "object"
+      ) {
+        const linkSharing = pageProps?.sceneMetadata?.linkSharing;
+        const workspaceId =
+          pageProps?.readOnlyLink?.workspace ??
+          pageProps?.sceneMetadata?.workspace;
+        const sceneId =
+          pageProps?.readOnlyLink?.scene ?? pageProps?.sceneMetadata?.id;
+
+        return {
+          source: "excalidraw-plus-readonly",
+          permission: permissionFromLinkSharing(linkSharing),
+          payload: {
+            elements: sceneContents.elements,
+            appState: sceneContents.appState as Record<string, unknown>,
+          },
+          metadata: {
+            token: readonlyToken,
+            workspaceId,
+            sceneId,
+            linkSharing,
+          },
+        };
+      }
+    } catch {
+      // Excalidraw+ moved from __NEXT_DATA__ to the app router flight payload.
+      // Fall through to scene-id extraction + export API.
     }
 
-    const linkSharing = pageProps?.sceneMetadata?.linkSharing;
-    const workspaceId =
-      pageProps?.readOnlyLink?.workspace ?? pageProps?.sceneMetadata?.workspace;
-    const sceneId =
-      pageProps?.readOnlyLink?.scene ?? pageProps?.sceneMetadata?.id;
+    const sceneId = extractReadonlySceneIdFromHtml(html, readonlyToken);
+    if (!sceneId) {
+      throw new Error("Readonly fetch failed: missing scene id");
+    }
+    const exported = await fetchExportedScene({ sceneId });
+    const linkSharing =
+      extractReadonlyLinkSharingFromHtml(html) ??
+      (await fetchLinkSharing(sceneId));
+    const workspaceId = extractReadonlyWorkspaceIdFromHtml(html);
 
     return {
       source: "excalidraw-plus-readonly",
       permission: permissionFromLinkSharing(linkSharing),
-      payload: {
-        elements: sceneContents.elements,
-        appState: sceneContents.appState as Record<string, unknown>,
-      },
+      payload: exported.payload,
       metadata: {
         token: readonlyToken,
         workspaceId,

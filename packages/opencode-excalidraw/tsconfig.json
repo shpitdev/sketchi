@@ -1,0 +1,9 @@
+{
+  "extends": "@sketchi/config/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "types": ["node", "bun-types"],
+    "strictNullChecks": true
+  },
+  "include": ["src/**/*.ts"]
+}

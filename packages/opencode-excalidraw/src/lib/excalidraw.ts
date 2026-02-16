@@ -1,9 +1,5 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import {
-  parseExcalidrawShareLink,
-  type ExcalidrawShareLinkPayload,
-} from "@sketchi/shared";
 
 const EXCALIDRAW_SHARE_URL_PATTERN = /#json=([^,]+),(.+)$/;
 
@@ -19,14 +15,19 @@ const SHAPE_TYPES = new Set([
   "trapezoid",
 ]);
 
-export type ExcalidrawFile = {
+export interface ExcalidrawFile {
   elements: Record<string, unknown>[];
   appState: Record<string, unknown>;
-};
+}
 
-export { type ExcalidrawShareLinkPayload } from "@sketchi/shared";
+interface Bounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
 
-export type ExcalidrawSummary = {
+export interface ExcalidrawSummary {
   elementCount: number;
   shapeCount: number;
   arrowCount: number;
@@ -34,8 +35,8 @@ export type ExcalidrawSummary = {
   deletedCount: number;
   unboundArrowCount: number;
   overlapPairs: number;
-  bounds: { minX: number; minY: number; maxX: number; maxY: number };
-};
+  bounds: Bounds;
+}
 
 export function extractShareLink(url: string): {
   url: string;
@@ -48,8 +49,6 @@ export function extractShareLink(url: string): {
   }
   return { url, shareId: match[1], encryptionKey: match[2] };
 }
-
-export { parseExcalidrawShareLink } from "@sketchi/shared";
 
 export async function readExcalidrawFile(
   path: string,
@@ -88,21 +87,76 @@ function getBoundingBox(element: Record<string, unknown>): {
   };
 }
 
-function overlaps(a: ReturnType<typeof getBoundingBox>, b: ReturnType<typeof getBoundingBox>): boolean {
-  if (!(a && b)) {
-    return false;
-  }
-  return !(a.maxX <= b.minX || a.minX >= b.maxX || a.maxY <= b.minY || a.minY >= b.maxY);
-}
-
-export function summarizeElements(elements: Record<string, unknown>[]): ExcalidrawSummary {
-  const bounds = {
+function emptyBounds(): Bounds {
+  return {
     minX: Number.POSITIVE_INFINITY,
     minY: Number.POSITIVE_INFINITY,
     maxX: Number.NEGATIVE_INFINITY,
     maxY: Number.NEGATIVE_INFINITY,
   };
+}
 
+function normalizeBounds(bounds: Bounds): Bounds {
+  if (Number.isFinite(bounds.minX)) {
+    return bounds;
+  }
+  return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+}
+
+function updateBounds(bounds: Bounds, box: Bounds | null): void {
+  if (!box) {
+    return;
+  }
+  bounds.minX = Math.min(bounds.minX, box.minX);
+  bounds.minY = Math.min(bounds.minY, box.minY);
+  bounds.maxX = Math.max(bounds.maxX, box.maxX);
+  bounds.maxY = Math.max(bounds.maxY, box.maxY);
+}
+
+function overlaps(
+  a: ReturnType<typeof getBoundingBox>,
+  b: ReturnType<typeof getBoundingBox>
+): boolean {
+  if (!(a && b)) {
+    return false;
+  }
+  return !(
+    a.maxX <= b.minX ||
+    a.minX >= b.maxX ||
+    a.maxY <= b.minY ||
+    a.minY >= b.maxY
+  );
+}
+
+function countOverlaps(shapes: Record<string, unknown>[]): number {
+  let overlapPairs = 0;
+  for (let i = 0; i < shapes.length; i += 1) {
+    const a = getBoundingBox(shapes[i] as Record<string, unknown>);
+    if (!a) {
+      continue;
+    }
+    for (let j = i + 1; j < shapes.length; j += 1) {
+      const b = getBoundingBox(shapes[j] as Record<string, unknown>);
+      if (overlaps(a, b)) {
+        overlapPairs += 1;
+      }
+    }
+  }
+  return overlapPairs;
+}
+
+function isBoundArrow(element: Record<string, unknown>): boolean {
+  const startBinding = element.startBinding as
+    | { elementId?: unknown }
+    | undefined;
+  const endBinding = element.endBinding as { elementId?: unknown } | undefined;
+  return Boolean(startBinding?.elementId && endBinding?.elementId);
+}
+
+export function summarizeElements(
+  elements: Record<string, unknown>[]
+): ExcalidrawSummary {
+  const bounds = emptyBounds();
   let deletedCount = 0;
   let arrowCount = 0;
   let textCount = 0;
@@ -121,9 +175,7 @@ export function summarizeElements(elements: Record<string, unknown>[]): Excalidr
     const type = typeof base.type === "string" ? base.type : "";
     if (type === "arrow") {
       arrowCount += 1;
-      const startBinding = base.startBinding as { elementId?: unknown } | undefined;
-      const endBinding = base.endBinding as { elementId?: unknown } | undefined;
-      if (!(startBinding?.elementId && endBinding?.elementId)) {
+      if (!isBoundArrow(base)) {
         unboundArrowCount += 1;
       }
     } else if (type === "text") {
@@ -132,35 +184,10 @@ export function summarizeElements(elements: Record<string, unknown>[]): Excalidr
       shapes.push(base);
     }
 
-    const box = getBoundingBox(base);
-    if (box) {
-      bounds.minX = Math.min(bounds.minX, box.minX);
-      bounds.minY = Math.min(bounds.minY, box.minY);
-      bounds.maxX = Math.max(bounds.maxX, box.maxX);
-      bounds.maxY = Math.max(bounds.maxY, box.maxY);
-    }
+    updateBounds(bounds, getBoundingBox(base));
   }
 
-  let overlapPairs = 0;
-  for (let i = 0; i < shapes.length; i += 1) {
-    const a = getBoundingBox(shapes[i] as Record<string, unknown>);
-    if (!a) {
-      continue;
-    }
-    for (let j = i + 1; j < shapes.length; j += 1) {
-      const b = getBoundingBox(shapes[j] as Record<string, unknown>);
-      if (overlaps(a, b)) {
-        overlapPairs += 1;
-      }
-    }
-  }
-
-  if (!Number.isFinite(bounds.minX)) {
-    bounds.minX = 0;
-    bounds.minY = 0;
-    bounds.maxX = 0;
-    bounds.maxY = 0;
-  }
+  const overlapPairs = countOverlaps(shapes);
 
   return {
     elementCount: elements.length,
@@ -170,6 +197,6 @@ export function summarizeElements(elements: Record<string, unknown>[]): Excalidr
     deletedCount,
     unboundArrowCount,
     overlapPairs,
-    bounds,
+    bounds: normalizeBounds(bounds),
   };
 }

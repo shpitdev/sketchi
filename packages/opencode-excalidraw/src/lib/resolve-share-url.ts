@@ -1,16 +1,9 @@
-import { parseExcalidrawShareLink } from "@sketchi/shared";
 import { fetchJson } from "./api";
 
-type ParseShareLink = typeof parseExcalidrawShareLink;
 type FetchJson = typeof fetchJson;
 
-export type ResolveShareUrlDeps = {
-  parseShareLink?: ParseShareLink;
+export interface ResolveShareUrlDeps {
   fetchJson?: FetchJson;
-};
-
-export function isJsonShareUrl(url: string): boolean {
-  return url.includes("#json=");
 }
 
 export async function resolveExcalidrawFromShareUrl(input: {
@@ -19,17 +12,11 @@ export async function resolveExcalidrawFromShareUrl(input: {
   traceId?: string;
   abort?: AbortSignal;
   deps?: ResolveShareUrlDeps;
-}): Promise<{ elements: Record<string, unknown>[]; appState: Record<string, unknown> }> {
-  const parseShareLink = input.deps?.parseShareLink ?? parseExcalidrawShareLink;
+}): Promise<{
+  elements: Record<string, unknown>[];
+  appState: Record<string, unknown>;
+}> {
   const fetchJsonImpl = input.deps?.fetchJson ?? fetchJson;
-
-  if (isJsonShareUrl(input.shareUrl)) {
-    const parsed = await parseShareLink(input.shareUrl);
-    return {
-      elements: parsed.elements as Record<string, unknown>[],
-      appState: parsed.appState ?? {},
-    };
-  }
 
   const parseUrl = new URL("/api/diagrams/parse", input.apiBase);
   parseUrl.searchParams.set("shareUrl", input.shareUrl);
@@ -51,4 +38,3 @@ export async function resolveExcalidrawFromShareUrl(input: {
     appState: response.appState ?? {},
   };
 }
-

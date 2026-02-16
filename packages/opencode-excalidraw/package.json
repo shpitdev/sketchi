@@ -1,0 +1,51 @@
+{
+  "name": "@sketchi-app/opencode-excalidraw",
+  "version": "0.1.0",
+  "description": "OpenCode plugin for generating and manipulating Excalidraw diagrams via Sketchi",
+  "license": "MIT",
+  "author": {
+    "name": "Anand Pant",
+    "email": "anand@shpit.dev"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anand-testcompare/sketchi.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "private": false,
+  "peerDependencies": {
+    "@opencode-ai/plugin": "^1.1.53"
+  },
+  "dependencies": {
+    "playwright": "^1.58.2"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "1.1.53",
+    "@types/node": "^24.10.12",
+    "bun-types": "1.3.9",
+    "typescript": "^5.8.2"
+  },
+  "scripts": {
+    "build": "bash scripts/build.sh",
+    "smoke": "bun run scripts/smoke-test.ts",
+    "typecheck": "bun x tsc -p tsconfig.ci.json --noEmit",
+    "test": "bun test"
+  }
+}

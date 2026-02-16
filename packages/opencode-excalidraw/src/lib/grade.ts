@@ -1,18 +1,22 @@
-import type { PluginInput } from "@opencode-ai/plugin";
 import { pathToFileURL } from "node:url";
-import { buildDefaultPngPath, resolveOutputPath, writePng } from "./output";
+import type { PluginInput } from "@opencode-ai/plugin";
+
+import { shareElements } from "./api";
+import type { ExcalidrawFile, ExcalidrawSummary } from "./excalidraw";
 import {
   extractShareLink,
   readExcalidrawFile,
   summarizeElements,
-  type ExcalidrawFile,
-  type ExcalidrawSummary,
 } from "./excalidraw";
-import { closeBrowser, renderElementsToPng, type RenderOptions } from "./render";
-import { shareElements } from "./api";
+import { buildDefaultPngPath, resolveOutputPath, writePng } from "./output";
+import {
+  closeBrowser,
+  type RenderOptions,
+  renderElementsToPng,
+} from "./render";
 import { resolveExcalidrawFromShareUrl } from "./resolve-share-url";
 
-export type DiagramGradeInput = {
+export interface DiagramGradeInput {
   prompt: string;
   expectedDiagramType?: string;
   shareUrl?: string;
@@ -25,9 +29,9 @@ export type DiagramGradeInput = {
   baseDir: string;
   abort?: AbortSignal;
   traceId?: string;
-};
+}
 
-export type DiagramGradeResult = {
+export interface DiagramGradeResult {
   shareLink?: { url: string; shareId?: string; encryptionKey?: string };
   pngPath: string | null;
   pngBytes?: number;
@@ -35,12 +39,16 @@ export type DiagramGradeResult = {
   summary?: ExcalidrawSummary;
   grade: Record<string, unknown>;
   raw: string;
-};
+}
 
 function toAttachmentUrl(value: string): string {
   try {
     const parsed = new URL(value);
-    if (parsed.protocol === "http:" || parsed.protocol === "https:" || parsed.protocol === "file:") {
+    if (
+      parsed.protocol === "http:" ||
+      parsed.protocol === "https:" ||
+      parsed.protocol === "file:"
+    ) {
       return parsed.href;
     }
   } catch {
@@ -110,12 +118,10 @@ function extractJson(text: string): Record<string, unknown> {
   return JSON.parse(jsonSlice) as Record<string, unknown>;
 }
 
-async function resolveExcalidraw(
-  input: DiagramGradeInput
-): Promise<{
+async function resolveExcalidraw(input: DiagramGradeInput): Promise<{
   excalidraw: ExcalidrawFile | null;
   shareLink?: { url: string; shareId?: string; encryptionKey?: string };
-  }> {
+}> {
   if (input.shareUrl) {
     const resolved = await resolveExcalidrawFromShareUrl({
       shareUrl: input.shareUrl,
@@ -150,7 +156,11 @@ async function resolveExcalidraw(
 async function ensurePng(
   excalidraw: ExcalidrawFile | null,
   input: DiagramGradeInput
-): Promise<{ pngPath: string | null; pngBytes?: number; pngDurationMs?: number }> {
+): Promise<{
+  pngPath: string | null;
+  pngBytes?: number;
+  pngDurationMs?: number;
+}> {
   if (input.pngPath) {
     return { pngPath: resolveOutputPath(input.pngPath, input.baseDir) };
   }
@@ -163,7 +173,10 @@ async function ensurePng(
     ? resolveOutputPath(input.outputPath, input.baseDir)
     : buildDefaultPngPath("diagram-grade", input.baseDir);
 
-  const pngResult = await renderElementsToPng(excalidraw.elements, input.renderOptions);
+  const pngResult = await renderElementsToPng(
+    excalidraw.elements,
+    input.renderOptions
+  );
   const pngPath = await writePng(outputPath, pngResult.png);
 
   return {
@@ -179,7 +192,9 @@ export async function gradeDiagram(
   input: DiagramGradeInput
 ): Promise<DiagramGradeResult> {
   if (!client) {
-    throw new Error("diagram_grade requires OpenCode client (run via OpenCode).");
+    throw new Error(
+      "diagram_grade requires OpenCode client (run via OpenCode)."
+    );
   }
 
   const resolved = await resolveExcalidraw(input);
@@ -244,15 +259,14 @@ export async function gradeDiagram(
       throwOnError: true,
     });
 
-    const text = Array.isArray(response.data.parts)
+    const raw = Array.isArray(response.data.parts)
       ? response.data.parts
           .map((part: { type?: string; text?: string }) =>
-            part.type === "text" ? part.text ?? "" : ""
+            part.type === "text" ? (part.text ?? "") : ""
           )
           .join("")
       : "";
-
-    const grade = extractJson(text);
+    const grade = extractJson(raw);
 
     return {
       shareLink,
@@ -261,7 +275,7 @@ export async function gradeDiagram(
       pngDurationMs,
       summary,
       grade,
-      raw: text,
+      raw,
     };
   } finally {
     await closeBrowser();

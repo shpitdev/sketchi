@@ -78,13 +78,14 @@
 
 ## Phase 2: OpenCode Plugin
 
-- [ ] Create `packages/opencode-plugin` workspace
-- [ ] Implement `diagram_generate` tool
-- [ ] Implement `diagram_tweak` tool
-- [ ] Implement `diagram_restructure` tool
-- [ ] Implement `diagram_parse` tool
-- [ ] Publish to npm as `@sketchi/opencode-plugin`
-- [x] Add local PNG exporter: `.opencode/plugins/sketchi/excalidraw-to-png-local.ts` (invokable; optimization later)
+- [x] Create `packages/opencode-excalidraw` workspace
+- [x] Implement `diagram_from_prompt` tool
+- [x] Implement `diagram_tweak` tool
+- [x] Implement `diagram_restructure` tool
+- [x] Implement `diagram_to_png` tool
+- [x] Implement `diagram_grade` tool
+- [ ] Publish to npm as `@sketchi-app/opencode-excalidraw`
+- [x] Add local PNG exporter: `packages/opencode-excalidraw/src/lib/render.ts`
 
 ## Phase 3: Tech Stack Schemas
 
