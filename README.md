@@ -212,7 +212,9 @@ For AI features and testing, see `.env.e2e.example` for additional variables.
 
 ## OpenCode Plugin
 
-The OpenCode plugin lives under `.opencode/plugins/sketchi` and calls the production API by default (`https://sketchi.app`).
+The publishable OpenCode plugin package lives under `packages/opencode-excalidraw` and is published to npm as `@sketchi-app/opencode-excalidraw`.
+
+The `.opencode/` folder is a dev harness (OpenCode web UI + parquet logging) that loads the plugin from source and calls the centralized API by default (`https://sketchi.app`).
 
 Notes:
 - OpenCode runs `bun install` in `.opencode`, but you still need Playwright browsers once per machine:
