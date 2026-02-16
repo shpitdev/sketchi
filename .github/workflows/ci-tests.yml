@@ -12,6 +12,7 @@ on:
       - ".codex/**"
       - ".opencode/**"
       - "packages/opencode-excalidraw/**"
+      - ".github/workflows/opencode-excalidraw-*.yml"
   push:
     branches:
       - main
@@ -22,6 +23,7 @@ on:
       - ".codex/**"
       - ".opencode/**"
       - "packages/opencode-excalidraw/**"
+      - ".github/workflows/opencode-excalidraw-*.yml"
 
 jobs:
   convex-tests:
