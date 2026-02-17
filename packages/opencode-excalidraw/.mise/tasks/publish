@@ -9,16 +9,24 @@ set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
 PKG_DIR="${ROOT}/packages/opencode-excalidraw"
+TAG="${usage_tag:-latest}"
+DRY_RUN="${usage_dry_run:-false}"
+OTP="${usage_otp:-}"
 
 cd "${PKG_DIR}"
 
 echo "Publishing to npm"
-echo " > with tag: ${usage_tag}"
+echo " > with tag: ${TAG}"
 echo " > npm version: $(npm --version)"
 
 # Mirror the palantir template behavior for next-tag prereleases.
-if [ "${usage_tag}" = "next" ]; then
-  LAST_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+if [ "${TAG}" = "next" ]; then
+  LAST_TAG="$(
+    git tag --list "opencode-excalidraw-v*" --sort="-v:refname" | head -n 1
+  )"
+  if [ -z "${LAST_TAG}" ]; then
+    LAST_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+  fi
   if [ -n "${LAST_TAG}" ]; then
     BUILD_NUMBER="$(git rev-list "${LAST_TAG}..HEAD" --count)"
     echo " > last tag: ${LAST_TAG}"
@@ -34,7 +42,7 @@ if [ "${usage_tag}" = "next" ]; then
   PRERELEASE_VERSION="${BASE_VERSION}-next.${BUILD_NUMBER}"
   echo " > bumping version: ${CURRENT_VERSION} -> ${PRERELEASE_VERSION}"
 
-  if [ "${usage_dry_run}" != "true" ]; then
+  if [ "${DRY_RUN}" != "true" ]; then
     npm version "${PRERELEASE_VERSION}" --no-git-tag-version --allow-same-version
   fi
 fi
@@ -46,16 +54,16 @@ if npm view "${NAME}@${VERSION}" version >/dev/null 2>&1; then
   exit 0
 fi
 
-args=(--access public --tag "${usage_tag}")
-if [ -n "${usage_otp}" ]; then
-  args+=(--otp "${usage_otp}")
+args=(--access public --tag "${TAG}")
+if [ -n "${OTP}" ]; then
+  args+=(--otp "${OTP}")
   echo " > using provided OTP for 2FA"
 fi
 if [ -n "${GITHUB_ACTIONS:-}" ]; then
   args+=(--provenance)
   echo " > adding provenance flag for CI publish"
 fi
-if [ "${usage_dry_run}" = "true" ]; then
+if [ "${DRY_RUN}" = "true" ]; then
   args+=(--dry-run)
   echo " > dry run mode enabled"
 fi
