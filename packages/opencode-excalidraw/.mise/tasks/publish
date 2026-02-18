@@ -43,7 +43,8 @@ if [ "${TAG}" = "next" ]; then
   echo " > bumping version: ${CURRENT_VERSION} -> ${PRERELEASE_VERSION}"
 
   if [ "${DRY_RUN}" != "true" ]; then
-    npm version "${PRERELEASE_VERSION}" --no-git-tag-version --allow-same-version
+    # npm version fails in this workspace because the root uses Bun catalog protocol.
+    npm pkg set "version=${PRERELEASE_VERSION}"
   fi
 fi
 
