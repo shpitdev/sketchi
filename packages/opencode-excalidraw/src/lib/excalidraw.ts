@@ -16,26 +16,26 @@ const SHAPE_TYPES = new Set([
 ]);
 
 export interface ExcalidrawFile {
-  elements: Record<string, unknown>[];
   appState: Record<string, unknown>;
+  elements: Record<string, unknown>[];
 }
 
 interface Bounds {
-  minX: number;
-  minY: number;
   maxX: number;
   maxY: number;
+  minX: number;
+  minY: number;
 }
 
 export interface ExcalidrawSummary {
-  elementCount: number;
-  shapeCount: number;
   arrowCount: number;
-  textCount: number;
-  deletedCount: number;
-  unboundArrowCount: number;
-  overlapPairs: number;
   bounds: Bounds;
+  deletedCount: number;
+  elementCount: number;
+  overlapPairs: number;
+  shapeCount: number;
+  textCount: number;
+  unboundArrowCount: number;
 }
 
 export function extractShareLink(url: string): {

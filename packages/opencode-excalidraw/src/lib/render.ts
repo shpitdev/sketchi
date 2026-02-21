@@ -41,10 +41,10 @@ const EXPORT_HARNESS_HTML = `
 `;
 
 export interface RenderOptions {
-  scale?: number;
-  padding?: number;
   background?: boolean;
   backgroundColor?: string;
+  padding?: number;
+  scale?: number;
 }
 
 let browser: Browser | null = null;

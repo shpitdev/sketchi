@@ -9,9 +9,9 @@ import {
 } from "./visual-review";
 
 export interface ActResult {
-  success?: boolean;
-  message?: string;
   actionDescription?: string;
+  message?: string;
+  success?: boolean;
 }
 
 export async function createStagehand(cfg: StagehandRunConfig) {
@@ -83,6 +83,33 @@ function isRetryableBrowserbaseError(message: string) {
 function delay(durationMs: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, durationMs);
+  });
+}
+
+function withTimeout<T>(
+  task: Promise<T>,
+  timeoutMs: number,
+  label: string
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    if (typeof timeoutId.unref === "function") {
+      timeoutId.unref();
+    }
+
+    task.then(
+      (result) => {
+        clearTimeout(timeoutId);
+        resolve(result);
+      },
+      (error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      }
+    );
   });
 }
 
@@ -233,9 +260,9 @@ export async function captureScreenshot(
   }
 }
 
-export async function shutdown(stagehand: Stagehand) {
+export async function shutdown(stagehand: Stagehand, timeoutMs = 10_000) {
   try {
-    await stagehand.close();
+    await withTimeout(stagehand.close(), timeoutMs, "Stagehand close");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.log(`Stagehand shutdown warning: ${message}`);

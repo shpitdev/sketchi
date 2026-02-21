@@ -17,28 +17,28 @@ import {
 import { resolveExcalidrawFromShareUrl } from "./resolve-share-url";
 
 export interface DiagramGradeInput {
-  prompt: string;
-  expectedDiagramType?: string;
-  shareUrl?: string;
-  excalidrawPath?: string;
-  excalidraw?: ExcalidrawFile;
-  pngPath?: string;
-  outputPath?: string;
-  renderOptions: RenderOptions;
+  abort?: AbortSignal;
   apiBase: string;
   baseDir: string;
-  abort?: AbortSignal;
+  excalidraw?: ExcalidrawFile;
+  excalidrawPath?: string;
+  expectedDiagramType?: string;
+  outputPath?: string;
+  pngPath?: string;
+  prompt: string;
+  renderOptions: RenderOptions;
+  shareUrl?: string;
   traceId?: string;
 }
 
 export interface DiagramGradeResult {
-  shareLink?: { url: string; shareId?: string; encryptionKey?: string };
-  pngPath: string | null;
+  grade: Record<string, unknown>;
   pngBytes?: number;
   pngDurationMs?: number;
-  summary?: ExcalidrawSummary;
-  grade: Record<string, unknown>;
+  pngPath: string | null;
   raw: string;
+  shareLink?: { url: string; shareId?: string; encryptionKey?: string };
+  summary?: ExcalidrawSummary;
 }
 
 function toAttachmentUrl(value: string): string {
