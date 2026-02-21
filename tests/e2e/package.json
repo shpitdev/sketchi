@@ -12,10 +12,10 @@
     "diagram-studio-occ-conflict": "bun run src/scenarios/unauthenticated/diagram-studio-occ-conflict.ts"
   },
   "dependencies": {
-    "@browserbasehq/stagehand": "^3.0.7",
+    "@browserbasehq/stagehand": "^3.0.8",
     "@sketchi/shared": "workspace:*",
-    "convex": "^1.31.7",
-    "dotenv": "^17.2.4",
+    "convex": "^1.32.0",
+    "dotenv": "^17.3.1",
     "pako": "^2.1.0"
   },
   "devDependencies": {
