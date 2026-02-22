@@ -122,29 +122,29 @@ function useOpencodeDemo(
 
     const runWebSequence = async () => {
       setDemoPhase("typing-web-command");
-      await ensure(typeText(webCommand, setTypedInstall, 35, 450));
+      await ensure(typeText(webCommand, setTypedInstall, 70, 650));
       setDemoPhase("ready-web");
-      await ensure(wait(260));
+      await ensure(wait(800));
       setDemoPhase("sending-web");
-      await ensure(wait(300));
+      await ensure(wait(1100));
       setDemoPhase("loading-web");
-      await ensure(wait(950));
+      await ensure(wait(1900));
       setDemoPhase("result-web");
-      await ensure(wait(1600));
+      await ensure(wait(5500));
     };
 
     const runCliSequence = async () => {
       setDemoPhase("editing-cli-command");
-      await ensure(wait(240));
-      await ensure(eraseTo(webCommand, cliCommand, setTypedInstall, 55));
+      await ensure(wait(900));
+      await ensure(eraseTo(webCommand, cliCommand, setTypedInstall, 110));
       setDemoPhase("ready-cli");
-      await ensure(wait(260));
+      await ensure(wait(900));
       setDemoPhase("sending-cli");
-      await ensure(wait(300));
+      await ensure(wait(1200));
       setDemoPhase("loading-cli");
-      await ensure(wait(950));
+      await ensure(wait(2100));
       setDemoPhase("result-cli");
-      await ensure(wait(1800));
+      await ensure(wait(6500));
     };
 
     const runLoop = async () => {
@@ -153,8 +153,8 @@ function useOpencodeDemo(
         setTypedInstall("");
         setDemoPhase("typing-config");
 
-        await ensure(typeText(pluginLine, setTypedPlugin, 18));
-        await ensure(wait(350));
+        await ensure(typeText(pluginLine, setTypedPlugin, 24));
+        await ensure(wait(700));
         await runWebSequence();
         await runCliSequence();
         await waitUntilReplayAllowed();
