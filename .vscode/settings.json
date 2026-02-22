@@ -71,5 +71,17 @@
     "activityBarBadge.background": "#e97416",
     "activityBarBadge.foreground": "#15202b"
   },
-  "peacock.color": "#cba6f7"
+  "peacock.color": "#cba6f7",
+  "files.exclude": {
+    "**/.next": true,
+    "**/.turbo": true,
+    "**/.vercel": true,
+    "**/node_modules": true,
+    "**/.git": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/.cache": true,
+    "**/coverage": true,
+    "**/.convex": true
+  }
 }

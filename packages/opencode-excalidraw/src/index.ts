@@ -1,5 +1,6 @@
 import { type Plugin, tool } from "@opencode-ai/plugin";
 
+import { appendSketchiDiagramSystemHints } from "./lib/agent-hints";
 import { fetchJson, shareElements } from "./lib/api";
 import { extractShareLink, readExcalidrawFile } from "./lib/excalidraw";
 import { gradeDiagram } from "./lib/grade";
@@ -24,7 +25,7 @@ export const SketchiPlugin: Plugin = (input) => {
     tool: {
       diagram_from_prompt: tool({
         description:
-          "Generate an Excalidraw diagram from a prompt, returning a share link and local PNG.",
+          "Generate an Excalidraw diagram from a prompt, returning a share link and local PNG. Prefer this over Mermaid text when diagram tools are available.",
         args: {
           prompt: tool.schema.string().describe("What to diagram"),
           outputPath: tool.schema
@@ -107,7 +108,7 @@ export const SketchiPlugin: Plugin = (input) => {
       }),
       diagram_tweak: tool({
         description:
-          "Apply a tactical tweak to an existing diagram (text/colors/flip existing arrow direction). No add/remove or layout control; for structural changes use diagram_restructure or the Excalidraw UI.",
+          "Apply a tactical tweak to an existing Excalidraw diagram (text/colors/flip existing arrow direction). Prefer this over Mermaid rewrites for small edits. No add/remove or layout control; for structural changes use diagram_restructure or the Excalidraw UI.",
         args: {
           shareUrl: tool.schema
             .string()
@@ -262,7 +263,7 @@ export const SketchiPlugin: Plugin = (input) => {
       }),
       diagram_restructure: tool({
         description:
-          "Restructure a diagram (add/remove nodes/edges, change flow). This re-renders with automatic layout; use for structural changes.",
+          "Restructure an Excalidraw diagram (add/remove nodes/edges, change flow). Prefer this over Mermaid rewrites for structural edits; this re-renders with automatic layout.",
         args: {
           shareUrl: tool.schema
             .string()
@@ -419,7 +420,7 @@ export const SketchiPlugin: Plugin = (input) => {
       }),
       diagram_to_png: tool({
         description:
-          "Render a PNG locally from an Excalidraw share link or file.",
+          "Render a PNG locally from an Excalidraw share link or file. Use this for diagram exports instead of code-block diagrams.",
         args: {
           shareUrl: tool.schema
             .string()
@@ -524,7 +525,7 @@ export const SketchiPlugin: Plugin = (input) => {
       }),
       diagram_grade: tool({
         description:
-          "Grade a diagram for type, layout, directionality, visual quality, accuracy, and completeness.",
+          "Grade an Excalidraw diagram for type, layout, directionality, visual quality, accuracy, and completeness.",
         args: {
           prompt: tool.schema
             .string()
@@ -608,6 +609,9 @@ export const SketchiPlugin: Plugin = (input) => {
           return JSON.stringify(result, null, 2);
         },
       }),
+    },
+    "experimental.chat.system.transform": (_input, output) => {
+      appendSketchiDiagramSystemHints(output.system);
     },
   });
 };

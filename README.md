@@ -183,19 +183,20 @@ For AI features and testing, see `.env.e2e.example` for additional variables.
 
 The publishable OpenCode plugin package lives under `packages/opencode-excalidraw` and is published to npm as `@sketchi-app/opencode-excalidraw`.
 
-The `.opencode/` folder is a dev harness (OpenCode web UI + parquet logging) that loads the plugin from source and calls the centralized API by default (`https://sketchi.app`).
-
 Notes:
-- OpenCode runs `bun install` in `.opencode`, but you still need Playwright browsers once per machine:
-  - `bunx playwright install`
-- PNG outputs default to `./sketchi/png` in the directory where OpenCode is run.
+- Install Playwright browsers once per machine:
+  - `npx playwright install`
 - Override API base with `SKETCHI_API_URL`.
 - Tools exposed: `diagram_from_prompt`, `diagram_tweak`, `diagram_restructure`, `diagram_to_png`, `diagram_grade`.
-- Start OpenCode web UI + event logging: `bun run opencode:serve` (logs to `./sketchi/opencode-logs/*.parquet`).
-- DuckDB example (explicit column list, newest log file):
+- Install and use from any repo:
 ```bash
-# Run at least once to generate logs: bun run opencode:serve
-duckdb -c "SELECT receivedAt, directory, eventType, eventStream, sessionID, messageID, parentMessageID, partID, partType, kind, toolName, toolStatus, toolCallID, toolStartMs, toolEndMs, toolDurationMs, role, providerID, modelID, messageCreatedMs, messageCompletedMs, stepCost, stepStartMs, stepEndMs, stepDurationMs, tokensInput, tokensOutput, tokensReasoning, tokensCacheRead, tokensCacheWrite, traceId, data FROM read_parquet('$(ls -t sketchi/opencode-logs/*.parquet | head -n 1)') ORDER BY receivedAt DESC LIMIT 200;"
+npm i @sketchi-app/opencode-excalidraw
+```
+- Add to `opencode.json`:
+```json
+{
+  "plugins": ["@sketchi-app/opencode-excalidraw"]
+}
 ```
 
 ---

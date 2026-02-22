@@ -10,7 +10,6 @@ on:
       - "README.md"
       - "AGENTS.md"
       - ".codex/**"
-      - ".opencode/**"
       - "packages/opencode-excalidraw/**"
       - ".github/workflows/opencode-excalidraw-*.yml"
   push:
@@ -21,7 +20,6 @@ on:
       - "README.md"
       - "AGENTS.md"
       - ".codex/**"
-      - ".opencode/**"
       - "packages/opencode-excalidraw/**"
       - ".github/workflows/opencode-excalidraw-*.yml"
 

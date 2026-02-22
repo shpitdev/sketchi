@@ -45,6 +45,7 @@
   "scripts": {
     "build": "bash scripts/build.sh",
     "smoke": "bun run scripts/smoke-test.ts",
+    "test:integration": "bun run scripts/integration-plugin-scenarios.ts",
     "typecheck": "bun x tsc -p tsconfig.ci.json --noEmit",
     "test": "bun test"
   }
