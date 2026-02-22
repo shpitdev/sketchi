@@ -238,15 +238,9 @@ export default function OpenCodeDocsPage() {
               <div className="relative h-full w-full overflow-hidden rounded-xl border border-border/50 bg-background shadow-2xl [border-radius:255px_15px_225px_15px/15px_225px_15px_255px]">
                 <Image
                   alt="Generated Excalidraw Diagram"
-                  className="object-cover object-left-top dark:hidden"
+                  className="object-cover object-left-top"
                   fill
                   src="/screenshots/opencode-preview-white.png"
-                />
-                <Image
-                  alt="Generated Excalidraw Diagram Dark"
-                  className="hidden object-cover object-left-top dark:block"
-                  fill
-                  src="/screenshots/opencode-preview.png"
                 />
               </div>
             </div>
