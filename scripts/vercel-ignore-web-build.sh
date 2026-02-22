@@ -20,7 +20,7 @@ while IFS= read -r file; do
   [ -z "${file}" ] && continue
   case "${file}" in
     README.md|AGENTS.md|bun.lock) ;;
-    docs/*|.codex/*|.opencode/*) ;;
+    docs/*|.codex/*) ;;
     packages/opencode-excalidraw/*) ;;
     .github/workflows/opencode-excalidraw-*) ;;
     *)

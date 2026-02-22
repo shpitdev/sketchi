@@ -29,7 +29,7 @@ function StatusBadge({
   label?: string;
 }) {
   const badgeBaseClass =
-    "inline-flex items-center gap-1.5 px-2.5 py-0.5 font-medium text-xs border border-current [border-radius:255px_15px_225px_15px/15px_225px_15px_255px] shadow-sm";
+    "inline-flex items-center gap-1.5 px-2.5 py-0.5 font-medium text-xs border border-current rounded-[255px_15px_225px_15px/15px_225px_15px_255px] shadow-sm";
 
   if (label) {
     return (
@@ -83,7 +83,7 @@ function FeatureCardContent({
 }: FeatureCardProps & { isClickable: boolean; isExternal: boolean }) {
   return (
     <>
-      <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted/30">
+      <div className="relative aspect-16/10 w-full overflow-hidden bg-muted/30">
         <Image
           alt={screenshot.alt}
           className={`object-cover object-top transition-transform duration-500 ${
@@ -102,7 +102,7 @@ function FeatureCardContent({
             src={screenshot.dark}
           />
         )}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card/80 via-transparent to-transparent" />
+        <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-card/80 via-transparent to-transparent" />
       </div>
 
       <div className="flex flex-1 flex-col gap-4 p-5">
@@ -122,7 +122,7 @@ function FeatureCardContent({
 
         {isClickable && (
           <div className="flex items-center gap-2 pt-1">
-            <span className="inline-flex items-center gap-2 border-2 border-primary bg-primary px-4 py-1.5 font-[family-name:var(--font-caveat)] text-lg text-primary-foreground shadow-sm transition-all [border-radius:255px_15px_225px_15px/15px_225px_15px_255px] group-hover:-rotate-2 group-hover:gap-3 group-hover:bg-primary/90 group-hover:shadow-[3px_3px_0px_0px_currentColor]">
+            <span className="font-(family-name:--font-caveat) inline-flex items-center gap-2 rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-primary bg-primary px-4 py-1.5 text-lg text-primary-foreground shadow-sm transition-all group-hover:-rotate-2 group-hover:gap-3 group-hover:bg-primary/90 group-hover:shadow-[3px_3px_0px_0px_currentColor]">
               {isExternal ? "Learn more" : "Open"}
               {isExternal && <ArrowUpRight className="size-4" />}
             </span>
@@ -131,7 +131,7 @@ function FeatureCardContent({
 
         {status === "coming-soon" && (
           <div className="flex items-center gap-2 pt-1">
-            <span className="inline-flex items-center gap-2 border-2 border-muted-foreground/20 bg-muted px-4 py-1.5 font-[family-name:var(--font-caveat)] text-lg text-muted-foreground [border-radius:255px_15px_225px_15px/15px_225px_15px_255px]">
+            <span className="font-(family-name:--font-caveat) inline-flex items-center gap-2 rounded-[255px_15px_225px_15px/15px_225px_15px_255px] border-2 border-muted-foreground/20 bg-muted px-4 py-1.5 text-lg text-muted-foreground">
               Coming soon
             </span>
           </div>
@@ -146,7 +146,7 @@ function FeatureCard(props: FeatureCardProps) {
   const isClickable = status !== "coming-soon" && (href || externalHref);
   const isExternal = !!externalHref;
 
-  const cardClassName = `group relative flex flex-col overflow-hidden border-2 bg-card transition-all duration-300 [border-radius:255px_15px_225px_15px/15px_225px_15px_255px] ${
+  const cardClassName = `group relative flex flex-col overflow-hidden border-2 bg-card transition-all duration-300 rounded-[255px_15px_225px_15px/15px_225px_15px_255px] ${
     isClickable
       ? "cursor-pointer hover:-translate-y-1 hover:-rotate-1 hover:border-foreground/30 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] dark:hover:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.05)]"
       : "border-dashed opacity-75"

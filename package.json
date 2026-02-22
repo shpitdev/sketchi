@@ -23,8 +23,7 @@
     "dev:web": "turbo -F web dev",
     "dev:server": "turbo -F @sketchi/backend dev",
     "dev:setup": "turbo -F @sketchi/backend dev:setup",
-    "seed:palantir-icons": "bun --cwd packages/backend run seed:palantir-icons",
-    "opencode:serve": "bun --cwd .opencode scripts/opencode-serve.ts --project-dir .."
+    "seed:palantir-icons": "bun --cwd packages/backend run seed:palantir-icons"
   },
   "dependencies": {
     "@sketchi/env": "workspace:*",
@@ -34,6 +33,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.4.4",
     "@sketchi/config": "workspace:*",
+    "@types/bun": "^1.3.9",
     "@types/node": "^25.3.0",
     "turbo": "^2.8.10",
     "typescript": "^5.9.3",

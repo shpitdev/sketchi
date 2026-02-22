@@ -34,11 +34,18 @@ The plugin exposes tools:
 - `diagram_to_png`
 - `diagram_grade`
 
+When this plugin is loaded, it also injects `sketchi-diagram` system guidance so diagram requests route to `diagram_*` tools instead of defaulting to Mermaid (unless Mermaid is explicitly requested).
+
 ## Configuration
 
 Optional env override:
 
 - `SKETCHI_API_URL` (defaults to `https://sketchi.app`)
+
+## Testing
+
+- Fast package tests: `bun run test`
+- Optional live integration scenario (calls Sketchi API and renders PNG): `bun run test:integration`
 
 ## Links
 

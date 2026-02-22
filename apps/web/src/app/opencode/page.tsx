@@ -333,7 +333,7 @@ export default function OpenCodeDocsPage() {
                 src="/icons/github-dark-svg.svg"
               />
             </div>
-            <span className="font-[family-name:var(--font-caveat)] text-foreground/80 text-xl group-hover:text-foreground">
+            <span className="font-(family-name:--font-caveat) text-foreground/80 text-xl group-hover:text-foreground">
               GitHub
             </span>
           </a>
@@ -413,7 +413,7 @@ export default function OpenCodeDocsPage() {
           </div>
 
           <div
-            className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted/20"
+            className="relative flex aspect-4/3 w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted/20"
             ref={previewFrameRef}
           >
             {demoUi.showWaiting && (
@@ -443,7 +443,7 @@ export default function OpenCodeDocsPage() {
                     alt={demoUi.preview.alt}
                     className={`dark:hidden ${
                       demoUi.previewMode === "web"
-                        ? "object-cover object-left-top"
+                        ? "object-cover object-top-left"
                         : "object-cover object-center"
                     }`}
                     fill
@@ -453,7 +453,7 @@ export default function OpenCodeDocsPage() {
                     alt={demoUi.preview.alt}
                     className={`hidden dark:block ${
                       demoUi.previewMode === "web"
-                        ? "object-cover object-left-top"
+                        ? "object-cover object-top-left"
                         : "object-cover object-center"
                     }`}
                     fill

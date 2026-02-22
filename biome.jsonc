@@ -8,7 +8,6 @@
     "includes": [
       "**/*",
       "!opencode.json",
-      "!.opencode",
       "!packages/backend/test-results",
       "!packages/backend/convex/_generated"
     ]

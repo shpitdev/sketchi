@@ -74,7 +74,6 @@ jobs:
                 file.filename === "AGENTS.md" ||
                 file.filename.startsWith("docs/") ||
                 file.filename.startsWith(".codex/") ||
-                file.filename.startsWith(".opencode/") ||
                 file.filename.startsWith("packages/opencode-excalidraw/") ||
                 file.filename.startsWith(".github/workflows/opencode-excalidraw-")
             );

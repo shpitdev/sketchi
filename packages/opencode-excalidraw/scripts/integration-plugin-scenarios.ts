@@ -1,12 +1,12 @@
-// Scenarios:
+// Scenario:
 // 1) diagram_from_prompt -> expect shareLink + PNG under ./sketchi/png
 // 2) diagram_tweak (shareUrl + request) -> expect new shareLink + PNG
 // 3) diagram_to_png (shareUrl) -> expect PNG under ./sketchi/png
 import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
-import assert from "node:assert/strict";
-import SketchiPlugin from "../plugins/sketchi";
+
+import SketchiPlugin from "../src/index";
 
 type ToolContext = Parameters<
   NonNullable<
@@ -16,6 +16,7 @@ type ToolContext = Parameters<
 
 function createContext(): ToolContext {
   const directory = resolve(process.cwd());
+
   return {
     sessionID: "test-session",
     messageID: "test-message",
@@ -23,22 +24,28 @@ function createContext(): ToolContext {
     directory,
     worktree: directory,
     abort: new AbortController().signal,
-    metadata: () => {},
-    ask: async () => {},
+    metadata: () => undefined,
+    ask: async () => undefined,
   };
 }
 
 async function assertPngPath(path: string) {
   const pngRoot = resolve(process.cwd(), "sketchi", "png");
   const normalized = resolve(path);
-  assert.ok(normalized.startsWith(pngRoot));
-  assert.ok(existsSync(normalized));
+  if (!normalized.startsWith(pngRoot)) {
+    throw new Error(`PNG path must stay under ${pngRoot}: ${normalized}`);
+  }
+  if (!existsSync(normalized)) {
+    throw new Error(`Expected PNG file to exist at ${normalized}`);
+  }
   const info = await stat(normalized);
-  assert.ok(info.size > 0);
+  if (info.size <= 0) {
+    throw new Error(`Expected non-empty PNG at ${normalized}`);
+  }
 }
 
-async function wait(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function wait(ms: number) {
+  return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 }
 
 async function run() {
@@ -58,9 +65,15 @@ async function run() {
   const tweak = tools.diagram_tweak;
   const toPng = tools.diagram_to_png;
 
-  assert.ok(fromPrompt, "diagram_from_prompt tool missing");
-  assert.ok(tweak, "diagram_tweak tool missing");
-  assert.ok(toPng, "diagram_to_png tool missing");
+  if (!fromPrompt) {
+    throw new Error("diagram_from_prompt tool missing");
+  }
+  if (!tweak) {
+    throw new Error("diagram_tweak tool missing");
+  }
+  if (!toPng) {
+    throw new Error("diagram_to_png tool missing");
+  }
 
   console.log("Scenario 1: diagram_from_prompt");
   const generateRaw = await fromPrompt.execute(
@@ -71,7 +84,9 @@ async function run() {
     shareLink: { url: string };
     pngPath: string;
   };
-  assert.ok(generate.shareLink?.url?.includes("https://excalidraw.com/#json="));
+  if (!generate.shareLink?.url?.includes("https://excalidraw.com/#json=")) {
+    throw new Error("diagram_from_prompt did not return Excalidraw share link");
+  }
   await assertPngPath(generate.pngPath);
 
   console.log("Scenario 2: diagram_tweak");
@@ -80,11 +95,11 @@ async function run() {
   const tweakRequests = [
     {
       request: "Rename 'End' to 'Finish'.",
-      options: { timeoutMs: 60000, maxSteps: 3 },
+      options: { timeoutMs: 60_000, maxSteps: 3 },
     },
     {
       request: "Change the label colors for better contrast.",
-      options: { timeoutMs: 60000, maxSteps: 2 },
+      options: { timeoutMs: 60_000, maxSteps: 2 },
     },
   ];
 
@@ -112,11 +127,14 @@ async function run() {
   if (!tweakRaw) {
     throw tweakError;
   }
+
   const tweaked = JSON.parse(tweakRaw) as {
     shareLink: { url: string };
     pngPath: string;
   };
-  assert.ok(tweaked.shareLink?.url?.includes("https://excalidraw.com/#json="));
+  if (!tweaked.shareLink?.url?.includes("https://excalidraw.com/#json=")) {
+    throw new Error("diagram_tweak did not return Excalidraw share link");
+  }
   await assertPngPath(tweaked.pngPath);
 
   console.log("Scenario 3: diagram_to_png");
@@ -130,7 +148,9 @@ async function run() {
   console.log("All plugin scenarios passed.");
 
   if (tools.diagram_grade) {
-    console.log("Scenario 4: diagram_grade (skipped - requires OpenCode session)");
+    console.log(
+      "Scenario 4: diagram_grade (skipped - requires OpenCode session)"
+    );
   }
 }
 
