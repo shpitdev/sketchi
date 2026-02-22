@@ -6,8 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 interface ChatMessage {
-  role: "user" | "assistant";
   content: string;
+  role: "user" | "assistant";
 }
 
 type ProcessingMode = "generating" | "updating" | null;

@@ -1,13 +1,13 @@
 import type { LayoutedDiagram } from "./diagram-layout";
 
 export interface ExcalidrawStyleOverrides {
+  arrowhead?: "arrow" | null;
+  arrowStroke?: string;
+  fontFamily?: number;
+  fontSize?: number;
   shapeFill?: string;
   shapeStroke?: string;
-  arrowStroke?: string;
-  arrowhead?: "arrow" | null;
   textColor?: string;
-  fontSize?: number;
-  fontFamily?: number;
 }
 
 function generateSeed(): number {
@@ -19,13 +19,13 @@ interface IndexRef {
 }
 
 interface StyleConfig {
-  shapeStroke: string;
-  shapeFillDefault: string;
-  textColor: string;
-  fontSize: number;
-  fontFamily: number;
-  arrowStroke: string;
   arrowhead: "arrow" | null;
+  arrowStroke: string;
+  fontFamily: number;
+  fontSize: number;
+  shapeFillDefault: string;
+  shapeStroke: string;
+  textColor: string;
 }
 
 function nextIndex(idx: IndexRef): string {

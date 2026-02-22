@@ -17,9 +17,9 @@ const SHAPE_TYPES = new Set([
 ]);
 
 interface SimplifyStats {
+  edgeCount: number;
   elementCount: number;
   nodeCount: number;
-  edgeCount: number;
 }
 
 export interface SimplifyDiagramResult {

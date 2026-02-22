@@ -18,14 +18,14 @@ import { createLoggedAction } from "./lib/logging";
 import { hashString, logEventSafely } from "./lib/observability";
 
 interface GenerateStats {
-  traceId: string;
-  iterations: number;
-  tokens: number;
-  durationMs: number;
-  nodeCount: number;
-  edgeCount: number;
-  shapeCount: number;
   arrowCount: number;
+  durationMs: number;
+  edgeCount: number;
+  iterations: number;
+  nodeCount: number;
+  shapeCount: number;
+  tokens: number;
+  traceId: string;
 }
 
 interface RestructureStats extends GenerateStats {

@@ -2,15 +2,15 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 export interface ScenarioSummary {
-  scenario: string;
-  status: "passed" | "failed";
-  warnings: string[];
-  visualIssues?: string[];
-  error?: string;
   baseUrl: string;
   env: string;
-  startedAt: string;
+  error?: string;
   finishedAt: string;
+  scenario: string;
+  startedAt: string;
+  status: "passed" | "failed";
+  visualIssues?: string[];
+  warnings: string[];
 }
 
 export async function writeScenarioSummary(params: {

@@ -36,14 +36,14 @@ const READONLY_LINK_SHARING_PATTERNS: RegExp[] = [
 ];
 
 export interface ExcalidrawShareLinkPayload {
-  elements: unknown[];
   appState: Record<string, unknown>;
+  elements: unknown[];
 }
 
 export interface ExcalidrawShareLinkResult {
-  url: string;
-  shareId: string;
   encryptionKey: string;
+  shareId: string;
+  url: string;
 }
 
 export type ShareUrlType = "v1" | "v2" | "base64" | "unknown";
@@ -89,9 +89,9 @@ export type ParseExcalidrawUrlResult =
     };
 
 interface FileEncodingInfo {
-  version: number;
   compression: string;
   encryption: string;
+  version: number;
 }
 
 function splitBuffers(concatenatedBuffer: Uint8Array): Uint8Array[] {

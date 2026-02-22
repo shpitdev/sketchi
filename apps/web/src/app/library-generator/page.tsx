@@ -18,14 +18,14 @@ export default function LibraryGeneratorPage() {
   const [isCreating, setIsCreating] = useState(false);
 
   let libraryContent = (
-    <div className="rounded border border-dashed p-6 text-muted-foreground text-xs">
+    <div className="rounded-2xl border-2 border-muted-foreground/30 border-dashed bg-muted/10 p-8 text-center font-medium text-muted-foreground text-sm">
       Loading libraries…
     </div>
   );
 
   if (libraries && libraries.length === 0) {
     libraryContent = (
-      <div className="rounded border border-dashed p-6 text-muted-foreground text-xs">
+      <div className="rounded-2xl border-2 border-muted-foreground/30 border-dashed bg-muted/10 p-12 text-center font-medium text-muted-foreground text-sm">
         No libraries yet. Create one to get started.
       </div>
     );
@@ -65,26 +65,30 @@ export default function LibraryGeneratorPage() {
   };
 
   return (
-    <div className="container mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="font-semibold text-xl">Icon Library Generator</h1>
-        <p className="text-muted-foreground text-sm">
+    <div className="container mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:py-12">
+      <div className="flex flex-col gap-2.5">
+        <h1 className="font-semibold text-2xl tracking-tight sm:text-3xl">
+          Icon Library Generator
+        </h1>
+        <p className="text-muted-foreground text-sm sm:text-base">
           Build and export Excalidraw icon libraries from SVG files.
         </p>
       </div>
 
-      <section className="flex flex-col gap-3 rounded border p-4">
-        <h2 className="font-semibold text-sm">Create a new library</h2>
+      <section className="flex flex-col gap-4 rounded-2xl border-2 border-foreground/10 bg-card p-6 shadow-sm transition-all hover:border-foreground/25 hover:shadow-md">
+        <h2 className="font-semibold text-base">Create a new library</h2>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <Input
+            className="border-2 shadow-sm"
             onChange={(event) => setLibraryName(event.target.value)}
             placeholder="Library name"
             value={libraryName}
           />
           <Button
+            className="font-semibold shadow-sm transition-transform [border-radius:255px_15px_225px_15px/15px_225px_15px_255px] hover:-translate-y-0.5"
             disabled={isCreating}
             onClick={handleCreate}
-            size="sm"
+            size="default"
             type="button"
           >
             {isCreating ? "Creating…" : "Create"}
@@ -92,8 +96,8 @@ export default function LibraryGeneratorPage() {
         </div>
       </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="font-semibold text-sm">Your libraries</h2>
+      <section className="mt-2 flex flex-col gap-4">
+        <h2 className="font-semibold text-base">Your libraries</h2>
         {libraryContent}
       </section>
     </div>

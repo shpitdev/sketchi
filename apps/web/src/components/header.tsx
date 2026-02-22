@@ -6,18 +6,27 @@ import { ModeToggle } from "./mode-toggle";
 
 export default function Header() {
   return (
-    <div>
-      <div className="flex flex-row items-center justify-between px-2 py-1">
+    <header className="sticky top-0 z-50 w-full border-b-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="flex h-14 items-center justify-between px-4 sm:px-6">
         <Link
           aria-label="Home"
-          className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-muted/50"
+          className="group flex items-center gap-2.5 rounded-lg p-1 transition-colors hover:opacity-80"
           href="/"
         >
-          <Image alt="Sketchi" height={24} src="/icons/logo.svg" width={24} />
+          <Image
+            alt="Sketchi"
+            className="h-7 w-7 object-contain transition-transform group-hover:-rotate-6"
+            height={28}
+            src="/icons/logo.svg"
+            width={28}
+          />
+          <span className="hidden font-[family-name:var(--font-caveat)] font-bold text-2xl text-foreground/90 tracking-tight sm:inline-block">
+            sketchi
+          </span>
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Link
-            className="rounded-md border border-transparent px-2 py-1 text-muted-foreground text-xs transition-colors hover:border-foreground/20 hover:text-foreground"
+            className="rounded-full border-2 border-transparent px-4 py-1.5 font-medium text-muted-foreground text-sm transition-all hover:border-foreground/10 hover:bg-muted/40 hover:text-foreground"
             href="/api/docs"
             rel="noreferrer"
             target="_blank"
@@ -27,7 +36,6 @@ export default function Header() {
           <ModeToggle />
         </div>
       </div>
-      <hr />
-    </div>
+    </header>
   );
 }

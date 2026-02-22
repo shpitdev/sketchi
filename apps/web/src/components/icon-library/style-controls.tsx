@@ -5,8 +5,8 @@ import type { StyleSettings } from "@/lib/icon-library/svg-to-excalidraw";
 const fillStyles = ["hachure", "solid", "cross-hatch", "zigzag"] as const;
 
 interface StyleControlsProps {
-  value: StyleSettings;
   onChange: (next: StyleSettings) => void;
+  value: StyleSettings;
 }
 
 export default function StyleControls({ value, onChange }: StyleControlsProps) {

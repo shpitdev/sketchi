@@ -8,10 +8,6 @@ export type StagehandEnv = "LOCAL" | "BROWSERBASE";
 
 export interface StagehandRunConfig {
   baseUrl: string;
-  env: StagehandEnv;
-  modelName: string;
-  openrouterApiKey: string;
-  vercelBypassSecret?: string;
   browserbaseApiKey?: string;
   browserbaseProjectId?: string;
   browserbaseRegion?:
@@ -19,12 +15,16 @@ export interface StagehandRunConfig {
     | "us-east-1"
     | "eu-central-1"
     | "ap-southeast-1";
-  headless: boolean;
-  chromePath?: string;
-  screenshotsEnabled: boolean;
-  screenshotsDir: string;
   cacheDir: string;
+  chromePath?: string;
+  env: StagehandEnv;
+  headless: boolean;
+  modelName: string;
+  openrouterApiKey: string;
+  screenshotsDir: string;
+  screenshotsEnabled: boolean;
   verbose: 0 | 1 | 2;
+  vercelBypassSecret?: string;
   visionModelName: string;
 }
 

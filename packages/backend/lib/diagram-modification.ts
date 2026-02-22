@@ -79,26 +79,26 @@ export type ExcalidrawElementPatch = z.infer<
 
 export interface DiagramModificationIssue {
   code: string;
-  message: string;
   elementId?: string;
+  message: string;
   path?: string;
 }
 
 export interface DiagramModificationChanges {
   addedIds: string[];
-  removedIds: string[];
   modifiedIds: string[];
+  removedIds: string[];
 }
 
 export interface DiagramModificationApplySuccess {
-  ok: true;
-  elements: ExcalidrawElementLike[];
   changes: DiagramModificationChanges;
+  elements: ExcalidrawElementLike[];
+  ok: true;
 }
 
 export interface DiagramModificationApplyFailure {
-  ok: false;
   issues: DiagramModificationIssue[];
+  ok: false;
 }
 
 export type DiagramModificationApplyResult =

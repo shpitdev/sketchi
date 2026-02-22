@@ -16,10 +16,10 @@ function getTimestamp(): string {
 
 export interface OutputSession {
   dir: string;
-  timestamp: string;
   saveJson: (name: string, data: unknown) => Promise<string>;
   savePng: (name: string, buffer: Buffer) => Promise<string>;
   saveText: (name: string, content: string) => Promise<string>;
+  timestamp: string;
 }
 
 export async function createOutputSession(

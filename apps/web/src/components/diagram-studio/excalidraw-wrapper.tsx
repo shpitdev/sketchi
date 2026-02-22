@@ -13,11 +13,11 @@ interface ExcalidrawWrapperProps {
     elements: readonly Record<string, unknown>[];
     appState: Record<string, unknown>;
   } | null;
-  onReady?: (api: ExcalidrawImperativeAPI) => void;
   onChange?: (
     elements: readonly Record<string, unknown>[],
     appState: Record<string, unknown>
   ) => void;
+  onReady?: (api: ExcalidrawImperativeAPI) => void;
   suppressOnChangeRef?: React.RefObject<boolean>;
 }
 

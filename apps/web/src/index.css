@@ -23,11 +23,11 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
+  --chart-1: oklch(0.71 0.16 45);
+  --chart-2: oklch(0.66 0.14 152);
+  --chart-3: oklch(0.62 0.18 22);
+  --chart-4: oklch(0.64 0.15 92);
+  --chart-5: oklch(0.58 0.17 335);
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -58,11 +58,11 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
+  --chart-1: oklch(0.77 0.14 45);
+  --chart-2: oklch(0.73 0.12 152);
+  --chart-3: oklch(0.72 0.15 22);
+  --chart-4: oklch(0.74 0.13 92);
+  --chart-5: oklch(0.73 0.14 335);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -128,22 +128,22 @@
 
   /* Range input thumb styling - light mode */
   input[type="range"]::-webkit-slider-thumb {
-    appearance: none;
     width: 16px;
     height: 16px;
-    border-radius: 50%;
-    background-color: oklch(0.4 0 0);
+    appearance: none;
     cursor: pointer;
+    background-color: oklch(0.4 0 0);
     border: none;
+    border-radius: 50%;
   }
 
   input[type="range"]::-moz-range-thumb {
     width: 16px;
     height: 16px;
-    border-radius: 50%;
-    background-color: oklch(0.4 0 0);
     cursor: pointer;
+    background-color: oklch(0.4 0 0);
     border: none;
+    border-radius: 50%;
   }
 
   /* Range input thumb styling - dark mode */

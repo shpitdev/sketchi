@@ -15,9 +15,9 @@ export interface IconGridItem {
 
 interface IconGridProps {
   icons: IconGridItem[];
+  isBusy?: boolean;
   onDeleteSelected: (ids: string[]) => void;
   onMove: (id: string, direction: "left" | "right") => void;
-  isBusy?: boolean;
   styleSettings: StyleSettings;
 }
 

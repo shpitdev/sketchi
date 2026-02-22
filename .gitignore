@@ -75,3 +75,6 @@ opencode-logs*/
 # Generated diagram exports
 /diagram-*.png
 /docs/architecture-diagram.png
+
+# Agents
+.agents/skills

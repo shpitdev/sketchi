@@ -11,15 +11,15 @@ export const AI_CONFIG = {
 } as const;
 
 export interface AICallOptions {
-  timeoutMs?: number;
   maxRetries?: number;
   temperature?: number;
+  timeoutMs?: number;
 }
 
 export interface RetryOptions {
-  maxRetries: number;
   baseDelayMs: number;
   maxDelayMs: number;
+  maxRetries: number;
   onRetry?: (attempt: number, error: Error, delayMs: number) => void;
 }
 
@@ -191,12 +191,12 @@ export function generateObjectWithRetry<SCHEMA extends z.ZodType>(
 }
 
 export interface TestResult {
-  name: string;
-  success: boolean;
   durationMs: number;
-  tokens?: number;
   error?: string;
   metadata?: Record<string, unknown>;
+  name: string;
+  success: boolean;
+  tokens?: number;
 }
 
 export async function runTest<T>(

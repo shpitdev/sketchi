@@ -11,21 +11,21 @@ import { getProfile } from "./profile-registry";
 import type { GenerateIntermediateResult } from "./types";
 
 export interface ModifyIntermediateOptions {
-  profileId?: string;
   /**
-   * Correlation id for logs/tracing across systems.
-   * If not provided, a new UUID is generated.
+   * Maximum tool-loop steps for the agent (default 5).
    */
-  traceId?: string;
+  maxSteps?: number;
+  profileId?: string;
   /**
    * Total wall-clock timeout for the agent call (ms).
    * This is passed through to the AI SDK generate() call.
    */
   timeoutMs?: number;
   /**
-   * Maximum tool-loop steps for the agent (default 5).
+   * Correlation id for logs/tracing across systems.
+   * If not provided, a new UUID is generated.
    */
-  maxSteps?: number;
+  traceId?: string;
 }
 
 const DEFAULT_PRIMARY_MODEL_ID = "google/gemini-3-flash-preview";

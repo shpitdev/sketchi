@@ -164,48 +164,49 @@ export default function DiagramsPage() {
         </p>
       </header>
 
-      <ul className="grid gap-3 sm:grid-cols-2">
+      <ul className="grid gap-4 sm:grid-cols-2">
         {FEATURES.map((f) => (
-          <li className="flex items-start gap-2.5 text-sm" key={f.label}>
-            <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-foreground/5 text-foreground/60">
+          <li className="flex items-start gap-3 text-sm" key={f.label}>
+            <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-foreground/5 p-1 text-foreground/70 shadow-sm transition-colors hover:bg-foreground/10 hover:text-foreground">
               {f.icon}
             </span>
-            <span className="text-muted-foreground">{f.label}</span>
+            <span className="pt-1 text-muted-foreground">{f.label}</span>
           </li>
         ))}
       </ul>
 
-      <section className="flex flex-col items-start gap-3 rounded-xl border bg-card p-5">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-9 items-center justify-center rounded-lg bg-foreground/5 text-foreground/70">
-            <PenTool className="size-4" />
+      <section className="flex flex-col items-start gap-4 rounded-2xl border-2 border-foreground/10 bg-card p-6 shadow-sm transition-all hover:border-foreground/25 hover:shadow-md">
+        <div className="flex items-center gap-3.5">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm">
+            <PenTool className="size-5" />
           </div>
           <div>
-            <h2 className="font-medium text-sm">Start a new diagram</h2>
-            <p className="text-muted-foreground text-xs">
+            <h2 className="font-semibold text-base">Start a new diagram</h2>
+            <p className="text-muted-foreground text-sm">
               Opens an Excalidraw canvas with AI restructure, autosave, and
               import/export.
             </p>
           </div>
         </div>
         <Button
+          className="mt-1 font-semibold shadow-sm transition-transform [border-radius:255px_15px_225px_15px/15px_225px_15px_255px] hover:-translate-y-0.5"
           data-testid="diagram-new-session"
           disabled={isCreating}
           onClick={handleCreate}
-          size="sm"
+          size="default"
           type="button"
         >
           {isCreating ? "Creating..." : "New diagram"}
-          <ArrowRight className="ml-1 size-3.5" />
+          <ArrowRight className="ml-1.5 size-4" />
         </Button>
       </section>
 
-      <section className="flex flex-col gap-3">
+      <section className="flex flex-col gap-4">
         <div className="flex items-baseline justify-between gap-4">
-          <h2 className="font-medium text-sm">Recent diagrams</h2>
+          <h2 className="font-semibold text-base">Recent diagrams</h2>
           {hasRecents && (
             <Button
-              className="text-muted-foreground"
+              className="font-medium text-muted-foreground"
               data-testid="diagram-recents-clear"
               onClick={handleClearAll}
               size="xs"
@@ -218,9 +219,9 @@ export default function DiagramsPage() {
           )}
         </div>
 
-        <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/40 px-3 py-2">
-          <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-          <p className="text-muted-foreground text-xs leading-relaxed">
+        <div className="flex items-start gap-2 rounded-xl border-2 border-border/80 bg-muted/30 px-4 py-3 shadow-sm">
+          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          <p className="text-muted-foreground text-sm leading-relaxed">
             Session URLs are capability tokens and grant edit access to anyone
             who has them. Share links carefully.
           </p>
@@ -228,7 +229,7 @@ export default function DiagramsPage() {
 
         {hasRecents ? (
           <ul
-            className="flex flex-col divide-y divide-border rounded-xl border bg-card"
+            className="flex flex-col divide-y-2 divide-border rounded-2xl border-2 bg-card shadow-sm"
             data-testid="diagram-recents-list"
           >
             {recents.map((r) => (
@@ -241,11 +242,11 @@ export default function DiagramsPage() {
           </ul>
         ) : (
           <div
-            className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed py-8 text-center"
+            className="flex flex-col items-center gap-2 rounded-2xl border-2 border-muted-foreground/30 border-dashed bg-muted/10 py-12 text-center"
             data-testid="diagram-recents-list"
           >
-            <Clock className="size-5 text-muted-foreground/50" />
-            <p className="text-muted-foreground text-xs">
+            <Clock className="size-6 text-muted-foreground/40" />
+            <p className="font-medium text-muted-foreground text-sm">
               No recent diagrams. Create one to get started.
             </p>
           </div>

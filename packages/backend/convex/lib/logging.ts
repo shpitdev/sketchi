@@ -14,8 +14,8 @@ export interface LoggingOptions<Args, Result> {
 
 interface ActionDefinition<Args extends object, Result> {
   args?: PropertyValidators | Validator<unknown, "required", string>;
-  returns?: PropertyValidators | Validator<unknown, "required", string>;
   handler: (ctx: ActionCtx, args: Args) => Promise<Result> | Result;
+  returns?: PropertyValidators | Validator<unknown, "required", string>;
 }
 
 function resolveTraceId<Args extends object, Result>(

@@ -6,8 +6,8 @@ import { createLoggedAction } from "./lib/logging";
 import { hashString, logEventSafely } from "./lib/observability";
 
 interface GenerateIntermediateFromPromptArgs {
-  prompt: string;
   profileId?: string;
+  prompt: string;
   /** Optional correlation id (recommended). */
   traceId?: string;
 }

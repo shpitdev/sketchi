@@ -7,12 +7,12 @@ import type {
 import type { ArrowElement, Diagram, ShapeElement } from "./diagram-structure";
 
 interface TreeNode {
-  id: string;
+  angle: number;
   children: TreeNode[];
   depth: number;
-  angle: number;
-  startAngle: number;
   endAngle: number;
+  id: string;
+  startAngle: number;
 }
 
 function buildTree(

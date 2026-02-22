@@ -70,14 +70,14 @@ Layout direction:
 - RL (right-to-left): rare, specific cultural contexts`;
 
 export interface ContentAnalyzerOptions {
-  timeoutMs?: number;
   maxRetries?: number;
+  timeoutMs?: number;
 }
 
 export interface ContentAnalyzerResult {
+  durationMs: number;
   intermediate: IntermediateFormat;
   tokens?: number;
-  durationMs: number;
 }
 
 export async function analyzeContent(

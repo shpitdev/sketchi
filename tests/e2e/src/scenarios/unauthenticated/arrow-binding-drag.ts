@@ -53,11 +53,11 @@ interface DragPayload {
 }
 
 interface DiagramResponse {
-  shareUrl?: string;
+  error?: string;
   shareLink?: {
     url?: string;
   };
-  error?: string;
+  shareUrl?: string;
 }
 
 async function generateTestDiagram(baseUrl: string): Promise<string> {
@@ -125,10 +125,10 @@ async function getArrowEndpoint(page: {
   }
 
   interface ArrowElement {
+    points?: [number, number][];
     type: string;
     x: number;
     y: number;
-    points?: [number, number][];
   }
 
   const arrow = (elements as ArrowElement[]).find((e) => e.type === "arrow");
@@ -198,6 +198,13 @@ async function getFirstRectanglePixel(page: {
 
 async function dragShape(
   page: {
+    dragAndDrop?: (
+      startX: number,
+      startY: number,
+      endX: number,
+      endY: number,
+      options?: { steps?: number }
+    ) => Promise<unknown>;
     evaluate: <T>(
       fn: (args: DragPayload) => T,
       args: DragPayload
@@ -212,7 +219,7 @@ async function dragShape(
   const endX = startX + offsetX;
   const endY = startY + offsetY;
 
-  if (typeof page.dragAndDrop === "function") {
+  if (page.dragAndDrop) {
     await page.dragAndDrop(startX, startY, endX, endY, { steps: 12 });
     return;
   }

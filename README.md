@@ -71,6 +71,12 @@
   <em>Icon Library Generator - Build and export Excalidraw libraries</em>
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/web-based-inline-generator-god-hates-js.png" alt="AI Diagram Generator" width="800" />
+  <br />
+  <em>AI Diagram Generator - Convert natural language to flowcharts and diagrams</em>
+</p>
+
 ---
 
 ## Table of Contents
@@ -89,48 +95,11 @@
 
 ## Architecture
 
-```mermaid
-flowchart TB
-    subgraph Client["Browser"]
-        Web["Next.js 16 Frontend<br/>(apps/web)"]
-    end
-
-    subgraph Packages["Shared Packages"]
-        Env["@sketchi/env<br/>Environment Config"]
-        Config["@sketchi/config<br/>TypeScript Config"]
-    end
-
-    subgraph Backend["Convex Backend"]
-        Functions["Convex Functions<br/>(packages/backend)"]
-        DB[(Convex Database)]
-        Storage[(File Storage)]
-    end
-
-    subgraph External["External Services"]
-        AI["Vercel AI SDK<br/>+ OpenRouter"]
-        BB["Browserbase<br/>Playwright"]
-    end
-
-    Web --> Functions
-    Web --> Env
-    Web --> Config
-    Functions --> DB
-    Functions --> Storage
-    Functions --> AI
-    Functions --> BB
-
-    classDef frontend fill:#3b82f6,stroke:#1d4ed8,color:#fff
-    classDef backend fill:#f97316,stroke:#c2410c,color:#fff
-    classDef packages fill:#8b5cf6,stroke:#6d28d9,color:#fff
-    classDef external fill:#6b7280,stroke:#374151,color:#fff
-    classDef storage fill:#10b981,stroke:#047857,color:#fff
-
-    class Web frontend
-    class Functions backend
-    class Env,Config packages
-    class AI,BB external
-    class DB,Storage storage
-```
+<p align="center">
+  <img src="docs/screenshots/architecture.png" alt="Sketchi Architecture" width="800" />
+  <br />
+  <em>Architecture - System design and data flow</em>
+</p>
 
 **Monorepo Structure:**
 

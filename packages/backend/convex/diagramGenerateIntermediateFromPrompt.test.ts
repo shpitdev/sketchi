@@ -29,8 +29,8 @@ const requiredEnv = ["OPENROUTER_API_KEY"] as const;
 
 interface Scenario {
   name: string;
-  slug: string;
   prompt: string;
+  slug: string;
 }
 
 const SCENARIOS: Scenario[] = [
@@ -63,23 +63,23 @@ using Redis.`,
 ];
 
 interface ScenarioResult {
+  createdAt: string;
+  durationMs: number;
+  edgeCount?: number;
+  error?: string;
+  jsonFile?: string;
+  nodeCount?: number;
+  pngFile?: string;
+  pngSizeBytes?: number;
   scenario: string;
+  shareUrl?: string;
   slug: string;
   status: "passed" | "failed";
-  durationMs: number;
   stepDurationsMs?: {
     generateDiagram?: number;
     renderPng?: number;
   };
   tokens?: number;
-  nodeCount?: number;
-  edgeCount?: number;
-  shareUrl?: string;
-  pngSizeBytes?: number;
-  jsonFile?: string;
-  pngFile?: string;
-  error?: string;
-  createdAt: string;
 }
 
 async function ensureOutputDir() {

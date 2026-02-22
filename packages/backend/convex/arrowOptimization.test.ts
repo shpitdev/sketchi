@@ -23,8 +23,8 @@ import { closeBrowser, renderElementsToPng } from "../lib/render-png";
 type Edge = "left" | "right" | "top" | "bottom";
 
 interface Scenario {
-  name: string;
   intermediate: IntermediateFormat;
+  name: string;
 }
 
 const SCENARIOS: Scenario[] = [
@@ -92,15 +92,15 @@ const summaryJsonPath = join(outputDir, "arrow-optimization.json");
 const summaryMdPath = join(outputDir, "arrow-optimization.md");
 
 interface ScenarioSummary {
+  afterPng?: string;
+  arrowCount?: number;
+  artifactFile?: string;
+  beforePng?: string;
+  createdAt: string;
+  durationMs: number;
+  error?: string;
   scenario: string;
   status: "passed" | "failed";
-  durationMs: number;
-  arrowCount?: number;
-  beforePng?: string;
-  afterPng?: string;
-  artifactFile?: string;
-  error?: string;
-  createdAt: string;
 }
 
 async function readJsonIfExists<T>(path: string): Promise<T | null> {

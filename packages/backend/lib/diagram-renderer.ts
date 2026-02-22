@@ -14,8 +14,8 @@ import { getTemplateForType } from "./templates";
 
 export interface RenderedDiagramResult {
   diagram: Diagram;
-  layouted: LayoutedDiagram;
   elements: Record<string, unknown>[];
+  layouted: LayoutedDiagram;
   stats: {
     nodeCount: number;
     edgeCount: number;

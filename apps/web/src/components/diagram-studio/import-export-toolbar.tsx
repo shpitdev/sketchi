@@ -29,13 +29,13 @@ import { Input } from "@/components/ui/input";
 
 interface ImportExportToolbarProps {
   excalidrawApi: ExcalidrawImperativeAPI | null;
-  sessionId: string;
+  knownVersionRef: React.RefObject<number>;
   saveScene: (
     elements: readonly Record<string, unknown>[],
     appState: Record<string, unknown>
   ) => Promise<void>;
+  sessionId: string;
   suppressOnChangeRef: React.RefObject<boolean>;
-  knownVersionRef: React.RefObject<number>;
 }
 
 type ImportState =

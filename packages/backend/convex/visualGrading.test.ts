@@ -40,11 +40,11 @@ type ChartType =
   | "sequence";
 
 interface Scenario {
+  chartType: ChartType;
+  layoutDirection: "TB" | "LR";
+  minScore: number;
   name: string;
   prompt: string;
-  chartType: ChartType;
-  minScore: number;
-  layoutDirection: "TB" | "LR";
 }
 
 const SCENARIOS: Scenario[] = [
@@ -99,27 +99,27 @@ const SCENARIOS: Scenario[] = [
 ];
 
 interface ScenarioResult {
-  scenario: string;
-  status: "passed" | "failed";
-  durationMs: number;
-  chartType: ChartType;
-  minScore: number;
-  score?: number;
-  issues?: string[];
-  strengths?: string[];
-  hasParticipants?: boolean;
-  hasLifelines?: boolean;
-  messagesLeftToRight?: boolean;
-  chronologicalOrder?: boolean;
   analysisTokens?: number;
-  gradingTokens?: number;
-  renderDurationMs?: number;
-  intermediateFile?: string;
-  diagramFile?: string;
-  pngFile?: string;
-  gradingFile?: string;
-  error?: string;
+  chartType: ChartType;
+  chronologicalOrder?: boolean;
   createdAt: string;
+  diagramFile?: string;
+  durationMs: number;
+  error?: string;
+  gradingFile?: string;
+  gradingTokens?: number;
+  hasLifelines?: boolean;
+  hasParticipants?: boolean;
+  intermediateFile?: string;
+  issues?: string[];
+  messagesLeftToRight?: boolean;
+  minScore: number;
+  pngFile?: string;
+  renderDurationMs?: number;
+  scenario: string;
+  score?: number;
+  status: "passed" | "failed";
+  strengths?: string[];
 }
 
 function slugify(value: string): string {

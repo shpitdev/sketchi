@@ -22,20 +22,20 @@ const summaryJsonPath = join(outputDir, "diagram-layout.json");
 const summaryMdPath = join(outputDir, "diagram-layout.md");
 
 interface ScenarioSummary {
-  scenario: string;
-  status: "passed" | "failed";
-  durationMs: number;
-  diagramType?: string;
-  layoutDirection?: string;
-  edgeRouting?: string;
-  nodeCount?: number;
-  edgeCount?: number;
-  shapeCount?: number;
   arrowCount?: number;
-  elementCount?: number;
   artifactFile?: string;
-  error?: string;
   createdAt: string;
+  diagramType?: string;
+  durationMs: number;
+  edgeCount?: number;
+  edgeRouting?: string;
+  elementCount?: number;
+  error?: string;
+  layoutDirection?: string;
+  nodeCount?: number;
+  scenario: string;
+  shapeCount?: number;
+  status: "passed" | "failed";
 }
 
 async function readJsonIfExists<T>(path: string): Promise<T | null> {

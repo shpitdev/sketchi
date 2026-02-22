@@ -1,23 +1,24 @@
-"use client";
 import { ArrowUpRight, Sparkles, Terminal, Wand2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { AnimatedSketchiLogo } from "@/components/animated-sketchi-logo";
+import { ScreenshotViewer } from "@/components/screenshot-viewer";
 
 type FeatureStatus = "available" | "alpha" | "coming-soon";
 
 interface FeatureCardProps {
-  title: string;
   description: string;
-  status: FeatureStatus;
-  statusLabel?: string;
-  href?: string;
   externalHref?: string;
+  href?: string;
   icon: React.ReactNode;
   screenshot: {
     light: string;
     dark?: string;
     alt: string;
   };
+  status: FeatureStatus;
+  statusLabel?: string;
+  title: string;
 }
 
 function StatusBadge({
@@ -203,8 +204,7 @@ export default function Home() {
       href: "/diagrams",
       icon: <Sparkles className="size-5" />,
       screenshot: {
-        light: "/screenshots/excalidraw-w-icons-white.png",
-        dark: "/screenshots/excalidraw-w-icons.png",
+        light: "/screenshots/web-based-inline-generator-god-hates-js.png",
         alt: "AI-generated Excalidraw diagram",
       },
     },
@@ -213,12 +213,12 @@ export default function Home() {
       description:
         "Bi-directional human-in-the-loop diagramming for AI agents. Create, modify, and grade diagrams directly from your development workflow.",
       status: "available",
-      statusLabel: "v0.0.2",
+      statusLabel: "v0.0.3",
       href: "/opencode",
       icon: <Terminal className="size-5" />,
       screenshot: {
-        light: "/screenshots/opencode-preview-white.png",
-        dark: "/screenshots/opencode-preview.png",
+        dark: "/screenshots/opencode-preview-dark.png",
+        light: "/screenshots/opencode-preview-light.png",
         alt: "OpenCode plugin preview",
       },
     },
@@ -227,14 +227,9 @@ export default function Home() {
   return (
     <div className="container mx-auto max-w-6xl px-4 py-8 sm:py-12">
       <div className="mx-auto mb-12 flex flex-col items-center gap-4 sm:mb-16">
-        <Image
-          alt="Sketchi"
-          className="h-auto w-auto"
-          height={140}
-          priority
-          src="/icons/logo-wide.svg"
-          width={420}
-        />
+        <div className="w-full max-w-[420px] transition-all hover:rotate-2 hover:scale-105">
+          <AnimatedSketchiLogo className="h-auto w-full" />
+        </div>
         <p className="max-w-lg text-center text-muted-foreground text-sm leading-relaxed">
           Transform SVGs into hand-drawn Excalidraw assets. Build icon
           libraries, generate diagrams, and export production-ready files.
@@ -248,50 +243,15 @@ export default function Home() {
       </div>
 
       <section aria-label="More screenshots" className="mt-10 sm:mt-14">
-        <div className="mb-3 flex items-baseline justify-between gap-4">
+        <div className="mb-4 flex items-baseline justify-between gap-4">
           <h2 className="font-medium text-foreground/90 text-sm">
             More screenshots
           </h2>
           <p className="hidden text-muted-foreground text-xs sm:block">
-            Scroll to explore
+            Click to explore
           </p>
         </div>
-
-        <div className="relative">
-          <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2">
-            {[
-              {
-                src: "/screenshots/editable-excalidraw.png",
-                alt: "Editable Excalidraw canvas",
-              },
-              {
-                src: "/screenshots/palantir-foundry-icon-set-white.png",
-                alt: "Icon set preview",
-              },
-              {
-                src: "/screenshots/excalidraw-w-icons-white.png",
-                alt: "Excalidraw diagram with icons",
-              },
-              {
-                src: "/screenshots/opencode-preview-white.png",
-                alt: "OpenCode plugin preview",
-              },
-            ].map((shot) => (
-              <div
-                className="relative h-[220px] w-[360px] shrink-0 snap-start overflow-hidden border-2 bg-card shadow-sm [border-radius:255px_15px_225px_15px/15px_225px_15px_255px]"
-                key={shot.src}
-              >
-                <Image
-                  alt={shot.alt}
-                  className="object-cover"
-                  fill
-                  sizes="(max-width: 640px) 90vw, 360px"
-                  src={shot.src}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+        <ScreenshotViewer />
       </section>
     </div>
   );

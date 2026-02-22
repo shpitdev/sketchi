@@ -2,10 +2,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 interface VitestSummary {
-  numTotalTests: number;
-  numPassedTests: number;
   numFailedTests: number;
+  numPassedTests: number;
   numPendingTests: number;
+  numTotalTests: number;
+  startTime?: number;
+  success?: boolean;
   testResults: Array<{
     assertionResults: Array<{
       fullName: string;
@@ -14,8 +16,6 @@ interface VitestSummary {
     }>;
     name: string;
   }>;
-  startTime?: number;
-  success?: boolean;
 }
 
 const outputDir = join(process.cwd(), "test-results");

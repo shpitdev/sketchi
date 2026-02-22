@@ -23,15 +23,15 @@ function findPlaceholders(body: string): string[] {
 }
 
 interface ParseResult {
-  prompts: PromptDefinition[];
   errors: string[];
   idCounts: Map<string, number>;
+  prompts: PromptDefinition[];
 }
 
 export interface PromptLibraryLoadResult {
+  errors: string[];
   prompts: PromptDefinition[];
   resolvedPrompts: PromptDefinition[];
-  errors: string[];
   warnings: string[];
 }
 

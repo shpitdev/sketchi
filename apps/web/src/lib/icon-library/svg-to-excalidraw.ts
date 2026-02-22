@@ -100,51 +100,51 @@ const computeBounds = (points: { x: number; y: number }[]) => {
 };
 
 interface ExcalidrawBaseElement {
-  version: number;
-  versionNonce: number;
-  isDeleted: boolean;
-  id: string;
-  fillStyle: "solid" | "hachure" | "cross-hatch" | "zigzag";
-  strokeWidth: number;
-  strokeStyle: "solid" | "dashed" | "dotted";
-  roughness: number;
-  opacity: number;
   angle: number;
-  x: number;
-  y: number;
-  strokeColor: string;
   backgroundColor: string;
-  width: number;
-  height: number;
-  seed: number;
-  groupIds: string[];
-  roundness: { type: number; value?: number } | null;
-  frameId: string | null;
   boundElements: { id: string; type: "arrow" | "text" }[] | null;
-  updated: number;
+  fillStyle: "solid" | "hachure" | "cross-hatch" | "zigzag";
+  frameId: string | null;
+  groupIds: string[];
+  height: number;
+  id: string;
+  index: string | null;
+  isDeleted: boolean;
   link: string | null;
   locked: boolean;
-  index: string | null;
+  opacity: number;
+  roughness: number;
+  roundness: { type: number; value?: number } | null;
+  seed: number;
+  strokeColor: string;
+  strokeStyle: "solid" | "dashed" | "dotted";
+  strokeWidth: number;
+  updated: number;
+  version: number;
+  versionNonce: number;
+  width: number;
+  x: number;
+  y: number;
 }
 
 export interface ExcalidrawFreedrawElement extends ExcalidrawBaseElement {
-  type: "freedraw";
   points: [number, number][];
-  simulatePressure: boolean;
   pressures: number[];
+  simulatePressure: boolean;
+  type: "freedraw";
 }
 
 export interface ExcalidrawTextElement extends ExcalidrawBaseElement {
-  type: "text";
-  text: string;
-  fontSize: number;
-  fontFamily: number;
-  textAlign: "left" | "center" | "right";
-  verticalAlign: "top" | "middle" | "bottom";
-  containerId: string | null;
-  originalText: string;
   autoResize: boolean;
+  containerId: string | null;
+  fontFamily: number;
+  fontSize: number;
   lineHeight: number;
+  originalText: string;
+  text: string;
+  textAlign: "left" | "center" | "right";
+  type: "text";
+  verticalAlign: "top" | "middle" | "bottom";
 }
 
 export type ExcalidrawElement =
@@ -152,13 +152,13 @@ export type ExcalidrawElement =
   | ExcalidrawTextElement;
 
 export interface StyleSettings {
-  fillStyle: "solid" | "hachure" | "cross-hatch" | "zigzag";
-  roughness: number;
   bowing: number;
-  randomize: boolean;
-  pencilFilter: boolean;
-  showLabel: boolean;
+  fillStyle: "solid" | "hachure" | "cross-hatch" | "zigzag";
   labelSize: number;
+  pencilFilter: boolean;
+  randomize: boolean;
+  roughness: number;
+  showLabel: boolean;
 }
 
 const SVG_EXTENSION_REGEX = /\.svg$/i;

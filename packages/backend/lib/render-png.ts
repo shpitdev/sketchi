@@ -254,16 +254,16 @@ export async function closeBrowser(): Promise<void> {
 }
 
 export interface RenderResult {
-  png: Buffer;
   durationMs: number;
+  png: Buffer;
   shareUrl: string;
 }
 
 export interface RenderOptions {
-  chartType?: string;
-  scale?: number;
-  padding?: number;
   background?: boolean;
+  chartType?: string;
+  padding?: number;
+  scale?: number;
 }
 
 export interface ImageValidationResult {
@@ -272,17 +272,17 @@ export interface ImageValidationResult {
 }
 
 export interface ImageValidationSummary {
-  results: ImageValidationResult[];
   durationMs: number;
+  results: ImageValidationResult[];
 }
 
 export interface SceneValidationResult {
-  loadOk: boolean;
-  loadError: string | null;
-  svgErrors: Array<{ id: string; error: string }>;
+  durationMs: number;
   harnessErrors?: string[];
   harnessLogs?: string[];
-  durationMs: number;
+  loadError: string | null;
+  loadOk: boolean;
+  svgErrors: Array<{ id: string; error: string }>;
 }
 
 async function exportElementsToPng(

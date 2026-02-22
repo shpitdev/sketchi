@@ -66,20 +66,13 @@ Example (recolor a rectangle):
 		If it returns ok=true, respond with the same diff as your final output (no tool call).`;
 
 interface DiagramModifyStats {
+  durationMs: number;
   iterations: number;
   tokens: number;
-  durationMs: number;
   traceId: string;
 }
 
 interface DiagramModifyResult {
-  status: "success" | "failed";
-  reason?:
-    | "invalid-elements"
-    | "invalid-diff"
-    | "unsupported-request"
-    | "error";
-  elements?: unknown[];
   appState?: Record<string, unknown>;
   changes?: {
     diff?: DiagramElementDiff;
@@ -87,14 +80,21 @@ interface DiagramModifyResult {
     removedIds?: string[];
     modifiedIds?: string[];
   };
+  elements?: unknown[];
   issues?: DiagramIssue[];
+  reason?:
+    | "invalid-elements"
+    | "invalid-diff"
+    | "unsupported-request"
+    | "error";
   stats: DiagramModifyStats;
+  status: "success" | "failed";
 }
 
 interface DiagramIssue {
   code: string;
-  message: string;
   elementId?: string;
+  message: string;
 }
 
 const DISALLOWED_TWEAK_CHANGE_KEYS = new Set([
@@ -216,21 +216,21 @@ function detectUnsupportedTweakRequest(request: string): DiagramIssue[] | null {
 
 interface DiagramChangeSet {
   addedIds: string[];
-  removedIds: string[];
   modifiedIds: string[];
+  removedIds: string[];
 }
 
 interface LastSuccessfulDiff {
-  elements: unknown[];
   changes: DiagramChangeSet;
   diff: DiagramElementDiff;
+  elements: unknown[];
 }
 
 interface ValidationToolOutput {
-  ok: boolean;
-  issues?: DiagramIssue[];
-  elements?: unknown[];
   changes?: DiagramChangeSet;
+  elements?: unknown[];
+  issues?: DiagramIssue[];
+  ok: boolean;
 }
 
 function isValidationToolOutput(
@@ -246,11 +246,11 @@ function isValidationToolOutput(
 }
 
 interface ModificationTracking {
-  lastSuccessful: LastSuccessfulDiff | null;
   lastIssues: DiagramIssue[];
+  lastStepAt: number;
+  lastSuccessful: LastSuccessfulDiff | null;
   stepCount: number;
   tokenCount: number;
-  lastStepAt: number;
 }
 
 function summarizeElements(elements: Record<string, unknown>[]) {

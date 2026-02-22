@@ -11,15 +11,15 @@ const RRWEB_PLAYER_JS = path.join(RRWEB_PLAYER_ROOT, "dist", "index.js");
 const RRWEB_PLAYER_CSS = path.join(RRWEB_PLAYER_ROOT, "dist", "style.css");
 
 export interface VisualReviewResult {
-  summary: string;
-  hasIssues: boolean;
   framesCaptured: number;
+  hasIssues: boolean;
+  summary: string;
 }
 
 interface RrwebEvent {
+  data?: Record<string, unknown>;
   timestamp: number;
   type: number;
-  data?: Record<string, unknown>;
 }
 
 export async function renderRrwebFrames(params: {
@@ -45,7 +45,9 @@ export async function renderRrwebFrames(params: {
   }
 
   const { width, height } = resolveViewport(events);
-  const durationMs = Math.max(0, events.at(-1).timestamp - events[0].timestamp);
+  const firstEvent = events[0];
+  const lastEvent = events.at(-1) ?? firstEvent;
+  const durationMs = Math.max(0, lastEvent.timestamp - firstEvent.timestamp);
   const playbackMs = Math.min(durationMs / speed, maxPlaybackMs);
   const intervalMs = frameCount > 1 ? playbackMs / (frameCount - 1) : 0;
 

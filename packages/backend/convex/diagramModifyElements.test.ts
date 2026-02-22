@@ -31,22 +31,22 @@ const summaryMdPath = join(outputDir, "diagram-modify.md");
 const t = convexTest(schema, modules);
 
 interface ScenarioSummary {
-  scenario: string;
-  status: "passed" | "failed";
-  durationMs: number;
-  request: string;
+  afterPng?: string;
   artifactFile?: string;
   beforePng?: string;
-  afterPng?: string;
+  createdAt: string;
+  durationMs: number;
+  elementCount?: number;
+  error?: string;
+  issues?: string[];
+  iterations?: number;
+  request: string;
+  scenario: string;
+  shareUrl?: string;
+  status: "passed" | "failed";
+  tokens?: number;
   visionStatus?: string;
   visionTokens?: number;
-  shareUrl?: string;
-  elementCount?: number;
-  issues?: string[];
-  tokens?: number;
-  iterations?: number;
-  error?: string;
-  createdAt: string;
 }
 
 const scenarioSummaries: ScenarioSummary[] = [];

@@ -13,8 +13,8 @@ const openrouter = createOpenRouter({
 
 interface OpenRouterModelOptions {
   modelId: string;
-  traceId?: string;
   profileId?: string;
+  traceId?: string;
   userId?: string;
 }
 

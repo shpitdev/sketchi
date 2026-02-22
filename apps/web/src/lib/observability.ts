@@ -4,27 +4,27 @@ import { createTraceId } from "@sketchi/shared";
 export type LogLevel = "info" | "warning" | "error";
 
 export interface ApiLogEvent extends Record<string, unknown> {
-  traceId: string;
-  message?: string;
-  severity?: "info" | "warn" | "error";
-  level?: "info" | "warn" | "error";
-  service?: string;
   component?: string;
-  op: string;
-  status?: "success" | "failed" | "warning";
   durationMs?: number;
-  requestLength?: number;
-  requestHash?: string;
-  responseStatus?: number;
-  method?: string;
-  path?: string;
-  orpcRoute?: string;
-  errorName?: string;
-  errorMessage?: string;
-  sampled?: boolean;
   env?: string;
+  errorMessage?: string;
+  errorName?: string;
+  level?: "info" | "warn" | "error";
+  message?: string;
+  method?: string;
+  op: string;
+  orpcRoute?: string;
+  path?: string;
   release?: string | null;
+  requestHash?: string;
+  requestLength?: number;
+  responseStatus?: number;
+  sampled?: boolean;
+  service?: string;
+  severity?: "info" | "warn" | "error";
+  status?: "success" | "failed" | "warning";
   timestamp?: string;
+  traceId: string;
 }
 
 const MAX_MESSAGE_LENGTH = 512;

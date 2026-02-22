@@ -16,14 +16,14 @@ function getChartPrompt(chartType: string): string {
 }
 
 export interface DiagramGeneratorOptions {
-  timeoutMs?: number;
   maxRetries?: number;
+  timeoutMs?: number;
 }
 
 export interface DiagramGeneratorResult {
   diagram: Diagram;
-  tokens?: number;
   durationMs: number;
+  tokens?: number;
 }
 
 export async function generateDiagram(

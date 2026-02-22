@@ -23,8 +23,8 @@ export interface ExportIconItem {
 }
 
 interface ExportButtonProps {
-  libraryName: string;
   icons: ExportIconItem[];
+  libraryName: string;
   styleSettings: StyleSettings;
 }
 
@@ -229,23 +229,23 @@ interface SkippedIcon {
 }
 
 interface SceneImageFile {
-  id: string;
-  dataURL: string;
-  mimeType: "image/svg+xml";
   created: number;
+  dataURL: string;
+  id: string;
   lastRetrieved: number;
+  mimeType: "image/svg+xml";
   status: "saved";
 }
 
 interface SceneBuildResult {
   elements: Record<string, unknown>[];
-  files: Record<string, SceneImageFile>;
   exportedIconCount: number;
+  files: Record<string, SceneImageFile>;
   skipped: SkippedIcon[];
 }
 
 interface SceneExportOutcome {
-  status: "empty" | "ready";
+  exportedIconCount: number;
   message?: string;
   payload?: {
     type: "excalidraw";
@@ -259,7 +259,7 @@ interface SceneExportOutcome {
     files: Record<string, SceneImageFile>;
   };
   skipped: SkippedIcon[];
-  exportedIconCount: number;
+  status: "empty" | "ready";
 }
 
 async function collectScenePayloads(

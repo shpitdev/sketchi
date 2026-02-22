@@ -7,6 +7,11 @@
 
 export interface DiagramTemplate {
   diagramType: string;
+  edgeDefaults: {
+    stroke: string;
+    arrowhead: "arrow" | null;
+  };
+  kindToShapeMap: Record<string, "rectangle" | "ellipse" | "diamond">;
   layout: {
     direction: "TB" | "LR" | "BT" | "RL";
     nodesep: number;
@@ -20,11 +25,6 @@ export interface DiagramTemplate {
     fill: string;
     stroke: string;
   };
-  edgeDefaults: {
-    stroke: string;
-    arrowhead: "arrow" | null;
-  };
-  kindToShapeMap: Record<string, "rectangle" | "ellipse" | "diamond">;
 }
 
 export const FlowchartTemplate: DiagramTemplate = {

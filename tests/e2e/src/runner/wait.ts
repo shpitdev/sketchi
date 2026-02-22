@@ -2,9 +2,9 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_INTERVAL_MS = 250;
 
 export interface WaitOptions {
-  timeoutMs?: number;
   intervalMs?: number;
   label?: string;
+  timeoutMs?: number;
 }
 
 export function sleep(ms: number) {

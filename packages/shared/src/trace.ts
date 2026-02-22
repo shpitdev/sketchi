@@ -1,16 +1,16 @@
 export type TraceStatus = "success" | "failed" | "warning";
 
 export interface TraceContext {
-  traceId: string;
-  requestId?: string;
   action?: string;
-  stage?: string;
-  provider?: string;
-  model?: string;
   durationMs?: number;
-  tokens?: number;
   iterations?: number;
+  model?: string;
+  provider?: string;
+  requestId?: string;
+  stage?: string;
   status?: TraceStatus;
+  tokens?: number;
+  traceId: string;
 }
 
 const TRACE_ID_PATTERN =

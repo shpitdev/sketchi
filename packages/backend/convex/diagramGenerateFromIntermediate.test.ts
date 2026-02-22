@@ -27,17 +27,17 @@ const summaryJsonPath = join(
 const summaryMdPath = join(outputDir, "diagram-generate-from-intermediate.md");
 
 interface ScenarioSummary {
-  scenario: string;
-  status: "passed" | "failed";
-  durationMs: number;
-  artifactFile?: string;
-  nodeCount?: number;
-  edgeCount?: number;
-  shapeCount?: number;
   arrowCount?: number;
+  artifactFile?: string;
+  createdAt: string;
+  durationMs: number;
+  edgeCount?: number;
   elementCount?: number;
   error?: string;
-  createdAt: string;
+  nodeCount?: number;
+  scenario: string;
+  shapeCount?: number;
+  status: "passed" | "failed";
 }
 
 async function readJsonIfExists<T>(path: string): Promise<T | null> {

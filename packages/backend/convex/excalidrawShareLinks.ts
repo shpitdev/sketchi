@@ -8,8 +8,8 @@ import {
 import { createLoggedAction } from "./lib/logging";
 
 interface CreateShareLinkArgs {
-  elements: unknown[];
   appState?: Record<string, unknown>;
+  elements: unknown[];
 }
 
 interface ParseShareLinkArgs {

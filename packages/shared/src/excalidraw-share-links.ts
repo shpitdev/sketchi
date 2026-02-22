@@ -21,8 +21,8 @@ const EXCALIDRAW_PLUS_FIRESTORE_URL =
   "https://firestore.googleapis.com/v1/projects/quickstart-1595168317408/databases/(default)/documents/scenes/";
 
 export interface ExcalidrawShareLinkPayload {
-  elements: unknown[];
   appState: Record<string, unknown>;
+  elements: unknown[];
 }
 
 export type ShareUrlType = "v1" | "v2" | "base64" | "unknown";
@@ -68,9 +68,9 @@ export type ParseExcalidrawUrlResult =
     };
 
 interface FileEncodingInfo {
-  version: number;
   compression: string;
   encryption: string;
+  version: number;
 }
 
 // Buffer format: [4-byte version][4-byte len][chunk]...[4-byte len][chunk]

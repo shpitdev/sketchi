@@ -4,9 +4,9 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 
 interface LibraryCardProps {
+  iconCount: number;
   id: string;
   name: string;
-  iconCount: number;
   previewUrls: string[];
 }
 
@@ -20,29 +20,29 @@ export default function LibraryCard({
 
   return (
     <Link href={`/library-generator/${id}`}>
-      <Card className="flex h-full flex-col gap-3 border p-4 transition hover:border-foreground/40">
+      <Card className="flex h-full flex-col gap-4 rounded-2xl border-2 p-5 shadow-sm transition-all hover:-translate-y-1 hover:border-foreground/30 hover:shadow-md">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-sm">{name}</h3>
-          <span className="text-muted-foreground text-xs">
+          <h3 className="font-semibold text-base">{name}</h3>
+          <span className="rounded-full bg-secondary/80 px-2 py-0.5 font-medium text-secondary-foreground text-xs">
             {iconCount} icons
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-3">
           {previewUrls.length === 0
             ? placeholderKeys.map((key) => (
                 <div
-                  className="aspect-square rounded border border-muted-foreground/40 border-dashed"
+                  className="aspect-square rounded-xl border-2 border-muted-foreground/30 border-dashed bg-muted/5"
                   key={key}
                 />
               ))
             : previewUrls.map((url, idx) => (
                 <div
-                  className="relative flex aspect-square items-center justify-center rounded border bg-muted/30"
+                  className="relative flex aspect-square items-center justify-center rounded-xl border-2 bg-muted/20"
                   key={url}
                 >
                   <Image
                     alt={`${name} preview ${idx + 1}`}
-                    className="object-contain"
+                    className="object-contain p-2"
                     fill
                     sizes="96px"
                     src={url}

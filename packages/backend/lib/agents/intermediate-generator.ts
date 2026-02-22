@@ -24,10 +24,10 @@ type IntermediateGenerationFailureReason =
   | "UNKNOWN";
 
 interface IntermediateGenerationAttemptFailure {
+  errorMessage?: string;
+  errorName?: string;
   modelId: string;
   reason: IntermediateGenerationFailureReason;
-  errorName?: string;
-  errorMessage?: string;
 }
 
 function classifyIntermediateErrorReason(
