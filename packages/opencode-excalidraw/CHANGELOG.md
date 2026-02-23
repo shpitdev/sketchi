@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4](https://github.com/anand-testcompare/sketchi/compare/opencode-excalidraw-v0.0.3...opencode-excalidraw-v0.0.4) (2026-02-23)
+
+
+### Refactors
+
+* **opencode-excalidraw:** register diagram agent + robust release triggering ([#147](https://github.com/anand-testcompare/sketchi/issues/147)) ([018c34d](https://github.com/anand-testcompare/sketchi/commit/018c34d25d9b045459a2e8113ea250defb1cfe19))
+* retire .opencode harness and migrate diagram guidance ([#145](https://github.com/anand-testcompare/sketchi/issues/145)) ([97b50fb](https://github.com/anand-testcompare/sketchi/commit/97b50fbd224f59d2e6499326aafdf53bd3cc7303))
+
 ## [0.0.3](https://github.com/anand-testcompare/sketchi/compare/opencode-excalidraw-v0.0.2...opencode-excalidraw-v0.0.3) (2026-02-21)
 
 
