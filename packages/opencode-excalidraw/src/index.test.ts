@@ -20,7 +20,7 @@ function createPluginInput() {
 }
 
 describe("SketchiPlugin", () => {
-  test("injects sketchi-diagram system hints", async () => {
+  test("injects sketchi-diagram routing system hints", async () => {
     const plugin = await SketchiPlugin(createPluginInput());
     const transform = plugin["experimental.chat.system.transform"];
 
@@ -39,9 +39,37 @@ describe("SketchiPlugin", () => {
     );
 
     const combined = output.system.join("\n").toLowerCase();
-    expect(combined).toContain("sketchi-diagram agent");
-    expect(combined).toContain("diagram_* tools");
+    expect(combined).toContain("sketchi-diagram subagent");
+    expect(combined).toContain("delegate to sketchi-diagram");
     expect(combined).toContain("instead of writing mermaid");
+  });
+
+  test("registers sketchi-diagram subagent via config hook", async () => {
+    const plugin = await SketchiPlugin(createPluginInput());
+    const configHook = plugin.config;
+    expect(typeof configHook).toBe("function");
+
+    const config = {
+      agent: {
+        build: { description: "default build agent" },
+        plan: { description: "default plan agent" },
+      },
+    };
+
+    await configHook?.(config as never);
+
+    expect(config.agent.build?.description).toBe("default build agent");
+    expect(config.agent.plan?.description).toBe("default plan agent");
+
+    const sketchiDiagram = config.agent["sketchi-diagram"] as
+      | Record<string, unknown>
+      | undefined;
+
+    expect(sketchiDiagram?.mode).toBe("subagent");
+    expect(sketchiDiagram?.hidden).toBe(false);
+    expect((sketchiDiagram?.description as string).toLowerCase()).toContain(
+      "prefer this over mermaid"
+    );
   });
 
   test("tool descriptions steer away from Mermaid", async () => {

@@ -1,13 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  appendSketchiDiagramAgentPrompt,
   appendSketchiDiagramSystemHints,
-  getSketchiDiagramSystemHints,
+  getSketchiDiagramAgentHints,
 } from "./agent-hints";
 
-describe("sketchi-diagram system hints", () => {
-  test("includes tool routing and Mermaid guardrails", () => {
-    const hints = getSketchiDiagramSystemHints().join("\n").toLowerCase();
+describe("sketchi-diagram hints", () => {
+  test("agent hints include tool routing and Mermaid guardrails", () => {
+    const hints = getSketchiDiagramAgentHints().join("\n").toLowerCase();
 
     expect(hints).toContain("diagram_from_prompt");
     expect(hints).toContain("diagram_tweak");
@@ -18,12 +19,29 @@ describe("sketchi-diagram system hints", () => {
     expect(hints).toContain("explicitly asks for mermaid");
   });
 
-  test("append does not duplicate hints", () => {
+  test("system hint append does not duplicate hints", () => {
     const system: string[] = [];
 
     appendSketchiDiagramSystemHints(system);
     appendSketchiDiagramSystemHints(system);
 
-    expect(system.length).toBe(getSketchiDiagramSystemHints().length);
+    expect(system.length).toBe(3);
+    expect(system.join("\n").toLowerCase()).toContain("subagent");
+    expect(system.join("\n").toLowerCase()).toContain("delegate");
+  });
+
+  test("agent prompt append merges custom prompt without duplicates", () => {
+    const initialPrompt = "Focus on concise answers.";
+    const withHints = appendSketchiDiagramAgentPrompt(initialPrompt);
+    const withHintsAgain = appendSketchiDiagramAgentPrompt(withHints);
+
+    expect(withHintsAgain).toBe(withHints);
+    expect(withHintsAgain).toContain(initialPrompt);
+    expect(withHintsAgain.toLowerCase()).toContain(
+      "role: sketchi-diagram agent."
+    );
+    expect(withHintsAgain.toLowerCase()).toContain(
+      "instead of writing mermaid"
+    );
   });
 });

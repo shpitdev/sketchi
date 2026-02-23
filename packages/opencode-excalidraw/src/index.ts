@@ -1,5 +1,6 @@
 import { type Plugin, tool } from "@opencode-ai/plugin";
 
+import { applySketchiDiagramAgentConfig } from "./lib/agent-config";
 import { appendSketchiDiagramSystemHints } from "./lib/agent-hints";
 import { fetchJson, shareElements } from "./lib/api";
 import { extractShareLink, readExcalidrawFile } from "./lib/excalidraw";
@@ -609,6 +610,10 @@ export const SketchiPlugin: Plugin = (input) => {
           return JSON.stringify(result, null, 2);
         },
       }),
+    },
+    config: (config) => {
+      applySketchiDiagramAgentConfig(config);
+      return Promise.resolve();
     },
     "experimental.chat.system.transform": (_input, output) =>
       Promise.resolve(appendSketchiDiagramSystemHints(output.system)),

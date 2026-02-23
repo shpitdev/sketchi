@@ -34,7 +34,7 @@ The plugin exposes tools:
 - `diagram_to_png`
 - `diagram_grade`
 
-When this plugin is loaded, it also injects `sketchi-diagram` system guidance so diagram requests route to `diagram_*` tools instead of defaulting to Mermaid (unless Mermaid is explicitly requested).
+When this plugin is loaded, it registers a `sketchi-diagram` subagent (without disabling built-in `build`/`plan`) and injects routing guidance so diagram requests route to `diagram_*` tools instead of defaulting to Mermaid (unless Mermaid is explicitly requested).
 
 ## Configuration
 
