@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.5](https://github.com/anand-testcompare/sketchi/compare/opencode-excalidraw-v0.0.4...opencode-excalidraw-v0.0.5) (2026-02-23)
+
+
+### Features
+
+* refresh OpenGraph + conditional Sketchi diagram steering ([#149](https://github.com/anand-testcompare/sketchi/issues/149)) ([25934a0](https://github.com/anand-testcompare/sketchi/commit/25934a0c7858dcbb2ad5e1a810ed071dade3c8e2))
+
 ## [0.0.4](https://github.com/anand-testcompare/sketchi/compare/opencode-excalidraw-v0.0.3...opencode-excalidraw-v0.0.4) (2026-02-23)
 
 
