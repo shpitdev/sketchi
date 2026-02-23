@@ -23,7 +23,10 @@ const caveat = Caveat({
 });
 
 const siteUrl = "https://sketchi.app";
-const ogImage = "/og-image.png";
+const ogImageLight = "/og-image.png";
+const ogImageDark = "/og-image-dark.png";
+const ogImageWidth = 2400;
+const ogImageHeight = 1260;
 const description =
   "Sketchi is a diagram and icon library toolkit that transforms SVGs into hand-drawn Excalidraw assets. Build icon libraries, generate AI-powered diagrams, and export production-ready .excalidrawlib files.";
 
@@ -39,10 +42,16 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: ogImage,
-        width: 1280,
-        height: 800,
-        alt: "Sketchi Home",
+        url: ogImageLight,
+        width: ogImageWidth,
+        height: ogImageHeight,
+        alt: "Sketchi home page (light mode)",
+      },
+      {
+        url: ogImageDark,
+        width: ogImageWidth,
+        height: ogImageHeight,
+        alt: "Sketchi home page (dark mode)",
       },
     ],
   },
@@ -50,7 +59,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Sketchi",
     description,
-    images: [ogImage],
+    images: [ogImageLight],
   },
 };
 

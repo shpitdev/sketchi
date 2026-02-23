@@ -195,7 +195,7 @@ npm i @sketchi-app/opencode-excalidraw
 - Add to `opencode.json`:
 ```json
 {
-  "plugins": ["@sketchi-app/opencode-excalidraw"]
+  "plugin": ["@sketchi-app/opencode-excalidraw"]
 }
 ```
 

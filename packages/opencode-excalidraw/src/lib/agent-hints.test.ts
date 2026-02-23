@@ -3,7 +3,9 @@ import { describe, expect, test } from "bun:test";
 import {
   appendSketchiDiagramAgentPrompt,
   appendSketchiDiagramSystemHints,
+  appendSketchiDiagramSystemPrompt,
   getSketchiDiagramAgentHints,
+  shouldInjectSketchiDiagramSystemHints,
 } from "./agent-hints";
 
 describe("sketchi-diagram hints", () => {
@@ -42,6 +44,31 @@ describe("sketchi-diagram hints", () => {
     );
     expect(withHintsAgain.toLowerCase()).toContain(
       "instead of writing mermaid"
+    );
+  });
+
+  test("system prompt append merges custom system prompt without duplicates", () => {
+    const initialSystem = "Follow the user's tone.";
+    const withHints = appendSketchiDiagramSystemPrompt(initialSystem);
+    const withHintsAgain = appendSketchiDiagramSystemPrompt(withHints);
+
+    expect(withHintsAgain).toBe(withHints);
+    expect(withHintsAgain).toContain(initialSystem);
+    expect(withHintsAgain.toLowerCase()).toContain("sketchi-diagram subagent");
+  });
+
+  test("diagram system hints trigger only for configured keywords", () => {
+    expect(
+      shouldInjectSketchiDiagramSystemHints("please generate a diagram")
+    ).toBe(true);
+    expect(shouldInjectSketchiDiagramSystemHints("use sketchi tools")).toBe(
+      true
+    );
+    expect(
+      shouldInjectSketchiDiagramSystemHints("edit this in excalidraw")
+    ).toBe(true);
+    expect(shouldInjectSketchiDiagramSystemHints("show git status")).toBe(
+      false
     );
   });
 });

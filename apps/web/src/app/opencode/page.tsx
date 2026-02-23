@@ -237,7 +237,7 @@ export default function OpenCodeDocsPage() {
 
   const fullJsonConfig = `{
   "$schema": "https://opencode.ai/config.json",
-  "plugins": [
+  "plugin": [
     "@sketchi-app/opencode-excalidraw@${version}"
   ]
 }`;
@@ -377,7 +377,7 @@ export default function OpenCodeDocsPage() {
                     {'"https://opencode.ai/config.json"'}
                   </span>
                   <span className="text-zinc-300">{",\n"}</span>
-                  <span className="text-[#9cdcfe]">{'  "plugins"'}</span>
+                  <span className="text-[#9cdcfe]">{'  "plugin"'}</span>
                   <span className="text-zinc-300">{": [\n"}</span>
                   <span className="text-[#ce9178]">{typedPlugin}</span>
                   {typedPlugin.length < pluginLine.length && (

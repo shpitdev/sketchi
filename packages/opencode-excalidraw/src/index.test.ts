@@ -20,28 +20,51 @@ function createPluginInput() {
 }
 
 describe("SketchiPlugin", () => {
-  test("injects sketchi-diagram routing system hints", async () => {
+  test("injects sketchi-diagram routing system hints for diagram requests", async () => {
     const plugin = await SketchiPlugin(createPluginInput());
-    const transform = plugin["experimental.chat.system.transform"];
+    const chatMessageHook = plugin["chat.message"];
 
-    expect(typeof transform).toBe("function");
+    expect(typeof chatMessageHook).toBe("function");
 
-    const output = { system: [] as string[] };
-    await transform?.(
+    const output = {
+      message: { system: undefined } as { system?: string },
+      parts: [{ type: "text", text: "Please create an excalidraw diagram." }],
+    };
+
+    await chatMessageHook?.(
       {
         sessionID: "session-1",
-        model: {
-          providerID: "provider",
-          modelID: "model",
-        } as never,
+        messageID: "message-1",
       },
       output
     );
 
-    const combined = output.system.join("\n").toLowerCase();
+    const combined = (output.message.system ?? "").toLowerCase();
     expect(combined).toContain("sketchi-diagram subagent");
     expect(combined).toContain("delegate to sketchi-diagram");
     expect(combined).toContain("instead of writing mermaid");
+  });
+
+  test("does not inject sketchi-diagram routing hints for unrelated requests", async () => {
+    const plugin = await SketchiPlugin(createPluginInput());
+    const chatMessageHook = plugin["chat.message"];
+
+    expect(typeof chatMessageHook).toBe("function");
+
+    const output = {
+      message: { system: undefined } as { system?: string },
+      parts: [{ type: "text", text: "What tools are available for git?" }],
+    };
+
+    await chatMessageHook?.(
+      {
+        sessionID: "session-1",
+        messageID: "message-2",
+      },
+      output
+    );
+
+    expect(output.message.system).toBeUndefined();
   });
 
   test("registers sketchi-diagram subagent via config hook", async () => {

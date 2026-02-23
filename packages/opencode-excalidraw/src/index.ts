@@ -1,7 +1,10 @@
 import { type Plugin, tool } from "@opencode-ai/plugin";
 
 import { applySketchiDiagramAgentConfig } from "./lib/agent-config";
-import { appendSketchiDiagramSystemHints } from "./lib/agent-hints";
+import {
+  appendSketchiDiagramSystemPrompt,
+  shouldInjectSketchiDiagramSystemHints,
+} from "./lib/agent-hints";
 import { fetchJson, shareElements } from "./lib/api";
 import { extractShareLink, readExcalidrawFile } from "./lib/excalidraw";
 import { gradeDiagram } from "./lib/grade";
@@ -15,6 +18,18 @@ const TRAILING_SLASH_PATTERN = /\/$/;
 
 function normalizeApiBase(value: string): string {
   return value.replace(TRAILING_SLASH_PATTERN, "");
+}
+
+function extractMessageText(
+  parts: Array<{ type: string; text?: string }>
+): string {
+  const textParts: string[] = [];
+  for (const part of parts) {
+    if (part.type === "text" && part.text) {
+      textParts.push(part.text);
+    }
+  }
+  return textParts.join("\n");
 }
 
 export const SketchiPlugin: Plugin = (input) => {
@@ -615,8 +630,20 @@ export const SketchiPlugin: Plugin = (input) => {
       applySketchiDiagramAgentConfig(config);
       return Promise.resolve();
     },
-    "experimental.chat.system.transform": (_input, output) =>
-      Promise.resolve(appendSketchiDiagramSystemHints(output.system)),
+    "chat.message": (_input, output) => {
+      const messageText = extractMessageText(
+        output.parts as Array<{ type: string; text?: string }>
+      );
+
+      if (!shouldInjectSketchiDiagramSystemHints(messageText)) {
+        return Promise.resolve();
+      }
+
+      output.message.system = appendSketchiDiagramSystemPrompt(
+        output.message.system
+      );
+      return Promise.resolve();
+    },
   });
 };
 

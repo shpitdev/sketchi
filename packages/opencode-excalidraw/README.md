@@ -8,7 +8,7 @@ OpenCode plugin for generating and manipulating Excalidraw diagrams via Sketchi.
 
 ```jsonc
 {
-  "plugins": ["@sketchi-app/opencode-excalidraw"]
+  "plugin": ["@sketchi-app/opencode-excalidraw"]
 }
 ```
 
@@ -34,7 +34,7 @@ The plugin exposes tools:
 - `diagram_to_png`
 - `diagram_grade`
 
-When this plugin is loaded, it registers a `sketchi-diagram` subagent (without disabling built-in `build`/`plan`) and injects routing guidance so diagram requests route to `diagram_*` tools instead of defaulting to Mermaid (unless Mermaid is explicitly requested).
+When this plugin is loaded, it registers a `sketchi-diagram` subagent (without disabling built-in `build`/`plan`) and conditionally injects routing guidance only when the user request mentions `diagram`, `sketchi`, or `excalidraw`, so diagram requests route to `diagram_*` tools instead of defaulting to Mermaid (unless Mermaid is explicitly requested).
 
 ## Configuration
 
