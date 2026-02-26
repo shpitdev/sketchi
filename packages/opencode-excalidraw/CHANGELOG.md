@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.6](https://github.com/shpitdev/sketchi/compare/opencode-excalidraw-v0.0.5...opencode-excalidraw-v0.0.6) (2026-02-26)
+
+
+### CI
+
+* **opencode-excalidraw:** publish GitHub linked artifact metadata ([#160](https://github.com/shpitdev/sketchi/issues/160)) ([8eec309](https://github.com/shpitdev/sketchi/commit/8eec30907b391bd46088c2d3275b8cdf3a50eacd))
+
 ## [0.0.5](https://github.com/anand-testcompare/sketchi/compare/opencode-excalidraw-v0.0.4...opencode-excalidraw-v0.0.5) (2026-02-23)
 
 
