@@ -3,6 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { OutputType, Svg2Roughjs } from "svg2roughjs";
 
+import {
+  inlineSvgPaintStyles,
+  makeRenderedSvgScalable,
+} from "@/lib/icon-library/rough-svg";
 import type { StyleSettings } from "@/lib/icon-library/svg-to-excalidraw";
 
 interface SketchyIconPreviewProps {
@@ -22,28 +26,6 @@ const formatLabelText = (filename: string) =>
 
 const FIXED_SEED = 12_345;
 const DEBOUNCE_MS = 300;
-
-function makeSvgScalable(container: HTMLElement): void {
-  const svg = container.querySelector("svg");
-  if (!svg) {
-    return;
-  }
-
-  const width = svg.getAttribute("width");
-  const height = svg.getAttribute("height");
-
-  if (!svg.getAttribute("viewBox") && width && height) {
-    const w = Number.parseFloat(width);
-    const h = Number.parseFloat(height);
-    if (!(Number.isNaN(w) || Number.isNaN(h))) {
-      svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
-    }
-  }
-
-  svg.removeAttribute("width");
-  svg.removeAttribute("height");
-  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-}
 
 export default function SketchyIconPreview({
   name,
@@ -133,6 +115,8 @@ export default function SketchyIconPreview({
         return;
       }
 
+      inlineSvgPaintStyles(svg);
+
       while (containerRef.current.firstChild) {
         containerRef.current.removeChild(containerRef.current.firstChild);
       }
@@ -150,7 +134,7 @@ export default function SketchyIconPreview({
       converterRef.current.pencilFilter = debouncedSettings.pencilFilter;
 
       converterRef.current.sketch();
-      makeSvgScalable(containerRef.current);
+      makeRenderedSvgScalable(containerRef.current);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to render sketch");
