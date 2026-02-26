@@ -1,6 +1,6 @@
 {
   "name": "@sketchi-app/opencode-excalidraw",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "OpenCode plugin for generating and manipulating Excalidraw diagrams via Sketchi",
   "license": "MIT",
   "author": {
