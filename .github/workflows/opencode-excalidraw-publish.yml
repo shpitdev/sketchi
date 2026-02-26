@@ -337,3 +337,72 @@ jobs:
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: /tmp/opencode-excalidraw.tgz
+
+      - name: Create linked artifact deployment record
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${OPENCODE_STORAGE_DIGEST:-}" ]; then
+            echo "::warning::Missing OPENCODE_STORAGE_DIGEST; skipping deployment record creation"
+            exit 0
+          fi
+
+          TAG="${{ steps.inputs.outputs.tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="latest"
+          fi
+
+          NAME="$(node -p 'require("./packages/opencode-excalidraw/package.json").name')"
+          VERSION="$(node -p 'require("./packages/opencode-excalidraw/package.json").version')"
+          OWNER="${GITHUB_REPOSITORY_OWNER}"
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          DEPLOYMENT_NAME="npm-dist-tag-${TAG}"
+
+          DEPLOYMENT_STATUS="post-failed"
+          DEPLOYMENT_ID=""
+          set +e
+          gh api -X POST "orgs/${OWNER}/artifacts/metadata/deployment-record" \
+            -f name="${NAME}" \
+            -f version="${VERSION}" \
+            -f digest="${OPENCODE_STORAGE_DIGEST}" \
+            -f status="deployed" \
+            -f logical_environment="distribution" \
+            -f physical_environment="global" \
+            -f cluster="npmjs" \
+            -f deployment_name="${DEPLOYMENT_NAME}" \
+            -f github_repository="${REPO_NAME}" \
+            > /tmp/opencode-excalidraw-deployment-record.json \
+            2> /tmp/opencode-excalidraw-deployment-record.err
+          POST_EXIT=$?
+          set -e
+
+          if [ "$POST_EXIT" -eq 0 ]; then
+            DEPLOYMENT_ID="$({
+              node -e '
+                const fs = require("fs");
+                const j = JSON.parse(fs.readFileSync("/tmp/opencode-excalidraw-deployment-record.json", "utf8"));
+                const id = j.deployment_records?.[0]?.id;
+                if (id !== undefined && id !== null) process.stdout.write(String(id));
+              '
+            })"
+            DEPLOYMENT_STATUS="created"
+          else
+            echo "::warning::Linked artifact deployment record POST failed for ${OPENCODE_STORAGE_DIGEST}"
+            if [ -s /tmp/opencode-excalidraw-deployment-record.err ]; then
+              cat /tmp/opencode-excalidraw-deployment-record.err
+            fi
+          fi
+
+          {
+            echo "## OpenCode Excalidraw Deployment Record"
+            echo "- Deployment name: \`${DEPLOYMENT_NAME}\`"
+            echo "- Digest: \`${OPENCODE_STORAGE_DIGEST}\`"
+            echo "- Deployment record id: \`${DEPLOYMENT_ID:-unknown}\`"
+            echo "- Deployment status: \`${DEPLOYMENT_STATUS}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$DEPLOYMENT_STATUS" = "created" ]; then
+            echo "✓ linked artifact deployment record created"
+          fi
