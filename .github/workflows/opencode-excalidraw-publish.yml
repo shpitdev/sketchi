@@ -15,6 +15,7 @@ on:
 
 permissions:
   id-token: write
+  attestations: write
   contents: write
 
 jobs:
@@ -290,4 +291,23 @@ jobs:
             echo "- Tarball: ${TARBALL_URL}"
           } >> "$GITHUB_STEP_SUMMARY"
 
+          echo "OPENCODE_TARBALL_URL=${TARBALL_URL}" >> "$GITHUB_ENV"
+          echo "OPENCODE_STORAGE_DIGEST=${DIGEST}" >> "$GITHUB_ENV"
+
           echo "✓ linked artifact storage record created"
+
+      - name: Download tarball for GitHub attestation
+        run: |
+          set -euo pipefail
+
+          if [ -z "${OPENCODE_TARBALL_URL:-}" ]; then
+            echo "[ERROR] missing OPENCODE_TARBALL_URL"
+            exit 1
+          fi
+
+          curl -fsSL "${OPENCODE_TARBALL_URL}" -o /tmp/opencode-excalidraw.tgz
+
+      - name: Create GitHub provenance attestation for tarball
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: /tmp/opencode-excalidraw.tgz
