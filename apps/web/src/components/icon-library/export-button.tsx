@@ -12,6 +12,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  inlineSvgPaintStyles,
+  makeRenderedSvgScalable,
+} from "@/lib/icon-library/rough-svg";
+import {
   type StyleSettings,
   svgToExcalidrawElements,
 } from "@/lib/icon-library/svg-to-excalidraw";
@@ -95,28 +99,6 @@ const formatLabelText = (filename: string) =>
     .replace(SEPARATOR_REGEX, " ")
     .trim();
 
-function makeSvgScalable(container: HTMLElement): void {
-  const svg = container.querySelector("svg");
-  if (!svg) {
-    return;
-  }
-
-  const width = svg.getAttribute("width");
-  const height = svg.getAttribute("height");
-
-  if (!svg.getAttribute("viewBox") && width && height) {
-    const w = Number.parseFloat(width);
-    const h = Number.parseFloat(height);
-    if (!(Number.isNaN(w) || Number.isNaN(h))) {
-      svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
-    }
-  }
-
-  svg.removeAttribute("width");
-  svg.removeAttribute("height");
-  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-}
-
 function validateAndLogSvg(svgText: string, iconName: string): boolean {
   try {
     validateSvgText(svgText);
@@ -149,6 +131,8 @@ function renderSketchySvg(
     throw new Error(`No SVG element found in ${iconName}`);
   }
 
+  inlineSvgPaintStyles(svg);
+
   const container = document.createElement("div");
   container.style.position = "absolute";
   container.style.left = "-9999px";
@@ -172,7 +156,7 @@ function renderSketchySvg(
     converter.pencilFilter = styleSettings.pencilFilter;
 
     converter.sketch();
-    makeSvgScalable(container);
+    makeRenderedSvgScalable(container);
 
     return container.innerHTML;
   } finally {
