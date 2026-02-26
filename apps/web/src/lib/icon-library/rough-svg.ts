@@ -3,6 +3,7 @@ const STYLE_DECLARATION_REGEX = /([a-z-]+)\s*:\s*([^;]+)\s*;?/gi;
 const VIEWBOX_SPLIT_REGEX = /[,\s]+/;
 const IMPORTANT_SUFFIX_REGEX = /\s*!important\s*$/i;
 const QUOTED_VALUE_REGEX = /^(["'])(.*)\1$/;
+const CLIP_PATH_URL_REGEX = /^url\((['"]?)#([^'")]+)\1\)$/;
 
 const PRESENTATION_PROPERTIES = new Set([
   "fill",
@@ -30,6 +31,7 @@ const INHERITABLE_PRESENTATION_PROPERTIES = [
 const DRAWABLE_SELECTOR = "path,rect,circle,ellipse,line,polyline,polygon,use";
 const MIN_VIEWBOX_PADDING = 2;
 const VIEWBOX_PADDING_RATIO = 0.04;
+const BOUNDS_EPSILON = 0.75;
 
 const parseStyleDeclarations = (declarations: string) => {
   const output = new Map<string, string>();
@@ -206,6 +208,112 @@ const getBoundsForDisplay = (svg: SVGSVGElement) => {
   return { minX, minY, width, height };
 };
 
+const nearlyEqual = (a: number, b: number, epsilon = BOUNDS_EPSILON) =>
+  Math.abs(a - b) <= epsilon;
+
+const extractClipPathId = (clipPathValue: string | null) => {
+  if (!clipPathValue) {
+    return null;
+  }
+  const trimmed = clipPathValue.trim();
+  const match = trimmed.match(CLIP_PATH_URL_REGEX);
+  return match?.[2] ?? null;
+};
+
+const isBoundsMatching = (
+  clipBounds: { x: number; y: number; width: number; height: number },
+  bounds: { minX: number; minY: number; width: number; height: number }
+) => {
+  if (!(clipBounds.width > 0 && clipBounds.height > 0)) {
+    return false;
+  }
+
+  return (
+    nearlyEqual(clipBounds.x, bounds.minX) &&
+    nearlyEqual(clipBounds.y, bounds.minY) &&
+    nearlyEqual(clipBounds.width, bounds.width) &&
+    nearlyEqual(clipBounds.height, bounds.height)
+  );
+};
+
+const measureClipPathBounds = (clipPath: SVGClipPathElement) => {
+  try {
+    return (clipPath as unknown as SVGGraphicsElement).getBBox();
+  } catch {
+    const child = clipPath.firstElementChild;
+    if (!child) {
+      return null;
+    }
+
+    try {
+      return (child as SVGGraphicsElement).getBBox();
+    } catch {
+      return null;
+    }
+  }
+};
+
+const collectBoundingClipPathIds = (
+  svg: SVGSVGElement,
+  bounds: { minX: number; minY: number; width: number; height: number }
+) => {
+  const clipPathIds = new Set<string>();
+
+  for (const clipPath of svg.querySelectorAll<SVGClipPathElement>(
+    "clipPath[id]"
+  )) {
+    const clipPathUnits = clipPath.getAttribute("clipPathUnits");
+    if (clipPathUnits && clipPathUnits !== "userSpaceOnUse") {
+      continue;
+    }
+
+    const clipBounds = measureClipPathBounds(clipPath);
+    if (!(clipBounds && isBoundsMatching(clipBounds, bounds))) {
+      continue;
+    }
+
+    const id = clipPath.getAttribute("id");
+    if (id) {
+      clipPathIds.add(id);
+    }
+  }
+
+  return clipPathIds;
+};
+
+const removeClipPathReferences = (
+  svg: SVGSVGElement,
+  clipPathIds: Set<string>
+) => {
+  if (clipPathIds.size === 0) {
+    return;
+  }
+
+  for (const element of svg.querySelectorAll<SVGElement>("[clip-path]")) {
+    const clipPathId = extractClipPathId(element.getAttribute("clip-path"));
+    if (clipPathId && clipPathIds.has(clipPathId)) {
+      element.removeAttribute("clip-path");
+    }
+  }
+
+  for (const clipPath of svg.querySelectorAll<SVGClipPathElement>(
+    "clipPath[id]"
+  )) {
+    const clipPathId = clipPath.getAttribute("id");
+    if (clipPathId && clipPathIds.has(clipPathId)) {
+      clipPath.remove();
+    }
+  }
+};
+
+const removeBoundingClipPaths = (
+  svg: SVGSVGElement,
+  bounds: { minX: number; minY: number; width: number; height: number }
+) => {
+  const clipPathIds = collectBoundingClipPathIds(svg, bounds);
+  removeClipPathReferences(svg, clipPathIds);
+};
+
 export const inlineSvgPaintStyles = (svg: SVGSVGElement) => {
   applyInlineStylesFromStylesheetRules(svg);
   inheritParentPresentationAttributes(svg);
@@ -216,6 +324,9 @@ export const makeRenderedSvgScalable = (container: HTMLElement) => {
   if (!svg) {
     return;
   }
+
+  const initialBounds = getBoundsForDisplay(svg);
+  removeBoundingClipPaths(svg, initialBounds);
 
   const bounds = getBoundsForDisplay(svg);
   const padding = Math.max(
