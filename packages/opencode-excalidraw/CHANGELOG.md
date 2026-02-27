@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.7](https://github.com/shpitdev/sketchi/compare/opencode-excalidraw-v0.0.6...opencode-excalidraw-v0.0.7) (2026-02-27)
+
+
+### Bug Fixes
+
+* **opencode-excalidraw:** stabilize diagram_grade under real harness ([#168](https://github.com/shpitdev/sketchi/issues/168)) ([5608e9e](https://github.com/shpitdev/sketchi/commit/5608e9e8a04e99b150bdc49f9c7ba9c27cfd3312))
+
 ## [0.0.6](https://github.com/shpitdev/sketchi/compare/opencode-excalidraw-v0.0.5...opencode-excalidraw-v0.0.6) (2026-02-26)
 
 
