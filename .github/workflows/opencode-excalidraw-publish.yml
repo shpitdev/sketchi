@@ -241,19 +241,31 @@ jobs:
           echo "Creating storage record for digest ${DIGEST}"
           METADATA_STATUS="post-failed"
           RECORD_ID=""
-          set +e
-          gh api -X POST "orgs/${OWNER}/artifacts/metadata/storage-record" \
-            -f name="${NAME}" \
-            -f version="${VERSION}" \
-            -f digest="${DIGEST}" \
-            -f artifact_url="${TARBALL_URL}" \
-            -f registry_url="https://registry.npmjs.org" \
-            -f repository="${NAME}" \
-            -f github_repository="${REPO_NAME}" \
-            > /tmp/opencode-excalidraw-storage-record.json \
-            2> /tmp/opencode-excalidraw-storage-record.err
-          POST_EXIT=$?
-          set -e
+          POST_EXIT=1
+          for i in $(seq 1 5); do
+            set +e
+            gh api -X POST "orgs/${OWNER}/artifacts/metadata/storage-record" \
+              -f name="${NAME}" \
+              -f version="${VERSION}" \
+              -f digest="${DIGEST}" \
+              -f artifact_url="${TARBALL_URL}" \
+              -f registry_url="https://registry.npmjs.org" \
+              -f repository="${NAME}" \
+              -f github_repository="${REPO_NAME}" \
+              > /tmp/opencode-excalidraw-storage-record.json \
+              2> /tmp/opencode-excalidraw-storage-record.err
+            POST_EXIT=$?
+            set -e
+
+            if [ "$POST_EXIT" -eq 0 ]; then
+              break
+            fi
+
+            if [ "$i" -lt 5 ]; then
+              echo "Retrying storage record POST (${i}/5)..."
+              sleep 3
+            fi
+          done
 
           if [ "$POST_EXIT" -eq 0 ]; then
             RECORD_ID="$({
@@ -311,10 +323,10 @@ jobs:
 
           {
             echo "## OpenCode Excalidraw Artifact Metadata"
-            echo "- Package: \\`${NAME}@${VERSION}\\`"
-            echo "- Digest: \\`${DIGEST}\\`"
-            echo "- Storage record id: \\`${RECORD_ID:-unknown}\\`"
-            echo "- Storage record status: \\`${METADATA_STATUS}\\`"
+            echo "- Package: ${NAME}@${VERSION}"
+            echo "- Digest: ${DIGEST}"
+            echo "- Storage record id: ${RECORD_ID:-unknown}"
+            echo "- Storage record status: ${METADATA_STATUS}"
             echo "- Tarball: ${TARBALL_URL}"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -362,21 +374,33 @@ jobs:
 
           DEPLOYMENT_STATUS="post-failed"
           DEPLOYMENT_ID=""
-          set +e
-          gh api -X POST "orgs/${OWNER}/artifacts/metadata/deployment-record" \
-            -f name="${NAME}" \
-            -f version="${VERSION}" \
-            -f digest="${OPENCODE_STORAGE_DIGEST}" \
-            -f status="deployed" \
-            -f logical_environment="distribution" \
-            -f physical_environment="global" \
-            -f cluster="npmjs" \
-            -f deployment_name="${DEPLOYMENT_NAME}" \
-            -f github_repository="${REPO_NAME}" \
-            > /tmp/opencode-excalidraw-deployment-record.json \
-            2> /tmp/opencode-excalidraw-deployment-record.err
-          POST_EXIT=$?
-          set -e
+          POST_EXIT=1
+          for i in $(seq 1 5); do
+            set +e
+            gh api -X POST "orgs/${OWNER}/artifacts/metadata/deployment-record" \
+              -f name="${NAME}" \
+              -f version="${VERSION}" \
+              -f digest="${OPENCODE_STORAGE_DIGEST}" \
+              -f status="deployed" \
+              -f logical_environment="distribution" \
+              -f physical_environment="global" \
+              -f cluster="npmjs" \
+              -f deployment_name="${DEPLOYMENT_NAME}" \
+              -f github_repository="${REPO_NAME}" \
+              > /tmp/opencode-excalidraw-deployment-record.json \
+              2> /tmp/opencode-excalidraw-deployment-record.err
+            POST_EXIT=$?
+            set -e
+
+            if [ "$POST_EXIT" -eq 0 ]; then
+              break
+            fi
+
+            if [ "$i" -lt 5 ]; then
+              echo "Retrying deployment record POST (${i}/5)..."
+              sleep 3
+            fi
+          done
 
           if [ "$POST_EXIT" -eq 0 ]; then
             DEPLOYMENT_ID="$({
