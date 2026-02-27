@@ -202,16 +202,12 @@ jobs:
 
           echo "✓ npm publish verification passed"
 
-      - name: Create linked artifact metadata record
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Resolve published tarball digest
         run: |
           set -euo pipefail
 
           NAME="$(node -p 'require("./packages/opencode-excalidraw/package.json").name')"
           VERSION="$(node -p 'require("./packages/opencode-excalidraw/package.json").version')"
-          OWNER="${GITHUB_REPOSITORY_OWNER}"
-          REPO_NAME="${GITHUB_REPOSITORY#*/}"
 
           VIEW_JSON="$(npm view "${NAME}@${VERSION}" --json)"
           TARBALL_URL="$({
@@ -238,101 +234,12 @@ jobs:
           echo "OPENCODE_TARBALL_URL=${TARBALL_URL}" >> "$GITHUB_ENV"
           echo "OPENCODE_STORAGE_DIGEST=${DIGEST}" >> "$GITHUB_ENV"
 
-          echo "Creating storage record for digest ${DIGEST}"
-          METADATA_STATUS="post-failed"
-          RECORD_ID=""
-          POST_EXIT=1
-          for i in $(seq 1 5); do
-            set +e
-            gh api -X POST "orgs/${OWNER}/artifacts/metadata/storage-record" \
-              -f name="${NAME}" \
-              -f version="${VERSION}" \
-              -f digest="${DIGEST}" \
-              -f artifact_url="${TARBALL_URL}" \
-              -f registry_url="https://registry.npmjs.org" \
-              -f repository="${NAME}" \
-              -f github_repository="${REPO_NAME}" \
-              > /tmp/opencode-excalidraw-storage-record.json \
-              2> /tmp/opencode-excalidraw-storage-record.err
-            POST_EXIT=$?
-            set -e
-
-            if [ "$POST_EXIT" -eq 0 ]; then
-              break
-            fi
-
-            if [ "$i" -lt 5 ]; then
-              echo "Retrying storage record POST (${i}/5)..."
-              sleep 3
-            fi
-          done
-
-          if [ "$POST_EXIT" -eq 0 ]; then
-            RECORD_ID="$({
-              node -e '
-                const fs = require("fs");
-                const j = JSON.parse(fs.readFileSync("/tmp/opencode-excalidraw-storage-record.json", "utf8"));
-                const id = j.storage_records?.[0]?.id;
-                if (id !== undefined && id !== null) process.stdout.write(String(id));
-              '
-            })"
-
-            RECORD_COUNT="0"
-            for i in $(seq 1 20); do
-              set +e
-              gh api "orgs/${OWNER}/artifacts/${DIGEST}/metadata/storage-records" >/tmp/opencode-excalidraw-storage-records.json 2>/tmp/opencode-excalidraw-storage-records.err
-              LIST_EXIT=$?
-              set -e
-
-              if [ "$LIST_EXIT" -eq 0 ]; then
-                RECORD_COUNT="$({
-                  node -e '
-                    const fs = require("fs");
-                    const j = JSON.parse(fs.readFileSync("/tmp/opencode-excalidraw-storage-records.json", "utf8"));
-                    const count = Number(j.total_count ?? 0);
-                    process.stdout.write(String(count));
-                  '
-                })"
-                if [ "${RECORD_COUNT}" -ge 1 ]; then
-                  METADATA_STATUS="created"
-                  break
-                fi
-              fi
-
-              if [ "$i" -eq 20 ]; then
-                METADATA_STATUS="pending-index"
-                break
-              fi
-
-              echo "Waiting for linked artifact storage record indexing (${i}/20)..."
-              sleep 3
-            done
-          fi
-
-          if [ "$METADATA_STATUS" = "post-failed" ]; then
-            echo "::warning::Linked artifact storage metadata POST failed for ${DIGEST}"
-            if [ -s /tmp/opencode-excalidraw-storage-record.err ]; then
-              cat /tmp/opencode-excalidraw-storage-record.err
-            fi
-          elif [ "$METADATA_STATUS" = "pending-index" ]; then
-            echo "::warning::Linked artifact storage metadata not queryable yet for ${DIGEST}; continuing"
-            if [ -s /tmp/opencode-excalidraw-storage-records.err ]; then
-              cat /tmp/opencode-excalidraw-storage-records.err
-            fi
-          fi
-
           {
-            echo "## OpenCode Excalidraw Artifact Metadata"
+            echo "## OpenCode Excalidraw Artifact Digest"
             echo "- Package: ${NAME}@${VERSION}"
             echo "- Digest: ${DIGEST}"
-            echo "- Storage record id: ${RECORD_ID:-unknown}"
-            echo "- Storage record status: ${METADATA_STATUS}"
             echo "- Tarball: ${TARBALL_URL}"
           } >> "$GITHUB_STEP_SUMMARY"
-
-          if [ "$METADATA_STATUS" = "created" ]; then
-            echo "✓ linked artifact storage record created"
-          fi
 
       - name: Download tarball for GitHub attestation
         run: |
@@ -349,6 +256,82 @@ jobs:
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: /tmp/opencode-excalidraw.tgz
+
+      - name: Create linked artifact metadata record
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${OPENCODE_STORAGE_DIGEST:-}" ] || [ -z "${OPENCODE_TARBALL_URL:-}" ]; then
+            echo "::warning::Missing linked artifact digest or tarball URL; skipping storage record creation"
+            exit 0
+          fi
+
+          NAME="$(node -p 'require("./packages/opencode-excalidraw/package.json").name')"
+          VERSION="$(node -p 'require("./packages/opencode-excalidraw/package.json").version')"
+          OWNER="${GITHUB_REPOSITORY_OWNER}"
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+
+          METADATA_STATUS="post-failed"
+          RECORD_ID=""
+          POST_EXIT=1
+          for i in $(seq 1 30); do
+            set +e
+            gh api -X POST "orgs/${OWNER}/artifacts/metadata/storage-record" \
+              -f name="${NAME}" \
+              -f version="${VERSION}" \
+              -f digest="${OPENCODE_STORAGE_DIGEST}" \
+              -f artifact_url="${OPENCODE_TARBALL_URL}" \
+              -f registry_url="https://registry.npmjs.org" \
+              -f repository="${NAME}" \
+              -f github_repository="${REPO_NAME}" \
+              > /tmp/opencode-excalidraw-storage-record.json \
+              2> /tmp/opencode-excalidraw-storage-record.err
+            POST_EXIT=$?
+            set -e
+
+            if [ "$POST_EXIT" -eq 0 ]; then
+              METADATA_STATUS="created"
+              RECORD_ID="$({
+                node -e '
+                  const fs = require("fs");
+                  const j = JSON.parse(fs.readFileSync("/tmp/opencode-excalidraw-storage-record.json", "utf8"));
+                  const id = j.storage_records?.[0]?.id;
+                  if (id !== undefined && id !== null) process.stdout.write(String(id));
+                '
+              })"
+              break
+            fi
+
+            if [ "$i" -lt 30 ]; then
+              if [ -s /tmp/opencode-excalidraw-storage-record.err ] && grep -qi "no artifacts found" /tmp/opencode-excalidraw-storage-record.err; then
+                echo "Waiting for linked artifact digest indexing (${i}/30)..."
+              else
+                echo "Retrying storage record POST (${i}/30)..."
+              fi
+              sleep 10
+            fi
+          done
+
+          if [ "$METADATA_STATUS" != "created" ]; then
+            echo "::warning::Linked artifact storage metadata POST failed for ${OPENCODE_STORAGE_DIGEST}"
+            if [ -s /tmp/opencode-excalidraw-storage-record.err ]; then
+              cat /tmp/opencode-excalidraw-storage-record.err
+            fi
+          fi
+
+          {
+            echo "## OpenCode Excalidraw Artifact Metadata"
+            echo "- Package: ${NAME}@${VERSION}"
+            echo "- Digest: ${OPENCODE_STORAGE_DIGEST}"
+            echo "- Storage record id: ${RECORD_ID:-unknown}"
+            echo "- Storage record status: ${METADATA_STATUS}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$METADATA_STATUS" = "created" ]; then
+            echo "✓ linked artifact storage record created"
+          fi
 
       - name: Create linked artifact deployment record
         env:
@@ -375,7 +358,7 @@ jobs:
           DEPLOYMENT_STATUS="post-failed"
           DEPLOYMENT_ID=""
           POST_EXIT=1
-          for i in $(seq 1 5); do
+          for i in $(seq 1 30); do
             set +e
             gh api -X POST "orgs/${OWNER}/artifacts/metadata/deployment-record" \
               -f name="${NAME}" \
@@ -396,9 +379,13 @@ jobs:
               break
             fi
 
-            if [ "$i" -lt 5 ]; then
-              echo "Retrying deployment record POST (${i}/5)..."
-              sleep 3
+            if [ "$i" -lt 30 ]; then
+              if [ -s /tmp/opencode-excalidraw-deployment-record.err ] && grep -qi "no artifacts found" /tmp/opencode-excalidraw-deployment-record.err; then
+                echo "Waiting for linked artifact digest indexing (${i}/30)..."
+              else
+                echo "Retrying deployment record POST (${i}/30)..."
+              fi
+              sleep 10
             fi
           done
 
