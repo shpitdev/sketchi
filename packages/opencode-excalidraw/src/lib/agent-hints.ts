@@ -4,6 +4,8 @@ const SKETCHI_DIAGRAM_AGENT_HINTS = [
   "When diagram_* tools are available and the request is diagram-related, call diagram_* tools instead of writing Mermaid.",
   "Only produce Mermaid when the user explicitly asks for Mermaid output.",
   "Tool selection: diagram_from_prompt for new diagrams, diagram_tweak for tactical edits, diagram_restructure for structural edits, diagram_to_png for exports, diagram_grade for evaluation.",
+  "If Playwright browsers are missing, stop and instruct the user to run `npx playwright install chromium`; do not run install commands automatically.",
+  "Use at most one diagram_grade call per assistant message; for multiple diagrams, ask for separate follow-up grading messages.",
   "Save diagram outputs under /sketchi at the project root.",
   "If requirements are unclear, ask one concise clarifying question.",
   "Keep replies concise and execution-focused.",

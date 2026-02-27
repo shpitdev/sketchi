@@ -15,6 +15,36 @@ import { createToolTraceId } from "./lib/trace";
 
 const DEFAULT_API_BASE = "https://sketchi.app";
 const TRAILING_SLASH_PATTERN = /\/$/;
+const GRADE_CALL_STATE_LIMIT = 2048;
+const gradeCallStateByMessage = new Map<string, "running" | "completed">();
+
+function gradeCallKey(sessionID: string, messageID?: string): string {
+  return `${sessionID}:${messageID ?? "unknown"}`;
+}
+
+function reserveGradeCall(key: string): void {
+  if (gradeCallStateByMessage.has(key)) {
+    throw new Error(
+      "diagram_grade allows only one image per message. Start a new message for each additional diagram_grade call."
+    );
+  }
+
+  while (gradeCallStateByMessage.size >= GRADE_CALL_STATE_LIMIT) {
+    const oldestKey = gradeCallStateByMessage.keys().next().value;
+    if (!oldestKey) {
+      break;
+    }
+    gradeCallStateByMessage.delete(oldestKey);
+  }
+
+  gradeCallStateByMessage.set(key, "running");
+}
+
+function completeGradeCall(key: string): void {
+  if (gradeCallStateByMessage.get(key) === "running") {
+    gradeCallStateByMessage.set(key, "completed");
+  }
+}
 
 function normalizeApiBase(value: string): string {
   return value.replace(TRAILING_SLASH_PATTERN, "");
@@ -588,6 +618,9 @@ export const SketchiPlugin: Plugin = (input) => {
         },
         async execute(args, context) {
           const traceId = createToolTraceId();
+          const callKey = gradeCallKey(context.sessionID, context.messageID);
+          reserveGradeCall(callKey);
+
           const excalidraw = args.excalidraw
             ? {
                 elements: args.excalidraw.elements,
@@ -595,34 +628,38 @@ export const SketchiPlugin: Plugin = (input) => {
               }
             : undefined;
 
-          const result = await gradeDiagram(
-            input.client,
-            {
-              sessionID: context.sessionID,
-              agent: context.agent,
-              messageID: context.messageID,
-            },
-            {
-              prompt: args.prompt,
-              expectedDiagramType: args.expectedDiagramType,
-              shareUrl: args.shareUrl,
-              excalidrawPath: args.excalidrawPath,
-              excalidraw,
-              pngPath: args.pngPath,
-              outputPath: args.outputPath,
-              renderOptions: {
-                scale: args.scale,
-                padding: args.padding,
-                background: args.background,
+          try {
+            const result = await gradeDiagram(
+              input.client,
+              {
+                sessionID: context.sessionID,
+                agent: context.agent,
+                messageID: context.messageID,
               },
-              apiBase,
-              baseDir: context.directory,
-              abort: context.abort,
-              traceId,
-            }
-          );
+              {
+                prompt: args.prompt,
+                expectedDiagramType: args.expectedDiagramType,
+                shareUrl: args.shareUrl,
+                excalidrawPath: args.excalidrawPath,
+                excalidraw,
+                pngPath: args.pngPath,
+                outputPath: args.outputPath,
+                renderOptions: {
+                  scale: args.scale,
+                  padding: args.padding,
+                  background: args.background,
+                },
+                apiBase,
+                baseDir: context.directory,
+                abort: context.abort,
+                traceId,
+              }
+            );
 
-          return JSON.stringify(result, null, 2);
+            return JSON.stringify(result, null, 2);
+          } finally {
+            completeGradeCall(callKey);
+          }
         },
       }),
     },

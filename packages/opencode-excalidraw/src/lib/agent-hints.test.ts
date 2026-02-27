@@ -19,6 +19,8 @@ describe("sketchi-diagram hints", () => {
     expect(hints).toContain("diagram_grade");
     expect(hints).toContain("instead of writing mermaid");
     expect(hints).toContain("explicitly asks for mermaid");
+    expect(hints).toContain("do not run install commands automatically");
+    expect(hints).toContain("one diagram_grade call per assistant message");
   });
 
   test("system hint append does not duplicate hints", () => {

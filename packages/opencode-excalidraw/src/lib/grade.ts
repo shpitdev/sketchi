@@ -26,6 +26,7 @@ export interface DiagramGradeInput {
   outputPath?: string;
   pngPath?: string;
   prompt: string;
+  promptTimeoutMs?: number;
   renderOptions: RenderOptions;
   shareUrl?: string;
   traceId?: string;
@@ -39,6 +40,87 @@ export interface DiagramGradeResult {
   raw: string;
   shareLink?: { url: string; shareId?: string; encryptionKey?: string };
   summary?: ExcalidrawSummary;
+}
+
+const DEFAULT_GRADE_PROMPT_TIMEOUT_MS = 60_000;
+const GRADER_SESSION_CACHE_LIMIT = 256;
+const graderSessionByParentSession = new Map<string, string>();
+
+type PromptPart =
+  | { type: "text"; text: string }
+  | { type: "file"; url: string; mime: string; filename: string };
+
+interface PromptResponsePart {
+  text?: string;
+  type?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function extractSessionIdFromCreateResult(result: unknown): string | null {
+  if (!isRecord(result)) {
+    return null;
+  }
+
+  if (typeof result.id === "string" && result.id.length > 0) {
+    return result.id;
+  }
+
+  const data = result.data;
+  if (!isRecord(data)) {
+    return null;
+  }
+
+  if (typeof data.id === "string" && data.id.length > 0) {
+    return data.id;
+  }
+
+  return null;
+}
+
+function cacheGraderSession(parentSessionID: string, sessionID: string): void {
+  while (graderSessionByParentSession.size >= GRADER_SESSION_CACHE_LIMIT) {
+    const oldestKey = graderSessionByParentSession.keys().next().value;
+    if (!oldestKey) {
+      break;
+    }
+    graderSessionByParentSession.delete(oldestKey);
+  }
+
+  graderSessionByParentSession.set(parentSessionID, sessionID);
+}
+
+async function resolvePromptSessionID(
+  client: PluginInput["client"],
+  parentSessionID: string
+): Promise<string> {
+  const cached = graderSessionByParentSession.get(parentSessionID);
+  if (cached) {
+    return cached;
+  }
+
+  const sessionClient = client.session as {
+    create?: () => Promise<unknown>;
+  };
+
+  if (!sessionClient.create) {
+    return parentSessionID;
+  }
+
+  try {
+    const created = await sessionClient.create();
+    const sessionID = extractSessionIdFromCreateResult(created);
+    if (!sessionID) {
+      return parentSessionID;
+    }
+
+    cacheGraderSession(parentSessionID, sessionID);
+    return sessionID;
+  } catch {
+    return parentSessionID;
+  }
 }
 
 function toAttachmentUrl(value: string): string {
@@ -112,10 +194,131 @@ function extractJson(text: string): Record<string, unknown> {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start === -1 || end === -1 || end <= start) {
-    throw new Error("Grade response did not include JSON object");
+    const snippet = text.replace(/\s+/g, " ").trim().slice(0, 240);
+    const detail = snippet.length > 0 ? snippet : "<empty response>";
+    throw new Error(`Grade response did not include JSON object: ${detail}`);
   }
   const jsonSlice = text.slice(start, end + 1);
   return JSON.parse(jsonSlice) as Record<string, unknown>;
+}
+
+function extractPromptResponseParts(response: unknown): PromptResponsePart[] {
+  if (!isRecord(response)) {
+    return [];
+  }
+
+  const topLevelParts = response.parts;
+  if (Array.isArray(topLevelParts)) {
+    return topLevelParts as PromptResponsePart[];
+  }
+
+  const data = response.data;
+  if (!isRecord(data)) {
+    return [];
+  }
+
+  const nestedParts = data.parts;
+  if (!Array.isArray(nestedParts)) {
+    return [];
+  }
+
+  return nestedParts as PromptResponsePart[];
+}
+
+function createGradePromptTimeoutError(timeoutMs: number): Error {
+  return new Error(
+    `diagram_grade timed out after ${timeoutMs}ms while waiting for the grading response. Retry with one diagram per grade call.`
+  );
+}
+
+function createGradePromptAbortError(): Error {
+  return new Error(
+    "diagram_grade was aborted while waiting for the grading response."
+  );
+}
+
+function resolvedPromptTimeoutMs(input: DiagramGradeInput): number {
+  return Math.max(
+    1000,
+    input.promptTimeoutMs ?? DEFAULT_GRADE_PROMPT_TIMEOUT_MS
+  );
+}
+
+async function promptForGrade(
+  client: PluginInput["client"],
+  context: { sessionID: string; agent: string; messageID: string },
+  parts: PromptPart[],
+  input: DiagramGradeInput
+): Promise<Awaited<ReturnType<PluginInput["client"]["session"]["prompt"]>>> {
+  const timeoutMs = resolvedPromptTimeoutMs(input);
+  const promptSessionID = await resolvePromptSessionID(
+    client,
+    context.sessionID
+  );
+  const requestBody: {
+    agent: string;
+    parts: PromptPart[];
+    messageID?: string;
+  } = {
+    agent: context.agent,
+    parts,
+  };
+
+  if (promptSessionID === context.sessionID) {
+    requestBody.messageID = context.messageID;
+  }
+
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  let removeAbortListener: (() => void) | undefined;
+
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(
+      () => reject(createGradePromptTimeoutError(timeoutMs)),
+      timeoutMs
+    );
+  });
+
+  const abortPromise = input.abort
+    ? new Promise<never>((_resolve, reject) => {
+        if (!input.abort) {
+          return;
+        }
+
+        if (input.abort.aborted) {
+          reject(createGradePromptAbortError());
+          return;
+        }
+
+        const onAbort = () => {
+          reject(createGradePromptAbortError());
+        };
+
+        input.abort.addEventListener("abort", onAbort, { once: true });
+        removeAbortListener = () => {
+          input.abort?.removeEventListener("abort", onAbort);
+        };
+      })
+    : null;
+
+  try {
+    return await Promise.race([
+      client.session.prompt({
+        path: { id: promptSessionID },
+        body: requestBody,
+        responseStyle: "data",
+        throwOnError: true,
+      }),
+      timeoutPromise,
+      ...(abortPromise ? [abortPromise] : []),
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    if (removeAbortListener) {
+      removeAbortListener();
+    }
+  }
 }
 
 async function resolveExcalidraw(input: DiagramGradeInput): Promise<{
@@ -248,24 +451,30 @@ export async function gradeDiagram(
       });
     }
 
-    const response = await client.session.prompt({
-      path: { id: context.sessionID },
-      body: {
-        messageID: context.messageID,
-        agent: context.agent,
-        parts,
-      },
-      responseStyle: "data",
-      throwOnError: true,
-    });
+    const response = await promptForGrade(client, context, parts, input);
 
-    const raw = Array.isArray(response.data.parts)
-      ? response.data.parts
-          .map((part: { type?: string; text?: string }) =>
-            part.type === "text" ? (part.text ?? "") : ""
-          )
-          .join("")
-      : "";
+    const responseParts = extractPromptResponseParts(response);
+    const responsePartTypes =
+      responseParts.length > 0
+        ? responseParts
+            .map((part) =>
+              typeof part.type === "string" && part.type.length > 0
+                ? part.type
+                : "unknown"
+            )
+            .join(",")
+        : "none";
+
+    const raw = responseParts
+      .map((part) => (part.type === "text" ? (part.text ?? "") : ""))
+      .join("");
+
+    if (raw.trim().length === 0) {
+      throw new Error(
+        `Grade response contained no text content (part types: ${responsePartTypes}).`
+      );
+    }
+
     const grade = extractJson(raw);
 
     return {

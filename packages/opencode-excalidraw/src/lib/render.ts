@@ -1,6 +1,7 @@
-import { type Browser, chromium, type Page } from "playwright";
+import { chromium, type Page } from "playwright";
 
 const RENDER_TIMEOUT_MS = 60_000;
+const PLAYWRIGHT_INSTALL_COMMAND = "npx playwright install chromium";
 
 const EXPORT_HARNESS_HTML = `
 <!DOCTYPE html>
@@ -47,13 +48,35 @@ export interface RenderOptions {
   scale?: number;
 }
 
-let browser: Browser | null = null;
-
-async function getBrowser(): Promise<Browser> {
-  if (!browser) {
-    browser = await chromium.launch({ headless: true });
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
   }
-  return browser;
+  return String(error);
+}
+
+export function mapPlaywrightLaunchError(error: unknown): Error | null {
+  const message = errorMessage(error);
+  const normalized = message.toLowerCase();
+  const missingExecutable = normalized.includes("executable doesn't exist");
+  const installHint = normalized.includes(
+    "please run the following command to download new browsers"
+  );
+
+  if (!(missingExecutable || installHint)) {
+    return null;
+  }
+
+  return new Error(
+    [
+      "Playwright Chromium is required for Sketchi PNG rendering but is not installed.",
+      "Install it once per machine and retry:",
+      `  ${PLAYWRIGHT_INSTALL_COMMAND}`,
+      "This plugin fails fast and does not auto-install browser binaries.",
+      "",
+      `Original error: ${message}`,
+    ].join("\n")
+  );
 }
 
 async function loadExportHarness(page: Page): Promise<void> {
@@ -65,11 +88,8 @@ async function loadExportHarness(page: Page): Promise<void> {
   }, EXPORT_HARNESS_HTML);
 }
 
-export async function closeBrowser(): Promise<void> {
-  if (browser) {
-    await browser.close();
-    browser = null;
-  }
+export function closeBrowser(): Promise<void> {
+  return Promise.resolve();
 }
 
 async function exportElementsToPng(
@@ -79,8 +99,17 @@ async function exportElementsToPng(
   const { scale = 2, padding = 20, background = true } = options;
   const start = Date.now();
 
-  const browser = await getBrowser();
-  const context = await browser.newContext();
+  const launchedBrowser = await chromium
+    .launch({ headless: true })
+    .catch((error) => {
+      const mapped = mapPlaywrightLaunchError(error);
+      if (mapped) {
+        throw mapped;
+      }
+      throw error;
+    });
+
+  const context = await launchedBrowser.newContext();
   const page = await context.newPage();
 
   try {
@@ -109,6 +138,7 @@ async function exportElementsToPng(
     return { png, durationMs: Date.now() - start };
   } finally {
     await context.close();
+    await launchedBrowser.close();
   }
 }
 

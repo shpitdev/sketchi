@@ -21,8 +21,10 @@ npm i @sketchi-app/opencode-excalidraw
 3. Install Playwright browsers once per machine (required for `diagram_to_png`):
 
 ```bash
-npx playwright install
+npx playwright install chromium
 ```
+
+If browsers are missing, PNG-related tools fail fast with this install command. They do not auto-install browser binaries during execution.
 
 ## Usage
 
@@ -33,6 +35,8 @@ The plugin exposes tools:
 - `diagram_restructure`
 - `diagram_to_png`
 - `diagram_grade`
+
+`diagram_grade` is intentionally one-image-per-call. For multiple diagrams, invoke `diagram_grade` in separate follow-up messages.
 
 When this plugin is loaded, it registers a `sketchi-diagram` subagent (without disabling built-in `build`/`plan`) and conditionally injects routing guidance only when the user request mentions `diagram`, `sketchi`, or `excalidraw`, so diagram requests route to `diagram_*` tools instead of defaulting to Mermaid (unless Mermaid is explicitly requested).
 
