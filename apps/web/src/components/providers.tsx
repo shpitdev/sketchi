@@ -17,12 +17,24 @@ function useConvexAuthFromWorkOS() {
   const { user, loading: authLoading } = useWorkosAuth();
   const {
     accessToken,
-    loading: tokenLoading,
     error: tokenHookError,
     refresh,
     getAccessToken,
   } = useWorkosAccessToken();
+  const [tokenCache, setTokenCache] = useState<string | null>(null);
   const [tokenError, setTokenError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setTokenCache(null);
+      setTokenError(null);
+      return;
+    }
+    if (accessToken) {
+      setTokenCache(accessToken);
+      setTokenError(null);
+    }
+  }, [accessToken, user]);
 
   const fetchAccessToken = useCallback(
     async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
@@ -31,14 +43,29 @@ function useConvexAuthFromWorkOS() {
         return null;
       }
 
+      if (!forceRefreshToken && tokenCache) {
+        setTokenError(null);
+        return tokenCache;
+      }
+
       try {
-        const token = forceRefreshToken
-          ? await refresh()
-          : await getAccessToken();
+        const directToken = await getAccessToken();
+        const refreshedToken =
+          directToken || !forceRefreshToken ? null : await refresh();
+        const fallbackRefreshedToken =
+          directToken || refreshedToken ? null : await refresh();
+        const token =
+          directToken ??
+          refreshedToken ??
+          fallbackRefreshedToken ??
+          accessToken ??
+          tokenCache ??
+          null;
         if (!token) {
-          setTokenError((prev) => prev ?? "WorkOS returned no access token");
+          setTokenError(null);
           return null;
         }
+        setTokenCache(token);
         setTokenError(null);
         return token;
       } catch (error) {
@@ -51,8 +78,10 @@ function useConvexAuthFromWorkOS() {
         return null;
       }
     },
-    [getAccessToken, refresh, user]
+    [accessToken, getAccessToken, refresh, tokenCache, user]
   );
+
+  const resolvedAccessToken = accessToken ?? tokenCache ?? null;
 
   return useMemo(
     () => ({
@@ -60,21 +89,22 @@ function useConvexAuthFromWorkOS() {
       isLoading:
         authLoading ||
         (Boolean(user) &&
-          !accessToken &&
-          tokenLoading &&
+          !resolvedAccessToken &&
           tokenError === null &&
           tokenHookError === null),
       isAuthenticated:
-        Boolean(user) && tokenError === null && tokenHookError === null,
+        Boolean(user) &&
+        Boolean(resolvedAccessToken) &&
+        tokenError === null &&
+        tokenHookError === null,
       fetchAccessToken,
     }),
     [
-      accessToken,
       authLoading,
       fetchAccessToken,
+      resolvedAccessToken,
       tokenError,
       tokenHookError,
-      tokenLoading,
       user,
     ]
   );

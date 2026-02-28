@@ -2,7 +2,8 @@
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { api } from "@sketchi/backend/convex/_generated/api";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAuth } from "@workos-inc/authkit-nextjs/components";
+import { useMutation, useQuery } from "convex/react";
 import {
   AlertTriangle,
   Check,
@@ -13,11 +14,13 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import type { ChatMessage } from "@/components/diagram-studio/chat-sidebar";
-import { ChatSidebar } from "@/components/diagram-studio/chat-sidebar";
+import {
+  ChatSidebar,
+  type ThreadMessage,
+} from "@/components/diagram-studio/chat-sidebar";
 import { ImportExportToolbar } from "@/components/diagram-studio/import-export-toolbar";
 import { sanitizeAppState } from "@/components/diagram-studio/sanitize-app-state";
 import { Button } from "@/components/ui/button";
@@ -25,6 +28,8 @@ import { Button } from "@/components/ui/button";
 const AUTOSAVE_DELAY_MS = 2000;
 const RECENTS_KEY = "sketchi.diagramRecents.v1";
 const RECENTS_MAX = 10;
+const COMPLETION_PULSE_MS = 1500;
+const STOP_RETRY_DELAYS_MS = [220, 380, 620];
 
 const ExcalidrawEditor = dynamic(
   () => import("@/components/diagram-studio/excalidraw-wrapper"),
@@ -38,7 +43,19 @@ type SaveState =
   | { status: "conflict"; serverVersion: number }
   | { status: "error"; message: string };
 
-type ProcessingMode = "generating" | "updating" | null;
+type RunStatus =
+  | "sending"
+  | "running"
+  | "applying"
+  | "persisted"
+  | "stopped"
+  | "error";
+
+interface RunState {
+  promptMessageId: string;
+  status: RunStatus;
+  stopRequested: boolean;
+}
 
 function writeDiagramRecent(sessionId: string) {
   if (typeof window === "undefined") {
@@ -64,55 +81,100 @@ function writeDiagramRecent(sessionId: string) {
       recents = [];
     }
 
-    const filtered = recents.filter((r) => r.sessionId !== sessionId);
+    const filtered = recents.filter((recent) => recent.sessionId !== sessionId);
     filtered.unshift({ sessionId, visitedAt: Date.now() });
     const capped = filtered.slice(0, RECENTS_MAX);
 
     try {
       localStorage.setItem(RECENTS_KEY, JSON.stringify(capped));
     } catch {
-      /* quota exceeded */
+      // quota exceeded
     }
   } catch {
-    /* localStorage unavailable */
+    // localStorage unavailable
   }
+}
+
+function createOptimisticUserMessage(input: {
+  content: string;
+  promptMessageId: string;
+}): ThreadMessage {
+  const now = Date.now();
+  return {
+    messageId: `optimistic_${input.promptMessageId}`,
+    promptMessageId: input.promptMessageId,
+    role: "user",
+    messageType: "chat",
+    content: input.content,
+    reasoningSummary: null,
+    status: "sending",
+    toolName: null,
+    toolCallId: null,
+    toolInput: null,
+    toolOutput: null,
+    traceId: null,
+    error: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function isRunActive(status: RunStatus | null): boolean {
+  return status === "sending" || status === "running" || status === "applying";
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 export default function DiagramStudioPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const canQuerySession = Boolean(sessionId && user);
 
   const session = useQuery(
     api.diagramSessions.get,
-    sessionId ? { sessionId } : "skip"
+    canQuerySession ? { sessionId } : "skip"
+  );
+  const thread = useQuery(
+    api.diagramThreads.listBySession,
+    canQuerySession ? { sessionId } : "skip"
   );
 
   const createSession = useMutation(api.diagramSessions.create);
+  const enqueuePrompt = useMutation(api.diagramThreads.enqueuePrompt);
   const setLatestScene = useMutation(api.diagramSessions.setLatestScene);
-  const restructureFromScene = useAction(api.diagrams.restructureFromScene);
-  const generateFromPrompt = useAction(
-    api.diagrams.generateFromPromptForStudio
-  );
+  const stopPrompt = useMutation(api.diagramThreads.stopPrompt);
   const [isCreating, setIsCreating] = useState(false);
 
   const [excalidrawApi, setExcalidrawApi] =
     useState<ExcalidrawImperativeAPI | null>(null);
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
   const [autosaveDisabled, setAutosaveDisabled] = useState(false);
-  const [processingMode, setProcessingMode] = useState<ProcessingMode>(null);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [liveNonDeletedCount, setLiveNonDeletedCount] = useState(0);
   const [showCompletionPulse, setShowCompletionPulse] = useState(false);
+  const [optimisticMessages, setOptimisticMessages] = useState<ThreadMessage[]>(
+    []
+  );
+  const [optimisticRunState, setOptimisticRunState] = useState<RunState | null>(
+    null
+  );
 
   const suppressOnChangeRef = useRef(true);
-  const initialLoadApplied = useRef(false);
+  const initialLoadAppliedRef = useRef(false);
   const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const knownVersionRef = useRef(0);
+  const appliedVersionRef = useRef<number | null>(null);
+  const isLocallyDirtyRef = useRef(false);
   const lastElementsHashRef = useRef("");
   const pendingSceneRef = useRef<{
     elements: readonly Record<string, unknown>[];
     appState: Record<string, unknown>;
   } | null>(null);
+  const previousRunStatusRef = useRef<RunStatus | null>(null);
 
   useEffect(() => {
     if (sessionId) {
@@ -120,7 +182,76 @@ export default function DiagramStudioPage() {
     }
   }, [sessionId]);
 
-  const isProcessing = processingMode !== null;
+  const threadRunState: RunState | null = useMemo(() => {
+    if (!thread?.latestRun) {
+      return null;
+    }
+
+    return {
+      promptMessageId: thread.latestRun.promptMessageId,
+      status: thread.latestRun.status as RunStatus,
+      stopRequested: thread.latestRun.stopRequested,
+    };
+  }, [thread]);
+
+  useEffect(() => {
+    if (!optimisticRunState) {
+      return;
+    }
+    if (
+      threadRunState &&
+      threadRunState.promptMessageId === optimisticRunState.promptMessageId
+    ) {
+      setOptimisticRunState(null);
+      return;
+    }
+    if (
+      !(isRunActive(optimisticRunState.status) || threadRunState) &&
+      optimisticRunState.stopRequested
+    ) {
+      setOptimisticRunState(null);
+    }
+  }, [optimisticRunState, threadRunState]);
+
+  const runState = optimisticRunState ?? threadRunState;
+
+  const activeRunStatus = runState?.status ?? null;
+  const isProcessing = isRunActive(activeRunStatus);
+
+  const triggerCompletionPulse = useCallback(() => {
+    setShowCompletionPulse(true);
+    setTimeout(() => {
+      setShowCompletionPulse(false);
+    }, COMPLETION_PULSE_MS);
+  }, []);
+
+  useEffect(() => {
+    const previous = previousRunStatusRef.current;
+    const current = runState?.status ?? null;
+
+    if (previous && previous !== "persisted" && current === "persisted") {
+      triggerCompletionPulse();
+    }
+
+    previousRunStatusRef.current = current;
+  }, [runState?.status, triggerCompletionPulse]);
+
+  useEffect(() => {
+    if (!(thread && thread.messages.length > 0)) {
+      return;
+    }
+
+    setOptimisticMessages((previous) =>
+      previous.filter((optimistic) => {
+        const hasPersisted = thread.messages.some(
+          (message) =>
+            message.role === "user" &&
+            message.promptMessageId === optimistic.promptMessageId
+        );
+        return !hasPersisted;
+      })
+    );
+  }, [thread]);
 
   const saveScene = useCallback(
     async (
@@ -144,10 +275,13 @@ export default function DiagramStudioPage() {
 
         if (result.status === "success") {
           knownVersionRef.current = result.latestSceneVersion;
+          appliedVersionRef.current = result.latestSceneVersion;
+          isLocallyDirtyRef.current = false;
           setAutosaveDisabled(false);
           setSaveState({ status: "saved", savedAt: result.savedAt });
           pendingSceneRef.current = null;
         } else if (result.status === "conflict") {
+          isLocallyDirtyRef.current = true;
           pendingSceneRef.current = { elements, appState };
           setSaveState({
             status: "conflict",
@@ -185,7 +319,9 @@ export default function DiagramStudioPage() {
       elements: readonly Record<string, unknown>[],
       appState: Record<string, unknown>
     ) => {
-      const nonDeleted = elements.filter((el) => el.isDeleted !== true).length;
+      const nonDeleted = elements.filter(
+        (element) => element.isDeleted !== true
+      ).length;
       setLiveNonDeletedCount(nonDeleted);
 
       if (autosaveDisabled || suppressOnChangeRef.current || isProcessing) {
@@ -194,83 +330,164 @@ export default function DiagramStudioPage() {
 
       const hash = elements
         .map(
-          (e) =>
-            `${e.id}:${e.version}:${e.versionNonce}:${e.isDeleted ?? false}`
+          (element) =>
+            `${element.id}:${element.version}:${element.versionNonce}:${element.isDeleted ?? false}`
         )
         .join("|");
       if (hash === lastElementsHashRef.current) {
         return;
       }
       lastElementsHashRef.current = hash;
+      isLocallyDirtyRef.current = true;
 
       if (autosaveTimeoutRef.current) {
         clearTimeout(autosaveTimeoutRef.current);
       }
 
       autosaveTimeoutRef.current = setTimeout(() => {
-        saveScene(elements, appState);
+        saveScene(elements, appState).catch(() => undefined);
       }, AUTOSAVE_DELAY_MS);
     },
     [autosaveDisabled, isProcessing, saveScene]
+  );
+
+  const applySceneToCanvas = useCallback(
+    (input: {
+      elements: readonly Record<string, unknown>[];
+      appState: Record<string, unknown>;
+      version: number;
+    }) => {
+      if (!excalidrawApi) {
+        return;
+      }
+
+      suppressOnChangeRef.current = true;
+      excalidrawApi.updateScene({
+        elements: input.elements as unknown as Parameters<
+          typeof excalidrawApi.updateScene
+        >[0]["elements"],
+        appState: input.appState as Parameters<
+          typeof excalidrawApi.updateScene
+        >[0]["appState"],
+      });
+
+      const hash = input.elements
+        .map(
+          (element) =>
+            `${element.id}:${element.version}:${element.versionNonce}:${element.isDeleted ?? false}`
+        )
+        .join("|");
+      lastElementsHashRef.current = hash;
+      const nonDeleted = input.elements.filter(
+        (element) => element.isDeleted !== true
+      ).length;
+      setLiveNonDeletedCount(nonDeleted);
+      knownVersionRef.current = input.version;
+      appliedVersionRef.current = input.version;
+      isLocallyDirtyRef.current = false;
+
+      requestAnimationFrame(() => {
+        suppressOnChangeRef.current = false;
+      });
+    },
+    [excalidrawApi]
   );
 
   const handleReady = useCallback(
     (readyApi: ExcalidrawImperativeAPI) => {
       setExcalidrawApi(readyApi);
 
-      if (session?.latestScene && !initialLoadApplied.current) {
-        initialLoadApplied.current = true;
-        const els = session.latestScene.elements as readonly Record<
-          string,
-          unknown
-        >[];
-        lastElementsHashRef.current = els
-          .map(
-            (e) =>
-              `${e.id}:${e.version}:${e.versionNonce}:${e.isDeleted ?? false}`
-          )
-          .join("|");
-
-        const nonDeleted = els.filter((el) => el.isDeleted !== true).length;
-        setLiveNonDeletedCount(nonDeleted);
+      if (session?.latestScene && !initialLoadAppliedRef.current) {
+        initialLoadAppliedRef.current = true;
+        applySceneToCanvas({
+          elements: session.latestScene.elements as readonly Record<
+            string,
+            unknown
+          >[],
+          appState: session.latestScene.appState as Record<string, unknown>,
+          version: session.latestSceneVersion,
+        });
+      } else {
+        knownVersionRef.current = session?.latestSceneVersion ?? 0;
+        appliedVersionRef.current = session?.latestSceneVersion ?? 0;
+        requestAnimationFrame(() => {
+          suppressOnChangeRef.current = false;
+        });
       }
-
-      knownVersionRef.current = session?.latestSceneVersion ?? 0;
-
-      requestAnimationFrame(() => {
-        suppressOnChangeRef.current = false;
-      });
     },
-    [session?.latestScene, session?.latestSceneVersion]
+    [applySceneToCanvas, session?.latestScene, session?.latestSceneVersion]
   );
 
-  const handleConflictReload = useCallback(async () => {
-    if (!(excalidrawApi && session?.latestScene)) {
+  useEffect(() => {
+    if (!(session?.latestScene && excalidrawApi)) {
       return;
     }
 
-    suppressOnChangeRef.current = true;
+    const version = session.latestSceneVersion;
+    if (appliedVersionRef.current === version) {
+      return;
+    }
 
-    excalidrawApi.updateScene({
-      elements: session.latestScene.elements as unknown as Parameters<
-        typeof excalidrawApi.updateScene
-      >[0]["elements"],
-      appState: session.latestScene.appState as Parameters<
-        typeof excalidrawApi.updateScene
-      >[0]["appState"],
+    // If remote version advanced while local edits are unsaved, enter conflict
+    // mode instead of silently replacing local work.
+    if (isLocallyDirtyRef.current && version > knownVersionRef.current) {
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current);
+        autosaveTimeoutRef.current = null;
+      }
+
+      pendingSceneRef.current = {
+        elements: excalidrawApi
+          .getSceneElements()
+          .map((element) => ({ ...element })) as readonly Record<
+          string,
+          unknown
+        >[],
+        appState: sanitizeAppState(
+          excalidrawApi.getAppState() as Record<string, unknown>
+        ),
+      };
+      knownVersionRef.current = version;
+      setSaveState({
+        status: "conflict",
+        serverVersion: version,
+      });
+      return;
+    }
+
+    applySceneToCanvas({
+      elements: session.latestScene.elements as readonly Record<
+        string,
+        unknown
+      >[],
+      appState: session.latestScene.appState as Record<string, unknown>,
+      version,
+    });
+  }, [
+    applySceneToCanvas,
+    excalidrawApi,
+    session?.latestScene,
+    session?.latestSceneVersion,
+  ]);
+
+  const handleConflictReload = useCallback(async () => {
+    if (!session?.latestScene) {
+      return;
+    }
+
+    applySceneToCanvas({
+      elements: session.latestScene.elements as readonly Record<
+        string,
+        unknown
+      >[],
+      appState: session.latestScene.appState as Record<string, unknown>,
+      version: session.latestSceneVersion,
     });
 
-    knownVersionRef.current = session.latestSceneVersion;
     pendingSceneRef.current = null;
-    setSaveState({
-      status: "saved",
-      savedAt: Date.now(),
-    });
-
-    requestAnimationFrame(() => {
-      suppressOnChangeRef.current = false;
-    });
-  }, [excalidrawApi, session?.latestScene, session?.latestSceneVersion]);
+    isLocallyDirtyRef.current = false;
+    setSaveState({ status: "saved", savedAt: Date.now() });
+  }, [applySceneToCanvas, session?.latestScene, session?.latestSceneVersion]);
 
   const handleConflictOverwrite = useCallback(async () => {
     if (!pendingSceneRef.current || saveState.status !== "conflict") {
@@ -282,174 +499,125 @@ export default function DiagramStudioPage() {
       pendingSceneRef.current.appState,
       saveState.serverVersion
     );
-  }, [saveState, saveScene]);
-
-  const triggerCompletionPulse = useCallback(() => {
-    setShowCompletionPulse(true);
-    setTimeout(() => setShowCompletionPulse(false), 1500);
-  }, []);
-
-  const pauseAutosave = useCallback(() => {
-    suppressOnChangeRef.current = true;
-    if (autosaveTimeoutRef.current) {
-      clearTimeout(autosaveTimeoutRef.current);
-      autosaveTimeoutRef.current = null;
-    }
-  }, []);
-
-  const applyResultScene = useCallback(
-    async (
-      api: ExcalidrawImperativeAPI,
-      result: {
-        elements: unknown[] | undefined;
-        appState?: Record<string, unknown> | null;
-      },
-      fallbackAppState: Record<string, unknown>
-    ) => {
-      const elements = result.elements as unknown as Parameters<
-        typeof api.updateScene
-      >[0]["elements"];
-      const appState = (result.appState ?? fallbackAppState) as Parameters<
-        typeof api.updateScene
-      >[0]["appState"];
-      api.updateScene({ elements, appState });
-
-      await saveScene(
-        result.elements as Record<string, unknown>[],
-        (result.appState ?? fallbackAppState) as Record<string, unknown>
-      );
-      triggerCompletionPulse();
-    },
-    [saveScene, triggerCompletionPulse]
-  );
-
-  const reportFailure = useCallback(
-    (
-      label: string,
-      result: { issues?: Array<{ message: string }>; reason?: string }
-    ) => {
-      const reason =
-        result.issues?.map((i) => i.message).join("; ") ??
-        result.reason ??
-        "Unknown error";
-      setChatMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: `${label}: ${reason}` },
-      ]);
-      toast.error(`${label}: ${reason}`);
-    },
-    []
-  );
-
-  const executeGenerate = useCallback(
-    async (
-      api: ExcalidrawImperativeAPI,
-      prompt: string,
-      sid: string,
-      appState: Record<string, unknown>
-    ) => {
-      const result = await generateFromPrompt({ prompt, sessionId: sid });
-      pauseAutosave();
-      if (result.status === "success" && result.elements) {
-        await applyResultScene(api, result, appState);
-      } else {
-        reportFailure("Generation failed", result);
-      }
-    },
-    [generateFromPrompt, pauseAutosave, applyResultScene, reportFailure]
-  );
-
-  const executeRestructure = useCallback(
-    async (
-      api: ExcalidrawImperativeAPI,
-      prompt: string,
-      sid: string,
-      currentElements: readonly Record<string, unknown>[],
-      appState: Record<string, unknown>
-    ) => {
-      await saveScene(currentElements, appState);
-      pauseAutosave();
-      const result = await restructureFromScene({
-        elements: [...currentElements] as unknown[],
-        appState,
-        prompt,
-        sessionId: sid,
-      });
-      if (result.status === "success" && result.elements) {
-        await applyResultScene(api, result, appState);
-      } else {
-        reportFailure("Restructure failed", result);
-      }
-    },
-    [
-      saveScene,
-      restructureFromScene,
-      pauseAutosave,
-      applyResultScene,
-      reportFailure,
-    ]
-  );
+  }, [saveScene, saveState]);
 
   const handlePrompt = useCallback(
-    async (prompt: string) => {
-      if (!(excalidrawApi && sessionId) || isProcessing) {
+    async (prompt: string, promptMessageId: string) => {
+      if (!(sessionId && prompt.trim().length > 0) || isProcessing) {
         return;
       }
 
-      setChatMessages((prev) => [...prev, { role: "user", content: prompt }]);
-
-      const currentElements =
-        excalidrawApi.getSceneElements() as unknown as readonly Record<
-          string,
-          unknown
-        >[];
-      const nonDeletedCount = currentElements.filter(
-        (el) => el.isDeleted !== true
-      ).length;
-      const isBlankCanvas = nonDeletedCount === 0;
-
-      setProcessingMode(isBlankCanvas ? "generating" : "updating");
+      setOptimisticMessages((previous) => [
+        ...previous,
+        createOptimisticUserMessage({ content: prompt, promptMessageId }),
+      ]);
+      setOptimisticRunState({
+        promptMessageId,
+        status: "sending",
+        stopRequested: false,
+      });
 
       try {
-        const rawAppState = excalidrawApi.getAppState() as unknown as Record<
-          string,
-          unknown
-        >;
-        const appState = sanitizeAppState(rawAppState);
-
-        if (isBlankCanvas) {
-          await executeGenerate(excalidrawApi, prompt, sessionId, appState);
-        } else {
-          await executeRestructure(
-            excalidrawApi,
-            prompt,
-            sessionId,
-            currentElements,
-            appState
-          );
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Operation failed";
-        setChatMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: message },
-        ]);
+        await enqueuePrompt({
+          sessionId,
+          prompt,
+          promptMessageId,
+          traceId: crypto.randomUUID(),
+        });
+      } catch (error) {
+        setOptimisticMessages((previous) =>
+          previous.filter(
+            (message) => message.promptMessageId !== promptMessageId
+          )
+        );
+        setOptimisticRunState((previous) => {
+          if (!previous) {
+            return null;
+          }
+          if (previous.promptMessageId !== promptMessageId) {
+            return previous;
+          }
+          return null;
+        });
+        const message =
+          error instanceof Error ? error.message : "Failed to send prompt";
         toast.error(message);
-      } finally {
-        setProcessingMode(null);
-        suppressOnChangeRef.current = false;
       }
     },
-    [
-      excalidrawApi,
-      sessionId,
-      isProcessing,
-      executeGenerate,
-      executeRestructure,
-    ]
+    [enqueuePrompt, isProcessing, sessionId]
   );
 
-  const handleCreateNew = async () => {
+  const handleStopPrompt = useCallback(
+    async (promptMessageId: string) => {
+      if (!sessionId) {
+        return;
+      }
+
+      try {
+        let attempts = 0;
+        let requested: {
+          status: "requested";
+          runStatus:
+            | "sending"
+            | "running"
+            | "applying"
+            | "persisted"
+            | "stopped"
+            | "error";
+          promptMessageId: string;
+        } | null = null;
+
+        while (attempts <= STOP_RETRY_DELAYS_MS.length) {
+          const result = await stopPrompt({
+            sessionId,
+            promptMessageId,
+          });
+
+          if (result.status === "requested") {
+            requested = result;
+            break;
+          }
+
+          if (attempts === STOP_RETRY_DELAYS_MS.length) {
+            break;
+          }
+
+          await delay(STOP_RETRY_DELAYS_MS[attempts] ?? 0);
+          attempts += 1;
+        }
+
+        if (requested) {
+          const resolvedPromptMessageId = requested.promptMessageId;
+          setOptimisticRunState((previous) => {
+            if (!previous) {
+              return previous;
+            }
+            if (
+              previous.promptMessageId !== promptMessageId &&
+              previous.promptMessageId !== resolvedPromptMessageId
+            ) {
+              return previous;
+            }
+            return {
+              ...previous,
+              promptMessageId: resolvedPromptMessageId,
+              status: requested.runStatus as RunStatus,
+              stopRequested: true,
+            };
+          });
+        } else {
+          toast.error("Prompt is no longer running.");
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to stop prompt";
+        toast.error(message);
+      }
+    },
+    [sessionId, stopPrompt]
+  );
+
+  const handleCreateNew = useCallback(async () => {
     if (isCreating) {
       return;
     }
@@ -458,13 +626,26 @@ export default function DiagramStudioPage() {
       const { sessionId: newId } = await createSession();
       router.push(`/diagrams/${newId}` as never);
     } catch {
-      /* empty — user can retry via button */
+      // user can retry
     } finally {
       setIsCreating(false);
     }
-  };
+  }, [createSession, isCreating, router]);
 
-  if (session === undefined) {
+  const threadMessages = useMemo(() => {
+    if (!thread) {
+      return [] as ThreadMessage[];
+    }
+    return thread.messages as ThreadMessage[];
+  }, [thread]);
+
+  const combinedMessages = useMemo(() => {
+    const merged = [...optimisticMessages, ...threadMessages];
+    merged.sort((left, right) => left.createdAt - right.createdAt);
+    return merged;
+  }, [optimisticMessages, threadMessages]);
+
+  if (authLoading || session === undefined) {
     return (
       <div
         className="flex h-full flex-col overflow-hidden"
@@ -487,7 +668,7 @@ export default function DiagramStudioPage() {
               </div>
             </div>
           </div>
-          <div className="flex h-full w-80 flex-col border-l bg-background">
+          <div className="flex h-full w-96 flex-col border-l bg-background">
             <div className="border-b px-4 py-3">
               <div className="h-4 w-24 animate-pulse rounded bg-muted" />
             </div>
@@ -512,7 +693,7 @@ export default function DiagramStudioPage() {
         <div className="flex flex-col items-center gap-2 text-center">
           <h1 className="font-semibold text-lg">Session not found</h1>
           <p className="max-w-sm text-muted-foreground text-sm">
-            This diagram session doesn't exist or may have been removed.
+            This diagram session doesn&apos;t exist or may have been removed.
           </p>
         </div>
         <Button
@@ -624,11 +805,14 @@ export default function DiagramStudioPage() {
             suppressOnChangeRef={suppressOnChangeRef}
           />
         </div>
+
         <ChatSidebar
-          messages={chatMessages}
+          messages={combinedMessages}
           nonDeletedElementCount={liveNonDeletedCount}
           onSendPrompt={handlePrompt}
-          processingMode={processingMode}
+          onStopPrompt={handleStopPrompt}
+          runState={runState}
+          sessionId={sessionId}
           showCompletionPulse={showCompletionPulse}
         />
       </div>
@@ -637,9 +821,9 @@ export default function DiagramStudioPage() {
 }
 
 function SaveStatus({ saveState }: { saveState: SaveState }) {
-  const formatTime = (ts: number) => {
-    const d = new Date(ts);
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const formatTime = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
   switch (saveState.status) {

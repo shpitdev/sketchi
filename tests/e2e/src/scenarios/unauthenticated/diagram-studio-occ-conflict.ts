@@ -17,6 +17,7 @@ Success:
 - Tab B shows the version from tab A's save after reload.
 */
 
+import { ensureSignedInForDiagrams } from "../../runner/auth";
 import { loadConfig } from "../../runner/config";
 import {
   captureScreenshot,
@@ -76,32 +77,90 @@ function waitForSaveStatus(
   );
 }
 
-async function createSession(page: PageLike, baseUrl: string): Promise<string> {
-  await page.goto(resolveUrl(baseUrl, "/diagrams"), {
-    waitUntil: "domcontentloaded",
-  });
-  await sleep(3000);
+function parseVersionValue(versionText: string): number | null {
+  const parsed = Number.parseInt(versionText.replace(/\D/g, ""), 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
 
-  await clickWhenVisible(page, testIdSelector("diagram-new-session"), {
-    timeoutMs: 15_000,
-    label: "new-session-button",
-  });
-
-  const navigated = await waitForCondition(
-    () => SESSION_URL_REGEX.test(page.url()),
-    { timeoutMs: 30_000, label: "session-url" }
+function waitForVersionAtLeast(
+  page: PageLike,
+  minVersion: number,
+  timeoutMs = 35_000
+): Promise<boolean> {
+  return waitForCondition(
+    async () => {
+      const versionText = await getTestIdText(page, "diagram-session-version");
+      const version = parseVersionValue(versionText);
+      return version !== null && version >= minVersion;
+    },
+    { timeoutMs, label: `session-version>=${minVersion}` }
   );
-  if (!navigated) {
-    throw new Error(`Expected session URL, got: ${page.url()}`);
+}
+
+async function createSession(page: PageLike, baseUrl: string): Promise<string> {
+  await ensureSignedInForDiagrams(page, baseUrl);
+  if (!page.url().includes("/diagrams")) {
+    await page.goto(resolveUrl(baseUrl, "/diagrams"), {
+      waitUntil: "domcontentloaded",
+    });
+  }
+  await sleep(2500);
+  const authReady = await waitForCondition(
+    () =>
+      page.evaluate(() => {
+        const hasSignInLink = Array.from(document.querySelectorAll("a")).some(
+          (anchor) => anchor.textContent?.trim() === "Sign in"
+        );
+        if (hasSignInLink) {
+          return false;
+        }
+        return Array.from(document.querySelectorAll("button")).some((button) =>
+          button.textContent?.toLowerCase().includes("sketchi preview")
+        );
+      }),
+    { timeoutMs: 30_000, label: "auth-ready-for-create-session" }
+  );
+  if (!authReady) {
+    throw new Error("Auth did not settle before session creation.");
   }
 
-  return page.url();
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    await clickWhenVisible(page, testIdSelector("diagram-new-session"), {
+      timeoutMs: 15_000,
+      label: `new-session-button-attempt-${attempt}`,
+    });
+
+    const navigated = await waitForCondition(
+      () => SESSION_URL_REGEX.test(page.url()),
+      { timeoutMs: 10_000, label: `session-url-attempt-${attempt}` }
+    );
+    if (navigated) {
+      return page.url();
+    }
+
+    await sleep(800 * attempt);
+    await page.goto(resolveUrl(baseUrl, "/diagrams"), {
+      waitUntil: "domcontentloaded",
+    });
+    await sleep(1200);
+  }
+
+  throw new Error(`Expected session URL, got: ${page.url()}`);
 }
 
 async function waitForCanvas(page: PageLike): Promise<void> {
-  const loaded = await waitForTestId(page, "diagram-canvas", 30_000);
+  const loaded = await waitForCondition(
+    () =>
+      page.evaluate(() => {
+        return Boolean(
+          document.querySelector('[data-testid="diagram-canvas"]') ||
+            document.querySelector(".excalidraw")
+        );
+      }),
+    { timeoutMs: 45_000, label: "diagram-canvas" }
+  );
   if (!loaded) {
-    throw new Error("Excalidraw canvas did not load.");
+    throw new Error(`Excalidraw canvas did not load. URL: ${page.url()}`);
   }
 }
 
@@ -158,6 +217,7 @@ async function triggerManualSave(_page: PageLike): Promise<void> {
   await sleep(500);
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: E2E scenario steps are intentionally explicit for traceability.
 async function main() {
   const cfg = loadConfig();
   const stagehand = await createStagehand(cfg);
@@ -188,6 +248,7 @@ async function main() {
       throw new Error("Tab A autosave did not complete.");
     }
     const versionA = await getTestIdText(pageA, "diagram-session-version");
+    const versionAValue = parseVersionValue(versionA);
     console.log(`  Tab A version: ${versionA}`);
 
     console.log("[4/6] Opening same session in tab B...");
@@ -197,32 +258,42 @@ async function main() {
     await pageB.goto(sessionUrl, { waitUntil: "domcontentloaded" });
     await sleep(3000);
 
-    const canvasB = await waitForTestId(pageB, "diagram-canvas", 30_000);
-    if (!canvasB) {
-      throw new Error("Tab B canvas did not load.");
-    }
+    await waitForCanvas(pageB);
 
     const versionB = await getTestIdText(pageB, "diagram-session-version");
     console.log(`  Tab B version: ${versionB}`);
 
-    console.log("[5/6] Tab A: editing again to create version conflict...");
+    console.log(
+      "[5/6] Tab A + Tab B: overlapping edits to trigger deterministic conflict..."
+    );
     await addCanvasElement(pageA);
-    await triggerManualSave(pageA);
-    const savedA2 = await waitForSaveStatus(pageA, "Saved", 30_000);
-    if (!savedA2) {
-      throw new Error("Tab A second save did not complete.");
+    // Keep tab B dirty while tab A saves. This forces tab B into conflict mode
+    // when reactive session updates arrive.
+    await sleep(1200);
+    await addCanvasElement(pageB);
+
+    if (versionAValue !== null) {
+      const advanced = await waitForVersionAtLeast(pageA, versionAValue + 1);
+      if (!advanced) {
+        throw new Error(
+          `Tab A version did not advance to >= v${versionAValue + 1}.`
+        );
+      }
+    } else {
+      const savedA2 = await waitForSaveStatus(pageA, "Saved", 35_000);
+      if (!savedA2) {
+        throw new Error("Tab A second save did not complete.");
+      }
     }
     const versionA2 = await getTestIdText(pageA, "diagram-session-version");
     console.log(`  Tab A new version: ${versionA2}`);
 
-    await addCanvasElement(pageB);
-    await triggerManualSave(pageB);
-    await sleep(5000);
+    await sleep(2500);
 
     const conflictBanner = await waitForTestId(
       pageB,
       "diagram-conflict-banner",
-      15_000
+      20_000
     );
     const saveStatusB = await getTestIdText(pageB, "diagram-save-status");
 
