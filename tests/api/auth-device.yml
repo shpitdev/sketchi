@@ -1,0 +1,133 @@
+name: Auth + Device Flow API
+vars:
+  target_url: "http://localhost:3001"
+  bypass_secret: "local-dev"
+  trace_id_generate_unauth: "00000000-0000-4000-8000-000000000201"
+  trace_id_parse_unauth: "00000000-0000-4000-8000-000000000202"
+  trace_id_device_start: "00000000-0000-4000-8000-000000000203"
+
+secrets:
+  - bypass_secret
+
+testcases:
+  - name: diagrams_generate_requires_auth
+    steps:
+      - type: http
+        method: POST
+        url: "{{.target_url}}/api/diagrams/generate"
+        headers:
+          Content-Type: application/json
+          x-vercel-protection-bypass: "{{.bypass_secret}}"
+          x-trace-id: "{{.trace_id_generate_unauth}}"
+        body: |
+          {
+            "intermediate": {
+              "nodes": [
+                { "id": "node-1", "label": "Start" },
+                { "id": "node-2", "label": "End" }
+              ],
+              "edges": [
+                { "fromId": "node-1", "toId": "node-2", "label": "next" }
+              ],
+              "graphOptions": { "diagramType": "flowchart" }
+            }
+          }
+        assertions:
+          - result.statuscode ShouldEqual 401
+          - result.headers.X-Trace-Id ShouldEqual "{{.trace_id_generate_unauth}}"
+          - result.bodyjson.code ShouldEqual "UNAUTHORIZED"
+          - result.bodyjson.data.traceId ShouldEqual "{{.trace_id_generate_unauth}}"
+
+  - name: diagrams_parse_requires_auth
+    steps:
+      - type: http
+        method: GET
+        url: "{{.target_url}}/api/diagrams/parse?shareUrl=https%3A%2F%2Fexcalidraw.com%2F%23json%3Du124S5epdCKEF07WlyRT7%2C_gQTcjl4lABzz__Fcytufg"
+        headers:
+          x-vercel-protection-bypass: "{{.bypass_secret}}"
+          x-trace-id: "{{.trace_id_parse_unauth}}"
+        assertions:
+          - result.statuscode ShouldEqual 401
+          - result.headers.X-Trace-Id ShouldEqual "{{.trace_id_parse_unauth}}"
+          - result.bodyjson.code ShouldEqual "UNAUTHORIZED"
+          - result.bodyjson.data.traceId ShouldEqual "{{.trace_id_parse_unauth}}"
+
+  - name: device_start_and_pending
+    steps:
+      - type: http
+        method: POST
+        url: "{{.target_url}}/api/auth/device/start"
+        headers:
+          Content-Type: application/json
+          x-vercel-protection-bypass: "{{.bypass_secret}}"
+          x-trace-id: "{{.trace_id_device_start}}"
+        body: "{}"
+        vars:
+          device_code:
+            from: result.bodyjson.deviceCode
+        assertions:
+          - result.statuscode ShouldEqual 200
+          - result.headers.X-Trace-Id ShouldEqual "{{.trace_id_device_start}}"
+          - result.bodyjson.deviceCode ShouldNotBeEmpty
+          - result.bodyjson.userCode ShouldContainSubstring "-"
+          - result.bodyjson.interval ShouldBeGreaterThan 0
+          - result.bodyjson.expiresIn ShouldBeGreaterThan 0
+
+      - type: http
+        method: POST
+        url: "{{.target_url}}/api/auth/device/token"
+        headers:
+          Content-Type: application/json
+          x-vercel-protection-bypass: "{{.bypass_secret}}"
+        body: |
+          {
+            "deviceCode": "{{.device_start_and_pending.device_code}}"
+          }
+        assertions:
+          - result.statuscode ShouldEqual 200
+          - result.bodyjson.status ShouldEqual "authorization_pending"
+          - result.bodyjson.interval ShouldBeGreaterThan 0
+
+      - type: http
+        method: POST
+        url: "{{.target_url}}/api/auth/device/token"
+        headers:
+          Content-Type: application/json
+          x-vercel-protection-bypass: "{{.bypass_secret}}"
+        body: |
+          {
+            "deviceCode": "{{.device_start_and_pending.device_code}}"
+          }
+        assertions:
+          - result.statuscode ShouldEqual 200
+          - result.bodyjson.status ShouldEqual "slow_down"
+          - result.bodyjson.interval ShouldBeGreaterThan 0
+
+  - name: device_token_invalid_grant
+    steps:
+      - type: http
+        method: POST
+        url: "{{.target_url}}/api/auth/device/token"
+        headers:
+          Content-Type: application/json
+          x-vercel-protection-bypass: "{{.bypass_secret}}"
+        body: |
+          {
+            "deviceCode": "invalid-device-code"
+          }
+        assertions:
+          - result.statuscode ShouldEqual 200
+          - result.bodyjson.status ShouldEqual "invalid_grant"
+
+  - name: device_token_requires_payload
+    steps:
+      - type: http
+        method: POST
+        url: "{{.target_url}}/api/auth/device/token"
+        headers:
+          Content-Type: application/json
+          x-vercel-protection-bypass: "{{.bypass_secret}}"
+        body: "{}"
+        assertions:
+          - result.statuscode ShouldEqual 400
+          - result.bodyjson.error ShouldContainSubstring "deviceCode"

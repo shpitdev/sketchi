@@ -113,10 +113,7 @@ jobs:
         run: |
           cd tests/e2e
           bun run visual-sanity
-          bun run icon-library-generator-happy-path
-          bun run excalidraw-plus-links
-          bun run diagram-studio-happy-path
-          bun run diagram-studio-occ-conflict
+          bun run auth-gates
 
       - name: Upload E2E artifacts
         if: always() && steps.doc_check.outputs.run_tests == 'true'

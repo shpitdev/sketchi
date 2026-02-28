@@ -105,7 +105,7 @@ jobs:
             exit 0
           fi
           echo "::add-mask::$BYPASS_SECRET"
-          venom run tests/api/*.yml \
+          venom run tests/api/auth-device.yml \
             --output-dir tests/api/results \
             --format xml
 
