@@ -18,7 +18,50 @@ const DEFAULT_OAUTH_TOKEN_TTL_MS = 60 * 60 * 1000;
 const DEVICE_FLOW_POLLING_SAFETY_MARGIN_MS = 1000;
 const TRAILING_SLASH_PATTERN = /\/$/;
 const GRADE_CALL_STATE_LIMIT = 2048;
+const SKETCHI_SESSION_CACHE_LIMIT = 2048;
+const DEFAULT_THREAD_RUN_TIMEOUT_MS = 180_000;
+const SKIP_PNG_RENDER = process.env.SKETCHI_SKIP_PNG_RENDER === "1";
 const gradeCallStateByMessage = new Map<string, "running" | "completed">();
+const sketchiSessionByOpenCodeSession = new Map<string, string>();
+
+type RunStatus =
+  | "sending"
+  | "running"
+  | "applying"
+  | "persisted"
+  | "stopped"
+  | "error";
+
+interface ThreadRunResponse {
+  appState?: Record<string, unknown>;
+  assistantMessage: string | null;
+  elapsedMs: number;
+  elements?: Record<string, unknown>[];
+  latestSceneVersion: number | null;
+  promptMessageId: string;
+  reasoningSummary: string | null;
+  runError: string | null;
+  runStatus: RunStatus;
+  sessionId: string;
+  shareLink?: { url: string; shareId: string; encryptionKey: string };
+  status: "persisted" | "error" | "stopped" | "timeout";
+  threadId: string | null;
+  traceId: string;
+}
+
+interface SessionSeedResponse {
+  latestSceneVersion: number;
+  savedAt?: number;
+  sessionId: string;
+  status: "success" | "conflict";
+  threadId: string | null;
+  traceId: string;
+}
+
+interface ExcalidrawSceneSeed {
+  appState: Record<string, unknown>;
+  elements: Record<string, unknown>[];
+}
 
 function toBearerHeaderValue(value: string): string {
   const trimmed = value.trim();
@@ -119,6 +162,174 @@ function extractMessageText(
   return textParts.join("\n");
 }
 
+function normalizeIdentifierPart(value: string): string {
+  const normalized = value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (!normalized) {
+    return "unknown";
+  }
+  return normalized.slice(0, 20);
+}
+
+function hashPromptForId(value: string): string {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) % 4_294_967_295;
+  }
+  return Math.abs(hash).toString(16).padStart(8, "0").slice(0, 8);
+}
+
+function buildPromptMessageId(input: {
+  messageID?: string;
+  prompt: string;
+  sessionID: string;
+  toolName: "from" | "tweak" | "restructure";
+}): string {
+  const sessionPart = normalizeIdentifierPart(input.sessionID);
+  const messagePart = normalizeIdentifierPart(input.messageID ?? "unknown");
+  const promptHash = hashPromptForId(input.prompt);
+  return `prompt_${input.toolName}_${sessionPart}_${messagePart}_${promptHash}`;
+}
+
+function cacheSketchiSession(
+  opencodeSessionID: string,
+  sketchiSessionID: string
+): void {
+  while (sketchiSessionByOpenCodeSession.size >= SKETCHI_SESSION_CACHE_LIMIT) {
+    const oldestKey = sketchiSessionByOpenCodeSession.keys().next().value;
+    if (!oldestKey) {
+      break;
+    }
+    sketchiSessionByOpenCodeSession.delete(oldestKey);
+  }
+
+  sketchiSessionByOpenCodeSession.set(opencodeSessionID, sketchiSessionID);
+}
+
+function resolveSessionCandidate(input: {
+  explicitSessionId?: string;
+  opencodeSessionID: string;
+}): string | undefined {
+  if (input.explicitSessionId) {
+    return input.explicitSessionId;
+  }
+  return sketchiSessionByOpenCodeSession.get(input.opencodeSessionID);
+}
+
+function createStudioUrl(apiBase: string, sessionId: string): string {
+  return `${apiBase}/diagrams/${sessionId}`;
+}
+
+async function runThreadPrompt(input: {
+  abort?: AbortSignal;
+  apiBase: string;
+  authorizationHeader: string | null;
+  pollIntervalMs?: number;
+  prompt: string;
+  promptMessageId: string;
+  sessionId?: string;
+  timeoutMs?: number;
+  traceId: string;
+}): Promise<ThreadRunResponse> {
+  const runTimeoutMs = input.timeoutMs ?? DEFAULT_THREAD_RUN_TIMEOUT_MS;
+  const requestTimeoutMs = Math.max(runTimeoutMs + 15_000, 90_000);
+
+  return await fetchJson<ThreadRunResponse>(
+    `${input.apiBase}/api/diagrams/thread-run`,
+    {
+      method: "POST",
+      headers: createRequestHeaders({
+        traceId: input.traceId,
+        authorizationHeader: input.authorizationHeader,
+      }),
+      body: JSON.stringify({
+        prompt: input.prompt,
+        sessionId: input.sessionId,
+        promptMessageId: input.promptMessageId,
+        timeoutMs: input.timeoutMs,
+        pollIntervalMs: input.pollIntervalMs,
+        traceId: input.traceId,
+      }),
+    },
+    input.abort,
+    requestTimeoutMs
+  );
+}
+
+async function seedSessionFromScene(input: {
+  abort?: AbortSignal;
+  apiBase: string;
+  authorizationHeader: string | null;
+  scene: ExcalidrawSceneSeed;
+  sessionId?: string;
+  traceId: string;
+}): Promise<SessionSeedResponse> {
+  return await fetchJson<SessionSeedResponse>(
+    `${input.apiBase}/api/diagrams/session-seed`,
+    {
+      method: "POST",
+      headers: createRequestHeaders({
+        traceId: input.traceId,
+        authorizationHeader: input.authorizationHeader,
+      }),
+      body: JSON.stringify({
+        sessionId: input.sessionId,
+        elements: input.scene.elements,
+        appState: input.scene.appState,
+        traceId: input.traceId,
+      }),
+    },
+    input.abort
+  );
+}
+
+async function resolveSceneSeed(input: {
+  abort?: AbortSignal;
+  apiBase: string;
+  authorizationHeader: string | null;
+  directory: string;
+  excalidraw?: {
+    elements: Record<string, unknown>[];
+    appState?: Record<string, unknown>;
+  };
+  excalidrawPath?: string;
+  shareUrl?: string;
+  traceId: string;
+}): Promise<ExcalidrawSceneSeed | null> {
+  if (input.excalidraw) {
+    return {
+      elements: input.excalidraw.elements,
+      appState: input.excalidraw.appState ?? {},
+    };
+  }
+
+  if (input.excalidrawPath) {
+    const parsed = await readExcalidrawFile(
+      input.excalidrawPath,
+      input.directory
+    );
+    return {
+      elements: parsed.elements,
+      appState: parsed.appState ?? {},
+    };
+  }
+
+  if (input.shareUrl) {
+    const parsed = await resolveExcalidrawFromShareUrl({
+      shareUrl: input.shareUrl,
+      apiBase: input.apiBase,
+      traceId: input.traceId,
+      authorizationHeader: input.authorizationHeader,
+      abort: input.abort,
+    });
+    return {
+      elements: parsed.elements,
+      appState: parsed.appState ?? {},
+    };
+  }
+
+  return null;
+}
+
 interface DeviceStartResponse {
   deviceCode: string;
   expiresIn: number;
@@ -166,9 +377,15 @@ export const SketchiPlugin: Plugin = (input) => {
     tool: {
       diagram_from_prompt: tool({
         description:
-          "Generate an Excalidraw diagram from a prompt, returning a share link and local PNG. Prefer this over Mermaid text when diagram tools are available.",
+          "Generate or continue an Excalidraw diagram from a prompt with durable Sketchi session/thread continuity, returning share link + local PNG. Prefer this over Mermaid text when diagram tools are available.",
         args: {
           prompt: tool.schema.string().describe("What to diagram"),
+          sessionId: tool.schema
+            .string()
+            .optional()
+            .describe(
+              "Optional existing Sketchi diagram session ID to continue"
+            ),
           outputPath: tool.schema
             .string()
             .optional()
@@ -189,36 +406,76 @@ export const SketchiPlugin: Plugin = (input) => {
         async execute(args, context) {
           const traceId = createToolTraceId();
           const authorizationHeader = await getAuthorizationHeader();
-          const response = await fetchJson<{
-            shareLink: { url: string; shareId: string; encryptionKey: string };
-            elements: Record<string, unknown>[];
-            intermediate: unknown;
-            stats: Record<string, unknown>;
-          }>(
-            `${apiBase}/api/diagrams/generate`,
-            {
-              method: "POST",
-              headers: createRequestHeaders({
-                traceId,
-                authorizationHeader,
-              }),
-              body: JSON.stringify({
-                prompt: args.prompt,
-              }),
-            },
-            context.abort
-          );
+
+          const promptMessageId = buildPromptMessageId({
+            toolName: "from",
+            sessionID: context.sessionID,
+            messageID: context.messageID,
+            prompt: args.prompt,
+          });
+
+          const sessionCandidate = resolveSessionCandidate({
+            explicitSessionId: args.sessionId,
+            opencodeSessionID: context.sessionID,
+          });
+
+          const runResult = await runThreadPrompt({
+            apiBase,
+            authorizationHeader,
+            traceId,
+            sessionId: sessionCandidate,
+            prompt: args.prompt,
+            promptMessageId,
+            abort: context.abort,
+            timeoutMs: DEFAULT_THREAD_RUN_TIMEOUT_MS,
+          });
+
+          if (runResult.status !== "persisted") {
+            throw new Error(
+              runResult.runError ??
+                `Diagram run ended with ${runResult.status} (${runResult.runStatus}).`
+            );
+          }
+
+          if (!runResult.shareLink?.url) {
+            throw new Error("Missing shareLink in thread-run response.");
+          }
+
+          cacheSketchiSession(context.sessionID, runResult.sessionId);
 
           const outputPath = args.outputPath
             ? resolveOutputPath(args.outputPath, context.directory)
             : buildDefaultPngPath("diagram-generate", context.directory);
 
           try {
-            const elements = response.elements?.length
-              ? response.elements
+            if (SKIP_PNG_RENDER) {
+              return JSON.stringify(
+                {
+                  sessionId: runResult.sessionId,
+                  threadId: runResult.threadId,
+                  studioUrl: createStudioUrl(apiBase, runResult.sessionId),
+                  promptMessageId: runResult.promptMessageId,
+                  assistantMessage: runResult.assistantMessage,
+                  reasoningSummary: runResult.reasoningSummary,
+                  shareLink: runResult.shareLink,
+                  pngSkipped: true,
+                  stats: {
+                    traceId: runResult.traceId,
+                    runStatus: runResult.runStatus,
+                    elapsedMs: runResult.elapsedMs,
+                    latestSceneVersion: runResult.latestSceneVersion,
+                  },
+                },
+                null,
+                2
+              );
+            }
+
+            const elements = runResult.elements?.length
+              ? runResult.elements
               : (
                   await resolveExcalidrawFromShareUrl({
-                    shareUrl: response.shareLink.url,
+                    shareUrl: runResult.shareLink.url,
                     apiBase,
                     traceId,
                     authorizationHeader,
@@ -235,11 +492,22 @@ export const SketchiPlugin: Plugin = (input) => {
 
             return JSON.stringify(
               {
-                shareLink: response.shareLink,
+                sessionId: runResult.sessionId,
+                threadId: runResult.threadId,
+                studioUrl: createStudioUrl(apiBase, runResult.sessionId),
+                promptMessageId: runResult.promptMessageId,
+                assistantMessage: runResult.assistantMessage,
+                reasoningSummary: runResult.reasoningSummary,
+                shareLink: runResult.shareLink,
                 pngPath,
                 pngBytes: pngResult.png.length,
                 pngDurationMs: pngResult.durationMs,
-                stats: response.stats,
+                stats: {
+                  traceId: runResult.traceId,
+                  runStatus: runResult.runStatus,
+                  elapsedMs: runResult.elapsedMs,
+                  latestSceneVersion: runResult.latestSceneVersion,
+                },
               },
               null,
               2
@@ -251,8 +519,14 @@ export const SketchiPlugin: Plugin = (input) => {
       }),
       diagram_tweak: tool({
         description:
-          "Apply a tactical tweak to an existing Excalidraw diagram (text/colors/flip existing arrow direction). Prefer this over Mermaid rewrites for small edits. No add/remove or layout control; for structural changes use diagram_restructure or the Excalidraw UI.",
+          "Apply a tactical tweak to a durable Sketchi session/thread (text/colors/minor edits) and return share link + local PNG. Prefer this over Mermaid rewrites for small edits.",
         args: {
+          sessionId: tool.schema
+            .string()
+            .optional()
+            .describe(
+              "Optional existing Sketchi diagram session ID to continue"
+            ),
           shareUrl: tool.schema
             .string()
             .optional()
@@ -296,87 +570,106 @@ export const SketchiPlugin: Plugin = (input) => {
         },
         async execute(args, context) {
           const serverTimeoutMs = args.options?.timeoutMs ?? 60_000;
-          const requestTimeoutMs = Math.max(5000, serverTimeoutMs + 5000);
           const traceId = createToolTraceId();
           const authorizationHeader = await getAuthorizationHeader();
+          const promptMessageId = buildPromptMessageId({
+            toolName: "tweak",
+            sessionID: context.sessionID,
+            messageID: context.messageID,
+            prompt: args.request,
+          });
 
-          let shareUrl = args.shareUrl;
-          if (!shareUrl) {
-            const excalidraw =
-              args.excalidraw ??
-              (args.excalidrawPath
-                ? await readExcalidrawFile(
-                    args.excalidrawPath,
-                    context.directory
-                  )
-                : undefined);
+          let workingSessionId = resolveSessionCandidate({
+            explicitSessionId: args.sessionId,
+            opencodeSessionID: context.sessionID,
+          });
 
-            if (!excalidraw) {
-              throw new Error("Provide shareUrl or excalidraw input");
-            }
+          const sceneSeed = await resolveSceneSeed({
+            apiBase,
+            authorizationHeader,
+            traceId,
+            shareUrl: args.shareUrl,
+            excalidraw: args.excalidraw,
+            excalidrawPath: args.excalidrawPath,
+            directory: context.directory,
+            abort: context.abort,
+          });
 
-            const shared = await shareElements(
+          if (sceneSeed) {
+            const seeded = await seedSessionFromScene({
               apiBase,
-              {
-                elements: excalidraw.elements,
-                appState: excalidraw.appState,
-              },
-              context.abort,
-              requestTimeoutMs,
+              authorizationHeader,
               traceId,
-              authorizationHeader
+              sessionId: workingSessionId,
+              scene: sceneSeed,
+              abort: context.abort,
+            });
+            workingSessionId = seeded.sessionId;
+          }
+
+          if (!workingSessionId) {
+            throw new Error(
+              "Provide sessionId, shareUrl, or excalidraw input."
             );
-
-            shareUrl = shared.url;
           }
 
-          const response = await fetchJson<{
-            status: "success" | "failed";
-            reason?: string;
-            elements?: Record<string, unknown>[];
-            shareLink?: {
-              url: string;
-              shareId: string;
-              encryptionKey: string;
-            };
-            stats: Record<string, unknown>;
-          }>(
-            `${apiBase}/api/diagrams/tweak`,
-            {
-              method: "POST",
-              headers: createRequestHeaders({
-                traceId,
-                authorizationHeader,
-              }),
-              body: JSON.stringify({
-                shareUrl,
-                request: args.request,
-                traceId,
-                options: args.options,
-              }),
-            },
-            context.abort,
-            requestTimeoutMs
-          );
+          const runResult = await runThreadPrompt({
+            apiBase,
+            authorizationHeader,
+            traceId,
+            sessionId: workingSessionId,
+            prompt: `Tactical tweak request:\\n${args.request}`,
+            promptMessageId,
+            abort: context.abort,
+            timeoutMs: Math.max(serverTimeoutMs, DEFAULT_THREAD_RUN_TIMEOUT_MS),
+          });
 
-          if (response.status !== "success") {
-            throw new Error(response.reason ?? "Diagram tweak failed");
+          if (runResult.status !== "persisted") {
+            throw new Error(
+              runResult.runError ??
+                `Diagram tweak ended with ${runResult.status} (${runResult.runStatus}).`
+            );
           }
 
-          if (!response.shareLink?.url) {
-            throw new Error("Missing shareLink in tweak response");
+          if (!runResult.shareLink?.url) {
+            throw new Error("Missing shareLink in tweak response.");
           }
+
+          cacheSketchiSession(context.sessionID, runResult.sessionId);
 
           const outputPath = args.outputPath
             ? resolveOutputPath(args.outputPath, context.directory)
             : buildDefaultPngPath("diagram-tweak", context.directory);
 
           try {
-            const elements = response.elements?.length
-              ? response.elements
+            if (SKIP_PNG_RENDER) {
+              return JSON.stringify(
+                {
+                  sessionId: runResult.sessionId,
+                  threadId: runResult.threadId,
+                  studioUrl: createStudioUrl(apiBase, runResult.sessionId),
+                  promptMessageId: runResult.promptMessageId,
+                  assistantMessage: runResult.assistantMessage,
+                  reasoningSummary: runResult.reasoningSummary,
+                  shareLink: runResult.shareLink,
+                  pngSkipped: true,
+                  stats: {
+                    traceId: runResult.traceId,
+                    runStatus: runResult.runStatus,
+                    elapsedMs: runResult.elapsedMs,
+                    latestSceneVersion: runResult.latestSceneVersion,
+                  },
+                },
+                null,
+                2
+              );
+            }
+
+            const elements = runResult.elements?.length
+              ? runResult.elements
               : (
                   await resolveExcalidrawFromShareUrl({
-                    shareUrl: response.shareLink.url,
+                    shareUrl: runResult.shareLink.url,
                     apiBase,
                     traceId,
                     authorizationHeader,
@@ -393,11 +686,22 @@ export const SketchiPlugin: Plugin = (input) => {
 
             return JSON.stringify(
               {
-                shareLink: response.shareLink,
+                sessionId: runResult.sessionId,
+                threadId: runResult.threadId,
+                studioUrl: createStudioUrl(apiBase, runResult.sessionId),
+                promptMessageId: runResult.promptMessageId,
+                assistantMessage: runResult.assistantMessage,
+                reasoningSummary: runResult.reasoningSummary,
+                shareLink: runResult.shareLink,
                 pngPath,
                 pngBytes: pngResult.png.length,
                 pngDurationMs: pngResult.durationMs,
-                stats: response.stats,
+                stats: {
+                  traceId: runResult.traceId,
+                  runStatus: runResult.runStatus,
+                  elapsedMs: runResult.elapsedMs,
+                  latestSceneVersion: runResult.latestSceneVersion,
+                },
               },
               null,
               2
@@ -409,8 +713,14 @@ export const SketchiPlugin: Plugin = (input) => {
       }),
       diagram_restructure: tool({
         description:
-          "Restructure an Excalidraw diagram (add/remove nodes/edges, change flow). Prefer this over Mermaid rewrites for structural edits; this re-renders with automatic layout.",
+          "Restructure a durable Sketchi session/thread for structural edits and return share link + local PNG.",
         args: {
+          sessionId: tool.schema
+            .string()
+            .optional()
+            .describe(
+              "Optional existing Sketchi diagram session ID to continue"
+            ),
           shareUrl: tool.schema
             .string()
             .optional()
@@ -456,87 +766,106 @@ export const SketchiPlugin: Plugin = (input) => {
         },
         async execute(args, context) {
           const serverTimeoutMs = args.options?.timeoutMs ?? 240_000;
-          const requestTimeoutMs = Math.max(5000, serverTimeoutMs + 5000);
           const traceId = createToolTraceId();
           const authorizationHeader = await getAuthorizationHeader();
+          const promptMessageId = buildPromptMessageId({
+            toolName: "restructure",
+            sessionID: context.sessionID,
+            messageID: context.messageID,
+            prompt: args.prompt,
+          });
 
-          let shareUrl = args.shareUrl;
-          if (!shareUrl) {
-            const excalidraw =
-              args.excalidraw ??
-              (args.excalidrawPath
-                ? await readExcalidrawFile(
-                    args.excalidrawPath,
-                    context.directory
-                  )
-                : undefined);
+          let workingSessionId = resolveSessionCandidate({
+            explicitSessionId: args.sessionId,
+            opencodeSessionID: context.sessionID,
+          });
 
-            if (!excalidraw) {
-              throw new Error("Provide shareUrl or excalidraw input");
-            }
+          const sceneSeed = await resolveSceneSeed({
+            apiBase,
+            authorizationHeader,
+            traceId,
+            shareUrl: args.shareUrl,
+            excalidraw: args.excalidraw,
+            excalidrawPath: args.excalidrawPath,
+            directory: context.directory,
+            abort: context.abort,
+          });
 
-            const shared = await shareElements(
+          if (sceneSeed) {
+            const seeded = await seedSessionFromScene({
               apiBase,
-              {
-                elements: excalidraw.elements,
-                appState: excalidraw.appState,
-              },
-              context.abort,
-              requestTimeoutMs,
+              authorizationHeader,
               traceId,
-              authorizationHeader
+              sessionId: workingSessionId,
+              scene: sceneSeed,
+              abort: context.abort,
+            });
+            workingSessionId = seeded.sessionId;
+          }
+
+          if (!workingSessionId) {
+            throw new Error(
+              "Provide sessionId, shareUrl, or excalidraw input."
             );
-
-            shareUrl = shared.url;
           }
 
-          const response = await fetchJson<{
-            status: "success" | "failed";
-            reason?: string;
-            elements?: Record<string, unknown>[];
-            shareLink?: {
-              url: string;
-              shareId: string;
-              encryptionKey: string;
-            };
-            stats: Record<string, unknown>;
-          }>(
-            `${apiBase}/api/diagrams/restructure`,
-            {
-              method: "POST",
-              headers: createRequestHeaders({
-                traceId,
-                authorizationHeader,
-              }),
-              body: JSON.stringify({
-                shareUrl,
-                prompt: args.prompt,
-                traceId,
-                options: args.options,
-              }),
-            },
-            context.abort,
-            requestTimeoutMs
-          );
+          const runResult = await runThreadPrompt({
+            apiBase,
+            authorizationHeader,
+            traceId,
+            sessionId: workingSessionId,
+            prompt: `Structural restructure request:\\n${args.prompt}`,
+            promptMessageId,
+            abort: context.abort,
+            timeoutMs: Math.max(serverTimeoutMs, DEFAULT_THREAD_RUN_TIMEOUT_MS),
+          });
 
-          if (response.status !== "success") {
-            throw new Error(response.reason ?? "Diagram restructure failed");
+          if (runResult.status !== "persisted") {
+            throw new Error(
+              runResult.runError ??
+                `Diagram restructure ended with ${runResult.status} (${runResult.runStatus}).`
+            );
           }
 
-          if (!response.shareLink?.url) {
-            throw new Error("Missing shareLink in restructure response");
+          if (!runResult.shareLink?.url) {
+            throw new Error("Missing shareLink in restructure response.");
           }
+
+          cacheSketchiSession(context.sessionID, runResult.sessionId);
 
           const outputPath = args.outputPath
             ? resolveOutputPath(args.outputPath, context.directory)
             : buildDefaultPngPath("diagram-restructure", context.directory);
 
           try {
-            const elements = response.elements?.length
-              ? response.elements
+            if (SKIP_PNG_RENDER) {
+              return JSON.stringify(
+                {
+                  sessionId: runResult.sessionId,
+                  threadId: runResult.threadId,
+                  studioUrl: createStudioUrl(apiBase, runResult.sessionId),
+                  promptMessageId: runResult.promptMessageId,
+                  assistantMessage: runResult.assistantMessage,
+                  reasoningSummary: runResult.reasoningSummary,
+                  shareLink: runResult.shareLink,
+                  pngSkipped: true,
+                  stats: {
+                    traceId: runResult.traceId,
+                    runStatus: runResult.runStatus,
+                    elapsedMs: runResult.elapsedMs,
+                    latestSceneVersion: runResult.latestSceneVersion,
+                  },
+                },
+                null,
+                2
+              );
+            }
+
+            const elements = runResult.elements?.length
+              ? runResult.elements
               : (
                   await resolveExcalidrawFromShareUrl({
-                    shareUrl: response.shareLink.url,
+                    shareUrl: runResult.shareLink.url,
                     apiBase,
                     traceId,
                     authorizationHeader,
@@ -553,11 +882,22 @@ export const SketchiPlugin: Plugin = (input) => {
 
             return JSON.stringify(
               {
-                shareLink: response.shareLink,
+                sessionId: runResult.sessionId,
+                threadId: runResult.threadId,
+                studioUrl: createStudioUrl(apiBase, runResult.sessionId),
+                promptMessageId: runResult.promptMessageId,
+                assistantMessage: runResult.assistantMessage,
+                reasoningSummary: runResult.reasoningSummary,
+                shareLink: runResult.shareLink,
                 pngPath,
                 pngBytes: pngResult.png.length,
                 pngDurationMs: pngResult.durationMs,
-                stats: response.stats,
+                stats: {
+                  traceId: runResult.traceId,
+                  runStatus: runResult.runStatus,
+                  elapsedMs: runResult.elapsedMs,
+                  latestSceneVersion: runResult.latestSceneVersion,
+                },
               },
               null,
               2
@@ -650,6 +990,17 @@ export const SketchiPlugin: Plugin = (input) => {
               );
               shareLink = shared;
               elements = excalidraw.elements;
+            }
+
+            if (SKIP_PNG_RENDER) {
+              return JSON.stringify(
+                {
+                  shareLink,
+                  pngSkipped: true,
+                },
+                null,
+                2
+              );
             }
 
             const pngResult = await renderElementsToPng(elements, {
