@@ -20,6 +20,7 @@ import { ModeToggle } from "./mode-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -59,14 +60,16 @@ export default function Header() {
           align="end"
           className="w-56 min-w-[14rem] rounded-xl p-1"
         >
-          <DropdownMenuLabel className="px-3 py-2">
-            <div className="truncate font-medium text-foreground text-xs">
-              {displayName}
-            </div>
-            <div className="truncate text-[11px] text-muted-foreground">
-              {identity.email ?? "Signed in"}
-            </div>
-          </DropdownMenuLabel>
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="px-3 py-2">
+              <div className="truncate font-medium text-foreground text-xs">
+                {displayName}
+              </div>
+              <div className="truncate text-[11px] text-muted-foreground">
+                {identity.email ?? "Signed in"}
+              </div>
+            </DropdownMenuLabel>
+          </DropdownMenuGroup>
 
           <DropdownMenuSeparator />
 
