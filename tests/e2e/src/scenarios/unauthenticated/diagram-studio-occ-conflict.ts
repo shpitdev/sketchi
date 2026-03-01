@@ -114,8 +114,8 @@ async function createSession(page: PageLike, baseUrl: string): Promise<string> {
         if (hasSignInLink) {
           return false;
         }
-        return Array.from(document.querySelectorAll("button")).some((button) =>
-          button.textContent?.toLowerCase().includes("sketchi preview")
+        return Boolean(
+          document.querySelector('[data-testid="diagram-new-session"]')
         );
       }),
     { timeoutMs: 30_000, label: "auth-ready-for-create-session" }
