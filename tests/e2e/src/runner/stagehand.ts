@@ -14,10 +14,22 @@ export interface ActResult {
   success?: boolean;
 }
 
+function buildBrowserbaseSessionCreateParams(cfg: StagehandRunConfig) {
+  if (cfg.env !== "BROWSERBASE") {
+    return undefined;
+  }
+
+  return {
+    ...(cfg.browserbaseRegion ? { region: cfg.browserbaseRegion } : {}),
+    ...(cfg.browserbaseSessionTimeoutSeconds
+      ? { timeout: cfg.browserbaseSessionTimeoutSeconds }
+      : {}),
+  };
+}
+
 export async function createStagehand(cfg: StagehandRunConfig) {
-  const browserbaseSessionCreateParams = cfg.browserbaseRegion
-    ? { region: cfg.browserbaseRegion }
-    : undefined;
+  const browserbaseSessionCreateParams =
+    buildBrowserbaseSessionCreateParams(cfg);
   const maxAttempts = cfg.env === "BROWSERBASE" ? 3 : 1;
   let lastError: unknown;
 

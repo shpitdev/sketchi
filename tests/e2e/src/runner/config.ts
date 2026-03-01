@@ -15,6 +15,7 @@ export interface StagehandRunConfig {
     | "us-east-1"
     | "eu-central-1"
     | "ap-southeast-1";
+  browserbaseSessionTimeoutSeconds?: number;
   cacheDir: string;
   chromePath?: string;
   env: StagehandEnv;
@@ -80,6 +81,12 @@ export function loadConfig(): StagehandRunConfig {
       (firstEnv("BROWSERBASE_REGION", "STAGEHAND_BROWSERBASE_REGION") as
         | StagehandRunConfig["browserbaseRegion"]
         | "") || undefined,
+    browserbaseSessionTimeoutSeconds: parsePositiveInteger(
+      firstEnv(
+        "BROWSERBASE_SESSION_TIMEOUT_SECONDS",
+        "STAGEHAND_BROWSERBASE_SESSION_TIMEOUT_SECONDS"
+      )
+    ),
     headless: parseBoolean(firstEnv("STAGEHAND_HEADLESS"), true),
     chromePath,
     screenshotsEnabled: parseBoolean(firstEnv("STAGEHAND_SCREENSHOTS"), true),
@@ -151,6 +158,14 @@ function parseVerbose(value: string | undefined): 0 | 1 | 2 {
     return 2;
   }
   return 0;
+}
+
+function parsePositiveInteger(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function resolvePath(

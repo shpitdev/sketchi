@@ -66,22 +66,69 @@ async function clickIfVisible(page: AuthPage, selector: string) {
   return false;
 }
 
-async function waitForDiagramsReturn(page: AuthPage, label: string) {
-  const returnedToDiagrams = await waitForCondition(
-    () => page.url().includes("/diagrams"),
+async function pageShowsSignInCallToAction(page: AuthPage): Promise<boolean> {
+  return await page.evaluate(() => {
+    const candidates = Array.from(
+      document.querySelectorAll("a,button,[role='button']")
+    );
+    return candidates.some((node) => {
+      const text = node.textContent?.trim().toLowerCase();
+      return text === "sign in";
+    });
+  });
+}
+
+async function waitForDiagramsReturn(
+  page: AuthPage,
+  label: string,
+  baseUrl: string
+) {
+  const reachedSignedInDestination = await waitForCondition(
+    () => {
+      const currentUrl = page.url();
+      if (currentUrl.includes("/diagrams")) {
+        return true;
+      }
+      try {
+        const parsed = new URL(currentUrl);
+        return parsed.pathname === "/";
+      } catch {
+        return false;
+      }
+    },
     { timeoutMs: 60_000, label }
   );
-  if (!returnedToDiagrams) {
-    throw new Error(`Expected redirect back to /diagrams, got ${page.url()}`);
+  if (!reachedSignedInDestination) {
+    throw new Error(`Expected redirect to signed-in page, got ${page.url()}`);
+  }
+
+  if (page.url().includes("/diagrams")) {
+    return;
+  }
+
+  await page.goto(resolveUrl(baseUrl, "/diagrams"), {
+    waitUntil: "domcontentloaded",
+  });
+  await sleep(1200);
+
+  const landedOnDiagrams = await waitForCondition(
+    () => page.url().includes("/diagrams"),
+    { timeoutMs: 20_000, label: `${label}-navigate-diagrams` }
+  );
+  if (!landedOnDiagrams) {
+    throw new Error(`Expected /diagrams after sign-in, got ${page.url()}`);
   }
 }
 
-async function continueFromSignedInPage(page: AuthPage): Promise<boolean> {
+async function continueFromSignedInPage(
+  page: AuthPage,
+  baseUrl: string
+): Promise<boolean> {
   const clicked = await clickIfVisible(page, 'a:has-text("Continue")');
   if (!clicked) {
     return false;
   }
-  await waitForDiagramsReturn(page, "auth-continue-diagrams");
+  await waitForDiagramsReturn(page, "auth-continue-diagrams", baseUrl);
   return true;
 }
 
@@ -180,8 +227,18 @@ export async function ensureSignedInForDiagrams(
   });
   await sleep(1500);
 
-  if (!page.url().includes("/sign-in")) {
+  const showsSignInCta = await pageShowsSignInCallToAction(page);
+  if (!(showsSignInCta || page.url().includes("/sign-in"))) {
     return;
+  }
+
+  if (showsSignInCta && !page.url().includes("/sign-in")) {
+    const clickedSignIn =
+      (await clickIfVisible(page, 'a[href="/sign-in"]')) ||
+      (await clickIfVisible(page, 'a:has-text("Sign in")'));
+    if (clickedSignIn) {
+      await sleep(1200);
+    }
   }
 
   const clickedContinueToSignIn = await clickIfVisible(
@@ -189,7 +246,7 @@ export async function ensureSignedInForDiagrams(
     'a:has-text("Continue to sign in")'
   );
   const continued =
-    clickedContinueToSignIn || (await continueFromSignedInPage(page));
+    clickedContinueToSignIn || (await continueFromSignedInPage(page, baseUrl));
   const hasCredentials = Boolean(credentials.email && credentials.password);
   if (!(continued || hasCredentials)) {
     throw new Error(
@@ -197,7 +254,8 @@ export async function ensureSignedInForDiagrams(
     );
   }
 
-  if (!page.url().includes("/diagrams")) {
+  const stillShowsSignInCta = await pageShowsSignInCallToAction(page);
+  if (!page.url().includes("/diagrams") || stillShowsSignInCta) {
     await openHostedSignInIfNeeded(page);
     if (!(credentials.email && credentials.password)) {
       throw new Error(
@@ -207,6 +265,13 @@ export async function ensureSignedInForDiagrams(
     await ensureCredentialsForm(page);
     await submitEmailStep(page, credentials.email);
     await submitPasswordStep(page, credentials.password);
-    await waitForDiagramsReturn(page, "auth-return-diagrams");
+    await waitForDiagramsReturn(page, "auth-return-diagrams", baseUrl);
+  }
+
+  const finalSignInCta = await pageShowsSignInCallToAction(page);
+  if (finalSignInCta) {
+    throw new Error(
+      "Diagram Studio sign-in did not complete; sign-in CTA still visible."
+    );
   }
 }
