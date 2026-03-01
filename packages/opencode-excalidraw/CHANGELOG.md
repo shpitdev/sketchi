@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.8](https://github.com/shpitdev/sketchi/compare/opencode-excalidraw-v0.0.7...opencode-excalidraw-v0.0.8) (2026-03-01)
+
+
+### Features
+
+* **auth:** add WorkOS auth foundation and OAuth device flow ([#171](https://github.com/shpitdev/sketchi/issues/171)) ([d695c99](https://github.com/shpitdev/sketchi/commit/d695c999bf1bbb6f9c9c52a66077708632b2c30b))
+* complete [#120](https://github.com/shpitdev/sketchi/issues/120) web↔OpenCode thread continuity, streaming UX, and OCC recovery ([#178](https://github.com/shpitdev/sketchi/issues/178)) ([d3e042a](https://github.com/shpitdev/sketchi/commit/d3e042a81e4f66b84da92399ab3263ff78f12961))
+
 ## [0.0.7](https://github.com/shpitdev/sketchi/compare/opencode-excalidraw-v0.0.6...opencode-excalidraw-v0.0.7) (2026-02-27)
 
 
