@@ -130,9 +130,10 @@ jobs:
             -H "Content-Type: application/json" \
             --data-binary "$(jq -nc \
               --arg clientId "$WORKOS_CLIENT_ID" \
+              --arg clientSecret "$WORKOS_API_KEY" \
               --arg email "$SKETCHI_E2E_EMAIL" \
               --arg password "$SKETCHI_E2E_PASSWORD" \
-              '{grant_type:"password",client_id:$clientId,email:$email,password:$password}')" \
+              '{grant_type:"password",client_id:$clientId,client_secret:$clientSecret,email:$email,password:$password}')" \
           )"
           API_AUTH_TOKEN="$(printf '%s' "$AUTH_RESPONSE" | jq -r '.access_token // empty')"
           if [ -z "$API_AUTH_TOKEN" ]; then
