@@ -14,6 +14,8 @@ import type * as diagramGenerateIntermediateFromPrompt from "../diagramGenerateI
 import type * as diagramModifyElements from "../diagramModifyElements.js";
 import type * as diagramModifyFromShareLink from "../diagramModifyFromShareLink.js";
 import type * as diagramSessions from "../diagramSessions.js";
+import type * as diagramThreads from "../diagramThreads.js";
+import type * as diagramThreadsNode from "../diagramThreadsNode.js";
 import type * as diagrams from "../diagrams.js";
 import type * as excalidrawShareLinks from "../excalidrawShareLinks.js";
 import type * as export_ from "../export.js";
@@ -42,6 +44,8 @@ declare const fullApi: ApiFromModules<{
   diagramModifyElements: typeof diagramModifyElements;
   diagramModifyFromShareLink: typeof diagramModifyFromShareLink;
   diagramSessions: typeof diagramSessions;
+  diagramThreads: typeof diagramThreads;
+  diagramThreadsNode: typeof diagramThreadsNode;
   diagrams: typeof diagrams;
   excalidrawShareLinks: typeof excalidrawShareLinks;
   export: typeof export_;

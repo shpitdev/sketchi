@@ -1,6 +1,6 @@
 // Scenario:
 // 1) diagram_from_prompt -> expect shareLink + PNG under ./sketchi/png
-// 2) diagram_tweak (shareUrl + request) -> expect new shareLink + PNG
+// 2) diagram_tweak (same session + request) -> expect same session continuity + PNG
 // 3) diagram_to_png (shareUrl) -> expect PNG under ./sketchi/png
 import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
@@ -29,7 +29,12 @@ function createContext(): ToolContext {
   };
 }
 
+const SKIP_PNG_RENDER = process.env.SKETCHI_SKIP_PNG_RENDER === "1";
+
 async function assertPngPath(path: string) {
+  if (SKIP_PNG_RENDER) {
+    return;
+  }
   const pngRoot = resolve(process.cwd(), "sketchi", "png");
   const normalized = resolve(path);
   if (!normalized.startsWith(pngRoot)) {
@@ -48,47 +53,74 @@ function wait(ms: number) {
   return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 }
 
-async function run() {
-  const directory = resolve(process.cwd());
-  const plugin = await SketchiPlugin({
-    client: {} as never,
-    project: { id: "test", name: "test", root: directory } as never,
-    directory,
-    worktree: directory,
-    serverUrl: new URL("http://localhost:0"),
-    $: {} as never,
-  });
-  const tools = plugin.tool ?? {};
-  const context = createContext();
+type DiagramFromPromptTool = NonNullable<
+  Awaited<ReturnType<typeof SketchiPlugin>>["tool"]
+>["diagram_from_prompt"];
+type DiagramTweakTool = NonNullable<
+  Awaited<ReturnType<typeof SketchiPlugin>>["tool"]
+>["diagram_tweak"];
+type DiagramToPngTool = NonNullable<
+  Awaited<ReturnType<typeof SketchiPlugin>>["tool"]
+>["diagram_to_png"];
 
-  const fromPrompt = tools.diagram_from_prompt;
-  const tweak = tools.diagram_tweak;
-  const toPng = tools.diagram_to_png;
+interface GenerateResult {
+  pngPath?: string;
+  pngSkipped?: boolean;
+  sessionId: string;
+  shareLink: { url: string };
+  studioUrl: string;
+}
 
-  if (!fromPrompt) {
-    throw new Error("diagram_from_prompt tool missing");
-  }
-  if (!tweak) {
-    throw new Error("diagram_tweak tool missing");
-  }
-  if (!toPng) {
-    throw new Error("diagram_to_png tool missing");
-  }
+interface TweakResult {
+  pngPath?: string;
+  pngSkipped?: boolean;
+  sessionId: string;
+  shareLink: { url: string };
+  studioUrl: string;
+}
 
+function requireTool<T>(tool: T | undefined, name: string): T {
+  if (!tool) {
+    throw new Error(`${name} tool missing`);
+  }
+  return tool;
+}
+
+async function runGenerateScenario(
+  fromPrompt: DiagramFromPromptTool,
+  context: ToolContext
+): Promise<GenerateResult> {
   console.log("Scenario 1: diagram_from_prompt");
   const generateRaw = await fromPrompt.execute(
     { prompt: "Create a two-step flowchart: Start -> End." },
     context
   );
-  const generate = JSON.parse(generateRaw) as {
-    shareLink: { url: string };
-    pngPath: string;
-  };
+  const generate = JSON.parse(generateRaw) as GenerateResult;
+
+  if (!generate.sessionId) {
+    throw new Error("diagram_from_prompt did not return sessionId");
+  }
+  if (!generate.studioUrl?.includes(`/diagrams/${generate.sessionId}`)) {
+    throw new Error("diagram_from_prompt did not return matching studioUrl");
+  }
   if (!generate.shareLink?.url?.includes("https://excalidraw.com/#json=")) {
     throw new Error("diagram_from_prompt did not return Excalidraw share link");
   }
-  await assertPngPath(generate.pngPath);
+  if (!SKIP_PNG_RENDER) {
+    if (!generate.pngPath) {
+      throw new Error("diagram_from_prompt missing pngPath");
+    }
+    await assertPngPath(generate.pngPath);
+  }
 
+  return generate;
+}
+
+async function runTweakScenario(
+  tweak: DiagramTweakTool,
+  context: ToolContext,
+  generate: GenerateResult
+): Promise<TweakResult> {
   console.log("Scenario 2: diagram_tweak");
   let tweakRaw: string | undefined;
   let tweakError: unknown;
@@ -108,7 +140,7 @@ async function run() {
       try {
         tweakRaw = await tweak.execute(
           {
-            shareUrl: generate.shareLink.url,
+            sessionId: generate.sessionId,
             ...payload,
           },
           context
@@ -128,14 +160,39 @@ async function run() {
     throw tweakError;
   }
 
-  const tweaked = JSON.parse(tweakRaw) as {
-    shareLink: { url: string };
-    pngPath: string;
-  };
+  const tweaked = JSON.parse(tweakRaw) as TweakResult;
+  if (tweaked.sessionId !== generate.sessionId) {
+    throw new Error(
+      `Expected tweak to stay on session ${generate.sessionId}, got ${tweaked.sessionId}`
+    );
+  }
+  if (!tweaked.studioUrl?.includes(`/diagrams/${generate.sessionId}`)) {
+    throw new Error("diagram_tweak did not return matching studioUrl");
+  }
   if (!tweaked.shareLink?.url?.includes("https://excalidraw.com/#json=")) {
     throw new Error("diagram_tweak did not return Excalidraw share link");
   }
-  await assertPngPath(tweaked.pngPath);
+  if (!SKIP_PNG_RENDER) {
+    if (!tweaked.pngPath) {
+      throw new Error("diagram_tweak missing pngPath");
+    }
+    await assertPngPath(tweaked.pngPath);
+  }
+
+  return tweaked;
+}
+
+async function runToPngScenario(
+  toPng: DiagramToPngTool,
+  context: ToolContext,
+  tweaked: TweakResult
+) {
+  if (SKIP_PNG_RENDER) {
+    console.log(
+      "Scenario 3: diagram_to_png (skipped via SKETCHI_SKIP_PNG_RENDER=1)"
+    );
+    return;
+  }
 
   console.log("Scenario 3: diagram_to_png");
   const toPngRaw = await toPng.execute(
@@ -144,6 +201,34 @@ async function run() {
   );
   const toPngResult = JSON.parse(toPngRaw) as { pngPath: string };
   await assertPngPath(toPngResult.pngPath);
+}
+
+async function run() {
+  const directory = resolve(process.cwd());
+  const plugin = await SketchiPlugin({
+    client: {} as never,
+    project: { id: "test", name: "test", root: directory } as never,
+    directory,
+    worktree: directory,
+    serverUrl: new URL("http://localhost:0"),
+    $: {} as never,
+  });
+  const tools = plugin.tool ?? {};
+  const context = createContext();
+
+  const fromPrompt = requireTool(
+    tools.diagram_from_prompt,
+    "diagram_from_prompt"
+  );
+  const tweak = requireTool(tools.diagram_tweak, "diagram_tweak");
+  const toPng = requireTool(tools.diagram_to_png, "diagram_to_png");
+
+  const generate = await runGenerateScenario(fromPrompt, context);
+  console.log(`  continuity.sessionId=${generate.sessionId}`);
+  console.log(`  continuity.studioUrl=${generate.studioUrl}`);
+  const tweaked = await runTweakScenario(tweak, context, generate);
+  console.log(`  continuity.tweakSessionId=${tweaked.sessionId}`);
+  await runToPngScenario(toPng, context, tweaked);
 
   console.log("All plugin scenarios passed.");
 

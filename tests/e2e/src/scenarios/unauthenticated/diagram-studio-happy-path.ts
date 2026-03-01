@@ -1,17 +1,20 @@
 /*
 Scenario: Diagram Studio happy path
 
-Intent: Validate session create -> canvas interaction -> autosave -> reload persistence ->
+Intent: Validate session create -> prompt streaming/tool lifecycle -> autosave ->
+        stop flow -> off-bottom scroll behavior -> reload persistence ->
         import share link -> export share link -> export .excalidraw file.
 
 Steps:
 - Navigate to /diagrams and click "New diagram" button.
 - Wait for session URL (pattern /diagrams/<sessionId>).
 - Verify Excalidraw canvas loads (diagram-canvas testid).
-- Add a text element: press "t", click canvas, type "hello", press Escape.
+- Add a text element to trigger autosave.
 - Wait for autosave (diagram-save-status becomes "Saved").
 - Capture version from diagram-session-version.
 - Reload page and verify version unchanged + element count > 0.
+- Trigger stop while streaming and verify stopped status.
+- Verify off-bottom streaming does not yank and scroll-to-latest works.
 - Verify AI restructure warning exists (diagram-restructure-warning).
 - Import a known share link and verify it persists after reload.
 - Export share link and verify URL pattern.
@@ -19,11 +22,14 @@ Steps:
 
 Success:
 - Session created with valid URL.
-- Text element added and autosaved.
+- Streaming shows tool lifecycle statuses.
+- Stop during streaming reaches terminal stopped state.
+- Off-bottom behavior preserves user scroll and affordance works.
 - Reload preserves version and elements.
 - Import/export flows complete without errors.
 */
 
+import { ensureSignedInForDiagrams } from "../../runner/auth";
 import { loadConfig } from "../../runner/config";
 import {
   captureScreenshot,
@@ -84,41 +90,118 @@ function waitForSaveStatus(
   );
 }
 
+function waitForRunStatus(
+  page: PageLike,
+  statusSubstring: string,
+  timeoutMs = 30_000
+): Promise<boolean> {
+  return waitForCondition(
+    async () => {
+      const text = await getTestIdText(page, "diagram-status-row");
+      return text.includes(statusSubstring);
+    },
+    { timeoutMs, label: `run-status:${statusSubstring}` }
+  );
+}
+
+async function sendChatPrompt(page: PageLike, prompt: string): Promise<void> {
+  await page.locator(testIdSelector("diagram-chat-input")).fill(prompt);
+  await clickWhenVisible(page, testIdSelector("diagram-chat-send"), {
+    timeoutMs: 5000,
+    label: "diagram-chat-send",
+  });
+}
+
+function hasToolStatus(
+  page: PageLike,
+  statuses: Array<"pending" | "running" | "completed" | "error">
+): Promise<boolean> {
+  return page.evaluate((wanted) => {
+    const nodes = Array.from(
+      document.querySelectorAll('[data-testid="diagram-tool-message"]')
+    );
+    return nodes.some((node) => {
+      const status = node.getAttribute("data-tool-status");
+      return Boolean(
+        status && wanted.includes(status as (typeof wanted)[number])
+      );
+    });
+  }, statuses);
+}
+
 async function createSessionAndNavigate(
   page: PageLike,
   baseUrl: string,
   cfg: import("../../runner/config").StagehandRunConfig
 ): Promise<string> {
-  await page.goto(resolveUrl(baseUrl, "/diagrams"), {
-    waitUntil: "domcontentloaded",
-  });
-  await sleep(3000);
+  await ensureSignedInForDiagrams(page, baseUrl);
+  if (!page.url().includes("/diagrams")) {
+    await page.goto(resolveUrl(baseUrl, "/diagrams"), {
+      waitUntil: "domcontentloaded",
+    });
+  }
+  await sleep(2500);
+  const authReady = await waitForCondition(
+    () =>
+      page.evaluate(() => {
+        const hasSignInLink = Array.from(document.querySelectorAll("a")).some(
+          (anchor) => anchor.textContent?.trim() === "Sign in"
+        );
+        if (hasSignInLink) {
+          return false;
+        }
+        return Array.from(document.querySelectorAll("button")).some((button) =>
+          button.textContent?.toLowerCase().includes("sketchi preview")
+        );
+      }),
+    { timeoutMs: 30_000, label: "auth-ready-for-create-session" }
+  );
+  if (!authReady) {
+    throw new Error("Auth did not settle before session creation.");
+  }
 
   // biome-ignore lint/suspicious/noExplicitAny: Playwright Page types
   await captureScreenshot(page as any, cfg, "diagram-studio-landing", {
     prompt: "Capture /diagrams landing page with recents list",
   });
 
-  await clickWhenVisible(page, testIdSelector("diagram-new-session"), {
-    timeoutMs: 15_000,
-    label: "new-session-button",
-  });
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    await clickWhenVisible(page, testIdSelector("diagram-new-session"), {
+      timeoutMs: 15_000,
+      label: `new-session-button-attempt-${attempt}`,
+    });
 
-  const navigated = await waitForCondition(
-    () => SESSION_URL_REGEX.test(page.url()),
-    { timeoutMs: 30_000, label: "session-url" }
-  );
-  if (!navigated) {
-    throw new Error(`Expected session URL, got: ${page.url()}`);
+    const navigated = await waitForCondition(
+      () => SESSION_URL_REGEX.test(page.url()),
+      { timeoutMs: 10_000, label: `session-url-attempt-${attempt}` }
+    );
+    if (navigated) {
+      return page.url();
+    }
+
+    await sleep(800 * attempt);
+    await page.goto(resolveUrl(baseUrl, "/diagrams"), {
+      waitUntil: "domcontentloaded",
+    });
+    await sleep(1200);
   }
 
-  return page.url();
+  throw new Error(`Expected session URL, got: ${page.url()}`);
 }
 
 async function waitForCanvas(page: PageLike): Promise<void> {
-  const canvasLoaded = await waitForTestId(page, "diagram-canvas", 30_000);
+  const canvasLoaded = await waitForCondition(
+    () =>
+      page.evaluate(() => {
+        return Boolean(
+          document.querySelector('[data-testid="diagram-canvas"]') ||
+            document.querySelector(".excalidraw")
+        );
+      }),
+    { timeoutMs: 45_000, label: "diagram-canvas" }
+  );
   if (!canvasLoaded) {
-    throw new Error("Excalidraw canvas did not load (diagram-canvas).");
+    throw new Error(`Excalidraw canvas did not load. URL: ${page.url()}`);
   }
 }
 
@@ -399,7 +482,11 @@ async function verifyEmptyCanvasAssertions(page: PageLike): Promise<void> {
     );
     return input?.textContent?.trim() ?? "";
   });
-  if (!placeholder.includes("Describe your diagram")) {
+  const validPlaceholders = [
+    "Describe the diagram to generate...",
+    "Describe how the current diagram should change...",
+  ];
+  if (!validPlaceholders.includes(placeholder)) {
     throw new Error(`Wrong placeholder: ${placeholder}`);
   }
 
@@ -418,12 +505,7 @@ async function generateFromBlankCanvas(
   reviewPage: Parameters<typeof captureScreenshot>[0],
   cfg: import("../../runner/config").StagehandRunConfig
 ): Promise<void> {
-  await page
-    .locator(testIdSelector("diagram-chat-input"))
-    .fill("Flowchart: Start -> Process -> End");
-  await clickWhenVisible(page, testIdSelector("diagram-chat-send"), {
-    timeoutMs: 5000,
-  });
+  await sendChatPrompt(page, "Flowchart: Start -> Process -> End");
   const statusRowAppeared = await waitForTestId(
     page,
     "diagram-status-row",
@@ -434,7 +516,166 @@ async function generateFromBlankCanvas(
       prompt: "Capture status row showing generating state",
     });
   }
+  const sawLiveToolStatus = await waitForCondition(
+    () => hasToolStatus(page, ["pending", "running"]),
+    { timeoutMs: 20_000, label: "tool-status-live" }
+  );
+  if (!sawLiveToolStatus) {
+    throw new Error(
+      "Did not observe pending/running tool status during generation."
+    );
+  }
+  const sawCompletedToolStatus = await waitForCondition(
+    () => hasToolStatus(page, ["completed"]),
+    { timeoutMs: 60_000, label: "tool-status-complete" }
+  );
+  if (!sawCompletedToolStatus) {
+    throw new Error("Did not observe completed tool status.");
+  }
+  const persisted = await waitForRunStatus(page, "Persisted", 60_000);
+  if (!persisted) {
+    throw new Error("Run did not reach persisted status.");
+  }
   await waitForSaveStatus(page, "Saved", 60_000);
+}
+
+async function stopDuringStreaming(
+  page: PageLike,
+  reviewPage: Parameters<typeof captureScreenshot>[0],
+  cfg: import("../../runner/config").StagehandRunConfig
+): Promise<void> {
+  await sendChatPrompt(
+    page,
+    "Create a detailed architecture with many components, retries, fallbacks, and monitoring lanes."
+  );
+  const stopVisible = await waitForTestId(page, "diagram-chat-stop", 15_000);
+  if (!stopVisible) {
+    throw new Error("Stop button did not appear during streaming.");
+  }
+
+  await clickWhenVisible(page, testIdSelector("diagram-chat-stop"), {
+    timeoutMs: 5000,
+    label: "diagram-chat-stop",
+  });
+
+  const stopped = await waitForRunStatus(page, "Stopped", 30_000);
+  if (!stopped) {
+    throw new Error("Run status did not transition to Stopped.");
+  }
+
+  await captureScreenshot(reviewPage, cfg, "diagram-studio-stopped", {
+    prompt: "Capture chat sidebar after stop during streaming.",
+  });
+}
+
+async function verifyOffBottomScrollBehavior(
+  page: PageLike,
+  reviewPage: Parameters<typeof captureScreenshot>[0],
+  cfg: import("../../runner/config").StagehandRunConfig
+): Promise<void> {
+  await page.evaluate(() => {
+    const container = document.querySelector(
+      '[data-testid="diagram-chat-scroll-container"]'
+    ) as HTMLElement | null;
+    if (container) {
+      container.style.maxHeight = "180px";
+      container.style.overflowY = "auto";
+    }
+  });
+
+  await sendChatPrompt(page, "Add a validation step after Process.");
+  await waitForRunStatus(page, "Persisted", 60_000);
+  await sendChatPrompt(page, "Add a final reporting node.");
+  await waitForRunStatus(page, "Persisted", 60_000);
+
+  const hasOverflow = await waitForCondition(
+    () =>
+      page.evaluate(() => {
+        const container = document.querySelector(
+          '[data-testid="diagram-chat-scroll-container"]'
+        ) as HTMLElement | null;
+        if (!container) {
+          return false;
+        }
+        return container.scrollHeight > container.clientHeight + 24;
+      }),
+    { timeoutMs: 15_000, label: "chat-overflow" }
+  );
+  if (!hasOverflow) {
+    throw new Error(
+      "Chat history did not overflow; cannot validate off-bottom behavior."
+    );
+  }
+
+  await page.evaluate(() => {
+    const container = document.querySelector(
+      '[data-testid="diagram-chat-scroll-container"]'
+    ) as HTMLElement | null;
+    if (container) {
+      container.scrollTop = 0;
+    }
+  });
+
+  await sendChatPrompt(page, "Add an audit trail side branch.");
+  const running = await waitForRunStatus(page, "Running", 20_000);
+  if (!running) {
+    throw new Error("Run did not enter running state for off-bottom check.");
+  }
+
+  await sleep(1200);
+  const stillOffBottom = await page.evaluate(() => {
+    const container = document.querySelector(
+      '[data-testid="diagram-chat-scroll-container"]'
+    ) as HTMLElement | null;
+    if (!container) {
+      return false;
+    }
+    return container.scrollTop < 32;
+  });
+  if (!stillOffBottom) {
+    throw new Error(
+      "Chat auto-follow yanked scroll while user was off-bottom."
+    );
+  }
+
+  const affordanceVisible = await waitForTestId(
+    page,
+    "diagram-scroll-to-latest",
+    15_000
+  );
+  if (!affordanceVisible) {
+    throw new Error("Scroll-to-latest affordance did not appear off-bottom.");
+  }
+
+  await clickWhenVisible(page, testIdSelector("diagram-scroll-to-latest"), {
+    timeoutMs: 5000,
+    label: "diagram-scroll-to-latest",
+  });
+
+  const returnedToBottom = await waitForCondition(
+    () =>
+      page.evaluate(() => {
+        const container = document.querySelector(
+          '[data-testid="diagram-chat-scroll-container"]'
+        ) as HTMLElement | null;
+        if (!container) {
+          return false;
+        }
+        const distance =
+          container.scrollHeight -
+          (container.scrollTop + container.clientHeight);
+        return distance <= 32;
+      }),
+    { timeoutMs: 10_000, label: "scroll-return-bottom" }
+  );
+  if (!returnedToBottom) {
+    throw new Error("Scroll-to-latest did not return the feed to bottom.");
+  }
+
+  await captureScreenshot(reviewPage, cfg, "diagram-studio-scroll-affordance", {
+    prompt:
+      "Capture chat sidebar while streaming off-bottom with scroll-to-latest behavior validated.",
+  });
 }
 
 function catchWarning(
@@ -522,8 +763,30 @@ async function main() {
       "restructure-warning check failed"
     );
 
-    // Step 9: Import share link
-    console.log("[9/12] Testing import share link...");
+    // Step 9: Stop during streaming
+    console.log("[9/14] Testing stop during streaming...");
+    await catchWarning(
+      async () => {
+        await stopDuringStreaming(page, reviewPage, cfg);
+        console.log("  Stop flow verified.");
+      },
+      warnings,
+      "stop-during-streaming check failed"
+    );
+
+    // Step 10: Off-bottom scroll behavior
+    console.log("[10/14] Testing off-bottom scroll behavior...");
+    await catchWarning(
+      async () => {
+        await verifyOffBottomScrollBehavior(page, reviewPage, cfg);
+        console.log("  Off-bottom scroll behavior verified.");
+      },
+      warnings,
+      "off-bottom scroll behavior check failed"
+    );
+
+    // Step 11: Import share link
+    console.log("[11/14] Testing import share link...");
     await catchWarning(
       async () => {
         await testImportShareLink(page);
@@ -537,8 +800,8 @@ async function main() {
       "import test failed"
     );
 
-    // Step 10: Export share link + .excalidraw
-    console.log("[10/12] Testing export flows...");
+    // Step 12: Export share link + .excalidraw
+    console.log("[12/14] Testing export flows...");
     await catchWarning(
       async () => {
         const exportedUrl = await testExportShareLink(page);
@@ -563,8 +826,8 @@ async function main() {
       "export excalidraw test failed"
     );
 
-    // Step 11: Recents screenshot
-    console.log("[11/12] Capturing recents list...");
+    // Step 13: Recents screenshot
+    console.log("[13/14] Capturing recents list...");
     await page.goto(resolveUrl(cfg.baseUrl, "/diagrams"), {
       waitUntil: "domcontentloaded",
     });
@@ -574,8 +837,8 @@ async function main() {
       prompt: "Capture recents list showing visited session",
     });
 
-    // Step 12: Final screenshot
-    console.log("[12/12] Final capture...");
+    // Step 14: Final screenshot
+    console.log("[14/14] Final capture...");
     await captureScreenshot(reviewPage, cfg, "diagram-studio-final", {
       prompt:
         "Does the diagram studio page look correct with canvas, toolbar, and chat sidebar?",

@@ -19,13 +19,18 @@ const authed = t.withIdentity({
 });
 
 const HEX_32_PATTERN = /^[0-9a-f]{32}$/;
+const THREAD_32_PATTERN = /^thread_[0-9a-f]{32}$/;
 
 describe("diagramSessions", () => {
   test("create -> get returns empty scene with version 0", async () => {
-    const { sessionId } = await authed.mutation(api.diagramSessions.create, {});
+    const { sessionId, threadId } = await authed.mutation(
+      api.diagramSessions.create,
+      {}
+    );
 
     expect(sessionId).toHaveLength(32);
     expect(HEX_32_PATTERN.test(sessionId)).toBe(true);
+    expect(threadId).toMatch(THREAD_32_PATTERN);
 
     const session = await authed.query(api.diagramSessions.get, { sessionId });
 
@@ -33,6 +38,7 @@ describe("diagramSessions", () => {
     expect(session?.sessionId).toBe(sessionId);
     expect(session?.latestScene).toBeNull();
     expect(session?.latestSceneVersion).toBe(0);
+    expect(session?.threadId).toBe(threadId);
     expect(session?.createdAt).toBeGreaterThan(0);
     expect(session?.updatedAt).toBeGreaterThan(0);
   });

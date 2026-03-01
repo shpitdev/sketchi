@@ -181,6 +181,255 @@ function throwInternalError(params: {
   });
 }
 
+const DEFAULT_THREAD_RUN_TIMEOUT_MS = 120_000;
+const DEFAULT_THREAD_RUN_POLL_INTERVAL_MS = 700;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function createPromptMessageId(): string {
+  return `prompt_${crypto.randomUUID().replace(/-/g, "")}`;
+}
+
+function getAssistantMessageForPrompt(
+  messages: Array<{
+    promptMessageId: string | null;
+    role: "user" | "assistant" | "tool";
+    messageType: "chat" | "tool";
+    content: string;
+    reasoningSummary: string | null;
+  }>,
+  promptMessageId: string
+): { content: string; reasoningSummary: string | null } | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!message) {
+      continue;
+    }
+    if (
+      message.promptMessageId === promptMessageId &&
+      message.role === "assistant" &&
+      message.messageType === "chat"
+    ) {
+      return {
+        content: message.content,
+        reasoningSummary: message.reasoningSummary,
+      };
+    }
+  }
+  return null;
+}
+
+function isTerminalRunStatus(
+  status: "sending" | "running" | "applying" | "persisted" | "stopped" | "error"
+): boolean {
+  return status === "persisted" || status === "stopped" || status === "error";
+}
+
+async function ensureSessionForThreadRun(input: {
+  context: OrpcContext;
+  sessionId?: string;
+}): Promise<{ sessionId: string; threadId: string | null }> {
+  if (input.sessionId) {
+    const ensured = await input.context.convex.mutation(
+      api.diagramSessions.ensureThread,
+      { sessionId: input.sessionId }
+    );
+    return {
+      sessionId: input.sessionId,
+      threadId: ensured.threadId,
+    };
+  }
+
+  const created = await input.context.convex.mutation(
+    api.diagramSessions.create,
+    {}
+  );
+  return {
+    sessionId: created.sessionId,
+    threadId: created.threadId,
+  };
+}
+
+async function waitForTerminalThreadRun(input: {
+  context: OrpcContext;
+  pollIntervalMs: number;
+  promptMessageId: string;
+  sessionId: string;
+  timeoutMs: number;
+}): Promise<{
+  run: {
+    status:
+      | "sending"
+      | "running"
+      | "applying"
+      | "persisted"
+      | "stopped"
+      | "error";
+    error: string | null;
+    appliedSceneVersion: number | null;
+  } | null;
+  timedOut: boolean;
+}> {
+  const deadline = Date.now() + input.timeoutMs;
+  let run = await input.context.convex.query(api.diagramThreads.getRun, {
+    sessionId: input.sessionId,
+    promptMessageId: input.promptMessageId,
+  });
+
+  while (!(run && isTerminalRunStatus(run.status))) {
+    if (Date.now() >= deadline) {
+      return {
+        run,
+        timedOut: true,
+      };
+    }
+
+    await sleep(input.pollIntervalMs);
+    run = await input.context.convex.query(api.diagramThreads.getRun, {
+      sessionId: input.sessionId,
+      promptMessageId: input.promptMessageId,
+    });
+  }
+
+  return {
+    run,
+    timedOut: false,
+  };
+}
+
+async function executeThreadRun(input: {
+  context: OrpcContext;
+  pollIntervalMs: number;
+  prompt: string;
+  promptMessageId: string;
+  sessionId?: string;
+  startedAt: number;
+  timeoutMs: number;
+  traceId: string;
+}) {
+  const session = await ensureSessionForThreadRun({
+    context: input.context,
+    sessionId: input.sessionId,
+  });
+  const enqueueResult = await input.context.convex.mutation(
+    api.diagramThreads.enqueuePrompt,
+    {
+      sessionId: session.sessionId,
+      prompt: input.prompt,
+      promptMessageId: input.promptMessageId,
+      traceId: input.traceId,
+    }
+  );
+
+  const terminal = await waitForTerminalThreadRun({
+    context: input.context,
+    sessionId: session.sessionId,
+    promptMessageId: input.promptMessageId,
+    timeoutMs: input.timeoutMs,
+    pollIntervalMs: input.pollIntervalMs,
+  });
+
+  if (terminal.timedOut) {
+    return {
+      status: "timeout" as const,
+      sessionId: session.sessionId,
+      threadId: enqueueResult.threadId,
+      promptMessageId: input.promptMessageId,
+      runStatus: terminal.run?.status ?? "sending",
+      traceId: input.traceId,
+      elapsedMs: Date.now() - input.startedAt,
+      runError: terminal.run?.error ?? null,
+      assistantMessage: null,
+      reasoningSummary: null,
+      latestSceneVersion: terminal.run?.appliedSceneVersion ?? null,
+    };
+  }
+
+  if (!terminal.run) {
+    throw new Error("Run disappeared before completion.");
+  }
+
+  const thread = await input.context.convex.query(
+    api.diagramThreads.listBySession,
+    {
+      sessionId: session.sessionId,
+    }
+  );
+  const assistantMessage = thread
+    ? getAssistantMessageForPrompt(
+        thread.messages as Array<{
+          promptMessageId: string | null;
+          role: "user" | "assistant" | "tool";
+          messageType: "chat" | "tool";
+          content: string;
+          reasoningSummary: string | null;
+        }>,
+        input.promptMessageId
+      )
+    : null;
+
+  if (terminal.run.status !== "persisted") {
+    return {
+      status: (terminal.run.status === "stopped" ? "stopped" : "error") as
+        | "stopped"
+        | "error",
+      sessionId: session.sessionId,
+      threadId: enqueueResult.threadId,
+      promptMessageId: input.promptMessageId,
+      runStatus: terminal.run.status,
+      traceId: input.traceId,
+      elapsedMs: Date.now() - input.startedAt,
+      runError: terminal.run.error ?? null,
+      assistantMessage: assistantMessage?.content ?? null,
+      reasoningSummary: assistantMessage?.reasoningSummary ?? null,
+      latestSceneVersion: terminal.run.appliedSceneVersion ?? null,
+    };
+  }
+
+  const persistedSession = await input.context.convex.query(
+    api.diagramSessions.get,
+    {
+      sessionId: session.sessionId,
+    }
+  );
+  if (!persistedSession?.latestScene) {
+    throw new Error("Run persisted without a saved scene.");
+  }
+
+  const shareLink = await input.context.convex.action(
+    api.diagrams.shareDiagram,
+    {
+      elements: persistedSession.latestScene.elements as unknown[],
+      appState: persistedSession.latestScene.appState as Record<
+        string,
+        unknown
+      >,
+      traceId: input.traceId,
+    }
+  );
+
+  return {
+    status: "persisted" as const,
+    sessionId: session.sessionId,
+    threadId: persistedSession.threadId ?? enqueueResult.threadId,
+    promptMessageId: input.promptMessageId,
+    runStatus: terminal.run.status,
+    traceId: input.traceId,
+    elapsedMs: Date.now() - input.startedAt,
+    runError: terminal.run.error ?? null,
+    assistantMessage: assistantMessage?.content ?? null,
+    reasoningSummary: assistantMessage?.reasoningSummary ?? null,
+    latestSceneVersion: persistedSession.latestSceneVersion,
+    shareLink,
+    elements: persistedSession.latestScene.elements as unknown[],
+    appState: persistedSession.latestScene.appState as Record<string, unknown>,
+  };
+}
+
 const shareLinkSchema = z.object({
   url: z.string().url(),
   shareId: z.string(),
@@ -410,6 +659,78 @@ JSON_SCHEMA_REGISTRY.add(shareInputSchema, {
   examples: [{ elements: exampleElements, appState: {} }],
 });
 
+const threadRunInputSchema = z.object({
+  prompt: z.string().min(1).max(10_000),
+  sessionId: z.string().optional(),
+  promptMessageId: z.string().optional(),
+  timeoutMs: z.number().int().min(5000).max(300_000).optional(),
+  pollIntervalMs: z.number().int().min(200).max(5000).optional(),
+  traceId: z.string().optional(),
+});
+
+JSON_SCHEMA_REGISTRY.add(threadRunInputSchema, {
+  examples: [
+    {
+      prompt: "Create a flowchart for user onboarding.",
+    },
+    {
+      sessionId: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+      prompt: "Add fraud-check branch before approval",
+      promptMessageId: "prompt_opencode_session_message_1234abcd",
+    },
+  ],
+});
+
+const threadRunOutputSchema = z.object({
+  status: z.enum(["persisted", "error", "stopped", "timeout"]),
+  sessionId: z.string(),
+  threadId: z.string().nullable(),
+  promptMessageId: z.string(),
+  runStatus: z.enum([
+    "sending",
+    "running",
+    "applying",
+    "persisted",
+    "stopped",
+    "error",
+  ]),
+  traceId: z.string(),
+  elapsedMs: z.number(),
+  runError: z.string().nullable(),
+  assistantMessage: z.string().nullable(),
+  reasoningSummary: z.string().nullable(),
+  latestSceneVersion: z.number().nullable(),
+  shareLink: shareLinkSchema.optional(),
+  elements: z.array(z.any()).optional(),
+  appState: z.record(z.string(), z.any()).optional(),
+});
+
+const seedSessionInputSchema = z.object({
+  sessionId: z.string().optional(),
+  elements: z.array(z.any()),
+  appState: z.record(z.string(), z.any()).optional(),
+  expectedVersion: z.number().int().min(0).optional(),
+  traceId: z.string().optional(),
+});
+
+JSON_SCHEMA_REGISTRY.add(seedSessionInputSchema, {
+  examples: [
+    {
+      elements: exampleElements,
+      appState: {},
+    },
+  ],
+});
+
+const seedSessionOutputSchema = z.object({
+  status: z.enum(["success", "conflict"]),
+  sessionId: z.string(),
+  threadId: z.string().nullable(),
+  latestSceneVersion: z.number(),
+  traceId: z.string(),
+  savedAt: z.number().optional(),
+});
+
 export const appRouter = {
   diagramsGenerate: orpc
     .route({ method: "POST", path: "/diagrams/generate" })
@@ -508,6 +829,126 @@ export const appRouter = {
           traceId,
           stage: "convex.action",
           action: "diagrams.shareDiagram",
+          error,
+        });
+      }
+    }),
+  diagramsSessionSeed: orpc
+    .route({ method: "POST", path: "/diagrams/session-seed" })
+    .input(seedSessionInputSchema)
+    .output(seedSessionOutputSchema)
+    .handler(async ({ input, context }) => {
+      const traceId = input.traceId ?? context.traceId;
+
+      try {
+        let sessionId = input.sessionId;
+        let threadId: string | null = null;
+
+        if (sessionId) {
+          const ensured = await context.convex.mutation(
+            api.diagramSessions.ensureThread,
+            {
+              sessionId,
+            }
+          );
+          threadId = ensured.threadId;
+        } else {
+          const created = await context.convex.mutation(
+            api.diagramSessions.create,
+            {}
+          );
+          sessionId = created.sessionId;
+          threadId = created.threadId;
+        }
+
+        if (!sessionId) {
+          throw new Error("Failed to resolve a diagram session.");
+        }
+
+        const session = await context.convex.query(api.diagramSessions.get, {
+          sessionId,
+        });
+        if (!session) {
+          throw new Error("Session not found.");
+        }
+
+        const expectedVersion =
+          input.expectedVersion ?? session.latestSceneVersion;
+        const saveResult = await context.convex.mutation(
+          api.diagramSessions.setLatestScene,
+          {
+            sessionId,
+            expectedVersion,
+            elements: input.elements,
+            appState: input.appState ?? {},
+          }
+        );
+
+        const responseThreadId = session.threadId ?? threadId;
+
+        if (saveResult.status === "success") {
+          return {
+            status: "success" as const,
+            sessionId,
+            threadId: responseThreadId,
+            latestSceneVersion: saveResult.latestSceneVersion,
+            savedAt: saveResult.savedAt,
+            traceId,
+          };
+        }
+
+        if (saveResult.status === "conflict") {
+          return {
+            status: "conflict" as const,
+            sessionId,
+            threadId: responseThreadId,
+            latestSceneVersion: saveResult.latestSceneVersion,
+            traceId,
+          };
+        }
+
+        throw new Error(
+          saveResult.reason === "scene-too-large"
+            ? "Scene is too large to seed."
+            : "Failed to seed session."
+        );
+      } catch (error) {
+        throwInternalError({
+          traceId,
+          stage: "convex.mutation",
+          action: "diagrams.sessionSeed",
+          error,
+        });
+      }
+    }),
+  diagramsThreadRun: orpc
+    .route({ method: "POST", path: "/diagrams/thread-run" })
+    .input(threadRunInputSchema)
+    .output(threadRunOutputSchema)
+    .handler(async ({ input, context }) => {
+      const traceId = input.traceId ?? context.traceId;
+      const timeoutMs = input.timeoutMs ?? DEFAULT_THREAD_RUN_TIMEOUT_MS;
+      const pollIntervalMs =
+        input.pollIntervalMs ?? DEFAULT_THREAD_RUN_POLL_INTERVAL_MS;
+      const startedAt = Date.now();
+      const promptMessageId = input.promptMessageId ?? createPromptMessageId();
+
+      try {
+        return await executeThreadRun({
+          context,
+          sessionId: input.sessionId,
+          prompt: input.prompt,
+          promptMessageId,
+          pollIntervalMs,
+          timeoutMs,
+          traceId,
+          startedAt,
+        });
+      } catch (error) {
+        throwInternalError({
+          traceId,
+          stage: "convex.thread-run",
+          action: "diagrams.threadRun",
           error,
         });
       }

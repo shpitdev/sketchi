@@ -22,6 +22,26 @@ const styleSettings = v.object({
 
 const userRole = v.union(v.literal("user"), v.literal("admin"));
 const libraryVisibility = v.union(v.literal("public"), v.literal("private"));
+const threadRunStatus = v.union(
+  v.literal("sending"),
+  v.literal("running"),
+  v.literal("applying"),
+  v.literal("persisted"),
+  v.literal("stopped"),
+  v.literal("error")
+);
+const threadMessageRole = v.union(
+  v.literal("user"),
+  v.literal("assistant"),
+  v.literal("tool")
+);
+const threadMessageType = v.union(v.literal("chat"), v.literal("tool"));
+const toolStatus = v.union(
+  v.literal("pending"),
+  v.literal("running"),
+  v.literal("completed"),
+  v.literal("error")
+);
 
 export default defineSchema({
   users: defineTable({
@@ -98,4 +118,47 @@ export default defineSchema({
   })
     .index("by_sessionId", ["sessionId"])
     .index("by_ownerUserId", ["ownerUserId"]),
+  diagramThreadRuns: defineTable({
+    sessionId: v.string(),
+    threadId: v.string(),
+    ownerUserId: v.id("users"),
+    promptMessageId: v.string(),
+    prompt: v.string(),
+    traceId: v.string(),
+    userMessageId: v.string(),
+    assistantMessageId: v.string(),
+    status: threadRunStatus,
+    stopRequested: v.boolean(),
+    error: v.optional(v.string()),
+    appliedSceneVersion: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    finishedAt: v.optional(v.number()),
+  })
+    .index("by_session_promptMessageId", ["sessionId", "promptMessageId"])
+    .index("by_session_createdAt", ["sessionId", "createdAt"]),
+  diagramThreadMessages: defineTable({
+    sessionId: v.string(),
+    threadId: v.string(),
+    runId: v.optional(v.id("diagramThreadRuns")),
+    messageId: v.string(),
+    promptMessageId: v.optional(v.string()),
+    role: threadMessageRole,
+    messageType: threadMessageType,
+    status: v.optional(v.union(threadRunStatus, toolStatus)),
+    content: v.optional(v.string()),
+    reasoningSummary: v.optional(v.string()),
+    toolName: v.optional(v.string()),
+    toolCallId: v.optional(v.string()),
+    toolInput: v.optional(v.any()),
+    toolOutput: v.optional(v.any()),
+    traceId: v.optional(v.string()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_session_createdAt", ["sessionId", "createdAt"])
+    .index("by_thread_createdAt", ["threadId", "createdAt"])
+    .index("by_run_toolCallId", ["runId", "toolCallId"])
+    .index("by_messageId", ["messageId"]),
 });

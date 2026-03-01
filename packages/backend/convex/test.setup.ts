@@ -15,6 +15,8 @@ export const modules = {
     import("./diagramModifyFromShareLink"),
   "./diagrams.ts": () => import("./diagrams"),
   "./diagramSessions.ts": () => import("./diagramSessions"),
+  "./diagramThreads.ts": () => import("./diagramThreads"),
+  "./diagramThreadsNode.ts": () => import("./diagramThreadsNode"),
   "./deviceAuth.ts": () => import("./deviceAuth"),
   "./users.ts": () => import("./users"),
 };
