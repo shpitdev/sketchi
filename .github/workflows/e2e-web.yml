@@ -140,13 +140,13 @@ jobs:
 
           if (!fs.existsSync(replayPath)) {
             lines.push("No Browserbase session metadata found.");
-            fs.appendFileSync(summaryPath, `${lines.join("\\n")}\\n`);
+            fs.appendFileSync(summaryPath, `${lines.join("\n")}\n`);
             process.exit(0);
           }
 
           const raw = fs
             .readFileSync(replayPath, "utf8")
-            .split("\\n")
+            .split("\n")
             .map((line) => line.trim())
             .filter(Boolean);
           const seen = new Set();
@@ -168,16 +168,16 @@ jobs:
 
           if (!sessions.length) {
             lines.push("No Browserbase sessions recorded.");
-            fs.appendFileSync(summaryPath, `${lines.join("\\n")}\\n`);
+            fs.appendFileSync(summaryPath, `${lines.join("\n")}\n`);
             process.exit(0);
           }
 
           for (const session of sessions) {
             const idText = session.sessionId
-              ? `\\`${session.sessionId}\\``
+              ? `\`${session.sessionId}\``
               : "`unknown`";
             const scenarioText = session.scenario
-              ? ` (scenario: \\`${session.scenario}\\`)`
+              ? ` (scenario: \`${session.scenario}\`)`
               : "";
             const links = [];
             if (session.sessionUrl) {
@@ -189,7 +189,7 @@ jobs:
             lines.push(`- Session ${idText}${scenarioText}: ${links.join(" | ") || "link unavailable"}`);
           }
 
-          fs.appendFileSync(summaryPath, `${lines.join("\\n")}\\n`);
+          fs.appendFileSync(summaryPath, `${lines.join("\n")}\n`);
           NODE
 
       - name: Comment Browserbase replay links on PR
