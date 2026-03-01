@@ -97,15 +97,22 @@ jobs:
         if: steps.doc_check.outputs.run_tests == 'true'
         env:
           BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          API_AUTH_TOKEN: ${{ secrets.SKETCHI_E2E_BEARER_TOKEN }}
           VENOM_VAR_target_url: ${{ github.event.deployment_status.environment_url }}
           VENOM_VAR_bypass_secret: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          VENOM_VAR_auth_token: ${{ secrets.SKETCHI_E2E_BEARER_TOKEN }}
         run: |
           if [ -z "$BYPASS_SECRET" ]; then
-            echo "BYPASS_SECRET is empty; skipping API tests"
-            exit 0
+            echo "Missing required secret: VERCEL_AUTOMATION_BYPASS_SECRET"
+            exit 1
+          fi
+          if [ -z "$API_AUTH_TOKEN" ]; then
+            echo "Missing required secret: SKETCHI_E2E_BEARER_TOKEN"
+            exit 1
           fi
           echo "::add-mask::$BYPASS_SECRET"
-          venom run tests/api/auth-device.yml \
+          echo "::add-mask::$API_AUTH_TOKEN"
+          venom run tests/api/auth-device.yml tests/api/diagrams.yml \
             --output-dir tests/api/results \
             --format xml
 
