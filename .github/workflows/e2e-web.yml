@@ -19,7 +19,7 @@ jobs:
        startsWith(github.event.deployment_status.environment_url, 'http://')) &&
       (github.event.deployment.environment == 'Preview' || github.event.deployment.environment == 'preview')
     runs-on: blacksmith-2vcpu-ubuntu-2404
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - name: Check for doc-only changes
         id: doc_check
@@ -97,7 +97,44 @@ jobs:
         run: bun install --frozen-lockfile
         working-directory: tests/e2e
 
-      - name: Run E2E scenarios
+      - name: Run Stagehand smoke scenarios
+        if: steps.doc_check.outputs.run_tests == 'true'
+        env:
+          STAGEHAND_TARGET_URL: ${{ github.event.deployment_status.environment_url }}
+          STAGEHAND_ENV: BROWSERBASE
+          STAGEHAND_HEADLESS: "true"
+          BROWSERBASE_SESSION_TIMEOUT_SECONDS: "900"
+          BROWSERBASE_API_KEY: ${{ secrets.BROWSERBASE_API_KEY }}
+          BROWSERBASE_PROJECT_ID: ${{ secrets.BROWSERBASE_PROJECT_ID }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MODEL_NAME: ${{ secrets.MODEL_NAME }}
+          VISION_MODEL_NAME: ${{ secrets.VISION_MODEL_NAME }}
+          STAGEHAND_VISUAL_STRICT: "false"
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          cd tests/e2e
+          # Smoke/sanity coverage: fast navigation/auth gating checks.
+          bun run visual-sanity
+          bun run auth-gates
+
+      - name: Validate authenticated E2E secrets
+        if: steps.doc_check.outputs.run_tests == 'true'
+        env:
+          SKETCHI_E2E_EMAIL: ${{ secrets.SKETCHI_E2E_EMAIL }}
+          SKETCHI_E2E_PASSWORD: ${{ secrets.SKETCHI_E2E_PASSWORD }}
+        run: |
+          if [ -z "$SKETCHI_E2E_EMAIL" ]; then
+            echo "Missing required secret: SKETCHI_E2E_EMAIL"
+            exit 1
+          fi
+          if [ -z "$SKETCHI_E2E_PASSWORD" ]; then
+            echo "Missing required secret: SKETCHI_E2E_PASSWORD"
+            exit 1
+          fi
+          echo "::add-mask::$SKETCHI_E2E_EMAIL"
+          echo "::add-mask::$SKETCHI_E2E_PASSWORD"
+
+      - name: Run Stagehand authenticated continuity scenarios
         if: steps.doc_check.outputs.run_tests == 'true'
         env:
           STAGEHAND_TARGET_URL: ${{ github.event.deployment_status.environment_url }}
@@ -110,10 +147,13 @@ jobs:
           VISION_MODEL_NAME: ${{ secrets.VISION_MODEL_NAME }}
           STAGEHAND_VISUAL_STRICT: "false"
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          SKETCHI_E2E_EMAIL: ${{ secrets.SKETCHI_E2E_EMAIL }}
+          SKETCHI_E2E_PASSWORD: ${{ secrets.SKETCHI_E2E_PASSWORD }}
         run: |
           cd tests/e2e
-          bun run visual-sanity
-          bun run auth-gates
+          # Assertion coverage: strict continuity + conflict recovery behavior.
+          bun run diagram-studio-happy-path
+          bun run diagram-studio-occ-conflict
 
       - name: Summarize Browserbase replay links
         if: always() && steps.doc_check.outputs.run_tests == 'true'
