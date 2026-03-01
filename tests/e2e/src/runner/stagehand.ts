@@ -46,6 +46,7 @@ export async function createStagehand(cfg: StagehandRunConfig) {
     try {
       await stagehand.init();
       await applyVercelBypassCookie(stagehand.context, cfg);
+      await persistBrowserbaseSessionMetadata(stagehand, cfg);
       return stagehand;
     } catch (error) {
       lastError = error;
@@ -70,6 +71,49 @@ export async function createStagehand(cfg: StagehandRunConfig) {
     throw lastError;
   }
   throw new Error(String(lastError ?? "Stagehand init failed"));
+}
+
+async function persistBrowserbaseSessionMetadata(
+  stagehand: Stagehand,
+  cfg: StagehandRunConfig
+) {
+  if (cfg.env !== "BROWSERBASE") {
+    return;
+  }
+
+  const sessionId = stagehand.browserbaseSessionID;
+  const sessionUrl = stagehand.browserbaseSessionURL;
+  const debugUrl = stagehand.browserbaseDebugURL;
+  if (!(sessionId || sessionUrl || debugUrl)) {
+    return;
+  }
+
+  const metadataPath = path.join(
+    cfg.screenshotsDir,
+    "browserbase-sessions.jsonl"
+  );
+  const record = {
+    capturedAt: new Date().toISOString(),
+    scenario: path.basename(process.argv[1] ?? ""),
+    baseUrl: cfg.baseUrl,
+    sessionId: sessionId ?? null,
+    sessionUrl: sessionUrl ?? null,
+    debugUrl: debugUrl ?? null,
+  };
+
+  try {
+    await fs.mkdir(cfg.screenshotsDir, { recursive: true });
+    await fs.appendFile(metadataPath, `${JSON.stringify(record)}\n`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`Browserbase session metadata write failed: ${message}`);
+  }
+
+  if (sessionUrl) {
+    console.log(`Browserbase replay URL: ${sessionUrl}`);
+  } else if (sessionId) {
+    console.log(`Browserbase session ID: ${sessionId}`);
+  }
 }
 
 function isRetryableBrowserbaseError(message: string) {
