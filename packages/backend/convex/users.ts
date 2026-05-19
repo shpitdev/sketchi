@@ -94,6 +94,19 @@ export const updateAuthorization = mutation({
       throw new Error("User not found");
     }
 
+    if (targetUser.role === "admin" && args.role !== "admin") {
+      const adminUsers = await ctx.db
+        .query("users")
+        .withIndex("by_role", (q) => q.eq("role", "admin"))
+        .take(2);
+      const hasAnotherAdmin = adminUsers.some(
+        (adminUser) => adminUser._id !== targetUser._id
+      );
+      if (!hasAnotherAdmin) {
+        throw new Error("Cannot remove the final admin");
+      }
+    }
+
     const canManagePublicIconLibraries =
       args.role === "admin" ? true : args.canManagePublicIconLibraries;
 

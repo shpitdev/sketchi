@@ -105,4 +105,51 @@ describe("users authorization", () => {
       })
     ).rejects.toThrow("Forbidden");
   });
+
+  test("admins cannot demote the final admin", async () => {
+    const { bootstrapAdmin } = setup();
+    process.env.SKETCHI_BOOTSTRAP_ADMIN_EMAILS = "bootstrap-admin@example.com";
+    const admin = await bootstrapAdmin.mutation(api.users.ensure, {});
+    delete process.env.SKETCHI_BOOTSTRAP_ADMIN_EMAILS;
+
+    await expect(
+      bootstrapAdmin.mutation(api.users.updateAuthorization, {
+        userId: admin._id,
+        role: "user",
+        canManagePublicIconLibraries: false,
+      })
+    ).rejects.toThrow("Cannot remove the final admin");
+
+    const viewer = await bootstrapAdmin.query(api.users.me, {});
+    expect(viewer.user?.role).toBe("admin");
+    expect(viewer.identity.isAdmin).toBe(true);
+  });
+
+  test("admins can demote another admin when one admin remains", async () => {
+    const { bootstrapAdmin, secondBootstrapCandidate } = setup();
+    process.env.SKETCHI_BOOTSTRAP_ADMIN_EMAILS = "bootstrap-admin@example.com";
+    await bootstrapAdmin.mutation(api.users.ensure, {});
+    delete process.env.SKETCHI_BOOTSTRAP_ADMIN_EMAILS;
+    const second = await secondBootstrapCandidate.mutation(
+      api.users.ensure,
+      {}
+    );
+
+    await bootstrapAdmin.mutation(api.users.updateAuthorization, {
+      userId: second._id,
+      role: "admin",
+      canManagePublicIconLibraries: true,
+    });
+    await bootstrapAdmin.mutation(api.users.updateAuthorization, {
+      userId: second._id,
+      role: "user",
+      canManagePublicIconLibraries: false,
+    });
+
+    const secondViewer = await secondBootstrapCandidate.query(api.users.me, {});
+    const adminViewer = await bootstrapAdmin.query(api.users.me, {});
+    expect(secondViewer.user?.role).toBe("user");
+    expect(secondViewer.identity.isAdmin).toBe(false);
+    expect(adminViewer.identity.isAdmin).toBe(true);
+  });
 });
