@@ -9,6 +9,10 @@ import { fetchJson, shareElements } from "./lib/api";
 import { extractShareLink, readExcalidrawFile } from "./lib/excalidraw";
 import { gradeDiagram } from "./lib/grade";
 import { buildDefaultPngPath, resolveOutputPath, writePng } from "./lib/output";
+import {
+  applySketchiAuthProviderConfig,
+  SKETCHI_AUTH_PROVIDER_ID,
+} from "./lib/provider-config";
 import { closeBrowser, renderElementsToPng } from "./lib/render";
 import { resolveExcalidrawFromShareUrl } from "./lib/resolve-share-url";
 import {
@@ -1269,7 +1273,7 @@ export const SketchiPlugin: Plugin = (input) => {
       }),
     },
     auth: {
-      provider: "sketchi",
+      provider: SKETCHI_AUTH_PROVIDER_ID,
       loader(getAuth) {
         getAuthorizationHeader = async () => {
           const auth = await getAuth();
@@ -1295,7 +1299,7 @@ export const SketchiPlugin: Plugin = (input) => {
                 return envAuthorizationHeader;
               }
               throw new Error(
-                "Sketchi OAuth is expired or invalid. Run `opencode auth login --provider sketchi`."
+                `Sketchi OAuth is expired or invalid. Run \`opencode auth login --provider ${SKETCHI_AUTH_PROVIDER_ID}\`.`
               );
             }
           }
@@ -1377,7 +1381,7 @@ export const SketchiPlugin: Plugin = (input) => {
                     expires:
                       pollResult.accessTokenExpiresAt ??
                       Date.now() + DEFAULT_OAUTH_TOKEN_TTL_MS,
-                    provider: "sketchi",
+                    provider: SKETCHI_AUTH_PROVIDER_ID,
                   };
                 }
 
@@ -1391,6 +1395,7 @@ export const SketchiPlugin: Plugin = (input) => {
       ],
     },
     config: (config) => {
+      applySketchiAuthProviderConfig(config);
       applySketchiDiagramAgentConfig(config);
       return Promise.resolve();
     },

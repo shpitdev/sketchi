@@ -146,6 +146,7 @@ describe("SketchiPlugin", () => {
     expect((sketchiDiagram?.description as string).toLowerCase()).toContain(
       "prefer this over mermaid"
     );
+    expect(config.provider?.sketchi?.models?.auth?.id).toBe("auth");
   });
 
   test("tool descriptions steer away from Mermaid", async () => {
