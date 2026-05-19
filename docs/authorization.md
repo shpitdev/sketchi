@@ -54,3 +54,8 @@ after this authz change lands:
 
 Remove old authorization allowlist env values from Vercel and Convex after the
 first Convex admin is confirmed.
+
+Preview WorkOS credentials must stay aligned across the web runtime and the
+Convex auth provider config. If a preview deployment uses a lower-env WorkOS
+client for sign-in, deploy Convex with the same `WORKOS_CLIENT_ID`; otherwise
+Convex will reject the issued access token before app authorization runs.
