@@ -56,6 +56,23 @@ describe("users authorization", () => {
     expect(viewer.identity.isAdmin).toBe(true);
   });
 
+  test("bootstraps an existing user when no app-owned admin exists", async () => {
+    const { bootstrapAdmin } = setup();
+
+    const initial = await bootstrapAdmin.mutation(api.users.ensure, {});
+    expect(initial.role).toBe("user");
+
+    process.env.SKETCHI_BOOTSTRAP_ADMIN_EMAILS = "bootstrap-admin@example.com";
+    const promoted = await bootstrapAdmin.mutation(api.users.ensure, {});
+    const viewer = await bootstrapAdmin.query(api.users.me, {});
+
+    expect(promoted.role).toBe("admin");
+    expect(promoted.isAdmin).toBe(true);
+    expect(promoted.canManagePublicIconLibraries).toBe(true);
+    expect(viewer.user?.role).toBe("admin");
+    expect(viewer.identity.isAdmin).toBe(true);
+  });
+
   test("bootstrap env is ignored after an app-owned admin exists", async () => {
     const { bootstrapAdmin, secondBootstrapCandidate } = setup();
     process.env.SKETCHI_BOOTSTRAP_ADMIN_EMAILS =

@@ -117,10 +117,10 @@ export async function getUserAuthorization(
   canManagePublicIconLibraries: boolean;
   canBootstrapFirstAdmin: boolean;
 }> {
-  const canBootstrapFirstAdmin =
-    args.user === null
-      ? await canBootstrapIdentityAsFirstAdmin(ctx, args.identity)
-      : false;
+  const canBootstrapFirstAdmin = await canBootstrapIdentityAsFirstAdmin(
+    ctx,
+    args.identity
+  );
   const isAdmin = isUserAdmin(args.user) || canBootstrapFirstAdmin;
   return {
     isAdmin,
