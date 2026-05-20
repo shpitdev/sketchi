@@ -25,6 +25,20 @@ interface AuthPage {
   url: () => string;
 }
 
+const emailInputSelector = [
+  'input[type="email"]',
+  'input[name*="email" i]',
+  'input[id*="email" i]',
+  'input[autocomplete="email"]',
+].join(",");
+
+const passwordInputSelector = [
+  'input[type="password"]',
+  'input[name*="password" i]',
+  'input[id*="password" i]',
+  'input[autocomplete="current-password"]',
+].join(",");
+
 function getCredential(name: string): string | null {
   const value = process.env[name]?.trim();
   return value && value.length > 0 ? value : null;
@@ -137,8 +151,8 @@ async function continueFromSignedInPage(
   baseUrl: string
 ): Promise<boolean> {
   const hasCredentialsForm =
-    (await pageHasSelector(page, 'input[type="email"]')) ||
-    (await pageHasSelector(page, 'input[type="password"]'));
+    (await pageHasSelector(page, emailInputSelector)) ||
+    (await pageHasSelector(page, passwordInputSelector));
   if (hasCredentialsForm) {
     return false;
   }
@@ -179,11 +193,11 @@ async function openHostedSignInIfNeeded(page: AuthPage): Promise<void> {
 async function ensureCredentialsForm(page: AuthPage): Promise<void> {
   const reachedCredentialsForm = await waitForCondition(
     async () => {
-      const hasPassword = await pageHasSelector(page, 'input[type="password"]');
+      const hasPassword = await pageHasSelector(page, passwordInputSelector);
       if (hasPassword) {
         return true;
       }
-      return await pageHasSelector(page, 'input[type="email"]');
+      return await pageHasSelector(page, emailInputSelector);
     },
     { timeoutMs: 30_000, label: "workos-credentials-form" }
   );
@@ -195,13 +209,13 @@ async function ensureCredentialsForm(page: AuthPage): Promise<void> {
 async function submitEmailStep(page: AuthPage, email: string): Promise<void> {
   const hasPasswordFieldFirst = await pageHasSelector(
     page,
-    'input[type="password"]'
+    passwordInputSelector
   );
   if (hasPasswordFieldFirst) {
     return;
   }
 
-  await page.locator('input[type="email"]').first().fill(email);
+  await page.locator(emailInputSelector).first().fill(email);
   if (page.keyboard) {
     await page.keyboard.press("Enter");
     return;
@@ -214,13 +228,13 @@ async function submitPasswordStep(
   password: string
 ): Promise<void> {
   let hasPasswordField = await waitForCondition(
-    () => pageHasSelector(page, 'input[type="password"]'),
+    () => pageHasSelector(page, passwordInputSelector),
     { timeoutMs: 12_000, label: "workos-password-input-enter" }
   );
   if (!hasPasswordField) {
     await clickIfVisible(page, 'button[type="submit"]');
     hasPasswordField = await waitForCondition(
-      () => pageHasSelector(page, 'input[type="password"]'),
+      () => pageHasSelector(page, passwordInputSelector),
       { timeoutMs: 12_000, label: "workos-password-input-submit" }
     );
   }
@@ -229,7 +243,7 @@ async function submitPasswordStep(
     throw new Error("WorkOS password input did not appear.");
   }
 
-  await page.locator('input[type="password"]').first().fill(password);
+  await page.locator(passwordInputSelector).first().fill(password);
   if (page.keyboard) {
     await page.keyboard.press("Enter");
     return;

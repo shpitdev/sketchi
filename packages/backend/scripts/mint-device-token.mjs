@@ -14,6 +14,41 @@ function resolveUrl(baseUrl, path) {
   return new URL(path, baseUrl).toString();
 }
 
+function decodeJwtClaims(token) {
+  const [, payload] = token.split(".");
+  if (!payload) {
+    return null;
+  }
+
+  try {
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(Buffer.from(normalized, "base64").toString("utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function logAccessTokenClaims(token) {
+  const claims = decodeJwtClaims(token);
+  if (!claims || typeof claims !== "object") {
+    console.error("[device-flow] access token claims unavailable");
+    return;
+  }
+
+  const safeClaims = {
+    iss: typeof claims.iss === "string" ? claims.iss : undefined,
+    aud:
+      typeof claims.aud === "string" || Array.isArray(claims.aud)
+        ? claims.aud
+        : undefined,
+    client_id:
+      typeof claims.client_id === "string" ? claims.client_id : undefined,
+  };
+  console.error(
+    `[device-flow] access token claims ${JSON.stringify(safeClaims)}`
+  );
+}
+
 async function wait(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -343,6 +378,7 @@ async function main() {
     started.intervalSeconds,
     started.expiresInSeconds
   );
+  logAccessTokenClaims(accessToken);
 
   process.stdout.write(accessToken);
 }
