@@ -19,21 +19,9 @@ export default {
     },
     {
       type: "customJwt",
-      issuer: "https://api.workos.com",
-      algorithm: "RS256",
-      jwks,
-    },
-    {
-      type: "customJwt",
       issuer: "https://api.workos.com/",
       algorithm: "RS256",
       applicationID: clientId,
-      jwks,
-    },
-    {
-      type: "customJwt",
-      issuer: "https://api.workos.com/",
-      algorithm: "RS256",
       jwks,
     },
     {
