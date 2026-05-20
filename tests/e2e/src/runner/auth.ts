@@ -290,16 +290,15 @@ export async function ensureSignedInForDiagrams(
   const stillShowsSignInCta = await pageShowsSignInCallToAction(page);
   if (!page.url().includes("/diagrams") || stillShowsSignInCta) {
     await openHostedSignInIfNeeded(page);
-    if (await continueFromSignedInPage(page, baseUrl)) {
-      return;
+    const usedExistingSession =
+      (await continueFromSignedInPage(page, baseUrl)) ||
+      (await continueOrRequireCredentialsForm(page, baseUrl));
+    if (!usedExistingSession) {
+      requireAuthCredentials(credentials);
+      await submitEmailStep(page, credentials.email);
+      await submitPasswordStep(page, credentials.password);
+      await waitForDiagramsReturn(page, "auth-return-diagrams", baseUrl);
     }
-    requireAuthCredentials(credentials);
-    if (await continueOrRequireCredentialsForm(page, baseUrl)) {
-      return;
-    }
-    await submitEmailStep(page, credentials.email);
-    await submitPasswordStep(page, credentials.password);
-    await waitForDiagramsReturn(page, "auth-return-diagrams", baseUrl);
   }
 
   const finalSignInCta = await pageShowsSignInCallToAction(page);
