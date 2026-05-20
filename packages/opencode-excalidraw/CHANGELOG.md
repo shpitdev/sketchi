@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.10](https://github.com/shpitdev/sketchi/compare/opencode-excalidraw-v0.0.9...opencode-excalidraw-v0.0.10) (2026-05-19)
+
+
+### Bug Fixes
+
+* improve diagram cards and persist embedded assets ([#206](https://github.com/shpitdev/sketchi/issues/206)) ([a2bfcaf](https://github.com/shpitdev/sketchi/commit/a2bfcaf00f2c8da1d7c781796522ddc90ba5f83e))
+* **opencode-excalidraw:** register sketchi auth provider ([#208](https://github.com/shpitdev/sketchi/issues/208)) ([7a87483](https://github.com/shpitdev/sketchi/commit/7a87483d786f4f8607b04087aa05f4e9334d135d))
+* recover stale sketchi sessions and refresh oauth ([#200](https://github.com/shpitdev/sketchi/issues/200)) ([8c2d89a](https://github.com/shpitdev/sketchi/commit/8c2d89a5f90b9a9a4aa9c2f693fadbf83e1b16ec))
+
+
+### Chores
+
+* clean up dead code and patch dependencies ([#204](https://github.com/shpitdev/sketchi/issues/204)) ([5128d13](https://github.com/shpitdev/sketchi/commit/5128d1341497b4ea5ea5735f6b1c384a0007a0d6))
+
 ## [0.0.9](https://github.com/shpitdev/sketchi/compare/opencode-excalidraw-v0.0.8...opencode-excalidraw-v0.0.9) (2026-03-02)
 
 
