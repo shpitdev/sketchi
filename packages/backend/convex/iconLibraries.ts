@@ -3,11 +3,10 @@ import { v } from "convex/values";
 import type { DatabaseReader } from "./_generated/server";
 import { internalMutation, mutation, query } from "./_generated/server";
 import {
-  canIdentityManagePublicIconLibraries,
   ensureViewerUser,
   findUserByExternalId,
   getIdentityExternalId,
-  isIdentityAdmin,
+  getUserAuthorization,
 } from "./lib/users";
 
 const DEFAULT_STYLE_SETTINGS = {
@@ -92,10 +91,9 @@ export const list = query({
       ? await findUserByExternalId(ctx, getIdentityExternalId(identity))
       : null;
     const viewerUserId = viewerUser?._id;
-    const isAdmin = identity ? isIdentityAdmin(identity) : false;
-    const canManagePublicIconLibraries = identity
-      ? canIdentityManagePublicIconLibraries(identity)
-      : false;
+    const authorization = identity
+      ? await getUserAuthorization(ctx, { identity, user: viewerUser })
+      : { isAdmin: false, canManagePublicIconLibraries: false };
 
     const libraries = await ctx.db.query("iconLibraries").collect();
 
@@ -104,7 +102,7 @@ export const list = query({
         visibility: resolveVisibility(library.visibility),
         ownerUserId: library.ownerUserId,
         viewerUserId,
-        isAdmin,
+        isAdmin: authorization.isAdmin,
       })
     );
 
@@ -133,8 +131,9 @@ export const list = query({
             visibility: resolveVisibility(library.visibility),
             ownerUserId: library.ownerUserId,
             viewerUserId,
-            isAdmin,
-            canManagePublicIconLibraries,
+            isAdmin: authorization.isAdmin,
+            canManagePublicIconLibraries:
+              authorization.canManagePublicIconLibraries,
           }),
           isOwner: Boolean(
             viewerUserId && library.ownerUserId === viewerUserId
@@ -155,10 +154,9 @@ export const getBySlug = query({
       ? await findUserByExternalId(ctx, getIdentityExternalId(identity))
       : null;
     const viewerUserId = viewerUser?._id;
-    const isAdmin = identity ? isIdentityAdmin(identity) : false;
-    const canManagePublicIconLibraries = identity
-      ? canIdentityManagePublicIconLibraries(identity)
-      : false;
+    const authorization = identity
+      ? await getUserAuthorization(ctx, { identity, user: viewerUser })
+      : { isAdmin: false, canManagePublicIconLibraries: false };
 
     const library = await ctx.db
       .query("iconLibraries")
@@ -175,7 +173,7 @@ export const getBySlug = query({
         visibility,
         ownerUserId: library.ownerUserId,
         viewerUserId,
-        isAdmin,
+        isAdmin: authorization.isAdmin,
       })
     ) {
       return null;
@@ -195,8 +193,9 @@ export const getBySlug = query({
         visibility,
         ownerUserId: library.ownerUserId,
         viewerUserId,
-        isAdmin,
-        canManagePublicIconLibraries,
+        isAdmin: authorization.isAdmin,
+        canManagePublicIconLibraries:
+          authorization.canManagePublicIconLibraries,
       }),
       iconCount: icons.length,
     };
@@ -211,10 +210,9 @@ export const get = query({
       ? await findUserByExternalId(ctx, getIdentityExternalId(identity))
       : null;
     const viewerUserId = viewerUser?._id;
-    const isAdmin = identity ? isIdentityAdmin(identity) : false;
-    const canManagePublicIconLibraries = identity
-      ? canIdentityManagePublicIconLibraries(identity)
-      : false;
+    const authorization = identity
+      ? await getUserAuthorization(ctx, { identity, user: viewerUser })
+      : { isAdmin: false, canManagePublicIconLibraries: false };
 
     const library = await ctx.db.get(id);
     if (!library) {
@@ -227,7 +225,7 @@ export const get = query({
         visibility,
         ownerUserId: library.ownerUserId,
         viewerUserId,
-        isAdmin,
+        isAdmin: authorization.isAdmin,
       })
     ) {
       return null;
@@ -237,8 +235,8 @@ export const get = query({
       visibility,
       ownerUserId: library.ownerUserId,
       viewerUserId,
-      isAdmin,
-      canManagePublicIconLibraries,
+      isAdmin: authorization.isAdmin,
+      canManagePublicIconLibraries: authorization.canManagePublicIconLibraries,
     });
 
     const icons = await ctx.db

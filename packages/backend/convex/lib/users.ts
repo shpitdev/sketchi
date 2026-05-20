@@ -3,36 +3,31 @@ import type { UserIdentity } from "convex/server";
 import type { Doc } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 
-const ADMIN_EMAILS = new Set(
-  (process.env.SKETCHI_ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter((value) => value.length > 0)
-);
+function parseEmailSet(value: string | undefined): Set<string> {
+  return new Set(
+    (value ?? "")
+      .split(",")
+      .map((entry) => entry.trim().toLowerCase())
+      .filter((entry) => entry.length > 0)
+  );
+}
 
-const ADMIN_SUBJECTS = new Set(
-  (process.env.SKETCHI_ADMIN_SUBJECTS ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter((value) => value.length > 0)
-);
+function parseSubjectSet(value: string | undefined): Set<string> {
+  return new Set(
+    (value ?? "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0)
+  );
+}
 
-const DEFAULT_PUBLIC_ICON_LIBRARY_EDITOR_EMAILS = ["anand@shpit.dev"];
+function getBootstrapAdminEmails(): Set<string> {
+  return parseEmailSet(process.env.SKETCHI_BOOTSTRAP_ADMIN_EMAILS);
+}
 
-const PUBLIC_ICON_LIBRARY_EDITOR_EMAILS = new Set([
-  ...DEFAULT_PUBLIC_ICON_LIBRARY_EDITOR_EMAILS,
-  ...(process.env.SKETCHI_ICON_LIBRARY_EDITOR_EMAILS ?? "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter((value) => value.length > 0),
-]);
-
-const PUBLIC_ICON_LIBRARY_EDITOR_SUBJECTS = new Set(
-  (process.env.SKETCHI_ICON_LIBRARY_EDITOR_SUBJECTS ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter((value) => value.length > 0)
-);
+function getBootstrapAdminSubjects(): Set<string> {
+  return parseSubjectSet(process.env.SKETCHI_BOOTSTRAP_ADMIN_SUBJECTS);
+}
 
 function normalizeEmail(email: string | null | undefined): string | undefined {
   if (!email) {
@@ -74,26 +69,65 @@ export function getIdentityImage(identity: UserIdentity): string | undefined {
   return normalizeImage(identity.pictureUrl);
 }
 
-export function isIdentityAdmin(identity: UserIdentity): boolean {
+export function canIdentityBootstrapFirstAdmin(
+  identity: UserIdentity
+): boolean {
   const email = getIdentityEmail(identity);
   return (
-    (email ? ADMIN_EMAILS.has(email) : false) ||
-    ADMIN_SUBJECTS.has(getIdentityExternalId(identity))
+    (email ? getBootstrapAdminEmails().has(email) : false) ||
+    getBootstrapAdminSubjects().has(getIdentityExternalId(identity))
   );
 }
 
-export function canIdentityManagePublicIconLibraries(
-  identity: UserIdentity
-): boolean {
-  if (isIdentityAdmin(identity)) {
-    return true;
-  }
+export async function hasAnyAdmin(
+  ctx: QueryCtx | MutationCtx
+): Promise<boolean> {
+  const admin = await ctx.db
+    .query("users")
+    .withIndex("by_role", (q) => q.eq("role", "admin"))
+    .first();
+  return Boolean(admin);
+}
 
-  const email = getIdentityEmail(identity);
-  return (
-    (email ? PUBLIC_ICON_LIBRARY_EDITOR_EMAILS.has(email) : false) ||
-    PUBLIC_ICON_LIBRARY_EDITOR_SUBJECTS.has(getIdentityExternalId(identity))
+export async function canBootstrapIdentityAsFirstAdmin(
+  ctx: QueryCtx | MutationCtx,
+  identity: UserIdentity
+): Promise<boolean> {
+  if (!canIdentityBootstrapFirstAdmin(identity)) {
+    return false;
+  }
+  return !(await hasAnyAdmin(ctx));
+}
+
+export function isUserAdmin(user: Doc<"users"> | null): boolean {
+  return user?.role === "admin";
+}
+
+export function canUserManagePublicIconLibraries(
+  user: Doc<"users"> | null
+): boolean {
+  return Boolean(isUserAdmin(user) || user?.canManagePublicIconLibraries);
+}
+
+export async function getUserAuthorization(
+  ctx: QueryCtx | MutationCtx,
+  args: { identity: UserIdentity; user: Doc<"users"> | null }
+): Promise<{
+  isAdmin: boolean;
+  canManagePublicIconLibraries: boolean;
+  canBootstrapFirstAdmin: boolean;
+}> {
+  const canBootstrapFirstAdmin = await canBootstrapIdentityAsFirstAdmin(
+    ctx,
+    args.identity
   );
+  const isAdmin = isUserAdmin(args.user) || canBootstrapFirstAdmin;
+  return {
+    isAdmin,
+    canManagePublicIconLibraries:
+      isAdmin || canUserManagePublicIconLibraries(args.user),
+    canBootstrapFirstAdmin,
+  };
 }
 
 export async function findUserByExternalId(
@@ -111,6 +145,7 @@ export async function getViewerWithUser(ctx: QueryCtx | MutationCtx): Promise<{
   user: Doc<"users"> | null;
   isAdmin: boolean;
   canManagePublicIconLibraries: boolean;
+  canBootstrapFirstAdmin: boolean;
 }> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) {
@@ -118,13 +153,12 @@ export async function getViewerWithUser(ctx: QueryCtx | MutationCtx): Promise<{
   }
 
   const user = await findUserByExternalId(ctx, getIdentityExternalId(identity));
+  const authorization = await getUserAuthorization(ctx, { identity, user });
 
   return {
     identity,
     user,
-    isAdmin: isIdentityAdmin(identity),
-    canManagePublicIconLibraries:
-      canIdentityManagePublicIconLibraries(identity),
+    ...authorization,
   };
 }
 
@@ -133,14 +167,19 @@ export async function ensureViewerUser(ctx: MutationCtx): Promise<{
   user: Doc<"users">;
   isAdmin: boolean;
   canManagePublicIconLibraries: boolean;
+  canBootstrapFirstAdmin: boolean;
 }> {
-  const { identity, user, isAdmin, canManagePublicIconLibraries } =
-    await getViewerWithUser(ctx);
+  const {
+    identity,
+    user,
+    isAdmin,
+    canManagePublicIconLibraries,
+    canBootstrapFirstAdmin,
+  } = await getViewerWithUser(ctx);
   const externalId = getIdentityExternalId(identity);
   const email = getIdentityEmail(identity);
   const name = getIdentityName(identity);
   const image = getIdentityImage(identity);
-  const role = isAdmin ? "admin" : "user";
   const now = Date.now();
 
   if (!user) {
@@ -149,7 +188,8 @@ export async function ensureViewerUser(ctx: MutationCtx): Promise<{
       email,
       name,
       image,
-      role,
+      role: canBootstrapFirstAdmin ? "admin" : "user",
+      canManagePublicIconLibraries: canBootstrapFirstAdmin,
       createdAt: now,
       updatedAt: now,
     });
@@ -160,22 +200,34 @@ export async function ensureViewerUser(ctx: MutationCtx): Promise<{
     return {
       identity,
       user: inserted,
-      isAdmin,
-      canManagePublicIconLibraries,
+      isAdmin: inserted.role === "admin",
+      canManagePublicIconLibraries:
+        inserted.role === "admin" ||
+        Boolean(inserted.canManagePublicIconLibraries),
+      canBootstrapFirstAdmin,
     };
   }
+
+  const nextRole =
+    canBootstrapFirstAdmin && user.role !== "admin" ? "admin" : user.role;
+  const nextCanManagePublicIconLibraries =
+    canBootstrapFirstAdmin && !user.canManagePublicIconLibraries
+      ? true
+      : user.canManagePublicIconLibraries;
 
   if (
     user.email !== email ||
     user.name !== name ||
     user.image !== image ||
-    user.role !== role
+    user.role !== nextRole ||
+    user.canManagePublicIconLibraries !== nextCanManagePublicIconLibraries
   ) {
     await ctx.db.patch(user._id, {
       email,
       name,
       image,
-      role,
+      role: nextRole,
+      canManagePublicIconLibraries: nextCanManagePublicIconLibraries,
       updatedAt: now,
     });
 
@@ -187,8 +239,11 @@ export async function ensureViewerUser(ctx: MutationCtx): Promise<{
     return {
       identity,
       user: refreshed,
-      isAdmin,
-      canManagePublicIconLibraries,
+      isAdmin: refreshed.role === "admin",
+      canManagePublicIconLibraries:
+        refreshed.role === "admin" ||
+        Boolean(refreshed.canManagePublicIconLibraries),
+      canBootstrapFirstAdmin,
     };
   }
 
@@ -197,5 +252,6 @@ export async function ensureViewerUser(ctx: MutationCtx): Promise<{
     user,
     isAdmin,
     canManagePublicIconLibraries,
+    canBootstrapFirstAdmin,
   };
 }

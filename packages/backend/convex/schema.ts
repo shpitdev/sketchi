@@ -54,11 +54,13 @@ export default defineSchema({
     name: v.optional(v.string()),
     image: v.optional(v.string()),
     role: userRole,
+    canManagePublicIconLibraries: v.optional(v.boolean()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_externalId", ["externalId"])
-    .index("by_email", ["email"]),
+    .index("by_email", ["email"])
+    .index("by_role", ["role"]),
   iconLibraries: defineTable({
     name: v.string(),
     slug: v.string(),
