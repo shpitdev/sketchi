@@ -124,7 +124,16 @@ async function continueFromSignedInPage(
   page: AuthPage,
   baseUrl: string
 ): Promise<boolean> {
-  const clicked = await clickIfVisible(page, 'a:has-text("Continue")');
+  const hasCredentialsForm =
+    (await pageHasSelector(page, 'input[type="email"]')) ||
+    (await pageHasSelector(page, 'input[type="password"]'));
+  if (hasCredentialsForm) {
+    return false;
+  }
+
+  const clicked =
+    (await clickIfVisible(page, 'a:has-text("Continue")')) ||
+    (await clickIfVisible(page, 'button:has-text("Continue")'));
   if (!clicked) {
     return false;
   }
@@ -257,6 +266,9 @@ export async function ensureSignedInForDiagrams(
   const stillShowsSignInCta = await pageShowsSignInCallToAction(page);
   if (!page.url().includes("/diagrams") || stillShowsSignInCta) {
     await openHostedSignInIfNeeded(page);
+    if (await continueFromSignedInPage(page, baseUrl)) {
+      return;
+    }
     if (!(credentials.email && credentials.password)) {
       throw new Error(
         "Diagram Studio requires sign-in. Set SKETCHI_E2E_EMAIL and SKETCHI_E2E_PASSWORD for authenticated E2E."

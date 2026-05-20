@@ -31,9 +31,9 @@ jobs:
               context.payload.deployment?.sha ??
               context.payload.deployment_status?.deployment?.sha;
             if (!sha) {
-              core.warning("No deployment SHA found; skipping E2E API tests.");
-              core.setOutput("run_tests", "false");
-              return;
+              throw new Error(
+                "No deployment SHA found; cannot evaluate E2E API policy."
+              );
             }
             let prs = [];
             try {
@@ -42,17 +42,17 @@ jobs:
                   owner,
                   repo,
                   commit_sha: sha,
-                });
+              });
               prs = response.data ?? [];
             } catch (error) {
-              core.warning(`Failed to resolve PR for ${sha}: ${error.message}`);
-              core.setOutput("run_tests", "false");
-              return;
+              throw new Error(
+                `Failed to resolve PR for ${sha}: ${error.message}`
+              );
             }
             if (!prs.length) {
-              core.notice(`No PR found for ${sha}; skipping E2E API tests.`);
-              core.setOutput("run_tests", "false");
-              return;
+              throw new Error(
+                `No PR found for ${sha}; cannot evaluate E2E API policy.`
+              );
             }
             const pr = prs[0];
             const prNumber = pr.number;
