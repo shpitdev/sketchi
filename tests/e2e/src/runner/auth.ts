@@ -73,9 +73,11 @@ function requireAuthCredentials(
 }
 
 async function pageHasSelector(page: AuthPage, selector: string) {
-  return await page.evaluate((querySelector) => {
-    return Boolean(document.querySelector(querySelector));
-  }, selector);
+  try {
+    return await page.locator(selector).first().isVisible({ timeout: 1000 });
+  } catch {
+    return false;
+  }
 }
 
 async function clickIfVisible(page: AuthPage, selector: string) {
@@ -101,6 +103,13 @@ async function pageShowsSignInCallToAction(page: AuthPage): Promise<boolean> {
       const text = node.textContent?.trim().toLowerCase();
       return text === "sign in";
     });
+  });
+}
+
+async function getPageTextPreview(page: AuthPage): Promise<string> {
+  return await page.evaluate(() => {
+    const text = document.body?.innerText ?? "";
+    return text.replace(/\s+/g, " ").trim().slice(0, 500);
   });
 }
 
@@ -202,7 +211,9 @@ async function ensureCredentialsForm(page: AuthPage): Promise<void> {
     { timeoutMs: 30_000, label: "workos-credentials-form" }
   );
   if (!reachedCredentialsForm) {
-    throw new Error("WorkOS email input did not appear.");
+    throw new Error(
+      `WorkOS email input did not appear. url=${page.url()} text=${JSON.stringify(await getPageTextPreview(page))}`
+    );
   }
 }
 
