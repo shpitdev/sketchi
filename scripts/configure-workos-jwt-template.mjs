@@ -70,7 +70,8 @@ async function readCurrentTemplate() {
     if (
       error instanceof Error &&
       error.message.includes("WorkOS GET") &&
-      error.message.includes("404")
+      (error.message.includes("404") ||
+        error.message.includes("JWT template not found"))
     ) {
       return {};
     }
