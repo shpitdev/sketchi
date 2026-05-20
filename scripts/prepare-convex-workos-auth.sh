@@ -12,7 +12,3 @@ if [ -z "${WORKOS_API_KEY:-}" ]; then
 fi
 
 bun scripts/configure-workos-jwt-template.mjs
-
-cd packages/backend
-npx convex env set WORKOS_CLIENT_ID "${WORKOS_CLIENT_ID}"
-npx convex env set WORKOS_API_KEY "${WORKOS_API_KEY}"
