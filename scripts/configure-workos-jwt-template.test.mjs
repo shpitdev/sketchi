@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { afterEach, describe, it } from "node:test";
 
-import { upsertAudInTemplateContent } from "./configure-workos-jwt-template.mjs";
+import {
+  getVercelPreviewOrigin,
+  upsertAudInTemplateContent,
+} from "./configure-workos-jwt-template.mjs";
+
+const originalVercelUrl = process.env.VERCEL_URL;
+
+afterEach(() => {
+  process.env.VERCEL_URL = originalVercelUrl;
+});
 
 describe("upsertAudInTemplateContent", () => {
   it("creates a minimal template when no content exists", () => {
@@ -49,6 +58,29 @@ describe("upsertAudInTemplateContent", () => {
   "aud": "client_test",
   "urn:sketchi:email": {{ user.email }}
 }`
+    );
+  });
+});
+
+describe("getVercelPreviewOrigin", () => {
+  it("returns null without a Vercel URL", () => {
+    process.env.VERCEL_URL = "";
+    assert.equal(getVercelPreviewOrigin(), null);
+  });
+
+  it("normalizes Vercel hostnames to HTTPS origins", () => {
+    process.env.VERCEL_URL = "sketchi-preview.vercel.app";
+    assert.equal(
+      getVercelPreviewOrigin(),
+      "https://sketchi-preview.vercel.app"
+    );
+  });
+
+  it("preserves fully qualified preview origins", () => {
+    process.env.VERCEL_URL = "https://sketchi-preview.vercel.app/some-path";
+    assert.equal(
+      getVercelPreviewOrigin(),
+      "https://sketchi-preview.vercel.app"
     );
   });
 });

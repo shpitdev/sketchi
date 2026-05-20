@@ -4,6 +4,9 @@ import { pathToFileURL } from "node:url";
 
 const WORKOS_API_BASE_URL = "https://api.workos.com";
 const JWT_TEMPLATE_PATH = "/user_management/jwt_template";
+const REDIRECT_URIS_PATH = "/user_management/redirect_uris";
+const CORS_ORIGINS_PATH = "/user_management/cors_origins";
+const ALREADY_CONFIGURED_PATTERN = /\b(already|duplicate|exists|taken)\b/i;
 const WHITESPACE_PATTERN = /\s/;
 
 const dryRun = process.argv.includes("--dry-run");
@@ -39,6 +42,58 @@ async function requestWorkOs(path, options = {}) {
   }
 
   return payload;
+}
+
+function isAlreadyConfiguredError(error) {
+  return (
+    error instanceof Error && ALREADY_CONFIGURED_PATTERN.test(error.message)
+  );
+}
+
+async function createIfMissing(path, body, label) {
+  try {
+    await requestWorkOs(path, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    console.log(`${label} added`);
+  } catch (error) {
+    if (isAlreadyConfiguredError(error)) {
+      console.log(`${label} already configured`);
+      return;
+    }
+    throw error;
+  }
+}
+
+export function getVercelPreviewOrigin() {
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (!vercelUrl) {
+    return null;
+  }
+
+  const url = vercelUrl.startsWith("http")
+    ? new URL(vercelUrl)
+    : new URL(`https://${vercelUrl}`);
+  return url.origin;
+}
+
+async function configurePreviewAuthKitUrls() {
+  const previewOrigin = getVercelPreviewOrigin();
+  if (!previewOrigin) {
+    return;
+  }
+
+  await createIfMissing(
+    REDIRECT_URIS_PATH,
+    { uri: `${previewOrigin}/callback` },
+    `AuthKit redirect URI ${previewOrigin}/callback`
+  );
+  await createIfMissing(
+    CORS_ORIGINS_PATH,
+    { origin: previewOrigin },
+    `AuthKit CORS origin ${previewOrigin}`
+  );
 }
 
 function isObject(value) {
@@ -335,6 +390,8 @@ export async function main() {
     console.log(nextContent);
     return;
   }
+
+  await configurePreviewAuthKitUrls();
 
   await requestWorkOs(JWT_TEMPLATE_PATH, {
     method: "PUT",
