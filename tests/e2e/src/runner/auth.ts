@@ -46,6 +46,18 @@ function getAuthCredentials():
   return { email, password };
 }
 
+function requireAuthCredentials(
+  credentials: ReturnType<typeof getAuthCredentials>
+): asserts credentials is { email: string; password: string } {
+  if (credentials.email && credentials.password) {
+    return;
+  }
+
+  throw new Error(
+    "Diagram Studio requires sign-in. Set SKETCHI_E2E_EMAIL and SKETCHI_E2E_PASSWORD for authenticated E2E."
+  );
+}
+
 async function pageHasSelector(page: AuthPage, selector: string) {
   return await page.evaluate((querySelector) => {
     return Boolean(document.querySelector(querySelector));
@@ -225,6 +237,21 @@ async function submitPasswordStep(
   await clickIfVisible(page, 'button[type="submit"]');
 }
 
+async function continueOrRequireCredentialsForm(
+  page: AuthPage,
+  baseUrl: string
+): Promise<boolean> {
+  try {
+    await ensureCredentialsForm(page);
+    return false;
+  } catch (error) {
+    if (await continueFromSignedInPage(page, baseUrl)) {
+      return true;
+    }
+    throw error;
+  }
+}
+
 export async function ensureSignedInForDiagrams(
   page: AuthPage,
   baseUrl: string
@@ -256,11 +283,8 @@ export async function ensureSignedInForDiagrams(
   );
   const continued =
     clickedContinueToSignIn || (await continueFromSignedInPage(page, baseUrl));
-  const hasCredentials = Boolean(credentials.email && credentials.password);
-  if (!(continued || hasCredentials)) {
-    throw new Error(
-      "Diagram Studio requires sign-in. Set SKETCHI_E2E_EMAIL and SKETCHI_E2E_PASSWORD for authenticated E2E."
-    );
+  if (!continued) {
+    requireAuthCredentials(credentials);
   }
 
   const stillShowsSignInCta = await pageShowsSignInCallToAction(page);
@@ -269,12 +293,10 @@ export async function ensureSignedInForDiagrams(
     if (await continueFromSignedInPage(page, baseUrl)) {
       return;
     }
-    if (!(credentials.email && credentials.password)) {
-      throw new Error(
-        "Diagram Studio requires sign-in. Set SKETCHI_E2E_EMAIL and SKETCHI_E2E_PASSWORD for authenticated E2E."
-      );
+    requireAuthCredentials(credentials);
+    if (await continueOrRequireCredentialsForm(page, baseUrl)) {
+      return;
     }
-    await ensureCredentialsForm(page);
     await submitEmailStep(page, credentials.email);
     await submitPasswordStep(page, credentials.password);
     await waitForDiagramsReturn(page, "auth-return-diagrams", baseUrl);
