@@ -27,6 +27,12 @@ jobs:
   convex-tests:
     if: |
       (github.event_name != 'pull_request' || (
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        (
+          github.event.pull_request.author_association == 'OWNER' ||
+          github.event.pull_request.author_association == 'MEMBER' ||
+          github.event.pull_request.author_association == 'COLLABORATOR'
+        ) &&
         !startsWith(github.event.pull_request.title, 'chore: bump version') &&
         !startsWith(github.event.pull_request.head.ref, 'chore/bump-version')
       )) &&

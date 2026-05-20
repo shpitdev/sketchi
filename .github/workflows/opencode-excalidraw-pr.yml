@@ -17,6 +17,15 @@ permissions:
 
 jobs:
   opencode-excalidraw:
+    if: |
+      github.event_name != 'pull_request' || (
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        (
+          github.event.pull_request.author_association == 'OWNER' ||
+          github.event.pull_request.author_association == 'MEMBER' ||
+          github.event.pull_request.author_association == 'COLLABORATOR'
+        )
+      )
     runs-on: depot-ubuntu-24.04
     env:
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"

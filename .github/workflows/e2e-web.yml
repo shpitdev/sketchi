@@ -21,7 +21,7 @@ jobs:
     runs-on: depot-ubuntu-24.04
     timeout-minutes: 35
     steps:
-      - name: Check for doc-only changes
+      - name: Check preview test policy
         id: doc_check
         uses: actions/github-script@v9
         with:
@@ -31,8 +31,8 @@ jobs:
               context.payload.deployment?.sha ??
               context.payload.deployment_status?.deployment?.sha;
             if (!sha) {
-              core.warning("No deployment SHA found; running tests.");
-              core.setOutput("run_tests", "true");
+              core.warning("No deployment SHA found; skipping E2E web tests.");
+              core.setOutput("run_tests", "false");
               return;
             }
             let prs = [];
@@ -46,16 +46,28 @@ jobs:
               prs = response.data ?? [];
             } catch (error) {
               core.warning(`Failed to resolve PR for ${sha}: ${error.message}`);
-              core.setOutput("run_tests", "true");
+              core.setOutput("run_tests", "false");
               return;
             }
             if (!prs.length) {
-              core.notice(`No PR found for ${sha}; running tests.`);
-              core.setOutput("run_tests", "true");
+              core.notice(`No PR found for ${sha}; skipping E2E web tests.`);
+              core.setOutput("run_tests", "false");
               return;
             }
             const pr = prs[0];
             const prNumber = pr.number;
+            const sameRepo = pr.head?.repo?.full_name === `${owner}/${repo}`;
+            const trustedAssociation = ["OWNER", "MEMBER", "COLLABORATOR"].includes(
+              pr.author_association
+            );
+            const isDependabot = pr.user?.login === "dependabot[bot]";
+            if (!sameRepo || !trustedAssociation || isDependabot) {
+              core.notice(
+                `PR #${prNumber} is not trusted for preview E2E; skipping web tests.`
+              );
+              core.setOutput("run_tests", "false");
+              return;
+            }
             const isBumpPr =
               pr.title?.startsWith("chore: bump version") ||
               pr.head?.ref?.startsWith("chore/bump-version");
