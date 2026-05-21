@@ -8,20 +8,30 @@ if (!clientId) {
 
 const previewWorkOsClientId = "client_01KFPXKM905BYDQY5Q7BFJN409";
 const legacyPreviewAuthConfigClientId = "client_01KG0NZ3QX0AJQE87CKZC74YXQ";
+const productionWorkOsClientId = "client_01KG0NPZN3AWXNTRHC58VAPVW2";
 
-const clientIds = Array.from(
-  new Set(
-    [
-      clientId,
-      // Convex auth config only permits env vars already set in Convex.
-      // During preview deploys, auth config currently sees the legacy client
-      // while Vercel/WorkOS mint tokens for the newer preview client.
-      clientId === legacyPreviewAuthConfigClientId
-        ? previewWorkOsClientId
-        : null,
-    ].filter((value): value is string => Boolean(value))
-  )
-);
+export function buildWorkOsClientIds(primaryClientId: string): string[] {
+  return Array.from(
+    new Set(
+      [
+        primaryClientId,
+        // Convex auth config can see the previously stored client during the
+        // same deploy that refreshes WorkOS/Vercel credentials. Keep the
+        // active handoff clients valid so first deploys do not reject fresh
+        // AuthKit tokens.
+        primaryClientId === legacyPreviewAuthConfigClientId
+          ? previewWorkOsClientId
+          : null,
+        primaryClientId === legacyPreviewAuthConfigClientId ||
+        primaryClientId === previewWorkOsClientId
+          ? productionWorkOsClientId
+          : null,
+      ].filter((value): value is string => Boolean(value))
+    )
+  );
+}
+
+const clientIds = buildWorkOsClientIds(clientId);
 
 export default {
   providers: clientIds.flatMap((currentClientId) => {
