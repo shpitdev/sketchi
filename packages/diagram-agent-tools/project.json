@@ -1,0 +1,38 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "diagram-agent-tools",
+  "projectType": "library",
+  "sourceRoot": "packages/diagram-agent-tools/src",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p tsconfig.lib.json",
+        "cwd": "packages/diagram-agent-tools"
+      },
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --config vitest.config.ts",
+        "cwd": "packages/diagram-agent-tools"
+      },
+      "outputs": ["{workspaceRoot}/coverage/packages/diagram-agent-tools"]
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p tsconfig.json --noEmit",
+        "cwd": "packages/diagram-agent-tools"
+      }
+    },
+    "typecheck-tsgo": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsgo -p packages/diagram-agent-tools/tsconfig.json --noEmit"
+      }
+    }
+  },
+  "tags": ["scope:diagram", "type:agent-tools"]
+}

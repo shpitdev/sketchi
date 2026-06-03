@@ -232,6 +232,8 @@ importers:
 
   packages/config: {}
 
+  packages/diagram-agent-tools: {}
+
   packages/diagram-core:
     dependencies:
       zod:
@@ -293,6 +295,9 @@ importers:
       '@sketchi/config':
         specifier: workspace:*
         version: link:../config
+      '@sketchi/diagram-agent-tools':
+        specifier: workspace:*
+        version: link:../diagram-agent-tools
       '@types/node':
         specifier: ^25.6.0
         version: 25.9.1

@@ -1,17 +1,12 @@
+import {
+  DIAGRAM_AGENT_TOOL_NAMES,
+  SKETCHI_DIAGRAM_AGENT_ID as SHARED_SKETCHI_DIAGRAM_AGENT_ID,
+  SKETCHI_DIAGRAM_AGENT_DESCRIPTION,
+} from "@sketchi/diagram-agent-tools";
+
 import { appendSketchiDiagramAgentPrompt } from "./agent-hints";
 
-export const SKETCHI_DIAGRAM_AGENT_ID = "sketchi-diagram";
-
-const DIAGRAM_TOOL_IDS = [
-  "diagram_from_prompt",
-  "diagram_tweak",
-  "diagram_restructure",
-  "diagram_to_png",
-  "diagram_grade",
-] as const;
-
-const DEFAULT_SKETCHI_DIAGRAM_DESCRIPTION =
-  "Use for Excalidraw diagram generation, edits, exports, and grading. Prefer this over Mermaid when diagram tools are available.";
+export const SKETCHI_DIAGRAM_AGENT_ID = SHARED_SKETCHI_DIAGRAM_AGENT_ID;
 
 type AgentDefinition = Record<string, unknown>;
 type AgentRegistry = Record<string, AgentDefinition | undefined>;
@@ -42,7 +37,7 @@ function mergeDiagramTools(value: unknown): Record<string, boolean> {
     }
   }
 
-  for (const toolID of DIAGRAM_TOOL_IDS) {
+  for (const toolID of DIAGRAM_AGENT_TOOL_NAMES) {
     if (merged[toolID] === undefined) {
       merged[toolID] = true;
     }
@@ -67,7 +62,7 @@ export function applySketchiDiagramAgentConfig(config: PluginConfig): void {
     hidden: asOptionalBoolean(existingAgent.hidden) ?? false,
     description:
       asOptionalString(existingAgent.description) ??
-      DEFAULT_SKETCHI_DIAGRAM_DESCRIPTION,
+      SKETCHI_DIAGRAM_AGENT_DESCRIPTION,
     prompt,
     tools: mergeDiagramTools(existingAgent.tools),
   };

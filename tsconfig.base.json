@@ -16,6 +16,9 @@
     "noImplicitReturns": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
+      "@sketchi/diagram-agent-tools": [
+        "./packages/diagram-agent-tools/src/index.ts"
+      ],
       "@sketchi/diagram-core": ["./packages/diagram-core/src/index.ts"],
       "@sketchi/diagram-renderer": ["./packages/diagram-renderer/src/index.ts"],
       "@sketchi/diagram-studio-ui": [

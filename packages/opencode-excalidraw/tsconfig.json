@@ -1,7 +1,13 @@
 {
   "extends": "@sketchi/config/tsconfig.base.json",
   "compilerOptions": {
+    "baseUrl": "../..",
     "lib": ["ES2022", "DOM"],
+    "paths": {
+      "@sketchi/diagram-agent-tools": [
+        "packages/diagram-agent-tools/src/index.ts"
+      ]
+    },
     "types": ["node", "bun-types"],
     "strictNullChecks": true
   },
