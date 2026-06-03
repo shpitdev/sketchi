@@ -9,5 +9,8 @@
     "types": ["node"]
   },
   "exclude": ["src/**/*.test.ts"],
-  "references": [{ "path": "../diagram-agent-tools/tsconfig.lib.json" }]
+  "references": [
+    { "path": "../diagram-agent-tools/tsconfig.lib.json" },
+    { "path": "../diagram-exporter/tsconfig.lib.json" }
+  ]
 }

@@ -35,6 +35,6 @@
       }
     }
   },
-  "implicitDependencies": ["diagram-agent-tools"],
+  "implicitDependencies": ["diagram-agent-tools", "diagram-exporter"],
   "tags": ["scope:agent", "type:mcp"]
 }

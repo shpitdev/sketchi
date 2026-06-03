@@ -15,6 +15,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@sketchi/diagram-agent-tools": "workspace:*",
+    "@sketchi/diagram-exporter": "workspace:*",
     "tslib": "^2.3.0"
   }
 }

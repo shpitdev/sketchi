@@ -197,6 +197,7 @@ export const DIAGRAM_AGENT_TOOL_INPUT_SCHEMAS = {
     type: "object",
     additionalProperties: false,
     properties: {
+      ...optionalSessionProperty,
       ...sceneInputProperties,
       ...renderOptionProperties,
     },

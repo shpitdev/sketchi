@@ -1,11 +1,11 @@
-import { describe, expect, test } from "bun:test";
 import { relative, resolve } from "node:path";
+import { describe, expect, test } from "vitest";
 
 import {
   buildDefaultPngPath,
   resolveOutputPath,
   resolveSessionPngOutputRoot,
-} from "./output";
+} from "./output.js";
 
 const BASE_DIR = resolve(process.cwd(), "tmp-output-policy");
 

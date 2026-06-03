@@ -1,6 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 
-import { mapPlaywrightLaunchError } from "./render";
+import { mapPlaywrightLaunchError } from "./render.js";
 
 describe("mapPlaywrightLaunchError", () => {
   test("maps missing browser launch failure to actionable message", () => {

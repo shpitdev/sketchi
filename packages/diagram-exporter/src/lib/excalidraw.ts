@@ -18,7 +18,7 @@ const SHAPE_TYPES = new Set([
 export interface ExcalidrawFile {
   appState: Record<string, unknown>;
   elements: Record<string, unknown>[];
-  files?: Record<string, unknown>;
+  files?: Record<string, unknown> | undefined;
 }
 
 interface Bounds {
@@ -48,7 +48,13 @@ export function extractShareLink(url: string): {
   if (!match) {
     return { url };
   }
-  return { url, shareId: match[1], encryptionKey: match[2] };
+  const shareId = match[1];
+  const encryptionKey = match[2];
+  return {
+    url,
+    ...(shareId ? { shareId } : {}),
+    ...(encryptionKey ? { encryptionKey } : {}),
+  };
 }
 
 export async function readExcalidrawFile(

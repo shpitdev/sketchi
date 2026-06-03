@@ -7,6 +7,10 @@ export default defineConfig({
         "../diagram-agent-tools/src/index.ts",
         import.meta.url
       ).pathname,
+      "@sketchi/diagram-exporter": new URL(
+        "../diagram-exporter/src/index.ts",
+        import.meta.url
+      ).pathname,
     },
   },
   test: {

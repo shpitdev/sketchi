@@ -96,12 +96,88 @@ describe("Sketchi HTTP MCP executor", () => {
     });
   });
 
-  test("returns an MCP error for host-owned rendering and grading", async () => {
+  test("exports diagram_to_png calls through the shared PNG exporter", async () => {
+    const executor = createSketchiHttpToolExecutor({
+      allowUnsafeOutputPath: true,
+      apiBase: "https://sketchi.app/",
+      authorizationToken: "test-token",
+      baseDir: "/workspace/sketchi",
+      skipPngRender: true,
+      traceIdFactory: () => "trace-png",
+      exportDiagramToPng: (input) => {
+        expect(input).toMatchObject({
+          allowUnsafeOutputPath: true,
+          apiBase: "https://www.sketchi.app",
+          authorizationHeader: "Bearer test-token",
+          baseDir: "/workspace/sketchi",
+          outputPath: "diagram.png",
+          sessionId: "session-png",
+          shareUrl: "https://excalidraw.com/#json=share,key",
+          skipRender: true,
+          traceId: "trace-png",
+        });
+        expect(input.renderOptions).toEqual({
+          background: false,
+          padding: 24,
+          scale: 3,
+        });
+
+        return Promise.resolve({
+          pngPath: null,
+          pngSkipped: true,
+          shareLink: {
+            url: "https://excalidraw.com/#json=share,key",
+            shareId: "share",
+            encryptionKey: "key",
+          },
+          summary: {
+            arrowCount: 0,
+            bounds: { minX: 0, minY: 0, maxX: 100, maxY: 50 },
+            deletedCount: 0,
+            elementCount: 1,
+            overlapPairs: 0,
+            shapeCount: 1,
+            textCount: 0,
+            unboundArrowCount: 0,
+          },
+        });
+      },
+    });
+
+    const result = await executor({
+      name: "diagram_to_png",
+      arguments: {
+        background: false,
+        outputPath: "diagram.png",
+        padding: 24,
+        scale: 3,
+        sessionId: "session-png",
+        shareUrl: "https://excalidraw.com/#json=share,key",
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(result.structuredContent).toMatchObject({
+      pngSkipped: true,
+      shareLink: { shareId: "share" },
+      summary: { elementCount: 1 },
+    });
+  });
+
+  test("returns an MCP error for missing PNG sources and host-owned grading", async () => {
     const executor = createSketchiHttpToolExecutor();
 
     await expect(
       executor({ name: "diagram_to_png", arguments: {} })
-    ).resolves.toMatchObject({ isError: true });
+    ).resolves.toMatchObject({
+      isError: true,
+      content: [
+        {
+          type: "text",
+          text: "Provide shareUrl, excalidrawPath, or excalidraw input.",
+        },
+      ],
+    });
     await expect(
       executor({ name: "diagram_grade", arguments: { prompt: "grade it" } })
     ).resolves.toMatchObject({ isError: true });

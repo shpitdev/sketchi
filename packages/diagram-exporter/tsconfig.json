@@ -6,11 +6,8 @@
     "moduleResolution": "NodeNext",
     "outDir": "dist/typecheck",
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
+    "types": ["node"]
   },
-  "include": ["src/**/*.ts"],
-  "references": [
-    { "path": "../diagram-agent-tools" },
-    { "path": "../diagram-exporter" }
-  ]
+  "include": ["src/**/*.ts"]
 }

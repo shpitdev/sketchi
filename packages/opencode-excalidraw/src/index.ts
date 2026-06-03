@@ -1,20 +1,26 @@
 import { type Plugin, tool } from "@opencode-ai/plugin";
+import {
+  buildDefaultPngPath,
+  closeBrowser,
+  exportDiagramToPng,
+  fetchJson,
+  readExcalidrawFile,
+  renderElementsToPng,
+  resolveExcalidrawFromShareUrl,
+  resolveOutputPath,
+  writePng,
+} from "@sketchi/diagram-exporter";
 
 import { applySketchiDiagramAgentConfig } from "./lib/agent-config";
 import {
   appendSketchiDiagramSystemPrompt,
   shouldInjectSketchiDiagramSystemHints,
 } from "./lib/agent-hints";
-import { fetchJson, shareElements } from "./lib/api";
-import { extractShareLink, readExcalidrawFile } from "./lib/excalidraw";
 import { gradeDiagram } from "./lib/grade";
-import { buildDefaultPngPath, resolveOutputPath, writePng } from "./lib/output";
 import {
   applySketchiAuthProviderConfig,
   SKETCHI_AUTH_PROVIDER_ID,
 } from "./lib/provider-config";
-import { closeBrowser, renderElementsToPng } from "./lib/render";
-import { resolveExcalidrawFromShareUrl } from "./lib/resolve-share-url";
 import {
   resolveSessionCandidate,
   withRecoveredCachedSession,
@@ -1084,95 +1090,41 @@ export const SketchiPlugin: Plugin = (input) => {
         async execute(args, context) {
           const traceId = createToolTraceId();
           const authorizationHeader = await getAuthorizationHeader();
-          const excalidraw =
-            args.excalidraw ??
-            (args.excalidrawPath
-              ? await readExcalidrawFile(args.excalidrawPath, context.directory)
-              : undefined);
 
-          if (!(args.shareUrl || excalidraw)) {
+          if (!(args.shareUrl || args.excalidrawPath || args.excalidraw)) {
             throw new Error("Provide shareUrl or excalidraw input");
           }
 
-          const outputPath = args.outputPath
-            ? resolveOutputPath(
-                args.outputPath,
-                context.directory,
-                context.sessionID,
-                {
-                  allowUnsafeOutputPath: ALLOW_UNSAFE_OUTPUT_PATH,
-                }
-              )
-            : buildDefaultPngPath(
-                "diagram-to-png",
-                context.directory,
-                context.sessionID
-              );
+          const inlineExcalidraw = args.excalidraw
+            ? {
+                elements: args.excalidraw.elements,
+                appState: args.excalidraw.appState ?? {},
+              }
+            : undefined;
 
-          try {
-            let shareLink:
-              | { url: string; shareId?: string; encryptionKey?: string }
-              | undefined;
-            let elements: Record<string, unknown>[] = [];
-
-            if (args.shareUrl) {
-              shareLink = extractShareLink(args.shareUrl);
-              const resolved = await resolveExcalidrawFromShareUrl({
-                shareUrl: args.shareUrl,
-                apiBase,
-                traceId,
-                authorizationHeader,
-                abort: context.abort,
-              });
-              elements = resolved.elements;
-            } else if (excalidraw) {
-              const shared = await shareElements(
-                apiBase,
-                {
-                  elements: excalidraw.elements,
-                  appState: excalidraw.appState,
-                },
-                context.abort,
-                undefined,
-                traceId,
-                authorizationHeader
-              );
-              shareLink = shared;
-              elements = excalidraw.elements;
-            }
-
-            if (SKIP_PNG_RENDER) {
-              return JSON.stringify(
-                {
-                  shareLink,
-                  pngSkipped: true,
-                },
-                null,
-                2
-              );
-            }
-
-            const pngResult = await renderElementsToPng(elements, {
+          const result = await exportDiagramToPng({
+            apiBase,
+            authorizationHeader,
+            baseDir: context.directory,
+            allowUnsafeOutputPath: ALLOW_UNSAFE_OUTPUT_PATH,
+            abort: context.abort,
+            renderOptions: {
               scale: args.scale,
               padding: args.padding,
               background: args.background,
-            });
+            },
+            sessionId: context.sessionID,
+            skipRender: SKIP_PNG_RENDER,
+            traceId,
+            ...(inlineExcalidraw ? { excalidraw: inlineExcalidraw } : {}),
+            ...(args.excalidrawPath
+              ? { excalidrawPath: args.excalidrawPath }
+              : {}),
+            ...(args.outputPath ? { outputPath: args.outputPath } : {}),
+            ...(args.shareUrl ? { shareUrl: args.shareUrl } : {}),
+          });
 
-            const pngPath = await writePng(outputPath, pngResult.png);
-
-            return JSON.stringify(
-              {
-                shareLink,
-                pngPath,
-                pngBytes: pngResult.png.length,
-                pngDurationMs: pngResult.durationMs,
-              },
-              null,
-              2
-            );
-          } finally {
-            await closeBrowser();
-          }
+          return JSON.stringify(result, null, 2);
         },
       }),
       diagram_grade: tool({

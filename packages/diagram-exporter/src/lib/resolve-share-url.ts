@@ -1,4 +1,4 @@
-import { fetchJson } from "./api";
+import { fetchJson } from "./api.js";
 
 type FetchJson = typeof fetchJson;
 

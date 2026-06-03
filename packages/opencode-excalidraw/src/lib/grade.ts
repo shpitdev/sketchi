@@ -1,21 +1,21 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { PluginInput } from "@opencode-ai/plugin";
-
-import { shareElements } from "./api";
-import type { ExcalidrawFile, ExcalidrawSummary } from "./excalidraw";
 import {
-  extractShareLink,
-  readExcalidrawFile,
-  summarizeElements,
-} from "./excalidraw";
-import { buildDefaultPngPath, resolveOutputPath, writePng } from "./output";
-import {
+  buildDefaultPngPath,
   closeBrowser,
+  type ExcalidrawFile,
+  type ExcalidrawSummary,
+  extractShareLink,
   type RenderOptions,
+  readExcalidrawFile,
   renderElementsToPng,
-} from "./render";
-import { resolveExcalidrawFromShareUrl } from "./resolve-share-url";
+  resolveExcalidrawFromShareUrl,
+  resolveOutputPath,
+  shareElements,
+  summarizeElements,
+  writePng,
+} from "@sketchi/diagram-exporter";
 
 export interface DiagramGradeInput {
   abort?: AbortSignal;

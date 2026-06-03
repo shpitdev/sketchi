@@ -1,4 +1,4 @@
-import { fetchJson } from "./api";
+import { fetchJson } from "@sketchi/diagram-exporter";
 
 const SKETCHI_PROVIDER_ID = "sketchi";
 const ACCESS_TOKEN_EXPIRY_BUFFER_MS = 60 * 1000;

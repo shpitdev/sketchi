@@ -6,7 +6,8 @@
     "paths": {
       "@sketchi/diagram-agent-tools": [
         "packages/diagram-agent-tools/src/index.ts"
-      ]
+      ],
+      "@sketchi/diagram-exporter": ["packages/diagram-exporter/src/index.ts"]
     },
     "types": ["node", "bun-types"],
     "strictNullChecks": true

@@ -40,6 +40,7 @@
     "@opencode-ai/plugin": "1.15.4",
     "@sketchi/config": "workspace:*",
     "@sketchi/diagram-agent-tools": "workspace:*",
+    "@sketchi/diagram-exporter": "workspace:*",
     "@types/node": "^25.6.0",
     "bun-types": "1.3.14",
     "typescript": "^5.9.3"

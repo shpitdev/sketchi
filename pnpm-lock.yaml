@@ -240,6 +240,15 @@ importers:
         specifier: ^4.1.13
         version: 4.4.3
 
+  packages/diagram-exporter:
+    dependencies:
+      playwright:
+        specifier: ^1.60.0
+        version: 1.60.0
+      tslib:
+        specifier: ^2.3.0
+        version: 2.8.1
+
   packages/diagram-renderer:
     dependencies:
       '@sketchi/diagram-core':
@@ -291,6 +300,9 @@ importers:
       '@sketchi/diagram-agent-tools':
         specifier: workspace:*
         version: link:../diagram-agent-tools
+      '@sketchi/diagram-exporter':
+        specifier: workspace:*
+        version: link:../diagram-exporter
       tslib:
         specifier: ^2.3.0
         version: 2.8.1
@@ -310,6 +322,9 @@ importers:
       '@sketchi/diagram-agent-tools':
         specifier: workspace:*
         version: link:../diagram-agent-tools
+      '@sketchi/diagram-exporter':
+        specifier: workspace:*
+        version: link:../diagram-exporter
       '@types/node':
         specifier: ^25.6.0
         version: 25.9.1

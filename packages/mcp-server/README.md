@@ -13,10 +13,12 @@ node packages/mcp-server/dist/stdio.js
 
 `SKETCHI_API_URL` defaults to `https://www.sketchi.app`. `SKETCHI_ACCESS_TOKEN` and `SKETCHI_BEARER_TOKEN` are accepted for bearer auth.
 
+`diagram_to_png` writes PNGs under `.sketchi/sessions/<sessionId>/png` by default. Set `SKETCHI_SKIP_PNG_RENDER=1` for metadata-only export, or `SKETCHI_ALLOW_UNSAFE_OUTPUT_PATH=1` to allow explicit paths outside the session PNG root.
+
 ## Current Executor Coverage
 
 - `diagram_from_prompt`: calls `/api/diagrams/thread-run`.
 - `diagram_tweak`: calls `/api/diagrams/session-seed` for inline Excalidraw scenes when needed, then `/api/diagrams/thread-run`.
 - `diagram_restructure`: calls `/api/diagrams/session-seed` for inline Excalidraw scenes when needed, then `/api/diagrams/thread-run`.
-- `diagram_to_png`: requires a host renderer executor.
+- `diagram_to_png`: renders local PNG output through `@sketchi/diagram-exporter`.
 - `diagram_grade`: requires a host LLM/grading executor.
