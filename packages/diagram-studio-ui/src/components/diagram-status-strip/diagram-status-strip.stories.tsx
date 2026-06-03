@@ -5,7 +5,6 @@ import { DiagramStatusStrip } from "./diagram-status-strip";
 const meta = {
   title: "Diagram Studio/Components/DiagramStatusStrip",
   component: DiagramStatusStrip,
-  tags: ["autodocs"],
   args: {
     edgeCount: 3,
     nodeCount: 4,

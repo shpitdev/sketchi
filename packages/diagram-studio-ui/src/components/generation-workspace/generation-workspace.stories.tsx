@@ -6,7 +6,6 @@ import { GenerationWorkspace } from "./generation-workspace";
 const meta = {
   title: "Diagram Studio/Components/GenerationWorkspace",
   component: GenerationWorkspace,
-  tags: ["autodocs"],
   args: {
     diagrams: [
       {

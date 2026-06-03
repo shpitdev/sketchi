@@ -6,7 +6,6 @@ import { DiagramPreview } from "./diagram-preview";
 const meta = {
   title: "Diagram Studio/Components/DiagramPreview",
   component: DiagramPreview,
-  tags: ["autodocs"],
   args: {
     diagram: architectureFixture,
   },

@@ -6,7 +6,6 @@ import { DiagramCatalog } from "./diagram-catalog";
 const meta = {
   title: "Diagram Studio/Components/DiagramCatalog",
   component: DiagramCatalog,
-  tags: ["autodocs"],
   args: {
     items: [
       {

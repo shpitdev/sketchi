@@ -25,16 +25,12 @@ pnpm nx g @sketchi/generators:ui-component diagram-status-strip
 ```
 
 The generator creates a component file, test, Storybook story, local barrel
-export, and package export. The generated component starts as an accessible
-section with a required title, optional description, Testing Library coverage,
-and an autodocs-enabled Storybook default state. After generation, replace the
-seed props and markup with the real component contract.
+export, and package export. After generation, replace the placeholder props and
+markup with the real component contract.
 
 The `diagram-studio-ui` test target includes a structure guard that fails if a
 component under `src/components/*` is missing its test, story, local export, or
-package export. It also checks that component stories use the maintained
-`Diagram Studio/Components/*` Storybook namespace, autodocs tag, typed metadata,
-and a default story.
+package export.
 
 ## Checks
 
