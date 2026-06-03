@@ -1,8 +1,12 @@
-import { createRouter } from "@tanstack/react-router";
+import { createRouter, type RouterHistory } from "@tanstack/react-router";
 import { createQueryClient } from "./router-context";
 import { routeTree } from "./routeTree.gen";
 
-export function getRouter() {
+export interface GetRouterOptions {
+  history?: RouterHistory;
+}
+
+export function getRouter(options: GetRouterOptions = {}) {
   const queryClient = createQueryClient();
 
   return createRouter({
@@ -11,6 +15,7 @@ export function getRouter() {
     },
     defaultNotFoundComponent: DefaultNotFoundComponent,
     defaultPreload: "intent",
+    ...(options.history ? { history: options.history } : {}),
     routeTree,
     scrollRestoration: true,
   });
