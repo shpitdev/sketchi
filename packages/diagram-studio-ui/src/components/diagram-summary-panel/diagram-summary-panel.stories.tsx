@@ -6,6 +6,7 @@ import { DiagramSummaryPanel } from "./diagram-summary-panel";
 const meta = {
   title: "Diagram Studio/Components/DiagramSummaryPanel",
   component: DiagramSummaryPanel,
+  tags: ["autodocs"],
   args: {
     diagram: architectureFixture,
     prompt: "Show the v2 app, API worker, Convex store, and AI provider.",

@@ -1,18 +1,16 @@
-import type { ReactNode } from "react";
-
 export interface <%= className %>Props {
-  title?: string;
-  children?: ReactNode;
+  description?: string;
+  title: string;
 }
 
 export function <%= className %>({
-  title = "<%= className %>",
-  children,
+  description,
+  title,
 }: <%= className %>Props) {
   return (
-    <section className="sketchi-<%= fileName %>">
+    <section aria-label={title} className="sketchi-<%= fileName %>">
       <h2>{title}</h2>
-      {children ? <div>{children}</div> : null}
+      {description ? <p>{description}</p> : null}
     </section>
   );
 }
