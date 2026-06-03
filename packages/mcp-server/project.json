@@ -1,0 +1,40 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "mcp-server",
+  "projectType": "library",
+  "sourceRoot": "packages/mcp-server/src",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
+      "options": {
+        "command": "tsc -b packages/mcp-server/tsconfig.lib.json"
+      },
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --config vitest.config.ts",
+        "cwd": "packages/mcp-server"
+      },
+      "outputs": ["{workspaceRoot}/coverage/packages/mcp-server"]
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["^typecheck"],
+      "options": {
+        "command": "tsc -b packages/mcp-server/tsconfig.json --pretty false"
+      }
+    },
+    "typecheck-tsgo": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["^typecheck-tsgo"],
+      "options": {
+        "command": "tsgo -p packages/mcp-server/tsconfig.json --noEmit"
+      }
+    }
+  },
+  "implicitDependencies": ["diagram-agent-tools"],
+  "tags": ["scope:agent", "type:mcp"]
+}

@@ -23,9 +23,9 @@
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsc -p tsconfig.json --noEmit",
-        "cwd": "packages/diagram-core"
-      }
+        "command": "tsc -b packages/diagram-core/tsconfig.json --pretty false"
+      },
+      "outputs": ["{projectRoot}/dist/typecheck"]
     }
   },
   "tags": ["scope:diagram", "type:core"]

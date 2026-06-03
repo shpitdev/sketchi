@@ -9,7 +9,8 @@ Sketchi v2 starts as a package-first workspace. The application shell, MCP/API s
 - `diagram-core` owns the intermediate representation, validation, and durable fixtures.
 - `diagram-renderer` converts valid intermediate diagrams into deterministic scene elements.
 - `diagram-studio-ui` owns reusable React controls and visual states with Storybook coverage.
-- `diagram-agent-tools` owns host-neutral diagram tool names, input schemas, descriptions, and routing hints for OpenCode and future MCP adapters.
+- `diagram-agent-tools` owns host-neutral diagram tool names, input schemas, descriptions, and routing hints.
+- `mcp-server` adapts the shared diagram tool catalog to MCP over stdio and accepts host-provided executors. Its default HTTP executor can call Sketchi's server-backed generation/edit APIs; host-owned PNG rendering and grading remain explicit executor responsibilities.
 - `apps/web` is a TanStack Start shell. It should stay thin.
 
 ## Deployment

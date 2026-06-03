@@ -24,7 +24,8 @@
       "@sketchi/diagram-studio-ui": [
         "./packages/diagram-studio-ui/src/index.ts"
       ],
-      "@sketchi/generators": ["./tools/sketchi-generators/src/index.ts"]
+      "@sketchi/generators": ["./tools/sketchi-generators/src/index.ts"],
+      "@sketchi/mcp-server": ["./packages/mcp-server/src/index.ts"]
     },
     "skipLibCheck": true,
     "strict": true,

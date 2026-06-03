@@ -23,9 +23,9 @@
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsc -p tsconfig.json --noEmit",
-        "cwd": "packages/diagram-agent-tools"
-      }
+        "command": "tsc -b packages/diagram-agent-tools/tsconfig.json --pretty false"
+      },
+      "outputs": ["{projectRoot}/dist/typecheck"]
     },
     "typecheck-tsgo": {
       "executor": "nx:run-commands",

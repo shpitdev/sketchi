@@ -7,5 +7,6 @@ export default defineConfig({
       reportsDirectory: "../../coverage/packages/diagram-agent-tools",
     },
     environment: "node",
+    include: ["src/**/*.test.ts"],
   },
 });
