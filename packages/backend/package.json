@@ -10,10 +10,17 @@
     "prompts:generate": "bun run scripts/generate-prompts.ts",
     "seed:palantir-icons": "bun run scripts/seed-palantir-icons.ts",
     "test": "vitest run --reporter=default --reporter=json --outputFile=./test-results/vitest.json",
+    "typecheck": "tsc -p convex/tsconfig.json --noEmit",
     "test:watch": "vitest --reporter=default",
     "test:report": "bun run scripts/generate-test-report.ts"
   },
+  "nx": {
+    "implicitDependencies": [
+      "diagram-core"
+    ]
+  },
   "dependencies": {
+    "@sketchi/diagram-core": "workspace:*",
     "@browserbasehq/sdk": "^2.6.0",
     "@excalidraw/excalidraw": "^0.18.0",
     "@openrouter/ai-sdk-provider": "^2.2.3",

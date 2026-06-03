@@ -1,0 +1,14 @@
+{
+  "generators": {
+    "diagram-type": {
+      "factory": "./src/generators/diagram-type/diagram-type",
+      "schema": "./src/generators/diagram-type/schema.json",
+      "description": "Create a typed Sketchi diagram type with core, renderer, and Storybook coverage."
+    },
+    "ui-component": {
+      "factory": "./src/generators/ui-component/ui-component",
+      "schema": "./src/generators/ui-component/schema.json",
+      "description": "Create a Sketchi UI component with tests and Storybook story."
+    }
+  }
+}

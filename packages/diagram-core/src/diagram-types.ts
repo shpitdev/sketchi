@@ -1,0 +1,27 @@
+export const DIAGRAM_TYPES = [
+  "flowchart",
+  "mindmap",
+  "orgchart",
+  "sequence",
+  "class",
+  "er",
+  "gantt",
+  "timeline",
+  "tree",
+  "network",
+  "architecture",
+  "dataflow",
+  "state",
+  "swimlane",
+  "concept",
+  "fishbone",
+  "swot",
+  "pyramid",
+  "funnel",
+  "venn",
+  "matrix",
+  "infographic",
+  "decision-tree",
+] as const;
+
+export type DiagramTypeValue = (typeof DIAGRAM_TYPES)[number];

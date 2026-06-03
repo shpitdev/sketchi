@@ -8,6 +8,7 @@
     "includes": [
       "**/*",
       "!opencode.json",
+      "!apps/web/src/routeTree.gen.ts",
       "!packages/backend/test-results",
       "!packages/backend/convex/_generated"
     ]
@@ -26,6 +27,10 @@
     {
       "includes": [
         "packages/shared/**",
+        "packages/diagram-core/src/index.ts",
+        "packages/diagram-renderer/src/index.ts",
+        "packages/diagram-studio-ui/src/index.ts",
+        "packages/diagram-studio-ui/src/components/**/index.ts",
         "packages/backend/lib/templates/**",
         "packages/backend/convex/lib/excalidrawShareLinks.ts"
       ],
@@ -35,6 +40,46 @@
             "noBarrelFile": "off"
           }
         }
+      }
+    },
+    {
+      "includes": ["tools/sketchi-generators/src/generators/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noGlobalDirnameFilename": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/web/src/routes/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noHeadElement": "off",
+            "useFilenamingConvention": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx"
+      ],
+      "javascript": {
+        "globals": [
+          "Bun",
+          "afterEach",
+          "beforeEach",
+          "describe",
+          "expect",
+          "it",
+          "vi"
+        ]
       }
     }
   ]

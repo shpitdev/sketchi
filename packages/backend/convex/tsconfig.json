@@ -11,6 +11,10 @@
     "jsx": "react-jsx",
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
+    "baseUrl": "../../..",
+    "paths": {
+      "@sketchi/diagram-core": ["packages/diagram-core/src/index.ts"]
+    },
 
     /* These compiler options are required by Convex */
     "target": "ESNext",

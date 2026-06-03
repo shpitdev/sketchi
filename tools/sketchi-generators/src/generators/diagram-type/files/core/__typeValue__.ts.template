@@ -1,0 +1,35 @@
+import type { IntermediateDiagram } from "../intermediate";
+
+export const <%= propertyName %>DiagramType = "<%= typeValue %>" as const;
+
+export const <%= fixtureName %> = {
+  edges: [
+    {
+      fromId: "root",
+      id: "edge-root-first-branch",
+      label: "expands",
+      toId: "first-branch",
+    },
+    {
+      fromId: "root",
+      id: "edge-root-second-branch",
+      label: "connects",
+      toId: "second-branch",
+    },
+  ],
+  graphOptions: {
+    diagramType: <%= propertyName %>DiagramType,
+    layout: { direction: "LR", edgeRouting: "elbow" },
+    style: {
+      arrowStroke: "#334155",
+      shapeFill: "#f3e8ff",
+      shapeStroke: "#7c3aed",
+      textColor: "#111827",
+    },
+  },
+  nodes: [
+    { id: "root", kind: "root", label: "<%= className %>" },
+    { id: "first-branch", kind: "branch", label: "First branch" },
+    { id: "second-branch", kind: "branch", label: "Second branch" },
+  ],
+} satisfies IntermediateDiagram;

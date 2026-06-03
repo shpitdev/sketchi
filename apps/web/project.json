@@ -1,0 +1,60 @@
+{
+  "name": "web",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/web/src",
+  "projectType": "application",
+  "implicitDependencies": ["diagram-core", "diagram-studio-ui"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/.output"],
+      "options": {
+        "command": "vite build --config apps/web/vite.config.ts"
+      }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vite dev --config apps/web/vite.config.ts --host 127.0.0.1"
+      }
+    },
+    "preview": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vite preview --config apps/web/vite.config.ts --host 127.0.0.1"
+      }
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "wrangler deploy --config dist/server/wrangler.json"
+      }
+    },
+    "cf-typegen": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "wrangler types --config apps/web/wrangler.jsonc"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/coverage/apps/web"],
+      "options": {
+        "command": "vitest run --config apps/web/vitest.config.ts"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p apps/web/tsconfig.json --noEmit"
+      }
+    },
+    "typecheck-tsgo": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsgo -p apps/web/tsconfig.json --noEmit"
+      }
+    }
+  }
+}

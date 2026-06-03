@@ -1,35 +1,10 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
+    "allowImportingTsExtensions": true,
     "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "verbatimModuleSyntax": true,
-    "jsx": "react-jsx",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+    "tsBuildInfoFile": "../../.nx/cache/web.tsbuildinfo",
+    "types": ["node", "vite/client"]
   },
-  "include": [
-    "./next-env.d.ts",
-    "./**/*.ts",
-    "./**/*.tsx",
-    "./.next/types/**/*.ts",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
-  ],
-  "exclude": ["./node_modules"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"]
 }

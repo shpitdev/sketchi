@@ -1,8 +1,1 @@
-# Re-include agent working state for OpenCode indexing (ripgrep)
-# These are gitignored but agents need to search/read them
-!.sisyphus/
-!.sisyphus/**
-!.agents/skills
-!.agents/skills/**
-!.memory/
 !.memory/**

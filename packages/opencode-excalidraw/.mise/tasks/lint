@@ -6,4 +6,4 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
-bun x ultracite check packages/opencode-excalidraw
+bun run ultracite check packages/opencode-excalidraw

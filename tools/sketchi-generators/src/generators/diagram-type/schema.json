@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "$id": "DiagramType",
+  "title": "",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Diagram type value, for example mindmap or system-map.",
+      "$default": {
+        "$source": "argv",
+        "index": 0
+      },
+      "x-prompt": "What diagram type would you like to use?"
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable fixture title."
+    },
+    "label": {
+      "type": "string",
+      "description": "Human-readable catalog label. Defaults to the PascalCase diagram name."
+    },
+    "description": {
+      "type": "string",
+      "description": "Catalog description shown in the generated Studio UI."
+    },
+    "prompt": {
+      "type": "string",
+      "description": "Prompt text shown alongside the generated fixture."
+    },
+    "skipFormat": {
+      "type": "boolean",
+      "description": "Skip formatting generated files.",
+      "default": false
+    }
+  },
+  "required": ["name"]
+}

@@ -1,20 +1,22 @@
-## Repo Constraints
-- **Branches**: only one active branch other than main at a time (cleanup or recommend cleanup if found in violation)
-- **Vercel**: `NEXT_PUBLIC_CONVEX_URL` is automatic. If undefined, Convex deploy failed.
-- **Pre-push**: `bun x ultracite fix`, `bun run check-types`, `bun run build`, and `cd packages/backend && bun run test`.
+# Agent Guidelines
 
-## Preferences
-- **Communication**: Succinct; fragments OK; facts first; show evidence (commands + exit codes).
-- **Engineering**: `readable > clever`; long descriptive names OK; split files at ~400 lines.
+## Operating Model
 
-## Testing Strategy
-- **Priority**: API > E2E > manual/verification.
-- **API (Convex)**: `packages/backend/convex/*.test.ts`. Never mock HTTP; verify functional intent.
-- **E2E (Stagehand)**: Prompt-first selectors; avoid brittle CSS. Use `STAGEHAND_TARGET_URL` for previews.
-- **Authenticated local E2E**: When a flow requires WorkOS sign-in, use `SKETCHI_E2E_EMAIL` and `SKETCHI_E2E_PASSWORD` from local env files instead of ad hoc credentials.
-- **Local auth/editor overrides**: For local WorkOS + Convex verification, prefer `SKETCHI_ADMIN_SUBJECTS` / `SKETCHI_ICON_LIBRARY_EDITOR_SUBJECTS` in addition to email allowlists. Local Convex identities may not include email claims even when the user is signed in.
-- **UI verification**: For any UI/E2E-affecting change, run a targeted local verification against the real app before finishing. Prefer `agent-browser` for the interaction path and `d3k` for browser/server log review; at minimum run the real dev server with `bun run dev` and verify the affected flow there.
-- **Manual**: Checklist + log analysis (`venom.log` or Convex logs).
+- This repository is the clean v2 lab for Sketchi.
+- Keep the original `shpitdev/sketchi` repository as the production/stars source of truth until the final one-shot integration PR.
+- Prefer package boundaries and proof over framework-level shortcuts.
+- Temporary artifacts belong in `.memory/`, which is gitignored but intentionally visible to local tools.
 
-## Memory
-- Use `.memory/` for temporary artifacts (gitignored but visible to tools).
+## V2 Priorities
+
+- Nx project graph first.
+- TanStack Start web shell on Cloudflare Workers.
+- Storybook for reusable UI before rebuilding app workflows.
+- Diagram IR, renderer, fixtures, and eval surfaces as standalone packages.
+- Generic MCP/API should consume package contracts, not UI internals.
+
+## Checks
+
+- `pnpm nx run-many -t typecheck,test,build`
+- `pnpm nx build-storybook diagram-studio-ui`
+- For app changes, run `pnpm nx dev web` and verify the real page locally.

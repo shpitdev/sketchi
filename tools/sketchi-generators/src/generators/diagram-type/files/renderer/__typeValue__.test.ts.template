@@ -1,0 +1,18 @@
+import { <%= fixtureName %> } from "@sketchi/diagram-core";
+import { describe, expect, it } from "vitest";
+
+import { renderIntermediateDiagram } from "../scene";
+
+describe("<%= className %> renderer contract", () => {
+  it("renders the generated fixture into deterministic scene elements", () => {
+    const scene = renderIntermediateDiagram(<%= fixtureName %>);
+
+    expect(scene.appState.diagramType).toBe("<%= typeValue %>");
+    expect(scene.stats.nodeCount).toBe(<%= fixtureName %>.nodes.length);
+    expect(scene.stats.edgeCount).toBe(<%= fixtureName %>.edges.length);
+    expect(scene.elements.filter((element) => element.type === "rectangle"))
+      .toHaveLength(<%= fixtureName %>.nodes.length);
+    expect(scene.elements.filter((element) => element.type === "arrow"))
+      .toHaveLength(<%= fixtureName %>.edges.length);
+  });
+});

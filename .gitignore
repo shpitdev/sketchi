@@ -1,20 +1,23 @@
 # Dependencies
 node_modules
-.DS_Store
-packages/backend/test-results/
 .pnp
 .pnp.js
 
 # Build outputs
 dist
 build
+storybook-static
+.output
+.wrangler
+worker-configuration.d.ts
 !packages/opencode-excalidraw/.mise/tasks/build
 *.tsbuildinfo
+vitest.config.*.timestamp*
 
 # Environment variables
 .env
 .env*.local
-.env.e2e
+.dev.vars
 
 # IDEs and editors
 .vscode/*
@@ -37,8 +40,8 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
-# Turbo
-.turbo
+# Nx
+.nx
 
 # Better-T-Stack
 .alchemy
@@ -46,9 +49,7 @@ lerna-debug.log*
 # Testing
 coverage
 .nyc_output
-tests/e2e/artifacts/
-tests/output/
-preview-artifacts/
+packages/backend/test-results/
 
 # Misc
 *.tgz
@@ -69,7 +70,6 @@ temp
 /sketchi/opencode-logs*/
 opencode-logs/
 opencode-logs*/
-.vercel
 
 # Generated diagram exports
 /diagram-*.png

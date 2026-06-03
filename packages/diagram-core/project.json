@@ -1,0 +1,32 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "diagram-core",
+  "projectType": "library",
+  "sourceRoot": "packages/diagram-core/src",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p tsconfig.lib.json",
+        "cwd": "packages/diagram-core"
+      },
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --config vitest.config.ts",
+        "cwd": "packages/diagram-core"
+      },
+      "outputs": ["{workspaceRoot}/coverage/packages/diagram-core"]
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p tsconfig.json --noEmit",
+        "cwd": "packages/diagram-core"
+      }
+    }
+  },
+  "tags": ["scope:diagram", "type:core"]
+}

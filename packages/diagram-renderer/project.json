@@ -1,0 +1,38 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "diagram-renderer",
+  "projectType": "library",
+  "sourceRoot": "packages/diagram-renderer/src",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -b packages/diagram-renderer/tsconfig.lib.json"
+      },
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --config vitest.config.ts",
+        "cwd": "packages/diagram-renderer"
+      },
+      "outputs": ["{workspaceRoot}/coverage/packages/diagram-renderer"]
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -b packages/diagram-renderer/tsconfig.json",
+        "cwd": "."
+      }
+    },
+    "typecheck-tsgo": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsgo -b packages/diagram-renderer/tsconfig.json"
+      }
+    }
+  },
+  "implicitDependencies": ["diagram-core"],
+  "tags": ["scope:diagram", "type:renderer"]
+}
