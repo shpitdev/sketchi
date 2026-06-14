@@ -60,6 +60,13 @@ test("previewWranglerConfig isolates preview worker settings", () => {
       vars: {
         SKETCHI_AI_GATEWAY_ID: "google-ai-studio",
       },
+      r2_buckets: [
+        {
+          binding: "SKETCHI_ARTIFACTS",
+          bucket_name: "sketchi-studio-codemode-artifacts-production",
+          preview_bucket_name: "sketchi-studio-codemode-artifacts-preview",
+        },
+      ],
     },
     "sketchi-playground-pr-42",
   );
@@ -75,6 +82,13 @@ test("previewWranglerConfig isolates preview worker settings", () => {
   assert.deepEqual(previewConfig.vars, {
     SKETCHI_AI_GATEWAY_ID: "google-ai-studio",
   });
+  assert.deepEqual(previewConfig.r2_buckets, [
+    {
+      binding: "SKETCHI_ARTIFACTS",
+      bucket_name: "sketchi-studio-codemode-artifacts-preview",
+      preview_bucket_name: "sketchi-studio-codemode-artifacts-preview",
+    },
+  ]);
 });
 
 test("extractPreviewUrl prefers the URL for the requested worker", () => {

@@ -89,6 +89,17 @@ five wired production Workers without assigning final custom domains.
 Those deploys keep `workers_dev` enabled so the app can be verified from
 Cloudflare-owned `workers.dev` URLs before any DNS or registrar cutover.
 
+The Studio Worker binds Code Mode artifacts to R2:
+
+| Surface                  | Binding             | Bucket                                         |
+| ------------------------ | ------------------- | ---------------------------------------------- |
+| Studio preview Workers   | `SKETCHI_ARTIFACTS` | `sketchi-studio-codemode-artifacts-preview`    |
+| Studio production Worker | `SKETCHI_ARTIFACTS` | `sketchi-studio-codemode-artifacts-production` |
+
+Preview Wrangler configs rewrite the Studio artifact binding to the preview
+bucket. Production deploys keep the production bucket. Both buckets must exist
+before their Workers deploy.
+
 Assigning `sketchi.app`, `www.sketchi.app`, `playground.sketchi.app`,
 `studio.sketchi.app`, `excalidraw.sketchi.app`, and `icons.sketchi.app` is
 intentionally manual. Run the `app-production-deploy` workflow with

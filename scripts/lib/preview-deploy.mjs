@@ -86,6 +86,7 @@ export function previewWranglerConfig(config, workerName) {
   nextConfig.topLevelName = workerName;
   nextConfig.workers_dev = true;
   nextConfig.preview_urls = false;
+  nextConfig.r2_buckets = previewR2Buckets(nextConfig.r2_buckets);
 
   delete nextConfig.route;
   delete nextConfig.routes;
@@ -94,6 +95,28 @@ export function previewWranglerConfig(config, workerName) {
   delete nextConfig.custom_domains;
 
   return nextConfig;
+}
+
+function previewR2Buckets(buckets) {
+  if (!Array.isArray(buckets)) {
+    return buckets;
+  }
+
+  return buckets.map((bucket) => {
+    if (
+      bucket &&
+      typeof bucket === "object" &&
+      typeof bucket.preview_bucket_name === "string" &&
+      bucket.preview_bucket_name.length > 0
+    ) {
+      return {
+        ...bucket,
+        bucket_name: bucket.preview_bucket_name,
+      };
+    }
+
+    return bucket;
+  });
 }
 
 export function extractPreviewUrl(logText, workerName = "") {

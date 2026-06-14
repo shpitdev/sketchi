@@ -42,6 +42,13 @@ test("productionDomainWranglerConfig adds custom domains only for manual attach"
       vars: {
         SKETCHI_APP_SURFACE: "icons",
       },
+      r2_buckets: [
+        {
+          binding: "SKETCHI_ARTIFACTS",
+          bucket_name: "sketchi-studio-codemode-artifacts-production",
+          preview_bucket_name: "sketchi-studio-codemode-artifacts-preview",
+        },
+      ],
     },
     "icons",
   );
@@ -61,4 +68,11 @@ test("productionDomainWranglerConfig adds custom domains only for manual attach"
   assert.deepEqual(domainConfig.vars, {
     SKETCHI_APP_SURFACE: "icons",
   });
+  assert.deepEqual(domainConfig.r2_buckets, [
+    {
+      binding: "SKETCHI_ARTIFACTS",
+      bucket_name: "sketchi-studio-codemode-artifacts-production",
+      preview_bucket_name: "sketchi-studio-codemode-artifacts-preview",
+    },
+  ]);
 });

@@ -18,6 +18,8 @@ are wrong, and retrieve the finished artifact.
 - [x] Implement the `buildFlowchart` pipeline for semantic flow and connectivity.
 - [x] Store accepted scene and Excalidraw artifacts through one consistent
       artifact manifest.
+- [x] Bind Studio Worker artifacts to durable R2 buckets for preview and
+      production deploys.
 - [x] Implement `getArtifact` for format-specific retrieval and refreshed
       artifact access.
 - [x] Implement `applyDiagramPatch` for deterministic style, shape, text, and
@@ -705,9 +707,18 @@ The first implementation should support:
 - `excalidraw`: portable Excalidraw scene JSON.
 
 The storage contract is consistent across environments: artifacts are written
-as a manifest plus one object per format. Local development and tests may use
-the in-memory store, but that is only a dev fallback. Worker deployments should
-use the same manifest/object layout through an R2-compatible binding.
+as a manifest plus one object per format. Studio Worker deployments bind
+`SKETCHI_ARTIFACTS` to R2 so `buildFlowchart -> getArtifact -> applyDiagramPatch`
+can cross request boundaries.
+
+| Environment       | Bucket                                         |
+| ----------------- | ---------------------------------------------- |
+| Preview Workers   | `sketchi-studio-codemode-artifacts-preview`    |
+| Production Worker | `sketchi-studio-codemode-artifacts-production` |
+
+Local tests may still use the in-memory store, and local Worker development may
+use Wrangler's local R2 storage unless remote bindings are enabled. Those are
+dev fallbacks only; deployed Workers should use the R2-compatible binding.
 
 `png` is allowed in the contract for forward compatibility, but it should not be
 advertised as available until the hosted render proof adapter exists.
