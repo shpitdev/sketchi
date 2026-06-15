@@ -29,6 +29,9 @@ are wrong, and retrieve the finished artifact.
 - [ ] Add `execute` examples that build the graph first and patch visual
       requests after acceptance.
 - [ ] Pressure-test the contract through Codex, Claude Code, and OpenCode.
+- [ ] After Convex managed threads exist, revisit Studio chat/canvas parity so
+      accepted Studio diagrams use stored `scene`/`excalidraw` artifacts rather
+      than the current chat-local rendering path.
 
 ## Decisions
 
@@ -43,6 +46,8 @@ are wrong, and retrieve the finished artifact.
 - Agents must get the semantic flow and connectivity accepted before applying
   styling or shape codemods.
 - Keep `draft` and managed threads out of this slice.
+- Keep Studio chat/canvas artifact parity out of this slice; revisit it with
+  Convex managed threads, message history, and artifact lineage.
 - Keep Effect, storage, auth, rendering, and model credentials host-side.
 
 ```mermaid
@@ -1139,6 +1144,7 @@ Out of scope for this document:
 
 - Managed thread APIs.
 - Convex run or artifact history.
+- Studio chat/canvas artifact parity before Convex managed threads exist.
 - User artifact library.
 - Auth policy details beyond "host-owned".
 - Hosted PNG rendering details.

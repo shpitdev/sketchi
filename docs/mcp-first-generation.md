@@ -94,6 +94,12 @@ Do not add thread tools yet:
 - no `accept_artifact`;
 - no `get_run_status`.
 
+Do not spend this Code Mode completion slice trying to make the visible Studio
+chat/canvas behave like the final Excalidraw artifact product. Today Studio can
+still render assistant markdown and its own local scene view; revisit that once
+Convex managed threads can own message history, accepted artifact lineage, and
+user-visible revisions.
+
 ## Package Plan
 
 ```mermaid
@@ -317,18 +323,19 @@ Acceptance:
 
 ## Proof Matrix
 
-| Proof                             | Required before Convex?     |
-| --------------------------------- | --------------------------- |
-| `pnpm nx test diagram-agent`      | yes                         |
-| `pnpm nx test diagram-generation` | yes                         |
-| local CLI scenario fixture        | yes                         |
-| local CLI Gemini scenario         | yes when credentials exist  |
-| local render screenshot           | yes                         |
-| MCP tool listing                  | yes                         |
-| MCP draft/revise/grade call       | yes                         |
-| remote Worker preview smoke       | yes if adapter is in the PR |
-| managed thread smoke              | no                          |
-| Studio artifact history           | no                          |
+| Proof                              | Required before Convex?     |
+| ---------------------------------- | --------------------------- |
+| `pnpm nx test diagram-agent`       | yes                         |
+| `pnpm nx test diagram-generation`  | yes                         |
+| local CLI scenario fixture         | yes                         |
+| local CLI Gemini scenario          | yes when credentials exist  |
+| local render screenshot            | yes                         |
+| MCP tool listing                   | yes                         |
+| MCP draft/revise/grade call        | yes                         |
+| remote Worker preview smoke        | yes if adapter is in the PR |
+| managed thread smoke               | no                          |
+| Studio artifact history            | no                          |
+| Studio chat/canvas artifact parity | no, wait for Convex threads |
 
 ## References
 
