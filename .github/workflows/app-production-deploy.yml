@@ -104,6 +104,7 @@ jobs:
           mkdir -p .memory
           pnpm exec wrangler deploy \
             --config dist/server/wrangler.json \
+            --no-x-provision \
             --message "${{ matrix.app }} production Worker ${{ github.sha }}" \
             2>&1 | tee ".memory/wrangler-${{ matrix.app }}-production-deploy.log"
 
@@ -140,4 +141,5 @@ jobs:
         run: |
           pnpm exec wrangler deploy \
             --config "${{ steps.domains.outputs.domain_config_path }}" \
+            --no-x-provision \
             --message "${{ matrix.app }} production domain attach ${{ github.sha }}"

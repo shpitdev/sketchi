@@ -11,27 +11,10 @@ Claude Code, Codex, OpenCode, and similar harnesses build a correct flowchart
 artifact through one clear contract, get structured repair feedback when they
 are wrong, and retrieve the finished artifact.
 
-## TODO
+## Implementation Plan
 
-- [x] Define shared contract types for `buildFlowchart`, `getArtifact`, and
-      `applyDiagramPatch`.
-- [x] Implement the `buildFlowchart` pipeline for semantic flow and connectivity.
-- [x] Store accepted scene and Excalidraw artifacts through one consistent
-      artifact manifest.
-- [x] Bind Studio Worker artifacts to durable R2 buckets for preview and
-      production deploys.
-- [x] Implement `getArtifact` for format-specific retrieval and refreshed
-      artifact access.
-- [x] Implement `applyDiagramPatch` for deterministic style, shape, text, and
-      layout codemods against accepted artifacts.
-- [ ] Add MCP `docs` and `search` entries that teach the connectivity-first,
-      styling-second agent loop.
-- [ ] Add `execute` examples that build the graph first and patch visual
-      requests after acceptance.
-- [ ] Pressure-test the contract through Codex, Claude Code, and OpenCode.
-- [ ] After Convex managed threads exist, revisit Studio chat/canvas parity so
-      accepted Studio diagrams use stored `scene`/`excalidraw` artifacts rather
-      than the current chat-local rendering path.
+Completed behavior is tracked by the code. The remaining next-PR work is tracked
+in [Code Mode Next PR Plan](codemode-next-pr-plan.md).
 
 ## Decisions
 
@@ -1157,6 +1140,7 @@ Out of scope for this document:
 ## References
 
 - [MCP-first generation scope](mcp-first-generation.md)
+- [Code Mode Next PR Plan](codemode-next-pr-plan.md)
 - [Agentic generation architecture](agentic-generation.md)
 - [System architecture](architecture.md)
 - Cloudflare Code Mode documentation:

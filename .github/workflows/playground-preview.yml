@@ -118,6 +118,7 @@ jobs:
           pnpm exec wrangler deploy \
             --config "${{ steps.prepare.outputs.preview_config_path }}" \
             --keep-vars \
+            --no-x-provision \
             --message "PR #${{ github.event.pull_request.number || inputs.pr_number }} ${{ matrix.app }} preview ${{ github.event.pull_request.head.sha || github.sha }}" \
             2>&1 | tee ".memory/wrangler-${{ matrix.app }}-preview-deploy.log"
 

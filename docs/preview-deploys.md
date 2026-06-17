@@ -15,7 +15,7 @@ flowchart LR
   PR["Pull request"] --> Matrix["preview matrix"]
   Matrix --> Build["pnpm nx build <app>"]
   Build --> Config["generated preview wrangler config"]
-  Config --> Deploy["wrangler deploy --keep-vars"]
+  Config --> Deploy["wrangler deploy --keep-vars --no-x-provision"]
   Deploy --> Comment["sticky PR comment"]
   Closed["PR closed"] --> Cleanup["delete preview Worker"]
 ```
@@ -29,7 +29,7 @@ Pull requests to `main` deploy matrix apps to PR-specific Cloudflare Workers.
 - builds each Nx app in an isolated matrix job;
 - writes a generated `dist/server/wrangler.<app>.preview.json` with the preview
   Worker name and no custom production routes;
-- runs `wrangler deploy --keep-vars`;
+- runs `wrangler deploy --keep-vars --no-x-provision`;
 - writes or updates one sticky PR comment per app with the preview URL.
 
 ## Required Configuration
@@ -57,6 +57,9 @@ from overwriting each other when the values eventually diverge.
 
 Cloudflare documents that non-interactive CI deploys require an API token and
 account ID. The token should stay in GitHub Secrets, not in source control.
+Preview deploys pass `--no-x-provision` so CI only uploads explicit Worker
+configuration. Preview deploys must not create, discover, or mutate KV, D1, or
+R2 resources.
 
 ## Cleanup
 
@@ -84,7 +87,9 @@ Pass `--app playground`, `--app studio`, `--app web`, `--app excalidraw`, or
 ## Production Worker Deploys
 
 The `app-production-deploy` workflow runs on pushes to `main` and deploys the
-five wired production Workers without assigning final custom domains.
+five wired production Workers without assigning final custom domains. Production
+deploys also pass `--no-x-provision`; Workers may bind existing resources, but
+CI deploys do not create or discover storage.
 
 Those deploys keep `workers_dev` enabled so the app can be verified from
 Cloudflare-owned `workers.dev` URLs before any DNS or registrar cutover.
@@ -98,7 +103,9 @@ The Studio Worker binds Code Mode artifacts to R2:
 
 Preview Wrangler configs rewrite the Studio artifact binding to the preview
 bucket. Production deploys keep the production bucket. Both buckets must exist
-before their Workers deploy.
+before their Workers deploy. Preview deploys disable Wrangler resource
+provisioning, so the CI token does not need R2 object read access just to deploy
+the Worker.
 
 Assigning `sketchi.app`, `www.sketchi.app`, `playground.sketchi.app`,
 `studio.sketchi.app`, `excalidraw.sketchi.app`, and `icons.sketchi.app` is
