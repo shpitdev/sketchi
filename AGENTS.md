@@ -19,6 +19,8 @@ Before pushing meaningful changes, run:
 
 For UI-affecting changes, run the web app locally and verify the changed flow against the real page.
 
+For end-to-end checks, prefer exercising the real deployed or local surface through an actual browser (Chrome/TabEx where a true browser is required; otherwise `agent-browser`) instead of relying only on in-process or mocked tests.
+
 ## Temporary Artifacts
 
 Use `.memory/` for local notes, logs, screenshots, and other temporary artifacts. It is gitignored but visible to agents through `.ignore`.

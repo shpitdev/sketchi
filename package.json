@@ -22,6 +22,7 @@
     "dev:studio": "pnpm nx dev studio",
     "dev:web": "pnpm nx dev web",
     "preview": "nx run-many -t preview --parallel",
+    "proof:codemode-mcp": "jiti tools/codemode-mcp-proof.ts",
     "storybook": "nx storybook diagram-studio-ui",
     "storybook:excalidraw": "nx storybook excalidraw",
     "storybook:icons": "nx storybook icons",
@@ -32,9 +33,12 @@
     "typecheck:tsgo": "nx run-many -t typecheck-tsgo"
   },
   "dependencies": {
+    "@cloudflare/codemode": "0.4.1",
+    "@modelcontextprotocol/sdk": "1.29.0",
     "@tanstack/react-query": "5.101.0",
     "@tanstack/react-router": "1.170.11",
     "@tanstack/react-start": "1.168.19",
+    "agents": "0.16.2",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "zod": "4.4.3"
@@ -66,6 +70,7 @@
     "@vitest/browser-playwright": "4.1.8",
     "@vitest/coverage-v8": "~4.1.0",
     "chromatic": "^17.2.0",
+    "jiti": "2.7.0",
     "jsdom": "29.1.1",
     "nx": "22.7.5",
     "playwright": "^1.60.0",

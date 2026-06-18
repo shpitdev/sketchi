@@ -5,6 +5,11 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: "jsdom",
+    server: {
+      deps: {
+        inline: [/agents/, /partyserver/],
+      },
+    },
     globals: true,
     coverage: {
       reportsDirectory: "../../coverage/apps/studio",
@@ -14,6 +19,20 @@ export default defineConfig({
   },
   resolve: {
     alias: [
+      {
+        find: "cloudflare:email",
+        replacement: new URL(
+          "./src/test/cloudflare-email.stub.ts",
+          import.meta.url,
+        ).pathname,
+      },
+      {
+        find: "cloudflare:workers",
+        replacement: new URL(
+          "./src/test/cloudflare-workers.stub.ts",
+          import.meta.url,
+        ).pathname,
+      },
       {
         find: "@sketchi/diagram-agent",
         replacement: new URL(

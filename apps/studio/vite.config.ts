@@ -1,7 +1,9 @@
+import codemode from "@cloudflare/codemode/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import react from "@vitejs/plugin-react";
+import agents from "agents/vite";
 import { defineConfig } from "vite";
 
 import {
@@ -13,6 +15,8 @@ export default defineConfig({
   cacheDir: localViteCacheDir("studio"),
   publicDir: new URL("./public", import.meta.url).pathname,
   plugins: [
+    agents(),
+    codemode(),
     cloudflare({
       configPath: new URL("./wrangler.jsonc", import.meta.url).pathname,
       inspectorPort: localInspectorPort(6210),
@@ -21,6 +25,10 @@ export default defineConfig({
       },
     }),
     tanstackStart({
+      router: {
+        quoteStyle: "double",
+        semicolons: true,
+      },
       srcDirectory: "apps/studio/src",
     }),
     react(),

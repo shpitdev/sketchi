@@ -34,6 +34,7 @@ import {
 
 export interface StudioEnv {
   AI?: CloudflareAiGatewayProvider;
+  LOADER?: unknown;
   SKETCHI_ARTIFACTS?: CodeModeObjectBucket;
   SKETCHI_AI_GATEWAY_ID?: string;
   SKETCHI_AI_MODEL?: string;

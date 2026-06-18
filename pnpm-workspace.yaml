@@ -2,8 +2,11 @@ packages:
   - "apps/*"
   - "packages/*"
 allowBuilds:
+  "@mongodb-js/zstd": false
   "@swc/core": true
+  core-js-pure: false
   esbuild: true
+  node-liblzma: false
   nx: true
   sharp: true
   unrs-resolver: true
@@ -51,3 +54,4 @@ minimumReleaseAgeExclude:
   - "@typescript/native-preview-win32-arm64@7.0.0-dev.20260602.1"
   - "@typescript/native-preview-win32-x64@7.0.0-dev.20260602.1"
   - "@typescript/native-preview@7.0.0-dev.20260602.1"
+  - agents@0.16.2

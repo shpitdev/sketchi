@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from "./routes/__root";
+import { Route as McpRouteImport } from "./routes/mcp";
 import { Route as IndexRouteImport } from "./routes/index";
 import { Route as ApiChatRouteImport } from "./routes/api/chat";
 import { Route as ApiV1FlowchartsBuildRouteImport } from "./routes/api/v1/flowcharts/build";
 import { Route as ApiV1ArtifactsArtifactIdRouteImport } from "./routes/api/v1/artifacts/$artifactId";
 import { Route as ApiV1ArtifactsArtifactIdPatchRouteImport } from "./routes/api/v1/artifacts/$artifactId/patch";
 
+const McpRoute = McpRouteImport.update({
+  id: "/mcp",
+  path: "/mcp",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const IndexRoute = IndexRouteImport.update({
   id: "/",
   path: "/",
@@ -45,6 +51,7 @@ const ApiV1ArtifactsArtifactIdPatchRoute =
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
+  "/mcp": typeof McpRoute;
   "/api/chat": typeof ApiChatRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
@@ -52,6 +59,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
+  "/mcp": typeof McpRoute;
   "/api/chat": typeof ApiChatRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
@@ -60,6 +68,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/": typeof IndexRoute;
+  "/mcp": typeof McpRoute;
   "/api/chat": typeof ApiChatRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
@@ -69,6 +78,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
     | "/"
+    | "/mcp"
     | "/api/chat"
     | "/api/v1/artifacts/$artifactId"
     | "/api/v1/flowcharts/build"
@@ -76,6 +86,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/"
+    | "/mcp"
     | "/api/chat"
     | "/api/v1/artifacts/$artifactId"
     | "/api/v1/flowcharts/build"
@@ -83,6 +94,7 @@ export interface FileRouteTypes {
   id:
     | "__root__"
     | "/"
+    | "/mcp"
     | "/api/chat"
     | "/api/v1/artifacts/$artifactId"
     | "/api/v1/flowcharts/build"
@@ -91,6 +103,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
+  McpRoute: typeof McpRoute;
   ApiChatRoute: typeof ApiChatRoute;
   ApiV1ArtifactsArtifactIdRoute: typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   ApiV1FlowchartsBuildRoute: typeof ApiV1FlowchartsBuildRoute;
@@ -98,6 +111,13 @@ export interface RootRouteChildren {
 
 declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
+    "/mcp": {
+      id: "/mcp";
+      path: "/mcp";
+      fullPath: "/mcp";
+      preLoaderRoute: typeof McpRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/": {
       id: "/";
       path: "/";
@@ -152,6 +172,7 @@ const ApiV1ArtifactsArtifactIdRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  McpRoute: McpRoute,
   ApiChatRoute: ApiChatRoute,
   ApiV1ArtifactsArtifactIdRoute: ApiV1ArtifactsArtifactIdRouteWithChildren,
   ApiV1FlowchartsBuildRoute: ApiV1FlowchartsBuildRoute,

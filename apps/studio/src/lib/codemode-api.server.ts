@@ -22,7 +22,7 @@ function artifactStoreForEnv(env: StudioEnv): CodeModeArtifactStore {
     : localArtifactStore;
 }
 
-function runtimeForEnv(env: StudioEnv) {
+export function createStudioCodeModeRuntime(env: StudioEnv) {
   return createCodeModeRuntime({
     store: artifactStoreForEnv(env),
   });
@@ -119,7 +119,7 @@ export async function handleBuildFlowchartRequest(
   env: StudioEnv,
   request: Request,
 ): Promise<Response> {
-  const result = await runtimeForEnv(env).buildFlowchart(
+  const result = await createStudioCodeModeRuntime(env).buildFlowchart(
     await readJson(request),
   );
   return jsonResponse(result, buildStatus(result));
@@ -130,7 +130,7 @@ export async function handleGetArtifactRequest(
   request: Request,
   artifactId: string,
 ): Promise<Response> {
-  const result = await runtimeForEnv(env).getArtifact({
+  const result = await createStudioCodeModeRuntime(env).getArtifact({
     artifactId,
     format: formatFromUrl(request),
     inline: inlineFromUrl(request),
@@ -154,7 +154,7 @@ export async function handlePatchArtifactRequest(
         source: { artifactId },
         operations: [],
       };
-  const result = await runtimeForEnv(env).applyDiagramPatch(input);
+  const result = await createStudioCodeModeRuntime(env).applyDiagramPatch(input);
 
   return jsonResponse(result, patchStatus(result));
 }
