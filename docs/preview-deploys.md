@@ -36,14 +36,16 @@ Pull requests to `main` deploy matrix apps to PR-specific Cloudflare Workers.
 
 - `CHROMATIC_PROJECT_TOKEN`: `staging` environment secret for Storybook
   publish and visual checks.
+- `GRAPHITE_CI_OPTIMIZER_TOKEN`: `staging` environment secret for the Graphite
+  CI optimizer job in `v2-ci`.
 - `CLOUDFLARE_ACCOUNT_ID`: `staging` environment variable or secret.
 - `CLOUDFLARE_API_TOKEN`: `staging` environment secret with Workers
   edit/deploy access.
 
-| Source                                  | Target                          | Purpose                   |
-| --------------------------------------- | ------------------------------- | ------------------------- |
-| Infisical `sketchi` `/github` `staging` | GitHub `staging` environment    | CI and PR preview deploys |
-| Infisical `sketchi` `/github` `prod`    | GitHub `production` environment | production deploys        |
+| Source                                  | Target                          | Purpose                                        |
+| --------------------------------------- | ------------------------------- | ---------------------------------------------- |
+| Infisical `sketchi` `/github` `staging` | GitHub `staging` environment    | CI, Graphite optimizer, and PR preview deploys |
+| Infisical `sketchi` `/github` `prod`    | GitHub `production` environment | production deploys                             |
 
 The canonical source for those GitHub Actions values is the Infisical `sketchi`
 project under `/github`, synced to GitHub environment secrets:

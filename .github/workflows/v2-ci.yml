@@ -11,6 +11,7 @@ on:
 jobs:
   optimize_ci:
     runs-on: ubuntu-latest
+    environment: staging
     outputs:
       skip: ${{ steps.check_skip.outputs.skip }}
     steps:
@@ -18,7 +19,7 @@ jobs:
         id: check_skip
         uses: withgraphite/graphite-ci-action@main
         with:
-          graphite_token: ${{ secrets.GRAPHITE_TOKEN }}
+          graphite_token: ${{ secrets.GRAPHITE_CI_OPTIMIZER_TOKEN }}
 
   verify:
     needs: optimize_ci
