@@ -1,0 +1,27 @@
+{
+  "name": "sketchi-agent-plugins",
+  "owner": {
+    "name": "Sketchi"
+  },
+  "description": "Sketchi agent plugins for diagram generation workflows.",
+  "version": "0.1.0",
+  "plugins": [
+    {
+      "name": "sketchi-code-mode-claude",
+      "displayName": "Sketchi Code Mode",
+      "source": "./plugins/sketchi-code-mode-claude",
+      "description": "Adds the Sketchi Code Mode skill and remote MCP server for Claude Code.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Sketchi"
+      },
+      "category": "developer-tools",
+      "tags": [
+        "sketchi",
+        "code-mode",
+        "mcp",
+        "diagrams"
+      ]
+    }
+  ]
+}

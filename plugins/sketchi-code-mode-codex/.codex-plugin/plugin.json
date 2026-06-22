@@ -1,0 +1,30 @@
+{
+  "name": "sketchi-code-mode-codex",
+  "version": "0.1.0",
+  "description": "Sketchi Code Mode skills and MCP config for Codex.",
+  "author": {
+    "name": "Sketchi"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Sketchi Code Mode",
+    "shortDescription": "Build Sketchi diagrams through Code Mode.",
+    "longDescription": "Sketchi Code Mode gives Codex a purpose-built skill and remote MCP server for generating typed Sketchi flowcharts, applying style patches, and retrieving diagram artifacts.",
+    "developerName": "Sketchi",
+    "category": "Developer Tools",
+    "capabilities": [
+      "MCP",
+      "Diagram Generation",
+      "Artifact Retrieval"
+    ],
+    "brandColor": "#2F6FED",
+    "composerIcon": "./assets/codex.svg",
+    "logo": "./assets/mcp.svg",
+    "defaultPrompt": [
+      "Use Sketchi Code Mode to build a diagram.",
+      "Patch the current Sketchi diagram style.",
+      "Retrieve the latest Sketchi artifact."
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}
