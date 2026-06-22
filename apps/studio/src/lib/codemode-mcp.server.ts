@@ -51,6 +51,19 @@ const ExecuteRequestSchema = z.object({
   code: z.string().min(1),
 });
 
+function stripCodeFence(code: string): string {
+  const match = code.match(
+    /^```(?:js|javascript|typescript|ts|tsx|jsx)?\s*\n([\s\S]*?)```\s*$/,
+  );
+  return match?.[1] ?? code;
+}
+
+export function normalizeSketchiExecuteCode(code: string): string {
+  return stripCodeFence(code.trim())
+    .trim()
+    .replace(/;+\s*$/, "");
+}
+
 function jsonTextResult(value: unknown) {
   return {
     content: [
@@ -109,16 +122,19 @@ export async function executeSketchiCodeMode(
     const parsed = ExecuteRequestSchema.parse(input);
     const runtime = createStudioCodeModeRuntime(env);
     const executor = await executorFor(env, options);
-    const execution = await executor.execute(parsed.code, [
-      {
-        name: "sketchi",
-        fns: {
-          buildFlowchart: (request) => runtime.buildFlowchart(request),
-          getArtifact: (request) => runtime.getArtifact(request),
-          applyDiagramPatch: (request) => runtime.applyDiagramPatch(request),
+    const execution = await executor.execute(
+      normalizeSketchiExecuteCode(parsed.code),
+      [
+        {
+          name: "sketchi",
+          fns: {
+            buildFlowchart: (request) => runtime.buildFlowchart(request),
+            getArtifact: (request) => runtime.getArtifact(request),
+            applyDiagramPatch: (request) => runtime.applyDiagramPatch(request),
+          },
         },
-      },
-    ]);
+      ],
+    );
 
     if (execution.error) {
       return {
@@ -188,6 +204,7 @@ export function createSketchiMcpServer(
       title: "Execute Sketchi Code Mode",
       description: [
         "Run an async JavaScript arrow function for an external agent harness.",
+        "Code fences and trailing expression semicolons are normalized before execution.",
         "The sandbox exposes only sketchi.buildFlowchart, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
         "First get the semantic graph accepted, then use patch operations for deterministic visual changes.",
         "",

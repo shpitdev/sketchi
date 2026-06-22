@@ -9,9 +9,13 @@ describe("Code Mode MCP docs", () => {
   it("documents the harness-first execute contract", () => {
     const docs = getCodeModeDocs({ topic: "execute" });
 
+    expect(docs.content).toContain("typed host tools");
     expect(docs.content).toContain("sketchi.buildFlowchart");
     expect(docs.content).toContain("sketchi.getArtifact");
     expect(docs.content).toContain("sketchi.applyDiagramPatch");
+    expect(docs.examples.map((example) => example.code)).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/};\s*$/)]),
+    );
     expect(docs.examples).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

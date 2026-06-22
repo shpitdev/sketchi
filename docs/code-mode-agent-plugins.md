@@ -2,6 +2,13 @@
 
 This repo packages the deployed Sketchi Code Mode MCP server for Codex and Claude Code.
 
+The MCP surface follows the Code Mode convention: agents call a single `execute`
+tool with generated JavaScript, and typed Sketchi tools are available in the
+sandbox as `sketchi.buildFlowchart`, `sketchi.applyDiagramPatch`, and
+`sketchi.getArtifact`. The server normalizes outer code fences and trailing
+expression semicolons before execution, but examples intentionally omit those
+wrappers so copied snippets are canonical function expressions.
+
 ## Codex
 
 - Marketplace: `.agents/plugins/marketplace.json`

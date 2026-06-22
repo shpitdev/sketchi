@@ -218,7 +218,7 @@ const ACCEPTANCE_LOOP_EXAMPLE = `async () => {
     ],
     options: { inlineArtifacts: ["scene", "excalidraw"] },
   });
-};`;
+}`;
 
 const CIRCLE_TO_DIAMOND_EXAMPLE = `async () => {
   const built = await sketchi.buildFlowchart({
@@ -262,7 +262,7 @@ const CIRCLE_TO_DIAMOND_EXAMPLE = `async () => {
     format: "scene",
     inline: true,
   });
-};`;
+}`;
 
 const INVALID_FIRST_EXAMPLE = `async () => {
   const built = await sketchi.buildFlowchart({
@@ -292,7 +292,7 @@ const INVALID_FIRST_EXAMPLE = `async () => {
   }
 
   return built;
-};`;
+}`;
 
 const catalog: CatalogEntry[] = [
   {
@@ -320,6 +320,8 @@ const catalog: CatalogEntry[] = [
       "Run an async JavaScript arrow function with sketchi.buildFlowchart, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
     content: [
       "execute({ code }) runs an async JavaScript arrow function.",
+      "This matches the Code Mode pattern: typed host tools are exposed as a namespace inside the sandbox, here sketchi.*.",
+      "Pass the function expression itself. A trailing semicolon and outer markdown code fence are accepted, but examples omit them so copied code is canonical.",
       "Inside code, call sketchi.buildFlowchart(input), sketchi.getArtifact(input), and sketchi.applyDiagramPatch(input).",
       "The sandbox must not receive secrets, storage bindings, model credentials, or raw network access.",
       "Call sketchi methods sequentially when possible so a harness can inspect structured failures and retry deliberately.",

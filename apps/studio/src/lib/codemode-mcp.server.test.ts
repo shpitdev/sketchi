@@ -8,6 +8,7 @@ import {
   createSketchiMcpServer,
   executeSketchiCodeMode,
   handleSketchiMcpRequest,
+  normalizeSketchiExecuteCode,
   type CodeModeMcpOptions,
   type SketchiCodeModeExecutor,
   type SketchiCodeModeProvider,
@@ -128,6 +129,15 @@ function createMcpFetch(options: CodeModeMcpOptions): typeof fetch {
 }
 
 describe("Sketchi Code Mode MCP server", () => {
+  it("normalizes common LLM execute input wrappers", () => {
+    expect(normalizeSketchiExecuteCode("async () => { return 1; };")).toBe(
+      "async () => { return 1; }",
+    );
+    expect(
+      normalizeSketchiExecuteCode("```js\nasync () => { return 1; };\n```"),
+    ).toBe("async () => { return 1; }");
+  });
+
   it("exposes docs, search, and execute tools through the MCP protocol", async () => {
     const client = new Client({
       name: "sketchi-codemode-test-client",
@@ -271,6 +281,24 @@ describe("Sketchi Code Mode MCP server", () => {
       error: "generated code failed",
       logs: [],
       result: null,
+    });
+  });
+
+  it("accepts execute code with a trailing arrow-function semicolon", async () => {
+    const result = await executeSketchiCodeMode(
+      {},
+      {
+        code: `${CIRCLE_TO_DIAMOND_CODE};`,
+      },
+      { executor: createInProcessExecutor() },
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      result: {
+        ok: true,
+        format: "scene",
+      },
     });
   });
 });
