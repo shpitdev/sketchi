@@ -88,13 +88,93 @@ function incidentEscalationOpsSpec() {
   };
 }
 
+function productionReleaseRollbackSpec() {
+  return {
+    id: "production-release-incident-response-rollback",
+    title: "Production Release Incident Response Rollback Flow",
+    nodes: [
+      { id: "start", label: "Start", kind: "start" },
+      { id: "ci_build", label: "CI Build", kind: "process" },
+      { id: "ci_gate", label: "CI Gate", kind: "decision" },
+      { id: "security_scan", label: "Security Scan", kind: "process" },
+      { id: "scan_gate", label: "Scan Gate", kind: "decision" },
+      { id: "vuln_gate", label: "Vuln Gate", kind: "decision" },
+      { id: "deploy_staging", label: "Deploy Staging", kind: "process" },
+      { id: "smoke_staging", label: "Smoke Staging", kind: "process" },
+      { id: "staging_gate", label: "Staging Gate", kind: "decision" },
+      { id: "fix_code", label: "Fix Code", kind: "process" },
+      { id: "canary_deploy", label: "Canary Deploy", kind: "process" },
+      { id: "canary_gate", label: "Canary Gate", kind: "decision" },
+      { id: "full_rollout", label: "Full Rollout", kind: "process" },
+      { id: "monitor", label: "Monitor", kind: "process" },
+      { id: "incident_gate", label: "Incident Gate", kind: "decision" },
+      { id: "severity_gate", label: "Severity Gate", kind: "decision" },
+      { id: "page_oncall", label: "Page Oncall", kind: "process" },
+      { id: "mitigate", label: "Mitigate", kind: "process" },
+      { id: "mitigation_gate", label: "Mitigation Gate", kind: "decision" },
+      { id: "rollback", label: "Rollback", kind: "process" },
+      { id: "rollback_gate", label: "Rollback Gate", kind: "decision" },
+      { id: "manual_recovery", label: "Manual Recovery", kind: "process" },
+      { id: "postmortem", label: "Postmortem", kind: "process" },
+      { id: "done", label: "Done", kind: "end" },
+    ],
+    edges: [
+      { source: "start", target: "ci_build", label: "trigger" },
+      { source: "ci_build", target: "ci_gate", label: "tests done" },
+      { source: "ci_gate", target: "security_scan", label: "green" },
+      { source: "ci_gate", target: "fix_code", label: "red" },
+      { source: "fix_code", target: "ci_build", label: "rebuild" },
+      { source: "security_scan", target: "scan_gate", label: "scan" },
+      { source: "scan_gate", target: "deploy_staging", label: "clean" },
+      { source: "scan_gate", target: "vuln_gate", label: "vulns" },
+      { source: "vuln_gate", target: "done", label: "abort" },
+      { source: "vuln_gate", target: "fix_code", label: "patch" },
+      { source: "deploy_staging", target: "smoke_staging", label: "deploy" },
+      { source: "smoke_staging", target: "staging_gate", label: "verify" },
+      { source: "staging_gate", target: "canary_deploy", label: "healthy" },
+      { source: "staging_gate", target: "fix_code", label: "failed" },
+      {
+        source: "canary_deploy",
+        target: "canary_gate",
+        label: "5 percent",
+      },
+      { source: "canary_gate", target: "full_rollout", label: "ok" },
+      { source: "canary_gate", target: "rollback", label: "regression" },
+      { source: "full_rollout", target: "monitor", label: "observe" },
+      { source: "monitor", target: "incident_gate", label: "signals" },
+      { source: "incident_gate", target: "done", label: "stable" },
+      { source: "incident_gate", target: "severity_gate", label: "incident" },
+      { source: "severity_gate", target: "page_oncall", label: "sev1" },
+      { source: "severity_gate", target: "mitigate", label: "low sev" },
+      { source: "page_oncall", target: "mitigate", label: "triage" },
+      { source: "mitigate", target: "mitigation_gate", label: "mitigate" },
+      { source: "mitigation_gate", target: "monitor", label: "worked" },
+      { source: "mitigation_gate", target: "rollback", label: "missed SLA" },
+      { source: "rollback", target: "rollback_gate", label: "rollback" },
+      { source: "rollback_gate", target: "postmortem", label: "restored" },
+      {
+        source: "rollback_gate",
+        target: "manual_recovery",
+        label: "still failing",
+      },
+      {
+        source: "manual_recovery",
+        target: "rollback_gate",
+        label: "re-verify",
+      },
+      { source: "postmortem", target: "done", label: "closed" },
+    ],
+    layout: { direction: "TB" },
+  };
+}
+
 function expectBuildOk(
   result: BuildFlowchartResult,
 ): asserts result is Extract<BuildFlowchartResult, { ok: true }> {
-  expect(result.ok).toBe(true);
   if (!result.ok) {
     throw new Error(`Expected build success: ${JSON.stringify(result.issues)}`);
   }
+  expect(result.ok).toBe(true);
 }
 
 function expectBuildFailure(
@@ -259,6 +339,24 @@ describe("Code Mode runtime", () => {
 
     expectBuildOk(built);
     expect(built.quality.summary).toEqual({ nodeCount: 16, edgeCount: 19 });
+    expect(built.artifact.formats.map((format) => format.format)).toEqual([
+      "scene",
+      "excalidraw",
+    ]);
+  });
+
+  it("exports production release rollback flows without dense route collisions", async () => {
+    const runtime = createTestRuntime();
+    const built = await runtime.buildFlowchart({
+      spec: productionReleaseRollbackSpec(),
+      options: {
+        artifactFormats: ["scene", "excalidraw"],
+        inlineArtifacts: ["scene", "excalidraw"],
+      },
+    });
+
+    expectBuildOk(built);
+    expect(built.quality.summary).toEqual({ nodeCount: 24, edgeCount: 32 });
     expect(built.artifact.formats.map((format) => format.format)).toEqual([
       "scene",
       "excalidraw",

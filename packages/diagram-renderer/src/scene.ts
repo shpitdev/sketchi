@@ -920,11 +920,8 @@ function exteriorLaneRoute(
     route.sourceEdge === "left" ||
     route.targetEdge === "left" ||
     center(route.target).x < center(route.source).x;
-  const laneOffset = (route.index % 6) * PORT_SPACING;
-  const leftLaneX = Math.max(
-    PADDING / 2,
-    minX - HORIZONTAL_GAP / 2 - laneOffset,
-  );
+  const laneOffset = route.index * PORT_SPACING;
+  const leftLaneX = minX - HORIZONTAL_GAP / 2 - laneOffset;
   const rightLaneX = maxX + HORIZONTAL_GAP / 2 + laneOffset;
   const preferredLaneX = useLeftLane ? leftLaneX : rightLaneX;
   const alternateLaneX = useLeftLane ? rightLaneX : leftLaneX;
@@ -963,7 +960,26 @@ function sceneBounds(elements: readonly SceneElement[]): {
   width: number;
   height: number;
 } {
-  const points = elements.flatMap((element): ScenePoint[] => {
+  const points = scenePoints(elements);
+  const maxX = Math.max(...points.map((point) => point.x));
+  const maxY = Math.max(...points.map((point) => point.y));
+
+  return {
+    width: maxX + PADDING,
+    height: maxY + PADDING,
+  };
+}
+
+function sceneMinimum(elements: readonly SceneElement[]): ScenePoint {
+  const points = scenePoints(elements);
+  return {
+    x: Math.min(...points.map((point) => point.x)),
+    y: Math.min(...points.map((point) => point.y)),
+  };
+}
+
+function scenePoints(elements: readonly SceneElement[]): ScenePoint[] {
+  return elements.flatMap((element): ScenePoint[] => {
     if (element.type === "arrow") {
       return [...element.points];
     }
@@ -982,13 +998,53 @@ function sceneBounds(elements: readonly SceneElement[]): {
       },
     ];
   });
-  const maxX = Math.max(...points.map((point) => point.x));
-  const maxY = Math.max(...points.map((point) => point.y));
+}
+
+function translatePoint(point: ScenePoint, dx: number, dy: number): ScenePoint {
+  return { x: point.x + dx, y: point.y + dy };
+}
+
+function translatePoints(
+  points: readonly [ScenePoint, ...ScenePoint[]],
+  dx: number,
+  dy: number,
+): [ScenePoint, ...ScenePoint[]] {
+  const [first, ...rest] = points;
+  return [
+    translatePoint(first, dx, dy),
+    ...rest.map((point) => translatePoint(point, dx, dy)),
+  ];
+}
+
+function translateElement(
+  element: SceneElement,
+  dx: number,
+  dy: number,
+): SceneElement {
+  if (element.type === "arrow") {
+    return {
+      ...element,
+      points: translatePoints(element.points, dx, dy),
+    };
+  }
 
   return {
-    width: maxX + PADDING,
-    height: maxY + PADDING,
+    ...element,
+    x: element.x + dx,
+    y: element.y + dy,
   };
+}
+
+function normalizeSceneOrigin(elements: readonly SceneElement[]): SceneElement[] {
+  const minimum = sceneMinimum(elements);
+  const dx = Math.max(0, PADDING - minimum.x);
+  const dy = Math.max(0, PADDING - minimum.y);
+
+  if (dx === 0 && dy === 0) {
+    return [...elements];
+  }
+
+  return elements.map((element) => translateElement(element, dx, dy));
 }
 
 export function renderIntermediateDiagram(
@@ -1007,7 +1063,11 @@ export function renderIntermediateDiagram(
     arrowForRoute(route, diagram.layout.edgeRouting, portOffsets, nodeShapes),
   );
   const labels = nodeShapes.map(textForNode);
-  const elements = [...edgeArrows, ...nodeShapes, ...labels];
+  const elements = normalizeSceneOrigin([
+    ...edgeArrows,
+    ...nodeShapes,
+    ...labels,
+  ]);
   const bounds = sceneBounds(elements);
 
   return {
