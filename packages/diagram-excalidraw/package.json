@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@sketchi/diagram-core": "workspace:*",
-    "@sketchi/diagram-renderer": "workspace:*"
+    "@sketchi/diagram-renderer": "workspace:*",
+    "fractional-indexing": "3.2.0"
   }
 }

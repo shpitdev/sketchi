@@ -4,6 +4,7 @@ import type {
   RenderedDiagramScene,
   TextSceneElement,
 } from "@sketchi/diagram-renderer";
+import { generateKeyBetween } from "fractional-indexing";
 
 export type ExcalidrawElement = Record<string, unknown> & {
   id: string;
@@ -134,7 +135,7 @@ function stableSeed(input: string): number {
   return Math.abs(hash) || 1;
 }
 
-function elementBase(id: string, index: number) {
+function elementBase(id: string, index: string) {
   const seed = stableSeed(id);
   return {
     id,
@@ -142,7 +143,7 @@ function elementBase(id: string, index: number) {
     fillStyle: "solid",
     frameId: null,
     groupIds: [],
-    index: `a${index}`,
+    index,
     isDeleted: false,
     link: null,
     locked: false,
@@ -173,7 +174,7 @@ function textElement(input: {
   containerId: string;
   fontSize: number;
   id: string;
-  index: number;
+  index: string;
   maxWidth: number;
   textColor?: string;
   text: string;
@@ -211,7 +212,7 @@ function textElement(input: {
 
 function shapeElement(input: {
   arrowIds: readonly string[];
-  index: number;
+  index: string;
   scene: RenderedDiagramScene;
   shape: NodeSceneElement;
   text?: TextSceneElement;
@@ -247,7 +248,7 @@ function lastArrowPoint(arrow: ArrowSceneElement) {
 
 function arrowElement(input: {
   arrow: ArrowSceneElement;
-  index: number;
+  index: string;
   scene: RenderedDiagramScene;
   sourceShape: ExcalidrawElement | undefined;
   targetShape: ExcalidrawElement | undefined;
@@ -290,7 +291,7 @@ function arrowElement(input: {
 
 function arrowLabelElement(input: {
   arrow: ArrowSceneElement;
-  index: number;
+  index: string;
 }): ExcalidrawElement | null {
   if (!input.arrow.label) {
     return null;
@@ -357,7 +358,12 @@ export function convertSceneToExcalidraw(
   const arrowsByNode = collectArrowsByNode(arrows);
   const shapeElementsByNodeId = new Map<string, ExcalidrawElement>();
   const elements: ExcalidrawElement[] = [];
-  let index = 0;
+  let previousIndex: string | null = null;
+  const nextIndex = () => {
+    const index = generateKeyBetween(previousIndex, null);
+    previousIndex = index;
+    return index;
+  };
 
   for (const node of nodes) {
     const text = textByContainerId.get(node.id);
@@ -365,13 +371,12 @@ export function convertSceneToExcalidraw(
       scene,
       shape: node,
       arrowIds: arrowsByNode.get(node.id) ?? [],
-      index,
+      index: nextIndex(),
       ...(text ? { text } : {}),
     });
 
     shapeElementsByNodeId.set(node.nodeId, shape);
     elements.push(shape);
-    index += 1;
   }
 
   for (const text of scene.elements.filter(isText)) {
@@ -381,7 +386,7 @@ export function convertSceneToExcalidraw(
     elements.push(
       textElement({
         id: text.id,
-        index,
+        index: nextIndex(),
         containerId: text.containerId,
         fontSize: text.fontSize,
         maxWidth: text.maxWidth ?? 160,
@@ -391,7 +396,6 @@ export function convertSceneToExcalidraw(
         y: text.y,
       }),
     );
-    index += 1;
   }
 
   for (const arrow of arrows) {
@@ -399,16 +403,16 @@ export function convertSceneToExcalidraw(
       arrowElement({
         arrow,
         scene,
-        index,
+        index: nextIndex(),
         sourceShape: shapeElementsByNodeId.get(arrow.sourceNodeId),
         targetShape: shapeElementsByNodeId.get(arrow.targetNodeId),
       }),
     );
-    index += 1;
-    const label = arrowLabelElement({ arrow, index });
+    const label = arrow.label
+      ? arrowLabelElement({ arrow, index: nextIndex() })
+      : null;
     if (label) {
       elements.push(label);
-      index += 1;
     }
   }
 

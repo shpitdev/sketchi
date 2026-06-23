@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { generateKeyBetween } from "fractional-indexing";
+
 import {
   flowchartFixture,
   pharmaBatchDispositionFlowchart,
@@ -77,6 +79,27 @@ function expectClosePoint(
 ) {
   expect(Math.abs(actual.x - expected.x)).toBeLessThan(0.05);
   expect(Math.abs(actual.y - expected.y)).toBeLessThan(0.05);
+}
+
+function expectValidOrderKeys(elements: readonly ExcalidrawElement[]) {
+  let previous: string | null = null;
+
+  for (const element of elements) {
+    const index = element.index;
+
+    expect(typeof index).toBe("string");
+    if (typeof index !== "string") {
+      throw new Error(`Expected ${element.id} to have a string order key.`);
+    }
+
+    expect(() => generateKeyBetween(previous, index)).not.toThrow();
+    if (previous !== null) {
+      expect(previous < index).toBe(true);
+    }
+    previous = index;
+  }
+
+  expect(() => generateKeyBetween(previous, null)).not.toThrow();
 }
 
 describe("convertSceneToExcalidraw", () => {
@@ -194,6 +217,265 @@ describe("convertSceneToExcalidraw", () => {
     expect(validateExcalidrawScene(scene).issues).not.toContainEqual(
       expect.objectContaining({ code: "overlapping-arrow-segment" }),
     );
+  });
+
+  it("emits valid Excalidraw order keys for dense scenes past 90 elements", () => {
+    const scene = convertSceneToExcalidraw(
+      renderIntermediateDiagram(
+        parseFlowchartDiagram({
+          id: "production-release-incident-response-rollback-de",
+          title: "Production Release, Incident Response & Rollback Decision Flow",
+          type: "flowchart",
+          nodes: [
+            { id: "start", label: "Release Triggered", kind: "start" },
+            { id: "ci_build", label: "CI Build & Unit Tests", kind: "process" },
+            { id: "ci_gate", label: "CI Green?", kind: "decision" },
+            {
+              id: "security_scan",
+              label: "Security & Dependency Scan",
+              kind: "process",
+            },
+            { id: "scan_gate", label: "Scan Clean?", kind: "decision" },
+            {
+              id: "deploy_staging",
+              label: "Deploy to Staging",
+              kind: "process",
+            },
+            { id: "vuln_gate", label: "Exploitable Vuln?", kind: "decision" },
+            {
+              id: "smoke_staging",
+              label: "Staging Smoke + Integration Tests",
+              kind: "process",
+            },
+            { id: "release_aborted", label: "Release Aborted", kind: "end" },
+            {
+              id: "staging_gate",
+              label: "Staging Healthy?",
+              kind: "decision",
+            },
+            { id: "fix_code", label: "Fix Code & Rebuild", kind: "process" },
+            {
+              id: "canary_deploy",
+              label: "Canary 5% Rollout",
+              kind: "process",
+            },
+            {
+              id: "canary_gate",
+              label: "Canary Metrics OK?",
+              kind: "decision",
+            },
+            {
+              id: "full_rollout",
+              label: "Full Production Rollout",
+              kind: "process",
+            },
+            {
+              id: "monitor",
+              label: "Monitor SLOs, Errors & Alerts",
+              kind: "process",
+            },
+            {
+              id: "incident_gate",
+              label: "Incident Detected?",
+              kind: "decision",
+            },
+            {
+              id: "severity_gate",
+              label: "Sev1 / Customer Impact?",
+              kind: "decision",
+            },
+            { id: "release_complete", label: "Release Complete", kind: "end" },
+            {
+              id: "page_oncall",
+              label: "Page On-Call & Declare Incident",
+              kind: "process",
+            },
+            {
+              id: "mitigate",
+              label: "Apply Mitigation / Feature Flag",
+              kind: "process",
+            },
+            {
+              id: "mitigation_gate",
+              label: "Mitigated Within SLA?",
+              kind: "decision",
+            },
+            {
+              id: "rollback",
+              label: "Rollback to Last Good Build",
+              kind: "process",
+            },
+            {
+              id: "rollback_gate",
+              label: "Health Restored?",
+              kind: "decision",
+            },
+            {
+              id: "manual_recovery",
+              label: "Escalate: Manual Infra/DB Recovery",
+              kind: "process",
+            },
+            {
+              id: "postmortem",
+              label: "Postmortem & Action Items",
+              kind: "process",
+            },
+            { id: "incident_closed", label: "Incident Closed", kind: "end" },
+          ],
+          edges: [
+            { id: "edge-1", source: "start", target: "ci_build" },
+            { id: "edge-2", source: "ci_build", target: "ci_gate" },
+            {
+              id: "edge-3",
+              source: "ci_gate",
+              target: "security_scan",
+              label: "yes",
+            },
+            {
+              id: "edge-4",
+              source: "ci_gate",
+              target: "fix_code",
+              label: "no",
+            },
+            {
+              id: "edge-5",
+              source: "fix_code",
+              target: "ci_build",
+              label: "rebuild",
+            },
+            { id: "edge-6", source: "security_scan", target: "scan_gate" },
+            {
+              id: "edge-7",
+              source: "scan_gate",
+              target: "deploy_staging",
+              label: "clean",
+            },
+            {
+              id: "edge-8",
+              source: "scan_gate",
+              target: "vuln_gate",
+              label: "vulns found",
+            },
+            {
+              id: "edge-9",
+              source: "vuln_gate",
+              target: "release_aborted",
+              label: "exploitable",
+            },
+            {
+              id: "edge-10",
+              source: "vuln_gate",
+              target: "fix_code",
+              label: "patchable",
+            },
+            {
+              id: "edge-11",
+              source: "deploy_staging",
+              target: "smoke_staging",
+            },
+            {
+              id: "edge-12",
+              source: "smoke_staging",
+              target: "staging_gate",
+            },
+            {
+              id: "edge-13",
+              source: "staging_gate",
+              target: "canary_deploy",
+              label: "healthy",
+            },
+            {
+              id: "edge-14",
+              source: "staging_gate",
+              target: "fix_code",
+              label: "failed",
+            },
+            {
+              id: "edge-15",
+              source: "canary_deploy",
+              target: "canary_gate",
+            },
+            {
+              id: "edge-16",
+              source: "canary_gate",
+              target: "full_rollout",
+              label: "metrics ok",
+            },
+            {
+              id: "edge-17",
+              source: "canary_gate",
+              target: "rollback",
+              label: "regression",
+            },
+            { id: "edge-18", source: "full_rollout", target: "monitor" },
+            { id: "edge-19", source: "monitor", target: "incident_gate" },
+            {
+              id: "edge-20",
+              source: "incident_gate",
+              target: "release_complete",
+              label: "stable",
+            },
+            {
+              id: "edge-21",
+              source: "incident_gate",
+              target: "severity_gate",
+              label: "anomaly",
+            },
+            {
+              id: "edge-22",
+              source: "severity_gate",
+              target: "page_oncall",
+              label: "sev1",
+            },
+            {
+              id: "edge-23",
+              source: "severity_gate",
+              target: "mitigate",
+              label: "low sev",
+            },
+            { id: "edge-24", source: "page_oncall", target: "mitigate" },
+            { id: "edge-25", source: "mitigate", target: "mitigation_gate" },
+            {
+              id: "edge-26",
+              source: "mitigation_gate",
+              target: "monitor",
+              label: "mitigated",
+            },
+            {
+              id: "edge-27",
+              source: "mitigation_gate",
+              target: "rollback",
+              label: "not mitigated",
+            },
+            { id: "edge-28", source: "rollback", target: "rollback_gate" },
+            {
+              id: "edge-29",
+              source: "rollback_gate",
+              target: "postmortem",
+              label: "restored",
+            },
+            {
+              id: "edge-30",
+              source: "rollback_gate",
+              target: "manual_recovery",
+              label: "still failing",
+            },
+            {
+              id: "edge-31",
+              source: "manual_recovery",
+              target: "rollback_gate",
+              label: "re-verify",
+            },
+            { id: "edge-32", source: "postmortem", target: "incident_closed" },
+          ],
+          layout: { direction: "TB", edgeRouting: "orthogonal" },
+        }),
+      ),
+    );
+
+    expect(scene.elements.length).toBeGreaterThan(90);
+    expect(scene.elements.map((element) => element.index)).not.toContain("a90");
+    expectValidOrderKeys(scene.elements);
   });
 
   it("uses fixed elbow bindings so Excalidraw can preserve connectors when shapes move", () => {
