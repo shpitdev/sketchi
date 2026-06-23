@@ -97,28 +97,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function firstText(response: unknown): string {
-  if (!isRecord(response) || !Array.isArray(response.content)) {
-    throw new Error("MCP response did not include content.");
+function structuredContent(response: unknown): Record<string, unknown> {
+  if (!isRecord(response) || !isRecord(response.structuredContent)) {
+    throw new Error("MCP response did not include structured content.");
   }
 
-  const content = response.content.find(
-    (item): item is { type: "text"; text: string } =>
-      Boolean(item) &&
-      typeof item === "object" &&
-      (item as { type?: unknown }).type === "text" &&
-      typeof (item as { text?: unknown }).text === "string",
-  );
-
-  if (!content) {
-    throw new Error("MCP response did not include text content.");
-  }
-
-  return content.text;
-}
-
-function parseTextJson(response: unknown): unknown {
-  return JSON.parse(firstText(response));
+  return response.structuredContent;
 }
 
 function createMcpFetch(options: CodeModeMcpOptions): typeof fetch {
@@ -171,8 +155,23 @@ describe("Sketchi Code Mode MCP server", () => {
         required: ["code"],
         type: "object",
       });
+      expect(
+        tools.tools.find((tool) => tool.name === "execute")?.description,
+      ).toContain("Write JavaScript only");
+      expect(
+        tools.tools.find((tool) => tool.name === "execute")?.description,
+      ).toContain("async () =>");
+      expect(
+        tools.tools.find((tool) => tool.name === "docs")?.outputSchema,
+      ).toBeDefined();
+      expect(
+        tools.tools.find((tool) => tool.name === "search")?.outputSchema,
+      ).toBeDefined();
+      expect(
+        tools.tools.find((tool) => tool.name === "execute")?.outputSchema,
+      ).toBeDefined();
 
-      const docs = parseTextJson(
+      const docs = structuredContent(
         await client.callTool({
           name: "docs",
           arguments: { topic: "agentSequence" },
@@ -183,7 +182,7 @@ describe("Sketchi Code Mode MCP server", () => {
       });
       expect(JSON.stringify(docs)).toContain("buildFlowchart");
 
-      const search = parseTextJson(
+      const search = structuredContent(
         await client.callTool({
           name: "search",
           arguments: { query: "managed convex threads" },
@@ -191,7 +190,7 @@ describe("Sketchi Code Mode MCP server", () => {
       );
       expect(JSON.stringify(search)).toContain("managed-thread-non-goal");
 
-      const execute = parseTextJson(
+      const execute = structuredContent(
         await client.callTool({
           name: "execute",
           arguments: { code: CIRCLE_TO_DIAMOND_CODE },
@@ -232,7 +231,7 @@ describe("Sketchi Code Mode MCP server", () => {
         "search",
       ]);
 
-      const docs = parseTextJson(
+      const docs = structuredContent(
         await client.callTool({
           name: "docs",
           arguments: { topic: "execute" },
@@ -240,7 +239,7 @@ describe("Sketchi Code Mode MCP server", () => {
       );
       expect(JSON.stringify(docs)).toContain("sketchi.applyDiagramPatch");
 
-      const execute = parseTextJson(
+      const execute = structuredContent(
         await client.callTool({
           name: "execute",
           arguments: { code: CIRCLE_TO_DIAMOND_CODE },

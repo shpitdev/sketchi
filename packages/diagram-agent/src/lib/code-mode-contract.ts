@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const ArtifactFormatSchema = z.enum(["excalidraw", "scene", "png"]);
+export const ArtifactFormatSchema = z.enum(["excalidraw", "scene"]);
 export const InlineArtifactFormatSchema = z.enum(["excalidraw", "scene"]);
 
 export const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -71,6 +71,19 @@ export const FlowchartNodeKindSchema = z.enum([
   "decision",
   "end",
 ]);
+
+export const DIAGRAM_PATCH_OPERATION_NAMES = [
+  "setDefaultStyle",
+  "setStyle",
+  "setShape",
+  "translate",
+  "replaceText",
+  "rerouteEdges",
+] as const;
+
+export const DiagramPatchOperationNameSchema = z.enum(
+  DIAGRAM_PATCH_OPERATION_NAMES,
+);
 
 export const FlowchartSpecNodeSchema = z.object({
   id: z.string().min(1),
@@ -258,13 +271,10 @@ export const DiagramPatchOperationSchema = z.discriminatedUnion("op", [
 export const DiagramPatchSourceSchema = z.union([
   z.object({
     artifactId: z.string().min(1),
-    format: z.enum(["scene", "excalidraw"]).optional(),
+    format: z.literal("scene").optional(),
   }),
   z.object({
     scene: RenderedDiagramSceneSchema,
-  }),
-  z.object({
-    excalidraw: ExcalidrawSceneSchema,
   }),
 ]);
 

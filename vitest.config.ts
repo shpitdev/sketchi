@@ -35,6 +35,7 @@ export default defineConfig({
       "apps/*/vitest.config.ts",
       "packages/*/vitest.config.ts",
       "packages/*/vitest.config.mts",
+      "tools/vitest.config.mts",
       "tools/*/vitest.config.mts",
       storybookProject("apps/web/.storybook"),
       storybookProject("apps/excalidraw/.storybook"),

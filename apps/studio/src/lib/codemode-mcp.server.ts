@@ -7,7 +7,9 @@ import type { StudioEnv } from "./agent.server";
 import { createStudioCodeModeRuntime } from "./codemode-api.server";
 import {
   CodeModeDocsRequestSchema,
+  CodeModeDocsResultSchema,
   CodeModeSearchRequestSchema,
+  CodeModeSearchResultSchema,
   getCodeModeDocs,
   searchCodeModeDocs,
   SKETCHI_CODE_MODE_TYPES,
@@ -51,6 +53,13 @@ const ExecuteRequestSchema = z.object({
   code: z.string().min(1),
 });
 
+const ExecuteResultSchema = z.object({
+  ok: z.boolean(),
+  result: z.unknown().optional(),
+  error: z.string().optional(),
+  logs: z.array(z.string()).optional(),
+});
+
 function stripCodeFence(code: string): string {
   const match = code.match(
     /^```(?:js|javascript|typescript|ts|tsx|jsx)?\s*\n([\s\S]*?)```\s*$/,
@@ -64,7 +73,7 @@ export function normalizeSketchiExecuteCode(code: string): string {
     .replace(/;+\s*$/, "");
 }
 
-function jsonTextResult(value: unknown) {
+function jsonResult(value: Record<string, unknown>) {
   return {
     content: [
       {
@@ -72,6 +81,7 @@ function jsonTextResult(value: unknown) {
         text: JSON.stringify(value, null, 2),
       },
     ],
+    structuredContent: value,
   };
 }
 
@@ -175,12 +185,13 @@ export function createSketchiMcpServer(
       description:
         "Read the harness-first Sketchi Code Mode MCP contract and usage guidance.",
       inputSchema: CodeModeDocsRequestSchema,
+      outputSchema: CodeModeDocsResultSchema,
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
       },
     },
-    (input) => jsonTextResult(getCodeModeDocs(input)),
+    (input) => jsonResult(getCodeModeDocs(input)),
   );
 
   server.registerTool(
@@ -190,12 +201,13 @@ export function createSketchiMcpServer(
       description:
         "Search Sketchi Code Mode operations, schemas, examples, non-goals, and repair hints.",
       inputSchema: CodeModeSearchRequestSchema,
+      outputSchema: CodeModeSearchResultSchema,
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
       },
     },
-    (input) => jsonTextResult(searchCodeModeDocs(input)),
+    (input) => jsonResult(searchCodeModeDocs(input)),
   );
 
   server.registerTool(
@@ -204,6 +216,8 @@ export function createSketchiMcpServer(
       title: "Execute Sketchi Code Mode",
       description: [
         "Run an async JavaScript arrow function for an external agent harness.",
+        "Write JavaScript only: no TypeScript syntax, annotations, interfaces, generics, imports, or named wrapper functions.",
+        "Use the canonical shape: async () => { const result = await sketchi.buildFlowchart(...); return result; }",
         "Code fences and trailing expression semicolons are normalized before execution.",
         "The sandbox exposes only sketchi.buildFlowchart, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
         "First get the semantic graph accepted, then use patch operations for deterministic visual changes.",
@@ -211,13 +225,14 @@ export function createSketchiMcpServer(
         SKETCHI_CODE_MODE_TYPES,
       ].join("\n"),
       inputSchema: ExecuteRequestSchema,
+      outputSchema: ExecuteResultSchema,
       annotations: {
         destructiveHint: false,
         idempotentHint: false,
       },
     },
     async (input) =>
-      jsonTextResult(await executeSketchiCodeMode(env, input, options)),
+      jsonResult(await executeSketchiCodeMode(env, input, options)),
   );
 
   return server;

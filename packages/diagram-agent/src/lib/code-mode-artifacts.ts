@@ -58,7 +58,6 @@ const MANIFEST_FORMAT = "manifest";
 
 export const ARTIFACT_MIME_TYPES: Record<ArtifactFormat, string> = {
   excalidraw: "application/vnd.excalidraw+json",
-  png: "image/png",
   scene: "application/vnd.sketchi.scene+json",
 };
 

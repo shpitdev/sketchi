@@ -189,6 +189,39 @@ describe("Code Mode runtime", () => {
     );
   });
 
+  it("keeps PNG out of the public artifact format contract", async () => {
+    const runtime = createTestRuntime();
+    const result = await runtime.buildFlowchart({
+      spec: approvalSpec(),
+      options: { artifactFormats: ["png"] },
+    });
+
+    expectBuildFailure(result);
+    expect(result.status).toBe("invalid_input");
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: "invalid_enum",
+        ref: { kind: "request", path: "options.artifactFormats.[0]" },
+      }),
+    );
+  });
+
+  it("rejects raw Excalidraw patch sources at the request contract", async () => {
+    const runtime = createTestRuntime();
+    const result = await runtime.applyDiagramPatch({
+      source: { excalidraw: { appState: {}, elements: [] } },
+      operations: [{ op: "rerouteEdges" }],
+    });
+
+    expectPatchFailure(result);
+    expect(result.status).toBe("invalid_input");
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        ref: expect.objectContaining({ path: "source" }),
+      }),
+    );
+  });
+
   it("patches styling after the graph artifact is accepted", async () => {
     const runtime = createTestRuntime();
     const built = await runtime.buildFlowchart({ spec: approvalSpec() });
@@ -290,6 +323,71 @@ describe("Code Mode runtime", () => {
     expect(patched.status).toBe("target_not_found");
     expect(patched.issues).toContainEqual(
       expect.objectContaining({ code: "unknown_patch_target" }),
+    );
+  });
+
+  it("enumerates supported patch operations when the op name is invalid", async () => {
+    const runtime = createTestRuntime();
+    const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+    expectBuildOk(built);
+
+    const patched = await runtime.applyDiagramPatch({
+      source: { artifactId: built.artifact.artifactId },
+      operations: [
+        {
+          op: "setText",
+          selector: { nodeIds: ["done"] },
+          text: "Ship to production",
+        },
+      ],
+    });
+
+    expectPatchFailure(patched);
+    expect(patched.status).toBe("invalid_input");
+    expect(patched.issues).toContainEqual(
+      expect.objectContaining({
+        code: "unsupported_patch_operation",
+        ref: { kind: "request", path: "operations.[0].op" },
+        hint: expect.stringContaining("replaceText"),
+      }),
+    );
+  });
+
+  it("uses replaceText to update accepted node labels", async () => {
+    const runtime = createTestRuntime();
+    const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+    expectBuildOk(built);
+
+    const patched = await runtime.applyDiagramPatch({
+      source: { artifactId: built.artifact.artifactId },
+      operations: [
+        {
+          op: "replaceText",
+          selector: { nodeIds: ["done"] },
+          text: "Ship to production",
+        },
+      ],
+    });
+
+    expectPatchOk(patched);
+    const scene = parseInlineScene(
+      patched.artifact.formats.find((format) => format.format === "scene")
+        ?.inline,
+    );
+
+    expect(scene.elements).toContainEqual(
+      expect.objectContaining({
+        type: "node",
+        nodeId: "done",
+        label: "Ship to production",
+      }),
+    );
+    expect(scene.elements).toContainEqual(
+      expect.objectContaining({
+        type: "text",
+        containerId: expect.stringContaining("done"),
+        text: "Ship to production",
+      }),
     );
   });
 

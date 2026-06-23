@@ -1,5 +1,6 @@
 import "@tanstack/react-start/server-only";
 
+import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagram-agent";
 import { z } from "zod";
 
 export const CodeModeDocsTopicSchema = z
@@ -9,6 +10,7 @@ export const CodeModeDocsTopicSchema = z
     "buildFlowchart",
     "getArtifact",
     "applyDiagramPatch",
+    "patchOperations",
     "agentSequence",
     "issues",
     "examples",
@@ -30,12 +32,25 @@ export interface CodeExample {
   code: string;
 }
 
-export interface DocsResult {
+export const CodeExampleSchema = z.object({
+  title: z.string(),
+  language: z.enum(["js", "json", "ts"]),
+  code: z.string(),
+});
+
+export interface DocsResult extends Record<string, unknown> {
   topic: z.infer<typeof CodeModeDocsTopicSchema>;
   content: string;
   examples: CodeExample[];
   version: string;
 }
+
+export const CodeModeDocsResultSchema = z.object({
+  topic: CodeModeDocsTopicSchema,
+  content: z.string(),
+  examples: z.array(CodeExampleSchema),
+  version: z.string(),
+});
 
 export interface SearchHit {
   id: string;
@@ -45,10 +60,23 @@ export interface SearchHit {
   score: number;
 }
 
-export interface SearchResult {
+export const CodeModeSearchHitSchema = z.object({
+  id: z.string(),
+  kind: z.enum(["operation", "schema", "issue", "example", "non_goal"]),
+  title: z.string(),
+  snippet: z.string(),
+  score: z.number(),
+});
+
+export interface SearchResult extends Record<string, unknown> {
   query: string;
   results: SearchHit[];
 }
+
+export const CodeModeSearchResultSchema = z.object({
+  query: z.string(),
+  results: z.array(CodeModeSearchHitSchema),
+});
 
 interface CatalogEntry {
   id: string;
@@ -61,7 +89,65 @@ interface CatalogEntry {
   examples?: CodeExample[];
 }
 
-export const SKETCHI_CODE_MODE_VERSION = "2026-06-18";
+export const SKETCHI_CODE_MODE_VERSION = "2026-06-23";
+
+const PATCH_OPERATION_SUMMARY = [
+  "- setDefaultStyle: set fallback strokeColor, fillColor, textColor, or backgroundColor for the scene.",
+  "- setStyle: style selected nodes, edges, labels, or scopes.",
+  "- setShape: change selected node shapes to rectangle, diamond, ellipse, or circle.",
+  "- translate: move selected nodes/edges/text by dx and dy; connectivity is preserved by default.",
+  "- replaceText: replace selected node labels, edge labels, or text elements. Use this for label edits.",
+  "- rerouteEdges: reroute selected edges after movement or shape changes.",
+].join("\n");
+
+const PATCH_REQUEST_SHAPE = `interface ApplyDiagramPatchRequest {
+  source: { artifactId: string; format?: "scene" } | { scene: RenderedDiagramScene };
+  operations: DiagramPatchOperation[];
+  intent?: string;
+  options?: { inlineArtifacts?: ["scene", "excalidraw"]; artifactFormats?: ["scene", "excalidraw"]; preserveConnectivity?: boolean };
+}
+
+type DiagramPatchOperation =
+  | { op: "setDefaultStyle"; style: DiagramStylePatch }
+  | { op: "setStyle"; selector: DiagramSelector; style: DiagramStylePatch }
+  | { op: "setShape"; selector: DiagramSelector; shape: "rectangle" | "diamond" | "ellipse" | "circle" }
+  | { op: "translate"; selector: DiagramSelector; dx: number; dy: number }
+  | { op: "replaceText"; selector: DiagramSelector; text: string }
+  | { op: "rerouteEdges"; selector?: DiagramSelector };
+
+// Primary public path:
+{
+  source: { artifactId: "<artifact id from buildFlowchart or applyDiagramPatch>" },
+  intent: "short human reason for the edit",
+  operations: [{ op: "replaceText", selector: { nodeIds: ["ship"] }, text: "Ship to production" }],
+  options: { inlineArtifacts: ["scene", "excalidraw"] }
+}`;
+
+const PATCH_OPERATIONS_EXAMPLE = `[
+  { op: "setDefaultStyle", style: { strokeColor: "#111827", fillColor: "#ffffff", textColor: "#111827" } },
+  { op: "setStyle", selector: { nodeIds: ["gate"] }, style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" } },
+  { op: "setShape", selector: { nodeIds: ["gate"] }, shape: "diamond" },
+  { op: "translate", selector: { nodeIds: ["gate"] }, dx: 24, dy: -12 },
+  { op: "replaceText", selector: { nodeIds: ["ship"] }, text: "Ship to production" },
+  { op: "rerouteEdges", selector: { scope: "edges" } }
+]`;
+
+const FULL_PATCH_REQUEST_EXAMPLE = `{
+  source: { artifactId: built.artifact.artifactId },
+  operations: [
+    {
+      op: "setStyle",
+      selector: { nodeIds: ["gate"] },
+      style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" }
+    },
+    {
+      op: "replaceText",
+      selector: { nodeIds: ["ship"] },
+      text: "Ship to production"
+    }
+  ],
+  options: { inlineArtifacts: ["scene", "excalidraw"], preserveConnectivity: true }
+}`;
 
 export const SKETCHI_CODE_MODE_TYPES = `declare const sketchi: {
   buildFlowchart(input: BuildFlowchartRequest): Promise<BuildFlowchartResult>;
@@ -70,7 +156,7 @@ export const SKETCHI_CODE_MODE_TYPES = `declare const sketchi: {
 };
 
 type FlowchartNodeKind = "start" | "process" | "decision" | "end";
-type ArtifactFormat = "scene" | "excalidraw" | "png";
+type ArtifactFormat = "scene" | "excalidraw";
 type InlineArtifactFormat = "scene" | "excalidraw";
 type DiagramShape = "rectangle" | "diamond" | "ellipse" | "circle";
 
@@ -137,9 +223,8 @@ interface DiagramStylePatch {
 }
 
 type DiagramPatchSource =
-  | { artifactId: string; format?: "scene" | "excalidraw" }
-  | { scene: unknown }
-  | { excalidraw: unknown };
+  | { artifactId: string; format?: "scene" }
+  | { scene: unknown };
 
 interface ApplyDiagramPatchRequest {
   requestId?: string;
@@ -294,6 +379,40 @@ const INVALID_FIRST_EXAMPLE = `async () => {
   return built;
 }`;
 
+const REPLACE_TEXT_EXAMPLE = `async () => {
+  const built = await sketchi.buildFlowchart({
+    spec: {
+      title: "Release gate",
+      nodes: [
+        { id: "start", label: "Start", kind: "start" },
+        { id: "gate", label: "Approved?", kind: "decision" },
+        { id: "ship", label: "Ship", kind: "end" },
+        { id: "revise", label: "Revise", kind: "end" },
+      ],
+      edges: [
+        { source: "start", target: "gate" },
+        { source: "gate", target: "ship", label: "yes" },
+        { source: "gate", target: "revise", label: "no" },
+      ],
+    },
+  });
+
+  if (!built.ok) return built;
+
+  return sketchi.applyDiagramPatch({
+    source: { artifactId: built.artifact.artifactId },
+    intent: "Rename the final state without rebuilding structure.",
+    operations: [
+      {
+        op: "replaceText",
+        selector: { nodeIds: ["ship"] },
+        text: "Ship to production",
+      },
+    ],
+    options: { inlineArtifacts: ["scene", "excalidraw"] },
+  });
+}`;
+
 const catalog: CatalogEntry[] = [
   {
     id: "overview",
@@ -307,6 +426,7 @@ const catalog: CatalogEntry[] = [
       "Sketchi Code Mode MCP is for external agent harnesses: Codex, Claude Code, OpenCode, and similar clients.",
       "The server exposes a small contract: docs, search, and execute. execute runs JavaScript against a typed sketchi client.",
       "The public sketchi client has exactly three operations: buildFlowchart, getArtifact, and applyDiagramPatch.",
+      "Use docs({ topic }) for full request envelopes and examples. Use search({ query }) to discover operation-specific topics such as patchOperations.",
       "The managed Sketchi product model, Convex threads, user artifact lineage, and Studio chat/canvas parity are intentionally out of this slice.",
     ].join("\n"),
   },
@@ -321,7 +441,10 @@ const catalog: CatalogEntry[] = [
     content: [
       "execute({ code }) runs an async JavaScript arrow function.",
       "This matches the Code Mode pattern: typed host tools are exposed as a namespace inside the sandbox, here sketchi.*.",
+      "Cloudflare Code Mode exposes typed namespace methods in generated code; this server follows that shape with sketchi.buildFlowchart, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
       "Pass the function expression itself. A trailing semicolon and outer markdown code fence are accepted, but examples omit them so copied code is canonical.",
+      "Write JavaScript only: no TypeScript annotations, interfaces, generics, imports, or named wrapper functions. Use the canonical shape async () => { const result = await sketchi.buildFlowchart(...); return result; }.",
+      "Do not define a named function and then call it. Put the arrow function body directly in code.",
       "Inside code, call sketchi.buildFlowchart(input), sketchi.getArtifact(input), and sketchi.applyDiagramPatch(input).",
       "The sandbox must not receive secrets, storage bindings, model credentials, or raw network access.",
       "Call sketchi methods sequentially when possible so a harness can inspect structured failures and retry deliberately.",
@@ -354,6 +477,7 @@ const catalog: CatalogEntry[] = [
       "Create the semantic flowchart first. Fix issues before styling or shape changes.",
     content: [
       "buildFlowchart accepts a compact FlowchartSpec: title, nodes, edges, optional layout, and optional style.",
+      'Request envelope: { spec: FlowchartSpec, options?: { artifactFormats?: ["scene", "excalidraw"], inlineArtifacts?: ["scene", "excalidraw"], minQualityScore?: number } }.',
       "Use stable node ids. Decision nodes need meaningful labeled outgoing branches, usually yes/no.",
       "If buildFlowchart returns ok: false, repair the spec from issues and call buildFlowchart again.",
       "Do not use applyDiagramPatch until buildFlowchart returns an accepted artifact.",
@@ -369,6 +493,7 @@ const catalog: CatalogEntry[] = [
       "Retrieve scene or Excalidraw artifacts by artifactId after build or patch acceptance.",
     content: [
       "getArtifact reads a stored artifact by artifactId.",
+      'Request envelope: { artifactId: string, format?: "scene" | "excalidraw", inline?: boolean }.',
       "Use format: 'scene' for the compact Sketchi scene and format: 'excalidraw' for portable Excalidraw JSON.",
       "Pass inline: true when the harness needs the payload in the MCP response.",
       "Use the artifactId returned by buildFlowchart or applyDiagramPatch.",
@@ -393,10 +518,75 @@ const catalog: CatalogEntry[] = [
       "Apply deterministic non-structural visual changes to an accepted artifact.",
     content: [
       "applyDiagramPatch modifies styling, shape, text, layout translation, and edge routes.",
+      "Request envelope:",
+      PATCH_REQUEST_SHAPE,
       "Selectors can target nodeIds, edgeIds, labels, element ids, kinds, or broad scopes.",
+      `Supported operation names: ${DIAGRAM_PATCH_OPERATION_NAMES.join(", ")}.`,
+      PATCH_OPERATION_SUMMARY,
       "Patch operations do not create or delete nodes and edges. Rebuild the FlowchartSpec for structural changes.",
       "For color changes, use 6-digit hex strings such as #7c3aed.",
+      "PNG is intentionally not part of the public Code Mode contract until a hosted render adapter exists; use scene/excalidraw plus a renderer for visual proof.",
     ].join("\n"),
+    examples: [
+      {
+        title: "Patch request envelope",
+        language: "ts",
+        code: FULL_PATCH_REQUEST_EXAMPLE,
+      },
+      {
+        title: "Rename an accepted node label with replaceText",
+        language: "js",
+        code: REPLACE_TEXT_EXAMPLE,
+      },
+    ],
+  },
+  {
+    id: "patchOperations",
+    kind: "schema",
+    title: "Patch operation vocabulary",
+    topic: "patchOperations",
+    keywords: [
+      "patch",
+      "operation",
+      "operations",
+      "op",
+      "enum",
+      "replaceText",
+      "setText",
+      "setLabel",
+      "rename",
+      "label",
+      "text",
+      "style",
+      "shape",
+      "translate",
+      "rerouteEdges",
+    ],
+    snippet:
+      "Allowed applyDiagramPatch operation names and the fields each operation needs.",
+    content: [
+      `Allowed op values: ${DIAGRAM_PATCH_OPERATION_NAMES.join(", ")}.`,
+      PATCH_OPERATION_SUMMARY,
+      "",
+      "Use replaceText for label edits. Do not use setText, setLabel, rename, relabel, text, updateLabel, or setNodeLabel.",
+      "Op-specific shapes:",
+      PATCH_REQUEST_SHAPE,
+      "Every operation except setDefaultStyle needs a selector unless noted otherwise. A selector can use nodeIds, edgeIds, ids, labels, kinds, or scope.",
+      "For style patches, node and edge colors use strokeColor, fillColor, textColor, and backgroundColor. FlowchartSpec top-level style uses accentColor and backgroundColor.",
+      "If a shape change causes arrow_overlap or text_overflow during export, retry with rerouteEdges, translate, or rebuild the FlowchartSpec with more space.",
+    ].join("\n"),
+    examples: [
+      {
+        title: "Every supported patch operation",
+        language: "json",
+        code: PATCH_OPERATIONS_EXAMPLE,
+      },
+      {
+        title: "Rename an accepted node label with replaceText",
+        language: "js",
+        code: REPLACE_TEXT_EXAMPLE,
+      },
+    ],
   },
   {
     id: "agentSequence",
@@ -410,7 +600,7 @@ const catalog: CatalogEntry[] = [
       "For mixed requests like 'circle connected to a purple decision diamond', split the task.",
       "Step 1: build a valid semantic flowchart with nodes and edges.",
       "Step 2: inspect issues. If not accepted, repair the spec and call buildFlowchart again.",
-      "Step 3: once accepted, use applyDiagramPatch for circle, diamond, color, movement, or text tweaks.",
+      "Step 3: once accepted, use applyDiagramPatch for circle, diamond, color, movement, rerouteEdges, or replaceText tweaks.",
     ].join("\n"),
     examples: [
       {
@@ -442,6 +632,7 @@ const catalog: CatalogEntry[] = [
       "flowchart-stage issues mean node ids, edges, starts, ends, or decision branches are invalid.",
       "quality-stage issues mean the diagram is technically valid but too weak or generic. Improve labels and branching.",
       "patch issues such as unknown_patch_target mean the selector does not match the accepted artifact.",
+      "unsupported_patch_operation on operations.[n].op means the op name is not supported; use patchOperations or the issue hint to pick an allowed value.",
     ].join("\n"),
     examples: [
       {
@@ -476,6 +667,11 @@ const catalog: CatalogEntry[] = [
         title: "Invalid graph returns repair hints",
         language: "js",
         code: INVALID_FIRST_EXAMPLE,
+      },
+      {
+        title: "Rename an accepted node label with replaceText",
+        language: "js",
+        code: REPLACE_TEXT_EXAMPLE,
       },
     ],
   },

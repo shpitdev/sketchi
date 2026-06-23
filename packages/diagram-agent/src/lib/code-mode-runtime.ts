@@ -24,6 +24,7 @@ import {
 import {
   ApplyDiagramPatchRequestSchema,
   BuildFlowchartRequestSchema,
+  DIAGRAM_PATCH_OPERATION_NAMES,
   GetArtifactRequestSchema,
   RenderedDiagramSceneSchema,
   type ApplyDiagramPatchRequest,
@@ -120,6 +121,9 @@ function pathForZodIssue(path: readonly PropertyKey[]): string {
 
 function codeForZodIssue(zodIssue: z.core.$ZodIssue): CodeModeIssueCode {
   const path = pathForZodIssue(zodIssue.path);
+  if (isPatchOperationNamePath(path)) {
+    return "unsupported_patch_operation";
+  }
   if (zodIssue.code === "invalid_type") {
     return "invalid_type";
   }
@@ -132,6 +136,25 @@ function codeForZodIssue(zodIssue: z.core.$ZodIssue): CodeModeIssueCode {
   return path === "input" ? "invalid_type" : "missing_field";
 }
 
+function isPatchOperationNamePath(path: string): boolean {
+  return /^operations\.\[\d+\]\.op$/.test(path);
+}
+
+function hintForZodIssue(path: string): string {
+  if (isPatchOperationNamePath(path)) {
+    return [
+      `Use one of: ${DIAGRAM_PATCH_OPERATION_NAMES.join(", ")}.`,
+      "For label edits, use replaceText with selector plus text.",
+    ].join(" ");
+  }
+
+  if (path === "source") {
+    return "Pass source: { artifactId } from an accepted build or patch, or source: { scene } for inline Sketchi scene patching.";
+  }
+
+  return `Fix ${path} so it matches the Code Mode API contract.`;
+}
+
 function inputIssues(error: z.ZodError): CodeModeIssue[] {
   return error.issues.map((zodIssue) => {
     const path = pathForZodIssue(zodIssue.path);
@@ -140,7 +163,7 @@ function inputIssues(error: z.ZodError): CodeModeIssue[] {
       stage: "input",
       ref: { kind: "request", path },
       message: zodIssue.message,
-      hint: `Fix ${path} so it matches the Code Mode API contract.`,
+      hint: hintForZodIssue(path),
     });
   });
 }
@@ -547,22 +570,6 @@ function requestedInlineFormats(
   input: BuildFlowchartRequest["options"] | ApplyDiagramPatchRequest["options"],
 ): InlineArtifactFormat[] {
   return input?.inlineArtifacts ?? DEFAULT_INLINE_FORMATS;
-}
-
-function unsupportedFormatIssues(
-  formats: readonly ArtifactFormat[],
-): CodeModeIssue[] {
-  return formats
-    .filter((format) => format === "png")
-    .map((format) =>
-      issue({
-        code: "unsupported_artifact_format",
-        stage: "input",
-        ref: { kind: "request", id: format, path: "options.artifactFormats" },
-        message: `Artifact format "${format}" is not available in the first Code Mode implementation.`,
-        hint: "Request scene and/or excalidraw until the hosted PNG render adapter exists.",
-      }),
-    );
 }
 
 function storedArtifactsForFormats(input: {
@@ -1199,19 +1206,6 @@ async function resolvePatchSource(
     return { scene: cloneScene(input.source.scene) };
   }
 
-  if ("excalidraw" in input.source) {
-    return [
-      issue({
-        code: "unsupported_patch_operation",
-        stage: "input",
-        ref: { kind: "request", path: "source.excalidraw" },
-        message:
-          "Inline Excalidraw patching is not supported by the first patch runtime.",
-        hint: "Patch an accepted artifactId or inline Sketchi scene instead of raw Excalidraw JSON.",
-      }),
-    ];
-  }
-
   const artifact = await store.read(input.source.artifactId, "scene");
   if (!artifact) {
     return [
@@ -1267,16 +1261,6 @@ export function createCodeModeRuntime(
 
       const request = parsed.data;
       const formats = requestedFormats(request.options);
-      const unsupported = unsupportedFormatIssues(formats);
-      if (unsupported.length > 0) {
-        return {
-          ok: false,
-          status: "invalid_input",
-          ...responseRequestId(request.requestId),
-          issues: unsupported,
-        };
-      }
-
       const buildId = createId("build");
       const normalizedSpec = normalizeFlowchartSpec(request.spec);
       const validationIssues = validateNormalizedFlowchart(normalizedSpec);
@@ -1505,25 +1489,11 @@ export function createCodeModeRuntime(
       const request = parsed.data;
       const patchId = createId("patch");
       const formats = requestedFormats(request.options);
-      const unsupported = unsupportedFormatIssues(formats);
-      if (unsupported.length > 0) {
-        return {
-          ok: false,
-          status: "invalid_input",
-          patchId,
-          ...responseRequestId(request.requestId),
-          issues: unsupported,
-        };
-      }
-
       const source = await resolvePatchSource(store, request);
       if (Array.isArray(source)) {
         return {
           ok: false,
-          status:
-            source[0]?.code === "unsupported_patch_operation"
-              ? "unsupported_operation"
-              : "source_unavailable",
+          status: "source_unavailable",
           patchId,
           ...responseRequestId(request.requestId),
           issues: source,

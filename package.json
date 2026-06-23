@@ -23,6 +23,8 @@
     "dev:web": "pnpm nx dev web",
     "preview": "nx run-many -t preview --parallel",
     "proof:codemode-mcp": "jiti tools/codemode-mcp-proof.ts",
+    "proof:codemode-render": "jiti tools/render-codemode-artifact.ts",
+    "test:tools": "vitest run --config tools/vitest.config.mts",
     "storybook": "nx storybook diagram-studio-ui",
     "storybook:excalidraw": "nx storybook excalidraw",
     "storybook:icons": "nx storybook icons",

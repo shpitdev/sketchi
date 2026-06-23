@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagram-agent";
 import {
   getCodeModeDocs,
   searchCodeModeDocs,
@@ -39,5 +40,40 @@ describe("Code Mode MCP docs", () => {
     expect(managedResults.results.map((result) => result.id)).toContain(
       "managed-thread-non-goal",
     );
+  });
+
+  it("documents patch envelopes and operation names for harness discovery", () => {
+    const docs = getCodeModeDocs({ topic: "applyDiagramPatch" });
+
+    expect(docs.content).toContain("source: { artifactId");
+    expect(docs.content).toContain("Supported operation names");
+    expect(docs.content).toContain("replaceText");
+    expect(docs.content).toContain("strokeColor");
+    expect(docs.content).toContain("interface ApplyDiagramPatchRequest");
+    expect(docs.content).not.toContain('"png"');
+    expect(docs.content).not.toContain("{ excalidraw: unknown }");
+    expect(docs.content).not.toContain('format?: "scene" | "excalidraw"');
+    expect(docs.examples).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: expect.stringContaining('op: "replaceText"'),
+        }),
+      ]),
+    );
+
+    const operationResults = searchCodeModeDocs({
+      query: "setText setLabel rename label operation",
+    });
+    expect(operationResults.results.map((result) => result.id)).toContain(
+      "patchOperations",
+    );
+
+    const operationDocs = getCodeModeDocs({ topic: "patchOperations" });
+    for (const operationName of DIAGRAM_PATCH_OPERATION_NAMES) {
+      expect(operationDocs.content).toContain(operationName);
+      expect(
+        operationDocs.examples.map((example) => example.code).join("\n"),
+      ).toContain(operationName);
+    }
   });
 });
