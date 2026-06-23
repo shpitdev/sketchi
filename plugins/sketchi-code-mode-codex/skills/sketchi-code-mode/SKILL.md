@@ -55,21 +55,40 @@ async () => {
         shape: "diamond",
       },
     ],
-    options: { inlineArtifacts: ["scene", "excalidraw"] },
+    options: {
+      artifactFormats: ["scene", "excalidraw", "png"],
+      inlineArtifacts: ["scene", "excalidraw"],
+    },
   });
 
   if (!patched.ok) return patched;
 
-  return patched;
+  const png = await sketchi.getArtifact({
+    artifactId: patched.artifact.artifactId,
+    format: "png",
+    inline: false,
+  });
+
+  return { patched, png };
 }
+```
+
+To view the PNG bytes after `execute` returns metadata, fetch:
+
+```text
+https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/<artifactId>?format=png&raw=true
 ```
 
 ## Guardrails
 
 - Keep IDs stable and readable.
+- For export-ready PNG proof, keep complex graphs monotonic in the chosen layout direction. Avoid long back-edges, loops to earlier nodes, or reusing one terminal node for both early and late outcomes; use distinct terminal nodes when branches resolve at different depths.
 - Prefer typed graph generation for adding, removing, or reconnecting nodes.
 - Use patching for style, layout hints, labels, and metadata only when the docs show support.
+- If `arrow_overlap` appears during export, rebuild the `FlowchartSpec` as a cleaner DAG first. `rerouteEdges` can tidy local routes, but it is not a reliable fix for a bottom node that points back up to an early terminal.
 - Pass the function expression itself. `async () => { ... }` is canonical; outer markdown fences and a trailing semicolon are tolerated by the server, but omit them in generated code.
 - Return the MCP result or artifact metadata so the caller has evidence.
+- Request `artifactFormats: ["scene", "excalidraw", "png"]` when visual proof matters. PNG is hosted binary evidence; `sketchi.getArtifact({ format: "png", inline: false })` returns metadata, then fetch the raw Studio API URL outside `execute` for bytes.
+- Do not install or require a local browser for plugin use; the deployed Studio Worker renders PNG artifacts through Cloudflare Browser Run.
 - Do not pass secrets or credentials into `execute`.
 - Do not treat the deployed Workers MCP endpoint as a private boundary; it is a tool surface for Code Mode operations.

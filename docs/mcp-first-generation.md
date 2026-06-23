@@ -77,7 +77,7 @@ flowchart TB
 | Normalize model output  | internal to `buildFlowchart`         | Public callers get structured `Issue[]`                              |
 | Validate IR             | internal to `buildFlowchart`         | Not a standalone external tool                                       |
 | Grade artifact quality  | internal to `buildFlowchart`         | Returned as part of `BuildFlowchartResult`                           |
-| Render proof/export     | internal to `buildFlowchart`         | Scene and Excalidraw artifacts first                                 |
+| Render proof/export     | internal to `buildFlowchart`         | Scene, Excalidraw, and hosted PNG artifacts                          |
 | Draft from prompt       | later                                | Needs free-prompt generation contract                                |
 | Revise supplied diagram | later or internal eval               | Caller owns state in this phase                                      |
 | Run scenarios           | CLI/eval surface, not public MCP API | Useful for regression and examples                                   |
@@ -161,14 +161,14 @@ this slice.
 
 We need two separate rendering concepts:
 
-| Need                               | First answer                  | Later answer                                    |
-| ---------------------------------- | ----------------------------- | ----------------------------------------------- |
-| Deterministic diagram layout       | existing `diagram-renderer`   | same                                            |
-| Excalidraw export                  | existing `diagram-excalidraw` | same                                            |
-| Visual proof for tests/agents      | local Playwright utility      | serverless browser adapter                      |
-| Production PNG/PDF-style rendering | defer                         | Cloudflare Browser Run or Browserbase Functions |
+| Need                               | Local/dev answer                | Production/CI answer                   |
+| ---------------------------------- | ------------------------------- | -------------------------------------- |
+| Deterministic diagram layout       | existing `diagram-renderer`     | same                                   |
+| Excalidraw export                  | existing `diagram-excalidraw`   | same                                   |
+| Visual proof for tests/agents      | optional local Playwright proof | Cloudflare Browser Run artifact render |
+| Production PNG/PDF-style rendering | no local browser requirement    | Cloudflare Browser Run for PNG         |
 
-Start local:
+Local debug utility:
 
 ```mermaid
 flowchart LR
@@ -179,12 +179,13 @@ flowchart LR
   Playwright --> Evidence["PNG + render assertions"]
 ```
 
-Why local first:
+Why keep local optional:
 
 - the repo already has Playwright;
-- it unblocks grading/eval proof immediately;
-- it avoids choosing hosted browser infrastructure too early;
-- it gives Browserbase/Cloudflare adapters a precise compatibility target.
+- it is useful for developer debugging and `.memory/` evidence;
+- it must not become a separate CI production path;
+- it gives the hosted renderer a compatibility target without requiring users
+  or plugins to install browser binaries.
 
 Then add a hosted render port:
 
@@ -192,11 +193,9 @@ Then add a hosted render port:
 flowchart TB
   RenderPort["RenderProofPort"]
   Local["Local Playwright adapter"]
-  Browserbase["Browserbase Functions adapter"]
   Cloudflare["Cloudflare Browser Run adapter"]
 
   RenderPort --> Local
-  RenderPort --> Browserbase
   RenderPort --> Cloudflare
 ```
 
@@ -206,12 +205,12 @@ flowchart TB
 | ---------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | Browserbase Functions  | Playwright-native scripts deployed as API-callable browser functions          | Adds another vendor and provider/runtime constraints to review   |
 | Cloudflare Browser Run | Worker-aligned screenshots/PDFs/browser sessions near existing deploy surface | Needs Worker binding/API setup and browser-runtime limits review |
-| Local Playwright only  | Fastest proof and deterministic CI/local tests                                | Not a production render service                                  |
+| Local Playwright only  | Fastest developer proof                                                       | Not a production or CI render service                            |
 
-Recommendation: implement the local render utility first, then run one small
-adapter spike. Prefer Cloudflare Browser Run if the MCP/API surface stays on
-Workers. Prefer Browserbase Functions if we want browser rendering isolated from
-the Worker and closer to standard Playwright deployment.
+Decision: use Cloudflare Browser Run for hosted PNG artifacts because Code Mode,
+R2 artifact storage, and the Studio MCP/API surface already run on Workers.
+Browserbase Functions remains the fallback only if Browser Run cannot satisfy
+the Excalidraw export harness.
 
 ## Implementation Steps
 
@@ -278,14 +277,15 @@ Acceptance:
 
 ### 5. Add Local Render Proof
 
-Create a local Playwright-backed utility that opens a minimal render page and
-captures evidence.
+Keep a local Playwright-backed utility that opens a minimal render page and
+captures evidence for developer debugging only.
 
 Acceptance:
 
 - PNG evidence exists for a valid flowchart;
 - assertions catch blank canvas, missing nodes, and obvious text/layout failure;
-- this works without a deployed app.
+- this works without a deployed app;
+- CI does not rely on this path instead of the deployed Worker renderer.
 
 ### 6. Add Remote Adapter
 
@@ -312,14 +312,15 @@ Acceptance:
 
 ### 8. Decide Hosted Renderer
 
-Only after local render proof is stable, pick a hosted adapter.
+Use Cloudflare Browser Run as the hosted renderer.
 
 Acceptance:
 
-- one Browserbase Functions or Cloudflare Browser Run proof renders the same
-  artifact as local Playwright;
+- one Cloudflare Browser Run proof renders a hosted PNG artifact from the same
+  production path agents use;
 - failures are mapped to the same typed render errors;
-- the hosted renderer is optional behind a capability flag.
+- the hosted renderer is optional at runtime but required for `png` artifact
+  requests to succeed.
 
 ## Proof Matrix
 
@@ -329,7 +330,7 @@ Acceptance:
 | `pnpm nx test diagram-generation`  | yes                         |
 | local CLI scenario fixture         | yes                         |
 | local CLI Gemini scenario          | yes when credentials exist  |
-| local render screenshot            | yes                         |
+| hosted Browser Run PNG proof       | yes                         |
 | MCP tool listing                   | yes                         |
 | MCP draft/revise/grade call        | yes                         |
 | remote Worker preview smoke        | yes if adapter is in the PR |

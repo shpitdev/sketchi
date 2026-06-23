@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createMemoryArtifactStore,
   createObjectBucketArtifactStore,
+  type CodeModeArtifactStore,
   type CodeModeObjectBucket,
   type CodeModeObjectBucketObject,
 } from "./code-mode-artifacts";
@@ -85,28 +86,71 @@ function expectPatchFailure(
   }
 }
 
+function throwingStore(): CodeModeArtifactStore {
+  return {
+    read: async () => {
+      throw new Error("bucket read failed");
+    },
+    readManifest: async () => {
+      throw new Error("manifest read failed");
+    },
+    write: async () => {
+      throw new Error("bucket write failed");
+    },
+  };
+}
+
 function parseInlineScene(value: unknown) {
   return RenderedDiagramSceneSchema.parse(value);
 }
 
 class MemoryBucket implements CodeModeObjectBucket {
-  readonly objects = new Map<string, string>();
+  readonly objects = new Map<string, string | Uint8Array>();
 
   async get(key: string): Promise<CodeModeObjectBucketObject | null> {
     const value = this.objects.get(key);
     if (!value) {
       return null;
     }
+    const bytes =
+      typeof value === "string" ? new TextEncoder().encode(value) : value;
     return {
-      size: new TextEncoder().encode(value).length,
-      text: async () => value,
+      size: bytes.byteLength,
+      arrayBuffer: async () => toArrayBuffer(bytes),
+      text: async () =>
+        typeof value === "string" ? value : new TextDecoder().decode(value),
     };
   }
 
-  async put(key: string, value: string): Promise<unknown> {
-    this.objects.set(key, value);
+  async put(
+    key: string,
+    value: string | ArrayBuffer | Uint8Array,
+  ): Promise<unknown> {
+    this.objects.set(
+      key,
+      typeof value === "string" ? value : new Uint8Array(value),
+    );
     return null;
   }
+}
+
+class FailingPngBucket extends MemoryBucket {
+  override async put(
+    key: string,
+    value: string | ArrayBuffer | Uint8Array,
+  ): Promise<unknown> {
+    if (key.endsWith("/png.png")) {
+      throw new Error("png write failed");
+    }
+
+    return super.put(key, value);
+  }
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }
 
 describe("Code Mode runtime", () => {
@@ -141,7 +185,16 @@ describe("Code Mode runtime", () => {
 
     expectGetOk(excalidraw);
     expect(excalidraw.mimeType).toBe("application/vnd.excalidraw+json");
-    expect(excalidraw.inline).toMatchObject({
+    expect(excalidraw).not.toHaveProperty("inline");
+
+    const inlineExcalidraw = await runtime.getArtifact({
+      artifactId: built.artifact.artifactId,
+      format: "excalidraw",
+      inline: true,
+    });
+
+    expectGetOk(inlineExcalidraw);
+    expect(inlineExcalidraw.inline).toMatchObject({
       appState: expect.any(Object),
       elements: expect.any(Array),
     });
@@ -189,7 +242,7 @@ describe("Code Mode runtime", () => {
     );
   });
 
-  it("keeps PNG out of the public artifact format contract", async () => {
+  it("reports PNG export failure when no hosted renderer is configured", async () => {
     const runtime = createTestRuntime();
     const result = await runtime.buildFlowchart({
       spec: approvalSpec(),
@@ -197,13 +250,77 @@ describe("Code Mode runtime", () => {
     });
 
     expectBuildFailure(result);
-    expect(result.status).toBe("invalid_input");
+    expect(result.status).toBe("export_failed");
     expect(result.issues).toContainEqual(
       expect.objectContaining({
-        code: "invalid_enum",
-        ref: { kind: "request", path: "options.artifactFormats.[0]" },
+        code: "render_failed",
+        message: "PNG artifact rendering is not configured for this runtime.",
       }),
     );
+  });
+
+  it("stores PNG artifacts through a configured renderer without inlining binary data", async () => {
+    let id = 0;
+    const runtime = createCodeModeRuntime({
+      store: createMemoryArtifactStore(),
+      createId: (prefix) => `${prefix}-${(id += 1)}`,
+      renderer: {
+        renderPng: async () => new Uint8Array([137, 80, 78, 71]),
+      },
+    });
+
+    const built = await runtime.buildFlowchart({
+      spec: approvalSpec(),
+      options: {
+        artifactFormats: ["scene", "png"],
+        inlineArtifacts: ["scene"],
+      },
+    });
+
+    expectBuildOk(built);
+    expect(built.artifact.formats).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          format: "scene",
+          inline: expect.any(Object),
+        }),
+        expect.objectContaining({
+          format: "png",
+          mimeType: "image/png",
+          sizeBytes: 4,
+        }),
+      ]),
+    );
+    expect(
+      built.artifact.formats.find((format) => format.format === "png"),
+    ).not.toHaveProperty("inline");
+
+    const png = await runtime.getArtifact({
+      artifactId: built.artifact.artifactId,
+      format: "png",
+    });
+
+    expectGetOk(png);
+    expect(png).toMatchObject({
+      format: "png",
+      mimeType: "image/png",
+      sizeBytes: 4,
+    });
+    expect(png).not.toHaveProperty("inline");
+
+    const explicitInlinePng = await runtime.getArtifact({
+      artifactId: built.artifact.artifactId,
+      format: "png",
+      inline: true,
+    });
+
+    expectGetOk(explicitInlinePng);
+    expect(explicitInlinePng).toMatchObject({
+      format: "png",
+      mimeType: "image/png",
+      sizeBytes: 4,
+    });
+    expect(explicitInlinePng).not.toHaveProperty("inline");
   });
 
   it("rejects raw Excalidraw patch sources at the request contract", async () => {
@@ -267,6 +384,53 @@ describe("Code Mode runtime", () => {
         .map((arrow) => `${arrow.sourceNodeId}->${arrow.targetNodeId}`)
         .sort(),
     ).toEqual(["approve->done", "approve->revise", "request->approve"]);
+  });
+
+  it("renders PNG artifacts after patch operations when a renderer is configured", async () => {
+    let id = 0;
+    const runtime = createCodeModeRuntime({
+      store: createMemoryArtifactStore(),
+      createId: (prefix) => `${prefix}-${(id += 1)}`,
+      renderer: {
+        renderPng: async ({ scene }) =>
+          new Uint8Array([137, 80, 78, 71, scene.elements.length]),
+      },
+    });
+    const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+    expectBuildOk(built);
+
+    const patched = await runtime.applyDiagramPatch({
+      source: { artifactId: built.artifact.artifactId },
+      operations: [
+        {
+          op: "setShape",
+          selector: { nodeIds: ["approve"] },
+          shape: "diamond",
+        },
+      ],
+      options: {
+        artifactFormats: ["scene", "png"],
+        inlineArtifacts: ["scene"],
+      },
+    });
+
+    expectPatchOk(patched);
+    expect(patched.artifact.formats).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          format: "scene",
+          inline: expect.any(Object),
+        }),
+        expect.objectContaining({
+          format: "png",
+          mimeType: "image/png",
+          sizeBytes: 5,
+        }),
+      ]),
+    );
+    expect(
+      patched.artifact.formats.find((format) => format.format === "png"),
+    ).not.toHaveProperty("inline");
   });
 
   it("keeps scoped edge style patches from recoloring node labels", async () => {
@@ -391,6 +555,44 @@ describe("Code Mode runtime", () => {
     );
   });
 
+  it("returns structured storage failures when artifact reads throw", async () => {
+    const runtime = createCodeModeRuntime({
+      store: throwingStore(),
+      createId: (prefix) => `${prefix}-1`,
+    });
+
+    const artifact = await runtime.getArtifact({
+      artifactId: "artifact-1",
+      format: "scene",
+    });
+
+    expect(artifact.ok).toBe(false);
+    if (artifact.ok) {
+      throw new Error("Expected get failure.");
+    }
+    expect(artifact.status).toBe("storage_failed");
+    expect(artifact.issues).toContainEqual(
+      expect.objectContaining({
+        code: "storage_read_failed",
+        message: "manifest read failed",
+      }),
+    );
+
+    const patched = await runtime.applyDiagramPatch({
+      source: { artifactId: "artifact-1" },
+      operations: [{ op: "rerouteEdges" }],
+    });
+
+    expectPatchFailure(patched);
+    expect(patched.status).toBe("storage_failed");
+    expect(patched.issues).toContainEqual(
+      expect.objectContaining({
+        code: "storage_read_failed",
+        message: "bucket read failed",
+      }),
+    );
+  });
+
   it("stores and retrieves artifacts through an object-bucket adapter", async () => {
     const bucket = new MemoryBucket();
     let id = 0;
@@ -413,11 +615,76 @@ describe("Code Mode runtime", () => {
     const scene = await runtime.getArtifact({
       artifactId: built.artifact.artifactId,
       format: "scene",
+      inline: true,
     });
 
     expectGetOk(scene);
     expect(parseInlineScene(scene.inline).diagramId).toBe(
       "simple-approval-flow",
     );
+  });
+
+  it("persists PNG artifacts as binary object-bucket entries", async () => {
+    const bucket = new MemoryBucket();
+    let id = 0;
+    const runtime = createCodeModeRuntime({
+      store: createObjectBucketArtifactStore(bucket, {
+        prefix: "codemode",
+      }),
+      createId: (prefix) => `${prefix}-${(id += 1)}`,
+      renderer: {
+        renderPng: async () => new Uint8Array([137, 80, 78, 71]),
+      },
+    });
+
+    const built = await runtime.buildFlowchart({
+      spec: approvalSpec(),
+      options: { artifactFormats: ["scene", "png"] },
+    });
+    expectBuildOk(built);
+
+    expect([...bucket.objects.keys()].sort()).toEqual([
+      "codemode/artifact-2/manifest.json",
+      "codemode/artifact-2/png.png",
+      "codemode/artifact-2/scene.json",
+    ]);
+
+    const png = await runtime.getArtifact({
+      artifactId: built.artifact.artifactId,
+      format: "png",
+    });
+
+    expectGetOk(png);
+    expect(png).toMatchObject({
+      format: "png",
+      mimeType: "image/png",
+      sizeBytes: 4,
+    });
+    expect(png).not.toHaveProperty("inline");
+  });
+
+  it("does not publish an object-bucket manifest when a format write fails", async () => {
+    const bucket = new FailingPngBucket();
+    let id = 0;
+    const runtime = createCodeModeRuntime({
+      store: createObjectBucketArtifactStore(bucket, {
+        prefix: "codemode",
+      }),
+      createId: (prefix) => `${prefix}-${(id += 1)}`,
+      renderer: {
+        renderPng: async () => new Uint8Array([137, 80, 78, 71]),
+      },
+    });
+
+    const built = await runtime.buildFlowchart({
+      spec: approvalSpec(),
+      options: { artifactFormats: ["scene", "png"] },
+    });
+
+    expectBuildFailure(built);
+    expect(built.status).toBe("storage_failed");
+    expect([...bucket.objects.keys()].sort()).toEqual([
+      "codemode/artifact-2/scene.json",
+    ]);
   });
 });

@@ -159,6 +159,7 @@ interface DocsRequest {
     | "buildFlowchart"
     | "getArtifact"
     | "applyDiagramPatch"
+    | "patchOperations"
     | "agentSequence"
     | "issues"
     | "examples";
@@ -248,9 +249,9 @@ host dispatcher. A future HTTP adapter can expose the same contracts directly.
 flowchart LR
   Code["sandbox<br/>sketchi.*"]
   Dispatcher["host dispatcher"]
-  Build["POST /v1/flowcharts/build"]
-  Artifact["GET /v1/artifacts/:artifactId"]
-  Patch["POST /v1/artifacts/:artifactId/patch"]
+  Build["POST /api/v1/flowcharts/build"]
+  Artifact["GET /api/v1/artifacts/:artifactId"]
+  Patch["POST /api/v1/artifacts/:artifactId/patch"]
   Runtime["shared runtime"]
 
   Code --> Dispatcher
@@ -262,17 +263,17 @@ flowchart LR
   Patch --> Runtime
 ```
 
-| Host operation                         | Code Mode function                 | Public now?           |
-| -------------------------------------- | ---------------------------------- | --------------------- |
-| `POST /v1/flowcharts/build`            | `sketchi.buildFlowchart(input)`    | Yes                   |
-| `GET /v1/artifacts/:artifactId`        | `sketchi.getArtifact(input)`       | Yes                   |
-| `POST /v1/artifacts/:artifactId/patch` | `sketchi.applyDiagramPatch(input)` | Yes                   |
-| validate IR                            | none                               | No, internal to build |
-| grade quality                          | none                               | No, internal to build |
-| render scene                           | none                               | No, internal to build |
-| export Excalidraw                      | none                               | No, internal to build |
-| draft from prompt                      | none                               | No, later             |
-| managed thread                         | none                               | No, later             |
+| Host operation                             | Code Mode function                 | Public now?           |
+| ------------------------------------------ | ---------------------------------- | --------------------- |
+| `POST /api/v1/flowcharts/build`            | `sketchi.buildFlowchart(input)`    | Yes                   |
+| `GET /api/v1/artifacts/:artifactId`        | `sketchi.getArtifact(input)`       | Yes                   |
+| `POST /api/v1/artifacts/:artifactId/patch` | `sketchi.applyDiagramPatch(input)` | Yes                   |
+| validate IR                                | none                               | No, internal to build |
+| grade quality                              | none                               | No, internal to build |
+| render scene                               | none                               | No, internal to build |
+| export Excalidraw                          | none                               | No, internal to build |
+| draft from prompt                          | none                               | No, later             |
+| managed thread                             | none                               | No, later             |
 
 ## Agent Sequencing
 
@@ -616,6 +617,7 @@ type IssueCode =
   | "arrow_binding_invalid"
   | "arrow_overlap"
   | "export_invalid_scene"
+  | "storage_read_failed"
   | "storage_write_failed"
   | "unsupported_artifact_format"
   | "patch_source_unavailable"
@@ -624,6 +626,12 @@ type IssueCode =
   | "patch_preserve_connectivity_failed"
   | "patch_output_invalid";
 ```
+
+`arrow_overlap` is intentionally surfaced as an export-stage issue instead of
+silently publishing a dubious PNG. For complex flowcharts, agents should first
+repair structure: keep edges flowing with the declared layout direction, avoid
+long back-edges, and use distinct terminal nodes for early and late outcomes
+instead of routing a bottom node back to an early terminal.
 
 Example:
 
@@ -652,13 +660,13 @@ flowchart LR
   Accepted["accepted build"]
   Scene["scene artifact"]
   Excalidraw["Excalidraw artifact"]
-  Png["PNG artifact<br/>later"]
+  Png["PNG artifact"]
   R2["R2 storage"]
   Ref["ArtifactBundle"]
 
   Accepted --> Scene
   Accepted --> Excalidraw
-  Accepted -. "optional/later" .-> Png
+  Accepted -. "optional" .-> Png
   Scene --> R2
   Excalidraw --> R2
   Png --> R2
@@ -693,6 +701,8 @@ The first implementation should support:
 
 - `scene`: rendered deterministic scene JSON.
 - `excalidraw`: portable Excalidraw scene JSON.
+- `png`: hosted visual proof rendered by the Studio Worker through Cloudflare
+  Browser Run when requested.
 
 The storage contract is consistent across environments: artifacts are written
 as a manifest plus one object per format. Studio Worker deployments bind
@@ -708,8 +718,9 @@ Local tests may still use the in-memory store, and local Worker development may
 use Wrangler's local R2 storage unless remote bindings are enabled. Those are
 dev fallbacks only; deployed Workers should use the R2-compatible binding.
 
-`png` is allowed in the contract for forward compatibility, but it should not be
-advertised as available until the hosted render proof adapter exists.
+`png` is a stored binary format. It is never returned inline in MCP JSON
+responses; fetch raw bytes from the Studio API with
+`GET /api/v1/artifacts/{artifactId}?format=png&raw=true`.
 
 Native Excalidraw JSON should not be inlined by default. It is large and noisy,
 and most agents should not inspect or rewrite it directly. Prefer inline
@@ -821,13 +832,10 @@ interface ApplyDiagramPatchRequest {
 type DiagramPatchSource =
   | {
       artifactId: string;
-      format?: "scene" | "excalidraw";
+      format?: "scene";
     }
   | {
       scene: unknown;
-    }
-  | {
-      excalidraw: unknown;
     };
 
 interface ApplyDiagramPatchOptions {
@@ -1130,7 +1138,7 @@ Out of scope for this document:
 - Studio chat/canvas artifact parity before Convex managed threads exist.
 - User artifact library.
 - Auth policy details beyond "host-owned".
-- Hosted PNG rendering details.
+- PDF rendering beyond PNG.
 - Free-prompt drafting.
 - OpenAPI search/execute over a large generated spec.
 - Direct public tools for validation, grading, rendering, or export.

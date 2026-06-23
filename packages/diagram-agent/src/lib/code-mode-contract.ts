@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const ArtifactFormatSchema = z.enum(["excalidraw", "scene"]);
+export const ArtifactFormatSchema = z.enum(["excalidraw", "scene", "png"]);
 export const InlineArtifactFormatSchema = z.enum(["excalidraw", "scene"]);
 
 export const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -34,6 +34,7 @@ export const CodeModeIssueCodeSchema = z.enum([
   "arrow_binding_invalid",
   "arrow_overlap",
   "export_invalid_scene",
+  "storage_read_failed",
   "storage_write_failed",
   "unsupported_artifact_format",
   "patch_source_unavailable",

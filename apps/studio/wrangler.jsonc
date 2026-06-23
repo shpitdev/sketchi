@@ -8,6 +8,10 @@
     "binding": "AI",
     "remote": true,
   },
+  "browser": {
+    "binding": "BROWSER",
+    "remote": true,
+  },
   "worker_loaders": [
     {
       "binding": "LOADER",

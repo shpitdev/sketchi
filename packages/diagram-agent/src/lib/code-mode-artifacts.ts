@@ -3,6 +3,7 @@ import type {
   ArtifactFormat,
   ArtifactFormatRef,
   CodeModeIssue,
+  CodeModeIssueCode,
   InlineArtifactFormat,
 } from "./code-mode-contract.js";
 
@@ -38,14 +39,17 @@ export interface CodeModeArtifactStore {
 
 export interface CodeModeObjectBucketObject {
   readonly size?: number;
+  arrayBuffer?(): Promise<ArrayBuffer>;
   text(): Promise<string>;
 }
+
+export type CodeModeObjectBucketBody = string | ArrayBuffer | Uint8Array;
 
 export interface CodeModeObjectBucket {
   get(key: string): Promise<CodeModeObjectBucketObject | null>;
   put(
     key: string,
-    value: string,
+    value: CodeModeObjectBucketBody,
     options?: {
       httpMetadata?: {
         contentType?: string;
@@ -58,6 +62,7 @@ const MANIFEST_FORMAT = "manifest";
 
 export const ARTIFACT_MIME_TYPES: Record<ArtifactFormat, string> = {
   excalidraw: "application/vnd.excalidraw+json",
+  png: "image/png",
   scene: "application/vnd.sketchi.scene+json",
 };
 
@@ -76,7 +81,7 @@ function artifactRef(
   };
 }
 
-function isInlineArtifactFormat(
+export function isInlineArtifactFormat(
   format: ArtifactFormat,
 ): format is InlineArtifactFormat {
   return format === "excalidraw" || format === "scene";
@@ -110,6 +115,10 @@ function cloneData<T>(value: T): T {
 
 export function jsonSizeBytes(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value)).length;
+}
+
+function binarySizeBytes(value: ArrayBuffer | Uint8Array): number {
+  return value.byteLength;
 }
 
 export function createMemoryArtifactStore(): CodeModeArtifactStore {
@@ -169,7 +178,8 @@ function keyForArtifact(
   artifactId: string,
   format: ArtifactFormat | typeof MANIFEST_FORMAT,
 ): string {
-  return `${prefix}${artifactId}/${format}.json`;
+  const extension = format === "png" ? "png" : "json";
+  return `${prefix}${artifactId}/${format}.${extension}`;
 }
 
 function normalizedPrefix(prefix: string | undefined): string {
@@ -225,6 +235,16 @@ export function createObjectBucketArtifactStore(
         return null;
       }
 
+      if (format === "png") {
+        const data = await readBinaryArtifact(object);
+        return {
+          format,
+          mimeType: ARTIFACT_MIME_TYPES[format],
+          data,
+          sizeBytes: object.size ?? binarySizeBytes(data),
+        };
+      }
+
       const data: unknown = JSON.parse(await object.text());
       return {
         format,
@@ -257,24 +277,24 @@ export function createObjectBucketArtifactStore(
         createdAt: new Date().toISOString(),
       };
 
-      await Promise.all([
-        bucket.put(
-          keyForArtifact(prefix, input.artifactId, MANIFEST_FORMAT),
-          JSON.stringify(manifest),
-          {
-            httpMetadata: { contentType: "application/json" },
-          },
-        ),
-        ...input.formats.map((artifact) =>
+      await Promise.all(
+        input.formats.map((artifact) =>
           bucket.put(
             keyForArtifact(prefix, input.artifactId, artifact.format),
-            JSON.stringify(artifact.data),
+            bodyForArtifact(artifact),
             {
               httpMetadata: { contentType: artifact.mimeType },
             },
           ),
         ),
-      ]);
+      );
+      await bucket.put(
+        keyForArtifact(prefix, input.artifactId, MANIFEST_FORMAT),
+        JSON.stringify(manifest),
+        {
+          httpMetadata: { contentType: "application/json" },
+        },
+      );
 
       const formats = input.formats.map((artifact) =>
         artifactRef(artifact, input.inlineFormats),
@@ -289,9 +309,43 @@ export function createObjectBucketArtifactStore(
   };
 }
 
-export function storageIssue(message: string): CodeModeIssue {
+function bodyForArtifact(
+  artifact: StoredArtifactFormat,
+): CodeModeObjectBucketBody {
+  if (artifact.format !== "png") {
+    return JSON.stringify(artifact.data);
+  }
+
+  if (artifact.data instanceof ArrayBuffer) {
+    return artifact.data;
+  }
+
+  if (artifact.data instanceof Uint8Array) {
+    return artifact.data;
+  }
+
+  throw new Error("PNG artifact data must be binary.");
+}
+
+async function readBinaryArtifact(
+  object: CodeModeObjectBucketObject,
+): Promise<ArrayBuffer> {
+  if (object.arrayBuffer) {
+    return object.arrayBuffer();
+  }
+
+  throw new Error("Artifact object does not support binary reads.");
+}
+
+export function storageIssue(
+  message: string,
+  code: Extract<
+    CodeModeIssueCode,
+    "storage_read_failed" | "storage_write_failed"
+  > = "storage_write_failed",
+): CodeModeIssue {
   return {
-    code: "storage_write_failed",
+    code,
     severity: "error",
     stage: "storage",
     message,

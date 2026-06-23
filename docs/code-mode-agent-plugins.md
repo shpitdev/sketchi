@@ -9,6 +9,20 @@ sandbox as `sketchi.buildFlowchart`, `sketchi.applyDiagramPatch`, and
 expression semicolons before execution, but examples intentionally omit those
 wrappers so copied snippets are canonical function expressions.
 
+For visual proof, agents should request `artifactFormats: ["scene",
+"excalidraw", "png"]` and then call `sketchi.getArtifact({ format: "png",
+inline: false })` for metadata. To view bytes, fetch
+`https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/<artifactId>?format=png&raw=true`
+outside `execute`. PNG bytes are hosted by the Studio Worker and rendered
+through Cloudflare Browser Run; plugin users should not need to install local
+browser binaries.
+
+For complex diagrams that need PNG proof, agents should keep the graph
+monotonic in the selected layout direction. Avoid long back-edges, loops to
+earlier nodes, and reused terminal nodes that force an edge from the bottom of
+the diagram back to the top. If `arrow_overlap` appears, rebuild the
+`FlowchartSpec` as a cleaner DAG before retrying PNG export.
+
 ## Codex
 
 - Marketplace: `.agents/plugins/marketplace.json`

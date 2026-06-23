@@ -470,10 +470,13 @@ function bindingFixedPoint(
 
 interface ArrowSegment {
   arrowId: string;
+  endBindingElementId: string | null;
+  isLastSegment: boolean;
   max: number;
   min: number;
   orientation: "horizontal" | "vertical";
   segmentIndex: number;
+  startBindingElementId: string | null;
   staticCoordinate: number;
 }
 
@@ -484,6 +487,8 @@ function pointTuple(value: unknown): [number, number] | null {
 function arrowSegments(element: ExcalidrawElement): ArrowSegment[] {
   const originX = numericValue(element.x) ?? 0;
   const originY = numericValue(element.y) ?? 0;
+  const startBindingElementId = bindingElementId(element, "startBinding");
+  const endBindingElementId = bindingElementId(element, "endBinding");
   const points = Array.isArray(element.points)
     ? element.points
         .map(pointTuple)
@@ -509,10 +514,13 @@ function arrowSegments(element: ExcalidrawElement): ArrowSegment[] {
     if (Math.abs(y1 - y2) <= SEGMENT_EPSILON) {
       segments.push({
         arrowId: element.id,
+        endBindingElementId,
+        isLastSegment: index === points.length - 2,
         max: Math.max(x1, x2),
         min: Math.min(x1, x2),
         orientation: "horizontal",
         segmentIndex: index,
+        startBindingElementId,
         staticCoordinate: y1,
       });
       continue;
@@ -521,10 +529,13 @@ function arrowSegments(element: ExcalidrawElement): ArrowSegment[] {
     if (Math.abs(x1 - x2) <= SEGMENT_EPSILON) {
       segments.push({
         arrowId: element.id,
+        endBindingElementId,
+        isLastSegment: index === points.length - 2,
         max: Math.max(y1, y2),
         min: Math.min(y1, y2),
         orientation: "vertical",
         segmentIndex: index,
+        startBindingElementId,
         staticCoordinate: x1,
       });
     }
@@ -537,6 +548,22 @@ function arrowSegments(element: ExcalidrawElement): ArrowSegment[] {
 
 function overlapLength(left: ArrowSegment, right: ArrowSegment): number {
   return Math.min(left.max, right.max) - Math.max(left.min, right.min);
+}
+
+function isSharedBoundStemOverlap(
+  left: ArrowSegment,
+  right: ArrowSegment,
+): boolean {
+  return (
+    (left.segmentIndex === 0 &&
+      right.segmentIndex === 0 &&
+      left.startBindingElementId !== null &&
+      left.startBindingElementId === right.startBindingElementId) ||
+    (left.isLastSegment &&
+      right.isLastSegment &&
+      left.endBindingElementId !== null &&
+      left.endBindingElementId === right.endBindingElementId)
+  );
 }
 
 function overlappingArrowSegments(
@@ -569,6 +596,7 @@ function overlappingArrowSegments(
         left.orientation !== right.orientation ||
         Math.abs(left.staticCoordinate - right.staticCoordinate) >
           SEGMENT_EPSILON ||
+        isSharedBoundStemOverlap(left, right) ||
         overlapLength(left, right) <= SEGMENT_EPSILON
       ) {
         continue;

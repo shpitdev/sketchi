@@ -104,7 +104,7 @@ const PATCH_REQUEST_SHAPE = `interface ApplyDiagramPatchRequest {
   source: { artifactId: string; format?: "scene" } | { scene: RenderedDiagramScene };
   operations: DiagramPatchOperation[];
   intent?: string;
-  options?: { inlineArtifacts?: ["scene", "excalidraw"]; artifactFormats?: ["scene", "excalidraw"]; preserveConnectivity?: boolean };
+  options?: { inlineArtifacts?: ["scene", "excalidraw"]; artifactFormats?: ["scene", "excalidraw", "png"]; preserveConnectivity?: boolean };
 }
 
 type DiagramPatchOperation =
@@ -156,7 +156,7 @@ export const SKETCHI_CODE_MODE_TYPES = `declare const sketchi: {
 };
 
 type FlowchartNodeKind = "start" | "process" | "decision" | "end";
-type ArtifactFormat = "scene" | "excalidraw";
+type ArtifactFormat = "scene" | "excalidraw" | "png";
 type InlineArtifactFormat = "scene" | "excalidraw";
 type DiagramShape = "rectangle" | "diamond" | "ellipse" | "circle";
 
@@ -252,7 +252,7 @@ type BuildFlowchartResult =
   | { ok: false; status: string; issues: CodeModeIssue[]; normalizedSpec?: unknown; quality?: unknown; partial?: unknown };
 
 type GetArtifactResult =
-  | { ok: true; artifactId: string; diagramId: string; format: ArtifactFormat; mimeType: string; inline?: unknown; sizeBytes?: number }
+  | { ok: true; artifactId: string; diagramId: string; format: ArtifactFormat; mimeType: string; inline?: unknown; sizeBytes?: number; url?: string; expiresAt?: string }
   | { ok: false; status: string; issues: CodeModeIssue[] };
 
 type ApplyDiagramPatchResult =
@@ -301,7 +301,10 @@ const ACCEPTANCE_LOOP_EXAMPLE = `async () => {
         shape: "diamond",
       },
     ],
-    options: { inlineArtifacts: ["scene", "excalidraw"] },
+    options: {
+      artifactFormats: ["scene", "excalidraw", "png"],
+      inlineArtifacts: ["scene", "excalidraw"],
+    },
   });
 }`;
 
@@ -337,15 +340,18 @@ const CIRCLE_TO_DIAMOND_EXAMPLE = `async () => {
         style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" },
       },
     ],
-    options: { inlineArtifacts: ["scene", "excalidraw"] },
+    options: {
+      artifactFormats: ["scene", "excalidraw", "png"],
+      inlineArtifacts: ["scene", "excalidraw"],
+    },
   });
 
   if (!patched.ok) return patched;
 
   return sketchi.getArtifact({
     artifactId: patched.artifact.artifactId,
-    format: "scene",
-    inline: true,
+    format: "png",
+    inline: false,
   });
 }`;
 
@@ -477,8 +483,10 @@ const catalog: CatalogEntry[] = [
       "Create the semantic flowchart first. Fix issues before styling or shape changes.",
     content: [
       "buildFlowchart accepts a compact FlowchartSpec: title, nodes, edges, optional layout, and optional style.",
-      'Request envelope: { spec: FlowchartSpec, options?: { artifactFormats?: ["scene", "excalidraw"], inlineArtifacts?: ["scene", "excalidraw"], minQualityScore?: number } }.',
+      'Request envelope: { spec: FlowchartSpec, options?: { artifactFormats?: ["scene", "excalidraw", "png"], inlineArtifacts?: ["scene", "excalidraw"], minQualityScore?: number } }.',
+      "Request png when the agent needs hosted visual proof. PNG artifacts are stored binary outputs and are never inlined in MCP JSON responses.",
       "Use stable node ids. Decision nodes need meaningful labeled outgoing branches, usually yes/no.",
+      "For export-ready visual proof, prefer monotonic flowchart graphs: avoid long back-edges, loops to earlier nodes, or reusing the same terminal node for both early and late outcomes. Use distinct terminal nodes when branches resolve at different depths.",
       "If buildFlowchart returns ok: false, repair the spec from issues and call buildFlowchart again.",
       "Do not use applyDiagramPatch until buildFlowchart returns an accepted artifact.",
     ].join("\n"),
@@ -488,14 +496,25 @@ const catalog: CatalogEntry[] = [
     kind: "operation",
     title: "getArtifact",
     topic: "getArtifact",
-    keywords: ["get", "artifact", "scene", "excalidraw", "format", "inline"],
+    keywords: [
+      "get",
+      "artifact",
+      "scene",
+      "excalidraw",
+      "png",
+      "format",
+      "inline",
+      "raw",
+    ],
     snippet:
-      "Retrieve scene or Excalidraw artifacts by artifactId after build or patch acceptance.",
+      "Retrieve scene, Excalidraw, or hosted PNG artifacts by artifactId after build or patch acceptance.",
     content: [
       "getArtifact reads a stored artifact by artifactId.",
-      'Request envelope: { artifactId: string, format?: "scene" | "excalidraw", inline?: boolean }.',
+      'Request envelope: { artifactId: string, format?: "scene" | "excalidraw" | "png", inline?: boolean }.',
       "Use format: 'scene' for the compact Sketchi scene and format: 'excalidraw' for portable Excalidraw JSON.",
-      "Pass inline: true when the harness needs the payload in the MCP response.",
+      "Use format: 'png' for hosted visual proof. PNG is binary and is returned as metadata from getArtifact, never as inline payload.",
+      "Pass inline: true only when the harness needs scene or Excalidraw JSON in the MCP response.",
+      "To fetch raw PNG bytes, request GET /api/v1/artifacts/{artifactId}?format=png&raw=true from the Studio API.",
       "Use the artifactId returned by buildFlowchart or applyDiagramPatch.",
     ].join("\n"),
   },
@@ -525,7 +544,8 @@ const catalog: CatalogEntry[] = [
       PATCH_OPERATION_SUMMARY,
       "Patch operations do not create or delete nodes and edges. Rebuild the FlowchartSpec for structural changes.",
       "For color changes, use 6-digit hex strings such as #7c3aed.",
-      "PNG is intentionally not part of the public Code Mode contract until a hosted render adapter exists; use scene/excalidraw plus a renderer for visual proof.",
+      "For hosted visual proof after a patch, include png in artifactFormats and fetch the raw Studio API artifact bytes.",
+      "If export returns arrow_overlap, first rebuild the FlowchartSpec into a cleaner DAG. rerouteEdges preserves connectivity, but it cannot reliably fix a graph with a long upward return edge.",
     ].join("\n"),
     examples: [
       {
@@ -574,6 +594,7 @@ const catalog: CatalogEntry[] = [
       "Every operation except setDefaultStyle needs a selector unless noted otherwise. A selector can use nodeIds, edgeIds, ids, labels, kinds, or scope.",
       "For style patches, node and edge colors use strokeColor, fillColor, textColor, and backgroundColor. FlowchartSpec top-level style uses accentColor and backgroundColor.",
       "If a shape change causes arrow_overlap or text_overflow during export, retry with rerouteEdges, translate, or rebuild the FlowchartSpec with more space.",
+      "For complex flowcharts, the most reliable repair is usually structural: keep edges flowing in the declared layout direction and avoid connecting a bottom node back to an early terminal.",
     ].join("\n"),
     examples: [
       {

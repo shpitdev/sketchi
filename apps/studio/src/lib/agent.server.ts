@@ -21,6 +21,8 @@ import {
   type UIMessage,
 } from "ai";
 
+import type { CloudflareBrowserRunBinding } from "./codemode-browser-renderer.server";
+
 /**
  * Studio route adapter for the diagram agent. The generation runtime —
  * prompt policy, tool contract, normalization, grading, attempt limits —
@@ -34,10 +36,12 @@ import {
 
 export interface StudioEnv {
   AI?: CloudflareAiGatewayProvider;
+  BROWSER?: CloudflareBrowserRunBinding;
   LOADER?: unknown;
   SKETCHI_ARTIFACTS?: CodeModeObjectBucket;
   SKETCHI_AI_GATEWAY_ID?: string;
   SKETCHI_AI_MODEL?: string;
+  SKETCHI_RENDER_ASSET_ORIGIN?: string;
 }
 
 const DEFAULT_GATEWAY_ID = "google-ai-studio";

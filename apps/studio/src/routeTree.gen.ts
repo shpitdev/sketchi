@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from "./routes/__root";
 import { Route as McpRouteImport } from "./routes/mcp";
+import { Route as CodemodeExportHarnessRouteImport } from "./routes/codemode-export-harness";
 import { Route as IndexRouteImport } from "./routes/index";
 import { Route as ApiChatRouteImport } from "./routes/api/chat";
 import { Route as ApiV1FlowchartsBuildRouteImport } from "./routes/api/v1/flowcharts/build";
@@ -19,6 +20,11 @@ import { Route as ApiV1ArtifactsArtifactIdPatchRouteImport } from "./routes/api/
 const McpRoute = McpRouteImport.update({
   id: "/mcp",
   path: "/mcp",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const CodemodeExportHarnessRoute = CodemodeExportHarnessRouteImport.update({
+  id: "/codemode-export-harness",
+  path: "/codemode-export-harness",
   getParentRoute: () => rootRouteImport,
 } as any);
 const IndexRoute = IndexRouteImport.update({
@@ -51,6 +57,7 @@ const ApiV1ArtifactsArtifactIdPatchRoute =
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
+  "/codemode-export-harness": typeof CodemodeExportHarnessRoute;
   "/mcp": typeof McpRoute;
   "/api/chat": typeof ApiChatRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
@@ -59,6 +66,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
+  "/codemode-export-harness": typeof CodemodeExportHarnessRoute;
   "/mcp": typeof McpRoute;
   "/api/chat": typeof ApiChatRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
@@ -68,6 +76,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/": typeof IndexRoute;
+  "/codemode-export-harness": typeof CodemodeExportHarnessRoute;
   "/mcp": typeof McpRoute;
   "/api/chat": typeof ApiChatRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
@@ -78,6 +87,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
     | "/"
+    | "/codemode-export-harness"
     | "/mcp"
     | "/api/chat"
     | "/api/v1/artifacts/$artifactId"
@@ -86,6 +96,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/"
+    | "/codemode-export-harness"
     | "/mcp"
     | "/api/chat"
     | "/api/v1/artifacts/$artifactId"
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
   id:
     | "__root__"
     | "/"
+    | "/codemode-export-harness"
     | "/mcp"
     | "/api/chat"
     | "/api/v1/artifacts/$artifactId"
@@ -103,6 +115,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
+  CodemodeExportHarnessRoute: typeof CodemodeExportHarnessRoute;
   McpRoute: typeof McpRoute;
   ApiChatRoute: typeof ApiChatRoute;
   ApiV1ArtifactsArtifactIdRoute: typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
@@ -116,6 +129,13 @@ declare module "@tanstack/react-router" {
       path: "/mcp";
       fullPath: "/mcp";
       preLoaderRoute: typeof McpRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/codemode-export-harness": {
+      id: "/codemode-export-harness";
+      path: "/codemode-export-harness";
+      fullPath: "/codemode-export-harness";
+      preLoaderRoute: typeof CodemodeExportHarnessRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/": {
@@ -172,6 +192,7 @@ const ApiV1ArtifactsArtifactIdRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CodemodeExportHarnessRoute: CodemodeExportHarnessRoute,
   McpRoute: McpRoute,
   ApiChatRoute: ApiChatRoute,
   ApiV1ArtifactsArtifactIdRoute: ApiV1ArtifactsArtifactIdRouteWithChildren,

@@ -54,24 +54,40 @@ function artifactIdFrom(value: unknown): string {
 }
 
 class MemoryBucket implements CodeModeObjectBucket {
-  readonly objects = new Map<string, string>();
+  readonly objects = new Map<string, string | Uint8Array>();
 
   async get(key: string): Promise<CodeModeObjectBucketObject | null> {
     const value = this.objects.get(key);
     if (!value) {
       return null;
     }
+    const bytes =
+      typeof value === "string" ? new TextEncoder().encode(value) : value;
 
     return {
-      size: new TextEncoder().encode(value).length,
-      text: async () => value,
+      size: bytes.byteLength,
+      arrayBuffer: async () => toArrayBuffer(bytes),
+      text: async () =>
+        typeof value === "string" ? value : new TextDecoder().decode(value),
     };
   }
 
-  async put(key: string, value: string): Promise<unknown> {
-    this.objects.set(key, value);
+  async put(
+    key: string,
+    value: string | ArrayBuffer | Uint8Array,
+  ): Promise<unknown> {
+    this.objects.set(
+      key,
+      typeof value === "string" ? value : new Uint8Array(value),
+    );
     return null;
   }
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }
 
 describe("Code Mode API handlers", () => {
@@ -173,5 +189,43 @@ describe("Code Mode API handlers", () => {
       artifactId,
       format: "scene",
     });
+  });
+
+  it("returns raw PNG bytes from the R2-compatible artifact binding", async () => {
+    const bucket = new MemoryBucket();
+    const artifactId = "artifact-png";
+    bucket.objects.set(
+      `codemode/${artifactId}/manifest.json`,
+      JSON.stringify({
+        artifactId,
+        diagramId: "diagram-png",
+        formats: [
+          {
+            format: "png",
+            mimeType: "image/png",
+            sizeBytes: 4,
+          },
+        ],
+        createdAt: new Date().toISOString(),
+      }),
+    );
+    bucket.objects.set(
+      `codemode/${artifactId}/png.png`,
+      new Uint8Array([137, 80, 78, 71]),
+    );
+
+    const getResponse = await handleGetArtifactRequest(
+      { SKETCHI_ARTIFACTS: bucket },
+      new Request(
+        `https://studio.test/api/v1/artifacts/${artifactId}?format=png&raw=true`,
+      ),
+      artifactId,
+    );
+
+    expect(getResponse.status).toBe(200);
+    expect(getResponse.headers.get("content-type")).toBe("image/png");
+    expect(new Uint8Array(await getResponse.arrayBuffer())).toEqual(
+      new Uint8Array([137, 80, 78, 71]),
+    );
   });
 });

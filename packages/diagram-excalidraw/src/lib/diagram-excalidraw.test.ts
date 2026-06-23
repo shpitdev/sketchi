@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   flowchartFixture,
   pharmaBatchDispositionFlowchart,
+  parseFlowchartDiagram,
 } from "@sketchi/diagram-core";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 
@@ -154,6 +155,37 @@ describe("convertSceneToExcalidraw", () => {
         expect.objectContaining({ code: "overlapping-arrow-segment" }),
       );
     }
+  });
+
+  it("allows shared bound stems when decision branches diverge", () => {
+    const scene = convertSceneToExcalidraw(
+      renderIntermediateDiagram(
+        parseFlowchartDiagram({
+          id: "shared-stem-branch",
+          title: "Shared stem branch",
+          type: "flowchart",
+          nodes: [
+            { id: "start", label: "Start", kind: "start" },
+            { id: "gate", label: "Proceed?", kind: "decision" },
+            { id: "left", label: "Left path", kind: "process" },
+            { id: "right", label: "Right path", kind: "process" },
+            { id: "done", label: "Done", kind: "end" },
+          ],
+          edges: [
+            { id: "start-gate", source: "start", target: "gate" },
+            { id: "gate-left", source: "gate", target: "left", label: "yes" },
+            { id: "gate-right", source: "gate", target: "right", label: "no" },
+            { id: "left-done", source: "left", target: "done" },
+            { id: "right-done", source: "right", target: "done" },
+          ],
+          layout: { direction: "TB", edgeRouting: "orthogonal" },
+        }),
+      ),
+    );
+
+    expect(validateExcalidrawScene(scene).issues).not.toContainEqual(
+      expect.objectContaining({ code: "overlapping-arrow-segment" }),
+    );
   });
 
   it("uses fixed elbow bindings so Excalidraw can preserve connectors when shapes move", () => {

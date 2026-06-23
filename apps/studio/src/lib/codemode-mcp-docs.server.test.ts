@@ -50,7 +50,8 @@ describe("Code Mode MCP docs", () => {
     expect(docs.content).toContain("replaceText");
     expect(docs.content).toContain("strokeColor");
     expect(docs.content).toContain("interface ApplyDiagramPatchRequest");
-    expect(docs.content).not.toContain('"png"');
+    expect(docs.content).toContain('"png"');
+    expect(docs.content).toContain("hosted visual proof");
     expect(docs.content).not.toContain("{ excalidraw: unknown }");
     expect(docs.content).not.toContain('format?: "scene" | "excalidraw"');
     expect(docs.examples).toEqual(

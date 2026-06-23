@@ -16,6 +16,7 @@ import { z } from "zod";
 import {
   ARTIFACT_MIME_TYPES,
   createMemoryArtifactStore,
+  isInlineArtifactFormat,
   jsonSizeBytes,
   storageIssue,
   type CodeModeArtifactStore,
@@ -58,12 +59,26 @@ const SCENE_PADDING = 48;
 export interface CodeModeRuntimeOptions {
   store?: CodeModeArtifactStore;
   createId?: (prefix: string) => string;
+  renderer?: CodeModeArtifactRenderer;
 }
 
 export interface CodeModeRuntime {
   buildFlowchart(input: unknown): Promise<BuildFlowchartResult>;
   getArtifact(input: unknown): Promise<GetArtifactResult>;
   applyDiagramPatch(input: unknown): Promise<ApplyDiagramPatchResult>;
+}
+
+export interface CodeModeArtifactRenderer {
+  renderPng(input: {
+    scene: RenderedDiagramScene;
+    excalidraw: unknown;
+  }): Promise<ArrayBuffer | Uint8Array>;
+}
+
+class ArtifactExportError extends Error {
+  constructor(readonly issue: CodeModeIssue) {
+    super(issue.message);
+  }
 }
 
 interface ValidationBuckets {
@@ -572,20 +587,83 @@ function requestedInlineFormats(
   return input?.inlineArtifacts ?? DEFAULT_INLINE_FORMATS;
 }
 
-function storedArtifactsForFormats(input: {
+async function storedArtifactsForFormats(input: {
   formats: readonly ArtifactFormat[];
   scene: RenderedDiagramScene;
   excalidraw: unknown;
-}): StoredArtifactFormat[] {
-  return input.formats.map((format) => {
-    const data = format === "scene" ? input.scene : input.excalidraw;
-    return {
+  renderer?: CodeModeArtifactRenderer | undefined;
+}): Promise<StoredArtifactFormat[]> {
+  const artifacts: StoredArtifactFormat[] = [];
+
+  for (const format of input.formats) {
+    const data = await dataForArtifactFormat(input, format);
+    artifacts.push({
       format,
       mimeType: ARTIFACT_MIME_TYPES[format],
       data,
-      sizeBytes: jsonSizeBytes(data),
-    };
+      sizeBytes: sizeBytesForArtifactData(data),
+    });
+  }
+
+  return artifacts;
+}
+
+async function dataForArtifactFormat(
+  input: {
+    scene: RenderedDiagramScene;
+    excalidraw: unknown;
+    renderer?: CodeModeArtifactRenderer | undefined;
+  },
+  format: ArtifactFormat,
+): Promise<unknown> {
+  if (format === "scene") {
+    return input.scene;
+  }
+
+  if (format === "excalidraw") {
+    return input.excalidraw;
+  }
+
+  if (!input.renderer) {
+    throw new ArtifactExportError(
+      issue({
+        code: "render_failed",
+        stage: "export",
+        ref: { kind: "artifact", path: "options.artifactFormats" },
+        message: "PNG artifact rendering is not configured for this runtime.",
+        hint: "Use the hosted Studio Code Mode runtime with its Cloudflare Browser Run binding, or omit png from artifactFormats.",
+      }),
+    );
+  }
+
+  return input.renderer.renderPng({
+    scene: input.scene,
+    excalidraw: input.excalidraw,
   });
+}
+
+function sizeBytesForArtifactData(data: unknown): number {
+  if (data instanceof ArrayBuffer || data instanceof Uint8Array) {
+    return data.byteLength;
+  }
+
+  return jsonSizeBytes(data);
+}
+
+function artifactExportIssues(error: unknown): CodeModeIssue[] {
+  if (error instanceof ArtifactExportError) {
+    return [error.issue];
+  }
+
+  return [
+    issue({
+      code: "render_failed",
+      stage: "export",
+      message:
+        error instanceof Error ? error.message : "Artifact export failed.",
+      hint: "Retry the request; if it keeps failing, inspect the configured renderer.",
+    }),
+  ];
 }
 
 function exportIssues(
@@ -1206,7 +1284,19 @@ async function resolvePatchSource(
     return { scene: cloneScene(input.source.scene) };
   }
 
-  const artifact = await store.read(input.source.artifactId, "scene");
+  let artifact: StoredArtifactFormat | null;
+  try {
+    artifact = await store.read(input.source.artifactId, "scene");
+  } catch (error) {
+    return [
+      storageIssue(
+        error instanceof Error
+          ? error.message
+          : `Scene artifact "${input.source.artifactId}" could not be read.`,
+        "storage_read_failed",
+      ),
+    ];
+  }
   if (!artifact) {
     return [
       issue({
@@ -1247,6 +1337,7 @@ export function createCodeModeRuntime(
 ): CodeModeRuntime {
   const store = options.store ?? createMemoryArtifactStore();
   const createId = options.createId ?? defaultCreateId;
+  const renderer = options.renderer;
 
   return {
     async buildFlowchart(input) {
@@ -1367,12 +1458,43 @@ export function createCodeModeRuntime(
         };
       }
 
+      let storedFormats: StoredArtifactFormat[];
+      try {
+        storedFormats = await storedArtifactsForFormats({
+          formats,
+          scene,
+          excalidraw,
+          renderer,
+        });
+      } catch (error) {
+        return {
+          ok: false,
+          status: "export_failed",
+          buildId,
+          ...responseRequestId(request.requestId),
+          normalizedSpec,
+          quality,
+          partial: {
+            diagramId: scene.diagramId,
+            formats: [
+              {
+                format: "scene",
+                mimeType: ARTIFACT_MIME_TYPES.scene,
+                inline: scene,
+                sizeBytes: jsonSizeBytes(scene),
+              },
+            ],
+          },
+          issues: artifactExportIssues(error),
+        };
+      }
+
       try {
         const artifactId = createId("artifact");
         const artifact = await store.write({
           artifactId,
           diagramId: scene.diagramId,
-          formats: storedArtifactsForFormats({ formats, scene, excalidraw }),
+          formats: storedFormats,
           inlineFormats: requestedInlineFormats(request.options),
         });
 
@@ -1414,7 +1536,23 @@ export function createCodeModeRuntime(
       }
 
       const request = parsed.data;
-      const manifest = await store.readManifest(request.artifactId);
+      let manifest: Awaited<ReturnType<CodeModeArtifactStore["readManifest"]>>;
+      try {
+        manifest = await store.readManifest(request.artifactId);
+      } catch (error) {
+        return {
+          ok: false,
+          status: "storage_failed",
+          issues: [
+            storageIssue(
+              error instanceof Error
+                ? error.message
+                : "Artifact manifest read failed.",
+              "storage_read_failed",
+            ),
+          ],
+        };
+      }
       if (!manifest) {
         return {
           ok: false,
@@ -1448,7 +1586,21 @@ export function createCodeModeRuntime(
         };
       }
 
-      const artifact = await store.read(request.artifactId, format);
+      let artifact: StoredArtifactFormat | null;
+      try {
+        artifact = await store.read(request.artifactId, format);
+      } catch (error) {
+        return {
+          ok: false,
+          status: "storage_failed",
+          issues: [
+            storageIssue(
+              error instanceof Error ? error.message : "Artifact read failed.",
+              "storage_read_failed",
+            ),
+          ],
+        };
+      }
       if (!artifact) {
         return {
           ok: false,
@@ -1471,7 +1623,9 @@ export function createCodeModeRuntime(
         diagramId: manifest.diagramId,
         format,
         mimeType: artifact.mimeType,
-        ...(request.inline === false ? {} : { inline: artifact.data }),
+        ...(request.inline !== true || !isInlineArtifactFormat(format)
+          ? {}
+          : { inline: artifact.data }),
         sizeBytes: artifact.sizeBytes,
       };
     },
@@ -1493,7 +1647,13 @@ export function createCodeModeRuntime(
       if (Array.isArray(source)) {
         return {
           ok: false,
-          status: "source_unavailable",
+          status: source.some(
+            (sourceIssue) =>
+              sourceIssue.code === "storage_read_failed" ||
+              sourceIssue.code === "storage_write_failed",
+          )
+            ? "storage_failed"
+            : "source_unavailable",
           patchId,
           ...responseRequestId(request.requestId),
           issues: source,
@@ -1593,16 +1753,44 @@ export function createCodeModeRuntime(
         };
       }
 
+      let storedFormats: StoredArtifactFormat[];
+      try {
+        storedFormats = await storedArtifactsForFormats({
+          formats,
+          scene: renderedScene,
+          excalidraw,
+          renderer,
+        });
+      } catch (error) {
+        return {
+          ok: false,
+          status: "export_failed",
+          patchId,
+          ...responseRequestId(request.requestId),
+          ...(source.sourceArtifactId
+            ? { sourceArtifactId: source.sourceArtifactId }
+            : {}),
+          partial: {
+            diagramId: renderedScene.diagramId,
+            formats: [
+              {
+                format: "scene",
+                mimeType: ARTIFACT_MIME_TYPES.scene,
+                inline: renderedScene,
+                sizeBytes: jsonSizeBytes(renderedScene),
+              },
+            ],
+          },
+          issues: artifactExportIssues(error),
+        };
+      }
+
       try {
         const artifactId = createId("artifact");
         const artifact = await store.write({
           artifactId,
           diagramId: renderedScene.diagramId,
-          formats: storedArtifactsForFormats({
-            formats,
-            scene: renderedScene,
-            excalidraw,
-          }),
+          formats: storedFormats,
           inlineFormats: requestedInlineFormats(request.options),
         });
 

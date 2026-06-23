@@ -35,6 +35,7 @@ export interface SketchiCodeModeExecutor {
 
 export interface CodeModeMcpOptions {
   executor?: SketchiCodeModeExecutor;
+  origin?: string;
 }
 
 interface MinimalExecutionContext {
@@ -130,7 +131,9 @@ export async function executeSketchiCodeMode(
 }> {
   try {
     const parsed = ExecuteRequestSchema.parse(input);
-    const runtime = createStudioCodeModeRuntime(env);
+    const runtime = createStudioCodeModeRuntime(env, {
+      ...(options.origin ? { origin: options.origin } : {}),
+    });
     const executor = await executorFor(env, options);
     const execution = await executor.execute(
       normalizeSketchiExecuteCode(parsed.code),
@@ -252,9 +255,15 @@ export async function handleSketchiMcpRequest(
   options: CodeModeMcpOptions = {},
 ): Promise<Response> {
   const { createMcpHandler } = await import("agents/mcp");
-  const handler = createMcpHandler(createSketchiMcpServer(env, options), {
-    route: "/mcp",
-  }) as McpHttpHandler;
+  const handler = createMcpHandler(
+    createSketchiMcpServer(env, {
+      ...options,
+      origin: new URL(request.url).origin,
+    }),
+    {
+      route: "/mcp",
+    },
+  ) as McpHttpHandler;
 
   return handler(request, env, createExecutionContext());
 }
