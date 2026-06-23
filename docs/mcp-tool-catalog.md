@@ -628,10 +628,11 @@ type IssueCode =
 ```
 
 `arrow_overlap` is intentionally surfaced as an export-stage issue instead of
-silently publishing a dubious PNG. For complex flowcharts, agents should first
-repair structure: keep edges flowing with the declared layout direction, avoid
-long back-edges, and use distinct terminal nodes for early and late outcomes
-instead of routing a bottom node back to an early terminal.
+silently publishing a dubious PNG. Agents should repair the graph only when the
+semantic structure is wrong. Fan-in, reused outcomes, and loop/back-edge cases
+are valid flowchart intent when they describe the workflow; deterministic
+placement and routing belong to Sketchi. For a correct graph, retry with
+`rerouteEdges` or preserve the artifact evidence for product repair.
 
 Example:
 

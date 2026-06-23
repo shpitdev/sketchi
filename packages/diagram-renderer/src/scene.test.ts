@@ -82,9 +82,9 @@ describe("renderIntermediateDiagram", () => {
       throw new Error("Expected onboarding nodes to render as scene nodes.");
     }
 
-    expect(draft.y).toBe(review.y);
-    expect(draft.x).toBeLessThan(clear.x);
-    expect(review.x).toBeGreaterThan(clear.x);
+    expect(draft.y).toBeGreaterThan(clear.y);
+    expect(review.y).toBeGreaterThan(draft.y);
+    expect(draft.x).toBe(clear.x);
   });
 
   it("routes offset decision branches with orthogonal points", () => {

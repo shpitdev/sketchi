@@ -17,11 +17,13 @@ outside `execute`. PNG bytes are hosted by the Studio Worker and rendered
 through Cloudflare Browser Run; plugin users should not need to install local
 browser binaries.
 
-For complex diagrams that need PNG proof, agents should keep the graph
-monotonic in the selected layout direction. Avoid long back-edges, loops to
-earlier nodes, and reused terminal nodes that force an edge from the bottom of
-the diagram back to the top. If `arrow_overlap` appears, rebuild the
-`FlowchartSpec` as a cleaner DAG before retrying PNG export.
+For complex diagrams that need PNG proof, agents should provide semantic graph
+intent: stable node IDs, labeled decision branches, and edges that match the
+real workflow. Fan-in, reused outcomes, and loop/back-edge cases are acceptable
+when they describe the process. Sketchi owns deterministic layout and routing;
+do not reshape a correct workflow solely to make the graph layout-friendly. If
+`arrow_overlap` appears, retry with `rerouteEdges` or preserve the artifact
+evidence for product repair unless the semantic structure itself is wrong.
 
 ## Codex
 

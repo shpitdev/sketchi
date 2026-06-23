@@ -20,6 +20,7 @@ export interface ExcalidrawSceneValidationIssue {
     | "arrow-endpoint-off-shape"
     | "empty-scene"
     | "invalid-elbow-binding"
+    | "arrow-segment-through-node"
     | "missing-arrow-binding"
     | "missing-bound-arrow"
     | "missing-container"
@@ -626,6 +627,97 @@ function overlappingArrowSegments(
   return issues;
 }
 
+function betweenInterior(value: number, min: number, max: number): boolean {
+  return value > min + BOUNDS_EPSILON && value < max - BOUNDS_EPSILON;
+}
+
+function interiorOverlap(
+  leftMin: number,
+  leftMax: number,
+  rightMin: number,
+  rightMax: number,
+): boolean {
+  return (
+    Math.min(leftMax, rightMax) - Math.max(leftMin, rightMin) > BOUNDS_EPSILON
+  );
+}
+
+function segmentCrossesShapeInterior(
+  segment: ArrowSegment,
+  shapeBounds: ElementBounds,
+): boolean {
+  if (segment.orientation === "horizontal") {
+    return (
+      betweenInterior(
+        segment.staticCoordinate,
+        shapeBounds.y,
+        shapeBounds.y + shapeBounds.height,
+      ) &&
+      interiorOverlap(
+        segment.min,
+        segment.max,
+        shapeBounds.x,
+        shapeBounds.x + shapeBounds.width,
+      )
+    );
+  }
+
+  return (
+    betweenInterior(
+      segment.staticCoordinate,
+      shapeBounds.x,
+      shapeBounds.x + shapeBounds.width,
+    ) &&
+    interiorOverlap(
+      segment.min,
+      segment.max,
+      shapeBounds.y,
+      shapeBounds.y + shapeBounds.height,
+    )
+  );
+}
+
+function arrowSegmentsThroughShapes(
+  elements: readonly ExcalidrawElement[],
+): ExcalidrawSceneValidationIssue[] {
+  const segments = elements
+    .filter((element) => element.type === "arrow")
+    .flatMap(arrowSegments);
+  const shapes = elements.filter((element) => SHAPE_TYPES.has(element.type));
+  const issues: ExcalidrawSceneValidationIssue[] = [];
+  const seen = new Set<string>();
+
+  for (const segment of segments) {
+    for (const shape of shapes) {
+      if (
+        shape.id === segment.startBindingElementId ||
+        shape.id === segment.endBindingElementId
+      ) {
+        continue;
+      }
+
+      const bounds = elementBounds(shape);
+      if (!bounds || !segmentCrossesShapeInterior(segment, bounds)) {
+        continue;
+      }
+
+      const key = `${segment.arrowId}:${segment.segmentIndex}:${shape.id}`;
+      if (seen.has(key)) {
+        continue;
+      }
+
+      seen.add(key);
+      issues.push({
+        code: "arrow-segment-through-node",
+        elementId: segment.arrowId,
+        message: `Arrow "${segment.arrowId}" passes through shape "${shape.id}".`,
+      });
+    }
+  }
+
+  return issues;
+}
+
 function arrowEndpoint(element: ExcalidrawElement, key: BindingKey) {
   const x = numericValue(element.x) ?? 0;
   const y = numericValue(element.y) ?? 0;
@@ -817,6 +909,7 @@ export function validateExcalidrawScene(
     }
   }
 
+  issues.push(...arrowSegmentsThroughShapes(scene.elements));
   issues.push(...overlappingArrowSegments(scene.elements));
 
   return {

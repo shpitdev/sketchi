@@ -121,7 +121,15 @@ describe("convertSceneToExcalidraw", () => {
       renderIntermediateDiagram(flowchartFixture),
     );
 
-    expect(scene.appState.zoom).toEqual({ value: 0.5 });
+    expect(scene.appState.zoom).toEqual({
+      value: expect.any(Number),
+    });
+    expect(
+      Number((scene.appState.zoom as { value: number }).value),
+    ).toBeGreaterThanOrEqual(0.42);
+    expect(
+      Number((scene.appState.zoom as { value: number }).value),
+    ).toBeLessThanOrEqual(0.5);
   });
 
   it("keeps wrapped flowchart text inside real shape containers", () => {
@@ -293,6 +301,73 @@ describe("convertSceneToExcalidraw", () => {
       expect.objectContaining({
         code: "overlapping-arrow-segment",
         elementId: "edge:prompt-requirements",
+      }),
+    );
+  });
+
+  it("reports arrow route segments that pass through unrelated nodes", () => {
+    const scene = convertSceneToExcalidraw({
+      diagramId: "through-node-route",
+      title: "Through-node route",
+      width: 420,
+      height: 140,
+      accentColor: "#0f766e",
+      backgroundColor: "#ffffff",
+      elements: [
+        {
+          type: "arrow",
+          id: "edge:start-end",
+          edgeId: "start-end",
+          sourceNodeId: "start",
+          targetNodeId: "end",
+          points: [
+            { x: 120, y: 70 },
+            { x: 320, y: 70 },
+          ],
+        },
+        {
+          type: "node",
+          id: "node:start",
+          nodeId: "start",
+          shape: "rectangle",
+          x: 20,
+          y: 40,
+          width: 100,
+          height: 60,
+          label: "Start",
+        },
+        {
+          type: "node",
+          id: "node:middle",
+          nodeId: "middle",
+          shape: "rectangle",
+          x: 170,
+          y: 40,
+          width: 100,
+          height: 60,
+          label: "Middle",
+        },
+        {
+          type: "node",
+          id: "node:end",
+          nodeId: "end",
+          shape: "rectangle",
+          x: 320,
+          y: 40,
+          width: 100,
+          height: 60,
+          label: "End",
+        },
+      ],
+    });
+
+    const validation = validateExcalidrawScene(scene);
+
+    expect(validation.ok).toBe(false);
+    expect(validation.issues).toContainEqual(
+      expect.objectContaining({
+        code: "arrow-segment-through-node",
+        elementId: "edge:start-end",
       }),
     );
   });

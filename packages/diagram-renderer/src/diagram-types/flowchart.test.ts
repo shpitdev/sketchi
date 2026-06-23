@@ -29,12 +29,9 @@ describe("Flowchart renderer contract", () => {
 
     expect(packagingArrow).toMatchObject({
       type: "arrow",
-      points: [
+      points: expect.arrayContaining([
         expect.objectContaining({ x: expect.any(Number) }),
-        expect.objectContaining({ x: expect.any(Number) }),
-        expect.objectContaining({ y: expect.any(Number) }),
-        expect.objectContaining({ y: expect.any(Number) }),
-      ],
+      ]),
     });
 
     if (packagingArrow?.type !== "arrow") {
@@ -42,14 +39,23 @@ describe("Flowchart renderer contract", () => {
     }
 
     const start = packagingArrow.points[0];
-    const firstBend = packagingArrow.points[1];
-    const end = packagingArrow.points[3];
+    const end = packagingArrow.points[packagingArrow.points.length - 1];
 
-    if (!start || !firstBend || !end) {
+    if (!start || !end) {
       throw new Error("Expected an orthogonal review-packaging route.");
     }
 
-    expect(start.x).toBe(firstBend.x);
+    for (let index = 0; index < packagingArrow.points.length - 1; index += 1) {
+      const previous = packagingArrow.points[index];
+      const current = packagingArrow.points[index + 1];
+
+      if (!previous || !current) {
+        throw new Error("Expected contiguous route points.");
+      }
+
+      expect(previous.x === current.x || previous.y === current.y).toBe(true);
+    }
+
     expect(end.y).toBeGreaterThan(start.y);
   });
 });

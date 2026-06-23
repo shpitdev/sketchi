@@ -82,10 +82,10 @@ https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/<artifactId>?format
 ## Guardrails
 
 - Keep IDs stable and readable.
-- For export-ready PNG proof, keep complex graphs monotonic in the chosen layout direction. Avoid long back-edges, loops to earlier nodes, or reusing one terminal node for both early and late outcomes; use distinct terminal nodes when branches resolve at different depths.
+- Express the real workflow semantics. Fan-in, reused outcomes, and loop/back-edge cases are acceptable when they describe the process; Sketchi owns deterministic placement and routing for export.
 - Prefer typed graph generation for adding, removing, or reconnecting nodes.
 - Use patching for style, layout hints, labels, and metadata only when the docs show support.
-- If `arrow_overlap` appears during export, rebuild the `FlowchartSpec` as a cleaner DAG first. `rerouteEdges` can tidy local routes, but it is not a reliable fix for a bottom node that points back up to an early terminal.
+- If export reports `arrow_overlap`, keep the semantic graph intact unless the structure is actually wrong. Retry with `rerouteEdges` or report the artifact evidence rather than contorting the workflow solely for layout.
 - Pass the function expression itself. `async () => { ... }` is canonical; outer markdown fences and a trailing semicolon are tolerated by the server, but omit them in generated code.
 - Return the MCP result or artifact metadata so the caller has evidence.
 - Request `artifactFormats: ["scene", "excalidraw", "png"]` when visual proof matters. PNG is hosted binary evidence; `sketchi.getArtifact({ format: "png", inline: false })` returns metadata, then fetch the raw Studio API URL outside `execute` for bytes.
