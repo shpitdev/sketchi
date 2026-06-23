@@ -41,6 +41,53 @@ function approvalSpec() {
   };
 }
 
+function incidentEscalationOpsSpec() {
+  return {
+    id: "incident-escalation-ops",
+    title: "Incident Escalation & Operations Response",
+    nodes: [
+      { id: "alert_received", label: "Alert Received", kind: "start" },
+      { id: "triage", label: "Triage & Deduplicate", kind: "process" },
+      { id: "is_actionable", label: "Actionable Signal?", kind: "decision" },
+      { id: "auto_close", label: "Auto-Close / Suppress", kind: "end" },
+      { id: "severity", label: "Assess Severity", kind: "decision" },
+      { id: "sev1_page", label: "Page On-Call (SEV1)", kind: "process" },
+      { id: "sev2_assign", label: "Assign Owner (SEV2)", kind: "process" },
+      { id: "sev3_queue", label: "Queue Backlog (SEV3)", kind: "process" },
+      { id: "incident_bridge", label: "Open Incident Bridge", kind: "process" },
+      { id: "investigate", label: "Investigate Root Cause", kind: "process" },
+      { id: "mitigated", label: "Mitigated?", kind: "decision" },
+      { id: "reassess", label: "Reassess Severity", kind: "process" },
+      { id: "comms", label: "Notify Stakeholders", kind: "process" },
+      { id: "monitor", label: "Stable After Monitoring?", kind: "decision" },
+      { id: "postmortem", label: "Write Postmortem", kind: "process" },
+      { id: "resolved", label: "Incident Resolved", kind: "end" },
+    ],
+    edges: [
+      { source: "alert_received", target: "triage" },
+      { source: "triage", target: "is_actionable" },
+      { source: "is_actionable", target: "auto_close", label: "no" },
+      { source: "is_actionable", target: "severity", label: "yes" },
+      { source: "severity", target: "sev1_page", label: "SEV1" },
+      { source: "severity", target: "sev2_assign", label: "SEV2" },
+      { source: "severity", target: "sev3_queue", label: "SEV3" },
+      { source: "sev1_page", target: "incident_bridge" },
+      { source: "sev2_assign", target: "incident_bridge" },
+      { source: "incident_bridge", target: "investigate" },
+      { source: "sev3_queue", target: "investigate" },
+      { source: "investigate", target: "mitigated" },
+      { source: "mitigated", target: "comms", label: "yes" },
+      { source: "mitigated", target: "reassess", label: "no" },
+      { source: "reassess", target: "severity", label: "re-triage" },
+      { source: "comms", target: "monitor" },
+      { source: "monitor", target: "postmortem", label: "stable" },
+      { source: "monitor", target: "investigate", label: "regressed" },
+      { source: "postmortem", target: "resolved" },
+    ],
+    layout: { direction: "TB" },
+  };
+}
+
 function expectBuildOk(
   result: BuildFlowchartResult,
 ): asserts result is Extract<BuildFlowchartResult, { ok: true }> {
@@ -198,6 +245,24 @@ describe("Code Mode runtime", () => {
       appState: expect.any(Object),
       elements: expect.any(Array),
     });
+  });
+
+  it("exports dense incident feedback flows without edge-through-node routes", async () => {
+    const runtime = createTestRuntime();
+    const built = await runtime.buildFlowchart({
+      spec: incidentEscalationOpsSpec(),
+      options: {
+        artifactFormats: ["scene", "excalidraw"],
+        inlineArtifacts: ["scene", "excalidraw"],
+      },
+    });
+
+    expectBuildOk(built);
+    expect(built.quality.summary).toEqual({ nodeCount: 16, edgeCount: 19 });
+    expect(built.artifact.formats.map((format) => format.format)).toEqual([
+      "scene",
+      "excalidraw",
+    ]);
   });
 
   it("returns structured repair issues for invalid connectivity", async () => {

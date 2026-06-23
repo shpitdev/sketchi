@@ -568,7 +568,10 @@ function connectionEdges(
   const sourceKind = source.kind?.toLowerCase();
 
   if (dy < 0) {
-    return { sourceEdge: "right", targetEdge: "right" };
+    return {
+      sourceEdge: "top",
+      targetEdge: dx < 0 ? "left" : "right",
+    };
   }
 
   if (sourceKind === "decision" && dx !== 0 && dy > 0) {
@@ -580,10 +583,6 @@ function connectionEdges(
 
   if (dy > 0) {
     return { sourceEdge: "bottom", targetEdge: "top" };
-  }
-
-  if (dy < 0) {
-    return { sourceEdge: "top", targetEdge: "bottom" };
   }
 
   if (Math.abs(dx) > Math.abs(dy)) {
