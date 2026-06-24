@@ -146,21 +146,22 @@ describe("Sketchi Code Mode MCP server", () => {
         "execute",
         "search",
       ]);
-      expect(
-        tools.tools.find((tool) => tool.name === "execute")?.inputSchema,
-      ).toMatchObject({
+      const executeTool = tools.tools.find((tool) => tool.name === "execute");
+      expect(executeTool?.inputSchema).toMatchObject({
         properties: {
           code: { type: "string" },
         },
         required: ["code"],
         type: "object",
       });
-      expect(
-        tools.tools.find((tool) => tool.name === "execute")?.description,
-      ).toContain("Write JavaScript only");
-      expect(
-        tools.tools.find((tool) => tool.name === "execute")?.description,
-      ).toContain("async () =>");
+      expect(executeTool?.description).toContain("Write JavaScript only");
+      expect(executeTool?.description).toContain("async () =>");
+      expect(executeTool?.annotations).toMatchObject({
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      });
       expect(
         tools.tools.find((tool) => tool.name === "docs")?.outputSchema,
       ).toBeDefined();

@@ -230,8 +230,10 @@ export function createSketchiMcpServer(
       inputSchema: ExecuteRequestSchema,
       outputSchema: ExecuteResultSchema,
       annotations: {
+        readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: false,
+        openWorldHint: false,
       },
     },
     async (input) =>
