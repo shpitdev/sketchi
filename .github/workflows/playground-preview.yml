@@ -33,12 +33,36 @@ env:
   NX_TUI: "false"
 
 jobs:
-  deploy-preview:
+  optimize_ci:
     if: >-
-      (github.event_name == 'pull_request' &&
+      github.event_name == 'pull_request' &&
+      github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    outputs:
+      skip: ${{ steps.check_skip.outputs.skip }}
+    steps:
+      - name: Optimize CI
+        id: check_skip
+        uses: withgraphite/graphite-ci-action@main
+        with:
+          github_token: ${{ github.token }}
+          graphite_token: ${{ secrets.GRAPHITE_CI_OPTIMIZER_TOKEN }}
+          pr_number: ${{ github.event.pull_request.number }}
+
+  deploy-preview:
+    needs: optimize_ci
+    if: >-
+      always() &&
+      ((github.event_name == 'pull_request' &&
         github.event.action != 'closed' &&
-        github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name == 'workflow_dispatch' && inputs.action == 'deploy')
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        needs.optimize_ci.outputs.skip != 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.action == 'deploy'))
     runs-on: ubuntu-latest
     environment: staging
     strategy:
