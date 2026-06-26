@@ -43,6 +43,32 @@ The Codex skill includes `agents/openai.yaml` with UI metadata, bundled icon ass
 
 Claude Code loads the skill as `/sketchi-code-mode-claude:sketchi-code-mode` after plugin installation. Its `allowed-tools` list uses Claude's plugin MCP namespace for `docs`, `search`, and `execute`.
 
+## Harness Evals
+
+Use the harness eval runner to measure whether an external agent can create
+correct Code Mode artifacts through the deployed MCP server. The runner launches
+the selected harness, injects the no-auth public MCP config, asks the agent to
+call `sketchi.buildFlowchart`, then grades the returned `normalizedSpec` with
+the maintained diagram scenarios.
+
+```sh
+pnpm eval:harness -- --harness opencode --model opencode-go/kimi-k2.7-code --all \
+  --report-out .memory/harness-evals/opencode-kimi27-all/report.json \
+  --candidate-out-dir .memory/harness-evals/opencode-kimi27-all \
+  --events-out-dir .memory/harness-evals/opencode-kimi27-all
+```
+
+```sh
+pnpm eval:harness -- --harness claude --scenario sketchi-onboarding-decision-flow \
+  --report-out .memory/harness-evals/claude-smoke/report.json \
+  --candidate-out-dir .memory/harness-evals/claude-smoke \
+  --events-out-dir .memory/harness-evals/claude-smoke
+```
+
+Reports include semantic scenario checks, Excalidraw validation issues, MCP tool
+call counts, raw harness event paths, candidate JSON paths, duration, cost, and
+token buckets when the harness exposes them.
+
 ## Endpoint
 
 Both plugins currently point at:
