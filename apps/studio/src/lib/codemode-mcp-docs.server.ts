@@ -479,6 +479,7 @@ const catalog: CatalogEntry[] = [
       "Call sketchi methods sequentially when possible so a harness can inspect structured failures and retry deliberately.",
       "For user-facing completion, return the accepted Sketchi artifactId plus Excalidraw and PNG URLs from the MCP result. Do not synthesize a Mermaid or Markdown replacement after Sketchi accepts an artifact.",
       "The execute wrapper adds artifactDelivery when it detects an accepted artifact bundle. Prefer returning artifactDelivery directly to the user because it already contains artifactId, format refs, raw Excalidraw/PNG URLs, and final-response instructions.",
+      "When artifactDelivery is available, the MCP text content begins with the exact final answer. Copy that first text block verbatim into chat and stop.",
       "When artifactDelivery.finalResponseText is present, paste that string as the final chat answer and stop. Do not call file/create/artifact tools, inspect nested inline Excalidraw JSON, or create an Antigravity artifact after that point.",
       "",
       SKETCHI_CODE_MODE_TYPES,
@@ -653,7 +654,8 @@ const catalog: CatalogEntry[] = [
       "Step 2: inspect issues. If not accepted, repair the spec and call buildFlowchart again.",
       "Step 3: once accepted, use applyDiagramPatch for circle, diamond, color, movement, rerouteEdges, or replaceText tweaks.",
       "For broad architecture prompts, keep the first build small and readable: one start, a mostly monotonic spine, a few decision or branch points, and separate terminal nodes for separate outcomes.",
-      "Step 4: if the execute response includes artifactDelivery.finalResponseText, paste that finalResponseText in chat and stop. Otherwise return the accepted Sketchi artifactId and Excalidraw/PNG URLs. Do not create a second Markdown, Mermaid, local file, or Antigravity artifact that duplicates the diagram.",
+      "Step 4: after an accepted build or patch, do not fetch the scene just to make a local summary. The accepted artifact bundle is already the deliverable.",
+      "Step 5: if the execute response includes artifactDelivery.finalResponseText, paste that finalResponseText in chat and stop. Otherwise return the accepted Sketchi artifactId and Excalidraw/PNG URLs. Do not create a second Markdown, Mermaid, local file, or Antigravity artifact that duplicates the diagram.",
     ].join("\n"),
     examples: [
       {
@@ -737,7 +739,7 @@ const catalog: CatalogEntry[] = [
     snippet:
       "When Sketchi accepts an artifact, the final result is that artifact bundle, not a recreated Markdown diagram.",
     content:
-      "Do not create a Markdown, Mermaid, local file, Antigravity artifact, or prose-only artifact after buildFlowchart or applyDiagramPatch succeeds. Paste execute.artifactDelivery.finalResponseText when present, or return the Sketchi artifactId, available formats, and raw Excalidraw/PNG URLs so the caller can open the actual generated artifact.",
+      "Do not create a Markdown, Mermaid, local file, Antigravity artifact, or prose-only artifact after buildFlowchart or applyDiagramPatch succeeds. Do not call getArtifact for scene just to make a local summary. Paste execute.artifactDelivery.finalResponseText when present, or return the Sketchi artifactId, available formats, and raw Excalidraw/PNG URLs so the caller can open the actual generated artifact.",
   },
   {
     id: "raw-excalidraw-non-goal",

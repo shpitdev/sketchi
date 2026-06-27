@@ -21,14 +21,16 @@ options: {
 }
 ```
 
-5. If the execute result contains `artifactDelivery.finalResponseText`, paste that text as the final chat response and stop.
-6. Otherwise return the accepted Sketchi artifact id, diagram id, artifact format refs, and the Excalidraw/PNG raw URLs directly in the chat response.
+5. If the MCP text content begins with `Sketchi artifact ready.`, paste that first text block as the final chat response and stop.
+6. If the execute result contains `artifactDelivery.finalResponseText`, paste that text as the final chat response and stop.
+7. Otherwise return the accepted Sketchi artifact id, diagram id, artifact format refs, and the Excalidraw/PNG raw URLs directly in the chat response.
 
 ## Guardrails
 
 - Do not create or edit repo files unless the user explicitly asks for files.
 - Do not call `write_to_file`, create an Antigravity artifact, inspect nested inline Excalidraw JSON, or create a Markdown wrapper such as `diagram_info.md` after Sketchi accepts an artifact. The final chat response with the Sketchi artifact ids and URLs is the deliverable.
 - Do not write a Markdown/Mermaid summary as the deliverable after Sketchi accepts an artifact.
+- Do not call `sketchi.getArtifact({ format: "scene" })` just to create a local summary or wrapper. `scene` is only for patching/debugging, and the accepted artifact bundle is already the deliverable.
 - `scene` is for patching and debugging only. `excalidraw` and `png` are the user-facing outputs.
 - If local repo context is needed, inspect files only to understand the graph, then send the final graph to the MCP execute tool.
 - For vague repo/system architecture prompts, summarize into a readable 8-14 node flowchart. Prefer a mostly monotonic spine with short side branches; group related packages/systems into layers instead of drawing every transitive dependency edge.

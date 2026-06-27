@@ -17,9 +17,10 @@ Use the bundled `sketchi-code-mode` MCP server for Sketchi diagrams instead of r
 2. Use `execute` with an async JavaScript arrow function expression.
 3. Build or rebuild structure with `sketchi.buildFlowchart(input)`.
 4. Apply non-structural visual edits with `sketchi.applyDiagramPatch(input)`.
-5. Retrieve proof or output with `sketchi.getArtifact(input)`.
-6. If the execute result contains `artifactDelivery.finalResponseText`, paste that text as the final chat response and stop.
-7. Otherwise return the accepted Sketchi artifact id, format refs, and Excalidraw/PNG URLs. Do not recreate the accepted diagram as a Markdown or Mermaid artifact.
+5. Only retrieve proof or output with `sketchi.getArtifact(input)` when you need raw Excalidraw/PNG metadata; do not fetch `scene` just to summarize the diagram.
+6. If the MCP text content begins with `Sketchi artifact ready.`, paste that first text block as the final chat response and stop.
+7. If the execute result contains `artifactDelivery.finalResponseText`, paste that text as the final chat response and stop.
+8. Otherwise return the accepted Sketchi artifact id, format refs, and Excalidraw/PNG URLs. Do not recreate the accepted diagram as a Markdown or Mermaid artifact.
 
 ## Execute Shape
 
@@ -111,6 +112,7 @@ https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/<artifactId>?format
 - If export reports `arrow_overlap`, keep the semantic graph intact unless the structure is actually wrong. Retry with `rerouteEdges` or report the artifact evidence rather than contorting the workflow solely for layout.
 - Pass the function expression itself. `async () => { ... }` is canonical; outer markdown fences and a trailing semicolon are tolerated by the server, but omit them in generated code.
 - Return the MCP result or artifact metadata so the caller has evidence. Do not make a separate Markdown/Mermaid diagram after Sketchi accepts an artifact.
+- Do not call `sketchi.getArtifact({ format: "scene" })` just to create a local summary or wrapper. `scene` is only for patching/debugging, and the accepted artifact bundle is already the deliverable.
 - When the execute tool returns `artifactDelivery.finalResponseText`, paste that string as the final response instead of digging through nested inline scene or Excalidraw JSON.
 - Request `artifactFormats: ["scene", "excalidraw", "png"]` when visual proof matters. Excalidraw is importable JSON; PNG is hosted binary evidence. `sketchi.getArtifact({ format: "excalidraw" | "png", inline: false })` returns metadata with raw Studio API URLs.
 - Do not install or require a local browser for plugin use; the deployed Studio Worker renders PNG artifacts through Cloudflare Browser Run.

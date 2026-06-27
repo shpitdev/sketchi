@@ -61,6 +61,59 @@ const CIRCLE_TO_DIAMOND_CODE = `async () => {
   });
 }`;
 
+const ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE = `async () => ({
+  ok: true,
+  status: "accepted",
+  artifact: {
+    artifactId: "artifact_without_urls",
+    diagramId: "diagram_without_urls",
+    formats: [
+      {
+        format: "scene",
+        mimeType: "application/vnd.sketchi.scene+json",
+        sizeBytes: 100
+      },
+      {
+        format: "excalidraw",
+        mimeType: "application/vnd.excalidraw+json",
+        sizeBytes: 200
+      },
+      {
+        format: "png",
+        mimeType: "image/png",
+        sizeBytes: 300
+      }
+    ]
+  }
+})`;
+
+const ACCEPTED_ARTIFACT_WITH_MIXED_URLS_CODE = `async () => ({
+  ok: true,
+  status: "accepted",
+  artifact: {
+    artifactId: "artifact_mixed_urls",
+    diagramId: "diagram_mixed_urls",
+    formats: [
+      {
+        format: "scene",
+        mimeType: "application/vnd.sketchi.scene+json",
+        sizeBytes: 100
+      },
+      {
+        format: "excalidraw",
+        mimeType: "application/vnd.excalidraw+json",
+        sizeBytes: 200,
+        url: "https://custom.test/excalidraw"
+      },
+      {
+        format: "png",
+        mimeType: "image/png",
+        sizeBytes: 300
+      }
+    ]
+  }
+})`;
+
 function createInProcessExecutor(): SketchiCodeModeExecutor {
   return {
     async execute(code: string, providers: SketchiCodeModeProvider[]) {
@@ -106,6 +159,23 @@ function structuredContent(response: unknown): Record<string, unknown> {
   }
 
   return response.structuredContent;
+}
+
+function textContent(response: unknown): string[] {
+  if (!isRecord(response) || !Array.isArray(response.content)) {
+    throw new Error("MCP response did not include content.");
+  }
+
+  return response.content.flatMap((item) => {
+    if (
+      !isRecord(item) ||
+      item.type !== "text" ||
+      typeof item.text !== "string"
+    ) {
+      return [];
+    }
+    return [item.text];
+  });
 }
 
 function createMcpFetch(options: CodeModeMcpOptions): typeof fetch {
@@ -211,6 +281,52 @@ describe("Sketchi Code Mode MCP server", () => {
             version: 2,
           },
         },
+      });
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("puts artifact delivery text first in execute content for harnesses", async () => {
+    const client = new Client({
+      name: "sketchi-codemode-delivery-text-test-client",
+      version: "0.0.0",
+    });
+    const server = createSketchiMcpServer(
+      {},
+      {
+        executor: createInProcessExecutor(),
+        origin: "https://studio.test",
+      },
+    );
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+
+    try {
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+
+      const response = await client.callTool({
+        name: "execute",
+        arguments: { code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE },
+      });
+      const text = textContent(response);
+
+      expect(text).toHaveLength(2);
+      expect(text[0]).toBe(
+        "Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
+      );
+      expect(text[1]).toContain('"artifactDelivery"');
+      expect(structuredContent(response)).toMatchObject({
+        artifactDelivery: {
+          artifactId: "artifact_without_urls",
+          excalidrawUrl:
+            "https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true",
+          pngUrl:
+            "https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
+        },
+        ok: true,
       });
     } finally {
       await client.close();
@@ -385,5 +501,130 @@ describe("Sketchi Code Mode MCP server", () => {
     expect(result.artifactDelivery?.finalResponseInstruction).toContain(
       "Paste artifactDelivery.finalResponseText",
     );
+  });
+
+  it("synthesizes artifactDelivery URLs from the MCP origin when formats omit URLs", async () => {
+    const result = await executeSketchiCodeMode(
+      {},
+      {
+        code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE,
+      },
+      {
+        executor: createInProcessExecutor(),
+        origin: "https://studio.test",
+      },
+    );
+
+    expect(result).toMatchObject({
+      artifactDelivery: {
+        artifactId: "artifact_without_urls",
+        diagramId: "diagram_without_urls",
+        excalidrawUrl:
+          "https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true",
+        finalResponseText:
+          "Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
+        formats: [
+          {
+            format: "scene",
+            url: "https://studio.test/api/v1/artifacts/artifact_without_urls?format=scene&raw=true",
+          },
+          {
+            format: "excalidraw",
+            url: "https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true",
+          },
+          {
+            format: "png",
+            url: "https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
+          },
+        ],
+        pngUrl:
+          "https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
+        sceneUrl:
+          "https://studio.test/api/v1/artifacts/artifact_without_urls?format=scene&raw=true",
+      },
+      finalResponseText:
+        "Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
+      ok: true,
+    });
+  });
+
+  it("preserves existing artifactDelivery URLs while synthesizing missing ones", async () => {
+    const result = await executeSketchiCodeMode(
+      {},
+      {
+        code: ACCEPTED_ARTIFACT_WITH_MIXED_URLS_CODE,
+      },
+      {
+        executor: createInProcessExecutor(),
+        origin: "https://studio.test",
+      },
+    );
+
+    expect(result).toMatchObject({
+      artifactDelivery: {
+        artifactId: "artifact_mixed_urls",
+        diagramId: "diagram_mixed_urls",
+        excalidrawUrl: "https://custom.test/excalidraw",
+        finalResponseText:
+          "Sketchi artifact ready.\nArtifact ID: artifact_mixed_urls\nDiagram ID: diagram_mixed_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://custom.test/excalidraw\nPNG URL: https://studio.test/api/v1/artifacts/artifact_mixed_urls?format=png&raw=true",
+        formats: [
+          {
+            format: "scene",
+            url: "https://studio.test/api/v1/artifacts/artifact_mixed_urls?format=scene&raw=true",
+          },
+          {
+            format: "excalidraw",
+            url: "https://custom.test/excalidraw",
+          },
+          {
+            format: "png",
+            url: "https://studio.test/api/v1/artifacts/artifact_mixed_urls?format=png&raw=true",
+          },
+        ],
+        pngUrl:
+          "https://studio.test/api/v1/artifacts/artifact_mixed_urls?format=png&raw=true",
+        sceneUrl:
+          "https://studio.test/api/v1/artifacts/artifact_mixed_urls?format=scene&raw=true",
+      },
+      ok: true,
+    });
+  });
+
+  it("keeps URL-less artifactDelivery URL-less when no MCP origin is available", async () => {
+    const result = await executeSketchiCodeMode(
+      {},
+      {
+        code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE,
+      },
+      {
+        executor: createInProcessExecutor(),
+      },
+    );
+
+    expect(result).toMatchObject({
+      artifactDelivery: {
+        artifactId: "artifact_without_urls",
+        diagramId: "diagram_without_urls",
+        finalResponseText:
+          "Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png",
+        formats: [
+          {
+            format: "scene",
+          },
+          {
+            format: "excalidraw",
+          },
+          {
+            format: "png",
+          },
+        ],
+      },
+      finalResponseText:
+        "Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png",
+      ok: true,
+    });
+    expect(result.artifactDelivery?.excalidrawUrl).toBeUndefined();
+    expect(result.artifactDelivery?.pngUrl).toBeUndefined();
+    expect(result.artifactDelivery?.sceneUrl).toBeUndefined();
   });
 });

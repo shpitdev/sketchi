@@ -114,9 +114,32 @@ export function normalizeSketchiExecuteCode(code: string): string {
     .replace(/;+\s*$/, "");
 }
 
-function jsonResult(value: Record<string, unknown>) {
+function finalResponseTextFromResult(value: Record<string, unknown>) {
+  return (
+    stringValue(value.finalResponseText) ??
+    (isRecord(value.artifactDelivery)
+      ? stringValue(value.artifactDelivery.finalResponseText)
+      : undefined)
+  );
+}
+
+function jsonResult(
+  value: Record<string, unknown>,
+  options: { includeFinalResponseText?: boolean } = {},
+) {
+  const finalResponseText = options.includeFinalResponseText
+    ? finalResponseTextFromResult(value)
+    : undefined;
   return {
     content: [
+      ...(finalResponseText
+        ? [
+            {
+              type: "text" as const,
+              text: finalResponseText,
+            },
+          ]
+        : []),
       {
         type: "text" as const,
         text: JSON.stringify(value, null, 2),
@@ -201,6 +224,19 @@ function urlForFormat(
   return formats.find((formatRef) => formatRef.format === format)?.url;
 }
 
+function fallbackArtifactUrl(
+  origin: string,
+  input: { artifactId: string; format: string },
+): string {
+  const url = new URL(
+    `/api/v1/artifacts/${encodeURIComponent(input.artifactId)}`,
+    origin,
+  );
+  url.searchParams.set("format", input.format);
+  url.searchParams.set("raw", "true");
+  return url.toString();
+}
+
 function artifactDeliveryResponseText(input: {
   artifactId: string;
   diagramId?: string;
@@ -218,7 +254,10 @@ function artifactDeliveryResponseText(input: {
   ].join("\n");
 }
 
-function artifactDeliveryFrom(value: unknown): ArtifactDelivery | undefined {
+function artifactDeliveryFrom(
+  value: unknown,
+  options: { origin?: string } = {},
+): ArtifactDelivery | undefined {
   const artifact = acceptedArtifactContainerFrom(value);
   const artifactId = stringValue(artifact?.artifactId);
   if (!artifact || !artifactId) {
@@ -229,15 +268,26 @@ function artifactDeliveryFrom(value: unknown): ArtifactDelivery | undefined {
   if (formats.length === 0) {
     return undefined;
   }
+  const formatsWithUrls = formats.map((formatRef) => ({
+    ...formatRef,
+    ...(formatRef.url || !options.origin
+      ? {}
+      : {
+          url: fallbackArtifactUrl(options.origin, {
+            artifactId,
+            format: formatRef.format,
+          }),
+        }),
+  }));
   const diagramId = stringValue(artifact.diagramId);
-  const excalidrawUrl = urlForFormat(formats, "excalidraw");
-  const pngUrl = urlForFormat(formats, "png");
-  const sceneUrl = urlForFormat(formats, "scene");
+  const excalidrawUrl = urlForFormat(formatsWithUrls, "excalidraw");
+  const pngUrl = urlForFormat(formatsWithUrls, "png");
+  const sceneUrl = urlForFormat(formatsWithUrls, "scene");
   const finalResponseText = artifactDeliveryResponseText({
     artifactId,
     ...(diagramId ? { diagramId } : {}),
     ...(excalidrawUrl ? { excalidrawUrl } : {}),
-    formats,
+    formats: formatsWithUrls,
     ...(pngUrl ? { pngUrl } : {}),
   });
 
@@ -248,7 +298,7 @@ function artifactDeliveryFrom(value: unknown): ArtifactDelivery | undefined {
     finalResponseInstruction:
       "Paste artifactDelivery.finalResponseText as the final chat response and stop. Do not inspect nested inline JSON, call write_to_file/Create, create a Markdown wrapper, create a Mermaid diagram, create a local file, or create a separate Antigravity artifact after Sketchi accepts the diagram.",
     finalResponseText,
-    formats,
+    formats: formatsWithUrls,
     ...(pngUrl ? { pngUrl } : {}),
     ...(sceneUrl ? { sceneUrl } : {}),
   };
@@ -319,7 +369,9 @@ export async function executeSketchiCodeMode(
       ],
     );
 
-    const artifactDelivery = artifactDeliveryFrom(execution.result);
+    const artifactDelivery = artifactDeliveryFrom(execution.result, {
+      ...(options.origin ? { origin: options.origin } : {}),
+    });
 
     if (execution.error) {
       return {
@@ -405,6 +457,7 @@ export function createSketchiMcpServer(
         "The sandbox exposes only sketchi.buildFlowchart, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
         "First get the semantic graph accepted, then use patch operations for deterministic visual changes.",
         "For final user-facing output, return accepted Sketchi artifact ids, format refs, and Excalidraw/PNG URLs. Do not recreate accepted diagrams as Markdown or Mermaid artifacts.",
+        "When artifactDelivery is available, the first text content block is the final user-facing answer; copy it verbatim and stop.",
         "When execute returns artifactDelivery, paste artifactDelivery.finalResponseText as the final chat response and stop.",
         "Do not call write_to_file/Create, create an Antigravity artifact, or inspect nested inline JSON after artifactDelivery is present.",
         "",
@@ -420,7 +473,9 @@ export function createSketchiMcpServer(
       },
     },
     async (input) =>
-      jsonResult(await executeSketchiCodeMode(env, input, options)),
+      jsonResult(await executeSketchiCodeMode(env, input, options), {
+        includeFinalResponseText: true,
+      }),
   );
 
   return server;
