@@ -264,6 +264,22 @@ interface ArtifactBundle {
   diagramId: string;
   formats: Array<{ format: ArtifactFormat; mimeType: string; inline?: unknown; sizeBytes?: number; url?: string; expiresAt?: string }>;
   preview?: { format: ArtifactFormat; mimeType: string; inline?: unknown; sizeBytes?: number; url?: string; expiresAt?: string };
+}
+
+interface ExecuteToolResult {
+  ok: boolean;
+  result?: unknown;
+  logs?: string[];
+  error?: string;
+  artifactDelivery?: {
+    artifactId: string;
+    diagramId?: string;
+    formats: Array<{ format: string; mimeType?: string; sizeBytes?: number; url?: string; expiresAt?: string }>;
+    excalidrawUrl?: string;
+    pngUrl?: string;
+    sceneUrl?: string;
+    finalResponseInstruction: string;
+  };
 }`;
 
 const ACCEPTANCE_LOOP_EXAMPLE = `async () => {
@@ -510,6 +526,7 @@ const catalog: CatalogEntry[] = [
       "The sandbox must not receive secrets, storage bindings, model credentials, or raw network access.",
       "Call sketchi methods sequentially when possible so a harness can inspect structured failures and retry deliberately.",
       "For user-facing completion, return the accepted Sketchi artifactId plus Excalidraw and PNG URLs from the MCP result. Do not synthesize a Mermaid or Markdown replacement after Sketchi accepts an artifact.",
+      "The execute wrapper adds artifactDelivery when it detects an accepted artifact bundle. Prefer returning artifactDelivery directly to the user because it already contains artifactId, format refs, raw Excalidraw/PNG URLs, and final-response instructions.",
       "",
       SKETCHI_CODE_MODE_TYPES,
     ].join("\n"),
@@ -680,7 +697,7 @@ const catalog: CatalogEntry[] = [
       "Step 1: build a valid semantic flowchart with nodes and edges.",
       "Step 2: inspect issues. If not accepted, repair the spec and call buildFlowchart again.",
       "Step 3: once accepted, use applyDiagramPatch for circle, diamond, color, movement, rerouteEdges, or replaceText tweaks.",
-      "Step 4: return the accepted Sketchi artifactId and Excalidraw/PNG URLs. Do not create a second Markdown or Mermaid artifact that duplicates the diagram.",
+      "Step 4: return the execute response artifactDelivery object if present, otherwise return the accepted Sketchi artifactId and Excalidraw/PNG URLs. Do not create a second Markdown or Mermaid artifact that duplicates the diagram.",
     ].join("\n"),
     examples: [
       {
@@ -764,7 +781,7 @@ const catalog: CatalogEntry[] = [
     snippet:
       "When Sketchi accepts an artifact, the final result is that artifact bundle, not a recreated Markdown diagram.",
     content:
-      "Do not create a Markdown, Mermaid, or prose-only artifact after buildFlowchart or applyDiagramPatch succeeds. Return the Sketchi artifactId, available formats, and raw Excalidraw/PNG URLs so the caller can open the actual generated artifact.",
+      "Do not create a Markdown, Mermaid, or prose-only artifact after buildFlowchart or applyDiagramPatch succeeds. Return execute.artifactDelivery when present, or return the Sketchi artifactId, available formats, and raw Excalidraw/PNG URLs so the caller can open the actual generated artifact.",
   },
   {
     id: "raw-excalidraw-non-goal",

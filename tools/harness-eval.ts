@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -11,7 +11,7 @@ import {
   type ScenarioEvaluation,
 } from "@sketchi/diagram-scenarios";
 
-type HarnessName = "claude" | "opencode";
+type HarnessName = "antigravity" | "claude" | "opencode";
 
 interface HarnessEvalOptions {
   all: boolean;
@@ -69,7 +69,7 @@ interface HarnessMcpArtifactProof {
   artifactUrls: Record<string, string>;
   buildId?: string;
   buildOk: boolean;
-  normalizedSpec: unknown;
+  normalizedSpec?: unknown;
   qualityAccepted?: boolean;
   qualityScore?: number;
   status: string;
@@ -102,6 +102,7 @@ interface HarnessRunReport {
     args: string[];
     command: string;
   };
+  conversationId?: string;
   difficulty: DiagramScenario["difficulty"];
   durationMs: number;
   error?: string;
@@ -122,6 +123,8 @@ interface HarnessRunReport {
   scenarioId: string;
   signal: NodeJS.Signals | null;
   stderrOut?: string;
+  transcriptOut?: string;
+  wrapperArtifactFiles: string[];
   stepCosts: number[];
   steps: HarnessStep[];
   timedOut: boolean;
@@ -151,6 +154,7 @@ interface HarnessReport {
 }
 
 const DEFAULT_MCP_URL = "https://sketchi-studio.dimethyl.workers.dev/mcp";
+const DEFAULT_ANTIGRAVITY_MODEL = "gemini-3.5-flash";
 const DEFAULT_OPENCODE_MODEL = "opencode-go/kimi-k2.7-code";
 const DEFAULT_CLAUDE_MODEL = "sonnet";
 const DEFAULT_TIMEOUT_MS = 180_000;
@@ -158,12 +162,13 @@ const DEFAULT_TIMEOUT_MS = 180_000;
 function usage(): string {
   return [
     "Usage:",
+    "  pnpm eval:harness -- --harness antigravity --model gemini-3.5-flash --scenario repo-package-interaction-flow",
     "  pnpm eval:harness -- --harness opencode --model opencode-go/kimi-k2.7-code --scenario sketchi-onboarding-decision-flow",
     "  pnpm eval:harness -- --harness opencode --model opencode-go/kimi-k2.7-code --all --repeat 3",
     "  pnpm eval:harness -- --harness claude --scenario pharma-batch-disposition",
     "",
     "Options:",
-    "  --harness opencode|claude",
+    "  --harness antigravity|opencode|claude",
     "  --model <model>",
     "  --scenario <scenario-id>",
     "  --all",
@@ -262,7 +267,7 @@ function parseOptions(argv: readonly string[]): HarnessEvalOptions {
 }
 
 function isHarnessName(value: string | undefined): value is HarnessName {
-  return value === "claude" || value === "opencode";
+  return value === "antigravity" || value === "claude" || value === "opencode";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -277,6 +282,169 @@ function numberValue(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value)
     ? value
     : undefined;
+}
+
+function cleanQuotedString(value: unknown): string | undefined {
+  const raw = stringValue(value);
+  if (!raw) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === "string") {
+      return parsed;
+    }
+  } catch {
+    // Not a quoted JSON string; use the original value.
+  }
+
+  return raw;
+}
+
+function antigravityRoot(): string | undefined {
+  return process.env.HOME
+    ? path.join(process.env.HOME, ".gemini", "antigravity-cli")
+    : undefined;
+}
+
+function antigravityAuthError(stdout: string): string | undefined {
+  if (
+    stdout.includes("Authentication required.") &&
+    stdout.includes("Error: authentication timed out.")
+  ) {
+    return "Antigravity authentication timed out before MCP tools could run. Complete Agy CLI auth, then rerun the harness eval.";
+  }
+  return undefined;
+}
+
+async function readJsonFile(filePath: string): Promise<unknown | undefined> {
+  try {
+    return JSON.parse(await readFile(filePath, "utf8"));
+  } catch {
+    return undefined;
+  }
+}
+
+async function readAntigravityConversationId(
+  cwd: string,
+): Promise<string | undefined> {
+  const root = antigravityRoot();
+  if (!root) {
+    return undefined;
+  }
+
+  const value = await readJsonFile(
+    path.join(root, "cache", "last_conversations.json"),
+  );
+  return isRecord(value) ? stringValue(value[cwd]) : undefined;
+}
+
+function outputPathsFromTranscript(transcript: string): string[] {
+  const paths = new Set<string>();
+  const pattern = /file:\/\/([^\s"')]+\/output\.txt)/g;
+
+  for (const match of transcript.matchAll(pattern)) {
+    const filePath = match[1];
+    if (filePath) {
+      paths.add(decodeURIComponent(filePath));
+    }
+  }
+
+  return [...paths];
+}
+
+async function readOptionalText(filePath: string): Promise<string | undefined> {
+  try {
+    return await readFile(filePath, "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+async function listFilesRecursive(dir: string): Promise<string[]> {
+  let entries: Array<Awaited<ReturnType<typeof readdir>>[number]>;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const result: string[] = [];
+  for (const entry of entries) {
+    const filePath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      result.push(...(await listFilesRecursive(filePath)));
+      continue;
+    }
+    if (entry.isFile()) {
+      result.push(filePath);
+    }
+  }
+  return result;
+}
+
+interface AntigravityEvidence {
+  conversationId?: string;
+  outputTexts: string[];
+  transcriptOut?: string;
+  transcriptText?: string;
+  wrapperArtifactFiles: string[];
+}
+
+async function readAntigravityEvidence(input: {
+  beforeConversationId?: string;
+  cwd: string;
+  outputDir: string;
+  stem: string;
+}): Promise<AntigravityEvidence> {
+  const root = antigravityRoot();
+  const conversationId = await readAntigravityConversationId(input.cwd);
+  if (
+    !root ||
+    !conversationId ||
+    conversationId === input.beforeConversationId
+  ) {
+    return { outputTexts: [], wrapperArtifactFiles: [] };
+  }
+
+  const brainDir = path.join(root, "brain", conversationId);
+  const transcriptPath = path.join(
+    brainDir,
+    ".system_generated",
+    "logs",
+    "transcript.jsonl",
+  );
+  const transcriptText = await readOptionalText(transcriptPath);
+  if (!transcriptText) {
+    return {
+      conversationId,
+      outputTexts: [],
+      wrapperArtifactFiles: [],
+    };
+  }
+
+  const transcriptOut = path.join(input.outputDir, `${input.stem}.agy.jsonl`);
+  await writeText(transcriptOut, transcriptText);
+
+  const outputTexts = (
+    await Promise.all(
+      outputPathsFromTranscript(transcriptText).map((filePath) =>
+        readOptionalText(filePath),
+      ),
+    )
+  ).filter((text): text is string => Boolean(text));
+  const wrapperArtifactFiles = (await listFilesRecursive(brainDir)).filter(
+    (filePath) => !filePath.includes(`${path.sep}.system_generated${path.sep}`),
+  );
+
+  return {
+    conversationId,
+    outputTexts,
+    transcriptOut,
+    transcriptText,
+    wrapperArtifactFiles,
+  };
 }
 
 function stableRunStem(input: {
@@ -413,7 +581,27 @@ function commandForRun(input: {
   model?: string;
   prompt: string;
   scenarioId: string;
+  timeoutMs: number;
 }): CommandSpec {
+  if (input.harness === "antigravity") {
+    const model = input.model ?? DEFAULT_ANTIGRAVITY_MODEL;
+    const timeoutSeconds = Math.max(1, Math.ceil(input.timeoutMs / 1000));
+    return {
+      args: [
+        "--print",
+        "--print-timeout",
+        `${timeoutSeconds}s`,
+        "--dangerously-skip-permissions",
+        "--model",
+        model,
+        input.prompt,
+      ],
+      command: "agy",
+      env: process.env,
+      prompt: input.prompt,
+    };
+  }
+
   if (input.harness === "opencode") {
     const model = input.model ?? DEFAULT_OPENCODE_MODEL;
     return {
@@ -614,6 +802,7 @@ function textFromEvent(event: unknown): string[] {
     ? messageRecord.content
     : [];
   const result = stringValue(event.result);
+  const eventContent = stringValue(event.content);
   const text = stringValue(part?.text);
   const message = stringValue(event.message);
   const contentText = content
@@ -621,7 +810,7 @@ function textFromEvent(event: unknown): string[] {
     .map((item) =>
       stringValue(item.type) === "text" ? stringValue(item.text) : undefined,
     );
-  return [result, text, message, ...contentText].filter(
+  return [result, eventContent, text, message, ...contentText].filter(
     (value): value is string => Boolean(value),
   );
 }
@@ -667,6 +856,33 @@ function toolCallsFromEvent(event: unknown): HarnessToolCall[] {
     }
   }
 
+  const agyToolCalls = Array.isArray(event.tool_calls) ? event.tool_calls : [];
+  for (const call of agyToolCalls.filter(isRecord)) {
+    const name = stringValue(call.name);
+    const args = isRecord(call.args) ? call.args : undefined;
+    if (name === "call_mcp_tool") {
+      const serverName = cleanQuotedString(args?.ServerName);
+      const toolName = cleanQuotedString(args?.ToolName);
+      if (serverName && toolName) {
+        calls.push({
+          name: `mcp(${serverName}/${toolName})`,
+          ...(stringValue(event.status)
+            ? { status: stringValue(event.status) }
+            : {}),
+        });
+      }
+      continue;
+    }
+    if (name) {
+      calls.push({
+        name,
+        ...(stringValue(event.status)
+          ? { status: stringValue(event.status) }
+          : {}),
+      });
+    }
+  }
+
   return calls;
 }
 
@@ -677,7 +893,8 @@ function successfulMcpToolCallCount(toolCalls: HarnessToolCall[]): number {
     if (!call.name.includes("sketchi-code-mode")) {
       continue;
     }
-    if (call.status && call.status !== "completed") {
+    const status = call.status?.toLowerCase();
+    if (status && status !== "completed" && status !== "done") {
       continue;
     }
     const key = call.callId ?? `${call.name}:${seen.size}`;
@@ -701,6 +918,13 @@ function acceptedBuildResultFrom(
     return undefined;
   }
   if (isRecord(value.artifact) && value.ok === true) {
+    return value;
+  }
+  if (
+    value.ok === true &&
+    stringValue(value.artifactId) &&
+    Array.isArray(value.formats)
+  ) {
     return value;
   }
   return acceptedBuildResultFrom(value.result);
@@ -729,20 +953,15 @@ function mcpArtifactFromPayload(input: {
     return undefined;
   }
 
-  const artifact = isRecord(result.artifact) ? result.artifact : undefined;
+  const artifact = isRecord(result.artifact) ? result.artifact : result;
   const quality = isRecord(result.quality) ? result.quality : undefined;
   const artifactId = stringValue(artifact?.artifactId);
   const artifactFormats = artifactFormatsFrom(artifact);
-  const status = stringValue(result.status);
+  const status = stringValue(result.status) ?? "accepted";
   const normalizedSpec = result.normalizedSpec;
   const buildOk = result.ok === true;
 
-  if (
-    !buildOk ||
-    status !== "accepted" ||
-    !artifactId ||
-    !isRecord(normalizedSpec)
-  ) {
+  if (!buildOk || status !== "accepted" || !artifactId) {
     return undefined;
   }
 
@@ -762,7 +981,7 @@ function mcpArtifactFromPayload(input: {
       ? { buildId: stringValue(result.buildId) }
       : {}),
     buildOk,
-    normalizedSpec,
+    ...(normalizedSpec === undefined ? {} : { normalizedSpec }),
     ...(quality?.accepted === true ? { qualityAccepted: true } : {}),
     ...(numberValue(quality?.score) === undefined
       ? {}
@@ -794,6 +1013,19 @@ function mcpArtifactsFromEvent(input: {
     });
     if (proof) {
       proofs.push(proof);
+    }
+  }
+
+  if (stringValue(input.event.type) === "MCP_TOOL") {
+    const content = stringValue(input.event.content);
+    if (content) {
+      const proof = mcpArtifactFromPayload({
+        payload: content,
+        toolName: "mcp(sketchi-code-mode/execute)",
+      });
+      if (proof) {
+        proofs.push(proof);
+      }
     }
   }
 
@@ -879,7 +1111,10 @@ function stepFromEvent(event: unknown): HarnessStep | undefined {
   return undefined;
 }
 
-export function summarizeHarnessStdout(stdout: string): HarnessOutputSummary {
+export function summarizeHarnessStdout(
+  stdout: string,
+  extraPayloads: readonly unknown[] = [],
+): HarnessOutputSummary {
   const events = parseJsonLines(stdout);
   const textParts: string[] = [];
   const mcpArtifacts: HarnessMcpArtifactProof[] = [];
@@ -899,6 +1134,16 @@ export function summarizeHarnessStdout(stdout: string): HarnessOutputSummary {
     const step = stepFromEvent(event);
     if (step) {
       steps.push(step);
+    }
+  }
+
+  for (const payload of extraPayloads) {
+    const proof = mcpArtifactFromPayload({
+      payload,
+      toolName: "mcp(sketchi-code-mode/execute)",
+    });
+    if (proof) {
+      mcpArtifacts.push(proof);
     }
   }
 
@@ -1078,6 +1323,21 @@ async function runHarnessScenario(input: {
   runNumber: number;
   scenario: DiagramScenario;
 }): Promise<HarnessRunReport> {
+  const stem = stableRunStem({
+    harness: input.options.harness,
+    repeat: input.repeat,
+    runNumber: input.runNumber,
+    scenarioId: input.scenario.id,
+  });
+  const eventsDir = input.options.eventsOutDir ?? input.outputDir;
+  const candidateDir = input.options.candidateOutDir ?? input.outputDir;
+  const eventsOut = path.join(eventsDir, `${stem}.stdout.jsonl`);
+  const stderrOut = path.join(eventsDir, `${stem}.stderr.txt`);
+  const candidateOut = path.join(candidateDir, `${stem}.candidate.json`);
+  const beforeAntigravityConversationId =
+    input.options.harness === "antigravity"
+      ? await readAntigravityConversationId(process.cwd())
+      : undefined;
   const prompt = buildHarnessPrompt({
     harness: input.options.harness,
     model: input.options.model,
@@ -1090,54 +1350,95 @@ async function runHarnessScenario(input: {
     model: input.options.model,
     prompt,
     scenarioId: input.scenario.id,
+    timeoutMs: input.options.timeoutMs,
   });
   const result = await runCommand(command, input.options.timeoutMs);
-  const summary = summarizeHarnessStdout(result.stdout);
+  const antigravityEvidence =
+    input.options.harness === "antigravity"
+      ? await readAntigravityEvidence({
+          beforeConversationId: beforeAntigravityConversationId,
+          cwd: process.cwd(),
+          outputDir: eventsDir,
+          stem,
+        })
+      : {
+          outputTexts: [],
+          wrapperArtifactFiles: [],
+        };
+  const summary = summarizeHarnessStdout(
+    [result.stdout, antigravityEvidence.transcriptText]
+      .filter((text): text is string => Boolean(text))
+      .join("\n"),
+    antigravityEvidence.outputTexts,
+  );
   const mcpProof = summary.mcpArtifacts.at(-1);
-  const outputErrors = outputContractErrors({
-    finalJson: summary.finalJson,
-    proof: mcpProof,
-  });
-  const artifactEvaluation = mcpProof
-    ? evaluateHarnessJson(input.scenario, {
-        normalizedSpec: mcpProof.normalizedSpec,
-      })
-    : {
+  const authError =
+    input.options.harness === "antigravity"
+      ? antigravityAuthError(result.stdout)
+      : undefined;
+  const outputErrors = [
+    ...(authError
+      ? [authError]
+      : outputContractErrors({
+          finalJson: summary.finalJson,
+          proof: mcpProof,
+        })),
+    ...(antigravityEvidence.wrapperArtifactFiles.length === 0
+      ? []
+      : [
+          `Antigravity created wrapper artifact file(s): ${antigravityEvidence.wrapperArtifactFiles.join(
+            ", ",
+          )}. Return the Sketchi artifact delivery in chat instead.`,
+        ]),
+  ].filter((message): message is string => Boolean(message));
+  const artifactEvaluation = authError
+    ? {
         checks: [],
-        error:
-          "No successful sketchi-code-mode execute artifact was observed in the harness event stream.",
+        error: authError,
         excalidrawIssues: [],
         ok: false,
-      };
+      }
+    : mcpProof
+      ? evaluateHarnessJson(
+          input.scenario,
+          mcpProof.normalizedSpec === undefined
+            ? summary.finalJson
+            : {
+                normalizedSpec: mcpProof.normalizedSpec,
+              },
+        )
+      : {
+          checks: [],
+          error:
+            "No successful sketchi-code-mode execute artifact was observed in the harness event stream.",
+          excalidrawIssues: [],
+          ok: false,
+        };
   const evaluation: HarnessCandidateEvaluation =
     outputErrors.length === 0
       ? artifactEvaluation
       : {
           ...artifactEvaluation,
-          error: [artifactEvaluation.error, ...outputErrors]
-            .filter(Boolean)
+          error: [...new Set([artifactEvaluation.error, ...outputErrors])]
+            .filter((message): message is string => Boolean(message))
             .join(" "),
           ok: false,
         };
-  const stem = stableRunStem({
-    harness: input.options.harness,
-    repeat: input.repeat,
-    runNumber: input.runNumber,
-    scenarioId: input.scenario.id,
-  });
-  const eventsDir = input.options.eventsOutDir ?? input.outputDir;
-  const candidateDir = input.options.candidateOutDir ?? input.outputDir;
-  const eventsOut = path.join(eventsDir, `${stem}.stdout.jsonl`);
-  const stderrOut = path.join(eventsDir, `${stem}.stderr.txt`);
-  const candidateOut = path.join(candidateDir, `${stem}.candidate.json`);
 
   await writeText(eventsOut, result.stdout);
   await writeText(stderrOut, result.stderr);
   await writeJson(candidateOut, {
+    ...(antigravityEvidence.conversationId
+      ? { conversationId: antigravityEvidence.conversationId }
+      : {}),
     finalJson: summary.finalJson,
     finalText: summary.finalText,
     mcpArtifact: reportableMcpArtifact(mcpProof),
     outputContractErrors: outputErrors,
+    ...(antigravityEvidence.transcriptOut
+      ? { transcriptOut: antigravityEvidence.transcriptOut }
+      : {}),
+    wrapperArtifactFiles: antigravityEvidence.wrapperArtifactFiles,
   });
 
   const runError = evaluation.error;
@@ -1145,6 +1446,9 @@ async function runHarnessScenario(input: {
   return {
     candidateOut,
     command: redactedCommandForReport(command),
+    ...(antigravityEvidence.conversationId
+      ? { conversationId: antigravityEvidence.conversationId }
+      : {}),
     difficulty: input.scenario.difficulty,
     durationMs: result.durationMs,
     ...(runError ? { error: runError } : {}),
@@ -1171,6 +1475,10 @@ async function runHarnessScenario(input: {
     scenarioId: input.scenario.id,
     signal: result.signal,
     stderrOut,
+    ...(antigravityEvidence.transcriptOut
+      ? { transcriptOut: antigravityEvidence.transcriptOut }
+      : {}),
+    wrapperArtifactFiles: antigravityEvidence.wrapperArtifactFiles,
     stepCosts: summary.stepCosts,
     steps: summary.steps,
     timedOut: result.timedOut,

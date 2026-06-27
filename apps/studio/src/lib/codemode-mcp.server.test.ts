@@ -159,6 +159,7 @@ describe("Sketchi Code Mode MCP server", () => {
       });
       expect(executeTool?.description).toContain("Write JavaScript only");
       expect(executeTool?.description).toContain("async () =>");
+      expect(executeTool?.description).toContain("artifactDelivery");
       expect(executeTool?.annotations).toMatchObject({
         readOnlyHint: true,
         destructiveHint: false,
@@ -312,5 +313,73 @@ describe("Sketchi Code Mode MCP server", () => {
         format: "excalidraw",
       },
     });
+  });
+
+  it("adds artifactDelivery when generated code returns an accepted artifact bundle", async () => {
+    const result = await executeSketchiCodeMode(
+      {},
+      {
+        code: `async () => ({
+          ok: true,
+          status: "accepted",
+          artifact: {
+            artifactId: "artifact_delivery",
+            diagramId: "diagram_delivery",
+            formats: [
+              {
+                format: "scene",
+                mimeType: "application/vnd.sketchi.scene+json",
+                url: "https://studio.test/api/v1/artifacts/artifact_delivery?format=scene&raw=true"
+              },
+              {
+                format: "excalidraw",
+                mimeType: "application/vnd.excalidraw+json",
+                sizeBytes: 1234,
+                url: "https://studio.test/api/v1/artifacts/artifact_delivery?format=excalidraw&raw=true"
+              },
+              {
+                format: "png",
+                mimeType: "image/png",
+                sizeBytes: 5678,
+                url: "https://studio.test/api/v1/artifacts/artifact_delivery?format=png&raw=true"
+              }
+            ]
+          }
+        })`,
+      },
+      { executor: createInProcessExecutor() },
+    );
+
+    expect(result).toMatchObject({
+      artifactDelivery: {
+        artifactId: "artifact_delivery",
+        diagramId: "diagram_delivery",
+        excalidrawUrl:
+          "https://studio.test/api/v1/artifacts/artifact_delivery?format=excalidraw&raw=true",
+        formats: [
+          {
+            format: "scene",
+          },
+          {
+            format: "excalidraw",
+            mimeType: "application/vnd.excalidraw+json",
+            sizeBytes: 1234,
+          },
+          {
+            format: "png",
+            mimeType: "image/png",
+            sizeBytes: 5678,
+          },
+        ],
+        pngUrl:
+          "https://studio.test/api/v1/artifacts/artifact_delivery?format=png&raw=true",
+        sceneUrl:
+          "https://studio.test/api/v1/artifacts/artifact_delivery?format=scene&raw=true",
+      },
+      ok: true,
+    });
+    expect(result.artifactDelivery?.finalResponseInstruction).toContain(
+      "Do not create a Markdown wrapper",
+    );
   });
 });

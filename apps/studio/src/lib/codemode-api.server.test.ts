@@ -239,6 +239,59 @@ describe("Code Mode API handlers", () => {
     });
   });
 
+  it("wraps legacy raw Excalidraw scene artifacts in an importable file envelope", async () => {
+    const bucket = new MemoryBucket();
+    const artifactId = "artifact-legacy-excalidraw";
+    bucket.objects.set(
+      `codemode/${artifactId}/manifest.json`,
+      JSON.stringify({
+        artifactId,
+        diagramId: "diagram-legacy-excalidraw",
+        formats: [
+          {
+            format: "excalidraw",
+            mimeType: "application/vnd.excalidraw+json",
+            sizeBytes: 142,
+          },
+        ],
+        createdAt: new Date().toISOString(),
+      }),
+    );
+    bucket.objects.set(
+      `codemode/${artifactId}/excalidraw.json`,
+      JSON.stringify({
+        appState: { viewBackgroundColor: "#ffffff" },
+        elements: [
+          {
+            id: "node:start",
+            type: "rectangle",
+          },
+        ],
+      }),
+    );
+
+    const getResponse = await handleGetArtifactRequest(
+      { SKETCHI_ARTIFACTS: bucket },
+      new Request(
+        `https://studio.test/api/v1/artifacts/${artifactId}?format=excalidraw&raw=true`,
+      ),
+      artifactId,
+    );
+
+    expect(getResponse.status).toBe(200);
+    expect(getResponse.headers.get("content-type")).toBe(
+      "application/vnd.excalidraw+json",
+    );
+    await expect(getResponse.json()).resolves.toMatchObject({
+      appState: { viewBackgroundColor: "#ffffff" },
+      elements: [{ id: "node:start", type: "rectangle" }],
+      files: {},
+      source: "https://sketchi.app",
+      type: "excalidraw",
+      version: 2,
+    });
+  });
+
   it("returns raw PNG bytes from the R2-compatible artifact binding", async () => {
     const bucket = new MemoryBucket();
     const artifactId = "artifact-png";

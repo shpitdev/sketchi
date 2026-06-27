@@ -11,6 +11,10 @@ import {
   type GetArtifactResult,
   type StoredArtifactFormat,
 } from "@sketchi/diagram-agent";
+import {
+  createExcalidrawFile,
+  type ExcalidrawScene,
+} from "@sketchi/diagram-excalidraw";
 
 import type { StudioEnv } from "./agent.server";
 import { createCloudflareBrowserRunArtifactRenderer } from "./codemode-browser-renderer.server";
@@ -192,6 +196,47 @@ function extensionForFormat(
   return format === "excalidraw" ? "excalidraw" : "json";
 }
 
+function isExcalidrawElement(
+  value: unknown,
+): value is ExcalidrawScene["elements"][number] {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.type === "string"
+  );
+}
+
+function isExcalidrawSceneData(value: unknown): value is ExcalidrawScene {
+  return (
+    isRecord(value) &&
+    isRecord(value.appState) &&
+    Array.isArray(value.elements) &&
+    value.elements.every(isExcalidrawElement)
+  );
+}
+
+function isExcalidrawFileData(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    value.type === "excalidraw" &&
+    value.version === 2 &&
+    typeof value.source === "string" &&
+    isRecord(value.files)
+  );
+}
+
+function dataForRawArtifact(artifact: StoredArtifactFormat): unknown {
+  if (
+    artifact.format === "excalidraw" &&
+    !isExcalidrawFileData(artifact.data) &&
+    isExcalidrawSceneData(artifact.data)
+  ) {
+    return createExcalidrawFile(artifact.data);
+  }
+
+  return artifact.data;
+}
+
 function bodyForRawArtifact(artifact: StoredArtifactFormat): BodyInit {
   if (artifact.format === "png") {
     if (artifact.data instanceof ArrayBuffer) {
@@ -203,7 +248,7 @@ function bodyForRawArtifact(artifact: StoredArtifactFormat): BodyInit {
     throw new Error("PNG artifact data is not binary.");
   }
 
-  return JSON.stringify(artifact.data);
+  return JSON.stringify(dataForRawArtifact(artifact));
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {

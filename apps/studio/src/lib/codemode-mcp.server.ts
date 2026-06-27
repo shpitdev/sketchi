@@ -54,12 +54,49 @@ const ExecuteRequestSchema = z.object({
   code: z.string().min(1),
 });
 
+const ExecuteArtifactDeliverySchema = z.object({
+  artifactId: z.string(),
+  diagramId: z.string().optional(),
+  excalidrawUrl: z.string().optional(),
+  finalResponseInstruction: z.string(),
+  formats: z.array(
+    z.object({
+      expiresAt: z.string().optional(),
+      format: z.string(),
+      mimeType: z.string().optional(),
+      sizeBytes: z.number().optional(),
+      url: z.string().optional(),
+    }),
+  ),
+  pngUrl: z.string().optional(),
+  sceneUrl: z.string().optional(),
+});
+
 const ExecuteResultSchema = z.object({
+  artifactDelivery: ExecuteArtifactDeliverySchema.optional(),
   ok: z.boolean(),
   result: z.unknown().optional(),
   error: z.string().optional(),
   logs: z.array(z.string()).optional(),
 });
+
+interface ArtifactDelivery {
+  artifactId: string;
+  diagramId?: string;
+  excalidrawUrl?: string;
+  finalResponseInstruction: string;
+  formats: ArtifactDeliveryFormat[];
+  pngUrl?: string;
+  sceneUrl?: string;
+}
+
+interface ArtifactDeliveryFormat {
+  expiresAt?: string;
+  format: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  url?: string;
+}
 
 function stripCodeFence(code: string): string {
   const match = code.match(
@@ -83,6 +120,109 @@ function jsonResult(value: Record<string, unknown>) {
       },
     ],
     structuredContent: value,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function numberValue(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+function artifactFormatsFrom(value: unknown): ArtifactDeliveryFormat[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isRecord).flatMap((formatRef) => {
+    const format = stringValue(formatRef.format);
+    if (!format) {
+      return [];
+    }
+    const expiresAt = stringValue(formatRef.expiresAt);
+    const mimeType = stringValue(formatRef.mimeType);
+    const sizeBytes = numberValue(formatRef.sizeBytes);
+    const url = stringValue(formatRef.url);
+
+    return [
+      {
+        ...(expiresAt ? { expiresAt } : {}),
+        format,
+        ...(mimeType ? { mimeType } : {}),
+        ...(sizeBytes === undefined ? {} : { sizeBytes }),
+        ...(url ? { url } : {}),
+      },
+    ];
+  });
+}
+
+function acceptedArtifactContainerFrom(
+  value: unknown,
+): Record<string, unknown> | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  if (value.ok === true && isRecord(value.artifact)) {
+    return value.artifact;
+  }
+
+  if (
+    value.ok === true &&
+    stringValue(value.artifactId) &&
+    Array.isArray(value.formats)
+  ) {
+    return value;
+  }
+
+  return (
+    acceptedArtifactContainerFrom(value.result) ??
+    acceptedArtifactContainerFrom(value.patched) ??
+    acceptedArtifactContainerFrom(value.built) ??
+    acceptedArtifactContainerFrom(value.artifact)
+  );
+}
+
+function urlForFormat(
+  formats: readonly ArtifactDeliveryFormat[],
+  format: string,
+): string | undefined {
+  return formats.find((formatRef) => formatRef.format === format)?.url;
+}
+
+function artifactDeliveryFrom(value: unknown): ArtifactDelivery | undefined {
+  const artifact = acceptedArtifactContainerFrom(value);
+  const artifactId = stringValue(artifact?.artifactId);
+  if (!artifact || !artifactId) {
+    return undefined;
+  }
+
+  const formats = artifactFormatsFrom(artifact.formats);
+  if (formats.length === 0) {
+    return undefined;
+  }
+  const diagramId = stringValue(artifact.diagramId);
+  const excalidrawUrl = urlForFormat(formats, "excalidraw");
+  const pngUrl = urlForFormat(formats, "png");
+  const sceneUrl = urlForFormat(formats, "scene");
+
+  return {
+    artifactId,
+    ...(diagramId ? { diagramId } : {}),
+    ...(excalidrawUrl ? { excalidrawUrl } : {}),
+    finalResponseInstruction:
+      "Return this Sketchi artifact delivery object directly to the user. Do not create a Markdown wrapper, Mermaid diagram, local file, or separate Antigravity artifact after Sketchi accepts the diagram.",
+    formats,
+    ...(pngUrl ? { pngUrl } : {}),
+    ...(sceneUrl ? { sceneUrl } : {}),
   };
 }
 
@@ -124,6 +264,7 @@ export async function executeSketchiCodeMode(
   input: unknown,
   options: CodeModeMcpOptions = {},
 ): Promise<{
+  artifactDelivery?: ArtifactDelivery;
   ok: boolean;
   result?: unknown;
   error?: string;
@@ -149,8 +290,11 @@ export async function executeSketchiCodeMode(
       ],
     );
 
+    const artifactDelivery = artifactDeliveryFrom(execution.result);
+
     if (execution.error) {
       return {
+        ...(artifactDelivery ? { artifactDelivery } : {}),
         ok: false,
         error: execution.error,
         logs: execution.logs ?? [],
@@ -159,6 +303,7 @@ export async function executeSketchiCodeMode(
     }
 
     return {
+      ...(artifactDelivery ? { artifactDelivery } : {}),
       ok: true,
       result: execution.result,
       logs: execution.logs ?? [],
@@ -225,6 +370,7 @@ export function createSketchiMcpServer(
         "The sandbox exposes only sketchi.buildFlowchart, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
         "First get the semantic graph accepted, then use patch operations for deterministic visual changes.",
         "For final user-facing output, return accepted Sketchi artifact ids, format refs, and Excalidraw/PNG URLs. Do not recreate accepted diagrams as Markdown or Mermaid artifacts.",
+        "When execute returns artifactDelivery, that object is the recommended final response payload for external harnesses.",
         "",
         SKETCHI_CODE_MODE_TYPES,
       ].join("\n"),

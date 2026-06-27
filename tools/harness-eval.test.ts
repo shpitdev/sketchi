@@ -352,4 +352,122 @@ describe("harness-eval", () => {
       },
     });
   });
+
+  it("summarizes Antigravity transcript MCP calls and flattened execute output", () => {
+    const stdout = [
+      JSON.stringify({
+        source: "MODEL",
+        status: "DONE",
+        tool_calls: [
+          {
+            name: "call_mcp_tool",
+            args: {
+              ServerName: '"sketchi-code-mode"',
+              ToolName: '"execute"',
+            },
+          },
+        ],
+        type: "PLANNER_RESPONSE",
+      }),
+      JSON.stringify({
+        source: "MODEL",
+        status: "DONE",
+        type: "MCP_TOOL",
+        content: JSON.stringify({
+          ok: true,
+          result: {
+            ok: true,
+            artifactId: "artifact_agy",
+            diagramId: "agy-demo",
+            formats: [
+              {
+                format: "excalidraw",
+                url: "https://studio.test/api/v1/artifacts/artifact_agy?format=excalidraw&raw=true",
+              },
+              {
+                format: "png",
+                url: "https://studio.test/api/v1/artifacts/artifact_agy?format=png&raw=true",
+              },
+            ],
+          },
+        }),
+      }),
+      JSON.stringify({
+        content: JSON.stringify({
+          artifactFormats: ["excalidraw", "png"],
+          artifactId: "artifact_agy",
+          buildOk: true,
+          excalidrawUrl:
+            "https://studio.test/api/v1/artifacts/artifact_agy?format=excalidraw&raw=true",
+          normalizedSpec: {
+            edges: [],
+            id: "agy-demo",
+            nodes: [],
+            title: "Agy demo",
+          },
+          pngUrl:
+            "https://studio.test/api/v1/artifacts/artifact_agy?format=png&raw=true",
+          status: "accepted",
+        }),
+        source: "MODEL",
+        status: "DONE",
+        type: "PLANNER_RESPONSE",
+      }),
+    ].join("\n");
+
+    const summary = summarizeHarnessStdout(stdout);
+
+    expect(summary.toolCalls).toEqual([
+      {
+        name: "mcp(sketchi-code-mode/execute)",
+        status: "DONE",
+      },
+    ]);
+    expect(summary.mcpArtifacts).toEqual([
+      expect.objectContaining({
+        artifactFormats: ["excalidraw", "png"],
+        artifactId: "artifact_agy",
+        artifactUrls: {
+          excalidraw:
+            "https://studio.test/api/v1/artifacts/artifact_agy?format=excalidraw&raw=true",
+          png: "https://studio.test/api/v1/artifacts/artifact_agy?format=png&raw=true",
+        },
+        buildOk: true,
+        status: "accepted",
+        toolName: "mcp(sketchi-code-mode/execute)",
+      }),
+    ]);
+    expect(summary.finalJson).toMatchObject({
+      artifactId: "artifact_agy",
+      normalizedSpec: { id: "agy-demo" },
+      status: "accepted",
+    });
+  });
+
+  it("uses extra MCP payloads as proof without replacing final response JSON", () => {
+    const stdout = JSON.stringify({
+      type: "text",
+      part: {
+        type: "text",
+        text: JSON.stringify({
+          artifactId: "artifact_final",
+          buildOk: true,
+          status: "accepted",
+        }),
+      },
+    });
+
+    const summary = summarizeHarnessStdout(stdout, [
+      JSON.stringify(acceptedMcpOutput),
+    ]);
+
+    expect(summary.finalJson).toEqual({
+      artifactId: "artifact_final",
+      buildOk: true,
+      status: "accepted",
+    });
+    expect(summary.mcpArtifacts[0]).toMatchObject({
+      artifactId: "artifact_demo",
+    });
+  });
 });

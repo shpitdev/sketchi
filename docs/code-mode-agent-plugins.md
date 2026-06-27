@@ -1,6 +1,7 @@
 # Code Mode Agent Plugins
 
-This repo packages the deployed Sketchi Code Mode MCP server for Codex and Claude Code.
+This repo packages the deployed Sketchi Code Mode MCP server for Codex, Claude
+Code, and Google Antigravity.
 
 The MCP surface follows the Code Mode convention: agents call a single `execute`
 tool with generated JavaScript, and typed Sketchi tools are available in the
@@ -16,6 +17,13 @@ inline: false })` for metadata. To view bytes, fetch
 outside `execute`. PNG bytes are hosted by the Studio Worker and rendered
 through Cloudflare Browser Run; plugin users should not need to install local
 browser binaries.
+
+When the MCP `execute` wrapper returns `artifactDelivery`, agents should use that
+object as the final response payload. It is a compact summary of the accepted
+artifact id, diagram id, format refs, raw Excalidraw URL, raw PNG URL when
+available, and final response guidance. This avoids low-reasoning harnesses
+digging through nested inline scene or Excalidraw JSON and accidentally creating
+Markdown/Mermaid wrapper artifacts.
 
 For complex diagrams that need PNG proof, agents should provide semantic graph
 intent: stable node IDs, labeled decision branches, and edges that match the
@@ -43,6 +51,34 @@ The Codex skill includes `agents/openai.yaml` with UI metadata, bundled icon ass
 
 Claude Code loads the skill as `/sketchi-code-mode-claude:sketchi-code-mode` after plugin installation. Its `allowed-tools` list uses Claude's plugin MCP namespace for `docs`, `search`, and `execute`.
 
+## Google Antigravity
+
+- Workspace MCP config: `.agents/mcp_config.json`
+- Workspace skill: `.agents/skills/sketchi-code-mode/SKILL.md`
+- Plugin: `plugins/sketchi-code-mode-antigravity`
+- Plugin MCP config: `plugins/sketchi-code-mode-antigravity/mcp_config.json`
+- Plugin skill: `plugins/sketchi-code-mode-antigravity/skills/sketchi-code-mode/SKILL.md`
+- MCP server key: `sketchi-code-mode`
+
+When `agy` is launched from this repository, Antigravity loads the workspace MCP
+config and workspace skill. To install the reusable local plugin into a global
+Antigravity CLI profile:
+
+```sh
+agy plugin install ./plugins/sketchi-code-mode-antigravity
+```
+
+Use fresh print-mode conversations for harness testing:
+
+```sh
+agy --print --dangerously-skip-permissions --model gemini-3.5-flash \
+  'use sketchi-code-mode to go create me a diagram that showcases how the various packages in this repo interact'
+```
+
+Do not pass `--continue` for eval runs; each run should start from a fresh
+conversation. If Agy prints an authentication URL, complete login before
+interpreting the harness result.
+
 ## Harness Evals
 
 Use the harness eval runner to measure whether an external agent can create
@@ -65,9 +101,19 @@ pnpm eval:harness -- --harness claude --scenario sketchi-onboarding-decision-flo
   --events-out-dir .memory/harness-evals/claude-smoke
 ```
 
+```sh
+pnpm eval:harness -- --harness antigravity --model gemini-3.5-flash \
+  --scenario repo-package-interaction-flow --repeat 3 \
+  --report-out .memory/harness-evals/antigravity-flash35-repo/report.json \
+  --candidate-out-dir .memory/harness-evals/antigravity-flash35-repo \
+  --events-out-dir .memory/harness-evals/antigravity-flash35-repo
+```
+
 Reports include semantic scenario checks, Excalidraw validation issues, MCP tool
 call counts, raw harness event paths, candidate JSON paths, duration, cost, and
-token buckets when the harness exposes them.
+token buckets when the harness exposes them. Antigravity reports also include
+the latest conversation transcript path when the CLI exposes one through its
+local brain cache.
 
 ## Endpoint
 
