@@ -89,7 +89,7 @@ interface CatalogEntry {
   examples?: CodeExample[];
 }
 
-export const SKETCHI_CODE_MODE_VERSION = "2026-06-23";
+export const SKETCHI_CODE_MODE_VERSION = "2026-06-27";
 
 const PATCH_OPERATION_SUMMARY = [
   "- setDefaultStyle: set fallback strokeColor, fillColor, textColor, or backgroundColor for the scene.",
@@ -514,6 +514,8 @@ const catalog: CatalogEntry[] = [
       "Request png when the agent needs hosted visual proof. PNG artifacts are stored binary outputs and are never inlined in MCP JSON responses.",
       "Use stable node ids. Decision nodes need meaningful labeled outgoing branches, usually yes/no.",
       "For export-ready visual proof, prefer monotonic flowchart graphs: avoid long back-edges, loops to earlier nodes, or reusing the same terminal node for both early and late outcomes. Use distinct terminal nodes when branches resolve at different depths.",
+      "For broad or vague repo/system architecture prompts, summarize into 8-14 high-signal nodes. Prefer a single readable spine with short side branches over a dense dependency graph with one node per package or many crossing links.",
+      "When a prompt asks how packages or systems interact, group related packages into layers and show the main flow of responsibility. Use labels/descriptions for detail instead of adding every possible transitive edge.",
       "If buildFlowchart returns ok: false, repair the spec from issues and call buildFlowchart again.",
       "Do not use applyDiagramPatch until buildFlowchart returns an accepted artifact.",
     ].join("\n"),
@@ -650,6 +652,7 @@ const catalog: CatalogEntry[] = [
       "Step 1: build a valid semantic flowchart with nodes and edges.",
       "Step 2: inspect issues. If not accepted, repair the spec and call buildFlowchart again.",
       "Step 3: once accepted, use applyDiagramPatch for circle, diamond, color, movement, rerouteEdges, or replaceText tweaks.",
+      "For broad architecture prompts, keep the first build small and readable: one start, a mostly monotonic spine, a few decision or branch points, and separate terminal nodes for separate outcomes.",
       "Step 4: if the execute response includes artifactDelivery.finalResponseText, paste that finalResponseText in chat and stop. Otherwise return the accepted Sketchi artifactId and Excalidraw/PNG URLs. Do not create a second Markdown, Mermaid, local file, or Antigravity artifact that duplicates the diagram.",
     ].join("\n"),
     examples: [

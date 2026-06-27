@@ -468,6 +468,44 @@ describe("harness-eval", () => {
     expect(summary.finalText).not.toContain("topic");
   });
 
+  it("excludes Antigravity tool output result fields from final text", () => {
+    const stdout = JSON.stringify({
+      result: '{"name":"workflows","isDir":true}',
+      source: "MODEL",
+      status: "DONE",
+      type: "LIST_DIR",
+    });
+
+    const summary = summarizeHarnessStdout(stdout);
+
+    expect(summary.finalJson).toBeUndefined();
+    expect(summary.finalText).toBe("");
+  });
+
+  it("does not scan past newer Antigravity delivery text to older tool JSON", () => {
+    const stdout = [
+      JSON.stringify({
+        result: '{"name":"workflows","isDir":true}',
+        source: "MODEL",
+        status: "DONE",
+        type: "LIST_DIR",
+      }),
+      JSON.stringify({
+        content:
+          "Sketchi artifact ready.\nArtifact ID: artifact_agy\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_agy?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_agy?format=png&raw=true",
+        source: "MODEL",
+        status: "DONE",
+        type: "PLANNER_RESPONSE",
+      }),
+    ].join("\n");
+
+    const summary = summarizeHarnessStdout(stdout);
+
+    expect(summary.finalJson).toBeUndefined();
+    expect(summary.finalText).toContain("Artifact ID: artifact_agy");
+    expect(summary.finalText).not.toContain("workflows");
+  });
+
   it("uses extra MCP payloads as proof without replacing final response JSON", () => {
     const stdout = JSON.stringify({
       type: "text",

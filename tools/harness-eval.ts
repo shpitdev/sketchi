@@ -876,16 +876,29 @@ function finalJsonFromTextParts(textParts: string[]): {
   finalJson?: unknown;
   finalText: string;
 } {
+  let lastTextIndex = -1;
   for (let index = textParts.length - 1; index >= 0; index -= 1) {
-    const text = textParts[index]?.trim() ?? "";
-    const parsed = maybeParseJsonObject(text);
-    if (parsed !== undefined) {
-      return { finalJson: parsed, finalText: text };
+    if ((textParts[index]?.trim() ?? "").length > 0) {
+      lastTextIndex = index;
+      break;
     }
+  }
+  if (lastTextIndex === -1) {
+    return { finalText: "" };
+  }
+
+  const finalText = textParts[lastTextIndex]?.trim() ?? "";
+  const parsedFinal = maybeParseJsonObject(finalText);
+  if (parsedFinal !== undefined) {
+    return { finalJson: parsedFinal, finalText };
+  }
+
+  if (!finalText.includes("{") && !finalText.includes("}")) {
+    return { finalText };
   }
 
   let suffix = "";
-  for (let index = textParts.length - 1; index >= 0; index -= 1) {
+  for (let index = lastTextIndex; index >= 0; index -= 1) {
     suffix = `${textParts[index] ?? ""}${suffix}`;
     const parsed = maybeParseJsonObject(suffix);
     if (parsed !== undefined) {
@@ -893,7 +906,7 @@ function finalJsonFromTextParts(textParts: string[]): {
     }
   }
 
-  return { finalText: textParts.at(-1)?.trim() ?? "" };
+  return { finalText };
 }
 
 function isAntigravityToolOutputEvent(type: string | undefined): boolean {
@@ -914,21 +927,24 @@ function textFromEvent(event: unknown): string[] {
   }
   const part = isRecord(event.part) ? event.part : undefined;
   const eventType = stringValue(event.type);
+  const isToolOutput = isAntigravityToolOutputEvent(eventType);
   const messageRecord = isRecord(event.message) ? event.message : undefined;
   const content = Array.isArray(messageRecord?.content)
     ? messageRecord.content
     : [];
-  const result = stringValue(event.result);
-  const eventContent = isAntigravityToolOutputEvent(eventType)
-    ? undefined
-    : stringValue(event.content);
+  const result = isToolOutput ? undefined : stringValue(event.result);
+  const eventContent = isToolOutput ? undefined : stringValue(event.content);
   const text = stringValue(part?.text);
-  const message = stringValue(event.message);
-  const contentText = content
-    .filter(isRecord)
-    .map((item) =>
-      stringValue(item.type) === "text" ? stringValue(item.text) : undefined,
-    );
+  const message = isToolOutput ? undefined : stringValue(event.message);
+  const contentText = isToolOutput
+    ? []
+    : content
+        .filter(isRecord)
+        .map((item) =>
+          stringValue(item.type) === "text"
+            ? stringValue(item.text)
+            : undefined,
+        );
   return [result, eventContent, text, message, ...contentText].filter(
     (value): value is string => Boolean(value),
   );

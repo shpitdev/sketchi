@@ -31,4 +31,5 @@ options: {
 - Do not write a Markdown/Mermaid summary as the deliverable after Sketchi accepts an artifact.
 - `scene` is for patching and debugging only. `excalidraw` and `png` are the user-facing outputs.
 - If local repo context is needed, inspect files only to understand the graph, then send the final graph to the MCP execute tool.
+- For vague repo/system architecture prompts, summarize into a readable 8-14 node flowchart. Prefer a mostly monotonic spine with short side branches; group related packages/systems into layers instead of drawing every transitive dependency edge.
 - If PNG export fails with a hosted renderer error, retry the hosted MCP request once. If it still fails, return the Excalidraw URL and clearly say PNG export is unavailable. Do not fall back to local rendering or remove PNG silently.

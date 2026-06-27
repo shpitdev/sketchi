@@ -100,7 +100,8 @@ https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/<artifactId>?format
 ## Guardrails
 
 - Keep IDs stable and readable.
-- Express the real workflow semantics. Fan-in, reused outcomes, and loop/back-edge cases are acceptable when they describe the process; Sketchi owns deterministic placement and routing for export.
+- Express the real workflow semantics, but keep export readability in mind. For broad repo/system prompts, summarize into a readable 8-14 node flowchart with a mostly monotonic spine and short side branches.
+- Group related packages/systems into layers instead of drawing every transitive dependency edge. Prefer labels/descriptions for nuance over dense cross-links.
 - Prefer typed graph generation for adding, removing, or reconnecting nodes.
 - Use patching for style, layout hints, labels, and metadata only when the docs show support.
 - If export reports `arrow_overlap`, keep the semantic graph intact unless the structure is actually wrong. Retry with `rerouteEdges` or report the artifact evidence rather than contorting the workflow solely for layout.

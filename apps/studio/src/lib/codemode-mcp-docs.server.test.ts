@@ -63,6 +63,15 @@ describe("Code Mode MCP docs", () => {
     expect(docs.content).toContain("format=png&raw=true");
   });
 
+  it("documents broad architecture prompt shaping", () => {
+    const docs = getCodeModeDocs({ topic: "buildFlowchart" });
+
+    expect(docs.content).toContain("broad or vague repo/system architecture");
+    expect(docs.content).toContain("8-14 high-signal nodes");
+    expect(docs.content).toContain("single readable spine");
+    expect(docs.content).toContain("group related packages into layers");
+  });
+
   it("documents patch envelopes and operation names for harness discovery", () => {
     const docs = getCodeModeDocs({ topic: "applyDiagramPatch" });
 
