@@ -87,6 +87,9 @@ Before building another eval framework, run a visible Agy/tmux capture pass and
 promote the results into one Markdown report. The report should keep the minimum
 fields that are useful for product decisions:
 
+First tracked capture:
+[Agy Code Mode Scenario Capture](evals/agy-code-mode-scenario-capture-2026-06-27.md).
+
 | Field           | Notes                                                   |
 | --------------- | ------------------------------------------------------- |
 | Prompt          | Full user prompt given to Agy                           |

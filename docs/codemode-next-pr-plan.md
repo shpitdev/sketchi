@@ -28,12 +28,14 @@ flowchart LR
 
 ## Current TODO Tasks
 
-- [ ] Capture a broad Agy/tmux Code Mode scenario suite before adding heavier
+- [x] Capture a broad Agy/tmux Code Mode scenario suite before adding heavier
       eval infrastructure. Use Agy as the visible primary surface and consolidate
       results in one tracked-or-promoted Markdown report once the shape is
       useful. Each row should capture prompt, harness, model, reasoning level,
       raw JSON artifact URL, raw PNG artifact URL, and brief notes.
-- [ ] Cover multiple complexity bands in that suite: simple linear flow, basic
+      First capture:
+      [Agy Code Mode Scenario Capture](evals/agy-code-mode-scenario-capture-2026-06-27.md).
+- [x] Cover multiple complexity bands in that suite: simple linear flow, basic
       decision tree, nested decisions, retry/loop workflow, lifecycle/state
       machine, incident escalation, actor handoff/swimlane-like flow,
       repo/package architecture, dense 10-15 node business process, and one
