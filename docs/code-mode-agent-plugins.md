@@ -18,12 +18,12 @@ outside `execute`. PNG bytes are hosted by the Studio Worker and rendered
 through Cloudflare Browser Run; plugin users should not need to install local
 browser binaries.
 
-When the MCP `execute` wrapper returns `artifactDelivery`, agents should use that
-object as the final response payload. It is a compact summary of the accepted
-artifact id, diagram id, format refs, raw Excalidraw URL, raw PNG URL when
-available, and final response guidance. This avoids low-reasoning harnesses
-digging through nested inline scene or Excalidraw JSON and accidentally creating
-Markdown/Mermaid wrapper artifacts.
+When the MCP `execute` wrapper returns `artifactDelivery`, agents should paste
+`artifactDelivery.finalResponseText` as the final chat response and stop. It is
+a compact summary of the accepted artifact id, diagram id, format refs, raw
+Excalidraw URL, and raw PNG URL when available. This avoids low-reasoning
+harnesses digging through nested inline scene or Excalidraw JSON and
+accidentally creating Markdown/Mermaid/local wrapper artifacts.
 
 For complex diagrams that need PNG proof, agents should provide semantic graph
 intent: stable node IDs, labeled decision branches, and edges that match the
@@ -113,7 +113,21 @@ Reports include semantic scenario checks, Excalidraw validation issues, MCP tool
 call counts, raw harness event paths, candidate JSON paths, duration, cost, and
 token buckets when the harness exposes them. Antigravity reports also include
 the latest conversation transcript path when the CLI exposes one through its
-local brain cache.
+local brain cache. For Agy TUI runs where `--print` auth is unavailable, replay
+an existing local brain transcript without launching Agy:
+
+```sh
+pnpm eval:harness -- --harness antigravity --scenario repo-package-interaction-flow \
+  --antigravity-conversation-id <conversation-id> \
+  --delivery-only \
+  --report-out .memory/harness-evals/antigravity-replay/report.json \
+  --candidate-out-dir .memory/harness-evals/antigravity-replay \
+  --events-out-dir .memory/harness-evals/antigravity-replay
+```
+
+The replay mode fails the run if Antigravity created wrapper files such as
+`diagram_info.md`, local PNG/SVG/JSON exports, or other non-MCP artifacts after
+Sketchi accepted an artifact.
 
 ## Endpoint
 

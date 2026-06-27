@@ -15,7 +15,9 @@ type HarnessName = "antigravity" | "claude" | "opencode";
 
 interface HarnessEvalOptions {
   all: boolean;
+  antigravityConversationId?: string;
   candidateOutDir?: string;
+  deliveryOnly: boolean;
   eventsOutDir?: string;
   harness: HarnessName;
   mcpUrl: string;
@@ -175,6 +177,8 @@ function usage(): string {
     "  --repeat <n>",
     "  --mcp-url <url>",
     "  --timeout-ms <ms>",
+    "  --antigravity-conversation-id <id>",
+    "  --delivery-only",
     "  --report-out <path>",
     "  --candidate-out-dir <dir>",
     "  --events-out-dir <dir>",
@@ -184,6 +188,7 @@ function usage(): string {
 function parseOptions(argv: readonly string[]): HarnessEvalOptions {
   const options: HarnessEvalOptions = {
     all: false,
+    deliveryOnly: false,
     harness: "opencode",
     mcpUrl: DEFAULT_MCP_URL,
     repeat: 1,
@@ -217,6 +222,10 @@ function parseOptions(argv: readonly string[]): HarnessEvalOptions {
       options.all = true;
       continue;
     }
+    if (arg === "--delivery-only") {
+      options.deliveryOnly = true;
+      continue;
+    }
     if (arg === "--repeat" && next) {
       const repeat = Number.parseInt(next, 10);
       if (!Number.isInteger(repeat) || repeat < 1) {
@@ -237,6 +246,11 @@ function parseOptions(argv: readonly string[]): HarnessEvalOptions {
         throw new Error("--timeout-ms must be an integer >= 1000.");
       }
       options.timeoutMs = timeoutMs;
+      index += 1;
+      continue;
+    }
+    if (arg === "--antigravity-conversation-id" && next) {
+      options.antigravityConversationId = next;
       index += 1;
       continue;
     }
@@ -261,6 +275,11 @@ function parseOptions(argv: readonly string[]): HarnessEvalOptions {
 
   if (!options.all && !options.scenarioId) {
     throw new Error(`Missing --scenario or --all.\n\n${usage()}`);
+  }
+  if (options.antigravityConversationId && options.harness !== "antigravity") {
+    throw new Error(
+      "--antigravity-conversation-id can only be used with --harness antigravity.",
+    );
   }
 
   return options;
@@ -354,6 +373,71 @@ function outputPathsFromTranscript(transcript: string): string[] {
   return [...paths];
 }
 
+function looksLikeWrapperArtifactPath(filePath: string): boolean {
+  const extension = path.extname(filePath).toLowerCase();
+  return [
+    ".excalidraw",
+    ".json",
+    ".markdown",
+    ".md",
+    ".mermaid",
+    ".mmd",
+    ".png",
+    ".svg",
+  ].includes(extension);
+}
+
+function stringArgumentsFrom(value: unknown): string[] {
+  if (!isRecord(value)) {
+    return [];
+  }
+
+  return Object.values(value)
+    .map(cleanQuotedString)
+    .filter((argument): argument is string => Boolean(argument));
+}
+
+function wrapperArtifactPathsFromTranscript(transcript: string): string[] {
+  const paths = new Set<string>();
+  const fileUrlPattern = /file:\/\/([^\s"')]+)/g;
+
+  for (const event of parseJsonLines(transcript)) {
+    if (!isRecord(event)) {
+      continue;
+    }
+
+    const calls = Array.isArray(event.tool_calls) ? event.tool_calls : [];
+    for (const call of calls.filter(isRecord)) {
+      const toolName = stringValue(call.name)?.toLowerCase();
+      if (
+        !toolName ||
+        (!toolName.includes("write_to_file") &&
+          !toolName.includes("create_file") &&
+          toolName !== "create")
+      ) {
+        continue;
+      }
+
+      for (const argument of stringArgumentsFrom(call.args)) {
+        if (looksLikeWrapperArtifactPath(argument)) {
+          paths.add(argument);
+        }
+      }
+    }
+
+    for (const text of textFromEvent(event)) {
+      for (const match of text.matchAll(fileUrlPattern)) {
+        const filePath = match[1];
+        if (filePath && looksLikeWrapperArtifactPath(filePath)) {
+          paths.add(decodeURIComponent(filePath));
+        }
+      }
+    }
+  }
+
+  return [...paths];
+}
+
 async function readOptionalText(filePath: string): Promise<string | undefined> {
   try {
     return await readFile(filePath, "utf8");
@@ -392,6 +476,57 @@ interface AntigravityEvidence {
   wrapperArtifactFiles: string[];
 }
 
+async function readAntigravityEvidenceForConversation(input: {
+  conversationId: string;
+  outputDir: string;
+  root: string;
+  stem: string;
+}): Promise<AntigravityEvidence> {
+  const brainDir = path.join(input.root, "brain", input.conversationId);
+  const transcriptPath = path.join(
+    brainDir,
+    ".system_generated",
+    "logs",
+    "transcript.jsonl",
+  );
+  const transcriptText = await readOptionalText(transcriptPath);
+  if (!transcriptText) {
+    return {
+      conversationId: input.conversationId,
+      outputTexts: [],
+      wrapperArtifactFiles: [],
+    };
+  }
+
+  const transcriptOut = path.join(input.outputDir, `${input.stem}.agy.jsonl`);
+  await writeText(transcriptOut, transcriptText);
+
+  const outputTexts = (
+    await Promise.all(
+      outputPathsFromTranscript(transcriptText).map((filePath) =>
+        readOptionalText(filePath),
+      ),
+    )
+  ).filter((text): text is string => Boolean(text));
+  const brainWrapperFiles = (await listFilesRecursive(brainDir)).filter(
+    (filePath) => !filePath.includes(`${path.sep}.system_generated${path.sep}`),
+  );
+  const wrapperArtifactFiles = [
+    ...new Set([
+      ...brainWrapperFiles,
+      ...wrapperArtifactPathsFromTranscript(transcriptText),
+    ]),
+  ];
+
+  return {
+    conversationId: input.conversationId,
+    outputTexts,
+    transcriptOut,
+    transcriptText,
+    wrapperArtifactFiles,
+  };
+}
+
 async function readAntigravityEvidence(input: {
   beforeConversationId?: string;
   cwd: string;
@@ -408,43 +543,12 @@ async function readAntigravityEvidence(input: {
     return { outputTexts: [], wrapperArtifactFiles: [] };
   }
 
-  const brainDir = path.join(root, "brain", conversationId);
-  const transcriptPath = path.join(
-    brainDir,
-    ".system_generated",
-    "logs",
-    "transcript.jsonl",
-  );
-  const transcriptText = await readOptionalText(transcriptPath);
-  if (!transcriptText) {
-    return {
-      conversationId,
-      outputTexts: [],
-      wrapperArtifactFiles: [],
-    };
-  }
-
-  const transcriptOut = path.join(input.outputDir, `${input.stem}.agy.jsonl`);
-  await writeText(transcriptOut, transcriptText);
-
-  const outputTexts = (
-    await Promise.all(
-      outputPathsFromTranscript(transcriptText).map((filePath) =>
-        readOptionalText(filePath),
-      ),
-    )
-  ).filter((text): text is string => Boolean(text));
-  const wrapperArtifactFiles = (await listFilesRecursive(brainDir)).filter(
-    (filePath) => !filePath.includes(`${path.sep}.system_generated${path.sep}`),
-  );
-
-  return {
+  return readAntigravityEvidenceForConversation({
     conversationId,
-    outputTexts,
-    transcriptOut,
-    transcriptText,
-    wrapperArtifactFiles,
-  };
+    outputDir: input.outputDir,
+    root,
+    stem: input.stem,
+  });
 }
 
 function stableRunStem(input: {
@@ -792,17 +896,32 @@ function finalJsonFromTextParts(textParts: string[]): {
   return { finalText: textParts.at(-1)?.trim() ?? "" };
 }
 
+function isAntigravityToolOutputEvent(type: string | undefined): boolean {
+  return [
+    "CODE_ACTION",
+    "ERROR_MESSAGE",
+    "GREP_SEARCH",
+    "LIST_DIR",
+    "MCP_TOOL",
+    "RUN_COMMAND",
+    "VIEW_FILE",
+  ].includes(type ?? "");
+}
+
 function textFromEvent(event: unknown): string[] {
   if (!isRecord(event)) {
     return [];
   }
   const part = isRecord(event.part) ? event.part : undefined;
+  const eventType = stringValue(event.type);
   const messageRecord = isRecord(event.message) ? event.message : undefined;
   const content = Array.isArray(messageRecord?.content)
     ? messageRecord.content
     : [];
   const result = stringValue(event.result);
-  const eventContent = stringValue(event.content);
+  const eventContent = isAntigravityToolOutputEvent(eventType)
+    ? undefined
+    : stringValue(event.content);
   const text = stringValue(part?.text);
   const message = stringValue(event.message);
   const contentText = content
@@ -938,6 +1057,47 @@ function artifactFormatsFrom(artifact: Record<string, unknown> | undefined) {
   }));
 }
 
+function artifactProofFromDelivery(input: {
+  callId?: string;
+  delivery: unknown;
+  toolName: string;
+}): HarnessMcpArtifactProof | undefined {
+  if (!isRecord(input.delivery)) {
+    return undefined;
+  }
+
+  const artifactId = stringValue(input.delivery.artifactId);
+  const artifactFormats = artifactFormatsFrom(input.delivery);
+  if (!artifactId || artifactFormats.length === 0) {
+    return undefined;
+  }
+
+  return {
+    artifactId,
+    artifactFormats: artifactFormats
+      .map((formatRef) => formatRef.format)
+      .filter((format): format is string => Boolean(format)),
+    artifactUrls: Object.fromEntries(
+      artifactFormats
+        .filter((formatRef): formatRef is { format: string; url: string } =>
+          Boolean(formatRef.format && formatRef.url),
+        )
+        .map((formatRef) => [formatRef.format, formatRef.url]),
+    ),
+    buildOk: true,
+    ...(stringValue(input.delivery.diagramId)
+      ? {
+          normalizedSpec: {
+            id: stringValue(input.delivery.diagramId),
+          },
+        }
+      : {}),
+    status: "accepted",
+    ...(input.callId ? { toolCallId: input.callId } : {}),
+    toolName: input.toolName,
+  };
+}
+
 function mcpArtifactFromPayload(input: {
   callId?: string;
   payload: unknown;
@@ -950,7 +1110,11 @@ function mcpArtifactFromPayload(input: {
 
   const result = acceptedBuildResultFrom(payload);
   if (!result || payload.ok !== true) {
-    return undefined;
+    return artifactProofFromDelivery({
+      ...(input.callId ? { callId: input.callId } : {}),
+      delivery: payload.artifactDelivery,
+      toolName: input.toolName,
+    });
   }
 
   const artifact = isRecord(result.artifact) ? result.artifact : result;
@@ -1228,8 +1392,31 @@ function reportableMcpArtifact(
   return report;
 }
 
-function outputContractErrors(input: {
+function finalTextDeliversArtifact(input: {
+  finalText: string;
+  proof: HarnessMcpArtifactProof | undefined;
+}): boolean {
+  if (!input.proof) {
+    return false;
+  }
+
+  const finalText = input.finalText.toLowerCase();
+  if (!finalText.includes(input.proof.artifactId.toLowerCase())) {
+    return false;
+  }
+
+  const excalidrawUrl = input.proof.artifactUrls.excalidraw;
+  const pngUrl = input.proof.artifactUrls.png;
+  return Boolean(
+    excalidrawUrl &&
+      finalText.includes(excalidrawUrl.toLowerCase()) &&
+      (!pngUrl || finalText.includes(pngUrl.toLowerCase())),
+  );
+}
+
+export function outputContractErrors(input: {
   finalJson: unknown | undefined;
+  finalText: string;
   proof: HarnessMcpArtifactProof | undefined;
 }): string[] {
   const errors: string[] = [];
@@ -1241,6 +1428,9 @@ function outputContractErrors(input: {
   }
 
   if (!isRecord(input.finalJson)) {
+    if (finalTextDeliversArtifact(input)) {
+      return errors;
+    }
     errors.push("Harness final response did not contain parseable JSON.");
     return errors;
   }
@@ -1316,6 +1506,16 @@ function redactedCommandForReport(spec: CommandSpec): {
   };
 }
 
+function replayCommandForReport(conversationId: string): {
+  args: string[];
+  command: string;
+} {
+  return {
+    args: ["<replay>", conversationId],
+    command: "agy",
+  };
+}
+
 async function runHarnessScenario(input: {
   options: HarnessEvalOptions;
   outputDir: string;
@@ -1335,7 +1535,8 @@ async function runHarnessScenario(input: {
   const stderrOut = path.join(eventsDir, `${stem}.stderr.txt`);
   const candidateOut = path.join(candidateDir, `${stem}.candidate.json`);
   const beforeAntigravityConversationId =
-    input.options.harness === "antigravity"
+    input.options.harness === "antigravity" &&
+    !input.options.antigravityConversationId
       ? await readAntigravityConversationId(process.cwd())
       : undefined;
   const prompt = buildHarnessPrompt({
@@ -1352,23 +1553,41 @@ async function runHarnessScenario(input: {
     scenarioId: input.scenario.id,
     timeoutMs: input.options.timeoutMs,
   });
-  const result = await runCommand(command, input.options.timeoutMs);
+  const result: SpawnResult = input.options.antigravityConversationId
+    ? {
+        durationMs: 0,
+        exitCode: 0,
+        signal: null,
+        stderr: "",
+        stdout: "",
+        timedOut: false,
+      }
+    : await runCommand(command, input.options.timeoutMs);
+  const antigravityRootForReplay = antigravityRoot();
   const antigravityEvidence =
-    input.options.harness === "antigravity"
-      ? await readAntigravityEvidence({
-          beforeConversationId: beforeAntigravityConversationId,
-          cwd: process.cwd(),
+    input.options.antigravityConversationId && antigravityRootForReplay
+      ? await readAntigravityEvidenceForConversation({
+          conversationId: input.options.antigravityConversationId,
           outputDir: eventsDir,
+          root: antigravityRootForReplay,
           stem,
         })
-      : {
-          outputTexts: [],
-          wrapperArtifactFiles: [],
-        };
+      : input.options.harness === "antigravity"
+        ? await readAntigravityEvidence({
+            beforeConversationId: beforeAntigravityConversationId,
+            cwd: process.cwd(),
+            outputDir: eventsDir,
+            stem,
+          })
+        : {
+            outputTexts: [],
+            wrapperArtifactFiles: [],
+          };
+  const combinedStdout = [result.stdout, antigravityEvidence.transcriptText]
+    .filter((text): text is string => Boolean(text))
+    .join("\n");
   const summary = summarizeHarnessStdout(
-    [result.stdout, antigravityEvidence.transcriptText]
-      .filter((text): text is string => Boolean(text))
-      .join("\n"),
+    combinedStdout,
     antigravityEvidence.outputTexts,
   );
   const mcpProof = summary.mcpArtifacts.at(-1);
@@ -1381,6 +1600,7 @@ async function runHarnessScenario(input: {
       ? [authError]
       : outputContractErrors({
           finalJson: summary.finalJson,
+          finalText: summary.finalText,
           proof: mcpProof,
         })),
     ...(antigravityEvidence.wrapperArtifactFiles.length === 0
@@ -1398,22 +1618,34 @@ async function runHarnessScenario(input: {
         excalidrawIssues: [],
         ok: false,
       }
-    : mcpProof
-      ? evaluateHarnessJson(
-          input.scenario,
-          mcpProof.normalizedSpec === undefined
-            ? summary.finalJson
-            : {
-                normalizedSpec: mcpProof.normalizedSpec,
-              },
-        )
-      : {
+    : input.options.deliveryOnly
+      ? {
           checks: [],
-          error:
-            "No successful sketchi-code-mode execute artifact was observed in the harness event stream.",
+          ...(mcpProof
+            ? {}
+            : {
+                error:
+                  "No successful sketchi-code-mode execute artifact was observed in the harness event stream.",
+              }),
           excalidrawIssues: [],
-          ok: false,
-        };
+          ok: Boolean(mcpProof),
+        }
+      : mcpProof
+        ? evaluateHarnessJson(
+            input.scenario,
+            mcpProof.normalizedSpec === undefined
+              ? summary.finalJson
+              : {
+                  normalizedSpec: mcpProof.normalizedSpec,
+                },
+          )
+        : {
+            checks: [],
+            error:
+              "No successful sketchi-code-mode execute artifact was observed in the harness event stream.",
+            excalidrawIssues: [],
+            ok: false,
+          };
   const evaluation: HarnessCandidateEvaluation =
     outputErrors.length === 0
       ? artifactEvaluation
@@ -1425,7 +1657,7 @@ async function runHarnessScenario(input: {
           ok: false,
         };
 
-  await writeText(eventsOut, result.stdout);
+  await writeText(eventsOut, combinedStdout);
   await writeText(stderrOut, result.stderr);
   await writeJson(candidateOut, {
     ...(antigravityEvidence.conversationId
@@ -1445,7 +1677,9 @@ async function runHarnessScenario(input: {
 
   return {
     candidateOut,
-    command: redactedCommandForReport(command),
+    command: input.options.antigravityConversationId
+      ? replayCommandForReport(input.options.antigravityConversationId)
+      : redactedCommandForReport(command),
     ...(antigravityEvidence.conversationId
       ? { conversationId: antigravityEvidence.conversationId }
       : {}),

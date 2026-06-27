@@ -16,7 +16,9 @@ describe("Code Mode MCP docs", () => {
     expect(docs.content).toContain("sketchi.applyDiagramPatch");
     expect(docs.content).toContain("Excalidraw and PNG URLs");
     expect(docs.content).toContain("artifactDelivery");
+    expect(docs.content).toContain("finalResponseText");
     expect(docs.content).toContain("Do not synthesize a Mermaid");
+    expect(docs.content).toContain("Do not call file/create/artifact tools");
     expect(docs.examples.map((example) => example.code)).not.toEqual(
       expect.arrayContaining([expect.stringMatching(/};\s*$/)]),
     );

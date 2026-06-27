@@ -14,8 +14,8 @@ Use the `sketchi-code-mode` MCP server for Sketchi diagrams instead of raw Excal
 3. Build or rebuild structure with `sketchi.buildFlowchart(input)`.
 4. Apply non-structural visual edits with `sketchi.applyDiagramPatch(input)`.
 5. Retrieve proof or output with `sketchi.getArtifact(input)`.
-6. Prefer the `artifactDelivery` object from the execute result when present. It already contains the accepted artifact id, format refs, and Excalidraw/PNG URLs.
-7. Return the accepted Sketchi artifact id, format refs, and Excalidraw/PNG URLs. Do not recreate the accepted diagram as a Markdown or Mermaid artifact.
+6. If the execute result contains `artifactDelivery.finalResponseText`, paste that text as the final chat response and stop.
+7. Otherwise return the accepted Sketchi artifact id, format refs, and Excalidraw/PNG URLs. Do not recreate the accepted diagram as a Markdown or Mermaid artifact.
 
 ## Execute Shape
 
@@ -106,7 +106,7 @@ https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/<artifactId>?format
 - If export reports `arrow_overlap`, keep the semantic graph intact unless the structure is actually wrong. Retry with `rerouteEdges` or report the artifact evidence rather than contorting the workflow solely for layout.
 - Pass the function expression itself. `async () => { ... }` is canonical; outer markdown fences and a trailing semicolon are tolerated by the server, but omit them in generated code.
 - Return the MCP result or artifact metadata so the caller has evidence. Do not make a separate Markdown/Mermaid diagram after Sketchi accepts an artifact.
-- When the execute tool returns `artifactDelivery`, use it as the final response payload instead of digging through nested inline scene or Excalidraw JSON.
+- When the execute tool returns `artifactDelivery.finalResponseText`, paste that string as the final response instead of digging through nested inline scene or Excalidraw JSON.
 - Request `artifactFormats: ["scene", "excalidraw", "png"]` when visual proof matters. Excalidraw is importable JSON; PNG is hosted binary evidence. `sketchi.getArtifact({ format: "excalidraw" | "png", inline: false })` returns metadata with raw Studio API URLs.
 - Do not install or require a local browser for plugin use; the deployed Studio Worker renders PNG artifacts through Cloudflare Browser Run.
 - Do not pass secrets or credentials into `execute`.

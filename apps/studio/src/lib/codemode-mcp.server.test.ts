@@ -356,6 +356,8 @@ describe("Sketchi Code Mode MCP server", () => {
         diagramId: "diagram_delivery",
         excalidrawUrl:
           "https://studio.test/api/v1/artifacts/artifact_delivery?format=excalidraw&raw=true",
+        finalResponseText:
+          "Sketchi artifact ready.\nArtifact ID: artifact_delivery\nDiagram ID: diagram_delivery\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_delivery?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_delivery?format=png&raw=true",
         formats: [
           {
             format: "scene",
@@ -376,10 +378,12 @@ describe("Sketchi Code Mode MCP server", () => {
         sceneUrl:
           "https://studio.test/api/v1/artifacts/artifact_delivery?format=scene&raw=true",
       },
+      finalResponseText:
+        "Sketchi artifact ready.\nArtifact ID: artifact_delivery\nDiagram ID: diagram_delivery\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_delivery?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_delivery?format=png&raw=true",
       ok: true,
     });
     expect(result.artifactDelivery?.finalResponseInstruction).toContain(
-      "Do not create a Markdown wrapper",
+      "Paste artifactDelivery.finalResponseText",
     );
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { summarizeHarnessStdout } from "./harness-eval";
+import { outputContractErrors, summarizeHarnessStdout } from "./harness-eval";
 
 describe("harness-eval", () => {
   const acceptedMcpOutput = {
@@ -444,6 +444,30 @@ describe("harness-eval", () => {
     });
   });
 
+  it("uses Antigravity planner prose instead of tool output as final text", () => {
+    const stdout = [
+      JSON.stringify({
+        content: 'File Path: file:///tmp/docs.json\n{"topic":"overview"}',
+        source: "MODEL",
+        status: "DONE",
+        type: "VIEW_FILE",
+      }),
+      JSON.stringify({
+        content:
+          "Sketchi artifact ready.\nArtifact ID: artifact_agy\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_agy?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_agy?format=png&raw=true",
+        source: "MODEL",
+        status: "DONE",
+        type: "PLANNER_RESPONSE",
+      }),
+    ].join("\n");
+
+    const summary = summarizeHarnessStdout(stdout);
+
+    expect(summary.finalJson).toBeUndefined();
+    expect(summary.finalText).toContain("Sketchi artifact ready.");
+    expect(summary.finalText).not.toContain("topic");
+  });
+
   it("uses extra MCP payloads as proof without replacing final response JSON", () => {
     const stdout = JSON.stringify({
       type: "text",
@@ -469,5 +493,146 @@ describe("harness-eval", () => {
     expect(summary.mcpArtifacts[0]).toMatchObject({
       artifactId: "artifact_demo",
     });
+  });
+
+  it("extracts MCP proof from artifactDelivery when nested result proof is absent", () => {
+    const stdout = [
+      JSON.stringify({
+        source: "MODEL",
+        status: "DONE",
+        type: "MCP_TOOL",
+        content: JSON.stringify({
+          ok: true,
+          artifactDelivery: {
+            artifactId: "artifact_delivery_only",
+            diagramId: "delivery-only",
+            formats: [
+              {
+                format: "excalidraw",
+                url: "https://studio.test/api/v1/artifacts/artifact_delivery_only?format=excalidraw&raw=true",
+              },
+              {
+                format: "png",
+                url: "https://studio.test/api/v1/artifacts/artifact_delivery_only?format=png&raw=true",
+              },
+            ],
+            finalResponseText:
+              "Sketchi artifact ready.\nArtifact ID: artifact_delivery_only",
+          },
+        }),
+      }),
+    ].join("\n");
+
+    const summary = summarizeHarnessStdout(stdout);
+
+    expect(summary.mcpArtifacts).toEqual([
+      expect.objectContaining({
+        artifactFormats: ["excalidraw", "png"],
+        artifactId: "artifact_delivery_only",
+        artifactUrls: {
+          excalidraw:
+            "https://studio.test/api/v1/artifacts/artifact_delivery_only?format=excalidraw&raw=true",
+          png: "https://studio.test/api/v1/artifacts/artifact_delivery_only?format=png&raw=true",
+        },
+        buildOk: true,
+        status: "accepted",
+      }),
+    ]);
+    expect(summary.finalJson).toBeUndefined();
+    expect(summary.finalText).toBe("");
+  });
+
+  it("accepts final chat text when it delivers the MCP artifact URLs", () => {
+    const proof = summarizeHarnessStdout(
+      JSON.stringify({
+        type: "tool_use",
+        part: {
+          type: "tool",
+          tool: "sketchi-code-mode_execute",
+          state: {
+            output: JSON.stringify(acceptedMcpOutput),
+            status: "completed",
+          },
+        },
+      }),
+    ).mcpArtifacts[0];
+
+    expect(
+      outputContractErrors({
+        finalJson: undefined,
+        finalText: [
+          "Sketchi artifact ready.",
+          "Artifact ID: artifact_demo",
+          "Excalidraw URL: https://studio.test/api/v1/artifacts/artifact_demo?format=excalidraw&raw=true",
+          "PNG URL: https://studio.test/api/v1/artifacts/artifact_demo?format=png&raw=true",
+        ].join("\n"),
+        proof,
+      }),
+    ).toEqual([]);
+  });
+
+  it("accepts final chat text for Excalidraw-only MCP artifacts", () => {
+    const excalidrawOnlyMcpOutput = {
+      ok: true,
+      result: {
+        ...acceptedMcpOutput.result,
+        artifact: {
+          ...acceptedMcpOutput.result.artifact,
+          formats: acceptedMcpOutput.result.artifact.formats.filter(
+            (formatRef) => formatRef.format !== "png",
+          ),
+        },
+      },
+    };
+    const proof = summarizeHarnessStdout(
+      JSON.stringify({
+        type: "tool_use",
+        part: {
+          type: "tool",
+          tool: "sketchi-code-mode_execute",
+          state: {
+            output: JSON.stringify(excalidrawOnlyMcpOutput),
+            status: "completed",
+          },
+        },
+      }),
+    ).mcpArtifacts[0];
+
+    expect(
+      outputContractErrors({
+        finalJson: undefined,
+        finalText: [
+          "Sketchi artifact ready.",
+          "Artifact ID: artifact_demo",
+          "Excalidraw URL: https://studio.test/api/v1/artifacts/artifact_demo?format=excalidraw&raw=true",
+        ].join("\n"),
+        proof,
+      }),
+    ).toEqual([]);
+  });
+
+  it("rejects final chat text that does not deliver the accepted MCP artifact", () => {
+    const proof = summarizeHarnessStdout(
+      JSON.stringify({
+        type: "tool_use",
+        part: {
+          type: "tool",
+          tool: "sketchi-code-mode_execute",
+          state: {
+            output: JSON.stringify(acceptedMcpOutput),
+            status: "completed",
+          },
+        },
+      }),
+    ).mcpArtifacts[0];
+
+    expect(
+      outputContractErrors({
+        finalJson: undefined,
+        finalText:
+          "Created a Markdown report in diagram_info.md. Please open that instead.",
+        proof,
+      }),
+    ).toContain("Harness final response did not contain parseable JSON.");
   });
 });

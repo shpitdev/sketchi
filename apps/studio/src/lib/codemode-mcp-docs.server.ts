@@ -268,6 +268,7 @@ interface ArtifactBundle {
 
 interface ExecuteToolResult {
   ok: boolean;
+  finalResponseText?: string;
   result?: unknown;
   logs?: string[];
   error?: string;
@@ -279,6 +280,7 @@ interface ExecuteToolResult {
     pngUrl?: string;
     sceneUrl?: string;
     finalResponseInstruction: string;
+    finalResponseText: string;
   };
 }`;
 
@@ -324,28 +326,7 @@ const ACCEPTANCE_LOOP_EXAMPLE = `async () => {
   });
 
   if (!patched.ok) return patched;
-
-  const excalidraw = await sketchi.getArtifact({
-    artifactId: patched.artifact.artifactId,
-    format: "excalidraw",
-    inline: false,
-  });
-  const png = await sketchi.getArtifact({
-    artifactId: patched.artifact.artifactId,
-    format: "png",
-    inline: false,
-  });
-
-  return {
-    ok: true,
-    artifactId: patched.artifact.artifactId,
-    diagramId: patched.artifact.diagramId,
-    formats: patched.artifact.formats,
-    excalidraw,
-    png,
-    finalArtifactInstruction:
-      "Return these Sketchi artifact ids and URLs as the final result. Do not recreate the diagram as Mermaid or Markdown.",
-  };
+  return patched;
 }`;
 
 const CIRCLE_TO_DIAMOND_EXAMPLE = `async () => {
@@ -387,28 +368,7 @@ const CIRCLE_TO_DIAMOND_EXAMPLE = `async () => {
   });
 
   if (!patched.ok) return patched;
-
-  const excalidraw = await sketchi.getArtifact({
-    artifactId: patched.artifact.artifactId,
-    format: "excalidraw",
-    inline: false,
-  });
-  const png = await sketchi.getArtifact({
-    artifactId: patched.artifact.artifactId,
-    format: "png",
-    inline: false,
-  });
-
-  return {
-    ok: true,
-    artifactId: patched.artifact.artifactId,
-    diagramId: patched.artifact.diagramId,
-    formats: patched.artifact.formats,
-    excalidraw,
-    png,
-    finalArtifactInstruction:
-      "Return these Sketchi artifact ids and URLs as the final result. Do not recreate the diagram as Mermaid or Markdown.",
-  };
+  return patched;
 }`;
 
 const INVALID_FIRST_EXAMPLE = `async () => {
@@ -478,15 +438,7 @@ const REPLACE_TEXT_EXAMPLE = `async () => {
   });
 
   if (!patched.ok) return patched;
-
-  return {
-    ok: true,
-    artifactId: patched.artifact.artifactId,
-    diagramId: patched.artifact.diagramId,
-    formats: patched.artifact.formats,
-    finalArtifactInstruction:
-      "Return these Sketchi artifact ids and URLs as the final result. Do not recreate the diagram as Mermaid or Markdown.",
-  };
+  return patched;
 }`;
 
 const catalog: CatalogEntry[] = [
@@ -527,6 +479,7 @@ const catalog: CatalogEntry[] = [
       "Call sketchi methods sequentially when possible so a harness can inspect structured failures and retry deliberately.",
       "For user-facing completion, return the accepted Sketchi artifactId plus Excalidraw and PNG URLs from the MCP result. Do not synthesize a Mermaid or Markdown replacement after Sketchi accepts an artifact.",
       "The execute wrapper adds artifactDelivery when it detects an accepted artifact bundle. Prefer returning artifactDelivery directly to the user because it already contains artifactId, format refs, raw Excalidraw/PNG URLs, and final-response instructions.",
+      "When artifactDelivery.finalResponseText is present, paste that string as the final chat answer and stop. Do not call file/create/artifact tools, inspect nested inline Excalidraw JSON, or create an Antigravity artifact after that point.",
       "",
       SKETCHI_CODE_MODE_TYPES,
     ].join("\n"),
@@ -697,7 +650,7 @@ const catalog: CatalogEntry[] = [
       "Step 1: build a valid semantic flowchart with nodes and edges.",
       "Step 2: inspect issues. If not accepted, repair the spec and call buildFlowchart again.",
       "Step 3: once accepted, use applyDiagramPatch for circle, diamond, color, movement, rerouteEdges, or replaceText tweaks.",
-      "Step 4: return the execute response artifactDelivery object if present, otherwise return the accepted Sketchi artifactId and Excalidraw/PNG URLs. Do not create a second Markdown or Mermaid artifact that duplicates the diagram.",
+      "Step 4: if the execute response includes artifactDelivery.finalResponseText, paste that finalResponseText in chat and stop. Otherwise return the accepted Sketchi artifactId and Excalidraw/PNG URLs. Do not create a second Markdown, Mermaid, local file, or Antigravity artifact that duplicates the diagram.",
     ].join("\n"),
     examples: [
       {
@@ -781,7 +734,7 @@ const catalog: CatalogEntry[] = [
     snippet:
       "When Sketchi accepts an artifact, the final result is that artifact bundle, not a recreated Markdown diagram.",
     content:
-      "Do not create a Markdown, Mermaid, or prose-only artifact after buildFlowchart or applyDiagramPatch succeeds. Return execute.artifactDelivery when present, or return the Sketchi artifactId, available formats, and raw Excalidraw/PNG URLs so the caller can open the actual generated artifact.",
+      "Do not create a Markdown, Mermaid, local file, Antigravity artifact, or prose-only artifact after buildFlowchart or applyDiagramPatch succeeds. Paste execute.artifactDelivery.finalResponseText when present, or return the Sketchi artifactId, available formats, and raw Excalidraw/PNG URLs so the caller can open the actual generated artifact.",
   },
   {
     id: "raw-excalidraw-non-goal",

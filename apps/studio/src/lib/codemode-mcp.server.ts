@@ -59,6 +59,7 @@ const ExecuteArtifactDeliverySchema = z.object({
   diagramId: z.string().optional(),
   excalidrawUrl: z.string().optional(),
   finalResponseInstruction: z.string(),
+  finalResponseText: z.string(),
   formats: z.array(
     z.object({
       expiresAt: z.string().optional(),
@@ -74,6 +75,7 @@ const ExecuteArtifactDeliverySchema = z.object({
 
 const ExecuteResultSchema = z.object({
   artifactDelivery: ExecuteArtifactDeliverySchema.optional(),
+  finalResponseText: z.string().optional(),
   ok: z.boolean(),
   result: z.unknown().optional(),
   error: z.string().optional(),
@@ -85,6 +87,7 @@ interface ArtifactDelivery {
   diagramId?: string;
   excalidrawUrl?: string;
   finalResponseInstruction: string;
+  finalResponseText: string;
   formats: ArtifactDeliveryFormat[];
   pngUrl?: string;
   sceneUrl?: string;
@@ -198,6 +201,23 @@ function urlForFormat(
   return formats.find((formatRef) => formatRef.format === format)?.url;
 }
 
+function artifactDeliveryResponseText(input: {
+  artifactId: string;
+  diagramId?: string;
+  excalidrawUrl?: string;
+  formats: readonly ArtifactDeliveryFormat[];
+  pngUrl?: string;
+}): string {
+  return [
+    "Sketchi artifact ready.",
+    `Artifact ID: ${input.artifactId}`,
+    ...(input.diagramId ? [`Diagram ID: ${input.diagramId}`] : []),
+    `Formats: ${input.formats.map((formatRef) => formatRef.format).join(", ")}`,
+    ...(input.excalidrawUrl ? [`Excalidraw URL: ${input.excalidrawUrl}`] : []),
+    ...(input.pngUrl ? [`PNG URL: ${input.pngUrl}`] : []),
+  ].join("\n");
+}
+
 function artifactDeliveryFrom(value: unknown): ArtifactDelivery | undefined {
   const artifact = acceptedArtifactContainerFrom(value);
   const artifactId = stringValue(artifact?.artifactId);
@@ -213,13 +233,21 @@ function artifactDeliveryFrom(value: unknown): ArtifactDelivery | undefined {
   const excalidrawUrl = urlForFormat(formats, "excalidraw");
   const pngUrl = urlForFormat(formats, "png");
   const sceneUrl = urlForFormat(formats, "scene");
+  const finalResponseText = artifactDeliveryResponseText({
+    artifactId,
+    ...(diagramId ? { diagramId } : {}),
+    ...(excalidrawUrl ? { excalidrawUrl } : {}),
+    formats,
+    ...(pngUrl ? { pngUrl } : {}),
+  });
 
   return {
     artifactId,
     ...(diagramId ? { diagramId } : {}),
     ...(excalidrawUrl ? { excalidrawUrl } : {}),
     finalResponseInstruction:
-      "Return this Sketchi artifact delivery object directly to the user. Do not create a Markdown wrapper, Mermaid diagram, local file, or separate Antigravity artifact after Sketchi accepts the diagram.",
+      "Paste artifactDelivery.finalResponseText as the final chat response and stop. Do not inspect nested inline JSON, call write_to_file/Create, create a Markdown wrapper, create a Mermaid diagram, create a local file, or create a separate Antigravity artifact after Sketchi accepts the diagram.",
+    finalResponseText,
     formats,
     ...(pngUrl ? { pngUrl } : {}),
     ...(sceneUrl ? { sceneUrl } : {}),
@@ -265,6 +293,7 @@ export async function executeSketchiCodeMode(
   options: CodeModeMcpOptions = {},
 ): Promise<{
   artifactDelivery?: ArtifactDelivery;
+  finalResponseText?: string;
   ok: boolean;
   result?: unknown;
   error?: string;
@@ -295,6 +324,9 @@ export async function executeSketchiCodeMode(
     if (execution.error) {
       return {
         ...(artifactDelivery ? { artifactDelivery } : {}),
+        ...(artifactDelivery
+          ? { finalResponseText: artifactDelivery.finalResponseText }
+          : {}),
         ok: false,
         error: execution.error,
         logs: execution.logs ?? [],
@@ -304,6 +336,9 @@ export async function executeSketchiCodeMode(
 
     return {
       ...(artifactDelivery ? { artifactDelivery } : {}),
+      ...(artifactDelivery
+        ? { finalResponseText: artifactDelivery.finalResponseText }
+        : {}),
       ok: true,
       result: execution.result,
       logs: execution.logs ?? [],
@@ -370,7 +405,8 @@ export function createSketchiMcpServer(
         "The sandbox exposes only sketchi.buildFlowchart, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
         "First get the semantic graph accepted, then use patch operations for deterministic visual changes.",
         "For final user-facing output, return accepted Sketchi artifact ids, format refs, and Excalidraw/PNG URLs. Do not recreate accepted diagrams as Markdown or Mermaid artifacts.",
-        "When execute returns artifactDelivery, that object is the recommended final response payload for external harnesses.",
+        "When execute returns artifactDelivery, paste artifactDelivery.finalResponseText as the final chat response and stop.",
+        "Do not call write_to_file/Create, create an Antigravity artifact, or inspect nested inline JSON after artifactDelivery is present.",
         "",
         SKETCHI_CODE_MODE_TYPES,
       ].join("\n"),
