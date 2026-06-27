@@ -81,6 +81,39 @@ interpreting the harness result.
 
 ## Harness Evals
 
+### Manual Agy Scenario Capture TODO
+
+Before building another eval framework, run a visible Agy/tmux capture pass and
+promote the results into one Markdown report. The report should keep the minimum
+fields that are useful for product decisions:
+
+| Field           | Notes                                                   |
+| --------------- | ------------------------------------------------------- |
+| Prompt          | Full user prompt given to Agy                           |
+| Harness         | Usually `agy` for this pass                             |
+| Model           | For example `gemini-3.5-flash`                          |
+| Reasoning level | The configured harness reasoning setting, when visible  |
+| JSON URL        | Raw hosted Excalidraw/scene artifact URL from Sketchi   |
+| PNG URL         | Raw hosted PNG artifact URL from Sketchi                |
+| Notes           | Short result summary, failure mode, or verification gap |
+
+Use a scenario mix that exercises different complexity bands:
+
+- simple linear flow;
+- basic decision tree;
+- nested decision workflow;
+- retry/loop workflow;
+- lifecycle or state-machine flow;
+- incident escalation;
+- actor handoff or swimlane-like flow;
+- repo/package architecture;
+- dense 10-15 node business process;
+- vague product/architecture request where the harness must infer structure.
+
+Keep this pass intentionally lightweight: verify that the JSON and PNG URLs load,
+capture obvious semantic or artifact failures, and do not add new eval tooling
+until the example set shows which checks matter.
+
 Use the harness eval runner to measure whether an external agent can create
 correct Code Mode artifacts through the deployed MCP server. The runner launches
 the selected harness, injects the no-auth public MCP config, asks the agent to
