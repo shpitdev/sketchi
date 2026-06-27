@@ -11,6 +11,7 @@ import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 
 import {
   convertSceneToExcalidraw,
+  createExcalidrawFile,
   type ExcalidrawElement,
   validateExcalidrawScene,
 } from "./diagram-excalidraw";
@@ -103,6 +104,24 @@ function expectValidOrderKeys(elements: readonly ExcalidrawElement[]) {
 }
 
 describe("convertSceneToExcalidraw", () => {
+  it("wraps scenes as importable Excalidraw files", () => {
+    const scene = convertSceneToExcalidraw(
+      renderIntermediateDiagram(flowchartFixture),
+    );
+    const file = createExcalidrawFile(scene, {
+      source: "https://studio.sketchi.app",
+    });
+
+    expect(file).toMatchObject({
+      type: "excalidraw",
+      version: 2,
+      source: "https://studio.sketchi.app",
+      elements: scene.elements,
+      appState: scene.appState,
+      files: {},
+    });
+  });
+
   it("creates bound arrows that validate as real Excalidraw elements", () => {
     const scene = convertSceneToExcalidraw(
       renderIntermediateDiagram(flowchartFixture),
@@ -224,7 +243,8 @@ describe("convertSceneToExcalidraw", () => {
       renderIntermediateDiagram(
         parseFlowchartDiagram({
           id: "production-release-incident-response-rollback-de",
-          title: "Production Release, Incident Response & Rollback Decision Flow",
+          title:
+            "Production Release, Incident Response & Rollback Decision Flow",
           type: "flowchart",
           nodes: [
             { id: "start", label: "Release Triggered", kind: "start" },

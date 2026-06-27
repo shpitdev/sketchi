@@ -14,6 +14,7 @@ Use the `sketchi-code-mode` MCP server for Sketchi diagrams instead of raw Excal
 3. Build or rebuild structure with `sketchi.buildFlowchart(input)`.
 4. Apply non-structural visual edits with `sketchi.applyDiagramPatch(input)`.
 5. Retrieve proof or output with `sketchi.getArtifact(input)`.
+6. Return the accepted Sketchi artifact id, format refs, and Excalidraw/PNG URLs. Do not recreate the accepted diagram as a Markdown or Mermaid artifact.
 
 ## Execute Shape
 
@@ -35,7 +36,10 @@ async () => {
       ],
       layout: { direction: "TB" },
     },
-    options: { inlineArtifacts: ["scene"] },
+    options: {
+      artifactFormats: ["scene", "excalidraw", "png"],
+      inlineArtifacts: ["excalidraw"],
+    },
   });
 
   if (!built.ok) return built;
@@ -63,19 +67,32 @@ async () => {
 
   if (!patched.ok) return patched;
 
+  const excalidraw = await sketchi.getArtifact({
+    artifactId: patched.artifact.artifactId,
+    format: "excalidraw",
+    inline: false,
+  });
   const png = await sketchi.getArtifact({
     artifactId: patched.artifact.artifactId,
     format: "png",
     inline: false,
   });
 
-  return { patched, png };
+  return {
+    ok: true,
+    artifactId: patched.artifact.artifactId,
+    diagramId: patched.artifact.diagramId,
+    formats: patched.artifact.formats,
+    excalidraw,
+    png,
+  };
 }
 ```
 
-To view the PNG bytes after `execute` returns metadata, fetch:
+To view the artifact bytes after `execute` returns metadata, fetch:
 
 ```text
+https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/<artifactId>?format=excalidraw&raw=true
 https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/<artifactId>?format=png&raw=true
 ```
 
@@ -87,8 +104,8 @@ https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/<artifactId>?format
 - Use patching for style, layout hints, labels, and metadata only when the docs show support.
 - If export reports `arrow_overlap`, keep the semantic graph intact unless the structure is actually wrong. Retry with `rerouteEdges` or report the artifact evidence rather than contorting the workflow solely for layout.
 - Pass the function expression itself. `async () => { ... }` is canonical; outer markdown fences and a trailing semicolon are tolerated by the server, but omit them in generated code.
-- Return the MCP result or artifact metadata so the caller has evidence.
-- Request `artifactFormats: ["scene", "excalidraw", "png"]` when visual proof matters. PNG is hosted binary evidence; `sketchi.getArtifact({ format: "png", inline: false })` returns metadata, then fetch the raw Studio API URL outside `execute` for bytes.
+- Return the MCP result or artifact metadata so the caller has evidence. Do not make a separate Markdown/Mermaid diagram after Sketchi accepts an artifact.
+- Request `artifactFormats: ["scene", "excalidraw", "png"]` when visual proof matters. Excalidraw is importable JSON; PNG is hosted binary evidence. `sketchi.getArtifact({ format: "excalidraw" | "png", inline: false })` returns metadata with raw Studio API URLs.
 - Do not install or require a local browser for plugin use; the deployed Studio Worker renders PNG artifacts through Cloudflare Browser Run.
 - Do not pass secrets or credentials into `execute`.
 - Do not treat the deployed Workers MCP endpoint as a private boundary; it is a tool surface for Code Mode operations.

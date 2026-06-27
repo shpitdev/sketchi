@@ -14,6 +14,8 @@ describe("Code Mode MCP docs", () => {
     expect(docs.content).toContain("sketchi.buildFlowchart");
     expect(docs.content).toContain("sketchi.getArtifact");
     expect(docs.content).toContain("sketchi.applyDiagramPatch");
+    expect(docs.content).toContain("Excalidraw and PNG URLs");
+    expect(docs.content).toContain("Do not synthesize a Mermaid");
     expect(docs.examples.map((example) => example.code)).not.toEqual(
       expect.arrayContaining([expect.stringMatching(/};\s*$/)]),
     );
@@ -40,6 +42,22 @@ describe("Code Mode MCP docs", () => {
     expect(managedResults.results.map((result) => result.id)).toContain(
       "managed-thread-non-goal",
     );
+
+    const finalArtifactResults = searchCodeModeDocs({
+      query: "do not create markdown mermaid final artifact url",
+    });
+    expect(finalArtifactResults.results.map((result) => result.id)).toContain(
+      "no-mermaid-wrapper-non-goal",
+    );
+  });
+
+  it("documents importable Excalidraw artifact URLs", () => {
+    const docs = getCodeModeDocs({ topic: "getArtifact" });
+
+    expect(docs.content).toContain("importable Excalidraw file JSON");
+    expect(docs.content).toContain("url fields");
+    expect(docs.content).toContain("format=excalidraw&raw=true");
+    expect(docs.content).toContain("format=png&raw=true");
   });
 
   it("documents patch envelopes and operation names for harness discovery", () => {

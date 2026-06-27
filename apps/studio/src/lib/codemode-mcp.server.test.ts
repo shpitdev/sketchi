@@ -46,14 +46,17 @@ const CIRCLE_TO_DIAMOND_CODE = `async () => {
         style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" },
       },
     ],
-    options: { inlineArtifacts: ["scene"] },
+    options: {
+      artifactFormats: ["scene", "excalidraw"],
+      inlineArtifacts: ["excalidraw"],
+    },
   });
 
   if (!patched.ok) return patched;
 
   return sketchi.getArtifact({
     artifactId: patched.artifact.artifactId,
-    format: "scene",
+    format: "excalidraw",
     inline: true,
   });
 }`;
@@ -201,7 +204,11 @@ describe("Sketchi Code Mode MCP server", () => {
         ok: true,
         result: {
           ok: true,
-          format: "scene",
+          format: "excalidraw",
+          inline: {
+            type: "excalidraw",
+            version: 2,
+          },
         },
       });
     } finally {
@@ -250,7 +257,12 @@ describe("Sketchi Code Mode MCP server", () => {
         ok: true,
         result: {
           ok: true,
-          format: "scene",
+          format: "excalidraw",
+          inline: {
+            type: "excalidraw",
+            version: 2,
+          },
+          url: expect.stringContaining("https://studio.test/api/v1/artifacts/"),
         },
       });
     } finally {
@@ -297,7 +309,7 @@ describe("Sketchi Code Mode MCP server", () => {
       ok: true,
       result: {
         ok: true,
-        format: "scene",
+        format: "excalidraw",
       },
     });
   });

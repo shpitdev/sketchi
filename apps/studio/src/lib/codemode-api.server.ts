@@ -36,10 +36,25 @@ export function createStudioCodeModeRuntime(
   options: StudioCodeModeRuntimeOptions = {},
 ) {
   const renderer = rendererForEnv(env, options);
+  const origin = options.origin;
   return createCodeModeRuntime({
+    ...(origin ? { artifactUrl: (input) => artifactUrl(origin, input) } : {}),
     ...(renderer ? { renderer } : {}),
     store: artifactStoreForEnv(env),
   });
+}
+
+function artifactUrl(
+  origin: string,
+  input: { artifactId: string; format: ArtifactFormat },
+): string {
+  const url = new URL(
+    `/api/v1/artifacts/${encodeURIComponent(input.artifactId)}`,
+    origin,
+  );
+  url.searchParams.set("format", input.format);
+  url.searchParams.set("raw", "true");
+  return url.toString();
 }
 
 function rendererForEnv(env: StudioEnv, options: StudioCodeModeRuntimeOptions) {
@@ -168,8 +183,13 @@ function inlineFromUrl(request: Request): boolean | undefined {
   return value !== "false";
 }
 
-function extensionForFormat(format: ArtifactFormat): "json" | "png" {
-  return format === "png" ? "png" : "json";
+function extensionForFormat(
+  format: ArtifactFormat,
+): "excalidraw" | "json" | "png" {
+  if (format === "png") {
+    return "png";
+  }
+  return format === "excalidraw" ? "excalidraw" : "json";
 }
 
 function bodyForRawArtifact(artifact: StoredArtifactFormat): BodyInit {

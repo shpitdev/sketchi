@@ -218,6 +218,33 @@ const flowchartScenarioDefinitions = [
     ],
   },
   {
+    id: "repo-package-interaction-flow",
+    title: "Repo package interaction flow",
+    difficulty: "standard",
+    tags: ["repo", "packages", "harness", "code-mode", "vague-prompt"],
+    description:
+      "A vague package-interaction request recast as a directed flowchart so harnesses preserve concrete package boundaries instead of inventing a Mermaid dependency report.",
+    prompt:
+      "Create a diagram that showcases how the various packages in this repo interact. Show the high-level path from an app request through the agent, core diagram model, renderer, Excalidraw export, and hosted artifact response.",
+    nodes: [
+      ["app-request", "App or MCP request", "start"],
+      ["diagram-agent", "diagram-agent orchestrates", "process"],
+      ["diagram-core", "diagram-core validates IR", "process"],
+      ["diagram-renderer", "diagram-renderer lays out scene", "process"],
+      ["diagram-excalidraw", "diagram-excalidraw exports file", "process"],
+      ["artifact-store", "Artifact store saves formats", "process"],
+      ["studio-api", "Studio API returns artifact URLs", "end"],
+    ],
+    edges: [
+      ["request-agent", "app-request", "diagram-agent"],
+      ["agent-core", "diagram-agent", "diagram-core"],
+      ["core-renderer", "diagram-core", "diagram-renderer"],
+      ["renderer-excalidraw", "diagram-renderer", "diagram-excalidraw"],
+      ["excalidraw-store", "diagram-excalidraw", "artifact-store"],
+      ["store-api", "artifact-store", "studio-api"],
+    ],
+  },
+  {
     id: "support-ticket-triage",
     title: "Support ticket triage",
     difficulty: "standard",

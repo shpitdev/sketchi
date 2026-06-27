@@ -104,6 +104,20 @@ describe("Code Mode API handlers", () => {
     expect(built).toMatchObject({ ok: true, status: "accepted" });
 
     const artifactId = artifactIdFrom(built);
+    expect(built).toMatchObject({
+      artifact: {
+        formats: expect.arrayContaining([
+          expect.objectContaining({
+            format: "excalidraw",
+            url: `https://studio.test/api/v1/artifacts/${artifactId}?format=excalidraw&raw=true`,
+          }),
+          expect.objectContaining({
+            format: "scene",
+            url: `https://studio.test/api/v1/artifacts/${artifactId}?format=scene&raw=true`,
+          }),
+        ]),
+      },
+    });
     const getResponse = await handleGetArtifactRequest(
       {},
       new Request(
@@ -117,6 +131,28 @@ describe("Code Mode API handlers", () => {
       ok: true,
       artifactId,
       format: "scene",
+      url: `https://studio.test/api/v1/artifacts/${artifactId}?format=scene&raw=true`,
+    });
+
+    const rawExcalidrawResponse = await handleGetArtifactRequest(
+      {},
+      new Request(
+        `https://studio.test/api/v1/artifacts/${artifactId}?format=excalidraw&raw=true`,
+      ),
+      artifactId,
+    );
+
+    expect(rawExcalidrawResponse.status).toBe(200);
+    expect(rawExcalidrawResponse.headers.get("content-type")).toBe(
+      "application/vnd.excalidraw+json",
+    );
+    expect(rawExcalidrawResponse.headers.get("content-disposition")).toBe(
+      `inline; filename="${artifactId}.excalidraw"`,
+    );
+    await expect(rawExcalidrawResponse.json()).resolves.toMatchObject({
+      type: "excalidraw",
+      version: 2,
+      files: {},
     });
 
     const invalidGetResponse = await handleGetArtifactRequest(
@@ -174,6 +210,18 @@ describe("Code Mode API handlers", () => {
       `codemode/${artifactId}/manifest.json`,
       `codemode/${artifactId}/scene.json`,
     ]);
+    const excalidrawObject = await bucket.get(
+      `codemode/${artifactId}/excalidraw.json`,
+    );
+    const excalidrawJson = JSON.parse((await excalidrawObject?.text()) ?? "{}");
+    expect(excalidrawJson).toMatchObject({
+      type: "excalidraw",
+      version: 2,
+      source: "https://sketchi.app",
+      files: {},
+      elements: expect.any(Array),
+      appState: expect.any(Object),
+    });
 
     const getResponse = await handleGetArtifactRequest(
       env,

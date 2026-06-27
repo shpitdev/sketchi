@@ -208,6 +208,13 @@ export const ExcalidrawSceneSchema = z.object({
   elements: z.array(ExcalidrawElementSchema),
 });
 
+export const ExcalidrawFileSchema = ExcalidrawSceneSchema.extend({
+  files: z.record(z.string(), z.unknown()),
+  source: z.string().min(1),
+  type: z.literal("excalidraw"),
+  version: z.literal(2),
+});
+
 export const GetArtifactRequestSchema = z.object({
   artifactId: z.string().min(1),
   format: ArtifactFormatSchema.optional(),
@@ -307,6 +314,7 @@ export type FlowchartSpecLayout = z.infer<typeof FlowchartSpecLayoutSchema>;
 export type FlowchartSpecStyle = z.infer<typeof FlowchartSpecStyleSchema>;
 export type BuildFlowchartOptions = z.infer<typeof BuildFlowchartOptionsSchema>;
 export type BuildFlowchartRequest = z.infer<typeof BuildFlowchartRequestSchema>;
+export type ExcalidrawFile = z.infer<typeof ExcalidrawFileSchema>;
 export type GetArtifactRequest = z.infer<typeof GetArtifactRequestSchema>;
 export type DiagramSelector = z.infer<typeof DiagramSelectorSchema>;
 export type DiagramStylePatch = z.infer<typeof DiagramStylePatchSchema>;

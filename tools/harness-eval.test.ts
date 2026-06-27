@@ -23,7 +23,20 @@ describe("harness-eval", () => {
       artifact: {
         artifactId: "artifact_demo",
         diagramId: "demo",
-        formats: [{ format: "scene" }, { format: "excalidraw" }],
+        formats: [
+          {
+            format: "scene",
+            url: "https://studio.test/api/v1/artifacts/artifact_demo?format=scene&raw=true",
+          },
+          {
+            format: "excalidraw",
+            url: "https://studio.test/api/v1/artifacts/artifact_demo?format=excalidraw&raw=true",
+          },
+          {
+            format: "png",
+            url: "https://studio.test/api/v1/artifacts/artifact_demo?format=png&raw=true",
+          },
+        ],
       },
     },
   };
@@ -47,7 +60,11 @@ describe("harness-eval", () => {
         part: {
           type: "text",
           text: JSON.stringify({
+            artifactFormats: ["scene", "excalidraw", "png"],
+            artifactId: "artifact_demo",
             buildOk: true,
+            excalidrawUrl:
+              "https://studio.test/api/v1/artifacts/artifact_demo?format=excalidraw&raw=true",
             normalizedSpec: {
               id: "demo",
               title: "Demo",
@@ -59,6 +76,9 @@ describe("harness-eval", () => {
                 backgroundColor: "#ffffff",
               },
             },
+            pngUrl:
+              "https://studio.test/api/v1/artifacts/artifact_demo?format=png&raw=true",
+            status: "accepted",
           }),
         },
       }),
@@ -95,6 +115,14 @@ describe("harness-eval", () => {
     expect(summary.mcpArtifacts).toEqual([
       {
         artifactId: "artifact_demo",
+        artifactFormats: ["scene", "excalidraw", "png"],
+        artifactUrls: {
+          excalidraw:
+            "https://studio.test/api/v1/artifacts/artifact_demo?format=excalidraw&raw=true",
+          png: "https://studio.test/api/v1/artifacts/artifact_demo?format=png&raw=true",
+          scene:
+            "https://studio.test/api/v1/artifacts/artifact_demo?format=scene&raw=true",
+        },
         buildId: "build_demo",
         buildOk: true,
         normalizedSpec: acceptedMcpOutput.result.normalizedSpec,
@@ -106,8 +134,14 @@ describe("harness-eval", () => {
       },
     ]);
     expect(summary.finalJson).toMatchObject({
+      artifactId: "artifact_demo",
       buildOk: true,
+      excalidrawUrl:
+        "https://studio.test/api/v1/artifacts/artifact_demo?format=excalidraw&raw=true",
       normalizedSpec: { id: "demo" },
+      pngUrl:
+        "https://studio.test/api/v1/artifacts/artifact_demo?format=png&raw=true",
+      status: "accepted",
     });
     expect(summary.stepCosts).toEqual([0.012]);
     expect(summary.steps[0]?.tokens).toEqual({

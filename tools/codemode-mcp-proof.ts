@@ -42,14 +42,17 @@ const CODE = `async () => {
         style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" },
       },
     ],
-    options: { inlineArtifacts: ["scene"] },
+    options: {
+      artifactFormats: ["scene", "excalidraw"],
+      inlineArtifacts: ["excalidraw"],
+    },
   });
 
   if (!patched.ok) return patched;
 
   return sketchi.getArtifact({
     artifactId: patched.artifact.artifactId,
-    format: "scene",
+    format: "excalidraw",
     inline: true,
   });
 }`;
@@ -123,7 +126,7 @@ async function main() {
   });
   const server = createSketchiMcpServer(
     {},
-    { executor: createInProcessExecutor() },
+    { executor: createInProcessExecutor(), origin: "https://studio.test" },
   );
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
@@ -165,8 +168,22 @@ async function main() {
       throw new Error("Code Mode execute did not return an accepted result.");
     }
 
-    if (execute.result.ok !== true || execute.result.format !== "scene") {
-      throw new Error("Code Mode execute did not return an inline scene.");
+    if (execute.result.ok !== true || execute.result.format !== "excalidraw") {
+      throw new Error("Code Mode execute did not return inline Excalidraw.");
+    }
+
+    const inline = isRecord(execute.result.inline)
+      ? execute.result.inline
+      : undefined;
+    if (inline?.type !== "excalidraw" || inline?.version !== 2) {
+      throw new Error("Code Mode execute did not return an Excalidraw file.");
+    }
+
+    if (
+      typeof execute.result.url !== "string" ||
+      !execute.result.url.includes("format=excalidraw")
+    ) {
+      throw new Error("Code Mode execute did not return an Excalidraw URL.");
     }
 
     const outputDir = join(process.cwd(), ".memory", "codemode-mcp-proof");
@@ -189,7 +206,10 @@ async function main() {
           diagramId: execute.result.diagramId,
           elementCount: elementCountFrom(execute.result),
           format: execute.result.format,
+          inlineType: inline.type,
           ok: execute.result.ok,
+          url: execute.result.url,
+          version: inline.version,
         },
       },
     };

@@ -4,6 +4,8 @@ import {
 } from "@sketchi/diagram-core";
 import {
   convertSceneToExcalidraw,
+  createExcalidrawFile,
+  type ExcalidrawScene,
   validateExcalidrawScene,
 } from "@sketchi/diagram-excalidraw";
 import {
@@ -60,6 +62,10 @@ export interface CodeModeRuntimeOptions {
   store?: CodeModeArtifactStore;
   createId?: (prefix: string) => string;
   renderer?: CodeModeArtifactRenderer;
+  artifactUrl?: (input: {
+    artifactId: string;
+    format: ArtifactFormat;
+  }) => string;
 }
 
 export interface CodeModeRuntime {
@@ -590,7 +596,7 @@ function requestedInlineFormats(
 async function storedArtifactsForFormats(input: {
   formats: readonly ArtifactFormat[];
   scene: RenderedDiagramScene;
-  excalidraw: unknown;
+  excalidraw: ExcalidrawScene;
   renderer?: CodeModeArtifactRenderer | undefined;
 }): Promise<StoredArtifactFormat[]> {
   const artifacts: StoredArtifactFormat[] = [];
@@ -611,7 +617,7 @@ async function storedArtifactsForFormats(input: {
 async function dataForArtifactFormat(
   input: {
     scene: RenderedDiagramScene;
-    excalidraw: unknown;
+    excalidraw: ExcalidrawScene;
     renderer?: CodeModeArtifactRenderer | undefined;
   },
   format: ArtifactFormat,
@@ -621,7 +627,7 @@ async function dataForArtifactFormat(
   }
 
   if (format === "excalidraw") {
-    return input.excalidraw;
+    return createExcalidrawFile(input.excalidraw);
   }
 
   if (!input.renderer) {
@@ -1332,12 +1338,39 @@ function responseRequestId(requestId: string | undefined) {
   return requestId ? { requestId } : {};
 }
 
+function withArtifactUrls(
+  artifact: Awaited<ReturnType<CodeModeArtifactStore["write"]>>,
+  artifactUrl: CodeModeRuntimeOptions["artifactUrl"],
+) {
+  if (!artifactUrl) {
+    return artifact;
+  }
+
+  const formats = artifact.formats.map((formatRef) => ({
+    ...formatRef,
+    url: artifactUrl({
+      artifactId: artifact.artifactId,
+      format: formatRef.format,
+    }),
+  }));
+  const preview = artifact.preview
+    ? formats.find((formatRef) => formatRef.format === artifact.preview?.format)
+    : undefined;
+
+  return {
+    ...artifact,
+    formats,
+    ...(preview ? { preview } : {}),
+  };
+}
+
 export function createCodeModeRuntime(
   options: CodeModeRuntimeOptions = {},
 ): CodeModeRuntime {
   const store = options.store ?? createMemoryArtifactStore();
   const createId = options.createId ?? defaultCreateId;
   const renderer = options.renderer;
+  const artifactUrl = options.artifactUrl;
 
   return {
     async buildFlowchart(input) {
@@ -1505,7 +1538,7 @@ export function createCodeModeRuntime(
           ...responseRequestId(request.requestId),
           normalizedSpec,
           quality,
-          artifact,
+          artifact: withArtifactUrls(artifact, artifactUrl),
           issues: [],
         };
       } catch (error) {
@@ -1623,6 +1656,9 @@ export function createCodeModeRuntime(
         diagramId: manifest.diagramId,
         format,
         mimeType: artifact.mimeType,
+        ...(artifactUrl
+          ? { url: artifactUrl({ artifactId: request.artifactId, format }) }
+          : {}),
         ...(request.inline !== true || !isInlineArtifactFormat(format)
           ? {}
           : { inline: artifact.data }),
@@ -1802,7 +1838,7 @@ export function createCodeModeRuntime(
           ...(source.sourceArtifactId
             ? { sourceArtifactId: source.sourceArtifactId }
             : {}),
-          artifact,
+          artifact: withArtifactUrls(artifact, artifactUrl),
           issues: [],
         };
       } catch (error) {

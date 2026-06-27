@@ -262,8 +262,8 @@ type ApplyDiagramPatchResult =
 interface ArtifactBundle {
   artifactId: string;
   diagramId: string;
-  formats: Array<{ format: ArtifactFormat; mimeType: string; inline?: unknown; sizeBytes?: number }>;
-  preview?: { format: ArtifactFormat; mimeType: string; inline?: unknown; sizeBytes?: number };
+  formats: Array<{ format: ArtifactFormat; mimeType: string; inline?: unknown; sizeBytes?: number; url?: string; expiresAt?: string }>;
+  preview?: { format: ArtifactFormat; mimeType: string; inline?: unknown; sizeBytes?: number; url?: string; expiresAt?: string };
 }`;
 
 const ACCEPTANCE_LOOP_EXAMPLE = `async () => {
@@ -286,7 +286,7 @@ const ACCEPTANCE_LOOP_EXAMPLE = `async () => {
 
   if (!built.ok) return built;
 
-  return sketchi.applyDiagramPatch({
+  const patched = await sketchi.applyDiagramPatch({
     source: { artifactId: built.artifact.artifactId },
     intent: "Make the decision node a purple diamond after the graph is accepted.",
     operations: [
@@ -306,6 +306,30 @@ const ACCEPTANCE_LOOP_EXAMPLE = `async () => {
       inlineArtifacts: ["scene", "excalidraw"],
     },
   });
+
+  if (!patched.ok) return patched;
+
+  const excalidraw = await sketchi.getArtifact({
+    artifactId: patched.artifact.artifactId,
+    format: "excalidraw",
+    inline: false,
+  });
+  const png = await sketchi.getArtifact({
+    artifactId: patched.artifact.artifactId,
+    format: "png",
+    inline: false,
+  });
+
+  return {
+    ok: true,
+    artifactId: patched.artifact.artifactId,
+    diagramId: patched.artifact.diagramId,
+    formats: patched.artifact.formats,
+    excalidraw,
+    png,
+    finalArtifactInstruction:
+      "Return these Sketchi artifact ids and URLs as the final result. Do not recreate the diagram as Mermaid or Markdown.",
+  };
 }`;
 
 const CIRCLE_TO_DIAMOND_EXAMPLE = `async () => {
@@ -348,11 +372,27 @@ const CIRCLE_TO_DIAMOND_EXAMPLE = `async () => {
 
   if (!patched.ok) return patched;
 
-  return sketchi.getArtifact({
+  const excalidraw = await sketchi.getArtifact({
+    artifactId: patched.artifact.artifactId,
+    format: "excalidraw",
+    inline: false,
+  });
+  const png = await sketchi.getArtifact({
     artifactId: patched.artifact.artifactId,
     format: "png",
     inline: false,
   });
+
+  return {
+    ok: true,
+    artifactId: patched.artifact.artifactId,
+    diagramId: patched.artifact.diagramId,
+    formats: patched.artifact.formats,
+    excalidraw,
+    png,
+    finalArtifactInstruction:
+      "Return these Sketchi artifact ids and URLs as the final result. Do not recreate the diagram as Mermaid or Markdown.",
+  };
 }`;
 
 const INVALID_FIRST_EXAMPLE = `async () => {
@@ -405,7 +445,7 @@ const REPLACE_TEXT_EXAMPLE = `async () => {
 
   if (!built.ok) return built;
 
-  return sketchi.applyDiagramPatch({
+  const patched = await sketchi.applyDiagramPatch({
     source: { artifactId: built.artifact.artifactId },
     intent: "Rename the final state without rebuilding structure.",
     operations: [
@@ -415,8 +455,22 @@ const REPLACE_TEXT_EXAMPLE = `async () => {
         text: "Ship to production",
       },
     ],
-    options: { inlineArtifacts: ["scene", "excalidraw"] },
+    options: {
+      artifactFormats: ["scene", "excalidraw", "png"],
+      inlineArtifacts: ["excalidraw"],
+    },
   });
+
+  if (!patched.ok) return patched;
+
+  return {
+    ok: true,
+    artifactId: patched.artifact.artifactId,
+    diagramId: patched.artifact.diagramId,
+    formats: patched.artifact.formats,
+    finalArtifactInstruction:
+      "Return these Sketchi artifact ids and URLs as the final result. Do not recreate the diagram as Mermaid or Markdown.",
+  };
 }`;
 
 const catalog: CatalogEntry[] = [
@@ -432,6 +486,7 @@ const catalog: CatalogEntry[] = [
       "Sketchi Code Mode MCP is for external agent harnesses: Codex, Claude Code, OpenCode, and similar clients.",
       "The server exposes a small contract: docs, search, and execute. execute runs JavaScript against a typed sketchi client.",
       "The public sketchi client has exactly three operations: buildFlowchart, getArtifact, and applyDiagramPatch.",
+      "The final deliverable is the accepted Sketchi artifact bundle: return the artifactId, format list, and Excalidraw/PNG artifact URLs instead of creating a separate Markdown, Mermaid, or prose-only diagram artifact.",
       "Use docs({ topic }) for full request envelopes and examples. Use search({ query }) to discover operation-specific topics such as patchOperations.",
       "The managed Sketchi product model, Convex threads, user artifact lineage, and Studio chat/canvas parity are intentionally out of this slice.",
     ].join("\n"),
@@ -454,6 +509,7 @@ const catalog: CatalogEntry[] = [
       "Inside code, call sketchi.buildFlowchart(input), sketchi.getArtifact(input), and sketchi.applyDiagramPatch(input).",
       "The sandbox must not receive secrets, storage bindings, model credentials, or raw network access.",
       "Call sketchi methods sequentially when possible so a harness can inspect structured failures and retry deliberately.",
+      "For user-facing completion, return the accepted Sketchi artifactId plus Excalidraw and PNG URLs from the MCP result. Do not synthesize a Mermaid or Markdown replacement after Sketchi accepts an artifact.",
       "",
       SKETCHI_CODE_MODE_TYPES,
     ].join("\n"),
@@ -484,6 +540,7 @@ const catalog: CatalogEntry[] = [
     content: [
       "buildFlowchart accepts a compact FlowchartSpec: title, nodes, edges, optional layout, and optional style.",
       'Request envelope: { spec: FlowchartSpec, options?: { artifactFormats?: ["scene", "excalidraw", "png"], inlineArtifacts?: ["scene", "excalidraw"], minQualityScore?: number } }.',
+      'For normal harness output, request artifactFormats: ["scene", "excalidraw", "png"] and inlineArtifacts: ["excalidraw"]. The scene is an internal patch source; Excalidraw and PNG are the user-facing artifacts.',
       "Request png when the agent needs hosted visual proof. PNG artifacts are stored binary outputs and are never inlined in MCP JSON responses.",
       "Use stable node ids. Decision nodes need meaningful labeled outgoing branches, usually yes/no.",
       "For export-ready visual proof, prefer monotonic flowchart graphs: avoid long back-edges, loops to earlier nodes, or reusing the same terminal node for both early and late outcomes. Use distinct terminal nodes when branches resolve at different depths.",
@@ -511,10 +568,11 @@ const catalog: CatalogEntry[] = [
     content: [
       "getArtifact reads a stored artifact by artifactId.",
       'Request envelope: { artifactId: string, format?: "scene" | "excalidraw" | "png", inline?: boolean }.',
-      "Use format: 'scene' for the compact Sketchi scene and format: 'excalidraw' for portable Excalidraw JSON.",
+      "Use format: 'scene' for the compact Sketchi patch source and format: 'excalidraw' for an importable Excalidraw file JSON envelope with type, version, source, elements, appState, and files.",
       "Use format: 'png' for hosted visual proof. PNG is binary and is returned as metadata from getArtifact, never as inline payload.",
+      "Hosted MCP/API responses include url fields for raw artifact downloads. Excalidraw URLs return importable JSON; PNG URLs return image bytes.",
       "Pass inline: true only when the harness needs scene or Excalidraw JSON in the MCP response.",
-      "To fetch raw PNG bytes, request GET /api/v1/artifacts/{artifactId}?format=png&raw=true from the Studio API.",
+      "To fetch raw artifact bytes, request GET /api/v1/artifacts/{artifactId}?format=excalidraw&raw=true or format=png&raw=true from the Studio API.",
       "Use the artifactId returned by buildFlowchart or applyDiagramPatch.",
     ].join("\n"),
   },
@@ -622,6 +680,7 @@ const catalog: CatalogEntry[] = [
       "Step 1: build a valid semantic flowchart with nodes and edges.",
       "Step 2: inspect issues. If not accepted, repair the spec and call buildFlowchart again.",
       "Step 3: once accepted, use applyDiagramPatch for circle, diamond, color, movement, rerouteEdges, or replaceText tweaks.",
+      "Step 4: return the accepted Sketchi artifactId and Excalidraw/PNG URLs. Do not create a second Markdown or Mermaid artifact that duplicates the diagram.",
     ].join("\n"),
     examples: [
       {
@@ -695,6 +754,17 @@ const catalog: CatalogEntry[] = [
         code: REPLACE_TEXT_EXAMPLE,
       },
     ],
+  },
+  {
+    id: "no-mermaid-wrapper-non-goal",
+    kind: "non_goal",
+    title: "Do not replace accepted Sketchi artifacts with Mermaid",
+    topic: "overview",
+    keywords: ["non-goal", "mermaid", "markdown", "artifact", "final"],
+    snippet:
+      "When Sketchi accepts an artifact, the final result is that artifact bundle, not a recreated Markdown diagram.",
+    content:
+      "Do not create a Markdown, Mermaid, or prose-only artifact after buildFlowchart or applyDiagramPatch succeeds. Return the Sketchi artifactId, available formats, and raw Excalidraw/PNG URLs so the caller can open the actual generated artifact.",
   },
   {
     id: "raw-excalidraw-non-goal",

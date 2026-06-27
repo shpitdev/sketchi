@@ -65,6 +65,8 @@ interface HarnessToolCall {
 
 interface HarnessMcpArtifactProof {
   artifactId: string;
+  artifactFormats: string[];
+  artifactUrls: Record<string, string>;
   buildId?: string;
   buildOk: boolean;
   normalizedSpec: unknown;
@@ -357,22 +359,28 @@ function buildHarnessPrompt(input: {
     "Execution rules:",
     "- The scenario below is complete; use docs/search only if the MCP call syntax is unclear.",
     "- Call the MCP execute tool with JavaScript that uses sketchi.buildFlowchart.",
-    '- Request artifactFormats ["scene", "excalidraw"] and inlineArtifacts ["scene"].',
+    '- Request artifactFormats ["scene", "excalidraw", "png"] and inlineArtifacts ["excalidraw"].',
     "- If buildFlowchart returns ok:false, repair the FlowchartSpec and try again.",
     "- Stop after at most 3 build attempts.",
     "- The run is not complete after an MCP tool call.",
     "- After the accepted buildFlowchart result, emit the final JSON object.",
     "- Final artifactId must exactly match artifact.artifactId returned by the accepted MCP execute result.",
+    "- Final JSON must include artifactFormats from the accepted MCP artifact bundle.",
+    "- Final JSON must include excalidrawUrl and pngUrl from artifact format refs or getArtifact responses.",
     "- Preserve the requested semantic graph over visual preference.",
+    "- Do not create or describe a separate Markdown/Mermaid diagram as the final artifact.",
     "- Final response must be JSON only, no markdown, no prose.",
     "",
     "Final JSON shape:",
     JSON.stringify(
       {
         artifactId: "...",
+        artifactFormats: ["scene", "excalidraw", "png"],
         attempts: 1,
         buildOk: true,
         diagramId: "...",
+        excalidrawUrl:
+          "https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/...?...",
         harness: input.harness,
         issues: [],
         model: input.model ?? "default",
@@ -387,6 +395,8 @@ function buildHarnessPrompt(input: {
           },
           title: input.scenario.title,
         },
+        pngUrl:
+          "https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/...?...",
         qualityScore: 10,
         scenarioId: input.scenario.id,
         status: "accepted",
@@ -696,6 +706,14 @@ function acceptedBuildResultFrom(
   return acceptedBuildResultFrom(value.result);
 }
 
+function artifactFormatsFrom(artifact: Record<string, unknown> | undefined) {
+  const formats = Array.isArray(artifact?.formats) ? artifact.formats : [];
+  return formats.filter(isRecord).map((formatRef) => ({
+    format: stringValue(formatRef.format),
+    url: stringValue(formatRef.url),
+  }));
+}
+
 function mcpArtifactFromPayload(input: {
   callId?: string;
   payload: unknown;
@@ -714,6 +732,7 @@ function mcpArtifactFromPayload(input: {
   const artifact = isRecord(result.artifact) ? result.artifact : undefined;
   const quality = isRecord(result.quality) ? result.quality : undefined;
   const artifactId = stringValue(artifact?.artifactId);
+  const artifactFormats = artifactFormatsFrom(artifact);
   const status = stringValue(result.status);
   const normalizedSpec = result.normalizedSpec;
   const buildOk = result.ok === true;
@@ -729,6 +748,16 @@ function mcpArtifactFromPayload(input: {
 
   return {
     artifactId,
+    artifactFormats: artifactFormats
+      .map((formatRef) => formatRef.format)
+      .filter((format): format is string => Boolean(format)),
+    artifactUrls: Object.fromEntries(
+      artifactFormats
+        .filter((formatRef): formatRef is { format: string; url: string } =>
+          Boolean(formatRef.format && formatRef.url),
+        )
+        .map((formatRef) => [formatRef.format, formatRef.url]),
+    ),
     ...(stringValue(result.buildId)
       ? { buildId: stringValue(result.buildId) }
       : {}),
@@ -986,6 +1015,35 @@ function outputContractErrors(input: {
     errors.push(
       `Final artifactId "${finalArtifactId}" does not match MCP artifactId "${input.proof.artifactId}".`,
     );
+  }
+
+  const artifactFormats = Array.isArray(input.finalJson.artifactFormats)
+    ? input.finalJson.artifactFormats.filter(
+        (format): format is string => typeof format === "string",
+      )
+    : [];
+  for (const requiredFormat of ["excalidraw", "png"]) {
+    if (!artifactFormats.includes(requiredFormat)) {
+      errors.push(
+        `Final JSON artifactFormats must include "${requiredFormat}".`,
+      );
+    }
+    if (input.proof && !input.proof.artifactFormats.includes(requiredFormat)) {
+      errors.push(
+        `Accepted MCP artifact bundle did not include "${requiredFormat}".`,
+      );
+    }
+  }
+
+  const excalidrawUrl = stringValue(input.finalJson.excalidrawUrl);
+  if (!excalidrawUrl || !excalidrawUrl.includes("format=excalidraw")) {
+    errors.push(
+      'Final JSON must include "excalidrawUrl" for the raw Excalidraw artifact.',
+    );
+  }
+  const pngUrl = stringValue(input.finalJson.pngUrl);
+  if (!pngUrl || !pngUrl.includes("format=png")) {
+    errors.push('Final JSON must include "pngUrl" for the raw PNG artifact.');
   }
 
   return errors;

@@ -224,6 +224,7 @@ export function createSketchiMcpServer(
         "Code fences and trailing expression semicolons are normalized before execution.",
         "The sandbox exposes only sketchi.buildFlowchart, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
         "First get the semantic graph accepted, then use patch operations for deterministic visual changes.",
+        "For final user-facing output, return accepted Sketchi artifact ids, format refs, and Excalidraw/PNG URLs. Do not recreate accepted diagrams as Markdown or Mermaid artifacts.",
         "",
         SKETCHI_CODE_MODE_TYPES,
       ].join("\n"),

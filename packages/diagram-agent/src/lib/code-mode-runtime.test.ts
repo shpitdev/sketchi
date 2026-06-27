@@ -322,8 +322,61 @@ describe("Code Mode runtime", () => {
 
     expectGetOk(inlineExcalidraw);
     expect(inlineExcalidraw.inline).toMatchObject({
+      type: "excalidraw",
+      version: 2,
+      source: "https://sketchi.app",
       appState: expect.any(Object),
       elements: expect.any(Array),
+      files: {},
+    });
+  });
+
+  it("adds raw artifact URLs when the runtime is configured with a URL builder", async () => {
+    let id = 0;
+    const runtime = createCodeModeRuntime({
+      store: createMemoryArtifactStore(),
+      createId: (prefix) => `${prefix}-${(id += 1)}`,
+      artifactUrl: ({ artifactId, format }) =>
+        `https://studio.test/api/v1/artifacts/${artifactId}?format=${format}&raw=true`,
+    });
+
+    const built = await runtime.buildFlowchart({
+      spec: approvalSpec(),
+      options: {
+        artifactFormats: ["scene", "excalidraw"],
+        inlineArtifacts: ["scene"],
+      },
+    });
+
+    expectBuildOk(built);
+    expect(built.artifact.formats).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          format: "scene",
+          url: `https://studio.test/api/v1/artifacts/${built.artifact.artifactId}?format=scene&raw=true`,
+        }),
+        expect.objectContaining({
+          format: "excalidraw",
+          url: `https://studio.test/api/v1/artifacts/${built.artifact.artifactId}?format=excalidraw&raw=true`,
+        }),
+      ]),
+    );
+
+    const excalidraw = await runtime.getArtifact({
+      artifactId: built.artifact.artifactId,
+      format: "excalidraw",
+      inline: true,
+    });
+
+    expectGetOk(excalidraw);
+    expect(excalidraw).toMatchObject({
+      format: "excalidraw",
+      url: `https://studio.test/api/v1/artifacts/${built.artifact.artifactId}?format=excalidraw&raw=true`,
+      inline: {
+        type: "excalidraw",
+        version: 2,
+        files: {},
+      },
     });
   });
 
