@@ -1,5 +1,9 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@excalidraw/excalidraw", () => ({
+  Excalidraw: () => <div data-testid="mock-excalidraw">Mock Excalidraw</div>,
+}));
 
 import { flowchartFixture } from "@sketchi/diagram-core";
 

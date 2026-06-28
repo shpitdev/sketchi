@@ -1,5 +1,19 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("../excalidraw-scene-canvas/index.js", () => ({
+  ExcalidrawSceneCanvas: ({
+    scene,
+    title,
+  }: {
+    scene: { elements: unknown[] };
+    title: string;
+  }) => (
+    <div aria-label={title} data-testid="excalidraw-scene-canvas">
+      {scene.elements.length} Excalidraw elements
+    </div>
+  ),
+}));
 
 import { flowchartFixture } from "@sketchi/diagram-core";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
@@ -7,13 +21,15 @@ import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 import { DiagramPreview } from "./diagram-preview";
 
 describe("DiagramPreview", () => {
-  it("renders an accessible diagram image", () => {
+  it("renders the diagram through the shared Excalidraw canvas", () => {
     const scene = renderIntermediateDiagram(flowchartFixture);
 
     render(<DiagramPreview scene={scene} />);
 
-    expect(
-      screen.getByRole("img", { name: "Sketchi onboarding decision flow" }),
-    ).toBeTruthy();
+    const canvas = screen.getByTestId("excalidraw-scene-canvas");
+    expect(canvas.getAttribute("aria-label")).toBe(
+      "Sketchi onboarding decision flow",
+    );
+    expect(canvas.textContent).toMatch(/Excalidraw elements/);
   });
 });

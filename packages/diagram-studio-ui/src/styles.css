@@ -71,28 +71,9 @@
 }
 
 .sketchi-diagram-preview {
-  border: 1px solid var(--line-2);
-  border-radius: 8px;
-  box-shadow: 0 18px 36px rgb(15 23 42 / 8%);
   height: min(520px, 64vh);
+  min-height: 340px;
   width: 100%;
-}
-
-.sketchi-diagram-preview__node {
-  fill: var(--card);
-  stroke: var(--line-2);
-  stroke-width: 1.5;
-}
-
-.sketchi-diagram-preview__label {
-  fill: var(--ink);
-  font-weight: 700;
-}
-
-.sketchi-diagram-preview__edge-label {
-  fill: var(--ink-2);
-  font-size: 12px;
-  font-weight: 700;
 }
 
 .sketchi-scenario-playground {
