@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   extractPreviewUrl,
+  normalizeWorkersDevSubdomain,
   previewAppConfig,
   previewCommentBody,
   previewWorkerName,
@@ -48,6 +49,21 @@ test("previewWorkerName rejects invalid PR numbers", () => {
   );
 });
 
+test("normalizeWorkersDevSubdomain accepts account subdomain or host", () => {
+  assert.equal(normalizeWorkersDevSubdomain("Dimethyl"), "dimethyl");
+  assert.equal(
+    normalizeWorkersDevSubdomain("dimethyl.workers.dev"),
+    "dimethyl",
+  );
+});
+
+test("normalizeWorkersDevSubdomain rejects invalid hosts", () => {
+  assert.throws(
+    () => normalizeWorkersDevSubdomain("https://dimethyl.workers.dev"),
+    /Invalid workers\.dev subdomain/,
+  );
+});
+
 test("previewWranglerConfig isolates preview worker settings", () => {
   const previewConfig = previewWranglerConfig(
     {
@@ -89,6 +105,53 @@ test("previewWranglerConfig isolates preview worker settings", () => {
       preview_bucket_name: "sketchi-studio-codemode-artifacts-preview",
     },
   ]);
+});
+
+test("previewWranglerConfig injects sibling app URLs for web previews", () => {
+  const previewConfig = previewWranglerConfig(
+    {
+      name: "sketchi-web",
+      vars: {
+        SKETCHI_APP_SURFACE: "web",
+      },
+    },
+    "sketchi-web-pr-42",
+    {
+      app: "web",
+      prNumber: 42,
+      workersDevSubdomain: "dimethyl",
+    },
+  );
+
+  assert.deepEqual(previewConfig.vars, {
+    SKETCHI_APP_SURFACE: "web",
+    SKETCHI_EXCALIDRAW_URL:
+      "https://sketchi-excalidraw-pr-42.dimethyl.workers.dev",
+    SKETCHI_ICONS_URL: "https://sketchi-icons-pr-42.dimethyl.workers.dev",
+    SKETCHI_PLAYGROUND_URL:
+      "https://sketchi-playground-pr-42.dimethyl.workers.dev",
+  });
+});
+
+test("previewWranglerConfig leaves non-web preview vars unchanged", () => {
+  const previewConfig = previewWranglerConfig(
+    {
+      name: "sketchi-icons",
+      vars: {
+        SKETCHI_APP_SURFACE: "icons",
+      },
+    },
+    "sketchi-icons-pr-42",
+    {
+      app: "icons",
+      prNumber: 42,
+      workersDevSubdomain: "dimethyl",
+    },
+  );
+
+  assert.deepEqual(previewConfig.vars, {
+    SKETCHI_APP_SURFACE: "icons",
+  });
 });
 
 test("extractPreviewUrl prefers the URL for the requested worker", () => {

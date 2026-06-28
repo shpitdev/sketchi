@@ -1,5 +1,11 @@
 const MAX_WORKER_NAME_LENGTH = 63;
 
+const webPreviewSurfaceApps = {
+  SKETCHI_EXCALIDRAW_URL: "excalidraw",
+  SKETCHI_ICONS_URL: "icons",
+  SKETCHI_PLAYGROUND_URL: "playground",
+};
+
 export const previewApps = {
   excalidraw: {
     commentMarker: "<!-- sketchi-excalidraw-preview -->",
@@ -79,7 +85,51 @@ export function previewWorkerName(input) {
   return workerName;
 }
 
-export function previewWranglerConfig(config, workerName) {
+export function normalizeWorkersDevSubdomain(value) {
+  const trimmed = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\.workers\.dev$/, "");
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(trimmed)) {
+    throw new Error(
+      `Invalid workers.dev subdomain "${value}". Expected an account subdomain such as "example".`,
+    );
+  }
+
+  return trimmed;
+}
+
+function previewWorkerUrl(app, prNumber, workersDevSubdomain) {
+  return `https://${previewWorkerName({
+    app,
+    prNumber,
+  })}.${workersDevSubdomain}.workers.dev`;
+}
+
+function webPreviewVars(input) {
+  const appConfig = previewAppConfig(input.app);
+  const workersDevSubdomain = normalizeWorkersDevSubdomain(
+    input.workersDevSubdomain,
+  );
+
+  if (appConfig.appId !== "web" || !workersDevSubdomain) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(webPreviewSurfaceApps).map(([envName, app]) => [
+      envName,
+      previewWorkerUrl(app, input.prNumber, workersDevSubdomain),
+    ]),
+  );
+}
+
+export function previewWranglerConfig(config, workerName, options = {}) {
   const nextConfig = structuredClone(config);
 
   nextConfig.name = workerName;
@@ -93,6 +143,14 @@ export function previewWranglerConfig(config, workerName) {
   delete nextConfig.domains;
   delete nextConfig.custom_domain;
   delete nextConfig.custom_domains;
+
+  const previewVars = webPreviewVars(options);
+  if (Object.keys(previewVars).length > 0) {
+    nextConfig.vars = {
+      ...(nextConfig.vars ?? {}),
+      ...previewVars,
+    };
+  }
 
   return nextConfig;
 }

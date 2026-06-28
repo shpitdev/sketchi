@@ -32,6 +32,17 @@ Pull requests to `main` deploy matrix apps to PR-specific Cloudflare Workers.
 - runs `wrangler deploy --keep-vars --no-x-provision`;
 - writes or updates one sticky PR comment per app with the preview URL.
 
+For the `web` preview, the workflow also reads the account workers.dev
+subdomain from Cloudflare and injects sibling preview URLs into the generated
+Wrangler vars:
+
+- `SKETCHI_EXCALIDRAW_URL`
+- `SKETCHI_ICONS_URL`
+- `SKETCHI_PLAYGROUND_URL`
+
+That keeps Web preview navigation inside the same PR's preview Workers instead
+of sending reviewers to production domains.
+
 ## Required Configuration
 
 - `CHROMATIC_PROJECT_TOKEN`: `staging` environment secret for Storybook

@@ -9,6 +9,6 @@ export default defineConfig({
     coverage: {
       reportsDirectory: "../../coverage/apps/web",
     },
-    include: ["apps/web/src/**/*.test.tsx"],
+    include: ["apps/web/src/**/*.test.ts", "apps/web/src/**/*.test.tsx"],
   },
 });

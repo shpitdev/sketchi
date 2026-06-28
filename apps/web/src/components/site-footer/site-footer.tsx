@@ -1,9 +1,16 @@
+import {
+  DEFAULT_WEB_SURFACE_URLS,
+  type WebSurfaceUrls,
+} from "../../lib/surface-urls";
+
 export interface SiteFooterProps {
   colophon?: string;
+  surfaceUrls?: WebSurfaceUrls;
 }
 
 export function SiteFooter({
   colophon = "Sketchi v2 — typed diagram generation",
+  surfaceUrls = DEFAULT_WEB_SURFACE_URLS,
 }: SiteFooterProps) {
   return (
     <footer className="site-footer">
@@ -29,7 +36,7 @@ export function SiteFooter({
               <a href="/docs">Docs</a>
             </li>
             <li>
-              <a href="https://playground.sketchi.app">Playground</a>
+              <a href={surfaceUrls.playground}>Playground</a>
             </li>
           </ul>
         </div>
@@ -38,10 +45,10 @@ export function SiteFooter({
           <h3>Surfaces</h3>
           <ul>
             <li>
-              <a href="https://excalidraw.sketchi.app">Excalidraw app</a>
+              <a href={surfaceUrls.excalidraw}>Excalidraw app</a>
             </li>
             <li>
-              <a href="https://icons.sketchi.app">Icons</a>
+              <a href={surfaceUrls.icons}>Icons</a>
             </li>
             <li>
               <a href="/docs#surfaces">Surface map</a>

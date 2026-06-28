@@ -3,14 +3,25 @@ import { PipelineFlow } from "../pipeline-flow/index.js";
 import { SiteFooter } from "../site-footer/index.js";
 import { SiteHeader } from "../site-header/index.js";
 import { SurfaceCard } from "../surface-card/index.js";
+import {
+  DEFAULT_WEB_SURFACE_URLS,
+  surfaceLinkLabel,
+  type WebSurfaceUrls,
+} from "../../lib/surface-urls";
 
-export function MarketingHome() {
+export interface MarketingHomeProps {
+  surfaceUrls?: WebSurfaceUrls;
+}
+
+export function MarketingHome({
+  surfaceUrls = DEFAULT_WEB_SURFACE_URLS,
+}: MarketingHomeProps) {
   return (
     <div className="sketchi-web">
-      <SiteHeader activePath="/" />
+      <SiteHeader activePath="/" surfaceUrls={surfaceUrls} />
 
       <main id="top">
-        <HomeHero />
+        <HomeHero primaryHref={surfaceUrls.excalidraw} />
 
         <section className="sk-section" id="pipeline">
           <div className="sk-shell">
@@ -39,22 +50,28 @@ export function MarketingHome() {
               <SurfaceCard
                 cta="Open workspace"
                 desc="Inspect the IR, scene, and a live Excalidraw canvas."
-                domain="excalidraw.sketchi.app"
-                href="https://excalidraw.sketchi.app"
+                domain={surfaceLinkLabel(
+                  surfaceUrls.excalidraw,
+                  "excalidraw.sketchi.app",
+                )}
+                href={surfaceUrls.excalidraw}
                 name="Excalidraw workspace"
               />
               <SurfaceCard
                 cta="Browse icons"
                 desc="Search and copy 1,400+ curated icons."
-                domain="icons.sketchi.app"
-                href="https://icons.sketchi.app"
+                domain={surfaceLinkLabel(surfaceUrls.icons, "icons.sketchi.app")}
+                href={surfaceUrls.icons}
                 name="Icon library"
               />
               <SurfaceCard
                 cta="Open playground"
                 desc="Evaluate prompts against the deterministic pipeline."
-                domain="playground.sketchi.app"
-                href="https://playground.sketchi.app"
+                domain={surfaceLinkLabel(
+                  surfaceUrls.playground,
+                  "playground.sketchi.app",
+                )}
+                href={surfaceUrls.playground}
                 name="Scenario playground"
               />
               <SurfaceCard
@@ -70,7 +87,7 @@ export function MarketingHome() {
         </section>
       </main>
 
-      <SiteFooter />
+      <SiteFooter surfaceUrls={surfaceUrls} />
     </div>
   );
 }

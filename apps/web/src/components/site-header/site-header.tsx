@@ -1,5 +1,10 @@
 import { useState } from "react";
 
+import {
+  DEFAULT_WEB_SURFACE_URLS,
+  type WebSurfaceUrls,
+} from "../../lib/surface-urls";
+
 export interface SiteHeaderNavItem {
   href: string;
   label: string;
@@ -8,6 +13,7 @@ export interface SiteHeaderNavItem {
 export interface SiteHeaderProps {
   activePath?: string;
   navItems?: readonly SiteHeaderNavItem[];
+  surfaceUrls?: WebSurfaceUrls;
 }
 
 const defaultNavItems: readonly SiteHeaderNavItem[] = [
@@ -19,6 +25,7 @@ const defaultNavItems: readonly SiteHeaderNavItem[] = [
 export function SiteHeader({
   activePath,
   navItems = defaultNavItems,
+  surfaceUrls = DEFAULT_WEB_SURFACE_URLS,
 }: SiteHeaderProps) {
   const [open, setOpen] = useState(false);
 
@@ -50,12 +57,12 @@ export function SiteHeader({
         </nav>
 
         <div className="site-header__actions">
-          <a className="site-header__link" href="https://icons.sketchi.app">
+          <a className="site-header__link" href={surfaceUrls.icons}>
             Icons
           </a>
           <a
             className="sk-btn sk-btn--primary site-header__cta"
-            href="https://excalidraw.sketchi.app"
+            href={surfaceUrls.excalidraw}
           >
             Open app
           </a>
@@ -109,13 +116,10 @@ export function SiteHeader({
             </a>
           ))}
           <div className="site-header__sheet-actions">
-            <a className="sk-btn sk-btn--ghost" href="https://icons.sketchi.app">
+            <a className="sk-btn sk-btn--ghost" href={surfaceUrls.icons}>
               Icons
             </a>
-            <a
-              className="sk-btn sk-btn--primary"
-              href="https://excalidraw.sketchi.app"
-            >
+            <a className="sk-btn sk-btn--primary" href={surfaceUrls.excalidraw}>
               Open app
             </a>
           </div>

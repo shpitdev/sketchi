@@ -112,9 +112,37 @@ jobs:
           echo "configured=false" >> "$GITHUB_OUTPUT"
           echo "::warning::Cloudflare preview deploy credentials are not configured. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN."
 
+      - name: Read workers.dev subdomain
+        if: steps.credentials.outputs.configured == 'true' && matrix.app == 'web'
+        id: workers-subdomain
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          response="$(
+            curl --fail-with-body --silent --show-error \
+              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/subdomain"
+          )"
+          subdomain="$(
+            RESPONSE="$response" node --input-type=module <<'NODE'
+          const response = JSON.parse(process.env.RESPONSE ?? "{}");
+          const subdomain = response?.result?.subdomain;
+
+          if (!response.success || typeof subdomain !== "string" || subdomain.length === 0) {
+            throw new Error(`Cloudflare workers.dev subdomain lookup failed: ${JSON.stringify(response.errors ?? [])}`);
+          }
+
+          process.stdout.write(subdomain);
+          NODE
+          )"
+          echo "workers_dev_subdomain=${subdomain}" >> "$GITHUB_OUTPUT"
+
       - name: Prepare preview Wrangler config
         id: prepare
         env:
+          CF_PREVIEW_WORKERS_SUBDOMAIN: ${{ steps.workers-subdomain.outputs.workers_dev_subdomain }}
           PREVIEW_APP: ${{ matrix.app }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
         run: node scripts/01-prepare-preview-deploy.mjs --app "$PREVIEW_APP" --pr-number "$PR_NUMBER"

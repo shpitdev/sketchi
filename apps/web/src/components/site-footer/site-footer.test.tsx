@@ -14,4 +14,26 @@ describe("SiteFooter", () => {
       screen.getByText("Sketchi v2 — typed diagram generation"),
     ).toBeTruthy();
   });
+
+  it("uses configured surface links", () => {
+    render(
+      <SiteFooter
+        surfaceUrls={{
+          excalidraw: "https://sketchi-excalidraw-pr-42.dimethyl.workers.dev",
+          icons: "https://sketchi-icons-pr-42.dimethyl.workers.dev",
+          playground: "https://sketchi-playground-pr-42.dimethyl.workers.dev",
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByRole("link", { name: "Playground" }).getAttribute("href"),
+    ).toBe("https://sketchi-playground-pr-42.dimethyl.workers.dev");
+    expect(
+      screen.getByRole("link", { name: "Excalidraw app" }).getAttribute("href"),
+    ).toBe("https://sketchi-excalidraw-pr-42.dimethyl.workers.dev");
+    expect(screen.getByRole("link", { name: "Icons" }).getAttribute("href")).toBe(
+      "https://sketchi-icons-pr-42.dimethyl.workers.dev",
+    );
+  });
 });

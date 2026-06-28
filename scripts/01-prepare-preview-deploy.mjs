@@ -68,7 +68,15 @@ export function preparePreviewDeploy(args = process.argv.slice(2)) {
     ),
   });
   const sourceConfig = JSON.parse(readFileSync(sourceConfigPath, "utf8"));
-  const previewConfig = previewWranglerConfig(sourceConfig, workerName);
+  const previewConfig = previewWranglerConfig(sourceConfig, workerName, {
+    app: app.appId,
+    prNumber,
+    workersDevSubdomain: readFlag(
+      args,
+      "--workers-dev-subdomain",
+      process.env.CF_PREVIEW_WORKERS_SUBDOMAIN,
+    ),
+  });
 
   mkdirSync(path.dirname(previewConfigPath), { recursive: true });
   writeFileSync(

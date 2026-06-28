@@ -20,4 +20,25 @@ describe("MarketingHome", () => {
       screen.getByRole("heading", { name: "Excalidraw workspace" }),
     ).toBeTruthy();
   });
+
+  it("uses configured surface URLs", () => {
+    render(
+      <MarketingHome
+        surfaceUrls={{
+          excalidraw: "https://sketchi-excalidraw-pr-42.dimethyl.workers.dev",
+          icons: "https://sketchi-icons-pr-42.dimethyl.workers.dev",
+          playground: "https://sketchi-playground-pr-42.dimethyl.workers.dev",
+        }}
+      />,
+    );
+
+    expect(
+      screen
+        .getByRole("link", { name: /Excalidraw workspace/ })
+        .getAttribute("href"),
+    ).toBe("https://sketchi-excalidraw-pr-42.dimethyl.workers.dev");
+    expect(
+      screen.getByText("sketchi-excalidraw-pr-42.dimethyl.workers.dev"),
+    ).toBeTruthy();
+  });
 });

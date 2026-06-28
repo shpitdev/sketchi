@@ -15,6 +15,25 @@ describe("SiteHeader", () => {
     ).toBe("page");
   });
 
+  it("uses configured surface action URLs", () => {
+    render(
+      <SiteHeader
+        surfaceUrls={{
+          excalidraw: "https://sketchi-excalidraw-pr-42.dimethyl.workers.dev",
+          icons: "https://sketchi-icons-pr-42.dimethyl.workers.dev",
+          playground: "https://sketchi-playground-pr-42.dimethyl.workers.dev",
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Icons" }).getAttribute("href")).toBe(
+      "https://sketchi-icons-pr-42.dimethyl.workers.dev",
+    );
+    expect(
+      screen.getByRole("link", { name: "Open app" }).getAttribute("href"),
+    ).toBe("https://sketchi-excalidraw-pr-42.dimethyl.workers.dev");
+  });
+
   it("toggles the mobile menu", () => {
     render(<SiteHeader />);
 
