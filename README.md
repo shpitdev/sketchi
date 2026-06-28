@@ -59,13 +59,13 @@ pnpm nx g @sketchi/generators:diagram-type mindmap --title "Sketchi mindmap fixt
 
 ## Deploys
 
-| Surface      | Local dev                | Deploy status                           |
-| ------------ | ------------------------ | --------------------------------------- |
-| `playground` | `pnpm nx dev playground` | preview/prod Worker matrix              |
-| `web`        | `pnpm nx dev web`        | preview/prod Worker matrix              |
-| `excalidraw` | `pnpm nx dev excalidraw` | preview/prod Worker matrix              |
-| `icons`      | `pnpm nx dev icons`      | preview/prod Worker matrix              |
-| `studio`     | `pnpm nx dev studio`     | app exists; deploy matrix not wired yet |
+| Surface      | Local dev                | Deploy status              |
+| ------------ | ------------------------ | -------------------------- |
+| `playground` | `pnpm nx dev playground` | preview/prod Worker matrix |
+| `web`        | `pnpm nx dev web`        | preview/prod Worker matrix |
+| `excalidraw` | `pnpm nx dev excalidraw` | preview/prod Worker matrix |
+| `icons`      | `pnpm nx dev icons`      | preview/prod Worker matrix |
+| `studio`     | `pnpm nx dev studio`     | preview/prod Worker matrix |
 
 Pull requests deploy each app to PR-specific Cloudflare Workers and update one
 sticky PR comment per app with the URL when Cloudflare credentials are
@@ -80,6 +80,7 @@ Local production Worker deploy targets are app-scoped:
 
 ```sh
 pnpm deploy:playground
+pnpm deploy:studio
 pnpm deploy:web
 pnpm deploy:excalidraw
 pnpm deploy:icons

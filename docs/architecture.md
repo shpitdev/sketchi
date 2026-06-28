@@ -123,11 +123,10 @@ flowchart LR
   Workspace --> Icons["icons"]
 
   Playground --> Deploy["preview/prod Worker matrix"]
+  Studio --> Deploy
   Web --> Deploy
   Excalidraw --> Deploy
   Icons --> Deploy
-  Studio -.-> StudioGap["deploy matrix not wired yet"]
-  StudioGap -.-> Deploy
 ```
 
 Keep app-specific UI in the app that owns it. Generate those components with
@@ -164,9 +163,9 @@ production domain direction is:
 Preview deploys strip production routes and deploy app-specific Workers named
 `sketchi-<app>-pr-<number>`.
 
-Today the workflow matrix and deploy helper maps cover `playground`, `web`,
-`studio`, `web`, `excalidraw`, and `icons`, with custom domain attachment kept
-as an explicit manual workflow dispatch.
+Today the workflow matrix and deploy helper maps cover `playground`, `studio`,
+`web`, `excalidraw`, and `icons`, with custom domain attachment kept as an
+explicit manual workflow dispatch.
 
 ## AI Gateway Observability
 

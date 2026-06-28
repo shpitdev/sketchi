@@ -53,7 +53,7 @@ flowchart LR
       Snowflake is acceptable if it lets us query accumulated real usage and let
       another LLM summarize reliability trends, failure classes, and prompt/tool
       contract gaps.
-- [ ] Add README files for each Nx package/app/tool that does not have one yet.
+- [x] Add README files for each Nx package/app/tool that does not have one yet.
       Match the existing concise package README style: one-sentence purpose,
       quick Mermaid diagram, owns/does-not-own table, common commands, and how
       the package is used by the rest of the workspace.
