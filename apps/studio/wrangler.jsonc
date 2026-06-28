@@ -27,6 +27,18 @@
       "preview_bucket_name": "sketchi-studio-codemode-artifacts-preview",
     },
   ],
+  "pipelines": [
+    {
+      "binding": "CODEMODE_USAGE_EVENTS",
+      "stream": "d9044253316f4273a60298098f444a62",
+      "remote": true,
+    },
+    {
+      "binding": "CODEMODE_USAGE_ISSUES",
+      "stream": "f687dab6e7d742c1a76834089e709462",
+      "remote": true,
+    },
+  ],
   "workers_dev": true,
   "vars": {
     "SKETCHI_APP_SURFACE": "studio",

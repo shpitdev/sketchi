@@ -107,18 +107,31 @@ CI deploys do not create or discover storage.
 Those deploys keep `workers_dev` enabled so the app can be verified from
 Cloudflare-owned `workers.dev` URLs before any DNS or registrar cutover.
 
-The Studio Worker binds Code Mode artifacts to R2:
+The Studio Worker binds Code Mode artifacts to R2 and Code Mode usage analytics
+to Cloudflare Pipelines:
 
-| Surface                  | Binding             | Bucket                                         |
-| ------------------------ | ------------------- | ---------------------------------------------- |
-| Studio preview Workers   | `SKETCHI_ARTIFACTS` | `sketchi-studio-codemode-artifacts-preview`    |
-| Studio production Worker | `SKETCHI_ARTIFACTS` | `sketchi-studio-codemode-artifacts-production` |
+| Surface                  | Binding                 | Remote target                                  |
+| ------------------------ | ----------------------- | ---------------------------------------------- |
+| Studio preview Workers   | `SKETCHI_ARTIFACTS`     | `sketchi-studio-codemode-artifacts-preview`    |
+| Studio production Worker | `SKETCHI_ARTIFACTS`     | `sketchi-studio-codemode-artifacts-production` |
+| Studio preview Workers   | `CODEMODE_USAGE_EVENTS` | `e9fc3bcd35314fa39fc6a89018207acc`             |
+| Studio preview Workers   | `CODEMODE_USAGE_ISSUES` | `d95a1767edf246af8c637c5b9bf5a5c5`             |
+| Studio production Worker | `CODEMODE_USAGE_EVENTS` | `d9044253316f4273a60298098f444a62`             |
+| Studio production Worker | `CODEMODE_USAGE_ISSUES` | `f687dab6e7d742c1a76834089e709462`             |
 
 Preview Wrangler configs rewrite the Studio artifact binding to the preview
-bucket. Production deploys keep the production bucket. Both buckets must exist
-before their Workers deploy. Preview deploys disable Wrangler resource
-provisioning, so the CI token does not need R2 object read access just to deploy
-the Worker.
+bucket and the Studio Pipeline bindings to preview streams. Production deploys
+keep production buckets and production streams. All Worker-bound buckets and
+streams must exist before their Workers deploy. Downstream Pipeline sinks or
+transforms are optional analytics resources and are not required unless they are
+explicitly enabled outside the Worker config. Preview deploys disable Wrangler
+resource provisioning, so the CI token does not need R2 object read access just
+to deploy the Worker.
+
+Wrangler accepts Pipeline stream names in local dry-runs, but the deploy API
+requires stream IDs for Worker bindings. Keep `apps/studio/wrangler.jsonc` on
+the production stream IDs and keep the preview deploy helper's ID rewrite table
+in sync with Cloudflare Pipeline stream creation.
 
 Assigning `sketchi.app`, `www.sketchi.app`, `playground.sketchi.app`,
 `studio.sketchi.app`, `excalidraw.sketchi.app`, and `icons.sketchi.app` is

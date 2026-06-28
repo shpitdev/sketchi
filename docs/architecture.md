@@ -196,20 +196,18 @@ failures into scenario or prompt-tuning follow-up.
 
 ## Code Mode Usage Capture
 
-Studio records an initial server-side usage trail for the harness-facing Code
-Mode surface. The `/api/v1/flowcharts/build`,
+Studio records a server-side usage trail for the harness-facing Code Mode
+surface. The `/api/v1/flowcharts/build`,
 `/api/v1/artifacts/:artifactId/patch`, and MCP `execute` paths create a
-`sketchi.codemode.usage.v1` event when the `SKETCHI_ARTIFACTS` R2 binding is
-available.
-
-The usage event is intentionally an index record, not a warehouse schema. It
-stores operation, surface, run/attempt/event IDs, client headers such as
-harness/model/reasoning level when supplied, status, duration, artifact refs,
-and bounded request and response JSON snapshots when they are serializable and
-below the current size cap. Capture is scheduled with Cloudflare Workers
+`sketchi.codemode.usage.v1` event. Capture is scheduled with Cloudflare Workers
 `waitUntil` so the response is not blocked on telemetry storage. Capture is
 best-effort and must not fail artifact generation when telemetry storage is
 unavailable.
+
+The raw usage event stores operation, surface, run/attempt/event IDs, client
+headers such as harness/model/reasoning level when supplied, status, duration,
+artifact refs, and bounded request and response JSON snapshots when they are
+serializable and below the current size cap.
 
 Events are date-partitioned under the existing artifact bucket:
 
@@ -217,6 +215,24 @@ Events are date-partitioned under the existing artifact bucket:
 codemode/usage/YYYY/MM/DD/<run_id>/<attempt_id>/<event_id>/event.json
 ```
 
-This keeps raw evidence available now while leaving the analytics path open.
-Cloudflare Pipelines, R2 Data Catalog/R2 SQL, Snowflake, Convex, or another
-projection can consume these objects later without changing the MCP contract.
+Studio also sends normalized rows to Cloudflare Pipeline streams. The
+`CODEMODE_USAGE_EVENTS` binding writes one flat row per Code Mode request and
+the `CODEMODE_USAGE_ISSUES` binding writes one row per structured issue:
+
+| Surface    | Binding                 | Stream ID                          |
+| ---------- | ----------------------- | ---------------------------------- |
+| Preview    | `CODEMODE_USAGE_EVENTS` | `e9fc3bcd35314fa39fc6a89018207acc` |
+| Preview    | `CODEMODE_USAGE_ISSUES` | `d95a1767edf246af8c637c5b9bf5a5c5` |
+| Production | `CODEMODE_USAGE_EVENTS` | `d9044253316f4273a60298098f444a62` |
+| Production | `CODEMODE_USAGE_ISSUES` | `f687dab6e7d742c1a76834089e709462` |
+
+The committed stream schemas live in `scripts/pipelines/`. Keep Pipeline rows
+flat and aggregate-friendly; keep the richer request/response snapshots in the
+raw R2 event objects.
+
+R2 Data Catalog and R2 SQL are the intended downstream aggregate-query path, but
+that sink is not active yet. Remote smoke tests against Pipeline-written Data
+Catalog tables, including a one-column uncompressed control stream, returned
+`50408: Corrupted Catalog` after the first committed data file. Until Cloudflare
+resolves that open-beta failure mode, raw R2 events remain the durable source of
+truth and the Pipeline streams stay ready for a future Data Catalog sink.

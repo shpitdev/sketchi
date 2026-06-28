@@ -87,6 +87,23 @@ async function waitForUsageEvents(
   throw new Error(`Expected ${count} usage event(s) to be persisted.`);
 }
 
+async function waitForPipelineRecords(
+  pipeline: MemoryPipeline,
+  count: number,
+): Promise<unknown[]> {
+  const deadline = Date.now() + 1_000;
+
+  while (Date.now() < deadline) {
+    const records = pipeline.records();
+    if (records.length >= count) {
+      return records;
+    }
+    await delay(5);
+  }
+
+  throw new Error(`Expected ${count} pipeline record(s) to be sent.`);
+}
+
 class MemoryBucket implements CodeModeObjectBucket {
   readonly objects = new Map<string, string | Uint8Array>();
 
@@ -156,6 +173,18 @@ class DelayedUsageBucket extends MemoryBucket {
 
   releaseUsagePersistence(): void {
     this.resolveReleaseUsageWrite();
+  }
+}
+
+class MemoryPipeline {
+  readonly batches: unknown[][] = [];
+
+  async send(records: readonly unknown[]): Promise<void> {
+    this.batches.push([...records]);
+  }
+
+  records(): unknown[] {
+    return this.batches.flat();
   }
 }
 
@@ -381,6 +410,75 @@ describe("Code Mode API handlers", () => {
 
     expect(response.status).toBe(200);
     expect(await usageEventsFrom(bucket)).toHaveLength(1);
+  });
+
+  it("sends aggregate usage and issue rows to Pipeline bindings", async () => {
+    const bucket = new MemoryBucket();
+    const usageEvents = new MemoryPipeline();
+    const usageIssues = new MemoryPipeline();
+
+    const response = await handleBuildFlowchartRequest(
+      {
+        CODEMODE_USAGE_EVENTS: usageEvents,
+        CODEMODE_USAGE_ISSUES: usageIssues,
+        SKETCHI_ARTIFACTS: bucket,
+      },
+      postRequest("https://studio.test/api/v1/flowcharts/build", {
+        spec: {
+          title: "Broken approval flow",
+          nodes: [],
+          edges: [{ source: "request", target: "done" }],
+        },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: expect.any(String),
+        }),
+      ]),
+    });
+
+    await waitForUsageEvents(bucket, 1);
+    const eventRows = await waitForPipelineRecords(usageEvents, 1);
+    const issueRows = await waitForPipelineRecords(usageIssues, 1);
+
+    expect(eventRows[0]).toMatchObject({
+      artifact_count: 0,
+      artifact_delivery: false,
+      issue_count: expect.any(Number),
+      operation: "buildFlowchart",
+      request_method: "POST",
+      request_path: "/api/v1/flowcharts/build",
+      schema: "sketchi.codemode.usage.v1",
+      status: "error",
+      status_code: 400,
+      surface: "api",
+    });
+    if (!isRecord(eventRows[0])) {
+      throw new Error("Usage pipeline event row was not an object.");
+    }
+    expect(eventRows[0].event_key).toMatch(/^codemode\/usage\//);
+    expect(eventRows[0].event_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(eventRows[0].issue_count).toBeGreaterThan(0);
+    expect(eventRows[0].request_snapshot_bytes).toBeGreaterThan(0);
+    expect(eventRows[0].response_snapshot_bytes).toBeGreaterThan(0);
+
+    expect(issueRows[0]).toMatchObject({
+      operation: "buildFlowchart",
+      schema: "sketchi.codemode.usage.v1",
+      status: "error",
+      surface: "api",
+    });
+    if (!isRecord(issueRows[0])) {
+      throw new Error("Usage pipeline issue row was not an object.");
+    }
+    expect(issueRows[0].event_key).toBe(eventRows[0].event_key);
+    expect(issueRows[0].issue_code).toEqual(expect.any(String));
+    expect(issueRows[0].issue_path).toMatch(/^response\.issues\[/);
   });
 
   it("wraps legacy raw Excalidraw scene artifacts in an importable file envelope", async () => {

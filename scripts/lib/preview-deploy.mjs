@@ -6,6 +6,11 @@ const webPreviewSurfaceApps = {
   SKETCHI_PLAYGROUND_URL: "playground",
 };
 
+const previewPipelineStreams = {
+  d9044253316f4273a60298098f444a62: "e9fc3bcd35314fa39fc6a89018207acc",
+  f687dab6e7d742c1a76834089e709462: "d95a1767edf246af8c637c5b9bf5a5c5",
+};
+
 export const previewApps = {
   excalidraw: {
     commentMarker: "<!-- sketchi-excalidraw-preview -->",
@@ -137,6 +142,7 @@ export function previewWranglerConfig(config, workerName, options = {}) {
   nextConfig.workers_dev = true;
   nextConfig.preview_urls = false;
   nextConfig.r2_buckets = previewR2Buckets(nextConfig.r2_buckets);
+  nextConfig.pipelines = previewPipelines(nextConfig.pipelines);
 
   delete nextConfig.route;
   delete nextConfig.routes;
@@ -174,6 +180,30 @@ function previewR2Buckets(buckets) {
     }
 
     return bucket;
+  });
+}
+
+function previewPipelines(pipelines) {
+  if (!Array.isArray(pipelines)) {
+    return pipelines;
+  }
+
+  return pipelines.map((pipeline) => {
+    if (!pipeline || typeof pipeline !== "object") {
+      return pipeline;
+    }
+
+    return {
+      ...pipeline,
+      ...(typeof pipeline.stream === "string" &&
+      previewPipelineStreams[pipeline.stream]
+        ? { stream: previewPipelineStreams[pipeline.stream] }
+        : {}),
+      ...(typeof pipeline.pipeline === "string" &&
+      previewPipelineStreams[pipeline.pipeline]
+        ? { pipeline: previewPipelineStreams[pipeline.pipeline] }
+        : {}),
+    };
   });
 }
 

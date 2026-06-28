@@ -45,14 +45,18 @@ flowchart LR
       `sketchi.codemode.usage.v1` event records with bounded request/response
       snapshots into the existing R2 artifact bucket for MCP `execute`,
       `buildFlowchart`, and `applyDiagramPatch`.
+- [x] Project that usage stream into remote Cloudflare Pipeline streams. Studio
+      sends flat request rows and per-issue rows to production and preview
+      streams from the Worker bindings.
+- [ ] Attach the Pipeline streams to R2 Data Catalog tables once Cloudflare R2
+      SQL can read Pipeline-written tables reliably. Remote smoke tests against
+      both the Sketchi streams and a one-column control stream returned
+      `50408: Corrupted Catalog` after the first committed data file, so the
+      downstream Data Catalog sinks are intentionally not active yet.
 - [ ] Enrich usage capture once more harness/model metadata is available. Keep
       adding tool sequence detail, retry detail, token/cost buckets when
       available, and model or harness error text without changing the public MCP
       contract.
-- [ ] Keep the analysis backend open-ended. A future warehouse path such as
-      Snowflake is acceptable if it lets us query accumulated real usage and let
-      another LLM summarize reliability trends, failure classes, and prompt/tool
-      contract gaps.
 - [x] Add README files for each Nx package/app/tool that does not have one yet.
       Match the existing concise package README style: one-sentence purpose,
       quick Mermaid diagram, owns/does-not-own table, common commands, and how

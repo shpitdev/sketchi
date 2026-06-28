@@ -215,6 +215,18 @@ class MemoryBucket implements CodeModeObjectBucket {
   }
 }
 
+class MemoryPipeline {
+  readonly batches: unknown[][] = [];
+
+  async send(records: readonly unknown[]): Promise<void> {
+    this.batches.push([...records]);
+  }
+
+  records(): unknown[] {
+    return this.batches.flat();
+  }
+}
+
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   const buffer = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(buffer).set(bytes);
@@ -253,6 +265,23 @@ async function waitForUsageEvents(
   }
 
   throw new Error(`Expected ${count} usage event(s) to be persisted.`);
+}
+
+async function waitForPipelineRecords(
+  pipeline: MemoryPipeline,
+  count: number,
+): Promise<unknown[]> {
+  const deadline = Date.now() + 1_000;
+
+  while (Date.now() < deadline) {
+    const records = pipeline.records();
+    if (records.length >= count) {
+      return records;
+    }
+    await delay(5);
+  }
+
+  throw new Error(`Expected ${count} pipeline record(s) to be sent.`);
 }
 
 function delay(ms: number): Promise<void> {
@@ -591,6 +620,7 @@ describe("Sketchi Code Mode MCP server", () => {
 
   it("captures MCP execute usage events in the artifact bucket", async () => {
     const bucket = new MemoryBucket();
+    const usageEventsPipeline = new MemoryPipeline();
     const request = new Request("https://studio.test/mcp", {
       method: "POST",
       headers: {
@@ -603,7 +633,10 @@ describe("Sketchi Code Mode MCP server", () => {
     });
 
     const result = await executeSketchiCodeMode(
-      { SKETCHI_ARTIFACTS: bucket },
+      {
+        CODEMODE_USAGE_EVENTS: usageEventsPipeline,
+        SKETCHI_ARTIFACTS: bucket,
+      },
       {
         code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE,
       },
@@ -655,6 +688,30 @@ describe("Sketchi Code Mode MCP server", () => {
     expect(usageEvents[0].request.body.value).toMatchObject({
       code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE,
     });
+
+    const eventRows = await waitForPipelineRecords(usageEventsPipeline, 1);
+    expect(eventRows[0]).toMatchObject({
+      artifact_count: 1,
+      artifact_delivery: true,
+      artifact_formats: "scene,excalidraw,png",
+      harness: "agy",
+      issue_count: 0,
+      model: "gemini-3.5-flash",
+      operation: "execute",
+      reasoning_level: "medium",
+      request_method: "POST",
+      request_path: "/mcp",
+      scenario_id: "scenario-approval",
+      schema: "sketchi.codemode.usage.v1",
+      status: "ok",
+      surface: "mcp",
+      user_agent: "agy-test",
+    });
+    if (!isRecord(eventRows[0])) {
+      throw new Error("Usage pipeline event row was not an object.");
+    }
+    expect(eventRows[0].event_key).toMatch(/^codemode\/usage\//);
+    expect(eventRows[0].event_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it("synthesizes artifactDelivery URLs from the MCP origin when formats omit URLs", async () => {

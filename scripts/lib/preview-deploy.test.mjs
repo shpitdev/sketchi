@@ -83,6 +83,18 @@ test("previewWranglerConfig isolates preview worker settings", () => {
           preview_bucket_name: "sketchi-studio-codemode-artifacts-preview",
         },
       ],
+      pipelines: [
+        {
+          binding: "CODEMODE_USAGE_EVENTS",
+          remote: true,
+          stream: "d9044253316f4273a60298098f444a62",
+        },
+        {
+          binding: "CODEMODE_USAGE_ISSUES_LEGACY",
+          pipeline: "f687dab6e7d742c1a76834089e709462",
+          remote: true,
+        },
+      ],
     },
     "sketchi-playground-pr-42",
   );
@@ -103,6 +115,18 @@ test("previewWranglerConfig isolates preview worker settings", () => {
       binding: "SKETCHI_ARTIFACTS",
       bucket_name: "sketchi-studio-codemode-artifacts-preview",
       preview_bucket_name: "sketchi-studio-codemode-artifacts-preview",
+    },
+  ]);
+  assert.deepEqual(previewConfig.pipelines, [
+    {
+      binding: "CODEMODE_USAGE_EVENTS",
+      remote: true,
+      stream: "e9fc3bcd35314fa39fc6a89018207acc",
+    },
+    {
+      binding: "CODEMODE_USAGE_ISSUES_LEGACY",
+      pipeline: "d95a1767edf246af8c637c5b9bf5a5c5",
+      remote: true,
     },
   ]);
 });
