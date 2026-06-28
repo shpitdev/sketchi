@@ -36,8 +36,8 @@ Pull requests to `main` deploy matrix apps to PR-specific Cloudflare Workers.
 
 - `CHROMATIC_PROJECT_TOKEN`: `staging` environment secret for Storybook
   publish and visual checks.
-- `GRAPHITE_CI_OPTIMIZER_TOKEN`: `staging` environment secret for the Graphite
-  CI optimizer job in `v2-ci`.
+- `GRAPHITE_TOKEN`: repository secret for the Graphite CI optimizer jobs in
+  `v2-ci` and preview deploy workflows.
 - `CLOUDFLARE_ACCOUNT_ID`: `staging` environment variable or secret.
 - `CLOUDFLARE_API_TOKEN`: `staging` environment secret with Workers
   edit/deploy access.

@@ -51,7 +51,7 @@ jobs:
         uses: withgraphite/graphite-ci-action@main
         with:
           github_token: ${{ github.token }}
-          graphite_token: ${{ secrets.GRAPHITE_CI_OPTIMIZER_TOKEN }}
+          graphite_token: ${{ secrets.GRAPHITE_TOKEN }}
           pr_number: ${{ github.event.pull_request.number }}
 
   deploy-preview:
