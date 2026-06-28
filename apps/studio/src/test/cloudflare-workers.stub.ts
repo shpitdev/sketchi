@@ -13,3 +13,7 @@ export class WorkflowEntrypoint {}
 
 export const env = {};
 export const exports: Record<string, unknown> = {};
+
+export function waitUntil(promise: Promise<unknown>): void {
+  void promise;
+}

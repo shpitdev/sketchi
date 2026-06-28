@@ -15,6 +15,11 @@ import {
   SKETCHI_CODE_MODE_TYPES,
   SKETCHI_CODE_MODE_VERSION,
 } from "./codemode-mcp-docs.server";
+import {
+  captureCodeModeUsageEvent,
+  createCodeModeUsageContext,
+  type CodeModeUsageContext,
+} from "./codemode-usage-events.server";
 
 export interface SketchiCodeModeProvider {
   name: string;
@@ -36,6 +41,7 @@ export interface SketchiCodeModeExecutor {
 export interface CodeModeMcpOptions {
   executor?: SketchiCodeModeExecutor;
   origin?: string;
+  request?: Request;
 }
 
 interface MinimalExecutionContext {
@@ -349,6 +355,11 @@ export async function executeSketchiCodeMode(
   error?: string;
   logs?: string[];
 }> {
+  const usageContext = options.request
+    ? createCodeModeUsageContext(options.request)
+    : undefined;
+  const startedAt = Date.now();
+
   try {
     const parsed = ExecuteRequestSchema.parse(input);
     const runtime = createStudioCodeModeRuntime(env, {
@@ -374,7 +385,7 @@ export async function executeSketchiCodeMode(
     });
 
     if (execution.error) {
-      return {
+      const output = {
         ...(artifactDelivery ? { artifactDelivery } : {}),
         ...(artifactDelivery
           ? { finalResponseText: artifactDelivery.finalResponseText }
@@ -384,9 +395,17 @@ export async function executeSketchiCodeMode(
         logs: execution.logs ?? [],
         result: execution.result,
       };
+      captureMcpExecuteUsage(env, {
+        context: usageContext,
+        input,
+        options,
+        responseBody: output,
+        startedAt,
+      });
+      return output;
     }
 
-    return {
+    const output = {
       ...(artifactDelivery ? { artifactDelivery } : {}),
       ...(artifactDelivery
         ? { finalResponseText: artifactDelivery.finalResponseText }
@@ -395,13 +414,55 @@ export async function executeSketchiCodeMode(
       result: execution.result,
       logs: execution.logs ?? [],
     };
+    captureMcpExecuteUsage(env, {
+      context: usageContext,
+      input,
+      options,
+      responseBody: output,
+      startedAt,
+    });
+    return output;
   } catch (error) {
-    return {
+    const output = {
       ok: false,
       error: error instanceof Error ? error.message : String(error),
       logs: [],
     };
+    captureMcpExecuteUsage(env, {
+      context: usageContext,
+      input,
+      options,
+      responseBody: output,
+      startedAt,
+    });
+    return output;
   }
+}
+
+function captureMcpExecuteUsage(
+  env: StudioEnv,
+  input: {
+    context: CodeModeUsageContext | undefined;
+    input: unknown;
+    options: CodeModeMcpOptions;
+    responseBody: unknown;
+    startedAt: number;
+  },
+): void {
+  if (!input.context || !input.options.request) {
+    return;
+  }
+
+  captureCodeModeUsageEvent({
+    context: input.context,
+    durationMs: Date.now() - input.startedAt,
+    env,
+    operation: "execute",
+    request: input.options.request,
+    requestBody: input.input,
+    responseBody: input.responseBody,
+    surface: "mcp",
+  });
 }
 
 export function createSketchiMcpServer(
@@ -499,6 +560,7 @@ export async function handleSketchiMcpRequest(
     createSketchiMcpServer(env, {
       ...options,
       origin: new URL(request.url).origin,
+      request,
     }),
     {
       route: "/mcp",

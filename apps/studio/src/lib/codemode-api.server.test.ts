@@ -53,6 +53,40 @@ function artifactIdFrom(value: unknown): string {
   throw new Error("Response did not contain an artifact id.");
 }
 
+async function readBucketJson(
+  bucket: MemoryBucket,
+  key: string,
+): Promise<unknown> {
+  const object = await bucket.get(key);
+  return JSON.parse((await object?.text()) ?? "{}");
+}
+
+async function usageEventsFrom(bucket: MemoryBucket): Promise<unknown[]> {
+  const eventKeys = [...bucket.objects.keys()]
+    .filter((key) => key.startsWith("codemode/usage/"))
+    .filter((key) => key.endsWith("/event.json"))
+    .sort();
+
+  return Promise.all(eventKeys.map((key) => readBucketJson(bucket, key)));
+}
+
+async function waitForUsageEvents(
+  bucket: MemoryBucket,
+  count: number,
+): Promise<unknown[]> {
+  const deadline = Date.now() + 1_000;
+
+  while (Date.now() < deadline) {
+    const events = await usageEventsFrom(bucket);
+    if (events.length >= count) {
+      return events;
+    }
+    await delay(5);
+  }
+
+  throw new Error(`Expected ${count} usage event(s) to be persisted.`);
+}
+
 class MemoryBucket implements CodeModeObjectBucket {
   readonly objects = new Map<string, string | Uint8Array>();
 
@@ -84,10 +118,57 @@ class MemoryBucket implements CodeModeObjectBucket {
   }
 }
 
+class DelayedUsageBucket extends MemoryBucket {
+  private readonly releaseUsageWrite: Promise<void>;
+  private resolveReleaseUsageWrite: () => void = () => {};
+  readonly usageWriteFinished: Promise<void>;
+  private resolveUsageWriteFinished: () => void = () => {};
+  readonly usageWriteStarted: Promise<void>;
+  private resolveUsageWriteStarted: () => void = () => {};
+
+  constructor() {
+    super();
+    this.releaseUsageWrite = new Promise((resolve) => {
+      this.resolveReleaseUsageWrite = resolve;
+    });
+    this.usageWriteFinished = new Promise((resolve) => {
+      this.resolveUsageWriteFinished = resolve;
+    });
+    this.usageWriteStarted = new Promise((resolve) => {
+      this.resolveUsageWriteStarted = resolve;
+    });
+  }
+
+  override async put(
+    key: string,
+    value: string | ArrayBuffer | Uint8Array,
+  ): Promise<unknown> {
+    if (!key.startsWith("codemode/usage/")) {
+      return super.put(key, value);
+    }
+
+    this.resolveUsageWriteStarted();
+    await this.releaseUsageWrite;
+    const result = await super.put(key, value);
+    this.resolveUsageWriteFinished();
+    return result;
+  }
+
+  releaseUsagePersistence(): void {
+    this.resolveReleaseUsageWrite();
+  }
+}
+
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   const buffer = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(buffer).set(bytes);
   return buffer;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 describe("Code Mode API handlers", () => {
@@ -100,6 +181,7 @@ describe("Code Mode API handlers", () => {
     );
 
     expect(buildResponse.status).toBe(200);
+    expect(buildResponse.headers.get("x-sketchi-run-id")).toMatch(/^run_/);
     const built: unknown = await buildResponse.json();
     expect(built).toMatchObject({ ok: true, status: "accepted" });
 
@@ -205,7 +287,11 @@ describe("Code Mode API handlers", () => {
     const built: unknown = await buildResponse.json();
     const artifactId = artifactIdFrom(built);
 
-    expect([...bucket.objects.keys()].sort()).toEqual([
+    expect(
+      [...bucket.objects.keys()]
+        .filter((key) => key.startsWith(`codemode/${artifactId}/`))
+        .sort(),
+    ).toEqual([
       `codemode/${artifactId}/excalidraw.json`,
       `codemode/${artifactId}/manifest.json`,
       `codemode/${artifactId}/scene.json`,
@@ -237,6 +323,64 @@ describe("Code Mode API handlers", () => {
       artifactId,
       format: "scene",
     });
+
+    const usageEvents = await waitForUsageEvents(bucket, 1);
+    expect(usageEvents).toHaveLength(1);
+    expect(usageEvents[0]).toMatchObject({
+      artifactRefs: [
+        {
+          artifactId,
+          diagramId: "worker-api-approval-flow",
+        },
+      ],
+      client: {},
+      operation: "buildFlowchart",
+      request: {
+        method: "POST",
+        path: "/api/v1/flowcharts/build",
+      },
+      schema: "sketchi.codemode.usage.v1",
+      status: "ok",
+      statusCode: 200,
+      surface: "api",
+    });
+    if (!isRecord(usageEvents[0]) || !isRecord(usageEvents[0].request)) {
+      throw new Error("Usage event did not include request metadata.");
+    }
+    if (!isRecord(usageEvents[0].request.body)) {
+      throw new Error("Usage event did not include a request snapshot.");
+    }
+    expect(usageEvents[0].request.body.value).toMatchObject({
+      spec: { title: "Worker API approval flow" },
+    });
+  });
+
+  it("does not wait for usage event persistence before returning the API response", async () => {
+    const bucket = new DelayedUsageBucket();
+    const responsePromise = handleBuildFlowchartRequest(
+      { SKETCHI_ARTIFACTS: bucket },
+      postRequest("https://studio.test/api/v1/flowcharts/build", {
+        spec: approvalSpec(),
+      }),
+    );
+
+    await bucket.usageWriteStarted;
+    expect(await usageEventsFrom(bucket)).toHaveLength(0);
+
+    const response = await Promise.race([
+      responsePromise,
+      delay(250).then(() => undefined),
+    ]);
+
+    bucket.releaseUsagePersistence();
+    await bucket.usageWriteFinished;
+
+    if (!response) {
+      throw new Error("API response waited for usage event persistence.");
+    }
+
+    expect(response.status).toBe(200);
+    expect(await usageEventsFrom(bucket)).toHaveLength(1);
   });
 
   it("wraps legacy raw Excalidraw scene artifacts in an importable file envelope", async () => {

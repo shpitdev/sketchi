@@ -4,6 +4,12 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { describe, expect, it } from "vitest";
 
+import type {
+  CodeModeObjectBucket,
+  CodeModeObjectBucketObject,
+} from "@sketchi/diagram-agent";
+
+import type { StudioEnv } from "./agent.server";
 import {
   createSketchiMcpServer,
   executeSketchiCodeMode,
@@ -178,10 +184,90 @@ function textContent(response: unknown): string[] {
   });
 }
 
-function createMcpFetch(options: CodeModeMcpOptions): typeof fetch {
+class MemoryBucket implements CodeModeObjectBucket {
+  readonly objects = new Map<string, string | Uint8Array>();
+
+  async get(key: string): Promise<CodeModeObjectBucketObject | null> {
+    const value = this.objects.get(key);
+    if (!value) {
+      return null;
+    }
+    const bytes =
+      typeof value === "string" ? new TextEncoder().encode(value) : value;
+
+    return {
+      size: bytes.byteLength,
+      arrayBuffer: async () => toArrayBuffer(bytes),
+      text: async () =>
+        typeof value === "string" ? value : new TextDecoder().decode(value),
+    };
+  }
+
+  async put(
+    key: string,
+    value: string | ArrayBuffer | Uint8Array,
+  ): Promise<unknown> {
+    this.objects.set(
+      key,
+      typeof value === "string" ? value : new Uint8Array(value),
+    );
+    return null;
+  }
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}
+
+async function readBucketJson(
+  bucket: MemoryBucket,
+  key: string,
+): Promise<unknown> {
+  const object = await bucket.get(key);
+  return JSON.parse((await object?.text()) ?? "{}");
+}
+
+async function usageEventsFrom(bucket: MemoryBucket): Promise<unknown[]> {
+  const eventKeys = [...bucket.objects.keys()]
+    .filter((key) => key.startsWith("codemode/usage/"))
+    .filter((key) => key.endsWith("/event.json"))
+    .sort();
+
+  return Promise.all(eventKeys.map((key) => readBucketJson(bucket, key)));
+}
+
+async function waitForUsageEvents(
+  bucket: MemoryBucket,
+  count: number,
+): Promise<unknown[]> {
+  const deadline = Date.now() + 1_000;
+
+  while (Date.now() < deadline) {
+    const events = await usageEventsFrom(bucket);
+    if (events.length >= count) {
+      return events;
+    }
+    await delay(5);
+  }
+
+  throw new Error(`Expected ${count} usage event(s) to be persisted.`);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function createMcpFetch(
+  options: CodeModeMcpOptions,
+  env: StudioEnv = {},
+): typeof fetch {
   return async (input, init) => {
     const request = new Request(input, init);
-    return handleSketchiMcpRequest({}, request, options);
+    return handleSketchiMcpRequest(env, request, options);
   };
 }
 
@@ -501,6 +587,74 @@ describe("Sketchi Code Mode MCP server", () => {
     expect(result.artifactDelivery?.finalResponseInstruction).toContain(
       "Paste artifactDelivery.finalResponseText",
     );
+  });
+
+  it("captures MCP execute usage events in the artifact bucket", async () => {
+    const bucket = new MemoryBucket();
+    const request = new Request("https://studio.test/mcp", {
+      method: "POST",
+      headers: {
+        "user-agent": "agy-test",
+        "x-sketchi-harness": "agy",
+        "x-sketchi-model": "gemini-3.5-flash",
+        "x-sketchi-reasoning-level": "medium",
+        "x-sketchi-scenario-id": "scenario-approval",
+      },
+    });
+
+    const result = await executeSketchiCodeMode(
+      { SKETCHI_ARTIFACTS: bucket },
+      {
+        code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE,
+      },
+      {
+        executor: createInProcessExecutor(),
+        origin: "https://studio.test",
+        request,
+      },
+    );
+
+    expect(result).toMatchObject({
+      artifactDelivery: {
+        artifactId: "artifact_without_urls",
+      },
+      ok: true,
+    });
+
+    const usageEvents = await waitForUsageEvents(bucket, 1);
+    expect(usageEvents).toHaveLength(1);
+    expect(usageEvents[0]).toMatchObject({
+      artifactRefs: [
+        {
+          artifactId: "artifact_without_urls",
+          diagramId: "diagram_without_urls",
+        },
+      ],
+      client: {
+        harness: "agy",
+        model: "gemini-3.5-flash",
+        reasoningLevel: "medium",
+        scenarioId: "scenario-approval",
+        userAgent: "agy-test",
+      },
+      operation: "execute",
+      request: {
+        method: "POST",
+        path: "/mcp",
+      },
+      schema: "sketchi.codemode.usage.v1",
+      status: "ok",
+      surface: "mcp",
+    });
+    if (!isRecord(usageEvents[0]) || !isRecord(usageEvents[0].request)) {
+      throw new Error("Usage event did not include request metadata.");
+    }
+    if (!isRecord(usageEvents[0].request.body)) {
+      throw new Error("Usage event did not include a request snapshot.");
+    }
+    expect(usageEvents[0].request.body.value).toMatchObject({
+      code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE,
+    });
   });
 
   it("synthesizes artifactDelivery URLs from the MCP origin when formats omit URLs", async () => {

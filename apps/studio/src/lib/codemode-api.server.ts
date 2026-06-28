@@ -18,6 +18,11 @@ import {
 
 import type { StudioEnv } from "./agent.server";
 import { createCloudflareBrowserRunArtifactRenderer } from "./codemode-browser-renderer.server";
+import {
+  captureCodeModeUsageEvent,
+  codeModeUsageResponseHeaders,
+  createCodeModeUsageContext,
+} from "./codemode-usage-events.server";
 
 const localArtifactStore = createMemoryArtifactStore();
 const DEFAULT_RENDER_ASSET_ORIGIN =
@@ -95,12 +100,17 @@ function isLocalOrigin(origin: string): boolean {
   }
 }
 
-function jsonResponse(body: unknown, status: number): Response {
+function jsonResponse(
+  body: unknown,
+  status: number,
+  extraHeaders: HeadersInit = {},
+): Response {
+  const headers = new Headers(extraHeaders);
+  headers.set("Cache-Control", "no-store");
+
   return Response.json(body, {
     status,
-    headers: {
-      "Cache-Control": "no-store",
-    },
+    headers,
   });
 }
 
@@ -276,10 +286,31 @@ export async function handleBuildFlowchartRequest(
   env: StudioEnv,
   request: Request,
 ): Promise<Response> {
+  const usageContext = createCodeModeUsageContext(request);
+  const startedAt = Date.now();
+  const requestBody = await readJson(request);
   const result = await createStudioCodeModeRuntime(env, {
     origin: new URL(request.url).origin,
-  }).buildFlowchart(await readJson(request));
-  return jsonResponse(result, buildStatus(result));
+  }).buildFlowchart(requestBody);
+  const status = buildStatus(result);
+
+  captureCodeModeUsageEvent({
+    context: usageContext,
+    durationMs: Date.now() - startedAt,
+    env,
+    operation: "buildFlowchart",
+    request,
+    requestBody,
+    responseBody: result,
+    statusCode: status,
+    surface: "api",
+  });
+
+  return jsonResponse(
+    result,
+    status,
+    codeModeUsageResponseHeaders(usageContext),
+  );
 }
 
 export async function handleGetArtifactRequest(
@@ -371,6 +402,8 @@ export async function handlePatchArtifactRequest(
   request: Request,
   artifactId: string,
 ): Promise<Response> {
+  const usageContext = createCodeModeUsageContext(request);
+  const startedAt = Date.now();
   const body = await readJson(request);
   const input = isRecord(body)
     ? {
@@ -384,6 +417,23 @@ export async function handlePatchArtifactRequest(
   const result = await createStudioCodeModeRuntime(env, {
     origin: new URL(request.url).origin,
   }).applyDiagramPatch(input);
+  const status = patchStatus(result);
 
-  return jsonResponse(result, patchStatus(result));
+  captureCodeModeUsageEvent({
+    context: usageContext,
+    durationMs: Date.now() - startedAt,
+    env,
+    operation: "applyDiagramPatch",
+    request,
+    requestBody: input,
+    responseBody: result,
+    statusCode: status,
+    surface: "api",
+  });
+
+  return jsonResponse(
+    result,
+    status,
+    codeModeUsageResponseHeaders(usageContext),
+  );
 }

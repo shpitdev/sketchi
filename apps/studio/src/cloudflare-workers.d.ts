@@ -12,4 +12,6 @@ declare module "cloudflare:workers" {
     SKETCHI_AI_MODEL?: string;
     SKETCHI_RENDER_ASSET_ORIGIN?: string;
   };
+
+  export function waitUntil(promise: Promise<unknown>): void;
 }

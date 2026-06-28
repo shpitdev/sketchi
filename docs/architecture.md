@@ -194,3 +194,30 @@ Use the repo-local `$sketchi-log-analysis` skill in
 for reusable analysis. The skill keeps the operational behavior read-only, asks
 for payload inspection only when retained by the Gateway, and turns model
 failures into scenario or prompt-tuning follow-up.
+
+## Code Mode Usage Capture
+
+Studio records an initial server-side usage trail for the harness-facing Code
+Mode surface. The `/api/v1/flowcharts/build`,
+`/api/v1/artifacts/:artifactId/patch`, and MCP `execute` paths create a
+`sketchi.codemode.usage.v1` event when the `SKETCHI_ARTIFACTS` R2 binding is
+available.
+
+The usage event is intentionally an index record, not a warehouse schema. It
+stores operation, surface, run/attempt/event IDs, client headers such as
+harness/model/reasoning level when supplied, status, duration, artifact refs,
+and bounded request and response JSON snapshots when they are serializable and
+below the current size cap. Capture is scheduled with Cloudflare Workers
+`waitUntil` so the response is not blocked on telemetry storage. Capture is
+best-effort and must not fail artifact generation when telemetry storage is
+unavailable.
+
+Events are date-partitioned under the existing artifact bucket:
+
+```text
+codemode/usage/YYYY/MM/DD/<run_id>/<attempt_id>/<event_id>/event.json
+```
+
+This keeps raw evidence available now while leaving the analytics path open.
+Cloudflare Pipelines, R2 Data Catalog/R2 SQL, Snowflake, Convex, or another
+projection can consume these objects later without changing the MCP contract.

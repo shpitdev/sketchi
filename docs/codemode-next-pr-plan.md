@@ -40,11 +40,15 @@ flowchart LR
       machine, incident escalation, actor handoff/swimlane-like flow,
       repo/package architecture, dense 10-15 node business process, and one
       vague prompt that forces the harness to infer structure.
-- [ ] Preserve real MCP usage server-side so ordinary agent traffic can become
-      the eval surface. Store enough metadata to analyze prompt, harness/client,
-      model, reasoning level, tool sequence, artifact refs, status, failure
-      stage, timing, retries, token/cost buckets when available, and any model
-      or harness error text.
+- [x] Preserve initial real MCP/API usage server-side so ordinary agent traffic
+      can become the eval surface. Studio now writes
+      `sketchi.codemode.usage.v1` event records with bounded request/response
+      snapshots into the existing R2 artifact bucket for MCP `execute`,
+      `buildFlowchart`, and `applyDiagramPatch`.
+- [ ] Enrich usage capture once more harness/model metadata is available. Keep
+      adding tool sequence detail, retry detail, token/cost buckets when
+      available, and model or harness error text without changing the public MCP
+      contract.
 - [ ] Keep the analysis backend open-ended. A future warehouse path such as
       Snowflake is acceptable if it lets us query accumulated real usage and let
       another LLM summarize reliability trends, failure classes, and prompt/tool
