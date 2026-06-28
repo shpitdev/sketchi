@@ -315,42 +315,15 @@ body {
   padding: 18px;
 }
 
-.artifact {
-  width: 100%;
+.studio__stage-card .sketchi-diagram-preview {
+  flex: 1;
   height: 100%;
+  min-height: 0;
 }
 
-.artifact__node {
-  fill: #fffdf8;
-  stroke: var(--ink);
-  stroke-width: 1.6;
-}
-
-.artifact__node--terminal {
-  fill: #f3e9ee;
-}
-
-.artifact__node--decision {
-  fill: #f7f1e2;
-}
-
-.artifact__edge {
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.artifact__label {
-  fill: var(--ink);
-  font-family: var(--font-sans);
-  font-weight: 600;
-}
-
-.artifact__edge-label {
-  fill: var(--mauve);
-  font-size: 12px;
-  font-weight: 700;
-  font-family: var(--font-sans);
+.studio__stage-card .sketchi-excalidraw-scene-canvas {
+  border: 0;
+  min-height: 0;
 }
 
 .studio__stage-status {

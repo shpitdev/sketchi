@@ -8,6 +8,7 @@ import {
   renderIntermediateDiagram,
   type RenderedDiagramScene,
 } from "@sketchi/diagram-renderer";
+import { DiagramPreview } from "@sketchi/diagram-studio-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
@@ -42,7 +43,6 @@ import {
   ToolInput,
   ToolOutput,
 } from "@/components/ai-elements/tool";
-import { DiagramArtifact } from "@/components/diagram-artifact";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -268,7 +268,7 @@ function DiagramStage({
       </header>
       <div className="studio__stage-card">
         {scene ? (
-          <DiagramArtifact scene={scene} />
+          <DiagramPreview scene={scene} />
         ) : (
           <StagePlaceholder generating={generating} ghostLabels={ghostLabels} />
         )}

@@ -5,6 +5,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 
+import "@sketchi/diagram-studio-ui/styles.css";
 import appStyles from "../styles/app.css?url";
 
 export const Route = createRootRoute({
