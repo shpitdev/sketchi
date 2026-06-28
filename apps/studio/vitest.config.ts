@@ -20,6 +20,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: /^@\//,
+        replacement: new URL("./src/", import.meta.url).pathname,
+      },
+      {
         find: "cloudflare:email",
         replacement: new URL(
           "./src/test/cloudflare-email.stub.ts",
