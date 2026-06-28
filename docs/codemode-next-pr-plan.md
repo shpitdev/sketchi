@@ -48,11 +48,14 @@ flowchart LR
 - [x] Project that usage stream into remote Cloudflare Pipeline streams. Studio
       sends flat request rows and per-issue rows to production and preview
       streams from the Worker bindings.
-- [ ] Attach the Pipeline streams to R2 Data Catalog tables once Cloudflare R2
-      SQL can read Pipeline-written tables reliably. Remote smoke tests against
-      both the Sketchi streams and a one-column control stream returned
-      `50408: Corrupted Catalog` after the first committed data file, so the
-      downstream Data Catalog sinks are intentionally not active yet.
+- [ ] Attach the Pipeline streams to R2 Data Catalog tables once the
+      credential-aware R2 Catalog smoke is green. Remote probes show R2 SQL can
+      discover Pipeline-written tables and schemas, and direct Parquet reads of
+      the generated files work, but R2 SQL data scans still return
+      `50408: Corrupted Catalog`. Run
+      `node scripts/pipelines/r2-catalog-smoke.mjs` with
+      `WRANGLER_R2_SQL_AUTH_TOKEN` set to a real R2 API token that has Admin
+      Read & Write permissions before enabling persistent Data Catalog sinks.
 - [ ] Enrich usage capture once more harness/model metadata is available. Keep
       adding tool sequence detail, retry detail, token/cost buckets when
       available, and model or harness error text without changing the public MCP

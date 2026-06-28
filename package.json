@@ -29,7 +29,7 @@
     "storybook:icons": "nx storybook icons",
     "storybook:web": "nx storybook web",
     "test": "nx run-many -t test",
-    "test:deploy-scripts": "node --test scripts/lib/*.test.mjs",
+    "test:deploy-scripts": "node --test scripts/lib/*.test.mjs scripts/pipelines/*.test.mjs",
     "typecheck": "nx run-many -t typecheck",
     "typecheck:tsgo": "nx run-many -t typecheck-tsgo"
   },

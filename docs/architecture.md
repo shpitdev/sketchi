@@ -231,8 +231,14 @@ flat and aggregate-friendly; keep the richer request/response snapshots in the
 raw R2 event objects.
 
 R2 Data Catalog and R2 SQL are the intended downstream aggregate-query path, but
-that sink is not active yet. Remote smoke tests against Pipeline-written Data
-Catalog tables, including a one-column uncompressed control stream, returned
-`50408: Corrupted Catalog` after the first committed data file. Until Cloudflare
-resolves that open-beta failure mode, raw R2 events remain the durable source of
+that sink is not active yet. Metadata-only R2 SQL commands such as `SHOW TABLES`
+and `DESCRIBE` can see Pipeline-written tables, and the underlying Parquet data
+files are readable when downloaded directly, but R2 SQL data scans currently
+return `50408: Corrupted Catalog` on those Pipeline-written tables. A Wrangler
+OAuth token is not a sufficient substitute for the R2 API token that Data
+Catalog sinks and R2 SQL data scans require. Before enabling long-lived Data
+Catalog sinks, run `node scripts/pipelines/r2-catalog-smoke.mjs` with
+`WRANGLER_R2_SQL_AUTH_TOKEN` set to a real R2 API token that has Admin Read &
+Write permissions and confirm its direct R2 SQL aggregate query passes. Until
+that credential-aware smoke is green, raw R2 events remain the durable source of
 truth and the Pipeline streams stay ready for a future Data Catalog sink.
