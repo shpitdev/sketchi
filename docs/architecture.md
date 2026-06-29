@@ -230,14 +230,26 @@ The committed stream schemas live in `scripts/pipelines/`. Keep Pipeline rows
 flat and aggregate-friendly; keep the richer request/response snapshots in the
 raw R2 event objects.
 
-R2 Data Catalog and R2 SQL are the intended downstream aggregate-query path, but
-that sink is not active yet. Keep the credential boundary explicit: a Wrangler
-OAuth token can list catalog metadata, but Data Catalog sinks and R2 SQL data
-scans require an R2 API token with Admin Read & Write permissions. Before
-attaching long-lived Data Catalog sinks, run
-`node scripts/pipelines/r2-catalog-smoke.mjs` with
-`WRANGLER_R2_SQL_AUTH_TOKEN` set and confirm its direct R2 SQL aggregate query
-passes. The 2026-06-29 smoke run passed by querying the exact Pipeline-ingested
-row after the table metadata appeared. Until the production and preview streams
-are attached to durable sinks, raw R2 events remain the durable source of truth
-and the Pipeline streams stay ready for a future Data Catalog sink.
+R2 Data Catalog and R2 SQL are the downstream aggregate-query path. The durable
+catalog topology is recorded in `scripts/pipelines/codemode-r2-catalog.mjs`:
+
+| Surface    | Stream kind | Catalog bucket                                   | Table                           |
+| ---------- | ----------- | ------------------------------------------------ | ------------------------------- |
+| Preview    | Events      | `sketchi-codemode-usage-analytics-preview-v4`    | `sketchi_codemode.usage_events` |
+| Preview    | Issues      | `sketchi-codemode-usage-analytics-preview-v4`    | `sketchi_codemode.usage_issues` |
+| Production | Events      | `sketchi-codemode-usage-analytics-production-v4` | `sketchi_codemode.usage_events` |
+| Production | Issues      | `sketchi-codemode-usage-analytics-production-v4` | `sketchi_codemode.usage_issues` |
+
+Keep the credential boundary explicit: a Wrangler OAuth token can list catalog
+metadata, but Data Catalog sinks and R2 SQL data scans require an R2 API token
+with Admin Read & Write permissions. The 2026-06-29 smoke run passed by
+querying the exact Pipeline-ingested row after the table metadata appeared, and
+the real production/preview Code Mode streams were then verified by querying
+both `usage_events` and `usage_issues` rows for live API run IDs through the v4
+catalog buckets. Use `pnpm r2sql:codemode:resources` to print the durable
+resource map and `pnpm r2sql:codemode:verify-run -- --production-run-id <id>
+--preview-run-id <id>` to query R2 SQL for a real end-to-end run pair. The
+verifier polls R2 SQL because catalog ingestion is asynchronous. Event rows are
+required; issue rows are queried and reported, but they are only required when
+the probe is expected to emit issues and the command includes `--require-issues`
+or explicit `--production-issue-run-id` / `--preview-issue-run-id` values.

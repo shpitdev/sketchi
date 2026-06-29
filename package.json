@@ -23,6 +23,8 @@
     "dev:web": "pnpm nx dev web",
     "eval:harness": "jiti tools/harness-eval.ts",
     "preview": "nx run-many -t preview --parallel",
+    "r2sql:codemode:resources": "node scripts/pipelines/codemode-r2-catalog.mjs resources",
+    "r2sql:codemode:verify-run": "node scripts/pipelines/codemode-r2-catalog.mjs verify-run",
     "test:tools": "vitest run --config tools/vitest.config.mts",
     "storybook": "nx storybook diagram-studio-ui",
     "storybook:excalidraw": "nx storybook excalidraw",

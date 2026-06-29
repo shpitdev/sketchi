@@ -48,11 +48,14 @@ flowchart LR
 - [x] Project that usage stream into remote Cloudflare Pipeline streams. Studio
       sends flat request rows and per-issue rows to production and preview
       streams from the Worker bindings.
-- [ ] Attach the Pipeline streams to R2 Data Catalog tables. The
-      credential-aware R2 Catalog smoke is now green with
+- [x] Attach the Pipeline streams to R2 Data Catalog tables. The
+      credential-aware R2 Catalog smoke is green with
       `WRANGLER_R2_SQL_AUTH_TOKEN` set to a real R2 API token that has Admin
       Read & Write permissions; it proved a Pipeline-ingested row through a
-      direct R2 SQL aggregate data scan, not just table metadata.
+      direct R2 SQL aggregate data scan, not just table metadata. The real
+      production and preview Code Mode streams now write to the v4 analytics
+      catalog buckets, and a live intentionally failing API run pair was
+      queried back from `usage_events` and `usage_issues`.
 - [ ] Enrich usage capture once more harness/model metadata is available. Keep
       adding tool sequence detail, retry detail, token/cost buckets when
       available, and model or harness error text without changing the public MCP

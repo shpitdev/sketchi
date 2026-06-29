@@ -122,19 +122,24 @@ to Cloudflare Pipelines:
 Preview Wrangler configs rewrite the Studio artifact binding to the preview
 bucket and the Studio Pipeline bindings to preview streams. Production deploys
 keep production buckets and production streams. All Worker-bound buckets and
-streams must exist before their Workers deploy. Downstream Pipeline sinks or
-transforms are optional analytics resources and are not required unless they are
-explicitly enabled outside the Worker config. Preview deploys disable Wrangler
-resource provisioning, so the CI token does not need R2 object read access just
-to deploy the Worker.
+streams must exist before their Workers deploy. The downstream R2 Data Catalog
+sinks are long-lived Cloudflare Pipeline resources, not Worker bindings. They
+write into `sketchi-codemode-usage-analytics-production-v4` and
+`sketchi-codemode-usage-analytics-preview-v4`; run
+`pnpm r2sql:codemode:resources` to print the sink, pipeline, bucket, and table
+map. Preview deploys disable Wrangler resource provisioning, so the CI token
+does not need R2 object read access just to deploy the Worker.
 
-Before attaching the Code Mode usage streams to R2 Data Catalog sinks, rerun
-`node scripts/pipelines/r2-catalog-smoke.mjs` with
-`WRANGLER_R2_SQL_AUTH_TOKEN` set to a real R2 API token. The smoke must prove an
-aggregate R2 SQL data scan through the direct R2 SQL API, not just `SHOW TABLES`
-or `DESCRIBE`, because metadata-only catalog calls can succeed before rows are
-queryable. The 2026-06-29 smoke passed by querying the exact Pipeline-ingested
-row.
+R2 Data Catalog verification must prove an aggregate R2 SQL data scan through
+the direct R2 SQL API, not just `SHOW TABLES` or `DESCRIBE`, because
+metadata-only catalog calls can succeed before rows are queryable. The
+2026-06-29 real end-to-end check called production and preview Studio APIs with
+unique `x-sketchi-run-id` headers, then verified both `usage_events` and
+`usage_issues` rows in the v4 catalog buckets with
+`pnpm r2sql:codemode:verify-run -- --require-issues`. The verifier polls R2
+SQL by default. For normal successful API runs, issue rows may be absent; the
+command only requires issue rows when `--require-issues` or explicit
+issue-run-id options are supplied.
 
 Wrangler accepts Pipeline stream names in local dry-runs, but the deploy API
 requires stream IDs for Worker bindings. Keep `apps/studio/wrangler.jsonc` on
