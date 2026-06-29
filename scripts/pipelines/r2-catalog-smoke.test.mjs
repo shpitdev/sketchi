@@ -3,14 +3,18 @@ import test from "node:test";
 
 import {
   aggregateQuery,
+  assertAggregateMatches,
   catalogSmokeNames,
   cloudflareErrorSummary,
   isR2SqlSuccess,
   normalizePipelineNamePart,
+  parseWranglerJsonOutput,
+  pipelineStatusFrom,
   r2SqlApiUrl,
   r2SqlErrorSummary,
   redactSecrets,
   requireToken,
+  sqlStringLiteral,
   streamEndpointFrom,
 } from "./r2-catalog-smoke.mjs";
 
@@ -51,15 +55,23 @@ test("catalogSmokeNames rejects invalid explicit bucket names", () => {
   );
 });
 
-test("aggregateQuery uses the namespace and table", () => {
+test("sqlStringLiteral escapes single quotes", () => {
+  assert.equal(sqlStringLiteral("row's value"), "'row''s value'");
+});
+
+test("aggregateQuery filters to the ingested value", () => {
   assert.equal(
-    aggregateQuery({ namespace: "sketchi_codemode", table: "usage_events" }),
+    aggregateQuery(
+      { namespace: "sketchi_codemode", table: "usage_events" },
+      "row's value",
+    ),
     [
       "SELECT",
       "  COUNT(*) AS total_rows,",
       "  MIN(value) AS min_value,",
       "  MAX(value) AS max_value",
       "FROM sketchi_codemode.usage_events",
+      "WHERE value = 'row''s value'",
     ].join("\n"),
   );
 });
@@ -124,5 +136,49 @@ test("requireToken returns the configured token", () => {
   assert.equal(
     requireToken({ WRANGLER_R2_SQL_AUTH_TOKEN: "  token-value  " }),
     "token-value",
+  );
+});
+
+test("parseWranglerJsonOutput extracts JSON from wrangler output", () => {
+  assert.deepEqual(
+    parseWranglerJsonOutput([
+      "wrangler pipelines get example --json",
+      '{ "result": { "status": "running" } }',
+      "warning: beta command",
+    ].join("\n")),
+    { result: { status: "running" } },
+  );
+});
+
+test("pipelineStatusFrom normalizes details responses", () => {
+  assert.equal(pipelineStatusFrom({ result: { status: "Running" } }), "running");
+  assert.equal(pipelineStatusFrom({ status: "ACTIVE" }), "active");
+});
+
+test("assertAggregateMatches accepts the ingested row", () => {
+  assert.doesNotThrow(() =>
+    assertAggregateMatches(
+      {
+        result: {
+          rows: [{ total_rows: 1, min_value: "expected", max_value: "expected" }],
+        },
+      },
+      "expected",
+    ),
+  );
+});
+
+test("assertAggregateMatches rejects metadata-only tables", () => {
+  assert.throws(
+    () =>
+      assertAggregateMatches(
+        {
+          result: {
+            rows: [{ total_rows: 0, min_value: null, max_value: null }],
+          },
+        },
+        "expected",
+      ),
+    /did not return the ingested value/,
   );
 });

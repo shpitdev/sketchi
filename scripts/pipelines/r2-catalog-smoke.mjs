@@ -11,6 +11,10 @@ const R2_SQL_API_BASE = "https://api.sql.cloudflarestorage.com/api/v1";
 const POLL_ATTEMPTS = 8;
 const INITIAL_POLL_DELAY_MS = 65_000;
 const POLL_DELAY_MS = 30_000;
+const PIPELINE_READY_ATTEMPTS = 12;
+const PIPELINE_READY_DELAY_MS = 5_000;
+const PIPELINE_READY_STATUSES = new Set(["active", "running"]);
+const PIPELINE_FAILED_STATUSES = new Set(["failed", "errored"]);
 
 export function normalizePipelineNamePart(value) {
   const normalized = String(value ?? "")
@@ -59,13 +63,18 @@ export function catalogSmokeNames(input = {}) {
   };
 }
 
-export function aggregateQuery(names) {
+export function sqlStringLiteral(value) {
+  return `'${String(value).replaceAll("'", "''")}'`;
+}
+
+export function aggregateQuery(names, expectedValue) {
   return [
     "SELECT",
     "  COUNT(*) AS total_rows,",
     "  MIN(value) AS min_value,",
     "  MAX(value) AS max_value",
     `FROM ${names.namespace}.${names.table}`,
+    `WHERE value = ${sqlStringLiteral(expectedValue)}`,
   ].join("\n");
 }
 
@@ -125,6 +134,38 @@ export function requireToken(env, tokenEnv = DEFAULT_TOKEN_ENV) {
   return token;
 }
 
+export function parseWranglerJsonOutput(output) {
+  const text = String(output ?? "");
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end === -1 || end < start) {
+    throw new Error("Wrangler did not return a JSON object.");
+  }
+  return JSON.parse(text.slice(start, end + 1));
+}
+
+export function pipelineStatusFrom(details) {
+  const result = details?.result ?? details;
+  return typeof result?.status === "string"
+    ? result.status.trim().toLowerCase()
+    : "";
+}
+
+export function assertAggregateMatches(responseBody, expectedValue) {
+  const row = responseBody?.result?.rows?.[0];
+  const totalRows = Number(row?.total_rows ?? 0);
+  if (
+    !row ||
+    totalRows < 1 ||
+    row.min_value !== expectedValue ||
+    row.max_value !== expectedValue
+  ) {
+    throw new Error(
+      `Aggregate query did not return the ingested value. Expected ${JSON.stringify(expectedValue)}, got ${JSON.stringify(row ?? null)}.`,
+    );
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const tokenEnv = args["token-env"] ?? DEFAULT_TOKEN_ENV;
@@ -156,8 +197,8 @@ async function main() {
 
   try {
     await provision(context);
-    await ingest(context, args.value);
-    await verifyQueries(context);
+    const expectedValue = await ingest(context, args.value);
+    await verifyQueries(context, expectedValue);
   } finally {
     if (context.cleanup) {
       await cleanup(context);
@@ -241,6 +282,37 @@ async function provision(context) {
     "--sql",
     `INSERT INTO ${context.names.sink} SELECT * FROM ${context.names.stream}`,
   ]);
+  await waitForPipelineReady(context);
+}
+
+async function waitForPipelineReady(context) {
+  let lastStatus = "unknown";
+  for (let attempt = 1; attempt <= PIPELINE_READY_ATTEMPTS; attempt += 1) {
+    const output = await runWrangler(context, `get-pipeline-${attempt}`, [
+      "pipelines",
+      "get",
+      context.names.pipeline,
+      "--json",
+    ]);
+    const details = parseWranglerJsonOutput(output);
+    const status = pipelineStatusFrom(details);
+
+    if (PIPELINE_READY_STATUSES.has(status)) {
+      return;
+    }
+    if (PIPELINE_FAILED_STATUSES.has(status)) {
+      throw new Error(
+        `Pipeline ${context.names.pipeline} failed before ingest. See ${context.outputDir}.`,
+      );
+    }
+
+    lastStatus = status || "unknown";
+    await delay(PIPELINE_READY_DELAY_MS);
+  }
+
+  throw new Error(
+    `Pipeline ${context.names.pipeline} was not ready after ${PIPELINE_READY_ATTEMPTS} checks; last status was ${lastStatus}. See ${context.outputDir}.`,
+  );
 }
 
 async function ingest(context, value) {
@@ -265,9 +337,10 @@ async function ingest(context, value) {
       `Pipeline ingest failed with HTTP ${response.status}: ${body}`,
     );
   }
+  return payloadValue;
 }
 
-async function verifyQueries(context) {
+async function verifyQueries(context, expectedValue) {
   let lastError = null;
   for (let attempt = 1; attempt <= POLL_ATTEMPTS; attempt += 1) {
     await delay(attempt === 1 ? INITIAL_POLL_DELAY_MS : POLL_DELAY_MS);
@@ -282,11 +355,12 @@ async function verifyQueries(context) {
         `describe-table-${attempt}`,
         `DESCRIBE ${context.names.namespace}.${context.names.table}`,
       );
-      await runR2SqlQuery(
+      const aggregate = await runR2SqlQuery(
         context,
         `aggregate-${attempt}`,
-        aggregateQuery(context.names),
+        aggregateQuery(context.names, expectedValue),
       );
+      assertAggregateMatches(aggregate, expectedValue);
       return;
     } catch (error) {
       lastError = error;

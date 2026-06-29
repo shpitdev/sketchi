@@ -128,12 +128,13 @@ explicitly enabled outside the Worker config. Preview deploys disable Wrangler
 resource provisioning, so the CI token does not need R2 object read access just
 to deploy the Worker.
 
-Do not attach the Code Mode usage streams to R2 Data Catalog sinks until
-`node scripts/pipelines/r2-catalog-smoke.mjs` passes with
+Before attaching the Code Mode usage streams to R2 Data Catalog sinks, rerun
+`node scripts/pipelines/r2-catalog-smoke.mjs` with
 `WRANGLER_R2_SQL_AUTH_TOKEN` set to a real R2 API token. The smoke must prove an
 aggregate R2 SQL data scan through the direct R2 SQL API, not just `SHOW TABLES`
-or `DESCRIBE`, because metadata-only catalog calls can succeed while data scans
-still fail.
+or `DESCRIBE`, because metadata-only catalog calls can succeed before rows are
+queryable. The 2026-06-29 smoke passed by querying the exact Pipeline-ingested
+row.
 
 Wrangler accepts Pipeline stream names in local dry-runs, but the deploy API
 requires stream IDs for Worker bindings. Keep `apps/studio/wrangler.jsonc` on
