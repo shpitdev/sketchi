@@ -568,9 +568,16 @@ function connectionEdges(
   const sourceKind = source.kind?.toLowerCase();
 
   if (dy < 0) {
+    if (dx !== 0) {
+      return {
+        sourceEdge: dx > 0 ? "right" : "left",
+        targetEdge: "bottom",
+      };
+    }
+
     return {
       sourceEdge: "top",
-      targetEdge: dx < 0 ? "left" : "right",
+      targetEdge: "bottom",
     };
   }
 
@@ -734,17 +741,7 @@ function arrowForRoute(
   let points = compactPoints([portedStart, portedEnd]);
 
   if (center(target).y < center(source).y) {
-    const laneX =
-      Math.max(source.x + source.width, target.x + target.width) +
-      HORIZONTAL_GAP / 2 +
-      (route.index % 4) * PORT_SPACING;
-
-    points = compactPoints([
-      portedStart,
-      { x: laneX, y: portedStart.y },
-      { x: laneX, y: portedEnd.y },
-      portedEnd,
-    ]);
+    points = exteriorLaneRoute(route, portedStart, portedEnd, shapes);
   } else if (
     edgeRouting === "orthogonal" &&
     portedStart.x !== portedEnd.x &&
@@ -908,52 +905,119 @@ function routeNodeCrossingCount(
   return crossingCount;
 }
 
+function routeLength(points: readonly ScenePoint[]): number {
+  let length = 0;
+
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+
+    if (!start || !end) {
+      continue;
+    }
+
+    length += Math.abs(end.x - start.x) + Math.abs(end.y - start.y);
+  }
+
+  return length;
+}
+
+function chooseBestRoute(
+  candidates: readonly [ScenePoint, ...ScenePoint[]][],
+  shapes: readonly NodeSceneElement[],
+  ignoredNodeIds: ReadonlySet<string>,
+): [ScenePoint, ...ScenePoint[]] {
+  const first = candidates[0];
+  if (!first) {
+    return [{ x: 0, y: 0 }];
+  }
+
+  return candidates.slice(1).reduce((best, candidate) => {
+    const bestCrossingCount = routeNodeCrossingCount(
+      best,
+      shapes,
+      ignoredNodeIds,
+    );
+    const candidateCrossingCount = routeNodeCrossingCount(
+      candidate,
+      shapes,
+      ignoredNodeIds,
+    );
+
+    if (candidateCrossingCount < bestCrossingCount) {
+      return candidate;
+    }
+
+    if (bestCrossingCount < candidateCrossingCount) {
+      return best;
+    }
+
+    return routeLength(candidate) < routeLength(best) ? candidate : best;
+  }, first);
+}
+
 function exteriorLaneRoute(
   route: RoutedEdge,
   start: ScenePoint,
   end: ScenePoint,
   shapes: readonly NodeSceneElement[],
 ): [ScenePoint, ...ScenePoint[]] {
+  const horizontalDominant =
+    Math.abs(end.x - start.x) >= Math.abs(end.y - start.y);
+  const ignoredNodeIds = new Set([route.source.nodeId, route.target.nodeId]);
   const minX = Math.min(...shapes.map((shape) => shape.x));
   const maxX = Math.max(...shapes.map((shape) => shape.x + shape.width));
+  const minY = Math.min(...shapes.map((shape) => shape.y));
+  const maxY = Math.max(...shapes.map((shape) => shape.y + shape.height));
   const useLeftLane =
     route.sourceEdge === "left" ||
     route.targetEdge === "left" ||
     center(route.target).x < center(route.source).x;
+  const useUpperLane =
+    route.sourceEdge === "top" ||
+    route.targetEdge === "top" ||
+    center(route.source).y <= center(route.target).y;
   const laneOffset = route.index * PORT_SPACING;
   const leftLaneX = minX - HORIZONTAL_GAP / 2 - laneOffset;
   const rightLaneX = maxX + HORIZONTAL_GAP / 2 + laneOffset;
-  const preferredLaneX = useLeftLane ? leftLaneX : rightLaneX;
-  const alternateLaneX = useLeftLane ? rightLaneX : leftLaneX;
-  const ignoredNodeIds = new Set([route.source.nodeId, route.target.nodeId]);
-  const routeForLane = (laneX: number) =>
+  const upperLaneY = minY - VERTICAL_GAP / 2 - laneOffset;
+  const lowerLaneY = maxY + VERTICAL_GAP / 2 + laneOffset;
+  const preferredX = useLeftLane ? leftLaneX : rightLaneX;
+  const alternateX = useLeftLane ? rightLaneX : leftLaneX;
+  const preferredY = useUpperLane ? upperLaneY : lowerLaneY;
+  const alternateY = useUpperLane ? lowerLaneY : upperLaneY;
+  const routeForVerticalLane = (laneX: number) =>
     compactPoints([
       start,
       { x: laneX, y: start.y },
       { x: laneX, y: end.y },
       end,
     ]);
-  const preferredRoute = routeForLane(preferredLaneX);
-  const preferredCrossingCount = routeNodeCrossingCount(
-    preferredRoute,
+  const routeForHorizontalLane = (laneY: number) =>
+    compactPoints([
+      start,
+      { x: start.x, y: laneY },
+      { x: end.x, y: laneY },
+      end,
+    ]);
+  const horizontalCandidates = [
+    routeForHorizontalLane(preferredY),
+    routeForHorizontalLane(alternateY),
+    routeForVerticalLane(preferredX),
+    routeForVerticalLane(alternateX),
+  ];
+  const verticalCandidates = [
+    routeForVerticalLane(preferredX),
+    routeForVerticalLane(alternateX),
+    routeForHorizontalLane(preferredY),
+    routeForHorizontalLane(alternateY),
+  ];
+
+  return chooseBestRoute(
+    horizontalDominant ? horizontalCandidates : verticalCandidates,
     shapes,
     ignoredNodeIds,
   );
-
-  if (preferredCrossingCount === 0) {
-    return preferredRoute;
-  }
-
-  const alternateRoute = routeForLane(alternateLaneX);
-  const alternateCrossingCount = routeNodeCrossingCount(
-    alternateRoute,
-    shapes,
-    ignoredNodeIds,
-  );
-
-  return alternateCrossingCount < preferredCrossingCount
-    ? alternateRoute
-    : preferredRoute;
 }
 
 function sceneBounds(elements: readonly SceneElement[]): {

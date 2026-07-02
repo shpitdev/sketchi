@@ -103,6 +103,16 @@ function expectValidOrderKeys(elements: readonly ExcalidrawElement[]) {
   expect(() => generateKeyBetween(previous, null)).not.toThrow();
 }
 
+function expectFlowchartExportValid(
+  input: Parameters<typeof parseFlowchartDiagram>[0],
+) {
+  const scene = convertSceneToExcalidraw(
+    renderIntermediateDiagram(parseFlowchartDiagram(input)),
+  );
+
+  expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
+}
+
 describe("convertSceneToExcalidraw", () => {
   it("wraps scenes as importable Excalidraw files", () => {
     const scene = convertSceneToExcalidraw(
@@ -205,6 +215,345 @@ describe("convertSceneToExcalidraw", () => {
         expect.objectContaining({ code: "overlapping-arrow-segment" }),
       );
     }
+  });
+
+  it("keeps Agy feedback-loop flowcharts valid without changing layout direction", () => {
+    const feedbackLoopSpecs = [
+      {
+        id: "enterprise-sales-to-implementation-handoff",
+        title: "Enterprise Sales-to-Implementation Handoff",
+        type: "flowchart",
+        nodes: [
+          {
+            id: "sales_qualify",
+            label: "Sales: Qualify Opportunity",
+            kind: "start",
+          },
+          {
+            id: "solutions_scope",
+            label: "Solutions: Scope Integration",
+            kind: "process",
+          },
+          {
+            id: "legal_review",
+            label: "Legal: Review Contract",
+            kind: "process",
+          },
+          {
+            id: "contract_approved",
+            label: "Contract Approved?",
+            kind: "decision",
+          },
+          {
+            id: "legal_redline",
+            label: "Legal: Redline Contract",
+            kind: "process",
+          },
+          {
+            id: "finance_approve",
+            label: "Finance: Approve Billing",
+            kind: "process",
+          },
+          { id: "customer_sign", label: "Customer: Sign Order", kind: "process" },
+          {
+            id: "impl_kickoff",
+            label: "Implementation: Kickoff",
+            kind: "process",
+          },
+          {
+            id: "customer_contacts",
+            label: "Customer: Tech Contacts",
+            kind: "process",
+          },
+          {
+            id: "impl_configure",
+            label: "Implementation: Config Workspace",
+            kind: "process",
+          },
+          {
+            id: "customer_validate",
+            label: "Customer: Launch Checklist",
+            kind: "process",
+          },
+          {
+            id: "support_handoff",
+            label: "Support: Success Handoff",
+            kind: "end",
+          },
+        ],
+        edges: [
+          { id: "edge-1", source: "sales_qualify", target: "solutions_scope" },
+          { id: "edge-2", source: "solutions_scope", target: "legal_review" },
+          { id: "edge-3", source: "legal_review", target: "contract_approved" },
+          {
+            id: "edge-4",
+            source: "contract_approved",
+            target: "legal_redline",
+            label: "no",
+          },
+          { id: "edge-5", source: "legal_redline", target: "legal_review" },
+          {
+            id: "edge-6",
+            source: "contract_approved",
+            target: "finance_approve",
+            label: "yes",
+          },
+          { id: "edge-7", source: "finance_approve", target: "customer_sign" },
+          { id: "edge-8", source: "customer_sign", target: "impl_kickoff" },
+          { id: "edge-9", source: "impl_kickoff", target: "customer_contacts" },
+          {
+            id: "edge-10",
+            source: "customer_contacts",
+            target: "impl_configure",
+          },
+          {
+            id: "edge-11",
+            source: "impl_configure",
+            target: "customer_validate",
+          },
+          {
+            id: "edge-12",
+            source: "customer_validate",
+            target: "support_handoff",
+          },
+        ],
+        layout: { direction: "TB" },
+      },
+      {
+        id: "agentic-diagram-pipeline-feedback-loop",
+        title: "Agentic Diagram Pipeline & Feedback Loop",
+        type: "flowchart",
+        nodes: [
+          {
+            id: "user_prompt",
+            label: "Messy User Request Received",
+            kind: "start",
+          },
+          {
+            id: "agent_orchestration",
+            label: "Agent Requests IR Candidate",
+            kind: "process",
+          },
+          {
+            id: "core_validation",
+            label: "diagram-core Validates IR Schema",
+            kind: "process",
+          },
+          { id: "ir_valid", label: "IR Valid?", kind: "decision" },
+          {
+            id: "agent_repair",
+            label: "Agent Repairs IR Candidate",
+            kind: "process",
+          },
+          {
+            id: "scene_rendering",
+            label: "diagram-renderer Generates Scene",
+            kind: "process",
+          },
+          {
+            id: "export_elements",
+            label: "diagram-excalidraw Exports Elements",
+            kind: "process",
+          },
+          {
+            id: "export_succeeded",
+            label: "Export Succeeded?",
+            kind: "decision",
+          },
+          { id: "log_failure", label: "Log Error & Alert Owner", kind: "end" },
+          {
+            id: "store_artifacts",
+            label: "Store Scene, Excalidraw & PNG",
+            kind: "process",
+          },
+          {
+            id: "telemetry_logs",
+            label: "Cloudflare Gateway Logs Telemetry",
+            kind: "process",
+          },
+          {
+            id: "eval_usage",
+            label: "Evaluate Usage & Tune Prompts",
+            kind: "process",
+          },
+          {
+            id: "deliver_block",
+            label: "Deliver Final Artifact Ready Block",
+            kind: "end",
+          },
+        ],
+        edges: [
+          { id: "edge-1", source: "user_prompt", target: "agent_orchestration" },
+          {
+            id: "edge-2",
+            source: "agent_orchestration",
+            target: "core_validation",
+          },
+          { id: "edge-3", source: "core_validation", target: "ir_valid" },
+          {
+            id: "edge-4",
+            source: "ir_valid",
+            target: "agent_repair",
+            label: "no",
+          },
+          { id: "edge-5", source: "agent_repair", target: "agent_orchestration" },
+          {
+            id: "edge-6",
+            source: "ir_valid",
+            target: "scene_rendering",
+            label: "yes",
+          },
+          {
+            id: "edge-7",
+            source: "scene_rendering",
+            target: "export_elements",
+          },
+          {
+            id: "edge-8",
+            source: "export_elements",
+            target: "export_succeeded",
+          },
+          {
+            id: "edge-9",
+            source: "export_succeeded",
+            target: "log_failure",
+            label: "no",
+          },
+          {
+            id: "edge-10",
+            source: "export_succeeded",
+            target: "store_artifacts",
+            label: "yes",
+          },
+          {
+            id: "edge-11",
+            source: "store_artifacts",
+            target: "telemetry_logs",
+          },
+          { id: "edge-12", source: "telemetry_logs", target: "eval_usage" },
+          { id: "edge-13", source: "eval_usage", target: "deliver_block" },
+        ],
+        layout: { direction: "TB" },
+      },
+    ];
+
+    for (const spec of feedbackLoopSpecs) {
+      expectFlowchartExportValid(spec);
+    }
+  });
+
+  it("routes Agy left-to-right skip edges around intervening row nodes", () => {
+    expectFlowchartExportValid({
+      id: "enterprise-vendor-onboarding-flow",
+      title: "Enterprise Vendor Onboarding Flow",
+      type: "flowchart",
+      nodes: [
+        { id: "intake_request", label: "Intake Request Submitted", kind: "start" },
+        {
+          id: "requester_details",
+          label: "Gather Requester Details",
+          kind: "process",
+        },
+        { id: "risk_screening", label: "Vendor Risk Screening", kind: "process" },
+        { id: "high_risk", label: "High Risk?", kind: "decision" },
+        {
+          id: "security_questionnaire",
+          label: "Security Questionnaire",
+          kind: "process",
+        },
+        { id: "legal_review", label: "Legal Review", kind: "process" },
+        { id: "finance_tax", label: "Finance Tax Review", kind: "process" },
+        {
+          id: "procurement_approval",
+          label: "Procurement Approval",
+          kind: "process",
+        },
+        {
+          id: "spend_threshold",
+          label: "Spend Above Threshold?",
+          kind: "decision",
+        },
+        {
+          id: "executive_approval",
+          label: "Executive Approval",
+          kind: "process",
+        },
+        {
+          id: "po_creation",
+          label: "Purchase Order Creation",
+          kind: "process",
+        },
+        {
+          id: "portal_and_bank",
+          label: "Portal Invite & Bank Validation",
+          kind: "process",
+        },
+        { id: "invoice_match", label: "First Invoice Match", kind: "process" },
+        {
+          id: "activate_and_archive",
+          label: "Activate & Archive Evidence",
+          kind: "end",
+        },
+      ],
+      edges: [
+        { id: "edge-1", source: "intake_request", target: "requester_details" },
+        { id: "edge-2", source: "requester_details", target: "risk_screening" },
+        { id: "edge-3", source: "risk_screening", target: "high_risk" },
+        {
+          id: "edge-4",
+          source: "high_risk",
+          target: "security_questionnaire",
+          label: "yes",
+        },
+        {
+          id: "edge-5",
+          source: "security_questionnaire",
+          target: "legal_review",
+        },
+        {
+          id: "edge-6",
+          source: "high_risk",
+          target: "legal_review",
+          label: "no",
+        },
+        { id: "edge-7", source: "legal_review", target: "finance_tax" },
+        {
+          id: "edge-8",
+          source: "finance_tax",
+          target: "procurement_approval",
+        },
+        {
+          id: "edge-9",
+          source: "procurement_approval",
+          target: "spend_threshold",
+        },
+        {
+          id: "edge-10",
+          source: "spend_threshold",
+          target: "executive_approval",
+          label: "yes",
+        },
+        {
+          id: "edge-11",
+          source: "executive_approval",
+          target: "po_creation",
+        },
+        {
+          id: "edge-12",
+          source: "spend_threshold",
+          target: "po_creation",
+          label: "no",
+        },
+        { id: "edge-13", source: "po_creation", target: "portal_and_bank" },
+        { id: "edge-14", source: "portal_and_bank", target: "invoice_match" },
+        {
+          id: "edge-15",
+          source: "invoice_match",
+          target: "activate_and_archive",
+        },
+      ],
+      layout: { direction: "LR" },
+    });
   });
 
   it("allows shared bound stems when decision branches diverge", () => {
