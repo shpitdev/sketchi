@@ -254,7 +254,11 @@ describe("convertSceneToExcalidraw", () => {
             label: "Finance: Approve Billing",
             kind: "process",
           },
-          { id: "customer_sign", label: "Customer: Sign Order", kind: "process" },
+          {
+            id: "customer_sign",
+            label: "Customer: Sign Order",
+            kind: "process",
+          },
           {
             id: "impl_kickoff",
             label: "Implementation: Kickoff",
@@ -383,7 +387,11 @@ describe("convertSceneToExcalidraw", () => {
           },
         ],
         edges: [
-          { id: "edge-1", source: "user_prompt", target: "agent_orchestration" },
+          {
+            id: "edge-1",
+            source: "user_prompt",
+            target: "agent_orchestration",
+          },
           {
             id: "edge-2",
             source: "agent_orchestration",
@@ -396,7 +404,11 @@ describe("convertSceneToExcalidraw", () => {
             target: "agent_repair",
             label: "no",
           },
-          { id: "edge-5", source: "agent_repair", target: "agent_orchestration" },
+          {
+            id: "edge-5",
+            source: "agent_repair",
+            target: "agent_orchestration",
+          },
           {
             id: "edge-6",
             source: "ir_valid",
@@ -448,13 +460,21 @@ describe("convertSceneToExcalidraw", () => {
       title: "Enterprise Vendor Onboarding Flow",
       type: "flowchart",
       nodes: [
-        { id: "intake_request", label: "Intake Request Submitted", kind: "start" },
+        {
+          id: "intake_request",
+          label: "Intake Request Submitted",
+          kind: "start",
+        },
         {
           id: "requester_details",
           label: "Gather Requester Details",
           kind: "process",
         },
-        { id: "risk_screening", label: "Vendor Risk Screening", kind: "process" },
+        {
+          id: "risk_screening",
+          label: "Vendor Risk Screening",
+          kind: "process",
+        },
         { id: "high_risk", label: "High Risk?", kind: "decision" },
         {
           id: "security_questionnaire",
@@ -1042,6 +1062,62 @@ describe("convertSceneToExcalidraw", () => {
       expect.objectContaining({
         code: "arrow-endpoint-off-shape",
         elementId: "edge:prompt-requirements",
+      }),
+    );
+  });
+
+  it("reports diamond endpoints that only land on the bounding box", () => {
+    const scene = convertSceneToExcalidraw(
+      renderIntermediateDiagram(flowchartFixture),
+    );
+    const branchArrow = scene.elements.find(
+      (element) => element.id === "edge:clear-draft",
+    );
+    const decisionShape = scene.elements.find(
+      (element) => element.id === "node:clear",
+    );
+
+    if (
+      !branchArrow ||
+      !decisionShape ||
+      typeof decisionShape.x !== "number" ||
+      typeof decisionShape.y !== "number" ||
+      typeof decisionShape.width !== "number" ||
+      typeof decisionShape.height !== "number"
+    ) {
+      throw new Error("Expected clear-draft arrow and clear decision shape.");
+    }
+
+    const offDiamondPoint = {
+      x: decisionShape.x + decisionShape.width / 2 - 9,
+      y: decisionShape.y + decisionShape.height,
+    };
+    const startBinding = branchArrow.startBinding;
+
+    if (!(startBinding && typeof startBinding === "object")) {
+      throw new Error("Expected clear-draft start binding.");
+    }
+
+    branchArrow.x = offDiamondPoint.x;
+    branchArrow.y = offDiamondPoint.y;
+    branchArrow.points = Array.isArray(branchArrow.points)
+      ? [[0, 0], ...branchArrow.points.slice(1)]
+      : [[0, 0]];
+    branchArrow.startBinding = {
+      ...startBinding,
+      fixedPoint: [
+        (offDiamondPoint.x - decisionShape.x) / decisionShape.width,
+        1,
+      ],
+    };
+
+    const validation = validateExcalidrawScene(scene);
+
+    expect(validation.ok).toBe(false);
+    expect(validation.issues).toContainEqual(
+      expect.objectContaining({
+        code: "arrow-endpoint-off-shape",
+        elementId: "edge:clear-draft",
       }),
     );
   });

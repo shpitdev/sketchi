@@ -653,6 +653,63 @@ function pointOnEdge(
   portOffset = 0,
 ): ScenePoint {
   const offset = constrainedPortOffset(shape, edge, portOffset);
+  const centerPoint = center(shape);
+  const halfWidth = shape.width / 2;
+  const halfHeight = shape.height / 2;
+
+  if (shape.shape === "diamond" && halfWidth > 0 && halfHeight > 0) {
+    if (edge === "top" || edge === "bottom") {
+      const x = centerPoint.x + offset;
+      const boundaryOffset = halfHeight * (1 - Math.abs(offset) / halfWidth);
+      return {
+        x,
+        y:
+          edge === "top"
+            ? centerPoint.y - boundaryOffset
+            : centerPoint.y + boundaryOffset,
+      };
+    }
+
+    const y = centerPoint.y + offset;
+    const boundaryOffset = halfWidth * (1 - Math.abs(offset) / halfHeight);
+    return {
+      x:
+        edge === "left"
+          ? centerPoint.x - boundaryOffset
+          : centerPoint.x + boundaryOffset,
+      y,
+    };
+  }
+
+  if (
+    (shape.shape === "ellipse" || shape.shape === "circle") &&
+    halfWidth > 0 &&
+    halfHeight > 0
+  ) {
+    if (edge === "top" || edge === "bottom") {
+      const x = centerPoint.x + offset;
+      const boundaryOffset =
+        halfHeight * Math.sqrt(Math.max(0, 1 - (offset / halfWidth) ** 2));
+      return {
+        x,
+        y:
+          edge === "top"
+            ? centerPoint.y - boundaryOffset
+            : centerPoint.y + boundaryOffset,
+      };
+    }
+
+    const y = centerPoint.y + offset;
+    const boundaryOffset =
+      halfWidth * Math.sqrt(Math.max(0, 1 - (offset / halfHeight) ** 2));
+    return {
+      x:
+        edge === "left"
+          ? centerPoint.x - boundaryOffset
+          : centerPoint.x + boundaryOffset,
+      y,
+    };
+  }
 
   switch (edge) {
     case "top":
@@ -1189,6 +1246,23 @@ function routeTargetOvershootDistance(points: readonly ScenePoint[]): number {
   return distance;
 }
 
+function pointAwayFromEdge(
+  point: ScenePoint,
+  edge: ConnectionEdge,
+  distance: number,
+): ScenePoint {
+  switch (edge) {
+    case "top":
+      return { x: point.x, y: point.y - distance };
+    case "right":
+      return { x: point.x + distance, y: point.y };
+    case "bottom":
+      return { x: point.x, y: point.y + distance };
+    case "left":
+      return { x: point.x - distance, y: point.y };
+  }
+}
+
 function chooseBestRoute(
   candidates: readonly [ScenePoint, ...ScenePoint[]][],
   shapes: readonly NodeSceneElement[],
@@ -1309,31 +1383,74 @@ function exteriorLaneRoute(
   const alternateX = useLeftLane ? rightLaneX : leftLaneX;
   const preferredY = useUpperLane ? upperLaneY : lowerLaneY;
   const alternateY = useUpperLane ? lowerLaneY : upperLaneY;
-  const routeForVerticalLane = (laneX: number) =>
-    compactPoints([
+  const localStubDistance =
+    ROUTE_STUB_LENGTH + (route.index % 4) * PORT_SPACING;
+  const stubDistances = [0, localStubDistance];
+  const routeForVerticalLane = (laneX: number, stubDistance: number) => {
+    const startStub =
+      stubDistance > 0
+        ? pointAwayFromEdge(start, route.sourceEdge, stubDistance)
+        : start;
+    const endStub =
+      stubDistance > 0
+        ? pointAwayFromEdge(end, route.targetEdge, stubDistance)
+        : end;
+
+    return compactPoints([
       start,
-      { x: laneX, y: start.y },
-      { x: laneX, y: end.y },
+      startStub,
+      { x: laneX, y: startStub.y },
+      { x: laneX, y: endStub.y },
+      endStub,
       end,
     ]);
-  const routeForHorizontalLane = (laneY: number) =>
-    compactPoints([
+  };
+  const routeForHorizontalLane = (laneY: number, stubDistance: number) => {
+    const startStub =
+      stubDistance > 0
+        ? pointAwayFromEdge(start, route.sourceEdge, stubDistance)
+        : start;
+    const endStub =
+      stubDistance > 0
+        ? pointAwayFromEdge(end, route.targetEdge, stubDistance)
+        : end;
+
+    return compactPoints([
       start,
-      { x: start.x, y: laneY },
-      { x: end.x, y: laneY },
+      startStub,
+      { x: startStub.x, y: laneY },
+      { x: endStub.x, y: laneY },
+      endStub,
       end,
     ]);
+  };
   const horizontalCandidates = [
-    routeForHorizontalLane(preferredY),
-    routeForHorizontalLane(alternateY),
-    routeForVerticalLane(preferredX),
-    routeForVerticalLane(alternateX),
+    ...stubDistances.map((stubDistance) =>
+      routeForHorizontalLane(preferredY, stubDistance),
+    ),
+    ...stubDistances.map((stubDistance) =>
+      routeForHorizontalLane(alternateY, stubDistance),
+    ),
+    ...stubDistances.map((stubDistance) =>
+      routeForVerticalLane(preferredX, stubDistance),
+    ),
+    ...stubDistances.map((stubDistance) =>
+      routeForVerticalLane(alternateX, stubDistance),
+    ),
   ];
   const verticalCandidates = [
-    routeForVerticalLane(preferredX),
-    routeForVerticalLane(alternateX),
-    routeForHorizontalLane(preferredY),
-    routeForHorizontalLane(alternateY),
+    ...stubDistances.map((stubDistance) =>
+      routeForVerticalLane(preferredX, stubDistance),
+    ),
+    ...stubDistances.map((stubDistance) =>
+      routeForVerticalLane(alternateX, stubDistance),
+    ),
+    ...stubDistances.map((stubDistance) =>
+      routeForHorizontalLane(preferredY, stubDistance),
+    ),
+    ...stubDistances.map((stubDistance) =>
+      routeForHorizontalLane(alternateY, stubDistance),
+    ),
   ];
 
   return chooseBestRoute(

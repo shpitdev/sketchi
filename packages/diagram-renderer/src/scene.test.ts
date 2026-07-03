@@ -6,7 +6,11 @@ import {
   parseFlowchartDiagram,
 } from "@sketchi/diagram-core";
 
-import { renderIntermediateDiagram } from "./scene";
+import {
+  type ArrowSceneElement,
+  renderIntermediateDiagram,
+  type NodeSceneElement,
+} from "./scene";
 
 interface TestRouteSegment {
   max: number;
@@ -18,6 +22,43 @@ interface TestRouteSegment {
 interface TestScenePoint {
   x: number;
   y: number;
+}
+
+function shapeBoundaryValue(
+  shape: NodeSceneElement,
+  point: TestScenePoint,
+): number | null {
+  const halfWidth = shape.width / 2;
+  const halfHeight = shape.height / 2;
+  const centerX = shape.x + halfWidth;
+  const centerY = shape.y + halfHeight;
+
+  if (halfWidth === 0 || halfHeight === 0) {
+    return null;
+  }
+
+  if (shape.shape === "diamond") {
+    return (
+      Math.abs(point.x - centerX) / halfWidth +
+      Math.abs(point.y - centerY) / halfHeight
+    );
+  }
+
+  if (shape.shape === "ellipse" || shape.shape === "circle") {
+    return (
+      ((point.x - centerX) / halfWidth) ** 2 +
+      ((point.y - centerY) / halfHeight) ** 2
+    );
+  }
+
+  return null;
+}
+
+function nonRectangularBoundaryValue(
+  shape: NodeSceneElement | undefined,
+  point: TestScenePoint | undefined,
+): number | null {
+  return shape && point ? shapeBoundaryValue(shape, point) : null;
 }
 
 function testRouteSegments(
@@ -220,6 +261,49 @@ describe("renderIntermediateDiagram", () => {
     expect(clearReview.points.length).toBeGreaterThan(2);
     expect(clearDraft.points[0].x).toBeLessThan(clearReview.points[0].x);
     expect(clearDraft.points[0].y).toBe(clearReview.points[0].y);
+  });
+
+  it("keeps offset ports on non-rectangular shape perimeters", () => {
+    const scene = renderIntermediateDiagram(flowchartFixture);
+    const nodesById = new Map(
+      scene.elements
+        .filter(
+          (element): element is NodeSceneElement => element.type === "node",
+        )
+        .map((element) => [element.nodeId, element]),
+    );
+    const arrows = scene.elements.filter(
+      (element): element is ArrowSceneElement => element.type === "arrow",
+    );
+    const checkedEndpoints: string[] = [];
+
+    for (const arrow of arrows) {
+      const source = nodesById.get(arrow.sourceNodeId);
+      const target = nodesById.get(arrow.targetNodeId);
+      const start = arrow.points[0];
+      const end = arrow.points[arrow.points.length - 1];
+      const sourceValue = nonRectangularBoundaryValue(source, start);
+      const targetValue = nonRectangularBoundaryValue(target, end);
+
+      if (sourceValue !== null) {
+        checkedEndpoints.push(`${arrow.edgeId}:source`);
+        expect(Math.abs(sourceValue - 1)).toBeLessThan(0.001);
+      }
+
+      if (targetValue !== null) {
+        checkedEndpoints.push(`${arrow.edgeId}:target`);
+        expect(Math.abs(targetValue - 1)).toBeLessThan(0.001);
+      }
+    }
+
+    expect(checkedEndpoints).toEqual(
+      expect.arrayContaining([
+        "clear-draft:source",
+        "clear-review:source",
+        "clear-review:target",
+        "draft-review:target",
+      ]),
+    );
   });
 
   it("keeps upward return edges on the closest vertical ports", () => {

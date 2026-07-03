@@ -777,6 +777,40 @@ function pointOnShapeBoundary(
     return false;
   }
 
+  if (shape.type === "diamond") {
+    const halfWidth = bounds.width / 2;
+    const halfHeight = bounds.height / 2;
+
+    if (halfWidth === 0 || halfHeight === 0) {
+      return false;
+    }
+
+    const centerX = bounds.x + halfWidth;
+    const centerY = bounds.y + halfHeight;
+    const boundaryValue =
+      Math.abs(point.x - centerX) / halfWidth +
+      Math.abs(point.y - centerY) / halfHeight;
+
+    return near(boundaryValue, 1);
+  }
+
+  if (shape.type === "ellipse") {
+    const halfWidth = bounds.width / 2;
+    const halfHeight = bounds.height / 2;
+
+    if (halfWidth === 0 || halfHeight === 0) {
+      return false;
+    }
+
+    const centerX = bounds.x + halfWidth;
+    const centerY = bounds.y + halfHeight;
+    const boundaryValue =
+      ((point.x - centerX) / halfWidth) ** 2 +
+      ((point.y - centerY) / halfHeight) ** 2;
+
+    return near(boundaryValue, 1);
+  }
+
   const onVerticalSide =
     (near(point.x, bounds.x) || near(point.x, bounds.x + bounds.width)) &&
     between(point.y, bounds.y, bounds.y + bounds.height);
