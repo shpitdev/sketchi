@@ -1,6 +1,9 @@
+import type { ReactNode } from "react";
+
 export type WorkspaceStatus = "empty" | "error" | "loading" | "ready";
 
 export interface WorkspaceTopBarProps {
+  actions?: ReactNode;
   diagramType?: string | undefined;
   status?: WorkspaceStatus;
   title: string;
@@ -14,6 +17,7 @@ const statusMeta: Record<WorkspaceStatus, { dot: string; label: string }> = {
 };
 
 export function WorkspaceTopBar({
+  actions,
   diagramType,
   status = "ready",
   title,
@@ -49,6 +53,9 @@ export function WorkspaceTopBar({
           {meta.label}
         </span>
       </div>
+      {actions ? (
+        <div className="workspace-top-bar__actions">{actions}</div>
+      ) : null}
     </header>
   );
 }

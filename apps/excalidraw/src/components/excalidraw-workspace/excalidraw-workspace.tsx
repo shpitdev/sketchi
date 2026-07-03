@@ -7,7 +7,7 @@ import {
 import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 import { ExcalidrawSceneCanvas } from "@sketchi/diagram-studio-ui";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { DiagramInspector } from "../diagram-inspector/index.js";
 import {
@@ -25,6 +25,8 @@ const defaultDiagrams: readonly IntermediateDiagram[] = [
   mindmapFixture,
 ];
 
+type CopyState = "copied" | "error" | "idle";
+
 export interface ExcalidrawWorkspaceProps {
   diagrams?: readonly IntermediateDiagram[];
   errorMessage?: string;
@@ -41,6 +43,7 @@ export function ExcalidrawWorkspace({
   const [selectedId, setSelectedId] = useState(
     initialDiagramId ?? diagrams[0]?.id ?? "",
   );
+  const [copyState, setCopyState] = useState<CopyState>("idle");
 
   const active = diagrams.find((item) => item.id === selectedId) ?? diagrams[0];
 
@@ -63,9 +66,67 @@ export function ExcalidrawWorkspace({
   const effectiveStatus: WorkspaceStatus =
     diagrams.length === 0 ? "empty" : status;
 
+  const irJson = useMemo(
+    () => (active ? JSON.stringify(active, null, 2) : ""),
+    [active],
+  );
+
+  const sceneJson = useMemo(
+    () => (scene ? JSON.stringify(scene, null, 2) : ""),
+    [scene],
+  );
+
+  const sceneDownloadHref = sceneJson
+    ? `data:application/json;charset=utf-8,${encodeURIComponent(sceneJson)}`
+    : undefined;
+
+  useEffect(() => {
+    setCopyState("idle");
+  }, [active?.id]);
+
+  async function copyIr() {
+    if (!active) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(irJson);
+      setCopyState("copied");
+    } catch {
+      setCopyState("error");
+    }
+  }
+
   return (
     <div className="sketchi-excalidraw-app">
       <WorkspaceTopBar
+        actions={
+          active && sceneDownloadHref ? (
+            <>
+              <a className="workspace-action" href="#workspace-canvas">
+                Canvas
+              </a>
+              <button
+                className="workspace-action"
+                onClick={copyIr}
+                type="button"
+              >
+                {copyState === "copied"
+                  ? "Copied"
+                  : copyState === "error"
+                    ? "Copy failed"
+                    : "Copy IR"}
+              </button>
+              <a
+                className="workspace-action workspace-action--primary"
+                download={`${active.id}.excalidraw.json`}
+                href={sceneDownloadHref}
+              >
+                Download scene
+              </a>
+            </>
+          ) : null
+        }
         diagramType={active?.type}
         status={effectiveStatus}
         title={active?.title ?? "No diagram"}
@@ -85,7 +146,11 @@ export function ExcalidrawWorkspace({
           ) : null}
         </aside>
 
-        <section className="sketchi-excalidraw-app__canvas">
+        <section
+          aria-label="Workspace canvas"
+          className="sketchi-excalidraw-app__canvas"
+          id="workspace-canvas"
+        >
           {effectiveStatus === "loading" ? (
             <WorkspaceState kind="loading" />
           ) : effectiveStatus === "error" ? (

@@ -15,15 +15,28 @@ type CopyState = "copied" | "error" | "idle";
 
 export function IconDetail({ icon, onClose }: IconDetailProps) {
   const [copyState, setCopyState] = useState<CopyState>("idle");
+  const [pathCopyState, setPathCopyState] = useState<CopyState>("idle");
 
   async function copySvg() {
     try {
       const response = await fetch(icon.urlPath);
+      if (!response.ok) {
+        throw new Error(`Icon SVG returned HTTP ${response.status}.`);
+      }
       const markup = await response.text();
       await navigator.clipboard.writeText(markup);
       setCopyState("copied");
     } catch {
       setCopyState("error");
+    }
+  }
+
+  async function copyPath() {
+    try {
+      await navigator.clipboard.writeText(icon.urlPath);
+      setPathCopyState("copied");
+    } catch {
+      setPathCopyState("error");
     }
   }
 
@@ -33,6 +46,12 @@ export function IconDetail({ icon, onClose }: IconDetailProps) {
       : copyState === "error"
         ? "Copy failed"
         : "Copy SVG";
+  const pathCopyLabel =
+    pathCopyState === "copied"
+      ? "Path copied"
+      : pathCopyState === "error"
+        ? "Path failed"
+        : "Copy path";
 
   return (
     <section className="icon-detail" aria-label={`${icon.slug} details`}>
@@ -128,7 +147,17 @@ export function IconDetail({ icon, onClose }: IconDetailProps) {
         >
           Download
         </a>
+        <button className="icon-detail__btn" onClick={copyPath} type="button">
+          {pathCopyLabel}
+        </button>
       </div>
+      <p className="icon-detail__copy-status" aria-live="polite">
+        {copyState === "copied" || pathCopyState === "copied"
+          ? "Copied to clipboard."
+          : copyState === "error" || pathCopyState === "error"
+            ? "Clipboard copy failed."
+            : ""}
+      </p>
     </section>
   );
 }

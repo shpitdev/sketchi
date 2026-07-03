@@ -17,6 +17,16 @@ describe("MarketingHome", () => {
       screen.getByRole("heading", { name: "Four surfaces, one pipeline." }),
     ).toBeTruthy();
     expect(
+      screen.getByRole("heading", {
+        name: "Direct Workers are the review surface.",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", {
+        name: "The playground keeps generation inspectable.",
+      }),
+    ).toBeTruthy();
+    expect(
       screen.getByRole("heading", { name: "Excalidraw workspace" }),
     ).toBeTruthy();
   });

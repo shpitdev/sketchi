@@ -12,6 +12,10 @@ describe("HomeHero", () => {
     ).toBeTruthy();
     expect(screen.getByRole("link", { name: "Open the app" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Read the docs" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open the app" })).toHaveProperty(
+      "href",
+      "https://sketchi-excalidraw.dimethyl.workers.dev/",
+    );
   });
 
   it("labels the diagram illustration", () => {
@@ -19,7 +23,7 @@ describe("HomeHero", () => {
 
     expect(
       screen.getByRole("img", {
-        name: /validated, deterministic diagram/i,
+        name: /playground rendering a validated flowchart/i,
       }),
     ).toBeTruthy();
   });

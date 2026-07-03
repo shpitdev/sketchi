@@ -1,4 +1,5 @@
 import type {
+  ExcalidrawImperativeAPI,
   ExcalidrawInitialDataState,
   ExcalidrawProps,
 } from "@excalidraw/excalidraw/types";
@@ -27,6 +28,8 @@ export function ExcalidrawSceneCanvas({
   const [Excalidraw, setExcalidraw] = useState<ExcalidrawComponent | null>(
     null,
   );
+  const [excalidrawApi, setExcalidrawApi] =
+    useState<ExcalidrawImperativeAPI | null>(null);
   const sceneKey = useMemo(
     () =>
       JSON.stringify({
@@ -79,6 +82,24 @@ export function ExcalidrawSceneCanvas({
     };
   }, []);
 
+  useEffect(() => {
+    if (!excalidrawApi) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      excalidrawApi.scrollToContent(undefined, {
+        animate: false,
+        fitToViewport: true,
+        viewportZoomFactor: 0.72,
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [excalidrawApi, sceneKey]);
+
   return (
     <section
       aria-label={title}
@@ -90,6 +111,7 @@ export function ExcalidrawSceneCanvas({
           key={sceneKey}
           {...(onChange ? { onChange } : {})}
           autoFocus={false}
+          excalidrawAPI={setExcalidrawApi}
           gridModeEnabled
           initialData={initialData}
           name={title}

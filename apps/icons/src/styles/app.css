@@ -5,7 +5,6 @@
    ===================================================================== */
 @import "../../../../packages/diagram-studio-ui/src/theme.css";
 
-
 /* ===================================================================== */
 /* Page                                                                  */
 /* ===================================================================== */
@@ -91,7 +90,9 @@
   box-shadow: var(--shadow-sm);
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(220px, 1fr) minmax(190px, 260px) auto auto;
+  grid-template-columns:
+    minmax(220px, 1fr) minmax(160px, 230px) minmax(130px, 170px)
+    minmax(130px, 170px) auto auto auto;
   padding: 14px;
 }
 
@@ -129,6 +130,35 @@
   font-weight: 600;
   gap: 8px;
   min-height: 42px;
+}
+
+.sketchi-icons__density {
+  align-items: center;
+  background: var(--paper-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  display: inline-flex;
+  min-height: 42px;
+  padding: 3px;
+}
+
+.sketchi-icons__density button {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ink-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 34px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.sketchi-icons__density button[aria-pressed="true"] {
+  background: #10372c;
+  color: #e8f5ee;
 }
 
 .sketchi-icons__count {
@@ -187,7 +217,27 @@
 .sketchi-icons__grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(var(--icon-card-min, 132px), 1fr)
+  );
+}
+
+.sketchi-icons[data-density="compact"] {
+  --icon-card-min: 104px;
+}
+
+.sketchi-icons[data-density="compact"] .icon-card {
+  gap: 6px;
+  padding: 8px;
+}
+
+.sketchi-icons[data-density="compact"] .icon-card__slug {
+  font-size: 12px;
+}
+
+.sketchi-icons[data-density="compact"] .icon-card__collection {
+  display: none;
 }
 
 .sketchi-icons__empty {
@@ -233,7 +283,9 @@
   font-weight: 700;
   min-height: 44px;
   padding: 0 22px;
-  transition: border-color 0.16s var(--ease), background 0.16s var(--ease);
+  transition:
+    border-color 0.16s var(--ease),
+    background 0.16s var(--ease);
 }
 
 .sketchi-icons__more-btn:hover {
@@ -282,7 +334,11 @@
   aspect-ratio: 1;
   background-color: var(--card);
   background-image: var(--checker);
-  background-position: 0 0, 0 7px, 7px -7px, -7px 0;
+  background-position:
+    0 0,
+    0 7px,
+    7px -7px,
+    -7px 0;
   background-size: 14px 14px;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -393,7 +449,11 @@
   aspect-ratio: 16 / 11;
   background-color: var(--card);
   background-image: var(--checker);
-  background-position: 0 0, 0 9px, 9px -9px, -9px 0;
+  background-position:
+    0 0,
+    0 9px,
+    9px -9px,
+    -9px 0;
   background-size: 18px 18px;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
@@ -454,6 +514,7 @@
 
 .icon-detail__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -472,7 +533,9 @@
   min-height: 44px;
   padding: 0 14px;
   text-decoration: none;
-  transition: border-color 0.16s var(--ease), background 0.16s var(--ease);
+  transition:
+    border-color 0.16s var(--ease),
+    background 0.16s var(--ease);
 }
 
 .icon-detail__btn:hover {
@@ -485,6 +548,14 @@
   color: var(--paper-2);
 }
 
+.icon-detail__copy-status {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  margin: -6px 0 0;
+  min-height: 18px;
+}
+
 /* ===================================================================== */
 /* Responsive                                                            */
 /* ===================================================================== */
@@ -493,12 +564,23 @@
     grid-template-columns: 1fr;
   }
 
+  .sketchi-icons__density {
+    width: 100%;
+  }
+
+  .sketchi-icons__density button {
+    flex: 1;
+  }
+
   .sketchi-icons__count {
     text-align: left;
   }
 
   .sketchi-icons__grid {
-    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(var(--icon-card-min, 108px), 1fr)
+    );
   }
 
   .sketchi-icons__body[data-detail="open"] {

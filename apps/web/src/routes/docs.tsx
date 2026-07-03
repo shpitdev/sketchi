@@ -29,7 +29,7 @@ export function DocsPage({ surfaceUrls }: DocsPageProps) {
     <div className="sketchi-web">
       <SiteHeader activePath="/docs" surfaceUrls={surfaceUrls} />
       <main>
-        <DocsView />
+        <DocsView surfaceUrls={surfaceUrls} />
       </main>
       <SiteFooter surfaceUrls={surfaceUrls} />
     </div>

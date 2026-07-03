@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import type { SketchiIcon } from "../../lib/icon-data";
 import { IconDetail } from "./icon-detail";
@@ -24,9 +24,39 @@ describe("IconDetail", () => {
     expect(screen.getByText("512×512")).toBeTruthy();
     expect(screen.getByText("duplicate-raster")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Copy SVG" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy path" })).toBeTruthy();
 
     const download = screen.getByRole("link", { name: "Download" });
     expect(download.getAttribute("href")).toBe(icon.urlPath);
     expect(download.getAttribute("download")).toBe("workos.svg");
+  });
+
+  it("copies the SVG markup and path", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve("<svg />"),
+      }),
+    );
+
+    render(<IconDetail icon={icon} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy SVG" }));
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith("<svg />");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy path" }));
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(icon.urlPath);
+    });
+
+    expect(screen.getByText("Copied to clipboard.")).toBeTruthy();
   });
 });

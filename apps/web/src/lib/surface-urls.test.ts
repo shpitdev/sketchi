@@ -7,8 +7,11 @@ import {
 } from "./surface-urls";
 
 describe("resolveWebSurfaceUrls", () => {
-  it("uses production domains by default", () => {
+  it("uses production worker URLs by default", () => {
     expect(resolveWebSurfaceUrls()).toEqual(DEFAULT_WEB_SURFACE_URLS);
+    expect(DEFAULT_WEB_SURFACE_URLS.excalidraw).toBe(
+      "https://sketchi-excalidraw.dimethyl.workers.dev",
+    );
   });
 
   it("uses configured preview URLs", () => {

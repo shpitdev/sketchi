@@ -1,3 +1,9 @@
+import {
+  DEFAULT_WEB_SURFACE_URLS,
+  surfaceLinkLabel,
+  type WebSurfaceUrls,
+} from "../../lib/surface-urls";
+
 export interface DocsNavEntry {
   href: string;
   label: string;
@@ -5,6 +11,7 @@ export interface DocsNavEntry {
 
 export interface DocsViewProps {
   nav?: readonly DocsNavEntry[];
+  surfaceUrls?: WebSurfaceUrls;
 }
 
 const defaultNav: readonly DocsNavEntry[] = [
@@ -16,7 +23,36 @@ const defaultNav: readonly DocsNavEntry[] = [
   { href: "#deploy", label: "Deploy" },
 ];
 
-export function DocsView({ nav = defaultNav }: DocsViewProps) {
+const appSurfaceRows = [
+  {
+    desc: "The no-auth diagram workspace built on the same pipeline.",
+    key: "excalidraw",
+    label: "excalidraw.sketchi.app",
+    title: "Excalidraw workspace",
+  },
+  {
+    desc: "A browser for the curated Sketchi icon output.",
+    key: "icons",
+    label: "icons.sketchi.app",
+    title: "Icon library",
+  },
+  {
+    desc: "Scenario evaluation and prompt-output inspection.",
+    key: "playground",
+    label: "playground.sketchi.app",
+    title: "Scenario playground",
+  },
+] satisfies ReadonlyArray<{
+  desc: string;
+  key: keyof WebSurfaceUrls;
+  label: string;
+  title: string;
+}>;
+
+export function DocsView({
+  nav = defaultNav,
+  surfaceUrls = DEFAULT_WEB_SURFACE_URLS,
+}: DocsViewProps) {
   return (
     <div className="sk-shell docs-view">
       <nav aria-label="Docs sections" className="docs-nav">
@@ -65,30 +101,42 @@ export function DocsView({ nav = defaultNav }: DocsViewProps) {
             The workspace ships five independently deployable surfaces. Each one
             owns its UI; shared diagram primitives stay in the studio package.
           </p>
-          <dl className="docs-defs">
-            <div className="docs-defs__row">
-              <dt>sketchi.app</dt>
-              <dd>This home and the product documentation.</dd>
-            </div>
-            <div className="docs-defs__row">
-              <dt>excalidraw.sketchi.app</dt>
-              <dd>The no-auth diagram workspace built on the same pipeline.</dd>
-            </div>
-            <div className="docs-defs__row">
-              <dt>icons.sketchi.app</dt>
-              <dd>A browser for the curated Sketchi icon output.</dd>
-            </div>
-            <div className="docs-defs__row">
-              <dt>playground.sketchi.app</dt>
-              <dd>Scenario evaluation and prompt-output inspection.</dd>
-            </div>
-            <div className="docs-defs__row">
-              <dt>studio.sketchi.app</dt>
-              <dd>
-                The no-auth agentic generation and artifact review surface.
-              </dd>
-            </div>
-          </dl>
+          <div className="docs-surface-map">
+            <article className="docs-surface-map__home">
+              <span className="docs-surface-map__k">Home</span>
+              <h3>sketchi.app</h3>
+              <p>This home and the product documentation.</p>
+            </article>
+            {appSurfaceRows.map((surface) => {
+              const href = surfaceUrls[surface.key];
+
+              return (
+                <a
+                  className="docs-surface-map__link"
+                  href={href}
+                  key={surface.key}
+                >
+                  <span className="docs-surface-map__k">
+                    {surfaceLinkLabel(href, surface.label)}
+                  </span>
+                  <h3>{surface.title}</h3>
+                  <p>{surface.desc}</p>
+                </a>
+              );
+            })}
+            <article className="docs-surface-map__home">
+              <span className="docs-surface-map__k">studio.sketchi.app</span>
+              <h3>Studio</h3>
+              <p>The no-auth agentic generation and artifact review surface.</p>
+            </article>
+          </div>
+          <div className="docs-callout">
+            <span className="docs-callout__k">Current URLs</span>
+            <span>
+              Review and production proof use direct <code>workers.dev</code>{" "}
+              links until the custom domains are attached manually.
+            </span>
+          </div>
         </section>
 
         <section className="docs-section" id="pipeline">

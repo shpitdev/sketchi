@@ -11,9 +11,9 @@ export interface WebSurfaceEnv {
 }
 
 export const DEFAULT_WEB_SURFACE_URLS: WebSurfaceUrls = {
-  excalidraw: "https://excalidraw.sketchi.app",
-  icons: "https://icons.sketchi.app",
-  playground: "https://playground.sketchi.app",
+  excalidraw: "https://sketchi-excalidraw.dimethyl.workers.dev",
+  icons: "https://sketchi-icons.dimethyl.workers.dev",
+  playground: "https://sketchi-playground.dimethyl.workers.dev",
 };
 
 function cleanHttpUrl(value: unknown, fallback: string): string {
@@ -36,9 +36,7 @@ function cleanHttpUrl(value: unknown, fallback: string): string {
   }
 }
 
-export function resolveWebSurfaceUrls(
-  env: WebSurfaceEnv = {},
-): WebSurfaceUrls {
+export function resolveWebSurfaceUrls(env: WebSurfaceEnv = {}): WebSurfaceUrls {
   return {
     excalidraw: cleanHttpUrl(
       env.SKETCHI_EXCALIDRAW_URL,
