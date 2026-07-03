@@ -99,6 +99,19 @@ interface EdgeBuckets {
   outgoing: Map<string, DiagramEdge[]>;
 }
 
+interface RouteSegment {
+  arrowId: string;
+  isFirstSegment: boolean;
+  isLastSegment: boolean;
+  max: number;
+  min: number;
+  orientation: "horizontal" | "vertical";
+  segmentIndex: number;
+  sourceNodeId: string;
+  staticCoordinate: number;
+  targetNodeId: string;
+}
+
 type VisitState = "visited" | "visiting";
 
 function splitLongWord(word: string, maxChars: number): string[] {
@@ -554,6 +567,17 @@ function center(shape: NodeSceneElement): ScenePoint {
   };
 }
 
+function horizontalRangesOverlap(
+  source: NodeSceneElement,
+  target: NodeSceneElement,
+): boolean {
+  return (
+    Math.min(source.x + source.width, target.x + target.width) -
+      Math.max(source.x, target.x) >
+    0.01
+  );
+}
+
 function connectionEdges(
   source: NodeSceneElement,
   target: NodeSceneElement,
@@ -568,7 +592,10 @@ function connectionEdges(
   const sourceKind = source.kind?.toLowerCase();
 
   if (dy < 0) {
-    if (dx !== 0) {
+    if (
+      !horizontalRangesOverlap(source, target) &&
+      Math.abs(dx) > Math.abs(dy)
+    ) {
       return {
         sourceEdge: dx > 0 ? "right" : "left",
         targetEdge: "bottom",
@@ -660,6 +687,14 @@ function portOffset(index: number, count: number): number {
   return (index - (count - 1) / 2) * PORT_SPACING;
 }
 
+function interiorLaneCoordinate(start: number, end: number, offset: number) {
+  const middle = start + (end - start) / 2;
+  const min = Math.min(start, end) + PORT_SPACING;
+  const max = Math.max(start, end) - PORT_SPACING;
+
+  return min < max ? clamp(middle + offset, min, max) : middle;
+}
+
 function portOffsetsForRoutes(
   routes: readonly RoutedEdge[],
 ): Map<string, number> {
@@ -724,6 +759,7 @@ function arrowForRoute(
   edgeRouting: IntermediateDiagram["layout"]["edgeRouting"],
   portOffsets: ReadonlyMap<string, number>,
   shapes: readonly NodeSceneElement[],
+  existingArrows: readonly ArrowSceneElement[],
 ): ArrowSceneElement {
   const { edge, source, sourceEdge, target, targetEdge } = route;
   const portedStart = pointOnEdge(
@@ -741,14 +777,24 @@ function arrowForRoute(
   let points = compactPoints([portedStart, portedEnd]);
 
   if (center(target).y < center(source).y) {
-    points = exteriorLaneRoute(route, portedStart, portedEnd, shapes);
+    points = exteriorLaneRoute(
+      route,
+      portedStart,
+      portedEnd,
+      shapes,
+      existingArrows,
+    );
   } else if (
     edgeRouting === "orthogonal" &&
     portedStart.x !== portedEnd.x &&
     portedStart.y !== portedEnd.y
   ) {
-    const laneY = portedStart.y + (portedEnd.y - portedStart.y) / 2;
     const sideStubOffset = (route.index % 4) * PORT_SPACING;
+    const laneY = interiorLaneCoordinate(
+      portedStart.y,
+      portedEnd.y,
+      portedEnd.y < portedStart.y ? -sideStubOffset : sideStubOffset,
+    );
     const startStub =
       sourceEdge === "left"
         ? {
@@ -785,9 +831,21 @@ function arrowForRoute(
 
   if (
     edgeRouting === "orthogonal" &&
-    routeCrossesNode(points, shapes, new Set([source.nodeId, target.nodeId]))
+    (routeCrossesNode(
+      points,
+      shapes,
+      new Set([source.nodeId, target.nodeId]),
+    ) ||
+      routeSelfOverlapCount(points, route) > 0 ||
+      routeArrowOverlapCount(points, existingArrows, route) > 0)
   ) {
-    points = exteriorLaneRoute(route, portedStart, portedEnd, shapes);
+    points = exteriorLaneRoute(
+      route,
+      portedStart,
+      portedEnd,
+      shapes,
+      existingArrows,
+    );
   }
 
   return {
@@ -922,10 +980,221 @@ function routeLength(points: readonly ScenePoint[]): number {
   return length;
 }
 
+function routeSegments(input: {
+  arrowId: string;
+  points: readonly ScenePoint[];
+  sourceNodeId: string;
+  targetNodeId: string;
+}): RouteSegment[] {
+  const segments: RouteSegment[] = [];
+
+  for (let index = 0; index < input.points.length - 1; index += 1) {
+    const start = input.points[index];
+    const end = input.points[index + 1];
+
+    if (!start || !end) {
+      continue;
+    }
+
+    if (start.y === end.y) {
+      segments.push({
+        arrowId: input.arrowId,
+        isFirstSegment: index === 0,
+        isLastSegment: index === input.points.length - 2,
+        max: Math.max(start.x, end.x),
+        min: Math.min(start.x, end.x),
+        orientation: "horizontal",
+        segmentIndex: index,
+        sourceNodeId: input.sourceNodeId,
+        staticCoordinate: start.y,
+        targetNodeId: input.targetNodeId,
+      });
+      continue;
+    }
+
+    if (start.x === end.x) {
+      segments.push({
+        arrowId: input.arrowId,
+        isFirstSegment: index === 0,
+        isLastSegment: index === input.points.length - 2,
+        max: Math.max(start.y, end.y),
+        min: Math.min(start.y, end.y),
+        orientation: "vertical",
+        segmentIndex: index,
+        sourceNodeId: input.sourceNodeId,
+        staticCoordinate: start.x,
+        targetNodeId: input.targetNodeId,
+      });
+    }
+  }
+
+  return segments.filter((segment) => segment.max - segment.min > 0.01);
+}
+
+function routeSegmentOverlapLength(
+  left: RouteSegment,
+  right: RouteSegment,
+): number {
+  return Math.min(left.max, right.max) - Math.max(left.min, right.min);
+}
+
+function isSharedBoundRouteStem(
+  left: RouteSegment,
+  right: RouteSegment,
+): boolean {
+  return (
+    (left.isFirstSegment &&
+      right.isFirstSegment &&
+      left.sourceNodeId === right.sourceNodeId) ||
+    (left.isLastSegment &&
+      right.isLastSegment &&
+      left.targetNodeId === right.targetNodeId)
+  );
+}
+
+function routeArrowOverlapCount(
+  points: readonly ScenePoint[],
+  existingArrows: readonly ArrowSceneElement[],
+  route: RoutedEdge,
+): number {
+  const candidateSegments = routeSegments({
+    arrowId: `edge:${route.edge.id}`,
+    points,
+    sourceNodeId: route.edge.source,
+    targetNodeId: route.edge.target,
+  });
+  const existingSegments = existingArrows.flatMap((arrow) =>
+    routeSegments({
+      arrowId: arrow.id,
+      points: arrow.points,
+      sourceNodeId: arrow.sourceNodeId,
+      targetNodeId: arrow.targetNodeId,
+    }),
+  );
+  let overlapCount = 0;
+
+  for (const candidate of candidateSegments) {
+    for (const existing of existingSegments) {
+      if (
+        candidate.arrowId === existing.arrowId ||
+        candidate.orientation !== existing.orientation ||
+        Math.abs(candidate.staticCoordinate - existing.staticCoordinate) >
+          0.01 ||
+        isSharedBoundRouteStem(candidate, existing) ||
+        routeSegmentOverlapLength(candidate, existing) <= 0.01
+      ) {
+        continue;
+      }
+
+      overlapCount += 1;
+    }
+  }
+
+  return overlapCount;
+}
+
+function routeSelfOverlapCount(
+  points: readonly ScenePoint[],
+  route: RoutedEdge,
+): number {
+  const segments = routeSegments({
+    arrowId: `edge:${route.edge.id}`,
+    points,
+    sourceNodeId: route.edge.source,
+    targetNodeId: route.edge.target,
+  });
+  let overlapCount = 0;
+
+  for (let leftIndex = 0; leftIndex < segments.length; leftIndex += 1) {
+    const left = segments[leftIndex];
+
+    if (!left) {
+      continue;
+    }
+
+    for (
+      let rightIndex = leftIndex + 1;
+      rightIndex < segments.length;
+      rightIndex += 1
+    ) {
+      const right = segments[rightIndex];
+
+      if (
+        !right ||
+        left.orientation !== right.orientation ||
+        Math.abs(left.staticCoordinate - right.staticCoordinate) > 0.01 ||
+        routeSegmentOverlapLength(left, right) <= 0.01
+      ) {
+        continue;
+      }
+
+      overlapCount += 1;
+    }
+  }
+
+  return overlapCount;
+}
+
+function routeBacktrackDistance(points: readonly ScenePoint[]): number {
+  const start = points[0];
+  const end = points[points.length - 1];
+
+  if (!start || !end) {
+    return 0;
+  }
+
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  let distance = 0;
+
+  if (end.x < start.x) {
+    distance += Math.max(0, Math.max(...xs) - start.x);
+  } else if (end.x > start.x) {
+    distance += Math.max(0, start.x - Math.min(...xs));
+  }
+
+  if (end.y < start.y) {
+    distance += Math.max(0, Math.max(...ys) - start.y);
+  } else if (end.y > start.y) {
+    distance += Math.max(0, start.y - Math.min(...ys));
+  }
+
+  return distance;
+}
+
+function routeTargetOvershootDistance(points: readonly ScenePoint[]): number {
+  const start = points[0];
+  const end = points[points.length - 1];
+
+  if (!start || !end) {
+    return 0;
+  }
+
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  let distance = 0;
+
+  if (end.x < start.x) {
+    distance += Math.max(0, end.x - Math.min(...xs));
+  } else if (end.x > start.x) {
+    distance += Math.max(0, Math.max(...xs) - end.x);
+  }
+
+  if (end.y < start.y) {
+    distance += Math.max(0, end.y - Math.min(...ys));
+  } else if (end.y > start.y) {
+    distance += Math.max(0, Math.max(...ys) - end.y);
+  }
+
+  return distance;
+}
+
 function chooseBestRoute(
   candidates: readonly [ScenePoint, ...ScenePoint[]][],
   shapes: readonly NodeSceneElement[],
   ignoredNodeIds: ReadonlySet<string>,
+  route: RoutedEdge,
+  existingArrows: readonly ArrowSceneElement[],
 ): [ScenePoint, ...ScenePoint[]] {
   const first = candidates[0];
   if (!first) {
@@ -952,6 +1221,59 @@ function chooseBestRoute(
       return best;
     }
 
+    const bestSelfOverlapCount = routeSelfOverlapCount(best, route);
+    const candidateSelfOverlapCount = routeSelfOverlapCount(candidate, route);
+
+    if (candidateSelfOverlapCount < bestSelfOverlapCount) {
+      return candidate;
+    }
+
+    if (bestSelfOverlapCount < candidateSelfOverlapCount) {
+      return best;
+    }
+
+    const bestArrowOverlapCount = routeArrowOverlapCount(
+      best,
+      existingArrows,
+      route,
+    );
+    const candidateArrowOverlapCount = routeArrowOverlapCount(
+      candidate,
+      existingArrows,
+      route,
+    );
+
+    if (candidateArrowOverlapCount < bestArrowOverlapCount) {
+      return candidate;
+    }
+
+    if (bestArrowOverlapCount < candidateArrowOverlapCount) {
+      return best;
+    }
+
+    const bestBacktrackDistance = routeBacktrackDistance(best);
+    const candidateBacktrackDistance = routeBacktrackDistance(candidate);
+
+    if (candidateBacktrackDistance < bestBacktrackDistance) {
+      return candidate;
+    }
+
+    if (bestBacktrackDistance < candidateBacktrackDistance) {
+      return best;
+    }
+
+    const bestTargetOvershootDistance = routeTargetOvershootDistance(best);
+    const candidateTargetOvershootDistance =
+      routeTargetOvershootDistance(candidate);
+
+    if (candidateTargetOvershootDistance < bestTargetOvershootDistance) {
+      return candidate;
+    }
+
+    if (bestTargetOvershootDistance < candidateTargetOvershootDistance) {
+      return best;
+    }
+
     return routeLength(candidate) < routeLength(best) ? candidate : best;
   }, first);
 }
@@ -961,6 +1283,7 @@ function exteriorLaneRoute(
   start: ScenePoint,
   end: ScenePoint,
   shapes: readonly NodeSceneElement[],
+  existingArrows: readonly ArrowSceneElement[],
 ): [ScenePoint, ...ScenePoint[]] {
   const horizontalDominant =
     Math.abs(end.x - start.x) >= Math.abs(end.y - start.y);
@@ -1017,6 +1340,8 @@ function exteriorLaneRoute(
     horizontalDominant ? horizontalCandidates : verticalCandidates,
     shapes,
     ignoredNodeIds,
+    route,
+    existingArrows,
   );
 }
 
@@ -1099,7 +1424,9 @@ function translateElement(
   };
 }
 
-function normalizeSceneOrigin(elements: readonly SceneElement[]): SceneElement[] {
+function normalizeSceneOrigin(
+  elements: readonly SceneElement[],
+): SceneElement[] {
   const minimum = sceneMinimum(elements);
   const dx = Math.max(0, PADDING - minimum.x);
   const dy = Math.max(0, PADDING - minimum.y);
@@ -1123,9 +1450,18 @@ export function renderIntermediateDiagram(
     routeForEdge(edge, index, shapesByNodeId),
   );
   const portOffsets = portOffsetsForRoutes(routedEdges);
-  const edgeArrows = routedEdges.map((route) =>
-    arrowForRoute(route, diagram.layout.edgeRouting, portOffsets, nodeShapes),
-  );
+  const edgeArrows: ArrowSceneElement[] = [];
+  for (const route of routedEdges) {
+    edgeArrows.push(
+      arrowForRoute(
+        route,
+        diagram.layout.edgeRouting,
+        portOffsets,
+        nodeShapes,
+        edgeArrows,
+      ),
+    );
+  }
   const labels = nodeShapes.map(textForNode);
   const elements = normalizeSceneOrigin([
     ...edgeArrows,
