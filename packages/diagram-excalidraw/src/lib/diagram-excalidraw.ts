@@ -121,7 +121,7 @@ function bindingForShape(
   return {
     elementId: shape?.id ?? "",
     focus: 0,
-    gap: 5,
+    gap: 0,
     fixedPoint: shape ? fixedPointForShape(shape, point) : null,
   };
 }

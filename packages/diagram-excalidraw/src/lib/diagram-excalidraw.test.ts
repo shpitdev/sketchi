@@ -34,6 +34,19 @@ function bindingFixedPoint(
   return [binding.fixedPoint[0], binding.fixedPoint[1]];
 }
 
+function bindingGap(
+  element: ExcalidrawElement | undefined,
+  key: "startBinding" | "endBinding",
+): number {
+  const binding = element?.[key] as { gap?: unknown } | undefined;
+
+  if (typeof binding?.gap !== "number") {
+    throw new Error(`Expected ${key} gap.`);
+  }
+
+  return binding.gap;
+}
+
 function globalPointFromFixedPoint(
   shape: ExcalidrawElement | undefined,
   fixedPoint: readonly [number, number],
@@ -137,7 +150,7 @@ describe("convertSceneToExcalidraw", () => {
       renderIntermediateDiagram(flowchartFixture),
     );
     const branchArrow = scene.elements.find(
-      (element) => element.id === "edge:clear-draft",
+      (element) => element.id === "edge:clear-review",
     );
 
     const validation = validateExcalidrawScene(scene);
@@ -872,7 +885,7 @@ describe("convertSceneToExcalidraw", () => {
       renderIntermediateDiagram(flowchartFixture),
     );
     const branchArrow = scene.elements.find(
-      (element) => element.id === "edge:clear-draft",
+      (element) => element.id === "edge:clear-review",
     );
     const sourceShape = scene.elements.find(
       (element) => element.id === "node:clear",
@@ -897,12 +910,16 @@ describe("convertSceneToExcalidraw", () => {
       startBinding: expect.objectContaining({
         elementId: "node:clear",
         fixedPoint: expect.any(Array),
+        gap: 0,
       }),
       endBinding: expect.objectContaining({
-        elementId: "node:draft",
+        elementId: "node:review",
         fixedPoint: expect.any(Array),
+        gap: 0,
       }),
     });
+    expect(bindingGap(branchArrow, "startBinding")).toBe(0);
+    expect(bindingGap(branchArrow, "endBinding")).toBe(0);
     expectClosePoint(fixedStart, originalStart);
     expectClosePoint(movedStart, {
       x: originalStart.x + 48,
@@ -910,12 +927,30 @@ describe("convertSceneToExcalidraw", () => {
     });
   });
 
+  it("exports boundary-bound arrows with zero binding gaps", () => {
+    const diagrams = [flowchartFixture, pharmaBatchDispositionFlowchart];
+
+    for (const diagram of diagrams) {
+      const scene = convertSceneToExcalidraw(
+        renderIntermediateDiagram(diagram),
+      );
+      const arrows = scene.elements.filter(
+        (element) => element.type === "arrow",
+      );
+
+      for (const arrow of arrows) {
+        expect(bindingGap(arrow, "startBinding")).toBe(0);
+        expect(bindingGap(arrow, "endBinding")).toBe(0);
+      }
+    }
+  });
+
   it("accepts Excalidraw-edited elbow arrows with null fixed segments", () => {
     const scene = convertSceneToExcalidraw(
       renderIntermediateDiagram(flowchartFixture),
     );
     const branchArrow = scene.elements.find(
-      (element) => element.id === "edge:clear-draft",
+      (element) => element.id === "edge:clear-review",
     );
 
     if (branchArrow) {
@@ -1071,7 +1106,7 @@ describe("convertSceneToExcalidraw", () => {
       renderIntermediateDiagram(flowchartFixture),
     );
     const branchArrow = scene.elements.find(
-      (element) => element.id === "edge:clear-draft",
+      (element) => element.id === "edge:clear-review",
     );
     const decisionShape = scene.elements.find(
       (element) => element.id === "node:clear",
@@ -1085,7 +1120,7 @@ describe("convertSceneToExcalidraw", () => {
       typeof decisionShape.width !== "number" ||
       typeof decisionShape.height !== "number"
     ) {
-      throw new Error("Expected clear-draft arrow and clear decision shape.");
+      throw new Error("Expected clear-review arrow and clear decision shape.");
     }
 
     const offDiamondPoint = {
@@ -1095,7 +1130,7 @@ describe("convertSceneToExcalidraw", () => {
     const startBinding = branchArrow.startBinding;
 
     if (!(startBinding && typeof startBinding === "object")) {
-      throw new Error("Expected clear-draft start binding.");
+      throw new Error("Expected clear-review start binding.");
     }
 
     branchArrow.x = offDiamondPoint.x;
@@ -1117,7 +1152,7 @@ describe("convertSceneToExcalidraw", () => {
     expect(validation.issues).toContainEqual(
       expect.objectContaining({
         code: "arrow-endpoint-off-shape",
-        elementId: "edge:clear-draft",
+        elementId: "edge:clear-review",
       }),
     );
   });
@@ -1127,7 +1162,7 @@ describe("convertSceneToExcalidraw", () => {
       renderIntermediateDiagram(flowchartFixture),
     );
     const branchArrow = scene.elements.find(
-      (element) => element.id === "edge:clear-draft",
+      (element) => element.id === "edge:clear-review",
     );
 
     if (branchArrow) {
@@ -1141,7 +1176,7 @@ describe("convertSceneToExcalidraw", () => {
     expect(validation.issues).toContainEqual(
       expect.objectContaining({
         code: "invalid-elbow-binding",
-        elementId: "edge:clear-draft",
+        elementId: "edge:clear-review",
       }),
     );
   });

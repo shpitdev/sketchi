@@ -43,9 +43,11 @@ function binding(
 
   const elementId = (value as { elementId?: unknown }).elementId;
   const fixedPoint = (value as { fixedPoint?: unknown }).fixedPoint;
+  const gap = (value as { gap?: unknown }).gap;
 
   if (
     typeof elementId !== "string" ||
+    typeof gap !== "number" ||
     !Array.isArray(fixedPoint) ||
     fixedPoint.length < 2 ||
     typeof fixedPoint[0] !== "number" ||
@@ -56,6 +58,7 @@ function binding(
 
   return {
     elementId,
+    gap,
     fixedPoint: [
       Math.abs(fixedPoint[0] - 0.5001) < 0.0001 ? 0.5 : fixedPoint[0],
       Math.abs(fixedPoint[1] - 0.5001) < 0.0001 ? 0.5 : fixedPoint[1],
@@ -167,7 +170,7 @@ describe("diagram scenario evaluation", () => {
       for (const arrow of arrows) {
         for (const key of ["startBinding", "endBinding"] as const) {
           const originalEndpoint = arrowEndpoint(arrow, key);
-          const { elementId, fixedPoint } = binding(arrow, key);
+          const { elementId, fixedPoint, gap } = binding(arrow, key);
           const shape = elementsById.get(elementId);
           const originalFixedPoint = pointFromBinding(shape, fixedPoint);
           const movedFixedPoint = pointFromBinding(
@@ -181,6 +184,7 @@ describe("diagram scenario evaluation", () => {
             fixedPoint,
           );
 
+          expect(gap, `${scenario.id}: ${arrow.id} ${key} gap`).toBe(0);
           expectClosePoint(originalFixedPoint, originalEndpoint);
           expectClosePoint(movedFixedPoint, {
             x: originalEndpoint.x + MOVE_DELTA.x,

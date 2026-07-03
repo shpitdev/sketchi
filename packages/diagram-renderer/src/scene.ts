@@ -608,9 +608,16 @@ function connectionEdges(
     };
   }
 
-  if (sourceKind === "decision" && dx !== 0 && dy > 0) {
+  const longDownwardDecisionBranch =
+    sourceKind === "decision" && dy > source.height + VERTICAL_GAP;
+
+  if (
+    sourceKind === "decision" &&
+    dy > 0 &&
+    (dx !== 0 || longDownwardDecisionBranch)
+  ) {
     return {
-      sourceEdge: dx > 0 ? "right" : "left",
+      sourceEdge: dx < 0 ? "left" : "right",
       targetEdge: "top",
     };
   }
@@ -1246,6 +1253,48 @@ function routeTargetOvershootDistance(points: readonly ScenePoint[]): number {
   return distance;
 }
 
+function pointLeavesEdge(
+  edgePoint: ScenePoint,
+  candidate: ScenePoint,
+  edge: ConnectionEdge,
+): boolean {
+  switch (edge) {
+    case "top":
+      return candidate.y < edgePoint.y;
+    case "right":
+      return candidate.x > edgePoint.x;
+    case "bottom":
+      return candidate.y > edgePoint.y;
+    case "left":
+      return candidate.x < edgePoint.x;
+  }
+}
+
+function endpointStubScore(
+  points: readonly [ScenePoint, ...ScenePoint[]],
+  route: RoutedEdge,
+): number {
+  const start = points[0];
+  const second = points[1];
+  const end = points[points.length - 1];
+  const pointBeforeEnd = points[points.length - 2];
+  let score = 0;
+
+  if (second && pointLeavesEdge(start, second, route.sourceEdge)) {
+    score += 1;
+  }
+
+  if (
+    pointBeforeEnd &&
+    end &&
+    pointLeavesEdge(end, pointBeforeEnd, route.targetEdge)
+  ) {
+    score += 1;
+  }
+
+  return score;
+}
+
 function pointAwayFromEdge(
   point: ScenePoint,
   edge: ConnectionEdge,
@@ -1322,6 +1371,17 @@ function chooseBestRoute(
     }
 
     if (bestArrowOverlapCount < candidateArrowOverlapCount) {
+      return best;
+    }
+
+    const bestEndpointStubScore = endpointStubScore(best, route);
+    const candidateEndpointStubScore = endpointStubScore(candidate, route);
+
+    if (candidateEndpointStubScore > bestEndpointStubScore) {
+      return candidate;
+    }
+
+    if (bestEndpointStubScore > candidateEndpointStubScore) {
       return best;
     }
 

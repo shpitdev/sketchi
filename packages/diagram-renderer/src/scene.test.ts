@@ -61,6 +61,18 @@ function nonRectangularBoundaryValue(
   return shape && point ? shapeBoundaryValue(shape, point) : null;
 }
 
+function expectClosePoint(
+  actual: TestScenePoint | undefined,
+  expected: TestScenePoint,
+) {
+  if (!actual) {
+    throw new Error("Expected a scene point.");
+  }
+
+  expect(Math.abs(actual.x - expected.x)).toBeLessThan(0.05);
+  expect(Math.abs(actual.y - expected.y)).toBeLessThan(0.05);
+}
+
 function testRouteSegments(
   points: readonly TestScenePoint[],
 ): TestRouteSegment[] {
@@ -239,6 +251,9 @@ describe("renderIntermediateDiagram", () => {
 
   it("routes offset decision branches with orthogonal points", () => {
     const scene = renderIntermediateDiagram(flowchartFixture);
+    const clear = scene.elements.find(
+      (element) => element.type === "node" && element.nodeId === "clear",
+    );
     const clearDraft = scene.elements.find(
       (element) => element.type === "arrow" && element.edgeId === "clear-draft",
     );
@@ -250,6 +265,9 @@ describe("renderIntermediateDiagram", () => {
     expect(clearDraft).toMatchObject({ type: "arrow" });
     expect(clearReview).toMatchObject({ type: "arrow" });
 
+    if (!clear || clear.type !== "node") {
+      throw new Error("Expected clear to render as a node.");
+    }
     if (!clearDraft || clearDraft.type !== "arrow") {
       throw new Error("Expected clear-draft to render as an arrow.");
     }
@@ -257,10 +275,17 @@ describe("renderIntermediateDiagram", () => {
       throw new Error("Expected clear-review to render as an arrow.");
     }
 
-    expect(clearDraft.points.length).toBeGreaterThan(2);
+    expect(clearDraft.points.length).toBe(2);
     expect(clearReview.points.length).toBeGreaterThan(2);
-    expect(clearDraft.points[0].x).toBeLessThan(clearReview.points[0].x);
-    expect(clearDraft.points[0].y).toBe(clearReview.points[0].y);
+    expectClosePoint(clearDraft.points[0], {
+      x: clear.x + clear.width / 2,
+      y: clear.y + clear.height,
+    });
+    expectClosePoint(clearReview.points[0], {
+      x: clear.x + clear.width,
+      y: clear.y + clear.height / 2,
+    });
+    expect(clearReview.points[1]?.x).toBeGreaterThan(clearReview.points[0].x);
   });
 
   it("keeps offset ports on non-rectangular shape perimeters", () => {
