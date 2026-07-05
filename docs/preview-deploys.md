@@ -165,10 +165,10 @@ route-bearing config.
 
 The production domain helper attaches `playground.sketchi.app` to the `studio`
 app because `apps/studio` currently carries the ephemeral public Playground
-chat surface. `studio.sketchi.app` remains a future product route for the
-persisted Studio workspace and is not emitted by the helper yet. The
-`playground` app has no public domain patterns; it is the internal eval harness
-Worker.
+chat surface. `studio.sketchi.app` remains a future custom domain until product
+auth is wired, even though the Studio app now has `/projects` and persisted
+`/diagrams/:diagramId` route foundations. The `playground` app has no public
+domain patterns; it is the internal eval harness Worker.
 
 The eval harness and standalone Excalidraw workspace should remain unlinked from
 public navigation. Do not attach a public `excalidraw.sketchi.app` product route

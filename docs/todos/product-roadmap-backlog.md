@@ -13,8 +13,8 @@ Scope:
 
 - Review `web`, `studio`, `excalidraw`, `icons`, and `playground` as product
   surfaces, not scaffolds.
-- Keep auth, billing, and durable user persistence out of scope until explicitly
-  reopened.
+- Keep billing out of scope. Auth and durable user persistence are only in scope
+  when they are explicitly reopened by the product migration plan.
 - Use real browser proof on desktop and mobile.
 - Preserve app-local UI ownership unless a component is genuinely shared.
 - Keep Storybook/test coverage for app components.

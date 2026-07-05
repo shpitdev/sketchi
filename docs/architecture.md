@@ -31,9 +31,8 @@ flowchart LR
 - `diagram-studio-ui` renders the scene model and owns user-facing component states.
 - `apps/playground` composes the packages in a TanStack Start internal eval
   harness for scenarios, candidate inspection, and regression review.
-- `apps/studio` owns the current ephemeral Sketchi Playground chat surface and
-  should become a thin product adapter over shared generation packages until
-  the future persisted Studio route exists.
+- `apps/studio` owns the current ephemeral Sketchi Playground chat surface,
+  artifact handoff, and persisted Studio project/diagram route foundation.
 - `apps/web` owns the public home/docs surface and should stay free of diagram runtime dependencies unless docs become interactive.
 - `apps/excalidraw` owns the internal Excalidraw rendering workspace and
   composes the diagram packages into a real canvas for isolated validation.
@@ -115,8 +114,8 @@ orchestration, and persistence.
 The v2 workspace has five TanStack Start app surfaces:
 
 - `playground`: internal scenario evaluation and prompt-output inspection.
-- `studio`: current ephemeral Sketchi Playground chat surface and future
-  persisted Studio foundation.
+- `studio`: current ephemeral Sketchi Playground chat surface, artifact
+  handoff, and persisted Studio foundation.
 - `web`: public home/docs for the Sketchi product direction.
 - `excalidraw`: internal Excalidraw rendering workspace; Excalidraw is an
   implementation/editor capability, not a standalone public product route.
@@ -171,7 +170,7 @@ The eval harness and standalone Excalidraw workspace should stay out of public
 navigation. Do not attach a public `excalidraw.sketchi.app` product route unless
 that route-map decision is explicitly reopened. The current
 `playground.sketchi.app` domain is attached to the `studio` app until the
-Playground route and persisted Studio route are split deliberately.
+Playground route and authenticated Studio product domain are split deliberately.
 
 Preview deploys strip production routes and deploy app-specific Workers named
 `sketchi-<app>-pr-<number>`.

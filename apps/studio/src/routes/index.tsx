@@ -593,8 +593,15 @@ function StudioRoute() {
     <TooltipProvider delayDuration={300}>
       <main className={cn("studio", buildMode && "studio--build")}>
         <header className="studio__head">
-          <span className="studio__mark">sketchi</span>
-          <span className="studio__sub">playground · ephemeral</span>
+          <div className="studio__head-brand">
+            <span className="studio__mark">sketchi</span>
+            <span className="studio__sub">playground · ephemeral</span>
+          </div>
+          <div className="studio__head-actions">
+            <a className="studio__artifact-link" href="/projects">
+              Projects
+            </a>
+          </div>
         </header>
 
         <div className="studio__body">

@@ -1,7 +1,8 @@
 # studio
 
 Current hosted Sketchi Playground chat surface for ephemeral generation, Code
-Mode APIs, MCP, artifacts, diagram review, and artifact editor routes.
+Mode APIs, MCP, artifacts, diagram review, artifact editor routes, and the
+persisted Studio project foundation.
 
 ```mermaid
 flowchart LR
@@ -36,9 +37,9 @@ pnpm nx cf-typegen studio
 This app is the current product-facing Worker boundary for ephemeral agentic
 diagram creation. It should remain a thin app adapter over shared diagram
 packages while owning transport details such as MCP `execute`, hosted artifact
-URLs, R2 bindings, and Cloudflare Browser Run rendering. Future persisted Studio
-routes should build on this boundary without making the anonymous Playground
-depend on full workspace persistence.
+URLs, R2 bindings, Cloudflare Browser Run rendering, and the smallest persisted
+Studio route layer. Anonymous Playground generation must not depend on Studio
+project persistence.
 
 ## Playground artifact retention
 
@@ -51,3 +52,22 @@ Review routes live at `/artifacts/:artifactId`; the product canvas entry lives
 at `/artifacts/:artifactId/edit`. The standalone `apps/excalidraw` workspace
 remains internal even though the editor capability is exposed through these
 artifact routes.
+
+## Studio persistence foundation
+
+Persisted Studio routes live at `/projects`, `/projects/:projectId`,
+`/diagrams/:diagramId`, and `/diagrams/:diagramId/edit`. Artifact review pages
+can save a Playground artifact into a Studio project without changing the
+anonymous Playground flow.
+
+Project, diagram, and owner-project membership records are JSON objects under
+the `studio/` prefix in the same `SKETCHI_ARTIFACTS` object bucket that stores
+generated artifact payloads. Project lists are derived by listing the owner's
+membership prefix instead of rewriting one shared index object, so concurrent
+saves for the same owner cannot drop each other from the list. The records point
+at the durable artifact id rather than copying scene data. Local development
+falls back to process memory when the Worker binding is not available.
+
+The persistence model supports authenticated owners, but the deployed resolver
+currently issues anonymous session-cookie owners until a real product auth
+provider is wired. Do not trust arbitrary request headers as auth.

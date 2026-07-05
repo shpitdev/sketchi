@@ -136,8 +136,16 @@ body {
 .studio__head {
   display: flex;
   align-items: baseline;
+  justify-content: space-between;
   gap: 10px;
   padding: 16px 24px 10px;
+}
+
+.studio__head-brand,
+.studio__head-actions {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
 }
 
 .studio__mark {
@@ -405,6 +413,17 @@ body {
   text-decoration: none;
 }
 
+button.studio__artifact-link {
+  appearance: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.studio__artifact-link:disabled {
+  cursor: progress;
+  opacity: 0.65;
+}
+
 .studio__artifact-link:focus-visible,
 .studio__artifact-link:hover {
   border-color: var(--mauve);
@@ -500,6 +519,103 @@ body {
   text-align: center;
 }
 
+/* ===================== Persisted Studio project routes ===================== */
+
+.studio-workspace {
+  min-height: 100dvh;
+  background: var(--paper);
+}
+
+.studio-workspace__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.studio-workspace__body {
+  width: min(960px, 100%);
+  margin: 0 auto;
+  padding: 36px 24px 48px;
+}
+
+.studio-workspace__intro {
+  margin-bottom: 22px;
+}
+
+.studio-workspace__title {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 34px;
+  line-height: 1.05;
+}
+
+.studio-workspace__message,
+.studio-workspace__empty {
+  margin: 32px 0 0;
+  color: var(--muted-ink);
+}
+
+.studio-workspace__message--error {
+  color: var(--destructive);
+}
+
+.studio-workspace__empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.studio-workspace__empty p {
+  margin: 0;
+}
+
+.studio-workspace__grid {
+  display: grid;
+  gap: 10px;
+}
+
+.studio-project-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 86px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.studio-project-row__content {
+  min-width: 0;
+}
+
+.studio-project-row__content h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1.15;
+}
+
+.studio-project-row__content p {
+  margin: 4px 0 0;
+  color: var(--muted-ink);
+  font-size: 13px;
+}
+
+.studio-project-row__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 /* ===================== Artifact review route ===================== */
 
 .artifact-view {
@@ -571,6 +687,16 @@ body {
   .artifact-view__bar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .studio-workspace__bar,
+  .studio-project-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .studio-project-row__actions {
+    justify-content: flex-start;
   }
 
   .artifact-view__actions {
