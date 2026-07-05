@@ -419,7 +419,10 @@ function wrapperArtifactPathsFromTranscript(transcript: string): string[] {
       }
 
       for (const argument of stringArgumentsFrom(call.args)) {
-        if (looksLikeWrapperArtifactPath(argument)) {
+        if (
+          looksLikeWrapperArtifactPath(argument) &&
+          !isAntigravityInternalFile(argument)
+        ) {
           paths.add(argument);
         }
       }
@@ -428,7 +431,11 @@ function wrapperArtifactPathsFromTranscript(transcript: string): string[] {
     for (const text of textFromEvent(event)) {
       for (const match of text.matchAll(fileUrlPattern)) {
         const filePath = match[1];
-        if (filePath && looksLikeWrapperArtifactPath(filePath)) {
+        if (
+          filePath &&
+          looksLikeWrapperArtifactPath(filePath) &&
+          !isAntigravityInternalFile(filePath)
+        ) {
           paths.add(decodeURIComponent(filePath));
         }
       }
@@ -436,6 +443,16 @@ function wrapperArtifactPathsFromTranscript(transcript: string): string[] {
   }
 
   return [...paths];
+}
+
+function isAntigravityInternalFile(filePath: string): boolean {
+  return (
+    filePath.includes(`${path.sep}.git${path.sep}`) ||
+    filePath.endsWith(`${path.sep}.gitignore`) ||
+    filePath.includes(
+      `${path.sep}.gemini${path.sep}antigravity-cli${path.sep}builtin${path.sep}`,
+    )
+  );
 }
 
 async function readOptionalText(filePath: string): Promise<string | undefined> {
@@ -509,7 +526,9 @@ async function readAntigravityEvidenceForConversation(input: {
     )
   ).filter((text): text is string => Boolean(text));
   const brainWrapperFiles = (await listFilesRecursive(brainDir)).filter(
-    (filePath) => !filePath.includes(`${path.sep}.system_generated${path.sep}`),
+    (filePath) =>
+      !filePath.includes(`${path.sep}.system_generated${path.sep}`) &&
+      !isAntigravityInternalFile(filePath),
   );
   const wrapperArtifactFiles = [
     ...new Set([
@@ -679,7 +698,7 @@ function buildHarnessPrompt(input: {
   ].join("\n");
 }
 
-function commandForRun(input: {
+export function commandForRun(input: {
   harness: HarnessName;
   mcpUrl: string;
   model?: string;
@@ -692,12 +711,12 @@ function commandForRun(input: {
     const timeoutSeconds = Math.max(1, Math.ceil(input.timeoutMs / 1000));
     return {
       args: [
-        "--print",
         "--print-timeout",
         `${timeoutSeconds}s`,
         "--dangerously-skip-permissions",
         "--model",
         model,
+        "--print",
         input.prompt,
       ],
       command: "agy",

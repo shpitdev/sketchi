@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { outputContractErrors, summarizeHarnessStdout } from "./harness-eval";
+import {
+  commandForRun,
+  outputContractErrors,
+  summarizeHarnessStdout,
+} from "./harness-eval";
 
 describe("harness-eval", () => {
   const acceptedMcpOutput = {
@@ -40,6 +44,27 @@ describe("harness-eval", () => {
       },
     },
   };
+
+  it("places Antigravity print-mode flags before the print prompt", () => {
+    const command = commandForRun({
+      harness: "antigravity",
+      mcpUrl: "https://studio.test/mcp",
+      model: "gemini-3.5-flash",
+      prompt: "Draw the scenario",
+      scenarioId: "demo",
+      timeoutMs: 240_000,
+    });
+
+    expect(command.args).toEqual([
+      "--print-timeout",
+      "240s",
+      "--dangerously-skip-permissions",
+      "--model",
+      "gemini-3.5-flash",
+      "--print",
+      "Draw the scenario",
+    ]);
+  });
 
   it("summarizes OpenCode JSONL text, tool calls, cost, and tokens", () => {
     const stdout = [
