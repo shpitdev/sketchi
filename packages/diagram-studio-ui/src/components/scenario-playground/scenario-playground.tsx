@@ -485,8 +485,8 @@ export function ScenarioPlayground({
     <section className="sketchi-scenario-playground">
       <header className="sketchi-scenario-playground__header">
         <div>
-          <p className="sketchi-scenario-playground__eyebrow">Playground</p>
-          <h1>Sketchi diagram scenarios</h1>
+          <p className="sketchi-scenario-playground__eyebrow">Eval Harness</p>
+          <h1>Sketchi scenario harness</h1>
         </div>
         <span className={statusClass}>{statusLabel}</span>
       </header>
@@ -758,7 +758,7 @@ export function ScenarioPlayground({
                 title: scenario.title,
               }))}
               selectedScenarioIds={state.selectedSuiteScenarioIds}
-              title="Scenario set"
+              title="Eval scenario set"
             />
           ) : null}
         </aside>

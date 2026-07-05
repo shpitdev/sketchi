@@ -11,7 +11,7 @@ export function HomeHero({
   docsHref = "/docs",
   eyebrow = "Typed diagram generation",
   lead = "Compile a prompt into typed, validated IR — then render deterministic, Excalidraw-ready scenes.",
-  primaryHref = DEFAULT_WEB_SURFACE_URLS.excalidraw,
+  primaryHref = DEFAULT_WEB_SURFACE_URLS.playground,
 }: HomeHeroProps) {
   return (
     <section className="home-hero">
@@ -34,7 +34,7 @@ export function HomeHero({
             style={{ "--i": 3 } as never}
           >
             <a className="sk-btn sk-btn--primary" href={primaryHref}>
-              Open the app
+              Open Playground
             </a>
             <a className="sk-btn sk-btn--ghost" href={docsHref}>
               Read the docs
@@ -68,7 +68,7 @@ export function HomeHero({
                 <span />
               </span>
               <span className="hero-frame__tag">
-                playground · fixture proof
+                playground · diagram proof
               </span>
             </div>
             <div className="hero-frame__stage hero-frame__stage--image">
@@ -78,7 +78,7 @@ export function HomeHero({
               />
               <div className="hero-frame__proof" aria-label="Surface proof">
                 <span>Direct Worker</span>
-                <span>Fixture checks</span>
+                <span>Validated IR</span>
                 <span>Excalidraw JSON</span>
               </div>
             </div>

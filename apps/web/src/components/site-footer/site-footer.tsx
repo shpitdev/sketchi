@@ -17,7 +17,13 @@ export function SiteFooter({
       <div className="sk-shell site-footer__inner">
         <div className="site-footer__about">
           <span className="site-footer__brand">
-            <img alt="" className="sk-icon" height="30" src="/icon.svg" width="30" />
+            <img
+              alt=""
+              className="sk-icon"
+              height="30"
+              src="/icon.svg"
+              width="30"
+            />
             <span>Sketchi</span>
           </span>
           <p className="site-footer__tagline">
@@ -38,6 +44,9 @@ export function SiteFooter({
             <li>
               <a href={surfaceUrls.playground}>Playground</a>
             </li>
+            <li>
+              <a href="/docs#agent-setup">Agent setup</a>
+            </li>
           </ul>
         </div>
 
@@ -45,10 +54,10 @@ export function SiteFooter({
           <h3>Surfaces</h3>
           <ul>
             <li>
-              <a href={surfaceUrls.excalidraw}>Excalidraw app</a>
+              <a href={surfaceUrls.icons}>Icons</a>
             </li>
             <li>
-              <a href={surfaceUrls.icons}>Icons</a>
+              <a href="/docs#studio-beta">Studio beta</a>
             </li>
             <li>
               <a href="/docs#surfaces">Surface map</a>

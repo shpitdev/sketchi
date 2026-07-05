@@ -10,12 +10,11 @@ describe("HomeHero", () => {
     expect(
       screen.getByRole("heading", { name: /validated diagrams/i }),
     ).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Open the app" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open Playground" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Read the docs" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Open the app" })).toHaveProperty(
-      "href",
-      "https://sketchi-excalidraw.dimethyl.workers.dev/",
-    );
+    expect(
+      screen.getByRole("link", { name: "Open Playground" }),
+    ).toHaveProperty("href", "https://sketchi-studio.dimethyl.workers.dev/");
   });
 
   it("labels the diagram illustration", () => {

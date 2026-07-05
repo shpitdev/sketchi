@@ -4,7 +4,7 @@ import { flowchartFixture } from "@sketchi/diagram-core";
 import { ScenarioPlayground } from "./scenario-playground";
 
 const meta = {
-  title: "Diagram Studio/Components/ScenarioPlayground",
+  title: "Diagram Studio/Harness/ScenarioHarness",
   component: ScenarioPlayground,
 } satisfies Meta<typeof ScenarioPlayground>;
 

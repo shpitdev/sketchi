@@ -17,8 +17,8 @@ The original repository, `shpitdev/sketchi`, remains the star-bearing upstream. 
 
 - Nx workspace for package boundaries, affected checks, and Storybook wiring.
 - TanStack Start playground app, prepared for optional Cloudflare deployment.
-- TanStack Start app surfaces for `sketchi.app`, `excalidraw.sketchi.app`,
-  `studio.sketchi.app`, and `icons.sketchi.app`.
+- TanStack Start app surfaces for `sketchi.app`, public Playground, future
+  Studio, `icons.sketchi.app`, and internal harnesses.
 - Typed diagram intermediate representation in `packages/diagram-core`.
 - Deterministic scene renderer in `packages/diagram-renderer`.
 - Real Excalidraw conversion and validation in `packages/diagram-excalidraw`.
@@ -59,13 +59,13 @@ pnpm nx g @sketchi/generators:diagram-type mindmap --title "Sketchi mindmap fixt
 
 ## Deploys
 
-| Surface      | Local dev                | Deploy status              |
-| ------------ | ------------------------ | -------------------------- |
-| `playground` | `pnpm nx dev playground` | preview/prod Worker matrix |
-| `web`        | `pnpm nx dev web`        | preview/prod Worker matrix |
-| `excalidraw` | `pnpm nx dev excalidraw` | preview/prod Worker matrix |
-| `icons`      | `pnpm nx dev icons`      | preview/prod Worker matrix |
-| `studio`     | `pnpm nx dev studio`     | preview/prod Worker matrix |
+| Surface      | Local dev                | Product role                                      |
+| ------------ | ------------------------ | ------------------------------------------------- |
+| `web`        | `pnpm nx dev web`        | `sketchi.app` home, docs, and setup routes        |
+| `studio`     | `pnpm nx dev studio`     | current ephemeral Sketchi Playground chat surface |
+| `icons`      | `pnpm nx dev icons`      | `icons.sketchi.app` product surface               |
+| `playground` | `pnpm nx dev playground` | internal eval harness for scenarios               |
+| `excalidraw` | `pnpm nx dev excalidraw` | internal Excalidraw rendering workspace           |
 
 Pull requests deploy each app to PR-specific Cloudflare Workers and update one
 sticky PR comment per app with the URL when Cloudflare credentials are
@@ -74,7 +74,11 @@ See [docs/preview-deploys.md](docs/preview-deploys.md).
 
 Merges to `main` deploy production Workers to their `workers.dev` URLs without
 claiming the final `sketchi.app` domains. Domain assignment is a manual
-`app-production-deploy` workflow dispatch with `attach_domains` enabled.
+`app-production-deploy` workflow dispatch with `attach_domains` enabled. Do not
+attach the eval harness or standalone Excalidraw app as public product routes
+unless the product route map is explicitly reopened; the current public
+Playground domain belongs to the `studio` app, not the internal `playground`
+harness.
 
 Local production Worker deploy targets are app-scoped:
 
@@ -89,10 +93,10 @@ pnpm deploy:icons
 ## Workspace Shape
 
 ```text
-apps/playground                  TanStack Start playground
-apps/studio                      Hosted agentic generation spike
+apps/playground                  Internal scenario/eval harness
+apps/studio                      Current ephemeral Sketchi Playground chat surface
 apps/web                         Sketchi public home and docs
-apps/excalidraw                  No-auth Excalidraw product shell
+apps/excalidraw                  Internal Excalidraw rendering workspace
 apps/icons                       Standalone curated icon output browser
 packages/diagram-agent           Graded diagram tool runtime and agent policy
 packages/diagram-core            Diagram IR, validation, fixtures

@@ -9,7 +9,7 @@ const scenarios = [
 ];
 
 const meta = {
-  title: "Diagram Studio/Components/ScenarioSuitePanel",
+  title: "Diagram Studio/Harness/ScenarioSuitePanel",
   component: ScenarioSuitePanel,
   args: {
     activeScenarioId: "support",

@@ -1,10 +1,11 @@
-# playground
+# eval harness
 
-TanStack Start playground for scenario evaluation and prompt-output inspection.
+TanStack Start internal eval harness for scenario evaluation and prompt-output
+inspection.
 
 ```mermaid
 flowchart LR
-  Route["playground route"] --> UI["diagram-studio-ui scenario playground"]
+  Route["harness route"] --> UI["diagram-studio-ui scenario harness"]
   UI --> API["scenario candidate API"]
   API --> Generation["diagram-generation"]
   Generation --> Scenarios["diagram-scenarios"]
@@ -13,7 +14,7 @@ flowchart LR
 
 | Owns                                | Does not own                   |
 | ----------------------------------- | ------------------------------ |
-| scenario playground route shell     | production Studio chat UX      |
+| scenario harness route shell        | public Sketchi Playground chat |
 | local/live candidate inspection     | Code Mode MCP server           |
 | app-specific Worker deployment      | core diagram contracts         |
 | Cloudflare binding adapter for runs | reusable component definitions |
@@ -32,5 +33,5 @@ pnpm nx deploy playground
 
 Use this app to inspect maintained scenarios, paste or generate candidate IR,
 and verify package behavior through a deployed app shell. It should stay a
-testing ground for generation reliability rather than grow into the product
-Studio surface.
+testing ground for generation reliability rather than grow into the public
+Playground or persisted Studio surface.

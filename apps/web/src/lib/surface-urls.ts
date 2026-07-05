@@ -1,19 +1,41 @@
 export interface WebSurfaceUrls {
-  excalidraw: string;
   icons: string;
   playground: string;
 }
 
 export interface WebSurfaceEnv {
-  SKETCHI_EXCALIDRAW_URL?: string;
   SKETCHI_ICONS_URL?: string;
   SKETCHI_PLAYGROUND_URL?: string;
 }
 
+export const PRODUCT_SURFACE_HOSTS = {
+  docs: "sketchi.app/docs",
+  icons: "icons.sketchi.app",
+  playground: "playground.sketchi.app",
+  studio: "studio.sketchi.app",
+} as const;
+
+export const LOCAL_WEB_SURFACE_URLS: WebSurfaceUrls = {
+  icons: "http://localhost:6203",
+  playground: "http://localhost:6310",
+};
+
+const WORKERS_DEV_ACCOUNT = "dimethyl";
+
+const WORKERS_DEV_WORKERS = {
+  icons: "sketchi-icons",
+  // apps/studio is the current ephemeral chat surface. apps/playground is the
+  // internal eval harness until deploy/domain alignment catches up.
+  playground: "sketchi-studio",
+} satisfies Record<keyof WebSurfaceUrls, string>;
+
+function workersDevUrl(workerName: string): string {
+  return `https://${workerName}.${WORKERS_DEV_ACCOUNT}.workers.dev`;
+}
+
 export const DEFAULT_WEB_SURFACE_URLS: WebSurfaceUrls = {
-  excalidraw: "https://sketchi-excalidraw.dimethyl.workers.dev",
-  icons: "https://sketchi-icons.dimethyl.workers.dev",
-  playground: "https://sketchi-playground.dimethyl.workers.dev",
+  icons: workersDevUrl(WORKERS_DEV_WORKERS.icons),
+  playground: workersDevUrl(WORKERS_DEV_WORKERS.playground),
 };
 
 function cleanHttpUrl(value: unknown, fallback: string): string {
@@ -38,10 +60,6 @@ function cleanHttpUrl(value: unknown, fallback: string): string {
 
 export function resolveWebSurfaceUrls(env: WebSurfaceEnv = {}): WebSurfaceUrls {
   return {
-    excalidraw: cleanHttpUrl(
-      env.SKETCHI_EXCALIDRAW_URL,
-      DEFAULT_WEB_SURFACE_URLS.excalidraw,
-    ),
     icons: cleanHttpUrl(env.SKETCHI_ICONS_URL, DEFAULT_WEB_SURFACE_URLS.icons),
     playground: cleanHttpUrl(
       env.SKETCHI_PLAYGROUND_URL,

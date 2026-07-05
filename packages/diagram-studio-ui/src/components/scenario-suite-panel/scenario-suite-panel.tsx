@@ -69,7 +69,7 @@ export function ScenarioSuitePanel({
   running = false,
   scenarios,
   selectedScenarioIds,
-  title = "LLM scenario suite",
+  title = "LLM eval suite",
 }: ScenarioSuitePanelProps) {
   const selectedIds = new Set(selectedScenarioIds);
   const selectedResults = results.filter((result) =>

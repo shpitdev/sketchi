@@ -149,11 +149,8 @@ test("previewWranglerConfig injects sibling app URLs for web previews", () => {
 
   assert.deepEqual(previewConfig.vars, {
     SKETCHI_APP_SURFACE: "web",
-    SKETCHI_EXCALIDRAW_URL:
-      "https://sketchi-excalidraw-pr-42.dimethyl.workers.dev",
     SKETCHI_ICONS_URL: "https://sketchi-icons-pr-42.dimethyl.workers.dev",
-    SKETCHI_PLAYGROUND_URL:
-      "https://sketchi-playground-pr-42.dimethyl.workers.dev",
+    SKETCHI_PLAYGROUND_URL: "https://sketchi-studio-pr-42.dimethyl.workers.dev",
   });
 });
 
@@ -205,7 +202,7 @@ test("previewCommentBody includes ready preview details", () => {
     }),
     [
       "<!-- sketchi-playground-preview -->",
-      "### Sketchi Playground Preview",
+      "### Sketchi Eval Harness Preview",
       "",
       "Status: `ready`",
       "- URL: https://sketchi-playground-pr-42.account.workers.dev",

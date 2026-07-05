@@ -29,11 +29,14 @@ flowchart LR
 - `diagram-scenarios` owns maintained prompts, assertions, fixture evaluation, and local command-provider runs.
 - `diagram-generation` owns provider request/response mapping and candidate parsing.
 - `diagram-studio-ui` renders the scene model and owns user-facing component states.
-- `apps/playground` composes the packages in a TanStack Start testing ground.
-- `apps/studio` owns the current agentic generation spike and should become a
-  thin product adapter over shared generation packages.
+- `apps/playground` composes the packages in a TanStack Start internal eval
+  harness for scenarios, candidate inspection, and regression review.
+- `apps/studio` owns the current ephemeral Sketchi Playground chat surface and
+  should become a thin product adapter over shared generation packages until
+  the future persisted Studio route exists.
 - `apps/web` owns the public home/docs surface and should stay free of diagram runtime dependencies unless docs become interactive.
-- `apps/excalidraw` owns the no-auth product shell for `excalidraw.sketchi.app` and composes the diagram packages into a real workspace.
+- `apps/excalidraw` owns the internal Excalidraw rendering workspace and
+  composes the diagram packages into a real canvas for isolated validation.
 - `apps/icons` owns `icons.sketchi.app` and serves the copied pre-cleaned `sketchi-icons/output` tree from its app-local public assets.
 
 See [Agentic Generation](agentic-generation.md) for the intended Convex,
@@ -75,13 +78,16 @@ plumbing. Effect can live inside the shared generation packages for schemas,
 typed errors, and pipeline composition. Nx still owns the project graph, builds,
 and affected checks.
 
-## Playground
+## Eval Harness
 
-The playground is not the product app and does not include the Convex remote
-agent loop. It is an independently deployable testing ground for maintained
-scenarios, pasted model output, and deterministic IR-to-Excalidraw conversion.
-The intended public shape is `playground.sketchi.app` once preview deployment is
-worth keeping on.
+The current `apps/playground` surface is not the public product Playground and
+does not include the Convex remote agent loop. It is an independently
+deployable internal testing ground for maintained scenarios, pasted model
+output, and deterministic IR-to-Excalidraw conversion.
+
+The public Sketchi Playground direction is anonymous prompt-to-diagram
+generation with artifact handoff. Until deploy/domain alignment is completed,
+that experience is implemented by the current `apps/studio` chat surface.
 
 The portable CLI path is:
 
@@ -108,10 +114,12 @@ orchestration, and persistence.
 
 The v2 workspace has five TanStack Start app surfaces:
 
-- `playground`: scenario evaluation and prompt-output inspection.
-- `studio`: hosted agentic generation and diagram artifact review.
+- `playground`: internal scenario evaluation and prompt-output inspection.
+- `studio`: current ephemeral Sketchi Playground chat surface and future
+  persisted Studio foundation.
 - `web`: public home/docs for the Sketchi product direction.
-- `excalidraw`: the no-auth diagram workspace that will become the authenticated app later.
+- `excalidraw`: internal Excalidraw rendering workspace; Excalidraw is an
+  implementation/editor capability, not a standalone public product route.
 - `icons`: a standalone browser for the curated Sketchi icon outputs.
 
 ```mermaid
@@ -157,8 +165,13 @@ production domain direction is:
 - `playground.sketchi.app`
 - `studio.sketchi.app`
 - `sketchi.app` and `www.sketchi.app`
-- `excalidraw.sketchi.app`
 - `icons.sketchi.app`
+
+The eval harness and standalone Excalidraw workspace should stay out of public
+navigation. Do not attach a public `excalidraw.sketchi.app` product route unless
+that route-map decision is explicitly reopened. The current
+`playground.sketchi.app` domain is attached to the `studio` app until the
+Playground route and persisted Studio route are split deliberately.
 
 Preview deploys strip production routes and deploy app-specific Workers named
 `sketchi-<app>-pr-<number>`.

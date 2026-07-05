@@ -7,21 +7,21 @@ describe("SurfaceCard", () => {
   it("renders the surface details and links out", () => {
     render(
       <SurfaceCard
-        cta="Open workspace"
-        desc="The no-auth diagram workspace."
-        domain="excalidraw.sketchi.app"
-        href="https://excalidraw.sketchi.app"
-        name="Excalidraw workspace"
+        cta="Open Playground"
+        desc="Anonymous prompt-to-diagram generation."
+        domain="playground.sketchi.app"
+        href="https://playground.sketchi.app"
+        name="Sketchi Playground"
       />,
     );
 
     expect(
-      screen.getByRole("heading", { name: "Excalidraw workspace" }),
+      screen.getByRole("heading", { name: "Sketchi Playground" }),
     ).toBeTruthy();
-    expect(screen.getByText("excalidraw.sketchi.app")).toBeTruthy();
+    expect(screen.getByText("playground.sketchi.app")).toBeTruthy();
     expect(screen.getByText("No-auth preview")).toBeTruthy();
     expect(screen.getByRole("link").getAttribute("href")).toBe(
-      "https://excalidraw.sketchi.app",
+      "https://playground.sketchi.app",
     );
   });
 
@@ -37,5 +37,19 @@ describe("SurfaceCard", () => {
     );
 
     expect(screen.getByText("Live")).toBeTruthy();
+  });
+
+  it("shows a beta status when requested", () => {
+    render(
+      <SurfaceCard
+        desc="Persisted projects are not public yet."
+        domain="studio.sketchi.app"
+        href="/docs#studio-beta"
+        name="Studio"
+        status="beta"
+      />,
+    );
+
+    expect(screen.getByText("Private beta")).toBeTruthy();
   });
 });

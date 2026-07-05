@@ -18,15 +18,21 @@ describe("DocsView", () => {
     expect(
       screen.getByRole("link", { name: "Generation pipeline" }),
     ).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /App surfaces/ })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: /Product routes/ }),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Agent setup/ })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: /Internal surfaces/ }),
+    ).toBeTruthy();
     expect(
       screen.getByRole("heading", { name: /No-auth status/ }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("link", { name: /Excalidraw workspace/ }),
-    ).toHaveProperty(
-      "href",
-      "https://sketchi-excalidraw.dimethyl.workers.dev/",
-    );
+      screen.getByRole("link", { name: /Sketchi Playground/ }),
+    ).toHaveProperty("href", "https://sketchi-studio.dimethyl.workers.dev/");
+    expect(
+      screen.queryByRole("link", { name: /Excalidraw workspace/ }),
+    ).toBeNull();
   });
 });

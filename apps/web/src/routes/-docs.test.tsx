@@ -4,9 +4,8 @@ import { describe, expect, it } from "vitest";
 import { DocsPage } from "./docs";
 
 const previewSurfaceUrls = {
-  excalidraw: "https://sketchi-excalidraw-pr-123.dimethyl.workers.dev",
   icons: "https://sketchi-icons-pr-123.dimethyl.workers.dev",
-  playground: "https://sketchi-playground-pr-123.dimethyl.workers.dev",
+  playground: "https://sketchi-studio-pr-123.dimethyl.workers.dev",
 };
 
 describe("DocsPage", () => {
@@ -19,13 +18,10 @@ describe("DocsPage", () => {
         .map((link) => link.getAttribute("href")),
     ).toContain(previewSurfaceUrls.icons);
     expect(
-      screen.getByRole("link", { name: "Open app" }).getAttribute("href"),
-    ).toBe(previewSurfaceUrls.excalidraw);
-    expect(
-      screen.getByRole("link", { name: "Excalidraw app" }).getAttribute("href"),
-    ).toBe(previewSurfaceUrls.excalidraw);
-    expect(
-      screen.getByRole("link", { name: "Playground" }).getAttribute("href"),
-    ).toBe(previewSurfaceUrls.playground);
+      screen
+        .getAllByRole("link", { name: "Playground" })
+        .map((link) => link.getAttribute("href")),
+    ).toEqual([previewSurfaceUrls.playground, previewSurfaceUrls.playground]);
+    expect(screen.queryByRole("link", { name: "Excalidraw app" })).toBeNull();
   });
 });

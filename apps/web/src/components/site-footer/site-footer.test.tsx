@@ -19,21 +19,20 @@ describe("SiteFooter", () => {
     render(
       <SiteFooter
         surfaceUrls={{
-          excalidraw: "https://sketchi-excalidraw-pr-42.dimethyl.workers.dev",
           icons: "https://sketchi-icons-pr-42.dimethyl.workers.dev",
-          playground: "https://sketchi-playground-pr-42.dimethyl.workers.dev",
+          playground: "https://sketchi-studio-pr-42.dimethyl.workers.dev",
         }}
       />,
     );
 
     expect(
       screen.getByRole("link", { name: "Playground" }).getAttribute("href"),
-    ).toBe("https://sketchi-playground-pr-42.dimethyl.workers.dev");
+    ).toBe("https://sketchi-studio-pr-42.dimethyl.workers.dev");
     expect(
-      screen.getByRole("link", { name: "Excalidraw app" }).getAttribute("href"),
-    ).toBe("https://sketchi-excalidraw-pr-42.dimethyl.workers.dev");
-    expect(screen.getByRole("link", { name: "Icons" }).getAttribute("href")).toBe(
-      "https://sketchi-icons-pr-42.dimethyl.workers.dev",
-    );
+      screen.getByRole("link", { name: "Icons" }).getAttribute("href"),
+    ).toBe("https://sketchi-icons-pr-42.dimethyl.workers.dev");
+    expect(
+      screen.getByRole("link", { name: "Studio beta" }).getAttribute("href"),
+    ).toBe("/docs#studio-beta");
   });
 });

@@ -14,7 +14,7 @@ describe("MarketingHome", () => {
       screen.getByRole("heading", { name: "Generation stays inspectable." }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("heading", { name: "Four surfaces, one pipeline." }),
+      screen.getByRole("heading", { name: "Public routes, one pipeline." }),
     ).toBeTruthy();
     expect(
       screen.getByRole("heading", {
@@ -23,32 +23,34 @@ describe("MarketingHome", () => {
     ).toBeTruthy();
     expect(
       screen.getByRole("heading", {
-        name: "The playground keeps generation inspectable.",
+        name: "Sketchi Playground keeps generation inspectable.",
       }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("heading", { name: "Excalidraw workspace" }),
+      screen.getByRole("heading", { name: "Sketchi Playground" }),
     ).toBeTruthy();
+    expect(
+      screen.queryByRole("link", { name: /Excalidraw workspace/ }),
+    ).toBeNull();
   });
 
   it("uses configured surface URLs", () => {
     render(
       <MarketingHome
         surfaceUrls={{
-          excalidraw: "https://sketchi-excalidraw-pr-42.dimethyl.workers.dev",
           icons: "https://sketchi-icons-pr-42.dimethyl.workers.dev",
-          playground: "https://sketchi-playground-pr-42.dimethyl.workers.dev",
+          playground: "https://sketchi-studio-pr-42.dimethyl.workers.dev",
         }}
       />,
     );
 
     expect(
       screen
-        .getByRole("link", { name: /Excalidraw workspace/ })
+        .getByRole("link", { name: /Sketchi Playground/ })
         .getAttribute("href"),
-    ).toBe("https://sketchi-excalidraw-pr-42.dimethyl.workers.dev");
+    ).toBe("https://sketchi-studio-pr-42.dimethyl.workers.dev");
     expect(
-      screen.getByText("sketchi-excalidraw-pr-42.dimethyl.workers.dev"),
+      screen.getByText("sketchi-studio-pr-42.dimethyl.workers.dev"),
     ).toBeTruthy();
   });
 });

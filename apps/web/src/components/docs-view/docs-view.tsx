@@ -1,5 +1,6 @@
 import {
   DEFAULT_WEB_SURFACE_URLS,
+  PRODUCT_SURFACE_HOSTS,
   surfaceLinkLabel,
   type WebSurfaceUrls,
 } from "../../lib/surface-urls";
@@ -16,31 +17,27 @@ export interface DocsViewProps {
 
 const defaultNav: readonly DocsNavEntry[] = [
   { href: "#overview", label: "Overview" },
-  { href: "#surfaces", label: "App surfaces" },
+  { href: "#surfaces", label: "Product routes" },
+  { href: "#agent-setup", label: "Agent setup" },
   { href: "#pipeline", label: "Generation pipeline" },
   { href: "#diagram-types", label: "Diagram types" },
+  { href: "#internal-surfaces", label: "Internal surfaces" },
   { href: "#no-auth", label: "No-auth status" },
   { href: "#deploy", label: "Deploy" },
 ];
 
 const appSurfaceRows = [
   {
-    desc: "The no-auth diagram workspace built on the same pipeline.",
-    key: "excalidraw",
-    label: "excalidraw.sketchi.app",
-    title: "Excalidraw workspace",
-  },
-  {
     desc: "A browser for the curated Sketchi icon output.",
     key: "icons",
-    label: "icons.sketchi.app",
+    label: PRODUCT_SURFACE_HOSTS.icons,
     title: "Icon library",
   },
   {
-    desc: "Scenario evaluation and prompt-output inspection.",
+    desc: "Anonymous prompt-to-diagram generation and artifact handoff.",
     key: "playground",
-    label: "playground.sketchi.app",
-    title: "Scenario playground",
+    label: PRODUCT_SURFACE_HOSTS.playground,
+    title: "Sketchi Playground",
   },
 ] satisfies ReadonlyArray<{
   desc: string;
@@ -72,8 +69,8 @@ export function DocsView({
         <p className="docs-article__intro">
           Sketchi makes diagram generation boring in the best way: inputs are
           validated, rendering is deterministic, and UI states are exercised
-          outside the app shell. These docs cover the contracts that matter for
-          the current no-auth phase.
+          outside the app shell. These docs name the product routes users can
+          follow and the internal harnesses that stay out of public navigation.
         </p>
 
         <section className="docs-section" id="overview">
@@ -95,17 +92,19 @@ export function DocsView({
 
         <section className="docs-section" id="surfaces">
           <h2>
-            <span className="docs-section__idx">02</span> App surfaces
+            <span className="docs-section__idx">02</span> Product routes
           </h2>
           <p>
-            The workspace ships five independently deployable surfaces. Each one
-            owns its UI; shared diagram primitives stay in the studio package.
+            Public links point to Sketchi product routes: homepage/docs,
+            Playground, Icons, and agent setup. Studio is planned for persisted
+            authenticated projects, but it is not the public try-it-now path
+            until persistence exists.
           </p>
           <div className="docs-surface-map">
             <article className="docs-surface-map__home">
               <span className="docs-surface-map__k">Home</span>
               <h3>sketchi.app</h3>
-              <p>This home and the product documentation.</p>
+              <p>Homepage, product documentation, and setup guides.</p>
             </article>
             {appSurfaceRows.map((surface) => {
               const href = surfaceUrls[surface.key];
@@ -124,10 +123,15 @@ export function DocsView({
                 </a>
               );
             })}
-            <article className="docs-surface-map__home">
-              <span className="docs-surface-map__k">studio.sketchi.app</span>
+            <article className="docs-surface-map__home" id="studio-beta">
+              <span className="docs-surface-map__k">
+                {PRODUCT_SURFACE_HOSTS.studio}
+              </span>
               <h3>Studio</h3>
-              <p>The no-auth agentic generation and artifact review surface.</p>
+              <p>
+                Private beta direction for authenticated projects, sessions,
+                history, and collaboration.
+              </p>
             </article>
           </div>
           <div className="docs-callout">
@@ -139,9 +143,36 @@ export function DocsView({
           </div>
         </section>
 
+        <section className="docs-section" id="agent-setup">
+          <h2>
+            <span className="docs-section__idx">03</span> Agent setup
+          </h2>
+          <p>
+            Agent setup belongs under <code>sketchi.app</code> docs until the
+            dedicated <code>/agents</code> hub lands. Keep user-facing setup
+            links here; do not route users through the eval harness.
+          </p>
+          <dl className="docs-defs">
+            <div className="docs-defs__row">
+              <dt>Codex, Claude Code, OpenCode, Antigravity</dt>
+              <dd>
+                Plugin and MCP setup docs live in the repo docs and plugins
+                directories while the product hub is built.
+              </dd>
+            </div>
+            <div className="docs-defs__row">
+              <dt>Code Mode APIs</dt>
+              <dd>
+                Harness-facing APIs remain hosted by the Studio Worker, but the
+                public setup path should describe Sketchi product behavior.
+              </dd>
+            </div>
+          </dl>
+        </section>
+
         <section className="docs-section" id="pipeline">
           <h2>
-            <span className="docs-section__idx">03</span> Generation pipeline
+            <span className="docs-section__idx">04</span> Generation pipeline
           </h2>
           <p>
             The pipeline keeps model output, typed IR, deterministic scenes, and
@@ -178,7 +209,7 @@ export function DocsView({
 
         <section className="docs-section" id="diagram-types">
           <h2>
-            <span className="docs-section__idx">04</span> Diagram types
+            <span className="docs-section__idx">05</span> Diagram types
           </h2>
           <p>
             Every registered diagram type is guarded by tests: it must have
@@ -208,9 +239,29 @@ export function DocsView({
           </pre>
         </section>
 
+        <section className="docs-section" id="internal-surfaces">
+          <h2>
+            <span className="docs-section__idx">06</span> Internal surfaces
+          </h2>
+          <p>
+            The eval harness and standalone Excalidraw app are not public
+            product destinations. The harness remains for scenario fixtures,
+            model-output inspection, and regression review. Excalidraw remains
+            an implementation/editor capability exposed through product artifact
+            routes once those routes exist.
+          </p>
+          <div className="docs-callout">
+            <span className="docs-callout__k">Routing rule</span>
+            <span>
+              Public navigation must not link to the eval harness or a
+              standalone <code>excalidraw.sketchi.app</code> product route.
+            </span>
+          </div>
+        </section>
+
         <section className="docs-section" id="no-auth">
           <h2>
-            <span className="docs-section__idx">05</span> No-auth status
+            <span className="docs-section__idx">07</span> No-auth status
           </h2>
           <div className="docs-callout">
             <span className="docs-callout__k">Current</span>
@@ -225,7 +276,7 @@ export function DocsView({
 
         <section className="docs-section" id="deploy">
           <h2>
-            <span className="docs-section__idx">06</span> Deploy
+            <span className="docs-section__idx">08</span> Deploy
           </h2>
           <p>
             Pull requests deploy each app to a PR-specific Cloudflare Worker.

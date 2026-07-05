@@ -1,6 +1,7 @@
 # excalidraw
 
-No-auth Excalidraw workspace shell for inspecting real Sketchi diagram artifacts.
+Internal Excalidraw workspace shell for inspecting real Sketchi diagram
+artifacts.
 
 ```mermaid
 flowchart LR
@@ -12,7 +13,7 @@ flowchart LR
 
 | Owns                              | Does not own                   |
 | --------------------------------- | ------------------------------ |
-| Excalidraw product shell          | generation or model calls      |
+| internal Excalidraw workspace     | generation or model calls      |
 | diagram workspace UI              | shared conversion internals    |
 | app-local inspector and switcher  | Studio Code Mode API routes    |
 | Worker deployment for the surface | authentication or account data |
@@ -34,3 +35,4 @@ pnpm nx deploy excalidraw
 Use this app when validating the actual Excalidraw experience independently of
 Studio chat or Code Mode. It composes shared diagram packages and app-local
 workspace UI so artifact rendering problems can be isolated from generation.
+Do not link it from the public homepage as a standalone product surface.

@@ -1,9 +1,8 @@
 const MAX_WORKER_NAME_LENGTH = 63;
 
 const webPreviewSurfaceApps = {
-  SKETCHI_EXCALIDRAW_URL: "excalidraw",
   SKETCHI_ICONS_URL: "icons",
-  SKETCHI_PLAYGROUND_URL: "playground",
+  SKETCHI_PLAYGROUND_URL: "studio",
 };
 
 const previewPipelineStreams = {
@@ -14,7 +13,7 @@ const previewPipelineStreams = {
 export const previewApps = {
   excalidraw: {
     commentMarker: "<!-- sketchi-excalidraw-preview -->",
-    title: "Sketchi Excalidraw",
+    title: "Sketchi Excalidraw Workspace",
     workerPrefix: "sketchi-excalidraw-pr",
   },
   icons: {
@@ -24,7 +23,7 @@ export const previewApps = {
   },
   playground: {
     commentMarker: "<!-- sketchi-playground-preview -->",
-    title: "Sketchi Playground",
+    title: "Sketchi Eval Harness",
     workerPrefix: "sketchi-playground-pr",
   },
   studio: {

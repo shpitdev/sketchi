@@ -28,7 +28,7 @@ describe("ScenarioSuitePanel", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "LLM scenario suite" }),
+      screen.getByRole("heading", { name: "LLM eval suite" }),
     ).toBeTruthy();
     expect(screen.getByText("1 / 1 passed")).toBeTruthy();
     expect(

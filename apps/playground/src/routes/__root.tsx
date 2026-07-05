@@ -20,10 +20,10 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "Sketchi playground — evaluate diagram scenarios and inspect prompt output against the deterministic pipeline.",
+          "Sketchi Eval Harness — evaluate diagram scenarios and inspect prompt output against the deterministic pipeline.",
       },
       { name: "theme-color", content: "#f6f1e7" },
-      { title: "Sketchi Playground" },
+      { title: "Sketchi Eval Harness" },
     ],
     links: [
       { rel: "icon", href: "/icon.svg", type: "image/svg+xml" },
@@ -65,7 +65,7 @@ function RootComponent() {
 function NotFoundComponent() {
   return (
     <main className="sketchi-not-found">
-      <h1>Not found</h1>
+      <h1>Harness route not found</h1>
     </main>
   );
 }

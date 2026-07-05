@@ -19,6 +19,7 @@ export interface SiteHeaderProps {
 const defaultNavItems: readonly SiteHeaderNavItem[] = [
   { href: "/#pipeline", label: "Pipeline" },
   { href: "/#surfaces", label: "Surfaces" },
+  { href: "/docs#agent-setup", label: "Agent setup" },
   { href: "/docs", label: "Docs" },
 ];
 
@@ -62,9 +63,9 @@ export function SiteHeader({
           </a>
           <a
             className="sk-btn sk-btn--primary site-header__cta"
-            href={surfaceUrls.excalidraw}
+            href={surfaceUrls.playground}
           >
-            Open app
+            Playground
           </a>
         </div>
 
@@ -119,8 +120,8 @@ export function SiteHeader({
             <a className="sk-btn sk-btn--ghost" href={surfaceUrls.icons}>
               Icons
             </a>
-            <a className="sk-btn sk-btn--primary" href={surfaceUrls.excalidraw}>
-              Open app
+            <a className="sk-btn sk-btn--primary" href={surfaceUrls.playground}>
+              Playground
             </a>
           </div>
         </div>

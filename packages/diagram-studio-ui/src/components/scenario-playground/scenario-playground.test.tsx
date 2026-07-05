@@ -76,8 +76,9 @@ describe("ScenarioPlayground", () => {
     render(<ScenarioPlayground />);
 
     expect(
-      screen.getByRole("heading", { name: "Sketchi diagram scenarios" }),
+      screen.getByRole("heading", { name: "Sketchi scenario harness" }),
     ).toBeTruthy();
+    expect(screen.getByText("Eval Harness")).toBeTruthy();
     expect(screen.getByText("Expected at least 5 nodes.")).toBeTruthy();
     expect(screen.getByLabelText("Fixture IR")).toBeTruthy();
   });

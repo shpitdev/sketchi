@@ -373,7 +373,7 @@ function StudioRoute() {
       <main className={cn("studio", buildMode && "studio--build")}>
         <header className="studio__head">
           <span className="studio__mark">sketchi</span>
-          <span className="studio__sub">studio · ephemeral</span>
+          <span className="studio__sub">playground · ephemeral</span>
         </header>
 
         <div className="studio__body">

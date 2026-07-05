@@ -1,7 +1,7 @@
 export const productionApps = {
   excalidraw: {
-    domainPatterns: ["excalidraw.sketchi.app"],
-    title: "Sketchi Excalidraw",
+    domainPatterns: [],
+    title: "Sketchi Excalidraw Workspace",
     workerName: "sketchi-excalidraw",
   },
   icons: {
@@ -10,12 +10,12 @@ export const productionApps = {
     workerName: "sketchi-icons",
   },
   playground: {
-    domainPatterns: ["playground.sketchi.app"],
-    title: "Sketchi Playground",
+    domainPatterns: [],
+    title: "Sketchi Eval Harness",
     workerName: "sketchi-playground",
   },
   studio: {
-    domainPatterns: ["studio.sketchi.app"],
+    domainPatterns: ["playground.sketchi.app", "studio.sketchi.app"],
     title: "Sketchi Studio",
     workerName: "sketchi-studio",
   },

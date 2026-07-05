@@ -19,10 +19,10 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "Sketchi Studio — chat with an AI companion that sketches diagrams as you talk.",
+          "Sketchi Playground — chat with an AI companion that sketches diagrams as you talk.",
       },
       { name: "theme-color", content: "#f6f1e7" },
-      { title: "Sketchi Studio" },
+      { title: "Sketchi Playground" },
     ],
     links: [
       { rel: "icon", href: "/icon.svg", type: "image/svg+xml" },
@@ -60,7 +60,7 @@ function RootComponent() {
 function NotFoundComponent() {
   return (
     <main className="studio-not-found">
-      <h1>Not found</h1>
+      <h1>Playground route not found</h1>
     </main>
   );
 }

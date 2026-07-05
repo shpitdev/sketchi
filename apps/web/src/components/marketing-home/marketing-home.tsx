@@ -5,6 +5,7 @@ import { SiteHeader } from "../site-header/index.js";
 import { SurfaceCard } from "../surface-card/index.js";
 import {
   DEFAULT_WEB_SURFACE_URLS,
+  PRODUCT_SURFACE_HOSTS,
   surfaceLinkLabel,
   type WebSurfaceUrls,
 } from "../../lib/surface-urls";
@@ -21,7 +22,7 @@ export function MarketingHome({
       <SiteHeader activePath="/" surfaceUrls={surfaceUrls} />
 
       <main id="top">
-        <HomeHero primaryHref={surfaceUrls.excalidraw} />
+        <HomeHero primaryHref={surfaceUrls.playground} />
 
         <section className="sk-section sk-section--readiness" id="readiness">
           <div className="sk-shell">
@@ -81,22 +82,22 @@ export function MarketingHome({
                 />
               </a>
               <div>
-                <p className="sk-eyebrow">Proof surface</p>
+                <p className="sk-eyebrow">Public playground</p>
                 <h3 className="playground-preview__title">
-                  The playground keeps generation inspectable.
+                  Sketchi Playground keeps generation inspectable.
                 </h3>
                 <ul className="playground-preview__list">
                   <li>
-                    <b>Fixture checks</b>
-                    Flowchart requirements are visible next to the canvas.
+                    <b>Anonymous generation</b>
+                    Prompts can become diagrams without a persisted workspace.
                   </li>
                   <li>
-                    <b>Real Excalidraw output</b>
-                    Scene conversion is rendered in the same browser surface.
+                    <b>Validated output</b>
+                    Sketchi owns IR, layout, and export before handoff.
                   </li>
                   <li>
-                    <b>Raw IR beside the diagram</b>
-                    Reviewers can inspect the accepted structure directly.
+                    <b>Artifact direction</b>
+                    Generated work will hand off to stable artifact routes.
                   </li>
                 </ul>
               </div>
@@ -109,42 +110,49 @@ export function MarketingHome({
             <div className="sk-section__head">
               <p className="sk-eyebrow">Surfaces</p>
               <h2 className="sk-section__title">
-                Four surfaces, one pipeline.
+                Public routes, one pipeline.
               </h2>
               <p className="sk-section__lead">
-                Each ships on its own. None need a sign-in.
+                The homepage points users at product surfaces, while eval and
+                canvas harnesses stay internal.
               </p>
             </div>
             <div className="surface-grid">
               <SurfaceCard
-                cta="Open workspace"
-                desc="Inspect the IR, scene, and a live Excalidraw canvas."
+                cta="Open Playground"
+                desc="Anonymous prompt-to-diagram generation with shareable artifact handoff next."
                 domain={surfaceLinkLabel(
-                  surfaceUrls.excalidraw,
-                  "excalidraw.sketchi.app",
+                  surfaceUrls.playground,
+                  PRODUCT_SURFACE_HOSTS.playground,
                 )}
-                href={surfaceUrls.excalidraw}
-                name="Excalidraw workspace"
+                href={surfaceUrls.playground}
+                name="Sketchi Playground"
               />
               <SurfaceCard
                 cta="Browse icons"
                 desc="Search and copy 1,400+ curated icons."
                 domain={surfaceLinkLabel(
                   surfaceUrls.icons,
-                  "icons.sketchi.app",
+                  PRODUCT_SURFACE_HOSTS.icons,
                 )}
                 href={surfaceUrls.icons}
                 name="Icon library"
               />
               <SurfaceCard
-                cta="Open playground"
-                desc="Evaluate prompts against the deterministic pipeline."
-                domain={surfaceLinkLabel(
-                  surfaceUrls.playground,
-                  "playground.sketchi.app",
-                )}
-                href={surfaceUrls.playground}
-                name="Scenario playground"
+                cta="Agent setup"
+                desc="Install and configure Sketchi for supported coding-agent workflows."
+                domain={PRODUCT_SURFACE_HOSTS.docs}
+                href="/docs#agent-setup"
+                name="Agent setup"
+                status="live"
+              />
+              <SurfaceCard
+                cta="Read status"
+                desc="Persisted projects, sessions, and history are the planned authenticated workspace."
+                domain={PRODUCT_SURFACE_HOSTS.studio}
+                href="/docs#studio-beta"
+                name="Studio"
+                status="beta"
               />
               <SurfaceCard
                 cta="Open docs"
