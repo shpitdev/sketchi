@@ -283,6 +283,9 @@ export function DocsView({
             Merges to <code>main</code> deploy production Workers to their{" "}
             <code>workers.dev</code> URLs without claiming the final{" "}
             <code>sketchi.app</code> domains.
+            Deploy summaries mark each Worker as a public product surface or
+            internal-only tool so reviewer links do not imply public
+            navigation.
           </p>
           <div className="docs-callout">
             <span className="docs-callout__k">Manual</span>

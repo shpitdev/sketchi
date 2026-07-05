@@ -13,26 +13,36 @@ const previewPipelineStreams = {
 export const previewApps = {
   excalidraw: {
     commentMarker: "<!-- sketchi-excalidraw-preview -->",
+    publicSurface: false,
+    routePolicy: "internal canvas workspace; no public product domain",
     title: "Sketchi Excalidraw Workspace",
     workerPrefix: "sketchi-excalidraw-pr",
   },
   icons: {
     commentMarker: "<!-- sketchi-icons-preview -->",
+    publicSurface: true,
+    routePolicy: "icons.sketchi.app product surface",
     title: "Sketchi Icons",
     workerPrefix: "sketchi-icons-pr",
   },
   playground: {
     commentMarker: "<!-- sketchi-playground-preview -->",
+    publicSurface: false,
+    routePolicy: "internal eval harness; no public product domain",
     title: "Sketchi Eval Harness",
     workerPrefix: "sketchi-playground-pr",
   },
   studio: {
     commentMarker: "<!-- sketchi-studio-preview -->",
-    title: "Sketchi Studio",
+    publicSurface: true,
+    routePolicy: "playground.sketchi.app now; studio.sketchi.app when persisted workspace is ready",
+    title: "Sketchi Playground / Studio",
     workerPrefix: "sketchi-studio-pr",
   },
   web: {
     commentMarker: "<!-- sketchi-web-preview -->",
+    publicSurface: true,
+    routePolicy: "sketchi.app and www.sketchi.app product surface",
     title: "Sketchi Web",
     workerPrefix: "sketchi-web-pr",
   },
@@ -230,6 +240,12 @@ export function previewCommentBody(input) {
     `### ${appConfig.title} Preview`,
     "",
     `Status: \`${status}\``,
+    `- Surface: ${
+      appConfig.publicSurface
+        ? "public product preview"
+        : "internal preview; not linked from public navigation"
+    }`,
+    `- Route policy: ${appConfig.routePolicy}`,
   ];
 
   if (previewUrl) {

@@ -118,12 +118,30 @@ jobs:
 
       - name: Summarize production Worker
         if: ${{ steps.credentials.outputs.configured == 'true' && (github.event_name == 'push' || inputs.app == 'all' || inputs.app == matrix.app) }}
+        env:
+          APP: ${{ matrix.app }}
         run: |
           {
             echo "### ${{ matrix.app }} production Worker"
             echo ""
             echo "- Worker: \`sketchi-${{ matrix.app }}\`"
             echo "- workers.dev URL: ${{ steps.workers-dev-url.outputs.preview_url }}"
+            node --input-type=module <<'NODE'
+          import { productionAppConfig } from "./scripts/lib/production-deploy.mjs";
+
+          const app = productionAppConfig(process.env.APP);
+          const visibility = app.publicSurface
+            ? "public product surface"
+            : "internal surface; not linked from public navigation";
+          const domains =
+            app.domainPatterns.length > 0
+              ? `${app.domainPatterns.join(", ")} (manual attach only)`
+              : "none";
+
+          console.log(`- Visibility: ${visibility}`);
+          console.log(`- Route policy: ${app.routePolicy}`);
+          console.log(`- Custom domains: ${domains}`);
+          NODE
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Prepare production domain Wrangler config

@@ -14,6 +14,8 @@ test("previewAppConfig returns app-scoped preview metadata", () => {
   assert.deepEqual(previewAppConfig("icons"), {
     appId: "icons",
     commentMarker: "<!-- sketchi-icons-preview -->",
+    publicSurface: true,
+    routePolicy: "icons.sketchi.app product surface",
     title: "Sketchi Icons",
     workerPrefix: "sketchi-icons-pr",
   });
@@ -23,7 +25,10 @@ test("previewAppConfig includes the studio preview Worker", () => {
   assert.deepEqual(previewAppConfig("studio"), {
     appId: "studio",
     commentMarker: "<!-- sketchi-studio-preview -->",
-    title: "Sketchi Studio",
+    publicSurface: true,
+    routePolicy:
+      "playground.sketchi.app now; studio.sketchi.app when persisted workspace is ready",
+    title: "Sketchi Playground / Studio",
     workerPrefix: "sketchi-studio-pr",
   });
 });
@@ -205,6 +210,8 @@ test("previewCommentBody includes ready preview details", () => {
       "### Sketchi Eval Harness Preview",
       "",
       "Status: `ready`",
+      "- Surface: internal preview; not linked from public navigation",
+      "- Route policy: internal eval harness; no public product domain",
       "- URL: https://sketchi-playground-pr-42.account.workers.dev",
       "- Worker: `sketchi-playground-pr-42`",
       "- Commit: `abcdef123456`",

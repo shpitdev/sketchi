@@ -10,6 +10,8 @@ test("productionAppConfig returns app-scoped domain metadata", () => {
   assert.deepEqual(productionAppConfig("web"), {
     appId: "web",
     domainPatterns: ["sketchi.app", "www.sketchi.app"],
+    publicSurface: true,
+    routePolicy: "sketchi.app and www.sketchi.app product surface",
     title: "Sketchi Web",
     workerName: "sketchi-web",
   });
@@ -18,8 +20,11 @@ test("productionAppConfig returns app-scoped domain metadata", () => {
 test("productionAppConfig includes the studio production Worker", () => {
   assert.deepEqual(productionAppConfig("studio"), {
     appId: "studio",
-    domainPatterns: ["playground.sketchi.app", "studio.sketchi.app"],
-    title: "Sketchi Studio",
+    domainPatterns: ["playground.sketchi.app"],
+    publicSurface: true,
+    routePolicy:
+      "playground.sketchi.app now; studio.sketchi.app when persisted workspace is ready",
+    title: "Sketchi Playground / Studio",
     workerName: "sketchi-studio",
   });
 });
@@ -28,12 +33,16 @@ test("productionAppConfig keeps internal apps off public domains", () => {
   assert.deepEqual(productionAppConfig("playground"), {
     appId: "playground",
     domainPatterns: [],
+    publicSurface: false,
+    routePolicy: "internal eval harness; no public product domain",
     title: "Sketchi Eval Harness",
     workerName: "sketchi-playground",
   });
   assert.deepEqual(productionAppConfig("excalidraw"), {
     appId: "excalidraw",
     domainPatterns: [],
+    publicSurface: false,
+    routePolicy: "internal canvas workspace; no public product domain",
     title: "Sketchi Excalidraw Workspace",
     workerName: "sketchi-excalidraw",
   });
@@ -90,6 +99,30 @@ test("productionDomainWranglerConfig adds custom domains only for manual attach"
       preview_bucket_name: "sketchi-studio-codemode-artifacts-preview",
     },
   ]);
+});
+
+test("productionDomainWranglerConfig only attaches the current studio domain", () => {
+  const domainConfig = productionDomainWranglerConfig(
+    {
+      name: "sketchi-studio",
+      routes: ["studio.sketchi.app/*"],
+      vars: {
+        SKETCHI_APP_SURFACE: "studio",
+      },
+    },
+    "studio",
+  );
+
+  assert.equal(domainConfig.name, "sketchi-studio");
+  assert.deepEqual(domainConfig.routes, [
+    {
+      pattern: "playground.sketchi.app",
+      custom_domain: true,
+    },
+  ]);
+  assert.deepEqual(domainConfig.vars, {
+    SKETCHI_APP_SURFACE: "studio",
+  });
 });
 
 test("productionDomainWranglerConfig emits no public routes for internal apps", () => {

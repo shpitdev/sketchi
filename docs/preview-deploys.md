@@ -30,7 +30,8 @@ Pull requests to `main` deploy matrix apps to PR-specific Cloudflare Workers.
 - writes a generated `dist/server/wrangler.<app>.preview.json` with the preview
   Worker name and no custom production routes;
 - runs `wrangler deploy --keep-vars --no-x-provision`;
-- writes or updates one sticky PR comment per app with the preview URL.
+- writes or updates one sticky PR comment per app with the preview URL and an
+  explicit public/internal surface policy.
 
 For the `web` preview, the workflow also reads the account workers.dev
 subdomain from Cloudflare and injects sibling preview URLs into the generated
@@ -43,6 +44,11 @@ surface; `apps/playground` remains the internal eval harness.
 
 That keeps Web preview navigation inside the same PR's preview Workers instead
 of sending reviewers to production domains.
+
+Preview comments intentionally distinguish product previews from internal tool
+previews. `web`, `studio`, and `icons` are public-product previews.
+`playground` and `excalidraw` are internal previews only; their comments exist
+for reviewer smoke tests and cleanup visibility, not public navigation.
 
 ## Required Configuration
 
@@ -107,6 +113,9 @@ CI deploys do not create or discover storage.
 
 Those deploys keep `workers_dev` enabled so the app can be verified from
 Cloudflare-owned `workers.dev` URLs before any DNS or registrar cutover.
+Production deploy summaries include the same public/internal route policy and
+the custom domains that would be attached by a manual domain dispatch. Internal
+apps report no custom domains.
 
 The Studio Worker binds Code Mode artifacts to R2 and Code Mode usage analytics
 to Cloudflare Pipelines:
@@ -147,17 +156,19 @@ requires stream IDs for Worker bindings. Keep `apps/studio/wrangler.jsonc` on
 the production stream IDs and keep the preview deploy helper's ID rewrite table
 in sync with Cloudflare Pipeline stream creation.
 
-Assigning `sketchi.app`, `www.sketchi.app`, `playground.sketchi.app`,
-`studio.sketchi.app`, and `icons.sketchi.app` is intentionally manual. Run the
-`app-production-deploy` workflow with `attach_domains` enabled only when the new
-site is ready to own those hostnames. The manual step writes a generated domain
-Wrangler config from `scripts/05-prepare-production-domain-deploy.mjs` and
-deploys that route-bearing config.
+Assigning `sketchi.app`, `www.sketchi.app`, `playground.sketchi.app`, and
+`icons.sketchi.app` is intentionally manual. Run the `app-production-deploy`
+workflow with `attach_domains` enabled only when the new site is ready to own
+those hostnames. The manual step writes a generated domain Wrangler config from
+`scripts/05-prepare-production-domain-deploy.mjs` and deploys that
+route-bearing config.
 
-The production domain helper attaches both `playground.sketchi.app` and
-`studio.sketchi.app` to the `studio` app because `apps/studio` currently carries
-the ephemeral public Playground chat surface. The `playground` app has no public
-domain patterns; it is the internal eval harness Worker.
+The production domain helper attaches `playground.sketchi.app` to the `studio`
+app because `apps/studio` currently carries the ephemeral public Playground
+chat surface. `studio.sketchi.app` remains a future product route for the
+persisted Studio workspace and is not emitted by the helper yet. The
+`playground` app has no public domain patterns; it is the internal eval harness
+Worker.
 
 The eval harness and standalone Excalidraw workspace should remain unlinked from
 public navigation. Do not attach a public `excalidraw.sketchi.app` product route
