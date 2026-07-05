@@ -546,6 +546,11 @@ body {
   min-height: 0;
 }
 
+.artifact-view__stage .sketchi-artifact-canvas {
+  height: 100%;
+  min-height: 0;
+}
+
 .artifact-view__stage .sketchi-excalidraw-scene-canvas {
   border: 0;
   min-height: 0;

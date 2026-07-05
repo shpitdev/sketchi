@@ -1,3 +1,4 @@
+export * from "./components/artifact-canvas/index.js";
 export * from "./components/diagram-preview/index.js";
 export * from "./components/generation-workspace/index.js";
 export * from "./components/flowchart-validation-panel/index.js";

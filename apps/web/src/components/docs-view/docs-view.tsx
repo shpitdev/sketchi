@@ -248,7 +248,7 @@ export function DocsView({
             product destinations. The harness remains for scenario fixtures,
             model-output inspection, and regression review. Excalidraw remains
             an implementation/editor capability exposed through product artifact
-            routes once those routes exist.
+            routes.
           </p>
           <div className="docs-callout">
             <span className="docs-callout__k">Routing rule</span>

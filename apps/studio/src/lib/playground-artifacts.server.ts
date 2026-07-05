@@ -25,6 +25,7 @@ export interface PlaygroundArtifactSuccess {
     excalidraw: string;
     scene: string;
   };
+  editUrl: string;
   viewUrl: string;
   retention: string;
 }
@@ -111,6 +112,10 @@ export function diagramToolInputToFlowchartSpec(
 
 export function playgroundArtifactViewUrl(artifactId: string): string {
   return `/artifacts/${encodeURIComponent(artifactId)}`;
+}
+
+export function playgroundArtifactEditUrl(artifactId: string): string {
+  return `${playgroundArtifactViewUrl(artifactId)}/edit`;
 }
 
 export function playgroundArtifactExportUrls(
@@ -217,6 +222,7 @@ export async function createPlaygroundArtifact(
     ok: true,
     status: "accepted",
     artifact: result.artifact,
+    editUrl: playgroundArtifactEditUrl(result.artifact.artifactId),
     exportUrls: playgroundArtifactExportUrls(result.artifact.artifactId),
     viewUrl: playgroundArtifactViewUrl(result.artifact.artifactId),
     retention: PLAYGROUND_ARTIFACT_RETENTION,

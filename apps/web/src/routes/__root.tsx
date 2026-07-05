@@ -18,7 +18,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "Sketchi turns prompts into validated diagrams and Excalidraw-ready scenes.",
+          "Sketchi turns prompts into validated diagrams and artifact-ready scenes.",
       },
       { name: "theme-color", content: "#f6f1e7" },
       { title: "Sketchi — typed diagram generation" },

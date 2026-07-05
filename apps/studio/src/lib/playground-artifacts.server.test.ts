@@ -136,6 +136,7 @@ describe("Playground artifact handoff", () => {
         excalidraw: `/api/v1/artifacts/${artifactId}?format=excalidraw&raw=true`,
         scene: `/api/v1/artifacts/${artifactId}?format=scene&raw=true`,
       },
+      editUrl: `/artifacts/${artifactId}/edit`,
       viewUrl: `/artifacts/${artifactId}`,
     });
 

@@ -1,7 +1,7 @@
 # studio
 
 Current hosted Sketchi Playground chat surface for ephemeral generation, Code
-Mode APIs, MCP, artifacts, and diagram review.
+Mode APIs, MCP, artifacts, diagram review, and artifact editor routes.
 
 ```mermaid
 flowchart LR
@@ -13,12 +13,12 @@ flowchart LR
   Artifacts --> UI
 ```
 
-| Owns                               | Does not own                         |
-| ---------------------------------- | ------------------------------------ |
-| Playground routes and app shell    | core IR shape or validation rules    |
-| Code Mode HTTP and MCP adapters    | reusable diagram review components   |
-| artifact storage and render routes | global preview deploy orchestration  |
-| server-side usage event scheduling | raw Excalidraw editing as a contract |
+| Owns                                    | Does not own                         |
+| --------------------------------------- | ------------------------------------ |
+| Playground routes and app shell         | core IR shape or validation rules    |
+| Code Mode HTTP and MCP adapters         | reusable diagram review components   |
+| artifact storage and review/edit routes | global preview deploy orchestration  |
+| server-side usage event scheduling      | raw Excalidraw editing as a contract |
 
 ## Commands
 
@@ -46,3 +46,8 @@ Anonymous Playground handoff URLs use the same artifact store as Code Mode.
 Deployed Workers write artifacts to the configured `SKETCHI_ARTIFACTS` object
 bucket. Local development falls back to process memory, so local artifact URLs
 survive page reloads but not dev-server restarts.
+
+Review routes live at `/artifacts/:artifactId`; the product canvas entry lives
+at `/artifacts/:artifactId/edit`. The standalone `apps/excalidraw` workspace
+remains internal even though the editor capability is exposed through these
+artifact routes.

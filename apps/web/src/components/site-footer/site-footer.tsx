@@ -28,7 +28,7 @@ export function SiteFooter({
           </span>
           <p className="site-footer__tagline">
             Prompt-to-diagram tooling with validated IR, deterministic
-            rendering, and Excalidraw-ready output.
+            rendering, and artifact-ready output.
           </p>
         </div>
 

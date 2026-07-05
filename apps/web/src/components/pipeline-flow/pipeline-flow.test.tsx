@@ -12,7 +12,9 @@ describe("PipelineFlow", () => {
     });
     expect(list).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Typed IR" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Excalidraw" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Canvas artifact" }),
+    ).toBeTruthy();
     expect(screen.getAllByText("diagram-core").length).toBeGreaterThan(0);
   });
 

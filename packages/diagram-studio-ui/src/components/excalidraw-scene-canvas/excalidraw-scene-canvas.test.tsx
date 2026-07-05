@@ -52,7 +52,7 @@ describe("ExcalidrawSceneCanvas", () => {
     expect(
       screen.getByTestId("excalidraw-scene-canvas").getAttribute("aria-label"),
     ).toBe("Sketchi onboarding decision flow");
-    expect(screen.getByText("Loading Excalidraw")).toBeTruthy();
+    expect(screen.getByText("Loading canvas")).toBeTruthy();
   });
 
   it("fits scene content after Excalidraw loads", async () => {

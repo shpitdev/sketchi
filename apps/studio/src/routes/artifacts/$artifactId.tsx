@@ -1,73 +1,38 @@
-import {
-  RenderedDiagramSceneSchema,
-  type GetArtifactResult,
-} from "@sketchi/diagram-agent";
-import { DiagramPreview } from "@sketchi/diagram-studio-ui";
+import { ArtifactCanvas } from "@sketchi/diagram-studio-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 
-import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
+import {
+  artifactRouteUrls,
+  fetchArtifactScene,
+  type ArtifactViewState,
+} from "@/lib/artifact-view-client";
 
 export const Route = createFileRoute("/artifacts/$artifactId")({
   component: ArtifactRoute,
 });
-
-type ArtifactViewState =
-  | { status: "loading" }
-  | { scene: RenderedDiagramScene; status: "ready" }
-  | { message: string; status: "error" };
-
-function isGetArtifactResult(value: unknown): value is GetArtifactResult {
-  return Boolean(value) && typeof value === "object";
-}
-
-function artifactExportUrls(artifactId: string) {
-  const encoded = encodeURIComponent(artifactId);
-  return {
-    excalidraw: `/api/v1/artifacts/${encoded}?format=excalidraw&raw=true`,
-    scene: `/api/v1/artifacts/${encoded}?format=scene&raw=true`,
-  };
-}
 
 function ArtifactRoute() {
   const { artifactId } = Route.useParams();
   const [state, setState] = useState<ArtifactViewState>({
     status: "loading",
   });
-  const exportUrls = useMemo(
-    () => artifactExportUrls(artifactId),
-    [artifactId],
-  );
+  const urls = useMemo(() => artifactRouteUrls(artifactId), [artifactId]);
 
   useEffect(() => {
     let cancelled = false;
 
     setState({ status: "loading" });
-    void (async () => {
-      try {
-        const response = await fetch(
-          `/api/v1/artifacts/${encodeURIComponent(
-            artifactId,
-          )}?format=scene&inline=true`,
-        );
-        const payload: unknown = await response.json();
-
-        if (!response.ok || !isGetArtifactResult(payload) || !payload.ok) {
-          throw new Error("Artifact could not be loaded.");
-        }
-
-        const parsed = RenderedDiagramSceneSchema.safeParse(payload.inline);
-        if (!parsed.success) {
-          throw new Error("Artifact scene could not be rendered.");
-        }
-
+    void fetchArtifactScene(artifactId)
+      .then((scene) => {
         if (!cancelled) {
           setState({
-            scene: parsed.data as RenderedDiagramScene,
+            scene,
             status: "ready",
           });
         }
-      } catch (caught) {
+      })
+      .catch((caught) => {
         if (!cancelled) {
           setState({
             message:
@@ -77,8 +42,7 @@ function ArtifactRoute() {
             status: "error",
           });
         }
-      }
-    })();
+      });
 
     return () => {
       cancelled = true;
@@ -95,11 +59,14 @@ function ArtifactRoute() {
           <a className="studio__artifact-link" href="/">
             Playground
           </a>
-          <a className="studio__artifact-link" href={exportUrls.scene}>
-            Scene JSON
+          <a className="studio__artifact-link" href={urls.edit}>
+            Edit
           </a>
-          <a className="studio__artifact-link" href={exportUrls.excalidraw}>
-            Excalidraw
+          <a className="studio__artifact-link" href={urls.scene}>
+            Scene file
+          </a>
+          <a className="studio__artifact-link" href={urls.drawing}>
+            Drawing file
           </a>
         </div>
       </header>
@@ -114,7 +81,7 @@ function ArtifactRoute() {
           </p>
         ) : null}
         {state.status === "ready" ? (
-          <DiagramPreview scene={state.scene} />
+          <ArtifactCanvas scene={state.scene} />
         ) : null}
       </section>
     </main>

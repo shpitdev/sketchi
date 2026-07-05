@@ -8,7 +8,7 @@ const meta = {
   component: SurfaceCard,
   args: {
     cta: "Open Playground",
-    desc: "Anonymous prompt-to-diagram generation with artifact handoff next.",
+    desc: "Anonymous prompt-to-diagram generation with artifact handoff.",
     domain: "playground.sketchi.app",
     href: "https://playground.sketchi.app",
     name: "Sketchi Playground",

@@ -6,15 +6,17 @@ import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 
 import { ExcalidrawSceneCanvas } from "./excalidraw-scene-canvas";
 
-const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+const scene = convertSceneToExcalidraw(
+  renderIntermediateDiagram(flowchartFixture),
+);
 
 const meta = {
   title: "Diagram Studio/Components/ExcalidrawSceneCanvas",
   component: ExcalidrawSceneCanvas,
   args: {
     scene,
-    title: "Sketchi onboarding decision flow"
-  }
+    title: "Sketchi onboarding decision flow",
+  },
 } satisfies Meta<typeof ExcalidrawSceneCanvas>;
 
 export default meta;

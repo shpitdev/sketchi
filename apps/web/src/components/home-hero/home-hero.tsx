@@ -10,7 +10,7 @@ export interface HomeHeroProps {
 export function HomeHero({
   docsHref = "/docs",
   eyebrow = "Typed diagram generation",
-  lead = "Compile a prompt into typed, validated IR — then render deterministic, Excalidraw-ready scenes.",
+  lead = "Compile a prompt into typed, validated IR, then render deterministic artifact-ready scenes.",
   primaryHref = DEFAULT_WEB_SURFACE_URLS.playground,
 }: HomeHeroProps) {
   return (
@@ -79,7 +79,7 @@ export function HomeHero({
               <div className="hero-frame__proof" aria-label="Surface proof">
                 <span>Direct Worker</span>
                 <span>Validated IR</span>
-                <span>Excalidraw JSON</span>
+                <span>Drawing artifact</span>
               </div>
             </div>
           </div>

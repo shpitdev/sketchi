@@ -35,4 +35,5 @@ pnpm nx deploy excalidraw
 Use this app when validating the actual Excalidraw experience independently of
 Studio chat or Code Mode. It composes shared diagram packages and app-local
 workspace UI so artifact rendering problems can be isolated from generation.
-Do not link it from the public homepage as a standalone product surface.
+Do not link it from the public homepage as a standalone product surface. Product
+review and edit entry points belong under the Studio/Playground artifact routes.

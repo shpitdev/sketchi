@@ -12,7 +12,7 @@ const defaultStages: readonly PipelineStage[] = [
   { name: "Typed IR", pkg: "diagram-core" },
   { name: "Validate", pkg: "diagram-core" },
   { name: "Render", pkg: "diagram-renderer" },
-  { name: "Excalidraw", pkg: "diagram-excalidraw" },
+  { name: "Canvas artifact", pkg: "diagram-excalidraw" },
 ];
 
 export function PipelineFlow({ stages = defaultStages }: PipelineFlowProps) {

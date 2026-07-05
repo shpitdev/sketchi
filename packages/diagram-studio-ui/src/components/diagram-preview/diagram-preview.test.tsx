@@ -1,16 +1,16 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../excalidraw-scene-canvas/index.js", () => ({
-  ExcalidrawSceneCanvas: ({
+vi.mock("../artifact-canvas/index.js", () => ({
+  ArtifactCanvas: ({
+    mode,
     scene,
-    title,
   }: {
-    scene: { elements: unknown[] };
-    title: string;
+    mode: string;
+    scene: { title: string };
   }) => (
-    <div aria-label={title} data-testid="excalidraw-scene-canvas">
-      {scene.elements.length} Excalidraw elements
+    <div data-mode={mode} data-testid="artifact-canvas">
+      {scene.title}
     </div>
   ),
 }));
@@ -21,15 +21,13 @@ import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 import { DiagramPreview } from "./diagram-preview";
 
 describe("DiagramPreview", () => {
-  it("renders the diagram through the shared Excalidraw canvas", () => {
+  it("renders the diagram through the shared artifact canvas", () => {
     const scene = renderIntermediateDiagram(flowchartFixture);
 
     render(<DiagramPreview scene={scene} />);
 
-    const canvas = screen.getByTestId("excalidraw-scene-canvas");
-    expect(canvas.getAttribute("aria-label")).toBe(
-      "Sketchi onboarding decision flow",
-    );
-    expect(canvas.textContent).toMatch(/Excalidraw elements/);
+    const canvas = screen.getByTestId("artifact-canvas");
+    expect(canvas.getAttribute("data-mode")).toBe("view");
+    expect(canvas.textContent).toBe("Sketchi onboarding decision flow");
   });
 });

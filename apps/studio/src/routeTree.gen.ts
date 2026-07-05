@@ -14,6 +14,7 @@ import { Route as CodemodeExportHarnessRouteImport } from "./routes/codemode-exp
 import { Route as IndexRouteImport } from "./routes/index";
 import { Route as ArtifactsArtifactIdRouteImport } from "./routes/artifacts/$artifactId";
 import { Route as ApiChatRouteImport } from "./routes/api/chat";
+import { Route as ArtifactsArtifactIdEditRouteImport } from "./routes/artifacts_/$artifactId/edit";
 import { Route as ApiPlaygroundArtifactsRouteImport } from "./routes/api/playground/artifacts";
 import { Route as ApiV1FlowchartsBuildRouteImport } from "./routes/api/v1/flowcharts/build";
 import { Route as ApiV1ArtifactsArtifactIdRouteImport } from "./routes/api/v1/artifacts/$artifactId";
@@ -42,6 +43,11 @@ const ArtifactsArtifactIdRoute = ArtifactsArtifactIdRouteImport.update({
 const ApiChatRoute = ApiChatRouteImport.update({
   id: "/api/chat",
   path: "/api/chat",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ArtifactsArtifactIdEditRoute = ArtifactsArtifactIdEditRouteImport.update({
+  id: "/artifacts_/$artifactId/edit",
+  path: "/artifacts/$artifactId/edit",
   getParentRoute: () => rootRouteImport,
 } as any);
 const ApiPlaygroundArtifactsRoute = ApiPlaygroundArtifactsRouteImport.update({
@@ -74,6 +80,7 @@ export interface FileRoutesByFullPath {
   "/api/chat": typeof ApiChatRoute;
   "/artifacts/$artifactId": typeof ArtifactsArtifactIdRoute;
   "/api/playground/artifacts": typeof ApiPlaygroundArtifactsRoute;
+  "/artifacts/$artifactId/edit": typeof ArtifactsArtifactIdEditRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
@@ -85,6 +92,7 @@ export interface FileRoutesByTo {
   "/api/chat": typeof ApiChatRoute;
   "/artifacts/$artifactId": typeof ArtifactsArtifactIdRoute;
   "/api/playground/artifacts": typeof ApiPlaygroundArtifactsRoute;
+  "/artifacts/$artifactId/edit": typeof ArtifactsArtifactIdEditRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
@@ -97,6 +105,7 @@ export interface FileRoutesById {
   "/api/chat": typeof ApiChatRoute;
   "/artifacts/$artifactId": typeof ArtifactsArtifactIdRoute;
   "/api/playground/artifacts": typeof ApiPlaygroundArtifactsRoute;
+  "/artifacts_/$artifactId/edit": typeof ArtifactsArtifactIdEditRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
@@ -110,6 +119,7 @@ export interface FileRouteTypes {
     | "/api/chat"
     | "/artifacts/$artifactId"
     | "/api/playground/artifacts"
+    | "/artifacts/$artifactId/edit"
     | "/api/v1/artifacts/$artifactId"
     | "/api/v1/flowcharts/build"
     | "/api/v1/artifacts/$artifactId/patch";
@@ -121,6 +131,7 @@ export interface FileRouteTypes {
     | "/api/chat"
     | "/artifacts/$artifactId"
     | "/api/playground/artifacts"
+    | "/artifacts/$artifactId/edit"
     | "/api/v1/artifacts/$artifactId"
     | "/api/v1/flowcharts/build"
     | "/api/v1/artifacts/$artifactId/patch";
@@ -132,6 +143,7 @@ export interface FileRouteTypes {
     | "/api/chat"
     | "/artifacts/$artifactId"
     | "/api/playground/artifacts"
+    | "/artifacts_/$artifactId/edit"
     | "/api/v1/artifacts/$artifactId"
     | "/api/v1/flowcharts/build"
     | "/api/v1/artifacts/$artifactId/patch";
@@ -144,6 +156,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute;
   ArtifactsArtifactIdRoute: typeof ArtifactsArtifactIdRoute;
   ApiPlaygroundArtifactsRoute: typeof ApiPlaygroundArtifactsRoute;
+  ArtifactsArtifactIdEditRoute: typeof ArtifactsArtifactIdEditRoute;
   ApiV1ArtifactsArtifactIdRoute: typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   ApiV1FlowchartsBuildRoute: typeof ApiV1FlowchartsBuildRoute;
 }
@@ -183,6 +196,13 @@ declare module "@tanstack/react-router" {
       path: "/api/chat";
       fullPath: "/api/chat";
       preLoaderRoute: typeof ApiChatRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/artifacts_/$artifactId/edit": {
+      id: "/artifacts_/$artifactId/edit";
+      path: "/artifacts/$artifactId/edit";
+      fullPath: "/artifacts/$artifactId/edit";
+      preLoaderRoute: typeof ArtifactsArtifactIdEditRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/api/playground/artifacts": {
@@ -237,6 +257,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ArtifactsArtifactIdRoute: ArtifactsArtifactIdRoute,
   ApiPlaygroundArtifactsRoute: ApiPlaygroundArtifactsRoute,
+  ArtifactsArtifactIdEditRoute: ArtifactsArtifactIdEditRoute,
   ApiV1ArtifactsArtifactIdRoute: ApiV1ArtifactsArtifactIdRouteWithChildren,
   ApiV1FlowchartsBuildRoute: ApiV1FlowchartsBuildRoute,
 };

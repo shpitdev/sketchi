@@ -120,7 +120,7 @@ export function MarketingHome({
             <div className="surface-grid">
               <SurfaceCard
                 cta="Open Playground"
-                desc="Anonymous prompt-to-diagram generation with shareable artifact handoff next."
+                desc="Anonymous prompt-to-diagram generation with shareable artifact handoff."
                 domain={surfaceLinkLabel(
                   surfaceUrls.playground,
                   PRODUCT_SURFACE_HOSTS.playground,

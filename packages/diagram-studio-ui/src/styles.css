@@ -79,6 +79,16 @@
   width: 100%;
 }
 
+.sketchi-artifact-canvas {
+  --sketchi-excalidraw-scene-canvas-height: 100%;
+  --sketchi-excalidraw-scene-canvas-min-height: 0;
+
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+}
+
 .sketchi-scenario-playground {
   background: var(--paper);
   color: var(--ink);

@@ -87,6 +87,7 @@ interface PlaygroundArtifactResponse {
     excalidraw?: string;
     scene?: string;
   };
+  editUrl?: string;
   issues?: Array<{
     message?: string;
   }>;
@@ -99,6 +100,7 @@ interface ReadyPlaygroundArtifact {
     excalidraw: string;
     scene: string;
   };
+  editUrl: string;
   viewUrl: string;
 }
 
@@ -153,9 +155,10 @@ function artifactFromResponse(
   const artifactId = value.artifact?.artifactId;
   const scene = value.exportUrls?.scene;
   const excalidraw = value.exportUrls?.excalidraw;
+  const editUrl = value.editUrl;
   const viewUrl = value.viewUrl;
 
-  if (!artifactId || !scene || !excalidraw || !viewUrl) {
+  if (!artifactId || !scene || !excalidraw || !editUrl || !viewUrl) {
     return null;
   }
 
@@ -165,6 +168,7 @@ function artifactFromResponse(
       excalidraw,
       scene,
     },
+    editUrl,
     viewUrl,
   };
 }
@@ -232,17 +236,20 @@ function ArtifactActions({ state }: { state: PlaygroundArtifactState }) {
       <a className="studio__artifact-link" href={state.artifact.viewUrl}>
         Open artifact
       </a>
+      <a className="studio__artifact-link" href={state.artifact.editUrl}>
+        Edit
+      </a>
       <a
         className="studio__artifact-link"
         href={state.artifact.exportUrls.scene}
       >
-        Scene JSON
+        Scene file
       </a>
       <a
         className="studio__artifact-link"
         href={state.artifact.exportUrls.excalidraw}
       >
-        Excalidraw
+        Drawing file
       </a>
     </div>
   );

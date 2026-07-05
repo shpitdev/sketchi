@@ -127,7 +127,7 @@ export function ExcalidrawSceneCanvas({
         />
       ) : (
         <div className="sketchi-excalidraw-scene-canvas__loading">
-          Loading Excalidraw
+          Loading canvas
         </div>
       )}
     </section>
