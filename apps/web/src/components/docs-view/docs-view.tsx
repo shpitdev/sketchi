@@ -148,9 +148,9 @@ export function DocsView({
             <span className="docs-section__idx">03</span> Agent setup
           </h2>
           <p>
-            Agent setup belongs under <code>sketchi.app</code> docs until the
-            dedicated <code>/agents</code> hub lands. Keep user-facing setup
-            links here; do not route users through the eval harness.
+            Agent setup now lives at <a href="/agents">sketchi.app/agents</a>.
+            Keep user-facing setup links there; do not route users through the
+            eval harness.
           </p>
           <dl className="docs-defs">
             <div className="docs-defs__row">

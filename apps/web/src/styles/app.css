@@ -839,6 +839,220 @@
 }
 
 /* ===================================================================== */
+/* Agent setup                                                           */
+/* ===================================================================== */
+.agent-page {
+  min-width: 0;
+}
+
+.agent-hero {
+  background: #eef4f1;
+  border-bottom: 1px solid #d6e4dc;
+}
+
+.agent-hero__inner {
+  align-items: center;
+  display: grid;
+  gap: 36px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  padding-block: clamp(42px, 7vw, 78px);
+}
+
+.agent-hero__copy {
+  min-width: 0;
+}
+
+.agent-hero h1 {
+  font-size: 58px;
+  line-height: 1.04;
+  margin: 16px 0 0;
+  max-width: 12ch;
+}
+
+.agent-hero p {
+  color: var(--ink-2);
+  font-size: 18px;
+  line-height: 1.6;
+  margin: 18px 0 0;
+  max-width: 58ch;
+}
+
+.agent-hero--detail h1 {
+  max-width: 14ch;
+}
+
+.agent-backlink {
+  color: var(--ink-3);
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 18px;
+  text-decoration: none;
+}
+
+.agent-backlink:hover {
+  color: var(--ink);
+}
+
+.agent-endpoint {
+  background: var(--card);
+  border: 1px solid #cdded5;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 18px;
+}
+
+.agent-endpoint__label,
+.agent-card__status,
+.agent-command__index {
+  color: var(--ok);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.agent-endpoint code {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  padding: 10px;
+}
+
+.agent-endpoint__meta {
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+.agent-list {
+  padding-top: 34px;
+}
+
+.agent-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.agent-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+  color: inherit;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 22px;
+  text-decoration: none;
+  transition:
+    transform 0.2s var(--ease),
+    box-shadow 0.2s var(--ease),
+    border-color 0.2s var(--ease);
+}
+
+.agent-card:hover {
+  border-color: var(--line-2);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-3px);
+}
+
+.agent-card h2,
+.agent-card p {
+  margin: 0;
+}
+
+.agent-card h2 {
+  font-size: 21px;
+}
+
+.agent-card p {
+  color: var(--ink-2);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+
+.agent-card__cta {
+  color: var(--ink);
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.agent-detail__layout {
+  align-items: start;
+  display: grid;
+  gap: 34px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.45fr);
+}
+
+.agent-steps,
+.agent-notes {
+  min-width: 0;
+}
+
+.agent-steps > h2,
+.agent-config h2,
+.agent-notes h2 {
+  font-size: 22px;
+  margin: 0 0 16px;
+}
+
+.agent-command {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 48px minmax(0, 1fr);
+  padding: 20px 0;
+}
+
+.agent-command:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.agent-command h3 {
+  font-size: 17px;
+  margin: 0;
+}
+
+.agent-command .docs-codeblock,
+.agent-config .docs-codeblock {
+  margin-bottom: 0;
+}
+
+.agent-notes {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  display: grid;
+  gap: 20px;
+  padding: 20px;
+}
+
+.agent-notes ul {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.agent-notes li {
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.55;
+  min-width: 0;
+}
+
+/* ===================================================================== */
 /* Footer                                                                */
 /* ===================================================================== */
 .site-footer {
@@ -971,6 +1185,15 @@
     grid-template-columns: 1fr;
   }
 
+  .agent-hero__inner,
+  .agent-detail__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-hero h1 {
+    font-size: 48px;
+  }
+
   .docs-view {
     grid-template-columns: 1fr;
     min-width: 0;
@@ -1040,6 +1263,18 @@
 
   .surface-grid {
     grid-template-columns: 1fr;
+  }
+
+  .agent-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-command {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-hero h1 {
+    font-size: 36px;
   }
 
   .pipeline-flow {

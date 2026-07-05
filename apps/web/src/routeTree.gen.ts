@@ -10,11 +10,21 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as DocsRouteImport } from './routes/docs'
+import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AgentsOpencodeRouteImport } from './routes/agents/opencode'
+import { Route as AgentsCodexRouteImport } from './routes/agents/codex'
+import { Route as AgentsClaudeCodeRouteImport } from './routes/agents/claude-code'
+import { Route as AgentsAntigravityRouteImport } from './routes/agents/antigravity'
 
 const DocsRoute = DocsRouteImport.update({
   id: '/docs',
   path: '/docs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsRoute = AgentsRouteImport.update({
+  id: '/agents',
+  path: '/agents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -22,30 +32,88 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AgentsOpencodeRoute = AgentsOpencodeRouteImport.update({
+  id: '/opencode',
+  path: '/opencode',
+  getParentRoute: () => AgentsRoute,
+} as any)
+const AgentsCodexRoute = AgentsCodexRouteImport.update({
+  id: '/codex',
+  path: '/codex',
+  getParentRoute: () => AgentsRoute,
+} as any)
+const AgentsClaudeCodeRoute = AgentsClaudeCodeRouteImport.update({
+  id: '/claude-code',
+  path: '/claude-code',
+  getParentRoute: () => AgentsRoute,
+} as any)
+const AgentsAntigravityRoute = AgentsAntigravityRouteImport.update({
+  id: '/antigravity',
+  path: '/antigravity',
+  getParentRoute: () => AgentsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agents': typeof AgentsRouteWithChildren
   '/docs': typeof DocsRoute
+  '/agents/antigravity': typeof AgentsAntigravityRoute
+  '/agents/claude-code': typeof AgentsClaudeCodeRoute
+  '/agents/codex': typeof AgentsCodexRoute
+  '/agents/opencode': typeof AgentsOpencodeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agents': typeof AgentsRouteWithChildren
   '/docs': typeof DocsRoute
+  '/agents/antigravity': typeof AgentsAntigravityRoute
+  '/agents/claude-code': typeof AgentsClaudeCodeRoute
+  '/agents/codex': typeof AgentsCodexRoute
+  '/agents/opencode': typeof AgentsOpencodeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/agents': typeof AgentsRouteWithChildren
   '/docs': typeof DocsRoute
+  '/agents/antigravity': typeof AgentsAntigravityRoute
+  '/agents/claude-code': typeof AgentsClaudeCodeRoute
+  '/agents/codex': typeof AgentsCodexRoute
+  '/agents/opencode': typeof AgentsOpencodeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/docs'
+  fullPaths:
+    | '/'
+    | '/agents'
+    | '/docs'
+    | '/agents/antigravity'
+    | '/agents/claude-code'
+    | '/agents/codex'
+    | '/agents/opencode'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/docs'
-  id: '__root__' | '/' | '/docs'
+  to:
+    | '/'
+    | '/agents'
+    | '/docs'
+    | '/agents/antigravity'
+    | '/agents/claude-code'
+    | '/agents/codex'
+    | '/agents/opencode'
+  id:
+    | '__root__'
+    | '/'
+    | '/agents'
+    | '/docs'
+    | '/agents/antigravity'
+    | '/agents/claude-code'
+    | '/agents/codex'
+    | '/agents/opencode'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AgentsRoute: typeof AgentsRouteWithChildren
   DocsRoute: typeof DocsRoute
 }
 
@@ -58,6 +126,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agents': {
+      id: '/agents'
+      path: '/agents'
+      fullPath: '/agents'
+      preLoaderRoute: typeof AgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -65,11 +140,57 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agents/opencode': {
+      id: '/agents/opencode'
+      path: '/opencode'
+      fullPath: '/agents/opencode'
+      preLoaderRoute: typeof AgentsOpencodeRouteImport
+      parentRoute: typeof AgentsRoute
+    }
+    '/agents/codex': {
+      id: '/agents/codex'
+      path: '/codex'
+      fullPath: '/agents/codex'
+      preLoaderRoute: typeof AgentsCodexRouteImport
+      parentRoute: typeof AgentsRoute
+    }
+    '/agents/claude-code': {
+      id: '/agents/claude-code'
+      path: '/claude-code'
+      fullPath: '/agents/claude-code'
+      preLoaderRoute: typeof AgentsClaudeCodeRouteImport
+      parentRoute: typeof AgentsRoute
+    }
+    '/agents/antigravity': {
+      id: '/agents/antigravity'
+      path: '/antigravity'
+      fullPath: '/agents/antigravity'
+      preLoaderRoute: typeof AgentsAntigravityRouteImport
+      parentRoute: typeof AgentsRoute
+    }
   }
 }
 
+interface AgentsRouteChildren {
+  AgentsAntigravityRoute: typeof AgentsAntigravityRoute
+  AgentsClaudeCodeRoute: typeof AgentsClaudeCodeRoute
+  AgentsCodexRoute: typeof AgentsCodexRoute
+  AgentsOpencodeRoute: typeof AgentsOpencodeRoute
+}
+
+const AgentsRouteChildren: AgentsRouteChildren = {
+  AgentsAntigravityRoute: AgentsAntigravityRoute,
+  AgentsClaudeCodeRoute: AgentsClaudeCodeRoute,
+  AgentsCodexRoute: AgentsCodexRoute,
+  AgentsOpencodeRoute: AgentsOpencodeRoute,
+}
+
+const AgentsRouteWithChildren =
+  AgentsRoute._addFileChildren(AgentsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AgentsRoute: AgentsRouteWithChildren,
   DocsRoute: DocsRoute,
 }
 export const routeTree = rootRouteImport

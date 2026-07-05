@@ -141,8 +141,8 @@ export function MarketingHome({
               <SurfaceCard
                 cta="Agent setup"
                 desc="Install and configure Sketchi for supported coding-agent workflows."
-                domain={PRODUCT_SURFACE_HOSTS.docs}
-                href="/docs#agent-setup"
+                domain="sketchi.app/agents"
+                href="/agents"
                 name="Agent setup"
                 status="live"
               />

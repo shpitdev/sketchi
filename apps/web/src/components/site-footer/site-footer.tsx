@@ -45,7 +45,7 @@ export function SiteFooter({
               <a href={surfaceUrls.playground}>Playground</a>
             </li>
             <li>
-              <a href="/docs#agent-setup">Agent setup</a>
+              <a href="/agents">Agent setup</a>
             </li>
           </ul>
         </div>
