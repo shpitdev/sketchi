@@ -382,6 +382,44 @@ body {
   animation: studio-ghost-in 0.35s ease;
 }
 
+.studio__artifact-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 34px;
+}
+
+.studio__artifact-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid color-mix(in srgb, var(--mauve) 35%, var(--line));
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--mauve);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.studio__artifact-link:focus-visible,
+.studio__artifact-link:hover {
+  border-color: var(--mauve);
+  background: var(--mauve-soft);
+}
+
+.studio__artifact-status {
+  color: var(--muted-ink);
+  font-size: 13px;
+}
+
+.studio__artifact-status--error {
+  color: var(--destructive);
+}
+
 @keyframes studio-ghost-in {
   from {
     opacity: 0;
@@ -460,4 +498,77 @@ body {
 .studio-not-found {
   padding: 48px;
   text-align: center;
+}
+
+/* ===================== Artifact review route ===================== */
+
+.artifact-view {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+  background: var(--paper);
+}
+
+.artifact-view__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.artifact-view__mark {
+  text-decoration: none;
+}
+
+.artifact-view__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.artifact-view__stage {
+  flex: 1;
+  min-height: 0;
+  padding: 18px;
+  background:
+    radial-gradient(rgb(143 112 127 / 9%) 1px, transparent 1.2px) 0 0 / 22px
+      22px,
+    var(--card);
+}
+
+.artifact-view__stage .sketchi-diagram-preview {
+  height: 100%;
+  min-height: 0;
+}
+
+.artifact-view__stage .sketchi-excalidraw-scene-canvas {
+  border: 0;
+  min-height: 0;
+}
+
+.artifact-view__message {
+  margin: 48px auto 0;
+  max-width: 420px;
+  color: var(--muted-ink);
+  text-align: center;
+}
+
+.artifact-view__message--error {
+  color: var(--destructive);
+}
+
+@media (max-width: 640px) {
+  .artifact-view__bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .artifact-view__actions {
+    justify-content: flex-start;
+  }
 }

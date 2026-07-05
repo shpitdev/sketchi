@@ -11,7 +11,14 @@ import {
 import { DiagramPreview } from "@sketchi/diagram-studio-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import {
   Conversation,
@@ -71,6 +78,40 @@ interface DiagramToolPart {
   errorText?: string;
 }
 
+interface PlaygroundArtifactResponse {
+  ok: boolean;
+  artifact?: {
+    artifactId?: string;
+  };
+  exportUrls?: {
+    excalidraw?: string;
+    scene?: string;
+  };
+  issues?: Array<{
+    message?: string;
+  }>;
+  viewUrl?: string;
+}
+
+interface ReadyPlaygroundArtifact {
+  artifactId: string;
+  exportUrls: {
+    excalidraw: string;
+    scene: string;
+  };
+  viewUrl: string;
+}
+
+type PlaygroundArtifactState =
+  | { status: "idle" }
+  | { key: string; status: "saving" }
+  | {
+      artifact: ReadyPlaygroundArtifact;
+      key: string;
+      status: "ready";
+    }
+  | { key: string; message: string; status: "error" };
+
 function isDiagramToolPart(
   part: MessagePart,
 ): part is DiagramToolPart & MessagePart {
@@ -85,6 +126,47 @@ function gradeReportOf(part: DiagramToolPart): DiagramGradeReport | undefined {
   return output && typeof output.grade === "number"
     ? (output as DiagramGradeReport)
     : undefined;
+}
+
+function isArtifactResponse(
+  value: unknown,
+): value is PlaygroundArtifactResponse {
+  return Boolean(value) && typeof value === "object";
+}
+
+function artifactErrorMessage(value: unknown, fallback: string): string {
+  if (!isArtifactResponse(value)) {
+    return fallback;
+  }
+
+  const issue = value.issues?.find(
+    (candidate) =>
+      typeof candidate.message === "string" &&
+      candidate.message.trim().length > 0,
+  );
+  return issue?.message ?? fallback;
+}
+
+function artifactFromResponse(
+  value: PlaygroundArtifactResponse,
+): ReadyPlaygroundArtifact | null {
+  const artifactId = value.artifact?.artifactId;
+  const scene = value.exportUrls?.scene;
+  const excalidraw = value.exportUrls?.excalidraw;
+  const viewUrl = value.viewUrl;
+
+  if (!artifactId || !scene || !excalidraw || !viewUrl) {
+    return null;
+  }
+
+  return {
+    artifactId,
+    exportUrls: {
+      excalidraw,
+      scene,
+    },
+    viewUrl,
+  };
 }
 
 function GradeReport({ report }: { report: DiagramGradeReport }) {
@@ -118,6 +200,50 @@ function GradeReport({ report }: { report: DiagramGradeReport }) {
           ))}
         </ul>
       ) : null}
+    </div>
+  );
+}
+
+function ArtifactActions({ state }: { state: PlaygroundArtifactState }) {
+  if (state.status === "idle") {
+    return null;
+  }
+
+  if (state.status === "saving") {
+    return (
+      <div className="studio__artifact-actions">
+        <span className="studio__artifact-status">saving artifact...</span>
+      </div>
+    );
+  }
+
+  if (state.status === "error") {
+    return (
+      <div className="studio__artifact-actions">
+        <span className="studio__artifact-status studio__artifact-status--error">
+          {state.message}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="studio__artifact-actions">
+      <a className="studio__artifact-link" href={state.artifact.viewUrl}>
+        Open artifact
+      </a>
+      <a
+        className="studio__artifact-link"
+        href={state.artifact.exportUrls.scene}
+      >
+        Scene JSON
+      </a>
+      <a
+        className="studio__artifact-link"
+        href={state.artifact.exportUrls.excalidraw}
+      >
+        Excalidraw
+      </a>
     </div>
   );
 }
@@ -229,12 +355,14 @@ function StagePlaceholder({
 }
 
 function DiagramStage({
+  artifactState,
   attemptCount,
   generating,
   ghostLabels,
   report,
   scene,
 }: {
+  artifactState: PlaygroundArtifactState;
   attemptCount: number;
   generating: boolean;
   ghostLabels: string[];
@@ -279,6 +407,7 @@ function DiagramStage({
           </div>
         ) : null}
       </div>
+      {report?.accepted ? <ArtifactActions state={artifactState} /> : null}
     </section>
   );
 }
@@ -290,6 +419,10 @@ function StudioRoute() {
   const { error, messages, sendMessage, status, stop } = useChat({
     transport,
   });
+  const [artifactState, setArtifactState] = useState<PlaygroundArtifactState>({
+    status: "idle",
+  });
+  const artifactKeyRef = useRef<string | null>(null);
 
   const busy = status === "submitted" || status === "streaming";
 
@@ -315,6 +448,8 @@ function StudioRoute() {
       part.state === "input-streaming" || part.state === "input-available",
   );
 
+  const displayReport = displayPart ? gradeReportOf(displayPart) : undefined;
+
   const scene = useMemo(() => {
     if (!displayPart?.input) {
       return null;
@@ -327,6 +462,85 @@ function StudioRoute() {
       return null;
     }
   }, [displayPart]);
+
+  const artifactKey =
+    displayPart && displayReport?.accepted ? displayPart.toolCallId : undefined;
+  const artifactInput = artifactKey ? displayPart?.input : undefined;
+  const artifactPayload = useMemo(() => {
+    if (!artifactKey || artifactInput === undefined) {
+      return undefined;
+    }
+
+    try {
+      return JSON.stringify({ input: artifactInput });
+    } catch {
+      return undefined;
+    }
+  }, [artifactInput, artifactKey]);
+
+  useEffect(() => {
+    if (!artifactKey || !artifactPayload) {
+      artifactKeyRef.current = null;
+      setArtifactState({ status: "idle" });
+      return;
+    }
+
+    if (artifactKeyRef.current === artifactKey) {
+      return;
+    }
+
+    artifactKeyRef.current = artifactKey;
+    let cancelled = false;
+    setArtifactState({ key: artifactKey, status: "saving" });
+
+    void (async () => {
+      let payload: unknown;
+      try {
+        const response = await fetch("/api/playground/artifacts", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: artifactPayload,
+        });
+        payload = await response.json();
+
+        if (!response.ok || !isArtifactResponse(payload) || !payload.ok) {
+          throw new Error(
+            artifactErrorMessage(payload, "Artifact could not be saved."),
+          );
+        }
+
+        const artifact = artifactFromResponse(payload);
+        if (!artifact) {
+          throw new Error("Artifact response was incomplete.");
+        }
+
+        if (!cancelled) {
+          setArtifactState({
+            artifact,
+            key: artifactKey,
+            status: "ready",
+          });
+        }
+      } catch (caught) {
+        if (!cancelled) {
+          setArtifactState({
+            key: artifactKey,
+            message:
+              caught instanceof Error
+                ? caught.message
+                : "Artifact could not be saved.",
+            status: "error",
+          });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [artifactKey, artifactPayload]);
 
   const ghostLabels = useMemo(() => {
     const input = activePart?.input as
@@ -455,10 +669,11 @@ function StudioRoute() {
 
           {buildMode ? (
             <DiagramStage
+              artifactState={artifactState}
               attemptCount={toolParts.length}
               generating={Boolean(activePart)}
               ghostLabels={ghostLabels}
-              report={displayPart ? gradeReportOf(displayPart) : undefined}
+              report={displayReport}
               scene={scene}
             />
           ) : null}

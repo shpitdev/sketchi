@@ -12,7 +12,9 @@ import { Route as rootRouteImport } from "./routes/__root";
 import { Route as McpRouteImport } from "./routes/mcp";
 import { Route as CodemodeExportHarnessRouteImport } from "./routes/codemode-export-harness";
 import { Route as IndexRouteImport } from "./routes/index";
+import { Route as ArtifactsArtifactIdRouteImport } from "./routes/artifacts/$artifactId";
 import { Route as ApiChatRouteImport } from "./routes/api/chat";
+import { Route as ApiPlaygroundArtifactsRouteImport } from "./routes/api/playground/artifacts";
 import { Route as ApiV1FlowchartsBuildRouteImport } from "./routes/api/v1/flowcharts/build";
 import { Route as ApiV1ArtifactsArtifactIdRouteImport } from "./routes/api/v1/artifacts/$artifactId";
 import { Route as ApiV1ArtifactsArtifactIdPatchRouteImport } from "./routes/api/v1/artifacts/$artifactId/patch";
@@ -32,9 +34,19 @@ const IndexRoute = IndexRouteImport.update({
   path: "/",
   getParentRoute: () => rootRouteImport,
 } as any);
+const ArtifactsArtifactIdRoute = ArtifactsArtifactIdRouteImport.update({
+  id: "/artifacts/$artifactId",
+  path: "/artifacts/$artifactId",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ApiChatRoute = ApiChatRouteImport.update({
   id: "/api/chat",
   path: "/api/chat",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ApiPlaygroundArtifactsRoute = ApiPlaygroundArtifactsRouteImport.update({
+  id: "/api/playground/artifacts",
+  path: "/api/playground/artifacts",
   getParentRoute: () => rootRouteImport,
 } as any);
 const ApiV1FlowchartsBuildRoute = ApiV1FlowchartsBuildRouteImport.update({
@@ -60,6 +72,8 @@ export interface FileRoutesByFullPath {
   "/codemode-export-harness": typeof CodemodeExportHarnessRoute;
   "/mcp": typeof McpRoute;
   "/api/chat": typeof ApiChatRoute;
+  "/artifacts/$artifactId": typeof ArtifactsArtifactIdRoute;
+  "/api/playground/artifacts": typeof ApiPlaygroundArtifactsRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
@@ -69,6 +83,8 @@ export interface FileRoutesByTo {
   "/codemode-export-harness": typeof CodemodeExportHarnessRoute;
   "/mcp": typeof McpRoute;
   "/api/chat": typeof ApiChatRoute;
+  "/artifacts/$artifactId": typeof ArtifactsArtifactIdRoute;
+  "/api/playground/artifacts": typeof ApiPlaygroundArtifactsRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
@@ -79,6 +95,8 @@ export interface FileRoutesById {
   "/codemode-export-harness": typeof CodemodeExportHarnessRoute;
   "/mcp": typeof McpRoute;
   "/api/chat": typeof ApiChatRoute;
+  "/artifacts/$artifactId": typeof ArtifactsArtifactIdRoute;
+  "/api/playground/artifacts": typeof ApiPlaygroundArtifactsRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
@@ -90,6 +108,8 @@ export interface FileRouteTypes {
     | "/codemode-export-harness"
     | "/mcp"
     | "/api/chat"
+    | "/artifacts/$artifactId"
+    | "/api/playground/artifacts"
     | "/api/v1/artifacts/$artifactId"
     | "/api/v1/flowcharts/build"
     | "/api/v1/artifacts/$artifactId/patch";
@@ -99,6 +119,8 @@ export interface FileRouteTypes {
     | "/codemode-export-harness"
     | "/mcp"
     | "/api/chat"
+    | "/artifacts/$artifactId"
+    | "/api/playground/artifacts"
     | "/api/v1/artifacts/$artifactId"
     | "/api/v1/flowcharts/build"
     | "/api/v1/artifacts/$artifactId/patch";
@@ -108,6 +130,8 @@ export interface FileRouteTypes {
     | "/codemode-export-harness"
     | "/mcp"
     | "/api/chat"
+    | "/artifacts/$artifactId"
+    | "/api/playground/artifacts"
     | "/api/v1/artifacts/$artifactId"
     | "/api/v1/flowcharts/build"
     | "/api/v1/artifacts/$artifactId/patch";
@@ -118,6 +142,8 @@ export interface RootRouteChildren {
   CodemodeExportHarnessRoute: typeof CodemodeExportHarnessRoute;
   McpRoute: typeof McpRoute;
   ApiChatRoute: typeof ApiChatRoute;
+  ArtifactsArtifactIdRoute: typeof ArtifactsArtifactIdRoute;
+  ApiPlaygroundArtifactsRoute: typeof ApiPlaygroundArtifactsRoute;
   ApiV1ArtifactsArtifactIdRoute: typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   ApiV1FlowchartsBuildRoute: typeof ApiV1FlowchartsBuildRoute;
 }
@@ -145,11 +171,25 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof IndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/artifacts/$artifactId": {
+      id: "/artifacts/$artifactId";
+      path: "/artifacts/$artifactId";
+      fullPath: "/artifacts/$artifactId";
+      preLoaderRoute: typeof ArtifactsArtifactIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/api/chat": {
       id: "/api/chat";
       path: "/api/chat";
       fullPath: "/api/chat";
       preLoaderRoute: typeof ApiChatRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/api/playground/artifacts": {
+      id: "/api/playground/artifacts";
+      path: "/api/playground/artifacts";
+      fullPath: "/api/playground/artifacts";
+      preLoaderRoute: typeof ApiPlaygroundArtifactsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/api/v1/flowcharts/build": {
@@ -195,6 +235,8 @@ const rootRouteChildren: RootRouteChildren = {
   CodemodeExportHarnessRoute: CodemodeExportHarnessRoute,
   McpRoute: McpRoute,
   ApiChatRoute: ApiChatRoute,
+  ArtifactsArtifactIdRoute: ArtifactsArtifactIdRoute,
+  ApiPlaygroundArtifactsRoute: ApiPlaygroundArtifactsRoute,
   ApiV1ArtifactsArtifactIdRoute: ApiV1ArtifactsArtifactIdRouteWithChildren,
   ApiV1FlowchartsBuildRoute: ApiV1FlowchartsBuildRoute,
 };

@@ -39,3 +39,10 @@ packages while owning transport details such as MCP `execute`, hosted artifact
 URLs, R2 bindings, and Cloudflare Browser Run rendering. Future persisted Studio
 routes should build on this boundary without making the anonymous Playground
 depend on full workspace persistence.
+
+## Playground artifact retention
+
+Anonymous Playground handoff URLs use the same artifact store as Code Mode.
+Deployed Workers write artifacts to the configured `SKETCHI_ARTIFACTS` object
+bucket. Local development falls back to process memory, so local artifact URLs
+survive page reloads but not dev-server restarts.
