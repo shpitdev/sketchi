@@ -8,8 +8,8 @@ describe("SiteHeader", () => {
     render(<SiteHeader activePath="/docs" />);
 
     expect(screen.getByRole("link", { name: "Sketchi home" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Pipeline" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Agent setup" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Product" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Agents" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Playground" })).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "Docs" }).getAttribute("aria-current"),

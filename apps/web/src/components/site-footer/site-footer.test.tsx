@@ -8,10 +8,12 @@ describe("SiteFooter", () => {
     render(<SiteFooter />);
 
     expect(screen.getByRole("heading", { name: "Product" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Surfaces" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Project" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Agents" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "More" })).toBeTruthy();
     expect(
-      screen.getByText("Sketchi v2 — typed diagram generation"),
+      screen.getByText(
+        "Made for people who'd rather describe a diagram than draw one.",
+      ),
     ).toBeTruthy();
   });
 
@@ -32,7 +34,7 @@ describe("SiteFooter", () => {
       screen.getByRole("link", { name: "Icons" }).getAttribute("href"),
     ).toBe("https://sketchi-icons-pr-42.dimethyl.workers.dev");
     expect(
-      screen.getByRole("link", { name: "Studio beta" }).getAttribute("href"),
-    ).toBe("/docs#studio-beta");
+      screen.getByRole("link", { name: "Claude Code" }).getAttribute("href"),
+    ).toBe("/agents/claude-code");
   });
 });

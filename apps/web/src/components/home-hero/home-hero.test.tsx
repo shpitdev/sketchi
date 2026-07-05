@@ -8,22 +8,21 @@ describe("HomeHero", () => {
     render(<HomeHero />);
 
     expect(
-      screen.getByRole("heading", { name: /validated diagrams/i }),
+      screen.getByRole("heading", { name: /Sketchi draws it/i }),
     ).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Open Playground" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Read the docs" })).toBeTruthy();
     expect(
-      screen.getByRole("link", { name: "Open Playground" }),
+      screen.getByRole("link", { name: "Open the playground" }),
     ).toHaveProperty("href", "https://sketchi-studio.dimethyl.workers.dev/");
+    expect(
+      screen.getByRole("link", { name: "Add to your agent" }),
+    ).toHaveProperty("href", "http://localhost:3000/agents");
   });
 
-  it("labels the diagram illustration", () => {
+  it("labels the sketched diagram illustration", () => {
     render(<HomeHero />);
 
     expect(
-      screen.getByRole("img", {
-        name: /playground rendering a validated flowchart/i,
-      }),
+      screen.getByRole("img", { name: /hand-drawn flowchart/i }),
     ).toBeTruthy();
   });
 });

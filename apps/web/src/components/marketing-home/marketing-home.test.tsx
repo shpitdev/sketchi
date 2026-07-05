@@ -4,34 +4,30 @@ import { describe, expect, it } from "vitest";
 import { MarketingHome } from "./marketing-home";
 
 describe("MarketingHome", () => {
-  it("composes the hero, pipeline, and surfaces", () => {
+  it("composes the hero, agents, features, icons, and CTA", () => {
     render(<MarketingHome />);
 
     expect(
-      screen.getByRole("heading", { name: /validated diagrams/i }),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole("heading", { name: "Generation stays inspectable." }),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole("heading", { name: "Public routes, one pipeline." }),
+      screen.getByRole("heading", { name: /Sketchi draws it/i }),
     ).toBeTruthy();
     expect(
       screen.getByRole("heading", {
-        name: "Direct Workers are the review surface.",
+        name: "Ask your coding agent for a diagram.",
       }),
     ).toBeTruthy();
     expect(
       screen.getByRole("heading", {
-        name: "Sketchi Playground keeps generation inspectable.",
+        name: "Diagrams that behave like diagrams.",
       }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("heading", { name: "Sketchi Playground" }),
+      screen.getByRole("heading", {
+        name: "Every logo you need, already sketched.",
+      }),
     ).toBeTruthy();
     expect(
-      screen.queryByRole("link", { name: /Excalidraw workspace/ }),
-    ).toBeNull();
+      screen.getByRole("heading", { name: "Start with a sentence." }),
+    ).toBeTruthy();
   });
 
   it("uses configured surface URLs", () => {
@@ -44,13 +40,18 @@ describe("MarketingHome", () => {
       />,
     );
 
+    for (const link of screen.getAllByRole("link", {
+      name: "Open the playground",
+    })) {
+      expect(link.getAttribute("href")).toBe(
+        "https://sketchi-studio-pr-42.dimethyl.workers.dev",
+      );
+    }
+
     expect(
       screen
-        .getByRole("link", { name: /Sketchi Playground/ })
+        .getByRole("link", { name: /Browse the library/ })
         .getAttribute("href"),
-    ).toBe("https://sketchi-studio-pr-42.dimethyl.workers.dev");
-    expect(
-      screen.getByText("sketchi-studio-pr-42.dimethyl.workers.dev"),
-    ).toBeTruthy();
+    ).toBe("https://sketchi-icons-pr-42.dimethyl.workers.dev");
   });
 });

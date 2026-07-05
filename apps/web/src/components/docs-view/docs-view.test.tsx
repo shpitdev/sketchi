@@ -8,28 +8,19 @@ describe("DocsView", () => {
     render(<DocsView />);
 
     expect(
-      screen.getByRole("heading", {
-        name: "How Sketchi v2 is put together",
-      }),
+      screen.getByRole("heading", { name: "Everything Sketchi can do" }),
     ).toBeTruthy();
     expect(
       screen.getByRole("navigation", { name: "Docs sections" }),
     ).toBeTruthy();
+    expect(screen.getByRole("link", { name: "How it works" })).toBeTruthy();
     expect(
-      screen.getByRole("link", { name: "Generation pipeline" }),
+      screen.getByRole("heading", { name: /In your coding agent/ }),
     ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Diagram types/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /FAQ/ })).toBeTruthy();
     expect(
-      screen.getByRole("heading", { name: /Product routes/ }),
-    ).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /Agent setup/ })).toBeTruthy();
-    expect(
-      screen.getByRole("heading", { name: /Internal surfaces/ }),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole("heading", { name: /Auth and persistence/ }),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole("link", { name: /Sketchi Playground/ }),
+      screen.getAllByRole("link", { name: "Sketchi Playground" })[0],
     ).toHaveProperty("href", "https://sketchi-studio.dimethyl.workers.dev/");
     expect(
       screen.queryByRole("link", { name: /Excalidraw workspace/ }),

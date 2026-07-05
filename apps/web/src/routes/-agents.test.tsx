@@ -24,7 +24,7 @@ describe("AgentsPage", () => {
     ).toEqual([previewSurfaceUrls.playground, previewSurfaceUrls.playground]);
     expect(
       screen
-        .getAllByRole("link", { name: "Agent setup" })
+        .getAllByRole("link", { name: "Agents" })
         .some((link) => link.getAttribute("aria-current") === "page"),
     ).toBe(true);
   });
@@ -40,7 +40,7 @@ describe("AgentDetailPage", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "Google Antigravity setup" }),
+      screen.getByRole("heading", { name: "Antigravity", level: 1 }),
     ).toBeTruthy();
     expect(
       screen.getByText(
@@ -50,7 +50,7 @@ describe("AgentDetailPage", () => {
     expect(screen.getByText("agy plugin list")).toBeTruthy();
     expect(
       screen
-        .getAllByRole("link", { name: "Agent setup" })
+        .getAllByRole("link", { name: "Agents" })
         .some((link) => link.getAttribute("aria-current") === "page"),
     ).toBe(true);
   });

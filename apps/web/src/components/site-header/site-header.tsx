@@ -17,9 +17,8 @@ export interface SiteHeaderProps {
 }
 
 const defaultNavItems: readonly SiteHeaderNavItem[] = [
-  { href: "/#pipeline", label: "Pipeline" },
-  { href: "/#surfaces", label: "Surfaces" },
-  { href: "/agents", label: "Agent setup" },
+  { href: "/#product", label: "Product" },
+  { href: "/agents", label: "Agents" },
   { href: "/docs", label: "Docs" },
 ];
 

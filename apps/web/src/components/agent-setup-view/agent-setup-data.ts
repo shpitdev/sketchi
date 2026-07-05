@@ -1,10 +1,6 @@
 const mcpEndpoint = "https://sketchi-studio.dimethyl.workers.dev/mcp";
 
-export type AgentSetupId =
-  | "codex"
-  | "opencode"
-  | "claude-code"
-  | "antigravity";
+export type AgentSetupId = "codex" | "opencode" | "claude-code" | "antigravity";
 
 export interface AgentSetupCommand {
   label: string;
@@ -12,25 +8,32 @@ export interface AgentSetupCommand {
 }
 
 export interface AgentSetupEntry {
+  /** Brand accent used to tint the agent tile. */
+  accent: string;
   commands: readonly AgentSetupCommand[];
   config?: string;
   href: `/agents/${AgentSetupId}`;
+  /** Path to the agent's brand icon in /public. */
+  icon: `/agents/${AgentSetupId}.svg`;
   id: AgentSetupId;
   name: string;
   notes: readonly string[];
   status: string;
   summary: string;
+  /** Short, one-line description of who makes the agent. */
+  tagline: string;
 }
 
 export const agentSetupEntries: readonly AgentSetupEntry[] = [
   {
+    accent: "#3941ff",
     commands: [
       {
-        label: "Register this repo as a Codex plugin marketplace",
+        label: "Add the Sketchi plugin marketplace",
         value: "codex plugin marketplace add .",
       },
       {
-        label: "Install the packaged Sketchi Code Mode plugin",
+        label: "Install the Sketchi plugin",
         value:
           "codex plugin add sketchi-code-mode-codex --marketplace sketchi-agent-plugins",
       },
@@ -44,46 +47,52 @@ export const agentSetupEntries: readonly AgentSetupEntry[] = [
   }
 }`,
     href: "/agents/codex",
+    icon: "/agents/codex.svg",
     id: "codex",
     name: "Codex",
     notes: [
-      "The plugin manifest declares the Sketchi Code Mode skill, UI metadata, and remote MCP dependency.",
-      "The Codex CLI command surface was checked locally: plugin marketplaces use `codex plugin marketplace add`, then `codex plugin add`.",
+      "Sketchi installs as a Codex plugin, so the diagram skill is always one command away.",
+      "Diagrams come back as editable Sketchi artifacts you can reopen later.",
     ],
-    status: "Packaged plugin",
+    status: "Plugin",
     summary:
-      "Install the repo-local Codex plugin package for the Sketchi Code Mode skill and streamable HTTP MCP server.",
+      "Install the Sketchi plugin and ask Codex to diagram anything you're building.",
+    tagline: "OpenAI's coding agent",
   },
   {
+    accent: "#1a1712",
     commands: [
       {
-        label: "Add the remote MCP server",
+        label: "Connect the Sketchi server",
         value: `opencode mcp add sketchi-code-mode --url ${mcpEndpoint}`,
       },
       {
-        label: "Confirm OpenCode can see the server",
+        label: "Confirm the connection",
         value: "opencode mcp list",
       },
     ],
     href: "/agents/opencode",
+    icon: "/agents/opencode.svg",
     id: "opencode",
     name: "OpenCode",
     notes: [
-      "This checkout proves OpenCode as an external client over Sketchi Code Mode MCP.",
-      "There is no tracked OpenCode plugin package in this repo yet, so setup is manual MCP configuration.",
+      "No plugin to install — OpenCode talks to Sketchi over a single server URL.",
+      "Run the list command any time to confirm the connection is live.",
     ],
-    status: "Manual MCP setup",
+    status: "Connect",
     summary:
-      "Connect OpenCode directly to the same no-auth Sketchi Code Mode MCP endpoint used by supported agents.",
+      "Point OpenCode at Sketchi and generate diagrams without leaving the terminal.",
+    tagline: "Open-source terminal agent",
   },
   {
+    accent: "#d97757",
     commands: [
       {
-        label: "Register this repo as a Claude Code plugin marketplace",
+        label: "Add the Sketchi plugin marketplace",
         value: "claude plugin marketplace add . --scope local",
       },
       {
-        label: "Install the packaged Claude Code plugin",
+        label: "Install the Sketchi plugin",
         value:
           "claude plugin install sketchi-code-mode-claude@sketchi-agent-plugins",
       },
@@ -97,24 +106,27 @@ export const agentSetupEntries: readonly AgentSetupEntry[] = [
   }
 }`,
     href: "/agents/claude-code",
+    icon: "/agents/claude-code.svg",
     id: "claude-code",
     name: "Claude Code",
     notes: [
-      "The plugin manifest points Claude Code at the bundled skill and `.mcp.json` server config.",
-      "After installation the skill loads as `/sketchi-code-mode-claude:sketchi-code-mode`.",
+      "The plugin bundles the Sketchi skill, so you can ask for a diagram in plain language.",
+      "Diagrams open as editable Sketchi artifacts, not throwaway files.",
     ],
-    status: "Packaged plugin",
+    status: "Plugin",
     summary:
-      "Install the Claude Code plugin package that bundles the Sketchi skill and remote MCP server.",
+      "Add the Sketchi plugin to Claude Code and turn any explanation into a diagram.",
+    tagline: "Anthropic's coding agent",
   },
   {
+    accent: "#3186ff",
     commands: [
       {
-        label: "Install the reusable Antigravity plugin from this repo",
+        label: "Install the Sketchi plugin",
         value: "agy plugin install ./plugins/sketchi-code-mode-antigravity",
       },
       {
-        label: "Confirm the plugin is installed",
+        label: "Confirm it's installed",
         value: "agy plugin list",
       },
     ],
@@ -126,15 +138,17 @@ export const agentSetupEntries: readonly AgentSetupEntry[] = [
   }
 }`,
     href: "/agents/antigravity",
+    icon: "/agents/antigravity.svg",
     id: "antigravity",
-    name: "Google Antigravity",
+    name: "Antigravity",
     notes: [
-      "Launching `agy` from this repository also loads the workspace MCP config and workspace skill.",
-      "Use a normal authenticated Antigravity session when asking Sketchi Code Mode to create diagrams.",
+      "Install once and every Antigravity session can reach Sketchi.",
+      "Use your normal signed-in session — Sketchi handles the diagram.",
     ],
-    status: "Packaged plugin",
+    status: "Plugin",
     summary:
-      "Install the Antigravity plugin or use the workspace config already tracked in this repository.",
+      "Install the Sketchi plugin for Antigravity and sketch systems as you build them.",
+    tagline: "Google's agent IDE",
   },
 ] satisfies readonly AgentSetupEntry[];
 

@@ -9,7 +9,7 @@ export interface SiteFooterProps {
 }
 
 export function SiteFooter({
-  colophon = "Sketchi v2 — typed diagram generation",
+  colophon = "Made for people who'd rather describe a diagram than draw one.",
   surfaceUrls = DEFAULT_WEB_SURFACE_URLS,
 }: SiteFooterProps) {
   return (
@@ -27,8 +27,7 @@ export function SiteFooter({
             <span>Sketchi</span>
           </span>
           <p className="site-footer__tagline">
-            Prompt-to-diagram tooling with validated IR, deterministic
-            rendering, and artifact-ready output.
+            Prompts become real, editable diagrams — logos included.
           </p>
         </div>
 
@@ -36,46 +35,46 @@ export function SiteFooter({
           <h3>Product</h3>
           <ul>
             <li>
-              <a href="/#pipeline">Pipeline</a>
-            </li>
-            <li>
-              <a href="/docs">Docs</a>
-            </li>
-            <li>
               <a href={surfaceUrls.playground}>Playground</a>
             </li>
-            <li>
-              <a href="/agents">Agent setup</a>
-            </li>
-          </ul>
-        </div>
-
-        <div className="site-footer__col">
-          <h3>Surfaces</h3>
-          <ul>
             <li>
               <a href={surfaceUrls.icons}>Icons</a>
             </li>
             <li>
-              <a href="/docs#studio-beta">Studio beta</a>
+              <a href="/agents">Agents</a>
             </li>
             <li>
-              <a href="/docs#surfaces">Surface map</a>
+              <a href="/docs">Docs</a>
             </li>
           </ul>
         </div>
 
         <div className="site-footer__col">
-          <h3>Project</h3>
+          <h3>Agents</h3>
           <ul>
             <li>
-              <a href="/docs#deploy">Deploy</a>
+              <a href="/agents/claude-code">Claude Code</a>
             </li>
             <li>
-              <a href="/docs#no-auth">Auth status</a>
+              <a href="/agents/codex">Codex</a>
             </li>
             <li>
-              <a href="https://github.com/shpitdev/sketchi">Upstream</a>
+              <a href="/agents/opencode">OpenCode</a>
+            </li>
+            <li>
+              <a href="/agents/antigravity">Antigravity</a>
+            </li>
+          </ul>
+        </div>
+
+        <div className="site-footer__col">
+          <h3>More</h3>
+          <ul>
+            <li>
+              <a href="/docs">How it works</a>
+            </li>
+            <li>
+              <a href="https://github.com/shpitdev/sketchi">GitHub</a>
             </li>
           </ul>
         </div>
@@ -84,7 +83,7 @@ export function SiteFooter({
       <div className="site-footer__base">
         <div className="sk-shell site-footer__base-inner">
           <span>{colophon}</span>
-          <span>No sign-in · PR previews · workers.dev production</span>
+          <span>© Sketchi</span>
         </div>
       </div>
     </footer>

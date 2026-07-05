@@ -1,13 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { PipelineFlow } from "./pipeline-flow";
+import { CtaBand } from "./cta-band";
 import "../../styles/app.css";
 
 const meta = {
-  title: "Web/Components/PipelineFlow",
-  component: PipelineFlow,
+  title: "Web/Components/CtaBand",
+  component: CtaBand,
+  parameters: {
+    layout: "fullscreen",
+  },
   tags: ["test"],
-} satisfies Meta<typeof PipelineFlow>;
+} satisfies Meta<typeof CtaBand>;
 
 export default meta;
 

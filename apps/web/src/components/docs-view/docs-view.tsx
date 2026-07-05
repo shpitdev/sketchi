@@ -1,7 +1,5 @@
 import {
   DEFAULT_WEB_SURFACE_URLS,
-  PRODUCT_SURFACE_HOSTS,
-  surfaceLinkLabel,
   type WebSurfaceUrls,
 } from "../../lib/surface-urls";
 
@@ -17,34 +15,12 @@ export interface DocsViewProps {
 
 const defaultNav: readonly DocsNavEntry[] = [
   { href: "#overview", label: "Overview" },
-  { href: "#surfaces", label: "Product routes" },
-  { href: "#agent-setup", label: "Agent setup" },
-  { href: "#pipeline", label: "Generation pipeline" },
+  { href: "#how", label: "How it works" },
+  { href: "#agents", label: "In your agent" },
   { href: "#diagram-types", label: "Diagram types" },
-  { href: "#internal-surfaces", label: "Internal surfaces" },
-  { href: "#no-auth", label: "Auth and persistence" },
-  { href: "#deploy", label: "Deploy" },
+  { href: "#icons", label: "Icons" },
+  { href: "#faq", label: "FAQ" },
 ];
-
-const appSurfaceRows = [
-  {
-    desc: "A browser for the curated Sketchi icon output.",
-    key: "icons",
-    label: PRODUCT_SURFACE_HOSTS.icons,
-    title: "Icon library",
-  },
-  {
-    desc: "Anonymous prompt-to-diagram generation and artifact handoff.",
-    key: "playground",
-    label: PRODUCT_SURFACE_HOSTS.playground,
-    title: "Sketchi Playground",
-  },
-] satisfies ReadonlyArray<{
-  desc: string;
-  key: keyof WebSurfaceUrls;
-  label: string;
-  title: string;
-}>;
 
 export function DocsView({
   nav = defaultNav,
@@ -64,13 +40,13 @@ export function DocsView({
       </nav>
 
       <article className="docs-article">
-        <p className="sk-eyebrow">Documentation</p>
-        <h1 className="sk-section__title">How Sketchi v2 is put together</h1>
+        <p className="sk-eyebrow">Docs</p>
+        <h1 className="sk-section__title">Everything Sketchi can do</h1>
         <p className="docs-article__intro">
-          Sketchi makes diagram generation boring in the best way: inputs are
-          validated, rendering is deterministic, and UI states are exercised
-          outside the app shell. These docs name the product routes users can
-          follow and the internal harnesses that stay out of public navigation.
+          Sketchi turns a plain-language prompt into a clean, editable diagram —
+          brand logos and all. Use it in the{" "}
+          <a href={surfaceUrls.playground}>Sketchi Playground</a> with no
+          sign-up, or connect it to the coding agent you already use.
         </p>
 
         <section className="docs-section" id="overview">
@@ -78,223 +54,130 @@ export function DocsView({
             <span className="docs-section__idx">01</span> Overview
           </h2>
           <p>
-            A prompt is compiled into a typed intermediate representation (IR),
-            validated, rendered into a deterministic scene, and converted into
-            real Excalidraw elements. Each stage lives in its own package, so a
-            defect fails close to its cause instead of somewhere downstream.
+            You describe what you want to see — a system, a flow, an
+            architecture — and Sketchi draws it. The result isn&rsquo;t a flat
+            image: it&rsquo;s a real diagram made of shapes, arrows, and labels
+            you can rearrange, restyle, and export.
           </p>
-          <p>
-            The first high-reliability path is decision-heavy{" "}
-            <code>flowchart</code> generation. Code owns layout, arrow routing,
-            and text wrapping; the model only produces typed IR.
-          </p>
-        </section>
-
-        <section className="docs-section" id="surfaces">
-          <h2>
-            <span className="docs-section__idx">02</span> Product routes
-          </h2>
-          <p>
-            Public links point to Sketchi product routes: homepage/docs,
-            Playground, Icons, and agent setup. The Studio route foundation now
-            persists projects and diagrams, while the authenticated
-            <code>studio.sketchi.app</code> product domain waits for real auth.
-          </p>
-          <div className="docs-surface-map">
-            <article className="docs-surface-map__home">
-              <span className="docs-surface-map__k">Home</span>
-              <h3>sketchi.app</h3>
-              <p>Homepage, product documentation, and setup guides.</p>
-            </article>
-            {appSurfaceRows.map((surface) => {
-              const href = surfaceUrls[surface.key];
-
-              return (
-                <a
-                  className="docs-surface-map__link"
-                  href={href}
-                  key={surface.key}
-                >
-                  <span className="docs-surface-map__k">
-                    {surfaceLinkLabel(href, surface.label)}
-                  </span>
-                  <h3>{surface.title}</h3>
-                  <p>{surface.desc}</p>
-                </a>
-              );
-            })}
-            <article className="docs-surface-map__home" id="studio-beta">
-              <span className="docs-surface-map__k">
-                {PRODUCT_SURFACE_HOSTS.studio}
-              </span>
-              <h3>Studio</h3>
-              <p>
-                Persisted project and diagram routes are live in the Studio
-                Worker. Authenticated sessions, history, and collaboration
-                remain the beta direction.
-              </p>
-            </article>
-          </div>
           <div className="docs-callout">
-            <span className="docs-callout__k">Current URLs</span>
+            <span className="docs-callout__k">Start here</span>
             <span>
-              Review and production proof use direct <code>workers.dev</code>{" "}
-              links until the custom domains are attached manually.
+              The fastest way to see it is the{" "}
+              <a href={surfaceUrls.playground}>Sketchi Playground</a> — type a
+              prompt and watch it become a diagram.
             </span>
           </div>
         </section>
 
-        <section className="docs-section" id="agent-setup">
+        <section className="docs-section" id="how">
           <h2>
-            <span className="docs-section__idx">03</span> Agent setup
+            <span className="docs-section__idx">02</span> How it works
           </h2>
           <p>
-            Agent setup now lives at <a href="/agents">sketchi.app/agents</a>.
-            Keep user-facing setup links there; do not route users through the
-            eval harness.
+            Sketchi keeps you in charge of the words and takes care of the
+            drawing. Under the hood it structures and checks your request before
+            anything is drawn, so the diagram is consistent and correct — not a
+            best-guess sketch.
           </p>
           <dl className="docs-defs">
             <div className="docs-defs__row">
-              <dt>Codex, Claude Code, OpenCode, Antigravity</dt>
+              <dt>You describe</dt>
+              <dd>Write what the diagram should show, in plain language.</dd>
+            </div>
+            <div className="docs-defs__row">
+              <dt>Sketchi builds</dt>
               <dd>
-                Plugin and MCP setup docs live in the repo docs and plugins
-                directories while the product hub is built.
+                It lays out the nodes, routes the arrows, and drops in the right
+                brand logos.
               </dd>
             </div>
             <div className="docs-defs__row">
-              <dt>Code Mode APIs</dt>
+              <dt>You edit</dt>
               <dd>
-                Harness-facing APIs remain hosted by the Studio Worker, but the
-                public setup path should describe Sketchi product behavior.
+                Open the diagram on the canvas, adjust anything by hand, and
+                export it.
               </dd>
             </div>
           </dl>
         </section>
 
-        <section className="docs-section" id="pipeline">
+        <section className="docs-section" id="agents">
           <h2>
-            <span className="docs-section__idx">04</span> Generation pipeline
+            <span className="docs-section__idx">03</span> In your coding agent
           </h2>
           <p>
-            The pipeline keeps model output, typed IR, deterministic scenes, and
-            Excalidraw conversion as separate, testable surfaces.
+            Sketchi plugs into Claude Code, Codex, OpenCode, and Antigravity.
+            Connect it once and ask for a diagram in chat — you&rsquo;ll get a
+            real, editable Sketchi diagram back without leaving your editor.
+            Full instructions live on the <a href="/agents">agents page</a>.
           </p>
-          <dl className="docs-defs">
-            <div className="docs-defs__row">
-              <dt>diagram-core</dt>
-              <dd>The IR, semantic validation, and reusable fixtures.</dd>
-            </div>
-            <div className="docs-defs__row">
-              <dt>diagram-renderer</dt>
-              <dd>Validated diagrams become a deterministic scene model.</dd>
-            </div>
-            <div className="docs-defs__row">
-              <dt>diagram-excalidraw</dt>
-              <dd>Scenes become persisted Excalidraw elements, validated.</dd>
-            </div>
-            <div className="docs-defs__row">
-              <dt>diagram-scenarios</dt>
-              <dd>Maintained prompts and assertions run against fixtures.</dd>
-            </div>
-          </dl>
-          <p>Run the canonical fixture evaluation locally:</p>
-          <pre className="docs-codeblock">
-            <span className="tok-c">
-              # deterministic IR → Excalidraw, no model
-            </span>
-            {"\n"}
-            pnpm nx scenario diagram-scenarios -- \{"\n"}
-            {"  "}--scenario pharma-batch-disposition --fixture
-          </pre>
         </section>
 
         <section className="docs-section" id="diagram-types">
           <h2>
-            <span className="docs-section__idx">05</span> Diagram types
+            <span className="docs-section__idx">04</span> Diagram types
           </h2>
           <p>
-            Every registered diagram type is guarded by tests: it must have
-            core, renderer, and Storybook coverage. New types are scaffolded
-            with the workspace generator so they are previewable before being
-            wired to generation.
+            Every diagram type is held to the same bar for layout and
+            readability before it ships.
           </p>
           <dl className="docs-defs">
             <div className="docs-defs__row">
-              <dt>flowchart</dt>
+              <dt>Flowchart</dt>
               <dd>
-                Start, process, decision, and end nodes with labeled branches —
-                the first hard reliability target.
+                Start, process, decision, and end steps with labeled branches —
+                the best-supported type today.
               </dd>
             </div>
             <div className="docs-defs__row">
-              <dt>mindmap</dt>
-              <dd>A radial fixture used to keep the type registry honest.</dd>
+              <dt>Mindmap</dt>
+              <dd>Radial breakdowns of an idea into related branches.</dd>
             </div>
           </dl>
-          <pre className="docs-codeblock">
-            <span className="tok-c">
-              # scaffold a new generated diagram type
-            </span>
-            {"\n"}
-            pnpm nx g @sketchi/generators:diagram-type mindmap
-          </pre>
         </section>
 
-        <section className="docs-section" id="internal-surfaces">
+        <section className="docs-section" id="icons">
           <h2>
-            <span className="docs-section__idx">06</span> Internal surfaces
+            <span className="docs-section__idx">05</span> The icon library
           </h2>
           <p>
-            The eval harness and standalone Excalidraw app are not public
-            product destinations. The harness remains for scenario fixtures,
-            model-output inspection, and regression review. Excalidraw remains
-            an implementation/editor capability exposed through product artifact
-            routes.
+            Sketchi ships with 1,400+ curated brand and tech icons — databases,
+            clouds, frameworks, AI models, and more — so your diagrams look like
+            your actual stack. The same set is available to browse and copy on
+            its own.
           </p>
           <div className="docs-callout">
-            <span className="docs-callout__k">Routing rule</span>
+            <span className="docs-callout__k">Browse</span>
             <span>
-              Public navigation must not link to the eval harness or a
-              standalone <code>excalidraw.sketchi.app</code> product route.
+              Open the <a href={surfaceUrls.icons}>Sketchi icon library</a> to
+              search and copy any logo.
             </span>
           </div>
         </section>
 
-        <section className="docs-section" id="no-auth">
+        <section className="docs-section" id="faq">
           <h2>
-            <span className="docs-section__idx">07</span> Auth and persistence
+            <span className="docs-section__idx">06</span> FAQ
           </h2>
-          <div className="docs-callout">
-            <span className="docs-callout__k">Current</span>
-            <span>
-              The deployable surfaces require no sign-in. Studio persistence
-              currently uses anonymous session cookies and object-bucket
-              records; real product auth, billing, history, and multi-user
-              collaboration are still future work.
-            </span>
-          </div>
-        </section>
-
-        <section className="docs-section" id="deploy">
-          <h2>
-            <span className="docs-section__idx">08</span> Deploy
-          </h2>
-          <p>
-            Pull requests deploy each app to a PR-specific Cloudflare Worker.
-            Merges to <code>main</code> deploy production Workers to their{" "}
-            <code>workers.dev</code> URLs without claiming the final{" "}
-            <code>sketchi.app</code> domains. Deploy summaries mark each Worker
-            as a public product surface or internal-only tool so reviewer links
-            do not imply public navigation.
-          </p>
-          <div className="docs-callout">
-            <span className="docs-callout__k">Manual</span>
-            <span>
-              Domain attachment is a deliberate, manual{" "}
-              <code>app-production-deploy</code> workflow dispatch. DNS cutover
-              is never automatic.
-            </span>
-          </div>
+          <dl className="docs-defs">
+            <div className="docs-defs__row">
+              <dt>Do I need an account?</dt>
+              <dd>No — the playground is open and requires no sign-up.</dd>
+            </div>
+            <div className="docs-defs__row">
+              <dt>Are the diagrams editable?</dt>
+              <dd>
+                Yes. Every element is a real object you can move, relabel, and
+                restyle on the canvas.
+              </dd>
+            </div>
+            <div className="docs-defs__row">
+              <dt>Can I export?</dt>
+              <dd>
+                Yes — take your diagram to your docs, slides, or pull request.
+              </dd>
+            </div>
+          </dl>
         </section>
       </article>
     </div>

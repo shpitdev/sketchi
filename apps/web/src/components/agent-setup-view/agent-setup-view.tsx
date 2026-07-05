@@ -1,3 +1,6 @@
+import type { CSSProperties } from "react";
+
+import { BrandIcon } from "../brand-icon/index.js";
 import {
   agentSetupEntries,
   codeModeMcpEndpoint,
@@ -18,28 +21,31 @@ export function AgentSetupView({ agentId }: AgentSetupViewProps) {
   return <AgentSetupHub />;
 }
 
+function EndpointCard({ meta }: { meta: string }) {
+  return (
+    <div className="agent-endpoint" aria-label="Sketchi server URL">
+      <span className="agent-endpoint__label">Server URL</span>
+      <code>{codeModeMcpEndpoint}</code>
+      <span className="agent-endpoint__meta">{meta}</span>
+    </div>
+  );
+}
+
 function AgentSetupHub() {
   return (
     <div className="agent-page">
       <section className="agent-hero">
         <div className="sk-shell agent-hero__inner">
           <div className="agent-hero__copy">
-            <p className="sk-eyebrow">Agent setup</p>
-            <h1>Connect Sketchi to your coding agent.</h1>
+            <p className="sk-eyebrow">For your coding agent</p>
+            <h1>Sketch diagrams without leaving your agent.</h1>
             <p>
-              Sketchi Code Mode exposes one remote MCP server for supported
-              agent clients. Pick the agent you use, install the tracked
-              package where one exists, and keep generated diagrams as Sketchi
-              artifacts instead of local wrapper files.
+              Connect Sketchi once and ask for a diagram in plain language.
+              Whatever you&rsquo;re building, your agent hands back a real,
+              editable Sketchi diagram — not a wall of ASCII.
             </p>
           </div>
-          <div className="agent-endpoint" aria-label="Current MCP endpoint">
-            <span className="agent-endpoint__label">MCP endpoint</span>
-            <code>{codeModeMcpEndpoint}</code>
-            <span className="agent-endpoint__meta">
-              Verified Workers URL until custom Studio domains are attached.
-            </span>
-          </div>
+          <EndpointCard meta="Add this URL wherever your agent keeps its MCP config." />
         </div>
       </section>
 
@@ -47,11 +53,25 @@ function AgentSetupHub() {
         <div className="sk-shell">
           <div className="agent-grid">
             {agentSetupEntries.map((entry) => (
-              <a className="agent-card" href={entry.href} key={entry.id}>
-                <span className="agent-card__status">{entry.status}</span>
+              <a
+                className="agent-card"
+                href={entry.href}
+                key={entry.id}
+                style={{ "--tile-accent": entry.accent } as CSSProperties}
+              >
+                <div className="agent-card__head">
+                  <BrandIcon
+                    label={entry.name}
+                    size={30}
+                    src={entry.icon}
+                    tile
+                  />
+                  <span className="agent-card__status">{entry.status}</span>
+                </div>
                 <h2>{entry.name}</h2>
+                <p className="agent-card__tag">{entry.tagline}</p>
                 <p>{entry.summary}</p>
-                <span className="agent-card__cta">Open setup</span>
+                <span className="agent-card__cta">Set up →</span>
               </a>
             ))}
           </div>
@@ -63,32 +83,33 @@ function AgentSetupHub() {
 
 function AgentSetupDetail({ entry }: { entry: AgentSetupEntry }) {
   return (
-    <div className="agent-page agent-detail">
+    <div
+      className="agent-page agent-detail"
+      style={{ "--tile-accent": entry.accent } as CSSProperties}
+    >
       <section className="agent-hero agent-hero--detail">
         <div className="sk-shell agent-hero__inner">
           <div className="agent-hero__copy">
             <a className="agent-backlink" href="/agents">
-              Agent setup
+              ← All agents
             </a>
-            <p className="sk-eyebrow">{entry.status}</p>
-            <h1>{entry.name} setup</h1>
+            <div className="agent-hero__title">
+              <BrandIcon label={entry.name} size={40} src={entry.icon} tile />
+              <div>
+                <h1>{entry.name}</h1>
+                <p className="agent-hero__tag">{entry.tagline}</p>
+              </div>
+            </div>
             <p>{entry.summary}</p>
           </div>
-          <div className="agent-endpoint" aria-label="Current MCP endpoint">
-            <span className="agent-endpoint__label">MCP endpoint</span>
-            <code>{codeModeMcpEndpoint}</code>
-            <span className="agent-endpoint__meta">
-              The current deployed endpoint is no-auth and backed by the Studio
-              Worker.
-            </span>
-          </div>
+          <EndpointCard meta="You'll paste this into the config below." />
         </div>
       </section>
 
       <section className="sk-section">
         <div className="sk-shell agent-detail__layout">
           <div className="agent-steps">
-            <h2>Setup commands</h2>
+            <h2>Set up in two steps</h2>
             {entry.commands.map((command, index) => (
               <div className="agent-command" key={command.label}>
                 <span className="agent-command__index">
@@ -105,7 +126,7 @@ function AgentSetupDetail({ entry }: { entry: AgentSetupEntry }) {
 
             {entry.config === undefined ? null : (
               <div className="agent-config">
-                <h2>MCP config shape</h2>
+                <h2>Or add it by hand</h2>
                 <pre className="docs-codeblock">
                   <code>{entry.config}</code>
                 </pre>
@@ -114,7 +135,7 @@ function AgentSetupDetail({ entry }: { entry: AgentSetupEntry }) {
           </div>
 
           <aside className="agent-notes" aria-label={`${entry.name} notes`}>
-            <h2>Notes</h2>
+            <h2>Good to know</h2>
             <ul>
               {entry.notes.map((note) => (
                 <li key={note}>{note}</li>

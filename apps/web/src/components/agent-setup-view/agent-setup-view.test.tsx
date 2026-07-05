@@ -9,7 +9,7 @@ describe("AgentSetupView", () => {
 
     expect(
       screen.getByRole("heading", {
-        name: "Connect Sketchi to your coding agent.",
+        name: "Sketch diagrams without leaving your agent.",
       }),
     ).toBeTruthy();
     expect(screen.getByRole("link", { name: /Codex/ })).toHaveProperty(
@@ -24,25 +24,21 @@ describe("AgentSetupView", () => {
       screen.getByText("https://sketchi-studio.dimethyl.workers.dev/mcp"),
     ).toBeTruthy();
     expect(screen.queryByRole("link", { name: /Eval harness/ })).toBeNull();
-    expect(
-      screen.queryByRole("link", { name: /Excalidraw app/ }),
-    ).toBeNull();
+    expect(screen.queryByRole("link", { name: /Excalidraw app/ })).toBeNull();
   });
 
-  it("renders the OpenCode manual MCP setup without claiming a plugin package", () => {
+  it("renders the OpenCode setup as a plain server connection", () => {
     render(<AgentSetupView agentId="opencode" />);
 
     expect(
-      screen.getByRole("heading", { name: "OpenCode setup" }),
+      screen.getByRole("heading", { name: "OpenCode", level: 1 }),
     ).toBeTruthy();
     expect(
       screen.getByText(
         "opencode mcp add sketchi-code-mode --url https://sketchi-studio.dimethyl.workers.dev/mcp",
       ),
     ).toBeTruthy();
-    expect(
-      screen.getByText(/There is no tracked OpenCode plugin package/),
-    ).toBeTruthy();
+    expect(screen.getByText(/No plugin to install/)).toBeTruthy();
   });
 
   it("renders the Codex plugin marketplace commands", () => {
