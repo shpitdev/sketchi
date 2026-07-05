@@ -2,13 +2,13 @@
 
 ## Current Matrix
 
-| App          | Preview Worker                   | Production Worker    | Product route status                                      |
-| ------------ | -------------------------------- | -------------------- | --------------------------------------------------------- |
-| `web`        | `sketchi-web-pr-<number>`        | `sketchi-web`        | `sketchi.app`, `www.sketchi.app`                          |
-| `studio`     | `sketchi-studio-pr-<number>`     | `sketchi-studio`     | `playground.sketchi.app` now; `studio.sketchi.app` later  |
-| `icons`      | `sketchi-icons-pr-<number>`      | `sketchi-icons`      | `icons.sketchi.app`                                       |
-| `playground` | `sketchi-playground-pr-<number>` | `sketchi-playground` | internal eval harness; not linked from public navigation  |
-| `excalidraw` | `sketchi-excalidraw-pr-<number>` | `sketchi-excalidraw` | internal rendering workspace; not a public product domain |
+| App          | Preview Worker                   | Production Worker    | Product route status                                                      |
+| ------------ | -------------------------------- | -------------------- | ------------------------------------------------------------------------- |
+| `web`        | `sketchi-web-pr-<number>`        | `sketchi-web`        | `sketchi.app`, `www.sketchi.app`                                          |
+| `studio`     | `sketchi-studio-pr-<number>`     | `sketchi-studio`     | `playground.sketchi.app` manual attach target; `studio.sketchi.app` later |
+| `icons`      | `sketchi-icons-pr-<number>`      | `sketchi-icons`      | `icons.sketchi.app`                                                       |
+| `playground` | `sketchi-playground-pr-<number>` | `sketchi-playground` | internal eval harness; not linked from public navigation                  |
+| `excalidraw` | `sketchi-excalidraw-pr-<number>` | `sketchi-excalidraw` | internal rendering workspace; not a public product domain                 |
 
 ```mermaid
 flowchart LR
@@ -36,8 +36,8 @@ Pull requests to `main` deploy matrix apps to PR-specific Cloudflare Workers.
 For the `web` preview, the workflow also reads the account workers.dev
 subdomain from Cloudflare and injects sibling preview URLs into the generated
 Wrangler vars. `SKETCHI_PLAYGROUND_URL` points at the `studio` preview Worker
-because that app currently implements the ephemeral public Playground chat
-surface; `apps/playground` remains the internal eval harness.
+because that app currently implements the public Playground worker boundary;
+`apps/playground` remains the internal eval harness.
 
 - `SKETCHI_ICONS_URL`
 - `SKETCHI_PLAYGROUND_URL`
@@ -163,12 +163,13 @@ those hostnames. The manual step writes a generated domain Wrangler config from
 `scripts/05-prepare-production-domain-deploy.mjs` and deploys that
 route-bearing config.
 
-The production domain helper attaches `playground.sketchi.app` to the `studio`
-app because `apps/studio` currently carries the ephemeral public Playground
-chat surface. `studio.sketchi.app` remains a future custom domain until product
-auth is wired, even though the Studio app now has `/projects` and persisted
-`/diagrams/:diagramId` route foundations. The `playground` app has no public
-domain patterns; it is the internal eval harness Worker.
+When `attach_domains` is enabled, the production domain helper attaches
+`playground.sketchi.app` to the `studio` app because `apps/studio` currently
+carries the public Playground worker boundary. `studio.sketchi.app` remains a
+future custom domain until product auth is wired, even though the Studio app now
+has `/projects` and persisted `/diagrams/:diagramId` route foundations. The
+`playground` app has no public domain patterns; it is the internal eval harness
+Worker.
 
 The eval harness and standalone Excalidraw workspace should remain unlinked from
 public navigation. Do not attach a public `excalidraw.sketchi.app` product route

@@ -26,7 +26,7 @@ export const Default: Story = {};
 export const Live: Story = {
   args: {
     cta: "Open docs",
-    desc: "How the pipeline, diagram types, no-auth status, and deploys fit together.",
+    desc: "How the pipeline, diagram types, auth status, and deploys fit together.",
     domain: "sketchi.app/docs",
     href: "/docs",
     name: "Documentation",

@@ -23,7 +23,7 @@ test("productionAppConfig includes the studio production Worker", () => {
     domainPatterns: ["playground.sketchi.app"],
     publicSurface: true,
     routePolicy:
-      "playground.sketchi.app now; studio.sketchi.app when persisted workspace is ready",
+      "playground.sketchi.app manual attach target; studio.sketchi.app waits for authenticated Studio",
     title: "Sketchi Playground / Studio",
     workerName: "sketchi-studio",
   });
@@ -101,7 +101,7 @@ test("productionDomainWranglerConfig adds custom domains only for manual attach"
   ]);
 });
 
-test("productionDomainWranglerConfig only attaches the current studio domain", () => {
+test("productionDomainWranglerConfig attaches the manual Playground domain for studio", () => {
   const domainConfig = productionDomainWranglerConfig(
     {
       name: "sketchi-studio",

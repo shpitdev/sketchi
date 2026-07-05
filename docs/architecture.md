@@ -31,8 +31,9 @@ flowchart LR
 - `diagram-studio-ui` renders the scene model and owns user-facing component states.
 - `apps/playground` composes the packages in a TanStack Start internal eval
   harness for scenarios, candidate inspection, and regression review.
-- `apps/studio` owns the current ephemeral Sketchi Playground chat surface,
-  artifact handoff, and persisted Studio project/diagram route foundation.
+- `apps/studio` owns the current public Playground worker boundary: ephemeral
+  chat generation, artifact handoff, and persisted Studio project/diagram route
+  foundation.
 - `apps/web` owns the public home/docs surface and should stay free of diagram runtime dependencies unless docs become interactive.
 - `apps/excalidraw` owns the internal Excalidraw rendering workspace and
   composes the diagram packages into a real canvas for isolated validation.
@@ -85,8 +86,9 @@ deployable internal testing ground for maintained scenarios, pasted model
 output, and deterministic IR-to-Excalidraw conversion.
 
 The public Sketchi Playground direction is anonymous prompt-to-diagram
-generation with artifact handoff. Until deploy/domain alignment is completed,
-that experience is implemented by the current `apps/studio` chat surface.
+generation with artifact handoff. That experience is implemented by the current
+`apps/studio` worker while the authenticated Studio product domain remains a
+separate future cutover.
 
 The portable CLI path is:
 
@@ -114,7 +116,7 @@ orchestration, and persistence.
 The v2 workspace has five TanStack Start app surfaces:
 
 - `playground`: internal scenario evaluation and prompt-output inspection.
-- `studio`: current ephemeral Sketchi Playground chat surface, artifact
+- `studio`: public Playground worker boundary with chat generation, artifact
   handoff, and persisted Studio foundation.
 - `web`: public home/docs for the Sketchi product direction.
 - `excalidraw`: internal Excalidraw rendering workspace; Excalidraw is an
@@ -168,9 +170,9 @@ production domain direction is:
 
 The eval harness and standalone Excalidraw workspace should stay out of public
 navigation. Do not attach a public `excalidraw.sketchi.app` product route unless
-that route-map decision is explicitly reopened. The current
-`playground.sketchi.app` domain is attached to the `studio` app until the
-Playground route and authenticated Studio product domain are split deliberately.
+that route-map decision is explicitly reopened. The manual domain attach target
+for `playground.sketchi.app` is the `studio` app until the Playground route and
+authenticated Studio product domain are split deliberately.
 
 Preview deploys strip production routes and deploy app-specific Workers named
 `sketchi-<app>-pr-<number>`.

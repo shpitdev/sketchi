@@ -1,6 +1,6 @@
 # studio
 
-Current hosted Sketchi Playground chat surface for ephemeral generation, Code
+Current hosted Sketchi Playground worker boundary for ephemeral generation, Code
 Mode APIs, MCP, artifacts, diagram review, artifact editor routes, and the
 persisted Studio project foundation.
 

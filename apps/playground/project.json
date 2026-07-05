@@ -14,7 +14,7 @@
     "dev": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "PORTLESS_PORT=443 portless run --name playground.sketchi vite dev --config apps/playground/vite.config.ts"
+        "command": "PORTLESS_PORT=443 portless run --name eval.sketchi vite dev --config apps/playground/vite.config.ts"
       }
     },
     "preview": {

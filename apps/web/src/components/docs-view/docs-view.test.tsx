@@ -26,7 +26,7 @@ describe("DocsView", () => {
       screen.getByRole("heading", { name: /Internal surfaces/ }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("heading", { name: /No-auth status/ }),
+      screen.getByRole("heading", { name: /Auth and persistence/ }),
     ).toBeTruthy();
     expect(
       screen.getByRole("link", { name: /Sketchi Playground/ }),

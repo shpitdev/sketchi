@@ -72,7 +72,7 @@ export function SiteFooter({
               <a href="/docs#deploy">Deploy</a>
             </li>
             <li>
-              <a href="/docs#no-auth">No-auth status</a>
+              <a href="/docs#no-auth">Auth status</a>
             </li>
             <li>
               <a href="https://github.com/shpitdev/sketchi">Upstream</a>

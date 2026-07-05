@@ -22,7 +22,7 @@ const defaultNav: readonly DocsNavEntry[] = [
   { href: "#pipeline", label: "Generation pipeline" },
   { href: "#diagram-types", label: "Diagram types" },
   { href: "#internal-surfaces", label: "Internal surfaces" },
-  { href: "#no-auth", label: "No-auth status" },
+  { href: "#no-auth", label: "Auth and persistence" },
   { href: "#deploy", label: "Deploy" },
 ];
 
@@ -96,9 +96,9 @@ export function DocsView({
           </h2>
           <p>
             Public links point to Sketchi product routes: homepage/docs,
-            Playground, Icons, and agent setup. Studio is planned for persisted
-            authenticated projects, but it is not the public try-it-now path
-            until persistence exists.
+            Playground, Icons, and agent setup. The Studio route foundation now
+            persists projects and diagrams, while the authenticated
+            <code>studio.sketchi.app</code> product domain waits for real auth.
           </p>
           <div className="docs-surface-map">
             <article className="docs-surface-map__home">
@@ -129,8 +129,9 @@ export function DocsView({
               </span>
               <h3>Studio</h3>
               <p>
-                Private beta direction for authenticated projects, sessions,
-                history, and collaboration.
+                Persisted project and diagram routes are live in the Studio
+                Worker. Authenticated sessions, history, and collaboration
+                remain the beta direction.
               </p>
             </article>
           </div>
@@ -261,15 +262,15 @@ export function DocsView({
 
         <section className="docs-section" id="no-auth">
           <h2>
-            <span className="docs-section__idx">07</span> No-auth status
+            <span className="docs-section__idx">07</span> Auth and persistence
           </h2>
           <div className="docs-callout">
             <span className="docs-callout__k">Current</span>
             <span>
-              The deployable surfaces require no sign-in. Auth, persistence,
-              billing, and multi-user collaboration are intentionally out of
-              scope for this phase. States are designed so auth can be added
-              later without a rewrite.
+              The deployable surfaces require no sign-in. Studio persistence
+              currently uses anonymous session cookies and object-bucket
+              records; real product auth, billing, history, and multi-user
+              collaboration are still future work.
             </span>
           </div>
         </section>
@@ -282,10 +283,9 @@ export function DocsView({
             Pull requests deploy each app to a PR-specific Cloudflare Worker.
             Merges to <code>main</code> deploy production Workers to their{" "}
             <code>workers.dev</code> URLs without claiming the final{" "}
-            <code>sketchi.app</code> domains.
-            Deploy summaries mark each Worker as a public product surface or
-            internal-only tool so reviewer links do not imply public
-            navigation.
+            <code>sketchi.app</code> domains. Deploy summaries mark each Worker
+            as a public product surface or internal-only tool so reviewer links
+            do not imply public navigation.
           </p>
           <div className="docs-callout">
             <span className="docs-callout__k">Manual</span>

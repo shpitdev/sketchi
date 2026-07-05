@@ -35,7 +35,8 @@ export const previewApps = {
   studio: {
     commentMarker: "<!-- sketchi-studio-preview -->",
     publicSurface: true,
-    routePolicy: "playground.sketchi.app now; studio.sketchi.app when persisted workspace is ready",
+    routePolicy:
+      "playground.sketchi.app manual attach target; studio.sketchi.app waits for authenticated Studio",
     title: "Sketchi Playground / Studio",
     workerPrefix: "sketchi-studio-pr",
   },

@@ -24,7 +24,7 @@ export const productionApps = {
     domainPatterns: ["playground.sketchi.app"],
     publicSurface: true,
     routePolicy:
-      "playground.sketchi.app now; studio.sketchi.app when persisted workspace is ready",
+      "playground.sketchi.app manual attach target; studio.sketchi.app waits for authenticated Studio",
     title: "Sketchi Playground / Studio",
     workerName: "sketchi-studio",
   },

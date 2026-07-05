@@ -7,6 +7,7 @@ flowchart LR
   Packages["diagram packages"] --> Components["review components"]
   Components --> Storybook["Storybook"]
   Components --> Playground["apps/playground"]
+  Components --> Studio["apps/studio"]
   Components --> Excalidraw["apps/excalidraw"]
 ```
 
