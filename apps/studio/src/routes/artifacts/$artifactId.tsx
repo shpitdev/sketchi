@@ -8,6 +8,8 @@ import {
   type ArtifactViewState,
 } from "@/lib/artifact-view-client";
 import { createStudioProjectFromArtifact } from "@/lib/studio-projects-client";
+import { IconActionBar, IconButton, IconLink } from "@/components/sketch-icons";
+import { SKETCHI_WEB_HOME_URL } from "@/lib/home-url";
 
 export const Route = createFileRoute("/artifacts/$artifactId")({
   component: ArtifactRoute,
@@ -85,36 +87,45 @@ function ArtifactRoute() {
   return (
     <main className="artifact-view">
       <header className="artifact-view__bar">
-        <a className="studio__mark artifact-view__mark" href="/">
+        <a
+          aria-label="Sketchi home"
+          className="studio__mark artifact-view__mark"
+          href={SKETCHI_WEB_HOME_URL}
+        >
           sketchi
         </a>
         <div className="artifact-view__actions">
           <a className="studio__artifact-link" href="/">
             Playground
           </a>
+          <IconActionBar>
+            {saveState.status === "ready" ? (
+              <IconLink
+                href={saveState.projectUrl}
+                icon="project"
+                label="Open project"
+                tone="primary"
+              />
+            ) : (
+              <IconButton
+                disabled={saveState.status === "saving"}
+                icon="save"
+                label={
+                  saveState.status === "saving" ? "Saving…" : "Save to Studio"
+                }
+                onClick={saveToStudio}
+                tone="primary"
+              />
+            )}
+            <IconLink href={urls.edit} icon="edit" label="Edit" />
+            <IconLink href={urls.scene} icon="scene" label="Scene file" />
+            <IconLink href={urls.drawing} icon="drawing" label="Drawing file" />
+          </IconActionBar>
           {saveState.status === "ready" ? (
-            <a className="studio__artifact-link" href={saveState.projectUrl}>
-              Open project
-            </a>
-          ) : (
-            <button
-              className="studio__artifact-link"
-              disabled={saveState.status === "saving"}
-              onClick={saveToStudio}
-              type="button"
-            >
-              {saveState.status === "saving" ? "Saving..." : "Save to Studio"}
-            </button>
-          )}
-          <a className="studio__artifact-link" href={urls.edit}>
-            Edit
-          </a>
-          <a className="studio__artifact-link" href={urls.scene}>
-            Scene file
-          </a>
-          <a className="studio__artifact-link" href={urls.drawing}>
-            Drawing file
-          </a>
+            <span className="studio__note">
+              Saved to this browser · no account yet
+            </span>
+          ) : null}
         </div>
       </header>
 

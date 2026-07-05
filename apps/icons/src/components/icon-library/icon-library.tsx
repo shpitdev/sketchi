@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
 import {
   formatCollectionLabel,
   type IconLibraryData,
@@ -35,6 +36,8 @@ function iconSortModeFromValue(value: string): IconSortMode {
 export interface IconLibraryProps {
   data?: IconLibraryData | undefined;
   errorMessage?: string | undefined;
+  /** Where the brand mark links — the Sketchi web home by default. */
+  homeHref?: string;
   initialCollection?: string;
   initialDensity?: IconDensity;
   initialFlaggedOnly?: boolean;
@@ -55,6 +58,7 @@ const emptyData: IconLibraryData = {
 export function IconLibrary({
   data = emptyData,
   errorMessage,
+  homeHref = SKETCHI_WEB_HOME_URL,
   initialCollection = "all",
   initialDensity = "comfortable",
   initialFlaggedOnly = false,
@@ -151,13 +155,19 @@ export function IconLibrary({
     <main className="sketchi-icons" data-density={density}>
       <header className="sketchi-icons__header">
         <div className="sketchi-icons__brand">
-          <img
-            alt=""
-            className="sk-icon"
-            height="38"
-            src="/icon.svg"
-            width="38"
-          />
+          <a
+            aria-label="Sketchi home"
+            className="sketchi-icons__home"
+            href={homeHref}
+          >
+            <img
+              alt=""
+              className="sk-icon"
+              height="38"
+              src="/icon.svg"
+              width="38"
+            />
+          </a>
           <div className="sketchi-icons__title">
             <p className="sketchi-icons__eyebrow">Sketchi icons</p>
             <h1>Curated icon output</h1>

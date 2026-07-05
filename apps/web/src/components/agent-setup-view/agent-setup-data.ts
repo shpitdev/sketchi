@@ -143,7 +143,7 @@ export const agentSetupEntries: readonly AgentSetupEntry[] = [
     name: "Antigravity",
     notes: [
       "Install once and every Antigravity session can reach Sketchi.",
-      "Use your normal signed-in session — Sketchi handles the diagram.",
+      "Diagrams come back as editable Sketchi artifacts, not screenshots.",
     ],
     status: "Plugin",
     summary:

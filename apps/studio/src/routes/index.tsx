@@ -51,6 +51,8 @@ import {
   ToolOutput,
 } from "@/components/ai-elements/tool";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { IconActionBar, IconLink } from "@/components/sketch-icons";
+import { SKETCHI_WEB_HOME_URL } from "@/lib/home-url";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -233,24 +235,25 @@ function ArtifactActions({ state }: { state: PlaygroundArtifactState }) {
 
   return (
     <div className="studio__artifact-actions">
-      <a className="studio__artifact-link" href={state.artifact.viewUrl}>
-        Open artifact
-      </a>
-      <a className="studio__artifact-link" href={state.artifact.editUrl}>
-        Edit
-      </a>
-      <a
-        className="studio__artifact-link"
-        href={state.artifact.exportUrls.scene}
-      >
-        Scene file
-      </a>
-      <a
-        className="studio__artifact-link"
-        href={state.artifact.exportUrls.excalidraw}
-      >
-        Drawing file
-      </a>
+      <IconActionBar>
+        <IconLink
+          href={state.artifact.viewUrl}
+          icon="open"
+          label="Open artifact"
+        />
+        <IconLink href={state.artifact.editUrl} icon="edit" label="Edit" />
+        <IconLink
+          href={state.artifact.exportUrls.scene}
+          icon="scene"
+          label="Scene file"
+        />
+        <IconLink
+          href={state.artifact.exportUrls.excalidraw}
+          icon="drawing"
+          label="Drawing file"
+        />
+      </IconActionBar>
+      <p className="studio__note">Shareable by link · no account yet</p>
     </div>
   );
 }
@@ -594,7 +597,13 @@ function StudioRoute() {
       <main className={cn("studio", buildMode && "studio--build")}>
         <header className="studio__head">
           <div className="studio__head-brand">
-            <span className="studio__mark">sketchi</span>
+            <a
+              aria-label="Sketchi home"
+              className="studio__mark"
+              href={SKETCHI_WEB_HOME_URL}
+            >
+              sketchi
+            </a>
             <span className="studio__sub">playground · ephemeral</span>
           </div>
           <div className="studio__head-actions">
@@ -611,9 +620,8 @@ function StudioRoute() {
                 <div className="studio__empty">
                   <p className="studio__empty-title">What should we draw?</p>
                   <p className="studio__empty-sub">
-                    Describe a system or flow. Sketchi clarifies what matters,
-                    then sketches it onto the canvas — grading its own work
-                    until it holds up.
+                    Describe a system or flow — Sketchi sketches it and grades
+                    its own work until it holds up.
                   </p>
                   <div className="studio__starters">
                     {STARTERS.map((starter) => (

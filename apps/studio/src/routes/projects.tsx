@@ -7,6 +7,7 @@ import {
   studioProjectUrl,
   type StudioProjectSummary,
 } from "@/lib/studio-projects-contract";
+import { SKETCHI_WEB_HOME_URL } from "@/lib/home-url";
 
 export const Route = createFileRoute("/projects")({
   component: ProjectsRoute,
@@ -50,7 +51,11 @@ function ProjectsRoute() {
   return (
     <main className="studio-workspace">
       <header className="studio-workspace__bar">
-        <a className="studio__mark artifact-view__mark" href="/">
+        <a
+          aria-label="Sketchi home"
+          className="studio__mark artifact-view__mark"
+          href={SKETCHI_WEB_HOME_URL}
+        >
           sketchi
         </a>
         <div className="artifact-view__actions">
@@ -64,6 +69,9 @@ function ProjectsRoute() {
         <div className="studio-workspace__intro">
           <p className="studio__stage-kicker">studio</p>
           <h1 className="studio-workspace__title">Projects</h1>
+          <p className="studio__note">
+            Saved to this browser only. No account yet — treat as temporary.
+          </p>
         </div>
 
         {state.status === "loading" ? (

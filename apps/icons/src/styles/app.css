@@ -39,6 +39,24 @@
   gap: 12px;
 }
 
+.sketchi-icons__home {
+  border-radius: 9px;
+  display: inline-flex;
+  transition:
+    transform 0.16s var(--ease),
+    box-shadow 0.16s var(--ease);
+}
+
+.sketchi-icons__home:hover {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.sketchi-icons__home:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .sketchi-icons__title {
   display: grid;
   gap: 4px;

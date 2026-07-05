@@ -9,6 +9,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { fetchArtifactScene } from "@/lib/artifact-view-client";
 import { fetchStudioDiagramDetails } from "@/lib/studio-projects-client";
+import { IconActionBar, IconLink } from "@/components/sketch-icons";
+import { SKETCHI_WEB_HOME_URL } from "@/lib/home-url";
 import type {
   StudioDiagramSummary,
   StudioProjectSummary,
@@ -141,7 +143,11 @@ function DiagramEditRoute() {
   return (
     <main className="artifact-view artifact-view--edit">
       <header className="artifact-view__bar">
-        <a className="studio__mark artifact-view__mark" href="/">
+        <a
+          aria-label="Sketchi home"
+          className="studio__mark artifact-view__mark"
+          href={SKETCHI_WEB_HOME_URL}
+        >
           sketchi
         </a>
         <div className="artifact-view__actions">
@@ -161,24 +167,26 @@ function DiagramEditRoute() {
               Project
             </a>
           ) : null}
-          <a
-            className="studio__artifact-link"
-            download={
-              downloadUrl && state.status === "ready"
-                ? `${state.diagram.id}.excalidraw`
-                : undefined
-            }
-            href={
-              downloadUrl ??
-              (state.status === "ready"
-                ? `/api/v1/artifacts/${encodeURIComponent(
-                    state.diagram.artifactId,
-                  )}?format=excalidraw&raw=true`
-                : "#")
-            }
-          >
-            {downloadUrl ? "Download changes" : "Drawing file"}
-          </a>
+          <IconActionBar>
+            <IconLink
+              download={
+                downloadUrl && state.status === "ready"
+                  ? `${state.diagram.id}.excalidraw`
+                  : undefined
+              }
+              href={
+                downloadUrl ??
+                (state.status === "ready"
+                  ? `/api/v1/artifacts/${encodeURIComponent(
+                      state.diagram.artifactId,
+                    )}?format=excalidraw&raw=true`
+                  : "#")
+              }
+              icon="download"
+              label={downloadUrl ? "Download changes" : "Drawing file"}
+              tone={downloadUrl ? "primary" : "default"}
+            />
+          </IconActionBar>
         </div>
       </header>
 

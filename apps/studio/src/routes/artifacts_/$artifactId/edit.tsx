@@ -12,6 +12,8 @@ import {
   fetchArtifactScene,
   type ArtifactViewState,
 } from "@/lib/artifact-view-client";
+import { IconActionBar, IconLink } from "@/components/sketch-icons";
+import { SKETCHI_WEB_HOME_URL } from "@/lib/home-url";
 
 export const Route = createFileRoute("/artifacts_/$artifactId/edit")({
   component: ArtifactEditRoute,
@@ -126,23 +128,27 @@ function ArtifactEditRoute() {
   return (
     <main className="artifact-view artifact-view--edit">
       <header className="artifact-view__bar">
-        <a className="studio__mark artifact-view__mark" href="/">
+        <a
+          aria-label="Sketchi home"
+          className="studio__mark artifact-view__mark"
+          href={SKETCHI_WEB_HOME_URL}
+        >
           sketchi
         </a>
         <div className="artifact-view__actions">
           <a className="studio__artifact-link" href={urls.review}>
             Review
           </a>
-          <a className="studio__artifact-link" href={urls.scene}>
-            Scene file
-          </a>
-          <a
-            className="studio__artifact-link"
-            download={downloadUrl ? `${artifactId}.excalidraw` : undefined}
-            href={downloadUrl ?? urls.drawing}
-          >
-            {downloadUrl ? "Download changes" : "Drawing file"}
-          </a>
+          <IconActionBar>
+            <IconLink href={urls.scene} icon="scene" label="Scene file" />
+            <IconLink
+              download={downloadUrl ? `${artifactId}.excalidraw` : undefined}
+              href={downloadUrl ?? urls.drawing}
+              icon="download"
+              label={downloadUrl ? "Download changes" : "Drawing file"}
+              tone={downloadUrl ? "primary" : "default"}
+            />
+          </IconActionBar>
         </div>
       </header>
 

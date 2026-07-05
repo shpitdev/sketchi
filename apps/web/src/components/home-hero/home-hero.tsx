@@ -78,8 +78,7 @@ export function HomeHero({
           </h1>
           <p className="home-hero__lead sk-rise" style={rise(2)}>
             Turn a sentence into a clean, editable diagram — with the real logos
-            of the tools in your stack. In the playground, or right inside your
-            coding agent.
+            of the tools in your stack.
           </p>
           <div className="home-hero__actions sk-rise" style={rise(3)}>
             <a className="sk-btn sk-btn--primary" href={primaryHref}>

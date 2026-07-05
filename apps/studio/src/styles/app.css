@@ -439,6 +439,70 @@ button.studio__artifact-link {
   color: var(--destructive);
 }
 
+/* ----- always-visible hand-drawn action buttons ----- */
+.studio__icon-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.studio__icon-action {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  block-size: 36px;
+  inline-size: 36px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--mauve) 32%, var(--line));
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--mauve);
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    transform 0.16s ease;
+}
+
+.studio__icon-action:hover,
+.studio__icon-action:focus-visible {
+  border-color: var(--mauve);
+  background: var(--mauve-soft);
+  transform: translateY(-1px);
+}
+
+.studio__icon-action:disabled {
+  cursor: progress;
+  opacity: 0.55;
+  transform: none;
+}
+
+.studio__icon-action--primary {
+  border-color: var(--mauve);
+  background: var(--mauve);
+  color: var(--paper);
+}
+
+.studio__icon-action--primary:hover,
+.studio__icon-action--primary:focus-visible {
+  border-color: color-mix(in srgb, var(--mauve) 82%, black);
+  background: color-mix(in srgb, var(--mauve) 82%, black);
+}
+
+.studio__icon-glyph {
+  display: block;
+}
+
+/* Quiet honesty note shown next to save affordances. */
+.studio__note {
+  margin: 0;
+  color: var(--muted-ink);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 @keyframes studio-ghost-in {
   from {
     opacity: 0;
@@ -543,6 +607,10 @@ button.studio__artifact-link {
 
 .studio-workspace__intro {
   margin-bottom: 22px;
+}
+
+.studio-workspace__intro .studio__note {
+  margin-top: 8px;
 }
 
 .studio-workspace__title {
