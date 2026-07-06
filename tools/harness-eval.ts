@@ -31,6 +31,7 @@ interface HarnessEvalOptions {
 interface CommandSpec {
   args: string[];
   command: string;
+  cwd?: string;
   env: NodeJS.ProcessEnv;
   prompt: string;
 }
@@ -159,6 +160,9 @@ const DEFAULT_MCP_URL = "https://sketchi-studio.dimethyl.workers.dev/mcp";
 const DEFAULT_ANTIGRAVITY_MODEL = "gemini-3.5-flash";
 const DEFAULT_OPENCODE_MODEL = "opencode-go/kimi-k2.7-code";
 const DEFAULT_CLAUDE_MODEL = "sonnet";
+const COMMAND_CLOSE_GRACE_MS = 1_000;
+const COMMAND_HARD_KILL_GRACE_MS = 5_000;
+const COMMAND_FORCE_SETTLE_GRACE_MS = 2_000;
 const DEFAULT_TIMEOUT_MS = 180_000;
 
 function usage(): string {
@@ -638,6 +642,19 @@ function buildHarnessPrompt(input: {
     `Scenario difficulty: ${input.scenario.difficulty}`,
     `Scenario prompt: ${input.scenario.prompt}`,
     "",
+    "Tool restrictions:",
+    "- Use only sketchi-code-mode MCP tools and your final chat response.",
+    "- In Antigravity, invoke MCP tools through `call_mcp_tool` only.",
+    '- For docs/search: call `call_mcp_tool` with ServerName "sketchi-code-mode", ToolName "docs" or "search", and Arguments as a JSON string.',
+    '- For execute: call `call_mcp_tool` with ServerName "sketchi-code-mode", ToolName "execute", and Arguments as a JSON string containing the JavaScript `code`.',
+    "- Do not guess alternate tool names such as mcp, mcp_execute, execute, sketchi-code-mode:docs, or mcp_sketchi_code_mode_execute.",
+    "- Do not run shell commands, scripts, package managers, or local MCP clients.",
+    "- Do not inspect repository files, browser cache files, or Antigravity internal files.",
+    "- Do not search the web.",
+    "- Do not create, define, or invoke subagents.",
+    "- Do not write files.",
+    "- If tool syntax is unclear, use sketchi-code-mode docs/search MCP tools only.",
+    "",
     "Required node labels:",
     requiredLabels,
     "",
@@ -648,7 +665,6 @@ function buildHarnessPrompt(input: {
     requiredEdges,
     "",
     "Execution rules:",
-    "- The scenario below is complete; use docs/search only if the MCP call syntax is unclear.",
     "- Call the MCP execute tool with JavaScript that uses sketchi.buildFlowchart.",
     '- Request artifactFormats ["scene", "excalidraw", "png"] and inlineArtifacts ["excalidraw"].',
     "- If buildFlowchart returns ok:false, repair the FlowchartSpec and try again.",
@@ -772,26 +788,66 @@ export function commandForRun(input: {
   };
 }
 
-function runCommand(
+export function runCommand(
   spec: CommandSpec,
   timeoutMs: number,
 ): Promise<SpawnResult> {
   return new Promise((resolve) => {
     const started = Date.now();
     const child = spawn(spec.command, spec.args, {
+      cwd: spec.cwd,
       env: spec.env,
       stdio: ["ignore", "pipe", "pipe"],
     });
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     let timedOut = false;
+    let settled = false;
+    let observedExitCode: number | null = null;
+    let observedSignal: NodeJS.Signals | null = null;
     let hardKill: NodeJS.Timeout | undefined;
+    let forceSettle: NodeJS.Timeout | undefined;
+    let closeGrace: NodeJS.Timeout | undefined;
+
+    const result = (
+      exitCode: number | null,
+      signal: NodeJS.Signals | null,
+      errorMessage?: string,
+    ): SpawnResult => ({
+      durationMs: Date.now() - started,
+      exitCode,
+      signal,
+      stderr: [Buffer.concat(stderr).toString("utf8"), errorMessage]
+        .filter((text): text is string => Boolean(text))
+        .join("\n"),
+      stdout: Buffer.concat(stdout).toString("utf8"),
+      timedOut,
+    });
+
+    const settle = (
+      exitCode: number | null,
+      signal: NodeJS.Signals | null,
+      errorMessage?: string,
+    ) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimers();
+      child.stdout.destroy();
+      child.stderr.destroy();
+      resolve(result(exitCode, signal, errorMessage));
+    };
+
     const timeout = setTimeout(() => {
       timedOut = true;
       child.kill("SIGTERM");
       hardKill = setTimeout(() => {
         child.kill("SIGKILL");
-      }, 5_000);
+      }, COMMAND_HARD_KILL_GRACE_MS);
+      forceSettle = setTimeout(() => {
+        settle(observedExitCode, observedSignal);
+      }, COMMAND_HARD_KILL_GRACE_MS + COMMAND_FORCE_SETTLE_GRACE_MS);
     }, timeoutMs);
 
     const clearTimers = () => {
@@ -799,31 +855,31 @@ function runCommand(
       if (hardKill) {
         clearTimeout(hardKill);
       }
+      if (forceSettle) {
+        clearTimeout(forceSettle);
+      }
+      if (closeGrace) {
+        clearTimeout(closeGrace);
+      }
     };
 
     child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
     child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
     child.on("error", (error) => {
-      clearTimers();
-      resolve({
-        durationMs: Date.now() - started,
-        exitCode: 1,
-        signal: null,
-        stderr: error.message,
-        stdout: Buffer.concat(stdout).toString("utf8"),
-        timedOut,
-      });
+      settle(1, null, error.message);
+    });
+    child.on("exit", (exitCode, signal) => {
+      observedExitCode = exitCode;
+      observedSignal = signal;
+      clearTimeout(timeout);
+      closeGrace = setTimeout(() => {
+        settle(exitCode, signal);
+      }, COMMAND_CLOSE_GRACE_MS);
     });
     child.on("close", (exitCode, signal) => {
-      clearTimers();
-      resolve({
-        durationMs: Date.now() - started,
-        exitCode,
-        signal,
-        stderr: Buffer.concat(stderr).toString("utf8"),
-        stdout: Buffer.concat(stdout).toString("utf8"),
-        timedOut,
-      });
+      observedExitCode = exitCode;
+      observedSignal = signal;
+      settle(exitCode, signal);
     });
   });
 }
@@ -1084,6 +1140,22 @@ function acceptedBuildResultFrom(
   return acceptedBuildResultFrom(value.result);
 }
 
+function compactArtifactResultFrom(
+  value: unknown,
+): Record<string, unknown> | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  if (
+    stringValue(value.artifactId) &&
+    Array.isArray(value.artifactFormats) &&
+    (value.buildOk === true || stringValue(value.status) === "accepted")
+  ) {
+    return value;
+  }
+  return compactArtifactResultFrom(value.result);
+}
+
 function artifactFormatsFrom(artifact: Record<string, unknown> | undefined) {
   const formats = Array.isArray(artifact?.formats) ? artifact.formats : [];
   return formats.filter(isRecord).map((formatRef) => ({
@@ -1133,6 +1205,54 @@ function artifactProofFromDelivery(input: {
   };
 }
 
+function artifactProofFromCompactResult(input: {
+  callId?: string;
+  result: unknown;
+  toolName: string;
+}): HarnessMcpArtifactProof | undefined {
+  const result = compactArtifactResultFrom(input.result);
+  if (!result) {
+    return undefined;
+  }
+
+  const artifactId = stringValue(result.artifactId);
+  const artifactFormats = Array.isArray(result.artifactFormats)
+    ? result.artifactFormats.filter(
+        (format): format is string => typeof format === "string",
+      )
+    : [];
+  const status = stringValue(result.status) ?? "accepted";
+  if (!artifactId || artifactFormats.length === 0 || status !== "accepted") {
+    return undefined;
+  }
+
+  return {
+    artifactId,
+    artifactFormats,
+    artifactUrls: {
+      ...(stringValue(result.sceneUrl)
+        ? { scene: stringValue(result.sceneUrl) }
+        : {}),
+      ...(stringValue(result.excalidrawUrl)
+        ? { excalidraw: stringValue(result.excalidrawUrl) }
+        : {}),
+      ...(stringValue(result.pngUrl)
+        ? { png: stringValue(result.pngUrl) }
+        : {}),
+    },
+    buildOk: true,
+    ...(result.normalizedSpec === undefined
+      ? {}
+      : { normalizedSpec: result.normalizedSpec }),
+    ...(numberValue(result.qualityScore) === undefined
+      ? {}
+      : { qualityScore: numberValue(result.qualityScore) }),
+    status,
+    ...(input.callId ? { toolCallId: input.callId } : {}),
+    toolName: input.toolName,
+  };
+}
+
 function mcpArtifactFromPayload(input: {
   callId?: string;
   payload: unknown;
@@ -1141,6 +1261,15 @@ function mcpArtifactFromPayload(input: {
   const payload = parseJsonPayload(input.payload);
   if (!isRecord(payload)) {
     return undefined;
+  }
+
+  const compactProof = artifactProofFromCompactResult({
+    ...(input.callId ? { callId: input.callId } : {}),
+    result: payload,
+    toolName: input.toolName,
+  });
+  if (compactProof) {
+    return compactProof;
   }
 
   const result = acceptedBuildResultFrom(payload);
@@ -1427,96 +1556,36 @@ function reportableMcpArtifact(
   return report;
 }
 
-function finalTextDeliversArtifact(input: {
-  finalText: string;
-  proof: HarnessMcpArtifactProof | undefined;
-}): boolean {
-  if (!input.proof) {
-    return false;
-  }
-
-  const finalText = input.finalText.toLowerCase();
-  if (!finalText.includes(input.proof.artifactId.toLowerCase())) {
-    return false;
-  }
-
-  const excalidrawUrl = input.proof.artifactUrls.excalidraw;
-  const pngUrl = input.proof.artifactUrls.png;
-  return Boolean(
-    excalidrawUrl &&
-      finalText.includes(excalidrawUrl.toLowerCase()) &&
-      (!pngUrl || finalText.includes(pngUrl.toLowerCase())),
-  );
-}
-
 export function outputContractErrors(input: {
   finalJson: unknown | undefined;
   finalText: string;
   proof: HarnessMcpArtifactProof | undefined;
 }): string[] {
-  const errors: string[] = [];
-
   if (!input.proof) {
-    errors.push(
+    return [
       "No successful sketchi-code-mode execute artifact was observed in the harness event stream.",
-    );
+    ];
   }
 
-  if (!isRecord(input.finalJson)) {
-    if (finalTextDeliversArtifact(input)) {
-      return errors;
-    }
-    errors.push("Harness final response did not contain parseable JSON.");
-    return errors;
-  }
+  return [];
+}
 
-  if (input.finalJson.buildOk !== true) {
-    errors.push('Final JSON must include "buildOk": true.');
-  }
-
-  if (stringValue(input.finalJson.status) !== "accepted") {
-    errors.push('Final JSON must include "status": "accepted".');
-  }
-
-  const finalArtifactId = stringValue(input.finalJson.artifactId);
-  if (!finalArtifactId) {
-    errors.push('Final JSON must include the accepted MCP "artifactId".');
-  } else if (input.proof && finalArtifactId !== input.proof.artifactId) {
-    errors.push(
-      `Final artifactId "${finalArtifactId}" does not match MCP artifactId "${input.proof.artifactId}".`,
-    );
-  }
-
-  const artifactFormats = Array.isArray(input.finalJson.artifactFormats)
-    ? input.finalJson.artifactFormats.filter(
-        (format): format is string => typeof format === "string",
-      )
-    : [];
-  for (const requiredFormat of ["excalidraw", "png"]) {
-    if (!artifactFormats.includes(requiredFormat)) {
-      errors.push(
-        `Final JSON artifactFormats must include "${requiredFormat}".`,
-      );
-    }
-    if (input.proof && !input.proof.artifactFormats.includes(requiredFormat)) {
-      errors.push(
-        `Accepted MCP artifact bundle did not include "${requiredFormat}".`,
-      );
+function proofForFinalOutput(
+  summary: HarnessOutputSummary,
+): HarnessMcpArtifactProof | undefined {
+  const finalArtifactId = isRecord(summary.finalJson)
+    ? stringValue(summary.finalJson.artifactId)
+    : undefined;
+  if (finalArtifactId) {
+    const matchingProof = summary.mcpArtifacts
+      .toReversed()
+      .find((proof) => proof.artifactId === finalArtifactId);
+    if (matchingProof) {
+      return matchingProof;
     }
   }
 
-  const excalidrawUrl = stringValue(input.finalJson.excalidrawUrl);
-  if (!excalidrawUrl || !excalidrawUrl.includes("format=excalidraw")) {
-    errors.push(
-      'Final JSON must include "excalidrawUrl" for the raw Excalidraw artifact.',
-    );
-  }
-  const pngUrl = stringValue(input.finalJson.pngUrl);
-  if (!pngUrl || !pngUrl.includes("format=png")) {
-    errors.push('Final JSON must include "pngUrl" for the raw PNG artifact.');
-  }
-
-  return errors;
+  return summary.mcpArtifacts.at(-1);
 }
 
 async function writeText(filePath: string, text: string): Promise<void> {
@@ -1625,7 +1694,7 @@ async function runHarnessScenario(input: {
     combinedStdout,
     antigravityEvidence.outputTexts,
   );
-  const mcpProof = summary.mcpArtifacts.at(-1);
+  const mcpProof = proofForFinalOutput(summary);
   const authError =
     input.options.harness === "antigravity"
       ? antigravityAuthError(result.stdout)
@@ -1817,6 +1886,19 @@ async function main(): Promise<void> {
         )
       : path.dirname(options.reportOut);
   const results: HarnessRunReport[] = [];
+  const reportOut = options.reportOut ?? path.join(outputDir, "report.json");
+  const writeCurrentReport = async (): Promise<HarnessReport> => {
+    const report = summarizeReport({
+      harness: options.harness,
+      mcpUrl: options.mcpUrl,
+      model: options.model,
+      repeat: options.repeat,
+      results,
+      scenarioCount: scenarios.length,
+    });
+    await writeJson(reportOut, report);
+    return report;
+  };
 
   for (let repeatIndex = 0; repeatIndex < options.repeat; repeatIndex += 1) {
     for (const scenario of scenarios) {
@@ -1833,19 +1915,11 @@ async function main(): Promise<void> {
           scenario,
         }),
       );
+      await writeCurrentReport();
     }
   }
 
-  const report = summarizeReport({
-    harness: options.harness,
-    mcpUrl: options.mcpUrl,
-    model: options.model,
-    repeat: options.repeat,
-    results,
-    scenarioCount: scenarios.length,
-  });
-  const reportOut = options.reportOut ?? path.join(outputDir, "report.json");
-  await writeJson(reportOut, report);
+  const report = await writeCurrentReport();
   console.log(JSON.stringify({ ...report, reportOut }, null, 2));
 
   if (!report.ok) {

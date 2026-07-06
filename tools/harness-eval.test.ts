@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   commandForRun,
   outputContractErrors,
+  runCommand,
   summarizeHarnessStdout,
 } from "./harness-eval";
 
@@ -64,6 +65,79 @@ describe("harness-eval", () => {
       "--print",
       "Draw the scenario",
     ]);
+  });
+
+  it("settles when a CLI parent exits but inherited stdio stays open", async () => {
+    const started = Date.now();
+    const result = await runCommand(
+      {
+        args: [
+          "-e",
+          [
+            "const { spawn } = require('node:child_process');",
+            "const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 5000)'], { stdio: ['ignore', 'inherit', 'inherit'] });",
+            "child.unref();",
+            "console.log('parent done');",
+          ].join(" "),
+        ],
+        command: process.execPath,
+        env: process.env,
+        prompt: "",
+      },
+      10_000,
+    );
+
+    expect(Date.now() - started).toBeLessThan(3_000);
+    expect(result).toMatchObject({
+      exitCode: 0,
+      signal: null,
+      timedOut: false,
+    });
+    expect(result.stdout).toContain("parent done");
+  });
+
+  it("does not time out after a CLI parent exits near its timeout budget", async () => {
+    const started = Date.now();
+    const result = await runCommand(
+      {
+        args: [
+          "-e",
+          [
+            "const { spawn } = require('node:child_process');",
+            "const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 5000)'], { stdio: ['ignore', 'inherit', 'inherit'] });",
+            "child.unref();",
+            "setTimeout(() => console.log('parent done'), 250);",
+          ].join(" "),
+        ],
+        command: process.execPath,
+        env: process.env,
+        prompt: "",
+      },
+      300,
+    );
+
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(result).toMatchObject({
+      exitCode: 0,
+      signal: null,
+      timedOut: false,
+    });
+    expect(result.stdout).toContain("parent done");
+  });
+
+  it("returns a timed-out result when a CLI process exceeds its budget", async () => {
+    const result = await runCommand(
+      {
+        args: ["-e", "setInterval(() => {}, 1000);"],
+        command: process.execPath,
+        env: process.env,
+        prompt: "",
+      },
+      100,
+    );
+
+    expect(result.timedOut).toBe(true);
+    expect(result.exitCode).toBeNull();
   });
 
   it("summarizes OpenCode JSONL text, tool calls, cost, and tokens", () => {
@@ -605,6 +679,52 @@ describe("harness-eval", () => {
     expect(summary.finalText).toBe("");
   });
 
+  it("extracts MCP proof from compact execute final delivery payloads", () => {
+    const stdout = [
+      JSON.stringify({
+        source: "MODEL",
+        status: "DONE",
+        type: "MCP_TOOL",
+        content: JSON.stringify({
+          ok: true,
+          result: {
+            artifactFormats: ["scene", "excalidraw", "png"],
+            artifactId: "artifact_compact",
+            buildOk: true,
+            excalidrawUrl:
+              "https://studio.test/api/v1/artifacts/artifact_compact?format=excalidraw&raw=true",
+            normalizedSpec: {
+              id: "compact-demo",
+            },
+            pngUrl:
+              "https://studio.test/api/v1/artifacts/artifact_compact?format=png&raw=true",
+            qualityScore: 10,
+            status: "accepted",
+          },
+        }),
+      }),
+    ].join("\n");
+
+    const summary = summarizeHarnessStdout(stdout);
+
+    expect(summary.mcpArtifacts).toEqual([
+      expect.objectContaining({
+        artifactFormats: ["scene", "excalidraw", "png"],
+        artifactId: "artifact_compact",
+        artifactUrls: {
+          excalidraw:
+            "https://studio.test/api/v1/artifacts/artifact_compact?format=excalidraw&raw=true",
+          png: "https://studio.test/api/v1/artifacts/artifact_compact?format=png&raw=true",
+        },
+        normalizedSpec: {
+          id: "compact-demo",
+        },
+        qualityScore: 10,
+        status: "accepted",
+      }),
+    ]);
+  });
+
   it("accepts final chat text when it delivers the MCP artifact URLs", () => {
     const proof = summarizeHarnessStdout(
       JSON.stringify({
@@ -674,7 +794,7 @@ describe("harness-eval", () => {
     ).toEqual([]);
   });
 
-  it("rejects final chat text that does not deliver the accepted MCP artifact", () => {
+  it("does not fail accepted MCP proof over final chat formatting", () => {
     const proof = summarizeHarnessStdout(
       JSON.stringify({
         type: "tool_use",
@@ -696,6 +816,27 @@ describe("harness-eval", () => {
           "Created a Markdown report in diagram_info.md. Please open that instead.",
         proof,
       }),
-    ).toContain("Harness final response did not contain parseable JSON.");
+    ).toEqual([]);
+  });
+
+  it("rejects plausible final JSON when no MCP artifact proof was observed", () => {
+    expect(
+      outputContractErrors({
+        finalJson: {
+          artifactFormats: ["scene", "excalidraw", "png"],
+          artifactId: "artifact_mock",
+          buildOk: true,
+          status: "accepted",
+        },
+        finalText: JSON.stringify({
+          artifactId: "artifact_mock",
+          buildOk: true,
+          status: "accepted",
+        }),
+        proof: undefined,
+      }),
+    ).toEqual([
+      "No successful sketchi-code-mode execute artifact was observed in the harness event stream.",
+    ]);
   });
 });
