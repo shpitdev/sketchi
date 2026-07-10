@@ -10,6 +10,7 @@ import {
 import {
   RenderedDiagramSceneSchema,
   type ApplyDiagramPatchResult,
+  type ArtifactFormat,
   type BuildFlowchartResult,
   type GetArtifactResult,
 } from "./code-mode-contract";
@@ -649,6 +650,64 @@ describe("Code Mode runtime", () => {
     ).not.toHaveProperty("inline");
   });
 
+  it("keeps patch provenance consistent across the result and later format retrieval", async () => {
+    let id = 0;
+    const runtime = createCodeModeRuntime({
+      store: createMemoryArtifactStore(),
+      createId: (prefix) => `${prefix}-${(id += 1)}`,
+      renderer: {
+        renderPng: async () => new Uint8Array([137, 80, 78, 71]),
+      },
+    });
+    const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+    expectBuildOk(built);
+
+    expect(built.artifact).not.toHaveProperty("provenance");
+    const rootScene = await runtime.getArtifact({
+      artifactId: built.artifact.artifactId,
+      format: "scene",
+      inline: true,
+    });
+    expectGetOk(rootScene);
+    expect(rootScene).not.toHaveProperty("provenance");
+
+    const patched = await runtime.applyDiagramPatch({
+      source: { artifactId: built.artifact.artifactId },
+      operations: [
+        {
+          op: "setShape",
+          selector: { nodeIds: ["approve"] },
+          shape: "diamond",
+        },
+      ],
+      options: {
+        artifactFormats: ["scene", "excalidraw", "png"],
+        inlineArtifacts: ["scene"],
+      },
+    });
+    expectPatchOk(patched);
+
+    const provenance = {
+      sourceArtifactId: built.artifact.artifactId,
+    };
+    expect(patched.sourceArtifactId).toBe(provenance.sourceArtifactId);
+    expect(patched.artifact.provenance).toEqual(provenance);
+    if (!patched.artifact.provenance) {
+      throw new Error("Expected the patched artifact to include provenance.");
+    }
+    patched.artifact.provenance.sourceArtifactId = "artifact-mutated";
+
+    const formats: ArtifactFormat[] = ["scene", "excalidraw", "png"];
+    for (const format of formats) {
+      const retrieved = await runtime.getArtifact({
+        artifactId: patched.artifact.artifactId,
+        format,
+      });
+      expectGetOk(retrieved);
+      expect(retrieved.provenance).toEqual(provenance);
+    }
+  });
+
   it("keeps scoped edge style patches from recoloring node labels", async () => {
     const runtime = createTestRuntime();
     const built = await runtime.buildFlowchart({ spec: approvalSpec() });
@@ -804,7 +863,7 @@ describe("Code Mode runtime", () => {
     expect(patched.issues).toContainEqual(
       expect.objectContaining({
         code: "storage_read_failed",
-        message: "bucket read failed",
+        message: "manifest read failed",
       }),
     );
   });
@@ -838,6 +897,44 @@ describe("Code Mode runtime", () => {
     expect(parseInlineScene(scene.inline).diagramId).toBe(
       "simple-approval-flow",
     );
+  });
+
+  it("rejects an object-store scene whose source manifest was not published", async () => {
+    const sourceRuntime = createTestRuntime();
+    const built = await sourceRuntime.buildFlowchart({ spec: approvalSpec() });
+    expectBuildOk(built);
+    const sourceScene = parseInlineScene(
+      built.artifact.formats.find((format) => format.format === "scene")
+        ?.inline,
+    );
+
+    const bucket = new MemoryBucket();
+    await bucket.put(
+      "codemode/artifact-partial/scene.json",
+      JSON.stringify(sourceScene),
+    );
+    let id = 0;
+    const runtime = createCodeModeRuntime({
+      store: createObjectBucketArtifactStore(bucket, { prefix: "codemode" }),
+      createId: (prefix) => `${prefix}-${(id += 1)}`,
+    });
+
+    const patched = await runtime.applyDiagramPatch({
+      source: { artifactId: "artifact-partial" },
+      operations: [{ op: "rerouteEdges" }],
+    });
+
+    expectPatchFailure(patched);
+    expect(patched.status).toBe("source_unavailable");
+    expect(patched.issues).toContainEqual(
+      expect.objectContaining({
+        code: "patch_source_unavailable",
+        message: expect.stringContaining("valid source manifest"),
+      }),
+    );
+    expect([...bucket.objects.keys()]).toEqual([
+      "codemode/artifact-partial/scene.json",
+    ]);
   });
 
   it("persists PNG artifacts as binary object-bucket entries", async () => {

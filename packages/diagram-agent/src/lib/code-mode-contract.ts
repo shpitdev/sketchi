@@ -2,6 +2,9 @@ import { z } from "zod";
 
 export const ArtifactFormatSchema = z.enum(["excalidraw", "scene", "png"]);
 export const InlineArtifactFormatSchema = z.enum(["excalidraw", "scene"]);
+export const ArtifactProvenanceSchema = z.object({
+  sourceArtifactId: z.string().min(1),
+});
 
 export const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
@@ -304,6 +307,7 @@ export const ApplyDiagramPatchRequestSchema = z.object({
 
 export type ArtifactFormat = z.infer<typeof ArtifactFormatSchema>;
 export type InlineArtifactFormat = z.infer<typeof InlineArtifactFormatSchema>;
+export type ArtifactProvenance = z.infer<typeof ArtifactProvenanceSchema>;
 export type CodeModeIssueCode = z.infer<typeof CodeModeIssueCodeSchema>;
 export type CodeModeIssueRef = z.infer<typeof CodeModeIssueRefSchema>;
 export type CodeModeIssue = z.infer<typeof CodeModeIssueSchema>;
@@ -370,6 +374,7 @@ export interface ArtifactBundle {
   artifactId: string;
   diagramId: string;
   formats: ArtifactFormatRef[];
+  provenance?: ArtifactProvenance;
   preview?: ArtifactFormatRef;
 }
 
@@ -418,6 +423,7 @@ export type GetArtifactResult =
       expiresAt?: string;
       inline?: unknown;
       sizeBytes?: number;
+      provenance?: ArtifactProvenance;
     }
   | {
       ok: false;

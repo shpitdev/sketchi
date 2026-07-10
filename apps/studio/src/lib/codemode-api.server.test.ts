@@ -238,12 +238,14 @@ describe("Code Mode API handlers", () => {
     );
 
     expect(getResponse.status).toBe(200);
-    await expect(getResponse.json()).resolves.toMatchObject({
+    const rootArtifact: unknown = await getResponse.json();
+    expect(rootArtifact).toMatchObject({
       ok: true,
       artifactId,
       format: "scene",
       url: `https://studio.test/api/v1/artifacts/${artifactId}?format=scene&raw=true`,
     });
+    expect(rootArtifact).not.toHaveProperty("provenance");
 
     const rawExcalidrawResponse = await handleGetArtifactRequest(
       {},
@@ -295,10 +297,29 @@ describe("Code Mode API handlers", () => {
     );
 
     expect(patchResponse.status).toBe(200);
-    await expect(patchResponse.json()).resolves.toMatchObject({
+    const patched: unknown = await patchResponse.json();
+    expect(patched).toMatchObject({
       ok: true,
       sourceArtifactId: artifactId,
       status: "accepted",
+      artifact: {
+        provenance: { sourceArtifactId: artifactId },
+      },
+    });
+
+    const childArtifactId = artifactIdFrom(patched);
+    const childResponse = await handleGetArtifactRequest(
+      {},
+      new Request(
+        `https://studio.test/api/v1/artifacts/${childArtifactId}?format=scene`,
+      ),
+      childArtifactId,
+    );
+    expect(childResponse.status).toBe(200);
+    await expect(childResponse.json()).resolves.toMatchObject({
+      ok: true,
+      artifactId: childArtifactId,
+      provenance: { sourceArtifactId: artifactId },
     });
   });
 

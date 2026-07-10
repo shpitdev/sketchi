@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   artifactRouteUrls,
-  fetchArtifactScene,
+  fetchArtifactReview,
   type ArtifactViewState,
 } from "@/lib/artifact-view-client";
+import { ArtifactSourceLink } from "@/components/artifact-source-link";
 import { createStudioProjectFromArtifact } from "@/lib/studio-projects-client";
 import { IconActionBar, IconButton, IconLink } from "@/components/sketch-icons";
 import { SKETCHI_WEB_HOME_URL } from "@/lib/home-url";
@@ -54,11 +55,11 @@ function ArtifactRoute() {
     let cancelled = false;
 
     setState({ status: "loading" });
-    void fetchArtifactScene(artifactId)
-      .then((scene) => {
+    void fetchArtifactReview(artifactId)
+      .then((artifact) => {
         if (!cancelled) {
           setState({
-            scene,
+            ...artifact,
             status: "ready",
           });
         }
@@ -99,6 +100,9 @@ function ArtifactRoute() {
             Playground
           </a>
           <IconActionBar>
+            {state.status === "ready" && state.provenance ? (
+              <ArtifactSourceLink provenance={state.provenance} />
+            ) : null}
             {saveState.status === "ready" ? (
               <IconLink
                 href={saveState.projectUrl}

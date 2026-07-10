@@ -679,7 +679,12 @@ interface ArtifactBundle {
   artifactId: string;
   diagramId: string;
   formats: ArtifactFormatRef[];
+  provenance?: ArtifactProvenance;
   preview?: ArtifactFormatRef;
+}
+
+interface ArtifactProvenance {
+  sourceArtifactId: string;
 }
 
 interface PartialArtifactBundle {
@@ -706,9 +711,12 @@ The first implementation should support:
   Browser Run when requested.
 
 The storage contract is consistent across environments: artifacts are written
-as a manifest plus one object per format. Studio Worker deployments bind
-`SKETCHI_ARTIFACTS` to R2 so `buildFlowchart -> getArtifact -> applyDiagramPatch`
-can cross request boundaries.
+as a manifest plus one object per format. A patched artifact manifest records
+`provenance.sourceArtifactId`, so every stored format resolves to the same
+durable source reference; root build artifacts omit provenance. Studio Worker
+deployments bind `SKETCHI_ARTIFACTS` to R2 so
+`buildFlowchart -> getArtifact -> applyDiagramPatch` can cross request
+boundaries.
 
 | Environment       | Bucket                                         |
 | ----------------- | ---------------------------------------------- |
@@ -764,6 +772,7 @@ interface GetArtifactSuccess {
   expiresAt?: string;
   inline?: unknown;
   sizeBytes?: number;
+  provenance?: ArtifactProvenance;
 }
 
 interface GetArtifactFailure {

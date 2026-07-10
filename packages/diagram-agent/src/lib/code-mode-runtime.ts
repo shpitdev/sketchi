@@ -1290,6 +1290,35 @@ async function resolvePatchSource(
     return { scene: cloneScene(input.source.scene) };
   }
 
+  let manifest: Awaited<ReturnType<CodeModeArtifactStore["readManifest"]>>;
+  try {
+    manifest = await store.readManifest(input.source.artifactId);
+  } catch (error) {
+    return [
+      storageIssue(
+        error instanceof Error
+          ? error.message
+          : `Artifact manifest "${input.source.artifactId}" could not be read.`,
+        "storage_read_failed",
+      ),
+    ];
+  }
+  if (
+    !manifest ||
+    manifest.artifactId !== input.source.artifactId ||
+    !manifest.formats.some((format) => format.format === "scene")
+  ) {
+    return [
+      issue({
+        code: "patch_source_unavailable",
+        stage: "storage",
+        ref: { kind: "artifact", id: input.source.artifactId },
+        message: `Artifact "${input.source.artifactId}" does not have a valid source manifest.`,
+        hint: "Rebuild the flowchart and patch the accepted artifact id.",
+      }),
+    ];
+  }
+
   let artifact: StoredArtifactFormat | null;
   try {
     artifact = await store.read(input.source.artifactId, "scene");
@@ -1663,6 +1692,7 @@ export function createCodeModeRuntime(
           ? {}
           : { inline: artifact.data }),
         sizeBytes: artifact.sizeBytes,
+        ...(manifest.provenance ? { provenance: manifest.provenance } : {}),
       };
     },
 
@@ -1828,6 +1858,13 @@ export function createCodeModeRuntime(
           diagramId: renderedScene.diagramId,
           formats: storedFormats,
           inlineFormats: requestedInlineFormats(request.options),
+          ...(source.sourceArtifactId
+            ? {
+                provenance: {
+                  sourceArtifactId: source.sourceArtifactId,
+                },
+              }
+            : {}),
         });
 
         return {

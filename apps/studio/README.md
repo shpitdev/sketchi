@@ -51,7 +51,8 @@ survive page reloads but not dev-server restarts.
 Review routes live at `/artifacts/:artifactId`; the product canvas entry lives
 at `/artifacts/:artifactId/edit`. The standalone `apps/excalidraw` workspace
 remains internal even though the editor capability is exposed through these
-artifact routes.
+artifact routes. Reviews of patched artifacts link back to the durable source
+artifact recorded in the stored manifest.
 
 ## Studio persistence foundation
 

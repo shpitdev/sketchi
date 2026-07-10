@@ -1,10 +1,12 @@
-import type {
-  ArtifactBundle,
-  ArtifactFormat,
-  ArtifactFormatRef,
-  CodeModeIssue,
-  CodeModeIssueCode,
-  InlineArtifactFormat,
+import {
+  ArtifactProvenanceSchema,
+  type ArtifactBundle,
+  type ArtifactFormat,
+  type ArtifactFormatRef,
+  type ArtifactProvenance,
+  type CodeModeIssue,
+  type CodeModeIssueCode,
+  type InlineArtifactFormat,
 } from "./code-mode-contract.js";
 
 export interface StoredArtifactFormat {
@@ -18,6 +20,7 @@ export interface StoredArtifactManifest {
   artifactId: string;
   diagramId: string;
   formats: ArtifactFormatRef[];
+  provenance?: ArtifactProvenance;
   createdAt: string;
 }
 
@@ -26,6 +29,7 @@ export interface ArtifactWriteInput {
   diagramId: string;
   formats: StoredArtifactFormat[];
   inlineFormats: InlineArtifactFormat[];
+  provenance?: ArtifactProvenance;
 }
 
 export interface CodeModeArtifactStore {
@@ -99,12 +103,14 @@ function bundleFromFormats(input: {
   artifactId: string;
   diagramId: string;
   formats: ArtifactFormatRef[];
+  provenance?: ArtifactProvenance;
 }): ArtifactBundle {
   const preview = input.formats.find((format) => format.format === "scene");
   return {
     artifactId: input.artifactId,
     diagramId: input.diagramId,
     formats: input.formats,
+    ...(input.provenance ? { provenance: input.provenance } : {}),
     ...(preview ? { preview } : {}),
   };
 }
@@ -141,10 +147,14 @@ export function createMemoryArtifactStore(): CodeModeArtifactStore {
     },
     async write(input) {
       const refs = input.formats.map(manifestRef);
+      const storedProvenance = input.provenance
+        ? cloneData(input.provenance)
+        : undefined;
       const manifest: StoredArtifactManifest = {
         artifactId: input.artifactId,
         diagramId: input.diagramId,
         formats: refs,
+        ...(storedProvenance ? { provenance: storedProvenance } : {}),
         createdAt: new Date().toISOString(),
       };
 
@@ -164,6 +174,9 @@ export function createMemoryArtifactStore(): CodeModeArtifactStore {
         artifactId: input.artifactId,
         diagramId: input.diagramId,
         formats,
+        ...(input.provenance
+          ? { provenance: cloneData(input.provenance) }
+          : {}),
       });
     },
   };
@@ -216,8 +229,13 @@ function isStoredArtifactManifest(
     typeof value.diagramId === "string" &&
     Array.isArray(value.formats) &&
     value.formats.every(isArtifactFormatRef) &&
+    (!("provenance" in value) || isArtifactProvenance(value.provenance)) &&
     typeof value.createdAt === "string"
   );
+}
+
+function isArtifactProvenance(value: unknown): value is ArtifactProvenance {
+  return ArtifactProvenanceSchema.safeParse(value).success;
 }
 
 export function createObjectBucketArtifactStore(
@@ -274,6 +292,7 @@ export function createObjectBucketArtifactStore(
         artifactId: input.artifactId,
         diagramId: input.diagramId,
         formats: refs,
+        ...(input.provenance ? { provenance: input.provenance } : {}),
         createdAt: new Date().toISOString(),
       };
 
@@ -304,6 +323,7 @@ export function createObjectBucketArtifactStore(
         artifactId: input.artifactId,
         diagramId: input.diagramId,
         formats,
+        ...(input.provenance ? { provenance: input.provenance } : {}),
       });
     },
   };

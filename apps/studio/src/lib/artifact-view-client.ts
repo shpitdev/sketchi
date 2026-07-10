@@ -1,13 +1,23 @@
 import {
   RenderedDiagramSceneSchema,
+  type ArtifactProvenance,
   type GetArtifactResult,
 } from "@sketchi/diagram-agent";
 import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 
 export type ArtifactViewState =
   | { status: "loading" }
-  | { scene: RenderedDiagramScene; status: "ready" }
+  | {
+      provenance?: ArtifactProvenance;
+      scene: RenderedDiagramScene;
+      status: "ready";
+    }
   | { message: string; status: "error" };
+
+export interface ArtifactReview {
+  provenance?: ArtifactProvenance;
+  scene: RenderedDiagramScene;
+}
 
 export interface ArtifactRouteUrls {
   drawing: string;
@@ -30,9 +40,9 @@ export function artifactRouteUrls(artifactId: string): ArtifactRouteUrls {
   };
 }
 
-export async function fetchArtifactScene(
+export async function fetchArtifactReview(
   artifactId: string,
-): Promise<RenderedDiagramScene> {
+): Promise<ArtifactReview> {
   const response = await fetch(
     `/api/v1/artifacts/${encodeURIComponent(
       artifactId,
@@ -49,5 +59,14 @@ export async function fetchArtifactScene(
     throw new Error("Artifact scene could not be rendered.");
   }
 
-  return parsed.data as RenderedDiagramScene;
+  return {
+    scene: parsed.data as RenderedDiagramScene,
+    ...(payload.provenance ? { provenance: payload.provenance } : {}),
+  };
+}
+
+export async function fetchArtifactScene(
+  artifactId: string,
+): Promise<RenderedDiagramScene> {
+  return (await fetchArtifactReview(artifactId)).scene;
 }

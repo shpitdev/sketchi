@@ -73,6 +73,14 @@ Scope:
 - Treat converted Excalidraw output as a first-class artifact reference, not a
   nested payload that only the harness can see.
 
+Landed:
+
+- Patched artifact manifests and bundles persist
+  `provenance.sourceArtifactId`; `getArtifact` returns that typed reference for
+  scene, Excalidraw, and PNG retrieval.
+- Studio artifact review exposes a source-artifact link for derived artifacts.
+- Root build artifacts omit provenance instead of manufacturing a source.
+
 Done when:
 
 - A harness final response can link to every useful generated format.

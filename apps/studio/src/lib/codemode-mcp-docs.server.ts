@@ -252,7 +252,7 @@ type BuildFlowchartResult =
   | { ok: false; status: string; issues: CodeModeIssue[]; normalizedSpec?: unknown; quality?: unknown; partial?: unknown };
 
 type GetArtifactResult =
-  | { ok: true; artifactId: string; diagramId: string; format: ArtifactFormat; mimeType: string; inline?: unknown; sizeBytes?: number; url?: string; expiresAt?: string }
+  | { ok: true; artifactId: string; diagramId: string; format: ArtifactFormat; mimeType: string; inline?: unknown; sizeBytes?: number; url?: string; expiresAt?: string; provenance?: ArtifactProvenance }
   | { ok: false; status: string; issues: CodeModeIssue[] };
 
 type ApplyDiagramPatchResult =
@@ -263,7 +263,12 @@ interface ArtifactBundle {
   artifactId: string;
   diagramId: string;
   formats: Array<{ format: ArtifactFormat; mimeType: string; inline?: unknown; sizeBytes?: number; url?: string; expiresAt?: string }>;
+  provenance?: ArtifactProvenance;
   preview?: { format: ArtifactFormat; mimeType: string; inline?: unknown; sizeBytes?: number; url?: string; expiresAt?: string };
+}
+
+interface ArtifactProvenance {
+  sourceArtifactId: string;
 }
 
 interface ExecuteToolResult {
@@ -540,6 +545,7 @@ const catalog: CatalogEntry[] = [
       "Retrieve scene, Excalidraw, or hosted PNG artifacts by artifactId after build or patch acceptance.",
     content: [
       "getArtifact reads a stored artifact by artifactId.",
+      "Derived artifacts return provenance.sourceArtifactId for the artifact they were patched from; root artifacts omit provenance.",
       'Request envelope: { artifactId: string, format?: "scene" | "excalidraw" | "png", inline?: boolean }.',
       "Use format: 'scene' for the compact Sketchi patch source and format: 'excalidraw' for an importable Excalidraw file JSON envelope with type, version, source, elements, appState, and files.",
       "Use format: 'png' for hosted visual proof. PNG is binary and is returned as metadata from getArtifact, never as inline payload.",
