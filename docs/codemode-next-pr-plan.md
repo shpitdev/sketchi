@@ -35,6 +35,8 @@ flowchart LR
       raw JSON artifact URL, raw PNG artifact URL, and brief notes.
       First capture:
       [Agy Code Mode Scenario Capture](evals/agy-code-mode-scenario-capture-2026-06-27.md).
+      Current harness closure:
+      [Agy Code Mode Current Suite](evals/agy-code-mode-current-suite-2026-07-10.md).
 - [x] Cover multiple complexity bands in that suite: simple linear flow, basic
       decision tree, nested decisions, retry/loop workflow, lifecycle/state
       machine, incident escalation, actor handoff/swimlane-like flow,

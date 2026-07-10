@@ -112,6 +112,34 @@ without pretending the entire routing system is finished:
   `.memory/agy-layout-pr-68-harness-report.json` and
   `.memory/agy-layout-pr-68-events/`.
 
+## 2026-07-10 Harness Closure
+
+- Current report:
+  [Agy Code Mode Current Suite](../evals/agy-code-mode-current-suite-2026-07-10.md).
+- Live MCP endpoint:
+  `https://sketchi-studio.dimethyl.workers.dev/mcp`.
+- Fresh full Agy CLI suite: 22 scenarios.
+- Passing evaluations: 22/22.
+- MCP tool calls observed: 114.
+- Timeouts: 0.
+- Local wrapper artifacts: 0.
+- Local Excalidraw validation issues from harness grading: 0.
+- Hosted Excalidraw/PNG URL liveness checks: 44/44 returned `200`.
+- The old PR 68 live-evidence blocker was not reproduced. Agy auth worked, and
+  the remaining local environment issue was that agent shells may omit
+  `/home/anandpant/.local/bin`, where the `agy` binary is installed. The harness
+  now supplies that child-process path explicitly.
+- The only full-suite failure reproduced during this loop was a harness grader
+  false negative: `loan-application-underwriting` returned a valid public
+  FlowchartSpec-style `normalizedSpec` with optional edge IDs omitted. The
+  grader now normalizes missing edge IDs before evaluating the candidate,
+  matching Code Mode runtime behavior.
+- No current evidence supports adding another renderer or Excalidraw regression
+  in this slice. The hosted URL checks prove artifact liveness; geometry claims
+  come from local harness validation of the returned specs. Future geometry work
+  should require a current Agy report with real `excalidrawIssues` or
+  product-side artifact failure.
+
 ## RCA Questions
 
 - Are source and target connector sides always selected by Sketchi code, not by
@@ -179,3 +207,6 @@ without pretending the entire routing system is finished:
 - New tests prove connector endpoints are selected by Sketchi and are visually
   reasonable for dense graphs.
 - The final report distinguishes product fixes from model retries.
+- The 2026-07-10 harness rerun closes the Agy reliability evidence gap for this
+  slice: current live failures were harness environment/grading failures, not
+  product geometry failures.

@@ -325,6 +325,29 @@ function cleanQuotedString(value: unknown): string | undefined {
   return raw;
 }
 
+const TRAILING_TOOL_KEY_FRAGMENT =
+  /[,;]\s*(?:id|label|kind|group|source|target|title|direction|nodes|edges)\s*:?\s*$/i;
+
+function cleanToolString(value: string): string {
+  let cleaned = value.trim();
+  for (;;) {
+    const next = cleaned.replace(TRAILING_TOOL_KEY_FRAGMENT, "").trim();
+    if (next === cleaned) {
+      return cleaned;
+    }
+    cleaned = next;
+  }
+}
+
+function cleanOptionalToolString(value: unknown): string | undefined {
+  const raw = cleanQuotedString(value);
+  if (raw === undefined) {
+    return undefined;
+  }
+  const cleaned = cleanToolString(raw);
+  return cleaned.length > 0 ? cleaned : undefined;
+}
+
 function antigravityRoot(): string | undefined {
   return process.env.HOME
     ? path.join(process.env.HOME, ".gemini", "antigravity-cli")
@@ -599,6 +622,25 @@ function mcpConfigContent(mcpUrl: string): string {
   });
 }
 
+function envWithLocalToolPath(
+  extraEnv: NodeJS.ProcessEnv = {},
+): NodeJS.ProcessEnv {
+  const pathEntries = [
+    process.env.HOME ? path.join(process.env.HOME, ".local", "bin") : undefined,
+    path.dirname(process.execPath),
+    process.env.PATH,
+  ]
+    .filter((entry): entry is string => Boolean(entry))
+    .flatMap((entry) => entry.split(path.delimiter))
+    .filter((entry) => entry.length > 0);
+
+  return {
+    ...process.env,
+    ...extraEnv,
+    PATH: [...new Set(pathEntries)].join(path.delimiter),
+  };
+}
+
 function claudeMcpConfig(mcpUrl: string): string {
   return JSON.stringify({
     mcpServers: {
@@ -736,7 +778,7 @@ export function commandForRun(input: {
         input.prompt,
       ],
       command: "agy",
-      env: process.env,
+      env: envWithLocalToolPath(),
       prompt: input.prompt,
     };
   }
@@ -757,10 +799,9 @@ export function commandForRun(input: {
         input.prompt,
       ],
       command: "opencode",
-      env: {
-        ...process.env,
+      env: envWithLocalToolPath({
         OPENCODE_CONFIG_CONTENT: mcpConfigContent(input.mcpUrl),
-      },
+      }),
       prompt: input.prompt,
     };
   }
@@ -783,7 +824,7 @@ export function commandForRun(input: {
       "--no-session-persistence",
     ],
     command: "claude",
-    env: process.env,
+    env: envWithLocalToolPath(),
     prompt: input.prompt,
   };
 }
@@ -1507,12 +1548,22 @@ function specToFlowchartCandidate(spec: unknown): unknown {
     return spec;
   }
   const layout = isRecord(spec.layout) ? spec.layout : {};
+  const edges = Array.isArray(spec.edges)
+    ? spec.edges.map((edge, index) =>
+        isRecord(edge)
+          ? {
+              ...edge,
+              id: cleanOptionalToolString(edge.id) ?? `edge-${index + 1}`,
+            }
+          : edge,
+      )
+    : spec.edges;
   return {
     id: spec.id,
     title: spec.title,
     type: "flowchart",
     nodes: spec.nodes,
-    edges: spec.edges,
+    edges,
     layout: {
       direction: layout.direction ?? "TB",
       edgeRouting: "orthogonal",
@@ -1521,7 +1572,7 @@ function specToFlowchartCandidate(spec: unknown): unknown {
   };
 }
 
-function evaluateHarnessJson(
+export function evaluateHarnessJson(
   scenario: DiagramScenario,
   value: unknown,
 ): HarnessCandidateEvaluation {

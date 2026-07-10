@@ -1,7 +1,11 @@
+import path from "node:path";
+
+import { getScenario } from "@sketchi/diagram-scenarios";
 import { describe, expect, it } from "vitest";
 
 import {
   commandForRun,
+  evaluateHarnessJson,
   outputContractErrors,
   runCommand,
   summarizeHarnessStdout,
@@ -47,24 +51,41 @@ describe("harness-eval", () => {
   };
 
   it("places Antigravity print-mode flags before the print prompt", () => {
-    const command = commandForRun({
-      harness: "antigravity",
-      mcpUrl: "https://studio.test/mcp",
-      model: "gemini-3.5-flash",
-      prompt: "Draw the scenario",
-      scenarioId: "demo",
-      timeoutMs: 240_000,
-    });
+    const originalHome = process.env.HOME;
+    process.env.HOME = "/home/sketchi-test";
 
-    expect(command.args).toEqual([
-      "--print-timeout",
-      "240s",
-      "--dangerously-skip-permissions",
-      "--model",
-      "gemini-3.5-flash",
-      "--print",
-      "Draw the scenario",
-    ]);
+    try {
+      const command = commandForRun({
+        harness: "antigravity",
+        mcpUrl: "https://studio.test/mcp",
+        model: "gemini-3.5-flash",
+        prompt: "Draw the scenario",
+        scenarioId: "demo",
+        timeoutMs: 240_000,
+      });
+
+      expect(command.args).toEqual([
+        "--print-timeout",
+        "240s",
+        "--dangerously-skip-permissions",
+        "--model",
+        "gemini-3.5-flash",
+        "--print",
+        "Draw the scenario",
+      ]);
+      expect(command.env.PATH?.split(path.delimiter)).toEqual(
+        expect.arrayContaining([
+          path.join("/home/sketchi-test", ".local", "bin"),
+          path.dirname(process.execPath),
+        ]),
+      );
+    } finally {
+      if (originalHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = originalHome;
+      }
+    }
   });
 
   it("settles when a CLI parent exits but inherited stdio stays open", async () => {
@@ -818,6 +839,43 @@ describe("harness-eval", () => {
       }),
     ).toEqual([]);
   });
+
+  const edgeIdCases: Array<
+    [string, (edgeId: string) => string | undefined]
+  > = [
+    ["omit optional edge ids", () => undefined],
+    ["fallback from empty edge ids", () => ""],
+    ["fallback from whitespace edge ids", () => "   "],
+    ["fallback from quoted empty edge ids", () => JSON.stringify("")],
+    ["fallback from quoted whitespace edge ids", () => JSON.stringify("   ")],
+    [
+      "trim and unquote supplied edge ids",
+      (edgeId: string) => `  ${JSON.stringify(edgeId)}  `,
+    ],
+  ];
+
+  it.each(edgeIdCases)(
+    "grades accepted flowchart specs that %s",
+    (_label, idForEdge) => {
+      const scenario = getScenario("loan-application-underwriting");
+      const candidate = {
+        normalizedSpec: {
+          ...scenario.expectedDiagram,
+          edges: scenario.expectedDiagram.edges.map(({ id, ...edge }) => {
+            const cleanedId = idForEdge(id);
+            return {
+              ...edge,
+              ...(cleanedId === undefined ? {} : { id: cleanedId }),
+            };
+          }),
+        },
+      };
+
+      expect(evaluateHarnessJson(scenario, candidate)).toMatchObject({
+        ok: true,
+      });
+    },
+  );
 
   it("rejects plausible final JSON when no MCP artifact proof was observed", () => {
     expect(
