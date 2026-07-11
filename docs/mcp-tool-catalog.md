@@ -157,6 +157,7 @@ interface DocsRequest {
     | "overview"
     | "execute"
     | "buildFlowchart"
+    | "buildMindmap"
     | "getArtifact"
     | "applyDiagramPatch"
     | "patchOperations"
@@ -230,6 +231,7 @@ Inside `execute`, the sandbox receives this namespace:
 ```ts
 declare const sketchi: {
   buildFlowchart(input: BuildFlowchartRequest): Promise<BuildFlowchartResult>;
+  buildMindmap(input: BuildMindmapRequest): Promise<BuildMindmapResult>;
   getArtifact(input: GetArtifactRequest): Promise<GetArtifactResult>;
   applyDiagramPatch(
     input: ApplyDiagramPatchRequest,
@@ -266,6 +268,7 @@ flowchart LR
 | Host operation                             | Code Mode function                 | Public now?           |
 | ------------------------------------------ | ---------------------------------- | --------------------- |
 | `POST /api/v1/flowcharts/build`            | `sketchi.buildFlowchart(input)`    | Yes                   |
+| `POST /api/v1/mindmaps/build`              | `sketchi.buildMindmap(input)`      | Yes                   |
 | `GET /api/v1/artifacts/:artifactId`        | `sketchi.getArtifact(input)`       | Yes                   |
 | `POST /api/v1/artifacts/:artifactId/patch` | `sketchi.applyDiagramPatch(input)` | Yes                   |
 | validate IR                                | none                               | No, internal to build |
@@ -364,6 +367,25 @@ interface BuildFlowchartOptions {
   artifactFormats?: ArtifactFormat[];
   inlineArtifacts?: InlineArtifactFormat[];
   minQualityScore?: number;
+}
+
+interface BuildMindmapRequest {
+  requestId?: string;
+  spec: MindmapSpec;
+  options?: BuildFlowchartOptions;
+}
+
+interface MindmapSpec {
+  id?: string;
+  title: string;
+  root: MindmapTopic;
+  layout?: { direction?: "LR" | "RL" };
+  style?: FlowchartStyle;
+}
+
+interface MindmapTopic {
+  label: string;
+  children?: MindmapTopic[];
 }
 
 type ArtifactFormat = "excalidraw" | "scene" | "png";
@@ -498,6 +520,36 @@ interface BuildFlowchartFailure {
 type NormalizedFlowchartSpec = Required<
   Pick<FlowchartSpec, "id" | "title" | "nodes" | "edges" | "layout" | "style">
 >;
+
+type BuildMindmapResult = BuildMindmapSuccess | BuildMindmapFailure;
+
+interface BuildMindmapSuccess {
+  ok: true;
+  status: "accepted";
+  buildId: string;
+  requestId?: string;
+  normalizedSpec: unknown;
+  quality: QualityReport;
+  artifact: ArtifactBundle;
+  issues: Issue[];
+}
+
+interface BuildMindmapFailure {
+  ok: false;
+  status:
+    | "invalid_input"
+    | "invalid_mindmap"
+    | "quality_failed"
+    | "render_failed"
+    | "export_failed"
+    | "storage_failed";
+  buildId?: string;
+  requestId?: string;
+  normalizedSpec?: unknown;
+  quality?: QualityReport;
+  partial?: PartialArtifactBundle;
+  issues: Issue[];
+}
 ```
 
 `issues` is empty when the build is accepted and there are no warnings. Warnings
@@ -554,7 +606,14 @@ good enough for an agent to patch its spec without guessing.
 interface Issue {
   code: IssueCode;
   severity: "error" | "warning";
-  stage: "input" | "flowchart" | "quality" | "render" | "export" | "storage";
+  stage:
+    | "input"
+    | "flowchart"
+    | "mindmap"
+    | "quality"
+    | "render"
+    | "export"
+    | "storage";
   ref?: IssueRef;
   message: string;
   hint: string;
@@ -609,6 +668,9 @@ type IssueCode =
   | "unlabeled_decision_branch"
   | "duplicate_decision_branch_label"
   | "disconnected_graph"
+  | "mindmap_too_deep"
+  | "mindmap_too_large"
+  | "request_too_large"
   | "generic_label"
   | "label_too_long"
   | "quality_below_threshold"
@@ -715,7 +777,7 @@ as a manifest plus one object per format. A patched artifact manifest records
 `provenance.sourceArtifactId`, so every stored format resolves to the same
 durable source reference; root build artifacts omit provenance. Studio Worker
 deployments bind `SKETCHI_ARTIFACTS` to R2 so
-`buildFlowchart -> getArtifact -> applyDiagramPatch` can cross request
+`buildFlowchart/buildMindmap -> getArtifact -> applyDiagramPatch` can cross request
 boundaries.
 
 | Environment       | Bucket                                         |
@@ -790,7 +852,7 @@ interface GetArtifactFailure {
 ## `applyDiagramPatch`
 
 `applyDiagramPatch` is the codemod-style operation for deterministic visual
-changes after a flowchart artifact has already been accepted. It should handle
+changes after a flowchart or mindmap artifact has already been accepted. It should handle
 common user requests such as changing colors, switching node shapes, shifting a
 group, replacing text, or rerouting edges without asking the agent to edit raw
 Excalidraw JSON.
@@ -921,7 +983,8 @@ type DiagramShape = "rectangle" | "diamond" | "ellipse" | "circle";
 The first patch operation set is deliberately non-structural. It can restyle,
 reshape, move, rename, and reroute existing elements, but it cannot create or
 delete nodes or edges. If a user asks to change the graph itself, the agent
-should repair the `FlowchartSpec` and call `buildFlowchart` again.
+should repair the semantic spec and call the matching `buildFlowchart` or
+`buildMindmap` operation again.
 
 ```ts
 type ApplyDiagramPatchResult =

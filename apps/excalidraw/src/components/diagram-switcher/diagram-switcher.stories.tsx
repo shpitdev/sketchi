@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { mindmapFixture } from "@sketchi/diagram-core";
 
 import { DiagramSwitcher } from "./diagram-switcher";
 import "../../styles/app.css";
@@ -24,11 +25,11 @@ const meta = {
         type: "flowchart",
       },
       {
-        edgeCount: 2,
-        id: "mindmap-example",
-        nodeCount: 3,
-        title: "Sketchi mindmap fixture",
-        type: "mindmap",
+        edgeCount: mindmapFixture.edges.length,
+        id: mindmapFixture.id,
+        nodeCount: mindmapFixture.nodes.length,
+        title: mindmapFixture.title,
+        type: mindmapFixture.type,
       },
     ],
     onSelect: () => {},

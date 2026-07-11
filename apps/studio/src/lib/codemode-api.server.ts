@@ -7,6 +7,7 @@ import {
   type ApplyDiagramPatchResult,
   type ArtifactFormat,
   type BuildFlowchartResult,
+  type BuildMindmapResult,
   type CodeModeArtifactStore,
   type GetArtifactResult,
   type StoredArtifactFormat,
@@ -27,6 +28,7 @@ import {
 const localArtifactStore = createMemoryArtifactStore();
 const DEFAULT_RENDER_ASSET_ORIGIN =
   "https://sketchi-studio.dimethyl.workers.dev";
+export const MAX_MINDMAP_REQUEST_BYTES = 256 * 1024;
 
 export interface StudioCodeModeRuntimeOptions {
   origin?: string;
@@ -122,6 +124,72 @@ async function readJson(request: Request): Promise<unknown> {
   }
 }
 
+async function readBoundedMindmapJson(
+  request: Request,
+): Promise<
+  | { ok: true; body: unknown }
+  | { ok: false; body: { omitted: true; reason: "request_too_large" } }
+> {
+  const contentLength = Number(request.headers.get("content-length"));
+  if (
+    Number.isFinite(contentLength) &&
+    contentLength > MAX_MINDMAP_REQUEST_BYTES
+  ) {
+    return {
+      ok: false,
+      body: { omitted: true, reason: "request_too_large" },
+    };
+  }
+
+  if (!request.body) return { ok: true, body: {} };
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+  for (;;) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    byteLength += chunk.value.byteLength;
+    if (byteLength > MAX_MINDMAP_REQUEST_BYTES) {
+      await reader.cancel("mindmap request byte limit exceeded");
+      return {
+        ok: false,
+        body: { omitted: true, reason: "request_too_large" },
+      };
+    }
+    chunks.push(chunk.value);
+  }
+
+  const bytes = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const text = new TextDecoder().decode(bytes);
+  try {
+    return { ok: true, body: JSON.parse(text) };
+  } catch {
+    return { ok: true, body: {} };
+  }
+}
+
+function mindmapTooLargeResult() {
+  return {
+    ok: false as const,
+    status: "invalid_input" as const,
+    issues: [
+      {
+        code: "request_too_large" as const,
+        severity: "error" as const,
+        stage: "input" as const,
+        ref: { kind: "request" as const, path: "input" },
+        message: `Mindmap request exceeds the ${MAX_MINDMAP_REQUEST_BYTES}-byte limit.`,
+        hint: "Send a smaller semantic topic hierarchy.",
+      },
+    ],
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -134,6 +202,21 @@ function buildStatus(result: BuildFlowchartResult): number {
     case "invalid_input":
       return 400;
     case "invalid_flowchart":
+    case "quality_failed":
+      return 422;
+    case "render_failed":
+    case "export_failed":
+    case "storage_failed":
+      return 500;
+  }
+}
+
+function mindmapBuildStatus(result: BuildMindmapResult): number {
+  if (result.ok) return 200;
+  switch (result.status) {
+    case "invalid_input":
+      return 400;
+    case "invalid_mindmap":
     case "quality_failed":
       return 422;
     case "render_failed":
@@ -306,6 +389,55 @@ export async function handleBuildFlowchartRequest(
     surface: "api",
   });
 
+  return jsonResponse(
+    result,
+    status,
+    codeModeUsageResponseHeaders(usageContext),
+  );
+}
+
+export async function handleBuildMindmapRequest(
+  env: StudioEnv,
+  request: Request,
+): Promise<Response> {
+  const usageContext = createCodeModeUsageContext(request);
+  const startedAt = Date.now();
+  const boundedRequest = await readBoundedMindmapJson(request);
+  if (!boundedRequest.ok) {
+    const result = mindmapTooLargeResult();
+    captureCodeModeUsageEvent({
+      context: usageContext,
+      durationMs: Date.now() - startedAt,
+      env,
+      operation: "buildMindmap",
+      request,
+      requestBody: boundedRequest.body,
+      responseBody: result,
+      statusCode: 413,
+      surface: "api",
+    });
+    return jsonResponse(
+      result,
+      413,
+      codeModeUsageResponseHeaders(usageContext),
+    );
+  }
+  const requestBody = boundedRequest.body;
+  const result = await createStudioCodeModeRuntime(env, {
+    origin: new URL(request.url).origin,
+  }).buildMindmap(requestBody);
+  const status = mindmapBuildStatus(result);
+  captureCodeModeUsageEvent({
+    context: usageContext,
+    durationMs: Date.now() - startedAt,
+    env,
+    operation: "buildMindmap",
+    request,
+    requestBody,
+    responseBody: result,
+    statusCode: status,
+    surface: "api",
+  });
   return jsonResponse(
     result,
     status,

@@ -632,6 +632,12 @@ function StudioRoute() {
                       />
                     ))}
                   </div>
+                  <a
+                    className="studio__artifact-link"
+                    href="/examples/public-mindmap"
+                  >
+                    Explore the new public mindmap capability →
+                  </a>
                 </div>
               </div>
             ) : (

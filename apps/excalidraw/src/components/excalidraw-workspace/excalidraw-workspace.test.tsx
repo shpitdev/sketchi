@@ -31,7 +31,7 @@ describe("ExcalidrawWorkspace", () => {
       screen.getByLabelText("Pharma batch disposition flow canvas"),
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: /Sketchi mindmap fixture/ }),
+      screen.getByRole("button", { name: /Public mindmap generation/ }),
     ).toBeTruthy();
 
     fireEvent.click(

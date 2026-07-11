@@ -581,6 +581,7 @@ function horizontalRangesOverlap(
 function connectionEdges(
   source: NodeSceneElement,
   target: NodeSceneElement,
+  direction: IntermediateDiagram["layout"]["direction"],
 ): {
   sourceEdge: ConnectionEdge;
   targetEdge: ConnectionEdge;
@@ -590,6 +591,12 @@ function connectionEdges(
   const dx = targetCenter.x - sourceCenter.x;
   const dy = targetCenter.y - sourceCenter.y;
   const sourceKind = source.kind?.toLowerCase();
+
+  if (direction === "LR" || direction === "RL") {
+    return dx >= 0
+      ? { sourceEdge: "right", targetEdge: "left" }
+      : { sourceEdge: "left", targetEdge: "right" };
+  }
 
   if (dy < 0) {
     if (
@@ -798,6 +805,7 @@ function routeForEdge(
   edge: DiagramEdge,
   index: number,
   shapesByNodeId: ReadonlyMap<string, NodeSceneElement>,
+  direction: IntermediateDiagram["layout"]["direction"],
 ): RoutedEdge {
   const source = shapesByNodeId.get(edge.source);
   const target = shapesByNodeId.get(edge.target);
@@ -806,7 +814,7 @@ function routeForEdge(
     throw new Error(`Cannot render edge "${edge.id}" with unresolved nodes.`);
   }
 
-  const { sourceEdge, targetEdge } = connectionEdges(source, target);
+  const { sourceEdge, targetEdge } = connectionEdges(source, target, direction);
 
   return {
     edge,
@@ -824,6 +832,7 @@ function arrowForRoute(
   portOffsets: ReadonlyMap<string, number>,
   shapes: readonly NodeSceneElement[],
   existingArrows: readonly ArrowSceneElement[],
+  direction: IntermediateDiagram["layout"]["direction"],
 ): ArrowSceneElement {
   const { edge, source, sourceEdge, target, targetEdge } = route;
   const portedStart = pointOnEdge(
@@ -840,7 +849,7 @@ function arrowForRoute(
   );
   let points = compactPoints([portedStart, portedEnd]);
 
-  if (center(target).y < center(source).y) {
+  if (travelsAgainstLayout(source, target, direction)) {
     points = exteriorLaneRoute(
       route,
       portedStart,
@@ -921,6 +930,25 @@ function arrowForRoute(
     points,
     ...(edge.label ? { label: edge.label } : {}),
   };
+}
+
+function travelsAgainstLayout(
+  source: NodeSceneElement,
+  target: NodeSceneElement,
+  direction: IntermediateDiagram["layout"]["direction"],
+): boolean {
+  const sourceCenter = center(source);
+  const targetCenter = center(target);
+  switch (direction) {
+    case "TB":
+      return targetCenter.y < sourceCenter.y;
+    case "BT":
+      return targetCenter.y > sourceCenter.y;
+    case "LR":
+      return targetCenter.x < sourceCenter.x;
+    case "RL":
+      return targetCenter.x > sourceCenter.x;
+  }
 }
 
 function compactPoints(
@@ -1624,7 +1652,7 @@ export function renderIntermediateDiagram(
     nodeShapes.map((shape) => [shape.nodeId, shape]),
   );
   const routedEdges = diagram.edges.map((edge, index) =>
-    routeForEdge(edge, index, shapesByNodeId),
+    routeForEdge(edge, index, shapesByNodeId, diagram.layout.direction),
   );
   const portOffsets = portOffsetsForRoutes(routedEdges);
   const edgeArrows: ArrowSceneElement[] = [];
@@ -1636,6 +1664,7 @@ export function renderIntermediateDiagram(
         portOffsets,
         nodeShapes,
         edgeArrows,
+        diagram.layout.direction,
       ),
     );
   }

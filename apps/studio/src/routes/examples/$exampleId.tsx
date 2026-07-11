@@ -2,6 +2,7 @@ import {
   normalizeDiagramInput,
   type DiagramToolInput,
 } from "@sketchi/diagram-agent";
+import { mindmapFixture } from "@sketchi/diagram-core";
 import {
   renderIntermediateDiagram,
   type RenderedDiagramScene,
@@ -18,7 +19,8 @@ export const Route = createFileRoute("/examples/$exampleId")({
 
 interface CuratedExample {
   blurb: string;
-  input: DiagramToolInput;
+  input?: DiagramToolInput;
+  scene?: RenderedDiagramScene;
   title: string;
 }
 
@@ -29,6 +31,12 @@ interface CuratedExample {
  * you can pan and zoom but not overwrite (view mode).
  */
 const EXAMPLES: Record<string, CuratedExample> = {
+  "public-mindmap": {
+    title: "Public mindmap generation",
+    blurb:
+      "Generated from a semantic nested topic hierarchy — pan and zoom to inspect it.",
+    scene: renderIntermediateDiagram(mindmapFixture),
+  },
   "how-it-works": {
     title: "How Sketchi works",
     blurb: "Read-only — pan and zoom, but nothing you change is saved.",
@@ -73,7 +81,12 @@ function useCuratedScene(
       return null;
     }
     try {
-      return renderIntermediateDiagram(normalizeDiagramInput(example.input));
+      return (
+        example.scene ??
+        (example.input
+          ? renderIntermediateDiagram(normalizeDiagramInput(example.input))
+          : null)
+      );
     } catch {
       return null;
     }

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagram-agent";
 import {
   getCodeModeDocs,
   searchCodeModeDocs,
+  SKETCHI_CODE_MODE_TYPES,
+  SKETCHI_CODE_MODE_VERSION,
 } from "./codemode-mcp-docs.server";
 
 describe("Code Mode MCP docs", () => {
@@ -12,6 +15,7 @@ describe("Code Mode MCP docs", () => {
 
     expect(docs.content).toContain("typed host tools");
     expect(docs.content).toContain("sketchi.buildFlowchart");
+    expect(docs.content).toContain("sketchi.buildMindmap");
     expect(docs.content).toContain("sketchi.getArtifact");
     expect(docs.content).toContain("sketchi.applyDiagramPatch");
     expect(docs.content).toContain("Excalidraw and PNG URLs");
@@ -29,6 +33,50 @@ describe("Code Mode MCP docs", () => {
         }),
       ]),
     );
+  });
+
+  it("emits a complete mindmap-aware public type contract", () => {
+    expect(SKETCHI_CODE_MODE_VERSION).toBe("2026-07-10");
+    expect(SKETCHI_CODE_MODE_TYPES).toContain("interface BuildMindmapRequest");
+    expect(SKETCHI_CODE_MODE_TYPES).toContain("type BuildMindmapResult");
+    expect(SKETCHI_CODE_MODE_TYPES).toContain(
+      'stage: "input" | "flowchart" | "mindmap"',
+    );
+    for (const operation of [
+      "buildFlowchart",
+      "buildMindmap",
+      "getArtifact",
+      "applyDiagramPatch",
+    ]) {
+      expect(SKETCHI_CODE_MODE_TYPES).toContain(`${operation}(`);
+      expect(getCodeModeDocs({ topic: "overview" }).content).toContain(
+        operation,
+      );
+      expect(getCodeModeDocs({ topic: "execute" }).content).toContain(
+        operation,
+      );
+    }
+    expect(getCodeModeDocs({ topic: "buildMindmap" }).content).toContain(
+      "Do not supply coordinates, edges, or Excalidraw JSON",
+    );
+    expect(getCodeModeDocs({ topic: "buildMindmap" }).content).toContain(
+      "intentional output formats",
+    );
+  });
+
+  it("keeps the published catalog complete for mindmap requests and bounded failures", () => {
+    const catalog = readFileSync("docs/mcp-tool-catalog.md", "utf8");
+    for (const declaration of [
+      "interface BuildMindmapRequest",
+      "type BuildMindmapResult",
+      '"request_too_large"',
+      '"mindmap_too_deep"',
+      '"mindmap_too_large"',
+    ]) {
+      expect(catalog).toContain(declaration);
+    }
+    expect(catalog).toContain("flowchart or mindmap artifact");
+    expect(catalog).toContain("matching `buildFlowchart` or");
   });
 
   it("searches operation guidance and non-goals", () => {

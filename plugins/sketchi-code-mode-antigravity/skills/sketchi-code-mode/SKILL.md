@@ -11,7 +11,7 @@ Use the bundled `sketchi-code-mode` MCP server for Sketchi diagrams instead of r
 
 1. If syntax is unclear, call `sketchi-code-mode/docs` or `sketchi-code-mode/search`.
 2. Call `sketchi-code-mode/execute` with an async JavaScript arrow function.
-3. Inside the function, use `sketchi.buildFlowchart`, then `sketchi.applyDiagramPatch` only for styling or supported visual edits.
+3. Inside the function, use `sketchi.buildFlowchart` for process graphs or `sketchi.buildMindmap` for nested topic hierarchies, then `sketchi.applyDiagramPatch` only for styling or supported visual edits.
 4. Request user-facing artifacts:
 
 ```js

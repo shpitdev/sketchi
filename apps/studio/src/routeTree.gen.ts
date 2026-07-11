@@ -22,6 +22,7 @@ import { Route as DiagramsDiagramIdEditRouteImport } from "./routes/diagrams_/$d
 import { Route as ArtifactsArtifactIdEditRouteImport } from "./routes/artifacts_/$artifactId/edit";
 import { Route as ApiStudioProjectsRouteImport } from "./routes/api/studio/projects";
 import { Route as ApiPlaygroundArtifactsRouteImport } from "./routes/api/playground/artifacts";
+import { Route as ApiV1MindmapsBuildRouteImport } from "./routes/api/v1/mindmaps/build";
 import { Route as ApiV1FlowchartsBuildRouteImport } from "./routes/api/v1/flowcharts/build";
 import { Route as ApiV1ArtifactsArtifactIdRouteImport } from "./routes/api/v1/artifacts/$artifactId";
 import { Route as ApiStudioProjectsProjectIdRouteImport } from "./routes/api/studio/projects_/$projectId";
@@ -94,6 +95,11 @@ const ApiPlaygroundArtifactsRoute = ApiPlaygroundArtifactsRouteImport.update({
   path: "/api/playground/artifacts",
   getParentRoute: () => rootRouteImport,
 } as any);
+const ApiV1MindmapsBuildRoute = ApiV1MindmapsBuildRouteImport.update({
+  id: "/api/v1/mindmaps/build",
+  path: "/api/v1/mindmaps/build",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ApiV1FlowchartsBuildRoute = ApiV1FlowchartsBuildRouteImport.update({
   id: "/api/v1/flowcharts/build",
   path: "/api/v1/flowcharts/build",
@@ -149,6 +155,7 @@ export interface FileRoutesByFullPath {
   "/api/studio/projects/$projectId": typeof ApiStudioProjectsProjectIdRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
+  "/api/v1/mindmaps/build": typeof ApiV1MindmapsBuildRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
 export interface FileRoutesByTo {
@@ -170,6 +177,7 @@ export interface FileRoutesByTo {
   "/api/studio/projects/$projectId": typeof ApiStudioProjectsProjectIdRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
+  "/api/v1/mindmaps/build": typeof ApiV1MindmapsBuildRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
 export interface FileRoutesById {
@@ -192,6 +200,7 @@ export interface FileRoutesById {
   "/api/studio/projects_/$projectId": typeof ApiStudioProjectsProjectIdRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
+  "/api/v1/mindmaps/build": typeof ApiV1MindmapsBuildRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
 export interface FileRouteTypes {
@@ -215,6 +224,7 @@ export interface FileRouteTypes {
     | "/api/studio/projects/$projectId"
     | "/api/v1/artifacts/$artifactId"
     | "/api/v1/flowcharts/build"
+    | "/api/v1/mindmaps/build"
     | "/api/v1/artifacts/$artifactId/patch";
   fileRoutesByTo: FileRoutesByTo;
   to:
@@ -236,6 +246,7 @@ export interface FileRouteTypes {
     | "/api/studio/projects/$projectId"
     | "/api/v1/artifacts/$artifactId"
     | "/api/v1/flowcharts/build"
+    | "/api/v1/mindmaps/build"
     | "/api/v1/artifacts/$artifactId/patch";
   id:
     | "__root__"
@@ -257,6 +268,7 @@ export interface FileRouteTypes {
     | "/api/studio/projects_/$projectId"
     | "/api/v1/artifacts/$artifactId"
     | "/api/v1/flowcharts/build"
+    | "/api/v1/mindmaps/build"
     | "/api/v1/artifacts/$artifactId/patch";
   fileRoutesById: FileRoutesById;
 }
@@ -278,6 +290,7 @@ export interface RootRouteChildren {
   ApiStudioProjectsProjectIdRoute: typeof ApiStudioProjectsProjectIdRoute;
   ApiV1ArtifactsArtifactIdRoute: typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   ApiV1FlowchartsBuildRoute: typeof ApiV1FlowchartsBuildRoute;
+  ApiV1MindmapsBuildRoute: typeof ApiV1MindmapsBuildRoute;
 }
 
 declare module "@tanstack/react-router" {
@@ -373,6 +386,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiPlaygroundArtifactsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/api/v1/mindmaps/build": {
+      id: "/api/v1/mindmaps/build";
+      path: "/api/v1/mindmaps/build";
+      fullPath: "/api/v1/mindmaps/build";
+      preLoaderRoute: typeof ApiV1MindmapsBuildRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/api/v1/flowcharts/build": {
       id: "/api/v1/flowcharts/build";
       path: "/api/v1/flowcharts/build";
@@ -461,6 +481,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiStudioProjectsProjectIdRoute: ApiStudioProjectsProjectIdRoute,
   ApiV1ArtifactsArtifactIdRoute: ApiV1ArtifactsArtifactIdRouteWithChildren,
   ApiV1FlowchartsBuildRoute: ApiV1FlowchartsBuildRoute,
+  ApiV1MindmapsBuildRoute: ApiV1MindmapsBuildRoute,
 };
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

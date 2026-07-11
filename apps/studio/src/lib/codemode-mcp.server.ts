@@ -373,6 +373,7 @@ export async function executeSketchiCodeMode(
           name: "sketchi",
           fns: {
             buildFlowchart: (request) => runtime.buildFlowchart(request),
+            buildMindmap: (request) => runtime.buildMindmap(request),
             getArtifact: (request) => runtime.getArtifact(request),
             applyDiagramPatch: (request) => runtime.applyDiagramPatch(request),
           },
@@ -515,7 +516,7 @@ export function createSketchiMcpServer(
         "Write JavaScript only: no TypeScript syntax, annotations, interfaces, generics, imports, or named wrapper functions.",
         "Use the canonical shape: async () => { const result = await sketchi.buildFlowchart(...); return result; }",
         "Code fences and trailing expression semicolons are normalized before execution.",
-        "The sandbox exposes only sketchi.buildFlowchart, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
+        "The sandbox exposes sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
         "First get the semantic graph accepted, then use patch operations for deterministic visual changes.",
         "For final user-facing output, return accepted Sketchi artifact ids, format refs, and Excalidraw/PNG URLs. Do not recreate accepted diagrams as Markdown or Mermaid artifacts.",
         "When artifactDelivery is available, the first text content block is the final user-facing answer; copy it verbatim and stop.",

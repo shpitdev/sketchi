@@ -67,6 +67,16 @@ const CIRCLE_TO_DIAMOND_CODE = `async () => {
   });
 }`;
 
+const BUILD_MINDMAP_CODE = `async () => sketchi.buildMindmap({
+  spec: {
+    title: "Code Mode mindmap",
+    root: { label: "Mindmap", children: [
+      { label: "Branches", children: [{ label: "Depth" }] },
+      { label: "Artifacts", children: [{ label: "Excalidraw" }] }
+    ] }
+  }
+})`;
+
 const ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE = `async () => ({
   ok: true,
   status: "accepted",
@@ -301,6 +311,21 @@ function createMcpFetch(
 }
 
 describe("Sketchi Code Mode MCP server", () => {
+  it("exposes buildMindmap inside the Code Mode namespace", async () => {
+    const result = await executeSketchiCodeMode(
+      {},
+      { code: BUILD_MINDMAP_CODE },
+      { executor: createInProcessExecutor() },
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      result: {
+        ok: true,
+        status: "accepted",
+        normalizedSpec: { root: { id: "topic-0" } },
+      },
+    });
+  });
   it("normalizes common LLM execute input wrappers", () => {
     expect(normalizeSketchiExecuteCode("async () => { return 1; };")).toBe(
       "async () => { return 1; }",

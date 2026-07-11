@@ -190,6 +190,35 @@ describe("renderIntermediateDiagram", () => {
     );
   });
 
+  it("keeps forward LR flowchart edges on horizontal ports", () => {
+    const scene = renderIntermediateDiagram({
+      ...flowchartFixture,
+      layout: { ...flowchartFixture.layout, direction: "LR" },
+    });
+    const source = scene.elements.find(
+      (element) => element.type === "node" && element.nodeId === "prompt",
+    );
+    const target = scene.elements.find(
+      (element) => element.type === "node" && element.nodeId === "requirements",
+    );
+    const arrow = scene.elements.find(
+      (element) =>
+        element.type === "arrow" && element.edgeId === "prompt-requirements",
+    );
+    if (
+      !source ||
+      source.type !== "node" ||
+      !target ||
+      target.type !== "node" ||
+      !arrow ||
+      arrow.type !== "arrow"
+    ) {
+      throw new Error("Expected LR flowchart route geometry.");
+    }
+    expect(arrow.points[0]?.x).toBe(source.x + source.width);
+    expect(arrow.points.at(-1)?.x).toBe(target.x);
+  });
+
   it("maps flowchart kinds to real scene shapes", () => {
     const scene = renderIntermediateDiagram(flowchartFixture);
 

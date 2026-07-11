@@ -282,6 +282,234 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 }
 
 describe("Code Mode runtime", () => {
+  it("builds a nested mindmap with deterministic hierarchy ids and exports", async () => {
+    const runtime = createTestRuntime();
+    const built = await runtime.buildMindmap({
+      requestId: "mindmap-request",
+      spec: {
+        title: "Launch strategy",
+        root: {
+          label: "Launch",
+          children: [
+            {
+              label: "Product",
+              children: [{ label: "Scope" }, { label: "Quality" }],
+            },
+            { label: "Go to market", children: [{ label: "Docs" }] },
+          ],
+        },
+      },
+    });
+    expect(built).toMatchObject({
+      ok: true,
+      status: "accepted",
+      requestId: "mindmap-request",
+      normalizedSpec: {
+        id: "launch-strategy",
+        root: {
+          id: "topic-0",
+          children: [
+            {
+              id: "topic-0-0",
+              children: [{ id: "topic-0-0-0" }, { id: "topic-0-0-1" }],
+            },
+            { id: "topic-0-1" },
+          ],
+        },
+      },
+    });
+    if (!built.ok) throw new Error("Expected accepted mindmap");
+    expect(built.artifact.formats.map((format) => format.format)).toEqual([
+      "excalidraw",
+      "scene",
+    ]);
+  });
+
+  it("returns typed mindmap hierarchy failures", async () => {
+    const result = await createTestRuntime().buildMindmap({
+      spec: { title: "Empty", root: { label: "Only root" } },
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      status: "invalid_mindmap",
+      issues: [{ code: "disconnected_graph", stage: "mindmap" }],
+    });
+  });
+
+  it("preflights extreme mindmap depth before recursive schema decoding", async () => {
+    const root: { label: string; children?: unknown[] } = { label: "root" };
+    let current = root;
+    for (let depth = 0; depth < 2_000; depth += 1) {
+      const child: { label: string; children?: unknown[] } = {
+        label: `depth ${depth}`,
+      };
+      current.children = [child];
+      current = child;
+    }
+    const result = await createTestRuntime().buildMindmap({
+      spec: { title: "Deep", root },
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      status: "invalid_mindmap",
+      issues: [{ code: "mindmap_too_deep", stage: "mindmap" }],
+    });
+  });
+
+  it("preflights overly wide mindmaps", async () => {
+    const result = await createTestRuntime().buildMindmap({
+      spec: {
+        title: "Wide",
+        root: {
+          label: "root",
+          children: Array.from({ length: 101 }, (_, index) => ({
+            label: `topic ${index}`,
+          })),
+        },
+      },
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      status: "invalid_mindmap",
+      issues: [{ code: "mindmap_too_large" }],
+    });
+  });
+
+  it("counts malformed child slots and keeps extreme-width failures bounded", async () => {
+    const result = await createTestRuntime().buildMindmap({
+      spec: {
+        title: "Malformed width",
+        root: {
+          label: "root",
+          children: Array.from({ length: 100_000 }, () => null),
+        },
+      },
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      status: "invalid_mindmap",
+      issues: [{ code: "mindmap_too_large" }],
+    });
+    expect(result.issues).toHaveLength(1);
+    expect(JSON.stringify(result).length).toBeLessThan(2_000);
+  });
+
+  it("caps schema issue amplification for every Code Mode operation", async () => {
+    const result = await createTestRuntime().buildFlowchart({
+      spec: {
+        title: "Malformed",
+        nodes: Array.from({ length: 1_000 }, () => ({})),
+      },
+    });
+    expect(result).toMatchObject({ ok: false, status: "invalid_input" });
+    expect(result.issues).toHaveLength(21);
+    expect(result.issues.at(-1)?.message).toContain(
+      "additional input issues were omitted",
+    );
+  });
+
+  it.each([
+    [
+      "title",
+      { title: "  ", root: { label: "Root", children: [{ label: "Child" }] } },
+      "spec.title",
+    ],
+    [
+      "topic",
+      { title: "Valid", root: { label: "Root", children: [{ label: "''" }] } },
+      "spec.root.children.[0].label",
+    ],
+    [
+      "tool-cleaned topic",
+      {
+        title: "Valid",
+        root: { label: "Root", children: [{ label: " , title:" }] },
+      },
+      "spec.root.children.[0].label",
+    ],
+  ])(
+    "returns precise invalid_input paths for empty semantic %s strings",
+    async (_name, spec, path) => {
+      const result = await createTestRuntime().buildMindmap({ spec });
+      expect(result).toMatchObject({
+        ok: false,
+        status: "invalid_input",
+        issues: [{ stage: "input", ref: { path } }],
+      });
+    },
+  );
+
+  it("renders and exports right-to-left mindmaps", async () => {
+    const result = await createTestRuntime().buildMindmap({
+      spec: {
+        title: "RTL hierarchy",
+        layout: { direction: "RL" },
+        root: {
+          label: "Root",
+          children: [{ label: "Child", children: [{ label: "Leaf" }] }],
+        },
+      },
+      options: { inlineArtifacts: ["scene", "excalidraw"] },
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      normalizedSpec: { layout: { direction: "RL" } },
+    });
+    if (!result.ok) throw new Error("Expected accepted RL mindmap");
+    const scene = parseInlineScene(
+      result.artifact.formats.find((format) => format.format === "scene")
+        ?.inline,
+    );
+    const nodes = scene.elements.filter((element) => element.type === "node");
+    const root = nodes.find((node) => node.nodeId === "topic-0");
+    const child = nodes.find((node) => node.nodeId === "topic-0-0");
+    expect(root?.x).toBeGreaterThan(child?.x ?? Number.POSITIVE_INFINITY);
+    expect(
+      result.artifact.formats.find((format) => format.format === "excalidraw")
+        ?.inline,
+    ).toBeDefined();
+  });
+
+  it("round-trips a persisted mindmap through getArtifact and patch retrieval", async () => {
+    const runtime = createTestRuntime();
+    const built = await runtime.buildMindmap({
+      spec: {
+        title: "Roadmap",
+        root: {
+          label: "Roadmap",
+          children: [{ label: "Now" }, { label: "Next" }],
+        },
+      },
+    });
+    if (!built.ok) throw new Error("Expected accepted mindmap");
+    const persisted = await runtime.getArtifact({
+      artifactId: built.artifact.artifactId,
+      format: "scene",
+      inline: true,
+    });
+    expect(persisted).toMatchObject({ ok: true, diagramId: "roadmap" });
+    const patched = await runtime.applyDiagramPatch({
+      source: { artifactId: built.artifact.artifactId },
+      operations: [
+        {
+          op: "replaceText",
+          selector: { nodeIds: ["topic-0-1"] },
+          text: "Later",
+        },
+      ],
+    });
+    if (!patched.ok) throw new Error("Expected accepted mindmap patch");
+    const retrieved = await runtime.getArtifact({
+      artifactId: patched.artifact.artifactId,
+      format: "scene",
+      inline: true,
+    });
+    expect(retrieved).toMatchObject({
+      ok: true,
+      provenance: { sourceArtifactId: built.artifact.artifactId },
+    });
+    expect(JSON.stringify(retrieved)).toContain("Later");
+  });
   it("builds an accepted flowchart and retrieves stored formats", async () => {
     const runtime = createTestRuntime();
     const built = await runtime.buildFlowchart({

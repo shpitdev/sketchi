@@ -6,7 +6,9 @@ import type {
 } from "@sketchi/diagram-agent";
 
 import {
+  MAX_MINDMAP_REQUEST_BYTES,
   handleBuildFlowchartRequest,
+  handleBuildMindmapRequest,
   handleGetArtifactRequest,
   handlePatchArtifactRequest,
 } from "./codemode-api.server";
@@ -201,6 +203,147 @@ function delay(ms: number): Promise<void> {
 }
 
 describe("Code Mode API handlers", () => {
+  it("builds a public mindmap through the no-auth HTTP handler", async () => {
+    const response = await handleBuildMindmapRequest(
+      {},
+      postRequest("https://studio.test/api/v1/mindmaps/build", {
+        spec: {
+          title: "Release plan",
+          root: {
+            label: "Release",
+            children: [
+              { label: "Engineering", children: [{ label: "Verification" }] },
+              { label: "Launch", children: [{ label: "Documentation" }] },
+            ],
+          },
+        },
+      }),
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      status: "accepted",
+      normalizedSpec: {
+        root: {
+          id: "topic-0",
+          children: [{ id: "topic-0-0" }, { id: "topic-0-1" }],
+        },
+      },
+    });
+  });
+
+  it("returns 422 instead of overflowing on a 2,000-level public mindmap", async () => {
+    const root: { label: string; children?: unknown[] } = { label: "root" };
+    let current = root;
+    for (let depth = 0; depth < 2_000; depth += 1) {
+      const child: { label: string; children?: unknown[] } = {
+        label: `depth ${depth}`,
+      };
+      current.children = [child];
+      current = child;
+    }
+    const response = await handleBuildMindmapRequest(
+      {},
+      postRequest("https://studio.test/api/v1/mindmaps/build", {
+        spec: { title: "Deep", root },
+      }),
+    );
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      status: "invalid_mindmap",
+      issues: [{ code: "mindmap_too_deep" }],
+    });
+  });
+
+  it("rejects oversized public mindmap request bodies with a typed 413", async () => {
+    const bucket = new MemoryBucket();
+    const response = await handleBuildMindmapRequest(
+      { SKETCHI_ARTIFACTS: bucket },
+      postRequest("https://studio.test/api/v1/mindmaps/build", {
+        spec: {
+          title: "Large",
+          root: {
+            label: "root",
+            children: [{ label: "x".repeat(MAX_MINDMAP_REQUEST_BYTES) }],
+          },
+        },
+      }),
+    );
+    expect(response.status).toBe(413);
+    expect(response.headers.get("x-sketchi-run-id")).toMatch(/^run_/);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      status: "invalid_input",
+      issues: [{ code: "request_too_large", stage: "input" }],
+    });
+    const usageEvents = await waitForUsageEvents(bucket, 1);
+    expect(usageEvents[0]).toMatchObject({
+      operation: "buildMindmap",
+      request: {
+        body: {
+          value: { omitted: true, reason: "request_too_large" },
+        },
+      },
+      statusCode: 413,
+    });
+  });
+
+  it("rejects malformed extreme width without response amplification", async () => {
+    const response = await handleBuildMindmapRequest(
+      {},
+      postRequest("https://studio.test/api/v1/mindmaps/build", {
+        spec: {
+          title: "Malformed width",
+          root: {
+            label: "root",
+            children: Array.from({ length: 40_000 }, () => null),
+          },
+        },
+      }),
+    );
+    expect(response.status).toBe(422);
+    const text = await response.text();
+    expect(text.length).toBeLessThan(2_000);
+    expect(JSON.parse(text)).toMatchObject({
+      issues: [{ code: "mindmap_too_large" }],
+    });
+  });
+
+  it("stops and cancels an oversized chunked body without Content-Length", async () => {
+    let cancelled = false;
+    let pullCount = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pullCount += 1;
+        controller.enqueue(
+          new Uint8Array(pullCount === 1 ? MAX_MINDMAP_REQUEST_BYTES : 2),
+        );
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const requestInit: RequestInit & { duplex: "half" } = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: stream,
+      duplex: "half",
+    };
+    const request = new Request(
+      "https://studio.test/api/v1/mindmaps/build",
+      requestInit,
+    );
+    expect(request.headers.has("content-length")).toBe(false);
+    const response = await handleBuildMindmapRequest({}, request);
+    expect(response.status).toBe(413);
+    expect(response.headers.get("x-sketchi-run-id")).toMatch(/^run_/);
+    expect(cancelled).toBe(true);
+    expect(pullCount).toBeLessThanOrEqual(3);
+    await expect(response.json()).resolves.toMatchObject({
+      issues: [{ code: "request_too_large" }],
+    });
+  });
   it("builds, retrieves, and patches an artifact through Response handlers", async () => {
     const buildResponse = await handleBuildFlowchartRequest(
       {},

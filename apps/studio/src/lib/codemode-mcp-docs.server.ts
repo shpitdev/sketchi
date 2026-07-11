@@ -8,6 +8,7 @@ export const CodeModeDocsTopicSchema = z
     "overview",
     "execute",
     "buildFlowchart",
+    "buildMindmap",
     "getArtifact",
     "applyDiagramPatch",
     "patchOperations",
@@ -89,7 +90,7 @@ interface CatalogEntry {
   examples?: CodeExample[];
 }
 
-export const SKETCHI_CODE_MODE_VERSION = "2026-06-27";
+export const SKETCHI_CODE_MODE_VERSION = "2026-07-10";
 
 const PATCH_OPERATION_SUMMARY = [
   "- setDefaultStyle: set fallback strokeColor, fillColor, textColor, or backgroundColor for the scene.",
@@ -151,6 +152,7 @@ const FULL_PATCH_REQUEST_EXAMPLE = `{
 
 export const SKETCHI_CODE_MODE_TYPES = `declare const sketchi: {
   buildFlowchart(input: BuildFlowchartRequest): Promise<BuildFlowchartResult>;
+  buildMindmap(input: BuildMindmapRequest): Promise<BuildMindmapResult>;
   getArtifact(input: GetArtifactRequest): Promise<GetArtifactResult>;
   applyDiagramPatch(input: ApplyDiagramPatchRequest): Promise<ApplyDiagramPatchResult>;
 };
@@ -159,6 +161,15 @@ type FlowchartNodeKind = "start" | "process" | "decision" | "end";
 type ArtifactFormat = "scene" | "excalidraw" | "png";
 type InlineArtifactFormat = "scene" | "excalidraw";
 type DiagramShape = "rectangle" | "diamond" | "ellipse" | "circle";
+
+interface MindmapTopic { label: string; children?: MindmapTopic[]; }
+interface MindmapSpec {
+  id?: string;
+  title: string;
+  root: MindmapTopic;
+  layout?: { direction?: "LR" | "RL" };
+  style?: { accentColor?: string; backgroundColor?: string };
+}
 
 interface FlowchartSpec {
   id?: string;
@@ -185,6 +196,16 @@ interface FlowchartSpec {
 interface BuildFlowchartRequest {
   requestId?: string;
   spec: FlowchartSpec;
+  options?: {
+    artifactFormats?: ArtifactFormat[];
+    inlineArtifacts?: InlineArtifactFormat[];
+    minQualityScore?: number;
+  };
+}
+
+interface BuildMindmapRequest {
+  requestId?: string;
+  spec: MindmapSpec;
   options?: {
     artifactFormats?: ArtifactFormat[];
     inlineArtifacts?: InlineArtifactFormat[];
@@ -241,13 +262,17 @@ interface ApplyDiagramPatchRequest {
 interface CodeModeIssue {
   code: string;
   severity: "error" | "warning";
-  stage: "input" | "flowchart" | "quality" | "render" | "export" | "storage";
+  stage: "input" | "flowchart" | "mindmap" | "quality" | "render" | "export" | "storage";
   ref?: { kind: "request" | "diagram" | "node" | "edge" | "artifact"; id?: string; path?: string };
   message: string;
   hint: string;
 }
 
 type BuildFlowchartResult =
+  | { ok: true; status: "accepted"; buildId: string; normalizedSpec: unknown; quality: unknown; artifact: ArtifactBundle; issues: CodeModeIssue[] }
+  | { ok: false; status: string; issues: CodeModeIssue[]; normalizedSpec?: unknown; quality?: unknown; partial?: unknown };
+
+type BuildMindmapResult =
   | { ok: true; status: "accepted"; buildId: string; normalizedSpec: unknown; quality: unknown; artifact: ArtifactBundle; issues: CodeModeIssue[] }
   | { ok: false; status: string; issues: CodeModeIssue[]; normalizedSpec?: unknown; quality?: unknown; partial?: unknown };
 
@@ -458,7 +483,7 @@ const catalog: CatalogEntry[] = [
     content: [
       "Sketchi Code Mode MCP is for external agent harnesses: Codex, Claude Code, OpenCode, and similar clients.",
       "The server exposes a small contract: docs, search, and execute. execute runs JavaScript against a typed sketchi client.",
-      "The public sketchi client has exactly three operations: buildFlowchart, getArtifact, and applyDiagramPatch.",
+      "The public sketchi client has four operations: buildFlowchart, buildMindmap, getArtifact, and applyDiagramPatch.",
       "The final deliverable is the accepted Sketchi artifact bundle: return the artifactId, format list, and Excalidraw/PNG artifact URLs instead of creating a separate Markdown, Mermaid, or prose-only diagram artifact.",
       "Use docs({ topic }) for full request envelopes and examples. Use search({ query }) to discover operation-specific topics such as patchOperations.",
       "The managed Sketchi product model, Convex threads, user artifact lineage, and Studio chat/canvas parity are intentionally out of this slice.",
@@ -471,15 +496,15 @@ const catalog: CatalogEntry[] = [
     topic: "execute",
     keywords: ["execute", "code", "javascript", "typescript", "sandbox"],
     snippet:
-      "Run an async JavaScript arrow function with sketchi.buildFlowchart, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
+      "Run an async JavaScript arrow function with sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
     content: [
       "execute({ code }) runs an async JavaScript arrow function.",
       "This matches the Code Mode pattern: typed host tools are exposed as a namespace inside the sandbox, here sketchi.*.",
-      "Cloudflare Code Mode exposes typed namespace methods in generated code; this server follows that shape with sketchi.buildFlowchart, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
+      "Cloudflare Code Mode exposes typed namespace methods in generated code; this server follows that shape with sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
       "Pass the function expression itself. A trailing semicolon and outer markdown code fence are accepted, but examples omit them so copied code is canonical.",
       "Write JavaScript only: no TypeScript annotations, interfaces, generics, imports, or named wrapper functions. Use the canonical shape async () => { const result = await sketchi.buildFlowchart(...); return result; }.",
       "Do not define a named function and then call it. Put the arrow function body directly in code.",
-      "Inside code, call sketchi.buildFlowchart(input), sketchi.getArtifact(input), and sketchi.applyDiagramPatch(input).",
+      "Inside code, call sketchi.buildFlowchart(input) for process graphs or sketchi.buildMindmap(input) for topic hierarchies, then sketchi.getArtifact(input) or sketchi.applyDiagramPatch(input) as needed.",
       "The sandbox must not receive secrets, storage bindings, model credentials, or raw network access.",
       "Call sketchi methods sequentially when possible so a harness can inspect structured failures and retry deliberately.",
       "For user-facing completion, return the accepted Sketchi artifactId plus Excalidraw and PNG URLs from the MCP result. Do not synthesize a Mermaid or Markdown replacement after Sketchi accepts an artifact.",
@@ -527,6 +552,29 @@ const catalog: CatalogEntry[] = [
     ].join("\n"),
   },
   {
+    id: "buildMindmap",
+    kind: "operation",
+    title: "buildMindmap",
+    topic: "buildMindmap",
+    keywords: ["build", "mindmap", "topic", "hierarchy", "tree", "branch"],
+    snippet: "Create a mindmap from a semantic nested topic hierarchy.",
+    content: [
+      "buildMindmap accepts a semantic MindmapSpec with one nested root topic. Do not supply coordinates, edges, or Excalidraw JSON.",
+      "The semantic-input restriction does not limit outputs: scene, Excalidraw, and PNG remain intentional output formats selected through artifact options.",
+      "Children remain in caller order and receive deterministic path identifiers such as topic-0-1-0.",
+      'Request envelope: { spec: MindmapSpec, options?: { artifactFormats?: ["scene", "excalidraw", "png"], inlineArtifacts?: ["scene", "excalidraw"], minQualityScore?: number } }.',
+      "Use nested children to express branches and depth. The public boundary supports LR or RL hierarchy layout.",
+      "If buildMindmap returns ok: false, repair the hierarchy from its typed issues and retry before patching.",
+    ].join("\n"),
+    examples: [
+      {
+        title: "Product launch mindmap",
+        language: "js",
+        code: `async () => sketchi.buildMindmap({\n  spec: {\n    title: "Product launch",\n    root: { label: "Launch", children: [\n      { label: "Product", children: [{ label: "Scope" }, { label: "Quality" }] },\n      { label: "Go to market", children: [{ label: "Docs" }, { label: "Enablement" }] }\n    ] }\n  },\n  options: { artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: ["excalidraw"] }\n})`,
+      },
+    ],
+  },
+  {
     id: "getArtifact",
     kind: "operation",
     title: "getArtifact",
@@ -552,7 +600,7 @@ const catalog: CatalogEntry[] = [
       "Hosted MCP/API responses include url fields for raw artifact downloads. Excalidraw URLs return importable JSON; PNG URLs return image bytes.",
       "Pass inline: true only when the harness needs scene or Excalidraw JSON in the MCP response.",
       "To fetch raw artifact bytes, request GET /api/v1/artifacts/{artifactId}?format=excalidraw&raw=true or format=png&raw=true from the Studio API.",
-      "Use the artifactId returned by buildFlowchart or applyDiagramPatch.",
+      "Use the artifactId returned by buildFlowchart, buildMindmap, or applyDiagramPatch.",
     ].join("\n"),
   },
   {
@@ -579,7 +627,7 @@ const catalog: CatalogEntry[] = [
       "Selectors can target nodeIds, edgeIds, labels, element ids, kinds, or broad scopes.",
       `Supported operation names: ${DIAGRAM_PATCH_OPERATION_NAMES.join(", ")}.`,
       PATCH_OPERATION_SUMMARY,
-      "Patch operations do not create or delete nodes and edges. Rebuild the FlowchartSpec for structural changes.",
+      "Patch operations do not create or delete structure. Use buildFlowchart again for process-graph changes or buildMindmap again for hierarchy changes.",
       "For color changes, use 6-digit hex strings such as #7c3aed.",
       "For hosted visual proof after a patch, include png in artifactFormats and fetch the raw Studio API artifact bytes.",
       "If export returns arrow_overlap, first rebuild the FlowchartSpec into a cleaner DAG. rerouteEdges preserves connectivity, but it cannot reliably fix a graph with a long upward return edge.",
@@ -656,8 +704,8 @@ const catalog: CatalogEntry[] = [
       "First get the semantic graph accepted, then apply visual patches.",
     content: [
       "For mixed requests like 'circle connected to a purple decision diamond', split the task.",
-      "Step 1: build a valid semantic flowchart with nodes and edges.",
-      "Step 2: inspect issues. If not accepted, repair the spec and call buildFlowchart again.",
+      "Step 1: choose buildFlowchart for a process graph or buildMindmap for a nested topic hierarchy.",
+      "Step 2: inspect issues. If not accepted, repair the spec and call the same build operation again.",
       "Step 3: once accepted, use applyDiagramPatch for circle, diamond, color, movement, rerouteEdges, or replaceText tweaks.",
       "For broad architecture prompts, keep the first build small and readable: one start, a mostly monotonic spine, a few decision or branch points, and separate terminal nodes for separate outcomes.",
       "Step 4: after an accepted build or patch, do not fetch the scene just to make a local summary. The accepted artifact bundle is already the deliverable.",
@@ -691,6 +739,7 @@ const catalog: CatalogEntry[] = [
       "All rejected operations return structured issues with code, severity, stage, ref, message, and hint.",
       "input-stage issues usually mean the request shape is wrong. Fix the referenced path.",
       "flowchart-stage issues mean node ids, edges, starts, ends, or decision branches are invalid.",
+      "mindmap-stage issues mean the topic hierarchy exceeds structural limits or is not a valid rooted tree.",
       "quality-stage issues mean the diagram is technically valid but too weak or generic. Improve labels and branching.",
       "patch issues such as unknown_patch_target mean the selector does not match the accepted artifact.",
       "unsupported_patch_operation on operations.[n].op means the op name is not supported; use patchOperations or the issue hint to pick an allowed value.",
@@ -745,7 +794,7 @@ const catalog: CatalogEntry[] = [
     snippet:
       "When Sketchi accepts an artifact, the final result is that artifact bundle, not a recreated Markdown diagram.",
     content:
-      "Do not create a Markdown, Mermaid, local file, Antigravity artifact, or prose-only artifact after buildFlowchart or applyDiagramPatch succeeds. Do not call getArtifact for scene just to make a local summary. Paste execute.artifactDelivery.finalResponseText when present, or return the Sketchi artifactId, available formats, and raw Excalidraw/PNG URLs so the caller can open the actual generated artifact.",
+      "Do not create a Markdown, Mermaid, local file, Antigravity artifact, or prose-only artifact after buildFlowchart, buildMindmap, or applyDiagramPatch succeeds. Do not call getArtifact for scene just to make a local summary. Paste execute.artifactDelivery.finalResponseText when present, or return the Sketchi artifactId, available formats, and raw Excalidraw/PNG URLs so the caller can open the actual generated artifact.",
   },
   {
     id: "raw-excalidraw-non-goal",
@@ -754,9 +803,9 @@ const catalog: CatalogEntry[] = [
     topic: "overview",
     keywords: ["non-goal", "excalidraw", "raw", "json", "structural"],
     snippet:
-      "Native Excalidraw is an export format. Prefer FlowchartSpec and structured patch operations.",
+      "Native Excalidraw is an output format. Prefer semantic FlowchartSpec or MindmapSpec input.",
     content:
-      "Do not ask harnesses to directly mutate native Excalidraw JSON for normal flowchart generation or styling. Rebuild structure with buildFlowchart and use applyDiagramPatch for deterministic visual changes.",
+      "Do not use coordinates, scene data, or native Excalidraw JSON as build input. Use FlowchartSpec with buildFlowchart or nested MindmapSpec with buildMindmap; scene and Excalidraw remain intentional output formats, and applyDiagramPatch handles deterministic visual changes.",
   },
   {
     id: "managed-thread-non-goal",

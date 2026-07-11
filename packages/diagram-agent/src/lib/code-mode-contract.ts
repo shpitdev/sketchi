@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { cleanToolString } from "./clean-tool-string.js";
+
 export const ArtifactFormatSchema = z.enum(["excalidraw", "scene", "png"]);
 export const InlineArtifactFormatSchema = z.enum(["excalidraw", "scene"]);
 export const ArtifactProvenanceSchema = z.object({
@@ -29,6 +31,9 @@ export const CodeModeIssueCodeSchema = z.enum([
   "unlabeled_decision_branch",
   "duplicate_decision_branch_label",
   "disconnected_graph",
+  "mindmap_too_deep",
+  "mindmap_too_large",
+  "request_too_large",
   "generic_label",
   "label_too_long",
   "quality_below_threshold",
@@ -59,6 +64,7 @@ export const CodeModeIssueSchema = z.object({
   stage: z.enum([
     "input",
     "flowchart",
+    "mindmap",
     "quality",
     "render",
     "export",
@@ -135,6 +141,47 @@ export const BuildFlowchartOptionsSchema = z
 export const BuildFlowchartRequestSchema = z.object({
   requestId: z.string().min(1).optional(),
   spec: FlowchartSpecSchema,
+  options: BuildFlowchartOptionsSchema,
+});
+
+export interface MindmapTopicInput {
+  label: string;
+  children?: MindmapTopicInput[] | undefined;
+}
+
+function hasSemanticText(value: string): boolean {
+  const cleaned = cleanToolString(value);
+  return cleaned.length > 0 && !/^(?:""|''|``)$/.test(cleaned);
+}
+
+const MindmapSemanticStringSchema = z
+  .string()
+  .min(1)
+  .refine(hasSemanticText, "Must contain semantic text after normalization.");
+
+export const MindmapTopicSchema: z.ZodType<MindmapTopicInput> = z.lazy(() =>
+  z.object({
+    label: MindmapSemanticStringSchema,
+    children: z.array(MindmapTopicSchema).optional(),
+  }),
+);
+
+export const MindmapSpecSchema = z.object({
+  id: z.string().min(1).optional(),
+  title: MindmapSemanticStringSchema,
+  root: MindmapTopicSchema,
+  layout: z
+    .object({ direction: z.enum(["LR", "RL"]).default("LR") })
+    .default({ direction: "LR" }),
+  style: FlowchartSpecStyleSchema.default({
+    accentColor: "#7c3aed",
+    backgroundColor: "#ffffff",
+  }),
+});
+
+export const BuildMindmapRequestSchema = z.object({
+  requestId: z.string().min(1).optional(),
+  spec: MindmapSpecSchema,
   options: BuildFlowchartOptionsSchema,
 });
 
@@ -318,6 +365,8 @@ export type FlowchartSpecLayout = z.infer<typeof FlowchartSpecLayoutSchema>;
 export type FlowchartSpecStyle = z.infer<typeof FlowchartSpecStyleSchema>;
 export type BuildFlowchartOptions = z.infer<typeof BuildFlowchartOptionsSchema>;
 export type BuildFlowchartRequest = z.infer<typeof BuildFlowchartRequestSchema>;
+export type MindmapSpec = z.infer<typeof MindmapSpecSchema>;
+export type BuildMindmapRequest = z.infer<typeof BuildMindmapRequestSchema>;
 export type ExcalidrawFile = z.infer<typeof ExcalidrawFileSchema>;
 export type GetArtifactRequest = z.infer<typeof GetArtifactRequestSchema>;
 export type DiagramSelector = z.infer<typeof DiagramSelectorSchema>;
@@ -339,6 +388,20 @@ export interface NormalizedFlowchartSpec {
   nodes: FlowchartSpecNode[];
   edges: Array<FlowchartSpecEdge & { id: string }>;
   layout: Required<FlowchartSpecLayout>;
+  style: Required<FlowchartSpecStyle>;
+}
+
+export interface NormalizedMindmapTopic {
+  id: string;
+  label: string;
+  children: NormalizedMindmapTopic[];
+}
+
+export interface NormalizedMindmapSpec {
+  id: string;
+  title: string;
+  root: NormalizedMindmapTopic;
+  layout: { direction: "LR" | "RL" };
   style: Required<FlowchartSpecStyle>;
 }
 
@@ -407,6 +470,34 @@ export type BuildFlowchartResult =
       buildId?: string;
       requestId?: string;
       normalizedSpec?: NormalizedFlowchartSpec;
+      quality?: QualityReport;
+      partial?: PartialArtifactBundle;
+      issues: CodeModeIssue[];
+    };
+
+export type BuildMindmapResult =
+  | {
+      ok: true;
+      status: "accepted";
+      buildId: string;
+      requestId?: string;
+      normalizedSpec: NormalizedMindmapSpec;
+      quality: QualityReport;
+      artifact: ArtifactBundle;
+      issues: CodeModeIssue[];
+    }
+  | {
+      ok: false;
+      status:
+        | "invalid_input"
+        | "invalid_mindmap"
+        | "quality_failed"
+        | "render_failed"
+        | "export_failed"
+        | "storage_failed";
+      buildId?: string;
+      requestId?: string;
+      normalizedSpec?: NormalizedMindmapSpec;
       quality?: QualityReport;
       partial?: PartialArtifactBundle;
       issues: CodeModeIssue[];

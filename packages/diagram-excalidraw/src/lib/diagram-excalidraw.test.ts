@@ -4,6 +4,7 @@ import { generateKeyBetween } from "fractional-indexing";
 
 import {
   flowchartFixture,
+  mindmapFixture,
   pharmaBatchDispositionFlowchart,
   parseFlowchartDiagram,
 } from "@sketchi/diagram-core";
@@ -127,6 +128,16 @@ function expectFlowchartExportValid(
 }
 
 describe("convertSceneToExcalidraw", () => {
+  it("exports the horizontal mindmap fixture with valid arrow bindings", () => {
+    const exported = convertSceneToExcalidraw(
+      renderIntermediateDiagram(mindmapFixture),
+    );
+    expect(validateExcalidrawScene(exported)).toEqual({ ok: true, issues: [] });
+    expect(
+      exported.elements.filter((element) => element.type === "arrow"),
+    ).toHaveLength(mindmapFixture.edges.length);
+  });
+
   it("wraps scenes as importable Excalidraw files", () => {
     const scene = convertSceneToExcalidraw(
       renderIntermediateDiagram(flowchartFixture),

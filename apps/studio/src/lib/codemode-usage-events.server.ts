@@ -14,6 +14,7 @@ const MAX_ISSUE_ROWS = 100;
 export type CodeModeUsageOperation =
   | "applyDiagramPatch"
   | "buildFlowchart"
+  | "buildMindmap"
   | "execute";
 
 export type CodeModeUsageSurface = "api" | "mcp";

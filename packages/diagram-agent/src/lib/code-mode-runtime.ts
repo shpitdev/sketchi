@@ -1,6 +1,8 @@
 import {
+  parseMindmapDiagram,
   parseFlowchartDiagram,
   type FlowchartDiagram,
+  type MindmapDiagram,
 } from "@sketchi/diagram-core";
 import {
   convertSceneToExcalidraw,
@@ -27,6 +29,7 @@ import {
 import {
   ApplyDiagramPatchRequestSchema,
   BuildFlowchartRequestSchema,
+  BuildMindmapRequestSchema,
   DIAGRAM_PATCH_OPERATION_NAMES,
   GetArtifactRequestSchema,
   RenderedDiagramSceneSchema,
@@ -35,6 +38,7 @@ import {
   type ArtifactFormat,
   type BuildFlowchartRequest,
   type BuildFlowchartResult,
+  type BuildMindmapResult,
   type CodeModeIssue,
   type CodeModeIssueCode,
   type CodeModeIssueRef,
@@ -44,6 +48,8 @@ import {
   type GetArtifactResult,
   type InlineArtifactFormat,
   type NormalizedFlowchartSpec,
+  type MindmapSpec,
+  type NormalizedMindmapSpec,
   type PatchableScene,
   type QualityReport,
 } from "./code-mode-contract.js";
@@ -57,6 +63,9 @@ const DEFAULT_BACKGROUND = "#ffffff";
 const DEFAULT_STROKE = "#000000";
 const DEFAULT_TEXT = "#000000";
 const SCENE_PADDING = 48;
+const MAX_MINDMAP_DEPTH = 8;
+const MAX_MINDMAP_TOPICS = 100;
+const MAX_INPUT_ISSUES = 20;
 
 export interface CodeModeRuntimeOptions {
   store?: CodeModeArtifactStore;
@@ -70,8 +79,206 @@ export interface CodeModeRuntimeOptions {
 
 export interface CodeModeRuntime {
   buildFlowchart(input: unknown): Promise<BuildFlowchartResult>;
+  buildMindmap(input: unknown): Promise<BuildMindmapResult>;
   getArtifact(input: unknown): Promise<GetArtifactResult>;
   applyDiagramPatch(input: unknown): Promise<ApplyDiagramPatchResult>;
+}
+
+function unknownRecord(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value))
+    : undefined;
+}
+
+function preflightMindmapInput(input: unknown): CodeModeIssue[] {
+  const root = unknownRecord(
+    unknownRecord(unknownRecord(input)?.["spec"])?.["root"],
+  );
+  if (!root) return [];
+
+  const stack: Array<{ depth: number; topic: Record<string, unknown> }> = [
+    { depth: 0, topic: root },
+  ];
+  let discoveredSlots = 1;
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    if (current.depth > MAX_MINDMAP_DEPTH) {
+      return [
+        issue({
+          code: "mindmap_too_deep",
+          stage: "mindmap",
+          ref: { kind: "request", path: "spec.root.children" },
+          message: `Mindmap depth exceeds the supported maximum of ${MAX_MINDMAP_DEPTH}.`,
+          hint: "Combine overly deep topics into a shallower hierarchy.",
+        }),
+      ];
+    }
+    const children = current.topic["children"];
+    if (!Array.isArray(children)) continue;
+    discoveredSlots += children.length;
+    if (discoveredSlots > MAX_MINDMAP_TOPICS) {
+      return [
+        issue({
+          code: "mindmap_too_large",
+          stage: "mindmap",
+          ref: { kind: "request", path: "spec.root" },
+          message: `Mindmap exceeds the supported maximum of ${MAX_MINDMAP_TOPICS} topic slots.`,
+          hint: "Split this hierarchy into smaller focused mindmaps.",
+        }),
+      ];
+    }
+    for (let index = children.length - 1; index >= 0; index -= 1) {
+      const child = unknownRecord(children[index]);
+      if (child) stack.push({ depth: current.depth + 1, topic: child });
+    }
+  }
+  return [];
+}
+
+function normalizeMindmapSpec(spec: MindmapSpec): NormalizedMindmapSpec {
+  const normalizeTopic = (
+    topic: MindmapSpec["root"],
+    path: readonly number[],
+  ): NormalizedMindmapSpec["root"] => ({
+    id: `topic-${path.join("-")}`,
+    label: cleanToolString(topic.label),
+    children: (topic.children ?? []).map((child, index) =>
+      normalizeTopic(child, [...path, index]),
+    ),
+  });
+  const title = cleanToolString(spec.title);
+  return {
+    id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-mindmap"),
+    title,
+    root: normalizeTopic(spec.root, [0]),
+    layout: { direction: spec.layout.direction },
+    style: spec.style,
+  };
+}
+
+function mindmapStats(spec: NormalizedMindmapSpec): {
+  count: number;
+  depth: number;
+} {
+  let count = 0;
+  let depth = 0;
+  const visit = (
+    topic: NormalizedMindmapSpec["root"],
+    currentDepth: number,
+  ) => {
+    count += 1;
+    depth = Math.max(depth, currentDepth);
+    topic.children.forEach((child) => visit(child, currentDepth + 1));
+  };
+  visit(spec.root, 0);
+  return { count, depth };
+}
+
+function validateNormalizedMindmap(
+  spec: NormalizedMindmapSpec,
+): CodeModeIssue[] {
+  const stats = mindmapStats(spec);
+  const issues: CodeModeIssue[] = [];
+  if (stats.count < 2) {
+    issues.push(
+      issue({
+        code: "disconnected_graph",
+        stage: "mindmap",
+        ref: { kind: "diagram", id: spec.id },
+        message: "Mindmap root must contain at least one child topic.",
+        hint: "Add one or more nested topics under spec.root.children.",
+      }),
+    );
+  }
+  if (stats.depth > MAX_MINDMAP_DEPTH) {
+    issues.push(
+      issue({
+        code: "mindmap_too_deep",
+        stage: "mindmap",
+        ref: { kind: "diagram", id: spec.id },
+        message: `Mindmap depth ${stats.depth} exceeds the supported maximum of ${MAX_MINDMAP_DEPTH}.`,
+        hint: "Combine overly deep topics into a shallower hierarchy.",
+      }),
+    );
+  }
+  if (stats.count > MAX_MINDMAP_TOPICS) {
+    issues.push(
+      issue({
+        code: "mindmap_too_large",
+        stage: "mindmap",
+        ref: { kind: "diagram", id: spec.id },
+        message: `Mindmap has ${stats.count} topics; the supported maximum is ${MAX_MINDMAP_TOPICS}.`,
+        hint: "Split this hierarchy into smaller focused mindmaps.",
+      }),
+    );
+  }
+  return issues;
+}
+
+function toMindmapDiagram(spec: NormalizedMindmapSpec): MindmapDiagram {
+  const nodes: Array<Record<string, unknown>> = [];
+  const edges: Array<Record<string, unknown>> = [];
+  const visit = (
+    topic: NormalizedMindmapSpec["root"],
+    depth: number,
+    siblingIndex: number,
+    parentId?: string,
+  ) => {
+    nodes.push({
+      id: topic.id,
+      label: topic.label,
+      kind: depth === 0 ? "root" : "topic",
+      metadata: { depth, siblingIndex },
+    });
+    if (parentId) {
+      edges.push({
+        id: `branch-${topic.id.slice("topic-".length)}`,
+        source: parentId,
+        target: topic.id,
+        metadata: { depth, siblingIndex },
+      });
+    }
+    topic.children.forEach((child, index) =>
+      visit(child, depth + 1, index, topic.id),
+    );
+  };
+  visit(spec.root, 0, 0);
+  return parseMindmapDiagram({
+    id: spec.id,
+    title: spec.title,
+    type: "mindmap",
+    nodes,
+    edges,
+    layout: { direction: spec.layout.direction, edgeRouting: "curved" },
+    style: spec.style,
+  });
+}
+
+function mindmapQuality(
+  diagram: MindmapDiagram,
+  threshold: number,
+): QualityReport {
+  const generic = diagram.nodes.filter((node) =>
+    /^(topic|branch|item|mindmap)$/i.test(node.label.trim()),
+  );
+  const score = Math.max(0, 10 - generic.length * 2);
+  return {
+    accepted: score >= threshold,
+    score,
+    threshold,
+    summary: {
+      nodeCount: diagram.nodes.length,
+      edgeCount: diagram.edges.length,
+    },
+    checks: generic.map((node) => ({
+      code: "generic_label",
+      passed: false,
+      severity: "warning",
+      message: `Topic "${node.label}" is too generic.`,
+      refs: [{ kind: "node", id: node.id }],
+    })),
+  };
 }
 
 export interface CodeModeArtifactRenderer {
@@ -177,7 +384,7 @@ function hintForZodIssue(path: string): string {
 }
 
 function inputIssues(error: z.ZodError): CodeModeIssue[] {
-  return error.issues.map((zodIssue) => {
+  const issues = error.issues.slice(0, MAX_INPUT_ISSUES).map((zodIssue) => {
     const path = pathForZodIssue(zodIssue.path);
     return issue({
       code: codeForZodIssue(zodIssue),
@@ -187,6 +394,18 @@ function inputIssues(error: z.ZodError): CodeModeIssue[] {
       hint: hintForZodIssue(path),
     });
   });
+  if (error.issues.length > MAX_INPUT_ISSUES) {
+    issues.push(
+      issue({
+        code: "invalid_type",
+        stage: "input",
+        ref: { kind: "request", path: "input" },
+        message: `${error.issues.length - MAX_INPUT_ISSUES} additional input issues were omitted.`,
+        hint: "Fix the summarized request shape before retrying.",
+      }),
+    );
+  }
+  return issues;
 }
 
 function slugify(value: string): string {
@@ -1212,7 +1431,7 @@ function rerouteArrow(
         stage: "render",
         ref: { kind: "edge", id: arrow.edgeId },
         message: `Arrow "${arrow.id}" references a node that is not in the scene.`,
-        hint: "Rebuild the flowchart artifact before applying visual patches.",
+        hint: "Rebuild the diagram with buildFlowchart or buildMindmap before applying visual patches.",
       }),
     ];
   }
@@ -1314,7 +1533,7 @@ async function resolvePatchSource(
         stage: "storage",
         ref: { kind: "artifact", id: input.source.artifactId },
         message: `Artifact "${input.source.artifactId}" does not have a valid source manifest.`,
-        hint: "Rebuild the flowchart and patch the accepted artifact id.",
+        hint: "Rebuild with the appropriate build operation and patch the accepted artifact id.",
       }),
     ];
   }
@@ -1339,7 +1558,7 @@ async function resolvePatchSource(
         stage: "storage",
         ref: { kind: "artifact", id: input.source.artifactId },
         message: `Scene artifact "${input.source.artifactId}" is not available.`,
-        hint: "Call buildFlowchart first, then patch the accepted artifact id.",
+        hint: "Call buildFlowchart or buildMindmap first, then patch the accepted artifact id.",
       }),
     ];
   }
@@ -1352,7 +1571,7 @@ async function resolvePatchSource(
         stage: "storage",
         ref: { kind: "artifact", id: input.source.artifactId },
         message: `Scene artifact "${input.source.artifactId}" could not be decoded.`,
-        hint: "Rebuild the flowchart and patch the new artifact.",
+        hint: "Rebuild with the appropriate build operation and patch the new artifact.",
       }),
     ];
   }
@@ -1402,6 +1621,199 @@ export function createCodeModeRuntime(
   const artifactUrl = options.artifactUrl;
 
   return {
+    async buildMindmap(input) {
+      const preflightIssues = preflightMindmapInput(input);
+      if (preflightIssues.length > 0) {
+        return {
+          ok: false,
+          status: "invalid_mindmap",
+          issues: preflightIssues,
+        };
+      }
+      const parsed = BuildMindmapRequestSchema.safeParse(input);
+      if (!parsed.success) {
+        return {
+          ok: false,
+          status: "invalid_input",
+          issues: inputIssues(parsed.error),
+        };
+      }
+      const request = parsed.data;
+      const buildId = createId("build");
+      const normalizedSpec = normalizeMindmapSpec(request.spec);
+      const validationIssues = validateNormalizedMindmap(normalizedSpec);
+      if (validationIssues.length > 0) {
+        return {
+          ok: false,
+          status: "invalid_mindmap",
+          buildId,
+          ...responseRequestId(request.requestId),
+          normalizedSpec,
+          issues: validationIssues,
+        };
+      }
+
+      let diagram: MindmapDiagram;
+      try {
+        diagram = toMindmapDiagram(normalizedSpec);
+      } catch (error) {
+        return {
+          ok: false,
+          status: "invalid_mindmap",
+          buildId,
+          ...responseRequestId(request.requestId),
+          normalizedSpec,
+          issues: [
+            issue({
+              code: "disconnected_graph",
+              stage: "mindmap",
+              ref: { kind: "diagram", id: normalizedSpec.id },
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Mindmap failed core validation.",
+              hint: "Repair the nested topic hierarchy and call buildMindmap again.",
+            }),
+          ],
+        };
+      }
+
+      const quality = mindmapQuality(
+        diagram,
+        request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+      );
+      if (!quality.accepted) {
+        return {
+          ok: false,
+          status: "quality_failed",
+          buildId,
+          ...responseRequestId(request.requestId),
+          normalizedSpec,
+          quality,
+          issues: qualityIssues(quality),
+        };
+      }
+
+      let scene: RenderedDiagramScene;
+      try {
+        scene = renderIntermediateDiagram(diagram);
+      } catch (error) {
+        return {
+          ok: false,
+          status: "render_failed",
+          buildId,
+          ...responseRequestId(request.requestId),
+          normalizedSpec,
+          quality,
+          issues: [
+            issue({
+              code: "render_failed",
+              stage: "render",
+              ref: { kind: "diagram", id: normalizedSpec.id },
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Unable to render mindmap scene.",
+              hint: "Simplify the hierarchy or retry with a smaller mindmap.",
+            }),
+          ],
+        };
+      }
+
+      const excalidraw = convertSceneToExcalidraw(scene);
+      const exportValidation = validateExcalidrawScene(excalidraw);
+      if (!exportValidation.ok) {
+        return {
+          ok: false,
+          status: "export_failed",
+          buildId,
+          ...responseRequestId(request.requestId),
+          normalizedSpec,
+          quality,
+          partial: {
+            diagramId: scene.diagramId,
+            formats: [
+              {
+                format: "scene",
+                mimeType: ARTIFACT_MIME_TYPES.scene,
+                inline: scene,
+                sizeBytes: jsonSizeBytes(scene),
+              },
+            ],
+          },
+          issues: exportIssues(exportValidation.issues),
+        };
+      }
+
+      let storedFormats: StoredArtifactFormat[];
+      try {
+        storedFormats = await storedArtifactsForFormats({
+          formats: requestedFormats(request.options),
+          scene,
+          excalidraw,
+          renderer,
+        });
+      } catch (error) {
+        return {
+          ok: false,
+          status: "export_failed",
+          buildId,
+          ...responseRequestId(request.requestId),
+          normalizedSpec,
+          quality,
+          partial: {
+            diagramId: scene.diagramId,
+            formats: [
+              {
+                format: "scene",
+                mimeType: ARTIFACT_MIME_TYPES.scene,
+                inline: scene,
+                sizeBytes: jsonSizeBytes(scene),
+              },
+            ],
+          },
+          issues: artifactExportIssues(error),
+        };
+      }
+
+      try {
+        const artifactId = createId("artifact");
+        const artifact = await store.write({
+          artifactId,
+          diagramId: scene.diagramId,
+          formats: storedFormats,
+          inlineFormats: requestedInlineFormats(request.options),
+        });
+        return {
+          ok: true,
+          status: "accepted",
+          buildId,
+          ...responseRequestId(request.requestId),
+          normalizedSpec,
+          quality,
+          artifact: withArtifactUrls(artifact, artifactUrl),
+          issues: [],
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          status: "storage_failed",
+          buildId,
+          ...responseRequestId(request.requestId),
+          normalizedSpec,
+          quality,
+          partial: { diagramId: scene.diagramId },
+          issues: [
+            storageIssue(
+              error instanceof Error
+                ? error.message
+                : "Artifact storage failed.",
+              "storage_write_failed",
+            ),
+          ],
+        };
+      }
+    },
     async buildFlowchart(input) {
       const parsed = BuildFlowchartRequestSchema.safeParse(input);
       if (!parsed.success) {
@@ -1764,7 +2176,7 @@ export function createCodeModeRuntime(
                 stage: "flowchart",
                 ref: { kind: "diagram", id: scene.diagramId },
                 message: "Patch changed the diagram edge connectivity.",
-                hint: "Use buildFlowchart with a repaired FlowchartSpec for structural graph changes.",
+                hint: "Use buildFlowchart for process-graph structure or buildMindmap for hierarchy structure.",
               }),
             ],
           };
