@@ -54,10 +54,13 @@ export function FeatureGrid() {
     <section className="sk-section feature-grid" id="product">
       <div className="sk-shell">
         <div className="sk-section__head">
-          <p className="sk-eyebrow">Why Sketchi</p>
           <h2 className="sk-section__title">
             Diagrams that behave like diagrams.
           </h2>
+          <p className="sk-section__lead">
+            Not a flat picture of a diagram — real shapes, real logos, yours to
+            edit.
+          </p>
         </div>
         <div className="feature-grid__cards">
           {features.map((feature) => (

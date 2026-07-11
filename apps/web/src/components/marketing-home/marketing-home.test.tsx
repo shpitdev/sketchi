@@ -4,16 +4,14 @@ import { describe, expect, it } from "vitest";
 import { MarketingHome } from "./marketing-home";
 
 describe("MarketingHome", () => {
-  it("composes the hero, agents, features, icons, and CTA", () => {
+  it("composes the hero, paths, features, icons, and CTA", () => {
     render(<MarketingHome />);
 
     expect(
       screen.getByRole("heading", { name: /Sketchi draws it/i }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("heading", {
-        name: "Ask your coding agent for a diagram.",
-      }),
+      screen.getByRole("heading", { name: "Pick your path." }),
     ).toBeTruthy();
     expect(
       screen.getByRole("heading", {

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { PathFork } from "./path-fork";
 
 describe("PathFork", () => {
-  it("offers a playground path and an agent path", () => {
+  it("offers a playground path and an agent path with agent links", () => {
     render(
       <PathFork
         agentsHref="/agents"
@@ -22,7 +22,10 @@ describe("PathFork", () => {
       screen.getByRole("link", { name: "Open the playground" }),
     ).toHaveProperty("href", "https://play.example.test/");
     expect(
-      screen.getByRole("link", { name: "Add to your agent" }),
+      screen.getByRole("link", { name: /Claude Code/ }),
+    ).toHaveProperty("href", "http://localhost:3000/agents/claude-code");
+    expect(
+      screen.getByRole("link", { name: /See every setup/ }),
     ).toHaveProperty("href", "http://localhost:3000/agents");
   });
 });

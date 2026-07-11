@@ -114,7 +114,7 @@ body {
 }
 
 .studio--build .studio__body {
-  grid-template-columns: clamp(340px, 32vw, 460px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) clamp(340px, 32vw, 440px);
 }
 
 .studio__chat {
@@ -124,8 +124,10 @@ body {
   min-width: 0;
 }
 
+/* Build mode: canvas is the primary left area, chat a narrower right rail.
+   DiagramStage renders before the chat, so grid/DOM/focus order all agree. */
 .studio--build .studio__chat {
-  border-right: 1px solid var(--line);
+  border-left: 1px solid var(--line);
 }
 
 .studio__conversation {
@@ -239,7 +241,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 10px 28px 24px 20px;
+  padding: 10px 20px 24px 28px;
   min-width: 0;
   min-height: 0;
   animation: studio-stage-in 0.5s ease;
@@ -248,7 +250,7 @@ body {
 @keyframes studio-stage-in {
   from {
     opacity: 0;
-    transform: translateX(18px);
+    transform: translateX(-18px);
   }
   to {
     opacity: 1;
@@ -561,19 +563,37 @@ button.studio__artifact-link {
   font-family: var(--font-mono);
 }
 
+/* Narrow build mode: a scrollable stage-then-chat page. Instead of splitting
+   a fixed viewport (which starved the canvas), the stage keeps a genuinely
+   useful canvas height and the chat sits usably below as the page scrolls. */
 @media (max-width: 920px) {
+  .studio--build {
+    height: auto;
+    min-height: 100dvh;
+  }
+
   .studio--build .studio__body {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 44%) minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
   }
 
   .studio--build .studio__stage {
-    order: -1;
-    padding: 6px 16px 10px;
+    flex: 0 0 auto;
+    padding: 6px 16px 12px;
+  }
+
+  /* Definite height (not min-height) so the preview's height:100% resolves
+     and the Excalidraw canvas actually draws at a useful size. */
+  .studio--build .studio__stage-card {
+    flex: 0 0 auto;
+    height: 360px;
+    padding: 12px;
   }
 
   .studio--build .studio__chat {
-    border-right: none;
+    flex: 1 0 auto;
+    min-height: 62dvh;
+    border-left: none;
     border-top: 1px solid var(--line);
   }
 }

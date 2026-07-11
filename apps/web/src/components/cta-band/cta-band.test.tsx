@@ -14,7 +14,7 @@ describe("CtaBand", () => {
       screen.getByRole("link", { name: "Open the playground" }),
     ).toHaveProperty("href", "https://play.example.test/");
     expect(
-      screen.getByRole("link", { name: "Add to your agent" }),
+      screen.getByRole("link", { name: /add it to your coding agent/ }),
     ).toHaveProperty("href", "http://localhost:3000/agents");
   });
 });

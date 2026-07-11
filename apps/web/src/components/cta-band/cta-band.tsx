@@ -8,7 +8,8 @@ export interface CtaBandProps {
 }
 
 /**
- * Closing call to action — one clear next step, framed for the reader.
+ * Closing invitation — a warm, blank sketch sheet echoing the hero board.
+ * One clear next step; the agent path stays a quiet secondary link.
  */
 export function CtaBand({
   playgroundHref = DEFAULT_WEB_SURFACE_URLS.playground,
@@ -16,20 +17,22 @@ export function CtaBand({
 }: CtaBandProps) {
   return (
     <section className="cta-band">
-      <div className="sk-shell cta-band__inner">
-        <p className="sk-eyebrow cta-band__eyebrow">Try it now</p>
-        <h2 className="cta-band__title">Start with a sentence.</h2>
-        <p className="cta-band__lead">
-          No sign-up. Type what you want to see and watch it become a diagram
-          you can edit.
-        </p>
-        <div className="cta-band__actions">
-          <a className="sk-btn sk-btn--accent" href={playgroundHref}>
-            Open the playground
-          </a>
-          <a className="sk-btn sk-btn--ghost cta-band__ghost" href={agentsHref}>
-            Add to your agent
-          </a>
+      <div className="sk-shell">
+        <div className="cta-band__sheet">
+          <span className="cta-band__caret" aria-hidden="true" />
+          <h2 className="cta-band__title">Start with a sentence.</h2>
+          <p className="cta-band__lead">
+            No sign-up. Type what you want to see and watch it become a diagram
+            you can edit.
+          </p>
+          <div className="cta-band__actions">
+            <a className="sk-btn sk-btn--accent" href={playgroundHref}>
+              Open the playground
+            </a>
+            <a className="cta-band__link" href={agentsHref}>
+              or add it to your coding agent →
+            </a>
+          </div>
         </div>
       </div>
     </section>

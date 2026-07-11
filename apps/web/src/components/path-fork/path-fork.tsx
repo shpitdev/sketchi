@@ -1,5 +1,7 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 
+import { BrandIcon } from "../brand-icon/index.js";
+import { agentSetupEntries } from "../agent-setup-view/index.js";
 import {
   DEFAULT_WEB_SURFACE_URLS,
   type WebSurfaceUrls,
@@ -10,46 +12,16 @@ export interface PathForkProps {
   surfaceUrls?: WebSurfaceUrls;
 }
 
-interface ForkPath {
-  accent: string;
-  body: string;
-  cta: string;
-  glyph: ReactNode;
-  href: string;
-  kicker: string;
-  title: string;
-}
-
 /**
  * The fork: one decision — use Sketchi yourself in the playground, or hand it
- * to the coding agent you already use — drives everything else. Kept right
- * under the hero so the two paths are the first thing a visitor sees.
+ * to the coding agent you already use. Two calm columns instead of stacked
+ * cards, with the supported agents folded into the agent side so the whole
+ * story lives in a single confident section.
  */
 export function PathFork({
   agentsHref = "/agents",
   surfaceUrls = DEFAULT_WEB_SURFACE_URLS,
 }: PathForkProps) {
-  const paths: readonly ForkPath[] = [
-    {
-      accent: "var(--accent)",
-      body: "Open the playground and describe a diagram. Sketchi draws it — you edit and export. No sign-up.",
-      cta: "Open the playground",
-      glyph: <HumanGlyph />,
-      href: surfaceUrls.playground,
-      kicker: "For people",
-      title: "Use it yourself",
-    },
-    {
-      accent: "var(--blueprint)",
-      body: "Connect Sketchi once, then ask the agent you already code with for a diagram — a real, editable one, in your editor.",
-      cta: "Add to your agent",
-      glyph: <AgentGlyph />,
-      href: agentsHref,
-      kicker: "For coding agents",
-      title: "Plug it into your agent",
-    },
-  ];
-
   return (
     <section aria-label="Two ways to use Sketchi" className="sk-section path-fork">
       <div className="sk-shell">
@@ -57,29 +29,55 @@ export function PathFork({
           <p className="sk-eyebrow">Two ways in</p>
           <h2 className="sk-section__title">Pick your path.</h2>
           <p className="sk-section__lead">
-            One choice sets everything else: draw with Sketchi yourself, or hand
-            it to your coding agent.
+            Draw with Sketchi yourself in the playground, or hand it to the
+            coding agent you already work in.
           </p>
         </div>
 
         <div className="path-fork__grid">
-          {paths.map((path) => (
-            <article
-              className="path-card"
-              key={path.title}
-              style={{ "--tile-accent": path.accent } as CSSProperties}
+          <article className="path-lane">
+            <span className="path-lane__glyph" aria-hidden="true">
+              <HumanGlyph />
+            </span>
+            <p className="path-lane__kicker">For people</p>
+            <h3 className="path-lane__title">Use it yourself</h3>
+            <p className="path-lane__body">
+              Open the playground and describe a diagram. Sketchi draws it — you
+              edit and export. No sign-up.
+            </p>
+            <a
+              className="sk-btn sk-btn--primary path-lane__cta"
+              href={surfaceUrls.playground}
             >
-              <span className="path-card__glyph" aria-hidden="true">
-                {path.glyph}
-              </span>
-              <p className="path-card__kicker">{path.kicker}</p>
-              <h3 className="path-card__title">{path.title}</h3>
-              <p className="path-card__body">{path.body}</p>
-              <a className="sk-btn sk-btn--primary path-card__cta" href={path.href}>
-                {path.cta}
-              </a>
-            </article>
-          ))}
+              Open the playground
+            </a>
+          </article>
+
+          <article className="path-lane path-lane--agent">
+            <span className="path-lane__glyph" aria-hidden="true">
+              <AgentGlyph />
+            </span>
+            <p className="path-lane__kicker">For coding agents</p>
+            <h3 className="path-lane__title">Plug it into your agent</h3>
+            <p className="path-lane__body">
+              Connect Sketchi once, then ask the agent you already code with for
+              a real, editable diagram — right in your editor.
+            </p>
+            <ul className="path-lane__agents" aria-label="Supported coding agents">
+              {agentSetupEntries.map((entry) => (
+                <li key={entry.id}>
+                  <a className="agent-chip" href={entry.href}>
+                    {/* Icon is decorative — the chip text already names the agent. */}
+                    <BrandIcon label="" size={20} src={entry.icon} />
+                    <span className="agent-chip__name">{entry.name}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <a className="path-lane__link" href={agentsHref}>
+              See every setup →
+            </a>
+          </article>
         </div>
       </div>
     </section>

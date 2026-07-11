@@ -1,4 +1,3 @@
-import { AgentStrip } from "../agent-strip/index.js";
 import { CtaBand } from "../cta-band/index.js";
 import { FeatureGrid } from "../feature-grid/index.js";
 import { HomeHero } from "../home-hero/index.js";
@@ -25,7 +24,6 @@ export function MarketingHome({
       <main id="top">
         <HomeHero primaryHref={surfaceUrls.playground} />
         <PathFork surfaceUrls={surfaceUrls} />
-        <AgentStrip />
         <FeatureGrid />
         <IconWall iconsHref={surfaceUrls.icons} />
         <CtaBand playgroundHref={surfaceUrls.playground} />

@@ -614,7 +614,19 @@ function StudioRoute() {
         </header>
 
         <div className="studio__body">
-          <section className="studio__chat">
+          {buildMode ? (
+            <DiagramStage
+              key="stage"
+              artifactState={artifactState}
+              attemptCount={toolParts.length}
+              generating={Boolean(activePart)}
+              ghostLabels={ghostLabels}
+              report={displayReport}
+              scene={scene}
+            />
+          ) : null}
+
+          <section className="studio__chat" key="chat">
             {isEmpty ? (
               <div className="studio__empty-wrap">
                 <div className="studio__empty">
@@ -694,17 +706,6 @@ function StudioRoute() {
               </PromptInput>
             </div>
           </section>
-
-          {buildMode ? (
-            <DiagramStage
-              artifactState={artifactState}
-              attemptCount={toolParts.length}
-              generating={Boolean(activePart)}
-              ghostLabels={ghostLabels}
-              report={displayReport}
-              scene={scene}
-            />
-          ) : null}
         </div>
       </main>
     </TooltipProvider>
