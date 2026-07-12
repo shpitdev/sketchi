@@ -23,6 +23,8 @@ export const corpusFixtures = {
   multicolor: corpusFixture("ai-infrastructure/vllm.svg"),
   realClip: corpusFixture("ai-ecosystem/jimeng.svg"),
   strokeOnly: corpusFixture("gcp-legacy/connectivity-test.svg"),
+  strokeDasharray: corpusFixture("programming-languages/lua.svg"),
   stylePaint: corpusFixture("gcp-legacy/cloud-router.svg"),
+  usePath: corpusFixture("gcp-legacy/os-inventory-management.svg"),
   v1DisjointMultipath: corpusFixture("operating-systems/windows11.svg"),
 } as const;

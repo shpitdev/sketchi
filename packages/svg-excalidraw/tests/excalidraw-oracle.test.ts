@@ -6,12 +6,13 @@ import {
   centroid,
   constructNativeTrace,
   filledRegionsForShape,
-  parseSvgForFillSpike,
+  parseSvg,
   type CanonicalSvgDocument,
   type NativeTraceOptions,
   type Point,
 } from "../src";
 import checkedEvidence from "../evidence/fill-spike-metrics.json";
+import checkedSlice1Evidence from "../evidence/slice-1-ir-capability-metrics.json";
 import { corpusFixtures } from "./corpus-fixtures";
 
 interface RasterizedSvg {
@@ -19,6 +20,14 @@ interface RasterizedSvg {
   readonly height: number;
   readonly viewBox: readonly [number, number, number, number];
   readonly width: number;
+}
+
+function mustParse(source: string, sourceName = "inline.svg") {
+  const result = parseSvg(source, { sourceName });
+  if (!result.ok) {
+    throw new Error(JSON.stringify(result.diagnostics));
+  }
+  return result.document;
 }
 
 async function renderDocument(
@@ -139,16 +148,17 @@ function circleDocument(pointCount: number): CanonicalSvgDocument {
     const angle = (index / vertexCount) * Math.PI * 2;
     return `${50 + Math.cos(angle) * 45},${50 + Math.sin(angle) * 45}`;
   }).join(" ");
-  return parseSvgForFillSpike(
+  return mustParse(
     `<svg viewBox="0 0 100 100"><polygon fill="#000" points="${points}"/></svg>`,
-    { sourceName: `circle-${pointCount}.svg` },
+    `circle-${pointCount}.svg`,
   );
 }
 
 describe("real Excalidraw renderer oracle", () => {
-  const counterDocument = parseSvgForFillSpike(corpusFixtures.counter.source, {
-    sourceName: corpusFixtures.counter.sourceName,
-  });
+  const counterDocument = mustParse(
+    corpusFixtures.counter.source,
+    corpusFixtures.counter.sourceName,
+  );
   const counterRegion = counterDocument.shapes
     .flatMap(filledRegionsForShape)
     .find((region) => region.holes.length > 0);
@@ -200,7 +210,9 @@ describe("real Excalidraw renderer oracle", () => {
         entry.roughness === 1 &&
         entry.fillStyle === "solid",
     );
-    expect(evidence).toEqual(checkedEvidence.counterHoleMatrix);
+    expect(evidence).toEqual(
+      checkedSlice1Evidence.rendererOracle.counterHoleMatrix,
+    );
     expect(keyhole?.elements).toBeLessThan(triangulation?.elements ?? 0);
     expect(keyhole?.points).toBeLessThan(triangulation?.points ?? 0);
   });
@@ -225,7 +237,7 @@ describe("real Excalidraw renderer oracle", () => {
     ] as const;
     const evidence = [];
     for (const testCase of cases) {
-      const document = parseSvgForFillSpike(
+      const document = mustParse(
         `<svg viewBox="0 0 20 20"><path fill="#000" fill-rule="${testCase.fillRule}" d="M0 0H20V20H0 ${testCase.innerPath}"/></svg>`,
       );
       const rendered = await renderDocument(document, {
@@ -251,7 +263,7 @@ describe("real Excalidraw renderer oracle", () => {
   });
 
   it("proves closed line fills at roughness 0/1/2 for solid and hachure", async () => {
-    const rectangle = parseSvgForFillSpike(
+    const rectangle = mustParse(
       '<svg viewBox="0 0 100 100"><path fill="#ff0000" d="M0 0h100v100H0z"/></svg>',
     );
     const outputs = new Set<string>();

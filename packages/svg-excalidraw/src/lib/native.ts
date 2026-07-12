@@ -16,8 +16,8 @@ import type {
   NativeTraceResult,
   Point,
   ProvisionalPointBudget,
-  SpikeFillStyle,
-  SpikeRoughness,
+  NativeFillStyle,
+  NativeRoughness,
 } from "./types";
 
 export const PROVISIONAL_POINT_BUDGET: ProvisionalPointBudget = {
@@ -65,13 +65,13 @@ function bounds(points: readonly Point[]): {
 
 function lineElement(input: {
   readonly backgroundColor: string;
-  readonly fillStyle: SpikeFillStyle;
+  readonly fillStyle: NativeFillStyle;
   readonly groupId: string;
   readonly id: string;
   readonly index: string;
   readonly opacity: number;
   readonly points: readonly Point[];
-  readonly roughness: SpikeRoughness;
+  readonly roughness: NativeRoughness;
   readonly roundness: "curved" | "sharp";
   readonly strokeColor: string;
   readonly strokeWidth: number;
@@ -177,8 +177,10 @@ export function constructNativeTrace(
   };
 
   for (const shape of document.shapes) {
-    if (shape.clipPathId !== null) {
-      diagnostics.add(`native-unsupported-real-clip:${shape.clipPathId}`);
+    if (shape.clipPathIds.length > 0) {
+      shape.clipPathIds.forEach((clipPathId) =>
+        diagnostics.add(`native-unsupported-real-clip:${clipPathId}`),
+      );
       continue;
     }
     const openSubpaths = shape.subpaths.filter((subpath) => !subpath.closed);

@@ -1,178 +1,398 @@
-import { XMLParser } from "fast-xml-parser";
-import {
-  SVGPathData,
-  SVGPathDataTransformer,
-  type SVGCommand,
-} from "svg-pathdata";
+import { XMLParser, XMLValidator } from "fast-xml-parser";
 
+import { flattenPrimitive } from "./flatten";
+import {
+  computeElementStyle,
+  DEFAULT_PAINT_CONTEXT,
+  descriptor,
+  parseCssRules,
+  resolvePaint,
+  type CssRule,
+  type PaintContext,
+  type SvgAttributes,
+  type SvgElementDescriptor,
+} from "./style";
+import {
+  IDENTITY_MATRIX,
+  multiplyMatrices,
+  numericTokens,
+  parseTransform,
+  transformedStrokeScale,
+} from "./transform";
 import type {
-  CanonicalPaint,
   CanonicalShape,
-  CanonicalSubpath,
   CanonicalSvgDocument,
-  PaintSource,
+  EffectiveAdaptiveFlatteningOptions,
+  EffectiveUseExpansionOptions,
+  Matrix,
   Point,
+  SvgDiagnostic,
+  SvgFeature,
+  SvgFeatureCounts,
+  SvgParseOptions,
+  SvgParseResult,
+  SvgPrimitiveName,
 } from "./types";
 
-type Matrix = readonly [number, number, number, number, number, number];
-type Attributes = Readonly<Record<string, string>>;
-
-interface PaintContext {
-  readonly color: string;
-  readonly fill: string;
-  readonly fillOpacity: number;
-  readonly fillOrigin: PaintSource;
-  readonly fillRule: "evenodd" | "nonzero";
-  readonly opacity: number;
-  readonly stroke: string;
-  readonly strokeOpacity: number;
-  readonly strokeOrigin: PaintSource;
-  readonly strokeWidth: number;
+interface SvgNode {
+  readonly attributes: SvgAttributes;
+  readonly children: readonly SvgNode[];
+  readonly name: string;
+  readonly text: string;
 }
 
-interface ParseContext {
-  readonly clipPathId: string | null;
+interface ClipApplication {
+  readonly id: string;
+  readonly sourcePath: string;
+}
+
+interface ClipDefinition {
+  readonly id: string;
+  readonly nonConstrainingCanvas: boolean;
+}
+
+interface WalkContext {
+  readonly activeClips: readonly ClipApplication[];
+  readonly ancestry: readonly SvgElementDescriptor[];
   readonly matrix: Matrix;
   readonly paint: PaintContext;
 }
 
 interface ParserState {
-  readonly classStyles: ReadonlyMap<string, Attributes>;
+  arcSegments: number;
+  cubicSegments: number;
+  readonly clipDefinitions: ReadonlyMap<string, ClipDefinition>;
+  readonly cssRules: readonly CssRule[];
+  readonly diagnostics: SvgDiagnostic[];
+  readonly diagnosticKeys: Set<string>;
+  readonly flattening: EffectiveAdaptiveFlatteningOptions;
+  flattenedSegments: number;
   readonly gradients: ReadonlyMap<string, string>;
-  readonly realClipIds: ReadonlySet<string>;
+  readonly ids: ReadonlyMap<string, SvgNode>;
   readonly shapes: CanonicalShape[];
-  readonly warnings: Set<string>;
+  resourceLimitExceeded: boolean;
   shapeIndex: number;
+  readonly useExpansion: EffectiveUseExpansionOptions;
+  useExpansions: number;
+  usesResolved: number;
 }
 
-const IDENTITY_MATRIX: Matrix = [1, 0, 0, 1, 0, 0];
-const DEFAULT_PAINT: PaintContext = {
-  color: "#000000",
-  fill: "#000000",
-  fillOpacity: 1,
-  fillOrigin: "default",
-  fillRule: "nonzero",
-  opacity: 1,
-  stroke: "none",
-  strokeOpacity: 1,
-  strokeOrigin: "default",
-  strokeWidth: 1,
+const CONTAINERS = new Set(["a", "g", "svg", "switch", "symbol"]);
+const NON_RENDERING = new Set([
+  "clipPath",
+  "defs",
+  "desc",
+  "filter",
+  "linearGradient",
+  "mask",
+  "metadata",
+  "pattern",
+  "radialGradient",
+  "style",
+  "title",
+]);
+
+const FEATURE_ELEMENTS: Readonly<Record<string, SvgFeature>> = {
+  clipPath: "clipPath",
+  filter: "filter",
+  image: "image",
+  linearGradient: "gradient",
+  mask: "mask",
+  pattern: "pattern",
+  radialGradient: "gradient",
+  style: "style",
+  text: "text",
+  use: "use",
 };
-const PATH_CURVE_SEGMENTS = 8;
 
-function finiteNumber(value: string | undefined, fallback: number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
+const BLOCKING_FEATURES = new Set<SvgFeature>([
+  "filter",
+  "image",
+  "mask",
+  "pattern",
+  "text",
+]);
 
-function clampOpacity(value: number): number {
-  return Math.max(0, Math.min(1, value));
-}
-
-function multiplyMatrices(left: Matrix, right: Matrix): Matrix {
-  return [
-    left[0] * right[0] + left[2] * right[1],
-    left[1] * right[0] + left[3] * right[1],
-    left[0] * right[2] + left[2] * right[3],
-    left[1] * right[2] + left[3] * right[3],
-    left[0] * right[4] + left[2] * right[5] + left[4],
-    left[1] * right[4] + left[3] * right[5] + left[5],
-  ];
-}
-
-function transformPoint(point: Point, matrix: Matrix): Point {
-  return {
-    x: matrix[0] * point.x + matrix[2] * point.y + matrix[4],
-    y: matrix[1] * point.x + matrix[3] * point.y + matrix[5],
-  };
-}
-
-function transformedStrokeScale(matrix: Matrix): number {
-  // A scalar native stroke cannot encode anisotropic SVG strokes. Area scale
-  // is exact for uniform scale/rotation and is a deterministic approximation
-  // for the throwaway spike IR under non-uniform transforms.
-  return Math.sqrt(Math.abs(matrix[0] * matrix[3] - matrix[1] * matrix[2]));
-}
-
-function transformNumbers(value: string): readonly number[] {
+function isPrimitiveName(name: string): name is SvgPrimitiveName {
   return (
-    value.match(/[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g)?.map(Number) ?? []
+    name === "circle" ||
+    name === "ellipse" ||
+    name === "line" ||
+    name === "path" ||
+    name === "polygon" ||
+    name === "polyline" ||
+    name === "rect"
   );
 }
 
-function transformMatrix(value: string | undefined): Matrix {
-  if (!value) {
-    return IDENTITY_MATRIX;
-  }
-  let result = IDENTITY_MATRIX;
-  for (const match of value.matchAll(/([A-Za-z]+)\s*\(([^)]*)\)/g)) {
-    const operation = match[1]?.toLowerCase();
-    const values = transformNumbers(match[2] ?? "");
-    let next = IDENTITY_MATRIX;
-    if (operation === "matrix" && values.length >= 6) {
-      next = [
-        values[0] ?? 1,
-        values[1] ?? 0,
-        values[2] ?? 0,
-        values[3] ?? 1,
-        values[4] ?? 0,
-        values[5] ?? 0,
-      ];
-    } else if (operation === "translate") {
-      next = [1, 0, 0, 1, values[0] ?? 0, values[1] ?? 0];
-    } else if (operation === "scale") {
-      const scaleX = values[0] ?? 1;
-      next = [scaleX, 0, 0, values[1] ?? scaleX, 0, 0];
-    } else if (operation === "rotate") {
-      const radians = ((values[0] ?? 0) * Math.PI) / 180;
-      const cosine = Math.cos(radians);
-      const sine = Math.sin(radians);
-      const rotation: Matrix = [cosine, sine, -sine, cosine, 0, 0];
-      const centerX = values[1] ?? 0;
-      const centerY = values[2] ?? 0;
-      next = multiplyMatrices(
-        multiplyMatrices([1, 0, 0, 1, centerX, centerY], rotation),
-        [1, 0, 0, 1, -centerX, -centerY],
-      );
-    }
-    result = multiplyMatrices(result, next);
-  }
-  return result;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function declarations(value: string | undefined): Attributes {
-  if (!value) {
+function stringAttributes(value: unknown): SvgAttributes {
+  if (!isRecord(value)) {
     return {};
   }
   return Object.fromEntries(
-    value
-      .split(";")
-      .map((entry) => entry.split(":"))
-      .flatMap(([property, ...rest]) => {
-        const normalizedProperty = property?.trim();
-        const normalizedValue = rest.join(":").trim();
-        return normalizedProperty && normalizedValue
-          ? [[normalizedProperty, normalizedValue]]
-          : [];
-      }),
+    Object.entries(value).flatMap(([key, entry]) =>
+      typeof entry === "string" || typeof entry === "number"
+        ? [[key, String(entry)]]
+        : [],
+    ),
   );
 }
 
-function parseClassStyles(source: string): ReadonlyMap<string, Attributes> {
-  const styles = new Map<string, Attributes>();
-  for (const styleBlock of source.matchAll(
-    /<style[^>]*>([\s\S]*?)<\/style>/gi,
-  )) {
-    for (const rule of (styleBlock[1] ?? "").matchAll(
-      /\.([\w-]+)\s*\{([^}]+)\}/g,
-    )) {
-      const className = rule[1];
-      if (className) {
-        styles.set(className, declarations(rule[2]));
-      }
+function nodesFromPreserveOrder(
+  values: readonly unknown[],
+): readonly SvgNode[] {
+  return values.flatMap((value) => {
+    if (!isRecord(value)) {
+      return [];
+    }
+    const name = Object.keys(value).find(
+      (key) => key !== ":@" && key !== "#text" && key !== "?xml",
+    );
+    if (!name) {
+      return [];
+    }
+    const childrenValue = value[name];
+    const rawChildren = Array.isArray(childrenValue) ? childrenValue : [];
+    const text = rawChildren
+      .flatMap((child) =>
+        isRecord(child) && typeof child["#text"] === "string"
+          ? [child["#text"]]
+          : [],
+      )
+      .join("");
+    return [
+      {
+        attributes: stringAttributes(value[":@"]),
+        children: nodesFromPreserveOrder(rawChildren),
+        name,
+        text,
+      },
+    ];
+  });
+}
+
+function diagnostic(input: {
+  readonly code: SvgDiagnostic["code"];
+  readonly elementId?: string | null;
+  readonly feature?: SvgFeature | null;
+  readonly message: string;
+  readonly severity: SvgDiagnostic["severity"];
+  readonly sourcePath?: string | null;
+}): SvgDiagnostic {
+  return {
+    code: input.code,
+    elementId: input.elementId ?? null,
+    feature: input.feature ?? null,
+    message: input.message,
+    severity: input.severity,
+    sourcePath: input.sourcePath ?? null,
+  };
+}
+
+function pushDiagnostic(
+  state: ParserState,
+  value: SvgDiagnostic,
+  key?: string,
+): void {
+  const diagnosticKey = key ?? JSON.stringify(value);
+  if (!state.diagnosticKeys.has(diagnosticKey)) {
+    state.diagnosticKeys.add(diagnosticKey);
+    state.diagnostics.push(value);
+  }
+}
+
+function exceedExpansionLimit(
+  state: ParserState,
+  message: string,
+  sourcePath: string,
+): void {
+  state.resourceLimitExceeded = true;
+  pushDiagnostic(
+    state,
+    diagnostic({
+      code: "use-expansion-limit-exceeded",
+      feature: "use",
+      message,
+      severity: "warning",
+      sourcePath,
+    }),
+    "use-expansion-limit-exceeded",
+  );
+}
+
+function sourceHash(source: string): string {
+  let hash = 2166136261;
+  for (const character of source) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function effectiveFlattening(
+  options: SvgParseOptions["flattening"],
+): EffectiveAdaptiveFlatteningOptions {
+  const tolerance = options?.tolerance ?? 0.5;
+  const maxDepth = options?.maxDepth ?? 18;
+  return {
+    tolerance: Number.isFinite(tolerance) && tolerance > 0 ? tolerance : 0.5,
+    maxDepth:
+      Number.isInteger(maxDepth) && maxDepth >= 1 && maxDepth <= 20
+        ? maxDepth
+        : 18,
+  };
+}
+
+function effectiveUseExpansion(
+  options: SvgParseOptions["useExpansion"],
+): EffectiveUseExpansionOptions {
+  const boundedInteger = (value: number | undefined, fallback: number) =>
+    Number.isInteger(value) && (value ?? 0) > 0
+      ? (value ?? fallback)
+      : fallback;
+  return {
+    maxDepth: Math.min(256, boundedInteger(options?.maxDepth, 64)),
+    maxExpansions: Math.min(
+      100_000,
+      boundedInteger(options?.maxExpansions, 10_000),
+    ),
+    maxShapes: Math.min(100_000, boundedInteger(options?.maxShapes, 20_000)),
+  };
+}
+
+function collectStyles(
+  node: SvgNode,
+  sourcePath: string,
+): readonly { readonly css: string; readonly sourcePath: string }[] {
+  const own = node.name === "style" ? [{ css: node.text, sourcePath }] : [];
+  return [
+    ...own,
+    ...node.children.flatMap((child, index) =>
+      collectStyles(child, `${sourcePath}/${child.name}[${index}]`),
+    ),
+  ];
+}
+
+function collectIds(
+  node: SvgNode,
+  sourcePath: string,
+  ids: Map<string, SvgNode>,
+  diagnostics: SvgDiagnostic[],
+): void {
+  const id = node.attributes.id;
+  if (id) {
+    if (ids.has(id)) {
+      diagnostics.push(
+        diagnostic({
+          code: "duplicate-id",
+          elementId: id,
+          message: `Duplicate SVG id: ${id}`,
+          severity: "warning",
+          sourcePath,
+        }),
+      );
+    } else {
+      ids.set(id, node);
     }
   }
-  return styles;
+  node.children.forEach((child, index) =>
+    collectIds(
+      child,
+      `${sourcePath}/${child.name}[${index}]`,
+      ids,
+      diagnostics,
+    ),
+  );
+}
+
+function emptyFeatureCounts(): SvgFeatureCounts {
+  return {
+    clipPath: 0,
+    filter: 0,
+    gradient: 0,
+    image: 0,
+    mask: 0,
+    pattern: 0,
+    style: 0,
+    text: 0,
+    use: 0,
+  };
+}
+
+function scanFeatures(
+  node: SvgNode,
+  sourcePath: string,
+  counts: Record<SvgFeature, number>,
+  diagnostics: SvgDiagnostic[],
+): void {
+  const feature = FEATURE_ELEMENTS[node.name];
+  if (feature) {
+    counts[feature] += 1;
+    if (BLOCKING_FEATURES.has(feature)) {
+      diagnostics.push(
+        diagnostic({
+          code: "native-unsupported-feature",
+          elementId: node.attributes.id ?? null,
+          feature,
+          message: `Native tracing does not support SVG ${feature}.`,
+          severity: "warning",
+          sourcePath,
+        }),
+      );
+    }
+  }
+  for (const appliedFeature of ["filter", "mask"] as const) {
+    const value = styleProperty(node.attributes, appliedFeature);
+    if (
+      node.name !== appliedFeature &&
+      value !== null &&
+      value.trim().toLowerCase() !== "none"
+    ) {
+      counts[appliedFeature] += 1;
+      diagnostics.push(
+        diagnostic({
+          code: "native-unsupported-feature",
+          elementId: node.attributes.id ?? null,
+          feature: appliedFeature,
+          message: `Applied SVG ${appliedFeature} is not native-traceable: ${value}`,
+          severity: "warning",
+          sourcePath,
+        }),
+      );
+    }
+  }
+  node.children.forEach((child, index) =>
+    scanFeatures(
+      child,
+      `${sourcePath}/${child.name}[${index}]`,
+      counts,
+      diagnostics,
+    ),
+  );
+}
+
+function styleProperty(
+  attributes: SvgAttributes,
+  property: string,
+): string | null {
+  const direct = attributes[property];
+  if (direct !== undefined) {
+    return direct;
+  }
+  for (const declaration of (attributes.style ?? "").split(";")) {
+    const separator = declaration.indexOf(":");
+    if (
+      separator >= 0 &&
+      declaration.slice(0, separator).trim().toLowerCase() === property
+    ) {
+      return declaration.slice(separator + 1).trim();
+    }
+  }
+  return null;
 }
 
 function normalizeHexColor(value: string): string | null {
@@ -186,536 +406,766 @@ function normalizeHexColor(value: string): string | null {
     : null;
 }
 
-function parseGradients(source: string): ReadonlyMap<string, string> {
+function gradientStops(node: SvgNode): readonly string[] {
+  const own =
+    node.name === "stop"
+      ? [styleProperty(node.attributes, "stop-color") ?? "#000000"]
+      : [];
+  return [...own, ...node.children.flatMap((child) => gradientStops(child))];
+}
+
+function collectGradients(root: SvgNode): ReadonlyMap<string, string> {
   const gradients = new Map<string, string>();
-  for (const match of source.matchAll(
-    /<(?:linearGradient|radialGradient)\b([^>]*)>([\s\S]*?)<\/(?:linearGradient|radialGradient)>/gi,
-  )) {
-    const id = /\bid="([^"]+)"/.exec(match[1] ?? "")?.[1];
-    const stopColors = [
-      ...(match[2] ?? "").matchAll(/\bstop-color="([^"]+)"/gi),
-    ]
-      .map((stop) => normalizeHexColor(stop[1] ?? ""))
-      .filter((color): color is string => color !== null);
-    const representative = stopColors[Math.floor(stopColors.length / 2)];
-    if (id && representative) {
-      gradients.set(id, representative);
+  const visit = (node: SvgNode) => {
+    if (
+      (node.name === "linearGradient" || node.name === "radialGradient") &&
+      node.attributes.id
+    ) {
+      const colors = gradientStops(node).map(
+        (color) => normalizeHexColor(color) ?? color.toLowerCase(),
+      );
+      const representative = colors[Math.floor(colors.length / 2)];
+      if (representative) {
+        gradients.set(node.attributes.id, representative);
+      }
     }
-  }
+    node.children.forEach(visit);
+  };
+  visit(root);
   return gradients;
 }
 
-function parseRealClipIds(source: string): ReadonlySet<string> {
-  const ids = new Set<string>();
-  for (const match of source.matchAll(
-    /<clipPath\b([^>]*)>([\s\S]*?)<\/clipPath>/gi,
-  )) {
-    const id = /\bid="([^"]+)"/.exec(match[1] ?? "")?.[1];
-    const body = (match[2] ?? "").replace(/\s+/g, " ");
-    const trivialHundredSquare = /d="M0(?:[ ,])0h100v100H0z"/i.test(body);
-    const trivialHundredSquareOffset = /d="M0(?:[ ,])-?\.001h100v100H0z"/i.test(
-      body,
-    );
-    if (id && !trivialHundredSquare && !trivialHundredSquareOffset) {
-      ids.add(id);
-    }
-  }
-  return ids;
-}
-
-function extractUrlId(value: string | undefined): string | null {
-  return value ? (/^url\(#([^)]+)\)$/.exec(value.trim())?.[1] ?? null) : null;
-}
-
-function localDeclarations(
-  attributes: Attributes,
-  classStyles: ReadonlyMap<string, Attributes>,
-): { readonly values: Attributes; readonly styleKeys: ReadonlySet<string> } {
-  const classDeclarations = (attributes.class ?? "")
-    .split(/\s+/)
-    .filter(Boolean)
-    .reduce<Attributes>(
-      (result, className) => ({ ...result, ...classStyles.get(className) }),
-      {},
-    );
-  const inlineDeclarations = declarations(attributes.style);
-  return {
-    values: { ...attributes, ...classDeclarations, ...inlineDeclarations },
-    styleKeys: new Set([
-      ...Object.keys(classDeclarations),
-      ...Object.keys(inlineDeclarations),
-    ]),
-  };
-}
-
-function nextPaintContext(
-  parent: PaintContext,
-  attributes: Attributes,
-  classStyles: ReadonlyMap<string, Attributes>,
-): PaintContext {
-  const local = localDeclarations(attributes, classStyles);
-  const values = local.values;
-  const originFor = (property: "fill" | "stroke"): PaintSource => {
-    if (local.styleKeys.has(property)) {
-      return "style";
-    }
-    return attributes[property] !== undefined
-      ? "direct"
-      : parent[`${property}Origin`];
-  };
-  const localOpacity = clampOpacity(finiteNumber(values.opacity, 1));
-  return {
-    color: values.color ?? parent.color,
-    fill: values.fill ?? parent.fill,
-    fillOpacity: clampOpacity(
-      finiteNumber(values["fill-opacity"], parent.fillOpacity),
-    ),
-    fillOrigin: originFor("fill"),
-    fillRule:
-      values["fill-rule"] === "evenodd"
-        ? "evenodd"
-        : values["fill-rule"] === "nonzero"
-          ? "nonzero"
-          : parent.fillRule,
-    opacity: parent.opacity * localOpacity,
-    stroke: values.stroke ?? parent.stroke,
-    strokeOpacity: clampOpacity(
-      finiteNumber(values["stroke-opacity"], parent.strokeOpacity),
-    ),
-    strokeOrigin: originFor("stroke"),
-    strokeWidth: finiteNumber(values["stroke-width"], parent.strokeWidth),
-  };
-}
-
-function resolvePaint(
-  value: string,
-  origin: PaintSource,
-  opacity: number,
-  color: string,
-  gradients: ReadonlyMap<string, string>,
-  warnings: Set<string>,
-): CanonicalPaint | null {
-  if (value.trim().toLowerCase() === "none") {
-    return null;
-  }
-  const gradientId = extractUrlId(value);
-  if (gradientId) {
-    warnings.add("gradient-flattened-to-representative-color");
-    return {
-      color: gradients.get(gradientId) ?? "#808080",
-      opacity: clampOpacity(opacity),
-      source: "gradient",
-    };
-  }
-  const resolved = value.trim() === "currentColor" ? color : value.trim();
-  return {
-    color: normalizeHexColor(resolved) ?? resolved.toLowerCase(),
-    opacity: clampOpacity(opacity),
-    source: origin,
-  };
-}
-
-function cubicPoint(
-  start: Point,
-  control1: Point,
-  control2: Point,
-  end: Point,
-  t: number,
-): Point {
-  const inverse = 1 - t;
-  return {
-    x:
-      inverse ** 3 * start.x +
-      3 * inverse ** 2 * t * control1.x +
-      3 * inverse * t ** 2 * control2.x +
-      t ** 3 * end.x,
-    y:
-      inverse ** 3 * start.y +
-      3 * inverse ** 2 * t * control1.y +
-      3 * inverse * t ** 2 * control2.y +
-      t ** 3 * end.y,
-  };
-}
-
-function normalizedCommands(pathData: string): readonly SVGCommand[] {
-  return new SVGPathData(pathData)
-    .transform(SVGPathDataTransformer.TO_ABS())
-    .transform(SVGPathDataTransformer.NORMALIZE_ST())
-    .transform(SVGPathDataTransformer.QT_TO_C())
-    .transform(SVGPathDataTransformer.A_TO_C())
-    .transform(SVGPathDataTransformer.NORMALIZE_HVZ(false, true, true, true))
-    .commands;
-}
-
-function flattenPath(
-  pathData: string,
-  matrix: Matrix,
-): readonly CanonicalSubpath[] {
-  const subpaths: CanonicalSubpath[] = [];
-  let points: Point[] = [];
-  let current: Point = { x: 0, y: 0 };
-  let start: Point = current;
-  let closed = false;
-
-  const finish = () => {
-    if (points.length > 0) {
-      subpaths.push({
-        closed,
-        points: points.map((point) => transformPoint(point, matrix)),
-      });
-    }
-    points = [];
-    closed = false;
-  };
-
-  for (const command of normalizedCommands(pathData)) {
-    if (command.type === SVGPathData.MOVE_TO) {
-      finish();
-      current = { x: command.x, y: command.y };
-      start = current;
-      points.push(current);
-    } else if (command.type === SVGPathData.LINE_TO) {
-      current = { x: command.x, y: command.y };
-      points.push(current);
-    } else if (command.type === SVGPathData.CURVE_TO) {
-      const end = { x: command.x, y: command.y };
-      const control1 = { x: command.x1, y: command.y1 };
-      const control2 = { x: command.x2, y: command.y2 };
-      for (let step = 1; step <= PATH_CURVE_SEGMENTS; step += 1) {
-        points.push(
-          cubicPoint(
-            current,
-            control1,
-            control2,
-            end,
-            step / PATH_CURVE_SEGMENTS,
-          ),
-        );
-      }
-      current = end;
-    } else if (command.type === SVGPathData.CLOSE_PATH) {
-      const lastPoint = points.at(-1);
-      if (
-        lastPoint &&
-        (Math.abs(lastPoint.x - start.x) > 1e-7 ||
-          Math.abs(lastPoint.y - start.y) > 1e-7)
-      ) {
-        points.push(start);
-      }
-      current = start;
-      closed = true;
-    }
-  }
-  finish();
-  return subpaths;
-}
-
-function pointsAttribute(
-  value: string | undefined,
-  matrix: Matrix,
-): readonly Point[] {
-  const values = transformNumbers(value ?? "");
-  const points: Point[] = [];
-  for (let index = 0; index + 1 < values.length; index += 2) {
-    points.push(
-      transformPoint(
-        { x: values[index] ?? 0, y: values[index + 1] ?? 0 },
-        matrix,
-      ),
-    );
-  }
-  return points;
-}
-
-function primitiveSubpaths(
-  elementName: string,
-  attributes: Attributes,
-  matrix: Matrix,
-): readonly CanonicalSubpath[] {
-  if (elementName === "path") {
-    return attributes.d ? flattenPath(attributes.d, matrix) : [];
-  }
-  if (elementName === "polyline" || elementName === "polygon") {
-    const points = [...pointsAttribute(attributes.points, matrix)];
-    const closed = elementName === "polygon";
-    if (closed && points[0]) {
-      points.push(points[0]);
-    }
-    return points.length > 0 ? [{ closed, points }] : [];
-  }
-  if (elementName === "line") {
-    return [
-      {
-        closed: false,
-        points: [
-          transformPoint(
-            {
-              x: finiteNumber(attributes.x1, 0),
-              y: finiteNumber(attributes.y1, 0),
-            },
-            matrix,
-          ),
-          transformPoint(
-            {
-              x: finiteNumber(attributes.x2, 0),
-              y: finiteNumber(attributes.y2, 0),
-            },
-            matrix,
-          ),
-        ],
-      },
-    ];
-  }
-  if (elementName === "rect") {
-    const x = finiteNumber(attributes.x, 0);
-    const y = finiteNumber(attributes.y, 0);
-    const width = finiteNumber(attributes.width, 0);
-    const height = finiteNumber(attributes.height, 0);
-    const points = [
-      { x, y },
-      { x: x + width, y },
-      { x: x + width, y: y + height },
-      { x, y: y + height },
-      { x, y },
-    ].map((point) => transformPoint(point, matrix));
-    return [{ closed: true, points }];
-  }
-  if (elementName === "circle" || elementName === "ellipse") {
-    const centerX = finiteNumber(attributes.cx, 0);
-    const centerY = finiteNumber(attributes.cy, 0);
-    const radiusX = finiteNumber(attributes.rx ?? attributes.r, 0);
-    const radiusY = finiteNumber(attributes.ry ?? attributes.r, 0);
-    const points = Array.from({ length: 65 }, (_, index) => {
-      const angle = (index / 64) * Math.PI * 2;
-      return transformPoint(
-        {
-          x: centerX + Math.cos(angle) * radiusX,
-          y: centerY + Math.sin(angle) * radiusY,
-        },
-        matrix,
-      );
-    });
-    return [{ closed: true, points }];
-  }
-  return [];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function stringAttributes(value: unknown): Attributes {
-  if (!isRecord(value)) {
-    return {};
-  }
-  return Object.fromEntries(
-    Object.entries(value).flatMap(([key, entry]) =>
-      typeof entry === "string" ? [[key, entry]] : [],
-    ),
-  );
-}
-
-function walk(
-  nodes: readonly unknown[],
-  context: ParseContext,
-  state: ParserState,
-): void {
-  for (const node of nodes) {
-    if (!isRecord(node)) {
-      continue;
-    }
-    const attributes = stringAttributes(node[":@"]);
-    const elementName = Object.keys(node).find(
-      (key) => key !== ":@" && key !== "#text" && key !== "?xml",
-    );
-    if (!elementName) {
-      continue;
-    }
-    const childrenValue = node[elementName];
-    const children = Array.isArray(childrenValue) ? childrenValue : [];
-    if (
-      elementName === "defs" ||
-      elementName === "clipPath" ||
-      elementName === "linearGradient" ||
-      elementName === "radialGradient" ||
-      elementName === "style" ||
-      elementName === "title"
-    ) {
-      continue;
-    }
-    const nextContext: ParseContext = {
-      clipPathId: (() => {
-        const localClipPathId = extractUrlId(attributes["clip-path"]);
-        return localClipPathId && state.realClipIds.has(localClipPathId)
-          ? localClipPathId
-          : context.clipPathId;
-      })(),
-      matrix: multiplyMatrices(
-        context.matrix,
-        transformMatrix(attributes.transform),
-      ),
-      paint: nextPaintContext(context.paint, attributes, state.classStyles),
-    };
-    if (elementName === "svg" || elementName === "g") {
-      walk(children, nextContext, state);
-      continue;
-    }
-    const supportedPrimitive = [
-      "path",
-      "polyline",
-      "polygon",
-      "line",
-      "rect",
-      "circle",
-      "ellipse",
-    ].includes(elementName);
-    if (!supportedPrimitive) {
-      state.warnings.add(`unsupported-element:${elementName}`);
-      continue;
-    }
-    try {
-      const subpaths = primitiveSubpaths(
-        elementName,
-        attributes,
-        nextContext.matrix,
-      );
-      if (subpaths.length === 0) {
-        continue;
-      }
-      const realClipPathId = nextContext.clipPathId;
-      if (realClipPathId) {
-        state.warnings.add("real-clip-native-unsupported");
-      }
-      const paint = nextContext.paint;
-      const fill = resolvePaint(
-        paint.fill,
-        paint.fillOrigin,
-        paint.opacity * paint.fillOpacity,
-        paint.color,
-        state.gradients,
-        state.warnings,
-      );
-      const stroke = resolvePaint(
-        paint.stroke,
-        paint.strokeOrigin,
-        paint.opacity * paint.strokeOpacity,
-        paint.color,
-        state.gradients,
-        state.warnings,
-      );
-      state.shapes.push({
-        id: `shape:${state.shapeIndex}`,
-        sourceElement: elementName,
-        clipPathId: realClipPathId,
-        fill,
-        fillRule: paint.fillRule,
-        stroke,
-        strokeWidth:
-          paint.strokeWidth * transformedStrokeScale(nextContext.matrix),
-        subpaths,
-      });
-      state.shapeIndex += 1;
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "unknown parser error";
-      state.warnings.add(`parse-error:${message}`);
-    }
-  }
-}
-
-function sourceHash(source: string): string {
-  let hash = 2166136261;
-  for (const character of source) {
-    hash ^= character.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
-}
-
 function parseViewBox(
-  source: string,
+  root: SvgNode,
 ): readonly [number, number, number, number] {
-  const value = /<svg\b[^>]*\bviewBox="([^"]+)"/i.exec(source)?.[1];
-  const numbers = transformNumbers(value ?? "");
+  const numbers = numericTokens(root.attributes.viewBox ?? "");
+  const width = Number(root.attributes.width);
+  const height = Number(root.attributes.height);
   return [
     numbers[0] ?? 0,
     numbers[1] ?? 0,
-    numbers[2] ?? 512,
-    numbers[3] ?? 512,
+    numbers[2] ?? (Number.isFinite(width) && width > 0 ? width : 512),
+    numbers[3] ?? (Number.isFinite(height) && height > 0 ? height : 512),
   ];
 }
 
-export function parseSvgForFillSpike(
-  source: string,
-  options: { readonly sourceName?: string } = {},
-): CanonicalSvgDocument {
-  const warnings = new Set<string>();
-  const state: ParserState = {
-    classStyles: parseClassStyles(source),
-    gradients: parseGradients(source),
-    realClipIds: parseRealClipIds(source),
-    shapes: [],
-    warnings,
-    shapeIndex: 0,
-  };
-  const parser = new XMLParser({
-    preserveOrder: true,
-    ignoreAttributes: false,
-    attributeNamePrefix: "",
-    trimValues: false,
-    processEntities: false,
-  });
-  const parsed: unknown = parser.parse(source);
-  if (!Array.isArray(parsed)) {
-    throw new Error("Expected an SVG XML document.");
-  }
-  walk(
-    parsed,
-    { clipPathId: null, matrix: IDENTITY_MATRIX, paint: DEFAULT_PAINT },
-    state,
+function pointsEqual(left: Point, right: Point): boolean {
+  return (
+    Math.abs(left.x - right.x) <= 1e-7 && Math.abs(left.y - right.y) <= 1e-7
   );
+}
 
-  const subpaths = state.shapes.flatMap((shape) => shape.subpaths);
-  const colors = new Set(
-    state.shapes.flatMap((shape) =>
-      [shape.fill?.color, shape.stroke?.color].filter(
-        (color): color is string => color !== undefined,
-      ),
-    ),
+function withoutClosingPoint(points: readonly Point[]): readonly Point[] {
+  const first = points[0];
+  const last = points.at(-1);
+  return first && last && pointsEqual(first, last)
+    ? points.slice(0, -1)
+    : points;
+}
+
+function isAxisAlignedRectangle(points: readonly Point[]): boolean {
+  const open = withoutClosingPoint(points);
+  if (open.length !== 4) {
+    return false;
+  }
+  const xValues = new Set(open.map((point) => point.x));
+  const yValues = new Set(open.map((point) => point.y));
+  if (xValues.size !== 2 || yValues.size !== 2) {
+    return false;
+  }
+  const edgeOrientations = open.map((point, index) => {
+    const next = open[(index + 1) % open.length];
+    if (!next) {
+      return null;
+    }
+    const horizontal =
+      Math.abs(point.y - next.y) <= 1e-7 && Math.abs(point.x - next.x) > 1e-7;
+    const vertical =
+      Math.abs(point.x - next.x) <= 1e-7 && Math.abs(point.y - next.y) > 1e-7;
+    return horizontal ? "horizontal" : vertical ? "vertical" : null;
+  });
+  return edgeOrientations.every(
+    (orientation, index) =>
+      orientation !== null &&
+      orientation !== edgeOrientations[(index + 1) % edgeOrientations.length],
   );
-  return {
-    sourceName: options.sourceName ?? "inline.svg",
-    sourceHash: sourceHash(source),
-    viewBox: parseViewBox(source),
-    shapes: state.shapes,
-    warnings: [...warnings].sort(),
-    capabilities: {
-      disjointMultipath: state.shapes.some(
-        (shape) => shape.subpaths.length > 1,
-      ),
-      evenOdd: state.shapes.some((shape) => shape.fillRule === "evenodd"),
-      gradient: state.shapes.some((shape) => shape.fill?.source === "gradient"),
-      multicolor: colors.size > 1,
-      realClip: state.shapes.some((shape) => shape.clipPathId !== null),
-      strokeOnly: state.shapes.some(
-        (shape) => shape.fill === null && shape.stroke !== null,
-      ),
-      stylePaint: state.shapes.some(
-        (shape) =>
-          shape.fill?.source === "style" || shape.stroke?.source === "style",
-      ),
-    },
-    metrics: {
-      shapes: state.shapes.length,
-      pathElements: state.shapes.filter(
-        (shape) => shape.sourceElement === "path",
-      ).length,
-      closedSubpaths: subpaths.filter((subpath) => subpath.closed).length,
-      openSubpaths: subpaths.filter((subpath) => !subpath.closed).length,
-      points: subpaths.reduce(
-        (total, subpath) => total + subpath.points.length,
-        0,
-      ),
-    },
+}
+
+function clipRectangle(
+  node: SvgNode,
+  matrix: Matrix,
+  paint: PaintContext,
+  ancestry: readonly SvgElementDescriptor[],
+  cssRules: readonly CssRule[],
+  flattening: EffectiveAdaptiveFlatteningOptions,
+  sourcePath: string,
+): readonly Point[] | null {
+  const transform = parseTransform(node.attributes.transform, sourcePath);
+  if (transform.diagnostics.length > 0) {
+    return null;
+  }
+  const nextMatrix = multiplyMatrices(matrix, transform.matrix);
+  const nextAncestry = [...ancestry, descriptor(node.name, node.attributes)];
+  const computed = computeElementStyle(
+    paint,
+    node.attributes,
+    nextAncestry,
+    cssRules,
+  );
+  if (!computed.paint.displayed) {
+    return null;
+  }
+  if (isPrimitiveName(node.name)) {
+    if (computed.paint.visibility !== "visible") {
+      return null;
+    }
+    const flattened = flattenPrimitive(
+      node.name,
+      node.attributes,
+      nextMatrix,
+      flattening,
+      sourcePath,
+    );
+    const points =
+      flattened.subpaths.length === 1
+        ? (flattened.subpaths[0]?.points ?? null)
+        : null;
+    return points && isAxisAlignedRectangle(points) ? points : null;
+  }
+  const candidates = node.children.flatMap((child, index) => {
+    const rectangle = clipRectangle(
+      child,
+      nextMatrix,
+      computed.paint,
+      nextAncestry,
+      cssRules,
+      flattening,
+      `${sourcePath}/${child.name}[${index}]`,
+    );
+    return rectangle ? [rectangle] : [];
+  });
+  return candidates.length === 1 ? (candidates[0] ?? null) : null;
+}
+
+function collectClipDefinitions(
+  root: SvgNode,
+  flattening: EffectiveAdaptiveFlatteningOptions,
+  cssRules: readonly CssRule[],
+): ReadonlyMap<string, ClipDefinition> {
+  const clips = new Map<string, ClipDefinition>();
+  const viewBox = parseViewBox(root);
+  const visit = (node: SvgNode, sourcePath: string) => {
+    if (node.name === "clipPath" && node.attributes.id) {
+      const rectangle =
+        node.attributes.clipPathUnits === "objectBoundingBox"
+          ? null
+          : clipRectangle(
+              node,
+              IDENTITY_MATRIX,
+              DEFAULT_PAINT_CONTEXT,
+              [],
+              cssRules,
+              flattening,
+              sourcePath,
+            );
+      const open = rectangle ? withoutClosingPoint(rectangle) : [];
+      const minX = Math.min(...open.map((point) => point.x));
+      const maxX = Math.max(...open.map((point) => point.x));
+      const minY = Math.min(...open.map((point) => point.y));
+      const maxY = Math.max(...open.map((point) => point.y));
+      const approximately = (left: number, right: number) =>
+        Math.abs(left - right) <= 0.01;
+      const matchesCanvas =
+        rectangle !== null &&
+        ((approximately(minX, 0) &&
+          approximately(minY, 0) &&
+          approximately(maxX, 100) &&
+          approximately(maxY, 100)) ||
+          (approximately(minX, viewBox[0]) &&
+            approximately(minY, viewBox[1]) &&
+            approximately(maxX, viewBox[0] + viewBox[2]) &&
+            approximately(maxY, viewBox[1] + viewBox[3])));
+      clips.set(node.attributes.id, {
+        id: node.attributes.id,
+        nonConstrainingCanvas: matchesCanvas,
+      });
+    }
+    node.children.forEach((child, index) =>
+      visit(child, `${sourcePath}/${child.name}[${index}]`),
+    );
   };
+  visit(root, root.name);
+  return clips;
+}
+
+function extractUrlId(value: string | null): string | null {
+  return value
+    ? (/^url\(\s*#([^)\s]+)\s*\)$/.exec(value.trim())?.[1] ?? null)
+    : null;
+}
+
+function strictNumberList(
+  value: string,
+  expectedCount: number,
+): readonly number[] | null {
+  const tokens = value.trim().split(/[\s,]+/);
+  if (tokens.length !== expectedCount) {
+    return null;
+  }
+  const numbers = tokens.map(Number);
+  return numbers.every(Number.isFinite) ? numbers : null;
+}
+
+function viewportLength(value: string | undefined): number | null {
+  const match =
+    /^\s*([-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?)\s*(?:px)?\s*$/.exec(
+      value ?? "",
+    );
+  const parsed = Number(match?.[1]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+type SymbolViewportResult =
+  | { readonly kind: "hidden" }
+  | { readonly kind: "mapped"; readonly matrix: Matrix }
+  | { readonly kind: "unsupported"; readonly message: string };
+
+function symbolViewport(
+  symbol: SvgNode,
+  useAttributes: SvgAttributes,
+): SymbolViewportResult {
+  if (
+    symbol.attributes.x !== undefined ||
+    symbol.attributes.y !== undefined ||
+    symbol.attributes.refX !== undefined ||
+    symbol.attributes.refY !== undefined ||
+    symbol.attributes.transform !== undefined
+  ) {
+    return {
+      kind: "unsupported",
+      message: `Symbol #${symbol.attributes.id ?? "(anonymous)"} uses unsupported symbol-level positioning, transform, or reference-point attributes.`,
+    };
+  }
+  if (
+    styleProperty(symbol.attributes, "overflow")?.trim().toLowerCase() !==
+    "visible"
+  ) {
+    return {
+      kind: "unsupported",
+      message: `Symbol #${symbol.attributes.id ?? "(anonymous)"} requires overflow="visible" because implicit symbol viewport clipping is not represented in Slice 1.`,
+    };
+  }
+  const viewBox = strictNumberList(symbol.attributes.viewBox ?? "", 4);
+  if (!viewBox || (viewBox[2] ?? 0) <= 0 || (viewBox[3] ?? 0) <= 0) {
+    return {
+      kind: "unsupported",
+      message: `Symbol #${symbol.attributes.id ?? "(anonymous)"} requires a finite positive viewBox.`,
+    };
+  }
+  const width = viewportLength(
+    styleProperty(useAttributes, "width") ??
+      styleProperty(symbol.attributes, "width") ??
+      undefined,
+  );
+  const height = viewportLength(
+    styleProperty(useAttributes, "height") ??
+      styleProperty(symbol.attributes, "height") ??
+      undefined,
+  );
+  if (width === null || height === null) {
+    return {
+      kind: "unsupported",
+      message: `Symbol #${symbol.attributes.id ?? "(anonymous)"} requires numeric use width and height.`,
+    };
+  }
+  if (width < 0 || height < 0) {
+    return {
+      kind: "unsupported",
+      message: `Symbol #${symbol.attributes.id ?? "(anonymous)"} has a negative viewport dimension.`,
+    };
+  }
+  if (width === 0 || height === 0) {
+    return { kind: "hidden" };
+  }
+  const preserveAspectRatio =
+    symbol.attributes.preserveAspectRatio ?? "xMidYMid meet";
+  const minX = viewBox[0] ?? 0;
+  const minY = viewBox[1] ?? 0;
+  const viewWidth = viewBox[2] ?? 1;
+  const viewHeight = viewBox[3] ?? 1;
+  if (preserveAspectRatio.trim() === "none") {
+    const scaleX = width / viewWidth;
+    const scaleY = height / viewHeight;
+    return {
+      kind: "mapped",
+      matrix: [scaleX, 0, 0, scaleY, -minX * scaleX, -minY * scaleY],
+    };
+  }
+  const match = /^(xMin|xMid|xMax)(YMin|YMid|YMax)(?:\s+(meet|slice))?$/.exec(
+    preserveAspectRatio.trim(),
+  );
+  if (!match) {
+    return {
+      kind: "unsupported",
+      message: `Unsupported preserveAspectRatio on symbol #${symbol.attributes.id ?? "(anonymous)"}: ${preserveAspectRatio}`,
+    };
+  }
+  const mode = match[3] ?? "meet";
+  const scale =
+    mode === "slice"
+      ? Math.max(width / viewWidth, height / viewHeight)
+      : Math.min(width / viewWidth, height / viewHeight);
+  const remainingX = width - viewWidth * scale;
+  const remainingY = height - viewHeight * scale;
+  const offsetX =
+    match[1] === "xMin" ? 0 : match[1] === "xMid" ? remainingX / 2 : remainingX;
+  const offsetY =
+    match[2] === "YMin" ? 0 : match[2] === "YMid" ? remainingY / 2 : remainingY;
+  return {
+    kind: "mapped",
+    matrix: [
+      scale,
+      0,
+      0,
+      scale,
+      offsetX - minX * scale,
+      offsetY - minY * scale,
+    ],
+  };
+}
+
+function clipIsTrivial(definition: ClipDefinition | undefined): boolean {
+  // The corpus normalizer emits a known full-canvas 100x100 clip. Only that
+  // structural case (or an exact root-viewBox rectangle) is safe to erase.
+  // A clip that merely appears to contain sampled points remains diagnostic:
+  // the unsampled source curve could still cross its boundary.
+  return definition?.nonConstrainingCanvas ?? false;
+}
+
+function nodePath(parent: string, child: SvgNode, index: number): string {
+  const id = child.attributes.id ? `#${child.attributes.id}` : "";
+  return `${parent}/${child.name}${id}[${index}]`;
+}
+
+function walkNode(
+  node: SvgNode,
+  sourcePath: string,
+  context: WalkContext,
+  state: ParserState,
+  useStack: readonly string[],
+  referencedSymbolRoot = false,
+): void {
+  if (state.resourceLimitExceeded) {
+    return;
+  }
+  const elementDescriptor = descriptor(node.name, node.attributes);
+  const ancestry = [...context.ancestry, elementDescriptor];
+  const transform = parseTransform(node.attributes.transform, sourcePath);
+  transform.diagnostics.forEach((entry) => pushDiagnostic(state, entry));
+  const matrix = multiplyMatrices(context.matrix, transform.matrix);
+  const computed = computeElementStyle(
+    context.paint,
+    node.attributes,
+    ancestry,
+    state.cssRules,
+  );
+  for (const property of computed.unsupportedProperties) {
+    pushDiagnostic(
+      state,
+      diagnostic({
+        code: "unsupported-presentation-property",
+        elementId: node.attributes.id ?? null,
+        message: `Unsupported presentation property: ${property}`,
+        severity: "warning",
+        sourcePath,
+      }),
+      `unsupported-presentation-property:${property}:${sourcePath}`,
+    );
+  }
+  if (
+    !(referencedSymbolRoot ? context.paint.displayed : computed.paint.displayed)
+  ) {
+    return;
+  }
+  const localClipId = extractUrlId(computed.clipPath);
+  const activeClips = localClipId
+    ? [...context.activeClips, { id: localClipId, sourcePath }]
+    : context.activeClips;
+  const nextContext: WalkContext = {
+    activeClips,
+    ancestry,
+    matrix,
+    paint: referencedSymbolRoot
+      ? { ...computed.paint, displayed: context.paint.displayed }
+      : computed.paint,
+  };
+
+  if (node.name === "use") {
+    const reference =
+      node.attributes.href ?? node.attributes["xlink:href"] ?? "";
+    const referenceId = reference.startsWith("#") ? reference.slice(1) : "";
+    if (!referenceId || !state.ids.has(referenceId)) {
+      pushDiagnostic(
+        state,
+        diagnostic({
+          code: "use-reference-missing",
+          elementId: node.attributes.id ?? null,
+          feature: "use",
+          message: `Unable to resolve SVG use reference: ${reference || "(empty)"}`,
+          severity: "warning",
+          sourcePath,
+        }),
+      );
+      return;
+    }
+    if (useStack.includes(referenceId)) {
+      pushDiagnostic(
+        state,
+        diagnostic({
+          code: "use-cycle",
+          elementId: node.attributes.id ?? null,
+          feature: "use",
+          message: `Cyclic SVG use reference: ${[...useStack, referenceId].join(" -> ")}`,
+          severity: "warning",
+          sourcePath,
+        }),
+      );
+      return;
+    }
+    const referenceNode = state.ids.get(referenceId);
+    if (!referenceNode) {
+      return;
+    }
+    if (useStack.length >= state.useExpansion.maxDepth) {
+      exceedExpansionLimit(
+        state,
+        `SVG use expansion exceeded maxDepth=${state.useExpansion.maxDepth}.`,
+        sourcePath,
+      );
+      return;
+    }
+    if (state.useExpansions >= state.useExpansion.maxExpansions) {
+      exceedExpansionLimit(
+        state,
+        `SVG use expansion exceeded maxExpansions=${state.useExpansion.maxExpansions}.`,
+        sourcePath,
+      );
+      return;
+    }
+    state.useExpansions += 1;
+    state.usesResolved += 1;
+    const x = Number(node.attributes.x ?? 0);
+    const y = Number(node.attributes.y ?? 0);
+    const translatedMatrix = multiplyMatrices(matrix, [
+      1,
+      0,
+      0,
+      1,
+      Number.isFinite(x) ? x : 0,
+      Number.isFinite(y) ? y : 0,
+    ]);
+    let referenceMatrix = translatedMatrix;
+    if (referenceNode.name === "symbol") {
+      const viewport = symbolViewport(referenceNode, node.attributes);
+      if (viewport.kind === "unsupported") {
+        pushDiagnostic(
+          state,
+          diagnostic({
+            code: "symbol-viewport-unsupported",
+            elementId: node.attributes.id ?? null,
+            feature: "use",
+            message: viewport.message,
+            severity: "warning",
+            sourcePath,
+          }),
+        );
+        return;
+      }
+      if (viewport.kind === "hidden") {
+        return;
+      }
+      referenceMatrix = multiplyMatrices(translatedMatrix, viewport.matrix);
+    }
+    walkNode(
+      referenceNode,
+      `${sourcePath}->#${referenceId}`,
+      { ...nextContext, matrix: referenceMatrix },
+      state,
+      [...useStack, referenceId],
+      referenceNode.name === "symbol",
+    );
+    return;
+  }
+
+  if (NON_RENDERING.has(node.name)) {
+    return;
+  }
+  if (node.name === "symbol" && !referencedSymbolRoot) {
+    return;
+  }
+  if (CONTAINERS.has(node.name)) {
+    node.children.forEach((child, index) =>
+      walkNode(
+        child,
+        nodePath(sourcePath, child, index),
+        nextContext,
+        state,
+        useStack,
+      ),
+    );
+    return;
+  }
+  if (!isPrimitiveName(node.name)) {
+    if (!NON_RENDERING.has(node.name)) {
+      pushDiagnostic(
+        state,
+        diagnostic({
+          code: "unsupported-element",
+          elementId: node.attributes.id ?? null,
+          message: `Unsupported rendered SVG element: ${node.name}`,
+          severity: "warning",
+          sourcePath,
+        }),
+      );
+    }
+    return;
+  }
+  if (computed.paint.visibility !== "visible") {
+    return;
+  }
+  if (state.shapes.length >= state.useExpansion.maxShapes) {
+    exceedExpansionLimit(
+      state,
+      `SVG shape expansion exceeded maxShapes=${state.useExpansion.maxShapes}.`,
+      sourcePath,
+    );
+    return;
+  }
+
+  const flattened = flattenPrimitive(
+    node.name,
+    node.attributes,
+    matrix,
+    state.flattening,
+    sourcePath,
+  );
+  flattened.diagnostics.forEach((entry) => pushDiagnostic(state, entry));
+  if (flattened.subpaths.length === 0) {
+    return;
+  }
+  state.cubicSegments += flattened.metrics.cubicSegments;
+  state.arcSegments += flattened.metrics.arcSegments;
+  state.flattenedSegments += flattened.metrics.flattenedSegments;
+
+  const realClipIds: string[] = [];
+  for (const application of activeClips) {
+    if (clipIsTrivial(state.clipDefinitions.get(application.id))) {
+      pushDiagnostic(
+        state,
+        diagnostic({
+          code: "trivial-clip-removed",
+          elementId: application.id,
+          feature: "clipPath",
+          message: `Removed non-constraining clip path #${application.id}.`,
+          severity: "info",
+          sourcePath: application.sourcePath,
+        }),
+        `trivial-clip:${application.id}:${application.sourcePath}`,
+      );
+    } else {
+      realClipIds.push(application.id);
+      pushDiagnostic(
+        state,
+        diagnostic({
+          code: "native-unsupported-clip",
+          elementId: application.id,
+          feature: "clipPath",
+          message: `Clip path #${application.id} constrains geometry and is not native-traceable in Slice 1.`,
+          severity: "warning",
+          sourcePath: application.sourcePath,
+        }),
+        `real-clip:${application.id}:${application.sourcePath}`,
+      );
+    }
+  }
+
+  const fillResult = resolvePaint(
+    computed.paint.fill,
+    computed.paint.opacity * computed.paint.fillOpacity,
+    computed.paint.color,
+    state.gradients,
+  );
+  const strokeResult = resolvePaint(
+    computed.paint.stroke,
+    computed.paint.opacity * computed.paint.strokeOpacity,
+    computed.paint.color,
+    state.gradients,
+  );
+  for (const paintResult of [fillResult, strokeResult]) {
+    if (paintResult.gradientId && state.gradients.has(paintResult.gradientId)) {
+      pushDiagnostic(
+        state,
+        diagnostic({
+          code: "gradient-flattened",
+          elementId: paintResult.gradientId,
+          feature: "gradient",
+          message: `Flattened gradient #${paintResult.gradientId} to a representative color.`,
+          severity: "warning",
+          sourcePath,
+        }),
+        `gradient:${paintResult.gradientId}`,
+      );
+    }
+  }
+  state.shapes.push({
+    clipPathIds: [...new Set(realClipIds)].sort(),
+    elementId: node.attributes.id ?? null,
+    fill: fillResult.paint,
+    fillRule: computed.paint.fillRule,
+    id: `shape:${state.shapeIndex}`,
+    sourceElement: node.name,
+    sourcePath,
+    stroke: strokeResult.paint,
+    strokeWidth: computed.paint.strokeWidth * transformedStrokeScale(matrix),
+    subpaths: flattened.subpaths,
+  });
+  state.shapeIndex += 1;
+}
+
+function parseFailure(message: string): SvgParseResult {
+  const error = diagnostic({
+    code: "invalid-svg",
+    message,
+    severity: "error",
+  });
+  return { diagnostics: [error], document: null, ok: false };
+}
+
+export function parseSvg(
+  source: string,
+  options: SvgParseOptions = {},
+): SvgParseResult {
+  const validation = XMLValidator.validate(source);
+  if (validation !== true) {
+    const message =
+      isRecord(validation) &&
+      isRecord(validation.err) &&
+      typeof validation.err.msg === "string"
+        ? validation.err.msg
+        : "Malformed SVG XML.";
+    return parseFailure(message);
+  }
+
+  try {
+    const parser = new XMLParser({
+      preserveOrder: true,
+      ignoreAttributes: false,
+      attributeNamePrefix: "",
+      trimValues: false,
+      processEntities: false,
+    });
+    const parsed: unknown = parser.parse(source);
+    if (!Array.isArray(parsed)) {
+      return parseFailure("Expected an SVG XML document.");
+    }
+    const roots = nodesFromPreserveOrder(parsed);
+    const root = roots.find((node) => node.name === "svg");
+    if (!root) {
+      return parseFailure("Expected an SVG root element.");
+    }
+
+    const initialDiagnostics: SvgDiagnostic[] = [];
+    const ids = new Map<string, SvgNode>();
+    collectIds(root, root.name, ids, initialDiagnostics);
+    const css = parseCssRules(collectStyles(root, root.name));
+    initialDiagnostics.push(...css.diagnostics);
+    const mutableFeatureCounts = emptyFeatureCounts();
+    scanFeatures(root, root.name, mutableFeatureCounts, initialDiagnostics);
+    const flattening = effectiveFlattening(options.flattening);
+    const useExpansion = effectiveUseExpansion(options.useExpansion);
+    const state: ParserState = {
+      arcSegments: 0,
+      clipDefinitions: collectClipDefinitions(root, flattening, css.rules),
+      cssRules: css.rules,
+      cubicSegments: 0,
+      diagnostics: [],
+      diagnosticKeys: new Set<string>(),
+      flattenedSegments: 0,
+      flattening,
+      gradients: collectGradients(root),
+      ids,
+      shapes: [],
+      resourceLimitExceeded: false,
+      shapeIndex: 0,
+      useExpansion,
+      useExpansions: 0,
+      usesResolved: 0,
+    };
+    initialDiagnostics.forEach((entry) => pushDiagnostic(state, entry));
+    walkNode(
+      root,
+      root.name,
+      {
+        activeClips: [],
+        ancestry: [],
+        matrix: IDENTITY_MATRIX,
+        paint: DEFAULT_PAINT_CONTEXT,
+      },
+      state,
+      [],
+    );
+
+    const compareCodeUnits = (left: string, right: string) =>
+      left < right ? -1 : left > right ? 1 : 0;
+    const diagnostics = [...state.diagnostics].sort((left, right) =>
+      compareCodeUnits(
+        `${left.code}:${left.sourcePath ?? ""}:${left.message}`,
+        `${right.code}:${right.sourcePath ?? ""}:${right.message}`,
+      ),
+    );
+    const subpaths = state.shapes.flatMap((shape) => shape.subpaths);
+    const document: CanonicalSvgDocument = {
+      diagnostics,
+      features: mutableFeatureCounts,
+      flattening,
+      metrics: {
+        arcSegments: state.arcSegments,
+        closedSubpaths: subpaths.filter((subpath) => subpath.closed).length,
+        cubicSegments: state.cubicSegments,
+        flattenedSegments: state.flattenedSegments,
+        openSubpaths: subpaths.filter((subpath) => !subpath.closed).length,
+        pathElements: state.shapes.filter(
+          (shape) => shape.sourceElement === "path",
+        ).length,
+        points: subpaths.reduce(
+          (total, subpath) => total + subpath.points.length,
+          0,
+        ),
+        shapes: state.shapes.length,
+        usesResolved: state.usesResolved,
+      },
+      shapes: state.shapes,
+      sourceHash: sourceHash(source),
+      sourceName: options.sourceName ?? "inline.svg",
+      useExpansion,
+      viewBox: parseViewBox(root),
+    };
+    return { diagnostics, document, ok: true };
+  } catch (error) {
+    return parseFailure(
+      error instanceof Error ? error.message : "Unknown SVG parser error.",
+    );
+  }
+}
+
+export function deterministicDocumentJson(
+  document: CanonicalSvgDocument,
+): string {
+  return JSON.stringify(document);
+}
+
+export function deterministicDocumentChecksum(
+  document: CanonicalSvgDocument,
+): string {
+  return sourceHash(deterministicDocumentJson(document));
 }

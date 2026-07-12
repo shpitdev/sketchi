@@ -28,10 +28,10 @@ Census of all 1,412 corpus SVGs (`apps/icons/public/output/upload-ready/svg`):
 | fill-only (no `stroke` attr)       | 1,314 (93%)                                                     | filled polygons are the primary case, not stroked lines                                         |
 | `fill-rule` / `evenodd`            | 712 / 670 (~47%)                                                | even-odd declarations are common; actual hole topology must be measured by the canonical parser |
 | `<path>` elements per file         | p50=2, p90=6, max=1,716                                         | parsing, decomposing, and budgeting path-heavy icons is a core operation                        |
-| `clip-path`                        | 281, of which 259 are the trivial full-canvas `M0 0h100v100H0z` | strip trivial clips in normalize; only ~22 real clips                                           |
+| `clip-path`                        | 282, of which 259 are the trivial full-canvas `M0 0h100v100H0z` | strip verified trivial clips in normalize; 26 files have a real clip                            |
 | gradients (unique files)           | 161 (~11%; 146 linear + 33 radial, 18 overlap)                  | flatten-to-representative-color is worth building, not rejecting                                |
 | `<style>` blocks                   | 130                                                             | a CSS declaration-subset parser is required, not optional                                       |
-| masks / filters / `<use>` / raster | 20 / 11 / 11 / 2                                                | diagnostic + fallback tier (~50 files total)                                                    |
+| masks / filters / `<use>` / raster | 20 / 11 / 11 / 2                                                | masks, filters, and raster block; use is bounded and resolved where safe                        |
 | `<text>`                           | 0                                                               | text-to-path is out of scope entirely                                                           |
 | generated wrapper `transform`      | 1,412 (all); 74 also contain other transforms                   | compose the wrapper and all nested transforms during normalization                              |
 
@@ -148,12 +148,21 @@ evidence. No product UI before this proof.
 
 ## Delivery slices after the spike
 
-1. **IR + diagnostics.** `parseSvg`/`inspectSvgCapabilities`: XML + CSS-subset
+1. **IR + diagnostics.** **Complete in Slice 1.** The accepted boundary is
+   recorded in `docs/adr/0002-svg-canonical-ir-and-capability-diagnostics.md`;
+   the checked support matrix is
+   `docs/svg-excalidraw-slice-1-support-matrix.md`. `parseSvg` /
+   `inspectSvgCapabilities`: XML + CSS-subset
    parsing, `<use>` resolution, trivial-clip stripping, inherited paint,
    conversion of `rect`/`circle`/`ellipse`/`line`/`polyline`/`polygon` into
    canonical geometry, complete nested transform composition, absolute
    canonical subpaths with closure/winding/paint/opacity/identity, and adaptive
-   output-space flattening measured against the ADR's provisional thresholds.
+   output-space flattening (including direct bounded SVG arcs) measured against
+   the ADR's provisional thresholds. Recursive use expansion has deterministic
+   depth/expansion/shape budgets; safe numeric symbol viewports are mapped and
+   all unrepresented symbol clipping blocks. Unsupported advanced stroke
+   properties, CSS at-rules/nesting, applied masks/filters, and non-trivial
+   clips are blocking diagnostics.
    Corpus census tests use
    explicitly defined, deduplicated file-level metrics so corpus drift is
    caught.

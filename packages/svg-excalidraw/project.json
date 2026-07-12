@@ -17,14 +17,7 @@
       "inputs": [
         "default",
         "^production",
-        "{workspaceRoot}/apps/icons/public/output/upload-ready/svg/ai-model-providers/ai21labsai.svg",
-        "{workspaceRoot}/apps/icons/public/output/upload-ready/svg/ai-infrastructure/vllm.svg",
-        "{workspaceRoot}/apps/icons/public/output/upload-ready/svg/programming-languages/kotlin.svg",
-        "{workspaceRoot}/apps/icons/public/output/upload-ready/svg/gcp-legacy/cloud-router.svg",
-        "{workspaceRoot}/apps/icons/public/output/upload-ready/svg/ai-ecosystem/jimeng.svg",
-        "{workspaceRoot}/apps/icons/public/output/upload-ready/svg/gcp-legacy/connectivity-test.svg",
-        "{workspaceRoot}/apps/icons/public/output/upload-ready/svg/operating-systems/windows11.svg",
-        "{workspaceRoot}/apps/icons/public/output/upload-ready/svg/operating-systems/linux.svg"
+        "{workspaceRoot}/apps/icons/public/output/upload-ready/svg/**/*.svg"
       ],
       "options": {
         "commands": [
