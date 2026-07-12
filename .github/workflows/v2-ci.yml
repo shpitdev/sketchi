@@ -83,6 +83,15 @@ jobs:
           else
             echo "storybook=false" >> "$GITHUB_OUTPUT"
           fi
+
+          if grep -qx "svg-excalidraw" .memory/affected-projects.txt; then
+            echo "playwright=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "playwright=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install Chromium for browser tests
+        if: ${{ steps.affected.outputs.playwright == 'true' }}
+        run: pnpm exec playwright install --with-deps chromium
       - run: pnpm nx affected -t typecheck,test,build --base="${{ steps.nx-refs.outputs.base }}" --head="${{ steps.nx-refs.outputs.head }}"
       - run: pnpm nx affected -t build-storybook --base="${{ steps.nx-refs.outputs.base }}" --head="${{ steps.nx-refs.outputs.head }}"
       - name: Publish Storybook to Chromatic

@@ -23,17 +23,17 @@ selectable, editable, recolorable, scalable, groupable, and serializable.
 
 Census of all 1,412 corpus SVGs (`apps/icons/public/output/upload-ready/svg`):
 
-| Feature | Files | Implication |
-|---|---|---|
-| fill-only (no `stroke` attr) | 1,314 (93%) | filled polygons are the primary case, not stroked lines |
-| `fill-rule` / `evenodd` | 712 / 670 (~47%) | even-odd declarations are common; actual hole topology must be measured by the canonical parser |
-| `<path>` elements per file | p50=2, p90=6, max=1,716 | parsing, decomposing, and budgeting path-heavy icons is a core operation |
-| `clip-path` | 281, of which 259 are the trivial full-canvas `M0 0h100v100H0z` | strip trivial clips in normalize; only ~22 real clips |
-| gradients (unique files) | 161 (~11%; 146 linear + 33 radial, 18 overlap) | flatten-to-representative-color is worth building, not rejecting |
-| `<style>` blocks | 130 | a CSS declaration-subset parser is required, not optional |
-| masks / filters / `<use>` / raster | 20 / 11 / 11 / 2 | diagnostic + fallback tier (~50 files total) |
-| `<text>` | 0 | text-to-path is out of scope entirely |
-| generated wrapper `transform` | 1,412 (all); 74 also contain other transforms | compose the wrapper and all nested transforms during normalization |
+| Feature                            | Files                                                           | Implication                                                                                     |
+| ---------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| fill-only (no `stroke` attr)       | 1,314 (93%)                                                     | filled polygons are the primary case, not stroked lines                                         |
+| `fill-rule` / `evenodd`            | 712 / 670 (~47%)                                                | even-odd declarations are common; actual hole topology must be measured by the canonical parser |
+| `<path>` elements per file         | p50=2, p90=6, max=1,716                                         | parsing, decomposing, and budgeting path-heavy icons is a core operation                        |
+| `clip-path`                        | 281, of which 259 are the trivial full-canvas `M0 0h100v100H0z` | strip trivial clips in normalize; only ~22 real clips                                           |
+| gradients (unique files)           | 161 (~11%; 146 linear + 33 radial, 18 overlap)                  | flatten-to-representative-color is worth building, not rejecting                                |
+| `<style>` blocks                   | 130                                                             | a CSS declaration-subset parser is required, not optional                                       |
+| masks / filters / `<use>` / raster | 20 / 11 / 11 / 2                                                | diagnostic + fallback tier (~50 files total)                                                    |
+| `<text>`                           | 0                                                               | text-to-path is out of scope entirely                                                           |
+| generated wrapper `transform`      | 1,412 (all); 74 also contain other transforms                   | compose the wrapper and all nested transforms during normalization                              |
 
 `@excalidraw/excalidraw@0.18.1` (installed, verified against dist types):
 
@@ -118,6 +118,13 @@ metrics, and effective options.
 
 ## Slice 0 — fill-first spike (blocking)
 
+Implementation status: complete in `packages/svg-excalidraw`. The accepted
+decision is recorded in
+`docs/adr/0001-svg-excalidraw-native-fill-representation.md`; the checked corpus
+matrix is `docs/svg-excalidraw-fill-spike-support-matrix.md`. Representation and
+hole strategy are accepted; the measured 256/4,096 point thresholds remain
+provisional until representative corpus evidence supports enforceable budgets.
+
 Minimal package skeleton plus throwaway IR. Fixtures from the real corpus: a
 wordmark with letter counters (e.g. `ai-model-providers/ai21labsai.svg`), a
 multi-color icon, a gradient icon, a `<style>`-driven icon, a real-clip icon, a
@@ -135,8 +142,9 @@ Measure, in the real Excalidraw renderer:
 - determinism: byte-identical output across two runs and across node/browser.
 
 Exit artifact: a support matrix plus an ADR fixing the native representation,
-hole strategy, hard per-element and per-icon point budgets, and confirmation of
-the hand-built construction path. No product UI before this proof.
+hole strategy, point-threshold evidence/status, and confirmation of the
+hand-built construction path. Hard budgets require representative follow-up
+evidence. No product UI before this proof.
 
 ## Delivery slices after the spike
 
@@ -145,7 +153,8 @@ the hand-built construction path. No product UI before this proof.
    conversion of `rect`/`circle`/`ellipse`/`line`/`polyline`/`polygon` into
    canonical geometry, complete nested transform composition, absolute
    canonical subpaths with closure/winding/paint/opacity/identity, and adaptive
-   output-space flattening under the ADR budgets. Corpus census tests use
+   output-space flattening measured against the ADR's provisional thresholds.
+   Corpus census tests use
    explicitly defined, deduplicated file-level metrics so corpus drift is
    caught.
 2. **Native backend + serialization.** Deterministic element construction per

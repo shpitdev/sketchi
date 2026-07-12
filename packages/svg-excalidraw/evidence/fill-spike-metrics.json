@@ -1,0 +1,266 @@
+{
+  "renderer": "@excalidraw/excalidraw@0.18.1",
+  "counterFixture": "ai-model-providers/ai21labsai.svg",
+  "counterHoleMatrix": [
+    {
+      "strategy": "keyhole",
+      "roughness": 0,
+      "fillStyle": "solid",
+      "elements": 4,
+      "points": 287,
+      "svgBytes": 37091,
+      "holeAlpha": 0
+    },
+    {
+      "strategy": "keyhole",
+      "roughness": 0,
+      "fillStyle": "hachure",
+      "elements": 4,
+      "points": 287,
+      "svgBytes": 33413,
+      "holeAlpha": 0
+    },
+    {
+      "strategy": "keyhole",
+      "roughness": 1,
+      "fillStyle": "solid",
+      "elements": 4,
+      "points": 287,
+      "svgBytes": 37285,
+      "holeAlpha": 0
+    },
+    {
+      "strategy": "keyhole",
+      "roughness": 1,
+      "fillStyle": "hachure",
+      "elements": 4,
+      "points": 287,
+      "svgBytes": 33531,
+      "holeAlpha": 0
+    },
+    {
+      "strategy": "keyhole",
+      "roughness": 2,
+      "fillStyle": "solid",
+      "elements": 4,
+      "points": 287,
+      "svgBytes": 37415,
+      "holeAlpha": 0
+    },
+    {
+      "strategy": "keyhole",
+      "roughness": 2,
+      "fillStyle": "hachure",
+      "elements": 4,
+      "points": 287,
+      "svgBytes": 36357,
+      "holeAlpha": 0
+    },
+    {
+      "strategy": "triangulation",
+      "roughness": 0,
+      "fillStyle": "solid",
+      "elements": 275,
+      "points": 1100,
+      "svgBytes": 185449,
+      "holeAlpha": 0
+    },
+    {
+      "strategy": "triangulation",
+      "roughness": 0,
+      "fillStyle": "hachure",
+      "elements": 275,
+      "points": 1100,
+      "svgBytes": 194412,
+      "holeAlpha": 0
+    },
+    {
+      "strategy": "triangulation",
+      "roughness": 1,
+      "fillStyle": "solid",
+      "elements": 275,
+      "points": 1100,
+      "svgBytes": 189402,
+      "holeAlpha": 0
+    },
+    {
+      "strategy": "triangulation",
+      "roughness": 1,
+      "fillStyle": "hachure",
+      "elements": 275,
+      "points": 1100,
+      "svgBytes": 196570,
+      "holeAlpha": 0
+    },
+    {
+      "strategy": "triangulation",
+      "roughness": 2,
+      "fillStyle": "solid",
+      "elements": 275,
+      "points": 1100,
+      "svgBytes": 197413,
+      "holeAlpha": 0
+    },
+    {
+      "strategy": "triangulation",
+      "roughness": 2,
+      "fillStyle": "hachure",
+      "elements": 275,
+      "points": 1100,
+      "svgBytes": 207549,
+      "holeAlpha": 0
+    }
+  ],
+  "fillRuleMatrix": [
+    { "name": "nonzero-same-winding", "centerAlpha": 1 },
+    { "name": "nonzero-opposite-winding", "centerAlpha": 0 },
+    { "name": "evenodd-same-winding", "centerAlpha": 0 }
+  ],
+  "candidatePointThresholdDecision": {
+    "status": "provisional",
+    "perElement": 256,
+    "perIcon": 4096,
+    "evidenceScope": "synthetic circles at 64, 128, 256, and 512 points",
+    "limitation": "not representative enough for production rejection or simplification"
+  },
+  "candidatePointBudgetMatrix": [
+    {
+      "pointCount": 64,
+      "roughness": 1,
+      "fillStyle": "solid",
+      "svgBytes": 8459,
+      "iou": 0.9894
+    },
+    {
+      "pointCount": 64,
+      "roughness": 1,
+      "fillStyle": "hachure",
+      "svgBytes": 10138,
+      "iou": 0.269
+    },
+    {
+      "pointCount": 64,
+      "roughness": 2,
+      "fillStyle": "solid",
+      "svgBytes": 8503,
+      "iou": 0.9654
+    },
+    {
+      "pointCount": 64,
+      "roughness": 2,
+      "fillStyle": "hachure",
+      "svgBytes": 10193,
+      "iou": 0.3655
+    },
+    {
+      "pointCount": 128,
+      "roughness": 1,
+      "fillStyle": "solid",
+      "svgBytes": 16455,
+      "iou": 0.9881
+    },
+    {
+      "pointCount": 128,
+      "roughness": 1,
+      "fillStyle": "hachure",
+      "svgBytes": 17238,
+      "iou": 0.3019
+    },
+    {
+      "pointCount": 128,
+      "roughness": 2,
+      "fillStyle": "solid",
+      "svgBytes": 16494,
+      "iou": 0.9682
+    },
+    {
+      "pointCount": 128,
+      "roughness": 2,
+      "fillStyle": "hachure",
+      "svgBytes": 17276,
+      "iou": 0.3527
+    },
+    {
+      "pointCount": 256,
+      "roughness": 1,
+      "fillStyle": "solid",
+      "svgBytes": 32415,
+      "iou": 0.989
+    },
+    {
+      "pointCount": 256,
+      "roughness": 1,
+      "fillStyle": "hachure",
+      "svgBytes": 31407,
+      "iou": 0.2767
+    },
+    {
+      "pointCount": 256,
+      "roughness": 2,
+      "fillStyle": "solid",
+      "svgBytes": 32535,
+      "iou": 0.963
+    },
+    {
+      "pointCount": 256,
+      "roughness": 2,
+      "fillStyle": "hachure",
+      "svgBytes": 31536,
+      "iou": 0.3366
+    },
+    {
+      "pointCount": 512,
+      "roughness": 1,
+      "fillStyle": "solid",
+      "svgBytes": 64432,
+      "iou": 0.9841
+    },
+    {
+      "pointCount": 512,
+      "roughness": 1,
+      "fillStyle": "hachure",
+      "svgBytes": 59898,
+      "iou": 0.2926
+    },
+    {
+      "pointCount": 512,
+      "roughness": 2,
+      "fillStyle": "solid",
+      "svgBytes": 64475,
+      "iou": 0.9411
+    },
+    {
+      "pointCount": 512,
+      "roughness": 2,
+      "fillStyle": "hachure",
+      "svgBytes": 59925,
+      "iou": 0.3455
+    }
+  ],
+  "roundnessMatrix": [
+    { "pointCount": 16, "roundness": "sharp", "svgBytes": 2478, "iou": 0.9816 },
+    {
+      "pointCount": 16,
+      "roundness": "curved",
+      "svgBytes": 2516,
+      "iou": 0.9698
+    },
+    { "pointCount": 32, "roundness": "sharp", "svgBytes": 4469, "iou": 0.9909 },
+    {
+      "pointCount": 32,
+      "roundness": "curved",
+      "svgBytes": 4486,
+      "iou": 0.9615
+    },
+    { "pointCount": 64, "roundness": "sharp", "svgBytes": 8459, "iou": 0.9894 },
+    { "pointCount": 64, "roundness": "curved", "svgBytes": 8492, "iou": 0.9604 }
+  ],
+  "linuxStress": {
+    "fixture": "operating-systems/linux.svg",
+    "sourceBytes": 474098,
+    "pathElements": 1716,
+    "implicitlyClosedFilledShapes": 1584,
+    "constructedPoints": 92105,
+    "provisionalIconThreshold": 4096
+  }
+}
