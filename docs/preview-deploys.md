@@ -157,11 +157,20 @@ the production stream IDs and keep the preview deploy helper's ID rewrite table
 in sync with Cloudflare Pipeline stream creation.
 
 Assigning `sketchi.app`, `www.sketchi.app`, `playground.sketchi.app`, and
-`icons.sketchi.app` is intentionally manual. Run the `app-production-deploy`
-workflow with `attach_domains` enabled only when the new site is ready to own
-those hostnames. The manual step writes a generated domain Wrangler config from
-`scripts/05-prepare-production-domain-deploy.mjs` and deploys that
-route-bearing config.
+`icons.sketchi.app` is intentionally blocked for the lifetime of this v2 fork.
+Do not run, recommend, or plan the `app-production-deploy` workflow with
+`attach_domains` enabled until the completed fork has been merged back into the
+original `shpitdev/sketchi` repository. Being visually or technically ready in
+this fork is not sufficient to open that gate. The manual step remains
+documented only for the post-migration repository: it writes a generated domain
+Wrangler config from `scripts/05-prepare-production-domain-deploy.mjs` and
+deploys that route-bearing config.
+
+This is an explicit operator policy gate, not a claim that the existing manual
+workflow is technically unavailable. Leave that post-migration workflow intact:
+do not dispatch it with `attach_domains`, and do not propose workflow changes,
+domain attachment, or production cutover work while development remains in this
+fork. The gate opens only after the fork is merged into `shpitdev/sketchi`.
 
 When `attach_domains` is enabled, the production domain helper attaches
 `playground.sketchi.app` to the `studio` app because `apps/studio` currently

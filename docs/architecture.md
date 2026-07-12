@@ -161,7 +161,7 @@ an implementation, test, story, local export, and package export.
 ## Deployment Direction
 
 Each app is scaffolded for Cloudflare Workers through Vite and Wrangler. The
-production domain direction is:
+production domain direction after the fork migration is complete is:
 
 - `playground.sketchi.app`
 - `studio.sketchi.app`
@@ -174,12 +174,20 @@ that route-map decision is explicitly reopened. The manual domain attach target
 for `playground.sketchi.app` is the `studio` app until the Playground route and
 authenticated Studio product domain are split deliberately.
 
+Custom-domain attachment is behind a hard migration gate. Do not attach,
+repoint, plan, recommend, or treat any `sketchi.app` domain cutover as current
+work while this repository remains the v2 fork. Domain cutover may be
+reconsidered only after the completed v2 fork is merged back into the original
+`shpitdev/sketchi` repository. Until then, use the stable `workers.dev` URLs for
+all deployment and runtime proof.
+
 Preview deploys strip production routes and deploy app-specific Workers named
 `sketchi-<app>-pr-<number>`.
 
 Today the workflow matrix and deploy helper maps cover `playground`, `studio`,
 `web`, `excalidraw`, and `icons`, with custom domain attachment kept as an
-explicit manual workflow dispatch.
+explicit manual workflow dispatch that must remain unused until the migration
+gate above is satisfied.
 
 ## AI Gateway Observability
 

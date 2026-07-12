@@ -4,6 +4,14 @@ These are tracked here because GitHub issues are disabled on this fork. They
 are not the active Agy layout RCA loop, but they should remain visible when the
 layout work is healthy enough to move on.
 
+## Hard Migration Boundary
+
+Custom-domain cutover is not a backlog item for this repository. Do not suggest,
+plan, attach, or repoint any `sketchi.app` domain while work remains in the v2
+fork. Reconsider domain ownership only after the completed fork is merged back
+into the original `shpitdev/sketchi` repository. Use `workers.dev` URLs for all
+proof until then.
+
 ## 1. Product UI/UX Readiness
 
 Goal: make the v2 app surfaces good enough that Sketchi can migrate toward this
@@ -28,7 +36,7 @@ Done when:
 - The icon surface is fast to search, inspect, copy, and download from copied
   output assets.
 - Production `workers.dev` surfaces can be confidently compared against the
-  current production app before any DNS move.
+  current production app without proposing a DNS move from this fork.
 
 ## 2. Broader Diagram And Excalidraw Element Support
 

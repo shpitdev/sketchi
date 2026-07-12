@@ -10,6 +10,16 @@ This fork is the Sketchi v2 clean-start lab. Keep the original repository intact
 - Treat diagram generation as product-critical infrastructure: deterministic inputs, typed intermediate representation, functional tests, and Storybook coverage.
 - Delete obsolete approaches when replacing them. Do not carry parallel systems unless a migration step explicitly requires it.
 
+## Delegated agents
+
+- Use Codex `gpt-5.6-sol` for planning, implementation, and independent review,
+  with reasoning effort set explicitly for the task.
+- Fable is advisory only and must never implement, edit files, delegate work,
+  commit, open or merge PRs, or perform any other mutation. Launch it with
+  read-only tools and `--permission-mode manual`; never use Plan Mode, auto
+  approval, or edit-capable tools. Its response is the only deliverable, and
+  agreement with that response is not authorization for Fable to execute it.
+
 ## Proof
 
 Before pushing meaningful changes, run:

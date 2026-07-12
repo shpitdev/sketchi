@@ -2,7 +2,9 @@
 
 Make the Sketchi v2 app surfaces feel like real products, not scaffolds. The
 deployment foundation is ready: PR previews and production `workers.dev` URLs
-work, while final `sketchi.app` domain attachment stays manual. Own the next
+work, while final `sketchi.app` domain attachment is prohibited until this fork
+has been fully merged into the original `shpitdev/sketchi` repository. Own the
+next
 phase end to end: inspect the current app shells, improve the product UX,
 preserve clean Nx boundaries, and prove the result on the real surfaces.
 
@@ -39,7 +41,9 @@ apps that will become `excalidraw.sketchi.app` and `icons.sketchi.app`.
   auth dependencies in this pass.
 - DNS cutover is intentionally out of scope. Use PR preview Workers and stable
   `workers.dev` production URLs for proof. Do not attach or repoint
-  `sketchi.app` domains.
+  `sketchi.app` domains, and do not recommend domain cutover as a next step.
+  Reconsider it only after the completed v2 fork has been merged back into the
+  original `shpitdev/sketchi` repository.
 
 # UX Direction
 
@@ -48,12 +52,14 @@ repo and live surfaces as truth, but be willing to improve copy, layout,
 information architecture, and interaction flow when the current shells feel too
 thin.
 
-Claude can be useful here once the work is truly product UI/UX rather than
-setup, standards, generators, or deployment wiring. If Claude is available, let
-it rip on the UI/UX implementation and iteration for the app surfaces: visual
-hierarchy, layout, copy, interaction flow, states, screenshots, and Storybook or
-browser-preview feedback. Treat its output as editable product work that can be
-kept, revised, or backed out. Keep repo truth, structural boundaries, generator
+Claude models other than Fable can be useful here once the work is truly product
+UI/UX rather than setup, standards, generators, or deployment wiring. Fable is
+strictly advisory and may only return analysis; it must never implement or edit
+the repository. If another Claude model is used, let it rip on the UI/UX
+implementation and iteration for the app surfaces: visual hierarchy, layout,
+copy, interaction flow, states, screenshots, and Storybook or browser-preview
+feedback. Treat its output as editable product work that can be kept, revised,
+or backed out. Keep repo truth, structural boundaries, generator
 creation/changes, deployment configuration, tests, and final proof owned by the
 goal runner.
 
