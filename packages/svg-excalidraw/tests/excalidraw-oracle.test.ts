@@ -164,7 +164,7 @@ describe("real Excalidraw renderer oracle", () => {
     corpusFixtures.counter.sourceName,
   );
   const counterRegion = counterDocument.shapes
-    .flatMap((shape) => filledRegionsForShape(shape))
+    .flatMap((shape) => filledRegionsForShape(shape) ?? [])
     .find((region) => region.holes.length > 0);
 
   it("loads deterministic library output and restores native editable elements", async () => {

@@ -43,7 +43,18 @@ support from missing or approximate geometry.
 
 The selected native representation is deterministic closed Excalidraw `line`
 elements with repeated-first-point closure and keyhole bridges for holes. Native
-conversion fails closed for blocked semantics and never returns partial output.
+conversion resolves crossing and self-intersecting nonzero contours through a
+deterministic planar union before constructing those elements. It translates
+contours to a local bounds origin before adaptive integer scaling and rejects
+quantization that collapses modeled vertices or changes intersection/winding
+topology. The integer domain is capped so Clipper's determinant arithmetic stays
+within JavaScript's exact-integer range, but that cap is not treated as proof of
+a successful union: independent post-decomposition probes compare filled and
+unfilled coverage on both sides of every open source-arrangement span, including
+narrow lobes and holes. Decomposed fills emit source strokes separately so union
+or winding cancellation cannot erase them. Integer-unsafe or unverified
+decomposition, unsafe hole bridges, and other blocked semantics fail closed and
+never return partial output.
 Source colors are preserved by default, with an explicit monochrome profile;
 gradient flattening and provisional point-budget excess remain typed warnings.
 True triangulation remains the renderer comparison oracle.

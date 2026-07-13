@@ -28,15 +28,30 @@ The product profiles are color-preserving and explicit monochrome. Roughness
 width. Full-corpus renderer evidence exposed that defect: transformed defaults
 more than doubled the silhouette of small filled regions. Explicit SVG strokes
 retain their transformed width, and open fill-plus-stroke paths retain separate
-fill and source-stroke elements.
+fill and source-stroke elements. Nonzero shapes routed through planar
+decomposition also emit every original stroke subpath separately, so unioned
+boundaries and winding cancellation cannot erase source stroke segments.
 
-Capability inspection blocks crossing, touching, or self-intersecting
-`nonzero` contours and unsafe keyhole bridges before construction. Even-odd
-compound paths stay in one native line connected by transparent, zero-area
-bridges, preserving parity instead of decomposing intersecting rings. This is a
-deliberate correction from the parser-only capability boundary, not silent
-geometry loss. Supporting unsafe files requires a proven general planar
-decomposition, which is deferred.
+Capability inspection decomposes crossing, touching, or self-intersecting
+`nonzero` contours with a deterministic Clipper nonzero planar union. Inputs
+are translated to their local bounds origin and initially scaled at 1,000,000
+units into a bounded integer domain. The scale increases deterministically when
+needed and safe, then the paths are unioned into a PolyTree, converted back into
+canonically ordered outer rings and holes, and passed through the existing
+keyhole safety gate. Quantization must preserve vertex identity, segment
+intersection topology, and winding orientation before conversion proceeds.
+The local integer-coordinate limit is 67,108,863: this keeps the two-product
+determinants used by the JavaScript Clipper port within
+`Number.MAX_SAFE_INTEGER`. The bound is necessary but not sufficient because
+Clipper can still report success after dropping thin contours or holes. After
+union, independent integer-domain probes compare filled and unfilled coverage
+on both sides of every open source-arrangement span. Evidence is never shared
+between cells with the same winding value. Coordinates or local detail that
+cannot be represented or independently verified, decomposition failures, and
+unsafe keyhole bridges remain blocking; construction returns no partial
+geometry. Even-odd compound paths stay in one native line connected by
+transparent, zero-area bridges, preserving parity without changing their
+established representation.
 
 `serializeExcalidrawLibrary` emits Excalidraw v2 library JSON directly from typed
 native elements. Stable defaults are `source: "https://sketchi.app"`,
@@ -64,6 +79,17 @@ to `.memory/svg-native-corpus/`. CI runs this target only when
 `svg-excalidraw` or its corpus inputs are affected and uploads the report as a
 workflow artifact; no generated report is checked in or used as a snapshot.
 
+The native-coverage run classified all 298 baseline blockers by exact blocker
+code set. Nonzero topology was the dominant class at 242 files (228 topology
+only). Planar decomposition made 213 additional files native-capable, moving
+the corpus from 1,114 native / 298 blocked to 1,327 native / 85 blocked after
+the integer bound and independent survival validation conservatively
+reclassified four otherwise unproven decompositions. Representative former
+blockers include `ai-apps-agents/agentvoice.svg` (self-intersection) and
+`ai-ecosystem/perplexity.svg` (touching/crossing compound contours); both are
+locked in focused conversion and corpus-renderer proof, while AgentVoice also
+anchors the byte-identical Node/Chromium decomposition assertion.
+
 ## Consequences
 
 Apps consume one fail-closed API and never infer support from partial elements.
@@ -72,6 +98,7 @@ selectable, recolorable, scalable, and serializable. The core conversion and
 serializer stay synchronous, pure, and DOM-free; Effect and hosted rendering
 infrastructure are unnecessary.
 
-Real clips, masks, filters, patterns, embedded raster, and unsafe nonzero
-planar topology remain blocked. Sketch-SVG remains deferred and is not required
+Real clips, masks, filters, patterns, embedded raster, integer-unsafe nonzero
+decomposition, and unsafe keyhole bridges remain blocked. Sketch-SVG remains
+deliberately deferred, is not a fallback for blocked files, and is not required
 for the approved native product vertical.

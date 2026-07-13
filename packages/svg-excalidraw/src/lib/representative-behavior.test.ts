@@ -3,13 +3,21 @@
 import { describe, expect, it } from "vitest";
 
 import { corpusFixtures } from "../../tests/corpus-fixtures";
+import {
+  nonzeroDecompositionFixture,
+  nonzeroDecompositionTraceChecksum,
+} from "../../tests/determinism-fixtures";
 import { inspectSvgCapabilities } from "./capabilities";
 import { convertSvgToExcalidraw } from "./convert";
 import {
   deterministicLibraryChecksum,
   serializeExcalidrawLibrary,
 } from "./library";
-import { constructNativeTrace, PROVISIONAL_POINT_BUDGET } from "./native";
+import {
+  constructNativeTrace,
+  deterministicTraceChecksum,
+  PROVISIONAL_POINT_BUDGET,
+} from "./native";
 import { parseSvg } from "./parse";
 
 const representativeFixtures = [
@@ -17,6 +25,9 @@ const representativeFixtures = [
   corpusFixtures.gradient,
   corpusFixtures.linuxStress,
   corpusFixtures.multicolor,
+  corpusFixtures.nonzeroSelfIntersection,
+  corpusFixtures.nonzeroTouchingContours,
+  corpusFixtures.nonzeroZeroAreaContours,
   corpusFixtures.realClip,
   corpusFixtures.strokeOnly,
   corpusFixtures.stylePaint,
@@ -104,5 +115,49 @@ describe("representative SVG conversion behavior", () => {
       );
       expect(first.exceedsProvisionalBudget).toBe(true);
     }
+  });
+
+  it.each([
+    corpusFixtures.nonzeroSelfIntersection,
+    corpusFixtures.nonzeroTouchingContours,
+    corpusFixtures.nonzeroZeroAreaContours,
+  ])("decomposes real nonzero topology in $sourceName", (fixture) => {
+    const parsed = parseSvg(fixture.source, {
+      sourceName: fixture.sourceName,
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) {
+      return;
+    }
+
+    const capability = inspectSvgCapabilities(parsed.document);
+    const first = convertSvgToExcalidraw(parsed.document, { roughness: 0 });
+    const second = convertSvgToExcalidraw(parsed.document, { roughness: 0 });
+
+    expect(capability.nativeTrace).toBe("supported");
+    expect(first.ok).toBe(true);
+    expect(second).toEqual(first);
+    expect(
+      capability.diagnostics.map((diagnostic) => diagnostic.code),
+    ).not.toContain("native-unsupported-topology");
+  });
+
+  it("locks the nonzero decomposition checksum for Chromium", () => {
+    const parsed = parseSvg(nonzeroDecompositionFixture, {
+      sourceName: "ai-apps-agents/agentvoice.svg",
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) {
+      return;
+    }
+    const trace = constructNativeTrace(parsed.document, {
+      fillStyle: "solid",
+      roughness: 1,
+      strategy: "keyhole",
+    });
+
+    expect(deterministicTraceChecksum(trace)).toBe(
+      nonzeroDecompositionTraceChecksum,
+    );
   });
 });

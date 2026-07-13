@@ -4,6 +4,7 @@ import { generateKeyBetween } from "fractional-indexing";
 import {
   closePoints,
   contoursAreNestedOrDisjoint,
+  decomposeNonzeroRings,
   keyholeBridge,
   regionsFromRings,
   triangulateRegion,
@@ -124,7 +125,7 @@ function lineElement(input: {
 export function filledRegionsForShape(
   shape: CanonicalShape,
   compoundEvenOdd = false,
-): readonly FilledRegion[] {
+): readonly FilledRegion[] | null {
   if (compoundEvenOdd && shape.fillRule === "evenodd") {
     const outer = shape.subpaths[0];
     return outer
@@ -136,9 +137,18 @@ export function filledRegionsForShape(
         ]
       : [];
   }
-  return regionsFromRings(
-    shape.subpaths.map((subpath) => subpath.points),
-    shape.fillRule,
+  const rings = shape.subpaths.map((subpath) => subpath.points);
+  return usesNonzeroDecomposition(shape)
+    ? decomposeNonzeroRings(rings)
+    : regionsFromRings(rings, shape.fillRule);
+}
+
+function usesNonzeroDecomposition(shape: CanonicalShape): boolean {
+  return (
+    shape.fillRule === "nonzero" &&
+    !contoursAreNestedOrDisjoint(
+      shape.subpaths.map((subpath) => subpath.points),
+    )
   );
 }
 
@@ -207,30 +217,26 @@ export function constructNativeTrace(
     const openSubpaths = shape.subpaths.filter((subpath) => !subpath.closed);
     const hasVisibleSourceStroke =
       shape.stroke !== null && shape.strokeWidth > 0;
+    const decomposesNonzeroFill =
+      shape.fill !== null && usesNonzeroDecomposition(shape);
     const separatesSourceStroke =
       hasVisibleSourceStroke &&
-      (openSubpaths.length > 0 ||
+      (decomposesNonzeroFill ||
+        openSubpaths.length > 0 ||
         (shape.fillRule === "evenodd" && shape.subpaths.length > 1) ||
         (shape.fill !== null &&
           Math.abs(shape.fill.opacity - (shape.stroke?.opacity ?? 1)) > 1e-7));
 
     // SVG fills implicitly close every subpath even when its path data omits Z.
-    const supportsFillContours =
-      shape.fill === null ||
-      shape.fillRule === "evenodd" ||
-      contoursAreNestedOrDisjoint(
-        shape.subpaths.map((subpath) => subpath.points),
-      );
-    if (!supportsFillContours) {
-      diagnostics.add(
-        `native-unsupported-nonzero-intersecting-contours:${shape.id}`,
-      );
-    }
-    if (shape.fill !== null && supportsFillContours) {
+    if (shape.fill !== null) {
       const regions = filledRegionsForShape(
         shape,
         options.compoundEvenOdd ?? false,
       );
+      if (regions === null) {
+        diagnostics.add(`native-unsupported-nonzero-decomposition:${shape.id}`);
+        continue;
+      }
       regions.forEach((region, regionIndex) => {
         const polygons = filledPolygons(region, options.strategy);
         polygons.forEach((points, polygonIndex) => {

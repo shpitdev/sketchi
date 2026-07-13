@@ -1,5 +1,6 @@
 import {
   contoursAreNestedOrDisjoint,
+  decomposeNonzeroRings,
   keyholeBridgeIsSafe,
   regionsFromRings,
 } from "./geometry";
@@ -29,6 +30,10 @@ const BLOCKING_DIAGNOSTICS = new Set([
   "use-reference-missing",
 ]);
 
+export function isBlockingSvgDiagnostic(diagnostic: SvgDiagnostic): boolean {
+  return BLOCKING_DIAGNOSTICS.has(diagnostic.code);
+}
+
 function compareDiagnostics(left: SvgDiagnostic, right: SvgDiagnostic): number {
   const leftKey = `${left.sourcePath ?? ""}\u0000${left.code}\u0000${left.message}`;
   const rightKey = `${right.sourcePath ?? ""}\u0000${right.code}\u0000${right.message}`;
@@ -47,20 +52,23 @@ export function inspectSvgCapabilities(
       if (shape.fillRule === "evenodd") {
         return [];
       }
-      if (!contoursAreNestedOrDisjoint(rings)) {
+      const regions = contoursAreNestedOrDisjoint(rings)
+        ? regionsFromRings(rings, shape.fillRule)
+        : decomposeNonzeroRings(rings);
+      if (regions === null) {
         return [
           {
             code: "native-unsupported-topology",
             elementId: shape.elementId,
             feature: null,
             message:
-              "Intersecting, touching, or self-intersecting contours cannot be represented safely as native Excalidraw fill geometry.",
+              "Nonzero contours could not be decomposed into integer-safe native fill regions.",
             severity: "error",
             sourcePath: shape.sourcePath,
           },
         ];
       }
-      const unsafeKeyhole = regionsFromRings(rings, shape.fillRule).some(
+      const unsafeKeyhole = regions.some(
         (region) => !keyholeBridgeIsSafe(region),
       );
       return unsafeKeyhole
@@ -91,9 +99,7 @@ export function inspectSvgCapabilities(
   return {
     diagnostics,
     features: document.features,
-    nativeTrace: diagnostics.some((entry) =>
-      BLOCKING_DIAGNOSTICS.has(entry.code),
-    )
+    nativeTrace: diagnostics.some(isBlockingSvgDiagnostic)
       ? "unsupported"
       : "supported",
     summary: {

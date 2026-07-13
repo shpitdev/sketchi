@@ -79,10 +79,11 @@ Visual regression is Chromatic, currently wired only for `diagram-studio-ui`.
    jsdom/browser mode. The proof contract is therefore "element construction
    typed against `@excalidraw/excalidraw` types and proven by restore
    round-trip in CI", not "no hand-maintained schema".
-3. **Hard files ship sketch-SVG-only.** The ~50 files using real clips, masks,
-   filters, or embedded raster get capability diagnostics and a visible
-   "no native trace" state in the product; an image-element fallback exists
-   only behind an explicit caller opt-in and is never labeled a native trace.
+3. **Hard files remain fail-closed.** Files using real clips, masks, filters,
+   embedded raster, or other semantics that the native backend cannot preserve
+   get capability diagnostics and a visible "no native trace" state. The first
+   product vertical ships native output only; Sketch-SVG is deliberately
+   deferred and is not a fallback for blocked files.
 
 ## Package boundary (unchanged)
 
@@ -92,7 +93,6 @@ preview controls, progress, downloads, and copy.
 
 ```ts
 parseSvg(source, options) -> SvgParseResult
-renderSketchSvg(document, options) -> SketchSvgResult
 convertSvgToExcalidraw(document, options) -> ExcalidrawTraceResult
 serializeExcalidrawLibrary(items, options) -> string
 inspectSvgCapabilities(document) -> SvgCapabilityReport
@@ -104,15 +104,13 @@ metrics, and effective options.
 ## Dependencies
 
 - `svg-pathdata` for path parsing/normalization; a small XML parser.
-- Polygon boolean operations for real clip intersection, plus a proven
-  simple-polygon decomposition or constrained-triangulation strategy that
-  eliminates interior rings for native hole handling. A clipping library such
-  as `polygon-clipping`/martinez does not solve hole elimination by itself.
+- `clipper-lib` for deterministic nonzero planar union/decomposition, plus
+  keyhole conversion for resulting holes. Earcut remains the independent
+  hole-eliminating triangulation oracle; polygon union alone does not eliminate
+  interior rings.
 - A CSS declaration-subset parser (tiny, possibly hand-rolled given the
   normalizer's uniform output) — 130 corpus files require it.
 - Color parsing for gradient flattening.
-- `roughjs` pinned compatible with Excalidraw's bundled 4.6.x so sketch-SVG and
-  native output stay visually consistent.
 - `@excalidraw/excalidraw` declared directly by the new package (runtime or dev
   scope according to the final import boundary) for its types and test oracle.
 - No browser DOM in the core conversion path.
@@ -175,13 +173,20 @@ evidence. No product UI before this proof.
    counts, time, size vs budgets) plus the silhouette metric: native output via
    `exportToSvg` → rasterize → fill-region IoU against the normalized source at
    roughness 0, thresholds tuned on fixtures. The production gate additionally
-   blocks unsafe nonzero planar topology rather than returning partial geometry:
-   1,114 files convert and 298 are blocked after capability overlap.
+   originally blocked unsafe nonzero planar topology rather than returning
+   partial geometry: 1,114 files converted and 298 were blocked after
+   capability overlap. The native-coverage follow-up decomposes arbitrary
+   nonzero crossings and self-intersections with deterministic nonzero planar
+   union, raising the current corpus to 1,327 native-capable files with 85
+   blocked. The exact-integer determinant cap plus independent post-union fill
+   and hole-survival validation deliberately block four files that the earlier
+   1,331/81 report accepted without sufficient proof. Integer-unsafe or
+   unverified decomposition and unsafe keyhole bridges still fail closed.
 3. **Sketch-SVG backend (deferred).** The native corpus and renderer gates are
    strong enough to ship the first product vertical without a parallel
-   Sketch-SVG system. Reconsider a RoughJS-direct backend only if product
-   evidence identifies a user need that editable native elements cannot meet;
-   do not carry `svg2roughjs` or a second conversion path speculatively.
+   Sketch-SVG system. No Sketch-SVG API or RoughJS dependency ships in this
+   package. Reconsider a second backend only if product evidence identifies a
+   user need that editable native elements cannot meet.
 4. **Product integration.** `apps/icons`: lazy original/native preview with
    supported, warned, and blocked capability states; roughness, fill, and color
    controls; deterministic `.excalidrawlib` download; and a reload-safe URL
@@ -202,7 +207,7 @@ autonomous merge after green review/CI, and worktree cleanup.
 
 Structural: typed construction validated against `@excalidraw/excalidraw`
 types; `restoreElements` and library serialization round-trip; no `image`
-element unless the caller explicitly selected fallback mode; deterministic
+fallback element—unsupported semantics fail closed; deterministic
 ids/seeds/output — byte-identical across runs and across node/browser; bounds,
 finite coordinates, closure, ordering, grouping, and ADR complexity budgets.
 
@@ -214,7 +219,7 @@ thresholds that separate intended sketch variation from lost geometry.
 Corpus: all icons through the canonical parser and native backend in
 affected-only CI, with the complete report uploaded as a workflow artifact and
 never checked in; representative regression fixtures cover supported features
-and fallback/diagnostic classes.
+and blocked diagnostic classes.
 
 Product/browser: original/native preview parity with export, real-editor
 import/edit proof, desktop and mobile UI plus worker preview. Custom domains

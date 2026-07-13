@@ -17,6 +17,8 @@ import {
   adaptiveDeterminismFixture,
   diagnosticDeterminismChecksum,
   diagnosticDeterminismFixture,
+  nonzeroDecompositionFixture,
+  nonzeroDecompositionTraceChecksum,
 } from "./determinism-fixtures";
 
 const corpusMulticolorFixture =
@@ -119,6 +121,26 @@ describe("browser construction determinism", () => {
     ).toEqual(["svg/unsupported#z[1]", "svg/unsupported#ä[0]"]);
     expect(deterministicDocumentChecksum(parsed.document)).toBe(
       diagnosticDeterminismChecksum,
+    );
+  });
+
+  it("matches nonzero planar decomposition output from Node", () => {
+    const parsed = parseSvg(nonzeroDecompositionFixture, {
+      sourceName: "ai-apps-agents/agentvoice.svg",
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) {
+      throw new Error(JSON.stringify(parsed.diagnostics));
+    }
+    const trace = constructNativeTrace(parsed.document, {
+      fillStyle: "solid",
+      roughness: 1,
+      strategy: "keyhole",
+    });
+
+    expect(trace.diagnostics).toEqual([]);
+    expect(deterministicTraceChecksum(trace)).toBe(
+      nonzeroDecompositionTraceChecksum,
     );
   });
 

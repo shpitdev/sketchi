@@ -51,9 +51,11 @@ element and emit the source stroke as its own open line. This prevents the
 source stroke from appearing on the synthetic implicit-closing edge. Classify
 `evenodd` regions by nesting parity. Classify non-intersecting `nonzero`
 contours by accumulated signed winding: only a nonzero-to-zero transition is a
-hole, and same-winding nested contours do not cut one. Diagnose intersecting,
-touching, or self-intersecting nonzero contours as unsupported rather than
-applying the nesting classifier.
+hole, and same-winding nested contours do not cut one. The later native-coverage
+slice supersedes the spike's unsupported-topology policy for intersecting,
+touching, and self-intersecting nonzero contours: those contours now use a
+deterministic nonzero planar union and fail closed when integer-safe
+decomposition cannot preserve their topology.
 
 Do not use background-colored ring stacking. Do not claim polygon boolean
 clipping solves holes; a clip result with interior rings still needs keyhole
@@ -92,11 +94,13 @@ as a hard icon budget.
   deterministic approximation for non-uniform transforms.
 - Honor implicit fill closure independently of stroke closure.
 - Separate source strokes from implicitly closed fill carriers for open paths.
-- Honor `evenodd` and nested/disjoint `nonzero` winding classification;
-  diagnose other nonzero contour topology as unsupported.
-- Treat real clips as native-unsupported. They remain sketch-SVG-only until a
-  later slice implements clip intersection and then applies the selected hole
-  strategy to any resulting rings.
+- Honor `evenodd` and nested/disjoint `nonzero` winding classification. The
+  native-coverage slice supersedes the earlier restriction on other nonzero
+  contour topology with deterministic planar decomposition and fail-closed
+  quantization checks.
+- Treat real clips as native-unsupported until a later slice implements clip
+  intersection and then applies the selected hole strategy to any resulting
+  rings. Sketch-SVG is deliberately deferred and is not a shipped fallback.
 - Keep disjoint SVG subpaths as separate elements; never sample continuously
   across an `M` move.
 - Report provisional threshold excess with diagnostics. Later representative
@@ -115,10 +119,10 @@ multiplies editable elements and introduces internal triangle boundaries. It is
 not selected for the default representation.
 
 The throwaway parser samples curves at a fixed density and supports only the
-feature subset needed for the spike. Nonzero classification assumes contours
-are nested or disjoint rather than intersecting, and non-uniform transformed
-stroke widths are scalar approximations. This is evidence infrastructure, not
-the production normalization API.
+feature subset needed for the spike. Its original nested-or-disjoint nonzero
+assumption is superseded by the native-coverage slice's planar decomposition;
+non-uniform transformed stroke widths remain scalar approximations. This is
+evidence infrastructure, not the production normalization API.
 
 ## Go / no-go
 

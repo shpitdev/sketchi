@@ -5,9 +5,104 @@ import { exportToSvg, restoreElements } from "@excalidraw/excalidraw";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 
-import { convertSvgToExcalidraw, parseSvg } from "../src";
+import {
+  convertSvgToExcalidraw,
+  parseSvg,
+  type CanonicalSvgDocument,
+} from "../src";
+import { isBlockingSvgDiagnostic } from "../src/lib/capabilities";
+import {
+  contoursAreNestedOrDisjoint,
+  keyholeBridgeIsSafe,
+  regionsFromRings,
+} from "../src/lib/geometry";
 
 const RASTER_SIZE = 128;
+
+function sortedUnique(values: readonly string[]): readonly string[] {
+  return [...new Set(values)].sort();
+}
+
+interface BlockedDiagnostic {
+  readonly code: string;
+  readonly message: string;
+  readonly sourcePath?: string | null;
+}
+
+interface BlockedRow {
+  readonly blockerCodes: readonly string[];
+  readonly conversionCodes: readonly string[];
+  readonly diagnostics: readonly BlockedDiagnostic[];
+  readonly path: string;
+}
+
+function blockerSummary(rows: readonly BlockedRow[]) {
+  const signatures = new Map<string, { count: number; paths: string[] }>();
+  const codes = new Map<string, { count: number; paths: string[] }>();
+  for (const row of rows) {
+    const signature = row.blockerCodes.join("+");
+    const signatureEntry = signatures.get(signature) ?? {
+      count: 0,
+      paths: [],
+    };
+    signatureEntry.count += 1;
+    signatureEntry.paths.push(row.path);
+    signatures.set(signature, signatureEntry);
+    for (const code of row.blockerCodes) {
+      const codeEntry = codes.get(code) ?? { count: 0, paths: [] };
+      codeEntry.count += 1;
+      codeEntry.paths.push(row.path);
+      codes.set(code, codeEntry);
+    }
+  }
+  const sortedEntries = (
+    entries: ReadonlyMap<string, { count: number; paths: string[] }>,
+  ) =>
+    [...entries.entries()]
+      .sort(
+        ([leftKey, left], [rightKey, right]) =>
+          right.count - left.count ||
+          (leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0),
+      )
+      .map(([key, value]) => ({ key, ...value }));
+  return {
+    byCode: sortedEntries(codes),
+    bySignature: sortedEntries(signatures),
+    rows,
+  };
+}
+
+function preDecompositionTopologyDiagnostic(
+  document: CanonicalSvgDocument,
+): BlockedDiagnostic | null {
+  for (const shape of document.shapes) {
+    if (shape.fill === null || shape.fillRule === "evenodd") {
+      continue;
+    }
+    const rings = shape.subpaths.map((subpath) => subpath.points);
+    if (!contoursAreNestedOrDisjoint(rings)) {
+      return {
+        code: "native-unsupported-topology",
+        message:
+          "Intersecting, touching, or self-intersecting contours cannot be represented safely as native Excalidraw fill geometry.",
+        sourcePath: shape.sourcePath,
+      };
+    }
+    if (
+      regionsFromRings(rings, shape.fillRule).some(
+        (region) => !keyholeBridgeIsSafe(region),
+      )
+    ) {
+      return {
+        code: "native-unsupported-topology",
+        message:
+          "The fill contains a hole that cannot be bridged without crossing an unfilled region.",
+        sourcePath: shape.sourcePath,
+      };
+    }
+  }
+  return null;
+}
 
 async function alphaMask(source: string | Buffer): Promise<Uint8Array> {
   const { data, info } = await sharp(source)
@@ -145,18 +240,62 @@ async function rendererReport() {
     )
     .sort();
   const rows = [];
+  const baselineBlockedRows: BlockedRow[] = [];
+  const blockedRows: BlockedRow[] = [];
 
   for (const relativePath of paths) {
     const source = readFileSync(resolve(corpusRoot, relativePath), "utf8");
     const parsed = parseSvg(source, { sourceName: relativePath });
     if (!parsed.ok) {
+      const row = {
+        blockerCodes: sortedUnique(parsed.diagnostics.map(({ code }) => code)),
+        conversionCodes: [],
+        diagnostics: parsed.diagnostics,
+        path: relativePath,
+      };
+      baselineBlockedRows.push(row);
+      blockedRows.push(row);
       continue;
     }
     const converted = convertSvgToExcalidraw(parsed.document, {
       fillStyle: "solid",
       roughness: 0,
     });
+    const blockingDiagnostics = converted.capability.diagnostics.filter(
+      isBlockingSvgDiagnostic,
+    );
+    const baselineTopology = preDecompositionTopologyDiagnostic(
+      parsed.document,
+    );
+    const baselineDiagnostics =
+      baselineTopology &&
+      !blockingDiagnostics.some(
+        ({ code }) => code === "native-unsupported-topology",
+      )
+        ? [...blockingDiagnostics, baselineTopology]
+        : blockingDiagnostics;
+    const baselineBlockerCodes = sortedUnique(
+      baselineDiagnostics.map(({ code }) => code),
+    );
+    if (baselineBlockerCodes.length > 0) {
+      baselineBlockedRows.push({
+        blockerCodes: baselineBlockerCodes,
+        conversionCodes: converted.ok
+          ? []
+          : sortedUnique(converted.diagnostics.map(({ code }) => code)),
+        diagnostics: baselineDiagnostics,
+        path: relativePath,
+      });
+    }
     if (!converted.ok) {
+      blockedRows.push({
+        blockerCodes: sortedUnique(blockingDiagnostics.map(({ code }) => code)),
+        conversionCodes: sortedUnique(
+          converted.diagnostics.map(({ code }) => code),
+        ),
+        diagnostics: blockingDiagnostics,
+        path: relativePath,
+      });
       continue;
     }
     const restored = restoreElements(converted.elements, null, {
@@ -190,6 +329,9 @@ async function rendererReport() {
     }
     rows.push({
       path: relativePath,
+      elements: converted.metrics.elements,
+      points: converted.metrics.points,
+      maxPointsPerElement: converted.metrics.maxPointsPerElement,
       iou: Number(
         alignedIntersectionOverUnion(sourceMask, nativeMask).toFixed(4),
       ),
@@ -208,7 +350,21 @@ async function rendererReport() {
   const percentile = (fraction: number) =>
     ious[Math.min(ious.length - 1, Math.floor(ious.length * fraction))] ?? 0;
   return {
+    corpusFiles: paths.length,
     files: rows.length,
+    blockedFiles: blockedRows.length,
+    blockers: blockerSummary(blockedRows),
+    coverage: {
+      beforeDecomposition: {
+        blockedFiles: baselineBlockedRows.length,
+        nativeFiles: paths.length - baselineBlockedRows.length,
+      },
+      afterDecomposition: {
+        blockedFiles: blockedRows.length,
+        nativeFiles: rows.length,
+      },
+    },
+    baselineBlockers: blockerSummary(baselineBlockedRows),
     rasterSize: RASTER_SIZE,
     meanIou: Number(
       (ious.reduce((total, value) => total + value, 0) / ious.length).toFixed(
@@ -253,7 +409,50 @@ describe("full corpus Excalidraw renderer", () => {
     );
 
     expect(renderer.files).toBeGreaterThan(0);
+    expect(renderer.corpusFiles).toBe(1_412);
+    expect(renderer.coverage.beforeDecomposition).toEqual({
+      blockedFiles: 298,
+      nativeFiles: 1_114,
+    });
+    expect(renderer.coverage.afterDecomposition).toEqual({
+      blockedFiles: 85,
+      nativeFiles: 1_327,
+    });
+    expect(renderer.files).toBeGreaterThanOrEqual(1_327);
+    expect(renderer.blockedFiles).toBeLessThanOrEqual(85);
+    expect(renderer.corpusFiles).toBe(renderer.files + renderer.blockedFiles);
     expect(renderer.rows).toHaveLength(renderer.files);
+    expect(renderer.blockers.rows).toHaveLength(renderer.blockedFiles);
+    expect(renderer.baselineBlockers.rows).toHaveLength(298);
+    expect(
+      renderer.blockers.rows.every((row) => row.blockerCodes.length > 0),
+    ).toBe(true);
+    expect(
+      renderer.baselineBlockers.rows.every(
+        (row) => row.blockerCodes.length > 0,
+      ),
+    ).toBe(true);
+    expect(
+      renderer.blockers.bySignature.reduce(
+        (total, signature) => total + signature.count,
+        0,
+      ),
+    ).toBe(renderer.blockedFiles);
+    expect(
+      renderer.baselineBlockers.bySignature.reduce(
+        (total, signature) => total + signature.count,
+        0,
+      ),
+    ).toBe(298);
+    const rowsByPath = new Map(renderer.rows.map((row) => [row.path, row]));
+    for (const path of [
+      "ai-apps-agents/agentvoice.svg",
+      "ai-ecosystem/perplexity.svg",
+    ]) {
+      expect(rowsByPath.get(path)?.tolerantOverlap).toBeGreaterThanOrEqual(
+        0.99,
+      );
+    }
     expect(renderer.meanIou).toBeGreaterThanOrEqual(0.97);
     expect(renderer.p10Iou).toBeGreaterThanOrEqual(0.94);
     expect(renderer.minIou).toBeGreaterThanOrEqual(0.65);

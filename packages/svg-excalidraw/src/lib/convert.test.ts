@@ -132,9 +132,131 @@ describe("production native conversion", () => {
     });
   });
 
-  it("blocks unsafe nonzero topology before returning partial elements", () => {
+  it("decomposes self-intersecting nonzero topology into simple elements", () => {
     const document = mustParse(
       '<svg viewBox="0 0 20 20"><path fill="#000" d="M0 0L20 20L0 20L20 0Z"/></svg>',
+    );
+    const result = convertSvgToExcalidraw(document);
+
+    expect(result.ok).toBe(true);
+    expect(result.elements).toHaveLength(2);
+    expect(
+      result.diagnostics.map((diagnostic) => diagnostic.code),
+    ).not.toContain("native-unsupported-topology");
+  });
+
+  it.each([0.4, 0.51])(
+    "preserves both lobes of a sub-unit bow-tie at a huge offset (span %s)",
+    (span) => {
+      const origin = 999_999_999_999;
+      const end = origin + span;
+      const document = mustParse(
+        `<svg><path fill="#000" d="M${origin} ${origin}L${end} ${end}L${origin} ${end}L${end} ${origin}Z"/></svg>`,
+      );
+      const result = convertSvgToExcalidraw(document, { roughness: 0 });
+
+      expect(result.ok).toBe(true);
+      expect(result.elements).toHaveLength(2);
+      expect(result.metrics.elements).toBe(2);
+      expect(result.metrics.points).toBeGreaterThan(0);
+    },
+  );
+
+  it("fails closed instead of returning partial output when quantization collapses a contour", () => {
+    const document = mustParse(
+      '<svg><path fill="#000" d="M0 0L999999999999 999999999999L0 999999999999L999999999999 0Z M10.1 10.1L10.4 10.4L10.1 10.4L10.4 10.1Z"/></svg>',
+    );
+    const result = convertSvgToExcalidraw(document, { roughness: 0 });
+
+    expect(result.ok).toBe(false);
+    expect(result.elements).toEqual([]);
+    expect(result.metrics).toEqual({
+      elements: 0,
+      maxPointsPerElement: 0,
+      points: 0,
+    });
+    expect(result.diagnostics.map(({ code }) => code)).toContain(
+      "native-unsupported-topology",
+    );
+  });
+
+  it("fails closed when exact-integer limits would let Clipper drop a thin contour", () => {
+    const document = mustParse(
+      '<svg><path fill="#000" d="M0 0L1000000000 999999999L1000100000 1000099999Z M-20 0L-10 10L-20 10L-10 0Z"/></svg>',
+    );
+    const result = convertSvgToExcalidraw(document, { roughness: 0 });
+
+    expect(result.ok).toBe(false);
+    expect(result.elements).toEqual([]);
+    expect(result.metrics).toEqual({
+      elements: 0,
+      maxPointsPerElement: 0,
+      points: 0,
+    });
+    expect(result.diagnostics.map(({ code }) => code)).toContain(
+      "native-unsupported-topology",
+    );
+  });
+
+  it.each([
+    [
+      "20,000,000",
+      "M0 0L20000000 19999999L20100000 20099999Z M30000000 0L40000000 10000000L30000000 10000000L40000000 0Z",
+    ],
+    [
+      "40,000,000",
+      "M0 0L40000000 39999999L40100000 40099999Z M50000000 0L60000000 10000000L50000000 10000000L60000000 0Z",
+    ],
+  ])(
+    "fails closed when Clipper drops a thin contour around %s below its integer limit",
+    (_coordinate, path) => {
+      const document = mustParse(`<svg><path fill="#000" d="${path}"/></svg>`);
+      const result = convertSvgToExcalidraw(document, { roughness: 0 });
+
+      expect(result.ok).toBe(false);
+      expect(result.elements).toEqual([]);
+      expect(result.metrics).toEqual({
+        elements: 0,
+        maxPointsPerElement: 0,
+        points: 0,
+      });
+      expect(result.diagnostics.map(({ code }) => code)).toContain(
+        "native-unsupported-topology",
+      );
+    },
+  );
+
+  it.each([
+    {
+      name: "missingFill",
+      path: "M0 0L40000000 39999999L40100000 40099999L0 0L50000000 0L60000000 0L60000000 10000000L50000000 10000000L50000000 0L0 0Z",
+    },
+    {
+      name: "missingHole",
+      path: "M0 0H60100000V60100000H0V0L60100000 60099999L60000000 59999999L0 0Z",
+    },
+  ])(
+    "fails closed instead of returning one partial element for $name",
+    ({ path }) => {
+      const document = mustParse(`<svg><path fill="#000" d="${path}"/></svg>`);
+      const result = convertSvgToExcalidraw(document, { roughness: 0 });
+
+      expect(result.ok).toBe(false);
+      expect(result.elements).toEqual([]);
+      expect(result.metrics).toEqual({
+        elements: 0,
+        maxPointsPerElement: 0,
+        points: 0,
+      });
+      expect(result.diagnostics.map(({ code }) => code)).toContain(
+        "native-unsupported-topology",
+      );
+    },
+  );
+
+  it("fails closed when nonzero topology cannot be decomposed safely", () => {
+    const document = mustParse(
+      '<svg viewBox="0 0 2000000000000 2000000000000"><path fill="#000" d="M0 0L2000000000000 2000000000000L0 2000000000000L2000000000000 0Z"/></svg>',
     );
     const result = convertSvgToExcalidraw(document);
 
@@ -201,6 +323,80 @@ describe("production native conversion", () => {
       strokeColor: "#0000ff",
       strokeWidth: 2,
     });
+  });
+
+  it("preserves each source stroke when nonzero overlap is decomposed", () => {
+    const result = convertSvgToExcalidraw(
+      mustParse(
+        '<svg><path fill="#f00" stroke="#00f" stroke-width="2" d="M0 0H20V20H0Z M10 0H30V20H10Z"/></svg>',
+      ),
+      { roughness: 0 },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    const fillElements = result.elements.filter(
+      ({ backgroundColor }) => backgroundColor !== "transparent",
+    );
+    const strokeElements = result.elements.filter(
+      ({ backgroundColor }) => backgroundColor === "transparent",
+    );
+    expect(fillElements).toHaveLength(1);
+    expect(fillElements[0]).toMatchObject({
+      backgroundColor: "#ff0000",
+      strokeColor: "#ff0000",
+    });
+    expect(strokeElements).toHaveLength(2);
+    expect(
+      strokeElements.map(({ points, strokeColor, strokeWidth }) => ({
+        points: points.length,
+        strokeColor,
+        strokeWidth,
+      })),
+    ).toEqual([
+      { points: 5, strokeColor: "#0000ff", strokeWidth: 2 },
+      { points: 5, strokeColor: "#0000ff", strokeWidth: 2 },
+    ]);
+  });
+
+  it("preserves source strokes when opposite nonzero winding cancels the fill", () => {
+    const result = convertSvgToExcalidraw(
+      mustParse(
+        '<svg><path fill="#f00" stroke="#00f" stroke-width="2" d="M0 0V20H20V0Z M0 0H20V20H0Z"/></svg>',
+      ),
+      { roughness: 0 },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.elements).toHaveLength(2);
+    expect(
+      result.elements.map(
+        ({ backgroundColor, points, strokeColor, strokeWidth }) => ({
+          backgroundColor,
+          points: points.length,
+          strokeColor,
+          strokeWidth,
+        }),
+      ),
+    ).toEqual([
+      {
+        backgroundColor: "transparent",
+        points: 5,
+        strokeColor: "#0000ff",
+        strokeWidth: 2,
+      },
+      {
+        backgroundColor: "transparent",
+        points: 5,
+        strokeColor: "#0000ff",
+        strokeWidth: 2,
+      },
+    ]);
   });
 
   it("suppresses an explicit zero-width source stroke", () => {
