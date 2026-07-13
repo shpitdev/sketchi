@@ -31,6 +31,18 @@
         "parallel": false
       }
     },
+    "corpus-renderer": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/.memory/svg-native-corpus"],
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/apps/icons/public/output/upload-ready/svg/**/*.svg"
+      ],
+      "options": {
+        "command": "SVG_NATIVE_CORPUS_REPORT=.memory/svg-native-corpus/native-renderer.json vitest run --config packages/svg-excalidraw/vitest.corpus.config.mts"
+      }
+    },
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {

@@ -1,5 +1,39 @@
 export * from "./lib/capabilities";
-export * from "./lib/geometry";
-export * from "./lib/native";
+export * from "./lib/convert";
+export * from "./lib/library";
 export * from "./lib/parse";
-export * from "./lib/types";
+export type {
+  AdaptiveFlatteningOptions,
+  CanonicalMetrics,
+  CanonicalPaint,
+  CanonicalShape,
+  CanonicalSubpath,
+  CanonicalSvgDocument,
+  EffectiveAdaptiveFlatteningOptions,
+  EffectiveSvgToExcalidrawOptions,
+  EffectiveUseExpansionOptions,
+  ExcalidrawLibraryItemInput,
+  Matrix,
+  NativeColorProfile,
+  NativeConversionDiagnostic,
+  NativeConversionDiagnosticCode,
+  NativeFillStyle,
+  NativeRoughness,
+  NativeTraceMetrics,
+  PaintSource,
+  Point,
+  ProvisionalPointBudget,
+  SerializeExcalidrawLibraryOptions,
+  SvgCapabilityReport,
+  SvgDiagnostic,
+  SvgDiagnosticCode,
+  SvgDiagnosticSeverity,
+  SvgFeature,
+  SvgFeatureCounts,
+  SvgParseOptions,
+  SvgParseResult,
+  SvgPrimitiveName,
+  SvgToExcalidrawOptions,
+  SvgToExcalidrawResult,
+  UseExpansionOptions,
+} from "./lib/types";

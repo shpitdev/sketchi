@@ -660,7 +660,9 @@ describe("canonical SVG parser", () => {
       corpusFixtures.v1DisjointMultipath.source,
       corpusFixtures.v1DisjointMultipath.sourceName,
     );
-    const regions = counter.shapes.flatMap(filledRegionsForShape);
+    const regions = counter.shapes.flatMap((shape) =>
+      filledRegionsForShape(shape),
+    );
     const trace = constructNativeTrace(multipath, defaultTraceOptions);
 
     expect(regions.some((region) => region.holes.length > 0)).toBe(true);

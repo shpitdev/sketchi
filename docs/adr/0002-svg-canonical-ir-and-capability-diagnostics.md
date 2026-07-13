@@ -75,36 +75,16 @@ Diagnostics use an explicit UTF-16 code-unit comparator, never locale
 collation. The non-ASCII ordering fixture is checksum-locked in both Node and
 Chromium.
 
-## Point-budget evidence
+## Reproduction
 
-The checked representative matrix covers a counter-bearing wordmark, gradient,
-style-driven paint, real clip, stroke-only icon, disjoint multipath, multicolor
-icon, and the 474 KB Linux stress vector at tolerances 0.25, 0.5, and 1.0.
+Representative fixtures cover counters, gradients, style-driven paint, real
+clips, stroke-only and disjoint paths, multicolor icons, and a large stress
+vector across multiple flattening tolerances. Tests validate parser policy,
+geometry, diagnostics, deterministic output, and warning-only point budgets
+directly rather than comparing generated aggregate evidence.
 
-At the selected 0.5 tolerance, the AI21 counter uses 108 native points and keeps
-its measured hole transparent in every roughness/fill oracle combination. The
-Linux fixture uses 31,888 native points with a maximum of 98 points in any one
-element. This is 65% fewer total points than Slice 0's fixed-density 92,105,
-while still exceeding the provisional 4,096-point icon budget because it has
-1,717 native elements. The evidence therefore supports adaptive flattening and
-the 0.5 default, but not a hard rejection or simplification threshold. The point
-change from the earlier evidence is expected: direct arc subdivision now proves
-the tolerance against source arcs rather than an intermediate cubic estimate.
-
-The existing 256 points per element and 4,096 points per icon remain diagnostic
-only. The representative set has no per-element breach; Linux is the sole
-per-icon breach at all three tested tolerances. Future native-backend visual
-corpus work must establish enforceable budgets.
-
-## Corpus evidence
-
-The checked census is file-deduplicated across all 1,412 SVGs. It finds 282 clip
-files, including 259 known full-canvas clips and 26 files with at least one real
-clip (some files contain both); 161 gradient, 130 style, 20 mask, 11 filter, 11
-use, two image, and two pattern files. Sixteen files apply advanced stroke
-semantics that the native IR cannot preserve. Under the corrected Slice 1
-boundary, 1,342 files are native-capable and 70 produce a blocking diagnostic.
-Counts are asserted in tests so corpus or parser-policy drift is visible.
+The affected-only corpus renderer described by ADR 0003 supplies broad drift
+coverage and uploads its complete report from CI without checking it into source.
 
 ## Consequences
 

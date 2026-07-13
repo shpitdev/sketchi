@@ -1,9 +1,9 @@
 import { nxCopyAssetsPlugin } from "@nx/vite/plugins/nx-copy-assets.plugin";
 import { defineConfig } from "vitest/config";
 
-export default defineConfig(() => ({
+export default defineConfig({
   root: __dirname,
-  cacheDir: "../../node_modules/.vite/packages/svg-excalidraw",
+  cacheDir: "../../node_modules/.vite/packages/svg-excalidraw-corpus",
   plugins: [nxCopyAssetsPlugin(["*.md"])],
   resolve: {
     alias: {
@@ -15,25 +15,13 @@ export default defineConfig(() => ({
     conditions: ["development"],
   },
   test: {
-    name: "svg-excalidraw",
+    name: "svg-excalidraw-corpus",
     watch: false,
     globals: true,
     environment: "jsdom",
-    server: {
-      deps: {
-        inline: true as const,
-      },
-    },
+    server: { deps: { inline: true as const } },
     setupFiles: ["./tests/setup-excalidraw.ts"],
-    include: ["{src,tests}/**/*.{test,spec}.{ts,mts,tsx}"],
-    exclude: [
-      "tests/browser-determinism.test.ts",
-      "tests/native-corpus-renderer.test.ts",
-    ],
+    include: ["tests/native-corpus-renderer.test.ts"],
     reporters: ["default"],
-    coverage: {
-      reportsDirectory: "../../coverage/packages/svg-excalidraw",
-      provider: "v8" as const,
-    },
   },
-}));
+});

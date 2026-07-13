@@ -120,8 +120,7 @@ metrics, and effective options.
 
 Implementation status: complete in `packages/svg-excalidraw`. The accepted
 decision is recorded in
-`docs/adr/0001-svg-excalidraw-native-fill-representation.md`; the checked corpus
-matrix is `docs/svg-excalidraw-fill-spike-support-matrix.md`. Representation and
+`docs/adr/0001-svg-excalidraw-native-fill-representation.md`. Representation and
 hole strategy are accepted; the measured 256/4,096 point thresholds remain
 provisional until representative corpus evidence supports enforceable budgets.
 
@@ -149,9 +148,7 @@ evidence. No product UI before this proof.
 ## Delivery slices after the spike
 
 1. **IR + diagnostics.** **Complete in Slice 1.** The accepted boundary is
-   recorded in `docs/adr/0002-svg-canonical-ir-and-capability-diagnostics.md`;
-   the checked support matrix is
-   `docs/svg-excalidraw-slice-1-support-matrix.md`. `parseSvg` /
+   recorded in `docs/adr/0002-svg-canonical-ir-and-capability-diagnostics.md`. `parseSvg` /
    `inspectSvgCapabilities`: XML + CSS-subset
    parsing, `<use>` resolution, trivial-clip stripping, inherited paint,
    conversion of `rect`/`circle`/`ellipse`/`line`/`polyline`/`polygon` into
@@ -166,15 +163,19 @@ evidence. No product UI before this proof.
    Corpus census tests use
    explicitly defined, deduplicated file-level metrics so corpus drift is
    caught.
-2. **Native backend + serialization.** Deterministic element construction per
+2. **Native backend + serialization.** **Complete in Slice 2.** The accepted
+   boundary is recorded in
+   `docs/adr/0003-svg-native-conversion-and-library-serialization.md`. Deterministic element construction per
    the ADR (reusing `diagram-excalidraw` conventions), grouping per icon, color
    preservation plus an explicit monochrome profile, gradient flattening,
    `serializeExcalidrawLibrary` proven by `loadLibraryFromBlob` /
-   `restoreElements` round-trip. Full 1,412-icon corpus run producing a checked
-   report artifact (success, warnings, unsupported features, point/element
+   `restoreElements` round-trip. An affected-only full-corpus CI run producing an untracked
+   workflow artifact (success, warnings, unsupported features, point/element
    counts, time, size vs budgets) plus the silhouette metric: native output via
    `exportToSvg` → rasterize → fill-region IoU against the normalized source at
-   roughness 0, thresholds tuned on fixtures.
+   roughness 0, thresholds tuned on fixtures. The production gate additionally
+   blocks unsafe nonzero planar topology rather than returning partial geometry:
+   1,114 files convert and 298 are blocked after capability overlap.
 3. **Sketch-SVG backend.** RoughJS direct; colors preserved by default with a
    monochrome profile; roughness, bowing, stroke width, fill style, seed;
    `svg2roughjs` retained only as a temporary parity oracle, then removed.
@@ -203,7 +204,7 @@ IoU vs normalized source at roughness 0; roughness 0/1/2 visibly distinct
 without topology or bounds changes; golden fixture stories under Chromatic with
 thresholds that separate intended sketch variation from lost geometry.
 
-Corpus: all 1,412 icons through both backends with the checked report artifact;
+Corpus: all icons through both backends in affected-only CI, with the complete report uploaded as a workflow artifact and never checked in;
 a regression set covering every supported feature and every
 fallback/diagnostic class, including the stroke-only profile (96 files),
 multi-color preservation, and the v1 multi-subpath artifact.

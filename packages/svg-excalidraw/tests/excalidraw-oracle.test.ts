@@ -1,18 +1,22 @@
-import { exportToSvg, restoreElements } from "@excalidraw/excalidraw";
+import {
+  exportToSvg,
+  loadLibraryFromBlob,
+  restoreElements,
+  serializeLibraryAsJSON,
+} from "@excalidraw/excalidraw";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 
 import {
-  centroid,
-  constructNativeTrace,
-  filledRegionsForShape,
+  convertSvgToExcalidraw,
   parseSvg,
+  serializeExcalidrawLibrary,
   type CanonicalSvgDocument,
-  type NativeTraceOptions,
   type Point,
 } from "../src";
-import checkedEvidence from "../evidence/fill-spike-metrics.json";
-import checkedSlice1Evidence from "../evidence/slice-1-ir-capability-metrics.json";
+import { centroid } from "../src/lib/geometry";
+import { constructNativeTrace, filledRegionsForShape } from "../src/lib/native";
+import type { NativeTraceOptions } from "../src/lib/types";
 import { corpusFixtures } from "./corpus-fixtures";
 
 interface RasterizedSvg {
@@ -160,8 +164,133 @@ describe("real Excalidraw renderer oracle", () => {
     corpusFixtures.counter.sourceName,
   );
   const counterRegion = counterDocument.shapes
-    .flatMap(filledRegionsForShape)
+    .flatMap((shape) => filledRegionsForShape(shape))
     .find((region) => region.holes.length > 0);
+
+  it("loads deterministic library output and restores native editable elements", async () => {
+    const converted = convertSvgToExcalidraw(counterDocument, {
+      fillStyle: "solid",
+      roughness: 1,
+    });
+    expect(converted.ok).toBe(true);
+    if (!converted.ok) {
+      return;
+    }
+    const serialized = serializeExcalidrawLibrary([
+      {
+        elements: converted.elements,
+        id: `svg:${converted.sourceHash}`,
+        name: "AI21",
+      },
+    ]);
+    const loaded = await loadLibraryFromBlob(
+      new Blob([serialized], { type: "application/vnd.excalidrawlib+json" }),
+    );
+    const restored = restoreElements(loaded[0]?.elements ?? [], null, {
+      refreshDimensions: false,
+      repairBindings: false,
+    });
+
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]).toMatchObject({
+      id: `svg:${converted.sourceHash}`,
+      name: "AI21",
+      created: 1,
+      status: "published",
+    });
+    expect(restored).toHaveLength(converted.elements.length);
+    expect(restored.every((element) => element.type === "line")).toBe(true);
+    expect(restored.some((element) => element.type === "image")).toBe(false);
+    expect(JSON.parse(serializeLibraryAsJSON(loaded))).toMatchObject({
+      type: "excalidrawlib",
+      version: 2,
+      libraryItems: [{ id: `svg:${converted.sourceHash}` }],
+    });
+  });
+
+  it("preserves representative edits across save, reload, and re-export", async () => {
+    const converted = convertSvgToExcalidraw(counterDocument, {
+      fillStyle: "solid",
+      roughness: 1,
+    });
+    expect(converted.ok).toBe(true);
+    if (!converted.ok) {
+      return;
+    }
+    const original = converted.elements[0];
+    expect(original).toBeDefined();
+    if (!original) {
+      return;
+    }
+    const loadAndRestore = async (serialized: string) => {
+      const items = await loadLibraryFromBlob(
+        new Blob([serialized], {
+          type: "application/vnd.excalidrawlib+json",
+        }),
+      );
+      return restoreElements(items[0]?.elements ?? [], null, {
+        refreshDimensions: false,
+        repairBindings: false,
+      });
+    };
+    const serialize = (
+      elements: Parameters<
+        typeof serializeExcalidrawLibrary
+      >[0][number]["elements"],
+    ) =>
+      serializeExcalidrawLibrary([
+        {
+          elements,
+          id: `svg:${converted.sourceHash}`,
+          name: "Edited AI21",
+        },
+      ]);
+    const baseline = await loadAndRestore(serialize(converted.elements));
+    const baselineElement = baseline.find(
+      (element) => element.id === original.id,
+    );
+    expect(baselineElement).toBeDefined();
+    if (!baselineElement) {
+      return;
+    }
+
+    const editedElements = converted.elements.map((element, index) =>
+      index === 0
+        ? {
+            ...element,
+            backgroundColor: "#ff006e",
+            groupIds: ["edited:group"],
+            strokeColor: "#ff006e",
+            version: element.version + 1,
+            x: element.x + 37,
+            y: element.y + 19,
+          }
+        : element,
+    );
+    const restored = await loadAndRestore(serialize(editedElements));
+    const edited = restored.find((element) => element.id === original.id);
+    expect(edited).toMatchObject({
+      backgroundColor: "#ff006e",
+      groupIds: ["edited:group"],
+      strokeColor: "#ff006e",
+      x: baselineElement.x + 37,
+      y: baselineElement.y + 19,
+    });
+    if (!edited) {
+      return;
+    }
+
+    const reloaded = await loadAndRestore(serialize(restored));
+    expect(
+      reloaded.find((element) => element.id === original.id),
+    ).toMatchObject({
+      backgroundColor: edited.backgroundColor,
+      groupIds: edited.groupIds,
+      strokeColor: edited.strokeColor,
+      x: edited.x,
+      y: edited.y,
+    });
+  });
 
   it("round-trips and renders keyhole and true hole-eliminating triangulation", async () => {
     expect(counterRegion).toBeDefined();
@@ -210,11 +339,79 @@ describe("real Excalidraw renderer oracle", () => {
         entry.roughness === 1 &&
         entry.fillStyle === "solid",
     );
-    expect(evidence).toEqual(
-      checkedSlice1Evidence.rendererOracle.counterHoleMatrix,
-    );
     expect(keyhole?.elements).toBeLessThan(triangulation?.elements ?? 0);
     expect(keyhole?.points).toBeLessThan(triangulation?.points ?? 0);
+  });
+
+  it("preserves a self-intersecting evenodd contour as one native line", async () => {
+    const source =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path fill="#000" fill-rule="evenodd" d="M0 0L20 20L0 20L20 0Z"/></svg>';
+    const document = mustParse(source);
+    const converted = convertSvgToExcalidraw(document, { roughness: 0 });
+    expect(converted.ok).toBe(true);
+    if (!converted.ok) {
+      return;
+    }
+    const rendered = await renderDocument(document, {
+      strategy: "keyhole",
+      roughness: 0,
+      fillStyle: "solid",
+      compoundEvenOdd: true,
+      fillCarrierStrokeWidth: 0.5,
+    });
+    const host = window.document.createElement("div");
+    host.innerHTML = source;
+    const sourceSvg = host.querySelector("svg");
+    if (!(sourceSvg instanceof SVGSVGElement)) {
+      throw new Error("Expected source SVG element");
+    }
+
+    expect(converted.elements).toHaveLength(1);
+    expect(
+      maskIntersectionOverUnion(
+        await rasterize(sourceSvg),
+        await rasterize(rendered.svg),
+      ),
+    ).toBeGreaterThan(0.9);
+  });
+
+  it("preserves compound evenodd parity across islands, overlaps, and deep nesting", async () => {
+    const sources = [
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 20"><path fill="#000" fill-rule="evenodd" d="M0 0H20V20H0Z M5 5H15V15H5Z M40 0H60V20H40Z M45 5H55V15H45Z"/></svg>',
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><path fill="#000" fill-rule="evenodd" d="M0 0H20V20H0Z M10 0H30V20H10Z"/></svg>',
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><path fill="#000" fill-rule="evenodd" d="M0 0H30V30H0Z M5 5H25V25H5Z M10 10H20V20H10Z"/></svg>',
+    ];
+
+    for (const source of sources) {
+      const document = mustParse(source);
+      const converted = convertSvgToExcalidraw(document, { roughness: 0 });
+      expect(converted.ok).toBe(true);
+      if (!converted.ok) {
+        continue;
+      }
+      const rendered = await renderDocument(document, {
+        strategy: "keyhole",
+        roughness: 0,
+        fillStyle: "solid",
+        compoundEvenOdd: true,
+        fillCarrierStrokeWidth: 0.5,
+      });
+      const host = window.document.createElement("div");
+      host.innerHTML = source;
+      const sourceSvg = host.querySelector("svg");
+      if (!(sourceSvg instanceof SVGSVGElement)) {
+        throw new Error("Expected source SVG element");
+      }
+
+      expect(converted.elements).toHaveLength(1);
+      expect(converted.elements[0]?.strokeColor).toBe("transparent");
+      expect(
+        maskIntersectionOverUnion(
+          await rasterize(sourceSvg),
+          await rasterize(rendered.svg),
+        ),
+      ).toBeGreaterThan(0.95);
+    }
   });
 
   it("renders nonzero winding and evenodd nesting with different topology", async () => {
@@ -256,7 +453,6 @@ describe("real Excalidraw renderer oracle", () => {
       });
     }
 
-    expect(evidence).toEqual(checkedEvidence.fillRuleMatrix);
     expect(evidence[0]?.centerAlpha).toBeGreaterThan(0.9);
     expect(evidence[1]?.centerAlpha).toBeLessThan(0.12);
     expect(evidence[2]?.centerAlpha).toBeLessThan(0.12);
@@ -344,18 +540,6 @@ describe("real Excalidraw renderer oracle", () => {
     }
     expect(candidateBudgetEvidence).toHaveLength(16);
     expect(roundnessEvidence).toHaveLength(6);
-    expect(candidateBudgetEvidence).toEqual(
-      checkedEvidence.candidatePointBudgetMatrix,
-    );
-    expect(checkedEvidence.candidatePointThresholdDecision).toEqual({
-      status: "provisional",
-      perElement: 256,
-      perIcon: 4096,
-      evidenceScope: "synthetic circles at 64, 128, 256, and 512 points",
-      limitation:
-        "not representative enough for production rejection or simplification",
-    });
-    expect(roundnessEvidence).toEqual(checkedEvidence.roundnessMatrix);
     const candidateThreshold = candidateBudgetEvidence.find(
       (entry) =>
         entry.pointCount === 256 &&

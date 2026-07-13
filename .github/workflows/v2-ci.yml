@@ -86,13 +86,25 @@ jobs:
 
           if grep -qx "svg-excalidraw" .memory/affected-projects.txt; then
             echo "playwright=true" >> "$GITHUB_OUTPUT"
+            echo "svg_corpus=true" >> "$GITHUB_OUTPUT"
           else
             echo "playwright=false" >> "$GITHUB_OUTPUT"
+            echo "svg_corpus=false" >> "$GITHUB_OUTPUT"
           fi
       - name: Install Chromium for browser tests
         if: ${{ steps.affected.outputs.playwright == 'true' }}
         run: pnpm exec playwright install --with-deps chromium
       - run: pnpm nx affected -t typecheck,test,build --base="${{ steps.nx-refs.outputs.base }}" --head="${{ steps.nx-refs.outputs.head }}"
+      - name: Run affected SVG corpus renderer
+        if: ${{ steps.affected.outputs.svg_corpus == 'true' }}
+        run: pnpm nx run svg-excalidraw:corpus-renderer
+      - name: Upload SVG corpus renderer report
+        if: ${{ always() && steps.affected.outputs.svg_corpus == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: svg-native-corpus-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .memory/svg-native-corpus
+          if-no-files-found: error
       - run: pnpm nx affected -t build-storybook --base="${{ steps.nx-refs.outputs.base }}" --head="${{ steps.nx-refs.outputs.head }}"
       - name: Publish Storybook to Chromatic
         if: ${{ env.CHROMATIC_PROJECT_TOKEN != '' && steps.affected.outputs.storybook == 'true' }}

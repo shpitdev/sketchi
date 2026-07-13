@@ -25,8 +25,8 @@ Slice 0 compared two representations through Excalidraw's real
    simple closed triangles.
 
 Both strategies were exercised at roughness 0, 1, and 2 with solid and hachure
-fill. The checked raw measurements are in
-`packages/svg-excalidraw/evidence/fill-spike-metrics.json`.
+fill. Representative oracle tests preserve the behavior directly; generated raw
+measurements are not source artifacts.
 
 ## Decision
 

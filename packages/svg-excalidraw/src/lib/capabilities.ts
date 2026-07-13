@@ -1,4 +1,13 @@
-import type { CanonicalSvgDocument, SvgCapabilityReport } from "./types";
+import {
+  contoursAreNestedOrDisjoint,
+  keyholeBridgeIsSafe,
+  regionsFromRings,
+} from "./geometry";
+import type {
+  CanonicalSvgDocument,
+  SvgCapabilityReport,
+  SvgDiagnostic,
+} from "./types";
 
 const BLOCKING_DIAGNOSTICS = new Set([
   "adaptive-flattening-depth-exceeded",
@@ -10,6 +19,7 @@ const BLOCKING_DIAGNOSTICS = new Set([
   "invalid-transform",
   "native-unsupported-clip",
   "native-unsupported-feature",
+  "native-unsupported-topology",
   "parse-error",
   "symbol-viewport-unsupported",
   "unsupported-element",
@@ -19,9 +29,58 @@ const BLOCKING_DIAGNOSTICS = new Set([
   "use-reference-missing",
 ]);
 
+function compareDiagnostics(left: SvgDiagnostic, right: SvgDiagnostic): number {
+  const leftKey = `${left.sourcePath ?? ""}\u0000${left.code}\u0000${left.message}`;
+  const rightKey = `${right.sourcePath ?? ""}\u0000${right.code}\u0000${right.message}`;
+  return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+}
+
 export function inspectSvgCapabilities(
   document: CanonicalSvgDocument,
 ): SvgCapabilityReport {
+  const topologyDiagnostics: SvgDiagnostic[] = document.shapes.flatMap(
+    (shape): readonly SvgDiagnostic[] => {
+      if (shape.fill === null) {
+        return [];
+      }
+      const rings = shape.subpaths.map((subpath) => subpath.points);
+      if (shape.fillRule === "evenodd") {
+        return [];
+      }
+      if (!contoursAreNestedOrDisjoint(rings)) {
+        return [
+          {
+            code: "native-unsupported-topology",
+            elementId: shape.elementId,
+            feature: null,
+            message:
+              "Intersecting, touching, or self-intersecting contours cannot be represented safely as native Excalidraw fill geometry.",
+            severity: "error",
+            sourcePath: shape.sourcePath,
+          },
+        ];
+      }
+      const unsafeKeyhole = regionsFromRings(rings, shape.fillRule).some(
+        (region) => !keyholeBridgeIsSafe(region),
+      );
+      return unsafeKeyhole
+        ? [
+            {
+              code: "native-unsupported-topology",
+              elementId: shape.elementId,
+              feature: null,
+              message:
+                "The fill contains a hole that cannot be bridged without crossing an unfilled region.",
+              severity: "error",
+              sourcePath: shape.sourcePath,
+            },
+          ]
+        : [];
+    },
+  );
+  const diagnostics = [...document.diagnostics, ...topologyDiagnostics].sort(
+    compareDiagnostics,
+  );
   const colors = new Set(
     document.shapes.flatMap((shape) =>
       [shape.fill?.color, shape.stroke?.color].filter(
@@ -30,9 +89,9 @@ export function inspectSvgCapabilities(
     ),
   );
   return {
-    diagnostics: document.diagnostics,
+    diagnostics,
     features: document.features,
-    nativeTrace: document.diagnostics.some((entry) =>
+    nativeTrace: diagnostics.some((entry) =>
       BLOCKING_DIAGNOSTICS.has(entry.code),
     )
       ? "unsupported"

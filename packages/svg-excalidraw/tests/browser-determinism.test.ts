@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  convertSvgToExcalidraw,
+  deterministicLibraryChecksum,
+  parseSvg,
+  serializeExcalidrawLibrary,
+} from "../src";
+import {
   constructNativeTrace,
-  deterministicDocumentChecksum,
   deterministicTraceChecksum,
   deterministicTraceJson,
-  parseSvg,
-} from "../src";
+} from "../src/lib/native";
+import { deterministicDocumentChecksum } from "../src/lib/parse";
 import {
   adaptiveDeterminismChecksums,
   adaptiveDeterminismFixture,
@@ -18,6 +23,42 @@ const corpusMulticolorFixture =
   '<svg style="flex:none;line-height:1" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><g transform="translate(36.685 30.72) scale(19.576)"><title>vLLM</title><path d="M0 4.973h9.324V23L0 4.973z" fill="#FDB515"></path><path d="M13.986 4.351L22.378 0l-6.216 23H9.324l4.662-18.649z" fill="#30A2FF"></path></g></svg>';
 
 describe("browser construction determinism", () => {
+  it("matches production conversion and library serialization checksums", () => {
+    const parsed = parseSvg(corpusMulticolorFixture, {
+      sourceName: "ai-infrastructure/vllm.svg",
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) {
+      return;
+    }
+    const converted = convertSvgToExcalidraw(parsed.document, {
+      fillStyle: "hachure",
+      roughness: 2,
+    });
+    expect(converted.ok).toBe(true);
+    if (!converted.ok) {
+      return;
+    }
+    const serialized = serializeExcalidrawLibrary([
+      {
+        elements: converted.elements,
+        id: `svg:${converted.sourceHash}`,
+        name: "vLLM",
+      },
+    ]);
+
+    expect(deterministicLibraryChecksum(serialized)).toBe("d224b974");
+    expect(serialized).toBe(
+      serializeExcalidrawLibrary([
+        {
+          elements: converted.elements,
+          id: `svg:${converted.sourceHash}`,
+          name: "vLLM",
+        },
+      ]),
+    );
+  });
+
   it("matches the Node checksum byte-for-byte in Chromium", () => {
     const parsed = parseSvg(corpusMulticolorFixture, {
       sourceName: "ai-infrastructure/vllm.svg",

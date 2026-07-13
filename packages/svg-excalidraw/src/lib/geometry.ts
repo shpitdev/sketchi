@@ -291,13 +291,14 @@ function cycleFrom(
     .filter((point): point is Point => point !== undefined);
 }
 
-/**
- * Produces one self-touching polygon with zero-width bridge slits. The bridge
- * edges are intentionally traversed in both directions; no background-colored
- * overlay is involved.
- */
-export function keyholeBridge(region: FilledRegion): readonly Point[] {
+interface KeyholeBridgeResult {
+  readonly bridges: readonly (readonly [Point, Point])[];
+  readonly points: readonly Point[];
+}
+
+function constructKeyholeBridge(region: FilledRegion): KeyholeBridgeResult {
   let combined = [...withoutClosingPoint(region.outer)];
+  const bridges: [Point, Point][] = [];
   const outerOrientation = Math.sign(signedArea(combined)) || 1;
 
   for (const rawHole of region.holes) {
@@ -334,6 +335,7 @@ export function keyholeBridge(region: FilledRegion): readonly Point[] {
     if (!outerBridge || !holeBridge) {
       continue;
     }
+    bridges.push([outerBridge, holeBridge]);
     combined = [
       ...combined.slice(0, combinedIndex + 1),
       holeBridge,
@@ -343,7 +345,75 @@ export function keyholeBridge(region: FilledRegion): readonly Point[] {
       ...combined.slice(combinedIndex + 1),
     ];
   }
-  return closePoints(combined);
+  return { bridges, points: closePoints(combined) };
+}
+
+/**
+ * Verifies that every zero-width bridge stays in the filled region and crosses
+ * neither source boundaries nor another bridge. This keeps keyholes fail-closed
+ * for concave or multi-hole regions where nearest-vertex bridging is unsafe.
+ */
+export function keyholeBridgeIsSafe(region: FilledRegion): boolean {
+  const result = constructKeyholeBridge(region);
+  if (result.bridges.length !== region.holes.length) {
+    return false;
+  }
+  const boundaries = [region.outer, ...region.holes].flatMap(ringSegments);
+  for (
+    let bridgeIndex = 0;
+    bridgeIndex < result.bridges.length;
+    bridgeIndex += 1
+  ) {
+    const bridge = result.bridges[bridgeIndex];
+    if (!bridge) {
+      return false;
+    }
+    const [start, end] = bridge;
+    for (const fraction of [0.25, 0.5, 0.75]) {
+      const sample = {
+        x: start.x + (end.x - start.x) * fraction,
+        y: start.y + (end.y - start.y) * fraction,
+      };
+      if (
+        !pointInPolygon(sample, region.outer) ||
+        region.holes.some((hole) => pointInPolygon(sample, hole))
+      ) {
+        return false;
+      }
+    }
+    for (const boundary of boundaries) {
+      if (
+        segmentsIntersect(start, end, boundary.start, boundary.end) &&
+        !pointsEqual(start, boundary.start) &&
+        !pointsEqual(start, boundary.end) &&
+        !pointsEqual(end, boundary.start) &&
+        !pointsEqual(end, boundary.end)
+      ) {
+        return false;
+      }
+    }
+    for (const previous of result.bridges.slice(0, bridgeIndex)) {
+      if (
+        segmentsIntersect(start, end, previous[0], previous[1]) &&
+        !pointsEqual(start, previous[0]) &&
+        !pointsEqual(start, previous[1]) &&
+        !pointsEqual(end, previous[0]) &&
+        !pointsEqual(end, previous[1])
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * Produces one self-touching polygon with zero-width bridge slits. The bridge
+ * edges are intentionally traversed in both directions; no background-colored
+ * overlay is involved. Callers must verify `keyholeBridgeIsSafe` first.
+ */
+export function keyholeBridge(region: FilledRegion): readonly Point[] {
+  return constructKeyholeBridge(region).points;
 }
 
 /**
