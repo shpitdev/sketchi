@@ -1,4 +1,7 @@
-import type { ExcalidrawLinearElement } from "@excalidraw/excalidraw/element/types";
+import type {
+  ExcalidrawElement,
+  ExcalidrawLinearElement,
+} from "@excalidraw/excalidraw/element/types";
 
 export interface Point {
   readonly x: number;
@@ -79,6 +82,7 @@ export type SvgDiagnosticCode =
   | "invalid-transform"
   | "native-unsupported-clip"
   | "native-unsupported-feature"
+  | "native-unsupported-topology"
   | "parse-error"
   | "symbol-viewport-unsupported"
   | "trivial-clip-removed"
@@ -194,13 +198,47 @@ export type SvgParseResult =
 export type FillStrategy = "keyhole" | "triangulation";
 export type NativeFillStyle = "hachure" | "solid";
 export type NativeRoughness = 0 | 1 | 2;
+export type NativeColorProfile =
+  | { readonly kind: "preserve" }
+  | { readonly color: string; readonly kind: "monochrome" };
 
+/** Internal construction options retained for renderer-oracle comparisons. */
 export interface NativeTraceOptions {
+  readonly colorProfile?: NativeColorProfile;
+  readonly compoundEvenOdd?: boolean;
+  readonly fillCarrierStrokeWidth?: number;
   readonly fillStyle: NativeFillStyle;
   readonly provisionalPointBudget?: ProvisionalPointBudget;
   readonly roughness: NativeRoughness;
   readonly roundness?: "curved" | "sharp";
   readonly strategy: FillStrategy;
+}
+
+export interface SvgToExcalidrawOptions {
+  readonly colorProfile?: NativeColorProfile;
+  readonly fillStyle?: NativeFillStyle;
+  readonly provisionalPointBudget?: ProvisionalPointBudget;
+  readonly roughness?: NativeRoughness;
+}
+
+export interface EffectiveSvgToExcalidrawOptions {
+  readonly colorProfile: NativeColorProfile;
+  readonly fillStyle: NativeFillStyle;
+  readonly provisionalPointBudget: ProvisionalPointBudget;
+  readonly roughness: NativeRoughness;
+}
+
+export type NativeConversionDiagnosticCode =
+  | "native-capability-blocked"
+  | "provisional-point-budget-per-element"
+  | "provisional-point-budget-per-icon";
+
+export interface NativeConversionDiagnostic {
+  readonly code: NativeConversionDiagnosticCode;
+  readonly message: string;
+  readonly severity: "error" | "warning";
+  readonly value?: number;
+  readonly limit?: number;
 }
 
 export interface ProvisionalPointBudget {
@@ -219,6 +257,48 @@ export interface NativeTraceResult {
   readonly elements: readonly ExcalidrawLinearElement[];
   readonly metrics: NativeTraceMetrics;
   readonly exceedsProvisionalBudget: boolean;
+}
+
+export type SvgToExcalidrawResult =
+  | {
+      readonly capability: SvgCapabilityReport;
+      readonly diagnostics: readonly (
+        | SvgDiagnostic
+        | NativeConversionDiagnostic
+      )[];
+      readonly elements: readonly ExcalidrawLinearElement[];
+      readonly metrics: NativeTraceMetrics;
+      readonly ok: true;
+      readonly options: EffectiveSvgToExcalidrawOptions;
+      readonly sourceHash: string;
+      readonly sourceName: string;
+    }
+  | {
+      readonly capability: SvgCapabilityReport;
+      readonly diagnostics: readonly (
+        | SvgDiagnostic
+        | NativeConversionDiagnostic
+      )[];
+      readonly elements: readonly [];
+      readonly metrics: NativeTraceMetrics;
+      readonly ok: false;
+      readonly options: EffectiveSvgToExcalidrawOptions;
+      readonly reason: "native-unsupported";
+      readonly sourceHash: string;
+      readonly sourceName: string;
+    };
+
+export interface ExcalidrawLibraryItemInput {
+  readonly elements: readonly ExcalidrawElement[];
+  readonly id: string;
+  readonly name?: string;
+}
+
+export interface SerializeExcalidrawLibraryOptions {
+  /** Stable epoch milliseconds. Defaults to 1 for byte determinism. */
+  readonly created?: number;
+  readonly source?: string;
+  readonly status?: "published" | "unpublished";
 }
 
 export interface FilledRegion {

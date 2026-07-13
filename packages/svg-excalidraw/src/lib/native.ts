@@ -123,11 +123,32 @@ function lineElement(input: {
 
 export function filledRegionsForShape(
   shape: CanonicalShape,
+  compoundEvenOdd = false,
 ): readonly FilledRegion[] {
+  if (compoundEvenOdd && shape.fillRule === "evenodd") {
+    const outer = shape.subpaths[0];
+    return outer
+      ? [
+          {
+            holes: shape.subpaths.slice(1).map((subpath) => subpath.points),
+            outer: outer.points,
+          },
+        ]
+      : [];
+  }
   return regionsFromRings(
     shape.subpaths.map((subpath) => subpath.points),
     shape.fillRule,
   );
+}
+
+function profileColor(
+  sourceColor: string,
+  options: NativeTraceOptions,
+): string {
+  return options.colorProfile?.kind === "monochrome"
+    ? options.colorProfile.color
+    : sourceColor;
 }
 
 function filledPolygons(
@@ -184,8 +205,14 @@ export function constructNativeTrace(
       continue;
     }
     const openSubpaths = shape.subpaths.filter((subpath) => !subpath.closed);
-    const separatesOpenSourceStroke =
-      shape.stroke !== null && openSubpaths.length > 0;
+    const hasVisibleSourceStroke =
+      shape.stroke !== null && shape.strokeWidth > 0;
+    const separatesSourceStroke =
+      hasVisibleSourceStroke &&
+      (openSubpaths.length > 0 ||
+        (shape.fillRule === "evenodd" && shape.subpaths.length > 1) ||
+        (shape.fill !== null &&
+          Math.abs(shape.fill.opacity - (shape.stroke?.opacity ?? 1)) > 1e-7));
 
     // SVG fills implicitly close every subpath even when its path data omits Z.
     const supportsFillContours =
@@ -200,29 +227,45 @@ export function constructNativeTrace(
       );
     }
     if (shape.fill !== null && supportsFillContours) {
-      const regions = filledRegionsForShape(shape);
+      const regions = filledRegionsForShape(
+        shape,
+        options.compoundEvenOdd ?? false,
+      );
       regions.forEach((region, regionIndex) => {
         const polygons = filledPolygons(region, options.strategy);
         polygons.forEach((points, polygonIndex) => {
+          const fillColor = profileColor(
+            shape.fill?.color ?? "transparent",
+            options,
+          );
+          const strokeColor = profileColor(
+            shape.stroke?.color ?? shape.fill?.color ?? "#000000",
+            options,
+          );
           appendElement({
             idSuffix: `${shape.id}:fill:${regionIndex}:${polygonIndex}`,
             points: closePoints(points),
-            backgroundColor: shape.fill?.color ?? "transparent",
-            strokeColor: separatesOpenSourceStroke
-              ? (shape.fill?.color ?? "transparent")
-              : (shape.stroke?.color ?? shape.fill?.color ?? "#000000"),
-            strokeWidth: separatesOpenSourceStroke
-              ? 0.5
-              : Math.max(0.5, shape.strokeWidth),
+            backgroundColor: fillColor,
+            strokeColor:
+              separatesSourceStroke || !hasVisibleSourceStroke
+                ? options.compoundEvenOdd && shape.fillRule === "evenodd"
+                  ? "transparent"
+                  : fillColor
+                : strokeColor,
+            strokeWidth:
+              separatesSourceStroke || !hasVisibleSourceStroke
+                ? (options.fillCarrierStrokeWidth ??
+                  Math.max(0.5, shape.strokeWidth))
+                : Math.max(0.5, shape.strokeWidth),
             opacity: shape.fill?.opacity ?? 1,
           });
         });
       });
     }
 
-    if (shape.stroke !== null) {
+    if (hasVisibleSourceStroke) {
       const strokeSubpaths =
-        shape.fill === null || separatesOpenSourceStroke
+        shape.fill === null || separatesSourceStroke
           ? shape.subpaths
           : openSubpaths;
       strokeSubpaths.forEach((subpath, subpathIndex) => {
@@ -230,7 +273,7 @@ export function constructNativeTrace(
           idSuffix: `${shape.id}:stroke:${subpathIndex}`,
           points: subpath.closed ? closePoints(subpath.points) : subpath.points,
           backgroundColor: "transparent",
-          strokeColor: shape.stroke?.color ?? "#000000",
+          strokeColor: profileColor(shape.stroke?.color ?? "#000000", options),
           strokeWidth: shape.strokeWidth,
           opacity: shape.stroke?.opacity ?? 1,
         });
