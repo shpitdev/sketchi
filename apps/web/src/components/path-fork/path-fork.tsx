@@ -26,7 +26,6 @@ export function PathFork({
     <section aria-label="Two ways to use Sketchi" className="sk-section path-fork">
       <div className="sk-shell">
         <div className="sk-section__head">
-          <p className="sk-eyebrow">Two ways in</p>
           <h2 className="sk-section__title">Pick your path.</h2>
           <p className="sk-section__lead">
             Draw with Sketchi yourself in the playground, or hand it to the
@@ -39,10 +38,9 @@ export function PathFork({
             <span className="path-lane__glyph" aria-hidden="true">
               <HumanGlyph />
             </span>
-            <p className="path-lane__kicker">For people</p>
             <h3 className="path-lane__title">Use it yourself</h3>
             <p className="path-lane__body">
-              Open the playground and describe a diagram. Sketchi draws it — you
+              Open the playground and describe a diagram. Sketchi draws it, you
               edit and export. No sign-up.
             </p>
             <a
@@ -57,11 +55,10 @@ export function PathFork({
             <span className="path-lane__glyph" aria-hidden="true">
               <AgentGlyph />
             </span>
-            <p className="path-lane__kicker">For coding agents</p>
             <h3 className="path-lane__title">Plug it into your agent</h3>
             <p className="path-lane__body">
               Connect Sketchi once, then ask the agent you already code with for
-              a real, editable diagram — right in your editor.
+              a real, editable diagram, right in your editor.
             </p>
             <ul className="path-lane__agents" aria-label="Supported coding agents">
               {agentSetupEntries.map((entry) => (

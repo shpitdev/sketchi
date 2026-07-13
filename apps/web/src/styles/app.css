@@ -454,19 +454,9 @@
   color: var(--blueprint-ink);
 }
 
-.path-lane__kicker {
-  color: var(--ink-3);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  margin: 8px 0 0;
-  text-transform: uppercase;
-}
-
 .path-lane__title {
   font-size: 23px;
-  margin: 0;
+  margin: 6px 0 0;
 }
 
 .path-lane__body {
@@ -608,24 +598,45 @@
   max-width: 56ch;
 }
 
+/* A contained "icon tray" — same dot-grid motif as the hero board and CTA
+   sheet, so the marquee reads as a deliberate shelf, not a full-bleed strip. */
 .icon-wall__rails {
+  background-color: var(--paper-2);
+  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: -1px -1px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
   display: grid;
-  gap: 14px;
-  margin-top: 40px;
-  -webkit-mask-image: linear-gradient(
-    90deg,
-    transparent,
-    #000 7%,
-    #000 93%,
-    transparent
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent,
-    #000 7%,
-    #000 93%,
-    transparent
-  );
+  gap: 16px;
+  margin-top: 36px;
+  overflow: hidden;
+  padding-block: 22px;
+  position: relative;
+}
+
+/* Fade tiles into the frame edges instead of clipping hard. The gradient
+   matches the tray fill so the border itself stays crisp. */
+.icon-wall__rails::before,
+.icon-wall__rails::after {
+  block-size: auto;
+  content: "";
+  inline-size: 72px;
+  inset-block: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+}
+
+.icon-wall__rails::before {
+  background: linear-gradient(90deg, var(--paper-2), transparent);
+  inset-inline-start: 0;
+}
+
+.icon-wall__rails::after {
+  background: linear-gradient(270deg, var(--paper-2), transparent);
+  inset-inline-end: 0;
 }
 
 .icon-rail {

@@ -17,12 +17,12 @@ const clusterIcons = [
 
 const features: readonly Feature[] = [
   {
-    body: "Every box, arrow, and label is a real shape you can drag, relabel, and restyle — never a flat picture you have to redraw from scratch.",
+    body: "Every box, arrow, and label is a real shape you can drag, relabel, and restyle, never a flat picture you have to redraw from scratch.",
     glyph: <ShapesGlyph />,
     title: "Real objects, not screenshots",
   },
   {
-    body: "Databases, clouds, frameworks, AI models — Sketchi drops in crisp brand logos so your architecture actually looks like your stack.",
+    body: "Databases, clouds, frameworks, AI models: Sketchi drops in crisp brand logos so your architecture actually looks like your stack.",
     glyph: (
       <span className="feature-card__cluster" aria-hidden="true">
         {clusterIcons.map((icon) => (
@@ -58,7 +58,7 @@ export function FeatureGrid() {
             Diagrams that behave like diagrams.
           </h2>
           <p className="sk-section__lead">
-            Not a flat picture of a diagram — real shapes, real logos, yours to
+            Not a flat picture of a diagram. Real shapes, real logos, yours to
             edit.
           </p>
         </div>

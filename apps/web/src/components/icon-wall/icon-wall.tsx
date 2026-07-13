@@ -83,25 +83,26 @@ export function IconWall({
 }: IconWallProps) {
   return (
     <section className="sk-section icon-wall" id="icons">
-      <div className="sk-shell icon-wall__head">
-        <div className="icon-wall__copy">
-          <p className="sk-eyebrow">The icon library</p>
-          <h2 className="sk-section__title">
-            Every logo you need, already sketched.
-          </h2>
-          <p className="sk-section__lead">
-            Search 1,400+ curated brand and tech icons — the same set Sketchi
-            drops straight into your diagrams.
-          </p>
+      <div className="sk-shell">
+        <div className="icon-wall__head">
+          <div className="icon-wall__copy">
+            <h2 className="sk-section__title">
+              Every logo you need, already sketched.
+            </h2>
+            <p className="sk-section__lead">
+              Search 1,400+ curated brand and tech icons, the same set Sketchi
+              drops straight into your diagrams.
+            </p>
+          </div>
+          <a className="sk-btn sk-btn--ghost" href={iconsHref}>
+            Browse the library →
+          </a>
         </div>
-        <a className="sk-btn sk-btn--ghost" href={iconsHref}>
-          Browse the library →
-        </a>
-      </div>
 
-      <div className="icon-wall__rails" aria-hidden="true">
-        <Rail slugs={rowOne} />
-        <Rail reverse slugs={rowTwo} />
+        <div className="icon-wall__rails" aria-hidden="true">
+          <Rail slugs={rowOne} />
+          <Rail reverse slugs={rowTwo} />
+        </div>
       </div>
     </section>
   );

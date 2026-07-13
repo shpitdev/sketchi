@@ -77,7 +77,7 @@ export function HomeHero({
             Sketchi <em>draws it.</em>
           </h1>
           <p className="home-hero__lead sk-rise" style={rise(2)}>
-            Turn a sentence into a clean, editable diagram — with the real logos
+            Turn a sentence into a clean, editable diagram, with the real logos
             of the tools in your stack.
           </p>
           <div className="home-hero__actions sk-rise" style={rise(3)}>

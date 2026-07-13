@@ -18,10 +18,10 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "Describe it and Sketchi draws it — turn a prompt into a clean, editable diagram, complete with the real logos of your stack. In the playground or inside your coding agent.",
+          "Describe it and Sketchi draws it: turn a prompt into a clean, editable diagram, complete with the real logos of your stack. In the playground or inside your coding agent.",
       },
       { name: "theme-color", content: "#f6f1e7" },
-      { title: "Sketchi — describe it, and Sketchi draws it" },
+      { title: "Sketchi: describe it, and Sketchi draws it" },
     ],
     links: [
       { rel: "icon", href: "/icon.svg", type: "image/svg+xml" },

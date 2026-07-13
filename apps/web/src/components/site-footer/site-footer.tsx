@@ -27,7 +27,7 @@ export function SiteFooter({
             <span>Sketchi</span>
           </span>
           <p className="site-footer__tagline">
-            Prompts become real, editable diagrams — logos included.
+            Prompts become real, editable diagrams, logos included.
           </p>
         </div>
 
