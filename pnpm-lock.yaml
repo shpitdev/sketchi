@@ -153,6 +153,9 @@ importers:
 
   apps/excalidraw:
     dependencies:
+      '@excalidraw/excalidraw':
+        specifier: 0.18.1
+        version: 0.18.1(@types/react-dom@19.2.3(@types/react@19.2.16))(@types/react@19.2.16)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@sketchi/diagram-core':
         specifier: workspace:*
         version: link:../../packages/diagram-core
@@ -165,8 +168,18 @@ importers:
       '@sketchi/diagram-studio-ui':
         specifier: workspace:*
         version: link:../../packages/diagram-studio-ui
+      '@sketchi/svg-excalidraw':
+        specifier: workspace:*
+        version: link:../../packages/svg-excalidraw
 
-  apps/icons: {}
+  apps/icons:
+    dependencies:
+      '@sketchi/diagram-studio-ui':
+        specifier: workspace:*
+        version: link:../../packages/diagram-studio-ui
+      '@sketchi/svg-excalidraw':
+        specifier: workspace:*
+        version: link:../../packages/svg-excalidraw
 
   apps/playground:
     dependencies:

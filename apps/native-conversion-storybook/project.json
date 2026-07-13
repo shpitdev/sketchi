@@ -1,0 +1,31 @@
+{
+  "name": "native-conversion-storybook",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/native-conversion-storybook",
+  "projectType": "application",
+  "implicitDependencies": ["diagram-studio-ui", "excalidraw", "icons"],
+  "targets": {
+    "build-storybook": {
+      "executor": "@nx/storybook:build",
+      "outputs": ["{workspaceRoot}/storybook-static/native-conversion"],
+      "options": {
+        "configDir": "apps/native-conversion-storybook/.storybook",
+        "outputDir": "storybook-static/native-conversion"
+      }
+    },
+    "chromatic": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build-storybook"],
+      "options": {
+        "command": "chromatic --storybook-build-dir storybook-static/native-conversion --storybook-config-dir apps/native-conversion-storybook/.storybook --storybook-base-dir apps/native-conversion-storybook"
+      }
+    },
+    "storybook": {
+      "executor": "@nx/storybook:storybook",
+      "options": {
+        "configDir": "apps/native-conversion-storybook/.storybook",
+        "port": 6010
+      }
+    }
+  }
+}

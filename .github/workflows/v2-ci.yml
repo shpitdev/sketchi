@@ -78,13 +78,13 @@ jobs:
             --head="${{ steps.nx-refs.outputs.head }}" \
             | tee .memory/affected-projects.txt
 
-          if grep -qx "diagram-studio-ui" .memory/affected-projects.txt; then
-            echo "storybook=true" >> "$GITHUB_OUTPUT"
+          if grep -qx "native-conversion-storybook" .memory/affected-projects.txt; then
+            echo "native_conversion_storybook=true" >> "$GITHUB_OUTPUT"
           else
-            echo "storybook=false" >> "$GITHUB_OUTPUT"
+            echo "native_conversion_storybook=false" >> "$GITHUB_OUTPUT"
           fi
 
-          if grep -qx "svg-excalidraw" .memory/affected-projects.txt; then
+          if grep -Eq '^(svg-excalidraw|excalidraw)$' .memory/affected-projects.txt; then
             echo "playwright=true" >> "$GITHUB_OUTPUT"
             echo "svg_corpus=true" >> "$GITHUB_OUTPUT"
           else
@@ -106,10 +106,10 @@ jobs:
           path: .memory/svg-native-corpus
           if-no-files-found: error
       - run: pnpm nx affected -t build-storybook --base="${{ steps.nx-refs.outputs.base }}" --head="${{ steps.nx-refs.outputs.head }}"
-      - name: Publish Storybook to Chromatic
-        if: ${{ env.CHROMATIC_PROJECT_TOKEN != '' && steps.affected.outputs.storybook == 'true' }}
+      - name: Publish native conversion Storybook to Chromatic
+        if: ${{ env.CHROMATIC_PROJECT_TOKEN != '' && steps.affected.outputs.native_conversion_storybook == 'true' }}
         env:
           CHROMATIC_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
           CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           CHROMATIC_SLUG: ${{ github.repository }}
-        run: pnpm nx chromatic diagram-studio-ui -- --exit-zero-on-changes
+        run: pnpm nx chromatic native-conversion-storybook -- --exit-zero-on-changes

@@ -6,18 +6,19 @@ flaw, but the spike scope, one architecture contradiction, and several missing
 dependencies had to be fixed before implementation. This document is the
 corrected plan of record.
 
-## Product requirement (unchanged)
+## Product requirement
 
-A self-contained conversion package that accepts curated SVG icons and produces
-two deliberately different first-class outputs:
+The current vertical is a self-contained conversion package that accepts
+curated SVG icons and produces an editable, native Excalidraw library item made
+from Excalidraw elements — not an SVG or raster image embedded in an `image`
+element. It exposes deterministic roughness and fill controls, imports into the
+real Excalidraw editor, and remains selectable, editable, recolorable, scalable,
+groupable, and serializable.
 
-1. a hand-drawn SVG that remains an SVG asset; and
-2. an editable, native Excalidraw library item made from Excalidraw elements —
-   not an SVG or raster image embedded in an `image` element.
-
-Both outputs expose a meaningful, deterministic sketch/roughness control. The
-native output must import into the real Excalidraw editor and remain
-selectable, editable, recolorable, scalable, groupable, and serializable.
+A second hand-drawn SVG output was part of the original draft, but is explicitly
+not required for this vertical. It remains deferred unless product evidence
+shows a need that native elements cannot meet; the implementation must not add a
+parallel Sketch-SVG system speculatively.
 
 ## Evidence the corrections rest on
 
@@ -176,17 +177,23 @@ evidence. No product UI before this proof.
    roughness 0, thresholds tuned on fixtures. The production gate additionally
    blocks unsafe nonzero planar topology rather than returning partial geometry:
    1,114 files convert and 298 are blocked after capability overlap.
-3. **Sketch-SVG backend.** RoughJS direct; colors preserved by default with a
-   monochrome profile; roughness, bowing, stroke width, fill style, seed;
-   `svg2roughjs` retained only as a temporary parity oracle, then removed.
-4. **Product integration.** `apps/icons`: three-way preview (original / sketch
-   SVG / native) with the same controls and seed used for export,
-   `.excalidrawlib` download, capability badges for sketch-SVG-only files.
-   Storybook fixture stories with a Chromatic target for the new surface.
-   Browser proof: import the exported library into the real editor, then
-   edit / recolor / group→ungroup→recolor→regroup / move / save / reload /
-   re-export. Deleting the v1 converter belongs to the eventual one-shot
-   migration PR in `shpitdev/sketchi`, not a slice in this fork.
+3. **Sketch-SVG backend (deferred).** The native corpus and renderer gates are
+   strong enough to ship the first product vertical without a parallel
+   Sketch-SVG system. Reconsider a RoughJS-direct backend only if product
+   evidence identifies a user need that editable native elements cannot meet;
+   do not carry `svg2roughjs` or a second conversion path speculatively.
+4. **Product integration.** `apps/icons`: lazy original/native preview with
+   supported, warned, and blocked capability states; roughness, fill, and color
+   controls; deterministic `.excalidrawlib` download; and a reload-safe URL
+   handoff to the existing `apps/excalidraw` workspace. The Excalidraw Worker
+   accepts only allowlisted public Sketchi icon SVG URLs and reconverts them in
+   the browser. The Icons Worker grants wildcard CORS only to
+   `/output/upload-ready/svg/*`; no scene payload or new hosted service is
+   introduced. Storybook covers each capability state and the editable
+   workspace. Browser proof covers control parity, deterministic download,
+   cross-worker fetch, and real-editor tool interaction. Deleting the v1
+   converter belongs to the eventual one-shot migration PR in
+   `shpitdev/sketchi`, not a slice in this fork.
 
 Each slice is a logical Graphite PR with Nx gates, Storybook, browser proof,
 autonomous merge after green review/CI, and worktree cleanup.
@@ -204,11 +211,11 @@ IoU vs normalized source at roughness 0; roughness 0/1/2 visibly distinct
 without topology or bounds changes; golden fixture stories under Chromatic with
 thresholds that separate intended sketch variation from lost geometry.
 
-Corpus: all icons through both backends in affected-only CI, with the complete report uploaded as a workflow artifact and never checked in;
-a regression set covering every supported feature and every
-fallback/diagnostic class, including the stroke-only profile (96 files),
-multi-color preservation, and the v1 multi-subpath artifact.
+Corpus: all icons through the canonical parser and native backend in
+affected-only CI, with the complete report uploaded as a workflow artifact and
+never checked in; representative regression fixtures cover supported features
+and fallback/diagnostic classes.
 
-Product/browser: side-by-side preview parity with export, real-editor
+Product/browser: original/native preview parity with export, real-editor
 import/edit proof, desktop and mobile UI plus worker preview. Custom domains
 stay out of scope until the fork merges into the original repository.

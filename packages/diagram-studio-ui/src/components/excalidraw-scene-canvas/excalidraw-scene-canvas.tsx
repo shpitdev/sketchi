@@ -1,23 +1,40 @@
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type {
   ExcalidrawImperativeAPI,
   ExcalidrawInitialDataState,
   ExcalidrawProps,
 } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawScene } from "@sketchi/diagram-excalidraw";
-import { type ComponentType, useEffect, useMemo, useState } from "react";
+import {
+  type ComponentType,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 type ExcalidrawComponent = ComponentType<ExcalidrawProps>;
 
+export interface ExcalidrawCanvasScene {
+  readonly appState: Record<string, unknown>;
+  readonly elements: readonly (
+    | ExcalidrawElement
+    | ExcalidrawScene["elements"][number]
+  )[];
+}
+
 export interface ExcalidrawSceneCanvasProps {
+  onApiChange?: (api: ExcalidrawImperativeAPI) => void;
   onChange?: ExcalidrawProps["onChange"];
   revision?: number | string;
-  scene: ExcalidrawScene;
+  scene: ExcalidrawCanvasScene;
   title: string;
   viewModeEnabled?: boolean;
   zenModeEnabled?: boolean;
 }
 
 export function ExcalidrawSceneCanvas({
+  onApiChange,
   onChange,
   revision = "scene",
   scene,
@@ -30,6 +47,13 @@ export function ExcalidrawSceneCanvas({
   );
   const [excalidrawApi, setExcalidrawApi] =
     useState<ExcalidrawImperativeAPI | null>(null);
+  const handleApiChange = useCallback(
+    (api: ExcalidrawImperativeAPI) => {
+      setExcalidrawApi(api);
+      onApiChange?.(api);
+    },
+    [onApiChange],
+  );
   const sceneKey = useMemo(
     () =>
       JSON.stringify({
@@ -111,7 +135,7 @@ export function ExcalidrawSceneCanvas({
           key={sceneKey}
           {...(onChange ? { onChange } : {})}
           autoFocus={false}
-          excalidrawAPI={setExcalidrawApi}
+          excalidrawAPI={handleApiChange}
           gridModeEnabled
           initialData={initialData}
           name={title}

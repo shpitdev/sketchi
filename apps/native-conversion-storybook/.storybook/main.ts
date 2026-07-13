@@ -1,14 +1,19 @@
 import type { StorybookConfig } from "@storybook/react-vite";
 
 const config: StorybookConfig = {
-  stories: ["../src/**/*.stories.tsx"],
-  staticDirs: ["../public"],
+  stories: [
+    "../../../packages/diagram-studio-ui/src/components/excalidraw-scene-canvas/*.stories.tsx",
+    "../../icons/src/components/icon-conversion-preview/*.stories.tsx",
+    "../../excalidraw/src/components/svg-icon-workspace/*.stories.tsx",
+  ],
+  staticDirs: ["../../icons/public"],
   addons: ["@storybook/addon-vitest", "@storybook/addon-mcp"],
   framework: {
     name: "@storybook/react-vite",
     options: {
       builder: {
-        viteConfigPath: "apps/icons/.storybook/vite.config.ts",
+        viteConfigPath:
+          "apps/native-conversion-storybook/.storybook/vite.config.ts",
       },
     },
   },
@@ -34,6 +39,10 @@ const config: StorybookConfig = {
       ).pathname,
       "@sketchi/diagram-studio-ui": new URL(
         "../../../packages/diagram-studio-ui/src/index.ts",
+        import.meta.url,
+      ).pathname,
+      "@sketchi/svg-excalidraw": new URL(
+        "../../../packages/svg-excalidraw/src/index.ts",
         import.meta.url,
       ).pathname,
     };
