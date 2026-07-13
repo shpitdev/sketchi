@@ -223,7 +223,7 @@
 }
 
 .sketchi-icons__body[data-detail="open"] {
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 520px);
 }
 
 .sketchi-icons__results {
@@ -462,9 +462,65 @@
   color: var(--ink);
 }
 
-.icon-detail__preview {
+.icon-conversion {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.icon-conversion__tabs {
   align-items: center;
-  aspect-ratio: 16 / 11;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.icon-conversion__tabs button {
+  background: var(--paper-2);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  color: var(--ink-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.icon-conversion__tabs button[aria-selected="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper-2);
+}
+
+.icon-conversion__capability {
+  border-radius: 999px;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  margin-left: auto;
+  padding: 5px 9px;
+  text-transform: uppercase;
+}
+
+.icon-conversion__capability[data-status="supported"] {
+  background: var(--ok-wash);
+  color: var(--ok);
+}
+
+.icon-conversion__capability[data-status="warned"] {
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+}
+
+.icon-conversion__capability[data-status="blocked"] {
+  background: #f7e1dd;
+  color: #8c2f24;
+}
+
+.icon-conversion__stage {
+  align-items: center;
   background-color: var(--card);
   background-image: var(--checker);
   background-position:
@@ -476,12 +532,143 @@
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   display: flex;
+  height: 320px;
   justify-content: center;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.icon-detail__preview img {
-  max-height: 52%;
-  max-width: 52%;
+.icon-conversion__stage > img {
+  max-height: 60%;
+  max-width: 60%;
+}
+
+.icon-conversion__stage .sketchi-excalidraw-scene-canvas {
+  border: 0;
+  border-radius: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.icon-conversion__state {
+  align-items: center;
+  color: var(--ink-2);
+  display: flex;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+}
+
+.icon-conversion__state button {
+  background: var(--card);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 7px 10px;
+}
+
+.icon-conversion__controls {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.icon-conversion__controls label {
+  color: var(--ink-2);
+  display: grid;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 5px;
+}
+
+.icon-conversion__controls select,
+.icon-conversion__controls input {
+  background: var(--paper-2);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  color: var(--ink);
+  font: inherit;
+  min-height: 38px;
+  min-width: 0;
+  padding: 7px 8px;
+}
+
+.icon-conversion__controls .icon-conversion__color {
+  grid-column: span 3;
+}
+
+.icon-conversion__color input {
+  padding: 4px;
+  width: 100%;
+}
+
+.icon-conversion__metrics {
+  color: var(--ink-3);
+  display: flex;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  gap: 12px;
+}
+
+.icon-conversion__diagnostics {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  display: grid;
+  font-size: 11px;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  max-height: 110px;
+  overflow: auto;
+  padding: 10px;
+}
+
+.icon-conversion__diagnostics strong {
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+
+.icon-conversion__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-conversion__actions button,
+.icon-conversion__actions a,
+.icon-conversion__actions span {
+  align-items: center;
+  background: var(--paper-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  display: inline-flex;
+  flex: 1;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 10px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.icon-conversion__actions a {
+  background: #10372c;
+  border-color: #10372c;
+  color: #e8f5ee;
+}
+
+.icon-conversion__actions button:disabled,
+.icon-conversion__actions span[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .icon-detail__meta {

@@ -9,6 +9,7 @@ flowchart LR
   Packages --> Workspace["Excalidraw workspace"]
   Workspace --> Inspector["diagram inspector"]
   Workspace --> Switcher["diagram switcher"]
+  IconUrl["allowlisted icon SVG URL"] --> NativeIcon["native icon workspace"]
 ```
 
 | Owns                              | Does not own                   |
@@ -17,6 +18,7 @@ flowchart LR
 | diagram workspace UI              | shared conversion internals    |
 | app-local inspector and switcher  | Studio Code Mode API routes    |
 | Worker deployment for the surface | authentication or account data |
+| allowlisted icon URL import       | hosted scene payloads          |
 
 ## Commands
 
@@ -36,4 +38,6 @@ Use this app when validating the actual Excalidraw experience independently of
 Studio chat or Code Mode. It composes shared diagram packages and app-local
 workspace UI so artifact rendering problems can be isolated from generation.
 Do not link it from the public homepage as a standalone product surface. Product
-review and edit entry points belong under the Studio/Playground artifact routes.
+review and edit entry points belong under an owning product flow. The Icons app
+may hand off a public corpus SVG through the root route's validated `svg` search
+parameter; arbitrary hosts and non-SVG output paths are rejected before fetch.

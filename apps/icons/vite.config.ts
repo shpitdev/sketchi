@@ -24,4 +24,22 @@ export default defineConfig({
     }),
     react(),
   ],
+  resolve: {
+    alias: [
+      {
+        find: "@sketchi/diagram-studio-ui/styles.css",
+        replacement: new URL(
+          "../../packages/diagram-studio-ui/src/styles.css",
+          import.meta.url,
+        ).pathname,
+      },
+      {
+        find: "@sketchi/diagram-studio-ui",
+        replacement: new URL(
+          "../../packages/diagram-studio-ui/src/index.ts",
+          import.meta.url,
+        ).pathname,
+      },
+    ],
+  },
 });

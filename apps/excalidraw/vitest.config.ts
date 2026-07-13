@@ -47,7 +47,8 @@ export default defineConfig({
     coverage: {
       reportsDirectory: "../../coverage/apps/excalidraw",
     },
-    include: ["apps/excalidraw/src/**/*.test.tsx"],
+    include: ["apps/excalidraw/src/**/*.test.{ts,tsx}"],
+    exclude: ["apps/excalidraw/src/**/*.browser.test.tsx"],
   },
   resolve: {
     alias: aliases,

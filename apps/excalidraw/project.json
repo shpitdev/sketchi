@@ -55,7 +55,11 @@
       "executor": "nx:run-commands",
       "outputs": ["{workspaceRoot}/coverage/apps/excalidraw"],
       "options": {
-        "command": "vitest run --config apps/excalidraw/vitest.config.ts"
+        "commands": [
+          "vitest run --config apps/excalidraw/vitest.config.ts",
+          "vitest run --config apps/excalidraw/vitest.browser.config.mts"
+        ],
+        "parallel": false
       }
     },
     "typecheck": {

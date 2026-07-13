@@ -11,7 +11,7 @@
     "cf-typegen:all": "nx run-many -t cf-typegen",
     "deploy:excalidraw": "nx deploy excalidraw",
     "deploy:icons": "nx deploy icons",
-    "chromatic": "nx chromatic diagram-studio-ui",
+    "chromatic": "nx chromatic native-conversion-storybook",
     "deploy:playground": "nx deploy playground",
     "deploy:studio": "nx deploy studio",
     "deploy:web": "nx deploy web",

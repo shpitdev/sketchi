@@ -23,6 +23,149 @@
   place-items: center;
 }
 
+.svg-icon-workspace {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  min-height: 0;
+}
+
+.svg-icon-workspace__body {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  min-height: 0;
+  padding: 14px;
+}
+
+.svg-icon-workspace__sidebar {
+  align-content: start;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px;
+}
+
+.svg-icon-workspace__eyebrow {
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.svg-icon-workspace__sidebar h1 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1.05;
+  margin: 0;
+}
+
+.svg-icon-workspace__sidebar > p:not(.svg-icon-workspace__eyebrow) {
+  color: var(--ink-2);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.svg-icon-workspace__sidebar dl {
+  display: grid;
+  margin: 0;
+}
+
+.svg-icon-workspace__sidebar dl > div {
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.svg-icon-workspace__sidebar dt {
+  color: var(--ink-2);
+}
+
+.svg-icon-workspace__sidebar dd {
+  font-family: var(--font-mono);
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.svg-icon-workspace__sidebar ul {
+  background: var(--paper-2);
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  display: grid;
+  font-size: 12px;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 12px;
+}
+
+.svg-icon-workspace__sidebar li strong {
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+
+.svg-icon-workspace__canvas {
+  background: var(--card);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.svg-icon-workspace__canvas .sketchi-excalidraw-scene-canvas {
+  border: 0;
+  border-radius: 0;
+  height: 100%;
+}
+
+.svg-handoff-error {
+  align-items: center;
+  display: grid;
+  min-height: 100vh;
+  padding: 24px;
+  place-items: center;
+}
+
+.svg-handoff-error > div {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  display: grid;
+  gap: 12px;
+  max-width: 540px;
+  padding: 28px;
+  text-align: center;
+}
+
+.svg-handoff-error p {
+  color: #8c2f24;
+  font-family: var(--font-mono);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.svg-handoff-error h1 {
+  margin: 0;
+}
+
+.svg-handoff-error a {
+  color: var(--blueprint-ink);
+  font-weight: 700;
+}
+
 .sketchi-excalidraw-app__body {
   display: grid;
   gap: 14px;
@@ -425,16 +568,19 @@
 /* Responsive                                                            */
 /* ===================================================================== */
 @media (max-width: 900px) {
-  .sketchi-excalidraw-app {
+  .sketchi-excalidraw-app,
+  .svg-icon-workspace {
     height: auto;
     min-height: 100vh;
   }
 
-  .sketchi-excalidraw-app__body {
+  .sketchi-excalidraw-app__body,
+  .svg-icon-workspace__body {
     grid-template-columns: 1fr;
   }
 
-  .sketchi-excalidraw-app__canvas {
+  .sketchi-excalidraw-app__canvas,
+  .svg-icon-workspace__canvas {
     min-height: 68vh;
     order: -1;
   }

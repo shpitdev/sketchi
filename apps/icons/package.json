@@ -1,5 +1,9 @@
 {
   "name": "@sketchi/icons-app",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@sketchi/diagram-studio-ui": "workspace:*",
+    "@sketchi/svg-excalidraw": "workspace:*"
+  }
 }

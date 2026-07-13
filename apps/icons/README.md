@@ -8,6 +8,8 @@ flowchart LR
   Data --> Library["icon library"]
   Library --> Card["icon cards"]
   Library --> Detail["icon detail"]
+  Detail --> Native["lazy native preview"]
+  Native --> Workspace["Excalidraw URL handoff"]
 ```
 
 | Owns                                | Does not own                   |
@@ -16,6 +18,8 @@ flowchart LR
 | app-local review data adapter       | normalization pipeline scripts |
 | icon card and detail states         | diagram generation packages    |
 | Worker deployment for icon browsing | Studio or Excalidraw surfaces  |
+| native preview and URL handoff      | SVG conversion internals       |
+| public-SVG-only CORS policy         | hosted scene payloads          |
 
 ## Commands
 
@@ -33,4 +37,7 @@ pnpm nx deploy icons
 
 Use this app to inspect the copied, pre-cleaned icon output tree from the
 Sketchi icon pipeline. Keep provider fetching, normalization, and upload
-preparation outside this app boundary.
+preparation outside this app boundary. Native conversion runs only after the
+Native tab is selected. Cross-origin reads are intentionally limited to
+`/output/upload-ready/svg/*`; do not broaden `_headers` to review data or other
+output assets.

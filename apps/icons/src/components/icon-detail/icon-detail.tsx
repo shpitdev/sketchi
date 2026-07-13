@@ -5,6 +5,7 @@ import {
   formatCollectionLabel,
   type SketchiIcon,
 } from "../../lib/icon-data.js";
+import { IconConversionPreview } from "../icon-conversion-preview/index.js";
 
 export interface IconDetailProps {
   icon: SketchiIcon;
@@ -87,9 +88,7 @@ export function IconDetail({ icon, onClose }: IconDetailProps) {
         ) : null}
       </header>
 
-      <div className="icon-detail__preview">
-        <img alt={`${icon.slug} icon, large preview`} src={icon.urlPath} />
-      </div>
+      <IconConversionPreview icon={icon} />
 
       <dl className="icon-detail__meta">
         <div>
