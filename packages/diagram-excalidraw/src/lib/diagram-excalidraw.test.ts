@@ -660,7 +660,6 @@ describe("convertSceneToExcalidraw", () => {
               label: "Staging Smoke + Integration Tests",
               kind: "process",
             },
-            { id: "release_aborted", label: "Release Aborted", kind: "end" },
             {
               id: "staging_gate",
               label: "Staging Healthy?",
@@ -697,7 +696,6 @@ describe("convertSceneToExcalidraw", () => {
               label: "Sev1 / Customer Impact?",
               kind: "decision",
             },
-            { id: "release_complete", label: "Release Complete", kind: "end" },
             {
               id: "page_oncall",
               label: "Page On-Call & Declare Incident",
@@ -772,7 +770,7 @@ describe("convertSceneToExcalidraw", () => {
             {
               id: "edge-9",
               source: "vuln_gate",
-              target: "release_aborted",
+              target: "incident_closed",
               label: "exploitable",
             },
             {
@@ -825,7 +823,7 @@ describe("convertSceneToExcalidraw", () => {
             {
               id: "edge-20",
               source: "incident_gate",
-              target: "release_complete",
+              target: "incident_closed",
               label: "stable",
             },
             {

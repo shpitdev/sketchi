@@ -36,12 +36,21 @@ describe("Code Mode MCP docs", () => {
   });
 
   it("emits a complete mindmap-aware public type contract", () => {
-    expect(SKETCHI_CODE_MODE_VERSION).toBe("2026-07-10");
+    expect(SKETCHI_CODE_MODE_VERSION).toBe("2026-07-13");
     expect(SKETCHI_CODE_MODE_TYPES).toContain("interface BuildMindmapRequest");
     expect(SKETCHI_CODE_MODE_TYPES).toContain("type BuildMindmapResult");
     expect(SKETCHI_CODE_MODE_TYPES).toContain(
       'stage: "input" | "flowchart" | "mindmap"',
     );
+    expect(SKETCHI_CODE_MODE_TYPES).toContain("type CodeModeIssueCode");
+    expect(SKETCHI_CODE_MODE_TYPES).toContain("code: CodeModeIssueCode");
+    for (const issueCode of [
+      "nonterminating_node",
+      "flowchart_too_large",
+      "request_too_large",
+    ]) {
+      expect(SKETCHI_CODE_MODE_TYPES).toContain(`"${issueCode}"`);
+    }
     for (const operation of [
       "buildFlowchart",
       "buildMindmap",
@@ -64,12 +73,14 @@ describe("Code Mode MCP docs", () => {
     );
   });
 
-  it("keeps the published catalog complete for mindmap requests and bounded failures", () => {
+  it("keeps the published catalog complete for bounded build failures", () => {
     const catalog = readFileSync("docs/mcp-tool-catalog.md", "utf8");
     for (const declaration of [
       "interface BuildMindmapRequest",
       "type BuildMindmapResult",
       '"request_too_large"',
+      '"nonterminating_node"',
+      '"flowchart_too_large"',
       '"mindmap_too_deep"',
       '"mindmap_too_large"',
     ]) {
@@ -77,6 +88,9 @@ describe("Code Mode MCP docs", () => {
     }
     expect(catalog).toContain("flowchart or mindmap artifact");
     expect(catalog).toContain("matching `buildFlowchart` or");
+    expect(catalog).toContain("24 nodes");
+    expect(catalog).toContain("64 edges");
+    expect(catalog).toContain("256 KiB");
   });
 
   it("searches operation guidance and non-goals", () => {
@@ -100,6 +114,13 @@ describe("Code Mode MCP docs", () => {
     expect(finalArtifactResults.results.map((result) => result.id)).toContain(
       "no-mermaid-wrapper-non-goal",
     );
+
+    const boundedFlowchartResults = searchCodeModeDocs({
+      query: "nonterminating cycle 24 nodes 64 edges request_too_large",
+    });
+    expect(boundedFlowchartResults.results.map((result) => result.id)).toEqual(
+      expect.arrayContaining(["buildFlowchart", "issues"]),
+    );
   });
 
   it("documents importable Excalidraw artifact URLs", () => {
@@ -118,6 +139,10 @@ describe("Code Mode MCP docs", () => {
     expect(docs.content).toContain("8-14 high-signal nodes");
     expect(docs.content).toContain("single readable spine");
     expect(docs.content).toContain("group related packages into layers");
+    expect(docs.content).toContain("24 nodes");
+    expect(docs.content).toContain("64 edges");
+    expect(docs.content).toContain("nonterminating_node");
+    expect(docs.content).toContain("request_too_large");
   });
 
   it("documents patch envelopes and operation names for harness discovery", () => {

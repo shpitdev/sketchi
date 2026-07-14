@@ -6,7 +6,7 @@ import type {
 } from "@sketchi/diagram-agent";
 
 import {
-  MAX_MINDMAP_REQUEST_BYTES,
+  MAX_CODE_MODE_BUILD_REQUEST_BYTES,
   handleBuildFlowchartRequest,
   handleBuildMindmapRequest,
   handleGetArtifactRequest,
@@ -38,6 +38,15 @@ function postRequest(url: string, body: unknown): Request {
     },
     body: JSON.stringify(body),
   });
+}
+
+function paddedJsonBody(body: unknown, byteLength: number): string {
+  const json = JSON.stringify(body);
+  const encodedLength = new TextEncoder().encode(json).byteLength;
+  if (encodedLength > byteLength) {
+    throw new Error(`JSON body already exceeds ${byteLength} bytes.`);
+  }
+  return `${json}${" ".repeat(byteLength - encodedLength)}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -265,7 +274,9 @@ describe("Code Mode API handlers", () => {
           title: "Large",
           root: {
             label: "root",
-            children: [{ label: "x".repeat(MAX_MINDMAP_REQUEST_BYTES) }],
+            children: [
+              { label: "x".repeat(MAX_CODE_MODE_BUILD_REQUEST_BYTES) },
+            ],
           },
         },
       }),
@@ -317,7 +328,9 @@ describe("Code Mode API handlers", () => {
       pull(controller) {
         pullCount += 1;
         controller.enqueue(
-          new Uint8Array(pullCount === 1 ? MAX_MINDMAP_REQUEST_BYTES : 2),
+          new Uint8Array(
+            pullCount === 1 ? MAX_CODE_MODE_BUILD_REQUEST_BYTES : 2,
+          ),
         );
       },
       cancel() {
@@ -344,6 +357,118 @@ describe("Code Mode API handlers", () => {
       issues: [{ code: "request_too_large" }],
     });
   });
+
+  it("accepts a flowchart HTTP body at the 256 KiB boundary", async () => {
+    const body = paddedJsonBody(
+      { spec: approvalSpec() },
+      MAX_CODE_MODE_BUILD_REQUEST_BYTES,
+    );
+    const response = await handleBuildFlowchartRequest(
+      {},
+      new Request("https://studio.test/api/v1/flowcharts/build", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      status: "accepted",
+    });
+  });
+
+  it("returns a structured 422 instead of a render 500 for a whitespace-only flowchart title", async () => {
+    const response = await handleBuildFlowchartRequest(
+      {},
+      postRequest("https://studio.test/api/v1/flowcharts/build", {
+        spec: { ...approvalSpec(), title: "   " },
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      status: "invalid_flowchart",
+      issues: [
+        {
+          stage: "flowchart",
+          ref: { path: "spec.title" },
+        },
+      ],
+    });
+  });
+
+  it("rejects flowchart Content-Length above 256 KiB with a typed 413", async () => {
+    const bucket = new MemoryBucket();
+    const response = await handleBuildFlowchartRequest(
+      { SKETCHI_ARTIFACTS: bucket },
+      new Request("https://studio.test/api/v1/flowcharts/build", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": String(MAX_CODE_MODE_BUILD_REQUEST_BYTES + 1),
+        },
+        body: JSON.stringify({ spec: approvalSpec() }),
+      }),
+    );
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      status: "invalid_input",
+      issues: [{ code: "request_too_large", stage: "input" }],
+    });
+    const usageEvents = await waitForUsageEvents(bucket, 1);
+    expect(usageEvents[0]).toMatchObject({
+      operation: "buildFlowchart",
+      request: {
+        body: { value: { omitted: true, reason: "request_too_large" } },
+      },
+      statusCode: 413,
+    });
+  });
+
+  it("stops and cancels an oversized chunked flowchart body", async () => {
+    let cancelled = false;
+    let pullCount = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pullCount += 1;
+        controller.enqueue(
+          new Uint8Array(
+            pullCount === 1 ? MAX_CODE_MODE_BUILD_REQUEST_BYTES : 2,
+          ),
+        );
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const requestInit: RequestInit & { duplex: "half" } = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: stream,
+      duplex: "half",
+    };
+    const request = new Request(
+      "https://studio.test/api/v1/flowcharts/build",
+      requestInit,
+    );
+
+    expect(request.headers.has("content-length")).toBe(false);
+    const response = await handleBuildFlowchartRequest({}, request);
+    expect(response.status).toBe(413);
+    expect(cancelled).toBe(true);
+    expect(pullCount).toBeLessThanOrEqual(3);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      status: "invalid_input",
+      issues: [{ code: "request_too_large" }],
+    });
+  });
+
   it("builds, retrieves, and patches an artifact through Response handlers", async () => {
     const buildResponse = await handleBuildFlowchartRequest(
       {},

@@ -1,6 +1,14 @@
 import "@tanstack/react-start/server-only";
 
-import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagram-agent";
+import {
+  CodeModeIssueCodeSchema,
+  DIAGRAM_PATCH_OPERATION_NAMES,
+} from "@sketchi/diagram-agent";
+import {
+  FLOWCHART_MAX_EDGES,
+  FLOWCHART_MAX_ISSUES,
+  FLOWCHART_MAX_NODES,
+} from "@sketchi/diagram-core";
 import { z } from "zod";
 
 export const CodeModeDocsTopicSchema = z
@@ -90,7 +98,11 @@ interface CatalogEntry {
   examples?: CodeExample[];
 }
 
-export const SKETCHI_CODE_MODE_VERSION = "2026-07-10";
+export const SKETCHI_CODE_MODE_VERSION = "2026-07-13";
+
+const CODE_MODE_ISSUE_CODE_TYPE = CodeModeIssueCodeSchema.options
+  .map((code, index) => `${index === 0 ? "  " : "  | "}"${code}"`)
+  .join("\n");
 
 const PATCH_OPERATION_SUMMARY = [
   "- setDefaultStyle: set fallback strokeColor, fillColor, textColor, or backgroundColor for the scene.",
@@ -259,8 +271,11 @@ interface ApplyDiagramPatchRequest {
   intent?: string;
 }
 
+type CodeModeIssueCode =
+${CODE_MODE_ISSUE_CODE_TYPE};
+
 interface CodeModeIssue {
-  code: string;
+  code: CodeModeIssueCode;
   severity: "error" | "warning";
   stage: "input" | "flowchart" | "mindmap" | "quality" | "render" | "export" | "storage";
   ref?: { kind: "request" | "diagram" | "node" | "edge" | "artifact"; id?: string; path?: string };
@@ -535,6 +550,12 @@ const catalog: CatalogEntry[] = [
       "edge",
       "graph",
       "acceptance",
+      "nonterminating",
+      "cycle",
+      "limit",
+      "bounded",
+      "24",
+      "64",
     ],
     snippet:
       "Create the semantic flowchart first. Fix issues before styling or shape changes.",
@@ -544,6 +565,9 @@ const catalog: CatalogEntry[] = [
       'For normal harness output, request artifactFormats: ["scene", "excalidraw", "png"] and inlineArtifacts: ["excalidraw"]. The scene is an internal patch source; Excalidraw and PNG are the user-facing artifacts.',
       "Request png when the agent needs hosted visual proof. PNG artifacts are stored binary outputs and are never inlined in MCP JSON responses.",
       "Use stable node ids. Decision nodes need meaningful labeled outgoing branches, usually yes/no.",
+      `Flowcharts are bounded to ${FLOWCHART_MAX_NODES} nodes and ${FLOWCHART_MAX_EDGES} edges. Larger graphs fail with flowchart_too_large before render or persistence.`,
+      "Every node must be reachable from the single start, and every reachable node must be able to reach an end. Closed cycles fail with nonterminating_node; retry loops remain valid when they retain an eventual exit to an end.",
+      "Studio HTTP build requests are bounded to 256 KiB, including streamed bodies without Content-Length. Oversized requests return HTTP 413 with request_too_large in the normal failure envelope.",
       "For export-ready visual proof, prefer monotonic flowchart graphs: avoid long back-edges, loops to earlier nodes, or reusing the same terminal node for both early and late outcomes. Use distinct terminal nodes when branches resolve at different depths.",
       "For broad or vague repo/system architecture prompts, summarize into 8-14 high-signal nodes. Prefer a single readable spine with short side branches over a dense dependency graph with one node per package or many crossing links.",
       "When a prompt asks how packages or systems interact, group related packages into layers and show the main flow of responsibility. Use labels/descriptions for detail instead of adding every possible transitive edge.",
@@ -732,6 +756,12 @@ const catalog: CatalogEntry[] = [
       "missing",
       "decision",
       "quality",
+      "nonterminating_node",
+      "flowchart_too_large",
+      "request_too_large",
+      "cycle",
+      "bounded",
+      "limit",
     ],
     snippet:
       "Structured issues include code, stage, ref, message, and hint. Repair from those fields.",
@@ -739,6 +769,10 @@ const catalog: CatalogEntry[] = [
       "All rejected operations return structured issues with code, severity, stage, ref, message, and hint.",
       "input-stage issues usually mean the request shape is wrong. Fix the referenced path.",
       "flowchart-stage issues mean node ids, edges, starts, ends, or decision branches are invalid.",
+      `flowchart_too_large means the graph exceeds ${FLOWCHART_MAX_NODES} nodes or ${FLOWCHART_MAX_EDGES} edges.`,
+      "nonterminating_node means a reachable node cannot reach any end. Add an eventual exit; bounded retry loops with an exit are valid.",
+      "request_too_large means a Studio HTTP build request exceeded 256 KiB and was rejected with 413 before render or persistence.",
+      `Flowchart semantic issue arrays are capped deterministically at ${FLOWCHART_MAX_ISSUES} entries. Repair the returned issues before retrying.`,
       "mindmap-stage issues mean the topic hierarchy exceeds structural limits or is not a valid rooted tree.",
       "quality-stage issues mean the diagram is technically valid but too weak or generic. Improve labels and branching.",
       "patch issues such as unknown_patch_target mean the selector does not match the accepted artifact.",

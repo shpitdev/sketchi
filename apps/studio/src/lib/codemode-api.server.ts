@@ -28,7 +28,7 @@ import {
 const localArtifactStore = createMemoryArtifactStore();
 const DEFAULT_RENDER_ASSET_ORIGIN =
   "https://sketchi-studio.dimethyl.workers.dev";
-export const MAX_MINDMAP_REQUEST_BYTES = 256 * 1024;
+export const MAX_CODE_MODE_BUILD_REQUEST_BYTES = 256 * 1024;
 
 export interface StudioCodeModeRuntimeOptions {
   origin?: string;
@@ -124,7 +124,7 @@ async function readJson(request: Request): Promise<unknown> {
   }
 }
 
-async function readBoundedMindmapJson(
+async function readBoundedBuildJson(
   request: Request,
 ): Promise<
   | { ok: true; body: unknown }
@@ -133,7 +133,7 @@ async function readBoundedMindmapJson(
   const contentLength = Number(request.headers.get("content-length"));
   if (
     Number.isFinite(contentLength) &&
-    contentLength > MAX_MINDMAP_REQUEST_BYTES
+    contentLength > MAX_CODE_MODE_BUILD_REQUEST_BYTES
   ) {
     return {
       ok: false,
@@ -149,8 +149,8 @@ async function readBoundedMindmapJson(
     const chunk = await reader.read();
     if (chunk.done) break;
     byteLength += chunk.value.byteLength;
-    if (byteLength > MAX_MINDMAP_REQUEST_BYTES) {
-      await reader.cancel("mindmap request byte limit exceeded");
+    if (byteLength > MAX_CODE_MODE_BUILD_REQUEST_BYTES) {
+      await reader.cancel("Code Mode build request byte limit exceeded");
       return {
         ok: false,
         body: { omitted: true, reason: "request_too_large" },
@@ -173,7 +173,7 @@ async function readBoundedMindmapJson(
   }
 }
 
-function mindmapTooLargeResult() {
+function requestTooLargeResult(diagramType: "Flowchart" | "Mindmap") {
   return {
     ok: false as const,
     status: "invalid_input" as const,
@@ -183,8 +183,8 @@ function mindmapTooLargeResult() {
         severity: "error" as const,
         stage: "input" as const,
         ref: { kind: "request" as const, path: "input" },
-        message: `Mindmap request exceeds the ${MAX_MINDMAP_REQUEST_BYTES}-byte limit.`,
-        hint: "Send a smaller semantic topic hierarchy.",
+        message: `${diagramType} request exceeds the ${MAX_CODE_MODE_BUILD_REQUEST_BYTES}-byte limit.`,
+        hint: "Send a smaller semantic diagram request.",
       },
     ],
   };
@@ -371,7 +371,27 @@ export async function handleBuildFlowchartRequest(
 ): Promise<Response> {
   const usageContext = createCodeModeUsageContext(request);
   const startedAt = Date.now();
-  const requestBody = await readJson(request);
+  const boundedRequest = await readBoundedBuildJson(request);
+  if (!boundedRequest.ok) {
+    const result = requestTooLargeResult("Flowchart");
+    captureCodeModeUsageEvent({
+      context: usageContext,
+      durationMs: Date.now() - startedAt,
+      env,
+      operation: "buildFlowchart",
+      request,
+      requestBody: boundedRequest.body,
+      responseBody: result,
+      statusCode: 413,
+      surface: "api",
+    });
+    return jsonResponse(
+      result,
+      413,
+      codeModeUsageResponseHeaders(usageContext),
+    );
+  }
+  const requestBody = boundedRequest.body;
   const result = await createStudioCodeModeRuntime(env, {
     origin: new URL(request.url).origin,
   }).buildFlowchart(requestBody);
@@ -402,9 +422,9 @@ export async function handleBuildMindmapRequest(
 ): Promise<Response> {
   const usageContext = createCodeModeUsageContext(request);
   const startedAt = Date.now();
-  const boundedRequest = await readBoundedMindmapJson(request);
+  const boundedRequest = await readBoundedBuildJson(request);
   if (!boundedRequest.ok) {
-    const result = mindmapTooLargeResult();
+    const result = requestTooLargeResult("Mindmap");
     captureCodeModeUsageEvent({
       context: usageContext,
       durationMs: Date.now() - startedAt,

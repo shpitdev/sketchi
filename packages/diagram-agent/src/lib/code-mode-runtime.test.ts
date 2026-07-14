@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  FLOWCHART_MAX_EDGES,
+  FLOWCHART_MAX_ISSUES,
+  FLOWCHART_MAX_NODES,
+  FlowchartDiagramSchema,
+  getFlowchartValidationIssues,
+} from "@sketchi/diagram-core";
+import {
   createMemoryArtifactStore,
   createObjectBucketArtifactStore,
   type CodeModeArtifactStore,
@@ -40,6 +47,112 @@ function approvalSpec() {
     ],
     layout: { direction: "TB" },
   };
+}
+
+function linearFlowchartSpec(nodeCount: number) {
+  const nodes = Array.from({ length: nodeCount }, (_, index) => ({
+    id: `node-${index}`,
+    label: `Concrete operation ${index}`,
+    kind: index === 0 ? "start" : index === nodeCount - 1 ? "end" : "process",
+  }));
+  return {
+    title: `Linear flow with ${nodeCount} nodes`,
+    nodes,
+    edges: nodes.slice(0, -1).map((node, index) => ({
+      source: node.id,
+      target: nodes[index + 1]?.id,
+    })),
+  };
+}
+
+function denseAcyclicFlowchartSpec(edgeCount: number) {
+  const spec = linearFlowchartSpec(FLOWCHART_MAX_NODES);
+  const chainKeys = new Set(
+    spec.edges.map((edge) => `${edge.source}->${edge.target}`),
+  );
+  const extraEdges = spec.nodes.flatMap((source, sourceIndex) =>
+    spec.nodes.slice(sourceIndex + 1).flatMap((target, targetOffset) => {
+      const key = `${source.id}->${target.id}`;
+      return chainKeys.has(key)
+        ? []
+        : [
+            {
+              source: source.id,
+              target: target.id,
+              id: `extra-${sourceIndex}-${sourceIndex + targetOffset + 1}`,
+            },
+          ];
+    }),
+  );
+  return {
+    ...spec,
+    edges: [...spec.edges, ...extraEdges].slice(0, edgeCount),
+  };
+}
+
+function whitespaceFlowchartCases(): Array<{
+  name: string;
+  path: string;
+  spec: unknown;
+}> {
+  const base = linearFlowchartSpec(3);
+  const processNodeId = base.nodes[1]?.id ?? "node-1";
+  return [
+    {
+      name: "title",
+      path: "spec.title",
+      spec: { ...base, title: "   " },
+    },
+    {
+      name: "node label",
+      path: "spec.nodes.[1].label",
+      spec: {
+        ...base,
+        nodes: base.nodes.map((node, index) =>
+          index === 1 ? { ...node, label: "   " } : node,
+        ),
+      },
+    },
+    {
+      name: "node id",
+      path: "spec.nodes.[1].id",
+      spec: {
+        ...base,
+        nodes: base.nodes.map((node, index) =>
+          index === 1 ? { ...node, id: "   " } : node,
+        ),
+        edges: base.edges.map((edge) => ({
+          ...edge,
+          source: edge.source === processNodeId ? "   " : edge.source,
+          target: edge.target === processNodeId ? "   " : edge.target,
+        })),
+      },
+    },
+    {
+      name: "optional node description",
+      path: "spec.nodes.[1].description",
+      spec: {
+        ...base,
+        nodes: base.nodes.map((node, index) =>
+          index === 1 ? { ...node, description: "   " } : node,
+        ),
+      },
+    },
+  ];
+}
+
+function canonicalCodesForSpec(spec: ReturnType<typeof approvalSpec>) {
+  const diagram = FlowchartDiagramSchema.parse({
+    id: "canonical-parity",
+    title: spec.title,
+    type: "flowchart",
+    nodes: spec.nodes,
+    edges: spec.edges.map((edge, index) => ({
+      ...edge,
+      id: `edge-${index + 1}`,
+    })),
+  });
+  return getFlowchartValidationIssues(diagram).map((issue) => issue.code);
 }
 
 function incidentEscalationOpsSpec() {
@@ -643,6 +756,220 @@ describe("Code Mode runtime", () => {
       "scene",
       "excalidraw",
     ]);
+  });
+
+  it("keeps missing start and end failures in parity with diagram-core", async () => {
+    const specs = [
+      {
+        expected: "missing_start",
+        spec: {
+          ...approvalSpec(),
+          nodes: approvalSpec().nodes.map((node) =>
+            node.kind === "start" ? { ...node, kind: "process" } : node,
+          ),
+        },
+      },
+      {
+        expected: "missing_end",
+        spec: {
+          ...approvalSpec(),
+          nodes: approvalSpec().nodes.map((node) =>
+            node.kind === "end" ? { ...node, kind: "process" } : node,
+          ),
+        },
+      },
+    ];
+
+    for (const { expected, spec } of specs) {
+      const canonicalCodes = canonicalCodesForSpec(spec);
+      const result = await createTestRuntime().buildFlowchart({ spec });
+      expectBuildFailure(result);
+      expect(result.status).toBe("invalid_flowchart");
+      expect(result.issues.map((issue) => issue.code)).toEqual(canonicalCodes);
+      expect(canonicalCodes).toContain(expected);
+    }
+  });
+
+  it.each(whitespaceFlowchartCases())(
+    "rejects whitespace-only $name after normalization as a bounded flowchart failure",
+    async ({ spec, path }) => {
+      const result = await createTestRuntime().buildFlowchart({ spec });
+      expectBuildFailure(result);
+
+      expect(result.status).toBe("invalid_flowchart");
+      expect(result.issues.length).toBeLessThanOrEqual(FLOWCHART_MAX_ISSUES);
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({
+          stage: "flowchart",
+          ref: expect.objectContaining({ path }),
+        }),
+      );
+      expect(result.issues.map((entry) => entry.code)).not.toContain(
+        "render_failed",
+      );
+    },
+  );
+
+  it("caps normalized flowchart schema failures deterministically", async () => {
+    const base = linearFlowchartSpec(FLOWCHART_MAX_NODES);
+    const spec = {
+      ...base,
+      nodes: base.nodes.map((node) => ({ ...node, label: "   " })),
+    };
+    const first = await createTestRuntime().buildFlowchart({ spec });
+    const second = await createTestRuntime().buildFlowchart({ spec });
+    expectBuildFailure(first);
+    expectBuildFailure(second);
+
+    expect(first.status).toBe("invalid_flowchart");
+    expect(first.issues).toHaveLength(FLOWCHART_MAX_ISSUES);
+    expect(second.issues).toEqual(first.issues);
+  });
+
+  it("rejects a reachable closed cycle with typed nonterminating nodes", async () => {
+    const result = await createTestRuntime().buildFlowchart({
+      spec: {
+        title: "Closed retry cycle",
+        nodes: [
+          { id: "start", label: "Request arrives", kind: "start" },
+          { id: "route", label: "Ready?", kind: "decision" },
+          { id: "done", label: "Completed", kind: "end" },
+          { id: "retry-a", label: "Retry stage alpha", kind: "process" },
+          { id: "retry-b", label: "Retry stage beta", kind: "process" },
+        ],
+        edges: [
+          { source: "start", target: "route" },
+          { source: "route", target: "done", label: "yes" },
+          { source: "route", target: "retry-a", label: "retry" },
+          { source: "retry-a", target: "retry-b" },
+          { source: "retry-b", target: "retry-a" },
+        ],
+      },
+    });
+
+    expectBuildFailure(result);
+    expect(result.status).toBe("invalid_flowchart");
+    expect(
+      result.issues
+        .filter((issue) => issue.code === "nonterminating_node")
+        .map((issue) => issue.ref?.id),
+    ).toEqual(["retry-a", "retry-b"]);
+  });
+
+  it("accepts retry loops that retain an eventual exit", async () => {
+    const result = await createTestRuntime().buildFlowchart({
+      spec: {
+        title: "Retry with eventual exit",
+        nodes: [
+          { id: "start", label: "Start request", kind: "start" },
+          { id: "attempt", label: "Attempt operation", kind: "process" },
+          { id: "retry", label: "Succeeded?", kind: "decision" },
+          { id: "done", label: "Complete request", kind: "end" },
+        ],
+        edges: [
+          { source: "start", target: "attempt" },
+          { source: "attempt", target: "retry" },
+          { source: "retry", target: "attempt", label: "retry" },
+          { source: "retry", target: "done", label: "yes" },
+        ],
+      },
+    });
+
+    expectBuildOk(result);
+  });
+
+  it("rejects disconnected cycles from canonical start reachability", async () => {
+    const result = await createTestRuntime().buildFlowchart({
+      spec: {
+        title: "Disconnected graph",
+        nodes: [
+          { id: "start", label: "Start request", kind: "start" },
+          { id: "done", label: "Complete request", kind: "end" },
+          { id: "orphan-a", label: "Orphan alpha", kind: "process" },
+          { id: "orphan-b", label: "Orphan beta", kind: "process" },
+        ],
+        edges: [
+          { source: "start", target: "done" },
+          { source: "orphan-a", target: "orphan-b" },
+          { source: "orphan-b", target: "orphan-a" },
+        ],
+      },
+    });
+
+    expectBuildFailure(result);
+    expect(
+      result.issues
+        .filter((issue) => issue.code === "unreachable_node")
+        .map((issue) => issue.ref?.id),
+    ).toEqual(["orphan-a", "orphan-b"]);
+  });
+
+  it("rejects node and edge counts above the canonical limits", async () => {
+    for (const spec of [
+      linearFlowchartSpec(FLOWCHART_MAX_NODES + 1),
+      denseAcyclicFlowchartSpec(FLOWCHART_MAX_EDGES + 1),
+    ]) {
+      const result = await createTestRuntime().buildFlowchart({ spec });
+      expectBuildFailure(result);
+      expect(result.status).toBe("invalid_flowchart");
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({ code: "flowchart_too_large" }),
+      );
+    }
+  });
+
+  it("fails semantic limits before rendering or persisting artifacts", async () => {
+    let renderCalls = 0;
+    let writeCalls = 0;
+    const store: CodeModeArtifactStore = {
+      read: async () => null,
+      readManifest: async () => null,
+      write: async () => {
+        writeCalls += 1;
+        throw new Error("invalid flowchart must not persist");
+      },
+    };
+    const runtime = createCodeModeRuntime({
+      store,
+      renderer: {
+        renderPng: async () => {
+          renderCalls += 1;
+          return new Uint8Array([137, 80, 78, 71]);
+        },
+      },
+    });
+    const result = await runtime.buildFlowchart({
+      spec: linearFlowchartSpec(FLOWCHART_MAX_NODES + 1),
+      options: { artifactFormats: ["png"] },
+    });
+
+    expectBuildFailure(result);
+    expect(result.status).toBe("invalid_flowchart");
+    expect(renderCalls).toBe(0);
+    expect(writeCalls).toBe(0);
+  });
+
+  it("caps canonical flowchart issue output deterministically", async () => {
+    const spec = {
+      title: "Bounded issue output",
+      nodes: [
+        { id: "start", label: "Start request", kind: "start" },
+        { id: "done", label: "Complete request", kind: "end" },
+        ...Array.from({ length: FLOWCHART_MAX_NODES - 2 }, (_, index) => ({
+          id: `orphan-${index}`,
+          label: `Orphan operation ${index}`,
+          kind: "process",
+        })),
+      ],
+      edges: [{ source: "start", target: "done" }],
+    };
+    const first = await createTestRuntime().buildFlowchart({ spec });
+    const second = await createTestRuntime().buildFlowchart({ spec });
+    expectBuildFailure(first);
+    expectBuildFailure(second);
+
+    expect(first.issues).toHaveLength(FLOWCHART_MAX_ISSUES);
+    expect(second.issues).toEqual(first.issues);
   });
 
   it("returns structured repair issues for invalid connectivity", async () => {

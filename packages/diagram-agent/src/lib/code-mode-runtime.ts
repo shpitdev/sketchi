@@ -1,7 +1,11 @@
 import {
+  FLOWCHART_MAX_ISSUES,
+  FlowchartDiagramSchema,
+  getFlowchartValidationIssues,
   parseMindmapDiagram,
-  parseFlowchartDiagram,
+  validateFlowchartDiagram,
   type FlowchartDiagram,
+  type FlowchartValidationIssueRef,
   type MindmapDiagram,
 } from "@sketchi/diagram-core";
 import {
@@ -294,11 +298,6 @@ class ArtifactExportError extends Error {
   }
 }
 
-interface ValidationBuckets {
-  incoming: Map<string, Array<NormalizedFlowchartSpec["edges"][number]>>;
-  outgoing: Map<string, Array<NormalizedFlowchartSpec["edges"][number]>>;
-}
-
 interface SelectorTargets {
   arrows: PatchableArrow[];
   nodes: PatchableNode[];
@@ -455,279 +454,88 @@ function normalizeFlowchartSpec(spec: FlowchartSpec): NormalizedFlowchartSpec {
   };
 }
 
-function duplicateValues(values: readonly string[]): string[] {
-  const seen = new Set<string>();
-  const duplicates = new Set<string>();
-  for (const value of values) {
-    if (seen.has(value)) {
-      duplicates.add(value);
-      continue;
-    }
-    seen.add(value);
+function codeModeRefForFlowchart(
+  ref: FlowchartValidationIssueRef | undefined,
+): CodeModeIssueRef | undefined {
+  if (!ref) {
+    return undefined;
   }
-  return [...duplicates];
+  return {
+    kind: ref.kind,
+    ...(ref.id ? { id: ref.id } : {}),
+    ...(ref.path ? { path: `spec.${ref.path}` } : {}),
+  };
 }
 
-function buildBuckets(spec: NormalizedFlowchartSpec): ValidationBuckets {
-  const incoming = new Map<
-    string,
-    Array<NormalizedFlowchartSpec["edges"][number]>
-  >();
-  const outgoing = new Map<
-    string,
-    Array<NormalizedFlowchartSpec["edges"][number]>
-  >();
-
-  for (const edge of spec.edges) {
-    incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge]);
-    outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), edge]);
-  }
-
-  return { incoming, outgoing };
+function canonicalFlowchartIssues(diagram: FlowchartDiagram): CodeModeIssue[] {
+  return getFlowchartValidationIssues(diagram).map((validationIssue) => {
+    const ref = codeModeRefForFlowchart(validationIssue.ref);
+    return issue({
+      code: validationIssue.code,
+      stage: "flowchart",
+      ...(ref ? { ref } : {}),
+      message: validationIssue.message,
+      hint: validationIssue.hint,
+    });
+  });
 }
 
-function validateNormalizedFlowchart(
+function flowchartSchemaRef(
+  zodIssue: z.core.$ZodIssue,
+  spec: NormalizedFlowchartSpec,
+): CodeModeIssueRef {
+  const path = pathForZodIssue(zodIssue.path);
+  const specPath = path === "input" ? "spec" : `spec.${path}`;
+  const [collection, index] = zodIssue.path;
+  if (collection === "nodes" && typeof index === "number") {
+    const nodeId = spec.nodes[index]?.id;
+    return {
+      kind: "node",
+      ...(nodeId ? { id: nodeId } : {}),
+      path: specPath,
+    };
+  }
+  if (collection === "edges" && typeof index === "number") {
+    const edgeId = spec.edges[index]?.id;
+    return {
+      kind: "edge",
+      ...(edgeId ? { id: edgeId } : {}),
+      path: specPath,
+    };
+  }
+  return { kind: "diagram", id: spec.id, path: specPath };
+}
+
+function flowchartSchemaIssues(
+  error: z.ZodError,
   spec: NormalizedFlowchartSpec,
 ): CodeModeIssue[] {
-  const issues: CodeModeIssue[] = [];
-  const nodeIds = new Set(spec.nodes.map((node) => node.id));
-  const duplicateNodeIds = duplicateValues(spec.nodes.map((node) => node.id));
-  const duplicateEdgeIds = duplicateValues(spec.edges.map((edge) => edge.id));
-
-  for (const nodeId of duplicateNodeIds) {
-    issues.push(
-      issue({
-        code: "duplicate_node_id",
-        stage: "flowchart",
-        ref: { kind: "node", id: nodeId },
-        message: `Node id "${nodeId}" is used more than once.`,
-        hint: "Give every node a stable unique id.",
-      }),
-    );
-  }
-
-  for (const edgeId of duplicateEdgeIds) {
-    issues.push(
-      issue({
-        code: "duplicate_edge_id",
-        stage: "flowchart",
-        ref: { kind: "edge", id: edgeId },
-        message: `Edge id "${edgeId}" is used more than once.`,
-        hint: "Give every supplied edge id a stable unique value, or omit ids and let Sketchi assign them.",
-      }),
-    );
-  }
-
-  for (const edge of spec.edges) {
-    if (!nodeIds.has(edge.source)) {
-      issues.push(
-        issue({
-          code: "missing_edge_source",
-          stage: "flowchart",
-          ref: { kind: "edge", id: edge.id, path: "spec.edges.source" },
-          message: `Edge "${edge.id}" references missing source node "${edge.source}".`,
-          hint: "Set edge.source to one of the node ids in spec.nodes.",
-        }),
-      );
-    }
-    if (!nodeIds.has(edge.target)) {
-      issues.push(
-        issue({
-          code: "missing_edge_target",
-          stage: "flowchart",
-          ref: { kind: "edge", id: edge.id, path: "spec.edges.target" },
-          message: `Edge "${edge.id}" references missing target node "${edge.target}".`,
-          hint: "Set edge.target to one of the node ids in spec.nodes.",
-        }),
-      );
-    }
-    if (edge.source === edge.target) {
-      issues.push(
-        issue({
-          code: "self_loop",
-          stage: "flowchart",
-          ref: { kind: "edge", id: edge.id },
-          message: `Edge "${edge.id}" connects node "${edge.source}" to itself.`,
-          hint: "Connect the edge to a different target node.",
-        }),
-      );
-    }
-  }
-
-  const starts = spec.nodes.filter((node) => node.kind === "start");
-  const ends = spec.nodes.filter((node) => node.kind === "end");
-  if (starts.length === 0) {
-    issues.push(
-      issue({
-        code: "missing_start",
-        stage: "flowchart",
-        ref: { kind: "diagram", id: spec.id },
-        message: "Flowchart must contain exactly one start node.",
-        hint: 'Mark the first node in the flow with kind: "start".',
-      }),
-    );
-  }
-  if (starts.length > 1) {
-    issues.push(
-      issue({
-        code: "multiple_starts",
-        stage: "flowchart",
-        ref: { kind: "diagram", id: spec.id },
-        message: `Flowchart has ${starts.length} start nodes.`,
-        hint: "Keep one start node and change the others to process, decision, or end.",
-      }),
-    );
-  }
-  if (ends.length === 0) {
-    issues.push(
-      issue({
-        code: "missing_end",
-        stage: "flowchart",
-        ref: { kind: "diagram", id: spec.id },
-        message: "Flowchart must contain at least one end node.",
-        hint: 'Add an end node or mark terminal outcomes with kind: "end".',
-      }),
-    );
-  }
-
-  const { incoming, outgoing } = buildBuckets(spec);
-  for (const node of spec.nodes) {
-    const incomingEdges = incoming.get(node.id) ?? [];
-    const outgoingEdges = outgoing.get(node.id) ?? [];
-
-    if (node.kind === "start" && incomingEdges.length > 0) {
-      issues.push(
-        issue({
-          code: "start_has_incoming",
-          stage: "flowchart",
-          ref: { kind: "node", id: node.id },
-          message: `Start node "${node.id}" has incoming edges.`,
-          hint: "Route the start node only to later nodes.",
-        }),
-      );
-    }
-    if (node.kind !== "start" && incomingEdges.length === 0) {
-      issues.push(
-        issue({
-          code: "unreachable_node",
-          stage: "flowchart",
-          ref: { kind: "node", id: node.id },
-          message: `Node "${node.id}" has no incoming edge.`,
-          hint: "Connect it from an earlier node, or make it the single start node.",
-        }),
-      );
-    }
-    if (node.kind === "end" && outgoingEdges.length > 0) {
-      issues.push(
-        issue({
-          code: "end_has_outgoing",
-          stage: "flowchart",
-          ref: { kind: "node", id: node.id },
-          message: `End node "${node.id}" has outgoing edges.`,
-          hint: "End nodes should be terminal outcomes with zero outgoing edges.",
-        }),
-      );
-    }
-    if (node.kind !== "end" && outgoingEdges.length === 0) {
-      issues.push(
-        issue({
-          code: "missing_outgoing_edge",
-          stage: "flowchart",
-          ref: { kind: "node", id: node.id },
-          message: `Node "${node.id}" has no outgoing edge.`,
-          hint: 'Connect it to the next step, or mark it as kind: "end".',
-        }),
-      );
-    }
-    if (node.kind === "decision") {
-      if (outgoingEdges.length < 2) {
-        issues.push(
-          issue({
-            code: "underbranched_decision",
-            stage: "flowchart",
-            ref: { kind: "node", id: node.id },
-            message: `Decision node "${node.id}" has fewer than two outgoing branches.`,
-            hint: "Add at least two outgoing edges for the decision outcomes.",
-          }),
-        );
-      }
-      const labels = outgoingEdges.map((edge) => edge.label?.trim() ?? "");
-      for (const edge of outgoingEdges.filter(
-        (outgoingEdge) => !outgoingEdge.label?.trim(),
-      )) {
-        issues.push(
-          issue({
-            code: "unlabeled_decision_branch",
-            stage: "flowchart",
-            ref: { kind: "edge", id: edge.id },
-            message: `Decision node "${node.id}" has an outgoing branch without a label.`,
-            hint: 'Add a short branch label such as "yes", "no", "approved", or "rejected".',
-          }),
-        );
-      }
-      for (const label of duplicateValues(
-        labels
-          .filter((labelValue) => labelValue.length > 0)
-          .map((labelValue) => labelValue.toLowerCase()),
-      )) {
-        issues.push(
-          issue({
-            code: "duplicate_decision_branch_label",
-            stage: "flowchart",
-            ref: { kind: "node", id: node.id },
-            message: `Decision node "${node.id}" repeats branch label "${label}".`,
-            hint: "Make every outgoing branch label from the same decision unique.",
-          }),
-        );
-      }
-    }
-  }
-
-  const start = starts[0];
-  if (start) {
-    const reached = new Set<string>();
-    const queue = [start.id];
-    while (queue.length > 0) {
-      const current = queue.shift();
-      if (!current || reached.has(current)) {
-        continue;
-      }
-      reached.add(current);
-      for (const edge of outgoing.get(current) ?? []) {
-        queue.push(edge.target);
-      }
-    }
-    for (const node of spec.nodes) {
-      if (!reached.has(node.id)) {
-        issues.push(
-          issue({
-            code: "unreachable_node",
-            stage: "flowchart",
-            ref: { kind: "node", id: node.id },
-            message: `Node "${node.id}" is not reachable from the start node.`,
-            hint: "Connect the graph so every node can be reached from the single start node.",
-          }),
-        );
-      }
-    }
-  }
-
-  return issues;
+  return error.issues.slice(0, FLOWCHART_MAX_ISSUES).map((zodIssue) => {
+    const ref = flowchartSchemaRef(zodIssue, spec);
+    return issue({
+      code: codeForZodIssue(zodIssue),
+      stage: "flowchart",
+      ref,
+      message: zodIssue.message,
+      hint: `Fix ${ref.path ?? "spec"} so normalization produces a valid canonical flowchart value.`,
+    });
+  });
 }
 
-function toFlowchartDiagram(spec: NormalizedFlowchartSpec): FlowchartDiagram {
-  return parseFlowchartDiagram({
+function flowchartDiagramInput(spec: NormalizedFlowchartSpec) {
+  return {
     id: spec.id,
     title: spec.title,
     type: "flowchart",
-    nodes: spec.nodes,
-    edges: spec.edges,
+    nodes: spec.nodes.map((node) => ({ ...node, metadata: {} })),
+    edges: spec.edges.map((edge) => ({ ...edge, metadata: {} })),
     layout: {
       direction: spec.layout.direction,
       edgeRouting: "orthogonal",
     },
     style: spec.style,
-  });
+    metadata: {},
+  };
 }
 
 function qualityFromDiagram(
@@ -1828,7 +1636,21 @@ export function createCodeModeRuntime(
       const formats = requestedFormats(request.options);
       const buildId = createId("build");
       const normalizedSpec = normalizeFlowchartSpec(request.spec);
-      const validationIssues = validateNormalizedFlowchart(normalizedSpec);
+      const parsedDiagram = FlowchartDiagramSchema.safeParse(
+        flowchartDiagramInput(normalizedSpec),
+      );
+      if (!parsedDiagram.success) {
+        return {
+          ok: false,
+          status: "invalid_flowchart",
+          buildId,
+          ...responseRequestId(request.requestId),
+          normalizedSpec,
+          issues: flowchartSchemaIssues(parsedDiagram.error, normalizedSpec),
+        };
+      }
+      const diagram = parsedDiagram.data;
+      const validationIssues = canonicalFlowchartIssues(diagram);
       if (validationIssues.length > 0) {
         return {
           ok: false,
@@ -1839,31 +1661,7 @@ export function createCodeModeRuntime(
           issues: validationIssues,
         };
       }
-
-      let diagram: FlowchartDiagram;
-      try {
-        diagram = toFlowchartDiagram(normalizedSpec);
-      } catch (error) {
-        return {
-          ok: false,
-          status: "invalid_flowchart",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          issues: [
-            issue({
-              code: "disconnected_graph",
-              stage: "flowchart",
-              ref: { kind: "diagram", id: normalizedSpec.id },
-              message:
-                error instanceof Error
-                  ? error.message
-                  : "Flowchart failed core validation.",
-              hint: "Repair the flowchart spec and call buildFlowchart again.",
-            }),
-          ],
-        };
-      }
+      validateFlowchartDiagram(diagram);
 
       const quality = qualityFromDiagram(
         diagram,

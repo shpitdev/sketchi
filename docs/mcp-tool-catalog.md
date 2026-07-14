@@ -402,6 +402,11 @@ Defaults:
 }
 ```
 
+Studio HTTP build endpoints accept request bodies up to 256 KiB. The same bound
+is enforced while reading streamed or chunked bodies without `Content-Length`.
+An oversized body returns HTTP 413 with `status: "invalid_input"` and a typed
+`request_too_large` issue before rendering or artifact persistence.
+
 ### Flowchart Spec
 
 The public input is not the full internal IR. It is the smallest shape agents
@@ -453,19 +458,23 @@ repair attempts on visual polish until graph invariants pass.
 flowchart TB
   Start["exactly one start"]
   End["at least one end"]
-  Reachable["every non-start node has incoming edge"]
+  Reachable["every node reachable from the single start"]
+  Terminating["every reachable node can reach an end"]
   Outgoing["every non-end node has outgoing edge"]
   Decision["every decision has >= 2 outgoing edges"]
   Branches["decision branch labels are present and unique"]
   Edges["edges reference existing nodes"]
   NoLoops["no self-loops"]
+  Bounds["24 nodes and 64 edges maximum"]
 
   Start --> Reachable
-  Reachable --> Outgoing
+  Reachable --> Terminating
+  Terminating --> Outgoing
   Outgoing --> Decision
   Decision --> Branches
   End --> Outgoing
   Edges --> NoLoops
+  Bounds --> Start
 ```
 
 Rules:
@@ -477,12 +486,18 @@ Rules:
 - A flowchart must have exactly one `start` node.
 - A flowchart must have at least one `end` node.
 - The `start` node cannot have incoming edges.
-- Every non-start node must be reachable from another node.
+- Every node must be reachable from the single `start` node.
+- Every reachable node must be able to reach an `end` node. Retry loops and
+  back-edges are valid only when every node in the loop retains an eventual
+  exit path to an end.
 - Every `end` node must have zero outgoing edges.
 - Every non-end node must have at least one outgoing edge.
 - Every `decision` node must have at least two outgoing edges.
 - Every outgoing decision branch must have a non-empty label.
 - Decision branch labels from the same decision must be unique.
+- A flowchart may contain at most 24 nodes and 64 edges. Larger graphs fail
+  with `flowchart_too_large` before render or persistence.
+- Semantic issue output is capped deterministically at 20 entries.
 
 ### Result
 
@@ -663,11 +678,13 @@ type IssueCode =
   | "start_has_incoming"
   | "end_has_outgoing"
   | "unreachable_node"
+  | "nonterminating_node"
   | "missing_outgoing_edge"
   | "underbranched_decision"
   | "unlabeled_decision_branch"
   | "duplicate_decision_branch_label"
   | "disconnected_graph"
+  | "flowchart_too_large"
   | "mindmap_too_deep"
   | "mindmap_too_large"
   | "request_too_large"
@@ -689,10 +706,22 @@ type IssueCode =
   | "patch_output_invalid";
 ```
 
+The boundary failures added for bounded flowchart repair are:
+
+- `nonterminating_node`: a reachable node cannot reach any end.
+- `flowchart_too_large`: the semantic graph exceeds 24 nodes or 64 edges.
+- `request_too_large`: the Studio HTTP body exceeds 256 KiB, including a
+  streamed body with no `Content-Length`; the API returns 413.
+
+These failures preserve the existing `BuildFlowchartResult` envelope. Graph
+failures use `status: "invalid_flowchart"`; request byte failures use
+`status: "invalid_input"`.
+
 `arrow_overlap` is intentionally surfaced as an export-stage issue instead of
 silently publishing a dubious PNG. Agents should repair the graph only when the
-semantic structure is wrong. Fan-in, reused outcomes, and loop/back-edge cases
-are valid flowchart intent when they describe the workflow; deterministic
+semantic structure is wrong. Fan-in and reused outcomes are valid flowchart
+intent. Loop/back-edge cases are valid when every loop node can still reach an
+end; deterministic
 placement and routing belong to Sketchi. For a correct graph, retry with
 `rerouteEdges` or preserve the artifact evidence for product repair.
 
