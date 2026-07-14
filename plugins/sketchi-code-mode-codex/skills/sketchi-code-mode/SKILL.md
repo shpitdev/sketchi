@@ -112,5 +112,6 @@ https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/<artifactId>?format
 - When the execute tool returns `artifactDelivery.finalResponseText`, paste that string as the final response instead of digging through nested inline scene or Excalidraw JSON.
 - Request `artifactFormats: ["scene", "excalidraw", "png"]` when visual proof matters. Excalidraw is importable JSON; PNG is hosted binary evidence. `sketchi.getArtifact({ format: "excalidraw" | "png", inline: false })` returns metadata with raw Studio API URLs.
 - Do not install or require a local browser for plugin use; the deployed Studio Worker renders PNG artifacts through Cloudflare Browser Run.
+- Do not prompt the user to authenticate to Sketchi or add credentials; the deployed MCP endpoint is public.
 - Do not pass secrets or credentials into `execute`.
 - Do not treat the deployed Workers MCP endpoint as a private boundary; it is a tool surface for Code Mode operations.

@@ -102,14 +102,14 @@ function AgentSetupDetail({ entry }: { entry: AgentSetupEntry }) {
             </div>
             <p>{entry.summary}</p>
           </div>
-          <EndpointCard meta="You'll paste this into the config below." />
+          <EndpointCard meta="Public endpoint used by the setup below." />
         </div>
       </section>
 
       <section className="sk-section">
         <div className="sk-shell agent-detail__layout">
           <div className="agent-steps">
-            <h2>Set up in two steps</h2>
+            <h2>Set up</h2>
             {entry.commands.map((command, index) => (
               <div className="agent-command" key={command.label}>
                 <span className="agent-command__index">
@@ -126,7 +126,7 @@ function AgentSetupDetail({ entry }: { entry: AgentSetupEntry }) {
 
             {entry.config === undefined ? null : (
               <div className="agent-config">
-                <h2>Or add it by hand</h2>
+                <h2>{entry.configLabel ?? "Add the public MCP server"}</h2>
                 <pre className="docs-codeblock">
                   <code>{entry.config}</code>
                 </pre>

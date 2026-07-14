@@ -1,5 +1,0 @@
-{
-  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
-  "name": "sketchi-code-mode-antigravity",
-  "description": "Sketchi Code Mode MCP config and skill guidance for Google Antigravity CLI."
-}

@@ -1,4 +1,6 @@
 const mcpEndpoint = "https://sketchi-studio.dimethyl.workers.dev/mcp";
+const portableSkillUrl =
+  "https://raw.githubusercontent.com/shpitdev/sketchi-v2/main/.agents/skills/sketchi-code-mode/SKILL.md";
 
 export type AgentSetupId = "codex" | "opencode" | "claude-code" | "antigravity";
 
@@ -12,6 +14,7 @@ export interface AgentSetupEntry {
   accent: string;
   commands: readonly AgentSetupCommand[];
   config?: string;
+  configLabel?: string;
   href: `/agents/${AgentSetupId}`;
   /** Path to the agent's brand icon in /public. */
   icon: `/agents/${AgentSetupId}.svg`;
@@ -30,29 +33,29 @@ export const agentSetupEntries: readonly AgentSetupEntry[] = [
     commands: [
       {
         label: "Add the Sketchi plugin marketplace",
-        value: "codex plugin marketplace add .",
+        value: "codex plugin marketplace add shpitdev/sketchi-v2",
       },
       {
         label: "Install the Sketchi plugin",
+        value: "codex plugin add sketchi-code-mode-codex@sketchi-agent-plugins",
+      },
+      {
+        label: "Verify the MCP server",
+        value: "codex mcp get sketchi-code-mode",
+      },
+      {
+        label: "Create your first diagram in a new Codex session",
         value:
-          "codex plugin add sketchi-code-mode-codex --marketplace sketchi-agent-plugins",
+          "$sketchi-code-mode Create a top-to-bottom request approval flowchart and return the hosted Excalidraw and PNG artifacts.",
       },
     ],
-    config: `{
-  "mcpServers": {
-    "sketchi-code-mode": {
-      "type": "http",
-      "url": "${mcpEndpoint}"
-    }
-  }
-}`,
     href: "/agents/codex",
     icon: "/agents/codex.svg",
     id: "codex",
     name: "Codex",
     notes: [
       "Sketchi installs as a Codex plugin, so the diagram skill is always one command away.",
-      "Diagrams come back as editable Sketchi artifacts you can reopen later.",
+      "Sketchi needs no separate account, API key, or local browser install.",
     ],
     status: "Plugin",
     summary:
@@ -63,7 +66,13 @@ export const agentSetupEntries: readonly AgentSetupEntry[] = [
     accent: "#1a1712",
     commands: [
       {
-        label: "Connect the Sketchi server",
+        label: "Copy the portable Sketchi skill",
+        value: `SKETCHI_SKILL_DIR="\${XDG_CONFIG_HOME:-$HOME/.config}/opencode/skills/sketchi-code-mode"
+mkdir -p "$SKETCHI_SKILL_DIR"
+curl -fsSL ${portableSkillUrl} -o "$SKETCHI_SKILL_DIR/SKILL.md"`,
+      },
+      {
+        label: "Connect the public Sketchi server",
         value: `opencode mcp add sketchi-code-mode --url ${mcpEndpoint}`,
       },
       {
@@ -76,8 +85,8 @@ export const agentSetupEntries: readonly AgentSetupEntry[] = [
     id: "opencode",
     name: "OpenCode",
     notes: [
-      "No plugin to install — OpenCode talks to Sketchi over a single server URL.",
-      "Run the list command any time to confirm the connection is live.",
+      "Sketchi setup stops after the portable skill and public MCP server are configured.",
+      "Sketchi needs no separate account, API key, or local browser install; provider and model behavior remain OpenCode concerns.",
     ],
     status: "Connect",
     summary:
@@ -89,29 +98,31 @@ export const agentSetupEntries: readonly AgentSetupEntry[] = [
     commands: [
       {
         label: "Add the Sketchi plugin marketplace",
-        value: "claude plugin marketplace add . --scope local",
+        value: "claude plugin marketplace add shpitdev/sketchi-v2",
       },
       {
         label: "Install the Sketchi plugin",
         value:
           "claude plugin install sketchi-code-mode-claude@sketchi-agent-plugins",
       },
+      {
+        label: "Verify the plugin",
+        value:
+          "claude plugin details sketchi-code-mode-claude@sketchi-agent-plugins",
+      },
+      {
+        label: "Create your first diagram in a new Claude Code session",
+        value:
+          "/sketchi-code-mode-claude:sketchi-code-mode Create a top-to-bottom request approval flowchart and return the hosted Excalidraw and PNG artifacts.",
+      },
     ],
-    config: `{
-  "mcpServers": {
-    "sketchi-code-mode": {
-      "type": "http",
-      "url": "${mcpEndpoint}"
-    }
-  }
-}`,
     href: "/agents/claude-code",
     icon: "/agents/claude-code.svg",
     id: "claude-code",
     name: "Claude Code",
     notes: [
       "The plugin bundles the Sketchi skill, so you can ask for a diagram in plain language.",
-      "Diagrams open as editable Sketchi artifacts, not throwaway files.",
+      "Sketchi needs no separate account, API key, or local browser install.",
     ],
     status: "Plugin",
     summary:
@@ -122,12 +133,9 @@ export const agentSetupEntries: readonly AgentSetupEntry[] = [
     accent: "#3186ff",
     commands: [
       {
-        label: "Install the Sketchi plugin",
-        value: "agy plugin install ./plugins/sketchi-code-mode-antigravity",
-      },
-      {
-        label: "Confirm it's installed",
-        value: "agy plugin list",
+        label: "Copy the portable Sketchi skill into your project",
+        value: `mkdir -p .agents/skills/sketchi-code-mode
+curl -fsSL ${portableSkillUrl} -o .agents/skills/sketchi-code-mode/SKILL.md`,
       },
     ],
     config: `{
@@ -137,17 +145,19 @@ export const agentSetupEntries: readonly AgentSetupEntry[] = [
     }
   }
 }`,
+    configLabel: "Save or merge .agents/mcp_config.json",
     href: "/agents/antigravity",
     icon: "/agents/antigravity.svg",
     id: "antigravity",
     name: "Antigravity",
     notes: [
-      "Install once and every Antigravity session can reach Sketchi.",
-      "Diagrams come back as editable Sketchi artifacts, not screenshots.",
+      "Save the JSON as .agents/mcp_config.json, merging the sketchi-code-mode server into any existing mcpServers object instead of overwriting it.",
+      "Sketchi setup stops after the portable skill and public MCP server are configured.",
+      "Sketchi needs no separate account, API key, or local browser install; model and harness behavior remain Agy concerns.",
     ],
-    status: "Plugin",
+    status: "Connect",
     summary:
-      "Install the Sketchi plugin for Antigravity and sketch systems as you build them.",
+      "Copy the Sketchi skill and point Agy at the public Code Mode server.",
     tagline: "Google's agent IDE",
   },
 ] satisfies readonly AgentSetupEntry[];

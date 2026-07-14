@@ -4,6 +4,15 @@ This fork is the clean-start lab for rebuilding Sketchi around a maintainable di
 
 The original repository, `shpitdev/sketchi`, remains the star-bearing upstream. This lab exists so the rewrite can progress without noise, then land back as one deliberate pull request when the v2 path is proven.
 
+## Sketchi Code Mode for agents
+
+Codex, Claude Code, Agy, and OpenCode can create hosted Sketchi diagrams through
+the public Code Mode MCP endpoint. Start with the
+[agent quickstart](docs/code-mode-agent-plugins.md) for copy-paste installation,
+verification, and a first diagram. Every harness section follows that sequence,
+including the portable skill and MCP-only Agy and OpenCode paths. Sketchi does
+not require its own login, API key, or local browser install.
+
 ## Stack
 
 | Layer            | Owner                                                        |

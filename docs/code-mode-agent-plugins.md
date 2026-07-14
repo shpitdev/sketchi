@@ -1,176 +1,199 @@
-# Code Mode Agent Plugins
+# Sketchi Code Mode agent quickstart
 
-This repo packages the deployed Sketchi Code Mode MCP server for Codex, Claude
-Code, and Google Antigravity.
+Sketchi Code Mode gives an agent one remote MCP surface for typed flowcharts and
+mindmaps, visual patches, and hosted Excalidraw and PNG artifacts.
 
-The MCP surface follows the Code Mode convention: agents call a single `execute`
-tool with generated JavaScript, and typed Sketchi tools are available in the
-sandbox as `sketchi.buildFlowchart`, `sketchi.buildMindmap`, `sketchi.applyDiagramPatch`, and
-`sketchi.getArtifact`. The server normalizes outer code fences and trailing
-expression semicolons before execution, but examples intentionally omit those
-wrappers so copied snippets are canonical function expressions.
-
-For visual proof, agents should request `artifactFormats: ["scene",
-"excalidraw", "png"]` and then call `sketchi.getArtifact({ format: "png",
-inline: false })` for metadata. To view bytes, fetch
-`https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/<artifactId>?format=png&raw=true`
-outside `execute`. PNG bytes are hosted by the Studio Worker and rendered
-through Cloudflare Browser Run; plugin users should not need to install local
-browser binaries.
-
-When the MCP `execute` wrapper returns `artifactDelivery`, agents should paste
-`artifactDelivery.finalResponseText` as the final chat response and stop. It is
-a compact summary of the accepted artifact id, diagram id, format refs, raw
-Excalidraw URL, and raw PNG URL when available. This avoids low-reasoning
-harnesses digging through nested inline scene or Excalidraw JSON and
-accidentally creating Markdown/Mermaid/local wrapper artifacts.
-
-For complex diagrams that need PNG proof, agents should provide semantic graph
-intent: stable node IDs, labeled decision branches, and edges that match the
-real workflow. Fan-in, reused outcomes, and loop/back-edge cases are acceptable
-when they describe the process. Sketchi owns deterministic layout and routing;
-do not reshape a correct workflow solely to make the graph layout-friendly. If
-`arrow_overlap` appears, retry with `rerouteEdges` or preserve the artifact
-evidence for product repair unless the semantic structure itself is wrong.
-
-## Codex
-
-- Marketplace: `.agents/plugins/marketplace.json`
-- Plugin: `plugins/sketchi-code-mode-codex`
-- Skill: `plugins/sketchi-code-mode-codex/skills/sketchi-code-mode`
-- MCP server key: `sketchi-code-mode`
-
-The Codex skill includes `agents/openai.yaml` with UI metadata, bundled icon assets, and a `streamable_http` MCP dependency.
-
-## Claude Code
-
-- Marketplace: `.claude-plugin/marketplace.json`
-- Plugin: `plugins/sketchi-code-mode-claude`
-- Skill: `plugins/sketchi-code-mode-claude/skills/sketchi-code-mode`
-- MCP server key: `sketchi-code-mode`
-
-Claude Code loads the skill as `/sketchi-code-mode-claude:sketchi-code-mode` after plugin installation. Its `allowed-tools` list uses Claude's plugin MCP namespace for `docs`, `search`, and `execute`.
-
-## Google Antigravity
-
-- Workspace MCP config: `.agents/mcp_config.json`
-- Workspace skill: `.agents/skills/sketchi-code-mode/SKILL.md`
-- Plugin: `plugins/sketchi-code-mode-antigravity`
-- Plugin MCP config: `plugins/sketchi-code-mode-antigravity/mcp_config.json`
-- Plugin skill: `plugins/sketchi-code-mode-antigravity/skills/sketchi-code-mode/SKILL.md`
-- MCP server key: `sketchi-code-mode`
-
-When `agy` is launched from this repository, Antigravity loads the workspace MCP
-config and workspace skill. To install the reusable local plugin into a global
-Antigravity CLI profile:
-
-```sh
-agy plugin install ./plugins/sketchi-code-mode-antigravity
-```
-
-Use fresh print-mode conversations for harness testing:
-
-```sh
-agy --print --dangerously-skip-permissions --model gemini-3.5-flash \
-  'use sketchi-code-mode to go create me a diagram that showcases how the various packages in this repo interact'
-```
-
-Do not pass `--continue` for eval runs; each run should start from a fresh
-conversation. If Agy prints an authentication URL, complete login before
-interpreting the harness result.
-
-## Harness Evals
-
-### Manual Agy Scenario Capture TODO
-
-Before building another eval framework, run a visible Agy/tmux capture pass and
-promote the results into one Markdown report. The report should keep the minimum
-fields that are useful for product decisions:
-
-First tracked capture:
-[Agy Code Mode Scenario Capture](evals/agy-code-mode-scenario-capture-2026-06-27.md).
-
-| Field           | Notes                                                   |
-| --------------- | ------------------------------------------------------- |
-| Prompt          | Full user prompt given to Agy                           |
-| Harness         | Usually `agy` for this pass                             |
-| Model           | For example `gemini-3.5-flash`                          |
-| Reasoning level | The configured harness reasoning setting, when visible  |
-| JSON URL        | Raw hosted Excalidraw/scene artifact URL from Sketchi   |
-| PNG URL         | Raw hosted PNG artifact URL from Sketchi                |
-| Notes           | Short result summary, failure mode, or verification gap |
-
-Use a scenario mix that exercises different complexity bands:
-
-- simple linear flow;
-- basic decision tree;
-- nested decision workflow;
-- retry/loop workflow;
-- lifecycle or state-machine flow;
-- incident escalation;
-- actor handoff or swimlane-like flow;
-- repo/package architecture;
-- dense 10-15 node business process;
-- vague product/architecture request where the harness must infer structure.
-
-Keep this pass intentionally lightweight: verify that the JSON and PNG URLs load,
-capture obvious semantic or artifact failures, and do not add new eval tooling
-until the example set shows which checks matter.
-
-Use the harness eval runner to measure whether an external agent can create
-correct Code Mode artifacts through the deployed MCP server. The runner launches
-the selected harness, injects the no-auth public MCP config, asks the agent to
-call `sketchi.buildFlowchart`, then grades the returned `normalizedSpec` with
-the maintained diagram scenarios.
-
-```sh
-pnpm eval:harness -- --harness opencode --model opencode-go/kimi-k2.7-code --all \
-  --report-out .memory/harness-evals/opencode-kimi27-all/report.json \
-  --candidate-out-dir .memory/harness-evals/opencode-kimi27-all \
-  --events-out-dir .memory/harness-evals/opencode-kimi27-all
-```
-
-```sh
-pnpm eval:harness -- --harness claude --scenario sketchi-onboarding-decision-flow \
-  --report-out .memory/harness-evals/claude-smoke/report.json \
-  --candidate-out-dir .memory/harness-evals/claude-smoke \
-  --events-out-dir .memory/harness-evals/claude-smoke
-```
-
-```sh
-pnpm eval:harness -- --harness antigravity --model gemini-3.5-flash \
-  --scenario repo-package-interaction-flow --repeat 3 \
-  --report-out .memory/harness-evals/antigravity-flash35-repo/report.json \
-  --candidate-out-dir .memory/harness-evals/antigravity-flash35-repo \
-  --events-out-dir .memory/harness-evals/antigravity-flash35-repo
-```
-
-Reports include semantic scenario checks, Excalidraw validation issues, MCP tool
-call counts, raw harness event paths, candidate JSON paths, duration, cost, and
-token buckets when the harness exposes them. Antigravity reports also include
-the latest conversation transcript path when the CLI exposes one through its
-local brain cache. For Agy TUI runs where `--print` auth is unavailable, replay
-an existing local brain transcript without launching Agy:
-
-```sh
-pnpm eval:harness -- --harness antigravity --scenario repo-package-interaction-flow \
-  --antigravity-conversation-id <conversation-id> \
-  --delivery-only \
-  --report-out .memory/harness-evals/antigravity-replay/report.json \
-  --candidate-out-dir .memory/harness-evals/antigravity-replay \
-  --events-out-dir .memory/harness-evals/antigravity-replay
-```
-
-The replay mode fails the run if Antigravity created wrapper files such as
-`diagram_info.md`, local PNG/SVG/JSON exports, or other non-MCP artifacts after
-Sketchi accepted an artifact.
-
-## Endpoint
-
-Both plugins currently point at:
+The supported public endpoint is:
 
 ```text
 https://sketchi-studio.dimethyl.workers.dev/mcp
 ```
 
-The custom `studio.sketchi.app/mcp` endpoint was not attached when these plugin packages were created, so the Workers URL is the verified production endpoint.
+Sketchi does not require a Sketchi account, API key, OAuth login, or local
+browser. Your agent harness still uses its normal provider authentication. PNG
+rendering happens in the deployed Studio Worker through Cloudflare Browser Run.
+
+Codex and Claude Code have installable plugins in the public
+`shpitdev/sketchi-v2` marketplace. Agy and OpenCode use the portable skill plus
+the public MCP endpoint; there is no separate Sketchi plugin distribution path
+for those harnesses.
+
+## Codex
+
+### Install
+
+```sh
+codex plugin marketplace add shpitdev/sketchi-v2
+codex plugin add sketchi-code-mode-codex@sketchi-agent-plugins
+```
+
+### Verify
+
+```sh
+codex plugin list --json
+codex mcp get sketchi-code-mode
+```
+
+The plugin list should show `sketchi-code-mode-codex@sketchi-agent-plugins` as
+installed and enabled. The MCP details should show the public endpoint with
+`transport: streamable_http` and `enabled: true`. Start a new Codex session
+after installation so the skill and MCP tools are in the session inventory.
+
+### Create the first diagram
+
+Start `codex`, then send:
+
+```text
+$sketchi-code-mode Create a top-to-bottom flowchart for request intake, review, approval or revision, and completion. Return the hosted Excalidraw and PNG artifacts.
+```
+
+The skill discovers the current contract, calls the `execute` tool, and returns
+the accepted artifact ID plus raw Excalidraw and PNG URLs.
+
+## Claude Code
+
+### Install
+
+```sh
+claude plugin marketplace add shpitdev/sketchi-v2
+claude plugin install sketchi-code-mode-claude@sketchi-agent-plugins
+```
+
+### Verify
+
+```sh
+claude plugin list --json
+claude plugin details sketchi-code-mode-claude@sketchi-agent-plugins
+```
+
+The details should report one `sketchi-code-mode` skill and one
+`sketchi-code-mode` MCP server. Start a new Claude Code session after
+installation, or run `/reload-plugins` in an existing session.
+
+### Create the first diagram
+
+Start `claude`, then send:
+
+```text
+/sketchi-code-mode-claude:sketchi-code-mode Create a top-to-bottom flowchart for request intake, review, approval or revision, and completion. Return the hosted Excalidraw and PNG artifacts.
+```
+
+A successful result includes the accepted artifact ID plus raw Excalidraw and
+PNG URLs.
+
+## Agy (Google Antigravity)
+
+### Install
+
+Copy the portable skill into the project where Agy will run:
+
+```sh
+mkdir -p .agents/skills/sketchi-code-mode
+curl -fsSL https://raw.githubusercontent.com/shpitdev/sketchi-v2/main/.agents/skills/sketchi-code-mode/SKILL.md \
+  -o .agents/skills/sketchi-code-mode/SKILL.md
+```
+
+Add this server to `.agents/mcp_config.json`, merging it with any existing
+servers instead of overwriting them:
+
+```json
+{
+  "mcpServers": {
+    "sketchi-code-mode": {
+      "serverUrl": "https://sketchi-studio.dimethyl.workers.dev/mcp"
+    }
+  }
+}
+```
+
+### Verify
+
+From the configured project, verify that the portable skill and public endpoint
+are present:
+
+```sh
+test -f .agents/skills/sketchi-code-mode/SKILL.md
+rg -n '"sketchi-code-mode"|"serverUrl": "https://sketchi-studio\.dimethyl\.workers\.dev/mcp"' .agents/mcp_config.json
+```
+
+### Create the first diagram
+
+Open that project in Antigravity, then send:
+
+```text
+Use the sketchi-code-mode skill to create a top-to-bottom flowchart for request intake, review, approval or revision, and completion. Return the hosted Excalidraw and PNG artifacts.
+```
+
+That is the supported Sketchi setup boundary for Agy. Model selection,
+invocation flags, authentication, and harness behavior belong to Agy.
+
+## OpenCode
+
+### Install
+
+Copy the portable skill into OpenCode's global skill directory and register the
+remote MCP server:
+
+```sh
+SKETCHI_SKILL_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/skills/sketchi-code-mode"
+mkdir -p "$SKETCHI_SKILL_DIR"
+curl -fsSL https://raw.githubusercontent.com/shpitdev/sketchi-v2/main/.agents/skills/sketchi-code-mode/SKILL.md \
+  -o "$SKETCHI_SKILL_DIR/SKILL.md"
+opencode mcp add sketchi-code-mode --url https://sketchi-studio.dimethyl.workers.dev/mcp
+```
+
+### Verify
+
+Restart OpenCode after changing its skills or MCP configuration, then run:
+
+```sh
+test -f "${XDG_CONFIG_HOME:-$HOME/.config}/opencode/skills/sketchi-code-mode/SKILL.md"
+opencode mcp list
+```
+
+The MCP list should show `sketchi-code-mode` as connected.
+
+### Create the first diagram
+
+Start `opencode`, then send:
+
+```text
+Use the sketchi-code-mode skill to create a top-to-bottom flowchart for request intake, review, approval or revision, and completion. Return the hosted Excalidraw and PNG artifacts.
+```
+
+That is the supported Sketchi setup boundary for OpenCode; provider, model, and
+harness behavior remain OpenCode concerns.
+
+## Troubleshooting
+
+- Codex installs plugins with `codex plugin add`, not `codex plugin install`.
+- If a newly installed Claude Code plugin is missing from an existing session,
+  run `/reload-plugins` or start a new session.
+- If you installed the removed Agy plugin from an earlier checkout, clean up its
+  stale registration once with
+  `agy plugin uninstall sketchi-code-mode-antigravity`. The message
+  `Uninstalled plugin "sketchi-code-mode-antigravity"` confirms the cleanup. Do
+  not reinstall it; use the portable skill and `.agents/mcp_config.json` above.
+- Do not run an MCP login command for Sketchi. The endpoint is public and the
+  plugin MCP configs contain no credentials.
+- Do not install Chrome, Playwright, or another browser for PNG output. Rendering
+  is hosted by Sketchi.
+
+## Maintainer validation
+
+The distributable sources are:
+
+- `.agents/plugins/marketplace.json` and
+  `plugins/sketchi-code-mode-codex` for Codex;
+- `.claude-plugin/marketplace.json` and
+  `plugins/sketchi-code-mode-claude` for Claude Code;
+- `.agents/skills/sketchi-code-mode/SKILL.md` and
+  `.agents/mcp_config.json` for portable Agy and OpenCode setup.
+
+Run the focused drift checks with:
+
+```sh
+pnpm test:onboarding
+claude plugin validate .
+claude plugin validate plugins/sketchi-code-mode-claude
+```

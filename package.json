@@ -32,6 +32,7 @@
     "storybook:web": "nx storybook web",
     "test": "nx run-many -t test",
     "test:deploy-scripts": "node --test scripts/lib/*.test.mjs scripts/pipelines/*.test.mjs",
+    "test:onboarding": "node --test scripts/lib/code-mode-onboarding.test.mjs",
     "typecheck": "nx run-many -t typecheck",
     "typecheck:tsgo": "nx run-many -t typecheck-tsgo"
   },
