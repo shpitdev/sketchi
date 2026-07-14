@@ -29,8 +29,9 @@ in [Code Mode Next PR Plan](codemode-next-pr-plan.md).
 - Agents must get the semantic flow and connectivity accepted before applying
   styling or shape codemods.
 - Keep `draft` and managed threads out of this slice.
-- Keep Studio chat/canvas artifact parity out of this slice; revisit it with
-  Convex managed threads, message history, and artifact lineage.
+- Studio chat, HTTP API, and MCP all call the same canonical `buildFlowchart`
+  runtime. Studio injects its artifact formats and limits one model turn to
+  three attempts; an accepted call is already the persisted canvas artifact.
 - Keep Effect, storage, auth, rendering, and model credentials host-side.
 
 ```mermaid
@@ -1237,7 +1238,6 @@ Out of scope for this document:
 
 - Managed thread APIs.
 - Convex run or artifact history.
-- Studio chat/canvas artifact parity before Convex managed threads exist.
 - User artifact library.
 - Auth policy details beyond "host-owned".
 - PDF rendering beyond PNG.

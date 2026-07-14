@@ -94,17 +94,17 @@ Do not add thread tools yet:
 - no `accept_artifact`;
 - no `get_run_status`.
 
-Do not spend this Code Mode completion slice trying to make the visible Studio
-chat/canvas behave like the final Excalidraw artifact product. Today Studio can
-still render assistant markdown and its own local scene view; revisit that once
-Convex managed threads can own message history, accepted artifact lineage, and
-user-visible revisions.
+The visible Studio chat/canvas now uses this same contract. Its model-facing
+`build_flowchart` tool accepts the canonical request without caller-controlled
+artifact options; the Studio host injects scene and Excalidraw output, displays
+the returned structured issues during repair, and uses the accepted artifact
+directly. Managed history and cross-turn lineage still wait for Convex threads.
 
 ## Package Plan
 
 ```mermaid
 flowchart LR
-  StudioSpike["apps/studio current spike"] -.extract.-> Agent["packages/diagram-agent"]
+  Studio["apps/studio build_flowchart host"] --> Agent["packages/diagram-agent"]
   Agent --> Generation["packages/diagram-generation"]
   Agent --> Core["packages/diagram-core"]
   Agent --> Renderer["packages/diagram-renderer"]
@@ -114,16 +114,16 @@ flowchart LR
   CLI["tools/diagram-cli"] --> Agent
 ```
 
-| Package/app                     | Responsibility                                                    |
-| ------------------------------- | ----------------------------------------------------------------- |
-| `diagram-agent`                 | draft/revise orchestration, grading, repair policy, Effect errors |
-| `diagram-generation`            | Gemini request/response and candidate parsing                     |
-| `diagram-core`                  | IR schema, parse, semantic validation                             |
-| `diagram-renderer`              | deterministic scene generation                                    |
-| `diagram-excalidraw`            | Excalidraw conversion/export validation                           |
-| `diagram-render-proof`          | browser-backed visual proof adapter                               |
-| `apps/api-mcp` or `apps/agents` | remote MCP/HTTP adapters over the package runtime                 |
-| `tools/diagram-cli`             | local commands for evals and non-hosted tests                     |
+| Package/app                     | Responsibility                                                                         |
+| ------------------------------- | -------------------------------------------------------------------------------------- |
+| `diagram-agent`                 | canonical build contracts, normalization, grading, render/export, artifact persistence |
+| `diagram-generation`            | Gemini request/response and candidate parsing                                          |
+| `diagram-core`                  | IR schema, parse, semantic validation                                                  |
+| `diagram-renderer`              | deterministic scene generation                                                         |
+| `diagram-excalidraw`            | Excalidraw conversion/export validation                                                |
+| `diagram-render-proof`          | browser-backed visual proof adapter                                                    |
+| `apps/api-mcp` or `apps/agents` | remote MCP/HTTP adapters over the package runtime                                      |
+| `tools/diagram-cli`             | local commands for evals and non-hosted tests                                          |
 
 ## Effect Refactor
 
@@ -227,17 +227,16 @@ flowchart TD
 
 ### 1. Extract Non-Convex Runtime
 
-Move existing Studio spike behavior into importable package functions:
+Keep the canonical build behavior importable as one package vertical:
 
-- draft;
-- revise;
-- normalize;
-- validate;
-- grade;
-- render/export.
+- normalize and validate `FlowchartSpec`;
+- grade with structured quality checks;
+- render and validate exports;
+- persist exactly one artifact after acceptance.
 
-The Studio app can keep calling the package, but it should no longer own the
-behavior.
+Studio, HTTP, and MCP call that package runtime directly. Surface adapters may
+own attempt budgets and host artifact options, but they do not remap or persist
+the result again.
 
 ### 2. Add Effect Contracts
 
@@ -324,19 +323,19 @@ Acceptance:
 
 ## Proof Matrix
 
-| Proof                              | Required before Convex?     |
-| ---------------------------------- | --------------------------- |
-| `pnpm nx test diagram-agent`       | yes                         |
-| `pnpm nx test diagram-generation`  | yes                         |
-| local CLI scenario fixture         | yes                         |
-| local CLI Gemini scenario          | yes when credentials exist  |
-| hosted Browser Run PNG proof       | yes                         |
-| MCP tool listing                   | yes                         |
-| MCP draft/revise/grade call        | yes                         |
-| remote Worker preview smoke        | yes if adapter is in the PR |
-| managed thread smoke               | no                          |
-| Studio artifact history            | no                          |
-| Studio chat/canvas artifact parity | no, wait for Convex threads |
+| Proof                              | Required before Convex?                 |
+| ---------------------------------- | --------------------------------------- |
+| `pnpm nx test diagram-agent`       | yes                                     |
+| `pnpm nx test diagram-generation`  | yes                                     |
+| local CLI scenario fixture         | yes                                     |
+| local CLI Gemini scenario          | yes when credentials exist              |
+| hosted Browser Run PNG proof       | yes                                     |
+| MCP tool listing                   | yes                                     |
+| MCP draft/revise/grade call        | yes                                     |
+| remote Worker preview smoke        | yes if adapter is in the PR             |
+| managed thread smoke               | no                                      |
+| Studio artifact history            | no                                      |
+| Studio chat/canvas artifact parity | yes, through canonical `buildFlowchart` |
 
 ## References
 

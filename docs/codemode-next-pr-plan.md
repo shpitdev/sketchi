@@ -132,7 +132,7 @@ fact that the CI preview deploy remains green.
 ## Non-Goals
 
 - Rebuilding the host API runtime already present in Studio.
-- Convex managed threads, accepted artifact lineage, or Studio chat/canvas
-  parity.
+- Convex managed threads or cross-turn accepted artifact lineage. Studio
+  chat/canvas now consumes the same canonical build result as HTTP and MCP.
 - Raw Excalidraw JSON editing as the primary public mutation path.
 - Structural patch operations that create or delete nodes and edges.

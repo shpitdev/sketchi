@@ -70,6 +70,140 @@
   padding: 8px 10px;
 }
 
+.sketchi-flowchart-build-report {
+  background: var(--card);
+  border: 1px solid var(--line-2);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  display: grid;
+  font-size: 13px;
+  gap: 12px;
+  padding: 14px;
+}
+
+.sketchi-flowchart-build-report[data-status="accepted"] {
+  border-left-color: var(--ok);
+}
+
+.sketchi-flowchart-build-report[data-status="failed"] {
+  border-left-color: var(--danger);
+}
+
+.sketchi-flowchart-build-report__header {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.sketchi-flowchart-build-report__status,
+.sketchi-flowchart-build-report__attempt,
+.sketchi-flowchart-build-report__accepted,
+.sketchi-flowchart-build-report__issues p,
+.sketchi-flowchart-build-report__issues small {
+  margin: 0;
+}
+
+.sketchi-flowchart-build-report__status {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sketchi-flowchart-build-report__attempt {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.sketchi-flowchart-build-report__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: end;
+}
+
+.sketchi-flowchart-build-report__metrics span {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+
+.sketchi-flowchart-build-report__accepted {
+  color: var(--ok);
+  line-height: 1.45;
+}
+
+.sketchi-flowchart-build-report__issues {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sketchi-flowchart-build-report__issues li {
+  background: color-mix(in srgb, var(--accent-wash) 55%, var(--card));
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+}
+
+.sketchi-flowchart-build-report[data-status="failed"]
+  .sketchi-flowchart-build-report__issues
+  li {
+  background: var(--danger-wash);
+}
+
+.sketchi-flowchart-build-report__issue-head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sketchi-flowchart-build-report__issue-head code {
+  color: var(--accent-strong);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sketchi-flowchart-build-report__issue-head span {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.sketchi-flowchart-build-report__issues p {
+  line-height: 1.4;
+}
+
+.sketchi-flowchart-build-report__issues small {
+  color: var(--ink-2);
+  line-height: 1.4;
+}
+
+@media (max-width: 520px) {
+  .sketchi-flowchart-build-report__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sketchi-flowchart-build-report__metrics {
+    justify-content: start;
+  }
+}
+
 .sketchi-diagram-preview {
   --sketchi-excalidraw-scene-canvas-height: 100%;
   --sketchi-excalidraw-scene-canvas-min-height: 0;

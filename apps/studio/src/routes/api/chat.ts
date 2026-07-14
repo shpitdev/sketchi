@@ -26,13 +26,18 @@ export const Route = createFileRoute("/api/chat")({
             return new Response("No messages provided.", { status: 400 });
           }
 
-          const [{ runStudioAgent }, { getStudioBindings }] =
-            await Promise.all([
+          const [{ runStudioAgent }, { getStudioBindings }] = await Promise.all(
+            [
               import("../../lib/agent.server"),
               import("../../lib/cloudflare-bindings.server"),
-            ]);
+            ],
+          );
 
-          return runStudioAgent(getStudioBindings(), body.messages);
+          return runStudioAgent(
+            getStudioBindings(),
+            body.messages,
+            new URL(request.url).origin,
+          );
         } catch (error) {
           return new Response(
             error instanceof Error ? error.message : "Chat request failed.",

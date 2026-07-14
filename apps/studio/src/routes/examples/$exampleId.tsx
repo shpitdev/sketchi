@@ -1,6 +1,6 @@
 import {
-  normalizeDiagramInput,
-  type DiagramToolInput,
+  flowchartDiagramFromSpec,
+  type FlowchartSpec,
 } from "@sketchi/diagram-agent";
 import { mindmapFixture } from "@sketchi/diagram-core";
 import {
@@ -19,16 +19,16 @@ export const Route = createFileRoute("/examples/$exampleId")({
 
 interface CuratedExample {
   blurb: string;
-  input?: DiagramToolInput;
   scene?: RenderedDiagramScene;
+  spec?: FlowchartSpec;
   title: string;
 }
 
 /**
  * Curated, read-only diagrams that the docs link to. They're authored as real
- * `create_diagram` inputs and rendered through the same pipeline as a live
- * generation, so "how it works" is shown with an actual Sketchi diagram — one
- * you can pan and zoom but not overwrite (view mode).
+ * canonical FlowchartSpec values and rendered from the same normalized core
+ * diagram used by buildFlowchart, so "how it works" stays contract-accurate
+ * without persisting a new artifact for every page view.
  */
 const EXAMPLES: Record<string, CuratedExample> = {
   "public-mindmap": {
@@ -40,9 +40,13 @@ const EXAMPLES: Record<string, CuratedExample> = {
   "how-it-works": {
     title: "How Sketchi works",
     blurb: "Read-only — pan and zoom, but nothing you change is saved.",
-    input: {
+    spec: {
       title: "How Sketchi works",
-      direction: "TB",
+      layout: { direction: "TB" },
+      style: {
+        accentColor: "#8f707f",
+        backgroundColor: "#fffdf8",
+      },
       nodes: [
         { id: "describe", label: "You describe a diagram", kind: "start" },
         { id: "where", label: "Where are you working?", kind: "decision" },
@@ -50,13 +54,13 @@ const EXAMPLES: Record<string, CuratedExample> = {
         {
           id: "playground-state",
           label: "Shareable link, no account",
-          kind: "data",
+          kind: "process",
         },
         { id: "agent", label: "Your agent calls Sketchi", kind: "process" },
         {
           id: "agent-state",
           label: "Your machine keeps the file",
-          kind: "external",
+          kind: "process",
         },
         { id: "result", label: "A real, editable diagram", kind: "end" },
       ],
@@ -83,8 +87,8 @@ function useCuratedScene(
     try {
       return (
         example.scene ??
-        (example.input
-          ? renderIntermediateDiagram(normalizeDiagramInput(example.input))
+        (example.spec
+          ? renderIntermediateDiagram(flowchartDiagramFromSpec(example.spec))
           : null)
       );
     } catch {

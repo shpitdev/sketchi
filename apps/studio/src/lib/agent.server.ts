@@ -2,13 +2,9 @@ import "@tanstack/react-start/server-only";
 
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import {
-  CREATE_DIAGRAM_TOOL_DESCRIPTION,
-  CREATE_DIAGRAM_TOOL_NAME,
-  createDiagramToolSession,
   type CodeModeObjectBucket,
   DIAGRAM_AGENT_SYSTEM_PROMPT,
   DIAGRAM_AGENT_TEMPERATURE,
-  DiagramToolInputSchema,
   MAX_AGENT_OUTPUT_TOKENS,
   MAX_AGENT_STEPS,
 } from "@sketchi/diagram-agent";
@@ -22,12 +18,19 @@ import {
 } from "ai";
 
 import type { CloudflareBrowserRunBinding } from "./codemode-browser-renderer.server";
+import { createStudioCodeModeRuntime } from "./codemode-api.server";
+import {
+  createStudioFlowchartToolExecutor,
+  STUDIO_BUILD_FLOWCHART_TOOL_DESCRIPTION,
+  STUDIO_BUILD_FLOWCHART_TOOL_NAME,
+  StudioBuildFlowchartInputSchema,
+} from "./studio-flowchart-tool.server";
 
 /**
  * Studio route adapter for the diagram agent. The generation runtime —
- * prompt policy, tool contract, normalization, grading, attempt limits —
- * lives in `@sketchi/diagram-agent`; this file only wires it into AI SDK
- * streaming over the Cloudflare AI Gateway.
+ * prompt policy and canonical buildFlowchart vertical live in
+ * `@sketchi/diagram-agent`; this file only wires them into AI SDK streaming
+ * over the Cloudflare AI Gateway and injects Studio's artifact host options.
  *
  * The Workers `env.AI` binding stays the single auth path (gateway-stored
  * provider keys, no local secrets); a fetch shim translates the google
@@ -123,14 +126,15 @@ function createStudioModel(env: StudioEnv) {
   return provider(modelId);
 }
 
-function buildAgentTools() {
-  const session = createDiagramToolSession();
+function buildAgentTools(env: StudioEnv, origin: string) {
+  const runtime = createStudioCodeModeRuntime(env, { origin });
+  const executor = createStudioFlowchartToolExecutor(runtime.buildFlowchart);
 
   return {
-    [CREATE_DIAGRAM_TOOL_NAME]: tool({
-      description: CREATE_DIAGRAM_TOOL_DESCRIPTION,
-      inputSchema: DiagramToolInputSchema,
-      execute: (input) => Promise.resolve(session.evaluate(input).report),
+    [STUDIO_BUILD_FLOWCHART_TOOL_NAME]: tool({
+      description: STUDIO_BUILD_FLOWCHART_TOOL_DESCRIPTION,
+      inputSchema: StudioBuildFlowchartInputSchema,
+      execute: (input) => executor.execute(input),
     }),
   };
 }
@@ -138,12 +142,13 @@ function buildAgentTools() {
 export async function runStudioAgent(
   env: StudioEnv,
   messages: UIMessage[],
+  origin: string,
 ): Promise<Response> {
   const result = streamText({
     model: createStudioModel(env),
     system: DIAGRAM_AGENT_SYSTEM_PROMPT,
     messages: await convertToModelMessages(messages),
-    tools: buildAgentTools(),
+    tools: buildAgentTools(env, origin),
     stopWhen: stepCountIs(MAX_AGENT_STEPS),
     maxOutputTokens: MAX_AGENT_OUTPUT_TOKENS,
     temperature: DIAGRAM_AGENT_TEMPERATURE,

@@ -50,11 +50,11 @@ flowchart TB
   Runtime --> Render["render/export"]
 ```
 
-| Surface              | Owns                                       | Example calls                                      | Best runtime                         |
-| -------------------- | ------------------------------------------ | -------------------------------------------------- | ------------------------------------ |
-| Managed thread       | Messages, async progress, artifact history | `createThread`, `continueThread`, `acceptArtifact` | Convex                               |
-| Stateless agent tool | One request/response generation task       | `draft_diagram`, `revise_diagram`, `grade_diagram` | Worker, MCP, or Convex action        |
-| Deterministic API    | Pure checks and conversions                | `normalize`, `validateIr`, `render`, `export`      | Shared package, wrapped by any route |
+| Surface              | Owns                                       | Example calls                                        | Best runtime                         |
+| -------------------- | ------------------------------------------ | ---------------------------------------------------- | ------------------------------------ |
+| Managed thread       | Messages, async progress, artifact history | `createThread`, `continueThread`, `acceptArtifact`   | Convex                               |
+| Stateless agent tool | One request/response artifact build        | `buildFlowchart`, `getArtifact`, `applyDiagramPatch` | Worker, MCP, or Convex action        |
+| Deterministic API    | Canonical semantic spec to artifact result | `buildFlowchart`                                     | Shared package, wrapped by any route |
 
 ## Package Shape
 
@@ -67,23 +67,22 @@ flowchart LR
     Renderer["diagram-renderer<br/>scene layout"]
     Excalidraw["diagram-excalidraw<br/>real Excalidraw conversion"]
     Generation["diagram-generation<br/>prompt contracts + candidates"]
-    Agent["diagram-agent<br/>graded tool runtime"]
+    Agent["diagram-agent<br/>canonical build runtime"]
   end
 
   AgentServer --> Agent
-  Agent --> Generation
   Agent --> Core
   Agent --> Renderer
-  Renderer --> Excalidraw
+  Agent --> Excalidraw
 ```
 
-| Package              | Keep here                                                    | Keep out                           |
-| -------------------- | ------------------------------------------------------------ | ---------------------------------- |
-| `diagram-core`       | IR types, parsing, semantic validation, fixtures             | Model calls, storage               |
-| `diagram-renderer`   | Deterministic scene model                                    | Provider logic, user/session state |
-| `diagram-excalidraw` | Excalidraw conversion and validation                         | Chat orchestration                 |
-| `diagram-generation` | Gemini request/response helpers, prompt messages, candidates | Durable threads                    |
-| `diagram-agent`      | Tool contract, normalize, grade, repair, revise, eval replay | App routes, auth, provider menus   |
+| Package              | Keep here                                                                        | Keep out                           |
+| -------------------- | -------------------------------------------------------------------------------- | ---------------------------------- |
+| `diagram-core`       | IR types, parsing, semantic validation, fixtures                                 | Model calls, storage               |
+| `diagram-renderer`   | Deterministic scene model                                                        | Provider logic, user/session state |
+| `diagram-excalidraw` | Excalidraw conversion and validation                                             | Chat orchestration                 |
+| `diagram-generation` | Gemini request/response helpers, prompt messages, candidates                     | Durable threads                    |
+| `diagram-agent`      | Canonical build contracts, normalize, grade, render/export, artifact persistence | App routes, auth, provider menus   |
 
 ## Effect + Nx
 
@@ -108,7 +107,7 @@ flowchart TB
 | Does Nx need special Effect config? | No. Effect is just TypeScript inside an Nx package.                               |
 | What does Nx add?                   | Boundaries, imports, cacheable targets, affected checks.                          |
 | What does Effect add?               | Typed pipelines, typed failures, schema-first parsing, testable retries/timeouts. |
-| Where should Effect live first?     | `packages/diagram-generation` or the planned `packages/diagram-agent`.            |
+| Where should Effect live first?     | Package boundaries where typed failures or resource ownership buy clarity.        |
 | Where should it not leak yet?       | React UI, Convex schema, or Cloudflare route handlers unless that buys clarity.   |
 
 Preferred shape:
@@ -123,7 +122,7 @@ sequenceDiagram
   Route->>Adapter: plain args
   Adapter->>EffectCore: parse + run
   EffectCore-->>Adapter: typed success or typed failure
-  Adapter->>Store: persist run/artifact when needed
+  Adapter->>Store: no second write; accepted build already persisted once
   Adapter-->>Route: plain JSON response
 ```
 
@@ -152,28 +151,26 @@ flowchart LR
 | MCP     | Agent-facing tools                                      | A parallel implementation              |
 | AI SDK  | Model calls, streaming, tool-call plumbing              | Artifact contract or provider strategy |
 
-## Next Slice
+## Canonical Build Vertical
 
-The next implementation slice should be MCP-first and non-Convex. See
-[MCP-First Generation Scope](mcp-first-generation.md) for the concrete steps.
+Studio, HTTP, and MCP now converge on one non-Convex product operation.
 
 ```mermaid
 flowchart TD
-  A["Extract tool contract"] --> B["Move normalize + validate"]
-  B --> C["Move grade + acceptance"]
-  C --> D["Add bounded repair/revision"]
-  D --> E["Expose one route adapter"]
-  E --> F["Fixture/eval coverage"]
+  Studio["Studio build_flowchart"] --> Build["diagram-agent buildFlowchart"]
+  Http["HTTP /api/v1/flowcharts/build"] --> Build
+  Mcp["MCP sketchi.buildFlowchart"] --> Build
+  Build --> Validate["normalize + canonical validation"]
+  Validate --> Quality["structured quality report"]
+  Quality --> Render["scene + Excalidraw"]
+  Render --> Store["one accepted artifact write"]
+  Validate -. "Issue[]" .-> Repair["bounded repair"]
 ```
 
-Acceptance criteria:
-
-- `agent.server.ts` becomes a route adapter, not the generation runtime.
-- Tool schema, normalization, grading, and repair are importable from a package.
-- Studio still streams a real Gemini 3.1 Flash Lite generation.
-- Tests cover malformed tool args, invalid edges, weak branching, accepted IR,
-  and revision against prior accepted context.
-- No OpenRouter path, provider menu, or generalized model router.
+Studio remains a thin AI SDK adapter: it injects scene/Excalidraw artifact
+options, caps a model turn at three build attempts, renders canonical issues,
+and consumes the accepted artifact returned by the runtime. It has no parallel
+flowchart schema, evaluator, session, mapper, or persistence endpoint.
 
 ## References
 

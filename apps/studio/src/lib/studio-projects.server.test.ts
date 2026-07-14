@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 import type {
   CodeModeObjectBucket,
   CodeModeObjectBucketObject,
+  FlowchartSpec,
 } from "@sketchi/diagram-agent";
 
-import { handleCreatePlaygroundArtifactRequest } from "./playground-artifacts.server";
+import { createStudioCodeModeRuntime } from "./codemode-api.server";
 import {
   createAuthenticatedStudioSession,
   createStudioProjectFromArtifact,
@@ -66,22 +67,30 @@ class MemoryBucket implements CodeModeObjectBucket {
   }
 }
 
-function toolInput(title = "Studio persistence approval flow") {
+function flowchartSpec(
+  title = "Studio persistence approval flow",
+): FlowchartSpec {
   return {
-    direction: "LR" as const,
     edges: [
-      { source: "draft", target: "persist" },
-      { source: "persist", target: "review" },
-      { source: "review", target: "done", label: "yes" },
-      { source: "review", target: "revise", label: "no" },
+      { id: "draft-persist", source: "draft", target: "persist" },
+      { id: "persist-review", source: "persist", target: "review" },
+      { id: "review-done", source: "review", target: "done", label: "yes" },
+      {
+        id: "review-revise",
+        source: "review",
+        target: "revise",
+        label: "no",
+      },
     ],
     nodes: [
-      { id: "draft", label: "Draft diagram", kind: "start" as const },
-      { id: "persist", label: "Save artifact", kind: "process" as const },
-      { id: "review", label: "Open Studio?", kind: "decision" as const },
-      { id: "done", label: "Persisted", kind: "end" as const },
-      { id: "revise", label: "Revise", kind: "end" as const },
+      { id: "draft", label: "Draft diagram", kind: "start" },
+      { id: "persist", label: "Save artifact", kind: "process" },
+      { id: "review", label: "Open Studio?", kind: "decision" },
+      { id: "done", label: "Persisted", kind: "end" },
+      { id: "revise", label: "Revise", kind: "end" },
     ],
+    layout: { direction: "LR" },
+    style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
     title,
   };
 }
@@ -154,15 +163,19 @@ async function createArtifact(
   bucket: MemoryBucket,
   title?: string,
 ): Promise<string> {
-  const response = await handleCreatePlaygroundArtifactRequest(
+  const result = await createStudioCodeModeRuntime(
     { SKETCHI_ARTIFACTS: bucket },
-    postRequest("https://playground.test/api/playground/artifacts", {
-      input: toolInput(title),
-    }),
-  );
+    { origin: "https://studio.test" },
+  ).buildFlowchart({
+    spec: flowchartSpec(title),
+    options: {
+      artifactFormats: ["scene", "excalidraw"],
+      inlineArtifacts: ["scene"],
+    },
+  });
 
-  expect(response.status).toBe(200);
-  return artifactIdFrom(await response.json());
+  expect(result.ok).toBe(true);
+  return artifactIdFrom(result);
 }
 
 describe("Studio project persistence", () => {

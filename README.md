@@ -22,7 +22,7 @@ The original repository, `shpitdev/sketchi`, remains the star-bearing upstream. 
 - Typed diagram intermediate representation in `packages/diagram-core`.
 - Deterministic scene renderer in `packages/diagram-renderer`.
 - Real Excalidraw conversion and validation in `packages/diagram-excalidraw`.
-- Graded `create_diagram` agent runtime and prompt policy in `packages/diagram-agent`.
+- Canonical `buildFlowchart` artifact runtime and prompt policy in `packages/diagram-agent`.
 - Maintained scenarios and local fixture/model-output evaluation in `packages/diagram-scenarios`.
 - Reusable React UI and Storybook in `packages/diagram-studio-ui`.
 - Workspace Nx generators in `tools/sketchi-generators`.
@@ -98,7 +98,7 @@ apps/studio                      Playground chat, artifact handoff, persisted St
 apps/web                         Sketchi public home and docs
 apps/excalidraw                  Internal Excalidraw rendering workspace
 apps/icons                       Standalone curated icon output browser
-packages/diagram-agent           Graded diagram tool runtime and agent policy
+packages/diagram-agent           Canonical diagram build runtime and agent policy
 packages/diagram-core            Diagram IR, validation, fixtures
 packages/diagram-renderer        Deterministic scene generation
 packages/diagram-excalidraw      Real Excalidraw conversion and validation

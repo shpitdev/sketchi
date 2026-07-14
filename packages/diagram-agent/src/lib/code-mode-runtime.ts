@@ -48,7 +48,6 @@ import {
   type CodeModeIssueRef,
   type DiagramPatchOperation,
   type DiagramSelector,
-  type FlowchartSpec,
   type GetArtifactResult,
   type InlineArtifactFormat,
   type NormalizedFlowchartSpec,
@@ -58,7 +57,11 @@ import {
   type QualityReport,
 } from "./code-mode-contract.js";
 import { cleanToolString } from "./clean-tool-string.js";
-import { gradeDiagram } from "./grade.js";
+import { assessFlowchartQuality } from "./flowchart-quality.js";
+import {
+  flowchartDiagramInput,
+  normalizeFlowchartSpec,
+} from "./flowchart-spec.js";
 
 const DEFAULT_BUILD_FORMATS: ArtifactFormat[] = ["excalidraw", "scene"];
 const DEFAULT_INLINE_FORMATS: InlineArtifactFormat[] = ["scene"];
@@ -423,37 +426,6 @@ function cleanOptional(value: string | undefined): string | undefined {
   return cleaned.length > 0 ? cleaned : undefined;
 }
 
-function normalizeFlowchartSpec(spec: FlowchartSpec): NormalizedFlowchartSpec {
-  const title = cleanToolString(spec.title);
-  const id = cleanOptional(spec.id) ?? (slugify(title) || "sketchi-flowchart");
-
-  return {
-    id,
-    title,
-    nodes: spec.nodes.map((node) => ({
-      id: cleanToolString(node.id),
-      label: cleanToolString(node.label),
-      kind: node.kind,
-      ...(node.description
-        ? { description: cleanToolString(node.description) }
-        : {}),
-    })),
-    edges: spec.edges.map((edge, index) => ({
-      id: cleanOptional(edge.id) ?? `edge-${index + 1}`,
-      source: cleanToolString(edge.source),
-      target: cleanToolString(edge.target),
-      ...(edge.label ? { label: cleanToolString(edge.label) } : {}),
-    })),
-    layout: {
-      direction: spec.layout.direction,
-    },
-    style: {
-      accentColor: spec.style.accentColor,
-      backgroundColor: spec.style.backgroundColor,
-    },
-  };
-}
-
 function codeModeRefForFlowchart(
   ref: FlowchartValidationIssueRef | undefined,
 ): CodeModeIssueRef | undefined {
@@ -520,66 +492,6 @@ function flowchartSchemaIssues(
       hint: `Fix ${ref.path ?? "spec"} so normalization produces a valid canonical flowchart value.`,
     });
   });
-}
-
-function flowchartDiagramInput(spec: NormalizedFlowchartSpec) {
-  return {
-    id: spec.id,
-    title: spec.title,
-    type: "flowchart",
-    nodes: spec.nodes.map((node) => ({ ...node, metadata: {} })),
-    edges: spec.edges.map((edge) => ({ ...edge, metadata: {} })),
-    layout: {
-      direction: spec.layout.direction,
-      edgeRouting: "orthogonal",
-    },
-    style: spec.style,
-    metadata: {},
-  };
-}
-
-function qualityFromDiagram(
-  diagram: FlowchartDiagram,
-  threshold: number,
-): QualityReport {
-  const report = gradeDiagram(diagram);
-  const checks = report.issues.map((entry) => {
-    const severity: "error" | "warning" = entry.startsWith("error:")
-      ? "error"
-      : "warning";
-    return {
-      code: qualityCode(entry),
-      passed: false,
-      severity,
-      message: entry.replace(/^(error|warn):\s*/, ""),
-      refs: [],
-    };
-  });
-  const hasError = checks.some((check) => check.severity === "error");
-
-  return {
-    accepted: report.grade >= threshold && !hasError,
-    score: report.grade,
-    threshold,
-    summary: {
-      nodeCount: diagram.nodes.length,
-      edgeCount: diagram.edges.length,
-    },
-    checks,
-  };
-}
-
-function qualityCode(entry: string): string {
-  if (entry.includes("generic label")) {
-    return "generic_label";
-  }
-  if (entry.includes("shorten label")) {
-    return "label_too_long";
-  }
-  if (entry.includes("disconnected")) {
-    return "disconnected_graph";
-  }
-  return "quality_below_threshold";
 }
 
 function qualityIssues(quality: QualityReport): CodeModeIssue[] {
@@ -1663,7 +1575,7 @@ export function createCodeModeRuntime(
       }
       validateFlowchartDiagram(diagram);
 
-      const quality = qualityFromDiagram(
+      const quality = assessFlowchartQuality(
         diagram,
         request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
       );

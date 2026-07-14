@@ -1,24 +1,18 @@
 import { useChat } from "@ai-sdk/react";
 import {
-  normalizeDiagramInput,
-  type DiagramGradeReport,
-  type DiagramToolInput,
+  BuildFlowchartRequestSchema,
+  CodeModeIssueSchema,
+  RenderedDiagramSceneSchema,
+  type BuildFlowchartResult,
 } from "@sketchi/diagram-agent";
+import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import {
-  renderIntermediateDiagram,
-  type RenderedDiagramScene,
-} from "@sketchi/diagram-renderer";
-import { DiagramPreview } from "@sketchi/diagram-studio-ui";
+  DiagramPreview,
+  FlowchartBuildReport,
+} from "@sketchi/diagram-studio-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 
 import {
   Conversation,
@@ -67,8 +61,8 @@ const STARTERS = [
 
 type MessagePart = UIMessage["parts"][number];
 
-interface DiagramToolPart {
-  type: "tool-create_diagram";
+interface FlowchartToolPart {
+  type: "tool-build_flowchart";
   toolCallId: string;
   state:
     | "input-streaming"
@@ -78,22 +72,6 @@ interface DiagramToolPart {
   input?: unknown;
   output?: unknown;
   errorText?: string;
-}
-
-interface PlaygroundArtifactResponse {
-  ok: boolean;
-  artifact?: {
-    artifactId?: string;
-  };
-  exportUrls?: {
-    excalidraw?: string;
-    scene?: string;
-  };
-  editUrl?: string;
-  issues?: Array<{
-    message?: string;
-  }>;
-  viewUrl?: string;
 }
 
 interface ReadyPlaygroundArtifact {
@@ -106,149 +84,118 @@ interface ReadyPlaygroundArtifact {
   viewUrl: string;
 }
 
-type PlaygroundArtifactState =
-  | { status: "idle" }
-  | { key: string; status: "saving" }
-  | {
-      artifact: ReadyPlaygroundArtifact;
-      key: string;
-      status: "ready";
-    }
-  | { key: string; message: string; status: "error" };
-
-function isDiagramToolPart(
+function isFlowchartToolPart(
   part: MessagePart,
-): part is DiagramToolPart & MessagePart {
-  return part.type === "tool-create_diagram";
+): part is FlowchartToolPart & MessagePart {
+  return part.type === "tool-build_flowchart";
 }
 
-function gradeReportOf(part: DiagramToolPart): DiagramGradeReport | undefined {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isBuildFlowchartFailureStatus(
+  value: unknown,
+): value is Exclude<BuildFlowchartResult, { ok: true }>["status"] {
+  switch (value) {
+    case "invalid_input":
+    case "invalid_flowchart":
+    case "quality_failed":
+    case "render_failed":
+    case "export_failed":
+    case "storage_failed":
+      return true;
+    default:
+      return false;
+  }
+}
+
+function isBuildFlowchartResult(value: unknown): value is BuildFlowchartResult {
+  if (
+    !isRecord(value) ||
+    !Array.isArray(value.issues) ||
+    !value.issues.every((issue) => CodeModeIssueSchema.safeParse(issue).success)
+  ) {
+    return false;
+  }
+
+  if (value.ok === true) {
+    return (
+      value.status === "accepted" &&
+      typeof value.buildId === "string" &&
+      isRecord(value.normalizedSpec) &&
+      isRecord(value.quality) &&
+      isRecord(value.artifact)
+    );
+  }
+
+  return value.ok === false && isBuildFlowchartFailureStatus(value.status);
+}
+
+function buildResultOf(
+  part: FlowchartToolPart,
+): BuildFlowchartResult | undefined {
   if (part.state !== "output-available") {
     return undefined;
   }
-  const output = part.output as Partial<DiagramGradeReport> | undefined;
-  return output && typeof output.grade === "number"
-    ? (output as DiagramGradeReport)
-    : undefined;
-}
-
-function isArtifactResponse(
-  value: unknown,
-): value is PlaygroundArtifactResponse {
-  return Boolean(value) && typeof value === "object";
-}
-
-function artifactErrorMessage(value: unknown, fallback: string): string {
-  if (!isArtifactResponse(value)) {
-    return fallback;
-  }
-
-  const issue = value.issues?.find(
-    (candidate) =>
-      typeof candidate.message === "string" &&
-      candidate.message.trim().length > 0,
-  );
-  return issue?.message ?? fallback;
+  return isBuildFlowchartResult(part.output) ? part.output : undefined;
 }
 
 function artifactFromResponse(
-  value: PlaygroundArtifactResponse,
+  result: BuildFlowchartResult,
 ): ReadyPlaygroundArtifact | null {
-  const artifactId = value.artifact?.artifactId;
-  const scene = value.exportUrls?.scene;
-  const excalidraw = value.exportUrls?.excalidraw;
-  const editUrl = value.editUrl;
-  const viewUrl = value.viewUrl;
-
-  if (!artifactId || !scene || !excalidraw || !editUrl || !viewUrl) {
+  if (!result.ok) {
     return null;
   }
+  const artifactId = result.artifact.artifactId;
+  const formats = new Set(
+    result.artifact.formats.map((format) => format.format),
+  );
+  if (!formats.has("scene") || !formats.has("excalidraw")) {
+    return null;
+  }
+  const encoded = encodeURIComponent(artifactId);
 
   return {
     artifactId,
     exportUrls: {
-      excalidraw,
-      scene,
+      excalidraw: `/api/v1/artifacts/${encoded}?format=excalidraw&raw=true`,
+      scene: `/api/v1/artifacts/${encoded}?format=scene&raw=true`,
     },
-    editUrl,
-    viewUrl,
+    editUrl: `/artifacts/${encoded}/edit`,
+    viewUrl: `/artifacts/${encoded}`,
   };
 }
 
-function GradeReport({ report }: { report: DiagramGradeReport }) {
-  return (
-    <div className="studio__grade">
-      <div className="studio__grade-row">
-        <span
-          className={cn(
-            "studio__grade-score",
-            report.accepted ? "is-accepted" : "is-rejected",
-          )}
-        >
-          {report.grade.toFixed(1)} / 10
-        </span>
-        <span className="studio__grade-summary">{report.summary}</span>
-        <span
-          className={cn(
-            "studio__stage-chip",
-            report.accepted
-              ? "studio__stage-chip--grade"
-              : "studio__stage-chip--draft",
-          )}
-        >
-          {report.accepted ? "accepted" : "revise"}
-        </span>
-      </div>
-      {report.issues.length > 0 ? (
-        <ul className="studio__grade-issues">
-          {report.issues.map((issue) => (
-            <li key={issue}>{issue}</li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
-  );
+function isRenderedDiagramScene(value: unknown): value is RenderedDiagramScene {
+  return RenderedDiagramSceneSchema.safeParse(value).success;
 }
 
-function ArtifactActions({ state }: { state: PlaygroundArtifactState }) {
-  if (state.status === "idle") {
+function sceneFromResult(
+  result: BuildFlowchartResult | undefined,
+): RenderedDiagramScene | null {
+  if (!result?.ok) {
     return null;
   }
+  const scene = result.artifact.formats.find(
+    (format) => format.format === "scene",
+  )?.inline;
+  return isRenderedDiagramScene(scene) ? scene : null;
+}
 
-  if (state.status === "saving") {
-    return (
-      <div className="studio__artifact-actions">
-        <span className="studio__artifact-status">saving artifact...</span>
-      </div>
-    );
-  }
-
-  if (state.status === "error") {
-    return (
-      <div className="studio__artifact-actions">
-        <span className="studio__artifact-status studio__artifact-status--error">
-          {state.message}
-        </span>
-      </div>
-    );
-  }
-
+function ArtifactActions({ artifact }: { artifact: ReadyPlaygroundArtifact }) {
   return (
     <div className="studio__artifact-actions">
       <IconActionBar>
+        <IconLink href={artifact.viewUrl} icon="open" label="Open artifact" />
+        <IconLink href={artifact.editUrl} icon="edit" label="Edit" />
         <IconLink
-          href={state.artifact.viewUrl}
-          icon="open"
-          label="Open artifact"
-        />
-        <IconLink href={state.artifact.editUrl} icon="edit" label="Edit" />
-        <IconLink
-          href={state.artifact.exportUrls.scene}
+          href={artifact.exportUrls.scene}
           icon="scene"
           label="Scene file"
         />
         <IconLink
-          href={state.artifact.exportUrls.excalidraw}
+          href={artifact.exportUrls.excalidraw}
           icon="drawing"
           label="Drawing file"
         />
@@ -258,31 +205,39 @@ function ArtifactActions({ state }: { state: PlaygroundArtifactState }) {
   );
 }
 
-function DiagramToolCard({
+function FlowchartToolCard({
   attempt,
   part,
 }: {
   attempt: number;
-  part: DiagramToolPart;
+  part: FlowchartToolPart;
 }) {
-  const report = gradeReportOf(part);
+  const result = buildResultOf(part);
   const title =
     part.state === "input-streaming"
-      ? `sketching diagram · attempt ${attempt}`
+      ? `building flowchart · attempt ${attempt}`
       : part.state === "input-available"
-        ? `grading sketch · attempt ${attempt}`
+        ? `validating flowchart · attempt ${attempt}`
         : part.state === "output-error"
-          ? `sketch failed · attempt ${attempt}`
-          : report?.accepted
-            ? `sketch accepted · attempt ${attempt}`
-            : `needs another pass · attempt ${attempt}`;
+          ? `build failed · attempt ${attempt}`
+          : result?.ok
+            ? `artifact accepted · attempt ${attempt}`
+            : `repair needed · attempt ${attempt}`;
 
   return (
     <Tool className="studio__tool" defaultOpen={false}>
-      <ToolHeader state={part.state} title={title} type="tool-create_diagram" />
+      <ToolHeader
+        state={part.state}
+        title={title}
+        type="tool-build_flowchart"
+      />
+      {result ? (
+        <div className="studio__tool-report">
+          <FlowchartBuildReport attempt={attempt} result={result} />
+        </div>
+      ) : null}
       <ToolContent>
         {part.input === undefined ? null : <ToolInput input={part.input} />}
-        {report ? <GradeReport report={report} /> : null}
         {part.state === "output-error" ? (
           <ToolOutput errorText={part.errorText} output={undefined} />
         ) : null}
@@ -319,10 +274,14 @@ function renderAssistantParts(message: UIMessage): ReactNode[] {
       return;
     }
 
-    if (isDiagramToolPart(part)) {
+    if (isFlowchartToolPart(part)) {
       attempt += 1;
       nodes.push(
-        <DiagramToolCard attempt={attempt} key={part.toolCallId} part={part} />,
+        <FlowchartToolCard
+          attempt={attempt}
+          key={part.toolCallId}
+          part={part}
+        />,
       );
     }
   });
@@ -348,8 +307,8 @@ function StagePlaceholder({
     <div className="studio__stage-placeholder">
       <p className="studio__stage-placeholder-text">
         {generating
-          ? "sketching the first draft…"
-          : "nothing on the canvas yet — ask for another pass"}
+          ? "building the canonical flowchart…"
+          : "no accepted artifact yet — repair the listed issues or try another flow"}
       </p>
       {ghostLabels.length > 0 ? (
         <div className="studio__ghosts">
@@ -365,41 +324,43 @@ function StagePlaceholder({
 }
 
 function DiagramStage({
-  artifactState,
+  artifact,
   attemptCount,
   generating,
   ghostLabels,
-  report,
+  result,
   scene,
 }: {
-  artifactState: PlaygroundArtifactState;
+  artifact: ReadyPlaygroundArtifact | null;
   attemptCount: number;
   generating: boolean;
   ghostLabels: string[];
-  report: DiagramGradeReport | undefined;
+  result: BuildFlowchartResult | undefined;
   scene: RenderedDiagramScene | null;
 }) {
+  const title =
+    scene?.title ?? result?.normalizedSpec?.title ?? "Warming up the pencil";
   return (
     <section className="studio__stage">
       <header className="studio__stage-head">
         <div>
           <p className="studio__stage-kicker">canvas</p>
-          <h2 className="studio__stage-title">
-            {scene?.title ?? "Warming up the pencil"}
-          </h2>
+          <h2 className="studio__stage-title">{title}</h2>
         </div>
         <div className="studio__stage-meta">
-          {report ? (
+          {result?.quality ? (
             <span className="studio__stage-chip studio__stage-chip--grade">
-              grade {report.grade.toFixed(1)}
+              quality {result.quality.score.toFixed(1)}
             </span>
           ) : null}
-          {attemptCount > 1 ? (
-            <span className="studio__stage-chip">sketch {attemptCount}</span>
+          {attemptCount > 0 ? (
+            <span className="studio__stage-chip">
+              attempt {Math.min(attemptCount, 3)} of 3
+            </span>
           ) : null}
-          {report && !report.accepted ? (
+          {result && !result.ok ? (
             <span className="studio__stage-chip studio__stage-chip--draft">
-              draft
+              repair
             </span>
           ) : null}
         </div>
@@ -413,11 +374,11 @@ function DiagramStage({
         {generating && scene ? (
           <div className="studio__stage-status">
             <span className="studio__stage-dot" />
-            redrawing…
+            rebuilding…
           </div>
         ) : null}
       </div>
-      {report?.accepted ? <ArtifactActions state={artifactState} /> : null}
+      {artifact ? <ArtifactActions artifact={artifact} /> : null}
     </section>
   );
 }
@@ -429,140 +390,57 @@ function StudioRoute() {
   const { error, messages, sendMessage, status, stop } = useChat({
     transport,
   });
-  const [artifactState, setArtifactState] = useState<PlaygroundArtifactState>({
-    status: "idle",
-  });
-  const artifactKeyRef = useRef<string | null>(null);
-
   const busy = status === "submitted" || status === "streaming";
 
   const toolParts = useMemo(
     () =>
-      messages.flatMap((message) => message.parts.filter(isDiagramToolPart)),
+      messages.flatMap((message) => message.parts.filter(isFlowchartToolPart)),
     [messages],
   );
   const buildMode = toolParts.length > 0;
 
-  const gradedParts = useMemo(
-    () => toolParts.filter((part) => gradeReportOf(part) !== undefined),
+  const completedParts = useMemo(
+    () => toolParts.filter((part) => buildResultOf(part) !== undefined),
     [toolParts],
   );
-  const displayPart = useMemo(() => {
-    const reversed = [...gradedParts].reverse();
-    return (
-      reversed.find((part) => gradeReportOf(part)?.accepted) ?? reversed[0]
-    );
-  }, [gradedParts]);
+  const displayPart = completedParts.at(-1);
   const activePart = toolParts.find(
     (part) =>
       part.state === "input-streaming" || part.state === "input-available",
   );
 
-  const displayReport = displayPart ? gradeReportOf(displayPart) : undefined;
+  const displayResult = displayPart ? buildResultOf(displayPart) : undefined;
+  const acceptedResult = useMemo(
+    () =>
+      [...completedParts]
+        .reverse()
+        .map(buildResultOf)
+        .find((result) => result?.ok),
+    [completedParts],
+  );
+  const scene = useMemo(
+    () => sceneFromResult(acceptedResult),
+    [acceptedResult],
+  );
+  const artifact = useMemo(
+    () => (acceptedResult ? artifactFromResponse(acceptedResult) : null),
+    [acceptedResult],
+  );
 
-  const scene = useMemo(() => {
-    if (!displayPart?.input) {
-      return null;
-    }
-    try {
-      return renderIntermediateDiagram(
-        normalizeDiagramInput(displayPart.input as DiagramToolInput),
-      );
-    } catch {
-      return null;
-    }
-  }, [displayPart]);
-
-  const artifactKey =
-    displayPart && displayReport?.accepted ? displayPart.toolCallId : undefined;
-  const artifactInput = artifactKey ? displayPart?.input : undefined;
-  const artifactPayload = useMemo(() => {
-    if (!artifactKey || artifactInput === undefined) {
-      return undefined;
-    }
-
-    try {
-      return JSON.stringify({ input: artifactInput });
-    } catch {
-      return undefined;
-    }
-  }, [artifactInput, artifactKey]);
-
-  useEffect(() => {
-    if (!artifactKey || !artifactPayload) {
-      artifactKeyRef.current = null;
-      setArtifactState({ status: "idle" });
-      return;
-    }
-
-    if (artifactKeyRef.current === artifactKey) {
-      return;
-    }
-
-    artifactKeyRef.current = artifactKey;
-    let cancelled = false;
-    setArtifactState({ key: artifactKey, status: "saving" });
-
-    void (async () => {
-      let payload: unknown;
-      try {
-        const response = await fetch("/api/playground/artifacts", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: artifactPayload,
-        });
-        payload = await response.json();
-
-        if (!response.ok || !isArtifactResponse(payload) || !payload.ok) {
-          throw new Error(
-            artifactErrorMessage(payload, "Artifact could not be saved."),
-          );
-        }
-
-        const artifact = artifactFromResponse(payload);
-        if (!artifact) {
-          throw new Error("Artifact response was incomplete.");
-        }
-
-        if (!cancelled) {
-          setArtifactState({
-            artifact,
-            key: artifactKey,
-            status: "ready",
-          });
-        }
-      } catch (caught) {
-        if (!cancelled) {
-          setArtifactState({
-            key: artifactKey,
-            message:
-              caught instanceof Error
-                ? caught.message
-                : "Artifact could not be saved.",
-            status: "error",
-          });
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [artifactKey, artifactPayload]);
+  const attemptCount = useMemo(() => {
+    const latestRun = [...messages]
+      .reverse()
+      .find((message) => message.parts.some(isFlowchartToolPart));
+    return latestRun?.parts.filter(isFlowchartToolPart).length ?? 0;
+  }, [messages]);
 
   const ghostLabels = useMemo(() => {
-    const input = activePart?.input as
-      | { nodes?: { label?: unknown }[] }
-      | undefined;
-    if (!input?.nodes) {
+    const input = BuildFlowchartRequestSchema.safeParse(activePart?.input);
+    if (!input.success) {
       return [];
     }
-    return input.nodes
-      .map((node) =>
-        node && typeof node.label === "string" ? node.label.trim() : "",
-      )
+    return input.data.spec.nodes
+      .map((node) => node.label.trim())
       .filter((label) => label.length > 0)
       .slice(0, 24);
   }, [activePart]);
@@ -617,11 +495,11 @@ function StudioRoute() {
           {buildMode ? (
             <DiagramStage
               key="stage"
-              artifactState={artifactState}
-              attemptCount={toolParts.length}
+              artifact={artifact}
+              attemptCount={attemptCount}
               generating={Boolean(activePart)}
               ghostLabels={ghostLabels}
-              report={displayReport}
+              result={displayResult}
               scene={scene}
             />
           ) : null}
@@ -632,8 +510,8 @@ function StudioRoute() {
                 <div className="studio__empty">
                   <p className="studio__empty-title">What should we draw?</p>
                   <p className="studio__empty-sub">
-                    Describe a system or flow — Sketchi sketches it and grades
-                    its own work until it holds up.
+                    Describe a system or flow — Sketchi builds one canonical
+                    artifact and repairs structured issues until it holds up.
                   </p>
                   <div className="studio__starters">
                     {STARTERS.map((starter) => (

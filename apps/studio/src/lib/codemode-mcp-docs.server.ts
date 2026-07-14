@@ -501,7 +501,7 @@ const catalog: CatalogEntry[] = [
       "The public sketchi client has four operations: buildFlowchart, buildMindmap, getArtifact, and applyDiagramPatch.",
       "The final deliverable is the accepted Sketchi artifact bundle: return the artifactId, format list, and Excalidraw/PNG artifact URLs instead of creating a separate Markdown, Mermaid, or prose-only diagram artifact.",
       "Use docs({ topic }) for full request envelopes and examples. Use search({ query }) to discover operation-specific topics such as patchOperations.",
-      "The managed Sketchi product model, Convex threads, user artifact lineage, and Studio chat/canvas parity are intentionally out of this slice.",
+      "Studio chat, HTTP, and MCP share the canonical buildFlowchart request/result contract. Convex threads and user artifact lineage remain outside this harness surface.",
     ].join("\n"),
   },
   {

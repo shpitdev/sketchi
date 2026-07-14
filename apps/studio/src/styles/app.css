@@ -432,15 +432,6 @@ button.studio__artifact-link {
   background: var(--mauve-soft);
 }
 
-.studio__artifact-status {
-  color: var(--muted-ink);
-  font-size: 13px;
-}
-
-.studio__artifact-status--error {
-  color: var(--destructive);
-}
-
 /* ----- always-visible hand-drawn action buttons ----- */
 .studio__icon-bar {
   display: flex;
@@ -516,51 +507,18 @@ button.studio__artifact-link {
   }
 }
 
-/* ===================== Tool calls + grade reports in chat ===================== */
+/* ===================== Canonical build tool calls in chat ===================== */
 
 .studio__tool {
   background: var(--card);
 }
 
+.studio__tool-report {
+  padding: 0 12px 12px;
+}
+
 .studio__reasoning {
   width: 100%;
-}
-
-.studio__grade-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.studio__grade-score {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 18px;
-}
-
-.studio__grade-score.is-accepted {
-  color: #4a7a4f;
-}
-
-.studio__grade-score.is-rejected {
-  color: #a06a32;
-}
-
-.studio__grade-summary {
-  color: var(--muted-ink);
-  font-size: 12.5px;
-}
-
-.studio__grade-issues {
-  margin: 8px 0 0;
-  padding-left: 18px;
-  font-size: 12px;
-  color: var(--ink);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-family: var(--font-mono);
 }
 
 /* Narrow build mode: a scrollable stage-then-chat page. Instead of splitting

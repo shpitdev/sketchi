@@ -28,12 +28,16 @@ flowchart LR
 - `diagram-excalidraw` converts deterministic scenes into persisted Excalidraw elements and validates real-scene invariants.
 - `diagram-scenarios` owns maintained prompts, assertions, fixture evaluation, and local command-provider runs.
 - `diagram-generation` owns provider request/response mapping and candidate parsing.
+- `diagram-agent` owns the canonical `buildFlowchart` request/result vertical,
+  structured issues, quality assessment, render/export orchestration, and
+  accepted artifact persistence used by Studio, HTTP, and MCP.
 - `diagram-studio-ui` renders the scene model and owns user-facing component states.
 - `apps/playground` composes the packages in a TanStack Start internal eval
   harness for scenarios, candidate inspection, and regression review.
 - `apps/studio` owns the current public Playground worker boundary: ephemeral
-  chat generation, artifact handoff, and persisted Studio project/diagram route
-  foundation.
+  chat generation over the canonical build runtime and the persisted Studio
+  project/diagram route foundation. Its host injects artifact options and never
+  performs a second accepted-artifact write.
 - `apps/web` owns the public home/docs surface and should stay free of diagram runtime dependencies unless docs become interactive.
 - `apps/excalidraw` owns the internal Excalidraw rendering workspace and
   composes the diagram packages into a real canvas for isolated validation.

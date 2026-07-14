@@ -1,18 +1,16 @@
-import type { IntermediateDiagram } from "@sketchi/diagram-core";
+import type { FlowchartDiagram } from "@sketchi/diagram-core";
 
-import type { DiagramGradeReport } from "./tool-contract.js";
+import type { QualityCheck, QualityReport } from "./code-mode-contract.js";
 
-/**
- * Deterministic quality gate for one diagram attempt. The report drives the
- * agent's revise loop: "error:" findings block acceptance outright, "warn:"
- * findings only cost grade points against the accept threshold.
- */
-
-const ACCEPT_THRESHOLD = 8;
 const GENERIC_LABEL = /^(node|step|item|box|thing|process|task)\s*\d*$/i;
 const GENERIC_TITLE = /^(diagram|untitled|flowchart|chart|sketch)$/i;
 
-function connectedComponentCount(diagram: IntermediateDiagram): number {
+interface QualityFinding {
+  message: string;
+  severity: QualityCheck["severity"];
+}
+
+function connectedComponentCount(diagram: FlowchartDiagram): number {
   const adjacency = new Map<string, string[]>();
   for (const node of diagram.nodes) {
     adjacency.set(node.id, []);
@@ -47,23 +45,42 @@ function connectedComponentCount(diagram: IntermediateDiagram): number {
   return components;
 }
 
-function isDecision(node: IntermediateDiagram["nodes"][number]): boolean {
-  return node.kind?.toLowerCase() === "decision" || node.label.endsWith("?");
+function isDecision(node: FlowchartDiagram["nodes"][number]): boolean {
+  return node.kind === "decision" || node.label.endsWith("?");
 }
 
-export function gradeDiagram(
-  diagram: IntermediateDiagram,
-): Omit<DiagramGradeReport, "attempt"> {
-  const issues: string[] = [];
+function qualityCode(message: string): string {
+  if (message.includes("generic label")) {
+    return "generic_label";
+  }
+  if (message.includes("shorten label")) {
+    return "label_too_long";
+  }
+  if (message.includes("disconnected")) {
+    return "disconnected_graph";
+  }
+  return "quality_below_threshold";
+}
+
+/**
+ * Deterministic quality assessment shared by every canonical flowchart host.
+ * This preserves the established scoring behavior while returning the
+ * canonical QualityReport directly instead of a legacy tool-grade envelope.
+ */
+export function assessFlowchartQuality(
+  diagram: FlowchartDiagram,
+  threshold: number,
+): QualityReport {
+  const findings: QualityFinding[] = [];
   let penalty = 0;
 
   const fault = (points: number, message: string, error = false) => {
     penalty += points;
-    issues.push(`${error ? "error" : "warn"}: ${message}`);
+    findings.push({ severity: error ? "error" : "warning", message });
   };
 
   const degree = new Map<string, number>();
-  const outgoing = new Map<string, IntermediateDiagram["edges"]>();
+  const outgoing = new Map<string, FlowchartDiagram["edges"]>();
   for (const edge of diagram.edges) {
     degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
     degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
@@ -106,7 +123,9 @@ export function gradeDiagram(
   if (duplicates.length > 0) {
     fault(
       Math.min(duplicates.length, 3),
-      `duplicate label(s): ${duplicates.map(([label]) => `"${label}"`).join(", ")}`,
+      `duplicate label(s): ${duplicates
+        .map(([label]) => `"${label}"`)
+        .join(", ")}`,
     );
   }
 
@@ -116,14 +135,16 @@ export function gradeDiagram(
     const branches = outgoing.get(node.id) ?? [];
     if (branches.length < 2) {
       underBranched += 1;
-      issues.push(
-        `error: decision "${node.id}" needs at least 2 outgoing branches`,
-      );
+      findings.push({
+        severity: "error",
+        message: `decision "${node.id}" needs at least 2 outgoing branches`,
+      });
     } else if (branches.some((edge) => !edge.label)) {
       unlabeledBranches += 1;
-      issues.push(
-        `warn: label every branch out of decision "${node.id}" (yes/no, …)`,
-      );
+      findings.push({
+        severity: "warning",
+        message: `label every branch out of decision "${node.id}" (yes/no, …)`,
+      });
     }
   }
   penalty +=
@@ -143,7 +164,9 @@ export function gradeDiagram(
   if (genericLabels.length > 0) {
     fault(
       Math.min(genericLabels.length, 3),
-      `generic label(s) say nothing: ${genericLabels.map((node) => `"${node.label}"`).join(", ")}`,
+      `generic label(s) say nothing: ${genericLabels
+        .map((node) => `"${node.label}"`)
+        .join(", ")}`,
     );
   }
 
@@ -154,13 +177,24 @@ export function gradeDiagram(
     fault(0.5, "give the diagram a specific title");
   }
 
-  const grade = Math.max(0, Math.round((10 - penalty) * 10) / 10);
-  const hasError = issues.some((issue) => issue.startsWith("error:"));
+  const score = Math.max(0, Math.round((10 - penalty) * 10) / 10);
+  const checks: QualityCheck[] = findings.map((finding) => ({
+    code: qualityCode(finding.message),
+    passed: false,
+    severity: finding.severity,
+    message: finding.message,
+    refs: [],
+  }));
 
   return {
-    accepted: grade >= ACCEPT_THRESHOLD && !hasError,
-    grade,
-    issues,
-    summary: `${diagram.nodes.length} nodes · ${diagram.edges.length} edges`,
+    accepted:
+      score >= threshold && !checks.some((check) => check.severity === "error"),
+    score,
+    threshold,
+    summary: {
+      nodeCount: diagram.nodes.length,
+      edgeCount: diagram.edges.length,
+    },
+    checks,
   };
 }
