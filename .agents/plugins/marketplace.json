@@ -1,0 +1,20 @@
+{
+  "name": "sketchi-agent-plugins",
+  "interface": {
+    "displayName": "Sketchi Agent Plugins"
+  },
+  "plugins": [
+    {
+      "name": "sketchi-code-mode-codex",
+      "source": {
+        "source": "local",
+        "path": "./plugins/sketchi-code-mode-codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

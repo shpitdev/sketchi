@@ -1,0 +1,51 @@
+{
+  "rawByPack": {
+    "gcp-category": 26,
+    "gcp-core": 19,
+    "gcp-legacy": 216,
+    "lobe-icons": 852,
+    "palantir": 68,
+    "tech-stack-icons": 694,
+    "workos-svg": 2
+  },
+  "mappedByCollection": {
+    "ai-apps-agents": 151,
+    "ai-devtools": 86,
+    "ai-ecosystem": 54,
+    "ai-harness-wrappers": 45,
+    "ai-infrastructure": 62,
+    "ai-model-families": 68,
+    "ai-model-labs": 41,
+    "ai-model-providers": 30,
+    "auth-identity": 10,
+    "cloud-hosting-paas": 23,
+    "cloud-platforms": 10,
+    "cloud-vendors": 37,
+    "data-storage": 36,
+    "design-productivity": 32,
+    "developer-clients": 49,
+    "devtools-ci": 76,
+    "ecommerce-retail": 2,
+    "education": 1,
+    "frameworks-runtimes": 117,
+    "frontend-frameworks": 68,
+    "gaming": 8,
+    "gcp": 45,
+    "gcp-legacy": 216,
+    "hardware-iot": 2,
+    "observability-security": 19,
+    "operating-systems": 14,
+    "palantir": 68,
+    "programming-languages": 36,
+    "social-communication": 1
+  },
+  "unmappedByPack": {
+    "lobe-icons": 249,
+    "tech-stack-icons": 221
+  },
+  "issues": [],
+  "warnings": [
+    "lobe-icons has 249 unmapped SVG icons",
+    "tech-stack-icons has 221 unmapped SVG icons"
+  ]
+}

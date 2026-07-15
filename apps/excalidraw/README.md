@@ -1,0 +1,43 @@
+# excalidraw
+
+Internal Excalidraw workspace shell for inspecting real Sketchi diagram
+artifacts.
+
+```mermaid
+flowchart LR
+  Fixtures["diagram fixtures"] --> Packages["core, renderer, excalidraw"]
+  Packages --> Workspace["Excalidraw workspace"]
+  Workspace --> Inspector["diagram inspector"]
+  Workspace --> Switcher["diagram switcher"]
+  IconUrl["allowlisted icon SVG URL"] --> NativeIcon["native icon workspace"]
+```
+
+| Owns                              | Does not own                   |
+| --------------------------------- | ------------------------------ |
+| internal Excalidraw workspace     | generation or model calls      |
+| diagram workspace UI              | shared conversion internals    |
+| app-local inspector and switcher  | Studio Code Mode API routes    |
+| Worker deployment for the surface | authentication or account data |
+| allowlisted icon URL import       | hosted scene payloads          |
+
+## Commands
+
+```sh
+pnpm nx dev excalidraw
+pnpm nx test excalidraw
+pnpm nx typecheck excalidraw
+pnpm nx build excalidraw
+pnpm nx storybook excalidraw
+pnpm nx build-storybook excalidraw
+pnpm nx deploy excalidraw
+```
+
+## Usage
+
+Use this app when validating the actual Excalidraw experience independently of
+Studio chat or Code Mode. It composes shared diagram packages and app-local
+workspace UI so artifact rendering problems can be isolated from generation.
+Do not link it from the public homepage as a standalone product surface. Product
+review and edit entry points belong under an owning product flow. The Icons app
+may hand off a public corpus SVG through the root route's validated `svg` search
+parameter; arbitrary hosts and non-SVG output paths are rejected before fetch.

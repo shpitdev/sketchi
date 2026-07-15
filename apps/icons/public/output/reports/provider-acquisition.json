@@ -1,0 +1,78 @@
+{
+  "generatedAt": "2026-06-06T10:25:56.174Z",
+  "providers": {
+    "tech-stack-icons": {
+      "name": "tech-stack-icons",
+      "version": "3.7.1",
+      "publishDate": "2026-03-05T18:45:20.321Z",
+      "sourceShape": "bundled-js-icon-map (dist/index.js -> { name: { svg: { light, dark, grayscale } } })",
+      "iconKeyCount": 694,
+      "variants": [
+        "light",
+        "dark",
+        "grayscale"
+      ],
+      "defaultVariant": "light",
+      "stagedDefaultFiles": 694,
+      "stagedReviewVariantFiles": 1388,
+      "stagedVariantCounts": {
+        "light": 694,
+        "dark": 694,
+        "grayscale": 694
+      },
+      "slugCollisions": [],
+      "stagedLayout": "input/providers/tech-stack-icons/generated/default/*.svg (+ variants/{dark,grayscale}/*.svg)",
+      "acquiredAt": "2026-06-06T10:25:57.042Z"
+    },
+    "lobe-icons": {
+      "name": "@lobehub/icons-static-svg",
+      "version": "1.91.0",
+      "publishDate": "2026-05-28T08:18:16.703Z",
+      "sourceShape": "flat icons/*.svg with variant suffixes (-color, -brand, -text, -brand-color, -text-cn, -text-color)",
+      "flatFileCount": 871,
+      "stagedFileCount": 852,
+      "stagedCategoryCounts": {
+        "base": 309,
+        "text": 316,
+        "color": 209,
+        "brand": 18
+      },
+      "chineseWordmarkCount": 10,
+      "stagedLayout": "input/providers/lobe-icons/{base,brand,color,text}/*.svg",
+      "acquiredAt": "2026-06-06T10:25:58.146Z"
+    },
+    "simple-icons": {
+      "name": "simple-icons",
+      "version": "16.22.0",
+      "publishDate": "2026-05-31T02:33:05.132Z",
+      "sourceShape": "flat icons/*.svg (thousands of generic brand icons)",
+      "svgCount": 3438,
+      "includedInCuration": false,
+      "exclusionReason": "Excluded by policy: no reviewed mapping strategy, duplicate policy, or license review for thousands of generic brand icons.",
+      "acquiredAt": "2026-06-06T10:25:59.194Z"
+    },
+    "local-snapshots": {
+      "note": "gcp/palantir/workos are local-only providers; raw inputs are reconstructed from committed outputs when absent.",
+      "groups": {
+        "gcp": {
+          "restored": true,
+          "source": "committed-output-reconstruction",
+          "files": 261,
+          "missingOutputs": []
+        },
+        "palantir": {
+          "restored": true,
+          "source": "committed-output-reconstruction",
+          "files": 68,
+          "missingOutputs": []
+        },
+        "workos": {
+          "restored": true,
+          "source": "committed-output-reconstruction",
+          "files": 2,
+          "missingOutputs": []
+        }
+      }
+    }
+  }
+}

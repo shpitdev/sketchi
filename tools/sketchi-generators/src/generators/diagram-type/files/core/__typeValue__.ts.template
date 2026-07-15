@@ -1,0 +1,36 @@
+import { parseIntermediateDiagram } from "../intermediate.js";
+
+export const <%= propertyName %>DiagramType = "<%= typeValue %>" as const;
+
+export const <%= fixtureName %> = parseIntermediateDiagram({
+  id: "<%= typeValue %>-example",
+  title: "<%= title %>",
+  type: <%= propertyName %>DiagramType,
+  nodes: [
+    { id: "root", label: "<%= className %>" },
+    { id: "first-branch", label: "First branch" },
+    { id: "second-branch", label: "Second branch" }
+  ],
+  edges: [
+    {
+      id: "root-first-branch",
+      source: "root",
+      target: "first-branch",
+      label: "expands"
+    },
+    {
+      id: "root-second-branch",
+      source: "root",
+      target: "second-branch",
+      label: "connects"
+    }
+  ],
+  layout: {
+    direction: "LR",
+    edgeRouting: "orthogonal"
+  },
+  style: {
+    accentColor: "#7c3aed",
+    backgroundColor: "#ffffff"
+  }
+});

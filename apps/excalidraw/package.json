@@ -1,0 +1,13 @@
+{
+  "name": "@sketchi/excalidraw-app",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@excalidraw/excalidraw": "0.18.1",
+    "@sketchi/diagram-core": "workspace:*",
+    "@sketchi/diagram-excalidraw": "workspace:*",
+    "@sketchi/diagram-renderer": "workspace:*",
+    "@sketchi/diagram-studio-ui": "workspace:*",
+    "@sketchi/svg-excalidraw": "workspace:*"
+  }
+}

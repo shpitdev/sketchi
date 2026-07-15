@@ -1,0 +1,26 @@
+{
+  "name": "@sketchi/svg-excalidraw",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@excalidraw/excalidraw": "0.18.1",
+    "clipper-lib": "6.4.2",
+    "earcut": "3.0.2",
+    "fast-xml-parser": "5.9.0",
+    "fractional-indexing": "3.2.0",
+    "svg-pathdata": "8.0.0"
+  },
+  "devDependencies": {
+    "@types/clipper-lib": "6.4.0",
+    "@types/earcut": "3.0.0",
+    "sharp": "0.34.5"
+  }
+}

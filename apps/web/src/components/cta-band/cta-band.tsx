@@ -1,0 +1,40 @@
+import { DEFAULT_WEB_SURFACE_URLS } from "../../lib/surface-urls";
+
+export interface CtaBandProps {
+  /** Link to the no-signup playground. */
+  playgroundHref?: string;
+  /** Link to the agent setup hub. */
+  agentsHref?: string;
+}
+
+/**
+ * Closing invitation — a warm, blank sketch sheet echoing the hero board.
+ * One clear next step; the agent path stays a quiet secondary link.
+ */
+export function CtaBand({
+  playgroundHref = DEFAULT_WEB_SURFACE_URLS.playground,
+  agentsHref = "/agents",
+}: CtaBandProps) {
+  return (
+    <section className="cta-band">
+      <div className="sk-shell">
+        <div className="cta-band__sheet">
+          <span className="cta-band__caret" aria-hidden="true" />
+          <h2 className="cta-band__title">Start with a sentence.</h2>
+          <p className="cta-band__lead">
+            No sign-up. Type what you want to see and watch it become a diagram
+            you can edit.
+          </p>
+          <div className="cta-band__actions">
+            <a className="sk-btn sk-btn--accent" href={playgroundHref}>
+              Open the playground
+            </a>
+            <a className="cta-band__link" href={agentsHref}>
+              or add it to your coding agent →
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

@@ -1,0 +1,48 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  NX_DAEMON: "false"
+  NX_TUI: "false"
+
+jobs:
+  required:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 11.5.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium for real browser-backed tests
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify deploy, onboarding, and cutover contracts
+        run: pnpm run test:deploy-scripts
+      - name: Run canonical workspace gates
+        run: pnpm nx run-many -t typecheck,test,build
+      - name: Build canonical Studio UI Storybook
+        run: pnpm nx build-storybook diagram-studio-ui
+      - name: Run SVG corpus renderer
+        run: pnpm nx run svg-excalidraw:corpus-renderer
+      - name: Upload SVG corpus renderer report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: svg-native-corpus-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .memory/svg-native-corpus
+          if-no-files-found: error

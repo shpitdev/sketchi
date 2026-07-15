@@ -1,0 +1,64 @@
+{
+  "name": "sketchi-generators",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "tools/sketchi-generators/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": [
+        "{options.outputPath}"
+      ],
+      "options": {
+        "outputPath": "dist/tools/sketchi-generators",
+        "main": "tools/sketchi-generators/src/index.ts",
+        "tsConfig": "tools/sketchi-generators/tsconfig.lib.json",
+        "assets": [
+          "tools/sketchi-generators/*.md",
+          {
+            "input": "./tools/sketchi-generators/src",
+            "glob": "**/!(*.ts)",
+            "output": "./src"
+          },
+          {
+            "input": "./tools/sketchi-generators/src",
+            "glob": "**/*.d.ts",
+            "output": "./src"
+          },
+          {
+            "input": "./tools/sketchi-generators",
+            "glob": "generators.json",
+            "output": "."
+          },
+          {
+            "input": "./tools/sketchi-generators",
+            "glob": "executors.json",
+            "output": "."
+          }
+        ]
+      }
+    },
+    "test": {
+      "executor": "@nx/vitest:test",
+      "outputs": [
+        "{options.reportsDirectory}"
+      ],
+      "options": {
+        "reportsDirectory": "coverage/tools/sketchi-generators"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p tools/sketchi-generators/tsconfig.json --noEmit"
+      }
+    },
+    "typecheck-tsgo": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsgo -p tools/sketchi-generators/tsconfig.json --noEmit"
+      }
+    }
+  }
+}

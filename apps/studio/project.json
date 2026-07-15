@@ -1,0 +1,59 @@
+{
+  "name": "studio",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/studio/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/.output"],
+      "options": {
+        "command": "vite build --config apps/studio/vite.config.ts"
+      }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "PORTLESS_PORT=443 portless run --name studio.sketchi vite dev --config apps/studio/vite.config.ts"
+      }
+    },
+    "preview": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vite preview --config apps/studio/vite.config.ts --host 127.0.0.1 --port 6310"
+      }
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "wrangler deploy --config dist/server/wrangler.json"
+      }
+    },
+    "cf-typegen": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "wrangler types --config apps/studio/wrangler.jsonc"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/coverage/apps/studio"],
+      "options": {
+        "command": "vitest run --config apps/studio/vitest.config.ts"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p apps/studio/tsconfig.json --noEmit"
+      }
+    },
+    "typecheck-tsgo": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsgo -p apps/studio/tsconfig.json --noEmit"
+      }
+    }
+  }
+}

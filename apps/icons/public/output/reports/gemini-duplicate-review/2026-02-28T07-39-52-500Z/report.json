@@ -1,0 +1,20 @@
+{
+  "summary": {
+    "generatedAt": "2026-02-28T07:39:52.500Z",
+    "model": "gemini-3-flash-preview",
+    "dryRun": false,
+    "filters": {
+      "collections": [
+        "ai-model-families"
+      ],
+      "includeNonCrossName": false,
+      "maxGroups": 200
+    },
+    "groupsSelected": 0,
+    "groupsWithParsedDecision": 0,
+    "groupsWithParseError": 0,
+    "recommendedRemovalCount": 0,
+    "recommendedRemovals": []
+  },
+  "groups": []
+}

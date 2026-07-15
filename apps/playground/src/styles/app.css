@@ -1,0 +1,21 @@
+/* =====================================================================
+   Sketchi v2 — playground surface. Tokens, base, motion, and shared atoms
+   come from the global design system. The playground UI itself is the
+   diagram-studio-ui ScenarioPlayground, styled by its themed styles.css.
+   ===================================================================== */
+@import "../../../../packages/diagram-studio-ui/src/theme.css";
+
+.sketchi-not-found {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  min-height: 100vh;
+  padding: 24px;
+  place-items: center;
+  text-align: center;
+}
+
+.sketchi-not-found h1 {
+  font-size: clamp(40px, 8vw, 72px);
+  margin: 0;
+}

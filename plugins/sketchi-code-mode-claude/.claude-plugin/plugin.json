@@ -1,0 +1,13 @@
+{
+  "name": "sketchi-code-mode-claude",
+  "displayName": "Sketchi Code Mode",
+  "version": "0.1.1",
+  "description": "Sketchi Code Mode skills and MCP config for Claude Code.",
+  "author": {
+    "name": "Sketchi"
+  },
+  "license": "MIT",
+  "keywords": ["sketchi", "code-mode", "mcp", "diagrams"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}

@@ -1,0 +1,45 @@
+{
+  "total": 1412,
+  "svg": 1412,
+  "collections": {
+    "svg/ai-apps-agents": 152,
+    "svg/ai-devtools": 86,
+    "svg/ai-ecosystem": 54,
+    "svg/ai-harness-wrappers": 45,
+    "svg/ai-infrastructure": 62,
+    "svg/ai-model-families": 68,
+    "svg/ai-model-labs": 41,
+    "svg/ai-model-providers": 30,
+    "svg/auth-identity": 10,
+    "svg/cloud-hosting-paas": 23,
+    "svg/cloud-platforms": 10,
+    "svg/cloud-vendors": 37,
+    "svg/data-storage": 36,
+    "svg/design-productivity": 33,
+    "svg/developer-clients": 49,
+    "svg/devtools-ci": 76,
+    "svg/ecommerce-retail": 2,
+    "svg/education": 1,
+    "svg/frameworks-runtimes": 118,
+    "svg/frontend-frameworks": 68,
+    "svg/gaming": 8,
+    "svg/gcp": 45,
+    "svg/gcp-legacy": 216,
+    "svg/hardware-iot": 2,
+    "svg/observability-security": 20,
+    "svg/operating-systems": 14,
+    "svg/palantir": 68,
+    "svg/programming-languages": 36,
+    "svg/social-communication": 1
+  },
+  "canonicalCanvasSize": 512,
+  "canonicalPaddingRatio": 0.06,
+  "canonicalizedSvgCount": 1411,
+  "canonicalStatusCounts": {
+    "reframed": 1411
+  },
+  "canonicalIssues": [],
+  "manualIcons": [
+    "svg/palantir/palantir.svg"
+  ]
+}

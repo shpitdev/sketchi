@@ -1,0 +1,614 @@
+/* =====================================================================
+   Sketchi v2 — "Drafting Studio" design language (excalidraw workspace)
+   Shares the web surface tokens; adds a full-height no-auth app shell.
+   Fonts loaded via <link> in routes/__root.tsx.
+   ===================================================================== */
+@import "../../../../packages/diagram-studio-ui/src/theme.css";
+
+/* ===================================================================== */
+/* App shell                                                             */
+/* ===================================================================== */
+.sketchi-excalidraw-app {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  min-height: 0;
+}
+
+.sketchi-excalidraw-not-found {
+  align-items: center;
+  display: grid;
+  font-family: var(--font-body);
+  min-height: 100vh;
+  place-items: center;
+}
+
+.svg-icon-workspace {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  min-height: 0;
+}
+
+.svg-icon-workspace__body {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  min-height: 0;
+  padding: 14px;
+}
+
+.svg-icon-workspace__sidebar {
+  align-content: start;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px;
+}
+
+.svg-icon-workspace__eyebrow {
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.svg-icon-workspace__sidebar h1 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1.05;
+  margin: 0;
+}
+
+.svg-icon-workspace__sidebar > p:not(.svg-icon-workspace__eyebrow) {
+  color: var(--ink-2);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.svg-icon-workspace__sidebar dl {
+  display: grid;
+  margin: 0;
+}
+
+.svg-icon-workspace__sidebar dl > div {
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.svg-icon-workspace__sidebar dt {
+  color: var(--ink-2);
+}
+
+.svg-icon-workspace__sidebar dd {
+  font-family: var(--font-mono);
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.svg-icon-workspace__sidebar ul {
+  background: var(--paper-2);
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  display: grid;
+  font-size: 12px;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 12px;
+}
+
+.svg-icon-workspace__sidebar li strong {
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+
+.svg-icon-workspace__canvas {
+  background: var(--card);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.svg-icon-workspace__canvas .sketchi-excalidraw-scene-canvas {
+  border: 0;
+  border-radius: 0;
+  height: 100%;
+}
+
+.svg-handoff-error {
+  align-items: center;
+  display: grid;
+  min-height: 100vh;
+  padding: 24px;
+  place-items: center;
+}
+
+.svg-handoff-error > div {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  display: grid;
+  gap: 12px;
+  max-width: 540px;
+  padding: 28px;
+  text-align: center;
+}
+
+.svg-handoff-error p {
+  color: #8c2f24;
+  font-family: var(--font-mono);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.svg-handoff-error h1 {
+  margin: 0;
+}
+
+.svg-handoff-error a {
+  color: var(--blueprint-ink);
+  font-weight: 700;
+}
+
+.sketchi-excalidraw-app__body {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  min-height: 0;
+  padding: 14px;
+}
+
+.sketchi-excalidraw-app__sidebar {
+  display: grid;
+  gap: 14px;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+.sketchi-excalidraw-app__canvas {
+  background: var(--card);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.sketchi-excalidraw-app__canvas .sketchi-excalidraw-scene-canvas {
+  border: 0;
+  border-radius: 0;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ===================================================================== */
+/* Top bar                                                               */
+/* ===================================================================== */
+.workspace-top-bar {
+  align-items: center;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: saturate(1.2) blur(8px);
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  justify-content: space-between;
+  padding: 11px 16px;
+}
+
+.workspace-top-bar__brand {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.workspace-top-bar__mark {
+  border-radius: 7px;
+  display: block;
+  flex: none;
+}
+
+.workspace-top-bar__heading {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.workspace-top-bar__eyebrow {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.workspace-top-bar__title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-top-bar__type {
+  background: var(--blueprint-wash);
+  border-radius: 999px;
+  color: var(--blueprint-ink);
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  text-transform: uppercase;
+}
+
+.workspace-top-bar__meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.workspace-top-bar__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.workspace-action {
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.workspace-action:hover {
+  border-color: var(--ink);
+}
+
+.workspace-action--primary {
+  background: #10372c;
+  border-color: #10372c;
+  color: #e8f5ee;
+}
+
+/* ===================================================================== */
+/* Diagram switcher                                                      */
+/* ===================================================================== */
+.diagram-switcher {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+  padding: 14px;
+}
+
+.diagram-switcher__label {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  margin: 0 0 10px;
+  text-transform: uppercase;
+}
+
+.diagram-switcher__list {
+  display: grid;
+  gap: 8px;
+}
+
+.diagram-switcher__item {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  display: grid;
+  gap: 5px;
+  font: inherit;
+  padding: 11px 13px;
+  text-align: left;
+  transition:
+    border-color 0.16s var(--ease),
+    background 0.16s var(--ease),
+    box-shadow 0.16s var(--ease);
+}
+
+.diagram-switcher__item:hover {
+  border-color: var(--line-2);
+}
+
+.diagram-switcher__item[aria-pressed="true"] {
+  background: var(--card);
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.diagram-switcher__item:focus-visible {
+  outline: 2px solid var(--blueprint);
+  outline-offset: 2px;
+}
+
+.diagram-switcher__title {
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.diagram-switcher__meta {
+  color: var(--ink-3);
+  display: flex;
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  gap: 4px 10px;
+}
+
+.diagram-switcher__type {
+  color: var(--blueprint-ink);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ===================================================================== */
+/* Diagram inspector                                                     */
+/* ===================================================================== */
+.diagram-inspector {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.diagram-inspector__tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 8px 0;
+}
+
+.diagram-inspector__tab {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 10px;
+  transition:
+    color 0.16s var(--ease),
+    border-color 0.16s var(--ease);
+}
+
+.diagram-inspector__tab:hover {
+  color: var(--ink);
+}
+
+.diagram-inspector__tab[aria-selected="true"] {
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+}
+
+.diagram-inspector__panel {
+  min-height: 0;
+  overflow: auto;
+  padding: 14px;
+}
+
+.diagram-inspector__defs {
+  display: grid;
+  margin: 0;
+}
+
+.diagram-inspector__defs > div {
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 9px 0;
+}
+
+.diagram-inspector__defs > div:first-child {
+  border-top: 0;
+}
+
+.diagram-inspector__defs dt {
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.diagram-inspector__defs dd {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  margin: 0;
+  text-align: right;
+}
+
+.diagram-inspector__swatch-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.diagram-inspector__swatch {
+  block-size: 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  inline-size: 14px;
+}
+
+.diagram-inspector__code {
+  background: var(--ink);
+  border-radius: var(--r-sm);
+  color: #e8e1d2;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0;
+  overflow: auto;
+  padding: 12px;
+  white-space: pre;
+}
+
+.diagram-inspector__scene {
+  display: grid;
+  gap: 12px;
+}
+
+.diagram-inspector__validity {
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  margin: 0;
+  padding: 9px 11px;
+}
+
+.diagram-inspector__validity--ok {
+  background: var(--ok-wash);
+  color: var(--ok);
+}
+
+.diagram-inspector__validity--warn {
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+}
+
+.diagram-inspector__scene-total {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+}
+
+/* ===================================================================== */
+/* Empty / loading / error states                                        */
+/* ===================================================================== */
+.workspace-state {
+  align-items: center;
+  color: var(--ink-2);
+  display: grid;
+  gap: 10px;
+  height: 100%;
+  justify-items: center;
+  padding: 24px;
+  place-content: center;
+  text-align: center;
+}
+
+.workspace-state__glyph {
+  color: var(--accent);
+  font-size: 30px;
+  line-height: 1;
+}
+
+.workspace-state__spin {
+  animation: sk-spin 0.8s linear infinite;
+  block-size: 26px;
+  border: 3px solid var(--line-2);
+  border-radius: 999px;
+  border-top-color: var(--accent);
+  display: inline-block;
+  inline-size: 26px;
+}
+
+.workspace-state__title {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 20px;
+  margin: 0;
+}
+
+.workspace-state__body {
+  color: var(--ink-2);
+  margin: 0;
+  max-width: 38ch;
+}
+
+/* ===================================================================== */
+/* Responsive                                                            */
+/* ===================================================================== */
+@media (max-width: 900px) {
+  .sketchi-excalidraw-app,
+  .svg-icon-workspace {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .sketchi-excalidraw-app__body,
+  .svg-icon-workspace__body {
+    grid-template-columns: 1fr;
+  }
+
+  .sketchi-excalidraw-app__canvas,
+  .svg-icon-workspace__canvas {
+    min-height: 68vh;
+    order: -1;
+  }
+
+  .sketchi-excalidraw-app__sidebar {
+    grid-template-rows: auto auto;
+  }
+
+  .diagram-inspector {
+    grid-template-rows: auto auto;
+  }
+
+  .diagram-inspector__panel {
+    max-height: 420px;
+  }
+}
+
+@media (max-width: 680px) {
+  .workspace-top-bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-top-bar__meta,
+  .workspace-top-bar__actions {
+    justify-content: flex-start;
+  }
+
+  .workspace-action {
+    flex: 1 1 auto;
+  }
+}

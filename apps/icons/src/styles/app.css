@@ -1,0 +1,810 @@
+/* =====================================================================
+   Sketchi v2 — "Drafting Studio" design language (icons gallery)
+   Shares the web/excalidraw tokens; adds a dense, searchable icon browser.
+   Fonts loaded via <link> in routes/__root.tsx.
+   ===================================================================== */
+@import "../../../../packages/diagram-studio-ui/src/theme.css";
+
+/* ===================================================================== */
+/* Page                                                                  */
+/* ===================================================================== */
+.sketchi-icons {
+  display: grid;
+  gap: 16px;
+  margin: 0 auto;
+  max-width: 1320px;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.sketchi-icons-not-found {
+  align-items: center;
+  display: grid;
+  font-family: var(--font-body);
+  min-height: 100vh;
+  place-items: center;
+}
+
+.sketchi-icons__header {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.sketchi-icons__brand {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.sketchi-icons__home {
+  border-radius: 9px;
+  display: inline-flex;
+  transition:
+    transform 0.16s var(--ease),
+    box-shadow 0.16s var(--ease);
+}
+
+.sketchi-icons__home:hover {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.sketchi-icons__home:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.sketchi-icons__title {
+  display: grid;
+  gap: 4px;
+}
+
+.sketchi-icons__eyebrow {
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.sketchi-icons h1 {
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.05;
+  margin: 0;
+}
+
+.sketchi-icons__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sketchi-icons__summary span {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 7px 12px;
+  white-space: nowrap;
+}
+
+.sketchi-icons__summary strong {
+  color: var(--ink);
+}
+
+/* ---- toolbar --------------------------------------------------------- */
+.sketchi-icons__toolbar {
+  align-items: end;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  gap: 12px;
+  grid-template-columns:
+    minmax(220px, 1fr) minmax(160px, 230px) minmax(130px, 170px)
+    minmax(130px, 170px) auto auto auto;
+  padding: 14px;
+}
+
+.sketchi-icons__field {
+  color: var(--ink-2);
+  display: grid;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 6px;
+}
+
+.sketchi-icons__field input,
+.sketchi-icons__field select {
+  background: var(--paper-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+  min-height: 42px;
+  padding: 9px 11px;
+}
+
+.sketchi-icons__field input:focus-visible,
+.sketchi-icons__field select:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-wash);
+}
+
+.sketchi-icons__toggle {
+  align-items: center;
+  color: var(--ink-2);
+  display: flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 8px;
+  min-height: 42px;
+}
+
+.sketchi-icons__density {
+  align-items: center;
+  background: var(--paper-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  display: inline-flex;
+  min-height: 42px;
+  padding: 3px;
+}
+
+.sketchi-icons__density button {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ink-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 34px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.sketchi-icons__density button[aria-pressed="true"] {
+  background: #10372c;
+  color: #e8f5ee;
+}
+
+.sketchi-icons__count {
+  align-self: center;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  margin: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ---- status ---------------------------------------------------------- */
+.sketchi-icons__status {
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--ink-2);
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  min-height: 280px;
+  padding: 24px;
+  text-align: center;
+}
+
+.sketchi-icons__spin {
+  animation: sk-spin 0.8s linear infinite;
+  block-size: 22px;
+  border: 3px solid var(--line-2);
+  border-radius: 999px;
+  border-top-color: var(--accent);
+  display: inline-block;
+  inline-size: 22px;
+}
+
+/* ---- body / grid ----------------------------------------------------- */
+.sketchi-icons__body {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.sketchi-icons__body[data-detail="open"] {
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 520px);
+}
+
+.sketchi-icons__results {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.sketchi-icons__grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(var(--icon-card-min, 132px), 1fr)
+  );
+}
+
+.sketchi-icons[data-density="compact"] {
+  --icon-card-min: 104px;
+}
+
+.sketchi-icons[data-density="compact"] .icon-card {
+  gap: 6px;
+  padding: 8px;
+}
+
+.sketchi-icons[data-density="compact"] .icon-card__slug {
+  font-size: 12px;
+}
+
+.sketchi-icons[data-density="compact"] .icon-card__collection {
+  display: none;
+}
+
+.sketchi-icons__empty {
+  background: var(--card);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-md);
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.sketchi-icons__empty-title {
+  color: var(--ink-2);
+  margin: 0;
+}
+
+.sketchi-icons__reset {
+  background: var(--ink);
+  border: 0;
+  border-radius: var(--r-sm);
+  color: var(--paper-2);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 10px 16px;
+}
+
+.sketchi-icons__more {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 4px;
+}
+
+.sketchi-icons__more-btn {
+  background: var(--card);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 0 22px;
+  transition:
+    border-color 0.16s var(--ease),
+    background 0.16s var(--ease);
+}
+
+.sketchi-icons__more-btn:hover {
+  background: var(--paper-2);
+  border-color: var(--ink);
+}
+
+/* ===================================================================== */
+/* Icon card                                                             */
+/* ===================================================================== */
+.icon-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  text-align: center;
+  transition:
+    border-color 0.16s var(--ease),
+    box-shadow 0.16s var(--ease),
+    transform 0.16s var(--ease);
+}
+
+.icon-card:hover {
+  border-color: var(--line-2);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-2px);
+}
+
+.icon-card:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-wash);
+}
+
+.icon-card[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.icon-card__preview {
+  align-items: center;
+  aspect-ratio: 1;
+  background-color: var(--card);
+  background-image: var(--checker);
+  background-position:
+    0 0,
+    0 7px,
+    7px -7px,
+    -7px 0;
+  background-size: 14px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  display: flex;
+  justify-content: center;
+  position: relative;
+}
+
+.icon-card__preview img {
+  display: block;
+  max-height: 56%;
+  max-width: 56%;
+}
+
+.icon-card__flag {
+  background: var(--accent);
+  block-size: 9px;
+  border: 2px solid var(--card);
+  border-radius: 999px;
+  inline-size: 9px;
+  position: absolute;
+  right: 5px;
+  top: 5px;
+}
+
+.icon-card__slug {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon-card__collection {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===================================================================== */
+/* Icon detail                                                           */
+/* ===================================================================== */
+.sketchi-icons__detail {
+  align-self: start;
+  min-width: 0;
+  position: sticky;
+  top: 16px;
+}
+
+.icon-detail {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.icon-detail__head {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.icon-detail__eyebrow {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  margin: 0 0 3px;
+  text-transform: uppercase;
+}
+
+.icon-detail__slug {
+  font-family: var(--font-display);
+  font-size: 22px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.icon-detail__close {
+  align-items: center;
+  background: var(--paper-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  cursor: pointer;
+  display: inline-flex;
+  flex: none;
+  block-size: 34px;
+  inline-size: 34px;
+  justify-content: center;
+}
+
+.icon-detail__close:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.icon-conversion {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.icon-conversion__tabs {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.icon-conversion__tabs button {
+  background: var(--paper-2);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  color: var(--ink-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.icon-conversion__tabs button[aria-selected="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper-2);
+}
+
+.icon-conversion__capability {
+  border-radius: 999px;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  margin-left: auto;
+  padding: 5px 9px;
+  text-transform: uppercase;
+}
+
+.icon-conversion__capability[data-status="supported"] {
+  background: var(--ok-wash);
+  color: var(--ok);
+}
+
+.icon-conversion__capability[data-status="warned"] {
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+}
+
+.icon-conversion__capability[data-status="blocked"] {
+  background: #f7e1dd;
+  color: #8c2f24;
+}
+
+.icon-conversion__stage {
+  align-items: center;
+  background-color: var(--card);
+  background-image: var(--checker);
+  background-position:
+    0 0,
+    0 9px,
+    9px -9px,
+    -9px 0;
+  background-size: 18px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  display: flex;
+  height: 320px;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.icon-conversion__stage > img {
+  max-height: 60%;
+  max-width: 60%;
+}
+
+.icon-conversion__stage .sketchi-excalidraw-scene-canvas {
+  border: 0;
+  border-radius: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.icon-conversion__state {
+  align-items: center;
+  color: var(--ink-2);
+  display: flex;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+}
+
+.icon-conversion__state button {
+  background: var(--card);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 7px 10px;
+}
+
+.icon-conversion__controls {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.icon-conversion__controls label {
+  color: var(--ink-2);
+  display: grid;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 5px;
+}
+
+.icon-conversion__controls select,
+.icon-conversion__controls input {
+  background: var(--paper-2);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  color: var(--ink);
+  font: inherit;
+  min-height: 38px;
+  min-width: 0;
+  padding: 7px 8px;
+}
+
+.icon-conversion__controls .icon-conversion__color {
+  grid-column: span 3;
+}
+
+.icon-conversion__color input {
+  padding: 4px;
+  width: 100%;
+}
+
+.icon-conversion__metrics {
+  color: var(--ink-3);
+  display: flex;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  gap: 12px;
+}
+
+.icon-conversion__diagnostics {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  display: grid;
+  font-size: 11px;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  max-height: 110px;
+  overflow: auto;
+  padding: 10px;
+}
+
+.icon-conversion__diagnostics strong {
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+
+.icon-conversion__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-conversion__actions button,
+.icon-conversion__actions a,
+.icon-conversion__actions span {
+  align-items: center;
+  background: var(--paper-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  display: inline-flex;
+  flex: 1;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 10px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.icon-conversion__actions a {
+  background: #10372c;
+  border-color: #10372c;
+  color: #e8f5ee;
+}
+
+.icon-conversion__actions button:disabled,
+.icon-conversion__actions span[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.icon-detail__meta {
+  display: grid;
+  margin: 0;
+}
+
+.icon-detail__meta > div {
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 9px 0;
+}
+
+.icon-detail__meta > div:first-child {
+  border-top: 0;
+}
+
+.icon-detail__meta dt {
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.icon-detail__meta dd {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.icon-detail__flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.icon-detail__flag {
+  background: var(--accent-wash);
+  border-radius: 999px;
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+.icon-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.icon-detail__btn {
+  align-items: center;
+  background: var(--paper-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 1;
+  font: inherit;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 14px;
+  text-decoration: none;
+  transition:
+    border-color 0.16s var(--ease),
+    background 0.16s var(--ease);
+}
+
+.icon-detail__btn:hover {
+  border-color: var(--ink);
+}
+
+.icon-detail__btn--primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper-2);
+}
+
+.icon-detail__copy-status {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  margin: -6px 0 0;
+  min-height: 18px;
+}
+
+/* ===================================================================== */
+/* Responsive                                                            */
+/* ===================================================================== */
+@media (max-width: 760px) {
+  .sketchi-icons__toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .sketchi-icons__density {
+    width: 100%;
+  }
+
+  .sketchi-icons__density button {
+    flex: 1;
+  }
+
+  .sketchi-icons__count {
+    text-align: left;
+  }
+
+  .sketchi-icons__grid {
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(var(--icon-card-min, 108px), 1fr)
+    );
+  }
+
+  .sketchi-icons__body[data-detail="open"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sketchi-icons__detail {
+    bottom: 0;
+    left: 0;
+    max-height: 86vh;
+    overflow: auto;
+    position: fixed;
+    right: 0;
+    top: auto;
+    z-index: 50;
+  }
+
+  .sketchi-icons__detail .icon-detail {
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    box-shadow: 0 -18px 50px rgba(26, 23, 18, 0.28);
+  }
+}

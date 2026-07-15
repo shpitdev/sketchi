@@ -1,0 +1,13 @@
+{
+  "name": "@sketchi/playground",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@sketchi/diagram-core": "workspace:*",
+    "@sketchi/diagram-excalidraw": "workspace:*",
+    "@sketchi/diagram-generation": "workspace:*",
+    "@sketchi/diagram-renderer": "workspace:*",
+    "@sketchi/diagram-scenarios": "workspace:*",
+    "@sketchi/diagram-studio-ui": "workspace:*"
+  }
+}

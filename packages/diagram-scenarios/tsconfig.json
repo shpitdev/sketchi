@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../diagram-core/tsconfig.lib.json" },
+    { "path": "../diagram-renderer/tsconfig.lib.json" },
+    { "path": "../diagram-excalidraw/tsconfig.lib.json" }
+  ]
+}
