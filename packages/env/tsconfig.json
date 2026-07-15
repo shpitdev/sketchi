@@ -1,7 +1,0 @@
-{
-  "extends": "@sketchi/config/tsconfig.base.json",
-  "compilerOptions": {
-    "strictNullChecks": true,
-    "types": ["node"]
-  }
-}

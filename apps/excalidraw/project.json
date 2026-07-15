@@ -1,0 +1,78 @@
+{
+  "name": "excalidraw",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/excalidraw/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/.output"],
+      "options": {
+        "command": "vite build --config apps/excalidraw/vite.config.ts"
+      }
+    },
+    "build-storybook": {
+      "executor": "@nx/storybook:build",
+      "outputs": ["{workspaceRoot}/storybook-static/excalidraw"],
+      "options": {
+        "configDir": "apps/excalidraw/.storybook",
+        "outputDir": "storybook-static/excalidraw"
+      }
+    },
+    "cf-typegen": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "wrangler types --config apps/excalidraw/wrangler.jsonc"
+      }
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "wrangler deploy --config dist/server/wrangler.json"
+      }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "PORTLESS_PORT=443 portless run --name excalidraw.sketchi vite dev --config apps/excalidraw/vite.config.ts"
+      }
+    },
+    "preview": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vite preview --config apps/excalidraw/vite.config.ts --host 127.0.0.1 --port 6302"
+      }
+    },
+    "storybook": {
+      "executor": "@nx/storybook:storybook",
+      "options": {
+        "configDir": "apps/excalidraw/.storybook",
+        "port": 6008
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/coverage/apps/excalidraw"],
+      "options": {
+        "commands": [
+          "vitest run --config apps/excalidraw/vitest.config.ts",
+          "vitest run --config apps/excalidraw/vitest.browser.config.mts"
+        ],
+        "parallel": false
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p apps/excalidraw/tsconfig.json --noEmit"
+      }
+    },
+    "typecheck-tsgo": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsgo -p apps/excalidraw/tsconfig.json --noEmit"
+      }
+    }
+  }
+}

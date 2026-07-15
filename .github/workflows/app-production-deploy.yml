@@ -1,0 +1,196 @@
+name: app-production-deploy
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('production {0} {1}', inputs.domain_action, inputs.app) || format('production deploy all at {0}', github.sha) }}
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "scripts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "nx.json"
+      - "tsconfig.base.json"
+  workflow_dispatch:
+    inputs:
+      app:
+        description: App to deploy.
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - playground
+          - studio
+          - web
+          - excalidraw
+          - icons
+      domain_action:
+        description: Post-merge production domain action.
+        required: true
+        default: none
+        type: choice
+        options:
+          - none
+          - attach
+          - detach
+
+env:
+  NX_DAEMON: "false"
+  NX_TUI: "false"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - playground
+          - studio
+          - web
+          - excalidraw
+          - icons
+    concurrency:
+      group: app-production-${{ matrix.app }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+        if: ${{ github.event_name == 'push' || inputs.app == 'all' || inputs.app == matrix.app }}
+
+      - uses: pnpm/action-setup@v5
+        if: ${{ github.event_name == 'push' || inputs.app == 'all' || inputs.app == matrix.app }}
+        with:
+          version: 11.5.0
+
+      - uses: actions/setup-node@v6
+        if: ${{ github.event_name == 'push' || inputs.app == 'all' || inputs.app == matrix.app }}
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - if: ${{ github.event_name == 'push' || inputs.app == 'all' || inputs.app == matrix.app }}
+        run: pnpm install --frozen-lockfile
+
+      - if: ${{ github.event_name == 'push' || inputs.app == 'all' || inputs.app == matrix.app }}
+        run: pnpm run test:deploy-scripts
+
+      - if: ${{ github.event_name == 'push' || inputs.app == 'all' || inputs.app == matrix.app }}
+        run: pnpm nx build ${{ matrix.app }}
+
+      - name: Check Cloudflare credentials
+        id: credentials
+        if: ${{ github.event_name == 'push' || inputs.app == 'all' || inputs.app == matrix.app }}
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ] && [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::Cloudflare production deploy credentials are not configured. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN."
+
+      - name: Deploy production Worker
+        id: deploy
+        if: ${{ steps.credentials.outputs.configured == 'true' && (github.event_name == 'push' || inputs.app == 'all' || inputs.app == matrix.app) }}
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p .memory
+          pnpm exec wrangler deploy \
+            --config dist/server/wrangler.json \
+            --no-x-provision \
+            --message "${{ matrix.app }} production Worker ${{ github.sha }}" \
+            2>&1 | tee ".memory/wrangler-${{ matrix.app }}-production-deploy.log"
+
+      - name: Extract workers.dev URL
+        id: workers-dev-url
+        if: ${{ steps.credentials.outputs.configured == 'true' && (github.event_name == 'push' || inputs.app == 'all' || inputs.app == matrix.app) }}
+        run: |
+          node scripts/02-extract-preview-url.mjs \
+            ".memory/wrangler-${{ matrix.app }}-production-deploy.log" \
+            --worker-name "sketchi-${{ matrix.app }}"
+
+      - name: Summarize production Worker
+        if: ${{ steps.credentials.outputs.configured == 'true' && (github.event_name == 'push' || inputs.app == 'all' || inputs.app == matrix.app) }}
+        env:
+          APP: ${{ matrix.app }}
+        run: |
+          {
+            echo "### ${{ matrix.app }} production Worker"
+            echo ""
+            echo "- Worker: \`sketchi-${{ matrix.app }}\`"
+            echo "- workers.dev URL: ${{ steps.workers-dev-url.outputs.preview_url }}"
+            node --input-type=module <<'NODE'
+          import { productionAppConfig } from "./scripts/lib/production-deploy.mjs";
+
+          const app = productionAppConfig(process.env.APP);
+          const visibility = app.publicSurface
+            ? "public product surface"
+            : "internal surface; not linked from public navigation";
+          const domains =
+            app.domainPatterns.length > 0
+              ? `${app.domainPatterns.join(", ")} (manual attach only)`
+              : "none";
+
+          console.log(`- Visibility: ${visibility}`);
+          console.log(`- Route policy: ${app.routePolicy}`);
+          console.log(`- Custom domains: ${domains}`);
+          NODE
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prepare production domain Wrangler config
+        id: domains
+        if: ${{ steps.credentials.outputs.configured == 'true' && github.event_name == 'workflow_dispatch' && inputs.domain_action == 'attach' && (inputs.app == 'all' || inputs.app == matrix.app) }}
+        env:
+          APP: ${{ matrix.app }}
+        run: node scripts/05-prepare-production-domain-deploy.mjs --app "$APP"
+
+      - name: Require an active Cloudflare zone before domain attach
+        if: ${{ steps.credentials.outputs.configured == 'true' && github.event_name == 'workflow_dispatch' && inputs.domain_action == 'attach' && (inputs.app == 'all' || inputs.app == matrix.app) }}
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          response="$(
+            curl --fail-with-body --silent --show-error \
+              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              "https://api.cloudflare.com/client/v4/zones?name=sketchi.app&account.id=${CLOUDFLARE_ACCOUNT_ID}"
+          )"
+          RESPONSE="$response" node --input-type=module <<'NODE'
+          const payload = JSON.parse(process.env.RESPONSE ?? "{}");
+          const zones = Array.isArray(payload.result) ? payload.result : [];
+          if (payload.success !== true || zones.length !== 1 || zones[0]?.status !== "active") {
+            throw new Error("sketchi.app must exist as one active Cloudflare zone before domain attachment.");
+          }
+          NODE
+
+      - name: Attach production domains
+        if: ${{ steps.credentials.outputs.configured == 'true' && github.event_name == 'workflow_dispatch' && inputs.domain_action == 'attach' && (inputs.app == 'all' || inputs.app == matrix.app) }}
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          pnpm exec wrangler deploy \
+            --config "${{ steps.domains.outputs.domain_config_path }}" \
+            --no-x-provision \
+            --message "${{ matrix.app }} production domain attach ${{ github.sha }}"
+
+      - name: Detach production domains
+        if: ${{ steps.credentials.outputs.configured == 'true' && github.event_name == 'workflow_dispatch' && inputs.domain_action == 'detach' && (inputs.app == 'all' || inputs.app == matrix.app) }}
+        env:
+          APP: ${{ matrix.app }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/06-detach-production-domains.mjs --app "$APP" --apply

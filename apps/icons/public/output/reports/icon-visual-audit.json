@@ -1,0 +1,660 @@
+{
+  "generatedAt": "2026-06-06T10:56:23.094Z",
+  "reviewUrl": "http://127.0.0.1:4173/review-app/index.html",
+  "screenshots": {
+    "allCollections": "output/reports/screenshots/review-all-collections.png",
+    "aiModelProviders": "output/reports/screenshots/review-ai-model-providers.png",
+    "gcpLegacy": "output/reports/screenshots/review-gcp-legacy.png",
+    "flaggedOnly": "output/reports/screenshots/review-flagged-only.png",
+    "duplicatesSimilarity": "output/reports/screenshots/review-duplicates-similarity.png"
+  },
+  "metrics": {
+    "cardCount": 1408,
+    "imageCount": 1408,
+    "brokenImages": 0,
+    "pixelAnalysisAvailable": false,
+    "pixelAnalysisNote": "In-browser canvas pixel analysis unavailable (SVG <img> taints the canvas in Chromium); see output/reports/icon-review.json for deterministic blank/tiny analysis.",
+    "undersizedPotentialCount": 0,
+    "undersizedPotentialSample": []
+  },
+  "duplicateCrossNameGroups": [],
+  "visualDuplicateCrossNameGroups": [],
+  "rasterDuplicateCrossNameGroups": [
+    {
+      "groupKey": "developer-clients:neutral:98fa9edc0fc8e5555b4a90a660e4206bd50e4a0b",
+      "rasterHash": "98fa9edc0fc8e5555b4a90a660e4206bd50e4a0b",
+      "size": 6,
+      "distinctBaseSlugs": [
+        "atom",
+        "chrome",
+        "chromium",
+        "insomnia",
+        "safari",
+        "starship"
+      ],
+      "distinctCollections": [
+        "developer-clients"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/developer-clients/atom.svg",
+        "output/upload-ready/svg/developer-clients/chrome.svg",
+        "output/upload-ready/svg/developer-clients/chromium.svg",
+        "output/upload-ready/svg/developer-clients/insomnia.svg",
+        "output/upload-ready/svg/developer-clients/safari.svg",
+        "output/upload-ready/svg/developer-clients/starship.svg"
+      ]
+    },
+    {
+      "groupKey": "palantir:neutral:95d0596a298f0abd887948e9d5cd4b00d33708e5",
+      "rasterHash": "95d0596a298f0abd887948e9d5cd4b00d33708e5",
+      "size": 5,
+      "distinctBaseSlugs": [
+        "deployed-application-app",
+        "inference-app",
+        "restricted-view-app",
+        "solution-design-app",
+        "structured-dataset-app"
+      ],
+      "distinctCollections": [
+        "palantir"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/palantir/deployed-application-app.svg",
+        "output/upload-ready/svg/palantir/inference-app.svg",
+        "output/upload-ready/svg/palantir/restricted-view-app.svg",
+        "output/upload-ready/svg/palantir/solution-design-app.svg",
+        "output/upload-ready/svg/palantir/structured-dataset-app.svg"
+      ]
+    },
+    {
+      "groupKey": "frameworks-runtimes:neutral:c5671feec3deb3bf964194d145a44f6d2b2a91c6",
+      "rasterHash": "c5671feec3deb3bf964194d145a44f6d2b2a91c6",
+      "size": 4,
+      "distinctBaseSlugs": [
+        "gulp",
+        "net",
+        "sanity",
+        "unjs"
+      ],
+      "distinctCollections": [
+        "frameworks-runtimes"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/frameworks-runtimes/gulp.svg",
+        "output/upload-ready/svg/frameworks-runtimes/net.svg",
+        "output/upload-ready/svg/frameworks-runtimes/sanity.svg",
+        "output/upload-ready/svg/frameworks-runtimes/unjs.svg"
+      ]
+    },
+    {
+      "groupKey": "frameworks-runtimes:neutral:98fa9edc0fc8e5555b4a90a660e4206bd50e4a0b",
+      "rasterHash": "98fa9edc0fc8e5555b4a90a660e4206bd50e4a0b",
+      "size": 3,
+      "distinctBaseSlugs": [
+        "esbuild",
+        "swagger",
+        "yoga"
+      ],
+      "distinctCollections": [
+        "frameworks-runtimes"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/frameworks-runtimes/esbuild.svg",
+        "output/upload-ready/svg/frameworks-runtimes/swagger.svg",
+        "output/upload-ready/svg/frameworks-runtimes/yoga.svg"
+      ]
+    },
+    {
+      "groupKey": "programming-languages:neutral:c5671feec3deb3bf964194d145a44f6d2b2a91c6",
+      "rasterHash": "c5671feec3deb3bf964194d145a44f6d2b2a91c6",
+      "size": 3,
+      "distinctBaseSlugs": [
+        "javascript",
+        "typescript",
+        "vala"
+      ],
+      "distinctCollections": [
+        "programming-languages"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/programming-languages/javascript.svg",
+        "output/upload-ready/svg/programming-languages/typescript.svg",
+        "output/upload-ready/svg/programming-languages/vala.svg"
+      ]
+    },
+    {
+      "groupKey": "design-productivity:neutral:1bbb4ba0cef148f6120e850096f7f2cbf415033e",
+      "rasterHash": "1bbb4ba0cef148f6120e850096f7f2cbf415033e",
+      "size": 2,
+      "distinctBaseSlugs": [
+        "canva",
+        "shotgrid"
+      ],
+      "distinctCollections": [
+        "design-productivity"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/design-productivity/canva.svg",
+        "output/upload-ready/svg/design-productivity/shotgrid.svg"
+      ]
+    },
+    {
+      "groupKey": "developer-clients:neutral:df5d048a1705d64951f5c4104979ccd24a53a0bc",
+      "rasterHash": "df5d048a1705d64951f5c4104979ccd24a53a0bc",
+      "size": 2,
+      "distinctBaseSlugs": [
+        "pycharm",
+        "webstorm"
+      ],
+      "distinctCollections": [
+        "developer-clients"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/developer-clients/pycharm.svg",
+        "output/upload-ready/svg/developer-clients/webstorm.svg"
+      ]
+    },
+    {
+      "groupKey": "frameworks-runtimes:neutral:e4e8a2a62bf165fc9cf21353daf4a7946d6ed364",
+      "rasterHash": "e4e8a2a62bf165fc9cf21353daf4a7946d6ed364",
+      "size": 2,
+      "distinctBaseSlugs": [
+        "id",
+        "ps"
+      ],
+      "distinctCollections": [
+        "frameworks-runtimes"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/frameworks-runtimes/id.svg",
+        "output/upload-ready/svg/frameworks-runtimes/ps.svg"
+      ]
+    },
+    {
+      "groupKey": "frontend-frameworks:neutral:98fa9edc0fc8e5555b4a90a660e4206bd50e4a0b",
+      "rasterHash": "98fa9edc0fc8e5555b4a90a660e4206bd50e4a0b",
+      "size": 2,
+      "distinctBaseSlugs": [
+        "chakraui",
+        "ember"
+      ],
+      "distinctCollections": [
+        "frontend-frameworks"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/frontend-frameworks/chakraui.svg",
+        "output/upload-ready/svg/frontend-frameworks/ember.svg"
+      ]
+    },
+    {
+      "groupKey": "frontend-frameworks:neutral:c5671feec3deb3bf964194d145a44f6d2b2a91c6",
+      "rasterHash": "c5671feec3deb3bf964194d145a44f6d2b2a91c6",
+      "size": 2,
+      "distinctBaseSlugs": [
+        "reflex",
+        "semanticui"
+      ],
+      "distinctCollections": [
+        "frontend-frameworks"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/frontend-frameworks/reflex.svg",
+        "output/upload-ready/svg/frontend-frameworks/semanticui.svg"
+      ]
+    },
+    {
+      "groupKey": "gcp-legacy:neutral:2c0b10cb40084f140d457338eea42de3df7dc1da",
+      "rasterHash": "2c0b10cb40084f140d457338eea42de3df7dc1da",
+      "size": 2,
+      "distinctBaseSlugs": [
+        "dialogflow-cx",
+        "dialogflow-insights"
+      ],
+      "distinctCollections": [
+        "gcp-legacy"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/gcp-legacy/dialogflow-cx.svg",
+        "output/upload-ready/svg/gcp-legacy/dialogflow-insights.svg"
+      ]
+    },
+    {
+      "groupKey": "programming-languages:neutral:98fa9edc0fc8e5555b4a90a660e4206bd50e4a0b",
+      "rasterHash": "98fa9edc0fc8e5555b4a90a660e4206bd50e4a0b",
+      "size": 2,
+      "distinctBaseSlugs": [
+        "clojure",
+        "wolfram"
+      ],
+      "distinctCollections": [
+        "programming-languages"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/programming-languages/clojure.svg",
+        "output/upload-ready/svg/programming-languages/wolfram.svg"
+      ]
+    }
+  ],
+  "nearSimilarityCrossNameGroups": [
+    {
+      "key": "frameworks-runtimes:neutral:00007ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe0000",
+      "size": 7,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "gulp",
+        "net",
+        "plotly",
+        "sanity",
+        "thymeleaf",
+        "unjs",
+        "vertx"
+      ],
+      "distinctCollections": [
+        "frameworks-runtimes"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/frameworks-runtimes/gulp.svg",
+        "output/upload-ready/svg/frameworks-runtimes/net.svg",
+        "output/upload-ready/svg/frameworks-runtimes/plotly.svg",
+        "output/upload-ready/svg/frameworks-runtimes/sanity.svg",
+        "output/upload-ready/svg/frameworks-runtimes/thymeleaf.svg",
+        "output/upload-ready/svg/frameworks-runtimes/unjs.svg",
+        "output/upload-ready/svg/frameworks-runtimes/vertx.svg"
+      ]
+    },
+    {
+      "key": "developer-clients:neutral:01c00ff01ff83ffc7ffe7ffe7fffffffffffffff7ffe7ffe3ffe1ffc0ff803c0",
+      "size": 5,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "atom",
+        "chrome",
+        "chromium",
+        "insomnia",
+        "safari"
+      ],
+      "distinctCollections": [
+        "developer-clients"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/developer-clients/atom.svg",
+        "output/upload-ready/svg/developer-clients/chrome.svg",
+        "output/upload-ready/svg/developer-clients/chromium.svg",
+        "output/upload-ready/svg/developer-clients/insomnia.svg",
+        "output/upload-ready/svg/developer-clients/safari.svg"
+      ]
+    },
+    {
+      "key": "frontend-frameworks:neutral:00007ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe0000",
+      "size": 4,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "mobx",
+        "pandacss",
+        "reflex",
+        "semanticui"
+      ],
+      "distinctCollections": [
+        "frontend-frameworks"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/frontend-frameworks/mobx.svg",
+        "output/upload-ready/svg/frontend-frameworks/pandacss.svg",
+        "output/upload-ready/svg/frontend-frameworks/reflex.svg",
+        "output/upload-ready/svg/frontend-frameworks/semanticui.svg"
+      ]
+    },
+    {
+      "key": "palantir:neutral:00007ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe0000",
+      "size": 4,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "approvals-app",
+        "deployed-application-app",
+        "dev-console-app",
+        "model-catalog-app"
+      ],
+      "distinctCollections": [
+        "palantir"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/palantir/approvals-app.svg",
+        "output/upload-ready/svg/palantir/deployed-application-app.svg",
+        "output/upload-ready/svg/palantir/dev-console-app.svg",
+        "output/upload-ready/svg/palantir/model-catalog-app.svg"
+      ]
+    },
+    {
+      "key": "frameworks-runtimes:neutral:00003ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe0000",
+      "size": 3,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "firefly",
+        "id",
+        "ps"
+      ],
+      "distinctCollections": [
+        "frameworks-runtimes"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/frameworks-runtimes/firefly.svg",
+        "output/upload-ready/svg/frameworks-runtimes/id.svg",
+        "output/upload-ready/svg/frameworks-runtimes/ps.svg"
+      ]
+    },
+    {
+      "key": "frameworks-runtimes:neutral:01c00ff01ff83ffc7ffe7ffe7fffffffffffffff7ffe7ffe3ffe1ffc0ff803c0",
+      "size": 3,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "esbuild",
+        "swagger",
+        "yoga"
+      ],
+      "distinctCollections": [
+        "frameworks-runtimes"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/frameworks-runtimes/esbuild.svg",
+        "output/upload-ready/svg/frameworks-runtimes/swagger.svg",
+        "output/upload-ready/svg/frameworks-runtimes/yoga.svg"
+      ]
+    },
+    {
+      "key": "programming-languages:neutral:00007ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe0000",
+      "size": 3,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "javascript",
+        "typescript",
+        "vala"
+      ],
+      "distinctCollections": [
+        "programming-languages"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/programming-languages/javascript.svg",
+        "output/upload-ready/svg/programming-languages/typescript.svg",
+        "output/upload-ready/svg/programming-languages/vala.svg"
+      ]
+    },
+    {
+      "key": "programming-languages:neutral:01c00ff01ff83ffc7ffe7ffe7fffffffffffffff7ffe7ffe3ffe1ffc0ff803c0",
+      "size": 3,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "clojure",
+        "visualbasic",
+        "wolfram"
+      ],
+      "distinctCollections": [
+        "programming-languages"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/programming-languages/clojure.svg",
+        "output/upload-ready/svg/programming-languages/visualbasic.svg",
+        "output/upload-ready/svg/programming-languages/wolfram.svg"
+      ]
+    },
+    {
+      "key": "ai-apps-agents:text:000000000000000000000000c180ffffffff2000000000000000000000000000",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "bytedance",
+        "openhuman"
+      ],
+      "distinctCollections": [
+        "ai-apps-agents"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/ai-apps-agents/bytedance-text.svg",
+        "output/upload-ready/svg/ai-apps-agents/openhuman-text.svg"
+      ]
+    },
+    {
+      "key": "ai-devtools:neutral:00001fe03ff03ff03ff87f3e7e3f7e3f7e7f7c7e7c7e0ffe0ffc07fc07f80000",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "copilot",
+        "copilotms"
+      ],
+      "distinctCollections": [
+        "ai-devtools"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/ai-devtools/copilot.svg",
+        "output/upload-ready/svg/ai-devtools/copilotms.svg"
+      ]
+    },
+    {
+      "key": "ai-model-labs:text:0000000000000000000000000000ffffffff0000000000000000000000000000",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "alephalpha",
+        "geminicli"
+      ],
+      "distinctCollections": [
+        "ai-model-labs"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/ai-model-labs/alephalpha-text.svg",
+        "output/upload-ready/svg/ai-model-labs/geminicli-text.svg"
+      ]
+    },
+    {
+      "key": "design-productivity:neutral:00000ff01ff83ffc7ffe7ffe7ffe7fff7fff7ffe7ffe7ffe3ffc1ffc0ff00180",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "canva",
+        "shotgrid"
+      ],
+      "distinctCollections": [
+        "design-productivity"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/design-productivity/canva.svg",
+        "output/upload-ready/svg/design-productivity/shotgrid.svg"
+      ]
+    },
+    {
+      "key": "design-productivity:neutral:00003ffc7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe3ffe0000",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "lunacy",
+        "trello"
+      ],
+      "distinctCollections": [
+        "design-productivity"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/design-productivity/lunacy.svg",
+        "output/upload-ready/svg/design-productivity/trello.svg"
+      ]
+    },
+    {
+      "key": "design-productivity:neutral:00003ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe0000",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "adobeillustrator",
+        "miro"
+      ],
+      "distinctCollections": [
+        "design-productivity"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/design-productivity/adobeillustrator.svg",
+        "output/upload-ready/svg/design-productivity/miro.svg"
+      ]
+    },
+    {
+      "key": "developer-clients:neutral:00007fe07ffc7ffc7ffc7ffc7ffc7ffe7ffe7ffe3ffe3ffe3ffe3ffe3ffc0000",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "pycharm",
+        "webstorm"
+      ],
+      "distinctCollections": [
+        "developer-clients"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/developer-clients/pycharm.svg",
+        "output/upload-ready/svg/developer-clients/webstorm.svg"
+      ]
+    },
+    {
+      "key": "devtools-ci:neutral:000003c00ff03ffc7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe3ffc0ff007e00180",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "nodered",
+        "webpack"
+      ],
+      "distinctCollections": [
+        "devtools-ci"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/devtools-ci/nodered.svg",
+        "output/upload-ready/svg/devtools-ci/webpack.svg"
+      ]
+    },
+    {
+      "key": "devtools-ci:neutral:00007ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe0000",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "jslint",
+        "npm"
+      ],
+      "distinctCollections": [
+        "devtools-ci"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/devtools-ci/jslint.svg",
+        "output/upload-ready/svg/devtools-ci/npm.svg"
+      ]
+    },
+    {
+      "key": "frontend-frameworks:neutral:000003c00ff03ffc7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe3ffc0ff007e00180",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "hexo",
+        "preact"
+      ],
+      "distinctCollections": [
+        "frontend-frameworks"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/frontend-frameworks/hexo.svg",
+        "output/upload-ready/svg/frontend-frameworks/preact.svg"
+      ]
+    },
+    {
+      "key": "frontend-frameworks:neutral:00007ffc3ffc3ffc3ffc3ffc3ffc3ffc3ffc3ffc3ffc3ffc3ffc1ff80ff00000",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "css3",
+        "html5"
+      ],
+      "distinctCollections": [
+        "frontend-frameworks"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/frontend-frameworks/css3.svg",
+        "output/upload-ready/svg/frontend-frameworks/html5.svg"
+      ]
+    },
+    {
+      "key": "frontend-frameworks:neutral:01c00ff01ff83ffc7ffe7ffe7fffffffffffffff7ffe7ffe3ffe1ffc0ff803c0",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "chakraui",
+        "ember"
+      ],
+      "distinctCollections": [
+        "frontend-frameworks"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/frontend-frameworks/chakraui.svg",
+        "output/upload-ready/svg/frontend-frameworks/ember.svg"
+      ]
+    },
+    {
+      "key": "gcp-legacy:neutral:000003c00ff01ff83ffc3ffc3ffc3ffc3ffc3ffc3ffc1ff807e007c007000400",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "dialogflow-cx",
+        "dialogflow-insights"
+      ],
+      "distinctCollections": [
+        "gcp-legacy"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/gcp-legacy/dialogflow-cx.svg",
+        "output/upload-ready/svg/gcp-legacy/dialogflow-insights.svg"
+      ]
+    },
+    {
+      "key": "palantir:neutral:000000007ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe00000000",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "foundry-rules-app",
+        "modeling-objective-app"
+      ],
+      "distinctCollections": [
+        "palantir"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/palantir/foundry-rules-app.svg",
+        "output/upload-ready/svg/palantir/modeling-objective-app.svg"
+      ]
+    },
+    {
+      "key": "palantir:neutral:ffffffffffffffffffff0000ffffffffffffffffffffffffffffffffffffffff",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "inference-app",
+        "structured-dataset-app"
+      ],
+      "distinctCollections": [
+        "palantir"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/palantir/inference-app.svg",
+        "output/upload-ready/svg/palantir/structured-dataset-app.svg"
+      ]
+    },
+    {
+      "key": "programming-languages:neutral:00000ff01ff83ffc7ffe7ffe7ffe7fff7fff7ffe7ffe7ffe3ffc1ffc0ff00180",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "crystal",
+        "perl"
+      ],
+      "distinctCollections": [
+        "programming-languages"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/programming-languages/crystal.svg",
+        "output/upload-ready/svg/programming-languages/perl.svg"
+      ]
+    }
+  ],
+  "duplicateCrossNameGroupsCount": 0,
+  "visualDuplicateCrossNameGroupsCount": 0,
+  "rasterDuplicateCrossNameGroupsCount": 12,
+  "nearSimilarityCrossNameGroupsCount": 24
+}

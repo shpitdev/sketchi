@@ -1,0 +1,207 @@
+{
+  "generatedAt": "2026-06-06T16:05:35.473Z",
+  "refreshedProviders": {
+    "tech-stack-icons": {
+      "version": "3.7.1",
+      "publishDate": "2026-03-05T18:45:20.321Z",
+      "sourceShape": "bundled-js-icon-map (dist/index.js -> { name: { svg: { light, dark, grayscale } } })",
+      "available": 694,
+      "includedInCuration": true
+    },
+    "lobe-icons": {
+      "version": "1.91.0",
+      "publishDate": "2026-05-28T08:18:16.703Z",
+      "sourceShape": "flat icons/*.svg with variant suffixes (-color, -brand, -text, -brand-color, -text-cn, -text-color)",
+      "available": 871,
+      "includedInCuration": true
+    },
+    "simple-icons": {
+      "version": "16.22.0",
+      "publishDate": "2026-05-31T02:33:05.132Z",
+      "sourceShape": "flat icons/*.svg (thousands of generic brand icons)",
+      "available": 3438,
+      "includedInCuration": false
+    },
+    "local-snapshots": {
+      "note": "gcp/palantir/workos are local-only providers; raw inputs are reconstructed from committed outputs when absent.",
+      "groups": {
+        "gcp": {
+          "restored": true,
+          "source": "committed-output-reconstruction",
+          "files": 261,
+          "missingOutputs": []
+        },
+        "palantir": {
+          "restored": true,
+          "source": "committed-output-reconstruction",
+          "files": 68,
+          "missingOutputs": []
+        },
+        "workos": {
+          "restored": true,
+          "source": "committed-output-reconstruction",
+          "files": 2,
+          "missingOutputs": []
+        }
+      }
+    }
+  },
+  "rawAvailabilityByProvider": {
+    "gcp-category": {
+      "total": 26,
+      "variants": {
+        "(default)": 26
+      }
+    },
+    "gcp-core": {
+      "total": 19,
+      "variants": {
+        "(default)": 19
+      }
+    },
+    "gcp-legacy": {
+      "total": 216,
+      "variants": {
+        "(default)": 215,
+        "text": 1
+      }
+    },
+    "lobe-icons": {
+      "total": 852,
+      "variants": {
+        "base": 309,
+        "brand": 18,
+        "color": 209,
+        "text": 316
+      }
+    },
+    "palantir": {
+      "total": 68,
+      "variants": {
+        "(default)": 68
+      }
+    },
+    "tech-stack-icons": {
+      "total": 694,
+      "variants": {
+        "(default)": 694
+      }
+    },
+    "workos-svg": {
+      "total": 2,
+      "variants": {
+        "full-color": 1,
+        "color": 1
+      }
+    }
+  },
+  "curatedOutputsByCollection": {
+    "ai-apps-agents": 152,
+    "ai-devtools": 86,
+    "ai-ecosystem": 54,
+    "ai-harness-wrappers": 45,
+    "ai-infrastructure": 62,
+    "ai-model-families": 68,
+    "ai-model-labs": 41,
+    "ai-model-providers": 30,
+    "auth-identity": 10,
+    "cloud-hosting-paas": 23,
+    "cloud-platforms": 10,
+    "cloud-vendors": 37,
+    "data-storage": 36,
+    "design-productivity": 33,
+    "developer-clients": 49,
+    "devtools-ci": 76,
+    "ecommerce-retail": 2,
+    "education": 1,
+    "frameworks-runtimes": 118,
+    "frontend-frameworks": 68,
+    "gaming": 8,
+    "gcp": 45,
+    "gcp-legacy": 216,
+    "hardware-iot": 2,
+    "observability-security": 20,
+    "operating-systems": 14,
+    "palantir": 68,
+    "programming-languages": 36,
+    "social-communication": 1
+  },
+  "totals": {
+    "curatedOutputs": 1411,
+    "previousCuratedOutputs": 1407,
+    "rawIcons": 1877
+  },
+  "newlyAvailableUnmapped": {
+    "techStack": [
+      "ae",
+      "ai360",
+      "aimass",
+      "bilibiliai",
+      "dphn-aiai",
+      "glmvai",
+      "higress",
+      "kwaikatai",
+      "kwaipilotai",
+      "liquidaiai",
+      "nimble",
+      "nodejs2",
+      "norg",
+      "novamodelai",
+      "npss",
+      "polygon",
+      "qingyan",
+      "reach",
+      "rect",
+      "relaceai",
+      "sema",
+      "ssh",
+      "thealgorithms",
+      "tripo",
+      "unifiedmodelinglanguage",
+      "xml",
+      "yaml"
+    ],
+    "techStackCount": 27,
+    "note": "Discovered tech-stack slugs with no confident curated mapping; review for manual placement."
+  },
+  "curatedDelta": {
+    "addedCount": 4,
+    "removedCount": 0,
+    "renamedCount": 0,
+    "movedToOtherCollectionCount": 0,
+    "trulyRemovedCount": 0,
+    "added": [
+      "ai-apps-agents/commandai",
+      "design-productivity/novelwriter",
+      "frameworks-runtimes/spss",
+      "observability-security/tenzir"
+    ],
+    "trulyRemoved": [],
+    "renamedSlugs": [],
+    "movedCollections": []
+  },
+  "outputContentChanges": {
+    "changed": 0,
+    "added": 4,
+    "removed": 0,
+    "note": "Versus committed tree (git status). All outputs change when re-canonicalized."
+  },
+  "canonicalSizing": {
+    "canvasSize": 512,
+    "paddingRatio": 0.06,
+    "canonicalizedSvgCount": 1411,
+    "statusCounts": {
+      "reframed": 1411
+    },
+    "issues": []
+  },
+  "duplicateReviewRisks": {
+    "exactDuplicateGroups": 0,
+    "exactCrossNameGroups": 0,
+    "visualDuplicateGroups": 0,
+    "visualCrossNameGroups": 0,
+    "nearSimilarityGroups": 24,
+    "nearCrossNameGroups": 24,
+    "note": "Cross-name groups (same shape, different brand) are the manual-review priority."
+  }
+}

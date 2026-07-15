@@ -1,0 +1,19 @@
+{
+  "fields": [
+    { "name": "schema", "type": "string", "required": true },
+    { "name": "event_id", "type": "string", "required": true },
+    { "name": "run_id", "type": "string", "required": true },
+    { "name": "attempt_id", "type": "string", "required": true },
+    { "name": "event_key", "type": "string", "required": true },
+    { "name": "event_time", "type": "string", "required": true },
+    { "name": "event_date", "type": "string", "required": true },
+    { "name": "surface", "type": "string", "required": true },
+    { "name": "operation", "type": "string", "required": true },
+    { "name": "status", "type": "string", "required": true },
+    { "name": "issue_code", "type": "string", "required": true },
+    { "name": "issue_severity", "type": "string", "required": false },
+    { "name": "issue_stage", "type": "string", "required": false },
+    { "name": "issue_message", "type": "string", "required": false },
+    { "name": "issue_path", "type": "string", "required": true }
+  ]
+}

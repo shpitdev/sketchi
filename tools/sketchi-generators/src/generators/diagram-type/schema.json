@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "$id": "DiagramType",
+  "title": "",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Diagram type value, for example mindmap or system-map.",
+      "$default": {
+        "$source": "argv",
+        "index": 0
+      },
+      "x-prompt": "What diagram type would you like to use?"
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable fixture title."
+    },
+    "skipFormat": {
+      "type": "boolean",
+      "description": "Skip formatting generated files.",
+      "default": false
+    }
+  },
+  "required": ["name"]
+}

@@ -1,0 +1,19 @@
+{
+  "apps": {
+    "apps/excalidraw": {
+      "name": "excalidraw.sketchi"
+    },
+    "apps/icons": {
+      "name": "icons.sketchi"
+    },
+    "apps/playground": {
+      "name": "eval.sketchi"
+    },
+    "apps/studio": {
+      "name": "studio.sketchi"
+    },
+    "apps/web": {
+      "name": "sketchi"
+    }
+  }
+}

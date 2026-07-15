@@ -1,0 +1,6 @@
+# Public conversion input contract. No other Icons assets receive CORS headers.
+/output/upload-ready/svg/*
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Methods: GET, HEAD, OPTIONS
+  Access-Control-Max-Age: 86400
+  Cross-Origin-Resource-Policy: cross-origin

@@ -1,0 +1,310 @@
+/* =====================================================================
+   Sketchi v2 — global "Drafting Studio" design system
+   Single source of truth for every app and shared component.
+   Brand pulled from sketchi.app: pencil icon + mauve accent.
+   Imported by each app's app.css and by diagram-studio-ui styles.css.
+   ===================================================================== */
+
+:root {
+  --font-display: "Bricolage Grotesque", "Hanken Grotesk", system-ui, sans-serif;
+  --font-body: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  --font-script: "Dancing Script", "Bricolage Grotesque", cursive;
+
+  /* surfaces */
+  --paper: #f6f1e7;
+  --paper-2: #fbf7ee;
+  --card: #fffdf8;
+  --ink: #1a1712;
+  --ink-2: #4c4639;
+  --ink-3: #8a8270;
+
+  /* lines */
+  --line: #e7ddc9;
+  --line-2: #d8ccb1;
+
+  /* accent — Sketchi brand mauve (from sketchi.app icon) */
+  --accent: #8f707f;
+  --accent-strong: #6f5462;
+  --accent-ink: #6a4e5c;
+  --accent-wash: #efe6ec;
+
+  /* secondary — blueprint (validated / technical) */
+  --blueprint: #1f44c9;
+  --blueprint-ink: #1a39a8;
+  --blueprint-wash: #e6eafb;
+
+  /* semantic status */
+  --ok: #1c7a4d;
+  --ok-wash: #def0e5;
+  --danger: #c0392b;
+  --danger-wash: #f6ddd9;
+
+  --grid-dot: rgba(26, 23, 18, 0.06);
+
+  --shadow-sm: 0 1px 2px rgba(40, 31, 12, 0.06), 0 2px 6px rgba(40, 31, 12, 0.05);
+  --shadow-md: 0 6px 18px rgba(40, 31, 12, 0.08), 0 2px 6px rgba(40, 31, 12, 0.05);
+  --shadow-lg: 0 24px 60px rgba(40, 31, 12, 0.16), 0 6px 18px rgba(40, 31, 12, 0.08);
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --shell: 1180px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --checker: linear-gradient(45deg, var(--line) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--line) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--line) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--line) 75%);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(52rem 28rem at 85% -12%, rgba(143, 112, 127, 0.1), transparent 60%),
+    radial-gradient(var(--grid-dot) 1px, transparent 1px);
+  background-size: auto, 24px 24px;
+  background-position: 0 0, -1px -1px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+a {
+  color: inherit;
+}
+
+img {
+  max-width: 100%;
+}
+
+/* ---- motion ---------------------------------------------------------- */
+@keyframes sk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sk-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes sk-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sk-rise {
+  animation: sk-rise 0.7s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ---- shared atoms ---------------------------------------------------- */
+.sk-shell {
+  margin: 0 auto;
+  max-width: var(--shell);
+  padding-inline: 24px;
+  width: 100%;
+}
+
+.sk-eyebrow {
+  align-items: center;
+  color: var(--accent-ink);
+  display: inline-flex;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  gap: 9px;
+  letter-spacing: 0.16em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.sk-eyebrow::before {
+  background: var(--accent);
+  block-size: 9px;
+  content: "";
+  inline-size: 9px;
+  rotate: 45deg;
+}
+
+.sk-icon {
+  border-radius: 7px;
+  display: block;
+}
+
+.sk-wordmark {
+  font-family: var(--font-script);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sk-btn {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  display: inline-flex;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 700;
+  gap: 8px;
+  justify-content: center;
+  line-height: 1;
+  min-height: 46px;
+  padding: 0 20px;
+  text-decoration: none;
+  transition:
+    transform 0.18s var(--ease),
+    box-shadow 0.18s var(--ease),
+    background 0.18s var(--ease),
+    border-color 0.18s var(--ease);
+  white-space: nowrap;
+}
+
+.sk-btn:hover {
+  transform: translateY(-2px);
+}
+
+.sk-btn:active {
+  transform: translateY(0);
+}
+
+.sk-btn:focus-visible {
+  outline: 2px solid var(--blueprint);
+  outline-offset: 2px;
+}
+
+.sk-btn--primary {
+  background: var(--ink);
+  box-shadow: var(--shadow-md);
+  color: var(--paper-2);
+}
+
+.sk-btn--primary:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.sk-btn--accent {
+  background: var(--accent-strong);
+  box-shadow: 0 8px 20px rgba(111, 84, 98, 0.28);
+  color: #fff;
+}
+
+.sk-btn--ghost {
+  background: transparent;
+  border-color: var(--line-2);
+  color: var(--ink);
+}
+
+.sk-btn--ghost:hover {
+  background: var(--card);
+  border-color: var(--ink);
+}
+
+.sk-pill {
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--ink-2);
+  display: inline-flex;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  gap: 8px;
+  letter-spacing: 0.01em;
+  padding: 6px 13px;
+  white-space: nowrap;
+}
+
+.sk-pill__dot {
+  block-size: 7px;
+  border-radius: 999px;
+  inline-size: 7px;
+}
+
+.sk-pill__dot--ok {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px var(--ok-wash);
+}
+
+.sk-pill__dot--accent {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+
+.sk-pill__dot--blueprint {
+  background: var(--blueprint);
+  box-shadow: 0 0 0 3px var(--blueprint-wash);
+}
+
+.sk-pill__dot--danger {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-wash);
+}
+
+/* ---- section scaffolding -------------------------------------------- */
+.sk-section {
+  border-top: 1px solid var(--line);
+  padding-block: clamp(52px, 7vw, 88px);
+}
+
+.sk-section__head {
+  max-width: 60ch;
+}
+
+.sk-section__title {
+  font-size: clamp(28px, 3.6vw, 40px);
+  line-height: 1.08;
+  margin: 14px 0 0;
+}
+
+.sk-section__lead {
+  color: var(--ink-2);
+  font-size: 17px;
+  line-height: 1.6;
+  margin: 14px 0 0;
+}

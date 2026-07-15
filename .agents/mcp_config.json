@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "sketchi-code-mode": {
+      "serverUrl": "https://sketchi-studio.dimethyl.workers.dev/mcp"
+    }
+  }
+}

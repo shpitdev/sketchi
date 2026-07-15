@@ -1,0 +1,48 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "sketchi-studio",
+  "compatibility_date": "2026-06-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  "ai": {
+    "binding": "AI",
+    "remote": true,
+  },
+  "browser": {
+    "binding": "BROWSER",
+    "remote": true,
+  },
+  "worker_loaders": [
+    {
+      "binding": "LOADER",
+    },
+  ],
+  "observability": {
+    "enabled": true,
+  },
+  "r2_buckets": [
+    {
+      "binding": "SKETCHI_ARTIFACTS",
+      "bucket_name": "sketchi-studio-codemode-artifacts-production",
+      "preview_bucket_name": "sketchi-studio-codemode-artifacts-preview",
+    },
+  ],
+  "pipelines": [
+    {
+      "binding": "CODEMODE_USAGE_EVENTS",
+      "stream": "d9044253316f4273a60298098f444a62",
+      "remote": true,
+    },
+    {
+      "binding": "CODEMODE_USAGE_ISSUES",
+      "stream": "f687dab6e7d742c1a76834089e709462",
+      "remote": true,
+    },
+  ],
+  "workers_dev": true,
+  "vars": {
+    "SKETCHI_APP_SURFACE": "studio",
+    "SKETCHI_AI_GATEWAY_ID": "google-ai-studio",
+    "SKETCHI_AI_MODEL": "google/gemini-3.1-flash-lite",
+  },
+}

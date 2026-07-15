@@ -1,0 +1,32 @@
+{
+  "summary": {
+    "generatedAt": "2026-02-28T05:40:40.369Z",
+    "model": "gemini-3-flash-preview",
+    "dryRun": false,
+    "filters": {
+      "collections": [
+        "ai-apps-agents",
+        "ai-devtools",
+        "ai-ecosystem",
+        "ai-harness-wrappers",
+        "ai-infrastructure",
+        "ai-model-families",
+        "ai-model-labs",
+        "ai-model-providers",
+        "cloud-hosting-paas",
+        "cloud-vendors",
+        "design-productivity",
+        "devtools-ci",
+        "frameworks-runtimes"
+      ],
+      "includeNonCrossName": false,
+      "maxGroups": 200
+    },
+    "groupsSelected": 0,
+    "groupsWithParsedDecision": 0,
+    "groupsWithParseError": 0,
+    "recommendedRemovalCount": 0,
+    "recommendedRemovals": []
+  },
+  "groups": []
+}

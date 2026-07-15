@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "$id": "UiComponent",
+  "title": "",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Component name, for example DiagramPreview or diagram-preview.",
+      "$default": {
+        "$source": "argv",
+        "index": 0
+      },
+      "x-prompt": "What component name would you like to use?"
+    },
+    "projectRoot": {
+      "type": "string",
+      "description": "Nx project root that owns the component.",
+      "default": "packages/diagram-studio-ui"
+    },
+    "directory": {
+      "type": "string",
+      "description": "Directory under the project src folder.",
+      "default": "components"
+    },
+    "skipFormat": {
+      "type": "boolean",
+      "description": "Skip formatting generated files.",
+      "default": false
+    }
+  },
+  "required": ["name"]
+}

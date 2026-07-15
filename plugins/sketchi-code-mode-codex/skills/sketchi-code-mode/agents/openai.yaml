@@ -1,0 +1,18 @@
+interface:
+  display_name: "Sketchi Code Mode"
+  short_description: "Build Sketchi diagrams through MCP"
+  icon_small: "./assets/codex.svg"
+  icon_large: "./assets/mcp.svg"
+  brand_color: "#2F6FED"
+  default_prompt: "Use $sketchi-code-mode to build and style a Sketchi flowchart."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "sketchi-code-mode"
+      description: "Remote Sketchi Code Mode MCP server"
+      transport: "streamable_http"
+      url: "https://sketchi-studio.dimethyl.workers.dev/mcp"
+
+policy:
+  allow_implicit_invocation: true

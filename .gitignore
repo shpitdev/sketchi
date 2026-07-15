@@ -1,80 +1,18 @@
-# Dependencies
-node_modules
-.DS_Store
-packages/backend/test-results/
-.pnp
-.pnp.js
-
-# Build outputs
-dist
-build
-!packages/opencode-excalidraw/.mise/tasks/build
-*.tsbuildinfo
-
-# Environment variables
-.env
-.env*.local
-.env.e2e
-
-# IDEs and editors
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-.idea
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-.pnpm-debug.log*
-
-# Turbo
-.turbo
-
-# Better-T-Stack
-.alchemy
-
-# Testing
-coverage
-.nyc_output
-tests/e2e/artifacts/
-tests/output/
-preview-artifacts/
-
-# Misc
-*.tgz
-.cache
-tmp
-temp
-.sisyphus/
-
-#additional exclude
-/.claude/settings.json
-/.claude/settings.json.bak
-/.claude/settings.local.json
-/.codex/environments/
-
-# Opencode plugin
-/.sketchi/
-/sketchi/opencode-logs/
-/sketchi/opencode-logs*/
-opencode-logs/
-opencode-logs*/
-.vercel
-
-# Generated diagram exports
-/diagram-*.png
-/docs/architecture-diagram.png
-
-# Agents
-.agents/skills
+node_modules/
+.nx/
+dist/
+coverage/
+storybook-static/
+.output/
+.wrangler/
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
+worker-configuration.d.ts
 .memory/
+packages/*/src/**/*.js
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.d.ts.map
+
+vitest.config.*.timestamp*

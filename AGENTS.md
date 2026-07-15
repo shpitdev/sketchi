@@ -1,20 +1,38 @@
-## Repo Constraints
-- **Branches**: only one active branch other than main at a time (cleanup or recommend cleanup if found in violation)
-- **Vercel**: `NEXT_PUBLIC_CONVEX_URL` is automatic. If undefined, Convex deploy failed.
-- **Pre-push**: `bun x ultracite fix`, `bun run check-types`, `bun run build`, and `cd packages/backend && bun run test`.
+# Agent Guidelines
 
-## Preferences
-- **Communication**: Succinct; fragments OK; facts first; show evidence (commands + exit codes).
-- **Engineering**: `readable > clever`; long descriptive names OK; split files at ~400 lines.
+## Scope
 
-## Testing Strategy
-- **Priority**: API > E2E > manual/verification.
-- **API (Convex)**: `packages/backend/convex/*.test.ts`. Never mock HTTP; verify functional intent.
-- **E2E (Stagehand)**: Prompt-first selectors; avoid brittle CSS. Use `STAGEHAND_TARGET_URL` for previews.
-- **Authenticated local E2E**: When a flow requires WorkOS sign-in, use `SKETCHI_E2E_EMAIL` and `SKETCHI_E2E_PASSWORD` from local env files instead of ad hoc credentials.
-- **Local auth/editor overrides**: For local WorkOS + Convex verification, prefer `SKETCHI_ADMIN_SUBJECTS` / `SKETCHI_ICON_LIBRARY_EDITOR_SUBJECTS` in addition to email allowlists. Local Convex identities may not include email claims even when the user is signed in.
-- **UI verification**: For any UI/E2E-affecting change, run a targeted local verification against the real app before finishing. Prefer `agent-browser` for the interaction path and `d3k` for browser/server log review; at minimum run the real dev server with `bun run dev` and verify the affected flow there.
-- **Manual**: Checklist + log analysis (`venom.log` or Convex logs).
+This is the canonical Sketchi product repository. Keep one coherent Nx and
+Cloudflare Workers architecture; do not reintroduce the retired Next.js,
+Convex, Vercel, Bun, or Turborepo stack.
 
-## Memory
-- Use `.memory/` for temporary artifacts (gitignored but visible to tools).
+## Priorities
+
+- Prefer readable, tested package boundaries over compatibility layers.
+- Treat diagram generation as product-critical infrastructure: deterministic inputs, typed intermediate representation, functional tests, and Storybook coverage.
+- Delete obsolete approaches when replacing them. Do not carry parallel systems unless a migration step explicitly requires it.
+
+## Delegated agents
+
+- Use Codex `gpt-5.6-sol` for planning, implementation, and independent review,
+  with reasoning effort set explicitly for the task.
+- Fable is advisory only and must never implement, edit files, delegate work,
+  commit, open or merge PRs, or perform any other mutation. Launch it with
+  read-only tools and `--permission-mode manual`; never use Plan Mode, auto
+  approval, or edit-capable tools. Its response is the only deliverable, and
+  agreement with that response is not authorization for Fable to execute it.
+
+## Proof
+
+Before pushing meaningful changes, run:
+
+- `pnpm nx run-many -t typecheck,test,build`
+- `pnpm nx build-storybook diagram-studio-ui`
+
+For UI-affecting changes, run the web app locally and verify the changed flow against the real page.
+
+For end-to-end checks, prefer exercising the real deployed or local surface through an actual browser (Chrome/TabEx where a true browser is required; otherwise `agent-browser`) instead of relying only on in-process or mocked tests.
+
+## Temporary Artifacts
+
+Use `.memory/` for local notes, logs, screenshots, and other temporary artifacts. It is gitignored but visible to agents through `.ignore`.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sketchi Log Analysis"
+  short_description: "Analyze Sketchi AI Gateway logs"
+  default_prompt: "Use $sketchi-log-analysis to inspect recent Sketchi AI Gateway logs and summarize prompt-tuning failures."

@@ -1,0 +1,11 @@
+import { describe, expect, it } from "vitest";
+
+import { parseIntermediateDiagram } from "../intermediate";
+import { <%= fixtureName %>, <%= propertyName %>DiagramType } from "./<%= typeValue %>";
+
+describe("<%= className %> diagram type", () => {
+  it("has a typed fixture that satisfies the intermediate diagram contract", () => {
+    expect(<%= fixtureName %>.type).toBe(<%= propertyName %>DiagramType);
+    expect(parseIntermediateDiagram(<%= fixtureName %>)).toEqual(<%= fixtureName %>);
+  });
+});

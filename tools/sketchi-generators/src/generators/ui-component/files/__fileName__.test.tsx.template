@@ -1,0 +1,13 @@
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+
+import { <%= className %> } from "./<%= fileName %>";
+
+describe("<%= className %>", () => {
+  it("renders the title", () => {
+    render(<<%= className %> title="Generated component" />);
+
+    expect(screen.getByRole("heading", { name: "Generated component" }))
+      .toBeTruthy();
+  });
+});
