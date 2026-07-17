@@ -6,10 +6,10 @@ Sketchi v2 should make diagram generation boring in the best way: inputs are val
 
 | Area                | Source of truth                                     | Proof                            |
 | ------------------- | --------------------------------------------------- | -------------------------------- |
-| Diagram contract    | `packages/diagram-core`                             | core tests and fixtures          |
-| Deterministic scene | `packages/diagram-renderer`                         | renderer tests and stories       |
-| Excalidraw output   | `packages/diagram-excalidraw`                       | real-scene validation            |
-| Agentic generation  | `packages/diagram-generation`, then `diagram-agent` | fixture/eval tests               |
+| Diagram contract    | `packages/diagram/core`                             | core tests and fixtures          |
+| Deterministic scene | `packages/diagram/renderer`                         | renderer tests and stories       |
+| Excalidraw output   | `packages/diagram/excalidraw`                       | real-scene validation            |
+| Agentic generation  | `packages/diagram/generation`, then `diagram-agent` | fixture/eval tests               |
 | Product surfaces    | `apps/*`                                            | Nx app builds and Worker deploys |
 
 ```mermaid

@@ -35,4 +35,4 @@ pnpm nx build diagram-agent
 ```
 
 The public contract and repair behavior are documented in
-[docs/mcp-tool-catalog.md](../../docs/mcp-tool-catalog.md).
+[docs/mcp-tool-catalog.md](../../../docs/mcp-tool-catalog.md).

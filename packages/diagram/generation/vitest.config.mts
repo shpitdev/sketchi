@@ -4,14 +4,12 @@ import { nxCopyAssetsPlugin } from "@nx/vite/plugins/nx-copy-assets.plugin";
 
 export default defineConfig(() => ({
   root: __dirname,
-  cacheDir: "../../node_modules/.vite/packages/diagram-generation",
+  cacheDir: "../../../node_modules/.vite/packages/diagram/generation",
   plugins: [nxViteTsPaths(), nxCopyAssetsPlugin(["*.md"])],
   resolve: {
     alias: {
-      "@sketchi/diagram-core": new URL(
-        "../diagram-core/src/index.ts",
-        import.meta.url,
-      ).pathname,
+      "@sketchi/diagram-core": new URL("../core/src/index.ts", import.meta.url)
+        .pathname,
     },
   },
   test: {
@@ -22,7 +20,7 @@ export default defineConfig(() => ({
     include: ["{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
     reporters: ["default"],
     coverage: {
-      reportsDirectory: "../../coverage/packages/diagram-generation",
+      reportsDirectory: "../../../coverage/packages/diagram/generation",
       provider: "v8" as const,
     },
   },

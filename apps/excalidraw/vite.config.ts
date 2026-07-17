@@ -45,21 +45,21 @@ export default defineConfig({
       {
         find: "@sketchi/diagram-core",
         replacement: new URL(
-          "../../packages/diagram-core/src/index.ts",
+          "../../packages/diagram/core/src/index.ts",
           import.meta.url,
         ).pathname,
       },
       {
         find: "@sketchi/diagram-renderer",
         replacement: new URL(
-          "../../packages/diagram-renderer/src/index.ts",
+          "../../packages/diagram/renderer/src/index.ts",
           import.meta.url,
         ).pathname,
       },
       {
         find: "@sketchi/diagram-excalidraw",
         replacement: new URL(
-          "../../packages/diagram-excalidraw/src/index.ts",
+          "../../packages/diagram/excalidraw/src/index.ts",
           import.meta.url,
         ).pathname,
       },

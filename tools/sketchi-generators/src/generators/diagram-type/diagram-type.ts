@@ -9,8 +9,8 @@ import path from "node:path";
 
 import type { DiagramTypeGeneratorSchema } from "./schema";
 
-const CORE_ROOT = "packages/diagram-core/src";
-const RENDERER_ROOT = "packages/diagram-renderer/src";
+const CORE_ROOT = "packages/diagram/core/src";
+const RENDERER_ROOT = "packages/diagram/renderer/src";
 const STUDIO_ROOT = "packages/diagram-studio-ui/src";
 
 function appendExport(tree: Tree, indexPath: string, exportPath: string) {

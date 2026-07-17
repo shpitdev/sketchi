@@ -5,7 +5,7 @@ import { defineConfig } from "vitest/config";
 const source = (path: string) => new URL(path, import.meta.url).pathname;
 
 export default defineConfig({
-  cacheDir: "../../node_modules/.vite/apps/excalidraw-browser",
+  cacheDir: source("../../node_modules/.vite/apps/excalidraw-browser"),
   plugins: [react()],
   resolve: {
     alias: [
@@ -15,15 +15,15 @@ export default defineConfig({
       },
       {
         find: "@sketchi/diagram-core",
-        replacement: source("../../packages/diagram-core/src/index.ts"),
+        replacement: source("../../packages/diagram/core/src/index.ts"),
       },
       {
         find: "@sketchi/diagram-renderer",
-        replacement: source("../../packages/diagram-renderer/src/index.ts"),
+        replacement: source("../../packages/diagram/renderer/src/index.ts"),
       },
       {
         find: "@sketchi/diagram-excalidraw",
-        replacement: source("../../packages/diagram-excalidraw/src/index.ts"),
+        replacement: source("../../packages/diagram/excalidraw/src/index.ts"),
       },
       {
         find: "@sketchi/diagram-studio-ui",

@@ -104,11 +104,11 @@ directly. Managed history and cross-turn lineage still wait for Convex threads.
 
 ```mermaid
 flowchart LR
-  Playground["apps/playground build_flowchart host"] --> Agent["packages/diagram-agent"]
-  Agent --> Generation["packages/diagram-generation"]
-  Agent --> Core["packages/diagram-core"]
-  Agent --> Renderer["packages/diagram-renderer"]
-  Renderer --> Excalidraw["packages/diagram-excalidraw"]
+  Playground["apps/playground build_flowchart host"] --> Agent["packages/diagram/agent"]
+  Agent --> Generation["packages/diagram/generation"]
+  Agent --> Core["packages/diagram/core"]
+  Agent --> Renderer["packages/diagram/renderer"]
+  Renderer --> Excalidraw["packages/diagram/excalidraw"]
   Agent --> RenderTool["packages/diagram-render-proof"]
   MCP["apps/agents or apps/api-mcp"] --> Agent
   CLI["tools/diagram-cli"] --> Agent

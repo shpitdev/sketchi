@@ -55,9 +55,9 @@ not in Agy intelligence.
 
 Sketchi already owns the connector endpoints:
 
-- `packages/diagram-renderer/src/scene.ts` chooses source and target edges,
+- `packages/diagram/renderer/src/scene.ts` chooses source and target edges,
   computes port offsets, and emits route points.
-- `packages/diagram-excalidraw/src/lib/diagram-excalidraw.ts` converts those
+- `packages/diagram/excalidraw/src/lib/diagram-excalidraw.ts` converts those
   route points into Excalidraw arrow bindings.
 
 Therefore the fix should improve renderer/excalidraw geometry and validation.
@@ -66,16 +66,16 @@ layout directions is not acceptable as the primary fix.
 
 The first code areas to inspect and change are:
 
-- `connectionEdges` in `packages/diagram-renderer/src/scene.ts`, which chooses
+- `connectionEdges` in `packages/diagram/renderer/src/scene.ts`, which chooses
   source and target sides from center deltas.
-- `portOffsetsForRoutes` in `packages/diagram-renderer/src/scene.ts`, which
+- `portOffsetsForRoutes` in `packages/diagram/renderer/src/scene.ts`, which
   currently assigns offsets per node side from route order rather than sorting
   by the opposite endpoint.
 - `arrowForRoute` and `exteriorLaneRoute` in
-  `packages/diagram-renderer/src/scene.ts`, which choose orthogonal lanes and
+  `packages/diagram/renderer/src/scene.ts`, which choose orthogonal lanes and
   fallback exterior lanes.
 - `validateExcalidrawScene` in
-  `packages/diagram-excalidraw/src/lib/diagram-excalidraw.ts`, which already
+  `packages/diagram/excalidraw/src/lib/diagram-excalidraw.ts`, which already
   catches overlapping segments, route-through-node defects, endpoint-off-shape
   defects, and broken elbow metadata.
 

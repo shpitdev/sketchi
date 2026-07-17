@@ -4,16 +4,14 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig(() => ({
   root: __dirname,
-  cacheDir: "../../node_modules/.vite/packages/diagram-excalidraw",
+  cacheDir: "../../../node_modules/.vite/packages/diagram/excalidraw",
   plugins: [nxViteTsPaths(), nxCopyAssetsPlugin(["*.md"])],
   resolve: {
     alias: {
-      "@sketchi/diagram-core": new URL(
-        "../diagram-core/src/index.ts",
-        import.meta.url,
-      ).pathname,
+      "@sketchi/diagram-core": new URL("../core/src/index.ts", import.meta.url)
+        .pathname,
       "@sketchi/diagram-renderer": new URL(
-        "../diagram-renderer/src/index.ts",
+        "../renderer/src/index.ts",
         import.meta.url,
       ).pathname,
     },
@@ -26,7 +24,7 @@ export default defineConfig(() => ({
     include: ["{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
     reporters: ["default"],
     coverage: {
-      reportsDirectory: "../../coverage/packages/diagram-excalidraw",
+      reportsDirectory: "../../../coverage/packages/diagram/excalidraw",
       provider: "v8" as const,
     },
   },

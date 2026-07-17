@@ -62,12 +62,12 @@ model candidate → typed diagram IR → deterministic scene → Excalidraw arti
 
 | Boundary                      | Responsibility                                                  |
 | ----------------------------- | --------------------------------------------------------------- |
-| `packages/diagram-core`       | Typed diagram contracts, semantic validation, fixtures          |
-| `packages/diagram-generation` | Provider messages, responses, and candidate parsing             |
-| `packages/diagram-agent`      | Canonical build runtime, quality checks, artifact orchestration |
-| `packages/diagram-renderer`   | Deterministic layout and scene generation                       |
-| `packages/diagram-excalidraw` | Persistable Excalidraw conversion and real-scene validation     |
-| `packages/diagram-scenarios`  | Maintained prompts, assertions, and local/live evals            |
+| `packages/diagram/core`       | Typed diagram contracts, semantic validation, fixtures          |
+| `packages/diagram/generation` | Provider messages, responses, and candidate parsing             |
+| `packages/diagram/agent`      | Canonical build runtime, quality checks, artifact orchestration |
+| `packages/diagram/renderer`   | Deterministic layout and scene generation                       |
+| `packages/diagram/excalidraw` | Persistable Excalidraw conversion and real-scene validation     |
+| `packages/diagram/scenarios`  | Maintained prompts, assertions, and local/live evals            |
 | `packages/diagram-studio-ui`  | Shared React diagram, review, and eval UI states                |
 | `packages/studio/projects`    | Studio project/diagram contracts and object-bucket persistence  |
 | `packages/svg-excalidraw`     | Native SVG-to-Excalidraw conversion and library serialization   |

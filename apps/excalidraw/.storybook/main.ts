@@ -16,15 +16,15 @@ const config: StorybookConfig = {
     config.resolve.alias = {
       ...(config.resolve.alias ?? {}),
       "@sketchi/diagram-core": new URL(
-        "../../../packages/diagram-core/src/index.ts",
+        "../../../packages/diagram/core/src/index.ts",
         import.meta.url,
       ).pathname,
       "@sketchi/diagram-excalidraw": new URL(
-        "../../../packages/diagram-excalidraw/src/index.ts",
+        "../../../packages/diagram/excalidraw/src/index.ts",
         import.meta.url,
       ).pathname,
       "@sketchi/diagram-renderer": new URL(
-        "../../../packages/diagram-renderer/src/index.ts",
+        "../../../packages/diagram/renderer/src/index.ts",
         import.meta.url,
       ).pathname,
       "@sketchi/diagram-studio-ui/styles.css": new URL(

@@ -11,8 +11,8 @@ storybook-static/
 !.env.example
 worker-configuration.d.ts
 .memory/
-packages/*/src/**/*.js
-packages/*/src/**/*.d.ts
-packages/*/src/**/*.d.ts.map
+packages/**/src/**/*.js
+packages/**/src/**/*.d.ts
+packages/**/src/**/*.d.ts.map
 
 vitest.config.*.timestamp*
