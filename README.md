@@ -143,6 +143,10 @@ operator action. Forks and unconfigured environments retain build proof without
 a Worker deploy. The eval harness and standalone Excalidraw workspace are
 internal surfaces.
 
+Worker builds are isolated under `dist/apps/<app>` and resolved through an
+explicit Nx-project-to-Worker map, so parallel builds and later repository
+renames cannot overwrite or implicitly rename durable Worker deployments.
+
 See [preview deployments](docs/preview-deploys.md) and the guarded
 [production domain runbook](docs/production-domain-cutover.md).
 

@@ -180,11 +180,14 @@ Custom-domain attachment is a post-merge operator action described in
 [Production domain cutover](production-domain-cutover.md). Until that cutover,
 use stable `workers.dev` URLs for deployment and runtime proof.
 
-Preview deploys strip production routes and deploy app-specific Workers named
-`sketchi-<app>-pr-<number>`.
+Preview deploys strip production routes and deploy app-specific Workers using
+the durable preview prefix declared for each app.
 
-Today the workflow matrix and deploy helper maps cover `playground`, `studio`,
-`web`, `excalidraw`, and `icons`, with custom-domain attachment kept as an
+Today `scripts/lib/worker-apps.mjs` maps the stable deploy key, current Nx
+project ID, durable Worker name, input Wrangler config, and isolated
+`dist/apps/<app>` output for `playground`, `studio`, `web`, `excalidraw`, and
+`icons`. The current Nx IDs happen to match the deploy keys, but workflows do
+not derive Worker identities from Nx names. Custom-domain attachment remains an
 explicit manual workflow dispatch.
 
 ## AI Gateway Observability

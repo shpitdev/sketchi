@@ -71,7 +71,13 @@ jobs:
 
       - run: pnpm run test:deploy-scripts
 
-      - run: pnpm nx build ${{ matrix.app }}
+      - name: Resolve Worker app
+        id: worker-app
+        env:
+          WORKER_APP: ${{ matrix.app }}
+        run: node scripts/00-resolve-worker-app.mjs --app "$WORKER_APP"
+
+      - run: pnpm nx build "${{ steps.worker-app.outputs.nx_project_id }}"
 
       - name: Check Cloudflare credentials
         id: credentials
@@ -121,7 +127,11 @@ jobs:
           CF_PREVIEW_WORKERS_SUBDOMAIN: ${{ steps.workers-subdomain.outputs.workers_dev_subdomain }}
           PREVIEW_APP: ${{ matrix.app }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
-        run: node scripts/01-prepare-preview-deploy.mjs --app "$PREVIEW_APP" --pr-number "$PR_NUMBER"
+        run: >-
+          node scripts/01-prepare-preview-deploy.mjs
+          --app "$PREVIEW_APP"
+          --pr-number "$PR_NUMBER"
+          --config "${{ steps.worker-app.outputs.worker_config_path }}"
 
       - name: Comment unconfigured preview
         if: steps.credentials.outputs.configured != 'true'

@@ -10,8 +10,17 @@ import {
   localInspectorPort,
   localViteCacheDir,
 } from "../../tools/local-dev-ports";
+import { workerAppConfig } from "../../scripts/lib/worker-apps.mjs";
+
+const workerApp = workerAppConfig("studio");
 
 export default defineConfig({
+  root: new URL(".", import.meta.url).pathname,
+  build: {
+    emptyOutDir: true,
+    outDir: new URL(`../../${workerApp.buildOutputPath}`, import.meta.url)
+      .pathname,
+  },
   cacheDir: localViteCacheDir("studio"),
   publicDir: new URL("./public", import.meta.url).pathname,
   plugins: [
@@ -29,7 +38,7 @@ export default defineConfig({
         quoteStyle: "double",
         semicolons: true,
       },
-      srcDirectory: "apps/studio/src",
+      srcDirectory: "src",
     }),
     react(),
     tailwindcss(),

@@ -79,8 +79,15 @@ jobs:
       - if: ${{ github.event_name == 'push' || inputs.app == 'all' || inputs.app == matrix.app }}
         run: pnpm run test:deploy-scripts
 
+      - name: Resolve Worker app
+        id: worker-app
+        if: ${{ github.event_name == 'push' || inputs.app == 'all' || inputs.app == matrix.app }}
+        env:
+          WORKER_APP: ${{ matrix.app }}
+        run: node scripts/00-resolve-worker-app.mjs --app "$WORKER_APP"
+
       - if: ${{ github.event_name == 'push' || inputs.app == 'all' || inputs.app == matrix.app }}
-        run: pnpm nx build ${{ matrix.app }}
+        run: pnpm nx build "${{ steps.worker-app.outputs.nx_project_id }}"
 
       - name: Check Cloudflare credentials
         id: credentials
@@ -108,7 +115,7 @@ jobs:
           set -euo pipefail
           mkdir -p .memory
           pnpm exec wrangler deploy \
-            --config dist/server/wrangler.json \
+            --config "${{ steps.worker-app.outputs.worker_config_path }}" \
             --no-x-provision \
             --message "${{ matrix.app }} production Worker ${{ github.sha }}" \
             2>&1 | tee ".memory/wrangler-${{ matrix.app }}-production-deploy.log"
@@ -119,7 +126,7 @@ jobs:
         run: |
           node scripts/02-extract-preview-url.mjs \
             ".memory/wrangler-${{ matrix.app }}-production-deploy.log" \
-            --worker-name "sketchi-${{ matrix.app }}"
+            --worker-name "${{ steps.worker-app.outputs.worker_name }}"
 
       - name: Summarize production Worker
         if: ${{ steps.credentials.outputs.configured == 'true' && (github.event_name == 'push' || inputs.app == 'all' || inputs.app == matrix.app) }}
@@ -129,7 +136,7 @@ jobs:
           {
             echo "### ${{ matrix.app }} production Worker"
             echo ""
-            echo "- Worker: \`sketchi-${{ matrix.app }}\`"
+            echo "- Worker: \`${{ steps.worker-app.outputs.worker_name }}\`"
             echo "- workers.dev URL: ${{ steps.workers-dev-url.outputs.preview_url }}"
             node --input-type=module <<'NODE'
           import { productionAppConfig } from "./scripts/lib/production-deploy.mjs";
@@ -154,7 +161,10 @@ jobs:
         if: ${{ steps.credentials.outputs.configured == 'true' && github.event_name == 'workflow_dispatch' && inputs.domain_action == 'attach' && (inputs.app == 'all' || inputs.app == matrix.app) }}
         env:
           APP: ${{ matrix.app }}
-        run: node scripts/05-prepare-production-domain-deploy.mjs --app "$APP"
+        run: >-
+          node scripts/05-prepare-production-domain-deploy.mjs
+          --app "$APP"
+          --config "${{ steps.worker-app.outputs.worker_config_path }}"
 
       - name: Require an active Cloudflare zone before domain attach
         if: ${{ steps.credentials.outputs.configured == 'true' && github.event_name == 'workflow_dispatch' && inputs.domain_action == 'attach' && (inputs.app == 'all' || inputs.app == matrix.app) }}

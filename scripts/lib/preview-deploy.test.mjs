@@ -9,10 +9,11 @@ import {
   previewWorkerName,
   previewWranglerConfig,
 } from "./preview-deploy.mjs";
+import { workerAppConfig } from "./worker-apps.mjs";
 
 test("previewAppConfig returns app-scoped preview metadata", () => {
   assert.deepEqual(previewAppConfig("icons"), {
-    appId: "icons",
+    ...workerAppConfig("icons"),
     commentMarker: "<!-- sketchi-icons-preview -->",
     publicSurface: true,
     routePolicy: "icons.sketchi.app product surface",
@@ -23,7 +24,7 @@ test("previewAppConfig returns app-scoped preview metadata", () => {
 
 test("previewAppConfig includes the studio preview Worker", () => {
   assert.deepEqual(previewAppConfig("studio"), {
-    appId: "studio",
+    ...workerAppConfig("studio"),
     commentMarker: "<!-- sketchi-studio-preview -->",
     publicSurface: true,
     routePolicy:
@@ -199,8 +200,7 @@ test("previewCommentBody includes ready preview details", () => {
     previewCommentBody({
       app: "playground",
       previewUrl: "https://sketchi-playground-pr-42.account.workers.dev",
-      runUrl:
-        "https://github.com/shpitdev/sketchi/actions/runs/1",
+      runUrl: "https://github.com/shpitdev/sketchi/actions/runs/1",
       sha: "abcdef1234567890",
       status: "ready",
       workerName: "sketchi-playground-pr-42",

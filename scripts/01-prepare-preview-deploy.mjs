@@ -45,18 +45,18 @@ export function preparePreviewDeploy(args = process.argv.slice(2)) {
   const prNumber =
     readFlag(args, "--pr-number", process.env.PR_NUMBER) ??
     process.env.GITHUB_REF_NAME?.match(/^(\d+)\/merge$/)?.[1];
+  const app = previewAppConfig(
+    readFlag(args, "--app", process.env.PREVIEW_APP),
+  );
   const sourceConfigPath = readFlag(
     args,
     "--config",
-    "dist/server/wrangler.json",
-  );
-  const app = previewAppConfig(
-    readFlag(args, "--app", process.env.PREVIEW_APP),
+    app.generatedWranglerConfigPath,
   );
   const previewConfigPath = readFlag(
     args,
     "--out",
-    `dist/server/wrangler.${app.appId}.preview.json`,
+    app.previewWranglerConfigPath,
   );
   const workerName = previewWorkerName({
     app: app.appId,
@@ -86,7 +86,9 @@ export function preparePreviewDeploy(args = process.argv.slice(2)) {
 
   writeOutputs({
     app: app.appId,
+    nx_project_id: app.nxProjectId,
     preview_config_path: previewConfigPath,
+    source_config_path: sourceConfigPath,
     worker_name: workerName,
   });
 }

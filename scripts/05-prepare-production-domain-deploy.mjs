@@ -41,16 +41,16 @@ function writeOutputs(outputs) {
 }
 
 export function prepareProductionDomainDeploy(args = process.argv.slice(2)) {
+  const app = productionAppConfig(readFlag(args, "--app", process.env.APP));
   const sourceConfigPath = readFlag(
     args,
     "--config",
-    "dist/server/wrangler.json",
+    app.generatedWranglerConfigPath,
   );
-  const app = productionAppConfig(readFlag(args, "--app", process.env.APP));
   const domainConfigPath = readFlag(
     args,
     "--out",
-    `dist/server/wrangler.${app.appId}.domains.json`,
+    app.productionDomainWranglerConfigPath,
   );
   const sourceConfig = JSON.parse(readFileSync(sourceConfigPath, "utf8"));
   const domainConfig = productionDomainWranglerConfig(sourceConfig, app.appId);
@@ -62,6 +62,8 @@ export function prepareProductionDomainDeploy(args = process.argv.slice(2)) {
     app: app.appId,
     domain_config_path: domainConfigPath,
     domain_patterns: app.domainPatterns.join(","),
+    nx_project_id: app.nxProjectId,
+    source_config_path: sourceConfigPath,
     worker_name: app.workerName,
   });
 }

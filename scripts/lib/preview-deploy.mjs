@@ -1,3 +1,5 @@
+import { workerAppConfig } from "./worker-apps.mjs";
+
 const MAX_WORKER_NAME_LENGTH = 63;
 
 const webPreviewSurfaceApps = {
@@ -16,21 +18,18 @@ export const previewApps = {
     publicSurface: false,
     routePolicy: "internal canvas workspace; no public product domain",
     title: "Sketchi Excalidraw Workspace",
-    workerPrefix: "sketchi-excalidraw-pr",
   },
   icons: {
     commentMarker: "<!-- sketchi-icons-preview -->",
     publicSurface: true,
     routePolicy: "icons.sketchi.app product surface",
     title: "Sketchi Icons",
-    workerPrefix: "sketchi-icons-pr",
   },
   playground: {
     commentMarker: "<!-- sketchi-playground-preview -->",
     publicSurface: false,
     routePolicy: "internal eval harness; no public product domain",
     title: "Sketchi Eval Harness",
-    workerPrefix: "sketchi-playground-pr",
   },
   studio: {
     commentMarker: "<!-- sketchi-studio-preview -->",
@@ -38,14 +37,12 @@ export const previewApps = {
     routePolicy:
       "playground.sketchi.app manual attach target; studio.sketchi.app waits for authenticated Studio",
     title: "Sketchi Playground / Studio",
-    workerPrefix: "sketchi-studio-pr",
   },
   web: {
     commentMarker: "<!-- sketchi-web-preview -->",
     publicSurface: true,
     routePolicy: "sketchi.app and www.sketchi.app product surface",
     title: "Sketchi Web",
-    workerPrefix: "sketchi-web-pr",
   },
 };
 
@@ -59,7 +56,13 @@ export function previewAppConfig(app = "playground") {
     );
   }
 
-  return { appId, ...config };
+  const worker = workerAppConfig(appId);
+
+  return {
+    ...worker,
+    ...config,
+    workerPrefix: `${worker.workerName}-pr`,
+  };
 }
 
 export function normalizePrNumber(value) {

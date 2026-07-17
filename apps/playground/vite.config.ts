@@ -7,8 +7,17 @@ import {
   localInspectorPort,
   localViteCacheDir,
 } from "../../tools/local-dev-ports";
+import { workerAppConfig } from "../../scripts/lib/worker-apps.mjs";
+
+const workerApp = workerAppConfig("playground");
 
 export default defineConfig({
+  root: new URL(".", import.meta.url).pathname,
+  build: {
+    emptyOutDir: true,
+    outDir: new URL(`../../${workerApp.buildOutputPath}`, import.meta.url)
+      .pathname,
+  },
   cacheDir: localViteCacheDir("playground"),
   publicDir: new URL("./public", import.meta.url).pathname,
   plugins: [
@@ -20,7 +29,7 @@ export default defineConfig({
       },
     }),
     tanstackStart({
-      srcDirectory: "apps/playground/src",
+      srcDirectory: "src",
     }),
     react(),
   ],

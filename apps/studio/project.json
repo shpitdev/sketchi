@@ -6,7 +6,10 @@
   "targets": {
     "build": {
       "executor": "nx:run-commands",
-      "outputs": ["{projectRoot}/.output"],
+      "outputs": [
+        "{workspaceRoot}/dist/apps/studio",
+        "{projectRoot}/.wrangler/deploy/config.json"
+      ],
       "options": {
         "command": "vite build --config apps/studio/vite.config.ts"
       }
@@ -27,7 +30,7 @@
       "executor": "nx:run-commands",
       "dependsOn": ["build"],
       "options": {
-        "command": "wrangler deploy --config dist/server/wrangler.json"
+        "command": "wrangler deploy --config dist/apps/studio/server/wrangler.json"
       }
     },
     "cf-typegen": {

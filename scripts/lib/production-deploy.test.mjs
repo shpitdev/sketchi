@@ -5,10 +5,11 @@ import {
   productionAppConfig,
   productionDomainWranglerConfig,
 } from "./production-deploy.mjs";
+import { workerAppConfig } from "./worker-apps.mjs";
 
 test("productionAppConfig returns app-scoped domain metadata", () => {
   assert.deepEqual(productionAppConfig("web"), {
-    appId: "web",
+    ...workerAppConfig("web"),
     domainPatterns: ["sketchi.app", "www.sketchi.app"],
     publicSurface: true,
     routePolicy: "sketchi.app and www.sketchi.app product surface",
@@ -19,7 +20,7 @@ test("productionAppConfig returns app-scoped domain metadata", () => {
 
 test("productionAppConfig includes the studio production Worker", () => {
   assert.deepEqual(productionAppConfig("studio"), {
-    appId: "studio",
+    ...workerAppConfig("studio"),
     domainPatterns: ["playground.sketchi.app"],
     publicSurface: true,
     routePolicy:
@@ -31,7 +32,7 @@ test("productionAppConfig includes the studio production Worker", () => {
 
 test("productionAppConfig keeps internal apps off public domains", () => {
   assert.deepEqual(productionAppConfig("playground"), {
-    appId: "playground",
+    ...workerAppConfig("playground"),
     domainPatterns: [],
     publicSurface: false,
     routePolicy: "internal eval harness; no public product domain",
@@ -39,7 +40,7 @@ test("productionAppConfig keeps internal apps off public domains", () => {
     workerName: "sketchi-playground",
   });
   assert.deepEqual(productionAppConfig("excalidraw"), {
-    appId: "excalidraw",
+    ...workerAppConfig("excalidraw"),
     domainPatterns: [],
     publicSurface: false,
     routePolicy: "internal canvas workspace; no public product domain",

@@ -2,18 +2,31 @@
 
 ## Current Matrix
 
-| App          | Preview Worker                   | Production Worker    | Product route status                                                      |
-| ------------ | -------------------------------- | -------------------- | ------------------------------------------------------------------------- |
-| `web`        | `sketchi-web-pr-<number>`        | `sketchi-web`        | `sketchi.app`, `www.sketchi.app`                                          |
-| `studio`     | `sketchi-studio-pr-<number>`     | `sketchi-studio`     | `playground.sketchi.app` manual attach target; `studio.sketchi.app` later |
-| `icons`      | `sketchi-icons-pr-<number>`      | `sketchi-icons`      | `icons.sketchi.app`                                                       |
-| `playground` | `sketchi-playground-pr-<number>` | `sketchi-playground` | internal eval harness; not linked from public navigation                  |
-| `excalidraw` | `sketchi-excalidraw-pr-<number>` | `sketchi-excalidraw` | internal rendering workspace; not a public product domain                 |
+| App key      | Nx project   | Preview Worker                   | Production Worker    | Product route status                                                      |
+| ------------ | ------------ | -------------------------------- | -------------------- | ------------------------------------------------------------------------- |
+| `web`        | `web`        | `sketchi-web-pr-<number>`        | `sketchi-web`        | `sketchi.app`, `www.sketchi.app`                                          |
+| `studio`     | `studio`     | `sketchi-studio-pr-<number>`     | `sketchi-studio`     | `playground.sketchi.app` manual attach target; `studio.sketchi.app` later |
+| `icons`      | `icons`      | `sketchi-icons-pr-<number>`      | `sketchi-icons`      | `icons.sketchi.app`                                                       |
+| `playground` | `playground` | `sketchi-playground-pr-<number>` | `sketchi-playground` | internal eval harness; not linked from public navigation                  |
+| `excalidraw` | `excalidraw` | `sketchi-excalidraw-pr-<number>` | `sketchi-excalidraw` | internal rendering workspace; not a public product domain                 |
+
+The app key is deployment metadata, not an Nx project-name convention.
+`scripts/lib/worker-apps.mjs` maps each app key to its current `nxProjectId`,
+durable Cloudflare Worker name, input config, and generated artifact paths.
+Future repository renames change the Nx/project fields without changing Worker
+names or other durable Cloudflare resources.
+
+Each Worker build is isolated under `dist/apps/<app>/`: browser assets go to
+`client/`, Worker code and the generated deploy snapshot go to `server/`, and
+the generated config is `server/wrangler.json`. The Cloudflare Vite plugin's
+deploy redirect is also isolated at `apps/<project>/.wrangler/deploy/config.json`.
+Parallel Nx builds therefore never write another app's deployable output.
 
 ```mermaid
 flowchart LR
   PR["Pull request"] --> Matrix["preview matrix"]
-  Matrix --> Build["pnpm nx build <app>"]
+  Matrix --> Resolve["resolve app key to Nx project and Worker"]
+  Resolve --> Build["pnpm nx build <nx-project>"]
   Build --> Config["generated preview wrangler config"]
   Config --> Deploy["wrangler deploy --keep-vars --no-x-provision"]
   Deploy --> Comment["sticky PR comment"]
@@ -27,8 +40,9 @@ Pull requests to `main` deploy matrix apps to PR-specific Cloudflare Workers.
 - uses the same pnpm 11.5.0, Node 24, `pnpm install --frozen-lockfile` setup as
   the required `ci` workflow;
 - builds each Nx app in an isolated matrix job;
-- writes a generated `dist/server/wrangler.<app>.preview.json` with the preview
-  Worker name and no custom production routes;
+- reads the app-scoped `dist/apps/<app>/server/wrangler.json` build snapshot;
+- writes `dist/apps/<app>/server/wrangler.preview.json` with the preview Worker
+  name and no custom production routes;
 - runs `wrangler deploy --keep-vars --no-x-provision`;
 - writes or updates one sticky PR comment per app with the preview URL and an
   explicit public/internal surface policy.
@@ -96,6 +110,7 @@ CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... \
 
 The deploy command scripts are numbered because they are operational steps:
 
+- `scripts/00-resolve-worker-app.mjs`
 - `scripts/01-prepare-preview-deploy.mjs`
 - `scripts/02-extract-preview-url.mjs`
 - `scripts/03-upsert-preview-comment.mjs`
@@ -158,7 +173,7 @@ the production stream IDs and keep the preview deploy helper's ID rewrite table
 in sync with Cloudflare Pipeline stream creation.
 
 Custom domains are a post-merge operator action. The production workflow writes
-a generated domain Wrangler config from
+a generated `dist/apps/<app>/server/wrangler.domains.json` config from
 `scripts/05-prepare-production-domain-deploy.mjs` and deploys that route-bearing
 config only when explicitly dispatched with `domain_action=attach`. Follow
 [Production domain cutover](production-domain-cutover.md); never attach domains
