@@ -12,18 +12,6 @@ export default defineConfig(() => ({
         "../diagram-core/src/index.ts",
         import.meta.url,
       ).pathname,
-      "@sketchi/diagram-excalidraw": new URL(
-        "../diagram-excalidraw/src/index.ts",
-        import.meta.url,
-      ).pathname,
-      "@sketchi/diagram-renderer": new URL(
-        "../diagram-renderer/src/index.ts",
-        import.meta.url,
-      ).pathname,
-      "@sketchi/diagram-scenarios": new URL(
-        "../diagram-scenarios/src/index.ts",
-        import.meta.url,
-      ).pathname,
     },
   },
   test: {

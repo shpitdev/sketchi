@@ -2,8 +2,9 @@ import {
   type FlowchartDiagram,
   parseFlowchartDiagram,
 } from "@sketchi/diagram-core";
-import type { DiagramScenario } from "@sketchi/diagram-scenarios";
 import { z } from "zod";
+
+import type { DiagramGenerationPrompt } from "./messages.js";
 
 export const diagramGenerationProviderIds = [
   "fixture",
@@ -55,7 +56,7 @@ export interface DiagramGenerationRequest {
   cacheMode?: DiagramGenerationCacheMode;
   maxOutputTokens?: number;
   model: string;
-  scenario: DiagramScenario;
+  prompt: DiagramGenerationPrompt;
   temperature?: number;
 }
 

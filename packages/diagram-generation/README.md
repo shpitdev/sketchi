@@ -4,7 +4,7 @@ Model-facing generation helpers for Sketchi diagram candidates.
 
 ```mermaid
 flowchart LR
-  Scenario["diagram-scenarios"] --> Messages["prompt messages"]
+  Prompt["generation prompt contract"] --> Messages["prompt messages"]
   Messages --> Gemini["Gemini request body"]
   Gemini --> Candidate["candidate text + usage"]
   Candidate --> Core["diagram-core parse"]
@@ -12,6 +12,7 @@ flowchart LR
 
 | Owns                                       | Does not own                  |
 | ------------------------------------------ | ----------------------------- |
+| provider prompt and request contracts      | eval scenarios and assertions |
 | prompt message mapping                     | chat threads                  |
 | Gemini REST body mapping                   | artifact persistence          |
 | Cloudflare AI Gateway client compatibility | UI streaming                  |

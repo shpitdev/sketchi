@@ -1,7 +1,6 @@
-import type { ScenarioPromptMessage } from "@sketchi/diagram-scenarios";
-
 import type { DiagramGenerationUsage } from "./candidates.js";
 import { buildDiagramGenerationMessages } from "./messages.js";
+import type { DiagramGenerationMessage } from "./messages.js";
 import type { DiagramGenerationRequest } from "./candidates.js";
 
 export interface GeminiTextPart {
@@ -50,8 +49,8 @@ const DEFAULT_MAX_OUTPUT_TOKENS = 2_048;
 const DEFAULT_TEMPERATURE = 0.1;
 
 function messageContent(
-  messages: readonly ScenarioPromptMessage[],
-  role: ScenarioPromptMessage["role"],
+  messages: readonly DiagramGenerationMessage[],
+  role: DiagramGenerationMessage["role"],
 ): string {
   return messages
     .filter((message) => message.role === role)
@@ -70,7 +69,7 @@ export function stripCloudflareGoogleModelPrefix(model: string): string {
 export function buildGeminiGenerateContentBody(
   request: DiagramGenerationRequest,
 ): GeminiGenerateContentBody {
-  const prompt = buildDiagramGenerationMessages(request.scenario);
+  const prompt = buildDiagramGenerationMessages(request.prompt);
   const system = messageContent(prompt.messages, "system");
   const user = messageContent(prompt.messages, "user");
 

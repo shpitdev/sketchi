@@ -8,7 +8,10 @@ import {
   type DiagramGenerationProviderId,
   summarizeGenerationCandidate,
 } from "@sketchi/diagram-generation";
-import { getScenario } from "@sketchi/diagram-scenarios";
+import {
+  getScenario,
+  toDiagramGenerationPrompt,
+} from "@sketchi/diagram-scenarios";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -101,7 +104,7 @@ async function runClient(
       await client.generate({
         cacheMode,
         model,
-        scenario: getScenario(scenarioId),
+        prompt: toDiagramGenerationPrompt(getScenario(scenarioId)),
       }),
     );
   } catch (error) {

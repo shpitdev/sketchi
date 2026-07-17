@@ -1,11 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import { buildScenarioPrompt, buildScenarioPromptParts } from "./prompt";
+import {
+  buildScenarioPrompt,
+  buildScenarioPromptParts,
+  toDiagramGenerationPrompt,
+} from "./prompt";
 import { getScenario } from "./scenarios";
 
 const scenario = getScenario("pharma-batch-disposition");
 
 describe("scenario prompts", () => {
+  it("explicitly adapts maintained scenarios to the generation prompt contract", () => {
+    expect(toDiagramGenerationPrompt(scenario)).toEqual({
+      id: scenario.id,
+      request: scenario.prompt,
+      requiredBranchLabels: scenario.assertions.requiredBranchLabels,
+      requiredNodeLabels: scenario.assertions.requiredNodeLabels,
+      title: scenario.title,
+    });
+  });
+
   it("separates system instructions from the user scenario", () => {
     const prompt = buildScenarioPromptParts(scenario);
 

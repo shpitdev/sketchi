@@ -90,7 +90,7 @@ export function createCloudflareGoogleAiStudioClient({
               collectLog,
               metadata: {
                 cacheMode: request.cacheMode ?? "default",
-                scenarioId: request.scenario.id,
+                scenarioId: request.prompt.id,
                 sketchiProvider: "cloudflare-google-ai-studio",
               },
             },

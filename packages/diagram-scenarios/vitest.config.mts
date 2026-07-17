@@ -13,6 +13,10 @@ export default defineConfig(() => ({
         "../diagram-excalidraw/src/index.ts",
         import.meta.url,
       ).pathname,
+      "@sketchi/diagram-generation": new URL(
+        "../diagram-generation/src/index.ts",
+        import.meta.url,
+      ).pathname,
       "@sketchi/diagram-renderer": new URL(
         "../diagram-renderer/src/index.ts",
         import.meta.url,

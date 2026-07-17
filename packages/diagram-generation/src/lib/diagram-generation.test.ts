@@ -1,17 +1,119 @@
-import { getScenario } from "@sketchi/diagram-scenarios";
 import { describe, expect, it, vi } from "vitest";
 
+import { candidateFromText, responseErrorDiagnostic } from "./candidates.js";
 import { createCloudflareGoogleAiStudioClient } from "./cloudflare-google-ai-studio.js";
-import { createFixtureGenerationClient } from "./fixture-client.js";
 import {
   buildGeminiGenerateContentBody,
   stripCloudflareGoogleModelPrefix,
 } from "./gemini.js";
-import { buildDiagramGenerationMessages } from "./messages.js";
-import { candidateFromText, responseErrorDiagnostic } from "./candidates.js";
+import {
+  buildDiagramGenerationMessages,
+  type DiagramGenerationPrompt,
+} from "./messages.js";
 
-const scenario = getScenario("sketchi-onboarding-decision-flow");
-const expectedText = JSON.stringify(scenario.expectedDiagram, null, 2);
+const prompt: DiagramGenerationPrompt = {
+  id: "pharma-batch-disposition",
+  request:
+    "Create a flowchart for pharma batch disposition. A batch is received, QA reviews the Certificate of Analysis, and then decides whether it passes specs. Passing goes to QA Manager final review and packaging. Retest goes through investigation and returns to final review. Reject ends at reject batch.",
+  requiredBranchLabels: ["yes", "retest", "reject"],
+  requiredNodeLabels: [
+    "Batch received",
+    "QA reviews Certificate of Analysis",
+    "Passes specs?",
+    "QA Manager final review",
+    "Send to packaging",
+    "Investigate retesting",
+    "Reject batch",
+  ],
+  title: "Pharma batch disposition",
+};
+const expectedDiagram = {
+  id: "pharma-batch-disposition-fixture",
+  title: "Pharma batch disposition",
+  type: "flowchart",
+  nodes: [
+    { id: "received", label: "Batch received", kind: "start" },
+    { id: "packaging", label: "Send to packaging", kind: "end" },
+  ],
+  edges: [
+    {
+      id: "received-to-packaging",
+      source: "received",
+      target: "packaging",
+    },
+  ],
+  layout: { direction: "TB", edgeRouting: "orthogonal" },
+  style: { accentColor: "#0f766e", backgroundColor: "#ffffff" },
+};
+const expectedText = JSON.stringify(expectedDiagram, null, 2);
+const expectedSystem = [
+  "You are creating a Sketchi typed intermediate diagram.",
+  "",
+  "Flowchart IR rules:",
+  "- Return only JSON. Do not wrap the JSON in markdown.",
+  '- Use type "flowchart".',
+  '- Every node must have id, label, and kind: "start", "process", "decision", or "end".',
+  "- Use exactly one start node and at least one end node.",
+  "- Every non-end node must have at least one outgoing edge.",
+  "- Every end node must have zero outgoing edges.",
+  "- Every decision node must have at least two outgoing edges.",
+  "- Every outgoing edge from a decision node must have a non-empty unique label.",
+  "- Edges must use existing node ids.",
+  '- Use layout { "direction": "TB", "edgeRouting": "orthogonal" } unless the prompt says otherwise.',
+].join("\n");
+const expectedUser = [
+  "Scenario:",
+  prompt.request,
+  "",
+  "Required node labels:",
+  ...prompt.requiredNodeLabels.map((label) => `- ${label}`),
+  "",
+  "Required decision branch labels:",
+  ...prompt.requiredBranchLabels.map((label) => `- ${label}`),
+  "",
+  "Use these required labels exactly unless the scenario explicitly asks for a clearer synonym.",
+  "",
+  "Expected JSON shape:",
+  JSON.stringify(
+    {
+      id: "short-kebab-case-id",
+      title: "Pharma batch disposition",
+      type: "flowchart",
+      nodes: [
+        { id: "start-id", label: "Human label", kind: "start" },
+        { id: "decision-id", label: "Question?", kind: "decision" },
+      ],
+      edges: [
+        {
+          id: "edge-id",
+          source: "decision-id",
+          target: "target-id",
+          label: "yes",
+        },
+      ],
+      layout: { direction: "TB", edgeRouting: "orthogonal" },
+      style: { accentColor: "#0f766e", backgroundColor: "#ffffff" },
+    },
+    null,
+    2,
+  ),
+].join("\n");
+const expectedGeminiBody = {
+  contents: [
+    {
+      role: "user",
+      parts: [{ text: expectedUser }],
+    },
+  ],
+  generationConfig: {
+    maxOutputTokens: 512,
+    response_mime_type: "application/json",
+    temperature: 0.2,
+  },
+  system_instruction: {
+    parts: [{ text: expectedSystem }],
+  },
+};
 const geminiResponse = {
   candidates: [
     {
@@ -37,37 +139,26 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response {
 }
 
 describe("diagram generation prompt mapping", () => {
-  it("keeps system and user instructions as separate messages", () => {
-    const prompt = buildDiagramGenerationMessages(scenario);
-
-    expect(prompt.messages).toHaveLength(2);
-    expect(prompt.messages[0]).toMatchObject({ role: "system" });
-    expect(prompt.messages[0].content).toContain("Flowchart IR rules");
-    expect(prompt.messages[1]).toMatchObject({ role: "user" });
-    expect(prompt.messages[1].content).toContain(scenario.prompt);
-    expect(prompt.messages[1].content).not.toContain("Flowchart IR rules");
+  it("keeps the provider-facing prompt messages byte-for-byte stable", () => {
+    expect(buildDiagramGenerationMessages(prompt)).toEqual({
+      messages: [
+        { role: "system", content: expectedSystem },
+        { role: "user", content: expectedUser },
+      ],
+      system: expectedSystem,
+      user: expectedUser,
+    });
   });
 
-  it("maps flowchart prompts into Gemini REST system instruction and contents", () => {
-    const body = buildGeminiGenerateContentBody({
-      maxOutputTokens: 512,
-      model: "google/gemini-3.1-flash-lite",
-      scenario,
-      temperature: 0.2,
-    });
-
-    expect(body.system_instruction.parts[0]?.text).toContain(
-      "Flowchart IR rules",
-    );
-    expect(body.contents[0]?.parts[0]?.text).toContain(scenario.prompt);
-    expect(body.contents[0]?.parts[0]?.text).not.toContain(
-      "Flowchart IR rules",
-    );
-    expect(body.generationConfig).toEqual({
-      maxOutputTokens: 512,
-      response_mime_type: "application/json",
-      temperature: 0.2,
-    });
+  it("keeps the Gemini REST body byte-for-byte stable", () => {
+    expect(
+      buildGeminiGenerateContentBody({
+        maxOutputTokens: 512,
+        model: "google/gemini-3.1-flash-lite",
+        prompt,
+        temperature: 0.2,
+      }),
+    ).toEqual(expectedGeminiBody);
   });
 
   it("normalizes Cloudflare Google model ids for provider-native calls", () => {
@@ -109,14 +200,15 @@ describe("diagram generation clients", () => {
     ).toBe("Unknown model.");
   });
 
-  it("returns parseable flowchart IR from the fixture client", async () => {
-    const candidate = await createFixtureGenerationClient().generate({
+  it("parses a local generation fixture without importing eval scenarios", () => {
+    const candidate = candidateFromText({
       model: "fixture",
-      scenario,
+      provider: "fixture",
+      text: expectedText,
     });
 
     expect(candidate.error).toBeUndefined();
-    expect(candidate.diagram?.id).toBe(scenario.expectedDiagram.id);
+    expect(candidate.diagram?.id).toBe(expectedDiagram.id);
   });
 
   it("uses the Cloudflare AI Gateway provider-native Google route", async () => {
@@ -132,8 +224,10 @@ describe("diagram generation clients", () => {
     });
 
     const candidate = await client.generate({
+      maxOutputTokens: 512,
       model: "google/gemini-3.1-flash-lite",
-      scenario,
+      prompt,
+      temperature: 0.2,
     });
 
     expect(run).toHaveBeenCalledWith(
@@ -143,17 +237,18 @@ describe("diagram generation clients", () => {
           "Cache-Control": "no-store",
         }),
         provider: "google-ai-studio",
+        query: expectedGeminiBody,
       }),
       expect.objectContaining({
         gateway: expect.objectContaining({
           collectLog: true,
           metadata: expect.objectContaining({
-            scenarioId: scenario.id,
+            scenarioId: prompt.id,
           }),
         }),
       }),
     );
-    expect(candidate.diagram?.id).toBe(scenario.expectedDiagram.id);
+    expect(candidate.diagram?.id).toBe(expectedDiagram.id);
     expect(candidate.usage?.totalTokens).toBe(34);
   });
 
@@ -172,7 +267,7 @@ describe("diagram generation clients", () => {
     const candidate = await client.generate({
       cacheMode: "fresh",
       model: "google/gemini-3.1-flash-lite",
-      scenario,
+      prompt,
     });
 
     expect(run).toHaveBeenCalledWith(
