@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@sketchi/diagram-studio-ui": "workspace:*",
+    "@sketchi/diagram-ui": "workspace:*",
     "@sketchi/svg-excalidraw": "workspace:*"
   }
 }

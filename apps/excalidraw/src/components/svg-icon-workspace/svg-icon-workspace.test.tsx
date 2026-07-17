@@ -2,7 +2,7 @@ import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@sketchi/diagram-studio-ui", () => ({
+vi.mock("@sketchi/diagram-ui", () => ({
   ExcalidrawSceneCanvas: ({
     onChange,
     scene,

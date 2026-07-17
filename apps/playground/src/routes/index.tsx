@@ -6,10 +6,7 @@ import {
   type BuildFlowchartResult,
 } from "@sketchi/diagram-agent";
 import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
-import {
-  DiagramPreview,
-  FlowchartBuildReport,
-} from "@sketchi/diagram-studio-ui";
+import { DiagramPreview, FlowchartBuildReport } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useCallback, useMemo, useState, type ReactNode } from "react";

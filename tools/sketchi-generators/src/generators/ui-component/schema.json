@@ -16,7 +16,7 @@
     "projectRoot": {
       "type": "string",
       "description": "Nx project root that owns the component.",
-      "default": "packages/diagram-studio-ui"
+      "default": "packages/diagram/ui"
     },
     "directory": {
       "type": "string",

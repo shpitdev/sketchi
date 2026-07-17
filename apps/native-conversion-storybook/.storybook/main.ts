@@ -2,7 +2,7 @@ import type { StorybookConfig } from "@storybook/react-vite";
 
 const config: StorybookConfig = {
   stories: [
-    "../../../packages/diagram-studio-ui/src/components/excalidraw-scene-canvas/*.stories.tsx",
+    "../../../packages/diagram/ui/src/components/excalidraw-scene-canvas/*.stories.tsx",
     "../../icons/src/components/icon-conversion-preview/*.stories.tsx",
     "../../excalidraw/src/components/svg-icon-workspace/*.stories.tsx",
   ],
@@ -33,12 +33,12 @@ const config: StorybookConfig = {
         "../../../packages/diagram/renderer/src/index.ts",
         import.meta.url,
       ).pathname,
-      "@sketchi/diagram-studio-ui/styles.css": new URL(
-        "../../../packages/diagram-studio-ui/src/styles.css",
+      "@sketchi/diagram-ui/styles.css": new URL(
+        "../../../packages/diagram/ui/src/styles.css",
         import.meta.url,
       ).pathname,
-      "@sketchi/diagram-studio-ui": new URL(
-        "../../../packages/diagram-studio-ui/src/index.ts",
+      "@sketchi/diagram-ui": new URL(
+        "../../../packages/diagram/ui/src/index.ts",
         import.meta.url,
       ).pathname,
       "@sketchi/svg-excalidraw": new URL(

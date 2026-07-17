@@ -36,9 +36,9 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: "@sketchi/diagram-studio-ui/styles.css",
+        find: "@sketchi/diagram-ui/styles.css",
         replacement: new URL(
-          "../../packages/diagram-studio-ui/src/styles.css",
+          "../../packages/diagram/ui/src/styles.css",
           import.meta.url,
         ).pathname,
       },
@@ -78,9 +78,9 @@ export default defineConfig({
         ).pathname,
       },
       {
-        find: "@sketchi/diagram-studio-ui",
+        find: "@sketchi/diagram-ui",
         replacement: new URL(
-          "../../packages/diagram-studio-ui/src/index.ts",
+          "../../packages/diagram/ui/src/index.ts",
           import.meta.url,
         ).pathname,
       },

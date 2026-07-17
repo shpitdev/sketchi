@@ -20,8 +20,8 @@ export interface IconConversionPreviewProps {
 
 const ExcalidrawSceneCanvas = lazy(async () => {
   const [module] = await Promise.all([
-    import("@sketchi/diagram-studio-ui"),
-    import("@sketchi/diagram-studio-ui/styles.css"),
+    import("@sketchi/diagram-ui"),
+    import("@sketchi/diagram-ui/styles.css"),
   ]);
   return { default: module.ExcalidrawSceneCanvas };
 });

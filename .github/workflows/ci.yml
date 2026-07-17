@@ -38,7 +38,7 @@ jobs:
       - name: Run canonical workspace gates
         run: pnpm nx run-many -t typecheck,test,build
       - name: Build canonical Studio UI Storybook
-        run: pnpm nx build-storybook diagram-studio-ui
+        run: pnpm nx build-storybook diagram-ui
       - name: Run SVG corpus renderer
         run: pnpm nx run svg-excalidraw:corpus-renderer
       - name: Upload SVG corpus renderer report

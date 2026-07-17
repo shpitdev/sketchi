@@ -68,7 +68,7 @@ model candidate → typed diagram IR → deterministic scene → Excalidraw arti
 | `packages/diagram/renderer`   | Deterministic layout and scene generation                       |
 | `packages/diagram/excalidraw` | Persistable Excalidraw conversion and real-scene validation     |
 | `packages/diagram/scenarios`  | Maintained prompts, assertions, and local/live evals            |
-| `packages/diagram-studio-ui`  | Shared React diagram, review, and eval UI states                |
+| `packages/diagram/ui`         | Shared React diagram, review, and eval UI states                |
 | `packages/studio/projects`    | Studio project/diagram contracts and object-bucket persistence  |
 | `packages/svg-excalidraw`     | Native SVG-to-Excalidraw conversion and library serialization   |
 
@@ -113,7 +113,7 @@ Required workspace proof:
 
 ```sh
 pnpm nx run-many -t typecheck,test,build
-pnpm nx build-storybook diagram-studio-ui
+pnpm nx build-storybook diagram-ui
 ```
 
 Run the canonical deterministic scenario:

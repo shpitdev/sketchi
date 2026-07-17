@@ -10,8 +10,8 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: "@sketchi/diagram-studio-ui/styles.css",
-        replacement: source("../../packages/diagram-studio-ui/src/styles.css"),
+        find: "@sketchi/diagram-ui/styles.css",
+        replacement: source("../../packages/diagram/ui/src/styles.css"),
       },
       {
         find: "@sketchi/diagram-core",
@@ -26,8 +26,8 @@ export default defineConfig({
         replacement: source("../../packages/diagram/excalidraw/src/index.ts"),
       },
       {
-        find: "@sketchi/diagram-studio-ui",
-        replacement: source("../../packages/diagram-studio-ui/src/index.ts"),
+        find: "@sketchi/diagram-ui",
+        replacement: source("../../packages/diagram/ui/src/index.ts"),
       },
       {
         find: "@sketchi/svg-excalidraw",

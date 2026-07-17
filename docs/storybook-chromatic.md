@@ -4,14 +4,14 @@
 
 | Need                    | Command or URL                                                 |
 | ----------------------- | -------------------------------------------------------------- |
-| Run local Storybook     | `pnpm nx storybook diagram-studio-ui -- --ci --host 127.0.0.1` |
-| Build Storybook         | `pnpm nx build-storybook diagram-studio-ui`                    |
-| Publish/check Chromatic | `pnpm nx chromatic diagram-studio-ui`                          |
+| Run local Storybook     | `pnpm nx storybook diagram-ui -- --ci --host 127.0.0.1` |
+| Build Storybook         | `pnpm nx build-storybook diagram-ui`                    |
+| Publish/check Chromatic | `pnpm nx chromatic diagram-ui`                          |
 | Local MCP endpoint      | `http://127.0.0.1:6006/mcp`                                    |
 
 ```mermaid
 flowchart LR
-  UI["diagram-studio-ui"] --> Storybook["Storybook"]
+  UI["diagram-ui"] --> Storybook["Storybook"]
   Storybook --> MCP["/mcp endpoint"]
   Storybook --> Chromatic["Chromatic publish"]
   CI["ci / required"] --> Build["Canonical Nx gates"]
@@ -20,12 +20,12 @@ flowchart LR
 
 ## Targets
 
-`diagram-studio-ui` owns the reusable Studio component stories. The Storybook
+`diagram-ui` owns the reusable Studio component stories. The Storybook
 targets are Nx targets:
 
-- `pnpm nx storybook diagram-studio-ui`
-- `pnpm nx build-storybook diagram-studio-ui`
-- `pnpm nx chromatic diagram-studio-ui`
+- `pnpm nx storybook diagram-ui`
+- `pnpm nx build-storybook diagram-ui`
+- `pnpm nx chromatic diagram-ui`
 
 The Storybook serve/build targets use `@nx/storybook` executors. Chromatic does
 not ship as an Nx executor in this workspace, so `chromatic` is a small
@@ -34,7 +34,7 @@ not ship as an Nx executor in this workspace, so `chromatic` is a small
 ## MCP
 
 `@storybook/addon-mcp` is installed and registered in
-`packages/diagram-studio-ui/.storybook/main.ts`. When Storybook is running, the
+`packages/diagram/ui/.storybook/main.ts`. When Storybook is running, the
 local MCP server is available at:
 
 ```sh
@@ -55,7 +55,7 @@ npx mcp-add \
 Then start Storybook before asking an agent to inspect component docs:
 
 ```sh
-pnpm nx storybook diagram-studio-ui -- --ci --host 127.0.0.1
+pnpm nx storybook diagram-ui -- --ci --host 127.0.0.1
 ```
 
 Useful first MCP prompt:
@@ -70,7 +70,7 @@ published URL under `/mcp`.
 ## CI Contract
 
 The required `ci / required` job runs the full workspace
-`typecheck,test,build` matrix and always builds `diagram-studio-ui` Storybook.
+`typecheck,test,build` matrix and always builds `diagram-ui` Storybook.
 Chromatic remains an explicit, token-backed publishing target rather than a
 required pull-request check.
 
@@ -87,8 +87,8 @@ the token from Infisical rather than pasting it into a shell history:
 ```sh
 infisical run --env=staging --path=/github -- \
   pnpm exec chromatic \
-    --storybook-build-dir storybook-static/diagram-studio-ui \
-    --storybook-config-dir packages/diagram-studio-ui/.storybook \
-    --storybook-base-dir packages/diagram-studio-ui \
+    --storybook-build-dir storybook-static/diagram-ui \
+    --storybook-config-dir packages/diagram/ui/.storybook \
+    --storybook-base-dir packages/diagram/ui \
     --patch-build=chore/chromatic-storybook-contrast...main
 ```

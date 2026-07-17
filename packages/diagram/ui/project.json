@@ -1,0 +1,60 @@
+{
+  "name": "diagram-ui",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/diagram/ui/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "commands": [
+          "vite build --config packages/diagram/ui/vite.config.ts",
+          "tsc -p packages/diagram/ui/tsconfig.lib.json"
+        ],
+        "parallel": false
+      }
+    },
+    "build-storybook": {
+      "executor": "@nx/storybook:build",
+      "outputs": ["{workspaceRoot}/storybook-static/diagram-ui"],
+      "options": {
+        "configDir": "packages/diagram/ui/.storybook",
+        "outputDir": "storybook-static/diagram-ui"
+      }
+    },
+    "chromatic": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build-storybook"],
+      "options": {
+        "command": "chromatic --storybook-build-dir storybook-static/diagram-ui --storybook-config-dir packages/diagram/ui/.storybook --storybook-base-dir packages/diagram/ui"
+      }
+    },
+    "storybook": {
+      "executor": "@nx/storybook:storybook",
+      "options": {
+        "configDir": "packages/diagram/ui/.storybook",
+        "port": 6006
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/coverage/packages/diagram/ui"],
+      "options": {
+        "command": "vitest run --config packages/diagram/ui/vitest.config.ts"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p packages/diagram/ui/tsconfig.json --noEmit"
+      }
+    },
+    "typecheck-tsgo": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsgo -p packages/diagram/ui/tsconfig.json --noEmit"
+      }
+    }
+  }
+}

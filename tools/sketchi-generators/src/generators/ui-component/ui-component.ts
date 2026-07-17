@@ -9,7 +9,7 @@ import path from "node:path";
 
 import type { UiComponentGeneratorSchema } from "./schema";
 
-const DEFAULT_PROJECT_ROOT = "packages/diagram-studio-ui";
+const DEFAULT_PROJECT_ROOT = "packages/diagram/ui";
 const DEFAULT_DIRECTORY = "components";
 
 function appendExport(tree: Tree, indexPath: string, exportPath: string) {
@@ -43,7 +43,7 @@ export async function uiComponentGenerator(
   );
   const indexPath = joinPathFragments(sourceRoot, "index.ts");
   const exportPath = `./${directory}/${normalizedName.fileName}/index.js`;
-  const storyTitle = `Diagram Studio/Components/${normalizedName.className}`;
+  const storyTitle = `Diagram UI/Components/${normalizedName.className}`;
 
   if (tree.exists(componentPath)) {
     throw new Error(`Component already exists at ${componentPath}.`);

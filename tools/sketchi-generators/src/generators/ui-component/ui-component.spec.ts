@@ -8,12 +8,12 @@ describe("ui-component generator", () => {
   let tree: Tree;
   const options: UiComponentGeneratorSchema = {
     name: "Status Badge",
-    skipFormat: true
+    skipFormat: true,
   };
 
   beforeEach(() => {
     tree = createTreeWithEmptyWorkspace();
-    tree.write("packages/diagram-studio-ui/src/index.ts", "");
+    tree.write("packages/diagram/ui/src/index.ts", "");
   });
 
   it("creates a component, test, story, and export", async () => {
@@ -21,20 +21,21 @@ describe("ui-component generator", () => {
 
     expect(
       tree.exists(
-        "packages/diagram-studio-ui/src/components/status-badge/status-badge.tsx"
-      )
+        "packages/diagram/ui/src/components/status-badge/status-badge.tsx",
+      ),
     ).toBe(true);
     expect(
       tree.exists(
-        "packages/diagram-studio-ui/src/components/status-badge/status-badge.test.tsx"
-      )
+        "packages/diagram/ui/src/components/status-badge/status-badge.test.tsx",
+      ),
     ).toBe(true);
     expect(
       tree.exists(
-        "packages/diagram-studio-ui/src/components/status-badge/status-badge.stories.tsx"
-      )
+        "packages/diagram/ui/src/components/status-badge/status-badge.stories.tsx",
+      ),
     ).toBe(true);
-    expect(tree.read("packages/diagram-studio-ui/src/index.ts", "utf-8"))
-      .toContain('export * from "./components/status-badge/index.js";');
+    expect(tree.read("packages/diagram/ui/src/index.ts", "utf-8")).toContain(
+      'export * from "./components/status-badge/index.js";',
+    );
   });
 });

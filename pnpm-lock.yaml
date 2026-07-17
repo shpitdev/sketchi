@@ -168,9 +168,9 @@ importers:
       '@sketchi/diagram-scenarios':
         specifier: workspace:*
         version: link:../../packages/diagram/scenarios
-      '@sketchi/diagram-studio-ui':
+      '@sketchi/diagram-ui':
         specifier: workspace:*
-        version: link:../../packages/diagram-studio-ui
+        version: link:../../packages/diagram/ui
 
   apps/excalidraw:
     dependencies:
@@ -186,18 +186,18 @@ importers:
       '@sketchi/diagram-renderer':
         specifier: workspace:*
         version: link:../../packages/diagram/renderer
-      '@sketchi/diagram-studio-ui':
+      '@sketchi/diagram-ui':
         specifier: workspace:*
-        version: link:../../packages/diagram-studio-ui
+        version: link:../../packages/diagram/ui
       '@sketchi/svg-excalidraw':
         specifier: workspace:*
         version: link:../../packages/svg-excalidraw
 
   apps/icons:
     dependencies:
-      '@sketchi/diagram-studio-ui':
+      '@sketchi/diagram-ui':
         specifier: workspace:*
-        version: link:../../packages/diagram-studio-ui
+        version: link:../../packages/diagram/ui
       '@sketchi/svg-excalidraw':
         specifier: workspace:*
         version: link:../../packages/svg-excalidraw
@@ -237,9 +237,9 @@ importers:
       '@sketchi/diagram-scenarios':
         specifier: workspace:*
         version: link:../../packages/diagram/scenarios
-      '@sketchi/diagram-studio-ui':
+      '@sketchi/diagram-ui':
         specifier: workspace:*
-        version: link:../../packages/diagram-studio-ui
+        version: link:../../packages/diagram/ui
       '@sketchi/studio-projects':
         specifier: workspace:*
         version: link:../../packages/studio/projects
@@ -378,7 +378,7 @@ importers:
         specifier: ^2.3.0
         version: 2.8.1
 
-  packages/diagram-studio-ui:
+  packages/diagram/ui:
     dependencies:
       '@codemirror/lang-json':
         specifier: ^6.0.2
@@ -394,22 +394,22 @@ importers:
         version: 0.18.1(@types/react-dom@19.2.3(@types/react@19.2.16))(@types/react@19.2.16)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@sketchi/diagram-agent':
         specifier: workspace:*
-        version: link:../diagram/agent
+        version: link:../agent
       '@sketchi/diagram-core':
         specifier: workspace:*
-        version: link:../diagram/core
+        version: link:../core
       '@sketchi/diagram-excalidraw':
         specifier: workspace:*
-        version: link:../diagram/excalidraw
+        version: link:../excalidraw
       '@sketchi/diagram-generation':
         specifier: workspace:*
-        version: link:../diagram/generation
+        version: link:../generation
       '@sketchi/diagram-renderer':
         specifier: workspace:*
-        version: link:../diagram/renderer
+        version: link:../renderer
       '@sketchi/diagram-scenarios':
         specifier: workspace:*
-        version: link:../diagram/scenarios
+        version: link:../scenarios
       '@tanstack/react-hotkeys':
         specifier: 0.10.0
         version: 0.10.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)

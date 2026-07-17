@@ -42,7 +42,7 @@ export default defineConfig({
       storybookProject("apps/web/.storybook"),
       storybookProject("apps/excalidraw/.storybook"),
       storybookProject("apps/icons/.storybook"),
-      storybookProject("packages/diagram-studio-ui/.storybook"),
+      storybookProject("packages/diagram/ui/.storybook"),
     ],
   },
 });

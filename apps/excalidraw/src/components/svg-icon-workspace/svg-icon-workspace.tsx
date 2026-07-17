@@ -2,7 +2,7 @@ import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import {
   ExcalidrawSceneCanvas,
   type ExcalidrawSceneCanvasProps,
-} from "@sketchi/diagram-studio-ui";
+} from "@sketchi/diagram-ui";
 import {
   convertSvgToExcalidraw,
   parseSvg,

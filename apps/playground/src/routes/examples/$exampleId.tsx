@@ -7,7 +7,7 @@ import {
   renderIntermediateDiagram,
   type RenderedDiagramScene,
 } from "@sketchi/diagram-renderer";
-import { ArtifactCanvas } from "@sketchi/diagram-studio-ui";
+import { ArtifactCanvas } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 

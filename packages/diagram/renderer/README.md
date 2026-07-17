@@ -6,7 +6,7 @@ Deterministic scene generation for validated Sketchi diagram IR.
 flowchart LR
   Core["diagram-core IR"] --> Layout["type renderer"]
   Layout --> Scene["scene primitives"]
-  Scene --> StudioUI["diagram-studio-ui"]
+  Scene --> StudioUI["diagram-ui"]
   Scene --> Excalidraw["diagram-excalidraw"]
 ```
 

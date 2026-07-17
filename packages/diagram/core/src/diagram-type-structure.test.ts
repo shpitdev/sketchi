@@ -28,9 +28,7 @@ describe("diagram type structure", () => {
         exists(`packages/diagram/renderer/src/diagram-types/${type}.test.ts`),
       ).toBe(true);
       expect(
-        exists(
-          `packages/diagram-studio-ui/src/diagram-types/${type}.stories.tsx`,
-        ),
+        exists(`packages/diagram/ui/src/diagram-types/${type}.stories.tsx`),
       ).toBe(true);
     }
   });

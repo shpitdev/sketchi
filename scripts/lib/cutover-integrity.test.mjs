@@ -45,7 +45,7 @@ const requiredReplacementPaths = [
   ".agents/skills/sketchi-code-mode/SKILL.md",
   ".agents/skills/sketchi-log-analysis/SKILL.md",
   ".agents/skills/sketchi-log-analysis/agents/openai.yaml",
-  "packages/diagram-studio-ui/src/styles.d.ts",
+  "packages/diagram/ui/src/styles.d.ts",
 ];
 
 const ignoredDirectories = new Set([
@@ -129,6 +129,40 @@ test("canonical sources contain no active lab-repository identifiers", () => {
         content.includes(identifier),
         false,
         `stale repository identifier ${identifier} in ${relative(repoPath, path)}`,
+      );
+    }
+  }
+});
+
+test("active sources contain no retired diagram UI identity or path", () => {
+  const retiredIdentifiers = [
+    ["diagram", "studio", "ui"].join("-"),
+    ["@sketchi", ["diagram", "studio", "ui"].join("-")].join("/"),
+    ["packages", ["diagram", "studio", "ui"].join("-")].join("/"),
+  ];
+
+  for (const path of repositoryTextFiles()) {
+    const repositoryPath = relative(repoPath, path);
+    if (repositoryPath.startsWith("docs/evals/")) {
+      continue;
+    }
+
+    let content = readFileSync(path, "utf8");
+    if (repositoryPath === "docs/repository-structure-proposal.html") {
+      const historicalTreeEntry = `├── ${retiredIdentifiers[0]}/`;
+      assert.equal(
+        content.split(historicalTreeEntry).length - 1,
+        1,
+        "the proposal must preserve exactly one retired diagram UI entry in its historical Phase 2 tree",
+      );
+      content = content.replace(historicalTreeEntry, "");
+    }
+
+    for (const identifier of retiredIdentifiers) {
+      assert.equal(
+        content.includes(identifier),
+        false,
+        `retired diagram UI identifier ${identifier} in ${repositoryPath}`,
       );
     }
   }

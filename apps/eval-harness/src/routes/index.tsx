@@ -5,8 +5,8 @@ import type {
   DiagramGenerationCacheMode,
   DiagramGenerationProviderId,
 } from "@sketchi/diagram-generation";
-import { ScenarioPlayground } from "@sketchi/diagram-studio-ui";
-import "@sketchi/diagram-studio-ui/styles.css";
+import { ScenarioPlayground } from "@sketchi/diagram-ui";
+import "@sketchi/diagram-ui/styles.css";
 
 import { generateScenarioCandidates } from "../lib/generate-scenario";
 

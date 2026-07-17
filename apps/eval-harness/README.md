@@ -5,7 +5,7 @@ inspection.
 
 ```mermaid
 flowchart LR
-  Route["harness route"] --> UI["diagram-studio-ui scenario harness"]
+  Route["harness route"] --> UI["diagram-ui scenario harness"]
   UI --> API["scenario candidate API"]
   API --> Generation["diagram-generation"]
   Generation --> Scenarios["diagram-scenarios"]

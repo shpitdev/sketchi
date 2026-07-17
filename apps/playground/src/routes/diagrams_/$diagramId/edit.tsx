@@ -3,7 +3,7 @@ import {
   createExcalidrawFile,
   type ExcalidrawScene,
 } from "@sketchi/diagram-excalidraw";
-import { ArtifactCanvas } from "@sketchi/diagram-studio-ui";
+import { ArtifactCanvas } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 

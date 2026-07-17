@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/native-conversion-storybook",
   "projectType": "application",
-  "implicitDependencies": ["diagram-studio-ui", "excalidraw", "icons"],
+  "implicitDependencies": ["diagram-ui", "excalidraw", "icons"],
   "targets": {
     "build-storybook": {
       "executor": "@nx/storybook:build",

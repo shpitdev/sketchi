@@ -40,9 +40,7 @@ describe("diagram-type generator", () => {
       ),
     ).toBe(true);
     expect(
-      tree.exists(
-        "packages/diagram-studio-ui/src/diagram-types/mindmap.stories.tsx",
-      ),
+      tree.exists("packages/diagram/ui/src/diagram-types/mindmap.stories.tsx"),
     ).toBe(true);
     expect(tree.read("packages/diagram/core/src/index.ts", "utf-8")).toContain(
       'export * from "./diagram-types/mindmap.js";',

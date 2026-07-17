@@ -2,7 +2,7 @@
    Sketchi v2 — web surface. Tokens, base, motion, and shared atoms come
    from the global design system; this file owns web-specific layout.
    ===================================================================== */
-@import "../../../../packages/diagram-studio-ui/src/theme.css";
+@import "../../../../packages/diagram/ui/src/theme.css";
 
 /* ===================================================================== */
 /* Site header                                                           */

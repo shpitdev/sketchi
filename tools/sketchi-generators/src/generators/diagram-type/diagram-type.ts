@@ -11,7 +11,7 @@ import type { DiagramTypeGeneratorSchema } from "./schema";
 
 const CORE_ROOT = "packages/diagram/core/src";
 const RENDERER_ROOT = "packages/diagram/renderer/src";
-const STUDIO_ROOT = "packages/diagram-studio-ui/src";
+const UI_ROOT = "packages/diagram/ui/src";
 
 function appendExport(tree: Tree, indexPath: string, exportPath: string) {
   const exportLine = `export * from "${exportPath}";`;
@@ -96,8 +96,8 @@ export async function diagramTypeGenerator(
   );
   generateFiles(
     tree,
-    path.join(__dirname, "files", "studio"),
-    joinPathFragments(STUDIO_ROOT, "diagram-types"),
+    path.join(__dirname, "files", "ui"),
+    joinPathFragments(UI_ROOT, "diagram-types"),
     templateContext,
   );
 

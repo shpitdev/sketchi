@@ -18,7 +18,7 @@ flowchart LR
   Generation --> Core["diagram-core<br/>typed IR validation"]
   Core --> Renderer["diagram-renderer<br/>scene model"]
   Renderer --> Excalidraw["diagram-excalidraw<br/>persistable scene"]
-  Excalidraw --> UI["apps + diagram-studio-ui"]
+  Excalidraw --> UI["apps + diagram-ui"]
 ```
 
 ## Package Boundaries
@@ -31,7 +31,7 @@ flowchart LR
 - `diagram-agent` owns the canonical `buildFlowchart` request/result vertical,
   structured issues, quality assessment, render/export orchestration, and
   accepted artifact persistence used by Studio, HTTP, and MCP.
-- `diagram-studio-ui` renders the scene model and owns user-facing component states.
+- `diagram-ui` renders the scene model and owns user-facing component states.
 - `studio-projects` owns Studio project/diagram contracts, browser API helpers,
   anonymous and authenticated ownership, and object-bucket persistence. It has
   no dependency on app routes, Cloudflare bindings, or the Code Mode runtime.

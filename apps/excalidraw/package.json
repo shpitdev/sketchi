@@ -7,7 +7,7 @@
     "@sketchi/diagram-core": "workspace:*",
     "@sketchi/diagram-excalidraw": "workspace:*",
     "@sketchi/diagram-renderer": "workspace:*",
-    "@sketchi/diagram-studio-ui": "workspace:*",
+    "@sketchi/diagram-ui": "workspace:*",
     "@sketchi/svg-excalidraw": "workspace:*"
   }
 }

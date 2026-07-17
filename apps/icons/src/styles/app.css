@@ -3,7 +3,7 @@
    Shares the web/excalidraw tokens; adds a dense, searchable icon browser.
    Fonts loaded via <link> in routes/__root.tsx.
    ===================================================================== */
-@import "../../../../packages/diagram-studio-ui/src/theme.css";
+@import "../../../../packages/diagram/ui/src/theme.css";
 
 /* ===================================================================== */
 /* Page                                                                  */

@@ -26,7 +26,7 @@
     "r2sql:codemode:resources": "node scripts/pipelines/codemode-r2-catalog.mjs resources",
     "r2sql:codemode:verify-run": "node scripts/pipelines/codemode-r2-catalog.mjs verify-run",
     "test:tools": "vitest run --config tools/vitest.config.mts",
-    "storybook": "nx storybook diagram-studio-ui",
+    "storybook": "nx storybook diagram-ui",
     "storybook:excalidraw": "nx storybook excalidraw",
     "storybook:icons": "nx storybook icons",
     "storybook:web": "nx storybook web",

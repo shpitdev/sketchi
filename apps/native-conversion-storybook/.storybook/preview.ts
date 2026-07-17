@@ -1,4 +1,4 @@
-import "../../../packages/diagram-studio-ui/src/styles.css";
+import "../../../packages/diagram/ui/src/styles.css";
 import "../../icons/src/styles/app.css";
 import "../../excalidraw/src/styles/app.css";
 

@@ -117,7 +117,8 @@ describe("harness-eval", () => {
     expect(result.stdout).toContain("parent done");
   });
 
-  it("does not time out after a CLI parent exits near its timeout budget", async () => {
+  it("does not time out when a CLI parent exits before its budget but inherited stdio stays open past it", async () => {
+    const timeoutMs = 1_000;
     const started = Date.now();
     const result = await runCommand(
       {
@@ -127,17 +128,19 @@ describe("harness-eval", () => {
             "const { spawn } = require('node:child_process');",
             "const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 5000)'], { stdio: ['ignore', 'inherit', 'inherit'] });",
             "child.unref();",
-            "setTimeout(() => console.log('parent done'), 250);",
+            "process.stdout.write('parent done\\n', () => process.exit(0));",
           ].join(" "),
         ],
         command: process.execPath,
         env: process.env,
         prompt: "",
       },
-      300,
+      timeoutMs,
     );
+    const elapsedMs = Date.now() - started;
 
-    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(elapsedMs).toBeGreaterThanOrEqual(timeoutMs);
+    expect(elapsedMs).toBeLessThan(3_000);
     expect(result).toMatchObject({
       exitCode: 0,
       signal: null,

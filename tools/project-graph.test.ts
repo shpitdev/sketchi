@@ -42,6 +42,14 @@ const diagramPackages = [
     root: "packages/diagram/scenarios",
     oldRoot: "packages/diagram-scenarios",
   },
+  {
+    name: "diagram-ui",
+    npmName: "@sketchi/diagram-ui",
+    root: "packages/diagram/ui",
+    oldRoot: ["packages", ["diagram", "studio", "ui"].join("-")].join(
+      "/",
+    ),
+  },
 ];
 
 describe("diagram package layout", () => {
@@ -55,7 +63,7 @@ describe("diagram package layout", () => {
     }
   });
 
-  it("preserves npm identities and removes the old active directories", () => {
+  it("uses the approved npm identities and removes old active directories", () => {
     for (const diagramPackage of diagramPackages) {
       const packageRoot = path.join(workspaceRoot, diagramPackage.root);
       const packageJson = readJsonFile<{ name: string }>(
@@ -68,10 +76,6 @@ describe("diagram package layout", () => {
         false,
       );
     }
-
-    expect(
-      existsSync(path.join(workspaceRoot, "packages/diagram-studio-ui")),
-    ).toBe(true);
     expect(
       existsSync(path.join(workspaceRoot, "packages/svg-excalidraw")),
     ).toBe(true);

@@ -6,7 +6,7 @@ import {
 } from "@sketchi/diagram-core";
 import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
-import { ExcalidrawSceneCanvas } from "@sketchi/diagram-studio-ui";
+import { ExcalidrawSceneCanvas } from "@sketchi/diagram-ui";
 import { useEffect, useMemo, useState } from "react";
 
 import { DiagramInspector } from "../diagram-inspector/index.js";

@@ -10,7 +10,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import "@sketchi/diagram-studio-ui/styles.css";
+import "@sketchi/diagram-ui/styles.css";
 import "../../styles/app.css";
 import type { SvgHandoff } from "../../lib/svg-handoff";
 import { SvgIconWorkspace } from "./svg-icon-workspace";

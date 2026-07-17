@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@sketchi/diagram-studio-ui", () => ({
+vi.mock("@sketchi/diagram-ui", () => ({
   ExcalidrawSceneCanvas: ({
     scene,
     title,

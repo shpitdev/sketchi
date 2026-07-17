@@ -56,7 +56,7 @@ connecting strokes between disjoint subpaths.
 v2 ground truth: no SVG tooling exists; `packages/diagram/excalidraw` already
 hand-builds deterministic raw elements (`elementBase()`, FNV-hash seeds,
 `fractional-indexing`, `createExcalidrawFile`, geometric validation).
-Visual regression is Chromatic, currently wired only for `diagram-studio-ui`.
+Visual regression is Chromatic, currently wired only for `diagram-ui`.
 
 ## Adopted decisions
 

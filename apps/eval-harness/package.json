@@ -8,6 +8,6 @@
     "@sketchi/diagram-generation": "workspace:*",
     "@sketchi/diagram-renderer": "workspace:*",
     "@sketchi/diagram-scenarios": "workspace:*",
-    "@sketchi/diagram-studio-ui": "workspace:*"
+    "@sketchi/diagram-ui": "workspace:*"
   }
 }

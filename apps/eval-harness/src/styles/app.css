@@ -1,9 +1,9 @@
 /* =====================================================================
    Sketchi v2 — eval harness surface. Tokens, base, motion, and shared atoms
    come from the global design system. The scenario UI itself is the
-   diagram-studio-ui ScenarioPlayground, styled by its themed styles.css.
+   diagram-ui ScenarioPlayground, styled by its themed styles.css.
    ===================================================================== */
-@import "../../../../packages/diagram-studio-ui/src/theme.css";
+@import "../../../../packages/diagram/ui/src/theme.css";
 
 .sketchi-not-found {
   align-items: center;
