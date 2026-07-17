@@ -15,6 +15,11 @@ describe("SiteFooter", () => {
         "Made for people who'd rather describe a diagram than draw one.",
       ),
     ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("link", { name: "Sketchi on GitHub" })
+        .getAttribute("href"),
+    ).toBe("https://github.com/shpitdev/sketchi");
   });
 
   it("uses configured surface links", () => {

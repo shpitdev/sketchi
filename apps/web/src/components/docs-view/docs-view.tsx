@@ -17,9 +17,7 @@ export interface DocsViewProps {
 const defaultNav: readonly DocsNavEntry[] = [
   { href: "#how", label: "How it works" },
   { href: "#open-source", label: "Open source" },
-  { href: "#agents", label: "In your agent" },
   { href: "#diagram-types", label: "Diagram types" },
-  { href: "#icons", label: "Icons" },
   { href: "#faq", label: "FAQ" },
 ];
 
@@ -48,20 +46,17 @@ export function DocsView({
       <article className="docs-article">
         <h1 className="sk-section__title">How Sketchi works</h1>
         <p className="docs-article__intro">
-          Sketchi turns a plain-language prompt into a clean, editable diagram —
-          brand logos and all. There are two ways to use it, and which one you
-          pick decides everything else.
+          Sketchi turns a plain-language prompt into a clean, editable diagram,
+          brand logos and all. You can use it two ways.
         </p>
 
         <section className="docs-section" id="how">
-          <h2>
-            <span className="docs-section__idx">01</span> Two paths
-          </h2>
+          <h2>Two paths</h2>
           <p>
-            You describe what you want to see. Sketchi structures and checks the
-            request before it draws, so the diagram is consistent — not a
-            best-guess sketch. The difference is <em>where</em> that happens and{" "}
-            <em>who keeps the result</em>.
+            You describe it. Sketchi structures and validates the request before
+            drawing, so the result stays consistent, not a best-guess sketch.
+            What differs between the two paths is where that happens and who
+            keeps the file.
           </p>
 
           <div className="docs-paths">
@@ -73,7 +68,7 @@ export function DocsView({
                 <li>Edit and export it.</li>
               </ol>
               <p className="docs-lane__state">
-                Sketchi holds it — as an unlisted link, tied to your browser. No
+                Sketchi holds it as an unlisted link tied to your browser. No
                 account yet, so treat it as temporary.
               </p>
             </div>
@@ -86,8 +81,9 @@ export function DocsView({
                 <li>The diagram lands in your project.</li>
               </ol>
               <p className="docs-lane__state">
-                Your harness and machine keep the file — Sketchi just draws it.
-                State lives where your code does.
+                Your harness and machine keep the file; Sketchi just draws it.
+                Setup for each agent lives on the{" "}
+                <a href="/agents">agents page</a>.
               </p>
             </div>
           </div>
@@ -96,20 +92,18 @@ export function DocsView({
             <span className="docs-callout__k">See it live</span>
             <span>
               Open the{" "}
-              <a href={liveExampleUrl}>interactive read-only diagram</a> — a real
-              Sketchi diagram you can pan and zoom, drawn from these very steps.
+              <a href={liveExampleUrl}>interactive read-only diagram</a>, a real
+              Sketchi diagram you can pan and zoom.
             </span>
           </div>
         </section>
 
         <section className="docs-section" id="open-source">
-          <h2>
-            <span className="docs-section__idx">02</span> Open source
-          </h2>
+          <h2>Open source</h2>
           <p>
-            Sketchi is built in the open. The whole thing — the diagram engine,
-            the icon set, the agent runtime, even these pages — lives on GitHub.
-            Read how it works, file an issue, fork it, or run your own copy.
+            Sketchi is built in the open and MIT-licensed: the diagram engine,
+            the icon set, the agent runtime, even these pages. Read the code,
+            file an issue, or run your own copy.
           </p>
           <div className="docs-callout">
             <span className="docs-callout__k">Source</span>
@@ -119,32 +113,14 @@ export function DocsView({
           </div>
         </section>
 
-        <section className="docs-section" id="agents">
-          <h2>
-            <span className="docs-section__idx">03</span> In your coding agent
-          </h2>
-          <p>
-            Sketchi plugs into Claude Code, Codex, OpenCode, and Antigravity.
-            Connect it once and ask for a diagram in chat — you&rsquo;ll get a
-            real, editable Sketchi diagram back without leaving your editor. Full
-            setup lives on the <a href="/agents">agents page</a>.
-          </p>
-        </section>
-
         <section className="docs-section" id="diagram-types">
-          <h2>
-            <span className="docs-section__idx">04</span> Diagram types
-          </h2>
-          <p>
-            Every type is held to the same bar for layout and readability before
-            it ships.
-          </p>
+          <h2>Diagram types</h2>
           <dl className="docs-defs">
             <div className="docs-defs__row">
               <dt>Flowchart</dt>
               <dd>
-                Start, process, decision, and end steps with labeled branches —
-                the best-supported type today.
+                Start, process, decision, and end steps with labeled branches.
+                The best-supported type today.
               </dd>
             </div>
             <div className="docs-defs__row">
@@ -154,50 +130,30 @@ export function DocsView({
           </dl>
         </section>
 
-        <section className="docs-section" id="icons">
-          <h2>
-            <span className="docs-section__idx">05</span> The icon library
-          </h2>
-          <p>
-            Sketchi ships with 1,400+ curated brand and tech icons — databases,
-            clouds, frameworks, AI models — so your diagrams look like your
-            actual stack. The same set is browsable on its own.
-          </p>
-          <div className="docs-callout">
-            <span className="docs-callout__k">Browse</span>
-            <span>
-              Open the <a href={surfaceUrls.icons}>Sketchi icon library</a> to
-              search and copy any logo.
-            </span>
-          </div>
-        </section>
-
         <section className="docs-section" id="faq">
-          <h2>
-            <span className="docs-section__idx">06</span> FAQ
-          </h2>
+          <h2>FAQ</h2>
           <dl className="docs-defs">
             <div className="docs-defs__row">
               <dt>Do I need an account?</dt>
-              <dd>No — the playground is open and requires no sign-up.</dd>
+              <dd>No. The playground needs no sign-up.</dd>
             </div>
             <div className="docs-defs__row">
               <dt>Does my work save?</dt>
               <dd>
-                Not to an account yet. Saved diagrams are tied to your browser,
-                so treat them as temporary — export anything you want to keep.
+                Not to an account yet. Diagrams are tied to your browser, so
+                export anything you want to keep.
               </dd>
             </div>
             <div className="docs-defs__row">
               <dt>Are the diagrams editable?</dt>
               <dd>
                 Yes. Every element is a real object you can move, relabel, and
-                restyle on the canvas.
+                restyle.
               </dd>
             </div>
             <div className="docs-defs__row">
               <dt>Can I export?</dt>
-              <dd>Yes — take it to your docs, slides, or pull request.</dd>
+              <dd>Yes. Take it to your docs, slides, or pull request.</dd>
             </div>
           </dl>
         </section>

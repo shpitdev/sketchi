@@ -424,132 +424,140 @@
 }
 
 /* ===================================================================== */
-/* Path fork (home) — two calm lanes, agents folded into the agent side  */
+/* GitHub mark — recolored via mask so it inherits ink on light, paper   */
+/* on the dark footer.                                                    */
 /* ===================================================================== */
-.path-fork__grid {
-  display: grid;
-  gap: 32px 56px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 44px;
-}
-
-.path-lane {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-}
-
-.path-lane--agent {
-  border-inline-start: 1px solid var(--line);
-  padding-inline-start: 56px;
-}
-
-.path-lane__glyph {
-  align-items: center;
-  background: var(--accent-wash);
-  border-radius: 13px;
-  color: var(--accent-ink);
-  display: inline-flex;
-  block-size: 46px;
-  inline-size: 46px;
-  justify-content: center;
-}
-
-.path-lane--agent .path-lane__glyph {
-  background: var(--blueprint-wash);
-  color: var(--blueprint-ink);
-}
-
-.path-lane__title {
-  font-size: 23px;
-  margin: 6px 0 0;
-}
-
-.path-lane__body {
-  color: var(--ink-2);
-  font-size: 15.5px;
-  line-height: 1.6;
-  margin: 0;
-  max-width: 42ch;
-}
-
-.path-lane__cta {
-  align-self: flex-start;
-  margin-top: 8px;
-}
-
-.path-lane__agents {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 9px;
-  list-style: none;
-  margin: 8px 0 0;
-  padding: 0;
-}
-
-.agent-chip {
-  align-items: center;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--ink);
-  display: inline-flex;
-  gap: 8px;
-  padding: 6px 14px 6px 8px;
-  text-decoration: none;
-  transition:
-    border-color 0.18s var(--ease),
-    transform 0.18s var(--ease);
-}
-
-.agent-chip .brand-icon__img {
+.gh-mark {
+  background: currentColor;
   block-size: 20px;
+  display: inline-block;
+  flex: none;
   inline-size: 20px;
+  mask: url("/brand/github.svg") center / contain no-repeat;
+  -webkit-mask: url("/brand/github.svg") center / contain no-repeat;
 }
 
-.agent-chip__name {
-  font-size: 13.5px;
-  font-weight: 600;
+.site-header__gh {
+  align-items: center;
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  display: inline-flex;
+  block-size: 40px;
+  inline-size: 40px;
+  justify-content: center;
+  transition:
+    color 0.16s var(--ease),
+    background 0.16s var(--ease);
 }
 
-.agent-chip:hover {
-  border-color: var(--line-2);
-  transform: translateY(-2px);
+.site-header__gh:hover {
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+  color: var(--ink);
 }
 
-.agent-chip:focus-visible {
+.site-header__gh:focus-visible {
   outline: 2px solid var(--blueprint);
   outline-offset: 2px;
 }
 
-.path-lane__link {
-  color: var(--accent-ink);
+.site-footer__gh {
+  align-items: center;
+  color: #d8d1c2;
+  display: inline-flex;
   font-size: 14px;
-  font-weight: 700;
-  margin-top: 4px;
+  font-weight: 600;
+  gap: 9px;
+  margin-top: 16px;
   text-decoration: none;
-  width: fit-content;
+  transition: color 0.16s var(--ease);
 }
 
-.path-lane__link:hover {
-  text-decoration: underline;
+.site-footer__gh .gh-mark {
+  block-size: 22px;
+  inline-size: 22px;
+}
+
+.site-footer__gh:hover {
+  color: #fff;
 }
 
 /* ===================================================================== */
-/* Feature grid — airy columns, no boxes                                 */
+/* Copy button — sits in the corner of a code snippet                    */
 /* ===================================================================== */
+.code-snippet {
+  position: relative;
+}
+
+.copy-btn {
+  align-items: center;
+  background: color-mix(in srgb, #ece6d8 16%, transparent);
+  border: 1px solid rgba(236, 230, 216, 0.22);
+  border-radius: var(--r-sm);
+  color: #ece6d8;
+  cursor: pointer;
+  display: inline-flex;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  gap: 6px;
+  letter-spacing: 0.04em;
+  padding: 5px 9px;
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-end: 10px;
+  text-transform: uppercase;
+  transition:
+    background 0.16s var(--ease),
+    border-color 0.16s var(--ease),
+    color 0.16s var(--ease);
+}
+
+.copy-btn:hover {
+  background: color-mix(in srgb, #ece6d8 26%, transparent);
+  border-color: rgba(236, 230, 216, 0.4);
+}
+
+.copy-btn:focus-visible {
+  outline: 2px solid var(--paper-2);
+  outline-offset: 2px;
+}
+
+.copy-btn[data-copied] {
+  background: color-mix(in srgb, var(--ok) 30%, transparent);
+  border-color: color-mix(in srgb, var(--ok) 55%, transparent);
+  color: #eafff3;
+}
+
+.copy-btn__glyph {
+  display: inline-flex;
+}
+
+/* Wrap long commands and reserve a gutter so the copy button never sits on
+   top of the code. */
+.code-snippet .docs-codeblock {
+  overflow-wrap: anywhere;
+  padding-right: 84px;
+  white-space: pre-wrap;
+}
+
+/* ===================================================================== */
+/* Feature grid — a wordless capability trio                             */
+/* ===================================================================== */
+.feature-grid__title {
+  max-width: 22ch;
+}
+
 .feature-grid__cards {
   display: grid;
   gap: 20px 44px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 44px;
+  margin-top: 40px;
 }
 
 .feature-card {
   display: flex;
   flex-direction: column;
-  gap: 13px;
+  gap: 14px;
   min-width: 0;
 }
 
@@ -564,8 +572,11 @@
   justify-content: center;
 }
 
+/* Match the single-glyph tiles' icon-row height so all three titles share a
+   baseline regardless of the cluster's shorter logo tiles. */
 .feature-card__cluster {
   align-items: center;
+  block-size: 48px;
   display: inline-flex;
   gap: 7px;
 }
@@ -577,13 +588,6 @@
 .feature-card__title {
   font-size: 18px;
   margin: 2px 0 0;
-}
-
-.feature-card__body {
-  color: var(--ink-2);
-  font-size: 14.5px;
-  line-height: 1.55;
-  margin: 0;
 }
 
 /* ===================================================================== */
@@ -601,8 +605,8 @@
   justify-content: space-between;
 }
 
-.icon-wall__copy {
-  max-width: 56ch;
+.icon-wall__title {
+  max-width: 20ch;
 }
 
 /* A contained "icon tray" — same dot-grid motif as the hero board and CTA
@@ -822,18 +826,8 @@
 }
 
 .docs-section > h2 {
-  align-items: baseline;
-  display: flex;
   font-size: 24px;
-  gap: 12px;
   margin: 0 0 14px;
-}
-
-.docs-section > h2 .docs-section__idx {
-  color: var(--accent-ink);
-  font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 600;
 }
 
 .docs-section p {
@@ -1421,21 +1415,6 @@
 
   .site-footer__inner {
     grid-template-columns: 1fr 1fr;
-  }
-}
-
-/* Stack the two path lanes: the divider moves from the side to the top. */
-@media (max-width: 800px) {
-  .path-fork__grid {
-    gap: 28px;
-    grid-template-columns: 1fr;
-  }
-
-  .path-lane--agent {
-    border-inline-start: 0;
-    border-top: 1px solid var(--line);
-    padding-block-start: 28px;
-    padding-inline-start: 0;
   }
 }
 

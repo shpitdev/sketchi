@@ -56,6 +56,9 @@ describe("AgentSetupView", () => {
       ),
     ).toBeTruthy();
     expect(screen.getByText("codex mcp get sketchi-code-mode")).toBeTruthy();
+    expect(
+      screen.getAllByRole("button", { name: /^Copy / }).length,
+    ).toBeGreaterThanOrEqual(4);
   });
 
   it("names the Antigravity MCP config path and merge behavior", () => {

@@ -2,7 +2,6 @@ import { CtaBand } from "../cta-band/index.js";
 import { FeatureGrid } from "../feature-grid/index.js";
 import { HomeHero } from "../home-hero/index.js";
 import { IconWall } from "../icon-wall/index.js";
-import { PathFork } from "../path-fork/index.js";
 import { SiteFooter } from "../site-footer/index.js";
 import { SiteHeader } from "../site-header/index.js";
 import {
@@ -23,7 +22,6 @@ export function MarketingHome({
 
       <main id="top">
         <HomeHero primaryHref={surfaceUrls.playground} />
-        <PathFork surfaceUrls={surfaceUrls} />
         <FeatureGrid />
         <IconWall iconsHref={surfaceUrls.icons} />
         <CtaBand playgroundHref={surfaceUrls.playground} />

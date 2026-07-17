@@ -15,11 +15,11 @@ describe("DocsView", () => {
     ).toBeTruthy();
     expect(screen.getByRole("link", { name: "How it works" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /Open source/ })).toBeTruthy();
-    expect(
-      screen.getByRole("heading", { name: /In your coding agent/ }),
-    ).toBeTruthy();
     expect(screen.getByRole("heading", { name: /Diagram types/ })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /FAQ/ })).toBeTruthy();
+    expect(
+      screen.queryByRole("heading", { name: /In your coding agent/ }),
+    ).toBeNull();
     expect(
       screen.queryByRole("link", { name: /Excalidraw workspace/ }),
     ).toBeNull();

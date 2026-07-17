@@ -21,10 +21,7 @@ export function CtaBand({
         <div className="cta-band__sheet">
           <span className="cta-band__caret" aria-hidden="true" />
           <h2 className="cta-band__title">Start with a sentence.</h2>
-          <p className="cta-band__lead">
-            No sign-up. Type what you want to see and watch it become a diagram
-            you can edit.
-          </p>
+          <p className="cta-band__lead">No sign-up. Just type it.</p>
           <div className="cta-band__actions">
             <a className="sk-btn sk-btn--accent" href={playgroundHref}>
               Open the playground

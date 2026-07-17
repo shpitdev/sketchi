@@ -5,11 +5,15 @@ import {
 
 export interface SiteFooterProps {
   colophon?: string;
+  repoUrl?: string;
   surfaceUrls?: WebSurfaceUrls;
 }
 
+const DEFAULT_REPO_URL = "https://github.com/shpitdev/sketchi";
+
 export function SiteFooter({
   colophon = "Made for people who'd rather describe a diagram than draw one.",
+  repoUrl = DEFAULT_REPO_URL,
   surfaceUrls = DEFAULT_WEB_SURFACE_URLS,
 }: SiteFooterProps) {
   return (
@@ -29,6 +33,16 @@ export function SiteFooter({
           <p className="site-footer__tagline">
             Prompts become real, editable diagrams, logos included.
           </p>
+          <a
+            aria-label="Sketchi on GitHub"
+            className="site-footer__gh"
+            href={repoUrl}
+            rel="noreferrer"
+            target="_blank"
+          >
+            <span aria-hidden="true" className="gh-mark" />
+            <span>Open source on GitHub</span>
+          </a>
         </div>
 
         <div className="site-footer__col">
@@ -74,7 +88,7 @@ export function SiteFooter({
               <a href="/docs">How it works</a>
             </li>
             <li>
-              <a href="https://github.com/shpitdev/sketchi">GitHub</a>
+              <a href={repoUrl}>GitHub</a>
             </li>
           </ul>
         </div>

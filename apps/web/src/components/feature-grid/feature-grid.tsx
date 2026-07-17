@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import { BrandIcon } from "../brand-icon/index.js";
 
 interface Feature {
-  body: string;
   glyph: ReactNode;
   title: string;
 }
@@ -17,12 +16,10 @@ const clusterIcons = [
 
 const features: readonly Feature[] = [
   {
-    body: "Every box, arrow, and label is a real shape you can drag, relabel, and restyle, never a flat picture you have to redraw from scratch.",
     glyph: <ShapesGlyph />,
     title: "Real objects, not screenshots",
   },
   {
-    body: "Databases, clouds, frameworks, AI models: Sketchi drops in crisp brand logos so your architecture actually looks like your stack.",
     glyph: (
       <span className="feature-card__cluster" aria-hidden="true">
         {clusterIcons.map((icon) => (
@@ -39,35 +36,27 @@ const features: readonly Feature[] = [
     title: "1,400+ logos, already drawn",
   },
   {
-    body: "Open any diagram on the canvas, adjust it by hand, and take it straight to your docs, your slides, or your pull request.",
     glyph: <ExportGlyph />,
     title: "Yours to edit and export",
   },
 ];
 
 /**
- * Three benefit cards that reframe the product in the reader's terms —
- * no pipeline internals, no package names.
+ * The wedge, scanned not read: three icon-led tiles that name what makes a
+ * Sketchi diagram different, no paragraphs.
  */
 export function FeatureGrid() {
   return (
     <section className="sk-section feature-grid" id="product">
       <div className="sk-shell">
-        <div className="sk-section__head">
-          <h2 className="sk-section__title">
-            Diagrams that behave like diagrams.
-          </h2>
-          <p className="sk-section__lead">
-            Not a flat picture of a diagram. Real shapes, real logos, yours to
-            edit.
-          </p>
-        </div>
+        <h2 className="sk-section__title feature-grid__title">
+          Diagrams that behave like diagrams.
+        </h2>
         <div className="feature-grid__cards">
           {features.map((feature) => (
             <article className="feature-card" key={feature.title}>
               {feature.glyph}
               <h3 className="feature-card__title">{feature.title}</h3>
-              <p className="feature-card__body">{feature.body}</p>
             </article>
           ))}
         </div>

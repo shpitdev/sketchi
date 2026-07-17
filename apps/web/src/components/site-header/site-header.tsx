@@ -13,6 +13,7 @@ export interface SiteHeaderNavItem {
 export interface SiteHeaderProps {
   activePath?: string;
   navItems?: readonly SiteHeaderNavItem[];
+  repoUrl?: string;
   surfaceUrls?: WebSurfaceUrls;
 }
 
@@ -22,9 +23,12 @@ const defaultNavItems: readonly SiteHeaderNavItem[] = [
   { href: "/docs", label: "Docs" },
 ];
 
+const DEFAULT_REPO_URL = "https://github.com/shpitdev/sketchi";
+
 export function SiteHeader({
   activePath,
   navItems = defaultNavItems,
+  repoUrl = DEFAULT_REPO_URL,
   surfaceUrls = DEFAULT_WEB_SURFACE_URLS,
 }: SiteHeaderProps) {
   const [open, setOpen] = useState(false);
@@ -59,6 +63,15 @@ export function SiteHeader({
         <div className="site-header__actions">
           <a className="site-header__link" href={surfaceUrls.icons}>
             Icons
+          </a>
+          <a
+            aria-label="Sketchi on GitHub"
+            className="site-header__gh"
+            href={repoUrl}
+            rel="noreferrer"
+            target="_blank"
+          >
+            <span aria-hidden="true" className="gh-mark" />
           </a>
           <a
             className="sk-btn sk-btn--primary site-header__cta"
@@ -118,6 +131,15 @@ export function SiteHeader({
           <div className="site-header__sheet-actions">
             <a className="sk-btn sk-btn--ghost" href={surfaceUrls.icons}>
               Icons
+            </a>
+            <a
+              className="sk-btn sk-btn--ghost"
+              href={repoUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              <span aria-hidden="true" className="gh-mark" />
+              GitHub
             </a>
             <a className="sk-btn sk-btn--primary" href={surfaceUrls.playground}>
               Playground

@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 import { BrandIcon } from "../brand-icon/index.js";
+import { CopyButton } from "../copy-button/index.js";
 import {
   agentSetupEntries,
   codeModeMcpEndpoint,
@@ -39,9 +40,8 @@ function AgentSetupHub() {
           <div className="agent-hero__copy">
             <h1>Sketch diagrams without leaving your agent.</h1>
             <p>
-              Connect Sketchi once and ask for a diagram in plain language.
-              Whatever you&rsquo;re building, your agent hands back a real,
-              editable Sketchi diagram — not a wall of ASCII.
+              Connect it once, then ask in plain language. Your agent hands back
+              a real, editable diagram, not a wall of ASCII.
             </p>
           </div>
           <EndpointCard meta="Add this URL wherever your agent keeps its MCP config." />
@@ -116,9 +116,12 @@ function AgentSetupDetail({ entry }: { entry: AgentSetupEntry }) {
                 </span>
                 <div>
                   <h3>{command.label}</h3>
-                  <pre className="docs-codeblock">
-                    <code>{command.value}</code>
-                  </pre>
+                  <div className="code-snippet">
+                    <pre className="docs-codeblock">
+                      <code>{command.value}</code>
+                    </pre>
+                    <CopyButton label={command.label} value={command.value} />
+                  </div>
                 </div>
               </div>
             ))}
@@ -126,9 +129,15 @@ function AgentSetupDetail({ entry }: { entry: AgentSetupEntry }) {
             {entry.config === undefined ? null : (
               <div className="agent-config">
                 <h2>{entry.configLabel ?? "Add the public MCP server"}</h2>
-                <pre className="docs-codeblock">
-                  <code>{entry.config}</code>
-                </pre>
+                <div className="code-snippet">
+                  <pre className="docs-codeblock">
+                    <code>{entry.config}</code>
+                  </pre>
+                  <CopyButton
+                    label={entry.configLabel ?? "config"}
+                    value={entry.config}
+                  />
+                </div>
               </div>
             )}
           </div>

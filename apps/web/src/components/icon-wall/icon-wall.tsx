@@ -85,15 +85,9 @@ export function IconWall({
     <section className="sk-section icon-wall" id="icons">
       <div className="sk-shell">
         <div className="icon-wall__head">
-          <div className="icon-wall__copy">
-            <h2 className="sk-section__title">
-              Every logo you need, already sketched.
-            </h2>
-            <p className="sk-section__lead">
-              Search 1,400+ curated brand and tech icons, the same set Sketchi
-              drops straight into your diagrams.
-            </p>
-          </div>
+          <h2 className="sk-section__title icon-wall__title">
+            Every logo you need, already sketched.
+          </h2>
           <a className="sk-btn sk-btn--ghost" href={iconsHref}>
             Browse the library →
           </a>

@@ -8,7 +8,7 @@ import { getWebSurfaceUrls } from "../lib/surface-urls-rpc";
 
 export const Route = createFileRoute("/docs")({
   head: () => ({
-    meta: [{ title: "Docs — Sketchi" }],
+    meta: [{ title: "Docs - Sketchi" }],
   }),
   loader: () => getWebSurfaceUrls(),
   component: DocsRoute,

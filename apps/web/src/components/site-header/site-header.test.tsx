@@ -12,6 +12,11 @@ describe("SiteHeader", () => {
     expect(screen.getByRole("link", { name: "Agents" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Playground" })).toBeTruthy();
     expect(
+      screen
+        .getByRole("link", { name: "Sketchi on GitHub" })
+        .getAttribute("href"),
+    ).toBe("https://github.com/shpitdev/sketchi");
+    expect(
       screen.getByRole("link", { name: "Docs" }).getAttribute("aria-current"),
     ).toBe("page");
   });
