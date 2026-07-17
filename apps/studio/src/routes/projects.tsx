@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import { fetchStudioProjects } from "@/lib/studio-projects-client";
 import {
+  fetchStudioProjects,
   studioDiagramUrl,
   studioProjectUrl,
   type StudioProjectSummary,
-} from "@/lib/studio-projects-contract";
+} from "@sketchi/studio-projects/client";
 import { SKETCHI_WEB_HOME_URL } from "@/lib/home-url";
 
 export const Route = createFileRoute("/projects")({

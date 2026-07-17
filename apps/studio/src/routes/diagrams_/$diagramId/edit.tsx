@@ -8,13 +8,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { fetchArtifactScene } from "@/lib/artifact-view-client";
-import { fetchStudioDiagramDetails } from "@/lib/studio-projects-client";
 import { IconActionBar, IconLink } from "@/components/sketch-icons";
 import { SKETCHI_WEB_HOME_URL } from "@/lib/home-url";
-import type {
-  StudioDiagramSummary,
-  StudioProjectSummary,
-} from "@/lib/studio-projects-contract";
+import {
+  fetchStudioDiagramDetails,
+  type StudioDiagramSummary,
+  type StudioProjectSummary,
+} from "@sketchi/studio-projects/client";
 import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 
 export const Route = createFileRoute("/diagrams_/$diagramId/edit")({

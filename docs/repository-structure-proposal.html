@@ -379,9 +379,9 @@
         </p>
         <div class="meta">
           <span class="pill">Approved migration plan</span>
-          <span class="pill">Phase 1 applied</span>
+          <span class="pill">Phase 2 applied</span>
           <span class="pill">Public URLs preserved</span>
-          <span class="pill">Prepared from <code>main@d32b494</code></span>
+          <span class="pill">Current through Studio extraction</span>
         </div>
       </header>
 
@@ -403,9 +403,9 @@
             <h3>Free the Playground name</h3>
             <p>
               The internal <code>apps/playground</code> has been renamed to
-              <code>apps/eval-harness</code>. Before renaming
-              <code>apps/studio</code>, extract its real Studio persistence
-              domain so the combined boundary is represented honestly.
+              <code>apps/eval-harness</code>, and the Studio persistence domain
+              has been extracted. The public host can now be renamed in a later
+              phase without moving project data logic with it.
             </p>
           </article>
           <article class="card info">
@@ -434,7 +434,7 @@
         <div class="section-head">
           <div>
             <p class="eyebrow">The newcomer test</p>
-            <h2>Phase 1 state vs. approved destination</h2>
+            <h2>Phase 2 state vs. approved destination</h2>
           </div>
           <p>
             A directory should answer “what is this?” without requiring a
@@ -445,7 +445,7 @@
           <div class="tree">
             <pre><span class="dim">apps/</span>
 ├── eval-harness/ <span class="accent"># internal scenarios</span>
-├── studio/       <span class="accent"># public Playground/API + Studio persistence</span>
+├── studio/       <span class="accent"># public Playground/API + Studio adapter</span>
 ├── web/
 ├── icons/
 └── excalidraw/
@@ -458,6 +458,8 @@
 ├── diagram-renderer/
 ├── diagram-scenarios/
 ├── diagram-studio-ui/
+├── studio/
+│   └── projects/ <span class="accent"># persistence contract + service</span>
 └── svg-excalidraw/</pre>
           </div>
           <div class="arrow" aria-hidden="true">→</div>
@@ -544,6 +546,13 @@
                 <td><code>@sketchi/diagram-ui</code></td>
                 <td>Rename from “studio UI”; it is shared by five surfaces.</td>
               </tr>
+              <tr>
+                <td><code>packages/studio/projects</code></td>
+                <td><code>@sketchi/studio-projects</code></td>
+                <td>
+                  Applied in phase 2 with explicit client and server exports.
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -576,9 +585,9 @@
             <h2>Studio exists today, inside the Playground host</h2>
           </div>
           <p>
-            The current <code>apps/studio</code> is not merely misnamed. It owns
-            public Playground, Code Mode, artifact routes, and a genuine
-            persisted project/diagram foundation.
+            The current <code>apps/studio</code> still owns public Playground,
+            Code Mode, and artifact routes. It now composes the extracted
+            project/diagram package through a thin Cloudflare adapter.
           </p>
         </div>
         <div class="grid two">
@@ -587,18 +596,18 @@
             <h3>Blindly rename the directory</h3>
             <p>
               A direct <code>apps/studio</code> →
-              <code>apps/playground</code> move would hide project records,
-              diagram records, ownership, and <code>/api/studio</code> behind
-              another incomplete name.
+              <code>apps/playground</code> move must still preserve the Worker,
+              Cloudflare bindings, and <code>/api/studio</code> route identity;
+              the package extraction does not authorize a runtime cutover.
             </p>
           </article>
           <article class="card good">
-            <span class="tag good">Extract first</span>
-            <h3>Make the domain portable</h3>
+            <span class="tag good">Extracted</span>
+            <h3>The domain is portable</h3>
             <p>
-              Move Studio contracts and persistence into
+              Studio contracts and persistence now live in
               <code>packages/studio/projects</code>. The public Playground app
-              may compose it temporarily; a future authenticated
+              composes it temporarily; a future authenticated
               <code>apps/studio</code> can consume the same domain when it
               becomes a separate deployment.
             </p>
@@ -686,9 +695,9 @@
             >
           </div>
           <div class="step">
-            <strong>Phase 2</strong><b>Extract Studio domain</b
+            <strong>Phase 2 / done</strong><b>Extract Studio domain</b
             ><span
-              >Move project/diagram contracts and persistence to
+              >Moved project/diagram contracts and persistence to
               <code>packages/studio/projects</code>.</span
             >
           </div>

@@ -69,6 +69,7 @@ model candidate → typed diagram IR → deterministic scene → Excalidraw arti
 | `packages/diagram-excalidraw` | Persistable Excalidraw conversion and real-scene validation     |
 | `packages/diagram-scenarios`  | Maintained prompts, assertions, and local/live evals            |
 | `packages/diagram-studio-ui`  | Shared React diagram, review, and eval UI states                |
+| `packages/studio/projects`    | Studio project/diagram contracts and object-bucket persistence  |
 | `packages/svg-excalidraw`     | Native SVG-to-Excalidraw conversion and library serialization   |
 
 The first high-reliability target is decision-heavy flowchart generation.
@@ -162,7 +163,7 @@ pnpm deploy:icons
 
 ```text
 apps/                    Deployable TanStack Start and Storybook surfaces
-packages/                Typed diagram, rendering, UI, eval, and SVG libraries
+packages/                Typed diagram, Studio persistence, UI, eval, and SVG libraries
 plugins/                 Codex and Claude Code distribution payloads
 tools/sketchi-generators Nx generators for components and diagram families
 scripts/                 Preview, production, cutover, and pipeline operations

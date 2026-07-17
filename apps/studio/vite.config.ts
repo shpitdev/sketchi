@@ -57,6 +57,20 @@ export default defineConfig({
         ).pathname,
       },
       {
+        find: "@sketchi/studio-projects/client",
+        replacement: new URL(
+          "../../packages/studio/projects/src/client.ts",
+          import.meta.url,
+        ).pathname,
+      },
+      {
+        find: "@sketchi/studio-projects/server",
+        replacement: new URL(
+          "../../packages/studio/projects/src/server.ts",
+          import.meta.url,
+        ).pathname,
+      },
+      {
         find: "@sketchi/diagram-core",
         replacement: new URL(
           "../../packages/diagram-core/src/index.ts",

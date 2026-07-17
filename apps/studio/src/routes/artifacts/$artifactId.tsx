@@ -8,7 +8,7 @@ import {
   type ArtifactViewState,
 } from "@/lib/artifact-view-client";
 import { ArtifactSourceLink } from "@/components/artifact-source-link";
-import { createStudioProjectFromArtifact } from "@/lib/studio-projects-client";
+import { createStudioProjectFromArtifact } from "@sketchi/studio-projects/client";
 import { IconActionBar, IconButton, IconLink } from "@/components/sketch-icons";
 import { SKETCHI_WEB_HOME_URL } from "@/lib/home-url";
 

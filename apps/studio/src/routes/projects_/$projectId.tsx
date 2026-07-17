@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import { fetchStudioProjectDetails } from "@/lib/studio-projects-client";
 import {
+  fetchStudioProjectDetails,
   studioDiagramUrl,
   type StudioProjectDetails,
-} from "@/lib/studio-projects-contract";
+} from "@sketchi/studio-projects/client";
 import { IconActionBar, IconLink } from "@/components/sketch-icons";
 import { SKETCHI_WEB_HOME_URL } from "@/lib/home-url";
 

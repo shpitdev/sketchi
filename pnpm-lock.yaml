@@ -151,6 +151,27 @@ importers:
         specifier: 4.97.0
         version: 4.97.0(@cloudflare/workers-types@4.20260617.1)
 
+  apps/eval-harness:
+    dependencies:
+      '@sketchi/diagram-core':
+        specifier: workspace:*
+        version: link:../../packages/diagram-core
+      '@sketchi/diagram-excalidraw':
+        specifier: workspace:*
+        version: link:../../packages/diagram-excalidraw
+      '@sketchi/diagram-generation':
+        specifier: workspace:*
+        version: link:../../packages/diagram-generation
+      '@sketchi/diagram-renderer':
+        specifier: workspace:*
+        version: link:../../packages/diagram-renderer
+      '@sketchi/diagram-scenarios':
+        specifier: workspace:*
+        version: link:../../packages/diagram-scenarios
+      '@sketchi/diagram-studio-ui':
+        specifier: workspace:*
+        version: link:../../packages/diagram-studio-ui
+
   apps/excalidraw:
     dependencies:
       '@excalidraw/excalidraw':
@@ -180,27 +201,6 @@ importers:
       '@sketchi/svg-excalidraw':
         specifier: workspace:*
         version: link:../../packages/svg-excalidraw
-
-  apps/eval-harness:
-    dependencies:
-      '@sketchi/diagram-core':
-        specifier: workspace:*
-        version: link:../../packages/diagram-core
-      '@sketchi/diagram-excalidraw':
-        specifier: workspace:*
-        version: link:../../packages/diagram-excalidraw
-      '@sketchi/diagram-generation':
-        specifier: workspace:*
-        version: link:../../packages/diagram-generation
-      '@sketchi/diagram-renderer':
-        specifier: workspace:*
-        version: link:../../packages/diagram-renderer
-      '@sketchi/diagram-scenarios':
-        specifier: workspace:*
-        version: link:../../packages/diagram-scenarios
-      '@sketchi/diagram-studio-ui':
-        specifier: workspace:*
-        version: link:../../packages/diagram-studio-ui
 
   apps/studio:
     dependencies:
@@ -240,6 +240,9 @@ importers:
       '@sketchi/diagram-studio-ui':
         specifier: workspace:*
         version: link:../../packages/diagram-studio-ui
+      '@sketchi/studio-projects':
+        specifier: workspace:*
+        version: link:../../packages/studio/projects
       '@streamdown/cjk':
         specifier: ^1.0.3
         version: 1.0.3(@types/mdast@4.0.4)(micromark-util-types@2.0.2)(micromark@4.0.2)(react@19.2.7)(unified@11.0.5)
@@ -422,6 +425,18 @@ importers:
       react-dom:
         specifier: ^19.0.0
         version: 19.2.7(react@19.2.7)
+
+  packages/studio/projects:
+    dependencies:
+      nanoid:
+        specifier: ^5.1.11
+        version: 5.1.11
+      tslib:
+        specifier: ^2.3.0
+        version: 2.8.1
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
 
   packages/svg-excalidraw:
     dependencies:

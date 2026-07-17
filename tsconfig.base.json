@@ -23,7 +23,13 @@
     "types": ["node"],
     "useDefineForClassFields": true,
     "paths": {
-      "@sketchi/generators": ["./tools/sketchi-generators/src/index.ts"]
+      "@sketchi/generators": ["./tools/sketchi-generators/src/index.ts"],
+      "@sketchi/studio-projects/client": [
+        "./packages/studio/projects/src/client.ts"
+      ],
+      "@sketchi/studio-projects/server": [
+        "./packages/studio/projects/src/server.ts"
+      ]
     }
   }
 }

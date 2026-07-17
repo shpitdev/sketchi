@@ -5,6 +5,7 @@
     { "path": "./apps/eval-harness" },
     { "path": "./packages/diagram-core" },
     { "path": "./packages/diagram-renderer" },
-    { "path": "./packages/diagram-studio-ui" }
+    { "path": "./packages/diagram-studio-ui" },
+    { "path": "./packages/studio/projects" }
   ]
 }

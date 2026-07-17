@@ -32,12 +32,16 @@ flowchart LR
   structured issues, quality assessment, render/export orchestration, and
   accepted artifact persistence used by Studio, HTTP, and MCP.
 - `diagram-studio-ui` renders the scene model and owns user-facing component states.
+- `studio-projects` owns Studio project/diagram contracts, browser API helpers,
+  anonymous and authenticated ownership, and object-bucket persistence. It has
+  no dependency on app routes, Cloudflare bindings, or the Code Mode runtime.
 - `apps/eval-harness` composes the packages in a TanStack Start internal eval
   harness for scenarios, candidate inspection, and regression review.
 - `apps/studio` owns the current public Playground worker boundary: ephemeral
-  chat generation over the canonical build runtime and the persisted Studio
-  project/diagram route foundation. Its host injects artifact options and never
-  performs a second accepted-artifact write.
+  chat generation over the canonical build runtime and the HTTP/browser routes
+  for the persisted Studio foundation. A thin server adapter translates the R2
+  binding and validated Code Mode source artifacts into `studio-projects`;
+  the app never performs a second accepted-artifact write.
 - `apps/web` owns the public home/docs surface and should stay free of diagram runtime dependencies unless docs become interactive.
 - `apps/excalidraw` owns the internal Excalidraw rendering workspace and
   composes the diagram packages into a real canvas for isolated validation.
@@ -121,7 +125,7 @@ The v2 workspace has five TanStack Start app surfaces:
 
 - `eval-harness`: internal scenario evaluation and prompt-output inspection.
 - `studio`: public Playground worker boundary with chat generation, artifact
-  handoff, and persisted Studio foundation.
+  handoff, and the Cloudflare/HTTP adapter for the persisted Studio foundation.
 - `web`: public home/docs for the Sketchi product direction.
 - `excalidraw`: internal Excalidraw rendering workspace; Excalidraw is an
   implementation/editor capability, not a standalone public product route.

@@ -7,7 +7,7 @@ export const Route = createFileRoute("/api/studio/diagrams/$diagramId")({
         const [{ getStudioBindings }, { handleGetStudioDiagramRequest }] =
           await Promise.all([
             import("../../../../lib/cloudflare-bindings.server"),
-            import("../../../../lib/studio-projects.server"),
+            import("../../../../server/studio/projects.server"),
           ]);
 
         return handleGetStudioDiagramRequest(

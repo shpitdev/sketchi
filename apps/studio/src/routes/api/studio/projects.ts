@@ -7,7 +7,7 @@ export const Route = createFileRoute("/api/studio/projects")({
         const [{ getStudioBindings }, { handleListStudioProjectsRequest }] =
           await Promise.all([
             import("../../../lib/cloudflare-bindings.server"),
-            import("../../../lib/studio-projects.server"),
+            import("../../../server/studio/projects.server"),
           ]);
 
         return handleListStudioProjectsRequest(getStudioBindings(), request);

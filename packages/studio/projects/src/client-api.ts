@@ -7,7 +7,7 @@ import {
   type StudioDiagramSummary,
   type StudioProjectDetails,
   type StudioProjectSummary,
-} from "./studio-projects-contract";
+} from "./contracts.js";
 
 export async function fetchStudioProjects(): Promise<StudioProjectSummary[]> {
   const response = await fetch("/api/studio/projects");
