@@ -25,7 +25,7 @@ const WORKERS_DEV_ACCOUNT = "dimethyl";
 const WORKERS_DEV_WORKERS = {
   icons: "sketchi-icons",
   // apps/studio currently carries the public Playground worker boundary.
-  // apps/playground is the internal eval harness and is not a public link target.
+  // apps/eval-harness is internal and is not a public link target.
   playground: "sketchi-studio",
 } satisfies Record<keyof WebSurfaceUrls, string>;
 

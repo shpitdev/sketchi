@@ -31,8 +31,8 @@ test("productionAppConfig includes the studio production Worker", () => {
 });
 
 test("productionAppConfig keeps internal apps off public domains", () => {
-  assert.deepEqual(productionAppConfig("playground"), {
-    ...workerAppConfig("playground"),
+  assert.deepEqual(productionAppConfig("eval-harness"), {
+    ...workerAppConfig("eval-harness"),
     domainPatterns: [],
     publicSurface: false,
     routePolicy: "internal eval harness; no public product domain",
@@ -47,6 +47,13 @@ test("productionAppConfig keeps internal apps off public domains", () => {
     title: "Sketchi Excalidraw Workspace",
     workerName: "sketchi-excalidraw",
   });
+});
+
+test("productionAppConfig requires an explicit project selection", () => {
+  assert.throws(
+    () => productionAppConfig(),
+    /Production app\/project selection is required/,
+  );
 });
 
 test("productionAppConfig rejects unknown apps", () => {
@@ -135,7 +142,7 @@ test("productionDomainWranglerConfig emits no public routes for internal apps", 
         SKETCHI_APP_SURFACE: "playground",
       },
     },
-    "playground",
+    "eval-harness",
   );
 
   assert.equal(domainConfig.name, "sketchi-playground");

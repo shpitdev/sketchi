@@ -6,8 +6,8 @@
     "apps/icons": {
       "name": "icons.sketchi"
     },
-    "apps/playground": {
-      "name": "eval.sketchi"
+    "apps/eval-harness": {
+      "name": "eval-harness.sketchi"
     },
     "apps/studio": {
       "name": "studio.sketchi"

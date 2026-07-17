@@ -6,19 +6,19 @@ const workerApps = {
     workerName: "sketchi-excalidraw",
     wranglerInputConfigPath: "apps/excalidraw/wrangler.jsonc",
   },
+  "eval-harness": {
+    buildOutputPath: "dist/apps/eval-harness",
+    nxProjectId: "eval-harness",
+    projectRoot: "apps/eval-harness",
+    workerName: "sketchi-playground",
+    wranglerInputConfigPath: "apps/eval-harness/wrangler.jsonc",
+  },
   icons: {
     buildOutputPath: "dist/apps/icons",
     nxProjectId: "icons",
     projectRoot: "apps/icons",
     workerName: "sketchi-icons",
     wranglerInputConfigPath: "apps/icons/wrangler.jsonc",
-  },
-  playground: {
-    buildOutputPath: "dist/apps/playground",
-    nxProjectId: "playground",
-    projectRoot: "apps/playground",
-    workerName: "sketchi-playground",
-    wranglerInputConfigPath: "apps/playground/wrangler.jsonc",
   },
   studio: {
     buildOutputPath: "dist/apps/studio",
@@ -38,8 +38,15 @@ const workerApps = {
 
 export const workerAppIds = Object.freeze(Object.keys(workerApps));
 
-export function workerAppConfig(app = "playground") {
-  const appId = String(app ?? "playground").trim();
+export function workerAppConfig(app) {
+  const appId = typeof app === "string" ? app.trim() : "";
+
+  if (!appId) {
+    throw new Error(
+      `Worker app/project selection is required. Expected one of ${workerAppIds.join(", ")}.`,
+    );
+  }
+
   const config = workerApps[appId];
 
   if (!config) {

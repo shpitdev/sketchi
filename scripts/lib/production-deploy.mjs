@@ -13,7 +13,7 @@ export const productionApps = {
     routePolicy: "icons.sketchi.app product surface",
     title: "Sketchi Icons",
   },
-  playground: {
+  "eval-harness": {
     domainPatterns: [],
     publicSurface: false,
     routePolicy: "internal eval harness; no public product domain",
@@ -34,8 +34,15 @@ export const productionApps = {
   },
 };
 
-export function productionAppConfig(app = "playground") {
-  const appId = String(app ?? "playground").trim();
+export function productionAppConfig(app) {
+  const appId = typeof app === "string" ? app.trim() : "";
+
+  if (!appId) {
+    throw new Error(
+      `Production app/project selection is required. Expected one of ${Object.keys(productionApps).join(", ")}.`,
+    );
+  }
+
   const config = productionApps[appId];
 
   if (!config) {
@@ -44,7 +51,9 @@ export function productionAppConfig(app = "playground") {
     );
   }
 
-  return { ...workerAppConfig(appId), ...config };
+  const worker = workerAppConfig(appId);
+
+  return { ...worker, ...config };
 }
 
 export function productionDomainWranglerConfig(config, app) {

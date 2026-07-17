@@ -45,7 +45,7 @@ jobs:
       fail-fast: false
       matrix:
         app:
-          - playground
+          - eval-harness
           - studio
           - web
           - excalidraw
@@ -203,7 +203,7 @@ jobs:
       fail-fast: false
       matrix:
         app:
-          - playground
+          - eval-harness
           - studio
           - web
           - excalidraw

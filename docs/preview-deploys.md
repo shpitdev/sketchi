@@ -2,13 +2,13 @@
 
 ## Current Matrix
 
-| App key      | Nx project   | Preview Worker                   | Production Worker    | Product route status                                                      |
-| ------------ | ------------ | -------------------------------- | -------------------- | ------------------------------------------------------------------------- |
-| `web`        | `web`        | `sketchi-web-pr-<number>`        | `sketchi-web`        | `sketchi.app`, `www.sketchi.app`                                          |
-| `studio`     | `studio`     | `sketchi-studio-pr-<number>`     | `sketchi-studio`     | `playground.sketchi.app` manual attach target; `studio.sketchi.app` later |
-| `icons`      | `icons`      | `sketchi-icons-pr-<number>`      | `sketchi-icons`      | `icons.sketchi.app`                                                       |
-| `playground` | `playground` | `sketchi-playground-pr-<number>` | `sketchi-playground` | internal eval harness; not linked from public navigation                  |
-| `excalidraw` | `excalidraw` | `sketchi-excalidraw-pr-<number>` | `sketchi-excalidraw` | internal rendering workspace; not a public product domain                 |
+| App key        | Nx project     | Preview Worker                   | Production Worker    | Product route status                                                      |
+| -------------- | -------------- | -------------------------------- | -------------------- | ------------------------------------------------------------------------- |
+| `web`          | `web`          | `sketchi-web-pr-<number>`        | `sketchi-web`        | `sketchi.app`, `www.sketchi.app`                                          |
+| `studio`       | `studio`       | `sketchi-studio-pr-<number>`     | `sketchi-studio`     | `playground.sketchi.app` manual attach target; `studio.sketchi.app` later |
+| `icons`        | `icons`        | `sketchi-icons-pr-<number>`      | `sketchi-icons`      | `icons.sketchi.app`                                                       |
+| `eval-harness` | `eval-harness` | `sketchi-playground-pr-<number>` | `sketchi-playground` | internal eval harness; not linked from public navigation                  |
+| `excalidraw`   | `excalidraw`   | `sketchi-excalidraw-pr-<number>` | `sketchi-excalidraw` | internal rendering workspace; not a public product domain                 |
 
 The app key is deployment metadata, not an Nx project-name convention.
 `scripts/lib/worker-apps.mjs` maps each app key to its current `nxProjectId`,
@@ -51,7 +51,7 @@ For the `web` preview, the workflow also reads the account workers.dev
 subdomain from Cloudflare and injects sibling preview URLs into the generated
 Wrangler vars. `SKETCHI_PLAYGROUND_URL` points at the `studio` preview Worker
 because that app currently implements the public Playground worker boundary;
-`apps/playground` remains the internal eval harness.
+`apps/eval-harness` remains the internal eval harness.
 
 - `SKETCHI_ICONS_URL`
 - `SKETCHI_PLAYGROUND_URL`
@@ -61,7 +61,7 @@ of sending reviewers to production domains.
 
 Preview comments intentionally distinguish product previews from internal tool
 previews. `web`, `studio`, and `icons` are public-product previews.
-`playground` and `excalidraw` are internal previews only; their comments exist
+`eval-harness` and `excalidraw` are internal previews only; their comments exist
 for reviewer smoke tests and cleanup visibility, not public navigation.
 
 ## Required Configuration
@@ -103,7 +103,9 @@ Manual cleanup is also available:
 
 ```sh
 CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... \
-  node scripts/04-delete-preview-worker.mjs --pr-number 123
+  node scripts/04-delete-preview-worker.mjs \
+    --app eval-harness \
+    --pr-number 123
 ```
 
 ## Operational Scripts
@@ -117,8 +119,9 @@ The deploy command scripts are numbered because they are operational steps:
 - `scripts/04-delete-preview-worker.mjs`
 - `scripts/05-prepare-production-domain-deploy.mjs`
 
-Pass `--app playground`, `--app studio`, `--app web`, `--app excalidraw`, or
-`--app icons` to the prepare and cleanup scripts when running them manually.
+Pass `--app eval-harness`, `--app studio`, `--app web`, `--app excalidraw`, or
+`--app icons` to the resolve, prepare, domain, and cleanup scripts. App/project
+selection is required; deploy helpers do not default to an app.
 
 ## Production Worker Deploys
 
@@ -184,8 +187,8 @@ When `domain_action=attach`, the production domain helper attaches
 carries the public Playground worker boundary. `studio.sketchi.app` remains a
 future custom domain until product auth is wired, even though the Studio app now
 has `/projects` and persisted `/diagrams/:diagramId` route foundations. The
-`playground` app has no public domain patterns; it is the internal eval harness
-Worker.
+`eval-harness` has no public domain patterns; it deploys to the durable internal
+`sketchi-playground` Worker.
 
 The eval harness and standalone Excalidraw workspace should remain unlinked from
 public navigation. Do not attach a public `excalidraw.sketchi.app` product route

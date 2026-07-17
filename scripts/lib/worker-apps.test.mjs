@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import test from "node:test";
 
 import { unstable_readConfig } from "wrangler";
@@ -10,11 +10,18 @@ const repoRoot = new URL("../../", import.meta.url);
 
 const expectedWorkers = {
   excalidraw: "sketchi-excalidraw",
+  "eval-harness": "sketchi-playground",
   icons: "sketchi-icons",
-  playground: "sketchi-playground",
   studio: "sketchi-studio",
   web: "sketchi-web",
 };
+
+test("Worker app resolution requires an explicit project selection", () => {
+  assert.throws(
+    () => workerAppConfig(),
+    /Worker app\/project selection is required/,
+  );
+});
 
 test("Worker apps have isolated build and generated config paths", () => {
   const apps = workerAppIds.map((appId) => workerAppConfig(appId));
@@ -61,6 +68,30 @@ test("Nx project IDs resolve independently to durable Worker identities", async 
     assert.equal(app.workerName, expectedWorkerName);
     assert.equal(wranglerConfig.name, expectedWorkerName);
   }
+
+  const evalHarness = workerAppConfig("eval-harness");
+  assert.equal(evalHarness.nxProjectId, "eval-harness");
+  assert.equal(evalHarness.workerName, "sketchi-playground");
+  assert.notEqual(evalHarness.nxProjectId, evalHarness.workerName);
+});
+
+test("the workspace has no active Nx app named playground", () => {
+  const appProjectIds = readdirSync(new URL("../../apps/", import.meta.url), {
+    withFileTypes: true,
+  })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) =>
+      JSON.parse(
+        readFileSync(
+          new URL(`../../apps/${entry.name}/project.json`, import.meta.url),
+          "utf8",
+        ),
+      ),
+    )
+    .map((project) => project.name);
+
+  assert.ok(appProjectIds.includes("eval-harness"));
+  assert.equal(appProjectIds.includes("playground"), false);
 });
 
 test("Nx build outputs and deploy targets use the app-scoped Worker paths", () => {

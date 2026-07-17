@@ -7,11 +7,11 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     coverage: {
-      reportsDirectory: "../../coverage/apps/playground",
+      reportsDirectory: "../../coverage/apps/eval-harness",
     },
     include: [
-      "apps/playground/src/**/*.test.ts",
-      "apps/playground/src/**/*.test.tsx",
+      "apps/eval-harness/src/**/*.test.ts",
+      "apps/eval-harness/src/**/*.test.tsx",
     ],
     passWithNoTests: true,
   },

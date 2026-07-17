@@ -34,9 +34,31 @@ test("previewAppConfig includes the studio preview Worker", () => {
   });
 });
 
+test("previewAppConfig maps eval-harness to the durable internal Worker", () => {
+  assert.deepEqual(previewAppConfig("eval-harness"), {
+    ...workerAppConfig("eval-harness"),
+    commentMarker: "<!-- sketchi-playground-preview -->",
+    publicSurface: false,
+    routePolicy: "internal eval harness; no public product domain",
+    title: "Sketchi Eval Harness",
+    workerPrefix: "sketchi-playground-pr",
+  });
+});
+
+test("previewAppConfig requires an explicit project selection", () => {
+  assert.throws(
+    () => previewAppConfig(),
+    /Preview app\/project selection is required/,
+  );
+});
+
 test("previewWorkerName creates a stable Cloudflare-safe PR worker name", () => {
   assert.equal(
-    previewWorkerName({ prNumber: 42, workerPrefix: "Sketchi Playground PR" }),
+    previewWorkerName({
+      app: "eval-harness",
+      prNumber: 42,
+      workerPrefix: "Sketchi Playground PR",
+    }),
     "sketchi-playground-pr-42",
   );
 });
@@ -103,6 +125,7 @@ test("previewWranglerConfig isolates preview worker settings", () => {
       ],
     },
     "sketchi-playground-pr-42",
+    { app: "eval-harness" },
   );
 
   assert.equal(previewConfig.name, "sketchi-playground-pr-42");
@@ -198,7 +221,7 @@ test("extractPreviewUrl prefers the URL for the requested worker", () => {
 test("previewCommentBody includes ready preview details", () => {
   assert.equal(
     previewCommentBody({
-      app: "playground",
+      app: "eval-harness",
       previewUrl: "https://sketchi-playground-pr-42.account.workers.dev",
       runUrl: "https://github.com/shpitdev/sketchi/actions/runs/1",
       sha: "abcdef1234567890",

@@ -137,8 +137,8 @@ test("canonical sources contain no active lab-repository identifiers", () => {
 test("the approved public-domain map is exact and internal apps stay private", () => {
   const expectedDomains = {
     excalidraw: [],
+    "eval-harness": [],
     icons: ["icons.sketchi.app"],
-    playground: [],
     studio: ["playground.sketchi.app"],
     web: ["sketchi.app", "www.sketchi.app"],
   };
@@ -148,12 +148,12 @@ test("the approved public-domain map is exact and internal apps stay private", (
   }
 
   assert.equal(productionAppConfig("excalidraw").publicSurface, false);
-  assert.equal(productionAppConfig("playground").publicSurface, false);
+  assert.equal(productionAppConfig("eval-harness").publicSurface, false);
   assert.equal(productionAppConfig("studio").publicSurface, true);
 });
 
 test("checked-in Wrangler configs never expose production custom domains", () => {
-  for (const app of ["excalidraw", "icons", "playground", "studio", "web"]) {
+  for (const app of ["eval-harness", "excalidraw", "icons", "studio", "web"]) {
     const configPath = new URL(`apps/${app}/wrangler.jsonc`, repoRoot);
     const config = readFileSync(configPath, "utf8");
     assert.doesNotMatch(
@@ -192,7 +192,7 @@ test("the cutover runbook preserves the audited provider boundary", () => {
     "transferring the registration away from Vercel",
     "CNAME flattening automatically to the apex DNS-only CNAME",
     "Workers Custom Domain cannot attach over an existing exact CNAME",
-    "Never dispatch attach for `playground` or `excalidraw`",
+    "Never dispatch attach for `eval-harness` or `excalidraw`",
     "`studio.sketchi.app` and `excalidraw.sketchi.app` are not exposed",
   ];
 

@@ -5,10 +5,15 @@ import { detachProductionDomains } from "./lib/production-domain-detach.mjs";
 function readFlag(args, name) {
   const index = args.indexOf(name);
   if (index === -1) {
-    return undefined;
+    throw new Error(`${name} is required.`);
   }
 
-  return args[index + 1];
+  const value = args[index + 1];
+  if (!value) {
+    throw new Error(`Missing value for ${name}.`);
+  }
+
+  return value;
 }
 
 export async function runProductionDomainDetach(args = process.argv.slice(2)) {

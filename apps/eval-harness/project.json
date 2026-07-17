@@ -1,61 +1,61 @@
 {
-  "name": "playground",
+  "name": "eval-harness",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/playground/src",
+  "sourceRoot": "apps/eval-harness/src",
   "projectType": "application",
   "targets": {
     "build": {
       "executor": "nx:run-commands",
       "outputs": [
-        "{workspaceRoot}/dist/apps/playground",
+        "{workspaceRoot}/dist/apps/eval-harness",
         "{projectRoot}/.wrangler/deploy/config.json"
       ],
       "options": {
-        "command": "vite build --config apps/playground/vite.config.ts"
+        "command": "vite build --config apps/eval-harness/vite.config.ts"
       }
     },
     "dev": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "PORTLESS_PORT=443 portless run --name eval.sketchi vite dev --config apps/playground/vite.config.ts"
+        "command": "PORTLESS_PORT=443 portless run --name eval-harness.sketchi vite dev --config apps/eval-harness/vite.config.ts"
       }
     },
     "preview": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "vite preview --config apps/playground/vite.config.ts --host 127.0.0.1 --port 6300"
+        "command": "vite preview --config apps/eval-harness/vite.config.ts --host 127.0.0.1 --port 6300"
       }
     },
     "deploy": {
       "executor": "nx:run-commands",
       "dependsOn": ["build"],
       "options": {
-        "command": "wrangler deploy --config dist/apps/playground/server/wrangler.json"
+        "command": "wrangler deploy --config dist/apps/eval-harness/server/wrangler.json"
       }
     },
     "cf-typegen": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "wrangler types --config apps/playground/wrangler.jsonc"
+        "command": "wrangler types --config apps/eval-harness/wrangler.jsonc"
       }
     },
     "test": {
       "executor": "nx:run-commands",
-      "outputs": ["{workspaceRoot}/coverage/apps/playground"],
+      "outputs": ["{workspaceRoot}/coverage/apps/eval-harness"],
       "options": {
-        "command": "vitest run --config apps/playground/vitest.config.ts"
+        "command": "vitest run --config apps/eval-harness/vitest.config.ts"
       }
     },
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsc -p apps/playground/tsconfig.json --noEmit"
+        "command": "tsc -p apps/eval-harness/tsconfig.json --noEmit"
       }
     },
     "typecheck-tsgo": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsgo -p apps/playground/tsconfig.json --noEmit"
+        "command": "tsgo -p apps/eval-harness/tsconfig.json --noEmit"
       }
     }
   }

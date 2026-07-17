@@ -10,7 +10,7 @@ Goal: keep the current app surfaces production-ready as Sketchi evolves.
 
 Scope:
 
-- Review `web`, `studio`, `excalidraw`, `icons`, and `playground` as product
+- Review `web`, `studio`, `excalidraw`, `icons`, and `eval-harness` as product
   surfaces, not scaffolds.
 - Keep billing out of scope. Auth and durable user persistence are only in scope
   when they are explicitly reopened by the product migration plan.

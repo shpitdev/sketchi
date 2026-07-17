@@ -79,18 +79,18 @@ not silently fall back to a generic template. See the full
 
 ## Product Surfaces
 
-| Surface      | Role                                                               | Local command            |
-| ------------ | ------------------------------------------------------------------ | ------------------------ |
-| `web`        | `sketchi.app` home, docs, and setup                                | `pnpm nx dev web`        |
-| `studio`     | Public Playground, Code Mode API/MCP, artifacts, Studio foundation | `pnpm nx dev studio`     |
-| `icons`      | `icons.sketchi.app` curated icon browser                           | `pnpm nx dev icons`      |
-| `playground` | Internal scenario and model-output eval harness                    | `pnpm nx dev playground` |
-| `excalidraw` | Internal real-canvas rendering and editing workspace               | `pnpm nx dev excalidraw` |
+| Surface        | Role                                                               | Local command              |
+| -------------- | ------------------------------------------------------------------ | -------------------------- |
+| `web`          | `sketchi.app` home, docs, and setup                                | `pnpm nx dev web`          |
+| `studio`       | Public Playground, Code Mode API/MCP, artifacts, Studio foundation | `pnpm nx dev studio`       |
+| `icons`        | `icons.sketchi.app` curated icon browser                           | `pnpm nx dev icons`        |
+| `eval-harness` | Internal scenario and model-output eval harness                    | `pnpm nx dev eval-harness` |
+| `excalidraw`   | Internal real-canvas rendering and editing workspace               | `pnpm nx dev excalidraw`   |
 
-The current `studio`/`playground` names are historically inverted relative to
-their product roles. A reviewed migration plan is available in the standalone
-[repository structure proposal](docs/repository-structure-proposal.html); no
-folder moves from that proposal have been applied.
+The internal harness rename from `playground` to `eval-harness` is complete.
+The current `studio` app still hosts the public Playground and Studio
+foundation; that public host has not moved. Later phases remain documented in
+the reviewed [repository structure proposal](docs/repository-structure-proposal.html).
 
 ## Quick Start
 
@@ -151,7 +151,7 @@ See [preview deployments](docs/preview-deploys.md) and the guarded
 [production domain runbook](docs/production-domain-cutover.md).
 
 ```sh
-pnpm deploy:playground
+pnpm deploy:eval-harness
 pnpm deploy:studio
 pnpm deploy:web
 pnpm deploy:excalidraw

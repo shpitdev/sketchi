@@ -9,7 +9,7 @@ import {
 } from "../../tools/local-dev-ports";
 import { workerAppConfig } from "../../scripts/lib/worker-apps.mjs";
 
-const workerApp = workerAppConfig("playground");
+const workerApp = workerAppConfig("eval-harness");
 
 export default defineConfig({
   root: new URL(".", import.meta.url).pathname,
@@ -18,7 +18,7 @@ export default defineConfig({
     outDir: new URL(`../../${workerApp.buildOutputPath}`, import.meta.url)
       .pathname,
   },
-  cacheDir: localViteCacheDir("playground"),
+  cacheDir: localViteCacheDir("eval-harness"),
   publicDir: new URL("./public", import.meta.url).pathname,
   plugins: [
     cloudflare({

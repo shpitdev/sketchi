@@ -43,9 +43,7 @@ function writeOutputs(outputs) {
 
 export async function deletePreviewWorker(args = process.argv.slice(2)) {
   const dryRun = args.includes("--dry-run");
-  const app = previewAppConfig(
-    readFlag(args, "--app", process.env.PREVIEW_APP),
-  );
+  const app = previewAppConfig(readFlag(args, "--app"));
   const workerName =
     readFlag(args, "--worker-name", undefined) ??
     previewWorkerName({

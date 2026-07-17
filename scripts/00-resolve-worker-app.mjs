@@ -32,7 +32,7 @@ function writeOutputs(outputs) {
 }
 
 export function resolveWorkerApp(args = process.argv.slice(2)) {
-  const app = workerAppConfig(readFlag(args, "--app", process.env.WORKER_APP));
+  const app = workerAppConfig(readFlag(args, "--app"));
 
   writeOutputs({
     app: app.appId,

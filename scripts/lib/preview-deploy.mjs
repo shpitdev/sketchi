@@ -25,7 +25,7 @@ export const previewApps = {
     routePolicy: "icons.sketchi.app product surface",
     title: "Sketchi Icons",
   },
-  playground: {
+  "eval-harness": {
     commentMarker: "<!-- sketchi-playground-preview -->",
     publicSurface: false,
     routePolicy: "internal eval harness; no public product domain",
@@ -46,8 +46,15 @@ export const previewApps = {
   },
 };
 
-export function previewAppConfig(app = "playground") {
-  const appId = String(app ?? "playground").trim();
+export function previewAppConfig(app) {
+  const appId = typeof app === "string" ? app.trim() : "";
+
+  if (!appId) {
+    throw new Error(
+      `Preview app/project selection is required. Expected one of ${Object.keys(previewApps).join(", ")}.`,
+    );
+  }
+
   const config = previewApps[appId];
 
   if (!config) {

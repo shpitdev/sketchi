@@ -38,7 +38,7 @@ async function githubRequest(path, options = {}) {
 export async function upsertPreviewComment() {
   const repository = requiredEnv("GITHUB_REPOSITORY");
   const prNumber = requiredEnv("PR_NUMBER");
-  const app = previewAppConfig(process.env.PREVIEW_APP);
+  const app = previewAppConfig(requiredEnv("PREVIEW_APP"));
   const marker =
     process.env.PREVIEW_COMMENT_MARKER?.trim() || app.commentMarker;
   const runId = process.env.GITHUB_RUN_ID?.trim();

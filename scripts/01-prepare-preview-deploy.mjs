@@ -45,9 +45,7 @@ export function preparePreviewDeploy(args = process.argv.slice(2)) {
   const prNumber =
     readFlag(args, "--pr-number", process.env.PR_NUMBER) ??
     process.env.GITHUB_REF_NAME?.match(/^(\d+)\/merge$/)?.[1];
-  const app = previewAppConfig(
-    readFlag(args, "--app", process.env.PREVIEW_APP),
-  );
+  const app = previewAppConfig(readFlag(args, "--app"));
   const sourceConfigPath = readFlag(
     args,
     "--config",

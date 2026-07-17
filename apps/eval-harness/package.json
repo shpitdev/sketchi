@@ -1,5 +1,5 @@
 {
-  "name": "@sketchi/playground",
+  "name": "@sketchi/eval-harness",
   "private": true,
   "type": "module",
   "dependencies": {

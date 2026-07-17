@@ -34,15 +34,15 @@ export interface GenerateScenarioOutput {
   scenarioId: string;
 }
 
-export interface PlaygroundEnv {
+export interface EvalHarnessEnv {
   AI?: CloudflareAiGatewayProvider;
   SKETCHI_AI_GATEWAY_ID?: string;
   SKETCHI_AI_MODEL?: string;
 }
 
 function envString(
-  bindings: PlaygroundEnv,
-  key: keyof PlaygroundEnv,
+  bindings: EvalHarnessEnv,
+  key: keyof EvalHarnessEnv,
   fallback: string,
 ): string {
   const value = bindings[key];
@@ -71,7 +71,7 @@ function errorCandidate(
 
 function createGenerationClients(
   providers: readonly DiagramGenerationProviderId[],
-  bindings: PlaygroundEnv,
+  bindings: EvalHarnessEnv,
   gatewayId: string,
 ): DiagramGenerationClient[] {
   const clients: DiagramGenerationClient[] = [];
@@ -116,7 +116,7 @@ async function runClient(
 
 export async function generateScenarioCandidatesForInput(
   input: GenerateScenarioInput,
-  bindings: PlaygroundEnv,
+  bindings: EvalHarnessEnv,
 ): Promise<GenerateScenarioOutput> {
   const data = GenerateScenarioInputSchema.parse(input);
   const gatewayId = envString(
@@ -153,9 +153,9 @@ export async function generateScenarioCandidatesForInput(
 export const generateScenarioCandidates = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => GenerateScenarioInputSchema.parse(input))
   .handler(async ({ data }) => {
-    const { getPlaygroundBindings } = await import(
+    const { getEvalHarnessBindings } = await import(
       "./cloudflare-bindings.server"
     );
 
-    return generateScenarioCandidatesForInput(data, getPlaygroundBindings());
+    return generateScenarioCandidatesForInput(data, getEvalHarnessBindings());
   });

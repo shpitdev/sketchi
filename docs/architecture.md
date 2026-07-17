@@ -32,7 +32,7 @@ flowchart LR
   structured issues, quality assessment, render/export orchestration, and
   accepted artifact persistence used by Studio, HTTP, and MCP.
 - `diagram-studio-ui` renders the scene model and owns user-facing component states.
-- `apps/playground` composes the packages in a TanStack Start internal eval
+- `apps/eval-harness` composes the packages in a TanStack Start internal eval
   harness for scenarios, candidate inspection, and regression review.
 - `apps/studio` owns the current public Playground worker boundary: ephemeral
   chat generation over the canonical build runtime and the persisted Studio
@@ -84,7 +84,7 @@ and affected checks.
 
 ## Eval Harness
 
-The current `apps/playground` surface is not the public product Playground and
+The `apps/eval-harness` surface is not the public product Playground and
 does not include the Convex remote agent loop. It is an independently
 deployable internal testing ground for maintained scenarios, pasted model
 output, and deterministic IR-to-Excalidraw conversion.
@@ -119,7 +119,7 @@ orchestration, and persistence.
 
 The v2 workspace has five TanStack Start app surfaces:
 
-- `playground`: internal scenario evaluation and prompt-output inspection.
+- `eval-harness`: internal scenario evaluation and prompt-output inspection.
 - `studio`: public Playground worker boundary with chat generation, artifact
   handoff, and persisted Studio foundation.
 - `web`: public home/docs for the Sketchi product direction.
@@ -129,13 +129,13 @@ The v2 workspace has five TanStack Start app surfaces:
 
 ```mermaid
 flowchart LR
-  Workspace["Nx workspace"] --> Playground["playground"]
+  Workspace["Nx workspace"] --> EvalHarness["eval-harness"]
   Workspace --> Studio["studio"]
   Workspace --> Web["web"]
   Workspace --> Excalidraw["excalidraw"]
   Workspace --> Icons["icons"]
 
-  Playground --> Deploy["preview/prod Worker matrix"]
+  EvalHarness --> Deploy["preview/prod Worker matrix"]
   Studio --> Deploy
   Web --> Deploy
   Excalidraw --> Deploy
@@ -183,12 +183,12 @@ use stable `workers.dev` URLs for deployment and runtime proof.
 Preview deploys strip production routes and deploy app-specific Workers using
 the durable preview prefix declared for each app.
 
-Today `scripts/lib/worker-apps.mjs` maps the stable deploy key, current Nx
-project ID, durable Worker name, input Wrangler config, and isolated
-`dist/apps/<app>` output for `playground`, `studio`, `web`, `excalidraw`, and
-`icons`. The current Nx IDs happen to match the deploy keys, but workflows do
-not derive Worker identities from Nx names. Custom-domain attachment remains an
-explicit manual workflow dispatch.
+Today `scripts/lib/worker-apps.mjs` maps each explicit deploy project ID to its
+durable Worker name, input Wrangler config, and isolated `dist/apps/<app>`
+output for `eval-harness`, `studio`, `web`, `excalidraw`, and `icons`.
+`eval-harness` intentionally maps to the existing `sketchi-playground` Worker;
+workflows never derive Worker identities from Nx names. Custom-domain
+attachment remains an explicit manual workflow dispatch.
 
 ## AI Gateway Observability
 

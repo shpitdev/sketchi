@@ -41,7 +41,7 @@ function writeOutputs(outputs) {
 }
 
 export function prepareProductionDomainDeploy(args = process.argv.slice(2)) {
-  const app = productionAppConfig(readFlag(args, "--app", process.env.APP));
+  const app = productionAppConfig(readFlag(args, "--app"));
   const sourceConfigPath = readFlag(
     args,
     "--config",

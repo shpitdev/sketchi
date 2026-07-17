@@ -181,7 +181,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/svg-excalidraw
 
-  apps/playground:
+  apps/eval-harness:
     dependencies:
       '@sketchi/diagram-core':
         specifier: workspace:*

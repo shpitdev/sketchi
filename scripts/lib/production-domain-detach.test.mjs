@@ -54,5 +54,5 @@ test("internal apps never select a public domain", () => {
     ]),
     [],
   );
-  assert.deepEqual(selectProductionDomainDetachments("playground", []), []);
+  assert.deepEqual(selectProductionDomainDetachments("eval-harness", []), []);
 });

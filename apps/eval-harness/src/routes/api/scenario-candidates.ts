@@ -7,14 +7,14 @@ export const Route = createFileRoute("/api/scenario-candidates")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const { getPlaygroundBindings } = await import(
+          const { getEvalHarnessBindings } = await import(
             "../../lib/cloudflare-bindings.server"
           );
 
           return Response.json(
             await generateScenarioCandidatesForInput(
               await request.json(),
-              getPlaygroundBindings(),
+              getEvalHarnessBindings(),
             ),
           );
         } catch (error) {

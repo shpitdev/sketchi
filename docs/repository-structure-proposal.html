@@ -378,8 +378,8 @@
           while implementation boundaries become easier to navigate.
         </p>
         <div class="meta">
-          <span class="pill">Proposal only</span>
-          <span class="pill">No package moves applied</span>
+          <span class="pill">Approved migration plan</span>
+          <span class="pill">Phase 1 applied</span>
           <span class="pill">Public URLs preserved</span>
           <span class="pill">Prepared from <code>main@d32b494</code></span>
         </div>
@@ -402,7 +402,7 @@
             <span class="tag good">1 / Fix first</span>
             <h3>Free the Playground name</h3>
             <p>
-              Rename the current internal <code>apps/playground</code> to
+              The internal <code>apps/playground</code> has been renamed to
               <code>apps/eval-harness</code>. Before renaming
               <code>apps/studio</code>, extract its real Studio persistence
               domain so the combined boundary is represented honestly.
@@ -434,7 +434,7 @@
         <div class="section-head">
           <div>
             <p class="eyebrow">The newcomer test</p>
-            <h2>Current names vs. actual jobs</h2>
+            <h2>Phase 1 state vs. approved destination</h2>
           </div>
           <p>
             A directory should answer “what is this?” without requiring a
@@ -444,7 +444,7 @@
         <div class="compare">
           <div class="tree">
             <pre><span class="dim">apps/</span>
-├── playground/   <span class="accent"># actually internal evals</span>
+├── eval-harness/ <span class="accent"># internal scenarios</span>
 ├── studio/       <span class="accent"># public Playground/API + Studio persistence</span>
 ├── web/
 ├── icons/
@@ -675,11 +675,11 @@
         </div>
         <div class="flow">
           <div class="step">
-            <strong>Phase 0</strong><b>Isolate build output</b
+            <strong>Phase 0 / done</strong><b>Isolate build output</b
             ><span>Give every Worker a unique Nx-declared artifact path.</span>
           </div>
           <div class="step">
-            <strong>Phase 1</strong><b>Rename eval harness</b
+            <strong>Phase 1 / done</strong><b>Rename eval harness</b
             ><span
               ><code>apps/playground</code> →
               <code>apps/eval-harness</code>.</span

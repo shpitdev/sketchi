@@ -102,7 +102,7 @@ the registration away from Vercel or the underlying registrar is unnecessary.
    ```
 
    The `studio` app dispatch attaches only `playground.sketchi.app`; it does not
-   expose `studio.sketchi.app`. Never dispatch attach for `playground` or
+   expose `studio.sketchi.app`. Never dispatch attach for `eval-harness` or
    `excalidraw`. Verify `icons.sketchi.app` and `playground.sketchi.app` while
    the wildcard DNS-only CNAME remains staged. That wildcard is not a working
    fallback for these two hosts: Vercel currently returns
