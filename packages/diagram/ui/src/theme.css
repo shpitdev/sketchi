@@ -149,24 +149,14 @@ img {
 }
 
 .sk-eyebrow {
-  align-items: center;
   color: var(--accent-ink);
-  display: inline-flex;
+  display: inline-block;
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 600;
-  gap: 9px;
   letter-spacing: 0.16em;
   margin: 0;
   text-transform: uppercase;
-}
-
-.sk-eyebrow::before {
-  background: var(--accent);
-  block-size: 9px;
-  content: "";
-  inline-size: 9px;
-  rotate: 45deg;
 }
 
 .sk-icon {

@@ -37,7 +37,6 @@ function AgentSetupHub() {
       <section className="agent-hero">
         <div className="sk-shell agent-hero__inner">
           <div className="agent-hero__copy">
-            <p className="sk-eyebrow">For your coding agent</p>
             <h1>Sketch diagrams without leaving your agent.</h1>
             <p>
               Connect Sketchi once and ask for a diagram in plain language.

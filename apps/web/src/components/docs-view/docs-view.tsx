@@ -46,7 +46,6 @@ export function DocsView({
       </nav>
 
       <article className="docs-article">
-        <p className="sk-eyebrow">Docs</p>
         <h1 className="sk-section__title">How Sketchi works</h1>
         <p className="docs-article__intro">
           Sketchi turns a plain-language prompt into a clean, editable diagram —

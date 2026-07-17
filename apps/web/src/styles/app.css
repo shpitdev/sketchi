@@ -306,6 +306,13 @@
   position: relative;
 }
 
+/* The node + wire layer. Positioned as the anchor box for the absolutely
+   placed nodes and wires so the whole composition scales as one unit. */
+.sketch-board__scene {
+  inset: 0;
+  position: absolute;
+}
+
 .sketch-board__wires {
   height: 100%;
   inset: 0;
@@ -1244,13 +1251,15 @@
   position: relative;
 }
 
+/* A short pen tick as the list marker — a drafting mark, not an ornament. */
 .agent-notes li::before {
-  color: var(--accent);
-  content: "✷";
-  font-size: 12px;
-  left: 0;
+  background: var(--accent);
+  block-size: 2px;
+  content: "";
+  inline-size: 9px;
+  inset-block-start: 10px;
+  inset-inline-start: 0;
   position: absolute;
-  top: 1px;
 }
 
 /* ===================================================================== */
@@ -1475,5 +1484,15 @@
 
   .docs-article .sk-section__title {
     font-size: 26px;
+  }
+}
+
+/* Phones: the sketch nodes are fixed-size but placed by percentage, so on a
+   narrow canvas the rightmost node runs into the frame. Scale the whole scene
+   down as one unit to sit it back inside the sheet, wires and all. */
+@media (max-width: 600px) {
+  .sketch-board__scene {
+    transform: scale(0.82);
+    transform-origin: center;
   }
 }

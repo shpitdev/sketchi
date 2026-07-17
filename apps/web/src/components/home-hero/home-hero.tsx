@@ -68,19 +68,16 @@ export function HomeHero({
     <section className="home-hero">
       <div className="sk-shell home-hero__inner">
         <div className="home-hero__copy">
-          <p className="sk-eyebrow sk-rise" style={rise(0)}>
-            Prompt to diagram
-          </p>
-          <h1 className="home-hero__title sk-rise" style={rise(1)}>
+          <h1 className="home-hero__title sk-rise" style={rise(0)}>
             Describe it.
             <br />
             Sketchi <em>draws it.</em>
           </h1>
-          <p className="home-hero__lead sk-rise" style={rise(2)}>
+          <p className="home-hero__lead sk-rise" style={rise(1)}>
             Turn a sentence into a clean, editable diagram, with the real logos
             of the tools in your stack.
           </p>
-          <div className="home-hero__actions sk-rise" style={rise(3)}>
+          <div className="home-hero__actions sk-rise" style={rise(2)}>
             <a className="sk-btn sk-btn--primary" href={primaryHref}>
               Open the playground
             </a>
@@ -90,7 +87,7 @@ export function HomeHero({
           </div>
         </div>
 
-        <div className="home-hero__visual sk-rise" style={rise(2)}>
+        <div className="home-hero__visual sk-rise" style={rise(1)}>
           <div
             aria-label="A prompt reading 'diagram our deploy pipeline' turning into a hand-drawn flowchart with GitHub, Docker, and Cloudflare icons"
             className="sketch-board"
@@ -114,51 +111,55 @@ export function HomeHero({
             </div>
 
             <div className="sketch-board__canvas">
-              <svg
-                className="sketch-board__wires"
-                fill="none"
-                preserveAspectRatio="none"
-                viewBox="0 0 100 100"
-              >
-                {wires.map((wire) => (
-                  <path
-                    className="wire"
-                    d={wire.d}
-                    key={wire.d}
-                    pathLength={1}
-                    style={{ "--delay": `${wire.delay}s` } as CSSProperties}
-                  />
-                ))}
-              </svg>
-
-              <span className="sketch-tag sketch-tag--yes">yes</span>
-              <span className="sketch-tag sketch-tag--no">no</span>
-
-              {nodes.map((node) => (
-                <div
-                  className={`sketch-node${
-                    node.variant ? ` sketch-node--${node.variant}` : ""
-                  }`}
-                  key={node.id}
-                  style={
-                    {
-                      left: `${node.left}%`,
-                      top: `${node.top}%`,
-                    } as CSSProperties
-                  }
+              {/* Wires and nodes share one scene box so they scale together
+                  as a unit on narrow screens, staying connected. */}
+              <div className="sketch-board__scene">
+                <svg
+                  className="sketch-board__wires"
+                  fill="none"
+                  preserveAspectRatio="none"
+                  viewBox="0 0 100 100"
                 >
-                  {node.icon ? (
-                    <img
-                      alt=""
-                      className="sketch-node__icon"
-                      height={24}
-                      src={node.icon}
-                      width={24}
+                  {wires.map((wire) => (
+                    <path
+                      className="wire"
+                      d={wire.d}
+                      key={wire.d}
+                      pathLength={1}
+                      style={{ "--delay": `${wire.delay}s` } as CSSProperties}
                     />
-                  ) : null}
-                  <span className="sketch-node__label">{node.label}</span>
-                </div>
-              ))}
+                  ))}
+                </svg>
+
+                <span className="sketch-tag sketch-tag--yes">yes</span>
+                <span className="sketch-tag sketch-tag--no">no</span>
+
+                {nodes.map((node) => (
+                  <div
+                    className={`sketch-node${
+                      node.variant ? ` sketch-node--${node.variant}` : ""
+                    }`}
+                    key={node.id}
+                    style={
+                      {
+                        left: `${node.left}%`,
+                        top: `${node.top}%`,
+                      } as CSSProperties
+                    }
+                  >
+                    {node.icon ? (
+                      <img
+                        alt=""
+                        className="sketch-node__icon"
+                        height={24}
+                        src={node.icon}
+                        width={24}
+                      />
+                    ) : null}
+                    <span className="sketch-node__label">{node.label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
