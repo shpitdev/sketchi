@@ -9,7 +9,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
-  previewAppConfig,
+  previewProjectConfig,
   previewWorkerName,
   previewWranglerConfig,
 } from "./lib/preview-deploy.mjs";
@@ -45,30 +45,27 @@ export function preparePreviewDeploy(args = process.argv.slice(2)) {
   const prNumber =
     readFlag(args, "--pr-number", process.env.PR_NUMBER) ??
     process.env.GITHUB_REF_NAME?.match(/^(\d+)\/merge$/)?.[1];
-  const app = previewAppConfig(readFlag(args, "--app"));
+  const project = previewProjectConfig(readFlag(args, "--project"));
   const sourceConfigPath = readFlag(
     args,
     "--config",
-    app.generatedWranglerConfigPath,
+    project.generatedWranglerConfigPath,
   );
   const previewConfigPath = readFlag(
     args,
     "--out",
-    app.previewWranglerConfigPath,
+    project.previewWranglerConfigPath,
   );
-  const workerName = previewWorkerName({
-    app: app.appId,
+  const previewName = previewWorkerName({
+    projectId: project.projectId,
     prNumber,
-    workerPrefix: readFlag(
-      args,
-      "--worker-prefix",
-      process.env.CF_PREVIEW_WORKER_PREFIX,
-    ),
+    workerName: project.workerName,
   });
   const sourceConfig = JSON.parse(readFileSync(sourceConfigPath, "utf8"));
-  const previewConfig = previewWranglerConfig(sourceConfig, workerName, {
-    app: app.appId,
+  const previewConfig = previewWranglerConfig(sourceConfig, {
+    projectId: project.projectId,
     prNumber,
+    workerName: project.workerName,
     workersDevSubdomain: readFlag(
       args,
       "--workers-dev-subdomain",
@@ -83,11 +80,11 @@ export function preparePreviewDeploy(args = process.argv.slice(2)) {
   );
 
   writeOutputs({
-    app: app.appId,
-    nx_project_id: app.nxProjectId,
     preview_config_path: previewConfigPath,
+    preview_worker_name: previewName,
+    project_id: project.projectId,
     source_config_path: sourceConfigPath,
-    worker_name: workerName,
+    worker_name: project.workerName,
   });
 }
 

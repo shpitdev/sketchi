@@ -2,21 +2,21 @@
 
 ## Current Matrix
 
-| App key        | Nx project     | Preview Worker                   | Production Worker    | Product route status                                                      |
-| -------------- | -------------- | -------------------------------- | -------------------- | ------------------------------------------------------------------------- |
-| `web`          | `web`          | `sketchi-web-pr-<number>`        | `sketchi-web`        | `sketchi.app`, `www.sketchi.app`                                          |
-| `studio`       | `studio`       | `sketchi-studio-pr-<number>`     | `sketchi-studio`     | `playground.sketchi.app` manual attach target; `studio.sketchi.app` later |
-| `icons`        | `icons`        | `sketchi-icons-pr-<number>`      | `sketchi-icons`      | `icons.sketchi.app`                                                       |
-| `eval-harness` | `eval-harness` | `sketchi-playground-pr-<number>` | `sketchi-playground` | internal eval harness; not linked from public navigation                  |
-| `excalidraw`   | `excalidraw`   | `sketchi-excalidraw-pr-<number>` | `sketchi-excalidraw` | internal rendering workspace; not a public product domain                 |
+| Project ID     | Preview Worker                   | Production Worker    | Product route status                                     |
+| -------------- | -------------------------------- | -------------------- | -------------------------------------------------------- |
+| `web`          | `sketchi-web-pr-<number>`        | `sketchi-web`        | `sketchi.app`, `www.sketchi.app`                         |
+| `playground`   | `sketchi-studio-pr-<number>`     | `sketchi-studio`     | `playground.sketchi.app`; authenticated Studio unexposed |
+| `icons`        | `sketchi-icons-pr-<number>`      | `sketchi-icons`      | `icons.sketchi.app`                                      |
+| `eval-harness` | `sketchi-playground-pr-<number>` | `sketchi-playground` | internal eval harness                                    |
+| `excalidraw`   | `sketchi-excalidraw-pr-<number>` | `sketchi-excalidraw` | internal rendering workspace                             |
 
-The app key is deployment metadata, not an Nx project-name convention.
-`scripts/lib/worker-apps.mjs` maps each app key to its current `nxProjectId`,
-durable Cloudflare Worker name, input config, and generated artifact paths.
-Future repository renames change the Nx/project fields without changing Worker
-names or other durable Cloudflare resources.
+`scripts/lib/worker-apps.mjs` records `projectId`, `workerName`, and
+`previewWorkerPrefix` as separate fields. Preview, production, cleanup, and
+domain-detach helpers validate the selected project/Worker pair and fail closed
+on a mismatch. Repository project renames do not rename durable Cloudflare
+Workers, buckets, bindings, or Pipeline streams.
 
-Each Worker build is isolated under `dist/apps/<app>/`: browser assets go to
+Each Worker build is isolated under `dist/apps/<project>/`: browser assets go to
 `client/`, Worker code and the generated deploy snapshot go to `server/`, and
 the generated config is `server/wrangler.json`. The Cloudflare Vite plugin's
 deploy redirect is also isolated at `apps/<project>/.wrangler/deploy/config.json`.
@@ -25,8 +25,8 @@ Parallel Nx builds therefore never write another app's deployable output.
 ```mermaid
 flowchart LR
   PR["Pull request"] --> Matrix["preview matrix"]
-  Matrix --> Resolve["resolve app key to Nx project and Worker"]
-  Resolve --> Build["pnpm nx build <nx-project>"]
+  Matrix --> Resolve["resolve project ID and Worker identity"]
+  Resolve --> Build["pnpm nx build <project-id>"]
   Build --> Config["generated preview wrangler config"]
   Config --> Deploy["wrangler deploy --keep-vars --no-x-provision"]
   Deploy --> Comment["sticky PR comment"]
@@ -40,8 +40,8 @@ Pull requests to `main` deploy matrix apps to PR-specific Cloudflare Workers.
 - uses the same pnpm 11.5.0, Node 24, `pnpm install --frozen-lockfile` setup as
   the required `ci` workflow;
 - builds each Nx app in an isolated matrix job;
-- reads the app-scoped `dist/apps/<app>/server/wrangler.json` build snapshot;
-- writes `dist/apps/<app>/server/wrangler.preview.json` with the preview Worker
+- reads the project-scoped `dist/apps/<project>/server/wrangler.json` build snapshot;
+- writes `dist/apps/<project>/server/wrangler.preview.json` with the preview Worker
   name and no custom production routes;
 - runs `wrangler deploy --keep-vars --no-x-provision`;
 - writes or updates one sticky PR comment per app with the preview URL and an
@@ -49,8 +49,8 @@ Pull requests to `main` deploy matrix apps to PR-specific Cloudflare Workers.
 
 For the `web` preview, the workflow also reads the account workers.dev
 subdomain from Cloudflare and injects sibling preview URLs into the generated
-Wrangler vars. `SKETCHI_PLAYGROUND_URL` points at the `studio` preview Worker
-because that app currently implements the public Playground worker boundary;
+Wrangler vars. `SKETCHI_PLAYGROUND_URL` maps from the `playground` project to
+its durable `sketchi-studio-pr-<number>` preview Worker;
 `apps/eval-harness` remains the internal eval harness.
 
 - `SKETCHI_ICONS_URL`
@@ -60,7 +60,7 @@ That keeps Web preview navigation inside the same PR's preview Workers instead
 of sending reviewers to production domains.
 
 Preview comments intentionally distinguish product previews from internal tool
-previews. `web`, `studio`, and `icons` are public-product previews.
+previews. `web`, `playground`, and `icons` are public-product previews.
 `eval-harness` and `excalidraw` are internal previews only; their comments exist
 for reviewer smoke tests and cleanup visibility, not public navigation.
 
@@ -104,7 +104,7 @@ Manual cleanup is also available:
 ```sh
 CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... \
   node scripts/04-delete-preview-worker.mjs \
-    --app eval-harness \
+    --project eval-harness \
     --pr-number 123
 ```
 
@@ -119,9 +119,10 @@ The deploy command scripts are numbered because they are operational steps:
 - `scripts/04-delete-preview-worker.mjs`
 - `scripts/05-prepare-production-domain-deploy.mjs`
 
-Pass `--app eval-harness`, `--app studio`, `--app web`, `--app excalidraw`, or
-`--app icons` to the resolve, prepare, domain, and cleanup scripts. App/project
-selection is required; deploy helpers do not default to an app.
+Pass `--project eval-harness`, `--project playground`, `--project web`,
+`--project excalidraw`, or `--project icons` to the resolve, prepare, domain,
+and cleanup scripts. Project selection is required; deploy helpers do not
+default to a project or accept an independent Worker override.
 
 ## Production Worker Deploys
 
@@ -171,22 +172,22 @@ command only requires issue rows when `--require-issues` or explicit
 issue-run-id options are supplied.
 
 Wrangler accepts Pipeline stream names in local dry-runs, but the deploy API
-requires stream IDs for Worker bindings. Keep `apps/studio/wrangler.jsonc` on
+requires stream IDs for Worker bindings. Keep `apps/playground/wrangler.jsonc` on
 the production stream IDs and keep the preview deploy helper's ID rewrite table
 in sync with Cloudflare Pipeline stream creation.
 
 Custom domains are a post-merge operator action. The production workflow writes
-a generated `dist/apps/<app>/server/wrangler.domains.json` config from
+a generated `dist/apps/<project>/server/wrangler.domains.json` config from
 `scripts/05-prepare-production-domain-deploy.mjs` and deploys that route-bearing
 config only when explicitly dispatched with `domain_action=attach`. Follow
 [Production domain cutover](production-domain-cutover.md); never attach domains
 from a pull request or before the Cloudflare zone is active.
 
 When `domain_action=attach`, the production domain helper attaches
-`playground.sketchi.app` to the `studio` app because `apps/studio` currently
-carries the public Playground worker boundary. `studio.sketchi.app` remains a
-future custom domain until product auth is wired, even though the Studio app now
-has `/projects` and persisted `/diagrams/:diagramId` route foundations. The
+`playground.sketchi.app` to the `playground` project while retaining the
+`sketchi-studio` Worker service. Authenticated Studio is not exposed, even
+though the Playground host has `/projects` and persisted
+`/diagrams/:diagramId` route foundations. The
 `eval-harness` has no public domain patterns; it deploys to the durable internal
 `sketchi-playground` Worker.
 

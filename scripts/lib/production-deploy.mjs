@@ -1,6 +1,10 @@
-import { workerAppConfig } from "./worker-apps.mjs";
+import {
+  assertWranglerWorkerIdentity,
+  requireWorkerIdentity,
+  workerProjectConfig,
+} from "./worker-apps.mjs";
 
-export const productionApps = {
+export const productionProjects = {
   excalidraw: {
     domainPatterns: [],
     publicSurface: false,
@@ -19,11 +23,11 @@ export const productionApps = {
     routePolicy: "internal eval harness; no public product domain",
     title: "Sketchi Eval Harness",
   },
-  studio: {
+  playground: {
     domainPatterns: ["playground.sketchi.app"],
     publicSurface: true,
     routePolicy:
-      "playground.sketchi.app manual attach target; studio.sketchi.app waits for authenticated Studio",
+      "playground.sketchi.app product surface; authenticated Studio remains unexposed",
     title: "Sketchi Playground / Studio",
   },
   web: {
@@ -34,36 +38,42 @@ export const productionApps = {
   },
 };
 
-export function productionAppConfig(app) {
-  const appId = typeof app === "string" ? app.trim() : "";
+export function productionProjectConfig(project) {
+  const projectId = typeof project === "string" ? project.trim() : "";
 
-  if (!appId) {
+  if (!projectId) {
     throw new Error(
-      `Production app/project selection is required. Expected one of ${Object.keys(productionApps).join(", ")}.`,
+      `Production project selection is required. Expected one of ${Object.keys(productionProjects).join(", ")}.`,
     );
   }
 
-  const config = productionApps[appId];
+  const config = productionProjects[projectId];
 
   if (!config) {
     throw new Error(
-      `Unknown production app "${appId}". Expected one of ${Object.keys(productionApps).join(", ")}.`,
+      `Unknown production project "${projectId}". Expected one of ${Object.keys(productionProjects).join(", ")}.`,
     );
   }
 
-  const worker = workerAppConfig(appId);
+  const worker = workerProjectConfig(projectId);
 
   return { ...worker, ...config };
 }
 
-export function productionDomainWranglerConfig(config, app) {
-  const appConfig = productionAppConfig(app);
+export function productionDomainWranglerConfig(config, identity) {
+  const project = assertWranglerWorkerIdentity(
+    config,
+    identity.projectId,
+    identity.workerName,
+  );
+  const production = productionProjectConfig(project.projectId);
+  requireWorkerIdentity(production.projectId, identity.workerName);
   const nextConfig = structuredClone(config);
 
-  nextConfig.name = appConfig.workerName;
-  nextConfig.topLevelName = appConfig.workerName;
+  nextConfig.name = production.workerName;
+  nextConfig.topLevelName = production.workerName;
   nextConfig.workers_dev = true;
-  nextConfig.routes = appConfig.domainPatterns.map((pattern) => ({
+  nextConfig.routes = production.domainPatterns.map((pattern) => ({
     pattern,
     custom_domain: true,
   }));

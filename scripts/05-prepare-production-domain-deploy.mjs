@@ -9,7 +9,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
-  productionAppConfig,
+  productionProjectConfig,
   productionDomainWranglerConfig,
 } from "./lib/production-deploy.mjs";
 
@@ -41,30 +41,32 @@ function writeOutputs(outputs) {
 }
 
 export function prepareProductionDomainDeploy(args = process.argv.slice(2)) {
-  const app = productionAppConfig(readFlag(args, "--app"));
+  const project = productionProjectConfig(readFlag(args, "--project"));
   const sourceConfigPath = readFlag(
     args,
     "--config",
-    app.generatedWranglerConfigPath,
+    project.generatedWranglerConfigPath,
   );
   const domainConfigPath = readFlag(
     args,
     "--out",
-    app.productionDomainWranglerConfigPath,
+    project.productionDomainWranglerConfigPath,
   );
   const sourceConfig = JSON.parse(readFileSync(sourceConfigPath, "utf8"));
-  const domainConfig = productionDomainWranglerConfig(sourceConfig, app.appId);
+  const domainConfig = productionDomainWranglerConfig(sourceConfig, {
+    projectId: project.projectId,
+    workerName: project.workerName,
+  });
 
   mkdirSync(path.dirname(domainConfigPath), { recursive: true });
   writeFileSync(domainConfigPath, `${JSON.stringify(domainConfig, null, 2)}\n`);
 
   writeOutputs({
-    app: app.appId,
     domain_config_path: domainConfigPath,
-    domain_patterns: app.domainPatterns.join(","),
-    nx_project_id: app.nxProjectId,
+    domain_patterns: project.domainPatterns.join(","),
+    project_id: project.projectId,
     source_config_path: sourceConfigPath,
-    worker_name: app.workerName,
+    worker_name: project.workerName,
   });
 }
 

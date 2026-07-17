@@ -21,7 +21,6 @@ describe("resolveWebSurfaceUrls", () => {
       docs: "sketchi.app/docs",
       icons: "icons.sketchi.app",
       playground: "playground.sketchi.app",
-      studio: "studio.sketchi.app",
     });
     expect(LOCAL_WEB_SURFACE_URLS).toEqual({
       icons: "http://localhost:6203",

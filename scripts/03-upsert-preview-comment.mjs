@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import { pathToFileURL } from "node:url";
 
-import { previewAppConfig, previewCommentBody } from "./lib/preview-deploy.mjs";
+import {
+  previewCommentBody,
+  previewProjectConfig,
+} from "./lib/preview-deploy.mjs";
 
 function requiredEnv(name) {
   const value = process.env[name]?.trim();
@@ -38,9 +41,9 @@ async function githubRequest(path, options = {}) {
 export async function upsertPreviewComment() {
   const repository = requiredEnv("GITHUB_REPOSITORY");
   const prNumber = requiredEnv("PR_NUMBER");
-  const app = previewAppConfig(requiredEnv("PREVIEW_APP"));
+  const project = previewProjectConfig(requiredEnv("PREVIEW_PROJECT_ID"));
   const marker =
-    process.env.PREVIEW_COMMENT_MARKER?.trim() || app.commentMarker;
+    process.env.PREVIEW_COMMENT_MARKER?.trim() || project.commentMarker;
   const runId = process.env.GITHUB_RUN_ID?.trim();
   const serverUrl =
     process.env.GITHUB_SERVER_URL?.trim() || "https://github.com";
@@ -48,13 +51,14 @@ export async function upsertPreviewComment() {
     ? `${serverUrl}/${repository}/actions/runs/${runId}`
     : "";
   const body = previewCommentBody({
-    app: app.appId,
     marker,
     previewUrl: process.env.PREVIEW_URL,
+    previewWorkerName: process.env.PREVIEW_WORKER_NAME,
+    projectId: project.projectId,
     runUrl,
     sha: process.env.PREVIEW_SHA ?? process.env.GITHUB_SHA,
     status: process.env.PREVIEW_STATUS,
-    workerName: process.env.WORKER_NAME,
+    workerName: project.workerName,
   });
   const comments = await githubRequest(
     `repos/${repository}/issues/${prNumber}/comments?per_page=100`,

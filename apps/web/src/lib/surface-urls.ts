@@ -12,7 +12,6 @@ export const PRODUCT_SURFACE_HOSTS = {
   docs: "sketchi.app/docs",
   icons: "icons.sketchi.app",
   playground: "playground.sketchi.app",
-  studio: "studio.sketchi.app",
 } as const;
 
 export const LOCAL_WEB_SURFACE_URLS: WebSurfaceUrls = {
@@ -24,7 +23,7 @@ const WORKERS_DEV_ACCOUNT = "dimethyl";
 
 const WORKERS_DEV_WORKERS = {
   icons: "sketchi-icons",
-  // apps/studio currently carries the public Playground worker boundary.
+  // The playground project retains the durable sketchi-studio Worker identity.
   // apps/eval-harness is internal and is not a public link target.
   playground: "sketchi-studio",
 } satisfies Record<keyof WebSurfaceUrls, string>;

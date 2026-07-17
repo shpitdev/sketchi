@@ -83,15 +83,16 @@ not silently fall back to a generic template. See the full
 | Surface        | Role                                                               | Local command              |
 | -------------- | ------------------------------------------------------------------ | -------------------------- |
 | `web`          | `sketchi.app` home, docs, and setup                                | `pnpm nx dev web`          |
-| `studio`       | Public Playground, Code Mode API/MCP, artifacts, Studio foundation | `pnpm nx dev studio`       |
+| `playground`   | Public Playground, Code Mode API/MCP, artifacts, Studio foundation | `pnpm nx dev playground`   |
 | `icons`        | `icons.sketchi.app` curated icon browser                           | `pnpm nx dev icons`        |
 | `eval-harness` | Internal scenario and model-output eval harness                    | `pnpm nx dev eval-harness` |
 | `excalidraw`   | Internal real-canvas rendering and editing workspace               | `pnpm nx dev excalidraw`   |
 
-The internal harness rename from `playground` to `eval-harness` is complete.
-The current `studio` app still hosts the public Playground and Studio
-foundation; that public host has not moved. Later phases remain documented in
-the reviewed [repository structure proposal](docs/repository-structure-proposal.html).
+The internal harness is `eval-harness`. The public host is `playground`, while
+its durable Worker identity remains `sketchi-studio` and the extracted Studio
+persistence boundary remains `packages/studio/projects`. Later phases remain
+documented in the reviewed
+[repository structure proposal](docs/repository-structure-proposal.html).
 
 ## Quick Start
 
@@ -153,7 +154,7 @@ See [preview deployments](docs/preview-deploys.md) and the guarded
 
 ```sh
 pnpm deploy:eval-harness
-pnpm deploy:studio
+pnpm deploy:playground
 pnpm deploy:web
 pnpm deploy:excalidraw
 pnpm deploy:icons

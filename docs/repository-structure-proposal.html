@@ -585,20 +585,21 @@
             <h2>Studio exists today, inside the Playground host</h2>
           </div>
           <p>
-            The current <code>apps/studio</code> still owns public Playground,
-            Code Mode, and artifact routes. It now composes the extracted
-            project/diagram package through a thin Cloudflare adapter.
+            <code>apps/playground</code> owns public Playground, Code Mode, and
+            artifact routes. It composes the extracted project/diagram package
+            through a thin Cloudflare adapter while retaining the
+            <code>sketchi-studio</code> Worker identity.
           </p>
         </div>
         <div class="grid two">
-          <article class="card warn">
-            <span class="tag warn">Do not</span>
-            <h3>Blindly rename the directory</h3>
+          <article class="card good">
+            <span class="tag good">Completed</span>
+            <h3>The public host moved without a runtime cutover</h3>
             <p>
-              A direct <code>apps/studio</code> →
-              <code>apps/playground</code> move must still preserve the Worker,
-              Cloudflare bindings, and <code>/api/studio</code> route identity;
-              the package extraction does not authorize a runtime cutover.
+              The <code>apps/playground</code> project preserves the Worker,
+              Cloudflare bindings, route set, and <code>/api/studio</code>
+              protocol identity. Project and Worker IDs remain separate in
+              deployment tooling.
             </p>
           </article>
           <article class="card good">
@@ -607,9 +608,9 @@
             <p>
               Studio contracts and persistence now live in
               <code>packages/studio/projects</code>. The public Playground app
-              composes it temporarily; a future authenticated
-              <code>apps/studio</code> can consume the same domain when it
-              becomes a separate deployment.
+              composes it temporarily; a future authenticated Studio project
+              can consume the same domain when it becomes a separate
+              deployment.
             </p>
           </article>
         </div>
@@ -702,7 +703,7 @@
             >
           </div>
           <div class="step">
-            <strong>Phase 3</strong><b>Rename public host</b
+            <strong>Phase 3 / done</strong><b>Rename public host</b
             ><span
               ><code>apps/studio</code> → <code>apps/playground</code>; preserve
               routes and Worker identity initially.</span
@@ -738,9 +739,8 @@
                 <code>eval-harness</code> owns internal regression work;
                 <code>playground</code> owns the public anonymous product and
                 Code Mode host; <code>packages/studio/projects</code> owns the
-                existing persistence domain; reserve
-                <code>apps/studio</code> for a future separately deployed
-                authenticated product.
+                existing persistence domain; keep any future authenticated
+                Studio product as a deliberate separate deployment.
               </p>
             </div>
           </div>

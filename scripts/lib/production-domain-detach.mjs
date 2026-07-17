@@ -1,4 +1,5 @@
-import { productionAppConfig } from "./production-deploy.mjs";
+import { productionProjectConfig } from "./production-deploy.mjs";
+import { requireWorkerIdentity } from "./worker-apps.mjs";
 
 const cloudflareApiBase = "https://api.cloudflare.com/client/v4";
 
@@ -22,9 +23,10 @@ function cloudflareErrors(payload) {
     .join("; ");
 }
 
-export function selectProductionDomainDetachments(app, domains) {
-  const appConfig = productionAppConfig(app);
-  const expectedHostnames = new Set(appConfig.domainPatterns);
+export function selectProductionDomainDetachments(identity, domains) {
+  const project = productionProjectConfig(identity.projectId);
+  requireWorkerIdentity(project.projectId, identity.workerName);
+  const expectedHostnames = new Set(project.domainPatterns);
 
   if (!Array.isArray(domains)) {
     throw new Error("Cloudflare domain list must be an array.");
@@ -38,9 +40,9 @@ export function selectProductionDomainDetachments(app, domains) {
         expectedHostnames.has(domain.hostname),
     )
     .map((domain) => {
-      if (domain.service !== appConfig.workerName) {
+      if (domain.service !== project.workerName) {
         throw new Error(
-          `Refusing to detach ${domain.hostname}: expected ${appConfig.workerName}, found ${String(domain.service)}.`,
+          `Refusing to detach ${domain.hostname}: project ${project.projectId} expects Worker ${project.workerName}, found ${String(domain.service)}.`,
         );
       }
 
@@ -55,15 +57,17 @@ export function selectProductionDomainDetachments(app, domains) {
 export async function detachProductionDomains({
   accountId,
   apiToken,
-  app,
+  projectId,
+  workerName,
   apply = false,
   fetchImpl = fetch,
 }) {
   const resolvedAccountId = requireString(accountId, "CLOUDFLARE_ACCOUNT_ID");
   const resolvedApiToken = requireString(apiToken, "CLOUDFLARE_API_TOKEN");
-  const appConfig = productionAppConfig(app);
+  const project = productionProjectConfig(projectId);
+  requireWorkerIdentity(project.projectId, workerName);
 
-  if (appConfig.domainPatterns.length === 0) {
+  if (project.domainPatterns.length === 0) {
     return [];
   }
 
@@ -82,7 +86,10 @@ export async function detachProductionDomains({
     );
   }
 
-  const detachments = selectProductionDomainDetachments(app, payload.result);
+  const detachments = selectProductionDomainDetachments(
+    { projectId: project.projectId, workerName: project.workerName },
+    payload.result,
+  );
 
   if (!apply) {
     return detachments;

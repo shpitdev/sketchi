@@ -12,9 +12,12 @@ export default defineConfig({
     },
     globals: true,
     coverage: {
-      reportsDirectory: "../../coverage/apps/studio",
+      reportsDirectory: "../../coverage/apps/playground",
     },
-    include: ["apps/studio/src/**/*.test.ts", "apps/studio/src/**/*.test.tsx"],
+    include: [
+      "apps/playground/src/**/*.test.ts",
+      "apps/playground/src/**/*.test.tsx",
+    ],
     passWithNoTests: true,
   },
   resolve: {

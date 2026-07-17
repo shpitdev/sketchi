@@ -1,4 +1,4 @@
-# studio
+# playground
 
 Current hosted Sketchi Playground worker boundary for ephemeral generation, Code
 Mode APIs, MCP, artifacts, diagram review, artifact editor routes, and the
@@ -24,12 +24,12 @@ flowchart LR
 ## Commands
 
 ```sh
-pnpm nx dev studio
-pnpm nx test studio
-pnpm nx typecheck studio
-pnpm nx build studio
-pnpm nx deploy studio
-pnpm nx cf-typegen studio
+pnpm nx dev playground
+pnpm nx test playground
+pnpm nx typecheck playground
+pnpm nx build playground
+pnpm nx deploy playground
+pnpm nx cf-typegen playground
 ```
 
 ## Usage

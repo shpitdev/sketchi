@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
 
 import { detachProductionDomains } from "./lib/production-domain-detach.mjs";
+import { productionProjectConfig } from "./lib/production-deploy.mjs";
 
 function readFlag(args, name) {
   const index = args.indexOf(name);
@@ -17,18 +18,21 @@ function readFlag(args, name) {
 }
 
 export async function runProductionDomainDetach(args = process.argv.slice(2)) {
-  const app = readFlag(args, "--app");
+  const project = productionProjectConfig(readFlag(args, "--project"));
   const apply = args.includes("--apply");
   const detachments = await detachProductionDomains({
     accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
     apiToken: process.env.CLOUDFLARE_API_TOKEN,
-    app,
+    projectId: project.projectId,
+    workerName: project.workerName,
     apply,
   });
 
   const action = apply ? "detached" : "would detach";
   if (detachments.length === 0) {
-    console.log(`No approved domains are attached for ${app}.`);
+    console.log(
+      `No approved domains are attached for project ${project.projectId} and Worker ${project.workerName}.`,
+    );
     return detachments;
   }
 

@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { extname, join, relative } from "node:path";
 import test from "node:test";
 
-import { productionAppConfig } from "./production-deploy.mjs";
+import { productionProjectConfig } from "./production-deploy.mjs";
 
 const repoRoot = new URL("../../", import.meta.url);
 const repoPath = repoRoot.pathname;
@@ -139,22 +139,31 @@ test("the approved public-domain map is exact and internal apps stay private", (
     excalidraw: [],
     "eval-harness": [],
     icons: ["icons.sketchi.app"],
-    studio: ["playground.sketchi.app"],
+    playground: ["playground.sketchi.app"],
     web: ["sketchi.app", "www.sketchi.app"],
   };
 
-  for (const [app, domainPatterns] of Object.entries(expectedDomains)) {
-    assert.deepEqual(productionAppConfig(app).domainPatterns, domainPatterns);
+  for (const [projectId, domainPatterns] of Object.entries(expectedDomains)) {
+    assert.deepEqual(
+      productionProjectConfig(projectId).domainPatterns,
+      domainPatterns,
+    );
   }
 
-  assert.equal(productionAppConfig("excalidraw").publicSurface, false);
-  assert.equal(productionAppConfig("eval-harness").publicSurface, false);
-  assert.equal(productionAppConfig("studio").publicSurface, true);
+  assert.equal(productionProjectConfig("excalidraw").publicSurface, false);
+  assert.equal(productionProjectConfig("eval-harness").publicSurface, false);
+  assert.equal(productionProjectConfig("playground").publicSurface, true);
 });
 
 test("checked-in Wrangler configs never expose production custom domains", () => {
-  for (const app of ["eval-harness", "excalidraw", "icons", "studio", "web"]) {
-    const configPath = new URL(`apps/${app}/wrangler.jsonc`, repoRoot);
+  for (const projectId of [
+    "eval-harness",
+    "excalidraw",
+    "icons",
+    "playground",
+    "web",
+  ]) {
+    const configPath = new URL(`apps/${projectId}/wrangler.jsonc`, repoRoot);
     const config = readFileSync(configPath, "utf8");
     assert.doesNotMatch(
       config,
@@ -204,7 +213,7 @@ test("the cutover runbook preserves the audited provider boundary", () => {
   }
 
   assert.doesNotMatch(runbook, /At Name\.com, replace/);
-  assert.doesNotMatch(runbook, /-f app=all/);
+  assert.doesNotMatch(runbook, /-f project=all/);
 });
 
 test("the runbook orders the conflict-free app-specific domain cutover", () => {
@@ -214,10 +223,10 @@ test("the runbook orders the conflict-free app-specific domain cutover", () => {
   ).replaceAll(/\s+/g, " ");
   const orderedSteps = [
     "`status=active`",
-    "-f app=icons",
-    "-f app=studio",
+    "-f project=icons",
+    "-f project=playground",
     "delete only the staged apex DNS-only CNAME",
-    "-f app=web",
+    "-f project=web",
     "Remove the staged wildcard DNS-only CNAME only after all four approved hosts pass verification",
   ];
 
@@ -244,7 +253,7 @@ test("the Web rollback identifies and awaits its asynchronous detach before DNS 
   const orderedSteps = [
     "Workflow dispatch is asynchronous",
     "previous_web_detach_run_id",
-    "-f app=web",
+    "-f project=web",
     "-f domain_action=detach",
     "web_detach_run_id",
     'gh run watch "$web_detach_run_id"',
@@ -265,7 +274,7 @@ test("the Web rollback identifies and awaits its asynchronous detach before DNS 
 
   assert.match(
     workflow,
-    /format\('production \{0\} \{1\}', inputs\.domain_action, inputs\.app\)/,
+    /format\('production \{0\} \{1\}', inputs\.domain_action, inputs\.project\)/,
   );
   assert.match(runbook, /remaining\.length > 0/);
   assert.match(runbook, /--exit-status/);

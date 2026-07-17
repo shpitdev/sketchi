@@ -1,10 +1,14 @@
-import { workerAppConfig } from "./worker-apps.mjs";
+import {
+  assertWranglerWorkerIdentity,
+  requireWorkerIdentity,
+  workerProjectConfig,
+} from "./worker-apps.mjs";
 
 const MAX_WORKER_NAME_LENGTH = 63;
 
-const webPreviewSurfaceApps = {
+const webPreviewSurfaceProjects = {
   SKETCHI_ICONS_URL: "icons",
-  SKETCHI_PLAYGROUND_URL: "studio",
+  SKETCHI_PLAYGROUND_URL: "playground",
 };
 
 const previewPipelineStreams = {
@@ -12,7 +16,7 @@ const previewPipelineStreams = {
   f687dab6e7d742c1a76834089e709462: "d95a1767edf246af8c637c5b9bf5a5c5",
 };
 
-export const previewApps = {
+export const previewProjects = {
   excalidraw: {
     commentMarker: "<!-- sketchi-excalidraw-preview -->",
     publicSurface: false,
@@ -31,11 +35,11 @@ export const previewApps = {
     routePolicy: "internal eval harness; no public product domain",
     title: "Sketchi Eval Harness",
   },
-  studio: {
+  playground: {
     commentMarker: "<!-- sketchi-studio-preview -->",
     publicSurface: true,
     routePolicy:
-      "playground.sketchi.app manual attach target; studio.sketchi.app waits for authenticated Studio",
+      "playground.sketchi.app product surface; authenticated Studio remains unexposed",
     title: "Sketchi Playground / Studio",
   },
   web: {
@@ -46,29 +50,28 @@ export const previewApps = {
   },
 };
 
-export function previewAppConfig(app) {
-  const appId = typeof app === "string" ? app.trim() : "";
+export function previewProjectConfig(project) {
+  const projectId = typeof project === "string" ? project.trim() : "";
 
-  if (!appId) {
+  if (!projectId) {
     throw new Error(
-      `Preview app/project selection is required. Expected one of ${Object.keys(previewApps).join(", ")}.`,
+      `Preview project selection is required. Expected one of ${Object.keys(previewProjects).join(", ")}.`,
     );
   }
 
-  const config = previewApps[appId];
+  const config = previewProjects[projectId];
 
   if (!config) {
     throw new Error(
-      `Unknown preview app "${appId}". Expected one of ${Object.keys(previewApps).join(", ")}.`,
+      `Unknown preview project "${projectId}". Expected one of ${Object.keys(previewProjects).join(", ")}.`,
     );
   }
 
-  const worker = workerAppConfig(appId);
+  const worker = workerProjectConfig(projectId);
 
   return {
     ...worker,
     ...config,
-    workerPrefix: `${worker.workerName}-pr`,
   };
 }
 
@@ -84,19 +87,8 @@ export function normalizePrNumber(value) {
 
 export function previewWorkerName(input) {
   const prNumber = normalizePrNumber(input.prNumber);
-  const appConfig = previewAppConfig(input.app);
-  const rawPrefix = (input.workerPrefix ?? appConfig.workerPrefix).trim();
-  const prefix = rawPrefix
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .replace(/-{2,}/g, "-");
-
-  if (!prefix) {
-    throw new Error("Preview worker prefix must contain letters or numbers.");
-  }
-
-  const workerName = `${prefix}-${prNumber}`;
+  const project = requireWorkerIdentity(input.projectId, input.workerName);
+  const workerName = `${project.previewWorkerPrefix}-${prNumber}`;
 
   if (
     workerName.length > MAX_WORKER_NAME_LENGTH ||
@@ -129,36 +121,51 @@ export function normalizeWorkersDevSubdomain(value) {
   return trimmed;
 }
 
-function previewWorkerUrl(app, prNumber, workersDevSubdomain) {
-  return `https://${previewWorkerName({
-    app,
+function previewWorkerUrl(projectId, prNumber, workersDevSubdomain) {
+  const project = previewProjectConfig(projectId);
+  const workerName = previewWorkerName({
+    projectId: project.projectId,
     prNumber,
-  })}.${workersDevSubdomain}.workers.dev`;
+    workerName: project.workerName,
+  });
+
+  return `https://${workerName}.${workersDevSubdomain}.workers.dev`;
 }
 
 function webPreviewVars(input) {
-  const appConfig = previewAppConfig(input.app);
+  const project = previewProjectConfig(input.projectId);
+  requireWorkerIdentity(project.projectId, input.workerName);
   const workersDevSubdomain = normalizeWorkersDevSubdomain(
     input.workersDevSubdomain,
   );
 
-  if (appConfig.appId !== "web" || !workersDevSubdomain) {
+  if (project.projectId !== "web" || !workersDevSubdomain) {
     return {};
   }
 
   return Object.fromEntries(
-    Object.entries(webPreviewSurfaceApps).map(([envName, app]) => [
+    Object.entries(webPreviewSurfaceProjects).map(([envName, projectId]) => [
       envName,
-      previewWorkerUrl(app, input.prNumber, workersDevSubdomain),
+      previewWorkerUrl(projectId, input.prNumber, workersDevSubdomain),
     ]),
   );
 }
 
-export function previewWranglerConfig(config, workerName, options = {}) {
+export function previewWranglerConfig(config, identity) {
+  const project = assertWranglerWorkerIdentity(
+    config,
+    identity.projectId,
+    identity.workerName,
+  );
+  const previewName = previewWorkerName({
+    projectId: project.projectId,
+    prNumber: identity.prNumber,
+    workerName: project.workerName,
+  });
   const nextConfig = structuredClone(config);
 
-  nextConfig.name = workerName;
-  nextConfig.topLevelName = workerName;
+  nextConfig.name = previewName;
+  nextConfig.topLevelName = previewName;
   nextConfig.workers_dev = true;
   nextConfig.preview_urls = false;
   nextConfig.r2_buckets = previewR2Buckets(nextConfig.r2_buckets);
@@ -170,7 +177,7 @@ export function previewWranglerConfig(config, workerName, options = {}) {
   delete nextConfig.custom_domain;
   delete nextConfig.custom_domains;
 
-  const previewVars = webPreviewVars(options);
+  const previewVars = webPreviewVars(identity);
   if (Object.keys(previewVars).length > 0) {
     nextConfig.vars = {
       ...(nextConfig.vars ?? {}),
@@ -239,32 +246,35 @@ export function extractPreviewUrl(logText, workerName = "") {
 }
 
 export function previewCommentBody(input) {
-  const appConfig = previewAppConfig(input.app);
+  const project = previewProjectConfig(input.projectId);
+  requireWorkerIdentity(project.projectId, input.workerName);
   const status = (input.status ?? "ready").trim().toLowerCase();
   const runUrl = input.runUrl?.trim();
   const previewUrl = input.previewUrl?.trim();
-  const workerName = input.workerName?.trim();
+  const previewName = input.previewWorkerName?.trim();
   const sha = input.sha?.trim();
-  const marker = input.marker?.trim() || appConfig.commentMarker;
+  const marker = input.marker?.trim() || project.commentMarker;
   const lines = [
     marker,
-    `### ${appConfig.title} Preview`,
+    `### ${project.title} Preview`,
     "",
     `Status: \`${status}\``,
     `- Surface: ${
-      appConfig.publicSurface
+      project.publicSurface
         ? "public product preview"
         : "internal preview; not linked from public navigation"
     }`,
-    `- Route policy: ${appConfig.routePolicy}`,
+    `- Project: \`${project.projectId}\``,
+    `- Worker identity: \`${project.workerName}\``,
+    `- Route policy: ${project.routePolicy}`,
   ];
 
   if (previewUrl) {
     lines.push(`- URL: ${previewUrl}`);
   }
 
-  if (workerName) {
-    lines.push(`- Worker: \`${workerName}\``);
+  if (previewName) {
+    lines.push(`- Preview Worker: \`${previewName}\``);
   }
 
   if (sha) {

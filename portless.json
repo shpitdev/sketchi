@@ -9,8 +9,8 @@
     "apps/eval-harness": {
       "name": "eval-harness.sketchi"
     },
-    "apps/studio": {
-      "name": "studio.sketchi"
+    "apps/playground": {
+      "name": "playground.sketchi"
     },
     "apps/web": {
       "name": "sketchi"

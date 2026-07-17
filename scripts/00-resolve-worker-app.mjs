@@ -2,7 +2,7 @@
 import { appendFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-import { workerAppConfig } from "./lib/worker-apps.mjs";
+import { workerProjectConfig } from "./lib/worker-apps.mjs";
 
 function readFlag(args, name, fallback) {
   const index = args.indexOf(name);
@@ -32,14 +32,13 @@ function writeOutputs(outputs) {
 }
 
 export function resolveWorkerApp(args = process.argv.slice(2)) {
-  const app = workerAppConfig(readFlag(args, "--app"));
+  const project = workerProjectConfig(readFlag(args, "--project"));
 
   writeOutputs({
-    app: app.appId,
-    build_output_path: app.buildOutputPath,
-    nx_project_id: app.nxProjectId,
-    worker_config_path: app.generatedWranglerConfigPath,
-    worker_name: app.workerName,
+    build_output_path: project.buildOutputPath,
+    project_id: project.projectId,
+    worker_config_path: project.generatedWranglerConfigPath,
+    worker_name: project.workerName,
   });
 }
 

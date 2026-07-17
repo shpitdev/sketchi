@@ -37,7 +37,7 @@ flowchart LR
   no dependency on app routes, Cloudflare bindings, or the Code Mode runtime.
 - `apps/eval-harness` composes the packages in a TanStack Start internal eval
   harness for scenarios, candidate inspection, and regression review.
-- `apps/studio` owns the current public Playground worker boundary: ephemeral
+- `apps/playground` owns the public Playground worker boundary: ephemeral
   chat generation over the canonical build runtime and the HTTP/browser routes
   for the persisted Studio foundation. A thin server adapter translates the R2
   binding and validated Code Mode source artifacts into `studio-projects`;
@@ -94,9 +94,9 @@ deployable internal testing ground for maintained scenarios, pasted model
 output, and deterministic IR-to-Excalidraw conversion.
 
 The public Sketchi Playground direction is anonymous prompt-to-diagram
-generation with artifact handoff. That experience is implemented by the current
-`apps/studio` worker while the authenticated Studio product domain remains a
-separate future cutover.
+generation with artifact handoff. That experience is implemented by
+`apps/playground` on the durable `sketchi-studio` Worker while authenticated
+Studio remains a separate future cutover.
 
 The portable CLI path is:
 
@@ -124,7 +124,7 @@ orchestration, and persistence.
 The v2 workspace has five TanStack Start app surfaces:
 
 - `eval-harness`: internal scenario evaluation and prompt-output inspection.
-- `studio`: public Playground worker boundary with chat generation, artifact
+- `playground`: public Playground worker boundary with chat generation, artifact
   handoff, and the Cloudflare/HTTP adapter for the persisted Studio foundation.
 - `web`: public home/docs for the Sketchi product direction.
 - `excalidraw`: internal Excalidraw rendering workspace; Excalidraw is an
@@ -134,13 +134,13 @@ The v2 workspace has five TanStack Start app surfaces:
 ```mermaid
 flowchart LR
   Workspace["Nx workspace"] --> EvalHarness["eval-harness"]
-  Workspace --> Studio["studio"]
+  Workspace --> Playground["playground"]
   Workspace --> Web["web"]
   Workspace --> Excalidraw["excalidraw"]
   Workspace --> Icons["icons"]
 
   EvalHarness --> Deploy["preview/prod Worker matrix"]
-  Studio --> Deploy
+  Playground --> Deploy
   Web --> Deploy
   Excalidraw --> Deploy
   Icons --> Deploy
@@ -172,14 +172,15 @@ Each app is scaffolded for Cloudflare Workers through Vite and Wrangler. The
 adopted production route map is:
 
 - `sketchi.app` and `www.sketchi.app` -> `web`
-- `playground.sketchi.app` -> `studio`, which currently owns the public
+- `playground.sketchi.app` -> `playground`, which owns the public
   Playground boundary
 - `icons.sketchi.app` -> `icons`
 - the eval harness and standalone Excalidraw workspace remain internal
 - authenticated Studio remains deferred until it is deliberately launched
 
-The manual domain attach target for `playground.sketchi.app` is the `studio`
-app until Playground and authenticated Studio are deliberately split.
+The manual domain attach target for `playground.sketchi.app` is the
+`playground` project. Its durable Cloudflare service remains `sketchi-studio`;
+authenticated Studio remains unexposed until deliberately launched.
 Custom-domain attachment is a post-merge operator action described in
 [Production domain cutover](production-domain-cutover.md). Until that cutover,
 use stable `workers.dev` URLs for deployment and runtime proof.
@@ -189,7 +190,7 @@ the durable preview prefix declared for each app.
 
 Today `scripts/lib/worker-apps.mjs` maps each explicit deploy project ID to its
 durable Worker name, input Wrangler config, and isolated `dist/apps/<app>`
-output for `eval-harness`, `studio`, `web`, `excalidraw`, and `icons`.
+output for `eval-harness`, `playground`, `web`, `excalidraw`, and `icons`.
 `eval-harness` intentionally maps to the existing `sketchi-playground` Worker;
 workflows never derive Worker identities from Nx names. Custom-domain
 attachment remains an explicit manual workflow dispatch.

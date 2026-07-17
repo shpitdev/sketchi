@@ -84,24 +84,25 @@ the registration away from Vercel or the underlying registrar is unnecessary.
 4. Wait until both public DNS and the Cloudflare API report the new
    nameservers, and the Cloudflare zone reports exactly one result with
    `status=active`.
-5. Attach the independent public hosts first. Run these app-specific workflow
+5. Attach the independent public hosts first. Run these project-specific workflow
    dispatches from the merged `main` branch:
 
    ```sh
    gh workflow run app-production-deploy.yml \
      --repo shpitdev/sketchi \
      --ref main \
-     -f app=icons \
+     -f project=icons \
      -f domain_action=attach
 
    gh workflow run app-production-deploy.yml \
      --repo shpitdev/sketchi \
      --ref main \
-     -f app=studio \
+     -f project=playground \
      -f domain_action=attach
    ```
 
-   The `studio` app dispatch attaches only `playground.sketchi.app`; it does not
+   The `playground` project dispatch retains the `sketchi-studio` Worker and
+   attaches only `playground.sketchi.app`; it does not
    expose `studio.sketchi.app`. Never dispatch attach for `eval-harness` or
    `excalidraw`. Verify `icons.sketchi.app` and `playground.sketchi.app` while
    the wildcard DNS-only CNAME remains staged. That wildcard is not a working
@@ -112,13 +113,13 @@ the registration away from Vercel or the underlying registrar is unnecessary.
    CNAME (`@` -> `34043a3f2790ef39.vercel-dns-016.com`). A Workers Custom
    Domain cannot attach over an existing exact CNAME. Leave the wildcard CNAME
    and all three CAA records in place.
-7. Attach the two Web hosts with an app-specific dispatch:
+7. Attach the two Web hosts with a project-specific dispatch:
 
    ```sh
    gh workflow run app-production-deploy.yml \
      --repo shpitdev/sketchi \
      --ref main \
-     -f app=web \
+     -f project=web \
      -f domain_action=attach
    ```
 
@@ -162,7 +163,7 @@ previous_web_detach_run_id="$(
 gh workflow run app-production-deploy.yml \
   --repo shpitdev/sketchi \
   --ref main \
-  -f app=web \
+  -f project=web \
   -f domain_action=detach
 
 while :; do
@@ -237,7 +238,7 @@ a successful fallback check.
 
 If that reduced route map is explicitly approved, first complete the watched
 Web detach, absence check, apex CNAME restoration, and apex/`www` verification
-above. Then dispatch app-specific detaches for `studio` and `icons`, identify
+above. Then dispatch project-specific detaches for `playground` and `icons`, identify
 and wait for each corresponding workflow run, and change the authoritative
 nameservers in **Vercel Domains** only after those runs succeed. The
 `workers.dev` URLs remain available, but the public Icons and Playground hosts

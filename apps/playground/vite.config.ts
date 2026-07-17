@@ -10,18 +10,18 @@ import {
   localInspectorPort,
   localViteCacheDir,
 } from "../../tools/local-dev-ports";
-import { workerAppConfig } from "../../scripts/lib/worker-apps.mjs";
+import { workerProjectConfig } from "../../scripts/lib/worker-apps.mjs";
 
-const workerApp = workerAppConfig("studio");
+const workerProject = workerProjectConfig("playground");
 
 export default defineConfig({
   root: new URL(".", import.meta.url).pathname,
   build: {
     emptyOutDir: true,
-    outDir: new URL(`../../${workerApp.buildOutputPath}`, import.meta.url)
+    outDir: new URL(`../../${workerProject.buildOutputPath}`, import.meta.url)
       .pathname,
   },
-  cacheDir: localViteCacheDir("studio"),
+  cacheDir: localViteCacheDir("playground"),
   publicDir: new URL("./public", import.meta.url).pathname,
   plugins: [
     agents(),

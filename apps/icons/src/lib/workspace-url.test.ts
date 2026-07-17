@@ -37,6 +37,9 @@ describe("workspace URL handoff", () => {
         "https://sketchi-icons.dimethyl.workers.dev",
       ),
     ).toBe("https://sketchi-excalidraw.dimethyl.workers.dev");
+    expect(workspaceOriginForIconsOrigin("https://icons.sketchi.app")).toBe(
+      "https://sketchi-excalidraw.dimethyl.workers.dev",
+    );
     expect(
       workspaceOriginForIconsOrigin("https://icons.sketchi.localhost"),
     ).toBe("https://excalidraw.sketchi.localhost");

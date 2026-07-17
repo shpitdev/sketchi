@@ -1,5 +1,5 @@
 {
-  "name": "@sketchi/studio",
+  "name": "@sketchi/playground",
   "private": true,
   "type": "module",
   "dependencies": {

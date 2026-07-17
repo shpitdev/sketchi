@@ -12,7 +12,7 @@ export function workspaceOriginForIconsOrigin(iconsOrigin: string): string {
     return `${origin.protocol}//sketchi-excalidraw${workersMatch.groups.preview ?? ""}${workersMatch.groups.suffix}`;
   }
   if (origin.hostname === "icons.sketchi.app") {
-    return "https://excalidraw.sketchi.app";
+    return DEFAULT_WORKSPACE_ORIGIN;
   }
   const localMatch = origin.hostname.match(
     /^(?<prefix>(?:[a-z0-9-]+\.)*)icons\.sketchi\.localhost$/,

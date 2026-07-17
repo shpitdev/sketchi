@@ -22,13 +22,16 @@ function markdownSection(markdown, heading) {
   return markdown.slice(start, next === -1 ? undefined : next);
 }
 
-test("all distributed MCP configs use the public credential-free endpoint", () => {
+test("the playground project rename preserves the distributed MCP endpoint", () => {
   const portable = readJson(".agents/mcp_config.json");
   const codex = readJson("plugins/sketchi-code-mode-codex/.mcp.json");
   const codexSkillMetadata = read(
     "plugins/sketchi-code-mode-codex/skills/sketchi-code-mode/agents/openai.yaml",
   );
   const claude = readJson("plugins/sketchi-code-mode-claude/.mcp.json");
+  const playgroundWrangler = read("apps/playground/wrangler.jsonc");
+
+  assert.match(playgroundWrangler, /^\s*"name": "sketchi-studio",$/m);
 
   assert.equal(portable.mcpServers["sketchi-code-mode"].serverUrl, endpoint);
   assert.deepEqual(codex.mcpServers["sketchi-code-mode"], {
@@ -49,6 +52,7 @@ test("all distributed MCP configs use the public credential-free endpoint", () =
   );
 
   for (const config of [portable, codex, claude]) {
+    assert.doesNotMatch(JSON.stringify(config), /sketchi-playground/);
     assert.doesNotMatch(
       JSON.stringify(config),
       /auth|token|secret|header|credential/i,

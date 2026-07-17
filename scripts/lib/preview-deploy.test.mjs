@@ -4,76 +4,88 @@ import test from "node:test";
 import {
   extractPreviewUrl,
   normalizeWorkersDevSubdomain,
-  previewAppConfig,
   previewCommentBody,
+  previewProjectConfig,
   previewWorkerName,
   previewWranglerConfig,
 } from "./preview-deploy.mjs";
-import { workerAppConfig } from "./worker-apps.mjs";
+import { workerProjectConfig } from "./worker-apps.mjs";
 
-test("previewAppConfig returns app-scoped preview metadata", () => {
-  assert.deepEqual(previewAppConfig("icons"), {
-    ...workerAppConfig("icons"),
+test("previewProjectConfig returns project and Worker metadata", () => {
+  assert.deepEqual(previewProjectConfig("icons"), {
+    ...workerProjectConfig("icons"),
     commentMarker: "<!-- sketchi-icons-preview -->",
     publicSurface: true,
     routePolicy: "icons.sketchi.app product surface",
     title: "Sketchi Icons",
-    workerPrefix: "sketchi-icons-pr",
   });
 });
 
-test("previewAppConfig includes the studio preview Worker", () => {
-  assert.deepEqual(previewAppConfig("studio"), {
-    ...workerAppConfig("studio"),
+test("playground project preserves the durable Studio preview Worker", () => {
+  assert.deepEqual(previewProjectConfig("playground"), {
+    ...workerProjectConfig("playground"),
     commentMarker: "<!-- sketchi-studio-preview -->",
     publicSurface: true,
     routePolicy:
-      "playground.sketchi.app manual attach target; studio.sketchi.app waits for authenticated Studio",
+      "playground.sketchi.app product surface; authenticated Studio remains unexposed",
     title: "Sketchi Playground / Studio",
-    workerPrefix: "sketchi-studio-pr",
   });
 });
 
-test("previewAppConfig maps eval-harness to the durable internal Worker", () => {
-  assert.deepEqual(previewAppConfig("eval-harness"), {
-    ...workerAppConfig("eval-harness"),
+test("eval-harness keeps its durable internal Worker", () => {
+  assert.deepEqual(previewProjectConfig("eval-harness"), {
+    ...workerProjectConfig("eval-harness"),
     commentMarker: "<!-- sketchi-playground-preview -->",
     publicSurface: false,
     routePolicy: "internal eval harness; no public product domain",
     title: "Sketchi Eval Harness",
-    workerPrefix: "sketchi-playground-pr",
   });
 });
 
-test("previewAppConfig requires an explicit project selection", () => {
+test("previewProjectConfig requires an explicit project selection", () => {
   assert.throws(
-    () => previewAppConfig(),
-    /Preview app\/project selection is required/,
+    () => previewProjectConfig(),
+    /Preview project selection is required/,
   );
 });
 
-test("previewWorkerName creates a stable Cloudflare-safe PR worker name", () => {
+test("previewWorkerName uses the registered durable prefix", () => {
   assert.equal(
     previewWorkerName({
-      app: "eval-harness",
+      projectId: "playground",
       prNumber: 42,
-      workerPrefix: "Sketchi Playground PR",
+      workerName: "sketchi-studio",
+    }),
+    "sketchi-studio-pr-42",
+  );
+  assert.equal(
+    previewWorkerName({
+      projectId: "eval-harness",
+      prNumber: 42,
+      workerName: "sketchi-playground",
     }),
     "sketchi-playground-pr-42",
   );
 });
 
-test("previewWorkerName defaults to the selected app prefix", () => {
-  assert.equal(
-    previewWorkerName({ app: "web", prNumber: 42 }),
-    "sketchi-web-pr-42",
-  );
-});
-
-test("previewWorkerName rejects invalid PR numbers", () => {
+test("previewWorkerName rejects invalid numbers and identity mismatches", () => {
   assert.throws(
-    () => previewWorkerName({ prNumber: "nope" }),
+    () =>
+      previewWorkerName({
+        projectId: "playground",
+        prNumber: "nope",
+        workerName: "sketchi-studio",
+      }),
     /positive integer/,
+  );
+  assert.throws(
+    () =>
+      previewWorkerName({
+        projectId: "playground",
+        prNumber: 42,
+        workerName: "sketchi-playground",
+      }),
+    /Worker identity mismatch/,
   );
 });
 
@@ -92,17 +104,18 @@ test("normalizeWorkersDevSubdomain rejects invalid hosts", () => {
   );
 });
 
-test("previewWranglerConfig isolates preview worker settings", () => {
+test("playground preview preserves Studio data contracts and isolates routes", () => {
   const previewConfig = previewWranglerConfig(
     {
-      name: "sketchi-playground",
-      topLevelName: "sketchi-playground",
+      name: "sketchi-studio",
+      topLevelName: "sketchi-studio",
       route: "playground.sketchi.app/*",
       routes: ["playground.sketchi.app/*"],
       domains: [{ pattern: "playground.sketchi.app" }],
       custom_domain: true,
       vars: {
         SKETCHI_AI_GATEWAY_ID: "google-ai-studio",
+        SKETCHI_APP_SURFACE: "studio",
       },
       r2_buckets: [
         {
@@ -118,18 +131,21 @@ test("previewWranglerConfig isolates preview worker settings", () => {
           stream: "d9044253316f4273a60298098f444a62",
         },
         {
-          binding: "CODEMODE_USAGE_ISSUES_LEGACY",
+          binding: "CODEMODE_USAGE_ISSUES",
           pipeline: "f687dab6e7d742c1a76834089e709462",
           remote: true,
         },
       ],
     },
-    "sketchi-playground-pr-42",
-    { app: "eval-harness" },
+    {
+      projectId: "playground",
+      prNumber: 42,
+      workerName: "sketchi-studio",
+    },
   );
 
-  assert.equal(previewConfig.name, "sketchi-playground-pr-42");
-  assert.equal(previewConfig.topLevelName, "sketchi-playground-pr-42");
+  assert.equal(previewConfig.name, "sketchi-studio-pr-42");
+  assert.equal(previewConfig.topLevelName, "sketchi-studio-pr-42");
   assert.equal(previewConfig.workers_dev, true);
   assert.equal(previewConfig.preview_urls, false);
   assert.equal(previewConfig.route, undefined);
@@ -138,6 +154,7 @@ test("previewWranglerConfig isolates preview worker settings", () => {
   assert.equal(previewConfig.custom_domain, undefined);
   assert.deepEqual(previewConfig.vars, {
     SKETCHI_AI_GATEWAY_ID: "google-ai-studio",
+    SKETCHI_APP_SURFACE: "studio",
   });
   assert.deepEqual(previewConfig.r2_buckets, [
     {
@@ -153,14 +170,29 @@ test("previewWranglerConfig isolates preview worker settings", () => {
       stream: "e9fc3bcd35314fa39fc6a89018207acc",
     },
     {
-      binding: "CODEMODE_USAGE_ISSUES_LEGACY",
+      binding: "CODEMODE_USAGE_ISSUES",
       pipeline: "d95a1767edf246af8c637c5b9bf5a5c5",
       remote: true,
     },
   ]);
 });
 
-test("previewWranglerConfig injects sibling app URLs for web previews", () => {
+test("preview config fails closed when selected project and source Worker differ", () => {
+  assert.throws(
+    () =>
+      previewWranglerConfig(
+        { name: "sketchi-playground" },
+        {
+          projectId: "playground",
+          prNumber: 42,
+          workerName: "sketchi-studio",
+        },
+      ),
+    /Wrangler name mismatch for project "playground"/,
+  );
+});
+
+test("web previews map SKETCHI_PLAYGROUND_URL to the playground project", () => {
   const previewConfig = previewWranglerConfig(
     {
       name: "sketchi-web",
@@ -168,10 +200,10 @@ test("previewWranglerConfig injects sibling app URLs for web previews", () => {
         SKETCHI_APP_SURFACE: "web",
       },
     },
-    "sketchi-web-pr-42",
     {
-      app: "web",
+      projectId: "web",
       prNumber: 42,
+      workerName: "sketchi-web",
       workersDevSubdomain: "dimethyl",
     },
   );
@@ -183,7 +215,7 @@ test("previewWranglerConfig injects sibling app URLs for web previews", () => {
   });
 });
 
-test("previewWranglerConfig leaves non-web preview vars unchanged", () => {
+test("non-web preview vars remain unchanged", () => {
   const previewConfig = previewWranglerConfig(
     {
       name: "sketchi-icons",
@@ -191,10 +223,10 @@ test("previewWranglerConfig leaves non-web preview vars unchanged", () => {
         SKETCHI_APP_SURFACE: "icons",
       },
     },
-    "sketchi-icons-pr-42",
     {
-      app: "icons",
+      projectId: "icons",
       prNumber: 42,
+      workerName: "sketchi-icons",
       workersDevSubdomain: "dimethyl",
     },
   );
@@ -204,39 +236,42 @@ test("previewWranglerConfig leaves non-web preview vars unchanged", () => {
   });
 });
 
-test("extractPreviewUrl prefers the URL for the requested worker", () => {
+test("extractPreviewUrl prefers the URL for the requested Worker", () => {
   const log = [
-    "Uploaded sketchi-playground",
-    "https://sketchi-playground.account.workers.dev",
-    "Uploaded sketchi-playground-pr-42",
-    "https://sketchi-playground-pr-42.account.workers.dev",
+    "Uploaded sketchi-studio",
+    "https://sketchi-studio.account.workers.dev",
+    "Uploaded sketchi-studio-pr-42",
+    "https://sketchi-studio-pr-42.account.workers.dev",
   ].join("\n");
 
   assert.equal(
-    extractPreviewUrl(log, "sketchi-playground-pr-42"),
-    "https://sketchi-playground-pr-42.account.workers.dev",
+    extractPreviewUrl(log, "sketchi-studio-pr-42"),
+    "https://sketchi-studio-pr-42.account.workers.dev",
   );
 });
 
-test("previewCommentBody includes ready preview details", () => {
+test("previewCommentBody exposes project and Worker identities separately", () => {
   assert.equal(
     previewCommentBody({
-      app: "eval-harness",
-      previewUrl: "https://sketchi-playground-pr-42.account.workers.dev",
+      previewUrl: "https://sketchi-studio-pr-42.account.workers.dev",
+      previewWorkerName: "sketchi-studio-pr-42",
+      projectId: "playground",
       runUrl: "https://github.com/shpitdev/sketchi/actions/runs/1",
       sha: "abcdef1234567890",
       status: "ready",
-      workerName: "sketchi-playground-pr-42",
+      workerName: "sketchi-studio",
     }),
     [
-      "<!-- sketchi-playground-preview -->",
-      "### Sketchi Eval Harness Preview",
+      "<!-- sketchi-studio-preview -->",
+      "### Sketchi Playground / Studio Preview",
       "",
       "Status: `ready`",
-      "- Surface: internal preview; not linked from public navigation",
-      "- Route policy: internal eval harness; no public product domain",
-      "- URL: https://sketchi-playground-pr-42.account.workers.dev",
-      "- Worker: `sketchi-playground-pr-42`",
+      "- Surface: public product preview",
+      "- Project: `playground`",
+      "- Worker identity: `sketchi-studio`",
+      "- Route policy: playground.sketchi.app product surface; authenticated Studio remains unexposed",
+      "- URL: https://sketchi-studio-pr-42.account.workers.dev",
+      "- Preview Worker: `sketchi-studio-pr-42`",
       "- Commit: `abcdef123456`",
       "- Workflow run: https://github.com/shpitdev/sketchi/actions/runs/1",
       "",
@@ -247,9 +282,10 @@ test("previewCommentBody includes ready preview details", () => {
 test("previewCommentBody marks deleted previews", () => {
   assert.match(
     previewCommentBody({
-      app: "icons",
+      previewWorkerName: "sketchi-icons-pr-42",
+      projectId: "icons",
       status: "deleted",
-      workerName: "sketchi-playground-pr-42",
+      workerName: "sketchi-icons",
     }),
     /Preview Worker cleanup has completed/,
   );

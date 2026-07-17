@@ -44,14 +44,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app:
+        project:
           - eval-harness
-          - studio
+          - playground
           - web
           - excalidraw
           - icons
     concurrency:
-      group: app-preview-${{ matrix.app }}-pr-${{ github.event.pull_request.number || inputs.pr_number }}
+      group: app-preview-${{ matrix.project }}-pr-${{ github.event.pull_request.number || inputs.pr_number }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v6
@@ -71,13 +71,13 @@ jobs:
 
       - run: pnpm run test:deploy-scripts
 
-      - name: Resolve Worker app
+      - name: Resolve Worker project and identity
         id: worker-app
         env:
-          WORKER_APP: ${{ matrix.app }}
-        run: node scripts/00-resolve-worker-app.mjs --app "$WORKER_APP"
+          WORKER_PROJECT: ${{ matrix.project }}
+        run: node scripts/00-resolve-worker-app.mjs --project "$WORKER_PROJECT"
 
-      - run: pnpm nx build "${{ steps.worker-app.outputs.nx_project_id }}"
+      - run: pnpm nx build "${{ steps.worker-app.outputs.project_id }}"
 
       - name: Check Cloudflare credentials
         id: credentials
@@ -95,7 +95,7 @@ jobs:
           echo "::warning::Cloudflare preview deploy credentials are not configured. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN."
 
       - name: Read workers.dev subdomain
-        if: steps.credentials.outputs.configured == 'true' && matrix.app == 'web'
+        if: steps.credentials.outputs.configured == 'true' && matrix.project == 'web'
         id: workers-subdomain
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -125,11 +125,11 @@ jobs:
         id: prepare
         env:
           CF_PREVIEW_WORKERS_SUBDOMAIN: ${{ steps.workers-subdomain.outputs.workers_dev_subdomain }}
-          PREVIEW_APP: ${{ matrix.app }}
+          PREVIEW_PROJECT_ID: ${{ matrix.project }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
         run: >-
           node scripts/01-prepare-preview-deploy.mjs
-          --app "$PREVIEW_APP"
+          --project "$PREVIEW_PROJECT_ID"
           --pr-number "$PR_NUMBER"
           --config "${{ steps.worker-app.outputs.worker_config_path }}"
 
@@ -137,11 +137,11 @@ jobs:
         if: steps.credentials.outputs.configured != 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          PREVIEW_APP: ${{ matrix.app }}
+          PREVIEW_PROJECT_ID: ${{ matrix.project }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
           PREVIEW_STATUS: unconfigured
           PREVIEW_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          WORKER_NAME: ${{ steps.prepare.outputs.worker_name }}
+          PREVIEW_WORKER_NAME: ${{ steps.prepare.outputs.preview_worker_name }}
         run: node scripts/03-upsert-preview-comment.mjs
 
       - name: Deploy preview Worker
@@ -150,6 +150,8 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PROJECT_ID: ${{ steps.prepare.outputs.project_id }}
+          WORKER_NAME: ${{ steps.prepare.outputs.worker_name }}
         run: |
           set -euo pipefail
           mkdir -p .memory
@@ -157,38 +159,38 @@ jobs:
             --config "${{ steps.prepare.outputs.preview_config_path }}" \
             --keep-vars \
             --no-x-provision \
-            --message "PR #${{ github.event.pull_request.number || inputs.pr_number }} ${{ matrix.app }} preview ${{ github.event.pull_request.head.sha || github.sha }}" \
-            2>&1 | tee ".memory/wrangler-${{ matrix.app }}-preview-deploy.log"
+            --message "PR #${{ github.event.pull_request.number || inputs.pr_number }} project ${PROJECT_ID} Worker ${WORKER_NAME} preview ${{ github.event.pull_request.head.sha || github.sha }}" \
+            2>&1 | tee ".memory/wrangler-${{ matrix.project }}-preview-deploy.log"
 
       - name: Extract preview URL
         if: steps.credentials.outputs.configured == 'true'
         id: preview-url
         run: |
           node scripts/02-extract-preview-url.mjs \
-            ".memory/wrangler-${{ matrix.app }}-preview-deploy.log" \
-            --worker-name "${{ steps.prepare.outputs.worker_name }}"
+            ".memory/wrangler-${{ matrix.project }}-preview-deploy.log" \
+            --worker-name "${{ steps.prepare.outputs.preview_worker_name }}"
 
       - name: Comment preview URL
         if: steps.credentials.outputs.configured == 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          PREVIEW_APP: ${{ matrix.app }}
+          PREVIEW_PROJECT_ID: ${{ matrix.project }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
           PREVIEW_STATUS: ready
           PREVIEW_URL: ${{ steps.preview-url.outputs.preview_url }}
           PREVIEW_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          WORKER_NAME: ${{ steps.prepare.outputs.worker_name }}
+          PREVIEW_WORKER_NAME: ${{ steps.prepare.outputs.preview_worker_name }}
         run: node scripts/03-upsert-preview-comment.mjs
 
       - name: Comment preview failure
         if: failure() && steps.credentials.outputs.configured == 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          PREVIEW_APP: ${{ matrix.app }}
+          PREVIEW_PROJECT_ID: ${{ matrix.project }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
           PREVIEW_STATUS: failed
           PREVIEW_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          WORKER_NAME: ${{ steps.prepare.outputs.worker_name }}
+          PREVIEW_WORKER_NAME: ${{ steps.prepare.outputs.preview_worker_name }}
         run: node scripts/03-upsert-preview-comment.mjs
 
   cleanup-preview:
@@ -202,14 +204,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app:
+        project:
           - eval-harness
-          - studio
+          - playground
           - web
           - excalidraw
           - icons
     concurrency:
-      group: app-preview-${{ matrix.app }}-pr-${{ github.event.pull_request.number || inputs.pr_number }}
+      group: app-preview-${{ matrix.project }}-pr-${{ github.event.pull_request.number || inputs.pr_number }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v6
@@ -239,16 +241,16 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          PREVIEW_APP: ${{ matrix.app }}
+          PREVIEW_PROJECT_ID: ${{ matrix.project }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
-        run: node scripts/04-delete-preview-worker.mjs --app "$PREVIEW_APP" --pr-number "$PR_NUMBER"
+        run: node scripts/04-delete-preview-worker.mjs --project "$PREVIEW_PROJECT_ID" --pr-number "$PR_NUMBER"
 
       - name: Comment preview cleanup
         if: steps.credentials.outputs.configured == 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          PREVIEW_APP: ${{ matrix.app }}
+          PREVIEW_PROJECT_ID: ${{ matrix.project }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
           PREVIEW_STATUS: deleted
-          WORKER_NAME: ${{ steps.cleanup.outputs.worker_name }}
+          PREVIEW_WORKER_NAME: ${{ steps.cleanup.outputs.preview_worker_name }}
         run: node scripts/03-upsert-preview-comment.mjs
