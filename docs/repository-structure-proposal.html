@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sketchi repository structure proposal</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #17151f;
+        --muted: #665f70;
+        --paper: #f5f1ea;
+        --panel: #fffdf9;
+        --line: #d8d0c7;
+        --plum: #765264;
+        --plum-dark: #4a3040;
+        --mint: #dff3e7;
+        --mint-ink: #24553a;
+        --amber: #f6e4b5;
+        --amber-ink: #6d4d00;
+        --blue: #e2eaf7;
+        --blue-ink: #264e82;
+        --shadow: 0 18px 50px rgb(49 37 45 / 9%);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          linear-gradient(rgb(118 82 100 / 5%) 1px, transparent 1px),
+          linear-gradient(90deg, rgb(118 82 100 / 5%) 1px, transparent 1px),
+          var(--paper);
+        background-size: 28px 28px;
+        font:
+          16px/1.55 Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      main {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 48px 0 80px;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: Georgia, "Times New Roman", serif;
+        line-height: 1.08;
+        margin-top: 0;
+      }
+      h1 {
+        max-width: 820px;
+        font-size: clamp(2.6rem, 7vw, 5.8rem);
+        letter-spacing: -0.055em;
+        margin-bottom: 20px;
+      }
+      h2 {
+        font-size: clamp(1.8rem, 3.4vw, 3rem);
+        letter-spacing: -0.035em;
+      }
+      h3 {
+        font-size: 1.35rem;
+      }
+      p {
+        margin: 0 0 16px;
+      }
+      code,
+      pre {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+      code {
+        padding: 0.12em 0.35em;
+        border-radius: 5px;
+        background: #eee8e2;
+        font-size: 0.9em;
+        overflow-wrap: anywhere;
+      }
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        font-size: 0.88rem;
+        line-height: 1.65;
+      }
+      a {
+        color: var(--plum-dark);
+      }
+
+      .eyebrow {
+        color: var(--plum);
+        font-size: 0.76rem;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+      .lede {
+        max-width: 800px;
+        color: var(--muted);
+        font-size: clamp(1.08rem, 2vw, 1.35rem);
+      }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 26px;
+      }
+      .pill {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 12px;
+        background: rgb(255 253 249 / 75%);
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+      .hero {
+        padding: 32px 0 58px;
+      }
+      .section {
+        margin-top: 34px;
+        padding: clamp(22px, 4vw, 40px);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: rgb(255 253 249 / 92%);
+        box-shadow: var(--shadow);
+      }
+      .section-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 24px;
+      }
+      .section-head p {
+        max-width: 570px;
+        color: var(--muted);
+      }
+      .grid {
+        display: grid;
+        gap: 18px;
+      }
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .card {
+        min-width: 0;
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--panel);
+      }
+      .card p:last-child {
+        margin-bottom: 0;
+      }
+      .card.good {
+        background: var(--mint);
+        border-color: #b8ddc6;
+      }
+      .card.warn {
+        background: var(--amber);
+        border-color: #e6cd8b;
+      }
+      .card.info {
+        background: var(--blue);
+        border-color: #c2d3ea;
+      }
+      .tag {
+        display: inline-block;
+        margin-bottom: 12px;
+        border-radius: 999px;
+        padding: 4px 9px;
+        font-size: 0.72rem;
+        font-weight: 850;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .tag.good {
+        color: var(--mint-ink);
+        background: #bfe5cd;
+      }
+      .tag.warn {
+        color: var(--amber-ink);
+        background: #edd294;
+      }
+      .tag.info {
+        color: var(--blue-ink);
+        background: #c7d8ee;
+      }
+      .compare {
+        display: grid;
+        grid-template-columns: minmax(0, 0.9fr) 72px minmax(0, 1.1fr);
+        gap: 16px;
+        align-items: stretch;
+      }
+      .arrow {
+        display: grid;
+        place-items: center;
+        color: var(--plum);
+        font-size: 2.5rem;
+      }
+      .tree {
+        overflow: auto;
+        padding: 22px;
+        border: 1px solid #38313a;
+        border-radius: 15px;
+        color: #f8f2f4;
+        background: #211d22;
+      }
+      .tree .accent {
+        color: #e8b6cc;
+      }
+      .tree .dim {
+        color: #aaa0aa;
+      }
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+        align-items: center;
+      }
+      .step {
+        min-height: 138px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--panel);
+      }
+      .step strong {
+        display: block;
+        color: var(--plum);
+        font-size: 0.75rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .step b {
+        display: block;
+        margin: 8px 0;
+        font-size: 1.02rem;
+      }
+      .decision {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        padding: 18px 0;
+        border-top: 1px solid var(--line);
+      }
+      .decision:first-child {
+        border-top: 0;
+      }
+      .decision-num {
+        flex: 0 0 34px;
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        color: #fff;
+        background: var(--plum);
+        font-weight: 800;
+      }
+      .decision p {
+        color: var(--muted);
+      }
+      .table-wrap {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        padding: 12px 10px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+      td code {
+        overflow-wrap: anywhere;
+      }
+      th {
+        color: var(--muted);
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .verdict {
+        font-weight: 800;
+        color: var(--mint-ink);
+      }
+      .footer {
+        padding: 40px 4px 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      @media (max-width: 900px) {
+        .grid.two,
+        .grid.three,
+        .compare {
+          grid-template-columns: 1fr;
+        }
+        .arrow {
+          transform: rotate(90deg);
+          min-height: 40px;
+        }
+        .flow {
+          grid-template-columns: 1fr;
+        }
+        .step {
+          min-height: 0;
+        }
+        .section-head {
+          display: block;
+        }
+        .table-wrap {
+          overflow: visible;
+        }
+        table,
+        tbody,
+        tr,
+        td {
+          display: block;
+          width: 100%;
+        }
+        thead {
+          display: none;
+        }
+        tr {
+          padding: 14px 0;
+          border-bottom: 1px solid var(--line);
+        }
+        td {
+          padding: 4px 0;
+          border: 0;
+        }
+        td::before {
+          display: block;
+          color: var(--muted);
+          font-size: 0.68rem;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+        td:nth-child(1)::before {
+          content: "Path";
+        }
+        td:nth-child(2)::before {
+          content: "Package";
+        }
+        td:nth-child(3)::before {
+          content: "Reason";
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <p class="eyebrow">Repository architecture review / 15 July 2026</p>
+        <h1>Make the tree tell the truth.</h1>
+        <p class="lede">
+          A proposed structure for the canonical Sketchi Nx and Cloudflare
+          repository. The plan removes the Studio/Playground naming inversion,
+          groups diagram packages as a domain, and keeps HTTP contracts stable
+          while implementation boundaries become easier to navigate.
+        </p>
+        <div class="meta">
+          <span class="pill">Proposal only</span>
+          <span class="pill">No package moves applied</span>
+          <span class="pill">Public URLs preserved</span>
+          <span class="pill">Prepared from <code>main@d32b494</code></span>
+        </div>
+      </header>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Executive call</p>
+            <h2>Three changes, in order</h2>
+          </div>
+          <p>
+            The current code is coherent. Most confusion comes from names that
+            contradict the deployed product map, not from a need to redesign the
+            runtime.
+          </p>
+        </div>
+        <div class="grid three">
+          <article class="card good">
+            <span class="tag good">1 / Fix first</span>
+            <h3>Free the Playground name</h3>
+            <p>
+              Rename the current internal <code>apps/playground</code> to
+              <code>apps/eval-harness</code>. Before renaming
+              <code>apps/studio</code>, extract its real Studio persistence
+              domain so the combined boundary is represented honestly.
+            </p>
+          </article>
+          <article class="card info">
+            <span class="tag info">2 / Group</span>
+            <h3>Nest the diagram domain</h3>
+            <p>
+              Move flat <code>packages/diagram-*</code> folders under
+              <code>packages/diagram/*</code>. Keep package boundaries and all
+              npm identities except the intentionally renamed shared UI package.
+            </p>
+          </article>
+          <article class="card warn">
+            <span class="tag warn">3 / Organize</span>
+            <h3>Keep routes, move logic</h3>
+            <p>
+              Retain TanStack adapters under <code>src/routes/api</code>. Move
+              large server implementations out of generic
+              <code>src/lib</code> into domain folders under
+              <code>src/server</code>.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">The newcomer test</p>
+            <h2>Current names vs. actual jobs</h2>
+          </div>
+          <p>
+            A directory should answer “what is this?” without requiring a
+            deployment-map footnote.
+          </p>
+        </div>
+        <div class="compare">
+          <div class="tree">
+            <pre><span class="dim">apps/</span>
+├── playground/   <span class="accent"># actually internal evals</span>
+├── studio/       <span class="accent"># public Playground/API + Studio persistence</span>
+├── web/
+├── icons/
+└── excalidraw/
+
+<span class="dim">packages/</span>
+├── diagram-agent/
+├── diagram-core/
+├── diagram-excalidraw/
+├── diagram-generation/
+├── diagram-renderer/
+├── diagram-scenarios/
+├── diagram-studio-ui/
+└── svg-excalidraw/</pre>
+          </div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="tree">
+            <pre><span class="dim">apps/</span>
+├── playground/       <span class="accent"># public product + API/MCP host</span>
+├── eval-harness/     <span class="accent"># internal scenarios</span>
+├── web/
+├── icons/
+└── excalidraw/
+
+<span class="dim">packages/</span>
+├── diagram/
+│   ├── agent/
+│   ├── core/
+│   ├── excalidraw/
+│   ├── generation/
+│   ├── renderer/
+│   ├── scenarios/
+│   └── ui/
+├── studio/
+│   └── projects/     <span class="accent"># persistence contract + service</span>
+└── svg-excalidraw/</pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Package identities</p>
+            <h2>Use folders for grouping, npm names for boundaries</h2>
+          </div>
+          <p>
+            The nested filesystem removes repeated visual noise. Most existing
+            npm names remain explicit; the overly narrow Studio UI name gets one
+            intentional migration.
+          </p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Proposed path</th>
+                <th>Package/import name</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>packages/diagram/core</code></td>
+                <td><code>@sketchi/diagram-core</code></td>
+                <td>Typed IR and validation remain an independent package.</td>
+              </tr>
+              <tr>
+                <td><code>packages/diagram/renderer</code></td>
+                <td><code>@sketchi/diagram-renderer</code></td>
+                <td>
+                  Deterministic scene generation remains independently testable.
+                </td>
+              </tr>
+              <tr>
+                <td><code>packages/diagram/excalidraw</code></td>
+                <td><code>@sketchi/diagram-excalidraw</code></td>
+                <td>Sketchi scene to Excalidraw adapter.</td>
+              </tr>
+              <tr>
+                <td><code>packages/diagram/generation</code></td>
+                <td><code>@sketchi/diagram-generation</code></td>
+                <td>Provider request/response and candidate parsing.</td>
+              </tr>
+              <tr>
+                <td><code>packages/diagram/agent</code></td>
+                <td><code>@sketchi/diagram-agent</code></td>
+                <td>Canonical build runtime and artifact orchestration.</td>
+              </tr>
+              <tr>
+                <td><code>packages/diagram/scenarios</code></td>
+                <td><code>@sketchi/diagram-scenarios</code></td>
+                <td>Eval-only prompts, assertions, and scenarios.</td>
+              </tr>
+              <tr>
+                <td><code>packages/diagram/ui</code></td>
+                <td><code>@sketchi/diagram-ui</code></td>
+                <td>Rename from “studio UI”; it is shared by five surfaces.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="grid two" style="margin-top: 20px">
+          <article class="card info">
+            <h3>Why not <code>@sketchi/diagram/core</code>?</h3>
+            <p>
+              npm package names allow <code>@scope/package</code>, not a second
+              package namespace. That syntax would mean a subpath export from
+              one monolithic <code>@sketchi/diagram</code> package, weakening Nx
+              package boundaries and increasing the migration risk.
+            </p>
+          </article>
+          <article class="card good">
+            <h3>Recommended compromise</h3>
+            <p>
+              Group by filesystem path, retain explicit npm package names, and
+              update <code>pnpm-workspace.yaml</code> to include
+              <code>packages/*/*</code>. The tree becomes ergonomic without
+              turning seven tested packages into one.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Combined boundary</p>
+            <h2>Studio exists today, inside the Playground host</h2>
+          </div>
+          <p>
+            The current <code>apps/studio</code> is not merely misnamed. It owns
+            public Playground, Code Mode, artifact routes, and a genuine
+            persisted project/diagram foundation.
+          </p>
+        </div>
+        <div class="grid two">
+          <article class="card warn">
+            <span class="tag warn">Do not</span>
+            <h3>Blindly rename the directory</h3>
+            <p>
+              A direct <code>apps/studio</code> →
+              <code>apps/playground</code> move would hide project records,
+              diagram records, ownership, and <code>/api/studio</code> behind
+              another incomplete name.
+            </p>
+          </article>
+          <article class="card good">
+            <span class="tag good">Extract first</span>
+            <h3>Make the domain portable</h3>
+            <p>
+              Move Studio contracts and persistence into
+              <code>packages/studio/projects</code>. The public Playground app
+              may compose it temporarily; a future authenticated
+              <code>apps/studio</code> can consume the same domain when it
+              becomes a separate deployment.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">API sanity check</p>
+            <h2><code>src/routes/api</code> is correct</h2>
+          </div>
+          <p>
+            These files are TanStack Start route adapters and deliberately map
+            to HTTP paths. Hiding them elsewhere would make the framework
+            boundary less obvious.
+          </p>
+        </div>
+        <div class="grid two">
+          <article class="card good">
+            <span class="tag good">Keep</span>
+            <h3>Thin route modules</h3>
+            <p>
+              <code>apps/playground/src/routes/api/v1/...</code>,
+              <code>api/studio/...</code>, <code>api/chat.ts</code>, and
+              <code>routes/mcp.ts</code> should continue to declare public
+              transport contracts.
+            </p>
+          </article>
+          <article class="card warn">
+            <span class="tag warn">Move</span>
+            <h3>Substantive server code</h3>
+            <p>
+              Move large <code>*.server.ts</code> implementations from
+              <code>src/lib</code> to
+              <code>src/server/{chat,codemode,studio,bindings}</code>. Route
+              paths do not change.
+            </p>
+          </article>
+        </div>
+        <div class="tree" style="margin-top: 18px">
+          <pre>apps/playground/src/
+├── routes/                   <span class="accent"># pages + HTTP adapters only</span>
+│   ├── api/
+│   │   ├── chat.ts
+│   │   ├── v1/
+│   │   └── studio/
+│   └── mcp.ts
+├── server/
+│   ├── bindings/
+│   ├── chat/
+│   ├── codemode/
+│   └── studio/
+├── features/                 <span class="accent"># client product domains</span>
+│   ├── playground/
+│   ├── artifacts/
+│   └── studio/
+└── components/</pre>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Migration sequence</p>
+            <h2>Small, reversible slices</h2>
+          </div>
+          <p>
+            Do not combine public HTTP changes with repository moves. Each phase
+            should leave tests, builds, Storybook, previews, and the deployed
+            route map green.
+          </p>
+        </div>
+        <div class="flow">
+          <div class="step">
+            <strong>Phase 0</strong><b>Isolate build output</b
+            ><span>Give every Worker a unique Nx-declared artifact path.</span>
+          </div>
+          <div class="step">
+            <strong>Phase 1</strong><b>Rename eval harness</b
+            ><span
+              ><code>apps/playground</code> →
+              <code>apps/eval-harness</code>.</span
+            >
+          </div>
+          <div class="step">
+            <strong>Phase 2</strong><b>Extract Studio domain</b
+            ><span
+              >Move project/diagram contracts and persistence to
+              <code>packages/studio/projects</code>.</span
+            >
+          </div>
+          <div class="step">
+            <strong>Phase 3</strong><b>Rename public host</b
+            ><span
+              ><code>apps/studio</code> → <code>apps/playground</code>; preserve
+              routes and Worker identity initially.</span
+            >
+          </div>
+          <div class="step">
+            <strong>Phase 4</strong><b>Group packages</b
+            ><span
+              >Move libraries to <code>packages/diagram/*</code>, rename shared
+              UI, and organize server domains.</span
+            >
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Review decisions</p>
+            <h2>What approval means</h2>
+          </div>
+          <p>
+            The proposal intentionally separates decisions that are safe now
+            from operational identities that need a later migration.
+          </p>
+        </div>
+        <div>
+          <div class="decision">
+            <span class="decision-num">1</span>
+            <div>
+              <h3>Approve the app identity map</h3>
+              <p>
+                <code>eval-harness</code> owns internal regression work;
+                <code>playground</code> owns the public anonymous product and
+                Code Mode host; <code>packages/studio/projects</code> owns the
+                existing persistence domain; reserve
+                <code>apps/studio</code> for a future separately deployed
+                authenticated product.
+              </p>
+            </div>
+          </div>
+          <div class="decision">
+            <span class="decision-num">2</span>
+            <div>
+              <h3>Approve nested diagram folders</h3>
+              <p>
+                Adopt <code>packages/diagram/*</code> while retaining
+                independent npm packages. This is the smallest change matching
+                the requested ergonomics.
+              </p>
+            </div>
+          </div>
+          <div class="decision">
+            <span class="decision-num">3</span>
+            <div>
+              <h3>Preserve HTTP routes</h3>
+              <p>
+                Keep <code>/api/v1</code>, <code>/api/studio</code>,
+                <code>/api/chat</code>, and <code>/mcp</code> stable during
+                repository work. Revisit API product naming only with a
+                versioned contract proposal.
+              </p>
+            </div>
+          </div>
+          <div class="decision">
+            <span class="decision-num">4</span>
+            <div>
+              <h3>Defer durable resource renames</h3>
+              <p>
+                Do not aesthetically rename R2 buckets, Pipeline streams, or
+                externally configured Worker endpoints in the same changes.
+                Migrate those only when there is operational value.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Secondary findings</p>
+            <h2>Cleanup unlocked by the move</h2>
+          </div>
+        </div>
+        <div class="grid three">
+          <article class="card">
+            <h3>Dependency direction</h3>
+            <p>
+              Production <code>diagram-generation</code> currently depends on
+              eval-focused <code>diagram-scenarios</code>. Move shared prompt
+              contracts toward generation so scenarios depend on runtime code,
+              not the reverse.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Workspace coverage</h3>
+            <p>
+              Add <code>packages/*/*</code> and
+              <code>tools/*</code> deliberately to pnpm globs, or remove package
+              semantics from tools. The current generator package is an Nx
+              project but not a pnpm workspace package.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Enforced boundaries</h3>
+            <p>
+              Add Nx tags such as <code>type:contract</code>,
+              <code>type:runtime</code>, <code>type:eval</code>, and
+              <code>type:app</code>, then prevent runtime packages from
+              importing eval or app code.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <footer class="footer">
+        Source audit: repository tree, Nx/project manifests, Worker deployment
+        maps, route adapters, package imports, generators, architecture docs,
+        and the post-replacement GitHub issue set.
+      </footer>
+    </main>
+  </body>
+</html>

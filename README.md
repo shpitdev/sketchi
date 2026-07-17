@@ -1,64 +1,130 @@
-# Sketchi
+<p align="center">
+  <img src="apps/web/public/icon.svg" alt="Sketchi" width="112" height="112" />
+</p>
 
-This is the canonical Sketchi product repository. The current architecture is
-the completed clean-start system: a maintainable diagram-generation core,
-Cloudflare Worker app surfaces, agent plugins, and deterministic proof paths in
-one Nx workspace.
+<h1 align="center">Sketchi</h1>
 
-## Sketchi Code Mode for agents
+<p align="center">
+  <strong>Typed, deterministic diagrams for people and AI agents.</strong><br />
+  Prompt to validated IR to editable Excalidraw and hosted PNG artifacts.
+</p>
 
-Codex, Claude Code, Agy, and OpenCode can create hosted Sketchi diagrams through
-the public Code Mode MCP endpoint. Start with the
-[agent quickstart](docs/code-mode-agent-plugins.md) for copy-paste installation,
-verification, and a first diagram. Every harness section follows that sequence,
-including the portable skill and MCP-only Agy and OpenCode paths. Sketchi does
-not require its own login, API key, or local browser install.
+<p align="center">
+  <a href="https://sketchi.app/"><img alt="Website" src="https://img.shields.io/badge/sketchi.app-live-765264" /></a>
+  <a href="https://nx.dev/"><img alt="Nx" src="https://img.shields.io/badge/Nx-22-143055?logo=nx" /></a>
+  <a href="https://workers.cloudflare.com/"><img alt="Cloudflare Workers" src="https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white" /></a>
+  <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white" /></a>
+  <a href="https://excalidraw.com/"><img alt="Excalidraw" src="https://img.shields.io/badge/output-Excalidraw-6965DB" /></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2F855A" /></a>
+</p>
 
-## Stack
+---
 
-| Layer            | Owner                                                        |
-| ---------------- | ------------------------------------------------------------ |
-| Workspace        | Nx boundaries, affected checks, generators, Storybook wiring |
-| App shells       | TanStack Start apps in `apps/*`                              |
-| Diagram contract | `packages/diagram-core`                                      |
-| Rendering        | `packages/diagram-renderer`, `packages/diagram-excalidraw`   |
-| Generation       | `packages/diagram-generation`, `packages/diagram-agent`      |
-| UI states        | `packages/diagram-studio-ui`                                 |
+Sketchi is the canonical Nx and Cloudflare workspace for generating reliable,
+editable diagrams. Model output is never treated as a finished drawing: it is
+parsed into a typed intermediate representation, validated, laid out by code,
+converted to real Excalidraw elements, and persisted as an artifact with PNG and
+scene representations.
 
-- Nx workspace for package boundaries, affected checks, and Storybook wiring.
-- TanStack Start app surfaces for `sketchi.app`, the public Playground worker,
-  the persisted Studio foundation, `icons.sketchi.app`, and internal
-  harnesses.
-- Typed diagram intermediate representation in `packages/diagram-core`.
-- Deterministic scene renderer in `packages/diagram-renderer`.
-- Real Excalidraw conversion and validation in `packages/diagram-excalidraw`.
-- Canonical `buildFlowchart` artifact runtime and prompt policy in `packages/diagram-agent`.
-- Maintained scenarios and local fixture/model-output evaluation in `packages/diagram-scenarios`.
-- Reusable React UI and Storybook in `packages/diagram-studio-ui`.
-- Workspace Nx generators in `tools/sketchi-generators`.
-- Agentic generation route-surface notes in
-  [docs/agentic-generation.md](docs/agentic-generation.md).
-- MCP-first non-Convex generation scope in
-  [docs/mcp-first-generation.md](docs/mcp-first-generation.md).
+<p align="center">
+  <img src="apps/web/public/media/sketchi-playground-preview.png" alt="Sketchi deterministic diagram scenario workspace" width="1000" />
+  <br />
+  <em>Deterministic scenario inspection: typed IR, rendered canvas, and quality checks in one workspace.</em>
+</p>
 
-## Commands
+## What Sketchi Does
+
+- Creates hosted flowcharts and mindmaps from natural-language prompts.
+- Produces validated, editable Excalidraw scenes instead of opaque images.
+- Exposes Code Mode through MCP and versioned HTTP artifact endpoints.
+- Keeps layout, bindings, wrapping, and scene conversion deterministic in code.
+- Tests diagram contracts with fixtures, maintained scenarios, real-scene
+  validation, component tests, and Storybook.
+- Converts a curated SVG corpus into native Excalidraw elements and libraries.
+
+## Code Mode
+
+Codex, Claude Code, Agy, and OpenCode can create hosted diagrams through the
+public Code Mode MCP endpoint. The [agent quickstart](docs/code-mode-agent-plugins.md)
+contains installation, verification, and first-diagram instructions for every
+supported harness. The public flow does not require a Sketchi login, API key, or
+local browser installation.
+
+```text
+prompt or revision
+        ↓
+model candidate → typed diagram IR → deterministic scene → Excalidraw artifact
+        ↓                                      ↓                  ↓
+ maintained scenarios                    validation          hosted PNG
+```
+
+## Architecture
+
+| Boundary                      | Responsibility                                                  |
+| ----------------------------- | --------------------------------------------------------------- |
+| `packages/diagram-core`       | Typed diagram contracts, semantic validation, fixtures          |
+| `packages/diagram-generation` | Provider messages, responses, and candidate parsing             |
+| `packages/diagram-agent`      | Canonical build runtime, quality checks, artifact orchestration |
+| `packages/diagram-renderer`   | Deterministic layout and scene generation                       |
+| `packages/diagram-excalidraw` | Persistable Excalidraw conversion and real-scene validation     |
+| `packages/diagram-scenarios`  | Maintained prompts, assertions, and local/live evals            |
+| `packages/diagram-studio-ui`  | Shared React diagram, review, and eval UI states                |
+| `packages/svg-excalidraw`     | Native SVG-to-Excalidraw conversion and library serialization   |
+
+The first high-reliability target is decision-heavy flowchart generation.
+`flowchart` and `mindmap` are explicit diagram families; unsupported families do
+not silently fall back to a generic template. See the full
+[architecture guide](docs/architecture.md) and the
+[MCP-first generation boundary](docs/mcp-first-generation.md).
+
+## Product Surfaces
+
+| Surface      | Role                                                               | Local command            |
+| ------------ | ------------------------------------------------------------------ | ------------------------ |
+| `web`        | `sketchi.app` home, docs, and setup                                | `pnpm nx dev web`        |
+| `studio`     | Public Playground, Code Mode API/MCP, artifacts, Studio foundation | `pnpm nx dev studio`     |
+| `icons`      | `icons.sketchi.app` curated icon browser                           | `pnpm nx dev icons`      |
+| `playground` | Internal scenario and model-output eval harness                    | `pnpm nx dev playground` |
+| `excalidraw` | Internal real-canvas rendering and editing workspace               | `pnpm nx dev excalidraw` |
+
+The current `studio`/`playground` names are historically inverted relative to
+their product roles. A reviewed migration plan is available in the standalone
+[repository structure proposal](docs/repository-structure-proposal.html); no
+folder moves from that proposal have been applied.
+
+## Quick Start
+
+Prerequisites: Node.js compatible with the pinned toolchain, Corepack, and pnpm
+`11.5.0`.
 
 ```sh
 pnpm install
-pnpm nx run-many -t typecheck,test,build
-pnpm nx build-storybook diagram-studio-ui
 pnpm dev
-pnpm nx dev playground
-pnpm nx dev studio
-pnpm nx dev web
-pnpm nx dev excalidraw
-pnpm nx dev icons
-pnpm nx scenario diagram-scenarios -- --scenario pharma-batch-disposition --fixture --out .memory/pharma-batch.excalidraw
-SKETCHI_GENERATOR_COMMAND="your-llm-command" pnpm nx scenario diagram-scenarios -- --scenario pharma-batch-disposition
 ```
 
-`pnpm dev` runs every Nx app with a `dev` target in parallel. The playground
-defaults to port `6200`; Vite will increment to the next free port when needed.
+Run one surface with `pnpm nx dev <project>`. `pnpm dev` starts every Nx app with
+a `dev` target in parallel through Portless.
+
+## Development
+
+Required workspace proof:
+
+```sh
+pnpm nx run-many -t typecheck,test,build
+pnpm nx build-storybook diagram-studio-ui
+```
+
+Run the canonical deterministic scenario:
+
+```sh
+pnpm nx scenario diagram-scenarios -- \
+  --scenario pharma-batch-disposition \
+  --fixture \
+  --out .memory/pharma-batch.excalidraw
+```
+
+Use a local model command by setting `SKETCHI_GENERATOR_COMMAND`; it receives the
+scenario prompt on stdin and writes candidate IR JSON to stdout.
 
 Generate new owned surfaces through the workspace plugin:
 
@@ -67,31 +133,18 @@ pnpm nx g @sketchi/generators:ui-component StatusBadge
 pnpm nx g @sketchi/generators:diagram-type mindmap --title "Sketchi mindmap fixture"
 ```
 
-## Deploys
+## Deployment
 
-| Surface      | Local dev                | Product role                                                   |
-| ------------ | ------------------------ | -------------------------------------------------------------- |
-| `web`        | `pnpm nx dev web`        | `sketchi.app` home, docs, and setup routes                     |
-| `studio`     | `pnpm nx dev studio`     | Playground chat, artifact handoff, persisted Studio foundation |
-| `icons`      | `pnpm nx dev icons`      | `icons.sketchi.app` product surface                            |
-| `playground` | `pnpm nx dev playground` | internal eval harness for scenarios                            |
-| `excalidraw` | `pnpm nx dev excalidraw` | internal Excalidraw rendering workspace                        |
+Eligible same-repository pull requests build and deploy app-specific Cloudflare
+Workers when Cloudflare credentials are configured, then maintain one preview
+comment per app. Relevant merges to `main` deploy production Workers when those
+credentials are available; custom domain attachment remains an explicit
+operator action. Forks and unconfigured environments retain build proof without
+a Worker deploy. The eval harness and standalone Excalidraw workspace are
+internal surfaces.
 
-Pull requests deploy each app to PR-specific Cloudflare Workers and update one
-sticky PR comment per app with the URL when Cloudflare credentials are
-configured.
-See [docs/preview-deploys.md](docs/preview-deploys.md).
-
-Merges to `main` deploy production Workers to their `workers.dev` URLs. Domain
-assignment is a manual `app-production-deploy` workflow dispatch with
-`domain_action=attach`; workers.dev remains the proof surface until that manual
-cutover happens. Follow the guarded, reversible
-[production domain runbook](docs/production-domain-cutover.md). Do not attach
-the eval harness or standalone Excalidraw app as public product routes unless
-the product route map is explicitly reopened; the public Playground domain
-belongs to the `studio` app, not the internal `playground` harness.
-
-Local production Worker deploy targets are app-scoped:
+See [preview deployments](docs/preview-deploys.md) and the guarded
+[production domain runbook](docs/production-domain-cutover.md).
 
 ```sh
 pnpm deploy:playground
@@ -101,23 +154,26 @@ pnpm deploy:excalidraw
 pnpm deploy:icons
 ```
 
-## Workspace Shape
+## Repository Map
 
 ```text
-apps/playground                  Internal scenario/eval harness
-apps/studio                      Playground chat, artifact handoff, persisted Studio foundation
-apps/web                         Sketchi public home and docs
-apps/excalidraw                  Internal Excalidraw rendering workspace
-apps/icons                       Standalone curated icon output browser
-packages/diagram-agent           Canonical diagram build runtime and agent policy
-packages/diagram-core            Diagram IR, validation, fixtures
-packages/diagram-renderer        Deterministic scene generation
-packages/diagram-excalidraw      Real Excalidraw conversion and validation
-packages/diagram-generation      Gemini request/response and candidate parsing
-packages/diagram-scenarios       Scenario prompts, checks, and CLI evals
-packages/diagram-studio-ui       React components and Storybook
-tools/sketchi-generators         Workspace generators for components and diagram types
-docs/architecture.md             architecture notes
-docs/agentic-generation.md       generation runtime and route-surface plan
-docs/mcp-first-generation.md     non-Convex MCP-first generation scope
+apps/                    Deployable TanStack Start and Storybook surfaces
+packages/                Typed diagram, rendering, UI, eval, and SVG libraries
+plugins/                 Codex and Claude Code distribution payloads
+tools/sketchi-generators Nx generators for components and diagram families
+scripts/                 Preview, production, cutover, and pipeline operations
+docs/                    Architecture, product boundaries, and runbooks
 ```
+
+## Documentation
+
+- [Agent plugin quickstart](docs/code-mode-agent-plugins.md)
+- [Architecture](docs/architecture.md)
+- [Agentic generation](docs/agentic-generation.md)
+- [MCP-first generation](docs/mcp-first-generation.md)
+- [SVG conversion plan](docs/svg-excalidraw-conversion-plan.md)
+- [Repository replacement record](docs/replacement.md)
+
+## License
+
+MIT. See [LICENSE](LICENSE).
