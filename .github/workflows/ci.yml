@@ -36,8 +36,12 @@ jobs:
       - name: Verify repository tooling contracts
         run: pnpm run test:tools
       - name: Run canonical workspace gates
-        run: pnpm nx run-many -t typecheck,test,build
-      - name: Build canonical Studio UI Storybook
+        run: pnpm nx run-many -t lint,typecheck,test,build
+      - name: Dry-run every Worker deployment
+        run: pnpm run test:wrangler-dry-runs
+      - name: Verify root TypeScript project references
+        run: pnpm exec tsc -b --pretty false
+      - name: Build canonical diagram UI Storybook
         run: pnpm nx build-storybook diagram-ui
       - name: Run SVG corpus renderer
         run: pnpm nx run svg-excalidraw:corpus-renderer

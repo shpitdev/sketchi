@@ -3,6 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/excalidraw/src",
   "projectType": "application",
+  "tags": ["scope:app", "type:app"],
   "targets": {
     "build": {
       "executor": "nx:run-commands",

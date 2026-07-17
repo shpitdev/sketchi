@@ -50,6 +50,35 @@ flowchart LR
 See [Agentic Generation](agentic-generation.md) for the intended Convex,
 Cloudflare Worker, MCP, AI SDK, Effect, and Nx boundaries.
 
+## Workspace Enforcement
+
+The repository has one truthful project inventory:
+
+- pnpm discovers package-backed projects through `apps/*`, `packages/*`,
+  `packages/*/*`, and `tools/*`;
+- Nx discovers the same package roots plus the generated-only
+  `native-conversion-storybook` composition project;
+- the root TypeScript solution references every composite app, buildable
+  package, and generator library. It deliberately omits the Storybook-only
+  composition root because that surface has no composite TypeScript project.
+
+Every Nx project has a `scope:*` tag and an explicit `type:*` role. Packages
+cannot import apps, normal apps cannot import apps, runtime packages cannot
+import eval or app code, and persistence cannot import app, eval, or UI code.
+`native-conversion-storybook` is the sole `scope:composition` surface and the
+only project allowed to declare app dependencies. Buildable libraries may only
+depend on other buildable libraries.
+
+The flat ESLint configuration intentionally enforces architecture rather than
+introducing a repository-wide style rewrite. Nx infers a `lint` target for all
+projects and applies the dependency rules to project source, configuration,
+test, and Storybook files. `tools/project-graph.test.ts` compares all three
+inventories to the explicit intended roots, so deleting a manifest, composite
+setting, or root reference cannot shrink both sides of the check. It also fails
+if tags, lint targets, boundary coverage, or app dependency ownership drift.
+Required CI builds all projects and then dry-runs Wrangler for every project in
+the canonical Worker map, using the generated per-app deployment configs.
+
 ## Diagram Pipeline
 
 1. The remote thread planner chooses a generated tool such as `generateDiagram`, `restructureDiagram`, or `tweakDiagram`.

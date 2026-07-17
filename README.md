@@ -90,8 +90,8 @@ not silently fall back to a generic template. See the full
 
 The internal harness is `eval-harness`. The public host is `playground`, while
 its durable Worker identity remains `sketchi-studio` and the extracted Studio
-persistence boundary remains `packages/studio/projects`. Later phases remain
-documented in the reviewed
+persistence boundary remains `packages/studio/projects`. The completed
+repository migration and its historical before tree are recorded in the
 [repository structure proposal](docs/repository-structure-proposal.html).
 
 ## Quick Start
@@ -112,8 +112,12 @@ a `dev` target in parallel through Portless.
 Required workspace proof:
 
 ```sh
-pnpm nx run-many -t typecheck,test,build
+pnpm run test:deploy-scripts
+pnpm run test:tools
+pnpm nx run-many -t lint,typecheck,test,build
+pnpm run test:wrangler-dry-runs
 pnpm nx build-storybook diagram-ui
+pnpm exec tsc -b --pretty false
 ```
 
 Run the canonical deterministic scenario:
@@ -163,13 +167,29 @@ pnpm deploy:icons
 ## Repository Map
 
 ```text
-apps/                    Deployable TanStack Start and Storybook surfaces
-packages/                Typed diagram, Studio persistence, UI, eval, and SVG libraries
-plugins/                 Codex and Claude Code distribution payloads
-tools/sketchi-generators Nx generators for components and diagram families
-scripts/                 Preview, production, cutover, and pipeline operations
-docs/                    Architecture, product boundaries, and runbooks
+apps/
+├── eval-harness/                 internal scenarios and model-output evals
+├── excalidraw/                   internal real-canvas workspace
+├── icons/                        public icon browser
+├── native-conversion-storybook/ explicit cross-app Storybook composition
+├── playground/                   public Playground, API/MCP, Studio adapter
+└── web/                          public home, docs, and setup
+packages/
+├── diagram/{agent,core,excalidraw,generation,renderer,scenarios,ui}/
+├── studio/projects/              persistence contract and service
+└── svg-excalidraw/               native SVG conversion
+tools/sketchi-generators/         Nx generators and tests
+scripts/                          deploy, cutover, and pipeline operations
+plugins/                          Codex and Claude Code distribution payloads
+docs/                             architecture, boundaries, and runbooks
 ```
+
+pnpm, Nx, and the root TypeScript solution all cover the same package-backed
+projects. Nx tags plus lint enforce package/app, runtime/eval, persistence/UI,
+and explicit composition boundaries across source, config, and Storybook
+files. Required CI also dry-runs every mapped Worker from its generated build
+configuration; see the
+[architecture guide](docs/architecture.md#workspace-enforcement).
 
 ## Documentation
 

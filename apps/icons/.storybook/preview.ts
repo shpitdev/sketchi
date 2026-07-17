@@ -1,4 +1,3 @@
-import "@sketchi/diagram-ui/styles.css";
 import "../src/styles/app.css";
 
 import type { Preview } from "@storybook/react-vite";

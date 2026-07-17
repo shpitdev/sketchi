@@ -2,10 +2,20 @@
   "extends": "./tsconfig.base.json",
   "files": [],
   "references": [
+    { "path": "./packages/diagram/core/tsconfig.lib.json" },
+    { "path": "./packages/diagram/generation/tsconfig.lib.json" },
+    { "path": "./packages/diagram/renderer/tsconfig.lib.json" },
+    { "path": "./packages/diagram/excalidraw/tsconfig.lib.json" },
+    { "path": "./packages/diagram/agent/tsconfig.lib.json" },
+    { "path": "./packages/diagram/scenarios/tsconfig.lib.json" },
+    { "path": "./packages/studio/projects/tsconfig.lib.json" },
+    { "path": "./packages/svg-excalidraw/tsconfig.lib.json" },
+    { "path": "./packages/diagram/ui/tsconfig.lib.json" },
+    { "path": "./tools/sketchi-generators/tsconfig.lib.json" },
     { "path": "./apps/eval-harness" },
-    { "path": "./packages/diagram/core" },
-    { "path": "./packages/diagram/renderer" },
-    { "path": "./packages/diagram/ui" },
-    { "path": "./packages/studio/projects" }
+    { "path": "./apps/excalidraw" },
+    { "path": "./apps/icons" },
+    { "path": "./apps/playground" },
+    { "path": "./apps/web" }
   ]
 }

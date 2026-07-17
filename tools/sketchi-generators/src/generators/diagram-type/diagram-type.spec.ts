@@ -58,7 +58,7 @@ describe("diagram-type generator", () => {
       "utf-8",
     );
 
-    expect(registry.match(/"flowchart"/g)).toHaveLength(1);
+    expect((registry ?? "").match(/"flowchart"/g)).toHaveLength(1);
     expect(
       tree.exists("packages/diagram/core/src/diagram-types/flowchart.ts"),
     ).toBe(true);

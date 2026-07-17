@@ -369,19 +369,21 @@
   <body>
     <main>
       <header class="hero">
-        <p class="eyebrow">Repository architecture review / 15 July 2026</p>
+        <p class="eyebrow">
+          Repository architecture review / finalized 16 July 2026
+        </p>
         <h1>Make the tree tell the truth.</h1>
         <p class="lede">
-          A proposed structure for the canonical Sketchi Nx and Cloudflare
-          repository. The plan removes the Studio/Playground naming inversion,
-          groups diagram packages as a domain, and keeps HTTP contracts stable
-          while implementation boundaries become easier to navigate.
+          The implementation record for the canonical Sketchi Nx and Cloudflare
+          repository. The completed stack removed the Studio/Playground naming
+          inversion, grouped diagram packages as a domain, and kept HTTP
+          contracts stable while making implementation boundaries enforceable.
         </p>
         <div class="meta">
-          <span class="pill">Approved migration plan</span>
-          <span class="pill">Phase 2 applied</span>
+          <span class="pill">Approved stack applied</span>
+          <span class="pill">All repository moves complete</span>
           <span class="pill">Public URLs preserved</span>
-          <span class="pill">Current through Studio extraction</span>
+          <span class="pill">Boundaries enforced in CI</span>
         </div>
       </header>
 
@@ -399,30 +401,32 @@
         </div>
         <div class="grid three">
           <article class="card good">
-            <span class="tag good">1 / Fix first</span>
+            <span class="tag good">1 / Completed</span>
             <h3>Free the Playground name</h3>
             <p>
-              The internal <code>apps/playground</code> has been renamed to
-              <code>apps/eval-harness</code>, and the Studio persistence domain
-              has been extracted. The public host can now be renamed in a later
-              phase without moving project data logic with it.
+              The internal <code>apps/playground</code> was renamed to
+              <code>apps/eval-harness</code>, the Studio persistence domain was
+              extracted, and the public host moved to
+              <code>apps/playground</code> without moving project data logic
+              with it.
             </p>
           </article>
           <article class="card info">
-            <span class="tag info">2 / Group</span>
+            <span class="tag good">2 / Completed</span>
             <h3>Nest the diagram domain</h3>
             <p>
-              Move flat <code>packages/diagram-*</code> folders under
-              <code>packages/diagram/*</code>. Keep package boundaries and all
-              npm identities except the intentionally renamed shared UI package.
+              The flat <code>packages/diagram-*</code> folders moved under
+              <code>packages/diagram/*</code>. Package boundaries and all npm
+              identities stayed stable except the intentionally renamed shared
+              UI package.
             </p>
           </article>
           <article class="card warn">
-            <span class="tag warn">3 / Organize</span>
+            <span class="tag good">3 / Completed</span>
             <h3>Keep routes, move logic</h3>
             <p>
-              Retain TanStack adapters under <code>src/routes/api</code>. Move
-              large server implementations out of generic
+              TanStack adapters remain under <code>src/routes/api</code>. Large
+              server implementations moved out of generic
               <code>src/lib</code> into domain folders under
               <code>src/server</code>.
             </p>
@@ -434,7 +438,7 @@
         <div class="section-head">
           <div>
             <p class="eyebrow">The newcomer test</p>
-            <h2>Phase 2 state vs. approved destination</h2>
+            <h2>Historical before tree vs. implemented tree</h2>
           </div>
           <p>
             A directory should answer “what is this?” without requiring a
@@ -443,6 +447,7 @@
         </div>
         <div class="compare">
           <div class="tree">
+            <p class="eyebrow">Historical phase 2 tree</p>
             <pre><span class="dim">apps/</span>
 ├── eval-harness/ <span class="accent"># internal scenarios</span>
 ├── studio/       <span class="accent"># public Playground/API + Studio adapter</span>
@@ -464,12 +469,14 @@
           </div>
           <div class="arrow" aria-hidden="true">→</div>
           <div class="tree">
+            <p class="eyebrow">Final implemented tree</p>
             <pre><span class="dim">apps/</span>
 ├── playground/       <span class="accent"># public product + API/MCP host</span>
 ├── eval-harness/     <span class="accent"># internal scenarios</span>
 ├── web/
 ├── icons/
-└── excalidraw/
+├── excalidraw/
+└── native-conversion-storybook/ <span class="accent"># explicit composition</span>
 
 <span class="dim">packages/</span>
 ├── diagram/
@@ -482,7 +489,10 @@
 │   └── ui/
 ├── studio/
 │   └── projects/     <span class="accent"># persistence contract + service</span>
-└── svg-excalidraw/</pre>
+└── svg-excalidraw/
+
+<span class="dim">tools/</span>
+└── sketchi-generators/</pre>
           </div>
         </div>
       </section>
@@ -503,7 +513,7 @@
           <table>
             <thead>
               <tr>
-                <th>Proposed path</th>
+                <th>Implemented path</th>
                 <th>Package/import name</th>
                 <th>Reason</th>
               </tr>
@@ -567,12 +577,12 @@
             </p>
           </article>
           <article class="card good">
-            <h3>Recommended compromise</h3>
+            <h3>Implemented boundary</h3>
             <p>
-              Group by filesystem path, retain explicit npm package names, and
-              update <code>pnpm-workspace.yaml</code> to include
-              <code>packages/*/*</code>. The tree becomes ergonomic without
-              turning seven tested packages into one.
+              The filesystem groups the domain, retains explicit npm package
+              names, and pnpm now includes <code>packages/*/*</code> and
+              <code>tools/*</code>. The tree is ergonomic without turning seven
+              tested packages into one.
             </p>
           </article>
         </div>
@@ -608,9 +618,8 @@
             <p>
               Studio contracts and persistence now live in
               <code>packages/studio/projects</code>. The public Playground app
-              composes it temporarily; a future authenticated Studio project
-              can consume the same domain when it becomes a separate
-              deployment.
+              composes it temporarily; a future authenticated Studio project can
+              consume the same domain when it becomes a separate deployment.
             </p>
           </article>
         </div>
@@ -640,10 +649,10 @@
             </p>
           </article>
           <article class="card warn">
-            <span class="tag warn">Move</span>
+            <span class="tag good">Moved</span>
             <h3>Substantive server code</h3>
             <p>
-              Move large <code>*.server.ts</code> implementations from
+              Large <code>*.server.ts</code> implementations moved from
               <code>src/lib</code> to
               <code>src/server/{chat,codemode,studio,bindings}</code>. Route
               paths do not change.
@@ -678,9 +687,9 @@
             <h2>Small, reversible slices</h2>
           </div>
           <p>
-            Do not combine public HTTP changes with repository moves. Each phase
-            should leave tests, builds, Storybook, previews, and the deployed
-            route map green.
+            The stack kept public HTTP changes separate from repository moves.
+            Every phase left tests, builds, Storybook, previews, and the
+            deployed route map green.
           </p>
         </div>
         <div class="flow">
@@ -710,10 +719,17 @@
             >
           </div>
           <div class="step">
-            <strong>Phase 4</strong><b>Group packages</b
+            <strong>Phase 4 / done</strong><b>Group packages</b
             ><span
-              >Move libraries to <code>packages/diagram/*</code>, rename shared
-              UI, and organize server domains.</span
+              >Moved libraries to <code>packages/diagram/*</code>, renamed
+              shared UI, and organized server domains.</span
+            >
+          </div>
+          <div class="step">
+            <strong>Phase 5 / done</strong><b>Enforce the graph</b
+            ><span
+              >Aligned pnpm, Nx, TypeScript references, lint targets, project
+              tags, and required CI proof.</span
             >
           </div>
         </div>
@@ -723,18 +739,18 @@
         <div class="section-head">
           <div>
             <p class="eyebrow">Review decisions</p>
-            <h2>What approval means</h2>
+            <h2>Decisions retained</h2>
           </div>
           <p>
-            The proposal intentionally separates decisions that are safe now
-            from operational identities that need a later migration.
+            The completed stack separates repository decisions from durable
+            operational identities that still require deliberate migrations.
           </p>
         </div>
         <div>
           <div class="decision">
             <span class="decision-num">1</span>
             <div>
-              <h3>Approve the app identity map</h3>
+              <h3>Approved app identity map</h3>
               <p>
                 <code>eval-harness</code> owns internal regression work;
                 <code>playground</code> owns the public anonymous product and
@@ -747,7 +763,7 @@
           <div class="decision">
             <span class="decision-num">2</span>
             <div>
-              <h3>Approve nested diagram folders</h3>
+              <h3>Approved nested diagram folders</h3>
               <p>
                 Adopt <code>packages/diagram/*</code> while retaining
                 independent npm packages. This is the smallest change matching
@@ -785,35 +801,37 @@
         <div class="section-head">
           <div>
             <p class="eyebrow">Secondary findings</p>
-            <h2>Cleanup unlocked by the move</h2>
+            <h2>Cleanup completed with the move</h2>
           </div>
         </div>
         <div class="grid three">
           <article class="card">
             <h3>Dependency direction</h3>
             <p>
-              Production <code>diagram-generation</code> currently depends on
-              eval-focused <code>diagram-scenarios</code>. Move shared prompt
-              contracts toward generation so scenarios depend on runtime code,
-              not the reverse.
+              Production <code>diagram-generation</code> is independent of
+              eval-focused <code>diagram-scenarios</code>. Shared prompt
+              contracts live with generation, so scenarios depend on runtime
+              code rather than the reverse.
             </p>
           </article>
           <article class="card">
             <h3>Workspace coverage</h3>
             <p>
-              Add <code>packages/*/*</code> and
-              <code>tools/*</code> deliberately to pnpm globs, or remove package
-              semantics from tools. The current generator package is an Nx
-              project but not a pnpm workspace package.
+              pnpm deliberately includes <code>apps/*</code>,
+              <code>packages/*</code>, <code>packages/*/*</code>, and
+              <code>tools/*</code>. The generator is now both an Nx project and
+              a lockfile-backed workspace importer.
             </p>
           </article>
           <article class="card">
             <h3>Enforced boundaries</h3>
             <p>
-              Add Nx tags such as <code>type:contract</code>,
-              <code>type:runtime</code>, <code>type:eval</code>, and
-              <code>type:app</code>, then prevent runtime packages from
-              importing eval or app code.
+              Nx scope and type tags plus ESLint now prevent package-to-app,
+              normal app-to-app, runtime-to-eval/app, and
+              persistence-to-eval/ui/app imports across source, config, and
+              Storybook files. CI requires lint and a generated-config Wrangler
+              dry-run for every Worker alongside the workspace build and test
+              gates.
             </p>
           </article>
         </div>

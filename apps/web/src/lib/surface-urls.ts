@@ -20,6 +20,8 @@ export const LOCAL_WEB_SURFACE_URLS: WebSurfaceUrls = {
 };
 
 const WORKERS_DEV_ACCOUNT = "dimethyl";
+const INTERNAL_EVAL_WORKER_HOST =
+  /^sketchi-playground(?:-pr(?:-[a-z0-9-]+)?)?\.dimethyl\.workers\.dev$/i;
 
 const WORKERS_DEV_WORKERS = {
   icons: "sketchi-icons",
@@ -57,13 +59,18 @@ function cleanHttpUrl(value: unknown, fallback: string): string {
   }
 }
 
+function cleanPublicPlaygroundUrl(value: unknown): string {
+  const fallback = DEFAULT_WEB_SURFACE_URLS.playground;
+  const url = cleanHttpUrl(value, fallback);
+  const hostname = new URL(url).hostname.replace(/\.+$/, "");
+
+  return INTERNAL_EVAL_WORKER_HOST.test(hostname) ? fallback : url;
+}
+
 export function resolveWebSurfaceUrls(env: WebSurfaceEnv = {}): WebSurfaceUrls {
   return {
     icons: cleanHttpUrl(env.SKETCHI_ICONS_URL, DEFAULT_WEB_SURFACE_URLS.icons),
-    playground: cleanHttpUrl(
-      env.SKETCHI_PLAYGROUND_URL,
-      DEFAULT_WEB_SURFACE_URLS.playground,
-    ),
+    playground: cleanPublicPlaygroundUrl(env.SKETCHI_PLAYGROUND_URL),
   };
 }
 

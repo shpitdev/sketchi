@@ -16,6 +16,16 @@ describe("resolveWebSurfaceUrls", () => {
     );
   });
 
+  it("links Web to the public Playground and never the internal eval Worker", () => {
+    expect(DEFAULT_WEB_SURFACE_URLS).toEqual({
+      icons: "https://sketchi-icons.dimethyl.workers.dev",
+      playground: "https://sketchi-studio.dimethyl.workers.dev",
+    });
+    expect(Object.values(DEFAULT_WEB_SURFACE_URLS)).not.toContain(
+      "https://sketchi-playground.dimethyl.workers.dev",
+    );
+  });
+
   it("centralizes future custom domains and local app URLs", () => {
     expect(PRODUCT_SURFACE_HOSTS).toEqual({
       docs: "sketchi.app/docs",
@@ -46,6 +56,17 @@ describe("resolveWebSurfaceUrls", () => {
       resolveWebSurfaceUrls({
         SKETCHI_PLAYGROUND_URL: "javascript:alert(1)",
       }).playground,
+    ).toBe(DEFAULT_WEB_SURFACE_URLS.playground);
+  });
+
+  it.each([
+    "https://sketchi-playground.dimethyl.workers.dev",
+    "https://sketchi-playground.dimethyl.workers.dev./",
+    "https://sketchi-playground-pr-42.dimethyl.workers.dev",
+    "https://sketchi-playground-pr-42.dimethyl.workers.dev./",
+  ])("rejects the internal eval Worker as a configured public link", (url) => {
+    expect(
+      resolveWebSurfaceUrls({ SKETCHI_PLAYGROUND_URL: url }).playground,
     ).toBe(DEFAULT_WEB_SURFACE_URLS.playground);
   });
 });

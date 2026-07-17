@@ -1,15 +1,14 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "../../dist/out-tsc",
+    "composite": true,
+    "outDir": "../../dist/out-tsc/tools/sketchi-generators",
+    "rootDir": "src",
+    "tsBuildInfoFile": "../../dist/out-tsc/tools/sketchi-generators/tsconfig.lib.tsbuildinfo",
     "declaration": true,
-    "types": [
-      "node"
-    ]
+    "types": ["node"]
   },
-  "include": [
-    "src/**/*.ts"
-  ],
+  "include": ["src/**/*.ts"],
   "exclude": [
     "vite.config.ts",
     "vite.config.mts",

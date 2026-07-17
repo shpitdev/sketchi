@@ -2,6 +2,7 @@ packages:
   - "apps/*"
   - "packages/*"
   - "packages/*/*"
+  - "tools/*"
 allowBuilds:
   "@mongodb-js/zstd": false
   "@swc/core": true

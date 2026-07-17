@@ -3,6 +3,7 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "packages/diagram/ui/src",
   "projectType": "library",
+  "tags": ["scope:package", "type:ui"],
   "targets": {
     "build": {
       "executor": "nx:run-commands",

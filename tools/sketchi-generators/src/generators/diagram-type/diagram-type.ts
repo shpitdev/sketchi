@@ -15,7 +15,9 @@ const UI_ROOT = "packages/diagram/ui/src";
 
 function appendExport(tree: Tree, indexPath: string, exportPath: string) {
   const exportLine = `export * from "${exportPath}";`;
-  const existing = tree.exists(indexPath) ? tree.read(indexPath, "utf-8") : "";
+  const existing = tree.exists(indexPath)
+    ? (tree.read(indexPath, "utf-8") ?? "")
+    : "";
 
   if (existing.includes(exportLine)) {
     return;
@@ -32,6 +34,9 @@ function addDiagramTypeToRegistry(tree: Tree, typeValue: string) {
   }
 
   const registry = tree.read(registryPath, "utf-8");
+  if (registry === null) {
+    throw new Error(`Missing diagram type registry at ${registryPath}.`);
+  }
 
   if (registry.includes(`"${typeValue}"`)) {
     return;

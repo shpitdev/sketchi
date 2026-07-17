@@ -14,7 +14,9 @@ const DEFAULT_DIRECTORY = "components";
 
 function appendExport(tree: Tree, indexPath: string, exportPath: string) {
   const exportLine = `export * from "${exportPath}";`;
-  const existing = tree.exists(indexPath) ? tree.read(indexPath, "utf-8") : "";
+  const existing = tree.exists(indexPath)
+    ? (tree.read(indexPath, "utf-8") ?? "")
+    : "";
 
   if (existing.includes(exportLine)) {
     return;

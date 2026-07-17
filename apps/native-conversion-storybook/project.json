@@ -3,6 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/native-conversion-storybook",
   "projectType": "application",
+  "tags": ["scope:composition", "type:composition"],
   "implicitDependencies": ["diagram-ui", "excalidraw", "icons"],
   "targets": {
     "build-storybook": {

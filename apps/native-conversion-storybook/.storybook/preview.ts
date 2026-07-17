@@ -1,6 +1,4 @@
-import "../../../packages/diagram/ui/src/styles.css";
-import "../../icons/src/styles/app.css";
-import "../../excalidraw/src/styles/app.css";
+import "@sketchi/diagram-ui/styles.css";
 
 import type { Preview } from "@storybook/react-vite";
 
