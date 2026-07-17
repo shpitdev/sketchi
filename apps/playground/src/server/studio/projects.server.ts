@@ -10,8 +10,8 @@ import {
   type StudioSourceArtifacts,
 } from "@sketchi/studio-projects/server";
 
-import type { StudioEnv } from "../../lib/agent.server";
-import { createStudioCodeModeRuntime } from "../../lib/codemode-api.server";
+import type { StudioEnv } from "../bindings/studio-env.server";
+import { createStudioCodeModeRuntime } from "../codemode/codemode-api.server";
 
 const localStudioBucket = new MemoryStudioObjectBucket();
 

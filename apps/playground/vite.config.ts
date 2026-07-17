@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import react from "@vitejs/plugin-react";
 import agents from "agents/vite";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 
 import {
   localInspectorPort,
@@ -13,6 +13,30 @@ import {
 import { workerProjectConfig } from "../../scripts/lib/worker-apps.mjs";
 
 const workerProject = workerProjectConfig("playground");
+
+const playgroundServerSourceSegment = "/apps/playground/src/server/";
+
+function enforceClientServerBoundary(): Plugin {
+  return {
+    name: "playground-client-server-boundary",
+    apply: "build",
+    applyToEnvironment: (environment) => environment.name === "client",
+    generateBundle(_options, bundle) {
+      const serverModuleIds = Object.values(bundle)
+        .flatMap((output) =>
+          output.type === "chunk" ? Object.keys(output.modules) : [],
+        )
+        .map((moduleId) => moduleId.replaceAll("\\", "/"))
+        .filter((moduleId) => moduleId.includes(playgroundServerSourceSegment));
+
+      if (serverModuleIds.length > 0) {
+        this.error(
+          `Playground server modules entered the client bundle:\n${serverModuleIds.join("\n")}`,
+        );
+      }
+    },
+  };
+}
 
 export default defineConfig({
   root: new URL(".", import.meta.url).pathname,
@@ -24,6 +48,7 @@ export default defineConfig({
   cacheDir: localViteCacheDir("playground"),
   publicDir: new URL("./public", import.meta.url).pathname,
   plugins: [
+    enforceClientServerBoundary(),
     agents(),
     codemode(),
     cloudflare({

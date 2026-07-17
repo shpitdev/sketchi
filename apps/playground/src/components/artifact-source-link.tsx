@@ -1,7 +1,7 @@
 import type { ArtifactProvenance } from "@sketchi/diagram-agent";
 
 import { IconLink } from "@/components/sketch-icons";
-import { artifactRouteUrls } from "@/lib/artifact-view-client";
+import { artifactRouteUrls } from "@/features/artifacts/artifact-view-client";
 
 export function ArtifactSourceLink({
   provenance,

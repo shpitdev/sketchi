@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type {
   CodeModeObjectBucket,
@@ -184,6 +184,19 @@ class DelayedUsageBucket extends MemoryBucket {
 
   releaseUsagePersistence(): void {
     this.resolveReleaseUsageWrite();
+  }
+}
+
+class RejectingUsageBucket extends MemoryBucket {
+  override async put(
+    key: string,
+    value: string | ArrayBuffer | Uint8Array,
+  ): Promise<unknown> {
+    if (key.startsWith("codemode/usage/")) {
+      throw new Error("usage persistence unavailable");
+    }
+
+    return super.put(key, value);
   }
 }
 
@@ -699,6 +712,33 @@ describe("Code Mode API handlers", () => {
 
     expect(response.status).toBe(200);
     expect(await usageEventsFrom(bucket)).toHaveLength(1);
+  });
+
+  it("keeps API responses successful when deferred usage capture fails", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const response = await handleBuildFlowchartRequest(
+        { SKETCHI_ARTIFACTS: new RejectingUsageBucket() },
+        postRequest("https://studio.test/api/v1/flowcharts/build", {
+          spec: approvalSpec(),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        ok: true,
+        status: "accepted",
+      });
+      await vi.waitFor(() => {
+        expect(warning).toHaveBeenCalledWith(
+          "Sketchi Code Mode usage capture failed.",
+          expect.objectContaining({ message: "usage persistence unavailable" }),
+        );
+      });
+    } finally {
+      warning.mockRestore();
+    }
   });
 
   it("sends aggregate usage and issue rows to Pipeline bindings", async () => {

@@ -2,9 +2,9 @@ import { ArtifactCanvas } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import { fetchArtifactScene } from "@/lib/artifact-view-client";
+import { fetchArtifactScene } from "@/features/artifacts/artifact-view-client";
 import { IconActionBar, IconLink } from "@/components/sketch-icons";
-import { SKETCHI_WEB_HOME_URL } from "@/lib/home-url";
+import { SKETCHI_WEB_HOME_URL } from "@/features/playground/home-url";
 import {
   fetchStudioDiagramDetails,
   type StudioDiagramSummary,

@@ -17,7 +17,7 @@ import {
   type ExcalidrawScene,
 } from "@sketchi/diagram-excalidraw";
 
-import type { StudioEnv } from "./agent.server";
+import type { StudioEnv } from "../bindings/studio-env.server";
 import { createCloudflareBrowserRunArtifactRenderer } from "./codemode-browser-renderer.server";
 import {
   captureCodeModeUsageEvent,

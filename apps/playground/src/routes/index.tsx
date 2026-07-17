@@ -43,7 +43,7 @@ import {
 } from "@/components/ai-elements/tool";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { IconActionBar, IconLink } from "@/components/sketch-icons";
-import { SKETCHI_WEB_HOME_URL } from "@/lib/home-url";
+import { SKETCHI_WEB_HOME_URL } from "@/features/playground/home-url";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({

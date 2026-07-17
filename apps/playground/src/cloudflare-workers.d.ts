@@ -1,8 +1,8 @@
 declare module "cloudflare:workers" {
   import type { CodeModeObjectBucket } from "@sketchi/diagram-agent";
   import type { CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
-  import type { CodeModeUsagePipelineBinding } from "./lib/agent.server";
-  import type { CloudflareBrowserRunBinding } from "./lib/codemode-browser-renderer.server";
+  import type { CodeModeUsagePipelineBinding } from "./server/bindings/studio-env.server";
+  import type { CloudflareBrowserRunBinding } from "./server/codemode/codemode-browser-renderer.server";
 
   export const env: {
     AI?: CloudflareAiGatewayProvider;

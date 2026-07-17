@@ -7,7 +7,7 @@ import {
   studioProjectUrl,
   type StudioProjectSummary,
 } from "@sketchi/studio-projects/client";
-import { SKETCHI_WEB_HOME_URL } from "@/lib/home-url";
+import { SKETCHI_WEB_HOME_URL } from "@/features/playground/home-url";
 
 export const Route = createFileRoute("/projects")({
   component: ProjectsRoute,

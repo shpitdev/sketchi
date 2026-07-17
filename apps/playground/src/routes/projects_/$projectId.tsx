@@ -7,7 +7,7 @@ import {
   type StudioProjectDetails,
 } from "@sketchi/studio-projects/client";
 import { IconActionBar, IconLink } from "@/components/sketch-icons";
-import { SKETCHI_WEB_HOME_URL } from "@/lib/home-url";
+import { SKETCHI_WEB_HOME_URL } from "@/features/playground/home-url";
 
 export const Route = createFileRoute("/projects_/$projectId")({
   component: ProjectRoute,

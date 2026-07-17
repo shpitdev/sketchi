@@ -60,7 +60,7 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-  AgentServer["apps/playground/src/lib/agent.server.ts<br/>route adapter"]
+  AgentServer["apps/playground/src/server/chat/agent.server.ts<br/>agent host adapter"]
 
   subgraph Packages["Shared Nx packages"]
     Core["diagram-core<br/>IR + semantic validation"]

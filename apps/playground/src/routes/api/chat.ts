@@ -28,8 +28,8 @@ export const Route = createFileRoute("/api/chat")({
 
           const [{ runStudioAgent }, { getStudioBindings }] = await Promise.all(
             [
-              import("../../lib/agent.server"),
-              import("../../lib/cloudflare-bindings.server"),
+              import("@/server/chat/agent.server"),
+              import("@/server/bindings/cloudflare-bindings.server"),
             ],
           );
 

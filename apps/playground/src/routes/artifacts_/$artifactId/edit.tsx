@@ -11,9 +11,9 @@ import {
   artifactRouteUrls,
   fetchArtifactScene,
   type ArtifactViewState,
-} from "@/lib/artifact-view-client";
+} from "@/features/artifacts/artifact-view-client";
 import { IconActionBar, IconLink } from "@/components/sketch-icons";
-import { SKETCHI_WEB_HOME_URL } from "@/lib/home-url";
+import { SKETCHI_WEB_HOME_URL } from "@/features/playground/home-url";
 
 export const Route = createFileRoute("/artifacts_/$artifactId/edit")({
   component: ArtifactEditRoute,

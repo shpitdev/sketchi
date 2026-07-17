@@ -3,8 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 async function handle(request: Request): Promise<Response> {
   const [{ getStudioBindings }, { handleSketchiMcpRequest }] =
     await Promise.all([
-      import("../lib/cloudflare-bindings.server"),
-      import("../lib/codemode-mcp.server"),
+      import("@/server/bindings/cloudflare-bindings.server"),
+      import("@/server/codemode/codemode-mcp.server"),
     ]);
 
   return handleSketchiMcpRequest(getStudioBindings(), request);

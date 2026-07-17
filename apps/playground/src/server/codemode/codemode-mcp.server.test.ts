@@ -9,7 +9,7 @@ import type {
   CodeModeObjectBucketObject,
 } from "@sketchi/diagram-agent";
 
-import type { StudioEnv } from "./agent.server";
+import type { StudioEnv } from "../bindings/studio-env.server";
 import {
   createSketchiMcpServer,
   executeSketchiCodeMode,

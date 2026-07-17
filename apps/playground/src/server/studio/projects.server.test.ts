@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { FlowchartSpec } from "@sketchi/diagram-agent";
 import { MemoryStudioObjectBucket } from "@sketchi/studio-projects/server";
 
-import { createStudioCodeModeRuntime } from "../../lib/codemode-api.server";
+import { createStudioCodeModeRuntime } from "../codemode/codemode-api.server";
 import {
   handleCreateStudioProjectFromArtifactRequest,
   handleListStudioProjectsRequest,

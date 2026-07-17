@@ -11,7 +11,7 @@ import { ArtifactCanvas } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 
-import { SKETCHI_WEB_HOME_URL } from "@/lib/home-url";
+import { SKETCHI_WEB_HOME_URL } from "@/features/playground/home-url";
 
 export const Route = createFileRoute("/examples/$exampleId")({
   component: ExampleRoute,

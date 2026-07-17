@@ -3,7 +3,7 @@ import "@tanstack/react-start/server-only";
 import { waitUntil } from "cloudflare:workers";
 import type { ArtifactFormat, ArtifactFormatRef } from "@sketchi/diagram-agent";
 
-import type { StudioEnv } from "./agent.server";
+import type { StudioEnv } from "../bindings/studio-env.server";
 
 const USAGE_PREFIX = "codemode/usage";
 const USAGE_EVENT_SCHEMA = "sketchi.codemode.usage.v1";

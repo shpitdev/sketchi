@@ -3,7 +3,7 @@ import "@tanstack/react-start/server-only";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-import type { StudioEnv } from "./agent.server";
+import type { StudioEnv } from "../bindings/studio-env.server";
 import { createStudioCodeModeRuntime } from "./codemode-api.server";
 import {
   CodeModeDocsRequestSchema,

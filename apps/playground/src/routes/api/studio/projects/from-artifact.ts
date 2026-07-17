@@ -8,8 +8,8 @@ export const Route = createFileRoute("/api/studio/projects/from-artifact")({
           { getStudioBindings },
           { handleCreateStudioProjectFromArtifactRequest },
         ] = await Promise.all([
-          import("../../../../lib/cloudflare-bindings.server"),
-          import("../../../../server/studio/projects.server"),
+          import("@/server/bindings/cloudflare-bindings.server"),
+          import("@/server/studio/projects.server"),
         ]);
 
         return handleCreateStudioProjectFromArtifactRequest(

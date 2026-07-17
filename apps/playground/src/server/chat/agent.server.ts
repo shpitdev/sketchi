@@ -2,13 +2,11 @@ import "@tanstack/react-start/server-only";
 
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import {
-  type CodeModeObjectBucket,
   DIAGRAM_AGENT_SYSTEM_PROMPT,
   DIAGRAM_AGENT_TEMPERATURE,
   MAX_AGENT_OUTPUT_TOKENS,
   MAX_AGENT_STEPS,
 } from "@sketchi/diagram-agent";
-import type { CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
 import {
   convertToModelMessages,
   stepCountIs,
@@ -17,8 +15,8 @@ import {
   type UIMessage,
 } from "ai";
 
-import type { CloudflareBrowserRunBinding } from "./codemode-browser-renderer.server";
-import { createStudioCodeModeRuntime } from "./codemode-api.server";
+import type { StudioEnv } from "../bindings/studio-env.server";
+import { createStudioCodeModeRuntime } from "../codemode/codemode-api.server";
 import {
   createStudioFlowchartToolExecutor,
   STUDIO_BUILD_FLOWCHART_TOOL_DESCRIPTION,
@@ -36,22 +34,6 @@ import {
  * provider keys, no local secrets); a fetch shim translates the google
  * provider's HTTP requests into `gateway.run()` calls.
  */
-
-export interface StudioEnv {
-  AI?: CloudflareAiGatewayProvider;
-  BROWSER?: CloudflareBrowserRunBinding;
-  CODEMODE_USAGE_EVENTS?: CodeModeUsagePipelineBinding;
-  CODEMODE_USAGE_ISSUES?: CodeModeUsagePipelineBinding;
-  LOADER?: unknown;
-  SKETCHI_ARTIFACTS?: CodeModeObjectBucket;
-  SKETCHI_AI_GATEWAY_ID?: string;
-  SKETCHI_AI_MODEL?: string;
-  SKETCHI_RENDER_ASSET_ORIGIN?: string;
-}
-
-export interface CodeModeUsagePipelineBinding {
-  send(records: readonly unknown[]): Promise<void>;
-}
 
 const DEFAULT_GATEWAY_ID = "google-ai-studio";
 const DEFAULT_MODEL = "google/gemini-3.1-flash-lite";

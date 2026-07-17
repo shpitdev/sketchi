@@ -6,8 +6,8 @@ export const Route = createFileRoute("/api/studio/projects_/$projectId")({
       GET: async ({ params, request }) => {
         const [{ getStudioBindings }, { handleGetStudioProjectRequest }] =
           await Promise.all([
-            import("../../../../lib/cloudflare-bindings.server"),
-            import("../../../../server/studio/projects.server"),
+            import("@/server/bindings/cloudflare-bindings.server"),
+            import("@/server/studio/projects.server"),
           ]);
 
         return handleGetStudioProjectRequest(

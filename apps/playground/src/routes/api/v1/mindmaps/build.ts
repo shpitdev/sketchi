@@ -6,8 +6,8 @@ export const Route = createFileRoute("/api/v1/mindmaps/build")({
       POST: async ({ request }) => {
         const [{ getStudioBindings }, { handleBuildMindmapRequest }] =
           await Promise.all([
-            import("../../../../lib/cloudflare-bindings.server"),
-            import("../../../../lib/codemode-api.server"),
+            import("@/server/bindings/cloudflare-bindings.server"),
+            import("@/server/codemode/codemode-api.server"),
           ]);
         return handleBuildMindmapRequest(getStudioBindings(), request);
       },
