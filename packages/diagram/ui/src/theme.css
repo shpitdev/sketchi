@@ -18,6 +18,10 @@
   --ink: #1a1712;
   --ink-2: #4c4639;
   --ink-3: #8a8270;
+  /* light "ink-on-dark" text for code surfaces (the excalidraw IR viewer,
+     docs code blocks). Web's .docs-codeblock/.copy-btn hardcode this same
+     value today and should adopt this token in a follow-up. */
+  --code-ink: #ece6d8;
 
   /* lines */
   --line: #e7ddc9;

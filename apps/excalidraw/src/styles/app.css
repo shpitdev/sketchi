@@ -151,7 +151,7 @@
 }
 
 .svg-handoff-error p {
-  color: #8c2f24;
+  color: var(--danger);
   font-family: var(--font-mono);
   margin: 0;
   text-transform: uppercase;
@@ -300,9 +300,9 @@
 }
 
 .workspace-action--primary {
-  background: #10372c;
-  border-color: #10372c;
-  color: #e8f5ee;
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper-2);
 }
 
 /* ===================================================================== */
@@ -479,7 +479,7 @@
 .diagram-inspector__code {
   background: var(--ink);
   border-radius: var(--r-sm);
-  color: #e8e1d2;
+  color: var(--code-ink);
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.6;
@@ -505,7 +505,7 @@
 
 .diagram-inspector__validity--ok {
   background: var(--ok-wash);
-  color: var(--ok);
+  color: var(--ok-ink);
 }
 
 .diagram-inspector__validity--warn {
