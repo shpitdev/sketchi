@@ -137,7 +137,7 @@
 }
 
 .sketchi-flowchart-build-report__accepted {
-  color: var(--ok);
+  color: var(--ok-ink);
   line-height: 1.45;
 }
 
@@ -262,10 +262,10 @@
 }
 
 .sketchi-scenario-playground__status {
-  background: #dcfce7;
-  border: 1px solid #86efac;
+  background: var(--ok-wash);
+  border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent);
   border-radius: 8px;
-  color: #14532d;
+  color: var(--ok-ink);
   font-size: 12px;
   font-weight: 800;
   padding: 6px 9px;
@@ -273,9 +273,9 @@
 }
 
 .sketchi-scenario-playground__status--failed {
-  background: #fee2e2;
-  border-color: #fca5a5;
-  color: #7f1d1d;
+  background: var(--danger-wash);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  color: var(--danger-ink);
 }
 
 .sketchi-scenario-playground__status--ready {
@@ -417,10 +417,10 @@
 }
 
 .sketchi-scenario-playground__checks li span {
-  background: #fee2e2;
-  border: 1px solid #fca5a5;
+  background: var(--danger-wash);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
   border-radius: 5px;
-  color: #7f1d1d;
+  color: var(--danger-ink);
   flex: 0 0 auto;
   font-size: 10px;
   font-weight: 800;
@@ -428,9 +428,9 @@
 }
 
 .sketchi-scenario-playground__checks li[data-pass="true"] span {
-  background: #dcfce7;
-  border-color: #86efac;
-  color: #14532d;
+  background: var(--ok-wash);
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+  color: var(--ok-ink);
 }
 
 .sketchi-scenario-playground__suite {
@@ -485,13 +485,13 @@
 }
 
 .sketchi-scenario-playground__suite li[data-status="pass"] span {
-  background: #dcfce7;
-  color: #14532d;
+  background: var(--ok-wash);
+  color: var(--ok-ink);
 }
 
 .sketchi-scenario-playground__suite li[data-status="fail"] span {
-  background: #fee2e2;
-  color: #7f1d1d;
+  background: var(--danger-wash);
+  color: var(--danger-ink);
 }
 
 .sketchi-scenario-playground__suite li strong {
@@ -511,10 +511,10 @@
 }
 
 .sketchi-scenario-playground__error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: var(--danger-wash);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
   border-radius: 6px;
-  color: #7f1d1d;
+  color: var(--danger-ink);
   font-size: 12px;
   font-weight: 700;
   margin: 0 0 8px;
@@ -712,15 +712,15 @@
 }
 
 .sketchi-generation-run-panel__summary[data-status="valid-ir"] {
-  border-color: #16a34a;
+  border-color: var(--ok);
 }
 
 .sketchi-generation-run-panel__summary[data-status="failed"] {
-  border-color: #dc2626;
+  border-color: var(--danger);
 }
 
 .sketchi-generation-run-panel__summary[data-status="running"] {
-  border-color: #f59e0b;
+  border-color: var(--warn);
 }
 
 .sketchi-generation-run-panel__settings {
@@ -753,15 +753,15 @@
 }
 
 .sketchi-generation-run-panel li[data-status="valid ir"] {
-  border-color: #16a34a;
+  border-color: var(--ok);
 }
 
 .sketchi-generation-run-panel li[data-status="valid-ir"] {
-  border-color: #16a34a;
+  border-color: var(--ok);
 }
 
 .sketchi-generation-run-panel li[data-status="failed"] {
-  border-color: #dc2626;
+  border-color: var(--danger);
 }
 
 .sketchi-generation-run-panel li div {
@@ -792,7 +792,7 @@
 
 .sketchi-generation-run-panel p:not(.sketchi-generation-run-panel__summary),
 .sketchi-generation-run-panel__error {
-  color: #991b1b;
+  color: var(--danger-ink);
   font-weight: 700;
   margin: 0;
 }
@@ -1160,10 +1160,10 @@
 }
 
 .sketchi-scenario-suite-panel__error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: var(--danger-wash);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
   border-radius: 6px;
-  color: #7f1d1d;
+  color: var(--danger-ink);
   font-size: 12px;
   font-weight: 700;
   margin: 0;
@@ -1259,18 +1259,18 @@
 }
 
 .sketchi-scenario-suite-panel__list li[data-status="pass"] output span {
-  background: #dcfce7;
-  color: #14532d;
+  background: var(--ok-wash);
+  color: var(--ok-ink);
 }
 
 .sketchi-scenario-suite-panel__list li[data-status="fail"] output span {
-  background: #fee2e2;
-  color: #7f1d1d;
+  background: var(--danger-wash);
+  color: var(--danger-ink);
 }
 
 .sketchi-scenario-suite-panel__list li[data-status="running"] output span {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--warn-wash);
+  color: var(--warn-ink);
 }
 
 .sketchi-scenario-suite-panel__list output small {
