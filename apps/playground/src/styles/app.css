@@ -1,39 +1,38 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "../../../../packages/diagram/ui/src/theme.css";
 
 @custom-variant dark (&:is(.dark *));
 
-/* shadcn tokens mapped to the Sketchi sketchbook palette */
+/* shadcn semantic tokens wired onto the shared "Drafting Studio" palette.
+   Every neutral, accent, line, radius, and shadow value lives in theme.css
+   (the single source of truth shared with the web surface); this block only
+   maps shadcn's names onto those tokens so the ai-elements and ui/* components
+   inherit the exact same system. */
 :root {
-  --radius: 0.75rem;
+  --radius: var(--r-md);
 
-  --background: #f6f1e7;
-  --foreground: #2b2723;
-  --card: #fffdf8;
-  --card-foreground: #2b2723;
-  --popover: #fffdf8;
-  --popover-foreground: #2b2723;
-  --primary: #8f707f;
-  --primary-foreground: #fffdf8;
-  --secondary: #efe7d7;
-  --secondary-foreground: #2b2723;
-  --muted: #efe7d7;
-  --muted-foreground: #8a7f70;
-  --accent: #ece1ef;
-  --accent-foreground: #4a3944;
-  --destructive: #b3503f;
-  --border: #e4dccd;
-  --input: #d8cfbf;
-  --ring: #8f707f;
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card-foreground: var(--ink);
+  --popover: var(--card);
+  --popover-foreground: var(--ink);
+  --primary: var(--accent);
+  --primary-foreground: var(--paper-2);
+  --secondary: var(--paper-2);
+  --secondary-foreground: var(--ink);
+  --muted: var(--paper-2);
+  --muted-foreground: var(--ink-3);
+  --destructive: var(--danger);
+  --border: var(--line);
+  --input: var(--line-2);
+  --ring: var(--accent);
 
   /* sketchbook aliases used by hand-written chrome */
-  --paper: #f6f1e7;
-  --ink: #2b2723;
-  --muted-ink: #9a8f80;
-  --mauve: #8f707f;
-  --mauve-soft: #8f707f1a;
-  --line: #e4dccd;
-  --code-bg: #2b2723;
+  --muted-ink: var(--ink-3);
+  --mauve: var(--accent);
+  --mauve-soft: var(--accent-wash);
+  --code-bg: var(--ink);
 }
 
 @theme inline {
@@ -54,8 +53,8 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent-wash);
+  --color-accent-foreground: var(--accent-ink);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);
@@ -87,7 +86,6 @@ body {
 
 body {
   font-family: var(--font-sans);
-  background: var(--paper);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
 }
@@ -154,15 +152,16 @@ body {
   font-family: var(--font-script);
   font-size: 30px;
   font-weight: 700;
-  color: var(--mauve);
+  color: var(--ink);
   line-height: 1;
 }
 
 .studio__sub {
+  font-family: var(--font-mono);
   font-size: 12px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--muted-ink);
+  color: var(--accent-ink);
 }
 
 /* Empty state */
@@ -304,9 +303,9 @@ body {
 }
 
 .studio__stage-chip--draft {
-  color: #a06a32;
-  border-color: #e3c89f;
-  background: #fdf4e3;
+  color: var(--warn-ink);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+  background: var(--warn-wash);
 }
 
 .studio__stage-card {
@@ -314,12 +313,15 @@ body {
   flex: 1;
   min-height: 0;
   background:
-    radial-gradient(rgb(143 112 127 / 10%) 1px, transparent 1.2px) 0 0 / 22px
-      22px,
+    radial-gradient(
+        color-mix(in srgb, var(--accent) 12%, transparent) 1px,
+        transparent 1.2px
+      )
+      0 0 / 22px 22px,
     var(--card);
   border: 1px solid var(--line);
-  border-radius: 16px;
-  box-shadow: 0 24px 48px rgb(43 39 35 / 7%);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
   display: flex;
   padding: 18px;
@@ -388,7 +390,7 @@ body {
   border: 1.4px dashed color-mix(in srgb, var(--mauve) 45%, transparent);
   color: var(--mauve);
   border-radius: 10px;
-  background: rgb(143 112 127 / 5%);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
   animation: studio-ghost-in 0.35s ease;
 }
 
@@ -698,8 +700,11 @@ button.studio__artifact-link {
   min-height: 0;
   padding: 18px;
   background:
-    radial-gradient(rgb(143 112 127 / 9%) 1px, transparent 1.2px) 0 0 / 22px
-      22px,
+    radial-gradient(
+        color-mix(in srgb, var(--accent) 12%, transparent) 1px,
+        transparent 1.2px
+      )
+      0 0 / 22px 22px,
     var(--card);
 }
 

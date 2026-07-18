@@ -477,7 +477,7 @@ function StudioRoute() {
               className="studio__mark"
               href={SKETCHI_WEB_HOME_URL}
             >
-              sketchi
+              Sketchi
             </a>
             <span className="studio__sub">playground · ephemeral</span>
           </div>

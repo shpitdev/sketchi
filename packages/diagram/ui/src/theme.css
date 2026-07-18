@@ -34,10 +34,17 @@
   --blueprint-ink: #1a39a8;
   --blueprint-wash: #e6eafb;
 
-  /* semantic status */
+  /* semantic status — base for dots/borders/accents; -ink is the darker
+     text tone for small status labels on the matching -wash so they clear
+     WCAG AA 4.5:1 (base tones dip below AA as 10–12px text on wash). */
   --ok: #1c7a4d;
+  --ok-ink: #15613c;
   --ok-wash: #def0e5;
+  --warn: #9a6a1f;
+  --warn-ink: #7a5216;
+  --warn-wash: #f6e8cf;
   --danger: #c0392b;
+  --danger-ink: #9c2a20;
   --danger-wash: #f6ddd9;
 
   --grid-dot: rgba(26, 23, 18, 0.06);

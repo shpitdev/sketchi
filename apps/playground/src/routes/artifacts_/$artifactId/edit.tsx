@@ -133,7 +133,7 @@ function ArtifactEditRoute() {
           className="studio__mark artifact-view__mark"
           href={SKETCHI_WEB_HOME_URL}
         >
-          sketchi
+          Sketchi
         </a>
         <div className="artifact-view__actions">
           <a className="studio__artifact-link" href={urls.review}>
