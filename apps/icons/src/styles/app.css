@@ -175,8 +175,8 @@
 }
 
 .sketchi-icons__density button[aria-pressed="true"] {
-  background: #10372c;
-  color: #e8f5ee;
+  background: var(--ink);
+  color: var(--paper-2);
 }
 
 .sketchi-icons__count {
@@ -506,7 +506,7 @@
 
 .icon-conversion__capability[data-status="supported"] {
   background: var(--ok-wash);
-  color: var(--ok);
+  color: var(--ok-ink);
 }
 
 .icon-conversion__capability[data-status="warned"] {
@@ -515,8 +515,8 @@
 }
 
 .icon-conversion__capability[data-status="blocked"] {
-  background: #f7e1dd;
-  color: #8c2f24;
+  background: var(--danger-wash);
+  color: var(--danger-ink);
 }
 
 .icon-conversion__stage {
@@ -660,9 +660,9 @@
 }
 
 .icon-conversion__actions a {
-  background: #10372c;
-  border-color: #10372c;
-  color: #e8f5ee;
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper-2);
 }
 
 .icon-conversion__actions button:disabled,
