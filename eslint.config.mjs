@@ -84,4 +84,64 @@ export default [
       ],
     },
   },
+  {
+    files: [
+      "apps/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
+      "packages/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
+      "tools/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["effect/unstable/*"],
+              message:
+                "Unstable Effect modules require a reviewed adapter under src/internal/effect-unstable-*.ts.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      "apps/excalidraw/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
+      "apps/icons/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
+      "apps/native-conversion-storybook/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
+      "apps/playground/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
+      "apps/web/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
+      "packages/diagram/core/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
+      "packages/diagram/excalidraw/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
+      "packages/diagram/renderer/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
+      "packages/diagram/ui/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
+      "packages/svg-excalidraw/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
+      "tools/sketchi-generators/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["effect", "effect/*", "@effect/*"],
+              message:
+                "This project is pure or framework-native; keep Effect at its owning orchestration boundary.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      "apps/**/src/internal/effect-unstable-*.ts",
+      "packages/**/src/internal/effect-unstable-*.ts",
+      "tools/**/src/internal/effect-unstable-*.ts",
+    ],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
 ];

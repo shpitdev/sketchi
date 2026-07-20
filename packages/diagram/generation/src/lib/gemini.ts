@@ -24,27 +24,6 @@ export interface GeminiGenerateContentBody {
   };
 }
 
-interface GeminiResponsePart {
-  text?: unknown;
-}
-
-interface GeminiResponseCandidate {
-  content?: {
-    parts?: GeminiResponsePart[];
-  };
-}
-
-interface GeminiUsageMetadata {
-  candidatesTokenCount?: unknown;
-  promptTokenCount?: unknown;
-  totalTokenCount?: unknown;
-}
-
-interface GeminiGenerateContentResponse {
-  candidates?: GeminiResponseCandidate[];
-  usageMetadata?: GeminiUsageMetadata;
-}
-
 const DEFAULT_MAX_OUTPUT_TOKENS = 2_048;
 const DEFAULT_TEMPERATURE = 0.1;
 
@@ -60,6 +39,18 @@ function messageContent(
 
 function numberUsage(value: unknown): number | undefined {
   return typeof value === "number" ? value : undefined;
+}
+
+interface UnknownRecord {
+  readonly [key: string]: unknown;
+}
+
+function isUnknownRecord(value: unknown): value is UnknownRecord {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function objectValue(value: unknown, key: string): unknown {
+  return isUnknownRecord(value) ? value[key] : undefined;
 }
 
 export function stripCloudflareGoogleModelPrefix(model: string): string {
@@ -92,10 +83,13 @@ export function buildGeminiGenerateContentBody(
 }
 
 export function extractGeminiText(response: unknown): string {
-  const parsed = response as GeminiGenerateContentResponse;
-  const text = parsed.candidates
-    ?.flatMap((candidate) => candidate.content?.parts ?? [])
-    .map((part) => part.text)
+  const candidates = objectValue(response, "candidates");
+  const text = (Array.isArray(candidates) ? candidates : [])
+    .flatMap((candidate) => {
+      const parts = objectValue(objectValue(candidate, "content"), "parts");
+      return Array.isArray(parts) ? parts : [];
+    })
+    .map((part) => objectValue(part, "text"))
     .filter((partText): partText is string => typeof partText === "string")
     .join("\n")
     .trim();
@@ -110,16 +104,15 @@ export function extractGeminiText(response: unknown): string {
 export function extractGeminiUsage(
   response: unknown,
 ): DiagramGenerationUsage | undefined {
-  const usageMetadata = (response as GeminiGenerateContentResponse)
-    .usageMetadata;
+  const usageMetadata = objectValue(response, "usageMetadata");
 
-  if (!usageMetadata) {
+  if (!isUnknownRecord(usageMetadata)) {
     return undefined;
   }
 
-  const inputTokens = numberUsage(usageMetadata.promptTokenCount);
-  const outputTokens = numberUsage(usageMetadata.candidatesTokenCount);
-  const totalTokens = numberUsage(usageMetadata.totalTokenCount);
+  const inputTokens = numberUsage(usageMetadata["promptTokenCount"]);
+  const outputTokens = numberUsage(usageMetadata["candidatesTokenCount"]);
+  const totalTokens = numberUsage(usageMetadata["totalTokenCount"]);
   const usage: DiagramGenerationUsage = {};
 
   if (inputTokens !== undefined) {

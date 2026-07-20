@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { generateScenarioCandidatesForInput } from "../../lib/generate-scenario";
+import { runGenerateScenarioCandidatesForInput } from "../../lib/generate-scenario";
 
 export const Route = createFileRoute("/api/scenario-candidates")({
   server: {
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/api/scenario-candidates")({
           );
 
           return Response.json(
-            await generateScenarioCandidatesForInput(
+            await runGenerateScenarioCandidatesForInput(
               await request.json(),
               getEvalHarnessBindings(),
             ),

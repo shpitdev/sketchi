@@ -1,7 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, layer, vi } from "@effect/vitest";
+import { Cause, Effect, Exit, Fiber, Layer } from "effect";
+import { TestClock } from "effect/testing";
 
 import { candidateFromText, responseErrorDiagnostic } from "./candidates.js";
-import { createCloudflareGoogleAiStudioClient } from "./cloudflare-google-ai-studio.js";
+import { DiagramGenerationClient, DiagramGenerationPolicy } from "./client.js";
+import {
+  type CloudflareAiGateway,
+  CloudflareAiGatewayBinding,
+  CloudflareGoogleAiStudioClientLive,
+  CloudflareGoogleAiStudioConfig,
+} from "./cloudflare-google-ai-studio.js";
 import {
   buildGeminiGenerateContentBody,
   stripCloudflareGoogleModelPrefix,
@@ -99,28 +107,18 @@ const expectedUser = [
   ),
 ].join("\n");
 const expectedGeminiBody = {
-  contents: [
-    {
-      role: "user",
-      parts: [{ text: expectedUser }],
-    },
-  ],
+  contents: [{ role: "user", parts: [{ text: expectedUser }] }],
   generationConfig: {
     maxOutputTokens: 512,
     response_mime_type: "application/json",
     temperature: 0.2,
   },
-  system_instruction: {
-    parts: [{ text: expectedSystem }],
-  },
+  system_instruction: { parts: [{ text: expectedSystem }] },
 };
 const geminiResponse = {
   candidates: [
     {
-      content: {
-        role: "model",
-        parts: [{ text: expectedText }],
-      },
+      content: { role: "model", parts: [{ text: expectedText }] },
       finishReason: "STOP",
     },
   ],
@@ -137,6 +135,23 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response {
     ...init,
   });
 }
+
+const configLayer = Layer.succeed(CloudflareGoogleAiStudioConfig, {
+  collectLog: true,
+  gatewayId: "sketchi",
+});
+const retryPolicyLayer = Layer.succeed(DiagramGenerationPolicy, {
+  concurrency: 2,
+  maxRetries: 2,
+  requestTimeoutMs: 1_000,
+  retryDelayMs: 100,
+});
+const cancellationPolicyLayer = Layer.succeed(DiagramGenerationPolicy, {
+  concurrency: 2,
+  maxRetries: 1,
+  requestTimeoutMs: 500,
+  retryDelayMs: 100,
+});
 
 describe("diagram generation prompt mapping", () => {
   it("keeps the provider-facing prompt messages byte-for-byte stable", () => {
@@ -173,7 +188,7 @@ describe("diagram generation prompt mapping", () => {
   });
 });
 
-describe("diagram generation clients", () => {
+describe("pure candidate behavior", () => {
   it("preserves explicit provider errors instead of replacing them with parse errors", () => {
     const candidate = candidateFromText({
       diagnostics: ["Google AI Studio Gateway request failed with HTTP 401."],
@@ -210,81 +225,306 @@ describe("diagram generation clients", () => {
     expect(candidate.error).toBeUndefined();
     expect(candidate.diagram?.id).toBe(expectedDiagram.id);
   });
+});
 
-  it("uses the Cloudflare AI Gateway provider-native Google route", async () => {
-    const run = vi.fn(async () => jsonResponse(geminiResponse));
-    const client = createCloudflareGoogleAiStudioClient({
-      ai: {
-        gateway: () => ({
-          getUrl: vi.fn(),
-          run,
-        }),
-      },
-      gatewayId: "sketchi",
-    });
-
-    const candidate = await client.generate({
-      maxOutputTokens: 512,
-      model: "google/gemini-3.1-flash-lite",
-      prompt,
-      temperature: 0.2,
-    });
-
-    expect(run).toHaveBeenCalledWith(
-      expect.objectContaining({
-        endpoint: "v1beta/models/gemini-3.1-flash-lite:generateContent",
-        headers: expect.not.objectContaining({
-          "Cache-Control": "no-store",
-        }),
-        provider: "google-ai-studio",
-        query: expectedGeminiBody,
+const successfulRun = vi.fn(async () => jsonResponse(geminiResponse));
+const successfulClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      Layer.succeed(CloudflareAiGatewayBinding, {
+        gateway: () => ({ getUrl: vi.fn(), run: successfulRun }),
       }),
-      expect.objectContaining({
-        gateway: expect.objectContaining({
-          collectLog: true,
-          metadata: expect.objectContaining({
-            scenarioId: prompt.id,
+      configLayer,
+      retryPolicyLayer,
+    ),
+  ),
+);
+
+layer(successfulClientLayer)("Cloudflare Google AI Studio live layer", (it) => {
+  it.effect("uses the provider-native Google route", () =>
+    Effect.gen(function* () {
+      const client = yield* DiagramGenerationClient;
+      const candidate = yield* client.generate({
+        maxOutputTokens: 512,
+        model: "google/gemini-3.1-flash-lite",
+        prompt,
+        temperature: 0.2,
+      });
+
+      expect(successfulRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpoint: "v1beta/models/gemini-3.1-flash-lite:generateContent",
+          headers: expect.not.objectContaining({
+            "Cache-Control": "no-store",
+          }),
+          provider: "google-ai-studio",
+          query: expectedGeminiBody,
+        }),
+        expect.objectContaining({
+          gateway: expect.objectContaining({
+            collectLog: true,
+            metadata: expect.objectContaining({ scenarioId: prompt.id }),
           }),
         }),
-      }),
-    );
-    expect(candidate.diagram?.id).toBe(expectedDiagram.id);
-    expect(candidate.usage?.totalTokens).toBe(34);
-  });
+      );
+      assert.strictEqual(candidate.diagram?.id, expectedDiagram.id);
+      assert.strictEqual(candidate.usage?.totalTokens, 34);
+    }),
+  );
 
-  it("sends no-store headers and metadata for fresh gateway runs", async () => {
-    const run = vi.fn(async () => jsonResponse(geminiResponse));
-    const client = createCloudflareGoogleAiStudioClient({
-      ai: {
-        gateway: () => ({
-          getUrl: vi.fn(),
-          run,
-        }),
-      },
-      gatewayId: "sketchi",
-    });
+  it.effect("sends no-store headers and metadata for fresh runs", () =>
+    Effect.gen(function* () {
+      const client = yield* DiagramGenerationClient;
+      const candidate = yield* client.generate({
+        cacheMode: "fresh",
+        model: "google/gemini-3.1-flash-lite",
+        prompt,
+      });
 
-    const candidate = await client.generate({
-      cacheMode: "fresh",
-      model: "google/gemini-3.1-flash-lite",
-      prompt,
-    });
-
-    expect(run).toHaveBeenCalledWith(
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          "Cache-Control": "no-store",
-          Pragma: "no-cache",
-        }),
-      }),
-      expect.objectContaining({
-        gateway: expect.objectContaining({
-          metadata: expect.objectContaining({
-            cacheMode: "fresh",
+      expect(successfulRun).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            "Cache-Control": "no-store",
+            Pragma: "no-cache",
           }),
         }),
+        expect.objectContaining({
+          gateway: expect.objectContaining({
+            metadata: expect.objectContaining({ cacheMode: "fresh" }),
+          }),
+        }),
+      );
+      assert.strictEqual(candidate.cacheMode, "fresh");
+    }),
+  );
+});
+
+let transientAttempts = 0;
+const transientRun = vi.fn(async () => {
+  transientAttempts += 1;
+  return transientAttempts < 3
+    ? jsonResponse(
+        { error: { message: "temporarily unavailable" } },
+        { status: 503 },
+      )
+    : jsonResponse(geminiResponse);
+});
+const retryClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      Layer.succeed(CloudflareAiGatewayBinding, {
+        gateway: () => ({ getUrl: vi.fn(), run: transientRun }),
       }),
+      configLayer,
+      retryPolicyLayer,
+    ),
+  ),
+);
+
+layer(retryClientLayer)("bounded retry policy", (it) => {
+  it.effect("retries transient failures with TestClock", () =>
+    Effect.gen(function* () {
+      const client = yield* DiagramGenerationClient;
+      const fiber = yield* Effect.forkChild(
+        client.generate({
+          model: "google/gemini-3.1-flash-lite",
+          prompt,
+        }),
+      );
+      yield* TestClock.adjust("1 second");
+      const candidate = yield* Fiber.join(fiber);
+
+      assert.strictEqual(candidate.diagram?.id, expectedDiagram.id);
+      assert.strictEqual(transientAttempts, 3);
+    }),
+  );
+});
+
+const permanentRun = vi.fn(async () =>
+  jsonResponse({ error: { message: "invalid request" } }, { status: 400 }),
+);
+const permanentClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      Layer.succeed(CloudflareAiGatewayBinding, {
+        gateway: () => ({ getUrl: vi.fn(), run: permanentRun }),
+      }),
+      configLayer,
+      retryPolicyLayer,
+    ),
+  ),
+);
+
+layer(permanentClientLayer)("non-retryable failures", (it) => {
+  it.effect("does not retry a permanent HTTP failure", () =>
+    Effect.gen(function* () {
+      const client = yield* DiagramGenerationClient;
+      const error = yield* Effect.flip(
+        client.generate({
+          model: "google/gemini-3.1-flash-lite",
+          prompt,
+        }),
+      );
+
+      assert.strictEqual(error._tag, "DiagramGenerationHttpError");
+      assert.strictEqual(permanentRun.mock.calls.length, 1);
+    }),
+  );
+});
+
+const cancellationSignals: AbortSignal[] = [];
+let activeUpstreamRequests = 0;
+let maxActiveUpstreamRequests = 0;
+const timeoutRun = vi.fn<CloudflareAiGateway["run"]>((_data, options) => {
+  const signal = options?.signal;
+
+  if (!signal) {
+    return Promise.reject(new Error("Generation request omitted AbortSignal."));
+  }
+
+  cancellationSignals.push(signal);
+  activeUpstreamRequests += 1;
+  maxActiveUpstreamRequests = Math.max(
+    maxActiveUpstreamRequests,
+    activeUpstreamRequests,
+  );
+
+  return new Promise<Response>((_resolve, reject) => {
+    signal.addEventListener(
+      "abort",
+      () => {
+        activeUpstreamRequests -= 1;
+        reject(signal.reason);
+      },
+      { once: true },
     );
-    expect(candidate.cacheMode).toBe("fresh");
   });
+});
+const timeoutClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      Layer.succeed(CloudflareAiGatewayBinding, {
+        gateway: () => ({ getUrl: vi.fn(), run: timeoutRun }),
+      }),
+      configLayer,
+      cancellationPolicyLayer,
+    ),
+  ),
+);
+
+layer(timeoutClientLayer)("timeouts and interruption", (it) => {
+  it.effect("aborts timed-out attempts before a bounded retry begins", () =>
+    Effect.gen(function* () {
+      cancellationSignals.length = 0;
+      activeUpstreamRequests = 0;
+      maxActiveUpstreamRequests = 0;
+      timeoutRun.mockClear();
+      const client = yield* DiagramGenerationClient;
+      const fiber = yield* Effect.forkChild(
+        Effect.flip(
+          client.generate({
+            model: "google/gemini-3.1-flash-lite",
+            prompt,
+          }),
+        ),
+      );
+      yield* TestClock.adjust("2 seconds");
+      const error = yield* Fiber.join(fiber);
+
+      assert.strictEqual(error._tag, "DiagramGenerationTimeoutError");
+      assert.strictEqual(timeoutRun.mock.calls.length, 2);
+      assert.strictEqual(cancellationSignals.length, 2);
+      assert.isTrue(cancellationSignals.every((signal) => signal.aborted));
+      assert.strictEqual(activeUpstreamRequests, 0);
+      assert.strictEqual(maxActiveUpstreamRequests, 1);
+    }),
+  );
+
+  it.effect("preserves interruption instead of translating it", () =>
+    Effect.gen(function* () {
+      cancellationSignals.length = 0;
+      activeUpstreamRequests = 0;
+      maxActiveUpstreamRequests = 0;
+      timeoutRun.mockClear();
+      const client = yield* DiagramGenerationClient;
+      const signalCountBeforeInterrupt = cancellationSignals.length;
+      const fiber = yield* Effect.forkChild(
+        client.generate({
+          model: "google/gemini-3.1-flash-lite",
+          prompt,
+        }),
+      );
+      yield* Effect.yieldNow;
+      yield* Fiber.interrupt(fiber);
+      const exit = yield* Fiber.await(fiber);
+
+      if (Exit.isSuccess(exit)) {
+        return assert.fail("Interrupted generation unexpectedly succeeded.");
+      }
+      assert.isTrue(Cause.hasInterrupts(exit.cause));
+      assert.strictEqual(
+        cancellationSignals.length,
+        signalCountBeforeInterrupt + 1,
+      );
+      assert.isTrue(cancellationSignals.at(-1)?.aborted);
+      assert.strictEqual(activeUpstreamRequests, 0);
+    }),
+  );
+});
+
+const malformedRun = vi.fn(async () => jsonResponse({ candidates: [] }));
+const malformedClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      Layer.succeed(CloudflareAiGatewayBinding, {
+        gateway: () => ({ getUrl: vi.fn(), run: malformedRun }),
+      }),
+      configLayer,
+      retryPolicyLayer,
+    ),
+  ),
+);
+
+layer(malformedClientLayer)("malformed model responses", (it) => {
+  it.effect("returns a typed response error without retrying", () =>
+    Effect.gen(function* () {
+      const client = yield* DiagramGenerationClient;
+      const error = yield* Effect.flip(
+        client.generate({
+          model: "google/gemini-3.1-flash-lite",
+          prompt,
+        }),
+      );
+
+      assert.strictEqual(error._tag, "DiagramGenerationResponseError");
+      assert.strictEqual(
+        error.message,
+        "Gemini response did not include text content.",
+      );
+      assert.strictEqual(malformedRun.mock.calls.length, 1);
+    }),
+  );
+});
+
+const substitutedClientLayer = Layer.succeed(DiagramGenerationClient, {
+  provider: "fixture",
+  generate: Effect.fn("diagramGeneration.test.generate")(function* () {
+    return candidateFromText({
+      model: "fixture",
+      provider: "fixture",
+      text: expectedText,
+    });
+  }),
+});
+
+layer(substitutedClientLayer)("client layer substitution", (it) => {
+  it.effect("substitutes the client without changing business code", () =>
+    Effect.gen(function* () {
+      const client = yield* DiagramGenerationClient;
+      const candidate = yield* client.generate({ model: "fixture", prompt });
+
+      assert.strictEqual(client.provider, "fixture");
+      assert.strictEqual(candidate.diagram?.id, expectedDiagram.id);
+    }),
+  );
 });

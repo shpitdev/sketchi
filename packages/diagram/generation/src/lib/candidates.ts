@@ -6,10 +6,10 @@ import { z } from "zod";
 
 import type { DiagramGenerationPrompt } from "./messages.js";
 
-export const diagramGenerationProviderIds = [
+export const diagramGenerationProviderIds: readonly [
   "fixture",
   "cloudflare-google-ai-studio",
-] as const;
+] = ["fixture", "cloudflare-google-ai-studio"];
 
 export const DiagramGenerationProviderIdSchema = z.enum(
   diagramGenerationProviderIds,
@@ -60,13 +60,6 @@ export interface DiagramGenerationRequest {
   temperature?: number;
 }
 
-export interface DiagramGenerationClient {
-  generate(
-    request: DiagramGenerationRequest,
-  ): Promise<DiagramGenerationCandidate>;
-  provider: DiagramGenerationProviderId;
-}
-
 export function extractJsonObject(text: string): unknown {
   try {
     return JSON.parse(text);
@@ -83,9 +76,15 @@ export function extractJsonObject(text: string): unknown {
 }
 
 function objectValue(value: unknown, key: string): unknown {
-  return value && typeof value === "object"
-    ? (value as Record<string, unknown>)[key]
-    : undefined;
+  return isUnknownRecord(value) ? value[key] : undefined;
+}
+
+interface UnknownRecord {
+  readonly [key: string]: unknown;
+}
+
+function isUnknownRecord(value: unknown): value is UnknownRecord {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function firstString(values: readonly unknown[]): string | undefined {
@@ -173,17 +172,5 @@ export function summarizeGenerationCandidate(
       : {}),
     ...(candidate.error ? { error: candidate.error } : {}),
     ...(candidate.usage ? { usage: candidate.usage } : {}),
-  };
-}
-
-export async function timeGenerationCandidate(
-  generate: () => Promise<DiagramGenerationCandidate>,
-): Promise<DiagramGenerationCandidate> {
-  const startedAt = performance.now();
-  const candidate = await generate();
-
-  return {
-    ...candidate,
-    durationMs: Math.round(performance.now() - startedAt),
   };
 }

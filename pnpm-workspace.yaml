@@ -8,6 +8,7 @@ allowBuilds:
   "@swc/core": true
   core-js-pure: false
   esbuild: true
+  msgpackr-extract: false
   node-liblzma: false
   nx: true
   sharp: true

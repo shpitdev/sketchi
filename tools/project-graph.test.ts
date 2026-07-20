@@ -33,6 +33,28 @@ const intendedNxProjectRoots = [
 const intendedWorkspacePackageRoots = intendedNxProjectRoots.filter(
   (projectRoot) => projectRoot !== "apps/native-conversion-storybook",
 );
+const effectAuthoritativeProjectRoots = [
+  "apps/eval-harness",
+  "packages/diagram/agent",
+  "packages/diagram/generation",
+  "packages/diagram/scenarios",
+];
+const effectPureProjectRoots = [
+  "packages/diagram/core",
+  "packages/diagram/excalidraw",
+  "packages/diagram/renderer",
+  "packages/svg-excalidraw",
+];
+const effectMigrationReadyProjectRoots = ["packages/studio/projects"];
+const frameworkNativeProjectRoots = [
+  "apps/excalidraw",
+  "apps/icons",
+  "apps/native-conversion-storybook",
+  "apps/playground",
+  "apps/web",
+  "packages/diagram/ui",
+  "tools/sketchi-generators",
+];
 const intendedCompositeReferences = [
   "apps/eval-harness/tsconfig.json",
   "apps/excalidraw/tsconfig.json",
@@ -101,6 +123,13 @@ interface TsConfig {
   };
   extends?: string;
   references?: Array<{ path: string }>;
+}
+
+interface PackageManifest {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
 }
 
 function normalizeWorkspacePath(filePath: string): string {
@@ -203,6 +232,97 @@ describe("diagram generation project boundaries", () => {
 
     expect(generationTargets).not.toContain("diagram-scenarios");
     expect(scenarioTargets).toContain("diagram-generation");
+  });
+
+  it("classifies every project and excludes Effect from pure/framework-native code", () => {
+    const classifiedRoots = [
+      ...effectAuthoritativeProjectRoots,
+      ...effectPureProjectRoots,
+      ...effectMigrationReadyProjectRoots,
+      ...frameworkNativeProjectRoots,
+    ].sort();
+    expect(classifiedRoots).toEqual(intendedNxProjectRoots);
+    expect(new Set(classifiedRoots).size).toBe(classifiedRoots.length);
+
+    for (const projectRoot of [
+      ...effectPureProjectRoots,
+      ...frameworkNativeProjectRoots,
+    ]) {
+      const sourceFiles = globSync(
+        `${projectRoot}/**/*.{ts,tsx,mts,cts,js,mjs}`,
+        {
+          cwd: workspaceRoot,
+          ignore: ["**/dist/**", "**/.output/**", "**/.wrangler/**"],
+        },
+      );
+
+      for (const sourceFile of sourceFiles) {
+        const source = readFileSync(
+          path.join(workspaceRoot, sourceFile),
+          "utf8",
+        );
+        expect(source, `${sourceFile} imports Effect`).not.toMatch(
+          /(?:from\s+|import\s*\()["'](?:effect(?:\/[^"']*)?|@effect\/[^"']+)["']/,
+        );
+      }
+    }
+  });
+
+  it("pins one Effect v4 substrate and rejects unreviewed unstable imports", () => {
+    const packageJsonPaths = [
+      "package.json",
+      ...globSync(
+        requiredWorkspaceGlobs.map(
+          (workspaceGlob) => `${workspaceGlob}/package.json`,
+        ),
+        { cwd: workspaceRoot },
+      ),
+    ];
+
+    for (const packageJsonPath of packageJsonPaths) {
+      const manifest = readJsonFile<PackageManifest>(
+        path.join(workspaceRoot, packageJsonPath),
+      );
+      for (const dependencies of [
+        manifest.dependencies,
+        manifest.devDependencies,
+        manifest.optionalDependencies,
+        manifest.peerDependencies,
+      ]) {
+        if (dependencies?.["effect"] !== undefined) {
+          expect(dependencies["effect"]).toBe("4.0.0-beta.99");
+        }
+        if (dependencies?.["@effect/vitest"] !== undefined) {
+          expect(dependencies["@effect/vitest"]).toBe("4.0.0-beta.99");
+        }
+      }
+    }
+
+    const rootManifest = readJsonFile<PackageManifest>(
+      path.join(workspaceRoot, "package.json"),
+    );
+    expect(rootManifest.dependencies?.["effect"]).toBe("4.0.0-beta.99");
+    expect(rootManifest.devDependencies?.["@effect/vitest"]).toBe(
+      "4.0.0-beta.99",
+    );
+    expect(
+      readFileSync(path.join(workspaceRoot, "pnpm-lock.yaml"), "utf8"),
+    ).not.toContain("effect@3.");
+
+    const sourceFiles = globSync(
+      ["apps", "packages", "tools"].map(
+        (root) => `${root}/**/*.{ts,tsx,mts,cts,js,mjs}`,
+      ),
+      {
+        cwd: workspaceRoot,
+        ignore: ["**/dist/**", "**/.output/**", "**/.wrangler/**"],
+      },
+    );
+    for (const sourceFile of sourceFiles) {
+      const source = readFileSync(path.join(workspaceRoot, sourceFile), "utf8");
+      if (!/["']effect\/unstable\//.test(source)) continue;
+      expect(sourceFile).toMatch(/\/src\/internal\/effect-unstable-[^/]+\.ts$/);
+    }
   });
 });
 

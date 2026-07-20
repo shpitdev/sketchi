@@ -10,13 +10,13 @@ flowchart LR
   Candidate --> Core["diagram-core parse"]
 ```
 
-| Owns                                       | Does not own                  |
-| ------------------------------------------ | ----------------------------- |
-| provider prompt and request contracts      | eval scenarios and assertions |
-| prompt message mapping                     | chat threads                  |
-| Gemini REST body mapping                   | artifact persistence          |
-| Cloudflare AI Gateway client compatibility | UI streaming                  |
-| candidate parsing and diagnostics          | final grading/revision policy |
+| Owns                                      | Does not own                  |
+| ----------------------------------------- | ----------------------------- |
+| provider prompt and request contracts     | eval scenarios and assertions |
+| prompt message mapping                    | chat threads                  |
+| Gemini REST body mapping                  | artifact persistence          |
+| Effect client contract and Workers layers | UI streaming                  |
+| candidate parsing and diagnostics         | final grading/revision policy |
 
 ## Commands
 
@@ -28,7 +28,8 @@ pnpm nx build diagram-generation
 
 ## Direction
 
-This package is the likely first home for Effect-backed schemas and typed
-generation errors. Keep the route handlers plain: Convex, Workers, MCP, and app
-routes should call this package or the planned `diagram-agent` package instead
-of owning generation logic themselves.
+`DiagramGenerationClient` is the Effect-native primary API. Workers compose the
+Cloudflare AI Gateway binding, configuration, policy, and live client layers at
+their runtime boundary. Pure prompt, response, and candidate helpers stay
+independent of that wiring. Node support belongs in a later live layer, not a
+parallel Promise client.

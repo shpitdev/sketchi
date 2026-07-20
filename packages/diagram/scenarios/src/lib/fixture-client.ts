@@ -1,25 +1,43 @@
 import {
   candidateFromText,
-  timeGenerationCandidate,
-  type DiagramGenerationClient,
-  type DiagramGenerationRequest,
+  DiagramGenerationClient,
+  DiagramGenerationInputError,
+  errorMessage,
 } from "@sketchi/diagram-generation";
+import { Clock, Effect, Layer } from "effect";
 
 import { getScenario } from "./scenarios.js";
 
-export function createFixtureGenerationClient(): DiagramGenerationClient {
-  return {
+export const FixtureGenerationClientLayer = Layer.succeed(
+  DiagramGenerationClient,
+  {
     provider: "fixture",
-    generate: (request: DiagramGenerationRequest) =>
-      timeGenerationCandidate(async () => {
-        const scenario = getScenario(request.prompt.id);
-
-        return candidateFromText({
+    generate: Effect.fn("diagramGeneration.fixture.generate")(
+      function* (request) {
+        const startedAt = yield* Clock.currentTimeMillis;
+        const scenario = yield* Effect.try({
+          try: () => getScenario(request.prompt.id),
+          catch: (cause) =>
+            DiagramGenerationInputError.make({
+              cause,
+              message: errorMessage(cause, "Unknown generation scenario."),
+              provider: "fixture",
+              scenarioId: request.prompt.id,
+            }),
+        });
+        const candidate = candidateFromText({
           cacheMode: request.cacheMode ?? "default",
           model: "fixture",
           provider: "fixture",
           text: JSON.stringify(scenario.expectedDiagram, null, 2),
         });
-      }),
-  };
-}
+        const finishedAt = yield* Clock.currentTimeMillis;
+
+        return {
+          ...candidate,
+          durationMs: Math.round(finishedAt - startedAt),
+        };
+      },
+    ),
+  },
+);
