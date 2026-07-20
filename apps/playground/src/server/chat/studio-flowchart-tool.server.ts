@@ -5,7 +5,7 @@ import {
   MAX_FLOWCHART_BUILD_ATTEMPTS,
   type BuildFlowchartOptions,
   type BuildFlowchartResult,
-  type CodeModeRuntime,
+  type PlaygroundCodeModePromiseRuntimeForIssue243,
 } from "@sketchi/diagram-agent";
 import { z } from "zod";
 
@@ -57,7 +57,7 @@ export interface StudioFlowchartToolExecutor {
  * exporting, and persistence remain the shared buildFlowchart vertical.
  */
 export function createStudioFlowchartToolExecutor(
-  buildFlowchart: CodeModeRuntime["buildFlowchart"],
+  buildFlowchart: PlaygroundCodeModePromiseRuntimeForIssue243["buildFlowchart"],
   maxAttempts = MAX_FLOWCHART_BUILD_ATTEMPTS,
 ): StudioFlowchartToolExecutor {
   let attempts = 0;

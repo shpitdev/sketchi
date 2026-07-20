@@ -1,14 +1,14 @@
 import "@tanstack/react-start/server-only";
 
 import {
-  createCodeModeRuntime,
-  createMemoryArtifactStore,
-  createObjectBucketArtifactStore,
+  createPlaygroundCodeModePromiseRuntimeForIssue243,
+  makeMemoryArtifactStorage,
+  makeObjectBucketArtifactStorage,
   type ApplyDiagramPatchResult,
   type ArtifactFormat,
   type BuildFlowchartResult,
   type BuildMindmapResult,
-  type CodeModeArtifactStore,
+  type CodeModeArtifactStorageShape,
   type GetArtifactResult,
   type StoredArtifactFormat,
 } from "@sketchi/diagram-agent";
@@ -25,7 +25,7 @@ import {
   createCodeModeUsageContext,
 } from "./codemode-usage-events.server";
 
-const localArtifactStore = createMemoryArtifactStore();
+const localArtifactStore = makeMemoryArtifactStorage();
 const DEFAULT_RENDER_ASSET_ORIGIN =
   "https://sketchi-studio.dimethyl.workers.dev";
 export const MAX_CODE_MODE_BUILD_REQUEST_BYTES = 256 * 1024;
@@ -34,9 +34,9 @@ export interface StudioCodeModeRuntimeOptions {
   origin?: string;
 }
 
-function artifactStoreForEnv(env: StudioEnv): CodeModeArtifactStore {
+function artifactStoreForEnv(env: StudioEnv): CodeModeArtifactStorageShape {
   return env.SKETCHI_ARTIFACTS
-    ? createObjectBucketArtifactStore(env.SKETCHI_ARTIFACTS, {
+    ? makeObjectBucketArtifactStorage(env.SKETCHI_ARTIFACTS, {
         prefix: "codemode",
       })
     : localArtifactStore;
@@ -48,7 +48,7 @@ export function createStudioCodeModeRuntime(
 ) {
   const renderer = rendererForEnv(env, options);
   const origin = options.origin;
-  return createCodeModeRuntime({
+  return createPlaygroundCodeModePromiseRuntimeForIssue243({
     ...(origin ? { artifactUrl: (input) => artifactUrl(origin, input) } : {}),
     ...(renderer ? { renderer } : {}),
     store: artifactStoreForEnv(env),
@@ -485,7 +485,10 @@ export async function handleGetArtifactRequest(
 
   let artifact: StoredArtifactFormat | null;
   try {
-    artifact = await artifactStoreForEnv(env).read(artifactId, result.format);
+    artifact = await runtime.readStoredArtifactForRawHttpResponseForIssue243(
+      artifactId,
+      result.format,
+    );
   } catch (error) {
     return jsonResponse(
       {

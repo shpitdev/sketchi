@@ -1,11 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   BuildFlowchartRequestSchema,
-  createCodeModeRuntime,
-  createMemoryArtifactStore,
+  createPlaygroundCodeModePromiseRuntimeForIssue243,
+  makeMemoryArtifactStorage,
   type BuildFlowchartResult,
-  type CodeModeArtifactStore,
   type FlowchartSpec,
 } from "@sketchi/diagram-agent";
 
@@ -53,23 +52,18 @@ function rejectedSpec(): FlowchartSpec {
 }
 
 function countingStore() {
-  const memory = createMemoryArtifactStore();
-  let writes = 0;
-  const store: CodeModeArtifactStore = {
-    read: (artifactId, format) => memory.read(artifactId, format),
-    readManifest: (artifactId) => memory.readManifest(artifactId),
-    async write(input) {
-      writes += 1;
-      return memory.write(input);
-    },
+  const memory = makeMemoryArtifactStorage();
+  const write = vi.fn(memory.write);
+  return {
+    store: { ...memory, write },
+    writes: () => write.mock.calls.length,
   };
-  return { store, writes: () => writes };
 }
 
-function deterministicRuntime(store: CodeModeArtifactStore) {
-  return createCodeModeRuntime({
+function deterministicRuntime(counted: ReturnType<typeof countingStore>) {
+  return createPlaygroundCodeModePromiseRuntimeForIssue243({
     createId: (prefix) => `${prefix}_fixed`,
-    store,
+    store: counted.store,
   });
 }
 
@@ -121,10 +115,10 @@ describe("Studio build_flowchart host", () => {
     const firstStore = countingStore();
     const secondStore = countingStore();
     const first = await createStudioFlowchartToolExecutor(
-      deterministicRuntime(firstStore.store).buildFlowchart,
+      deterministicRuntime(firstStore).buildFlowchart,
     ).execute({ spec: rejectedSpec() });
     const second = await createStudioFlowchartToolExecutor(
-      deterministicRuntime(secondStore.store).buildFlowchart,
+      deterministicRuntime(secondStore).buildFlowchart,
     ).execute({ spec: rejectedSpec() });
 
     expect(second).toEqual(first);
@@ -147,7 +141,7 @@ describe("Studio build_flowchart host", () => {
   it("persists one canonical artifact and reuses it after acceptance", async () => {
     const counted = countingStore();
     const executor = createStudioFlowchartToolExecutor(
-      deterministicRuntime(counted.store).buildFlowchart,
+      deterministicRuntime(counted).buildFlowchart,
     );
 
     const first = await executor.execute({ spec: acceptedSpec() });
@@ -174,7 +168,7 @@ describe("Studio build_flowchart host", () => {
 
   it("serializes concurrent accepted calls and persists only the first artifact", async () => {
     const counted = countingStore();
-    const runtime = deterministicRuntime(counted.store);
+    const runtime = deterministicRuntime(counted);
     const started = deferred<void>();
     const release = deferred<void>();
     let runtimeCalls = 0;

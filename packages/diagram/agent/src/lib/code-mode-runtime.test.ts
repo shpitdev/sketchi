@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Effect } from "effect";
 
 import {
   FLOWCHART_MAX_EDGES,
@@ -8,9 +9,10 @@ import {
   getFlowchartValidationIssues,
 } from "@sketchi/diagram-core";
 import {
-  createMemoryArtifactStore,
-  createObjectBucketArtifactStore,
-  type CodeModeArtifactStore,
+  CodeModeArtifactStorageError,
+  makeMemoryArtifactStorage,
+  makeObjectBucketArtifactStorage,
+  type CodeModeArtifactStorageShape,
   type CodeModeObjectBucket,
   type CodeModeObjectBucketObject,
 } from "./code-mode-artifacts";
@@ -21,12 +23,12 @@ import {
   type BuildFlowchartResult,
   type GetArtifactResult,
 } from "./code-mode-contract";
-import { createCodeModeRuntime } from "./code-mode-runtime";
+import { createPlaygroundCodeModePromiseRuntimeForIssue243 } from "./code-mode-runtime";
 
 function createTestRuntime() {
   let id = 0;
-  return createCodeModeRuntime({
-    store: createMemoryArtifactStore(),
+  return createPlaygroundCodeModePromiseRuntimeForIssue243({
+    store: makeMemoryArtifactStorage(),
     createId: (prefix) => `${prefix}-${(id += 1)}`,
   });
 }
@@ -327,17 +329,22 @@ function expectPatchFailure(
   }
 }
 
-function throwingStore(): CodeModeArtifactStore {
+function throwingStore(): CodeModeArtifactStorageShape {
+  const fail = (
+    operation: "read" | "readManifest" | "write",
+    message: string,
+  ) =>
+    Effect.fail(
+      new CodeModeArtifactStorageError({
+        cause: new Error(message),
+        message,
+        operation,
+      }),
+    );
   return {
-    read: async () => {
-      throw new Error("bucket read failed");
-    },
-    readManifest: async () => {
-      throw new Error("manifest read failed");
-    },
-    write: async () => {
-      throw new Error("bucket write failed");
-    },
+    read: () => fail("read", "bucket read failed"),
+    readManifest: () => fail("readManifest", "manifest read failed"),
+    write: () => fail("write", "bucket write failed"),
   };
 }
 
@@ -675,8 +682,8 @@ describe("Code Mode runtime", () => {
 
   it("adds raw artifact URLs when the runtime is configured with a URL builder", async () => {
     let id = 0;
-    const runtime = createCodeModeRuntime({
-      store: createMemoryArtifactStore(),
+    const runtime = createPlaygroundCodeModePromiseRuntimeForIssue243({
+      store: makeMemoryArtifactStorage(),
       createId: (prefix) => `${prefix}-${(id += 1)}`,
       artifactUrl: ({ artifactId, format }) =>
         `https://studio.test/api/v1/artifacts/${artifactId}?format=${format}&raw=true`,
@@ -921,15 +928,21 @@ describe("Code Mode runtime", () => {
   it("fails semantic limits before rendering or persisting artifacts", async () => {
     let renderCalls = 0;
     let writeCalls = 0;
-    const store: CodeModeArtifactStore = {
-      read: async () => null,
-      readManifest: async () => null,
-      write: async () => {
+    const store: CodeModeArtifactStorageShape = {
+      read: () => Effect.succeed(null),
+      readManifest: () => Effect.succeed(null),
+      write: () => {
         writeCalls += 1;
-        throw new Error("invalid flowchart must not persist");
+        return Effect.fail(
+          new CodeModeArtifactStorageError({
+            cause: new Error("invalid flowchart must not persist"),
+            message: "invalid flowchart must not persist",
+            operation: "write",
+          }),
+        );
       },
     };
-    const runtime = createCodeModeRuntime({
+    const runtime = createPlaygroundCodeModePromiseRuntimeForIssue243({
       store,
       renderer: {
         renderPng: async () => {
@@ -1033,8 +1046,8 @@ describe("Code Mode runtime", () => {
 
   it("stores PNG artifacts through a configured renderer without inlining binary data", async () => {
     let id = 0;
-    const runtime = createCodeModeRuntime({
-      store: createMemoryArtifactStore(),
+    const runtime = createPlaygroundCodeModePromiseRuntimeForIssue243({
+      store: makeMemoryArtifactStorage(),
       createId: (prefix) => `${prefix}-${(id += 1)}`,
       renderer: {
         renderPng: async () => new Uint8Array([137, 80, 78, 71]),
@@ -1160,8 +1173,8 @@ describe("Code Mode runtime", () => {
 
   it("renders PNG artifacts after patch operations when a renderer is configured", async () => {
     let id = 0;
-    const runtime = createCodeModeRuntime({
-      store: createMemoryArtifactStore(),
+    const runtime = createPlaygroundCodeModePromiseRuntimeForIssue243({
+      store: makeMemoryArtifactStorage(),
       createId: (prefix) => `${prefix}-${(id += 1)}`,
       renderer: {
         renderPng: async ({ scene }) =>
@@ -1207,8 +1220,8 @@ describe("Code Mode runtime", () => {
 
   it("keeps patch provenance consistent across the result and later format retrieval", async () => {
     let id = 0;
-    const runtime = createCodeModeRuntime({
-      store: createMemoryArtifactStore(),
+    const runtime = createPlaygroundCodeModePromiseRuntimeForIssue243({
+      store: makeMemoryArtifactStorage(),
       createId: (prefix) => `${prefix}-${(id += 1)}`,
       renderer: {
         renderPng: async () => new Uint8Array([137, 80, 78, 71]),
@@ -1386,7 +1399,7 @@ describe("Code Mode runtime", () => {
   });
 
   it("returns structured storage failures when artifact reads throw", async () => {
-    const runtime = createCodeModeRuntime({
+    const runtime = createPlaygroundCodeModePromiseRuntimeForIssue243({
       store: throwingStore(),
       createId: (prefix) => `${prefix}-1`,
     });
@@ -1426,8 +1439,8 @@ describe("Code Mode runtime", () => {
   it("stores and retrieves artifacts through an object-bucket adapter", async () => {
     const bucket = new MemoryBucket();
     let id = 0;
-    const runtime = createCodeModeRuntime({
-      store: createObjectBucketArtifactStore(bucket, {
+    const runtime = createPlaygroundCodeModePromiseRuntimeForIssue243({
+      store: makeObjectBucketArtifactStorage(bucket, {
         prefix: "codemode",
       }),
       createId: (prefix) => `${prefix}-${(id += 1)}`,
@@ -1469,8 +1482,8 @@ describe("Code Mode runtime", () => {
       JSON.stringify(sourceScene),
     );
     let id = 0;
-    const runtime = createCodeModeRuntime({
-      store: createObjectBucketArtifactStore(bucket, { prefix: "codemode" }),
+    const runtime = createPlaygroundCodeModePromiseRuntimeForIssue243({
+      store: makeObjectBucketArtifactStorage(bucket, { prefix: "codemode" }),
       createId: (prefix) => `${prefix}-${(id += 1)}`,
     });
 
@@ -1495,8 +1508,8 @@ describe("Code Mode runtime", () => {
   it("persists PNG artifacts as binary object-bucket entries", async () => {
     const bucket = new MemoryBucket();
     let id = 0;
-    const runtime = createCodeModeRuntime({
-      store: createObjectBucketArtifactStore(bucket, {
+    const runtime = createPlaygroundCodeModePromiseRuntimeForIssue243({
+      store: makeObjectBucketArtifactStorage(bucket, {
         prefix: "codemode",
       }),
       createId: (prefix) => `${prefix}-${(id += 1)}`,
@@ -1534,8 +1547,8 @@ describe("Code Mode runtime", () => {
   it("does not publish an object-bucket manifest when a format write fails", async () => {
     const bucket = new FailingPngBucket();
     let id = 0;
-    const runtime = createCodeModeRuntime({
-      store: createObjectBucketArtifactStore(bucket, {
+    const runtime = createPlaygroundCodeModePromiseRuntimeForIssue243({
+      store: makeObjectBucketArtifactStorage(bucket, {
         prefix: "codemode",
       }),
       createId: (prefix) => `${prefix}-${(id += 1)}`,

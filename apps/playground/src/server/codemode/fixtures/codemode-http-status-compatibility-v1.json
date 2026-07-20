@@ -1,0 +1,556 @@
+{
+  "version": 1,
+  "lineage": {
+    "exactBase": "486e7169255354b8dc79cfa86e30c508721f5425",
+    "captureRule": "Response status and body observations were captured by production HTTP handlers at the exact base."
+  },
+  "flowchart": {
+    "accepted": {
+      "status": 200,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": true,
+        "status": "accepted",
+        "buildId": "build-http-flowchart",
+        "normalizedSpec": {
+          "id": "flowchart-http"
+        },
+        "quality": {
+          "accepted": true,
+          "score": 10,
+          "threshold": 8,
+          "summary": {
+            "nodeCount": 1,
+            "edgeCount": 0
+          },
+          "checks": []
+        },
+        "artifact": {
+          "artifactId": "artifact-http-flowchart",
+          "diagramId": "flowchart-http",
+          "formats": []
+        },
+        "issues": []
+      }
+    },
+    "invalid_input": {
+      "status": 400,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "invalid_input",
+        "issues": [
+          {
+            "code": "missing_field",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for invalid_input.",
+            "hint": "Compatibility hint for invalid_input."
+          }
+        ]
+      }
+    },
+    "invalid_flowchart": {
+      "status": 422,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "invalid_flowchart",
+        "issues": [
+          {
+            "code": "missing_start",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for invalid_flowchart.",
+            "hint": "Compatibility hint for invalid_flowchart."
+          }
+        ]
+      }
+    },
+    "quality_failed": {
+      "status": 422,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "quality_failed",
+        "issues": [
+          {
+            "code": "generic_label",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for quality_failed.",
+            "hint": "Compatibility hint for quality_failed."
+          }
+        ]
+      }
+    },
+    "render_failed": {
+      "status": 500,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "render_failed",
+        "issues": [
+          {
+            "code": "render_failed",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for render_failed.",
+            "hint": "Compatibility hint for render_failed."
+          }
+        ]
+      }
+    },
+    "export_failed": {
+      "status": 500,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "export_failed",
+        "issues": [
+          {
+            "code": "export_invalid_scene",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for export_failed.",
+            "hint": "Compatibility hint for export_failed."
+          }
+        ]
+      }
+    },
+    "storage_failed": {
+      "status": 500,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "storage_failed",
+        "issues": [
+          {
+            "code": "storage_write_failed",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for storage_failed.",
+            "hint": "Compatibility hint for storage_failed."
+          }
+        ]
+      }
+    }
+  },
+  "mindmap": {
+    "accepted": {
+      "status": 200,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": true,
+        "status": "accepted",
+        "buildId": "build-http-mindmap",
+        "normalizedSpec": {
+          "id": "mindmap-http"
+        },
+        "quality": {
+          "accepted": true,
+          "score": 10,
+          "threshold": 8,
+          "summary": {
+            "nodeCount": 1,
+            "edgeCount": 0
+          },
+          "checks": []
+        },
+        "artifact": {
+          "artifactId": "artifact-http-mindmap",
+          "diagramId": "mindmap-http",
+          "formats": []
+        },
+        "issues": []
+      }
+    },
+    "invalid_input": {
+      "status": 400,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "invalid_input",
+        "issues": [
+          {
+            "code": "missing_field",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for invalid_input.",
+            "hint": "Compatibility hint for invalid_input."
+          }
+        ]
+      }
+    },
+    "invalid_mindmap": {
+      "status": 422,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "invalid_mindmap",
+        "issues": [
+          {
+            "code": "disconnected_graph",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for invalid_mindmap.",
+            "hint": "Compatibility hint for invalid_mindmap."
+          }
+        ]
+      }
+    },
+    "quality_failed": {
+      "status": 422,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "quality_failed",
+        "issues": [
+          {
+            "code": "generic_label",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for quality_failed.",
+            "hint": "Compatibility hint for quality_failed."
+          }
+        ]
+      }
+    },
+    "render_failed": {
+      "status": 500,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "render_failed",
+        "issues": [
+          {
+            "code": "render_failed",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for render_failed.",
+            "hint": "Compatibility hint for render_failed."
+          }
+        ]
+      }
+    },
+    "export_failed": {
+      "status": 500,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "export_failed",
+        "issues": [
+          {
+            "code": "export_invalid_scene",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for export_failed.",
+            "hint": "Compatibility hint for export_failed."
+          }
+        ]
+      }
+    },
+    "storage_failed": {
+      "status": 500,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "storage_failed",
+        "issues": [
+          {
+            "code": "storage_write_failed",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for storage_failed.",
+            "hint": "Compatibility hint for storage_failed."
+          }
+        ]
+      }
+    }
+  },
+  "getArtifact": {
+    "accepted": {
+      "status": 200,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": true,
+        "artifactId": "artifact-http",
+        "diagramId": "diagram-http",
+        "format": "scene",
+        "mimeType": "application/vnd.sketchi.scene+json",
+        "sizeBytes": 123
+      }
+    },
+    "invalid_input": {
+      "status": 400,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "invalid_input",
+        "issues": [
+          {
+            "code": "missing_field",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for invalid_input.",
+            "hint": "Compatibility hint for invalid_input."
+          }
+        ]
+      }
+    },
+    "not_found": {
+      "status": 404,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "not_found",
+        "issues": [
+          {
+            "code": "patch_source_unavailable",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for not_found.",
+            "hint": "Compatibility hint for not_found."
+          }
+        ]
+      }
+    },
+    "format_unavailable": {
+      "status": 404,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "format_unavailable",
+        "issues": [
+          {
+            "code": "unsupported_artifact_format",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for format_unavailable.",
+            "hint": "Compatibility hint for format_unavailable."
+          }
+        ]
+      }
+    },
+    "expired": {
+      "status": 410,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "expired",
+        "issues": [
+          {
+            "code": "patch_source_unavailable",
+            "severity": "error",
+            "stage": "storage",
+            "message": "Artifact \"artifact-expired\" has expired.",
+            "hint": "Rebuild the artifact and use its new artifactId."
+          }
+        ]
+      }
+    },
+    "storage_failed": {
+      "status": 500,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "storage_failed",
+        "issues": [
+          {
+            "code": "storage_read_failed",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for storage_failed.",
+            "hint": "Compatibility hint for storage_failed."
+          }
+        ]
+      }
+    }
+  },
+  "applyDiagramPatch": {
+    "accepted": {
+      "status": 200,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": true,
+        "status": "accepted",
+        "patchId": "patch-http",
+        "sourceArtifactId": "artifact-source",
+        "artifact": {
+          "artifactId": "artifact-child",
+          "diagramId": "patch-http",
+          "formats": [],
+          "provenance": {
+            "sourceArtifactId": "artifact-source"
+          }
+        },
+        "issues": []
+      }
+    },
+    "invalid_input": {
+      "status": 400,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "invalid_input",
+        "issues": [
+          {
+            "code": "missing_field",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for invalid_input.",
+            "hint": "Compatibility hint for invalid_input."
+          }
+        ]
+      }
+    },
+    "source_unavailable": {
+      "status": 404,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "source_unavailable",
+        "issues": [
+          {
+            "code": "patch_source_unavailable",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for source_unavailable.",
+            "hint": "Compatibility hint for source_unavailable."
+          }
+        ]
+      }
+    },
+    "target_not_found": {
+      "status": 404,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "target_not_found",
+        "issues": [
+          {
+            "code": "unknown_patch_target",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for target_not_found.",
+            "hint": "Compatibility hint for target_not_found."
+          }
+        ]
+      }
+    },
+    "unsupported_operation": {
+      "status": 422,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "unsupported_operation",
+        "issues": [
+          {
+            "code": "unsupported_patch_operation",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for unsupported_operation.",
+            "hint": "Compatibility hint for unsupported_operation."
+          }
+        ]
+      }
+    },
+    "connectivity_changed": {
+      "status": 422,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "connectivity_changed",
+        "issues": [
+          {
+            "code": "patch_preserve_connectivity_failed",
+            "severity": "error",
+            "stage": "flowchart",
+            "ref": {
+              "kind": "request",
+              "path": "operations"
+            },
+            "message": "Patch changed the diagram edge connectivity.",
+            "hint": "Use a build operation when changing graph structure."
+          }
+        ]
+      }
+    },
+    "render_failed": {
+      "status": 500,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "render_failed",
+        "issues": [
+          {
+            "code": "patch_output_invalid",
+            "severity": "error",
+            "stage": "render",
+            "ref": {
+              "kind": "request",
+              "path": "operations"
+            },
+            "message": "Patched scene has an invalid arrow point list.",
+            "hint": "Reroute edges or rebuild the flowchart artifact."
+          }
+        ]
+      }
+    },
+    "export_failed": {
+      "status": 500,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "export_failed",
+        "issues": [
+          {
+            "code": "export_invalid_scene",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for export_failed.",
+            "hint": "Compatibility hint for export_failed."
+          }
+        ]
+      }
+    },
+    "storage_failed": {
+      "status": 500,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": false,
+        "status": "storage_failed",
+        "issues": [
+          {
+            "code": "storage_write_failed",
+            "severity": "error",
+            "stage": "input",
+            "message": "Compatibility message for storage_failed.",
+            "hint": "Compatibility hint for storage_failed."
+          }
+        ]
+      }
+    }
+  },
+  "requestTooLarge": {
+    "status": 413,
+    "cacheControl": "no-store",
+    "body": {
+      "ok": false,
+      "status": "invalid_input",
+      "issues": [
+        {
+          "code": "request_too_large",
+          "severity": "error",
+          "stage": "input",
+          "ref": {
+            "kind": "request",
+            "path": "input"
+          },
+          "message": "Flowchart request exceeds the 262144-byte limit.",
+          "hint": "Send a smaller semantic diagram request."
+        }
+      ]
+    }
+  }
+}

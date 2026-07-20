@@ -19,15 +19,18 @@ import {
   type RenderedDiagramScene,
   type ScenePoint,
 } from "@sketchi/diagram-renderer";
+import { Context, Effect, Layer, Schema } from "effect";
 import { z } from "zod";
 
 import {
   ARTIFACT_MIME_TYPES,
-  createMemoryArtifactStore,
+  CodeModeArtifactStorage,
   isInlineArtifactFormat,
   jsonSizeBytes,
+  makeMemoryArtifactStorage,
   storageIssue,
-  type CodeModeArtifactStore,
+  type CodeModeArtifactStorageError,
+  type CodeModeArtifactStorageShape,
   type StoredArtifactFormat,
 } from "./code-mode-artifacts.js";
 import {
@@ -39,6 +42,7 @@ import {
   RenderedDiagramSceneSchema,
   type ApplyDiagramPatchRequest,
   type ApplyDiagramPatchResult,
+  type ArtifactBundle,
   type ArtifactFormat,
   type BuildFlowchartRequest,
   type BuildFlowchartResult,
@@ -50,9 +54,10 @@ import {
   type DiagramSelector,
   type GetArtifactResult,
   type InlineArtifactFormat,
-  type NormalizedFlowchartSpec,
   type MindmapSpec,
+  type NormalizedFlowchartSpec,
   type NormalizedMindmapSpec,
+  type PartialArtifactBundle,
   type PatchableScene,
   type QualityReport,
 } from "./code-mode-contract.js";
@@ -75,7 +80,6 @@ const MAX_MINDMAP_TOPICS = 100;
 const MAX_INPUT_ISSUES = 20;
 
 export interface CodeModeRuntimeOptions {
-  store?: CodeModeArtifactStore;
   createId?: (prefix: string) => string;
   renderer?: CodeModeArtifactRenderer;
   artifactUrl?: (input: {
@@ -84,11 +88,41 @@ export interface CodeModeRuntimeOptions {
   }) => string;
 }
 
-export interface CodeModeRuntime {
+export interface PlaygroundCodeModePromiseRuntimeForIssue243 {
   buildFlowchart(input: unknown): Promise<BuildFlowchartResult>;
   buildMindmap(input: unknown): Promise<BuildMindmapResult>;
   getArtifact(input: unknown): Promise<GetArtifactResult>;
   applyDiagramPatch(input: unknown): Promise<ApplyDiagramPatchResult>;
+  readStoredArtifactForRawHttpResponseForIssue243(
+    artifactId: string,
+    format: ArtifactFormat,
+  ): Promise<StoredArtifactFormat | null>;
+}
+
+export interface PlaygroundCodeModePromiseRuntimeOptionsForIssue243
+  extends CodeModeRuntimeOptions {
+  store?: CodeModeArtifactStorageShape;
+}
+
+export class CodeModeRuntimeEnvironment extends Context.Service<
+  CodeModeRuntimeEnvironment,
+  Required<Pick<CodeModeRuntimeOptions, "createId">> &
+    Pick<CodeModeRuntimeOptions, "artifactUrl" | "renderer">
+>()("@sketchi/diagram-agent/CodeModeRuntimeEnvironment") {}
+
+export const CodeModeRuntimeEnvironmentLive = Layer.succeed(
+  CodeModeRuntimeEnvironment,
+  { createId: defaultCreateId },
+);
+
+export function makeCodeModeRuntimeEnvironmentLayer(
+  options: CodeModeRuntimeOptions = {},
+) {
+  return Layer.succeed(CodeModeRuntimeEnvironment, {
+    createId: options.createId ?? defaultCreateId,
+    ...(options.renderer ? { renderer: options.renderer } : {}),
+    ...(options.artifactUrl ? { artifactUrl: options.artifactUrl } : {}),
+  });
 }
 
 function unknownRecord(value: unknown): Record<string, unknown> | undefined {
@@ -292,14 +326,18 @@ export interface CodeModeArtifactRenderer {
   renderPng(input: {
     scene: RenderedDiagramScene;
     excalidraw: unknown;
+    signal: AbortSignal;
   }): Promise<ArrayBuffer | Uint8Array>;
 }
 
-class ArtifactExportError extends Error {
-  constructor(readonly issue: CodeModeIssue) {
-    super(issue.message);
-  }
-}
+class CodeModeArtifactExportError extends Schema.TaggedErrorClass<CodeModeArtifactExportError>()(
+  "CodeModeArtifactExportError",
+  {
+    cause: Schema.Defect(),
+    message: Schema.String,
+    optionPath: Schema.Boolean,
+  },
+) {}
 
 interface SelectorTargets {
   arrows: PatchableArrow[];
@@ -310,6 +348,165 @@ interface SelectorTargets {
 interface SourceScene {
   scene: PatchableScene;
   sourceArtifactId?: string;
+}
+
+type BuildFlowchartFailureStatus = Extract<
+  BuildFlowchartResult,
+  { ok: false }
+>["status"];
+
+interface BuildFlowchartFailureContext {
+  readonly buildId?: string;
+  readonly requestId?: string;
+  readonly normalizedSpec?: NormalizedFlowchartSpec;
+  readonly quality?: QualityReport;
+  readonly partial?: PartialArtifactBundle;
+  readonly issues: CodeModeIssue[];
+}
+
+class BuildFlowchartFailure extends Schema.TaggedErrorClass<BuildFlowchartFailure>()(
+  "BuildFlowchartFailure",
+  {
+    message: Schema.String,
+    status: Schema.Literals([
+      "invalid_input",
+      "invalid_flowchart",
+      "quality_failed",
+      "render_failed",
+      "export_failed",
+      "storage_failed",
+    ]),
+  },
+) {
+  readonly context: BuildFlowchartFailureContext;
+
+  constructor(input: {
+    readonly status: BuildFlowchartFailureStatus;
+    readonly context: BuildFlowchartFailureContext;
+  }) {
+    super({
+      message: input.context.issues[0]?.message ?? input.status,
+      status: input.status,
+    });
+    this.context = input.context;
+  }
+}
+
+type BuildMindmapFailureStatus = Extract<
+  BuildMindmapResult,
+  { ok: false }
+>["status"];
+
+interface BuildMindmapFailureContext {
+  readonly buildId?: string;
+  readonly requestId?: string;
+  readonly normalizedSpec?: NormalizedMindmapSpec;
+  readonly quality?: QualityReport;
+  readonly partial?: PartialArtifactBundle;
+  readonly issues: CodeModeIssue[];
+}
+
+class BuildMindmapFailure extends Schema.TaggedErrorClass<BuildMindmapFailure>()(
+  "BuildMindmapFailure",
+  {
+    message: Schema.String,
+    status: Schema.Literals([
+      "invalid_input",
+      "invalid_mindmap",
+      "quality_failed",
+      "render_failed",
+      "export_failed",
+      "storage_failed",
+    ]),
+  },
+) {
+  readonly context: BuildMindmapFailureContext;
+
+  constructor(input: {
+    readonly status: BuildMindmapFailureStatus;
+    readonly context: BuildMindmapFailureContext;
+  }) {
+    super({
+      message: input.context.issues[0]?.message ?? input.status,
+      status: input.status,
+    });
+    this.context = input.context;
+  }
+}
+
+type GetArtifactFailureStatus = Extract<
+  GetArtifactResult,
+  { ok: false }
+>["status"];
+
+class GetArtifactFailure extends Schema.TaggedErrorClass<GetArtifactFailure>()(
+  "GetArtifactFailure",
+  {
+    message: Schema.String,
+    status: Schema.Literals([
+      "invalid_input",
+      "not_found",
+      "format_unavailable",
+      "expired",
+      "storage_failed",
+    ]),
+  },
+) {
+  readonly issues: CodeModeIssue[];
+
+  constructor(input: {
+    readonly status: GetArtifactFailureStatus;
+    readonly issues: CodeModeIssue[];
+  }) {
+    super({
+      message: input.issues[0]?.message ?? input.status,
+      status: input.status,
+    });
+    this.issues = input.issues;
+  }
+}
+
+type ApplyDiagramPatchFailureStatus = Extract<
+  ApplyDiagramPatchResult,
+  { ok: false }
+>["status"];
+
+interface ApplyDiagramPatchFailureContext {
+  readonly patchId?: string;
+  readonly requestId?: string;
+  readonly sourceArtifactId?: string;
+  readonly partial?: PartialArtifactBundle;
+  readonly issues: CodeModeIssue[];
+}
+
+class ApplyDiagramPatchFailure extends Schema.TaggedErrorClass<ApplyDiagramPatchFailure>()(
+  "ApplyDiagramPatchFailure",
+  {
+    message: Schema.String,
+    status: Schema.Literals([
+      "invalid_input",
+      "source_unavailable",
+      "target_not_found",
+      "unsupported_operation",
+      "connectivity_changed",
+      "render_failed",
+      "export_failed",
+      "storage_failed",
+    ]),
+  },
+) {
+  readonly context: ApplyDiagramPatchFailureContext;
+
+  constructor(input: {
+    readonly status: ApplyDiagramPatchFailureStatus;
+    readonly context: ApplyDiagramPatchFailureContext;
+  }) {
+    super({
+      message: input.context.issues[0]?.message ?? input.status,
+      status: input.status,
+    });
+    this.context = input.context;
+  }
 }
 
 type PatchableElement = PatchableScene["elements"][number];
@@ -532,58 +729,71 @@ function requestedInlineFormats(
   return input?.inlineArtifacts ?? DEFAULT_INLINE_FORMATS;
 }
 
-async function storedArtifactsForFormats(input: {
-  formats: readonly ArtifactFormat[];
-  scene: RenderedDiagramScene;
-  excalidraw: ExcalidrawScene;
-  renderer?: CodeModeArtifactRenderer | undefined;
-}): Promise<StoredArtifactFormat[]> {
-  const artifacts: StoredArtifactFormat[] = [];
+const storedArtifactsForFormats = Effect.fn("codeMode.artifacts.exportFormats")(
+  function* (input: {
+    formats: readonly ArtifactFormat[];
+    scene: RenderedDiagramScene;
+    excalidraw: ExcalidrawScene;
+    renderer?: CodeModeArtifactRenderer | undefined;
+  }) {
+    const artifacts: StoredArtifactFormat[] = [];
 
-  for (const format of input.formats) {
-    const data = await dataForArtifactFormat(input, format);
-    artifacts.push({
-      format,
-      mimeType: ARTIFACT_MIME_TYPES[format],
-      data,
-      sizeBytes: sizeBytesForArtifactData(data),
-    });
-  }
+    for (const format of input.formats) {
+      const data = yield* dataForArtifactFormat(input, format);
+      artifacts.push({
+        format,
+        mimeType: ARTIFACT_MIME_TYPES[format],
+        data,
+        sizeBytes: sizeBytesForArtifactData(data),
+      });
+    }
 
-  return artifacts;
-}
+    return artifacts;
+  },
+);
 
-async function dataForArtifactFormat(
+function dataForArtifactFormat(
   input: {
     scene: RenderedDiagramScene;
     excalidraw: ExcalidrawScene;
     renderer?: CodeModeArtifactRenderer | undefined;
   },
   format: ArtifactFormat,
-): Promise<unknown> {
+): Effect.Effect<unknown, CodeModeArtifactExportError> {
   if (format === "scene") {
-    return input.scene;
+    return Effect.succeed(input.scene);
   }
 
   if (format === "excalidraw") {
-    return createExcalidrawFile(input.excalidraw);
+    return Effect.succeed(createExcalidrawFile(input.excalidraw));
   }
 
   if (!input.renderer) {
-    throw new ArtifactExportError(
-      issue({
-        code: "render_failed",
-        stage: "export",
-        ref: { kind: "artifact", path: "options.artifactFormats" },
+    return Effect.fail(
+      CodeModeArtifactExportError.make({
+        cause: new Error(
+          "PNG artifact rendering is not configured for this runtime.",
+        ),
         message: "PNG artifact rendering is not configured for this runtime.",
-        hint: "Use the hosted Studio Code Mode runtime with its Cloudflare Browser Run binding, or omit png from artifactFormats.",
+        optionPath: true,
       }),
     );
   }
 
-  return input.renderer.renderPng({
-    scene: input.scene,
-    excalidraw: input.excalidraw,
+  return Effect.tryPromise({
+    try: (signal) =>
+      input.renderer?.renderPng({
+        scene: input.scene,
+        excalidraw: input.excalidraw,
+        signal,
+      }) ?? Promise.reject(new Error("PNG renderer is unavailable.")),
+    catch: (cause) =>
+      CodeModeArtifactExportError.make({
+        cause,
+        message:
+          cause instanceof Error ? cause.message : "Artifact export failed.",
+        optionPath: false,
+      }),
   });
 }
 
@@ -595,18 +805,20 @@ function sizeBytesForArtifactData(data: unknown): number {
   return jsonSizeBytes(data);
 }
 
-function artifactExportIssues(error: unknown): CodeModeIssue[] {
-  if (error instanceof ArtifactExportError) {
-    return [error.issue];
-  }
-
+function artifactExportIssues(
+  error: CodeModeArtifactExportError,
+): CodeModeIssue[] {
   return [
     issue({
       code: "render_failed",
       stage: "export",
-      message:
-        error instanceof Error ? error.message : "Artifact export failed.",
-      hint: "Retry the request; if it keeps failing, inspect the configured renderer.",
+      ...(error.optionPath
+        ? { ref: { kind: "artifact", path: "options.artifactFormats" } }
+        : {}),
+      message: error.message,
+      hint: error.optionPath
+        ? "Use the hosted Studio Code Mode runtime with its Cloudflare Browser Run binding, or omit png from artifactFormats."
+        : "Retry the request; if it keeps failing, inspect the configured renderer.",
     }),
   ];
 }
@@ -1221,93 +1433,104 @@ function applyPatchOperation(
   }
 }
 
-async function resolvePatchSource(
-  store: CodeModeArtifactStore,
+const resolvePatchSource = Effect.fn("codeMode.patch.resolveSource")(function* (
   input: ApplyDiagramPatchRequest,
-): Promise<SourceScene | CodeModeIssue[]> {
+) {
   if ("scene" in input.source) {
     return { scene: cloneScene(input.source.scene) };
   }
 
-  let manifest: Awaited<ReturnType<CodeModeArtifactStore["readManifest"]>>;
-  try {
-    manifest = await store.readManifest(input.source.artifactId);
-  } catch (error) {
-    return [
-      storageIssue(
-        error instanceof Error
-          ? error.message
-          : `Artifact manifest "${input.source.artifactId}" could not be read.`,
-        "storage_read_failed",
-      ),
-    ];
-  }
+  const store = yield* CodeModeArtifactStorage;
+  const manifest = yield* store.readManifest(input.source.artifactId).pipe(
+    Effect.mapError(
+      (error) =>
+        new ApplyDiagramPatchFailure({
+          status: "storage_failed",
+          context: {
+            issues: [storageIssue(error.message, "storage_read_failed")],
+          },
+        }),
+    ),
+  );
   if (
     !manifest ||
     manifest.artifactId !== input.source.artifactId ||
     !manifest.formats.some((format) => format.format === "scene")
   ) {
-    return [
-      issue({
-        code: "patch_source_unavailable",
-        stage: "storage",
-        ref: { kind: "artifact", id: input.source.artifactId },
-        message: `Artifact "${input.source.artifactId}" does not have a valid source manifest.`,
-        hint: "Rebuild with the appropriate build operation and patch the accepted artifact id.",
-      }),
-    ];
+    return yield* new ApplyDiagramPatchFailure({
+      status: "source_unavailable",
+      context: {
+        issues: [
+          issue({
+            code: "patch_source_unavailable",
+            stage: "storage",
+            ref: { kind: "artifact", id: input.source.artifactId },
+            message: `Artifact "${input.source.artifactId}" does not have a valid source manifest.`,
+            hint: "Rebuild with the appropriate build operation and patch the accepted artifact id.",
+          }),
+        ],
+      },
+    });
   }
 
-  let artifact: StoredArtifactFormat | null;
-  try {
-    artifact = await store.read(input.source.artifactId, "scene");
-  } catch (error) {
-    return [
-      storageIssue(
-        error instanceof Error
-          ? error.message
-          : `Scene artifact "${input.source.artifactId}" could not be read.`,
-        "storage_read_failed",
-      ),
-    ];
-  }
+  const artifact = yield* store.read(input.source.artifactId, "scene").pipe(
+    Effect.mapError(
+      (error) =>
+        new ApplyDiagramPatchFailure({
+          status: "storage_failed",
+          context: {
+            issues: [storageIssue(error.message, "storage_read_failed")],
+          },
+        }),
+    ),
+  );
   if (!artifact) {
-    return [
-      issue({
-        code: "patch_source_unavailable",
-        stage: "storage",
-        ref: { kind: "artifact", id: input.source.artifactId },
-        message: `Scene artifact "${input.source.artifactId}" is not available.`,
-        hint: "Call buildFlowchart or buildMindmap first, then patch the accepted artifact id.",
-      }),
-    ];
+    return yield* new ApplyDiagramPatchFailure({
+      status: "source_unavailable",
+      context: {
+        issues: [
+          issue({
+            code: "patch_source_unavailable",
+            stage: "storage",
+            ref: { kind: "artifact", id: input.source.artifactId },
+            message: `Scene artifact "${input.source.artifactId}" is not available.`,
+            hint: "Call buildFlowchart or buildMindmap first, then patch the accepted artifact id.",
+          }),
+        ],
+      },
+    });
   }
 
   const parsed = RenderedDiagramSceneSchema.safeParse(artifact.data);
   if (!parsed.success) {
-    return [
-      issue({
-        code: "patch_source_unavailable",
-        stage: "storage",
-        ref: { kind: "artifact", id: input.source.artifactId },
-        message: `Scene artifact "${input.source.artifactId}" could not be decoded.`,
-        hint: "Rebuild with the appropriate build operation and patch the new artifact.",
-      }),
-    ];
+    return yield* new ApplyDiagramPatchFailure({
+      status: "source_unavailable",
+      context: {
+        issues: [
+          issue({
+            code: "patch_source_unavailable",
+            stage: "storage",
+            ref: { kind: "artifact", id: input.source.artifactId },
+            message: `Scene artifact "${input.source.artifactId}" could not be decoded.`,
+            hint: "Rebuild with the appropriate build operation and patch the new artifact.",
+          }),
+        ],
+      },
+    });
   }
 
   return {
     scene: cloneScene(parsed.data),
     sourceArtifactId: input.source.artifactId,
   };
-}
+});
 
 function responseRequestId(requestId: string | undefined) {
   return requestId ? { requestId } : {};
 }
 
 function withArtifactUrls(
-  artifact: Awaited<ReturnType<CodeModeArtifactStore["write"]>>,
+  artifact: ArtifactBundle,
   artifactUrl: CodeModeRuntimeOptions["artifactUrl"],
 ) {
   if (!artifactUrl) {
@@ -1332,690 +1555,732 @@ function withArtifactUrls(
   };
 }
 
-export function createCodeModeRuntime(
-  options: CodeModeRuntimeOptions = {},
-): CodeModeRuntime {
-  const store = options.store ?? createMemoryArtifactStore();
-  const createId = options.createId ?? defaultCreateId;
-  const renderer = options.renderer;
-  const artifactUrl = options.artifactUrl;
-
+function scenePartial(scene: RenderedDiagramScene): PartialArtifactBundle {
   return {
-    async buildMindmap(input) {
-      const preflightIssues = preflightMindmapInput(input);
-      if (preflightIssues.length > 0) {
-        return {
-          ok: false,
+    diagramId: scene.diagramId,
+    formats: [
+      {
+        format: "scene",
+        mimeType: ARTIFACT_MIME_TYPES.scene,
+        inline: scene,
+        sizeBytes: jsonSizeBytes(scene),
+      },
+    ],
+  };
+}
+
+function buildFlowchartFailureResult(
+  error: BuildFlowchartFailure,
+): Extract<BuildFlowchartResult, { ok: false }> {
+  return {
+    ok: false,
+    status: error.status,
+    ...(error.context.buildId ? { buildId: error.context.buildId } : {}),
+    ...(error.context.requestId ? { requestId: error.context.requestId } : {}),
+    ...(error.context.normalizedSpec
+      ? { normalizedSpec: error.context.normalizedSpec }
+      : {}),
+    ...(error.context.quality ? { quality: error.context.quality } : {}),
+    ...(error.context.partial ? { partial: error.context.partial } : {}),
+    issues: error.context.issues,
+  };
+}
+
+function buildMindmapFailureResult(
+  error: BuildMindmapFailure,
+): Extract<BuildMindmapResult, { ok: false }> {
+  return {
+    ok: false,
+    status: error.status,
+    ...(error.context.buildId ? { buildId: error.context.buildId } : {}),
+    ...(error.context.requestId ? { requestId: error.context.requestId } : {}),
+    ...(error.context.normalizedSpec
+      ? { normalizedSpec: error.context.normalizedSpec }
+      : {}),
+    ...(error.context.quality ? { quality: error.context.quality } : {}),
+    ...(error.context.partial ? { partial: error.context.partial } : {}),
+    issues: error.context.issues,
+  };
+}
+
+function getArtifactFailureResult(
+  error: GetArtifactFailure,
+): Extract<GetArtifactResult, { ok: false }> {
+  return { ok: false, status: error.status, issues: error.issues };
+}
+
+function applyDiagramPatchFailureResult(
+  error: ApplyDiagramPatchFailure,
+): Extract<ApplyDiagramPatchResult, { ok: false }> {
+  return {
+    ok: false,
+    status: error.status,
+    ...(error.context.patchId ? { patchId: error.context.patchId } : {}),
+    ...(error.context.requestId ? { requestId: error.context.requestId } : {}),
+    ...(error.context.sourceArtifactId
+      ? { sourceArtifactId: error.context.sourceArtifactId }
+      : {}),
+    ...(error.context.partial ? { partial: error.context.partial } : {}),
+    issues: error.context.issues,
+  };
+}
+
+function storageFailureIssue(
+  error: CodeModeArtifactStorageError,
+  code: "storage_read_failed" | "storage_write_failed",
+) {
+  return storageIssue(error.message, code);
+}
+
+const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
+  function* (input: unknown) {
+    const preflightIssues = preflightMindmapInput(input);
+    if (preflightIssues.length > 0) {
+      return yield* new BuildMindmapFailure({
+        status: "invalid_mindmap",
+        context: { issues: preflightIssues },
+      });
+    }
+
+    const parsed = BuildMindmapRequestSchema.safeParse(input);
+    if (!parsed.success) {
+      return yield* new BuildMindmapFailure({
+        status: "invalid_input",
+        context: { issues: inputIssues(parsed.error) },
+      });
+    }
+
+    const environment = yield* CodeModeRuntimeEnvironment;
+    const store = yield* CodeModeArtifactStorage;
+    const request = parsed.data;
+    const buildId = yield* Effect.sync(() => environment.createId("build"));
+    const normalizedSpec = normalizeMindmapSpec(request.spec);
+    const baseContext = {
+      buildId,
+      ...responseRequestId(request.requestId),
+      normalizedSpec,
+    };
+    const validationIssues = validateNormalizedMindmap(normalizedSpec);
+    if (validationIssues.length > 0) {
+      return yield* new BuildMindmapFailure({
+        status: "invalid_mindmap",
+        context: { ...baseContext, issues: validationIssues },
+      });
+    }
+
+    const diagram = yield* Effect.try({
+      try: () => toMindmapDiagram(normalizedSpec),
+      catch: (cause) =>
+        new BuildMindmapFailure({
           status: "invalid_mindmap",
-          issues: preflightIssues,
-        };
-      }
-      const parsed = BuildMindmapRequestSchema.safeParse(input);
-      if (!parsed.success) {
-        return {
-          ok: false,
-          status: "invalid_input",
-          issues: inputIssues(parsed.error),
-        };
-      }
-      const request = parsed.data;
-      const buildId = createId("build");
-      const normalizedSpec = normalizeMindmapSpec(request.spec);
-      const validationIssues = validateNormalizedMindmap(normalizedSpec);
-      if (validationIssues.length > 0) {
-        return {
-          ok: false,
-          status: "invalid_mindmap",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          issues: validationIssues,
-        };
-      }
-
-      let diagram: MindmapDiagram;
-      try {
-        diagram = toMindmapDiagram(normalizedSpec);
-      } catch (error) {
-        return {
-          ok: false,
-          status: "invalid_mindmap",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          issues: [
-            issue({
-              code: "disconnected_graph",
-              stage: "mindmap",
-              ref: { kind: "diagram", id: normalizedSpec.id },
-              message:
-                error instanceof Error
-                  ? error.message
-                  : "Mindmap failed core validation.",
-              hint: "Repair the nested topic hierarchy and call buildMindmap again.",
-            }),
-          ],
-        };
-      }
-
-      const quality = mindmapQuality(
-        diagram,
-        request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-      );
-      if (!quality.accepted) {
-        return {
-          ok: false,
-          status: "quality_failed",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          quality,
-          issues: qualityIssues(quality),
-        };
-      }
-
-      let scene: RenderedDiagramScene;
-      try {
-        scene = renderIntermediateDiagram(diagram);
-      } catch (error) {
-        return {
-          ok: false,
-          status: "render_failed",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          quality,
-          issues: [
-            issue({
-              code: "render_failed",
-              stage: "render",
-              ref: { kind: "diagram", id: normalizedSpec.id },
-              message:
-                error instanceof Error
-                  ? error.message
-                  : "Unable to render mindmap scene.",
-              hint: "Simplify the hierarchy or retry with a smaller mindmap.",
-            }),
-          ],
-        };
-      }
-
-      const excalidraw = convertSceneToExcalidraw(scene);
-      const exportValidation = validateExcalidrawScene(excalidraw);
-      if (!exportValidation.ok) {
-        return {
-          ok: false,
-          status: "export_failed",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          quality,
-          partial: {
-            diagramId: scene.diagramId,
-            formats: [
-              {
-                format: "scene",
-                mimeType: ARTIFACT_MIME_TYPES.scene,
-                inline: scene,
-                sizeBytes: jsonSizeBytes(scene),
-              },
-            ],
-          },
-          issues: exportIssues(exportValidation.issues),
-        };
-      }
-
-      let storedFormats: StoredArtifactFormat[];
-      try {
-        storedFormats = await storedArtifactsForFormats({
-          formats: requestedFormats(request.options),
-          scene,
-          excalidraw,
-          renderer,
-        });
-      } catch (error) {
-        return {
-          ok: false,
-          status: "export_failed",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          quality,
-          partial: {
-            diagramId: scene.diagramId,
-            formats: [
-              {
-                format: "scene",
-                mimeType: ARTIFACT_MIME_TYPES.scene,
-                inline: scene,
-                sizeBytes: jsonSizeBytes(scene),
-              },
-            ],
-          },
-          issues: artifactExportIssues(error),
-        };
-      }
-
-      try {
-        const artifactId = createId("artifact");
-        const artifact = await store.write({
-          artifactId,
-          diagramId: scene.diagramId,
-          formats: storedFormats,
-          inlineFormats: requestedInlineFormats(request.options),
-        });
-        return {
-          ok: true,
-          status: "accepted",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          quality,
-          artifact: withArtifactUrls(artifact, artifactUrl),
-          issues: [],
-        };
-      } catch (error) {
-        return {
-          ok: false,
-          status: "storage_failed",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          quality,
-          partial: { diagramId: scene.diagramId },
-          issues: [
-            storageIssue(
-              error instanceof Error
-                ? error.message
-                : "Artifact storage failed.",
-              "storage_write_failed",
-            ),
-          ],
-        };
-      }
-    },
-    async buildFlowchart(input) {
-      const parsed = BuildFlowchartRequestSchema.safeParse(input);
-      if (!parsed.success) {
-        return {
-          ok: false,
-          status: "invalid_input",
-          issues: inputIssues(parsed.error),
-        };
-      }
-
-      const request = parsed.data;
-      const formats = requestedFormats(request.options);
-      const buildId = createId("build");
-      const normalizedSpec = normalizeFlowchartSpec(request.spec);
-      const parsedDiagram = FlowchartDiagramSchema.safeParse(
-        flowchartDiagramInput(normalizedSpec),
-      );
-      if (!parsedDiagram.success) {
-        return {
-          ok: false,
-          status: "invalid_flowchart",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          issues: flowchartSchemaIssues(parsedDiagram.error, normalizedSpec),
-        };
-      }
-      const diagram = parsedDiagram.data;
-      const validationIssues = canonicalFlowchartIssues(diagram);
-      if (validationIssues.length > 0) {
-        return {
-          ok: false,
-          status: "invalid_flowchart",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          issues: validationIssues,
-        };
-      }
-      validateFlowchartDiagram(diagram);
-
-      const quality = assessFlowchartQuality(
-        diagram,
-        request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-      );
-      if (!quality.accepted) {
-        return {
-          ok: false,
-          status: "quality_failed",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          quality,
-          issues: qualityIssues(quality),
-        };
-      }
-
-      let scene: RenderedDiagramScene;
-      try {
-        scene = renderIntermediateDiagram(diagram);
-      } catch (error) {
-        return {
-          ok: false,
-          status: "render_failed",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          quality,
-          issues: [
-            issue({
-              code: "render_failed",
-              stage: "render",
-              ref: { kind: "diagram", id: normalizedSpec.id },
-              message:
-                error instanceof Error
-                  ? error.message
-                  : "Unable to render flowchart scene.",
-              hint: "Simplify the graph or retry with a smaller flowchart.",
-            }),
-          ],
-        };
-      }
-
-      const excalidraw = convertSceneToExcalidraw(scene);
-      const validation = validateExcalidrawScene(excalidraw);
-      if (!validation.ok) {
-        return {
-          ok: false,
-          status: "export_failed",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          quality,
-          partial: {
-            diagramId: scene.diagramId,
-            formats: [
-              {
-                format: "scene",
-                mimeType: ARTIFACT_MIME_TYPES.scene,
-                inline: scene,
-                sizeBytes: jsonSizeBytes(scene),
-              },
-            ],
-          },
-          issues: exportIssues(validation.issues),
-        };
-      }
-
-      let storedFormats: StoredArtifactFormat[];
-      try {
-        storedFormats = await storedArtifactsForFormats({
-          formats,
-          scene,
-          excalidraw,
-          renderer,
-        });
-      } catch (error) {
-        return {
-          ok: false,
-          status: "export_failed",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          quality,
-          partial: {
-            diagramId: scene.diagramId,
-            formats: [
-              {
-                format: "scene",
-                mimeType: ARTIFACT_MIME_TYPES.scene,
-                inline: scene,
-                sizeBytes: jsonSizeBytes(scene),
-              },
-            ],
-          },
-          issues: artifactExportIssues(error),
-        };
-      }
-
-      try {
-        const artifactId = createId("artifact");
-        const artifact = await store.write({
-          artifactId,
-          diagramId: scene.diagramId,
-          formats: storedFormats,
-          inlineFormats: requestedInlineFormats(request.options),
-        });
-
-        return {
-          ok: true,
-          status: "accepted",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          quality,
-          artifact: withArtifactUrls(artifact, artifactUrl),
-          issues: [],
-        };
-      } catch (error) {
-        return {
-          ok: false,
-          status: "storage_failed",
-          buildId,
-          ...responseRequestId(request.requestId),
-          normalizedSpec,
-          quality,
-          issues: [
-            storageIssue(
-              error instanceof Error ? error.message : "Artifact write failed.",
-            ),
-          ],
-        };
-      }
-    },
-
-    async getArtifact(input) {
-      const parsed = GetArtifactRequestSchema.safeParse(input);
-      if (!parsed.success) {
-        return {
-          ok: false,
-          status: "invalid_input",
-          issues: inputIssues(parsed.error),
-        };
-      }
-
-      const request = parsed.data;
-      let manifest: Awaited<ReturnType<CodeModeArtifactStore["readManifest"]>>;
-      try {
-        manifest = await store.readManifest(request.artifactId);
-      } catch (error) {
-        return {
-          ok: false,
-          status: "storage_failed",
-          issues: [
-            storageIssue(
-              error instanceof Error
-                ? error.message
-                : "Artifact manifest read failed.",
-              "storage_read_failed",
-            ),
-          ],
-        };
-      }
-      if (!manifest) {
-        return {
-          ok: false,
-          status: "not_found",
-          issues: [
-            issue({
-              code: "patch_source_unavailable",
-              stage: "storage",
-              ref: { kind: "artifact", id: request.artifactId },
-              message: `Artifact "${request.artifactId}" was not found.`,
-              hint: "Use the artifactId returned by buildFlowchart or applyDiagramPatch.",
-            }),
-          ],
-        };
-      }
-
-      const format = request.format ?? "scene";
-      if (!manifest.formats.some((entry) => entry.format === format)) {
-        return {
-          ok: false,
-          status: "format_unavailable",
-          issues: [
-            issue({
-              code: "unsupported_artifact_format",
-              stage: "storage",
-              ref: { kind: "artifact", id: request.artifactId },
-              message: `Artifact "${request.artifactId}" does not include format "${format}".`,
-              hint: "Request a format listed in the artifact bundle.",
-            }),
-          ],
-        };
-      }
-
-      let artifact: StoredArtifactFormat | null;
-      try {
-        artifact = await store.read(request.artifactId, format);
-      } catch (error) {
-        return {
-          ok: false,
-          status: "storage_failed",
-          issues: [
-            storageIssue(
-              error instanceof Error ? error.message : "Artifact read failed.",
-              "storage_read_failed",
-            ),
-          ],
-        };
-      }
-      if (!artifact) {
-        return {
-          ok: false,
-          status: "format_unavailable",
-          issues: [
-            issue({
-              code: "patch_source_unavailable",
-              stage: "storage",
-              ref: { kind: "artifact", id: request.artifactId },
-              message: `Artifact "${request.artifactId}" format "${format}" could not be read.`,
-              hint: "Retry retrieval or rebuild the artifact.",
-            }),
-          ],
-        };
-      }
-
-      return {
-        ok: true,
-        artifactId: request.artifactId,
-        diagramId: manifest.diagramId,
-        format,
-        mimeType: artifact.mimeType,
-        ...(artifactUrl
-          ? { url: artifactUrl({ artifactId: request.artifactId, format }) }
-          : {}),
-        ...(request.inline !== true || !isInlineArtifactFormat(format)
-          ? {}
-          : { inline: artifact.data }),
-        sizeBytes: artifact.sizeBytes,
-        ...(manifest.provenance ? { provenance: manifest.provenance } : {}),
-      };
-    },
-
-    async applyDiagramPatch(input) {
-      const parsed = ApplyDiagramPatchRequestSchema.safeParse(input);
-      if (!parsed.success) {
-        return {
-          ok: false,
-          status: "invalid_input",
-          issues: inputIssues(parsed.error),
-        };
-      }
-
-      const request = parsed.data;
-      const patchId = createId("patch");
-      const formats = requestedFormats(request.options);
-      const source = await resolvePatchSource(store, request);
-      if (Array.isArray(source)) {
-        return {
-          ok: false,
-          status: source.some(
-            (sourceIssue) =>
-              sourceIssue.code === "storage_read_failed" ||
-              sourceIssue.code === "storage_write_failed",
-          )
-            ? "storage_failed"
-            : "source_unavailable",
-          patchId,
-          ...responseRequestId(request.requestId),
-          issues: source,
-        };
-      }
-
-      const scene = source.scene;
-      const beforeConnectivity = sourceConnectivity(scene);
-      for (const operation of request.operations) {
-        const operationIssues = applyPatchOperation(scene, operation);
-        if (operationIssues.length > 0) {
-          return {
-            ok: false,
-            status:
-              operationIssues[0]?.code === "unknown_patch_target"
-                ? "target_not_found"
-                : "unsupported_operation",
-            patchId,
-            ...responseRequestId(request.requestId),
-            ...(source.sourceArtifactId
-              ? { sourceArtifactId: source.sourceArtifactId }
-              : {}),
-            issues: operationIssues,
-          };
-        }
-      }
-
-      if (request.options?.preserveConnectivity !== false) {
-        const afterConnectivity = sourceConnectivity(scene);
-        if (!sameConnectivity(beforeConnectivity, afterConnectivity)) {
-          return {
-            ok: false,
-            status: "connectivity_changed",
-            patchId,
-            ...responseRequestId(request.requestId),
-            ...(source.sourceArtifactId
-              ? { sourceArtifactId: source.sourceArtifactId }
-              : {}),
+          context: {
+            ...baseContext,
             issues: [
               issue({
-                code: "patch_preserve_connectivity_failed",
-                stage: "flowchart",
-                ref: { kind: "diagram", id: scene.diagramId },
-                message: "Patch changed the diagram edge connectivity.",
-                hint: "Use buildFlowchart for process-graph structure or buildMindmap for hierarchy structure.",
+                code: "disconnected_graph",
+                stage: "mindmap",
+                ref: { kind: "diagram", id: normalizedSpec.id },
+                message:
+                  cause instanceof Error
+                    ? cause.message
+                    : "Mindmap failed core validation.",
+                hint: "Repair the nested topic hierarchy and call buildMindmap again.",
               }),
             ],
-          };
-        }
-      }
+          },
+        }),
+    });
+    const quality = mindmapQuality(
+      diagram,
+      request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+    );
+    const qualityContext = { ...baseContext, quality };
+    if (!quality.accepted) {
+      return yield* new BuildMindmapFailure({
+        status: "quality_failed",
+        context: { ...qualityContext, issues: qualityIssues(quality) },
+      });
+    }
 
-      const renderedScene = normalizePatchableScene(scene);
-      if (!renderedScene) {
-        return {
-          ok: false,
+    const scene = yield* Effect.try({
+      try: () => renderIntermediateDiagram(diagram),
+      catch: (cause) =>
+        new BuildMindmapFailure({
           status: "render_failed",
-          patchId,
-          ...responseRequestId(request.requestId),
-          ...(source.sourceArtifactId
-            ? { sourceArtifactId: source.sourceArtifactId }
-            : {}),
+          context: {
+            ...qualityContext,
+            issues: [
+              issue({
+                code: "render_failed",
+                stage: "render",
+                ref: { kind: "diagram", id: normalizedSpec.id },
+                message:
+                  cause instanceof Error
+                    ? cause.message
+                    : "Unable to render mindmap scene.",
+                hint: "Simplify the hierarchy or retry with a smaller mindmap.",
+              }),
+            ],
+          },
+        }),
+    });
+    const excalidraw = convertSceneToExcalidraw(scene);
+    const exportValidation = validateExcalidrawScene(excalidraw);
+    const exportContext = {
+      ...qualityContext,
+      partial: scenePartial(scene),
+    };
+    if (!exportValidation.ok) {
+      return yield* new BuildMindmapFailure({
+        status: "export_failed",
+        context: {
+          ...exportContext,
+          issues: exportIssues(exportValidation.issues),
+        },
+      });
+    }
+
+    const storedFormats = yield* storedArtifactsForFormats({
+      formats: requestedFormats(request.options),
+      scene,
+      excalidraw,
+      renderer: environment.renderer,
+    }).pipe(
+      Effect.mapError(
+        (error) =>
+          new BuildMindmapFailure({
+            status: "export_failed",
+            context: {
+              ...exportContext,
+              issues: artifactExportIssues(error),
+            },
+          }),
+      ),
+    );
+    const artifactId = yield* Effect.sync(() =>
+      environment.createId("artifact"),
+    );
+    const artifact = yield* store
+      .write({
+        artifactId,
+        diagramId: scene.diagramId,
+        formats: storedFormats,
+        inlineFormats: requestedInlineFormats(request.options),
+      })
+      .pipe(
+        Effect.mapError(
+          (error) =>
+            new BuildMindmapFailure({
+              status: "storage_failed",
+              context: {
+                ...qualityContext,
+                partial: { diagramId: scene.diagramId },
+                issues: [storageFailureIssue(error, "storage_write_failed")],
+              },
+            }),
+        ),
+      );
+
+    return {
+      ok: true,
+      status: "accepted",
+      buildId,
+      ...responseRequestId(request.requestId),
+      normalizedSpec,
+      quality,
+      artifact: withArtifactUrls(artifact, environment.artifactUrl),
+      issues: [],
+    } satisfies Extract<BuildMindmapResult, { ok: true }>;
+  },
+);
+
+const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
+  function* (input: unknown) {
+    const parsed = BuildFlowchartRequestSchema.safeParse(input);
+    if (!parsed.success) {
+      return yield* new BuildFlowchartFailure({
+        status: "invalid_input",
+        context: { issues: inputIssues(parsed.error) },
+      });
+    }
+
+    const environment = yield* CodeModeRuntimeEnvironment;
+    const store = yield* CodeModeArtifactStorage;
+    const request = parsed.data;
+    const formats = requestedFormats(request.options);
+    const buildId = yield* Effect.sync(() => environment.createId("build"));
+    const normalizedSpec = normalizeFlowchartSpec(request.spec);
+    const baseContext = {
+      buildId,
+      ...responseRequestId(request.requestId),
+      normalizedSpec,
+    };
+    const parsedDiagram = FlowchartDiagramSchema.safeParse(
+      flowchartDiagramInput(normalizedSpec),
+    );
+    if (!parsedDiagram.success) {
+      return yield* new BuildFlowchartFailure({
+        status: "invalid_flowchart",
+        context: {
+          ...baseContext,
+          issues: flowchartSchemaIssues(parsedDiagram.error, normalizedSpec),
+        },
+      });
+    }
+    const diagram = parsedDiagram.data;
+    const validationIssues = canonicalFlowchartIssues(diagram);
+    if (validationIssues.length > 0) {
+      return yield* new BuildFlowchartFailure({
+        status: "invalid_flowchart",
+        context: { ...baseContext, issues: validationIssues },
+      });
+    }
+    validateFlowchartDiagram(diagram);
+
+    const quality = assessFlowchartQuality(
+      diagram,
+      request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+    );
+    const qualityContext = { ...baseContext, quality };
+    if (!quality.accepted) {
+      return yield* new BuildFlowchartFailure({
+        status: "quality_failed",
+        context: { ...qualityContext, issues: qualityIssues(quality) },
+      });
+    }
+
+    const scene = yield* Effect.try({
+      try: () => renderIntermediateDiagram(diagram),
+      catch: (cause) =>
+        new BuildFlowchartFailure({
+          status: "render_failed",
+          context: {
+            ...qualityContext,
+            issues: [
+              issue({
+                code: "render_failed",
+                stage: "render",
+                ref: { kind: "diagram", id: normalizedSpec.id },
+                message:
+                  cause instanceof Error
+                    ? cause.message
+                    : "Unable to render flowchart scene.",
+                hint: "Simplify the graph or retry with a smaller flowchart.",
+              }),
+            ],
+          },
+        }),
+    });
+    const excalidraw = convertSceneToExcalidraw(scene);
+    const validation = validateExcalidrawScene(excalidraw);
+    const exportContext = {
+      ...qualityContext,
+      partial: scenePartial(scene),
+    };
+    if (!validation.ok) {
+      return yield* new BuildFlowchartFailure({
+        status: "export_failed",
+        context: {
+          ...exportContext,
+          issues: exportIssues(validation.issues),
+        },
+      });
+    }
+
+    const storedFormats = yield* storedArtifactsForFormats({
+      formats,
+      scene,
+      excalidraw,
+      renderer: environment.renderer,
+    }).pipe(
+      Effect.mapError(
+        (error) =>
+          new BuildFlowchartFailure({
+            status: "export_failed",
+            context: {
+              ...exportContext,
+              issues: artifactExportIssues(error),
+            },
+          }),
+      ),
+    );
+    const artifactId = yield* Effect.sync(() =>
+      environment.createId("artifact"),
+    );
+    const artifact = yield* store
+      .write({
+        artifactId,
+        diagramId: scene.diagramId,
+        formats: storedFormats,
+        inlineFormats: requestedInlineFormats(request.options),
+      })
+      .pipe(
+        Effect.mapError(
+          (error) =>
+            new BuildFlowchartFailure({
+              status: "storage_failed",
+              context: {
+                ...qualityContext,
+                issues: [storageFailureIssue(error, "storage_write_failed")],
+              },
+            }),
+        ),
+      );
+
+    return {
+      ok: true,
+      status: "accepted",
+      buildId,
+      ...responseRequestId(request.requestId),
+      normalizedSpec,
+      quality,
+      artifact: withArtifactUrls(artifact, environment.artifactUrl),
+      issues: [],
+    } satisfies Extract<BuildFlowchartResult, { ok: true }>;
+  },
+);
+
+const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(
+  function* (input: unknown) {
+    const parsed = GetArtifactRequestSchema.safeParse(input);
+    if (!parsed.success) {
+      return yield* new GetArtifactFailure({
+        status: "invalid_input",
+        issues: inputIssues(parsed.error),
+      });
+    }
+
+    const environment = yield* CodeModeRuntimeEnvironment;
+    const store = yield* CodeModeArtifactStorage;
+    const request = parsed.data;
+    const manifest = yield* store.readManifest(request.artifactId).pipe(
+      Effect.mapError(
+        (error) =>
+          new GetArtifactFailure({
+            status: "storage_failed",
+            issues: [storageFailureIssue(error, "storage_read_failed")],
+          }),
+      ),
+    );
+    if (!manifest) {
+      return yield* new GetArtifactFailure({
+        status: "not_found",
+        issues: [
+          issue({
+            code: "patch_source_unavailable",
+            stage: "storage",
+            ref: { kind: "artifact", id: request.artifactId },
+            message: `Artifact "${request.artifactId}" was not found.`,
+            hint: "Use the artifactId returned by buildFlowchart or applyDiagramPatch.",
+          }),
+        ],
+      });
+    }
+
+    const format = request.format ?? "scene";
+    if (!manifest.formats.some((entry) => entry.format === format)) {
+      return yield* new GetArtifactFailure({
+        status: "format_unavailable",
+        issues: [
+          issue({
+            code: "unsupported_artifact_format",
+            stage: "storage",
+            ref: { kind: "artifact", id: request.artifactId },
+            message: `Artifact "${request.artifactId}" does not include format "${format}".`,
+            hint: "Request a format listed in the artifact bundle.",
+          }),
+        ],
+      });
+    }
+
+    const artifact = yield* store.read(request.artifactId, format).pipe(
+      Effect.mapError(
+        (error) =>
+          new GetArtifactFailure({
+            status: "storage_failed",
+            issues: [storageFailureIssue(error, "storage_read_failed")],
+          }),
+      ),
+    );
+    if (!artifact) {
+      return yield* new GetArtifactFailure({
+        status: "format_unavailable",
+        issues: [
+          issue({
+            code: "patch_source_unavailable",
+            stage: "storage",
+            ref: { kind: "artifact", id: request.artifactId },
+            message: `Artifact "${request.artifactId}" format "${format}" could not be read.`,
+            hint: "Retry retrieval or rebuild the artifact.",
+          }),
+        ],
+      });
+    }
+
+    return {
+      ok: true,
+      artifactId: request.artifactId,
+      diagramId: manifest.diagramId,
+      format,
+      mimeType: artifact.mimeType,
+      ...(environment.artifactUrl
+        ? {
+            url: environment.artifactUrl({
+              artifactId: request.artifactId,
+              format,
+            }),
+          }
+        : {}),
+      ...(request.inline !== true || !isInlineArtifactFormat(format)
+        ? {}
+        : { inline: artifact.data }),
+      sizeBytes: artifact.sizeBytes,
+      ...(manifest.provenance ? { provenance: manifest.provenance } : {}),
+    } satisfies Extract<GetArtifactResult, { ok: true }>;
+  },
+);
+
+const applyDiagramPatchWorkflow = Effect.fn(
+  "codeMode.applyDiagramPatch.workflow",
+)(function* (input: unknown) {
+  const parsed = ApplyDiagramPatchRequestSchema.safeParse(input);
+  if (!parsed.success) {
+    return yield* new ApplyDiagramPatchFailure({
+      status: "invalid_input",
+      context: { issues: inputIssues(parsed.error) },
+    });
+  }
+
+  const environment = yield* CodeModeRuntimeEnvironment;
+  const store = yield* CodeModeArtifactStorage;
+  const request = parsed.data;
+  const patchId = yield* Effect.sync(() => environment.createId("patch"));
+  const baseContext = {
+    patchId,
+    ...responseRequestId(request.requestId),
+  };
+  const formats = requestedFormats(request.options);
+  const source = yield* resolvePatchSource(request).pipe(
+    Effect.mapError(
+      (error) =>
+        new ApplyDiagramPatchFailure({
+          status: error.status,
+          context: { ...baseContext, ...error.context },
+        }),
+    ),
+  );
+  const sourceContext = {
+    ...baseContext,
+    ...(source.sourceArtifactId
+      ? { sourceArtifactId: source.sourceArtifactId }
+      : {}),
+  };
+  const scene = source.scene;
+  const beforeConnectivity = sourceConnectivity(scene);
+  for (const operation of request.operations) {
+    const operationIssues = applyPatchOperation(scene, operation);
+    if (operationIssues.length > 0) {
+      return yield* new ApplyDiagramPatchFailure({
+        status:
+          operationIssues[0]?.code === "unknown_patch_target"
+            ? "target_not_found"
+            : "unsupported_operation",
+        context: { ...sourceContext, issues: operationIssues },
+      });
+    }
+  }
+
+  if (request.options?.preserveConnectivity !== false) {
+    const afterConnectivity = sourceConnectivity(scene);
+    if (!sameConnectivity(beforeConnectivity, afterConnectivity)) {
+      return yield* new ApplyDiagramPatchFailure({
+        status: "connectivity_changed",
+        context: {
+          ...sourceContext,
           issues: [
             issue({
-              code: "patch_output_invalid",
-              stage: "render",
+              code: "patch_preserve_connectivity_failed",
+              stage: "flowchart",
               ref: { kind: "diagram", id: scene.diagramId },
-              message: "Patched scene has an invalid arrow point list.",
-              hint: "Reroute edges or rebuild the flowchart artifact.",
+              message: "Patch changed the diagram edge connectivity.",
+              hint: "Use buildFlowchart for process-graph structure or buildMindmap for hierarchy structure.",
             }),
           ],
-        };
-      }
+        },
+      });
+    }
+  }
 
-      const excalidraw = convertSceneToExcalidraw(renderedScene);
-      const validation = validateExcalidrawScene(excalidraw);
-      if (!validation.ok) {
-        return {
-          ok: false,
+  const renderedScene = normalizePatchableScene(scene);
+  if (!renderedScene) {
+    return yield* new ApplyDiagramPatchFailure({
+      status: "render_failed",
+      context: {
+        ...sourceContext,
+        issues: [
+          issue({
+            code: "patch_output_invalid",
+            stage: "render",
+            ref: { kind: "diagram", id: scene.diagramId },
+            message: "Patched scene has an invalid arrow point list.",
+            hint: "Reroute edges or rebuild the flowchart artifact.",
+          }),
+        ],
+      },
+    });
+  }
+
+  const excalidraw = convertSceneToExcalidraw(renderedScene);
+  const validation = validateExcalidrawScene(excalidraw);
+  const exportContext = {
+    ...sourceContext,
+    partial: scenePartial(renderedScene),
+  };
+  if (!validation.ok) {
+    return yield* new ApplyDiagramPatchFailure({
+      status: "export_failed",
+      context: { ...exportContext, issues: exportIssues(validation.issues) },
+    });
+  }
+
+  const storedFormats = yield* storedArtifactsForFormats({
+    formats,
+    scene: renderedScene,
+    excalidraw,
+    renderer: environment.renderer,
+  }).pipe(
+    Effect.mapError(
+      (error) =>
+        new ApplyDiagramPatchFailure({
           status: "export_failed",
-          patchId,
-          ...responseRequestId(request.requestId),
-          ...(source.sourceArtifactId
-            ? { sourceArtifactId: source.sourceArtifactId }
-            : {}),
-          partial: {
-            diagramId: renderedScene.diagramId,
-            formats: [
-              {
-                format: "scene",
-                mimeType: ARTIFACT_MIME_TYPES.scene,
-                inline: renderedScene,
-                sizeBytes: jsonSizeBytes(renderedScene),
-              },
-            ],
-          },
-          issues: exportIssues(validation.issues),
-        };
-      }
+          context: { ...exportContext, issues: artifactExportIssues(error) },
+        }),
+    ),
+  );
+  const artifactId = yield* Effect.sync(() => environment.createId("artifact"));
+  const artifact = yield* store
+    .write({
+      artifactId,
+      diagramId: renderedScene.diagramId,
+      formats: storedFormats,
+      inlineFormats: requestedInlineFormats(request.options),
+      ...(source.sourceArtifactId
+        ? { provenance: { sourceArtifactId: source.sourceArtifactId } }
+        : {}),
+    })
+    .pipe(
+      Effect.mapError(
+        (error) =>
+          new ApplyDiagramPatchFailure({
+            status: "storage_failed",
+            context: {
+              ...sourceContext,
+              issues: [storageFailureIssue(error, "storage_write_failed")],
+            },
+          }),
+      ),
+    );
 
-      let storedFormats: StoredArtifactFormat[];
-      try {
-        storedFormats = await storedArtifactsForFormats({
-          formats,
-          scene: renderedScene,
-          excalidraw,
-          renderer,
-        });
-      } catch (error) {
-        return {
-          ok: false,
-          status: "export_failed",
-          patchId,
-          ...responseRequestId(request.requestId),
-          ...(source.sourceArtifactId
-            ? { sourceArtifactId: source.sourceArtifactId }
-            : {}),
-          partial: {
-            diagramId: renderedScene.diagramId,
-            formats: [
-              {
-                format: "scene",
-                mimeType: ARTIFACT_MIME_TYPES.scene,
-                inline: renderedScene,
-                sizeBytes: jsonSizeBytes(renderedScene),
-              },
-            ],
-          },
-          issues: artifactExportIssues(error),
-        };
-      }
+  return {
+    ok: true,
+    status: "accepted",
+    patchId,
+    ...responseRequestId(request.requestId),
+    ...(source.sourceArtifactId
+      ? { sourceArtifactId: source.sourceArtifactId }
+      : {}),
+    artifact: withArtifactUrls(artifact, environment.artifactUrl),
+    issues: [],
+  } satisfies Extract<ApplyDiagramPatchResult, { ok: true }>;
+});
 
-      try {
-        const artifactId = createId("artifact");
-        const artifact = await store.write({
-          artifactId,
-          diagramId: renderedScene.diagramId,
-          formats: storedFormats,
-          inlineFormats: requestedInlineFormats(request.options),
-          ...(source.sourceArtifactId
-            ? {
-                provenance: {
-                  sourceArtifactId: source.sourceArtifactId,
-                },
-              }
-            : {}),
-        });
+function codeModeResultBoundary<A, E, R, B>(
+  program: Effect.Effect<A, E, R>,
+  onFailure: (error: E) => B,
+): Effect.Effect<A | B, never, R> {
+  return program.pipe(
+    Effect.match({
+      onFailure,
+      onSuccess: (result) => result,
+    }),
+  );
+}
 
-        return {
-          ok: true,
-          status: "accepted",
-          patchId,
-          ...responseRequestId(request.requestId),
-          ...(source.sourceArtifactId
-            ? { sourceArtifactId: source.sourceArtifactId }
-            : {}),
-          artifact: withArtifactUrls(artifact, artifactUrl),
-          issues: [],
-        };
-      } catch (error) {
-        return {
-          ok: false,
-          status: "storage_failed",
-          patchId,
-          ...responseRequestId(request.requestId),
-          ...(source.sourceArtifactId
-            ? { sourceArtifactId: source.sourceArtifactId }
-            : {}),
-          issues: [
-            storageIssue(
-              error instanceof Error ? error.message : "Artifact write failed.",
-            ),
-          ],
-        };
-      }
-    },
+type CodeModeWorkflowEffect<A> = Effect.Effect<
+  A,
+  never,
+  CodeModeArtifactStorage | CodeModeRuntimeEnvironment
+>;
+
+export const buildFlowchart: (
+  input: unknown,
+) => CodeModeWorkflowEffect<BuildFlowchartResult> = Effect.fn(
+  "codeMode.buildFlowchart",
+)((input: unknown) =>
+  codeModeResultBoundary(
+    buildFlowchartWorkflow(input),
+    buildFlowchartFailureResult,
+  ),
+);
+
+export const buildMindmap: (
+  input: unknown,
+) => CodeModeWorkflowEffect<BuildMindmapResult> = Effect.fn(
+  "codeMode.buildMindmap",
+)((input: unknown) =>
+  codeModeResultBoundary(
+    buildMindmapWorkflow(input),
+    buildMindmapFailureResult,
+  ),
+);
+
+export const getArtifact: (
+  input: unknown,
+) => CodeModeWorkflowEffect<GetArtifactResult> = Effect.fn(
+  "codeMode.getArtifact",
+)((input: unknown) =>
+  codeModeResultBoundary(getArtifactWorkflow(input), getArtifactFailureResult),
+);
+
+export const applyDiagramPatch: (
+  input: unknown,
+) => CodeModeWorkflowEffect<ApplyDiagramPatchResult> = Effect.fn(
+  "codeMode.applyDiagramPatch",
+)((input: unknown) =>
+  codeModeResultBoundary(
+    applyDiagramPatchWorkflow(input),
+    applyDiagramPatchFailureResult,
+  ),
+);
+
+/**
+ * @deprecated Temporary Promise boundary for current Playground callers only.
+ * Delete this facade when issue #243 composes the Playground Effect runtime.
+ */
+export function createPlaygroundCodeModePromiseRuntimeForIssue243(
+  options: PlaygroundCodeModePromiseRuntimeOptionsForIssue243 = {},
+): PlaygroundCodeModePromiseRuntimeForIssue243 {
+  const storage = options.store ?? makeMemoryArtifactStorage();
+  const environment: Context.Service.Shape<typeof CodeModeRuntimeEnvironment> =
+    {
+      createId: options.createId ?? defaultCreateId,
+      ...(options.renderer ? { renderer: options.renderer } : {}),
+      ...(options.artifactUrl ? { artifactUrl: options.artifactUrl } : {}),
+    };
+  const run = <A>(program: CodeModeWorkflowEffect<A>) =>
+    Effect.runPromise(
+      program.pipe(
+        Effect.provideService(CodeModeArtifactStorage, storage),
+        Effect.provideService(CodeModeRuntimeEnvironment, environment),
+      ),
+    );
+
+  return {
+    buildFlowchart: (input) => run(buildFlowchart(input)),
+    buildMindmap: (input) => run(buildMindmap(input)),
+    getArtifact: (input) => run(getArtifact(input)),
+    applyDiagramPatch: (input) => run(applyDiagramPatch(input)),
+    readStoredArtifactForRawHttpResponseForIssue243: (artifactId, format) =>
+      Effect.runPromise(storage.read(artifactId, format)),
   };
 }

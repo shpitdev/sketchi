@@ -26,10 +26,28 @@ export function createCloudflareBrowserRunArtifactRenderer(
 
   return {
     async renderPng(input) {
+      input.signal.throwIfAborted();
       const { launch } = await import("@cloudflare/playwright");
-      const browser = await launch(browserBinding, { keep_alive: 10_000 });
+      const browser = await launch(
+        browserBindingWithSignal(browserBinding, input.signal),
+        { keep_alive: 10_000 },
+      );
+      let closePromise: Promise<void> | undefined;
+      const closeBrowser = (reason?: string): Promise<void> => {
+        closePromise ??= browser.close(reason ? { reason } : undefined);
+        return closePromise;
+      };
+      const abortReason = "Code Mode PNG render interrupted";
+      const onAbort = () => {
+        void closeBrowser(abortReason).catch(() => {});
+      };
+      input.signal.addEventListener("abort", onAbort, { once: true });
 
       try {
+        if (input.signal.aborted) {
+          onAbort();
+          input.signal.throwIfAborted();
+        }
         const page = await browser.newPage();
         await page.goto(harnessUrl, {
           waitUntil: "domcontentloaded",
@@ -78,9 +96,23 @@ export function createCloudflareBrowserRunArtifactRenderer(
 
         return base64ToArrayBuffer(pngBase64);
       } finally {
-        await browser.close();
+        input.signal.removeEventListener("abort", onAbort);
+        await closeBrowser();
       }
     },
+  };
+}
+
+function browserBindingWithSignal(
+  browserBinding: CloudflareBrowserRunBinding,
+  signal: AbortSignal,
+): CloudflareBrowserRunBinding {
+  return {
+    fetch: (request, init) =>
+      browserBinding.fetch(request, {
+        ...init,
+        signal,
+      }),
   };
 }
 

@@ -1,3 +1,5 @@
+import { Context, Effect, Layer, Schema } from "effect";
+
 import {
   ArtifactProvenanceSchema,
   type ArtifactBundle,
@@ -32,14 +34,41 @@ export interface ArtifactWriteInput {
   provenance?: ArtifactProvenance;
 }
 
-export interface CodeModeArtifactStore {
-  read(
+const ArtifactStorageOperationSchema = Schema.Literals([
+  "read",
+  "readManifest",
+  "write",
+]);
+
+export class CodeModeArtifactStorageError extends Schema.TaggedErrorClass<CodeModeArtifactStorageError>()(
+  "CodeModeArtifactStorageError",
+  {
+    cause: Schema.Defect(),
+    message: Schema.String,
+    operation: ArtifactStorageOperationSchema,
+  },
+) {}
+
+export interface CodeModeArtifactStorageShape {
+  readonly read: (
     artifactId: string,
     format: ArtifactFormat,
-  ): Promise<StoredArtifactFormat | null>;
-  readManifest(artifactId: string): Promise<StoredArtifactManifest | null>;
-  write(input: ArtifactWriteInput): Promise<ArtifactBundle>;
+  ) => Effect.Effect<StoredArtifactFormat | null, CodeModeArtifactStorageError>;
+  readonly readManifest: (
+    artifactId: string,
+  ) => Effect.Effect<
+    StoredArtifactManifest | null,
+    CodeModeArtifactStorageError
+  >;
+  readonly write: (
+    input: ArtifactWriteInput,
+  ) => Effect.Effect<ArtifactBundle, CodeModeArtifactStorageError>;
 }
+
+export class CodeModeArtifactStorage extends Context.Service<
+  CodeModeArtifactStorage,
+  CodeModeArtifactStorageShape
+>()("@sketchi/diagram-agent/CodeModeArtifactStorage") {}
 
 export interface CodeModeObjectBucketObject {
   readonly size?: number;
@@ -127,62 +156,122 @@ function binarySizeBytes(value: ArrayBuffer | Uint8Array): number {
   return value.byteLength;
 }
 
-export function createMemoryArtifactStore(): CodeModeArtifactStore {
+function errorMessage(cause: unknown, fallback: string): string {
+  return cause instanceof Error ? cause.message : fallback;
+}
+
+function storageError(operation: "read" | "readManifest" | "write") {
+  return (cause: unknown) =>
+    CodeModeArtifactStorageError.make({
+      cause,
+      message: errorMessage(
+        cause,
+        operation === "write"
+          ? "Artifact storage failed."
+          : "Artifact read failed.",
+      ),
+      operation,
+    });
+}
+
+interface MemoryArtifactStorageState {
+  readonly close: Effect.Effect<void>;
+  readonly storage: CodeModeArtifactStorageShape;
+}
+
+function makeMemoryArtifactStorageState(): MemoryArtifactStorageState {
   const manifests = new Map<string, StoredArtifactManifest>();
   const artifacts = new Map<string, StoredArtifactFormat>();
 
   return {
-    async read(artifactId, format) {
-      const artifact = artifacts.get(`${artifactId}:${format}`);
-      return artifact
-        ? {
-            ...artifact,
-            data: cloneData(artifact.data),
-          }
-        : null;
-    },
-    async readManifest(artifactId) {
-      const manifest = manifests.get(artifactId);
-      return manifest ? cloneData(manifest) : null;
-    },
-    async write(input) {
-      const refs = input.formats.map(manifestRef);
-      const storedProvenance = input.provenance
-        ? cloneData(input.provenance)
-        : undefined;
-      const manifest: StoredArtifactManifest = {
-        artifactId: input.artifactId,
-        diagramId: input.diagramId,
-        formats: refs,
-        ...(storedProvenance ? { provenance: storedProvenance } : {}),
-        createdAt: new Date().toISOString(),
-      };
+    close: Effect.sync(() => {
+      artifacts.clear();
+      manifests.clear();
+    }),
+    storage: {
+      read: Effect.fn("codeMode.artifacts.memory.read")(
+        function* (artifactId, format) {
+          return yield* Effect.try({
+            try: () => {
+              const artifact = artifacts.get(`${artifactId}:${format}`);
+              return artifact
+                ? {
+                    ...artifact,
+                    data: cloneData(artifact.data),
+                  }
+                : null;
+            },
+            catch: storageError("read"),
+          });
+        },
+      ),
+      readManifest: Effect.fn("codeMode.artifacts.memory.readManifest")(
+        function* (artifactId) {
+          return yield* Effect.try({
+            try: () => {
+              const manifest = manifests.get(artifactId);
+              return manifest ? cloneData(manifest) : null;
+            },
+            catch: storageError("readManifest"),
+          });
+        },
+      ),
+      write: Effect.fn("codeMode.artifacts.memory.write")(function* (input) {
+        return yield* Effect.try({
+          try: () => {
+            const refs = input.formats.map(manifestRef);
+            const storedProvenance = input.provenance
+              ? cloneData(input.provenance)
+              : undefined;
+            const manifest: StoredArtifactManifest = {
+              artifactId: input.artifactId,
+              diagramId: input.diagramId,
+              formats: refs,
+              ...(storedProvenance ? { provenance: storedProvenance } : {}),
+              createdAt: new Date().toISOString(),
+            };
 
-      manifests.set(input.artifactId, manifest);
-      for (const artifact of input.formats) {
-        artifacts.set(`${input.artifactId}:${artifact.format}`, {
-          ...artifact,
-          data: cloneData(artifact.data),
+            manifests.set(input.artifactId, manifest);
+            for (const artifact of input.formats) {
+              artifacts.set(`${input.artifactId}:${artifact.format}`, {
+                ...artifact,
+                data: cloneData(artifact.data),
+              });
+            }
+
+            const formats = input.formats.map((artifact) =>
+              artifactRef(artifact, input.inlineFormats),
+            );
+            return bundleFromFormats({
+              artifactId: input.artifactId,
+              diagramId: input.diagramId,
+              formats,
+              ...(input.provenance
+                ? { provenance: cloneData(input.provenance) }
+                : {}),
+            });
+          },
+          catch: storageError("write"),
         });
-      }
-
-      const formats = input.formats.map((artifact) =>
-        artifactRef(artifact, input.inlineFormats),
-      );
-
-      return bundleFromFormats({
-        artifactId: input.artifactId,
-        diagramId: input.diagramId,
-        formats,
-        ...(input.provenance
-          ? { provenance: cloneData(input.provenance) }
-          : {}),
-      });
+      }),
     },
   };
 }
 
-export interface ObjectBucketArtifactStoreOptions {
+export function makeMemoryArtifactStorage(): CodeModeArtifactStorageShape {
+  return makeMemoryArtifactStorageState().storage;
+}
+
+export const CodeModeArtifactStorageMemory = Layer.effect(
+  CodeModeArtifactStorage,
+)(
+  Effect.acquireRelease(
+    Effect.sync(makeMemoryArtifactStorageState),
+    (state) => state.close,
+  ).pipe(Effect.map((state) => state.storage)),
+);
+
+export interface ObjectBucketArtifactStorageOptions {
   prefix?: string;
 }
 
@@ -196,16 +285,12 @@ function keyForArtifact(
 }
 
 function normalizedPrefix(prefix: string | undefined): string {
-  if (!prefix) {
-    return "";
-  }
+  if (!prefix) return "";
   return prefix.endsWith("/") ? prefix : `${prefix}/`;
 }
 
 function isArtifactFormatRef(value: unknown): value is ArtifactFormatRef {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
+  if (!value || typeof value !== "object") return false;
   return (
     "format" in value &&
     "mimeType" in value &&
@@ -217,9 +302,7 @@ function isArtifactFormatRef(value: unknown): value is ArtifactFormatRef {
 function isStoredArtifactManifest(
   value: unknown,
 ): value is StoredArtifactManifest {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
+  if (!value || typeof value !== "object") return false;
   return (
     "artifactId" in value &&
     "diagramId" in value &&
@@ -238,55 +321,100 @@ function isArtifactProvenance(value: unknown): value is ArtifactProvenance {
   return ArtifactProvenanceSchema.safeParse(value).success;
 }
 
-export function createObjectBucketArtifactStore(
+function bodyForArtifact(
+  artifact: StoredArtifactFormat,
+): CodeModeObjectBucketBody {
+  if (artifact.format !== "png") return JSON.stringify(artifact.data);
+  if (
+    artifact.data instanceof ArrayBuffer ||
+    artifact.data instanceof Uint8Array
+  ) {
+    return artifact.data;
+  }
+  throw new Error("PNG artifact data must be binary.");
+}
+
+function readBinaryArtifact(
+  object: CodeModeObjectBucketObject,
+): Effect.Effect<ArrayBuffer, CodeModeArtifactStorageError> {
+  const arrayBuffer = object.arrayBuffer;
+  if (!arrayBuffer) {
+    return Effect.fail(
+      CodeModeArtifactStorageError.make({
+        cause: new Error("Artifact object does not support binary reads."),
+        message: "Artifact object does not support binary reads.",
+        operation: "read",
+      }),
+    );
+  }
+  return Effect.tryPromise({
+    try: () => arrayBuffer.call(object),
+    catch: storageError("read"),
+  });
+}
+
+export function makeObjectBucketArtifactStorage(
   bucket: CodeModeObjectBucket,
-  options: ObjectBucketArtifactStoreOptions = {},
-): CodeModeArtifactStore {
+  options: ObjectBucketArtifactStorageOptions = {},
+): CodeModeArtifactStorageShape {
   const prefix = normalizedPrefix(options.prefix);
 
   return {
-    async read(artifactId, format) {
-      const object = await bucket.get(
-        keyForArtifact(prefix, artifactId, format),
-      );
-      if (!object) {
-        return null;
-      }
+    read: Effect.fn("codeMode.artifacts.r2.read")(
+      function* (artifactId, format) {
+        const object = yield* Effect.tryPromise({
+          try: () => bucket.get(keyForArtifact(prefix, artifactId, format)),
+          catch: storageError("read"),
+        });
+        if (!object) return null;
 
-      if (format === "png") {
-        const data = await readBinaryArtifact(object);
+        if (format === "png") {
+          const data = yield* readBinaryArtifact(object);
+          return {
+            format,
+            mimeType: ARTIFACT_MIME_TYPES[format],
+            data,
+            sizeBytes: object.size ?? binarySizeBytes(data),
+          };
+        }
+
+        const text = yield* Effect.tryPromise({
+          try: () => object.text(),
+          catch: storageError("read"),
+        });
+        const data: unknown = yield* Effect.try({
+          try: () => JSON.parse(text),
+          catch: storageError("read"),
+        });
         return {
           format,
           mimeType: ARTIFACT_MIME_TYPES[format],
           data,
-          sizeBytes: object.size ?? binarySizeBytes(data),
+          sizeBytes: object.size ?? jsonSizeBytes(data),
         };
-      }
+      },
+    ),
+    readManifest: Effect.fn("codeMode.artifacts.r2.readManifest")(
+      function* (artifactId) {
+        const object = yield* Effect.tryPromise({
+          try: () =>
+            bucket.get(keyForArtifact(prefix, artifactId, MANIFEST_FORMAT)),
+          catch: storageError("readManifest"),
+        });
+        if (!object) return null;
 
-      const data: unknown = JSON.parse(await object.text());
-      return {
-        format,
-        mimeType: ARTIFACT_MIME_TYPES[format],
-        data,
-        sizeBytes: object.size ?? jsonSizeBytes(data),
-      };
-    },
-    async readManifest(artifactId) {
-      const object = await bucket.get(
-        keyForArtifact(prefix, artifactId, MANIFEST_FORMAT),
-      );
-      if (!object) {
-        return null;
-      }
-
-      const data: unknown = JSON.parse(await object.text());
-      if (!isStoredArtifactManifest(data)) {
-        return null;
-      }
-
-      return data;
-    },
-    async write(input) {
+        const text = yield* Effect.tryPromise({
+          try: () => object.text(),
+          catch: storageError("readManifest"),
+        });
+        const data: unknown = yield* Effect.try({
+          try: () => JSON.parse(text),
+          catch: storageError("readManifest"),
+        });
+        return isStoredArtifactManifest(data) ? data : null;
+      },
+    ),
+    write: Effect.fn("codeMode.artifacts.r2.write")(function* (input) {
       const refs = input.formats.map(manifestRef);
       const manifest: StoredArtifactManifest = {
         artifactId: input.artifactId,
@@ -296,65 +424,57 @@ export function createObjectBucketArtifactStore(
         createdAt: new Date().toISOString(),
       };
 
-      await Promise.all(
-        input.formats.map((artifact) =>
+      yield* Effect.forEach(
+        input.formats,
+        (artifact) =>
+          Effect.gen(function* () {
+            const body = yield* Effect.try({
+              try: () => bodyForArtifact(artifact),
+              catch: storageError("write"),
+            });
+            yield* Effect.tryPromise({
+              try: () =>
+                bucket.put(
+                  keyForArtifact(prefix, input.artifactId, artifact.format),
+                  body,
+                  { httpMetadata: { contentType: artifact.mimeType } },
+                ),
+              catch: storageError("write"),
+            });
+          }),
+        { concurrency: 3, discard: true },
+      );
+      yield* Effect.tryPromise({
+        try: () =>
           bucket.put(
-            keyForArtifact(prefix, input.artifactId, artifact.format),
-            bodyForArtifact(artifact),
-            {
-              httpMetadata: { contentType: artifact.mimeType },
-            },
+            keyForArtifact(prefix, input.artifactId, MANIFEST_FORMAT),
+            JSON.stringify(manifest),
+            { httpMetadata: { contentType: "application/json" } },
           ),
-        ),
-      );
-      await bucket.put(
-        keyForArtifact(prefix, input.artifactId, MANIFEST_FORMAT),
-        JSON.stringify(manifest),
-        {
-          httpMetadata: { contentType: "application/json" },
-        },
-      );
+        catch: storageError("write"),
+      });
 
       const formats = input.formats.map((artifact) =>
         artifactRef(artifact, input.inlineFormats),
       );
-
       return bundleFromFormats({
         artifactId: input.artifactId,
         diagramId: input.diagramId,
         formats,
         ...(input.provenance ? { provenance: input.provenance } : {}),
       });
-    },
+    }),
   };
 }
 
-function bodyForArtifact(
-  artifact: StoredArtifactFormat,
-): CodeModeObjectBucketBody {
-  if (artifact.format !== "png") {
-    return JSON.stringify(artifact.data);
-  }
-
-  if (artifact.data instanceof ArrayBuffer) {
-    return artifact.data;
-  }
-
-  if (artifact.data instanceof Uint8Array) {
-    return artifact.data;
-  }
-
-  throw new Error("PNG artifact data must be binary.");
-}
-
-async function readBinaryArtifact(
-  object: CodeModeObjectBucketObject,
-): Promise<ArrayBuffer> {
-  if (object.arrayBuffer) {
-    return object.arrayBuffer();
-  }
-
-  throw new Error("Artifact object does not support binary reads.");
+export function makeCodeModeArtifactStorageR2Layer(
+  bucket: CodeModeObjectBucket,
+  options: ObjectBucketArtifactStorageOptions = {},
+) {
+  return Layer.succeed(
+    CodeModeArtifactStorage,
+    makeObjectBucketArtifactStorage(bucket, options),
+  );
 }
 
 export function storageIssue(

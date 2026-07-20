@@ -3,7 +3,9 @@
 Canonical diagram build runtime shared by Studio, the HTTP API, and Code Mode
 MCP. `buildFlowchart` owns the complete accepted-artifact vertical: request
 decode, FlowchartSpec normalization, semantic validation, quality assessment,
-deterministic rendering, export validation, and one artifact-store write.
+deterministic rendering, export validation, and one artifact-storage service
+write. The package exports `buildFlowchart`, `buildMindmap`, `getArtifact`, and
+`applyDiagramPatch` as Effect programs.
 
 ```mermaid
 flowchart LR
@@ -15,16 +17,23 @@ flowchart LR
   Build -. "Issue[]" .-> Repair["bounded caller repair loop"]
 ```
 
-| Owns                                                | Does not own                    |
-| --------------------------------------------------- | ------------------------------- |
-| Canonical request/result and structured issue types | Model calls and chat streaming  |
-| FlowchartSpec normalization and quality assessment  | Per-surface credentials or auth |
-| Deterministic render/export/persistence pipeline    | Managed chat threads            |
-| Artifact store interfaces and Code Mode operations  | Studio presentation state       |
+| Owns                                                     | Does not own                    |
+| -------------------------------------------------------- | ------------------------------- |
+| Canonical request/result and structured issue types      | Model calls and chat streaming  |
+| FlowchartSpec normalization and quality assessment       | Per-surface credentials or auth |
+| Deterministic render/export/persistence pipeline         | Managed chat threads            |
+| Effect storage service, layers, and Code Mode operations | Studio presentation state       |
 
 Studio exposes the runtime to its model as `build_flowchart`. That host injects
 artifact formats and a three-attempt per-turn cap; it does not map into another
 flowchart schema or persist the accepted result a second time.
+
+Use `CodeModeArtifactStorageMemory` for scoped in-memory storage or
+`makeCodeModeArtifactStorageR2Layer` for a Cloudflare object-bucket binding, and
+compose either with `makeCodeModeRuntimeEnvironmentLayer`. The temporary
+`createPlaygroundCodeModePromiseRuntimeForIssue243` export is only the current
+Playground Promise boundary and is removed by issue #243 when the app composes
+the Effect layers directly.
 
 ## Commands
 
