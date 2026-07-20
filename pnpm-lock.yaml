@@ -458,6 +458,9 @@ importers:
 
   packages/studio/projects:
     dependencies:
+      effect:
+        specifier: 4.0.0-beta.99
+        version: 4.0.0-beta.99
       nanoid:
         specifier: ^5.1.11
         version: 5.1.11

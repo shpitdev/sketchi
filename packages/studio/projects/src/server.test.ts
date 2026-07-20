@@ -1,13 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@effect/vitest";
 
-import type { StudioOwner, StudioProjectRecord } from "./contracts.js";
 import {
-  createAuthenticatedStudioSession,
   createStudioProjectsServer,
   MemoryStudioObjectBucket,
+  studioDiagramRecordKey,
   studioOwnerKey,
+  studioOwnerProjectEntryKey,
+  studioProjectRecordKey,
   type StudioObjectBucketListOptions,
   type StudioObjectBucketListResult,
+  type StudioOwner,
+  type StudioProjectRecord,
   type StudioSourceArtifactLoadResult,
   type StudioSourceArtifacts,
 } from "./server.js";
@@ -57,10 +60,19 @@ class PaginatedMemoryBucket extends MemoryStudioObjectBucket {
 function createTestServer(
   bucket = new MemoryStudioObjectBucket(),
   sourceArtifacts = new TestSourceArtifacts(),
+  overrides: {
+    createId?: (kind: "dia" | "proj") => string;
+    listingConcurrency?: number;
+    now?: () => string;
+  } = {},
 ) {
   return {
     bucket,
-    server: createStudioProjectsServer({ bucket, sourceArtifacts }),
+    server: createStudioProjectsServer({
+      bucket,
+      sourceArtifacts,
+      ...overrides,
+    }),
     sourceArtifacts,
   };
 }
@@ -69,6 +81,7 @@ function postRequest(
   url: string,
   body: unknown,
   headers: HeadersInit = {},
+  signal?: AbortSignal,
 ): Request {
   return new Request(url, {
     body: JSON.stringify(body),
@@ -77,11 +90,14 @@ function postRequest(
       ...headers,
     },
     method: "POST",
+    ...(signal ? { signal } : {}),
   });
 }
 
-function getRequest(url: string, headers: HeadersInit = {}): Request {
-  return new Request(url, { headers });
+function requestWithSession(url: string, sessionId: string): Request {
+  return new Request(url, {
+    headers: { Cookie: `sketchi_studio_session=${sessionId}` },
+  });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -102,216 +118,209 @@ function nestedString(
   throw new Error(`Response did not contain ${parentKey}.${childKey}.`);
 }
 
-function cookieHeaderFrom(response: Response): string {
-  const setCookie = response.headers.get("set-cookie");
-  if (!setCookie) {
-    throw new Error("Response did not set a session cookie.");
-  }
-  return setCookie.split(";")[0] ?? setCookie;
-}
-
-function anonymousRequest(sessionId: string): Request {
-  return getRequest("https://studio.test/api/studio/projects", {
-    Cookie: `sketchi_studio_session=${sessionId}`,
-  });
-}
-
-describe("Studio project persistence", () => {
-  it("creates studio records and reloads every response for the same anonymous session", async () => {
-    const { bucket, server, sourceArtifacts } = createTestServer();
+describe("Studio project HTTP runtime edge", () => {
+  it("preserves keys, bytes, identifiers, and HTTP bodies for valid records", async () => {
+    const sessionId = "anon_abcdefghijklmnop";
+    const owner: StudioOwner = { kind: "anonymous", sessionId };
+    const createdAt = "2026-07-20T02:00:00.000Z";
+    const { bucket, server, sourceArtifacts } = createTestServer(
+      new MemoryStudioObjectBucket(),
+      new TestSourceArtifacts(),
+      {
+        createId: (kind) =>
+          kind === "proj" ? "proj_persisted" : "dia_persisted",
+        now: () => createdAt,
+      },
+    );
     sourceArtifacts.artifacts.set("artifact-approval", {
       diagramId: "approval-flow",
       title: "Studio persistence approval flow",
     });
 
     const createResponse = await server.handleCreateFromArtifactRequest(
-      postRequest("https://studio.test/api/studio/projects/from-artifact", {
-        artifactId: "artifact-approval",
-      }),
+      postRequest(
+        "https://studio.test/api/studio/projects/from-artifact",
+        { artifactId: "artifact-approval" },
+        { Cookie: `sketchi_studio_session=${sessionId}` },
+      ),
     );
     expect(createResponse.status).toBe(200);
     expect(createResponse.headers.get("cache-control")).toBe("no-store");
-    expect(createResponse.headers.get("set-cookie")).toContain(
-      "sketchi_studio_session=anon_",
-    );
-    expect(createResponse.headers.get("set-cookie")).toContain(
-      "HttpOnly; SameSite=Lax; Max-Age=31536000; Secure",
-    );
-
-    const cookie = cookieHeaderFrom(createResponse);
     const created: unknown = await createResponse.json();
-    const projectId = nestedString(created, "project", "id");
-    const diagramId = nestedString(created, "diagram", "id");
-
     expect(created).toMatchObject({
       auth: { status: "anonymous" },
       diagram: {
         artifactDiagramId: "approval-flow",
         artifactId: "artifact-approval",
-        id: diagramId,
-        projectId,
-        reviewUrl: `/diagrams/${diagramId}`,
+        id: "dia_persisted",
+        projectId: "proj_persisted",
+        reviewUrl: "/diagrams/dia_persisted",
         title: "Studio persistence approval flow",
       },
       ok: true,
       project: {
         diagramCount: 1,
-        id: projectId,
-        primaryDiagramId: diagramId,
-        title: "Studio persistence approval flow",
+        id: "proj_persisted",
+        primaryDiagramId: "dia_persisted",
       },
       urls: {
-        diagram: `/diagrams/${diagramId}`,
-        edit: `/diagrams/${diagramId}/edit`,
-        project: `/projects/${projectId}`,
+        diagram: "/diagrams/dia_persisted",
+        edit: "/diagrams/dia_persisted/edit",
+        project: "/projects/proj_persisted",
       },
     });
-    expect([...bucket.objects.keys()]).toEqual(
-      expect.arrayContaining([
-        expect.stringMatching(
-          /^studio\/owners\/anonymous\/anon_[a-zA-Z0-9_-]+\/projects\/proj_[a-zA-Z0-9_-]+\.json$/,
-        ),
-        `studio/diagrams/${diagramId}.json`,
-        `studio/projects/${projectId}.json`,
+
+    const source: StudioProjectRecord["source"] = {
+      artifactId: "artifact-approval",
+      kind: "playground-artifact",
+    };
+    expect(bucket.objects).toEqual(
+      new Map([
+        [
+          studioDiagramRecordKey("dia_persisted"),
+          JSON.stringify({
+            artifactDiagramId: "approval-flow",
+            artifactId: "artifact-approval",
+            createdAt,
+            id: "dia_persisted",
+            owner,
+            projectId: "proj_persisted",
+            source,
+            title: "Studio persistence approval flow",
+            updatedAt: createdAt,
+          }),
+        ],
+        [
+          studioProjectRecordKey("proj_persisted"),
+          JSON.stringify({
+            createdAt,
+            diagramIds: ["dia_persisted"],
+            id: "proj_persisted",
+            owner,
+            source,
+            title: "Studio persistence approval flow",
+            updatedAt: createdAt,
+          }),
+        ],
+        [
+          studioOwnerProjectEntryKey(owner, "proj_persisted"),
+          JSON.stringify({
+            ownerKey: studioOwnerKey(owner),
+            projectId: "proj_persisted",
+            updatedAt: createdAt,
+          }),
+        ],
       ]),
     );
-    expect(bucket.objects.size).toBe(3);
 
     const listResponse = await server.handleListProjectsRequest(
-      getRequest("https://studio.test/api/studio/projects", {
-        Cookie: cookie,
-      }),
+      requestWithSession("https://studio.test/api/studio/projects", sessionId),
     );
     expect(listResponse.status).toBe(200);
     await expect(listResponse.json()).resolves.toMatchObject({
       ok: true,
-      projects: [{ id: projectId, primaryDiagramId: diagramId }],
+      projects: [{ id: "proj_persisted", primaryDiagramId: "dia_persisted" }],
     });
 
     const projectResponse = await server.handleGetProjectRequest(
-      getRequest(`https://studio.test/api/studio/projects/${projectId}`, {
-        Cookie: cookie,
-      }),
-      projectId,
+      requestWithSession(
+        "https://studio.test/api/studio/projects/proj_persisted",
+        sessionId,
+      ),
+      "proj_persisted",
     );
     expect(projectResponse.status).toBe(200);
     await expect(projectResponse.json()).resolves.toMatchObject({
       details: {
-        diagrams: [{ artifactId: "artifact-approval", id: diagramId }],
-        project: { id: projectId },
+        diagrams: [{ id: "dia_persisted" }],
+        project: { id: "proj_persisted" },
       },
       ok: true,
     });
+  });
 
-    const diagramResponse = await server.handleGetDiagramRequest(
-      getRequest(`https://studio.test/api/studio/diagrams/${diagramId}`, {
-        Cookie: cookie,
-      }),
-      diagramId,
+  it("sets the preserved anonymous cookie contract", async () => {
+    const { server } = createTestServer();
+    const response = await server.handleListProjectsRequest(
+      new Request("https://studio.test/api/studio/projects"),
     );
-    expect(diagramResponse.status).toBe(200);
-    await expect(diagramResponse.json()).resolves.toMatchObject({
-      diagram: { artifactId: "artifact-approval", id: diagramId },
-      ok: true,
-      project: { id: projectId },
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie")).toContain(
+      "sketchi_studio_session=anon_",
+    );
+    expect(response.headers.get("set-cookie")).toContain(
+      "HttpOnly; SameSite=Lax; Max-Age=31536000; Secure",
+    );
+  });
+
+  it("maps malformed session cookies to a stable public failure", async () => {
+    const { server } = createTestServer();
+    const response = await server.handleListProjectsRequest(
+      new Request("https://studio.test/api/studio/projects", {
+        headers: { Cookie: "sketchi_studio_session=%E0%A4%A" },
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      code: "storage_failed",
+      message: "Studio session could not be resolved.",
+      ok: false,
     });
   });
 
-  it("isolates lists and direct reads between anonymous sessions", async () => {
+  it("keeps ownership failures concealed behind the existing 404 contract", async () => {
+    const firstSession = "anon_abcdefghijklmnop";
+    const secondSession = "anon_qrstuvwxyzabcdef";
     const { server, sourceArtifacts } = createTestServer();
     sourceArtifacts.artifacts.set("artifact-isolated", {
       diagramId: "isolated-flow",
       title: "Isolated Studio project",
     });
     const createResponse = await server.handleCreateFromArtifactRequest(
-      postRequest("https://studio.test/api/studio/projects/from-artifact", {
-        artifactId: "artifact-isolated",
-      }),
+      postRequest(
+        "https://studio.test/api/studio/projects/from-artifact",
+        { artifactId: "artifact-isolated" },
+        { Cookie: `sketchi_studio_session=${firstSession}` },
+      ),
     );
     const created: unknown = await createResponse.json();
     const projectId = nestedString(created, "project", "id");
     const diagramId = nestedString(created, "diagram", "id");
 
-    const otherList = await server.handleListProjectsRequest(
-      getRequest("https://studio.test/api/studio/projects"),
-    );
-    await expect(otherList.json()).resolves.toMatchObject({ projects: [] });
-
     const deniedProject = await server.handleGetProjectRequest(
-      getRequest(`https://studio.test/api/studio/projects/${projectId}`),
+      requestWithSession(
+        `https://studio.test/api/studio/projects/${projectId}`,
+        secondSession,
+      ),
       projectId,
     );
     const deniedDiagram = await server.handleGetDiagramRequest(
-      getRequest(`https://studio.test/api/studio/diagrams/${diagramId}`),
+      requestWithSession(
+        `https://studio.test/api/studio/diagrams/${diagramId}`,
+        secondSession,
+      ),
       diagramId,
     );
+
     expect(deniedProject.status).toBe(404);
     expect(deniedDiagram.status).toBe(404);
+    await expect(deniedProject.json()).resolves.toMatchObject({
+      code: "not_found",
+      message: "Studio project was not found for this session.",
+      ok: false,
+    });
   });
 
-  it("stores and lists projects under authenticated ownership", async () => {
-    const { server, sourceArtifacts } = createTestServer();
-    sourceArtifacts.artifacts.set("artifact-auth", {
-      diagramId: "auth-flow",
-      title: "Authenticated Studio project",
-    });
-    const session = createAuthenticatedStudioSession({
-      displayName: "Ada",
-      subjectId: "user_ada",
-    });
-
-    const created = await server.createFromArtifact({
-      artifactId: "artifact-auth",
-      session,
-    });
-    expect(created.ok).toBe(true);
-    if (!created.ok) {
-      throw new Error(created.message);
-    }
-    expect(studioOwnerKey(created.projectRecord.owner)).toBe(
-      "authenticated/user_ada",
-    );
-    await expect(server.listProjects(session)).resolves.toEqual([
-      expect.objectContaining({
-        id: created.project.id,
-        title: "Authenticated Studio project",
-      }),
-    ]);
-  });
-
-  it("keeps concurrent saves for one owner in independent index entries", async () => {
-    const { server, sourceArtifacts } = createTestServer();
-    sourceArtifacts.artifacts.set("artifact-first", {
-      diagramId: "first-flow",
-      title: "First concurrent Studio save",
-    });
-    sourceArtifacts.artifacts.set("artifact-second", {
-      diagramId: "second-flow",
-      title: "Second concurrent Studio save",
-    });
-    const session = createAuthenticatedStudioSession({
-      subjectId: "user_concurrent",
-    });
-
-    const [first, second] = await Promise.all([
-      server.createFromArtifact({ artifactId: "artifact-first", session }),
-      server.createFromArtifact({ artifactId: "artifact-second", session }),
-    ]);
-    expect(first.ok).toBe(true);
-    expect(second.ok).toBe(true);
-    if (!first.ok || !second.ok) {
-      throw new Error("Concurrent Studio saves should both succeed.");
-    }
-
-    const projects = await server.listProjects(session);
-    expect(new Set(projects.map((project) => project.id))).toEqual(
-      new Set([first.project.id, second.project.id]),
-    );
-  });
-
-  it("follows R2 cursors until a truncated owner listing is complete", async () => {
+  it("follows R2 cursors until the owner listing is complete", async () => {
     const bucket = new PaginatedMemoryBucket();
-    const { server, sourceArtifacts } = createTestServer(bucket);
+    const ids = ["proj_pageone", "dia_pageone", "proj_pagetwo", "dia_pagetwo"];
+    const { server, sourceArtifacts } = createTestServer(
+      bucket,
+      new TestSourceArtifacts(),
+      { createId: () => ids.shift() ?? "proj_fallback" },
+    );
     sourceArtifacts.artifacts.set("artifact-page-one", {
       diagramId: "page-one",
       title: "First page",
@@ -320,110 +329,122 @@ describe("Studio project persistence", () => {
       diagramId: "page-two",
       title: "Second page",
     });
-    const session = createAuthenticatedStudioSession({
-      subjectId: "user_paginated",
-    });
-    await server.createFromArtifact({
-      artifactId: "artifact-page-one",
-      session,
-    });
-    await server.createFromArtifact({
-      artifactId: "artifact-page-two",
-      session,
-    });
+    const sessionId = "anon_abcdefghijklmnop";
 
-    await expect(server.listProjects(session)).resolves.toHaveLength(2);
+    for (const artifactId of ["artifact-page-one", "artifact-page-two"]) {
+      const response = await server.handleCreateFromArtifactRequest(
+        postRequest(
+          "https://studio.test/api/studio/projects/from-artifact",
+          { artifactId },
+          { Cookie: `sketchi_studio_session=${sessionId}` },
+        ),
+      );
+      expect(response.status).toBe(200);
+    }
+
+    const response = await server.handleListProjectsRequest(
+      requestWithSession("https://studio.test/api/studio/projects", sessionId),
+    );
+    const payload: unknown = await response.json();
+    expect(
+      isRecord(payload) &&
+        Array.isArray(payload["projects"]) &&
+        payload["projects"].length,
+    ).toBe(2);
     expect(bucket.listCalls).toEqual([
       {
-        prefix: "studio/owners/authenticated/user_paginated/projects/",
+        prefix: `studio/owners/anonymous/${sessionId}/projects/`,
       },
       {
         cursor: "1",
-        prefix: "studio/owners/authenticated/user_paginated/projects/",
+        prefix: `studio/owners/anonymous/${sessionId}/projects/`,
       },
     ]);
   });
 
-  it("filters an owner-index entry whose project owner does not match", async () => {
-    const { bucket, server, sourceArtifacts } = createTestServer();
-    sourceArtifacts.artifacts.set("artifact-owner", {
-      diagramId: "owner-flow",
-      title: "Owner mismatch",
+  it.each([
+    [
+      "schema-invalid JSON",
+      JSON.stringify({ id: "proj_corrupt" }),
+      "Stored Studio data could not be decoded.",
+    ],
+    [
+      "syntactically invalid JSON",
+      "{not-json",
+      "Expected property name or '}' in JSON at position 1 (line 1 column 2)",
+    ],
+    ["empty bytes", "", "Unexpected end of JSON input"],
+  ])(
+    "maps %s to typed corruption instead of not-found",
+    async (_, bytes, expectedMessage) => {
+      const bucket = new MemoryStudioObjectBucket();
+      const { server } = createTestServer(bucket);
+      await bucket.put(studioProjectRecordKey("proj_corrupt"), bytes);
+
+      const response = await server.handleGetProjectRequest(
+        requestWithSession(
+          "https://studio.test/api/studio/projects/proj_corrupt",
+          "anon_abcdefghijklmnop",
+        ),
+        "proj_corrupt",
+      );
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        code: "storage_failed",
+        message: expectedMessage,
+        ok: false,
+      });
+    },
+  );
+
+  it("propagates request cancellation without committing records", async () => {
+    const bucket = new MemoryStudioObjectBucket();
+    const controller = new AbortController();
+    let sourceSignal: AbortSignal | undefined;
+    let sourceLoadStarted: (() => void) | undefined;
+    const sourceStarted = new Promise<void>((resolve) => {
+      sourceLoadStarted = resolve;
     });
-    const owner = createAuthenticatedStudioSession({ subjectId: "user_owner" });
-    const otherOwner = createAuthenticatedStudioSession({
-      subjectId: "user_other",
-    });
-    const created = await server.createFromArtifact({
-      artifactId: "artifact-owner",
-      session: owner,
-    });
-    if (!created.ok) {
-      throw new Error(created.message);
-    }
-    const mismatchedRecord: StudioProjectRecord = {
-      ...created.projectRecord,
-      owner: otherOwner,
+    const sourceArtifacts: StudioSourceArtifacts = {
+      load: (_artifactId, signal) => {
+        sourceSignal = signal;
+        sourceLoadStarted?.();
+
+        return new Promise((resolve) => {
+          const complete = () =>
+            resolve({
+              artifact: {
+                diagramId: "cancelled-diagram",
+                title: "Cancelled Studio project",
+              },
+              ok: true,
+            });
+
+          signal?.addEventListener("abort", complete, { once: true });
+          setTimeout(complete, 25);
+        });
+      },
     };
-    await bucket.put(
-      `studio/projects/${created.project.id}.json`,
-      JSON.stringify(mismatchedRecord),
+    const server = createStudioProjectsServer({ bucket, sourceArtifacts });
+    const response = server.handleCreateFromArtifactRequest(
+      postRequest(
+        "https://studio.test/api/studio/projects/from-artifact",
+        { artifactId: "artifact-cancelled" },
+        {},
+        controller.signal,
+      ),
     );
 
-    await expect(server.listProjects(owner)).resolves.toEqual([]);
-    await expect(
-      server.getProject(owner, created.project.id),
-    ).resolves.toBeNull();
+    await sourceStarted;
+    controller.abort();
+
+    await expect(response).rejects.toThrow();
+    expect(sourceSignal?.aborted).toBe(true);
+    expect(bucket.objects.size).toBe(0);
   });
 
-  it("skips schema-invalid records and reports invalid JSON as a storage failure", async () => {
-    const sessionId = "anon_abcdefghijklmnop";
-    const session: StudioOwner = { kind: "anonymous", sessionId };
-    const { bucket, server } = createTestServer();
-    const ownerPrefix = `studio/owners/${studioOwnerKey(session)}/projects`;
-    await bucket.put(
-      `${ownerPrefix}/proj_invalidshape.json`,
-      JSON.stringify({
-        ownerKey: studioOwnerKey(session),
-        projectId: "proj_invalidshape",
-        updatedAt: "2026-07-16T00:00:00.000Z",
-      }),
-    );
-    await bucket.put(
-      "studio/projects/proj_invalidshape.json",
-      JSON.stringify({ id: "proj_invalidshape" }),
-    );
-
-    const skippedResponse = await server.handleListProjectsRequest(
-      anonymousRequest(sessionId),
-    );
-    expect(skippedResponse.status).toBe(200);
-    await expect(skippedResponse.json()).resolves.toMatchObject({
-      ok: true,
-      projects: [],
-    });
-
-    await bucket.put(
-      `${ownerPrefix}/proj_brokenjson.json`,
-      JSON.stringify({
-        ownerKey: studioOwnerKey(session),
-        projectId: "proj_brokenjson",
-        updatedAt: "2026-07-16T00:00:01.000Z",
-      }),
-    );
-    await bucket.put("studio/projects/proj_brokenjson.json", "{not-json");
-
-    const malformedResponse = await server.handleListProjectsRequest(
-      anonymousRequest(sessionId),
-    );
-    expect(malformedResponse.status).toBe(500);
-    await expect(malformedResponse.json()).resolves.toMatchObject({
-      code: "storage_failed",
-      ok: false,
-    });
-  });
-
-  it("preserves source-artifact failures in the HTTP response without writes", async () => {
+  it("preserves source-artifact failure responses without writes", async () => {
     const { bucket, server } = createTestServer();
     const response = await server.handleCreateFromArtifactRequest(
       postRequest("https://studio.test/api/studio/projects/from-artifact", {
@@ -437,5 +458,19 @@ describe("Studio project persistence", () => {
       ok: false,
     });
     expect([...bucket.objects.keys()]).toEqual([]);
+  });
+
+  it("preserves the invalid request body contract", async () => {
+    const { server } = createTestServer();
+    const response = await server.handleCreateFromArtifactRequest(
+      postRequest("https://studio.test/api/studio/projects/from-artifact", {}),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "invalid_input",
+      message: "A playground artifactId is required.",
+      ok: false,
+    });
   });
 });

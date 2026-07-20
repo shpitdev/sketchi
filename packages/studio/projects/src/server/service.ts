@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import { Context, Effect, Layer } from "effect";
 import { z } from "zod";
 
 import {
@@ -14,12 +15,10 @@ import {
   type StudioProjectRecord,
   type StudioProjectSummary,
 } from "../contracts.js";
-import {
-  putStudioJson,
-  readStudioJson,
-  type StudioObjectBucket,
-} from "./bucket.js";
-import type { StudioSourceArtifacts } from "./source-artifacts.js";
+import { makeStudioJsonPersistence, StudioObjectStore } from "./bucket.js";
+import type { StudioProjectsError } from "./errors.js";
+import { StudioSessionService } from "./session.js";
+import { StudioSourceArtifactStore } from "./source-artifacts.js";
 
 const STUDIO_PREFIX = "studio";
 
@@ -30,13 +29,6 @@ const StudioProjectIndexEntrySchema = z.object({
 });
 
 type StudioProjectIndexEntry = z.infer<typeof StudioProjectIndexEntrySchema>;
-
-export interface StudioProjectOperationFailure {
-  code: string;
-  message: string;
-  ok: false;
-  status: number;
-}
 
 export interface StudioProjectCreateSuccess {
   diagram: StudioDiagramSummary;
@@ -51,35 +43,85 @@ export interface StudioProjectCreateSuccess {
   };
 }
 
-export type StudioProjectCreateResult =
-  | StudioProjectCreateSuccess
-  | StudioProjectOperationFailure;
-
-export interface StudioProjectsService {
-  createFromArtifact(input: {
-    artifactId: string;
-    session: StudioOwner;
-  }): Promise<StudioProjectCreateResult>;
-  getDiagram(
+export interface StudioProjectsShape {
+  readonly createFromArtifact: (input: {
+    readonly artifactId: string;
+    readonly session: StudioOwner;
+  }) => Effect.Effect<StudioProjectCreateSuccess, StudioProjectsError>;
+  readonly getDiagram: (
     session: StudioOwner,
     diagramId: string,
-  ): Promise<{
-    diagram: StudioDiagramSummary;
-    project: StudioProjectSummary;
-  } | null>;
-  getProject(
+  ) => Effect.Effect<
+    {
+      readonly diagram: StudioDiagramSummary;
+      readonly project: StudioProjectSummary;
+    },
+    StudioProjectsError
+  >;
+  readonly getProject: (
     session: StudioOwner,
     projectId: string,
-  ): Promise<StudioProjectDetails | null>;
-  listProjects(session: StudioOwner): Promise<StudioProjectSummary[]>;
+  ) => Effect.Effect<StudioProjectDetails, StudioProjectsError>;
+  readonly listProjects: (
+    session: StudioOwner,
+  ) => Effect.Effect<StudioProjectSummary[], StudioProjectsError>;
 }
 
-export interface StudioProjectsServiceOptions {
-  bucket: StudioObjectBucket;
-  createId?: (kind: "dia" | "proj") => string;
-  now?: () => string;
-  sourceArtifacts: StudioSourceArtifacts;
+export class StudioProjects extends Context.Service<
+  StudioProjects,
+  StudioProjectsShape
+>()("@sketchi/studio-projects/StudioProjects") {}
+
+export interface StudioPersistencePolicyConfig {
+  readonly listingConcurrency: number;
 }
+
+export class StudioPersistencePolicy extends Context.Service<
+  StudioPersistencePolicy,
+  StudioPersistencePolicyConfig
+>()("@sketchi/studio-projects/StudioPersistencePolicy") {}
+
+const INVALID_LISTING_CONCURRENCY_MESSAGE =
+  "Studio listing concurrency must be a finite positive integer.";
+
+function validateStudioPersistencePolicy(
+  config: StudioPersistencePolicyConfig,
+): StudioPersistencePolicyConfig {
+  if (
+    !Number.isSafeInteger(config.listingConcurrency) ||
+    config.listingConcurrency <= 0
+  ) {
+    throw new TypeError(INVALID_LISTING_CONCURRENCY_MESSAGE);
+  }
+
+  return Object.freeze({
+    listingConcurrency: config.listingConcurrency,
+  });
+}
+
+export const studioPersistencePolicyDefaults = validateStudioPersistencePolicy({
+  listingConcurrency: 8,
+});
+
+export const StudioPersistencePolicyLive = Layer.succeed(
+  StudioPersistencePolicy,
+  studioPersistencePolicyDefaults,
+);
+
+export interface StudioRecordFactoryShape {
+  readonly createId: (kind: "dia" | "proj") => string;
+  readonly now: () => string;
+}
+
+export class StudioRecordFactory extends Context.Service<
+  StudioRecordFactory,
+  StudioRecordFactoryShape
+>()("@sketchi/studio-projects/StudioRecordFactory") {}
+
+export const StudioRecordFactoryLive = Layer.succeed(StudioRecordFactory, {
+  createId: (kind) => `${kind}_${nanoid(14)}`,
+  now: () => new Date().toISOString(),
+});
 
 function keySegment(value: string): string {
   return encodeURIComponent(value);
@@ -91,24 +133,23 @@ export function studioOwnerKey(owner: StudioOwner): string {
     : `anonymous/${keySegment(owner.sessionId)}`;
 }
 
-function ownerProjectsPrefix(owner: StudioOwner): string {
+export function studioOwnerProjectsPrefix(owner: StudioOwner): string {
   return `${STUDIO_PREFIX}/owners/${studioOwnerKey(owner)}/projects/`;
 }
 
-function ownerProjectEntryKey(owner: StudioOwner, projectId: string): string {
-  return `${ownerProjectsPrefix(owner)}${keySegment(projectId)}.json`;
+export function studioOwnerProjectEntryKey(
+  owner: StudioOwner,
+  projectId: string,
+): string {
+  return `${studioOwnerProjectsPrefix(owner)}${keySegment(projectId)}.json`;
 }
 
-function projectKey(projectId: string): string {
+export function studioProjectRecordKey(projectId: string): string {
   return `${STUDIO_PREFIX}/projects/${keySegment(projectId)}.json`;
 }
 
-function diagramKey(diagramId: string): string {
+export function studioDiagramRecordKey(diagramId: string): string {
   return `${STUDIO_PREFIX}/diagrams/${keySegment(diagramId)}.json`;
-}
-
-function ownersMatch(left: StudioOwner, right: StudioOwner): boolean {
-  return studioOwnerKey(left) === studioOwnerKey(right);
 }
 
 function projectSummary(record: StudioProjectRecord): StudioProjectSummary {
@@ -146,216 +187,272 @@ function sortedProjects(
   );
 }
 
-async function readProjectRecord(
-  bucket: StudioObjectBucket,
-  projectId: string,
-): Promise<StudioProjectRecord | null> {
-  return readStudioJson(
-    bucket,
-    projectKey(projectId),
-    StudioProjectRecordSchema,
-  );
-}
+export const StudioProjectsLive = Layer.effect(
+  StudioProjects,
+  Effect.gen(function* () {
+    const objectStore = yield* StudioObjectStore;
+    const sourceArtifacts = yield* StudioSourceArtifactStore;
+    const sessions = yield* StudioSessionService;
+    const policy = yield* StudioPersistencePolicy;
+    const recordFactory = yield* StudioRecordFactory;
+    const json = makeStudioJsonPersistence(objectStore);
 
-async function readDiagramRecord(
-  bucket: StudioObjectBucket,
-  diagramId: string,
-): Promise<StudioDiagramRecord | null> {
-  return readStudioJson(
-    bucket,
-    diagramKey(diagramId),
-    StudioDiagramRecordSchema,
-  );
-}
+    const readProjectRecord = Effect.fn(
+      "studioPersistence.projects.readProject",
+    )(function* (projectId: string) {
+      return yield* json.read(
+        studioProjectRecordKey(projectId),
+        StudioProjectRecordSchema,
+        "project",
+        projectId,
+      );
+    });
 
-async function listOwnerProjectEntryKeys(
-  bucket: StudioObjectBucket,
-  session: StudioOwner,
-): Promise<string[]> {
-  const prefix = ownerProjectsPrefix(session);
-  const keys: string[] = [];
-  let cursor: string | undefined;
+    const readDiagramRecord = Effect.fn(
+      "studioPersistence.projects.readDiagram",
+    )(function* (diagramId: string) {
+      return yield* json.read(
+        studioDiagramRecordKey(diagramId),
+        StudioDiagramRecordSchema,
+        "diagram",
+        diagramId,
+      );
+    });
 
-  do {
-    const result = await bucket.list(cursor ? { cursor, prefix } : { prefix });
-    keys.push(...result.objects.map((object) => object.key));
-    cursor =
-      result.truncated === true && result.cursor ? result.cursor : undefined;
-  } while (cursor);
+    const listOwnerProjectEntryKeys = Effect.fn(
+      "studioPersistence.projects.listOwnerIndex",
+    )(function* (session: StudioOwner) {
+      const prefix = studioOwnerProjectsPrefix(session);
+      const keys: string[] = [];
+      let cursor: string | undefined;
 
-  return keys;
-}
+      do {
+        const result = yield* objectStore.list(
+          cursor ? { cursor, prefix } : { prefix },
+        );
+        keys.push(...result.objects.map((object) => object.key));
+        cursor =
+          result.truncated === true && result.cursor
+            ? result.cursor
+            : undefined;
+      } while (cursor);
 
-async function listOwnerProjectIds(
-  bucket: StudioObjectBucket,
-  session: StudioOwner,
-): Promise<string[]> {
-  const ownerKey = studioOwnerKey(session);
-  const entryKeys = await listOwnerProjectEntryKeys(bucket, session);
-  const entries = await Promise.all(
-    entryKeys.map((entryKey) =>
-      readStudioJson(bucket, entryKey, StudioProjectIndexEntrySchema),
-    ),
-  );
+      return keys;
+    });
 
-  return entries.flatMap((entry) =>
-    entry && entry.ownerKey === ownerKey ? [entry.projectId] : [],
-  );
-}
+    const listOwnerProjectIds = Effect.fn(
+      "studioPersistence.projects.loadOwnerIndex",
+    )(function* (session: StudioOwner) {
+      const ownerKey = studioOwnerKey(session);
+      const entryKeys = yield* listOwnerProjectEntryKeys(session);
+      const entries = yield* Effect.forEach(
+        entryKeys,
+        (entryKey) =>
+          json
+            .read(
+              entryKey,
+              StudioProjectIndexEntrySchema,
+              "owner-index",
+              entryKey,
+            )
+            .pipe(
+              Effect.catchTag("StudioNotFoundError", () =>
+                Effect.succeed(null),
+              ),
+            ),
+        { concurrency: policy.listingConcurrency },
+      );
 
-async function writeOwnerProjectEntry(
-  bucket: StudioObjectBucket,
-  session: StudioOwner,
-  projectId: string,
-  updatedAt: string,
-): Promise<void> {
-  const entry = {
-    ownerKey: studioOwnerKey(session),
-    projectId,
-    updatedAt,
-  } satisfies StudioProjectIndexEntry;
+      return entries.flatMap((entry) =>
+        entry && entry.ownerKey === ownerKey ? [entry.projectId] : [],
+      );
+    });
 
-  await putStudioJson(bucket, ownerProjectEntryKey(session, projectId), entry);
-}
+    const writeOwnerProjectEntry = Effect.fn(
+      "studioPersistence.projects.writeOwnerIndex",
+    )(function* (session: StudioOwner, projectId: string, updatedAt: string) {
+      const entry = {
+        ownerKey: studioOwnerKey(session),
+        projectId,
+        updatedAt,
+      } satisfies StudioProjectIndexEntry;
 
-export function createStudioProjectsService(
-  options: StudioProjectsServiceOptions,
-): StudioProjectsService {
-  const createId =
-    options.createId ?? ((kind: "dia" | "proj") => `${kind}_${nanoid(14)}`);
-  const now = options.now ?? (() => new Date().toISOString());
+      yield* json.put(studioOwnerProjectEntryKey(session, projectId), entry);
+    });
 
-  const listProjects = async (
-    session: StudioOwner,
-  ): Promise<StudioProjectSummary[]> => {
-    const projectIds = await listOwnerProjectIds(options.bucket, session);
-    const records = await Promise.all(
-      projectIds.map((projectId) =>
-        readProjectRecord(options.bucket, projectId),
-      ),
-    );
+    const listProjects = Effect.fn("studioPersistence.projects.list")(
+      function* (session: StudioOwner) {
+        const projectIds = yield* listOwnerProjectIds(session);
+        const records = yield* Effect.forEach(
+          projectIds,
+          (projectId) =>
+            readProjectRecord(projectId).pipe(
+              Effect.flatMap((record) =>
+                sessions
+                  .ensureOwner(record.owner, session, "project", record.id)
+                  .pipe(Effect.as(record)),
+              ),
+              Effect.catchTags({
+                StudioNotFoundError: () => Effect.succeed(null),
+                StudioOwnershipError: () => Effect.succeed(null),
+              }),
+            ),
+          { concurrency: policy.listingConcurrency },
+        );
 
-    return sortedProjects(
-      records.flatMap((record) =>
-        record && ownersMatch(record.owner, session)
-          ? [projectSummary(record)]
-          : [],
-      ),
-    );
-  };
-
-  const getProject = async (
-    session: StudioOwner,
-    projectId: string,
-  ): Promise<StudioProjectDetails | null> => {
-    const project = await readProjectRecord(options.bucket, projectId);
-    if (!project || !ownersMatch(project.owner, session)) {
-      return null;
-    }
-
-    const diagrams = await Promise.all(
-      project.diagramIds.map((diagramId) =>
-        readDiagramRecord(options.bucket, diagramId),
-      ),
-    );
-
-    return {
-      diagrams: diagrams.flatMap((diagram) =>
-        diagram && ownersMatch(diagram.owner, session)
-          ? [diagramSummary(diagram)]
-          : [],
-      ),
-      project: projectSummary(project),
-    };
-  };
-
-  const getDiagram = async (
-    session: StudioOwner,
-    diagramId: string,
-  ): Promise<{
-    diagram: StudioDiagramSummary;
-    project: StudioProjectSummary;
-  } | null> => {
-    const diagram = await readDiagramRecord(options.bucket, diagramId);
-    if (!diagram || !ownersMatch(diagram.owner, session)) {
-      return null;
-    }
-
-    const project = await readProjectRecord(options.bucket, diagram.projectId);
-    if (!project || !ownersMatch(project.owner, session)) {
-      return null;
-    }
-
-    return {
-      diagram: diagramSummary(diagram),
-      project: projectSummary(project),
-    };
-  };
-
-  const createFromArtifact = async (input: {
-    artifactId: string;
-    session: StudioOwner;
-  }): Promise<StudioProjectCreateResult> => {
-    const sourceArtifact = await options.sourceArtifacts.load(input.artifactId);
-    if (!sourceArtifact.ok) {
-      return sourceArtifact;
-    }
-
-    const createdAt = now();
-    const projectId = createId("proj");
-    const diagramId = createId("dia");
-    const source = {
-      artifactId: input.artifactId,
-      kind: "playground-artifact",
-    } satisfies StudioProjectRecord["source"];
-    const diagram: StudioDiagramRecord = {
-      artifactDiagramId: sourceArtifact.artifact.diagramId,
-      artifactId: input.artifactId,
-      createdAt,
-      id: diagramId,
-      owner: input.session,
-      projectId,
-      source,
-      title: sourceArtifact.artifact.title,
-      updatedAt: createdAt,
-    };
-    const project: StudioProjectRecord = {
-      createdAt,
-      diagramIds: [diagram.id],
-      id: projectId,
-      owner: input.session,
-      source,
-      title: sourceArtifact.artifact.title,
-      updatedAt: createdAt,
-    };
-
-    await putStudioJson(options.bucket, diagramKey(diagram.id), diagram);
-    await putStudioJson(options.bucket, projectKey(project.id), project);
-    await writeOwnerProjectEntry(
-      options.bucket,
-      input.session,
-      project.id,
-      createdAt,
-    );
-
-    return {
-      diagram: diagramSummary(diagram),
-      diagramRecord: diagram,
-      ok: true,
-      project: projectSummary(project),
-      projectRecord: project,
-      urls: {
-        diagram: studioDiagramUrl(diagram.id),
-        edit: studioDiagramEditUrl(diagram.id),
-        project: studioProjectUrl(project.id),
+        return sortedProjects(
+          records.flatMap((record) =>
+            record === null ? [] : [projectSummary(record)],
+          ),
+        );
       },
-    };
-  };
+    );
 
-  return {
-    createFromArtifact,
-    getDiagram,
-    getProject,
-    listProjects,
-  };
+    const getProject = Effect.fn("studioPersistence.projects.getProject")(
+      function* (session: StudioOwner, projectId: string) {
+        const project = yield* readProjectRecord(projectId);
+        yield* sessions.ensureOwner(
+          project.owner,
+          session,
+          "project",
+          project.id,
+        );
+
+        const diagrams = yield* Effect.forEach(
+          project.diagramIds,
+          (diagramId) =>
+            readDiagramRecord(diagramId).pipe(
+              Effect.flatMap((diagram) =>
+                sessions
+                  .ensureOwner(diagram.owner, session, "diagram", diagram.id)
+                  .pipe(Effect.as(diagram)),
+              ),
+              Effect.catchTags({
+                StudioNotFoundError: () => Effect.succeed(null),
+                StudioOwnershipError: () => Effect.succeed(null),
+              }),
+            ),
+          { concurrency: policy.listingConcurrency },
+        );
+
+        return {
+          diagrams: diagrams.flatMap((diagram) =>
+            diagram === null ? [] : [diagramSummary(diagram)],
+          ),
+          project: projectSummary(project),
+        };
+      },
+    );
+
+    const getDiagram = Effect.fn("studioPersistence.projects.getDiagram")(
+      function* (session: StudioOwner, diagramId: string) {
+        const diagram = yield* readDiagramRecord(diagramId);
+        yield* sessions.ensureOwner(
+          diagram.owner,
+          session,
+          "diagram",
+          diagram.id,
+        );
+        const project = yield* readProjectRecord(diagram.projectId);
+        yield* sessions.ensureOwner(
+          project.owner,
+          session,
+          "project",
+          project.id,
+        );
+
+        return {
+          diagram: diagramSummary(diagram),
+          project: projectSummary(project),
+        };
+      },
+    );
+
+    const createFromArtifact = Effect.fn(
+      "studioPersistence.projects.createFromArtifact",
+    )(function* (input: {
+      readonly artifactId: string;
+      readonly session: StudioOwner;
+    }) {
+      const sourceArtifact = yield* sourceArtifacts.load(input.artifactId);
+      const createdAt = recordFactory.now();
+      const projectId = recordFactory.createId("proj");
+      const diagramId = recordFactory.createId("dia");
+      const source = {
+        artifactId: input.artifactId,
+        kind: "playground-artifact",
+      } satisfies StudioProjectRecord["source"];
+      const diagram: StudioDiagramRecord = {
+        artifactDiagramId: sourceArtifact.diagramId,
+        artifactId: input.artifactId,
+        createdAt,
+        id: diagramId,
+        owner: input.session,
+        projectId,
+        source,
+        title: sourceArtifact.title,
+        updatedAt: createdAt,
+      };
+      const project: StudioProjectRecord = {
+        createdAt,
+        diagramIds: [diagram.id],
+        id: projectId,
+        owner: input.session,
+        source,
+        title: sourceArtifact.title,
+        updatedAt: createdAt,
+      };
+
+      yield* json.put(studioDiagramRecordKey(diagram.id), diagram);
+      yield* json.put(studioProjectRecordKey(project.id), project);
+      yield* writeOwnerProjectEntry(input.session, project.id, createdAt);
+
+      return {
+        diagram: diagramSummary(diagram),
+        diagramRecord: diagram,
+        ok: true,
+        project: projectSummary(project),
+        projectRecord: project,
+        urls: {
+          diagram: studioDiagramUrl(diagram.id),
+          edit: studioDiagramEditUrl(diagram.id),
+          project: studioProjectUrl(project.id),
+        },
+      } satisfies StudioProjectCreateSuccess;
+    });
+
+    return {
+      createFromArtifact,
+      getDiagram,
+      getProject,
+      listProjects,
+    };
+  }),
+);
+
+export function makeStudioPersistencePolicyLayer(
+  config: StudioPersistencePolicyConfig,
+) {
+  return Layer.succeed(
+    StudioPersistencePolicy,
+    validateStudioPersistencePolicy(config),
+  );
+}
+
+export function makeStudioPersistencePolicyTestLayer(
+  config: StudioPersistencePolicyConfig,
+) {
+  return makeStudioPersistencePolicyLayer(config);
+}
+
+export function makeStudioRecordFactoryLayer(
+  factory: StudioRecordFactoryShape,
+) {
+  return Layer.succeed(StudioRecordFactory, factory);
+}
+
+export function makeStudioRecordFactoryTestLayer(
+  factory: StudioRecordFactoryShape,
+) {
+  return makeStudioRecordFactoryLayer(factory);
 }

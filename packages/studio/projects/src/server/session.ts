@@ -1,10 +1,17 @@
 import { nanoid } from "nanoid";
+import { Context, Effect, Layer } from "effect";
 
 import type {
   StudioAuthStatus,
   StudioOwner,
   StudioPublicSession,
 } from "../contracts.js";
+import {
+  failureMessage,
+  StudioOwnershipError,
+  type StudioResourceKind,
+  StudioSessionError,
+} from "./errors.js";
 
 const STUDIO_SESSION_COOKIE = "sketchi_studio_session";
 const SESSION_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
@@ -16,6 +23,23 @@ export interface StudioSessionResolution {
   publicSession: StudioPublicSession;
   setCookie?: string;
 }
+
+export interface StudioSessionServiceShape {
+  readonly ensureOwner: (
+    actual: StudioOwner,
+    expected: StudioOwner,
+    resource: StudioResourceKind,
+    id: string,
+  ) => Effect.Effect<void, StudioOwnershipError>;
+  readonly resolve: (
+    request: Request,
+  ) => Effect.Effect<StudioSessionResolution, StudioSessionError>;
+}
+
+export class StudioSessionService extends Context.Service<
+  StudioSessionService,
+  StudioSessionServiceShape
+>()("@sketchi/studio-projects/StudioSessionService") {}
 
 function publicSession(session: StudioOwner): StudioPublicSession {
   if (session.kind === "authenticated") {
@@ -81,6 +105,23 @@ export function createAuthenticatedStudioSession(input: {
       };
 }
 
+export function studioOwnersMatch(
+  left: StudioOwner,
+  right: StudioOwner,
+): boolean {
+  if (left.kind !== right.kind) {
+    return false;
+  }
+
+  if (left.kind === "authenticated" && right.kind === "authenticated") {
+    return left.subjectId === right.subjectId;
+  }
+
+  return left.kind === "anonymous" && right.kind === "anonymous"
+    ? left.sessionId === right.sessionId
+    : false;
+}
+
 export function resolveStudioSession(
   request: Request,
 ): StudioSessionResolution {
@@ -109,4 +150,38 @@ export function resolveStudioSession(
     session,
     setCookie: sessionCookie(session.sessionId, request),
   };
+}
+
+export const StudioSessionServiceLive = Layer.succeed(StudioSessionService, {
+  ensureOwner: Effect.fn("studioPersistence.session.ensureOwner")(function* (
+    actual: StudioOwner,
+    expected: StudioOwner,
+    resource: StudioResourceKind,
+    id: string,
+  ) {
+    if (!studioOwnersMatch(actual, expected)) {
+      return yield* Effect.fail(StudioOwnershipError.make({ id, resource }));
+    }
+  }),
+  resolve: Effect.fn("studioPersistence.session.resolve")(function* (
+    request: Request,
+  ) {
+    return yield* Effect.try({
+      try: () => resolveStudioSession(request),
+      catch: (cause) =>
+        StudioSessionError.make({
+          cause,
+          message: failureMessage(
+            cause,
+            "Studio session could not be resolved.",
+          ),
+        }),
+    });
+  }),
+});
+
+export function makeStudioSessionServiceTestLayer(
+  service: StudioSessionServiceShape,
+) {
+  return Layer.succeed(StudioSessionService, service);
 }

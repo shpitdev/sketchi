@@ -1,4 +1,13 @@
-import { z } from "zod";
+import { Context, Effect, Layer } from "effect";
+import type { z } from "zod";
+
+import {
+  failureMessage,
+  StudioDecodeError,
+  StudioNotFoundError,
+  StudioStorageError,
+  type StudioResourceKind,
+} from "./errors.js";
 
 export interface StudioObjectBucketObject {
   readonly size?: number;
@@ -23,7 +32,9 @@ export interface StudioObjectBucketListResult {
   truncated?: boolean;
 }
 
+/** The minimal Cloudflare R2-compatible runtime binding accepted at the edge. */
 export interface StudioObjectBucket {
+  delete?(key: string): Promise<unknown>;
   get(key: string): Promise<StudioObjectBucketObject | null>;
   put(
     key: string,
@@ -39,12 +50,107 @@ export interface StudioObjectBucket {
   ): Promise<StudioObjectBucketListResult>;
 }
 
+export interface StudioObjectStoreShape {
+  readonly delete: (key: string) => Effect.Effect<void, StudioStorageError>;
+  readonly getText: (
+    key: string,
+  ) => Effect.Effect<string | null, StudioStorageError>;
+  readonly list: (
+    options: StudioObjectBucketListOptions,
+  ) => Effect.Effect<StudioObjectBucketListResult, StudioStorageError>;
+  readonly put: (
+    key: string,
+    value: StudioObjectBucketBody,
+    options?: {
+      readonly httpMetadata?: {
+        readonly contentType?: string;
+      };
+    },
+  ) => Effect.Effect<void, StudioStorageError>;
+}
+
+export class StudioObjectStore extends Context.Service<
+  StudioObjectStore,
+  StudioObjectStoreShape
+>()("@sketchi/studio-projects/StudioObjectStore") {}
+
+function storageError(
+  operation: "delete" | "get" | "list" | "put",
+  target: string,
+) {
+  return (cause: unknown) =>
+    StudioStorageError.make({
+      cause,
+      message: failureMessage(cause, "Studio persistence failed."),
+      operation,
+      target,
+    });
+}
+
+export function makeStudioObjectStoreLayer(bucket: StudioObjectBucket) {
+  return Layer.succeed(StudioObjectStore, {
+    delete: Effect.fn("studioPersistence.objectStore.delete")(function* (
+      key: string,
+    ) {
+      if (!bucket.delete) {
+        return yield* Effect.fail(
+          storageError(
+            "delete",
+            key,
+          )(new Error("Studio persistence object deletion is unavailable.")),
+        );
+      }
+
+      yield* Effect.tryPromise({
+        try: () => bucket.delete?.(key) ?? Promise.resolve(),
+        catch: storageError("delete", key),
+      });
+    }),
+    getText: Effect.fn("studioPersistence.objectStore.get")(function* (
+      key: string,
+    ) {
+      return yield* Effect.tryPromise({
+        try: async () => {
+          const object = await bucket.get(key);
+          return object ? object.text() : null;
+        },
+        catch: storageError("get", key),
+      });
+    }),
+    list: Effect.fn("studioPersistence.objectStore.list")(function* (
+      options: StudioObjectBucketListOptions,
+    ) {
+      return yield* Effect.tryPromise({
+        try: () => bucket.list(options),
+        catch: storageError("list", options.prefix),
+      });
+    }),
+    put: Effect.fn("studioPersistence.objectStore.put")(function* (
+      key: string,
+      value: StudioObjectBucketBody,
+      options?: {
+        readonly httpMetadata?: { readonly contentType?: string };
+      },
+    ) {
+      yield* Effect.tryPromise({
+        try: () => bucket.put(key, value, options),
+        catch: storageError("put", key),
+      });
+    }),
+  });
+}
+
 export class MemoryStudioObjectBucket implements StudioObjectBucket {
   readonly objects = new Map<string, string | Uint8Array>();
 
+  async delete(key: string): Promise<unknown> {
+    this.objects.delete(key);
+    return null;
+  }
+
   async get(key: string): Promise<StudioObjectBucketObject | null> {
     const value = this.objects.get(key);
-    if (!value) {
+    if (value === undefined) {
       return null;
     }
 
@@ -84,6 +190,12 @@ export class MemoryStudioObjectBucket implements StudioObjectBucket {
   }
 }
 
+export function makeMemoryStudioObjectStoreTestLayer(
+  bucket: MemoryStudioObjectBucket,
+) {
+  return makeStudioObjectStoreLayer(bucket);
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -99,26 +211,75 @@ export function isStudioObjectBucket(
   );
 }
 
-export async function readStudioJson<T>(
-  bucket: StudioObjectBucket,
-  key: string,
-  schema: z.ZodType<T>,
-): Promise<T | null> {
-  const object = await bucket.get(key);
-  if (!object) {
-    return null;
-  }
+export function makeStudioJsonPersistence(objectStore: StudioObjectStoreShape) {
+  const read = Effect.fn("studioPersistence.readJson")(function* <T>(
+    key: string,
+    schema: z.ZodType<T>,
+    resource: StudioResourceKind,
+    id: string,
+  ) {
+    const text = yield* objectStore.getText(key);
 
-  const parsed = schema.safeParse(JSON.parse(await object.text()));
-  return parsed.success ? parsed.data : null;
-}
+    if (text === null) {
+      return yield* Effect.fail(StudioNotFoundError.make({ id, resource }));
+    }
 
-export async function putStudioJson(
-  bucket: StudioObjectBucket,
-  key: string,
-  value: unknown,
-): Promise<void> {
-  await bucket.put(key, JSON.stringify(value), {
-    httpMetadata: { contentType: "application/json" },
+    const json = yield* Effect.try({
+      try: () => JSON.parse(text),
+      catch: (cause) =>
+        StudioDecodeError.make({
+          cause,
+          key,
+          message: failureMessage(cause, "Studio persistence failed."),
+          operation: "decode",
+        }),
+    });
+    const parsed = schema.safeParse(json);
+
+    if (!parsed.success) {
+      return yield* Effect.fail(
+        StudioDecodeError.make({
+          cause: parsed.error,
+          key,
+          message: "Stored Studio data could not be decoded.",
+          operation: "decode",
+        }),
+      );
+    }
+
+    return parsed.data;
   });
+
+  const put = Effect.fn("studioPersistence.putJson")(function* (
+    key: string,
+    value: unknown,
+  ) {
+    const json = yield* Effect.try({
+      try: () => JSON.stringify(value),
+      catch: (cause) =>
+        StudioDecodeError.make({
+          cause,
+          key,
+          message: failureMessage(cause, "Studio persistence failed."),
+          operation: "encode",
+        }),
+    });
+
+    if (json === undefined) {
+      return yield* Effect.fail(
+        StudioDecodeError.make({
+          cause: new TypeError("Value cannot be encoded as JSON"),
+          key,
+          message: "Studio persistence failed.",
+          operation: "encode",
+        }),
+      );
+    }
+
+    yield* objectStore.put(key, json, {
+      httpMetadata: { contentType: "application/json" },
+    });
+  });
+
+  return { put, read };
 }
