@@ -1,0 +1,63 @@
+{
+  "name": "sketchi-cli",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/cli/src",
+  "projectType": "application",
+  "tags": ["scope:app", "type:runtime"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "command": "node apps/cli/scripts/build.mjs"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "outputs": ["{workspaceRoot}/coverage/apps/cli"],
+      "options": {
+        "command": "vitest run --config apps/cli/vitest.config.mts"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
+      "options": {
+        "command": "tsc -p apps/cli/tsconfig.json --noEmit"
+      }
+    },
+    "typecheck-tsgo": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
+      "options": {
+        "command": "tsgo -p apps/cli/tsconfig.json --noEmit"
+      }
+    },
+    "package": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "outputs": ["{workspaceRoot}/.memory/cli-package"],
+      "options": {
+        "command": "node apps/cli/scripts/package.mjs"
+      }
+    },
+    "smoke": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["package", "bundle-report"],
+      "outputs": ["{workspaceRoot}/.memory/cli-smoke"],
+      "options": {
+        "command": "node apps/cli/scripts/smoke.mjs"
+      }
+    },
+    "bundle-report": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "outputs": ["{workspaceRoot}/.memory/cli-bundle-report.json"],
+      "options": {
+        "command": "node apps/cli/scripts/bundle-report.mjs"
+      }
+    }
+  }
+}

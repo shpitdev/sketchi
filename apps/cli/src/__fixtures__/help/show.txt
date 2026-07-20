@@ -1,0 +1,19 @@
+DESCRIPTION
+  Show the current canonical document, manifest summary, formats, and recoverable revision paths for DIAGRAM_ID. This does not rebuild or mutate the record.
+
+USAGE
+  sketchi show [flags] <diagram-id>
+
+ARGUMENTS
+  diagram-id string
+
+FLAGS
+  --output text|json    Result presentation format. (choices: text, json)
+
+GLOBAL FLAGS
+  --help, -h       Show help information
+  --version, -v    Show version information
+
+EXAMPLES
+  # Read a record as a stable JSON envelope.
+  sketchi show release-flow --output json

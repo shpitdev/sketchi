@@ -1,0 +1,21 @@
+DESCRIPTION
+  Create one local diagram from exactly one canonical document source. The document is validated and built before the record directory is committed atomically. --file - rejects an interactive TTY with exit 2.
+
+USAGE
+  sketchi create [flags]
+
+FLAGS
+  --output text|json    Result presentation format. (choices: text, json)
+  --file PATH|-         Read one canonical document from PATH, or stdin with -.
+  --json VALUE          Read one canonical document from inline JSON.
+
+GLOBAL FLAGS
+  --help, -h       Show help information
+  --version, -v    Show version information
+
+EXAMPLES
+  # Create from a UTF-8 JSON file.
+  sketchi create --file diagram.json
+
+  # Create from noninteractive stdin with a JSON result.
+  printf '%s' '{...}' | sketchi create --file - --output json

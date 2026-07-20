@@ -1,0 +1,53 @@
+DESCRIPTION
+  Deterministic offline authoring for canonical Sketchi flowcharts and mindmaps.
+
+Manual workflow (available now):
+  create a canonical document, inspect or replace it, list local records, and export stored artifacts.
+  Prompt-assisted generation is a later workflow and is not available in this CLI yet.
+
+Canonical flowchart example:
+  {"type":"flowchart","spec":{"id":"release-flow","title":"Release approval","nodes":[{"id":"start","label":"Change proposed","kind":"start"},{"id":"review","label":"Review evidence","kind":"process"},{"id":"end","label":"Release approved","kind":"end"}],"edges":[{"source":"start","target":"review"},{"source":"review","target":"end"}]}}
+
+Canonical mindmap example:
+  {"type":"mindmap","spec":{"id":"launch-map","title":"Launch plan","root":{"label":"Launch","children":[{"label":"Product"},{"label":"Operations"}]}}}
+
+Input and output:
+  create/edit require exactly one of --file PATH|- or --json VALUE. --file - reads one
+  noninteractive UTF-8 JSON document from stdin and exits with usage code 2 on a TTY.
+  --json is inline input only. Use --output text|json for result presentation.
+  export writes bytes with --dest PATH|-. With --dest -, bytes use stdout and status uses stderr.
+
+Offline boundary and storage:
+  These five commands use no model, remote agent, MCP server, login, account, browser, or network.
+  Records live at ~/.sketchi/diagrams/<id>/ with manifest.json, document.json, scene.json,
+  diagram.excalidraw, optional diagram.png, and revisions/<revision>.json.
+  Formats are scene, excalidraw, and png. PNG export only returns an already-stored PNG.
+
+Exit codes and errors:
+  0 success; 1 internal failure; 2 usage or interactive stdin; 3 invalid input/document;
+  4 build/export construction failure; 5 diagram not found; 6 conflict/busy;
+  7 filesystem/storage failure; 8 unavailable format or export write failure.
+  Text errors start with "error: CODE". JSON errors use {"ok":false,"command":...,"error":...}.
+  Errors never include stacks.
+
+Revision recovery and next steps:
+  edit validates and builds before an atomic commit, then saves the prior document under revisions/.
+  To recover, inspect the prior revision JSON and pass that complete document back to edit.
+  Start with create, use the returned id with show/list, then export a stored format.
+
+USAGE
+  sketchi <subcommand> [flags]
+
+FLAGS
+  --output text|json    Result presentation format. (choices: text, json)
+
+GLOBAL FLAGS
+  --help, -h       Show help information
+  --version, -v    Show version information
+
+SUBCOMMANDS
+  create    Create one local diagram from exactly one canonical document source. The document is validated and built before the record directory is committed atomically. --file - rejects an interactive TTY with exit 2.
+  show      Show the current canonical document, manifest summary, formats, and recoverable revision paths for DIAGRAM_ID. This does not rebuild or mutate the record.
+  edit      Replace the complete canonical document for DIAGRAM_ID. Sketchi validates and builds first, preserves the prior document under revisions/, and atomically swaps the record. The new spec.id must match DIAGRAM_ID.
+  list      List local diagrams in ascending id order with type, revision, stored formats, and title. The command is deterministic and read-only.
+  export    Export one already-stored scene, Excalidraw, or PNG artifact. --dest - writes only artifact bytes to stdout and writes the text/JSON success envelope to stderr. PNG never starts a browser or network request; unavailable PNG exits 8.

@@ -1,0 +1,16 @@
+DESCRIPTION
+  List local diagrams in ascending id order with type, revision, stored formats, and title. The command is deterministic and read-only.
+
+USAGE
+  sketchi list [flags]
+
+FLAGS
+  --output text|json    Result presentation format. (choices: text, json)
+
+GLOBAL FLAGS
+  --help, -h       Show help information
+  --version, -v    Show version information
+
+EXAMPLES
+  # List records as a stable JSON envelope.
+  sketchi list --output json

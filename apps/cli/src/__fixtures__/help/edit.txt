@@ -1,0 +1,21 @@
+DESCRIPTION
+  Replace the complete canonical document for DIAGRAM_ID. Sketchi validates and builds first, preserves the prior document under revisions/, and atomically swaps the record. The new spec.id must match DIAGRAM_ID.
+
+USAGE
+  sketchi edit [flags] <diagram-id>
+
+ARGUMENTS
+  diagram-id string
+
+FLAGS
+  --output text|json    Result presentation format. (choices: text, json)
+  --file PATH|-         Read one canonical document from PATH, or stdin with -.
+  --json VALUE          Read one canonical document from inline JSON.
+
+GLOBAL FLAGS
+  --help, -h       Show help information
+  --version, -v    Show version information
+
+EXAMPLES
+  # Replace a document and retain the prior revision.
+  sketchi edit release-flow --file revised.json

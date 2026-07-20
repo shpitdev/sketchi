@@ -13,6 +13,7 @@ const requiredWorkspaceGlobs = [
   "tools/*",
 ];
 const intendedNxProjectRoots = [
+  "apps/cli",
   "apps/eval-harness",
   "apps/excalidraw",
   "apps/icons",
@@ -34,6 +35,7 @@ const intendedWorkspacePackageRoots = intendedNxProjectRoots.filter(
   (projectRoot) => projectRoot !== "apps/native-conversion-storybook",
 );
 const effectAuthoritativeProjectRoots = [
+  "apps/cli",
   "apps/eval-harness",
   "apps/playground",
   "packages/diagram/agent",
@@ -62,6 +64,7 @@ const frameworkNativeProjectRoots = [
   "tools/sketchi-generators",
 ];
 const intendedCompositeReferences = [
+  "apps/cli/tsconfig.json",
   "apps/eval-harness/tsconfig.json",
   "apps/excalidraw/tsconfig.json",
   "apps/icons/tsconfig.json",
@@ -77,6 +80,9 @@ const intendedCompositeReferences = [
   "packages/studio/projects/tsconfig.lib.json",
   "packages/svg-excalidraw/tsconfig.lib.json",
   "tools/sketchi-generators/tsconfig.lib.json",
+];
+const reviewedEffectUnstableAdapterPaths = [
+  "apps/cli/src/internal/effect-unstable-cli.ts",
 ];
 const diagramPackages = [
   {
@@ -325,9 +331,15 @@ describe("diagram generation project boundaries", () => {
         exclude: ["**/dist/**", "**/.output/**", "**/.wrangler/**"],
       },
     );
-    for (const sourceFile of sourceFiles) {
-      const source = readFileSync(path.join(workspaceRoot, sourceFile), "utf8");
-      if (!/["']effect\/unstable\//.test(source)) continue;
+    const unstableImportPaths = sourceFiles
+      .filter((sourceFile) =>
+        /["']effect\/unstable\//.test(
+          readFileSync(path.join(workspaceRoot, sourceFile), "utf8"),
+        ),
+      )
+      .sort();
+    expect(unstableImportPaths).toEqual(reviewedEffectUnstableAdapterPaths);
+    for (const sourceFile of unstableImportPaths) {
       expect(sourceFile).toMatch(/\/src\/internal\/effect-unstable-[^/]+\.ts$/);
     }
   });

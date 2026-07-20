@@ -12,6 +12,7 @@
     { "path": "./packages/svg-excalidraw/tsconfig.lib.json" },
     { "path": "./packages/diagram/ui/tsconfig.lib.json" },
     { "path": "./tools/sketchi-generators/tsconfig.lib.json" },
+    { "path": "./apps/cli" },
     { "path": "./apps/eval-harness" },
     { "path": "./apps/excalidraw" },
     { "path": "./apps/icons" },

@@ -1,0 +1,24 @@
+DESCRIPTION
+  Export one already-stored scene, Excalidraw, or PNG artifact. --dest - writes only artifact bytes to stdout and writes the text/JSON success envelope to stderr. PNG never starts a browser or network request; unavailable PNG exits 8.
+
+USAGE
+  sketchi export [flags] <diagram-id>
+
+ARGUMENTS
+  diagram-id string
+
+FLAGS
+  --output text|json               Result presentation format. (choices: text, json)
+  --format scene|excalidraw|png    Stored artifact format to export. (choices: scene, excalidraw, png)
+  --dest PATH|-                    Artifact byte destination path, or - for stdout.
+
+GLOBAL FLAGS
+  --help, -h       Show help information
+  --version, -v    Show version information
+
+EXAMPLES
+  # Write an Excalidraw artifact atomically to a file.
+  sketchi export release-flow --format excalidraw --dest release.excalidraw
+
+  # Pipe raw scene bytes without status contamination.
+  sketchi export release-flow --format scene --dest - > scene.json
