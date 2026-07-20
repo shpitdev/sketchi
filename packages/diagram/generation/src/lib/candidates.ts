@@ -1,64 +1,76 @@
 import {
   type FlowchartDiagram,
+  FlowchartDiagramSchema,
   parseFlowchartDiagram,
 } from "@sketchi/diagram-core";
-import { z } from "zod";
+import { Schema } from "effect";
 
-import type { DiagramGenerationPrompt } from "./messages.js";
+import { DiagramGenerationPrompt } from "./messages.js";
 
 export const diagramGenerationProviderIds: readonly [
   "fixture",
   "cloudflare-google-ai-studio",
 ] = ["fixture", "cloudflare-google-ai-studio"];
 
-export const DiagramGenerationProviderIdSchema = z.enum(
+export const DiagramGenerationProviderIdSchema = Schema.Literals(
   diagramGenerationProviderIds,
 );
+export type DiagramGenerationProviderId =
+  typeof DiagramGenerationProviderIdSchema.Type;
 
-export type DiagramGenerationProviderId = z.infer<
-  typeof DiagramGenerationProviderIdSchema
->;
+export const DiagramGenerationCacheModeSchema = Schema.Literals([
+  "default",
+  "fresh",
+]);
+export type DiagramGenerationCacheMode =
+  typeof DiagramGenerationCacheModeSchema.Type;
 
-export interface DiagramGenerationUsage {
-  inputTokens?: number;
-  outputTokens?: number;
-  totalTokens?: number;
-}
+export class DiagramGenerationUsage extends Schema.Class<DiagramGenerationUsage>(
+  "DiagramGenerationUsage",
+)({
+  inputTokens: Schema.optional(Schema.Number).pipe(Schema.mutableKey),
+  outputTokens: Schema.optional(Schema.Number).pipe(Schema.mutableKey),
+  totalTokens: Schema.optional(Schema.Number).pipe(Schema.mutableKey),
+}) {}
 
-export type DiagramGenerationCacheMode = "default" | "fresh";
+export class DiagramGenerationCandidate extends Schema.Class<DiagramGenerationCandidate>(
+  "DiagramGenerationCandidate",
+)({
+  cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
+  diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
+  diagram: Schema.optional(FlowchartDiagramSchema),
+  durationMs: Schema.optional(Schema.Number),
+  error: Schema.optional(Schema.String),
+  model: Schema.String,
+  provider: DiagramGenerationProviderIdSchema,
+  raw: Schema.optional(Schema.Unknown),
+  text: Schema.String,
+  usage: Schema.optional(DiagramGenerationUsage),
+}) {}
 
-export interface DiagramGenerationCandidate {
-  cacheMode?: DiagramGenerationCacheMode;
-  diagnostics: string[];
-  diagram?: FlowchartDiagram;
-  durationMs?: number;
-  error?: string;
-  model: string;
-  provider: DiagramGenerationProviderId;
-  raw?: unknown;
-  text: string;
-  usage?: DiagramGenerationUsage;
-}
+export class DiagramGenerationCandidateSummary extends Schema.Class<DiagramGenerationCandidateSummary>(
+  "DiagramGenerationCandidateSummary",
+)({
+  cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
+  diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
+  diagramValid: Schema.Boolean,
+  durationMs: Schema.optional(Schema.Number),
+  error: Schema.optional(Schema.String),
+  model: Schema.String,
+  provider: DiagramGenerationProviderIdSchema,
+  text: Schema.String,
+  usage: Schema.optional(DiagramGenerationUsage),
+}) {}
 
-export interface DiagramGenerationCandidateSummary {
-  cacheMode?: DiagramGenerationCacheMode;
-  diagnostics: string[];
-  diagramValid: boolean;
-  durationMs?: number;
-  error?: string;
-  model: string;
-  provider: DiagramGenerationProviderId;
-  text: string;
-  usage?: DiagramGenerationUsage;
-}
-
-export interface DiagramGenerationRequest {
-  cacheMode?: DiagramGenerationCacheMode;
-  maxOutputTokens?: number;
-  model: string;
-  prompt: DiagramGenerationPrompt;
-  temperature?: number;
-}
+export class DiagramGenerationRequest extends Schema.Class<DiagramGenerationRequest>(
+  "DiagramGenerationRequest",
+)({
+  cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
+  maxOutputTokens: Schema.optional(Schema.Number),
+  model: Schema.String,
+  prompt: DiagramGenerationPrompt,
+  temperature: Schema.optional(Schema.Number),
+}) {}
 
 export function extractJsonObject(text: string): unknown {
   try {

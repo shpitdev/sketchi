@@ -144,4 +144,25 @@ export default [
       "no-restricted-imports": "off",
     },
   },
+  {
+    files: [
+      "packages/diagram/core/src/intermediate.ts",
+      "packages/diagram/core/src/diagram-types/flowchart.ts",
+      "packages/diagram/core/src/diagram-types/mindmap.ts",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["effect/unstable/*"],
+              message:
+                "Unstable Effect modules require a reviewed adapter under src/internal/effect-unstable-*.ts.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];

@@ -1,37 +1,58 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
 import {
-  DiagramEdgeSchema,
-  DiagramNodeSchema,
+  DiagramEdge,
+  DiagramNode,
   DiagramValidationError,
-  IntermediateDiagramSchema,
+  IntermediateDiagram,
+  parseDiagramSchema,
   validateIntermediateDiagram,
+  withDiagramParser,
 } from "../intermediate.js";
 
 export const mindmapDiagramType = "mindmap" as const;
 
-export const MindmapNodeSchema = DiagramNodeSchema.extend({
-  kind: z.enum(["root", "topic"]),
-  metadata: z.object({
-    depth: z.number().int().nonnegative(),
-    siblingIndex: z.number().int().nonnegative(),
-  }),
-});
+export class MindmapNodeMetadata extends Schema.Class<MindmapNodeMetadata>(
+  "MindmapNodeMetadata",
+)({
+  depth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  siblingIndex: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+}) {}
 
-export const MindmapEdgeSchema = DiagramEdgeSchema.extend({
-  metadata: z.object({
-    depth: z.number().int().positive(),
-    siblingIndex: z.number().int().nonnegative(),
-  }),
-});
+export class MindmapNode extends DiagramNode.extend<MindmapNode>("MindmapNode")(
+  {
+    kind: Schema.Literals(["root", "topic"]),
+    metadata: MindmapNodeMetadata,
+  },
+) {}
+export const MindmapNodeSchema = MindmapNode;
 
-export const MindmapDiagramSchema = IntermediateDiagramSchema.extend({
-  type: z.literal(mindmapDiagramType),
-  nodes: z.array(MindmapNodeSchema).min(2),
-  edges: z.array(MindmapEdgeSchema).min(1),
-});
+export class MindmapEdgeMetadata extends Schema.Class<MindmapEdgeMetadata>(
+  "MindmapEdgeMetadata",
+)({
+  depth: Schema.Int.check(Schema.isGreaterThan(0)),
+  siblingIndex: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+}) {}
 
-export type MindmapDiagram = z.infer<typeof MindmapDiagramSchema>;
+export class MindmapEdge extends DiagramEdge.extend<MindmapEdge>("MindmapEdge")(
+  {
+    metadata: MindmapEdgeMetadata,
+  },
+) {}
+export const MindmapEdgeSchema = MindmapEdge;
+
+export class MindmapDiagram extends IntermediateDiagram.extend<MindmapDiagram>(
+  "MindmapDiagram",
+)({
+  type: Schema.Literal(mindmapDiagramType),
+  nodes: Schema.Array(MindmapNode)
+    .pipe(Schema.mutable)
+    .check(Schema.isMinLength(2)),
+  edges: Schema.Array(MindmapEdge)
+    .pipe(Schema.mutable)
+    .check(Schema.isMinLength(1)),
+}) {}
+export const MindmapDiagramSchema = withDiagramParser(MindmapDiagram);
 
 export function validateMindmapDiagram(
   diagram: MindmapDiagram,
@@ -98,7 +119,7 @@ export function validateMindmapDiagram(
 }
 
 export function parseMindmapDiagram(input: unknown): MindmapDiagram {
-  return validateMindmapDiagram(MindmapDiagramSchema.parse(input));
+  return validateMindmapDiagram(parseDiagramSchema(MindmapDiagram, input));
 }
 
 export const mindmapFixture = parseMindmapDiagram({

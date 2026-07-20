@@ -342,17 +342,24 @@ importers:
       '@sketchi/diagram-renderer':
         specifier: workspace:*
         version: link:../renderer
+      '@standard-schema/spec':
+        specifier: 1.1.0
+        version: 1.1.0
       effect:
         specifier: 4.0.0-beta.99
         version: 4.0.0-beta.99
       tslib:
         specifier: ^2.3.0
         version: 2.8.1
-      zod:
-        specifier: 4.4.3
-        version: 4.4.3
 
-  packages/diagram/core: {}
+  packages/diagram/core:
+    dependencies:
+      effect:
+        specifier: 4.0.0-beta.99
+        version: 4.0.0-beta.99
+      tslib:
+        specifier: ^2.3.0
+        version: 2.8.1
 
   packages/diagram/excalidraw:
     dependencies:
@@ -377,9 +384,6 @@ importers:
       tslib:
         specifier: ^2.3.0
         version: 2.8.1
-      zod:
-        specifier: 4.4.3
-        version: 4.4.3
 
   packages/diagram/renderer:
     dependencies:
@@ -467,9 +471,6 @@ importers:
       tslib:
         specifier: ^2.3.0
         version: 2.8.1
-      zod:
-        specifier: 4.4.3
-        version: 4.4.3
 
   packages/svg-excalidraw:
     dependencies:

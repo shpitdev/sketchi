@@ -13,11 +13,33 @@ import { Effect, Fiber, Layer } from "effect";
 import { TestClock } from "effect/testing";
 
 import {
+  GenerateScenarioInputSchema,
   generateScenarioCandidatesForInput,
   runGenerateScenarioCandidatesForInput,
 } from "./generate-scenario";
 
 describe("eval harness scenario generation composition", () => {
+  it("preserves the Zod-visible invalid-provider issue contract", () => {
+    const result = GenerateScenarioInputSchema.safeParse({
+      providers: ["unsupported"],
+      scenarioId: "sketchi-onboarding-decision-flow",
+    });
+
+    if (result.success) {
+      return assert.fail("Invalid provider unexpectedly passed validation.");
+    }
+
+    assert.deepStrictEqual(result.error.issues, [
+      {
+        code: "invalid_value",
+        message:
+          'Invalid option: expected one of "fixture"|"cloudflare-google-ai-studio"',
+        path: ["providers", 0],
+        values: ["fixture", "cloudflare-google-ai-studio"],
+      },
+    ]);
+  });
+
   it("adapts a maintained scenario before calling the generation client", async () => {
     const scenario = getScenario("sketchi-onboarding-decision-flow");
     const responseBody = {

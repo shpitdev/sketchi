@@ -1,10 +1,12 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
 import {
-  DiagramEdgeSchema,
-  DiagramNodeSchema,
+  DiagramEdge,
+  DiagramNode,
   DiagramValidationError,
-  IntermediateDiagramSchema,
+  IntermediateDiagram,
+  parseDiagramSchema,
+  withDiagramParser,
 } from "../intermediate.js";
 
 export const flowchartDiagramType = "flowchart" as const;
@@ -13,7 +15,7 @@ export const FLOWCHART_MAX_NODES = 24;
 export const FLOWCHART_MAX_EDGES = 64;
 export const FLOWCHART_MAX_ISSUES = 20;
 
-export const FlowchartValidationIssueCodeSchema = z.enum([
+export const FlowchartValidationIssueCodeSchema = Schema.Literals([
   "duplicate_node_id",
   "duplicate_edge_id",
   "missing_edge_source",
@@ -33,54 +35,61 @@ export const FlowchartValidationIssueCodeSchema = z.enum([
   "flowchart_too_large",
 ]);
 
-export const FlowchartValidationIssueRefSchema = z.object({
-  kind: z.enum(["diagram", "node", "edge"]),
-  id: z.string().min(1).optional(),
-  path: z.string().min(1).optional(),
-});
+export class FlowchartValidationIssueRef extends Schema.Class<FlowchartValidationIssueRef>(
+  "FlowchartValidationIssueRef",
+)({
+  kind: Schema.Literals(["diagram", "node", "edge"]),
+  id: Schema.optional(Schema.NonEmptyString),
+  path: Schema.optional(Schema.NonEmptyString),
+}) {}
+export const FlowchartValidationIssueRefSchema = FlowchartValidationIssueRef;
 
-export const FlowchartValidationIssueSchema = z.object({
+export class FlowchartValidationIssue extends Schema.Class<FlowchartValidationIssue>(
+  "FlowchartValidationIssue",
+)({
   code: FlowchartValidationIssueCodeSchema,
-  ref: FlowchartValidationIssueRefSchema.optional(),
-  message: z.string().min(1),
-  hint: z.string().min(1),
-});
+  ref: Schema.optional(FlowchartValidationIssueRef),
+  message: Schema.NonEmptyString,
+  hint: Schema.NonEmptyString,
+}) {}
+export const FlowchartValidationIssueSchema = FlowchartValidationIssue;
 
-export const FlowchartNodeKindSchema = z.enum([
+export const FlowchartNodeKindSchema = Schema.Literals([
   "start",
   "process",
   "decision",
   "end",
 ]);
 
-export const FlowchartNodeSchema = DiagramNodeSchema.extend({
+export class FlowchartNode extends DiagramNode.extend<FlowchartNode>(
+  "FlowchartNode",
+)({
   kind: FlowchartNodeKindSchema,
-  description: z.string().min(1).optional(),
-});
+  description: Schema.optional(Schema.NonEmptyString),
+}) {}
+export const FlowchartNodeSchema = FlowchartNode;
 
-export const FlowchartEdgeSchema = DiagramEdgeSchema.extend({
-  label: z.string().min(1).optional(),
-});
+export class FlowchartEdge extends DiagramEdge.extend<FlowchartEdge>(
+  "FlowchartEdge",
+)({ label: Schema.optional(Schema.NonEmptyString) }) {}
+export const FlowchartEdgeSchema = FlowchartEdge;
 
-export const FlowchartDiagramSchema = IntermediateDiagramSchema.extend({
-  type: z.literal(flowchartDiagramType),
-  nodes: z.array(FlowchartNodeSchema).min(2),
-  edges: z.array(FlowchartEdgeSchema).min(1),
-});
+export class FlowchartDiagram extends IntermediateDiagram.extend<FlowchartDiagram>(
+  "FlowchartDiagram",
+)({
+  type: Schema.Literal(flowchartDiagramType),
+  nodes: Schema.Array(FlowchartNode)
+    .pipe(Schema.mutable)
+    .check(Schema.isMinLength(2)),
+  edges: Schema.Array(FlowchartEdge)
+    .pipe(Schema.mutable)
+    .check(Schema.isMinLength(1)),
+}) {}
+export const FlowchartDiagramSchema = withDiagramParser(FlowchartDiagram);
 
-export type FlowchartNodeKind = z.infer<typeof FlowchartNodeKindSchema>;
-export type FlowchartNode = z.infer<typeof FlowchartNodeSchema>;
-export type FlowchartEdge = z.infer<typeof FlowchartEdgeSchema>;
-export type FlowchartDiagram = z.infer<typeof FlowchartDiagramSchema>;
-export type FlowchartValidationIssueCode = z.infer<
-  typeof FlowchartValidationIssueCodeSchema
->;
-export type FlowchartValidationIssueRef = z.infer<
-  typeof FlowchartValidationIssueRefSchema
->;
-export type FlowchartValidationIssue = z.infer<
-  typeof FlowchartValidationIssueSchema
->;
+export type FlowchartNodeKind = typeof FlowchartNodeKindSchema.Type;
+export type FlowchartValidationIssueCode =
+  typeof FlowchartValidationIssueCodeSchema.Type;
 
 function edgeBuckets(edges: readonly FlowchartEdge[]) {
   const incoming = new Map<string, FlowchartEdge[]>();
@@ -356,7 +365,7 @@ export function validateFlowchartDiagram(
 }
 
 export function parseFlowchartDiagram(input: unknown): FlowchartDiagram {
-  return validateFlowchartDiagram(FlowchartDiagramSchema.parse(input));
+  return validateFlowchartDiagram(parseDiagramSchema(FlowchartDiagram, input));
 }
 
 export const flowchartFixture = parseFlowchartDiagram({

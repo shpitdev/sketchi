@@ -1,23 +1,32 @@
-export type DiagramGenerationRole = "system" | "user";
+import { Schema } from "effect";
 
-export interface DiagramGenerationMessage {
-  content: string;
-  role: DiagramGenerationRole;
-}
+export const DiagramGenerationRoleSchema = Schema.Literals(["system", "user"]);
+export type DiagramGenerationRole = typeof DiagramGenerationRoleSchema.Type;
 
-export interface DiagramGenerationPrompt {
-  id: string;
-  request: string;
-  requiredBranchLabels: readonly string[];
-  requiredNodeLabels: readonly string[];
-  title: string;
-}
+export class DiagramGenerationMessage extends Schema.Class<DiagramGenerationMessage>(
+  "DiagramGenerationMessage",
+)({
+  content: Schema.String,
+  role: DiagramGenerationRoleSchema,
+}) {}
 
-export interface DiagramGenerationMessages {
-  messages: readonly [DiagramGenerationMessage, DiagramGenerationMessage];
-  system: string;
-  user: string;
-}
+export class DiagramGenerationPrompt extends Schema.Class<DiagramGenerationPrompt>(
+  "DiagramGenerationPrompt",
+)({
+  id: Schema.String,
+  request: Schema.String,
+  requiredBranchLabels: Schema.Array(Schema.String),
+  requiredNodeLabels: Schema.Array(Schema.String),
+  title: Schema.String,
+}) {}
+
+export class DiagramGenerationMessages extends Schema.Class<DiagramGenerationMessages>(
+  "DiagramGenerationMessages",
+)({
+  messages: Schema.Tuple([DiagramGenerationMessage, DiagramGenerationMessage]),
+  system: Schema.String,
+  user: Schema.String,
+}) {}
 
 const FLOWCHART_IR_INSTRUCTIONS = [
   "Return only JSON. Do not wrap the JSON in markdown.",

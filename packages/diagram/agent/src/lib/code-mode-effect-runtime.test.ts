@@ -1,9 +1,13 @@
 import { assert, layer } from "@effect/vitest";
-import { Cause, Effect, Exit, Fiber, Layer } from "effect";
+import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 import { FastCheck } from "effect/testing";
 
 import { CodeModeArtifactStorageMemory } from "./code-mode-artifacts";
-import { DIAGRAM_PATCH_OPERATION_NAMES } from "./code-mode-contract";
+import {
+  BuildFlowchartRequestSchema,
+  DIAGRAM_PATCH_OPERATION_NAMES,
+  MindmapTopicSchema,
+} from "./code-mode-contract";
 import {
   applyDiagramPatch,
   buildFlowchart,
@@ -29,6 +33,67 @@ const runtimeLayer = Layer.mergeAll(
 );
 
 layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
+  it.effect("preserves golden request encoding and failure output", () =>
+    Effect.gen(function* () {
+      const decoded = BuildFlowchartRequestSchema.parse({
+        spec: {
+          nodes: [{ id: "start", kind: "start", label: "Start" }],
+          title: "Golden flow",
+        },
+      });
+      const encoded = yield* Schema.encodeEffect(BuildFlowchartRequestSchema)(
+        decoded,
+      );
+      assert.deepStrictEqual(encoded, {
+        spec: {
+          title: "Golden flow",
+          nodes: [{ id: "start", label: "Start", kind: "start" }],
+          edges: [],
+          layout: { direction: "TB" },
+          style: { accentColor: "#000000", backgroundColor: "#ffffff" },
+        },
+      });
+
+      const failure = BuildFlowchartRequestSchema.safeParse({
+        requestId: "",
+        spec: { nodes: [], title: "" },
+      });
+      assert.isFalse(failure.success);
+      if (failure.success) {
+        return assert.fail("Invalid golden request unexpectedly decoded.");
+      }
+      assert.deepStrictEqual(failure.error.issues, [
+        {
+          code: "custom",
+          message: "Too small: expected string to have >=1 characters",
+          path: ["requestId"],
+        },
+        {
+          code: "custom",
+          message: "Too small: expected string to have >=1 characters",
+          path: ["spec", "title"],
+        },
+        {
+          code: "custom",
+          message: "Too small: expected array to have >=1 items",
+          path: ["spec", "nodes"],
+        },
+      ]);
+    }),
+  );
+
+  it.effect.prop(
+    "round-trips arbitrary recursive mindmap topics",
+    { topic: MindmapTopicSchema },
+    ({ topic }) =>
+      Effect.gen(function* () {
+        const encoded = yield* Schema.encodeEffect(MindmapTopicSchema)(topic);
+        const decoded =
+          yield* Schema.decodeUnknownEffect(MindmapTopicSchema)(encoded);
+        assert.deepStrictEqual(decoded, topic);
+      }),
+  );
+
   it.effect("forwards renderer cancellation and preserves interruption", () =>
     Effect.gen(function* () {
       const fiber = yield* Effect.forkChild(

@@ -1,4 +1,4 @@
-import { Context, type Effect, Layer } from "effect";
+import { Context, type Effect, Layer, Schema } from "effect";
 
 import type {
   DiagramGenerationCandidate,
@@ -17,12 +17,14 @@ export class DiagramGenerationClient extends Context.Service<
   }
 >()("@sketchi/diagram-generation/DiagramGenerationClient") {}
 
-export interface DiagramGenerationPolicyConfig {
-  readonly concurrency: number;
-  readonly maxRetries: number;
-  readonly requestTimeoutMs: number;
-  readonly retryDelayMs: number;
-}
+export class DiagramGenerationPolicyConfig extends Schema.Class<DiagramGenerationPolicyConfig>(
+  "DiagramGenerationPolicyConfig",
+)({
+  concurrency: Schema.Number,
+  maxRetries: Schema.Number,
+  requestTimeoutMs: Schema.Number,
+  retryDelayMs: Schema.Number,
+}) {}
 
 export class DiagramGenerationPolicy extends Context.Service<
   DiagramGenerationPolicy,

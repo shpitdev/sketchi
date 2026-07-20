@@ -6,17 +6,13 @@ import type {
   DiagramGenerationProviderId,
   DiagramGenerationRequest,
 } from "./candidates.js";
-
-const DiagramGenerationProviderId = Schema.Literals([
-  "fixture",
-  "cloudflare-google-ai-studio",
-]);
+import { DiagramGenerationProviderIdSchema } from "./candidates.js";
 
 export class DiagramGenerationConfigurationError extends Schema.TaggedErrorClass<DiagramGenerationConfigurationError>()(
   "DiagramGenerationConfigurationError",
   {
     message: Schema.String,
-    provider: DiagramGenerationProviderId,
+    provider: DiagramGenerationProviderIdSchema,
   },
 ) {}
 
@@ -25,7 +21,7 @@ export class DiagramGenerationInputError extends Schema.TaggedErrorClass<Diagram
   {
     cause: Schema.Defect(),
     message: Schema.String,
-    provider: DiagramGenerationProviderId,
+    provider: DiagramGenerationProviderIdSchema,
     scenarioId: Schema.String,
   },
 ) {}
@@ -36,7 +32,7 @@ export class DiagramGenerationTransportError extends Schema.TaggedErrorClass<Dia
     cause: Schema.Defect(),
     message: Schema.String,
     operation: Schema.String,
-    provider: DiagramGenerationProviderId,
+    provider: DiagramGenerationProviderIdSchema,
     retryable: Schema.Boolean,
   },
 ) {}
@@ -46,7 +42,7 @@ export class DiagramGenerationHttpError extends Schema.TaggedErrorClass<DiagramG
   {
     diagnostics: Schema.Array(Schema.String),
     durationMs: Schema.Number,
-    provider: DiagramGenerationProviderId,
+    provider: DiagramGenerationProviderIdSchema,
     raw: Schema.Unknown,
     retryable: Schema.Boolean,
     status: Schema.Number,
@@ -58,7 +54,7 @@ export class DiagramGenerationResponseError extends Schema.TaggedErrorClass<Diag
   {
     cause: Schema.Defect(),
     message: Schema.String,
-    provider: DiagramGenerationProviderId,
+    provider: DiagramGenerationProviderIdSchema,
   },
 ) {}
 
@@ -66,7 +62,7 @@ export class DiagramGenerationTimeoutError extends Schema.TaggedErrorClass<Diagr
   "DiagramGenerationTimeoutError",
   {
     message: Schema.String,
-    provider: DiagramGenerationProviderId,
+    provider: DiagramGenerationProviderIdSchema,
     timeoutMs: Schema.Number,
   },
 ) {}

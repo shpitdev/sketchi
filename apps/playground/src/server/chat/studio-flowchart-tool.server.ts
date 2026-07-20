@@ -5,9 +5,9 @@ import {
   MAX_FLOWCHART_BUILD_ATTEMPTS,
   type BuildFlowchartOptions,
   type BuildFlowchartResult,
+  type BuildFlowchartToolInput,
   type PlaygroundCodeModePromiseRuntimeForIssue243,
 } from "@sketchi/diagram-agent";
-import { z } from "zod";
 
 export const STUDIO_BUILD_FLOWCHART_TOOL_NAME: "build_flowchart" =
   "build_flowchart";
@@ -19,9 +19,7 @@ export const StudioBuildFlowchartInputSchema = BuildFlowchartRequestSchema.omit(
   { options: true },
 );
 
-export type StudioBuildFlowchartInput = z.infer<
-  typeof StudioBuildFlowchartInputSchema
->;
+export type StudioBuildFlowchartInput = BuildFlowchartToolInput;
 
 export const STUDIO_FLOWCHART_ARTIFACT_OPTIONS: NonNullable<BuildFlowchartOptions> =
   {

@@ -1,146 +1,213 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
-const StudioRecordIdSchema = z.string().regex(/^[a-z0-9_-]{6,80}$/i);
-const IsoDateStringSchema = z.string().min(1);
+const NonEmptyString = Schema.NonEmptyString;
 
-export const StudioOwnerSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("anonymous"),
-    sessionId: StudioRecordIdSchema,
-  }),
-  z.object({
-    displayName: z.string().min(1).optional(),
-    kind: z.literal("authenticated"),
-    subjectId: z.string().min(1),
-  }),
+export const StudioRecordIdSchema = Schema.String.check(
+  Schema.isPattern(/^[a-z0-9_-]{6,80}$/i),
+).pipe(Schema.brand("StudioRecordId"));
+export type StudioRecordId = typeof StudioRecordIdSchema.Type;
+
+export function makeStudioRecordId(input: string): StudioRecordId {
+  return Schema.decodeUnknownSync(StudioRecordIdSchema)(input);
+}
+
+export const IsoDateStringSchema = NonEmptyString.pipe(
+  Schema.brand("IsoDateString"),
+);
+export type IsoDateString = typeof IsoDateStringSchema.Type;
+
+export function makeIsoDateString(input: string): IsoDateString {
+  return Schema.decodeUnknownSync(IsoDateStringSchema)(input);
+}
+
+export class AnonymousStudioOwner extends Schema.Class<AnonymousStudioOwner>(
+  "AnonymousStudioOwner",
+)({
+  kind: Schema.Literal("anonymous"),
+  sessionId: StudioRecordIdSchema,
+}) {}
+
+export class AuthenticatedStudioOwner extends Schema.Class<AuthenticatedStudioOwner>(
+  "AuthenticatedStudioOwner",
+)({
+  displayName: Schema.optional(NonEmptyString),
+  kind: Schema.Literal("authenticated"),
+  subjectId: NonEmptyString,
+}) {}
+
+export const StudioOwnerSchema = Schema.Union([
+  AnonymousStudioOwner,
+  AuthenticatedStudioOwner,
 ]);
+export type StudioOwner = typeof StudioOwnerSchema.Type;
 
-export const StudioProjectSourceSchema = z.object({
-  artifactId: z.string().min(1),
-  kind: z.literal("playground-artifact"),
-});
+export class StudioProjectSource extends Schema.Class<StudioProjectSource>(
+  "StudioProjectSource",
+)({
+  artifactId: NonEmptyString,
+  kind: Schema.Literal("playground-artifact"),
+}) {}
+export const StudioProjectSourceSchema = StudioProjectSource;
 
-export const StudioProjectRecordSchema = z.object({
+export class StudioProjectRecord extends Schema.Class<StudioProjectRecord>(
+  "StudioProjectRecord",
+)({
   createdAt: IsoDateStringSchema,
-  diagramIds: z.array(StudioRecordIdSchema),
+  diagramIds: Schema.Array(StudioRecordIdSchema).pipe(Schema.mutable),
   id: StudioRecordIdSchema,
   owner: StudioOwnerSchema,
-  source: StudioProjectSourceSchema,
-  title: z.string().min(1),
+  source: StudioProjectSource,
+  title: NonEmptyString,
   updatedAt: IsoDateStringSchema,
-});
+}) {}
+export const StudioProjectRecordSchema = StudioProjectRecord;
 
-export const StudioDiagramRecordSchema = z.object({
-  artifactDiagramId: z.string().min(1).optional(),
-  artifactId: z.string().min(1),
+export class StudioDiagramRecord extends Schema.Class<StudioDiagramRecord>(
+  "StudioDiagramRecord",
+)({
+  artifactDiagramId: Schema.optional(NonEmptyString),
+  artifactId: NonEmptyString,
   createdAt: IsoDateStringSchema,
   id: StudioRecordIdSchema,
   owner: StudioOwnerSchema,
   projectId: StudioRecordIdSchema,
-  source: StudioProjectSourceSchema,
-  title: z.string().min(1),
+  source: StudioProjectSource,
+  title: NonEmptyString,
   updatedAt: IsoDateStringSchema,
-});
+}) {}
+export const StudioDiagramRecordSchema = StudioDiagramRecord;
 
-export const StudioAuthStatusSchema = z.discriminatedUnion("status", [
-  z.object({
-    message: z.string().min(1),
-    status: z.literal("anonymous"),
-  }),
-  z.object({
-    displayName: z.string().min(1).optional(),
-    status: z.literal("authenticated"),
-  }),
+export class AnonymousStudioAuthStatus extends Schema.Class<AnonymousStudioAuthStatus>(
+  "AnonymousStudioAuthStatus",
+)({
+  message: NonEmptyString,
+  status: Schema.Literal("anonymous"),
+}) {}
+
+export class AuthenticatedStudioAuthStatus extends Schema.Class<AuthenticatedStudioAuthStatus>(
+  "AuthenticatedStudioAuthStatus",
+)({
+  displayName: Schema.optional(NonEmptyString),
+  status: Schema.Literal("authenticated"),
+}) {}
+
+export const StudioAuthStatusSchema = Schema.Union([
+  AnonymousStudioAuthStatus,
+  AuthenticatedStudioAuthStatus,
 ]);
+export type StudioAuthStatus = typeof StudioAuthStatusSchema.Type;
 
-export const StudioPublicSessionSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("anonymous"),
-  }),
-  z.object({
-    displayName: z.string().min(1).optional(),
-    kind: z.literal("authenticated"),
-  }),
+export class AnonymousStudioPublicSession extends Schema.Class<AnonymousStudioPublicSession>(
+  "AnonymousStudioPublicSession",
+)({ kind: Schema.Literal("anonymous") }) {}
+
+export class AuthenticatedStudioPublicSession extends Schema.Class<AuthenticatedStudioPublicSession>(
+  "AuthenticatedStudioPublicSession",
+)({
+  displayName: Schema.optional(NonEmptyString),
+  kind: Schema.Literal("authenticated"),
+}) {}
+
+export const StudioPublicSessionSchema = Schema.Union([
+  AnonymousStudioPublicSession,
+  AuthenticatedStudioPublicSession,
 ]);
+export type StudioPublicSession = typeof StudioPublicSessionSchema.Type;
 
-export const StudioProjectSummarySchema = z.object({
+export class StudioProjectSummary extends Schema.Class<StudioProjectSummary>(
+  "StudioProjectSummary",
+)({
   createdAt: IsoDateStringSchema,
-  diagramCount: z.number().int().nonnegative(),
+  diagramCount: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   id: StudioRecordIdSchema,
-  primaryDiagramId: StudioRecordIdSchema.optional(),
-  source: StudioProjectSourceSchema,
-  title: z.string().min(1),
+  primaryDiagramId: Schema.optional(StudioRecordIdSchema),
+  source: StudioProjectSource,
+  title: NonEmptyString,
   updatedAt: IsoDateStringSchema,
-});
+}) {}
+export const StudioProjectSummarySchema = StudioProjectSummary;
 
-export const StudioDiagramSummarySchema = z.object({
-  artifactDiagramId: z.string().min(1).optional(),
-  artifactId: z.string().min(1),
+export class StudioDiagramSummary extends Schema.Class<StudioDiagramSummary>(
+  "StudioDiagramSummary",
+)({
+  artifactDiagramId: Schema.optional(NonEmptyString),
+  artifactId: NonEmptyString,
   createdAt: IsoDateStringSchema,
-  editUrl: z.string().min(1),
+  editUrl: NonEmptyString,
   id: StudioRecordIdSchema,
   projectId: StudioRecordIdSchema,
-  reviewUrl: z.string().min(1),
-  source: StudioProjectSourceSchema,
-  title: z.string().min(1),
+  reviewUrl: NonEmptyString,
+  source: StudioProjectSource,
+  title: NonEmptyString,
   updatedAt: IsoDateStringSchema,
-});
+}) {}
+export const StudioDiagramSummarySchema = StudioDiagramSummary;
 
-export const StudioProjectDetailsSchema = z.object({
-  diagrams: z.array(StudioDiagramSummarySchema),
-  project: StudioProjectSummarySchema,
-});
+export class StudioProjectDetails extends Schema.Class<StudioProjectDetails>(
+  "StudioProjectDetails",
+)({
+  diagrams: Schema.Array(StudioDiagramSummary).pipe(Schema.mutable),
+  project: StudioProjectSummary,
+}) {}
+export const StudioProjectDetailsSchema = StudioProjectDetails;
 
-export const CreateStudioProjectFromArtifactRequestSchema = z.object({
-  artifactId: z.string().min(1),
-});
+export class CreateStudioProjectFromArtifactRequest extends Schema.Class<CreateStudioProjectFromArtifactRequest>(
+  "CreateStudioProjectFromArtifactRequest",
+)({ artifactId: NonEmptyString }) {}
+export const CreateStudioProjectFromArtifactRequestSchema =
+  CreateStudioProjectFromArtifactRequest;
 
-export const StudioProjectsListResponseSchema = z.object({
+export class StudioProjectsListResponse extends Schema.Class<StudioProjectsListResponse>(
+  "StudioProjectsListResponse",
+)({
   auth: StudioAuthStatusSchema,
-  ok: z.literal(true),
-  projects: z.array(StudioProjectSummarySchema),
+  ok: Schema.Literal(true),
+  projects: Schema.Array(StudioProjectSummary).pipe(Schema.mutable),
   session: StudioPublicSessionSchema,
-});
+}) {}
+export const StudioProjectsListResponseSchema = StudioProjectsListResponse;
 
-export const StudioProjectDetailsResponseSchema = z.object({
+export class StudioProjectDetailsResponse extends Schema.Class<StudioProjectDetailsResponse>(
+  "StudioProjectDetailsResponse",
+)({
   auth: StudioAuthStatusSchema,
-  details: StudioProjectDetailsSchema,
-  ok: z.literal(true),
+  details: StudioProjectDetails,
+  ok: Schema.Literal(true),
   session: StudioPublicSessionSchema,
-});
+}) {}
+export const StudioProjectDetailsResponseSchema = StudioProjectDetailsResponse;
 
-export const StudioDiagramDetailsResponseSchema = z.object({
+export class StudioDiagramDetailsResponse extends Schema.Class<StudioDiagramDetailsResponse>(
+  "StudioDiagramDetailsResponse",
+)({
   auth: StudioAuthStatusSchema,
-  diagram: StudioDiagramSummarySchema,
-  ok: z.literal(true),
-  project: StudioProjectSummarySchema,
+  diagram: StudioDiagramSummary,
+  ok: Schema.Literal(true),
+  project: StudioProjectSummary,
   session: StudioPublicSessionSchema,
-});
+}) {}
+export const StudioDiagramDetailsResponseSchema = StudioDiagramDetailsResponse;
 
-export const CreateStudioProjectFromArtifactResponseSchema = z.object({
+export class StudioProjectUrls extends Schema.Class<StudioProjectUrls>(
+  "StudioProjectUrls",
+)({
+  diagram: NonEmptyString,
+  edit: NonEmptyString,
+  project: NonEmptyString,
+}) {}
+
+export class CreateStudioProjectFromArtifactResponse extends Schema.Class<CreateStudioProjectFromArtifactResponse>(
+  "CreateStudioProjectFromArtifactResponse",
+)({
   auth: StudioAuthStatusSchema,
-  diagram: StudioDiagramSummarySchema,
-  ok: z.literal(true),
-  project: StudioProjectSummarySchema,
+  diagram: StudioDiagramSummary,
+  ok: Schema.Literal(true),
+  project: StudioProjectSummary,
   session: StudioPublicSessionSchema,
-  urls: z.object({
-    diagram: z.string().min(1),
-    edit: z.string().min(1),
-    project: z.string().min(1),
-  }),
-});
-
-export type StudioOwner = z.infer<typeof StudioOwnerSchema>;
-export type StudioProjectRecord = z.infer<typeof StudioProjectRecordSchema>;
-export type StudioDiagramRecord = z.infer<typeof StudioDiagramRecordSchema>;
-export type StudioAuthStatus = z.infer<typeof StudioAuthStatusSchema>;
-export type StudioPublicSession = z.infer<typeof StudioPublicSessionSchema>;
-export type StudioProjectSummary = z.infer<typeof StudioProjectSummarySchema>;
-export type StudioDiagramSummary = z.infer<typeof StudioDiagramSummarySchema>;
-export type StudioProjectDetails = z.infer<typeof StudioProjectDetailsSchema>;
-export type CreateStudioProjectFromArtifactResponse = z.infer<
-  typeof CreateStudioProjectFromArtifactResponseSchema
->;
+  urls: StudioProjectUrls,
+}) {}
+export const CreateStudioProjectFromArtifactResponseSchema =
+  CreateStudioProjectFromArtifactResponse;
 
 export function studioProjectUrl(projectId: string): string {
   return `/projects/${encodeURIComponent(projectId)}`;

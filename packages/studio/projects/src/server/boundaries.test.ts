@@ -1,7 +1,8 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Cause, Effect, Exit, Fiber } from "effect";
+import { Cause, Effect, Exit, Fiber, Schema } from "effect";
 
 import {
+  makeStudioJsonPersistence,
   makeStudioObjectStoreLayer,
   MemoryStudioObjectBucket,
   StudioObjectStore,
@@ -105,6 +106,39 @@ describe("StudioObjectStore R2 boundary", () => {
             null,
           );
         }),
+      );
+
+      it.effect(
+        "round-trips transformed codecs through their persisted bytes",
+        () =>
+          Effect.gen(function* () {
+            const objectStore = yield* StudioObjectStore;
+            const persistence = makeStudioJsonPersistence(objectStore);
+            const key = "studio/transformed-number.json";
+
+            yield* persistence.put(key, Schema.NumberFromString, 42);
+            assert.strictEqual(memoryBucket.objects.get(key), '"42"');
+            assert.strictEqual(
+              yield* persistence.read(
+                key,
+                Schema.NumberFromString,
+                "project",
+                "transformed-number",
+              ),
+              42,
+            );
+
+            memoryBucket.objects.set(key, '"43"');
+            assert.strictEqual(
+              yield* persistence.read(
+                key,
+                Schema.NumberFromString,
+                "project",
+                "transformed-number",
+              ),
+              43,
+            );
+          }),
       );
     },
   );

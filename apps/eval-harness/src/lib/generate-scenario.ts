@@ -29,11 +29,14 @@ const DEFAULT_MODEL = "google/gemini-3.1-flash-lite";
 const DEFAULT_PROVIDERS: readonly DiagramGenerationProviderId[] = [
   "cloudflare-google-ai-studio",
 ];
+const DiagramGenerationProviderIdAdapter = z.enum(
+  DiagramGenerationProviderIdSchema.literals,
+);
 
-const GenerateScenarioInputSchema = z.object({
+export const GenerateScenarioInputSchema = z.object({
   cacheMode: z.enum(["default", "fresh"]).default("default"),
   providers: z
-    .array(DiagramGenerationProviderIdSchema)
+    .array(DiagramGenerationProviderIdAdapter)
     .default([...DEFAULT_PROVIDERS]),
   scenarioId: z.string().min(1),
 });

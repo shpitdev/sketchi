@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 
 import {
   createStudioProjectsServer,
+  makeStudioRecordId,
   MemoryStudioObjectBucket,
   studioDiagramRecordKey,
   studioOwnerKey,
@@ -121,7 +122,10 @@ function nestedString(
 describe("Studio project HTTP runtime edge", () => {
   it("preserves keys, bytes, identifiers, and HTTP bodies for valid records", async () => {
     const sessionId = "anon_abcdefghijklmnop";
-    const owner: StudioOwner = { kind: "anonymous", sessionId };
+    const owner: StudioOwner = {
+      kind: "anonymous",
+      sessionId: makeStudioRecordId(sessionId),
+    };
     const createdAt = "2026-07-20T02:00:00.000Z";
     const { bucket, server, sourceArtifacts } = createTestServer(
       new MemoryStudioObjectBucket(),

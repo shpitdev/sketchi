@@ -1,19 +1,24 @@
 import { nanoid } from "nanoid";
-import { Context, Effect, Layer } from "effect";
-import { z } from "zod";
+import { Context, Effect, Layer, Schema } from "effect";
 
 import {
+  IsoDateStringSchema,
+  makeIsoDateString,
+  makeStudioRecordId,
+  StudioDiagramRecord,
   StudioDiagramRecordSchema,
+  StudioProjectRecord,
   StudioProjectRecordSchema,
+  StudioProjectSource,
+  StudioRecordIdSchema,
   studioDiagramEditUrl,
   studioDiagramUrl,
   studioProjectUrl,
-  type StudioDiagramRecord,
   type StudioDiagramSummary,
   type StudioOwner,
   type StudioProjectDetails,
-  type StudioProjectRecord,
   type StudioProjectSummary,
+  type IsoDateString,
 } from "../contracts.js";
 import { makeStudioJsonPersistence, StudioObjectStore } from "./bucket.js";
 import type { StudioProjectsError } from "./errors.js";
@@ -22,13 +27,15 @@ import { StudioSourceArtifactStore } from "./source-artifacts.js";
 
 const STUDIO_PREFIX = "studio";
 
-const StudioProjectIndexEntrySchema = z.object({
-  ownerKey: z.string().min(1),
-  projectId: z.string().min(1),
-  updatedAt: z.string().min(1),
-});
+class StudioProjectIndexEntry extends Schema.Class<StudioProjectIndexEntry>(
+  "StudioProjectIndexEntry",
+)({
+  ownerKey: Schema.NonEmptyString,
+  projectId: StudioRecordIdSchema,
+  updatedAt: IsoDateStringSchema,
+}) {}
 
-type StudioProjectIndexEntry = z.infer<typeof StudioProjectIndexEntrySchema>;
+const StudioProjectIndexEntrySchema = StudioProjectIndexEntry;
 
 export interface StudioProjectCreateSuccess {
   diagram: StudioDiagramSummary;
@@ -72,9 +79,9 @@ export class StudioProjects extends Context.Service<
   StudioProjectsShape
 >()("@sketchi/studio-projects/StudioProjects") {}
 
-export interface StudioPersistencePolicyConfig {
-  readonly listingConcurrency: number;
-}
+export class StudioPersistencePolicyConfig extends Schema.Class<StudioPersistencePolicyConfig>(
+  "StudioPersistencePolicyConfig",
+)({ listingConcurrency: Schema.Number }) {}
 
 export class StudioPersistencePolicy extends Context.Service<
   StudioPersistencePolicy,
@@ -270,14 +277,22 @@ export const StudioProjectsLive = Layer.effect(
 
     const writeOwnerProjectEntry = Effect.fn(
       "studioPersistence.projects.writeOwnerIndex",
-    )(function* (session: StudioOwner, projectId: string, updatedAt: string) {
-      const entry = {
+    )(function* (
+      session: StudioOwner,
+      projectId: string,
+      updatedAt: IsoDateString,
+    ) {
+      const entry = StudioProjectIndexEntry.make({
         ownerKey: studioOwnerKey(session),
-        projectId,
+        projectId: makeStudioRecordId(projectId),
         updatedAt,
-      } satisfies StudioProjectIndexEntry;
+      });
 
-      yield* json.put(studioOwnerProjectEntryKey(session, projectId), entry);
+      yield* json.put(
+        studioOwnerProjectEntryKey(session, projectId),
+        StudioProjectIndexEntrySchema,
+        entry,
+      );
     });
 
     const listProjects = Effect.fn("studioPersistence.projects.list")(
@@ -375,14 +390,14 @@ export const StudioProjectsLive = Layer.effect(
       readonly session: StudioOwner;
     }) {
       const sourceArtifact = yield* sourceArtifacts.load(input.artifactId);
-      const createdAt = recordFactory.now();
-      const projectId = recordFactory.createId("proj");
-      const diagramId = recordFactory.createId("dia");
-      const source = {
+      const createdAt = makeIsoDateString(recordFactory.now());
+      const projectId = makeStudioRecordId(recordFactory.createId("proj"));
+      const diagramId = makeStudioRecordId(recordFactory.createId("dia"));
+      const source = StudioProjectSource.make({
         artifactId: input.artifactId,
         kind: "playground-artifact",
-      } satisfies StudioProjectRecord["source"];
-      const diagram: StudioDiagramRecord = {
+      });
+      const diagram = StudioDiagramRecord.make({
         artifactDiagramId: sourceArtifact.diagramId,
         artifactId: input.artifactId,
         createdAt,
@@ -392,8 +407,8 @@ export const StudioProjectsLive = Layer.effect(
         source,
         title: sourceArtifact.title,
         updatedAt: createdAt,
-      };
-      const project: StudioProjectRecord = {
+      });
+      const project = StudioProjectRecord.make({
         createdAt,
         diagramIds: [diagram.id],
         id: projectId,
@@ -401,10 +416,18 @@ export const StudioProjectsLive = Layer.effect(
         source,
         title: sourceArtifact.title,
         updatedAt: createdAt,
-      };
+      });
 
-      yield* json.put(studioDiagramRecordKey(diagram.id), diagram);
-      yield* json.put(studioProjectRecordKey(project.id), project);
+      yield* json.put(
+        studioDiagramRecordKey(diagram.id),
+        StudioDiagramRecordSchema,
+        diagram,
+      );
+      yield* json.put(
+        studioProjectRecordKey(project.id),
+        StudioProjectRecordSchema,
+        project,
+      );
       yield* writeOwnerProjectEntry(input.session, project.id, createdAt);
 
       return {

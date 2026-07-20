@@ -1,67 +1,140 @@
-import { z } from "zod";
+import { Effect, Result, Schema, SchemaIssue } from "effect";
 
 import { DIAGRAM_TYPES } from "./diagram-types.js";
 
-export const DiagramTypeSchema = z.enum(DIAGRAM_TYPES);
+const NonEmptyString = Schema.NonEmptyString;
+const Metadata = Schema.Record(Schema.String, Schema.Unknown);
 
-export const LayoutDirectionSchema = z.enum(["TB", "BT", "LR", "RL"]);
-export const EdgeRoutingSchema = z.enum(["straight", "orthogonal", "curved"]);
+function withDefault<S extends Schema.Top>(schema: S, value: S["Encoded"]) {
+  return schema.pipe(Schema.withDecodingDefault(Effect.succeed(value)));
+}
 
-export const DiagramNodeSchema = z.object({
-  id: z.string().min(1),
-  label: z.string().min(1),
-  group: z.string().min(1).optional(),
-  kind: z.string().min(1).optional(),
-  metadata: z.record(z.string(), z.unknown()).default({}),
-});
+export function parseDiagramSchema<S extends Schema.ConstraintDecoder<unknown>>(
+  schema: S,
+  input: unknown,
+): S["Type"] {
+  return Schema.decodeUnknownSync(schema, { errors: "all" })(input);
+}
 
-export const DiagramEdgeSchema = z.object({
-  id: z.string().min(1),
-  source: z.string().min(1),
-  target: z.string().min(1),
-  label: z.string().min(1).optional(),
-  metadata: z.record(z.string(), z.unknown()).default({}),
-});
+export interface DiagramSchemaIssue {
+  readonly message: string;
+  readonly path: readonly PropertyKey[];
+}
 
-export const DiagramStyleSchema = z.object({
-  accentColor: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/)
-    .default("#0f766e"),
-  backgroundColor: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/)
-    .default("#ffffff"),
-});
+export interface DiagramSchemaError {
+  readonly issues: readonly DiagramSchemaIssue[];
+}
 
-export const DiagramLayoutSchema = z.object({
-  direction: LayoutDirectionSchema.default("LR"),
-  edgeRouting: EdgeRoutingSchema.default("orthogonal"),
-});
+const diagramSchemaFormatter = SchemaIssue.makeFormatterStandardSchemaV1();
 
-export const IntermediateDiagramSchema = z.object({
-  id: z.string().min(1),
-  title: z.string().min(1),
-  type: DiagramTypeSchema.default("flowchart"),
-  nodes: z.array(DiagramNodeSchema).min(1),
-  edges: z.array(DiagramEdgeSchema).default([]),
-  layout: DiagramLayoutSchema.default({
+function schemaIssuePath(
+  path: readonly (PropertyKey | { readonly key: PropertyKey })[] | undefined,
+): PropertyKey[] {
+  return (path ?? []).map((segment) =>
+    typeof segment === "object" ? segment.key : segment,
+  );
+}
+
+export function safeParseDiagramSchema<
+  S extends Schema.ConstraintDecoder<unknown>,
+>(
+  schema: S,
+  input: unknown,
+):
+  | { readonly data: S["Type"]; readonly success: true }
+  | { readonly error: DiagramSchemaError; readonly success: false } {
+  const result = Schema.decodeUnknownResult(schema, { errors: "all" })(input);
+  if (Result.isSuccess(result)) {
+    return { data: result.success, success: true };
+  }
+  const formatted = diagramSchemaFormatter(result.failure.issue);
+  return {
+    error: {
+      issues: formatted.issues.map((issue) => ({
+        message: issue.message,
+        path: schemaIssuePath(issue.path),
+      })),
+    },
+    success: false,
+  };
+}
+
+export function withDiagramParser<S extends Schema.ConstraintDecoder<unknown>>(
+  schema: S,
+) {
+  return Object.assign(schema, {
+    parse: (input: unknown) => parseDiagramSchema(schema, input),
+    safeParse: (input: unknown) => safeParseDiagramSchema(schema, input),
+  });
+}
+
+export const DiagramTypeSchema = Schema.Literals(DIAGRAM_TYPES);
+export const LayoutDirectionSchema = Schema.Literals(["TB", "BT", "LR", "RL"]);
+export const EdgeRoutingSchema = Schema.Literals([
+  "straight",
+  "orthogonal",
+  "curved",
+]);
+
+export type DiagramType = typeof DiagramTypeSchema.Type;
+export type LayoutDirection = typeof LayoutDirectionSchema.Type;
+export type EdgeRouting = typeof EdgeRoutingSchema.Type;
+
+export class DiagramNode extends Schema.Class<DiagramNode>("DiagramNode")({
+  id: NonEmptyString,
+  label: NonEmptyString,
+  group: Schema.optional(NonEmptyString),
+  kind: Schema.optional(NonEmptyString),
+  metadata: withDefault(Metadata, {}),
+}) {}
+export const DiagramNodeSchema = withDiagramParser(DiagramNode);
+
+export class DiagramEdge extends Schema.Class<DiagramEdge>("DiagramEdge")({
+  id: NonEmptyString,
+  source: NonEmptyString,
+  target: NonEmptyString,
+  label: Schema.optional(NonEmptyString),
+  metadata: withDefault(Metadata, {}),
+}) {}
+export const DiagramEdgeSchema = withDiagramParser(DiagramEdge);
+
+const HexColor = Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/));
+
+export class DiagramStyle extends Schema.Class<DiagramStyle>("DiagramStyle")({
+  accentColor: withDefault(HexColor, "#0f766e"),
+  backgroundColor: withDefault(HexColor, "#ffffff"),
+}) {}
+export const DiagramStyleSchema = withDiagramParser(DiagramStyle);
+
+export class DiagramLayout extends Schema.Class<DiagramLayout>("DiagramLayout")(
+  {
+    direction: withDefault(LayoutDirectionSchema, "LR"),
+    edgeRouting: withDefault(EdgeRoutingSchema, "orthogonal"),
+  },
+) {}
+export const DiagramLayoutSchema = withDiagramParser(DiagramLayout);
+
+export class IntermediateDiagram extends Schema.Class<IntermediateDiagram>(
+  "IntermediateDiagram",
+)({
+  id: NonEmptyString,
+  title: NonEmptyString,
+  type: withDefault(DiagramTypeSchema, "flowchart"),
+  nodes: Schema.Array(DiagramNode)
+    .pipe(Schema.mutable)
+    .check(Schema.isMinLength(1)),
+  edges: withDefault(Schema.Array(DiagramEdge).pipe(Schema.mutable), []),
+  layout: withDefault(DiagramLayout, {
     direction: "LR",
     edgeRouting: "orthogonal",
   }),
-  style: DiagramStyleSchema.default({
+  style: withDefault(DiagramStyle, {
     accentColor: "#0f766e",
     backgroundColor: "#ffffff",
   }),
-  metadata: z.record(z.string(), z.unknown()).default({}),
-});
-
-export type DiagramType = z.infer<typeof DiagramTypeSchema>;
-export type LayoutDirection = z.infer<typeof LayoutDirectionSchema>;
-export type EdgeRouting = z.infer<typeof EdgeRoutingSchema>;
-export type DiagramNode = z.infer<typeof DiagramNodeSchema>;
-export type DiagramEdge = z.infer<typeof DiagramEdgeSchema>;
-export type IntermediateDiagram = z.infer<typeof IntermediateDiagramSchema>;
+  metadata: withDefault(Metadata, {}),
+}) {}
+export const IntermediateDiagramSchema = withDiagramParser(IntermediateDiagram);
 
 export class DiagramValidationError extends Error {
   constructor(message: string) {
@@ -129,6 +202,6 @@ export function validateIntermediateDiagram(
 }
 
 export function parseIntermediateDiagram(input: unknown): IntermediateDiagram {
-  const diagram = IntermediateDiagramSchema.parse(input);
+  const diagram = parseDiagramSchema(IntermediateDiagram, input);
   return validateIntermediateDiagram(diagram);
 }

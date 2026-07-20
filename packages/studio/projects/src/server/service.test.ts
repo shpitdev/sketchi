@@ -1,7 +1,14 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Cause, Effect, Exit, Fiber, Layer } from "effect";
+import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 
-import type { StudioOwner, StudioProjectRecord } from "../contracts.js";
+import {
+  AuthenticatedStudioOwner,
+  makeIsoDateString,
+  makeStudioRecordId,
+  StudioRecordIdSchema,
+  type StudioOwner,
+  type StudioProjectRecord,
+} from "../contracts.js";
 import {
   makeStudioObjectStoreLayer,
   MemoryStudioObjectBucket,
@@ -23,10 +30,24 @@ import {
 import { StudioSessionService, StudioSessionServiceLive } from "./session.js";
 import { makeStudioSourceArtifactStoreTestLayer } from "./source-artifacts.js";
 
-const owner: StudioOwner = {
+const owner = AuthenticatedStudioOwner.make({
   kind: "authenticated",
   subjectId: "user_effect_tests",
-};
+});
+
+describe("Studio schema contracts", () => {
+  it.effect.prop(
+    "round-trips arbitrary branded record identifiers",
+    { id: StudioRecordIdSchema },
+    ({ id }) =>
+      Effect.gen(function* () {
+        const encoded = yield* Schema.encodeEffect(StudioRecordIdSchema)(id);
+        const decoded =
+          yield* Schema.decodeUnknownEffect(StudioRecordIdSchema)(encoded);
+        assert.strictEqual(decoded, id);
+      }),
+  );
+});
 
 describe("StudioPersistencePolicy", () => {
   it.each([0, Number.NaN, Number.POSITIVE_INFINITY, -1, 1.5])(
@@ -178,18 +199,18 @@ describe("StudioProjects Effect service", () => {
   });
 
   const otherOwnerBucket = new MemoryStudioObjectBucket();
-  const otherOwner: StudioOwner = {
+  const otherOwner = AuthenticatedStudioOwner.make({
     kind: "authenticated",
     subjectId: "user_other",
-  };
+  });
   const mismatchedRecord: StudioProjectRecord = {
-    createdAt: "2026-07-20T03:00:00.000Z",
+    createdAt: makeIsoDateString("2026-07-20T03:00:00.000Z"),
     diagramIds: [],
-    id: "proj_private",
+    id: makeStudioRecordId("proj_private"),
     owner: otherOwner,
     source: { artifactId: "artifact-private", kind: "playground-artifact" },
     title: "Private project",
-    updatedAt: "2026-07-20T03:00:00.000Z",
+    updatedAt: makeIsoDateString("2026-07-20T03:00:00.000Z"),
   };
   otherOwnerBucket.objects.set(
     studioProjectRecordKey(mismatchedRecord.id),

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Effect } from "effect";
-import { z } from "zod";
+import { Effect, Schema } from "effect";
+import { readFile } from "node:fs/promises";
 
 import {
   ARTIFACT_MIME_TYPES,
@@ -22,6 +22,7 @@ import {
   DIAGRAM_PATCH_OPERATION_NAMES,
   GetArtifactRequestSchema,
   RenderedDiagramSceneSchema,
+  toCodeModeJsonSchema,
   type ApplyDiagramPatchResult,
   type BuildFlowchartResult,
   type BuildMindmapResult,
@@ -921,12 +922,14 @@ async function buildGoldenCorpus() {
         patchOperationOrder: DIAGRAM_PATCH_OPERATION_NAMES,
         issueCodeOrder: CodeModeIssueCodeSchema.options,
         schemas: {
-          buildFlowchart: z.toJSONSchema(BuildFlowchartRequestSchema),
-          buildMindmap: z.toJSONSchema(BuildMindmapRequestSchema),
-          getArtifact: z.toJSONSchema(GetArtifactRequestSchema),
-          applyDiagramPatch: z.toJSONSchema(ApplyDiagramPatchRequestSchema),
-          codeModeIssue: z.toJSONSchema(CodeModeIssueSchema),
-          artifactProvenance: z.toJSONSchema(ArtifactProvenanceSchema),
+          buildFlowchart: toCodeModeJsonSchema(BuildFlowchartRequestSchema),
+          buildMindmap: toCodeModeJsonSchema(BuildMindmapRequestSchema),
+          getArtifact: toCodeModeJsonSchema(GetArtifactRequestSchema),
+          applyDiagramPatch: toCodeModeJsonSchema(
+            ApplyDiagramPatchRequestSchema,
+          ),
+          codeModeIssue: toCodeModeJsonSchema(CodeModeIssueSchema),
+          artifactProvenance: toCodeModeJsonSchema(ArtifactProvenanceSchema),
         },
       },
     },
@@ -1080,6 +1083,29 @@ afterEach(() => {
 });
 
 describe("pre-Effect Code Mode compatibility corpus", () => {
+  it("emits the six frozen MCP-visible schemas without post-processing", async () => {
+    const fixturePath = new URL(
+      "./fixtures/code-mode-compatibility-v1.json",
+      import.meta.url,
+    );
+    const fixture = Schema.decodeUnknownSync(
+      Schema.Struct({
+        publicContract: Schema.Struct({
+          mcpVisible: Schema.Struct({ schemas: Schema.Unknown }),
+        }),
+      }),
+    )(JSON.parse(await readFile(fixturePath, "utf8")));
+
+    expect({
+      buildFlowchart: toCodeModeJsonSchema(BuildFlowchartRequestSchema),
+      buildMindmap: toCodeModeJsonSchema(BuildMindmapRequestSchema),
+      getArtifact: toCodeModeJsonSchema(GetArtifactRequestSchema),
+      applyDiagramPatch: toCodeModeJsonSchema(ApplyDiagramPatchRequestSchema),
+      codeModeIssue: toCodeModeJsonSchema(CodeModeIssueSchema),
+      artifactProvenance: toCodeModeJsonSchema(ArtifactProvenanceSchema),
+    }).toEqual(fixture.publicContract.mcpVisible.schemas);
+  });
+
   it("matches the frozen pre-refactor public and persisted contract", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-07-20T12:34:56.789Z"));
@@ -1088,9 +1114,10 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
       "./fixtures/code-mode-compatibility-v1.json",
       import.meta.url,
     ).pathname;
-    await expect(`${JSON.stringify(corpus, null, 2)}\n`).toMatchFileSnapshot(
-      fixturePath,
+    const frozen = Schema.decodeUnknownSync(Schema.Unknown)(
+      JSON.parse(await readFile(fixturePath, "utf8")),
     );
+    expect(corpus).toEqual(frozen);
   });
 
   it("matches the expanded exact-base issue behavior matrix", async () => {

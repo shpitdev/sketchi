@@ -1,4 +1,4 @@
-import { Context, Effect } from "effect";
+import { Context, Effect, Schema } from "effect";
 
 import { CreateStudioProjectFromArtifactRequestSchema } from "../contracts.js";
 import { StudioInvalidInputError, type StudioHttpError } from "./errors.js";
@@ -195,20 +195,20 @@ export const handleCreateFromArtifactRequestEffect = Effect.fn(
   return yield* withStudioSession(request, undefined, (resolution, projects) =>
     Effect.gen(function* () {
       const body = yield* readRequestJson(request);
-      const parsed =
-        CreateStudioProjectFromArtifactRequestSchema.safeParse(body);
-
-      if (!parsed.success) {
-        return yield* Effect.fail(
+      const parsed = yield* Schema.decodeUnknownEffect(
+        CreateStudioProjectFromArtifactRequestSchema,
+        { errors: "all" },
+      )(body).pipe(
+        Effect.mapError((cause) =>
           StudioInvalidInputError.make({
-            cause: parsed.error,
+            cause,
             message: "A playground artifactId is required.",
           }),
-        );
-      }
+        ),
+      );
 
       const result = yield* projects.createFromArtifact({
-        artifactId: parsed.data.artifactId,
+        artifactId: parsed.artifactId,
         session: resolution.session,
       });
 

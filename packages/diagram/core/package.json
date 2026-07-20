@@ -9,5 +9,9 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
+  },
+  "dependencies": {
+    "effect": "4.0.0-beta.99",
+    "tslib": "^2.3.0"
   }
 }

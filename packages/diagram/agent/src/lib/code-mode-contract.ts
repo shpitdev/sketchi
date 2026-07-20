@@ -1,16 +1,346 @@
-import { z } from "zod";
+import {
+  Effect,
+  Option,
+  Result,
+  Schema,
+  SchemaAST,
+  SchemaGetter,
+  SchemaIssue,
+  SchemaParser,
+} from "effect";
+import type {
+  StandardJSONSchemaV1,
+  StandardSchemaV1,
+} from "@standard-schema/spec";
 
 import { cleanToolString } from "./clean-tool-string.js";
 
-export const ArtifactFormatSchema = z.enum(["excalidraw", "scene", "png"]);
-export const InlineArtifactFormatSchema = z.enum(["excalidraw", "scene"]);
-export const ArtifactProvenanceSchema = z.object({
-  sourceArtifactId: z.string().min(1),
+export class ContractSchemaIssue extends Schema.Class<ContractSchemaIssue>(
+  "ContractSchemaIssue",
+)(
+  {
+    code: stringLiteral("custom"),
+    message: Schema.String,
+    path: Schema.Array(Schema.PropertyKey),
+  },
+  { identifier: undefined },
+) {}
+
+export class ContractSchemaError extends Schema.TaggedErrorClass<ContractSchemaError>()(
+  "ContractSchemaError",
+  { issues: Schema.Array(Schema.toEncoded(ContractSchemaIssue)) },
+) {}
+
+export type ContractSafeParseResult<A> =
+  | { readonly data: A; readonly success: true }
+  | { readonly error: ContractSchemaError; readonly success: false };
+
+function actualType(value: unknown): string {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  return typeof value;
+}
+
+function expectedType(ast: SchemaAST.AST): string {
+  if (SchemaAST.isString(ast)) return "string";
+  if (SchemaAST.isNumber(ast)) return "number";
+  if (SchemaAST.isBoolean(ast)) return "boolean";
+  if (SchemaAST.isArrays(ast)) return "array";
+  if (SchemaAST.isObjects(ast)) return "object";
+  if (SchemaAST.isLiteral(ast)) return JSON.stringify(ast.literal);
+  return "value";
+}
+
+const contractLeafHook: SchemaIssue.LeafHook = (issue) => {
+  if (issue._tag !== "InvalidType") {
+    return SchemaIssue.defaultLeafHook(issue);
+  }
+  const actual = Option.isSome(issue.actual) ? issue.actual.value : undefined;
+  return `Invalid input: expected ${expectedType(issue.ast)}, received ${actualType(actual)}`;
+};
+
+const contractFormatter = SchemaIssue.makeFormatterStandardSchemaV1({
+  leafHook: contractLeafHook,
 });
 
-export const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+function isPropertyKey(value: unknown): value is PropertyKey {
+  return (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "symbol"
+  );
+}
 
-export const CodeModeIssueCodeSchema = z.enum([
+function pathSegment(value: unknown): PropertyKey | undefined {
+  if (isPropertyKey(value)) return value;
+  if (value !== null && typeof value === "object" && "key" in value) {
+    return isPropertyKey(value.key) ? value.key : undefined;
+  }
+  return undefined;
+}
+
+function contractIssues(
+  error: Schema.SchemaError,
+): ReadonlyArray<typeof ContractSchemaIssue.Encoded> {
+  const issues = contractFormatter(error.issue).issues.map(
+    (issue): typeof ContractSchemaIssue.Encoded => {
+      const path = (issue.path ?? []).flatMap((segment) => {
+        const normalized = pathSegment(segment);
+        return normalized === undefined ? [] : [normalized];
+      });
+      return {
+        code: "custom",
+        message: issue.message,
+        path: issue.message.startsWith("Invalid discriminator value.")
+          ? [...path, "op"]
+          : path,
+      };
+    },
+  );
+  if (
+    issues.length > 1 &&
+    issues.every((issue) => issue.path[0] === "source")
+  ) {
+    return [{ code: "custom", message: "Invalid input", path: ["source"] }];
+  }
+  return issues;
+}
+
+export function safeParseContract<S extends Schema.ConstraintDecoder<unknown>>(
+  schema: S,
+  input: unknown,
+): ContractSafeParseResult<S["Type"]> {
+  const result = Schema.decodeUnknownResult(schema, { errors: "all" })(input);
+  return Result.isSuccess(result)
+    ? { data: result.success, success: true }
+    : {
+        error: new ContractSchemaError({
+          issues: contractIssues(result.failure),
+        }),
+        success: false,
+      };
+}
+
+export function parseContract<S extends Schema.ConstraintDecoder<unknown>>(
+  schema: S,
+  input: unknown,
+): S["Type"] {
+  const result = safeParseContract(schema, input);
+  if (result.success) return result.data;
+  throw result.error;
+}
+
+function withParser<S extends Schema.ConstraintDecoder<unknown>>(schema: S) {
+  return Object.assign(schema, {
+    parse: (input: unknown) => parseContract(schema, input),
+    safeParse: (input: unknown) => safeParseContract(schema, input),
+  });
+}
+
+const codeModeJsonSchemaAnnotationKeys = new Set([
+  "const",
+  "exclusiveMaximum",
+  "exclusiveMinimum",
+  "maximum",
+  "maxLength",
+  "minimum",
+  "minItems",
+  "minLength",
+  "pattern",
+]);
+
+export function toCodeModeJsonSchema(
+  schema: Schema.Constraint,
+): Record<string, unknown> {
+  const document = Schema.toJsonSchemaDocument(Schema.toType(schema), {
+    includeAnnotationKey: (key) => codeModeJsonSchemaAnnotationKeys.has(key),
+  });
+  return {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    ...document.schema,
+    ...(Object.keys(document.definitions).length === 0
+      ? {}
+      : { $defs: document.definitions }),
+  };
+}
+
+function nonEmptyString() {
+  const minimumLength = 1;
+  return Schema.String.annotate({ minLength: minimumLength }).check(
+    Schema.makeFilter((value) => value.length >= minimumLength, {
+      message: "Too small: expected string to have >=1 characters",
+    }),
+  );
+}
+
+function nonEmptyArray<S extends Schema.Constraint>(schema: S) {
+  const minimumLength = 1;
+  return Schema.Array(schema)
+    .pipe(Schema.mutable)
+    .annotate({ minItems: minimumLength })
+    .check(
+      Schema.makeFilter((value) => value.length >= minimumLength, {
+        message: "Too small: expected array to have >=1 items",
+      }),
+    );
+}
+
+function optionalContract<S extends Schema.Constraint>(schema: S) {
+  const present = Schema.declareConstructor<
+    S["Type"] | undefined,
+    S["Encoded"] | undefined
+  >()(
+    [schema],
+    ([value]) =>
+      (input, _ast, options) =>
+        input === undefined
+          ? Effect.succeed(undefined)
+          : SchemaParser.decodeUnknownEffect(value)(input, options),
+    {
+      toCodecJson: ([value]) =>
+        Schema.link<S["Encoded"] | undefined>()(value, {
+          decode: SchemaGetter.passthrough({ strict: false }),
+          encode: new SchemaGetter.Getter((input) =>
+            Effect.succeed(Option.filter(input, (item) => item !== undefined)),
+          ),
+        }),
+    },
+  );
+  return Schema.optionalKey(present);
+}
+
+function requiredString<S extends Schema.Top>(schema: S): S["Rebuild"] {
+  return schema.pipe(
+    Schema.annotateKey({
+      messageMissingKey: "Invalid input: expected string, received undefined",
+    }),
+  );
+}
+
+function requiredObject<S extends Schema.Top>(schema: S): S["Rebuild"] {
+  return schema.pipe(
+    Schema.annotateKey({
+      messageMissingKey: "Invalid input: expected object, received undefined",
+    }),
+  );
+}
+
+function requiredArray<S extends Schema.Top>(schema: S): S["Rebuild"] {
+  return schema.pipe(
+    Schema.annotateKey({
+      messageMissingKey: "Invalid input: expected array, received undefined",
+    }),
+  );
+}
+
+function literals<
+  const Values extends readonly [
+    SchemaAST.LiteralValue,
+    ...SchemaAST.LiteralValue[],
+  ],
+>(values: Values) {
+  return Schema.Literals(values).annotate({
+    message: `Invalid option: expected one of ${values
+      .map((value) => JSON.stringify(value))
+      .join("|")}`,
+  });
+}
+
+function stringLiteral<const Value extends string>(value: Value) {
+  return Schema.Literal(value).pipe(
+    Schema.decodeTo(
+      Schema.String.annotate({ const: value }).pipe(
+        Schema.refine((input): input is Value => input === value, {
+          message: `Invalid literal value, expected ${JSON.stringify(value)}`,
+        }),
+      ),
+    ),
+  );
+}
+
+function numberLiteral<const Value extends number>(value: Value) {
+  return Schema.Literal(value).pipe(
+    Schema.decodeTo(
+      Schema.Number.annotate({ const: value }).pipe(
+        Schema.refine((input): input is Value => input === value, {
+          message: `Invalid literal value, expected ${JSON.stringify(value)}`,
+        }),
+      ),
+    ),
+  );
+}
+
+function booleanLiteral<const Value extends boolean>(value: Value) {
+  return Schema.Literal(value).pipe(
+    Schema.decodeTo(
+      Schema.Boolean.annotate({ const: value }).pipe(
+        Schema.refine((input): input is Value => input === value, {
+          message: `Invalid literal value, expected ${JSON.stringify(value)}`,
+        }),
+      ),
+    ),
+  );
+}
+
+const NonEmptyString = nonEmptyString();
+const RequiredNonEmptyString = requiredString(NonEmptyString);
+const FiniteNumber = Schema.Finite;
+const positiveThreshold = 0;
+const PositiveNumber = Schema.Number.annotate({
+  exclusiveMinimum: positiveThreshold,
+}).check(
+  Schema.isFinite(),
+  Schema.makeFilter((value) => value > positiveThreshold, {
+    message: "Too small: expected number to be >0",
+  }),
+);
+const hexColorPattern = /^#[0-9a-fA-F]{6}$/;
+function hexColor(defaultValue?: string) {
+  return Schema.String.annotate({
+    pattern: hexColorPattern.source,
+    ...(defaultValue === undefined ? {} : { default: defaultValue }),
+  }).check(
+    Schema.makeFilter((value) => hexColorPattern.test(value), {
+      message: `Invalid string: must match pattern /${hexColorPattern.source}/`,
+    }),
+  );
+}
+const HexColor = hexColor();
+
+export const HexColorSchema = withParser(HexColor);
+
+export const ARTIFACT_FORMATS: readonly ["excalidraw", "scene", "png"] = [
+  "excalidraw",
+  "scene",
+  "png",
+];
+export const INLINE_ARTIFACT_FORMATS: readonly ["excalidraw", "scene"] = [
+  "excalidraw",
+  "scene",
+];
+
+export const ArtifactFormatSchema = Object.assign(
+  withParser(literals(ARTIFACT_FORMATS)),
+  { options: ARTIFACT_FORMATS },
+);
+export const InlineArtifactFormatSchema = Object.assign(
+  withParser(literals(INLINE_ARTIFACT_FORMATS)),
+  { options: INLINE_ARTIFACT_FORMATS },
+);
+export type ArtifactFormat = typeof ArtifactFormatSchema.Type;
+export type InlineArtifactFormat = typeof InlineArtifactFormatSchema.Type;
+
+export class ArtifactProvenance extends Schema.Class<ArtifactProvenance>(
+  "ArtifactProvenance",
+)(
+  {
+    sourceArtifactId: RequiredNonEmptyString.pipe(Schema.mutableKey),
+  },
+  { identifier: undefined },
+) {}
+export const ArtifactProvenanceSchema = withParser(ArtifactProvenance);
+
+export const CODE_MODE_ISSUE_CODES: readonly [
   "missing_field",
   "invalid_type",
   "invalid_enum",
@@ -52,99 +382,313 @@ export const CodeModeIssueCodeSchema = z.enum([
   "unsupported_patch_operation",
   "patch_preserve_connectivity_failed",
   "patch_output_invalid",
+] = [
+  "missing_field",
+  "invalid_type",
+  "invalid_enum",
+  "invalid_color",
+  "duplicate_node_id",
+  "duplicate_edge_id",
+  "missing_edge_source",
+  "missing_edge_target",
+  "self_loop",
+  "missing_start",
+  "multiple_starts",
+  "missing_end",
+  "start_has_incoming",
+  "end_has_outgoing",
+  "unreachable_node",
+  "nonterminating_node",
+  "missing_outgoing_edge",
+  "underbranched_decision",
+  "unlabeled_decision_branch",
+  "duplicate_decision_branch_label",
+  "disconnected_graph",
+  "flowchart_too_large",
+  "mindmap_too_deep",
+  "mindmap_too_large",
+  "request_too_large",
+  "generic_label",
+  "label_too_long",
+  "quality_below_threshold",
+  "render_failed",
+  "text_overflow",
+  "arrow_binding_invalid",
+  "arrow_overlap",
+  "export_invalid_scene",
+  "storage_read_failed",
+  "storage_write_failed",
+  "unsupported_artifact_format",
+  "patch_source_unavailable",
+  "unknown_patch_target",
+  "unsupported_patch_operation",
+  "patch_preserve_connectivity_failed",
+  "patch_output_invalid",
+];
+
+export const CodeModeIssueCodeSchema = Object.assign(
+  withParser(literals(CODE_MODE_ISSUE_CODES)),
+  { options: CODE_MODE_ISSUE_CODES },
+);
+export type CodeModeIssueCode = typeof CodeModeIssueCodeSchema.Type;
+
+const CodeModeIssueKindSchema = literals([
+  "request",
+  "diagram",
+  "node",
+  "edge",
+  "artifact",
+]);
+const CodeModeIssueStageSchema = literals([
+  "input",
+  "flowchart",
+  "mindmap",
+  "quality",
+  "render",
+  "export",
+  "storage",
 ]);
 
-export const CodeModeIssueRefSchema = z.object({
-  kind: z.enum(["request", "diagram", "node", "edge", "artifact"]),
-  id: z.string().min(1).optional(),
-  path: z.string().min(1).optional(),
-});
+export class CodeModeIssueRef extends Schema.Class<CodeModeIssueRef>(
+  "CodeModeIssueRef",
+)(
+  {
+    kind: CodeModeIssueKindSchema,
+    id: optionalContract(NonEmptyString),
+    path: optionalContract(NonEmptyString),
+  },
+  { identifier: undefined },
+) {}
+export const CodeModeIssueRefSchema = withParser(CodeModeIssueRef);
 
-export const CodeModeIssueSchema = z.object({
-  code: CodeModeIssueCodeSchema,
-  severity: z.enum(["error", "warning"]),
-  stage: z.enum([
-    "input",
-    "flowchart",
-    "mindmap",
-    "quality",
-    "render",
-    "export",
-    "storage",
-  ]),
-  ref: CodeModeIssueRefSchema.optional(),
-  message: z.string().min(1),
-  hint: z.string().min(1),
-});
+export class CodeModeIssue extends Schema.Class<CodeModeIssue>("CodeModeIssue")(
+  {
+    code: CodeModeIssueCodeSchema,
+    severity: literals(["error", "warning"]),
+    stage: CodeModeIssueStageSchema,
+    ref: optionalContract(CodeModeIssueRef),
+    message: RequiredNonEmptyString,
+    hint: RequiredNonEmptyString,
+  },
+  { identifier: undefined },
+) {}
+export const CodeModeIssueSchema = withParser(CodeModeIssue);
 
-export const FlowchartNodeKindSchema = z.enum([
+export const FLOWCHART_NODE_KINDS: readonly [
   "start",
   "process",
   "decision",
   "end",
-]);
+] = ["start", "process", "decision", "end"];
+export const FlowchartNodeKindSchema = Object.assign(
+  withParser(literals(FLOWCHART_NODE_KINDS)),
+  { options: FLOWCHART_NODE_KINDS },
+);
 
-export const DIAGRAM_PATCH_OPERATION_NAMES = [
+export const DIAGRAM_PATCH_OPERATION_NAMES: readonly [
   "setDefaultStyle",
   "setStyle",
   "setShape",
   "translate",
   "replaceText",
   "rerouteEdges",
-] as const;
-
-export const DiagramPatchOperationNameSchema = z.enum(
-  DIAGRAM_PATCH_OPERATION_NAMES,
+] = [
+  "setDefaultStyle",
+  "setStyle",
+  "setShape",
+  "translate",
+  "replaceText",
+  "rerouteEdges",
+];
+export const DiagramPatchOperationNameSchema = Object.assign(
+  withParser(literals(DIAGRAM_PATCH_OPERATION_NAMES)),
+  { options: DIAGRAM_PATCH_OPERATION_NAMES },
 );
 
-export const FlowchartSpecNodeSchema = z.object({
-  id: z.string().min(1),
-  label: z.string().min(1),
-  kind: FlowchartNodeKindSchema,
-  description: z.string().min(1).optional(),
-});
+export class FlowchartSpecNode extends Schema.Class<FlowchartSpecNode>(
+  "FlowchartSpecNode",
+)(
+  {
+    id: RequiredNonEmptyString,
+    label: RequiredNonEmptyString,
+    kind: FlowchartNodeKindSchema,
+    description: optionalContract(NonEmptyString),
+  },
+  { identifier: undefined },
+) {}
 
-export const FlowchartSpecEdgeSchema = z.object({
-  id: z.string().min(1).optional(),
-  source: z.string().min(1),
-  target: z.string().min(1),
-  label: z.string().min(1).optional(),
-});
+export class FlowchartSpecEdge extends Schema.Class<FlowchartSpecEdge>(
+  "FlowchartSpecEdge",
+)(
+  {
+    id: optionalContract(NonEmptyString),
+    source: RequiredNonEmptyString,
+    target: RequiredNonEmptyString,
+    label: optionalContract(NonEmptyString),
+  },
+  { identifier: undefined },
+) {}
 
-export const FlowchartSpecLayoutSchema = z.object({
-  direction: z.enum(["TB", "LR"]).default("TB"),
-});
+const FlowchartDirection = literals(["TB", "LR"]);
+const flowchartDirectionDefault = "TB";
+const FlowchartDirectionWithDefault = FlowchartDirection.annotate({
+  default: flowchartDirectionDefault,
+}).pipe(Schema.withDecodingDefault(Effect.succeed(flowchartDirectionDefault)));
 
-export const FlowchartSpecStyleSchema = z.object({
-  accentColor: HexColorSchema.default("#000000"),
-  backgroundColor: HexColorSchema.default("#ffffff"),
-});
+export class FlowchartSpecLayout extends Schema.Class<FlowchartSpecLayout>(
+  "FlowchartSpecLayout",
+)(
+  {
+    direction: FlowchartDirectionWithDefault,
+  },
+  { identifier: undefined },
+) {}
 
-export const FlowchartSpecSchema = z.object({
-  id: z.string().min(1).optional(),
-  title: z.string().min(1),
-  nodes: z.array(FlowchartSpecNodeSchema).min(1),
-  edges: z.array(FlowchartSpecEdgeSchema).default([]),
-  layout: FlowchartSpecLayoutSchema.default({ direction: "TB" }),
-  style: FlowchartSpecStyleSchema.default({
-    accentColor: "#000000",
-    backgroundColor: "#ffffff",
-  }),
-});
+const defaultAccentColor = "#000000";
+const DefaultAccentColor = hexColor(defaultAccentColor).pipe(
+  Schema.withDecodingDefault(Effect.succeed(defaultAccentColor)),
+);
+const defaultBackgroundColor = "#ffffff";
+const DefaultBackgroundColor = hexColor(defaultBackgroundColor).pipe(
+  Schema.withDecodingDefault(Effect.succeed(defaultBackgroundColor)),
+);
 
-export const BuildFlowchartOptionsSchema = z
-  .object({
-    artifactFormats: z.array(ArtifactFormatSchema).min(1).optional(),
-    inlineArtifacts: z.array(InlineArtifactFormatSchema).optional(),
-    minQualityScore: z.number().min(0).max(10).optional(),
-  })
-  .optional();
+export class FlowchartSpecStyle extends Schema.Class<FlowchartSpecStyle>(
+  "FlowchartSpecStyle",
+)(
+  {
+    accentColor: DefaultAccentColor,
+    backgroundColor: DefaultBackgroundColor,
+  },
+  { identifier: undefined },
+) {}
 
-export const BuildFlowchartRequestSchema = z.object({
-  requestId: z.string().min(1).optional(),
-  spec: FlowchartSpecSchema,
-  options: BuildFlowchartOptionsSchema,
+const flowchartEdgesDefault: FlowchartSpecEdge[] = [];
+const FlowchartEdgesWithDefault = Schema.Array(FlowchartSpecEdge)
+  .pipe(Schema.mutable)
+  .annotate({ default: flowchartEdgesDefault })
+  .pipe(Schema.withDecodingDefault(Effect.succeed(flowchartEdgesDefault)));
+const flowchartLayoutDefault: { readonly direction: "TB" } = {
+  direction: "TB",
+};
+const FlowchartLayoutWithDefault = FlowchartSpecLayout.annotate({
+  default: flowchartLayoutDefault,
+}).pipe(Schema.withDecodingDefault(Effect.succeed(flowchartLayoutDefault)));
+const flowchartStyleDefault = {
+  accentColor: "#000000",
+  backgroundColor: "#ffffff",
+};
+const FlowchartStyleWithDefault = FlowchartSpecStyle.annotate({
+  default: flowchartStyleDefault,
+}).pipe(Schema.withDecodingDefault(Effect.succeed(flowchartStyleDefault)));
+export class FlowchartSpec extends Schema.Class<FlowchartSpec>("FlowchartSpec")(
+  {
+    id: optionalContract(NonEmptyString),
+    title: RequiredNonEmptyString,
+    nodes: requiredArray(nonEmptyArray(FlowchartSpecNode)),
+    edges: FlowchartEdgesWithDefault,
+    layout: FlowchartLayoutWithDefault,
+    style: FlowchartStyleWithDefault,
+  },
+  { identifier: undefined },
+) {}
+export const FlowchartSpecSchema = withParser(FlowchartSpec);
+export const FlowchartSpecNodeSchema = withParser(FlowchartSpecNode);
+export const FlowchartSpecEdgeSchema = withParser(FlowchartSpecEdge);
+export const FlowchartSpecLayoutSchema = withParser(FlowchartSpecLayout);
+export const FlowchartSpecStyleSchema = withParser(FlowchartSpecStyle);
+
+const ArtifactFormatsOption = optionalContract(
+  nonEmptyArray(ArtifactFormatSchema),
+);
+const InlineArtifactsOption = optionalContract(
+  Schema.Array(InlineArtifactFormatSchema).pipe(Schema.mutable),
+);
+const minimumQualityScore = 0;
+const maximumQualityScore = 10;
+const QualityScoreOption = optionalContract(
+  Schema.Number.annotate({
+    minimum: minimumQualityScore,
+    maximum: maximumQualityScore,
+  }).check(
+    Schema.isFinite(),
+    Schema.makeFilter((value) => value >= minimumQualityScore, {
+      message: `Too small: expected number to be >=${minimumQualityScore}`,
+    }),
+    Schema.makeFilter((value) => value <= maximumQualityScore, {
+      message: `Too big: expected number to be <=${maximumQualityScore}`,
+    }),
+  ),
+);
+
+export class BuildFlowchartOptions extends Schema.Class<BuildFlowchartOptions>(
+  "BuildFlowchartOptions",
+)(
+  {
+    artifactFormats: ArtifactFormatsOption,
+    inlineArtifacts: InlineArtifactsOption,
+    minQualityScore: QualityScoreOption,
+  },
+  { identifier: undefined },
+) {}
+export const BuildFlowchartOptionsSchema = withParser(
+  optionalContract(BuildFlowchartOptions),
+);
+
+export class BuildFlowchartRequest extends Schema.Class<BuildFlowchartRequest>(
+  "BuildFlowchartRequest",
+)(
+  {
+    requestId: optionalContract(NonEmptyString),
+    spec: requiredObject(FlowchartSpec),
+    options: optionalContract(BuildFlowchartOptions),
+  },
+  { identifier: undefined },
+) {}
+
+const BuildFlowchartToolInputContract = BuildFlowchartRequest.mapFields(
+  ({ requestId, spec }) => ({ requestId, spec }),
+);
+const BuildFlowchartToolInputStandardSchema = Schema.toStandardSchemaV1(
+  BuildFlowchartToolInputContract,
+  { leafHook: contractLeafHook, parseOptions: { errors: "all" } },
+);
+Object.assign(BuildFlowchartToolInputStandardSchema["~standard"], {
+  jsonSchema: {
+    input: () =>
+      toCodeModeJsonSchema(BuildFlowchartToolInputContract) as Record<
+        string,
+        unknown
+      >,
+    output: () =>
+      toCodeModeJsonSchema(BuildFlowchartToolInputContract) as Record<
+        string,
+        unknown
+      >,
+  },
 });
+export const BuildFlowchartToolInputSchema: StandardSchemaV1<
+  typeof BuildFlowchartToolInputContract.Encoded,
+  typeof BuildFlowchartToolInputContract.Type
+> &
+  StandardJSONSchemaV1<
+    typeof BuildFlowchartToolInputContract.Encoded,
+    typeof BuildFlowchartToolInputContract.Type
+  > &
+  typeof BuildFlowchartToolInputContract =
+  BuildFlowchartToolInputStandardSchema as typeof BuildFlowchartToolInputStandardSchema &
+    StandardJSONSchemaV1<
+      typeof BuildFlowchartToolInputContract.Encoded,
+      typeof BuildFlowchartToolInputContract.Type
+    >;
+export type BuildFlowchartToolInput =
+  typeof BuildFlowchartToolInputContract.Type;
+export const BuildFlowchartRequestSchema = Object.assign(
+  withParser(BuildFlowchartRequest),
+  {
+    omit: (_keys: { readonly options: true }) => BuildFlowchartToolInputSchema,
+  },
+);
 
 export interface MindmapTopicInput {
   label: string;
@@ -156,403 +700,709 @@ function hasSemanticText(value: string): boolean {
   return cleaned.length > 0 && !/^(?:""|''|``)$/.test(cleaned);
 }
 
-const MindmapSemanticStringSchema = z
-  .string()
-  .min(1)
-  .refine(hasSemanticText, "Must contain semantic text after normalization.");
-
-export const MindmapTopicSchema: z.ZodType<MindmapTopicInput> = z.lazy(() =>
-  z.object({
-    label: MindmapSemanticStringSchema,
-    children: z.array(MindmapTopicSchema).optional(),
+const semanticTextMinimumLength = 1;
+const MindmapSemanticString = Schema.String.annotate({
+  minLength: semanticTextMinimumLength,
+}).check(
+  Schema.makeFilter((value) => value.length >= semanticTextMinimumLength, {
+    message: `Too small: expected string to have >=${semanticTextMinimumLength} characters`,
+  }),
+  Schema.makeFilter(hasSemanticText, {
+    message: "Must contain semantic text after normalization.",
   }),
 );
 
-export const MindmapSpecSchema = z.object({
-  id: z.string().min(1).optional(),
-  title: MindmapSemanticStringSchema,
-  root: MindmapTopicSchema,
-  layout: z
-    .object({ direction: z.enum(["LR", "RL"]).default("LR") })
-    .default({ direction: "LR" }),
-  style: FlowchartSpecStyleSchema.default({
-    accentColor: "#7c3aed",
-    backgroundColor: "#ffffff",
-  }),
-});
-
-export const BuildMindmapRequestSchema = z.object({
-  requestId: z.string().min(1).optional(),
-  spec: MindmapSpecSchema,
-  options: BuildFlowchartOptionsSchema,
-});
-
-export const ScenePointSchema = z.object({
-  x: z.number().finite(),
-  y: z.number().finite(),
-});
-
-export const NodeSceneElementSchema = z.object({
-  type: z.literal("node"),
-  id: z.string().min(1),
-  nodeId: z.string().min(1),
-  kind: z.string().min(1).optional(),
-  shape: z.enum(["rectangle", "ellipse", "diamond", "circle"]),
-  fillColor: HexColorSchema.optional(),
-  strokeColor: HexColorSchema.optional(),
-  textColor: HexColorSchema.optional(),
-  x: z.number().finite(),
-  y: z.number().finite(),
-  width: z.number().positive(),
-  height: z.number().positive(),
-  label: z.string().min(1),
-});
-
-export const TextSceneElementSchema = z.object({
-  type: z.literal("text"),
-  id: z.string().min(1),
-  containerId: z.string().min(1).optional(),
-  textColor: HexColorSchema.optional(),
-  x: z.number().finite(),
-  y: z.number().finite(),
-  text: z.string().min(1),
-  fontSize: z.number().positive(),
-  maxWidth: z.number().positive().optional(),
-});
-
-export const ArrowSceneElementSchema = z.object({
-  type: z.literal("arrow"),
-  id: z.string().min(1),
-  edgeId: z.string().min(1),
-  sourceNodeId: z.string().min(1),
-  targetNodeId: z.string().min(1),
-  strokeColor: HexColorSchema.optional(),
-  textColor: HexColorSchema.optional(),
-  points: z.array(ScenePointSchema).min(2),
-  label: z.string().min(1).optional(),
-});
-
-export const SceneElementSchema = z.discriminatedUnion("type", [
-  NodeSceneElementSchema,
-  TextSceneElementSchema,
-  ArrowSceneElementSchema,
-]);
-
-export const RenderedDiagramSceneSchema = z.object({
-  diagramId: z.string().min(1),
-  title: z.string().min(1),
-  width: z.number().positive(),
-  height: z.number().positive(),
-  accentColor: HexColorSchema,
-  backgroundColor: HexColorSchema,
-  elements: z.array(SceneElementSchema),
-});
-
-export const ExcalidrawElementSchema = z.record(z.string(), z.unknown()).and(
-  z.object({
-    id: z.string().min(1),
-    type: z.string().min(1),
-  }),
+const MindmapTopicReference: Schema.Codec<
+  MindmapTopicInput,
+  MindmapTopicInput
+> = requiredObject(
+  Schema.suspend(() => MindmapTopic).annotate({ identifier: "__schema0" }),
 );
 
-export const ExcalidrawSceneSchema = z.object({
-  appState: z.record(z.string(), z.unknown()),
-  elements: z.array(ExcalidrawElementSchema),
-});
+export const MindmapTopic: Schema.Codec<MindmapTopicInput, MindmapTopicInput> =
+  Schema.Struct({
+    label: requiredString(MindmapSemanticString),
+    children: Schema.optionalKey(
+      Schema.Array(MindmapTopicReference).pipe(Schema.mutable),
+    ),
+  });
+export const MindmapTopicSchema = withParser(MindmapTopicReference);
 
-export const ExcalidrawFileSchema = ExcalidrawSceneSchema.extend({
-  files: z.record(z.string(), z.unknown()),
-  source: z.string().min(1),
-  type: z.literal("excalidraw"),
-  version: z.literal(2),
-});
+export class MindmapSpecLayout extends Schema.Class<MindmapSpecLayout>(
+  "MindmapSpecLayout",
+)(
+  {
+    direction: literals(["LR", "RL"])
+      .annotate({ default: "LR" })
+      .pipe(Schema.withDecodingDefault(Effect.succeed("LR"))),
+  },
+  { identifier: undefined },
+) {}
 
-export const GetArtifactRequestSchema = z.object({
-  artifactId: z.string().min(1),
-  format: ArtifactFormatSchema.optional(),
-  inline: z.boolean().optional(),
-});
+const mindmapLayoutDefault: { readonly direction: "LR" } = {
+  direction: "LR",
+};
+const MindmapLayoutWithDefault = MindmapSpecLayout.annotate({
+  default: mindmapLayoutDefault,
+}).pipe(Schema.withDecodingDefault(Effect.succeed(mindmapLayoutDefault)));
+const mindmapStyleDefault = {
+  accentColor: "#7c3aed",
+  backgroundColor: "#ffffff",
+};
+const MindmapStyleWithDefault = FlowchartSpecStyle.annotate({
+  default: mindmapStyleDefault,
+}).pipe(Schema.withDecodingDefault(Effect.succeed(mindmapStyleDefault)));
 
-export const DiagramSelectorSchema = z.object({
-  ids: z.array(z.string().min(1)).optional(),
-  nodeIds: z.array(z.string().min(1)).optional(),
-  edgeIds: z.array(z.string().min(1)).optional(),
-  kinds: z.array(FlowchartNodeKindSchema).optional(),
-  labels: z.array(z.string().min(1)).optional(),
-  scope: z.enum(["all", "nodes", "edges"]).optional(),
+const MindmapSpecContract = Schema.Struct({
+  id: optionalContract(NonEmptyString),
+  title: requiredString(MindmapSemanticString),
+  root: MindmapTopicReference,
+  layout: MindmapLayoutWithDefault,
+  style: MindmapStyleWithDefault,
 });
+export class MindmapSpec extends Schema.Class<MindmapSpec>("MindmapSpec")(
+  MindmapSpecContract,
+  { identifier: undefined },
+) {}
+export const MindmapSpecSchema = withParser(MindmapSpec);
 
-export const DiagramStylePatchSchema = z.object({
-  strokeColor: HexColorSchema.optional(),
-  fillColor: HexColorSchema.optional(),
-  textColor: HexColorSchema.optional(),
-  backgroundColor: HexColorSchema.optional(),
+const BuildMindmapRequestContract = Schema.Struct({
+  requestId: optionalContract(NonEmptyString),
+  spec: requiredObject(MindmapSpecContract),
+  options: optionalContract(BuildFlowchartOptions),
 });
+export class BuildMindmapRequest extends Schema.Class<BuildMindmapRequest>(
+  "BuildMindmapRequest",
+)(BuildMindmapRequestContract, { identifier: undefined }) {}
+export const BuildMindmapRequestSchema = withParser(
+  BuildMindmapRequestContract,
+);
 
-export const DiagramShapeSchema = z.enum([
+export class ScenePoint extends Schema.Class<ScenePoint>("ScenePoint")(
+  {
+    x: FiniteNumber.pipe(Schema.mutableKey),
+    y: FiniteNumber.pipe(Schema.mutableKey),
+  },
+  { identifier: undefined },
+) {}
+export const ScenePointSchema = withParser(ScenePoint);
+
+export class NodeSceneElement extends Schema.Class<NodeSceneElement>(
+  "NodeSceneElement",
+)(
+  {
+    type: stringLiteral("node"),
+    id: RequiredNonEmptyString,
+    nodeId: RequiredNonEmptyString,
+    kind: optionalContract(NonEmptyString),
+    shape: literals(["rectangle", "ellipse", "diamond", "circle"]).pipe(
+      Schema.mutableKey,
+    ),
+    fillColor: optionalContract(HexColor).pipe(Schema.mutableKey),
+    strokeColor: optionalContract(HexColor).pipe(Schema.mutableKey),
+    textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
+    x: FiniteNumber.pipe(Schema.mutableKey),
+    y: FiniteNumber.pipe(Schema.mutableKey),
+    width: PositiveNumber.pipe(Schema.mutableKey),
+    height: PositiveNumber.pipe(Schema.mutableKey),
+    label: RequiredNonEmptyString.pipe(Schema.mutableKey),
+  },
+  { identifier: undefined },
+) {}
+
+export class TextSceneElement extends Schema.Class<TextSceneElement>(
+  "TextSceneElement",
+)(
+  {
+    type: stringLiteral("text"),
+    id: RequiredNonEmptyString,
+    containerId: optionalContract(NonEmptyString),
+    textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
+    x: FiniteNumber.pipe(Schema.mutableKey),
+    y: FiniteNumber.pipe(Schema.mutableKey),
+    text: RequiredNonEmptyString.pipe(Schema.mutableKey),
+    fontSize: PositiveNumber,
+    maxWidth: optionalContract(PositiveNumber),
+  },
+  { identifier: undefined },
+) {}
+
+export class ArrowSceneElement extends Schema.Class<ArrowSceneElement>(
+  "ArrowSceneElement",
+)(
+  {
+    type: stringLiteral("arrow"),
+    id: RequiredNonEmptyString,
+    edgeId: RequiredNonEmptyString,
+    sourceNodeId: RequiredNonEmptyString,
+    targetNodeId: RequiredNonEmptyString.pipe(Schema.mutableKey),
+    strokeColor: optionalContract(HexColor).pipe(Schema.mutableKey),
+    textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
+    points: requiredArray(Schema.Array(ScenePoint).pipe(Schema.mutable))
+      .annotate({ minItems: 2 })
+      .check(
+        Schema.makeFilter((value) => value.length >= 2, {
+          message: "Too small: expected array to have >=2 items",
+        }),
+      )
+      .pipe(Schema.mutableKey),
+    label: optionalContract(NonEmptyString).pipe(Schema.mutableKey),
+  },
+  { identifier: undefined },
+) {}
+
+export const NodeSceneElementSchema = withParser(NodeSceneElement);
+export const TextSceneElementSchema = withParser(TextSceneElement);
+export const ArrowSceneElementSchema = withParser(ArrowSceneElement);
+export const SceneElementSchema = Schema.Union(
+  [NodeSceneElement, TextSceneElement, ArrowSceneElement],
+  { mode: "oneOf" },
+);
+
+export class RenderedDiagramScene extends Schema.Class<RenderedDiagramScene>(
+  "RenderedDiagramScene",
+)(
+  {
+    diagramId: RequiredNonEmptyString,
+    title: RequiredNonEmptyString,
+    width: PositiveNumber.pipe(Schema.mutableKey),
+    height: PositiveNumber.pipe(Schema.mutableKey),
+    accentColor: HexColor.pipe(Schema.mutableKey),
+    backgroundColor: HexColor.pipe(Schema.mutableKey),
+    elements: requiredArray(
+      Schema.Array(SceneElementSchema).pipe(Schema.mutable),
+    ),
+  },
+  { identifier: undefined },
+) {}
+export const RenderedDiagramSceneSchema = withParser(RenderedDiagramScene);
+export type PatchableScene = RenderedDiagramScene;
+
+const ExcalidrawElement = Schema.Record(Schema.String, Schema.Unknown).check(
+  Schema.makeFilter(
+    (value) =>
+      typeof value["id"] === "string" &&
+      value["id"].length > 0 &&
+      typeof value["type"] === "string" &&
+      value["type"].length > 0,
+    { message: "Invalid input" },
+  ),
+);
+export const ExcalidrawElementSchema = withParser(ExcalidrawElement);
+
+export class ExcalidrawScene extends Schema.Class<ExcalidrawScene>(
+  "ExcalidrawScene",
+)(
+  {
+    appState: Schema.Record(Schema.String, Schema.Unknown),
+    elements: Schema.Array(ExcalidrawElement).pipe(Schema.mutable),
+  },
+  { identifier: undefined },
+) {}
+export const ExcalidrawSceneSchema = withParser(ExcalidrawScene);
+
+export class ExcalidrawFile extends ExcalidrawScene.extend<ExcalidrawFile>(
+  "ExcalidrawFile",
+)(
+  {
+    files: Schema.Record(Schema.String, Schema.Unknown),
+    source: RequiredNonEmptyString,
+    type: stringLiteral("excalidraw"),
+    version: numberLiteral(2),
+  },
+  { identifier: undefined },
+) {}
+export const ExcalidrawFileSchema = withParser(ExcalidrawFile);
+
+export class GetArtifactRequest extends Schema.Class<GetArtifactRequest>(
+  "GetArtifactRequest",
+)(
+  {
+    artifactId: RequiredNonEmptyString,
+    format: optionalContract(ArtifactFormatSchema),
+    inline: optionalContract(Schema.Boolean),
+  },
+  { identifier: undefined },
+) {}
+export const GetArtifactRequestSchema = withParser(GetArtifactRequest);
+
+export class DiagramSelector extends Schema.Class<DiagramSelector>(
+  "DiagramSelector",
+)(
+  {
+    ids: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+    nodeIds: optionalContract(
+      Schema.Array(NonEmptyString).pipe(Schema.mutable),
+    ),
+    edgeIds: optionalContract(
+      Schema.Array(NonEmptyString).pipe(Schema.mutable),
+    ),
+    kinds: optionalContract(
+      Schema.Array(FlowchartNodeKindSchema).pipe(Schema.mutable),
+    ),
+    labels: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+    scope: optionalContract(literals(["all", "nodes", "edges"])),
+  },
+  { identifier: undefined },
+) {}
+export const DiagramSelectorSchema = withParser(DiagramSelector);
+
+export class DiagramStylePatch extends Schema.Class<DiagramStylePatch>(
+  "DiagramStylePatch",
+)(
+  {
+    strokeColor: optionalContract(HexColor),
+    fillColor: optionalContract(HexColor),
+    textColor: optionalContract(HexColor),
+    backgroundColor: optionalContract(HexColor),
+  },
+  { identifier: undefined },
+) {}
+export const DiagramStylePatchSchema = withParser(DiagramStylePatch);
+
+export const DIAGRAM_SHAPES: readonly [
   "rectangle",
   "diamond",
   "ellipse",
   "circle",
-]);
+] = ["rectangle", "diamond", "ellipse", "circle"];
+export const DiagramShapeSchema = Object.assign(
+  withParser(literals(DIAGRAM_SHAPES)),
+  { options: DIAGRAM_SHAPES },
+);
+export type DiagramShape = typeof DiagramShapeSchema.Type;
 
-export const DiagramPatchOperationSchema = z.discriminatedUnion("op", [
-  z.object({
-    op: z.literal("setDefaultStyle"),
-    style: DiagramStylePatchSchema,
-  }),
-  z.object({
-    op: z.literal("setStyle"),
-    selector: DiagramSelectorSchema,
-    style: DiagramStylePatchSchema,
-  }),
-  z.object({
-    op: z.literal("setShape"),
-    selector: DiagramSelectorSchema,
+export class SetDefaultStyleOperation extends Schema.Class<SetDefaultStyleOperation>(
+  "SetDefaultStyleOperation",
+)(
+  {
+    op: stringLiteral("setDefaultStyle"),
+    style: requiredObject(DiagramStylePatch),
+  },
+  { identifier: undefined },
+) {}
+export class SetStyleOperation extends Schema.Class<SetStyleOperation>(
+  "SetStyleOperation",
+)(
+  {
+    op: stringLiteral("setStyle"),
+    selector: requiredObject(DiagramSelector),
+    style: requiredObject(DiagramStylePatch),
+  },
+  { identifier: undefined },
+) {}
+export class SetShapeOperation extends Schema.Class<SetShapeOperation>(
+  "SetShapeOperation",
+)(
+  {
+    op: stringLiteral("setShape"),
+    selector: requiredObject(DiagramSelector),
     shape: DiagramShapeSchema,
-  }),
-  z.object({
-    op: z.literal("translate"),
-    selector: DiagramSelectorSchema,
-    dx: z.number().finite(),
-    dy: z.number().finite(),
-  }),
-  z.object({
-    op: z.literal("replaceText"),
-    selector: DiagramSelectorSchema,
-    text: z.string().min(1),
-  }),
-  z.object({
-    op: z.literal("rerouteEdges"),
-    selector: DiagramSelectorSchema.optional(),
-  }),
-]);
+  },
+  { identifier: undefined },
+) {}
+export class TranslateOperation extends Schema.Class<TranslateOperation>(
+  "TranslateOperation",
+)(
+  {
+    op: stringLiteral("translate"),
+    selector: requiredObject(DiagramSelector),
+    dx: FiniteNumber,
+    dy: FiniteNumber,
+  },
+  { identifier: undefined },
+) {}
+export class ReplaceTextOperation extends Schema.Class<ReplaceTextOperation>(
+  "ReplaceTextOperation",
+)(
+  {
+    op: stringLiteral("replaceText"),
+    selector: requiredObject(DiagramSelector),
+    text: RequiredNonEmptyString,
+  },
+  { identifier: undefined },
+) {}
+export class RerouteEdgesOperation extends Schema.Class<RerouteEdgesOperation>(
+  "RerouteEdgesOperation",
+)(
+  {
+    op: stringLiteral("rerouteEdges"),
+    selector: optionalContract(DiagramSelector),
+  },
+  { identifier: undefined },
+) {}
 
-export const DiagramPatchSourceSchema = z.union([
-  z.object({
-    artifactId: z.string().min(1),
-    format: z.literal("scene").optional(),
-  }),
-  z.object({
-    scene: RenderedDiagramSceneSchema,
-  }),
-]);
-
-export const ApplyDiagramPatchOptionsSchema = z
-  .object({
-    artifactFormats: z.array(ArtifactFormatSchema).min(1).optional(),
-    inlineArtifacts: z.array(InlineArtifactFormatSchema).optional(),
-    preserveConnectivity: z.boolean().optional(),
-  })
-  .optional();
-
-export const ApplyDiagramPatchRequestSchema = z.object({
-  requestId: z.string().min(1).optional(),
-  source: DiagramPatchSourceSchema,
-  operations: z.array(DiagramPatchOperationSchema).min(1),
-  options: ApplyDiagramPatchOptionsSchema,
-  intent: z.string().min(1).optional(),
+export const DiagramPatchOperationSchema = Schema.Union(
+  [
+    SetDefaultStyleOperation,
+    SetStyleOperation,
+    SetShapeOperation,
+    TranslateOperation,
+    ReplaceTextOperation,
+    RerouteEdgesOperation,
+  ],
+  { mode: "oneOf" },
+).annotate({
+  message: `Invalid discriminator value. Expected ${DIAGRAM_PATCH_OPERATION_NAMES.map(
+    (name) => `'${name}'`,
+  ).join(" | ")}`,
 });
+export type DiagramPatchOperation = typeof DiagramPatchOperationSchema.Type;
 
-export type ArtifactFormat = z.infer<typeof ArtifactFormatSchema>;
-export type InlineArtifactFormat = z.infer<typeof InlineArtifactFormatSchema>;
-export type ArtifactProvenance = z.infer<typeof ArtifactProvenanceSchema>;
-export type CodeModeIssueCode = z.infer<typeof CodeModeIssueCodeSchema>;
-export type CodeModeIssueRef = z.infer<typeof CodeModeIssueRefSchema>;
-export type CodeModeIssue = z.infer<typeof CodeModeIssueSchema>;
-export type FlowchartSpec = z.infer<typeof FlowchartSpecSchema>;
-export type FlowchartSpecNode = z.infer<typeof FlowchartSpecNodeSchema>;
-export type FlowchartSpecEdge = z.infer<typeof FlowchartSpecEdgeSchema>;
-export type FlowchartSpecLayout = z.infer<typeof FlowchartSpecLayoutSchema>;
-export type FlowchartSpecStyle = z.infer<typeof FlowchartSpecStyleSchema>;
-export type BuildFlowchartOptions = z.infer<typeof BuildFlowchartOptionsSchema>;
-export type BuildFlowchartRequest = z.infer<typeof BuildFlowchartRequestSchema>;
-export type MindmapSpec = z.infer<typeof MindmapSpecSchema>;
-export type BuildMindmapRequest = z.infer<typeof BuildMindmapRequestSchema>;
-export type ExcalidrawFile = z.infer<typeof ExcalidrawFileSchema>;
-export type GetArtifactRequest = z.infer<typeof GetArtifactRequestSchema>;
-export type DiagramSelector = z.infer<typeof DiagramSelectorSchema>;
-export type DiagramStylePatch = z.infer<typeof DiagramStylePatchSchema>;
-export type DiagramShape = z.infer<typeof DiagramShapeSchema>;
-export type DiagramPatchOperation = z.infer<typeof DiagramPatchOperationSchema>;
-export type DiagramPatchSource = z.infer<typeof DiagramPatchSourceSchema>;
-export type ApplyDiagramPatchOptions = z.infer<
-  typeof ApplyDiagramPatchOptionsSchema
->;
-export type ApplyDiagramPatchRequest = z.infer<
-  typeof ApplyDiagramPatchRequestSchema
->;
-export type PatchableScene = z.infer<typeof RenderedDiagramSceneSchema>;
+export class ArtifactPatchSource extends Schema.Class<ArtifactPatchSource>(
+  "ArtifactPatchSource",
+)(
+  {
+    artifactId: RequiredNonEmptyString,
+    format: optionalContract(stringLiteral("scene")),
+  },
+  { identifier: undefined },
+) {}
+export class InlineScenePatchSource extends Schema.Class<InlineScenePatchSource>(
+  "InlineScenePatchSource",
+)(
+  {
+    scene: requiredObject(RenderedDiagramScene),
+  },
+  { identifier: undefined },
+) {}
+export const DiagramPatchSourceSchema = Schema.Union([
+  ArtifactPatchSource,
+  InlineScenePatchSource,
+]).annotate({ message: "Invalid input" });
+export type DiagramPatchSource = typeof DiagramPatchSourceSchema.Type;
+
+export class ApplyDiagramPatchOptions extends Schema.Class<ApplyDiagramPatchOptions>(
+  "ApplyDiagramPatchOptions",
+)(
+  {
+    artifactFormats: ArtifactFormatsOption,
+    inlineArtifacts: InlineArtifactsOption,
+    preserveConnectivity: optionalContract(Schema.Boolean),
+  },
+  { identifier: undefined },
+) {}
+export const ApplyDiagramPatchOptionsSchema = withParser(
+  optionalContract(ApplyDiagramPatchOptions),
+);
+
+export class ApplyDiagramPatchRequest extends Schema.Class<ApplyDiagramPatchRequest>(
+  "ApplyDiagramPatchRequest",
+)(
+  {
+    requestId: optionalContract(NonEmptyString),
+    source: DiagramPatchSourceSchema.annotateKey({
+      messageMissingKey: "Invalid input",
+    }),
+    operations: requiredArray(nonEmptyArray(DiagramPatchOperationSchema)).pipe(
+      Schema.annotateEncoded({ minItems: 1 }),
+    ),
+    options: optionalContract(ApplyDiagramPatchOptions),
+    intent: optionalContract(NonEmptyString),
+  },
+  { identifier: undefined },
+) {}
+export const ApplyDiagramPatchRequestSchema = withParser(
+  ApplyDiagramPatchRequest,
+);
 
 export interface NormalizedFlowchartSpec {
-  id: string;
-  title: string;
-  nodes: FlowchartSpecNode[];
-  edges: Array<FlowchartSpecEdge & { id: string }>;
-  layout: Required<FlowchartSpecLayout>;
-  style: Required<FlowchartSpecStyle>;
+  readonly id: string;
+  readonly title: string;
+  readonly nodes: FlowchartSpecNode[];
+  readonly edges: Array<FlowchartSpecEdge & { readonly id: string }>;
+  readonly layout: Required<FlowchartSpecLayout>;
+  readonly style: Required<FlowchartSpecStyle>;
 }
 
 export interface NormalizedMindmapTopic {
-  id: string;
-  label: string;
-  children: NormalizedMindmapTopic[];
+  readonly id: string;
+  readonly label: string;
+  readonly children: NormalizedMindmapTopic[];
 }
 
 export interface NormalizedMindmapSpec {
-  id: string;
-  title: string;
-  root: NormalizedMindmapTopic;
-  layout: { direction: "LR" | "RL" };
-  style: Required<FlowchartSpecStyle>;
+  readonly id: string;
+  readonly title: string;
+  readonly root: NormalizedMindmapTopic;
+  readonly layout: { readonly direction: "LR" | "RL" };
+  readonly style: Required<FlowchartSpecStyle>;
 }
 
 export interface QualityCheck {
-  code: string;
-  passed: boolean;
-  severity: "error" | "warning";
-  message: string;
-  refs: CodeModeIssueRef[];
+  readonly code: string;
+  readonly passed: boolean;
+  readonly severity: "error" | "warning";
+  readonly message: string;
+  readonly refs: CodeModeIssueRef[];
 }
 
 export interface QualityReport {
-  accepted: boolean;
-  score: number;
-  threshold: number;
-  summary: {
-    nodeCount: number;
-    edgeCount: number;
-  };
-  checks: QualityCheck[];
+  readonly accepted: boolean;
+  readonly score: number;
+  readonly threshold: number;
+  readonly summary: { readonly nodeCount: number; readonly edgeCount: number };
+  readonly checks: QualityCheck[];
 }
 
 export interface ArtifactFormatRef {
-  format: ArtifactFormat;
-  mimeType: string;
-  url?: string;
-  expiresAt?: string;
-  inline?: unknown;
-  sizeBytes?: number;
+  readonly format: ArtifactFormat;
+  readonly mimeType: string;
+  readonly url?: string;
+  readonly expiresAt?: string;
+  readonly inline?: unknown;
+  readonly sizeBytes?: number;
 }
 
 export interface ArtifactBundle {
-  artifactId: string;
-  diagramId: string;
-  formats: ArtifactFormatRef[];
-  provenance?: ArtifactProvenance;
-  preview?: ArtifactFormatRef;
+  readonly artifactId: string;
+  readonly diagramId: string;
+  readonly formats: ArtifactFormatRef[];
+  readonly provenance?: ArtifactProvenance;
+  readonly preview?: ArtifactFormatRef;
 }
 
 export interface PartialArtifactBundle {
-  artifactId?: string;
-  diagramId?: string;
-  formats?: ArtifactFormatRef[];
+  readonly artifactId?: string;
+  readonly diagramId?: string;
+  readonly formats?: ArtifactFormatRef[];
 }
 
-export type BuildFlowchartResult =
-  | {
-      ok: true;
-      status: "accepted";
-      buildId: string;
-      requestId?: string;
-      normalizedSpec: NormalizedFlowchartSpec;
-      quality: QualityReport;
-      artifact: ArtifactBundle;
-      issues: CodeModeIssue[];
-    }
-  | {
-      ok: false;
-      status:
-        | "invalid_input"
-        | "invalid_flowchart"
-        | "quality_failed"
-        | "render_failed"
-        | "export_failed"
-        | "storage_failed";
-      buildId?: string;
-      requestId?: string;
-      normalizedSpec?: NormalizedFlowchartSpec;
-      quality?: QualityReport;
-      partial?: PartialArtifactBundle;
-      issues: CodeModeIssue[];
-    };
+const NormalizedFlowchartSpecSchema = Schema.Struct({
+  id: NonEmptyString,
+  title: NonEmptyString,
+  nodes: Schema.Array(FlowchartSpecNode).pipe(Schema.mutable),
+  edges: Schema.Array(
+    FlowchartSpecEdge.mapFields((fields) => ({
+      ...fields,
+      id: NonEmptyString,
+    })),
+  ).pipe(Schema.mutable),
+  layout: Schema.Struct({ direction: FlowchartDirection }),
+  style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
+});
+const NormalizedMindmapTopicSchema: Schema.Schema<NormalizedMindmapTopic> =
+  Schema.Struct({
+    id: NonEmptyString,
+    label: NonEmptyString,
+    children: Schema.Array(
+      Schema.suspend(
+        (): Schema.Schema<NormalizedMindmapTopic> =>
+          NormalizedMindmapTopicSchema,
+      ),
+    ).pipe(Schema.mutable),
+  });
+const NormalizedMindmapSpecSchema = Schema.Struct({
+  id: NonEmptyString,
+  title: NonEmptyString,
+  root: NormalizedMindmapTopicSchema,
+  layout: Schema.Struct({ direction: literals(["LR", "RL"]) }),
+  style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
+});
+const QualityCheckSchema = Schema.Struct({
+  code: Schema.String,
+  passed: Schema.Boolean,
+  severity: literals(["error", "warning"]),
+  message: Schema.String,
+  refs: Schema.Array(CodeModeIssueRef).pipe(Schema.mutable),
+});
+const QualityReportSchema = Schema.Struct({
+  accepted: Schema.Boolean,
+  score: Schema.Number,
+  threshold: Schema.Number,
+  summary: Schema.Struct({
+    nodeCount: Schema.Number,
+    edgeCount: Schema.Number,
+  }),
+  checks: Schema.Array(QualityCheckSchema).pipe(Schema.mutable),
+});
+const ArtifactFormatRefSchema = Schema.Struct({
+  format: ArtifactFormatSchema,
+  mimeType: Schema.String,
+  url: optionalContract(Schema.String),
+  expiresAt: optionalContract(Schema.String),
+  inline: optionalContract(Schema.Unknown),
+  sizeBytes: optionalContract(Schema.Number),
+});
+const ArtifactBundleSchema = Schema.Struct({
+  artifactId: Schema.String,
+  diagramId: Schema.String,
+  formats: Schema.Array(ArtifactFormatRefSchema).pipe(Schema.mutable),
+  provenance: optionalContract(ArtifactProvenance),
+  preview: optionalContract(ArtifactFormatRefSchema),
+});
+const PartialArtifactBundleSchema = Schema.Struct({
+  artifactId: optionalContract(Schema.String),
+  diagramId: optionalContract(Schema.String),
+  formats: optionalContract(
+    Schema.Array(ArtifactFormatRefSchema).pipe(Schema.mutable),
+  ),
+});
 
-export type BuildMindmapResult =
-  | {
-      ok: true;
-      status: "accepted";
-      buildId: string;
-      requestId?: string;
-      normalizedSpec: NormalizedMindmapSpec;
-      quality: QualityReport;
-      artifact: ArtifactBundle;
-      issues: CodeModeIssue[];
-    }
-  | {
-      ok: false;
-      status:
-        | "invalid_input"
-        | "invalid_mindmap"
-        | "quality_failed"
-        | "render_failed"
-        | "export_failed"
-        | "storage_failed";
-      buildId?: string;
-      requestId?: string;
-      normalizedSpec?: NormalizedMindmapSpec;
-      quality?: QualityReport;
-      partial?: PartialArtifactBundle;
-      issues: CodeModeIssue[];
-    };
+export class BuildFlowchartAccepted extends Schema.Class<BuildFlowchartAccepted>(
+  "BuildFlowchartAccepted",
+)(
+  {
+    ok: booleanLiteral(true),
+    status: stringLiteral("accepted"),
+    buildId: Schema.String,
+    requestId: optionalContract(Schema.String),
+    normalizedSpec: NormalizedFlowchartSpecSchema,
+    quality: QualityReportSchema,
+    artifact: ArtifactBundleSchema,
+    issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+  },
+  { identifier: undefined },
+) {}
+export class BuildFlowchartRejected extends Schema.Class<BuildFlowchartRejected>(
+  "BuildFlowchartRejected",
+)(
+  {
+    ok: booleanLiteral(false),
+    status: literals([
+      "invalid_input",
+      "invalid_flowchart",
+      "quality_failed",
+      "render_failed",
+      "export_failed",
+      "storage_failed",
+    ]),
+    buildId: optionalContract(Schema.String),
+    requestId: optionalContract(Schema.String),
+    normalizedSpec: optionalContract(NormalizedFlowchartSpecSchema),
+    quality: optionalContract(QualityReportSchema),
+    partial: optionalContract(PartialArtifactBundleSchema),
+    issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+  },
+  { identifier: undefined },
+) {}
+export const BuildFlowchartResultSchema = Schema.Union([
+  BuildFlowchartAccepted,
+  BuildFlowchartRejected,
+]);
+export type BuildFlowchartResult = typeof BuildFlowchartResultSchema.Type;
 
-export type GetArtifactResult =
-  | {
-      ok: true;
-      artifactId: string;
-      diagramId: string;
-      format: ArtifactFormat;
-      mimeType: string;
-      url?: string;
-      expiresAt?: string;
-      inline?: unknown;
-      sizeBytes?: number;
-      provenance?: ArtifactProvenance;
-    }
-  | {
-      ok: false;
-      status:
-        | "invalid_input"
-        | "not_found"
-        | "format_unavailable"
-        | "expired"
-        | "storage_failed";
-      issues: CodeModeIssue[];
-    };
+export class BuildMindmapAccepted extends Schema.Class<BuildMindmapAccepted>(
+  "BuildMindmapAccepted",
+)(
+  {
+    ok: booleanLiteral(true),
+    status: stringLiteral("accepted"),
+    buildId: Schema.String,
+    requestId: optionalContract(Schema.String),
+    normalizedSpec: NormalizedMindmapSpecSchema,
+    quality: QualityReportSchema,
+    artifact: ArtifactBundleSchema,
+    issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+  },
+  { identifier: undefined },
+) {}
+export class BuildMindmapRejected extends Schema.Class<BuildMindmapRejected>(
+  "BuildMindmapRejected",
+)(
+  {
+    ok: booleanLiteral(false),
+    status: literals([
+      "invalid_input",
+      "invalid_mindmap",
+      "quality_failed",
+      "render_failed",
+      "export_failed",
+      "storage_failed",
+    ]),
+    buildId: optionalContract(Schema.String),
+    requestId: optionalContract(Schema.String),
+    normalizedSpec: optionalContract(NormalizedMindmapSpecSchema),
+    quality: optionalContract(QualityReportSchema),
+    partial: optionalContract(PartialArtifactBundleSchema),
+    issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+  },
+  { identifier: undefined },
+) {}
+export const BuildMindmapResultSchema = Schema.Union([
+  BuildMindmapAccepted,
+  BuildMindmapRejected,
+]);
+export type BuildMindmapResult = typeof BuildMindmapResultSchema.Type;
 
-export type ApplyDiagramPatchResult =
-  | {
-      ok: true;
-      status: "accepted";
-      patchId: string;
-      requestId?: string;
-      sourceArtifactId?: string;
-      artifact: ArtifactBundle;
-      issues: CodeModeIssue[];
-    }
-  | {
-      ok: false;
-      status:
-        | "invalid_input"
-        | "source_unavailable"
-        | "target_not_found"
-        | "unsupported_operation"
-        | "connectivity_changed"
-        | "render_failed"
-        | "export_failed"
-        | "storage_failed";
-      patchId?: string;
-      requestId?: string;
-      sourceArtifactId?: string;
-      partial?: PartialArtifactBundle;
-      issues: CodeModeIssue[];
-    };
+export class GetArtifactAccepted extends Schema.Class<GetArtifactAccepted>(
+  "GetArtifactAccepted",
+)(
+  {
+    ok: booleanLiteral(true),
+    artifactId: Schema.String,
+    diagramId: Schema.String,
+    format: ArtifactFormatSchema,
+    mimeType: Schema.String,
+    url: optionalContract(Schema.String),
+    expiresAt: optionalContract(Schema.String),
+    inline: optionalContract(Schema.Unknown),
+    sizeBytes: optionalContract(Schema.Number),
+    provenance: optionalContract(ArtifactProvenance),
+  },
+  { identifier: undefined },
+) {}
+export class GetArtifactRejected extends Schema.Class<GetArtifactRejected>(
+  "GetArtifactRejected",
+)(
+  {
+    ok: booleanLiteral(false),
+    status: literals([
+      "invalid_input",
+      "not_found",
+      "format_unavailable",
+      "expired",
+      "storage_failed",
+    ]),
+    issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+  },
+  { identifier: undefined },
+) {}
+export const GetArtifactResultSchema = Schema.Union([
+  GetArtifactAccepted,
+  GetArtifactRejected,
+]);
+export type GetArtifactResult = typeof GetArtifactResultSchema.Type;
+
+export class ApplyDiagramPatchAccepted extends Schema.Class<ApplyDiagramPatchAccepted>(
+  "ApplyDiagramPatchAccepted",
+)(
+  {
+    ok: booleanLiteral(true),
+    status: stringLiteral("accepted"),
+    patchId: Schema.String,
+    requestId: optionalContract(Schema.String),
+    sourceArtifactId: optionalContract(Schema.String),
+    artifact: ArtifactBundleSchema,
+    issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+  },
+  { identifier: undefined },
+) {}
+export class ApplyDiagramPatchRejected extends Schema.Class<ApplyDiagramPatchRejected>(
+  "ApplyDiagramPatchRejected",
+)(
+  {
+    ok: booleanLiteral(false),
+    status: literals([
+      "invalid_input",
+      "source_unavailable",
+      "target_not_found",
+      "unsupported_operation",
+      "connectivity_changed",
+      "render_failed",
+      "export_failed",
+      "storage_failed",
+    ]),
+    patchId: optionalContract(Schema.String),
+    requestId: optionalContract(Schema.String),
+    sourceArtifactId: optionalContract(Schema.String),
+    partial: optionalContract(PartialArtifactBundleSchema),
+    issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+  },
+  { identifier: undefined },
+) {}
+export const ApplyDiagramPatchResultSchema = Schema.Union([
+  ApplyDiagramPatchAccepted,
+  ApplyDiagramPatchRejected,
+]);
+export type ApplyDiagramPatchResult = typeof ApplyDiagramPatchResultSchema.Type;

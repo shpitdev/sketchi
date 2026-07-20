@@ -1,5 +1,5 @@
 import { assert, describe, expect, it, layer, vi } from "@effect/vitest";
-import { Cause, Effect, Exit, Fiber, Layer } from "effect";
+import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 import { TestClock } from "effect/testing";
 
 import { candidateFromText, responseErrorDiagnostic } from "./candidates.js";
@@ -16,7 +16,7 @@ import {
 } from "./gemini.js";
 import {
   buildDiagramGenerationMessages,
-  type DiagramGenerationPrompt,
+  DiagramGenerationPrompt,
 } from "./messages.js";
 
 const prompt: DiagramGenerationPrompt = {
@@ -154,6 +154,21 @@ const cancellationPolicyLayer = Layer.succeed(DiagramGenerationPolicy, {
 });
 
 describe("diagram generation prompt mapping", () => {
+  it.effect.prop(
+    "round-trips generated prompt contracts through their encoded form",
+    { generatedPrompt: DiagramGenerationPrompt },
+    ({ generatedPrompt }) =>
+      Effect.gen(function* () {
+        const encoded = yield* Schema.encodeEffect(DiagramGenerationPrompt)(
+          generatedPrompt,
+        );
+        const decoded = yield* Schema.decodeUnknownEffect(
+          DiagramGenerationPrompt,
+        )(encoded);
+        assert.deepStrictEqual(decoded, generatedPrompt);
+      }),
+  );
+
   it("keeps the provider-facing prompt messages byte-for-byte stable", () => {
     expect(buildDiagramGenerationMessages(prompt)).toEqual({
       messages: [

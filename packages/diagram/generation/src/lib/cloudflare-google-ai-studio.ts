@@ -1,4 +1,12 @@
-import { Clock, Context, Effect, Layer, Metric, Schedule } from "effect";
+import {
+  Clock,
+  Context,
+  Effect,
+  Layer,
+  Metric,
+  Schedule,
+  Schema,
+} from "effect";
 
 import {
   candidateFromText,
@@ -50,10 +58,12 @@ export class CloudflareAiGatewayBinding extends Context.Service<
   CloudflareAiGatewayProvider
 >()("@sketchi/diagram-generation/CloudflareAiGatewayBinding") {}
 
-export interface CloudflareGoogleAiStudioConfigValue {
-  readonly collectLog: boolean;
-  readonly gatewayId: string;
-}
+export class CloudflareGoogleAiStudioConfigValue extends Schema.Class<CloudflareGoogleAiStudioConfigValue>(
+  "CloudflareGoogleAiStudioConfigValue",
+)({
+  collectLog: Schema.Boolean,
+  gatewayId: Schema.String,
+}) {}
 
 export class CloudflareGoogleAiStudioConfig extends Context.Service<
   CloudflareGoogleAiStudioConfig,

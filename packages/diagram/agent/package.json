@@ -11,11 +11,11 @@
     }
   },
   "dependencies": {
+    "@standard-schema/spec": "1.1.0",
     "@sketchi/diagram-core": "workspace:*",
     "@sketchi/diagram-excalidraw": "workspace:*",
     "@sketchi/diagram-renderer": "workspace:*",
     "effect": "4.0.0-beta.99",
-    "tslib": "^2.3.0",
-    "zod": "4.4.3"
+    "tslib": "^2.3.0"
   }
 }

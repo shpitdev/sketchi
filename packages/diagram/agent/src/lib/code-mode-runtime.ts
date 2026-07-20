@@ -20,7 +20,6 @@ import {
   type ScenePoint,
 } from "@sketchi/diagram-renderer";
 import { Context, Effect, Layer, Schema } from "effect";
-import { z } from "zod";
 
 import {
   ARTIFACT_MIME_TYPES,
@@ -50,6 +49,7 @@ import {
   type CodeModeIssue,
   type CodeModeIssueCode,
   type CodeModeIssueRef,
+  type ContractSchemaError,
   type DiagramPatchOperation,
   type DiagramSelector,
   type GetArtifactResult,
@@ -546,15 +546,26 @@ function pathForZodIssue(path: readonly PropertyKey[]): string {
     .join(".");
 }
 
-function codeForZodIssue(zodIssue: z.core.$ZodIssue): CodeModeIssueCode {
-  const path = pathForZodIssue(zodIssue.path);
+interface ContractIssueLike {
+  readonly message: string;
+  readonly path: readonly PropertyKey[];
+}
+
+interface ContractErrorLike {
+  readonly issues: readonly ContractIssueLike[];
+}
+
+function codeForContractIssue(
+  contractIssue: ContractIssueLike,
+): CodeModeIssueCode {
+  const path = pathForZodIssue(contractIssue.path);
   if (isPatchOperationNamePath(path)) {
     return "unsupported_patch_operation";
   }
-  if (zodIssue.code === "invalid_type") {
+  if (contractIssue.message.startsWith("Invalid input: expected")) {
     return "invalid_type";
   }
-  if (zodIssue.code === "invalid_value") {
+  if (contractIssue.message.startsWith("Invalid option:")) {
     return "invalid_enum";
   }
   if (path.toLowerCase().includes("color")) {
@@ -582,17 +593,19 @@ function hintForZodIssue(path: string): string {
   return `Fix ${path} so it matches the Code Mode API contract.`;
 }
 
-function inputIssues(error: z.ZodError): CodeModeIssue[] {
-  const issues = error.issues.slice(0, MAX_INPUT_ISSUES).map((zodIssue) => {
-    const path = pathForZodIssue(zodIssue.path);
-    return issue({
-      code: codeForZodIssue(zodIssue),
-      stage: "input",
-      ref: { kind: "request", path },
-      message: zodIssue.message,
-      hint: hintForZodIssue(path),
+function inputIssues(error: ContractSchemaError): CodeModeIssue[] {
+  const issues = error.issues
+    .slice(0, MAX_INPUT_ISSUES)
+    .map((contractIssue) => {
+      const path = pathForZodIssue(contractIssue.path);
+      return issue({
+        code: codeForContractIssue(contractIssue),
+        stage: "input",
+        ref: { kind: "request", path },
+        message: contractIssue.message,
+        hint: hintForZodIssue(path),
+      });
     });
-  });
   if (error.issues.length > MAX_INPUT_ISSUES) {
     issues.push(
       issue({
@@ -650,12 +663,12 @@ function canonicalFlowchartIssues(diagram: FlowchartDiagram): CodeModeIssue[] {
 }
 
 function flowchartSchemaRef(
-  zodIssue: z.core.$ZodIssue,
+  contractIssue: ContractIssueLike,
   spec: NormalizedFlowchartSpec,
 ): CodeModeIssueRef {
-  const path = pathForZodIssue(zodIssue.path);
+  const path = pathForZodIssue(contractIssue.path);
   const specPath = path === "input" ? "spec" : `spec.${path}`;
-  const [collection, index] = zodIssue.path;
+  const [collection, index] = contractIssue.path;
   if (collection === "nodes" && typeof index === "number") {
     const nodeId = spec.nodes[index]?.id;
     return {
@@ -676,16 +689,16 @@ function flowchartSchemaRef(
 }
 
 function flowchartSchemaIssues(
-  error: z.ZodError,
+  error: ContractErrorLike,
   spec: NormalizedFlowchartSpec,
 ): CodeModeIssue[] {
-  return error.issues.slice(0, FLOWCHART_MAX_ISSUES).map((zodIssue) => {
-    const ref = flowchartSchemaRef(zodIssue, spec);
+  return error.issues.slice(0, FLOWCHART_MAX_ISSUES).map((contractIssue) => {
+    const ref = flowchartSchemaRef(contractIssue, spec);
     return issue({
-      code: codeForZodIssue(zodIssue),
+      code: codeForContractIssue(contractIssue),
       stage: "flowchart",
       ref,
-      message: zodIssue.message,
+      message: contractIssue.message,
       hint: `Fix ${ref.path ?? "spec"} so normalization produces a valid canonical flowchart value.`,
     });
   });

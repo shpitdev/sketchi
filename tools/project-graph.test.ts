@@ -38,6 +38,7 @@ const effectAuthoritativeProjectRoots = [
   "packages/diagram/agent",
   "packages/diagram/generation",
   "packages/diagram/scenarios",
+  "packages/studio/projects",
 ];
 const effectPureProjectRoots = [
   "packages/diagram/core",
@@ -45,7 +46,12 @@ const effectPureProjectRoots = [
   "packages/diagram/renderer",
   "packages/svg-excalidraw",
 ];
-const effectMigrationReadyProjectRoots = ["packages/studio/projects"];
+const effectMigrationReadyProjectRoots: string[] = [];
+const effectSchemaBoundaryFiles = new Set([
+  "packages/diagram/core/src/diagram-types/flowchart.ts",
+  "packages/diagram/core/src/diagram-types/mindmap.ts",
+  "packages/diagram/core/src/intermediate.ts",
+]);
 const frameworkNativeProjectRoots = [
   "apps/excalidraw",
   "apps/icons",
@@ -234,7 +240,7 @@ describe("diagram generation project boundaries", () => {
     expect(scenarioTargets).toContain("diagram-generation");
   });
 
-  it("classifies every project and excludes Effect from pure/framework-native code", () => {
+  it("classifies every project and confines Effect to authoritative or schema-boundary code", () => {
     const classifiedRoots = [
       ...effectAuthoritativeProjectRoots,
       ...effectPureProjectRoots,
@@ -252,11 +258,12 @@ describe("diagram generation project boundaries", () => {
         `${projectRoot}/**/*.{ts,tsx,mts,cts,js,mjs}`,
         {
           cwd: workspaceRoot,
-          ignore: ["**/dist/**", "**/.output/**", "**/.wrangler/**"],
+          exclude: ["**/dist/**", "**/.output/**", "**/.wrangler/**"],
         },
       );
 
       for (const sourceFile of sourceFiles) {
+        if (effectSchemaBoundaryFiles.has(sourceFile)) continue;
         const source = readFileSync(
           path.join(workspaceRoot, sourceFile),
           "utf8",
@@ -315,7 +322,7 @@ describe("diagram generation project boundaries", () => {
       ),
       {
         cwd: workspaceRoot,
-        ignore: ["**/dist/**", "**/.output/**", "**/.wrangler/**"],
+        exclude: ["**/dist/**", "**/.output/**", "**/.wrangler/**"],
       },
     );
     for (const sourceFile of sourceFiles) {

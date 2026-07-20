@@ -15,7 +15,6 @@
   "dependencies": {
     "effect": "4.0.0-beta.99",
     "nanoid": "^5.1.11",
-    "tslib": "^2.3.0",
-    "zod": "4.4.3"
+    "tslib": "^2.3.0"
   }
 }

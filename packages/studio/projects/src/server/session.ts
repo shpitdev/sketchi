@@ -1,10 +1,17 @@
 import { nanoid } from "nanoid";
 import { Context, Effect, Layer } from "effect";
 
-import type {
-  StudioAuthStatus,
-  StudioOwner,
-  StudioPublicSession,
+import {
+  AnonymousStudioAuthStatus,
+  AnonymousStudioOwner,
+  AnonymousStudioPublicSession,
+  AuthenticatedStudioAuthStatus,
+  AuthenticatedStudioOwner,
+  AuthenticatedStudioPublicSession,
+  makeStudioRecordId,
+  type StudioAuthStatus,
+  type StudioOwner,
+  type StudioPublicSession,
 } from "../contracts.js";
 import {
   failureMessage,
@@ -44,25 +51,31 @@ export class StudioSessionService extends Context.Service<
 function publicSession(session: StudioOwner): StudioPublicSession {
   if (session.kind === "authenticated") {
     return session.displayName
-      ? { displayName: session.displayName, kind: "authenticated" }
-      : { kind: "authenticated" };
+      ? AuthenticatedStudioPublicSession.make({
+          displayName: session.displayName,
+          kind: "authenticated",
+        })
+      : AuthenticatedStudioPublicSession.make({ kind: "authenticated" });
   }
 
-  return { kind: "anonymous" };
+  return AnonymousStudioPublicSession.make({ kind: "anonymous" });
 }
 
 function authStatus(session: StudioOwner): StudioAuthStatus {
   if (session.kind === "authenticated") {
     return session.displayName
-      ? { displayName: session.displayName, status: "authenticated" }
-      : { status: "authenticated" };
+      ? AuthenticatedStudioAuthStatus.make({
+          displayName: session.displayName,
+          status: "authenticated",
+        })
+      : AuthenticatedStudioAuthStatus.make({ status: "authenticated" });
   }
 
-  return {
+  return AnonymousStudioAuthStatus.make({
     message:
       "Studio persistence is using an anonymous session cookie until product auth is wired.",
     status: "anonymous",
-  };
+  });
 }
 
 function cookieValue(request: Request, name: string): string | undefined {
@@ -94,15 +107,15 @@ export function createAuthenticatedStudioSession(input: {
   subjectId: string;
 }): StudioOwner {
   return input.displayName
-    ? {
+    ? AuthenticatedStudioOwner.make({
         displayName: input.displayName,
         kind: "authenticated",
         subjectId: input.subjectId,
-      }
-    : {
+      })
+    : AuthenticatedStudioOwner.make({
         kind: "authenticated",
         subjectId: input.subjectId,
-      };
+      });
 }
 
 export function studioOwnersMatch(
@@ -128,10 +141,10 @@ export function resolveStudioSession(
   const existingSessionId = cookieValue(request, STUDIO_SESSION_COOKIE);
 
   if (existingSessionId && ANONYMOUS_SESSION_PATTERN.test(existingSessionId)) {
-    const session: StudioOwner = {
+    const session = AnonymousStudioOwner.make({
       kind: "anonymous",
-      sessionId: existingSessionId,
-    };
+      sessionId: makeStudioRecordId(existingSessionId),
+    });
     return {
       auth: authStatus(session),
       publicSession: publicSession(session),
@@ -139,10 +152,10 @@ export function resolveStudioSession(
     };
   }
 
-  const session: StudioOwner = {
+  const session = AnonymousStudioOwner.make({
     kind: "anonymous",
-    sessionId: `anon_${nanoid(24)}`,
-  };
+    sessionId: makeStudioRecordId(`anon_${nanoid(24)}`),
+  });
 
   return {
     auth: authStatus(session),

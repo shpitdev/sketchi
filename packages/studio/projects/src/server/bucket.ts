@@ -1,5 +1,4 @@
-import { Context, Effect, Layer } from "effect";
-import type { z } from "zod";
+import { Context, Effect, Layer, Schema } from "effect";
 
 import {
   failureMessage,
@@ -212,12 +211,9 @@ export function isStudioObjectBucket(
 }
 
 export function makeStudioJsonPersistence(objectStore: StudioObjectStoreShape) {
-  const read = Effect.fn("studioPersistence.readJson")(function* <T>(
-    key: string,
-    schema: z.ZodType<T>,
-    resource: StudioResourceKind,
-    id: string,
-  ) {
+  const read = Effect.fn("studioPersistence.readJson")(function* <
+    S extends Schema.ConstraintCodec<unknown>,
+  >(key: string, schema: S, resource: StudioResourceKind, id: string) {
     const text = yield* objectStore.getText(key);
 
     if (text === null) {
@@ -234,28 +230,35 @@ export function makeStudioJsonPersistence(objectStore: StudioObjectStoreShape) {
           operation: "decode",
         }),
     });
-    const parsed = schema.safeParse(json);
-
-    if (!parsed.success) {
-      return yield* Effect.fail(
+    return yield* Schema.decodeUnknownEffect(schema, { errors: "all" })(
+      json,
+    ).pipe(
+      Effect.mapError((cause) =>
         StudioDecodeError.make({
-          cause: parsed.error,
+          cause,
           key,
           message: "Stored Studio data could not be decoded.",
           operation: "decode",
         }),
-      );
-    }
-
-    return parsed.data;
+      ),
+    );
   });
 
-  const put = Effect.fn("studioPersistence.putJson")(function* (
-    key: string,
-    value: unknown,
-  ) {
+  const put = Effect.fn("studioPersistence.putJson")(function* <
+    S extends Schema.ConstraintCodec<unknown>,
+  >(key: string, schema: S, value: S["Type"]) {
+    const encoded = yield* Schema.encodeEffect(schema)(value).pipe(
+      Effect.mapError((cause) =>
+        StudioDecodeError.make({
+          cause,
+          key,
+          message: "Studio persistence failed.",
+          operation: "encode",
+        }),
+      ),
+    );
     const json = yield* Effect.try({
-      try: () => JSON.stringify(value),
+      try: () => JSON.stringify(encoded),
       catch: (cause) =>
         StudioDecodeError.make({
           cause,

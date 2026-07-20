@@ -1,28 +1,40 @@
+import { Schema } from "effect";
+
 import type { DiagramGenerationUsage } from "./candidates.js";
 import { buildDiagramGenerationMessages } from "./messages.js";
 import type { DiagramGenerationMessage } from "./messages.js";
 import type { DiagramGenerationRequest } from "./candidates.js";
 
-export interface GeminiTextPart {
-  text: string;
-}
+export class GeminiTextPart extends Schema.Class<GeminiTextPart>(
+  "GeminiTextPart",
+)({ text: Schema.String }) {}
 
-export interface GeminiContent {
-  parts: GeminiTextPart[];
-  role: "model" | "user";
-}
+export class GeminiContent extends Schema.Class<GeminiContent>("GeminiContent")(
+  {
+    parts: Schema.Array(GeminiTextPart).pipe(Schema.mutable),
+    role: Schema.Literals(["model", "user"]),
+  },
+) {}
 
-export interface GeminiGenerateContentBody {
-  contents: GeminiContent[];
-  generationConfig: {
-    maxOutputTokens: number;
-    response_mime_type: "application/json";
-    temperature: number;
-  };
-  system_instruction: {
-    parts: GeminiTextPart[];
-  };
-}
+export class GeminiGenerationConfig extends Schema.Class<GeminiGenerationConfig>(
+  "GeminiGenerationConfig",
+)({
+  maxOutputTokens: Schema.Number,
+  response_mime_type: Schema.Literal("application/json"),
+  temperature: Schema.Number,
+}) {}
+
+export class GeminiSystemInstruction extends Schema.Class<GeminiSystemInstruction>(
+  "GeminiSystemInstruction",
+)({ parts: Schema.Array(GeminiTextPart).pipe(Schema.mutable) }) {}
+
+export class GeminiGenerateContentBody extends Schema.Class<GeminiGenerateContentBody>(
+  "GeminiGenerateContentBody",
+)({
+  contents: Schema.Array(GeminiContent).pipe(Schema.mutable),
+  generationConfig: GeminiGenerationConfig,
+  system_instruction: GeminiSystemInstruction,
+}) {}
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 2_048;
 const DEFAULT_TEMPERATURE = 0.1;
