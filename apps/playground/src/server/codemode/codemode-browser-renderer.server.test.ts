@@ -1,6 +1,12 @@
 import type { Browser } from "@cloudflare/playwright";
 import { launch } from "@cloudflare/playwright";
 import { assert, describe, it } from "@effect/vitest";
+import {
+  makeTelemetryTestSink,
+  makeWorkersTelemetryLayer,
+  type TelemetryMetricEvent,
+  type TelemetrySpanEvent,
+} from "@sketchi/observability";
 import { Cause, Effect, Exit, Fiber } from "effect";
 import { TestClock } from "effect/testing";
 import { beforeEach, expect, vi } from "vitest";
@@ -43,8 +49,13 @@ describe("Cloudflare Browser Rendering Code Mode renderer", () => {
     launchMock.mockReset();
   });
 
-  it.effect("renders through the harness and closes on success", () =>
-    Effect.gen(function* () {
+  it.effect("renders through the harness with boundary telemetry", () => {
+    const { probe, sink } = makeTelemetryTestSink();
+    const telemetryLayer = makeWorkersTelemetryLayer({
+      resource: { serviceName: "sketchi-browser-test" },
+      sink,
+    });
+    return Effect.gen(function* () {
       let visitedUrl = "";
       const close = vi.fn(async () => {});
       const page = {
@@ -71,8 +82,32 @@ describe("Cloudflare Browser Rendering Code Mode renderer", () => {
       expect(visitedUrl).toBe("https://studio.test/codemode-export-harness");
       expect(new Uint8Array(png)).toEqual(new Uint8Array([80, 78, 71]));
       expect(close).toHaveBeenCalledTimes(1);
-    }),
-  );
+      const spans = probe.events.filter(
+        (event): event is TelemetrySpanEvent => event.event === "effect.span",
+      );
+      const metrics = probe.events.filter(
+        (event): event is TelemetryMetricEvent =>
+          event.event === "effect.metric",
+      );
+      assert.isTrue(
+        spans.some(
+          (span) =>
+            span.name === "playground.browserRendering.goto" &&
+            span.attributes["operation"] === "goto",
+        ),
+      );
+      assert.deepInclude(
+        metrics.find(
+          (metric) => metric.metric === "sketchi_browser_rendering_requests",
+        )?.attributes,
+        {
+          operation: "renderPng",
+          outcome: "success",
+          surface: "browser_rendering",
+        },
+      );
+    }).pipe(Effect.provide(telemetryLayer));
+  });
 
   it.effect("closes on a typed page failure", () =>
     Effect.gen(function* () {

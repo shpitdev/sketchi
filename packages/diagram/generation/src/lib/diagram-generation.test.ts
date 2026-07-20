@@ -1,4 +1,11 @@
 import { assert, describe, expect, it, layer, vi } from "@effect/vitest";
+import {
+  makeTelemetryTestSink,
+  makeWorkersTelemetryLayer,
+  type TelemetryLogEvent,
+  type TelemetryMetricEvent,
+  type TelemetrySpanEvent,
+} from "@sketchi/observability";
 import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 import { TestClock } from "effect/testing";
 
@@ -337,8 +344,13 @@ const retryClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
 );
 
 layer(retryClientLayer)("bounded retry policy", (it) => {
-  it.effect("retries transient failures with TestClock", () =>
-    Effect.gen(function* () {
+  it.effect("retries transient failures with correlated telemetry", () => {
+    const { probe, sink } = makeTelemetryTestSink();
+    const telemetryLayer = makeWorkersTelemetryLayer({
+      resource: { serviceName: "sketchi-generation-test" },
+      sink,
+    });
+    return Effect.gen(function* () {
       const client = yield* DiagramGenerationClient;
       const fiber = yield* Effect.forkChild(
         client.generate({
@@ -351,8 +363,47 @@ layer(retryClientLayer)("bounded retry policy", (it) => {
 
       assert.strictEqual(candidate.diagram?.id, expectedDiagram.id);
       assert.strictEqual(transientAttempts, 3);
-    }),
-  );
+      const metrics = probe.events.filter(
+        (event): event is TelemetryMetricEvent =>
+          event.event === "effect.metric",
+      );
+      const logs = probe.events.filter(
+        (event): event is TelemetryLogEvent => event.event === "effect.log",
+      );
+      const attempts = probe.events.filter(
+        (event): event is TelemetrySpanEvent =>
+          event.event === "effect.span" &&
+          event.name === "diagramGeneration.cloudflareGoogleAiStudio.attempt",
+      );
+      assert.strictEqual(
+        metrics.filter(
+          (metric) => metric.metric === "sketchi_generation_attempts",
+        ).length,
+        3,
+      );
+      assert.strictEqual(
+        metrics.filter(
+          (metric) => metric.metric === "sketchi_generation_retries",
+        ).length,
+        2,
+      );
+      assert.deepStrictEqual(
+        logs.map((log) => log.fields["attempt"]),
+        [2, 3],
+      );
+      assert.deepStrictEqual(
+        attempts.map((span) => span.attributes["attempt"]),
+        [1, 2, 3],
+      );
+      assert.isTrue(
+        attempts.every(
+          (span) =>
+            span.attributes["sketchi.scenario_id"] === prompt.id &&
+            span.trace_id === attempts[0]?.trace_id,
+        ),
+      );
+    }).pipe(Effect.provide(telemetryLayer));
+  });
 });
 
 const permanentRun = vi.fn(async () =>
@@ -428,31 +479,65 @@ const timeoutClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
 );
 
 layer(timeoutClientLayer)("timeouts and interruption", (it) => {
-  it.effect("aborts timed-out attempts before a bounded retry begins", () =>
-    Effect.gen(function* () {
-      cancellationSignals.length = 0;
-      activeUpstreamRequests = 0;
-      maxActiveUpstreamRequests = 0;
-      timeoutRun.mockClear();
-      const client = yield* DiagramGenerationClient;
-      const fiber = yield* Effect.forkChild(
-        Effect.flip(
-          client.generate({
-            model: "google/gemini-3.1-flash-lite",
-            prompt,
-          }),
-        ),
-      );
-      yield* TestClock.adjust("2 seconds");
-      const error = yield* Fiber.join(fiber);
+  it.effect(
+    "aborts timed-out attempts and records one terminal timeout",
+    () => {
+      const { probe, sink } = makeTelemetryTestSink();
+      const telemetryLayer = makeWorkersTelemetryLayer({
+        resource: { serviceName: "sketchi-generation-timeout-test" },
+        sink,
+      });
+      return Effect.gen(function* () {
+        cancellationSignals.length = 0;
+        activeUpstreamRequests = 0;
+        maxActiveUpstreamRequests = 0;
+        timeoutRun.mockClear();
+        const client = yield* DiagramGenerationClient;
+        const fiber = yield* Effect.forkChild(
+          Effect.flip(
+            client.generate({
+              model: "google/gemini-3.1-flash-lite",
+              prompt,
+            }),
+          ),
+        );
+        yield* TestClock.adjust("2 seconds");
+        const error = yield* Fiber.join(fiber);
 
-      assert.strictEqual(error._tag, "DiagramGenerationTimeoutError");
-      assert.strictEqual(timeoutRun.mock.calls.length, 2);
-      assert.strictEqual(cancellationSignals.length, 2);
-      assert.isTrue(cancellationSignals.every((signal) => signal.aborted));
-      assert.strictEqual(activeUpstreamRequests, 0);
-      assert.strictEqual(maxActiveUpstreamRequests, 1);
-    }),
+        assert.strictEqual(error._tag, "DiagramGenerationTimeoutError");
+        assert.strictEqual(timeoutRun.mock.calls.length, 2);
+        assert.strictEqual(cancellationSignals.length, 2);
+        assert.isTrue(cancellationSignals.every((signal) => signal.aborted));
+        assert.strictEqual(activeUpstreamRequests, 0);
+        assert.strictEqual(maxActiveUpstreamRequests, 1);
+        const metrics = probe.events.filter(
+          (event): event is TelemetryMetricEvent =>
+            event.event === "effect.metric",
+        );
+        const logs = probe.events.filter(
+          (event): event is TelemetryLogEvent => event.event === "effect.log",
+        );
+        assert.strictEqual(
+          metrics.filter(
+            (metric) => metric.metric === "sketchi_generation_timeouts",
+          ).length,
+          1,
+        );
+        assert.deepInclude(
+          metrics.find(
+            (metric) => metric.metric === "sketchi_generation_failures",
+          )?.attributes,
+          {
+            failure_category: "DiagramGenerationTimeoutError",
+            operation: "generate",
+            provider: "cloudflare-google-ai-studio",
+          },
+        );
+        assert.strictEqual(logs.length, 1);
+        assert.strictEqual(logs[0]?.message, "Retrying diagram generation");
+        assert.strictEqual(logs[0]?.fields["attempt"], 2);
+      }).pipe(Effect.provide(telemetryLayer));
+    },
   );
 
   it.effect("preserves interruption instead of translating it", () =>

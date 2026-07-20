@@ -2,7 +2,17 @@ import "@tanstack/react-start/server-only";
 
 import type { Browser, BrowserWorker } from "@cloudflare/playwright";
 import type { CodeModeArtifactRenderer } from "@sketchi/diagram-agent";
-import { Cause, Context, Effect, Exit, Layer, Schema } from "effect";
+import { recordMetric } from "@sketchi/observability";
+import {
+  Cause,
+  Clock,
+  Context,
+  Effect,
+  Exit,
+  Layer,
+  Metric,
+  Schema,
+} from "effect";
 
 export type CloudflareBrowserRunBinding = BrowserWorker;
 
@@ -11,6 +21,37 @@ const EXPORT_SCALE = 2;
 const EXPORT_PADDING = 20;
 const DEFAULT_ASSET_ORIGIN = "https://sketchi-studio.dimethyl.workers.dev";
 const HARNESS_PATH = "/codemode-export-harness";
+
+const browserRenderingRequests = Metric.counter(
+  "sketchi_browser_rendering_requests",
+  {
+    description: "Browser Rendering requests by terminal outcome",
+    incremental: true,
+  },
+);
+const browserRenderingFailures = Metric.counter(
+  "sketchi_browser_rendering_failures",
+  {
+    description: "Browser Rendering typed failures",
+    incremental: true,
+  },
+);
+const browserRenderingTimeouts = Metric.counter(
+  "sketchi_browser_rendering_timeouts",
+  {
+    description: "Browser Rendering timeouts",
+    incremental: true,
+  },
+);
+const browserRenderingDuration = Metric.histogram(
+  "sketchi_browser_rendering_duration_ms",
+  {
+    description: "Browser Rendering duration in milliseconds",
+    boundaries: Metric.boundariesFromIterable([
+      50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 30_000, 60_000,
+    ]),
+  },
+);
 
 const BrowserRenderingOperationSchema = Schema.Literals([
   "base64",
@@ -94,7 +135,10 @@ function tryBrowserPromise<A>(
   return Effect.tryPromise({
     try: run,
     catch: browserFailure(operation),
-  });
+  }).pipe(
+    Effect.withSpan(`playground.browserRendering.${operation}`),
+    Effect.annotateSpans({ operation }),
+  );
 }
 
 function closeBrowser(
@@ -112,9 +156,11 @@ function closeBrowser(
     catch: (cause) => cause,
   }).pipe(
     Effect.catch((cause) =>
-      Effect.logWarning("Browser Rendering session cleanup failed.").pipe(
-        Effect.annotateLogs({ cause }),
-      ),
+      Effect.logWarning("Browser Rendering session cleanup failed", {
+        error_tag:
+          cause instanceof Error ? cause.name : "BrowserCleanupFailure",
+        operation: "close",
+      }),
     ),
     Effect.asVoid,
   );
@@ -144,8 +190,8 @@ export function createCloudflareBrowserRunArtifactRenderer(
   ).toString();
 
   return {
-    renderPng: Effect.fn("playground.browserRendering.renderPng")((input) =>
-      withScopedBrowserSession(
+    renderPng: Effect.fn("playground.browserRendering.renderPng")((input) => {
+      const render = withScopedBrowserSession(
         tryBrowserPromise("launch", async (signal) => {
           const { launch } = await import("@cloudflare/playwright");
           return launch(browserBindingWithSignal(browserBinding, signal), {
@@ -211,7 +257,10 @@ export function createCloudflareBrowserRunArtifactRenderer(
             return yield* Effect.try({
               try: () => base64ToArrayBuffer(pngBase64),
               catch: browserFailure("base64"),
-            });
+            }).pipe(
+              Effect.withSpan("playground.browserRendering.base64"),
+              Effect.annotateSpans({ operation: "base64" }),
+            );
           }),
       ).pipe(
         Effect.timeout(BROWSER_RENDER_TIMEOUT_MS),
@@ -223,8 +272,66 @@ export function createCloudflareBrowserRunArtifactRenderer(
             }),
           ),
         ),
-      ),
-    ),
+      );
+
+      return Effect.gen(function* () {
+        const startedAt = yield* Clock.currentTimeMillis;
+        return yield* render.pipe(
+          Effect.tap(() =>
+            Effect.gen(function* () {
+              const finishedAt = yield* Clock.currentTimeMillis;
+              yield* recordMetric(browserRenderingRequests, 1, {
+                operation: "renderPng",
+                outcome: "success",
+                surface: "browser_rendering",
+              });
+              yield* recordMetric(
+                browserRenderingDuration,
+                finishedAt - startedAt,
+                {
+                  operation: "renderPng",
+                  outcome: "success",
+                  surface: "browser_rendering",
+                },
+              );
+            }),
+          ),
+          Effect.tapError((error) =>
+            Effect.gen(function* () {
+              const finishedAt = yield* Clock.currentTimeMillis;
+              yield* recordMetric(browserRenderingRequests, 1, {
+                failureCategory: error._tag,
+                operation: "renderPng",
+                outcome: "failure",
+                surface: "browser_rendering",
+              });
+              yield* recordMetric(browserRenderingFailures, 1, {
+                failureCategory: error._tag,
+                operation: "renderPng",
+                surface: "browser_rendering",
+              });
+              yield* recordMetric(
+                browserRenderingDuration,
+                finishedAt - startedAt,
+                {
+                  failureCategory: error._tag,
+                  operation: "renderPng",
+                  outcome: "failure",
+                  surface: "browser_rendering",
+                },
+              );
+              if (error._tag === "BrowserRenderingTimeout") {
+                yield* recordMetric(browserRenderingTimeouts, 1, {
+                  operation: "renderPng",
+                  surface: "browser_rendering",
+                  timeoutKind: "render",
+                });
+              }
+            }),
+          ),
+        );
+      });
+    }),
   };
 }
 

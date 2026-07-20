@@ -95,22 +95,22 @@ test("countQuery filters by run id", () => {
 test("detailQuery selects event or issue details", () => {
   const [eventsTarget, issuesTarget] = codeModeR2CatalogTargets();
 
-  assert.match(
+  assert.equal(
     detailQuery(eventsTarget, "run_1"),
-    /SELECT event_time, event_id, run_id, operation, status/,
-  );
-  assert.match(
-    detailQuery(eventsTarget, "run_1"),
-    /FROM sketchi_codemode\.usage_events/,
+    [
+      "SELECT event_time, event_id, run_id, operation, status, status_code, issue_count, request_path, harness, scenario_id",
+      "FROM sketchi_codemode.usage_events",
+      "WHERE run_id = 'run_1'",
+    ].join("\n"),
   );
 
-  assert.match(
+  assert.equal(
     detailQuery(issuesTarget, "run_1"),
-    /SELECT event_time, event_id, run_id, issue_code/,
-  );
-  assert.match(
-    detailQuery(issuesTarget, "run_1"),
-    /FROM sketchi_codemode\.usage_issues/,
+    [
+      "SELECT event_time, event_id, run_id, issue_code, issue_path, issue_message",
+      "FROM sketchi_codemode.usage_issues",
+      "WHERE run_id = 'run_1'",
+    ].join("\n"),
   );
 });
 

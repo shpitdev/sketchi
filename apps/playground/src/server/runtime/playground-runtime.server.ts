@@ -1,5 +1,9 @@
 import "@tanstack/react-start/server-only";
 
+import {
+  makeWorkersTelemetryLayer,
+  withTelemetryCorrelation,
+} from "@sketchi/observability";
 import { Context, Effect, FiberSet, Layer, ManagedRuntime, pipe } from "effect";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
@@ -42,6 +46,10 @@ const PlaygroundCallbackFibersLive = Layer.effect(
   FiberSet.make<unknown, unknown>(),
 );
 
+const PlaygroundTelemetryLive = makeWorkersTelemetryLayer({
+  resource: { serviceName: "sketchi-playground" },
+});
+
 const PlaygroundCoreLive = Layer.mergeAll(
   PlaygroundClockLive,
   PlaygroundIdsLive,
@@ -49,6 +57,7 @@ const PlaygroundCoreLive = Layer.mergeAll(
   PlaygroundCallbackFibersLive,
   PlaygroundCodeModeLive,
   PlaygroundCodeModeUsageLive,
+  PlaygroundTelemetryLive,
 );
 
 export const PlaygroundHostLive = PlaygroundStudioLayer.pipe(
@@ -113,10 +122,15 @@ function runWithPlaygroundRuntime<A, E>(
     const traceId =
       boundary.request.headers.get("x-sketchi-trace-id")?.trim() ||
       ids.create("trace");
+    const requestRoute = normalizedRequestRoute(url.pathname);
+    const requestAnnotations = {
+      "request.method": boundary.request.method,
+      "request.route": requestRoute,
+    };
+    const correlation = { traceId };
 
     yield* Effect.annotateCurrentSpan({
-      "request.method": boundary.request.method,
-      "request.path": url.pathname,
+      ...requestAnnotations,
       "sketchi.trace_id": traceId,
     });
 
@@ -130,6 +144,10 @@ function runWithPlaygroundRuntime<A, E>(
       callbackEffect.pipe(
         Effect.provide(requestContext),
         Effect.withSpan(spanName, { parent: requestSpan }),
+        Effect.annotateSpans(requestAnnotations),
+        Effect.annotateLogs(requestAnnotations),
+        (callbackProgram) =>
+          withTelemetryCorrelation(callbackProgram, correlation),
       );
     const runDeferredEffect: PlaygroundRequestRunner = (callbackEffect) =>
       runTrackedEffect(
@@ -162,12 +180,48 @@ function runWithPlaygroundRuntime<A, E>(
         runPromise: runRequestEffect,
       }),
       Effect.provide(requestContext),
+      Effect.annotateSpans(requestAnnotations),
+      Effect.annotateLogs(requestAnnotations),
+      (requestEffect) => withTelemetryCorrelation(requestEffect, correlation),
     );
   }).pipe(Effect.withSpan("playground.request"));
 
   return runtime.runPromise(program, {
     signal: boundary.request.signal,
   });
+}
+
+function normalizedRequestRoute(pathname: string): string {
+  const routePatterns: ReadonlyArray<readonly [RegExp, string]> = [
+    [
+      /^\/api\/v1\/artifacts\/[^/]+\/patch$/,
+      "/api/v1/artifacts/:artifactId/patch",
+    ],
+    [/^\/api\/v1\/artifacts\/[^/]+$/, "/api/v1/artifacts/:artifactId"],
+    [/^\/api\/studio\/projects\/[^/]+$/, "/api/studio/projects/:projectId"],
+    [/^\/api\/studio\/diagrams\/[^/]+$/, "/api/studio/diagrams/:diagramId"],
+    [/^\/artifacts\/[^/]+\/edit$/, "/artifacts/:artifactId/edit"],
+    [/^\/artifacts\/[^/]+$/, "/artifacts/:artifactId"],
+    [/^\/diagrams\/[^/]+\/edit$/, "/diagrams/:diagramId/edit"],
+    [/^\/diagrams\/[^/]+$/, "/diagrams/:diagramId"],
+    [/^\/examples\/[^/]+$/, "/examples/:exampleId"],
+    [/^\/projects\/[^/]+$/, "/projects/:projectId"],
+  ];
+  for (const [pattern, route] of routePatterns) {
+    if (pattern.test(pathname)) return route;
+  }
+  const staticRoutes = new Set([
+    "/",
+    "/api/chat",
+    "/api/studio/projects",
+    "/api/studio/projects/from-artifact",
+    "/api/v1/flowcharts/build",
+    "/api/v1/mindmaps/build",
+    "/codemode-export-harness",
+    "/mcp",
+    "/projects",
+  ]);
+  return staticRoutes.has(pathname) ? pathname : "/unmatched";
 }
 
 export function makePlaygroundRuntime(): PlaygroundRuntime {

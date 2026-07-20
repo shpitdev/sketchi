@@ -1,5 +1,10 @@
+import {
+  recordMetric,
+  withTelemetryCorrelation,
+  type TelemetryCorrelationInput,
+} from "@sketchi/observability";
 import { nanoid } from "nanoid";
-import { Clock, Context, Effect, Layer, Schema } from "effect";
+import { Clock, Context, Effect, Layer, Metric, Schema } from "effect";
 
 import {
   IsoDateStringSchema,
@@ -26,6 +31,94 @@ import { StudioSessionService } from "./session.js";
 import { StudioSourceArtifactStore } from "./source-artifacts.js";
 
 const STUDIO_PREFIX = "studio";
+
+const studioPersistenceRequests = Metric.counter(
+  "sketchi_studio_persistence_requests",
+  {
+    description: "Studio persistence boundary requests by terminal outcome",
+    incremental: true,
+  },
+);
+const studioPersistenceFailures = Metric.counter(
+  "sketchi_studio_persistence_failures",
+  {
+    description: "Studio persistence typed failures",
+    incremental: true,
+  },
+);
+const studioPersistenceDuration = Metric.histogram(
+  "sketchi_studio_persistence_duration_ms",
+  {
+    description: "Studio persistence boundary duration in milliseconds",
+    boundaries: Metric.boundariesFromIterable([
+      1, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000,
+    ]),
+  },
+);
+
+type StudioPersistenceOperation =
+  | "createFromArtifact"
+  | "getDiagram"
+  | "getProject"
+  | "listProjects";
+
+function observeStudioPersistence<A>(
+  operation: StudioPersistenceOperation,
+  correlation: TelemetryCorrelationInput,
+  effect: Effect.Effect<A, StudioProjectsError>,
+): Effect.Effect<A, StudioProjectsError> {
+  const observed = Effect.gen(function* () {
+    const startedAt = yield* Clock.currentTimeMillis;
+    return yield* effect.pipe(
+      Effect.tap(() =>
+        Effect.gen(function* () {
+          const finishedAt = yield* Clock.currentTimeMillis;
+          yield* recordMetric(studioPersistenceRequests, 1, {
+            operation,
+            outcome: "success",
+            surface: "studio",
+          });
+          yield* recordMetric(
+            studioPersistenceDuration,
+            finishedAt - startedAt,
+            {
+              operation,
+              outcome: "success",
+              surface: "studio",
+            },
+          );
+        }),
+      ),
+      Effect.tapError((error) =>
+        Effect.gen(function* () {
+          const finishedAt = yield* Clock.currentTimeMillis;
+          yield* recordMetric(studioPersistenceRequests, 1, {
+            failureCategory: error._tag,
+            operation,
+            outcome: "failure",
+            surface: "studio",
+          });
+          yield* recordMetric(studioPersistenceFailures, 1, {
+            failureCategory: error._tag,
+            operation,
+            surface: "studio",
+          });
+          yield* recordMetric(
+            studioPersistenceDuration,
+            finishedAt - startedAt,
+            {
+              failureCategory: error._tag,
+              operation,
+              outcome: "failure",
+              surface: "studio",
+            },
+          );
+        }),
+      ),
+    );
+  });
+  return withTelemetryCorrelation(observed, correlation);
+}
 
 class StudioProjectIndexEntry extends Schema.Class<StudioProjectIndexEntry>(
   "StudioProjectIndexEntry",
@@ -116,9 +209,7 @@ export const StudioPersistencePolicyLive = Layer.succeed(
 );
 
 export interface StudioRecordFactoryShape {
-  readonly createId: (
-    kind: "dia" | "proj",
-  ) => typeof StudioRecordIdSchema.Type;
+  readonly createId: (kind: "dia" | "proj") => typeof StudioRecordIdSchema.Type;
   readonly now: Effect.Effect<IsoDateString>;
 }
 
@@ -422,17 +513,22 @@ export const StudioProjectsLive = Layer.effect(
         updatedAt: createdAt,
       });
 
-      yield* json.put(
-        studioDiagramRecordKey(diagram.id),
-        StudioDiagramRecordSchema,
-        diagram,
+      yield* withTelemetryCorrelation(
+        Effect.gen(function* () {
+          yield* json.put(
+            studioDiagramRecordKey(diagram.id),
+            StudioDiagramRecordSchema,
+            diagram,
+          );
+          yield* json.put(
+            studioProjectRecordKey(project.id),
+            StudioProjectRecordSchema,
+            project,
+          );
+          yield* writeOwnerProjectEntry(input.session, project.id, createdAt);
+        }),
+        { artifactId: input.artifactId, projectId: project.id },
       );
-      yield* json.put(
-        studioProjectRecordKey(project.id),
-        StudioProjectRecordSchema,
-        project,
-      );
-      yield* writeOwnerProjectEntry(input.session, project.id, createdAt);
 
       return {
         diagram: diagramSummary(diagram),
@@ -449,10 +545,26 @@ export const StudioProjectsLive = Layer.effect(
     });
 
     return {
-      createFromArtifact,
-      getDiagram,
-      getProject,
-      listProjects,
+      createFromArtifact: (input) =>
+        observeStudioPersistence(
+          "createFromArtifact",
+          { artifactId: input.artifactId },
+          createFromArtifact(input),
+        ),
+      getDiagram: (session, diagramId) =>
+        observeStudioPersistence(
+          "getDiagram",
+          {},
+          getDiagram(session, diagramId),
+        ),
+      getProject: (session, projectId) =>
+        observeStudioPersistence(
+          "getProject",
+          { projectId },
+          getProject(session, projectId),
+        ),
+      listProjects: (session) =>
+        observeStudioPersistence("listProjects", {}, listProjects(session)),
     };
   }),
 );

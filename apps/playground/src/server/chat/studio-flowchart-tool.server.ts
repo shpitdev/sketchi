@@ -8,7 +8,8 @@ import {
   type BuildFlowchartResult,
   type BuildFlowchartToolInput,
 } from "@sketchi/diagram-agent";
-import { Effect, Ref, Semaphore } from "effect";
+import { recordMetric } from "@sketchi/observability";
+import { Effect, Metric, Ref, Semaphore } from "effect";
 
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 
@@ -32,6 +33,14 @@ export const STUDIO_FLOWCHART_ARTIFACT_OPTIONS: NonNullable<BuildFlowchartOption
     artifactFormats: ["scene", "excalidraw"],
     inlineArtifacts: ["scene"],
   };
+
+const studioFlowchartRetries = Metric.counter(
+  "sketchi_chat_flowchart_retries",
+  {
+    description: "Studio chat flowchart repair attempts",
+    incremental: true,
+  },
+);
 
 function attemptLimitResult(maxAttempts: number): BuildFlowchartResult {
   return {
@@ -83,6 +92,21 @@ export function makeStudioFlowchartToolExecutor<E, R>(
             }
             if (current.attempts >= maxAttempts) {
               return attemptLimitResult(maxAttempts);
+            }
+
+            const attempt = current.attempts + 1;
+            if (attempt > 1) {
+              yield* recordMetric(studioFlowchartRetries, 1, {
+                operation: "buildFlowchart",
+                retryKind: "repair",
+                surface: "chat",
+              });
+              yield* Effect.logInfo("Retrying Studio flowchart repair", {
+                attempt,
+                operation: "buildFlowchart",
+                retry_kind: "repair",
+                surface: "chat",
+              });
             }
 
             yield* Ref.update(state, (value) => ({

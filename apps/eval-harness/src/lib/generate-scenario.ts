@@ -20,6 +20,10 @@ import {
   getScenario,
   toDiagramGenerationPrompt,
 } from "@sketchi/diagram-scenarios";
+import {
+  makeWorkersTelemetryLayer,
+  withTelemetryCorrelation,
+} from "@sketchi/observability";
 import { createServerFn } from "@tanstack/react-start";
 import { Context, Effect, Layer } from "effect";
 import { z } from "zod";
@@ -208,10 +212,17 @@ export function runGenerateScenarioCandidatesForInput(
     DEFAULT_GATEWAY_ID,
   );
   const model = envString(bindings, "SKETCHI_AI_MODEL", DEFAULT_MODEL);
+  const telemetryLayer = makeWorkersTelemetryLayer({
+    resource: { serviceName: "sketchi-eval-harness" },
+  });
 
   return Effect.runPromise(
-    generateScenarioCandidatesForInput(input, model).pipe(
-      Effect.provide(generationClientLayer(bindings, gatewayId)),
+    withTelemetryCorrelation(generateScenarioCandidatesForInput(input, model), {
+      scenarioId: input.scenarioId,
+    }).pipe(
+      Effect.provide(
+        Layer.merge(generationClientLayer(bindings, gatewayId), telemetryLayer),
+      ),
     ),
   );
 }

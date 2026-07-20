@@ -15,6 +15,10 @@ export default defineConfig({
         "../packages/diagram/generation/src/index.ts",
         import.meta.url,
       ).pathname,
+      "@sketchi/observability": new URL(
+        "../packages/observability/src/index.ts",
+        import.meta.url,
+      ).pathname,
       "@sketchi/diagram-renderer": new URL(
         "../packages/diagram/renderer/src/index.ts",
         import.meta.url,

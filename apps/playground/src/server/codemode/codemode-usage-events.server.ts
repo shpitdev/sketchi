@@ -1,7 +1,8 @@
 import "@tanstack/react-start/server-only";
 
 import type { ArtifactFormat, ArtifactFormatRef } from "@sketchi/diagram-agent";
-import { Context, Effect, Layer, Schema } from "effect";
+import { recordMetric, withTelemetryCorrelation } from "@sketchi/observability";
+import { Context, Effect, Layer, Metric, Schema } from "effect";
 
 import {
   PlaygroundBindings,
@@ -17,6 +18,21 @@ const USAGE_EVENT_SCHEMA = "sketchi.codemode.usage.v1";
 const MAX_SNAPSHOT_BYTES = 1_000_000;
 const MAX_ISSUE_DEPTH = 8;
 const MAX_ISSUE_ROWS = 100;
+
+const usageCaptureWrites = Metric.counter(
+  "sketchi_codemode_usage_capture_writes",
+  {
+    description: "Code Mode usage capture writes by terminal outcome",
+    incremental: true,
+  },
+);
+const usageCaptureFailures = Metric.counter(
+  "sketchi_codemode_usage_capture_failures",
+  {
+    description: "Code Mode usage capture sink failures",
+    incremental: true,
+  },
+);
 
 export type CodeModeUsageOperation =
   | "applyDiagramPatch"
@@ -220,6 +236,12 @@ const captureCodeModeUsageEvent = Effect.fn("playground.codeModeUsage.capture")(
       metadata.request,
       eventTime,
     );
+    yield* Effect.annotateCurrentSpan({
+      operation: input.operation,
+      "sketchi.attempt_id": input.context.attemptId,
+      "sketchi.run_id": input.context.runId,
+      surface: input.surface,
+    });
     const writes: Array<Effect.Effect<void, CodeModeUsageCaptureError>> = [
       sendCodeModeUsageAnalytics(env, event, input.responseBody),
     ];
@@ -243,13 +265,43 @@ const captureCodeModeUsageEvent = Effect.fn("playground.codeModeUsage.capture")(
 
     const deferredCapture = Effect.yieldNow.pipe(
       Effect.andThen(Effect.all(writes, { concurrency: 2, discard: true })),
+      Effect.tap(() =>
+        recordMetric(usageCaptureWrites, 1, {
+          operation: input.operation,
+          outcome: "success",
+          surface: input.surface,
+        }),
+      ),
       Effect.catchTag("CodeModeUsageCaptureError", (error) =>
-        Effect.sync(() =>
-          console.warn("Sketchi Code Mode usage capture failed.", error.cause),
-        ),
+        Effect.gen(function* () {
+          yield* recordMetric(usageCaptureWrites, 1, {
+            failureCategory: error._tag,
+            operation: input.operation,
+            outcome: "failure",
+            sink: error.sink,
+            surface: input.surface,
+          });
+          yield* recordMetric(usageCaptureFailures, 1, {
+            failureCategory: error._tag,
+            operation: input.operation,
+            sink: error.sink,
+            surface: input.surface,
+          });
+          yield* Effect.logWarning("Code Mode usage capture failed", {
+            error_tag: error._tag,
+            operation: input.operation,
+            sink: error.sink,
+            surface: input.surface,
+          });
+        }),
       ),
     );
-    platform.waitUntil(deferredCapture);
+    platform.waitUntil(
+      withTelemetryCorrelation(deferredCapture, {
+        attemptId: input.context.attemptId,
+        runId: input.context.runId,
+      }),
+    );
   },
 );
 

@@ -1,4 +1,10 @@
 import { assert, describe, it } from "@effect/vitest";
+import {
+  makeTelemetryTestSink,
+  makeWorkersTelemetryLayer,
+  type TelemetryMetricEvent,
+  type TelemetrySpanEvent,
+} from "@sketchi/observability";
 import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 
 import {
@@ -116,6 +122,70 @@ function projectLayer(options: {
 
 describe("StudioProjects Effect service", () => {
   const bucket = new MemoryStudioObjectBucket();
+
+  it.effect("correlates persistence spans and typed boundary metrics", () => {
+    const { probe, sink } = makeTelemetryTestSink();
+    const telemetryLayer = makeWorkersTelemetryLayer({
+      resource: { serviceName: "sketchi-studio-test" },
+      sink,
+    });
+    return Effect.gen(function* () {
+      const projects = yield* StudioProjects;
+      const created = yield* projects.createFromArtifact({
+        artifactId: "artifact-telemetry",
+        session: owner,
+      });
+      const missing = yield* Effect.flip(
+        projects.getProject(owner, "proj_missing_telemetry"),
+      );
+      assert.strictEqual(missing._tag, "StudioNotFoundError");
+
+      const spans = probe.events.filter(
+        (event): event is TelemetrySpanEvent => event.event === "effect.span",
+      );
+      const metrics = probe.events.filter(
+        (event): event is TelemetryMetricEvent =>
+          event.event === "effect.metric",
+      );
+      assert.deepInclude(
+        spans.find(
+          (span) =>
+            span.name === "studioPersistence.projects.createFromArtifact",
+        )?.attributes,
+        { "sketchi.artifact_id": "artifact-telemetry" },
+      );
+      assert.deepInclude(
+        spans.find(
+          (span) =>
+            span.name === "studioPersistence.putJson" &&
+            span.attributes["sketchi.project_id"] === "proj_effecttest",
+        )?.attributes,
+        {
+          "sketchi.artifact_id": "artifact-telemetry",
+          "sketchi.project_id": "proj_effecttest",
+        },
+      );
+      assert.deepInclude(
+        spans.find(
+          (span) =>
+            span.name === "studioPersistence.projects.getProject" &&
+            span.outcome === "failure",
+        ),
+        { error_category: "StudioNotFoundError" },
+      );
+      assert.deepInclude(
+        metrics.find(
+          (metric) => metric.metric === "sketchi_studio_persistence_failures",
+        )?.attributes,
+        {
+          failure_category: "StudioNotFoundError",
+          operation: "getProject",
+          surface: "studio",
+        },
+      );
+      assert.strictEqual(created.project.id, "proj_effecttest");
+    }).pipe(Effect.provide(Layer.merge(projectLayer({}), telemetryLayer)));
+  });
 
   it.layer(projectLayer({ bucket }))("in-memory persistence", (it) => {
     it.effect("creates, reads, and lists through the service layer", () =>

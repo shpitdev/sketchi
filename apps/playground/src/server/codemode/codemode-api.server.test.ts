@@ -783,8 +783,16 @@ describe("Code Mode API handlers", () => {
       });
       await vi.waitFor(() => {
         expect(warning).toHaveBeenCalledWith(
-          "Sketchi Code Mode usage capture failed.",
-          expect.objectContaining({ message: "usage persistence unavailable" }),
+          expect.objectContaining({
+            event: "effect.log",
+            fields: expect.objectContaining({
+              error_tag: "CodeModeUsageCaptureError",
+              operation: "buildFlowchart",
+              sink: "artifacts",
+              surface: "api",
+            }),
+            message: "Code Mode usage capture failed",
+          }),
         );
       });
     } finally {

@@ -19,7 +19,12 @@ import {
   type RenderedDiagramScene,
   type ScenePoint,
 } from "@sketchi/diagram-renderer";
-import { Context, Effect, Layer, Schema } from "effect";
+import {
+  recordMetric,
+  withTelemetryCorrelation,
+  type TelemetryCorrelationInput,
+} from "@sketchi/observability";
+import { Clock, Context, Effect, Layer, Metric, Schema } from "effect";
 
 import {
   ARTIFACT_MIME_TYPES,
@@ -77,6 +82,25 @@ const MAX_MINDMAP_DEPTH = 8;
 const MAX_MINDMAP_TOPICS = 100;
 const MAX_INPUT_ISSUES = 20;
 
+const codeModeRequests = Metric.counter("sketchi_codemode_requests", {
+  description: "Code Mode boundary requests by terminal outcome",
+  incremental: true,
+});
+const codeModeFailures = Metric.counter("sketchi_codemode_failures", {
+  description: "Code Mode boundary failures by typed status",
+  incremental: true,
+});
+const codeModeArtifacts = Metric.counter("sketchi_codemode_artifacts", {
+  description: "Code Mode artifacts accepted at workflow boundaries",
+  incremental: true,
+});
+const codeModeDuration = Metric.histogram("sketchi_codemode_duration_ms", {
+  description: "Code Mode boundary duration in milliseconds",
+  boundaries: Metric.boundariesFromIterable([
+    1, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000,
+  ]),
+});
+
 export interface CodeModeRuntimeOptions {
   createId?: (prefix: string) => string;
   renderer?: CodeModeArtifactRenderer;
@@ -111,6 +135,88 @@ function unknownRecord(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? Object.fromEntries(Object.entries(value))
     : undefined;
+}
+
+type CodeModeBoundaryOperation =
+  | "applyDiagramPatch"
+  | "buildFlowchart"
+  | "buildMindmap"
+  | "getArtifact";
+
+interface ObservableCodeModeResult {
+  readonly ok: boolean;
+  readonly status?: string;
+}
+
+function codeModeCorrelation(input: unknown): TelemetryCorrelationInput {
+  const record = unknownRecord(input);
+  const source = unknownRecord(record?.["source"]);
+  const artifactId =
+    typeof record?.["artifactId"] === "string"
+      ? record["artifactId"]
+      : typeof source?.["artifactId"] === "string"
+        ? source["artifactId"]
+        : undefined;
+  const requestId =
+    typeof record?.["requestId"] === "string" ? record["requestId"] : undefined;
+  return {
+    ...(artifactId ? { artifactId } : {}),
+    ...(requestId ? { requestId } : {}),
+  };
+}
+
+function artifactKindForOperation(
+  operation: CodeModeBoundaryOperation,
+): string | undefined {
+  if (operation === "buildFlowchart") return "flowchart";
+  if (operation === "buildMindmap") return "mindmap";
+  if (operation === "applyDiagramPatch") return "patch";
+  return undefined;
+}
+
+function observeCodeModeBoundary<A extends ObservableCodeModeResult, R>(
+  operation: CodeModeBoundaryOperation,
+  input: unknown,
+  effect: Effect.Effect<A, never, R>,
+): Effect.Effect<A, never, R> {
+  const observed = Effect.gen(function* () {
+    const startedAt = yield* Clock.currentTimeMillis;
+    const result = yield* effect;
+    const finishedAt = yield* Clock.currentTimeMillis;
+    const outcome = result.ok ? "success" : "failure";
+    const failureCategory = result.ok
+      ? undefined
+      : (result.status ?? "unknown_failure");
+    yield* recordMetric(codeModeRequests, 1, {
+      ...(failureCategory ? { failureCategory } : {}),
+      operation,
+      outcome,
+      surface: "code_mode",
+    });
+    yield* recordMetric(codeModeDuration, finishedAt - startedAt, {
+      ...(failureCategory ? { failureCategory } : {}),
+      operation,
+      outcome,
+      surface: "code_mode",
+    });
+    if (failureCategory) {
+      yield* recordMetric(codeModeFailures, 1, {
+        failureCategory,
+        operation,
+        surface: "code_mode",
+      });
+    }
+    const artifactKind = artifactKindForOperation(operation);
+    if (result.ok && artifactKind) {
+      yield* recordMetric(codeModeArtifacts, 1, {
+        artifactKind,
+        operation,
+        surface: "code_mode",
+      });
+    }
+    return result;
+  });
+  return withTelemetryCorrelation(observed, codeModeCorrelation(input));
 }
 
 function preflightMindmapInput(input: unknown): CodeModeIssue[] {
@@ -1628,7 +1734,9 @@ function storageFailureIssue(
 
 const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
   function* (input: unknown) {
-    const preflightIssues = preflightMindmapInput(input);
+    const preflightIssues = yield* Effect.sync(() =>
+      preflightMindmapInput(input),
+    ).pipe(Effect.withSpan("codeMode.buildMindmap.preflight"));
     if (preflightIssues.length > 0) {
       return yield* new BuildMindmapFailure({
         status: "invalid_mindmap",
@@ -1636,7 +1744,9 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
       });
     }
 
-    const parsed = BuildMindmapRequestSchema.safeParse(input);
+    const parsed = yield* Effect.sync(() =>
+      BuildMindmapRequestSchema.safeParse(input),
+    ).pipe(Effect.withSpan("codeMode.buildMindmap.parse"));
     if (!parsed.success) {
       return yield* new BuildMindmapFailure({
         status: "invalid_input",
@@ -1648,13 +1758,17 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
     const store = yield* CodeModeArtifactStorage;
     const request = parsed.data;
     const buildId = yield* Effect.sync(() => environment.createId("build"));
-    const normalizedSpec = normalizeMindmapSpec(request.spec);
+    const normalizedSpec = yield* Effect.sync(() =>
+      normalizeMindmapSpec(request.spec),
+    ).pipe(Effect.withSpan("codeMode.buildMindmap.normalize"));
     const baseContext = {
       buildId,
       ...responseRequestId(request.requestId),
       normalizedSpec,
     };
-    const validationIssues = validateNormalizedMindmap(normalizedSpec);
+    const validationIssues = yield* Effect.sync(() =>
+      validateNormalizedMindmap(normalizedSpec),
+    ).pipe(Effect.withSpan("codeMode.buildMindmap.validate"));
     if (validationIssues.length > 0) {
       return yield* new BuildMindmapFailure({
         status: "invalid_mindmap",
@@ -1683,11 +1797,13 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
             ],
           },
         }),
-    });
-    const quality = mindmapQuality(
-      diagram,
-      request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-    );
+    }).pipe(Effect.withSpan("codeMode.buildMindmap.canonicalize"));
+    const quality = yield* Effect.sync(() =>
+      mindmapQuality(
+        diagram,
+        request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+      ),
+    ).pipe(Effect.withSpan("codeMode.buildMindmap.quality"));
     const qualityContext = { ...baseContext, quality };
     if (!quality.accepted) {
       return yield* new BuildMindmapFailure({
@@ -1717,9 +1833,14 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
             ],
           },
         }),
-    });
-    const excalidraw = convertSceneToExcalidraw(scene);
-    const exportValidation = validateExcalidrawScene(excalidraw);
+    }).pipe(Effect.withSpan("codeMode.buildMindmap.render"));
+    const { excalidraw, exportValidation } = yield* Effect.sync(() => {
+      const excalidrawScene = convertSceneToExcalidraw(scene);
+      return {
+        excalidraw: excalidrawScene,
+        exportValidation: validateExcalidrawScene(excalidrawScene),
+      };
+    }).pipe(Effect.withSpan("codeMode.buildMindmap.exportValidate"));
     const exportContext = {
       ...qualityContext,
       partial: scenePartial(scene),
@@ -1754,26 +1875,30 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
     const artifactId = yield* Effect.sync(() =>
       environment.createId("artifact"),
     );
-    const artifact = yield* store
-      .write({
+    const artifact = yield* withTelemetryCorrelation(
+      store.write({
         artifactId,
         diagramId: scene.diagramId,
         formats: storedFormats,
         inlineFormats: requestedInlineFormats(request.options),
-      })
-      .pipe(
-        Effect.mapError(
-          (error) =>
-            new BuildMindmapFailure({
-              status: "storage_failed",
-              context: {
-                ...qualityContext,
-                partial: { diagramId: scene.diagramId },
-                issues: [storageFailureIssue(error, "storage_write_failed")],
-              },
-            }),
-        ),
-      );
+      }),
+      {
+        artifactId,
+        ...(request.requestId ? { requestId: request.requestId } : {}),
+      },
+    ).pipe(
+      Effect.mapError(
+        (error) =>
+          new BuildMindmapFailure({
+            status: "storage_failed",
+            context: {
+              ...qualityContext,
+              partial: { diagramId: scene.diagramId },
+              issues: [storageFailureIssue(error, "storage_write_failed")],
+            },
+          }),
+      ),
+    );
 
     return {
       ok: true,
@@ -1790,7 +1915,9 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
 
 const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
   function* (input: unknown) {
-    const parsed = BuildFlowchartRequestSchema.safeParse(input);
+    const parsed = yield* Effect.sync(() =>
+      BuildFlowchartRequestSchema.safeParse(input),
+    ).pipe(Effect.withSpan("codeMode.buildFlowchart.parse"));
     if (!parsed.success) {
       return yield* new BuildFlowchartFailure({
         status: "invalid_input",
@@ -1803,15 +1930,17 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
     const request = parsed.data;
     const formats = requestedFormats(request.options);
     const buildId = yield* Effect.sync(() => environment.createId("build"));
-    const normalizedSpec = normalizeFlowchartSpec(request.spec);
+    const normalizedSpec = yield* Effect.sync(() =>
+      normalizeFlowchartSpec(request.spec),
+    ).pipe(Effect.withSpan("codeMode.buildFlowchart.normalize"));
     const baseContext = {
       buildId,
       ...responseRequestId(request.requestId),
       normalizedSpec,
     };
-    const parsedDiagram = FlowchartDiagramSchema.safeParse(
-      flowchartDiagramInput(normalizedSpec),
-    );
+    const parsedDiagram = yield* Effect.sync(() =>
+      FlowchartDiagramSchema.safeParse(flowchartDiagramInput(normalizedSpec)),
+    ).pipe(Effect.withSpan("codeMode.buildFlowchart.parseCanonical"));
     if (!parsedDiagram.success) {
       return yield* new BuildFlowchartFailure({
         status: "invalid_flowchart",
@@ -1822,19 +1951,25 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
       });
     }
     const diagram = parsedDiagram.data;
-    const validationIssues = canonicalFlowchartIssues(diagram);
+    const validationIssues = yield* Effect.sync(() =>
+      canonicalFlowchartIssues(diagram),
+    ).pipe(Effect.withSpan("codeMode.buildFlowchart.validate"));
     if (validationIssues.length > 0) {
       return yield* new BuildFlowchartFailure({
         status: "invalid_flowchart",
         context: { ...baseContext, issues: validationIssues },
       });
     }
-    validateFlowchartDiagram(diagram);
-
-    const quality = assessFlowchartQuality(
-      diagram,
-      request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+    yield* Effect.sync(() => validateFlowchartDiagram(diagram)).pipe(
+      Effect.withSpan("codeMode.buildFlowchart.assertValid"),
     );
+
+    const quality = yield* Effect.sync(() =>
+      assessFlowchartQuality(
+        diagram,
+        request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+      ),
+    ).pipe(Effect.withSpan("codeMode.buildFlowchart.quality"));
     const qualityContext = { ...baseContext, quality };
     if (!quality.accepted) {
       return yield* new BuildFlowchartFailure({
@@ -1864,9 +1999,14 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
             ],
           },
         }),
-    });
-    const excalidraw = convertSceneToExcalidraw(scene);
-    const validation = validateExcalidrawScene(excalidraw);
+    }).pipe(Effect.withSpan("codeMode.buildFlowchart.render"));
+    const { excalidraw, validation } = yield* Effect.sync(() => {
+      const excalidrawScene = convertSceneToExcalidraw(scene);
+      return {
+        excalidraw: excalidrawScene,
+        validation: validateExcalidrawScene(excalidrawScene),
+      };
+    }).pipe(Effect.withSpan("codeMode.buildFlowchart.exportValidate"));
     const exportContext = {
       ...qualityContext,
       partial: scenePartial(scene),
@@ -1901,25 +2041,29 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
     const artifactId = yield* Effect.sync(() =>
       environment.createId("artifact"),
     );
-    const artifact = yield* store
-      .write({
+    const artifact = yield* withTelemetryCorrelation(
+      store.write({
         artifactId,
         diagramId: scene.diagramId,
         formats: storedFormats,
         inlineFormats: requestedInlineFormats(request.options),
-      })
-      .pipe(
-        Effect.mapError(
-          (error) =>
-            new BuildFlowchartFailure({
-              status: "storage_failed",
-              context: {
-                ...qualityContext,
-                issues: [storageFailureIssue(error, "storage_write_failed")],
-              },
-            }),
-        ),
-      );
+      }),
+      {
+        artifactId,
+        ...(request.requestId ? { requestId: request.requestId } : {}),
+      },
+    ).pipe(
+      Effect.mapError(
+        (error) =>
+          new BuildFlowchartFailure({
+            status: "storage_failed",
+            context: {
+              ...qualityContext,
+              issues: [storageFailureIssue(error, "storage_write_failed")],
+            },
+          }),
+      ),
+    );
 
     return {
       ok: true,
@@ -1936,7 +2080,9 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
 
 const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(
   function* (input: unknown) {
-    const parsed = GetArtifactRequestSchema.safeParse(input);
+    const parsed = yield* Effect.sync(() =>
+      GetArtifactRequestSchema.safeParse(input),
+    ).pipe(Effect.withSpan("codeMode.getArtifact.parse"));
     if (!parsed.success) {
       return yield* new GetArtifactFailure({
         status: "invalid_input",
@@ -2037,7 +2183,9 @@ const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(
 const applyDiagramPatchWorkflow = Effect.fn(
   "codeMode.applyDiagramPatch.workflow",
 )(function* (input: unknown) {
-  const parsed = ApplyDiagramPatchRequestSchema.safeParse(input);
+  const parsed = yield* Effect.sync(() =>
+    ApplyDiagramPatchRequestSchema.safeParse(input),
+  ).pipe(Effect.withSpan("codeMode.applyDiagramPatch.parse"));
   if (!parsed.success) {
     return yield* new ApplyDiagramPatchFailure({
       status: "invalid_input",
@@ -2071,17 +2219,21 @@ const applyDiagramPatchWorkflow = Effect.fn(
   };
   const scene = source.scene;
   const beforeConnectivity = sourceConnectivity(scene);
-  for (const operation of request.operations) {
-    const operationIssues = applyPatchOperation(scene, operation);
-    if (operationIssues.length > 0) {
-      return yield* new ApplyDiagramPatchFailure({
-        status:
-          operationIssues[0]?.code === "unknown_patch_target"
-            ? "target_not_found"
-            : "unsupported_operation",
-        context: { ...sourceContext, issues: operationIssues },
-      });
+  const patchIssues = yield* Effect.sync(() => {
+    for (const operation of request.operations) {
+      const operationIssues = applyPatchOperation(scene, operation);
+      if (operationIssues.length > 0) return operationIssues;
     }
+    return [];
+  }).pipe(Effect.withSpan("codeMode.applyDiagramPatch.operations"));
+  if (patchIssues.length > 0) {
+    return yield* new ApplyDiagramPatchFailure({
+      status:
+        patchIssues[0]?.code === "unknown_patch_target"
+          ? "target_not_found"
+          : "unsupported_operation",
+      context: { ...sourceContext, issues: patchIssues },
+    });
   }
 
   if (request.options?.preserveConnectivity !== false) {
@@ -2105,7 +2257,9 @@ const applyDiagramPatchWorkflow = Effect.fn(
     }
   }
 
-  const renderedScene = normalizePatchableScene(scene);
+  const renderedScene = yield* Effect.sync(() =>
+    normalizePatchableScene(scene),
+  ).pipe(Effect.withSpan("codeMode.applyDiagramPatch.normalize"));
   if (!renderedScene) {
     return yield* new ApplyDiagramPatchFailure({
       status: "render_failed",
@@ -2124,8 +2278,13 @@ const applyDiagramPatchWorkflow = Effect.fn(
     });
   }
 
-  const excalidraw = convertSceneToExcalidraw(renderedScene);
-  const validation = validateExcalidrawScene(excalidraw);
+  const { excalidraw, validation } = yield* Effect.sync(() => {
+    const excalidrawScene = convertSceneToExcalidraw(renderedScene);
+    return {
+      excalidraw: excalidrawScene,
+      validation: validateExcalidrawScene(excalidrawScene),
+    };
+  }).pipe(Effect.withSpan("codeMode.applyDiagramPatch.exportValidate"));
   const exportContext = {
     ...sourceContext,
     partial: scenePartial(renderedScene),
@@ -2152,8 +2311,8 @@ const applyDiagramPatchWorkflow = Effect.fn(
     ),
   );
   const artifactId = yield* Effect.sync(() => environment.createId("artifact"));
-  const artifact = yield* store
-    .write({
+  const artifact = yield* withTelemetryCorrelation(
+    store.write({
       artifactId,
       diagramId: renderedScene.diagramId,
       formats: storedFormats,
@@ -2161,19 +2320,23 @@ const applyDiagramPatchWorkflow = Effect.fn(
       ...(source.sourceArtifactId
         ? { provenance: { sourceArtifactId: source.sourceArtifactId } }
         : {}),
-    })
-    .pipe(
-      Effect.mapError(
-        (error) =>
-          new ApplyDiagramPatchFailure({
-            status: "storage_failed",
-            context: {
-              ...sourceContext,
-              issues: [storageFailureIssue(error, "storage_write_failed")],
-            },
-          }),
-      ),
-    );
+    }),
+    {
+      artifactId,
+      ...(request.requestId ? { requestId: request.requestId } : {}),
+    },
+  ).pipe(
+    Effect.mapError(
+      (error) =>
+        new ApplyDiagramPatchFailure({
+          status: "storage_failed",
+          context: {
+            ...sourceContext,
+            issues: [storageFailureIssue(error, "storage_write_failed")],
+          },
+        }),
+    ),
+  );
 
   return {
     ok: true,
@@ -2211,9 +2374,13 @@ export const buildFlowchart: (
 ) => CodeModeWorkflowEffect<BuildFlowchartResult> = Effect.fn(
   "codeMode.buildFlowchart",
 )((input: unknown) =>
-  codeModeResultBoundary(
-    buildFlowchartWorkflow(input),
-    buildFlowchartFailureResult,
+  observeCodeModeBoundary(
+    "buildFlowchart",
+    input,
+    codeModeResultBoundary(
+      buildFlowchartWorkflow(input),
+      buildFlowchartFailureResult,
+    ),
   ),
 );
 
@@ -2222,9 +2389,13 @@ export const buildMindmap: (
 ) => CodeModeWorkflowEffect<BuildMindmapResult> = Effect.fn(
   "codeMode.buildMindmap",
 )((input: unknown) =>
-  codeModeResultBoundary(
-    buildMindmapWorkflow(input),
-    buildMindmapFailureResult,
+  observeCodeModeBoundary(
+    "buildMindmap",
+    input,
+    codeModeResultBoundary(
+      buildMindmapWorkflow(input),
+      buildMindmapFailureResult,
+    ),
   ),
 );
 
@@ -2233,7 +2404,14 @@ export const getArtifact: (
 ) => CodeModeWorkflowEffect<GetArtifactResult> = Effect.fn(
   "codeMode.getArtifact",
 )((input: unknown) =>
-  codeModeResultBoundary(getArtifactWorkflow(input), getArtifactFailureResult),
+  observeCodeModeBoundary(
+    "getArtifact",
+    input,
+    codeModeResultBoundary(
+      getArtifactWorkflow(input),
+      getArtifactFailureResult,
+    ),
+  ),
 );
 
 export const applyDiagramPatch: (
@@ -2241,8 +2419,12 @@ export const applyDiagramPatch: (
 ) => CodeModeWorkflowEffect<ApplyDiagramPatchResult> = Effect.fn(
   "codeMode.applyDiagramPatch",
 )((input: unknown) =>
-  codeModeResultBoundary(
-    applyDiagramPatchWorkflow(input),
-    applyDiagramPatchFailureResult,
+  observeCodeModeBoundary(
+    "applyDiagramPatch",
+    input,
+    codeModeResultBoundary(
+      applyDiagramPatchWorkflow(input),
+      applyDiagramPatchFailureResult,
+    ),
   ),
 );

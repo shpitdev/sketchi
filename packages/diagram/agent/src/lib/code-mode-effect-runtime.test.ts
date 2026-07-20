@@ -1,4 +1,10 @@
-import { assert, layer } from "@effect/vitest";
+import { assert, describe, it, layer } from "@effect/vitest";
+import {
+  makeTelemetryTestSink,
+  makeWorkersTelemetryLayer,
+  type TelemetryMetricEvent,
+  type TelemetrySpanEvent,
+} from "@sketchi/observability";
 import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 import { FastCheck } from "effect/testing";
 
@@ -29,6 +35,70 @@ const runtimeLayer = Layer.mergeAll(
     },
   }),
 );
+
+describe("Code Mode telemetry", () => {
+  it.effect(
+    "records bounded stage spans, correlation, and boundary metrics",
+    () => {
+      const { probe, sink } = makeTelemetryTestSink();
+      const telemetryLayer = makeWorkersTelemetryLayer({
+        resource: { serviceName: "sketchi-codemode-test" },
+        sink,
+      });
+
+      return Effect.gen(function* () {
+        const result = yield* buildFlowchart({
+          requestId: "request-effect-telemetry",
+          spec: {
+            title: "Simple approval flow",
+            nodes: [
+              { id: "request", label: "Request arrives", kind: "start" },
+              { id: "approve", label: "Approved?", kind: "decision" },
+              { id: "done", label: "Done", kind: "end" },
+              { id: "revise", label: "Revise", kind: "end" },
+            ],
+            edges: [
+              { source: "request", target: "approve" },
+              { source: "approve", target: "done", label: "yes" },
+              { source: "approve", target: "revise", label: "no" },
+            ],
+            layout: { direction: "TB" },
+          },
+        });
+        assert.isTrue(result.ok);
+
+        const spans = probe.events.filter(
+          (event): event is TelemetrySpanEvent => event.event === "effect.span",
+        );
+        const metrics = probe.events.filter(
+          (event): event is TelemetryMetricEvent =>
+            event.event === "effect.metric",
+        );
+        assert.deepInclude(
+          spans.find(
+            (span) => span.name === "codeMode.buildFlowchart.normalize",
+          )?.attributes,
+          { "sketchi.request_id": "request-effect-telemetry" },
+        );
+        assert.deepInclude(
+          metrics.find(
+            (metric) => metric.metric === "sketchi_codemode_requests",
+          )?.attributes,
+          {
+            operation: "buildFlowchart",
+            outcome: "success",
+            surface: "code_mode",
+          },
+        );
+        assert.isTrue(
+          metrics.some(
+            (metric) => metric.metric === "sketchi_codemode_artifacts",
+          ),
+        );
+      }).pipe(Effect.provide(Layer.merge(runtimeLayer, telemetryLayer)));
+    },
+  );
+});
 
 layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
   it.effect("preserves golden request encoding and failure output", () =>

@@ -1,5 +1,5 @@
 {
-  "name": "@sketchi/diagram-generation",
+  "name": "@sketchi/observability",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -11,8 +11,6 @@
     }
   },
   "dependencies": {
-    "@sketchi/diagram-core": "workspace:*",
-    "@sketchi/observability": "workspace:*",
     "effect": "4.0.0-beta.99",
     "tslib": "^2.3.0"
   }

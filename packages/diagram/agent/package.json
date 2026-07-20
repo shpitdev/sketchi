@@ -15,6 +15,7 @@
     "@sketchi/diagram-core": "workspace:*",
     "@sketchi/diagram-excalidraw": "workspace:*",
     "@sketchi/diagram-renderer": "workspace:*",
+    "@sketchi/observability": "workspace:*",
     "effect": "4.0.0-beta.99",
     "tslib": "^2.3.0"
   }

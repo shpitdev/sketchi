@@ -27,6 +27,7 @@ const intendedNxProjectRoots = [
   "packages/diagram/renderer",
   "packages/diagram/scenarios",
   "packages/diagram/ui",
+  "packages/observability",
   "packages/studio/projects",
   "packages/svg-excalidraw",
   "tools/sketchi-generators",
@@ -41,6 +42,7 @@ const effectAuthoritativeProjectRoots = [
   "packages/diagram/agent",
   "packages/diagram/generation",
   "packages/diagram/scenarios",
+  "packages/observability",
   "packages/studio/projects",
 ];
 const effectPureProjectRoots = [
@@ -77,6 +79,7 @@ const intendedCompositeReferences = [
   "packages/diagram/renderer/tsconfig.lib.json",
   "packages/diagram/scenarios/tsconfig.lib.json",
   "packages/diagram/ui/tsconfig.lib.json",
+  "packages/observability/tsconfig.lib.json",
   "packages/studio/projects/tsconfig.lib.json",
   "packages/svg-excalidraw/tsconfig.lib.json",
   "tools/sketchi-generators/tsconfig.lib.json",

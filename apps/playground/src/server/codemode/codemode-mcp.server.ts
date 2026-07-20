@@ -1,6 +1,10 @@
 import "@tanstack/react-start/server-only";
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import {
+  withTelemetryCorrelation,
+  type TelemetryCorrelationInput,
+} from "@sketchi/observability";
 import { Context, Effect, Schema } from "effect";
 
 import {
@@ -403,7 +407,10 @@ export const executeSketchiCodeMode = Effect.fn(
     const execution = yield* Effect.tryPromise({
       try: () =>
         executor.execute(normalizeSketchiExecuteCode(parsed.code), [
-          makeSketchiCodeModeProvider(codeMode, runToolEffect),
+          makeSketchiCodeModeProvider(codeMode, runToolEffect, {
+            attemptId: usageContext.attemptId,
+            runId: usageContext.runId,
+          }),
         ]),
       catch: (cause) =>
         CodeModeExecutionError.make({
@@ -446,6 +453,11 @@ export const executeSketchiCodeMode = Effect.fn(
         logs: [] as string[],
       }),
     ),
+    (executionEffect) =>
+      withTelemetryCorrelation(executionEffect, {
+        attemptId: usageContext.attemptId,
+        runId: usageContext.runId,
+      }),
   );
   const finishedAt = yield* clock.nowMillis;
   yield* usage.capture({
@@ -462,16 +474,33 @@ export const executeSketchiCodeMode = Effect.fn(
 export function makeSketchiCodeModeProvider(
   codeMode: Context.Service.Shape<typeof PlaygroundCodeMode>,
   runToolEffect: PlaygroundRequestRunner,
+  correlation: TelemetryCorrelationInput = {},
 ): SketchiCodeModeProvider {
   return {
     name: "sketchi",
     fns: {
       buildFlowchart: (request) =>
-        runToolEffect(codeMode.buildFlowchart(request)),
-      buildMindmap: (request) => runToolEffect(codeMode.buildMindmap(request)),
-      getArtifact: (request) => runToolEffect(codeMode.getArtifact(request)),
+        runToolEffect(
+          withTelemetryCorrelation(
+            codeMode.buildFlowchart(request),
+            correlation,
+          ),
+        ),
+      buildMindmap: (request) =>
+        runToolEffect(
+          withTelemetryCorrelation(codeMode.buildMindmap(request), correlation),
+        ),
+      getArtifact: (request) =>
+        runToolEffect(
+          withTelemetryCorrelation(codeMode.getArtifact(request), correlation),
+        ),
       applyDiagramPatch: (request) =>
-        runToolEffect(codeMode.applyDiagramPatch(request)),
+        runToolEffect(
+          withTelemetryCorrelation(
+            codeMode.applyDiagramPatch(request),
+            correlation,
+          ),
+        ),
     },
   };
 }

@@ -12,6 +12,7 @@ import {
   createExcalidrawFile,
   type ExcalidrawScene,
 } from "@sketchi/diagram-excalidraw";
+import { withTelemetryCorrelation } from "@sketchi/observability";
 import { Effect, Schema } from "effect";
 
 import { PlaygroundClock } from "../runtime/playground-context.server";
@@ -346,7 +347,13 @@ export const handleBuildFlowchartRequest = Effect.fn(
       requestBody,
     ),
   );
-  const result = yield* codeMode.buildFlowchart(codeModeInput);
+  const result = yield* withTelemetryCorrelation(
+    codeMode.buildFlowchart(codeModeInput),
+    {
+      attemptId: usageContext.attemptId,
+      runId: usageContext.runId,
+    },
+  );
   const status = buildStatus(result);
   const finishedAt = yield* clock.nowMillis;
   yield* usage.capture({
@@ -403,7 +410,13 @@ export const handleBuildMindmapRequest = Effect.fn(
       requestBody,
     ),
   );
-  const result = yield* codeMode.buildMindmap(codeModeInput);
+  const result = yield* withTelemetryCorrelation(
+    codeMode.buildMindmap(codeModeInput),
+    {
+      attemptId: usageContext.attemptId,
+      runId: usageContext.runId,
+    },
+  );
   const status = mindmapBuildStatus(result);
   const finishedAt = yield* clock.nowMillis;
   yield* usage.capture({
@@ -541,7 +554,14 @@ export const handlePatchArtifactRequest = Effect.fn(
       routeInput,
     ),
   );
-  const result = yield* codeMode.applyDiagramPatch(input);
+  const result = yield* withTelemetryCorrelation(
+    codeMode.applyDiagramPatch(input),
+    {
+      artifactId,
+      attemptId: usageContext.attemptId,
+      runId: usageContext.runId,
+    },
+  );
   const status = patchStatus(result);
   const finishedAt = yield* clock.nowMillis;
 

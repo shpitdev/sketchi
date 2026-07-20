@@ -2,13 +2,10 @@
 
 Sketchi pins `effect` and `@effect/vitest` to `4.0.0-beta.99`. Effect owns
 effectful orchestration in `diagram-generation`, `diagram-agent`,
-`diagram-scenarios`, and `eval-harness`. Parsing, formatting, IR validation,
-rendering, React/TanStack surfaces, and generators stay pure or
+`diagram-scenarios`, `studio/projects`, `observability`, and the Worker runtime
+boundaries in `playground` and `eval-harness`. Parsing, formatting, IR
+validation, rendering, React/TanStack surfaces, and generators stay pure or
 framework-native.
-
-`packages/studio/projects` is migration-ready rather than Effect-forbidden.
-Issue #240 will introduce Effect at its persistence boundary while its pure
-data transformations remain ordinary TypeScript.
 
 ## Operations and observability
 
@@ -20,6 +17,25 @@ data transformations remain ordinary TypeScript.
   responses, credentials, or unbounded payloads.
 - Count work at boundaries (requests, upstream attempts, retries, failures), not
   inside pure helpers. Configure exporters at the application layer.
+- Correlation uses `withTelemetryCorrelation`; nested calls merge request,
+  run, attempt, scenario, project, and artifact identifiers through Effect
+  context and annotations. Correlation identifiers link events but are never
+  metric attributes.
+- Logs inside the Effect ring use `Effect.log*` with approved static messages
+  and allowlisted scalar fields. Do not log causes, prompts, artifacts, request
+  bodies, response bodies, or arbitrary object serialization.
+
+## Workers telemetry
+
+`@sketchi/observability` installs one tracer, logger, and isolated metric
+registry in an application-owned Effect scope. The live sink emits bounded JSON
+events to Workers Logs with Effect trace and span identifiers. Allocation and
+shutdown belong to the layer scope; the package performs no module-scope I/O,
+starts no timers, and owns no global mutable correlation state.
+
+The exporter complements Cloudflare surfaces. It does not change AI Gateway
+`collectLog`, Code Mode usage-event rows, Pipeline streams, R2 catalog targets,
+or R2 SQL verification queries.
 
 ## Services, layers, and runtimes
 

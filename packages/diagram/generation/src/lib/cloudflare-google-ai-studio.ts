@@ -1,9 +1,11 @@
+import { recordMetric, withTelemetryCorrelation } from "@sketchi/observability";
 import {
   Clock,
   Context,
   Effect,
   Layer,
   Metric,
+  Ref,
   Schedule,
   Schema,
 } from "effect";
@@ -98,7 +100,29 @@ function isTransientHttpStatus(status: number): boolean {
 const generationAttempts = Metric.counter("sketchi_generation_attempts", {
   description: "Diagram generation upstream attempts",
   incremental: true,
-}).pipe(Metric.withConstantInput(1));
+});
+const generationRequests = Metric.counter("sketchi_generation_requests", {
+  description: "Diagram generation requests by terminal outcome",
+  incremental: true,
+});
+const generationRetries = Metric.counter("sketchi_generation_retries", {
+  description: "Diagram generation retry attempts",
+  incremental: true,
+});
+const generationFailures = Metric.counter("sketchi_generation_failures", {
+  description: "Diagram generation terminal failures",
+  incremental: true,
+});
+const generationTimeouts = Metric.counter("sketchi_generation_timeouts", {
+  description: "Diagram generation upstream timeouts",
+  incremental: true,
+});
+const generationDuration = Metric.histogram("sketchi_generation_duration_ms", {
+  description: "Diagram generation request duration in milliseconds",
+  boundaries: Metric.boundariesFromIterable([
+    50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 30_000, 60_000,
+  ]),
+});
 
 const readResponse = Effect.fn("diagramGeneration.readResponse")(function* (
   response: Response,
@@ -163,7 +187,7 @@ const runGatewayAttempt = Effect.fn(
         provider: "cloudflare-google-ai-studio",
         retryable: true,
       }),
-  }).pipe(Effect.track(generationAttempts));
+  });
   const raw = yield* readResponse(response);
 
   if (!response.ok) {
@@ -222,63 +246,137 @@ export const CloudflareGoogleAiStudioClientLive = Layer.effect(
         request: DiagramGenerationRequest,
       ) {
         yield* Effect.annotateCurrentSpan({
-          cacheMode: request.cacheMode ?? "default",
+          cache_mode: request.cacheMode ?? "default",
           model: request.model,
           provider: "cloudflare-google-ai-studio",
-          scenarioId: request.prompt.id,
+          "sketchi.scenario_id": request.prompt.id,
         });
         const startedAt = yield* Clock.currentTimeMillis;
-        const gateway = yield* Effect.try({
-          try: () => ai.gateway(config.gatewayId),
-          catch: (cause) =>
-            DiagramGenerationTransportError.make({
-              cause,
-              message: errorMessage(
+        const operation = Effect.gen(function* () {
+          const gateway = yield* Effect.try({
+            try: () => ai.gateway(config.gatewayId),
+            catch: (cause) =>
+              DiagramGenerationTransportError.make({
                 cause,
-                "AI Gateway could not be initialized.",
-              ),
-              operation: "ai.gateway",
+                message: errorMessage(
+                  cause,
+                  "AI Gateway could not be initialized.",
+                ),
+                operation: "ai.gateway",
+                provider: "cloudflare-google-ai-studio",
+                retryable: false,
+              }),
+          });
+          const attemptRef = yield* Ref.make(0);
+          const previousErrorTagRef = yield* Ref.make("initial");
+          const attempt = Effect.gen(function* () {
+            const attemptNumber = yield* Ref.updateAndGet(
+              attemptRef,
+              (value) => value + 1,
+            );
+            yield* recordMetric(generationAttempts, 1, {
+              operation: "generate",
               provider: "cloudflare-google-ai-studio",
-              retryable: false,
-            }),
-        });
-        const candidate = yield* runGatewayAttempt(
-          gateway,
-          config.collectLog,
-          request,
-        ).pipe(
-          Effect.timeoutOrElse({
-            duration: policy.requestTimeoutMs,
-            orElse: () =>
-              Effect.fail(
-                DiagramGenerationTimeoutError.make({
-                  message: `Generation timed out after ${policy.requestTimeoutMs} ms.`,
-                  provider: "cloudflare-google-ai-studio",
-                  timeoutMs: policy.requestTimeoutMs,
-                }),
+            });
+            if (attemptNumber > 1) {
+              const previousErrorTag = yield* Ref.get(previousErrorTagRef);
+              yield* recordMetric(generationRetries, 1, {
+                operation: "generate",
+                provider: "cloudflare-google-ai-studio",
+                retryKind: "transient",
+              });
+              yield* Effect.logWarning("Retrying diagram generation", {
+                attempt: attemptNumber,
+                error_tag: previousErrorTag,
+                operation: "generate",
+                provider: "cloudflare-google-ai-studio",
+                retry_kind: "transient",
+              });
+            }
+            return yield* runGatewayAttempt(
+              gateway,
+              config.collectLog,
+              request,
+            ).pipe(
+              Effect.annotateSpans({ attempt: attemptNumber }),
+              Effect.timeoutOrElse({
+                duration: policy.requestTimeoutMs,
+                orElse: () =>
+                  Effect.fail(
+                    DiagramGenerationTimeoutError.make({
+                      message: `Generation timed out after ${policy.requestTimeoutMs} ms.`,
+                      provider: "cloudflare-google-ai-studio",
+                      timeoutMs: policy.requestTimeoutMs,
+                    }),
+                  ),
+              }),
+              Effect.tapError((error) =>
+                Ref.set(previousErrorTagRef, error._tag),
               ),
-          }),
-          Effect.tapError((error) =>
-            isRetryableGenerationError(error)
-              ? Effect.logWarning("Diagram generation attempt failed", {
-                  errorTag: error._tag,
-                  provider: "cloudflare-google-ai-studio",
-                  scenarioId: request.prompt.id,
-                })
-              : Effect.void,
+            );
+          });
+          const candidate = yield* attempt.pipe(
+            Effect.retry({
+              schedule: Schedule.exponential(policy.retryDelayMs),
+              times: policy.maxRetries,
+              while: isRetryableGenerationError,
+            }),
+          );
+          const finishedAt = yield* Clock.currentTimeMillis;
+          return {
+            ...candidate,
+            durationMs: Math.round(finishedAt - startedAt),
+          };
+        }).pipe(
+          Effect.tap((candidate) =>
+            Effect.all([
+              recordMetric(generationRequests, 1, {
+                operation: "generate",
+                outcome: "success",
+                provider: "cloudflare-google-ai-studio",
+              }),
+              recordMetric(generationDuration, candidate.durationMs, {
+                operation: "generate",
+                outcome: "success",
+                provider: "cloudflare-google-ai-studio",
+              }),
+            ]),
           ),
-          Effect.retry({
-            schedule: Schedule.exponential(policy.retryDelayMs),
-            times: policy.maxRetries,
-            while: isRetryableGenerationError,
-          }),
+          Effect.tapError((error) =>
+            Effect.gen(function* () {
+              const finishedAt = yield* Clock.currentTimeMillis;
+              const durationMs = Math.max(0, finishedAt - startedAt);
+              yield* recordMetric(generationRequests, 1, {
+                failureCategory: error._tag,
+                operation: "generate",
+                outcome: "failure",
+                provider: "cloudflare-google-ai-studio",
+              });
+              yield* recordMetric(generationFailures, 1, {
+                failureCategory: error._tag,
+                operation: "generate",
+                provider: "cloudflare-google-ai-studio",
+              });
+              yield* recordMetric(generationDuration, durationMs, {
+                failureCategory: error._tag,
+                operation: "generate",
+                outcome: "failure",
+                provider: "cloudflare-google-ai-studio",
+              });
+              if (error._tag === "DiagramGenerationTimeoutError") {
+                yield* recordMetric(generationTimeouts, 1, {
+                  operation: "generate",
+                  provider: "cloudflare-google-ai-studio",
+                  timeoutKind: "upstream",
+                });
+              }
+            }),
+          ),
         );
-        const finishedAt = yield* Clock.currentTimeMillis;
 
-        return {
-          ...candidate,
-          durationMs: Math.round(finishedAt - startedAt),
-        };
+        return yield* withTelemetryCorrelation(operation, {
+          scenarioId: request.prompt.id,
+        });
       }),
     };
   }),
