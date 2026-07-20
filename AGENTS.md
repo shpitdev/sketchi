@@ -16,11 +16,15 @@ Convex, Vercel, Bun, or Turborepo stack.
 
 - Use Codex `gpt-5.6-sol` for planning, implementation, and independent review,
   with reasoning effort set explicitly for the task.
-- Fable is advisory only and must never implement, edit files, delegate work,
-  commit, open or merge PRs, or perform any other mutation. Launch it with
-  read-only tools and `--permission-mode manual`; never use Plan Mode, auto
-  approval, or edit-capable tools. Its response is the only deliverable, and
-  agreement with that response is not authorization for Fable to execute it.
+- Fable may act as the primary delivery orchestrator from the canonical root.
+  In that role it may inspect repository and external state, maintain coordination
+  artifacts, create and clean Herdr worktrees, launch and steer agents, route
+  review findings, run proof, manage GitHub issues and Graphite PRs, merge green
+  slices, and verify main and production/runtime surfaces.
+- Keep implementation and independent review delegated to separate Codex
+  `gpt-5.6-sol` agents with explicit reasoning effort. Fable should remain the
+  coordinator and must not directly implement product/source/test changes or
+  substitute its own assessment for the required independent review.
 
 ## Proof
 
