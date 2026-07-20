@@ -31,6 +31,7 @@ import {
   STUDIO_BUILD_FLOWCHART_TOOL_DESCRIPTION,
   STUDIO_BUILD_FLOWCHART_TOOL_NAME,
   StudioBuildFlowchartInputSchema,
+  StudioBuildFlowchartOutputSchema,
   type StudioBuildFlowchartInput,
 } from "./studio-flowchart-tool.server";
 
@@ -128,6 +129,7 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(
             [STUDIO_BUILD_FLOWCHART_TOOL_NAME]: tool({
               description: STUDIO_BUILD_FLOWCHART_TOOL_DESCRIPTION,
               inputSchema: StudioBuildFlowchartInputSchema,
+              outputSchema: StudioBuildFlowchartOutputSchema,
               execute: makeStudioFlowchartToolCallback(
                 executor,
                 callbacks.runPromise,

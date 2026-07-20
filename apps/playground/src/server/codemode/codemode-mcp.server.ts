@@ -1,8 +1,7 @@
 import "@tanstack/react-start/server-only";
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { Context, Effect, Schema } from "effect";
-import { z } from "zod";
 
 import {
   PlaygroundBindings,
@@ -14,6 +13,7 @@ import {
   PlaygroundRequestCallbacks,
   type PlaygroundRequestRunner,
 } from "../runtime/playground-runtime.server";
+import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 import { PlaygroundCodeMode } from "./codemode-service.server";
 import {
   CodeModeDocsRequestSchema,
@@ -25,6 +25,10 @@ import {
   SKETCHI_CODE_MODE_TYPES,
   SKETCHI_CODE_MODE_VERSION,
 } from "./codemode-mcp-docs.server";
+import {
+  createEffectMcpServer,
+  defineEffectMcpTool,
+} from "./effect-mcp-adapter.server";
 import { PlaygroundCodeModeUsage } from "./codemode-usage-events.server";
 
 export interface SketchiCodeModeProvider {
@@ -60,65 +64,53 @@ type McpHttpHandler = (
   ctx: MinimalExecutionContext,
 ) => Promise<Response>;
 
-const ExecuteRequestSchema = z.object({
-  code: z.string().min(1),
-});
-
-const ExecuteArtifactDeliverySchema = z.object({
-  artifactId: z.string(),
-  diagramId: z.string().optional(),
-  excalidrawUrl: z.string().optional(),
-  finalResponseInstruction: z.string(),
-  finalResponseText: z.string(),
-  formats: z.array(
-    z.object({
-      expiresAt: z.string().optional(),
-      format: z.string(),
-      mimeType: z.string().optional(),
-      sizeBytes: z.number().optional(),
-      url: z.string().optional(),
+const ExecuteRequestContract = Schema.Struct({
+  code: Schema.String.check(
+    Schema.isMinLength(1, {
+      message: "Too small: expected string to have >=1 characters",
     }),
   ),
-  pngUrl: z.string().optional(),
-  sceneUrl: z.string().optional(),
+});
+export const ExecuteRequestSchema = toPlaygroundStandardSchema(
+  ExecuteRequestContract,
+);
+
+const ExecuteArtifactDeliveryContract = Schema.Struct({
+  artifactId: Schema.String,
+  diagramId: Schema.optionalKey(Schema.String),
+  excalidrawUrl: Schema.optionalKey(Schema.String),
+  finalResponseInstruction: Schema.String,
+  finalResponseText: Schema.String,
+  formats: Schema.Array(
+    Schema.Struct({
+      expiresAt: Schema.optionalKey(Schema.String),
+      format: Schema.String,
+      mimeType: Schema.optionalKey(Schema.String),
+      sizeBytes: Schema.optionalKey(Schema.Finite),
+      url: Schema.optionalKey(Schema.String),
+    }),
+  ).pipe(Schema.mutable),
+  pngUrl: Schema.optionalKey(Schema.String),
+  sceneUrl: Schema.optionalKey(Schema.String),
 });
 
-const ExecuteResultSchema = z.object({
-  artifactDelivery: ExecuteArtifactDeliverySchema.optional(),
-  finalResponseText: z.string().optional(),
-  ok: z.boolean(),
-  result: z.unknown().optional(),
-  error: z.string().optional(),
-  logs: z.array(z.string()).optional(),
+const ExecuteResultContract = Schema.Struct({
+  artifactDelivery: Schema.optionalKey(ExecuteArtifactDeliveryContract),
+  finalResponseText: Schema.optionalKey(Schema.String),
+  ok: Schema.Boolean,
+  result: Schema.optionalKey(Schema.Unknown),
+  error: Schema.optionalKey(Schema.String),
+  logs: Schema.optionalKey(Schema.Array(Schema.String).pipe(Schema.mutable)),
 });
+export const ExecuteResultSchema = toPlaygroundStandardSchema(
+  ExecuteResultContract,
+);
 
-interface ArtifactDelivery {
-  artifactId: string;
-  diagramId?: string;
-  excalidrawUrl?: string;
-  finalResponseInstruction: string;
-  finalResponseText: string;
-  formats: ArtifactDeliveryFormat[];
-  pngUrl?: string;
-  sceneUrl?: string;
-}
+type ArtifactDelivery = typeof ExecuteArtifactDeliveryContract.Type;
+type ArtifactDeliveryFormat = ArtifactDelivery["formats"][number];
 
-interface ArtifactDeliveryFormat {
-  expiresAt?: string;
-  format: string;
-  mimeType?: string;
-  sizeBytes?: number;
-  url?: string;
-}
-
-export interface SketchiCodeModeExecuteOutput extends Record<string, unknown> {
-  artifactDelivery?: ArtifactDelivery;
-  finalResponseText?: string;
-  ok: boolean;
-  result?: unknown;
-  error?: string;
-  logs?: string[];
-}
+export type SketchiCodeModeExecuteOutput = typeof ExecuteResultContract.Type &
+  Record<string, unknown>;
 
 function stripCodeFence(code: string): string {
   const match = code.match(
@@ -398,7 +390,7 @@ export const executeSketchiCodeMode = Effect.fn(
 
   const executed = yield* Effect.gen(function* () {
     const parsed = yield* Effect.try({
-      try: () => ExecuteRequestSchema.parse(input),
+      try: () => Schema.decodeUnknownSync(ExecuteRequestContract)(input),
       catch: (cause) =>
         CodeModeExecutionError.make({
           cause,
@@ -487,13 +479,8 @@ export function makeSketchiCodeModeProvider(
 export function createSketchiMcpServer(
   runToolEffect: PlaygroundRequestRunner,
   options: CodeModeMcpOptions = {},
-): McpServer {
-  const server = new McpServer({
-    name: "sketchi-code-mode",
-    version: SKETCHI_CODE_MODE_VERSION,
-  });
-
-  server.registerTool(
+): Server {
+  const docs = defineEffectMcpTool(
     "docs",
     {
       title: "Sketchi Code Mode docs",
@@ -509,7 +496,7 @@ export function createSketchiMcpServer(
     (input) => jsonResult(getCodeModeDocs(input)),
   );
 
-  server.registerTool(
+  const search = defineEffectMcpTool(
     "search",
     {
       title: "Search Sketchi Code Mode docs",
@@ -525,7 +512,7 @@ export function createSketchiMcpServer(
     (input) => jsonResult(searchCodeModeDocs(input)),
   );
 
-  server.registerTool(
+  const execute = defineEffectMcpTool(
     "execute",
     {
       title: "Execute Sketchi Code Mode",
@@ -561,7 +548,11 @@ export function createSketchiMcpServer(
       ),
   );
 
-  return server;
+  return createEffectMcpServer({
+    name: "sketchi-code-mode",
+    tools: [docs, search, execute],
+    version: SKETCHI_CODE_MODE_VERSION,
+  });
 }
 
 function createExecutionContext(

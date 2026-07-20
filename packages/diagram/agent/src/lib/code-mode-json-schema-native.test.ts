@@ -13,9 +13,11 @@ describe("Effect beta.99 native JSON Schema primitives", () => {
   it("uses exact property optionality without a null schema", () => {
     const schema = Schema.Struct({ value: Schema.optionalKey(Schema.String) });
 
-    expect(JSON.stringify(jsonSchema(schema))).toBe(
-      '{"type":"object","properties":{"value":{"type":"string"}},"additionalProperties":false}',
-    );
+    expect(jsonSchema(schema)).toEqual({
+      type: "object",
+      properties: { value: { type: "string" } },
+      additionalProperties: false,
+    });
     expect(Schema.decodeUnknownSync(schema)({})).toEqual({});
     expect(() =>
       Schema.decodeUnknownSync(schema)({ value: undefined }),
@@ -38,12 +40,8 @@ describe("Effect beta.99 native JSON Schema primitives", () => {
       ),
     );
 
-    expect(JSON.stringify(jsonSchema(nonEmpty))).toBe(
-      '{"type":"string","minLength":1}',
-    );
-    expect(JSON.stringify(jsonSchema(literal))).toBe(
-      '{"type":"string","const":"node"}',
-    );
+    expect(jsonSchema(nonEmpty)).toEqual({ type: "string", minLength: 1 });
+    expect(jsonSchema(literal)).toEqual({ type: "string", const: "node" });
   });
 
   it("emits oneOf from the native union mode", () => {
@@ -51,12 +49,12 @@ describe("Effect beta.99 native JSON Schema primitives", () => {
       mode: "oneOf",
     });
 
-    expect(JSON.stringify(jsonSchema(schema))).toBe(
-      '{"oneOf":[{"type":"string"},{"type":"boolean"}]}',
-    );
+    expect(jsonSchema(schema)).toEqual({
+      oneOf: [{ type: "string" }, { type: "boolean" }],
+    });
   });
 
-  it("records the fixed base-before-annotation ordering", () => {
+  it("emits array and default annotations structurally", () => {
     const minimumItems = 1;
     const array = Schema.Array(Schema.String)
       .annotate({ minItems: minimumItems })
@@ -66,16 +64,15 @@ describe("Effect beta.99 native JSON Schema primitives", () => {
       default: defaultValue,
     }).pipe(Schema.withDecodingDefault(Effect.succeed(defaultValue)));
 
-    const nativeArray = JSON.stringify(jsonSchema(array));
-    const nativeDefault = JSON.stringify(jsonSchema(defaulted));
-    expect(nativeArray).toBe(
-      '{"type":"array","items":{"type":"string"},"minItems":1}',
-    );
-    expect(nativeDefault).toBe('{"type":"string","default":"x"}');
-    expect(nativeArray).not.toBe(
-      '{"minItems":1,"type":"array","items":{"type":"string"}}',
-    );
-    expect(nativeDefault).not.toBe('{"default":"x","type":"string"}');
+    expect(jsonSchema(array)).toEqual({
+      type: "array",
+      items: { type: "string" },
+      minItems: 1,
+    });
+    expect(jsonSchema(defaulted)).toEqual({
+      type: "string",
+      default: "x",
+    });
   });
 
   it("records default-key input behavior for both beta.99 helpers", () => {

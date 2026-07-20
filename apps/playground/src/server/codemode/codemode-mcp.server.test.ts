@@ -3,7 +3,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { describe, expect, it } from "vitest";
-import { Context, Effect, Option } from "effect";
+import { Context, Effect, Option, Schema } from "effect";
 
 import type {
   CodeModeObjectBucket,
@@ -16,7 +16,12 @@ import {
   PlaygroundRequestCallbacks,
   runPlaygroundEffect,
 } from "../runtime/playground-runtime.server";
+import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 import { PlaygroundCodeMode } from "./codemode-service.server";
+import {
+  createEffectMcpServer,
+  defineEffectMcpTool,
+} from "./effect-mcp-adapter.server";
 import {
   createSketchiMcpServer as createSketchiMcpServerEffect,
   executeSketchiCodeMode as executeSketchiCodeModeEffect,
@@ -531,6 +536,160 @@ describe("Sketchi Code Mode MCP server", () => {
       expect(
         tools.tools.find((tool) => tool.name === "execute")?.outputSchema,
       ).toBeDefined();
+      const invalidSearch = await client.callTool({
+        name: "search",
+        arguments: { query: "", limit: 21 },
+      });
+      expect(invalidSearch).toEqual({
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `MCP error -32602: Input validation error: Invalid arguments for tool search: [
+  {
+    "origin": "string",
+    "code": "too_small",
+    "minimum": 1,
+    "inclusive": true,
+    "path": [
+      "query"
+    ],
+    "message": "Invalid input"
+  },
+  {
+    "origin": "number",
+    "code": "too_big",
+    "maximum": 20,
+    "inclusive": true,
+    "path": [
+      "limit"
+    ],
+    "message": "Invalid input"
+  }
+]`,
+          },
+        ],
+      });
+
+      // These complete payloads were captured from the parent production MCP
+      // Worker at playground.sketchi.app/mcp.
+      const invalidExecuteType = await client.callTool({
+        name: "execute",
+        arguments: { code: 123 },
+      });
+      expect(invalidExecuteType).toEqual({
+        content: [
+          {
+            type: "text",
+            text: `MCP error -32602: Input validation error: Invalid arguments for tool execute: [
+  {
+    "expected": "string",
+    "code": "invalid_type",
+    "path": [
+      "code"
+    ],
+    "message": "Invalid input"
+  }
+]`,
+          },
+        ],
+        isError: true,
+      });
+
+      const missingExecuteCode = await client.callTool({
+        name: "execute",
+        arguments: {},
+      });
+      expect(missingExecuteCode).toEqual({
+        content: [
+          {
+            type: "text",
+            text: `MCP error -32602: Input validation error: Invalid arguments for tool execute: [
+  {
+    "expected": "string",
+    "code": "invalid_type",
+    "path": [
+      "code"
+    ],
+    "message": "Invalid input"
+  }
+]`,
+          },
+        ],
+        isError: true,
+      });
+
+      const invalidSearchLimit = await client.callTool({
+        name: "search",
+        arguments: { query: "diagram", limit: 1.5 },
+      });
+      expect(invalidSearchLimit).toEqual({
+        content: [
+          {
+            type: "text",
+            text: `MCP error -32602: Input validation error: Invalid arguments for tool search: [
+  {
+    "expected": "int",
+    "format": "safeint",
+    "code": "invalid_type",
+    "path": [
+      "limit"
+    ],
+    "message": "Invalid input"
+  }
+]`,
+          },
+        ],
+        isError: true,
+      });
+
+      const invalidDocsTopic = await client.callTool({
+        name: "docs",
+        arguments: { topic: "bogus" },
+      });
+      expect(invalidDocsTopic).toEqual({
+        content: [
+          {
+            type: "text",
+            text: `MCP error -32602: Input validation error: Invalid arguments for tool docs: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "overview",
+      "execute",
+      "buildFlowchart",
+      "buildMindmap",
+      "getArtifact",
+      "applyDiagramPatch",
+      "patchOperations",
+      "agentSequence",
+      "issues",
+      "examples"
+    ],
+    "path": [
+      "topic"
+    ],
+    "message": "Invalid input"
+  }
+]`,
+          },
+        ],
+        isError: true,
+      });
+
+      const unknownTool = await client.callTool({
+        name: "missing",
+        arguments: {},
+      });
+      expect(unknownTool).toEqual({
+        content: [
+          {
+            type: "text",
+            text: "MCP error -32602: Tool missing not found",
+          },
+        ],
+        isError: true,
+      });
 
       const docs = structuredContent(
         await client.callTool({
@@ -567,6 +726,70 @@ describe("Sketchi Code Mode MCP server", () => {
             version: 2,
           },
         },
+      });
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("preserves the complete parent rejection payload for invalid tool output", async () => {
+    const invalidOutput = defineEffectMcpTool(
+      "invalid-output",
+      {
+        title: "Invalid output fixture",
+        description: "Exercises MCP output validation.",
+        inputSchema: toPlaygroundStandardSchema(
+          Schema.Struct({ ok: Schema.optionalKey(Schema.Boolean) }),
+        ),
+        outputSchema: toPlaygroundStandardSchema(
+          Schema.Struct({ value: Schema.String }),
+        ),
+      },
+      () => ({
+        content: [{ type: "text", text: "invalid" }],
+        structuredContent: { value: 1 },
+      }),
+    );
+    const server = createEffectMcpServer({
+      name: "effect-mcp-output-validation-test",
+      tools: [invalidOutput],
+      version: "0.0.0",
+    });
+    const client = new Client({
+      name: "effect-mcp-output-validation-test-client",
+      version: "0.0.0",
+    });
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+
+    try {
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+
+      const response = await client.callTool({
+        name: "invalid-output",
+        arguments: {},
+      });
+      // Captured from the parent high-level MCP adapter after bundling it with
+      // the Playground Worker's production build pipeline.
+      expect(response).toEqual({
+        content: [
+          {
+            type: "text",
+            text: `MCP error -32602: Output validation error: Invalid structured content for tool invalid-output: [
+  {
+    "expected": "string",
+    "code": "invalid_type",
+    "path": [
+      "value"
+    ],
+    "message": "Invalid input"
+  }
+]`,
+          },
+        ],
+        isError: true,
       });
     } finally {
       await client.close();

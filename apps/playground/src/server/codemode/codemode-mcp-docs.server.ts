@@ -9,83 +9,101 @@ import {
   FLOWCHART_MAX_ISSUES,
   FLOWCHART_MAX_NODES,
 } from "@sketchi/diagram-core";
-import { z } from "zod";
+import { Schema } from "effect";
 
-export const CodeModeDocsTopicSchema = z
-  .enum([
-    "overview",
-    "execute",
-    "buildFlowchart",
-    "buildMindmap",
-    "getArtifact",
-    "applyDiagramPatch",
-    "patchOperations",
-    "agentSequence",
-    "issues",
-    "examples",
-  ])
-  .default("overview");
+import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 
-export const CodeModeDocsRequestSchema = z.object({
-  topic: CodeModeDocsTopicSchema.optional(),
+const CodeModeDocsTopicContract = Schema.Literals([
+  "overview",
+  "execute",
+  "buildFlowchart",
+  "buildMindmap",
+  "getArtifact",
+  "applyDiagramPatch",
+  "patchOperations",
+  "agentSequence",
+  "issues",
+  "examples",
+]).annotate({ default: "overview" });
+
+const CodeModeDocsRequestContract = Schema.Struct({
+  topic: Schema.optionalKey(CodeModeDocsTopicContract),
 });
+export const CodeModeDocsRequestSchema = toPlaygroundStandardSchema(
+  CodeModeDocsRequestContract,
+);
+export type CodeModeDocsRequest = typeof CodeModeDocsRequestContract.Type;
 
-export const CodeModeSearchRequestSchema = z.object({
-  query: z.string().min(1),
-  limit: z.number().int().min(1).max(20).optional(),
+const NonEmptyString = Schema.String.check(
+  Schema.isMinLength(1, {
+    message: "Too small: expected string to have >=1 characters",
+  }),
+);
+const CodeModeSearchLimit = Schema.Int.check(
+  Schema.isGreaterThanOrEqualTo(1, {
+    message: "Too small: expected number to be >=1",
+  }),
+  Schema.isLessThanOrEqualTo(20, {
+    message: "Too big: expected number to be <=20",
+  }),
+);
+const CodeModeSearchRequestContract = Schema.Struct({
+  query: NonEmptyString,
+  limit: Schema.optionalKey(CodeModeSearchLimit),
 });
+export const CodeModeSearchRequestSchema = toPlaygroundStandardSchema(
+  CodeModeSearchRequestContract,
+);
+export type CodeModeSearchRequest = typeof CodeModeSearchRequestContract.Type;
 
-export interface CodeExample {
-  title: string;
-  language: "js" | "json" | "ts";
-  code: string;
-}
-
-export const CodeExampleSchema = z.object({
-  title: z.string(),
-  language: z.enum(["js", "json", "ts"]),
-  code: z.string(),
+const CodeExampleContract = Schema.Struct({
+  title: Schema.String,
+  language: Schema.Literals(["js", "json", "ts"]),
+  code: Schema.String,
 });
+export const CodeExampleSchema =
+  toPlaygroundStandardSchema(CodeExampleContract);
+export type CodeExample = typeof CodeExampleContract.Type;
 
-export interface DocsResult extends Record<string, unknown> {
-  topic: z.infer<typeof CodeModeDocsTopicSchema>;
-  content: string;
-  examples: CodeExample[];
-  version: string;
-}
-
-export const CodeModeDocsResultSchema = z.object({
-  topic: CodeModeDocsTopicSchema,
-  content: z.string(),
-  examples: z.array(CodeExampleSchema),
-  version: z.string(),
+const CodeModeDocsResultContract = Schema.Struct({
+  topic: CodeModeDocsTopicContract,
+  content: Schema.String,
+  examples: Schema.Array(CodeExampleContract).pipe(Schema.mutable),
+  version: Schema.String,
 });
+export const CodeModeDocsResultSchema = toPlaygroundStandardSchema(
+  CodeModeDocsResultContract,
+);
+export type DocsResult = typeof CodeModeDocsResultContract.Type &
+  Record<string, unknown>;
 
-export interface SearchHit {
-  id: string;
-  kind: "operation" | "schema" | "issue" | "example" | "non_goal";
-  title: string;
-  snippet: string;
-  score: number;
-}
-
-export const CodeModeSearchHitSchema = z.object({
-  id: z.string(),
-  kind: z.enum(["operation", "schema", "issue", "example", "non_goal"]),
-  title: z.string(),
-  snippet: z.string(),
-  score: z.number(),
+const CodeModeSearchHitContract = Schema.Struct({
+  id: Schema.String,
+  kind: Schema.Literals([
+    "operation",
+    "schema",
+    "issue",
+    "example",
+    "non_goal",
+  ]),
+  title: Schema.String,
+  snippet: Schema.String,
+  score: Schema.Finite,
 });
+export const CodeModeSearchHitSchema = toPlaygroundStandardSchema(
+  CodeModeSearchHitContract,
+);
+export type SearchHit = typeof CodeModeSearchHitContract.Type;
 
-export interface SearchResult extends Record<string, unknown> {
-  query: string;
-  results: SearchHit[];
-}
-
-export const CodeModeSearchResultSchema = z.object({
-  query: z.string(),
-  results: z.array(CodeModeSearchHitSchema),
+const CodeModeSearchResultContract = Schema.Struct({
+  query: Schema.String,
+  results: Schema.Array(CodeModeSearchHitContract).pipe(Schema.mutable),
 });
+export const CodeModeSearchResultSchema = toPlaygroundStandardSchema(
+  CodeModeSearchResultContract,
+);
+export type SearchResult = typeof CodeModeSearchResultContract.Type &
+  Record<string, unknown>;
 
 interface CatalogEntry {
   id: string;
@@ -896,9 +914,8 @@ function scoreEntry(entry: CatalogEntry, terms: string[]): number {
   }, 0);
 }
 
-export function getCodeModeDocs(input: unknown): DocsResult {
-  const parsed = CodeModeDocsRequestSchema.parse(input);
-  const topic = parsed.topic ?? "overview";
+export function getCodeModeDocs(input: CodeModeDocsRequest): DocsResult {
+  const topic = input.topic ?? "overview";
   const entry = docsEntryForTopic(topic);
   return {
     topic,
@@ -908,13 +925,12 @@ export function getCodeModeDocs(input: unknown): DocsResult {
   };
 }
 
-export function searchCodeModeDocs(input: unknown): SearchResult {
-  const parsed = CodeModeSearchRequestSchema.parse(input);
-  const terms = parsed.query
+export function searchCodeModeDocs(input: CodeModeSearchRequest): SearchResult {
+  const terms = input.query
     .toLowerCase()
     .split(/[^a-z0-9_#-]+/)
     .filter(Boolean);
-  const limit = parsed.limit ?? 8;
+  const limit = input.limit ?? 8;
   const results = catalog
     .map((entry) => ({
       id: entry.id,
@@ -931,7 +947,7 @@ export function searchCodeModeDocs(input: unknown): SearchResult {
     .slice(0, limit);
 
   return {
-    query: parsed.query,
+    query: input.query,
     results,
   };
 }

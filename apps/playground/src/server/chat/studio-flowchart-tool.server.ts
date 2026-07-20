@@ -2,6 +2,7 @@ import "@tanstack/react-start/server-only";
 
 import {
   BuildFlowchartRequestSchema,
+  BuildFlowchartResultSchema,
   MAX_FLOWCHART_BUILD_ATTEMPTS,
   type BuildFlowchartOptions,
   type BuildFlowchartResult,
@@ -9,14 +10,19 @@ import {
 } from "@sketchi/diagram-agent";
 import { Effect, Ref, Semaphore } from "effect";
 
+import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
+
 export const STUDIO_BUILD_FLOWCHART_TOOL_NAME: "build_flowchart" =
   "build_flowchart";
 
 export const STUDIO_BUILD_FLOWCHART_TOOL_DESCRIPTION =
   "Build and persist one canonical flowchart artifact. Pass { spec: FlowchartSpec }; the host supplies artifact options. If rejected, repair every structured issue and retry, up to three total attempts.";
 
-export const StudioBuildFlowchartInputSchema = BuildFlowchartRequestSchema.omit(
-  { options: true },
+export const StudioBuildFlowchartInputSchema = toPlaygroundStandardSchema(
+  BuildFlowchartRequestSchema.omit({ options: true }),
+);
+export const StudioBuildFlowchartOutputSchema = toPlaygroundStandardSchema(
+  BuildFlowchartResultSchema,
 );
 
 export type StudioBuildFlowchartInput = BuildFlowchartToolInput;

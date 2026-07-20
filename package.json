@@ -41,6 +41,7 @@
   "dependencies": {
     "@cloudflare/codemode": "0.4.1",
     "@modelcontextprotocol/sdk": "1.29.0",
+    "@standard-schema/spec": "1.1.0",
     "@tanstack/react-query": "5.101.0",
     "@tanstack/react-router": "1.170.11",
     "@tanstack/react-start": "1.168.19",

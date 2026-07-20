@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "@effect/vitest";
 import { Effect, Fiber } from "effect";
 
 import {
+  BuildFlowchartResultSchema,
   BuildFlowchartRequestSchema,
   buildFlowchart,
   CodeModeArtifactStorage,
@@ -9,9 +10,14 @@ import {
   makeMemoryArtifactStorage,
   type BuildFlowchartResult,
   type FlowchartSpec,
+  toCodeModeJsonSchema,
 } from "@sketchi/diagram-agent";
 
-import { makeStudioFlowchartToolExecutor } from "./studio-flowchart-tool.server";
+import {
+  makeStudioFlowchartToolExecutor,
+  StudioBuildFlowchartInputSchema,
+  StudioBuildFlowchartOutputSchema,
+} from "./studio-flowchart-tool.server";
 
 function acceptedSpec(): FlowchartSpec {
   return {
@@ -97,6 +103,37 @@ const repairResult: BuildFlowchartResult = {
 };
 
 describe("Studio build_flowchart host", () => {
+  it("exposes package-derived Standard Schema input and output contracts", async () => {
+    expect(
+      StudioBuildFlowchartInputSchema["~standard"].jsonSchema.input({
+        target: "draft-2020-12",
+      }),
+    ).toEqual(
+      toCodeModeJsonSchema(BuildFlowchartRequestSchema.omit({ options: true })),
+    );
+
+    expect(
+      StudioBuildFlowchartOutputSchema["~standard"].jsonSchema.output({
+        target: "draft-2020-12",
+      }),
+    ).toEqual(toCodeModeJsonSchema(BuildFlowchartResultSchema));
+    expect(
+      StudioBuildFlowchartOutputSchema["~standard"].jsonSchema.output({
+        target: "draft-07",
+      }).$schema,
+    ).toBe("http://json-schema.org/draft-07/schema#");
+
+    const validRepair =
+      await StudioBuildFlowchartOutputSchema["~standard"].validate(
+        repairResult,
+      );
+    expect(validRepair).toEqual({ value: repairResult });
+    const invalidRepair = await StudioBuildFlowchartOutputSchema[
+      "~standard"
+    ].validate({ ok: false, status: "invalid_flowchart", issues: [{}] });
+    expect(invalidRepair).toHaveProperty("issues");
+  });
+
   it("injects artifact options instead of exposing them to the model", async () => {
     let request:
       | ReturnType<typeof BuildFlowchartRequestSchema.parse>

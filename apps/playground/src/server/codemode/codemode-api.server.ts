@@ -17,6 +17,10 @@ import { Effect, Schema } from "effect";
 import { PlaygroundClock } from "../runtime/playground-context.server";
 import { PlaygroundCodeMode } from "./codemode-service.server";
 import {
+  CodeModeHttpSchemas,
+  decodeCodeModeHttpInput,
+} from "./codemode-http-schema.server";
+import {
   codeModeUsageResponseHeaders,
   PlaygroundCodeModeUsage,
 } from "./codemode-usage-events.server";
@@ -336,7 +340,13 @@ export const handleBuildFlowchartRequest = Effect.fn(
   }
 
   const requestBody = boundedRequest.body;
-  const result = yield* codeMode.buildFlowchart(requestBody);
+  const codeModeInput = yield* Effect.promise(() =>
+    decodeCodeModeHttpInput(
+      CodeModeHttpSchemas.buildFlowchart.input,
+      requestBody,
+    ),
+  );
+  const result = yield* codeMode.buildFlowchart(codeModeInput);
   const status = buildStatus(result);
   const finishedAt = yield* clock.nowMillis;
   yield* usage.capture({
@@ -387,7 +397,13 @@ export const handleBuildMindmapRequest = Effect.fn(
   }
 
   const requestBody = boundedRequest.body;
-  const result = yield* codeMode.buildMindmap(requestBody);
+  const codeModeInput = yield* Effect.promise(() =>
+    decodeCodeModeHttpInput(
+      CodeModeHttpSchemas.buildMindmap.input,
+      requestBody,
+    ),
+  );
+  const result = yield* codeMode.buildMindmap(codeModeInput);
   const status = mindmapBuildStatus(result);
   const finishedAt = yield* clock.nowMillis;
   yield* usage.capture({
@@ -410,11 +426,14 @@ export const handleGetArtifactRequest = Effect.fn(
   "playground.http.getArtifact",
 )(function* (request: Request, artifactId: string) {
   const codeMode = yield* PlaygroundCodeMode;
-  const result = yield* codeMode.getArtifact({
-    artifactId,
-    format: formatFromUrl(request),
-    inline: rawFromUrl(request) ? false : inlineFromUrl(request),
-  });
+  const input = yield* Effect.promise(() =>
+    decodeCodeModeHttpInput(CodeModeHttpSchemas.getArtifact.input, {
+      artifactId,
+      format: formatFromUrl(request),
+      inline: rawFromUrl(request) ? false : inlineFromUrl(request),
+    }),
+  );
+  const result = yield* codeMode.getArtifact(input);
 
   if (!result.ok || !rawFromUrl(request)) {
     return jsonResponse(result, getStatus(result));
@@ -507,7 +526,7 @@ export const handlePatchArtifactRequest = Effect.fn(
   const usageContext = yield* usage.createContext;
   const startedAt = yield* clock.nowMillis;
   const body = yield* requestRead(() => readJson(request));
-  const input = isRecord(body)
+  const routeInput = isRecord(body)
     ? {
         ...body,
         source: body.source ?? { artifactId },
@@ -516,6 +535,12 @@ export const handlePatchArtifactRequest = Effect.fn(
         source: { artifactId },
         operations: [],
       };
+  const input = yield* Effect.promise(() =>
+    decodeCodeModeHttpInput(
+      CodeModeHttpSchemas.applyDiagramPatch.input,
+      routeInput,
+    ),
+  );
   const result = yield* codeMode.applyDiagramPatch(input);
   const status = patchStatus(result);
   const finishedAt = yield* clock.nowMillis;
@@ -524,7 +549,7 @@ export const handlePatchArtifactRequest = Effect.fn(
     context: usageContext,
     durationMs: finishedAt - startedAt,
     operation: "applyDiagramPatch",
-    requestBody: input,
+    requestBody: routeInput,
     responseBody: result,
     statusCode: status,
     surface: "api",

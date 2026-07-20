@@ -1181,13 +1181,13 @@ const NormalizedFlowchartSpecSchema = Schema.Struct({
   layout: Schema.Struct({ direction: FlowchartDirection }),
   style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
-const NormalizedMindmapTopicSchema: Schema.Schema<NormalizedMindmapTopic> =
+const NormalizedMindmapTopicSchema: Schema.Codec<NormalizedMindmapTopic> =
   Schema.Struct({
     id: NonEmptyString,
     label: NonEmptyString,
     children: Schema.Array(
       Schema.suspend(
-        (): Schema.Schema<NormalizedMindmapTopic> =>
+        (): Schema.Codec<NormalizedMindmapTopic> =>
           NormalizedMindmapTopicSchema,
       ),
     ).pipe(Schema.mutable),
