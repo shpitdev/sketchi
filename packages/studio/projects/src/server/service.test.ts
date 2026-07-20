@@ -104,8 +104,10 @@ function projectLayer(options: {
     makeStudioPersistencePolicyTestLayer({ listingConcurrency: 2 }),
     makeStudioRecordFactoryTestLayer({
       createId: (kind) =>
-        kind === "proj" ? "proj_effecttest" : "dia_effecttest",
-      now: () => "2026-07-20T03:00:00.000Z",
+        makeStudioRecordId(
+          kind === "proj" ? "proj_effecttest" : "dia_effecttest",
+        ),
+      now: Effect.succeed(makeIsoDateString("2026-07-20T03:00:00.000Z")),
     }),
   );
 

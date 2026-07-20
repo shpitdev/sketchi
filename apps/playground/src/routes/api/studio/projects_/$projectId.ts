@@ -4,16 +4,17 @@ export const Route = createFileRoute("/api/studio/projects_/$projectId")({
   server: {
     handlers: {
       GET: async ({ params, request }) => {
-        const [{ getStudioBindings }, { handleGetStudioProjectRequest }] =
-          await Promise.all([
-            import("@/server/bindings/cloudflare-bindings.server"),
-            import("@/server/studio/projects.server"),
-          ]);
+        const [
+          { getPlaygroundRequestBoundary },
+          { handleGetStudioProjectRequest, runPlaygroundEffect },
+        ] = await Promise.all([
+          import("@/server/bindings/cloudflare-bindings.server"),
+          import("@/server/runtime/playground-runtime.server"),
+        ]);
 
-        return handleGetStudioProjectRequest(
-          getStudioBindings(),
-          request,
-          params.projectId,
+        return runPlaygroundEffect(
+          handleGetStudioProjectRequest(request, params.projectId),
+          getPlaygroundRequestBoundary(request),
         );
       },
     },

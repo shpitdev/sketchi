@@ -3,6 +3,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { describe, expect, it } from "vitest";
+import { Context, Effect, Option } from "effect";
 
 import type {
   CodeModeObjectBucket,
@@ -10,15 +11,91 @@ import type {
 } from "@sketchi/diagram-agent";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
+import { PlaygroundRequestMetadata } from "../runtime/playground-context.server";
 import {
-  createSketchiMcpServer,
-  executeSketchiCodeMode,
-  handleSketchiMcpRequest,
+  PlaygroundRequestCallbacks,
+  runPlaygroundEffect,
+} from "../runtime/playground-runtime.server";
+import { PlaygroundCodeMode } from "./codemode-service.server";
+import {
+  createSketchiMcpServer as createSketchiMcpServerEffect,
+  executeSketchiCodeMode as executeSketchiCodeModeEffect,
+  handleSketchiMcpRequest as handleSketchiMcpRequestEffect,
+  makeSketchiCodeModeProvider,
   normalizeSketchiExecuteCode,
   type CodeModeMcpOptions,
   type SketchiCodeModeExecutor,
   type SketchiCodeModeProvider,
 } from "./codemode-mcp.server";
+
+function testBoundary(env: StudioEnv, request: Request) {
+  return {
+    env,
+    request,
+    platform: {
+      waitUntilPromise: (promise: Promise<unknown>) => {
+        void promise;
+      },
+    },
+  };
+}
+
+function createSketchiMcpServer(
+  env: StudioEnv,
+  options: CodeModeMcpOptions & { origin?: string; request?: Request } = {},
+) {
+  const request =
+    options.request ??
+    new Request(`${options.origin ?? "https://studio.test"}/mcp`, {
+      method: "POST",
+    });
+  return runPlaygroundEffect(
+    Effect.gen(function* () {
+      const callbacks = yield* PlaygroundRequestCallbacks;
+      return createSketchiMcpServerEffect(
+        callbacks.runPromise,
+        options.executor ? { executor: options.executor } : {},
+      );
+    }),
+    testBoundary(env, request),
+  );
+}
+
+function executeSketchiCodeMode(
+  env: StudioEnv,
+  input: unknown,
+  options: CodeModeMcpOptions & { origin?: string; request?: Request } = {},
+) {
+  const request =
+    options.request ??
+    new Request(`${options.origin ?? "https://studio.test"}/mcp`, {
+      method: "POST",
+    });
+  const boundary = testBoundary(env, request);
+  return runPlaygroundEffect(
+    Effect.gen(function* () {
+      const callbacks = yield* PlaygroundRequestCallbacks;
+      return yield* executeSketchiCodeModeEffect(
+        input,
+        callbacks.runPromise,
+        options.executor ? { executor: options.executor } : {},
+      );
+    }),
+    boundary,
+  );
+}
+
+function handleSketchiMcpRequest(
+  env: StudioEnv,
+  request: Request,
+  options: CodeModeMcpOptions = {},
+) {
+  const boundary = testBoundary(env, request);
+  return runPlaygroundEffect(
+    handleSketchiMcpRequestEffect(request, options),
+    boundary,
+  );
+}
 
 const CIRCLE_TO_DIAMOND_CODE = `async () => {
   const built = await sketchi.buildFlowchart({
@@ -311,6 +388,75 @@ function createMcpFetch(
 }
 
 describe("Sketchi Code Mode MCP server", () => {
+  it("preserves the MCP request trace in provider callbacks", async () => {
+    let callbackContext:
+      | {
+          parentSpanId: string | undefined;
+          spanId: string;
+          spanName: string;
+          spanTraceId: string;
+          traceId: string;
+        }
+      | undefined;
+    const observeContext = Effect.gen(function* () {
+      const metadata = yield* PlaygroundRequestMetadata;
+      const span = yield* Effect.currentSpan;
+      const parent = Option.getOrUndefined(span.parent);
+      return {
+        parentSpanId: parent?.spanId,
+        spanName: span.name,
+        spanId: span.spanId,
+        spanTraceId: span.traceId,
+        traceId: metadata.traceId,
+      };
+    });
+    const codeMode = {
+      buildFlowchart: () =>
+        observeContext.pipe(
+          Effect.tap((context) =>
+            Effect.sync(() => {
+              callbackContext = context;
+            }),
+          ),
+          Effect.as({
+            ok: false as const,
+            status: "invalid_input" as const,
+            issues: [],
+          }),
+        ),
+    } as unknown as Context.Service.Shape<typeof PlaygroundCodeMode>;
+    const request = new Request("https://studio.test/mcp", {
+      headers: { "x-sketchi-trace-id": "trace-mcp-provider" },
+      method: "POST",
+    });
+
+    const root = await runPlaygroundEffect(
+      Effect.gen(function* () {
+        const callbacks = yield* PlaygroundRequestCallbacks;
+        const requestContext = yield* observeContext;
+        const provider = makeSketchiCodeModeProvider(
+          codeMode,
+          callbacks.runPromise,
+        );
+        const buildFlowchart = provider.fns.buildFlowchart;
+        if (!buildFlowchart) {
+          throw new Error("MCP provider did not expose buildFlowchart.");
+        }
+        return {
+          callback: buildFlowchart({ spec: {} }),
+          requestContext,
+        };
+      }),
+      testBoundary({}, request),
+    );
+
+    await root.callback;
+    expect(callbackContext?.spanTraceId).toBe(root.requestContext.spanTraceId);
+    expect(callbackContext?.parentSpanId).toBe(root.requestContext.spanId);
+    expect(callbackContext?.spanName).toBe("playground.request.callback");
+    expect(callbackContext?.traceId).toBe("trace-mcp-provider");
+  });
+
   it("exposes buildMindmap inside the Code Mode namespace", async () => {
     const result = await executeSketchiCodeMode(
       {},
@@ -340,7 +486,7 @@ describe("Sketchi Code Mode MCP server", () => {
       name: "sketchi-codemode-test-client",
       version: "0.0.0",
     });
-    const server = createSketchiMcpServer(
+    const server = await createSketchiMcpServer(
       {},
       { executor: createInProcessExecutor() },
     );
@@ -433,7 +579,7 @@ describe("Sketchi Code Mode MCP server", () => {
       name: "sketchi-codemode-delivery-text-test-client",
       version: "0.0.0",
     });
-    const server = createSketchiMcpServer(
+    const server = await createSketchiMcpServer(
       {},
       {
         executor: createInProcessExecutor(),
@@ -826,7 +972,7 @@ describe("Sketchi Code Mode MCP server", () => {
     });
   });
 
-  it("keeps URL-less artifactDelivery URL-less when no MCP origin is available", async () => {
+  it("uses the injected MCP request origin when no override is supplied", async () => {
     const result = await executeSketchiCodeMode(
       {},
       {
@@ -842,7 +988,7 @@ describe("Sketchi Code Mode MCP server", () => {
         artifactId: "artifact_without_urls",
         diagramId: "diagram_without_urls",
         finalResponseText:
-          "Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png",
+          "Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
         formats: [
           {
             format: "scene",
@@ -856,11 +1002,17 @@ describe("Sketchi Code Mode MCP server", () => {
         ],
       },
       finalResponseText:
-        "Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png",
+        "Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
       ok: true,
     });
-    expect(result.artifactDelivery?.excalidrawUrl).toBeUndefined();
-    expect(result.artifactDelivery?.pngUrl).toBeUndefined();
-    expect(result.artifactDelivery?.sceneUrl).toBeUndefined();
+    expect(result.artifactDelivery?.excalidrawUrl).toContain(
+      "https://studio.test/api/v1/artifacts/",
+    );
+    expect(result.artifactDelivery?.pngUrl).toContain(
+      "https://studio.test/api/v1/artifacts/",
+    );
+    expect(result.artifactDelivery?.sceneUrl).toContain(
+      "https://studio.test/api/v1/artifacts/",
+    );
   });
 });

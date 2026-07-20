@@ -1,9 +1,23 @@
 import { describe, expect, it } from "@effect/vitest";
+import { Effect, Layer } from "effect";
 
 import {
-  createStudioProjectsServer,
+  handleCreateFromArtifactRequestEffect,
+  handleGetDiagramRequestEffect,
+  handleGetProjectRequestEffect,
+  handleListProjectsRequestEffect,
+  makeIsoDateString,
   makeStudioRecordId,
+  makeStudioObjectStoreLayer,
+  makeStudioPersistencePolicyLayer,
+  makeStudioRecordFactoryLayer,
   MemoryStudioObjectBucket,
+  StudioPersistencePolicyLive,
+  StudioProjectsLive,
+  StudioRecordFactoryLive,
+  StudioSessionServiceLive,
+  StudioSourceArtifactError,
+  StudioSourceArtifactStore,
   studioDiagramRecordKey,
   studioOwnerKey,
   studioOwnerProjectEntryKey,
@@ -12,25 +26,26 @@ import {
   type StudioObjectBucketListResult,
   type StudioOwner,
   type StudioProjectRecord,
-  type StudioSourceArtifactLoadResult,
-  type StudioSourceArtifacts,
+  type StudioSourceArtifactStoreShape,
 } from "./server.js";
 
-class TestSourceArtifacts implements StudioSourceArtifacts {
+class TestSourceArtifacts implements StudioSourceArtifactStoreShape {
   readonly artifacts = new Map<string, { diagramId: string; title: string }>();
 
-  async load(artifactId: string): Promise<StudioSourceArtifactLoadResult> {
+  load(artifactId: string) {
     const artifact = this.artifacts.get(artifactId);
     if (!artifact) {
-      return {
-        code: "not_found",
-        message: `Playground artifact "${artifactId}" is not available for Studio persistence.`,
-        ok: false,
-        status: 404,
-      };
+      return Effect.fail(
+        StudioSourceArtifactError.make({
+          artifactId,
+          code: "not_found",
+          message: `Playground artifact "${artifactId}" is not available for Studio persistence.`,
+          status: 404,
+        }),
+      );
     }
 
-    return { artifact, ok: true };
+    return Effect.succeed(artifact);
   }
 }
 
@@ -58,22 +73,59 @@ class PaginatedMemoryBucket extends MemoryStudioObjectBucket {
   }
 }
 
-function createTestServer(
+function createTestServer<
+  SourceArtifacts extends StudioSourceArtifactStoreShape = TestSourceArtifacts,
+>(
   bucket = new MemoryStudioObjectBucket(),
-  sourceArtifacts = new TestSourceArtifacts(),
+  sourceArtifacts: SourceArtifacts = new TestSourceArtifacts() as unknown as SourceArtifacts,
   overrides: {
     createId?: (kind: "dia" | "proj") => string;
     listingConcurrency?: number;
     now?: () => string;
   } = {},
 ) {
+  const dependencies = Layer.mergeAll(
+    makeStudioObjectStoreLayer(bucket),
+    Layer.succeed(StudioSourceArtifactStore, sourceArtifacts),
+    overrides.listingConcurrency === undefined
+      ? StudioPersistencePolicyLive
+      : makeStudioPersistencePolicyLayer({
+          listingConcurrency: overrides.listingConcurrency,
+        }),
+    overrides.createId || overrides.now
+      ? makeStudioRecordFactoryLayer({
+          createId: (kind) =>
+            makeStudioRecordId(
+              (overrides.createId ??
+                ((recordKind) =>
+                  recordKind === "proj" ? "proj_test" : "dia_test"))(kind),
+            ),
+          now: Effect.succeed(
+            makeIsoDateString(
+              overrides.now?.() ?? "2026-07-20T02:00:00.000Z",
+            ),
+          ),
+        })
+      : StudioRecordFactoryLive,
+    StudioSessionServiceLive,
+  );
+  const appLayer = StudioProjectsLive.pipe(Layer.provideMerge(dependencies));
+  const run = <A>(
+    effect: Effect.Effect<A, never, Layer.Success<typeof appLayer>>,
+    signal: AbortSignal,
+  ) => Effect.runPromise(effect.pipe(Effect.provide(appLayer)), { signal });
   return {
     bucket,
-    server: createStudioProjectsServer({
-      bucket,
-      sourceArtifacts,
-      ...overrides,
-    }),
+    server: {
+      handleCreateFromArtifactRequest: (request: Request) =>
+        run(handleCreateFromArtifactRequestEffect(request), request.signal),
+      handleGetDiagramRequest: (request: Request, diagramId: string) =>
+        run(handleGetDiagramRequestEffect(request, diagramId), request.signal),
+      handleGetProjectRequest: (request: Request, projectId: string) =>
+        run(handleGetProjectRequestEffect(request, projectId), request.signal),
+      handleListProjectsRequest: (request: Request) =>
+        run(handleListProjectsRequestEffect(request), request.signal),
+    },
     sourceArtifacts,
   };
 }
@@ -405,32 +457,23 @@ describe("Studio project HTTP runtime edge", () => {
   it("propagates request cancellation without committing records", async () => {
     const bucket = new MemoryStudioObjectBucket();
     const controller = new AbortController();
-    let sourceSignal: AbortSignal | undefined;
+    let sourceInterrupted = false;
     let sourceLoadStarted: (() => void) | undefined;
     const sourceStarted = new Promise<void>((resolve) => {
       sourceLoadStarted = resolve;
     });
-    const sourceArtifacts: StudioSourceArtifacts = {
-      load: (_artifactId, signal) => {
-        sourceSignal = signal;
-        sourceLoadStarted?.();
-
-        return new Promise((resolve) => {
-          const complete = () =>
-            resolve({
-              artifact: {
-                diagramId: "cancelled-diagram",
-                title: "Cancelled Studio project",
-              },
-              ok: true,
-            });
-
-          signal?.addEventListener("abort", complete, { once: true });
-          setTimeout(complete, 25);
-        });
-      },
+    const sourceArtifacts: StudioSourceArtifactStoreShape = {
+      load: () =>
+        Effect.sync(() => sourceLoadStarted?.()).pipe(
+          Effect.andThen(Effect.never),
+          Effect.onInterrupt(() =>
+            Effect.sync(() => {
+              sourceInterrupted = true;
+            }),
+          ),
+        ),
     };
-    const server = createStudioProjectsServer({ bucket, sourceArtifacts });
+    const { server } = createTestServer(bucket, sourceArtifacts);
     const response = server.handleCreateFromArtifactRequest(
       postRequest(
         "https://studio.test/api/studio/projects/from-artifact",
@@ -444,7 +487,7 @@ describe("Studio project HTTP runtime edge", () => {
     controller.abort();
 
     await expect(response).rejects.toThrow();
-    expect(sourceSignal?.aborted).toBe(true);
+    expect(sourceInterrupted).toBe(true);
     expect(bucket.objects.size).toBe(0);
   });
 

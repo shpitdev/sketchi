@@ -8,19 +8,6 @@ import {
   type StudioSessionResolution,
 } from "./session.js";
 
-export interface StudioProjectsHttpHandlers {
-  handleCreateFromArtifactRequest(request: Request): Promise<Response>;
-  handleGetDiagramRequest(
-    request: Request,
-    diagramId: string,
-  ): Promise<Response>;
-  handleGetProjectRequest(
-    request: Request,
-    projectId: string,
-  ): Promise<Response>;
-  handleListProjectsRequest(request: Request): Promise<Response>;
-}
-
 type RequestedResource = "diagram" | "project";
 
 const readRequestJson = Effect.fn("studioPersistence.http.readJson")(function* (

@@ -1,14 +1,10 @@
 import "@tanstack/react-start/server-only";
 
 import {
-  createPlaygroundCodeModePromiseRuntimeForIssue243,
-  makeMemoryArtifactStorage,
-  makeObjectBucketArtifactStorage,
   type ApplyDiagramPatchResult,
   type ArtifactFormat,
   type BuildFlowchartResult,
   type BuildMindmapResult,
-  type CodeModeArtifactStorageShape,
   type GetArtifactResult,
   type StoredArtifactFormat,
 } from "@sketchi/diagram-agent";
@@ -16,91 +12,24 @@ import {
   createExcalidrawFile,
   type ExcalidrawScene,
 } from "@sketchi/diagram-excalidraw";
+import { Effect, Schema } from "effect";
 
-import type { StudioEnv } from "../bindings/studio-env.server";
-import { createCloudflareBrowserRunArtifactRenderer } from "./codemode-browser-renderer.server";
+import { PlaygroundClock } from "../runtime/playground-context.server";
+import { PlaygroundCodeMode } from "./codemode-service.server";
 import {
-  captureCodeModeUsageEvent,
   codeModeUsageResponseHeaders,
-  createCodeModeUsageContext,
+  PlaygroundCodeModeUsage,
 } from "./codemode-usage-events.server";
 
-const localArtifactStore = makeMemoryArtifactStorage();
-const DEFAULT_RENDER_ASSET_ORIGIN =
-  "https://sketchi-studio.dimethyl.workers.dev";
 export const MAX_CODE_MODE_BUILD_REQUEST_BYTES = 256 * 1024;
 
-export interface StudioCodeModeRuntimeOptions {
-  origin?: string;
-}
-
-function artifactStoreForEnv(env: StudioEnv): CodeModeArtifactStorageShape {
-  return env.SKETCHI_ARTIFACTS
-    ? makeObjectBucketArtifactStorage(env.SKETCHI_ARTIFACTS, {
-        prefix: "codemode",
-      })
-    : localArtifactStore;
-}
-
-export function createStudioCodeModeRuntime(
-  env: StudioEnv,
-  options: StudioCodeModeRuntimeOptions = {},
-) {
-  const renderer = rendererForEnv(env, options);
-  const origin = options.origin;
-  return createPlaygroundCodeModePromiseRuntimeForIssue243({
-    ...(origin ? { artifactUrl: (input) => artifactUrl(origin, input) } : {}),
-    ...(renderer ? { renderer } : {}),
-    store: artifactStoreForEnv(env),
-  });
-}
-
-function artifactUrl(
-  origin: string,
-  input: { artifactId: string; format: ArtifactFormat },
-): string {
-  const url = new URL(
-    `/api/v1/artifacts/${encodeURIComponent(input.artifactId)}`,
-    origin,
-  );
-  url.searchParams.set("format", input.format);
-  url.searchParams.set("raw", "true");
-  return url.toString();
-}
-
-function rendererForEnv(env: StudioEnv, options: StudioCodeModeRuntimeOptions) {
-  if (!env.BROWSER) {
-    return undefined;
-  }
-
-  return createCloudflareBrowserRunArtifactRenderer(env.BROWSER, {
-    assetOrigin: renderAssetOrigin(env, options),
-  });
-}
-
-function renderAssetOrigin(
-  env: StudioEnv,
-  options: StudioCodeModeRuntimeOptions,
-): string {
-  if (env.SKETCHI_RENDER_ASSET_ORIGIN) {
-    return env.SKETCHI_RENDER_ASSET_ORIGIN;
-  }
-
-  if (options.origin && !isLocalOrigin(options.origin)) {
-    return options.origin;
-  }
-
-  return DEFAULT_RENDER_ASSET_ORIGIN;
-}
-
-function isLocalOrigin(origin: string): boolean {
-  try {
-    const hostname = new URL(origin).hostname;
-    return hostname === "localhost" || hostname === "127.0.0.1";
-  } catch {
-    return false;
-  }
-}
+export class CodeModeHttpRequestError extends Schema.TaggedErrorClass<CodeModeHttpRequestError>()(
+  "CodeModeHttpRequestError",
+  {
+    cause: Schema.Defect(),
+    message: Schema.String,
+  },
+) {}
 
 function jsonResponse(
   body: unknown,
@@ -365,21 +294,35 @@ function rawArtifactResponse(input: {
   });
 }
 
-export async function handleBuildFlowchartRequest(
-  env: StudioEnv,
-  request: Request,
-): Promise<Response> {
-  const usageContext = createCodeModeUsageContext(request);
-  const startedAt = Date.now();
-  const boundedRequest = await readBoundedBuildJson(request);
+function requestRead<A>(run: () => Promise<A>) {
+  return Effect.tryPromise({
+    try: run,
+    catch: (cause) =>
+      CodeModeHttpRequestError.make({
+        cause,
+        message: "Code Mode request body could not be read.",
+      }),
+  });
+}
+
+export const handleBuildFlowchartRequest = Effect.fn(
+  "playground.http.buildFlowchart",
+)(function* (request: Request) {
+  const clock = yield* PlaygroundClock;
+  const codeMode = yield* PlaygroundCodeMode;
+  const usage = yield* PlaygroundCodeModeUsage;
+  const usageContext = yield* usage.createContext;
+  const startedAt = yield* clock.nowMillis;
+  const boundedRequest = yield* requestRead(() =>
+    readBoundedBuildJson(request),
+  );
   if (!boundedRequest.ok) {
     const result = requestTooLargeResult("Flowchart");
-    captureCodeModeUsageEvent({
+    const finishedAt = yield* clock.nowMillis;
+    yield* usage.capture({
       context: usageContext,
-      durationMs: Date.now() - startedAt,
-      env,
+      durationMs: finishedAt - startedAt,
       operation: "buildFlowchart",
-      request,
       requestBody: boundedRequest.body,
       responseBody: result,
       statusCode: 413,
@@ -391,18 +334,15 @@ export async function handleBuildFlowchartRequest(
       codeModeUsageResponseHeaders(usageContext),
     );
   }
-  const requestBody = boundedRequest.body;
-  const result = await createStudioCodeModeRuntime(env, {
-    origin: new URL(request.url).origin,
-  }).buildFlowchart(requestBody);
-  const status = buildStatus(result);
 
-  captureCodeModeUsageEvent({
+  const requestBody = boundedRequest.body;
+  const result = yield* codeMode.buildFlowchart(requestBody);
+  const status = buildStatus(result);
+  const finishedAt = yield* clock.nowMillis;
+  yield* usage.capture({
     context: usageContext,
-    durationMs: Date.now() - startedAt,
-    env,
+    durationMs: finishedAt - startedAt,
     operation: "buildFlowchart",
-    request,
     requestBody,
     responseBody: result,
     statusCode: status,
@@ -414,23 +354,26 @@ export async function handleBuildFlowchartRequest(
     status,
     codeModeUsageResponseHeaders(usageContext),
   );
-}
+});
 
-export async function handleBuildMindmapRequest(
-  env: StudioEnv,
-  request: Request,
-): Promise<Response> {
-  const usageContext = createCodeModeUsageContext(request);
-  const startedAt = Date.now();
-  const boundedRequest = await readBoundedBuildJson(request);
+export const handleBuildMindmapRequest = Effect.fn(
+  "playground.http.buildMindmap",
+)(function* (request: Request) {
+  const clock = yield* PlaygroundClock;
+  const codeMode = yield* PlaygroundCodeMode;
+  const usage = yield* PlaygroundCodeModeUsage;
+  const usageContext = yield* usage.createContext;
+  const startedAt = yield* clock.nowMillis;
+  const boundedRequest = yield* requestRead(() =>
+    readBoundedBuildJson(request),
+  );
   if (!boundedRequest.ok) {
     const result = requestTooLargeResult("Mindmap");
-    captureCodeModeUsageEvent({
+    const finishedAt = yield* clock.nowMillis;
+    yield* usage.capture({
       context: usageContext,
-      durationMs: Date.now() - startedAt,
-      env,
+      durationMs: finishedAt - startedAt,
       operation: "buildMindmap",
-      request,
       requestBody: boundedRequest.body,
       responseBody: result,
       statusCode: 413,
@@ -442,17 +385,15 @@ export async function handleBuildMindmapRequest(
       codeModeUsageResponseHeaders(usageContext),
     );
   }
+
   const requestBody = boundedRequest.body;
-  const result = await createStudioCodeModeRuntime(env, {
-    origin: new URL(request.url).origin,
-  }).buildMindmap(requestBody);
+  const result = yield* codeMode.buildMindmap(requestBody);
   const status = mindmapBuildStatus(result);
-  captureCodeModeUsageEvent({
+  const finishedAt = yield* clock.nowMillis;
+  yield* usage.capture({
     context: usageContext,
-    durationMs: Date.now() - startedAt,
-    env,
+    durationMs: finishedAt - startedAt,
     operation: "buildMindmap",
-    request,
     requestBody,
     responseBody: result,
     statusCode: status,
@@ -463,17 +404,13 @@ export async function handleBuildMindmapRequest(
     status,
     codeModeUsageResponseHeaders(usageContext),
   );
-}
+});
 
-export async function handleGetArtifactRequest(
-  env: StudioEnv,
-  request: Request,
-  artifactId: string,
-): Promise<Response> {
-  const runtime = createStudioCodeModeRuntime(env, {
-    origin: new URL(request.url).origin,
-  });
-  const result = await runtime.getArtifact({
+export const handleGetArtifactRequest = Effect.fn(
+  "playground.http.getArtifact",
+)(function* (request: Request, artifactId: string) {
+  const codeMode = yield* PlaygroundCodeMode;
+  const result = yield* codeMode.getArtifact({
     artifactId,
     format: formatFromUrl(request),
     inline: rawFromUrl(request) ? false : inlineFromUrl(request),
@@ -483,13 +420,15 @@ export async function handleGetArtifactRequest(
     return jsonResponse(result, getStatus(result));
   }
 
-  let artifact: StoredArtifactFormat | null;
-  try {
-    artifact = await runtime.readStoredArtifactForRawHttpResponseForIssue243(
-      artifactId,
-      result.format,
+  const readResult = yield* codeMode
+    .readStoredArtifact(artifactId, result.format)
+    .pipe(
+      Effect.match({
+        onFailure: (error) => ({ error, ok: false as const }),
+        onSuccess: (artifact) => ({ artifact, ok: true as const }),
+      }),
     );
-  } catch (error) {
+  if (!readResult.ok) {
     return jsonResponse(
       {
         ok: false,
@@ -499,8 +438,7 @@ export async function handleGetArtifactRequest(
             code: "storage_read_failed",
             severity: "error",
             stage: "storage",
-            message:
-              error instanceof Error ? error.message : "Artifact read failed.",
+            message: readResult.error.message,
             hint: "Retry retrieval or rebuild the artifact.",
           },
         ],
@@ -509,7 +447,7 @@ export async function handleGetArtifactRequest(
     );
   }
 
-  if (!artifact) {
+  if (!readResult.artifact) {
     return jsonResponse(
       {
         ok: false,
@@ -528,38 +466,47 @@ export async function handleGetArtifactRequest(
       404,
     );
   }
+  const artifact = readResult.artifact;
 
-  try {
-    return rawArtifactResponse({ artifact, artifactId });
-  } catch (error) {
-    return jsonResponse(
-      {
-        ok: false,
-        status: "storage_failed",
-        issues: [
+  return yield* Effect.try({
+    try: () => rawArtifactResponse({ artifact, artifactId }),
+    catch: (error) => error,
+  }).pipe(
+    Effect.catch((error) =>
+      Effect.succeed(
+        jsonResponse(
           {
-            code: "storage_read_failed",
-            severity: "error",
-            stage: "storage",
-            message:
-              error instanceof Error ? error.message : "Artifact read failed.",
-            hint: "Retry retrieval or rebuild the artifact.",
+            ok: false,
+            status: "storage_failed",
+            issues: [
+              {
+                code: "storage_read_failed",
+                severity: "error",
+                stage: "storage",
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : "Artifact read failed.",
+                hint: "Retry retrieval or rebuild the artifact.",
+              },
+            ],
           },
-        ],
-      },
-      500,
-    );
-  }
-}
+          500,
+        ),
+      ),
+    ),
+  );
+});
 
-export async function handlePatchArtifactRequest(
-  env: StudioEnv,
-  request: Request,
-  artifactId: string,
-): Promise<Response> {
-  const usageContext = createCodeModeUsageContext(request);
-  const startedAt = Date.now();
-  const body = await readJson(request);
+export const handlePatchArtifactRequest = Effect.fn(
+  "playground.http.patchArtifact",
+)(function* (request: Request, artifactId: string) {
+  const clock = yield* PlaygroundClock;
+  const codeMode = yield* PlaygroundCodeMode;
+  const usage = yield* PlaygroundCodeModeUsage;
+  const usageContext = yield* usage.createContext;
+  const startedAt = yield* clock.nowMillis;
+  const body = yield* requestRead(() => readJson(request));
   const input = isRecord(body)
     ? {
         ...body,
@@ -569,17 +516,14 @@ export async function handlePatchArtifactRequest(
         source: { artifactId },
         operations: [],
       };
-  const result = await createStudioCodeModeRuntime(env, {
-    origin: new URL(request.url).origin,
-  }).applyDiagramPatch(input);
+  const result = yield* codeMode.applyDiagramPatch(input);
   const status = patchStatus(result);
+  const finishedAt = yield* clock.nowMillis;
 
-  captureCodeModeUsageEvent({
+  yield* usage.capture({
     context: usageContext,
-    durationMs: Date.now() - startedAt,
-    env,
+    durationMs: finishedAt - startedAt,
     operation: "applyDiagramPatch",
-    request,
     requestBody: input,
     responseBody: result,
     statusCode: status,
@@ -591,4 +535,4 @@ export async function handlePatchArtifactRequest(
     status,
     codeModeUsageResponseHeaders(usageContext),
   );
-}
+});

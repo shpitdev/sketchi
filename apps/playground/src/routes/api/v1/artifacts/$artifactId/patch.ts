@@ -4,16 +4,19 @@ export const Route = createFileRoute("/api/v1/artifacts/$artifactId/patch")({
   server: {
     handlers: {
       POST: async ({ params, request }) => {
-        const [{ getStudioBindings }, { handlePatchArtifactRequest }] =
-          await Promise.all([
-            import("@/server/bindings/cloudflare-bindings.server"),
-            import("@/server/codemode/codemode-api.server"),
-          ]);
+        const [
+          { getPlaygroundRequestBoundary },
+          { handlePatchArtifactRequest },
+          { runPlaygroundEffect },
+        ] = await Promise.all([
+          import("@/server/bindings/cloudflare-bindings.server"),
+          import("@/server/codemode/codemode-api.server"),
+          import("@/server/runtime/playground-runtime.server"),
+        ]);
 
-        return handlePatchArtifactRequest(
-          getStudioBindings(),
-          request,
-          params.artifactId,
+        return runPlaygroundEffect(
+          handlePatchArtifactRequest(request, params.artifactId),
+          getPlaygroundRequestBoundary(request),
         );
       },
     },

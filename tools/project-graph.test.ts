@@ -35,6 +35,7 @@ const intendedWorkspacePackageRoots = intendedNxProjectRoots.filter(
 );
 const effectAuthoritativeProjectRoots = [
   "apps/eval-harness",
+  "apps/playground",
   "packages/diagram/agent",
   "packages/diagram/generation",
   "packages/diagram/scenarios",
@@ -56,7 +57,6 @@ const frameworkNativeProjectRoots = [
   "apps/excalidraw",
   "apps/icons",
   "apps/native-conversion-storybook",
-  "apps/playground",
   "apps/web",
   "packages/diagram/ui",
   "tools/sketchi-generators",

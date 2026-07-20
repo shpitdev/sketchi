@@ -1,10 +1,20 @@
 import "@tanstack/react-start/server-only";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Context, Effect, Schema } from "effect";
 import { z } from "zod";
 
-import type { StudioEnv } from "../bindings/studio-env.server";
-import { createStudioCodeModeRuntime } from "./codemode-api.server";
+import {
+  PlaygroundBindings,
+  PlaygroundClock,
+  PlaygroundPlatformCallbacks,
+  PlaygroundRequestMetadata,
+} from "../runtime/playground-context.server";
+import {
+  PlaygroundRequestCallbacks,
+  type PlaygroundRequestRunner,
+} from "../runtime/playground-runtime.server";
+import { PlaygroundCodeMode } from "./codemode-service.server";
 import {
   CodeModeDocsRequestSchema,
   CodeModeDocsResultSchema,
@@ -15,11 +25,7 @@ import {
   SKETCHI_CODE_MODE_TYPES,
   SKETCHI_CODE_MODE_VERSION,
 } from "./codemode-mcp-docs.server";
-import {
-  captureCodeModeUsageEvent,
-  createCodeModeUsageContext,
-  type CodeModeUsageContext,
-} from "./codemode-usage-events.server";
+import { PlaygroundCodeModeUsage } from "./codemode-usage-events.server";
 
 export interface SketchiCodeModeProvider {
   name: string;
@@ -40,8 +46,6 @@ export interface SketchiCodeModeExecutor {
 
 export interface CodeModeMcpOptions {
   executor?: SketchiCodeModeExecutor;
-  origin?: string;
-  request?: Request;
 }
 
 interface MinimalExecutionContext {
@@ -105,6 +109,15 @@ interface ArtifactDeliveryFormat {
   mimeType?: string;
   sizeBytes?: number;
   url?: string;
+}
+
+export interface SketchiCodeModeExecuteOutput extends Record<string, unknown> {
+  artifactDelivery?: ArtifactDelivery;
+  finalResponseText?: string;
+  ok: boolean;
+  result?: unknown;
+  error?: string;
+  logs?: string[];
 }
 
 function stripCodeFence(code: string): string {
@@ -310,83 +323,109 @@ function artifactDeliveryFrom(
   };
 }
 
-async function createDefaultCodeModeExecutor(
-  env: StudioEnv,
-): Promise<SketchiCodeModeExecutor> {
-  if (!env.LOADER) {
-    throw new Error(
-      "Code Mode Worker Loader binding is not configured (env.LOADER).",
-    );
-  }
+const CodeModeExecutionStageSchema = Schema.Literals([
+  "configuration",
+  "execute",
+  "input",
+]);
 
-  const { DynamicWorkerExecutor } = (await import(
-    "@cloudflare/codemode"
-  )) as unknown as {
-    DynamicWorkerExecutor: new (options: {
-      loader: unknown;
-      timeout?: number;
-      globalOutbound?: unknown;
-    }) => SketchiCodeModeExecutor;
-  };
+export class CodeModeExecutionError extends Schema.TaggedErrorClass<CodeModeExecutionError>()(
+  "CodeModeExecutionError",
+  {
+    cause: Schema.Defect(),
+    message: Schema.String,
+    stage: CodeModeExecutionStageSchema,
+  },
+) {}
 
-  return new DynamicWorkerExecutor({
-    loader: env.LOADER,
-    globalOutbound: null,
-    timeout: 30_000,
+function createDefaultCodeModeExecutor() {
+  return Effect.gen(function* () {
+    const env = yield* PlaygroundBindings;
+    if (!env.LOADER) {
+      return yield* Effect.fail(
+        CodeModeExecutionError.make({
+          cause: new Error("Code Mode Worker Loader binding is unavailable."),
+          message:
+            "Code Mode Worker Loader binding is not configured (env.LOADER).",
+          stage: "configuration",
+        }),
+      );
+    }
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const { DynamicWorkerExecutor } = (await import(
+          "@cloudflare/codemode"
+        )) as unknown as {
+          DynamicWorkerExecutor: new (options: {
+            loader: unknown;
+            timeout?: number;
+            globalOutbound?: unknown;
+          }) => SketchiCodeModeExecutor;
+        };
+        return new DynamicWorkerExecutor({
+          loader: env.LOADER,
+          globalOutbound: null,
+          timeout: 30_000,
+        });
+      },
+      catch: (cause) =>
+        CodeModeExecutionError.make({
+          cause,
+          message:
+            cause instanceof Error
+              ? cause.message
+              : "Code Mode executor configuration failed.",
+          stage: "configuration",
+        }),
+    });
   });
 }
 
-async function executorFor(
-  env: StudioEnv,
-  options: CodeModeMcpOptions,
-): Promise<SketchiCodeModeExecutor> {
-  return options.executor ?? createDefaultCodeModeExecutor(env);
-}
-
-export async function executeSketchiCodeMode(
-  env: StudioEnv,
+export const executeSketchiCodeMode = Effect.fn(
+  "playground.mcp.executeCodeMode",
+)(function* (
   input: unknown,
+  runToolEffect: PlaygroundRequestRunner,
   options: CodeModeMcpOptions = {},
-): Promise<{
-  artifactDelivery?: ArtifactDelivery;
-  finalResponseText?: string;
-  ok: boolean;
-  result?: unknown;
-  error?: string;
-  logs?: string[];
-}> {
-  const usageContext = options.request
-    ? createCodeModeUsageContext(options.request)
-    : undefined;
-  const startedAt = Date.now();
+) {
+  const clock = yield* PlaygroundClock;
+  const codeMode = yield* PlaygroundCodeMode;
+  const metadata = yield* PlaygroundRequestMetadata;
+  const usage = yield* PlaygroundCodeModeUsage;
+  const usageContext = yield* usage.createContext;
+  const startedAt = yield* clock.nowMillis;
 
-  try {
-    const parsed = ExecuteRequestSchema.parse(input);
-    const runtime = createStudioCodeModeRuntime(env, {
-      ...(options.origin ? { origin: options.origin } : {}),
+  const executed = yield* Effect.gen(function* () {
+    const parsed = yield* Effect.try({
+      try: () => ExecuteRequestSchema.parse(input),
+      catch: (cause) =>
+        CodeModeExecutionError.make({
+          cause,
+          message: cause instanceof Error ? cause.message : String(cause),
+          stage: "input",
+        }),
     });
-    const executor = await executorFor(env, options);
-    const execution = await executor.execute(
-      normalizeSketchiExecuteCode(parsed.code),
-      [
-        {
-          name: "sketchi",
-          fns: {
-            buildFlowchart: (request) => runtime.buildFlowchart(request),
-            buildMindmap: (request) => runtime.buildMindmap(request),
-            getArtifact: (request) => runtime.getArtifact(request),
-            applyDiagramPatch: (request) => runtime.applyDiagramPatch(request),
-          },
-        },
-      ],
-    );
-
+    const executor =
+      options.executor ?? (yield* createDefaultCodeModeExecutor());
+    const execution = yield* Effect.tryPromise({
+      try: () =>
+        executor.execute(normalizeSketchiExecuteCode(parsed.code), [
+          makeSketchiCodeModeProvider(codeMode, runToolEffect),
+        ]),
+      catch: (cause) =>
+        CodeModeExecutionError.make({
+          cause,
+          message: cause instanceof Error ? cause.message : String(cause),
+          stage: "execute",
+        }),
+    });
     const artifactDelivery = artifactDeliveryFrom(execution.result, {
-      ...(options.origin ? { origin: options.origin } : {}),
+      origin: metadata.origin,
     });
 
     if (execution.error) {
-      const output = {
+      return {
         ...(artifactDelivery ? { artifactDelivery } : {}),
         ...(artifactDelivery
           ? { finalResponseText: artifactDelivery.finalResponseText }
@@ -396,17 +435,9 @@ export async function executeSketchiCodeMode(
         logs: execution.logs ?? [],
         result: execution.result,
       };
-      captureMcpExecuteUsage(env, {
-        context: usageContext,
-        input,
-        options,
-        responseBody: output,
-        startedAt,
-      });
-      return output;
     }
 
-    const output = {
+    return {
       ...(artifactDelivery ? { artifactDelivery } : {}),
       ...(artifactDelivery
         ? { finalResponseText: artifactDelivery.finalResponseText }
@@ -415,59 +446,46 @@ export async function executeSketchiCodeMode(
       result: execution.result,
       logs: execution.logs ?? [],
     };
-    captureMcpExecuteUsage(env, {
-      context: usageContext,
-      input,
-      options,
-      responseBody: output,
-      startedAt,
-    });
-    return output;
-  } catch (error) {
-    const output = {
-      ok: false,
-      error: error instanceof Error ? error.message : String(error),
-      logs: [],
-    };
-    captureMcpExecuteUsage(env, {
-      context: usageContext,
-      input,
-      options,
-      responseBody: output,
-      startedAt,
-    });
-    return output;
-  }
-}
-
-function captureMcpExecuteUsage(
-  env: StudioEnv,
-  input: {
-    context: CodeModeUsageContext | undefined;
-    input: unknown;
-    options: CodeModeMcpOptions;
-    responseBody: unknown;
-    startedAt: number;
-  },
-): void {
-  if (!input.context || !input.options.request) {
-    return;
-  }
-
-  captureCodeModeUsageEvent({
-    context: input.context,
-    durationMs: Date.now() - input.startedAt,
-    env,
+  }).pipe(
+    Effect.catchTag("CodeModeExecutionError", (error) =>
+      Effect.succeed({
+        ok: false as const,
+        error: error.message,
+        logs: [] as string[],
+      }),
+    ),
+  );
+  const finishedAt = yield* clock.nowMillis;
+  yield* usage.capture({
+    context: usageContext,
+    durationMs: finishedAt - startedAt,
     operation: "execute",
-    request: input.options.request,
-    requestBody: input.input,
-    responseBody: input.responseBody,
+    requestBody: input,
+    responseBody: executed,
     surface: "mcp",
   });
+  return executed as SketchiCodeModeExecuteOutput;
+});
+
+export function makeSketchiCodeModeProvider(
+  codeMode: Context.Service.Shape<typeof PlaygroundCodeMode>,
+  runToolEffect: PlaygroundRequestRunner,
+): SketchiCodeModeProvider {
+  return {
+    name: "sketchi",
+    fns: {
+      buildFlowchart: (request) =>
+        runToolEffect(codeMode.buildFlowchart(request)),
+      buildMindmap: (request) => runToolEffect(codeMode.buildMindmap(request)),
+      getArtifact: (request) => runToolEffect(codeMode.getArtifact(request)),
+      applyDiagramPatch: (request) =>
+        runToolEffect(codeMode.applyDiagramPatch(request)),
+    },
+  };
 }
 
 export function createSketchiMcpServer(
-  env: StudioEnv,
+  runToolEffect: PlaygroundRequestRunner,
   options: CodeModeMcpOptions = {},
 ): McpServer {
   const server = new McpServer({
@@ -534,39 +552,63 @@ export function createSketchiMcpServer(
         openWorldHint: false,
       },
     },
-    async (input) =>
-      jsonResult(await executeSketchiCodeMode(env, input, options), {
-        includeFinalResponseText: true,
-      }),
+    (input) =>
+      runToolEffect(executeSketchiCodeMode(input, runToolEffect, options)).then(
+        (result) =>
+          jsonResult(result, {
+            includeFinalResponseText: true,
+          }),
+      ),
   );
 
   return server;
 }
 
-function createExecutionContext(): MinimalExecutionContext {
+function createExecutionContext(
+  platform: Context.Service.Shape<typeof PlaygroundPlatformCallbacks>,
+): MinimalExecutionContext {
   return {
     passThroughOnException() {},
     props: {},
-    waitUntil() {},
+    waitUntil: platform.waitUntilPromise,
   };
 }
 
-export async function handleSketchiMcpRequest(
-  env: StudioEnv,
-  request: Request,
-  options: CodeModeMcpOptions = {},
-): Promise<Response> {
-  const { createMcpHandler } = await import("agents/mcp");
-  const handler = createMcpHandler(
-    createSketchiMcpServer(env, {
-      ...options,
-      origin: new URL(request.url).origin,
-      request,
-    }),
-    {
-      route: "/mcp",
-    },
-  ) as McpHttpHandler;
+export class McpTransportError extends Schema.TaggedErrorClass<McpTransportError>()(
+  "McpTransportError",
+  {
+    cause: Schema.Defect(),
+    message: Schema.String,
+  },
+) {}
 
-  return handler(request, env, createExecutionContext());
-}
+export const handleSketchiMcpRequest = Effect.fn("playground.http.mcp")(
+  function* (request: Request, options: CodeModeMcpOptions = {}) {
+    const callbacks = yield* PlaygroundRequestCallbacks;
+    const env = yield* PlaygroundBindings;
+    const platform = yield* PlaygroundPlatformCallbacks;
+    const createMcpHandler = yield* Effect.tryPromise({
+      try: () => import("agents/mcp").then((module) => module.createMcpHandler),
+      catch: (cause) =>
+        McpTransportError.make({
+          cause,
+          message:
+            cause instanceof Error ? cause.message : "MCP transport failed.",
+        }),
+    });
+    const handler = createMcpHandler(
+      createSketchiMcpServer(callbacks.runPromise, options),
+      { route: "/mcp" },
+    ) as McpHttpHandler;
+
+    return yield* Effect.tryPromise({
+      try: () => handler(request, env, createExecutionContext(platform)),
+      catch: (cause) =>
+        McpTransportError.make({
+          cause,
+          message:
+            cause instanceof Error ? cause.message : "MCP transport failed.",
+        }),
+    });
+  },
+);

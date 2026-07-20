@@ -11,10 +11,10 @@ import {
   type StudioObjectBucketListOptions,
 } from "./bucket.js";
 import {
-  makeStudioSourceArtifactStoreLayer,
+  makeStudioSourceArtifactStoreTestLayer,
   StudioSourceArtifactStore,
-  type StudioSourceArtifactLoadResult,
 } from "./source-artifacts.js";
+import { StudioSourceArtifactError } from "./errors.js";
 
 class FailingBucket implements StudioObjectBucket {
   constructor(private readonly operation: "delete" | "get" | "list" | "put") {}
@@ -146,13 +146,20 @@ describe("StudioObjectStore R2 boundary", () => {
 
 describe("StudioSourceArtifactStore boundary", () => {
   it.layer(
-    makeStudioSourceArtifactStoreLayer({
-      async load() {
-        throw new Error("source R2 failed");
-      },
+    makeStudioSourceArtifactStoreTestLayer({
+      load: (artifactId) =>
+        Effect.fail(
+          StudioSourceArtifactError.make({
+            artifactId,
+            cause: new Error("source R2 failed"),
+            code: "storage_failed",
+            message: "source R2 failed",
+            status: 500,
+          }),
+        ),
     }),
-  )("foreign failure", (it) => {
-    it.effect("wraps rejected loaders with the retained cause", () =>
+  )("typed failure", (it) => {
+    it.effect("retains the source failure cause", () =>
       Effect.gen(function* () {
         const sourceArtifacts = yield* StudioSourceArtifactStore;
         const error = yield* Effect.flip(
@@ -166,37 +173,41 @@ describe("StudioSourceArtifactStore boundary", () => {
     );
   });
 
-  const observedSignal: { value: AbortSignal | undefined } = {
-    value: undefined,
+  const interruption: { started: boolean; finalized: boolean } = {
+    finalized: false,
+    started: false,
   };
-  const readObservedSignal = () => observedSignal.value;
-  const cancellationLayer = makeStudioSourceArtifactStoreLayer({
-    load(_artifactId, signal) {
-      observedSignal.value = signal;
-      return new Promise<StudioSourceArtifactLoadResult>(() => undefined);
-    },
+  const cancellationLayer = makeStudioSourceArtifactStoreTestLayer({
+    load: () =>
+      Effect.sync(() => {
+        interruption.started = true;
+      }).pipe(
+        Effect.andThen(Effect.never),
+        Effect.onInterrupt(() =>
+          Effect.sync(() => {
+            interruption.finalized = true;
+          }),
+        ),
+      ),
   });
 
   it.layer(cancellationLayer)("cancellation", (it) => {
     it.effect("forwards interruption without translating it to an error", () =>
       Effect.gen(function* () {
-        observedSignal.value = undefined;
+        interruption.finalized = false;
+        interruption.started = false;
         const sourceArtifacts = yield* StudioSourceArtifactStore;
         const fiber = yield* Effect.forkChild(
           sourceArtifacts.load("artifact-interrupted"),
         );
 
-        while (!readObservedSignal()) {
+        while (!interruption.started) {
           yield* Effect.yieldNow;
         }
 
         yield* Fiber.interrupt(fiber);
         const exit = yield* Fiber.await(fiber);
-        const signal = readObservedSignal();
-        if (!signal) {
-          return assert.fail("Source loader did not receive an AbortSignal.");
-        }
-        assert.isTrue(signal.aborted);
+        assert.isTrue(interruption.finalized);
         assert.isTrue(Exit.isFailure(exit));
         if (Exit.isFailure(exit)) {
           assert.isTrue(Cause.hasInterrupts(exit.cause));

@@ -1,4 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import { Effect, Layer } from "effect";
+import type {
+  ApplyDiagramPatchResult,
+  BuildFlowchartResult,
+  BuildMindmapResult,
+  GetArtifactResult,
+} from "@sketchi/diagram-agent";
 
 const runtimeResults = vi.hoisted(() => {
   let buildFlowchartResult: unknown;
@@ -7,13 +14,10 @@ const runtimeResults = vi.hoisted(() => {
   let applyDiagramPatchResult: unknown;
 
   return {
-    runtime: {
-      buildFlowchart: async () => buildFlowchartResult,
-      buildMindmap: async () => buildMindmapResult,
-      getArtifact: async () => getArtifactResult,
-      applyDiagramPatch: async () => applyDiagramPatchResult,
-      readStoredArtifactForRawHttpResponseForIssue243: async () => null,
-    },
+    getApplyDiagramPatch: () => applyDiagramPatchResult,
+    getBuildFlowchart: () => buildFlowchartResult,
+    getBuildMindmap: () => buildMindmapResult,
+    getGetArtifact: () => getArtifactResult,
     setApplyDiagramPatch: (result: unknown) => {
       applyDiagramPatchResult = result;
     },
@@ -29,23 +33,86 @@ const runtimeResults = vi.hoisted(() => {
   };
 });
 
-vi.mock("@sketchi/diagram-agent", async (importOriginal) => {
+vi.mock("./codemode-service.server", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("@sketchi/diagram-agent")>();
+    await importOriginal<typeof import("./codemode-service.server")>();
   return {
     ...actual,
-    createPlaygroundCodeModePromiseRuntimeForIssue243: () =>
-      runtimeResults.runtime,
+    PlaygroundCodeModeLive: Layer.succeed(actual.PlaygroundCodeMode, {
+      applyDiagramPatch: () =>
+        Effect.succeed(
+          runtimeResults.getApplyDiagramPatch() as ApplyDiagramPatchResult,
+        ),
+      buildFlowchart: () =>
+        Effect.succeed(
+          runtimeResults.getBuildFlowchart() as BuildFlowchartResult,
+        ),
+      buildMindmap: () =>
+        Effect.succeed(runtimeResults.getBuildMindmap() as BuildMindmapResult),
+      getArtifact: () =>
+        Effect.succeed(runtimeResults.getGetArtifact() as GetArtifactResult),
+      readStoredArtifact: () => Effect.succeed(null),
+    }),
   };
 });
 
 import {
   MAX_CODE_MODE_BUILD_REQUEST_BYTES,
-  handleBuildFlowchartRequest,
-  handleBuildMindmapRequest,
-  handleGetArtifactRequest,
-  handlePatchArtifactRequest,
+  handleBuildFlowchartRequest as handleBuildFlowchartRequestEffect,
+  handleBuildMindmapRequest as handleBuildMindmapRequestEffect,
+  handleGetArtifactRequest as handleGetArtifactRequestEffect,
+  handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
 } from "./codemode-api.server";
+import type { StudioEnv } from "../bindings/studio-env.server";
+import { runPlaygroundEffect } from "../runtime/playground-runtime.server";
+
+function testBoundary(env: StudioEnv, request: Request) {
+  return {
+    env,
+    request,
+    platform: {
+      waitUntilPromise: (promise: Promise<unknown>) => {
+        void promise;
+      },
+    },
+  };
+}
+
+function handleBuildFlowchartRequest(env: StudioEnv, request: Request) {
+  return runPlaygroundEffect(
+    handleBuildFlowchartRequestEffect(request),
+    testBoundary(env, request),
+  );
+}
+
+function handleBuildMindmapRequest(env: StudioEnv, request: Request) {
+  return runPlaygroundEffect(
+    handleBuildMindmapRequestEffect(request),
+    testBoundary(env, request),
+  );
+}
+
+function handleGetArtifactRequest(
+  env: StudioEnv,
+  request: Request,
+  artifactId: string,
+) {
+  return runPlaygroundEffect(
+    handleGetArtifactRequestEffect(request, artifactId),
+    testBoundary(env, request),
+  );
+}
+
+function handlePatchArtifactRequest(
+  env: StudioEnv,
+  request: Request,
+  artifactId: string,
+) {
+  return runPlaygroundEffect(
+    handlePatchArtifactRequestEffect(request, artifactId),
+    testBoundary(env, request),
+  );
+}
 
 function issue(input: {
   readonly code: string;

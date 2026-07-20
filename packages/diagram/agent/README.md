@@ -30,10 +30,9 @@ flowchart schema or persist the accepted result a second time.
 
 Use `CodeModeArtifactStorageMemory` for scoped in-memory storage or
 `makeCodeModeArtifactStorageR2Layer` for a Cloudflare object-bucket binding, and
-compose either with `makeCodeModeRuntimeEnvironmentLayer`. The temporary
-`createPlaygroundCodeModePromiseRuntimeForIssue243` export is only the current
-Playground Promise boundary and is removed by issue #243 when the app composes
-the Effect layers directly.
+compose either with `makeCodeModeRuntimeEnvironmentLayer`. Hosts compose these
+Effect services directly and establish their execution boundary at the
+transport edge.
 
 ## Commands
 

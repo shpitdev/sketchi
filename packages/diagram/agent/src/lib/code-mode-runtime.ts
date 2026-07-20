@@ -26,10 +26,8 @@ import {
   CodeModeArtifactStorage,
   isInlineArtifactFormat,
   jsonSizeBytes,
-  makeMemoryArtifactStorage,
   storageIssue,
   type CodeModeArtifactStorageError,
-  type CodeModeArtifactStorageShape,
   type StoredArtifactFormat,
 } from "./code-mode-artifacts.js";
 import {
@@ -86,22 +84,6 @@ export interface CodeModeRuntimeOptions {
     artifactId: string;
     format: ArtifactFormat;
   }) => string;
-}
-
-export interface PlaygroundCodeModePromiseRuntimeForIssue243 {
-  buildFlowchart(input: unknown): Promise<BuildFlowchartResult>;
-  buildMindmap(input: unknown): Promise<BuildMindmapResult>;
-  getArtifact(input: unknown): Promise<GetArtifactResult>;
-  applyDiagramPatch(input: unknown): Promise<ApplyDiagramPatchResult>;
-  readStoredArtifactForRawHttpResponseForIssue243(
-    artifactId: string,
-    format: ArtifactFormat,
-  ): Promise<StoredArtifactFormat | null>;
-}
-
-export interface PlaygroundCodeModePromiseRuntimeOptionsForIssue243
-  extends CodeModeRuntimeOptions {
-  store?: CodeModeArtifactStorageShape;
 }
 
 export class CodeModeRuntimeEnvironment extends Context.Service<
@@ -326,8 +308,7 @@ export interface CodeModeArtifactRenderer {
   renderPng(input: {
     scene: RenderedDiagramScene;
     excalidraw: unknown;
-    signal: AbortSignal;
-  }): Promise<ArrayBuffer | Uint8Array>;
+  }): Effect.Effect<ArrayBuffer | Uint8Array, unknown>;
 }
 
 class CodeModeArtifactExportError extends Schema.TaggedErrorClass<CodeModeArtifactExportError>()(
@@ -793,21 +774,21 @@ function dataForArtifactFormat(
     );
   }
 
-  return Effect.tryPromise({
-    try: (signal) =>
-      input.renderer?.renderPng({
-        scene: input.scene,
-        excalidraw: input.excalidraw,
-        signal,
-      }) ?? Promise.reject(new Error("PNG renderer is unavailable.")),
-    catch: (cause) =>
-      CodeModeArtifactExportError.make({
-        cause,
-        message:
-          cause instanceof Error ? cause.message : "Artifact export failed.",
-        optionPath: false,
-      }),
-  });
+  return input.renderer
+    .renderPng({
+      scene: input.scene,
+      excalidraw: input.excalidraw,
+    })
+    .pipe(
+      Effect.mapError((cause) =>
+        CodeModeArtifactExportError.make({
+          cause,
+          message:
+            cause instanceof Error ? cause.message : "Artifact export failed.",
+          optionPath: false,
+        }),
+      ),
+    );
 }
 
 function sizeBytesForArtifactData(data: unknown): number {
@@ -2265,35 +2246,3 @@ export const applyDiagramPatch: (
     applyDiagramPatchFailureResult,
   ),
 );
-
-/**
- * @deprecated Temporary Promise boundary for current Playground callers only.
- * Delete this facade when issue #243 composes the Playground Effect runtime.
- */
-export function createPlaygroundCodeModePromiseRuntimeForIssue243(
-  options: PlaygroundCodeModePromiseRuntimeOptionsForIssue243 = {},
-): PlaygroundCodeModePromiseRuntimeForIssue243 {
-  const storage = options.store ?? makeMemoryArtifactStorage();
-  const environment: Context.Service.Shape<typeof CodeModeRuntimeEnvironment> =
-    {
-      createId: options.createId ?? defaultCreateId,
-      ...(options.renderer ? { renderer: options.renderer } : {}),
-      ...(options.artifactUrl ? { artifactUrl: options.artifactUrl } : {}),
-    };
-  const run = <A>(program: CodeModeWorkflowEffect<A>) =>
-    Effect.runPromise(
-      program.pipe(
-        Effect.provideService(CodeModeArtifactStorage, storage),
-        Effect.provideService(CodeModeRuntimeEnvironment, environment),
-      ),
-    );
-
-  return {
-    buildFlowchart: (input) => run(buildFlowchart(input)),
-    buildMindmap: (input) => run(buildMindmap(input)),
-    getArtifact: (input) => run(getArtifact(input)),
-    applyDiagramPatch: (input) => run(applyDiagramPatch(input)),
-    readStoredArtifactForRawHttpResponseForIssue243: (artifactId, format) =>
-      Effect.runPromise(storage.read(artifactId, format)),
-  };
-}

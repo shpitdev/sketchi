@@ -44,6 +44,12 @@ export default [
             "^\\.\\./\\.\\./scripts/lib/worker-apps\\.mjs$",
             "^\\.\\./\\.\\./tools/local-dev-ports$",
           ],
+          // Playground lazy-loads its server composition root while its
+          // client routes consume the same package's contracts.
+          checkDynamicDependenciesExceptions: [
+            "@sketchi/studio-projects",
+            "@sketchi/studio-projects/server",
+          ],
           depConstraints: [
             {
               sourceTag: "scope:package",
@@ -110,7 +116,6 @@ export default [
       "apps/excalidraw/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
       "apps/icons/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
       "apps/native-conversion-storybook/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
-      "apps/playground/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
       "apps/web/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
       "packages/diagram/core/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
       "packages/diagram/excalidraw/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",

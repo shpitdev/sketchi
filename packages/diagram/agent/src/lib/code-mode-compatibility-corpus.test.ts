@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Effect, Schema } from "effect";
+import { Context, Effect, Schema } from "effect";
 import { readFile } from "node:fs/promises";
 
 import {
   ARTIFACT_MIME_TYPES,
+  CodeModeArtifactStorage,
   CodeModeArtifactStorageError,
   makeMemoryArtifactStorage,
   makeObjectBucketArtifactStorage,
@@ -30,7 +31,47 @@ import {
   type CodeModeIssueCode,
   type GetArtifactResult,
 } from "./code-mode-contract";
-import { createPlaygroundCodeModePromiseRuntimeForIssue243 } from "./code-mode-runtime";
+import {
+  applyDiagramPatch,
+  buildFlowchart,
+  buildMindmap,
+  CodeModeRuntimeEnvironment,
+  getArtifact,
+  type CodeModeRuntimeOptions,
+} from "./code-mode-runtime";
+
+function makeTestRuntime(
+  options: CodeModeRuntimeOptions & {
+    readonly store?: CodeModeArtifactStorageShape;
+  } = {},
+) {
+  const storage = options.store ?? makeMemoryArtifactStorage();
+  const environment: Context.Service.Shape<typeof CodeModeRuntimeEnvironment> =
+    {
+      createId: options.createId ?? ((prefix) => `${prefix}-test`),
+      ...(options.renderer ? { renderer: options.renderer } : {}),
+      ...(options.artifactUrl ? { artifactUrl: options.artifactUrl } : {}),
+    };
+  const run = <A>(
+    program: Effect.Effect<
+      A,
+      never,
+      CodeModeArtifactStorage | CodeModeRuntimeEnvironment
+    >,
+  ) =>
+    Effect.runPromise(
+      program.pipe(
+        Effect.provideService(CodeModeArtifactStorage, storage),
+        Effect.provideService(CodeModeRuntimeEnvironment, environment),
+      ),
+    );
+  return {
+    applyDiagramPatch: (input: unknown) => run(applyDiagramPatch(input)),
+    buildFlowchart: (input: unknown) => run(buildFlowchart(input)),
+    buildMindmap: (input: unknown) => run(buildMindmap(input)),
+    getArtifact: (input: unknown) => run(getArtifact(input)),
+  };
+}
 
 const renderFailure = vi.hoisted(() => {
   let message: string | undefined;
@@ -136,12 +177,12 @@ function deterministicRuntime(input?: {
   readonly store?: CodeModeArtifactStorageShape;
 }) {
   let nextId = 0;
-  return createPlaygroundCodeModePromiseRuntimeForIssue243({
+  return makeTestRuntime({
     createId: (prefix) => `${prefix}-${(nextId += 1)}`,
     ...(input?.renderer
       ? {
           renderer: {
-            renderPng: async () => new Uint8Array([137, 80, 78, 71]),
+            renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
           },
         }
       : {}),

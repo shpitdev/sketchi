@@ -137,6 +137,7 @@ export function studioOwnersMatch(
 
 export function resolveStudioSession(
   request: Request,
+  createSessionId: () => string = () => `anon_${nanoid(24)}`,
 ): StudioSessionResolution {
   const existingSessionId = cookieValue(request, STUDIO_SESSION_COOKIE);
 
@@ -154,7 +155,7 @@ export function resolveStudioSession(
 
   const session = AnonymousStudioOwner.make({
     kind: "anonymous",
-    sessionId: makeStudioRecordId(`anon_${nanoid(24)}`),
+    sessionId: makeStudioRecordId(createSessionId()),
   });
 
   return {
@@ -165,33 +166,49 @@ export function resolveStudioSession(
   };
 }
 
-export const StudioSessionServiceLive = Layer.succeed(StudioSessionService, {
-  ensureOwner: Effect.fn("studioPersistence.session.ensureOwner")(function* (
-    actual: StudioOwner,
-    expected: StudioOwner,
-    resource: StudioResourceKind,
-    id: string,
-  ) {
-    if (!studioOwnersMatch(actual, expected)) {
-      return yield* Effect.fail(StudioOwnershipError.make({ id, resource }));
-    }
-  }),
-  resolve: Effect.fn("studioPersistence.session.resolve")(function* (
-    request: Request,
-  ) {
-    return yield* Effect.try({
-      try: () => resolveStudioSession(request),
-      catch: (cause) =>
-        StudioSessionError.make({
-          cause,
-          message: failureMessage(
+function makeStudioSessionService(createSessionId: () => string) {
+  return StudioSessionService.of({
+    ensureOwner: Effect.fn("studioPersistence.session.ensureOwner")(function* (
+      actual: StudioOwner,
+      expected: StudioOwner,
+      resource: StudioResourceKind,
+      id: string,
+    ) {
+      if (!studioOwnersMatch(actual, expected)) {
+        return yield* Effect.fail(StudioOwnershipError.make({ id, resource }));
+      }
+    }),
+    resolve: Effect.fn("studioPersistence.session.resolve")(function* (
+      request: Request,
+    ) {
+      return yield* Effect.try({
+        try: () => resolveStudioSession(request, createSessionId),
+        catch: (cause) =>
+          StudioSessionError.make({
             cause,
-            "Studio session could not be resolved.",
-          ),
-        }),
-    });
-  }),
-});
+            message: failureMessage(
+              cause,
+              "Studio session could not be resolved.",
+            ),
+          }),
+      });
+    }),
+  });
+}
+
+export const StudioSessionServiceLive = Layer.succeed(
+  StudioSessionService,
+  makeStudioSessionService(() => `anon_${nanoid(24)}`),
+);
+
+export function makeStudioSessionServiceLayer(options: {
+  readonly createSessionId: () => string;
+}) {
+  return Layer.succeed(
+    StudioSessionService,
+    makeStudioSessionService(options.createSessionId),
+  );
+}
 
 export function makeStudioSessionServiceTestLayer(
   service: StudioSessionServiceShape,

@@ -6,8 +6,8 @@ import {
   type BuildFlowchartOptions,
   type BuildFlowchartResult,
   type BuildFlowchartToolInput,
-  type PlaygroundCodeModePromiseRuntimeForIssue243,
 } from "@sketchi/diagram-agent";
+import { Effect, Ref, Semaphore } from "effect";
 
 export const STUDIO_BUILD_FLOWCHART_TOOL_NAME: "build_flowchart" =
   "build_flowchart";
@@ -44,9 +44,11 @@ function attemptLimitResult(maxAttempts: number): BuildFlowchartResult {
   };
 }
 
-export interface StudioFlowchartToolExecutor {
-  readonly attempts: number;
-  execute(input: StudioBuildFlowchartInput): Promise<BuildFlowchartResult>;
+export interface StudioFlowchartToolExecutor<E = never, R = never> {
+  readonly attempts: Effect.Effect<number>;
+  readonly execute: (
+    input: StudioBuildFlowchartInput,
+  ) => Effect.Effect<BuildFlowchartResult, E, R>;
 }
 
 /**
@@ -54,46 +56,51 @@ export interface StudioFlowchartToolExecutor {
  * attempt budget and artifact options; validation, quality, rendering,
  * exporting, and persistence remain the shared buildFlowchart vertical.
  */
-export function createStudioFlowchartToolExecutor(
-  buildFlowchart: PlaygroundCodeModePromiseRuntimeForIssue243["buildFlowchart"],
+export function makeStudioFlowchartToolExecutor<E, R>(
+  buildFlowchart: (input: unknown) => Effect.Effect<BuildFlowchartResult, E, R>,
   maxAttempts = MAX_FLOWCHART_BUILD_ATTEMPTS,
-): StudioFlowchartToolExecutor {
-  let attempts = 0;
-  let accepted: Extract<BuildFlowchartResult, { ok: true }> | undefined;
-  let executionTail: Promise<void> = Promise.resolve();
+): Effect.Effect<StudioFlowchartToolExecutor<E, R>> {
+  return Effect.gen(function* () {
+    const semaphore = yield* Semaphore.make(1);
+    const state = yield* Ref.make<{
+      attempts: number;
+      accepted?: Extract<BuildFlowchartResult, { ok: true }>;
+    }>({ attempts: 0 });
 
-  const executeNext = async (
-    input: StudioBuildFlowchartInput,
-  ): Promise<BuildFlowchartResult> => {
-    if (accepted) {
-      return accepted;
-    }
-    if (attempts >= maxAttempts) {
-      return attemptLimitResult(maxAttempts);
-    }
+    const execute = Effect.fn("playground.chat.buildFlowchart.execute")(
+      (input: StudioBuildFlowchartInput) =>
+        semaphore.withPermit(
+          Effect.gen(function* () {
+            const current = yield* Ref.get(state);
+            if (current.accepted) {
+              return current.accepted;
+            }
+            if (current.attempts >= maxAttempts) {
+              return attemptLimitResult(maxAttempts);
+            }
 
-    attempts += 1;
-    const result = await buildFlowchart({
-      ...input,
-      options: STUDIO_FLOWCHART_ARTIFACT_OPTIONS,
-    });
-    if (result.ok) {
-      accepted = result;
-    }
-    return result;
-  };
+            yield* Ref.update(state, (value) => ({
+              ...value,
+              attempts: value.attempts + 1,
+            }));
+            const result = yield* buildFlowchart({
+              ...input,
+              options: STUDIO_FLOWCHART_ARTIFACT_OPTIONS,
+            });
+            if (result.ok) {
+              yield* Ref.update(state, (value) => ({
+                ...value,
+                accepted: result,
+              }));
+            }
+            return result;
+          }),
+        ),
+    );
 
-  return {
-    get attempts() {
-      return attempts;
-    },
-    execute(input) {
-      const result = executionTail.then(() => executeNext(input));
-      executionTail = result.then(
-        () => undefined,
-        () => undefined,
-      );
-      return result;
-    },
-  };
+    return {
+      attempts: Ref.get(state).pipe(Effect.map((value) => value.attempts)),
+      execute,
+    };
+  });
 }

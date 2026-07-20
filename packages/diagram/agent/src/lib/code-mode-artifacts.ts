@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Schema } from "effect";
+import { Clock, Context, Effect, Layer, Schema } from "effect";
 
 import {
   ArtifactProvenanceSchema,
@@ -217,6 +217,7 @@ function makeMemoryArtifactStorageState(): MemoryArtifactStorageState {
         },
       ),
       write: Effect.fn("codeMode.artifacts.memory.write")(function* (input) {
+        const now = yield* Clock.currentTimeMillis;
         return yield* Effect.try({
           try: () => {
             const refs = input.formats.map(manifestRef);
@@ -228,7 +229,7 @@ function makeMemoryArtifactStorageState(): MemoryArtifactStorageState {
               diagramId: input.diagramId,
               formats: refs,
               ...(storedProvenance ? { provenance: storedProvenance } : {}),
-              createdAt: new Date().toISOString(),
+              createdAt: new Date(now).toISOString(),
             };
 
             manifests.set(input.artifactId, manifest);
@@ -415,13 +416,14 @@ export function makeObjectBucketArtifactStorage(
       },
     ),
     write: Effect.fn("codeMode.artifacts.r2.write")(function* (input) {
+      const now = yield* Clock.currentTimeMillis;
       const refs = input.formats.map(manifestRef);
       const manifest: StoredArtifactManifest = {
         artifactId: input.artifactId,
         diagramId: input.diagramId,
         formats: refs,
         ...(input.provenance ? { provenance: input.provenance } : {}),
-        createdAt: new Date().toISOString(),
+        createdAt: new Date(now).toISOString(),
       };
 
       yield* Effect.forEach(

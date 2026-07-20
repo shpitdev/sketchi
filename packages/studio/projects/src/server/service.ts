@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Clock, Context, Effect, Layer, Schema } from "effect";
 
 import {
   IsoDateStringSchema,
@@ -116,8 +116,10 @@ export const StudioPersistencePolicyLive = Layer.succeed(
 );
 
 export interface StudioRecordFactoryShape {
-  readonly createId: (kind: "dia" | "proj") => string;
-  readonly now: () => string;
+  readonly createId: (
+    kind: "dia" | "proj",
+  ) => typeof StudioRecordIdSchema.Type;
+  readonly now: Effect.Effect<IsoDateString>;
 }
 
 export class StudioRecordFactory extends Context.Service<
@@ -126,8 +128,10 @@ export class StudioRecordFactory extends Context.Service<
 >()("@sketchi/studio-projects/StudioRecordFactory") {}
 
 export const StudioRecordFactoryLive = Layer.succeed(StudioRecordFactory, {
-  createId: (kind) => `${kind}_${nanoid(14)}`,
-  now: () => new Date().toISOString(),
+  createId: (kind) => makeStudioRecordId(`${kind}_${nanoid(14)}`),
+  now: Clock.currentTimeMillis.pipe(
+    Effect.map((millis) => makeIsoDateString(new Date(millis).toISOString())),
+  ),
 });
 
 function keySegment(value: string): string {
@@ -390,9 +394,9 @@ export const StudioProjectsLive = Layer.effect(
       readonly session: StudioOwner;
     }) {
       const sourceArtifact = yield* sourceArtifacts.load(input.artifactId);
-      const createdAt = makeIsoDateString(recordFactory.now());
-      const projectId = makeStudioRecordId(recordFactory.createId("proj"));
-      const diagramId = makeStudioRecordId(recordFactory.createId("dia"));
+      const createdAt = yield* recordFactory.now;
+      const projectId = recordFactory.createId("proj");
+      const diagramId = recordFactory.createId("dia");
       const source = StudioProjectSource.make({
         artifactId: input.artifactId,
         kind: "playground-artifact",

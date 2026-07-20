@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Effect } from "effect";
 
 import type {
   CodeModeObjectBucket,
@@ -7,11 +8,61 @@ import type {
 } from "@sketchi/diagram-agent";
 
 import {
-  handleBuildFlowchartRequest,
-  handleBuildMindmapRequest,
-  handleGetArtifactRequest,
-  handlePatchArtifactRequest,
+  handleBuildFlowchartRequest as handleBuildFlowchartRequestEffect,
+  handleBuildMindmapRequest as handleBuildMindmapRequestEffect,
+  handleGetArtifactRequest as handleGetArtifactRequestEffect,
+  handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
 } from "./codemode-api.server";
+import type { StudioEnv } from "../bindings/studio-env.server";
+import { runPlaygroundEffect } from "../runtime/playground-runtime.server";
+
+function testBoundary(env: StudioEnv, request: Request) {
+  return {
+    env,
+    request,
+    platform: {
+      waitUntilPromise: (promise: Promise<unknown>) => {
+        void promise;
+      },
+    },
+  };
+}
+
+function handleBuildFlowchartRequest(env: StudioEnv, request: Request) {
+  return runPlaygroundEffect(
+    handleBuildFlowchartRequestEffect(request),
+    testBoundary(env, request),
+  );
+}
+
+function handleBuildMindmapRequest(env: StudioEnv, request: Request) {
+  return runPlaygroundEffect(
+    handleBuildMindmapRequestEffect(request),
+    testBoundary(env, request),
+  );
+}
+
+function handleGetArtifactRequest(
+  env: StudioEnv,
+  request: Request,
+  artifactId: string,
+) {
+  return runPlaygroundEffect(
+    handleGetArtifactRequestEffect(request, artifactId),
+    testBoundary(env, request),
+  );
+}
+
+function handlePatchArtifactRequest(
+  env: StudioEnv,
+  request: Request,
+  artifactId: string,
+) {
+  return runPlaygroundEffect(
+    handlePatchArtifactRequestEffect(request, artifactId),
+    testBoundary(env, request),
+  );
+}
 
 interface StoredObject {
   readonly body: CodeModeObjectBucketBody;

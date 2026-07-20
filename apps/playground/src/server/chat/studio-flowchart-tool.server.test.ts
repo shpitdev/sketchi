@@ -1,14 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "@effect/vitest";
+import { Effect, Fiber } from "effect";
 
 import {
   BuildFlowchartRequestSchema,
-  createPlaygroundCodeModePromiseRuntimeForIssue243,
+  buildFlowchart,
+  CodeModeArtifactStorage,
+  CodeModeRuntimeEnvironment,
   makeMemoryArtifactStorage,
   type BuildFlowchartResult,
   type FlowchartSpec,
 } from "@sketchi/diagram-agent";
 
-import { createStudioFlowchartToolExecutor } from "./studio-flowchart-tool.server";
+import { makeStudioFlowchartToolExecutor } from "./studio-flowchart-tool.server";
 
 function acceptedSpec(): FlowchartSpec {
   return {
@@ -61,10 +64,13 @@ function countingStore() {
 }
 
 function deterministicRuntime(counted: ReturnType<typeof countingStore>) {
-  return createPlaygroundCodeModePromiseRuntimeForIssue243({
-    createId: (prefix) => `${prefix}_fixed`,
-    store: counted.store,
-  });
+  return (input: unknown) =>
+    buildFlowchart(input).pipe(
+      Effect.provideService(CodeModeArtifactStorage, counted.store),
+      Effect.provideService(CodeModeRuntimeEnvironment, {
+        createId: (prefix) => `${prefix}_fixed`,
+      }),
+    );
 }
 
 function deferred<T>() {
@@ -95,12 +101,18 @@ describe("Studio build_flowchart host", () => {
     let request:
       | ReturnType<typeof BuildFlowchartRequestSchema.parse>
       | undefined;
-    const executor = createStudioFlowchartToolExecutor(async (input) => {
-      request = BuildFlowchartRequestSchema.parse(input);
-      return repairResult;
-    });
+    const executor = await Effect.runPromise(
+      makeStudioFlowchartToolExecutor((input) =>
+        Effect.sync(() => {
+          request = BuildFlowchartRequestSchema.parse(input);
+          return repairResult;
+        }),
+      ),
+    );
 
-    await executor.execute({ requestId: "studio-run", spec: rejectedSpec() });
+    await Effect.runPromise(
+      executor.execute({ requestId: "studio-run", spec: rejectedSpec() }),
+    );
 
     expect(request).toMatchObject({
       options: {
@@ -114,12 +126,18 @@ describe("Studio build_flowchart host", () => {
   it("returns deterministic structured canonical issues for rejected flows", async () => {
     const firstStore = countingStore();
     const secondStore = countingStore();
-    const first = await createStudioFlowchartToolExecutor(
-      deterministicRuntime(firstStore).buildFlowchart,
-    ).execute({ spec: rejectedSpec() });
-    const second = await createStudioFlowchartToolExecutor(
-      deterministicRuntime(secondStore).buildFlowchart,
-    ).execute({ spec: rejectedSpec() });
+    const firstExecutor = await Effect.runPromise(
+      makeStudioFlowchartToolExecutor(deterministicRuntime(firstStore)),
+    );
+    const secondExecutor = await Effect.runPromise(
+      makeStudioFlowchartToolExecutor(deterministicRuntime(secondStore)),
+    );
+    const first = await Effect.runPromise(
+      firstExecutor.execute({ spec: rejectedSpec() }),
+    );
+    const second = await Effect.runPromise(
+      secondExecutor.execute({ spec: rejectedSpec() }),
+    );
 
     expect(second).toEqual(first);
     expect(first).toMatchObject({
@@ -140,12 +158,16 @@ describe("Studio build_flowchart host", () => {
 
   it("persists one canonical artifact and reuses it after acceptance", async () => {
     const counted = countingStore();
-    const executor = createStudioFlowchartToolExecutor(
-      deterministicRuntime(counted).buildFlowchart,
+    const executor = await Effect.runPromise(
+      makeStudioFlowchartToolExecutor(deterministicRuntime(counted)),
     );
 
-    const first = await executor.execute({ spec: acceptedSpec() });
-    const duplicate = await executor.execute({ spec: acceptedSpec() });
+    const first = await Effect.runPromise(
+      executor.execute({ spec: acceptedSpec() }),
+    );
+    const duplicate = await Effect.runPromise(
+      executor.execute({ spec: acceptedSpec() }),
+    );
 
     expect(first).toMatchObject({
       ok: true,
@@ -162,35 +184,44 @@ describe("Studio build_flowchart host", () => {
       },
     });
     expect(duplicate).toEqual(first);
-    expect(executor.attempts).toBe(1);
+    await expect(Effect.runPromise(executor.attempts)).resolves.toBe(1);
     expect(counted.writes()).toBe(1);
   });
 
   it("serializes concurrent accepted calls and persists only the first artifact", async () => {
     const counted = countingStore();
-    const runtime = deterministicRuntime(counted);
+    const build = deterministicRuntime(counted);
     const started = deferred<void>();
     const release = deferred<void>();
     let runtimeCalls = 0;
-    const executor = createStudioFlowchartToolExecutor(async (input) => {
-      runtimeCalls += 1;
-      started.resolve(undefined);
-      await release.promise;
-      return runtime.buildFlowchart(input);
-    });
+    const executor = await Effect.runPromise(
+      makeStudioFlowchartToolExecutor((input) =>
+        Effect.sync(() => {
+          runtimeCalls += 1;
+          started.resolve(undefined);
+        }).pipe(
+          Effect.andThen(Effect.promise(() => release.promise)),
+          Effect.andThen(build(input)),
+        ),
+      ),
+    );
 
-    const firstPromise = executor.execute({
-      requestId: "accepted-first",
-      spec: acceptedSpec(),
-    });
-    const queuedPromise = executor.execute({
-      requestId: "accepted-queued",
-      spec: acceptedSpec(),
-    });
+    const firstPromise = Effect.runPromise(
+      executor.execute({
+        requestId: "accepted-first",
+        spec: acceptedSpec(),
+      }),
+    );
+    const queuedPromise = Effect.runPromise(
+      executor.execute({
+        requestId: "accepted-queued",
+        spec: acceptedSpec(),
+      }),
+    );
 
     await started.promise;
     expect(runtimeCalls).toBe(1);
-    expect(executor.attempts).toBe(1);
+    await expect(Effect.runPromise(executor.attempts)).resolves.toBe(1);
     expect(counted.writes()).toBe(0);
 
     release.resolve(undefined);
@@ -199,7 +230,7 @@ describe("Studio build_flowchart host", () => {
     expect(first).toMatchObject({ ok: true, status: "accepted" });
     expect(queued).toBe(first);
     expect(runtimeCalls).toBe(1);
-    expect(executor.attempts).toBe(1);
+    await expect(Effect.runPromise(executor.attempts)).resolves.toBe(1);
     expect(counted.writes()).toBe(1);
   });
 
@@ -207,23 +238,30 @@ describe("Studio build_flowchart host", () => {
     const started = deferred<void>();
     const release = deferred<void>();
     const requestIds: Array<string> = [];
-    const executor = createStudioFlowchartToolExecutor(async (input) => {
-      const request = BuildFlowchartRequestSchema.parse(input);
-      requestIds.push(request.requestId ?? "missing-request-id");
-      if (requestIds.length === 1) {
-        started.resolve(undefined);
-        await release.promise;
-      }
-      return repairResult;
-    });
+    const executor = await Effect.runPromise(
+      makeStudioFlowchartToolExecutor((input) =>
+        Effect.gen(function* () {
+          const request = BuildFlowchartRequestSchema.parse(input);
+          requestIds.push(request.requestId ?? "missing-request-id");
+          if (requestIds.length === 1) {
+            started.resolve(undefined);
+            yield* Effect.promise(() => release.promise);
+          }
+          return repairResult;
+        }),
+      ),
+    );
 
     const pending = ["repair-1", "repair-2", "repair-3", "past-cap"].map(
-      (requestId) => executor.execute({ requestId, spec: rejectedSpec() }),
+      (requestId) =>
+        Effect.runPromise(
+          executor.execute({ requestId, spec: rejectedSpec() }),
+        ),
     );
 
     await started.promise;
     expect(requestIds).toEqual(["repair-1"]);
-    expect(executor.attempts).toBe(1);
+    await expect(Effect.runPromise(executor.attempts)).resolves.toBe(1);
 
     release.resolve(undefined);
     const results = await Promise.all(pending);
@@ -238,23 +276,29 @@ describe("Studio build_flowchart host", () => {
       ok: false,
       status: "quality_failed",
     });
-    expect(executor.attempts).toBe(3);
+    await expect(Effect.runPromise(executor.attempts)).resolves.toBe(3);
   });
 
   it("caps rejected repair attempts at three without invoking the runtime again", async () => {
     let calls = 0;
-    const executor = createStudioFlowchartToolExecutor(async () => {
-      calls += 1;
-      return repairResult;
-    });
+    const executor = await Effect.runPromise(
+      makeStudioFlowchartToolExecutor(() =>
+        Effect.sync(() => {
+          calls += 1;
+          return repairResult;
+        }),
+      ),
+    );
 
-    await executor.execute({ spec: rejectedSpec() });
-    await executor.execute({ spec: rejectedSpec() });
-    await executor.execute({ spec: rejectedSpec() });
-    const capped = await executor.execute({ spec: acceptedSpec() });
+    await Effect.runPromise(executor.execute({ spec: rejectedSpec() }));
+    await Effect.runPromise(executor.execute({ spec: rejectedSpec() }));
+    await Effect.runPromise(executor.execute({ spec: rejectedSpec() }));
+    const capped = await Effect.runPromise(
+      executor.execute({ spec: acceptedSpec() }),
+    );
 
     expect(calls).toBe(3);
-    expect(executor.attempts).toBe(3);
+    await expect(Effect.runPromise(executor.attempts)).resolves.toBe(3);
     expect(capped).toMatchObject({
       ok: false,
       status: "quality_failed",
@@ -265,4 +309,51 @@ describe("Studio build_flowchart host", () => {
       ],
     });
   });
+
+  it.effect(
+    "bounds execution to one and releases the permit on interruption",
+    () =>
+      Effect.gen(function* () {
+        const firstStarted = Promise.withResolvers<void>();
+        let active = 0;
+        let calls = 0;
+        let maxActive = 0;
+        const executor = yield* makeStudioFlowchartToolExecutor(() =>
+          Effect.gen(function* () {
+            calls += 1;
+            active += 1;
+            maxActive = Math.max(maxActive, active);
+            if (calls === 1) {
+              firstStarted.resolve();
+              return yield* Effect.never;
+            }
+            return repairResult;
+          }).pipe(
+            Effect.ensuring(
+              Effect.sync(() => {
+                active -= 1;
+              }),
+            ),
+          ),
+        );
+        const first = yield* Effect.forkChild(
+          executor.execute({ requestId: "first", spec: rejectedSpec() }),
+        );
+        yield* Effect.promise(() => firstStarted.promise);
+        const second = yield* Effect.forkChild(
+          executor.execute({ requestId: "second", spec: rejectedSpec() }),
+        );
+        yield* Effect.yieldNow;
+
+        expect(calls).toBe(1);
+        expect(maxActive).toBe(1);
+        yield* Fiber.interrupt(first);
+        const secondResult = yield* Fiber.join(second);
+
+        expect(secondResult).toEqual(repairResult);
+        expect(calls).toBe(2);
+        expect(maxActive).toBe(1);
+        expect(yield* executor.attempts).toBe(2);
+      }),
+  );
 });

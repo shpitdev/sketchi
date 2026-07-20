@@ -1,9 +1,16 @@
 import "@tanstack/react-start/server-only";
 
-import { waitUntil } from "cloudflare:workers";
 import type { ArtifactFormat, ArtifactFormatRef } from "@sketchi/diagram-agent";
+import { Context, Effect, Layer, Schema } from "effect";
 
-import type { StudioEnv } from "../bindings/studio-env.server";
+import {
+  PlaygroundBindings,
+  PlaygroundClock,
+  PlaygroundIds,
+  PlaygroundPlatformCallbacks,
+  PlaygroundRequestMetadata,
+  type PlaygroundRequestServices,
+} from "../runtime/playground-context.server";
 
 const USAGE_PREFIX = "codemode/usage";
 const USAGE_EVENT_SCHEMA = "sketchi.codemode.usage.v1";
@@ -28,9 +35,7 @@ export interface CodeModeUsageContext {
 export interface CodeModeUsageCaptureInput {
   context: CodeModeUsageContext;
   durationMs: number;
-  env: StudioEnv;
   operation: CodeModeUsageOperation;
-  request: Request;
   requestBody: unknown;
   responseBody: unknown;
   statusCode?: number;
@@ -146,16 +151,52 @@ interface CodeModeUsageIssueAnalyticsRow {
   surface: CodeModeUsageSurface;
 }
 
-export function createCodeModeUsageContext(
-  request: Request,
-): CodeModeUsageContext {
+const CodeModeUsageSinkSchema = Schema.Literals(["analytics", "artifacts"]);
+
+export class CodeModeUsageCaptureError extends Schema.TaggedErrorClass<CodeModeUsageCaptureError>()(
+  "CodeModeUsageCaptureError",
+  {
+    cause: Schema.Defect(),
+    message: Schema.String,
+    sink: CodeModeUsageSinkSchema,
+  },
+) {}
+
+type UsageRequestContext =
+  | PlaygroundRequestServices
+  | PlaygroundClock
+  | PlaygroundIds;
+
+export interface PlaygroundCodeModeUsageShape {
+  readonly capture: (
+    input: CodeModeUsageCaptureInput,
+  ) => Effect.Effect<void, never, UsageRequestContext>;
+  readonly createContext: Effect.Effect<
+    CodeModeUsageContext,
+    never,
+    PlaygroundIds | PlaygroundRequestMetadata
+  >;
+}
+
+export class PlaygroundCodeModeUsage extends Context.Service<
+  PlaygroundCodeModeUsage,
+  PlaygroundCodeModeUsageShape
+>()("@sketchi/playground/PlaygroundCodeModeUsage") {}
+
+const createCodeModeUsageContext = Effect.fn(
+  "playground.codeModeUsage.createContext",
+)(function* () {
+  const ids = yield* PlaygroundIds;
+  const metadata = yield* PlaygroundRequestMetadata;
   return {
     attemptId:
-      headerValue(request, "x-sketchi-attempt-id") ?? randomId("attempt"),
-    eventId: randomId("event"),
-    runId: headerValue(request, "x-sketchi-run-id") ?? randomId("run"),
+      headerValue(metadata.request, "x-sketchi-attempt-id") ??
+      ids.create("attempt"),
+    eventId: ids.create("event"),
+    runId:
+      headerValue(metadata.request, "x-sketchi-run-id") ?? ids.create("run"),
   };
-}
+});
 
 export function codeModeUsageResponseHeaders(
   context: CodeModeUsageContext,
@@ -167,60 +208,79 @@ export function codeModeUsageResponseHeaders(
   };
 }
 
-export function captureCodeModeUsageEvent(
-  input: CodeModeUsageCaptureInput,
-): void {
-  waitUntil(
-    deferredCodeModeUsageCapture(input).catch((error: unknown) => {
-      console.warn("Sketchi Code Mode usage capture failed.", error);
-    }),
-  );
-}
-
-async function deferredCodeModeUsageCapture(
-  input: CodeModeUsageCaptureInput,
-): Promise<void> {
-  await nextTurn();
-  await persistCodeModeUsageEvent(input);
-}
-
-async function persistCodeModeUsageEvent(
-  input: CodeModeUsageCaptureInput,
-): Promise<void> {
-  const event = codeModeUsageEventFromInput(input);
-  const writes: Promise<unknown>[] = [
-    sendCodeModeUsageAnalytics(input.env, event, input.responseBody),
-  ];
-
-  if (input.env.SKETCHI_ARTIFACTS) {
-    writes.push(
-      input.env.SKETCHI_ARTIFACTS.put(event.eventKey, JSON.stringify(event), {
-        httpMetadata: { contentType: "application/json" },
-      }),
+const captureCodeModeUsageEvent = Effect.fn("playground.codeModeUsage.capture")(
+  function* (input: CodeModeUsageCaptureInput) {
+    const clock = yield* PlaygroundClock;
+    const env = yield* PlaygroundBindings;
+    const metadata = yield* PlaygroundRequestMetadata;
+    const platform = yield* PlaygroundPlatformCallbacks;
+    const eventTime = yield* clock.nowIso;
+    const event = codeModeUsageEventFromInput(
+      input,
+      metadata.request,
+      eventTime,
     );
-  }
+    const writes: Array<Effect.Effect<void, CodeModeUsageCaptureError>> = [
+      sendCodeModeUsageAnalytics(env, event, input.responseBody),
+    ];
 
-  await Promise.all(writes);
-}
+    if (env.SKETCHI_ARTIFACTS) {
+      writes.push(
+        Effect.tryPromise({
+          try: () =>
+            env.SKETCHI_ARTIFACTS?.put(event.eventKey, JSON.stringify(event), {
+              httpMetadata: { contentType: "application/json" },
+            }) ?? Promise.resolve(),
+          catch: (cause) =>
+            CodeModeUsageCaptureError.make({
+              cause,
+              message: "Code Mode usage artifact persistence failed.",
+              sink: "artifacts",
+            }),
+        }).pipe(Effect.asVoid),
+      );
+    }
+
+    const deferredCapture = Effect.yieldNow.pipe(
+      Effect.andThen(Effect.all(writes, { concurrency: 2, discard: true })),
+      Effect.catchTag("CodeModeUsageCaptureError", (error) =>
+        Effect.sync(() =>
+          console.warn("Sketchi Code Mode usage capture failed.", error.cause),
+        ),
+      ),
+    );
+    platform.waitUntil(deferredCapture);
+  },
+);
+
+export const PlaygroundCodeModeUsageLive = Layer.succeed(
+  PlaygroundCodeModeUsage,
+  {
+    capture: captureCodeModeUsageEvent,
+    createContext: createCodeModeUsageContext(),
+  },
+);
 
 function codeModeUsageEventFromInput(
   input: CodeModeUsageCaptureInput,
+  request: Request,
+  eventTime: string,
 ): CodeModeUsageEvent {
-  const eventKey = keyForUsageEvent(input.context, "event.json");
+  const eventKey = keyForUsageEvent(input.context, eventTime, "event.json");
 
   return {
     artifactRefs: artifactRefsFrom(input.responseBody),
     attemptId: input.context.attemptId,
-    client: clientFromRequest(input.request),
+    client: clientFromRequest(request),
     durationMs: input.durationMs,
     eventId: input.context.eventId,
     eventKey,
-    eventTime: new Date().toISOString(),
+    eventTime,
     operation: input.operation,
     request: {
       body: snapshotFrom(input.requestBody),
-      method: input.request.method,
-      path: pathFromRequest(input.request),
+      method: request.method,
+      path: pathFromRequest(request),
     },
     response: {
       body: snapshotFrom(input.responseBody),
@@ -233,31 +293,38 @@ function codeModeUsageEventFromInput(
   };
 }
 
-async function sendCodeModeUsageAnalytics(
-  env: StudioEnv,
+function sendCodeModeUsageAnalytics(
+  env: Context.Service.Shape<typeof PlaygroundBindings>,
   event: CodeModeUsageEvent,
   responseBody: unknown,
-): Promise<void> {
+): Effect.Effect<void, CodeModeUsageCaptureError> {
   const issueSummaries = issueSummariesFrom(responseBody);
-  const writes: Promise<void>[] = [];
-
-  if (env.CODEMODE_USAGE_EVENTS) {
-    writes.push(
-      env.CODEMODE_USAGE_EVENTS.send([
-        analyticsRowFrom(event, responseBody, issueSummaries),
-      ]),
-    );
-  }
-
-  if (env.CODEMODE_USAGE_ISSUES && issueSummaries.length > 0) {
-    writes.push(
-      env.CODEMODE_USAGE_ISSUES.send(
-        issueSummaries.map((issue) => issueAnalyticsRowFrom(event, issue)),
-      ),
-    );
-  }
-
-  await Promise.all(writes);
+  return Effect.tryPromise({
+    try: async () => {
+      const writes: Promise<void>[] = [];
+      if (env.CODEMODE_USAGE_EVENTS) {
+        writes.push(
+          env.CODEMODE_USAGE_EVENTS.send([
+            analyticsRowFrom(event, responseBody, issueSummaries),
+          ]),
+        );
+      }
+      if (env.CODEMODE_USAGE_ISSUES && issueSummaries.length > 0) {
+        writes.push(
+          env.CODEMODE_USAGE_ISSUES.send(
+            issueSummaries.map((issue) => issueAnalyticsRowFrom(event, issue)),
+          ),
+        );
+      }
+      await Promise.all(writes);
+    },
+    catch: (cause) =>
+      CodeModeUsageCaptureError.make({
+        cause,
+        message: "Code Mode usage analytics persistence failed.",
+        sink: "analytics",
+      }),
+  });
 }
 
 function analyticsRowFrom(
@@ -477,9 +544,10 @@ function clientFromRequest(request: Request): CodeModeUsageClient {
 
 function keyForUsageEvent(
   context: CodeModeUsageContext,
+  eventTime: string,
   fileName: "event.json",
 ): string {
-  const now = new Date();
+  const now = new Date(eventTime);
   const year = now.getUTCFullYear();
   const month = String(now.getUTCMonth() + 1).padStart(2, "0");
   const day = String(now.getUTCDate()).padStart(2, "0");
@@ -627,14 +695,4 @@ function byteSize(value: string): number {
 function headerValue(request: Request, name: string): string | undefined {
   const value = request.headers.get(name)?.trim();
   return value ? value : undefined;
-}
-
-function randomId(prefix: "attempt" | "event" | "run"): string {
-  return `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
-}
-
-function nextTurn(): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, 0);
-  });
 }

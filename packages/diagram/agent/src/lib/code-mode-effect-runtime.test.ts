@@ -14,7 +14,6 @@ import {
   makeCodeModeRuntimeEnvironmentLayer,
 } from "./code-mode-runtime";
 
-let renderingSignal: AbortSignal | undefined;
 const renderingStarted = Promise.withResolvers<void>();
 const patchOperationNames = new Set<string>(DIAGRAM_PATCH_OPERATION_NAMES);
 
@@ -23,11 +22,10 @@ const runtimeLayer = Layer.mergeAll(
   makeCodeModeRuntimeEnvironmentLayer({
     createId: (prefix) => `${prefix}-effect-test`,
     renderer: {
-      renderPng: ({ signal }) => {
-        renderingSignal = signal;
-        renderingStarted.resolve();
-        return new Promise<never>(() => undefined);
-      },
+      renderPng: () =>
+        Effect.sync(() => renderingStarted.resolve()).pipe(
+          Effect.andThen(Effect.never),
+        ),
     },
   }),
 );
@@ -126,7 +124,6 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
         );
       }
       assert.isTrue(Cause.hasInterrupts(exit.cause));
-      assert.isTrue(renderingSignal?.aborted);
     }),
   );
 

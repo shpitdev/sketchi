@@ -1,13 +1,45 @@
 import { describe, expect, it } from "vitest";
+import { Effect } from "effect";
 
 import type { FlowchartSpec } from "@sketchi/diagram-agent";
 import { MemoryStudioObjectBucket } from "@sketchi/studio-projects/server";
 
-import { createStudioCodeModeRuntime } from "../codemode/codemode-api.server";
+import type { StudioEnv } from "../bindings/studio-env.server";
+import { PlaygroundCodeMode } from "../codemode/codemode-service.server";
+import { runPlaygroundEffect } from "../runtime/playground-runtime.server";
 import {
-  handleCreateStudioProjectFromArtifactRequest,
-  handleListStudioProjectsRequest,
+  handleCreateStudioProjectFromArtifactRequest as handleCreateStudioProjectFromArtifactRequestEffect,
+  handleListStudioProjectsRequest as handleListStudioProjectsRequestEffect,
 } from "./projects.server";
+
+function testBoundary(env: StudioEnv, request: Request) {
+  return {
+    env,
+    request,
+    platform: {
+      waitUntilPromise: (promise: Promise<unknown>) => {
+        void promise;
+      },
+    },
+  };
+}
+
+function handleCreateStudioProjectFromArtifactRequest(
+  env: StudioEnv,
+  request: Request,
+) {
+  return runPlaygroundEffect(
+    handleCreateStudioProjectFromArtifactRequestEffect(request),
+    testBoundary(env, request),
+  );
+}
+
+function handleListStudioProjectsRequest(env: StudioEnv, request: Request) {
+  return runPlaygroundEffect(
+    handleListStudioProjectsRequestEffect(request),
+    testBoundary(env, request),
+  );
+}
 
 function flowchartSpec(title: string): FlowchartSpec {
   return {
@@ -38,16 +70,23 @@ async function createArtifact(
   bucket: MemoryStudioObjectBucket,
   title: string,
 ): Promise<string> {
-  const result = await createStudioCodeModeRuntime(
-    { SKETCHI_ARTIFACTS: bucket },
-    { origin: "https://studio.test" },
-  ).buildFlowchart({
-    spec: flowchartSpec(title),
-    options: {
-      artifactFormats: ["scene", "excalidraw"],
-      inlineArtifacts: ["scene"],
-    },
+  const request = new Request("https://studio.test/test-artifact", {
+    method: "POST",
   });
+  const env = { SKETCHI_ARTIFACTS: bucket };
+  const result = await runPlaygroundEffect(
+    Effect.gen(function* () {
+      const codeMode = yield* PlaygroundCodeMode;
+      return yield* codeMode.buildFlowchart({
+        spec: flowchartSpec(title),
+        options: {
+          artifactFormats: ["scene", "excalidraw"],
+          inlineArtifacts: ["scene"],
+        },
+      });
+    }),
+    testBoundary(env, request),
+  );
 
   if (!result.ok) {
     throw new Error("Expected the test artifact to be accepted.");
