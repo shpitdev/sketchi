@@ -1,0 +1,127 @@
+name: release
+
+on:
+  push:
+    branches:
+      - main
+
+# Serialize releases: a newer push replaces any pending (not-yet-started) run in
+# this group. An intermediate version whose run is superseded before it starts is
+# intentionally skipped — the newest version on main wins. cancel-in-progress is
+# false so an already-running publish is never interrupted mid-flight.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  NX_DAEMON: "false"
+  NX_TUI: "false"
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      publish: ${{ steps.check.outputs.publish }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.13.0
+      - name: Decide whether the exact source CLI version is unpublished
+        id: check
+        run: |
+          set -euo pipefail
+          local_version="$(node -p "require('./apps/cli/package.json').version")"
+          echo "version=$local_version" >> "$GITHUB_OUTPUT"
+
+          # Query the registry for this EXACT version, not the latest dist-tag, so
+          # a rolled-back or re-pointed `latest` cannot trigger repeated
+          # duplicate-publish attempts. Capture stdout/exit separately so we can
+          # fail closed on network/5xx errors instead of swallowing them.
+          set +e
+          registry_version="$(npm view "sketchi@$local_version" version 2>view-error.log)"
+          view_status=$?
+          set -e
+
+          if [ "$view_status" -eq 0 ] && [ -n "$registry_version" ]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "sketchi@$local_version is already published; skipping release."
+            exit 0
+          fi
+
+          # npm exits non-zero for a missing version. Only treat a genuine
+          # 404 / "no such version" as publishable; anything else (network, 5xx,
+          # auth, rate limit) fails the job rather than risking a bad decision.
+          if grep -qiE 'code E404|no matching version|is not in this registry|No match found' view-error.log; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "sketchi@$local_version is not on the registry; releasing."
+            exit 0
+          fi
+
+          echo "npm view failed for a non-404 reason; failing closed:" >&2
+          cat view-error.log >&2
+          exit 1
+
+  publish:
+    needs: guard
+    if: ${{ needs.guard.outputs.publish == 'true' }}
+    runs-on: ubuntu-latest
+    # id-token: write is required for npm OIDC trusted publishing; no npm secret
+    # or NODE_AUTH_TOKEN is used. contents stays read-only here.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+        with:
+          version: 11.5.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.13.0
+          cache: pnpm
+      # node 24.13.0 bundles npm 11.12.0, which already supports OIDC trusted
+      # publishing (>= 11.5.1). No npm upgrade: the bundled npm is pinned by the
+      # node version, keeping the publishing toolchain deterministic.
+      - run: pnpm install --frozen-lockfile
+      - name: Build and run the offline packaging smoke
+        run: pnpm exec nx run sketchi-cli:smoke
+      - name: Publish sketchi to npm via OIDC trusted publishing
+        run: npm publish --access public
+        working-directory: apps/cli/dist
+
+  tag:
+    needs: [guard, publish]
+    if: ${{ needs.guard.outputs.publish == 'true' }}
+    runs-on: ubuntu-latest
+    # contents: write is scoped to this job only, purely to push the release tag.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Tag the published CLI release
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="cli-v$VERSION"
+          # Peeled ref (^{}) resolves an annotated tag to its commit; fall back to
+          # the plain ref for a lightweight tag (what this job creates).
+          peeled="$(git ls-remote origin "refs/tags/$tag^{}" | awk '{print $1; exit}')"
+          plain="$(git ls-remote origin "refs/tags/$tag" | awk '{print $1; exit}')"
+          existing="${peeled:-$plain}"
+          if [ -n "$existing" ]; then
+            if [ "$existing" = "$GITHUB_SHA" ]; then
+              echo "Tag $tag already points at $GITHUB_SHA; idempotent rerun, nothing to do."
+              exit 0
+            fi
+            echo "Tag $tag already exists but points at $existing, not the release commit $GITHUB_SHA." >&2
+            exit 1
+          fi
+          git tag "$tag" "$GITHUB_SHA"
+          git push origin "$tag"
