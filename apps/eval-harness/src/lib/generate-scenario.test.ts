@@ -9,36 +9,70 @@ import {
   toDiagramGenerationPrompt,
 } from "@sketchi/diagram-scenarios";
 import { assert, describe, expect, it, layer, vi } from "@effect/vitest";
-import { Effect, Fiber, Layer } from "effect";
+import { Cause, Effect, Fiber, Layer, Exit } from "effect";
 import { TestClock } from "effect/testing";
 
 import {
-  GenerateScenarioInputSchema,
+  decodeGenerateScenarioInput,
+  generateScenarioErrorPayload,
+  GenerateScenarioInputValidationError,
   generateScenarioCandidatesForInput,
   runGenerateScenarioCandidatesForInput,
 } from "./generate-scenario";
 
 describe("eval harness scenario generation composition", () => {
-  it("preserves the Zod-visible invalid-provider issue contract", () => {
-    const result = GenerateScenarioInputSchema.safeParse({
-      providers: ["unsupported"],
-      scenarioId: "sketchi-onboarding-decision-flow",
-    });
-
-    if (result.success) {
-      return assert.fail("Invalid provider unexpectedly passed validation.");
-    }
-
-    assert.deepStrictEqual(result.error.issues, [
-      {
-        code: "invalid_value",
-        message:
-          'Invalid option: expected one of "fixture"|"cloudflare-google-ai-studio"|"google-ai-studio"',
-        path: ["providers", 0],
-        values: ["fixture", "cloudflare-google-ai-studio", "google-ai-studio"],
-      },
-    ]);
-  });
+  it.effect(
+    "preserves the invalid-provider issue contract with Effect Schema",
+    () =>
+      Effect.gen(function* () {
+        const exit = yield* Effect.exit(
+          decodeGenerateScenarioInput({
+            providers: ["unsupported"],
+            scenarioId: "sketchi-onboarding-decision-flow",
+          }),
+        );
+        assert.isTrue(Exit.isFailure(exit));
+        if (Exit.isFailure(exit)) {
+          const error = Cause.findError(exit.cause);
+          assert.strictEqual(error._tag, "Success");
+          if (error._tag === "Success") {
+            assert.instanceOf(
+              error.success,
+              GenerateScenarioInputValidationError,
+            );
+            if (error.success instanceof GenerateScenarioInputValidationError) {
+              const expectedIssues = [
+                {
+                  code: "invalid_value",
+                  message:
+                    'Invalid option: expected one of "fixture"|"cloudflare-google-ai-studio"|"google-ai-studio"',
+                  path: ["providers", 0],
+                  values: [
+                    "fixture",
+                    "cloudflare-google-ai-studio",
+                    "google-ai-studio",
+                  ],
+                },
+              ];
+              assert.deepStrictEqual(
+                JSON.parse(JSON.stringify(error.success.issues)),
+                expectedIssues,
+              );
+              assert.deepStrictEqual(
+                JSON.parse(
+                  JSON.stringify(generateScenarioErrorPayload(error.success)),
+                ),
+                { error: JSON.stringify(error.success.issues, null, 2) },
+              );
+              assert.strictEqual(
+                error.success.message,
+                '[\n  {\n    "code": "invalid_value",\n    "values": [\n      "fixture",\n      "cloudflare-google-ai-studio",\n      "google-ai-studio"\n    ],\n    "path": [\n      "providers",\n      0\n    ],\n    "message": "Invalid option: expected one of \\"fixture\\"|\\"cloudflare-google-ai-studio\\"|\\"google-ai-studio\\""\n  }\n]',
+              );
+            }
+          }
+        }
+      }),
+  );
 
   it("adapts a maintained scenario before calling the generation client", async () => {
     const scenario = getScenario("sketchi-onboarding-decision-flow");

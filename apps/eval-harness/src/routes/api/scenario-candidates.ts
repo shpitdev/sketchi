@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { runGenerateScenarioCandidatesForInput } from "../../lib/generate-scenario";
+import {
+  generateScenarioErrorPayload,
+  runGenerateScenarioCandidatesForInput,
+} from "../../lib/generate-scenario";
 
 export const Route = createFileRoute("/api/scenario-candidates")({
   server: {
@@ -18,15 +21,9 @@ export const Route = createFileRoute("/api/scenario-candidates")({
             ),
           );
         } catch (error) {
-          return Response.json(
-            {
-              error:
-                error instanceof Error
-                  ? error.message
-                  : "Scenario generation failed.",
-            },
-            { status: 400 },
-          );
+          return Response.json(generateScenarioErrorPayload(error), {
+            status: 400,
+          });
         }
       },
     },

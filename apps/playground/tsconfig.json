@@ -5,9 +5,8 @@
     "rootDir": "src",
     "tsBuildInfoFile": ".output/tsconfig.tsbuildinfo",
     "types": ["node", "vite/client"],
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.tsx"]

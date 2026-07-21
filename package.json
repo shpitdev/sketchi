@@ -48,10 +48,10 @@
     "agents": "0.16.2",
     "effect": "4.0.0-beta.99",
     "react": "19.2.7",
-    "react-dom": "19.2.7",
-    "zod": "4.4.3"
+    "react-dom": "19.2.7"
   },
   "devDependencies": {
+    "@effect/platform-node": "4.0.0-beta.99",
     "@cloudflare/vite-plugin": "1.39.2",
     "@effect/vitest": "4.0.0-beta.99",
     "@nx/devkit": "22.7.5",

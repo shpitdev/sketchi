@@ -9,7 +9,7 @@ API helpers, anonymous/authenticated ownership, and object-bucket persistence.
   project workflows. Typed failures distinguish absence, corrupt data,
   authorization, session, source-artifact, and storage infrastructure errors.
 - Persistence fan-out uses the provided `StudioPersistencePolicy` concurrency
-  limit. The current Playground export is one thin Promise runtime edge over
-  the Effect HTTP handlers until the app composition slice owns that wiring.
+  limit. Playground provides the Worker bindings at its single Effect runtime
+  composition root; route handlers remain thin framework adapters.
 
 Cloudflare bindings and Code Mode artifact loading stay in the consuming app.

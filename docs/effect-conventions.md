@@ -1,11 +1,15 @@
 # Effect conventions
 
-Sketchi pins `effect` and `@effect/vitest` to `4.0.0-beta.99`. Effect owns
+Sketchi exact-pins `effect` and every `@effect/*` package to the approved
+`4.0.0-beta.99` substrate. Effect owns
 effectful orchestration in `diagram-generation`, `diagram-agent`,
 `diagram-scenarios`, `studio/projects`, `observability`, and the Worker runtime
 boundaries in `playground` and `eval-harness`. Parsing, formatting, IR
 validation, rendering, React/TanStack surfaces, and generators stay pure or
 framework-native.
+
+There is no `@effect/cli` dependency. Beta upgrades happen only in dedicated
+changes with full proof.
 
 ## Operations and observability
 
@@ -45,8 +49,20 @@ or R2 SQL verification queries.
 - Compose layers once at an application or test boundary. A framework adapter
   may call `Effect.runPromise`; package and business APIs return `Effect`.
   Do not preserve a parallel Promise-primary implementation.
+- Executable Node entrypoints use `NodeRuntime.runMain`, so SIGINT and SIGTERM
+  interrupt the main fiber and wait for scoped process-tree and remote-resource
+  finalizers before exit. `Effect.runPromise` is not a Node main-loop adapter.
 - Parameterized layer construction is restricted to runtime bindings. Build it
   once at the edge and reuse the resulting layer.
+- Node child processes are scoped resources. Timeout is measured until process
+  exit; close receives a separate bounded grace for inherited stdio. Timeout or
+  interruption targets the owned process group/tree with SIGTERM, escalates to
+  SIGKILL, force-settles after a final bound, and always releases descendants,
+  listeners, and streams.
+- Provisioning scripts that create remote resources are Effect-authoritative,
+  not ordinary deployment plumbing. Register cleanup in a scope before the
+  first mutation, use interruptible Effect polling, forward fetch cancellation,
+  and make finalizers best-effort and complete.
 
 ## Failures, resilience, and cancellation
 
@@ -70,3 +86,18 @@ or R2 SQL verification queries.
   introduced.
 - Pure helpers and framework-native projects do not import Effect. Keep their
   ordinary unit tests and deterministic contracts intact.
+
+## Structural closure
+
+`tools/project-graph.test.ts` is the executable boundary inventory. It pins the
+allowed manifests and unstable adapter, rejects Effect v3 and Zod source
+imports, enumerates runtime host edges, and enumerates the remaining native
+Promise sites and counts. The TypeScript type-checker gate resolves
+Promise/PromiseLike identity and assignability for async returns, awaits,
+constructions, calls, and thenable member access, including qualified and
+aliased forms. Union/intersection constituents, generic use-site instantiation,
+and nullable/optional consumption are included. Adding a file or a site fails
+the test until its ownership is deliberately classified.
+
+The full rationale and exhaustive glob classification are checked in at
+[Effect v4 program-closure inventory](effect-program-closure-inventory.md).

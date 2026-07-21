@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { NodeRuntime } from "@effect/platform-node";
+import { Context, Effect, Layer, Schema } from "effect";
 
 const DEFAULT_ACCOUNT_ID = "75f9660f39e4dafe8b95980b87e7399a";
 const DEFAULT_NAMESPACE = "smoke";
@@ -166,45 +168,181 @@ export function assertAggregateMatches(responseBody, expectedValue) {
   }
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  const tokenEnv = args["token-env"] ?? DEFAULT_TOKEN_ENV;
-  const token = requireToken(process.env, tokenEnv);
-  const accountId = args["account-id"] ?? DEFAULT_ACCOUNT_ID;
-  const names = catalogSmokeNames({
-    accountId,
-    base: args.base,
-    bucket: args.bucket,
-    namespace: args.namespace,
-    suffix: args.suffix,
-    table: args.table,
+export class R2CatalogSmokeError extends Schema.TaggedErrorClass()(
+  "R2CatalogSmokeError",
+  {
+    cause: Schema.optionalKey(Schema.Defect()),
+    message: Schema.String,
+    operation: Schema.String,
+  },
+) {}
+
+export class CatalogSmokeCommandRunner extends Context.Service()(
+  "CatalogSmokeCommandRunner",
+) {}
+
+function smokeError(operation, message, cause) {
+  return R2CatalogSmokeError.make({ cause, message, operation });
+}
+
+function effectTry(operation, run, message) {
+  return Effect.try({
+    try: run,
+    catch: (cause) => smokeError(operation, message, cause),
   });
-  const outputDir = join(args["output-dir"] ?? DEFAULT_OUTPUT_DIR, names.base);
-  const context = {
-    accountId,
-    cleanup: args.cleanup !== "false",
-    names,
-    outputDir,
-    secrets: [token],
-    token,
-  };
+}
 
-  await mkdir(outputDir, { recursive: true });
-  await writeFile(
-    join(outputDir, "schema.json"),
-    `${JSON.stringify({ fields: [{ name: "value", type: "string", required: true }] })}\n`,
+function effectTryPromise(operation, run, message) {
+  return Effect.tryPromise({
+    try: run,
+    catch: (cause) => smokeError(operation, message, cause),
+  });
+}
+
+function writeOutputFile(context, fileName, contents) {
+  const filePath = join(context.outputDir, fileName);
+  return effectTryPromise(
+    `write:${fileName}`,
+    () => writeFile(filePath, contents),
+    `Unable to write ${filePath}.`,
   );
+}
 
-  try {
-    await provision(context);
-    const expectedValue = await ingest(context, args.value);
-    await verifyQueries(context, expectedValue);
-  } finally {
-    if (context.cleanup) {
-      await cleanup(context);
+function signalCommandTree(state, signal) {
+  const pid = state.child.pid;
+  if (pid === undefined) return false;
+  if (process.platform === "win32") {
+    const result = spawnSync(
+      "taskkill",
+      ["/pid", String(pid), "/T", ...(signal === "SIGKILL" ? ["/F"] : [])],
+      { stdio: "ignore", windowsHide: true },
+    );
+    if (result.error) throw result.error;
+    if (result.status === 0 || state.event !== undefined) {
+      return result.status === 0;
     }
+    throw new Error(
+      `taskkill could not send ${signal} to process tree ${String(pid)}.`,
+    );
+  }
+  if (state.processGroupId === undefined) return state.child.kill(signal);
+  try {
+    process.kill(-state.processGroupId, signal);
+    return true;
+  } catch (cause) {
+    if (
+      typeof cause === "object" &&
+      cause !== null &&
+      "code" in cause &&
+      cause.code === "ESRCH"
+    ) {
+      return state.child.kill(signal);
+    }
+    throw cause;
   }
 }
+
+function makeNodeCommandState(spec) {
+  const ownsProcessGroup = process.platform !== "win32";
+  const child = spawn(spec.command, spec.args, {
+    detached: ownsProcessGroup,
+    env: spec.env,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const state = {
+    child,
+    event: undefined,
+    processGroupId: ownsProcessGroup ? child.pid : undefined,
+    stderr: [],
+    stdout: [],
+    subscribers: new Set(),
+  };
+  child.stdout.on("data", (chunk) => state.stdout.push(chunk));
+  child.stderr.on("data", (chunk) => state.stderr.push(chunk));
+  const settle = (event) => {
+    if (state.event !== undefined) return;
+    state.event = event;
+    for (const subscriber of state.subscribers) subscriber(event);
+    state.subscribers.clear();
+  };
+  child.once("error", (cause) =>
+    settle({
+      _tag: "Failure",
+      error: smokeError(
+        `command:${spec.label}`,
+        `${spec.label} could not start.`,
+        cause,
+      ),
+    }),
+  );
+  child.once("close", (exitCode, signal) =>
+    settle({ _tag: "Success", exitCode, signal }),
+  );
+  child.stdin.end(spec.input);
+  return state;
+}
+
+function awaitNodeCommand(state) {
+  return Effect.callback((resume) => {
+    const complete = (event) => {
+      resume(
+        event._tag === "Failure"
+          ? Effect.fail(event.error)
+          : Effect.succeed({
+              exitCode: event.exitCode,
+              signal: event.signal,
+              stderr: Buffer.concat(state.stderr).toString("utf8"),
+              stdout: Buffer.concat(state.stdout).toString("utf8"),
+            }),
+      );
+    };
+    if (state.event !== undefined) {
+      complete(state.event);
+      return;
+    }
+    state.subscribers.add(complete);
+    return Effect.sync(() => {
+      state.subscribers.delete(complete);
+    });
+  });
+}
+
+function releaseNodeCommand(state) {
+  return effectTry(
+    "command:release",
+    () => signalCommandTree(state, "SIGKILL"),
+    "Unable to terminate the command process tree.",
+  ).pipe(
+    Effect.ignore,
+    Effect.andThen(
+      Effect.sync(() => {
+        state.child.stdout.destroy();
+        state.child.stderr.destroy();
+        state.subscribers.clear();
+      }),
+    ),
+  );
+}
+
+export const CatalogSmokeCommandRunnerLive = Layer.succeed(
+  CatalogSmokeCommandRunner,
+  {
+    run: (spec) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const state = yield* Effect.acquireRelease(
+            effectTry(
+              `command:${spec.label}`,
+              () => makeNodeCommandState(spec),
+              `${spec.label} could not start.`,
+            ),
+            releaseNodeCommand,
+          );
+          return yield* awaitNodeCommand(state);
+        }),
+      ),
+  },
+);
 
 function parseArgs(args) {
   const parsed = {};
@@ -225,23 +363,23 @@ function parseArgs(args) {
   return parsed;
 }
 
-async function provision(context) {
+const provision = Effect.fn("r2CatalogSmoke.provision")(function* (context) {
   const schemaFile = join(context.outputDir, "schema.json");
 
-  await runWrangler(context, "create-bucket", [
+  yield* runWrangler(context, "create-bucket", [
     "r2",
     "bucket",
     "create",
     context.names.bucket,
   ]);
-  await runWrangler(context, "enable-catalog", [
+  yield* runWrangler(context, "enable-catalog", [
     "r2",
     "bucket",
     "catalog",
     "enable",
     context.names.bucket,
   ]);
-  const streamOutput = await runWrangler(context, "create-stream", [
+  const streamOutput = yield* runWrangler(context, "create-stream", [
     "pipelines",
     "streams",
     "create",
@@ -253,7 +391,7 @@ async function provision(context) {
   ]);
   context.streamEndpoint = streamEndpointFrom(streamOutput);
 
-  await runWrangler(context, "create-sink", [
+  yield* runWrangler(context, "create-sink", [
     "pipelines",
     "sinks",
     "create",
@@ -275,260 +413,345 @@ async function provision(context) {
     "--roll-interval",
     "60",
   ]);
-  await runWrangler(context, "create-pipeline", [
+  yield* runWrangler(context, "create-pipeline", [
     "pipelines",
     "create",
     context.names.pipeline,
     "--sql",
     `INSERT INTO ${context.names.sink} SELECT * FROM ${context.names.stream}`,
   ]);
-  await waitForPipelineReady(context);
-}
+  yield* waitForPipelineReady(context);
+});
 
-async function waitForPipelineReady(context) {
-  let lastStatus = "unknown";
-  for (let attempt = 1; attempt <= PIPELINE_READY_ATTEMPTS; attempt += 1) {
-    const output = await runWrangler(context, `get-pipeline-${attempt}`, [
-      "pipelines",
-      "get",
-      context.names.pipeline,
-      "--json",
-    ]);
-    const details = parseWranglerJsonOutput(output);
-    const status = pipelineStatusFrom(details);
-
-    if (PIPELINE_READY_STATUSES.has(status)) {
-      return;
-    }
-    if (PIPELINE_FAILED_STATUSES.has(status)) {
-      throw new Error(
-        `Pipeline ${context.names.pipeline} failed before ingest. See ${context.outputDir}.`,
+const waitForPipelineReady = Effect.fn("r2CatalogSmoke.waitForPipelineReady")(
+  function* (context) {
+    let lastStatus = "unknown";
+    for (let attempt = 1; attempt <= PIPELINE_READY_ATTEMPTS; attempt += 1) {
+      const output = yield* runWrangler(context, `get-pipeline-${attempt}`, [
+        "pipelines",
+        "get",
+        context.names.pipeline,
+        "--json",
+      ]);
+      const details = yield* effectTry(
+        "pipeline:ready-decode",
+        () => parseWranglerJsonOutput(output),
+        `Pipeline ${context.names.pipeline} returned malformed details.`,
       );
+      const status = pipelineStatusFrom(details);
+
+      if (PIPELINE_READY_STATUSES.has(status)) {
+        return;
+      }
+      if (PIPELINE_FAILED_STATUSES.has(status)) {
+        return yield* Effect.fail(
+          smokeError(
+            "pipeline:ready",
+            `Pipeline ${context.names.pipeline} failed before ingest. See ${context.outputDir}.`,
+          ),
+        );
+      }
+
+      lastStatus = status || "unknown";
+      yield* Effect.sleep(PIPELINE_READY_DELAY_MS);
     }
 
-    lastStatus = status || "unknown";
-    await delay(PIPELINE_READY_DELAY_MS);
-  }
+    return yield* Effect.fail(
+      smokeError(
+        "pipeline:ready",
+        `Pipeline ${context.names.pipeline} was not ready after ${PIPELINE_READY_ATTEMPTS} checks; last status was ${lastStatus}. See ${context.outputDir}.`,
+      ),
+    );
+  },
+);
 
-  throw new Error(
-    `Pipeline ${context.names.pipeline} was not ready after ${PIPELINE_READY_ATTEMPTS} checks; last status was ${lastStatus}. See ${context.outputDir}.`,
-  );
-}
-
-async function ingest(context, value) {
+const ingest = Effect.fn("r2CatalogSmoke.ingest")(function* (context, value) {
   const endpoint = context.streamEndpoint;
   if (!endpoint) {
-    throw new Error(
-      `Could not find HTTP endpoint for stream ${context.names.stream}.`,
+    return yield* Effect.fail(
+      smokeError(
+        "pipeline:ingest",
+        `Could not find HTTP endpoint for stream ${context.names.stream}.`,
+      ),
     );
   }
 
   const payloadValue =
     value ?? `r2-catalog-smoke-${new Date().toISOString().replace(/\D/g, "")}`;
-  const response = await fetch(endpoint, {
-    body: JSON.stringify([{ value: payloadValue }]),
-    headers: { "content-type": "application/json" },
-    method: "POST",
-  });
-  const body = await response.text();
-  await writeFile(join(context.outputDir, "ingest-response.json"), `${body}\n`);
+  const response = yield* effectTryPromise(
+    "pipeline:ingest",
+    (signal) =>
+      fetch(endpoint, {
+        body: JSON.stringify([{ value: payloadValue }]),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+        signal,
+      }),
+    "Pipeline ingest request failed.",
+  );
+  const body = yield* effectTryPromise(
+    "pipeline:ingest-body",
+    () => response.text(),
+    "Pipeline ingest response could not be read.",
+  );
+  yield* writeOutputFile(context, "ingest-response.json", `${body}\n`);
   if (!response.ok) {
-    throw new Error(
-      `Pipeline ingest failed with HTTP ${response.status}: ${body}`,
+    return yield* Effect.fail(
+      smokeError(
+        "pipeline:ingest",
+        `Pipeline ingest failed with HTTP ${response.status}: ${body}`,
+      ),
     );
   }
   return payloadValue;
-}
+});
 
-async function verifyQueries(context, expectedValue) {
-  let lastError = null;
-  for (let attempt = 1; attempt <= POLL_ATTEMPTS; attempt += 1) {
-    await delay(attempt === 1 ? INITIAL_POLL_DELAY_MS : POLL_DELAY_MS);
-    try {
-      await runR2SqlQuery(
-        context,
-        `show-tables-${attempt}`,
-        `SHOW TABLES FROM ${context.names.namespace}`,
+const verifyQueries = Effect.fn("r2CatalogSmoke.verifyQueries")(
+  function* (context, expectedValue) {
+    let lastError = null;
+    for (let attempt = 1; attempt <= POLL_ATTEMPTS; attempt += 1) {
+      yield* Effect.sleep(
+        attempt === 1 ? INITIAL_POLL_DELAY_MS : POLL_DELAY_MS,
       );
-      await runR2SqlQuery(
-        context,
-        `describe-table-${attempt}`,
-        `DESCRIBE ${context.names.namespace}.${context.names.table}`,
+      const verified = yield* Effect.gen(function* () {
+        yield* runR2SqlQuery(
+          context,
+          `show-tables-${attempt}`,
+          `SHOW TABLES FROM ${context.names.namespace}`,
+        );
+        yield* runR2SqlQuery(
+          context,
+          `describe-table-${attempt}`,
+          `DESCRIBE ${context.names.namespace}.${context.names.table}`,
+        );
+        const aggregate = yield* runR2SqlQuery(
+          context,
+          `aggregate-${attempt}`,
+          aggregateQuery(context.names, expectedValue),
+        );
+        yield* effectTry(
+          "r2-sql:aggregate-contract",
+          () => assertAggregateMatches(aggregate, expectedValue),
+          "R2 SQL aggregate did not contain the ingested value.",
+        );
+        return true;
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            lastError = error;
+            return false;
+          }),
+        ),
       );
-      const aggregate = await runR2SqlQuery(
-        context,
-        `aggregate-${attempt}`,
-        aggregateQuery(context.names, expectedValue),
-      );
-      assertAggregateMatches(aggregate, expectedValue);
-      return;
-    } catch (error) {
-      lastError = error;
+      if (verified) return;
     }
-  }
-  throw lastError;
-}
+    return yield* Effect.fail(
+      lastError ??
+        smokeError("r2-sql:verify", "R2 SQL verification did not complete."),
+    );
+  },
+);
 
-async function runR2SqlQuery(context, label, query) {
-  const response = await fetch(
-    r2SqlApiUrl(context.accountId, context.names.bucket),
-    {
-      body: JSON.stringify({
-        query,
-        warehouse: context.names.warehouse,
-      }),
-      headers: {
-        authorization: `Bearer ${context.token}`,
-        "content-type": "application/json",
-      },
-      method: "POST",
-    },
-  );
-  const bodyText = await response.text();
-  const redactedBody = redactSecrets(bodyText, context.secrets);
-  await writeFile(
-    join(context.outputDir, `${label}.json`),
-    `${redactedBody}\n`,
-  );
+const runR2SqlQuery = Effect.fn("r2CatalogSmoke.runR2SqlQuery")(
+  function* (context, label, query) {
+    const response = yield* effectTryPromise(
+      `r2-sql:${label}`,
+      (signal) =>
+        fetch(r2SqlApiUrl(context.accountId, context.names.bucket), {
+          body: JSON.stringify({
+            query,
+            warehouse: context.names.warehouse,
+          }),
+          headers: {
+            authorization: `Bearer ${context.token}`,
+            "content-type": "application/json",
+          },
+          method: "POST",
+          signal,
+        }),
+      `${label} R2 SQL request failed.`,
+    );
+    const bodyText = yield* effectTryPromise(
+      `r2-sql:${label}:body`,
+      () => response.text(),
+      `${label} R2 SQL response could not be read.`,
+    );
+    const redactedBody = redactSecrets(bodyText, context.secrets);
+    yield* writeOutputFile(context, `${label}.json`, `${redactedBody}\n`);
 
-  let body;
-  try {
-    body = JSON.parse(bodyText);
-  } catch {
-    throw new Error(
+    const body = yield* effectTry(
+      `r2-sql:${label}:decode`,
+      () => JSON.parse(bodyText),
       `${label} returned malformed R2 SQL response with HTTP ${response.status}. See ${context.outputDir}.`,
     );
-  }
 
-  if (!response.ok || !isR2SqlSuccess(body)) {
-    throw new Error(
-      `${label} failed with HTTP ${response.status}: ${r2SqlErrorSummary(body)}. See ${context.outputDir}.`,
-    );
-  }
+    if (!response.ok || !isR2SqlSuccess(body)) {
+      return yield* Effect.fail(
+        smokeError(
+          `r2-sql:${label}`,
+          `${label} failed with HTTP ${response.status}: ${r2SqlErrorSummary(body)}. See ${context.outputDir}.`,
+        ),
+      );
+    }
 
-  return body;
-}
+    return body;
+  },
+);
 
-async function cleanup(context) {
-  await runWrangler(context, "delete-pipeline", [
+const cleanup = Effect.fn("r2CatalogSmoke.cleanup")(function* (context) {
+  yield* runWrangler(context, "delete-pipeline", [
     "pipelines",
     "delete",
     context.names.pipeline,
     "--force",
-  ]).catch(() => undefined);
-  await runWrangler(context, "delete-sink", [
+  ]).pipe(Effect.ignore);
+  yield* runWrangler(context, "delete-sink", [
     "pipelines",
     "sinks",
     "delete",
     context.names.sink,
     "--force",
-  ]).catch(() => undefined);
-  await runWrangler(context, "delete-stream", [
+  ]).pipe(Effect.ignore);
+  yield* runWrangler(context, "delete-stream", [
     "pipelines",
     "streams",
     "delete",
     context.names.stream,
     "--force",
-  ]).catch(() => undefined);
-  await deleteBucketObjects(context).catch(async (error) => {
-    await writeFile(
-      join(context.outputDir, "delete-objects.log"),
-      `${redactSecrets(error.message, context.secrets)}\n`,
-    );
-  });
-  await runWrangler(context, "disable-catalog", [
+  ]).pipe(Effect.ignore);
+  yield* deleteBucketObjects(context).pipe(
+    Effect.catch((error) =>
+      writeOutputFile(
+        context,
+        "delete-objects.log",
+        `${redactSecrets(error.message, context.secrets)}\n`,
+      ).pipe(Effect.ignore),
+    ),
+  );
+  yield* runWrangler(context, "disable-catalog", [
     "r2",
     "bucket",
     "catalog",
     "disable",
     context.names.bucket,
-  ]).catch(() => undefined);
-  await runWrangler(
+  ]).pipe(Effect.ignore);
+  yield* runWrangler(
     context,
     "delete-bucket",
     ["r2", "bucket", "delete", context.names.bucket],
     {
       input: "y\n",
     },
-  ).catch(() => undefined);
-}
+  ).pipe(Effect.ignore);
+});
 
-async function deleteBucketObjects(context) {
-  const keys = [];
-  let cursor = undefined;
-  do {
-    const response = await callCloudflareApi(
+const deleteBucketObjects = Effect.fn("r2CatalogSmoke.deleteBucketObjects")(
+  function* (context) {
+    const keys = [];
+    let cursor = undefined;
+    do {
+      const response = yield* callCloudflareApi(
+        context,
+        `accounts/${context.accountId}/r2/buckets/${context.names.bucket}/objects`,
+        {
+          label: "list-objects",
+          query: { cursor, per_page: "1000" },
+        },
+      );
+      const pageKeys = yield* effectTry(
+        "cloudflare-api:list-objects-contract",
+        () => {
+          if (!Array.isArray(response.result)) {
+            throw new Error(
+              "Cloudflare object listing omitted its result array.",
+            );
+          }
+          return response.result.map((object) => object.key);
+        },
+        "Cloudflare object listing returned an invalid response.",
+      );
+      keys.push(...pageKeys);
+      cursor = response.result_info?.cursor;
+    } while (cursor);
+
+    yield* writeOutputFile(
       context,
-      `accounts/${context.accountId}/r2/buckets/${context.names.bucket}/objects`,
-      {
-        label: "list-objects",
-        query: { cursor, per_page: "1000" },
-      },
+      "delete-object-keys.json",
+      `${JSON.stringify(keys, null, 2)}\n`,
     );
-    keys.push(...response.result.map((object) => object.key));
-    cursor = response.result_info?.cursor;
-  } while (cursor);
 
-  await writeFile(
-    join(context.outputDir, "delete-object-keys.json"),
-    `${JSON.stringify(keys, null, 2)}\n`,
-  );
+    for (let index = 0; index < keys.length; index += 1000) {
+      yield* callCloudflareApi(
+        context,
+        `accounts/${context.accountId}/r2/buckets/${context.names.bucket}/objects`,
+        {
+          body: keys.slice(index, index + 1000),
+          label: `delete-objects-${index / 1000 + 1}`,
+          method: "DELETE",
+        },
+      );
+    }
+  },
+);
 
-  for (let index = 0; index < keys.length; index += 1000) {
-    await callCloudflareApi(
+const callCloudflareApi = Effect.fn("r2CatalogSmoke.callCloudflareApi")(
+  function* (context, apiPath, options = {}) {
+    const query = new URLSearchParams(
+      Object.entries(options.query ?? {}).filter(
+        ([, value]) => value !== undefined,
+      ),
+    );
+    const url = new URL(
+      `https://api.cloudflare.com/client/v4/${apiPath.replace(/^\/+/, "")}`,
+    );
+    url.search = query.toString();
+    const response = yield* effectTryPromise(
+      `cloudflare-api:${options.label ?? "request"}`,
+      (signal) =>
+        fetch(url, {
+          body:
+            options.body === undefined
+              ? undefined
+              : JSON.stringify(options.body),
+          headers: {
+            authorization: `Bearer ${context.token}`,
+            "content-type": "application/json",
+          },
+          method: options.method ?? "GET",
+          signal,
+        }),
+      `Cloudflare API ${apiPath} request failed.`,
+    );
+    const bodyText = yield* effectTryPromise(
+      `cloudflare-api:${options.label ?? "request"}:body`,
+      () => response.text(),
+      `Cloudflare API ${apiPath} response could not be read.`,
+    );
+    yield* writeOutputFile(
       context,
-      `accounts/${context.accountId}/r2/buckets/${context.names.bucket}/objects`,
-      {
-        body: keys.slice(index, index + 1000),
-        label: `delete-objects-${index / 1000 + 1}`,
-        method: "DELETE",
-      },
+      `${options.label ?? "cloudflare-api"}.json`,
+      `${redactSecrets(bodyText, context.secrets)}\n`,
     );
-  }
-}
-
-async function callCloudflareApi(context, path, options = {}) {
-  const query = new URLSearchParams(
-    Object.entries(options.query ?? {}).filter(
-      ([, value]) => value !== undefined,
-    ),
-  );
-  const url = new URL(
-    `https://api.cloudflare.com/client/v4/${path.replace(/^\/+/, "")}`,
-  );
-  url.search = query.toString();
-  const response = await fetch(url, {
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    headers: {
-      authorization: `Bearer ${context.token}`,
-      "content-type": "application/json",
-    },
-    method: options.method ?? "GET",
-  });
-  const bodyText = await response.text();
-  await writeFile(
-    join(context.outputDir, `${options.label ?? "cloudflare-api"}.json`),
-    `${redactSecrets(bodyText, context.secrets)}\n`,
-  );
-  let body;
-  try {
-    body = JSON.parse(bodyText);
-  } catch {
-    throw new Error(
-      `Cloudflare API ${path} returned malformed JSON with HTTP ${response.status}`,
+    const body = yield* effectTry(
+      `cloudflare-api:${options.label ?? "request"}:decode`,
+      () => JSON.parse(bodyText),
+      `Cloudflare API ${apiPath} returned malformed JSON with HTTP ${response.status}`,
     );
-  }
 
-  if (!response.ok || body.success === false) {
-    throw new Error(
-      `Cloudflare API ${path} failed with HTTP ${response.status}: ${cloudflareErrorSummary(body)}`,
-    );
-  }
+    if (!response.ok || body.success === false) {
+      return yield* Effect.fail(
+        smokeError(
+          `cloudflare-api:${options.label ?? "request"}`,
+          `Cloudflare API ${apiPath} failed with HTTP ${response.status}: ${cloudflareErrorSummary(body)}`,
+        ),
+      );
+    }
 
-  return body;
-}
+    return body;
+  },
+);
 
-async function runWrangler(context, label, wranglerArgs, options = {}) {
+function runWrangler(context, label, wranglerArgs, options = {}) {
   return runLogged(
     context,
     label,
@@ -537,26 +760,23 @@ async function runWrangler(context, label, wranglerArgs, options = {}) {
   );
 }
 
-async function runLogged(context, label, args, options = {}) {
+const runLogged = Effect.fn("r2CatalogSmoke.runLogged")(function* (
+  context,
+  label,
+  args,
+  options = {},
+) {
   const executable = args[0];
   const childArgs = args.slice(1);
-  const child = spawn(executable, childArgs, {
+  const runner = yield* CatalogSmokeCommandRunner;
+  const result = yield* runner.run({
+    args: childArgs,
+    command: executable,
     env: options.env ?? process.env,
-    stdio: ["pipe", "pipe", "pipe"],
+    input: options.input,
+    label,
   });
-
-  if (options.input) {
-    child.stdin.end(options.input);
-  } else {
-    child.stdin.end();
-  }
-
-  const [stdout, stderr, exitCode] = await Promise.all([
-    collect(child.stdout),
-    collect(child.stderr),
-    new Promise((resolve) => child.on("close", resolve)),
-  ]);
-  const output = `${stdout}${stderr}`;
+  const output = `${result.stdout}${result.stderr}`;
   const redacted = redactSecrets(
     [
       `$ ${[basename(executable), ...childArgs].join(" ")}`,
@@ -565,36 +785,91 @@ async function runLogged(context, label, args, options = {}) {
     ].join("\n"),
     context.secrets,
   );
-  await writeFile(join(context.outputDir, `${label}.log`), redacted);
+  yield* writeOutputFile(context, `${label}.log`, redacted);
 
-  if (exitCode !== 0) {
-    throw new Error(
-      `${label} failed with exit code ${exitCode}. See ${context.outputDir}.`,
+  if (result.exitCode !== 0) {
+    return yield* Effect.fail(
+      smokeError(
+        `command:${label}`,
+        `${label} failed with exit code ${result.exitCode}. See ${context.outputDir}.`,
+      ),
     );
   }
 
   return output;
+});
+
+function parseContext(argv, env) {
+  return effectTry(
+    "input",
+    () => {
+      const args = parseArgs(argv);
+      const tokenEnv = args["token-env"] ?? DEFAULT_TOKEN_ENV;
+      const token = requireToken(env, tokenEnv);
+      const accountId = args["account-id"] ?? DEFAULT_ACCOUNT_ID;
+      const names = catalogSmokeNames({
+        accountId,
+        base: args.base,
+        bucket: args.bucket,
+        namespace: args.namespace,
+        suffix: args.suffix,
+        table: args.table,
+      });
+      return {
+        args,
+        context: {
+          accountId,
+          cleanup: args.cleanup !== "false",
+          names,
+          outputDir: join(args["output-dir"] ?? DEFAULT_OUTPUT_DIR, names.base),
+          secrets: [token],
+          token,
+        },
+      };
+    },
+    "Invalid R2 catalog smoke configuration.",
+  );
 }
 
-function collect(stream) {
-  return new Promise((resolve, reject) => {
-    let data = "";
-    stream.setEncoding("utf8");
-    stream.on("data", (chunk) => {
-      data += chunk;
-    });
-    stream.on("error", reject);
-    stream.on("end", () => resolve(data));
-  });
-}
+export const runCatalogSmoke = Effect.fn("r2CatalogSmoke.run")(function* (
+  argv,
+  env = process.env,
+) {
+  const { args, context } = yield* parseContext(argv, env);
+  yield* effectTryPromise(
+    "output:mkdir",
+    () => mkdir(context.outputDir, { recursive: true }),
+    `Unable to create ${context.outputDir}.`,
+  );
+  yield* writeOutputFile(
+    context,
+    "schema.json",
+    `${JSON.stringify({ fields: [{ name: "value", type: "string", required: true }] })}\n`,
+  );
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+  yield* Effect.scoped(
+    Effect.gen(function* () {
+      const resource = yield* Effect.acquireRelease(
+        Effect.succeed(context),
+        (ownedContext) =>
+          ownedContext.cleanup ? cleanup(ownedContext) : Effect.void,
+      );
+      yield* provision(resource);
+      const expectedValue = yield* ingest(resource, args.value);
+      yield* verifyQueries(resource, expectedValue);
+    }),
+  );
+});
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
-    console.error(error.message);
-    process.exitCode = 1;
-  });
+  const main = runCatalogSmoke(process.argv.slice(2)).pipe(
+    Effect.provide(CatalogSmokeCommandRunnerLive),
+    Effect.catch((error) =>
+      Effect.sync(() => {
+        console.error(error.message);
+        process.exitCode = 1;
+      }),
+    ),
+  );
+  NodeRuntime.runMain(main);
 }

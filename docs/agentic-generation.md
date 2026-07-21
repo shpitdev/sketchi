@@ -1,180 +1,100 @@
-# Agentic Generation
+# Agentic generation
 
 ## Decision
 
-Keep **normal Convex** for product state. Put the valuable generation behavior in
-shared Nx packages. Use **Effect inside those packages** when it improves
-schemas, typed errors, and pipeline tests.
+Sketchi generation is an Effect-first Cloudflare system. Cloudflare Workers
+host chat, HTTP, MCP, persistence, Browser Rendering, AI Gateway, and internal
+evaluation. Shared Nx packages own the product behavior; adapters only decode,
+provide a layer, run one Effect program, and encode the established contract.
 
-AI SDK stays narrow: chat streaming, model calls, and tool-call transport.
-Gemini 3.1 Flash Lite is the only planned model path for now.
-
-```mermaid
-flowchart LR
-  User["User or external agent"]
-  Studio["Studio UI"]
-  Convex["Convex<br/>threads, runs, artifacts"]
-  Worker["Cloudflare Worker<br/>HTTP, MCP, AI Gateway"]
-  Core["Nx packages<br/>contracts, IR, validation,<br/>grading, rendering"]
-  Gemini["Gemini 3.1 Flash Lite"]
-  Files["Exports<br/>Excalidraw, PNG, JSON"]
-
-  User --> Studio
-  Studio --> Convex
-  User --> Worker
-  Convex --> Core
-  Worker --> Core
-  Core --> Gemini
-  Core --> Files
-```
-
-## Route Surfaces
-
-```mermaid
-flowchart TB
-  Managed["1. Managed thread<br/>Sketchi owns chat state"]
-  Stateless["2. Stateless agent tools<br/>Caller owns chat state"]
-  Deterministic["3. Deterministic APIs<br/>Caller owns IR or output"]
-
-  Managed --> ConvexAdapter["Convex adapter"]
-  Stateless --> ApiAdapter["HTTP or MCP adapter"]
-  Deterministic --> ApiAdapter
-
-  ConvexAdapter --> Runtime["diagram-generation runtime"]
-  ApiAdapter --> Runtime
-
-  Runtime --> Contracts["schemas and errors"]
-  Runtime --> Normalize["normalize"]
-  Runtime --> Validate["validate"]
-  Runtime --> Grade["grade"]
-  Runtime --> Render["render/export"]
-```
-
-| Surface              | Owns                                       | Example calls                                        | Best runtime                         |
-| -------------------- | ------------------------------------------ | ---------------------------------------------------- | ------------------------------------ |
-| Managed thread       | Messages, async progress, artifact history | `createThread`, `continueThread`, `acceptArtifact`   | Convex                               |
-| Stateless agent tool | One request/response artifact build        | `buildFlowchart`, `getArtifact`, `applyDiagramPatch` | Worker, MCP, or Convex action        |
-| Deterministic API    | Canonical semantic spec to artifact result | `buildFlowchart`                                     | Shared package, wrapped by any route |
-
-## Package Shape
+There is no current Convex runtime or parallel generation implementation.
 
 ```mermaid
 flowchart LR
-  AgentServer["apps/playground/src/server/chat/agent.server.ts<br/>agent host adapter"]
-
-  subgraph Packages["Shared Nx packages"]
-    Core["diagram-core<br/>IR + semantic validation"]
-    Renderer["diagram-renderer<br/>scene layout"]
-    Excalidraw["diagram-excalidraw<br/>real Excalidraw conversion"]
-    Generation["diagram-generation<br/>prompt contracts + candidates"]
-    Agent["diagram-agent<br/>canonical build runtime"]
-  end
-
-  AgentServer --> Agent
-  Agent --> Core
-  Agent --> Renderer
-  Agent --> Excalidraw
+  Prompt["Prompt"] --> Host["Chat, CLI, or eval host"]
+  Host --> Gateway["Cloudflare AI Gateway"]
+  Gateway --> Candidate["diagram-generation candidate"]
+  Candidate --> Build["diagram-agent build"]
+  Build --> IR["validated Effect Schema IR"]
+  IR --> Scene["deterministic scene + Excalidraw"]
+  Scene --> Artifact["R2 scene, Excalidraw, PNG"]
 ```
 
-| Package              | Keep here                                                                        | Keep out                           |
-| -------------------- | -------------------------------------------------------------------------------- | ---------------------------------- |
-| `diagram-core`       | IR types, parsing, semantic validation, fixtures                                 | Model calls, storage               |
-| `diagram-renderer`   | Deterministic scene model                                                        | Provider logic, user/session state |
-| `diagram-excalidraw` | Excalidraw conversion and validation                                             | Chat orchestration                 |
-| `diagram-generation` | Gemini request/response helpers, prompt messages, candidates                     | Durable threads                    |
-| `diagram-agent`      | Canonical build contracts, normalize, grade, render/export, artifact persistence | App routes, auth, provider menus   |
+## Canonical vertical
 
-## Effect + Nx
+`diagram-generation` owns model request construction, the provider service,
+timeouts, retries, response decoding, and candidate diagnostics.
+`diagram-agent` owns the canonical build transaction: normalization, semantic
+validation, quality assessment, deterministic rendering, Excalidraw export,
+Browser Rendering input, and accepted artifact persistence.
 
-Effect and Nx do not compete.
+The following surfaces converge on that vertical:
 
-```mermaid
-flowchart TB
-  Nx["Nx<br/>project graph, builds, affected tests"]
-  EffectPkg["Effect-powered package<br/>schema, typed errors, pipeline"]
-  App["App or backend route<br/>plain adapter"]
-  Tests["Vitest/evals<br/>fixtures and failure modes"]
+| Surface        | Adapter responsibility                                  | State                                    |
+| -------------- | ------------------------------------------------------- | ---------------------------------------- |
+| Studio chat    | AI SDK streaming and bounded tool turns                 | accepted artifacts returned by the build |
+| HTTP           | request/response and status mapping                     | R2 artifact URLs                         |
+| MCP            | SDK callback and tool result mapping                    | the same R2 artifact URLs                |
+| CLI `generate` | terminal options/output and local atomic record storage | local versioned records                  |
+| eval harness   | scenario selection and candidate reporting              | internal evidence files                  |
 
-  Nx --> EffectPkg
-  Nx --> App
-  Nx --> Tests
-  App --> EffectPkg
-  Tests --> EffectPkg
-```
+No surface owns a parallel flowchart schema, repair issue model, quality
+grader, renderer, or accepted-artifact writer.
 
-| Question                            | Answer                                                                            |
-| ----------------------------------- | --------------------------------------------------------------------------------- |
-| Does Nx need special Effect config? | No. Effect is just TypeScript inside an Nx package.                               |
-| What does Nx add?                   | Boundaries, imports, cacheable targets, affected checks.                          |
-| What does Effect add?               | Typed pipelines, typed failures, schema-first parsing, testable retries/timeouts. |
-| Where should Effect live first?     | Package boundaries where typed failures or resource ownership buy clarity.        |
-| Where should it not leak yet?       | React UI, Convex schema, or Cloudflare route handlers unless that buys clarity.   |
+## Provider routing
 
-Preferred shape:
+Worker generation uses a Cloudflare AI Gateway binding. CLI `generate` calls
+the gateway's provider-native Google AI Studio endpoint directly through the
+reviewed HTTP adapter. The CLI requires `CF_AIG_TOKEN`, sends it only as
+`cf-aig-authorization`, and relies on the gateway's stored provider key. It
+does not accept a Google API credential. The five manual CLI commands remain
+strictly offline.
 
-```mermaid
-sequenceDiagram
-  participant Route as Convex/Worker/MCP route
-  participant Adapter as Thin adapter
-  participant EffectCore as Effect pipeline
-  participant Store as Convex storage
+Provider boundaries retain the existing no-store policy, model and scenario
+metadata, correlation fields, typed failures, bounded retries, TestClock
+timeouts, and interruption forwarding.
 
-  Route->>Adapter: plain args
-  Adapter->>EffectCore: parse + run
-  EffectCore-->>Adapter: typed success or typed failure
-  Adapter->>Store: no second write; accepted build already persisted once
-  Adapter-->>Route: plain JSON response
-```
+## Effect ownership
 
-## Runtime Ownership
+- External capabilities are `Context.Service` contracts.
+- Production and test implementations are `Layer` values.
+- Business operations are named with `Effect.fn` and return typed failures.
+- Effect Schema is the domain and protocol authority.
+- Foreign SDK and platform Promises are adapted once at framework boundaries.
+- Scope owns exporters, Browser Rendering, child processes, and cleanup.
+- Interruption is never translated into an expected provider or domain error.
 
-```mermaid
-flowchart LR
-  Convex["Convex"]
-  Worker["Cloudflare Worker"]
-  MCP["MCP server"]
-  Packages["Shared packages"]
+Pure validation, layout, geometry, transformations, and React rendering stay
+plain. Effect composes them but does not wrap them for ceremony.
 
-  Convex -->|"stateful imports"| Packages
-  Worker -->|"edge/API imports"| Packages
-  MCP -->|"tool imports"| Packages
+## Agent and Code Mode contract
 
-  Convex -.stores.-> State["threads, messages,<br/>runs, artifacts"]
-  Worker -.uses.-> Gateway["Cloudflare AI Gateway"]
-  MCP -.exposes.-> Tools["managed, stateless,<br/>deterministic tools"]
-```
+The MCP Code Mode surface exposes documentation, search, and execution around
+one canonical contract. The generated tool program produces a build request;
+the runtime returns structured issues for bounded repair or accepted artifact
+metadata. Scene, Excalidraw, and PNG URLs all refer to one artifact identity.
 
-| Runtime | Good at                                                 | Should not become                      |
-| ------- | ------------------------------------------------------- | -------------------------------------- |
-| Convex  | Product state, auth, threads, artifacts, async progress | The only way to run generation         |
-| Worker  | Public HTTP, MCP, AI Gateway, independent deploys       | The source of truth for shared logic   |
-| MCP     | Agent-facing tools                                      | A parallel implementation              |
-| AI SDK  | Model calls, streaming, tool-call plumbing              | Artifact contract or provider strategy |
+Chat renders those canonical issues and caps repair attempts. MCP and HTTP keep
+the same issue codes, paths, hints, status mapping, and persisted formats. The
+schema adapter is derived from Effect Schema instead of maintaining Zod or a
+manual duplicate.
 
-## Canonical Build Vertical
+## Evaluation
 
-Studio, HTTP, and MCP now converge on one non-Convex product operation.
+`diagram-scenarios` keeps prompts and grading deterministic. Its internal CLI
+can evaluate fixtures, input files, or one generator command. The command
+lifecycle is a scoped Effect service: normal exit, inherited-stdio close grace,
+timeout, SIGTERM, SIGKILL escalation, forced settlement, interruption, output
+capture, and release are explicit and TestClock-tested.
 
-```mermaid
-flowchart TD
-  Studio["Studio build_flowchart"] --> Build["diagram-agent buildFlowchart"]
-  Http["HTTP /api/v1/flowcharts/build"] --> Build
-  Mcp["MCP sketchi.buildFlowchart"] --> Build
-  Build --> Validate["normalize + canonical validation"]
-  Validate --> Quality["structured quality report"]
-  Quality --> Render["scene + Excalidraw"]
-  Render --> Store["one accepted artifact write"]
-  Validate -. "Issue[]" .-> Repair["bounded repair"]
-```
+`tools/harness-eval.ts` uses that service to drive supported external harnesses
+and writes sanitized evidence under `.memory/`. These internal tools do not add
+public Sketchi CLI commands.
 
-Studio remains a thin AI SDK adapter: it injects scene/Excalidraw artifact
-options, caps a model turn at three build attempts, renders canonical issues,
-and consumes the accepted artifact returned by the runtime. It has no parallel
-flowchart schema, evaluator, session, mapper, or persistence endpoint.
+## Proof
 
-## References
-
-- Convex Agent overview: https://docs.convex.dev/agents/overview
-- Convex Agent streaming: https://docs.convex.dev/agents/streaming
-- Cloudflare AI Gateway Worker binding methods:
-  https://developers.cloudflare.com/changelog/post/2025-01-26-worker-binding-methods/
+Generation changes preserve golden HTTP/MCP/persistence contracts and run
+package tests, Storybook, packaged CLI smoke, Worker dry-runs/bundle reports,
+and exact-head preview probes. Live gateway credentials and retained payloads
+are never invented or logged; an unavailable privileged proof is reported as a
+blocker rather than simulated.

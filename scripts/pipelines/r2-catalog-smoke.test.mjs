@@ -1,9 +1,16 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { access, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import test from "node:test";
+import { Cause, Effect, Exit, Fiber } from "effect";
 
 import {
   aggregateQuery,
   assertAggregateMatches,
+  CatalogSmokeCommandRunner,
+  CatalogSmokeCommandRunnerLive,
   catalogSmokeNames,
   cloudflareErrorSummary,
   isR2SqlSuccess,
@@ -17,6 +24,63 @@ import {
   sqlStringLiteral,
   streamEndpointFrom,
 } from "./r2-catalog-smoke.mjs";
+
+function pidExists(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function waitForPid(pidFile) {
+  return Effect.gen(function* () {
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      const contents = yield* Effect.tryPromise(() =>
+        readFile(pidFile, "utf8"),
+      ).pipe(Effect.option);
+      if (contents._tag === "Some") {
+        const pid = Number.parseInt(contents.value, 10);
+        if (Number.isSafeInteger(pid) && pid > 0) return pid;
+      }
+      yield* Effect.sleep(10);
+    }
+    return yield* Effect.fail(new Error("Command descendant pid unavailable."));
+  });
+}
+
+function waitForPidExit(pid) {
+  return Effect.gen(function* () {
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      if (!pidExists(pid)) return;
+      yield* Effect.sleep(10);
+    }
+    return yield* Effect.fail(
+      new Error(`Command descendant ${String(pid)} remained alive.`),
+    );
+  });
+}
+
+function waitForChildExit(child) {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return Effect.succeed({
+      exitCode: child.exitCode,
+      signal: child.signalCode,
+    });
+  }
+  return Effect.callback((resume) => {
+    const onError = (cause) => resume(Effect.fail(cause));
+    const onExit = (exitCode, signal) =>
+      resume(Effect.succeed({ exitCode, signal }));
+    child.once("error", onError);
+    child.once("exit", onExit);
+    return Effect.sync(() => {
+      child.off("error", onError);
+      child.off("exit", onExit);
+    });
+  });
+}
 
 test("normalizePipelineNamePart keeps Cloudflare Pipeline-safe names", () => {
   assert.equal(
@@ -141,17 +205,22 @@ test("requireToken returns the configured token", () => {
 
 test("parseWranglerJsonOutput extracts JSON from wrangler output", () => {
   assert.deepEqual(
-    parseWranglerJsonOutput([
-      "wrangler pipelines get example --json",
-      '{ "result": { "status": "running" } }',
-      "warning: beta command",
-    ].join("\n")),
+    parseWranglerJsonOutput(
+      [
+        "wrangler pipelines get example --json",
+        '{ "result": { "status": "running" } }',
+        "warning: beta command",
+      ].join("\n"),
+    ),
     { result: { status: "running" } },
   );
 });
 
 test("pipelineStatusFrom normalizes details responses", () => {
-  assert.equal(pipelineStatusFrom({ result: { status: "Running" } }), "running");
+  assert.equal(
+    pipelineStatusFrom({ result: { status: "Running" } }),
+    "running",
+  );
   assert.equal(pipelineStatusFrom({ status: "ACTIVE" }), "active");
 });
 
@@ -160,7 +229,9 @@ test("assertAggregateMatches accepts the ingested row", () => {
     assertAggregateMatches(
       {
         result: {
-          rows: [{ total_rows: 1, min_value: "expected", max_value: "expected" }],
+          rows: [
+            { total_rows: 1, min_value: "expected", max_value: "expected" },
+          ],
         },
       },
       "expected",
@@ -182,3 +253,131 @@ test("assertAggregateMatches rejects metadata-only tables", () => {
     /did not return the ingested value/,
   );
 });
+
+test(
+  "scoped command interruption terminates the Wrangler process tree",
+  { skip: process.platform === "win32" },
+  () =>
+    Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          yield* Effect.tryPromise(() => mkdir(".memory", { recursive: true }));
+          const fixtureDir = yield* Effect.acquireRelease(
+            Effect.tryPromise(() =>
+              mkdtemp(join(".memory", "r2-catalog-command-")),
+            ),
+            (directory) =>
+              Effect.tryPromise(() =>
+                rm(directory, { recursive: true, force: true }),
+              ).pipe(Effect.ignore),
+          );
+          const pidFile = join(fixtureDir, "descendant.pid");
+          const descendantScript = [
+            "process.on('SIGTERM', () => {});",
+            "setInterval(() => {}, 1000);",
+          ].join("");
+          const parentScript = [
+            "const { spawn } = require('node:child_process');",
+            "const { writeFileSync } = require('node:fs');",
+            `const child = spawn(process.execPath, ['-e', ${JSON.stringify(descendantScript)}], { stdio: 'ignore' });`,
+            `writeFileSync(${JSON.stringify(pidFile)}, String(child.pid));`,
+            "setInterval(() => {}, 1000);",
+          ].join("");
+          const runner = yield* CatalogSmokeCommandRunner;
+          const commandFiber = yield* runner
+            .run({
+              args: ["-e", parentScript],
+              command: process.execPath,
+              env: process.env,
+              label: "interruption-test",
+            })
+            .pipe(Effect.forkChild);
+          const descendantPid = yield* waitForPid(pidFile);
+          yield* Fiber.interrupt(commandFiber);
+          const commandExit = yield* Fiber.await(commandFiber);
+
+          assert.equal(Exit.isFailure(commandExit), true);
+          if (Exit.isFailure(commandExit)) {
+            assert.equal(Cause.hasInterrupts(commandExit.cause), true);
+          }
+          yield* waitForPidExit(descendantPid);
+          assert.equal(pidExists(descendantPid), false);
+        }),
+      ).pipe(Effect.provide(CatalogSmokeCommandRunnerLive)),
+    ),
+);
+
+test(
+  "SIGTERM interrupts the main fiber, terminates descendants, and runs cleanup",
+  { skip: process.platform === "win32" },
+  () =>
+    Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          yield* Effect.tryPromise(() => mkdir(".memory", { recursive: true }));
+          const fixtureDir = yield* Effect.acquireRelease(
+            Effect.tryPromise(() =>
+              mkdtemp(join(".memory", "r2-catalog-signal-")),
+            ),
+            (directory) =>
+              Effect.tryPromise(() =>
+                rm(directory, { recursive: true, force: true }),
+              ).pipe(Effect.ignore),
+          );
+          const cleanupFile = join(fixtureDir, "cleanup.complete");
+          const pidFile = join(fixtureDir, "descendant.pid");
+          const descendantScript = [
+            "process.on('SIGTERM', () => {});",
+            "setInterval(() => {}, 1000);",
+          ].join("");
+          const parentScript = [
+            "const { spawn } = require('node:child_process');",
+            "const { writeFileSync } = require('node:fs');",
+            `const child = spawn(process.execPath, ['-e', ${JSON.stringify(descendantScript)}], { stdio: 'ignore' });`,
+            `writeFileSync(${JSON.stringify(pidFile)}, String(child.pid));`,
+            "setInterval(() => {}, 1000);",
+          ].join("");
+          const moduleUrl = pathToFileURL(
+            join(process.cwd(), "scripts/pipelines/r2-catalog-smoke.mjs"),
+          ).href;
+          const entryScript = [
+            "import { writeFile } from 'node:fs/promises';",
+            "import { NodeRuntime } from '@effect/platform-node';",
+            "import { Effect } from 'effect';",
+            `import { CatalogSmokeCommandRunner, CatalogSmokeCommandRunnerLive } from ${JSON.stringify(moduleUrl)};`,
+            "const main = Effect.scoped(Effect.gen(function* () {",
+            `  yield* Effect.acquireRelease(Effect.void, () => Effect.tryPromise(() => writeFile(${JSON.stringify(cleanupFile)}, 'complete')));`,
+            "  const runner = yield* CatalogSmokeCommandRunner;",
+            `  yield* runner.run({ command: process.execPath, args: ['-e', ${JSON.stringify(parentScript)}], env: process.env, label: 'signal-test' });`,
+            "})).pipe(Effect.provide(CatalogSmokeCommandRunnerLive));",
+            "NodeRuntime.runMain(main);",
+          ].join("\n");
+          const entryProcess = yield* Effect.acquireRelease(
+            Effect.sync(() =>
+              spawn(
+                process.execPath,
+                ["--input-type=module", "-e", entryScript],
+                {
+                  stdio: "ignore",
+                },
+              ),
+            ),
+            (child) =>
+              Effect.sync(() => {
+                if (child.exitCode === null && child.signalCode === null) {
+                  child.kill("SIGKILL");
+                }
+              }),
+          );
+          const descendantPid = yield* waitForPid(pidFile);
+          assert.equal(entryProcess.kill("SIGTERM"), true);
+          const entryExit = yield* waitForChildExit(entryProcess);
+
+          assert.notEqual(entryExit.exitCode, 0);
+          yield* waitForPidExit(descendantPid);
+          yield* Effect.tryPromise(() => access(cleanupFile));
+          assert.equal(pidExists(descendantPid), false);
+        }),
+      ),
+    ),
+);

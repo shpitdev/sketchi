@@ -68,6 +68,16 @@ export class DiagramGenerationCandidateSummary extends Schema.Class<DiagramGener
   usage: Schema.optional(DiagramGenerationUsage),
 }) {}
 
+export class DiagramGenerationScenarioOutput extends Schema.Class<DiagramGenerationScenarioOutput>(
+  "DiagramGenerationScenarioOutput",
+)({
+  candidates: Schema.Array(DiagramGenerationCandidateSummary).pipe(
+    Schema.mutable,
+  ),
+  model: Schema.String,
+  scenarioId: Schema.String,
+}) {}
+
 export class DiagramGenerationRequest extends Schema.Class<DiagramGenerationRequest>(
   "DiagramGenerationRequest",
 )({

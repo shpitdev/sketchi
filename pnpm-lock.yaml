@@ -37,10 +37,10 @@ importers:
       react-dom:
         specifier: 19.2.7
         version: 19.2.7(react@19.2.7)
-      zod:
-        specifier: 4.4.3
-        version: 4.4.3
     devDependencies:
+      "@effect/platform-node":
+        specifier: 4.0.0-beta.99
+        version: 4.0.0-beta.99(effect@4.0.0-beta.99)(ioredis@5.11.1)
       "@cloudflare/vite-plugin":
         specifier: 1.39.2
         version: 1.39.2(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(workerd@1.20260601.1)(wrangler@4.97.0(@cloudflare/workers-types@4.20260617.1))
@@ -428,6 +428,9 @@ importers:
 
   packages/diagram/scenarios:
     dependencies:
+      "@effect/platform-node":
+        specifier: 4.0.0-beta.99
+        version: 4.0.0-beta.99(effect@4.0.0-beta.99)(ioredis@5.11.1)
       "@sketchi/diagram-core":
         specifier: workspace:*
         version: link:../core

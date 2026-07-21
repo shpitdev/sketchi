@@ -3,6 +3,10 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
+      "@sketchi/diagram-scenarios/internal/tool-process": new URL(
+        "../packages/diagram/scenarios/src/internal/tool-process.ts",
+        import.meta.url,
+      ).pathname,
       "@sketchi/diagram-core": new URL(
         "../packages/diagram/core/src/index.ts",
         import.meta.url,

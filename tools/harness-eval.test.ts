@@ -1,15 +1,26 @@
 import path from "node:path";
 
 import { getScenario } from "@sketchi/diagram-scenarios";
+import { ToolProcessSpawnerLive } from "@sketchi/diagram-scenarios/internal/tool-process";
+import { Cause, Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
   commandForRun,
   evaluateHarnessJson,
+  harnessEvalExitCode,
+  HarnessEvalUsageError,
   outputContractErrors,
+  parseOptions,
   runCommand,
   summarizeHarnessStdout,
 } from "./harness-eval";
+
+function runCommandLive(...args: Parameters<typeof runCommand>) {
+  return Effect.runPromise(
+    runCommand(...args).pipe(Effect.provide(ToolProcessSpawnerLive)),
+  );
+}
 
 describe("harness-eval", () => {
   const acceptedMcpOutput = {
@@ -49,6 +60,20 @@ describe("harness-eval", () => {
       },
     },
   };
+
+  it("maps invalid arguments to typed usage failures and exit 2", async () => {
+    const exit = await Effect.runPromise(Effect.exit(parseOptions(["--bad"])));
+
+    expect(exit._tag).toBe("Failure");
+    if (exit._tag === "Failure") {
+      const failure = Cause.findError(exit.cause);
+      expect(failure._tag).toBe("Success");
+      if (failure._tag === "Success") {
+        expect(failure.success).toBeInstanceOf(HarnessEvalUsageError);
+        expect(harnessEvalExitCode(failure.success)).toBe(2);
+      }
+    }
+  });
 
   it("places Antigravity print-mode flags before the print prompt", () => {
     const originalHome = process.env.HOME;
@@ -90,7 +115,7 @@ describe("harness-eval", () => {
 
   it("settles when a CLI parent exits but inherited stdio stays open", async () => {
     const started = Date.now();
-    const result = await runCommand(
+    const result = await runCommandLive(
       {
         args: [
           "-e",
@@ -120,7 +145,7 @@ describe("harness-eval", () => {
   it("does not time out when a CLI parent exits before its budget but inherited stdio stays open past it", async () => {
     const timeoutMs = 1_000;
     const started = Date.now();
-    const result = await runCommand(
+    const result = await runCommandLive(
       {
         args: [
           "-e",
@@ -150,7 +175,7 @@ describe("harness-eval", () => {
   });
 
   it("returns a timed-out result when a CLI process exceeds its budget", async () => {
-    const result = await runCommand(
+    const result = await runCommandLive(
       {
         args: ["-e", "setInterval(() => {}, 1000);"],
         command: process.execPath,
@@ -843,9 +868,7 @@ describe("harness-eval", () => {
     ).toEqual([]);
   });
 
-  const edgeIdCases: Array<
-    [string, (edgeId: string) => string | undefined]
-  > = [
+  const edgeIdCases: Array<[string, (edgeId: string) => string | undefined]> = [
     ["omit optional edge ids", () => undefined],
     ["fallback from empty edge ids", () => ""],
     ["fallback from whitespace edge ids", () => "   "],
