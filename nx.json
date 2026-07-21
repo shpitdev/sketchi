@@ -54,5 +54,12 @@
       "inputs": ["default", "^production"]
     }
   },
+  "release": {
+    "projects": ["sketchi-cli"],
+    "releaseTagPattern": "cli-v{version}",
+    "changelog": {
+      "workspaceChangelog": false
+    }
+  },
   "analytics": false
 }

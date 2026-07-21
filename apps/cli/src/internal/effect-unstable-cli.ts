@@ -16,6 +16,12 @@ import {
 
 export { Argument, Command, Flag };
 
+/** Replaced with the package version by DefinePlugin in the release bundle. */
+declare const __SKETCHI_VERSION__: string | undefined;
+
+const cliVersion =
+  typeof __SKETCHI_VERSION__ === "string" ? __SKETCHI_VERSION__ : "0.0.0";
+
 const PUBLIC_COMMANDS = new Set(["create", "show", "edit", "list", "export"]);
 
 export type InputSource =
@@ -136,7 +142,7 @@ export function runEffectCommand<
       return typeof value === "function" ? value.bind(target) : value;
     },
   }) as Console.Console;
-  return Command.runWith(command, { version: "0.0.0" })(args).pipe(
+  return Command.runWith(command, { version: cliVersion })(args).pipe(
     Effect.provideService(CliConfig.CliConfig, {
       builtIns: [GlobalFlag.Help, GlobalFlag.Version],
     }),

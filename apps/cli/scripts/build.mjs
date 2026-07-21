@@ -1,12 +1,16 @@
-import { chmod, mkdir, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { BannerPlugin, rspack } from "@rspack/core";
+import { BannerPlugin, DefinePlugin, rspack } from "@rspack/core";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(scriptDirectory, "..");
 const outputDirectory = resolve(projectRoot, "dist");
+
+const { version } = JSON.parse(
+  await readFile(resolve(projectRoot, "package.json"), "utf8"),
+);
 
 await rm(outputDirectory, { force: true, recursive: true });
 await mkdir(outputDirectory, { recursive: true });
@@ -49,6 +53,9 @@ const compiler = rspack({
   },
   optimization: { minimize: true },
   plugins: [
+    new DefinePlugin({
+      __SKETCHI_VERSION__: JSON.stringify(version),
+    }),
     new BannerPlugin({
       banner: "#!/usr/bin/env node",
       raw: true,
@@ -79,7 +86,7 @@ const stats = await new Promise((resolveBuild, rejectBuild) => {
 
 const packageManifest = {
   name: "sketchi",
-  version: "0.0.0",
+  version,
   description:
     "Local Sketchi authoring CLI: offline flowchart and mindmap workflows plus one unauthenticated prompt-assisted generate command.",
   keywords: [

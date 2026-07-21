@@ -109,7 +109,7 @@ const approvedRuntimeBoundaryFiles = [
   "tools/harness-eval.ts",
 ];
 const approvedManagedPromiseSiteCounts: Record<string, number> = {
-  "apps/cli/scripts/build.mjs": 10,
+  "apps/cli/scripts/build.mjs": 12,
   "apps/cli/scripts/bundle-report.mjs": 6,
   "apps/cli/scripts/package.mjs": 8,
   "apps/cli/scripts/smoke.mjs": 86,
