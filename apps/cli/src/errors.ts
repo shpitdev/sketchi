@@ -46,7 +46,6 @@ export class CliGenerationError extends Schema.TaggedErrorClass<CliGenerationErr
   "CliGenerationError",
   {
     code: Schema.Literals([
-      "missing_credential",
       "provider_failure",
       "generation_timeout",
       "malformed_output",
@@ -106,8 +105,6 @@ export function exitCodeForFailure(error: CliFailure): number {
       switch (error.code) {
         case "invalid_generated_document":
           return 3;
-        case "missing_credential":
-          return 9;
         case "provider_failure":
           return 10;
         case "generation_timeout":

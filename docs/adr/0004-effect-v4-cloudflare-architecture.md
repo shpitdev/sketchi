@@ -20,9 +20,11 @@ defects remain distinct; resources are scoped; runtime execution occurs only
 at approved host edges.
 
 Cloudflare Workers remain the application runtime. This is not a temporary
-bridge. Provider calls use Cloudflare AI Gateway. In the CLI, `CF_AIG_TOKEN` is
-sent as `cf-aig-authorization`; provider credentials remain stored at the
-gateway.
+bridge. Provider calls use the Cloudflare AI Gateway binding server-side; the
+binding authenticates the request and supplies the stored provider key. The CLI
+holds no gateway credential: it reaches generation through one unauthenticated
+HTTPS call to the public Sketchi generate API, and every other CLI command is
+strictly offline.
 
 Deterministic IR validation, layout, geometry, rendering transformations, and
 formatting stay plain TypeScript. React view state and rendering stay React.

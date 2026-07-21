@@ -74,12 +74,13 @@ See [Effect conventions](effect-conventions.md), the
 ## Generation and gateway routing
 
 Worker generation uses the Cloudflare AI Gateway binding with `collectLog` and
-bounded request metadata. The public CLI has exactly six commands:
-`create`, `show`, `edit`, `list`, `export`, and `generate`. Only `generate`
-uses the network. It calls the Cloudflare AI Gateway provider-native Google AI
-Studio route, authenticates with `CF_AIG_TOKEN` in
-`cf-aig-authorization`, and never reads or sends a Google provider credential.
-The gateway supplies its stored BYOK provider key.
+bounded request metadata. The binding runs server-side and supplies its stored
+BYOK provider key. The public `POST /api/v1/generate` endpoint on the Playground
+Worker exposes this vertical unauthenticated, with the same typed error contract
+and usage telemetry as the sibling `/api/v1` build endpoints. The public CLI has
+exactly six commands: `create`, `show`, `edit`, `list`, `export`, and
+`generate`. Only `generate` uses the network: it makes one unauthenticated HTTPS
+call to the generate endpoint and needs no token, key, account, or login.
 
 Manual CLI commands remain offline. Scenario and harness commands are internal
 Nx/tool entrypoints and are not public CLI commands.

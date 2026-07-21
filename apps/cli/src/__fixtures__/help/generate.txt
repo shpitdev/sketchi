@@ -1,25 +1,23 @@
 DESCRIPTION
-  Create one persisted diagram from --prompt TEXT. This is Sketchi's only command that uses a model or network. It calls the Cloudflare AI Gateway HTTP endpoint directly; it does not use Cloudflare bindings, a Sketchi service, or MCP.
+  Create one persisted diagram from --prompt TEXT. This is Sketchi's only command that uses the network. It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
 
-Credential, routing, and options:
-  export CF_AIG_TOKEN=<cloudflare-api-token-with-ai-gateway-run-access>
-  Sketchi sends that token only as cf-aig-authorization to the Google AI Studio provider route.
-  The gateway supplies its stored BYOK Google provider key; Sketchi never reads or sends a Google
-  API key. Route: https://gateway.ai.cloudflare.com/v1/ACCOUNT_ID/GATEWAY_ID/google-ai-studio.
-  Defaults: ACCOUNT_ID=75f9660f39e4dafe8b95980b87e7399a; GATEWAY_ID=google-ai-studio.
-  Override them with SKETCHI_AI_GATEWAY_ACCOUNT_ID and SKETCHI_AI_GATEWAY_ID.
-  --type defaults to flowchart; --model defaults to
-  gemini-3.1-flash-lite. --output text|json controls only the local result envelope.
+Network and options:
+  Endpoint: https://playground.sketchi.app/api/v1/generate
+  The model call, schema validation, and quality gate run server-side; the finished diagram
+  and Excalidraw artifact are returned over plain HTTPS. Sketchi sends no credentials.
+  --type defaults to flowchart; --model defaults to gemini-3.1-flash-lite.
+  Override the endpoint for preview or local testing with SKETCHI_GENERATE_ENDPOINT
+  or --endpoint URL. --output text|json controls only the local result envelope.
 
 Validation and storage:
-  Provider JSON is validated by Sketchi's canonical package schemas, built with Code Mode, and
-  atomically committed through the create store at ~/.sketchi/diagrams/<id>/. The record contains
-  manifest.json, document.json, scene.json, diagram.excalidraw, and optional diagram.png.
-  Any credential/provider/timeout/output/validation/build/storage failure leaves no visible record.
+  The returned diagram is decoded against Sketchi's canonical package schemas and atomically
+  committed through the create store at ~/.sketchi/diagrams/<id>/. The record contains
+  manifest.json, document.json, scene.json, and diagram.excalidraw.
+  Any network/endpoint/timeout/output/validation/storage failure leaves no visible record.
 
 Errors and next steps:
-  Exit 9 means missing credential, 10 provider/network failure, 11 timeout, and 12 malformed output;
-  generated schema validation uses 3, build uses 4, conflict uses 6, and storage uses 7.
+  Exit 10 means a network or endpoint failure, 11 a timeout, and 12 malformed output;
+  a rejected or invalid generated document uses 3, conflict uses 6, and storage uses 7.
   On success, pass the returned id to show, edit, list, or export. For strictly offline manual
   authoring and accepted canonical JSON examples, run sketchi --help.
 
@@ -28,9 +26,10 @@ USAGE
 
 FLAGS
   --output text|json          Result presentation format. (choices: text, json)
-  --prompt TEXT               Diagram request text sent only through Cloudflare AI Gateway.
+  --prompt TEXT               Diagram request text sent to the public Sketchi generate API.
   --type flowchart|mindmap    Requested canonical diagram type; default flowchart. (choices: flowchart, mindmap)
-  --model MODEL               Google AI Studio model id routed through AI Gateway; default gemini-3.1-flash-lite.
+  --model MODEL               Server-routed generation model id; default gemini-3.1-flash-lite.
+  --endpoint URL              Unauthenticated generate API URL; defaults to the production Sketchi endpoint.
 
 GLOBAL FLAGS
   --help, -h       Show help information

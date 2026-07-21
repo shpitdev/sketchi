@@ -29,11 +29,10 @@ pnpm nx build diagram-generation
 ## Direction
 
 `DiagramGenerationClient` is the Effect-native primary API. Workers compose the
-Cloudflare AI Gateway binding at their runtime boundary. Node hosts compose
-`CloudflareGoogleAiStudioHttpClientLive` with an authenticated AI Gateway
-provider-native URL, fetch, and the shared generation policy. The gateway token
-authenticates the Cloudflare request, while the gateway supplies its stored
-Google AI Studio BYOK key. The Node layer uses the Google AI SDK boundary without
-reading or sending a Google API key and preserves the same timeout, retry,
-cancellation, and candidate parsing behavior. Pure prompt, response, and
-candidate helpers stay independent of runtime wiring.
+Cloudflare AI Gateway binding (`CloudflareGoogleAiStudioClientLive`) at their
+runtime boundary; the binding authenticates the request and supplies the stored
+Google AI Studio BYOK key, so no provider credential is read or sent. The public
+Sketchi generate API and the eval harness are the only hosts that compose this
+client. There is no client-side/CLI token adapter: the CLI reaches generation
+through one unauthenticated HTTPS call to the public generate API. Pure prompt,
+response, and candidate helpers stay independent of runtime wiring.

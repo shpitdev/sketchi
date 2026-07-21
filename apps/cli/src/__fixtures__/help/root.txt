@@ -13,17 +13,13 @@ Canonical mindmap example:
 
 Prompt-assisted workflow (sole network boundary):
   sketchi generate --prompt TEXT [--type flowchart|mindmap] [--model MODEL]
-  Only generate uses the network or a model. It sends the prompt to Cloudflare AI Gateway's
-  Google AI Studio provider route; the gateway injects its stored BYOK provider key. Sketchi
-  never reads or sends a Google API key. Credential setup:
-    export CF_AIG_TOKEN=<cloudflare-api-token-with-ai-gateway-run-access>
-  Sketchi sends that token only as cf-aig-authorization. The route template is
-  https://gateway.ai.cloudflare.com/v1/ACCOUNT_ID/GATEWAY_ID/google-ai-studio.
-  Defaults: ACCOUNT_ID=75f9660f39e4dafe8b95980b87e7399a; GATEWAY_ID=google-ai-studio.
-  Override them with SKETCHI_AI_GATEWAY_ACCOUNT_ID and SKETCHI_AI_GATEWAY_ID.
-  The default type is flowchart and default model is
-  gemini-3.1-flash-lite. Output is schema-validated, built with the canonical Code Mode
-  runtime, and committed through the same store as create.
+  Only generate uses the network. It makes one unauthenticated HTTPS POST to the public
+  Sketchi generate API at https://playground.sketchi.app/api/v1/generate
+  and needs no token, key, account, or login. The model call, validation, and quality gate
+  run server-side; the finished diagram and Excalidraw artifact come back and are committed
+  through the same local store as create. The default type is flowchart and default model is
+  gemini-3.1-flash-lite. Override the endpoint for preview or local testing with
+  SKETCHI_GENERATE_ENDPOINT or --endpoint URL.
 
 Input and output contracts:
   create/edit require exactly one of --file PATH|- or --json VALUE. --file - reads one
@@ -43,8 +39,7 @@ Exit codes and errors:
   0 success; 1 internal failure; 2 usage or interactive stdin; 3 invalid input/document;
   4 build/export construction failure; 5 diagram not found; 6 conflict/busy;
   7 filesystem/storage failure; 8 unavailable format or export write failure;
-  9 missing generation credential; 10 provider/network failure; 11 generation timeout;
-  12 malformed provider output.
+  10 generate network/endpoint failure; 11 generate timeout; 12 malformed generate output.
   Text errors start with "error: CODE". JSON errors use {"ok":false,"command":...,"error":...}.
   Errors never include stacks.
 
@@ -65,7 +60,7 @@ GLOBAL FLAGS
   --version, -v    Show version information
 
 SUBCOMMANDS
-  generate    Generate and persist one diagram through the sole Cloudflare AI Gateway network path.
+  generate    Generate and persist one diagram through the public unauthenticated Sketchi generate API.
   create      Create one local diagram from exactly one canonical document source. The document is validated and built before the record directory is committed atomically. --file - rejects an interactive TTY with exit 2.
   show        Show the current canonical document, manifest summary, formats, and recoverable revision paths for DIAGRAM_ID. This does not rebuild or mutate the record.
   edit        Replace the complete canonical document for DIAGRAM_ID. Sketchi validates and builds first, preserves the prior document under revisions/, and atomically swaps the record. The new spec.id must match DIAGRAM_ID.

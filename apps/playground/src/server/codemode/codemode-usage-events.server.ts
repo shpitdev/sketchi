@@ -38,7 +38,8 @@ export type CodeModeUsageOperation =
   | "applyDiagramPatch"
   | "buildFlowchart"
   | "buildMindmap"
-  | "execute";
+  | "execute"
+  | "generateDiagram";
 
 export type CodeModeUsageSurface = "api" | "mcp";
 

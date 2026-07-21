@@ -1,0 +1,12 @@
+{
+  "ok": false,
+  "command": "generate",
+  "error": {
+    "code": "provider_failure",
+    "message": "The Sketchi generate API could not be reached.",
+    "hint": "Check your network connection and retry; generate is the only command that uses the network.",
+    "details": [
+      "transport"
+    ]
+  }
+}

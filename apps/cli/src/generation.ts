@@ -1,283 +1,270 @@
-import type { FlowchartDiagram, MindmapDiagram } from "@sketchi/diagram-core";
 import {
-  CLOUDFLARE_AI_GATEWAY_PROVIDER_KEY_DIAGNOSTIC,
-  CLOUDFLARE_AI_GATEWAY_TOKEN_REJECTED_DIAGNOSTIC,
-  CloudflareGoogleAiStudioHttpClientLive,
-  CloudflareGoogleAiStudioHttpConfig,
-  CloudflareGoogleAiStudioHttpFetch,
-  DiagramGenerationClient,
-  type DiagramGenerationError,
-  type DiagramGenerationType,
-  DiagramGenerationPolicyLive,
-  extractJsonObject,
-} from "@sketchi/diagram-generation";
-import { Effect, Layer } from "effect";
+  ExcalidrawFileSchema,
+  RenderedDiagramSceneSchema,
+  type ExcalidrawFile,
+  type PatchableScene,
+} from "@sketchi/diagram-agent";
+import { Effect } from "effect";
 
-import { DiagramBuilder } from "./builder.js";
-import type { StoredDiagram } from "./contracts.js";
-import { decodeCanonicalDiagramDocument } from "./document.js";
+import type { BuiltDiagram, StoredDiagram } from "./contracts.js";
+import {
+  decodeCanonicalDiagramDocument,
+  documentId,
+  validateStorageId,
+} from "./document.js";
 import { CliGenerationError } from "./errors.js";
 import { DiagramStore } from "./storage.js";
 
 export const DEFAULT_GENERATION_MODEL = "gemini-3.1-flash-lite";
-export const CF_AIG_TOKEN_ENV = "CF_AIG_TOKEN";
-export const SKETCHI_AI_GATEWAY_ACCOUNT_ID_ENV =
-  "SKETCHI_AI_GATEWAY_ACCOUNT_ID";
-export const SKETCHI_AI_GATEWAY_ID_ENV = "SKETCHI_AI_GATEWAY_ID";
-export const DEFAULT_SKETCHI_AI_GATEWAY_ACCOUNT_ID =
-  "75f9660f39e4dafe8b95980b87e7399a";
-export const DEFAULT_SKETCHI_AI_GATEWAY_ID = "google-ai-studio";
+export const DEFAULT_GENERATE_ENDPOINT =
+  "https://playground.sketchi.app/api/v1/generate";
+export const SKETCHI_GENERATE_ENDPOINT_ENV = "SKETCHI_GENERATE_ENDPOINT";
+
+export type GenerationType = "flowchart" | "mindmap";
 
 export interface GenerateDiagramInput {
+  readonly endpoint: string;
   readonly model: string;
   readonly prompt: string;
-  readonly type: DiagramGenerationType;
+  readonly type: GenerationType;
 }
 
 export interface GenerateDiagramResult {
   readonly diagram: StoredDiagram;
   readonly model: string;
-  readonly provider: "cloudflare-google-ai-studio";
+  readonly provider: string;
 }
 
-function titleFromPrompt(prompt: string): string {
-  const title = prompt.replace(/\s+/gu, " ").trim().slice(0, 80);
-  return title || "Generated Sketchi diagram";
+/**
+ * Resolve the default generate endpoint: the production Sketchi generate API,
+ * overridable only for preview or local testing through the environment.
+ */
+export function resolveGenerateEndpoint(): string {
+  return (
+    process.env[SKETCHI_GENERATE_ENDPOINT_ENV]?.trim() ||
+    DEFAULT_GENERATE_ENDPOINT
+  );
 }
 
-function generationFailure(error: DiagramGenerationError): CliGenerationError {
-  switch (error._tag) {
-    case "DiagramGenerationConfigurationError":
-      return CliGenerationError.make({
-        code: "missing_credential",
-        message: `Prompt-assisted generation requires ${CF_AIG_TOKEN_ENV}.`,
-        hint: `Set ${CF_AIG_TOKEN_ENV} to a Cloudflare API token with AI Gateway Run access and retry.`,
-        details: [],
-      });
-    case "DiagramGenerationHttpError": {
-      const missingProviderKey = error.diagnostics.includes(
-        CLOUDFLARE_AI_GATEWAY_PROVIDER_KEY_DIAGNOSTIC,
-      );
-      const rejectedToken =
-        error.status === 401 ||
-        error.status === 403 ||
-        error.diagnostics.includes(
-          CLOUDFLARE_AI_GATEWAY_TOKEN_REJECTED_DIAGNOSTIC,
-        );
-      return CliGenerationError.make({
-        code: "provider_failure",
-        message: missingProviderKey
-          ? CLOUDFLARE_AI_GATEWAY_PROVIDER_KEY_DIAGNOSTIC
-          : rejectedToken
-            ? CLOUDFLARE_AI_GATEWAY_TOKEN_REJECTED_DIAGNOSTIC
-            : `Cloudflare AI Gateway rejected the provider request with HTTP ${String(error.status)}.`,
-        hint: missingProviderKey
-          ? "Configure a default Google AI Studio BYOK key on the selected gateway, then retry."
-          : rejectedToken
-            ? `Set ${CF_AIG_TOKEN_ENV} to a Cloudflare API token with AI Gateway Run access.`
-            : "Verify the gateway, model name, and Google AI Studio availability, then retry.",
-        details: [`http_status:${String(error.status)}`],
-      });
-    }
-    case "DiagramGenerationTransportError":
-      return CliGenerationError.make({
-        code: "provider_failure",
-        message: "Cloudflare AI Gateway could not be reached.",
-        hint: "Check network access and gateway availability, then retry.",
-        details: ["transport"],
-      });
-    case "DiagramGenerationTimeoutError":
-      return CliGenerationError.make({
-        code: "generation_timeout",
-        message: `Cloudflare AI Gateway did not respond within ${String(error.timeoutMs)} ms.`,
-        hint: "Retry once; if it persists, choose a faster model.",
-        details: [`timeout_ms:${String(error.timeoutMs)}`],
-      });
-    case "DiagramGenerationResponseError":
-      return CliGenerationError.make({
-        code: "malformed_output",
-        message:
-          "The Google AI Studio provider returned an unreadable response through Cloudflare AI Gateway.",
-        hint: "Retry once; if it persists, choose another model.",
-        details: [],
-      });
-    case "DiagramGenerationInputError":
-      return CliGenerationError.make({
-        code: "invalid_generated_document",
-        message:
-          "The generation request could not be converted into a diagram.",
-        hint: "Use a concrete prompt that describes one diagram.",
-        details: [],
-      });
-  }
+function networkFailure(): CliGenerationError {
+  return CliGenerationError.make({
+    code: "provider_failure",
+    message: "The Sketchi generate API could not be reached.",
+    hint: "Check your network connection and retry; generate is the only command that uses the network.",
+    details: ["transport"],
+  });
 }
 
-function flowchartDocumentInput(diagram: FlowchartDiagram): unknown {
-  return {
-    type: "flowchart",
-    spec: {
-      id: diagram.id,
-      title: diagram.title,
-      nodes: diagram.nodes.map((node) => ({
-        id: node.id,
-        label: node.label,
-        kind: node.kind,
-        ...(node.description ? { description: node.description } : {}),
-      })),
-      edges: diagram.edges.map((edge) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        ...(edge.label ? { label: edge.label } : {}),
-      })),
-      layout: { direction: diagram.layout.direction },
-      style: diagram.style,
-    },
-  };
-}
-
-function mindmapDocumentInput(diagram: MindmapDiagram): unknown {
-  const root = diagram.nodes.find((node) => node.kind === "root");
-  if (!root) return undefined;
-  const nodes = new Map(diagram.nodes.map((node) => [node.id, node]));
-  const children = new Map<string, MindmapDiagram["edges"]>();
-  for (const edge of diagram.edges) {
-    children.set(edge.source, [...(children.get(edge.source) ?? []), edge]);
-  }
-  const topic = (nodeId: string): unknown => {
-    const node = nodes.get(nodeId);
-    if (!node) return undefined;
-    const nested = [...(children.get(nodeId) ?? [])]
-      .sort(
-        (left, right) =>
-          left.metadata.siblingIndex - right.metadata.siblingIndex,
-      )
-      .map((edge) => topic(edge.target));
-    return {
-      label: node.label,
-      ...(nested.length > 0 ? { children: nested } : {}),
-    };
-  };
-
-  return {
-    type: "mindmap",
-    spec: {
-      id: diagram.id,
-      title: diagram.title,
-      root: topic(root.id),
-      layout: { direction: diagram.layout.direction },
-      style: diagram.style,
-    },
-  };
-}
-
-function malformedOutput(
-  text: string,
-): Effect.Effect<void, CliGenerationError> {
-  return Effect.try({
-    try: () => {
-      extractJsonObject(text);
-    },
-    catch: () =>
-      CliGenerationError.make({
-        code: "malformed_output",
-        message:
-          "The Google AI Studio provider output did not contain one JSON object.",
-        hint: "Retry once; if it persists, choose another model.",
-        details: [],
-      }),
+function malformedResponse(): CliGenerationError {
+  return CliGenerationError.make({
+    code: "malformed_output",
+    message: "The Sketchi generate API returned an unreadable response.",
+    hint: "Retry once; if it persists, report the prompt without secrets.",
+    details: [],
   });
 }
 
 function invalidGeneratedDocument(): CliGenerationError {
   return CliGenerationError.make({
     code: "invalid_generated_document",
-    message: "Generated JSON failed Sketchi schema or semantic validation.",
-    hint: "Refine the prompt or choose another model, then retry.",
+    message: "The generated diagram failed Sketchi schema or semantic validation.",
+    hint: "Refine the prompt with concrete diagram content, then retry.",
     details: [],
   });
 }
 
+interface EndpointErrorBody {
+  readonly status?: string;
+  readonly issues?: ReadonlyArray<{
+    readonly message?: string;
+    readonly hint?: string;
+  }>;
+}
+
+function readErrorBody(text: string): EndpointErrorBody {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return parsed !== null && typeof parsed === "object"
+      ? (parsed as EndpointErrorBody)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function endpointFailure(status: number, text: string): CliGenerationError {
+  const body = readErrorBody(text);
+  const firstIssue = body.issues?.[0];
+  const details = [`http_status:${String(status)}`];
+
+  switch (body.status) {
+    case "generation_timeout":
+      return CliGenerationError.make({
+        code: "generation_timeout",
+        message: firstIssue?.message ?? "The generate API timed out.",
+        hint: firstIssue?.hint ?? "Retry once; if it persists, try a shorter prompt.",
+        details,
+      });
+    case "malformed_output":
+      return CliGenerationError.make({
+        code: "malformed_output",
+        message:
+          firstIssue?.message ??
+          "The generate API returned unreadable model output.",
+        hint: firstIssue?.hint ?? "Retry once; if it persists, try another prompt.",
+        details,
+      });
+    case "invalid_input":
+    case "invalid_generated_document":
+    case "quality_failed":
+      return CliGenerationError.make({
+        code: "invalid_generated_document",
+        message:
+          firstIssue?.message ??
+          "The generated diagram failed Sketchi validation.",
+        hint:
+          firstIssue?.hint ?? "Refine the prompt with concrete content, then retry.",
+        details,
+      });
+    default:
+      return CliGenerationError.make({
+        code: "provider_failure",
+        message:
+          firstIssue?.message ??
+          `The Sketchi generate API responded with HTTP ${String(status)}.`,
+        hint:
+          firstIssue?.hint ??
+          "Retry once; if it persists, report the prompt without secrets.",
+        details,
+      });
+  }
+}
+
+interface GenerateApiSuccess {
+  readonly document: unknown;
+  readonly scene: unknown;
+  readonly excalidraw: unknown;
+  readonly model: string;
+  readonly provider: string;
+}
+
+function readSuccessBody(text: string): GenerateApiSuccess | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (parsed === null || typeof parsed !== "object") return undefined;
+  const body = parsed as {
+    ok?: unknown;
+    diagram?: {
+      document?: unknown;
+      scene?: unknown;
+      excalidraw?: unknown;
+    };
+    generation?: { model?: unknown; provider?: unknown };
+  };
+  if (
+    body.ok !== true ||
+    !body.diagram ||
+    body.diagram.document === undefined ||
+    body.diagram.scene === undefined ||
+    body.diagram.excalidraw === undefined
+  ) {
+    return undefined;
+  }
+  return {
+    document: body.diagram.document,
+    scene: body.diagram.scene,
+    excalidraw: body.diagram.excalidraw,
+    model:
+      typeof body.generation?.model === "string" ? body.generation.model : "",
+    provider:
+      typeof body.generation?.provider === "string"
+        ? body.generation.provider
+        : "cloudflare-google-ai-studio",
+  };
+}
+
+function decodeScene(value: unknown): Effect.Effect<PatchableScene, CliGenerationError> {
+  const decoded = RenderedDiagramSceneSchema.safeParse(value);
+  return decoded.success
+    ? Effect.succeed(decoded.data)
+    : Effect.fail(malformedResponse());
+}
+
+function decodeExcalidraw(
+  value: unknown,
+): Effect.Effect<ExcalidrawFile, CliGenerationError> {
+  const decoded = ExcalidrawFileSchema.safeParse(value);
+  return decoded.success
+    ? Effect.succeed(decoded.data)
+    : Effect.fail(malformedResponse());
+}
+
+const requestGeneration = Effect.fn("sketchi.cli.generate.request")(function* (
+  input: GenerateDiagramInput,
+) {
+  const response = yield* Effect.tryPromise({
+    try: (signal) =>
+      globalThis.fetch(input.endpoint, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-sketchi-client": "sketchi-cli",
+        },
+        body: JSON.stringify({
+          prompt: input.prompt,
+          type: input.type,
+          model: input.model,
+        }),
+        signal,
+      }),
+    catch: () => networkFailure(),
+  });
+  const text = yield* Effect.tryPromise({
+    try: () => response.text(),
+    catch: () => networkFailure(),
+  });
+  if (!response.ok) {
+    return yield* Effect.fail(endpointFailure(response.status, text));
+  }
+  const success = readSuccessBody(text);
+  if (!success) {
+    return yield* Effect.fail(malformedResponse());
+  }
+  return success;
+});
+
 export const generateDiagram = Effect.fn("sketchi.cli.generate")(function* (
   input: GenerateDiagramInput,
 ) {
-  const client = yield* DiagramGenerationClient;
-  const builder = yield* DiagramBuilder;
   const store = yield* DiagramStore;
-  const candidate = yield* client
-    .generate({
-      model: input.model,
-      prompt: {
-        id: "sketchi-cli-generate",
-        request: input.prompt,
-        requiredBranchLabels: [],
-        requiredNodeLabels: [],
-        title: titleFromPrompt(input.prompt),
-        type: input.type,
-      },
-    })
-    .pipe(Effect.mapError(generationFailure));
+  const response = yield* requestGeneration(input);
 
-  if (!candidate.diagram) {
-    yield* malformedOutput(candidate.text);
-    return yield* invalidGeneratedDocument();
-  }
-  if (candidate.diagram.type !== input.type) {
-    return yield* invalidGeneratedDocument();
-  }
+  const document = yield* decodeCanonicalDiagramDocument(response.document).pipe(
+    Effect.mapError(() => invalidGeneratedDocument()),
+  );
+  const id = yield* validateStorageId(documentId(document)).pipe(
+    Effect.mapError(() => invalidGeneratedDocument()),
+  );
+  const scene = yield* decodeScene(response.scene);
+  const excalidraw = yield* decodeExcalidraw(response.excalidraw);
 
-  const document = yield* decodeCanonicalDiagramDocument(
-    candidate.diagram.type === "flowchart"
-      ? flowchartDocumentInput(candidate.diagram)
-      : mindmapDocumentInput(candidate.diagram),
-  ).pipe(Effect.mapError(() => invalidGeneratedDocument()));
-  const built = yield* builder.build(document);
+  const built: BuiltDiagram = {
+    id,
+    type: document.type,
+    title: document.spec.title,
+    document,
+    scene,
+    excalidraw,
+  };
   const diagram = yield* store.create(built);
 
   return {
     diagram,
-    model: candidate.model,
-    provider: "cloudflare-google-ai-studio",
+    model: response.model || input.model,
+    provider: response.provider,
   } satisfies GenerateDiagramResult;
 });
-
-export function makeCloudflareGoogleAiStudioHttpConfigLayer(config: {
-  readonly accountId: string;
-  readonly gatewayId: string;
-  readonly token: string | undefined;
-}) {
-  return Layer.succeed(CloudflareGoogleAiStudioHttpConfig, config);
-}
-
-export function makeCloudflareGoogleAiStudioHttpFetchLayer(
-  fetch: typeof globalThis.fetch,
-) {
-  return Layer.succeed(CloudflareGoogleAiStudioHttpFetch, { fetch });
-}
-
-function environmentValueOrDefault(name: string, fallback: string): string {
-  return process.env[name]?.trim() || fallback;
-}
-
-const CloudflareGoogleAiStudioHttpNodeDependencies = Layer.mergeAll(
-  makeCloudflareGoogleAiStudioHttpConfigLayer({
-    accountId: environmentValueOrDefault(
-      SKETCHI_AI_GATEWAY_ACCOUNT_ID_ENV,
-      DEFAULT_SKETCHI_AI_GATEWAY_ACCOUNT_ID,
-    ),
-    gatewayId: environmentValueOrDefault(
-      SKETCHI_AI_GATEWAY_ID_ENV,
-      DEFAULT_SKETCHI_AI_GATEWAY_ID,
-    ),
-    token: process.env[CF_AIG_TOKEN_ENV],
-  }),
-  makeCloudflareGoogleAiStudioHttpFetchLayer((input, init) =>
-    globalThis.fetch(input, init),
-  ),
-  DiagramGenerationPolicyLive,
-);
-
-export const DiagramGenerationClientNodeLive =
-  CloudflareGoogleAiStudioHttpClientLive.pipe(
-    Layer.provide(CloudflareGoogleAiStudioHttpNodeDependencies),
-  );

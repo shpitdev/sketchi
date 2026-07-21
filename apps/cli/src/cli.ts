@@ -16,14 +16,11 @@ import { encodeJson, validateStorageId } from "./document.js";
 import { CliFilesystemError, CliValidationError } from "./errors.js";
 import { LocalFileSystem, LocalFileSystemLive } from "./filesystem.js";
 import {
-  CF_AIG_TOKEN_ENV,
-  DEFAULT_SKETCHI_AI_GATEWAY_ACCOUNT_ID,
-  DEFAULT_SKETCHI_AI_GATEWAY_ID,
+  DEFAULT_GENERATE_ENDPOINT,
   DEFAULT_GENERATION_MODEL,
-  DiagramGenerationClientNodeLive,
-  SKETCHI_AI_GATEWAY_ACCOUNT_ID_ENV,
-  SKETCHI_AI_GATEWAY_ID_ENV,
+  SKETCHI_GENERATE_ENDPOINT_ENV,
   generateDiagram,
+  resolveGenerateEndpoint,
   type GenerateDiagramResult,
 } from "./generation.js";
 import {
@@ -65,17 +62,13 @@ Canonical mindmap example:
 
 Prompt-assisted workflow (sole network boundary):
   sketchi generate --prompt TEXT [--type flowchart|mindmap] [--model MODEL]
-  Only generate uses the network or a model. It sends the prompt to Cloudflare AI Gateway's
-  Google AI Studio provider route; the gateway injects its stored BYOK provider key. Sketchi
-  never reads or sends a Google API key. Credential setup:
-    export ${CF_AIG_TOKEN_ENV}=<cloudflare-api-token-with-ai-gateway-run-access>
-  Sketchi sends that token only as cf-aig-authorization. The route template is
-  https://gateway.ai.cloudflare.com/v1/ACCOUNT_ID/GATEWAY_ID/google-ai-studio.
-  Defaults: ACCOUNT_ID=${DEFAULT_SKETCHI_AI_GATEWAY_ACCOUNT_ID}; GATEWAY_ID=${DEFAULT_SKETCHI_AI_GATEWAY_ID}.
-  Override them with ${SKETCHI_AI_GATEWAY_ACCOUNT_ID_ENV} and ${SKETCHI_AI_GATEWAY_ID_ENV}.
-  The default type is flowchart and default model is
-  ${DEFAULT_GENERATION_MODEL}. Output is schema-validated, built with the canonical Code Mode
-  runtime, and committed through the same store as create.
+  Only generate uses the network. It makes one unauthenticated HTTPS POST to the public
+  Sketchi generate API at ${DEFAULT_GENERATE_ENDPOINT}
+  and needs no token, key, account, or login. The model call, validation, and quality gate
+  run server-side; the finished diagram and Excalidraw artifact come back and are committed
+  through the same local store as create. The default type is flowchart and default model is
+  ${DEFAULT_GENERATION_MODEL}. Override the endpoint for preview or local testing with
+  ${SKETCHI_GENERATE_ENDPOINT_ENV} or --endpoint URL.
 
 Input and output contracts:
   create/edit require exactly one of --file PATH|- or --json VALUE. --file - reads one
@@ -95,8 +88,7 @@ Exit codes and errors:
   0 success; 1 internal failure; 2 usage or interactive stdin; 3 invalid input/document;
   4 build/export construction failure; 5 diagram not found; 6 conflict/busy;
   7 filesystem/storage failure; 8 unavailable format or export write failure;
-  9 missing generation credential; 10 provider/network failure; 11 generation timeout;
-  12 malformed provider output.
+  10 generate network/endpoint failure; 11 generate timeout; 12 malformed generate output.
   Text errors start with "error: CODE". JSON errors use {"ok":false,"command":...,"error":...}.
   Errors never include stacks.
 
@@ -116,7 +108,7 @@ const rootCommand = Command.make("sketchi").pipe(
   Command.withSharedFlags({ output: outputFlag }),
   Command.withDescription(ROOT_HELP),
   Command.withShortDescription(
-    "Local Sketchi authoring with one prompt-assisted command.",
+    "Local Sketchi authoring with one credential-free prompt-assisted command.",
   ),
 );
 
@@ -199,27 +191,25 @@ function listText(diagrams: ReadonlyArray<DiagramSummary>): string {
   ].join("\n");
 }
 
-const GENERATE_HELP = `Create one persisted diagram from --prompt TEXT. This is Sketchi's only command that uses a model or network. It calls the Cloudflare AI Gateway HTTP endpoint directly; it does not use Cloudflare bindings, a Sketchi service, or MCP.
+const GENERATE_HELP = `Create one persisted diagram from --prompt TEXT. This is Sketchi's only command that uses the network. It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
 
-Credential, routing, and options:
-  export ${CF_AIG_TOKEN_ENV}=<cloudflare-api-token-with-ai-gateway-run-access>
-  Sketchi sends that token only as cf-aig-authorization to the Google AI Studio provider route.
-  The gateway supplies its stored BYOK Google provider key; Sketchi never reads or sends a Google
-  API key. Route: https://gateway.ai.cloudflare.com/v1/ACCOUNT_ID/GATEWAY_ID/google-ai-studio.
-  Defaults: ACCOUNT_ID=${DEFAULT_SKETCHI_AI_GATEWAY_ACCOUNT_ID}; GATEWAY_ID=${DEFAULT_SKETCHI_AI_GATEWAY_ID}.
-  Override them with ${SKETCHI_AI_GATEWAY_ACCOUNT_ID_ENV} and ${SKETCHI_AI_GATEWAY_ID_ENV}.
-  --type defaults to flowchart; --model defaults to
-  ${DEFAULT_GENERATION_MODEL}. --output text|json controls only the local result envelope.
+Network and options:
+  Endpoint: ${DEFAULT_GENERATE_ENDPOINT}
+  The model call, schema validation, and quality gate run server-side; the finished diagram
+  and Excalidraw artifact are returned over plain HTTPS. Sketchi sends no credentials.
+  --type defaults to flowchart; --model defaults to ${DEFAULT_GENERATION_MODEL}.
+  Override the endpoint for preview or local testing with ${SKETCHI_GENERATE_ENDPOINT_ENV}
+  or --endpoint URL. --output text|json controls only the local result envelope.
 
 Validation and storage:
-  Provider JSON is validated by Sketchi's canonical package schemas, built with Code Mode, and
-  atomically committed through the create store at ~/.sketchi/diagrams/<id>/. The record contains
-  manifest.json, document.json, scene.json, diagram.excalidraw, and optional diagram.png.
-  Any credential/provider/timeout/output/validation/build/storage failure leaves no visible record.
+  The returned diagram is decoded against Sketchi's canonical package schemas and atomically
+  committed through the create store at ~/.sketchi/diagrams/<id>/. The record contains
+  manifest.json, document.json, scene.json, and diagram.excalidraw.
+  Any network/endpoint/timeout/output/validation/storage failure leaves no visible record.
 
 Errors and next steps:
-  Exit 9 means missing credential, 10 provider/network failure, 11 timeout, and 12 malformed output;
-  generated schema validation uses 3, build uses 4, conflict uses 6, and storage uses 7.
+  Exit 10 means a network or endpoint failure, 11 a timeout, and 12 malformed output;
+  a rejected or invalid generated document uses 3, conflict uses 6, and storage uses 7.
   On success, pass the returned id to show, edit, list, or export. For strictly offline manual
   authoring and accepted canonical JSON examples, run sketchi --help.`;
 
@@ -228,7 +218,7 @@ const generateCommand = Command.make(
   {
     prompt: Flag.string("prompt").pipe(
       Flag.withDescription(
-        "Diagram request text sent only through Cloudflare AI Gateway.",
+        "Diagram request text sent to the public Sketchi generate API.",
       ),
       Flag.withMetavar("TEXT"),
     ),
@@ -242,9 +232,16 @@ const generateCommand = Command.make(
     model: Flag.string("model").pipe(
       Flag.withDefault(DEFAULT_GENERATION_MODEL),
       Flag.withDescription(
-        `Google AI Studio model id routed through AI Gateway; default ${DEFAULT_GENERATION_MODEL}.`,
+        `Server-routed generation model id; default ${DEFAULT_GENERATION_MODEL}.`,
       ),
       Flag.withMetavar("MODEL"),
+    ),
+    endpoint: Flag.string("endpoint").pipe(
+      Flag.withDefault(resolveGenerateEndpoint()),
+      Flag.withDescription(
+        "Unauthenticated generate API URL; defaults to the production Sketchi endpoint.",
+      ),
+      Flag.withMetavar("URL"),
     ),
   },
   (input) =>
@@ -261,7 +258,7 @@ const generateCommand = Command.make(
 ).pipe(
   Command.withDescription(GENERATE_HELP),
   Command.withShortDescription(
-    "Generate and persist one diagram through the sole Cloudflare AI Gateway network path.",
+    "Generate and persist one diagram through the public unauthenticated Sketchi generate API.",
   ),
   Command.withExamples([
     {
@@ -551,7 +548,6 @@ export const CliApplicationLayer = Layer.mergeAll(
   StorageRootLive,
   diagramBuilderLayer,
   diagramStoreLayer,
-  DiagramGenerationClientNodeLive,
   InputReaderLive.pipe(Layer.provide(LocalFileSystemLive)),
   OutputWriterLive,
 );

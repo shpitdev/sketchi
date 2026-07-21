@@ -20,6 +20,7 @@ import { Route as ArtifactsArtifactIdRouteImport } from "./routes/artifacts/$art
 import { Route as ApiChatRouteImport } from "./routes/api/chat";
 import { Route as DiagramsDiagramIdEditRouteImport } from "./routes/diagrams_/$diagramId/edit";
 import { Route as ArtifactsArtifactIdEditRouteImport } from "./routes/artifacts_/$artifactId/edit";
+import { Route as ApiV1GenerateRouteImport } from "./routes/api/v1/generate";
 import { Route as ApiStudioProjectsRouteImport } from "./routes/api/studio/projects";
 import { Route as ApiV1MindmapsBuildRouteImport } from "./routes/api/v1/mindmaps/build";
 import { Route as ApiV1FlowchartsBuildRouteImport } from "./routes/api/v1/flowcharts/build";
@@ -84,6 +85,11 @@ const ArtifactsArtifactIdEditRoute = ArtifactsArtifactIdEditRouteImport.update({
   path: "/artifacts/$artifactId/edit",
   getParentRoute: () => rootRouteImport,
 } as any);
+const ApiV1GenerateRoute = ApiV1GenerateRouteImport.update({
+  id: "/api/v1/generate",
+  path: "/api/v1/generate",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ApiStudioProjectsRoute = ApiStudioProjectsRouteImport.update({
   id: "/api/studio/projects",
   path: "/api/studio/projects",
@@ -141,6 +147,7 @@ export interface FileRoutesByFullPath {
   "/examples/$exampleId": typeof ExamplesExampleIdRoute;
   "/projects/$projectId": typeof ProjectsProjectIdRoute;
   "/api/studio/projects": typeof ApiStudioProjectsRouteWithChildren;
+  "/api/v1/generate": typeof ApiV1GenerateRoute;
   "/artifacts/$artifactId/edit": typeof ArtifactsArtifactIdEditRoute;
   "/diagrams/$diagramId/edit": typeof DiagramsDiagramIdEditRoute;
   "/api/studio/diagrams/$diagramId": typeof ApiStudioDiagramsDiagramIdRoute;
@@ -162,6 +169,7 @@ export interface FileRoutesByTo {
   "/examples/$exampleId": typeof ExamplesExampleIdRoute;
   "/projects/$projectId": typeof ProjectsProjectIdRoute;
   "/api/studio/projects": typeof ApiStudioProjectsRouteWithChildren;
+  "/api/v1/generate": typeof ApiV1GenerateRoute;
   "/artifacts/$artifactId/edit": typeof ArtifactsArtifactIdEditRoute;
   "/diagrams/$diagramId/edit": typeof DiagramsDiagramIdEditRoute;
   "/api/studio/diagrams/$diagramId": typeof ApiStudioDiagramsDiagramIdRoute;
@@ -184,6 +192,7 @@ export interface FileRoutesById {
   "/examples/$exampleId": typeof ExamplesExampleIdRoute;
   "/projects_/$projectId": typeof ProjectsProjectIdRoute;
   "/api/studio/projects": typeof ApiStudioProjectsRouteWithChildren;
+  "/api/v1/generate": typeof ApiV1GenerateRoute;
   "/artifacts_/$artifactId/edit": typeof ArtifactsArtifactIdEditRoute;
   "/diagrams_/$diagramId/edit": typeof DiagramsDiagramIdEditRoute;
   "/api/studio/diagrams/$diagramId": typeof ApiStudioDiagramsDiagramIdRoute;
@@ -207,6 +216,7 @@ export interface FileRouteTypes {
     | "/examples/$exampleId"
     | "/projects/$projectId"
     | "/api/studio/projects"
+    | "/api/v1/generate"
     | "/artifacts/$artifactId/edit"
     | "/diagrams/$diagramId/edit"
     | "/api/studio/diagrams/$diagramId"
@@ -228,6 +238,7 @@ export interface FileRouteTypes {
     | "/examples/$exampleId"
     | "/projects/$projectId"
     | "/api/studio/projects"
+    | "/api/v1/generate"
     | "/artifacts/$artifactId/edit"
     | "/diagrams/$diagramId/edit"
     | "/api/studio/diagrams/$diagramId"
@@ -249,6 +260,7 @@ export interface FileRouteTypes {
     | "/examples/$exampleId"
     | "/projects_/$projectId"
     | "/api/studio/projects"
+    | "/api/v1/generate"
     | "/artifacts_/$artifactId/edit"
     | "/diagrams_/$diagramId/edit"
     | "/api/studio/diagrams/$diagramId"
@@ -271,6 +283,7 @@ export interface RootRouteChildren {
   ExamplesExampleIdRoute: typeof ExamplesExampleIdRoute;
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute;
   ApiStudioProjectsRoute: typeof ApiStudioProjectsRouteWithChildren;
+  ApiV1GenerateRoute: typeof ApiV1GenerateRoute;
   ArtifactsArtifactIdEditRoute: typeof ArtifactsArtifactIdEditRoute;
   DiagramsDiagramIdEditRoute: typeof DiagramsDiagramIdEditRoute;
   ApiStudioDiagramsDiagramIdRoute: typeof ApiStudioDiagramsDiagramIdRoute;
@@ -357,6 +370,13 @@ declare module "@tanstack/react-router" {
       path: "/artifacts/$artifactId/edit";
       fullPath: "/artifacts/$artifactId/edit";
       preLoaderRoute: typeof ArtifactsArtifactIdEditRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/api/v1/generate": {
+      id: "/api/v1/generate";
+      path: "/api/v1/generate";
+      fullPath: "/api/v1/generate";
+      preLoaderRoute: typeof ApiV1GenerateRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/api/studio/projects": {
@@ -454,6 +474,7 @@ const rootRouteChildren: RootRouteChildren = {
   ExamplesExampleIdRoute: ExamplesExampleIdRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRoute,
   ApiStudioProjectsRoute: ApiStudioProjectsRouteWithChildren,
+  ApiV1GenerateRoute: ApiV1GenerateRoute,
   ArtifactsArtifactIdEditRoute: ArtifactsArtifactIdEditRoute,
   DiagramsDiagramIdEditRoute: DiagramsDiagramIdEditRoute,
   ApiStudioDiagramsDiagramIdRoute: ApiStudioDiagramsDiagramIdRoute,

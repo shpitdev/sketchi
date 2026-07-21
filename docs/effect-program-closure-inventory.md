@@ -90,5 +90,6 @@ only at framework edges.
 
 The public CLI surface is exactly `create`, `show`, `edit`, `list`, `export`,
 and `generate`. Scenario and harness entrypoints stay internal. `generate`
-uses `CF_AIG_TOKEN` through `cf-aig-authorization` to Cloudflare AI Gateway;
-manual commands remain offline.
+makes one unauthenticated HTTPS call to the public Sketchi generate API and
+holds no credential; the Cloudflare AI Gateway binding runs server-side. Manual
+commands remain offline.

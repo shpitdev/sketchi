@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { createServer } from "node:http";
 import {
   mkdir,
   mkdtemp,
@@ -187,11 +188,15 @@ try {
   };
   delete cliEnvironment.NO_COLOR;
   delete cliEnvironment.FORCE_COLOR;
-  delete cliEnvironment.CF_AIG_TOKEN;
-  delete cliEnvironment.SKETCHI_AI_GATEWAY_ACCOUNT_ID;
-  delete cliEnvironment.SKETCHI_AI_GATEWAY_ID;
+  delete cliEnvironment.SKETCHI_GENERATE_ENDPOINT;
   const cli = (args, input) =>
     run(binary, args, { env: cliEnvironment, input });
+
+  // Online environment for the generate endpoint-error proof only: the offline
+  // matrix stays network-blocked; generate is deliberately excepted so its
+  // typed endpoint-error failure can be exercised against a loopback server.
+  const onlineEnvironment = { ...cliEnvironment };
+  delete onlineEnvironment.NODE_OPTIONS;
 
   const rootHelp = await cli(["--help"]);
   expectExit(rootHelp, 0, "root help");
@@ -204,41 +209,71 @@ try {
     "Root help omitted the generation network boundary.",
   );
 
-  const missingCredential = await cli([
+  // Network-down: the offline preload blocks fetch, so the sole HTTPS call fails
+  // with the stable provider/network exit and leaves no partial local state.
+  const networkDown = await cli([
     "generate",
     "--prompt",
     "Create a two-step release flow.",
     "--output",
     "json",
   ]);
-  expectExit(missingCredential, 9, "missing generation credential");
+  expectExit(networkDown, 10, "generate network-down");
   assert(
-    parseJson(missingCredential.stderr, "missing generation credential").error
-      .code === "missing_credential",
-    "Missing generation credential did not use the stable error code.",
+    parseJson(networkDown.stderr, "generate network-down").error.code ===
+      "provider_failure",
+    "Generate network-down did not use the stable error code.",
   );
 
-  const blockedNetwork = await run(
-    binary,
-    [
-      "generate",
-      "--prompt",
-      "Create a two-step release flow.",
-      "--output",
-      "json",
-    ],
-    {
-      env: {
-        ...cliEnvironment,
-        CF_AIG_TOKEN: "blocked-network-proof-token",
-      },
-    },
-  );
-  expectExit(blockedNetwork, 10, "blocked generation network");
+  // Endpoint-error: a loopback generate API returns a typed rejection; the CLI
+  // maps it to a stable exit and still writes no partial local state.
+  const endpointServer = createServer((request, response) => {
+    const chunks = [];
+    request.on("data", (chunk) => chunks.push(chunk));
+    request.on("end", () => {
+      response.writeHead(422, { "content-type": "application/json" });
+      response.end(
+        JSON.stringify({
+          ok: false,
+          status: "invalid_generated_document",
+          issues: [
+            {
+              code: "invalid_generated_document",
+              severity: "error",
+              stage: "generation",
+              message: "The generated diagram failed validation.",
+              hint: "Refine the prompt with concrete content, then retry.",
+            },
+          ],
+        }),
+      );
+    });
+  });
+  await new Promise((ready) => endpointServer.listen(0, "127.0.0.1", ready));
+  const endpointPort = endpointServer.address().port;
+  let endpointError;
+  try {
+    endpointError = await run(
+      binary,
+      [
+        "generate",
+        "--prompt",
+        "Create a two-step release flow.",
+        "--endpoint",
+        `http://127.0.0.1:${String(endpointPort)}/api/v1/generate`,
+        "--output",
+        "json",
+      ],
+      { env: onlineEnvironment },
+    );
+  } finally {
+    await new Promise((closed) => endpointServer.close(closed));
+  }
+  expectExit(endpointError, 3, "generate endpoint-error");
   assert(
-    parseJson(blockedNetwork.stderr, "blocked generation network").error
-      .code === "provider_failure",
-    "Blocked generation network did not use the stable error code.",
+    parseJson(endpointError.stderr, "generate endpoint-error").error.code ===
+      "invalid_generated_document",
+    "Generate endpoint-error did not use the stable error code.",
   );
 
   const emptyAfterGenerationFailures = await cli(["list", "--output", "json"]);
@@ -510,10 +545,10 @@ try {
       "not-found:5",
       "conflict:6",
       "format-unavailable:8",
-      "missing-credential:9",
-      "blocked-network:10",
+      "generate-network-down:10",
+      "generate-endpoint-error:3",
     ],
-    network: "disabled-by-preload",
+    network: "disabled-by-preload-except-generate-loopback-proof",
     home: "isolated-under-.memory",
     bundle: {
       bytes: archivedBundle.stdout.byteLength,

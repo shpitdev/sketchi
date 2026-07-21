@@ -43,12 +43,14 @@ grader, renderer, or accepted-artifact writer.
 
 ## Provider routing
 
-Worker generation uses a Cloudflare AI Gateway binding. CLI `generate` calls
-the gateway's provider-native Google AI Studio endpoint directly through the
-reviewed HTTP adapter. The CLI requires `CF_AIG_TOKEN`, sends it only as
-`cf-aig-authorization`, and relies on the gateway's stored provider key. It
-does not accept a Google API credential. The five manual CLI commands remain
-strictly offline.
+Worker generation uses a Cloudflare AI Gateway binding, which authenticates the
+request and supplies the stored Google AI Studio provider key. The public
+Sketchi generate API (`POST /api/v1/generate` on the Playground Worker) exposes
+this vertical unauthenticated: prompt in; generated, validated, quality-gated
+diagram and artifacts out. CLI `generate` makes one unauthenticated HTTPS call
+to that endpoint and requires no token, key, account, or login; it never reads
+or sends a provider credential. The five manual CLI commands remain strictly
+offline.
 
 Provider boundaries retain the existing no-store policy, model and scenario
 metadata, correlation fields, typed failures, bounded retries, TestClock

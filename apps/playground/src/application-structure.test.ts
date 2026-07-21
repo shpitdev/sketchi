@@ -17,6 +17,7 @@ const expectedPublicFullPaths = [
   "/api/v1/artifacts/$artifactId",
   "/api/v1/artifacts/$artifactId/patch",
   "/api/v1/flowcharts/build",
+  "/api/v1/generate",
   "/api/v1/mindmaps/build",
   "/artifacts/$artifactId",
   "/artifacts/$artifactId/edit",
@@ -76,6 +77,7 @@ describe("Playground application structure", () => {
       "api/v1/artifacts/$artifactId.ts",
       "api/v1/artifacts/$artifactId/patch.ts",
       "api/v1/flowcharts/build.ts",
+      "api/v1/generate.ts",
       "api/v1/mindmaps/build.ts",
       "mcp.ts",
     ]);

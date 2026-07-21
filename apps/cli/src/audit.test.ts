@@ -32,9 +32,10 @@ describe("CLI dependency and public-surface audit", () => {
       "4.0.0-beta.99",
     );
     assert.strictEqual(
-      manifest.dependencies["@sketchi/diagram-generation"],
+      manifest.dependencies["@sketchi/diagram-agent"],
       "workspace:*",
     );
+    assert.notProperty(manifest.dependencies, "@sketchi/diagram-generation");
     assert.notProperty(manifest.dependencies, "@ai-sdk/google");
     assert.notProperty(manifest.dependencies, "ai");
     assert.notProperty(manifest.dependencies, "oclif");
@@ -77,7 +78,7 @@ describe("CLI dependency and public-surface audit", () => {
     assert.notInclude(source, "NormalizedMindmapSchema");
   });
 
-  it("keeps the gateway provider SDK and sole fetch boundary behind diagram-generation", async () => {
+  it("confines the sole network boundary to a credential-free generate HTTPS call", async () => {
     const files = await sourceFiles(join(workspaceRoot, "apps/cli/src"));
     const fetchFiles: string[] = [];
     let cliSource = "";
@@ -93,19 +94,19 @@ describe("CLI dependency and public-surface audit", () => {
       ["apps/cli/src/generation.ts"],
     );
     assert.notInclude(cliSource, "GOOGLE_GENERATIVE_AI_API_KEY");
-    assert.include(cliSource, "CF_AIG_TOKEN");
+    assert.notInclude(cliSource, "CF_AIG_TOKEN");
+    assert.notInclude(cliSource, "cf-aig-authorization");
+    assert.notInclude(cliSource, "gateway.ai.cloudflare.com");
 
-    const providerSource = await readFile(
-      join(
-        workspaceRoot,
-        "packages/diagram/generation/src/lib/cloudflare-google-ai-studio-http.ts",
-      ),
+    const generationSource = await readFile(
+      join(workspaceRoot, "apps/cli/src/generation.ts"),
       "utf8",
     );
-    assert.include(providerSource, "https://gateway.ai.cloudflare.com/v1/");
-    assert.include(providerSource, '"cf-aig-authorization"');
-    assert.include(providerSource, '"x-goog-api-key": undefined');
-    assert.notInclude(providerSource, "process.env");
+    assert.include(
+      generationSource,
+      "https://playground.sketchi.app/api/v1/generate",
+    );
+    assert.notInclude(generationSource, "@sketchi/diagram-generation");
 
     const providerManifest = JSON.parse(
       await readFile(
@@ -113,11 +114,8 @@ describe("CLI dependency and public-surface audit", () => {
         "utf8",
       ),
     );
-    assert.strictEqual(
-      providerManifest.dependencies["@ai-sdk/google"],
-      "3.0.80",
-    );
-    assert.strictEqual(providerManifest.dependencies.ai, "6.0.198");
+    assert.notProperty(providerManifest.dependencies, "@ai-sdk/google");
+    assert.notProperty(providerManifest.dependencies, "ai");
   });
 
   it("publishes generate plus exactly the five manual top-level commands", async () => {
@@ -162,10 +160,15 @@ describe("CLI dependency and public-surface audit", () => {
       "utf8",
     );
 
+    assert.strictEqual(manifest.name, "sketchi");
     assert.deepStrictEqual(manifest.bin, { sketchi: "./sketchi.js" });
+    assert.deepStrictEqual(manifest.files, ["sketchi.js"]);
+    assert.deepStrictEqual(manifest.publishConfig, { access: "public" });
+    assert.strictEqual(manifest.license, "MIT");
     assert.notProperty(manifest, "dependencies");
     assert.match(bundle.slice(0, 64), /^#!\/usr\/bin\/env node/u);
     assert.notInclude(bundle, "sourceMappingURL");
-    assert.include(bundle, "CF_AIG_TOKEN");
+    assert.notInclude(bundle, "CF_AIG_TOKEN");
+    assert.include(bundle, "playground.sketchi.app/api/v1/generate");
   });
 });

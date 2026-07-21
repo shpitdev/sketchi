@@ -9,6 +9,7 @@ import { Context, Effect, FiberSet, Layer, ManagedRuntime, pipe } from "effect";
 import type { StudioEnv } from "../bindings/studio-env.server";
 import { PlaygroundAiModelLive } from "../ai/playground-ai-model.server";
 import { PlaygroundCodeModeLive } from "../codemode/codemode-service.server";
+import { PlaygroundGenerationLive } from "../generation/playground-generation.server";
 import { PlaygroundCodeModeUsageLive } from "../codemode/codemode-usage-events.server";
 import {
   handleCreateStudioProjectFromArtifactRequest,
@@ -57,6 +58,7 @@ const PlaygroundCoreLive = Layer.mergeAll(
   PlaygroundCallbackFibersLive,
   PlaygroundCodeModeLive,
   PlaygroundCodeModeUsageLive,
+  PlaygroundGenerationLive,
   PlaygroundTelemetryLive,
 );
 
@@ -216,6 +218,7 @@ function normalizedRequestRoute(pathname: string): string {
     "/api/studio/projects",
     "/api/studio/projects/from-artifact",
     "/api/v1/flowcharts/build",
+    "/api/v1/generate",
     "/api/v1/mindmaps/build",
     "/codemode-export-harness",
     "/mcp",

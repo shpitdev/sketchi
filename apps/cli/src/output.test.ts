@@ -76,12 +76,11 @@ describe("output envelopes and exits", () => {
     Effect.gen(function* () {
       const stdout: string[] = [];
       const stderr: string[] = [];
-      const missingCredentialFailure = CliGenerationError.make({
-        code: "missing_credential",
-        message:
-          "Prompt-assisted generation requires CF_AIG_TOKEN.",
-        hint: "Set CF_AIG_TOKEN to a Cloudflare API token with AI Gateway Run access and retry.",
-        details: [],
+      const providerFailure = CliGenerationError.make({
+        code: "provider_failure",
+        message: "The Sketchi generate API could not be reached.",
+        hint: "Check your network connection and retry; generate is the only command that uses the network.",
+        details: ["transport"],
       });
       yield* reportSuccess(
         "generate",
@@ -99,12 +98,12 @@ describe("output envelopes and exits", () => {
         "unused",
       ).pipe(Effect.provide(captureLayer(stdout, stderr)));
       yield* Effect.exit(
-        reportFailure("generate", "json", missingCredentialFailure).pipe(
+        reportFailure("generate", "json", providerFailure).pipe(
           Effect.provide(captureLayer(stdout, stderr)),
         ),
       );
 
-      assert.strictEqual(exitCodeForFailure(missingCredentialFailure), 9);
+      assert.strictEqual(exitCodeForFailure(providerFailure), 10);
 
       yield* Effect.promise(() =>
         expect(stdout.join("")).toMatchFileSnapshot(
@@ -113,7 +112,7 @@ describe("output envelopes and exits", () => {
       );
       yield* Effect.promise(() =>
         expect(stderr.join("")).toMatchFileSnapshot(
-          "./__fixtures__/output/generate-missing-credential.json",
+          "./__fixtures__/output/generate-provider-failure.json",
         ),
       );
     }),
@@ -163,12 +162,6 @@ describe("output envelopes and exits", () => {
         details: [],
       }),
       CliGenerationError.make({
-        code: "missing_credential",
-        message: "m",
-        hint: "h",
-        details: [],
-      }),
-      CliGenerationError.make({
         code: "provider_failure",
         message: "m",
         hint: "h",
@@ -190,7 +183,7 @@ describe("output envelopes and exits", () => {
 
     assert.deepStrictEqual(
       failures.map(exitCodeForFailure),
-      [2, 3, 3, 4, 5, 6, 7, 8, 3, 9, 10, 11, 12],
+      [2, 3, 3, 4, 5, 6, 7, 8, 3, 10, 11, 12],
     );
   });
 

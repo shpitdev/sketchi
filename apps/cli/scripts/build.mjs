@@ -78,13 +78,32 @@ const stats = await new Promise((resolveBuild, rejectBuild) => {
 });
 
 const packageManifest = {
-  name: "@sketchi/cli",
+  name: "sketchi",
   version: "0.0.0",
-  description: "Local Sketchi authoring CLI with prompt-assisted generation",
+  description:
+    "Local Sketchi authoring CLI: offline flowchart and mindmap workflows plus one unauthenticated prompt-assisted generate command.",
+  keywords: [
+    "sketchi",
+    "diagram",
+    "flowchart",
+    "mindmap",
+    "excalidraw",
+    "cli",
+  ],
+  homepage: "https://sketchi.app",
+  repository: {
+    type: "git",
+    url: "git+https://github.com/shpitdev/sketchi.git",
+    directory: "apps/cli",
+  },
+  bugs: { url: "https://github.com/shpitdev/sketchi/issues" },
+  license: "MIT",
+  author: "SHPIT LLC",
   type: "module",
   bin: { sketchi: "./sketchi.js" },
   files: ["sketchi.js"],
   engines: { node: ">=24.13.0" },
+  publishConfig: { access: "public" },
 };
 
 await writeFile(
