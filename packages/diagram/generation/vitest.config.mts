@@ -10,6 +10,10 @@ export default defineConfig(() => ({
     alias: {
       "@sketchi/diagram-core": new URL("../core/src/index.ts", import.meta.url)
         .pathname,
+      "@sketchi/observability": new URL(
+        "../../observability/src/index.ts",
+        import.meta.url,
+      ).pathname,
     },
   },
   test: {

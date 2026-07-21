@@ -80,7 +80,7 @@ const stats = await new Promise((resolveBuild, rejectBuild) => {
 const packageManifest = {
   name: "@sketchi/cli",
   version: "0.0.0",
-  description: "Deterministic offline Sketchi manual CLI",
+  description: "Local Sketchi authoring CLI with prompt-assisted generation",
   type: "module",
   bin: { sketchi: "./sketchi.js" },
   files: ["sketchi.js"],

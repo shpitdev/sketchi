@@ -42,6 +42,22 @@ export class CliBuildError extends Schema.TaggedErrorClass<CliBuildError>()(
   },
 ) {}
 
+export class CliGenerationError extends Schema.TaggedErrorClass<CliGenerationError>()(
+  "CliGenerationError",
+  {
+    code: Schema.Literals([
+      "missing_credential",
+      "provider_failure",
+      "generation_timeout",
+      "malformed_output",
+      "invalid_generated_document",
+    ]),
+    message: Schema.String,
+    hint: Schema.String,
+    details: Schema.Array(Schema.String),
+  },
+) {}
+
 export class CliStorageError extends Schema.TaggedErrorClass<CliStorageError>()(
   "CliStorageError",
   {
@@ -74,6 +90,7 @@ export type CliFailure =
   | CliInputError
   | CliValidationError
   | CliBuildError
+  | CliGenerationError
   | CliStorageError
   | CliExportError;
 
@@ -85,6 +102,19 @@ export function exitCodeForFailure(error: CliFailure): number {
       return 3;
     case "CliBuildError":
       return 4;
+    case "CliGenerationError":
+      switch (error.code) {
+        case "invalid_generated_document":
+          return 3;
+        case "missing_credential":
+          return 9;
+        case "provider_failure":
+          return 10;
+        case "generation_timeout":
+          return 11;
+        case "malformed_output":
+          return 12;
+      }
     case "CliStorageError":
       if (error.code === "diagram_not_found") return 5;
       if (

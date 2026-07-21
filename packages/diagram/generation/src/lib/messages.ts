@@ -3,6 +3,12 @@ import { Schema } from "effect";
 export const DiagramGenerationRoleSchema = Schema.Literals(["system", "user"]);
 export type DiagramGenerationRole = typeof DiagramGenerationRoleSchema.Type;
 
+export const DiagramGenerationTypeSchema = Schema.Literals([
+  "flowchart",
+  "mindmap",
+]);
+export type DiagramGenerationType = typeof DiagramGenerationTypeSchema.Type;
+
 export class DiagramGenerationMessage extends Schema.Class<DiagramGenerationMessage>(
   "DiagramGenerationMessage",
 )({
@@ -18,6 +24,7 @@ export class DiagramGenerationPrompt extends Schema.Class<DiagramGenerationPromp
   requiredBranchLabels: Schema.Array(Schema.String),
   requiredNodeLabels: Schema.Array(Schema.String),
   title: Schema.String,
+  type: DiagramGenerationTypeSchema,
 }) {}
 
 export class DiagramGenerationMessages extends Schema.Class<DiagramGenerationMessages>(
@@ -41,7 +48,55 @@ const FLOWCHART_IR_INSTRUCTIONS = [
   'Use layout { "direction": "TB", "edgeRouting": "orthogonal" } unless the prompt says otherwise.',
 ];
 
+const MINDMAP_IR_INSTRUCTIONS = [
+  "Return only JSON. Do not wrap the JSON in markdown.",
+  'Use type "mindmap".',
+  'Every node must have id, label, kind ("root" or "topic"), and metadata with depth and siblingIndex.',
+  "Use exactly one root node at depth 0 with siblingIndex 0.",
+  "Every non-root node must have exactly one incoming edge from its immediate parent.",
+  "Every edge must have id, source, target, and metadata matching the child depth and siblingIndex.",
+  "Sibling indexes under each parent must be contiguous from 0.",
+  "Edges must use existing node ids and the graph must be connected.",
+  'Use layout { "direction": "LR", "edgeRouting": "curved" } unless the prompt says right-to-left.',
+];
+
 function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
+  if (prompt.type === "mindmap") {
+    return JSON.stringify(
+      {
+        id: "short-kebab-case-id",
+        title: prompt.title,
+        type: "mindmap",
+        nodes: [
+          {
+            id: "topic-0",
+            label: "Root topic",
+            kind: "root",
+            metadata: { depth: 0, siblingIndex: 0 },
+          },
+          {
+            id: "topic-0-0",
+            label: "Child topic",
+            kind: "topic",
+            metadata: { depth: 1, siblingIndex: 0 },
+          },
+        ],
+        edges: [
+          {
+            id: "branch-0-0",
+            source: "topic-0",
+            target: "topic-0-0",
+            metadata: { depth: 1, siblingIndex: 0 },
+          },
+        ],
+        layout: { direction: "LR", edgeRouting: "curved" },
+        style: { accentColor: "#7c3aed", backgroundColor: "#ffffff" },
+      },
+      null,
+      2,
+    );
+  }
+
   return JSON.stringify(
     {
       id: "short-kebab-case-id",
@@ -78,11 +133,16 @@ function requiredList(title: string, values: readonly string[]): string[] {
 export function buildDiagramGenerationMessages(
   prompt: DiagramGenerationPrompt,
 ): DiagramGenerationMessages {
+  const diagramName = prompt.type === "flowchart" ? "Flowchart" : "Mindmap";
+  const instructions =
+    prompt.type === "flowchart"
+      ? FLOWCHART_IR_INSTRUCTIONS
+      : MINDMAP_IR_INSTRUCTIONS;
   const system = [
     "You are creating a Sketchi typed intermediate diagram.",
     "",
-    "Flowchart IR rules:",
-    ...FLOWCHART_IR_INSTRUCTIONS.map((instruction) => `- ${instruction}`),
+    `${diagramName} IR rules:`,
+    ...instructions.map((instruction) => `- ${instruction}`),
   ].join("\n");
   const user = [
     "Scenario:",

@@ -19,7 +19,7 @@ import {
 } from "./cloudflare-google-ai-studio.js";
 import {
   buildGeminiGenerateContentBody,
-  stripCloudflareGoogleModelPrefix,
+  stripGoogleModelPrefix,
 } from "./gemini.js";
 import {
   buildDiagramGenerationMessages,
@@ -41,6 +41,7 @@ const prompt: DiagramGenerationPrompt = {
     "Reject batch",
   ],
   title: "Pharma batch disposition",
+  type: "flowchart",
 };
 const expectedDiagram = {
   id: "pharma-batch-disposition-fixture",
@@ -187,6 +188,17 @@ describe("diagram generation prompt mapping", () => {
     });
   });
 
+  it("maps mindmap requests to the mindmap IR contract", () => {
+    const messages = buildDiagramGenerationMessages({
+      ...prompt,
+      type: "mindmap",
+    });
+
+    expect(messages.system).toContain('Use type "mindmap".');
+    expect(messages.system).toContain("exactly one root node");
+    expect(messages.user).toContain('"type": "mindmap"');
+  });
+
   it("keeps the Gemini REST body byte-for-byte stable", () => {
     expect(
       buildGeminiGenerateContentBody({
@@ -199,13 +211,11 @@ describe("diagram generation prompt mapping", () => {
   });
 
   it("normalizes Cloudflare Google model ids for provider-native calls", () => {
+    expect(stripGoogleModelPrefix("google/gemini-3.1-flash-lite")).toBe(
+      "gemini-3.1-flash-lite",
+    );
     expect(
-      stripCloudflareGoogleModelPrefix("google/gemini-3.1-flash-lite"),
-    ).toBe("gemini-3.1-flash-lite");
-    expect(
-      stripCloudflareGoogleModelPrefix(
-        "google-ai-studio/gemini-3.1-flash-lite",
-      ),
+      stripGoogleModelPrefix("google-ai-studio/gemini-3.1-flash-lite"),
     ).toBe("gemini-3.1-flash-lite");
   });
 });
@@ -246,6 +256,45 @@ describe("pure candidate behavior", () => {
 
     expect(candidate.error).toBeUndefined();
     expect(candidate.diagram?.id).toBe(expectedDiagram.id);
+  });
+
+  it("parses validated mindmap candidates through diagram-core", () => {
+    const candidate = candidateFromText({
+      model: "fixture",
+      provider: "fixture",
+      text: JSON.stringify({
+        id: "launch-map",
+        title: "Launch map",
+        type: "mindmap",
+        nodes: [
+          {
+            id: "root",
+            label: "Launch",
+            kind: "root",
+            metadata: { depth: 0, siblingIndex: 0 },
+          },
+          {
+            id: "product",
+            label: "Product",
+            kind: "topic",
+            metadata: { depth: 1, siblingIndex: 0 },
+          },
+        ],
+        edges: [
+          {
+            id: "root-product",
+            source: "root",
+            target: "product",
+            metadata: { depth: 1, siblingIndex: 0 },
+          },
+        ],
+        layout: { direction: "LR", edgeRouting: "curved" },
+        style: { accentColor: "#7c3aed", backgroundColor: "#ffffff" },
+      }),
+    });
+
+    expect(candidate.diagram?.type).toBe("mindmap");
+    expect(candidate.error).toBeUndefined();
   });
 });
 
@@ -318,6 +367,80 @@ layer(successfulClientLayer)("Cloudflare Google AI Studio live layer", (it) => {
       );
       assert.strictEqual(candidate.cacheMode, "fresh");
     }),
+  );
+});
+
+const gatewayConstructionFailure = new Error("gateway construction failed");
+const gatewayConstructionFailureLayer = CloudflareGoogleAiStudioClientLive.pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      Layer.succeed(CloudflareAiGatewayBinding, {
+        gateway: () => {
+          throw gatewayConstructionFailure;
+        },
+      }),
+      configLayer,
+      retryPolicyLayer,
+    ),
+  ),
+);
+
+layer(gatewayConstructionFailureLayer)("provider preflight failures", (it) => {
+  it.effect(
+    "records terminal telemetry without an upstream attempt when gateway construction fails",
+    () => {
+      const { probe, sink } = makeTelemetryTestSink();
+      const telemetryLayer = makeWorkersTelemetryLayer({
+        resource: { serviceName: "sketchi-generation-preflight-test" },
+        sink,
+      });
+      return Effect.gen(function* () {
+        const client = yield* DiagramGenerationClient;
+        const error = yield* Effect.flip(
+          client.generate({
+            model: "google/gemini-3.1-flash-lite",
+            prompt,
+          }),
+        );
+
+        assert.strictEqual(error._tag, "DiagramGenerationTransportError");
+        if (error._tag === "DiagramGenerationTransportError") {
+          assert.strictEqual(error.operation, "ai.gateway");
+          assert.isFalse(error.retryable);
+        }
+        const metrics = probe.events.filter(
+          (event): event is TelemetryMetricEvent =>
+            event.event === "effect.metric",
+        );
+        assert.strictEqual(
+          metrics.filter(
+            (metric) => metric.metric === "sketchi_generation_attempts",
+          ).length,
+          0,
+        );
+        assert.strictEqual(
+          metrics.filter(
+            (metric) => metric.metric === "sketchi_generation_retries",
+          ).length,
+          0,
+        );
+        for (const metricName of [
+          "sketchi_generation_requests",
+          "sketchi_generation_failures",
+          "sketchi_generation_duration_ms",
+        ]) {
+          const matching = metrics.filter(
+            (metric) => metric.metric === metricName,
+          );
+          assert.strictEqual(matching.length, 1);
+          assert.deepInclude(matching[0]?.attributes, {
+            failure_category: "DiagramGenerationTransportError",
+            operation: "generate",
+            provider: "cloudflare-google-ai-studio",
+          });
+        }
+      }).pipe(Effect.provide(telemetryLayer));
+    },
   );
 });
 

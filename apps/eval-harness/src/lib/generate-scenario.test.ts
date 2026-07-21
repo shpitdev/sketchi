@@ -33,9 +33,9 @@ describe("eval harness scenario generation composition", () => {
       {
         code: "invalid_value",
         message:
-          'Invalid option: expected one of "fixture"|"cloudflare-google-ai-studio"',
+          'Invalid option: expected one of "fixture"|"cloudflare-google-ai-studio"|"google-ai-studio"',
         path: ["providers", 0],
-        values: ["fixture", "cloudflare-google-ai-studio"],
+        values: ["fixture", "cloudflare-google-ai-studio", "google-ai-studio"],
       },
     ]);
   });

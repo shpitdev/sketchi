@@ -21,6 +21,7 @@ export function toDiagramGenerationPrompt(
     requiredBranchLabels: scenario.assertions.requiredBranchLabels,
     requiredNodeLabels: scenario.assertions.requiredNodeLabels,
     title: scenario.title,
+    type: "flowchart",
   };
 }
 

@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "command": "generate",
+  "data": {
+    "id": "generated-release-flow",
+    "type": "flowchart",
+    "revision": 1,
+    "formats": [
+      "scene",
+      "excalidraw"
+    ],
+    "generation": {
+      "model": "gemini-3.1-flash-lite",
+      "provider": "cloudflare-google-ai-studio"
+    }
+  }
+}

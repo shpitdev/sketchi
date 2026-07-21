@@ -16,6 +16,17 @@ import { encodeJson, validateStorageId } from "./document.js";
 import { CliFilesystemError, CliValidationError } from "./errors.js";
 import { LocalFileSystem, LocalFileSystemLive } from "./filesystem.js";
 import {
+  CF_AIG_TOKEN_ENV,
+  DEFAULT_SKETCHI_AI_GATEWAY_ACCOUNT_ID,
+  DEFAULT_SKETCHI_AI_GATEWAY_ID,
+  DEFAULT_GENERATION_MODEL,
+  DiagramGenerationClientNodeLive,
+  SKETCHI_AI_GATEWAY_ACCOUNT_ID_ENV,
+  SKETCHI_AI_GATEWAY_ID_ENV,
+  generateDiagram,
+  type GenerateDiagramResult,
+} from "./generation.js";
+import {
   Argument,
   Command,
   Flag,
@@ -40,11 +51,11 @@ import {
   writeExportFile,
 } from "./storage.js";
 
-const ROOT_HELP = `Deterministic offline authoring for canonical Sketchi flowcharts and mindmaps.
+const ROOT_HELP = `Local Sketchi authoring for canonical flowcharts and mindmaps, with one prompt-assisted path.
 
-Manual workflow (available now):
+Manual JSON workflow (strictly offline):
   create a canonical document, inspect or replace it, list local records, and export stored artifacts.
-  Prompt-assisted generation is a later workflow and is not available in this CLI yet.
+  Accepted input is exactly one complete JSON object shaped like an example below.
 
 Canonical flowchart example:
   {"type":"flowchart","spec":{"id":"release-flow","title":"Release approval","nodes":[{"id":"start","label":"Change proposed","kind":"start"},{"id":"review","label":"Review evidence","kind":"process"},{"id":"end","label":"Release approved","kind":"end"}],"edges":[{"source":"start","target":"review"},{"source":"review","target":"end"}]}}
@@ -52,14 +63,30 @@ Canonical flowchart example:
 Canonical mindmap example:
   {"type":"mindmap","spec":{"id":"launch-map","title":"Launch plan","root":{"label":"Launch","children":[{"label":"Product"},{"label":"Operations"}]}}}
 
-Input and output:
+Prompt-assisted workflow (sole network boundary):
+  sketchi generate --prompt TEXT [--type flowchart|mindmap] [--model MODEL]
+  Only generate uses the network or a model. It sends the prompt to Cloudflare AI Gateway's
+  Google AI Studio provider route; the gateway injects its stored BYOK provider key. Sketchi
+  never reads or sends a Google API key. Credential setup:
+    export ${CF_AIG_TOKEN_ENV}=<cloudflare-api-token-with-ai-gateway-run-access>
+  Sketchi sends that token only as cf-aig-authorization. The route template is
+  https://gateway.ai.cloudflare.com/v1/ACCOUNT_ID/GATEWAY_ID/google-ai-studio.
+  Defaults: ACCOUNT_ID=${DEFAULT_SKETCHI_AI_GATEWAY_ACCOUNT_ID}; GATEWAY_ID=${DEFAULT_SKETCHI_AI_GATEWAY_ID}.
+  Override them with ${SKETCHI_AI_GATEWAY_ACCOUNT_ID_ENV} and ${SKETCHI_AI_GATEWAY_ID_ENV}.
+  The default type is flowchart and default model is
+  ${DEFAULT_GENERATION_MODEL}. Output is schema-validated, built with the canonical Code Mode
+  runtime, and committed through the same store as create.
+
+Input and output contracts:
   create/edit require exactly one of --file PATH|- or --json VALUE. --file - reads one
   noninteractive UTF-8 JSON document from stdin and exits with usage code 2 on a TTY.
-  --json is inline input only. Use --output text|json for result presentation.
+  --json is inline input only. --prompt is noninteractive text. Use --output text|json for
+  result presentation on every command.
   export writes bytes with --dest PATH|-. With --dest -, bytes use stdout and status uses stderr.
 
 Offline boundary and storage:
-  These five commands use no model, remote agent, MCP server, login, account, browser, or network.
+  create, show, edit, list, and export use no model, remote agent, MCP server, login,
+  account, browser, credential, or network. No command sends stored records to a provider.
   Records live at ~/.sketchi/diagrams/<id>/ with manifest.json, document.json, scene.json,
   diagram.excalidraw, optional diagram.png, and revisions/<revision>.json.
   Formats are scene, excalidraw, and png. PNG export only returns an already-stored PNG.
@@ -67,14 +94,17 @@ Offline boundary and storage:
 Exit codes and errors:
   0 success; 1 internal failure; 2 usage or interactive stdin; 3 invalid input/document;
   4 build/export construction failure; 5 diagram not found; 6 conflict/busy;
-  7 filesystem/storage failure; 8 unavailable format or export write failure.
+  7 filesystem/storage failure; 8 unavailable format or export write failure;
+  9 missing generation credential; 10 provider/network failure; 11 generation timeout;
+  12 malformed provider output.
   Text errors start with "error: CODE". JSON errors use {"ok":false,"command":...,"error":...}.
   Errors never include stacks.
 
 Revision recovery and next steps:
   edit validates and builds before an atomic commit, then saves the prior document under revisions/.
   To recover, inspect the prior revision JSON and pass that complete document back to edit.
-  Start with create, use the returned id with show/list, then export a stored format.`;
+  Start with create for accepted JSON or generate for a prompt. Use the returned id with show/list,
+  edit with a complete replacement document, then export a stored scene or Excalidraw artifact.`;
 
 const outputFlag = Flag.choice("output", ["text", "json"]).pipe(
   Flag.withDefault("text"),
@@ -86,7 +116,7 @@ const rootCommand = Command.make("sketchi").pipe(
   Command.withSharedFlags({ output: outputFlag }),
   Command.withDescription(ROOT_HELP),
   Command.withShortDescription(
-    "Deterministic offline Sketchi diagram authoring.",
+    "Local Sketchi authoring with one prompt-assisted command.",
   ),
 );
 
@@ -124,6 +154,21 @@ function summaryText(
   ].join("\n");
 }
 
+function generatedData(result: GenerateDiagramResult) {
+  return {
+    ...storedData(result.diagram),
+    generation: { model: result.model, provider: result.provider },
+  };
+}
+
+function generatedText(result: GenerateDiagramResult): string {
+  return [
+    summaryText("created", result.diagram).replace(/^created:/u, "generated:"),
+    `provider: ${result.provider}`,
+    `model: ${result.model}`,
+  ].join("\n");
+}
+
 function showText(diagram: StoredDiagram): string {
   const revisions = revisionLocations(diagram);
   return [
@@ -153,6 +198,84 @@ function listText(diagrams: ReadonlyArray<DiagramSummary>): string {
     ),
   ].join("\n");
 }
+
+const GENERATE_HELP = `Create one persisted diagram from --prompt TEXT. This is Sketchi's only command that uses a model or network. It calls the Cloudflare AI Gateway HTTP endpoint directly; it does not use Cloudflare bindings, a Sketchi service, or MCP.
+
+Credential, routing, and options:
+  export ${CF_AIG_TOKEN_ENV}=<cloudflare-api-token-with-ai-gateway-run-access>
+  Sketchi sends that token only as cf-aig-authorization to the Google AI Studio provider route.
+  The gateway supplies its stored BYOK Google provider key; Sketchi never reads or sends a Google
+  API key. Route: https://gateway.ai.cloudflare.com/v1/ACCOUNT_ID/GATEWAY_ID/google-ai-studio.
+  Defaults: ACCOUNT_ID=${DEFAULT_SKETCHI_AI_GATEWAY_ACCOUNT_ID}; GATEWAY_ID=${DEFAULT_SKETCHI_AI_GATEWAY_ID}.
+  Override them with ${SKETCHI_AI_GATEWAY_ACCOUNT_ID_ENV} and ${SKETCHI_AI_GATEWAY_ID_ENV}.
+  --type defaults to flowchart; --model defaults to
+  ${DEFAULT_GENERATION_MODEL}. --output text|json controls only the local result envelope.
+
+Validation and storage:
+  Provider JSON is validated by Sketchi's canonical package schemas, built with Code Mode, and
+  atomically committed through the create store at ~/.sketchi/diagrams/<id>/. The record contains
+  manifest.json, document.json, scene.json, diagram.excalidraw, and optional diagram.png.
+  Any credential/provider/timeout/output/validation/build/storage failure leaves no visible record.
+
+Errors and next steps:
+  Exit 9 means missing credential, 10 provider/network failure, 11 timeout, and 12 malformed output;
+  generated schema validation uses 3, build uses 4, conflict uses 6, and storage uses 7.
+  On success, pass the returned id to show, edit, list, or export. For strictly offline manual
+  authoring and accepted canonical JSON examples, run sketchi --help.`;
+
+const generateCommand = Command.make(
+  "generate",
+  {
+    prompt: Flag.string("prompt").pipe(
+      Flag.withDescription(
+        "Diagram request text sent only through Cloudflare AI Gateway.",
+      ),
+      Flag.withMetavar("TEXT"),
+    ),
+    type: Flag.choice("type", ["flowchart", "mindmap"]).pipe(
+      Flag.withDefault("flowchart"),
+      Flag.withDescription(
+        "Requested canonical diagram type; default flowchart.",
+      ),
+      Flag.withMetavar("flowchart|mindmap"),
+    ),
+    model: Flag.string("model").pipe(
+      Flag.withDefault(DEFAULT_GENERATION_MODEL),
+      Flag.withDescription(
+        `Google AI Studio model id routed through AI Gateway; default ${DEFAULT_GENERATION_MODEL}.`,
+      ),
+      Flag.withMetavar("MODEL"),
+    ),
+  },
+  (input) =>
+    Effect.gen(function* () {
+      const { output } = yield* rootCommand;
+      yield* runReported(
+        "generate",
+        output,
+        generateDiagram(input),
+        generatedText,
+        generatedData,
+      );
+    }),
+).pipe(
+  Command.withDescription(GENERATE_HELP),
+  Command.withShortDescription(
+    "Generate and persist one diagram through the sole Cloudflare AI Gateway network path.",
+  ),
+  Command.withExamples([
+    {
+      command:
+        'sketchi generate --prompt "Map release approval with pass and revise branches"',
+      description: `Generate a flowchart with ${DEFAULT_GENERATION_MODEL}.`,
+    },
+    {
+      command:
+        'sketchi generate --prompt "Organize launch readiness" --type mindmap --model gemini-3.1-flash-lite --output json',
+      description: "Generate and persist a mindmap with structured output.",
+    },
+  ]),
+);
 
 const createCommand = Command.make(
   "create",
@@ -368,6 +491,7 @@ const exportCommand = Command.make(
 
 export const sketchiCommand = rootCommand.pipe(
   Command.withSubcommands([
+    generateCommand,
     createCommand,
     showCommand,
     editCommand,
@@ -427,6 +551,7 @@ export const CliApplicationLayer = Layer.mergeAll(
   StorageRootLive,
   diagramBuilderLayer,
   diagramStoreLayer,
+  DiagramGenerationClientNodeLive,
   InputReaderLive.pipe(Layer.provide(LocalFileSystemLive)),
   OutputWriterLive,
 );

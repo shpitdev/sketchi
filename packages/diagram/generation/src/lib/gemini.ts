@@ -65,7 +65,7 @@ function objectValue(value: unknown, key: string): unknown {
   return isUnknownRecord(value) ? value[key] : undefined;
 }
 
-export function stripCloudflareGoogleModelPrefix(model: string): string {
+export function stripGoogleModelPrefix(model: string): string {
   return model.replace(/^google-ai-studio\//, "").replace(/^google\//, "");
 }
 

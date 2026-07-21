@@ -1,10 +1,11 @@
-import { assert, describe, it } from "@effect/vitest";
+import { assert, describe, expect, it } from "@effect/vitest";
 import { Cause, Effect, Exit, Layer, Option } from "effect";
 
 import {
   CliBuildError,
   CliExportError,
   CliFilesystemError,
+  CliGenerationError,
   CliInputError,
   CliStorageError,
   CliValidationError,
@@ -71,6 +72,53 @@ describe("output envelopes and exits", () => {
     }),
   );
 
+  it.effect("keeps generation success and failure envelopes golden", () =>
+    Effect.gen(function* () {
+      const stdout: string[] = [];
+      const stderr: string[] = [];
+      const missingCredentialFailure = CliGenerationError.make({
+        code: "missing_credential",
+        message:
+          "Prompt-assisted generation requires CF_AIG_TOKEN.",
+        hint: "Set CF_AIG_TOKEN to a Cloudflare API token with AI Gateway Run access and retry.",
+        details: [],
+      });
+      yield* reportSuccess(
+        "generate",
+        "json",
+        {
+          id: "generated-release-flow",
+          type: "flowchart",
+          revision: 1,
+          formats: ["scene", "excalidraw"],
+          generation: {
+            model: "gemini-3.1-flash-lite",
+            provider: "cloudflare-google-ai-studio",
+          },
+        },
+        "unused",
+      ).pipe(Effect.provide(captureLayer(stdout, stderr)));
+      yield* Effect.exit(
+        reportFailure("generate", "json", missingCredentialFailure).pipe(
+          Effect.provide(captureLayer(stdout, stderr)),
+        ),
+      );
+
+      assert.strictEqual(exitCodeForFailure(missingCredentialFailure), 9);
+
+      yield* Effect.promise(() =>
+        expect(stdout.join("")).toMatchFileSnapshot(
+          "./__fixtures__/output/generate-success.json",
+        ),
+      );
+      yield* Effect.promise(() =>
+        expect(stderr.join("")).toMatchFileSnapshot(
+          "./__fixtures__/output/generate-missing-credential.json",
+        ),
+      );
+    }),
+  );
+
   it("keeps the documented exit mapping stable", () => {
     const failures = [
       CliInputError.make({
@@ -108,11 +156,41 @@ describe("output envelopes and exits", () => {
         message: "m",
         hint: "h",
       }),
+      CliGenerationError.make({
+        code: "invalid_generated_document",
+        message: "m",
+        hint: "h",
+        details: [],
+      }),
+      CliGenerationError.make({
+        code: "missing_credential",
+        message: "m",
+        hint: "h",
+        details: [],
+      }),
+      CliGenerationError.make({
+        code: "provider_failure",
+        message: "m",
+        hint: "h",
+        details: [],
+      }),
+      CliGenerationError.make({
+        code: "generation_timeout",
+        message: "m",
+        hint: "h",
+        details: [],
+      }),
+      CliGenerationError.make({
+        code: "malformed_output",
+        message: "m",
+        hint: "h",
+        details: [],
+      }),
     ];
 
     assert.deepStrictEqual(
       failures.map(exitCodeForFailure),
-      [2, 3, 3, 4, 5, 6, 7, 8],
+      [2, 3, 3, 4, 5, 6, 7, 8, 3, 9, 10, 11, 12],
     );
   });
 

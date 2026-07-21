@@ -13,5 +13,9 @@
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../../packages/diagram/agent/tsconfig.lib.json" }]
+  "references": [
+    { "path": "../../packages/diagram/agent/tsconfig.lib.json" },
+    { "path": "../../packages/diagram/core/tsconfig.lib.json" },
+    { "path": "../../packages/diagram/generation/tsconfig.lib.json" }
+  ]
 }

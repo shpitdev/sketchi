@@ -187,6 +187,9 @@ try {
   };
   delete cliEnvironment.NO_COLOR;
   delete cliEnvironment.FORCE_COLOR;
+  delete cliEnvironment.CF_AIG_TOKEN;
+  delete cliEnvironment.SKETCHI_AI_GATEWAY_ACCOUNT_ID;
+  delete cliEnvironment.SKETCHI_AI_GATEWAY_ID;
   const cli = (args, input) =>
     run(binary, args, { env: cliEnvironment, input });
 
@@ -195,6 +198,55 @@ try {
   assert(
     rootHelp.stdout.includes(Buffer.from("Canonical flowchart example")),
     "Root help omitted flowchart guidance.",
+  );
+  assert(
+    rootHelp.stdout.includes(Buffer.from("sole network boundary")),
+    "Root help omitted the generation network boundary.",
+  );
+
+  const missingCredential = await cli([
+    "generate",
+    "--prompt",
+    "Create a two-step release flow.",
+    "--output",
+    "json",
+  ]);
+  expectExit(missingCredential, 9, "missing generation credential");
+  assert(
+    parseJson(missingCredential.stderr, "missing generation credential").error
+      .code === "missing_credential",
+    "Missing generation credential did not use the stable error code.",
+  );
+
+  const blockedNetwork = await run(
+    binary,
+    [
+      "generate",
+      "--prompt",
+      "Create a two-step release flow.",
+      "--output",
+      "json",
+    ],
+    {
+      env: {
+        ...cliEnvironment,
+        CF_AIG_TOKEN: "blocked-network-proof-token",
+      },
+    },
+  );
+  expectExit(blockedNetwork, 10, "blocked generation network");
+  assert(
+    parseJson(blockedNetwork.stderr, "blocked generation network").error
+      .code === "provider_failure",
+    "Blocked generation network did not use the stable error code.",
+  );
+
+  const emptyAfterGenerationFailures = await cli(["list", "--output", "json"]);
+  expectExit(emptyAfterGenerationFailures, 0, "post-generation-failure list");
+  assert(
+    parseJson(emptyAfterGenerationFailures.stdout, "empty diagram list").data
+      .length === 0,
+    "Generation failures left partial local state.",
   );
 
   const createFlow = await cli([
@@ -458,6 +510,8 @@ try {
       "not-found:5",
       "conflict:6",
       "format-unavailable:8",
+      "missing-credential:9",
+      "blocked-network:10",
     ],
     network: "disabled-by-preload",
     home: "isolated-under-.memory",

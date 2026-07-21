@@ -1,7 +1,10 @@
 import {
   type FlowchartDiagram,
   FlowchartDiagramSchema,
+  type MindmapDiagram,
+  MindmapDiagramSchema,
   parseFlowchartDiagram,
+  parseMindmapDiagram,
 } from "@sketchi/diagram-core";
 import { Schema } from "effect";
 
@@ -10,7 +13,8 @@ import { DiagramGenerationPrompt } from "./messages.js";
 export const diagramGenerationProviderIds: readonly [
   "fixture",
   "cloudflare-google-ai-studio",
-] = ["fixture", "cloudflare-google-ai-studio"];
+  "google-ai-studio",
+] = ["fixture", "cloudflare-google-ai-studio", "google-ai-studio"];
 
 export const DiagramGenerationProviderIdSchema = Schema.Literals(
   diagramGenerationProviderIds,
@@ -38,7 +42,9 @@ export class DiagramGenerationCandidate extends Schema.Class<DiagramGenerationCa
 )({
   cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
   diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
-  diagram: Schema.optional(FlowchartDiagramSchema),
+  diagram: Schema.optional(
+    Schema.Union([FlowchartDiagramSchema, MindmapDiagramSchema]),
+  ),
   durationMs: Schema.optional(Schema.Number),
   error: Schema.optional(Schema.String),
   model: Schema.String,
@@ -130,6 +136,21 @@ export function parseGeneratedFlowchart(text: string): FlowchartDiagram {
   return parseFlowchartDiagram(extractJsonObject(text));
 }
 
+export function parseGeneratedDiagram(
+  text: string,
+): FlowchartDiagram | MindmapDiagram {
+  const input = extractJsonObject(text);
+  if (
+    typeof input === "object" &&
+    input !== null &&
+    "type" in input &&
+    input.type === "mindmap"
+  ) {
+    return parseMindmapDiagram(input);
+  }
+  return parseFlowchartDiagram(input);
+}
+
 export function candidateFromText(
   input: Omit<DiagramGenerationCandidate, "diagnostics" | "text"> & {
     diagnostics?: string[];
@@ -149,7 +170,7 @@ export function candidateFromText(
     return {
       ...input,
       diagnostics,
-      diagram: parseGeneratedFlowchart(input.text),
+      diagram: parseGeneratedDiagram(input.text),
     };
   } catch (error) {
     diagnostics.push(

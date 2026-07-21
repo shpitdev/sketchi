@@ -1,0 +1,44 @@
+DESCRIPTION
+  Create one persisted diagram from --prompt TEXT. This is Sketchi's only command that uses a model or network. It calls the Cloudflare AI Gateway HTTP endpoint directly; it does not use Cloudflare bindings, a Sketchi service, or MCP.
+
+Credential, routing, and options:
+  export CF_AIG_TOKEN=<cloudflare-api-token-with-ai-gateway-run-access>
+  Sketchi sends that token only as cf-aig-authorization to the Google AI Studio provider route.
+  The gateway supplies its stored BYOK Google provider key; Sketchi never reads or sends a Google
+  API key. Route: https://gateway.ai.cloudflare.com/v1/ACCOUNT_ID/GATEWAY_ID/google-ai-studio.
+  Defaults: ACCOUNT_ID=75f9660f39e4dafe8b95980b87e7399a; GATEWAY_ID=google-ai-studio.
+  Override them with SKETCHI_AI_GATEWAY_ACCOUNT_ID and SKETCHI_AI_GATEWAY_ID.
+  --type defaults to flowchart; --model defaults to
+  gemini-3.1-flash-lite. --output text|json controls only the local result envelope.
+
+Validation and storage:
+  Provider JSON is validated by Sketchi's canonical package schemas, built with Code Mode, and
+  atomically committed through the create store at ~/.sketchi/diagrams/<id>/. The record contains
+  manifest.json, document.json, scene.json, diagram.excalidraw, and optional diagram.png.
+  Any credential/provider/timeout/output/validation/build/storage failure leaves no visible record.
+
+Errors and next steps:
+  Exit 9 means missing credential, 10 provider/network failure, 11 timeout, and 12 malformed output;
+  generated schema validation uses 3, build uses 4, conflict uses 6, and storage uses 7.
+  On success, pass the returned id to show, edit, list, or export. For strictly offline manual
+  authoring and accepted canonical JSON examples, run sketchi --help.
+
+USAGE
+  sketchi generate [flags]
+
+FLAGS
+  --output text|json          Result presentation format. (choices: text, json)
+  --prompt TEXT               Diagram request text sent only through Cloudflare AI Gateway.
+  --type flowchart|mindmap    Requested canonical diagram type; default flowchart. (choices: flowchart, mindmap)
+  --model MODEL               Google AI Studio model id routed through AI Gateway; default gemini-3.1-flash-lite.
+
+GLOBAL FLAGS
+  --help, -h       Show help information
+  --version, -v    Show version information
+
+EXAMPLES
+  # Generate a flowchart with gemini-3.1-flash-lite.
+  sketchi generate --prompt "Map release approval with pass and revise branches"
+
+  # Generate and persist a mindmap with structured output.
+  sketchi generate --prompt "Organize launch readiness" --type mindmap --model gemini-3.1-flash-lite --output json

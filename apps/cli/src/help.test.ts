@@ -27,6 +27,7 @@ function help(command?: string): string {
 describe("golden product help", () => {
   for (const command of [
     "root",
+    "generate",
     "create",
     "show",
     "edit",

@@ -31,6 +31,12 @@ describe("CLI dependency and public-surface audit", () => {
       manifest.dependencies["@effect/platform-node"],
       "4.0.0-beta.99",
     );
+    assert.strictEqual(
+      manifest.dependencies["@sketchi/diagram-generation"],
+      "workspace:*",
+    );
+    assert.notProperty(manifest.dependencies, "@ai-sdk/google");
+    assert.notProperty(manifest.dependencies, "ai");
     assert.notProperty(manifest.dependencies, "oclif");
     assert.notProperty(manifest.dependencies, "ink");
     assert.deepStrictEqual(Object.keys(manifest.bin), ["sketchi"]);
@@ -71,7 +77,50 @@ describe("CLI dependency and public-surface audit", () => {
     assert.notInclude(source, "NormalizedMindmapSchema");
   });
 
-  it("publishes exactly the five manual top-level commands", async () => {
+  it("keeps the gateway provider SDK and sole fetch boundary behind diagram-generation", async () => {
+    const files = await sourceFiles(join(workspaceRoot, "apps/cli/src"));
+    const fetchFiles: string[] = [];
+    let cliSource = "";
+    for (const file of files) {
+      const text = await readFile(file, "utf8");
+      cliSource += `${text}\n`;
+      if (text.includes("globalThis.fetch")) fetchFiles.push(file);
+      assert.notInclude(text, "CloudflareAiGateway");
+      assert.notInclude(text, "Mcp");
+    }
+    assert.deepStrictEqual(
+      fetchFiles.map((file) => file.slice(workspaceRoot.length + 1)),
+      ["apps/cli/src/generation.ts"],
+    );
+    assert.notInclude(cliSource, "GOOGLE_GENERATIVE_AI_API_KEY");
+    assert.include(cliSource, "CF_AIG_TOKEN");
+
+    const providerSource = await readFile(
+      join(
+        workspaceRoot,
+        "packages/diagram/generation/src/lib/cloudflare-google-ai-studio-http.ts",
+      ),
+      "utf8",
+    );
+    assert.include(providerSource, "https://gateway.ai.cloudflare.com/v1/");
+    assert.include(providerSource, '"cf-aig-authorization"');
+    assert.include(providerSource, '"x-goog-api-key": undefined');
+    assert.notInclude(providerSource, "process.env");
+
+    const providerManifest = JSON.parse(
+      await readFile(
+        join(workspaceRoot, "packages/diagram/generation/package.json"),
+        "utf8",
+      ),
+    );
+    assert.strictEqual(
+      providerManifest.dependencies["@ai-sdk/google"],
+      "3.0.80",
+    );
+    assert.strictEqual(providerManifest.dependencies.ai, "6.0.198");
+  });
+
+  it("publishes generate plus exactly the five manual top-level commands", async () => {
     const help = await readFile(
       join(workspaceRoot, "apps/cli/src/__fixtures__/help/root.txt"),
       "utf8",
@@ -83,6 +132,7 @@ describe("CLI dependency and public-surface audit", () => {
       .map((line) => line.trim().split(/\s+/u)[0]);
 
     assert.deepStrictEqual(commands, [
+      "generate",
       "create",
       "show",
       "edit",
@@ -90,7 +140,6 @@ describe("CLI dependency and public-surface audit", () => {
       "export",
     ]);
     for (const forbidden of [
-      "generate",
       "auth",
       "config",
       "completion",
@@ -117,5 +166,6 @@ describe("CLI dependency and public-surface audit", () => {
     assert.notProperty(manifest, "dependencies");
     assert.match(bundle.slice(0, 64), /^#!\/usr\/bin\/env node/u);
     assert.notInclude(bundle, "sourceMappingURL");
+    assert.include(bundle, "CF_AIG_TOKEN");
   });
 });
