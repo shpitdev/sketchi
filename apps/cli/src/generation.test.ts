@@ -7,14 +7,16 @@ import { Effect, Layer } from "effect";
 
 import { DiagramBuilder, DiagramBuilderLive } from "./builder.js";
 import type { BuiltDiagram, StoredDiagram } from "./contracts.js";
-import { decodeCanonicalDiagramDocument } from "./document.js";
+import { decodeCanonicalDiagramDocument, encodeJson } from "./document.js";
 import { CliStorageError } from "./errors.js";
+import { DiagramExporter, DiagramExporterLive } from "./exporter.js";
 import {
   DEFAULT_GENERATE_ENDPOINT,
   DEFAULT_GENERATION_MODEL,
   generateDiagram,
 } from "./generation.js";
 import { DiagramStore } from "./storage.js";
+import { CliPngRendererLive } from "./png-renderer.js";
 import { flowchartInput, mindmapInput } from "./__tests__/fixtures.js";
 
 const builderLayer = DiagramBuilderLive.pipe(
@@ -76,7 +78,7 @@ function capturingStoreLayer(created: BuiltDiagram[]) {
     edit: () => Effect.die("unused edit"),
     show: () => Effect.die("unused show"),
     list: () => Effect.die("unused list"),
-    readArtifact: () => Effect.die("unused readArtifact"),
+    readExportSource: () => Effect.die("unused readExportSource"),
   });
 }
 
@@ -93,7 +95,38 @@ function failingStoreLayer(attempts: { count: number }) {
     edit: () => Effect.die("unused edit"),
     show: () => Effect.die("unused show"),
     list: () => Effect.die("unused list"),
-    readArtifact: () => Effect.die("unused readArtifact"),
+    readExportSource: () => Effect.die("unused readExportSource"),
+  });
+}
+
+function generatedArtifactStoreLayer(created: BuiltDiagram[]) {
+  return Layer.succeed(DiagramStore, {
+    create: Effect.fn("sketchi.cli.storage.testGeneratedCreate")(
+      function* (diagram) {
+        created.push(diagram);
+        return stored(diagram);
+      },
+    ),
+    edit: () => Effect.die("unused edit"),
+    show: () => Effect.die("unused show"),
+    list: () => Effect.die("unused list"),
+    readExportSource: (diagramId, format) => {
+      const diagram = created.find((candidate) => candidate.id === diagramId);
+      if (!diagram) return Effect.die(`missing generated diagram ${diagramId}`);
+      if (format === "png") {
+        return Effect.succeed({
+          _tag: "RenderPng" as const,
+          scene: new TextEncoder().encode(encodeJson(diagram.scene)),
+          excalidraw: new TextEncoder().encode(encodeJson(diagram.excalidraw)),
+        });
+      }
+      return Effect.succeed({
+        _tag: "StoredArtifact" as const,
+        bytes: new TextEncoder().encode(
+          encodeJson(format === "scene" ? diagram.scene : diagram.excalidraw),
+        ),
+      });
+    },
   });
 }
 
@@ -163,6 +196,44 @@ describe("prompt-assisted generation over the public generate API", () => {
     }),
   );
 
+  it.effect(
+    "exports generated flowchart and mindmap responses directly to PNG",
+    () => {
+      const created: BuiltDiagram[] = [];
+      const storeLayer = generatedArtifactStoreLayer(created);
+      const exporterLayer = DiagramExporterLive.pipe(
+        Layer.provide(Layer.mergeAll(storeLayer, CliPngRendererLive)),
+      );
+      return Effect.gen(function* () {
+        for (const [type, input] of [
+          ["flowchart", flowchartInput],
+          ["mindmap", mindmapInput],
+        ] satisfies ReadonlyArray<
+          readonly ["flowchart" | "mindmap", unknown]
+        >) {
+          const body = yield* Effect.promise(() => buildSuccessBody(input));
+          stubFetch(() => new Response(body, { status: 200 }));
+          const generated = yield* generateDiagram({
+            endpoint: DEFAULT_GENERATE_ENDPOINT,
+            model: DEFAULT_GENERATION_MODEL,
+            prompt: "Create a diagram",
+            type,
+          });
+          const exporter = yield* DiagramExporter;
+          const png = yield* exporter.exportArtifact(
+            generated.diagram.manifest.id,
+            "png",
+          );
+          assert.deepStrictEqual(
+            [...png.slice(0, 8)],
+            [137, 80, 78, 71, 13, 10, 26, 10],
+          );
+        }
+      }).pipe(Effect.provide(Layer.mergeAll(storeLayer, exporterLayer)));
+    },
+    { timeout: 15_000 },
+  );
+
   it.effect("maps a network-down failure to a typed provider error", () =>
     Effect.gen(function* () {
       globalThis.fetch = (() =>
@@ -179,44 +250,43 @@ describe("prompt-assisted generation over the public generate API", () => {
     }),
   );
 
-  it.effect("maps an endpoint rejection to a typed invalid-document error", () =>
-    Effect.gen(function* () {
-      stubFetch(() =>
-        jsonResponse(
-          {
-            ok: false,
-            status: "invalid_generated_document",
-            issues: [
-              {
-                code: "invalid_generated_document",
-                message: "The generated diagram failed validation.",
-                hint: "Refine the prompt.",
-              },
-            ],
-          },
-          422,
-        ),
-      );
-      const created: BuiltDiagram[] = [];
+  it.effect(
+    "maps an endpoint rejection to a typed invalid-document error",
+    () =>
+      Effect.gen(function* () {
+        stubFetch(() =>
+          jsonResponse(
+            {
+              ok: false,
+              status: "invalid_generated_document",
+              issues: [
+                {
+                  code: "invalid_generated_document",
+                  message: "The generated diagram failed validation.",
+                  hint: "Refine the prompt.",
+                },
+              ],
+            },
+            422,
+          ),
+        );
+        const created: BuiltDiagram[] = [];
 
-      const error = yield* Effect.flip(runGenerate(created, "flowchart"));
+        const error = yield* Effect.flip(runGenerate(created, "flowchart"));
 
-      assert.strictEqual(error._tag, "CliGenerationError");
-      if (error._tag === "CliGenerationError") {
-        assert.strictEqual(error.code, "invalid_generated_document");
-        assert.deepStrictEqual(error.details, ["http_status:422"]);
-      }
-      assert.strictEqual(created.length, 0);
-    }),
+        assert.strictEqual(error._tag, "CliGenerationError");
+        if (error._tag === "CliGenerationError") {
+          assert.strictEqual(error.code, "invalid_generated_document");
+          assert.deepStrictEqual(error.details, ["http_status:422"]);
+        }
+        assert.strictEqual(created.length, 0);
+      }),
   );
 
   it.effect("maps a provider endpoint error to a typed provider failure", () =>
     Effect.gen(function* () {
       stubFetch(() =>
-        jsonResponse(
-          { ok: false, status: "provider_failed", issues: [] },
-          502,
-        ),
+        jsonResponse({ ok: false, status: "provider_failed", issues: [] }, 502),
       );
       const created: BuiltDiagram[] = [];
 
@@ -297,28 +367,30 @@ describe("prompt-assisted generation over the public generate API", () => {
     }),
   );
 
-  it.effect("propagates the exact local store failure without partial state", () =>
-    Effect.gen(function* () {
-      const body = yield* Effect.promise(() =>
-        buildSuccessBody(flowchartInput),
-      );
-      stubFetch(() => new Response(body, { status: 200 }));
-      const attempts = { count: 0 };
+  it.effect(
+    "propagates the exact local store failure without partial state",
+    () =>
+      Effect.gen(function* () {
+        const body = yield* Effect.promise(() =>
+          buildSuccessBody(flowchartInput),
+        );
+        stubFetch(() => new Response(body, { status: 200 }));
+        const attempts = { count: 0 };
 
-      const error = yield* Effect.flip(
-        generateDiagram({
-          endpoint: DEFAULT_GENERATE_ENDPOINT,
-          model: DEFAULT_GENERATION_MODEL,
-          prompt: "Create a release flow",
-          type: "flowchart",
-        }).pipe(Effect.provide(failingStoreLayer(attempts))),
-      );
+        const error = yield* Effect.flip(
+          generateDiagram({
+            endpoint: DEFAULT_GENERATE_ENDPOINT,
+            model: DEFAULT_GENERATION_MODEL,
+            prompt: "Create a release flow",
+            type: "flowchart",
+          }).pipe(Effect.provide(failingStoreLayer(attempts))),
+        );
 
-      assert.strictEqual(error._tag, "CliStorageError");
-      if (error._tag === "CliStorageError") {
-        assert.strictEqual(error.code, "storage_commit_failed");
-      }
-      assert.strictEqual(attempts.count, 1);
-    }),
+        assert.strictEqual(error._tag, "CliStorageError");
+        if (error._tag === "CliStorageError") {
+          assert.strictEqual(error.code, "storage_commit_failed");
+        }
+        assert.strictEqual(attempts.count, 1);
+      }),
   );
 });

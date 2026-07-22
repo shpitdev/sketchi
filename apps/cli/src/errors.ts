@@ -77,7 +77,12 @@ export class CliStorageError extends Schema.TaggedErrorClass<CliStorageError>()(
 export class CliExportError extends Schema.TaggedErrorClass<CliExportError>()(
   "CliExportError",
   {
-    code: Schema.Literals(["format_unavailable", "export_write_failed"]),
+    code: Schema.Literals([
+      "format_unavailable",
+      "invalid_destination",
+      "render_failed",
+      "export_write_failed",
+    ]),
     format: Schema.String,
     message: Schema.String,
     hint: Schema.String,

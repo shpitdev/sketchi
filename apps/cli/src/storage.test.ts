@@ -20,6 +20,7 @@ import {
   DiagramStore,
   DiagramStoreLive,
   makeStorageRootLayer,
+  writeExportFile,
 } from "./storage.js";
 import { builtDiagram, canonicalDocument } from "./__tests__/fixtures.js";
 
@@ -58,6 +59,13 @@ function storeLayer(
         makeStorageRootLayer(root),
       ),
     ),
+  );
+}
+
+function exportFileLayer(root: string) {
+  return Layer.mergeAll(
+    Layer.succeed(LocalFileSystem, localFileSystemLive),
+    makeStorageRootLayer(root),
   );
 }
 
@@ -685,7 +693,7 @@ describe("diagram storage", () => {
             .pipe(Effect.forkChild);
           const listFiber = yield* reader.list().pipe(Effect.forkChild);
           const exportFiber = yield* reader
-            .readArtifact("release-flow", "scene")
+            .readExportSource("release-flow", "scene")
             .pipe(Effect.forkChild);
           yield* Deferred.await(readersWaiting);
           assert.strictEqual(
@@ -698,8 +706,11 @@ describe("diagram storage", () => {
 
           const shown = yield* Fiber.join(showFiber);
           const listed = yield* Fiber.join(listFiber);
+          const exportSource = yield* Fiber.join(exportFiber);
+          assert.strictEqual(exportSource._tag, "StoredArtifact");
+          if (exportSource._tag !== "StoredArtifact") return;
           const scene = JSON.parse(
-            new TextDecoder().decode(yield* Fiber.join(exportFiber)),
+            new TextDecoder().decode(exportSource.bytes),
           );
           assert.strictEqual(shown.manifest.revision, 2);
           assert.strictEqual(
@@ -920,7 +931,7 @@ describe("diagram storage", () => {
             Effect.forkChild,
           );
           const exportFiber = yield* Effect.flip(
-            reader.readArtifact("release-flow", "scene"),
+            reader.readExportSource("release-flow", "scene"),
           ).pipe(Effect.forkChild);
 
           yield* Deferred.await(firstAttempts);
@@ -949,28 +960,67 @@ describe("diagram storage", () => {
         yield* store.create(
           builtDiagram({ png: new Uint8Array([137, 80, 78, 71]) }),
         );
-        const png = yield* store.readArtifact("release-flow", "png");
-        assert.deepStrictEqual([...png], [137, 80, 78, 71]);
+        const source = yield* store.readExportSource("release-flow", "png");
+        assert.strictEqual(source._tag, "StoredArtifact");
+        if (source._tag === "StoredArtifact") {
+          assert.deepStrictEqual([...source.bytes], [137, 80, 78, 71]);
+        }
+      }).pipe(Effect.provide(storeLayer(root))),
+    ),
+  );
+
+  it.effect("returns PNG render inputs from the same locked read", () =>
+    withTestRoot((root) =>
+      Effect.gen(function* () {
+        const store = yield* DiagramStore;
+        yield* store.create(builtDiagram());
+        const source = yield* store.readExportSource("release-flow", "png");
+        assert.strictEqual(source._tag, "RenderPng");
+        if (source._tag === "RenderPng") {
+          assert.match(new TextDecoder().decode(source.scene), /release-flow/u);
+          assert.match(
+            new TextDecoder().decode(source.excalidraw),
+            /excalidraw/u,
+          );
+        }
       }).pipe(Effect.provide(storeLayer(root))),
     ),
   );
 
   it.effect(
-    "reports unavailable PNG through the structured export channel",
+    "rejects export destinations inside diagram storage, including aliases",
     () =>
-      withTestRoot((root) =>
-        Effect.gen(function* () {
-          const store = yield* DiagramStore;
-          yield* store.create(builtDiagram());
-          const error = yield* Effect.flip(
-            store.readArtifact("release-flow", "png"),
-          );
-          assert.strictEqual(error._tag, "CliExportError");
-          if (error._tag === "CliExportError") {
-            assert.strictEqual(error.code, "format_unavailable");
+      withTestRoot((sandbox) => {
+        const diagramsRoot = join(sandbox, "diagrams");
+        const record = join(diagramsRoot, "release-flow");
+        const alias = join(sandbox, "diagrams-alias");
+        const recordAlias = join(sandbox, "record-alias");
+        return Effect.gen(function* () {
+          yield* Effect.promise(async () => {
+            await mkdir(record, { recursive: true });
+            await symlink(diagramsRoot, alias, "dir");
+            await symlink(record, recordAlias, "dir");
+          });
+          for (const destination of [
+            join(record, "diagram.png"),
+            join(alias, "release-flow", "diagram.png"),
+            join(recordAlias, "diagram.png"),
+          ]) {
+            const error = yield* Effect.flip(
+              writeExportFile(destination, new Uint8Array([1, 2, 3])),
+            );
+            assert.strictEqual(error._tag, "CliExportError");
+            if (error._tag === "CliExportError") {
+              assert.strictEqual(error.code, "invalid_destination");
+              assert.match(error.hint, /outside ~\/\.sketchi\/diagrams/u);
+            }
           }
-        }).pipe(Effect.provide(storeLayer(root))),
-      ),
+          assert.strictEqual(
+            yield* localFileSystemLive.kind(join(record, "diagram.png")),
+            "missing",
+          );
+        }).pipe(Effect.provide(exportFileLayer(diagramsRoot)));
+      }),
   );
 
   it.effect.prop(

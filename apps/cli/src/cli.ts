@@ -14,6 +14,7 @@ import {
 } from "./contracts.js";
 import { encodeJson, validateStorageId } from "./document.js";
 import { CliFilesystemError, CliValidationError } from "./errors.js";
+import { DiagramExporter, DiagramExporterLive } from "./exporter.js";
 import { LocalFileSystem, LocalFileSystemLive } from "./filesystem.js";
 import {
   DEFAULT_GENERATE_ENDPOINT,
@@ -41,6 +42,7 @@ import {
   reportSuccess,
   runReported,
 } from "./output.js";
+import { CliPngRendererLive } from "./png-renderer.js";
 import {
   DiagramStore,
   DiagramStoreLive,
@@ -75,14 +77,17 @@ Input and output contracts:
   noninteractive UTF-8 JSON document from stdin and exits with usage code 2 on a TTY.
   --json is inline input only. --prompt is noninteractive text. Use --output text|json for
   result presentation on every command.
-  export writes bytes with --dest PATH|-. With --dest -, bytes use stdout and status uses stderr.
+  export writes bytes with --dest PATH|- and always writes status to stderr. With --dest -,
+  stdout contains only artifact bytes. A successful PNG file export adds a generic inline-Markdown
+  display hint for calling agents.
 
 Offline boundary and storage:
   create, show, edit, list, and export use no model, remote agent, MCP server, login,
   account, browser, credential, or network. No command sends stored records to a provider.
   Records live at ~/.sketchi/diagrams/<id>/ with manifest.json, document.json, scene.json,
   diagram.excalidraw, optional diagram.png, and revisions/<revision>.json.
-  Formats are scene, excalidraw, and png. PNG export only returns an already-stored PNG.
+  Formats are scene, excalidraw, and png. If no PNG is stored, export deterministically renders one
+  on demand from the local scene and Excalidraw artifacts, without a browser, network, or record write.
 
 Exit codes and errors:
   0 success; 1 internal failure; 2 usage or interactive stdin; 3 invalid input/document;
@@ -406,12 +411,20 @@ interface ExportResult {
 }
 
 function exportData(result: ExportResult) {
+  const hint = displayHint(result);
   return {
     id: result.id,
     format: result.format,
     destination: result.destination,
     sizeBytes: result.sizeBytes,
+    ...(hint ? { hint } : {}),
   };
+}
+
+function displayHint(result: ExportResult): string | undefined {
+  return result.format === "png" && result.destination !== "-"
+    ? `to show this diagram to the user, display the exported file as an inline markdown image, e.g. ![${result.id}](${result.destination})`
+    : undefined;
 }
 
 const exportCommand = Command.make(
@@ -430,10 +443,10 @@ const exportCommand = Command.make(
   ({ destination, diagramId, format }) =>
     Effect.gen(function* () {
       const { output } = yield* rootCommand;
-      const store = yield* DiagramStore;
+      const exporter = yield* DiagramExporter;
       const operation = Effect.gen(function* () {
         const id = yield* validateStorageId(diagramId);
-        const bytes = yield* store.readArtifact(id, format);
+        const bytes = yield* exporter.exportArtifact(id, format);
         if (destination !== "-") yield* writeExportFile(destination, bytes);
         return {
           id,
@@ -451,26 +464,22 @@ const exportCommand = Command.make(
               const writer = yield* OutputWriter;
               if (result.stdoutBytes) yield* writer.stdout(result.stdoutBytes);
               const data = exportData(result);
+              const hint = displayHint(result);
               const text = [
                 `exported: ${result.id}`,
                 `format: ${result.format}`,
                 `destination: ${result.destination}`,
                 `bytes: ${String(result.sizeBytes)}`,
+                ...(hint ? [`hint: ${hint}`] : []),
               ].join("\n");
-              yield* reportSuccess(
-                "export",
-                output,
-                data,
-                text,
-                result.stdoutBytes ? "stderr" : "stdout",
-              );
+              yield* reportSuccess("export", output, data, text, "stderr");
             }),
         }),
       );
     }),
 ).pipe(
   Command.withDescription(
-    "Export one already-stored scene, Excalidraw, or PNG artifact. --dest - writes only artifact bytes to stdout and writes the text/JSON success envelope to stderr. PNG never starts a browser or network request; unavailable PNG exits 8.",
+    "Export a stored scene or Excalidraw artifact, or render PNG on demand from both when no PNG is stored. Rendering is deterministic, export-only, and uses bundled fonts plus a WASM rasterizer: it never starts a browser or network request and never writes the PNG back to the record. Status always uses stderr, so --dest - leaves stdout byte-only. A successful PNG file export adds a generic inline-Markdown display hint for calling agents. Render or write failures exit 8.",
   ),
   Command.withExamples([
     {
@@ -542,12 +551,17 @@ const storageDependencies = Layer.mergeAll(
   StorageRootLive,
 );
 const diagramStoreLayer = Layer.provide(DiagramStoreLive, storageDependencies);
+const diagramExporterLayer = Layer.provide(
+  DiagramExporterLive,
+  Layer.mergeAll(diagramStoreLayer, CliPngRendererLive),
+);
 
 export const CliApplicationLayer = Layer.mergeAll(
   LocalFileSystemLive,
   StorageRootLive,
   diagramBuilderLayer,
   diagramStoreLayer,
+  diagramExporterLayer,
   InputReaderLive.pipe(Layer.provide(LocalFileSystemLive)),
   OutputWriterLive,
 );

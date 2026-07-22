@@ -5,6 +5,7 @@ import {
   lstat,
   mkdtemp,
   open,
+  realpath,
   readdir,
   rename,
   rm,
@@ -48,6 +49,9 @@ export class LocalFileSystem extends Context.Service<
     readonly kind: (
       path: string,
     ) => Effect.Effect<LocalEntryKind | "missing", CliFilesystemError>;
+    readonly realPath: (
+      path: string,
+    ) => Effect.Effect<string, CliFilesystemError>;
     readonly readText: (
       path: string,
     ) => Effect.Effect<string, CliFilesystemError>;
@@ -188,6 +192,11 @@ export const localFileSystemLive = {
         }
       },
       catch: (cause) => filesystemError("stat", path, cause),
+    }),
+  realPath: (path) =>
+    Effect.tryPromise({
+      try: () => realpath(path),
+      catch: (cause) => filesystemError("resolve", path, cause),
     }),
   readText: (path) =>
     Effect.tryPromise({

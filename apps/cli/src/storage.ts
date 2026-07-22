@@ -1,5 +1,12 @@
 import { homedir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+} from "node:path";
 
 import { Context, Effect, Layer, Schedule, Schema } from "effect";
 
@@ -32,6 +39,14 @@ export class StorageRoot extends Context.Service<
   { readonly path: string }
 >()("@sketchi/cli/StorageRoot") {}
 
+export type ExportSource =
+  | { readonly _tag: "StoredArtifact"; readonly bytes: Uint8Array }
+  | {
+      readonly _tag: "RenderPng";
+      readonly scene: Uint8Array;
+      readonly excalidraw: Uint8Array;
+    };
+
 export class DiagramStore extends Context.Service<
   DiagramStore,
   {
@@ -49,11 +64,11 @@ export class DiagramStore extends Context.Service<
       ReadonlyArray<DiagramSummary>,
       CliFilesystemError | CliStorageError
     >;
-    readonly readArtifact: (
+    readonly readExportSource: (
       diagramId: string,
       format: DiagramFormat,
     ) => Effect.Effect<
-      Uint8Array,
+      ExportSource,
       CliExportError | CliFilesystemError | CliStorageError
     >;
   }
@@ -979,33 +994,57 @@ const DiagramStoreLive = Layer.effect(
       return summaries;
     });
 
-    const readArtifact = Effect.fn("sketchi.cli.storage.readArtifact")(
+    const readExportSource = Effect.fn("sketchi.cli.storage.readExportSource")(
       function* (diagramId: string, format: DiagramFormat) {
         return yield* withLock(
           diagramId,
           Effect.gen(function* () {
             const stored = yield* loadUnlocked(diagramId);
-            if (!stored.manifest.formats.includes(format)) {
+            if (stored.manifest.formats.includes(format)) {
+              return {
+                _tag: "StoredArtifact",
+                bytes: yield* fs.readBytes(
+                  join(recordPath(root.path, diagramId), artifactFile(format)),
+                ),
+              } as const;
+            }
+            if (format !== "png") {
               return yield* CliExportError.make({
                 code: "format_unavailable",
                 format,
                 message: `Diagram "${diagramId}" has no stored ${format} artifact.`,
-                hint:
-                  format === "png"
-                    ? "PNG export is offline-only and requires an already-stored PNG artifact."
-                    : "Edit the diagram to rebuild its local artifacts.",
+                hint: "Edit the diagram to rebuild its local artifacts.",
               });
             }
-            return yield* fs.readBytes(
-              join(recordPath(root.path, diagramId), artifactFile(format)),
-            );
+            for (const renderFormat of ["scene", "excalidraw"] as const) {
+              if (!stored.manifest.formats.includes(renderFormat)) {
+                return yield* CliExportError.make({
+                  code: "format_unavailable",
+                  format: renderFormat,
+                  message: `Diagram "${diagramId}" has no stored ${renderFormat} artifact.`,
+                  hint: "Edit the diagram to rebuild its local artifacts.",
+                });
+              }
+            }
+            const [scene, excalidraw] = yield* Effect.all([
+              fs.readBytes(
+                join(recordPath(root.path, diagramId), artifactFile("scene")),
+              ),
+              fs.readBytes(
+                join(
+                  recordPath(root.path, diagramId),
+                  artifactFile("excalidraw"),
+                ),
+              ),
+            ]);
+            return { _tag: "RenderPng", scene, excalidraw } as const;
           }),
           true,
         );
       },
     );
 
-    return { create, edit, show, list, readArtifact };
+    return { create, edit, show, list, readExportSource };
   }),
 );
 
@@ -1014,24 +1053,49 @@ export { DiagramStoreLive };
 export const writeExportFile = Effect.fn("sketchi.cli.export.writeFile")(
   function* (destination: string, bytes: Uint8Array) {
     const fs = yield* LocalFileSystem;
-    const parent = dirname(destination);
-    if ((yield* fs.kind(parent)) !== "directory") {
-      return yield* CliExportError.make({
+    const root = yield* StorageRoot;
+    const absoluteDestination = resolve(destination);
+    const parent = dirname(absoluteDestination);
+    const destinationDirectoryError = () =>
+      CliExportError.make({
         code: "export_write_failed",
         format: basename(destination),
         message: `Export destination directory does not exist: ${parent}.`,
         hint: "Create the destination directory and retry.",
       });
+    const resolvedParent = yield* fs
+      .realPath(parent)
+      .pipe(Effect.mapError(destinationDirectoryError));
+    if ((yield* fs.kind(resolvedParent)) !== "directory") {
+      return yield* destinationDirectoryError();
+    }
+    const resolvedRoot = yield* fs.realPath(root.path);
+    const resolvedDestination = join(
+      resolvedParent,
+      basename(absoluteDestination),
+    );
+    const destinationFromRoot = relative(resolvedRoot, resolvedDestination);
+    if (
+      destinationFromRoot === "" ||
+      (!destinationFromRoot.startsWith("..") &&
+        !isAbsolute(destinationFromRoot))
+    ) {
+      return yield* CliExportError.make({
+        code: "invalid_destination",
+        format: basename(destination),
+        message: `Export destination is inside Sketchi's diagram storage: ${destination}.`,
+        hint: "Choose a destination outside ~/.sketchi/diagrams so the stored record remains valid.",
+      });
     }
     const temp = join(
-      parent,
+      resolvedParent,
       `.${basename(destination)}.sketchi.${String(process.pid)}.${crypto.randomUUID()}`,
     );
     return yield* Effect.acquireUseRelease(
       Effect.succeed(temp),
       (path) =>
         fs.writeBytes(path, bytes).pipe(
-          Effect.andThen(fs.rename(path, destination)),
+          Effect.andThen(fs.rename(path, resolvedDestination)),
           Effect.mapError(() =>
             CliExportError.make({
               code: "export_write_failed",

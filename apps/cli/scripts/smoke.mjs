@@ -7,10 +7,12 @@ import {
   readFile,
   readdir,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { PNG } from "pngjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(scriptDirectory, "../../..");
@@ -77,6 +79,49 @@ function expectExit(result, expected, label) {
   );
 }
 
+function inkBounds(bytes) {
+  const png = PNG.sync.read(bytes);
+  const background = [...png.data.subarray(0, 4)];
+  let minX = png.width;
+  let minY = png.height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < png.height; y += 1) {
+    for (let x = 0; x < png.width; x += 1) {
+      const offset = (y * png.width + x) * 4;
+      if (
+        png.data[offset] === background[0] &&
+        png.data[offset + 1] === background[1] &&
+        png.data[offset + 2] === background[2] &&
+        png.data[offset + 3] === background[3]
+      ) {
+        continue;
+      }
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+  return { width: png.width, height: png.height, minX, minY, maxX, maxY };
+}
+
+function assertInkHasPadding(bytes, label) {
+  const bounds = inkBounds(bytes);
+  const minimumPadding = 16;
+  assert(bounds.maxX >= 0, `${label} contains no visible ink.`);
+  assert(bounds.minX >= minimumPadding, `${label} clips ink at the left edge.`);
+  assert(bounds.minY >= minimumPadding, `${label} clips ink at the top edge.`);
+  assert(
+    bounds.maxX <= bounds.width - minimumPadding - 1,
+    `${label} clips ink at the right edge.`,
+  );
+  assert(
+    bounds.maxY <= bounds.height - minimumPadding - 1,
+    `${label} clips ink at the bottom edge.`,
+  );
+}
+
 const flowchart = {
   type: "flowchart",
   spec: {
@@ -103,6 +148,14 @@ const flowchart = {
 const revisedFlowchart = {
   ...flowchart,
   spec: { ...flowchart.spec, title: "Release approval revised" },
+};
+const wideTitleFlowchart = {
+  ...flowchart,
+  spec: {
+    ...flowchart.spec,
+    id: "wide-title",
+    title: "W".repeat(40),
+  },
 };
 const mindmap = {
   type: "mindmap",
@@ -140,37 +193,47 @@ try {
     .trim()
     .split("\n")
     .sort();
-  assert(
-    JSON.stringify(packagedFileNames) ===
-      JSON.stringify(
-        [
-          "package/README.md",
-          "package/package.json",
-          "package/sketchi.js",
-        ].sort(),
-      ),
-    `Unexpected packaged CLI files: ${packagedFileNames.join(", ")}.`,
-  );
   const bundleReport = parseJson(
     await readFile(bundleReportPath),
     "CLI bundle report",
   );
-  const archivedBundle = await run("tar", [
-    "-xOf",
-    archive,
-    "package/sketchi.js",
-  ]);
-  expectExit(archivedBundle, 0, "read packaged CLI bundle");
-  const archivedBundleSha256 = createHash("sha256")
-    .update(archivedBundle.stdout)
-    .digest("hex");
+  const expectedPackageFiles = [
+    "package/README.md",
+    "package/THIRD_PARTY_NOTICES",
+    "package/package.json",
+    ...bundleReport.files.map(({ path }) => `package/${path}`),
+  ].sort();
   assert(
-    archivedBundle.stdout.byteLength === bundleReport.bytes,
-    `Packaged CLI bundle has ${String(archivedBundle.stdout.byteLength)} bytes; exact-head report has ${String(bundleReport.bytes)}.`,
+    JSON.stringify(packagedFileNames) === JSON.stringify(expectedPackageFiles),
+    `Unexpected packaged CLI files: ${packagedFileNames.join(", ")}.`,
   );
+  const archivedBundleHash = createHash("sha256");
+  let archivedBundleBytes = 0;
+  for (const file of bundleReport.files) {
+    const archivedFile = await run("tar", [
+      "-xOf",
+      archive,
+      `package/${file.path}`,
+    ]);
+    expectExit(archivedFile, 0, `read packaged CLI file ${file.path}`);
+    archivedBundleBytes += archivedFile.stdout.byteLength;
+    archivedBundleHash.update(file.path);
+    archivedBundleHash.update("\0");
+    archivedBundleHash.update(archivedFile.stdout);
+    assert(
+      createHash("sha256").update(archivedFile.stdout).digest("hex") ===
+        file.sha256,
+      `Packaged ${file.path} does not match the exact-head report.`,
+    );
+  }
+  const archivedBundleSha256 = archivedBundleHash.digest("hex");
   assert(
     archivedBundleSha256 === bundleReport.sha256,
-    `Packaged CLI bundle SHA-256 ${archivedBundleSha256} does not match exact-head report ${String(bundleReport.sha256)}.`,
+    `Packaged CLI JavaScript SHA-256 ${archivedBundleSha256} does not match exact-head report ${String(bundleReport.sha256)}.`,
+  );
+  assert(
+    archivedBundleBytes === bundleReport.bytes,
+    `Packaged CLI JavaScript has ${String(archivedBundleBytes)} bytes; exact-head report has ${String(bundleReport.bytes)}.`,
   );
   const archivedReadme = await run("tar", [
     "-xOf",
@@ -184,6 +247,20 @@ try {
   assert(
     archivedReadme.stdout.equals(sourceReadme),
     "Packaged CLI README does not match apps/cli/README.md.",
+  );
+  const archivedNotices = await run("tar", [
+    "-xOf",
+    archive,
+    "package/THIRD_PARTY_NOTICES",
+  ]);
+  expectExit(archivedNotices, 0, "read packaged third-party notices");
+  assert(
+    archivedNotices.stdout.includes(
+      Buffer.from("Mozilla Public License 2.0"),
+    ) &&
+      archivedNotices.stdout.includes(Buffer.from("SIL OPEN FONT LICENSE")) &&
+      archivedNotices.stdout.includes(Buffer.from("MIT License")),
+    "Packaged third-party notices omit a bundled dependency license.",
   );
   const installRoot = resolve(runRoot, "install");
   const homeRoot = resolve(runRoot, "home");
@@ -459,6 +536,14 @@ try {
   ]);
   expectExit(exportScene, 0, "scene file export");
   parseJson(await readFile(sceneDestination), "exported scene");
+  assert(
+    exportScene.stdout.byteLength === 0,
+    "File export wrote status to stdout.",
+  );
+  assert(
+    parseJson(exportScene.stderr, "scene file export status").ok === true,
+    "File export status was not isolated on stderr.",
+  );
 
   const exportExcalidraw = await cli([
     "export",
@@ -475,6 +560,149 @@ try {
   assert(
     parseJson(exportExcalidraw.stderr, "stdout export status").ok === true,
     "Stdout export status was not isolated on stderr.",
+  );
+
+  const pngDestination = resolve(fixtureRoot, "release-flow.png");
+  const exportPng = await cli([
+    "export",
+    "release-flow",
+    "--format",
+    "png",
+    "--dest",
+    pngDestination,
+  ]);
+  expectExit(exportPng, 0, "PNG file export");
+  assert(
+    exportPng.stdout.byteLength === 0,
+    "PNG file export contaminated stdout.",
+  );
+  assert(
+    exportPng.stderr.includes(
+      Buffer.from(
+        `hint: to show this diagram to the user, display the exported file as an inline markdown image, e.g. ![release-flow](${pngDestination})`,
+      ),
+    ),
+    "PNG file export omitted the agent display hint.",
+  );
+  const firstPng = await readFile(pngDestination);
+  assert(
+    firstPng
+      .subarray(0, 8)
+      .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+    "PNG file export did not write a PNG signature.",
+  );
+  assertInkHasPadding(firstPng, "PNG file export");
+
+  const createWideTitle = await cli([
+    "create",
+    "--json",
+    JSON.stringify(wideTitleFlowchart),
+    "--output",
+    "json",
+  ]);
+  expectExit(createWideTitle, 0, "wide-title flowchart create");
+  const wideTitleDestination = resolve(fixtureRoot, "wide-title.png");
+  const exportWideTitle = await cli([
+    "export",
+    "wide-title",
+    "--format",
+    "png",
+    "--dest",
+    wideTitleDestination,
+  ]);
+  expectExit(exportWideTitle, 0, "wide-title PNG export");
+  const wideTitlePng = await readFile(wideTitleDestination);
+  assertInkHasPadding(wideTitlePng, "wide-title PNG export");
+  assert(
+    inkBounds(wideTitlePng).width > inkBounds(firstPng).width,
+    "Wide-title PNG did not grow its canvas to the measured font bounds.",
+  );
+
+  const record = resolve(homeRoot, ".sketchi/diagrams/release-flow");
+  const insideRecord = await cli([
+    "export",
+    "release-flow",
+    "--format",
+    "png",
+    "--dest",
+    resolve(record, "diagram.png"),
+    "--output",
+    "json",
+  ]);
+  expectExit(insideRecord, 8, "inside-record PNG destination rejection");
+  assert(
+    parseJson(insideRecord.stderr, "inside-record destination error").error
+      .code === "invalid_destination",
+    "Inside-record destination did not use the typed destination error.",
+  );
+  const storageAlias = resolve(fixtureRoot, "diagram-storage-alias");
+  await symlink(resolve(homeRoot, ".sketchi/diagrams"), storageAlias, "dir");
+  const aliasedRecord = await cli([
+    "export",
+    "release-flow",
+    "--format",
+    "png",
+    "--dest",
+    resolve(storageAlias, "release-flow/diagram.png"),
+    "--output",
+    "json",
+  ]);
+  expectExit(aliasedRecord, 8, "aliased-record PNG destination rejection");
+  assert(
+    parseJson(aliasedRecord.stderr, "aliased-record destination error").error
+      .code === "invalid_destination",
+    "Aliased record destination did not use the typed destination error.",
+  );
+
+  const repeatedPngDestination = resolve(
+    fixtureRoot,
+    "release-flow-repeat.png",
+  );
+  const repeatedPng = await cli([
+    "export",
+    "release-flow",
+    "--format",
+    "png",
+    "--dest",
+    repeatedPngDestination,
+    "--output",
+    "json",
+  ]);
+  expectExit(repeatedPng, 0, "repeated PNG file export");
+  const repeatedPngStatus = parseJson(
+    repeatedPng.stderr,
+    "repeated PNG file export status",
+  );
+  assert(
+    repeatedPngStatus.data.hint.includes("![release-flow]"),
+    "JSON PNG status omitted the agent display hint.",
+  );
+  assert(
+    firstPng.equals(await readFile(repeatedPngDestination)),
+    "Repeated PNG exports were not byte-identical.",
+  );
+
+  const stdoutPng = await cli([
+    "export",
+    "launch-map",
+    "--format",
+    "png",
+    "--dest",
+    "-",
+    "--output",
+    "json",
+  ]);
+  expectExit(stdoutPng, 0, "PNG stdout export");
+  assert(
+    stdoutPng.stdout
+      .subarray(0, 8)
+      .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+    "PNG stdout export did not keep stdout byte-only.",
+  );
+  const stdoutPngStatus = parseJson(stdoutPng.stderr, "PNG stdout status");
+  assert(
+    !("hint" in stdoutPngStatus.data),
+    "PNG stdout export emitted a file-only display hint.",
   );
 
   const textShow = await cli(["show", "release-flow"]);
@@ -551,24 +779,6 @@ try {
   expectExit(conflict, 6, "create conflict");
   const missing = await cli(["show", "missing-diagram", "--output", "json"]);
   expectExit(missing, 5, "missing diagram");
-  const unavailablePng = await cli([
-    "export",
-    "release-flow",
-    "--format",
-    "png",
-    "--dest",
-    "-",
-    "--output",
-    "json",
-  ]);
-  expectExit(unavailablePng, 8, "offline unavailable PNG");
-  assert(
-    parseJson(unavailablePng.stderr, "unavailable PNG error").error.code ===
-      "format_unavailable",
-    "PNG failure was not structured.",
-  );
-
-  const record = resolve(homeRoot, ".sketchi/diagrams/release-flow");
   for (const relative of [
     "manifest.json",
     "document.json",
@@ -578,6 +788,18 @@ try {
   ]) {
     await readFile(resolve(record, relative));
   }
+  const recordEntries = await readdir(record);
+  assert(
+    !recordEntries.includes("diagram.png"),
+    "On-demand PNG export wrote back to the diagram record.",
+  );
+  assert(
+    JSON.stringify(
+      parseJson(await readFile(resolve(record, "manifest.json")), "manifest")
+        .formats,
+    ) === JSON.stringify(["scene", "excalidraw"]),
+    "On-demand PNG export changed manifest formats.",
+  );
   const priorRevision = parseJson(
     await readFile(resolve(record, "revisions/000001.json")),
     "prior revision",
@@ -594,7 +816,7 @@ try {
       "flowchart:create-show-edit-show",
       "mindmap:create-show-edit-show",
       "list",
-      "export:file-stdout",
+      "export:file-stdout-png-on-demand",
     ],
     expectedFailures: [
       "exclusive-source:2",
@@ -603,15 +825,16 @@ try {
       "edit-id-mismatch:3",
       "not-found:5",
       "conflict:6",
-      "format-unavailable:8",
       "generate-network-down:10",
       "generate-endpoint-error:3",
     ],
     network: "disabled-by-preload-except-generate-loopback-proof",
     home: "isolated-under-.memory",
     bundle: {
-      bytes: archivedBundle.stdout.byteLength,
+      bytes: archivedBundleBytes,
       sha256: archivedBundleSha256,
+      entryBytes: bundleReport.entryBytes,
+      files: bundleReport.files,
     },
     packageFiles: packagedFileNames,
     completions: ["zsh", "bash"],

@@ -35,6 +35,8 @@ describe("CLI dependency and public-surface audit", () => {
       manifest.dependencies["@sketchi/diagram-agent"],
       "workspace:*",
     );
+    assert.strictEqual(manifest.dependencies.linkedom, "0.18.13");
+    assert.notProperty(manifest.dependencies, "jsdom");
     assert.notProperty(manifest.dependencies, "@sketchi/diagram-generation");
     assert.notProperty(manifest.dependencies, "@ai-sdk/google");
     assert.notProperty(manifest.dependencies, "ai");
@@ -151,7 +153,7 @@ describe("CLI dependency and public-surface audit", () => {
     }
   });
 
-  it("emits one self-contained executable package with no runtime dependencies", async () => {
+  it("emits a self-contained executable package with lazy local renderer code", async () => {
     const manifest = JSON.parse(
       await readFile(join(workspaceRoot, "apps/cli/dist/package.json"), "utf8"),
     );
@@ -166,9 +168,15 @@ describe("CLI dependency and public-surface audit", () => {
 
     assert.strictEqual(manifest.name, "sketchi");
     assert.deepStrictEqual(manifest.bin, { sketchi: "./sketchi.js" });
-    assert.deepStrictEqual(manifest.files, ["sketchi.js", "README.md"]);
+    assert.deepStrictEqual(manifest.files, [
+      "sketchi.js",
+      "chunks",
+      "README.md",
+      "THIRD_PARTY_NOTICES",
+    ]);
     assert.deepStrictEqual(manifest.publishConfig, { access: "public" });
     assert.strictEqual(manifest.license, "MIT");
+    assert.strictEqual(manifest.thirdPartyNotices, "THIRD_PARTY_NOTICES");
     assert.notProperty(manifest, "dependencies");
     assert.match(bundle.slice(0, 64), /^#!\/usr\/bin\/env node/u);
     assert.notInclude(bundle, "sourceMappingURL");

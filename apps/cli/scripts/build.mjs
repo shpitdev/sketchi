@@ -2,7 +2,13 @@ import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { BannerPlugin, DefinePlugin, rspack } from "@rspack/core";
+import {
+  BannerPlugin,
+  DefinePlugin,
+  IgnorePlugin,
+  optimize,
+  rspack,
+} from "@rspack/core";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(scriptDirectory, "..");
@@ -12,6 +18,31 @@ const { version } = JSON.parse(
   await readFile(resolve(projectRoot, "package.json"), "utf8"),
 );
 const readme = await readFile(resolve(projectRoot, "README.md"), "utf8");
+const thirdPartyNotices = await readFile(
+  resolve(projectRoot, "THIRD_PARTY_NOTICES"),
+  "utf8",
+);
+const resvgWasm = await readFile(
+  resolve(projectRoot, "node_modules/@resvg/resvg-wasm/index_bg.wasm"),
+);
+const excalifontDirectory = resolve(
+  projectRoot,
+  "node_modules/@excalidraw/excalidraw/dist/prod/fonts/Excalifont",
+);
+const excalifontFiles = [
+  "Excalifont-Regular-a88b72a24fb54c9f94e3b5fdaa7481c9.woff2",
+  "Excalifont-Regular-be310b9bcd4f1a43f571c46df7809174.woff2",
+  "Excalifont-Regular-b9dcf9d2e50a1eaf42fc664b50a3fd0d.woff2",
+  "Excalifont-Regular-41b173a47b57366892116a575a43e2b6.woff2",
+  "Excalifont-Regular-3f2c5db56cc93c5a6873b1361d730c16.woff2",
+  "Excalifont-Regular-349fac6ca4700ffec595a7150a0d1e1d.woff2",
+  "Excalifont-Regular-623ccf21b21ef6b3a0d87738f77eb071.woff2",
+];
+const excalifontBase64 = await Promise.all(
+  excalifontFiles.map(async (file) =>
+    (await readFile(resolve(excalifontDirectory, file))).toString("base64"),
+  ),
+);
 
 await rm(outputDirectory, { force: true, recursive: true });
 await mkdir(outputDirectory, { recursive: true });
@@ -27,6 +58,7 @@ const compiler = rspack({
   output: {
     path: outputDirectory,
     filename: "sketchi.js",
+    chunkFilename: "chunks/[name].[contenthash].js",
     module: true,
     chunkFormat: "module",
     library: { type: "module" },
@@ -35,9 +67,19 @@ const compiler = rspack({
   resolve: {
     extensions: [".ts", ".js"],
     extensionAlias: { ".js": [".ts", ".js"] },
+    alias: {
+      "@excalidraw/excalidraw": resolve(
+        projectRoot,
+        "node_modules/@excalidraw/excalidraw/dist/dev/index.js",
+      ),
+    },
   },
   module: {
     rules: [
+      {
+        test: /\.m?js$/u,
+        resolve: { fullySpecified: false },
+      },
       {
         test: /\.ts$/u,
         exclude: /node_modules/u,
@@ -55,8 +97,14 @@ const compiler = rspack({
   optimization: { minimize: true },
   plugins: [
     new DefinePlugin({
+      __SKETCHI_EXCALIFONT_BASE64__: JSON.stringify(excalifontBase64),
+      __SKETCHI_RESVG_WASM_BASE64__: JSON.stringify(
+        resvgWasm.toString("base64"),
+      ),
       __SKETCHI_VERSION__: JSON.stringify(version),
     }),
+    new IgnorePlugin({ resourceRegExp: /^canvas$/u }),
+    new optimize.LimitChunkCountPlugin({ maxChunks: 2 }),
     new BannerPlugin({
       banner: "#!/usr/bin/env node",
       raw: true,
@@ -99,10 +147,11 @@ const packageManifest = {
   },
   bugs: { url: "https://github.com/shpitdev/sketchi/issues" },
   license: "MIT",
+  thirdPartyNotices: "THIRD_PARTY_NOTICES",
   author: "SHPIT LLC",
   type: "module",
   bin: { sketchi: "./sketchi.js" },
-  files: ["sketchi.js", "README.md"],
+  files: ["sketchi.js", "chunks", "README.md", "THIRD_PARTY_NOTICES"],
   engines: { node: ">=24.13.0" },
   publishConfig: { access: "public" },
 };
@@ -116,12 +165,27 @@ await writeFile(resolve(outputDirectory, "README.md"), readme, {
   encoding: "utf8",
   mode: 0o600,
 });
+await writeFile(
+  resolve(outputDirectory, "THIRD_PARTY_NOTICES"),
+  thirdPartyNotices,
+  { encoding: "utf8", mode: 0o600 },
+);
 await chmod(resolve(outputDirectory, "sketchi.js"), 0o755);
 
 const details = stats.toJson({ assets: true });
-const bytes = details.assets?.find(
-  (asset) => asset.name === "sketchi.js",
-)?.size;
+const javascriptAssets = (details.assets ?? []).filter((asset) =>
+  asset.name.endsWith(".js"),
+);
+const bytes = javascriptAssets.reduce(
+  (total, asset) => total + (asset.size ?? 0),
+  0,
+);
+const maximumPublishedJavascriptBytes = 20_000_000;
+if (bytes > maximumPublishedJavascriptBytes) {
+  throw new Error(
+    `Published JavaScript is ${String(bytes)} bytes, exceeding the ${String(maximumPublishedJavascriptBytes)} byte budget.`,
+  );
+}
 process.stdout.write(
-  `built apps/cli/dist/sketchi.js (${String(bytes ?? "unknown")} bytes)\n`,
+  `built ${String(javascriptAssets.length)} CLI JavaScript files (${String(bytes)} bytes total)\n`,
 );
