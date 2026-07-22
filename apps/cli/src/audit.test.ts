@@ -159,10 +159,14 @@ describe("CLI dependency and public-surface audit", () => {
       join(workspaceRoot, "apps/cli/dist/sketchi.js"),
       "utf8",
     );
+    const readme = await readFile(
+      join(workspaceRoot, "apps/cli/dist/README.md"),
+      "utf8",
+    );
 
     assert.strictEqual(manifest.name, "sketchi");
     assert.deepStrictEqual(manifest.bin, { sketchi: "./sketchi.js" });
-    assert.deepStrictEqual(manifest.files, ["sketchi.js"]);
+    assert.deepStrictEqual(manifest.files, ["sketchi.js", "README.md"]);
     assert.deepStrictEqual(manifest.publishConfig, { access: "public" });
     assert.strictEqual(manifest.license, "MIT");
     assert.notProperty(manifest, "dependencies");
@@ -170,5 +174,7 @@ describe("CLI dependency and public-surface audit", () => {
     assert.notInclude(bundle, "sourceMappingURL");
     assert.notInclude(bundle, "CF_AIG_TOKEN");
     assert.include(bundle, "playground.sketchi.app/api/v1/generate");
+    assert.include(readme, "Typed, deterministic diagrams from your terminal.");
+    assert.include(readme, "npm install -g sketchi");
   });
 });

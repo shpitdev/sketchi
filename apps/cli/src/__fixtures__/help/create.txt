@@ -10,8 +10,9 @@ FLAGS
   --json VALUE          Read one canonical document from inline JSON.
 
 GLOBAL FLAGS
-  --help, -h       Show help information
-  --version, -v    Show version information
+  --help, -h                          Show help information
+  --version, -v                       Show version information
+  --completions <bash|zsh|fish|sh>    Print shell completion script (choices: bash, zsh, fish, sh)
 
 EXAMPLES
   # Create from a UTF-8 JSON file.

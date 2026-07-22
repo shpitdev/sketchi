@@ -32,8 +32,9 @@ FLAGS
   --endpoint URL              Unauthenticated generate API URL; defaults to the production Sketchi endpoint.
 
 GLOBAL FLAGS
-  --help, -h       Show help information
-  --version, -v    Show version information
+  --help, -h                          Show help information
+  --version, -v                       Show version information
+  --completions <bash|zsh|fish|sh>    Print shell completion script (choices: bash, zsh, fish, sh)
 
 EXAMPLES
   # Generate a flowchart with gemini-3.1-flash-lite.

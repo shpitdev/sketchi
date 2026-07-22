@@ -11,6 +11,7 @@
 
 <p align="center">
   <a href="https://sketchi.app/"><img alt="Website" src="https://img.shields.io/badge/sketchi.app-live-765264" /></a>
+  <a href="https://www.npmjs.com/package/sketchi"><img alt="npm version" src="https://img.shields.io/npm/v/sketchi?logo=npm&color=CB3837" /></a>
   <a href="https://nx.dev/"><img alt="Nx" src="https://img.shields.io/badge/Nx-22-143055?logo=nx" /></a>
   <a href="https://workers.cloudflare.com/"><img alt="Cloudflare Workers" src="https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white" /></a>
   <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white" /></a>
@@ -41,6 +42,51 @@ scene representations.
 - Tests diagram contracts with fixtures, maintained scenarios, real-scene
   validation, component tests, and Storybook.
 - Converts a curated SVG corpus into native Excalidraw elements and libraries.
+
+## CLI
+
+Install Sketchi from npm, or use the noninteractive installer to install the
+same package and configure Zsh, Bash, or Fish completions:
+
+```sh
+npm install -g sketchi
+
+# Or install and configure completions in one step:
+curl -fsSL https://raw.githubusercontent.com/shpitdev/sketchi/main/install.sh | sh
+```
+
+Create a canonical document, inspect and revise it, list the local store, then
+export editable Excalidraw:
+
+```sh
+sketchi create --json '{"type":"flowchart","spec":{"id":"release-flow","title":"Release approval","nodes":[{"id":"start","label":"Change proposed","kind":"start"},{"id":"review","label":"Review evidence","kind":"process"},{"id":"end","label":"Release approved","kind":"end"}],"edges":[{"source":"start","target":"review"},{"source":"review","target":"end"}]}}'
+sketchi show release-flow
+sketchi edit release-flow --json '{"type":"flowchart","spec":{"id":"release-flow","title":"Release approval revised","nodes":[{"id":"start","label":"Change proposed","kind":"start"},{"id":"review","label":"Review complete evidence","kind":"process"},{"id":"end","label":"Release approved","kind":"end"}],"edges":[{"source":"start","target":"review"},{"source":"review","target":"end"}]}}'
+sketchi list
+sketchi export release-flow --format excalidraw --dest release-flow.excalidraw
+```
+
+Generate and persist a diagram through the public, unauthenticated Sketchi API:
+
+```sh
+sketchi generate --prompt "Map release approval with pass and revise branches"
+```
+
+`create`, `show`, `edit`, `list`, and `export` are deterministic, fully offline,
+and need no credentials. `generate` is the only network command and also needs
+no API key, token, account, or login. All commands support `--output json`.
+Generate completions directly with `sketchi --completions zsh`,
+`sketchi --completions bash`, or `sketchi --completions fish`. See the
+[complete CLI guide](apps/cli/README.md) for file/stdin input, completion setup,
+storage details, and agent-oriented usage.
+
+### Shell completions
+
+The installer configures Zsh, Bash, or Fish completions for the detected shell.
+Generated Bash completions require Bash 4 or newer; the installed source block
+silently skips them on the stock macOS Bash 3.2. Bash login shells may not read
+`.bashrc`, so `.bash_profile` may need to source `.bashrc` for completions to be
+available.
 
 ## Code Mode
 
@@ -80,13 +126,14 @@ not silently fall back to a generic template. See the full
 
 ## Product Surfaces
 
-| Surface        | Role                                                               | Local command              |
-| -------------- | ------------------------------------------------------------------ | -------------------------- |
-| `web`          | `sketchi.app` home, docs, and setup                                | `pnpm nx dev web`          |
-| `playground`   | Public Playground, Code Mode API/MCP, artifacts, Studio foundation | `pnpm nx dev playground`   |
-| `icons`        | `icons.sketchi.app` curated icon browser                           | `pnpm nx dev icons`        |
-| `eval-harness` | Internal scenario and model-output eval harness                    | `pnpm nx dev eval-harness` |
-| `excalidraw`   | Internal real-canvas rendering and editing workspace               | `pnpm nx dev excalidraw`   |
+| Surface        | Role                                                               | Local command               |
+| -------------- | ------------------------------------------------------------------ | --------------------------- |
+| `cli`          | Offline local authoring plus credential-free public generation     | `pnpm nx build sketchi-cli` |
+| `web`          | `sketchi.app` home, docs, and setup                                | `pnpm nx dev web`           |
+| `playground`   | Public Playground, Code Mode API/MCP, artifacts, Studio foundation | `pnpm nx dev playground`    |
+| `icons`        | `icons.sketchi.app` curated icon browser                           | `pnpm nx dev icons`         |
+| `eval-harness` | Internal scenario and model-output eval harness                    | `pnpm nx dev eval-harness`  |
+| `excalidraw`   | Internal real-canvas rendering and editing workspace               | `pnpm nx dev excalidraw`    |
 
 The internal harness is `eval-harness`. The public host is `playground`, while
 its durable Worker identity remains `sketchi-studio` and the extracted Studio
@@ -168,6 +215,7 @@ pnpm deploy:icons
 
 ```text
 apps/
+├── cli/                          local authoring and generation CLI
 ├── eval-harness/                 internal scenarios and model-output evals
 ├── excalidraw/                   internal real-canvas workspace
 ├── icons/                        public icon browser

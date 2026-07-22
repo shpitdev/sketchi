@@ -13,8 +13,9 @@ FLAGS
   --dest PATH|-                    Artifact byte destination path, or - for stdout.
 
 GLOBAL FLAGS
-  --help, -h       Show help information
-  --version, -v    Show version information
+  --help, -h                          Show help information
+  --version, -v                       Show version information
+  --completions <bash|zsh|fish|sh>    Print shell completion script (choices: bash, zsh, fish, sh)
 
 EXAMPLES
   # Write an Excalidraw artifact atomically to a file.

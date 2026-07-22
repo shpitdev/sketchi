@@ -11,6 +11,7 @@ const outputDirectory = resolve(projectRoot, "dist");
 const { version } = JSON.parse(
   await readFile(resolve(projectRoot, "package.json"), "utf8"),
 );
+const readme = await readFile(resolve(projectRoot, "README.md"), "utf8");
 
 await rm(outputDirectory, { force: true, recursive: true });
 await mkdir(outputDirectory, { recursive: true });
@@ -89,14 +90,7 @@ const packageManifest = {
   version,
   description:
     "Local Sketchi authoring CLI: offline flowchart and mindmap workflows plus one unauthenticated prompt-assisted generate command.",
-  keywords: [
-    "sketchi",
-    "diagram",
-    "flowchart",
-    "mindmap",
-    "excalidraw",
-    "cli",
-  ],
+  keywords: ["sketchi", "diagram", "flowchart", "mindmap", "excalidraw", "cli"],
   homepage: "https://sketchi.app",
   repository: {
     type: "git",
@@ -108,7 +102,7 @@ const packageManifest = {
   author: "SHPIT LLC",
   type: "module",
   bin: { sketchi: "./sketchi.js" },
-  files: ["sketchi.js"],
+  files: ["sketchi.js", "README.md"],
   engines: { node: ">=24.13.0" },
   publishConfig: { access: "public" },
 };
@@ -118,6 +112,10 @@ await writeFile(
   `${JSON.stringify(packageManifest, null, 2)}\n`,
   { encoding: "utf8", mode: 0o600 },
 );
+await writeFile(resolve(outputDirectory, "README.md"), readme, {
+  encoding: "utf8",
+  mode: 0o600,
+});
 await chmod(resolve(outputDirectory, "sketchi.js"), 0o755);
 
 const details = stats.toJson({ assets: true });

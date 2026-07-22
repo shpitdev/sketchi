@@ -143,8 +143,13 @@ export function runEffectCommand<
     },
   }) as Console.Console;
   return Command.runWith(command, { version: cliVersion })(args).pipe(
+    Effect.tapError((error) =>
+      CliError.isCliError(error) && error._tag !== "ShowHelp"
+        ? Console.error(formatter.formatErrors([error]))
+        : Effect.void,
+    ),
     Effect.provideService(CliConfig.CliConfig, {
-      builtIns: [GlobalFlag.Help, GlobalFlag.Version],
+      builtIns: [GlobalFlag.Help, GlobalFlag.Version, GlobalFlag.Completions],
     }),
     Effect.provideService(CliOutput.Formatter, formatter),
     Effect.provideService(Console.Console, cliConsole),

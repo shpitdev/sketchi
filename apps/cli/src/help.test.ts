@@ -24,6 +24,13 @@ function help(command?: string): string {
   );
 }
 
+function completions(shell: "bash" | "zsh"): string {
+  return execFileSync(process.execPath, [binary, "--completions", shell], {
+    encoding: "utf8",
+    env: cliEnvironment(),
+  });
+}
+
 describe("golden product help", () => {
   for (const command of [
     "root",
@@ -70,5 +77,61 @@ describe("golden product help", () => {
         error: { code: "usage_error" },
       });
     }
+  });
+
+  it("generates installable zsh completions from the built bundle", () => {
+    const output = completions("zsh");
+
+    expect(output).toMatch(/^#compdef sketchi\n/u);
+    expect(output).toContain("###-begin-sketchi-completions-###");
+    expect(output).toContain("compdef _sketchi sketchi");
+    expect(output).toContain("###-end-sketchi-completions-###");
+  });
+
+  it("generates installable bash completions from the built bundle", () => {
+    const output = completions("bash");
+
+    expect(output).toMatch(/^###-begin-sketchi-completions-###\n/u);
+    expect(output).toContain("complete -F _sketchi sketchi");
+    expect(output).toContain("###-end-sketchi-completions-###");
+  });
+
+  it("reports unsupported completion shells as a text usage error", () => {
+    const result = spawnSync(
+      process.execPath,
+      [binary, "--completions", "powershell"],
+      {
+        encoding: "utf8",
+        env: cliEnvironment(),
+      },
+    );
+
+    expect(result.status).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("error: usage_error");
+    expect(result.stderr).toContain("powershell");
+    expect(result.stderr).toContain('"bash" | "zsh" | "fish" | "sh"');
+  });
+
+  it("reports unsupported completion shells in the JSON usage envelope", () => {
+    const result = spawnSync(
+      process.execPath,
+      [binary, "--output", "json", "--completions", "powershell"],
+      {
+        encoding: "utf8",
+        env: cliEnvironment(),
+      },
+    );
+
+    expect(result.status).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(JSON.parse(result.stderr)).toMatchObject({
+      ok: false,
+      command: "sketchi",
+      error: {
+        code: "usage_error",
+        message: expect.stringContaining('"bash" | "zsh" | "fish" | "sh"'),
+      },
+    });
   });
 });

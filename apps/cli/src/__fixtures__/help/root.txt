@@ -56,8 +56,9 @@ FLAGS
   --output text|json    Result presentation format. (choices: text, json)
 
 GLOBAL FLAGS
-  --help, -h       Show help information
-  --version, -v    Show version information
+  --help, -h                          Show help information
+  --version, -v                       Show version information
+  --completions <bash|zsh|fish|sh>    Print shell completion script (choices: bash, zsh, fish, sh)
 
 SUBCOMMANDS
   generate    Generate and persist one diagram through the public unauthenticated Sketchi generate API.

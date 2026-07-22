@@ -133,6 +133,24 @@ try {
     .sort();
   assert(archives.length === 1, "Expected exactly one packaged CLI archive.");
   const archive = resolve(packageDirectory, archives[0]);
+  const packagedFiles = await run("tar", ["-tzf", archive]);
+  expectExit(packagedFiles, 0, "list packaged CLI files");
+  const packagedFileNames = packagedFiles.stdout
+    .toString("utf8")
+    .trim()
+    .split("\n")
+    .sort();
+  assert(
+    JSON.stringify(packagedFileNames) ===
+      JSON.stringify(
+        [
+          "package/README.md",
+          "package/package.json",
+          "package/sketchi.js",
+        ].sort(),
+      ),
+    `Unexpected packaged CLI files: ${packagedFileNames.join(", ")}.`,
+  );
   const bundleReport = parseJson(
     await readFile(bundleReportPath),
     "CLI bundle report",
@@ -153,6 +171,19 @@ try {
   assert(
     archivedBundleSha256 === bundleReport.sha256,
     `Packaged CLI bundle SHA-256 ${archivedBundleSha256} does not match exact-head report ${String(bundleReport.sha256)}.`,
+  );
+  const archivedReadme = await run("tar", [
+    "-xOf",
+    archive,
+    "package/README.md",
+  ]);
+  expectExit(archivedReadme, 0, "read packaged CLI README");
+  const sourceReadme = await readFile(
+    resolve(workspaceRoot, "apps/cli/README.md"),
+  );
+  assert(
+    archivedReadme.stdout.equals(sourceReadme),
+    "Packaged CLI README does not match apps/cli/README.md.",
   );
   const installRoot = resolve(runRoot, "install");
   const homeRoot = resolve(runRoot, "home");
@@ -207,6 +238,34 @@ try {
   assert(
     rootHelp.stdout.includes(Buffer.from("sole network boundary")),
     "Root help omitted the generation network boundary.",
+  );
+
+  const zshCompletions = await cli(["--completions", "zsh"]);
+  expectExit(zshCompletions, 0, "zsh completions");
+  assert(
+    zshCompletions.stdout
+      .toString("utf8")
+      .startsWith("#compdef sketchi\n###-begin-sketchi-completions-###\n"),
+    "Built CLI did not emit the expected zsh completion script.",
+  );
+  assert(
+    zshCompletions.stdout.includes(Buffer.from("compdef _sketchi sketchi")),
+    "Zsh completion script did not register the sketchi completer.",
+  );
+
+  const bashCompletions = await cli(["--completions", "bash"]);
+  expectExit(bashCompletions, 0, "bash completions");
+  assert(
+    bashCompletions.stdout
+      .toString("utf8")
+      .startsWith("###-begin-sketchi-completions-###\n"),
+    "Built CLI did not emit the expected bash completion script.",
+  );
+  assert(
+    bashCompletions.stdout.includes(
+      Buffer.from("complete -F _sketchi sketchi"),
+    ),
+    "Bash completion script did not register the sketchi completer.",
   );
 
   // Network-down: the offline preload blocks fetch, so the sole HTTPS call fails
@@ -554,6 +613,8 @@ try {
       bytes: archivedBundle.stdout.byteLength,
       sha256: archivedBundleSha256,
     },
+    packageFiles: packagedFileNames,
+    completions: ["zsh", "bash"],
   };
   await writeFile(
     resolve(smokeDirectory, "latest.json"),
