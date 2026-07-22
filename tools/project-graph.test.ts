@@ -112,7 +112,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
   "apps/cli/scripts/build.mjs": 27,
   "apps/cli/scripts/bundle-report.mjs": 8,
   "apps/cli/scripts/package.mjs": 8,
-  "apps/cli/scripts/smoke.mjs": 122,
+  "apps/cli/scripts/smoke.mjs": 124,
   "apps/cli/src/filesystem.ts": 69,
   "apps/cli/src/generation.ts": 4,
   "apps/cli/src/png-renderer-runtime.ts": 25,

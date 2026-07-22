@@ -62,9 +62,23 @@ Export the stored editable artifact:
 sketchi export release-flow --format excalidraw --dest release-flow.excalidraw
 ```
 
+Or render a PNG directly from the stored scene and Excalidraw artifacts:
+
+```sh
+sketchi export release-flow --format png --dest release-flow.png
+```
+
+PNG rendering is deterministic and fully local. Sketchi uses Excalidraw's
+headless SVG exporter, bundled Excalifont files, and a bundled WASM rasterizer;
+it does not start a browser or use the network. The rendered image is
+export-only and is not added to the diagram record, while a pre-existing
+`diagram.png` remains the fast path.
+
 Every command also supports `--output json` for a stable machine-readable
-result envelope. `export --dest -` writes only artifact bytes to stdout and
-writes its status envelope to stderr.
+result envelope. Export status always uses stderr. `export --dest -` writes
+only artifact bytes to stdout; a PNG file export also includes one generic
+inline-Markdown display hint for calling agents. Its destination is enclosed
+in CommonMark angle brackets so local paths containing spaces remain valid.
 
 ## Generate from a prompt
 
@@ -125,8 +139,18 @@ or MCP server. They never send stored records to a provider. Agents can use
 `--output json`, complete noninteractive input through `--json` or `--file`, and
 raw artifact output through `export --dest -` without prompts.
 
+After exporting PNG to a file, agents can follow the returned hint to display
+that path as an inline Markdown image for the user.
+
 `generate` is deliberately separate: it uses the public Sketchi API, remains
 credential-free, and is the only command that uses the network.
+
+## License
+
+Sketchi CLI's own code is MIT-licensed. The published package also bundles
+Excalidraw, resvg-wasm, and Excalifont under their respective licenses; see
+the included `THIRD_PARTY_NOTICES` file for copyright, license, and source
+availability details.
 
 ## Help
 

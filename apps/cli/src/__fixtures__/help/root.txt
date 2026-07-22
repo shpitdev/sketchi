@@ -41,7 +41,7 @@ Offline boundary and storage:
 Exit codes and errors:
   0 success; 1 internal failure; 2 usage or interactive stdin; 3 invalid input/document;
   4 build/export construction failure; 5 diagram not found; 6 conflict/busy;
-  7 filesystem/storage failure; 8 unavailable format or export write failure;
+  7 filesystem/storage failure; 8 unavailable format, render, destination, or write failure;
   10 generate network/endpoint failure; 11 generate timeout; 12 malformed generate output.
   Text errors start with "error: CODE". JSON errors use {"ok":false,"command":...,"error":...}.
   Errors never include stacks.

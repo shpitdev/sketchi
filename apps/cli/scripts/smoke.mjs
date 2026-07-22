@@ -259,7 +259,9 @@ try {
       Buffer.from("Mozilla Public License 2.0"),
     ) &&
       archivedNotices.stdout.includes(Buffer.from("SIL OPEN FONT LICENSE")) &&
-      archivedNotices.stdout.includes(Buffer.from("MIT License")),
+      archivedNotices.stdout.includes(Buffer.from("MIT License")) &&
+      archivedNotices.stdout.includes(Buffer.from("linkedom 0.18.13")) &&
+      archivedNotices.stdout.includes(Buffer.from("htmlparser2 10.1.0")),
     "Packaged third-party notices omit a bundled dependency license.",
   );
   const installRoot = resolve(runRoot, "install");
@@ -562,7 +564,7 @@ try {
     "Stdout export status was not isolated on stderr.",
   );
 
-  const pngDestination = resolve(fixtureRoot, "release-flow.png");
+  const pngDestination = resolve(fixtureRoot, "release flow.png");
   const exportPng = await cli([
     "export",
     "release-flow",
@@ -579,7 +581,7 @@ try {
   assert(
     exportPng.stderr.includes(
       Buffer.from(
-        `hint: to show this diagram to the user, display the exported file as an inline markdown image, e.g. ![release-flow](${pngDestination})`,
+        `hint: to show this diagram to the user, display the exported file as an inline markdown image, e.g. ![release-flow](<${pngDestination}>)`,
       ),
     ),
     "PNG file export omitted the agent display hint.",
@@ -592,6 +594,33 @@ try {
     "PNG file export did not write a PNG signature.",
   );
   assertInkHasPadding(firstPng, "PNG file export");
+
+  const newlineDestination = resolve(
+    fixtureRoot,
+    "release\n\u0085\u2028\u2029flow.png",
+  );
+  const newlineExport = await cli([
+    "export",
+    "release-flow",
+    "--format",
+    "png",
+    "--dest",
+    newlineDestination,
+    "--output",
+    "json",
+  ]);
+  expectExit(newlineExport, 0, "newline-path PNG export");
+  const newlineHint = parseJson(
+    newlineExport.stderr,
+    "newline-path PNG export status",
+  ).data.hint;
+  assert(
+    !/[\n\u0085\u2028\u2029]/u.test(newlineHint) &&
+      ["%0A", "%C2%85", "%E2%80%A8", "%E2%80%A9"].every((encoded) =>
+        newlineHint.includes(encoded),
+      ),
+    "PNG display hint did not preserve its one-line contract.",
+  );
 
   const createWideTitle = await cli([
     "create",

@@ -64,6 +64,7 @@ sketchi show release-flow
 sketchi edit release-flow --json '{"type":"flowchart","spec":{"id":"release-flow","title":"Release approval revised","nodes":[{"id":"start","label":"Change proposed","kind":"start"},{"id":"review","label":"Review complete evidence","kind":"process"},{"id":"end","label":"Release approved","kind":"end"}],"edges":[{"source":"start","target":"review"},{"source":"review","target":"end"}]}}'
 sketchi list
 sketchi export release-flow --format excalidraw --dest release-flow.excalidraw
+sketchi export release-flow --format png --dest release-flow.png
 ```
 
 Generate and persist a diagram through the public, unauthenticated Sketchi API:
@@ -75,6 +76,10 @@ sketchi generate --prompt "Map release approval with pass and revise branches"
 `create`, `show`, `edit`, `list`, and `export` are deterministic, fully offline,
 and need no credentials. `generate` is the only network command and also needs
 no API key, token, account, or login. All commands support `--output json`.
+PNG export renders on demand through Excalidraw plus bundled fonts and WASM when
+no PNG is stored, without modifying the record. PNG file exports include a
+generic inline-Markdown display hint for calling agents; export status uses
+stderr and `--dest -` keeps stdout byte-only.
 Generate completions directly with `sketchi --completions zsh`,
 `sketchi --completions bash`, or `sketchi --completions fish`. See the
 [complete CLI guide](apps/cli/README.md) for file/stdin input, completion setup,

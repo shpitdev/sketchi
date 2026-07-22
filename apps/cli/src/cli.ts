@@ -92,7 +92,7 @@ Offline boundary and storage:
 Exit codes and errors:
   0 success; 1 internal failure; 2 usage or interactive stdin; 3 invalid input/document;
   4 build/export construction failure; 5 diagram not found; 6 conflict/busy;
-  7 filesystem/storage failure; 8 unavailable format or export write failure;
+  7 filesystem/storage failure; 8 unavailable format, render, destination, or write failure;
   10 generate network/endpoint failure; 11 generate timeout; 12 malformed generate output.
   Text errors start with "error: CODE". JSON errors use {"ok":false,"command":...,"error":...}.
   Errors never include stacks.
@@ -422,8 +422,21 @@ function exportData(result: ExportResult) {
 }
 
 function displayHint(result: ExportResult): string | undefined {
+  const markdownDestination = [...result.destination]
+    .map((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint < 0x20 ||
+        (codePoint >= 0x80 && codePoint <= 0x9f) ||
+        codePoint === 0x7f ||
+        codePoint === 0x2028 ||
+        codePoint === 0x2029 ||
+        "%<>#?\\".includes(character)
+        ? encodeURIComponent(character)
+        : character;
+    })
+    .join("");
   return result.format === "png" && result.destination !== "-"
-    ? `to show this diagram to the user, display the exported file as an inline markdown image, e.g. ![${result.id}](${result.destination})`
+    ? `to show this diagram to the user, display the exported file as an inline markdown image, e.g. ![${result.id}](<${markdownDestination}>)`
     : undefined;
 }
 
@@ -432,7 +445,7 @@ const exportCommand = Command.make(
   {
     diagramId: Argument.string("diagram-id"),
     format: Flag.choice("format", ["scene", "excalidraw", "png"]).pipe(
-      Flag.withDescription("Stored artifact format to export."),
+      Flag.withDescription("Artifact format to export or render on demand."),
       Flag.withMetavar("scene|excalidraw|png"),
     ),
     destination: Flag.string("dest").pipe(

@@ -9,7 +9,7 @@ ARGUMENTS
 
 FLAGS
   --output text|json               Result presentation format. (choices: text, json)
-  --format scene|excalidraw|png    Stored artifact format to export. (choices: scene, excalidraw, png)
+  --format scene|excalidraw|png    Artifact format to export or render on demand. (choices: scene, excalidraw, png)
   --dest PATH|-                    Artifact byte destination path, or - for stdout.
 
 GLOBAL FLAGS
