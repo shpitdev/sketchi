@@ -167,6 +167,11 @@ pnpm nx build-storybook diagram-ui
 pnpm exec tsc -b --pretty false
 ```
 
+For a CLI change that should ship, run `pnpm changeset` and commit the generated
+changeset with the change. Changesets maintains a Version Packages PR on `main`;
+merging that PR updates the CLI version and causes the existing release workflow
+to publish it.
+
 Run the canonical deterministic scenario:
 
 ```sh
