@@ -33,6 +33,7 @@ const tanstackFullPathSnapshot = [
   "/api/v1/flowcharts/build",
   "/api/v1/generate",
   "/api/v1/mindmaps/build",
+  "/api/v1/sequences/build",
   "/artifacts/$artifactId",
   "/artifacts/$artifactId/edit",
   "/codemode-export-harness",

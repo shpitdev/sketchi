@@ -159,6 +159,21 @@ const BUILD_MINDMAP_CODE = `async () => sketchi.buildMindmap({
   }
 })`;
 
+const BUILD_SEQUENCE_CODE = `async () => sketchi.buildSequenceDiagram({
+  spec: {
+    title: "Request sequence",
+    participants: [
+      { id: "client", label: "Client" },
+      { id: "api", label: "API" },
+      { id: "store", label: "Store" }
+    ],
+    messages: [
+      { source: "client", target: "api", label: "Request" },
+      { source: "api", target: "store", label: "Read" }
+    ]
+  }
+})`;
+
 const ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE = `async () => ({
   ok: true,
   status: "accepted",
@@ -477,6 +492,23 @@ describe("Sketchi Code Mode MCP server", () => {
       },
     });
   });
+  it("exposes buildSequenceDiagram inside the Code Mode namespace", async () => {
+    const result = await executeSketchiCodeMode(
+      {},
+      { code: BUILD_SEQUENCE_CODE },
+      { executor: createInProcessExecutor() },
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      result: {
+        ok: true,
+        status: "accepted",
+        normalizedSpec: {
+          participants: [{ id: "client" }, { id: "api" }, { id: "store" }],
+        },
+      },
+    });
+  });
   it("normalizes common LLM execute input wrappers", () => {
     expect(normalizeSketchiExecuteCode("async () => { return 1; };")).toBe(
       "async () => { return 1; }",
@@ -659,6 +691,7 @@ describe("Sketchi Code Mode MCP server", () => {
       "execute",
       "buildFlowchart",
       "buildMindmap",
+      "buildSequenceDiagram",
       "getArtifact",
       "applyDiagramPatch",
       "patchOperations",

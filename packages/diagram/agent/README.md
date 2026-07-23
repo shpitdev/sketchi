@@ -4,7 +4,8 @@ Canonical diagram build runtime shared by Studio, the HTTP API, and Code Mode
 MCP. `buildFlowchart` owns the complete accepted-artifact vertical: request
 decode, FlowchartSpec normalization, semantic validation, quality assessment,
 deterministic rendering, export validation, and one artifact-storage service
-write. The package exports `buildFlowchart`, `buildMindmap`, `getArtifact`, and
+write. The package exports `buildFlowchart`, `buildMindmap`,
+`buildSequenceDiagram`, `getArtifact`, and
 `applyDiagramPatch` as Effect programs.
 
 ```mermaid

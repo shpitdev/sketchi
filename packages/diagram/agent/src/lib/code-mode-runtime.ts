@@ -16,6 +16,9 @@ import {
 } from "@sketchi/diagram-excalidraw";
 import {
   renderIntermediateDiagram,
+  renderSequenceDiagram,
+  isStructurallyValidSequenceLifeline,
+  sequenceLifelineId,
   type RenderedDiagramScene,
   type ScenePoint,
 } from "@sketchi/diagram-renderer";
@@ -39,6 +42,7 @@ import {
   ApplyDiagramPatchRequestSchema,
   BuildFlowchartRequestSchema,
   BuildMindmapRequestSchema,
+  BuildSequenceDiagramRequestSchema,
   DIAGRAM_PATCH_OPERATION_NAMES,
   GetArtifactRequestSchema,
   RenderedDiagramSceneSchema,
@@ -49,6 +53,8 @@ import {
   type BuildFlowchartRequest,
   type BuildFlowchartResult,
   type BuildMindmapResult,
+  type BuildSequenceDiagramRequest,
+  type BuildSequenceDiagramResult,
   type CodeModeIssue,
   type CodeModeIssueCode,
   type CodeModeIssueRef,
@@ -60,6 +66,7 @@ import {
   type MindmapSpec,
   type NormalizedFlowchartSpec,
   type NormalizedMindmapSpec,
+  type NormalizedSequenceDiagramSpec,
   type PartialArtifactBundle,
   type PatchableScene,
   type QualityReport,
@@ -141,6 +148,7 @@ type CodeModeBoundaryOperation =
   | "applyDiagramPatch"
   | "buildFlowchart"
   | "buildMindmap"
+  | "buildSequenceDiagram"
   | "getArtifact";
 
 interface ObservableCodeModeResult {
@@ -170,6 +178,7 @@ function artifactKindForOperation(
 ): string | undefined {
   if (operation === "buildFlowchart") return "flowchart";
   if (operation === "buildMindmap") return "mindmap";
+  if (operation === "buildSequenceDiagram") return "sequence";
   if (operation === "applyDiagramPatch") return "patch";
   return undefined;
 }
@@ -410,6 +419,143 @@ function mindmapQuality(
   };
 }
 
+function normalizeSequenceDiagramSpec(
+  spec: BuildSequenceDiagramRequest["spec"],
+): NormalizedSequenceDiagramSpec {
+  const title = cleanToolString(spec.title);
+  return {
+    id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-sequence"),
+    title,
+    participants: spec.participants.map((participant) => ({
+      id: cleanToolString(participant.id),
+      label: cleanToolString(participant.label),
+      ...(participant.kind ? { kind: cleanToolString(participant.kind) } : {}),
+    })),
+    messages: spec.messages.map((message, index) => ({
+      id:
+        cleanOptional(message.id) ??
+        `message-${index + 1}-${slugify(message.source)}-${slugify(message.target)}`,
+      source: cleanToolString(message.source),
+      target: cleanToolString(message.target),
+      label: cleanToolString(message.label),
+      ...(message.type ? { type: message.type } : {}),
+      ...(message.style ? { style: message.style } : {}),
+    })),
+    style: spec.style,
+  };
+}
+
+function validateNormalizedSequenceDiagram(
+  spec: NormalizedSequenceDiagramSpec,
+): CodeModeIssue[] {
+  const issues: CodeModeIssue[] = [];
+  const participantIds = new Set<string>();
+  spec.participants.forEach((participant, index) => {
+    if (participantIds.has(participant.id)) {
+      issues.push(
+        issue({
+          code: "duplicate_node_id",
+          stage: "input",
+          ref: { kind: "request", path: `spec.participants.[${index}].id` },
+          message: `Participant id "${participant.id}" is duplicated.`,
+          hint: "Give every participant a unique stable id and update message references.",
+        }),
+      );
+    }
+    participantIds.add(participant.id);
+  });
+
+  const participantIndexById = new Map(
+    spec.participants.map((participant, index) => [participant.id, index]),
+  );
+  spec.participants.forEach((participant) => {
+    const generatedLifelineId = sequenceLifelineId(participant.id);
+    const collisionIndex = participantIndexById.get(generatedLifelineId);
+    if (collisionIndex === undefined) {
+      return;
+    }
+    issues.push(
+      issue({
+        code: "duplicate_node_id",
+        stage: "input",
+        ref: {
+          kind: "request",
+          path: `spec.participants.[${collisionIndex}].id`,
+        },
+        message: `Participant id "${generatedLifelineId}" collides with the generated lifeline for "${participant.id}".`,
+        hint: "Rename the participant so its id does not equal another participant id followed by :lifeline.",
+      }),
+    );
+  });
+
+  const messageIds = new Set<string>();
+  spec.messages.forEach((message, index) => {
+    if (messageIds.has(message.id)) {
+      issues.push(
+        issue({
+          code: "duplicate_edge_id",
+          stage: "input",
+          ref: { kind: "request", path: `spec.messages.[${index}].id` },
+          message: `Message id "${message.id}" is duplicated.`,
+          hint: "Give every message a unique id or omit message ids to generate them deterministically.",
+        }),
+      );
+    }
+    messageIds.add(message.id);
+    if (!participantIds.has(message.source)) {
+      issues.push(
+        issue({
+          code: "missing_edge_source",
+          stage: "input",
+          ref: { kind: "request", path: `spec.messages.[${index}].source` },
+          message: `Message source "${message.source}" is not a participant.`,
+          hint: "Use the id of a participant declared in spec.participants.",
+        }),
+      );
+    }
+    if (!participantIds.has(message.target)) {
+      issues.push(
+        issue({
+          code: "missing_edge_target",
+          stage: "input",
+          ref: { kind: "request", path: `spec.messages.[${index}].target` },
+          message: `Message target "${message.target}" is not a participant.`,
+          hint: "Use the id of a participant declared in spec.participants.",
+        }),
+      );
+    }
+    if (message.source === message.target) {
+      issues.push(
+        issue({
+          code: "self_loop",
+          stage: "input",
+          ref: { kind: "request", path: `spec.messages.[${index}]` },
+          message: `Message "${message.id}" is self-referential.`,
+          hint: "Choose a different target participant; self messages are not supported.",
+        }),
+      );
+    }
+  });
+  return issues;
+}
+
+function sequenceQuality(
+  spec: NormalizedSequenceDiagramSpec,
+  threshold: number,
+): QualityReport {
+  const score = 10;
+  return {
+    accepted: score >= threshold,
+    score,
+    threshold,
+    summary: {
+      nodeCount: spec.participants.length,
+      edgeCount: spec.messages.length,
+    },
+    checks: [],
+  };
+}
+
 export interface CodeModeArtifactRenderer {
   renderPng(input: {
     scene: RenderedDiagramScene;
@@ -512,6 +658,48 @@ class BuildMindmapFailure extends Schema.TaggedErrorClass<BuildMindmapFailure>()
   constructor(input: {
     readonly status: BuildMindmapFailureStatus;
     readonly context: BuildMindmapFailureContext;
+  }) {
+    super({
+      message: input.context.issues[0]?.message ?? input.status,
+      status: input.status,
+    });
+    this.context = input.context;
+  }
+}
+
+type BuildSequenceDiagramFailureStatus = Extract<
+  BuildSequenceDiagramResult,
+  { ok: false }
+>["status"];
+
+interface BuildSequenceDiagramFailureContext {
+  readonly buildId?: string;
+  readonly requestId?: string;
+  readonly normalizedSpec?: NormalizedSequenceDiagramSpec;
+  readonly quality?: QualityReport;
+  readonly partial?: PartialArtifactBundle;
+  readonly issues: CodeModeIssue[];
+}
+
+class BuildSequenceDiagramFailure extends Schema.TaggedErrorClass<BuildSequenceDiagramFailure>()(
+  "BuildSequenceDiagramFailure",
+  {
+    message: Schema.String,
+    status: Schema.Literals([
+      "invalid_input",
+      "invalid_sequence",
+      "quality_failed",
+      "render_failed",
+      "export_failed",
+      "storage_failed",
+    ]),
+  },
+) {
+  readonly context: BuildSequenceDiagramFailureContext;
+
+  constructor(input: {
+    readonly status: BuildSequenceDiagramFailureStatus;
+    readonly context: BuildSequenceDiagramFailureContext;
   }) {
     super({
       message: input.context.issues[0]?.message ?? input.status,
@@ -818,13 +1006,19 @@ function CodeModeIssueCodeFromString(value: string): CodeModeIssueCode {
 }
 
 function requestedFormats(
-  input: BuildFlowchartRequest["options"] | ApplyDiagramPatchRequest["options"],
+  input:
+    | BuildFlowchartRequest["options"]
+    | BuildSequenceDiagramRequest["options"]
+    | ApplyDiagramPatchRequest["options"],
 ): ArtifactFormat[] {
   return input?.artifactFormats ?? DEFAULT_BUILD_FORMATS;
 }
 
 function requestedInlineFormats(
-  input: BuildFlowchartRequest["options"] | ApplyDiagramPatchRequest["options"],
+  input:
+    | BuildFlowchartRequest["options"]
+    | BuildSequenceDiagramRequest["options"]
+    | ApplyDiagramPatchRequest["options"],
 ): InlineArtifactFormat[] {
   return input?.inlineArtifacts ?? DEFAULT_INLINE_FORMATS;
 }
@@ -975,6 +1169,7 @@ function normalizePatchableScene(
         sourceNodeId: element.sourceNodeId,
         targetNodeId: element.targetNodeId,
         ...(element.strokeColor ? { strokeColor: element.strokeColor } : {}),
+        ...(element.strokeStyle ? { strokeStyle: element.strokeStyle } : {}),
         ...(element.textColor ? { textColor: element.textColor } : {}),
         points,
         ...(element.label ? { label: element.label } : {}),
@@ -988,6 +1183,10 @@ function normalizePatchableScene(
         id: element.id,
         nodeId: element.nodeId,
         ...(element.kind ? { kind: element.kind } : {}),
+        ...(element.rendererRole === "sequence-lifeline" &&
+        isStructurallyValidSequenceLifeline(scene, element)
+          ? { rendererRole: element.rendererRole }
+          : {}),
         shape: element.shape,
         ...(element.fillColor ? { fillColor: element.fillColor } : {}),
         ...(element.strokeColor ? { strokeColor: element.strokeColor } : {}),
@@ -1703,6 +1902,23 @@ function buildMindmapFailureResult(
   };
 }
 
+function buildSequenceDiagramFailureResult(
+  error: BuildSequenceDiagramFailure,
+): Extract<BuildSequenceDiagramResult, { ok: false }> {
+  return {
+    ok: false,
+    status: error.status,
+    ...(error.context.buildId ? { buildId: error.context.buildId } : {}),
+    ...(error.context.requestId ? { requestId: error.context.requestId } : {}),
+    ...(error.context.normalizedSpec
+      ? { normalizedSpec: error.context.normalizedSpec }
+      : {}),
+    ...(error.context.quality ? { quality: error.context.quality } : {}),
+    ...(error.context.partial ? { partial: error.context.partial } : {}),
+    issues: error.context.issues,
+  };
+}
+
 function getArtifactFailureResult(
   error: GetArtifactFailure,
 ): Extract<GetArtifactResult, { ok: false }> {
@@ -1912,6 +2128,155 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
     } satisfies Extract<BuildMindmapResult, { ok: true }>;
   },
 );
+
+const buildSequenceDiagramWorkflow = Effect.fn(
+  "codeMode.buildSequenceDiagram.workflow",
+)(function* (input: unknown) {
+  yield* Effect.void.pipe(
+    Effect.withSpan("codeMode.buildSequenceDiagram.preflight"),
+  );
+  const parsed = yield* Effect.sync(() =>
+    BuildSequenceDiagramRequestSchema.safeParse(input),
+  ).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.parse"));
+  if (!parsed.success) {
+    return yield* new BuildSequenceDiagramFailure({
+      status: "invalid_input",
+      context: { issues: inputIssues(parsed.error) },
+    });
+  }
+
+  const environment = yield* CodeModeRuntimeEnvironment;
+  const store = yield* CodeModeArtifactStorage;
+  const request = parsed.data;
+  const buildId = yield* Effect.sync(() => environment.createId("build"));
+  const normalizedSpec = yield* Effect.sync(() =>
+    normalizeSequenceDiagramSpec(request.spec),
+  ).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.normalize"));
+  const baseContext = {
+    buildId,
+    ...responseRequestId(request.requestId),
+    normalizedSpec,
+  };
+  const validationIssues = yield* Effect.sync(() =>
+    validateNormalizedSequenceDiagram(normalizedSpec),
+  ).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.validate"));
+  if (validationIssues.length > 0) {
+    return yield* new BuildSequenceDiagramFailure({
+      status: "invalid_sequence",
+      context: { ...baseContext, issues: validationIssues },
+    });
+  }
+
+  const quality = yield* Effect.sync(() =>
+    sequenceQuality(
+      normalizedSpec,
+      request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+    ),
+  ).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.quality"));
+  const qualityContext = { ...baseContext, quality };
+  if (!quality.accepted) {
+    return yield* new BuildSequenceDiagramFailure({
+      status: "quality_failed",
+      context: { ...qualityContext, issues: qualityIssues(quality) },
+    });
+  }
+
+  const scene = yield* Effect.try({
+    try: () => renderSequenceDiagram(normalizedSpec),
+    catch: (cause) =>
+      new BuildSequenceDiagramFailure({
+        status: "render_failed",
+        context: {
+          ...qualityContext,
+          issues: [
+            issue({
+              code: "render_failed",
+              stage: "render",
+              ref: { kind: "diagram", id: normalizedSpec.id },
+              message:
+                cause instanceof Error
+                  ? cause.message
+                  : "Unable to render sequence diagram scene.",
+              hint: "Repair the participant/message structure and retry.",
+            }),
+          ],
+        },
+      }),
+  }).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.render"));
+  const { excalidraw, validation } = yield* Effect.sync(() => {
+    const excalidrawScene = convertSceneToExcalidraw(scene);
+    return {
+      excalidraw: excalidrawScene,
+      validation: validateExcalidrawScene(excalidrawScene),
+    };
+  }).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.exportValidate"));
+  const exportContext = {
+    ...qualityContext,
+    partial: scenePartial(scene),
+  };
+  if (!validation.ok) {
+    return yield* new BuildSequenceDiagramFailure({
+      status: "export_failed",
+      context: {
+        ...exportContext,
+        issues: exportIssues(validation.issues),
+      },
+    });
+  }
+
+  const storedFormats = yield* storedArtifactsForFormats({
+    formats: requestedFormats(request.options),
+    scene,
+    excalidraw,
+    renderer: environment.renderer,
+  }).pipe(
+    Effect.mapError(
+      (error) =>
+        new BuildSequenceDiagramFailure({
+          status: "export_failed",
+          context: {
+            ...exportContext,
+            issues: artifactExportIssues(error),
+          },
+        }),
+    ),
+  );
+  const artifactId = yield* Effect.sync(() => environment.createId("artifact"));
+  const artifact = yield* withTelemetryCorrelation(
+    store.write({
+      artifactId,
+      diagramId: scene.diagramId,
+      formats: storedFormats,
+      inlineFormats: requestedInlineFormats(request.options),
+    }),
+    {
+      artifactId,
+      ...(request.requestId ? { requestId: request.requestId } : {}),
+    },
+  ).pipe(
+    Effect.mapError(
+      (error) =>
+        new BuildSequenceDiagramFailure({
+          status: "storage_failed",
+          context: {
+            ...qualityContext,
+            issues: [storageFailureIssue(error, "storage_write_failed")],
+          },
+        }),
+    ),
+  );
+
+  return {
+    ok: true,
+    status: "accepted",
+    buildId,
+    ...responseRequestId(request.requestId),
+    normalizedSpec,
+    quality,
+    artifact: withArtifactUrls(artifact, environment.artifactUrl),
+    issues: [],
+  } satisfies Extract<BuildSequenceDiagramResult, { ok: true }>;
+});
 
 const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
   function* (input: unknown) {
@@ -2395,6 +2760,21 @@ export const buildMindmap: (
     codeModeResultBoundary(
       buildMindmapWorkflow(input),
       buildMindmapFailureResult,
+    ),
+  ),
+);
+
+export const buildSequenceDiagram: (
+  input: unknown,
+) => CodeModeWorkflowEffect<BuildSequenceDiagramResult> = Effect.fn(
+  "codeMode.buildSequenceDiagram",
+)((input: unknown) =>
+  observeCodeModeBoundary(
+    "buildSequenceDiagram",
+    input,
+    codeModeResultBoundary(
+      buildSequenceDiagramWorkflow(input),
+      buildSequenceDiagramFailureResult,
     ),
   ),
 );

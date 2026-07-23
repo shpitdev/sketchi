@@ -8,7 +8,10 @@ import {
   pharmaBatchDispositionFlowchart,
   parseFlowchartDiagram,
 } from "@sketchi/diagram-core";
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import {
+  renderIntermediateDiagram,
+  renderSequenceDiagram,
+} from "@sketchi/diagram-renderer";
 
 import {
   convertSceneToExcalidraw,
@@ -1020,7 +1023,7 @@ describe("convertSceneToExcalidraw", () => {
     );
   });
 
-  it("reports arrow route segments that pass through unrelated nodes", () => {
+  it("reports routes through ordinary nodes claiming lifeline identity", () => {
     const scene = convertSceneToExcalidraw({
       diagramId: "through-node-route",
       title: "Through-node route",
@@ -1053,8 +1056,9 @@ describe("convertSceneToExcalidraw", () => {
         },
         {
           type: "node",
-          id: "node:middle",
-          nodeId: "middle",
+          id: "node:middle:lifeline",
+          nodeId: "middle:lifeline",
+          kind: "sequence-lifeline",
           shape: "rectangle",
           x: 170,
           y: 40,
@@ -1188,5 +1192,42 @@ describe("convertSceneToExcalidraw", () => {
         elementId: "edge:clear-review",
       }),
     );
+  });
+
+  it("accepts sequence messages that cross intermediate lifelines", () => {
+    const scene = convertSceneToExcalidraw(
+      renderSequenceDiagram({
+        id: "cross-lifeline",
+        title: "Cross lifeline",
+        participants: [
+          { id: "left", label: "Left" },
+          {
+            id: "middle",
+            label: "Middle",
+            kind: "sequence-lifeline",
+          },
+          { id: "right", label: "Right" },
+        ],
+        messages: [
+          {
+            id: "cross",
+            source: "left",
+            target: "right",
+            label: "Cross middle",
+          },
+        ],
+        style: { accentColor: "#000000", backgroundColor: "#ffffff" },
+      }),
+    );
+
+    expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
+    expect(
+      scene.elements.find((element) => element.id === "node:middle:lifeline"),
+    ).toMatchObject({
+      customData: { sketchiRendererRole: "sequence-lifeline" },
+    });
+    expect(
+      scene.elements.find((element) => element.id === "node:middle"),
+    ).not.toHaveProperty("customData.sketchiRendererRole");
   });
 });

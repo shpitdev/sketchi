@@ -5,6 +5,7 @@ import {
   type ArtifactFormat,
   type BuildFlowchartResult,
   type BuildMindmapResult,
+  type BuildSequenceDiagramResult,
   type GetArtifactResult,
   type StoredArtifactFormat,
 } from "@sketchi/diagram-agent";
@@ -107,7 +108,9 @@ async function readBoundedBuildJson(
   }
 }
 
-function requestTooLargeResult(diagramType: "Flowchart" | "Mindmap") {
+function requestTooLargeResult(
+  diagramType: "Flowchart" | "Mindmap" | "Sequence diagram",
+) {
   return {
     ok: false as const,
     status: "invalid_input" as const,
@@ -151,6 +154,21 @@ function mindmapBuildStatus(result: BuildMindmapResult): number {
     case "invalid_input":
       return 400;
     case "invalid_mindmap":
+    case "quality_failed":
+      return 422;
+    case "render_failed":
+    case "export_failed":
+    case "storage_failed":
+      return 500;
+  }
+}
+
+function sequenceBuildStatus(result: BuildSequenceDiagramResult): number {
+  if (result.ok) return 200;
+  switch (result.status) {
+    case "invalid_input":
+      return 400;
+    case "invalid_sequence":
     case "quality_failed":
       return 422;
     case "render_failed":
@@ -423,6 +441,68 @@ export const handleBuildMindmapRequest = Effect.fn(
     context: usageContext,
     durationMs: finishedAt - startedAt,
     operation: "buildMindmap",
+    requestBody,
+    responseBody: result,
+    statusCode: status,
+    surface: "api",
+  });
+  return jsonResponse(
+    result,
+    status,
+    codeModeUsageResponseHeaders(usageContext),
+  );
+});
+
+export const handleBuildSequenceDiagramRequest = Effect.fn(
+  "playground.http.buildSequenceDiagram",
+)(function* (request: Request) {
+  const clock = yield* PlaygroundClock;
+  const codeMode = yield* PlaygroundCodeMode;
+  const usage = yield* PlaygroundCodeModeUsage;
+  const usageContext = yield* usage.createContext;
+  const startedAt = yield* clock.nowMillis;
+  const boundedRequest = yield* requestRead(() =>
+    readBoundedBuildJson(request),
+  );
+  if (!boundedRequest.ok) {
+    const result = requestTooLargeResult("Sequence diagram");
+    const finishedAt = yield* clock.nowMillis;
+    yield* usage.capture({
+      context: usageContext,
+      durationMs: finishedAt - startedAt,
+      operation: "buildSequenceDiagram",
+      requestBody: boundedRequest.body,
+      responseBody: result,
+      statusCode: 413,
+      surface: "api",
+    });
+    return jsonResponse(
+      result,
+      413,
+      codeModeUsageResponseHeaders(usageContext),
+    );
+  }
+
+  const requestBody = boundedRequest.body;
+  const codeModeInput = yield* Effect.promise(() =>
+    decodeCodeModeHttpInput(
+      CodeModeHttpSchemas.buildSequenceDiagram.input,
+      requestBody,
+    ),
+  );
+  const result = yield* withTelemetryCorrelation(
+    codeMode.buildSequenceDiagram(codeModeInput),
+    {
+      attemptId: usageContext.attemptId,
+      runId: usageContext.runId,
+    },
+  );
+  const status = sequenceBuildStatus(result);
+  const finishedAt = yield* clock.nowMillis;
+  yield* usage.capture({
+    context: usageContext,
+    durationMs: finishedAt - startedAt,
+    operation: "buildSequenceDiagram",
     requestBody,
     responseBody: result,
     statusCode: status,

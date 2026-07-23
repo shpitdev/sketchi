@@ -1,4 +1,9 @@
 import { assert, describe, it, layer } from "@effect/vitest";
+import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
+import {
+  renderSequenceDiagram,
+  type RenderedDiagramScene as RendererScene,
+} from "@sketchi/diagram-renderer";
 import {
   makeTelemetryTestSink,
   makeWorkersTelemetryLayer,
@@ -11,8 +16,10 @@ import { FastCheck } from "effect/testing";
 import { CodeModeArtifactStorageMemory } from "./code-mode-artifacts";
 import {
   BuildFlowchartRequestSchema,
+  BuildSequenceDiagramRequestSchema,
   DIAGRAM_PATCH_OPERATION_NAMES,
   MindmapTopicSchema,
+  RenderedDiagramSceneSchema,
 } from "./code-mode-contract";
 import {
   applyDiagramPatch,
@@ -160,6 +167,105 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
           yield* Schema.decodeUnknownEffect(MindmapTopicSchema)(encoded);
         assert.deepStrictEqual(decoded, topic);
       }),
+  );
+
+  it.effect("validates and defaults the sequence diagram contract", () =>
+    Effect.gen(function* () {
+      const decoded = BuildSequenceDiagramRequestSchema.parse({
+        spec: {
+          title: "Checkout",
+          participants: [
+            { id: "customer", label: "Customer" },
+            { id: "store", label: "Store" },
+          ],
+          messages: [
+            {
+              source: "customer",
+              target: "store",
+              label: "Checkout",
+              type: "message",
+            },
+          ],
+        },
+      });
+      const encoded = yield* Schema.encodeEffect(
+        BuildSequenceDiagramRequestSchema,
+      )(decoded);
+      assert.deepStrictEqual(encoded, {
+        spec: {
+          title: "Checkout",
+          participants: [
+            { id: "customer", label: "Customer" },
+            { id: "store", label: "Store" },
+          ],
+          messages: [
+            {
+              source: "customer",
+              target: "store",
+              label: "Checkout",
+              type: "message",
+            },
+          ],
+          style: { accentColor: "#000000", backgroundColor: "#ffffff" },
+        },
+      });
+
+      const malformed = BuildSequenceDiagramRequestSchema.safeParse({
+        spec: {
+          title: "Checkout",
+          participants: [{ id: "store", label: "Store" }],
+          messages: [{ source: "store", target: "store" }],
+        },
+      });
+      assert.isFalse(malformed.success);
+      if (malformed.success) {
+        return assert.fail("Malformed sequence message unexpectedly decoded.");
+      }
+      assert.deepInclude(malformed.error.issues[0], {
+        path: ["spec", "messages", 0, "label"],
+      });
+    }),
+  );
+
+  it.effect("preserves sequence stroke styles through scene encoding", () =>
+    Effect.gen(function* () {
+      const rendered = renderSequenceDiagram({
+        id: "return-message",
+        title: "Return message",
+        participants: [
+          { id: "client", label: "Client" },
+          { id: "api", label: "API" },
+        ],
+        messages: [
+          {
+            id: "response",
+            source: "api",
+            target: "client",
+            label: "Response",
+            type: "return",
+          },
+        ],
+        style: { accentColor: "#000000", backgroundColor: "#ffffff" },
+      });
+      const encoded = yield* Schema.encodeEffect(RenderedDiagramSceneSchema)(
+        RenderedDiagramSceneSchema.parse(rendered),
+      );
+      const decoded = yield* Schema.decodeUnknownEffect(
+        RenderedDiagramSceneSchema,
+      )(encoded);
+      const converted = convertSceneToExcalidraw(decoded as RendererScene);
+
+      assert.deepInclude(
+        converted.elements.find((element) => element.id === "arrow:response"),
+        { strokeStyle: "dashed" },
+      );
+      assert.deepInclude(
+        converted.elements.find(
+          (element) => element.id === "node:api:lifeline",
+        ),
+        { customData: { sketchiRendererRole: "sequence-lifeline" } },
+      );
+    }),
   );
 
   it.effect("forwards renderer cancellation and preserves interruption", () =>

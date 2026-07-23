@@ -16,6 +16,7 @@ describe("Code Mode MCP docs", () => {
     expect(docs.content).toContain("typed host tools");
     expect(docs.content).toContain("sketchi.buildFlowchart");
     expect(docs.content).toContain("sketchi.buildMindmap");
+    expect(docs.content).toContain("sketchi.buildSequenceDiagram");
     expect(docs.content).toContain("sketchi.getArtifact");
     expect(docs.content).toContain("sketchi.applyDiagramPatch");
     expect(docs.content).toContain("Excalidraw and PNG URLs");
@@ -35,10 +36,16 @@ describe("Code Mode MCP docs", () => {
     );
   });
 
-  it("emits a complete mindmap-aware public type contract", () => {
-    expect(SKETCHI_CODE_MODE_VERSION).toBe("2026-07-13");
+  it("emits a complete semantic-builder public type contract", () => {
+    expect(SKETCHI_CODE_MODE_VERSION).toBe("2026-07-23");
     expect(SKETCHI_CODE_MODE_TYPES).toContain("interface BuildMindmapRequest");
     expect(SKETCHI_CODE_MODE_TYPES).toContain("type BuildMindmapResult");
+    expect(SKETCHI_CODE_MODE_TYPES).toContain(
+      "interface BuildSequenceDiagramRequest",
+    );
+    expect(SKETCHI_CODE_MODE_TYPES).toContain(
+      "type BuildSequenceDiagramResult",
+    );
     expect(SKETCHI_CODE_MODE_TYPES).toContain(
       'stage: "input" | "flowchart" | "mindmap"',
     );
@@ -54,6 +61,7 @@ describe("Code Mode MCP docs", () => {
     for (const operation of [
       "buildFlowchart",
       "buildMindmap",
+      "buildSequenceDiagram",
       "getArtifact",
       "applyDiagramPatch",
     ]) {
@@ -71,6 +79,13 @@ describe("Code Mode MCP docs", () => {
     expect(getCodeModeDocs({ topic: "buildMindmap" }).content).toContain(
       "intentional output formats",
     );
+    const sequenceDocs = getCodeModeDocs({ topic: "buildSequenceDiagram" });
+    expect(sequenceDocs.content).toContain("preserved left-to-right");
+    expect(sequenceDocs.content).toContain("preserved top-to-bottom");
+    expect(sequenceDocs.content).toContain("Self-referential messages");
+    expect(sequenceDocs.examples[0]?.code).toContain(
+      "sketchi.buildSequenceDiagram",
+    );
   });
 
   it("keeps the published catalog complete for bounded build failures", () => {
@@ -78,6 +93,8 @@ describe("Code Mode MCP docs", () => {
     for (const declaration of [
       "interface BuildMindmapRequest",
       "type BuildMindmapResult",
+      "interface BuildSequenceDiagramRequest",
+      "buildSequenceDiagram",
       '"request_too_large"',
       '"nonterminating_node"',
       '"flowchart_too_large"',
@@ -86,8 +103,8 @@ describe("Code Mode MCP docs", () => {
     ]) {
       expect(catalog).toContain(declaration);
     }
-    expect(catalog).toContain("flowchart or mindmap artifact");
-    expect(catalog).toContain("matching `buildFlowchart` or");
+    expect(catalog).toContain("flowchart, mindmap, or sequence artifact");
+    expect(catalog).toContain("matching `buildFlowchart`,");
     expect(catalog).toContain("24 nodes");
     expect(catalog).toContain("64 edges");
     expect(catalog).toContain("256 KiB");
@@ -120,6 +137,13 @@ describe("Code Mode MCP docs", () => {
     });
     expect(boundedFlowchartResults.results.map((result) => result.id)).toEqual(
       expect.arrayContaining(["buildFlowchart", "issues"]),
+    );
+
+    const sequenceResults = searchCodeModeDocs({
+      query: "chronological participant lifeline messages",
+    });
+    expect(sequenceResults.results.map((result) => result.id)).toContain(
+      "buildSequenceDiagram",
     );
   });
 

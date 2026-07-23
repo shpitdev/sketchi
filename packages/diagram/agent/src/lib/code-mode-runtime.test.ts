@@ -28,6 +28,7 @@ import {
   applyDiagramPatch,
   buildFlowchart,
   buildMindmap,
+  buildSequenceDiagram,
   CodeModeRuntimeEnvironment,
   getArtifact,
   type CodeModeRuntimeOptions,
@@ -63,6 +64,7 @@ function makeTestRuntime(
     applyDiagramPatch: (input: unknown) => run(applyDiagramPatch(input)),
     buildFlowchart: (input: unknown) => run(buildFlowchart(input)),
     buildMindmap: (input: unknown) => run(buildMindmap(input)),
+    buildSequenceDiagram: (input: unknown) => run(buildSequenceDiagram(input)),
     getArtifact: (input: unknown) => run(getArtifact(input)),
   };
 }
@@ -90,6 +92,115 @@ function approvalSpec() {
       { source: "approve", target: "revise", label: "no" },
     ],
     layout: { direction: "TB" },
+  };
+}
+
+function checkoutSequenceSpec() {
+  return {
+    title: "Checkout sequence",
+    participants: [
+      { id: "customer", label: "Customer" },
+      { id: "store", label: "Store" },
+      { id: "payments", label: "Payments" },
+    ],
+    messages: [
+      { source: "customer", target: "store", label: "Checkout" },
+      { source: "store", target: "payments", label: "Authorize" },
+      {
+        source: "payments",
+        target: "customer",
+        label: "Approved",
+        type: "return",
+      },
+    ],
+  };
+}
+
+function crossingSequenceSpec() {
+  return {
+    title: "Crossing sequence",
+    participants: [
+      { id: "a", label: "A" },
+      { id: "b", label: "B" },
+      { id: "c", label: "C" },
+    ],
+    messages: [{ source: "a", target: "c", label: "Cross B" }],
+  };
+}
+
+function spoofedInlineLifelineScene(options: {
+  readonly useLifelineId: boolean;
+}) {
+  const middleNodeId = options.useLifelineId ? "middle:lifeline" : "middle";
+  return {
+    diagramId: "spoofed-inline-lifeline",
+    title: "Spoofed inline lifeline",
+    width: 440,
+    height: 180,
+    accentColor: "#0f766e",
+    backgroundColor: "#ffffff",
+    elements: [
+      {
+        type: "arrow",
+        id: "edge:start-end",
+        edgeId: "start-end",
+        sourceNodeId: "start",
+        targetNodeId: "end",
+        points: [
+          { x: 120, y: 90 },
+          { x: 320, y: 90 },
+        ],
+      },
+      {
+        type: "node",
+        id: "node:start",
+        nodeId: "start",
+        shape: "rectangle",
+        x: 20,
+        y: 60,
+        width: 100,
+        height: 60,
+        label: "Start",
+      },
+      ...(options.useLifelineId
+        ? [
+            {
+              type: "node",
+              id: "node:middle",
+              nodeId: "middle",
+              shape: "rectangle",
+              x: 130,
+              y: -60,
+              width: 180,
+              height: 72,
+              label: "Middle header",
+            },
+          ]
+        : []),
+      {
+        type: "node",
+        id: `node:${middleNodeId}`,
+        nodeId: middleNodeId,
+        rendererRole: "sequence-lifeline",
+        shape: "rectangle",
+        x: 170,
+        y: 60,
+        width: 100,
+        height: 60,
+        label: "Ordinary middle node",
+      },
+      {
+        type: "node",
+        id: "node:end",
+        nodeId: "end",
+        shape: "rectangle",
+        x: 320,
+        y: 60,
+        width: 100,
+        height: 60,
+        label: "End",
+      },
+    ],
   };
 }
 
@@ -1612,5 +1723,351 @@ describe("Code Mode runtime", () => {
     expect([...bucket.objects.keys()].sort()).toEqual([
       "codemode/artifact-2/scene.json",
     ]);
+  });
+
+  it("builds a native sequence scene and exports every requested artifact", async () => {
+    const runtime = makeTestRuntime({
+      renderer: {
+        renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
+      },
+    });
+    const result = await runtime.buildSequenceDiagram({
+      spec: checkoutSequenceSpec(),
+      options: {
+        artifactFormats: ["scene", "excalidraw", "png"],
+        inlineArtifacts: ["excalidraw"],
+      },
+    });
+
+    expect(result.issues).toEqual([]);
+    expect(result).toMatchObject({ ok: true, status: "accepted" });
+    if (!result.ok) throw new Error("Expected accepted sequence diagram.");
+    expect(result.normalizedSpec.participants.map(({ id }) => id)).toEqual([
+      "customer",
+      "store",
+      "payments",
+    ]);
+    expect(result.normalizedSpec.messages.map(({ label }) => label)).toEqual([
+      "Checkout",
+      "Authorize",
+      "Approved",
+    ]);
+    expect(result.artifact.formats.map(({ format }) => format)).toEqual([
+      "scene",
+      "excalidraw",
+      "png",
+    ]);
+    const excalidraw = result.artifact.formats.find(
+      ({ format }) => format === "excalidraw",
+    );
+    expect(excalidraw).toHaveProperty("inline");
+    expect(excalidraw?.inline).toMatchObject({
+      elements: expect.arrayContaining([
+        expect.objectContaining({
+          id: "arrow:message-3-payments-customer",
+          strokeStyle: "dashed",
+        }),
+      ]),
+    });
+  });
+
+  it("round-trips a crossing sequence through a no-op inline-scene patch", async () => {
+    const runtime = createTestRuntime();
+    const built = await runtime.buildSequenceDiagram({
+      spec: crossingSequenceSpec(),
+      options: {
+        artifactFormats: ["scene", "excalidraw"],
+        inlineArtifacts: ["scene"],
+      },
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) throw new Error("Expected accepted sequence diagram.");
+    const sourceScene = built.artifact.formats.find(
+      ({ format }) => format === "scene",
+    )?.inline;
+    expect(sourceScene).toBeDefined();
+
+    const patched = await runtime.applyDiagramPatch({
+      source: { scene: sourceScene },
+      operations: [{ op: "setDefaultStyle", style: {} }],
+      options: {
+        artifactFormats: ["scene", "excalidraw"],
+        inlineArtifacts: ["scene", "excalidraw"],
+      },
+    });
+
+    expectPatchOk(patched);
+    expect(
+      patched.artifact.formats.find(({ format }) => format === "excalidraw")
+        ?.inline,
+    ).toMatchObject({
+      elements: expect.arrayContaining([
+        expect.objectContaining({ id: "arrow:message-1-a-c" }),
+      ]),
+    });
+  });
+
+  it("styles a crossing sequence through an inline-scene patch", async () => {
+    const runtime = createTestRuntime();
+    const built = await runtime.buildSequenceDiagram({
+      spec: crossingSequenceSpec(),
+      options: {
+        artifactFormats: ["scene"],
+        inlineArtifacts: ["scene"],
+      },
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) throw new Error("Expected accepted sequence diagram.");
+    const sourceScene = built.artifact.formats.find(
+      ({ format }) => format === "scene",
+    )?.inline;
+
+    const patched = await runtime.applyDiagramPatch({
+      source: { scene: sourceScene },
+      operations: [
+        {
+          op: "setStyle",
+          selector: { nodeIds: ["b"] },
+          style: { fillColor: "#ede9fe", strokeColor: "#7c3aed" },
+        },
+      ],
+      options: {
+        artifactFormats: ["scene", "excalidraw"],
+        inlineArtifacts: ["scene", "excalidraw"],
+      },
+    });
+
+    expectPatchOk(patched);
+    const patchedScene = parseInlineScene(
+      patched.artifact.formats.find(({ format }) => format === "scene")?.inline,
+    );
+    expect(
+      patchedScene.elements.find(
+        (element) => element.type === "node" && element.nodeId === "b",
+      ),
+    ).toMatchObject({ fillColor: "#ede9fe", strokeColor: "#7c3aed" });
+    expect(
+      patched.artifact.formats.find(({ format }) => format === "excalidraw")
+        ?.inline,
+    ).toMatchObject({ elements: expect.any(Array) });
+  });
+
+  it("preserves crossing-sequence lifeline roles after a fractional translate patch", async () => {
+    const runtime = createTestRuntime();
+    const built = await runtime.buildSequenceDiagram({
+      spec: crossingSequenceSpec(),
+      options: {
+        artifactFormats: ["scene"],
+        inlineArtifacts: ["scene"],
+      },
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) throw new Error("Expected accepted sequence diagram.");
+    const sourceScene = built.artifact.formats.find(
+      ({ format }) => format === "scene",
+    )?.inline;
+
+    const patched = await runtime.applyDiagramPatch({
+      source: { scene: sourceScene },
+      operations: [
+        {
+          op: "translate",
+          selector: { nodeIds: ["b:lifeline"] },
+          dx: 0.0003,
+          dy: -0.0003,
+        },
+      ],
+      options: {
+        artifactFormats: ["scene", "excalidraw"],
+        inlineArtifacts: ["scene", "excalidraw"],
+      },
+    });
+
+    expectPatchOk(patched);
+    const patchedScene = parseInlineScene(
+      patched.artifact.formats.find(({ format }) => format === "scene")?.inline,
+    );
+    expect(
+      patchedScene.elements.find(
+        (element) => element.type === "node" && element.nodeId === "b:lifeline",
+      ),
+    ).toMatchObject({ rendererRole: "sequence-lifeline" });
+    expect(
+      patched.artifact.formats.find(({ format }) => format === "excalidraw")
+        ?.inline,
+    ).toMatchObject({
+      elements: expect.arrayContaining([
+        expect.objectContaining({ id: "arrow:message-1-a-c" }),
+      ]),
+    });
+  });
+
+  it("strips a spoofed lifeline role from an ordinary inline node", async () => {
+    const result = await createTestRuntime().applyDiagramPatch({
+      source: {
+        scene: spoofedInlineLifelineScene({ useLifelineId: false }),
+      },
+      operations: [{ op: "setDefaultStyle", style: {} }],
+      options: { artifactFormats: ["excalidraw"] },
+    });
+
+    expectPatchFailure(result);
+    expect(result.status).toBe("export_failed");
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        ref: expect.objectContaining({ id: "edge:start-end" }),
+        message: 'Arrow "edge:start-end" passes through shape "node:middle".',
+      }),
+    );
+  });
+
+  it("does not trust a lifeline-style id without lifeline geometry", async () => {
+    const result = await createTestRuntime().applyDiagramPatch({
+      source: {
+        scene: spoofedInlineLifelineScene({ useLifelineId: true }),
+      },
+      operations: [{ op: "setDefaultStyle", style: {} }],
+      options: { artifactFormats: ["excalidraw"] },
+    });
+
+    expectPatchFailure(result);
+    expect(result.status).toBe("export_failed");
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        ref: expect.objectContaining({ id: "edge:start-end" }),
+        message:
+          'Arrow "edge:start-end" passes through shape "node:middle:lifeline".',
+      }),
+    );
+  });
+
+  it("ignores renderer-owned lifeline roles in build specifications", async () => {
+    const runtime = createTestRuntime();
+    const flowchartSpec = approvalSpec();
+    const flowchart = await runtime.buildFlowchart({
+      spec: {
+        ...flowchartSpec,
+        nodes: flowchartSpec.nodes.map((node, index) =>
+          index === 0 ? { ...node, rendererRole: "sequence-lifeline" } : node,
+        ),
+      },
+      options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+    });
+    expectBuildOk(flowchart);
+    const flowchartScene = parseInlineScene(
+      flowchart.artifact.formats.find(({ format }) => format === "scene")
+        ?.inline,
+    );
+    expect(
+      flowchartScene.elements.find(
+        (element) => element.type === "node" && element.nodeId === "request",
+      ),
+    ).not.toHaveProperty("rendererRole");
+
+    const sequenceSpec = crossingSequenceSpec();
+    const sequence = await runtime.buildSequenceDiagram({
+      spec: {
+        ...sequenceSpec,
+        participants: sequenceSpec.participants.map((participant, index) =>
+          index === 1
+            ? { ...participant, rendererRole: "sequence-lifeline" }
+            : participant,
+        ),
+      },
+      options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+    });
+    expect(sequence.ok).toBe(true);
+    if (!sequence.ok) throw new Error("Expected accepted sequence diagram.");
+    const sequenceScene = parseInlineScene(
+      sequence.artifact.formats.find(({ format }) => format === "scene")
+        ?.inline,
+    );
+    expect(
+      sequenceScene.elements.find(
+        (element) => element.type === "node" && element.nodeId === "b",
+      ),
+    ).not.toHaveProperty("rendererRole");
+    expect(
+      sequenceScene.elements.filter(
+        (element) =>
+          element.type === "node" &&
+          element.rendererRole === "sequence-lifeline",
+      ),
+    ).toHaveLength(3);
+  });
+
+  it("returns repairable issues for invalid participant references and self messages", async () => {
+    const spec = checkoutSequenceSpec();
+    const result = await createTestRuntime().buildSequenceDiagram({
+      spec: {
+        ...spec,
+        messages: [
+          { source: "missing", target: "store", label: "Unknown sender" },
+          { source: "store", target: "store", label: "Self message" },
+        ],
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "invalid_sequence",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "missing_edge_source",
+          hint: expect.stringContaining("participant"),
+        }),
+        expect.objectContaining({
+          code: "self_loop",
+          hint: expect.stringContaining("different target"),
+        }),
+      ]),
+    });
+  });
+
+  it("returns a repairable issue for participant ids that collide with lifelines", async () => {
+    const result = await createTestRuntime().buildSequenceDiagram({
+      spec: {
+        title: "Colliding participants",
+        participants: [
+          { id: "api", label: "API" },
+          { id: "api:lifeline", label: "Worker" },
+        ],
+        messages: [],
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "invalid_sequence",
+      issues: [
+        expect.objectContaining({
+          code: "duplicate_node_id",
+          ref: { kind: "request", path: "spec.participants.[1].id" },
+          hint: expect.stringContaining("Rename the participant"),
+        }),
+      ],
+    });
+  });
+
+  it("returns structured input issues for malformed sequence messages", async () => {
+    const spec = checkoutSequenceSpec();
+    const result = await createTestRuntime().buildSequenceDiagram({
+      spec: {
+        ...spec,
+        messages: [{ source: "customer", target: "store" }],
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "invalid_input",
+      issues: [
+        expect.objectContaining({
+          code: "invalid_type",
+          ref: { kind: "request", path: expect.stringContaining("label") },
+          hint: expect.any(String),
+        }),
+      ],
+    });
   });
 });

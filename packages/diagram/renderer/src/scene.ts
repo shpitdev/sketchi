@@ -17,6 +17,7 @@ export interface NodeSceneElement {
   id: string;
   nodeId: string;
   kind?: string;
+  rendererRole?: "sequence-lifeline";
   shape: NodeSceneShape;
   fillColor?: string;
   strokeColor?: string;
@@ -47,6 +48,7 @@ export interface ArrowSceneElement {
   sourceNodeId: string;
   targetNodeId: string;
   strokeColor?: string;
+  strokeStyle?: "dashed" | "dotted" | "solid";
   textColor?: string;
   points: readonly [ScenePoint, ...ScenePoint[]];
   label?: string;
