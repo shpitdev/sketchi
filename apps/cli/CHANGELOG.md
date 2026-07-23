@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.2.0
+
+### Minor Changes
+
+- [#273](https://github.com/shpitdev/sketchi/pull/273) [`01beea6`](https://github.com/shpitdev/sketchi/commit/01beea637c597b57434c027322e66b43c023096b) Thanks [@anandpant](https://github.com/anandpant)! - Add encrypted Excalidraw share links, validated pull-to-detached authority, full-snapshot revisions, and offline restore.
+
 ## 0.1.1
 
 ### Patch Changes
