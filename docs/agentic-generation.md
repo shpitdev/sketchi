@@ -49,8 +49,9 @@ Sketchi generate API (`POST /api/v1/generate` on the Playground Worker) exposes
 this vertical unauthenticated: prompt in; generated, validated, quality-gated
 diagram and artifacts out. CLI `generate` makes one unauthenticated HTTPS call
 to that endpoint and requires no token, key, account, or login; it never reads
-or sends a provider credential. The five manual CLI commands remain strictly
-offline.
+or sends a provider credential. The six manual CLI commands (`create`, `show`,
+`edit`, `list`, `restore`, and `export`) remain strictly offline; credential-free
+`share` and `pull` use the pinned Excalidraw share service.
 
 Provider boundaries retain the existing no-store policy, model and scenario
 metadata, correlation fields, typed failures, bounded retries, TestClock

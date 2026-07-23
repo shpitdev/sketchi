@@ -22,9 +22,9 @@ at approved host edges.
 Cloudflare Workers remain the application runtime. This is not a temporary
 bridge. Provider calls use the Cloudflare AI Gateway binding server-side; the
 binding authenticates the request and supplies the stored provider key. The CLI
-holds no gateway credential: it reaches generation through one unauthenticated
-HTTPS call to the public Sketchi generate API, and every other CLI command is
-strictly offline.
+holds no gateway credential. Its explicit network commands are `generate`,
+`share`, and `pull`; `create`, `show`, `edit`, `list`, `restore`, and `export`
+are strictly offline.
 
 Deterministic IR validation, layout, geometry, rendering transformations, and
 formatting stay plain TypeScript. React view state and rendering stay React.

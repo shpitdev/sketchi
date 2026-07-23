@@ -15,9 +15,10 @@
   <a href="https://github.com/shpitdev/sketchi/blob/main/LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2F855A" /></a>
 </p>
 
-Sketchi stores canonical diagram documents and deterministic Excalidraw artifacts
-under `~/.sketchi/diagrams`. Its manual workflow stays local; generation is one
-explicit, credential-free network command.
+Sketchi stores canonical diagram documents and authoritative Excalidraw artifacts
+under `~/.sketchi/diagrams`. Its manual and recovery workflows stay local;
+generation and encrypted snapshot exchange are explicit, credential-free network
+commands.
 
 ## Install
 
@@ -90,8 +91,75 @@ sketchi generate --prompt "Map release approval with pass and revise branches"
 sketchi generate --prompt "Organize launch readiness" --type mindmap --output json
 ```
 
-It requires no API key, token, account, or login. It is the CLI's only network
-boundary.
+It requires no API key, token, account, or login. `generate`, `share`, and
+`pull` are the CLI's three explicit network commands; each makes one HTTPS
+request.
+
+## Share, pull, and restore browser edits
+
+Create an immutable encrypted Excalidraw snapshot link from the record's current
+authoritative artifact:
+
+```sh
+sketchi share release-flow
+sketchi share release-flow --open --output json
+```
+
+The URL is a bearer secret: anyone who receives the complete URL can decrypt the
+snapshot. Encryption hides the drawing from the storage service, but the service
+can observe connection metadata, timing, and ciphertext size. Retention is
+uncontrolled and may be indefinite; Sketchi cannot revoke or delete a link.
+`--open` is opt-in, discloses the URL to the local opener and browser history,
+and reports only whether the OS accepted the request—not whether a visible
+window opened.
+
+Browser edits do not update an existing link. In Excalidraw choose
+**Save to… → Export to Link**, then pull the newly exported link:
+
+```sh
+sketchi pull release-flow --link 'https://excalidraw.com/#json=ID,KEY'
+printf '%s\n' 'https://excalidraw.com/#json=ID,KEY' | sketchi pull release-flow --link -
+```
+
+The linked drawing has no trusted Sketchi identity and may be unrelated to
+`release-flow`. A successful pull preserves the complete prior record under
+`revisions/`, removes any stale stored PNG, and makes `diagram.excalidraw` the
+sole authoritative artifact. `show` and `list` then report `authority:
+"detached"` and `documentAuthoritative: false`; retained `document.json` and
+`scene.json` are provenance only. Detached `edit` refuses, scene export is
+unavailable, and on-demand PNG renders directly from `diagram.excalidraw` using
+its background without a stale canonical title.
+
+Recover any retained full snapshot through the strictly offline CLI:
+
+```sh
+sketchi restore release-flow --revision 1
+```
+
+Restore archives the displaced current state first, does not consume the chosen
+snapshot, and advances revision numbering monotonically. New edit/pull/restore
+history uses full `revisions/000001/` authority snapshots; legacy
+`revisions/000001.json` document revisions remain restorable on canonical
+records.
+
+Share/pull v1 supports exactly `rectangle`, `ellipse`, `diamond`, `arrow`,
+`line`, `freedraw`, and `text`. Text must use Excalifont `fontFamily` id `5`.
+Images, non-empty `files`, frames, embeddables, iframes, external resources,
+custom fonts, libraries, and unknown element types are rejected. Compatibility
+is pinned to Excalidraw `e6ae6bf` and excalidraw-store `76de642`; both commands
+use the unofficial `json.excalidraw.com` API without retries.
+
+The enforced v1 bounds are a 4 KiB bearer link, 2 MiB encrypted body, 16 MiB
+inflated contents, 10,000 elements, and JSON depth 64. Before any raster
+allocation, Sketchi also limits each element dimension to 8,192 units, each
+canvas dimension to 8,192 units, canvas area to 4,194,304 square units, and the
+final PNG to 16,777,216 pixels. Share enforces its compressed-output budget
+while streaming and reserves framing plus encryption overhead before encryption.
+Pull requires exactly one literal root
+`https://excalidraw.com/#json=ID,KEY` or
+`https://www.excalidraw.com/#json=ID,KEY` URL (or one such URL through stdin);
+userinfo, ports, query strings, alternate spellings, and repeated `--link`
+flags are rejected.
 
 ## Shell completions
 
@@ -133,17 +201,20 @@ source ~/.sketchi/completions/sketchi.fish
 
 ## For AI agents
 
-The five deterministic commands—`create`, `show`, `edit`, `list`, and
-`export`—are fully offline and require no credentials, account, browser, model,
-or MCP server. They never send stored records to a provider. Agents can use
+The six deterministic commands—`create`, `show`, `edit`, `list`, `export`, and
+`restore`—are fully offline and require no credentials, account, browser, model,
+or MCP server. Those six commands never send stored records to a provider.
+Agents can use
 `--output json`, complete noninteractive input through `--json` or `--file`, and
 raw artifact output through `export --dest -` without prompts.
 
 After exporting PNG to a file, agents can follow the returned hint to display
 that path as an inline Markdown image for the user.
 
-`generate` is deliberately separate: it uses the public Sketchi API, remains
-credential-free, and is the only command that uses the network.
+`generate`, `share`, and `pull` are deliberately separate, explicit network
+commands. They remain credential-free and each makes one HTTPS request. Share
+is randomized by its key and IV; pull depends on remote availability and
+untrusted input, so neither belongs to determinism claims.
 
 ## License
 
@@ -158,6 +229,9 @@ availability details.
 sketchi --help
 sketchi create --help
 sketchi generate --help
+sketchi share --help
+sketchi pull --help
+sketchi restore --help
 ```
 
 Source, issue tracking, and architecture documentation live in the

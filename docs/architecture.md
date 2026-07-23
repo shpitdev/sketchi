@@ -78,12 +78,14 @@ bounded request metadata. The binding runs server-side and supplies its stored
 BYOK provider key. The public `POST /api/v1/generate` endpoint on the Playground
 Worker exposes this vertical unauthenticated, with the same typed error contract
 and usage telemetry as the sibling `/api/v1` build endpoints. The public CLI has
-exactly six commands: `create`, `show`, `edit`, `list`, `export`, and
-`generate`. Only `generate` uses the network: it makes one unauthenticated HTTPS
-call to the generate endpoint and needs no token, key, account, or login.
+nine commands. `create`, `show`, `edit`, `list`, `restore`, and `export` remain
+offline. The credential-free network commands are `generate`, `share`, and
+`pull`: each makes one unauthenticated HTTPS request to its documented endpoint
+and needs no token, key, account, or login. `share` uses randomized client-side
+encryption, and `pull` depends on Excalidraw share availability.
 
-Manual CLI commands remain offline. Scenario and harness commands are internal
-Nx/tool entrypoints and are not public CLI commands.
+Scenario and harness commands are internal Nx/tool entrypoints and are not
+public CLI commands.
 
 ## Persistence and telemetry
 

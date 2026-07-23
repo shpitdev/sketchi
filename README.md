@@ -65,6 +65,7 @@ sketchi edit release-flow --json '{"type":"flowchart","spec":{"id":"release-flow
 sketchi list
 sketchi export release-flow --format excalidraw --dest release-flow.excalidraw
 sketchi export release-flow --format png --dest release-flow.png
+sketchi restore release-flow --revision 1
 ```
 
 Generate and persist a diagram through the public, unauthenticated Sketchi API:
@@ -73,9 +74,12 @@ Generate and persist a diagram through the public, unauthenticated Sketchi API:
 sketchi generate --prompt "Map release approval with pass and revise branches"
 ```
 
-`create`, `show`, `edit`, `list`, and `export` are deterministic, fully offline,
-and need no credentials. `generate` is the only network command and also needs
-no API key, token, account, or login. All commands support `--output json`.
+`create`, `show`, `edit`, `list`, `export`, and `restore` are deterministic,
+fully offline, and need no credentials. `generate`, `share`, and `pull` are
+explicit credential-free network commands, each making one HTTPS request.
+Share an immutable encrypted snapshot with `sketchi share release-flow`; after
+browser edits are exported to a new Excalidraw link, apply it with
+`sketchi pull release-flow --link URL`. All commands support `--output json`.
 PNG export renders on demand through Excalidraw plus bundled fonts and WASM when
 no PNG is stored, without modifying the record. PNG file exports include a
 generic inline-Markdown display hint for calling agents; export status uses

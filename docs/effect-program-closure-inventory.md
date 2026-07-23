@@ -88,8 +88,8 @@ manifests are an exact allowlist. Source imports no Zod. Shared/domain schemas
 are Effect Schema contracts; Standard Schema or synchronous decoders appear
 only at framework edges.
 
-The public CLI surface is exactly `create`, `show`, `edit`, `list`, `export`,
-and `generate`. Scenario and harness entrypoints stay internal. `generate`
-makes one unauthenticated HTTPS call to the public Sketchi generate API and
-holds no credential; the Cloudflare AI Gateway binding runs server-side. Manual
-commands remain offline.
+The public CLI surface is exactly `generate`, `create`, `show`, `edit`, `list`,
+`restore`, `share`, `pull`, and `export`. Scenario and harness entrypoints stay
+internal. The credential-free network commands are `generate`, `share`, and
+`pull`; `create`, `show`, `edit`, `list`, `restore`, and `export` remain
+strictly offline.
