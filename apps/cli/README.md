@@ -162,3 +162,7 @@ sketchi generate --help
 
 Source, issue tracking, and architecture documentation live in the
 [Sketchi repository](https://github.com/shpitdev/sketchi).
+
+See the [changelog](https://github.com/shpitdev/sketchi/blob/main/apps/cli/CHANGELOG.md)
+for everything that changed, or browse published versions on
+[GitHub Releases](https://github.com/shpitdev/sketchi/releases).

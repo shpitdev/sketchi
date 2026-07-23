@@ -31,3 +31,5 @@ jobs:
         with:
           version: pnpm changeset version
           createGithubReleases: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

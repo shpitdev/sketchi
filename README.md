@@ -85,6 +85,9 @@ Generate completions directly with `sketchi --completions zsh`,
 [complete CLI guide](apps/cli/README.md) for file/stdin input, completion setup,
 storage details, and agent-oriented usage.
 
+See the CLI [changelog](apps/cli/CHANGELOG.md) for what changed, or browse
+published versions on [GitHub Releases](https://github.com/shpitdev/sketchi/releases).
+
 ### Shell completions
 
 The installer configures Zsh, Bash, or Fish completions for the detected shell.

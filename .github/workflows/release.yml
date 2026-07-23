@@ -125,3 +125,40 @@ jobs:
           fi
           git tag "$tag" "$GITHUB_SHA"
           git push origin "$tag"
+
+  release:
+    needs: [guard, publish, tag]
+    if: ${{ needs.guard.outputs.publish == 'true' }}
+    runs-on: ubuntu-latest
+    # contents: write is scoped to this job only, purely to create the GitHub Release.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="cli-v$VERSION"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "GitHub Release $tag already exists; idempotent rerun, nothing to do."
+            exit 0
+          fi
+
+          if ! awk -v heading="## $VERSION" '
+            $0 == heading { found = 1; print; next }
+            found && /^## / { exit }
+            found { print }
+            END { if (!found) exit 1 }
+          ' apps/cli/CHANGELOG.md > release-notes.md; then
+            echo "Missing $tag section in apps/cli/CHANGELOG.md." >&2
+            exit 1
+          fi
+
+          gh release create "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "sketchi v$VERSION" \
+            --notes-file release-notes.md \
+            --verify-tag
