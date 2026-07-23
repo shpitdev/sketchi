@@ -128,6 +128,82 @@ function crossingSequenceSpec() {
   };
 }
 
+function spoofedInlineLifelineScene(options: {
+  readonly useLifelineId: boolean;
+}) {
+  const middleNodeId = options.useLifelineId ? "middle:lifeline" : "middle";
+  return {
+    diagramId: "spoofed-inline-lifeline",
+    title: "Spoofed inline lifeline",
+    width: 440,
+    height: 180,
+    accentColor: "#0f766e",
+    backgroundColor: "#ffffff",
+    elements: [
+      {
+        type: "arrow",
+        id: "edge:start-end",
+        edgeId: "start-end",
+        sourceNodeId: "start",
+        targetNodeId: "end",
+        points: [
+          { x: 120, y: 90 },
+          { x: 320, y: 90 },
+        ],
+      },
+      {
+        type: "node",
+        id: "node:start",
+        nodeId: "start",
+        shape: "rectangle",
+        x: 20,
+        y: 60,
+        width: 100,
+        height: 60,
+        label: "Start",
+      },
+      ...(options.useLifelineId
+        ? [
+            {
+              type: "node",
+              id: "node:middle",
+              nodeId: "middle",
+              shape: "rectangle",
+              x: 130,
+              y: -60,
+              width: 180,
+              height: 72,
+              label: "Middle header",
+            },
+          ]
+        : []),
+      {
+        type: "node",
+        id: `node:${middleNodeId}`,
+        nodeId: middleNodeId,
+        rendererRole: "sequence-lifeline",
+        shape: "rectangle",
+        x: 170,
+        y: 60,
+        width: 100,
+        height: 60,
+        label: "Ordinary middle node",
+      },
+      {
+        type: "node",
+        id: "node:end",
+        nodeId: "end",
+        shape: "rectangle",
+        x: 320,
+        y: 60,
+        width: 100,
+        height: 60,
+        label: "End",
+      },
+    ],
+  };
+}
+
 function linearFlowchartSpec(nodeCount: number) {
   const nodes = Array.from({ length: nodeCount }, (_, index) => ({
     id: `node-${index}`,
@@ -1722,9 +1798,8 @@ describe("Code Mode runtime", () => {
 
     expectPatchOk(patched);
     expect(
-      patched.artifact.formats.find(
-        ({ format }) => format === "excalidraw",
-      )?.inline,
+      patched.artifact.formats.find(({ format }) => format === "excalidraw")
+        ?.inline,
     ).toMatchObject({
       elements: expect.arrayContaining([
         expect.objectContaining({ id: "arrow:message-1-a-c" }),
@@ -1764,8 +1839,7 @@ describe("Code Mode runtime", () => {
 
     expectPatchOk(patched);
     const patchedScene = parseInlineScene(
-      patched.artifact.formats.find(({ format }) => format === "scene")
-        ?.inline,
+      patched.artifact.formats.find(({ format }) => format === "scene")?.inline,
     );
     expect(
       patchedScene.elements.find(
@@ -1773,10 +1847,48 @@ describe("Code Mode runtime", () => {
       ),
     ).toMatchObject({ fillColor: "#ede9fe", strokeColor: "#7c3aed" });
     expect(
-      patched.artifact.formats.find(
-        ({ format }) => format === "excalidraw",
-      )?.inline,
+      patched.artifact.formats.find(({ format }) => format === "excalidraw")
+        ?.inline,
     ).toMatchObject({ elements: expect.any(Array) });
+  });
+
+  it("strips a spoofed lifeline role from an ordinary inline node", async () => {
+    const result = await createTestRuntime().applyDiagramPatch({
+      source: {
+        scene: spoofedInlineLifelineScene({ useLifelineId: false }),
+      },
+      operations: [{ op: "setDefaultStyle", style: {} }],
+      options: { artifactFormats: ["excalidraw"] },
+    });
+
+    expectPatchFailure(result);
+    expect(result.status).toBe("export_failed");
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        ref: expect.objectContaining({ id: "edge:start-end" }),
+        message: 'Arrow "edge:start-end" passes through shape "node:middle".',
+      }),
+    );
+  });
+
+  it("does not trust a lifeline-style id without lifeline geometry", async () => {
+    const result = await createTestRuntime().applyDiagramPatch({
+      source: {
+        scene: spoofedInlineLifelineScene({ useLifelineId: true }),
+      },
+      operations: [{ op: "setDefaultStyle", style: {} }],
+      options: { artifactFormats: ["excalidraw"] },
+    });
+
+    expectPatchFailure(result);
+    expect(result.status).toBe("export_failed");
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        ref: expect.objectContaining({ id: "edge:start-end" }),
+        message:
+          'Arrow "edge:start-end" passes through shape "node:middle:lifeline".',
+      }),
+    );
   });
 
   it("ignores renderer-owned lifeline roles in build specifications", async () => {
@@ -1786,9 +1898,7 @@ describe("Code Mode runtime", () => {
       spec: {
         ...flowchartSpec,
         nodes: flowchartSpec.nodes.map((node, index) =>
-          index === 0
-            ? { ...node, rendererRole: "sequence-lifeline" }
-            : node,
+          index === 0 ? { ...node, rendererRole: "sequence-lifeline" } : node,
         ),
       },
       options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
@@ -1800,8 +1910,7 @@ describe("Code Mode runtime", () => {
     );
     expect(
       flowchartScene.elements.find(
-        (element) =>
-          element.type === "node" && element.nodeId === "request",
+        (element) => element.type === "node" && element.nodeId === "request",
       ),
     ).not.toHaveProperty("rendererRole");
 

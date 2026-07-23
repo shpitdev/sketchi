@@ -47,6 +47,59 @@ export function sequenceLifelineId(participantId: string): string {
   return `${participantId}:lifeline`;
 }
 
+interface SequenceLifelineStructureNode {
+  readonly type: "node";
+  readonly id: string;
+  readonly nodeId: string;
+  readonly shape: string;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+interface SequenceLifelineStructureScene {
+  readonly elements: readonly (
+    | SequenceLifelineStructureNode
+    | { readonly type: "arrow" | "text"; readonly id: string }
+  )[];
+}
+
+export function isStructurallyValidSequenceLifeline(
+  scene: SequenceLifelineStructureScene,
+  element: SequenceLifelineStructureNode,
+): boolean {
+  const suffix = ":lifeline";
+  if (
+    !element.nodeId.endsWith(suffix) ||
+    element.id !== `node:${element.nodeId}` ||
+    element.shape !== "rectangle" ||
+    element.width !== LIFELINE_WIDTH ||
+    element.height < MESSAGE_TOP_GAP + LIFELINE_BOTTOM_GAP
+  ) {
+    return false;
+  }
+
+  const participantId = element.nodeId.slice(0, -suffix.length);
+  if (participantId.length === 0) {
+    return false;
+  }
+  const header = scene.elements.find(
+    (candidate): candidate is SequenceLifelineStructureNode =>
+      candidate.type === "node" &&
+      candidate.id === `node:${participantId}` &&
+      candidate.nodeId === participantId,
+  );
+  if (!header) {
+    return false;
+  }
+
+  return (
+    element.x + element.width / 2 === header.x + header.width / 2 &&
+    element.y >= header.y + header.height
+  );
+}
+
 /** Render a validated semantic sequence specification without graph normalization. */
 export function renderSequenceDiagram(
   input: SequenceDiagramInput,

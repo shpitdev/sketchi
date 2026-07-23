@@ -17,6 +17,7 @@ import {
 import {
   renderIntermediateDiagram,
   renderSequenceDiagram,
+  isStructurallyValidSequenceLifeline,
   sequenceLifelineId,
   type RenderedDiagramScene,
   type ScenePoint,
@@ -1182,7 +1183,8 @@ function normalizePatchableScene(
         id: element.id,
         nodeId: element.nodeId,
         ...(element.kind ? { kind: element.kind } : {}),
-        ...(element.rendererRole
+        ...(element.rendererRole === "sequence-lifeline" &&
+        isStructurallyValidSequenceLifeline(scene, element)
           ? { rendererRole: element.rendererRole }
           : {}),
         shape: element.shape,
