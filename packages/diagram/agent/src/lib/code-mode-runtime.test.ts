@@ -116,6 +116,18 @@ function checkoutSequenceSpec() {
   };
 }
 
+function crossingSequenceSpec() {
+  return {
+    title: "Crossing sequence",
+    participants: [
+      { id: "a", label: "A" },
+      { id: "b", label: "B" },
+      { id: "c", label: "C" },
+    ],
+    messages: [{ source: "a", target: "c", label: "Cross B" }],
+  };
+}
+
 function linearFlowchartSpec(nodeCount: number) {
   const nodes = Array.from({ length: nodeCount }, (_, index) => ({
     id: `node-${index}`,
@@ -1681,6 +1693,148 @@ describe("Code Mode runtime", () => {
         }),
       ]),
     });
+  });
+
+  it("round-trips a crossing sequence through a no-op inline-scene patch", async () => {
+    const runtime = createTestRuntime();
+    const built = await runtime.buildSequenceDiagram({
+      spec: crossingSequenceSpec(),
+      options: {
+        artifactFormats: ["scene", "excalidraw"],
+        inlineArtifacts: ["scene"],
+      },
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) throw new Error("Expected accepted sequence diagram.");
+    const sourceScene = built.artifact.formats.find(
+      ({ format }) => format === "scene",
+    )?.inline;
+    expect(sourceScene).toBeDefined();
+
+    const patched = await runtime.applyDiagramPatch({
+      source: { scene: sourceScene },
+      operations: [{ op: "setDefaultStyle", style: {} }],
+      options: {
+        artifactFormats: ["scene", "excalidraw"],
+        inlineArtifacts: ["scene", "excalidraw"],
+      },
+    });
+
+    expectPatchOk(patched);
+    expect(
+      patched.artifact.formats.find(
+        ({ format }) => format === "excalidraw",
+      )?.inline,
+    ).toMatchObject({
+      elements: expect.arrayContaining([
+        expect.objectContaining({ id: "arrow:message-1-a-c" }),
+      ]),
+    });
+  });
+
+  it("styles a crossing sequence through an inline-scene patch", async () => {
+    const runtime = createTestRuntime();
+    const built = await runtime.buildSequenceDiagram({
+      spec: crossingSequenceSpec(),
+      options: {
+        artifactFormats: ["scene"],
+        inlineArtifacts: ["scene"],
+      },
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) throw new Error("Expected accepted sequence diagram.");
+    const sourceScene = built.artifact.formats.find(
+      ({ format }) => format === "scene",
+    )?.inline;
+
+    const patched = await runtime.applyDiagramPatch({
+      source: { scene: sourceScene },
+      operations: [
+        {
+          op: "setStyle",
+          selector: { nodeIds: ["b"] },
+          style: { fillColor: "#ede9fe", strokeColor: "#7c3aed" },
+        },
+      ],
+      options: {
+        artifactFormats: ["scene", "excalidraw"],
+        inlineArtifacts: ["scene", "excalidraw"],
+      },
+    });
+
+    expectPatchOk(patched);
+    const patchedScene = parseInlineScene(
+      patched.artifact.formats.find(({ format }) => format === "scene")
+        ?.inline,
+    );
+    expect(
+      patchedScene.elements.find(
+        (element) => element.type === "node" && element.nodeId === "b",
+      ),
+    ).toMatchObject({ fillColor: "#ede9fe", strokeColor: "#7c3aed" });
+    expect(
+      patched.artifact.formats.find(
+        ({ format }) => format === "excalidraw",
+      )?.inline,
+    ).toMatchObject({ elements: expect.any(Array) });
+  });
+
+  it("ignores renderer-owned lifeline roles in build specifications", async () => {
+    const runtime = createTestRuntime();
+    const flowchartSpec = approvalSpec();
+    const flowchart = await runtime.buildFlowchart({
+      spec: {
+        ...flowchartSpec,
+        nodes: flowchartSpec.nodes.map((node, index) =>
+          index === 0
+            ? { ...node, rendererRole: "sequence-lifeline" }
+            : node,
+        ),
+      },
+      options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+    });
+    expectBuildOk(flowchart);
+    const flowchartScene = parseInlineScene(
+      flowchart.artifact.formats.find(({ format }) => format === "scene")
+        ?.inline,
+    );
+    expect(
+      flowchartScene.elements.find(
+        (element) =>
+          element.type === "node" && element.nodeId === "request",
+      ),
+    ).not.toHaveProperty("rendererRole");
+
+    const sequenceSpec = crossingSequenceSpec();
+    const sequence = await runtime.buildSequenceDiagram({
+      spec: {
+        ...sequenceSpec,
+        participants: sequenceSpec.participants.map((participant, index) =>
+          index === 1
+            ? { ...participant, rendererRole: "sequence-lifeline" }
+            : participant,
+        ),
+      },
+      options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+    });
+    expect(sequence.ok).toBe(true);
+    if (!sequence.ok) throw new Error("Expected accepted sequence diagram.");
+    const sequenceScene = parseInlineScene(
+      sequence.artifact.formats.find(({ format }) => format === "scene")
+        ?.inline,
+    );
+    expect(
+      sequenceScene.elements.find(
+        (element) => element.type === "node" && element.nodeId === "b",
+      ),
+    ).not.toHaveProperty("rendererRole");
+    expect(
+      sequenceScene.elements.filter(
+        (element) =>
+          element.type === "node" &&
+          element.rendererRole === "sequence-lifeline",
+      ),
+    ).toHaveLength(3);
   });
 
   it("returns repairable issues for invalid participant references and self messages", async () => {

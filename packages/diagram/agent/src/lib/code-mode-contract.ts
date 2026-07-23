@@ -1151,44 +1151,11 @@ export class ArtifactPatchSource extends Schema.Class<ArtifactPatchSource>(
   { identifier: undefined },
 ) {}
 
-const InlineNodeSceneElement = Schema.Struct({
-  type: stringLiteral("node"),
-  id: RequiredNonEmptyString,
-  nodeId: RequiredNonEmptyString,
-  kind: optionalContract(NonEmptyString),
-  shape: literals(["rectangle", "ellipse", "diamond", "circle"]).pipe(
-    Schema.mutableKey,
-  ),
-  fillColor: optionalContract(HexColor).pipe(Schema.mutableKey),
-  strokeColor: optionalContract(HexColor).pipe(Schema.mutableKey),
-  textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
-  x: FiniteNumber.pipe(Schema.mutableKey),
-  y: FiniteNumber.pipe(Schema.mutableKey),
-  width: PositiveNumber.pipe(Schema.mutableKey),
-  height: PositiveNumber.pipe(Schema.mutableKey),
-  label: RequiredNonEmptyString.pipe(Schema.mutableKey),
-});
-const InlineSceneElementSchema = Schema.Union(
-  [InlineNodeSceneElement, TextSceneElement, ArrowSceneElement],
-  { mode: "oneOf" },
-);
-const InlineRenderedDiagramScene = Schema.Struct({
-  diagramId: RequiredNonEmptyString,
-  title: RequiredNonEmptyString,
-  width: PositiveNumber.pipe(Schema.mutableKey),
-  height: PositiveNumber.pipe(Schema.mutableKey),
-  accentColor: HexColor.pipe(Schema.mutableKey),
-  backgroundColor: HexColor.pipe(Schema.mutableKey),
-  elements: requiredArray(
-    Schema.Array(InlineSceneElementSchema).pipe(Schema.mutable),
-  ),
-});
-
 export class InlineScenePatchSource extends Schema.Class<InlineScenePatchSource>(
   "InlineScenePatchSource",
 )(
   {
-    scene: requiredObject(InlineRenderedDiagramScene),
+    scene: requiredObject(RenderedDiagramScene),
   },
   { identifier: undefined },
 ) {}

@@ -15,7 +15,6 @@ import { FastCheck } from "effect/testing";
 
 import { CodeModeArtifactStorageMemory } from "./code-mode-artifacts";
 import {
-  ApplyDiagramPatchRequestSchema,
   BuildFlowchartRequestSchema,
   BuildSequenceDiagramRequestSchema,
   DIAGRAM_PATCH_OPERATION_NAMES,
@@ -268,41 +267,6 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
       );
     }),
   );
-
-  it("does not accept renderer-owned lifeline roles from inline scenes", () => {
-    const request = ApplyDiagramPatchRequestSchema.parse({
-      source: {
-        scene: {
-          diagramId: "spoofed-lifeline",
-          title: "Spoofed lifeline",
-          width: 200,
-          height: 120,
-          accentColor: "#000000",
-          backgroundColor: "#ffffff",
-          elements: [
-            {
-              type: "node",
-              id: "node:ordinary",
-              nodeId: "ordinary",
-              rendererRole: "sequence-lifeline",
-              shape: "rectangle",
-              x: 20,
-              y: 20,
-              width: 100,
-              height: 60,
-              label: "Ordinary",
-            },
-          ],
-        },
-      },
-      operations: [{ op: "setDefaultStyle", style: {} }],
-    });
-
-    assert.isTrue("scene" in request.source);
-    if ("scene" in request.source) {
-      assert.notProperty(request.source.scene.elements[0], "rendererRole");
-    }
-  });
 
   it.effect("forwards renderer cancellation and preserves interruption", () =>
     Effect.gen(function* () {
