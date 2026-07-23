@@ -7,6 +7,8 @@ import {
   BuildFlowchartResultSchema,
   BuildMindmapRequestSchema,
   BuildMindmapResultSchema,
+  BuildSequenceDiagramRequestSchema,
+  BuildSequenceDiagramResultSchema,
   GetArtifactRequestSchema,
   GetArtifactResultSchema,
 } from "@sketchi/diagram-agent";
@@ -26,6 +28,10 @@ export const CodeModeHttpSchemas = {
   buildMindmap: {
     input: toPlaygroundStandardSchema(BuildMindmapRequestSchema),
     output: toPlaygroundStandardSchema(BuildMindmapResultSchema),
+  },
+  buildSequenceDiagram: {
+    input: toPlaygroundStandardSchema(BuildSequenceDiagramRequestSchema),
+    output: toPlaygroundStandardSchema(BuildSequenceDiagramResultSchema),
   },
   getArtifact: {
     input: toPlaygroundStandardSchema(GetArtifactRequestSchema),

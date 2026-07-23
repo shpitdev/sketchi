@@ -38,6 +38,7 @@ export type CodeModeUsageOperation =
   | "applyDiagramPatch"
   | "buildFlowchart"
   | "buildMindmap"
+  | "buildSequenceDiagram"
   | "execute"
   | "generateDiagram";
 

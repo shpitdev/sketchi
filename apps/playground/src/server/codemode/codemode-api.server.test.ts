@@ -10,6 +10,7 @@ import {
   MAX_CODE_MODE_BUILD_REQUEST_BYTES,
   handleBuildFlowchartRequest as handleBuildFlowchartRequestEffect,
   handleBuildMindmapRequest as handleBuildMindmapRequestEffect,
+  handleBuildSequenceDiagramRequest as handleBuildSequenceDiagramRequestEffect,
   handleGetArtifactRequest as handleGetArtifactRequestEffect,
   handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
 } from "./codemode-api.server";
@@ -38,6 +39,13 @@ function handleBuildFlowchartRequest(env: StudioEnv, request: Request) {
 function handleBuildMindmapRequest(env: StudioEnv, request: Request) {
   return runPlaygroundEffect(
     handleBuildMindmapRequestEffect(request),
+    testBoundary(env, request),
+  );
+}
+
+function handleBuildSequenceDiagramRequest(env: StudioEnv, request: Request) {
+  return runPlaygroundEffect(
+    handleBuildSequenceDiagramRequestEffect(request),
     testBoundary(env, request),
   );
 }
@@ -77,6 +85,22 @@ function approvalSpec() {
       { source: "request", target: "approve" },
       { source: "approve", target: "done", label: "yes" },
       { source: "approve", target: "revise", label: "no" },
+    ],
+  };
+}
+
+function sequenceSpec() {
+  return {
+    title: "Worker API sequence",
+    participants: [
+      { id: "client", label: "Client" },
+      { id: "api", label: "API" },
+      { id: "store", label: "Store" },
+    ],
+    messages: [
+      { source: "client", target: "api", label: "Request" },
+      { source: "api", target: "store", label: "Read" },
+      { source: "store", target: "client", label: "Response" },
     ],
   };
 }
@@ -276,6 +300,34 @@ function delay(ms: number): Promise<void> {
 }
 
 describe("Code Mode API handlers", () => {
+  it("builds a public sequence diagram through the no-auth HTTP handler", async () => {
+    const response = await handleBuildSequenceDiagramRequest(
+      {},
+      postRequest("https://studio.test/api/v1/sequences/build", {
+        spec: sequenceSpec(),
+        options: {
+          artifactFormats: ["scene", "excalidraw"],
+          inlineArtifacts: ["excalidraw"],
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      status: "accepted",
+      normalizedSpec: {
+        participants: [{ id: "client" }, { id: "api" }, { id: "store" }],
+      },
+      artifact: {
+        formats: [
+          { format: "scene" },
+          { format: "excalidraw", inline: expect.any(Object) },
+        ],
+      },
+    });
+  });
+
   it("builds a public mindmap through the no-auth HTTP handler", async () => {
     const response = await handleBuildMindmapRequest(
       {},

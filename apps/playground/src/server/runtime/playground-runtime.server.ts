@@ -220,6 +220,7 @@ function normalizedRequestRoute(pathname: string): string {
     "/api/v1/flowcharts/build",
     "/api/v1/generate",
     "/api/v1/mindmaps/build",
+    "/api/v1/sequences/build",
     "/codemode-export-harness",
     "/mcp",
     "/projects",

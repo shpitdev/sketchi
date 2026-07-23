@@ -8,7 +8,10 @@ import {
   pharmaBatchDispositionFlowchart,
   parseFlowchartDiagram,
 } from "@sketchi/diagram-core";
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import {
+  renderIntermediateDiagram,
+  renderSequenceDiagram,
+} from "@sketchi/diagram-renderer";
 
 import {
   convertSceneToExcalidraw,
@@ -1188,5 +1191,30 @@ describe("convertSceneToExcalidraw", () => {
         elementId: "edge:clear-review",
       }),
     );
+  });
+
+  it("accepts sequence messages that cross intermediate lifelines", () => {
+    const scene = convertSceneToExcalidraw(
+      renderSequenceDiagram({
+        id: "cross-lifeline",
+        title: "Cross lifeline",
+        participants: [
+          { id: "left", label: "Left" },
+          { id: "middle", label: "Middle" },
+          { id: "right", label: "Right" },
+        ],
+        messages: [
+          {
+            id: "cross",
+            source: "left",
+            target: "right",
+            label: "Cross middle",
+          },
+        ],
+        style: { accentColor: "#000000", backgroundColor: "#ffffff" },
+      }),
+    );
+
+    expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
   });
 });

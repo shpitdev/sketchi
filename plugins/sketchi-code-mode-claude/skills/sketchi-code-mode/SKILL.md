@@ -1,6 +1,6 @@
 ---
 name: sketchi-code-mode
-description: Use Sketchi Code Mode when creating, editing, styling, or retrieving Sketchi flowchart or mindmap diagrams through the Sketchi MCP server.
+description: Use Sketchi Code Mode when creating, editing, styling, or retrieving Sketchi flowchart, mindmap, or sequence diagrams through the Sketchi MCP server.
 allowed-tools:
   - mcp__plugin_sketchi-code-mode-claude_sketchi-code-mode__docs
   - mcp__plugin_sketchi-code-mode-claude_sketchi-code-mode__search
@@ -15,7 +15,7 @@ Use the bundled `sketchi-code-mode` MCP server for Sketchi diagrams instead of r
 
 1. Call `docs` or `search` first when you need the current contract for graph input, patch input, artifact retrieval, or supported style fields.
 2. Use `execute` with an async JavaScript arrow function expression.
-3. Build structure with `sketchi.buildFlowchart(input)` for process graphs or `sketchi.buildMindmap(input)` for nested topic hierarchies.
+3. Build structure with `sketchi.buildFlowchart(input)` for process graphs, `sketchi.buildMindmap(input)` for nested topic hierarchies, or `sketchi.buildSequenceDiagram(input)` for chronological participant interactions.
 4. Apply non-structural visual edits with `sketchi.applyDiagramPatch(input)`.
 5. Only retrieve proof or output with `sketchi.getArtifact(input)` when you need raw Excalidraw/PNG metadata; do not fetch `scene` just to summarize the diagram.
 6. If the MCP text content begins with `Sketchi artifact ready.`, paste that first text block as the final chat response and stop.
@@ -105,6 +105,7 @@ https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/<artifactId>?format
 ## Guardrails
 
 - Keep IDs stable and readable.
+- Choose by the relationship being communicated: flowcharts for process paths and decisions, mind maps for topic hierarchy, and sequence diagrams for ordered messages between participants.
 - Express the real workflow semantics, but keep export readability in mind. For broad repo/system prompts, summarize into a readable 8-14 node flowchart with a mostly monotonic spine and short side branches.
 - Group related packages/systems into layers instead of drawing every transitive dependency edge. Prefer labels/descriptions for nuance over dense cross-links.
 - Prefer typed graph generation for adding, removing, or reconnecting nodes.

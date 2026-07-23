@@ -598,6 +598,69 @@ export const FlowchartSpecEdgeSchema = withParser(FlowchartSpecEdge);
 export const FlowchartSpecLayoutSchema = withParser(FlowchartSpecLayout);
 export const FlowchartSpecStyleSchema = withParser(FlowchartSpecStyle);
 
+export class SequenceParticipantSpec extends Schema.Class<SequenceParticipantSpec>(
+  "SequenceParticipantSpec",
+)(
+  {
+    id: RequiredNonEmptyString,
+    label: RequiredNonEmptyString,
+    kind: optionalContract(NonEmptyString),
+  },
+  { identifier: undefined },
+) {}
+
+export class SequenceMessageSpec extends Schema.Class<SequenceMessageSpec>(
+  "SequenceMessageSpec",
+)(
+  {
+    id: optionalContract(NonEmptyString),
+    source: RequiredNonEmptyString,
+    target: RequiredNonEmptyString,
+    label: RequiredNonEmptyString,
+    type: optionalContract(literals(["message", "return"])),
+    style: optionalContract(literals(["solid", "dashed"])),
+  },
+  { identifier: undefined },
+) {}
+
+const sequenceMessagesDefault: SequenceMessageSpec[] = [];
+const SequenceMessagesWithDefault = Schema.Array(SequenceMessageSpec)
+  .pipe(Schema.mutable)
+  .annotate({ default: sequenceMessagesDefault })
+  .pipe(Schema.withDecodingDefault(Effect.succeed(sequenceMessagesDefault)));
+const sequenceStyleDefault = {
+  accentColor: "#000000",
+  backgroundColor: "#ffffff",
+};
+const SequenceStyleWithDefault = Schema.Struct({
+  accentColor: hexColor(defaultAccentColor).pipe(
+    Schema.withDecodingDefault(Effect.succeed(defaultAccentColor)),
+  ),
+  backgroundColor: hexColor(defaultBackgroundColor).pipe(
+    Schema.withDecodingDefault(Effect.succeed(defaultBackgroundColor)),
+  ),
+})
+  .annotate({ default: sequenceStyleDefault })
+  .pipe(Schema.withDecodingDefault(Effect.succeed(sequenceStyleDefault)));
+
+export class SequenceDiagramSpec extends Schema.Class<SequenceDiagramSpec>(
+  "SequenceDiagramSpec",
+)(
+  {
+    id: optionalContract(NonEmptyString),
+    title: RequiredNonEmptyString,
+    participants: requiredArray(nonEmptyArray(SequenceParticipantSpec)),
+    messages: SequenceMessagesWithDefault,
+    style: SequenceStyleWithDefault,
+  },
+  { identifier: undefined },
+) {}
+export const SequenceDiagramSpecSchema = withParser(SequenceDiagramSpec);
+export const SequenceParticipantSpecSchema = withParser(
+  SequenceParticipantSpec,
+);
+export const SequenceMessageSpecSchema = withParser(SequenceMessageSpec);
+
 const ArtifactFormatsOption = optionalContract(
   nonEmptyArray(ArtifactFormatSchema),
 );
@@ -688,6 +751,20 @@ export const BuildFlowchartRequestSchema = Object.assign(
   {
     omit: (_keys: { readonly options: true }) => BuildFlowchartToolInputSchema,
   },
+);
+
+export class BuildSequenceDiagramRequest extends Schema.Class<BuildSequenceDiagramRequest>(
+  "BuildSequenceDiagramRequest",
+)(
+  {
+    requestId: optionalContract(NonEmptyString),
+    spec: requiredObject(SequenceDiagramSpec),
+    options: optionalContract(BuildFlowchartOptions),
+  },
+  { identifier: undefined },
+) {}
+export const BuildSequenceDiagramRequestSchema = withParser(
+  BuildSequenceDiagramRequest,
 );
 
 export interface MindmapTopicInput {
@@ -1129,6 +1206,14 @@ export interface NormalizedMindmapSpec {
   readonly style: Required<FlowchartSpecStyle>;
 }
 
+export interface NormalizedSequenceDiagramSpec {
+  readonly id: string;
+  readonly title: string;
+  readonly participants: SequenceParticipantSpec[];
+  readonly messages: Array<SequenceMessageSpec & { readonly id: string }>;
+  readonly style: Required<FlowchartSpecStyle>;
+}
+
 export interface QualityCheck {
   readonly code: string;
   readonly passed: boolean;
@@ -1197,6 +1282,18 @@ const NormalizedMindmapSpecSchema = Schema.Struct({
   title: NonEmptyString,
   root: NormalizedMindmapTopicSchema,
   layout: Schema.Struct({ direction: literals(["LR", "RL"]) }),
+  style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
+});
+const NormalizedSequenceDiagramSpecSchema = Schema.Struct({
+  id: NonEmptyString,
+  title: NonEmptyString,
+  participants: Schema.Array(SequenceParticipantSpec).pipe(Schema.mutable),
+  messages: Schema.Array(
+    SequenceMessageSpec.mapFields((fields) => ({
+      ...fields,
+      id: NonEmptyString,
+    })),
+  ).pipe(Schema.mutable),
   style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 const QualityCheckSchema = Schema.Struct({
@@ -1324,6 +1421,50 @@ export const BuildMindmapResultSchema = Schema.Union([
   BuildMindmapRejected,
 ]);
 export type BuildMindmapResult = typeof BuildMindmapResultSchema.Type;
+
+export class BuildSequenceDiagramAccepted extends Schema.Class<BuildSequenceDiagramAccepted>(
+  "BuildSequenceDiagramAccepted",
+)(
+  {
+    ok: booleanLiteral(true),
+    status: stringLiteral("accepted"),
+    buildId: Schema.String,
+    requestId: optionalContract(Schema.String),
+    normalizedSpec: NormalizedSequenceDiagramSpecSchema,
+    quality: QualityReportSchema,
+    artifact: ArtifactBundleSchema,
+    issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+  },
+  { identifier: undefined },
+) {}
+export class BuildSequenceDiagramRejected extends Schema.Class<BuildSequenceDiagramRejected>(
+  "BuildSequenceDiagramRejected",
+)(
+  {
+    ok: booleanLiteral(false),
+    status: literals([
+      "invalid_input",
+      "invalid_sequence",
+      "quality_failed",
+      "render_failed",
+      "export_failed",
+      "storage_failed",
+    ]),
+    buildId: optionalContract(Schema.String),
+    requestId: optionalContract(Schema.String),
+    normalizedSpec: optionalContract(NormalizedSequenceDiagramSpecSchema),
+    quality: optionalContract(QualityReportSchema),
+    partial: optionalContract(PartialArtifactBundleSchema),
+    issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+  },
+  { identifier: undefined },
+) {}
+export const BuildSequenceDiagramResultSchema = Schema.Union([
+  BuildSequenceDiagramAccepted,
+  BuildSequenceDiagramRejected,
+]);
+export type BuildSequenceDiagramResult =
+  typeof BuildSequenceDiagramResultSchema.Type;
 
 export class GetArtifactAccepted extends Schema.Class<GetArtifactAccepted>(
   "GetArtifactAccepted",

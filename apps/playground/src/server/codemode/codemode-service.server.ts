@@ -4,6 +4,7 @@ import {
   applyDiagramPatch,
   buildFlowchart,
   buildMindmap,
+  buildSequenceDiagram,
   CodeModeArtifactStorage,
   CodeModeRuntimeEnvironment,
   getArtifact,
@@ -13,6 +14,7 @@ import {
   type ArtifactFormat,
   type BuildFlowchartResult,
   type BuildMindmapResult,
+  type BuildSequenceDiagramResult,
   type CodeModeArtifactStorageError,
   type CodeModeArtifactStorageShape,
   type CodeModeRuntimeOptions,
@@ -50,6 +52,9 @@ export interface PlaygroundCodeModeShape {
   readonly buildMindmap: (
     input: unknown,
   ) => Effect.Effect<BuildMindmapResult, never, CodeModeRequestContext>;
+  readonly buildSequenceDiagram: (
+    input: unknown,
+  ) => Effect.Effect<BuildSequenceDiagramResult, never, CodeModeRequestContext>;
   readonly getArtifact: (
     input: unknown,
   ) => Effect.Effect<GetArtifactResult, never, CodeModeRequestContext>;
@@ -169,6 +174,9 @@ export const PlaygroundCodeModeLive = Layer.effect(
       buildMindmap: Effect.fn("playground.codeMode.buildMindmap")((input) =>
         provideRequestCodeMode(buildMindmap(input)),
       ),
+      buildSequenceDiagram: Effect.fn(
+        "playground.codeMode.buildSequenceDiagram",
+      )((input) => provideRequestCodeMode(buildSequenceDiagram(input))),
       getArtifact: Effect.fn("playground.codeMode.getArtifact")((input) =>
         provideRequestCodeMode(getArtifact(input)),
       ),

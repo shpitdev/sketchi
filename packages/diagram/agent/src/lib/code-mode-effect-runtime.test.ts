@@ -11,6 +11,7 @@ import { FastCheck } from "effect/testing";
 import { CodeModeArtifactStorageMemory } from "./code-mode-artifacts";
 import {
   BuildFlowchartRequestSchema,
+  BuildSequenceDiagramRequestSchema,
   DIAGRAM_PATCH_OPERATION_NAMES,
   MindmapTopicSchema,
 } from "./code-mode-contract";
@@ -160,6 +161,64 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
           yield* Schema.decodeUnknownEffect(MindmapTopicSchema)(encoded);
         assert.deepStrictEqual(decoded, topic);
       }),
+  );
+
+  it.effect("validates and defaults the sequence diagram contract", () =>
+    Effect.gen(function* () {
+      const decoded = BuildSequenceDiagramRequestSchema.parse({
+        spec: {
+          title: "Checkout",
+          participants: [
+            { id: "customer", label: "Customer" },
+            { id: "store", label: "Store" },
+          ],
+          messages: [
+            {
+              source: "customer",
+              target: "store",
+              label: "Checkout",
+              type: "message",
+            },
+          ],
+        },
+      });
+      const encoded = yield* Schema.encodeEffect(
+        BuildSequenceDiagramRequestSchema,
+      )(decoded);
+      assert.deepStrictEqual(encoded, {
+        spec: {
+          title: "Checkout",
+          participants: [
+            { id: "customer", label: "Customer" },
+            { id: "store", label: "Store" },
+          ],
+          messages: [
+            {
+              source: "customer",
+              target: "store",
+              label: "Checkout",
+              type: "message",
+            },
+          ],
+          style: { accentColor: "#000000", backgroundColor: "#ffffff" },
+        },
+      });
+
+      const malformed = BuildSequenceDiagramRequestSchema.safeParse({
+        spec: {
+          title: "Checkout",
+          participants: [{ id: "store", label: "Store" }],
+          messages: [{ source: "store", target: "store" }],
+        },
+      });
+      assert.isFalse(malformed.success);
+      if (malformed.success) {
+        return assert.fail("Malformed sequence message unexpectedly decoded.");
+      }
+      assert.deepInclude(malformed.error.issues[0], {
+        path: ["spec", "messages", 0, "label"],
+      });
+    }),
   );
 
   it.effect("forwards renderer cancellation and preserves interruption", () =>

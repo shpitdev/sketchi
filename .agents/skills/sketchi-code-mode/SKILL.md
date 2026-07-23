@@ -11,7 +11,7 @@ When the user asks to use `sketchi-code-mode`, use the configured MCP server too
 
 1. If syntax is unclear, call `sketchi-code-mode/docs` or `sketchi-code-mode/search`.
 2. Call `sketchi-code-mode/execute` with an async JavaScript arrow function.
-3. Inside the function, use `sketchi.buildFlowchart` for process graphs or `sketchi.buildMindmap` for nested topic hierarchies, then `sketchi.applyDiagramPatch` only for styling or supported visual edits.
+3. Inside the function, use `sketchi.buildFlowchart` for process graphs, `sketchi.buildMindmap` for nested topic hierarchies, or `sketchi.buildSequenceDiagram` for chronological participant interactions, then `sketchi.applyDiagramPatch` only for styling or supported visual edits.
 4. Request user-facing artifacts:
 
 ```js
@@ -34,6 +34,7 @@ options: {
 - `scene` is for patching and debugging only. `excalidraw` and `png` are the user-facing outputs.
 - If local repo context is needed, inspect files only to understand the graph, then send the final graph to the MCP execute tool.
 - For vague repo/system architecture prompts, summarize into a readable 8-14 node flowchart. Prefer a mostly monotonic spine with short side branches; group related packages/systems into layers instead of drawing every transitive dependency edge.
+- Choose by the relationship being communicated: flowcharts for process paths and decisions, mind maps for topic hierarchy, and sequence diagrams for ordered messages between participants.
 - Do not prompt the user to authenticate to Sketchi or add credentials. The deployed MCP endpoint is public.
 - Do not install or require a local browser. The deployed Studio Worker renders PNG artifacts through Cloudflare Browser Run.
 - If PNG export fails with a hosted renderer error, retry the hosted MCP request once. If it still fails, return the Excalidraw URL and clearly say PNG export is unavailable. Do not fall back to local rendering or remove PNG silently.

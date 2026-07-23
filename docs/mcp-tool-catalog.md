@@ -159,6 +159,7 @@ interface DocsRequest {
     | "execute"
     | "buildFlowchart"
     | "buildMindmap"
+    | "buildSequenceDiagram"
     | "getArtifact"
     | "applyDiagramPatch"
     | "patchOperations"
@@ -233,6 +234,9 @@ Inside `execute`, the sandbox receives this namespace:
 declare const sketchi: {
   buildFlowchart(input: BuildFlowchartRequest): Promise<BuildFlowchartResult>;
   buildMindmap(input: BuildMindmapRequest): Promise<BuildMindmapResult>;
+  buildSequenceDiagram(
+    input: BuildSequenceDiagramRequest,
+  ): Promise<BuildSequenceDiagramResult>;
   getArtifact(input: GetArtifactRequest): Promise<GetArtifactResult>;
   applyDiagramPatch(
     input: ApplyDiagramPatchRequest,
@@ -252,7 +256,7 @@ host dispatcher. A future HTTP adapter can expose the same contracts directly.
 flowchart LR
   Code["sandbox<br/>sketchi.*"]
   Dispatcher["host dispatcher"]
-  Build["POST /api/v1/flowcharts/build"]
+  Build["POST /api/v1/{flowcharts,mindmaps,sequences}/build"]
   Artifact["GET /api/v1/artifacts/:artifactId"]
   Patch["POST /api/v1/artifacts/:artifactId/patch"]
   Runtime["shared runtime"]
@@ -266,18 +270,19 @@ flowchart LR
   Patch --> Runtime
 ```
 
-| Host operation                             | Code Mode function                 | Public now?           |
-| ------------------------------------------ | ---------------------------------- | --------------------- |
-| `POST /api/v1/flowcharts/build`            | `sketchi.buildFlowchart(input)`    | Yes                   |
-| `POST /api/v1/mindmaps/build`              | `sketchi.buildMindmap(input)`      | Yes                   |
-| `GET /api/v1/artifacts/:artifactId`        | `sketchi.getArtifact(input)`       | Yes                   |
-| `POST /api/v1/artifacts/:artifactId/patch` | `sketchi.applyDiagramPatch(input)` | Yes                   |
-| validate IR                                | none                               | No, internal to build |
-| grade quality                              | none                               | No, internal to build |
-| render scene                               | none                               | No, internal to build |
-| export Excalidraw                          | none                               | No, internal to build |
-| draft from prompt                          | none                               | No, later             |
-| managed thread                             | none                               | No, later             |
+| Host operation                             | Code Mode function                    | Public now?           |
+| ------------------------------------------ | ------------------------------------- | --------------------- |
+| `POST /api/v1/flowcharts/build`            | `sketchi.buildFlowchart(input)`       | Yes                   |
+| `POST /api/v1/mindmaps/build`              | `sketchi.buildMindmap(input)`         | Yes                   |
+| `POST /api/v1/sequences/build`             | `sketchi.buildSequenceDiagram(input)` | Yes                   |
+| `GET /api/v1/artifacts/:artifactId`        | `sketchi.getArtifact(input)`          | Yes                   |
+| `POST /api/v1/artifacts/:artifactId/patch` | `sketchi.applyDiagramPatch(input)`    | Yes                   |
+| validate IR                                | none                                  | No, internal to build |
+| grade quality                              | none                                  | No, internal to build |
+| render scene                               | none                                  | No, internal to build |
+| export Excalidraw                          | none                                  | No, internal to build |
+| draft from prompt                          | none                                  | No, later             |
+| managed thread                             | none                                  | No, later             |
 
 ## Agent Sequencing
 
@@ -374,6 +379,27 @@ interface BuildMindmapRequest {
   requestId?: string;
   spec: MindmapSpec;
   options?: BuildFlowchartOptions;
+}
+
+interface BuildSequenceDiagramRequest {
+  requestId?: string;
+  spec: SequenceDiagramSpec;
+  options?: BuildFlowchartOptions;
+}
+
+interface SequenceDiagramSpec {
+  id?: string;
+  title: string;
+  participants: Array<{ id: string; label: string; kind?: string }>;
+  messages?: Array<{
+    id?: string;
+    source: string;
+    target: string;
+    label: string;
+    type?: "message" | "return";
+    style?: "solid" | "dashed";
+  }>;
+  style?: FlowchartStyle;
 }
 
 interface MindmapSpec {
@@ -807,7 +833,7 @@ as a manifest plus one object per format. A patched artifact manifest records
 `provenance.sourceArtifactId`, so every stored format resolves to the same
 durable source reference; root build artifacts omit provenance. Studio Worker
 deployments bind `SKETCHI_ARTIFACTS` to R2 so
-`buildFlowchart/buildMindmap -> getArtifact -> applyDiagramPatch` can cross request
+`buildFlowchart/buildMindmap/buildSequenceDiagram -> getArtifact -> applyDiagramPatch` can cross request
 boundaries.
 
 | Environment       | Bucket                                         |
@@ -882,7 +908,7 @@ interface GetArtifactFailure {
 ## `applyDiagramPatch`
 
 `applyDiagramPatch` is the codemod-style operation for deterministic visual
-changes after a flowchart or mindmap artifact has already been accepted. It should handle
+changes after a flowchart, mindmap, or sequence artifact has already been accepted. It should handle
 common user requests such as changing colors, switching node shapes, shifting a
 group, replacing text, or rerouting edges without asking the agent to edit raw
 Excalidraw JSON.
@@ -1013,8 +1039,8 @@ type DiagramShape = "rectangle" | "diamond" | "ellipse" | "circle";
 The first patch operation set is deliberately non-structural. It can restyle,
 reshape, move, rename, and reroute existing elements, but it cannot create or
 delete nodes or edges. If a user asks to change the graph itself, the agent
-should repair the semantic spec and call the matching `buildFlowchart` or
-`buildMindmap` operation again.
+should repair the semantic spec and call the matching `buildFlowchart`,
+`buildMindmap`, or `buildSequenceDiagram` operation again.
 
 ```ts
 type ApplyDiagramPatchResult =

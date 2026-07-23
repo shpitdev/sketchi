@@ -296,6 +296,7 @@ function arrowElement(input: {
     startArrowhead: null,
     startBinding: bindingForShape(input.sourceShape, start),
     strokeColor: input.arrow.strokeColor ?? input.scene.accentColor,
+    strokeStyle: input.arrow.strokeStyle ?? "solid",
   };
 }
 
@@ -718,6 +719,7 @@ function arrowSegmentsThroughShapes(
   for (const segment of segments) {
     for (const shape of shapes) {
       if (
+        shape.id.endsWith(":lifeline") ||
         shape.id === segment.startBindingElementId ||
         shape.id === segment.endBindingElementId
       ) {

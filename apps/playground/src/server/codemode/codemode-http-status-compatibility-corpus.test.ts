@@ -49,6 +49,8 @@ vi.mock("./codemode-service.server", async (importOriginal) => {
         ),
       buildMindmap: () =>
         Effect.succeed(runtimeResults.getBuildMindmap() as BuildMindmapResult),
+      buildSequenceDiagram: () =>
+        Effect.die("Sequence diagrams are outside the frozen v1 corpus."),
       getArtifact: () =>
         Effect.succeed(runtimeResults.getGetArtifact() as GetArtifactResult),
       readStoredArtifact: () => Effect.succeed(null),

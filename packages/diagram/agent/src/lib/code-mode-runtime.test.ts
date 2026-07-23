@@ -28,6 +28,7 @@ import {
   applyDiagramPatch,
   buildFlowchart,
   buildMindmap,
+  buildSequenceDiagram,
   CodeModeRuntimeEnvironment,
   getArtifact,
   type CodeModeRuntimeOptions,
@@ -63,6 +64,7 @@ function makeTestRuntime(
     applyDiagramPatch: (input: unknown) => run(applyDiagramPatch(input)),
     buildFlowchart: (input: unknown) => run(buildFlowchart(input)),
     buildMindmap: (input: unknown) => run(buildMindmap(input)),
+    buildSequenceDiagram: (input: unknown) => run(buildSequenceDiagram(input)),
     getArtifact: (input: unknown) => run(getArtifact(input)),
   };
 }
@@ -90,6 +92,27 @@ function approvalSpec() {
       { source: "approve", target: "revise", label: "no" },
     ],
     layout: { direction: "TB" },
+  };
+}
+
+function checkoutSequenceSpec() {
+  return {
+    title: "Checkout sequence",
+    participants: [
+      { id: "customer", label: "Customer" },
+      { id: "store", label: "Store" },
+      { id: "payments", label: "Payments" },
+    ],
+    messages: [
+      { source: "customer", target: "store", label: "Checkout" },
+      { source: "store", target: "payments", label: "Authorize" },
+      {
+        source: "payments",
+        target: "customer",
+        label: "Approved",
+        type: "return",
+      },
+    ],
   };
 }
 
@@ -1612,5 +1635,101 @@ describe("Code Mode runtime", () => {
     expect([...bucket.objects.keys()].sort()).toEqual([
       "codemode/artifact-2/scene.json",
     ]);
+  });
+
+  it("builds a native sequence scene and exports every requested artifact", async () => {
+    const runtime = makeTestRuntime({
+      renderer: {
+        renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
+      },
+    });
+    const result = await runtime.buildSequenceDiagram({
+      spec: checkoutSequenceSpec(),
+      options: {
+        artifactFormats: ["scene", "excalidraw", "png"],
+        inlineArtifacts: ["excalidraw"],
+      },
+    });
+
+    expect(result.issues).toEqual([]);
+    expect(result).toMatchObject({ ok: true, status: "accepted" });
+    if (!result.ok) throw new Error("Expected accepted sequence diagram.");
+    expect(result.normalizedSpec.participants.map(({ id }) => id)).toEqual([
+      "customer",
+      "store",
+      "payments",
+    ]);
+    expect(result.normalizedSpec.messages.map(({ label }) => label)).toEqual([
+      "Checkout",
+      "Authorize",
+      "Approved",
+    ]);
+    expect(result.artifact.formats.map(({ format }) => format)).toEqual([
+      "scene",
+      "excalidraw",
+      "png",
+    ]);
+    const excalidraw = result.artifact.formats.find(
+      ({ format }) => format === "excalidraw",
+    );
+    expect(excalidraw).toHaveProperty("inline");
+    expect(excalidraw?.inline).toMatchObject({
+      elements: expect.arrayContaining([
+        expect.objectContaining({
+          id: "arrow:message-3-payments-customer",
+          strokeStyle: "dashed",
+        }),
+      ]),
+    });
+  });
+
+  it("returns repairable issues for invalid participant references and self messages", async () => {
+    const spec = checkoutSequenceSpec();
+    const result = await createTestRuntime().buildSequenceDiagram({
+      spec: {
+        ...spec,
+        messages: [
+          { source: "missing", target: "store", label: "Unknown sender" },
+          { source: "store", target: "store", label: "Self message" },
+        ],
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "invalid_sequence",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "missing_edge_source",
+          hint: expect.stringContaining("participant"),
+        }),
+        expect.objectContaining({
+          code: "self_loop",
+          hint: expect.stringContaining("different target"),
+        }),
+      ]),
+    });
+  });
+
+  it("returns structured input issues for malformed sequence messages", async () => {
+    const spec = checkoutSequenceSpec();
+    const result = await createTestRuntime().buildSequenceDiagram({
+      spec: {
+        ...spec,
+        messages: [{ source: "customer", target: "store" }],
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "invalid_input",
+      issues: [
+        expect.objectContaining({
+          code: "invalid_type",
+          ref: { kind: "request", path: expect.stringContaining("label") },
+          hint: expect.any(String),
+        }),
+      ],
+    });
   });
 });
