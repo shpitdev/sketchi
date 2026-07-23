@@ -1,8 +1,9 @@
-import type {
-  ArrowSceneElement,
-  NodeSceneElement,
-  RenderedDiagramScene,
-  TextSceneElement,
+import {
+  SEQUENCE_LIFELINE_KIND,
+  type ArrowSceneElement,
+  type NodeSceneElement,
+  type RenderedDiagramScene,
+  type TextSceneElement,
 } from "@sketchi/diagram-renderer";
 import { generateKeyBetween } from "fractional-indexing";
 
@@ -249,6 +250,9 @@ function shapeElement(input: {
     boundElements: boundElements.length > 0 ? boundElements : null,
     roundness: shapeType === "rectangle" ? { type: 3 } : null,
     strokeColor: input.shape.strokeColor ?? input.scene.accentColor,
+    ...(input.shape.kind === SEQUENCE_LIFELINE_KIND
+      ? { customData: { sketchiKind: SEQUENCE_LIFELINE_KIND } }
+      : {}),
   };
 }
 
@@ -719,7 +723,7 @@ function arrowSegmentsThroughShapes(
   for (const segment of segments) {
     for (const shape of shapes) {
       if (
-        shape.id.endsWith(":lifeline") ||
+        isSequenceLifelineShape(shape) ||
         shape.id === segment.startBindingElementId ||
         shape.id === segment.endBindingElementId
       ) {
@@ -746,6 +750,16 @@ function arrowSegmentsThroughShapes(
   }
 
   return issues;
+}
+
+function isSequenceLifelineShape(element: ExcalidrawElement): boolean {
+  const customData = element.customData;
+  return (
+    customData !== null &&
+    typeof customData === "object" &&
+    (customData as Record<string, unknown>)["sketchiKind"] ===
+      SEQUENCE_LIFELINE_KIND
+  );
 }
 
 function arrowEndpoint(element: ExcalidrawElement, key: BindingKey) {

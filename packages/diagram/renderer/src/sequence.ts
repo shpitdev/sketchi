@@ -41,7 +41,9 @@ const LIFELINE_BOTTOM_GAP = 56;
 const LIFELINE_WIDTH = 2;
 const LABEL_FONT_SIZE = 14;
 
-function lifelineId(participantId: string): string {
+export const SEQUENCE_LIFELINE_KIND = "sequence-lifeline";
+
+export function sequenceLifelineId(participantId: string): string {
   return `${participantId}:lifeline`;
 }
 
@@ -49,6 +51,18 @@ function lifelineId(participantId: string): string {
 export function renderSequenceDiagram(
   input: SequenceDiagramInput,
 ): RenderedDiagramScene {
+  const participantIds = new Set(
+    input.participants.map((participant) => participant.id),
+  );
+  for (const participant of input.participants) {
+    const generatedLifelineId = sequenceLifelineId(participant.id);
+    if (participantIds.has(generatedLifelineId)) {
+      throw new Error(
+        `Sequence participant "${generatedLifelineId}" collides with the generated lifeline for "${participant.id}".`,
+      );
+    }
+  }
+
   const columnStep = HEADER_WIDTH + PARTICIPANT_GAP;
   const headerY = PADDING;
   const lifelineY = headerY + HEADER_HEIGHT;
@@ -90,9 +104,9 @@ export function renderSequenceDiagram(
     });
     lifelines.push({
       type: "node",
-      id: `node:${lifelineId(participant.id)}`,
-      nodeId: lifelineId(participant.id),
-      kind: "sequence-lifeline",
+      id: `node:${sequenceLifelineId(participant.id)}`,
+      nodeId: sequenceLifelineId(participant.id),
+      kind: SEQUENCE_LIFELINE_KIND,
       shape: "rectangle",
       fillColor: input.style.backgroundColor,
       strokeColor: input.style.accentColor,
@@ -124,8 +138,8 @@ export function renderSequenceDiagram(
         type: "arrow",
         id: `arrow:${message.id}`,
         edgeId: message.id,
-        sourceNodeId: lifelineId(message.source),
-        targetNodeId: lifelineId(message.target),
+        sourceNodeId: sequenceLifelineId(message.source),
+        targetNodeId: sequenceLifelineId(message.target),
         ...(message.type === "return" ? { strokeColor: "#6b7280" } : {}),
         ...(message.style === "dashed" || message.type === "return"
           ? { strokeStyle: "dashed" as const }

@@ -1185,7 +1185,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
       lineage: {
         exactBase: "486e7169255354b8dc79cfa86e30c508721f5425",
         previousFixture:
-          "code-mode-compatibility-v1.json@c668b53ee90043a06c640d06cc28253496d50e7431c916b523fcd4157b91ae55",
+          "code-mode-compatibility-v1.json@3dc42ce9e1717ecc54ad1ce09e9ec2d23aa7e1da4cb795cecd509ee8d5ecabc9",
         captureRule:
           "Added expectations were generated only by the exact-base Promise implementation.",
       },

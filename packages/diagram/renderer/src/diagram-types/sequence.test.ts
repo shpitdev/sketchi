@@ -63,4 +63,17 @@ describe("sequence diagram renderer", () => {
       }),
     ).toThrow(/cannot target its source/);
   });
+
+  it("rejects participant ids that collide with generated lifelines", () => {
+    expect(() =>
+      renderSequenceDiagram({
+        ...sequence,
+        participants: [
+          { id: "api", label: "API" },
+          { id: "api:lifeline", label: "Worker" },
+        ],
+        messages: [],
+      }),
+    ).toThrow(/collides with the generated lifeline/);
+  });
 });

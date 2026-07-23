@@ -1711,6 +1711,31 @@ describe("Code Mode runtime", () => {
     });
   });
 
+  it("returns a repairable issue for participant ids that collide with lifelines", async () => {
+    const result = await createTestRuntime().buildSequenceDiagram({
+      spec: {
+        title: "Colliding participants",
+        participants: [
+          { id: "api", label: "API" },
+          { id: "api:lifeline", label: "Worker" },
+        ],
+        messages: [],
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "invalid_sequence",
+      issues: [
+        expect.objectContaining({
+          code: "duplicate_node_id",
+          ref: { kind: "request", path: "spec.participants.[1].id" },
+          hint: expect.stringContaining("Rename the participant"),
+        }),
+      ],
+    });
+  });
+
   it("returns structured input issues for malformed sequence messages", async () => {
     const spec = checkoutSequenceSpec();
     const result = await createTestRuntime().buildSequenceDiagram({

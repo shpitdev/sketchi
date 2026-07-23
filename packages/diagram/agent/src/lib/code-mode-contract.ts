@@ -826,9 +826,20 @@ const mindmapStyleDefault = {
   accentColor: "#7c3aed",
   backgroundColor: "#ffffff",
 };
-const MindmapStyleWithDefault = FlowchartSpecStyle.annotate({
-  default: mindmapStyleDefault,
-}).pipe(Schema.withDecodingDefault(Effect.succeed(mindmapStyleDefault)));
+const MindmapStyleWithDefault = Schema.Struct({
+  accentColor: hexColor(defaultAccentColor).pipe(
+    Schema.withDecodingDefault(
+      Effect.succeed(mindmapStyleDefault.accentColor),
+    ),
+  ),
+  backgroundColor: hexColor(mindmapStyleDefault.backgroundColor).pipe(
+    Schema.withDecodingDefault(
+      Effect.succeed(mindmapStyleDefault.backgroundColor),
+    ),
+  ),
+})
+  .annotate({ default: mindmapStyleDefault })
+  .pipe(Schema.withDecodingDefault(Effect.succeed(mindmapStyleDefault)));
 
 const MindmapSpecContract = Schema.Struct({
   id: optionalContract(NonEmptyString),
@@ -914,6 +925,9 @@ export class ArrowSceneElement extends Schema.Class<ArrowSceneElement>(
     sourceNodeId: RequiredNonEmptyString,
     targetNodeId: RequiredNonEmptyString.pipe(Schema.mutableKey),
     strokeColor: optionalContract(HexColor).pipe(Schema.mutableKey),
+    strokeStyle: optionalContract(
+      literals(["dashed", "dotted", "solid"]),
+    ).pipe(Schema.mutableKey),
     textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
     points: requiredArray(Schema.Array(ScenePoint).pipe(Schema.mutable))
       .annotate({ minItems: 2 })

@@ -1023,7 +1023,7 @@ describe("convertSceneToExcalidraw", () => {
     );
   });
 
-  it("reports arrow route segments that pass through unrelated nodes", () => {
+  it("reports routes through ordinary nodes whose ids end in :lifeline", () => {
     const scene = convertSceneToExcalidraw({
       diagramId: "through-node-route",
       title: "Through-node route",
@@ -1056,8 +1056,8 @@ describe("convertSceneToExcalidraw", () => {
         },
         {
           type: "node",
-          id: "node:middle",
-          nodeId: "middle",
+          id: "node:middle:lifeline",
+          nodeId: "middle:lifeline",
           shape: "rectangle",
           x: 170,
           y: 40,
@@ -1216,5 +1216,10 @@ describe("convertSceneToExcalidraw", () => {
     );
 
     expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
+    expect(
+      scene.elements.find((element) => element.id === "node:middle:lifeline"),
+    ).toMatchObject({
+      customData: { sketchiKind: "sequence-lifeline" },
+    });
   });
 });

@@ -17,6 +17,7 @@ import {
 import {
   renderIntermediateDiagram,
   renderSequenceDiagram,
+  sequenceLifelineId,
   type RenderedDiagramScene,
   type ScenePoint,
 } from "@sketchi/diagram-renderer";
@@ -461,6 +462,29 @@ function validateNormalizedSequenceDiagram(
       );
     }
     participantIds.add(participant.id);
+  });
+
+  const participantIndexById = new Map(
+    spec.participants.map((participant, index) => [participant.id, index]),
+  );
+  spec.participants.forEach((participant) => {
+    const generatedLifelineId = sequenceLifelineId(participant.id);
+    const collisionIndex = participantIndexById.get(generatedLifelineId);
+    if (collisionIndex === undefined) {
+      return;
+    }
+    issues.push(
+      issue({
+        code: "duplicate_node_id",
+        stage: "input",
+        ref: {
+          kind: "request",
+          path: `spec.participants.[${collisionIndex}].id`,
+        },
+        message: `Participant id "${generatedLifelineId}" collides with the generated lifeline for "${participant.id}".`,
+        hint: "Rename the participant so its id does not equal another participant id followed by :lifeline.",
+      }),
+    );
   });
 
   const messageIds = new Set<string>();
@@ -1144,6 +1168,7 @@ function normalizePatchableScene(
         sourceNodeId: element.sourceNodeId,
         targetNodeId: element.targetNodeId,
         ...(element.strokeColor ? { strokeColor: element.strokeColor } : {}),
+        ...(element.strokeStyle ? { strokeStyle: element.strokeStyle } : {}),
         ...(element.textColor ? { textColor: element.textColor } : {}),
         points,
         ...(element.label ? { label: element.label } : {}),
