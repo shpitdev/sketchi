@@ -54,8 +54,19 @@ sketchi show release-flow
 
 sketchi edit release-flow --json '{"type":"flowchart","spec":{"id":"release-flow","title":"Release approval revised","nodes":[{"id":"start","label":"Change proposed","kind":"start"},{"id":"review","label":"Review complete evidence","kind":"process"},{"id":"end","label":"Release approved","kind":"end"}],"edges":[{"source":"start","target":"review"},{"source":"review","target":"end"}]}}'
 
+sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb"}}]}'
+
 sketchi list
 ```
+
+`patch` reuses Sketchi's semantic selectors and operations (`setStyle`,
+`setDefaultStyle`, `setShape`, `translate`, `replaceText`, and
+`rerouteEdges`) without exposing raw Excalidraw mutation. It is fully offline,
+preserves the prior full revision, retains `document.json` unchanged as
+provenance, makes `scene.json` authoritative, and removes any stale stored PNG.
+Patched records report `authority: "patched"` and
+`documentAuthoritative: false`; restore a canonical revision before using
+`edit` again.
 
 Export the stored editable artifact:
 
@@ -201,9 +212,10 @@ source ~/.sketchi/completions/sketchi.fish
 
 ## For AI agents
 
-The six deterministic commands—`create`, `show`, `edit`, `list`, `export`, and
-`restore`—are fully offline and require no credentials, account, browser, model,
-or MCP server. Those six commands never send stored records to a provider.
+The seven deterministic commands—`create`, `patch`, `show`, `edit`, `list`,
+`export`, and `restore`—are fully offline and require no credentials, account,
+browser, model, or MCP server. Those seven commands never send stored records
+to a provider.
 Agents can use
 `--output json`, complete noninteractive input through `--json` or `--file`, and
 raw artifact output through `export --dest -` without prompts.
@@ -228,6 +240,7 @@ availability details.
 ```sh
 sketchi --help
 sketchi create --help
+sketchi patch --help
 sketchi generate --help
 sketchi share --help
 sketchi pull --help

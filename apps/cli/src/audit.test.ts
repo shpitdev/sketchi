@@ -146,6 +146,7 @@ describe("CLI dependency and public-surface audit", () => {
       "create",
       "show",
       "edit",
+      "patch",
       "list",
       "restore",
       "share",

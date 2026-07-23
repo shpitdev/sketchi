@@ -13,7 +13,7 @@ export const REVISIONS_DIRECTORY = "revisions";
 
 export type DiagramFormat = "scene" | "excalidraw" | "png";
 export type OutputFormat = "text" | "json";
-export type DiagramAuthority = "canonical" | "detached";
+export type DiagramAuthority = "canonical" | "patched" | "detached";
 
 export class DiagramRecordManifest extends Schema.Class<DiagramRecordManifest>(
   "DiagramRecordManifest",
@@ -23,7 +23,7 @@ export class DiagramRecordManifest extends Schema.Class<DiagramRecordManifest>(
   type: Schema.Literals(["flowchart", "mindmap"]),
   title: Schema.String,
   revision: Schema.Int.check(Schema.isGreaterThan(0)),
-  authority: Schema.Literals(["canonical", "detached"]).pipe(
+  authority: Schema.Literals(["canonical", "patched", "detached"]).pipe(
     Schema.withDecodingDefaultKey(Effect.succeed("canonical")),
   ),
   formats: Schema.Array(Schema.Literals(["scene", "excalidraw", "png"])),
@@ -37,6 +37,16 @@ export interface BuiltDiagram {
   readonly scene: PatchableScene;
   readonly excalidraw: ExcalidrawFile;
   readonly png?: Uint8Array;
+}
+
+export interface PatchSource {
+  readonly revision: number;
+  readonly scene: PatchableScene;
+}
+
+export interface PatchedDiagramArtifacts {
+  readonly scene: PatchableScene;
+  readonly excalidraw: ExcalidrawFile;
 }
 
 export interface StoredDiagram {

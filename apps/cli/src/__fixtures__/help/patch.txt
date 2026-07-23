@@ -1,0 +1,25 @@
+DESCRIPTION
+  Apply Sketchi semantic setStyle, setDefaultStyle, setShape, translate, replaceText, or rerouteEdges operations to the current stored scene. The CLI owns source and requestId; input contains operations plus optional options or intent. The prior full revision is recoverable, document.json remains unchanged provenance, stale stored PNG is removed, and the patched scene becomes authoritative. This command is strictly offline. Edit remains blocked until a canonical revision is restored.
+
+USAGE
+  sketchi patch [flags] <diagram-id>
+
+ARGUMENTS
+  diagram-id string
+
+FLAGS
+  --output text|json    Result presentation format. (choices: text, json)
+  --file PATH|-         Read one patch request from PATH, or stdin with -.
+  --json VALUE          Read one patch request from inline JSON.
+
+GLOBAL FLAGS
+  --help, -h                          Show help information
+  --version, -v                       Show version information
+  --completions <bash|zsh|fish|sh>    Print shell completion script (choices: bash, zsh, fish, sh)
+
+EXAMPLES
+  # Color selected nodes through semantic ids.
+  sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
+
+  # Patch from a file, then export or restore the reported diagram revision.
+  sketchi patch release-flow --file patch.json --output json

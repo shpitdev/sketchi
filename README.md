@@ -62,6 +62,7 @@ export editable Excalidraw:
 sketchi create --json '{"type":"flowchart","spec":{"id":"release-flow","title":"Release approval","nodes":[{"id":"start","label":"Change proposed","kind":"start"},{"id":"review","label":"Review evidence","kind":"process"},{"id":"end","label":"Release approved","kind":"end"}],"edges":[{"source":"start","target":"review"},{"source":"review","target":"end"}]}}'
 sketchi show release-flow
 sketchi edit release-flow --json '{"type":"flowchart","spec":{"id":"release-flow","title":"Release approval revised","nodes":[{"id":"start","label":"Change proposed","kind":"start"},{"id":"review","label":"Review complete evidence","kind":"process"},{"id":"end","label":"Release approved","kind":"end"}],"edges":[{"source":"start","target":"review"},{"source":"review","target":"end"}]}}'
+sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb"}}]}'
 sketchi list
 sketchi export release-flow --format excalidraw --dest release-flow.excalidraw
 sketchi export release-flow --format png --dest release-flow.png
@@ -74,7 +75,7 @@ Generate and persist a diagram through the public, unauthenticated Sketchi API:
 sketchi generate --prompt "Map release approval with pass and revise branches"
 ```
 
-`create`, `show`, `edit`, `list`, `export`, and `restore` are deterministic,
+`create`, `patch`, `show`, `edit`, `list`, `export`, and `restore` are deterministic,
 fully offline, and need no credentials. `generate`, `share`, and `pull` are
 explicit credential-free network commands, each making one HTTPS request.
 Share an immutable encrypted snapshot with `sketchi share release-flow`; after

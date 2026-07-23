@@ -5,10 +5,11 @@ import { parseJsonDocument } from "./document.js";
 import { CliInputError } from "./errors.js";
 import { LocalFileSystem } from "./filesystem.js";
 import type { InputSource } from "./internal/effect-unstable-cli.js";
+import { parseJsonPatchInput } from "./patch.js";
 
 export interface InputReadOptions {
   readonly maxBytes?: number;
-  readonly content: "JSON document" | "share link";
+  readonly content: "JSON document" | "patch request" | "share link";
 }
 
 export class InputReader extends Context.Service<
@@ -134,5 +135,13 @@ export const readDocumentInput = Effect.fn("sketchi.cli.input.readDocument")(
     const reader = yield* InputReader;
     const text = yield* reader.read(source);
     return yield* parseJsonDocument(text);
+  },
+);
+
+export const readPatchInput = Effect.fn("sketchi.cli.input.readPatch")(
+  function* (source: InputSource) {
+    const reader = yield* InputReader;
+    const text = yield* reader.read(source, { content: "patch request" });
+    return yield* parseJsonPatchInput(text);
   },
 );

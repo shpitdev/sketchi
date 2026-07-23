@@ -2,7 +2,8 @@ DESCRIPTION
   Local Sketchi authoring for canonical flowcharts and mindmaps, plus explicit snapshot sharing.
 
 Manual JSON workflow (strictly offline):
-  create a canonical document, inspect or replace it, list local records, and export stored artifacts.
+  create a canonical document, apply semantic patches, inspect or replace it, list local records,
+  and export stored artifacts.
   Accepted input is exactly one complete JSON object shaped like an example below.
 
 Canonical flowchart example:
@@ -10,6 +11,9 @@ Canonical flowchart example:
 
 Canonical mindmap example:
   {"type":"mindmap","spec":{"id":"launch-map","title":"Launch plan","root":{"label":"Launch","children":[{"label":"Product"},{"label":"Operations"}]}}}
+
+Semantic color patch example:
+  sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
   sketchi generate --prompt TEXT [--type flowchart|mindmap] [--model MODEL]
@@ -23,7 +27,7 @@ Explicit network commands (one credential-free HTTPS request each):
   SKETCHI_GENERATE_ENDPOINT or --endpoint URL.
 
 Input and output contracts:
-  create/edit require exactly one of --file PATH|- or --json VALUE. --file - reads one
+  create/edit/patch require exactly one of --file PATH|- or --json VALUE. --file - reads one
   noninteractive UTF-8 JSON document from stdin and exits with usage code 2 on a TTY.
   --json is inline input only. --prompt is noninteractive text. Use --output text|json for
   result presentation on every command.
@@ -38,14 +42,15 @@ Share/pull safety limits:
   16777216 pixels. Limits are checked before encryption or raster allocation.
 
 Offline boundary and storage:
-  create, show, edit, list, export, and restore use no model, remote agent, MCP server, login,
+  create, patch, show, edit, list, export, and restore use no model, remote agent, MCP server, login,
   account, browser, credential, or network. share sends only locally encrypted ciphertext from
   the selected record to Excalidraw storage; pull sends only the link id in its download request.
   Records live at ~/.sketchi/diagrams/<id>/ with manifest.json, document.json, scene.json,
   diagram.excalidraw, optional diagram.png, and revisions/. New revisions are full snapshots
   under revisions/<revision>/; legacy document-only revisions/<revision>.json remain readable.
   A pulled record is detached: diagram.excalidraw is authoritative while document.json and
-  scene.json remain non-authoritative provenance. show/list expose this state; edit refuses.
+  scene.json remain non-authoritative provenance. A patched record makes scene.json authoritative
+  while retaining document.json as provenance. show/list expose these states; edit refuses both.
   Formats are scene, excalidraw, and png. If no PNG is stored, export deterministically renders one
   on demand from the local scene and Excalidraw artifacts, without a browser, network, or record write.
 
@@ -79,7 +84,8 @@ SUBCOMMANDS
   generate    Generate and persist one diagram through the public unauthenticated Sketchi generate API.
   create      Create one local diagram from exactly one canonical document source. The document is validated and built before the record directory is committed atomically. --file - rejects an interactive TTY with exit 2.
   show        Show current authority, documentAuthoritative state, retained document provenance, manifest formats, and recoverable revision paths for DIAGRAM_ID. This is strictly offline and does not rebuild or mutate the record.
-  edit        Replace the complete canonical document for DIAGRAM_ID. Sketchi validates and builds first, preserves the prior full authority state under revisions/, and atomically swaps the record. Detached records refuse edit because their canonical document is no longer authoritative. The new spec.id must match DIAGRAM_ID.
+  edit        Replace the complete canonical document for DIAGRAM_ID. Sketchi validates and builds first, preserves the prior full authority state under revisions/, and atomically swaps the record. Patched and detached records refuse edit because their canonical document is no longer authoritative. The new spec.id must match DIAGRAM_ID.
+  patch       Apply Sketchi semantic setStyle, setDefaultStyle, setShape, translate, replaceText, or rerouteEdges operations to the current stored scene. The CLI owns source and requestId; input contains operations plus optional options or intent. The prior full revision is recoverable, document.json remains unchanged provenance, stale stored PNG is removed, and the patched scene becomes authoritative. This command is strictly offline. Edit remains blocked until a canonical revision is restored.
   list        List local diagrams in ascending id order with type, revision, authority, documentAuthoritative, current stored formats, and retained title provenance. The command is deterministic, strictly offline, and read-only.
   restore     Strictly offline recovery. Archive the current full state first, then restore revision N byte-for-byte without consuming it and commit at the next monotonic revision. Full snapshots restore artifacts and authority without rebuilding; legacy document-only revisions rebuild only while the record remains canonical.
   share       Encrypt and upload the current authoritative Excalidraw artifact as one immutable excalidraw.com bearer snapshot. This makes exactly one credential-free HTTPS request. The storage service can observe connection metadata, timing, and ciphertext size; retention is uncontrolled, and Sketchi cannot revoke or delete a link. Anyone with the full URL can decrypt it. Supported elements: rectangle, ellipse, diamond, arrow, line, freedraw, text; text must use Excalifont fontFamily 5; files and images are rejected. Render limits: element dimension 8192, canvas dimension 8192, canvas area 4194304, final PNG pixels 16777216. --open is opt-in and only confirms whether the OS accepted the request.
