@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.3.0
+
+### Minor Changes
+
+- [#276](https://github.com/shpitdev/sketchi/pull/276) [`9e55dc4`](https://github.com/shpitdev/sketchi/commit/9e55dc4c6d3f254938fb25bf4b7c5c9cde921b52) Thanks [@anandpant](https://github.com/anandpant)! - Apply offline semantic patches to stored diagrams with scene authority, atomic revision recovery, and coherent Excalidraw and PNG export.
+
 ## 0.2.0
 
 ### Minor Changes
