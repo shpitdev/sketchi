@@ -1023,7 +1023,7 @@ describe("convertSceneToExcalidraw", () => {
     );
   });
 
-  it("reports routes through ordinary nodes whose ids end in :lifeline", () => {
+  it("reports routes through ordinary nodes claiming lifeline identity", () => {
     const scene = convertSceneToExcalidraw({
       diagramId: "through-node-route",
       title: "Through-node route",
@@ -1058,6 +1058,7 @@ describe("convertSceneToExcalidraw", () => {
           type: "node",
           id: "node:middle:lifeline",
           nodeId: "middle:lifeline",
+          kind: "sequence-lifeline",
           shape: "rectangle",
           x: 170,
           y: 40,
@@ -1200,7 +1201,11 @@ describe("convertSceneToExcalidraw", () => {
         title: "Cross lifeline",
         participants: [
           { id: "left", label: "Left" },
-          { id: "middle", label: "Middle" },
+          {
+            id: "middle",
+            label: "Middle",
+            kind: "sequence-lifeline",
+          },
           { id: "right", label: "Right" },
         ],
         messages: [
@@ -1219,7 +1224,10 @@ describe("convertSceneToExcalidraw", () => {
     expect(
       scene.elements.find((element) => element.id === "node:middle:lifeline"),
     ).toMatchObject({
-      customData: { sketchiKind: "sequence-lifeline" },
+      customData: { sketchiRendererRole: "sequence-lifeline" },
     });
+    expect(
+      scene.elements.find((element) => element.id === "node:middle"),
+    ).not.toHaveProperty("customData.sketchiRendererRole");
   });
 });

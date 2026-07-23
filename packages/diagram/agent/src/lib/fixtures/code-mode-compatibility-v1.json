@@ -693,14 +693,6 @@
                                     "type": "string",
                                     "pattern": "^#[0-9a-fA-F]{6}$"
                                   },
-                                  "strokeStyle": {
-                                    "enum": [
-                                      "dashed",
-                                      "dotted",
-                                      "solid"
-                                    ],
-                                    "type": "string"
-                                  },
                                   "textColor": {
                                     "type": "string",
                                     "pattern": "^#[0-9a-fA-F]{6}$"

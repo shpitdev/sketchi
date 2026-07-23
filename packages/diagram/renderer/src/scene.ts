@@ -17,6 +17,7 @@ export interface NodeSceneElement {
   id: string;
   nodeId: string;
   kind?: string;
+  rendererRole?: "sequence-lifeline";
   shape: NodeSceneShape;
   fillColor?: string;
   strokeColor?: string;

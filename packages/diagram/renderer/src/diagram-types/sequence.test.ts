@@ -23,7 +23,8 @@ describe("sequence diagram renderer", () => {
     const scene = renderSequenceDiagram(sequence);
     const headers = scene.elements.filter(
       (element): element is Extract<typeof element, { type: "node" }> =>
-        element.type === "node" && element.kind !== "sequence-lifeline",
+        element.type === "node" &&
+        element.rendererRole !== "sequence-lifeline",
     );
     const messages = scene.elements.filter(
       (element) => element.type === "arrow",
@@ -48,7 +49,8 @@ describe("sequence diagram renderer", () => {
     expect(
       scene.elements.filter(
         (element) =>
-          element.type === "node" && element.kind === "sequence-lifeline",
+          element.type === "node" &&
+          element.rendererRole === "sequence-lifeline",
       ),
     ).toHaveLength(3);
   });

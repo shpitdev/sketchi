@@ -41,7 +41,7 @@ const LIFELINE_BOTTOM_GAP = 56;
 const LIFELINE_WIDTH = 2;
 const LABEL_FONT_SIZE = 14;
 
-export const SEQUENCE_LIFELINE_KIND = "sequence-lifeline";
+export const SEQUENCE_LIFELINE_ROLE = "sequence-lifeline";
 
 export function sequenceLifelineId(participantId: string): string {
   return `${participantId}:lifeline`;
@@ -106,7 +106,7 @@ export function renderSequenceDiagram(
       type: "node",
       id: `node:${sequenceLifelineId(participant.id)}`,
       nodeId: sequenceLifelineId(participant.id),
-      kind: SEQUENCE_LIFELINE_KIND,
+      rendererRole: SEQUENCE_LIFELINE_ROLE,
       shape: "rectangle",
       fillColor: input.style.backgroundColor,
       strokeColor: input.style.accentColor,

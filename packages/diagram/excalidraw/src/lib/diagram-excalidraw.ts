@@ -1,5 +1,5 @@
 import {
-  SEQUENCE_LIFELINE_KIND,
+  SEQUENCE_LIFELINE_ROLE,
   type ArrowSceneElement,
   type NodeSceneElement,
   type RenderedDiagramScene,
@@ -250,8 +250,8 @@ function shapeElement(input: {
     boundElements: boundElements.length > 0 ? boundElements : null,
     roundness: shapeType === "rectangle" ? { type: 3 } : null,
     strokeColor: input.shape.strokeColor ?? input.scene.accentColor,
-    ...(input.shape.kind === SEQUENCE_LIFELINE_KIND
-      ? { customData: { sketchiKind: SEQUENCE_LIFELINE_KIND } }
+    ...(input.shape.rendererRole === SEQUENCE_LIFELINE_ROLE
+      ? { customData: { sketchiRendererRole: SEQUENCE_LIFELINE_ROLE } }
       : {}),
   };
 }
@@ -757,8 +757,8 @@ function isSequenceLifelineShape(element: ExcalidrawElement): boolean {
   return (
     customData !== null &&
     typeof customData === "object" &&
-    (customData as Record<string, unknown>)["sketchiKind"] ===
-      SEQUENCE_LIFELINE_KIND
+    (customData as Record<string, unknown>)["sketchiRendererRole"] ===
+      SEQUENCE_LIFELINE_ROLE
   );
 }
 

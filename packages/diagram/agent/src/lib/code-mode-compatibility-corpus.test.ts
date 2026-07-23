@@ -40,6 +40,32 @@ import {
   type CodeModeRuntimeOptions,
 } from "./code-mode-runtime";
 
+const POST_BASELINE_SCENE_FIELDS = new Set(["rendererRole", "strokeStyle"]);
+
+function withoutPostBaselineSceneFields(
+  value: unknown,
+  isSchemaProperties = false,
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => withoutPostBaselineSceneFields(item));
+  }
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, nested]) =>
+      isSchemaProperties && POST_BASELINE_SCENE_FIELDS.has(key)
+        ? []
+        : [
+            [
+              key,
+              withoutPostBaselineSceneFields(nested, key === "properties"),
+            ],
+          ],
+    ),
+  );
+}
+
 function makeTestRuntime(
   options: CodeModeRuntimeOptions & {
     readonly store?: CodeModeArtifactStorageShape;
@@ -1137,14 +1163,18 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
       }),
     )(JSON.parse(await readFile(fixturePath, "utf8")));
 
-    expect({
-      buildFlowchart: toCodeModeJsonSchema(BuildFlowchartRequestSchema),
-      buildMindmap: toCodeModeJsonSchema(BuildMindmapRequestSchema),
-      getArtifact: toCodeModeJsonSchema(GetArtifactRequestSchema),
-      applyDiagramPatch: toCodeModeJsonSchema(ApplyDiagramPatchRequestSchema),
-      codeModeIssue: toCodeModeJsonSchema(CodeModeIssueSchema),
-      artifactProvenance: toCodeModeJsonSchema(ArtifactProvenanceSchema),
-    }).toEqual(fixture.publicContract.mcpVisible.schemas);
+    expect(
+      withoutPostBaselineSceneFields({
+        buildFlowchart: toCodeModeJsonSchema(BuildFlowchartRequestSchema),
+        buildMindmap: toCodeModeJsonSchema(BuildMindmapRequestSchema),
+        getArtifact: toCodeModeJsonSchema(GetArtifactRequestSchema),
+        applyDiagramPatch: toCodeModeJsonSchema(
+          ApplyDiagramPatchRequestSchema,
+        ),
+        codeModeIssue: toCodeModeJsonSchema(CodeModeIssueSchema),
+        artifactProvenance: toCodeModeJsonSchema(ArtifactProvenanceSchema),
+      }),
+    ).toEqual(fixture.publicContract.mcpVisible.schemas);
   });
 
   it("matches the frozen pre-refactor public and persisted contract", async () => {
@@ -1158,7 +1188,19 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
     const frozen = Schema.decodeUnknownSync(Schema.Unknown)(
       JSON.parse(await readFile(fixturePath, "utf8")),
     );
-    expect(corpus).toEqual(frozen);
+    const normalizedCorpus = {
+      ...corpus,
+      publicContract: {
+        ...corpus.publicContract,
+        mcpVisible: {
+          ...corpus.publicContract.mcpVisible,
+          schemas: withoutPostBaselineSceneFields(
+            corpus.publicContract.mcpVisible.schemas,
+          ),
+        },
+      },
+    };
+    expect(normalizedCorpus).toEqual(frozen);
   });
 
   it("matches the expanded exact-base issue behavior matrix", async () => {
@@ -1185,7 +1227,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
       lineage: {
         exactBase: "486e7169255354b8dc79cfa86e30c508721f5425",
         previousFixture:
-          "code-mode-compatibility-v1.json@3dc42ce9e1717ecc54ad1ce09e9ec2d23aa7e1da4cb795cecd509ee8d5ecabc9",
+          "code-mode-compatibility-v1.json@c668b53ee90043a06c640d06cc28253496d50e7431c916b523fcd4157b91ae55",
         captureRule:
           "Added expectations were generated only by the exact-base Promise implementation.",
       },

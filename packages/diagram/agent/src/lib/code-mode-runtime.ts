@@ -1182,6 +1182,9 @@ function normalizePatchableScene(
         id: element.id,
         nodeId: element.nodeId,
         ...(element.kind ? { kind: element.kind } : {}),
+        ...(element.rendererRole
+          ? { rendererRole: element.rendererRole }
+          : {}),
         shape: element.shape,
         ...(element.fillColor ? { fillColor: element.fillColor } : {}),
         ...(element.strokeColor ? { strokeColor: element.strokeColor } : {}),
