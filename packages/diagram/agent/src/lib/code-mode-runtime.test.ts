@@ -1852,6 +1852,56 @@ describe("Code Mode runtime", () => {
     ).toMatchObject({ elements: expect.any(Array) });
   });
 
+  it("preserves crossing-sequence lifeline roles after a fractional translate patch", async () => {
+    const runtime = createTestRuntime();
+    const built = await runtime.buildSequenceDiagram({
+      spec: crossingSequenceSpec(),
+      options: {
+        artifactFormats: ["scene"],
+        inlineArtifacts: ["scene"],
+      },
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) throw new Error("Expected accepted sequence diagram.");
+    const sourceScene = built.artifact.formats.find(
+      ({ format }) => format === "scene",
+    )?.inline;
+
+    const patched = await runtime.applyDiagramPatch({
+      source: { scene: sourceScene },
+      operations: [
+        {
+          op: "translate",
+          selector: { nodeIds: ["b:lifeline"] },
+          dx: 0.0003,
+          dy: -0.0003,
+        },
+      ],
+      options: {
+        artifactFormats: ["scene", "excalidraw"],
+        inlineArtifacts: ["scene", "excalidraw"],
+      },
+    });
+
+    expectPatchOk(patched);
+    const patchedScene = parseInlineScene(
+      patched.artifact.formats.find(({ format }) => format === "scene")?.inline,
+    );
+    expect(
+      patchedScene.elements.find(
+        (element) => element.type === "node" && element.nodeId === "b:lifeline",
+      ),
+    ).toMatchObject({ rendererRole: "sequence-lifeline" });
+    expect(
+      patched.artifact.formats.find(({ format }) => format === "excalidraw")
+        ?.inline,
+    ).toMatchObject({
+      elements: expect.arrayContaining([
+        expect.objectContaining({ id: "arrow:message-1-a-c" }),
+      ]),
+    });
+  });
+
   it("strips a spoofed lifeline role from an ordinary inline node", async () => {
     const result = await createTestRuntime().applyDiagramPatch({
       source: {

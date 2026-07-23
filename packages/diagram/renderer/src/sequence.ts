@@ -40,6 +40,7 @@ const MESSAGE_TOP_GAP = 64;
 const LIFELINE_BOTTOM_GAP = 56;
 const LIFELINE_WIDTH = 2;
 const LABEL_FONT_SIZE = 14;
+const LAYOUT_ALIGNMENT_EPSILON = 0.01;
 
 export const SEQUENCE_LIFELINE_ROLE = "sequence-lifeline";
 
@@ -95,8 +96,9 @@ export function isStructurallyValidSequenceLifeline(
   }
 
   return (
-    element.x + element.width / 2 === header.x + header.width / 2 &&
-    element.y >= header.y + header.height
+    Math.abs(element.x + element.width / 2 - (header.x + header.width / 2)) <=
+      LAYOUT_ALIGNMENT_EPSILON &&
+    element.y >= header.y + header.height - LAYOUT_ALIGNMENT_EPSILON
   );
 }
 
