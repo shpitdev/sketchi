@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.1.1
+
+### Patch Changes
+
+- [#269](https://github.com/shpitdev/sketchi/pull/269) [`ef6b392`](https://github.com/shpitdev/sketchi/commit/ef6b3925125d197649559331fb5c7c2e0059fd93) Thanks [@anandpant](https://github.com/anandpant)! - Add linked changelog entries and publish matching GitHub Releases for new CLI versions.
+
 ## 0.1.0
 
 ### Minor Changes
