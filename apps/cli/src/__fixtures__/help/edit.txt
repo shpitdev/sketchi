@@ -1,5 +1,5 @@
 DESCRIPTION
-  Replace the complete canonical document for DIAGRAM_ID. Sketchi validates and builds first, preserves the prior full authority state under revisions/, and atomically swaps the record. Detached records refuse edit because their canonical document is no longer authoritative. The new spec.id must match DIAGRAM_ID.
+  Replace the complete canonical document for DIAGRAM_ID. Sketchi validates and builds first, preserves the prior full authority state under revisions/, and atomically swaps the record. Patched and detached records refuse edit because their canonical document is no longer authoritative. The new spec.id must match DIAGRAM_ID.
 
 USAGE
   sketchi edit [flags] <diagram-id>

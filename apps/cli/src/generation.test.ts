@@ -79,6 +79,8 @@ function capturingStoreLayer(created: BuiltDiagram[]) {
       return stored(diagram);
     }),
     edit: () => Effect.die("unused edit"),
+    readPatchSource: () => Effect.die("unused readPatchSource"),
+    commitPatch: () => Effect.die("unused commitPatch"),
     show: () => Effect.die("unused show"),
     list: () => Effect.die("unused list"),
     replaceWithDetached: () => Effect.die("unused replaceWithDetached"),
@@ -99,6 +101,8 @@ function failingStoreLayer(attempts: { count: number }) {
       });
     }),
     edit: () => Effect.die("unused edit"),
+    readPatchSource: () => Effect.die("unused readPatchSource"),
+    commitPatch: () => Effect.die("unused commitPatch"),
     show: () => Effect.die("unused show"),
     list: () => Effect.die("unused list"),
     replaceWithDetached: () => Effect.die("unused replaceWithDetached"),
@@ -117,6 +121,8 @@ function generatedArtifactStoreLayer(created: BuiltDiagram[]) {
       },
     ),
     edit: () => Effect.die("unused edit"),
+    readPatchSource: () => Effect.die("unused readPatchSource"),
+    commitPatch: () => Effect.die("unused commitPatch"),
     show: () => Effect.die("unused show"),
     list: () => Effect.die("unused list"),
     replaceWithDetached: () => Effect.die("unused replaceWithDetached"),

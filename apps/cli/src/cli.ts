@@ -37,7 +37,12 @@ import {
   exclusiveInputSourceFlags,
   runEffectCommand,
 } from "./internal/effect-unstable-cli.js";
-import { InputReader, InputReaderLive, readDocumentInput } from "./input.js";
+import {
+  InputReader,
+  InputReaderLive,
+  readDocumentInput,
+  readPatchInput,
+} from "./input.js";
 import {
   CliCommandExit,
   OutputWriter,
@@ -48,6 +53,7 @@ import {
   runReported,
 } from "./output.js";
 import { CliPngRenderer, CliPngRendererLive } from "./png-renderer.js";
+import { DiagramPatcher, DiagramPatcherLive } from "./patch.js";
 import { preflightPullTarget, pullIntoStore } from "./pull.js";
 import {
   MAX_RENDER_CANVAS_AREA,
@@ -74,7 +80,8 @@ import {
 const ROOT_HELP = `Local Sketchi authoring for canonical flowcharts and mindmaps, plus explicit snapshot sharing.
 
 Manual JSON workflow (strictly offline):
-  create a canonical document, inspect or replace it, list local records, and export stored artifacts.
+  create a canonical document, apply semantic patches, inspect or replace it, list local records,
+  and export stored artifacts.
   Accepted input is exactly one complete JSON object shaped like an example below.
 
 Canonical flowchart example:
@@ -82,6 +89,9 @@ Canonical flowchart example:
 
 Canonical mindmap example:
   {"type":"mindmap","spec":{"id":"launch-map","title":"Launch plan","root":{"label":"Launch","children":[{"label":"Product"},{"label":"Operations"}]}}}
+
+Semantic color patch example:
+  sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
   sketchi generate --prompt TEXT [--type flowchart|mindmap] [--model MODEL]
@@ -95,7 +105,7 @@ Explicit network commands (one credential-free HTTPS request each):
   ${SKETCHI_GENERATE_ENDPOINT_ENV} or --endpoint URL.
 
 Input and output contracts:
-  create/edit require exactly one of --file PATH|- or --json VALUE. --file - reads one
+  create/edit/patch require exactly one of --file PATH|- or --json VALUE. --file - reads one
   noninteractive UTF-8 JSON document from stdin and exits with usage code 2 on a TTY.
   --json is inline input only. --prompt is noninteractive text. Use --output text|json for
   result presentation on every command.
@@ -110,14 +120,15 @@ Share/pull safety limits:
   ${String(MAX_RENDER_OUTPUT_PIXELS)} pixels. Limits are checked before encryption or raster allocation.
 
 Offline boundary and storage:
-  create, show, edit, list, export, and restore use no model, remote agent, MCP server, login,
+  create, patch, show, edit, list, export, and restore use no model, remote agent, MCP server, login,
   account, browser, credential, or network. share sends only locally encrypted ciphertext from
   the selected record to Excalidraw storage; pull sends only the link id in its download request.
   Records live at ~/.sketchi/diagrams/<id>/ with manifest.json, document.json, scene.json,
   diagram.excalidraw, optional diagram.png, and revisions/. New revisions are full snapshots
   under revisions/<revision>/; legacy document-only revisions/<revision>.json remain readable.
   A pulled record is detached: diagram.excalidraw is authoritative while document.json and
-  scene.json remain non-authoritative provenance. show/list expose this state; edit refuses.
+  scene.json remain non-authoritative provenance. A patched record makes scene.json authoritative
+  while retaining document.json as provenance. show/list expose these states; edit refuses both.
   Formats are scene, excalidraw, and png. If no PNG is stored, export deterministically renders one
   on demand from the local scene and Excalidraw artifacts, without a browser, network, or record write.
 
@@ -195,7 +206,7 @@ const readLinkInput = Effect.fn("sketchi.cli.pull.readLink")(function* (
 });
 
 function summaryText(
-  action: "created" | "edited",
+  action: "created" | "edited" | "patched",
   diagram: StoredDiagram,
 ): string {
   return [
@@ -437,12 +448,60 @@ const editCommand = Command.make(
     }),
 ).pipe(
   Command.withDescription(
-    "Replace the complete canonical document for DIAGRAM_ID. Sketchi validates and builds first, preserves the prior full authority state under revisions/, and atomically swaps the record. Detached records refuse edit because their canonical document is no longer authoritative. The new spec.id must match DIAGRAM_ID.",
+    "Replace the complete canonical document for DIAGRAM_ID. Sketchi validates and builds first, preserves the prior full authority state under revisions/, and atomically swaps the record. Patched and detached records refuse edit because their canonical document is no longer authoritative. The new spec.id must match DIAGRAM_ID.",
   ),
   Command.withExamples([
     {
       command: "sketchi edit release-flow --file revised.json",
       description: "Replace a document and retain the prior revision.",
+    },
+  ]),
+);
+
+const patchCommand = Command.make(
+  "patch",
+  {
+    diagramId: Argument.string("diagram-id"),
+    ...exclusiveInputSourceFlags("patch request"),
+  },
+  ({ diagramId, source }) =>
+    Effect.gen(function* () {
+      const { output } = yield* rootCommand;
+      const patcher = yield* DiagramPatcher;
+      const store = yield* DiagramStore;
+      const operation = Effect.gen(function* () {
+        const id = yield* validateStorageId(diagramId);
+        const input = yield* readPatchInput(source);
+        const current = yield* store.readPatchSource(id);
+        const artifacts = yield* patcher.patch(
+          current.scene,
+          input,
+          `cli-patch-${id}-${String(current.revision + 1)}`,
+        );
+        return yield* store.commitPatch(id, current.revision, artifacts);
+      });
+      yield* runReported(
+        "patch",
+        output,
+        operation,
+        (diagram) => summaryText("patched", diagram),
+        storedData,
+      );
+    }),
+).pipe(
+  Command.withDescription(
+    "Apply Sketchi semantic setStyle, setDefaultStyle, setShape, translate, replaceText, or rerouteEdges operations to the current stored scene. The CLI owns source and requestId; input contains operations plus optional options or intent. The prior full revision is recoverable, document.json remains unchanged provenance, stale stored PNG is removed, and the patched scene becomes authoritative. This command is strictly offline. Edit remains blocked until a canonical revision is restored.",
+  ),
+  Command.withExamples([
+    {
+      command:
+        'sketchi patch release-flow --json \'{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}\'',
+      description: "Color selected nodes through semantic ids.",
+    },
+    {
+      command: "sketchi patch release-flow --file patch.json --output json",
+      description:
+        "Patch from a file, then export or restore the reported diagram revision.",
     },
   ]),
 );
@@ -760,6 +819,7 @@ export const sketchiCommand = rootCommand.pipe(
     createCommand,
     showCommand,
     editCommand,
+    patchCommand,
     listCommand,
     restoreCommand,
     shareCommand,
@@ -808,6 +868,10 @@ const diagramBuilderLayer = Layer.provide(
   DiagramBuilderLive,
   codeModeDependencies,
 );
+const diagramPatcherLayer = Layer.provide(
+  DiagramPatcherLive,
+  codeModeDependencies,
+);
 const storageDependencies = Layer.mergeAll(
   LocalFileSystemLive,
   StorageRootLive,
@@ -826,6 +890,7 @@ export const CliApplicationLayer = Layer.mergeAll(
   LocalFileSystemLive,
   StorageRootLive,
   diagramBuilderLayer,
+  diagramPatcherLayer,
   diagramStoreLayer,
   diagramExporterLayer,
   CliPngRendererLive,

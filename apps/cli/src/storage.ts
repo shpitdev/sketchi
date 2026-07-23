@@ -27,6 +27,8 @@ import {
   type BuiltDiagram,
   type DiagramFormat,
   type DiagramSummary,
+  type PatchedDiagramArtifacts,
+  type PatchSource,
   type StoredDiagram,
   revisionFileName,
   revisionDirectoryName,
@@ -330,6 +332,14 @@ export class DiagramStore extends Context.Service<
     readonly edit: (
       diagramId: string,
       diagram: BuiltDiagram,
+    ) => Effect.Effect<StoredDiagram, CliFilesystemError | CliStorageError>;
+    readonly readPatchSource: (
+      diagramId: string,
+    ) => Effect.Effect<PatchSource, CliFilesystemError | CliStorageError>;
+    readonly commitPatch: (
+      diagramId: string,
+      expectedRevision: number,
+      artifacts: PatchedDiagramArtifacts,
     ) => Effect.Effect<StoredDiagram, CliFilesystemError | CliStorageError>;
     readonly replaceWithDetached: (
       diagramId: string,
@@ -1364,10 +1374,10 @@ const DiagramStoreLive = Layer.effect(
         diagramId,
         Effect.gen(function* () {
           const current = yield* loadUnlocked(diagramId);
-          if (current.authority === "detached") {
+          if (current.authority !== "canonical") {
             return yield* storageError(
               "detached_edit",
-              `Diagram "${diagramId}" is detached from its canonical document.`,
+              `Diagram "${diagramId}" does not have an authoritative canonical document.`,
               "Restore a canonical revision before editing this diagram.",
               diagramId,
             );
@@ -1421,6 +1431,137 @@ const DiagramStoreLive = Layer.effect(
       );
     });
 
+    const patchSourceUnavailable = (diagramId: string) =>
+      storageError(
+        "patch_source_unavailable",
+        `Diagram "${diagramId}" has no current authoritative scene to patch.`,
+        "Restore a canonical or patched revision before patching this diagram.",
+        diagramId,
+      );
+
+    const readPatchSourceUnlocked = Effect.fn(
+      "sketchi.cli.storage.readPatchSourceUnlocked",
+    )(function* (diagramId: string) {
+      const current = yield* loadUnlocked(diagramId);
+      if (
+        current.authority === "detached" ||
+        !current.manifest.formats.includes("scene")
+      ) {
+        return yield* patchSourceUnavailable(diagramId);
+      }
+      const scenePath = join(recordPath(root.path, diagramId), SCENE_FILE);
+      const text = yield* fs.readText(scenePath);
+      const decoded = yield* Effect.sync(() => {
+        try {
+          return RenderedDiagramSceneSchema.safeParse(JSON.parse(text));
+        } catch {
+          return undefined;
+        }
+      });
+      if (!decoded?.success || decoded.data.diagramId !== diagramId) {
+        return yield* storageError(
+          "corrupt_record",
+          `Diagram "${diagramId}" has an invalid current scene artifact.`,
+          "Restore a valid prior revision before patching this diagram.",
+          diagramId,
+        );
+      }
+      return {
+        revision: current.manifest.revision,
+        scene: decoded.data,
+      } satisfies PatchSource;
+    });
+
+    const readPatchSource = Effect.fn("sketchi.cli.storage.readPatchSource")(
+      (diagramId: string) =>
+        withLock(diagramId, readPatchSourceUnlocked(diagramId), true),
+    );
+
+    const commitPatch = Effect.fn("sketchi.cli.storage.commitPatch")(function* (
+      diagramId: string,
+      expectedRevision: number,
+      artifacts: PatchedDiagramArtifacts,
+    ) {
+      return yield* withLock(
+        diagramId,
+        Effect.gen(function* () {
+          const current = yield* loadUnlocked(diagramId);
+          if (current.manifest.revision !== expectedRevision) {
+            return yield* storageError(
+              "patch_conflict",
+              `Diagram "${diagramId}" changed before the patch could commit.`,
+              "Run sketchi show, verify the current record, and retry the patch if it is still intended.",
+              diagramId,
+            );
+          }
+          if (
+            current.authority === "detached" ||
+            !current.manifest.formats.includes("scene")
+          ) {
+            return yield* patchSourceUnavailable(diagramId);
+          }
+          if (artifacts.scene.diagramId !== diagramId) {
+            return yield* storageError(
+              "storage_commit_failed",
+              `Patched scene id "${artifacts.scene.diagramId}" does not match "${diagramId}".`,
+              "Retry the patch against the named stored diagram.",
+              diagramId,
+            );
+          }
+          const source = recordPath(root.path, diagramId);
+          const manifest = DiagramRecordManifest.make({
+            schemaVersion: RECORD_SCHEMA_VERSION,
+            id: diagramId,
+            type: current.manifest.type,
+            title: current.manifest.title,
+            revision: current.manifest.revision + 1,
+            authority: "patched",
+            formats: ["scene", "excalidraw"],
+          });
+          return yield* Effect.acquireUseRelease(
+            fs.makeTempDirectory(root.path, STAGE_PREFIX),
+            (stage) =>
+              Effect.gen(function* () {
+                yield* copySafeTree(source, stage, diagramId);
+                yield* snapshotCurrent(
+                  diagramId,
+                  stage,
+                  current.manifest.revision,
+                );
+                yield* fs.writeText(
+                  join(stage, SCENE_FILE),
+                  encodeJson(artifacts.scene),
+                  true,
+                );
+                yield* fs.writeText(
+                  join(stage, EXCALIDRAW_FILE),
+                  encodeJson(artifacts.excalidraw),
+                  true,
+                );
+                yield* fs.remove(join(stage, PNG_FILE));
+                yield* fs.writeText(
+                  join(stage, MANIFEST_FILE),
+                  encodeJson(manifest),
+                  true,
+                );
+                yield* commitStage(diagramId, stage);
+                return {
+                  manifest,
+                  document: current.document,
+                  revisions: [
+                    ...current.revisions,
+                    `${revisionDirectoryName(current.manifest.revision)}/`,
+                  ].sort(compareRevisionEntries),
+                  authority: "patched",
+                  documentAuthoritative: false,
+                } satisfies StoredDiagram;
+              }),
+            (stage) => fs.remove(stage),
+          );
+        }),
+      );
+    });
+
     const revisionNotFound = (diagramId: string, revision: number) =>
       storageError(
         "revision_not_found",
@@ -1458,7 +1599,7 @@ const DiagramStoreLive = Layer.effect(
     )(function* (
       path: string,
       kind: "scene" | "excalidraw",
-      authority: "canonical" | "detached",
+      authority: "canonical" | "patched" | "detached",
       diagramId: string,
       revision: number,
     ) {
@@ -1562,7 +1703,7 @@ const DiagramStoreLive = Layer.effect(
           );
         }
         const formats: ReadonlyArray<DiagramFormat> =
-          manifest.authority === "canonical"
+          manifest.authority !== "detached"
             ? pngKind === "file"
               ? ["scene", "excalidraw", "png"]
               : ["scene", "excalidraw"]
@@ -1908,6 +2049,8 @@ const DiagramStoreLive = Layer.effect(
     return {
       create,
       edit,
+      readPatchSource,
+      commitPatch,
       replaceWithDetached,
       readRevision,
       restore,

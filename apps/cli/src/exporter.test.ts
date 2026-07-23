@@ -14,6 +14,8 @@ function missingPngStoreLayer() {
   return Layer.succeed(DiagramStore, {
     create: () => Effect.die("unused create"),
     edit: () => Effect.die("unused edit"),
+    readPatchSource: () => Effect.die("unused readPatchSource"),
+    commitPatch: () => Effect.die("unused commitPatch"),
     show: () => Effect.die("unused show"),
     list: () => Effect.die("unused list"),
     replaceWithDetached: () => Effect.die("unused replaceWithDetached"),
@@ -61,6 +63,8 @@ describe("diagram export orchestration", () => {
     const store = Layer.succeed(DiagramStore, {
       create: () => Effect.die("unused create"),
       edit: () => Effect.die("unused edit"),
+      readPatchSource: () => Effect.die("unused readPatchSource"),
+      commitPatch: () => Effect.die("unused commitPatch"),
       show: () => Effect.die("unused show"),
       list: () => Effect.die("unused list"),
       replaceWithDetached: () => Effect.die("unused replaceWithDetached"),

@@ -29,6 +29,7 @@ const PUBLIC_COMMANDS = new Set([
   "create",
   "show",
   "edit",
+  "patch",
   "list",
   "restore",
   "share",
@@ -48,17 +49,15 @@ function inlineSource(value: string): InputSource {
   return { _tag: "InlineJson", value };
 }
 
-export function exclusiveInputSourceFlags() {
+export function exclusiveInputSourceFlags(content = "canonical document") {
   const file = Flag.string("file").pipe(
     Flag.withMetavar("PATH|-"),
-    Flag.withDescription(
-      "Read one canonical document from PATH, or stdin with -.",
-    ),
+    Flag.withDescription(`Read one ${content} from PATH, or stdin with -.`),
     Flag.map(fileSource),
   );
   const json = Flag.string("json").pipe(
     Flag.withMetavar("VALUE"),
-    Flag.withDescription("Read one canonical document from inline JSON."),
+    Flag.withDescription(`Read one ${content} from inline JSON.`),
     Flag.map(inlineSource),
   );
   const source = Object.assign(

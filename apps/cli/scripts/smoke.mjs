@@ -149,6 +149,31 @@ const revisedFlowchart = {
   ...flowchart,
   spec: { ...flowchart.spec, title: "Release approval revised" },
 };
+const colorPatch = {
+  intent: "Color agent, local runtime, browser, and evidence locations.",
+  operations: [
+    {
+      op: "setStyle",
+      selector: { nodeIds: ["start"] },
+      style: { fillColor: "#ede9fe", strokeColor: "#7c3aed" },
+    },
+    {
+      op: "setStyle",
+      selector: { nodeIds: ["review"] },
+      style: { fillColor: "#dbeafe", strokeColor: "#2563eb" },
+    },
+    {
+      op: "setStyle",
+      selector: { nodeIds: ["decision"] },
+      style: { fillColor: "#dcfce7", strokeColor: "#16a34a" },
+    },
+    {
+      op: "setStyle",
+      selector: { nodeIds: ["approve", "revise"] },
+      style: { fillColor: "#fef3c7", strokeColor: "#d97706" },
+    },
+  ],
+};
 const wideTitleFlowchart = {
   ...flowchart,
   spec: {
@@ -522,6 +547,59 @@ try {
     "Offline restore did not recover the archived document.",
   );
 
+  const patchFlow = await cli(
+    ["patch", "release-flow", "--file", "-", "--output", "json"],
+    `${JSON.stringify(colorPatch)}\n`,
+  );
+  expectExit(patchFlow, 0, "flowchart semantic patch");
+  const patchData = parseJson(
+    patchFlow.stdout,
+    "flowchart semantic patch",
+  ).data;
+  assert(
+    patchData.revision === 4 &&
+      patchData.authority === "patched" &&
+      patchData.documentAuthoritative === false,
+    "Semantic patch did not establish scene authority.",
+  );
+  const blockedEdit = await cli([
+    "edit",
+    "release-flow",
+    "--json",
+    JSON.stringify(flowchart),
+    "--output",
+    "json",
+  ]);
+  expectExit(blockedEdit, 6, "patched flowchart edit rejection");
+  assert(
+    parseJson(blockedEdit.stderr, "patched edit rejection").error.code ===
+      "detached_edit",
+    "Patched edit did not use the documented authority error.",
+  );
+  const restoreBeforePatch = await cli([
+    "restore",
+    "release-flow",
+    "--revision",
+    "3",
+    "--output",
+    "json",
+  ]);
+  expectExit(restoreBeforePatch, 0, "pre-patch canonical restore");
+  assert(
+    parseJson(restoreBeforePatch.stdout, "pre-patch canonical restore").data
+      .authority === "canonical",
+    "Restore did not recover canonical authority after patching.",
+  );
+  const repatchFlow = await cli([
+    "patch",
+    "release-flow",
+    "--json",
+    JSON.stringify(colorPatch),
+    "--output",
+    "json",
+  ]);
+  expectExit(repatchFlow, 0, "flowchart semantic repatch");
+
   const createMindmap = await cli(
     ["create", "--file", "-", "--output", "json"],
     `${JSON.stringify(mindmap)}\n`,
@@ -584,6 +662,19 @@ try {
   assert(
     parseJson(exportScene.stderr, "scene file export status").ok === true,
     "File export status was not isolated on stderr.",
+  );
+  const patchedScene = parseJson(
+    await readFile(sceneDestination),
+    "patched exported scene",
+  );
+  const reviewNode = patchedScene.elements.find(
+    (element) => element.type === "node" && element.nodeId === "review",
+  );
+  assert(
+    reviewNode?.backgroundColor === undefined &&
+      reviewNode?.fillColor === "#dbeafe" &&
+      reviewNode?.strokeColor === "#2563eb",
+    "Exported scene did not retain the semantic node colors.",
   );
 
   const exportExcalidraw = await cli([
@@ -798,18 +889,27 @@ try {
   const noSource = await cli(["create", "--output", "json"]);
   expectExit(noSource, 2, "missing input source");
   parseJson(noSource.stderr, "missing input source error");
-  const interactiveStdin = await run(
-    "script",
-    ["-q", "-e", "-c", `${binary} create --file - --output json`, "/dev/null"],
-    { env: cliEnvironment },
-  );
-  expectExit(interactiveStdin, 2, "interactive stdin rejection");
-  assert(
-    Buffer.concat([interactiveStdin.stdout, interactiveStdin.stderr]).includes(
-      Buffer.from("interactive_stdin"),
-    ),
-    "Interactive stdin did not return the structured usage failure.",
-  );
+  if (process.platform !== "darwin") {
+    const interactiveStdin = await run(
+      "script",
+      [
+        "-q",
+        "-e",
+        "-c",
+        `${binary} create --file - --output json`,
+        "/dev/null",
+      ],
+      { env: cliEnvironment },
+    );
+    expectExit(interactiveStdin, 2, "interactive stdin rejection");
+    assert(
+      Buffer.concat([
+        interactiveStdin.stdout,
+        interactiveStdin.stderr,
+      ]).includes(Buffer.from("interactive_stdin")),
+      "Interactive stdin did not return the structured usage failure.",
+    );
+  }
   const invalidDocument = await cli([
     "create",
     "--json",
@@ -855,6 +955,9 @@ try {
     "revisions/000001/manifest.json",
     "revisions/000001/document.json",
     "revisions/000002/manifest.json",
+    "revisions/000003/manifest.json",
+    "revisions/000004/manifest.json",
+    "revisions/000005/manifest.json",
   ]) {
     await readFile(resolve(record, relative));
   }
@@ -885,13 +988,14 @@ try {
     flows: [
       "flowchart:create-show-edit-show",
       "flowchart:restore-offline",
+      "flowchart:patch-edit-blocked-restore-repatch",
       "mindmap:create-show-edit-show",
       "list",
       "export:file-stdout-png-on-demand",
     ],
     expectedFailures: [
       "exclusive-source:2",
-      "interactive-stdin:2",
+      ...(process.platform === "darwin" ? [] : ["interactive-stdin:2"]),
       "invalid-document:3",
       "edit-id-mismatch:3",
       "not-found:5",
@@ -900,7 +1004,7 @@ try {
       "generate-endpoint-error:3",
     ],
     network:
-      "offline create/show/edit/list/export/restore; share/pull excluded; generate loopback proof excepted",
+      "offline create/patch/show/edit/list/export/restore; share/pull excluded; generate loopback proof excepted",
     home: "isolated-under-.memory",
     bundle: {
       bytes: archivedBundleBytes,

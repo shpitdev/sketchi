@@ -65,6 +65,8 @@ export class CliStorageError extends Schema.TaggedErrorClass<CliStorageError>()(
       "diagram_already_exists",
       "diagram_busy",
       "detached_edit",
+      "patch_source_unavailable",
+      "patch_conflict",
       "replacement_conflict",
       "restore_conflict",
       "revision_not_found",
@@ -149,6 +151,7 @@ export function exitCodeForFailure(error: CliFailure): number {
         error.code === "diagram_already_exists" ||
         error.code === "diagram_busy" ||
         error.code === "detached_edit" ||
+        error.code === "patch_conflict" ||
         error.code === "replacement_conflict" ||
         error.code === "restore_conflict"
       ) {
