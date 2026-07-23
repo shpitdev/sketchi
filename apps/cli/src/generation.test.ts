@@ -62,8 +62,11 @@ function stored(diagram: BuiltDiagram): StoredDiagram {
       type: diagram.type,
       title: diagram.title,
       revision: 1,
+      authority: "canonical",
       formats: ["scene", "excalidraw"],
     },
+    authority: "canonical",
+    documentAuthoritative: true,
     document: diagram.document,
     revisions: [],
   };
@@ -78,6 +81,9 @@ function capturingStoreLayer(created: BuiltDiagram[]) {
     edit: () => Effect.die("unused edit"),
     show: () => Effect.die("unused show"),
     list: () => Effect.die("unused list"),
+    replaceWithDetached: () => Effect.die("unused replaceWithDetached"),
+    readRevision: () => Effect.die("unused readRevision"),
+    restore: () => Effect.die("unused restore"),
     readExportSource: () => Effect.die("unused readExportSource"),
   });
 }
@@ -95,6 +101,9 @@ function failingStoreLayer(attempts: { count: number }) {
     edit: () => Effect.die("unused edit"),
     show: () => Effect.die("unused show"),
     list: () => Effect.die("unused list"),
+    replaceWithDetached: () => Effect.die("unused replaceWithDetached"),
+    readRevision: () => Effect.die("unused readRevision"),
+    restore: () => Effect.die("unused restore"),
     readExportSource: () => Effect.die("unused readExportSource"),
   });
 }
@@ -110,6 +119,9 @@ function generatedArtifactStoreLayer(created: BuiltDiagram[]) {
     edit: () => Effect.die("unused edit"),
     show: () => Effect.die("unused show"),
     list: () => Effect.die("unused list"),
+    replaceWithDetached: () => Effect.die("unused replaceWithDetached"),
+    readRevision: () => Effect.die("unused readRevision"),
+    restore: () => Effect.die("unused restore"),
     readExportSource: (diagramId, format) => {
       const diagram = created.find((candidate) => candidate.id === diagramId);
       if (!diagram) return Effect.die(`missing generated diagram ${diagramId}`);

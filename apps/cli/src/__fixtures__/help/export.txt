@@ -1,5 +1,5 @@
 DESCRIPTION
-  Export a stored scene or Excalidraw artifact, or render PNG on demand from both when no PNG is stored. Rendering is deterministic, export-only, and uses bundled fonts plus a WASM rasterizer: it never starts a browser or network request and never writes the PNG back to the record. Status always uses stderr, so --dest - leaves stdout byte-only. A successful PNG file export adds a generic inline-Markdown display hint for calling agents. Render or write failures exit 8.
+  Strictly offline export of a current stored artifact or on-demand PNG. Canonical PNG uses scene plus Excalidraw; detached PNG restores diagram.excalidraw directly, uses its viewBackgroundColor, and adds no stale canonical title. Detached scene export is unavailable. Rendering never starts a browser or network request and never writes the PNG back. Status always uses stderr, so --dest - leaves stdout byte-only. Render or write failures exit 8.
 
 USAGE
   sketchi export [flags] <diagram-id>

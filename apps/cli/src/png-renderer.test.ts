@@ -127,5 +127,68 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))(
         }
       }),
     );
+
+    it.effect(
+      "renders detached artifacts without stale canonical title semantics",
+      () =>
+        Effect.gen(function* () {
+          const builder = yield* DiagramBuilder;
+          const renderer = yield* CliPngRenderer;
+          const built = yield* builder.build(canonicalDocument(flowchartInput));
+          const detachedArtifact = {
+            ...built.excalidraw,
+            appState: {
+              ...built.excalidraw.appState,
+              viewBackgroundColor: "#ff0000",
+            },
+          };
+          const canonical = yield* renderer.renderPng({
+            scene: built.scene,
+            excalidraw: detachedArtifact,
+          });
+          const detached = yield* renderer.renderPng({
+            excalidraw: detachedArtifact,
+          });
+          const parsed = PNG.sync.read(Buffer.from(detached));
+          assert.deepStrictEqual(
+            [...parsed.data.subarray(0, 4)],
+            [255, 0, 0, 255],
+          );
+          assert.isBelow(
+            parsed.height,
+            PNG.sync.read(Buffer.from(canonical)).height,
+          );
+        }),
+    );
+
+    it.effect("restores database share payloads before normalization", () =>
+      Effect.gen(function* () {
+        const builder = yield* DiagramBuilder;
+        const renderer = yield* CliPngRenderer;
+        const built = yield* builder.build(canonicalDocument(flowchartInput));
+        const normalized = yield* renderer.normalizeExcalidraw({
+          type: built.excalidraw.type,
+          version: built.excalidraw.version,
+          source: built.excalidraw.source,
+          elements: built.excalidraw.elements,
+          appState: {
+            ...built.excalidraw.appState,
+            lockedMultiSelections: { fixtureGroup: true },
+          },
+        });
+        assert.equal(typeof normalized, "object");
+        assert.isNotNull(normalized);
+        if (typeof normalized === "object" && normalized !== null) {
+          assert.deepStrictEqual(Reflect.get(normalized, "files"), {});
+          assert.deepStrictEqual(
+            Reflect.get(
+              Reflect.get(normalized, "appState"),
+              "lockedMultiSelections",
+            ),
+            { fixtureGroup: true },
+          );
+        }
+      }),
+    );
   },
 );

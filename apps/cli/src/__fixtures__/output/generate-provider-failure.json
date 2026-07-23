@@ -4,7 +4,7 @@
   "error": {
     "code": "provider_failure",
     "message": "The Sketchi generate API could not be reached.",
-    "hint": "Check your network connection and retry; generate is the only command that uses the network.",
+    "hint": "Check your network connection and retry. create/show/edit/list/export/restore remain offline; share and pull are separate explicit network commands.",
     "details": [
       "transport"
     ]

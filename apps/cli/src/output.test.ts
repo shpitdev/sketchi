@@ -7,6 +7,7 @@ import {
   CliFilesystemError,
   CliGenerationError,
   CliInputError,
+  CliShareError,
   CliStorageError,
   CliValidationError,
   exitCodeForFailure,
@@ -72,6 +73,29 @@ describe("output envelopes and exits", () => {
     }),
   );
 
+  it.effect("redacts share fragments from text and JSON typed errors", () =>
+    Effect.gen(function* () {
+      const fragment = "#json=AAAAAAAAAAAAAAAAAAAAAA,BBBBBBBBBBBBBBBBBBBBBB";
+      for (const format of ["text", "json"] as const) {
+        const stderr: string[] = [];
+        yield* Effect.exit(
+          reportFailure(
+            "pull",
+            format,
+            CliValidationError.make({
+              message: `Invalid diagram id ${fragment}.`,
+              hint: `Remove ${fragment} and retry.`,
+              details: [`received ${fragment}`],
+            }),
+          ).pipe(Effect.provide(captureLayer([], stderr))),
+        );
+
+        assert.notInclude(stderr.join(""), fragment);
+        assert.include(stderr.join(""), "[redacted-share-link]");
+      }
+    }),
+  );
+
   it.effect("keeps generation success and failure envelopes golden", () =>
     Effect.gen(function* () {
       const stdout: string[] = [];
@@ -79,7 +103,7 @@ describe("output envelopes and exits", () => {
       const providerFailure = CliGenerationError.make({
         code: "provider_failure",
         message: "The Sketchi generate API could not be reached.",
-        hint: "Check your network connection and retry; generate is the only command that uses the network.",
+        hint: "Check your network connection and retry. create/show/edit/list/export/restore remain offline; share and pull are separate explicit network commands.",
         details: ["transport"],
       });
       yield* reportSuccess(
@@ -161,6 +185,18 @@ describe("output envelopes and exits", () => {
         hint: "h",
         details: [],
       }),
+      CliShareError.make({
+        code: "invalid_share_link",
+        message: "m",
+        hint: "h",
+        details: [],
+      }),
+      CliShareError.make({
+        code: "share_transport_failed",
+        message: "m",
+        hint: "h",
+        details: [],
+      }),
       CliGenerationError.make({
         code: "provider_failure",
         message: "m",
@@ -183,7 +219,7 @@ describe("output envelopes and exits", () => {
 
     assert.deepStrictEqual(
       failures.map(exitCodeForFailure),
-      [2, 3, 3, 4, 5, 6, 7, 8, 3, 10, 11, 12],
+      [2, 3, 3, 4, 5, 6, 7, 8, 3, 3, 13, 10, 11, 12],
     );
   });
 

@@ -137,7 +137,7 @@ const packageManifest = {
   name: "sketchi",
   version,
   description:
-    "Local Sketchi authoring CLI: offline flowchart and mindmap workflows plus one unauthenticated prompt-assisted generate command.",
+    "Local Sketchi authoring CLI with six offline authoring and recovery commands plus three credential-free network commands for generation and encrypted Excalidraw sharing.",
   keywords: ["sketchi", "diagram", "flowchart", "mindmap", "excalidraw", "cli"],
   homepage: "https://sketchi.app",
   repository: {

@@ -1,5 +1,5 @@
 DESCRIPTION
-  Show the current canonical document, manifest summary, formats, and recoverable revision paths for DIAGRAM_ID. This does not rebuild or mutate the record.
+  Show current authority, documentAuthoritative state, retained document provenance, manifest formats, and recoverable revision paths for DIAGRAM_ID. This is strictly offline and does not rebuild or mutate the record.
 
 USAGE
   sketchi show [flags] <diagram-id>

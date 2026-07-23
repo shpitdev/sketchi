@@ -50,16 +50,23 @@ export const DiagramExporterLive = Layer.effect(
 
     const renderStoredPng = Effect.fn("sketchi.cli.export.renderPng")(
       function* (artifacts: {
-        readonly scene: Uint8Array;
+        readonly scene?: Uint8Array;
         readonly excalidraw: Uint8Array;
       }) {
-        const sceneJson = yield* decodeJson(artifacts.scene);
         const excalidrawJson = yield* decodeJson(artifacts.excalidraw);
-        const scene = RenderedDiagramSceneSchema.safeParse(sceneJson);
         const excalidraw = ExcalidrawFileSchema.safeParse(excalidrawJson);
-        if (!scene.success || !excalidraw.success) return yield* renderFailed();
+        if (!excalidraw.success) return yield* renderFailed();
+        const scene = artifacts.scene
+          ? RenderedDiagramSceneSchema.safeParse(
+              yield* decodeJson(artifacts.scene),
+            )
+          : undefined;
+        if (scene && !scene.success) return yield* renderFailed();
         const png = yield* renderer
-          .renderPng({ scene: scene.data, excalidraw: excalidraw.data })
+          .renderPng({
+            ...(scene?.success ? { scene: scene.data } : {}),
+            excalidraw: excalidraw.data,
+          })
           .pipe(Effect.mapError(renderFailed));
         return png instanceof Uint8Array ? png : new Uint8Array(png);
       },

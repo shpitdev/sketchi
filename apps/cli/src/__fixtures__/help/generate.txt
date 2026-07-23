@@ -1,5 +1,5 @@
 DESCRIPTION
-  Create one persisted diagram from --prompt TEXT. This is Sketchi's only command that uses the network. It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
+  Create one persisted diagram from --prompt TEXT. This is one of Sketchi's three explicit network commands (generate, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
 
 Network and options:
   Endpoint: https://playground.sketchi.app/api/v1/generate

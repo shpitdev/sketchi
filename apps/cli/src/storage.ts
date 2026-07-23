@@ -7,7 +7,12 @@ import {
   relative,
   resolve,
 } from "node:path";
+import { inflateSync } from "node:zlib";
 
+import {
+  ExcalidrawFileSchema,
+  RenderedDiagramSceneSchema,
+} from "@sketchi/diagram-agent";
 import { Context, Effect, Layer, Schedule, Schema } from "effect";
 
 import {
@@ -24,15 +29,24 @@ import {
   type DiagramSummary,
   type StoredDiagram,
   revisionFileName,
+  revisionDirectoryName,
   summaryFromStored,
 } from "./contracts.js";
-import { decodeCanonicalDiagramDocument, encodeJson } from "./document.js";
+import {
+  type CanonicalDiagramDocument,
+  decodeCanonicalDiagramDocument,
+  encodeJson,
+} from "./document.js";
 import {
   CliExportError,
   CliFilesystemError,
   CliStorageError,
 } from "./errors.js";
 import { LocalFileSystem, type LocalEntry } from "./filesystem.js";
+import {
+  MAX_DECOMPRESSED_BYTES,
+  validateShareScene,
+} from "./share-protocol.js";
 
 export class StorageRoot extends Context.Service<
   StorageRoot,
@@ -43,9 +57,269 @@ export type ExportSource =
   | { readonly _tag: "StoredArtifact"; readonly bytes: Uint8Array }
   | {
       readonly _tag: "RenderPng";
-      readonly scene: Uint8Array;
+      readonly scene?: Uint8Array;
       readonly excalidraw: Uint8Array;
     };
+
+export type RevisionSource =
+  | {
+      readonly _tag: "LegacyDocument";
+      readonly revision: number;
+      readonly document: CanonicalDiagramDocument;
+    }
+  | { readonly _tag: "FullSnapshot"; readonly revision: number };
+
+export interface RestoreResult {
+  readonly diagram: StoredDiagram;
+  readonly restoredFromRevision: number;
+}
+
+function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function readUint32(bytes: Uint8Array, offset: number): number {
+  return (
+    ((bytes[offset]! << 24) |
+      (bytes[offset + 1]! << 16) |
+      (bytes[offset + 2]! << 8) |
+      bytes[offset + 3]!) >>>
+    0
+  );
+}
+
+function concatenateBytes(chunks: ReadonlyArray<Uint8Array>): Uint8Array {
+  const byteLength = chunks.reduce(
+    (total, chunk) => total + chunk.byteLength,
+    0,
+  );
+  const bytes = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
+const ADAM7_PASSES = [
+  [0, 0, 8, 8],
+  [4, 0, 8, 8],
+  [0, 4, 4, 8],
+  [2, 0, 4, 4],
+  [0, 2, 2, 4],
+  [1, 0, 2, 2],
+  [0, 1, 1, 2],
+] as const;
+
+function passExtent(size: number, start: number, step: number): number {
+  return size <= start ? 0 : Math.ceil((size - start) / step);
+}
+
+function pngScanlines(
+  width: number,
+  height: number,
+  bitsPerPixel: number,
+  interlace: number,
+): ReadonlyArray<{ readonly rows: number; readonly rowBytes: number }> | null {
+  const passes = interlace === 0 ? ([[0, 0, 1, 1]] as const) : ADAM7_PASSES;
+  const scanlines: Array<{ readonly rows: number; readonly rowBytes: number }> =
+    [];
+  let totalBytes = 0;
+  for (const [xStart, yStart, xStep, yStep] of passes) {
+    const passWidth = passExtent(width, xStart, xStep);
+    const rows = passExtent(height, yStart, yStep);
+    if (passWidth === 0 || rows === 0) continue;
+    const rowBytes = Math.ceil((passWidth * bitsPerPixel) / 8) + 1;
+    if (
+      rowBytes > MAX_DECOMPRESSED_BYTES - totalBytes ||
+      rows > Math.floor((MAX_DECOMPRESSED_BYTES - totalBytes) / rowBytes)
+    ) {
+      return null;
+    }
+    totalBytes += rows * rowBytes;
+    scanlines.push({ rows, rowBytes });
+  }
+  return scanlines;
+}
+
+function hasValidInflatedPngData(
+  chunks: ReadonlyArray<Uint8Array>,
+  width: number,
+  height: number,
+  bitDepth: number,
+  colorType: number,
+  interlace: number,
+): boolean {
+  const samplesPerPixel: Readonly<Record<number, number>> = {
+    0: 1,
+    2: 3,
+    3: 1,
+    4: 2,
+    6: 4,
+  };
+  const samples = samplesPerPixel[colorType];
+  if (samples === undefined) return false;
+  const scanlines = pngScanlines(width, height, samples * bitDepth, interlace);
+  if (scanlines === null) return false;
+  const expectedLength = scanlines.reduce(
+    (total, pass) => total + pass.rows * pass.rowBytes,
+    0,
+  );
+  try {
+    const compressed = concatenateBytes(chunks);
+    const result = inflateSync(compressed, {
+      info: true,
+      maxOutputLength: MAX_DECOMPRESSED_BYTES,
+    }) as unknown as {
+      readonly buffer: Uint8Array;
+      readonly engine: { readonly bytesWritten: number };
+    };
+    if (result.engine.bytesWritten !== compressed.byteLength) return false;
+    const inflated = result.buffer;
+    if (inflated.byteLength !== expectedLength) return false;
+    let offset = 0;
+    for (const pass of scanlines) {
+      for (let row = 0; row < pass.rows; row += 1) {
+        if ((inflated[offset] ?? 5) > 4) return false;
+        offset += pass.rowBytes;
+      }
+    }
+    return offset === inflated.byteLength;
+  } catch {
+    return false;
+  }
+}
+
+function isValidPng(bytes: Uint8Array): boolean {
+  const signature = [137, 80, 78, 71, 13, 10, 26, 10];
+  if (
+    bytes.byteLength < 33 ||
+    signature.some((byte, index) => bytes[index] !== byte)
+  ) {
+    return false;
+  }
+  let offset = signature.length;
+  let chunkIndex = 0;
+  let width: number | undefined;
+  let height: number | undefined;
+  let colorType: number | undefined;
+  let bitDepth: number | undefined;
+  let interlace: number | undefined;
+  let seenPalette = false;
+  let seenImageData = false;
+  let imageDataEnded = false;
+  const imageDataChunks: Uint8Array[] = [];
+  while (offset + 12 <= bytes.byteLength) {
+    const length = readUint32(bytes, offset);
+    const chunkEnd = offset + 12 + length;
+    if (chunkEnd > bytes.byteLength) return false;
+    const typeStart = offset + 4;
+    const typeBytes = bytes.subarray(typeStart, typeStart + 4);
+    const isAsciiLetter = (byte: number): boolean =>
+      (byte >= 65 && byte <= 90) || (byte >= 97 && byte <= 122);
+    if (
+      typeBytes.byteLength !== 4 ||
+      !typeBytes.every(isAsciiLetter) ||
+      (typeBytes[2]! & 0x20) !== 0
+    ) {
+      return false;
+    }
+    const type = String.fromCharCode(...typeBytes);
+    if (chunkIndex === 0 && (type !== "IHDR" || length !== 13)) return false;
+    if (type === "IHDR") {
+      if (chunkIndex !== 0 || length !== 13) return false;
+      width = readUint32(bytes, offset + 8);
+      height = readUint32(bytes, offset + 12);
+      bitDepth = bytes[offset + 16];
+      colorType = bytes[offset + 17];
+      interlace = bytes[offset + 20];
+      const legalDepths: Readonly<Record<number, ReadonlyArray<number>>> = {
+        0: [1, 2, 4, 8, 16],
+        2: [8, 16],
+        3: [1, 2, 4, 8],
+        4: [8, 16],
+        6: [8, 16],
+      };
+      if (
+        width === 0 ||
+        height === 0 ||
+        width > 0x7fffffff ||
+        height > 0x7fffffff ||
+        colorType === undefined ||
+        bitDepth === undefined ||
+        !legalDepths[colorType]?.includes(bitDepth) ||
+        bytes[offset + 18] !== 0 ||
+        bytes[offset + 19] !== 0 ||
+        ![0, 1].includes(interlace ?? -1)
+      ) {
+        return false;
+      }
+    } else if (type === "PLTE") {
+      if (
+        seenPalette ||
+        seenImageData ||
+        length === 0 ||
+        length % 3 !== 0 ||
+        length > 768 ||
+        colorType === 0 ||
+        colorType === 4 ||
+        (colorType === 3 &&
+          bitDepth !== undefined &&
+          length / 3 > 2 ** bitDepth)
+      ) {
+        return false;
+      }
+      seenPalette = true;
+    } else if (type === "IDAT") {
+      if (imageDataEnded || (colorType === 3 && !seenPalette)) return false;
+      seenImageData = true;
+      imageDataChunks.push(bytes.subarray(offset + 8, offset + 8 + length));
+    } else if (type === "IEND") {
+      if (length !== 0 || !seenImageData || (colorType === 3 && !seenPalette)) {
+        return false;
+      }
+    } else {
+      if (seenImageData) imageDataEnded = true;
+      const firstTypeByte = bytes[typeStart];
+      if (firstTypeByte === undefined || (firstTypeByte & 0x20) === 0) {
+        return false;
+      }
+    }
+    const expectedCrc = readUint32(bytes, offset + 8 + length);
+    if (crc32(bytes.subarray(typeStart, offset + 8 + length)) !== expectedCrc) {
+      return false;
+    }
+    offset = chunkEnd;
+    chunkIndex += 1;
+    if (type === "IEND") {
+      return (
+        offset === bytes.byteLength &&
+        width !== undefined &&
+        height !== undefined &&
+        bitDepth !== undefined &&
+        colorType !== undefined &&
+        interlace !== undefined &&
+        hasValidInflatedPngData(
+          imageDataChunks,
+          width,
+          height,
+          bitDepth,
+          colorType,
+          interlace,
+        )
+      );
+    }
+  }
+  return false;
+}
 
 export class DiagramStore extends Context.Service<
   DiagramStore,
@@ -57,6 +331,20 @@ export class DiagramStore extends Context.Service<
       diagramId: string,
       diagram: BuiltDiagram,
     ) => Effect.Effect<StoredDiagram, CliFilesystemError | CliStorageError>;
+    readonly replaceWithDetached: (
+      diagramId: string,
+      excalidraw: Uint8Array,
+      expectedRevision?: number,
+    ) => Effect.Effect<StoredDiagram, CliFilesystemError | CliStorageError>;
+    readonly readRevision: (
+      diagramId: string,
+      revision: number,
+    ) => Effect.Effect<RevisionSource, CliFilesystemError | CliStorageError>;
+    readonly restore: (
+      diagramId: string,
+      revision: number,
+      legacyDiagram?: BuiltDiagram,
+    ) => Effect.Effect<RestoreResult, CliFilesystemError | CliStorageError>;
     readonly show: (
       diagramId: string,
     ) => Effect.Effect<StoredDiagram, CliFilesystemError | CliStorageError>;
@@ -126,6 +414,81 @@ function decodedId(value: string): string | undefined {
 
 function compareCodeUnits(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function compareRevisionEntries(left: string, right: string): number {
+  const leftDigits = left.replace(/(?:\/|\.json)$/u, "").replace(/^0+/u, "");
+  const rightDigits = right.replace(/(?:\/|\.json)$/u, "").replace(/^0+/u, "");
+  const lengthComparison = leftDigits.length - rightDigits.length;
+  return lengthComparison !== 0
+    ? lengthComparison
+    : compareCodeUnits(leftDigits, rightDigits) ||
+        compareCodeUnits(left, right);
+}
+
+function replaceManifestRevision(
+  source: string,
+  revision: number,
+): string | undefined {
+  let depth = 0;
+  let replacementStart = -1;
+  let replacementEnd = -1;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === "{") {
+      depth += 1;
+      continue;
+    }
+    if (character === "}") {
+      depth -= 1;
+      continue;
+    }
+    if (character !== '"') continue;
+
+    const stringStart = index;
+    let escaped = false;
+    for (index += 1; index < source.length; index += 1) {
+      const stringCharacter = source[index];
+      if (escaped) {
+        escaped = false;
+      } else if (stringCharacter === "\\") {
+        escaped = true;
+      } else if (stringCharacter === '"') {
+        break;
+      }
+    }
+    if (index >= source.length || depth !== 1) continue;
+
+    let key: unknown;
+    try {
+      key = JSON.parse(source.slice(stringStart, index + 1));
+    } catch {
+      return undefined;
+    }
+    if (key !== "revision") continue;
+
+    let cursor = index + 1;
+    while (/\s/u.test(source[cursor] ?? "")) cursor += 1;
+    if (source[cursor] !== ":") continue;
+    cursor += 1;
+    while (/\s/u.test(source[cursor] ?? "")) cursor += 1;
+    const match = /^-?\d+/u.exec(source.slice(cursor));
+    if (!match) return undefined;
+    const end = cursor + match[0].length;
+    let delimiter = end;
+    while (/\s/u.test(source[delimiter] ?? "")) delimiter += 1;
+    if (source[delimiter] !== "," && source[delimiter] !== "}") {
+      return undefined;
+    }
+    if (replacementStart !== -1) return undefined;
+    replacementStart = cursor;
+    replacementEnd = end;
+  }
+
+  return replacementStart === -1
+    ? undefined
+    : `${source.slice(0, replacementStart)}${String(revision)}${source.slice(replacementEnd)}`;
 }
 
 function processIsAlive(pid: number): boolean {
@@ -757,10 +1120,25 @@ const DiagramStoreLive = Layer.effect(
         if (pngKind !== "file" && pngKind !== "missing") {
           return yield* unsafeEntry(join(path, PNG_FILE), diagramId);
         }
+        if (
+          pngKind === "file" &&
+          !isValidPng(yield* fs.readBytes(join(path, PNG_FILE)))
+        ) {
+          return yield* storageError(
+            "corrupt_record",
+            `Diagram "${diagramId}" has an invalid stored PNG artifact.`,
+            "Recover a valid prior revision or rebuild the record.",
+            diagramId,
+          );
+        }
         const expectedFormats: ReadonlyArray<DiagramFormat> =
-          pngKind === "file"
-            ? ["scene", "excalidraw", "png"]
-            : ["scene", "excalidraw"];
+          manifest.authority === "detached"
+            ? pngKind === "file"
+              ? ["excalidraw", "png"]
+              : ["excalidraw"]
+            : pngKind === "file"
+              ? ["scene", "excalidraw", "png"]
+              : ["scene", "excalidraw"];
         if (
           manifest.formats.length !== expectedFormats.length ||
           manifest.formats.some(
@@ -775,13 +1153,29 @@ const DiagramStoreLive = Layer.effect(
           );
         }
         const revisionDirectory = join(path, REVISIONS_DIRECTORY);
-        const revisions = [...(yield* fs.list(revisionDirectory))]
-          .filter(
-            (entry) => entry.kind === "file" && entry.name.endsWith(".json"),
-          )
-          .map((entry) => entry.name)
-          .sort(compareCodeUnits);
-        return { manifest, document, revisions } satisfies StoredDiagram;
+        const revisions: string[] = [];
+        for (const entry of yield* fs.list(revisionDirectory)) {
+          if (entry.kind === "file" && /^\d{6,}\.json$/u.test(entry.name)) {
+            revisions.push(entry.name);
+            continue;
+          }
+          if (entry.kind === "directory" && /^\d{6,}$/u.test(entry.name)) {
+            revisions.push(`${entry.name}/`);
+            continue;
+          }
+          return yield* unsafeEntry(
+            join(revisionDirectory, entry.name),
+            diagramId,
+          );
+        }
+        revisions.sort(compareRevisionEntries);
+        return {
+          manifest,
+          document,
+          revisions,
+          authority: manifest.authority,
+          documentAuthoritative: manifest.authority === "canonical",
+        } satisfies StoredDiagram;
       },
     );
 
@@ -807,6 +1201,83 @@ const DiagramStoreLive = Layer.effect(
         }
       }
     });
+
+    const copyRecordSnapshot = Effect.fn(
+      "sketchi.cli.storage.copyRecordSnapshot",
+    )(function* (source: string, destination: string, diagramId: string) {
+      yield* fs.makeDirectory(destination);
+      for (const entry of yield* fs.list(source)) {
+        if (entry.name === REVISIONS_DIRECTORY) continue;
+        const sourcePath = join(source, entry.name);
+        const destinationPath = join(destination, entry.name);
+        if (entry.kind === "file") {
+          yield* fs.writeBytes(
+            destinationPath,
+            yield* fs.readBytes(sourcePath),
+          );
+        } else {
+          return yield* unsafeEntry(sourcePath, diagramId);
+        }
+      }
+    });
+
+    const commitStage = Effect.fn("sketchi.cli.storage.commitStage")(function* (
+      diagramId: string,
+      stage: string,
+    ) {
+      const source = recordPath(root.path, diagramId);
+      const backup = join(
+        root.path,
+        `${BACKUP_PREFIX}${encodedId(diagramId)}.${String(process.pid)}.${crypto.randomUUID()}`,
+      );
+      yield* fs.rename(source, backup);
+      const committed = yield* fs.rename(stage, source).pipe(
+        Effect.matchEffect({
+          onFailure: (commitError) =>
+            fs.rename(backup, source).pipe(
+              Effect.matchEffect({
+                onFailure: () =>
+                  Effect.fail(
+                    storageError(
+                      "storage_commit_failed",
+                      `Atomic storage commit and rollback both failed for "${diagramId}".`,
+                      "Retry; Sketchi will recover the backup transaction before the next operation.",
+                      diagramId,
+                    ),
+                  ),
+                onSuccess: () => Effect.fail(commitError),
+              }),
+            ),
+          onSuccess: () => Effect.succeed(true),
+        }),
+      );
+      if (committed) {
+        yield* fs.remove(backup).pipe(Effect.catch(() => Effect.void));
+      }
+    });
+
+    const snapshotCurrent = Effect.fn("sketchi.cli.storage.snapshotCurrent")(
+      function* (diagramId: string, stage: string, currentRevision: number) {
+        const destination = join(
+          stage,
+          REVISIONS_DIRECTORY,
+          revisionDirectoryName(currentRevision),
+        );
+        if ((yield* fs.kind(destination)) !== "missing") {
+          return yield* storageError(
+            "corrupt_record",
+            `Diagram "${diagramId}" already has a snapshot for current revision ${String(currentRevision)}.`,
+            "Inspect the revisions directory before retrying.",
+            diagramId,
+          );
+        }
+        yield* copyRecordSnapshot(
+          recordPath(root.path, diagramId),
+          destination,
+          diagramId,
+        );
+      },
+    );
 
     const writeBuilt = Effect.fn("sketchi.cli.storage.writeBuilt")(function* (
       stage: string,
@@ -860,6 +1331,7 @@ const DiagramStoreLive = Layer.effect(
             type: diagram.type,
             title: diagram.title,
             revision: 1,
+            authority: "canonical",
             formats: diagram.png
               ? ["scene", "excalidraw", "png"]
               : ["scene", "excalidraw"],
@@ -874,6 +1346,8 @@ const DiagramStoreLive = Layer.effect(
                   manifest,
                   document: diagram.document,
                   revisions: [],
+                  authority: "canonical",
+                  documentAuthoritative: true,
                 } satisfies StoredDiagram;
               }),
             (stage) => fs.remove(stage),
@@ -890,6 +1364,14 @@ const DiagramStoreLive = Layer.effect(
         diagramId,
         Effect.gen(function* () {
           const current = yield* loadUnlocked(diagramId);
+          if (current.authority === "detached") {
+            return yield* storageError(
+              "detached_edit",
+              `Diagram "${diagramId}" is detached from its canonical document.`,
+              "Restore a canonical revision before editing this diagram.",
+              diagramId,
+            );
+          }
           if (diagram.id !== diagramId) {
             return yield* storageError(
               "storage_commit_failed",
@@ -905,6 +1387,7 @@ const DiagramStoreLive = Layer.effect(
             type: diagram.type,
             title: diagram.title,
             revision: current.manifest.revision + 1,
+            authority: "canonical",
             formats: diagram.png
               ? ["scene", "excalidraw", "png"]
               : ["scene", "excalidraw"],
@@ -914,54 +1397,421 @@ const DiagramStoreLive = Layer.effect(
             (stage) =>
               Effect.gen(function* () {
                 yield* copySafeTree(source, stage, diagramId);
-                yield* fs.writeText(
-                  join(
-                    stage,
-                    REVISIONS_DIRECTORY,
-                    revisionFileName(current.manifest.revision),
-                  ),
-                  encodeJson(current.document),
+                yield* snapshotCurrent(
+                  diagramId,
+                  stage,
+                  current.manifest.revision,
                 );
                 yield* writeBuilt(stage, diagram, manifest);
-
-                const backup = join(
-                  root.path,
-                  `${BACKUP_PREFIX}${encodedId(diagramId)}.${String(process.pid)}.${crypto.randomUUID()}`,
-                );
-                yield* fs.rename(source, backup);
-                const committed = yield* fs.rename(stage, source).pipe(
-                  Effect.matchEffect({
-                    onFailure: (commitError) =>
-                      fs.rename(backup, source).pipe(
-                        Effect.matchEffect({
-                          onFailure: () =>
-                            Effect.fail(
-                              storageError(
-                                "storage_commit_failed",
-                                `Atomic edit commit and rollback both failed for "${diagramId}".`,
-                                "Retry; Sketchi will recover the backup transaction before the next operation.",
-                                diagramId,
-                              ),
-                            ),
-                          onSuccess: () => Effect.fail(commitError),
-                        }),
-                      ),
-                    onSuccess: () => Effect.succeed(true),
-                  }),
-                );
-                if (committed) {
-                  yield* fs
-                    .remove(backup)
-                    .pipe(Effect.catch(() => Effect.void));
-                }
+                yield* commitStage(diagramId, stage);
                 return {
                   manifest,
                   document: diagram.document,
                   revisions: [
                     ...current.revisions,
-                    revisionFileName(current.manifest.revision),
-                  ].sort(compareCodeUnits),
+                    `${revisionDirectoryName(current.manifest.revision)}/`,
+                  ].sort(compareRevisionEntries),
+                  authority: "canonical",
+                  documentAuthoritative: true,
                 } satisfies StoredDiagram;
+              }),
+            (stage) => fs.remove(stage),
+          );
+        }),
+      );
+    });
+
+    const revisionNotFound = (diagramId: string, revision: number) =>
+      storageError(
+        "revision_not_found",
+        `Diagram "${diagramId}" has no revision ${String(revision)}.`,
+        "Run sketchi show to inspect the available revision paths.",
+        diagramId,
+      );
+
+    const corruptRevision = (diagramId: string, revision: number) =>
+      storageError(
+        "corrupt_revision",
+        `Diagram "${diagramId}" revision ${String(revision)} is corrupt.`,
+        "Choose another revision or repair the corrupt snapshot.",
+        diagramId,
+      );
+
+    const readArchivedJson = Effect.fn(
+      "sketchi.cli.storage.validateArchivedJson",
+    )(function* (path: string, diagramId: string, revision: number) {
+      const text = yield* fs.readText(path);
+      return yield* Effect.try({
+        try: () => {
+          const value: unknown = JSON.parse(text);
+          if (typeof value !== "object" || value === null) {
+            throw new Error("archived JSON must contain an object");
+          }
+          return value;
+        },
+        catch: () => corruptRevision(diagramId, revision),
+      });
+    });
+
+    const validateArchivedArtifact = Effect.fn(
+      "sketchi.cli.storage.validateArchivedArtifact",
+    )(function* (
+      path: string,
+      kind: "scene" | "excalidraw",
+      authority: "canonical" | "detached",
+      diagramId: string,
+      revision: number,
+    ) {
+      const value = yield* readArchivedJson(path, diagramId, revision);
+      const decoded =
+        kind === "scene"
+          ? RenderedDiagramSceneSchema.safeParse(value)
+          : ExcalidrawFileSchema.safeParse(value);
+      if (!decoded.success) return yield* corruptRevision(diagramId, revision);
+      if (kind === "excalidraw" && authority === "detached") {
+        yield* validateShareScene(value).pipe(
+          Effect.mapError(() => corruptRevision(diagramId, revision)),
+        );
+      }
+    });
+
+    const validateArchivedPng = Effect.fn(
+      "sketchi.cli.storage.validateArchivedPng",
+    )(function* (path: string, diagramId: string, revision: number) {
+      const bytes = yield* fs.readBytes(path);
+      if (!isValidPng(bytes)) {
+        return yield* corruptRevision(diagramId, revision);
+      }
+    });
+
+    const readRevisionUnlocked = Effect.fn(
+      "sketchi.cli.storage.readRevisionUnlocked",
+    )(function* (diagramId: string, revision: number) {
+      yield* loadUnlocked(diagramId);
+      const revisions = join(
+        recordPath(root.path, diagramId),
+        REVISIONS_DIRECTORY,
+      );
+      const snapshot = join(revisions, revisionDirectoryName(revision));
+      const snapshotKind = yield* fs.kind(snapshot);
+      if (snapshotKind === "directory") {
+        yield* assertSafeTree(snapshot, diagramId);
+        const manifest = yield* decodeManifest(
+          join(snapshot, MANIFEST_FILE),
+          diagramId,
+        ).pipe(Effect.mapError(() => corruptRevision(diagramId, revision)));
+        const document = yield* decodeDocument(
+          join(snapshot, DOCUMENT_FILE),
+          diagramId,
+        ).pipe(Effect.mapError(() => corruptRevision(diagramId, revision)));
+        if (
+          manifest.id !== diagramId ||
+          manifest.revision !== revision ||
+          manifest.type !== document.type ||
+          manifest.title !== document.spec.title
+        ) {
+          return yield* storageError(
+            "corrupt_revision",
+            `Diagram "${diagramId}" revision ${String(revision)} has inconsistent metadata.`,
+            "Choose another revision or repair the corrupt snapshot.",
+            diagramId,
+          );
+        }
+        for (const [required, kind] of [
+          [SCENE_FILE, "scene"],
+          [EXCALIDRAW_FILE, "excalidraw"],
+        ] as const) {
+          const artifactPath = join(snapshot, required);
+          if ((yield* fs.kind(artifactPath)) !== "file") {
+            return yield* storageError(
+              "corrupt_revision",
+              `Diagram "${diagramId}" revision ${String(revision)} is missing ${required}.`,
+              "Choose another revision or repair the corrupt snapshot.",
+              diagramId,
+            );
+          }
+          yield* validateArchivedArtifact(
+            artifactPath,
+            kind,
+            manifest.authority,
+            diagramId,
+            revision,
+          ).pipe(
+            Effect.mapError((error) =>
+              error._tag === "CliFilesystemError"
+                ? corruptRevision(diagramId, revision)
+                : error,
+            ),
+          );
+        }
+        const pngKind = yield* fs.kind(join(snapshot, PNG_FILE));
+        if (pngKind !== "file" && pngKind !== "missing") {
+          return yield* unsafeEntry(join(snapshot, PNG_FILE), diagramId);
+        }
+        if (pngKind === "file") {
+          yield* validateArchivedPng(
+            join(snapshot, PNG_FILE),
+            diagramId,
+            revision,
+          ).pipe(
+            Effect.mapError((error) =>
+              error._tag === "CliFilesystemError"
+                ? corruptRevision(diagramId, revision)
+                : error,
+            ),
+          );
+        }
+        const formats: ReadonlyArray<DiagramFormat> =
+          manifest.authority === "canonical"
+            ? pngKind === "file"
+              ? ["scene", "excalidraw", "png"]
+              : ["scene", "excalidraw"]
+            : pngKind === "file"
+              ? ["excalidraw", "png"]
+              : ["excalidraw"];
+        if (
+          manifest.formats.length !== formats.length ||
+          manifest.formats.some((format, index) => format !== formats[index])
+        ) {
+          return yield* storageError(
+            "corrupt_revision",
+            `Diagram "${diagramId}" revision ${String(revision)} has inconsistent formats.`,
+            "Choose another revision or repair the corrupt snapshot.",
+            diagramId,
+          );
+        }
+        return { _tag: "FullSnapshot", revision } satisfies RevisionSource;
+      }
+      if (snapshotKind !== "missing") {
+        return yield* unsafeEntry(snapshot, diagramId);
+      }
+      const legacy = join(revisions, revisionFileName(revision));
+      const legacyKind = yield* fs.kind(legacy);
+      if (legacyKind === "missing") {
+        return yield* revisionNotFound(diagramId, revision);
+      }
+      if (legacyKind !== "file") return yield* unsafeEntry(legacy, diagramId);
+      const document = yield* decodeDocument(legacy, diagramId).pipe(
+        Effect.mapError((error) =>
+          error._tag === "CliStorageError"
+            ? storageError(
+                "corrupt_revision",
+                `Diagram "${diagramId}" revision ${String(revision)} is corrupt.`,
+                "Choose another revision or repair the legacy revision file.",
+                diagramId,
+              )
+            : error,
+        ),
+      );
+      return {
+        _tag: "LegacyDocument",
+        revision,
+        document,
+      } satisfies RevisionSource;
+    });
+
+    const replaceWithDetached = Effect.fn(
+      "sketchi.cli.storage.replaceWithDetached",
+    )(function* (
+      diagramId: string,
+      excalidraw: Uint8Array,
+      expectedRevision?: number,
+    ) {
+      return yield* withLock(
+        diagramId,
+        Effect.gen(function* () {
+          const current = yield* loadUnlocked(diagramId);
+          if (
+            expectedRevision !== undefined &&
+            current.manifest.revision !== expectedRevision
+          ) {
+            return yield* storageError(
+              "replacement_conflict",
+              `Diagram "${diagramId}" changed before the pulled replacement could commit.`,
+              "Run sketchi show, verify the current record, and retry the pull if it is still intended.",
+              diagramId,
+            );
+          }
+          const source = recordPath(root.path, diagramId);
+          const manifest = DiagramRecordManifest.make({
+            schemaVersion: RECORD_SCHEMA_VERSION,
+            id: diagramId,
+            type: current.manifest.type,
+            title: current.manifest.title,
+            revision: current.manifest.revision + 1,
+            authority: "detached",
+            formats: ["excalidraw"],
+          });
+          return yield* Effect.acquireUseRelease(
+            fs.makeTempDirectory(root.path, STAGE_PREFIX),
+            (stage) =>
+              Effect.gen(function* () {
+                yield* copySafeTree(source, stage, diagramId);
+                yield* snapshotCurrent(
+                  diagramId,
+                  stage,
+                  current.manifest.revision,
+                );
+                yield* fs.writeBytes(
+                  join(stage, EXCALIDRAW_FILE),
+                  excalidraw,
+                  true,
+                );
+                yield* fs.remove(join(stage, PNG_FILE));
+                yield* fs.writeText(
+                  join(stage, MANIFEST_FILE),
+                  encodeJson(manifest),
+                  true,
+                );
+                yield* commitStage(diagramId, stage);
+                return {
+                  manifest,
+                  document: current.document,
+                  revisions: [
+                    ...current.revisions,
+                    `${revisionDirectoryName(current.manifest.revision)}/`,
+                  ].sort(compareRevisionEntries),
+                  authority: "detached",
+                  documentAuthoritative: false,
+                } satisfies StoredDiagram;
+              }),
+            (stage) => fs.remove(stage),
+          );
+        }),
+      );
+    });
+
+    const readRevision = Effect.fn("sketchi.cli.storage.readRevision")(
+      (diagramId: string, revision: number) =>
+        withLock(diagramId, readRevisionUnlocked(diagramId, revision), true),
+    );
+
+    const restore = Effect.fn("sketchi.cli.storage.restore")(function* (
+      diagramId: string,
+      revision: number,
+      legacyDiagram?: BuiltDiagram,
+    ) {
+      return yield* withLock(
+        diagramId,
+        Effect.gen(function* () {
+          const current = yield* loadUnlocked(diagramId);
+          const selected = yield* readRevisionUnlocked(diagramId, revision);
+          if (selected._tag === "LegacyDocument") {
+            if (current.authority !== "canonical" || !legacyDiagram) {
+              return yield* storageError(
+                "restore_conflict",
+                `Legacy revision ${String(revision)} requires a canonical rebuild for "${diagramId}".`,
+                "Restore a full canonical snapshot, or provide the rebuilt legacy document.",
+                diagramId,
+              );
+            }
+            if (
+              legacyDiagram.id !== diagramId ||
+              encodeJson(legacyDiagram.document) !==
+                encodeJson(selected.document)
+            ) {
+              return yield* storageError(
+                "storage_commit_failed",
+                `Legacy revision ${String(revision)} rebuild does not match its archived document.`,
+                "Rebuild the exact archived canonical document before restoring.",
+                diagramId,
+              );
+            }
+          }
+          const source = recordPath(root.path, diagramId);
+          return yield* Effect.acquireUseRelease(
+            fs.makeTempDirectory(root.path, STAGE_PREFIX),
+            (stage) =>
+              Effect.gen(function* () {
+                yield* copySafeTree(source, stage, diagramId);
+                yield* snapshotCurrent(
+                  diagramId,
+                  stage,
+                  current.manifest.revision,
+                );
+                const revisions = [
+                  ...current.revisions,
+                  `${revisionDirectoryName(current.manifest.revision)}/`,
+                ].sort(compareRevisionEntries);
+                const diagram = yield* selected._tag === "FullSnapshot"
+                  ? Effect.gen(function* () {
+                      const selectedPath = join(
+                        stage,
+                        REVISIONS_DIRECTORY,
+                        revisionDirectoryName(revision),
+                      );
+                      for (const entry of yield* fs.list(stage)) {
+                        if (entry.name !== REVISIONS_DIRECTORY) {
+                          yield* fs.remove(join(stage, entry.name));
+                        }
+                      }
+                      yield* copySafeTree(selectedPath, stage, diagramId);
+                      const manifestPath = join(stage, MANIFEST_FILE);
+                      const archivedText = yield* fs.readText(manifestPath);
+                      yield* decodeManifest(manifestPath, diagramId);
+                      const document = yield* decodeDocument(
+                        join(stage, DOCUMENT_FILE),
+                        diagramId,
+                      );
+                      const restoredManifestText = replaceManifestRevision(
+                        archivedText,
+                        current.manifest.revision + 1,
+                      );
+                      if (restoredManifestText === undefined) {
+                        return yield* corruptRevision(diagramId, revision);
+                      }
+                      yield* fs.writeText(
+                        manifestPath,
+                        restoredManifestText,
+                        true,
+                      );
+                      const manifest = yield* decodeManifest(
+                        manifestPath,
+                        diagramId,
+                      );
+                      return {
+                        manifest,
+                        document,
+                        revisions,
+                        authority: manifest.authority,
+                        documentAuthoritative:
+                          manifest.authority === "canonical",
+                      } satisfies StoredDiagram;
+                    })
+                  : Effect.gen(function* () {
+                      if (!legacyDiagram) {
+                        return yield* storageError(
+                          "storage_commit_failed",
+                          `Legacy revision ${String(revision)} has no rebuilt document.`,
+                          "Rebuild the archived canonical document before restoring.",
+                          diagramId,
+                        );
+                      }
+                      const manifest = DiagramRecordManifest.make({
+                        schemaVersion: RECORD_SCHEMA_VERSION,
+                        id: diagramId,
+                        type: legacyDiagram.type,
+                        title: legacyDiagram.title,
+                        revision: current.manifest.revision + 1,
+                        authority: "canonical",
+                        formats: legacyDiagram.png
+                          ? ["scene", "excalidraw", "png"]
+                          : ["scene", "excalidraw"],
+                      });
+                      yield* writeBuilt(stage, legacyDiagram, manifest);
+                      return {
+                        manifest,
+                        document: legacyDiagram.document,
+                        revisions,
+                        authority: "canonical",
+                        documentAuthoritative: true,
+                      } satisfies StoredDiagram;
+                    });
+                yield* commitStage(diagramId, stage);
+                return {
+                  diagram,
+                  restoredFromRevision: revision,
+                } satisfies RestoreResult;
               }),
             (stage) => fs.remove(stage),
           );
@@ -1016,6 +1866,17 @@ const DiagramStoreLive = Layer.effect(
                 hint: "Edit the diagram to rebuild its local artifacts.",
               });
             }
+            if (stored.authority === "detached") {
+              return {
+                _tag: "RenderPng",
+                excalidraw: yield* fs.readBytes(
+                  join(
+                    recordPath(root.path, diagramId),
+                    artifactFile("excalidraw"),
+                  ),
+                ),
+              } as const;
+            }
             for (const renderFormat of ["scene", "excalidraw"] as const) {
               if (!stored.manifest.formats.includes(renderFormat)) {
                 return yield* CliExportError.make({
@@ -1044,7 +1905,16 @@ const DiagramStoreLive = Layer.effect(
       },
     );
 
-    return { create, edit, show, list, readExportSource };
+    return {
+      create,
+      edit,
+      replaceWithDetached,
+      readRevision,
+      restore,
+      show,
+      list,
+      readExportSource,
+    };
   }),
 );
 

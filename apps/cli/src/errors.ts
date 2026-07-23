@@ -64,6 +64,11 @@ export class CliStorageError extends Schema.TaggedErrorClass<CliStorageError>()(
       "diagram_not_found",
       "diagram_already_exists",
       "diagram_busy",
+      "detached_edit",
+      "replacement_conflict",
+      "restore_conflict",
+      "revision_not_found",
+      "corrupt_revision",
       "corrupt_record",
       "unsafe_storage_entry",
       "storage_commit_failed",
@@ -71,6 +76,25 @@ export class CliStorageError extends Schema.TaggedErrorClass<CliStorageError>()(
     diagramId: Schema.optionalKey(Schema.String),
     message: Schema.String,
     hint: Schema.String,
+  },
+) {}
+
+export class CliShareError extends Schema.TaggedErrorClass<CliShareError>()(
+  "CliShareError",
+  {
+    code: Schema.Literals([
+      "invalid_share_link",
+      "unsupported_scene",
+      "share_payload_too_large",
+      "share_crypto_failed",
+      "share_transport_failed",
+      "share_timeout",
+      "share_api_changed",
+      "share_link_unavailable",
+    ]),
+    message: Schema.String,
+    hint: Schema.String,
+    details: Schema.Array(Schema.String),
   },
 ) {}
 
@@ -96,7 +120,8 @@ export type CliFailure =
   | CliBuildError
   | CliGenerationError
   | CliStorageError
-  | CliExportError;
+  | CliExportError
+  | CliShareError;
 
 export function exitCodeForFailure(error: CliFailure): number {
   switch (error._tag) {
@@ -119,9 +144,13 @@ export function exitCodeForFailure(error: CliFailure): number {
       }
     case "CliStorageError":
       if (error.code === "diagram_not_found") return 5;
+      if (error.code === "revision_not_found") return 5;
       if (
         error.code === "diagram_already_exists" ||
-        error.code === "diagram_busy"
+        error.code === "diagram_busy" ||
+        error.code === "detached_edit" ||
+        error.code === "replacement_conflict" ||
+        error.code === "restore_conflict"
       ) {
         return 6;
       }
@@ -130,5 +159,12 @@ export function exitCodeForFailure(error: CliFailure): number {
       return 7;
     case "CliExportError":
       return 8;
+    case "CliShareError":
+      return error.code === "share_transport_failed" ||
+        error.code === "share_timeout" ||
+        error.code === "share_api_changed" ||
+        error.code === "share_link_unavailable"
+        ? 13
+        : 3;
   }
 }

@@ -1,5 +1,5 @@
 DESCRIPTION
-  List local diagrams in ascending id order with type, revision, stored formats, and title. The command is deterministic and read-only.
+  List local diagrams in ascending id order with type, revision, authority, documentAuthoritative, current stored formats, and retained title provenance. The command is deterministic, strictly offline, and read-only.
 
 USAGE
   sketchi list [flags]

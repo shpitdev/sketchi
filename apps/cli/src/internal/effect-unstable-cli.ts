@@ -14,6 +14,8 @@ import {
   Param,
 } from "effect/unstable/cli";
 
+import { redactShareLinks } from "../redaction.js";
+
 export { Argument, Command, Flag };
 
 /** Replaced with the package version by DefinePlugin in the release bundle. */
@@ -22,7 +24,17 @@ declare const __SKETCHI_VERSION__: string | undefined;
 const cliVersion =
   typeof __SKETCHI_VERSION__ === "string" ? __SKETCHI_VERSION__ : "0.0.0";
 
-const PUBLIC_COMMANDS = new Set(["create", "show", "edit", "list", "export"]);
+const PUBLIC_COMMANDS = new Set([
+  "generate",
+  "create",
+  "show",
+  "edit",
+  "list",
+  "restore",
+  "share",
+  "pull",
+  "export",
+]);
 
 export type InputSource =
   | { readonly _tag: "File"; readonly path: string }
@@ -80,6 +92,33 @@ export function exclusiveInputSourceFlags() {
   };
 }
 
+export function exactlyOnceStringFlag(
+  name: string,
+  metavar: string,
+  description: string,
+) {
+  const base = Flag.string(name).pipe(
+    Flag.withMetavar(metavar),
+    Flag.withDescription(description),
+  );
+  return Object.assign(Object.create(Object.getPrototypeOf(base)), base, {
+    parse: (args: Param.ParsedArgs) =>
+      (args.flags[name]?.length ?? 0) === 1
+        ? base.parse(args)
+        : Effect.fail(
+            new CliError.InvalidValue({
+              option: name,
+              value:
+                (args.flags[name]?.length ?? 0) === 0
+                  ? "not provided"
+                  : "provided more than once",
+              expected: `exactly one --${name} ${metavar}`,
+              kind: "flag",
+            }),
+          ),
+  }) as Flag.Flag<string>;
+}
+
 export function runEffectCommand<
   const Name extends string,
   Input,
@@ -117,17 +156,19 @@ export function runEffectCommand<
         .map((error) => defaultFormatter.formatCliError(error))
         .join("; ");
       const hint = `Run sketchi${commandName ? ` ${commandName}` : ""} --help for usage.`;
-      return jsonOutput
-        ? `${JSON.stringify(
-            {
-              ok: false,
-              command: errorCommand,
-              error: { code: "usage_error", message, hint },
-            },
-            null,
-            2,
-          )}\n`
-        : `error: usage_error\n${message}\nnext: ${hint}\n`;
+      return redactShareLinks(
+        jsonOutput
+          ? `${JSON.stringify(
+              {
+                ok: false,
+                command: errorCommand,
+                error: { code: "usage_error", message, hint },
+              },
+              null,
+              2,
+            )}\n`
+          : `error: usage_error\n${message}\nnext: ${hint}\n`,
+      );
     },
   };
   const cliConsole = new Proxy(globalThis.console, {

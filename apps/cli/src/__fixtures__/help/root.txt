@@ -1,5 +1,5 @@
 DESCRIPTION
-  Local Sketchi authoring for canonical flowcharts and mindmaps, with one prompt-assisted path.
+  Local Sketchi authoring for canonical flowcharts and mindmaps, plus explicit snapshot sharing.
 
 Manual JSON workflow (strictly offline):
   create a canonical document, inspect or replace it, list local records, and export stored artifacts.
@@ -11,10 +11,11 @@ Canonical flowchart example:
 Canonical mindmap example:
   {"type":"mindmap","spec":{"id":"launch-map","title":"Launch plan","root":{"label":"Launch","children":[{"label":"Product"},{"label":"Operations"}]}}}
 
-Prompt-assisted workflow (sole network boundary):
+Explicit network commands (one credential-free HTTPS request each):
   sketchi generate --prompt TEXT [--type flowchart|mindmap] [--model MODEL]
-  Only generate uses the network. It makes one unauthenticated HTTPS POST to the public
-  Sketchi generate API at https://playground.sketchi.app/api/v1/generate
+  sketchi share DIAGRAM_ID [--open]
+  sketchi pull DIAGRAM_ID --link URL|-
+  generate makes one unauthenticated HTTPS POST to the public Sketchi generate API at https://playground.sketchi.app/api/v1/generate
   and needs no token, key, account, or login. The model call, validation, and quality gate
   run server-side; the finished diagram and Excalidraw artifact come back and are committed
   through the same local store as create. The default type is flowchart and default model is
@@ -30,11 +31,21 @@ Input and output contracts:
   stdout contains only artifact bytes. A successful PNG file export adds a generic inline-Markdown
   display hint for calling agents.
 
+Share/pull safety limits:
+  links 4 KiB; encrypted bodies 2 MiB; inflated contents 16 MiB; 10,000 elements;
+  JSON depth 64; element dimensions 8192; canvas dimensions
+  8192; canvas area 4194304 square units; final PNG
+  16777216 pixels. Limits are checked before encryption or raster allocation.
+
 Offline boundary and storage:
-  create, show, edit, list, and export use no model, remote agent, MCP server, login,
-  account, browser, credential, or network. No command sends stored records to a provider.
+  create, show, edit, list, export, and restore use no model, remote agent, MCP server, login,
+  account, browser, credential, or network. share sends only locally encrypted ciphertext from
+  the selected record to Excalidraw storage; pull sends only the link id in its download request.
   Records live at ~/.sketchi/diagrams/<id>/ with manifest.json, document.json, scene.json,
-  diagram.excalidraw, optional diagram.png, and revisions/<revision>.json.
+  diagram.excalidraw, optional diagram.png, and revisions/. New revisions are full snapshots
+  under revisions/<revision>/; legacy document-only revisions/<revision>.json remain readable.
+  A pulled record is detached: diagram.excalidraw is authoritative while document.json and
+  scene.json remain non-authoritative provenance. show/list expose this state; edit refuses.
   Formats are scene, excalidraw, and png. If no PNG is stored, export deterministically renders one
   on demand from the local scene and Excalidraw artifacts, without a browser, network, or record write.
 
@@ -42,13 +53,14 @@ Exit codes and errors:
   0 success; 1 internal failure; 2 usage or interactive stdin; 3 invalid input/document;
   4 build/export construction failure; 5 diagram not found; 6 conflict/busy;
   7 filesystem/storage failure; 8 unavailable format, render, destination, or write failure;
-  10 generate network/endpoint failure; 11 generate timeout; 12 malformed generate output.
+  10 generate network/endpoint failure; 11 generate timeout; 12 malformed generate output;
+  13 Excalidraw transport, timeout, HTTP, or API-shape failure.
   Text errors start with "error: CODE". JSON errors use {"ok":false,"command":...,"error":...}.
   Errors never include stacks.
 
 Revision recovery and next steps:
-  edit validates and builds before an atomic commit, then saves the prior document under revisions/.
-  To recover, inspect the prior revision JSON and pass that complete document back to edit.
+  edit, pull, and restore archive the complete prior authority state before atomic replacement.
+  Use restore --revision N to recover through the CLI without consuming the selected snapshot.
   Start with create for accepted JSON or generate for a prompt. Use the returned id with show/list,
   edit with a complete replacement document, then export a stored scene or Excalidraw artifact.
 
@@ -66,7 +78,10 @@ GLOBAL FLAGS
 SUBCOMMANDS
   generate    Generate and persist one diagram through the public unauthenticated Sketchi generate API.
   create      Create one local diagram from exactly one canonical document source. The document is validated and built before the record directory is committed atomically. --file - rejects an interactive TTY with exit 2.
-  show        Show the current canonical document, manifest summary, formats, and recoverable revision paths for DIAGRAM_ID. This does not rebuild or mutate the record.
-  edit        Replace the complete canonical document for DIAGRAM_ID. Sketchi validates and builds first, preserves the prior document under revisions/, and atomically swaps the record. The new spec.id must match DIAGRAM_ID.
-  list        List local diagrams in ascending id order with type, revision, stored formats, and title. The command is deterministic and read-only.
-  export      Export a stored scene or Excalidraw artifact, or render PNG on demand from both when no PNG is stored. Rendering is deterministic, export-only, and uses bundled fonts plus a WASM rasterizer: it never starts a browser or network request and never writes the PNG back to the record. Status always uses stderr, so --dest - leaves stdout byte-only. A successful PNG file export adds a generic inline-Markdown display hint for calling agents. Render or write failures exit 8.
+  show        Show current authority, documentAuthoritative state, retained document provenance, manifest formats, and recoverable revision paths for DIAGRAM_ID. This is strictly offline and does not rebuild or mutate the record.
+  edit        Replace the complete canonical document for DIAGRAM_ID. Sketchi validates and builds first, preserves the prior full authority state under revisions/, and atomically swaps the record. Detached records refuse edit because their canonical document is no longer authoritative. The new spec.id must match DIAGRAM_ID.
+  list        List local diagrams in ascending id order with type, revision, authority, documentAuthoritative, current stored formats, and retained title provenance. The command is deterministic, strictly offline, and read-only.
+  restore     Strictly offline recovery. Archive the current full state first, then restore revision N byte-for-byte without consuming it and commit at the next monotonic revision. Full snapshots restore artifacts and authority without rebuilding; legacy document-only revisions rebuild only while the record remains canonical.
+  share       Encrypt and upload the current authoritative Excalidraw artifact as one immutable excalidraw.com bearer snapshot. This makes exactly one credential-free HTTPS request. The storage service can observe connection metadata, timing, and ciphertext size; retention is uncontrolled, and Sketchi cannot revoke or delete a link. Anyone with the full URL can decrypt it. Supported elements: rectangle, ellipse, diamond, arrow, line, freedraw, text; text must use Excalifont fontFamily 5; files and images are rejected. Render limits: element dimension 8192, canvas dimension 8192, canvas area 4194304, final PNG pixels 16777216. --open is opt-in and only confirms whether the OS accepted the request.
+  pull        Fetch exactly one current-format excalidraw.com bearer snapshot, decrypt it locally, restore and strictly validate it, prove detached PNG renderability, then atomically preserve the prior full record and replace diagram.excalidraw as detached authority. The link carries no trusted Sketchi identity and may be unrelated to DIAGRAM_ID. This makes exactly one credential-free HTTPS request and never echoes or stores the input link or key. Supported elements: rectangle, ellipse, diamond, arrow, line, freedraw, text; text must use Excalifont fontFamily 5; files, images, external resources, and other fonts are rejected. Render limits: element dimension 8192, canvas dimension 8192, canvas area 4194304, final PNG pixels 16777216.
+  export      Strictly offline export of a current stored artifact or on-demand PNG. Canonical PNG uses scene plus Excalidraw; detached PNG restores diagram.excalidraw directly, uses its viewBackgroundColor, and adds no stale canonical title. Detached scene export is unavailable. Rendering never starts a browser or network request and never writes the PNG back. Status always uses stderr, so --dest - leaves stdout byte-only. Render or write failures exit 8.

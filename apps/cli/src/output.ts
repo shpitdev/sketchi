@@ -8,6 +8,7 @@ import {
   CliFilesystemError,
   exitCodeForFailure,
 } from "./errors.js";
+import { redactShareLinks } from "./redaction.js";
 
 export class OutputWriter extends Context.Service<
   OutputWriter,
@@ -96,6 +97,13 @@ function failureView(error: CliFailure): ErrorView {
       return { code: error.code, message: error.message, hint: error.hint };
     case "CliExportError":
       return { code: error.code, message: error.message, hint: error.hint };
+    case "CliShareError":
+      return {
+        code: error.code,
+        message: error.message,
+        hint: error.hint,
+        details: error.details,
+      };
   }
 }
 
@@ -122,7 +130,7 @@ export const reportFailure = Effect.fn("sketchi.cli.output.failure")(function* (
     format === "json"
       ? encodeJson({ ok: false, command, error: view })
       : textError(view);
-  yield* writer.stderr(rendered);
+  yield* writer.stderr(redactShareLinks(rendered));
   return yield* CliCommandExit.make({ exitCode: exitCodeForFailure(error) });
 });
 

@@ -260,6 +260,10 @@ try {
     ) &&
       archivedNotices.stdout.includes(Buffer.from("SIL OPEN FONT LICENSE")) &&
       archivedNotices.stdout.includes(Buffer.from("MIT License")) &&
+      archivedNotices.stdout.includes(Buffer.from("pako 2.0.3")) &&
+      archivedNotices.stdout.includes(
+        Buffer.from("Vitaly Puzrin and Andrei Tuputcyn"),
+      ) &&
       archivedNotices.stdout.includes(Buffer.from("linkedom 0.18.13")) &&
       archivedNotices.stdout.includes(Buffer.from("htmlparser2 10.1.0")),
     "Packaged third-party notices omit a bundled dependency license.",
@@ -303,7 +307,8 @@ try {
     run(binary, args, { env: cliEnvironment, input });
 
   // Online environment for the generate endpoint-error proof only: the offline
-  // matrix stays network-blocked; generate is deliberately excepted so its
+  // matrix covers create/show/edit/list/export/restore. Network-bound generate,
+  // share, and pull are excluded from offline claims; generate is excepted so its
   // typed endpoint-error failure can be exercised against a loopback server.
   const onlineEnvironment = { ...cliEnvironment };
   delete onlineEnvironment.NODE_OPTIONS;
@@ -315,8 +320,10 @@ try {
     "Root help omitted flowchart guidance.",
   );
   assert(
-    rootHelp.stdout.includes(Buffer.from("sole network boundary")),
-    "Root help omitted the generation network boundary.",
+    rootHelp.stdout.includes(Buffer.from("Explicit network commands")) &&
+      rootHelp.stdout.includes(Buffer.from("sketchi share")) &&
+      rootHelp.stdout.includes(Buffer.from("sketchi pull")),
+    "Root help omitted explicit network command boundaries.",
   );
 
   const zshCompletions = await cli(["--completions", "zsh"]);
@@ -347,7 +354,7 @@ try {
     "Bash completion script did not register the sketchi completer.",
   );
 
-  // Network-down: the offline preload blocks fetch, so the sole HTTPS call fails
+  // Network-down: the offline preload blocks fetch, so generate's HTTPS call fails
   // with the stable provider/network exit and leaves no partial local state.
   const networkDown = await cli([
     "generate",
@@ -481,6 +488,38 @@ try {
   assert(
     revisedFlowData.revisions.length === 1,
     "Flowchart prior revision was not recoverable.",
+  );
+
+  const restoreFlow = await cli([
+    "restore",
+    "release-flow",
+    "--revision",
+    "1",
+    "--output",
+    "json",
+  ]);
+  expectExit(restoreFlow, 0, "flowchart restore");
+  const restoredFlowData = parseJson(
+    restoreFlow.stdout,
+    "flowchart restore",
+  ).data;
+  assert(
+    restoredFlowData.restoredFromRevision === 1 &&
+      restoredFlowData.revision === 3 &&
+      restoredFlowData.authority === "canonical",
+    "Flowchart restore did not preserve monotonic canonical authority.",
+  );
+  const showRestoredFlow = await cli([
+    "show",
+    "release-flow",
+    "--output",
+    "json",
+  ]);
+  expectExit(showRestoredFlow, 0, "restored flowchart show");
+  assert(
+    parseJson(showRestoredFlow.stdout, "restored flowchart show").data.document
+      .spec.title === "Release approval",
+    "Offline restore did not recover the archived document.",
   );
 
   const createMindmap = await cli(
@@ -813,7 +852,9 @@ try {
     "document.json",
     "scene.json",
     "diagram.excalidraw",
-    "revisions/000001.json",
+    "revisions/000001/manifest.json",
+    "revisions/000001/document.json",
+    "revisions/000002/manifest.json",
   ]) {
     await readFile(resolve(record, relative));
   }
@@ -830,7 +871,7 @@ try {
     "On-demand PNG export changed manifest formats.",
   );
   const priorRevision = parseJson(
-    await readFile(resolve(record, "revisions/000001.json")),
+    await readFile(resolve(record, "revisions/000001/document.json")),
     "prior revision",
   );
   assert(
@@ -843,6 +884,7 @@ try {
     package: archives[0],
     flows: [
       "flowchart:create-show-edit-show",
+      "flowchart:restore-offline",
       "mindmap:create-show-edit-show",
       "list",
       "export:file-stdout-png-on-demand",
@@ -857,7 +899,8 @@ try {
       "generate-network-down:10",
       "generate-endpoint-error:3",
     ],
-    network: "disabled-by-preload-except-generate-loopback-proof",
+    network:
+      "offline create/show/edit/list/export/restore; share/pull excluded; generate loopback proof excepted",
     home: "isolated-under-.memory",
     bundle: {
       bytes: archivedBundleBytes,

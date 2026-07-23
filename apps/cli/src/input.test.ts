@@ -47,6 +47,34 @@ describe("input reader", () => {
     }),
   );
 
+  it.effect("fails bounded stdin before collecting an oversized link", () =>
+    Effect.gen(function* () {
+      const program = Effect.gen(function* () {
+        const reader = yield* InputReader;
+        return yield* Effect.flip(
+          reader.read(
+            { _tag: "File", path: "-" },
+            { content: "share link", maxBytes: 4 },
+          ),
+        );
+      });
+      const error = yield* program.pipe(
+        Effect.provide(
+          inputLayer(
+            Stream.make(
+              new TextEncoder().encode("1234"),
+              new TextEncoder().encode("5"),
+            ),
+            false,
+          ),
+        ),
+      );
+
+      assert.strictEqual(error.code, "input_read_failed");
+      assert.include(error.message, "4 byte limit");
+    }),
+  );
+
   it.effect("reports invalid UTF-8 through the typed input channel", () =>
     Effect.gen(function* () {
       const program = Effect.gen(function* () {

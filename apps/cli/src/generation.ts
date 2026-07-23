@@ -50,7 +50,7 @@ function networkFailure(): CliGenerationError {
   return CliGenerationError.make({
     code: "provider_failure",
     message: "The Sketchi generate API could not be reached.",
-    hint: "Check your network connection and retry; generate is the only command that uses the network.",
+    hint: "Check your network connection and retry. create/show/edit/list/export/restore remain offline; share and pull are separate explicit network commands.",
     details: ["transport"],
   });
 }
@@ -67,7 +67,8 @@ function malformedResponse(): CliGenerationError {
 function invalidGeneratedDocument(): CliGenerationError {
   return CliGenerationError.make({
     code: "invalid_generated_document",
-    message: "The generated diagram failed Sketchi schema or semantic validation.",
+    message:
+      "The generated diagram failed Sketchi schema or semantic validation.",
     hint: "Refine the prompt with concrete diagram content, then retry.",
     details: [],
   });
@@ -102,7 +103,9 @@ function endpointFailure(status: number, text: string): CliGenerationError {
       return CliGenerationError.make({
         code: "generation_timeout",
         message: firstIssue?.message ?? "The generate API timed out.",
-        hint: firstIssue?.hint ?? "Retry once; if it persists, try a shorter prompt.",
+        hint:
+          firstIssue?.hint ??
+          "Retry once; if it persists, try a shorter prompt.",
         details,
       });
     case "malformed_output":
@@ -111,7 +114,8 @@ function endpointFailure(status: number, text: string): CliGenerationError {
         message:
           firstIssue?.message ??
           "The generate API returned unreadable model output.",
-        hint: firstIssue?.hint ?? "Retry once; if it persists, try another prompt.",
+        hint:
+          firstIssue?.hint ?? "Retry once; if it persists, try another prompt.",
         details,
       });
     case "invalid_input":
@@ -123,7 +127,8 @@ function endpointFailure(status: number, text: string): CliGenerationError {
           firstIssue?.message ??
           "The generated diagram failed Sketchi validation.",
         hint:
-          firstIssue?.hint ?? "Refine the prompt with concrete content, then retry.",
+          firstIssue?.hint ??
+          "Refine the prompt with concrete content, then retry.",
         details,
       });
     default:
@@ -187,7 +192,9 @@ function readSuccessBody(text: string): GenerateApiSuccess | undefined {
   };
 }
 
-function decodeScene(value: unknown): Effect.Effect<PatchableScene, CliGenerationError> {
+function decodeScene(
+  value: unknown,
+): Effect.Effect<PatchableScene, CliGenerationError> {
   const decoded = RenderedDiagramSceneSchema.safeParse(value);
   return decoded.success
     ? Effect.succeed(decoded.data)
@@ -243,9 +250,9 @@ export const generateDiagram = Effect.fn("sketchi.cli.generate")(function* (
   const store = yield* DiagramStore;
   const response = yield* requestGeneration(input);
 
-  const document = yield* decodeCanonicalDiagramDocument(response.document).pipe(
-    Effect.mapError(() => invalidGeneratedDocument()),
-  );
+  const document = yield* decodeCanonicalDiagramDocument(
+    response.document,
+  ).pipe(Effect.mapError(() => invalidGeneratedDocument()));
   const id = yield* validateStorageId(documentId(document)).pipe(
     Effect.mapError(() => invalidGeneratedDocument()),
   );

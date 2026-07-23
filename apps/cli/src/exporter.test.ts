@@ -16,6 +16,9 @@ function missingPngStoreLayer() {
     edit: () => Effect.die("unused edit"),
     show: () => Effect.die("unused show"),
     list: () => Effect.die("unused list"),
+    replaceWithDetached: () => Effect.die("unused replaceWithDetached"),
+    readRevision: () => Effect.die("unused readRevision"),
+    restore: () => Effect.die("unused restore"),
     readExportSource: () =>
       Effect.succeed({
         _tag: "RenderPng" as const,
@@ -47,6 +50,7 @@ describe("diagram export orchestration", () => {
       Effect.provide(
         exporterLayer(store, {
           renderPng: () => Effect.succeed(generatedPng),
+          normalizeExcalidraw: () => Effect.die("unused normalize"),
         }),
       ),
     );
@@ -59,6 +63,9 @@ describe("diagram export orchestration", () => {
       edit: () => Effect.die("unused edit"),
       show: () => Effect.die("unused show"),
       list: () => Effect.die("unused list"),
+      replaceWithDetached: () => Effect.die("unused replaceWithDetached"),
+      readRevision: () => Effect.die("unused readRevision"),
+      restore: () => Effect.die("unused restore"),
       readExportSource: (_diagramId, format) =>
         format === "png"
           ? Effect.succeed({
@@ -79,6 +86,7 @@ describe("diagram export orchestration", () => {
             renderCalls += 1;
             return Effect.succeed(new Uint8Array());
           },
+          normalizeExcalidraw: () => Effect.die("unused normalize"),
         }),
       ),
     );
@@ -105,6 +113,7 @@ describe("diagram export orchestration", () => {
                 message: "Unable to render PNG.",
               }),
             ),
+          normalizeExcalidraw: () => Effect.die("unused normalize"),
         }),
       ),
     );

@@ -3,12 +3,16 @@ import { Resvg, initWasm, type ResvgRenderOptions } from "@resvg/resvg-wasm";
 import * as Linkedom from "linkedom";
 
 import type { PngRenderInput } from "./png-renderer.js";
+import {
+  PNG_EXPORT_PADDING,
+  PNG_EXPORT_SCALE,
+  renderLimitFailure,
+  renderedSvgLimitFailure,
+} from "./render-limits.js";
 
 declare const __SKETCHI_EXCALIFONT_BASE64__: ReadonlyArray<string>;
 declare const __SKETCHI_RESVG_WASM_BASE64__: string;
 
-const EXPORT_PADDING = 20;
-const EXPORT_SCALE = 2;
 const TITLE_FONT_SIZE = 24;
 const TITLE_HEIGHT = 64;
 const TITLE_HORIZONTAL_PADDING = 20;
@@ -309,8 +313,11 @@ function addTitle(
     "viewBox",
     `${canvasMinX} ${minY - TITLE_HEIGHT} ${canvasWidth} ${height + TITLE_HEIGHT}`,
   );
-  svg.setAttribute("width", String(canvasWidth * EXPORT_SCALE));
-  svg.setAttribute("height", String((height + TITLE_HEIGHT) * EXPORT_SCALE));
+  svg.setAttribute("width", String(canvasWidth * PNG_EXPORT_SCALE));
+  svg.setAttribute(
+    "height",
+    String((height + TITLE_HEIGHT) * PNG_EXPORT_SCALE),
+  );
 
   const background = svg.ownerDocument.createElementNS(SVG_NAMESPACE, "rect");
   background.setAttribute("x", String(canvasMinX));
@@ -366,8 +373,13 @@ export async function renderPngBytes(
   if (!decodedExcalidraw.success) {
     throw new Error("Stored Excalidraw data failed schema validation.");
   }
+  const sizeFailure = renderLimitFailure(
+    decodedExcalidraw.data.elements,
+    input.scene ? TITLE_HEIGHT : 0,
+  );
+  if (sizeFailure) throw new Error(sizeFailure);
   const textValues = [
-    input.scene.title,
+    ...(input.scene ? [input.scene.title] : []),
     ...decodedExcalidraw.data.elements.flatMap((element) =>
       "text" in element && typeof element["text"] === "string"
         ? [element["text"]]
@@ -400,14 +412,23 @@ export async function renderPngBytes(
       ...restored.appState,
       exportBackground: true,
       exportEmbedScene: false,
-      exportScale: EXPORT_SCALE,
-      viewBackgroundColor: input.scene.backgroundColor,
+      exportScale: PNG_EXPORT_SCALE,
+      viewBackgroundColor:
+        input.scene?.backgroundColor ??
+        decodedExcalidraw.data.appState["viewBackgroundColor"] ??
+        "#ffffff",
     },
     files: restored.files,
-    exportPadding: EXPORT_PADDING,
+    exportPadding: PNG_EXPORT_PADDING,
     skipInliningFonts: true,
   });
-  addTitle(svg, input.scene.title, input.scene.backgroundColor);
+  if (input.scene) {
+    addTitle(svg, input.scene.title, input.scene.backgroundColor);
+  }
+  const svgWidth = Number.parseFloat(svg.getAttribute("width") ?? "");
+  const svgHeight = Number.parseFloat(svg.getAttribute("height") ?? "");
+  const svgFailure = renderedSvgLimitFailure(svgWidth, svgHeight);
+  if (svgFailure) throw new Error(svgFailure);
   const rasterizer = new Resvg(svg.outerHTML, fontOptions);
   try {
     const rendered = rasterizer.render();
@@ -419,4 +440,45 @@ export async function renderPngBytes(
   } finally {
     rasterizer.free();
   }
+}
+
+export async function normalizeExcalidrawArtifact(
+  input: unknown,
+): Promise<unknown> {
+  if (typeof input !== "object" || input === null) {
+    throw new Error("Share payload is not an Excalidraw artifact.");
+  }
+  const candidate = {
+    ...input,
+    files: "files" in input ? input.files : {},
+  };
+  const inputAppState =
+    "appState" in input &&
+    typeof input.appState === "object" &&
+    input.appState !== null
+      ? input.appState
+      : {};
+  const { loadFromBlob, MIME_TYPES } = await loadExcalidraw();
+  const restored = await loadFromBlob(
+    new Blob([JSON.stringify(candidate)], { type: MIME_TYPES.excalidraw }),
+    null,
+    null,
+  );
+  return {
+    type: "excalidraw",
+    version: 2,
+    source: "https://sketchi.app",
+    elements: restored.elements,
+    appState: {
+      gridSize: restored.appState.gridSize,
+      gridStep: restored.appState.gridStep,
+      gridModeEnabled: restored.appState.gridModeEnabled,
+      viewBackgroundColor: restored.appState.viewBackgroundColor,
+      lockedMultiSelections:
+        "lockedMultiSelections" in inputAppState
+          ? inputAppState.lockedMultiSelections
+          : {},
+    },
+    files: {},
+  };
 }

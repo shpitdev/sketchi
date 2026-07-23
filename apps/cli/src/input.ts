@@ -6,11 +6,17 @@ import { CliInputError } from "./errors.js";
 import { LocalFileSystem } from "./filesystem.js";
 import type { InputSource } from "./internal/effect-unstable-cli.js";
 
+export interface InputReadOptions {
+  readonly maxBytes?: number;
+  readonly content: "JSON document" | "share link";
+}
+
 export class InputReader extends Context.Service<
   InputReader,
   {
     readonly read: (
       source: InputSource,
+      options?: InputReadOptions,
     ) => Effect.Effect<string, CliInputError>;
   }
 >()("@sketchi/cli/InputReader") {}
@@ -55,6 +61,7 @@ export function makeInputReaderLayer(
 
       const read = Effect.fn("sketchi.cli.input.read")(function* (
         source: InputSource,
+        options: InputReadOptions = { content: "JSON document" },
       ) {
         if (source._tag === "InlineJson") return source.value;
         if (source.path !== "-") {
@@ -72,20 +79,47 @@ export function makeInputReaderLayer(
         if (stdinIsTTY()) {
           return yield* CliInputError.make({
             code: "interactive_stdin",
-            message: "--file - requires piped or redirected stdin.",
-            hint: "Pipe one JSON document, or use --file PATH / --json VALUE.",
+            message: `${options.content} input requires piped or redirected stdin.`,
+            hint:
+              options.content === "share link"
+                ? "Pipe one complete Excalidraw share link to --link -."
+                : "Pipe one JSON document, or use --file PATH / --json VALUE.",
           });
         }
-        const chunks = yield* Stream.runCollect(stdio.stdin).pipe(
-          Effect.mapError(() =>
-            CliInputError.make({
-              code: "input_read_failed",
-              message: "Unable to read JSON from stdin.",
-              hint: "Pipe one complete UTF-8 JSON document and retry.",
-            }),
+        const chunks = yield* Stream.runFoldEffect(
+          stdio.stdin,
+          () => ({
+            chunks: [] as ReadonlyArray<Uint8Array>,
+            size: 0,
+          }),
+          (collected, chunk) => {
+            const size = chunk.byteLength + collected.size;
+            if (options.maxBytes !== undefined && size > options.maxBytes) {
+              return Effect.fail(
+                CliInputError.make({
+                  code: "input_read_failed",
+                  message: `Standard input exceeds the ${String(options.maxBytes)} byte limit for a ${options.content}.`,
+                  hint: `Pipe one complete ${options.content} within the documented limit.`,
+                }),
+              );
+            }
+            return Effect.succeed({
+              chunks: [...collected.chunks, chunk],
+              size,
+            });
+          },
+        ).pipe(
+          Effect.mapError((error) =>
+            error instanceof CliInputError
+              ? error
+              : CliInputError.make({
+                  code: "input_read_failed",
+                  message: `Unable to read the ${options.content} from stdin.`,
+                  hint: `Pipe one complete UTF-8 ${options.content} and retry.`,
+                }),
           ),
         );
-        return yield* decodeUtf8(concatenate(chunks), "stdin");
+        return yield* decodeUtf8(concatenate(chunks.chunks), "stdin");
       });
 
       return { read };

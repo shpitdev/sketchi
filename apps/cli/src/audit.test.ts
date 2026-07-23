@@ -80,20 +80,20 @@ describe("CLI dependency and public-surface audit", () => {
     assert.notInclude(source, "NormalizedMindmapSchema");
   });
 
-  it("confines the sole network boundary to a credential-free generate HTTPS call", async () => {
+  it("confines network boundaries to the three credential-free HTTPS commands", async () => {
     const files = await sourceFiles(join(workspaceRoot, "apps/cli/src"));
     const fetchFiles: string[] = [];
     let cliSource = "";
     for (const file of files) {
       const text = await readFile(file, "utf8");
       cliSource += `${text}\n`;
-      if (text.includes("globalThis.fetch")) fetchFiles.push(file);
+      if (/(?:globalThis\.)?fetch\s*\(/u.test(text)) fetchFiles.push(file);
       assert.notInclude(text, "CloudflareAiGateway");
       assert.notInclude(text, "Mcp");
     }
     assert.deepStrictEqual(
       fetchFiles.map((file) => file.slice(workspaceRoot.length + 1)),
-      ["apps/cli/src/generation.ts"],
+      ["apps/cli/src/generation.ts", "apps/cli/src/share.ts"],
     );
     assert.notInclude(cliSource, "GOOGLE_GENERATIVE_AI_API_KEY");
     assert.notInclude(cliSource, "CF_AIG_TOKEN");
@@ -110,6 +110,16 @@ describe("CLI dependency and public-surface audit", () => {
     );
     assert.notInclude(generationSource, "@sketchi/diagram-generation");
 
+    const shareProtocolSource = await readFile(
+      join(workspaceRoot, "apps/cli/src/share-protocol.ts"),
+      "utf8",
+    );
+    assert.include(
+      shareProtocolSource,
+      "https://json.excalidraw.com/api/v2/post/",
+    );
+    assert.include(shareProtocolSource, "https://json.excalidraw.com/api/v2/");
+
     const providerManifest = JSON.parse(
       await readFile(
         join(workspaceRoot, "packages/diagram/generation/package.json"),
@@ -120,7 +130,7 @@ describe("CLI dependency and public-surface audit", () => {
     assert.notProperty(providerManifest.dependencies, "ai");
   });
 
-  it("publishes generate plus exactly the five manual top-level commands", async () => {
+  it("publishes the explicit offline and network top-level commands", async () => {
     const help = await readFile(
       join(workspaceRoot, "apps/cli/src/__fixtures__/help/root.txt"),
       "utf8",
@@ -137,6 +147,9 @@ describe("CLI dependency and public-surface audit", () => {
       "show",
       "edit",
       "list",
+      "restore",
+      "share",
+      "pull",
       "export",
     ]);
     for (const forbidden of [

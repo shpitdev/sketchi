@@ -15,9 +15,11 @@
     "@resvg/resvg-wasm": "2.6.2",
     "@sketchi/diagram-agent": "workspace:*",
     "effect": "4.0.0-beta.99",
-    "linkedom": "0.18.13"
+    "linkedom": "0.18.13",
+    "pako": "2.0.3"
   },
   "devDependencies": {
+    "@types/pako": "2.0.4",
     "@types/pngjs": "6.0.5",
     "pngjs": "7.0.0"
   }

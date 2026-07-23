@@ -1,0 +1,17 @@
+DESCRIPTION
+  Encrypt and upload the current authoritative Excalidraw artifact as one immutable excalidraw.com bearer snapshot. This makes exactly one credential-free HTTPS request. The storage service can observe connection metadata, timing, and ciphertext size; retention is uncontrolled, and Sketchi cannot revoke or delete a link. Anyone with the full URL can decrypt it. Supported elements: rectangle, ellipse, diamond, arrow, line, freedraw, text; text must use Excalifont fontFamily 5; files and images are rejected. Render limits: element dimension 8192, canvas dimension 8192, canvas area 4194304, final PNG pixels 16777216. --open is opt-in and only confirms whether the OS accepted the request.
+
+USAGE
+  sketchi share [flags] <diagram-id>
+
+ARGUMENTS
+  diagram-id string
+
+FLAGS
+  --output text|json    Result presentation format. (choices: text, json)
+  --open                Hand the bearer link to the default OS browser opener.
+
+GLOBAL FLAGS
+  --help, -h                          Show help information
+  --version, -v                       Show version information
+  --completions <bash|zsh|fish|sh>    Print shell completion script (choices: bash, zsh, fish, sh)

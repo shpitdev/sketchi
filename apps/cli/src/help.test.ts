@@ -1,4 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { describe, expect, it } from "@effect/vitest";
@@ -39,6 +40,9 @@ describe("golden product help", () => {
     "show",
     "edit",
     "list",
+    "restore",
+    "share",
+    "pull",
     "export",
   ] as const) {
     it(`keeps ${command} help stable`, async () => {
@@ -50,6 +54,7 @@ describe("golden product help", () => {
 
   it("keeps parser-level exclusivity failures in the JSON usage envelope", () => {
     for (const args of [
+      ["generate", "--output", "json"],
       ["create", "--output", "json"],
       ["create", "--file", "a.json", "--json", "{}", "--output", "json"],
       ["edit", "release-flow", "--output", "json"],
@@ -60,6 +65,25 @@ describe("golden product help", () => {
         "a.json",
         "--json",
         "{}",
+        "--output",
+        "json",
+      ],
+      ["pull", "release-flow", "--output", "json"],
+      [
+        "pull",
+        "release-flow",
+        "--link",
+        "https://excalidraw.com/#json=one,AAAAAAAAAAAAAAAAAAAAAA",
+        "--link",
+        "https://excalidraw.com/#json=two,AAAAAAAAAAAAAAAAAAAAAA",
+        "--output",
+        "json",
+      ],
+      [
+        "restore",
+        "release-flow",
+        "--revision",
+        "not-a-number",
         "--output",
         "json",
       ],
@@ -76,6 +100,65 @@ describe("golden product help", () => {
         command: args[0],
         error: { code: "usage_error" },
       });
+    }
+  });
+
+  it("redacts bearer-shaped values from parser and typed error envelopes", () => {
+    const bearer =
+      "https://excalidraw.com/#json=AAAAAAAAAAAAAAAAAAAAAA,BBBBBBBBBBBBBBBBBBBBBB";
+    for (const args of [
+      [
+        "pull",
+        "missing",
+        "--link",
+        bearer,
+        "--output",
+        bearer,
+        "--output",
+        "json",
+      ],
+      ["pull", bearer, "--link", bearer, "--output", "json"],
+    ]) {
+      const result = spawnSync(process.execPath, [binary, ...args], {
+        encoding: "utf8",
+        env: cliEnvironment(),
+      });
+
+      expect([2, 3]).toContain(result.status);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).not.toContain(bearer);
+      expect(result.stderr).toContain("[redacted-share-link]");
+    }
+  });
+
+  it("checks a pull target before reading a TTY-backed --link -", () => {
+    mkdirSync(helpHome, { recursive: true });
+    const ttyHome = mkdtempSync(resolve(helpHome, "tty-"));
+    const command = [
+      JSON.stringify(process.execPath),
+      JSON.stringify(binary),
+      "pull",
+      "missing",
+      "--link",
+      "-",
+      "--output",
+      "json",
+    ].join(" ");
+    try {
+      const result = spawnSync(
+        "script",
+        ["--quiet", "--return", "--command", command, "/dev/null"],
+        {
+          encoding: "utf8",
+          env: { ...cliEnvironment(), HOME: ttyHome },
+        },
+      );
+
+      expect(result.status).toBe(5);
+      expect(result.stdout).toContain('"code": "diagram_not_found"');
+      expect(result.stdout).not.toContain("interactive_stdin");
+    } finally {
+      rmSync(ttyHome, { force: true, recursive: true });
     }
   });
 
