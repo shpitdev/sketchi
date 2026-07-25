@@ -18,7 +18,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "Browse, search, filter, inspect, and copy the curated Sketchi icon output — over 1,400 icons across 30 collections.",
+          "Search, copy, and download more than 1,400 SVG icons from Sketchi.",
       },
       { name: "theme-color", content: "#f6f1e7" },
       { title: "Sketchi Icons" },
@@ -33,7 +33,7 @@ export const Route = createRootRoute({
       },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Hanken+Grotesk:wght@400..700&family=IBM+Plex+Mono:wght@400;500;600&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Dancing+Script:wght@600;700&family=Hanken+Grotesk:wght@400..700&family=IBM+Plex+Mono:wght@400;500;600&display=swap",
       },
       { rel: "stylesheet", href: appStyles },
     ],
@@ -60,6 +60,7 @@ function NotFoundComponent() {
   return (
     <main className="sketchi-icons-not-found">
       <h1>Not found</h1>
+      <a href="/">Browse icons</a>
     </main>
   );
 }

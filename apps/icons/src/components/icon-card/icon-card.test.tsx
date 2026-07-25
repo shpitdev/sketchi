@@ -5,25 +5,44 @@ import type { SketchiIcon } from "../../lib/icon-data";
 import { IconCard } from "./icon-card";
 
 const icon: SketchiIcon = {
+  aliases: [],
   bytes: 1802,
   collection: "ai-apps-agents",
-  fileName: "codex.svg",
-  flags: [],
-  id: "ai-apps-agents:codex",
+  keywords: ["ai", "agents"],
+  name: "Codex",
   slug: "codex",
-  urlPath: "/output/upload-ready/svg/ai-apps-agents/codex.svg",
+  svgPath: "/output/upload-ready/svg/ai-apps-agents/codex.svg",
+  viewBox: { height: 512, minX: 0, minY: 0, width: 512 },
 };
 
 describe("IconCard", () => {
-  it("renders the icon and reports selection", () => {
-    const onSelect = vi.fn();
-    render(<IconCard icon={icon} onSelect={onSelect} />);
+  it("makes raw SVG copy the primary tile action", () => {
+    const onCopy = vi.fn();
+    render(<IconCard icon={icon} onCopy={onCopy} />);
 
-    expect(screen.getByText("codex")).toBeTruthy();
-    expect(screen.getByText("ai-apps-agents")).toBeTruthy();
-    expect(screen.getByRole("img", { name: "codex icon" })).toBeTruthy();
+    expect(screen.getByText("Codex")).toBeTruthy();
+    expect(screen.getByText("AI Apps Agents")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Copy Codex SVG" }));
+    expect(onCopy).toHaveBeenCalledWith(icon);
+  });
 
-    fireEvent.click(screen.getByRole("button"));
-    expect(onSelect).toHaveBeenCalledWith(icon);
+  it("keeps selection and details as separate accessible actions", () => {
+    const onDetails = vi.fn();
+    const onToggleSelected = vi.fn();
+    render(
+      <IconCard
+        icon={icon}
+        onDetails={onDetails}
+        onToggleSelected={onToggleSelected}
+        selected
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /remove codex/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /view codex details/i }),
+    );
+    expect(onToggleSelected).toHaveBeenCalledWith(icon);
+    expect(onDetails).toHaveBeenCalledWith(icon);
   });
 });

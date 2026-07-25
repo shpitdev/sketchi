@@ -1,0 +1,34 @@
+# Sketchi Icons
+
+Sketchi Icons is a public library of SVG icons for people and software agents.
+The browser is available at https://icons.sketchi.app/.
+All API responses allow cross-origin reads.
+
+## Search
+
+GET /api/icons?q=k8s&collection=&limit=20
+Search ranks exact slugs, name prefixes, aliases, substrings, then collections.
+The response includes public slugs, names, collections, keywords, and URLs.
+The limit defaults to 50 and is capped at 100.
+
+## Get one icon
+
+GET /api/icons/kubernetes
+Returns metadata plus the full SVG source in the svg field.
+
+GET /api/icons/kubernetes.svg
+Returns only the raw SVG with Content-Type: image/svg+xml.
+Use this endpoint when you only need the icon file.
+
+Public slugs are stable and unique.
+When source collections contain the same raw slug, one keeps the short slug.
+Other icons receive a collection-qualified slug returned by search.
+
+## MCP
+
+Connect a Streamable HTTP MCP client to /mcp.
+Tool search_icons accepts q, collection, and limit.
+Tool get_icon accepts an exact slug and returns raw SVG first.
+
+Example: search for psql, then call get_icon with postgresql.
+Example: search for next, then fetch /api/icons/nextjs.svg.

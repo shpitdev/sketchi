@@ -9,38 +9,75 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as McpRouteImport } from './routes/mcp'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiIconsIndexRouteImport } from './routes/api/icons/index'
+import { Route as ApiIconsSlugRouteImport } from './routes/api/icons/$slug'
 
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiIconsIndexRoute = ApiIconsIndexRouteImport.update({
+  id: '/api/icons/',
+  path: '/api/icons/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiIconsSlugRoute = ApiIconsSlugRouteImport.update({
+  id: '/api/icons/$slug',
+  path: '/api/icons/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/mcp': typeof McpRoute
+  '/api/icons/$slug': typeof ApiIconsSlugRoute
+  '/api/icons/': typeof ApiIconsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/mcp': typeof McpRoute
+  '/api/icons/$slug': typeof ApiIconsSlugRoute
+  '/api/icons': typeof ApiIconsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/mcp': typeof McpRoute
+  '/api/icons/$slug': typeof ApiIconsSlugRoute
+  '/api/icons/': typeof ApiIconsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/mcp' | '/api/icons/$slug' | '/api/icons/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/mcp' | '/api/icons/$slug' | '/api/icons'
+  id: '__root__' | '/' | '/mcp' | '/api/icons/$slug' | '/api/icons/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  McpRoute: typeof McpRoute
+  ApiIconsSlugRoute: typeof ApiIconsSlugRoute
+  ApiIconsIndexRoute: typeof ApiIconsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +85,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/icons/': {
+      id: '/api/icons/'
+      path: '/api/icons'
+      fullPath: '/api/icons/'
+      preLoaderRoute: typeof ApiIconsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/icons/$slug': {
+      id: '/api/icons/$slug'
+      path: '/api/icons/$slug'
+      fullPath: '/api/icons/$slug'
+      preLoaderRoute: typeof ApiIconsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  McpRoute: McpRoute,
+  ApiIconsSlugRoute: ApiIconsSlugRoute,
+  ApiIconsIndexRoute: ApiIconsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

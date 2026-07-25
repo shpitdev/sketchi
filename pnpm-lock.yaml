@@ -265,12 +265,9 @@ importers:
 
   apps/icons:
     dependencies:
-      '@sketchi/diagram-ui':
-        specifier: workspace:*
-        version: link:../../packages/diagram/ui
-      '@sketchi/svg-excalidraw':
-        specifier: workspace:*
-        version: link:../../packages/svg-excalidraw
+      fflate:
+        specifier: 0.8.2
+        version: 0.8.2
 
   apps/playground:
     dependencies:
@@ -7491,6 +7488,9 @@ packages:
 
   fetchdts@0.1.7:
     resolution: {integrity: sha512-YoZjBdafyLIop9lSxXVI33oLD5kN31q4Td+CasofLLYeLXRFeOsuOw0Uo+XNRi9PZlbfdlN2GmRtm4tCEQ9/KA==}
+
+  fflate@0.8.2:
+    resolution: {integrity: sha512-cPJU47OaAoCbg0pBvzsgpTPhmhqI5eJjh/JIu8tPj5q+T7iLvW/JAYUqmE7KOB4R1ZyEhzBaIQpQpardBF5z8A==}
 
   figures@3.2.0:
     resolution: {integrity: sha512-yaduQFRKLXYOGgEn6AZau90j3ggSOyiqXU0F9JZfeXYhNa+Jk4X+s45A2zg5jns87GAFa34BBm2kXw4XpNcbdg==}
@@ -18521,6 +18521,8 @@ snapshots:
       picomatch: 4.0.4
 
   fetchdts@0.1.7: {}
+
+  fflate@0.8.2: {}
 
   figures@3.2.0:
     dependencies:

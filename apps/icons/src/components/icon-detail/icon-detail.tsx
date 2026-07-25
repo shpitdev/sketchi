@@ -1,162 +1,193 @@
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 
 import {
   formatBytes,
   formatCollectionLabel,
   type SketchiIcon,
 } from "../../lib/icon-data.js";
-import { IconConversionPreview } from "../icon-conversion-preview/index.js";
+
+export type IconDetailAction =
+  | "copy-data-uri"
+  | "copy-jsx"
+  | "copy-svg"
+  | "copy-url"
+  | "download";
 
 export interface IconDetailProps {
-  icon: SketchiIcon;
-  onClose?: () => void;
+  readonly busyAction?: IconDetailAction;
+  readonly icon: SketchiIcon;
+  readonly onAction?: (action: IconDetailAction, icon: SketchiIcon) => void;
+  readonly onClose?: () => void;
+  readonly onPreviewModeChange?: (mode: "dark" | "light") => void;
+  readonly permanentUrl: string;
+  readonly previewMode?: "dark" | "light";
+  readonly returnFocusTo?: HTMLElement | null;
 }
 
-type CopyState = "copied" | "error" | "idle";
+const actionLabels: Readonly<Record<IconDetailAction, string>> = {
+  "copy-data-uri": "Copy data URI",
+  "copy-jsx": "Copy JSX",
+  "copy-svg": "Copy SVG",
+  "copy-url": "Copy URL",
+  download: "Download SVG",
+};
 
-export function IconDetail({ icon, onClose }: IconDetailProps) {
-  const [copyState, setCopyState] = useState<CopyState>("idle");
-  const [pathCopyState, setPathCopyState] = useState<CopyState>("idle");
+const detailActions: readonly IconDetailAction[] = [
+  "copy-svg",
+  "copy-url",
+  "copy-jsx",
+  "copy-data-uri",
+  "download",
+];
 
-  async function copySvg() {
-    try {
-      const response = await fetch(icon.urlPath);
-      if (!response.ok) {
-        throw new Error(`Icon SVG returned HTTP ${response.status}.`);
+export function IconDetail({
+  busyAction,
+  icon,
+  onAction,
+  onClose,
+  onPreviewModeChange,
+  permanentUrl,
+  previewMode = "light",
+  returnFocusTo,
+}: IconDetailProps) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose?.();
+        return;
       }
-      const markup = await response.text();
-      await navigator.clipboard.writeText(markup);
-      setCopyState("copied");
-    } catch {
-      setCopyState("error");
-    }
-  }
+      if (event.key !== "Tab") return;
 
-  async function copyPath() {
-    try {
-      await navigator.clipboard.writeText(icon.urlPath);
-      setPathCopyState("copied");
-    } catch {
-      setPathCopyState("error");
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      ).filter((element) => !element.hasAttribute("disabled"));
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) {
+        event.preventDefault();
+        return;
+      }
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (!dialogRef.current?.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      }
     }
-  }
 
-  const copyLabel =
-    copyState === "copied"
-      ? "Copied"
-      : copyState === "error"
-        ? "Copy failed"
-        : "Copy SVG";
-  const pathCopyLabel =
-    pathCopyState === "copied"
-      ? "Path copied"
-      : pathCopyState === "error"
-        ? "Path failed"
-        : "Copy path";
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, true);
+      if (returnFocusTo?.isConnected) returnFocusTo.focus();
+    };
+  }, [onClose, returnFocusTo]);
 
   return (
-    <section className="icon-detail" aria-label={`${icon.slug} details`}>
+    <aside
+      aria-label={`${icon.name} details`}
+      aria-modal="true"
+      className="icon-detail"
+      ref={dialogRef}
+      role="dialog"
+    >
       <header className="icon-detail__head">
         <div>
-          <p className="icon-detail__eyebrow">
+          <p className="icon-detail__collection">
             {formatCollectionLabel(icon.collection)}
           </p>
-          <h2 className="icon-detail__slug">{icon.slug}</h2>
+          <h2>{icon.name}</h2>
         </div>
-        {onClose ? (
-          <button
-            aria-label="Close details"
-            className="icon-detail__close"
-            onClick={onClose}
-            type="button"
-          >
-            <svg
-              aria-hidden="true"
-              fill="none"
-              height="18"
-              viewBox="0 0 18 18"
-              width="18"
-            >
-              <path
-                d="M4 4l10 10M14 4L4 14"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeWidth="1.7"
-              />
-            </svg>
-          </button>
-        ) : null}
+        <button
+          aria-label="Close icon details"
+          className="icon-detail__close"
+          onClick={onClose}
+          ref={closeButtonRef}
+          type="button"
+        >
+          Close
+        </button>
       </header>
 
-      <IconConversionPreview icon={icon} />
+      <div className="icon-detail__preview" data-preview={previewMode}>
+        <img alt={`${icon.name} preview`} src={icon.svgPath} />
+      </div>
+
+      <div className="preview-toggle" aria-label="Preview background">
+        <span>Preview</span>
+        <div className="preview-toggle__buttons">
+          <button
+            aria-pressed={previewMode === "light"}
+            onClick={() => onPreviewModeChange?.("light")}
+            type="button"
+          >
+            Light
+          </button>
+          <button
+            aria-pressed={previewMode === "dark"}
+            onClick={() => onPreviewModeChange?.("dark")}
+            type="button"
+          >
+            Dark
+          </button>
+        </div>
+      </div>
 
       <dl className="icon-detail__meta">
         <div>
-          <dt>File</dt>
-          <dd>{icon.fileName}</dd>
+          <dt>Dimensions</dt>
+          <dd>
+            {icon.viewBox.width} × {icon.viewBox.height}
+          </dd>
         </div>
         <div>
-          <dt>Size</dt>
+          <dt>File size</dt>
           <dd>{formatBytes(icon.bytes)}</dd>
         </div>
-        {icon.viewBox ? (
-          <div>
-            <dt>viewBox</dt>
-            <dd>
-              {icon.viewBox.width}×{icon.viewBox.height}
-            </dd>
-          </div>
-        ) : null}
         {icon.variant ? (
           <div>
-            <dt>Variant</dt>
-            <dd>{icon.variant}</dd>
-          </div>
-        ) : null}
-        {icon.similarityGroupSize && icon.similarityGroupSize > 1 ? (
-          <div>
-            <dt>Similar</dt>
-            <dd>{icon.similarityGroupSize} in group</dd>
+            <dt>Style</dt>
+            <dd>{icon.variant === "text" ? "Wordmark" : icon.variant}</dd>
           </div>
         ) : null}
       </dl>
 
-      {icon.flags.length > 0 ? (
-        <div className="icon-detail__flags" aria-label="Review flags">
-          {icon.flags.map((flag) => (
-            <span className="icon-detail__flag" key={flag}>
-              {flag}
-            </span>
-          ))}
-        </div>
-      ) : null}
+      <div className="icon-detail__url">
+        <span>Permanent SVG URL</span>
+        <code>{permanentUrl}</code>
+      </div>
 
       <div className="icon-detail__actions">
-        <button
-          className="icon-detail__btn icon-detail__btn--primary"
-          onClick={copySvg}
-          type="button"
-        >
-          {copyLabel}
-        </button>
-        <a
-          className="icon-detail__btn"
-          download={icon.fileName}
-          href={icon.urlPath}
-        >
-          Download
-        </a>
-        <button className="icon-detail__btn" onClick={copyPath} type="button">
-          {pathCopyLabel}
-        </button>
+        {detailActions.map((action) => (
+          <button
+            className={action === "copy-svg" ? "is-primary" : undefined}
+            disabled={busyAction !== undefined}
+            key={action}
+            onClick={() => onAction?.(action, icon)}
+            type="button"
+          >
+            {busyAction === action ? "Working" : actionLabels[action]}
+          </button>
+        ))}
       </div>
-      <p className="icon-detail__copy-status" aria-live="polite">
-        {copyState === "copied" || pathCopyState === "copied"
-          ? "Copied to clipboard."
-          : copyState === "error" || pathCopyState === "error"
-            ? "Clipboard copy failed."
-            : ""}
-      </p>
-    </section>
+
+      {icon.aliases.length ? (
+        <p className="icon-detail__aliases">
+          Also found by: {icon.aliases.join(", ")}
+        </p>
+      ) : null}
+    </aside>
   );
 }

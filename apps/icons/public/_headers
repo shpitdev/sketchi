@@ -1,6 +1,24 @@
-# Public conversion input contract. No other Icons assets receive CORS headers.
+# Public SVG and agent API contracts.
 /output/upload-ready/svg/*
   Access-Control-Allow-Origin: *
   Access-Control-Allow-Methods: GET, HEAD, OPTIONS
   Access-Control-Max-Age: 86400
   Cross-Origin-Resource-Policy: cross-origin
+  Cache-Control: public, max-age=86400
+
+/api/*
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Methods: GET, HEAD, OPTIONS
+  Access-Control-Allow-Headers: Content-Type
+  Access-Control-Max-Age: 86400
+  Cross-Origin-Resource-Policy: cross-origin
+
+/mcp
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Methods: DELETE, GET, OPTIONS, POST
+  Access-Control-Allow-Headers: Content-Type, MCP-Protocol-Version, MCP-Session-Id
+  Access-Control-Expose-Headers: MCP-Session-Id
+  Access-Control-Max-Age: 86400
+
+/icons-manifest.json
+  Cache-Control: public, max-age=3600

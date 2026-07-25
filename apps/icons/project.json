@@ -7,6 +7,7 @@
   "targets": {
     "build": {
       "executor": "nx:run-commands",
+      "dependsOn": ["generate-manifest"],
       "outputs": [
         "{workspaceRoot}/dist/apps/icons",
         "{projectRoot}/.wrangler/deploy/config.json"
@@ -38,8 +39,19 @@
     },
     "dev": {
       "executor": "nx:run-commands",
+      "dependsOn": ["generate-manifest"],
       "options": {
         "command": "PORTLESS_PORT=443 portless run --name icons.sketchi vite dev --config apps/icons/vite.config.ts"
+      }
+    },
+    "generate-manifest": {
+      "executor": "nx:run-commands",
+      "outputs": [
+        "{projectRoot}/public/icons-manifest.json",
+        "{projectRoot}/src/generated/icon-catalog.json"
+      ],
+      "options": {
+        "command": "jiti apps/icons/scripts/generate-icon-manifest.ts"
       }
     },
     "preview": {
@@ -57,6 +69,7 @@
     },
     "test": {
       "executor": "nx:run-commands",
+      "dependsOn": ["build"],
       "outputs": ["{workspaceRoot}/coverage/apps/icons"],
       "options": {
         "command": "vitest run --config apps/icons/vitest.config.ts"

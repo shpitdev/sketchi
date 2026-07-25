@@ -33,22 +33,4 @@ export default defineConfig({
     }),
     react(),
   ],
-  resolve: {
-    alias: [
-      {
-        find: "@sketchi/diagram-ui/styles.css",
-        replacement: new URL(
-          "../../packages/diagram/ui/src/styles.css",
-          import.meta.url,
-        ).pathname,
-      },
-      {
-        find: "@sketchi/diagram-ui",
-        replacement: new URL(
-          "../../packages/diagram/ui/src/index.ts",
-          import.meta.url,
-        ).pathname,
-      },
-    ],
-  },
 });

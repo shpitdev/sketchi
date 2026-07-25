@@ -3,7 +3,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@sketchi/diagram-ui": "workspace:*",
-    "@sketchi/svg-excalidraw": "workspace:*"
+    "fflate": "0.8.2"
   }
 }

@@ -1,62 +1,92 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { SketchiIcon } from "../../lib/icon-data";
 import { IconDetail } from "./icon-detail";
 
 const icon: SketchiIcon = {
+  aliases: ["postgres", "psql"],
   bytes: 1901,
-  collection: "auth-identity",
-  fileName: "workos.svg",
-  flags: ["duplicate-raster"],
-  id: "auth-identity:workos",
-  slug: "workos",
-  urlPath: "/output/upload-ready/svg/auth-identity/workos.svg",
+  collection: "data-storage",
+  keywords: ["data", "database"],
+  name: "PostgreSQL",
+  slug: "postgresql",
+  svgPath: "/output/upload-ready/svg/data-storage/postgresql.svg",
   viewBox: { height: 512, minX: 0, minY: 0, width: 512 },
 };
 
 describe("IconDetail", () => {
-  it("renders metadata, flags, and copy/download actions", () => {
-    render(<IconDetail icon={icon} />);
-
-    expect(screen.getByRole("heading", { name: "workos" })).toBeTruthy();
-    expect(screen.getByText("workos.svg")).toBeTruthy();
-    expect(screen.getByText("512×512")).toBeTruthy();
-    expect(screen.getByText("duplicate-raster")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Copy SVG" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Copy path" })).toBeTruthy();
-
-    const download = screen.getByRole("link", { name: "Download" });
-    expect(download.getAttribute("href")).toBe(icon.urlPath);
-    expect(download.getAttribute("download")).toBe("workos.svg");
-  });
-
-  it("copies the SVG markup and path", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText },
-    });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        text: () => Promise.resolve("<svg />"),
-      }),
+  it("shows preview, metadata, permanent URL, and every use action", () => {
+    render(
+      <IconDetail
+        icon={icon}
+        permanentUrl="https://icons.sketchi.app/api/icons/postgresql.svg"
+      />,
     );
 
-    render(<IconDetail icon={icon} />);
+    expect(screen.getByRole("heading", { name: "PostgreSQL" })).toBeTruthy();
+    const dialog = screen.getByRole("dialog", { name: "PostgreSQL details" });
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Close icon details" }),
+    );
+    expect(screen.getByText("512 × 512")).toBeTruthy();
+    expect(screen.getByText("1.9 KB")).toBeTruthy();
+    expect(screen.getByText(/api\/icons\/postgresql.svg/)).toBeTruthy();
+    for (const name of [
+      "Copy SVG",
+      "Copy URL",
+      "Copy JSX",
+      "Copy data URI",
+      "Download SVG",
+    ]) {
+      expect(screen.getByRole("button", { name })).toBeTruthy();
+    }
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: "Copy SVG" }));
-    await waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith("<svg />");
-    });
+  it("reports action and preview changes", () => {
+    const onAction = vi.fn();
+    const onPreviewModeChange = vi.fn();
+    render(
+      <IconDetail
+        icon={icon}
+        onAction={onAction}
+        onPreviewModeChange={onPreviewModeChange}
+        permanentUrl="https://icons.test/api/icons/postgresql.svg"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Copy JSX" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dark" }));
+    expect(onAction).toHaveBeenCalledWith("copy-jsx", icon);
+    expect(onPreviewModeChange).toHaveBeenCalledWith("dark");
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: "Copy path" }));
-    await waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith(icon.urlPath);
-    });
+  it("traps focus, closes with Escape, and restores the opener", () => {
+    const onClose = vi.fn();
+    const opener = document.createElement("button");
+    document.body.append(opener);
+    opener.focus();
+    const { unmount } = render(
+      <IconDetail
+        icon={icon}
+        onClose={onClose}
+        permanentUrl="https://icons.test/api/icons/postgresql.svg"
+        returnFocusTo={opener}
+      />,
+    );
+    const close = screen.getByRole("button", { name: "Close icon details" });
+    const download = screen.getByRole("button", { name: "Download SVG" });
 
-    expect(screen.getByText("Copied to clipboard.")).toBeTruthy();
+    expect(document.activeElement).toBe(close);
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(download);
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(document.activeElement).toBe(close);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledOnce();
+
+    unmount();
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
   });
 });

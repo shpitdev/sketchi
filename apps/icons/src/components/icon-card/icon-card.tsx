@@ -1,35 +1,80 @@
-import type { SketchiIcon } from "../../lib/icon-data.js";
+import {
+  formatCollectionLabel,
+  type SketchiIcon,
+} from "../../lib/icon-data.js";
 
 export interface IconCardProps {
-  active?: boolean;
-  icon: SketchiIcon;
-  onSelect?: (icon: SketchiIcon) => void;
+  readonly active?: boolean;
+  readonly copied?: boolean;
+  readonly copying?: boolean;
+  readonly icon: SketchiIcon;
+  readonly onCopy?: (icon: SketchiIcon) => void;
+  readonly onDetails?: (icon: SketchiIcon) => void;
+  readonly onToggleSelected?: (icon: SketchiIcon) => void;
+  readonly previewMode?: "dark" | "light";
+  readonly selected?: boolean;
 }
 
-export function IconCard({ active = false, icon, onSelect }: IconCardProps) {
-  const flagged = icon.flags.length > 0;
-
+export function IconCard({
+  active = false,
+  copied = false,
+  copying = false,
+  icon,
+  onCopy,
+  onDetails,
+  onToggleSelected,
+  previewMode = "light",
+  selected = false,
+}: IconCardProps) {
   return (
-    <button
-      aria-pressed={active}
+    <article
       className="icon-card"
-      onClick={() => onSelect?.(icon)}
-      type="button"
+      data-active={active ? "true" : "false"}
+      data-selected={selected ? "true" : "false"}
     >
-      <span className="icon-card__preview">
-        <img alt={`${icon.slug} icon`} loading="lazy" src={icon.urlPath} />
-        {flagged ? (
-          <span
-            aria-label={`${icon.flags.length} review flag${
-              icon.flags.length === 1 ? "" : "s"
-            }`}
-            className="icon-card__flag"
-            title={icon.flags.join(", ")}
-          />
-        ) : null}
-      </span>
-      <span className="icon-card__slug">{icon.slug}</span>
-      <span className="icon-card__collection">{icon.collection}</span>
-    </button>
+      <button
+        aria-label={`Copy ${icon.name} SVG`}
+        aria-describedby={`icon-meta-${icon.slug}`}
+        className="icon-card__copy"
+        id={`icon-result-${icon.slug}`}
+        onClick={() => onCopy?.(icon)}
+        type="button"
+      >
+        <span className="icon-card__preview" data-preview={previewMode}>
+          <img alt="" loading="lazy" src={icon.svgPath} />
+          <span className="icon-card__copy-cue">
+            {copying ? "Copying" : copied ? "Copied" : "Copy SVG"}
+          </span>
+        </span>
+        <span className="icon-card__name">{icon.name}</span>
+        <span className="icon-card__collection" id={`icon-meta-${icon.slug}`}>
+          {formatCollectionLabel(icon.collection)}
+        </span>
+      </button>
+      <div className="icon-card__actions">
+        <button
+          aria-label={`${selected ? "Remove" : "Add"} ${icon.name} ${
+            selected ? "from" : "to"
+          } selection`}
+          aria-pressed={selected}
+          className="icon-card__select"
+          onClick={() => onToggleSelected?.(icon)}
+          type="button"
+        >
+          <span aria-hidden="true" className="icon-card__check">
+            {selected ? "✓" : "+"}
+          </span>
+          {selected ? "Selected" : "Select"}
+        </button>
+        <button
+          aria-label={`View ${icon.name} details`}
+          className="icon-card__details"
+          onClick={() => onDetails?.(icon)}
+          type="button"
+        >
+          Details
+        </button>
+      </div>
+    </article>
   );
 }
