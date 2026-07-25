@@ -1,3 +1,5 @@
+import { BrandIcon } from "../brand-icon/index.js";
+import { CLI_NPM_URL } from "../../lib/cli-package";
 import {
   DEFAULT_WEB_SURFACE_URLS,
   type WebSurfaceUrls,
@@ -8,6 +10,7 @@ export interface SiteFooterProps {
   // Every surface that renders this footer must actually serve the file it
   // points at; pass an absolute URL when the surface has no llms.txt of its own.
   llmsTxtUrl?: string;
+  npmUrl?: string;
   repoUrl?: string;
   surfaceUrls?: WebSurfaceUrls;
 }
@@ -18,6 +21,7 @@ const DEFAULT_LLMS_TXT_URL = "/llms.txt";
 export function SiteFooter({
   colophon = "Made for people who'd rather describe a diagram than draw one.",
   llmsTxtUrl = DEFAULT_LLMS_TXT_URL,
+  npmUrl = CLI_NPM_URL,
   repoUrl = DEFAULT_REPO_URL,
   surfaceUrls = DEFAULT_WEB_SURFACE_URLS,
 }: SiteFooterProps) {
@@ -60,6 +64,9 @@ export function SiteFooter({
               <a href={surfaceUrls.icons}>Icons</a>
             </li>
             <li>
+              <a href="/#cli">CLI</a>
+            </li>
+            <li>
               <a href="/agents">Agents</a>
             </li>
             <li>
@@ -91,6 +98,12 @@ export function SiteFooter({
           <ul>
             <li>
               <a href="/docs">How it works</a>
+            </li>
+            <li>
+              <a className="site-footer__npm" href={npmUrl}>
+                <BrandIcon label="npm" size={15} src="/brand/npm.svg" />
+                npm package
+              </a>
             </li>
             <li>
               <a href={repoUrl}>GitHub</a>

@@ -1,8 +1,9 @@
 # Sketchi
 
 Sketchi turns a plain-language prompt into a clean, editable diagram, brand
-logos included. It is usable by people in the browser and by software agents
-over MCP. Source is MIT-licensed at https://github.com/shpitdev/sketchi.
+logos included. It is usable by people in the browser, by software agents over
+MCP, and from a terminal through the sketchi CLI. Source is MIT-licensed at
+https://github.com/shpitdev/sketchi.
 
 ## Surfaces
 
@@ -25,7 +26,35 @@ The server is named sketchi-code-mode and exposes three tools:
 Per-agent setup instructions live at https://sketchi.app/agents, with pages for
 Claude Code, Codex, OpenCode, and Antigravity.
 
+## CLI
+
+https://www.npmjs.com/package/sketchi — the published `sketchi` command-line
+tool. Requires Node.js 24.13.0 or newer. Install with either:
+
+  curl -fsSL https://raw.githubusercontent.com/shpitdev/sketchi/main/install.sh | sh
+  npm install -g sketchi
+
+Diagram records live under ~/.sketchi/diagrams. Every command accepts
+--output json for a stable result envelope. Input is command-specific: create,
+edit, and patch take their JSON through --json or --file (--file - reads
+stdin); generate takes --prompt; pull takes --link. Other commands accept
+neither --json nor --file. `export --dest -` streams raw artifact bytes to
+stdout, with status on stderr.
+
+- generate: one prompt to a validated diagram. One credential-free HTTPS
+  request; no key, token, account, or login.
+- create, edit, patch: author and revise from canonical JSON, or apply semantic
+  style and layout operations. Fully offline.
+- show, list, restore: inspect a record, list the local store, recover a
+  retained revision. Fully offline.
+- export: write PNG or Excalidraw. Deterministic and local; never starts a
+  browser or uses the network.
+- share, pull: publish an encrypted excalidraw.com snapshot link and pull
+  browser edits back. One HTTPS request each. A share URL is a bearer secret.
+
+Install and command details: https://sketchi.app/docs#cli
+
 ## Docs
 
-https://sketchi.app/docs — how generation works, supported diagram types, and
-the open-source layout.
+https://sketchi.app/docs — how generation works, the CLI, supported diagram
+types, and the open-source layout.

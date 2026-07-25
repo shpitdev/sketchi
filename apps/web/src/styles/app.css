@@ -634,6 +634,161 @@
 }
 
 /* ===================================================================== */
+/* CLI band — the terminal as a peer of the playground and the agent      */
+/* route, so the install command is the section rather than a link to it. */
+/* ===================================================================== */
+.cli-band__inner {
+  align-items: start;
+  display: grid;
+  gap: 44px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+}
+
+.cli-band__title {
+  max-width: 18ch;
+}
+
+.cli-band__lead {
+  color: var(--ink-2);
+  font-size: 17px;
+  line-height: 1.6;
+  margin: 16px 0 0;
+  max-width: 46ch;
+}
+
+.cli-band__lead code,
+.cli-band__point dd code {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  padding: 1px 5px;
+}
+
+.cli-band__points {
+  display: grid;
+  gap: 16px;
+  margin: 26px 0 0;
+}
+
+.cli-band__point dt {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.cli-band__point dd {
+  color: var(--ink-2);
+  font-size: 14.5px;
+  line-height: 1.6;
+  margin: 3px 0 0;
+  max-width: 44ch;
+}
+
+.cli-band__links {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-top: 30px;
+}
+
+/* The npm mark is a solid red tile; round it a touch so it sits in the button
+   like the other brand tiles rather than as a hard square. */
+.cli-band__npm .brand-icon__img {
+  border-radius: 3px;
+  flex: none;
+}
+
+.cli-band__docs-link {
+  color: var(--accent-ink);
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.cli-band__docs-link:hover {
+  text-decoration: underline;
+}
+
+/* Terminal card: same chrome as the hero board, dark body like a codeblock. */
+.cli-band__terminal {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-md);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.cli-band__bar {
+  align-items: center;
+  background: color-mix(in srgb, var(--card) 86%, var(--paper));
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 11px 15px;
+}
+
+.cli-band__dots {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.cli-band__dots i {
+  background: var(--line-2);
+  block-size: 9px;
+  border-radius: 999px;
+  inline-size: 9px;
+}
+
+.cli-band__dots i:first-child {
+  background: var(--accent);
+}
+
+.cli-band__shell {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.03em;
+}
+
+.cli-band__body {
+  padding: 18px 18px 20px;
+}
+
+.cli-band__body .docs-codeblock {
+  margin: 0;
+}
+
+.cli-band__note {
+  color: var(--ink-3);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 8px 0 0;
+}
+
+.cli-band__step + .cli-band__step {
+  margin-top: 18px;
+}
+
+.cli-band__then {
+  color: var(--ink-2);
+  font-size: 14.5px;
+  font-weight: 600;
+  margin: 24px 0 10px;
+}
+
+.cli-band__req {
+  color: var(--ink-3);
+  font-size: 13px;
+  margin: 12px 0 0;
+}
+
+/* ===================================================================== */
 /* Icon wall                                                             */
 /* ===================================================================== */
 .icon-wall {
@@ -895,6 +1050,18 @@
   padding: 1px 6px;
 }
 
+/* The inline pill above is for `code` in running prose. Inside a codeblock the
+   block already owns the surface, so a pale pill on dark ink renders the
+   command unreadable — the block's own styling wins. */
+.docs-section .docs-codeblock code {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  font-size: inherit;
+  padding: 0;
+}
+
 .docs-callout {
   background: var(--accent-wash);
   border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
@@ -932,6 +1099,35 @@
   color: #b6ad97;
 }
 
+/* Docs CLI section — subheads, install steps, and the npm package link */
+.docs-h3 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  margin: 26px 0 0;
+}
+
+.docs-install .docs-codeblock {
+  margin-bottom: 6px;
+}
+
+.docs-install__note {
+  color: var(--ink-3) !important;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0 0 14px !important;
+}
+
+.docs-npm-link {
+  align-items: center;
+  display: inline-flex;
+  gap: 7px;
+}
+
+.docs-npm-link .brand-icon__img {
+  border-radius: 3px;
+  flex: none;
+}
+
 .docs-defs {
   border: 1px solid var(--line);
   border-radius: var(--r-md);
@@ -963,12 +1159,24 @@
   margin: 0;
 }
 
-/* Two-path explainer */
+/* Path explainer */
 .docs-paths {
   display: grid;
   gap: 14px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 18px 0;
+}
+
+/* The article column is capped at 72ch, so three side-by-side lanes would be
+   ~200px each — too narrow for the inline commands they carry. Stack them: the
+   lanes stay adjacent and identically shaped, so they still read as a
+   comparison, and each one gets the width its content needs. */
+.docs-paths--three {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.docs-paths--three .docs-lane__steps {
+  padding-left: 20px;
 }
 
 .docs-lane {
@@ -998,6 +1206,10 @@
 
 .docs-lane--agent {
   --lane-accent: var(--blueprint);
+}
+
+.docs-lane--cli {
+  --lane-accent: var(--ok);
 }
 
 .docs-lane__tag {
@@ -1365,6 +1577,17 @@
   transition: color 0.16s var(--ease);
 }
 
+.site-footer__npm {
+  align-items: center;
+  display: inline-flex;
+  gap: 7px;
+}
+
+.site-footer__npm .brand-icon__img {
+  border-radius: 3px;
+  flex: none;
+}
+
 .site-footer__col a:hover {
   color: #fff;
 }
@@ -1431,6 +1654,17 @@
   .feature-grid__cards {
     gap: 28px 36px;
     grid-template-columns: 1fr 1fr;
+  }
+
+  .cli-band__inner {
+    gap: 32px;
+    grid-template-columns: 1fr;
+  }
+
+  .cli-band__title,
+  .cli-band__lead,
+  .cli-band__point dd {
+    max-width: none;
   }
 
   .agent-hero__inner,

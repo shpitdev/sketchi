@@ -5,15 +5,19 @@ export interface CtaBandProps {
   playgroundHref?: string;
   /** Link to the agent setup hub. */
   agentsHref?: string;
+  /** Link to the CLI section. */
+  cliHref?: string;
 }
 
 /**
  * Closing invitation — a warm, blank sketch sheet echoing the hero board.
- * One clear next step; the agent path stays a quiet secondary link.
+ * One clear next step, with the agent and terminal paths as quiet secondary
+ * links for readers the browser is not the answer for.
  */
 export function CtaBand({
   playgroundHref = DEFAULT_WEB_SURFACE_URLS.playground,
   agentsHref = "/agents",
+  cliHref = "/#cli",
 }: CtaBandProps) {
   return (
     <section className="cta-band">
@@ -28,6 +32,9 @@ export function CtaBand({
             </a>
             <a className="cta-band__link" href={agentsHref}>
               or add it to your coding agent →
+            </a>
+            <a className="cta-band__link" href={cliHref}>
+              or install the CLI →
             </a>
           </div>
         </div>

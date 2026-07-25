@@ -39,6 +39,22 @@ describe("SiteFooter", () => {
     ).toBe("https://sketchi.app/llms.txt");
   });
 
+  it("lists the CLI as a product and links the npm package with its mark", () => {
+    render(<SiteFooter />);
+
+    expect(screen.getByRole("link", { name: "CLI" }).getAttribute("href")).toBe(
+      "/#cli",
+    );
+
+    const npmLink = screen.getByRole("link", { name: /npm package/ });
+    expect(npmLink.getAttribute("href")).toBe(
+      "https://www.npmjs.com/package/sketchi",
+    );
+    expect(npmLink.querySelector("img")?.getAttribute("src")).toBe(
+      "/brand/npm.svg",
+    );
+  });
+
   it("uses configured surface links", () => {
     render(
       <SiteFooter

@@ -25,6 +25,18 @@ describe("MarketingHome", () => {
     ).toBeTruthy();
   });
 
+  it("features the CLI on the homepage with a reachable anchor", () => {
+    const { container } = render(<MarketingHome />);
+
+    expect(
+      screen.getByRole("heading", { name: "Or never leave the terminal." }),
+    ).toBeTruthy();
+    expect(container.querySelector("#cli")).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: /View on npm/ }).getAttribute("href"),
+    ).toBe("https://www.npmjs.com/package/sketchi");
+  });
+
   it("uses configured surface URLs", () => {
     render(
       <MarketingHome

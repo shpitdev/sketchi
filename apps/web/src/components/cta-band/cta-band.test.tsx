@@ -19,4 +19,14 @@ describe("CtaBand", () => {
       screen.getByRole("link", { name: /add it to your coding agent/ }),
     ).toHaveProperty("href", "http://localhost:3000/agents");
   });
+
+  it("offers the CLI as the third closing route", () => {
+    render(<CtaBand />);
+
+    expect(
+      screen
+        .getByRole("link", { name: /install the CLI/ })
+        .getAttribute("href"),
+    ).toBe("/#cli");
+  });
 });

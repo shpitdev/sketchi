@@ -44,6 +44,27 @@ describe("SiteHeader", () => {
     ).toBe("https://sketchi-studio-pr-42.dimethyl.workers.dev");
   });
 
+  /**
+   * The CLI is a peer of the playground and the agent route, so it has to be
+   * reachable from the nav on every page, in the desktop bar and the mobile
+   * sheet alike.
+   */
+  it("offers the CLI in both the desktop nav and the mobile sheet", () => {
+    render(<SiteHeader />);
+
+    expect(screen.getByRole("link", { name: "CLI" }).getAttribute("href")).toBe(
+      "/#cli",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Toggle menu" }));
+
+    expect(
+      screen
+        .getAllByRole("link", { name: "CLI" })
+        .map((link) => link.getAttribute("href")),
+    ).toEqual(["/#cli", "/#cli"]);
+  });
+
   it("toggles the mobile menu", () => {
     render(<SiteHeader />);
 
