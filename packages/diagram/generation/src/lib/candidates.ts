@@ -3,6 +3,7 @@ import {
   FlowchartDiagramSchema,
   type MindmapDiagram,
   MindmapDiagramSchema,
+  SKETCHI_DIAGRAM_STYLE,
   parseFlowchartDiagram,
   parseMindmapDiagram,
 } from "@sketchi/diagram-core";
@@ -115,6 +116,12 @@ function isUnknownRecord(value: unknown): value is UnknownRecord {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+function withSketchiDiagramStyle(input: unknown): unknown {
+  return isUnknownRecord(input)
+    ? { ...input, style: { ...SKETCHI_DIAGRAM_STYLE } }
+    : input;
+}
+
 function firstString(values: readonly unknown[]): string | undefined {
   return values.find((value): value is string => typeof value === "string");
 }
@@ -143,13 +150,15 @@ export function responseErrorDiagnostic(raw: unknown): string | undefined {
 }
 
 export function parseGeneratedFlowchart(text: string): FlowchartDiagram {
-  return parseFlowchartDiagram(extractJsonObject(text));
+  return parseFlowchartDiagram(
+    withSketchiDiagramStyle(extractJsonObject(text)),
+  );
 }
 
 export function parseGeneratedDiagram(
   text: string,
 ): FlowchartDiagram | MindmapDiagram {
-  const input = extractJsonObject(text);
+  const input = withSketchiDiagramStyle(extractJsonObject(text));
   if (
     typeof input === "object" &&
     input !== null &&

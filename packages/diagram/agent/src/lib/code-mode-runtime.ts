@@ -1,6 +1,8 @@
 import {
   FLOWCHART_MAX_ISSUES,
   FlowchartDiagramSchema,
+  SKETCHI_DIAGRAM_PALETTE,
+  SKETCHI_DIAGRAM_STYLE,
   getFlowchartValidationIssues,
   parseMindmapDiagram,
   validateFlowchartDiagram,
@@ -81,9 +83,9 @@ import {
 const DEFAULT_BUILD_FORMATS: ArtifactFormat[] = ["excalidraw", "scene"];
 const DEFAULT_INLINE_FORMATS: InlineArtifactFormat[] = ["scene"];
 const DEFAULT_MIN_QUALITY_SCORE = 8;
-const DEFAULT_BACKGROUND = "#ffffff";
-const DEFAULT_STROKE = "#000000";
-const DEFAULT_TEXT = "#000000";
+const DEFAULT_BACKGROUND = SKETCHI_DIAGRAM_PALETTE.card;
+const DEFAULT_STROKE = SKETCHI_DIAGRAM_PALETTE.accent;
+const DEFAULT_TEXT = SKETCHI_DIAGRAM_PALETTE.ink;
 const SCENE_PADDING = 48;
 const MAX_MINDMAP_DEPTH = 8;
 const MAX_MINDMAP_TOPICS = 100;
@@ -291,7 +293,7 @@ function normalizeMindmapSpec(spec: MindmapSpec): NormalizedMindmapSpec {
     title,
     root: normalizeTopic(spec.root, [0]),
     layout: { direction: spec.layout.direction },
-    style: spec.style,
+    style: { ...SKETCHI_DIAGRAM_STYLE },
   };
 }
 
@@ -389,7 +391,7 @@ function toMindmapDiagram(spec: NormalizedMindmapSpec): MindmapDiagram {
     nodes,
     edges,
     layout: { direction: spec.layout.direction, edgeRouting: "curved" },
-    style: spec.style,
+    style: { ...SKETCHI_DIAGRAM_STYLE },
   });
 }
 
@@ -441,7 +443,7 @@ function normalizeSequenceDiagramSpec(
       ...(message.type ? { type: message.type } : {}),
       ...(message.style ? { style: message.style } : {}),
     })),
-    style: spec.style,
+    style: { ...SKETCHI_DIAGRAM_STYLE },
   };
 }
 

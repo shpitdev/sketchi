@@ -395,10 +395,6 @@ export const flowchartFixture = parseFlowchartDiagram({
     direction: "TB",
     edgeRouting: "orthogonal",
   },
-  style: {
-    accentColor: "#0f766e",
-    backgroundColor: "#ffffff",
-  },
 });
 
 export const pharmaBatchDispositionFlowchart = parseFlowchartDiagram({
@@ -445,10 +441,6 @@ export const pharmaBatchDispositionFlowchart = parseFlowchartDiagram({
   layout: {
     direction: "TB",
     edgeRouting: "orthogonal",
-  },
-  style: {
-    accentColor: "#0f766e",
-    backgroundColor: "#ffffff",
   },
 });
 

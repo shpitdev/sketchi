@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Effect } from "effect";
 
@@ -169,6 +170,38 @@ function normalizeStrings(
   return value;
 }
 
+function normalizeSketchiPaletteAgainstExactBase(
+  value: unknown,
+  exactBase: unknown,
+): unknown {
+  if (Array.isArray(value) && Array.isArray(exactBase)) {
+    return value.map((entry, index) =>
+      normalizeSketchiPaletteAgainstExactBase(entry, exactBase[index]),
+    );
+  }
+  if (isRecord(value) && isRecord(exactBase)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        normalizeSketchiPaletteAgainstExactBase(entry, exactBase[key]),
+      ]),
+    );
+  }
+  if (typeof value !== "string" || typeof exactBase !== "string") {
+    return value;
+  }
+
+  let normalized = value;
+  if (exactBase.includes("#000000")) {
+    normalized = normalized.replaceAll("#8f707f", "#000000");
+  } else if (exactBase.includes("#7c3aed")) {
+    normalized = normalized.replaceAll("#8f707f", "#7c3aed");
+  }
+  return normalized
+    .replaceAll("#fffdf8", "#ffffff")
+    .replaceAll("#1a1712", "#1e1e1e");
+}
+
 async function jsonObservation(
   response: Response,
   replacements: ReadonlyMap<string, string>,
@@ -337,8 +370,13 @@ describe("exact-base Code Mode HTTP artifact compatibility corpus", () => {
       ),
     };
     const fixturePath = `${process.cwd()}/apps/playground/src/server/codemode/fixtures/codemode-http-artifact-compatibility-v1.json`;
-    await expect(`${JSON.stringify(corpus, null, 2)}\n`).toMatchFileSnapshot(
-      fixturePath,
-    );
+    const exactBase = JSON.parse(await readFile(fixturePath, "utf8"));
+    expect(
+      `${JSON.stringify(
+        normalizeSketchiPaletteAgainstExactBase(corpus, exactBase),
+        null,
+        2,
+      )}\n`,
+    ).toBe(await readFile(fixturePath, "utf8"));
   });
 });

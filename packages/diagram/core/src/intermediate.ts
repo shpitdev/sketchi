@@ -5,6 +5,22 @@ import { DIAGRAM_TYPES } from "./diagram-types.js";
 const NonEmptyString = Schema.NonEmptyString;
 const Metadata = Schema.Record(Schema.String, Schema.Unknown);
 
+/**
+ * Server/runtime mirror of the canonical CSS tokens in diagram-ui/theme.css.
+ * intermediate.test.ts fails if these values drift from that source of truth.
+ */
+export const SKETCHI_DIAGRAM_PALETTE = Object.freeze({
+  paper: "#f6f1e7",
+  card: "#fffdf8",
+  ink: "#1a1712",
+  accent: "#8f707f",
+});
+
+export const SKETCHI_DIAGRAM_STYLE = Object.freeze({
+  accentColor: SKETCHI_DIAGRAM_PALETTE.accent,
+  backgroundColor: SKETCHI_DIAGRAM_PALETTE.card,
+});
+
 function withDefault<S extends Schema.Top>(schema: S, value: S["Encoded"]) {
   return schema.pipe(Schema.withDecodingDefault(Effect.succeed(value)));
 }
@@ -101,8 +117,8 @@ export const DiagramEdgeSchema = withDiagramParser(DiagramEdge);
 const HexColor = Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/));
 
 export class DiagramStyle extends Schema.Class<DiagramStyle>("DiagramStyle")({
-  accentColor: withDefault(HexColor, "#0f766e"),
-  backgroundColor: withDefault(HexColor, "#ffffff"),
+  accentColor: withDefault(HexColor, SKETCHI_DIAGRAM_STYLE.accentColor),
+  backgroundColor: withDefault(HexColor, SKETCHI_DIAGRAM_STYLE.backgroundColor),
 }) {}
 export const DiagramStyleSchema = withDiagramParser(DiagramStyle);
 
@@ -128,10 +144,7 @@ export class IntermediateDiagram extends Schema.Class<IntermediateDiagram>(
     direction: "LR",
     edgeRouting: "orthogonal",
   }),
-  style: withDefault(DiagramStyle, {
-    accentColor: "#0f766e",
-    backgroundColor: "#ffffff",
-  }),
+  style: withDefault(DiagramStyle, SKETCHI_DIAGRAM_STYLE),
   metadata: withDefault(Metadata, {}),
 }) {}
 export const IntermediateDiagramSchema = withDiagramParser(IntermediateDiagram);

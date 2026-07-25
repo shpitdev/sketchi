@@ -1,5 +1,6 @@
 import {
   FlowchartDiagramSchema,
+  SKETCHI_DIAGRAM_STYLE,
   validateFlowchartDiagram,
   type FlowchartDiagram,
 } from "@sketchi/diagram-core";
@@ -55,10 +56,7 @@ export function normalizeFlowchartSpec(
     layout: {
       direction: spec.layout.direction,
     },
-    style: {
-      accentColor: spec.style.accentColor,
-      backgroundColor: spec.style.backgroundColor,
-    },
+    style: { ...SKETCHI_DIAGRAM_STYLE },
   };
 }
 

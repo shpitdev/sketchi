@@ -6,6 +6,7 @@ import {
   FLOWCHART_MAX_ISSUES,
   FLOWCHART_MAX_NODES,
   FlowchartDiagramSchema,
+  SKETCHI_DIAGRAM_STYLE,
   getFlowchartValidationIssues,
 } from "@sketchi/diagram-core";
 import {
@@ -555,6 +556,46 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 }
 
 describe("Code Mode runtime", () => {
+  it("normalizes accepted legacy builder styles to the Sketchi palette", async () => {
+    const legacyStyle = {
+      accentColor: "#7c3aed",
+      backgroundColor: "#ffffff",
+    };
+    const results = await Promise.all([
+      createTestRuntime().buildFlowchart({
+        spec: { ...approvalSpec(), style: legacyStyle },
+        options: { inlineArtifacts: ["scene"] },
+      }),
+      createTestRuntime().buildMindmap({
+        spec: {
+          title: "Legacy mindmap style",
+          root: { label: "Root", children: [{ label: "Child" }] },
+          style: legacyStyle,
+        },
+        options: { inlineArtifacts: ["scene"] },
+      }),
+      createTestRuntime().buildSequenceDiagram({
+        spec: { ...checkoutSequenceSpec(), style: legacyStyle },
+        options: { inlineArtifacts: ["scene"] },
+      }),
+    ]);
+
+    for (const result of results) {
+      expect(result).toMatchObject({
+        ok: true,
+        normalizedSpec: { style: SKETCHI_DIAGRAM_STYLE },
+      });
+      if (!result.ok) throw new Error("Expected accepted branded diagram.");
+      expect(
+        result.artifact.formats.find(({ format }) => format === "scene")
+          ?.inline,
+      ).toMatchObject({
+        accentColor: SKETCHI_DIAGRAM_STYLE.accentColor,
+        backgroundColor: SKETCHI_DIAGRAM_STYLE.backgroundColor,
+      });
+    }
+  });
+
   it("builds a nested mindmap with deterministic hierarchy ids and exports", async () => {
     const runtime = createTestRuntime();
     const built = await runtime.buildMindmap({
@@ -794,8 +835,8 @@ describe("Code Mode runtime", () => {
     expect(built.status).toBe("accepted");
     expect(built.requestId).toBe("request-1");
     expect(built.normalizedSpec.style).toEqual({
-      accentColor: "#000000",
-      backgroundColor: "#ffffff",
+      accentColor: "#8f707f",
+      backgroundColor: "#fffdf8",
     });
     expect(built.artifact.formats.map((format) => format.format)).toEqual([
       "excalidraw",

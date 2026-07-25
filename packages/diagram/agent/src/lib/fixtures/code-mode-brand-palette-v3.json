@@ -1,0 +1,28 @@
+{
+  "version": 3,
+  "lineage": {
+    "previousFixture": "code-mode-compatibility-v2.json@52858006d02386fa0aac993ce35afca219aaae9860144836b0884e7770f948d9",
+    "change": "Builder style remains accepted for legacy callers but is normalized to the theme.css Sketchi palette."
+  },
+  "modelContract": {
+    "buildFlowchartStyleVisible": false
+  },
+  "legacyInput": {
+    "accentColor": "#7c3aed",
+    "backgroundColor": "#ffffff"
+  },
+  "normalizedStyles": {
+    "flowchart": {
+      "accentColor": "#8f707f",
+      "backgroundColor": "#fffdf8"
+    },
+    "mindmap": {
+      "accentColor": "#8f707f",
+      "backgroundColor": "#fffdf8"
+    },
+    "sequence": {
+      "accentColor": "#8f707f",
+      "backgroundColor": "#fffdf8"
+    }
+  }
+}

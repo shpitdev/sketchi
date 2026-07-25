@@ -5,6 +5,7 @@ import {
   type RenderedDiagramScene,
   type TextSceneElement,
 } from "@sketchi/diagram-renderer";
+import { SKETCHI_DIAGRAM_PALETTE } from "@sketchi/diagram-core";
 import { generateKeyBetween } from "fractional-indexing";
 
 export type ExcalidrawElement = Record<string, unknown> & {
@@ -57,7 +58,7 @@ const FIT_TARGET_HEIGHT = 340;
 const MIN_INITIAL_ZOOM = 0.42;
 const SEGMENT_EPSILON = 0.001;
 const BOUNDS_EPSILON = 0.01;
-const DEFAULT_TEXT_COLOR = "#1e1e1e";
+const DEFAULT_TEXT_COLOR = SKETCHI_DIAGRAM_PALETTE.ink;
 const DEFAULT_EXCALIDRAW_EXPORT_SOURCE = "https://sketchi.app";
 
 type BindingKey = "startBinding" | "endBinding";

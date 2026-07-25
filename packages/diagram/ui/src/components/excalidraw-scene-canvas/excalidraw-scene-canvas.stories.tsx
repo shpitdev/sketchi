@@ -1,7 +1,7 @@
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { flowchartFixture } from "@sketchi/diagram-core";
+import { flowchartFixture, parseFlowchartDiagram } from "@sketchi/diagram-core";
 import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 
@@ -26,9 +26,51 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+const wideFlowchartScene = convertSceneToExcalidraw(
+  renderIntermediateDiagram(
+    parseFlowchartDiagram({
+      id: "wide-left-to-right-flow",
+      title: "Wide left-to-right flow",
+      type: "flowchart",
+      nodes: [
+        { id: "brief", label: "Brief received", kind: "start" },
+        { id: "structure", label: "Structure diagram", kind: "process" },
+        { id: "review", label: "Review details", kind: "process" },
+        { id: "share", label: "Share diagram", kind: "end" },
+      ],
+      edges: [
+        { id: "brief-structure", source: "brief", target: "structure" },
+        { id: "structure-review", source: "structure", target: "review" },
+        { id: "review-share", source: "review", target: "share" },
+      ],
+      layout: { direction: "LR", edgeRouting: "orthogonal" },
+    }),
+  ),
+);
+
+export const WideLeftToRight: Story = {
+  args: {
+    scene: wideFlowchartScene,
+    title: "Wide left-to-right Sketchi flowchart",
+    viewModeEnabled: true,
+    zenModeEnabled: true,
+  },
+  tags: ["test"],
+};
+
+export const EditableEmbed: Story = {
+  args: {
+    scene: wideFlowchartScene,
+    title: "Editable wide Sketchi flowchart",
+    viewModeEnabled: false,
+    zenModeEnabled: false,
+  },
+  tags: ["test"],
+};
+
 const nativeElement = {
   angle: 0,
-  backgroundColor: "#5f3dc4",
+  backgroundColor: "#fffdf8",
   boundElements: null,
   endArrowhead: null,
   endBinding: null,
@@ -55,7 +97,7 @@ const nativeElement = {
   seed: 911,
   startArrowhead: null,
   startBinding: null,
-  strokeColor: "#3b1f73",
+  strokeColor: "#8f707f",
   strokeStyle: "solid",
   strokeWidth: 2,
   type: "line",
@@ -70,7 +112,7 @@ const nativeElement = {
 export const NativeEditableElement: Story = {
   args: {
     scene: {
-      appState: { viewBackgroundColor: "#ffffff" },
+      appState: { viewBackgroundColor: "#fffdf8" },
       elements: [nativeElement],
     },
     title: "Native SVG conversion element",

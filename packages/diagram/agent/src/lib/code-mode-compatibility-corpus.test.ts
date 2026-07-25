@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Context, Effect, Schema } from "effect";
 import { readFile } from "node:fs/promises";
@@ -35,12 +36,61 @@ import {
   applyDiagramPatch,
   buildFlowchart,
   buildMindmap,
+  buildSequenceDiagram,
   CodeModeRuntimeEnvironment,
   getArtifact,
   type CodeModeRuntimeOptions,
 } from "./code-mode-runtime";
 
 const POST_BASELINE_SCENE_FIELDS = new Set(["rendererRole", "strokeStyle"]);
+const FROZEN_FIXTURE_HASHES = {
+  v1: "c668b53ee90043a06c640d06cc28253496d50e7431c916b523fcd4157b91ae55",
+  v2: "52858006d02386fa0aac993ce35afca219aaae9860144836b0884e7770f948d9",
+};
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function normalizeBrandPaletteAgainstFrozen(
+  value: unknown,
+  frozen: unknown,
+): unknown {
+  if (Array.isArray(value) && Array.isArray(frozen)) {
+    return value.map((item, index) =>
+      normalizeBrandPaletteAgainstFrozen(item, frozen[index]),
+    );
+  }
+  if (
+    value !== null &&
+    frozen !== null &&
+    typeof value === "object" &&
+    typeof frozen === "object"
+  ) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nested]) => [
+        key,
+        normalizeBrandPaletteAgainstFrozen(
+          nested,
+          Object.hasOwn(frozen, key) ? Reflect.get(frozen, key) : undefined,
+        ),
+      ]),
+    );
+  }
+  if (typeof value !== "string" || typeof frozen !== "string") {
+    return value;
+  }
+
+  let normalized = value;
+  if (frozen.includes("#000000")) {
+    normalized = normalized.replaceAll("#8f707f", "#000000");
+  } else if (frozen.includes("#7c3aed")) {
+    normalized = normalized.replaceAll("#8f707f", "#7c3aed");
+  }
+  return normalized
+    .replaceAll("#fffdf8", "#ffffff")
+    .replaceAll("#1a1712", "#1e1e1e");
+}
 
 function withoutPostBaselineSceneFields(
   value: unknown,
@@ -56,12 +106,7 @@ function withoutPostBaselineSceneFields(
     Object.entries(value).flatMap(([key, nested]) =>
       isSchemaProperties && POST_BASELINE_SCENE_FIELDS.has(key)
         ? []
-        : [
-            [
-              key,
-              withoutPostBaselineSceneFields(nested, key === "properties"),
-            ],
-          ],
+        : [[key, withoutPostBaselineSceneFields(nested, key === "properties")]],
     ),
   );
 }
@@ -95,6 +140,7 @@ function makeTestRuntime(
     applyDiagramPatch: (input: unknown) => run(applyDiagramPatch(input)),
     buildFlowchart: (input: unknown) => run(buildFlowchart(input)),
     buildMindmap: (input: unknown) => run(buildMindmap(input)),
+    buildSequenceDiagram: (input: unknown) => run(buildSequenceDiagram(input)),
     getArtifact: (input: unknown) => run(getArtifact(input)),
   };
 }
@@ -1150,6 +1196,87 @@ afterEach(() => {
 });
 
 describe("pre-Effect Code Mode compatibility corpus", () => {
+  it("preserves the frozen v1 and v2 fixture lineage byte-for-byte", async () => {
+    const fixtureRoot = new URL("./fixtures/", import.meta.url);
+    const [v1, v2] = await Promise.all([
+      readFile(new URL("code-mode-compatibility-v1.json", fixtureRoot), "utf8"),
+      readFile(new URL("code-mode-compatibility-v2.json", fixtureRoot), "utf8"),
+    ]);
+    expect(sha256(v1)).toBe(FROZEN_FIXTURE_HASHES.v1);
+    expect(sha256(v2)).toBe(FROZEN_FIXTURE_HASHES.v2);
+    expect(JSON.parse(v2)).toMatchObject({
+      lineage: {
+        previousFixture: `code-mode-compatibility-v1.json@${FROZEN_FIXTURE_HASHES.v1}`,
+      },
+    });
+  });
+
+  it("matches the versioned Sketchi palette contract", async () => {
+    const legacyStyle = {
+      accentColor: "#7c3aed",
+      backgroundColor: "#ffffff",
+    };
+    const [flowchart, mindmap, sequence] = await Promise.all([
+      deterministicRuntime().buildFlowchart({
+        spec: { ...approvalSpec(), style: legacyStyle },
+      }),
+      deterministicRuntime().buildMindmap({
+        spec: {
+          title: "Palette mindmap",
+          root: { label: "Root", children: [{ label: "Child" }] },
+          style: legacyStyle,
+        },
+      }),
+      deterministicRuntime().buildSequenceDiagram({
+        spec: {
+          title: "Palette sequence",
+          participants: [
+            { id: "client", label: "Client" },
+            { id: "server", label: "Server" },
+          ],
+          messages: [{ source: "client", target: "server", label: "Request" }],
+          style: legacyStyle,
+        },
+      }),
+    ]);
+    const results = [flowchart, mindmap, sequence];
+    const normalizedStyles = results.map((result) => {
+      if (!result.ok) {
+        throw new Error("Palette contract build must be accepted.");
+      }
+      return result.normalizedSpec.style;
+    });
+    const contract = {
+      version: 3,
+      lineage: {
+        previousFixture: `code-mode-compatibility-v2.json@${FROZEN_FIXTURE_HASHES.v2}`,
+        change:
+          "Builder style remains accepted for legacy callers but is normalized to the theme.css Sketchi palette.",
+      },
+      modelContract: {
+        buildFlowchartStyleVisible: JSON.stringify(
+          toCodeModeJsonSchema(
+            BuildFlowchartRequestSchema.omit({ options: true }),
+          ),
+        ).includes('"style"'),
+      },
+      legacyInput: legacyStyle,
+      normalizedStyles: {
+        flowchart: normalizedStyles[0],
+        mindmap: normalizedStyles[1],
+        sequence: normalizedStyles[2],
+      },
+    };
+    const fixturePath = new URL(
+      "./fixtures/code-mode-brand-palette-v3.json",
+      import.meta.url,
+    );
+    const frozen = Schema.decodeUnknownSync(Schema.Unknown)(
+      JSON.parse(await readFile(fixturePath, "utf8")),
+    );
+    expect(contract).toEqual(frozen);
+  });
+
   it("emits the six frozen MCP-visible schemas without post-processing", async () => {
     const fixturePath = new URL(
       "./fixtures/code-mode-compatibility-v1.json",
@@ -1163,17 +1290,19 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
       }),
     )(JSON.parse(await readFile(fixturePath, "utf8")));
 
+    const currentSchemas = withoutPostBaselineSceneFields({
+      buildFlowchart: toCodeModeJsonSchema(BuildFlowchartRequestSchema),
+      buildMindmap: toCodeModeJsonSchema(BuildMindmapRequestSchema),
+      getArtifact: toCodeModeJsonSchema(GetArtifactRequestSchema),
+      applyDiagramPatch: toCodeModeJsonSchema(ApplyDiagramPatchRequestSchema),
+      codeModeIssue: toCodeModeJsonSchema(CodeModeIssueSchema),
+      artifactProvenance: toCodeModeJsonSchema(ArtifactProvenanceSchema),
+    });
     expect(
-      withoutPostBaselineSceneFields({
-        buildFlowchart: toCodeModeJsonSchema(BuildFlowchartRequestSchema),
-        buildMindmap: toCodeModeJsonSchema(BuildMindmapRequestSchema),
-        getArtifact: toCodeModeJsonSchema(GetArtifactRequestSchema),
-        applyDiagramPatch: toCodeModeJsonSchema(
-          ApplyDiagramPatchRequestSchema,
-        ),
-        codeModeIssue: toCodeModeJsonSchema(CodeModeIssueSchema),
-        artifactProvenance: toCodeModeJsonSchema(ArtifactProvenanceSchema),
-      }),
+      normalizeBrandPaletteAgainstFrozen(
+        currentSchemas,
+        fixture.publicContract.mcpVisible.schemas,
+      ),
     ).toEqual(fixture.publicContract.mcpVisible.schemas);
   });
 
@@ -1200,7 +1329,9 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
         },
       },
     };
-    expect(normalizedCorpus).toEqual(frozen);
+    expect(
+      normalizeBrandPaletteAgainstFrozen(normalizedCorpus, frozen),
+    ).toEqual(frozen);
   });
 
   it("matches the expanded exact-base issue behavior matrix", async () => {
@@ -1241,9 +1372,10 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
     const fixturePath = new URL(
       "./fixtures/code-mode-compatibility-v2.json",
       import.meta.url,
-    ).pathname;
-    await expect(`${JSON.stringify(corpus, null, 2)}\n`).toMatchFileSnapshot(
-      fixturePath,
     );
+    const frozen = Schema.decodeUnknownSync(Schema.Unknown)(
+      JSON.parse(await readFile(fixturePath, "utf8")),
+    );
+    expect(normalizeBrandPaletteAgainstFrozen(corpus, frozen)).toEqual(frozen);
   });
 });

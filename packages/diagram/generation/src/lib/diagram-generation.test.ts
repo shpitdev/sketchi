@@ -59,9 +59,16 @@ const expectedDiagram = {
     },
   ],
   layout: { direction: "TB", edgeRouting: "orthogonal" },
-  style: { accentColor: "#0f766e", backgroundColor: "#ffffff" },
+  style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
 };
-const expectedText = JSON.stringify(expectedDiagram, null, 2);
+const expectedText = JSON.stringify(
+  {
+    ...expectedDiagram,
+    style: { accentColor: "#0f766e", backgroundColor: "#ffffff" },
+  },
+  null,
+  2,
+);
 const expectedSystem = [
   "You are creating a Sketchi typed intermediate diagram.",
   "",
@@ -108,7 +115,6 @@ const expectedUser = [
         },
       ],
       layout: { direction: "TB", edgeRouting: "orthogonal" },
-      style: { accentColor: "#0f766e", backgroundColor: "#ffffff" },
     },
     null,
     2,
@@ -256,6 +262,7 @@ describe("pure candidate behavior", () => {
 
     expect(candidate.error).toBeUndefined();
     expect(candidate.diagram?.id).toBe(expectedDiagram.id);
+    expect(candidate.diagram?.style).toEqual(expectedDiagram.style);
   });
 
   it("parses validated mindmap candidates through diagram-core", () => {
@@ -294,6 +301,10 @@ describe("pure candidate behavior", () => {
     });
 
     expect(candidate.diagram?.type).toBe("mindmap");
+    expect(candidate.diagram?.style).toEqual({
+      accentColor: "#8f707f",
+      backgroundColor: "#fffdf8",
+    });
     expect(candidate.error).toBeUndefined();
   });
 });

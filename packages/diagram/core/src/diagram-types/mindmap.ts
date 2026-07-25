@@ -209,5 +209,4 @@ export const mindmapFixture = parseMindmapDiagram({
     },
   ],
   layout: { direction: "LR", edgeRouting: "curved" },
-  style: { accentColor: "#7c3aed", backgroundColor: "#ffffff" },
 });

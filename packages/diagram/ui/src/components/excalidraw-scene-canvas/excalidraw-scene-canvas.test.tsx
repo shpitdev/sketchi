@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const excalidrawMock = vi.hoisted(() => ({
+  props: vi.fn(),
   scrollToContent: vi.fn(),
 }));
 
@@ -9,16 +10,19 @@ vi.mock("@excalidraw/excalidraw", async () => {
   const React = await import("react");
 
   return {
-    Excalidraw: ({
-      excalidrawAPI,
-    }: {
+    Excalidraw: (props: {
       excalidrawAPI?: (api: {
         scrollToContent: typeof excalidrawMock.scrollToContent;
       }) => void;
+      gridModeEnabled?: boolean;
+      initialData?: { appState?: Record<string, unknown> };
     }) => {
+      excalidrawMock.props(props);
       React.useEffect(() => {
-        excalidrawAPI?.({ scrollToContent: excalidrawMock.scrollToContent });
-      }, [excalidrawAPI]);
+        props.excalidrawAPI?.({
+          scrollToContent: excalidrawMock.scrollToContent,
+        });
+      }, [props.excalidrawAPI]);
 
       return <div data-testid="mock-excalidraw">Mock Excalidraw</div>;
     },
@@ -34,6 +38,7 @@ import { ExcalidrawSceneCanvas } from "./excalidraw-scene-canvas";
 describe("ExcalidrawSceneCanvas", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    excalidrawMock.props.mockReset();
     excalidrawMock.scrollToContent.mockReset();
   });
 
@@ -52,6 +57,11 @@ describe("ExcalidrawSceneCanvas", () => {
     expect(
       screen.getByTestId("excalidraw-scene-canvas").getAttribute("aria-label"),
     ).toBe("Sketchi onboarding decision flow");
+    expect(
+      screen
+        .getByTestId("excalidraw-scene-canvas")
+        .getAttribute("data-view-mode"),
+    ).toBe("false");
     expect(screen.getByText("Loading canvas")).toBeTruthy();
   });
 
@@ -76,8 +86,31 @@ describe("ExcalidrawSceneCanvas", () => {
       expect(excalidrawMock.scrollToContent).toHaveBeenCalledWith(undefined, {
         animate: false,
         fitToViewport: true,
-        viewportZoomFactor: 0.72,
+        viewportZoomFactor: 1,
       });
     });
+    expect(excalidrawMock.props).toHaveBeenLastCalledWith(
+      expect.objectContaining({ gridModeEnabled: false }),
+    );
+  });
+
+  it("uses the Sketchi card color when a scene has no background", async () => {
+    render(
+      <ExcalidrawSceneCanvas
+        scene={{ appState: {}, elements: [] }}
+        title="Empty Sketchi canvas"
+      />,
+    );
+
+    expect(await screen.findByTestId("mock-excalidraw")).toBeTruthy();
+    expect(excalidrawMock.props).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        initialData: expect.objectContaining({
+          appState: expect.objectContaining({
+            viewBackgroundColor: "#fffdf8",
+          }),
+        }),
+      }),
+    );
   });
 });

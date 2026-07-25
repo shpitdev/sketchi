@@ -20,6 +20,7 @@ import {
   DIAGRAM_PATCH_OPERATION_NAMES,
   MindmapTopicSchema,
   RenderedDiagramSceneSchema,
+  toCodeModeJsonSchema,
 } from "./code-mode-contract";
 import {
   applyDiagramPatch,
@@ -108,6 +109,28 @@ describe("Code Mode telemetry", () => {
 });
 
 layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
+  it("keeps legacy style input decodable but out of the model contract", () => {
+    const legacy = BuildFlowchartRequestSchema.parse({
+      spec: {
+        title: "Legacy style",
+        nodes: [{ id: "start", kind: "start", label: "Start" }],
+        style: { accentColor: "#7c3aed", backgroundColor: "#ffffff" },
+      },
+    });
+    assert.deepInclude(legacy.spec.style, {
+      accentColor: "#7c3aed",
+      backgroundColor: "#ffffff",
+    });
+    assert.notInclude(
+      JSON.stringify(
+        toCodeModeJsonSchema(
+          BuildFlowchartRequestSchema.omit({ options: true }),
+        ),
+      ),
+      '"style"',
+    );
+  });
+
   it.effect("preserves golden request encoding and failure output", () =>
     Effect.gen(function* () {
       const decoded = BuildFlowchartRequestSchema.parse({
@@ -125,7 +148,7 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
           nodes: [{ id: "start", label: "Start", kind: "start" }],
           edges: [],
           layout: { direction: "TB" },
-          style: { accentColor: "#000000", backgroundColor: "#ffffff" },
+          style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
         },
       });
 
@@ -206,7 +229,7 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
               type: "message",
             },
           ],
-          style: { accentColor: "#000000", backgroundColor: "#ffffff" },
+          style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
         },
       });
 
@@ -245,7 +268,7 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
             type: "return",
           },
         ],
-        style: { accentColor: "#000000", backgroundColor: "#ffffff" },
+        style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
       });
       const encoded = yield* Schema.encodeEffect(RenderedDiagramSceneSchema)(
         RenderedDiagramSceneSchema.parse(rendered),

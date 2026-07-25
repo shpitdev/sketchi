@@ -12,6 +12,7 @@ import type {
   StandardJSONSchemaV1,
   StandardSchemaV1,
 } from "@standard-schema/spec";
+import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/diagram-core";
 
 import { cleanToolString } from "./clean-tool-string.js";
 
@@ -544,11 +545,11 @@ export class FlowchartSpecLayout extends Schema.Class<FlowchartSpecLayout>(
   { identifier: undefined },
 ) {}
 
-const defaultAccentColor = "#000000";
+const defaultAccentColor = SKETCHI_DIAGRAM_STYLE.accentColor;
 const DefaultAccentColor = hexColor(defaultAccentColor).pipe(
   Schema.withDecodingDefault(Effect.succeed(defaultAccentColor)),
 );
-const defaultBackgroundColor = "#ffffff";
+const defaultBackgroundColor = SKETCHI_DIAGRAM_STYLE.backgroundColor;
 const DefaultBackgroundColor = hexColor(defaultBackgroundColor).pipe(
   Schema.withDecodingDefault(Effect.succeed(defaultBackgroundColor)),
 );
@@ -575,8 +576,8 @@ const FlowchartLayoutWithDefault = FlowchartSpecLayout.annotate({
   default: flowchartLayoutDefault,
 }).pipe(Schema.withDecodingDefault(Effect.succeed(flowchartLayoutDefault)));
 const flowchartStyleDefault = {
-  accentColor: "#000000",
-  backgroundColor: "#ffffff",
+  accentColor: SKETCHI_DIAGRAM_STYLE.accentColor,
+  backgroundColor: SKETCHI_DIAGRAM_STYLE.backgroundColor,
 };
 const FlowchartStyleWithDefault = FlowchartSpecStyle.annotate({
   default: flowchartStyleDefault,
@@ -629,8 +630,8 @@ const SequenceMessagesWithDefault = Schema.Array(SequenceMessageSpec)
   .annotate({ default: sequenceMessagesDefault })
   .pipe(Schema.withDecodingDefault(Effect.succeed(sequenceMessagesDefault)));
 const sequenceStyleDefault = {
-  accentColor: "#000000",
-  backgroundColor: "#ffffff",
+  accentColor: SKETCHI_DIAGRAM_STYLE.accentColor,
+  backgroundColor: SKETCHI_DIAGRAM_STYLE.backgroundColor,
 };
 const SequenceStyleWithDefault = Schema.Struct({
   accentColor: hexColor(defaultAccentColor).pipe(
@@ -709,9 +710,36 @@ export class BuildFlowchartRequest extends Schema.Class<BuildFlowchartRequest>(
   { identifier: undefined },
 ) {}
 
-const BuildFlowchartToolInputContract = BuildFlowchartRequest.mapFields(
-  ({ requestId, spec }) => ({ requestId, spec }),
+const FlowchartToolSpecContract = FlowchartSpec.mapFields(
+  ({ id, title, nodes, edges, layout }) => ({
+    id,
+    title,
+    nodes,
+    edges,
+    layout,
+  }),
 );
+const BuildFlowchartToolInputContract = Schema.Struct({
+  requestId: optionalContract(NonEmptyString),
+  spec: requiredObject(FlowchartToolSpecContract),
+});
+type ModelBuildFlowchartToolInput = typeof BuildFlowchartToolInputContract.Type;
+/**
+ * The model contract intentionally excludes style. This public input type stays
+ * wide enough for existing direct callback callers; the runtime accepts their
+ * legacy field and normalizes it to the Sketchi palette.
+ */
+export type BuildFlowchartToolInput = ModelBuildFlowchartToolInput & {
+  readonly spec: ModelBuildFlowchartToolInput["spec"] & {
+    readonly style?: typeof FlowchartSpecStyle.Type;
+  };
+};
+type BuildFlowchartToolInputContractWithLegacyType = Omit<
+  typeof BuildFlowchartToolInputContract,
+  "Type"
+> & {
+  readonly Type: BuildFlowchartToolInput;
+};
 const BuildFlowchartToolInputStandardSchema = Schema.toStandardSchemaV1(
   BuildFlowchartToolInputContract,
   { leafHook: contractLeafHook, parseOptions: { errors: "all" } },
@@ -732,20 +760,22 @@ Object.assign(BuildFlowchartToolInputStandardSchema["~standard"], {
 });
 export const BuildFlowchartToolInputSchema: StandardSchemaV1<
   typeof BuildFlowchartToolInputContract.Encoded,
-  typeof BuildFlowchartToolInputContract.Type
+  BuildFlowchartToolInput
 > &
   StandardJSONSchemaV1<
     typeof BuildFlowchartToolInputContract.Encoded,
-    typeof BuildFlowchartToolInputContract.Type
+    BuildFlowchartToolInput
   > &
-  typeof BuildFlowchartToolInputContract =
-  BuildFlowchartToolInputStandardSchema as typeof BuildFlowchartToolInputStandardSchema &
+  BuildFlowchartToolInputContractWithLegacyType =
+  BuildFlowchartToolInputStandardSchema as unknown as BuildFlowchartToolInputContractWithLegacyType &
+    StandardSchemaV1<
+      typeof BuildFlowchartToolInputContract.Encoded,
+      BuildFlowchartToolInput
+    > &
     StandardJSONSchemaV1<
       typeof BuildFlowchartToolInputContract.Encoded,
-      typeof BuildFlowchartToolInputContract.Type
+      BuildFlowchartToolInput
     >;
-export type BuildFlowchartToolInput =
-  typeof BuildFlowchartToolInputContract.Type;
 export const BuildFlowchartRequestSchema = Object.assign(
   withParser(BuildFlowchartRequest),
   {
@@ -823,8 +853,8 @@ const MindmapLayoutWithDefault = MindmapSpecLayout.annotate({
   default: mindmapLayoutDefault,
 }).pipe(Schema.withDecodingDefault(Effect.succeed(mindmapLayoutDefault)));
 const mindmapStyleDefault = {
-  accentColor: "#7c3aed",
-  backgroundColor: "#ffffff",
+  accentColor: SKETCHI_DIAGRAM_STYLE.accentColor,
+  backgroundColor: SKETCHI_DIAGRAM_STYLE.backgroundColor,
 };
 const MindmapStyleWithDefault = Schema.Struct({
   accentColor: hexColor(defaultAccentColor).pipe(

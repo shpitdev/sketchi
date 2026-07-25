@@ -5,6 +5,7 @@ import type {
   ExcalidrawProps,
 } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawScene } from "@sketchi/diagram-excalidraw";
+import { SKETCHI_DIAGRAM_PALETTE } from "@sketchi/diagram-core";
 import {
   type ComponentType,
   useCallback,
@@ -82,7 +83,7 @@ export function ExcalidrawSceneCanvas({
       viewBackgroundColor:
         typeof scene.appState.viewBackgroundColor === "string"
           ? scene.appState.viewBackgroundColor
-          : "#ffffff",
+          : SKETCHI_DIAGRAM_PALETTE.card,
     } as NonNullable<ExcalidrawInitialDataState["appState"]>;
 
     return {
@@ -115,7 +116,7 @@ export function ExcalidrawSceneCanvas({
       excalidrawApi.scrollToContent(undefined, {
         animate: false,
         fitToViewport: true,
-        viewportZoomFactor: 0.72,
+        viewportZoomFactor: 1,
       });
     });
 
@@ -128,6 +129,7 @@ export function ExcalidrawSceneCanvas({
     <section
       aria-label={title}
       className="sketchi-excalidraw-scene-canvas"
+      data-view-mode={viewModeEnabled}
       data-testid="excalidraw-scene-canvas"
     >
       {Excalidraw ? (
@@ -136,7 +138,7 @@ export function ExcalidrawSceneCanvas({
           {...(onChange ? { onChange } : {})}
           autoFocus={false}
           excalidrawAPI={handleApiChange}
-          gridModeEnabled
+          gridModeEnabled={false}
           initialData={initialData}
           name={title}
           theme="light"

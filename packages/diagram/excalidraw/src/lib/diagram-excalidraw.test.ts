@@ -171,11 +171,14 @@ describe("convertSceneToExcalidraw", () => {
 
     expect(validation).toEqual({ ok: true, issues: [] });
     expect(scene.appState).toMatchObject({
-      viewBackgroundColor: "#ffffff",
+      viewBackgroundColor: "#fffdf8",
       zoom: {
         value: expect.any(Number),
       },
     });
+    expect(
+      scene.elements.find((element) => element.type === "text"),
+    ).toMatchObject({ strokeColor: "#1a1712" });
     expect(
       scene.elements.filter((element) => element.type === "arrow"),
     ).toHaveLength(flowchartFixture.edges.length);

@@ -1,6 +1,7 @@
 import {
   type FlowchartDiagram,
   type FlowchartNodeKind,
+  SKETCHI_DIAGRAM_STYLE,
   parseFlowchartDiagram,
 } from "@sketchi/diagram-core";
 
@@ -58,10 +59,7 @@ interface FlowchartScenarioDefinition {
   title: string;
 }
 
-const DEFAULT_STYLE = {
-  accentColor: "#0f766e",
-  backgroundColor: "#ffffff",
-};
+const DEFAULT_STYLE = SKETCHI_DIAGRAM_STYLE;
 const FLOWCHART_NODE_KIND_ORDER: readonly FlowchartNodeKind[] = [
   "start",
   "process",

@@ -365,10 +365,61 @@
   background: var(--card);
   border: 1px solid var(--line-2);
   border-radius: 8px;
+  container-type: inline-size;
   height: var(--sketchi-excalidraw-scene-canvas-height, min(520px, 64vh));
   min-height: var(--sketchi-excalidraw-scene-canvas-min-height, 340px);
   overflow: hidden;
   width: 100%;
+}
+
+@container (min-width: 700px) {
+  .sketchi-excalidraw-scene-canvas
+    .excalidraw.excalidraw--mobile
+    .main-menu-trigger,
+  .sketchi-excalidraw-scene-canvas[data-view-mode="true"]
+    .excalidraw.excalidraw--mobile
+    > .App-bottom-bar {
+    display: none;
+  }
+
+  .sketchi-excalidraw-scene-canvas[data-view-mode="false"]
+    .excalidraw.excalidraw--mobile
+    > .App-bottom-bar {
+    bottom: 8px;
+    height: max-content;
+    left: 8px;
+    padding: 0;
+    right: auto;
+    top: auto;
+    width: max-content;
+  }
+
+  .sketchi-excalidraw-scene-canvas[data-view-mode="false"]
+    .excalidraw.excalidraw--mobile
+    > .App-bottom-bar
+    > .Island {
+    background: transparent;
+    box-shadow: none;
+    max-width: max-content;
+    min-width: 0;
+    width: max-content;
+  }
+
+  .sketchi-excalidraw-scene-canvas[data-view-mode="false"]
+    .excalidraw.excalidraw--mobile
+    .App-toolbar {
+    width: auto;
+  }
+
+  .sketchi-excalidraw-scene-canvas[data-view-mode="false"]
+    .excalidraw.excalidraw--mobile
+    .App-toolbar-content {
+    background: var(--card);
+    border: 1px solid var(--line-2);
+    border-radius: 8px;
+    box-shadow: var(--shadow-sm);
+    padding: 4px;
+  }
 }
 
 .sketchi-excalidraw-scene-canvas__loading {
