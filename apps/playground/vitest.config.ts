@@ -18,6 +18,7 @@ export default defineConfig({
       "apps/playground/src/**/*.test.ts",
       "apps/playground/src/**/*.test.tsx",
     ],
+    exclude: ["apps/playground/src/**/*.browser.test.tsx"],
     passWithNoTests: true,
   },
   resolve: {

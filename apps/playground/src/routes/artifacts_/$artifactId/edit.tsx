@@ -13,7 +13,7 @@ import {
   type ArtifactViewState,
 } from "@/features/artifacts/artifact-view-client";
 import { IconActionBar, IconLink } from "@/components/sketch-icons";
-import { SKETCHI_WEB_HOME_URL } from "@/features/playground/home-url";
+import { StudioBrand } from "@/components/studio-brand";
 
 export const Route = createFileRoute("/artifacts_/$artifactId/edit")({
   component: ArtifactEditRoute,
@@ -128,13 +128,7 @@ function ArtifactEditRoute() {
   return (
     <main className="artifact-view artifact-view--edit">
       <header className="artifact-view__bar">
-        <a
-          aria-label="Sketchi home"
-          className="studio__mark artifact-view__mark"
-          href={SKETCHI_WEB_HOME_URL}
-        >
-          Sketchi
-        </a>
+        <StudioBrand />
         <div className="artifact-view__actions">
           <a className="studio__artifact-link" href={urls.review}>
             Review

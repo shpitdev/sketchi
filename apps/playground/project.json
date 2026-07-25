@@ -44,7 +44,11 @@
       "executor": "nx:run-commands",
       "outputs": ["{workspaceRoot}/coverage/apps/playground"],
       "options": {
-        "command": "vitest run --config apps/playground/vitest.config.ts"
+        "commands": [
+          "vitest run --config apps/playground/vitest.config.ts",
+          "vitest run --config apps/playground/vitest.browser.config.mts"
+        ],
+        "parallel": false
       }
     },
     "typecheck": {

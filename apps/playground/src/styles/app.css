@@ -135,30 +135,56 @@ body {
 
 .studio__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 16px 24px 10px;
+  min-height: 68px;
+  padding: 12px 24px;
 }
 
-.studio__head-brand,
 .studio__head-actions {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
 }
 
-.studio__mark {
-  font-family: var(--font-script);
-  font-size: 30px;
-  font-weight: 700;
+.studio-brand {
+  align-items: center;
   color: var(--ink);
+  display: inline-flex;
+  gap: 9px;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.studio-brand__tile {
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  box-shadow: var(--shadow-sm);
+  display: inline-flex;
+  flex: 0 0 auto;
+  justify-content: center;
+  padding: 6px;
+}
+
+.studio-brand__tile img {
+  display: block;
+  object-fit: contain;
+}
+
+.studio-brand__wordmark {
+  font-family: var(--font-script);
+  font-size: 28px;
+  font-weight: 700;
   line-height: 1;
 }
 
-.studio__sub {
+.studio-brand__surface {
   font-family: var(--font-mono);
   font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--accent-ink);
@@ -168,35 +194,191 @@ body {
 .studio__empty-wrap {
   flex: 1;
   min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow-y: auto;
   padding: 0 24px;
 }
 
 .studio__empty {
-  text-align: center;
-  max-width: 540px;
-  padding: 40px 0;
+  display: grid;
+  gap: 12px 18px;
+  grid-template-columns: minmax(220px, 0.78fr) minmax(360px, 1.22fr);
+  margin: 0 auto;
+  max-width: 812px;
+  padding: 14px 0 16px;
+  width: 100%;
+}
+
+.studio__empty-copy {
+  align-self: center;
+}
+
+.studio__empty-kicker {
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  margin: 0 0 5px;
+  text-transform: uppercase;
 }
 
 .studio__empty-title {
   font-family: var(--font-display);
-  font-size: 28px;
+  font-size: clamp(28px, 3.2vw, 36px);
   font-weight: 700;
-  margin: 0 0 8px;
+  line-height: 1.05;
+  margin: 0 0 10px;
 }
 
 .studio__empty-sub {
-  color: var(--muted-ink);
-  margin: 0 0 22px;
+  color: var(--ink-2);
+  line-height: 1.5;
+  margin: 0;
+  max-width: 320px;
+}
+
+.studio__sample {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: clamp(300px, 42vh, 350px);
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.studio__sample-caption {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-2);
+  display: flex;
+  font-size: 12px;
+  font-weight: 700;
+  justify-content: space-between;
+  padding: 7px 10px;
+}
+
+.studio__sample-caption span:last-child {
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.studio__sample-brand-path {
+  align-items: center;
+  display: flex;
+  gap: 5px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.studio__sample-brand-path li {
+  align-items: center;
+  display: flex;
+}
+
+.studio__sample-brand-path li:not(:last-child)::after {
+  color: var(--accent-ink);
+  content: "\2192";
+  font-family: var(--font-mono);
+  font-size: 10px;
+  margin-left: 5px;
+}
+
+.studio__sample-brand-path img {
+  display: block;
+  object-fit: contain;
+}
+
+.studio__sample-canvas {
+  min-height: 0;
+  position: relative;
+}
+
+.studio__sample-canvas .sketchi-diagram-preview,
+.studio__sample-canvas .sketchi-artifact-canvas,
+.studio__sample-canvas .sketchi-excalidraw-scene-canvas {
+  border: 0;
+  height: 100%;
+  min-height: 0;
+}
+
+.studio__sample-canvas
+  .sketchi-excalidraw-scene-canvas
+  .excalidraw.excalidraw--mobile
+  .main-menu-trigger,
+.studio__sample-canvas
+  .sketchi-excalidraw-scene-canvas[data-view-mode="true"]
+  .excalidraw.excalidraw--mobile
+  > .App-bottom-bar {
+  display: none;
 }
 
 .studio__starters {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.studio__starter {
+  align-items: flex-start;
+  border-radius: var(--r-sm);
+  height: auto;
+  justify-content: flex-start;
+  line-height: 1.35;
+  min-height: 54px;
+  padding: 10px 12px;
+  text-align: left;
+  white-space: normal;
+  width: 100%;
+}
+
+.studio__announcement {
   align-items: center;
+  background: var(--accent-wash);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  border-radius: var(--r-sm);
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: auto 1fr auto;
+  min-height: 42px;
+  padding: 8px 12px;
+}
+
+.studio__announcement-kicker {
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.studio__announcement-copy {
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.studio__announcement a {
+  color: var(--accent-ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.studio__announcement a:hover,
+.studio__announcement a:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .studio__thinking {
@@ -221,7 +403,12 @@ body {
 
 .studio__composer-hint {
   font-size: 12px;
-  color: var(--muted-ink);
+  color: var(--ink-2);
+}
+
+.studio__composer textarea::placeholder {
+  color: var(--ink-2);
+  opacity: 1;
 }
 
 .studio__error {
@@ -297,9 +484,10 @@ body {
   white-space: nowrap;
 }
 
-.studio__stage-chip--grade {
-  color: var(--mauve);
-  border-color: color-mix(in srgb, var(--mauve) 40%, transparent);
+.studio__stage-chip--ready {
+  background: var(--ok-wash);
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+  color: var(--ok-ink);
 }
 
 .studio__stage-chip--draft {
@@ -453,7 +641,7 @@ button.studio__artifact-link {
   border: 1px solid color-mix(in srgb, var(--mauve) 32%, var(--line));
   border-radius: 9px;
   background: var(--card);
-  color: var(--mauve);
+  color: var(--accent-ink);
   cursor: pointer;
   transition:
     border-color 0.16s ease,
@@ -486,6 +674,19 @@ button.studio__artifact-link {
   background: color-mix(in srgb, var(--mauve) 82%, black);
 }
 
+.studio__icon-action--labelled {
+  gap: 7px;
+  inline-size: auto;
+  padding-inline: 10px;
+}
+
+.studio__icon-action-label {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .studio__icon-glyph {
   display: block;
 }
@@ -515,12 +716,184 @@ button.studio__artifact-link {
   background: var(--card);
 }
 
-.studio__tool-report {
-  padding: 0 12px 12px;
-}
-
 .studio__reasoning {
   width: 100%;
+}
+
+.studio__build-result {
+  display: grid;
+  gap: 12px;
+}
+
+.studio__build-result-summary,
+.studio__build-issues p,
+.studio__build-issues small {
+  margin: 0;
+}
+
+.studio__build-result-summary {
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.studio__build-issues {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.studio__build-issues li {
+  background: var(--warn-wash);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--r-sm);
+  color: var(--warn-ink);
+  display: grid;
+  gap: 3px;
+  padding: 9px 11px;
+}
+
+.studio__build-issues small {
+  color: var(--ink-2);
+}
+
+.studio__build-disclosure {
+  border-top: 1px solid var(--line);
+  color: var(--ink-2);
+  padding-top: 9px;
+}
+
+.studio__build-disclosure summary {
+  color: var(--accent-ink);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.studio__build-disclosure dl {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 10px 0 0;
+}
+
+.studio__build-disclosure dl div {
+  align-items: baseline;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 9px;
+}
+
+.studio__build-disclosure dt,
+.studio__build-disclosure dd {
+  margin: 0;
+}
+
+.studio__build-disclosure dt {
+  font-size: 11px;
+}
+
+.studio__build-disclosure dd {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.studio__follow-ups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+@media (max-width: 720px) {
+  .studio__head {
+    padding-inline: 16px;
+  }
+
+  .studio-brand {
+    gap: 7px;
+  }
+
+  .studio-brand__tile {
+    padding: 5px;
+  }
+
+  .studio-brand__surface {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  .studio__empty-wrap {
+    padding-inline: 16px;
+  }
+
+  .studio__empty {
+    grid-template-columns: minmax(0, 1fr);
+    padding-block: 12px;
+  }
+
+  .studio__empty-sub {
+    max-width: none;
+  }
+
+  .studio__sample {
+    height: 320px;
+  }
+
+  .studio__starters {
+    grid-column: auto;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .studio__announcement {
+    grid-column: auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .studio__announcement-kicker,
+  .studio__announcement-copy {
+    grid-column: 1;
+  }
+
+  .studio__announcement a {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+
+  .studio__composer {
+    padding: 10px 16px 16px;
+  }
+}
+
+/* At common laptop viewport heights the empty surface becomes one normal
+   document flow. This keeps starters above the composer and lets the page,
+   rather than a hidden inner panel, own scrolling and hit-testing. */
+@media (max-height: 720px) {
+  .studio:not(.studio--build) {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .studio:not(.studio--build) .studio__body,
+  .studio:not(.studio--build) .studio__chat {
+    min-height: auto;
+  }
+
+  .studio:not(.studio--build) .studio__empty-wrap {
+    flex: none;
+    min-height: auto;
+    overflow-y: visible;
+  }
+
+  .studio:not(.studio--build) .studio__sample {
+    height: 300px;
+  }
 }
 
 /* Narrow build mode: a scrollable stage-then-chat page. Instead of splitting
@@ -681,10 +1054,6 @@ button.studio__artifact-link {
   gap: 16px;
   padding: 14px 20px;
   border-bottom: 1px solid var(--line);
-}
-
-.artifact-view__mark {
-  text-decoration: none;
 }
 
 .artifact-view__actions {

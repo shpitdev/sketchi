@@ -11,7 +11,7 @@ import { ArtifactCanvas } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 
-import { SKETCHI_WEB_HOME_URL } from "@/features/playground/home-url";
+import { StudioBrand } from "@/components/studio-brand";
 
 export const Route = createFileRoute("/examples/$exampleId")({
   component: ExampleRoute,
@@ -105,13 +105,7 @@ function ExampleRoute() {
   return (
     <main className="artifact-view">
       <header className="artifact-view__bar">
-        <a
-          aria-label="Sketchi home"
-          className="studio__mark artifact-view__mark"
-          href={SKETCHI_WEB_HOME_URL}
-        >
-          Sketchi
-        </a>
+        <StudioBrand />
         <div className="artifact-view__actions">
           {example && scene ? (
             <span className="studio__note">{example.blurb}</span>

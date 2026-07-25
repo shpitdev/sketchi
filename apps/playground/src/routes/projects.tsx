@@ -7,7 +7,7 @@ import {
   studioProjectUrl,
   type StudioProjectSummary,
 } from "@sketchi/studio-projects/client";
-import { SKETCHI_WEB_HOME_URL } from "@/features/playground/home-url";
+import { StudioBrand } from "@/components/studio-brand";
 
 export const Route = createFileRoute("/projects")({
   component: ProjectsRoute,
@@ -51,13 +51,7 @@ function ProjectsRoute() {
   return (
     <main className="studio-workspace">
       <header className="studio-workspace__bar">
-        <a
-          aria-label="Sketchi home"
-          className="studio__mark artifact-view__mark"
-          href={SKETCHI_WEB_HOME_URL}
-        >
-          Sketchi
-        </a>
+        <StudioBrand />
         <div className="artifact-view__actions">
           <a className="studio__artifact-link" href="/">
             Playground

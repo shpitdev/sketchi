@@ -6,10 +6,10 @@ import {
   type BuildFlowchartResult,
 } from "@sketchi/diagram-agent";
 import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
-import { DiagramPreview, FlowchartBuildReport } from "@sketchi/diagram-ui";
+import { DiagramPreview } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 
 import {
   Conversation,
@@ -22,18 +22,10 @@ import {
   MessageResponse,
 } from "@/components/ai-elements/message";
 import {
-  PromptInput,
-  PromptInputBody,
-  PromptInputFooter,
-  PromptInputSubmit,
-  PromptInputTextarea,
-} from "@/components/ai-elements/prompt-input";
-import {
   Reasoning,
   ReasoningContent,
   ReasoningTrigger,
 } from "@/components/ai-elements/reasoning";
-import { Suggestion } from "@/components/ai-elements/suggestion";
 import {
   Tool,
   ToolContent,
@@ -41,20 +33,22 @@ import {
   ToolInput,
   ToolOutput,
 } from "@/components/ai-elements/tool";
+import { StudioBrand } from "@/components/studio-brand";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { IconActionBar, IconLink } from "@/components/sketch-icons";
-import { SKETCHI_WEB_HOME_URL } from "@/features/playground/home-url";
+import {
+  ArtifactActions,
+  AssistantFollowUp,
+  BuildResultDetails,
+  PlaygroundComposer,
+  PlaygroundEmptyState,
+  assistantAsksQuestion,
+  type ReadyPlaygroundArtifact,
+} from "@/features/playground/playground-surface";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
   component: StudioRoute,
 });
-
-const STARTERS = [
-  "Sketch a login flow with retries and a fraud check",
-  "Diagram a CI/CD pipeline from commit to production",
-  "Map the data flow for an AI chat app with streaming",
-];
 
 type MessagePart = UIMessage["parts"][number];
 
@@ -69,16 +63,6 @@ interface FlowchartToolPart {
   input?: unknown;
   output?: unknown;
   errorText?: string;
-}
-
-interface ReadyPlaygroundArtifact {
-  artifactId: string;
-  exportUrls: {
-    excalidraw: string;
-    scene: string;
-  };
-  editUrl: string;
-  viewUrl: string;
 }
 
 function isFlowchartToolPart(
@@ -180,28 +164,6 @@ function sceneFromResult(
   return isRenderedDiagramScene(scene) ? scene : null;
 }
 
-function ArtifactActions({ artifact }: { artifact: ReadyPlaygroundArtifact }) {
-  return (
-    <div className="studio__artifact-actions">
-      <IconActionBar>
-        <IconLink href={artifact.viewUrl} icon="open" label="Open artifact" />
-        <IconLink href={artifact.editUrl} icon="edit" label="Edit" />
-        <IconLink
-          href={artifact.exportUrls.scene}
-          icon="scene"
-          label="Scene file"
-        />
-        <IconLink
-          href={artifact.exportUrls.excalidraw}
-          icon="drawing"
-          label="Drawing file"
-        />
-      </IconActionBar>
-      <p className="studio__note">Shareable by link · no account yet</p>
-    </div>
-  );
-}
-
 function FlowchartToolCard({
   attempt,
   part,
@@ -212,14 +174,14 @@ function FlowchartToolCard({
   const result = buildResultOf(part);
   const title =
     part.state === "input-streaming"
-      ? `building flowchart · attempt ${attempt}`
+      ? "Drawing your flowchart"
       : part.state === "input-available"
-        ? `validating flowchart · attempt ${attempt}`
+        ? "Checking your flowchart"
         : part.state === "output-error"
-          ? `build failed · attempt ${attempt}`
+          ? "Couldn’t finish the diagram"
           : result?.ok
-            ? `artifact accepted · attempt ${attempt}`
-            : `repair needed · attempt ${attempt}`;
+            ? "Diagram ready"
+            : "Diagram needs changes";
 
   return (
     <Tool className="studio__tool" defaultOpen={false}>
@@ -228,22 +190,25 @@ function FlowchartToolCard({
         title={title}
         type="tool-build_flowchart"
       />
-      {result ? (
-        <div className="studio__tool-report">
-          <FlowchartBuildReport attempt={attempt} result={result} />
-        </div>
-      ) : null}
       <ToolContent>
+        {result ? <BuildResultDetails pass={attempt} result={result} /> : null}
         {part.input === undefined ? null : <ToolInput input={part.input} />}
         {part.state === "output-error" ? (
-          <ToolOutput errorText={part.errorText} output={undefined} />
+          <ToolOutput
+            errorText="Sketchi couldn’t finish this diagram. Try again, or simplify the request."
+            output={undefined}
+          />
         ) : null}
       </ToolContent>
     </Tool>
   );
 }
 
-function renderAssistantParts(message: UIMessage): ReactNode[] {
+function renderAssistantParts(
+  message: UIMessage,
+  onAnswer?: (answer: string) => void,
+  onCompose?: () => void,
+): ReactNode[] {
   const nodes: ReactNode[] = [];
   let attempt = 0;
 
@@ -283,6 +248,16 @@ function renderAssistantParts(message: UIMessage): ReactNode[] {
     }
   });
 
+  if (onAnswer && onCompose && assistantAsksQuestion(message)) {
+    nodes.push(
+      <AssistantFollowUp
+        key={`${message.id}-follow-up`}
+        onCompose={onCompose}
+        onSelect={onAnswer}
+      />,
+    );
+  }
+
   return nodes;
 }
 
@@ -304,8 +279,8 @@ function StagePlaceholder({
     <div className="studio__stage-placeholder">
       <p className="studio__stage-placeholder-text">
         {generating
-          ? "building the canonical flowchart…"
-          : "no accepted artifact yet — repair the listed issues or try another flow"}
+          ? "Drawing your flowchart…"
+          : "This version needs a few changes. Ask Sketchi to revise it or try another flow."}
       </p>
       {ghostLabels.length > 0 ? (
         <div className="studio__ghosts">
@@ -322,14 +297,12 @@ function StagePlaceholder({
 
 function DiagramStage({
   artifact,
-  attemptCount,
   generating,
   ghostLabels,
   result,
   scene,
 }: {
   artifact: ReadyPlaygroundArtifact | null;
-  attemptCount: number;
   generating: boolean;
   ghostLabels: string[];
   result: BuildFlowchartResult | undefined;
@@ -345,19 +318,16 @@ function DiagramStage({
           <h2 className="studio__stage-title">{title}</h2>
         </div>
         <div className="studio__stage-meta">
-          {result?.quality ? (
-            <span className="studio__stage-chip studio__stage-chip--grade">
-              quality {result.quality.score.toFixed(1)}
-            </span>
-          ) : null}
-          {attemptCount > 0 ? (
-            <span className="studio__stage-chip">
-              attempt {Math.min(attemptCount, 3)} of 3
-            </span>
-          ) : null}
-          {result && !result.ok ? (
-            <span className="studio__stage-chip studio__stage-chip--draft">
-              repair
+          {result ? (
+            <span
+              className={cn(
+                "studio__stage-chip",
+                result.ok
+                  ? "studio__stage-chip--ready"
+                  : "studio__stage-chip--draft",
+              )}
+            >
+              {result.ok ? "Ready" : "Needs changes"}
             </span>
           ) : null}
         </div>
@@ -381,6 +351,7 @@ function DiagramStage({
 }
 
 function StudioRoute() {
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const [transport] = useState(
     () => new DefaultChatTransport({ api: "/api/chat" }),
   );
@@ -424,13 +395,6 @@ function StudioRoute() {
     [acceptedResult],
   );
 
-  const attemptCount = useMemo(() => {
-    const latestRun = [...messages]
-      .reverse()
-      .find((message) => message.parts.some(isFlowchartToolPart));
-    return latestRun?.parts.filter(isFlowchartToolPart).length ?? 0;
-  }, [messages]);
-
   const ghostLabels = useMemo(() => {
     const input = BuildFlowchartRequestSchema.safeParse(activePart?.input);
     if (!input.success) {
@@ -465,22 +429,22 @@ function StudioRoute() {
     [busy, send, stop],
   );
 
+  const focusComposer = useCallback(() => {
+    composerRef.current?.focus();
+  }, []);
+
   const isEmpty = messages.length === 0;
+  const latestMessage = messages.at(-1);
+  const answerableMessageId =
+    !busy && latestMessage && assistantAsksQuestion(latestMessage)
+      ? latestMessage.id
+      : undefined;
 
   return (
     <TooltipProvider delayDuration={300}>
       <main className={cn("studio", buildMode && "studio--build")}>
         <header className="studio__head">
-          <div className="studio__head-brand">
-            <a
-              aria-label="Sketchi home"
-              className="studio__mark"
-              href={SKETCHI_WEB_HOME_URL}
-            >
-              Sketchi
-            </a>
-            <span className="studio__sub">playground · ephemeral</span>
-          </div>
+          <StudioBrand />
           <div className="studio__head-actions">
             <a className="studio__artifact-link" href="/projects">
               Projects
@@ -493,7 +457,6 @@ function StudioRoute() {
             <DiagramStage
               key="stage"
               artifact={artifact}
-              attemptCount={attemptCount}
               generating={Boolean(activePart)}
               ghostLabels={ghostLabels}
               result={displayResult}
@@ -503,30 +466,7 @@ function StudioRoute() {
 
           <section className="studio__chat" key="chat">
             {isEmpty ? (
-              <div className="studio__empty-wrap">
-                <div className="studio__empty">
-                  <p className="studio__empty-title">What should we draw?</p>
-                  <p className="studio__empty-sub">
-                    Describe a system or flow — Sketchi builds one canonical
-                    artifact and repairs structured issues until it holds up.
-                  </p>
-                  <div className="studio__starters">
-                    {STARTERS.map((starter) => (
-                      <Suggestion
-                        key={starter}
-                        onClick={(value) => send(value)}
-                        suggestion={starter}
-                      />
-                    ))}
-                  </div>
-                  <a
-                    className="studio__artifact-link"
-                    href="/examples/public-mindmap"
-                  >
-                    Explore the new public mindmap capability →
-                  </a>
-                </div>
-              </div>
+              <PlaygroundEmptyState onSelect={send} />
             ) : (
               <Conversation className="studio__conversation">
                 <ConversationContent>
@@ -540,7 +480,13 @@ function StudioRoute() {
                       ) : null;
                     }
 
-                    const parts = renderAssistantParts(message);
+                    const parts = renderAssistantParts(
+                      message,
+                      message.id === answerableMessageId ? send : undefined,
+                      message.id === answerableMessageId
+                        ? focusComposer
+                        : undefined,
+                    );
                     return parts.length > 0 ? (
                       <Message from="assistant" key={message.id}>
                         <MessageContent>{parts}</MessageContent>
@@ -559,27 +505,18 @@ function StudioRoute() {
               </Conversation>
             )}
 
-            {error ? <p className="studio__error">{error.message}</p> : null}
+            {error ? (
+              <p className="studio__error">
+                Sketchi couldn’t finish that request. Try again.
+              </p>
+            ) : null}
 
-            <div className="studio__composer">
-              <PromptInput onSubmit={handleSubmit}>
-                <PromptInputBody>
-                  <PromptInputTextarea
-                    placeholder={
-                      buildMode
-                        ? "Ask for changes to the sketch…"
-                        : "Describe a diagram…"
-                    }
-                  />
-                </PromptInputBody>
-                <PromptInputFooter>
-                  <span className="studio__composer-hint">
-                    Enter to send · Shift+Enter for a new line
-                  </span>
-                  <PromptInputSubmit status={status} />
-                </PromptInputFooter>
-              </PromptInput>
-            </div>
+            <PlaygroundComposer
+              buildMode={buildMode}
+              composerRef={composerRef}
+              onSubmit={handleSubmit}
+              status={status}
+            />
           </section>
         </div>
       </main>

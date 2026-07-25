@@ -42,7 +42,7 @@ const studioFlowchartRetries = Metric.counter(
   },
 );
 
-function attemptLimitResult(maxAttempts: number): BuildFlowchartResult {
+function attemptLimitResult(): BuildFlowchartResult {
   return {
     ok: false,
     status: "quality_failed",
@@ -52,8 +52,8 @@ function attemptLimitResult(maxAttempts: number): BuildFlowchartResult {
         severity: "error",
         stage: "quality",
         ref: { kind: "request", path: "spec" },
-        message: `Flowchart was not accepted within ${maxAttempts} attempts.`,
-        hint: "Stop calling build_flowchart this turn and summarize the remaining structured issues for the user.",
+        message: "The diagram still needs changes before it can be shared.",
+        hint: "Explain that the draft needs another pass and invite the user to simplify or clarify the flow.",
       },
     ],
   };
@@ -91,7 +91,7 @@ export function makeStudioFlowchartToolExecutor<E, R>(
               return current.accepted;
             }
             if (current.attempts >= maxAttempts) {
-              return attemptLimitResult(maxAttempts);
+              return attemptLimitResult();
             }
 
             const attempt = current.attempts + 1;

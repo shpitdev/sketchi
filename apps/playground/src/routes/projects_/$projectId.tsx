@@ -7,7 +7,7 @@ import {
   type StudioProjectDetails,
 } from "@sketchi/studio-projects/client";
 import { IconActionBar, IconLink } from "@/components/sketch-icons";
-import { SKETCHI_WEB_HOME_URL } from "@/features/playground/home-url";
+import { StudioBrand } from "@/components/studio-brand";
 
 export const Route = createFileRoute("/projects_/$projectId")({
   component: ProjectRoute,
@@ -52,13 +52,7 @@ function ProjectRoute() {
   return (
     <main className="studio-workspace">
       <header className="studio-workspace__bar">
-        <a
-          aria-label="Sketchi home"
-          className="studio__mark artifact-view__mark"
-          href={SKETCHI_WEB_HOME_URL}
-        >
-          Sketchi
-        </a>
+        <StudioBrand />
         <div className="artifact-view__actions">
           <a className="studio__artifact-link" href="/projects">
             Projects

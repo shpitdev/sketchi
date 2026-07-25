@@ -341,10 +341,14 @@ describe("Studio build_flowchart host", () => {
       status: "quality_failed",
       issues: [
         expect.objectContaining({
-          message: "Flowchart was not accepted within 3 attempts.",
+          hint: "Explain that the draft needs another pass and invite the user to simplify or clarify the flow.",
+          message: "The diagram still needs changes before it can be shared.",
         }),
       ],
     });
+    expect(JSON.stringify(capped)).not.toMatch(
+      /build_flowchart|attempts|structured issues/i,
+    );
   });
 
   it.effect(

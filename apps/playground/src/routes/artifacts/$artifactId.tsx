@@ -10,7 +10,7 @@ import {
 import { ArtifactSourceLink } from "@/components/artifact-source-link";
 import { createStudioProjectFromArtifact } from "@sketchi/studio-projects/client";
 import { IconActionBar, IconButton, IconLink } from "@/components/sketch-icons";
-import { SKETCHI_WEB_HOME_URL } from "@/features/playground/home-url";
+import { StudioBrand } from "@/components/studio-brand";
 
 export const Route = createFileRoute("/artifacts/$artifactId")({
   component: ArtifactRoute,
@@ -88,13 +88,7 @@ function ArtifactRoute() {
   return (
     <main className="artifact-view">
       <header className="artifact-view__bar">
-        <a
-          aria-label="Sketchi home"
-          className="studio__mark artifact-view__mark"
-          href={SKETCHI_WEB_HOME_URL}
-        >
-          Sketchi
-        </a>
+        <StudioBrand />
         <div className="artifact-view__actions">
           <a className="studio__artifact-link" href="/">
             Playground

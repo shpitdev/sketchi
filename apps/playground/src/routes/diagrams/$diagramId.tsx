@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { fetchArtifactScene } from "@/features/artifacts/artifact-view-client";
 import { IconActionBar, IconLink } from "@/components/sketch-icons";
-import { SKETCHI_WEB_HOME_URL } from "@/features/playground/home-url";
+import { StudioBrand } from "@/components/studio-brand";
 import {
   fetchStudioDiagramDetails,
   type StudioDiagramSummary,
@@ -66,13 +66,7 @@ function DiagramRoute() {
   return (
     <main className="artifact-view">
       <header className="artifact-view__bar">
-        <a
-          aria-label="Sketchi home"
-          className="studio__mark artifact-view__mark"
-          href={SKETCHI_WEB_HOME_URL}
-        >
-          Sketchi
-        </a>
+        <StudioBrand />
         <div className="artifact-view__actions">
           {state.status === "ready" ? (
             <a

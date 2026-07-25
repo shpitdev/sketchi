@@ -33,4 +33,20 @@ describe("icon actions", () => {
     button.click();
     expect(clicks).toBe(1);
   });
+
+  it("can keep a label visible beside the drawn icon", () => {
+    render(
+      <IconActionBar>
+        <IconLink
+          href="/download"
+          icon="download"
+          label="Download drawing"
+          showLabel
+        />
+      </IconActionBar>,
+    );
+
+    const link = screen.getByRole("link", { name: "Download drawing" });
+    expect(link.textContent).toBe("Download drawing");
+  });
 });
