@@ -7,10 +7,15 @@ describe("SiteHeader", () => {
   it("renders the brand, primary nav, and playground CTA", () => {
     render(<SiteHeader activePath="/docs" />);
 
-    expect(screen.getByRole("link", { name: "Sketchi home" })).toBeTruthy();
+    const brand = screen.getByRole("link", { name: "Sketchi home" });
+    expect(brand.getAttribute("href")).toBe("/");
+    expect(brand.querySelector(".site-header__brand-icon")).toBeTruthy();
+    expect(brand.querySelector(".sk-wordmark")?.textContent).toBe("Sketchi");
     expect(screen.getByRole("link", { name: "Product" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Agents" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Playground" })).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "Playground" }).classList,
+    ).toContain("sk-btn--accent");
     expect(
       screen
         .getByRole("link", { name: "Sketchi on GitHub" })

@@ -39,7 +39,7 @@ export function SiteHeader({
         <a aria-label="Sketchi home" className="site-header__brand" href="/">
           <img
             alt=""
-            className="sk-icon"
+            className="sk-icon site-header__brand-icon"
             height="30"
             src="/icon.svg"
             width="30"
@@ -74,7 +74,7 @@ export function SiteHeader({
             <span aria-hidden="true" className="gh-mark" />
           </a>
           <a
-            className="sk-btn sk-btn--primary site-header__cta"
+            className="sk-btn sk-btn--accent site-header__cta"
             href={surfaceUrls.playground}
           >
             Playground
@@ -141,7 +141,7 @@ export function SiteHeader({
               <span aria-hidden="true" className="gh-mark" />
               GitHub
             </a>
-            <a className="sk-btn sk-btn--primary" href={surfaceUrls.playground}>
+            <a className="sk-btn sk-btn--accent" href={surfaceUrls.playground}>
               Playground
             </a>
           </div>

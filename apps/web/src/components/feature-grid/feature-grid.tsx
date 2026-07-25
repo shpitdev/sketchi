@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { BrandIcon } from "../brand-icon/index.js";
 
 interface Feature {
+  description: string;
   glyph: ReactNode;
   title: string;
 }
@@ -16,10 +17,14 @@ const clusterIcons = [
 
 const features: readonly Feature[] = [
   {
+    description:
+      "Every shape, connector, and label stays editable after generation.",
     glyph: <ShapesGlyph />,
     title: "Real objects, not screenshots",
   },
   {
+    description:
+      "Find the tools in your stack without drawing their marks by hand.",
     glyph: (
       <span className="feature-card__cluster" aria-hidden="true">
         {clusterIcons.map((icon) => (
@@ -36,14 +41,15 @@ const features: readonly Feature[] = [
     title: "1,400+ logos, already drawn",
   },
   {
+    description:
+      "Open the scene in Excalidraw, then export it when you are ready.",
     glyph: <ExportGlyph />,
     title: "Yours to edit and export",
   },
 ];
 
 /**
- * The wedge, scanned not read: three icon-led tiles that name what makes a
- * Sketchi diagram different, no paragraphs.
+ * Three icon-led benefits with one supporting sentence each.
  */
 export function FeatureGrid() {
   return (
@@ -57,6 +63,7 @@ export function FeatureGrid() {
             <article className="feature-card" key={feature.title}>
               {feature.glyph}
               <h3 className="feature-card__title">{feature.title}</h3>
+              <p className="feature-card__description">{feature.description}</p>
             </article>
           ))}
         </div>

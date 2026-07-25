@@ -21,17 +21,15 @@
 
 ---
 
+<p align="center">
+  <img src="apps/web/public/media/sketchi-og-card.png" alt="Describe it. Sketchi draws it. A deploy flow connects GitHub push, Docker build, tests pass, and Cloudflare ship steps." width="1000" />
+</p>
+
 Sketchi is the canonical Nx and Cloudflare workspace for generating reliable,
 editable diagrams. Model output is never treated as a finished drawing: it is
 parsed into a typed intermediate representation, validated, laid out by code,
 converted to real Excalidraw elements, and persisted as an artifact with PNG and
 scene representations.
-
-<p align="center">
-  <img src="apps/web/public/media/sketchi-playground-preview.png" alt="Sketchi deterministic diagram scenario workspace" width="1000" />
-  <br />
-  <em>Deterministic scenario inspection: typed IR, rendered canvas, and quality checks in one workspace.</em>
-</p>
 
 ## What Sketchi Does
 

@@ -4,17 +4,13 @@ export const SITE_URL = "https://sketchi.app";
 /** Site name used for og:site_name. */
 export const SITE_NAME = "Sketchi";
 
-/**
- * Social share image. Crawlers need an absolute URL, so this is built from
- * SITE_URL rather than a root-relative path. The asset lives in
- * `public/media/` and is served at `/media/...`.
- */
+/** Static raster used by link previews and social crawlers. */
 export const OG_IMAGE = {
-  url: `${SITE_URL}/media/sketchi-playground-preview.png`,
-  width: "1280",
-  height: "577",
+  url: `${SITE_URL}/media/sketchi-og-card.png`,
+  width: "1200",
+  height: "630",
   type: "image/png",
-  alt: "The Sketchi playground turning a written prompt into a clean, editable diagram.",
+  alt: "Describe it. Sketchi draws it. A deploy flow connects GitHub push, Docker build, tests pass, and Cloudflare ship steps.",
 } as const;
 
 /** A route-head meta entry (subset of what TanStack Router accepts). */
@@ -33,9 +29,8 @@ export function absoluteUrl(path: string): string {
 }
 
 /**
- * Page-agnostic social meta that is identical on every page: the OpenGraph
- * type, site name, share image, and Twitter card style. Rendered once from the
- * root route so it applies site-wide.
+ * Page-agnostic social meta that is identical on every page. Rendered once
+ * from the root route so it applies site-wide.
  */
 export function siteSocialMeta(): MetaTag[] {
   return [

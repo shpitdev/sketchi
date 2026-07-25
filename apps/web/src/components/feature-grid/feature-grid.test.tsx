@@ -16,5 +16,20 @@ describe("FeatureGrid", () => {
     expect(
       screen.getByRole("heading", { name: "Yours to edit and export" }),
     ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Every shape, connector, and label stays editable after generation.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Find the tools in your stack without drawing their marks by hand.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Open the scene in Excalidraw, then export it when you are ready.",
+      ),
+    ).toBeTruthy();
   });
 });

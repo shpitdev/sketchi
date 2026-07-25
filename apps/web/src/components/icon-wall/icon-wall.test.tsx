@@ -16,4 +16,18 @@ describe("IconWall", () => {
       screen.getByRole("link", { name: /Browse the library/ }),
     ).toHaveProperty("href", "https://icons.example.test/");
   });
+
+  it("keeps every logo unique within each marquee cycle", () => {
+    const { container } = render(<IconWall />);
+    const cycles = [...container.querySelectorAll("[data-icon-cycle]")];
+
+    expect(cycles).toHaveLength(4);
+    for (const cycle of cycles) {
+      const sources = [...cycle.querySelectorAll("img")].map((image) =>
+        image.getAttribute("src"),
+      );
+      expect(sources.length).toBeGreaterThanOrEqual(13);
+      expect(new Set(sources).size).toBe(sources.length);
+    }
+  });
 });

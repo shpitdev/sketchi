@@ -43,16 +43,39 @@ const nodes: readonly SketchNode[] = [
   },
 ];
 
-// Hand-drawn connectors (with arrowheads) in the 0–100 space the nodes sit in.
-const wires: readonly { d: string; delay: number }[] = [
-  { d: "M28 21 C 34 17, 40 17, 45 21 M42.5 19 L45 21 L42.5 23", delay: 0.15 },
-  { d: "M52 28 C 50 35, 54 41, 52 46 M50 43.5 L52 46 L54 43.5", delay: 0.45 },
+// Each connector runs beneath its source and target node. The nodes mask the
+// overlap, so every visible line meets an edge cleanly at every board width.
+const wires: readonly {
+  arrowD: string;
+  d: string;
+  delay: number;
+  drawLength: number;
+}[] = [
+  {
+    arrowD: "M41.5 18.5 L44.5 21 L41.5 23.5",
+    d: "M20 21 C 31 18.5, 42 18.5, 52 21",
+    delay: 0.15,
+    drawLength: 220,
+  },
+  {
+    arrowD: "M49.5 41.5 L52 44.5 L54.5 41.5",
+    d: "M52 21 C 51.2 31, 52.8 42, 52 53",
+    delay: 0.45,
+    drawLength: 150,
+  },
   // yes → ship
-  { d: "M60 53 C 68 51, 74 52, 78 53 M75.5 51 L78 53 L75.5 55", delay: 0.85 },
+  {
+    arrowD: "M72 50.7 L75 53 L72 55.3",
+    d: "M52 53 C 62 51.5, 72 52, 82 53",
+    delay: 0.85,
+    drawLength: 200,
+  },
   // no → back to build
   {
-    d: "M44 54 C 31 52, 33 31, 45 27 M42.6 29.5 L45 27 L47.4 29.5",
+    arrowD: "M43.8 24.2 L47 25 L46.1 28.2",
+    d: "M52 53 L39 53 C 35 53, 34 50, 34 46 L34 36 C 34 32, 37 29, 41 29 L52 21",
     delay: 1.15,
+    drawLength: 310,
   },
 ];
 
@@ -78,7 +101,7 @@ export function HomeHero({
             of your stack.
           </p>
           <div className="home-hero__actions sk-rise" style={rise(2)}>
-            <a className="sk-btn sk-btn--primary" href={primaryHref}>
+            <a className="sk-btn sk-btn--accent" href={primaryHref}>
               Open the playground
             </a>
             <a className="sk-btn sk-btn--ghost" href={agentsHref}>
@@ -121,13 +144,21 @@ export function HomeHero({
                   viewBox="0 0 100 100"
                 >
                   {wires.map((wire) => (
-                    <path
-                      className="wire"
-                      d={wire.d}
+                    <g
+                      className="wire-group"
                       key={wire.d}
-                      pathLength={1}
-                      style={{ "--delay": `${wire.delay}s` } as CSSProperties}
-                    />
+                      style={
+                        {
+                          "--delay": `${wire.delay}s`,
+                          // The stroke does not scale, so the draw dash uses
+                          // a rendered-pixel upper bound for every board size.
+                          "--wire-length": wire.drawLength,
+                        } as CSSProperties
+                      }
+                    >
+                      <path className="wire" d={wire.d} />
+                      <path className="wire-head" d={wire.arrowD} />
+                    </g>
                   ))}
                 </svg>
 

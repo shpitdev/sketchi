@@ -50,9 +50,6 @@ function Rail({
   slugs: readonly string[];
   reverse?: boolean;
 }) {
-  // The track is duplicated so the marquee can loop seamlessly.
-  const doubled = [...slugs, ...slugs];
-
   return (
     <div className="icon-rail">
       <div
@@ -60,15 +57,19 @@ function Rail({
           reverse ? " icon-rail__track--reverse" : ""
         }`}
       >
-        {doubled.map((slug, index) => (
-          <BrandIcon
-            key={`${slug}-${index}`}
-            label={label(slug)}
-            loading="eager"
-            size={30}
-            src={`/brand/${slug}.svg`}
-            tile
-          />
+        {[0, 1].map((cycle) => (
+          <div className="icon-rail__cycle" data-icon-cycle key={cycle}>
+            {slugs.map((slug) => (
+              <BrandIcon
+                key={slug}
+                label={label(slug)}
+                loading="eager"
+                size={30}
+                src={`/brand/${slug}.svg`}
+                tile
+              />
+            ))}
+          </div>
         ))}
       </div>
     </div>

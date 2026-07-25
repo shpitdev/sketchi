@@ -10,9 +10,11 @@ describe("CtaBand", () => {
     expect(
       screen.getByRole("heading", { name: "Start with a sentence." }),
     ).toBeTruthy();
-    expect(
-      screen.getByRole("link", { name: "Open the playground" }),
-    ).toHaveProperty("href", "https://play.example.test/");
+    const primaryAction = screen.getByRole("link", {
+      name: "Open the playground",
+    });
+    expect(primaryAction).toHaveProperty("href", "https://play.example.test/");
+    expect(primaryAction.classList).toContain("sk-btn--accent");
     expect(
       screen.getByRole("link", { name: /add it to your coding agent/ }),
     ).toHaveProperty("href", "http://localhost:3000/agents");

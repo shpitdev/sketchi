@@ -33,6 +33,12 @@
   text-decoration: none;
 }
 
+.site-header__brand-icon {
+  block-size: 30px;
+  flex: none;
+  inline-size: 30px;
+}
+
 .site-header__nav {
   align-items: center;
   display: flex;
@@ -321,22 +327,40 @@
   width: 100%;
 }
 
-.wire {
-  animation: sk-draw 0.7s var(--ease) both;
-  animation-delay: var(--delay, 0s);
+.wire,
+.wire-head {
   fill: none;
   stroke: var(--accent-ink);
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
 
+.wire {
+  animation: sk-draw 0.7s var(--ease) both;
+  animation-delay: var(--delay, 0s);
+  stroke-dasharray: var(--wire-length);
+  stroke-dashoffset: var(--wire-length);
+}
+
+.wire-head {
+  animation: wire-head-appear 0.01s step-end both;
+  animation-delay: calc(var(--delay, 0s) + 0.7s);
+}
+
+@keyframes wire-head-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .sketch-node {
   align-items: center;
-  animation: sk-rise 0.5s var(--ease) both;
+  animation: sketch-node-rise 0.5s var(--ease) both;
   background: var(--card);
   border: 1.5px solid var(--ink);
   border-radius: 10px;
@@ -348,6 +372,17 @@
   transform: translate(-50%, -50%) rotate(var(--tilt, -1.5deg));
   white-space: nowrap;
   z-index: 2;
+}
+
+@keyframes sketch-node-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 14px)) rotate(var(--tilt, -1.5deg));
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(var(--tilt, -1.5deg));
+  }
 }
 
 .sketch-node:nth-of-type(2n) {
@@ -590,6 +625,14 @@
   margin: 2px 0 0;
 }
 
+.feature-card__description {
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1.6;
+  margin: -4px 0 0;
+  max-width: 31ch;
+}
+
 /* ===================================================================== */
 /* Icon wall                                                             */
 /* ===================================================================== */
@@ -655,10 +698,17 @@
 }
 
 .icon-rail__track {
+  --icon-rail-gap: 30px;
   animation: sk-marquee 48s linear infinite;
   display: flex;
-  gap: 14px;
+  gap: var(--icon-rail-gap);
   width: max-content;
+}
+
+.icon-rail__cycle {
+  display: flex;
+  flex: none;
+  gap: var(--icon-rail-gap);
 }
 
 .icon-rail__track--reverse {
@@ -667,7 +717,7 @@
 
 @keyframes sk-marquee {
   to {
-    transform: translateX(-50%);
+    transform: translateX(calc(-50% - (var(--icon-rail-gap) / 2)));
   }
 }
 
@@ -1372,6 +1422,12 @@
     grid-template-columns: 1fr;
   }
 
+  .home-hero__visual {
+    justify-self: center;
+    max-width: 620px;
+    width: 100%;
+  }
+
   .feature-grid__cards {
     gap: 28px 36px;
     grid-template-columns: 1fr 1fr;
@@ -1473,5 +1529,19 @@
   .sketch-board__scene {
     transform: scale(0.82);
     transform-origin: center;
+  }
+
+  .sketch-node {
+    gap: 4px;
+    padding: 5px 7px;
+  }
+
+  .sketch-node__icon {
+    block-size: 16px;
+    inline-size: 16px;
+  }
+
+  .sketch-node__label {
+    font-size: 10.5px;
   }
 }

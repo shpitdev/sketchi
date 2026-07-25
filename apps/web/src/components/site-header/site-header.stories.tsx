@@ -23,3 +23,9 @@ export const DocsActive: Story = {
     activePath: "/docs",
   },
 };
+
+export const Mobile: Story = {
+  parameters: {
+    viewport: { defaultViewport: "mobile1" },
+  },
+};
