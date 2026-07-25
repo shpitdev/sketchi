@@ -10,13 +10,7 @@ import {
   type Tool,
   type ToolAnnotations,
 } from "@modelcontextprotocol/sdk/types.js";
-import {
-  Result,
-  Schema,
-  SchemaAST,
-  SchemaIssue,
-  SchemaParser,
-} from "effect";
+import { Result, Schema, SchemaAST, SchemaIssue, SchemaParser } from "effect";
 
 import type { PlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 
@@ -136,9 +130,7 @@ function invalidTypeIssue(
       };
 }
 
-function literalValues(
-  ast: SchemaAST.AST,
-): ReadonlyArray<unknown> | undefined {
+function literalValues(ast: SchemaAST.AST): ReadonlyArray<unknown> | undefined {
   if (SchemaAST.isLiteral(ast)) return [ast.literal];
   if (!SchemaAST.isUnion(ast)) return undefined;
   const values: Array<unknown> = [];

@@ -94,8 +94,8 @@ async () => {
 To view the artifact bytes after `execute` returns metadata, fetch:
 
 ```text
-https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/<artifactId>?format=excalidraw&raw=true
-https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/<artifactId>?format=png&raw=true
+https://playground.sketchi.app/api/v1/artifacts/<artifactId>?format=excalidraw&raw=true
+https://playground.sketchi.app/api/v1/artifacts/<artifactId>?format=png&raw=true
 ```
 
 ## Guardrails

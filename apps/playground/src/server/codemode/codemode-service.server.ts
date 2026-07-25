@@ -29,13 +29,11 @@ import {
   PlaygroundRequestMetadata,
 } from "../runtime/playground-context.server";
 import {
+  DEFAULT_ASSET_ORIGIN,
   PlaygroundBrowserRendering,
   PlaygroundBrowserRenderingLive,
   type CloudflareBrowserRunRendererOptions,
 } from "./codemode-browser-renderer.server";
-
-const DEFAULT_RENDER_ASSET_ORIGIN =
-  "https://sketchi-studio.dimethyl.workers.dev";
 
 type CodeModeRequestContext =
   | PlaygroundBindings
@@ -112,7 +110,7 @@ function rendererOptions(
   if (!isLocalOrigin(origin)) {
     return { assetOrigin: origin };
   }
-  return { assetOrigin: DEFAULT_RENDER_ASSET_ORIGIN };
+  return { assetOrigin: DEFAULT_ASSET_ORIGIN };
 }
 
 function isLocalOrigin(origin: string): boolean {

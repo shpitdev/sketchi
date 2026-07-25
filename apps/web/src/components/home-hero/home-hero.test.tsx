@@ -15,7 +15,7 @@ describe("HomeHero", () => {
     });
     expect(primaryAction).toHaveProperty(
       "href",
-      "https://sketchi-studio.dimethyl.workers.dev/",
+      "https://playground.sketchi.app/",
     );
     expect(primaryAction.classList).toContain("sk-btn--accent");
     expect(

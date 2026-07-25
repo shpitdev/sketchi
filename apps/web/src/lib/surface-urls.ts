@@ -19,25 +19,19 @@ export const LOCAL_WEB_SURFACE_URLS: WebSurfaceUrls = {
   playground: "http://localhost:6310",
 };
 
-const WORKERS_DEV_ACCOUNT = "dimethyl";
+// Worker hostnames are an implementation detail and must never reach a user.
+// The defaults are the public product hosts; a PR preview is the one place a
+// Worker hostname is the correct link target, and it only ever arrives through
+// the SKETCHI_*_URL vars the preview workflow injects into the PR Worker.
+export const DEFAULT_WEB_SURFACE_URLS: WebSurfaceUrls = {
+  icons: `https://${PRODUCT_SURFACE_HOSTS.icons}`,
+  playground: `https://${PRODUCT_SURFACE_HOSTS.playground}`,
+};
+
+// sketchi-allow-workers-dev: rejection pattern for the internal eval Worker,
+// which is never a public link target. This value is matched, never rendered.
 const INTERNAL_EVAL_WORKER_HOST =
   /^sketchi-playground(?:-pr(?:-[a-z0-9-]+)?)?\.dimethyl\.workers\.dev$/i;
-
-const WORKERS_DEV_WORKERS = {
-  icons: "sketchi-icons",
-  // The playground project retains the durable sketchi-studio Worker identity.
-  // apps/eval-harness is internal and is not a public link target.
-  playground: "sketchi-studio",
-} satisfies Record<keyof WebSurfaceUrls, string>;
-
-function workersDevUrl(workerName: string): string {
-  return `https://${workerName}.${WORKERS_DEV_ACCOUNT}.workers.dev`;
-}
-
-export const DEFAULT_WEB_SURFACE_URLS: WebSurfaceUrls = {
-  icons: workersDevUrl(WORKERS_DEV_WORKERS.icons),
-  playground: workersDevUrl(WORKERS_DEV_WORKERS.playground),
-};
 
 function cleanHttpUrl(value: unknown, fallback: string): string {
   if (typeof value !== "string") {

@@ -6,7 +6,7 @@ mindmaps, visual patches, and hosted Excalidraw and PNG artifacts.
 The supported public endpoint is:
 
 ```text
-https://sketchi-studio.dimethyl.workers.dev/mcp
+https://playground.sketchi.app/mcp
 ```
 
 Sketchi does not require a Sketchi account, API key, OAuth login, or local
@@ -100,7 +100,7 @@ servers instead of overwriting them:
 {
   "mcpServers": {
     "sketchi-code-mode": {
-      "serverUrl": "https://sketchi-studio.dimethyl.workers.dev/mcp"
+      "serverUrl": "https://playground.sketchi.app/mcp"
     }
   }
 }
@@ -113,7 +113,7 @@ are present:
 
 ```sh
 test -f .agents/skills/sketchi-code-mode/SKILL.md
-rg -n '"sketchi-code-mode"|"serverUrl": "https://sketchi-studio\.dimethyl\.workers\.dev/mcp"' .agents/mcp_config.json
+rg -n '"sketchi-code-mode"|"serverUrl": "https://playground\.sketchi\.app/mcp"' .agents/mcp_config.json
 ```
 
 ### Create the first diagram
@@ -139,7 +139,7 @@ SKETCHI_SKILL_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/skills/sketchi-cod
 mkdir -p "$SKETCHI_SKILL_DIR"
 curl -fsSL https://raw.githubusercontent.com/shpitdev/sketchi/main/.agents/skills/sketchi-code-mode/SKILL.md \
   -o "$SKETCHI_SKILL_DIR/SKILL.md"
-opencode mcp add sketchi-code-mode --url https://sketchi-studio.dimethyl.workers.dev/mcp
+opencode mcp add sketchi-code-mode --url https://playground.sketchi.app/mcp
 ```
 
 ### Verify

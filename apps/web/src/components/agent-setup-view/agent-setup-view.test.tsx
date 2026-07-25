@@ -21,7 +21,7 @@ describe("AgentSetupView", () => {
       "http://localhost:3000/agents/opencode",
     );
     expect(
-      screen.getByText("https://sketchi-studio.dimethyl.workers.dev/mcp"),
+      screen.getByText("https://playground.sketchi.app/mcp"),
     ).toBeTruthy();
     expect(screen.queryByRole("link", { name: /Eval harness/ })).toBeNull();
     expect(screen.queryByRole("link", { name: /Excalidraw app/ })).toBeNull();
@@ -35,7 +35,7 @@ describe("AgentSetupView", () => {
     ).toBeTruthy();
     expect(
       screen.getByText(
-        "opencode mcp add sketchi-code-mode --url https://sketchi-studio.dimethyl.workers.dev/mcp",
+        "opencode mcp add sketchi-code-mode --url https://playground.sketchi.app/mcp",
       ),
     ).toBeTruthy();
     expect(

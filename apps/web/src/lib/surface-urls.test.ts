@@ -9,21 +9,21 @@ import {
 } from "./surface-urls";
 
 describe("resolveWebSurfaceUrls", () => {
-  it("uses production worker URLs by default", () => {
+  it("uses public product URLs by default", () => {
     expect(resolveWebSurfaceUrls()).toEqual(DEFAULT_WEB_SURFACE_URLS);
-    expect(DEFAULT_WEB_SURFACE_URLS.playground).toBe(
-      "https://sketchi-studio.dimethyl.workers.dev",
-    );
+    expect(DEFAULT_WEB_SURFACE_URLS).toEqual({
+      icons: "https://icons.sketchi.app",
+      playground: "https://playground.sketchi.app",
+    });
   });
 
-  it("links Web to the public Playground and never the internal eval Worker", () => {
-    expect(DEFAULT_WEB_SURFACE_URLS).toEqual({
-      icons: "https://sketchi-icons.dimethyl.workers.dev",
-      playground: "https://sketchi-studio.dimethyl.workers.dev",
-    });
-    expect(Object.values(DEFAULT_WEB_SURFACE_URLS)).not.toContain(
-      "https://sketchi-playground.dimethyl.workers.dev",
-    );
+  it("never falls back to a Worker hostname", () => {
+    for (const url of Object.values(DEFAULT_WEB_SURFACE_URLS)) {
+      expect(url).not.toContain("workers.dev");
+    }
+    for (const url of Object.values(resolveWebSurfaceUrls())) {
+      expect(url).not.toContain("workers.dev");
+    }
   });
 
   it("centralizes future custom domains and local app URLs", () => {

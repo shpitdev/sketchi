@@ -12,7 +12,7 @@ dependencies:
       value: "sketchi-code-mode"
       description: "Remote Sketchi Code Mode MCP server"
       transport: "streamable_http"
-      url: "https://sketchi-studio.dimethyl.workers.dev/mcp"
+      url: "https://playground.sketchi.app/mcp"
 
 policy:
   allow_implicit_invocation: true

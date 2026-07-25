@@ -1,4 +1,4 @@
-const mcpEndpoint = "https://sketchi-studio.dimethyl.workers.dev/mcp";
+const mcpEndpoint = "https://playground.sketchi.app/mcp";
 const portableSkillUrl =
   "https://raw.githubusercontent.com/shpitdev/sketchi/main/.agents/skills/sketchi-code-mode/SKILL.md";
 
@@ -88,7 +88,7 @@ curl -fsSL ${portableSkillUrl} -o "$SKETCHI_SKILL_DIR/SKILL.md"`,
       "Setup is just the skill plus the public MCP server.",
       "No account, API key, or local browser needed; provider and model behavior remain OpenCode concerns.",
     ],
-    status: "Connect",
+    status: "MCP",
     summary:
       "Point OpenCode at Sketchi and diagram from the terminal.",
     tagline: "Open-source terminal agent",
@@ -155,7 +155,7 @@ curl -fsSL ${portableSkillUrl} -o .agents/skills/sketchi-code-mode/SKILL.md`,
       "Setup is just the skill plus the public MCP server.",
       "No account, API key, or local browser needed; model and harness behavior remain Agy concerns.",
     ],
-    status: "Connect",
+    status: "MCP",
     summary:
       "Add the skill and point Agy at the Code Mode server.",
     tagline: "Google's agent IDE",

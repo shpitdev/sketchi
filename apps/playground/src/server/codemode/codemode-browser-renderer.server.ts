@@ -19,7 +19,12 @@ export type CloudflareBrowserRunBinding = BrowserWorker;
 export const BROWSER_RENDER_TIMEOUT_MS = 60_000;
 const EXPORT_SCALE = 2;
 const EXPORT_PADDING = 20;
-const DEFAULT_ASSET_ORIGIN = "https://sketchi-studio.dimethyl.workers.dev";
+/**
+ * Browser Rendering loads the export harness over the public internet, so this
+ * fallback origin must be the public product host rather than the Worker
+ * hostname that currently serves it.
+ */
+export const DEFAULT_ASSET_ORIGIN = "https://playground.sketchi.app";
 const HARNESS_PATH = "/codemode-export-harness";
 
 const browserRenderingRequests = Metric.counter(

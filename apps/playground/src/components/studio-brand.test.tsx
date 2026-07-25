@@ -8,9 +8,7 @@ describe("StudioBrand", () => {
     render(<StudioBrand />);
 
     const home = screen.getByRole("link", { name: "Sketchi home" });
-    expect(home.getAttribute("href")).toBe(
-      "https://sketchi-web.dimethyl.workers.dev",
-    );
+    expect(home.getAttribute("href")).toBe("https://sketchi.app");
     expect(home.querySelector("img")?.getAttribute("src")).toBe("/icon.svg");
     expect(screen.getByText("Sketchi")).toBeTruthy();
     expect(screen.getByText("Playground")).toBeTruthy();

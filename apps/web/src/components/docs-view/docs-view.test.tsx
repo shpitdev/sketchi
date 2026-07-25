@@ -32,7 +32,7 @@ describe("DocsView", () => {
       screen
         .getByRole("link", { name: /interactive read-only diagram/ })
         .getAttribute("href"),
-    ).toBe("https://sketchi-studio.dimethyl.workers.dev/examples/how-it-works");
+    ).toBe("https://playground.sketchi.app/examples/how-it-works");
     expect(
       screen
         .getByRole("link", { name: /github\.com\/shpitdev\/sketchi/ })

@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 const repoRoot = new URL("../../", import.meta.url);
-const endpoint = "https://sketchi-studio.dimethyl.workers.dev/mcp";
+const endpoint = "https://playground.sketchi.app/mcp";
 
 function read(relativePath) {
   return readFileSync(new URL(relativePath, repoRoot), "utf8");
@@ -48,7 +48,7 @@ test("the playground project rename preserves the distributed MCP endpoint", () 
   );
   assert.match(
     codexSkillMetadata,
-    /^\s+url:\s*["']https:\/\/sketchi-studio\.dimethyl\.workers\.dev\/mcp["']\s*$/m,
+    /^\s+url:\s*["']https:\/\/playground\.sketchi\.app\/mcp["']\s*$/m,
   );
 
   for (const config of [portable, codex, claude]) {
@@ -174,7 +174,7 @@ test("Agy and OpenCode stay on the portable skill and MCP-only boundary", () => 
   assert.match(quickstart, /\.agents\/skills\/sketchi-code-mode\/SKILL\.md/);
   assert.match(
     quickstart,
-    /"serverUrl": "https:\/\/sketchi-studio\.dimethyl\.workers\.dev\/mcp"/,
+    /"serverUrl": "https:\/\/playground\.sketchi\.app\/mcp"/,
   );
   assert.match(quickstart, /opencode\/skills\/sketchi-code-mode/);
   assert.match(
