@@ -22,12 +22,11 @@ export function AgentSetupView({ agentId }: AgentSetupViewProps) {
   return <AgentSetupHub />;
 }
 
-function EndpointCard({ meta }: { meta: string }) {
+function EndpointCard() {
   return (
     <div className="agent-endpoint" aria-label="Sketchi server URL">
       <span className="agent-endpoint__label">Server URL</span>
       <code>{codeModeMcpEndpoint}</code>
-      <span className="agent-endpoint__meta">{meta}</span>
     </div>
   );
 }
@@ -41,10 +40,10 @@ function AgentSetupHub() {
             <h1>Sketch diagrams without leaving your agent.</h1>
             <p>
               Connect it once, then ask in plain language. Your agent hands back
-              a real, editable diagram, not a wall of ASCII.
+              a real, editable diagram.
             </p>
           </div>
-          <EndpointCard meta="Add this URL wherever your agent keeps its MCP config." />
+          <EndpointCard />
         </div>
       </section>
 
@@ -101,7 +100,7 @@ function AgentSetupDetail({ entry }: { entry: AgentSetupEntry }) {
             </div>
             <p>{entry.summary}</p>
           </div>
-          <EndpointCard meta="Public endpoint used by the setup below." />
+          <EndpointCard />
         </div>
       </section>
 

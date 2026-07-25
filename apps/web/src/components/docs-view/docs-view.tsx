@@ -62,10 +62,9 @@ export function DocsView({
         <section className="docs-section" id="how">
           <h2>Three paths</h2>
           <p>
-            You describe it. Sketchi structures and validates the request before
-            drawing, so the result stays consistent, not a best-guess sketch.
-            What differs between the three paths is where that happens and who
-            keeps the file.
+            Sketchi structures and validates every request before drawing. What
+            differs between the three paths is where that happens and who keeps
+            the file.
           </p>
 
           <div className="docs-paths docs-paths--three">
@@ -129,20 +128,16 @@ export function DocsView({
             <code>{CLI_PACKAGE_NAME}</code> is published on npm and authors
             diagrams from your shell. Records live under{" "}
             <code>~/.sketchi/diagrams</code> with the canonical document, the
-            Excalidraw artifact, and every prior revision, so nothing you make
-            is trapped in a browser tab.
+            Excalidraw artifact, and every prior revision.
           </p>
 
           <h3 className="docs-h3">Install</h3>
           {cliInstallOptions.map((option) => (
-            <div className="docs-install" key={option.command}>
-              <div className="code-snippet">
-                <pre className="docs-codeblock">
-                  <code>{option.command}</code>
-                </pre>
-                <CopyButton label={option.label} value={option.command} />
-              </div>
-              <p className="docs-install__note">{option.detail}</p>
+            <div className="code-snippet docs-install" key={option.command}>
+              <pre className="docs-codeblock">
+                <code>{option.command}</code>
+              </pre>
+              <CopyButton label={option.label} value={option.command} />
             </div>
           ))}
           <p className="docs-install__note">Requires {CLI_NODE_REQUIREMENT}.</p>
@@ -154,9 +149,8 @@ export function DocsView({
                 <code>generate</code>
               </dt>
               <dd>
-                Turn one prompt into a validated diagram. Makes a single
-                credential-free HTTPS request — no key, token, account, or
-                login.
+                Turn one prompt into a validated diagram. No key, token,
+                account, or login.
               </dd>
             </div>
             <div className="docs-defs__row">
@@ -182,8 +176,8 @@ export function DocsView({
                 <code>export</code>
               </dt>
               <dd>
-                Write PNG or Excalidraw. PNG rendering is deterministic and
-                local; it never starts a browser or uses the network.
+                Write PNG or Excalidraw. Local and deterministic; never uses the
+                network.
               </dd>
             </div>
             <div className="docs-defs__row">
@@ -227,8 +221,7 @@ export function DocsView({
           <h2>Open source</h2>
           <p>
             Sketchi is built in the open and MIT-licensed: the diagram engine,
-            the icon set, the agent runtime, even these pages. Read the code,
-            file an issue, or run your own copy.
+            the icon set, the agent runtime, even these pages.
           </p>
           <div className="docs-callout">
             <span className="docs-callout__k">Source</span>
@@ -278,7 +271,7 @@ export function DocsView({
             </div>
             <div className="docs-defs__row">
               <dt>Can I export?</dt>
-              <dd>Yes. Take it to your docs, slides, or pull request.</dd>
+              <dd>Yes, as PNG or Excalidraw.</dd>
             </div>
             <div className="docs-defs__row">
               <dt>Is there a CLI?</dt>

@@ -1,4 +1,3 @@
-import { BrandIcon } from "../brand-icon/index.js";
 import { CLI_NPM_URL } from "../../lib/cli-package";
 import {
   DEFAULT_WEB_SURFACE_URLS,
@@ -6,7 +5,6 @@ import {
 } from "../../lib/surface-urls";
 
 export interface SiteFooterProps {
-  colophon?: string;
   // Every surface that renders this footer must actually serve the file it
   // points at; pass an absolute URL when the surface has no llms.txt of its own.
   llmsTxtUrl?: string;
@@ -19,7 +17,6 @@ const DEFAULT_REPO_URL = "https://github.com/shpitdev/sketchi";
 const DEFAULT_LLMS_TXT_URL = "/llms.txt";
 
 export function SiteFooter({
-  colophon = "Made for people who'd rather describe a diagram than draw one.",
   llmsTxtUrl = DEFAULT_LLMS_TXT_URL,
   npmUrl = CLI_NPM_URL,
   repoUrl = DEFAULT_REPO_URL,
@@ -39,9 +36,6 @@ export function SiteFooter({
             />
             <span>Sketchi</span>
           </span>
-          <p className="site-footer__tagline">
-            Prompts become real, editable diagrams, logos included.
-          </p>
           <a
             aria-label="Sketchi on GitHub"
             className="site-footer__gh"
@@ -100,9 +94,12 @@ export function SiteFooter({
               <a href="/docs">How it works</a>
             </li>
             <li>
-              <a className="site-footer__npm" href={npmUrl}>
-                <BrandIcon label="npm" size={15} src="/brand/npm.svg" />
-                npm package
+              <a
+                aria-label="sketchi on npm"
+                className="site-footer__npm"
+                href={npmUrl}
+              >
+                <span aria-hidden="true" className="npm-mark npm-mark--sm" />
               </a>
             </li>
             <li>
@@ -117,7 +114,6 @@ export function SiteFooter({
 
       <div className="site-footer__base">
         <div className="sk-shell site-footer__base-inner">
-          <span>{colophon}</span>
           <span>© Sketchi</span>
         </div>
       </div>

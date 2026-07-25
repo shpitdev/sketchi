@@ -16,20 +16,15 @@ describe("FeatureGrid", () => {
     expect(
       screen.getByRole("heading", { name: "Yours to edit and export" }),
     ).toBeTruthy();
-    expect(
-      screen.getByText(
-        "Every shape, connector, and label stays editable after generation.",
-      ),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(
-        "Find the tools in your stack without drawing their marks by hand.",
-      ),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(
-        "Open the scene in Excalidraw, then export it when you are ready.",
-      ),
-    ).toBeTruthy();
+  });
+
+  /**
+   * The titles say the whole thing. A supporting sentence per card was padding
+   * dressed as polish, so the band carries its weight through layout instead.
+   */
+  it("adds no restating sentence under a title", () => {
+    const { container } = render(<FeatureGrid />);
+
+    expect(container.querySelector(".feature-card p")).toBeNull();
   });
 });

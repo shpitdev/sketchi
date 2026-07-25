@@ -459,40 +459,67 @@
 }
 
 /* ===================================================================== */
-/* GitHub mark — recolored via mask so it inherits ink on light, paper   */
-/* on the dark footer.                                                    */
+/* Source marks — both recolored via mask so they inherit ink on light    */
+/* and paper on the dark footer. npm's square tile does not survive that  */
+/* treatment (its n is a knockout, so masking it leaves a bare frame), so */
+/* npm uses its wordmark, which is legible small and reads as the brand.  */
+/* It keeps its natural 780:250 aspect rather than being squared off.     */
 /* ===================================================================== */
-.gh-mark {
+.gh-mark,
+.npm-mark {
   background: currentColor;
-  block-size: 20px;
   display: inline-block;
   flex: none;
+}
+
+.gh-mark {
+  block-size: 20px;
   inline-size: 20px;
   mask: url("/brand/github.svg") center / contain no-repeat;
   -webkit-mask: url("/brand/github.svg") center / contain no-repeat;
 }
 
-.site-header__gh {
+.npm-mark {
+  block-size: 18px;
+  inline-size: 46px;
+  mask: url("/brand/npm-wordmark.svg") center / contain no-repeat;
+  -webkit-mask: url("/brand/npm-wordmark.svg") center / contain no-repeat;
+}
+
+/* Footer link lists set their own type scale, so the mark tracks it. */
+.npm-mark--sm {
+  block-size: 15px;
+  inline-size: 38px;
+}
+
+.site-header__mark {
   align-items: center;
   border-radius: var(--r-sm);
   color: var(--ink-2);
   display: inline-flex;
   block-size: 40px;
-  inline-size: 40px;
   justify-content: center;
+  min-inline-size: 40px;
+  padding-inline: 9px;
   transition:
     color 0.16s var(--ease),
     background 0.16s var(--ease);
 }
 
-.site-header__gh:hover {
+.site-header__mark:hover {
   background: color-mix(in srgb, var(--card) 70%, transparent);
   color: var(--ink);
 }
 
-.site-header__gh:focus-visible {
+.site-header__mark:focus-visible {
   outline: 2px solid var(--blueprint);
   outline-offset: 2px;
+}
+
+/* The marks are a pair, so they sit tighter to each other than to the
+   surrounding actions. */
+.site-header__mark + .site-header__mark {
+  margin-inline-start: -6px;
 }
 
 .site-footer__gh {
@@ -584,16 +611,23 @@
 
 .feature-grid__cards {
   display: grid;
-  gap: 20px 44px;
+  gap: 20px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: 40px;
 }
 
+/* Without a supporting sentence each, the cards need their own surface to
+   hold the band; the tile is the body. */
 .feature-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 20px;
   min-width: 0;
+  padding: 26px 24px 28px;
 }
 
 .feature-card__glyph {
@@ -621,24 +655,19 @@
 }
 
 .feature-card__title {
-  font-size: 18px;
-  margin: 2px 0 0;
-}
-
-.feature-card__description {
-  color: var(--ink-2);
-  font-size: 15px;
-  line-height: 1.6;
-  margin: -4px 0 0;
-  max-width: 31ch;
+  font-size: 19px;
+  margin: 0;
+  max-width: 18ch;
 }
 
 /* ===================================================================== */
 /* CLI band — the terminal as a peer of the playground and the agent      */
 /* route, so the install command is the section rather than a link to it. */
 /* ===================================================================== */
+/* The copy column is now a title, a line, and a link, so it centers against
+   the terminal card rather than hanging from its top edge. */
 .cli-band__inner {
-  align-items: start;
+  align-items: center;
   display: grid;
   gap: 44px;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
@@ -656,35 +685,13 @@
   max-width: 46ch;
 }
 
-.cli-band__lead code,
-.cli-band__point dd code {
+.cli-band__lead code {
   background: var(--paper-2);
   border: 1px solid var(--line);
   border-radius: 5px;
   font-family: var(--font-mono);
   font-size: 0.88em;
   padding: 1px 5px;
-}
-
-.cli-band__points {
-  display: grid;
-  gap: 16px;
-  margin: 26px 0 0;
-}
-
-.cli-band__point dt {
-  color: var(--ink);
-  font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.cli-band__point dd {
-  color: var(--ink-2);
-  font-size: 14.5px;
-  line-height: 1.6;
-  margin: 3px 0 0;
-  max-width: 44ch;
 }
 
 .cli-band__links {
@@ -700,17 +707,6 @@
 .cli-band__npm .brand-icon__img {
   border-radius: 3px;
   flex: none;
-}
-
-.cli-band__docs-link {
-  color: var(--accent-ink);
-  font-size: 15px;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.cli-band__docs-link:hover {
-  text-decoration: underline;
 }
 
 /* Terminal card: same chrome as the hero board, dark body like a codeblock. */
@@ -764,22 +760,14 @@
   margin: 0;
 }
 
-.cli-band__note {
-  color: var(--ink-3);
-  font-size: 13px;
-  line-height: 1.5;
-  margin: 8px 0 0;
+.cli-band__body .code-snippet + .code-snippet {
+  margin-top: 12px;
 }
 
-.cli-band__step + .cli-band__step {
-  margin-top: 18px;
-}
-
-.cli-band__then {
-  color: var(--ink-2);
-  font-size: 14.5px;
-  font-weight: 600;
-  margin: 24px 0 10px;
+/* The example command is a different kind of line from the two installers, so
+   it gets a wider gap rather than a label. */
+.cli-band__example {
+  margin-top: 24px;
 }
 
 .cli-band__req {
@@ -1107,7 +1095,7 @@
 }
 
 .docs-install .docs-codeblock {
-  margin-bottom: 6px;
+  margin-bottom: 12px;
 }
 
 .docs-install__note {
@@ -1341,11 +1329,6 @@
   padding: 10px;
 }
 
-.agent-endpoint__meta {
-  color: var(--ink-3);
-  font-size: 13px;
-}
-
 .agent-list {
   padding-top: 34px;
 }
@@ -1530,8 +1513,16 @@
 .site-footer__inner {
   display: grid;
   gap: 36px;
-  grid-template-columns: 1.6fr repeat(3, 1fr);
+  grid-template-columns: 1.25fr repeat(3, 1fr);
   padding-block: 52px;
+}
+
+/* The brand column is a wordmark and a source link; it stacks on its own
+   rather than relying on a paragraph between them to break the line. */
+.site-footer__about {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
 }
 
 .site-footer__brand {
@@ -1542,14 +1533,6 @@
   font-size: 26px;
   font-weight: 700;
   gap: 9px;
-}
-
-.site-footer__tagline {
-  color: #a9a294;
-  font-size: 14px;
-  line-height: 1.6;
-  margin: 14px 0 0;
-  max-width: 32ch;
 }
 
 .site-footer__col h3 {
@@ -1580,12 +1563,7 @@
 .site-footer__npm {
   align-items: center;
   display: inline-flex;
-  gap: 7px;
-}
-
-.site-footer__npm .brand-icon__img {
-  border-radius: 3px;
-  flex: none;
+  padding-block: 3px;
 }
 
 .site-footer__col a:hover {
@@ -1652,7 +1630,7 @@
   }
 
   .feature-grid__cards {
-    gap: 28px 36px;
+    gap: 16px;
     grid-template-columns: 1fr 1fr;
   }
 
@@ -1662,8 +1640,7 @@
   }
 
   .cli-band__title,
-  .cli-band__lead,
-  .cli-band__point dd {
+  .cli-band__lead {
     max-width: none;
   }
 

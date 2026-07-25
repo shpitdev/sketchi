@@ -1,0 +1,12 @@
+<!--
+  npm's wordmark, drawn as a mask: the box is the fill and the letters are
+  knocked out of it, which is how the logo is built (white letters on a red
+  box). Rendered with `background: currentColor` it inherits ink on the light
+  header and paper on the dark footer, exactly like the GitHub mark.
+
+  Letterforms are npm's own 780x250 grid, unchanged, inset by a uniform 50
+  units. The inset is the one deviation and it is load-bearing: npm's letters
+  bleed to the left, top, and right edges, and a mask whose holes break the
+  field's outline renders as disconnected slivers rather than as letters.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 350"><path fill="#000" fill-rule="evenodd" d="M0 0h880v350H0zM50 250h100V100h50v150h50V50H50zM290 300h100v-50h100V50H290zM390 100h50v100h-50zM530 50v200h100V100h50v150h50V100h50v150h50V50z"/></svg>

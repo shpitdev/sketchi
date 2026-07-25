@@ -20,13 +20,15 @@ describe("CtaBand", () => {
     ).toHaveProperty("href", "http://localhost:3000/agents");
   });
 
-  it("offers the CLI as the third closing route", () => {
-    render(<CtaBand />);
+  /**
+   * Three trailing routes out of one closing sheet is clutter. The playground
+   * is the primary, the agent hub is the one alternative, and the CLI keeps
+   * its own full section further up the page.
+   */
+  it("closes on one primary action and one alternative", () => {
+    const { container } = render(<CtaBand />);
 
-    expect(
-      screen
-        .getByRole("link", { name: /install the CLI/ })
-        .getAttribute("href"),
-    ).toBe("/#cli");
+    expect(container.querySelectorAll(".cta-band__actions a")).toHaveLength(2);
+    expect(screen.queryByRole("link", { name: /install the CLI/ })).toBeNull();
   });
 });

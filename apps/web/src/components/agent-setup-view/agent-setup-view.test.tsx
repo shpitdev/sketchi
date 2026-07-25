@@ -20,9 +20,7 @@ describe("AgentSetupView", () => {
       "href",
       "http://localhost:3000/agents/opencode",
     );
-    expect(
-      screen.getByText("https://playground.sketchi.app/mcp"),
-    ).toBeTruthy();
+    expect(screen.getByText("https://playground.sketchi.app/mcp")).toBeTruthy();
     expect(screen.queryByRole("link", { name: /Eval harness/ })).toBeNull();
     expect(screen.queryByRole("link", { name: /Excalidraw app/ })).toBeNull();
   });
@@ -41,7 +39,9 @@ describe("AgentSetupView", () => {
     expect(
       screen.getByText(/opencode\/skills\/sketchi-code-mode/),
     ).toBeTruthy();
-    expect(screen.getByText(/provider and model behavior/)).toBeTruthy();
+    expect(
+      screen.getByText("No account, API key, or local browser needed."),
+    ).toBeTruthy();
   });
 
   it("renders the Codex plugin marketplace commands", () => {

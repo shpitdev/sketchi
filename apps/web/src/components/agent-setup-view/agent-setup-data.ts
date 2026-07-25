@@ -53,13 +53,9 @@ export const agentSetupEntries: readonly AgentSetupEntry[] = [
     icon: "/agents/codex.svg",
     id: "codex",
     name: "Codex",
-    notes: [
-      "Installs as a Codex plugin, so the skill is always a command away.",
-      "No account, API key, or local browser needed.",
-    ],
+    notes: ["No account, API key, or local browser needed."],
     status: "Plugin",
-    summary:
-      "Install the plugin, then ask Codex to diagram anything.",
+    summary: "Install the plugin, then ask Codex to diagram anything.",
     tagline: "OpenAI's coding agent",
   },
   {
@@ -84,13 +80,9 @@ curl -fsSL ${portableSkillUrl} -o "$SKETCHI_SKILL_DIR/SKILL.md"`,
     icon: "/agents/opencode.svg",
     id: "opencode",
     name: "OpenCode",
-    notes: [
-      "Setup is just the skill plus the public MCP server.",
-      "No account, API key, or local browser needed; provider and model behavior remain OpenCode concerns.",
-    ],
+    notes: ["No account, API key, or local browser needed."],
     status: "MCP",
-    summary:
-      "Point OpenCode at Sketchi and diagram from the terminal.",
+    summary: "Point OpenCode at Sketchi and diagram from the terminal.",
     tagline: "Open-source terminal agent",
   },
   {
@@ -120,13 +112,9 @@ curl -fsSL ${portableSkillUrl} -o "$SKETCHI_SKILL_DIR/SKILL.md"`,
     icon: "/agents/claude-code.svg",
     id: "claude-code",
     name: "Claude Code",
-    notes: [
-      "The plugin bundles the skill, so you can ask in plain language.",
-      "No account, API key, or local browser needed.",
-    ],
+    notes: ["No account, API key, or local browser needed."],
     status: "Plugin",
-    summary:
-      "Add the plugin, then turn any explanation into a diagram.",
+    summary: "Add the plugin, then turn any explanation into a diagram.",
     tagline: "Anthropic's coding agent",
   },
   {
@@ -152,12 +140,10 @@ curl -fsSL ${portableSkillUrl} -o .agents/skills/sketchi-code-mode/SKILL.md`,
     name: "Antigravity",
     notes: [
       "Save as .agents/mcp_config.json, merging the sketchi-code-mode server into any existing mcpServers object instead of overwriting it.",
-      "Setup is just the skill plus the public MCP server.",
-      "No account, API key, or local browser needed; model and harness behavior remain Agy concerns.",
+      "No account, API key, or local browser needed.",
     ],
     status: "MCP",
-    summary:
-      "Add the skill and point Agy at the Code Mode server.",
+    summary: "Add the skill and point Agy at the Code Mode server.",
     tagline: "Google's agent IDE",
   },
 ] satisfies readonly AgentSetupEntry[];

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CliBand } from "./cli-band";
 import {
   CLI_INSTALL_COMMAND,
+  CLI_NODE_REQUIREMENT,
   CLI_NPM_INSTALL_COMMAND,
   CLI_NPM_URL,
 } from "../../lib/cli-package";
@@ -60,20 +61,29 @@ describe("CliBand", () => {
   });
 
   /**
-   * `generate`, `share`, and `pull` all make HTTPS requests. Only the other
-   * seven commands are offline, so a blanket "offline except generation" claim
-   * is false — and a wrong privacy claim is worse than a vague one.
+   * Generation needs the network, so counting the commands that do not is a
+   * claim nobody installs a CLI for. The band makes no offline claim at all
+   * now, and must not grow one back.
    */
-  it("does not overstate what works offline", () => {
+  it("makes no offline claim", () => {
     const { container } = render(<CliBand />);
-    const text = container.textContent ?? "";
 
-    expect(text).not.toMatch(/offline for everything but generation/);
+    expect(container.textContent).not.toMatch(/offline/i);
+  });
+
+  /**
+   * Every install command carried a sentence explaining it. The commands are
+   * self-evident, so the terminal card is commands and the Node floor, nothing
+   * else.
+   */
+  it("captions none of the commands", () => {
+    const { container } = render(<CliBand />);
+
     expect(
-      screen.getByText(
-        "Create, patch, show, edit, list, export, and restore never touch the network or a model.",
+      [...container.querySelectorAll(".cli-band__body p")].map(
+        (element) => element.textContent,
       ),
-    ).toBeTruthy();
+    ).toEqual([`Requires ${CLI_NODE_REQUIREMENT}.`]);
   });
 
   it("links to the real npm package page with the npm mark", () => {
@@ -88,14 +98,13 @@ describe("CliBand", () => {
     );
   });
 
-  it("links to the CLI docs section", () => {
-    render(<CliBand />);
+  it("offers npm as the section's only trailing link", () => {
+    const { container } = render(<CliBand />);
 
+    expect(container.querySelectorAll(".cli-band__links a")).toHaveLength(1);
     expect(
-      screen
-        .getByRole("link", { name: /Read the CLI docs/ })
-        .getAttribute("href"),
-    ).toBe("/docs#cli");
+      screen.queryByRole("link", { name: /Read the CLI docs/ }),
+    ).toBeNull();
   });
 
   it("is anchored so navigation and footer entries can reach it", () => {

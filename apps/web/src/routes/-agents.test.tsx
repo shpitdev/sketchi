@@ -48,9 +48,6 @@ describe("AgentDetailPage", () => {
       ),
     ).toBeTruthy();
     expect(
-      screen.getByText(/model and harness behavior remain Agy/),
-    ).toBeTruthy();
-    expect(
       screen.getByRole("heading", {
         name: "Save or merge .agents/mcp_config.json",
         level: 2,

@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { CLI_NPM_URL } from "../../lib/cli-package";
 import {
   DEFAULT_WEB_SURFACE_URLS,
   type WebSurfaceUrls,
@@ -13,12 +14,12 @@ export interface SiteHeaderNavItem {
 export interface SiteHeaderProps {
   activePath?: string;
   navItems?: readonly SiteHeaderNavItem[];
+  npmUrl?: string;
   repoUrl?: string;
   surfaceUrls?: WebSurfaceUrls;
 }
 
 const defaultNavItems: readonly SiteHeaderNavItem[] = [
-  { href: "/#product", label: "Product" },
   { href: "/#cli", label: "CLI" },
   { href: "/agents", label: "Agents" },
   { href: "/docs", label: "Docs" },
@@ -29,6 +30,7 @@ const DEFAULT_REPO_URL = "https://github.com/shpitdev/sketchi";
 export function SiteHeader({
   activePath,
   navItems = defaultNavItems,
+  npmUrl = CLI_NPM_URL,
   repoUrl = DEFAULT_REPO_URL,
   surfaceUrls = DEFAULT_WEB_SURFACE_URLS,
 }: SiteHeaderProps) {
@@ -67,12 +69,21 @@ export function SiteHeader({
           </a>
           <a
             aria-label="Sketchi on GitHub"
-            className="site-header__gh"
+            className="site-header__mark"
             href={repoUrl}
             rel="noreferrer"
             target="_blank"
           >
             <span aria-hidden="true" className="gh-mark" />
+          </a>
+          <a
+            aria-label="sketchi on npm"
+            className="site-header__mark"
+            href={npmUrl}
+            rel="noreferrer"
+            target="_blank"
+          >
+            <span aria-hidden="true" className="npm-mark" />
           </a>
           <a
             className="sk-btn sk-btn--accent site-header__cta"
@@ -141,6 +152,15 @@ export function SiteHeader({
             >
               <span aria-hidden="true" className="gh-mark" />
               GitHub
+            </a>
+            <a
+              aria-label="sketchi on npm"
+              className="sk-btn sk-btn--ghost"
+              href={npmUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              <span aria-hidden="true" className="npm-mark" />
             </a>
             <a className="sk-btn sk-btn--accent" href={surfaceUrls.playground}>
               Playground
