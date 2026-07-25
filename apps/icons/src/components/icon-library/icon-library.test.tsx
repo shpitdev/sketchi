@@ -86,7 +86,14 @@ describe("IconLibrary", () => {
     expect(styles).toMatch(
       /\.icons-brand \.sk-wordmark\s*\{[^}]*font-family:\s*var\(--font-script\)/u,
     );
-    expect(rootRoute).toContain("family=Dancing+Script");
+    // The script font is Excalifont, self-hosted from this surface's own
+    // public/ rather than fetched from Google, so the wordmark renders in the
+    // same face the diagrams do. Preloading the Latin subset is what keeps it
+    // from painting the fallback first.
+    expect(rootRoute).not.toContain("family=Dancing+Script");
+    expect(rootRoute).toContain(
+      "/fonts/Excalifont/Excalifont-Regular-a88b72a24fb54c9f94e3b5fdaa7481c9.woff2",
+    );
   });
 
   it("calls the agent entry point llms.txt everywhere it appears", () => {

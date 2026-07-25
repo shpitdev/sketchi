@@ -30,6 +30,16 @@ export const Route = createRootRoute({
     ],
     links: [
       { rel: "icon", href: "/icon.svg", type: "image/svg+xml" },
+      // Excalifont's Latin subset backs the wordmark; preload it so the
+      // lockup paints in the product's own hand instead of reflowing
+      // through the sans fallback.
+      {
+        rel: "preload",
+        as: "font",
+        type: "font/woff2",
+        href: "/fonts/Excalifont/Excalifont-Regular-a88b72a24fb54c9f94e3b5fdaa7481c9.woff2",
+        crossOrigin: "anonymous",
+      },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       {
         rel: "preconnect",
@@ -38,7 +48,7 @@ export const Route = createRootRoute({
       },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Dancing+Script:wght@600;700&family=Hanken+Grotesk:wght@400..700&family=IBM+Plex+Mono:wght@400;500;600&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Hanken+Grotesk:wght@400..700&family=IBM+Plex+Mono:wght@400;500;600&display=swap",
       },
       { rel: "stylesheet", href: appStyles },
     ],

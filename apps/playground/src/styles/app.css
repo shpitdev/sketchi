@@ -63,7 +63,7 @@
   --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
-  --font-script: "Dancing Script", cursive;
+  --font-script: "Excalifont", cursive;
 }
 
 @layer base {
@@ -179,7 +179,7 @@ body {
 .studio-brand__wordmark {
   font-family: var(--font-script);
   font-size: 28px;
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1;
 }
 

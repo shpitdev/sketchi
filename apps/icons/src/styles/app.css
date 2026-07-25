@@ -872,7 +872,7 @@ select:focus-visible {
   display: inline-flex;
   font-family: var(--font-script);
   font-size: 26px;
-  font-weight: 700;
+  font-weight: 400;
   gap: 9px;
   text-decoration: none;
 }

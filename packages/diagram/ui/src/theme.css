@@ -5,11 +5,108 @@
    Imported by each app's app.css and by diagram-ui styles.css.
    ===================================================================== */
 
+/* ---------------------------------------------------------------------
+   Excalifont — the typeface every Sketchi diagram renders in, and now the
+   wordmark too, so the name is written in the same hand the product draws.
+
+   Vendored (unmodified) from @excalidraw/excalidraw under the SIL Open Font
+   License 1.1; see the LICENSE beside the woff2 files in each surface's
+   public/fonts/Excalifont. "Excalifont is a trademark of Excalidraw" — we
+   use the letterforms, never the name, as Sketchi branding.
+
+   These seven files are cn-font-split subsets of one face, not seven faces:
+   declaring only the Latin one leaves every other codepoint silently falling
+   back, so all seven ship with their upstream unicode-range. Only Regular
+   exists, so weights are pinned to 400 — any bolder wordmark would be a
+   synthetic smear of a hand-drawn face. Surfaces that render the wordmark
+   preload the U+20-7e subset so the lockup never reflows through a fallback.
+   --------------------------------------------------------------------- */
+@font-face {
+  font-family: "Excalifont";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Excalifont/Excalifont-Regular-a88b72a24fb54c9f94e3b5fdaa7481c9.woff2")
+    format("woff2");
+  unicode-range:
+    U+20-7e, U+a0-a3, U+a5-a6, U+a8-ab, U+ad-b1, U+b4, U+b6-b8, U+ba-ff, U+131,
+    U+152-153, U+2bc, U+2c6, U+2da, U+2dc, U+304, U+308, U+2013-2014,
+    U+2018-201a, U+201c-201e, U+2020, U+2022, U+2024-2026, U+2030, U+2039-203a,
+    U+20ac, U+2122, U+2212;
+}
+
+@font-face {
+  font-family: "Excalifont";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Excalifont/Excalifont-Regular-be310b9bcd4f1a43f571c46df7809174.woff2")
+    format("woff2");
+  unicode-range:
+    U+100-130, U+132-137, U+139-149, U+14c-151, U+154-17e, U+192, U+1fc-1ff,
+    U+218-21b, U+237, U+1e80-1e85, U+1ef2-1ef3, U+2113;
+}
+
+@font-face {
+  font-family: "Excalifont";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Excalifont/Excalifont-Regular-b9dcf9d2e50a1eaf42fc664b50a3fd0d.woff2")
+    format("woff2");
+  unicode-range: U+400-45f, U+490-491, U+2116;
+}
+
+@font-face {
+  font-family: "Excalifont";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Excalifont/Excalifont-Regular-41b173a47b57366892116a575a43e2b6.woff2")
+    format("woff2");
+  unicode-range:
+    U+37e, U+384-38a, U+38c, U+38e-393, U+395-3a1, U+3a3-3a8, U+3aa-3cf, U+3d7;
+}
+
+@font-face {
+  font-family: "Excalifont";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Excalifont/Excalifont-Regular-3f2c5db56cc93c5a6873b1361d730c16.woff2")
+    format("woff2");
+  unicode-range:
+    U+2c7, U+2d8-2d9, U+2db, U+2dd, U+302, U+306-307, U+30a-30c, U+326-328,
+    U+212e, U+2211, U+fb01-fb02;
+}
+
+@font-face {
+  font-family: "Excalifont";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Excalifont/Excalifont-Regular-349fac6ca4700ffec595a7150a0d1e1d.woff2")
+    format("woff2");
+  unicode-range:
+    U+462-463, U+472-475, U+4d8-4d9, U+4e2-4e3, U+4e6-4e9, U+4ee-4ef;
+}
+
+@font-face {
+  font-family: "Excalifont";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Excalifont/Excalifont-Regular-623ccf21b21ef6b3a0d87738f77eb071.woff2")
+    format("woff2");
+  unicode-range: U+300-301, U+303;
+}
+
 :root {
-  --font-display: "Bricolage Grotesque", "Hanken Grotesk", system-ui, sans-serif;
+  --font-display:
+    "Bricolage Grotesque", "Hanken Grotesk", system-ui, sans-serif;
   --font-body: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
-  --font-script: "Dancing Script", "Bricolage Grotesque", cursive;
+  --font-script: "Excalifont", "Bricolage Grotesque", cursive;
 
   /* surfaces */
   --paper: #f6f1e7;
@@ -53,16 +150,20 @@
 
   --grid-dot: rgba(26, 23, 18, 0.06);
 
-  --shadow-sm: 0 1px 2px rgba(40, 31, 12, 0.06), 0 2px 6px rgba(40, 31, 12, 0.05);
-  --shadow-md: 0 6px 18px rgba(40, 31, 12, 0.08), 0 2px 6px rgba(40, 31, 12, 0.05);
-  --shadow-lg: 0 24px 60px rgba(40, 31, 12, 0.16), 0 6px 18px rgba(40, 31, 12, 0.08);
+  --shadow-sm:
+    0 1px 2px rgba(40, 31, 12, 0.06), 0 2px 6px rgba(40, 31, 12, 0.05);
+  --shadow-md:
+    0 6px 18px rgba(40, 31, 12, 0.08), 0 2px 6px rgba(40, 31, 12, 0.05);
+  --shadow-lg:
+    0 24px 60px rgba(40, 31, 12, 0.16), 0 6px 18px rgba(40, 31, 12, 0.08);
 
   --r-sm: 8px;
   --r-md: 12px;
   --r-lg: 18px;
   --shell: 1180px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --checker: linear-gradient(45deg, var(--line) 25%, transparent 25%),
+  --checker:
+    linear-gradient(45deg, var(--line) 25%, transparent 25%),
     linear-gradient(-45deg, var(--line) 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, var(--line) 75%),
     linear-gradient(-45deg, transparent 75%, var(--line) 75%);
@@ -83,10 +184,18 @@ body {
 body {
   background-color: var(--paper);
   background-image:
-    radial-gradient(52rem 28rem at 85% -12%, rgba(143, 112, 127, 0.1), transparent 60%),
+    radial-gradient(
+      52rem 28rem at 85% -12%,
+      rgba(143, 112, 127, 0.1),
+      transparent 60%
+    ),
     radial-gradient(var(--grid-dot) 1px, transparent 1px);
-  background-size: auto, 24px 24px;
-  background-position: 0 0, -1px -1px;
+  background-size:
+    auto,
+    24px 24px;
+  background-position:
+    0 0,
+    -1px -1px;
   color: var(--ink);
   font-family: var(--font-body);
   font-size: 16px;
@@ -164,10 +273,13 @@ img {
   display: block;
 }
 
+/* 400, not 700: Excalifont has a single Regular, so anything bolder is a
+   synthetic smear that thickens the strokes without widening the letters and
+   closes up the counters in "e" and "c". Regular is the real hand. */
 .sk-wordmark {
   font-family: var(--font-script);
   font-size: 28px;
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1;
 }
 
