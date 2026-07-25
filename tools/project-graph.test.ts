@@ -127,7 +127,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
   "apps/excalidraw/src/components/svg-icon-workspace/svg-icon-workspace.tsx": 7,
   "apps/icons/scripts/generate-icon-manifest.ts": 10,
   "apps/icons/src/components/icon-library/icon-library.tsx": 38,
-  "apps/icons/src/lib/icon-actions.ts": 8,
+  "apps/icons/src/lib/icon-actions.ts": 15,
   "apps/icons/src/lib/icon-api.server.ts": 9,
   "apps/icons/src/lib/icon-catalog.server.ts": 6,
   "apps/icons/src/lib/icon-mcp.server.ts": 8,

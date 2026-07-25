@@ -265,6 +265,9 @@ importers:
 
   apps/icons:
     dependencies:
+      '@tanstack/react-hotkeys':
+        specifier: 0.10.0
+        version: 0.10.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       fflate:
         specifier: 0.8.2
         version: 0.8.2

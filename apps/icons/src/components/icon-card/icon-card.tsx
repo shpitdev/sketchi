@@ -61,9 +61,6 @@ export function IconCard({
           onClick={() => onToggleSelected?.(icon)}
           type="button"
         >
-          <span aria-hidden="true" className="icon-card__check">
-            {selected ? "✓" : "+"}
-          </span>
           {selected ? "Selected" : "Select"}
         </button>
         <button

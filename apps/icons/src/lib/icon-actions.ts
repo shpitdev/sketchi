@@ -115,6 +115,44 @@ export async function copyText(value: string): Promise<void> {
   if (!copied) throw new Error("Clipboard copy failed.");
 }
 
+/**
+ * Maps over items with at most `limit` tasks in flight. Bulk selection actions
+ * can cover hundreds of icons, and an unbounded `Promise.all` would open that
+ * many requests at once.
+ *
+ * The first failure stops the remaining workers from claiming new items, and
+ * the rejection is only raised once every in-flight task has settled, so a
+ * caller that resets its state on error is never racing leftover work.
+ */
+export async function mapWithConcurrency<Item, Result>(
+  items: readonly Item[],
+  limit: number,
+  run: (item: Item, index: number) => Promise<Result>,
+): Promise<Result[]> {
+  const results = Array.from<Result>({ length: items.length });
+  let cursor = 0;
+  let failure: { readonly error: unknown } | undefined;
+  async function worker(): Promise<void> {
+    while (cursor < items.length && !failure) {
+      const index = cursor;
+      cursor += 1;
+      const item = items[index];
+      if (item === undefined) continue;
+      try {
+        results[index] = await run(item, index);
+      } catch (error) {
+        failure ??= { error };
+        return;
+      }
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker),
+  );
+  if (failure) throw failure.error;
+  return results;
+}
+
 export function createIconZip(
   icons: readonly { readonly slug: string; readonly svg: string }[],
 ): Promise<Blob> {

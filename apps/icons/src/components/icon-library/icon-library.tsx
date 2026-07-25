@@ -1,10 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { detectPlatform, useHotkeys } from "@tanstack/react-hotkeys";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 
 import {
   copyText,
   createIconZip,
   downloadBlob,
   downloadSvg,
+  mapWithConcurrency,
   svgDataUri,
   svgToJsxComponent,
 } from "../../lib/icon-actions.js";
@@ -15,12 +24,24 @@ import {
   type IconManifest,
   type SketchiIcon,
 } from "../../lib/icon-data.js";
+import {
+  describeSelectionNotice,
+  initialSelectionState,
+  remainingCapacity,
+  selectAllLabel,
+  selectionReducer,
+  SELECTION_LIMIT,
+} from "../../lib/icon-selection.js";
 import { IconCard } from "../icon-card/index.js";
 import { IconDetail, type IconDetailAction } from "../icon-detail/index.js";
 
 export type { IconManifest, SketchiIcon } from "../../lib/icon-data.js";
 
 const PAGE_SIZE = 72;
+/** Nothing is highlighted until the user actually navigates with the keyboard. */
+const NO_ACTIVE_INDEX = -1;
+/** Concurrent SVG fetches while a bulk selection action runs. */
+const FETCH_CONCURRENCY = 8;
 
 type LoadStatus = "error" | "loading" | "ready";
 type PreviewMode = "dark" | "light";
@@ -50,17 +71,20 @@ function permanentSvgUrl(slug: string): string {
     : new URL(path, window.location.href).href;
 }
 
-function isEditableTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  );
-}
-
 function isActionTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && target.closest("a, button") !== null;
+}
+
+/**
+ * `Mod` renders as `⌘` on macOS and `Ctrl` elsewhere. Platform detection has to
+ * wait for mount so the server and the first client render agree.
+ */
+function useModifierLabel(): string {
+  const [platform, setPlatform] = useState<"linux" | "mac" | "windows">(
+    "linux",
+  );
+  useEffect(() => setPlatform(detectPlatform()), []);
+  return platform === "mac" ? "⌘" : "Ctrl";
 }
 
 export function IconLibrary({
@@ -78,16 +102,25 @@ export function IconLibrary({
   const [previewMode, setPreviewMode] =
     useState<PreviewMode>(initialPreviewMode);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(NO_ACTIVE_INDEX);
   const [detailSlug, setDetailSlug] = useState<string>();
-  const [selectedSlugs, setSelectedSlugs] = useState<ReadonlySet<string>>(
-    new Set(),
+  const [selection, dispatchSelection] = useReducer(
+    selectionReducer,
+    initialSelectionState,
   );
+  const selectedSlugs = selection.slugs;
   const [copyingSlug, setCopyingSlug] = useState<string>();
   const [copiedSlug, setCopiedSlug] = useState<string>();
   const [busyDetailAction, setBusyDetailAction] = useState<IconDetailAction>();
   const [busySelectionAction, setBusySelectionAction] =
     useState<SelectionAction>();
+  // Both halves are snapshotted when a bulk action starts: it runs over the
+  // selection as it was then, so editing the selection mid-flight must not
+  // move the denominator.
+  const [selectionProgress, setSelectionProgress] = useState({
+    done: 0,
+    total: 0,
+  });
   const [notice, setNotice] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const detailOpenerRef = useRef<HTMLElement | null>(null);
@@ -117,6 +150,12 @@ export function IconLibrary({
   const selectedIcons = data.icons.filter((icon) =>
     selectedSlugs.has(icon.slug),
   );
+  const capacityLeft = remainingCapacity(selectedSlugs);
+  const selectionIsFull = capacityLeft === 0;
+  const pendingCount = results.filter(
+    (icon) => !selectedSlugs.has(icon.slug),
+  ).length;
+  const modifierLabel = useModifierLabel();
   const closeDetail = useCallback(() => setDetailSlug(undefined), []);
 
   const showNotice = useCallback((message: string) => {
@@ -167,13 +206,11 @@ export function IconLibrary({
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-    setActiveIndex(0);
+    setActiveIndex(NO_ACTIVE_INDEX);
   }, [collection, query]);
 
   useEffect(() => {
-    if (activeIndex >= results.length) {
-      setActiveIndex(Math.max(0, results.length - 1));
-    }
+    if (activeIndex >= results.length) setActiveIndex(NO_ACTIVE_INDEX);
   }, [activeIndex, results.length]);
 
   useEffect(() => {
@@ -183,63 +220,204 @@ export function IconLibrary({
     };
   }, []);
 
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (detailSlug) return;
-      if (event.key === "/" && !isEditableTarget(event.target)) {
-        event.preventDefault();
-        searchRef.current?.focus();
-        return;
-      }
-      if (event.key === "Escape") {
-        if (query) {
-          setQuery("");
-          searchRef.current?.focus();
-        }
-        return;
-      }
-      const targetIsSearch = event.target === searchRef.current;
-      if (isActionTarget(event.target) && !targetIsSearch) {
-        return;
-      }
-      if (isEditableTarget(event.target) && !targetIsSearch) return;
+  const moveActive = useCallback(
+    (direction: -1 | 1) => {
+      if (!results.length) return;
+      const next =
+        activeIndex === NO_ACTIVE_INDEX
+          ? direction === 1
+            ? 0
+            : results.length - 1
+          : (activeIndex + direction + results.length) % results.length;
+      setActiveIndex(next);
+      setVisibleCount((count) => Math.max(count, next + 1));
+      const slug = results[next]?.slug;
+      if (!slug) return;
+      window.setTimeout(() => {
+        document
+          .getElementById(`icon-result-${slug}`)
+          ?.scrollIntoView({ block: "nearest" });
+      }, 0);
+    },
+    [activeIndex, results],
+  );
 
-      const direction =
-        event.key === "ArrowDown" || event.key === "ArrowRight"
-          ? 1
-          : event.key === "ArrowUp" || event.key === "ArrowLeft"
-            ? -1
-            : 0;
-      if (direction !== 0 && results.length) {
-        event.preventDefault();
-        setActiveIndex((current) => {
-          const next = (current + direction + results.length) % results.length;
-          setVisibleCount((count) => Math.max(count, next + 1));
-          window.setTimeout(() => {
-            document
-              .getElementById(`icon-result-${results[next]?.slug ?? ""}`)
-              ?.scrollIntoView({ block: "nearest" });
-          }, 0);
-          return next;
-        });
-        return;
-      }
-      if (event.key === "Enter" && results[activeIndex]) {
-        event.preventDefault();
-        void copySvg(results[activeIndex]);
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeIndex, copySvg, detailSlug, query, results]);
+  const selectAllResults = useCallback(() => {
+    dispatchSelection({
+      slugs: results.map((icon) => icon.slug),
+      type: "select-all",
+    });
+  }, [results]);
+
+  const clearSelection = useCallback(
+    () => dispatchSelection({ type: "clear" }),
+    [],
+  );
+
+  // The reducer reports what happened as data; announcing it is this effect's
+  // job so that no selection update fires a side effect mid-update.
+  useEffect(() => {
+    if (selection.notice) showNotice(describeSelectionNotice(selection.notice));
+  }, [selection, showNotice]);
+
+  const focusSearch = useCallback(() => searchRef.current?.focus(), []);
+
+  const clearSearch = useCallback(() => {
+    setActiveIndex(NO_ACTIVE_INDEX);
+    if (!query) return;
+    setQuery("");
+    searchRef.current?.focus();
+  }, [query]);
+
+  /**
+   * Copies the keyboard-highlighted icon. With nothing highlighted, Enter from
+   * the search field falls back to the top result so "type, Enter" still works.
+   */
+  const copyKeyboardTarget = useCallback(
+    (event: KeyboardEvent, allowTopResult: boolean) => {
+      const icon =
+        activeIndex === NO_ACTIVE_INDEX
+          ? allowTopResult
+            ? results[0]
+            : undefined
+          : results[activeIndex];
+      if (!icon) return;
+      event.preventDefault();
+      void copySvg(icon);
+    },
+    [activeIndex, copySvg, results],
+  );
+
+  /**
+   * Buttons and links are not "inputs", so the hotkey manager would happily
+   * steal their arrow keys. Leave them alone, and only swallow the default
+   * scroll when the highlight actually moves.
+   */
+  const moveFromKey = useCallback(
+    (event: KeyboardEvent, direction: -1 | 1, fromSearch: boolean) => {
+      if (!fromSearch && isActionTarget(event.target)) return;
+      if (!results.length) return;
+      event.preventDefault();
+      moveActive(direction);
+    },
+    [moveActive, results.length],
+  );
+
+  // Arrow and Enter shortcuts have to work both from the search field and from
+  // the page at large, but must leave every other input alone — notably the
+  // collection <select>, whose own arrow behaviour we do not want to hijack.
+  // One registration targets the search field (`ignoreInputs: false`), the
+  // other the document, where the default input handling skips form controls.
+  const gridHotkeys = useMemo(
+    () =>
+      (
+        [
+          ["ArrowDown", 1],
+          ["ArrowUp", -1],
+          ["ArrowRight", 1],
+          ["ArrowLeft", -1],
+        ] as const
+      ).flatMap(([hotkey, direction]) => [
+        {
+          callback: (event: KeyboardEvent) =>
+            moveFromKey(event, direction, true),
+          hotkey,
+          options: {
+            ignoreInputs: false,
+            preventDefault: false,
+            target: searchRef,
+          },
+        },
+        {
+          callback: (event: KeyboardEvent) =>
+            moveFromKey(event, direction, false),
+          hotkey,
+          options: { preventDefault: false },
+        },
+      ]),
+    [moveFromKey],
+  );
+
+  useHotkeys(
+    [
+      ...gridHotkeys,
+      { callback: focusSearch, hotkey: "/" },
+      // On layouts where slash is a shifted key — Shift+7 on German QWERTZ —
+      // the event still reads `key: "/"` but carries Shift, which the plain
+      // "/" registration rejects. This also picks up "?" on US layouts.
+      { callback: focusSearch, hotkey: { key: "/", shift: true } },
+      {
+        callback: (event) => copyKeyboardTarget(event, true),
+        hotkey: "Enter",
+        // Enter must still activate whatever button has focus, so the default
+        // action is only suppressed when we actually copy something.
+        options: {
+          ignoreInputs: false,
+          preventDefault: false,
+          target: searchRef,
+        },
+      },
+      {
+        callback: (event) => {
+          if (isActionTarget(event.target)) return;
+          copyKeyboardTarget(event, false);
+        },
+        hotkey: "Enter",
+        options: { preventDefault: false },
+      },
+      // These three stay unregistered when they would do nothing: a registered
+      // hotkey suppresses the browser's own Escape, Select All and Bookmark
+      // Page even when our callback bails out.
+      {
+        callback: clearSearch,
+        hotkey: "Escape",
+        options: {
+          enabled:
+            !detailIcon && (query !== "" || activeIndex !== NO_ACTIVE_INDEX),
+        },
+      },
+      {
+        callback: selectAllResults,
+        hotkey: "Mod+A",
+        options: {
+          // Mirrors the select-all button: enabled only when the click would
+          // actually add something.
+          enabled:
+            !detailIcon &&
+            status === "ready" &&
+            pendingCount > 0 &&
+            capacityLeft > 0,
+          // Leave Cmd/Ctrl+A alone while someone is editing the search text.
+          ignoreInputs: true,
+        },
+      },
+      // Clearing the selection has to work from the search field too: filtering
+      // then clearing is the normal flow, and unlike Mod+A there is no native
+      // in-field behaviour worth keeping. Mod+D is claimed on the field itself
+      // and, separately, everywhere outside an input.
+      {
+        callback: clearSelection,
+        hotkey: "Mod+D",
+        options: {
+          enabled: !detailIcon && selectedSlugs.size > 0,
+          ignoreInputs: false,
+          target: searchRef,
+        },
+      },
+      {
+        callback: clearSelection,
+        hotkey: "Mod+D",
+        options: {
+          enabled: !detailIcon && selectedSlugs.size > 0,
+          ignoreInputs: true,
+        },
+      },
+    ],
+    { enabled: !detailIcon },
+  );
 
   function toggleSelected(icon: SketchiIcon) {
-    setSelectedSlugs((current) => {
-      const next = new Set(current);
-      if (next.has(icon.slug)) next.delete(icon.slug);
-      else next.add(icon.slug);
-      return next;
-    });
+    dispatchSelection({ slug: icon.slug, type: "toggle" });
   }
 
   async function runDetailAction(action: IconDetailAction, icon: SketchiIcon) {
@@ -276,14 +454,22 @@ export function IconLibrary({
   }
 
   async function runSelectionAction(action: SelectionAction) {
-    if (!selectedIcons.length) return;
+    const batch = selectedIcons;
+    if (!batch.length) return;
     setBusySelectionAction(action);
+    setSelectionProgress({ done: 0, total: batch.length });
     try {
-      const sources = await Promise.all(
-        selectedIcons.map(async (icon) => ({
-          slug: icon.slug,
-          svg: await getSvg(icon),
-        })),
+      const sources = await mapWithConcurrency(
+        batch,
+        FETCH_CONCURRENCY,
+        async (icon) => {
+          const svg = await getSvg(icon);
+          setSelectionProgress((progress) => ({
+            ...progress,
+            done: progress.done + 1,
+          }));
+          return { slug: icon.slug, svg };
+        },
       );
       if (action === "copy") {
         await copyText(sources.map(({ svg }) => svg).join("\n\n"));
@@ -296,6 +482,7 @@ export function IconLibrary({
       showNotice("Could not prepare the selected icons. Try again.");
     } finally {
       setBusySelectionAction(undefined);
+      setSelectionProgress({ done: 0, total: 0 });
     }
   }
 
@@ -316,7 +503,7 @@ export function IconLibrary({
           </a>
           <nav aria-label="Sketchi links" className="icons-header__nav">
             <a href={`${homeHref}/docs`}>Docs</a>
-            <a href="/llms.txt">Agent API</a>
+            <a href="/llms.txt">llms.txt</a>
             <a href="https://github.com/shpitdev/sketchi">GitHub</a>
           </nav>
         </div>
@@ -330,7 +517,6 @@ export function IconLibrary({
         <section className="icons-hero">
           <div className="icons-shell icons-hero__inner">
             <div className="icons-hero__copy">
-              <p className="icons-hero__eyebrow">Open SVG library</p>
               <h1>Icons, ready when you are.</h1>
               <p>
                 Search {data.summary.totalIcons.toLocaleString()} clean SVGs.
@@ -346,10 +532,6 @@ export function IconLibrary({
                 <strong>{collections.length.toLocaleString()}</strong>
                 Collections
               </span>
-              <a href="/llms.txt">
-                <strong>MCP</strong>
-                Agent access
-              </a>
             </div>
           </div>
         </section>
@@ -424,16 +606,30 @@ export function IconLibrary({
             </div>
 
             <div className="icons-browser__meta">
-              <p aria-live="polite" role="status">
-                {status === "ready"
-                  ? `${results.length.toLocaleString()} ${
-                      results.length === 1 ? "icon" : "icons"
-                    }`
-                  : ""}
-              </p>
-              <p>
+              <div className="icons-browser__count">
+                <p aria-live="polite" role="status">
+                  {status === "ready"
+                    ? `${results.length.toLocaleString()} ${
+                        results.length === 1 ? "icon" : "icons"
+                      }`
+                    : ""}
+                </p>
+                {status === "ready" && results.length ? (
+                  <button
+                    className="icons-browser__select-all"
+                    disabled={selectionIsFull || pendingCount === 0}
+                    onClick={selectAllResults}
+                    type="button"
+                  >
+                    {selectAllLabel(results.length, pendingCount, capacityLeft)}
+                  </button>
+                ) : null}
+              </div>
+              <p className="icons-browser__keys">
                 <kbd>↑</kbd> <kbd>↓</kbd> move <kbd>Enter</kbd> copy SVG{" "}
-                <kbd>Esc</kbd> clear
+                <kbd>{modifierLabel}</kbd> <kbd>A</kbd> select all{" "}
+                <kbd>{modifierLabel}</kbd> <kbd>D</kbd> clear selection{" "}
+                <kbd>Esc</kbd> clear search
               </p>
             </div>
 
@@ -541,7 +737,7 @@ export function IconLibrary({
           <nav aria-label="Footer">
             <a href={homeHref}>Home</a>
             <a href={`${homeHref}/docs`}>Docs</a>
-            <a href="/llms.txt">For agents</a>
+            <a href="/llms.txt">llms.txt</a>
             <a href="https://playground.sketchi.app">Playground</a>
           </nav>
         </div>
@@ -576,9 +772,12 @@ export function IconLibrary({
           inert={detailIcon ? true : undefined}
         >
           <div className="selection-bar__count">
-            <strong>{selectedIcons.length}</strong>
+            <strong>{selectedIcons.length.toLocaleString()}</strong>
             <span>
               {selectedIcons.length === 1 ? "icon" : "icons"} selected
+              {selectionIsFull
+                ? ` — capped at ${SELECTION_LIMIT.toLocaleString()}`
+                : ""}
             </span>
           </div>
           <div className="selection-bar__actions">
@@ -587,7 +786,9 @@ export function IconLibrary({
               onClick={() => void runSelectionAction("copy")}
               type="button"
             >
-              {busySelectionAction === "copy" ? "Copying" : "Copy all SVG"}
+              {busySelectionAction === "copy"
+                ? `Copying ${selectionProgress.done}/${selectionProgress.total}`
+                : "Copy all SVG"}
             </button>
             <button
               className="is-primary"
@@ -595,11 +796,13 @@ export function IconLibrary({
               onClick={() => void runSelectionAction("zip")}
               type="button"
             >
-              {busySelectionAction === "zip" ? "Building zip" : "Download zip"}
+              {busySelectionAction === "zip"
+                ? `Building zip ${selectionProgress.done}/${selectionProgress.total}`
+                : "Download zip"}
             </button>
             <button
               disabled={busySelectionAction !== undefined}
-              onClick={() => setSelectedSlugs(new Set())}
+              onClick={clearSelection}
               type="button"
             >
               Clear selection
