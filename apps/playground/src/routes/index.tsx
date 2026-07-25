@@ -314,7 +314,6 @@ function DiagramStage({
     <section className="studio__stage">
       <header className="studio__stage-head">
         <div>
-          <p className="studio__stage-kicker">canvas</p>
           <h2 className="studio__stage-title">{title}</h2>
         </div>
         <div className="studio__stage-meta">

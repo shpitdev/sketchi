@@ -64,7 +64,6 @@ function RootComponent() {
 function NotFoundComponent() {
   return (
     <main className="sketchi-not-found">
-      <p className="sk-eyebrow">404</p>
       <h1>This page isn&rsquo;t on the board.</h1>
       <a className="sk-btn sk-btn--primary" href="/">
         Back to Sketchi

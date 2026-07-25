@@ -22,6 +22,23 @@ describe("SiteFooter", () => {
     ).toBe("https://github.com/shpitdev/sketchi");
   });
 
+  it("links to llms.txt under its own name", () => {
+    render(<SiteFooter />);
+
+    expect(
+      screen.getByRole("link", { name: "llms.txt" }).getAttribute("href"),
+    ).toBe("/llms.txt");
+    expect(screen.queryByRole("link", { name: "Agent API" })).toBeNull();
+  });
+
+  it("lets a surface point llms.txt somewhere it actually resolves", () => {
+    render(<SiteFooter llmsTxtUrl="https://sketchi.app/llms.txt" />);
+
+    expect(
+      screen.getByRole("link", { name: "llms.txt" }).getAttribute("href"),
+    ).toBe("https://sketchi.app/llms.txt");
+  });
+
   it("uses configured surface links", () => {
     render(
       <SiteFooter

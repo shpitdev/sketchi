@@ -159,17 +159,6 @@ img {
   width: 100%;
 }
 
-.sk-eyebrow {
-  color: var(--accent-ink);
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  margin: 0;
-  text-transform: uppercase;
-}
-
 .sk-icon {
   border-radius: 7px;
   display: block;

@@ -1,0 +1,31 @@
+# Sketchi
+
+Sketchi turns a plain-language prompt into a clean, editable diagram, brand
+logos included. It is usable by people in the browser and by software agents
+over MCP. Source is MIT-licensed at https://github.com/shpitdev/sketchi.
+
+## Surfaces
+
+https://sketchi.app/ — what Sketchi is, docs, and agent setup.
+https://playground.sketchi.app/ — describe a diagram, refine it in chat, then
+view, edit, or download it.
+https://icons.sketchi.app/ — public SVG icon library with its own HTTP API.
+See https://icons.sketchi.app/llms.txt for the icon endpoints.
+
+## Agents
+
+Connect a Streamable HTTP MCP client to https://playground.sketchi.app/mcp.
+The server is named sketchi-code-mode and exposes three tools:
+
+- docs: how to drive Sketchi, including the diagram spec shape.
+- search: look up Sketchi API surface before writing a call.
+- execute: run Sketchi code mode, which builds flowcharts, mindmaps, and
+  sequence diagrams, fetches artifacts, and applies diagram patches.
+
+Per-agent setup instructions live at https://sketchi.app/agents, with pages for
+Claude Code, Codex, OpenCode, and Antigravity.
+
+## Docs
+
+https://sketchi.app/docs — how generation works, supported diagram types, and
+the open-source layout.

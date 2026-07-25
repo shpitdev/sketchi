@@ -234,7 +234,6 @@ export function PlaygroundEmptyState({
         className="studio__empty"
       >
         <div className="studio__empty-copy">
-          <p className="studio__empty-kicker">Start with a sketch</p>
           <h1 className="studio__empty-title" id="playground-empty-title">
             What should we draw?
           </h1>
@@ -281,9 +280,8 @@ export function PlaygroundEmptyState({
         </div>
 
         <aside className="studio__announcement">
-          <span className="studio__announcement-kicker">New sketch type</span>
           <span className="studio__announcement-copy">
-            Mind maps are ready to explore.
+            Mind maps are a new sketch type, ready to explore.
           </span>
           <a href="/examples/public-mindmap">View the example →</a>
         </aside>

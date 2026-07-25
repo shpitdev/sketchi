@@ -88,6 +88,11 @@ describe("playground surface", () => {
     render(<PlaygroundEmptyState onSelect={() => undefined} />);
 
     expect(screen.getByText("Deploy pipeline")).toBeTruthy();
+    // The sample is the live renderer's output, and the caption says so. Keep
+    // the claim attached to the same figure that carries the real scene.
+    expect(
+      screen.getByText("Rendered in Sketchi").closest("figcaption"),
+    ).not.toBeNull();
     expect(
       screen.getByTestId("diagram-preview").getAttribute("data-diagram-id"),
     ).toBe(DEPLOY_PIPELINE_SCENE.diagramId);
@@ -152,7 +157,9 @@ describe("playground surface", () => {
     render(<PlaygroundEmptyState onSelect={() => undefined} />);
 
     expect(screen.getByLabelText("Starter prompts").children).toHaveLength(3);
-    expect(screen.getByText("Mind maps are ready to explore.")).toBeTruthy();
+    expect(
+      screen.getByText("Mind maps are a new sketch type, ready to explore."),
+    ).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "View the example →" }),
     ).toBeTruthy();

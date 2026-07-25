@@ -93,6 +93,57 @@ describe("playground short viewport layout", () => {
     expect(brandPath.closest(".studio__sample-canvas")).toBeNull();
   });
 
+  it("states the sample is real output without shouting it", () => {
+    render(<PlaygroundEmptyState onSelect={() => undefined} />);
+
+    const claim = screen.getByText("Rendered in Sketchi");
+    const style = getComputedStyle(claim);
+
+    expect(claim.closest("figcaption")).not.toBeNull();
+    expect(style.textTransform).toBe("none");
+    expect(style.letterSpacing).toBe("normal");
+  });
+
+  it("gives the empty state the same shell width as every other surface", () => {
+    render(
+      <main className="studio">
+        <div className="studio__body">
+          <section className="studio__chat">
+            <PlaygroundEmptyState onSelect={() => undefined} />
+          </section>
+        </div>
+      </main>,
+    );
+
+    const studio = document.querySelector(".studio");
+    const empty = document.querySelector(".studio__empty");
+    const wrap = document.querySelector(".studio__empty-wrap");
+    expect(studio).not.toBeNull();
+    expect(empty).not.toBeNull();
+    expect(wrap).not.toBeNull();
+    if (!studio || !empty || !wrap) {
+      return;
+    }
+
+    const shell = getComputedStyle(document.documentElement)
+      .getPropertyValue("--shell")
+      .trim();
+
+    expect(shell).toBe("1180px");
+    expect(getComputedStyle(studio).maxWidth).toBe(shell);
+
+    // The empty state fills the shell instead of sitting in its own narrower
+    // column, so the first screen is not visibly narrower than the rest.
+    const wrapStyle = getComputedStyle(wrap);
+    const inner =
+      wrap.getBoundingClientRect().width -
+      Number.parseFloat(wrapStyle.paddingLeft) -
+      Number.parseFloat(wrapStyle.paddingRight);
+
+    expect(empty.getBoundingClientRect().width).toBeCloseTo(inner, 1);
+    expect(getComputedStyle(empty).maxWidth).toBe("none");
+  });
+
   it("keeps every starter in document flow and hit-testable at 1280x577", async () => {
     const selections: string[] = [];
 

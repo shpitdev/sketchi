@@ -13,8 +13,8 @@ describe("WorkspaceTopBar", () => {
       />,
     );
 
-    expect(screen.getByText("Sketchi workspace")).toBeTruthy();
     expect(screen.getByText("Pharma batch disposition flow")).toBeTruthy();
+    expect(screen.queryByText("Sketchi workspace")).toBeNull();
     expect(screen.getByText("flowchart")).toBeTruthy();
     expect(screen.getByText("Ready")).toBeTruthy();
     expect(screen.getByText(/No sign-in/)).toBeTruthy();

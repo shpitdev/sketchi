@@ -1,0 +1,59 @@
+# Sketchi Playground
+
+The Sketchi Playground turns a plain-language prompt into a clean, editable
+diagram. People use it at https://playground.sketchi.app/; agents use the MCP
+endpoint and the HTTP API described below, both served from this origin.
+Sketchi is MIT-licensed at https://github.com/shpitdev/sketchi.
+
+There is no sign-in. Anonymous diagrams are addressed by artifact id and are
+not tied to an account; treat them as temporary.
+
+## MCP
+
+Connect a Streamable HTTP MCP client to /mcp. The server is named
+sketchi-code-mode and exposes three tools:
+
+- docs: how to drive Sketchi, including the diagram spec shape.
+- search: look up the Sketchi API surface before writing a call.
+- execute: run Sketchi code mode, which builds flowcharts, mindmaps, and
+  sequence diagrams, fetches artifacts, and applies diagram patches.
+
+This is the recommended entry point for agents. Prefer it over the HTTP
+endpoints below unless you need a single direct call.
+
+## HTTP API
+
+POST /api/v1/flowcharts/build
+POST /api/v1/mindmaps/build
+POST /api/v1/sequences/build
+Build one diagram from a typed spec and store the result as an artifact.
+
+POST /api/v1/generate
+Generate a diagram from a prompt rather than a prebuilt spec.
+
+GET /api/v1/artifacts/{artifactId}?format=scene
+GET /api/v1/artifacts/{artifactId}?format=excalidraw
+Fetch a stored artifact. Add raw=true to receive only the file body, which is
+what a download wants; omit it for the metadata envelope.
+
+POST /api/v1/artifacts/{artifactId}/patch
+Apply a patch to a stored diagram and record a new artifact.
+
+These endpoints are same-origin: they do not send CORS headers, so call them
+from a server or an agent runtime rather than from another site's browser page.
+
+## Pages
+
+/ — the playground itself.
+/artifacts/{artifactId} — read-only review of a generated diagram.
+/artifacts/{artifactId}/edit — the editable canvas for that diagram.
+/examples/{exampleId} — read-only sample diagrams, for example
+/examples/how-it-works and /examples/public-mindmap.
+/projects, /projects/{projectId}, /diagrams/{diagramId} — saved Studio projects.
+These are stored in the current browser only, not in an account.
+
+## Elsewhere
+
+https://sketchi.app/ — what Sketchi is, docs, and per-agent setup.
+https://sketchi.app/llms.txt — the same overview for the main site.
+https://icons.sketchi.app/llms.txt — the public SVG icon library and its API.

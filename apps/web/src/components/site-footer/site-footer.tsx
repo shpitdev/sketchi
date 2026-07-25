@@ -5,14 +5,19 @@ import {
 
 export interface SiteFooterProps {
   colophon?: string;
+  // Every surface that renders this footer must actually serve the file it
+  // points at; pass an absolute URL when the surface has no llms.txt of its own.
+  llmsTxtUrl?: string;
   repoUrl?: string;
   surfaceUrls?: WebSurfaceUrls;
 }
 
 const DEFAULT_REPO_URL = "https://github.com/shpitdev/sketchi";
+const DEFAULT_LLMS_TXT_URL = "/llms.txt";
 
 export function SiteFooter({
   colophon = "Made for people who'd rather describe a diagram than draw one.",
+  llmsTxtUrl = DEFAULT_LLMS_TXT_URL,
   repoUrl = DEFAULT_REPO_URL,
   surfaceUrls = DEFAULT_WEB_SURFACE_URLS,
 }: SiteFooterProps) {
@@ -89,6 +94,9 @@ export function SiteFooter({
             </li>
             <li>
               <a href={repoUrl}>GitHub</a>
+            </li>
+            <li>
+              <a href={llmsTxtUrl}>llms.txt</a>
             </li>
           </ul>
         </div>

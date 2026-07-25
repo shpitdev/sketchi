@@ -61,7 +61,6 @@ function ProjectsRoute() {
 
       <section className="studio-workspace__body">
         <div className="studio-workspace__intro">
-          <p className="studio__stage-kicker">studio</p>
           <h1 className="studio-workspace__title">Projects</h1>
           <p className="studio__note">
             Saved to this browser only. No account yet — treat as temporary.

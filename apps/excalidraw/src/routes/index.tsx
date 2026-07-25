@@ -37,7 +37,6 @@ function HomeRoute() {
     return (
       <main className="svg-handoff-error">
         <div>
-          <p>SVG handoff blocked</p>
           <h1>Workspace import unavailable</h1>
           <span>{handoff.message}</span>
           <a href="/">Return to sample workspace</a>

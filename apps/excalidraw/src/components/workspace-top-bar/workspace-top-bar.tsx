@@ -35,7 +35,6 @@ export function WorkspaceTopBar({
           width="30"
         />
         <span className="workspace-top-bar__heading">
-          <span className="workspace-top-bar__eyebrow">Sketchi workspace</span>
           <span className="workspace-top-bar__title">{title}</span>
         </span>
         {diagramType ? (

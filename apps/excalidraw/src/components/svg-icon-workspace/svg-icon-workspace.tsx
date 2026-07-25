@@ -228,7 +228,6 @@ export function SvgIconWorkspace({
 
       <div className="svg-icon-workspace__body">
         <aside className="svg-icon-workspace__sidebar">
-          <p className="svg-icon-workspace__eyebrow">SVG handoff</p>
           <h1>Editable native elements</h1>
           <p>
             Reload-safe URL import from the public Sketchi icon corpus. The

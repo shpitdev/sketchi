@@ -75,7 +75,6 @@ function ProjectRoute() {
         {state.status === "ready" ? (
           <>
             <div className="studio-workspace__intro">
-              <p className="studio__stage-kicker">project</p>
               <h1 className="studio-workspace__title">
                 {state.details.project.title}
               </h1>
