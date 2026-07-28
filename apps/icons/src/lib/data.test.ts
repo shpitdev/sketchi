@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { SketchiIcon } from "./icon-data";
-import { iconSearchRank, searchIcons } from "./icon-data";
+import type { SketchiIcon } from "./data";
+import { iconSearchRank, searchIcons } from "./data";
 
 function icon(
   slug: string,

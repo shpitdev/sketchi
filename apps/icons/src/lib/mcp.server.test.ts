@@ -4,7 +4,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it } from "vitest";
 
-import { createIconMcpServer } from "./icon-mcp.server";
+import { createIconMcpServer } from "./mcp.server";
 
 describe("Sketchi Icons MCP", () => {
   it("exposes ranked search_icons and raw-first get_icon contracts", async () => {

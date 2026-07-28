@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { mapWithConcurrency } from "./icon-actions";
+import { mapWithConcurrency } from "./actions";
 
 describe("mapWithConcurrency", () => {
   it("preserves input order regardless of completion order", async () => {

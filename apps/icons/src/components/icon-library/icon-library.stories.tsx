@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import type { IconManifest } from "../../lib/icon-data";
+import type { IconManifest } from "../../lib/data";
 import { IconLibrary } from "./icon-library";
 
 const data: IconManifest = {

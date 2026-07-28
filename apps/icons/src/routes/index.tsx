@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { IconLibrary } from "../components/icon-library/index.js";
-import { decodeIconManifest, type IconManifest } from "../lib/icon-data.js";
+import { decodeIconManifest, type IconManifest } from "../lib/data.js";
 
 export const Route = createFileRoute("/")({
   component: HomeRoute,

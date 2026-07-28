@@ -51,7 +51,7 @@
         "{projectRoot}/src/generated/icon-catalog.json"
       ],
       "options": {
-        "command": "jiti apps/icons/scripts/generate-icon-manifest.ts"
+        "command": "jiti apps/icons/scripts/generate-manifest.ts"
       }
     },
     "preview": {

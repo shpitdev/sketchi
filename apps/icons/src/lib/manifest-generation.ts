@@ -2,7 +2,7 @@ import type {
   IconManifest,
   SketchiIcon,
   SketchiIconViewBox,
-} from "./icon-data.js";
+} from "./data.js";
 
 interface SourceIcon {
   readonly baseSlug?: string;

@@ -1,6 +1,6 @@
 import { strToU8, zipSync } from "fflate";
 
-import type { SketchiIcon } from "./icon-data.js";
+import type { SketchiIcon } from "./data.js";
 
 function toCamelCase(value: string): string {
   return value.replace(/[-:]([a-z])/gu, (_, letter: string) =>

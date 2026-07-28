@@ -1,7 +1,7 @@
 import {
   formatCollectionLabel,
   type SketchiIcon,
-} from "../../lib/icon-data.js";
+} from "../../lib/data.js";
 
 export interface IconCardProps {
   readonly active?: boolean;

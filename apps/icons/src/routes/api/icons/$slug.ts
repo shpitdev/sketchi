@@ -8,8 +8,8 @@ export const Route = createFileRoute("/api/icons/$slug")({
           { handleIconDetailRequest, handleRawIconRequest },
           { getIconSourceLoader },
         ] = await Promise.all([
-          import("../../../lib/icon-api.server.js"),
-          import("../../../lib/icon-assets.server.js"),
+          import("../../../lib/api.server.js"),
+          import("../../../lib/assets.server.js"),
         ]);
         const sourceLoader = getIconSourceLoader();
         if (params.slug.endsWith(".svg")) {
@@ -26,8 +26,8 @@ export const Route = createFileRoute("/api/icons/$slug")({
           { handleIconDetailHeadRequest, handleRawIconRequest },
           { getIconSourceLoader },
         ] = await Promise.all([
-          import("../../../lib/icon-api.server.js"),
-          import("../../../lib/icon-assets.server.js"),
+          import("../../../lib/api.server.js"),
+          import("../../../lib/assets.server.js"),
         ]);
         return params.slug.endsWith(".svg")
           ? handleRawIconRequest(

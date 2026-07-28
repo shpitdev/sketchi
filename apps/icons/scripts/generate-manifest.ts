@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
-import { buildIconCatalog } from "../src/lib/icon-manifest-generation.js";
+import { buildIconCatalog } from "../src/lib/manifest-generation.js";
 
 const appRoot = resolve(import.meta.dirname, "..");
 const sourcePath = resolve(appRoot, "pipeline-output/review/review-data.json");

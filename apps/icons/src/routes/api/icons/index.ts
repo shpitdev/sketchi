@@ -5,7 +5,7 @@ export const Route = createFileRoute("/api/icons/")({
     handlers: {
       GET: async ({ request }) => {
         const { handleIconSearchRequest } = await import(
-          "../../../lib/icon-api.server.js"
+          "../../../lib/api.server.js"
         );
         return handleIconSearchRequest(request);
       },
