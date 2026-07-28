@@ -17,14 +17,14 @@ import {
   type CodeModeArtifactStorageShape,
   type CodeModeObjectBucket,
   type CodeModeObjectBucketObject,
-} from "./code-mode-artifacts";
+} from "./artifacts";
 import {
   RenderedDiagramSceneSchema,
   type ApplyDiagramPatchResult,
   type ArtifactFormat,
   type BuildFlowchartResult,
   type GetArtifactResult,
-} from "./code-mode-contract";
+} from "./contract";
 import {
   applyDiagramPatch,
   buildFlowchart,
@@ -33,7 +33,7 @@ import {
   CodeModeRuntimeEnvironment,
   getArtifact,
   type CodeModeRuntimeOptions,
-} from "./code-mode-runtime";
+} from "./runtime";
 
 function makeTestRuntime(
   options: CodeModeRuntimeOptions & {

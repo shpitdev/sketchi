@@ -8,8 +8,8 @@ import {
 import type {
   FlowchartSpec,
   NormalizedFlowchartSpec,
-} from "./code-mode-contract.js";
-import { cleanToolString } from "./clean-tool-string.js";
+} from "../code-mode/contract.js";
+import { cleanToolString } from "../clean-tool-string.js";
 
 const FLOWCHART_TYPE: "flowchart" = "flowchart";
 const ORTHOGONAL_ROUTING: "orthogonal" = "orthogonal";

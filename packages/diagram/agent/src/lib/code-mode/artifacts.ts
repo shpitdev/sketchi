@@ -9,7 +9,7 @@ import {
   type CodeModeIssue,
   type CodeModeIssueCode,
   type InlineArtifactFormat,
-} from "./code-mode-contract.js";
+} from "./contract.js";
 
 export interface StoredArtifactFormat {
   format: ArtifactFormat;

@@ -39,7 +39,7 @@ import {
   storageIssue,
   type CodeModeArtifactStorageError,
   type StoredArtifactFormat,
-} from "./code-mode-artifacts.js";
+} from "./artifacts.js";
 import {
   ApplyDiagramPatchRequestSchema,
   BuildFlowchartRequestSchema,
@@ -72,13 +72,13 @@ import {
   type PartialArtifactBundle,
   type PatchableScene,
   type QualityReport,
-} from "./code-mode-contract.js";
-import { cleanToolString } from "./clean-tool-string.js";
-import { assessFlowchartQuality } from "./flowchart-quality.js";
+} from "./contract.js";
+import { cleanToolString } from "../clean-tool-string.js";
+import { assessFlowchartQuality } from "../flowchart/quality.js";
 import {
   flowchartDiagramInput,
   normalizeFlowchartSpec,
-} from "./flowchart-spec.js";
+} from "../flowchart/spec.js";
 
 const DEFAULT_BUILD_FORMATS: ArtifactFormat[] = ["excalidraw", "scene"];
 const DEFAULT_INLINE_FORMATS: InlineArtifactFormat[] = ["scene"];

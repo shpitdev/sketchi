@@ -2,7 +2,7 @@
   "version": 2,
   "lineage": {
     "exactBase": "486e7169255354b8dc79cfa86e30c508721f5425",
-    "previousFixture": "code-mode-compatibility-v1.json@c668b53ee90043a06c640d06cc28253496d50e7431c916b523fcd4157b91ae55",
+    "previousFixture": "compatibility-v1.json@c668b53ee90043a06c640d06cc28253496d50e7431c916b523fcd4157b91ae55",
     "captureRule": "Added expectations were generated only by the exact-base Promise implementation."
   },
   "issueMatrix": {

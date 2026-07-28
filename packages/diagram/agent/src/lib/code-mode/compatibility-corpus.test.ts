@@ -13,7 +13,7 @@ import {
   type CodeModeObjectBucket,
   type CodeModeObjectBucketBody,
   type CodeModeObjectBucketObject,
-} from "./code-mode-artifacts";
+} from "./artifacts";
 import {
   ApplyDiagramPatchRequestSchema,
   ArtifactProvenanceSchema,
@@ -31,7 +31,7 @@ import {
   type CodeModeIssue,
   type CodeModeIssueCode,
   type GetArtifactResult,
-} from "./code-mode-contract";
+} from "./contract";
 import {
   applyDiagramPatch,
   buildFlowchart,
@@ -40,12 +40,12 @@ import {
   CodeModeRuntimeEnvironment,
   getArtifact,
   type CodeModeRuntimeOptions,
-} from "./code-mode-runtime";
+} from "./runtime";
 
 const POST_BASELINE_SCENE_FIELDS = new Set(["rendererRole", "strokeStyle"]);
 const FROZEN_FIXTURE_HASHES = {
   v1: "c668b53ee90043a06c640d06cc28253496d50e7431c916b523fcd4157b91ae55",
-  v2: "52858006d02386fa0aac993ce35afca219aaae9860144836b0884e7770f948d9",
+  v2: "cfb6a47960f3a1b812d9c934d5fe11587d774c426ef830997b4dcd86dbbae48b",
 };
 
 function sha256(value: string): string {
@@ -1199,14 +1199,14 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
   it("preserves the frozen v1 and v2 fixture lineage byte-for-byte", async () => {
     const fixtureRoot = new URL("./fixtures/", import.meta.url);
     const [v1, v2] = await Promise.all([
-      readFile(new URL("code-mode-compatibility-v1.json", fixtureRoot), "utf8"),
-      readFile(new URL("code-mode-compatibility-v2.json", fixtureRoot), "utf8"),
+      readFile(new URL("compatibility-v1.json", fixtureRoot), "utf8"),
+      readFile(new URL("compatibility-v2.json", fixtureRoot), "utf8"),
     ]);
     expect(sha256(v1)).toBe(FROZEN_FIXTURE_HASHES.v1);
     expect(sha256(v2)).toBe(FROZEN_FIXTURE_HASHES.v2);
     expect(JSON.parse(v2)).toMatchObject({
       lineage: {
-        previousFixture: `code-mode-compatibility-v1.json@${FROZEN_FIXTURE_HASHES.v1}`,
+        previousFixture: `compatibility-v1.json@${FROZEN_FIXTURE_HASHES.v1}`,
       },
     });
   });
@@ -1249,7 +1249,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
     const contract = {
       version: 3,
       lineage: {
-        previousFixture: `code-mode-compatibility-v2.json@${FROZEN_FIXTURE_HASHES.v2}`,
+        previousFixture: `compatibility-v2.json@${FROZEN_FIXTURE_HASHES.v2}`,
         change:
           "Builder style remains accepted for legacy callers but is normalized to the theme.css Sketchi palette.",
       },
@@ -1268,7 +1268,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
       },
     };
     const fixturePath = new URL(
-      "./fixtures/code-mode-brand-palette-v3.json",
+      "./fixtures/brand-palette-v3.json",
       import.meta.url,
     );
     const frozen = Schema.decodeUnknownSync(Schema.Unknown)(
@@ -1279,7 +1279,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 
   it("emits the six frozen MCP-visible schemas without post-processing", async () => {
     const fixturePath = new URL(
-      "./fixtures/code-mode-compatibility-v1.json",
+      "./fixtures/compatibility-v1.json",
       import.meta.url,
     );
     const fixture = Schema.decodeUnknownSync(
@@ -1311,7 +1311,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
     vi.setSystemTime(new Date("2026-07-20T12:34:56.789Z"));
     const corpus = await buildGoldenCorpus();
     const fixturePath = new URL(
-      "./fixtures/code-mode-compatibility-v1.json",
+      "./fixtures/compatibility-v1.json",
       import.meta.url,
     ).pathname;
     const frozen = Schema.decodeUnknownSync(Schema.Unknown)(
@@ -1358,7 +1358,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
       lineage: {
         exactBase: "486e7169255354b8dc79cfa86e30c508721f5425",
         previousFixture:
-          "code-mode-compatibility-v1.json@c668b53ee90043a06c640d06cc28253496d50e7431c916b523fcd4157b91ae55",
+          "compatibility-v1.json@c668b53ee90043a06c640d06cc28253496d50e7431c916b523fcd4157b91ae55",
         captureRule:
           "Added expectations were generated only by the exact-base Promise implementation.",
       },
@@ -1370,7 +1370,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
       persistedEncoding: baseline.persistedEncoding,
     };
     const fixturePath = new URL(
-      "./fixtures/code-mode-compatibility-v2.json",
+      "./fixtures/compatibility-v2.json",
       import.meta.url,
     );
     const frozen = Schema.decodeUnknownSync(Schema.Unknown)(

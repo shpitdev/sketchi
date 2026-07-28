@@ -13,7 +13,7 @@ import {
 import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 import { FastCheck } from "effect/testing";
 
-import { CodeModeArtifactStorageMemory } from "./code-mode-artifacts";
+import { CodeModeArtifactStorageMemory } from "./artifacts";
 import {
   BuildFlowchartRequestSchema,
   BuildSequenceDiagramRequestSchema,
@@ -21,12 +21,12 @@ import {
   MindmapTopicSchema,
   RenderedDiagramSceneSchema,
   toCodeModeJsonSchema,
-} from "./code-mode-contract";
+} from "./contract";
 import {
   applyDiagramPatch,
   buildFlowchart,
   makeCodeModeRuntimeEnvironmentLayer,
-} from "./code-mode-runtime";
+} from "./runtime";
 
 const renderingStarted = Promise.withResolvers<void>();
 const patchOperationNames = new Set<string>(DIAGRAM_PATCH_OPERATION_NAMES);
