@@ -1,6 +1,6 @@
 import type { FlowchartDiagram } from "@sketchi/diagram-core";
 
-import type { QualityCheck, QualityReport } from "./code-mode-contract.js";
+import type { QualityCheck, QualityReport } from "../code-mode/contract.js";
 
 const GENERIC_LABEL = /^(node|step|item|box|thing|process|task)\s*\d*$/i;
 const GENERIC_TITLE = /^(diagram|untitled|flowchart|chart|sketch)$/i;

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { parseFlowchartDiagram } from "@sketchi/diagram-core";
 
-import { assessFlowchartQuality } from "./flowchart-quality";
+import { assessFlowchartQuality } from "./quality";
 
 function decisionLoopFlowchart() {
   return parseFlowchartDiagram({

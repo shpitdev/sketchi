@@ -13,7 +13,7 @@ import {
   type CodeModeObjectBucketBody,
   type CodeModeObjectBucketObject,
   type StoredArtifactFormat,
-} from "./code-mode-artifacts";
+} from "./artifacts";
 
 class MemoryBucket implements CodeModeObjectBucket {
   readonly objects = new Map<string, CodeModeObjectBucketBody>();

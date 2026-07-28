@@ -14,7 +14,7 @@ import type {
 } from "@standard-schema/spec";
 import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/diagram-core";
 
-import { cleanToolString } from "./clean-tool-string.js";
+import { cleanToolString } from "../clean-tool-string.js";
 
 export class ContractSchemaIssue extends Schema.Class<ContractSchemaIssue>(
   "ContractSchemaIssue",
