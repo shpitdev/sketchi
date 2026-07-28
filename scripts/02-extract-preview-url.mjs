@@ -2,7 +2,7 @@
 import { appendFileSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-import { extractPreviewUrl } from "./lib/preview-deploy.mjs";
+import { extractPreviewUrl } from "./lib/deploy/preview.mjs";
 
 function readFlag(args, name, fallback) {
   const index = args.indexOf(name);

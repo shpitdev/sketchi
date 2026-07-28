@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import {
   previewProjectConfig,
   previewWorkerName,
-} from "./lib/preview-deploy.mjs";
+} from "./lib/deploy/preview.mjs";
 
 function readFlag(args, name, fallback) {
   const index = args.indexOf(name);

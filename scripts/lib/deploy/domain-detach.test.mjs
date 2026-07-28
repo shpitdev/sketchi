@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { selectProductionDomainDetachments } from "./production-domain-detach.mjs";
+import { selectProductionDomainDetachments } from "./domain-detach.mjs";
 
 test("domain detach selects only the project's approved Worker domains", () => {
   assert.deepEqual(

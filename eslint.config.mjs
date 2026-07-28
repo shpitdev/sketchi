@@ -152,8 +152,8 @@ export default [
   {
     files: [
       "packages/diagram/core/src/intermediate.ts",
-      "packages/diagram/core/src/diagram-types/flowchart.ts",
-      "packages/diagram/core/src/diagram-types/mindmap.ts",
+      "packages/diagram/core/src/types/flowchart.ts",
+      "packages/diagram/core/src/types/mindmap.ts",
     ],
     rules: {
       "no-restricted-imports": [

@@ -54,9 +54,9 @@ const effectPureProjectRoots = [
 ];
 const effectMigrationReadyProjectRoots: string[] = [];
 const effectSchemaBoundaryFiles = new Set([
-  "packages/diagram/core/src/diagram-types/flowchart.ts",
-  "packages/diagram/core/src/diagram-types/mindmap.ts",
   "packages/diagram/core/src/intermediate.ts",
+  "packages/diagram/core/src/types/flowchart.ts",
+  "packages/diagram/core/src/types/mindmap.ts",
 ]);
 const frameworkNativeProjectRoots = [
   "apps/excalidraw",

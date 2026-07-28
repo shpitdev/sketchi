@@ -18,7 +18,7 @@ import {
   createExcalidrawFile,
   type ExcalidrawElement,
   validateExcalidrawScene,
-} from "./diagram-excalidraw";
+} from "./convert";
 
 function bindingFixedPoint(
   element: ExcalidrawElement | undefined,

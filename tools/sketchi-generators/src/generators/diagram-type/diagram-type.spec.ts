@@ -15,7 +15,7 @@ describe("diagram-type generator", () => {
   beforeEach(() => {
     tree = createTreeWithEmptyWorkspace();
     tree.write(
-      "packages/diagram/core/src/diagram-types.ts",
+      "packages/diagram/core/src/types.ts",
       `export const DIAGRAM_TYPES = [
   "architecture",
   "flowchart"
@@ -29,10 +29,10 @@ describe("diagram-type generator", () => {
     await diagramTypeGenerator(tree, options);
 
     expect(
-      tree.read("packages/diagram/core/src/diagram-types.ts", "utf-8"),
+      tree.read("packages/diagram/core/src/types.ts", "utf-8"),
     ).toContain('"mindmap"');
     expect(
-      tree.exists("packages/diagram/core/src/diagram-types/mindmap.ts"),
+      tree.exists("packages/diagram/core/src/types/mindmap.ts"),
     ).toBe(true);
     expect(
       tree.exists(
@@ -43,7 +43,7 @@ describe("diagram-type generator", () => {
       tree.exists("packages/diagram/ui/src/diagram-types/mindmap.stories.tsx"),
     ).toBe(true);
     expect(tree.read("packages/diagram/core/src/index.ts", "utf-8")).toContain(
-      'export * from "./diagram-types/mindmap.js";',
+      'export * from "./types/mindmap.js";',
     );
   });
 
@@ -54,13 +54,13 @@ describe("diagram-type generator", () => {
     });
 
     const registry = tree.read(
-      "packages/diagram/core/src/diagram-types.ts",
+      "packages/diagram/core/src/types.ts",
       "utf-8",
     );
 
     expect((registry ?? "").match(/"flowchart"/g)).toHaveLength(1);
     expect(
-      tree.exists("packages/diagram/core/src/diagram-types/flowchart.ts"),
+      tree.exists("packages/diagram/core/src/types/flowchart.ts"),
     ).toBe(true);
   });
 });

@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { extname, join, relative } from "node:path";
 import test from "node:test";
 
-import { productionProjectConfig } from "./production-deploy.mjs";
+import { productionProjectConfig } from "./deploy/production.mjs";
 
 const repoRoot = new URL("../../", import.meta.url);
 const repoPath = repoRoot.pathname;

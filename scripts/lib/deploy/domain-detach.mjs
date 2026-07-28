@@ -1,5 +1,5 @@
-import { productionProjectConfig } from "./production-deploy.mjs";
-import { requireWorkerIdentity } from "./worker-apps.mjs";
+import { productionProjectConfig } from "./production.mjs";
+import { requireWorkerIdentity } from "../worker-apps.mjs";
 
 const cloudflareApiBase = "https://api.cloudflare.com/client/v4";
 

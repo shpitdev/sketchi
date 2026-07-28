@@ -4,8 +4,8 @@ import test from "node:test";
 import {
   productionDomainWranglerConfig,
   productionProjectConfig,
-} from "./production-deploy.mjs";
-import { workerProjectConfig } from "./worker-apps.mjs";
+} from "./production.mjs";
+import { workerProjectConfig } from "../worker-apps.mjs";
 
 test("productionProjectConfig returns project-scoped domain metadata", () => {
   assert.deepEqual(productionProjectConfig("web"), {

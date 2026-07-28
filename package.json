@@ -32,7 +32,7 @@
     "storybook:icons": "nx storybook icons",
     "storybook:web": "nx storybook web",
     "test": "nx run-many -t test",
-    "test:deploy-scripts": "node --test scripts/lib/*.test.mjs scripts/pipelines/*.test.mjs",
+    "test:deploy-scripts": "node --test scripts/lib/*.test.mjs scripts/lib/deploy/*.test.mjs scripts/pipelines/*.test.mjs",
     "test:wrangler-dry-runs": "node scripts/06-dry-run-worker-apps.mjs",
     "test:onboarding": "node --test scripts/lib/code-mode-onboarding.test.mjs",
     "typecheck": "nx run-many -t typecheck",
