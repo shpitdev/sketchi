@@ -3,7 +3,7 @@ import "@tanstack/react-start/server-only";
 import type { CodeModeObjectBucket } from "@sketchi/diagram-agent";
 import type { CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
 
-import type { CloudflareBrowserRunBinding } from "../codemode/codemode-browser-renderer.server";
+import type { CloudflareBrowserRunBinding } from "../codemode/browser-renderer.server";
 
 export interface StudioEnv {
   AI?: CloudflareAiGatewayProvider;

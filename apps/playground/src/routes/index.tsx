@@ -43,7 +43,7 @@ import {
   PlaygroundEmptyState,
   assistantAsksQuestion,
   type ReadyPlaygroundArtifact,
-} from "@/features/playground/playground-surface";
+} from "@/features/playground/surface";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({

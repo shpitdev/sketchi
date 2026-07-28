@@ -2,8 +2,8 @@ import type { CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
 import { describe, expect, it } from "vitest";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
-import { runPlaygroundEffect } from "../runtime/playground-runtime.server";
-import { handleGenerateDiagramRequest } from "./generation-api.server";
+import { runPlaygroundEffect } from "../runtime/runtime.server";
+import { handleGenerateDiagramRequest } from "./api.server";
 
 const flowchartIr = {
   id: "generated-release-flow",

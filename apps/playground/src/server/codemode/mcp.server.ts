@@ -12,13 +12,13 @@ import {
   PlaygroundClock,
   PlaygroundPlatformCallbacks,
   PlaygroundRequestMetadata,
-} from "../runtime/playground-context.server";
+} from "../runtime/context.server";
 import {
   PlaygroundRequestCallbacks,
   type PlaygroundRequestRunner,
-} from "../runtime/playground-runtime.server";
+} from "../runtime/runtime.server";
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
-import { PlaygroundCodeMode } from "./codemode-service.server";
+import { PlaygroundCodeMode } from "./service.server";
 import {
   CodeModeDocsRequestSchema,
   CodeModeDocsResultSchema,
@@ -28,12 +28,12 @@ import {
   searchCodeModeDocs,
   SKETCHI_CODE_MODE_TYPES,
   SKETCHI_CODE_MODE_VERSION,
-} from "./codemode-mcp-docs.server";
+} from "./mcp-docs.server";
 import {
   createEffectMcpServer,
   defineEffectMcpTool,
 } from "./effect-mcp-adapter.server";
-import { PlaygroundCodeModeUsage } from "./codemode-usage-events.server";
+import { PlaygroundCodeModeUsage } from "./usage-events.server";
 
 export interface SketchiCodeModeProvider {
   name: string;

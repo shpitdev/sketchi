@@ -7,8 +7,8 @@ async function handle(request: Request): Promise<Response> {
     { runPlaygroundEffect },
   ] = await Promise.all([
     import("@/server/bindings/cloudflare-bindings.server"),
-    import("@/server/codemode/codemode-mcp.server"),
-    import("@/server/runtime/playground-runtime.server"),
+    import("@/server/codemode/mcp.server"),
+    import("@/server/runtime/runtime.server"),
   ]);
 
   const boundary = getPlaygroundRequestBoundary(request);

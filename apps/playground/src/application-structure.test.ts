@@ -33,20 +33,20 @@ const expectedPublicFullPaths = [
 
 const retiredGenericPaths = [
   "agent.server.ts",
+  "api.server.test.ts",
+  "api.server.ts",
   "artifact-view-client.ts",
+  "browser-renderer.server.test.ts",
+  "browser-renderer.server.ts",
   "cloudflare-bindings.server.ts",
-  "codemode-api.server.test.ts",
-  "codemode-api.server.ts",
-  "codemode-browser-renderer.server.test.ts",
-  "codemode-browser-renderer.server.ts",
-  "codemode-mcp-docs.server.test.ts",
-  "codemode-mcp-docs.server.ts",
-  "codemode-mcp.server.test.ts",
-  "codemode-mcp.server.ts",
-  "codemode-usage-events.server.ts",
   "home-url.ts",
+  "mcp-docs.server.test.ts",
+  "mcp-docs.server.ts",
+  "mcp.server.test.ts",
+  "mcp.server.ts",
   "studio-flowchart-tool.server.test.ts",
   "studio-flowchart-tool.server.ts",
+  "usage-events.server.ts",
 ];
 
 function sourceFilesUnder(root: string): string[] {

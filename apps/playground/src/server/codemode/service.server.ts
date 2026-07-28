@@ -27,13 +27,13 @@ import {
   PlaygroundBindings,
   PlaygroundIds,
   PlaygroundRequestMetadata,
-} from "../runtime/playground-context.server";
+} from "../runtime/context.server";
 import {
   DEFAULT_ASSET_ORIGIN,
   PlaygroundBrowserRendering,
   PlaygroundBrowserRenderingLive,
   type CloudflareBrowserRunRendererOptions,
-} from "./codemode-browser-renderer.server";
+} from "./browser-renderer.server";
 
 type CodeModeRequestContext =
   | PlaygroundBindings

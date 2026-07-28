@@ -19,13 +19,13 @@ import { Effect, Schema } from "effect";
 import {
   PlaygroundAiModel,
   StudioAiModelError,
-} from "../ai/playground-ai-model.server";
-import { PlaygroundCodeMode } from "../codemode/codemode-service.server";
+} from "../ai/model.server";
+import { PlaygroundCodeMode } from "../codemode/service.server";
 import {
   type PlaygroundCallbackEffect,
   PlaygroundRequestCallbacks,
   type PlaygroundRequestRunner,
-} from "../runtime/playground-runtime.server";
+} from "../runtime/runtime.server";
 import {
   makeStudioFlowchartToolExecutor,
   STUDIO_BUILD_FLOWCHART_TOOL_DESCRIPTION,

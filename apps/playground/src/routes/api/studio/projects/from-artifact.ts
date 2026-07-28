@@ -12,7 +12,7 @@ export const Route = createFileRoute("/api/studio/projects/from-artifact")({
           },
         ] = await Promise.all([
           import("@/server/bindings/cloudflare-bindings.server"),
-          import("@/server/runtime/playground-runtime.server"),
+          import("@/server/runtime/runtime.server"),
         ]);
 
         return runPlaygroundEffect(

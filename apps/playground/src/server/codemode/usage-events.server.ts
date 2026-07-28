@@ -11,7 +11,7 @@ import {
   PlaygroundPlatformCallbacks,
   PlaygroundRequestMetadata,
   type PlaygroundRequestServices,
-} from "../runtime/playground-context.server";
+} from "../runtime/context.server";
 
 const USAGE_PREFIX = "codemode/usage";
 const USAGE_EVENT_SCHEMA = "sketchi.codemode.usage.v1";

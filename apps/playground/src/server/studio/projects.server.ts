@@ -21,13 +21,13 @@ import {
 } from "@sketchi/studio-projects/server";
 import { Context, Effect, Layer } from "effect";
 
-import { PlaygroundCodeMode } from "../codemode/codemode-service.server";
+import { PlaygroundCodeMode } from "../codemode/service.server";
 import {
   PlaygroundBindings,
   PlaygroundClock,
   PlaygroundIds,
   PlaygroundRequestMetadata,
-} from "../runtime/playground-context.server";
+} from "../runtime/context.server";
 
 export class PlaygroundStudioLocalBucket extends Context.Service<
   PlaygroundStudioLocalBucket,

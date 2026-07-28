@@ -3,11 +3,11 @@ import { Effect, Option } from "effect";
 
 import type { BuildFlowchartResult } from "@sketchi/diagram-agent";
 
-import { PlaygroundRequestMetadata } from "../runtime/playground-context.server";
+import { PlaygroundRequestMetadata } from "../runtime/context.server";
 import {
   PlaygroundRequestCallbacks,
   runPlaygroundEffect,
-} from "../runtime/playground-runtime.server";
+} from "../runtime/runtime.server";
 import { makeStudioFlowchartToolCallback } from "./agent.server";
 
 const repairResult: BuildFlowchartResult = {

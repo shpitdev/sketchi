@@ -18,7 +18,7 @@ import {
 import { Context, Effect, Layer } from "effect";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
-import { PlaygroundBindings } from "../runtime/playground-context.server";
+import { PlaygroundBindings } from "../runtime/context.server";
 
 const GENERATION_PROVIDER = "cloudflare-google-ai-studio" as const;
 const DEFAULT_GATEWAY_ID = "google-ai-studio";
