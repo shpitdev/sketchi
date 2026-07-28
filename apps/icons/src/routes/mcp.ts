@@ -3,8 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 async function handle(request: Request): Promise<Response> {
   const [{ handleIconMcpRequest }, { getIconSourceLoader }] = await Promise.all(
     [
-      import("../lib/icon-mcp.server.js"),
-      import("../lib/icon-assets.server.js"),
+      import("../lib/mcp.server.js"),
+      import("../lib/assets.server.js"),
     ],
   );
   return handleIconMcpRequest(request, getIconSourceLoader());

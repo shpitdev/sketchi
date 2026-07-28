@@ -9,8 +9,8 @@ import {
   getIconDetail,
   parseIconLimit,
   searchIconResults,
-} from "./icon-api.server.js";
-import type { IconSourceLoader } from "./icon-catalog.server.js";
+} from "./api.server.js";
+import type { IconSourceLoader } from "./catalog.server.js";
 
 const SEARCH_ICONS_TOOL = {
   annotations: {

@@ -3,12 +3,12 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { decodeIconManifest } from "./icon-data";
-import { searchIcons } from "./icon-data";
+import { decodeIconManifest } from "./data";
+import { searchIcons } from "./data";
 import {
   buildIconCatalog,
   COLLISION_CANONICAL_COLLECTIONS,
-} from "./icon-manifest-generation";
+} from "./manifest-generation";
 
 function sourceIcon(slug: string, collection: string) {
   return {

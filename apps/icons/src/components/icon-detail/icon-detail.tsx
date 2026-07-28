@@ -4,7 +4,7 @@ import {
   formatBytes,
   formatCollectionLabel,
   type SketchiIcon,
-} from "../../lib/icon-data.js";
+} from "../../lib/data.js";
 
 export type IconDetailAction =
   | "copy-data-uri"

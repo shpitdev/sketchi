@@ -3,7 +3,7 @@ import {
   decodeIconManifest,
   type IconManifest,
   type SketchiIcon,
-} from "./icon-data.js";
+} from "./data.js";
 
 interface IconCatalog {
   readonly manifest: IconManifest;

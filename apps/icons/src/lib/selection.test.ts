@@ -11,7 +11,7 @@ import {
   SELECTION_LIMIT,
   type SelectionEvent,
   type SelectionState,
-} from "./icon-selection";
+} from "./selection";
 
 const slugs = (count: number, prefix = "icon") =>
   Array.from({ length: count }, (_, index) => `${prefix}-${index}`);

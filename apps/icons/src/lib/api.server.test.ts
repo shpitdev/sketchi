@@ -8,7 +8,7 @@ import {
   handleIconSearchRequest,
   handleRawIconRequest,
   parseIconLimit,
-} from "./icon-api.server";
+} from "./api.server";
 
 describe("icon HTTP API", () => {
   it("returns ranked alias matches with stable agent URLs", async () => {

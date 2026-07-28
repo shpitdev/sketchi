@@ -3,7 +3,7 @@
 import { unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 
-import { createIconZipBytes } from "./icon-actions";
+import { createIconZipBytes } from "./actions";
 
 describe("icon zip downloads", () => {
   it("creates a valid archive containing every raw SVG", async () => {

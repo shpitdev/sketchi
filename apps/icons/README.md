@@ -21,7 +21,7 @@ SVG paths keep grid previews on the asset layer instead of routing every image
 through the Worker.
 
 Duplicate source slugs are resolved by the explicit canonical map in
-`src/lib/icon-manifest-generation.ts`. The chosen collection keeps the short
+`src/lib/manifest-generation.ts`. The chosen collection keeps the short
 slug. Every alternate receives a collection-qualified slug. Generation fails
 when a new collision has no explicit choice, which keeps public URLs
 deterministic.

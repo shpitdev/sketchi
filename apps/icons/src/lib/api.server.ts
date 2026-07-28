@@ -3,8 +3,8 @@ import {
   getIconBySlug,
   iconManifest,
   type IconSourceLoader,
-} from "./icon-catalog.server.js";
-import { searchIcons, type SketchiIcon } from "./icon-data.js";
+} from "./catalog.server.js";
+import { searchIcons, type SketchiIcon } from "./data.js";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;

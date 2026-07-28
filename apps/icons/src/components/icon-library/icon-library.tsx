@@ -16,14 +16,14 @@ import {
   mapWithConcurrency,
   svgDataUri,
   svgToJsxComponent,
-} from "../../lib/icon-actions.js";
+} from "../../lib/actions.js";
 import { SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
 import {
   formatCollectionLabel,
   searchIcons,
   type IconManifest,
   type SketchiIcon,
-} from "../../lib/icon-data.js";
+} from "../../lib/data.js";
 import {
   describeSelectionNotice,
   initialSelectionState,
@@ -31,11 +31,11 @@ import {
   selectAllLabel,
   selectionReducer,
   SELECTION_LIMIT,
-} from "../../lib/icon-selection.js";
+} from "../../lib/selection.js";
 import { IconCard } from "../icon-card/index.js";
 import { IconDetail, type IconDetailAction } from "../icon-detail/index.js";
 
-export type { IconManifest, SketchiIcon } from "../../lib/icon-data.js";
+export type { IconManifest, SketchiIcon } from "../../lib/data.js";
 
 const PAGE_SIZE = 72;
 /** Nothing is highlighted until the user actually navigates with the keyboard. */
