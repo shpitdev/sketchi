@@ -1,7 +1,7 @@
 {
   "version": 3,
   "lineage": {
-    "previousFixture": "compatibility-v2.json@cfb6a47960f3a1b812d9c934d5fe11587d774c426ef830997b4dcd86dbbae48b",
+    "previousFixture": "code-mode-compatibility-v2.json@52858006d02386fa0aac993ce35afca219aaae9860144836b0884e7770f948d9",
     "change": "Builder style remains accepted for legacy callers but is normalized to the theme.css Sketchi palette."
   },
   "modelContract": {

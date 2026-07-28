@@ -45,7 +45,7 @@ import {
 const POST_BASELINE_SCENE_FIELDS = new Set(["rendererRole", "strokeStyle"]);
 const FROZEN_FIXTURE_HASHES = {
   v1: "c668b53ee90043a06c640d06cc28253496d50e7431c916b523fcd4157b91ae55",
-  v2: "cfb6a47960f3a1b812d9c934d5fe11587d774c426ef830997b4dcd86dbbae48b",
+  v2: "52858006d02386fa0aac993ce35afca219aaae9860144836b0884e7770f948d9",
 };
 
 function sha256(value: string): string {
@@ -1206,7 +1206,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
     expect(sha256(v2)).toBe(FROZEN_FIXTURE_HASHES.v2);
     expect(JSON.parse(v2)).toMatchObject({
       lineage: {
-        previousFixture: `compatibility-v1.json@${FROZEN_FIXTURE_HASHES.v1}`,
+        previousFixture: `code-mode-compatibility-v1.json@${FROZEN_FIXTURE_HASHES.v1}`,
       },
     });
   });
@@ -1249,7 +1249,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
     const contract = {
       version: 3,
       lineage: {
-        previousFixture: `compatibility-v2.json@${FROZEN_FIXTURE_HASHES.v2}`,
+        previousFixture: `code-mode-compatibility-v2.json@${FROZEN_FIXTURE_HASHES.v2}`,
         change:
           "Builder style remains accepted for legacy callers but is normalized to the theme.css Sketchi palette.",
       },
@@ -1358,7 +1358,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
       lineage: {
         exactBase: "486e7169255354b8dc79cfa86e30c508721f5425",
         previousFixture:
-          "compatibility-v1.json@c668b53ee90043a06c640d06cc28253496d50e7431c916b523fcd4157b91ae55",
+          "code-mode-compatibility-v1.json@c668b53ee90043a06c640d06cc28253496d50e7431c916b523fcd4157b91ae55",
         captureRule:
           "Added expectations were generated only by the exact-base Promise implementation.",
       },
