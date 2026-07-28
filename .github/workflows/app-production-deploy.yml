@@ -142,7 +142,7 @@ jobs:
             echo "- Worker: \`${{ steps.worker-app.outputs.worker_name }}\`"
             echo "- workers.dev URL: ${{ steps.workers-dev-url.outputs.preview_url }}"
             node --input-type=module <<'NODE'
-          import { productionProjectConfig } from "./scripts/lib/production-deploy.mjs";
+          import { productionProjectConfig } from "./scripts/lib/deploy/production.mjs";
           import { requireWorkerIdentity } from "./scripts/lib/worker-apps.mjs";
 
           const project = productionProjectConfig(process.env.PROJECT_ID);

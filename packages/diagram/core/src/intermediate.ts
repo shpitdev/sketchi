@@ -1,6 +1,6 @@
 import { Effect, Result, Schema, SchemaIssue } from "effect";
 
-import { DIAGRAM_TYPES } from "./diagram-types.js";
+import { DIAGRAM_TYPES } from "./types.js";
 
 const NonEmptyString = Schema.NonEmptyString;
 const Metadata = Schema.Record(Schema.String, Schema.Unknown);

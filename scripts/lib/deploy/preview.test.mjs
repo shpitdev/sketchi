@@ -8,8 +8,8 @@ import {
   previewProjectConfig,
   previewWorkerName,
   previewWranglerConfig,
-} from "./preview-deploy.mjs";
-import { workerProjectConfig } from "./worker-apps.mjs";
+} from "./preview.mjs";
+import { workerProjectConfig } from "../worker-apps.mjs";
 
 test("previewProjectConfig returns project and Worker metadata", () => {
   assert.deepEqual(previewProjectConfig("icons"), {

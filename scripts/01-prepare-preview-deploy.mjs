@@ -12,7 +12,7 @@ import {
   previewProjectConfig,
   previewWorkerName,
   previewWranglerConfig,
-} from "./lib/preview-deploy.mjs";
+} from "./lib/deploy/preview.mjs";
 
 function readFlag(args, name, fallback) {
   const index = args.indexOf(name);

@@ -11,7 +11,7 @@ import { pathToFileURL } from "node:url";
 import {
   productionProjectConfig,
   productionDomainWranglerConfig,
-} from "./lib/production-deploy.mjs";
+} from "./lib/deploy/production.mjs";
 
 function readFlag(args, name, fallback) {
   const index = args.indexOf(name);

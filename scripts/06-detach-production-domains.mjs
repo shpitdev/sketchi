@@ -1,7 +1,7 @@
 import { pathToFileURL } from "node:url";
 
-import { detachProductionDomains } from "./lib/production-domain-detach.mjs";
-import { productionProjectConfig } from "./lib/production-deploy.mjs";
+import { detachProductionDomains } from "./lib/deploy/domain-detach.mjs";
+import { productionProjectConfig } from "./lib/deploy/production.mjs";
 
 function readFlag(args, name) {
   const index = args.indexOf(name);

@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import {
   previewCommentBody,
   previewProjectConfig,
-} from "./lib/preview-deploy.mjs";
+} from "./lib/deploy/preview.mjs";
 
 function requiredEnv(name) {
   const value = process.env[name]?.trim();

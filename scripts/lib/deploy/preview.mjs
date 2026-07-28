@@ -2,7 +2,7 @@ import {
   assertWranglerWorkerIdentity,
   requireWorkerIdentity,
   workerProjectConfig,
-} from "./worker-apps.mjs";
+} from "../worker-apps.mjs";
 
 const MAX_WORKER_NAME_LENGTH = 63;
 

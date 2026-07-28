@@ -57,7 +57,7 @@ Sketchi already owns the connector endpoints:
 
 - `packages/diagram/renderer/src/scene.ts` chooses source and target edges,
   computes port offsets, and emits route points.
-- `packages/diagram/excalidraw/src/lib/diagram-excalidraw.ts` converts those
+- `packages/diagram/excalidraw/src/lib/convert.ts` converts those
   route points into Excalidraw arrow bindings.
 
 Therefore the fix should improve renderer/excalidraw geometry and validation.
@@ -75,7 +75,7 @@ The first code areas to inspect and change are:
   `packages/diagram/renderer/src/scene.ts`, which choose orthogonal lanes and
   fallback exterior lanes.
 - `validateExcalidrawScene` in
-  `packages/diagram/excalidraw/src/lib/diagram-excalidraw.ts`, which already
+  `packages/diagram/excalidraw/src/lib/convert.ts`, which already
   catches overlapping segments, route-through-node defects, endpoint-off-shape
   defects, and broken elbow metadata.
 

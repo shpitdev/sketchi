@@ -27,7 +27,7 @@ function appendExport(tree: Tree, indexPath: string, exportPath: string) {
 }
 
 function addDiagramTypeToRegistry(tree: Tree, typeValue: string) {
-  const registryPath = joinPathFragments(CORE_ROOT, "diagram-types.ts");
+  const registryPath = joinPathFragments(CORE_ROOT, "types.ts");
 
   if (!tree.exists(registryPath)) {
     throw new Error(`Missing diagram type registry at ${registryPath}.`);
@@ -71,7 +71,7 @@ export async function diagramTypeGenerator(
   const fixtureName = `${normalizedName.propertyName}Fixture`;
   const coreFilePath = joinPathFragments(
     CORE_ROOT,
-    "diagram-types",
+    "types",
     `${typeValue}.ts`,
   );
   const templateContext = {
@@ -90,7 +90,7 @@ export async function diagramTypeGenerator(
   generateFiles(
     tree,
     path.join(__dirname, "files", "core"),
-    joinPathFragments(CORE_ROOT, "diagram-types"),
+    joinPathFragments(CORE_ROOT, "types"),
     templateContext,
   );
   generateFiles(
@@ -109,7 +109,7 @@ export async function diagramTypeGenerator(
   appendExport(
     tree,
     joinPathFragments(CORE_ROOT, "index.ts"),
-    `./diagram-types/${typeValue}.js`,
+    `./types/${typeValue}.js`,
   );
 
   if (!options.skipFormat) {

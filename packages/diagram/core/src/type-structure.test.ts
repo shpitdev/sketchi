@@ -3,12 +3,12 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { DIAGRAM_TYPES } from "./diagram-types";
+import { DIAGRAM_TYPES } from "./types";
 
 const workspaceRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const coreDiagramTypeRoot = join(
   workspaceRoot,
-  "packages/diagram/core/src/diagram-types",
+  "packages/diagram/core/src/types",
 );
 
 function exists(path: string): boolean {
@@ -18,11 +18,11 @@ function exists(path: string): boolean {
 describe("diagram type structure", () => {
   it("keeps the registry backed by generated core, renderer, and Storybook files", () => {
     for (const type of DIAGRAM_TYPES) {
-      expect(exists(`packages/diagram/core/src/diagram-types/${type}.ts`)).toBe(
+      expect(exists(`packages/diagram/core/src/types/${type}.ts`)).toBe(
         true,
       );
       expect(
-        exists(`packages/diagram/core/src/diagram-types/${type}.test.ts`),
+        exists(`packages/diagram/core/src/types/${type}.test.ts`),
       ).toBe(true);
       expect(
         exists(`packages/diagram/renderer/src/diagram-types/${type}.test.ts`),
