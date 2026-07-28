@@ -7,7 +7,7 @@ import {
   searchCodeModeDocs,
   SKETCHI_CODE_MODE_TYPES,
   SKETCHI_CODE_MODE_VERSION,
-} from "./codemode-mcp-docs.server";
+} from "./mcp-docs.server";
 
 describe("Code Mode MCP docs", () => {
   it("documents the harness-first execute contract", () => {

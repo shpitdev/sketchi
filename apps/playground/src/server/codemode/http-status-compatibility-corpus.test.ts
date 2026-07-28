@@ -33,9 +33,9 @@ const runtimeResults = vi.hoisted(() => {
   };
 });
 
-vi.mock("./codemode-service.server", async (importOriginal) => {
+vi.mock("./service.server", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("./codemode-service.server")>();
+    await importOriginal<typeof import("./service.server")>();
   return {
     ...actual,
     PlaygroundCodeModeLive: Layer.succeed(actual.PlaygroundCodeMode, {
@@ -64,9 +64,9 @@ import {
   handleBuildMindmapRequest as handleBuildMindmapRequestEffect,
   handleGetArtifactRequest as handleGetArtifactRequestEffect,
   handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
-} from "./codemode-api.server";
+} from "./api.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
-import { runPlaygroundEffect } from "../runtime/playground-runtime.server";
+import { runPlaygroundEffect } from "../runtime/runtime.server";
 
 function testBoundary(env: StudioEnv, request: Request) {
   return {
@@ -374,7 +374,7 @@ describe("exact-base Code Mode HTTP status compatibility corpus", () => {
       applyDiagramPatch,
       requestTooLarge,
     };
-    const fixturePath = `${process.cwd()}/apps/playground/src/server/codemode/fixtures/codemode-http-status-compatibility-v1.json`;
+    const fixturePath = `${process.cwd()}/apps/playground/src/server/codemode/fixtures/http-status-compatibility-v1.json`;
     await expect(`${JSON.stringify(corpus, null, 2)}\n`).toMatchFileSnapshot(
       fixturePath,
     );

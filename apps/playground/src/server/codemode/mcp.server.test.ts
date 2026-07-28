@@ -11,13 +11,13 @@ import type {
 } from "@sketchi/diagram-agent";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
-import { PlaygroundRequestMetadata } from "../runtime/playground-context.server";
+import { PlaygroundRequestMetadata } from "../runtime/context.server";
 import {
   PlaygroundRequestCallbacks,
   runPlaygroundEffect,
-} from "../runtime/playground-runtime.server";
+} from "../runtime/runtime.server";
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
-import { PlaygroundCodeMode } from "./codemode-service.server";
+import { PlaygroundCodeMode } from "./service.server";
 import {
   createEffectMcpServer,
   defineEffectMcpTool,
@@ -31,7 +31,7 @@ import {
   type CodeModeMcpOptions,
   type SketchiCodeModeExecutor,
   type SketchiCodeModeProvider,
-} from "./codemode-mcp.server";
+} from "./mcp.server";
 
 function testBoundary(env: StudioEnv, request: Request) {
   return {

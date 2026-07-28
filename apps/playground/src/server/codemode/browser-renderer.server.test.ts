@@ -16,7 +16,7 @@ import {
   createCloudflareBrowserRunArtifactRenderer,
   withScopedBrowserSession,
   type CloudflareBrowserRunBinding,
-} from "./codemode-browser-renderer.server";
+} from "./browser-renderer.server";
 
 vi.mock("@cloudflare/playwright", () => ({
   launch: vi.fn(),

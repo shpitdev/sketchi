@@ -28,7 +28,7 @@ vi.mock("@excalidraw/excalidraw", () => ({
 
 import "../../styles/app.css";
 import { DEPLOY_PIPELINE_SCENE } from "./deploy-pipeline-sample";
-import { PlaygroundComposer, PlaygroundEmptyState } from "./playground-surface";
+import { PlaygroundComposer, PlaygroundEmptyState } from "./surface";
 
 afterEach(() => {
   cleanup();

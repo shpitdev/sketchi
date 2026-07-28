@@ -13,9 +13,9 @@ import {
   handleBuildMindmapRequest as handleBuildMindmapRequestEffect,
   handleGetArtifactRequest as handleGetArtifactRequestEffect,
   handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
-} from "./codemode-api.server";
+} from "./api.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
-import { runPlaygroundEffect } from "../runtime/playground-runtime.server";
+import { runPlaygroundEffect } from "../runtime/runtime.server";
 
 function testBoundary(env: StudioEnv, request: Request) {
   return {
@@ -369,7 +369,7 @@ describe("exact-base Code Mode HTTP artifact compatibility corpus", () => {
         replacements,
       ),
     };
-    const fixturePath = `${process.cwd()}/apps/playground/src/server/codemode/fixtures/codemode-http-artifact-compatibility-v1.json`;
+    const fixturePath = `${process.cwd()}/apps/playground/src/server/codemode/fixtures/http-artifact-compatibility-v1.json`;
     const exactBase = JSON.parse(await readFile(fixturePath, "utf8"));
     expect(
       `${JSON.stringify(

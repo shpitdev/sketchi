@@ -8,7 +8,7 @@ import type { StudioEnv } from "../bindings/studio-env.server";
 import {
   PlaygroundBindings,
   PlaygroundRequestMetadata,
-} from "../runtime/playground-context.server";
+} from "../runtime/context.server";
 
 const DEFAULT_GATEWAY_ID = "google-ai-studio";
 const DEFAULT_MODEL = "google/gemini-3.1-flash-lite";

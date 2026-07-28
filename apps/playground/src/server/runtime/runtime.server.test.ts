@@ -5,12 +5,12 @@ import {
   PlaygroundBindings,
   PlaygroundPlatformCallbacks,
   PlaygroundRequestMetadata,
-} from "./playground-context.server";
+} from "./context.server";
 import {
   makePlaygroundRuntime,
   PlaygroundRequestCallbacks,
   runPlaygroundEffect,
-} from "./playground-runtime.server";
+} from "./runtime.server";
 
 function requestBoundary(
   request: Request,

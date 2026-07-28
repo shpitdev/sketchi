@@ -13,9 +13,9 @@ import {
   handleBuildSequenceDiagramRequest as handleBuildSequenceDiagramRequestEffect,
   handleGetArtifactRequest as handleGetArtifactRequestEffect,
   handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
-} from "./codemode-api.server";
+} from "./api.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
-import { runPlaygroundEffect } from "../runtime/playground-runtime.server";
+import { runPlaygroundEffect } from "../runtime/runtime.server";
 
 function testBoundary(env: StudioEnv, request: Request) {
   return {

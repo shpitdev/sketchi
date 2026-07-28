@@ -10,11 +10,11 @@ import {
   toCodeModeJsonSchema,
 } from "@sketchi/diagram-agent";
 
-import { CodeModeSearchRequestSchema } from "./codemode-mcp-docs.server";
+import { CodeModeSearchRequestSchema } from "./mcp-docs.server";
 import {
   CodeModeHttpSchemas,
   decodeCodeModeHttpInput,
-} from "./codemode-http-schema.server";
+} from "./http-schema.server";
 
 describe("Playground Effect schema adapters", () => {
   it("keeps every route input structurally equal to the frozen package authority", () => {

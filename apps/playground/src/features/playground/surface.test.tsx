@@ -22,7 +22,7 @@ import {
   PlaygroundEmptyState,
   assistantAsksQuestion,
   type ReadyPlaygroundArtifact,
-} from "./playground-surface";
+} from "./surface";
 import {
   DEPLOY_PIPELINE_SCENE,
   DEPLOY_PIPELINE_SPEC,

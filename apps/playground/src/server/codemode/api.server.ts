@@ -16,16 +16,16 @@ import {
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { Effect, Schema } from "effect";
 
-import { PlaygroundClock } from "../runtime/playground-context.server";
-import { PlaygroundCodeMode } from "./codemode-service.server";
+import { PlaygroundClock } from "../runtime/context.server";
+import { PlaygroundCodeMode } from "./service.server";
 import {
   CodeModeHttpSchemas,
   decodeCodeModeHttpInput,
-} from "./codemode-http-schema.server";
+} from "./http-schema.server";
 import {
   codeModeUsageResponseHeaders,
   PlaygroundCodeModeUsage,
-} from "./codemode-usage-events.server";
+} from "./usage-events.server";
 
 export const MAX_CODE_MODE_BUILD_REQUEST_BYTES = 256 * 1024;
 

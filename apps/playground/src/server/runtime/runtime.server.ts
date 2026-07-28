@@ -7,10 +7,10 @@ import {
 import { Context, Effect, FiberSet, Layer, ManagedRuntime, pipe } from "effect";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
-import { PlaygroundAiModelLive } from "../ai/playground-ai-model.server";
-import { PlaygroundCodeModeLive } from "../codemode/codemode-service.server";
-import { PlaygroundGenerationLive } from "../generation/playground-generation.server";
-import { PlaygroundCodeModeUsageLive } from "../codemode/codemode-usage-events.server";
+import { PlaygroundAiModelLive } from "../ai/model.server";
+import { PlaygroundCodeModeLive } from "../codemode/service.server";
+import { PlaygroundGenerationLive } from "../generation/service.server";
+import { PlaygroundCodeModeUsageLive } from "../codemode/usage-events.server";
 import {
   handleCreateStudioProjectFromArtifactRequest,
   handleGetStudioDiagramRequest,
@@ -29,7 +29,7 @@ import {
   PlaygroundRequestMetadata,
   type PlaygroundPlatformBoundaryShape,
   type PlaygroundRequestServices,
-} from "./playground-context.server";
+} from "./context.server";
 
 export interface PlaygroundRequestBoundary {
   readonly env: StudioEnv;

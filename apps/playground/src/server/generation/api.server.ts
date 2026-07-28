@@ -13,20 +13,20 @@ import {
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { Effect, Result, Schema } from "effect";
 
-import { PlaygroundCodeMode } from "../codemode/codemode-service.server";
+import { PlaygroundCodeMode } from "../codemode/service.server";
 import {
   codeModeUsageResponseHeaders,
   PlaygroundCodeModeUsage,
-} from "../codemode/codemode-usage-events.server";
+} from "../codemode/usage-events.server";
 import {
   PlaygroundBindings,
   PlaygroundClock,
-} from "../runtime/playground-context.server";
+} from "../runtime/context.server";
 import {
   flowchartDocumentInput,
   mindmapDocumentInput,
   PlaygroundGeneration,
-} from "./playground-generation.server";
+} from "./service.server";
 
 export const MAX_GENERATE_REQUEST_BYTES = 32 * 1024;
 export const MAX_GENERATE_PROMPT_LENGTH = 8_000;

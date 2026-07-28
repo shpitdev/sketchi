@@ -5,8 +5,8 @@ import type { FlowchartSpec } from "@sketchi/diagram-agent";
 import { MemoryStudioObjectBucket } from "@sketchi/studio-projects/server";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
-import { PlaygroundCodeMode } from "../codemode/codemode-service.server";
-import { runPlaygroundEffect } from "../runtime/playground-runtime.server";
+import { PlaygroundCodeMode } from "../codemode/service.server";
+import { runPlaygroundEffect } from "../runtime/runtime.server";
 import {
   handleCreateStudioProjectFromArtifactRequest as handleCreateStudioProjectFromArtifactRequestEffect,
   handleListStudioProjectsRequest as handleListStudioProjectsRequestEffect,
