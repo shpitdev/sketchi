@@ -77,7 +77,7 @@ import {
   writeExportFile,
 } from "./storage.js";
 
-const ROOT_HELP = `Local Sketchi authoring for canonical flowcharts and mindmaps, plus explicit snapshot sharing.
+const AGENT_DOCS = `Sketchi CLI contracts for agents and automation.
 
 Manual JSON workflow (strictly offline):
   create a canonical document, apply semantic patches, inspect or replace it, list local records,
@@ -107,8 +107,9 @@ Explicit network commands (one credential-free HTTPS request each):
 Input and output contracts:
   create/edit/patch require exactly one of --file PATH|- or --json VALUE. --file - reads one
   noninteractive UTF-8 JSON document from stdin and exits with usage code 2 on a TTY.
-  --json is inline input only. --prompt is noninteractive text. Use --output text|json for
-  result presentation on every command.
+  --json is inline input only. --prompt is noninteractive text. generate exports PNG to
+  <generated-id>.png by default; --format scene|excalidraw selects another artifact and --dest
+  PATH|- overrides its destination. Use --output text|json for result presentation on every command.
   export writes bytes with --dest PATH|- and always writes status to stderr. With --dest -,
   stdout contains only artifact bytes. A successful PNG file export adds a generic inline-Markdown
   display hint for calling agents.
@@ -129,8 +130,10 @@ Offline boundary and storage:
   A pulled record is detached: diagram.excalidraw is authoritative while document.json and
   scene.json remain non-authoritative provenance. A patched record makes scene.json authoritative
   while retaining document.json as provenance. show/list expose these states; edit refuses both.
-  Formats are scene, excalidraw, and png. If no PNG is stored, export deterministically renders one
-  on demand from the local scene and Excalidraw artifacts, without a browser, network, or record write.
+  Formats are scene, excalidraw, and png. generate persists the canonical record before exporting
+  the requested artifact; a later destination failure leaves that record recoverable. If no PNG is
+  stored, export deterministically renders one on demand from the local scene and Excalidraw artifacts,
+  without a browser, network, or record write.
 
 Exit codes and errors:
   0 success; 1 internal failure; 2 usage or interactive stdin; 3 invalid input/document;
@@ -144,8 +147,16 @@ Exit codes and errors:
 Revision recovery and next steps:
   edit, pull, and restore archive the complete prior authority state before atomic replacement.
   Use restore --revision N to recover through the CLI without consuming the selected snapshot.
-  Start with create for accepted JSON or generate for a prompt. Use the returned id with show/list,
-  edit with a complete replacement document, then export a stored scene or Excalidraw artifact.`;
+  Start with generate for a prompt or create for accepted JSON. Use the returned id with show/list,
+  edit with a complete replacement document, then export another stored artifact when needed.`;
+
+const HUMAN_HELP = `Describe a diagram and get a validated PNG plus an editable local record.
+
+Start here:
+  sketchi generate --prompt "Map our release approval flow"
+
+The PNG is written to <generated-id>.png in the current directory. Use --format or --dest to
+choose another artifact or destination. Run sketchi docs for complete agent and automation contracts.`;
 
 const outputFlag = Flag.choice("output", ["text", "json"]).pipe(
   Flag.withDefault("text"),
@@ -155,9 +166,28 @@ const outputFlag = Flag.choice("output", ["text", "json"]).pipe(
 
 const rootCommand = Command.make("sketchi").pipe(
   Command.withSharedFlags({ output: outputFlag }),
-  Command.withDescription(ROOT_HELP),
+  Command.withDescription(HUMAN_HELP),
   Command.withShortDescription(
-    "Local Sketchi authoring with one credential-free prompt-assisted command.",
+    "Turn a prompt into a validated PNG and editable local diagram.",
+  ),
+);
+
+const docsCommand = Command.make("docs", {}, () =>
+  Effect.gen(function* () {
+    const { output } = yield* rootCommand;
+    yield* reportSuccess(
+      "docs",
+      output,
+      { documentation: AGENT_DOCS },
+      AGENT_DOCS,
+    );
+  }),
+).pipe(
+  Command.withDescription(
+    "Print the complete CLI contracts for agents, automation, storage, formats, safety limits, and errors.",
+  ),
+  Command.withShortDescription(
+    "Print complete agent and automation documentation.",
   ),
 );
 
@@ -236,6 +266,40 @@ function generatedText(result: GenerateDiagramResult): string {
   ].join("\n");
 }
 
+interface GenerateCommandResult {
+  readonly generated: GenerateDiagramResult;
+  readonly artifact: ExportResult;
+}
+
+function generatedArtifactData(result: GenerateCommandResult) {
+  return {
+    ...generatedData(result.generated),
+    export: exportData(result.artifact),
+  };
+}
+
+function generatedArtifactText(result: GenerateCommandResult): string {
+  const hint = displayHint(result.artifact);
+  return [
+    generatedText(result.generated),
+    `format: ${result.artifact.format}`,
+    `destination: ${result.artifact.destination}`,
+    `bytes: ${String(result.artifact.sizeBytes)}`,
+    ...(hint ? [`hint: ${hint}`] : []),
+  ].join("\n");
+}
+
+function generatedDestination(id: string, format: DiagramFormat): string {
+  switch (format) {
+    case "png":
+      return `${id}.png`;
+    case "excalidraw":
+      return `${id}.excalidraw`;
+    case "scene":
+      return `${id}.scene.json`;
+  }
+}
+
 function showText(diagram: StoredDiagram): string {
   const revisions = revisionLocations(diagram);
   return [
@@ -270,7 +334,7 @@ function listText(diagrams: ReadonlyArray<DiagramSummary>): string {
   ].join("\n");
 }
 
-const GENERATE_HELP = `Create one persisted diagram from --prompt TEXT. This is one of Sketchi's three explicit network commands (generate, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
+const GENERATE_HELP = `Create one persisted diagram from --prompt TEXT and export its PNG by default. This is one of Sketchi's three explicit network commands (generate, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
 
 Network and options:
   Endpoint: ${DEFAULT_GENERATE_ENDPOINT}
@@ -278,19 +342,23 @@ Network and options:
   and Excalidraw artifact are returned over plain HTTPS. Sketchi sends no credentials.
   --type defaults to flowchart; --model defaults to ${DEFAULT_GENERATION_MODEL}.
   Override the endpoint for preview or local testing with ${SKETCHI_GENERATE_ENDPOINT_ENV}
-  or --endpoint URL. --output text|json controls only the local result envelope.
+  or --endpoint URL. --format defaults to png. Without --dest, the artifact is written as
+  <generated-id>.png, <generated-id>.excalidraw, or <generated-id>.scene.json in the current
+  directory. --dest PATH|- overrides that path. --output text|json controls only the status envelope.
 
 Validation and storage:
   The returned diagram is decoded against Sketchi's canonical package schemas and atomically
   committed through the create store at ~/.sketchi/diagrams/<id>/. The record contains
-  manifest.json, document.json, scene.json, and diagram.excalidraw.
-  Any network/endpoint/timeout/output/validation/storage failure leaves no visible record.
+  manifest.json, document.json, scene.json, and diagram.excalidraw. PNG rendering remains lazy
+  and is not written back to that record. Network/endpoint/timeout/output/validation/storage
+  failures leave no visible record; a later export destination failure leaves the created record.
 
 Errors and next steps:
   Exit 10 means a network or endpoint failure, 11 a timeout, and 12 malformed output;
   a rejected or invalid generated document uses 3, conflict uses 6, and storage uses 7.
-  On success, pass the returned id to show, edit, list, or export. For strictly offline manual
-  authoring and accepted canonical JSON examples, run sketchi --help.`;
+  With --dest -, stdout contains artifact bytes only and all status uses stderr. On success, pass
+  the returned id to show, edit, list, or export. For strictly offline manual authoring, accepted
+  canonical JSON examples, and full error contracts, run sketchi docs.`;
 
 const generateCommand = Command.make(
   "generate",
@@ -322,33 +390,80 @@ const generateCommand = Command.make(
       ),
       Flag.withMetavar("URL"),
     ),
+    format: Flag.choice("format", ["png", "excalidraw", "scene"]).pipe(
+      Flag.withDefault("png"),
+      Flag.withDescription("Artifact exported after generation; default png."),
+      Flag.withMetavar("png|excalidraw|scene"),
+    ),
+    destination: Flag.optional(
+      Flag.string("dest").pipe(
+        Flag.withDescription(
+          "Artifact destination; defaults from the generated id, or - for stdout.",
+        ),
+        Flag.withMetavar("PATH|-"),
+      ),
+    ),
   },
   (input) =>
     Effect.gen(function* () {
       const { output } = yield* rootCommand;
-      yield* runReported(
-        "generate",
-        output,
-        generateDiagram(input),
-        generatedText,
-        generatedData,
+      const exporter = yield* DiagramExporter;
+      const operation = Effect.gen(function* () {
+        const generated = yield* generateDiagram(input);
+        const destination = Option.getOrElse(input.destination, () =>
+          generatedDestination(generated.diagram.manifest.id, input.format),
+        );
+        const bytes = yield* exporter.exportArtifact(
+          generated.diagram.manifest.id,
+          input.format,
+        );
+        if (destination !== "-") yield* writeExportFile(destination, bytes);
+        return {
+          generated,
+          artifact: {
+            id: generated.diagram.manifest.id,
+            format: input.format,
+            destination,
+            sizeBytes: bytes.byteLength,
+            ...(destination === "-" ? { stdoutBytes: bytes } : {}),
+          },
+        };
+      });
+      yield* operation.pipe(
+        Effect.matchEffect({
+          onFailure: (error) => reportFailure("generate", output, error),
+          onSuccess: (result) =>
+            Effect.gen(function* () {
+              const writer = yield* OutputWriter;
+              if (result.artifact.stdoutBytes) {
+                yield* writer.stdout(result.artifact.stdoutBytes);
+              }
+              yield* reportSuccess(
+                "generate",
+                output,
+                generatedArtifactData(result),
+                generatedArtifactText(result),
+                result.artifact.destination === "-" ? "stderr" : "stdout",
+              );
+            }),
+        }),
       );
     }),
 ).pipe(
   Command.withDescription(GENERATE_HELP),
   Command.withShortDescription(
-    "Generate and persist one diagram through the public unauthenticated Sketchi generate API.",
+    "Generate, persist, and export a PNG from one prompt.",
   ),
   Command.withExamples([
     {
       command:
         'sketchi generate --prompt "Map release approval with pass and revise branches"',
-      description: `Generate a flowchart with ${DEFAULT_GENERATION_MODEL}.`,
+      description: `Generate a flowchart with ${DEFAULT_GENERATION_MODEL} and write its PNG.`,
     },
     {
       command:
-        'sketchi generate --prompt "Organize launch readiness" --type mindmap --model gemini-3.1-flash-lite --output json',
-      description: "Generate and persist a mindmap with structured output.",
+        'sketchi generate --prompt "Organize launch readiness" --type mindmap --format excalidraw --dest launch.excalidraw --output json',
+      description: "Generate a mindmap and write editable Excalidraw.",
     },
   ]),
 );
@@ -378,6 +493,7 @@ const createCommand = Command.make(
   Command.withDescription(
     "Create one local diagram from exactly one canonical document source. The document is validated and built before the record directory is committed atomically. --file - rejects an interactive TTY with exit 2.",
   ),
+  Command.withShortDescription("Create a local diagram from canonical JSON."),
   Command.withExamples([
     {
       command: "sketchi create --file diagram.json",
@@ -406,6 +522,7 @@ const showCommand = Command.make(
   Command.withDescription(
     "Show current authority, documentAuthoritative state, retained document provenance, manifest formats, and recoverable revision paths for DIAGRAM_ID. This is strictly offline and does not rebuild or mutate the record.",
   ),
+  Command.withShortDescription("Inspect one local diagram."),
   Command.withExamples([
     {
       command: "sketchi show release-flow --output json",
@@ -450,6 +567,7 @@ const editCommand = Command.make(
   Command.withDescription(
     "Replace the complete canonical document for DIAGRAM_ID. Sketchi validates and builds first, preserves the prior full authority state under revisions/, and atomically swaps the record. Patched and detached records refuse edit because their canonical document is no longer authoritative. The new spec.id must match DIAGRAM_ID.",
   ),
+  Command.withShortDescription("Replace a canonical diagram document."),
   Command.withExamples([
     {
       command: "sketchi edit release-flow --file revised.json",
@@ -492,6 +610,7 @@ const patchCommand = Command.make(
   Command.withDescription(
     "Apply Sketchi semantic setStyle, setDefaultStyle, setShape, translate, replaceText, or rerouteEdges operations to the current stored scene. The CLI owns source and requestId; input contains operations plus optional options or intent. The prior full revision is recoverable, document.json remains unchanged provenance, stale stored PNG is removed, and the patched scene becomes authoritative. This command is strictly offline. Edit remains blocked until a canonical revision is restored.",
   ),
+  Command.withShortDescription("Apply semantic edits to a stored diagram."),
   Command.withExamples([
     {
       command:
@@ -516,6 +635,7 @@ const listCommand = Command.make("list", {}, () =>
   Command.withDescription(
     "List local diagrams in ascending id order with type, revision, authority, documentAuthoritative, current stored formats, and retained title provenance. The command is deterministic, strictly offline, and read-only.",
   ),
+  Command.withShortDescription("List local diagrams."),
   Command.withExamples([
     {
       command: "sketchi list --output json",
@@ -598,6 +718,7 @@ const shareCommand = Command.make(
   Command.withDescription(
     `Encrypt and upload the current authoritative Excalidraw artifact as one immutable excalidraw.com bearer snapshot. This makes exactly one credential-free HTTPS request. The storage service can observe connection metadata, timing, and ciphertext size; retention is uncontrolled, and Sketchi cannot revoke or delete a link. Anyone with the full URL can decrypt it. Supported elements: rectangle, ellipse, diamond, arrow, line, freedraw, text; text must use Excalifont fontFamily 5; files and images are rejected. Render limits: element dimension ${String(MAX_RENDER_ELEMENT_DIMENSION)}, canvas dimension ${String(MAX_RENDER_CANVAS_DIMENSION)}, canvas area ${String(MAX_RENDER_CANVAS_AREA)}, final PNG pixels ${String(MAX_RENDER_OUTPUT_PIXELS)}. --open is opt-in and only confirms whether the OS accepted the request.`,
   ),
+  Command.withShortDescription("Share an encrypted Excalidraw snapshot."),
 );
 
 const pullCommand = Command.make(
@@ -644,6 +765,7 @@ const pullCommand = Command.make(
   Command.withDescription(
     `Fetch exactly one current-format excalidraw.com bearer snapshot, decrypt it locally, restore and strictly validate it, prove detached PNG renderability, then atomically preserve the prior full record and replace diagram.excalidraw as detached authority. The link carries no trusted Sketchi identity and may be unrelated to DIAGRAM_ID. This makes exactly one credential-free HTTPS request and never echoes or stores the input link or key. Supported elements: rectangle, ellipse, diamond, arrow, line, freedraw, text; text must use Excalifont fontFamily 5; files, images, external resources, and other fonts are rejected. Render limits: element dimension ${String(MAX_RENDER_ELEMENT_DIMENSION)}, canvas dimension ${String(MAX_RENDER_CANVAS_DIMENSION)}, canvas area ${String(MAX_RENDER_CANVAS_AREA)}, final PNG pixels ${String(MAX_RENDER_OUTPUT_PIXELS)}.`,
   ),
+  Command.withShortDescription("Pull browser edits from an Excalidraw link."),
 );
 
 const restoreCommand = Command.make(
@@ -705,6 +827,7 @@ const restoreCommand = Command.make(
   Command.withDescription(
     "Strictly offline recovery. Archive the current full state first, then restore revision N byte-for-byte without consuming it and commit at the next monotonic revision. Full snapshots restore artifacts and authority without rebuilding; legacy document-only revisions rebuild only while the record remains canonical.",
   ),
+  Command.withShortDescription("Restore a retained diagram revision."),
 );
 
 interface ExportResult {
@@ -799,6 +922,7 @@ const exportCommand = Command.make(
   Command.withDescription(
     "Strictly offline export of a current stored artifact or on-demand PNG. Canonical PNG uses scene plus Excalidraw; detached PNG restores diagram.excalidraw directly, uses its viewBackgroundColor, and adds no stale canonical title. Detached scene export is unavailable. Rendering never starts a browser or network request and never writes the PNG back. Status always uses stderr, so --dest - leaves stdout byte-only. Render or write failures exit 8.",
   ),
+  Command.withShortDescription("Export scene, Excalidraw, or PNG bytes."),
   Command.withExamples([
     {
       command:
@@ -816,6 +940,7 @@ const exportCommand = Command.make(
 export const sketchiCommand = rootCommand.pipe(
   Command.withSubcommands([
     generateCommand,
+    docsCommand,
     createCommand,
     showCommand,
     editCommand,

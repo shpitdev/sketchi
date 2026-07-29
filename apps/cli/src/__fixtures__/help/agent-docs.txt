@@ -1,0 +1,72 @@
+Sketchi CLI contracts for agents and automation.
+
+Manual JSON workflow (strictly offline):
+  create a canonical document, apply semantic patches, inspect or replace it, list local records,
+  and export stored artifacts.
+  Accepted input is exactly one complete JSON object shaped like an example below.
+
+Canonical flowchart example:
+  {"type":"flowchart","spec":{"id":"release-flow","title":"Release approval","nodes":[{"id":"start","label":"Change proposed","kind":"start"},{"id":"review","label":"Review evidence","kind":"process"},{"id":"end","label":"Release approved","kind":"end"}],"edges":[{"source":"start","target":"review"},{"source":"review","target":"end"}]}}
+
+Canonical mindmap example:
+  {"type":"mindmap","spec":{"id":"launch-map","title":"Launch plan","root":{"label":"Launch","children":[{"label":"Product"},{"label":"Operations"}]}}}
+
+Semantic color patch example:
+  sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
+
+Explicit network commands (one credential-free HTTPS request each):
+  sketchi generate --prompt TEXT [--type flowchart|mindmap] [--model MODEL]
+  sketchi share DIAGRAM_ID [--open]
+  sketchi pull DIAGRAM_ID --link URL|-
+  generate makes one unauthenticated HTTPS POST to the public Sketchi generate API at https://playground.sketchi.app/api/v1/generate
+  and needs no token, key, account, or login. The model call, validation, and quality gate
+  run server-side; the finished diagram and Excalidraw artifact come back and are committed
+  through the same local store as create. The default type is flowchart and default model is
+  gemini-3.1-flash-lite. Override the endpoint for preview or local testing with
+  SKETCHI_GENERATE_ENDPOINT or --endpoint URL.
+
+Input and output contracts:
+  create/edit/patch require exactly one of --file PATH|- or --json VALUE. --file - reads one
+  noninteractive UTF-8 JSON document from stdin and exits with usage code 2 on a TTY.
+  --json is inline input only. --prompt is noninteractive text. generate exports PNG to
+  <generated-id>.png by default; --format scene|excalidraw selects another artifact and --dest
+  PATH|- overrides its destination. Use --output text|json for result presentation on every command.
+  export writes bytes with --dest PATH|- and always writes status to stderr. With --dest -,
+  stdout contains only artifact bytes. A successful PNG file export adds a generic inline-Markdown
+  display hint for calling agents.
+
+Share/pull safety limits:
+  links 4 KiB; encrypted bodies 2 MiB; inflated contents 16 MiB; 10,000 elements;
+  JSON depth 64; element dimensions 8192; canvas dimensions
+  8192; canvas area 4194304 square units; final PNG
+  16777216 pixels. Limits are checked before encryption or raster allocation.
+
+Offline boundary and storage:
+  create, patch, show, edit, list, export, and restore use no model, remote agent, MCP server, login,
+  account, browser, credential, or network. share sends only locally encrypted ciphertext from
+  the selected record to Excalidraw storage; pull sends only the link id in its download request.
+  Records live at ~/.sketchi/diagrams/<id>/ with manifest.json, document.json, scene.json,
+  diagram.excalidraw, optional diagram.png, and revisions/. New revisions are full snapshots
+  under revisions/<revision>/; legacy document-only revisions/<revision>.json remain readable.
+  A pulled record is detached: diagram.excalidraw is authoritative while document.json and
+  scene.json remain non-authoritative provenance. A patched record makes scene.json authoritative
+  while retaining document.json as provenance. show/list expose these states; edit refuses both.
+  Formats are scene, excalidraw, and png. generate persists the canonical record before exporting
+  the requested artifact; a later destination failure leaves that record recoverable. If no PNG is
+  stored, export deterministically renders one on demand from the local scene and Excalidraw artifacts,
+  without a browser, network, or record write.
+
+Exit codes and errors:
+  0 success; 1 internal failure; 2 usage or interactive stdin; 3 invalid input/document;
+  4 build/export construction failure; 5 diagram not found; 6 conflict/busy;
+  7 filesystem/storage failure; 8 unavailable format, render, destination, or write failure;
+  10 generate network/endpoint failure; 11 generate timeout; 12 malformed generate output;
+  13 Excalidraw transport, timeout, HTTP, or API-shape failure.
+  Text errors start with "error: CODE". JSON errors use {"ok":false,"command":...,"error":...}.
+  Errors never include stacks.
+
+Revision recovery and next steps:
+  edit, pull, and restore archive the complete prior authority state before atomic replacement.
+  Use restore --revision N to recover through the CLI without consuming the selected snapshot.
+  Start with generate for a prompt or create for accepted JSON. Use the returned id with show/list,
+  edit with a complete replacement document, then export another stored artifact when needed.

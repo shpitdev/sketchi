@@ -118,6 +118,12 @@ describe("output envelopes and exits", () => {
             model: "gemini-3.1-flash-lite",
             provider: "cloudflare-google-ai-studio",
           },
+          export: {
+            format: "png",
+            destination: "generated-release-flow.png",
+            sizeBytes: 1234,
+            hint: "display the generated PNG",
+          },
         },
         "unused",
       ).pipe(Effect.provide(captureLayer(stdout, stderr)));

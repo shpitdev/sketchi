@@ -35,6 +35,7 @@ function completions(shell: "bash" | "zsh"): string {
 describe("golden product help", () => {
   for (const command of [
     "root",
+    "docs",
     "generate",
     "create",
     "show",
@@ -52,6 +53,114 @@ describe("golden product help", () => {
       ).toMatchFileSnapshot(`./__fixtures__/help/${command}.txt`);
     });
   }
+
+  it("keeps the default help concise and points to the detailed docs", () => {
+    const output = help();
+
+    expect(output).toContain(
+      'sketchi generate --prompt "Map our release approval flow"',
+    );
+    expect(output).toContain("sketchi docs");
+    expect(output).not.toContain("Canonical flowchart example");
+    expect(output).not.toContain("Share/pull safety limits");
+    expect(output.split("\n").length).toBeLessThan(60);
+  });
+
+  it("uses the same human help when invoked without arguments", () => {
+    expect(
+      execFileSync(process.execPath, [binary], {
+        encoding: "utf8",
+        env: cliEnvironment(),
+      }),
+    ).toBe(help());
+  });
+
+  it("keeps the detailed agent contracts on the explicit docs command", async () => {
+    const output = execFileSync(process.execPath, [binary, "docs"], {
+      encoding: "utf8",
+      env: cliEnvironment(),
+    });
+
+    expect(output).toContain("Canonical flowchart example");
+    expect(output).toContain("Share/pull safety limits");
+    expect(output).toContain("stdout contains only artifact bytes");
+    await expect(output).toMatchFileSnapshot(
+      "./__fixtures__/help/agent-docs.txt",
+    );
+  });
+
+  it("wraps agent documentation in the shared JSON success envelope", () => {
+    const output = execFileSync(
+      process.execPath,
+      [binary, "docs", "--output", "json"],
+      { encoding: "utf8", env: cliEnvironment() },
+    );
+
+    expect(JSON.parse(output)).toMatchObject({
+      ok: true,
+      command: "docs",
+      data: {
+        documentation: expect.stringContaining("Canonical flowchart example"),
+      },
+    });
+  });
+
+  it("brands automatic root help when only text output is selected", () => {
+    expect(
+      execFileSync(process.execPath, [binary, "--output", "text"], {
+        encoding: "utf8",
+        env: cliEnvironment(),
+      }),
+    ).toBe(help());
+  });
+
+  it("wraps automatic root help when only JSON output is selected", () => {
+    for (const args of [["--output", "json"], ["--output=json"]]) {
+      const output = execFileSync(process.execPath, [binary, ...args], {
+        encoding: "utf8",
+        env: cliEnvironment(),
+      });
+
+      expect(JSON.parse(output)).toMatchObject({
+        ok: true,
+        command: "sketchi",
+        data: {
+          help: expect.stringContaining(
+            'sketchi generate --prompt "Map our release approval flow"',
+          ),
+        },
+      });
+      expect(output).not.toContain("\u001b");
+    }
+  });
+
+  it("colors only TTY help and chooses readable dark/light wordmarks", () => {
+    const command = [
+      JSON.stringify(process.execPath),
+      JSON.stringify(binary),
+      "--help",
+    ].join(" ");
+    const ttyHelp = (colorForegroundBackground: string, noColor?: string) =>
+      spawnSync(
+        "script",
+        ["--quiet", "--return", "--command", command, "/dev/null"],
+        {
+          encoding: "utf8",
+          env: {
+            ...cliEnvironment(),
+            TERM: "xterm-256color",
+            COLORTERM: "truecolor",
+            COLORFGBG: colorForegroundBackground,
+            ...(noColor === undefined ? {} : { NO_COLOR: noColor }),
+          },
+        },
+      ).stdout;
+
+    expect(ttyHelp("15;0")).toContain("\u001b[38;2;246;241;231msketchi");
+    expect(ttyHelp("0;15")).toContain("\u001b[38;2;26;23;18msketchi");
+    expect(ttyHelp("15;0", "1")).not.toContain("\u001b");
+    expect(help()).not.toContain("\u001b");
+  });
 
   it("keeps parser-level exclusivity failures in the JSON usage envelope", () => {
     for (const args of [

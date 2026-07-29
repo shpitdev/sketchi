@@ -102,7 +102,7 @@ export function DocsView({
                   Run <code>sketchi generate --prompt "…"</code>.
                 </li>
                 <li>Sketchi validates it and commits a local record.</li>
-                <li>Export PNG or Excalidraw offline.</li>
+                <li>Your PNG lands in the current directory.</li>
               </ol>
               <p className="docs-lane__state">
                 Your machine keeps the file, under{" "}
@@ -149,8 +149,8 @@ export function DocsView({
                 <code>generate</code>
               </dt>
               <dd>
-                Turn one prompt into a validated diagram. No key, token,
-                account, or login.
+                Turn one prompt into a validated diagram and write its PNG by
+                default. No key, token, account, or login.
               </dd>
             </div>
             <div className="docs-defs__row">
@@ -200,9 +200,11 @@ export function DocsView({
               envelope. <code>create</code>, <code>edit</code>, and{" "}
               <code>patch</code> take their JSON noninteractively through{" "}
               <code>--json</code> or <code>--file</code>; <code>generate</code>{" "}
-              takes <code>--prompt</code>; and <code>export --dest -</code>{" "}
-              streams raw bytes to stdout. Shell completions ship for zsh, bash,
-              and fish.
+              takes <code>--prompt</code> and writes PNG by default; and either
+              <code>generate --dest -</code> or <code>export --dest -</code>{" "}
+              streams raw artifact bytes to stdout. Run{" "}
+              <code>sketchi docs</code> for complete automation contracts. Shell
+              completions ship for zsh, bash, and fish.
             </span>
           </div>
 

@@ -36,7 +36,7 @@ function assert(condition, message) {
 function run(file, args, options = {}) {
   return new Promise((complete, reject) => {
     const child = spawn(file, args, {
-      cwd: workspaceRoot,
+      cwd: options.cwd ?? workspaceRoot,
       env: options.env ?? process.env,
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -329,7 +329,7 @@ try {
   delete cliEnvironment.FORCE_COLOR;
   delete cliEnvironment.SKETCHI_GENERATE_ENDPOINT;
   const cli = (args, input) =>
-    run(binary, args, { env: cliEnvironment, input });
+    run(binary, args, { cwd: fixtureRoot, env: cliEnvironment, input });
 
   // Online environment for the generate endpoint-error proof only: the offline
   // matrix covers create/show/edit/list/export/restore. Network-bound generate,
@@ -341,14 +341,23 @@ try {
   const rootHelp = await cli(["--help"]);
   expectExit(rootHelp, 0, "root help");
   assert(
-    rootHelp.stdout.includes(Buffer.from("Canonical flowchart example")),
-    "Root help omitted flowchart guidance.",
+    rootHelp.stdout.includes(
+      Buffer.from('sketchi generate --prompt "Map our release approval flow"'),
+    ) && rootHelp.stdout.includes(Buffer.from("sketchi docs")),
+    "Root help omitted the human quick start or detailed-docs route.",
   );
   assert(
-    rootHelp.stdout.includes(Buffer.from("Explicit network commands")) &&
-      rootHelp.stdout.includes(Buffer.from("sketchi share")) &&
-      rootHelp.stdout.includes(Buffer.from("sketchi pull")),
-    "Root help omitted explicit network command boundaries.",
+    !rootHelp.stdout.includes(Buffer.from("Canonical flowchart example")) &&
+      rootHelp.stdout.toString("utf8").split("\n").length < 60,
+    "Root help retained the agent-oriented documentation wall.",
+  );
+
+  const agentDocs = await cli(["docs"]);
+  expectExit(agentDocs, 0, "agent docs");
+  assert(
+    agentDocs.stdout.includes(Buffer.from("Canonical flowchart example")) &&
+      agentDocs.stdout.includes(Buffer.from("Share/pull safety limits")),
+    "Explicit agent docs omitted the detailed CLI contracts.",
   );
 
   const zshCompletions = await cli(["--completions", "zsh"]);
@@ -378,6 +387,145 @@ try {
     ),
     "Bash completion script did not register the sketchi completer.",
   );
+
+  // Build a valid loopback API response through the exact packaged CLI, then
+  // remove the seed record so generate must persist and export it itself.
+  const generatedFlowchart = {
+    ...flowchart,
+    spec: { ...flowchart.spec, id: "generated-release-flow" },
+  };
+  const seedGenerated = await cli([
+    "create",
+    "--json",
+    JSON.stringify(generatedFlowchart),
+    "--output",
+    "json",
+  ]);
+  expectExit(seedGenerated, 0, "generate response seed");
+  const generatedRecord = resolve(
+    homeRoot,
+    ".sketchi/diagrams/generated-release-flow",
+  );
+  const generatedScene = parseJson(
+    await readFile(resolve(generatedRecord, "scene.json")),
+    "generated response scene",
+  );
+  const generatedExcalidraw = parseJson(
+    await readFile(resolve(generatedRecord, "diagram.excalidraw")),
+    "generated response Excalidraw",
+  );
+  await rm(generatedRecord, { force: true, recursive: true });
+
+  const makeSuccessServer = () =>
+    createServer((request, response) => {
+      request.resume();
+      request.on("end", () => {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(
+          JSON.stringify({
+            ok: true,
+            status: "generated",
+            diagram: {
+              document: generatedFlowchart,
+              scene: generatedScene,
+              excalidraw: generatedExcalidraw,
+            },
+            generation: {
+              model: "gemini-3.1-flash-lite",
+              provider: "smoke-loopback",
+            },
+          }),
+        );
+      });
+    });
+  const successServer = makeSuccessServer();
+  await new Promise((ready) => successServer.listen(0, "127.0.0.1", ready));
+  const successPort = successServer.address().port;
+  let generatedDefault;
+  try {
+    generatedDefault = await run(
+      binary,
+      [
+        "generate",
+        "--prompt",
+        "Create a release flow.",
+        "--endpoint",
+        `http://127.0.0.1:${String(successPort)}/api/v1/generate`,
+        "--output",
+        "json",
+      ],
+      { cwd: fixtureRoot, env: onlineEnvironment },
+    );
+  } finally {
+    await new Promise((closed) => successServer.close(closed));
+  }
+  expectExit(generatedDefault, 0, "default generated PNG");
+  const generatedStatus = parseJson(
+    generatedDefault.stdout,
+    "default generated PNG status",
+  );
+  assert(
+    generatedStatus.data.export.format === "png" &&
+      generatedStatus.data.export.destination === "generated-release-flow.png",
+    "Generate did not report its default PNG destination.",
+  );
+  const generatedPngPath = resolve(fixtureRoot, "generated-release-flow.png");
+  const generatedPng = await readFile(generatedPngPath);
+  assert(
+    generatedPng
+      .subarray(0, 8)
+      .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+    "Generate did not write a PNG by default.",
+  );
+  assertInkHasPadding(generatedPng, "default generated PNG");
+  assert(
+    !(await readdir(generatedRecord)).includes("diagram.png"),
+    "Generate wrote the rendered PNG back into the record.",
+  );
+  await rm(generatedRecord, { force: true, recursive: true });
+  await rm(generatedPngPath, { force: true });
+
+  const overrideServer = makeSuccessServer();
+  await new Promise((ready) => overrideServer.listen(0, "127.0.0.1", ready));
+  const overridePort = overrideServer.address().port;
+  let generatedExcalidrawStdout;
+  try {
+    generatedExcalidrawStdout = await run(
+      binary,
+      [
+        "generate",
+        "--prompt",
+        "Create an editable release flow.",
+        "--endpoint",
+        `http://127.0.0.1:${String(overridePort)}/api/v1/generate`,
+        "--format",
+        "excalidraw",
+        "--dest",
+        "-",
+        "--output",
+        "json",
+      ],
+      { cwd: fixtureRoot, env: onlineEnvironment },
+    );
+  } finally {
+    await new Promise((closed) => overrideServer.close(closed));
+  }
+  expectExit(generatedExcalidrawStdout, 0, "generated Excalidraw stdout");
+  assert(
+    parseJson(generatedExcalidrawStdout.stdout, "generated Excalidraw artifact")
+      .type === "excalidraw",
+    "Generate --format excalidraw did not keep stdout artifact-only.",
+  );
+  const generatedOverrideStatus = parseJson(
+    generatedExcalidrawStdout.stderr,
+    "generated Excalidraw status",
+  );
+  assert(
+    generatedOverrideStatus.data.export.format === "excalidraw" &&
+      generatedOverrideStatus.data.export.destination === "-",
+    "Generate did not preserve explicit format, destination, and JSON status overrides.",
+  );
+  await rm(generatedRecord, { force: true, recursive: true });
 
   // Network-down: the offline preload blocks fetch, so generate's HTTPS call fails
   // with the stable provider/network exit and leaves no partial local state.
@@ -986,6 +1134,7 @@ try {
     node: process.versions.node,
     package: archives[0],
     flows: [
+      "generate:loopback-default-png-excalidraw-stdout",
       "flowchart:create-show-edit-show",
       "flowchart:restore-offline",
       "flowchart:patch-edit-blocked-restore-repatch",

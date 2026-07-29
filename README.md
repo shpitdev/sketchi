@@ -53,8 +53,18 @@ npm install -g sketchi
 curl -fsSL https://raw.githubusercontent.com/shpitdev/sketchi/main/install.sh | sh
 ```
 
-Create a canonical document, inspect and revise it, list the local store, then
-export editable Excalidraw:
+Turn a prompt into a validated PNG and editable local record:
+
+```sh
+sketchi generate --prompt "Map release approval with pass and revise branches"
+```
+
+The default file is `<generated-id>.png` in the current directory. Use
+`--format excalidraw` or `--format scene` for another artifact, and `--dest`
+to choose its path or stream bytes with `--dest -`.
+
+For manual offline authoring, create a canonical document, inspect and revise
+it, list the local store, then export another artifact:
 
 ```sh
 sketchi create --json '{"type":"flowchart","spec":{"id":"release-flow","title":"Release approval","nodes":[{"id":"start","label":"Change proposed","kind":"start"},{"id":"review","label":"Review evidence","kind":"process"},{"id":"end","label":"Release approved","kind":"end"}],"edges":[{"source":"start","target":"review"},{"source":"review","target":"end"}]}}'
@@ -65,12 +75,6 @@ sketchi list
 sketchi export release-flow --format excalidraw --dest release-flow.excalidraw
 sketchi export release-flow --format png --dest release-flow.png
 sketchi restore release-flow --revision 1
-```
-
-Generate and persist a diagram through the public, unauthenticated Sketchi API:
-
-```sh
-sketchi generate --prompt "Map release approval with pass and revise branches"
 ```
 
 `create`, `patch`, `show`, `edit`, `list`, `export`, and `restore` are deterministic,
@@ -87,6 +91,8 @@ Generate completions directly with `sketchi --completions zsh`,
 `sketchi --completions bash`, or `sketchi --completions fish`. See the
 [complete CLI guide](apps/cli/README.md) for file/stdin input, completion setup,
 storage details, and agent-oriented usage.
+The concise `sketchi --help` is for people; `sketchi docs` prints the complete
+agent and automation contracts from the packaged binary.
 
 See the CLI [changelog](apps/cli/CHANGELOG.md) for what changed, or browse
 published versions on [GitHub Releases](https://github.com/shpitdev/sketchi/releases).

@@ -15,6 +15,7 @@ import {
 } from "effect/unstable/cli";
 
 import { redactShareLinks } from "../redaction.js";
+import { terminalHelpBrand } from "../help-brand.js";
 
 export { Argument, Command, Flag };
 
@@ -26,6 +27,7 @@ const cliVersion =
 
 const PUBLIC_COMMANDS = new Set([
   "generate",
+  "docs",
   "create",
   "show",
   "edit",
@@ -143,13 +145,35 @@ export function runEffectCommand<
         argument === "--output" && args[index + 1] === "json",
     );
   const commandName = args.find((argument) => PUBLIC_COMMANDS.has(argument));
+  const usesOnlyRootOutputFlags = args.every(
+    (argument, index) =>
+      argument === "--output" ||
+      argument === "--output=text" ||
+      argument === "--output=json" ||
+      (args[index - 1] === "--output" &&
+        (argument === "text" || argument === "json")),
+  );
+  const rootHelp =
+    commandName === undefined &&
+    (args.length === 0 || usesDocumentationAction || usesOnlyRootOutputFlags);
   const errorCommand = commandName ?? "sketchi";
   const formatter: CliOutput.Formatter = {
     ...defaultFormatter,
-    formatHelpDoc: (document) =>
-      jsonOutput && !usesDocumentationAction
-        ? ""
-        : defaultFormatter.formatHelpDoc(document).replace(/[ \t]+$/gmu, ""),
+    formatHelpDoc: (document) => {
+      const help = defaultFormatter
+        .formatHelpDoc(document)
+        .replace(/[ \t]+$/gmu, "");
+      if (jsonOutput && !usesDocumentationAction) {
+        return rootHelp
+          ? `${JSON.stringify(
+              { ok: true, command: "sketchi", data: { help } },
+              null,
+              2,
+            )}\n`
+          : "";
+      }
+      return rootHelp ? `${terminalHelpBrand()}\n\n${help}` : help;
+    },
     formatErrors: (errors) => {
       const message = errors
         .map((error) => defaultFormatter.formatCliError(error))

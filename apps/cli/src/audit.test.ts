@@ -143,6 +143,7 @@ describe("CLI dependency and public-surface audit", () => {
 
     assert.deepStrictEqual(commands, [
       "generate",
+      "docs",
       "create",
       "show",
       "edit",

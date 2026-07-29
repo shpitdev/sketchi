@@ -38,7 +38,31 @@ sketchi --version
 
 Sketchi requires Node.js 24.13.0 or newer.
 
-## Create and work with a diagram
+## Generate a PNG from a prompt
+
+`generate` sends one prompt to Sketchi's public generation API, validates and
+persists the editable result, then writes `<generated-id>.png` in the current
+directory:
+
+```sh
+sketchi generate --prompt "Map release approval with pass and revise branches"
+```
+
+The PNG is rendered locally from the returned validated artifacts and is not
+written back into the record. Choose another artifact or destination explicitly:
+
+```sh
+sketchi generate --prompt "Organize launch readiness" --type mindmap --format excalidraw --dest launch.excalidraw
+sketchi generate --prompt "Map release approval" --dest - > release.png
+sketchi generate --prompt "Map release approval" --output json
+```
+
+`--format` accepts `png`, `excalidraw`, or `scene`; their default names are
+`<id>.png`, `<id>.excalidraw`, and `<id>.scene.json`. With `--dest -`, stdout
+contains artifact bytes only and the text or JSON status envelope moves to
+stderr. Generation, sharing, and pulling are the CLI's three network commands.
+
+## Create and work with a diagram offline
 
 Create a canonical flowchart from inline JSON:
 
@@ -91,20 +115,6 @@ result envelope. Export status always uses stderr. `export --dest -` writes
 only artifact bytes to stdout; a PNG file export also includes one generic
 inline-Markdown display hint for calling agents. Its destination is enclosed
 in CommonMark angle brackets so local paths containing spaces remain valid.
-
-## Generate from a prompt
-
-`generate` sends one prompt to Sketchi's public generation API, validates the
-result server-side, and commits the same local record shape used by `create`:
-
-```sh
-sketchi generate --prompt "Map release approval with pass and revise branches"
-sketchi generate --prompt "Organize launch readiness" --type mindmap --output json
-```
-
-It requires no API key, token, account, or login. `generate`, `share`, and
-`pull` are the CLI's three explicit network commands; each makes one HTTPS
-request.
 
 ## Share, pull, and restore browser edits
 
@@ -239,6 +249,7 @@ availability details.
 
 ```sh
 sketchi --help
+sketchi docs
 sketchi create --help
 sketchi patch --help
 sketchi generate --help
