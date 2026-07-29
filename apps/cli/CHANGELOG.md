@@ -1,5 +1,12 @@
 # @sketchi/cli
 
+## 0.4.0
+
+### Minor Changes
+
+- [#300](https://github.com/shpitdev/sketchi/pull/300) [`60e1c1e`](https://github.com/shpitdev/sketchi/commit/60e1c1e6cc2df18841ea79932d743b473c0dc1bf) Thanks [@anandpant](https://github.com/anandpant)! - Make the default CLI help concise and human-readable, move complete automation
+  contracts to `sketchi docs`, and export generated diagrams to PNG by default.
+
 ## 0.3.0
 
 ### Minor Changes
