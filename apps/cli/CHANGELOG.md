@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.4.1
+
+### Patch Changes
+
+- [#302](https://github.com/shpitdev/sketchi/pull/302) [`b8ed328`](https://github.com/shpitdev/sketchi/commit/b8ed328b5d90ed758e016d354c42c8004aec084a) Thanks [@anandpant](https://github.com/anandpant)! - Redesign root help as a progressive, terminal-aware Sketchi landing screen with a recognizable pencil lockup, a prompt-first example, and ANSI-free pipe, JSON, and `NO_COLOR` output.
+
 ## 0.4.0
 
 ### Minor Changes
