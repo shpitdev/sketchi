@@ -28,7 +28,7 @@ export const CLI_NODE_REQUIREMENT = "Node.js 24.13.0 or newer";
 
 /** One command worth showing as proof that it does real work. */
 export const CLI_EXAMPLE_COMMAND =
-  'sketchi generate --prompt "Map our release approval flow"';
+  'sketchi generate --prompt "Map release approval with pass and revise branches"';
 
 export interface CliInstallOption {
   /** The shell command itself. */

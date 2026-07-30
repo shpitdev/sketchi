@@ -79,6 +79,11 @@ import {
 
 const AGENT_DOCS = `Sketchi CLI contracts for agents and automation.
 
+Command map:
+  Start with generate for prompt-to-PNG. Use show, edit, patch, list, restore, and export for
+  local records. Use create for accepted canonical JSON. Share and pull are explicit network
+  boundaries for Excalidraw links. Run sketchi COMMAND --help for every flag and example.
+
 Manual JSON workflow (strictly offline):
   create a canonical document, apply semantic patches, inspect or replace it, list local records,
   and export stored artifacts.
@@ -150,13 +155,8 @@ Revision recovery and next steps:
   Start with generate for a prompt or create for accepted JSON. Use the returned id with show/list,
   edit with a complete replacement document, then export another stored artifact when needed.`;
 
-const HUMAN_HELP = `Describe a diagram and get a validated PNG plus an editable local record.
-
-Start here:
-  sketchi generate --prompt "Map our release approval flow"
-
-The PNG is written to <generated-id>.png in the current directory. Use --format or --dest to
-choose another artifact or destination. Run sketchi docs for complete agent and automation contracts.`;
+const HUMAN_HELP =
+  "Turn one prompt into a validated PNG and editable local diagram.";
 
 const outputFlag = Flag.choice("output", ["text", "json"]).pipe(
   Flag.withDefault("text"),

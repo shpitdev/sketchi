@@ -91,8 +91,9 @@ Generate completions directly with `sketchi --completions zsh`,
 `sketchi --completions bash`, or `sketchi --completions fish`. See the
 [complete CLI guide](apps/cli/README.md) for file/stdin input, completion setup,
 storage details, and agent-oriented usage.
-The concise `sketchi --help` is for people; `sketchi docs` prints the complete
-agent and automation contracts from the packaged binary.
+The progressive `sketchi --help` leads with prompt-to-PNG and the next human
+actions; `sketchi docs` prints the complete command map plus agent and
+automation contracts from the packaged binary.
 
 See the CLI [changelog](apps/cli/CHANGELOG.md) for what changed, or browse
 published versions on [GitHub Releases](https://github.com/shpitdev/sketchi/releases).

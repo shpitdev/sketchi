@@ -130,17 +130,26 @@ describe("CLI dependency and public-surface audit", () => {
     assert.notProperty(providerManifest.dependencies, "ai");
   });
 
-  it("publishes the explicit offline and network top-level commands", async () => {
+  it("keeps every command registered while root help uses progressive disclosure", async () => {
     const help = await readFile(
       join(workspaceRoot, "apps/cli/src/__fixtures__/help/root.txt"),
       "utf8",
     );
-    const section = help.split("SUBCOMMANDS\n")[1] ?? "";
-    const commands = section
-      .split("\n")
-      .filter((line) => /^  [a-z]/u.test(line))
-      .map((line) => line.trim().split(/\s+/u)[0]);
+    assert.include(help, "START HERE");
+    assert.include(help, "WORK WITH A DIAGRAM");
+    assert.include(help, "sketchi docs");
+    assert.notInclude(help, "SUBCOMMANDS");
+    assert.notInclude(help, "patch       Apply semantic edits");
 
+    const cliSource = await readFile(
+      join(workspaceRoot, "apps/cli/src/cli.ts"),
+      "utf8",
+    );
+    const registration =
+      cliSource.match(/Command\.withSubcommands\(\[([\s\S]*?)\]\)/u)?.[1] ?? "";
+    const commands = [...registration.matchAll(/\b([a-z]+)Command\b/gu)].map(
+      ([, name]) => name,
+    );
     assert.deepStrictEqual(commands, [
       "generate",
       "docs",

@@ -1,5 +1,10 @@
 Sketchi CLI contracts for agents and automation.
 
+Command map:
+  Start with generate for prompt-to-PNG. Use show, edit, patch, list, restore, and export for
+  local records. Use create for accepted canonical JSON. Share and pull are explicit network
+  boundaries for Excalidraw links. Run sketchi COMMAND --help for every flag and example.
+
 Manual JSON workflow (strictly offline):
   create a canonical document, apply semantic patches, inspect or replace it, list local records,
   and export stored artifacts.

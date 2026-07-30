@@ -1,38 +1,33 @@
-    /\
-   /  \   sketchi
-  /____\
-  |    |
-  |____|
+                             ______
+                           /#####/
+                         /#####/
+                       /#####/
+                     /#####/
+                   /#####/
+                 /  # /
+               /__#/
+             /#/
+           /
 
-DESCRIPTION
-  Describe a diagram and get a validated PNG plus an editable local record.
+                    sketchi
+        describe it. sketchi draws it.
 
-Start here:
-  sketchi generate --prompt "Map our release approval flow"
+START HERE
+  generate  Turn one prompt into a validated PNG and editable local diagram.
 
-The PNG is written to <generated-id>.png in the current directory. Use --format or --dest to
-choose another artifact or destination. Run sketchi docs for complete agent and automation contracts.
+EXAMPLE
+  sketchi generate --prompt "Map release approval with pass and revise branches"
+  Writes <generated-id>.png by default. No account or API key needed.
 
-USAGE
-  sketchi <subcommand> [flags]
+WORK WITH A DIAGRAM
+  show    Inspect a local diagram.
+  edit    Replace its canonical document.
+  export  Write PNG, Excalidraw, or scene bytes.
+  share   Create an encrypted Excalidraw link.
 
-FLAGS
-  --output text|json    Result presentation format. (choices: text, json)
+GO DEEPER
+  sketchi docs               Complete command map and automation contracts.
+  sketchi generate --help    Every generation option.
+  sketchi <command> --help   Targeted help for any command.
 
-GLOBAL FLAGS
-  --help, -h                          Show help information
-  --version, -v                       Show version information
-  --completions <bash|zsh|fish|sh>    Print shell completion script (choices: bash, zsh, fish, sh)
-
-SUBCOMMANDS
-  generate    Generate, persist, and export a PNG from one prompt.
-  docs        Print complete agent and automation documentation.
-  create      Create a local diagram from canonical JSON.
-  show        Inspect one local diagram.
-  edit        Replace a canonical diagram document.
-  patch       Apply semantic edits to a stored diagram.
-  list        List local diagrams.
-  restore     Restore a retained diagram revision.
-  share       Share an encrypted Excalidraw snapshot.
-  pull        Pull browser edits from an Excalidraw link.
-  export      Export scene, Excalidraw, or PNG bytes.
+Automation: add --output json.  Version: sketchi --version

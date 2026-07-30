@@ -32,6 +32,48 @@ function completions(shell: "bash" | "zsh"): string {
   });
 }
 
+function ttyHelp({
+  colorForegroundBackground,
+  colorTerminal = "truecolor",
+  noColor,
+  terminal = "xterm-256color",
+}: {
+  readonly colorForegroundBackground: string | undefined;
+  readonly colorTerminal?: string | null;
+  readonly noColor?: string;
+  readonly terminal?: string;
+}): string {
+  const command = [
+    JSON.stringify(process.execPath),
+    JSON.stringify(binary),
+    "--help",
+  ].join(" ");
+  const environment: NodeJS.ProcessEnv = {
+    ...cliEnvironment(),
+    TERM: terminal,
+    ...(noColor === undefined ? {} : { NO_COLOR: noColor }),
+  };
+  if (colorForegroundBackground === undefined) delete environment["COLORFGBG"];
+  else environment["COLORFGBG"] = colorForegroundBackground;
+  delete environment["CI"];
+  delete environment["GITHUB_ACTIONS"];
+  if (colorTerminal === null) delete environment["COLORTERM"];
+  else environment["COLORTERM"] = colorTerminal;
+  const terminalCommand =
+    colorForegroundBackground === undefined
+      ? `env -u COLORFGBG ${command}`
+      : command;
+
+  return spawnSync(
+    "script",
+    ["--quiet", "--return", "--command", terminalCommand, "/dev/null"],
+    {
+      encoding: "utf8",
+      env: environment,
+    },
+  ).stdout;
+}
+
 describe("golden product help", () => {
   for (const command of [
     "root",
@@ -58,9 +100,13 @@ describe("golden product help", () => {
     const output = help();
 
     expect(output).toContain(
-      'sketchi generate --prompt "Map our release approval flow"',
+      'sketchi generate --prompt "Map release approval with pass and revise branches"',
     );
     expect(output).toContain("sketchi docs");
+    expect(output).toContain("START HERE");
+    expect(output).toContain("WORK WITH A DIAGRAM");
+    expect(output).not.toContain("create      Create a local diagram");
+    expect(output).not.toContain("GLOBAL FLAGS");
     expect(output).not.toContain("Canonical flowchart example");
     expect(output).not.toContain("Share/pull safety limits");
     expect(output.split("\n").length).toBeLessThan(60);
@@ -114,8 +160,13 @@ describe("golden product help", () => {
     ).toBe(help());
   });
 
-  it("wraps automatic root help when only JSON output is selected", () => {
-    for (const args of [["--output", "json"], ["--output=json"]]) {
+  it("wraps every root JSON help combination without ANSI or empty output", () => {
+    for (const args of [
+      ["--output", "json"],
+      ["--output=json"],
+      ["--help", "--output", "json"],
+      ["--output=json", "--help"],
+    ]) {
       const output = execFileSync(process.execPath, [binary, ...args], {
         encoding: "utf8",
         env: cliEnvironment(),
@@ -126,7 +177,7 @@ describe("golden product help", () => {
         command: "sketchi",
         data: {
           help: expect.stringContaining(
-            'sketchi generate --prompt "Map our release approval flow"',
+            'sketchi generate --prompt "Map release approval with pass and revise branches"',
           ),
         },
       });
@@ -134,33 +185,60 @@ describe("golden product help", () => {
     }
   });
 
-  it("colors only TTY help and chooses readable dark/light wordmarks", () => {
-    const command = [
-      JSON.stringify(process.execPath),
-      JSON.stringify(binary),
-      "--help",
-    ].join(" ");
-    const ttyHelp = (colorForegroundBackground: string, noColor?: string) =>
-      spawnSync(
-        "script",
-        ["--quiet", "--return", "--command", command, "/dev/null"],
-        {
-          encoding: "utf8",
-          env: {
-            ...cliEnvironment(),
-            TERM: "xterm-256color",
-            COLORTERM: "truecolor",
-            COLORFGBG: colorForegroundBackground,
-            ...(noColor === undefined ? {} : { NO_COLOR: noColor }),
-          },
-        },
-      ).stdout;
+  it("chooses readable dark and light truecolor wordmarks", () => {
+    const dark = ttyHelp({ colorForegroundBackground: "15;0" });
+    expect(dark).toContain("\u001b[1;38;2;246;241;231msketchi");
+    expect(dark).toContain("\u001b[1;38;2;195;154;172mSTART HERE");
+    expect(ttyHelp({ colorForegroundBackground: "0;15" })).toContain(
+      "\u001b[1;38;2;26;23;18msketchi",
+    );
+  });
 
-    expect(ttyHelp("15;0")).toContain("\u001b[38;2;246;241;231msketchi");
-    expect(ttyHelp("0;15")).toContain("\u001b[38;2;26;23;18msketchi");
-    expect(ttyHelp("15;0", "1")).not.toContain("\u001b");
+  it("disables color for NO_COLOR, 4-bit terminals, and pipes", () => {
+    expect(
+      ttyHelp({ colorForegroundBackground: "15;0", noColor: "1" }),
+    ).not.toContain("\u001b");
+    expect(
+      ttyHelp({
+        colorForegroundBackground: "15;0",
+        colorTerminal: null,
+        terminal: "ansi",
+      }),
+    ).not.toContain("\u001b");
     expect(help()).not.toContain("\u001b");
   });
+
+  it("uses ANSI-256 colors only when its exact palette is readable", () => {
+    expect(
+      ttyHelp({
+        colorForegroundBackground: "15;0",
+        colorTerminal: null,
+      }),
+    ).toContain("\u001b[1;38;5;255msketchi");
+  });
+
+  it.each([undefined, "unknown", "15;"])(
+    "uses terminal-default text for unknown background %s",
+    (colorForegroundBackground) => {
+      expect(ttyHelp({ colorForegroundBackground })).not.toContain("\u001b");
+    },
+  );
+
+  it.each(["0;7", "0;10", "0;14", "0;46", "0;82"])(
+    "uses terminal-default text for unreadable ANSI-256 background %s",
+    (colorForegroundBackground) => {
+      expect(
+        ttyHelp({ colorForegroundBackground, colorTerminal: null }),
+      ).not.toContain("\u001b");
+    },
+  );
+
+  it.each(["15;12", "15;13"])(
+    "uses terminal-default text for unreadable truecolor background %s",
+    (colorForegroundBackground) => {
+      expect(ttyHelp({ colorForegroundBackground })).not.toContain("\u001b");
+    },
+  );
 
   it("keeps parser-level exclusivity failures in the JSON usage envelope", () => {
     for (const args of [

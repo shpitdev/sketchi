@@ -258,6 +258,13 @@ sketchi pull --help
 sketchi restore --help
 ```
 
+The root screen is deliberately progressive: it leads with `generate`, one
+copyable prompt, and the few commands used to continue working with a diagram.
+`sketchi docs` is the complete command and automation map; targeted
+`COMMAND --help` pages retain every flag and example. Interactive terminals get
+the Sketchi pencil lockup and restrained brand color. Pipes, `NO_COLOR`, and
+JSON output remain plain and contain no ANSI control sequences.
+
 Source, issue tracking, and architecture documentation live in the
 [Sketchi repository](https://github.com/shpitdev/sketchi).
 

@@ -342,7 +342,9 @@ try {
   expectExit(rootHelp, 0, "root help");
   assert(
     rootHelp.stdout.includes(
-      Buffer.from('sketchi generate --prompt "Map our release approval flow"'),
+      Buffer.from(
+        'sketchi generate --prompt "Map release approval with pass and revise branches"',
+      ),
     ) && rootHelp.stdout.includes(Buffer.from("sketchi docs")),
     "Root help omitted the human quick start or detailed-docs route.",
   );

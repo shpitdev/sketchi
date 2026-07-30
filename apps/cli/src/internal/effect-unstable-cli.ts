@@ -15,7 +15,7 @@ import {
 } from "effect/unstable/cli";
 
 import { redactShareLinks } from "../redaction.js";
-import { terminalHelpBrand } from "../help-brand.js";
+import { renderRootHelp, terminalRootHelp } from "../help-brand.js";
 
 export { Argument, Command, Flag };
 
@@ -163,16 +163,21 @@ export function runEffectCommand<
       const help = defaultFormatter
         .formatHelpDoc(document)
         .replace(/[ \t]+$/gmu, "");
-      if (jsonOutput && !usesDocumentationAction) {
-        return rootHelp
-          ? `${JSON.stringify(
-              { ok: true, command: "sketchi", data: { help } },
-              null,
-              2,
-            )}\n`
-          : "";
+      if (jsonOutput && rootHelp) {
+        return `${JSON.stringify(
+          {
+            ok: true,
+            command: "sketchi",
+            data: {
+              help: renderRootHelp({ colors: "none", background: "dark" }),
+            },
+          },
+          null,
+          2,
+        )}\n`;
       }
-      return rootHelp ? `${terminalHelpBrand()}\n\n${help}` : help;
+      if (jsonOutput && !usesDocumentationAction) return "";
+      return rootHelp ? terminalRootHelp() : help;
     },
     formatErrors: (errors) => {
       const message = errors
