@@ -56,9 +56,17 @@ curl -fsSL https://raw.githubusercontent.com/shpitdev/sketchi/main/install.sh | 
 Turn a prompt into a validated PNG and editable local record:
 
 ```sh
+sketchi generate
+
+# Direct and noninteractive:
 sketchi generate --prompt "Map release approval with pass and revise branches"
 ```
 
+Bare `sketchi generate` opens a short wizard only in a human text TTY. Scripts,
+pipes, redirects, CI, and JSON output never prompt and must pass `--prompt`.
+Explicit `--type` and file `--dest` values preset their wizard questions;
+interactive generation remains PNG-only, so other formats and `--dest -` also
+require `--prompt`.
 The default file is `<generated-id>.png` in the current directory. Use
 `--format excalidraw` or `--format scene` for another artifact, and `--dest`
 to choose its path or stream bytes with `--dest -`.

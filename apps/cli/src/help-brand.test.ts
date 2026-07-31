@@ -1,13 +1,17 @@
 import { describe, expect, it } from "@effect/vitest";
 
-import { renderRootHelp, terminalPaletteForBackground } from "./help-brand.js";
+import {
+  renderRootHelp,
+  terminalPaletteForBackground,
+  terminalSupportsUnicode,
+} from "./help-brand.js";
 
 describe("CLI help brand", () => {
   it("renders a readable plain fallback without escape sequences", () => {
     const output = renderRootHelp({ colors: "none", background: "dark" });
 
-    expect(output).toContain("/#####/\n");
-    expect(output).toContain("               /__#/");
+    expect(output).toContain("╱████╲");
+    expect(output).toContain("◢");
     expect(output).toContain("sketchi");
     expect(output).toContain("START HERE");
     expect(output).toContain("WORK WITH A DIAGRAM");
@@ -22,9 +26,53 @@ describe("CLI help brand", () => {
     });
 
     expect(dark).toContain("\u001b[38;2;195;154;172m");
-    expect(dark).toContain("\u001b[1;38;2;246;241;231msketchi");
-    expect(dark).toContain("\u001b[1;38;2;195;154;172mSTART HERE");
-    expect(light).toContain("\u001b[1;38;2;26;23;18msketchi");
+    expect(dark).toContain("\u001b[38;2;246;241;231m\u001b[1msketchi");
+    expect(dark).toContain("\u001b[38;2;195;154;172m\u001b[1mSTART HERE");
+    expect(light).toContain("\u001b[38;2;26;23;18m\u001b[1msketchi");
+  });
+
+  it("uses a strict ASCII pencil and wraps descriptions at narrow widths", () => {
+    const output = renderRootHelp({
+      colors: "none",
+      background: "dark",
+      unicode: false,
+      width: 36,
+    });
+
+    expect(output).toContain("/####\\");
+    expect(output).not.toContain("█");
+    expect(output).not.toContain("◢");
+    expect(output.split("\n").every((line) => [...line].length <= 36)).toBe(
+      true,
+    );
+  });
+
+  it("uses ASCII unless the effective locale explicitly supports UTF-8", () => {
+    expect(terminalSupportsUnicode({ TERM: "dumb", LANG: "en_US.UTF-8" })).toBe(
+      false,
+    );
+    expect(terminalSupportsUnicode({ TERM: "xterm", LC_ALL: "C" })).toBe(false);
+    expect(
+      terminalSupportsUnicode({
+        TERM: "xterm",
+        LC_ALL: "POSIX",
+        LANG: "en_US.UTF-8",
+      }),
+    ).toBe(false);
+    expect(terminalSupportsUnicode({ TERM: "xterm" })).toBe(false);
+    expect(
+      terminalSupportsUnicode({ TERM: "xterm", LANG: "en_US.ISO-8859-1" }),
+    ).toBe(false);
+    expect(
+      terminalSupportsUnicode({ TERM: "xterm", LANG: "en_US.UTF-8" }),
+    ).toBe(true);
+    expect(
+      terminalSupportsUnicode({
+        TERM: "xterm",
+        LC_ALL: "",
+        LANG: "C.UTF-8",
+      }),
+    ).toBe(true);
   });
 
   it("selects a readable complete palette for every ANSI background", () => {

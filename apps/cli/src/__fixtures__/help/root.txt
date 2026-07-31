@@ -1,33 +1,30 @@
-                             ______
-                           /#####/
-                         /#####/
-                       /#####/
-                     /#####/
-                   /#####/
-                 /  # /
-               /__#/
-             /#/
-           /
+              ╱██╲
+             ╱████╲
+            ╱████╱
+           ╱████╱
+          ╱████╱
+         ╱___╱
+        ◢
 
-                    sketchi
+        sketchi
         describe it. sketchi draws it.
 
 START HERE
-  generate  Turn one prompt into a validated PNG and editable local diagram.
+  generate  Start the short wizard, or pass --prompt for direct generation.
 
 EXAMPLE
   sketchi generate --prompt "Map release approval with pass and revise branches"
-  Writes <generated-id>.png by default. No account or API key needed.
+  Writes <generated-id>.png in this directory. No account or API key needed.
 
 WORK WITH A DIAGRAM
-  show    Inspect a local diagram.
-  edit    Replace its canonical document.
-  export  Write PNG, Excalidraw, or scene bytes.
-  share   Create an encrypted Excalidraw link.
+  show      Inspect a local diagram.
+  edit      Replace its canonical document.
+  export    Write PNG, Excalidraw, or scene bytes.
+  share     Create an encrypted Excalidraw link.
 
 GO DEEPER
-  sketchi docs               Complete command map and automation contracts.
-  sketchi generate --help    Every generation option.
-  sketchi <command> --help   Targeted help for any command.
+  sketchi docs                Complete command map and automation contracts.
+  sketchi generate --help     Every generation option.
+  sketchi <command> --help    Targeted help for any command.
 
-Automation: add --output json.  Version: sketchi --version
+Automation: pass --prompt and add --output json.  Version: sketchi --version

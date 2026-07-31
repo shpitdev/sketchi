@@ -93,6 +93,8 @@ function failureView(error: CliFailure): ErrorView {
         hint: error.hint,
         details: error.details,
       };
+    case "CliInteractiveError":
+      return { code: error.code, message: error.message, hint: error.hint };
     case "CliStorageError":
       return { code: error.code, message: error.message, hint: error.hint };
     case "CliExportError":

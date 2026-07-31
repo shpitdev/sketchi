@@ -58,6 +58,56 @@ function run(file, args, options = {}) {
   });
 }
 
+function shellQuote(value) {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
+function runTty(file, args, options = {}) {
+  return new Promise((complete, reject) => {
+    const command = [
+      "stty cols 100",
+      [file, ...args].map(shellQuote).join(" "),
+    ].join("; ");
+    const child = spawn(
+      "script",
+      ["--quiet", "--return", "--command", command, "/dev/null"],
+      {
+        cwd: options.cwd ?? workspaceRoot,
+        env: { ...(options.env ?? process.env), SHELL: "/bin/bash" },
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
+    const stdout = [];
+    const stderr = [];
+    child.stdout.on("data", (chunk) => stdout.push(chunk));
+    child.stderr.on("data", (chunk) => stderr.push(chunk));
+    child.on("error", reject);
+    child.on("close", (code, signal) =>
+      complete({
+        code: code ?? -1,
+        signal,
+        stdout: Buffer.concat(stdout),
+        stderr: Buffer.concat(stderr),
+      }),
+    );
+    const steps = options.steps ?? [];
+    const send = (index) => {
+      if (index >= steps.length) {
+        child.stdin.end();
+        return;
+      }
+      setTimeout(
+        () => {
+          child.stdin.write(steps[index]);
+          send(index + 1);
+        },
+        index === 0 ? 400 : 600,
+      );
+    };
+    send(0);
+  });
+}
+
 function parseJson(buffer, label) {
   try {
     return JSON.parse(buffer.toString("utf8"));
@@ -285,6 +335,7 @@ try {
     ) &&
       archivedNotices.stdout.includes(Buffer.from("SIL OPEN FONT LICENSE")) &&
       archivedNotices.stdout.includes(Buffer.from("MIT License")) &&
+      archivedNotices.stdout.includes(Buffer.from("is-ci 4.1.0")) &&
       archivedNotices.stdout.includes(Buffer.from("pako 2.0.3")) &&
       archivedNotices.stdout.includes(
         Buffer.from("Vitaly Puzrin and Andrei Tuputcyn"),
@@ -362,6 +413,61 @@ try {
     "Explicit agent docs omitted the detailed CLI contracts.",
   );
 
+  const noninteractiveGenerate = await cli(["generate", "--output", "json"]);
+  expectExit(
+    noninteractiveGenerate,
+    2,
+    "noninteractive generate without prompt",
+  );
+  assert(
+    noninteractiveGenerate.stdout.length === 0 &&
+      parseJson(
+        noninteractiveGenerate.stderr,
+        "noninteractive generate without prompt",
+      ).error.code === "usage_error" &&
+      !noninteractiveGenerate.stderr.includes(
+        Buffer.from("What should Sketchi draw?"),
+      ),
+    "Noninteractive generate prompted or changed its machine-readable failure.",
+  );
+
+  const ciTtyEnvironment = { ...onlineEnvironment, NO_COLOR: "1" };
+  for (const name of [
+    "CI",
+    "GITHUB_ACTIONS",
+    "BUILD_ID",
+    "JENKINS_URL",
+    "TF_BUILD",
+    "TEAMCITY_VERSION",
+  ]) {
+    delete ciTtyEnvironment[name];
+  }
+  for (const provider of [
+    {
+      name: "Jenkins",
+      environment: { BUILD_ID: "smoke-build", JENKINS_URL: "https://ci.test/" },
+    },
+    { name: "Azure Pipelines", environment: { TF_BUILD: "True" } },
+    { name: "TeamCity", environment: { TEAMCITY_VERSION: "2026.1" } },
+  ]) {
+    const ciTtyGenerate = await runTty(binary, ["generate"], {
+      cwd: fixtureRoot,
+      env: { ...ciTtyEnvironment, ...provider.environment },
+    });
+    expectExit(
+      ciTtyGenerate,
+      2,
+      `${provider.name} TTY generate without prompt`,
+    );
+    assert(
+      ciTtyGenerate.stdout.includes(Buffer.from("error: usage_error")) &&
+        !ciTtyGenerate.stdout.includes(
+          Buffer.from("What should Sketchi draw?"),
+        ),
+      `${provider.name} TTY generate prompted instead of returning the usage error.`,
+    );
+  }
+
   const zshCompletions = await cli(["--completions", "zsh"]);
   expectExit(zshCompletions, 0, "zsh completions");
   assert(
@@ -418,10 +524,12 @@ try {
   );
   await rm(generatedRecord, { force: true, recursive: true });
 
-  const makeSuccessServer = () =>
+  const makeSuccessServer = (requests = []) =>
     createServer((request, response) => {
-      request.resume();
+      const chunks = [];
+      request.on("data", (chunk) => chunks.push(chunk));
       request.on("end", () => {
+        requests.push(parseJson(Buffer.concat(chunks), "generate request"));
         response.writeHead(200, { "content-type": "application/json" });
         response.end(
           JSON.stringify({
@@ -486,6 +594,159 @@ try {
   );
   await rm(generatedRecord, { force: true, recursive: true });
   await rm(generatedPngPath, { force: true });
+
+  const wizardEnvironment = {
+    ...onlineEnvironment,
+    TERM: "xterm-256color",
+    NO_COLOR: "1",
+  };
+  delete wizardEnvironment.CI;
+  delete wizardEnvironment.GITHUB_ACTIONS;
+  const runWizard = (steps, extraArguments = []) =>
+    runTty(
+      binary,
+      [
+        "generate",
+        "--endpoint",
+        `http://127.0.0.1:${String(successPort)}/api/v1/generate`,
+        ...extraArguments,
+      ],
+      { cwd: fixtureRoot, env: wizardEnvironment, steps },
+    );
+
+  const wizardRequests = [];
+  const wizardServer = makeSuccessServer(wizardRequests);
+  await new Promise((ready) =>
+    wizardServer.listen(successPort, "127.0.0.1", ready),
+  );
+  try {
+    const wizardCurrent = await runWizard([
+      "Create a release flow.\r",
+      "\r",
+      "\r",
+    ]);
+    expectExit(wizardCurrent, 0, "wizard current-directory PNG");
+    assert(
+      wizardCurrent.stdout.includes(
+        Buffer.from("created: generated-release-flow"),
+      ) &&
+        wizardCurrent.stdout.includes(Buffer.from(generatedPngPath)) &&
+        (await readFile(generatedPngPath))
+          .subarray(0, 8)
+          .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+      "Wizard current-directory default did not create and summarize its PNG.",
+    );
+    await rm(generatedRecord, { force: true, recursive: true });
+    await rm(generatedPngPath, { force: true });
+
+    const diagramsDirectory = resolve(fixtureRoot, "diagrams");
+    await rm(diagramsDirectory, { force: true, recursive: true });
+    const wizardProject = await runWizard([
+      "Create a release flow.\r",
+      "\r",
+      "\u001b[B\r",
+    ]);
+    expectExit(wizardProject, 0, "wizard project-diagrams PNG");
+    const projectPng = resolve(diagramsDirectory, "generated-release-flow.png");
+    assert(
+      (await readFile(projectPng))
+        .subarray(0, 8)
+        .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+      "Wizard did not create the cwd diagrams folder after generation.",
+    );
+    await rm(generatedRecord, { force: true, recursive: true });
+
+    const customPng = resolve(fixtureRoot, "wizard-custom.png");
+    const wizardCustom = await runWizard([
+      "Create a release flow.\r",
+      "\u001b[B\r",
+      "\u001b[B\u001b[B\r",
+      `${customPng}\r`,
+    ]);
+    expectExit(wizardCustom, 0, "wizard custom PNG");
+    assert(
+      (await readFile(customPng))
+        .subarray(0, 8)
+        .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+      "Wizard custom destination did not reuse --dest semantics.",
+    );
+    assert(
+      wizardRequests.some((request) => request.type === "mindmap"),
+      "Wizard mind-map selection did not reach the shared generation workflow.",
+    );
+    await rm(generatedRecord, { force: true, recursive: true });
+
+    const presetPng = resolve(fixtureRoot, "wizard-preset.png");
+    const requestCountBeforePreset = wizardRequests.length;
+    const wizardPreset = await runWizard(
+      ["Create a preset release map.\r"],
+      [
+        "--type",
+        "mindmap",
+        "--format",
+        "png",
+        "--dest",
+        presetPng,
+        "--model",
+        "preset-model",
+      ],
+    );
+    expectExit(wizardPreset, 0, "wizard explicit presets");
+    const presetRequest = wizardRequests[requestCountBeforePreset];
+    assert(
+      presetRequest?.type === "mindmap" &&
+        presetRequest.model === "preset-model" &&
+        !wizardPreset.stdout.includes(Buffer.from("Diagram type")) &&
+        !wizardPreset.stdout.includes(Buffer.from("Save the PNG")) &&
+        (await readFile(presetPng))
+          .subarray(0, 8)
+          .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+      "Wizard discarded an explicit type, format, model, or destination preset.",
+    );
+    await rm(generatedRecord, { force: true, recursive: true });
+
+    for (const invalidPreset of [
+      {
+        name: "non-PNG format",
+        arguments: ["--format", "excalidraw"],
+        expected: "pass --prompt for excalidraw or scene generation",
+      },
+      {
+        name: "stdout destination",
+        arguments: ["--dest", "-"],
+        expected: "pass --prompt to write an artifact to stdout",
+      },
+    ]) {
+      const rejectedPreset = await runWizard([], invalidPreset.arguments);
+      expectExit(rejectedPreset, 2, `wizard ${invalidPreset.name} rejection`);
+      assert(
+        rejectedPreset.stdout.includes(Buffer.from("error: usage_error")) &&
+          rejectedPreset.stdout.includes(Buffer.from(invalidPreset.expected)) &&
+          !rejectedPreset.stdout.includes(
+            Buffer.from("What should Sketchi draw?"),
+          ),
+        `Wizard ${invalidPreset.name} did not fail before prompting.`,
+      );
+    }
+
+    const wizardCancellation = await runTty(binary, ["generate"], {
+      cwd: fixtureRoot,
+      env: wizardEnvironment,
+      steps: ["\u0003"],
+    });
+    expectExit(wizardCancellation, 2, "wizard cancellation");
+    assert(
+      wizardCancellation.stdout.includes(Buffer.from("Generation cancelled")) &&
+        wizardCancellation.stdout.includes(Buffer.from("error: cancelled")) &&
+        !wizardCancellation.stdout.includes(Buffer.from("at file:")) &&
+        !wizardCancellation.stdout.includes(Buffer.from("node:internal")) &&
+        wizardCancellation.stdout.lastIndexOf(Buffer.from("\u001b[?25h")) >
+          wizardCancellation.stdout.lastIndexOf(Buffer.from("\u001b[?25l")),
+      "Wizard cancellation was not clean and typed.",
+    );
+  } finally {
+    await new Promise((closed) => wizardServer.close(closed));
+  }
 
   const overrideServer = makeSuccessServer();
   await new Promise((ready) => overrideServer.listen(0, "127.0.0.1", ready));
@@ -1137,6 +1398,7 @@ try {
     package: archives[0],
     flows: [
       "generate:loopback-default-png-excalidraw-stdout",
+      "generate:wizard-current-project-custom-mindmap-cancel",
       "flowchart:create-show-edit-show",
       "flowchart:restore-offline",
       "flowchart:patch-edit-blocked-restore-repatch",
@@ -1153,6 +1415,8 @@ try {
       "conflict:6",
       "generate-network-down:10",
       "generate-endpoint-error:3",
+      "generate-missing-prompt-noninteractive:2",
+      "generate-wizard-cancelled:2",
     ],
     network:
       "offline create/patch/show/edit/list/export/restore; share/pull excluded; generate loopback proof excepted",

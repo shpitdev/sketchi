@@ -1,5 +1,13 @@
 DESCRIPTION
-  Create one persisted diagram from --prompt TEXT and export its PNG by default. This is one of Sketchi's three explicit network commands (generate, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
+  Create one persisted diagram and export its PNG by default. With no --prompt, Sketchi opens a short wizard only when stdin and stdout are human TTYs, output is text, and CI is absent. Pipes, redirects, CI, and --output json never prompt or block; pass --prompt for every script and automation path. This is one of Sketchi's three explicit network commands (generate, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
+
+Everyday wizard:
+  The wizard asks only for prompt text, flowchart (default) or mind map, and a PNG destination.
+  Current directory writes <cwd>/<generated-id>.png. Project diagrams folder means exactly the
+  directory where Sketchi was run: <cwd>/diagrams/<generated-id>.png, with no Git detection; the
+  diagrams folder is created only after generation succeeds. Explicit --type and file --dest values
+  preset and skip those questions. Explicit --format png may proceed; pass --prompt for another
+  format or --dest - because the interactive wizard writes only PNG files.
 
 Network and options:
   Endpoint: https://playground.sketchi.app/api/v1/generate
@@ -30,7 +38,7 @@ USAGE
 
 FLAGS
   --output text|json               Result presentation format. (choices: text, json)
-  --prompt TEXT                    Diagram request text sent to the public Sketchi generate API.
+  --prompt TEXT                    Diagram request text sent directly without interactive prompts.
   --type flowchart|mindmap         Requested canonical diagram type; default flowchart. (choices: flowchart, mindmap)
   --model MODEL                    Server-routed generation model id; default gemini-3.1-flash-lite.
   --endpoint URL                   Unauthenticated generate API URL; defaults to the production Sketchi endpoint.

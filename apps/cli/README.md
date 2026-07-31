@@ -45,8 +45,25 @@ persists the editable result, then writes `<generated-id>.png` in the current
 directory:
 
 ```sh
+sketchi generate
+
+# Direct and noninteractive:
 sketchi generate --prompt "Map release approval with pass and revise branches"
 ```
+
+With no `--prompt`, Sketchi opens a short wizard only when both standard input
+and standard output are human terminals, output is text, and CI is absent. It
+asks for prompt text, flowchart (the default) or mind map, and where to save the
+PNG. The choices are the current directory, a `diagrams/` folder under exactly
+the directory where Sketchi was run, or a custom path with the same semantics as
+`--dest`. Sketchi does not inspect Git, and it creates `diagrams/` only after
+generation succeeds. An explicit `--type` or file `--dest` presets and skips
+that wizard question. Explicit `--format png` may proceed; another format or
+`--dest -` requires `--prompt` because the interactive wizard writes PNG files.
+
+Scripts, pipes, redirected streams, CI, and `--output json` never prompt or
+block. They must pass `--prompt`; omitting it retains the deterministic usage
+error. Passing `--prompt` is always direct and noninteractive.
 
 The PNG is rendered locally from the returned validated artifacts and is not
 written back into the record. Choose another artifact or destination explicitly:
@@ -229,6 +246,9 @@ to a provider.
 Agents can use
 `--output json`, complete noninteractive input through `--json` or `--file`, and
 raw artifact output through `export --dest -` without prompts.
+
+Agents must pass `--prompt` to `generate`. Interactive prompting is restricted
+to human text TTYs and is never enabled by JSON output, pipes, redirects, or CI.
 
 After exporting PNG to a file, agents can follow the returned hint to display
 that path as an inline Markdown image for the user.

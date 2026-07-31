@@ -120,6 +120,23 @@ export function exactlyOnceStringFlag(
   }) as Flag.Flag<string>;
 }
 
+export function missingRequiredFlag(name: string) {
+  return new CliError.MissingOption({ option: name });
+}
+
+export function invalidFlagValue(
+  name: string,
+  value: string,
+  expected: string,
+) {
+  return new CliError.InvalidValue({
+    option: name,
+    value,
+    expected,
+    kind: "flag",
+  });
+}
+
 export function runEffectCommand<
   const Name extends string,
   Input,

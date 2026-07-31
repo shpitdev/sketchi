@@ -61,8 +61,8 @@ function ttyHelp({
   else environment["COLORTERM"] = colorTerminal;
   const terminalCommand =
     colorForegroundBackground === undefined
-      ? `env -u COLORFGBG ${command}`
-      : command;
+      ? `stty cols 80; env -u COLORFGBG ${command}`
+      : `stty cols 80; ${command}`;
 
   return spawnSync(
     "script",
@@ -187,10 +187,10 @@ describe("golden product help", () => {
 
   it("chooses readable dark and light truecolor wordmarks", () => {
     const dark = ttyHelp({ colorForegroundBackground: "15;0" });
-    expect(dark).toContain("\u001b[1;38;2;246;241;231msketchi");
-    expect(dark).toContain("\u001b[1;38;2;195;154;172mSTART HERE");
+    expect(dark).toContain("\u001b[38;2;246;241;231m\u001b[1msketchi");
+    expect(dark).toContain("\u001b[38;2;195;154;172m\u001b[1mSTART HERE");
     expect(ttyHelp({ colorForegroundBackground: "0;15" })).toContain(
-      "\u001b[1;38;2;26;23;18msketchi",
+      "\u001b[38;2;26;23;18m\u001b[1msketchi",
     );
   });
 
@@ -214,7 +214,7 @@ describe("golden product help", () => {
         colorForegroundBackground: "15;0",
         colorTerminal: null,
       }),
-    ).toContain("\u001b[1;38;5;255msketchi");
+    ).toContain("\u001b[38;5;255m\u001b[1msketchi");
   });
 
   it.each([undefined, "unknown", "15;"])(

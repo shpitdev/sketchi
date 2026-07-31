@@ -20,7 +20,7 @@ Semantic color patch example:
   sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
-  sketchi generate --prompt TEXT [--type flowchart|mindmap] [--model MODEL]
+  sketchi generate [--prompt TEXT] [--type flowchart|mindmap] [--model MODEL]
   sketchi share DIAGRAM_ID [--open]
   sketchi pull DIAGRAM_ID --link URL|-
   generate makes one unauthenticated HTTPS POST to the public Sketchi generate API at https://playground.sketchi.app/api/v1/generate
@@ -33,9 +33,16 @@ Explicit network commands (one credential-free HTTPS request each):
 Input and output contracts:
   create/edit/patch require exactly one of --file PATH|- or --json VALUE. --file - reads one
   noninteractive UTF-8 JSON document from stdin and exits with usage code 2 on a TTY.
-  --json is inline input only. --prompt is noninteractive text. generate exports PNG to
-  <generated-id>.png by default; --format scene|excalidraw selects another artifact and --dest
-  PATH|- overrides its destination. Use --output text|json for result presentation on every command.
+  --json is inline input only. --prompt is always direct and noninteractive. With no --prompt,
+  generate opens a short prompt/type/PNG-destination wizard only when stdin and stdout are human
+  TTYs, output is text, and CI is absent. JSON, pipes, redirected streams, and CI never prompt and
+  retain the missing --prompt usage error. Explicit --type and file --dest values preset and skip
+  those wizard questions. The wizard is PNG-only: explicit --format png may proceed; use --prompt
+  with --format scene|excalidraw or --dest -. It saves to <cwd>/<id>.png by default, can create
+  <cwd>/diagrams/<id>.png after generation succeeds, or accepts a custom file path.
+  Direct generate exports PNG to <generated-id>.png by default; --format scene|excalidraw selects
+  another artifact and --dest PATH|- overrides its destination. Use --output text|json for result
+  presentation on every command.
   export writes bytes with --dest PATH|- and always writes status to stderr. With --dest -,
   stdout contains only artifact bytes. A successful PNG file export adds a generic inline-Markdown
   display hint for calling agents.

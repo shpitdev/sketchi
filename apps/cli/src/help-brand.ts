@@ -1,14 +1,28 @@
-const PENCIL_LINES = [
-  "                             ______",
-  "                           /#####/",
-  "                         /#####/",
-  "                       /#####/",
-  "                     /#####/",
-  "                   /#####/",
-  "                 /  # /",
-  "               /__#/",
-  "             /#/",
-  "           /",
+import { Chalk } from "chalk";
+import stringWidth from "string-width";
+import wrapAnsi from "wrap-ansi";
+
+// These silhouettes follow the down-left nib and up-right barrel of the
+// product icon in apps/web/public/icon.svg. The ASCII version is deliberately
+// structural rather than a transliteration of box-drawing characters.
+const UNICODE_PENCIL = [
+  "              ╱██╲",
+  "             ╱████╲",
+  "            ╱████╱",
+  "           ╱████╱",
+  "          ╱████╱",
+  "         ╱___╱",
+  "        ◢",
+] as const;
+
+const ASCII_PENCIL = [
+  "              /##\\",
+  "             /####\\",
+  "            /####/",
+  "           /####/",
+  "          /####/",
+  "         /___/",
+  "        /_",
 ] as const;
 
 const BRAND = {
@@ -57,6 +71,8 @@ const MINIMUM_TEXT_CONTRAST = 4.5;
 export interface HelpBrandOptions {
   readonly colors: "none" | "ansi256" | "truecolor";
   readonly background: "dark" | "light";
+  readonly unicode?: boolean;
+  readonly width?: number;
 }
 
 function styled(
@@ -66,12 +82,12 @@ function styled(
   emphasis: "plain" | "bold" = "plain",
 ): string {
   if (options.colors === "none") return text;
-  const colorCode =
+  const chalk = new Chalk({ level: options.colors === "truecolor" ? 3 : 2 });
+  const paint =
     options.colors === "truecolor"
-      ? `38;2;${String(color.red)};${String(color.green)};${String(color.blue)}`
-      : `38;5;${String(color.ansi256)}`;
-  const emphasisCode = emphasis === "bold" ? "1;" : "";
-  return `\u001b[${emphasisCode}${colorCode}m${text}\u001b[0m`;
+      ? chalk.rgb(color.red, color.green, color.blue)
+      : chalk.ansi256(color.ansi256);
+  return emphasis === "bold" ? paint.bold(text) : paint(text);
 }
 
 function heading(text: string, options: HelpBrandOptions): string {
@@ -87,41 +103,114 @@ function description(text: string, options: HelpBrandOptions): string {
 }
 
 function brandLockup(options: HelpBrandOptions): string {
+  const pencil = options.unicode === false ? ASCII_PENCIL : UNICODE_PENCIL;
+  const width = Math.max(32, options.width ?? 80);
+  const indent = width < 40 ? "  " : "        ";
   return [
-    ...PENCIL_LINES.map((line) =>
-      styled(line, BRAND[options.background], options),
-    ),
+    ...pencil.map((line) => styled(line, BRAND[options.background], options)),
     "",
-    `                    ${styled("sketchi", FOREGROUND[options.background], options, "bold")}`,
-    `        ${description("describe it. sketchi draws it.", options)}`,
+    `${indent}${styled("sketchi", FOREGROUND[options.background], options, "bold")}`,
+    wrappedLine(
+      indent,
+      description("describe it. sketchi draws it.", options),
+      width,
+    ),
   ].join("\n");
 }
 
+function wrappedLine(
+  prefix: string,
+  text: string,
+  width: number,
+  continuationIndent = stringWidth(prefix),
+): string {
+  const available = Math.max(16, width - stringWidth(prefix));
+  return `${prefix}${wrapAnsi(text, available, {
+    hard: true,
+    trim: true,
+  }).replaceAll("\n", `\n${" ".repeat(continuationIndent)}`)}`;
+}
+
+function action(
+  name: string,
+  text: string,
+  options: HelpBrandOptions,
+  width: number,
+  labelWidth = 8,
+): string {
+  if (width < 52) {
+    return [
+      `  ${command(name, options)}`,
+      wrappedLine("    ", description(text, options), width),
+    ].join("\n");
+  }
+  const label = name.padEnd(labelWidth);
+  const prefix = `  ${command(label, options)}  `;
+  return wrappedLine(prefix, description(text, options), width);
+}
+
 export function renderRootHelp(options: HelpBrandOptions): string {
+  const width = Math.max(32, options.width ?? 80);
+  const example =
+    'sketchi generate --prompt "Map release approval with pass and revise branches"';
   return [
     brandLockup(options),
     "",
     heading("START HERE", options),
-    `  ${command("generate", options)}  ${description("Turn one prompt into a validated PNG and editable local diagram.", options)}`,
+    action(
+      "generate",
+      "Start the short wizard, or pass --prompt for direct generation.",
+      options,
+      width,
+    ),
     "",
     heading("EXAMPLE", options),
-    `  ${command('sketchi generate --prompt "Map release approval with pass and revise branches"', options)}`,
-    `  ${description("Writes <generated-id>.png by default. No account or API key needed.", options)}`,
+    wrappedLine("  ", command(example, options), width),
+    wrappedLine(
+      "  ",
+      description(
+        "Writes <generated-id>.png in this directory. No account or API key needed.",
+        options,
+      ),
+      width,
+    ),
     "",
     heading("WORK WITH A DIAGRAM", options),
-    `  ${command("show", options)}    ${description("Inspect a local diagram.", options)}`,
-    `  ${command("edit", options)}    ${description("Replace its canonical document.", options)}`,
-    `  ${command("export", options)}  ${description("Write PNG, Excalidraw, or scene bytes.", options)}`,
-    `  ${command("share", options)}   ${description("Create an encrypted Excalidraw link.", options)}`,
+    action("show", "Inspect a local diagram.", options, width),
+    action("edit", "Replace its canonical document.", options, width),
+    action("export", "Write PNG, Excalidraw, or scene bytes.", options, width),
+    action("share", "Create an encrypted Excalidraw link.", options, width),
     "",
     heading("GO DEEPER", options),
-    `  ${command("sketchi docs", options)}               ${description("Complete command map and automation contracts.", options)}`,
-    `  ${command("sketchi generate --help", options)}    ${description("Every generation option.", options)}`,
-    `  ${command("sketchi <command> --help", options)}   ${description("Targeted help for any command.", options)}`,
-    "",
-    description(
-      "Automation: add --output json.  Version: sketchi --version",
+    action(
+      "sketchi docs",
+      "Complete command map and automation contracts.",
       options,
+      width,
+      26,
+    ),
+    action(
+      "sketchi generate --help",
+      "Every generation option.",
+      options,
+      width,
+      26,
+    ),
+    action(
+      "sketchi <command> --help",
+      "Targeted help for any command.",
+      options,
+      width,
+      26,
+    ),
+    "",
+    wrappedLine(
+      "",
+      description(
+        "Automation: pass --prompt and add --output json.  Version: sketchi --version",
+        options,
+      ),
+      width,
     ),
   ].join("\n");
 }
@@ -214,13 +303,23 @@ function terminalPalette(
 }
 
 export function terminalRootHelp(): string {
+  const width =
+    process.stdout.columns === undefined || process.stdout.columns <= 0
+      ? 80
+      : process.stdout.columns;
+  const unicode = terminalSupportsUnicode();
   if (
     process.env["NO_COLOR"] !== undefined ||
     process.env["TERM"] === "dumb" ||
     process.env["TERM"] === "ansi" ||
     process.stdout.isTTY !== true
   ) {
-    return renderRootHelp({ colors: "none", background: "dark" });
+    return renderRootHelp({
+      colors: "none",
+      background: "dark",
+      unicode,
+      width,
+    });
   }
   const colors = process.stdout.hasColors(2 ** 24)
     ? "truecolor"
@@ -228,14 +327,40 @@ export function terminalRootHelp(): string {
       ? "ansi256"
       : "none";
   if (colors === "none") {
-    return renderRootHelp({ colors: "none", background: "dark" });
+    return renderRootHelp({
+      colors: "none",
+      background: "dark",
+      unicode,
+      width,
+    });
   }
   const palette = terminalPalette(colors);
   if (!palette.readable) {
-    return renderRootHelp({ colors: "none", background: palette.background });
+    return renderRootHelp({
+      colors: "none",
+      background: palette.background,
+      unicode,
+      width,
+    });
   }
   return renderRootHelp({
     colors,
     background: palette.background,
+    unicode,
+    width,
   });
+}
+
+export function terminalSupportsUnicode(
+  environment: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (environment["TERM"] === "dumb" || environment["TERM"] === "linux") {
+    return false;
+  }
+  const locale = [
+    environment["LC_ALL"],
+    environment["LC_CTYPE"],
+    environment["LANG"],
+  ].find((value) => value !== undefined && value.length > 0);
+  return locale !== undefined && /(?:^|[._-])utf-?8(?:@|$)/iu.test(locale);
 }

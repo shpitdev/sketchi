@@ -57,6 +57,15 @@ export class CliGenerationError extends Schema.TaggedErrorClass<CliGenerationErr
   },
 ) {}
 
+export class CliInteractiveError extends Schema.TaggedErrorClass<CliInteractiveError>()(
+  "CliInteractiveError",
+  {
+    code: Schema.Literals(["cancelled", "prompt_failed"]),
+    message: Schema.String,
+    hint: Schema.String,
+  },
+) {}
+
 export class CliStorageError extends Schema.TaggedErrorClass<CliStorageError>()(
   "CliStorageError",
   {
@@ -121,6 +130,7 @@ export type CliFailure =
   | CliValidationError
   | CliBuildError
   | CliGenerationError
+  | CliInteractiveError
   | CliStorageError
   | CliExportError
   | CliShareError;
@@ -144,6 +154,8 @@ export function exitCodeForFailure(error: CliFailure): number {
         case "malformed_output":
           return 12;
       }
+    case "CliInteractiveError":
+      return error.code === "cancelled" ? 2 : 1;
     case "CliStorageError":
       if (error.code === "diagram_not_found") return 5;
       if (error.code === "revision_not_found") return 5;

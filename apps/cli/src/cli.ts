@@ -14,6 +14,7 @@ import {
 } from "./contracts.js";
 import { encodeJson, validateStorageId } from "./document.js";
 import {
+  type CliFailure,
   CliFilesystemError,
   CliShareError,
   CliValidationError,
@@ -21,10 +22,20 @@ import {
 import { DiagramExporter, DiagramExporterLive } from "./exporter.js";
 import { LocalFileSystem, LocalFileSystemLive } from "./filesystem.js";
 import {
+  runGenerateWorkflow,
+  type GenerateWorkflowResult,
+  type GenerationDestination,
+} from "./generate-workflow.js";
+import {
+  GenerateWizard,
+  GenerateWizardLive,
+  liveGenerateWizardAvailable,
+  type WizardDestination,
+} from "./generate-wizard.js";
+import {
   DEFAULT_GENERATE_ENDPOINT,
   DEFAULT_GENERATION_MODEL,
   SKETCHI_GENERATE_ENDPOINT_ENV,
-  generateDiagram,
   resolveGenerateEndpoint,
   type GenerateDiagramResult,
 } from "./generation.js";
@@ -35,6 +46,8 @@ import {
   cliErrorExitCode,
   exactlyOnceStringFlag,
   exclusiveInputSourceFlags,
+  invalidFlagValue,
+  missingRequiredFlag,
   runEffectCommand,
 } from "./internal/effect-unstable-cli.js";
 import {
@@ -99,7 +112,7 @@ Semantic color patch example:
   sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
-  sketchi generate --prompt TEXT [--type flowchart|mindmap] [--model MODEL]
+  sketchi generate [--prompt TEXT] [--type flowchart|mindmap] [--model MODEL]
   sketchi share DIAGRAM_ID [--open]
   sketchi pull DIAGRAM_ID --link URL|-
   generate makes one unauthenticated HTTPS POST to the public Sketchi generate API at ${DEFAULT_GENERATE_ENDPOINT}
@@ -112,9 +125,16 @@ Explicit network commands (one credential-free HTTPS request each):
 Input and output contracts:
   create/edit/patch require exactly one of --file PATH|- or --json VALUE. --file - reads one
   noninteractive UTF-8 JSON document from stdin and exits with usage code 2 on a TTY.
-  --json is inline input only. --prompt is noninteractive text. generate exports PNG to
-  <generated-id>.png by default; --format scene|excalidraw selects another artifact and --dest
-  PATH|- overrides its destination. Use --output text|json for result presentation on every command.
+  --json is inline input only. --prompt is always direct and noninteractive. With no --prompt,
+  generate opens a short prompt/type/PNG-destination wizard only when stdin and stdout are human
+  TTYs, output is text, and CI is absent. JSON, pipes, redirected streams, and CI never prompt and
+  retain the missing --prompt usage error. Explicit --type and file --dest values preset and skip
+  those wizard questions. The wizard is PNG-only: explicit --format png may proceed; use --prompt
+  with --format scene|excalidraw or --dest -. It saves to <cwd>/<id>.png by default, can create
+  <cwd>/diagrams/<id>.png after generation succeeds, or accepts a custom file path.
+  Direct generate exports PNG to <generated-id>.png by default; --format scene|excalidraw selects
+  another artifact and --dest PATH|- overrides its destination. Use --output text|json for result
+  presentation on every command.
   export writes bytes with --dest PATH|- and always writes status to stderr. With --dest -,
   stdout contains only artifact bytes. A successful PNG file export adds a generic inline-Markdown
   display hint for calling agents.
@@ -266,9 +286,8 @@ function generatedText(result: GenerateDiagramResult): string {
   ].join("\n");
 }
 
-interface GenerateCommandResult {
-  readonly generated: GenerateDiagramResult;
-  readonly artifact: ExportResult;
+interface GenerateCommandResult extends GenerateWorkflowResult {
+  readonly interactive: boolean;
 }
 
 function generatedArtifactData(result: GenerateCommandResult) {
@@ -279,6 +298,15 @@ function generatedArtifactData(result: GenerateCommandResult) {
 }
 
 function generatedArtifactText(result: GenerateCommandResult): string {
+  if (result.interactive) {
+    return [
+      `created: ${result.generated.diagram.manifest.id}`,
+      `artifact: ${result.artifact.destination}`,
+      "next:",
+      `  sketchi show ${result.generated.diagram.manifest.id}`,
+      `  sketchi export ${result.generated.diagram.manifest.id} --format excalidraw --dest ${result.generated.diagram.manifest.id}.excalidraw`,
+    ].join("\n");
+  }
   const hint = displayHint(result.artifact);
   return [
     generatedText(result.generated),
@@ -289,15 +317,42 @@ function generatedArtifactText(result: GenerateCommandResult): string {
   ].join("\n");
 }
 
-function generatedDestination(id: string, format: DiagramFormat): string {
-  switch (format) {
-    case "png":
-      return `${id}.png`;
-    case "excalidraw":
-      return `${id}.excalidraw`;
-    case "scene":
-      return `${id}.scene.json`;
+function wizardDestination(
+  destination: WizardDestination,
+): GenerationDestination {
+  switch (destination._tag) {
+    case "CurrentDirectory":
+      return { _tag: "CurrentDirectory", cwd: process.cwd() };
+    case "ProjectDiagrams":
+      return { _tag: "ProjectDiagrams", cwd: process.cwd() };
+    case "Custom":
+      return destination;
   }
+}
+
+function reportGenerateOperation<E extends CliFailure, R>(
+  output: OutputFormat,
+  operation: Effect.Effect<GenerateCommandResult, E, R>,
+) {
+  return operation.pipe(
+    Effect.matchEffect({
+      onFailure: (error) => reportFailure("generate", output, error),
+      onSuccess: (result) =>
+        Effect.gen(function* () {
+          const writer = yield* OutputWriter;
+          if (result.artifact.stdoutBytes) {
+            yield* writer.stdout(result.artifact.stdoutBytes);
+          }
+          yield* reportSuccess(
+            "generate",
+            output,
+            generatedArtifactData(result),
+            generatedArtifactText(result),
+            result.artifact.destination === "-" ? "stderr" : "stdout",
+          );
+        }),
+    }),
+  );
 }
 
 function showText(diagram: StoredDiagram): string {
@@ -334,7 +389,15 @@ function listText(diagrams: ReadonlyArray<DiagramSummary>): string {
   ].join("\n");
 }
 
-const GENERATE_HELP = `Create one persisted diagram from --prompt TEXT and export its PNG by default. This is one of Sketchi's three explicit network commands (generate, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
+const GENERATE_HELP = `Create one persisted diagram and export its PNG by default. With no --prompt, Sketchi opens a short wizard only when stdin and stdout are human TTYs, output is text, and CI is absent. Pipes, redirects, CI, and --output json never prompt or block; pass --prompt for every script and automation path. This is one of Sketchi's three explicit network commands (generate, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
+
+Everyday wizard:
+  The wizard asks only for prompt text, flowchart (default) or mind map, and a PNG destination.
+  Current directory writes <cwd>/<generated-id>.png. Project diagrams folder means exactly the
+  directory where Sketchi was run: <cwd>/diagrams/<generated-id>.png, with no Git detection; the
+  diagrams folder is created only after generation succeeds. Explicit --type and file --dest values
+  preset and skip those questions. Explicit --format png may proceed; pass --prompt for another
+  format or --dest - because the interactive wizard writes only PNG files.
 
 Network and options:
   Endpoint: ${DEFAULT_GENERATE_ENDPOINT}
@@ -363,18 +426,21 @@ Errors and next steps:
 const generateCommand = Command.make(
   "generate",
   {
-    prompt: Flag.string("prompt").pipe(
-      Flag.withDescription(
-        "Diagram request text sent to the public Sketchi generate API.",
+    prompt: Flag.optional(
+      Flag.string("prompt").pipe(
+        Flag.withDescription(
+          "Diagram request text sent directly without interactive prompts.",
+        ),
+        Flag.withMetavar("TEXT"),
       ),
-      Flag.withMetavar("TEXT"),
     ),
-    type: Flag.choice("type", ["flowchart", "mindmap"]).pipe(
-      Flag.withDefault("flowchart"),
-      Flag.withDescription(
-        "Requested canonical diagram type; default flowchart.",
+    type: Flag.optional(
+      Flag.choice("type", ["flowchart", "mindmap"]).pipe(
+        Flag.withDescription(
+          "Requested canonical diagram type; default flowchart.",
+        ),
+        Flag.withMetavar("flowchart|mindmap"),
       ),
-      Flag.withMetavar("flowchart|mindmap"),
     ),
     model: Flag.string("model").pipe(
       Flag.withDefault(DEFAULT_GENERATION_MODEL),
@@ -390,10 +456,13 @@ const generateCommand = Command.make(
       ),
       Flag.withMetavar("URL"),
     ),
-    format: Flag.choice("format", ["png", "excalidraw", "scene"]).pipe(
-      Flag.withDefault("png"),
-      Flag.withDescription("Artifact exported after generation; default png."),
-      Flag.withMetavar("png|excalidraw|scene"),
+    format: Flag.optional(
+      Flag.choice("format", ["png", "excalidraw", "scene"]).pipe(
+        Flag.withDescription(
+          "Artifact exported after generation; default png.",
+        ),
+        Flag.withMetavar("png|excalidraw|scene"),
+      ),
     ),
     destination: Flag.optional(
       Flag.string("dest").pipe(
@@ -407,52 +476,79 @@ const generateCommand = Command.make(
   (input) =>
     Effect.gen(function* () {
       const { output } = yield* rootCommand;
-      const exporter = yield* DiagramExporter;
-      const operation = Effect.gen(function* () {
-        const generated = yield* generateDiagram(input);
-        const destination = Option.getOrElse(input.destination, () =>
-          generatedDestination(generated.diagram.manifest.id, input.format),
-        );
-        const bytes = yield* exporter.exportArtifact(
-          generated.diagram.manifest.id,
-          input.format,
-        );
-        if (destination !== "-") yield* writeExportFile(destination, bytes);
-        return {
-          generated,
-          artifact: {
-            id: generated.diagram.manifest.id,
-            format: input.format,
-            destination,
-            sizeBytes: bytes.byteLength,
-            ...(destination === "-" ? { stdoutBytes: bytes } : {}),
-          },
-        };
-      });
-      yield* operation.pipe(
-        Effect.matchEffect({
-          onFailure: (error) => reportFailure("generate", output, error),
-          onSuccess: (result) =>
+      const suppliedPrompt = Option.getOrUndefined(input.prompt);
+      const suppliedType = Option.getOrUndefined(input.type);
+      const suppliedFormat = Option.getOrUndefined(input.format);
+      const suppliedDestination = Option.getOrUndefined(input.destination);
+      if (suppliedPrompt === undefined) {
+        if (!liveGenerateWizardAvailable(output)) {
+          return yield* missingRequiredFlag("prompt");
+        }
+        if (suppliedFormat !== undefined && suppliedFormat !== "png") {
+          return yield* invalidFlagValue(
+            "format",
+            suppliedFormat,
+            "png when --prompt is omitted; pass --prompt for excalidraw or scene generation",
+          );
+        }
+        if (suppliedDestination === "-") {
+          return yield* invalidFlagValue(
+            "dest",
+            suppliedDestination,
+            "a file path when --prompt is omitted; pass --prompt to write an artifact to stdout",
+          );
+        }
+        const wizard = yield* GenerateWizard;
+        yield* reportGenerateOperation(
+          output,
+          Effect.scoped(
             Effect.gen(function* () {
-              const writer = yield* OutputWriter;
-              if (result.artifact.stdoutBytes) {
-                yield* writer.stdout(result.artifact.stdoutBytes);
-              }
-              yield* reportSuccess(
-                "generate",
-                output,
-                generatedArtifactData(result),
-                generatedArtifactText(result),
-                result.artifact.destination === "-" ? "stderr" : "stdout",
-              );
+              const answers = yield* wizard.ask({
+                ...(suppliedType === undefined ? {} : { type: suppliedType }),
+                ...(suppliedDestination === undefined
+                  ? {}
+                  : {
+                      destination: {
+                        _tag: "Custom",
+                        path: suppliedDestination,
+                      },
+                    }),
+              });
+              const activity = yield* wizard.activity;
+              const result = yield* runGenerateWorkflow({
+                endpoint: input.endpoint,
+                model: input.model,
+                prompt: answers.prompt,
+                type: answers.type,
+                format: "png",
+                destination: wizardDestination(answers.destination),
+              });
+              yield* activity.succeed("Diagram ready");
+              return { ...result, interactive: true };
             }),
-        }),
+          ),
+        );
+        return;
+      }
+      yield* reportGenerateOperation(
+        output,
+        runGenerateWorkflow({
+          endpoint: input.endpoint,
+          model: input.model,
+          prompt: suppliedPrompt,
+          type: suppliedType ?? "flowchart",
+          format: suppliedFormat ?? "png",
+          destination:
+            suppliedDestination === undefined
+              ? { _tag: "Default" }
+              : { _tag: "Custom", path: suppliedDestination },
+        }).pipe(Effect.map((result) => ({ ...result, interactive: false }))),
       );
     }),
 ).pipe(
   Command.withDescription(GENERATE_HELP),
   Command.withShortDescription(
-    "Generate, persist, and export a PNG from one prompt.",
+    "Create a PNG with the wizard or a direct --prompt.",
   ),
   Command.withExamples([
     {
@@ -1023,4 +1119,5 @@ export const CliApplicationLayer = Layer.mergeAll(
   LinkOpenerLive,
   InputReaderLive.pipe(Layer.provide(LocalFileSystemLive)),
   OutputWriterLive,
+  GenerateWizardLive,
 );
