@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.4.2
+
+### Patch Changes
+
+- [#304](https://github.com/shpitdev/sketchi/pull/304) [`ab9cd3f`](https://github.com/shpitdev/sketchi/commit/ab9cd3fd44e833502dce2342ae1e2b2a51847ead) Thanks [@anandpant](https://github.com/anandpant)! - Add a human-TTY-only generate wizard and responsive, terminal-aware CLI presentation while preserving direct and machine-readable generation contracts.
+
 ## 0.4.1
 
 ### Patch Changes
