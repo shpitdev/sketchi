@@ -1,18 +1,8 @@
-              ╱██╲
-             ╱████╲
-            ╱████╱
-           ╱████╱
-          ╱████╱
-         ╱___╱
-        ◢
-
-        sketchi
-        describe it. sketchi draws it.
+  sketchi
+  describe it. sketchi draws it.
 
 START HERE
-  generate  Start the short wizard, or pass --prompt for direct generation.
-
-EXAMPLE
+  sketchi generate  interactive
   sketchi generate --prompt "Map release approval with pass and revise branches"
   Writes <generated-id>.png in this directory. No account or API key needed.
 
@@ -22,9 +12,4 @@ WORK WITH A DIAGRAM
   export    Write PNG, Excalidraw, or scene bytes.
   share     Create an encrypted Excalidraw link.
 
-GO DEEPER
-  sketchi docs                Complete command map and automation contracts.
-  sketchi generate --help     Every generation option.
-  sketchi <command> --help    Targeted help for any command.
-
-Automation: pass --prompt and add --output json.  Version: sketchi --version
+sketchi docs for every command.  Add --output json for automation.
