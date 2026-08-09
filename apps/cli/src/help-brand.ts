@@ -2,28 +2,72 @@ import { Chalk } from "chalk";
 import stringWidth from "string-width";
 import wrapAnsi from "wrap-ansi";
 
-// These silhouettes follow the down-left nib and up-right barrel of the
-// product icon in apps/web/public/icon.svg. The ASCII version is deliberately
-// structural rather than a transliteration of box-drawing characters.
-const UNICODE_PENCIL = [
-  "              ╱██╲",
-  "             ╱████╲",
-  "            ╱████╱",
-  "           ╱████╱",
-  "          ╱████╱",
-  "         ╱___╱",
-  "        ◢",
+// A 16x16 pixel icon drawn for the terminal, painted two pixel rows per cell
+// with half blocks. The product icon in apps/web/public/icon.svg is a hairline
+// pencil outline that dissolves below ~64px, so this redraws the same subject
+// as solid material bands — graphite nib, wood bevel, barrel, ferrule, eraser —
+// on the brand plate. Legend: space plate cut-out, p plate, k graphite, w wood,
+// c barrel, f ferrule, e eraser.
+const PENCIL_TILE = [
+  "  pppppppppppp  ",
+  " pppppppppppppp ",
+  "pppppppppppeeppp",
+  "ppppppppppfeeepp",
+  "pppppppppcffeepp",
+  "ppppppppcccffppp",
+  "pppppppcccccpppp",
+  "ppppppcccccppppp",
+  "pppppcccccpppppp",
+  "ppppwccccppppppp",
+  "pppwwwccpppppppp",
+  "pppkwwwppppppppp",
+  "pppkkwpppppppppp",
+  "pppppppppppppppp",
+  " pppppppppppppp ",
+  "  pppppppppppp  ",
 ] as const;
 
-const ASCII_PENCIL = [
-  "              /##\\",
-  "             /####\\",
-  "            /####/",
-  "           /####/",
-  "          /####/",
-  "         /___/",
-  "        /_",
-] as const;
+// 8 rows tall so it pairs with the tile at four half-block cells.
+const WORDMARK_GLYPHS: Readonly<Record<string, readonly string[]>> = {
+  s: ["....", "....", ".###", "#...", ".##.", "...#", "###.", "...."],
+  k: ["#...", "#...", "#..#", "#.#.", "##..", "#.#.", "#..#", "...."],
+  e: ["....", "....", ".##.", "#..#", "####", "#...", ".###", "...."],
+  t: [".#.", ".#.", "###", ".#.", ".#.", ".#.", ".##", "..."],
+  c: ["....", "....", ".###", "#...", "#...", "#...", ".###", "...."],
+  h: ["#...", "#...", "#.#.", "##.#", "#..#", "#..#", "#..#", "...."],
+  i: ["#", ".", "#", "#", "#", "#", "#", "."],
+};
+
+const TILE_MATERIALS = {
+  p: {
+    dark: { red: 158, green: 124, blue: 140, ansi256: 138 },
+    light: { red: 143, green: 112, blue: 127, ansi256: 96 },
+  },
+  c: {
+    dark: { red: 250, green: 248, blue: 247, ansi256: 231 },
+    light: { red: 250, green: 248, blue: 247, ansi256: 231 },
+  },
+  w: {
+    dark: { red: 214, green: 186, blue: 152, ansi256: 180 },
+    light: { red: 214, green: 186, blue: 152, ansi256: 180 },
+  },
+  k: {
+    dark: { red: 58, green: 50, blue: 54, ansi256: 237 },
+    light: { red: 58, green: 50, blue: 54, ansi256: 237 },
+  },
+  f: {
+    dark: { red: 186, green: 190, blue: 196, ansi256: 250 },
+    light: { red: 186, green: 190, blue: 196, ansi256: 250 },
+  },
+  e: {
+    dark: { red: 222, green: 152, blue: 158, ansi256: 175 },
+    light: { red: 222, green: 152, blue: 158, ansi256: 175 },
+  },
+} as const satisfies Record<string, Record<HelpBrandOptions["background"], Color>>;
+
+const TILE_WIDTH = 16;
+const LOCKUP_GAP = 2;
+const TAGLINE = "describe it. sketchi draws it.";
 
 const BRAND = {
   dark: { red: 195, green: 154, blue: 172, ansi256: 181 },
@@ -102,19 +146,112 @@ function description(text: string, options: HelpBrandOptions): string {
   return styled(text, MUTED[options.background], options);
 }
 
+function paint(
+  color: Color,
+  options: HelpBrandOptions,
+): (text: string) => string {
+  const chalk = new Chalk({ level: options.colors === "truecolor" ? 3 : 2 });
+  return options.colors === "truecolor"
+    ? chalk.rgb(color.red, color.green, color.blue)
+    : chalk.ansi256(color.ansi256);
+}
+
+function tileColor(
+  pixel: string,
+  options: HelpBrandOptions,
+): Color | undefined {
+  const material = TILE_MATERIALS[pixel as keyof typeof TILE_MATERIALS];
+  return material === undefined ? undefined : material[options.background];
+}
+
+// Two pixel rows per cell: the upper half block carries the top pixel as
+// foreground and the lower pixel as background, so square pixels stay square.
+function tileRows(options: HelpBrandOptions): readonly string[] {
+  const rows: string[] = [];
+  for (let y = 0; y < PENCIL_TILE.length; y += 2) {
+    let row = "";
+    for (let x = 0; x < TILE_WIDTH; x += 1) {
+      const top = tileColor(PENCIL_TILE[y]?.[x] ?? " ", options);
+      const bottom = tileColor(PENCIL_TILE[y + 1]?.[x] ?? " ", options);
+      if (top === undefined && bottom === undefined) row += " ";
+      else if (top === undefined) row += paint(bottom as Color, options)("▄");
+      else if (bottom === undefined) row += paint(top, options)("▀");
+      else row += paintPair(top, bottom, options);
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+function paintPair(
+  top: Color,
+  bottom: Color,
+  options: HelpBrandOptions,
+): string {
+  const chalk = new Chalk({ level: options.colors === "truecolor" ? 3 : 2 });
+  const background =
+    options.colors === "truecolor"
+      ? chalk.bgRgb(bottom.red, bottom.green, bottom.blue)
+      : chalk.bgAnsi256(bottom.ansi256);
+  return options.colors === "truecolor"
+    ? background.rgb(top.red, top.green, top.blue)("▀")
+    : background.ansi256(top.ansi256)("▀");
+}
+
+function wordmarkRows(options: HelpBrandOptions): readonly string[] {
+  const pixels = Array.from({ length: 8 }, (_, y) =>
+    [..."sketchi"]
+      .map(
+        (character, index) =>
+          `${WORDMARK_GLYPHS[character]?.[y] ?? ""}${index === 6 ? "" : "."}`,
+      )
+      .join(""),
+  );
+  const ink = FOREGROUND[options.background];
+  const rows: string[] = [];
+  for (let y = 0; y < pixels.length; y += 2) {
+    let row = "";
+    for (let x = 0; x < (pixels[y]?.length ?? 0); x += 1) {
+      const top = pixels[y]?.[x] === "#";
+      const bottom = pixels[y + 1]?.[x] === "#";
+      row += top && bottom ? "█" : top ? "▀" : bottom ? "▄" : " ";
+    }
+    rows.push(options.colors === "none" ? row : paint(ink, options)(row));
+  }
+  return rows;
+}
+
+const WORDMARK_WIDTH = 30;
+
 function brandLockup(options: HelpBrandOptions): string {
-  const pencil = options.unicode === false ? ASCII_PENCIL : UNICODE_PENCIL;
   const width = Math.max(32, options.width ?? 80);
-  const indent = width < 40 ? "  " : "        ";
+  const tagline = wrappedLine("  ", description(TAGLINE, options), width);
+
+  // The mark is a colour asset. Pipes, NO_COLOR and non-UTF-8 locales get the
+  // word itself rather than block art that would be noise there.
+  if (options.colors === "none" || options.unicode === false) {
+    return [
+      `  ${styled("sketchi", FOREGROUND[options.background], options, "bold")}`,
+      tagline,
+    ].join("\n");
+  }
+
+  const wordmark = wordmarkRows(options);
+  if (width < 2 + TILE_WIDTH + LOCKUP_GAP + WORDMARK_WIDTH) {
+    return [...wordmark.map((row) => `  ${row}`), "", tagline].join("\n");
+  }
+
+  // Centre the four-cell wordmark against the eight-cell tile.
+  const tile = tileRows(options);
+  const offset = (tile.length - wordmark.length) / 2;
+  const gap = " ".repeat(LOCKUP_GAP);
   return [
-    ...pencil.map((line) => styled(line, BRAND[options.background], options)),
+    ...tile.map((row, index) => {
+      const beside = wordmark[index - offset];
+      return `  ${row}${beside === undefined ? "" : `${gap}${beside}`}`;
+    }),
     "",
-    `${indent}${styled("sketchi", FOREGROUND[options.background], options, "bold")}`,
-    wrappedLine(
-      indent,
-      description("describe it. sketchi draws it.", options),
-      width,
-    ),
+    tagline,
   ].join("\n");
 }
 
@@ -157,14 +294,11 @@ export function renderRootHelp(options: HelpBrandOptions): string {
     brandLockup(options),
     "",
     heading("START HERE", options),
-    action(
-      "generate",
-      "Start the short wizard, or pass --prompt for direct generation.",
-      options,
+    wrappedLine(
+      `  ${command("sketchi generate", options)}  `,
+      description("interactive", options),
       width,
     ),
-    "",
-    heading("EXAMPLE", options),
     wrappedLine("  ", command(example, options), width),
     wrappedLine(
       "  ",
@@ -181,33 +315,10 @@ export function renderRootHelp(options: HelpBrandOptions): string {
     action("export", "Write PNG, Excalidraw, or scene bytes.", options, width),
     action("share", "Create an encrypted Excalidraw link.", options, width),
     "",
-    heading("GO DEEPER", options),
-    action(
-      "sketchi docs",
-      "Complete command map and automation contracts.",
-      options,
-      width,
-      26,
-    ),
-    action(
-      "sketchi generate --help",
-      "Every generation option.",
-      options,
-      width,
-      26,
-    ),
-    action(
-      "sketchi <command> --help",
-      "Targeted help for any command.",
-      options,
-      width,
-      26,
-    ),
-    "",
     wrappedLine(
       "",
       description(
-        "Automation: pass --prompt and add --output json.  Version: sketchi --version",
+        "sketchi docs for every command.  Add --output json for automation.",
         options,
       ),
       width,
@@ -291,13 +402,16 @@ export function terminalPaletteForBackground(
   };
 }
 
+// COLORFGBG is a courtesy hint that only a minority of terminals set, so its
+// absence must not disable colour — it only means we cannot detect a light
+// background and fall back to the dark palette.
 function terminalPalette(
   colors: Exclude<HelpBrandOptions["colors"], "none">,
 ): TerminalPalette {
   const colorForegroundBackground = process.env["COLORFGBG"];
   const background = colorForegroundBackground?.split(";").at(-1);
   if (!background || !/^\d+$/u.test(background)) {
-    return { background: "dark", readable: false };
+    return { background: "dark", readable: true };
   }
   return terminalPaletteForBackground(Number(background), colors);
 }

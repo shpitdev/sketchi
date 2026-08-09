@@ -217,10 +217,16 @@ describe("golden product help", () => {
     ).toContain("\u001b[38;5;255m\u001b[1msketchi");
   });
 
+  // COLORFGBG is set by a minority of terminals, so an absent or malformed
+  // value must still paint: it only costs us light-background detection.
   it.each([undefined, "unknown", "15;"])(
-    "uses terminal-default text for unknown background %s",
+    "paints the dark palette when the background is unknown (%s)",
     (colorForegroundBackground) => {
-      expect(ttyHelp({ colorForegroundBackground })).not.toContain("\u001b");
+      const output = ttyHelp({ colorForegroundBackground });
+
+      expect(output).toContain("\u001b[38;2;158;124;140m");
+      expect(output).toContain("\u001b[38;2;195;154;172m\u001b[1mSTART HERE");
+      expect(output).not.toContain("\u001b[38;2;143;112;127m");
     },
   );
 
