@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+  # changesets.yml merges the Version Packages PR with GITHUB_TOKEN, which raises
+  # no push event. workflow_dispatch is the documented exception to that rule, so
+  # it is how the auto-merged release reaches this workflow.
+  workflow_dispatch:
 
 # Serialize releases: a newer push replaces any pending (not-yet-started) run in
 # this group. An intermediate version whose run is superseded before it starts is
@@ -67,8 +71,18 @@ jobs:
           cat view-error.log >&2
           exit 1
 
-  publish:
+  # Nothing reaches npm without the full pull-request gate. The Version Packages
+  # PR cannot run it itself: PRs opened with GITHUB_TOKEN never trigger workflows,
+  # so this is where a broken release is actually caught.
+  verify:
     needs: guard
+    if: ${{ needs.guard.outputs.publish == 'true' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: [guard, verify]
     if: ${{ needs.guard.outputs.publish == 'true' }}
     runs-on: ubuntu-latest
     # id-token: write is required for npm OIDC trusted publishing; no npm secret
@@ -96,7 +110,7 @@ jobs:
         working-directory: apps/cli/dist
 
   tag:
-    needs: [guard, publish]
+    needs: [guard, verify, publish]
     if: ${{ needs.guard.outputs.publish == 'true' }}
     runs-on: ubuntu-latest
     # contents: write is scoped to this job only, purely to push the release tag.
@@ -127,7 +141,7 @@ jobs:
           git push origin "$tag"
 
   release:
-    needs: [guard, publish, tag]
+    needs: [guard, verify, publish, tag]
     if: ${{ needs.guard.outputs.publish == 'true' }}
     runs-on: ubuntu-latest
     # contents: write is scoped to this job only, purely to create the GitHub Release.

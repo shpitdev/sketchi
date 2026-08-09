@@ -12,6 +12,8 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  # actions: write dispatches release.yml once the Version Packages PR is merged.
+  actions: write
 
 jobs:
   version:
@@ -26,10 +28,34 @@ jobs:
           node-version: 24.13.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # PRs opened with github.token do not trigger pull_request CI; release.yml packaging smoke remains the publish gate.
       - uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
+        id: changesets
         with:
           version: pnpm changeset version
           createGithubReleases: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The Version Packages PR only restates what the source changesets already
+      # said, so it is merged unattended. It cannot gate itself: a PR opened with
+      # GITHUB_TOKEN never triggers pull_request CI, so release.yml runs the full
+      # ci.yml gate before anything reaches npm.
+      - name: Merge the Version Packages PR and start the release
+        if: ${{ steps.changesets.outputs.pullRequestNumber != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PULL_REQUEST: ${{ steps.changesets.outputs.pullRequestNumber }}
+        run: |
+          set -euo pipefail
+          gh pr merge "$PULL_REQUEST" \
+            --repo "$GITHUB_REPOSITORY" \
+            --squash \
+            --delete-branch
+
+          # Merging with GITHUB_TOKEN raises no push event, so release.yml would
+          # never see this commit. workflow_dispatch is the documented exception
+          # to that rule and is what keeps the chain alive. This is also why the
+          # merge cannot loop back into this workflow.
+          gh workflow run release.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main
