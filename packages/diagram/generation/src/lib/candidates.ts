@@ -103,13 +103,28 @@ export function extractJsonObject(text: string): unknown {
     return JSON.parse(text);
   } catch {
     const firstBrace = text.indexOf("{");
-    const lastBrace = text.lastIndexOf("}");
-
-    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    if (firstBrace === -1) {
       throw new Error("Model output did not contain a JSON object.");
     }
-
-    return JSON.parse(text.slice(firstBrace, lastBrace + 1));
+    let depth = 0;
+    let escaped = false;
+    let inString = false;
+    for (let index = firstBrace; index < text.length; index += 1) {
+      const character = text[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (character === "\\") escaped = true;
+        else if (character === '"') inString = false;
+        continue;
+      }
+      if (character === '"') inString = true;
+      else if (character === "{") depth += 1;
+      else if (character === "}") {
+        depth -= 1;
+        if (depth === 0) return JSON.parse(text.slice(firstBrace, index + 1));
+      }
+    }
+    throw new Error("Model output did not contain one complete JSON object.");
   }
 }
 
@@ -129,6 +144,25 @@ function withSketchiDiagramStyle(input: unknown): unknown {
   return isUnknownRecord(input)
     ? { ...input, style: { ...SKETCHI_DIAGRAM_STYLE } }
     : input;
+}
+
+function normalizeGeneratedFlowchartInput(input: unknown): unknown {
+  const styled = withSketchiDiagramStyle(input);
+  if (!isUnknownRecord(styled) || !Array.isArray(styled["edges"])) {
+    return styled;
+  }
+  return {
+    ...styled,
+    edges: styled["edges"].map((edge) =>
+      isUnknownRecord(edge) &&
+      typeof edge["label"] === "string" &&
+      edge["label"].trim().length === 0
+        ? Object.fromEntries(
+            Object.entries(edge).filter(([key]) => key !== "label"),
+          )
+        : edge,
+    ),
+  };
 }
 
 function firstString(values: readonly unknown[]): string | undefined {
@@ -160,7 +194,7 @@ export function responseErrorDiagnostic(raw: unknown): string | undefined {
 
 export function parseGeneratedFlowchart(text: string): FlowchartDiagram {
   return parseFlowchartDiagram(
-    withSketchiDiagramStyle(extractJsonObject(text)),
+    normalizeGeneratedFlowchartInput(extractJsonObject(text)),
   );
 }
 
@@ -175,7 +209,7 @@ export function parseGeneratedDiagram(
     }
     return parseMindmapDiagram(withSketchiDiagramStyle(extracted));
   }
-  return parseFlowchartDiagram(withSketchiDiagramStyle(extracted));
+  return parseFlowchartDiagram(normalizeGeneratedFlowchartInput(extracted));
 }
 
 interface CandidateParseFailure {
@@ -281,7 +315,7 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 
   const decoded = safeParseDiagramSchema(
     FlowchartDiagramSchema,
-    withSketchiDiagramStyle(extracted),
+    normalizeGeneratedFlowchartInput(extracted),
   );
   if (!decoded.success) {
     const diagnostics = decoded.error.issues.map(schemaIssueDiagnostic);
@@ -327,6 +361,135 @@ export function candidateFromText(
     ...input,
     diagnostics,
     error: parsed.error,
+  };
+}
+
+const EXPLICIT_MINIMUM_PATTERN =
+  /\bat least\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:distinct|labeled)\s+)?(steps?|nodes?|topics?|decisions?(?:\s+nodes?)?)\b/giu;
+const LOOP_REQUIREMENT_PATTERN =
+  /\b(?:feedback|review|resubmission|retry|revision|remediation|investigation)\s+loop\b|\bloop(?:s|ed|ing)?\s+(?:back|through|to)\b|\breturns?\s+to\b/iu;
+const NUMBER_WORD_COUNTS: Readonly<Record<string, number>> = {
+  eight: 8,
+  five: 5,
+  four: 4,
+  nine: 9,
+  one: 1,
+  seven: 7,
+  six: 6,
+  ten: 10,
+  three: 3,
+  two: 2,
+};
+
+export interface ExplicitRequestMinimum {
+  readonly expectedCount: number;
+  readonly expectedUnit: "decision nodes" | "nodes" | "topics";
+  readonly requestedCount: number;
+  readonly requestedUnit: string;
+}
+
+function requestedCount(value: string): number | undefined {
+  const numeric = Number.parseInt(value, 10);
+  return Number.isInteger(numeric)
+    ? numeric
+    : NUMBER_WORD_COUNTS[value.toLowerCase()];
+}
+
+export function explicitRequestMinimums(
+  request: string,
+  diagramType: DiagramGenerationPrompt["type"],
+): readonly ExplicitRequestMinimum[] {
+  return Array.from(request.matchAll(EXPLICIT_MINIMUM_PATTERN), (match) => {
+    const requested = match[1] ? requestedCount(match[1]) : undefined;
+    const unit = match[2]?.toLowerCase();
+    if (!requested || !unit) return undefined;
+
+    const decisionMinimum = /^decisions?(?:\s+nodes?)?$/.test(unit);
+    const applies =
+      (diagramType === "flowchart" &&
+        (/^(?:steps?|nodes?)$/.test(unit) || decisionMinimum)) ||
+      (diagramType === "mindmap" && /^topics?$/.test(unit));
+    if (!applies) return undefined;
+
+    const expectedUnit: ExplicitRequestMinimum["expectedUnit"] = decisionMinimum
+      ? "decision nodes"
+      : diagramType === "flowchart"
+        ? "nodes"
+        : "topics";
+    return {
+      expectedCount:
+        diagramType === "flowchart" && !decisionMinimum
+          ? Math.min(requested, 24)
+          : requested,
+      expectedUnit,
+      requestedCount: requested,
+      requestedUnit: unit,
+    };
+  }).filter(
+    (minimum): minimum is ExplicitRequestMinimum => minimum !== undefined,
+  );
+}
+
+function flowchartHasDirectedCycle(diagram: FlowchartDiagram): boolean {
+  const adjacency = new Map<string, string[]>();
+  for (const edge of diagram.edges) {
+    adjacency.set(edge.source, [
+      ...(adjacency.get(edge.source) ?? []),
+      edge.target,
+    ]);
+  }
+  const pathExists = (start: string, destination: string): boolean => {
+    const pending = [start];
+    const visited = new Set<string>();
+    while (pending.length > 0) {
+      const current = pending.pop();
+      if (!current) continue;
+      if (current === destination) return true;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      pending.push(...(adjacency.get(current) ?? []));
+    }
+    return false;
+  };
+  return diagram.edges.some((edge) => pathExists(edge.target, edge.source));
+}
+
+/** Turn a structurally valid result that misses explicit requirements into repair input. */
+export function enforceCandidateRequestRequirements(
+  candidate: DiagramGenerationCandidate,
+  request: DiagramGenerationRequest,
+): DiagramGenerationCandidate {
+  const diagram = candidate.diagram;
+  if (!diagram || diagram.type !== request.prompt.type) {
+    return candidate;
+  }
+  const requestDiagnostics = [
+    ...explicitRequestMinimums(request.prompt.request, request.prompt.type)
+      .map((minimum) => {
+        const actual =
+          minimum.expectedUnit === "decision nodes"
+            ? diagram.nodes.filter((node) => node.kind === "decision").length
+            : diagram.nodes.length;
+        if (actual >= minimum.expectedCount) return undefined;
+
+        return `request_minimum_not_met: requested at least ${minimum.requestedCount} ${minimum.requestedUnit}, but the generated ${diagram.type} contained ${actual}. Hint: return a complete diagram with at least ${minimum.expectedCount} ${minimum.expectedUnit}.`;
+      })
+      .filter((diagnostic): diagnostic is string => diagnostic !== undefined),
+    ...(diagram.type === "flowchart" &&
+    LOOP_REQUIREMENT_PATTERN.test(request.prompt.request) &&
+    !flowchartHasDirectedCycle(diagram)
+      ? [
+          "request_loop_not_met: prompt requires a retry or loop, but the generated flowchart contains no directed cycle. Hint: add a real back-edge from the loop path to the intended process or decision node, never the start node.",
+        ]
+      : []),
+  ];
+  if (requestDiagnostics.length === 0) return candidate;
+
+  const { diagram: _diagram, ...withoutDiagram } = candidate;
+  return {
+    ...withoutDiagram,
+    diagnostics: [...candidate.diagnostics, ...requestDiagnostics],
+    error: "Generated diagram did not satisfy explicit request requirements.",
   };
 }
 

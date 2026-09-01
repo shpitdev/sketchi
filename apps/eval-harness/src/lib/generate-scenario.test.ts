@@ -307,6 +307,7 @@ const concurrencyLayer = Layer.mergeAll(
   }),
   Layer.succeed(DiagramGenerationPolicy, {
     concurrency: 1,
+    maxRepairAttempts: 1,
     maxRetries: 0,
     requestTimeoutMs: 1_000,
     retryDelayMs: 0,

@@ -21,6 +21,7 @@ export class DiagramGenerationPolicyConfig extends Schema.Class<DiagramGeneratio
   "DiagramGenerationPolicyConfig",
 )({
   concurrency: Schema.Number,
+  maxRepairAttempts: Schema.Number,
   maxRetries: Schema.Number,
   requestTimeoutMs: Schema.Number,
   retryDelayMs: Schema.Number,
@@ -33,6 +34,7 @@ export class DiagramGenerationPolicy extends Context.Service<
 
 export const diagramGenerationPolicyDefaults: DiagramGenerationPolicyConfig = {
   concurrency: 2,
+  maxRepairAttempts: 2,
   maxRetries: 2,
   requestTimeoutMs: 30_000,
   retryDelayMs: 250,
