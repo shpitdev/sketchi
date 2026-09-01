@@ -307,6 +307,40 @@ describe("pure candidate behavior", () => {
     });
     expect(candidate.error).toBeUndefined();
   });
+
+  it("captures every flowchart validator issue with its repair hint", () => {
+    const candidate = candidateFromText({
+      model: "fixture",
+      provider: "fixture",
+      text: JSON.stringify({
+        id: "broken-loop",
+        title: "Broken loop",
+        type: "flowchart",
+        nodes: [
+          { id: "start", label: "Start", kind: "start" },
+          { id: "retry", label: "Retry?", kind: "decision" },
+          { id: "done", label: "Done", kind: "end" },
+        ],
+        edges: [
+          { id: "start-retry", source: "start", target: "retry" },
+          { id: "retry-done", source: "retry", target: "done" },
+          { id: "done-start", source: "done", target: "start" },
+        ],
+        layout: { direction: "TB", edgeRouting: "orthogonal" },
+      }),
+    });
+
+    expect(candidate.diagram).toBeUndefined();
+    expect(candidate.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("start_has_incoming"),
+        expect.stringContaining("end_has_outgoing"),
+        expect.stringContaining("underbranched_decision"),
+        expect.stringContaining("unlabeled_decision_branch"),
+        expect.stringContaining("Hint:"),
+      ]),
+    );
+  });
 });
 
 const successfulRun = vi.fn(async () => jsonResponse(geminiResponse));

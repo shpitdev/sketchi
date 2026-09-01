@@ -59,11 +59,14 @@ function testBoundary(env: StudioEnv, request: Request) {
 }
 
 function generateRequest(env: StudioEnv, body: unknown): Promise<Response> {
-  const request = new Request("https://playground.sketchi.app/api/v1/generate", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const request = new Request(
+    "https://playground.sketchi.app/api/v1/generate",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
   return runPlaygroundEffect(
     handleGenerateDiagramRequest(request),
     testBoundary(env, request),
@@ -132,5 +135,36 @@ describe("public generate endpoint", () => {
     expect(response.status).toBe(422);
     const body = (await response.json()) as Record<string, unknown>;
     expect(body.status).toBe("malformed_output");
+  });
+
+  it("returns bounded validator diagnostics for malformed diagrams", async () => {
+    const invalidFlowchart = {
+      ...flowchartIr,
+      edges: [
+        ...flowchartIr.edges.map((edge) =>
+          edge.id === "e4" ? { ...edge, label: "Complete" } : edge,
+        ),
+        { id: "end-retry", source: "end", target: "review" },
+      ],
+    };
+    const env: StudioEnv = {
+      AI: fakeAiGateway(JSON.stringify(invalidFlowchart)),
+    };
+    const response = await generateRequest(env, {
+      prompt: "Map a release flow with a retry loop",
+      type: "flowchart",
+    });
+
+    expect(response.status).toBe(422);
+    const body = (await response.json()) as {
+      status: string;
+      issues: ReadonlyArray<{ message: string }>;
+    };
+    expect(body.status).toBe("malformed_output");
+    expect(body.issues.length).toBeGreaterThan(1);
+    expect(body.issues.length).toBeLessThanOrEqual(8);
+    expect(body.issues.map((entry) => entry.message).join("\n")).toContain(
+      "end_has_outgoing",
+    );
   });
 });

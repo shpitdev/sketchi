@@ -18,10 +18,7 @@ import {
   codeModeUsageResponseHeaders,
   PlaygroundCodeModeUsage,
 } from "../codemode/usage-events.server";
-import {
-  PlaygroundBindings,
-  PlaygroundClock,
-} from "../runtime/context.server";
+import { PlaygroundBindings, PlaygroundClock } from "../runtime/context.server";
 import {
   flowchartDocumentInput,
   mindmapDocumentInput,
@@ -63,7 +60,10 @@ interface GenerateSuccess {
   readonly ok: true;
   readonly status: "generated";
   readonly diagram: {
-    readonly document: { readonly type: DiagramGenerationType; readonly spec: unknown };
+    readonly document: {
+      readonly type: DiagramGenerationType;
+      readonly spec: unknown;
+    };
     readonly scene: unknown;
     readonly excalidraw: unknown;
   };
@@ -77,9 +77,12 @@ const GenerateRequestSchema = Schema.Struct({
   type: Schema.optional(Schema.Literals(["flowchart", "mindmap"])),
   model: Schema.optional(Schema.String),
 });
-const decodeGenerateRequest = Schema.decodeUnknownResult(GenerateRequestSchema, {
-  errors: "all",
-});
+const decodeGenerateRequest = Schema.decodeUnknownResult(
+  GenerateRequestSchema,
+  {
+    errors: "all",
+  },
+);
 
 function issue(
   code: string,
@@ -162,7 +165,9 @@ async function readBoundedGenerateJson(request: Request): Promise<unknown> {
   }
 }
 
-function generationErrorFailure(error: DiagramGenerationError): GenerateFailure {
+function generationErrorFailure(
+  error: DiagramGenerationError,
+): GenerateFailure {
   switch (error._tag) {
     case "DiagramGenerationConfigurationError":
     case "DiagramGenerationHttpError":
@@ -217,19 +222,34 @@ function malformedCandidateFailure(
       return false;
     }
   })();
-  return failure("malformed_output", [
-    issue(
-      "malformed_output",
-      "generation",
-      canParse
-        ? "The generation provider output did not describe a valid diagram."
-        : "The generation provider output did not contain one JSON object.",
-      "Retry once; if it persists, try another prompt.",
-    ),
-  ]);
+  const diagnostics = candidate.diagnostics.slice(0, 8);
+  return failure(
+    "malformed_output",
+    diagnostics.length > 0
+      ? diagnostics.map((diagnostic) =>
+          issue(
+            "malformed_output",
+            "generation",
+            diagnostic,
+            "Return one complete diagram JSON object that resolves this diagnostic.",
+          ),
+        )
+      : [
+          issue(
+            "malformed_output",
+            "generation",
+            canParse
+              ? "The generation provider output did not describe a valid diagram."
+              : "The generation provider output did not contain one JSON object.",
+            "Retry once; if it persists, try another prompt.",
+          ),
+        ],
+  );
 }
 
-function buildFailure(result: Extract<BuildResult, { ok: false }>): GenerateFailure {
+function buildFailure(
+  result: Extract<BuildResult, { ok: false }>,
+): GenerateFailure {
   const issues = result.issues.map((entry) =>
     issue(
       entry.code,
@@ -293,9 +313,7 @@ export const handleGenerateDiagramRequest = Effect.fn(
       );
     });
 
-  const rawBody = yield* Effect.promise(() =>
-    readBoundedGenerateJson(request),
-  );
+  const rawBody = yield* Effect.promise(() => readBoundedGenerateJson(request));
   if (
     rawBody !== null &&
     typeof rawBody === "object" &&
@@ -422,16 +440,11 @@ export const handleGenerateDiagramRequest = Effect.fn(
     artifactFormats: ["scene", "excalidraw"],
     inlineArtifacts: ["scene", "excalidraw"],
   };
-  const buildResult: BuildResult = yield* (
-    type === "flowchart"
-      ? codeMode.buildFlowchart({ spec, options: buildOptions })
-      : codeMode.buildMindmap({ spec, options: buildOptions })
-  );
+  const buildResult: BuildResult = yield* type === "flowchart"
+    ? codeMode.buildFlowchart({ spec, options: buildOptions })
+    : codeMode.buildMindmap({ spec, options: buildOptions });
   if (!buildResult.ok) {
-    return yield* finish(
-      { prompt, type, spec },
-      buildFailure(buildResult),
-    );
+    return yield* finish({ prompt, type, spec }, buildFailure(buildResult));
   }
 
   const scene = inlineArtifact(buildResult.artifact, "scene");

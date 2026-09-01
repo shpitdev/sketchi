@@ -295,10 +295,52 @@ describe("prompt-assisted generation over the public generate API", () => {
         assert.strictEqual(error._tag, "CliGenerationError");
         if (error._tag === "CliGenerationError") {
           assert.strictEqual(error.code, "invalid_generated_document");
-          assert.deepStrictEqual(error.details, ["http_status:422"]);
+          assert.deepStrictEqual(error.details, [
+            "http_status:422",
+            "The generated diagram failed validation.",
+            "Refine the prompt.",
+          ]);
         }
         assert.strictEqual(created.length, 0);
       }),
+  );
+
+  it.effect("surfaces every endpoint issue message and hint", () =>
+    Effect.gen(function* () {
+      stubFetch(() =>
+        jsonResponse(
+          {
+            ok: false,
+            status: "malformed_output",
+            issues: [
+              {
+                message: "End node cannot have outgoing edges.",
+                hint: "Change the retry outcome to a process node.",
+              },
+              {
+                message: "Decision branch is missing a label.",
+                hint: "Label every decision outcome.",
+              },
+            ],
+          },
+          422,
+        ),
+      );
+      const created: BuiltDiagram[] = [];
+
+      const error = yield* Effect.flip(runGenerate(created, "flowchart"));
+
+      assert.strictEqual(error._tag, "CliGenerationError");
+      if (error._tag === "CliGenerationError") {
+        assert.deepStrictEqual(error.details, [
+          "http_status:422",
+          "End node cannot have outgoing edges.",
+          "Change the retry outcome to a process node.",
+          "Decision branch is missing a label.",
+          "Label every decision outcome.",
+        ]);
+      }
+    }),
   );
 
   it.effect("maps a provider endpoint error to a typed provider failure", () =>

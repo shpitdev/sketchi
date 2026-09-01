@@ -93,10 +93,20 @@ function readErrorBody(text: string): EndpointErrorBody {
   }
 }
 
+function endpointIssueDetails(body: EndpointErrorBody): string[] {
+  return (body.issues ?? []).flatMap((entry) => [
+    ...(entry.message ? [entry.message] : []),
+    ...(entry.hint ? [entry.hint] : []),
+  ]);
+}
+
 function endpointFailure(status: number, text: string): CliGenerationError {
   const body = readErrorBody(text);
   const firstIssue = body.issues?.[0];
-  const details = [`http_status:${String(status)}`];
+  const details = [
+    `http_status:${String(status)}`,
+    ...endpointIssueDetails(body),
+  ];
 
   switch (body.status) {
     case "generation_timeout":

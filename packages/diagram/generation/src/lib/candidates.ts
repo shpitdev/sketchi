@@ -1,11 +1,16 @@
 import {
+  DiagramValidationError,
   type FlowchartDiagram,
   FlowchartDiagramSchema,
+  FlowchartValidationError,
   type MindmapDiagram,
   MindmapDiagramSchema,
   SKETCHI_DIAGRAM_STYLE,
   parseFlowchartDiagram,
   parseMindmapDiagram,
+  safeParseDiagramSchema,
+  validateFlowchartDiagram,
+  validateMindmapDiagram,
 } from "@sketchi/diagram-core";
 import { Schema } from "effect";
 
@@ -170,6 +175,102 @@ export function parseGeneratedDiagram(
   return parseFlowchartDiagram(input);
 }
 
+interface CandidateParseFailure {
+  readonly diagnostics: readonly string[];
+  readonly error: string;
+  readonly success: false;
+}
+
+interface CandidateParseSuccess {
+  readonly diagram: FlowchartDiagram | MindmapDiagram;
+  readonly success: true;
+}
+
+type CandidateParseResult = CandidateParseFailure | CandidateParseSuccess;
+
+function schemaIssueDiagnostic(issue: {
+  readonly message: string;
+  readonly path: readonly PropertyKey[];
+}): string {
+  const path =
+    issue.path.length > 0 ? issue.path.map(String).join(".") : "diagram";
+  return `schema_error at ${path}: ${issue.message}`;
+}
+
+function diagramValidationFailure(error: unknown): CandidateParseFailure {
+  if (error instanceof FlowchartValidationError) {
+    return {
+      diagnostics: error.issues.map(
+        (entry) =>
+          `flowchart.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
+      ),
+      error: error.message,
+      success: false,
+    };
+  }
+
+  const message =
+    error instanceof DiagramValidationError || error instanceof Error
+      ? error.message
+      : "Generated diagram parse failed.";
+  return {
+    diagnostics: [`diagram_validation_error: ${message}`],
+    error: message,
+    success: false,
+  };
+}
+
+function parseCandidateDiagram(text: string): CandidateParseResult {
+  let extracted: unknown;
+  try {
+    extracted = withSketchiDiagramStyle(extractJsonObject(text));
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Generated diagram parse failed.";
+    return {
+      diagnostics: [`json_parse_error: ${message}`],
+      error: message,
+      success: false,
+    };
+  }
+
+  const isMindmap =
+    isUnknownRecord(extracted) && extracted["type"] === "mindmap";
+  if (isMindmap) {
+    const decoded = safeParseDiagramSchema(MindmapDiagramSchema, extracted);
+    if (!decoded.success) {
+      const diagnostics = decoded.error.issues.map(schemaIssueDiagnostic);
+      return {
+        diagnostics,
+        error: diagnostics[0] ?? "Generated diagram schema validation failed.",
+        success: false,
+      };
+    }
+    try {
+      return { diagram: validateMindmapDiagram(decoded.data), success: true };
+    } catch (error) {
+      return diagramValidationFailure(error);
+    }
+  }
+
+  const decoded = safeParseDiagramSchema(FlowchartDiagramSchema, extracted);
+  if (!decoded.success) {
+    const diagnostics = decoded.error.issues.map(schemaIssueDiagnostic);
+    return {
+      diagnostics,
+      error: diagnostics[0] ?? "Generated diagram schema validation failed.",
+      success: false,
+    };
+  }
+  try {
+    return { diagram: validateFlowchartDiagram(decoded.data), success: true };
+  } catch (error) {
+    return diagramValidationFailure(error);
+  }
+}
+
 export function candidateFromText(
   input: Omit<DiagramGenerationCandidate, "diagnostics" | "text"> & {
     diagnostics?: string[];
@@ -185,28 +286,21 @@ export function candidateFromText(
     };
   }
 
-  try {
+  const parsed = parseCandidateDiagram(input.text);
+  if (parsed.success) {
     return {
       ...input,
       diagnostics,
-      diagram: parseGeneratedDiagram(input.text),
-    };
-  } catch (error) {
-    diagnostics.push(
-      error instanceof Error
-        ? error.message
-        : "Generated diagram parse failed.",
-    );
-
-    return {
-      ...input,
-      diagnostics,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Generated diagram parse failed.",
+      diagram: parsed.diagram,
     };
   }
+
+  diagnostics.push(...parsed.diagnostics);
+  return {
+    ...input,
+    diagnostics,
+    error: parsed.error,
+  };
 }
 
 export function summarizeGenerationCandidate(
