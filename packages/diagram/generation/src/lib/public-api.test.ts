@@ -81,6 +81,11 @@ const expectedSystem = [
   "- Every end node must have zero outgoing edges.",
   "- Every decision node must have at least two outgoing edges.",
   "- Every outgoing edge from a decision node must have a non-empty unique label.",
+  "- When the scenario describes a retry, resubmission, return, or feedback loop, include a real back-edge from the loop path to the intended earlier process or decision; naming a loop or drawing a one-way list is insufficient.",
+  "- Loop-back edges must target a process or decision node, never the start node; start nodes have no incoming edges.",
+  "- Self-loop edges are forbidden. Model every retry or re-check as a decision whose retry branch routes back to an earlier distinct process or decision node.",
+  '- Minimal loop example: decision "Retry?" --"yes"--> process "Try again" --> decision "Retry?"; decision "Retry?" --"no"--> end.',
+  "- Honor every explicit count or minimum for nodes, steps, decisions, branches, ends, and loops; never return fewer. For a rich scenario without an explicit count, include the major actions and decisions rather than collapsing them into a short summary.",
   "- Edges must use existing node ids.",
   '- Use layout { "direction": "TB", "edgeRouting": "orthogonal" } unless the prompt says otherwise.',
 ].join("\n");
@@ -198,7 +203,29 @@ describe("diagram generation prompt mapping", () => {
 
     expect(messages.system).toContain('Use type "mindmap".');
     expect(messages.system).toContain("exactly one root node");
+    expect(messages.system).toContain("2-4 children per major topic");
+    expect(messages.system).toContain("2-3 levels of meaningful depth");
     expect(messages.user).toContain('"type":"mindmap"');
+  });
+
+  it("requires real loop topology and flowchart richness", () => {
+    const messages = buildDiagramGenerationMessages(prompt);
+
+    expect(messages.system).toContain(
+      "include a real back-edge from the loop path",
+    );
+    expect(messages.system).toContain(
+      "Loop-back edges must target a process or decision node, never the start node",
+    );
+    expect(messages.system).toContain("start nodes have no incoming edges");
+    expect(messages.system).toContain("Self-loop edges are forbidden");
+    expect(messages.system).toContain(
+      "retry branch routes back to an earlier distinct process or decision node",
+    );
+    expect(messages.system).toContain('decision "Retry?" --"yes"-->');
+    expect(messages.system).toContain(
+      "Honor every explicit count or minimum for nodes, steps, decisions, branches, ends, and loops",
+    );
   });
 
   it("keeps the Gemini REST body byte-for-byte stable", () => {

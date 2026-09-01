@@ -44,6 +44,11 @@ const FLOWCHART_IR_INSTRUCTIONS = [
   "Every end node must have zero outgoing edges.",
   "Every decision node must have at least two outgoing edges.",
   "Every outgoing edge from a decision node must have a non-empty unique label.",
+  "When the scenario describes a retry, resubmission, return, or feedback loop, include a real back-edge from the loop path to the intended earlier process or decision; naming a loop or drawing a one-way list is insufficient.",
+  "Loop-back edges must target a process or decision node, never the start node; start nodes have no incoming edges.",
+  "Self-loop edges are forbidden. Model every retry or re-check as a decision whose retry branch routes back to an earlier distinct process or decision node.",
+  'Minimal loop example: decision "Retry?" --"yes"--> process "Try again" --> decision "Retry?"; decision "Retry?" --"no"--> end.',
+  "Honor every explicit count or minimum for nodes, steps, decisions, branches, ends, and loops; never return fewer. For a rich scenario without an explicit count, include the major actions and decisions rather than collapsing them into a short summary.",
   "Edges must use existing node ids.",
   'Use layout { "direction": "TB", "edgeRouting": "orthogonal" } unless the prompt says otherwise.',
 ];
@@ -56,6 +61,7 @@ const MINDMAP_IR_INSTRUCTIONS = [
   "Every non-root node must have exactly one incoming edge from its immediate parent.",
   "Every edge must have id, source, target, and metadata matching the child depth and siblingIndex.",
   "Sibling indexes under each parent must be contiguous from 0.",
+  "Honor explicit depth and topic-count requirements. Unless the scenario is intentionally tiny, create 2-4 children per major topic and 2-3 levels of meaningful depth.",
   "Edges must use existing node ids and the graph must be connected.",
   'Use layout { "direction": "LR", "edgeRouting": "curved" } unless the prompt says right-to-left.',
 ];
