@@ -36,7 +36,7 @@ export class DiagramGenerationMessages extends Schema.Class<DiagramGenerationMes
 }) {}
 
 const FLOWCHART_IR_INSTRUCTIONS = [
-  "Return only JSON. Do not wrap the JSON in markdown.",
+  "Return only compact, minified JSON on one line. Do not use markdown.",
   'Use type "flowchart".',
   'Every node must have id, label, and kind: "start", "process", "decision", or "end".',
   "Use exactly one start node and at least one end node.",
@@ -49,7 +49,7 @@ const FLOWCHART_IR_INSTRUCTIONS = [
 ];
 
 const MINDMAP_IR_INSTRUCTIONS = [
-  "Return only JSON. Do not wrap the JSON in markdown.",
+  "Return only compact, minified JSON on one line. Do not use markdown.",
   'Use type "mindmap".',
   'Every node must have id, label, kind ("root" or "topic"), and metadata with depth and siblingIndex.',
   "Use exactly one root node at depth 0 with siblingIndex 0.",
@@ -62,62 +62,54 @@ const MINDMAP_IR_INSTRUCTIONS = [
 
 function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
   if (prompt.type === "mindmap") {
-    return JSON.stringify(
-      {
-        id: "short-kebab-case-id",
-        title: prompt.title,
-        type: "mindmap",
-        nodes: [
-          {
-            id: "topic-0",
-            label: "Root topic",
-            kind: "root",
-            metadata: { depth: 0, siblingIndex: 0 },
-          },
-          {
-            id: "topic-0-0",
-            label: "Child topic",
-            kind: "topic",
-            metadata: { depth: 1, siblingIndex: 0 },
-          },
-        ],
-        edges: [
-          {
-            id: "branch-0-0",
-            source: "topic-0",
-            target: "topic-0-0",
-            metadata: { depth: 1, siblingIndex: 0 },
-          },
-        ],
-        layout: { direction: "LR", edgeRouting: "curved" },
-      },
-      null,
-      2,
-    );
-  }
-
-  return JSON.stringify(
-    {
+    return JSON.stringify({
       id: "short-kebab-case-id",
       title: prompt.title,
-      type: "flowchart",
+      type: "mindmap",
       nodes: [
-        { id: "start-id", label: "Human label", kind: "start" },
-        { id: "decision-id", label: "Question?", kind: "decision" },
+        {
+          id: "topic-0",
+          label: "Root topic",
+          kind: "root",
+          metadata: { depth: 0, siblingIndex: 0 },
+        },
+        {
+          id: "topic-0-0",
+          label: "Child topic",
+          kind: "topic",
+          metadata: { depth: 1, siblingIndex: 0 },
+        },
       ],
       edges: [
         {
-          id: "edge-id",
-          source: "decision-id",
-          target: "target-id",
-          label: "yes",
+          id: "branch-0-0",
+          source: "topic-0",
+          target: "topic-0-0",
+          metadata: { depth: 1, siblingIndex: 0 },
         },
       ],
-      layout: { direction: "TB", edgeRouting: "orthogonal" },
-    },
-    null,
-    2,
-  );
+      layout: { direction: "LR", edgeRouting: "curved" },
+    });
+  }
+
+  return JSON.stringify({
+    id: "short-kebab-case-id",
+    title: prompt.title,
+    type: "flowchart",
+    nodes: [
+      { id: "start-id", label: "Human label", kind: "start" },
+      { id: "decision-id", label: "Question?", kind: "decision" },
+    ],
+    edges: [
+      {
+        id: "edge-id",
+        source: "decision-id",
+        target: "target-id",
+        label: "yes",
+      },
+    ],
+    layout: { direction: "TB", edgeRouting: "orthogonal" },
+  });
 }
 
 function requiredList(title: string, values: readonly string[]): string[] {

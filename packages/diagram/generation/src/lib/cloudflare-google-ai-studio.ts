@@ -15,6 +15,7 @@ import {
 } from "./errors.js";
 import {
   buildGeminiGenerateContentBody,
+  extractGeminiFinishReason,
   extractGeminiText,
   extractGeminiUsage,
   stripGoogleModelPrefix,
@@ -183,8 +184,15 @@ const runGatewayAttempt = Effect.fn(
       }),
   });
   const usage = extractGeminiUsage(raw);
+  const finishReason = extractGeminiFinishReason(raw);
 
   return candidateFromText({
+    diagnostics:
+      finishReason === "MAX_TOKENS"
+        ? [
+            "output_truncated: Gemini stopped at the maximum output-token budget; regenerate the complete diagram.",
+          ]
+        : [],
     model,
     provider: "cloudflare-google-ai-studio",
     raw,

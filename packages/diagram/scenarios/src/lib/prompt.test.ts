@@ -45,7 +45,7 @@ describe("scenario prompts", () => {
     expect(prompt.user).toContain("- QA Manager final review");
     expect(prompt.user).toContain("Required decision branch labels:");
     expect(prompt.user).toContain("- retest");
-    expect(prompt.user).toContain('"title": "Pharma batch disposition"');
+    expect(prompt.user).toContain('"title":"Pharma batch disposition"');
   });
 
   it("keeps a flattened prompt for stdin-based generator commands", () => {
@@ -53,7 +53,9 @@ describe("scenario prompts", () => {
 
     expect(flattened).toContain("System message:");
     expect(flattened).toContain("User message:");
-    expect(flattened).toContain("Return only JSON.");
+    expect(flattened).toContain(
+      "Return only compact, minified JSON on one line.",
+    );
     expect(flattened).toContain(scenario.prompt);
   });
 });

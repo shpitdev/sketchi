@@ -36,7 +36,7 @@ export class GeminiGenerateContentBody extends Schema.Class<GeminiGenerateConten
   system_instruction: GeminiSystemInstruction,
 }) {}
 
-const DEFAULT_MAX_OUTPUT_TOKENS = 2_048;
+const DEFAULT_MAX_OUTPUT_TOKENS = 16_384;
 const DEFAULT_TEMPERATURE = 0.1;
 
 function messageContent(
@@ -140,4 +140,13 @@ export function extractGeminiUsage(
   }
 
   return Object.keys(usage).length > 0 ? usage : undefined;
+}
+
+export function extractGeminiFinishReason(
+  response: unknown,
+): string | undefined {
+  const candidates = objectValue(response, "candidates");
+  const firstCandidate = Array.isArray(candidates) ? candidates[0] : undefined;
+  const finishReason = objectValue(firstCandidate, "finishReason");
+  return typeof finishReason === "string" ? finishReason : undefined;
 }

@@ -73,7 +73,7 @@ const expectedSystem = [
   "You are creating a Sketchi typed intermediate diagram.",
   "",
   "Flowchart IR rules:",
-  "- Return only JSON. Do not wrap the JSON in markdown.",
+  "- Return only compact, minified JSON on one line. Do not use markdown.",
   '- Use type "flowchart".',
   '- Every node must have id, label, and kind: "start", "process", "decision", or "end".',
   "- Use exactly one start node and at least one end node.",
@@ -97,28 +97,24 @@ const expectedUser = [
   "Use these required labels exactly unless the scenario explicitly asks for a clearer synonym.",
   "",
   "Expected JSON shape:",
-  JSON.stringify(
-    {
-      id: "short-kebab-case-id",
-      title: "Pharma batch disposition",
-      type: "flowchart",
-      nodes: [
-        { id: "start-id", label: "Human label", kind: "start" },
-        { id: "decision-id", label: "Question?", kind: "decision" },
-      ],
-      edges: [
-        {
-          id: "edge-id",
-          source: "decision-id",
-          target: "target-id",
-          label: "yes",
-        },
-      ],
-      layout: { direction: "TB", edgeRouting: "orthogonal" },
-    },
-    null,
-    2,
-  ),
+  JSON.stringify({
+    id: "short-kebab-case-id",
+    title: "Pharma batch disposition",
+    type: "flowchart",
+    nodes: [
+      { id: "start-id", label: "Human label", kind: "start" },
+      { id: "decision-id", label: "Question?", kind: "decision" },
+    ],
+    edges: [
+      {
+        id: "edge-id",
+        source: "decision-id",
+        target: "target-id",
+        label: "yes",
+      },
+    ],
+    layout: { direction: "TB", edgeRouting: "orthogonal" },
+  }),
 ].join("\n");
 const expectedGeminiBody = {
   contents: [{ role: "user", parts: [{ text: expectedUser }] }],
@@ -202,7 +198,7 @@ describe("diagram generation prompt mapping", () => {
 
     expect(messages.system).toContain('Use type "mindmap".');
     expect(messages.system).toContain("exactly one root node");
-    expect(messages.user).toContain('"type": "mindmap"');
+    expect(messages.user).toContain('"type":"mindmap"');
   });
 
   it("keeps the Gemini REST body byte-for-byte stable", () => {
@@ -214,6 +210,15 @@ describe("diagram generation prompt mapping", () => {
         temperature: 0.2,
       }),
     ).toEqual(expectedGeminiBody);
+  });
+
+  it("uses the expanded output budget unless the request overrides it", () => {
+    expect(
+      buildGeminiGenerateContentBody({
+        model: "google/gemini-3.1-flash-lite",
+        prompt,
+      }).generationConfig.maxOutputTokens,
+    ).toBe(16_384);
   });
 
   it("normalizes Cloudflare Google model ids for provider-native calls", () => {
@@ -770,6 +775,45 @@ layer(malformedClientLayer)("malformed model responses", (it) => {
         "Gemini response did not include text content.",
       );
       assert.strictEqual(malformedRun.mock.calls.length, 1);
+    }),
+  );
+});
+
+const truncatedRun = vi.fn(async () =>
+  jsonResponse({
+    candidates: [
+      {
+        content: { role: "model", parts: [{ text: '{"type":"flowchart"' }] },
+        finishReason: "MAX_TOKENS",
+      },
+    ],
+  }),
+);
+const truncatedClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      Layer.succeed(CloudflareAiGatewayBinding, {
+        gateway: () => ({ getUrl: vi.fn(), run: truncatedRun }),
+      }),
+      configLayer,
+      retryPolicyLayer,
+    ),
+  ),
+);
+
+layer(truncatedClientLayer)("token-budget exhaustion", (it) => {
+  it.effect("returns an explicit output-truncated diagnostic", () =>
+    Effect.gen(function* () {
+      const client = yield* DiagramGenerationClient;
+      const candidate = yield* client.generate({
+        model: "google/gemini-3.1-flash-lite",
+        prompt,
+      });
+
+      assert.isUndefined(candidate.diagram);
+      expect(candidate.diagnostics).toContain(
+        "output_truncated: Gemini stopped at the maximum output-token budget; regenerate the complete diagram.",
+      );
     }),
   );
 });
