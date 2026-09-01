@@ -15,6 +15,10 @@ import {
 import { Schema } from "effect";
 
 import { DiagramGenerationPrompt } from "./messages.js";
+import {
+  GeneratedMindmapTree,
+  generatedMindmapTreeToDiagram,
+} from "./mindmap-tree.js";
 
 export const diagramGenerationProviderIds: readonly [
   "fixture",
@@ -163,16 +167,15 @@ export function parseGeneratedFlowchart(text: string): FlowchartDiagram {
 export function parseGeneratedDiagram(
   text: string,
 ): FlowchartDiagram | MindmapDiagram {
-  const input = withSketchiDiagramStyle(extractJsonObject(text));
-  if (
-    typeof input === "object" &&
-    input !== null &&
-    "type" in input &&
-    input.type === "mindmap"
-  ) {
-    return parseMindmapDiagram(input);
+  const extracted = extractJsonObject(text);
+  if (isUnknownRecord(extracted) && extracted["type"] === "mindmap") {
+    if ("root" in extracted) {
+      const nested = safeParseDiagramSchema(GeneratedMindmapTree, extracted);
+      if (nested.success) return generatedMindmapTreeToDiagram(nested.data);
+    }
+    return parseMindmapDiagram(withSketchiDiagramStyle(extracted));
   }
-  return parseFlowchartDiagram(input);
+  return parseFlowchartDiagram(withSketchiDiagramStyle(extracted));
 }
 
 interface CandidateParseFailure {
@@ -223,7 +226,7 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 function parseCandidateDiagram(text: string): CandidateParseResult {
   let extracted: unknown;
   try {
-    extracted = withSketchiDiagramStyle(extractJsonObject(text));
+    extracted = extractJsonObject(text);
   } catch (error) {
     const message =
       error instanceof Error
@@ -236,10 +239,31 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
     };
   }
 
-  const isMindmap =
-    isUnknownRecord(extracted) && extracted["type"] === "mindmap";
-  if (isMindmap) {
-    const decoded = safeParseDiagramSchema(MindmapDiagramSchema, extracted);
+  if (isUnknownRecord(extracted) && extracted["type"] === "mindmap") {
+    if ("root" in extracted) {
+      const decoded = safeParseDiagramSchema(GeneratedMindmapTree, extracted);
+      if (!decoded.success) {
+        const diagnostics = decoded.error.issues.map(schemaIssueDiagnostic);
+        return {
+          diagnostics,
+          error:
+            diagnostics[0] ?? "Generated mindmap schema validation failed.",
+          success: false,
+        };
+      }
+      try {
+        return {
+          diagram: generatedMindmapTreeToDiagram(decoded.data),
+          success: true,
+        };
+      } catch (error) {
+        return diagramValidationFailure(error);
+      }
+    }
+    const decoded = safeParseDiagramSchema(
+      MindmapDiagramSchema,
+      withSketchiDiagramStyle(extracted),
+    );
     if (!decoded.success) {
       const diagnostics = decoded.error.issues.map(schemaIssueDiagnostic);
       return {
@@ -255,7 +279,10 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
     }
   }
 
-  const decoded = safeParseDiagramSchema(FlowchartDiagramSchema, extracted);
+  const decoded = safeParseDiagramSchema(
+    FlowchartDiagramSchema,
+    withSketchiDiagramStyle(extracted),
+  );
   if (!decoded.success) {
     const diagnostics = decoded.error.issues.map(schemaIssueDiagnostic);
     return {

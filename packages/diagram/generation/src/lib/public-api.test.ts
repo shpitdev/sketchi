@@ -25,6 +25,10 @@ import {
   buildDiagramGenerationMessages,
   DiagramGenerationPrompt,
 } from "./messages.js";
+import {
+  GeneratedMindmapTree,
+  generatedMindmapTreeToDiagram,
+} from "./mindmap-tree.js";
 
 const prompt: DiagramGenerationPrompt = {
   id: "pharma-batch-disposition",
@@ -202,7 +206,10 @@ describe("diagram generation prompt mapping", () => {
     });
 
     expect(messages.system).toContain('Use type "mindmap".');
-    expect(messages.system).toContain("exactly one root node");
+    expect(messages.system).toContain("one nested root topic");
+    expect(messages.system).toContain("required top-level diagram id");
+    expect(messages.system).toContain("Do not return flat nodes");
+    expect(messages.system).toContain("derived topic/node/edge ids");
     expect(messages.system).toContain("2-4 children per major topic");
     expect(messages.system).toContain("2-3 levels of meaningful depth");
     expect(messages.user).toContain('"type":"mindmap"');
@@ -259,6 +266,20 @@ describe("diagram generation prompt mapping", () => {
 });
 
 describe("pure candidate behavior", () => {
+  it.effect.prop(
+    "derives a valid flat mindmap from every generated nested hierarchy",
+    { tree: GeneratedMindmapTree },
+    ({ tree }) =>
+      Effect.gen(function* () {
+        const diagram = generatedMindmapTreeToDiagram(tree);
+        const root = diagram.nodes.find((node) => node.kind === "root");
+
+        assert.strictEqual(root?.id, "topic-0");
+        assert.strictEqual(diagram.edges.length, diagram.nodes.length - 1);
+        assert.isTrue(diagram.nodes.length >= 2);
+      }),
+  );
+
   it("preserves explicit provider errors instead of replacing them with parse errors", () => {
     const candidate = candidateFromText({
       diagnostics: ["Google AI Studio Gateway request failed with HTTP 401."],
@@ -338,6 +359,43 @@ describe("pure candidate behavior", () => {
       backgroundColor: "#fffdf8",
     });
     expect(candidate.error).toBeUndefined();
+  });
+
+  it("derives deterministic graph metadata from nested mindmap output", () => {
+    const candidate = candidateFromText({
+      model: "fixture",
+      provider: "fixture",
+      text: JSON.stringify({
+        id: "launch-map",
+        layout: { direction: "LR", edgeRouting: "curved" },
+        root: {
+          children: [
+            {
+              children: [{ children: [], label: "Positioning" }],
+              label: "Product",
+            },
+            { children: [], label: "Go to market" },
+          ],
+          label: "Launch",
+        },
+        title: "Launch map",
+        type: "mindmap",
+      }),
+    });
+
+    expect(candidate.error).toBeUndefined();
+    expect(candidate.diagram?.nodes.map((node) => node.id)).toEqual([
+      "topic-0",
+      "topic-0-0",
+      "topic-0-0-0",
+      "topic-0-1",
+    ]);
+    expect(candidate.diagram?.edges[1]).toMatchObject({
+      id: "branch-0-0-0",
+      metadata: { depth: 2, siblingIndex: 0 },
+      source: "topic-0-0",
+      target: "topic-0-0-0",
+    });
   });
 
   it("captures every flowchart validator issue with its repair hint", () => {

@@ -56,13 +56,9 @@ const FLOWCHART_IR_INSTRUCTIONS = [
 const MINDMAP_IR_INSTRUCTIONS = [
   "Return only compact, minified JSON on one line. Do not use markdown.",
   'Use type "mindmap".',
-  'Every node must have id, label, kind ("root" or "topic"), and metadata with depth and siblingIndex.',
-  "Use exactly one root node at depth 0 with siblingIndex 0.",
-  "Every non-root node must have exactly one incoming edge from its immediate parent.",
-  "Every edge must have id, source, target, and metadata matching the child depth and siblingIndex.",
-  "Sibling indexes under each parent must be contiguous from 0.",
+  "Return one nested root topic with label and children. Every child topic must also have label and children; use an empty children array for a leaf.",
+  "Return the required top-level diagram id. Do not return flat nodes, edges, derived topic/node/edge ids, depth, sibling indexes, or parent references; Sketchi derives those deterministically from the hierarchy.",
   "Honor explicit depth and topic-count requirements. Unless the scenario is intentionally tiny, create 2-4 children per major topic and 2-3 levels of meaningful depth.",
-  "Edges must use existing node ids and the graph must be connected.",
   'Use layout { "direction": "LR", "edgeRouting": "curved" } unless the prompt says right-to-left.',
 ];
 
@@ -72,28 +68,10 @@ function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
       id: "short-kebab-case-id",
       title: prompt.title,
       type: "mindmap",
-      nodes: [
-        {
-          id: "topic-0",
-          label: "Root topic",
-          kind: "root",
-          metadata: { depth: 0, siblingIndex: 0 },
-        },
-        {
-          id: "topic-0-0",
-          label: "Child topic",
-          kind: "topic",
-          metadata: { depth: 1, siblingIndex: 0 },
-        },
-      ],
-      edges: [
-        {
-          id: "branch-0-0",
-          source: "topic-0",
-          target: "topic-0-0",
-          metadata: { depth: 1, siblingIndex: 0 },
-        },
-      ],
+      root: {
+        label: "Root topic",
+        children: [{ label: "Child topic", children: [] }],
+      },
       layout: { direction: "LR", edgeRouting: "curved" },
     });
   }
