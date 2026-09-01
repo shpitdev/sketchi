@@ -1,8 +1,4 @@
-import type {
-  IconManifest,
-  SketchiIcon,
-  SketchiIconViewBox,
-} from "./data.js";
+import type { IconManifest, SketchiIcon, SketchiIconViewBox } from "./data.js";
 
 interface SourceIcon {
   readonly baseSlug?: string;
@@ -40,6 +36,17 @@ export const COLLISION_CANONICAL_COLLECTIONS: Readonly<Record<string, string>> =
   };
 
 const ALIASES_BY_BASE_SLUG: Readonly<Record<string, readonly string[]>> = {
+  "ontology-objecttype-app": [
+    "object type",
+    "object types",
+    "ontology",
+    "ontology manager",
+  ],
+  "palantir-ontology": ["ontology manager", "palantir ontology"],
+  "palantir-pipeline": ["palantir pipeline", "pipeline"],
+  "palantir-workshop": ["palantir workshop"],
+  "pipeline-builder-graph-app": ["pipeline", "pipeline builder"],
+  "workshop-module-app": ["workshop", "workshop module"],
   aws: ["amazon web services"],
   googlecloud: ["gcp", "google cloud"],
   kubernetes: ["k8s", "kube"],
@@ -63,11 +70,16 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
   digitalocean: "DigitalOcean",
   githubcopilot: "GitHub Copilot",
   googlecloud: "Google Cloud",
+  "hyperauto-app": "HyperAuto App",
   kubernetes: "Kubernetes",
   lmstudio: "LM Studio",
   nextjs: "Next.js",
   nodejs: "Node.js",
   openai: "OpenAI",
+  "ontology-objecttype-app": "Ontology Object Type App",
+  "palantir-ontology": "Ontology",
+  "palantir-pipeline": "Pipeline Builder",
+  "palantir-workshop": "Workshop",
   postgresql: "PostgreSQL",
   reactnative: "React Native",
   tailwindcss: "Tailwind CSS",
@@ -80,6 +92,7 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 
 const UPPERCASE_WORDS = new Set([
   "ai",
+  "aip",
   "api",
   "aws",
   "cdn",
@@ -102,6 +115,7 @@ const UPPERCASE_WORDS = new Set([
   "os",
   "php",
   "sdk",
+  "sddi",
   "sql",
   "ssh",
   "svg",

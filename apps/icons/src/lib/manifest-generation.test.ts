@@ -20,6 +20,38 @@ function sourceIcon(slug: string, collection: string) {
   };
 }
 
+interface ReviewGroup {
+  readonly distinctBaseSlugs: readonly string[];
+  readonly groupKey?: string;
+  readonly key?: string;
+  readonly rasterHash?: string;
+  readonly visualHash?: string;
+}
+
+interface ReviewIcon {
+  readonly baseSlug: string;
+  readonly flags: readonly string[];
+  readonly nearSimilarityGroupKey: string | null;
+  readonly perceptualHash: string;
+  readonly rasterHash: string;
+  readonly similarityGroupKey: string | null;
+  readonly slug: string;
+  readonly visualHash: string;
+}
+
+interface ReviewData {
+  readonly icons: readonly ReviewIcon[];
+  readonly nearSimilarityGroups: readonly ReviewGroup[];
+  readonly rasterDuplicateGroups: readonly ReviewGroup[];
+  readonly summary: {
+    readonly flagCounts: Readonly<Record<string, number>>;
+    readonly nearSimilarityGroupsCount: number;
+    readonly rasterDuplicateGroupsCount: number;
+    readonly visualDuplicateGroupsCount: number;
+  };
+  readonly visualDuplicateGroups: readonly ReviewGroup[];
+}
+
 describe("public icon manifest generation", () => {
   it("keeps an explicit canonical collision slug and qualifies alternates", () => {
     const catalog = buildIconCatalog({
@@ -142,6 +174,106 @@ describe("public icon manifest generation", () => {
       aliases: ["Claude Code"],
       name: "Claude Code Wordmark",
     });
+  });
+
+  it("uses product names and search aliases for Palantir icons", () => {
+    const catalog = buildIconCatalog({
+      icons: [
+        sourceIcon("aip-autopilot-app", "palantir"),
+        sourceIcon("ontology-objecttype-app", "palantir"),
+        sourceIcon("palantir-ontology", "palantir"),
+        sourceIcon("palantir-pipeline", "palantir"),
+        sourceIcon("palantir-workshop", "palantir"),
+        sourceIcon("pipeline-builder-graph-app", "palantir"),
+        sourceIcon("sddi-app", "palantir"),
+        sourceIcon("workshop-module-app", "palantir"),
+      ],
+    });
+
+    expect(
+      Object.fromEntries(
+        catalog.manifest.icons.map(({ name, slug }) => [slug, name]),
+      ),
+    ).toMatchObject({
+      "aip-autopilot-app": "AIP Autopilot App",
+      "ontology-objecttype-app": "Ontology Object Type App",
+      "palantir-ontology": "Ontology",
+      "palantir-pipeline": "Pipeline Builder",
+      "palantir-workshop": "Workshop",
+      "sddi-app": "SDDI App",
+    });
+    expect(
+      searchIcons(catalog.manifest.icons, { query: "ontology" })[0]?.icon.slug,
+    ).toBe("palantir-ontology");
+    expect(
+      searchIcons(catalog.manifest.icons, { query: "pipeline builder" })[0]
+        ?.icon.slug,
+    ).toBe("palantir-pipeline");
+    expect(
+      searchIcons(catalog.manifest.icons, { query: "workshop" })[0]?.icon.slug,
+    ).toBe("palantir-workshop");
+  });
+
+  it("accounts for promoted Palantir glyph pairs in review aggregates", () => {
+    const path = resolve(
+      process.cwd(),
+      "apps/icons/pipeline-output/review/review-data.json",
+    );
+    const review = JSON.parse(readFileSync(path, "utf8")) as ReviewData;
+    const flagCounts = review.icons
+      .flatMap(({ flags }) => flags)
+      .reduce<Record<string, number>>((counts, flag) => {
+        counts[flag] = (counts[flag] ?? 0) + 1;
+        return counts;
+      }, {});
+
+    expect(review.summary.flagCounts).toEqual(flagCounts);
+    expect(review.summary.visualDuplicateGroupsCount).toBe(
+      review.visualDuplicateGroups.length,
+    );
+    expect(review.summary.rasterDuplicateGroupsCount).toBe(
+      review.rasterDuplicateGroups.length,
+    );
+    expect(review.summary.nearSimilarityGroupsCount).toBe(
+      review.nearSimilarityGroups.length,
+    );
+
+    const pairs = [
+      ["ontology-objecttype-app", "palantir-ontology"],
+      ["pipeline-builder-graph-app", "palantir-pipeline"],
+      ["workshop-module-app", "palantir-workshop"],
+    ] as const;
+    for (const [sourceSlug, canonicalSlug] of pairs) {
+      const source = review.icons.find(({ slug }) => slug === sourceSlug);
+      const canonical = review.icons.find(({ slug }) => slug === canonicalSlug);
+      expect(source).toBeDefined();
+      expect(canonical).toBeDefined();
+      if (!source || !canonical) continue;
+
+      expect(canonical).toMatchObject({
+        flags: ["duplicate-raster", "duplicate-raster-cross-name"],
+        nearSimilarityGroupKey: source.nearSimilarityGroupKey,
+        perceptualHash: source.perceptualHash,
+        rasterHash: source.rasterHash,
+        similarityGroupKey: source.similarityGroupKey,
+        visualHash: source.visualHash,
+      });
+      expect(
+        review.visualDuplicateGroups.find(
+          ({ visualHash }) => visualHash === source.visualHash,
+        )?.distinctBaseSlugs,
+      ).toEqual(expect.arrayContaining([source.baseSlug, canonical.baseSlug]));
+      expect(
+        review.rasterDuplicateGroups.find(
+          ({ groupKey }) => groupKey === source.similarityGroupKey,
+        )?.distinctBaseSlugs,
+      ).toEqual(expect.arrayContaining([source.baseSlug, canonical.baseSlug]));
+      expect(
+        review.nearSimilarityGroups.find(
+          ({ key }) => key === source.nearSimilarityGroupKey,
+        )?.distinctBaseSlugs,
+      ).toEqual(expect.arrayContaining([source.baseSlug, canonical.baseSlug]));
+    }
   });
 
   it("ships a compact clean manifest with aliases and no review fields", () => {

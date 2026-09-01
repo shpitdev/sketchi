@@ -34,19 +34,19 @@
       "social-communication": 1
     },
     "flagCounts": {
-      "duplicate-raster": 20,
-      "duplicate-raster-cross-name": 20
+      "duplicate-raster": 26,
+      "duplicate-raster-cross-name": 26
     },
     "duplicateGroupsCount": 0,
     "duplicateCrossNameGroupsCount": 0,
-    "visualDuplicateGroupsCount": 0,
-    "visualDuplicateCrossNameGroupsCount": 0,
-    "rasterDuplicateGroupsCount": 12,
-    "rasterDuplicateCrossNameGroupsCount": 12,
-    "nearSimilarityGroupsCount": 24,
-    "nearSimilarityCrossNameGroupsCount": 24,
-    "similarityGroupsCount": 24,
-    "similarityCrossNameGroupsCount": 24
+    "visualDuplicateGroupsCount": 3,
+    "visualDuplicateCrossNameGroupsCount": 3,
+    "rasterDuplicateGroupsCount": 15,
+    "rasterDuplicateCrossNameGroupsCount": 15,
+    "nearSimilarityGroupsCount": 27,
+    "nearSimilarityCrossNameGroupsCount": 27,
+    "similarityGroupsCount": 27,
+    "similarityCrossNameGroupsCount": 27
   },
   "icons": [
     {
@@ -43308,10 +43308,10 @@
       "visualHash": "065be251937eb0e78e62e66b4723f4f6e95ed4b3",
       "rasterHash": "8d7c46a84204b1e0e63a3e5ee6ef7f8a7dd55401",
       "perceptualHash": "008003e00ff03ffc1ff867e7718f7c3f7e7f7f7f7f7f7f7f7f7e1f7807600000",
-      "similarityGroupKey": null,
-      "similarityGroupSize": 1,
-      "nearSimilarityGroupKey": null,
-      "nearSimilarityGroupSize": 1,
+      "similarityGroupKey": "palantir:neutral:8d7c46a84204b1e0e63a3e5ee6ef7f8a7dd55401",
+      "similarityGroupSize": 2,
+      "nearSimilarityGroupKey": "palantir:neutral:008003e00ff03ffc1ff867e7718f7c3f7e7f7f7f7f7f7f7f7f7e1f7807600000",
+      "nearSimilarityGroupSize": 2,
       "hasViewBox": true,
       "viewBox": {
         "minX": 0,
@@ -43324,7 +43324,10 @@
       "rasterFillRatio": 0.875,
       "rasterAreaRatio": 0.73828125,
       "rasterAspectRatio": 0.9642857142857143,
-      "flags": []
+      "flags": [
+        "duplicate-raster",
+        "duplicate-raster-cross-name"
+      ]
     },
     {
       "id": "palantir:palantir",
@@ -43367,15 +43370,15 @@
       "variant": null,
       "relativePath": "output/upload-ready/svg/palantir/palantir-ontology.svg",
       "urlPath": "/output/upload-ready/svg/palantir/palantir-ontology.svg",
-      "bytes": 261,
-      "hash": "79f06949241b7e2d6f2a391c36f0e28b5a6cbdef",
-      "visualHash": "93a6f6dda79ec07880db1483e4562c8296dbcc5b",
-      "rasterHash": "fbd5a063ed613f7f0f2615390a90352a67f2ad79",
-      "perceptualHash": "03c00ff8381c300e60064003c183c3c3c3c3c1c340036006700e381c1ff807e0",
-      "similarityGroupKey": null,
-      "similarityGroupSize": 1,
-      "nearSimilarityGroupKey": null,
-      "nearSimilarityGroupSize": 1,
+      "bytes": 1149,
+      "hash": "ac547583512cc9be99767c2dbe2648199832d214",
+      "visualHash": "065be251937eb0e78e62e66b4723f4f6e95ed4b3",
+      "rasterHash": "8d7c46a84204b1e0e63a3e5ee6ef7f8a7dd55401",
+      "perceptualHash": "008003e00ff03ffc1ff867e7718f7c3f7e7f7f7f7f7f7f7f7f7e1f7807600000",
+      "similarityGroupKey": "palantir:neutral:8d7c46a84204b1e0e63a3e5ee6ef7f8a7dd55401",
+      "similarityGroupSize": 2,
+      "nearSimilarityGroupKey": "palantir:neutral:008003e00ff03ffc1ff867e7718f7c3f7e7f7f7f7f7f7f7f7f7e1f7807600000",
+      "nearSimilarityGroupSize": 2,
       "hasViewBox": true,
       "viewBox": {
         "minX": 0,
@@ -43385,10 +43388,13 @@
       },
       "widthAttr": null,
       "heightAttr": null,
-      "rasterFillRatio": 0.90625,
-      "rasterAreaRatio": 0.8212890625,
-      "rasterAspectRatio": 1,
-      "flags": []
+      "rasterFillRatio": 0.875,
+      "rasterAreaRatio": 0.73828125,
+      "rasterAspectRatio": 0.9642857142857143,
+      "flags": [
+        "duplicate-raster",
+        "duplicate-raster-cross-name"
+      ]
     },
     {
       "id": "palantir:palantir-pipeline",
@@ -43399,15 +43405,15 @@
       "variant": null,
       "relativePath": "output/upload-ready/svg/palantir/palantir-pipeline.svg",
       "urlPath": "/output/upload-ready/svg/palantir/palantir-pipeline.svg",
-      "bytes": 346,
-      "hash": "e6867aa09cfc3d8fb4631249ef8384bc62970828",
-      "visualHash": "98c08caa38d64646e4128c7fa951dd8f98de1d61",
-      "rasterHash": "ea7086f7a4163e16f37af4d8d56ac0aa1d29421d",
-      "perceptualHash": "00000000ffffffff7ffe00000000ffffffff000000007ffeffffffff00000000",
-      "similarityGroupKey": null,
-      "similarityGroupSize": 1,
-      "nearSimilarityGroupKey": null,
-      "nearSimilarityGroupSize": 1,
+      "bytes": 1285,
+      "hash": "428555c2c7cf738b1a64551047aa1c755ffab5b5",
+      "visualHash": "8aaae2ba5ae4520578d318d66f0e59564bdc102f",
+      "rasterHash": "f2c3eb9233d7913ecc87c6d5194ece124ce41c8d",
+      "perceptualHash": "6000ff80ffc0ffc001c001c001c701ff01ff01ff01c001c0efc0ffc0ff806000",
+      "similarityGroupKey": "palantir:neutral:f2c3eb9233d7913ecc87c6d5194ece124ce41c8d",
+      "similarityGroupSize": 2,
+      "nearSimilarityGroupKey": "palantir:neutral:6000ff80ffc0ffc001c001c001c701ff01ff01ff01c001c0efc0ffc0ff806000",
+      "nearSimilarityGroupSize": 2,
       "hasViewBox": true,
       "viewBox": {
         "minX": 0,
@@ -43420,7 +43426,10 @@
       "rasterFillRatio": 0.90625,
       "rasterAreaRatio": 0.6513671875,
       "rasterAspectRatio": 1.2608695652173914,
-      "flags": []
+      "flags": [
+        "duplicate-raster",
+        "duplicate-raster-cross-name"
+      ]
     },
     {
       "id": "palantir:palantir-workshop",
@@ -43431,15 +43440,15 @@
       "variant": null,
       "relativePath": "output/upload-ready/svg/palantir/palantir-workshop.svg",
       "urlPath": "/output/upload-ready/svg/palantir/palantir-workshop.svg",
-      "bytes": 194,
-      "hash": "cdd484d2f868b3ff77ad0d1ca1d20e49d6c9bc24",
-      "visualHash": "7b3cd1985fc38633989b1723906e482d2aad4ec7",
-      "rasterHash": "88f68d91492810761bcfcf15054833f0a7d33a6b",
-      "perceptualHash": "00000080018001c003c007e007e00ff00ff81ff81ffc3ffc7ffe7ffeffff0000",
-      "similarityGroupKey": null,
-      "similarityGroupSize": 1,
-      "nearSimilarityGroupKey": null,
-      "nearSimilarityGroupSize": 1,
+      "bytes": 3130,
+      "hash": "a159c05ca052ea5c702351cae15633a0e7e983fe",
+      "visualHash": "6608c5a35badb8c0860a9512e43b99ae2ee2e345",
+      "rasterHash": "d0bcc45ff901fdece5445d1550aca24cfc6f51cd",
+      "perceptualHash": "00007ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe01800ff80000",
+      "similarityGroupKey": "palantir:neutral:d0bcc45ff901fdece5445d1550aca24cfc6f51cd",
+      "similarityGroupSize": 2,
+      "nearSimilarityGroupKey": "palantir:neutral:00007ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe01800ff80000",
+      "nearSimilarityGroupSize": 2,
       "hasViewBox": true,
       "viewBox": {
         "minX": 0,
@@ -43449,10 +43458,13 @@
       },
       "widthAttr": null,
       "heightAttr": null,
-      "rasterFillRatio": 0.875,
-      "rasterAreaRatio": 0.7109375,
-      "rasterAspectRatio": 1.0769230769230769,
-      "flags": []
+      "rasterFillRatio": 0.90625,
+      "rasterAreaRatio": 0.8212890625,
+      "rasterAspectRatio": 1,
+      "flags": [
+        "duplicate-raster",
+        "duplicate-raster-cross-name"
+      ]
     },
     {
       "id": "palantir:pipeline-builder-graph-app",
@@ -43468,10 +43480,10 @@
       "visualHash": "8aaae2ba5ae4520578d318d66f0e59564bdc102f",
       "rasterHash": "f2c3eb9233d7913ecc87c6d5194ece124ce41c8d",
       "perceptualHash": "6000ff80ffc0ffc001c001c001c701ff01ff01ff01c001c0efc0ffc0ff806000",
-      "similarityGroupKey": null,
-      "similarityGroupSize": 1,
-      "nearSimilarityGroupKey": null,
-      "nearSimilarityGroupSize": 1,
+      "similarityGroupKey": "palantir:neutral:f2c3eb9233d7913ecc87c6d5194ece124ce41c8d",
+      "similarityGroupSize": 2,
+      "nearSimilarityGroupKey": "palantir:neutral:6000ff80ffc0ffc001c001c001c701ff01ff01ff01c001c0efc0ffc0ff806000",
+      "nearSimilarityGroupSize": 2,
       "hasViewBox": true,
       "viewBox": {
         "minX": 0,
@@ -43484,7 +43496,10 @@
       "rasterFillRatio": 0.90625,
       "rasterAreaRatio": 0.8212890625,
       "rasterAspectRatio": 1,
-      "flags": []
+      "flags": [
+        "duplicate-raster",
+        "duplicate-raster-cross-name"
+      ]
     },
     {
       "id": "palantir:preparation-app",
@@ -44085,10 +44100,10 @@
       "visualHash": "6608c5a35badb8c0860a9512e43b99ae2ee2e345",
       "rasterHash": "d0bcc45ff901fdece5445d1550aca24cfc6f51cd",
       "perceptualHash": "00007ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe01800ff80000",
-      "similarityGroupKey": null,
-      "similarityGroupSize": 1,
-      "nearSimilarityGroupKey": null,
-      "nearSimilarityGroupSize": 1,
+      "similarityGroupKey": "palantir:neutral:d0bcc45ff901fdece5445d1550aca24cfc6f51cd",
+      "similarityGroupSize": 2,
+      "nearSimilarityGroupKey": "palantir:neutral:00007ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe01800ff80000",
+      "nearSimilarityGroupSize": 2,
       "hasViewBox": true,
       "viewBox": {
         "minX": 0,
@@ -44101,7 +44116,10 @@
       "rasterFillRatio": 0.90625,
       "rasterAreaRatio": 0.8212890625,
       "rasterAspectRatio": 1,
-      "flags": []
+      "flags": [
+        "duplicate-raster",
+        "duplicate-raster-cross-name"
+      ]
     },
     {
       "id": "programming-languages:c-plus-plus",
@@ -45295,7 +45313,56 @@
     }
   ],
   "duplicateGroups": [],
-  "visualDuplicateGroups": [],
+  "visualDuplicateGroups": [
+    {
+      "groupKey": "palantir:neutral:065be251937eb0e78e62e66b4723f4f6e95ed4b3",
+      "visualHash": "065be251937eb0e78e62e66b4723f4f6e95ed4b3",
+      "size": 2,
+      "distinctBaseSlugs": [
+        "ontology-objecttype-app",
+        "palantir-ontology"
+      ],
+      "distinctCollections": [
+        "palantir"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/palantir/ontology-objecttype-app.svg",
+        "output/upload-ready/svg/palantir/palantir-ontology.svg"
+      ]
+    },
+    {
+      "groupKey": "palantir:neutral:6608c5a35badb8c0860a9512e43b99ae2ee2e345",
+      "visualHash": "6608c5a35badb8c0860a9512e43b99ae2ee2e345",
+      "size": 2,
+      "distinctBaseSlugs": [
+        "palantir-workshop",
+        "workshop-module-app"
+      ],
+      "distinctCollections": [
+        "palantir"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/palantir/palantir-workshop.svg",
+        "output/upload-ready/svg/palantir/workshop-module-app.svg"
+      ]
+    },
+    {
+      "groupKey": "palantir:neutral:8aaae2ba5ae4520578d318d66f0e59564bdc102f",
+      "visualHash": "8aaae2ba5ae4520578d318d66f0e59564bdc102f",
+      "size": 2,
+      "distinctBaseSlugs": [
+        "palantir-pipeline",
+        "pipeline-builder-graph-app"
+      ],
+      "distinctCollections": [
+        "palantir"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/palantir/palantir-pipeline.svg",
+        "output/upload-ready/svg/palantir/pipeline-builder-graph-app.svg"
+      ]
+    }
+  ],
   "rasterDuplicateGroups": [
     {
       "groupKey": "developer-clients:neutral:98fa9edc0fc8e5555b4a90a660e4206bd50e4a0b",
@@ -45493,6 +45560,54 @@
       "samplePaths": [
         "output/upload-ready/svg/gcp-legacy/dialogflow-cx.svg",
         "output/upload-ready/svg/gcp-legacy/dialogflow-insights.svg"
+      ]
+    },
+    {
+      "groupKey": "palantir:neutral:8d7c46a84204b1e0e63a3e5ee6ef7f8a7dd55401",
+      "rasterHash": "8d7c46a84204b1e0e63a3e5ee6ef7f8a7dd55401",
+      "size": 2,
+      "distinctBaseSlugs": [
+        "ontology-objecttype-app",
+        "palantir-ontology"
+      ],
+      "distinctCollections": [
+        "palantir"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/palantir/ontology-objecttype-app.svg",
+        "output/upload-ready/svg/palantir/palantir-ontology.svg"
+      ]
+    },
+    {
+      "groupKey": "palantir:neutral:d0bcc45ff901fdece5445d1550aca24cfc6f51cd",
+      "rasterHash": "d0bcc45ff901fdece5445d1550aca24cfc6f51cd",
+      "size": 2,
+      "distinctBaseSlugs": [
+        "palantir-workshop",
+        "workshop-module-app"
+      ],
+      "distinctCollections": [
+        "palantir"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/palantir/palantir-workshop.svg",
+        "output/upload-ready/svg/palantir/workshop-module-app.svg"
+      ]
+    },
+    {
+      "groupKey": "palantir:neutral:f2c3eb9233d7913ecc87c6d5194ece124ce41c8d",
+      "rasterHash": "f2c3eb9233d7913ecc87c6d5194ece124ce41c8d",
+      "size": 2,
+      "distinctBaseSlugs": [
+        "palantir-pipeline",
+        "pipeline-builder-graph-app"
+      ],
+      "distinctCollections": [
+        "palantir"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/palantir/palantir-pipeline.svg",
+        "output/upload-ready/svg/palantir/pipeline-builder-graph-app.svg"
       ]
     },
     {
@@ -45895,6 +46010,54 @@
       "samplePaths": [
         "output/upload-ready/svg/palantir/foundry-rules-app.svg",
         "output/upload-ready/svg/palantir/modeling-objective-app.svg"
+      ]
+    },
+    {
+      "key": "palantir:neutral:00007ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe7ffe01800ff80000",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "palantir-workshop",
+        "workshop-module-app"
+      ],
+      "distinctCollections": [
+        "palantir"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/palantir/palantir-workshop.svg",
+        "output/upload-ready/svg/palantir/workshop-module-app.svg"
+      ]
+    },
+    {
+      "key": "palantir:neutral:008003e00ff03ffc1ff867e7718f7c3f7e7f7f7f7f7f7f7f7f7e1f7807600000",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "ontology-objecttype-app",
+        "palantir-ontology"
+      ],
+      "distinctCollections": [
+        "palantir"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/palantir/ontology-objecttype-app.svg",
+        "output/upload-ready/svg/palantir/palantir-ontology.svg"
+      ]
+    },
+    {
+      "key": "palantir:neutral:6000ff80ffc0ffc001c001c001c701ff01ff01ff01c001c0efc0ffc0ff806000",
+      "size": 2,
+      "maxHammingDistance": 0,
+      "distinctBaseSlugs": [
+        "palantir-pipeline",
+        "pipeline-builder-graph-app"
+      ],
+      "distinctCollections": [
+        "palantir"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/palantir/palantir-pipeline.svg",
+        "output/upload-ready/svg/palantir/pipeline-builder-graph-app.svg"
       ]
     },
     {
