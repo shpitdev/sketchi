@@ -73,6 +73,7 @@ interface GenerateSuccess {
 type GenerateResult = GenerateSuccess | GenerateFailure;
 
 const GenerateRequestSchema = Schema.Struct({
+  cacheMode: Schema.optional(Schema.Literals(["default", "fresh"])),
   prompt: Schema.String,
   type: Schema.optional(Schema.Literals(["flowchart", "mindmap"])),
   model: Schema.optional(Schema.String),
@@ -381,13 +382,15 @@ export const handleGenerateDiagramRequest = Effect.fn(
     );
   }
   const type: DiagramGenerationType = input.type ?? "flowchart";
+  const generationInput = {
+    ...(input.cacheMode ? { cacheMode: input.cacheMode } : {}),
+    prompt,
+    type,
+    ...(input.model ? { model: input.model } : {}),
+  };
 
   const candidateResult = yield* withTelemetryCorrelation(
-    generation.generate({
-      prompt,
-      type,
-      ...(input.model ? { model: input.model } : {}),
-    }),
+    generation.generate(generationInput),
     { attemptId: usageContext.attemptId, runId: usageContext.runId },
   ).pipe(
     Effect.match({
@@ -397,7 +400,7 @@ export const handleGenerateDiagramRequest = Effect.fn(
   );
   if (!candidateResult.ok) {
     return yield* finish(
-      { prompt, type, ...(input.model ? { model: input.model } : {}) },
+      generationInput,
       generationErrorFailure(candidateResult.error),
     );
   }
@@ -405,7 +408,7 @@ export const handleGenerateDiagramRequest = Effect.fn(
   const malformed = malformedCandidateFailure(candidate);
   if (malformed || !candidate.diagram) {
     return yield* finish(
-      { prompt, type, ...(input.model ? { model: input.model } : {}) },
+      generationInput,
       malformed ??
         failure("malformed_output", [
           issue(
@@ -419,7 +422,7 @@ export const handleGenerateDiagramRequest = Effect.fn(
   }
   if (candidate.diagram.type !== type) {
     return yield* finish(
-      { prompt, type, ...(input.model ? { model: input.model } : {}) },
+      generationInput,
       failure("invalid_generated_document", [
         issue(
           "invalid_generated_document",

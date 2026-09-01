@@ -1,4 +1,7 @@
-import type { CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
+import type {
+  CloudflareAiGateway,
+  CloudflareAiGatewayProvider,
+} from "@sketchi/diagram-generation";
 import { describe, expect, it } from "vitest";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
@@ -29,18 +32,23 @@ const flowchartIr = {
   style: { accentColor: "#0f766e", backgroundColor: "#ffffff" },
 };
 
-function fakeAiGateway(text: string): CloudflareAiGatewayProvider {
+function fakeAiGateway(
+  text: string,
+  observeRun?: (input: Parameters<CloudflareAiGateway["run"]>[0]) => void,
+): CloudflareAiGatewayProvider {
   return {
     gateway: () => ({
-      run: () =>
-        Promise.resolve(
+      run: (input) => {
+        observeRun?.(input);
+        return Promise.resolve(
           new Response(
             JSON.stringify({
               candidates: [{ content: { parts: [{ text }] } }],
             }),
             { status: 200, headers: { "content-type": "application/json" } },
           ),
-        ),
+        );
+      },
       getUrl: () => Promise.resolve("https://gateway.invalid"),
     }),
   };
@@ -92,6 +100,32 @@ describe("public generate endpoint", () => {
     expect(diagram.excalidraw).toBeTruthy();
     const generation = body.generation as { provider: string };
     expect(generation.provider).toBe("cloudflare-google-ai-studio");
+  });
+
+  it("requests fresh provider output for reliability probes", async () => {
+    const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];
+    const env: StudioEnv = {
+      AI: fakeAiGateway(JSON.stringify(flowchartIr), (input) => {
+        observedRuns.push(input);
+      }),
+    };
+    const response = await generateRequest(env, {
+      cacheMode: "fresh",
+      prompt: "Map release approval with pass and revise branches",
+      type: "flowchart",
+    });
+
+    expect(response.status).toBe(200);
+    expect(observedRuns).toHaveLength(1);
+    expect(observedRuns[0]).toEqual(
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "Cache-Control": "no-store",
+          "cf-aig-skip-cache": "true",
+          Pragma: "no-cache",
+        }),
+      }),
+    );
   });
 
   it("rejects an empty prompt with a typed invalid-input contract", async () => {

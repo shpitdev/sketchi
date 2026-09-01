@@ -1,13 +1,11 @@
 import "@tanstack/react-start/server-only";
 
-import type {
-  FlowchartDiagram,
-  MindmapDiagram,
-} from "@sketchi/diagram-core";
+import type { FlowchartDiagram, MindmapDiagram } from "@sketchi/diagram-core";
 import {
   CloudflareAiGatewayBinding,
   CloudflareGoogleAiStudioClientLive,
   CloudflareGoogleAiStudioConfig,
+  type DiagramGenerationCacheMode,
   DiagramGenerationClient,
   DiagramGenerationConfigurationError,
   type DiagramGenerationCandidate,
@@ -25,6 +23,7 @@ const DEFAULT_GATEWAY_ID = "google-ai-studio";
 const DEFAULT_MODEL = "google/gemini-3.1-flash-lite";
 
 export interface GenerateDiagramServiceInput {
+  readonly cacheMode?: DiagramGenerationCacheMode;
   readonly model?: string;
   readonly prompt: string;
   readonly type: DiagramGenerationType;
@@ -33,7 +32,11 @@ export interface GenerateDiagramServiceInput {
 export interface PlaygroundGenerationShape {
   readonly generate: (
     input: GenerateDiagramServiceInput,
-  ) => Effect.Effect<DiagramGenerationCandidate, DiagramGenerationError, PlaygroundBindings>;
+  ) => Effect.Effect<
+    DiagramGenerationCandidate,
+    DiagramGenerationError,
+    PlaygroundBindings
+  >;
   readonly defaultModel: (env: StudioEnv) => string;
 }
 
@@ -154,6 +157,7 @@ export const PlaygroundGenerationLive = Layer.succeed(PlaygroundGeneration, {
     );
 
     const request = {
+      ...(input.cacheMode ? { cacheMode: input.cacheMode } : {}),
       model,
       prompt: {
         id: "sketchi-generate",

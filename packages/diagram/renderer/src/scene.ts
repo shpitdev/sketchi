@@ -1469,10 +1469,37 @@ function exteriorLaneRoute(
   const rightLaneX = maxX + HORIZONTAL_GAP / 2 + laneOffset;
   const upperLaneY = minY - VERTICAL_GAP / 2 - laneOffset;
   const lowerLaneY = maxY + VERTICAL_GAP / 2 + laneOffset;
+  const localLaneOffset = ((route.index % 4) * PORT_SPACING) / 2;
+  const localLeftLaneX =
+    Math.min(route.source.x, route.target.x) -
+    HORIZONTAL_GAP / 2 -
+    localLaneOffset;
+  const localRightLaneX =
+    Math.max(
+      route.source.x + route.source.width,
+      route.target.x + route.target.width,
+    ) +
+    HORIZONTAL_GAP / 2 +
+    localLaneOffset;
+  const localUpperLaneY =
+    Math.min(route.source.y, route.target.y) -
+    VERTICAL_GAP / 2 -
+    localLaneOffset;
+  const localLowerLaneY =
+    Math.max(
+      route.source.y + route.source.height,
+      route.target.y + route.target.height,
+    ) +
+    VERTICAL_GAP / 2 +
+    localLaneOffset;
   const preferredX = useLeftLane ? leftLaneX : rightLaneX;
   const alternateX = useLeftLane ? rightLaneX : leftLaneX;
   const preferredY = useUpperLane ? upperLaneY : lowerLaneY;
   const alternateY = useUpperLane ? lowerLaneY : upperLaneY;
+  const preferredLocalX = useLeftLane ? localLeftLaneX : localRightLaneX;
+  const alternateLocalX = useLeftLane ? localRightLaneX : localLeftLaneX;
+  const preferredLocalY = useUpperLane ? localUpperLaneY : localLowerLaneY;
+  const alternateLocalY = useUpperLane ? localLowerLaneY : localUpperLaneY;
   const localStubDistance =
     ROUTE_STUB_LENGTH + (route.index % 4) * PORT_SPACING;
   const stubDistances = [0, localStubDistance];
@@ -1516,6 +1543,18 @@ function exteriorLaneRoute(
   };
   const horizontalCandidates = [
     ...stubDistances.map((stubDistance) =>
+      routeForHorizontalLane(preferredLocalY, stubDistance),
+    ),
+    ...stubDistances.map((stubDistance) =>
+      routeForHorizontalLane(alternateLocalY, stubDistance),
+    ),
+    ...stubDistances.map((stubDistance) =>
+      routeForVerticalLane(preferredLocalX, stubDistance),
+    ),
+    ...stubDistances.map((stubDistance) =>
+      routeForVerticalLane(alternateLocalX, stubDistance),
+    ),
+    ...stubDistances.map((stubDistance) =>
       routeForHorizontalLane(preferredY, stubDistance),
     ),
     ...stubDistances.map((stubDistance) =>
@@ -1529,6 +1568,18 @@ function exteriorLaneRoute(
     ),
   ];
   const verticalCandidates = [
+    ...stubDistances.map((stubDistance) =>
+      routeForVerticalLane(preferredLocalX, stubDistance),
+    ),
+    ...stubDistances.map((stubDistance) =>
+      routeForVerticalLane(alternateLocalX, stubDistance),
+    ),
+    ...stubDistances.map((stubDistance) =>
+      routeForHorizontalLane(preferredLocalY, stubDistance),
+    ),
+    ...stubDistances.map((stubDistance) =>
+      routeForHorizontalLane(alternateLocalY, stubDistance),
+    ),
     ...stubDistances.map((stubDistance) =>
       routeForVerticalLane(preferredX, stubDistance),
     ),

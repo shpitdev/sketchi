@@ -106,6 +106,7 @@ const approvedRuntimeBoundaryFiles = [
   "packages/diagram/scenarios/src/cli.ts",
   "packages/diagram/scenarios/src/live-generator.ts",
   "scripts/pipelines/r2-catalog-smoke.mjs",
+  "tools/generation-reliability-probe.ts",
   "tools/harness-eval.ts",
 ];
 const approvedManagedPromiseSiteCounts: Record<string, number> = {
@@ -189,6 +190,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
   "packages/studio/projects/src/server/bucket.ts": 23,
   "packages/studio/projects/src/server/http.ts": 2,
   "scripts/pipelines/r2-catalog-smoke.mjs": 10,
+  "tools/generation-reliability-probe.ts": 4,
   "tools/harness-eval.ts": 8,
   "tools/sketchi-generators/src/generators/diagram-type/diagram-type.spec.ts": 6,
   "tools/sketchi-generators/src/generators/diagram-type/diagram-type.ts": 3,

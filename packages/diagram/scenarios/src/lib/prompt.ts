@@ -7,21 +7,34 @@ import {
 } from "@sketchi/diagram-generation";
 
 import type { DiagramScenario } from "./scenarios.js";
+import type { GenerationReliabilityScenario } from "./generation-reliability.js";
+
+type GenerationPromptScenario = DiagramScenario | GenerationReliabilityScenario;
 
 export type ScenarioPromptRole = DiagramGenerationRole;
 export type ScenarioPromptMessage = DiagramGenerationMessage;
 export type ScenarioPromptParts = DiagramGenerationMessages;
 
 export function toDiagramGenerationPrompt(
-  scenario: DiagramScenario,
+  scenario: GenerationPromptScenario,
 ): DiagramGenerationPrompt {
+  const requiredBranchLabels =
+    scenario.diagramType === "flowchart" &&
+    "requiredBranchLabels" in scenario.assertions
+      ? scenario.assertions.requiredBranchLabels
+      : [];
+  const requiredNodeLabels =
+    scenario.diagramType === "flowchart" &&
+    "requiredNodeLabels" in scenario.assertions
+      ? scenario.assertions.requiredNodeLabels
+      : [];
   return {
     id: scenario.id,
     request: scenario.prompt,
-    requiredBranchLabels: scenario.assertions.requiredBranchLabels,
-    requiredNodeLabels: scenario.assertions.requiredNodeLabels,
+    requiredBranchLabels,
+    requiredNodeLabels,
     title: scenario.title,
-    type: "flowchart",
+    type: scenario.diagramType,
   };
 }
 

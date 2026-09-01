@@ -19,7 +19,7 @@ import {
   summarizeGenerationCandidate,
 } from "@sketchi/diagram-generation";
 import {
-  getScenario,
+  getGenerationScenario,
   toDiagramGenerationPrompt,
 } from "@sketchi/diagram-scenarios";
 import {
@@ -242,7 +242,7 @@ const runClient = Effect.fn("evalHarness.generateScenario.runClient")(
 
     return yield* Effect.gen(function* () {
       const scenario = yield* Effect.try({
-        try: () => getScenario(scenarioId),
+        try: () => getGenerationScenario(scenarioId),
         catch: (cause) =>
           DiagramGenerationInputError.make({
             cause,
