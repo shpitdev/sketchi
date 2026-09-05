@@ -12,8 +12,14 @@ import {
   validateFlowchartDiagram,
   validateMindmapDiagram,
 } from "@sketchi/diagram-core";
-import { Schema } from "effect";
+import { Result, Schema } from "effect";
 
+import {
+  type DiagramRequirement,
+  GeneratedDiagramIntent,
+  GeneratedDiagramResponse,
+  modelTitleOrFallback,
+} from "./intent.js";
 import { DiagramGenerationPrompt } from "./messages.js";
 import {
   GeneratedMindmapTree,
@@ -99,6 +105,7 @@ export class DiagramGenerationCandidate extends Schema.Class<DiagramGenerationCa
   ),
   durationMs: Schema.optional(Schema.Number),
   error: Schema.optional(Schema.String),
+  intent: Schema.optional(GeneratedDiagramIntent),
   model: Schema.String,
   provider: DiagramGenerationProviderIdSchema,
   raw: Schema.optional(Schema.Unknown),
@@ -111,9 +118,11 @@ export class DiagramGenerationCandidateSummary extends Schema.Class<DiagramGener
 )({
   cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
   diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
+  diagramText: Schema.optional(Schema.String),
   diagramValid: Schema.Boolean,
   durationMs: Schema.optional(Schema.Number),
   error: Schema.optional(Schema.String),
+  intent: Schema.optional(GeneratedDiagramIntent),
   model: Schema.String,
   provider: DiagramGenerationProviderIdSchema,
   text: Schema.String,
@@ -264,10 +273,11 @@ interface CandidateParseFailure {
 }
 
 interface CandidateParseSuccess {
-  readonly diagram:
+  readonly diagram?:
     | FlowchartDiagram
     | MindmapDiagram
     | GeneratedSequenceDiagram;
+  readonly intent: GeneratedDiagramIntent;
   readonly success: true;
 }
 
@@ -347,6 +357,20 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
   };
 }
 
+/** Decode only the typed intent envelope when artifact validation has failed. */
+export function decodedIntentFromText(
+  text: string,
+): GeneratedDiagramIntent | undefined {
+  try {
+    const response = Schema.decodeUnknownResult(GeneratedDiagramResponse)(
+      extractJsonObject(text),
+    );
+    return Result.isSuccess(response) ? response.success.intent : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function parseCandidateDiagram(text: string): CandidateParseResult {
   let extracted: unknown;
   try {
@@ -363,9 +387,62 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
     };
   }
 
-  if (isUnknownRecord(extracted) && extracted["type"] === "mindmap") {
-    if ("root" in extracted) {
-      const decoded = safeParseDiagramSchema(GeneratedMindmapTree, extracted);
+  const response = Schema.decodeUnknownResult(GeneratedDiagramResponse)(
+    extracted,
+  );
+  if (Result.isFailure(response)) {
+    const diagnostics = [`response_schema_error: ${String(response.failure)}`];
+    return {
+      diagnostics,
+      error: diagnostics[0] ?? "Generated response schema validation failed.",
+      success: false,
+    };
+  }
+
+  const { diagram: rawDiagram, intent, title } = response.success;
+  if (intent.nativeKind === null) {
+    if (rawDiagram !== undefined) {
+      return {
+        diagnostics: [
+          "intent_diagram_mismatch: nativeKind is null, but the response included a diagram. Hint: omit diagram for unsupported requests.",
+        ],
+        error: "Generated intent and diagram did not agree.",
+        success: false,
+      };
+    }
+    return { intent, success: true };
+  }
+  if (!isUnknownRecord(rawDiagram)) {
+    return {
+      diagnostics: [
+        "intent_diagram_missing: a native diagram kind requires one diagram object.",
+      ],
+      error: "Generated response omitted its native diagram.",
+      success: false,
+    };
+  }
+  if (rawDiagram["type"] !== intent.nativeKind) {
+    return {
+      diagnostics: [
+        `intent_diagram_mismatch: nativeKind is ${intent.nativeKind}, but diagram.type is ${String(rawDiagram["type"])}.`,
+      ],
+      error: "Generated intent and diagram did not agree.",
+      success: false,
+    };
+  }
+
+  const id = typeof rawDiagram["id"] === "string" ? rawDiagram["id"] : "";
+  const titledDiagram = {
+    ...rawDiagram,
+    title: modelTitleOrFallback(title, id, intent.nativeKind),
+  };
+
+  if (intent.nativeKind === "mindmap") {
+    if ("root" in titledDiagram) {
+      const decoded = safeParseDiagramSchema(
+        GeneratedMindmapTree,
+        titledDiagram,
+      );
       if (!decoded.success) {
         const diagnostics = decoded.error.issues.map(schemaIssueDiagnostic);
         return {
@@ -378,6 +455,7 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
       try {
         return {
           diagram: generatedMindmapTreeToDiagram(decoded.data),
+          intent,
           success: true,
         };
       } catch (error) {
@@ -386,7 +464,7 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
     }
     const decoded = safeParseDiagramSchema(
       MindmapDiagramSchema,
-      withSketchiDiagramStyle(extracted),
+      withSketchiDiagramStyle(titledDiagram),
     );
     if (!decoded.success) {
       const diagnostics = decoded.error.issues.map(schemaIssueDiagnostic);
@@ -397,14 +475,21 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
       };
     }
     try {
-      return { diagram: validateMindmapDiagram(decoded.data), success: true };
+      return {
+        diagram: validateMindmapDiagram(decoded.data),
+        intent,
+        success: true,
+      };
     } catch (error) {
       return diagramValidationFailure(error);
     }
   }
 
-  if (isUnknownRecord(extracted) && extracted["type"] === "sequence") {
-    const decoded = safeParseDiagramSchema(GeneratedSequenceDiagram, extracted);
+  if (intent.nativeKind === "sequence") {
+    const decoded = safeParseDiagramSchema(
+      GeneratedSequenceDiagram,
+      titledDiagram,
+    );
     if (!decoded.success) {
       const diagnostics = decoded.error.issues.map(schemaIssueDiagnostic);
       return {
@@ -416,7 +501,11 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
       };
     }
     try {
-      return { diagram: parseGeneratedSequence(extracted), success: true };
+      return {
+        diagram: parseGeneratedSequence(titledDiagram),
+        intent,
+        success: true,
+      };
     } catch (error) {
       return diagramValidationFailure(error);
     }
@@ -424,7 +513,7 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 
   const decoded = safeParseDiagramSchema(
     FlowchartDiagramSchema,
-    normalizeGeneratedFlowchartInput(extracted),
+    normalizeGeneratedFlowchartInput(titledDiagram),
   );
   if (!decoded.success) {
     const diagnostics = decoded.error.issues.map(schemaIssueDiagnostic);
@@ -435,7 +524,11 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
     };
   }
   try {
-    return { diagram: validateFlowchartDiagram(decoded.data), success: true };
+    return {
+      diagram: validateFlowchartDiagram(decoded.data),
+      intent,
+      success: true,
+    };
   } catch (error) {
     return diagramValidationFailure(error);
   }
@@ -461,7 +554,8 @@ export function candidateFromText(
     return {
       ...input,
       diagnostics,
-      diagram: parsed.diagram,
+      ...(parsed.diagram ? { diagram: parsed.diagram } : {}),
+      intent: parsed.intent,
     };
   }
 
@@ -473,133 +567,234 @@ export function candidateFromText(
   };
 }
 
-const EXPLICIT_MINIMUM_PATTERN =
-  /\bat least\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:distinct|labeled)\s+)?(steps?|nodes?|topics?|decisions?(?:\s+nodes?)?)\b/giu;
-const LOOP_REQUIREMENT_PATTERN =
-  /\b(?:feedback|review|resubmission|retry|revision|remediation|investigation)\s+loop\b|\bloop(?:s|ed|ing)?\s+(?:back|through|to)\b|\breturns?\s+to\b/iu;
-const NUMBER_WORD_COUNTS: Readonly<Record<string, number>> = {
-  eight: 8,
-  five: 5,
-  four: 4,
-  nine: 9,
-  one: 1,
-  seven: 7,
-  six: 6,
-  ten: 10,
-  three: 3,
-  two: 2,
-};
-
-export interface ExplicitRequestMinimum {
-  readonly expectedCount: number;
-  readonly expectedUnit: "decision nodes" | "nodes" | "topics";
-  readonly requestedCount: number;
-  readonly requestedUnit: string;
-}
-
-function requestedCount(value: string): number | undefined {
-  const numeric = Number.parseInt(value, 10);
-  return Number.isInteger(numeric)
-    ? numeric
-    : NUMBER_WORD_COUNTS[value.toLowerCase()];
-}
-
-export function explicitRequestMinimums(
-  request: string,
-  diagramType: DiagramGenerationPrompt["type"],
-): readonly ExplicitRequestMinimum[] {
-  return Array.from(request.matchAll(EXPLICIT_MINIMUM_PATTERN), (match) => {
-    const requested = match[1] ? requestedCount(match[1]) : undefined;
-    const unit = match[2]?.toLowerCase();
-    if (!requested || !unit) return undefined;
-
-    const decisionMinimum = /^decisions?(?:\s+nodes?)?$/.test(unit);
-    const applies =
-      (diagramType === "flowchart" &&
-        (/^(?:steps?|nodes?)$/.test(unit) || decisionMinimum)) ||
-      (diagramType === "mindmap" && /^topics?$/.test(unit));
-    if (!applies) return undefined;
-
-    const expectedUnit: ExplicitRequestMinimum["expectedUnit"] = decisionMinimum
-      ? "decision nodes"
-      : diagramType === "flowchart"
-        ? "nodes"
-        : "topics";
-    return {
-      expectedCount:
-        diagramType === "flowchart" && !decisionMinimum
-          ? Math.min(requested, 24)
-          : requested,
-      expectedUnit,
-      requestedCount: requested,
-      requestedUnit: unit,
-    };
-  }).filter(
-    (minimum): minimum is ExplicitRequestMinimum => minimum !== undefined,
-  );
-}
-
-function flowchartHasDirectedCycle(diagram: FlowchartDiagram): boolean {
+function flowchartCycleRank(diagram: FlowchartDiagram): number {
   const adjacency = new Map<string, string[]>();
-  for (const edge of diagram.edges) {
-    adjacency.set(edge.source, [
-      ...(adjacency.get(edge.source) ?? []),
-      edge.target,
-    ]);
-  }
-  const pathExists = (start: string, destination: string): boolean => {
-    const pending = [start];
-    const visited = new Set<string>();
-    while (pending.length > 0) {
-      const current = pending.pop();
-      if (!current) continue;
-      if (current === destination) return true;
-      if (visited.has(current)) continue;
-      visited.add(current);
-      pending.push(...(adjacency.get(current) ?? []));
+  for (const node of diagram.nodes) adjacency.set(node.id, []);
+  for (const edge of diagram.edges)
+    adjacency.get(edge.source)?.push(edge.target);
+
+  let nextIndex = 0;
+  const indexes = new Map<string, number>();
+  const lowLinks = new Map<string, number>();
+  const stack: string[] = [];
+  const onStack = new Set<string>();
+  let rank = 0;
+
+  const visit = (nodeId: string): void => {
+    indexes.set(nodeId, nextIndex);
+    lowLinks.set(nodeId, nextIndex);
+    nextIndex += 1;
+    stack.push(nodeId);
+    onStack.add(nodeId);
+
+    for (const target of adjacency.get(nodeId) ?? []) {
+      if (!indexes.has(target)) {
+        visit(target);
+        lowLinks.set(
+          nodeId,
+          Math.min(lowLinks.get(nodeId) ?? 0, lowLinks.get(target) ?? 0),
+        );
+      } else if (onStack.has(target)) {
+        lowLinks.set(
+          nodeId,
+          Math.min(lowLinks.get(nodeId) ?? 0, indexes.get(target) ?? 0),
+        );
+      }
     }
-    return false;
+
+    if (lowLinks.get(nodeId) !== indexes.get(nodeId)) return;
+    const component = new Set<string>();
+    for (;;) {
+      const member = stack.pop();
+      if (!member) break;
+      onStack.delete(member);
+      component.add(member);
+      if (member === nodeId) break;
+    }
+    const internalEdges = diagram.edges.filter(
+      (edge) => component.has(edge.source) && component.has(edge.target),
+    ).length;
+    if (internalEdges > 0) {
+      rank += Math.max(0, internalEdges - component.size + 1);
+    }
   };
-  return diagram.edges.some((edge) => pathExists(edge.target, edge.source));
+
+  for (const node of diagram.nodes) {
+    if (!indexes.has(node.id)) visit(node.id);
+  }
+  return rank;
 }
 
-/** Turn a structurally valid result that misses explicit requirements into repair input. */
+function labelsForRequirement(
+  diagram: NonNullable<DiagramGenerationCandidate["diagram"]>,
+  requirement: Extract<DiagramRequirement, { readonly kind: "label" }>,
+): readonly string[] | undefined {
+  if (diagram.type === "flowchart") {
+    if (requirement.target === "node") {
+      return diagram.nodes.map((node) => node.label);
+    }
+    if (requirement.target === "branch") {
+      return diagram.edges.flatMap((edge) =>
+        edge.label === undefined ? [] : [edge.label],
+      );
+    }
+    return undefined;
+  }
+  if (diagram.type === "mindmap") {
+    return requirement.target === "topic"
+      ? diagram.nodes.map((node) => node.label)
+      : undefined;
+  }
+  if (requirement.target === "participant") {
+    return diagram.participants.map((participant) => participant.label);
+  }
+  if (requirement.target === "message") {
+    return diagram.messages.map((message) => message.label);
+  }
+  return undefined;
+}
+
+function countForRequirement(
+  diagram: NonNullable<DiagramGenerationCandidate["diagram"]>,
+  target: Extract<DiagramRequirement, { readonly kind: "count" }>["target"],
+): number | undefined {
+  if (diagram.type === "flowchart") {
+    switch (target) {
+      case "nodes":
+        return diagram.nodes.length;
+      case "decision_nodes":
+        return diagram.nodes.filter((node) => node.kind === "decision").length;
+      case "terminal_nodes":
+        return diagram.nodes.filter((node) => node.kind === "end").length;
+      case "cycles":
+        return flowchartCycleRank(diagram);
+      default:
+        return undefined;
+    }
+  }
+  if (diagram.type === "mindmap") {
+    return target === "topics" ? diagram.nodes.length : undefined;
+  }
+  if (target === "participants") return diagram.participants.length;
+  return target === "messages" ? diagram.messages.length : undefined;
+}
+
+function normalizeLabel(value: string): string {
+  return value.replace(/\s+/gu, " ").trim().toLocaleLowerCase("en-US");
+}
+
+function requirementDiagnostic(
+  diagram: NonNullable<DiagramGenerationCandidate["diagram"]>,
+  requirement: DiagramRequirement,
+): string | undefined {
+  if (requirement.kind === "label") {
+    const labels = labelsForRequirement(diagram, requirement);
+    if (!labels) {
+      return `requirement_target_invalid: ${requirement.target} labels do not apply to ${diagram.type}.`;
+    }
+    const expected = normalizeLabel(requirement.value);
+    if (labels.some((label) => normalizeLabel(label) === expected)) {
+      return undefined;
+    }
+    return `requirement_label_not_met: required ${requirement.target} label "${requirement.value}" was not present.`;
+  }
+
+  const actual =
+    requirement.kind === "depth"
+      ? diagram.type === "mindmap"
+        ? Math.max(...diagram.nodes.map((node) => node.metadata.depth)) + 1
+        : undefined
+      : countForRequirement(diagram, requirement.target);
+  if (actual === undefined) {
+    return `requirement_target_invalid: ${requirement.target} does not apply to ${diagram.type}.`;
+  }
+  const satisfied =
+    requirement.comparator === "exact"
+      ? actual === requirement.value
+      : actual >= requirement.value;
+  if (satisfied) return undefined;
+  return `requirement_count_not_met: ${requirement.target} must be ${requirement.comparator === "exact" ? "exactly" : "at least"} ${requirement.value}, but the generated ${diagram.type} contained ${actual}.`;
+}
+
+function requirementsAreEqual(
+  expected: readonly DiagramRequirement[],
+  actual: readonly DiagramRequirement[],
+): boolean {
+  if (expected.length !== actual.length) return false;
+  return expected.every((requirement, index) => {
+    const candidate = actual[index];
+    if (!candidate || candidate.kind !== requirement.kind) return false;
+    if (requirement.kind === "label") {
+      return (
+        candidate.kind === "label" &&
+        candidate.target === requirement.target &&
+        candidate.value === requirement.value
+      );
+    }
+    return (
+      candidate.kind === requirement.kind &&
+      candidate.comparator === requirement.comparator &&
+      candidate.target === requirement.target &&
+      candidate.value === requirement.value
+    );
+  });
+}
+
+/** Deterministically enforce the original model-authored plan against the artifact. */
 export function enforceCandidateRequestRequirements(
   candidate: DiagramGenerationCandidate,
   request: DiagramGenerationRequest,
+  originalRequirements?: readonly DiagramRequirement[],
 ): DiagramGenerationCandidate {
-  const diagram = candidate.diagram;
-  if (!diagram || diagram.type !== request.prompt.type) {
-    return candidate;
-  }
-  if (diagram.type === "sequence") return candidate;
-  const requestDiagnostics = [
-    ...explicitRequestMinimums(request.prompt.request, request.prompt.type)
-      .map((minimum) => {
-        const actual =
-          minimum.expectedUnit === "decision nodes"
-            ? diagram.nodes.filter((node) => node.kind === "decision").length
-            : diagram.nodes.length;
-        if (actual >= minimum.expectedCount) return undefined;
+  const { diagram, intent } = candidate;
+  if (!intent || candidate.error) return candidate;
 
-        return `request_minimum_not_met: requested at least ${minimum.requestedCount} ${minimum.requestedUnit}, but the generated ${diagram.type} contained ${actual}. Hint: return a complete diagram with at least ${minimum.expectedCount} ${minimum.expectedUnit}.`;
-      })
-      .filter((diagnostic): diagnostic is string => diagnostic !== undefined),
-    ...(diagram.type === "flowchart" &&
-    LOOP_REQUIREMENT_PATTERN.test(request.prompt.request) &&
-    !flowchartHasDirectedCycle(diagram)
-      ? [
-          "request_loop_not_met: prompt requires a retry or loop, but the generated flowchart contains no directed cycle. Hint: add a real back-edge from the loop path to the intended process or decision node, never the start node.",
-        ]
-      : []),
-  ];
+  const requestDiagnostics: string[] = [];
+  const requirements = originalRequirements ?? intent.requirements;
+  if (
+    originalRequirements &&
+    !requirementsAreEqual(originalRequirements, intent.requirements)
+  ) {
+    requestDiagnostics.push(
+      "intent_requirements_changed: semantic repair altered or omitted the original typed requirement plan.",
+    );
+  }
+  const requestedKindIsNative =
+    intent.requestedKind === "flowchart" ||
+    intent.requestedKind === "mindmap" ||
+    intent.requestedKind === "sequence";
+  if (
+    request.prompt.requestedType &&
+    (intent.requestedKind !== request.prompt.requestedType ||
+      intent.nativeKind !== request.prompt.requestedType)
+  ) {
+    requestDiagnostics.push(
+      `explicit_type_not_met: the caller required ${request.prompt.requestedType}, but the response selected requestedKind ${intent.requestedKind} and nativeKind ${String(intent.nativeKind)}.`,
+    );
+  }
+  if (
+    (intent.nativeKind === null && requestedKindIsNative) ||
+    (intent.nativeKind !== null && intent.requestedKind !== intent.nativeKind)
+  ) {
+    requestDiagnostics.push(
+      `intent_kind_mismatch: requestedKind ${intent.requestedKind} cannot be generated as nativeKind ${intent.nativeKind}.`,
+    );
+  }
+  if (diagram) {
+    requestDiagnostics.push(
+      ...requirements.flatMap((requirement) => {
+        const diagnostic = requirementDiagnostic(diagram, requirement);
+        return diagnostic ? [diagnostic] : [];
+      }),
+    );
+  }
   if (requestDiagnostics.length === 0) return candidate;
 
   const { diagram: _diagram, ...withoutDiagram } = candidate;
   return {
     ...withoutDiagram,
     diagnostics: [...candidate.diagnostics, ...requestDiagnostics],
-    error: "Generated diagram did not satisfy explicit request requirements.",
+    error: "Generated diagram did not satisfy its typed intent contract.",
   };
 }
 
@@ -608,6 +803,9 @@ export function summarizeGenerationCandidate(
 ): DiagramGenerationCandidateSummary {
   return {
     diagnostics: candidate.diagnostics,
+    ...(candidate.diagram
+      ? { diagramText: JSON.stringify(candidate.diagram, null, 2) }
+      : {}),
     diagramValid: Boolean(candidate.diagram) && !candidate.error,
     model: candidate.model,
     provider: candidate.provider,
@@ -617,6 +815,7 @@ export function summarizeGenerationCandidate(
       ? { durationMs: candidate.durationMs }
       : {}),
     ...(candidate.error ? { error: candidate.error } : {}),
+    ...(candidate.intent ? { intent: candidate.intent } : {}),
     ...(candidate.usage ? { usage: candidate.usage } : {}),
   };
 }

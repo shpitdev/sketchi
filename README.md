@@ -33,7 +33,7 @@ scene representations.
 
 ## What Sketchi Does
 
-- Creates hosted flowcharts and mindmaps from natural-language prompts.
+- Creates hosted flowcharts, mindmaps, and sequence diagrams from natural-language prompts.
 - Produces validated, editable Excalidraw scenes instead of opaque images.
 - Exposes Code Mode through MCP and versioned HTTP artifact endpoints.
 - Keeps layout, bindings, wrapping, and scene conversion deterministic in code.
@@ -67,6 +67,9 @@ pipes, redirects, CI, and JSON output never prompt and must pass `--prompt`.
 Explicit `--type` and file `--dest` values preset their wizard questions;
 interactive generation remains PNG-only, so other formats and `--dest -` also
 require `--prompt`.
+Without `--type`, the model selects a supported native type. Explicit flowchart,
+mindmap, or sequence selection is authoritative; ER, architecture, swimlane, and
+state-machine requests fail clearly instead of being coerced.
 The default file is `<generated-id>.png` in the current directory. Use
 `--format excalidraw` or `--format scene` for another artifact, and `--dest`
 to choose its path or stream bytes with `--dest -`.
@@ -145,7 +148,7 @@ model candidate → typed diagram IR → deterministic scene → Excalidraw arti
 | `packages/svg-excalidraw`     | Native SVG-to-Excalidraw conversion and library serialization   |
 
 The first high-reliability target is decision-heavy flowchart generation.
-`flowchart` and `mindmap` are explicit diagram families; unsupported families do
+`flowchart`, `mindmap`, and `sequence` are explicit diagram families; unsupported families do
 not silently fall back to a generic template. See the full
 [architecture guide](docs/architecture.md) and the
 [MCP-first generation boundary](docs/mcp-first-generation.md).

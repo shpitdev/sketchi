@@ -167,7 +167,9 @@ function pickCandidateText(
   );
 
   return (
-    validCandidate?.text ?? candidates.find((candidate) => candidate.text)?.text
+    validCandidate?.diagramText ??
+    validCandidate?.text ??
+    candidates.find((candidate) => candidate.text)?.text
   );
 }
 

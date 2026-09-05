@@ -18,23 +18,10 @@ export type ScenarioPromptParts = DiagramGenerationMessages;
 export function toDiagramGenerationPrompt(
   scenario: GenerationPromptScenario,
 ): DiagramGenerationPrompt {
-  const requiredBranchLabels =
-    scenario.diagramType === "flowchart" &&
-    "requiredBranchLabels" in scenario.assertions
-      ? scenario.assertions.requiredBranchLabels
-      : [];
-  const requiredNodeLabels =
-    scenario.diagramType === "flowchart" &&
-    "requiredNodeLabels" in scenario.assertions
-      ? scenario.assertions.requiredNodeLabels
-      : [];
   return {
     id: scenario.id,
     request: scenario.prompt,
-    requiredBranchLabels,
-    requiredNodeLabels,
-    title: scenario.title,
-    type: scenario.diagramType,
+    requestedType: scenario.diagramType,
   };
 }
 

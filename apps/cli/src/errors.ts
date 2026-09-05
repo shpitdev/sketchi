@@ -50,6 +50,7 @@ export class CliGenerationError extends Schema.TaggedErrorClass<CliGenerationErr
       "generation_timeout",
       "malformed_output",
       "invalid_generated_document",
+      "unsupported_diagram_type",
     ]),
     message: Schema.String,
     hint: Schema.String,
@@ -154,6 +155,7 @@ export function exitCodeForFailure(error: CliFailure): number {
     case "CliGenerationError":
       switch (error.code) {
         case "invalid_generated_document":
+        case "unsupported_diagram_type":
           return 3;
         case "provider_failure":
           return 10;

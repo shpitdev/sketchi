@@ -5,7 +5,8 @@ import {
   type DiagramGenerationCandidate,
   type DiagramGenerationProviderId,
   type DiagramGenerationRequest,
-  explicitRequestMinimums,
+  decodedIntentFromText,
+  enforceCandidateRequestRequirements,
 } from "./candidates.js";
 import type { DiagramGenerationPolicyConfig } from "./client.js";
 import {
@@ -45,6 +46,15 @@ const generationDuration = Metric.histogram("sketchi_generation_duration_ms", {
     50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 30_000, 60_000,
   ]),
 });
+
+function isAcceptedCandidate(candidate: DiagramGenerationCandidate): boolean {
+  return (
+    Boolean(candidate.diagram) ||
+    (!candidate.diagram &&
+      candidate.intent?.nativeKind === null &&
+      !candidate.error)
+  );
+}
 
 export const runDiagramGenerationWithPolicy = Effect.fn(
   "diagramGeneration.runWithPolicy",
@@ -117,12 +127,16 @@ export const runDiagramGenerationWithPolicy = Effect.fn(
 
   const operation = Effect.gen(function* () {
     const originalCandidate = yield* executeModelCall(request);
+    const originalRequirements =
+      originalCandidate.intent?.requirements ??
+      decodedIntentFromText(originalCandidate.text)?.requirements;
     let latestCandidate = originalCandidate;
     let candidate = originalCandidate;
     let diagnostics = [...originalCandidate.diagnostics];
     for (
       let repairAttempt = 1;
-      repairAttempt <= policy.maxRepairAttempts && !latestCandidate.diagram;
+      repairAttempt <= policy.maxRepairAttempts &&
+      !isAcceptedCandidate(latestCandidate);
       repairAttempt += 1
     ) {
       const truncated = latestCandidate.diagnostics.some((diagnostic) =>
@@ -169,8 +183,13 @@ export const runDiagramGenerationWithPolicy = Effect.fn(
         candidate = { ...originalCandidate, diagnostics };
         break;
       }
-      const repaired = repairResult.success;
-      const outcome = repaired.diagram ? "succeeded" : "failed";
+      const repaired = enforceCandidateRequestRequirements(
+        repairResult.success,
+        request,
+        originalRequirements,
+      );
+      const repairedAccepted = isAcceptedCandidate(repaired);
+      const outcome = repairedAccepted ? "succeeded" : "failed";
       yield* recordMetric(generationRepairs, 1, {
         operation: "generate",
         outcome,
@@ -183,7 +202,7 @@ export const runDiagramGenerationWithPolicy = Effect.fn(
         `repair_${outcome}: semantic repair attempt ${repairAttempt} ${outcome}.`,
       ];
       latestCandidate = repaired;
-      candidate = repaired.diagram
+      candidate = repairedAccepted
         ? { ...repaired, diagnostics }
         : { ...originalCandidate, diagnostics };
     }
@@ -197,12 +216,12 @@ export const runDiagramGenerationWithPolicy = Effect.fn(
       Effect.all([
         recordMetric(generationRequests, 1, {
           operation: "generate",
-          outcome: candidate.diagram ? "success" : "invalid",
+          outcome: isAcceptedCandidate(candidate) ? "success" : "invalid",
           provider,
         }),
         recordMetric(generationDuration, candidate.durationMs, {
           operation: "generate",
-          outcome: candidate.diagram ? "success" : "invalid",
+          outcome: isAcceptedCandidate(candidate) ? "success" : "invalid",
           provider,
         }),
       ]),
@@ -279,24 +298,12 @@ function buildRepairRequest(
           "",
         ]
       : [];
-  const parsedMinimums = explicitRequestMinimums(
-    request.prompt.request,
-    request.prompt.type,
-  );
   const originalHardRequirements = [
     "Original hard requirements (all remain mandatory):",
-    `- Diagram type: ${request.prompt.type}.`,
+    `- Diagram type authority: ${request.prompt.requestedType ?? "model-selected from the original scenario"}.`,
     `- Original scenario: ${request.prompt.request}`,
-    ...parsedMinimums.map(
-      (minimum) =>
-        `- Parsed minimum: at least ${minimum.expectedCount} ${minimum.expectedUnit} (from the original request for at least ${minimum.requestedCount} ${minimum.requestedUnit}).`,
-    ),
-    ...request.prompt.requiredNodeLabels.map(
-      (label) => `- Required node label: ${label}`,
-    ),
-    ...request.prompt.requiredBranchLabels.map(
-      (label) => `- Required decision branch label: ${label}`,
-    ),
+    "- Preserve the typed intent plan and make the corrected artifact satisfy every plan entry.",
+    "- Preserve the model-authored concise title unless a validator diagnostic requires changing it.",
     "",
   ];
   return {

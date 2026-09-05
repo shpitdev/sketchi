@@ -40,6 +40,7 @@ type GenerateFailureStatus =
   | "invalid_input"
   | "provider_failed"
   | "generation_timeout"
+  | "unsupported_diagram_type"
   | "malformed_output"
   | "invalid_generated_document"
   | "quality_failed"
@@ -80,7 +81,17 @@ type GenerateResult = GenerateSuccess | GenerateFailure;
 const GenerateRequestSchema = Schema.Struct({
   cacheMode: Schema.optional(Schema.Literals(["default", "fresh"])),
   prompt: Schema.String,
-  type: Schema.optional(Schema.Literals(["flowchart", "mindmap", "sequence"])),
+  type: Schema.optional(
+    Schema.Literals([
+      "architecture",
+      "er",
+      "flowchart",
+      "mindmap",
+      "sequence",
+      "state-machine",
+      "swimlane",
+    ]),
+  ),
   model: Schema.optional(Schema.String),
 });
 const decodeGenerateRequest = Schema.decodeUnknownResult(
@@ -112,6 +123,7 @@ function generateHttpStatus(result: GenerateResult): number {
     case "invalid_input":
       return 400;
     case "malformed_output":
+    case "unsupported_diagram_type":
     case "invalid_generated_document":
     case "quality_failed":
       return 422;
@@ -219,7 +231,9 @@ function generationErrorFailure(
 function malformedCandidateFailure(
   candidate: DiagramGenerationCandidate,
 ): GenerateFailure | undefined {
-  if (candidate.diagram) return undefined;
+  if (candidate.diagram || candidate.intent?.nativeKind === null) {
+    return undefined;
+  }
   const canParse = (() => {
     try {
       extractJsonObject(candidate.text);
@@ -250,6 +264,40 @@ function malformedCandidateFailure(
             "Retry once; if it persists, try another prompt.",
           ),
         ],
+  );
+}
+
+function unsupportedCandidateFailure(
+  candidate: DiagramGenerationCandidate,
+): GenerateFailure | undefined {
+  const intent = candidate.intent;
+  if (!intent || intent.nativeKind !== null || candidate.error)
+    return undefined;
+  return failure("unsupported_diagram_type", [
+    issue(
+      "unsupported_diagram_type",
+      "generation",
+      `Sketchi does not natively support ${intent.requestedKind} generation.`,
+      "Request a flowchart, mindmap, or sequence diagram instead.",
+    ),
+  ]);
+}
+
+function rejectedIntentFailure(
+  candidate: DiagramGenerationCandidate,
+): GenerateFailure | undefined {
+  if (!candidate.intent || !candidate.error) return undefined;
+  const diagnostics = candidate.diagnostics.slice(0, 8);
+  return failure(
+    "quality_failed",
+    diagnostics.map((diagnostic) =>
+      issue(
+        "intent_contract_not_met",
+        "generation",
+        diagnostic,
+        "Return one artifact that satisfies the typed intent plan and explicit type authority.",
+      ),
+    ),
   );
 }
 
@@ -387,11 +435,28 @@ export const handleGenerateDiagramRequest = Effect.fn(
       ]),
     );
   }
-  const type: DiagramGenerationType = input.type ?? "flowchart";
+  if (
+    input.type &&
+    input.type !== "flowchart" &&
+    input.type !== "mindmap" &&
+    input.type !== "sequence"
+  ) {
+    return yield* finish(
+      rawBody,
+      failure("unsupported_diagram_type", [
+        issue(
+          "unsupported_diagram_type",
+          "input",
+          `Sketchi does not natively support ${input.type} generation.`,
+          "Request a flowchart, mindmap, or sequence diagram instead.",
+        ),
+      ]),
+    );
+  }
   const generationInput = {
     ...(input.cacheMode ? { cacheMode: input.cacheMode } : {}),
     prompt,
-    type,
+    ...(input.type ? { type: input.type } : {}),
     ...(input.model ? { model: input.model } : {}),
   };
 
@@ -411,6 +476,14 @@ export const handleGenerateDiagramRequest = Effect.fn(
     );
   }
   const candidate = candidateResult.candidate;
+  const unsupported = unsupportedCandidateFailure(candidate);
+  if (unsupported) {
+    return yield* finish(generationInput, unsupported);
+  }
+  const rejectedIntent = rejectedIntentFailure(candidate);
+  if (rejectedIntent) {
+    return yield* finish(generationInput, rejectedIntent);
+  }
   const malformed = malformedCandidateFailure(candidate);
   if (malformed || !candidate.diagram) {
     return yield* finish(
@@ -426,19 +499,20 @@ export const handleGenerateDiagramRequest = Effect.fn(
         ]),
     );
   }
-  if (candidate.diagram.type !== type) {
+  if (input.type && candidate.diagram.type !== input.type) {
     return yield* finish(
       generationInput,
       failure("invalid_generated_document", [
         issue(
           "invalid_generated_document",
           "generation",
-          `The generation provider returned a ${candidate.diagram.type} for a ${type} request.`,
+          `The generation provider returned a ${candidate.diagram.type} for a ${input.type} request.`,
           "Retry once; if it persists, rephrase the prompt.",
         ),
       ]),
     );
   }
+  const type: DiagramGenerationType = candidate.diagram.type;
 
   const documentInput =
     candidate.diagram.type === "flowchart"

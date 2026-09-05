@@ -165,7 +165,7 @@ const main = Effect.gen(function* () {
       }),
     );
   }
-  process.stdout.write(`${candidate.text.trim()}\n`);
+  process.stdout.write(`${(candidate.diagramText ?? candidate.text).trim()}\n`);
 });
 
 Effect.runPromise(main).catch((error: unknown) => {

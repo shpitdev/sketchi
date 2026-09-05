@@ -14,10 +14,7 @@ describe("scenario prompts", () => {
     expect(toDiagramGenerationPrompt(scenario)).toEqual({
       id: scenario.id,
       request: scenario.prompt,
-      requiredBranchLabels: scenario.assertions.requiredBranchLabels,
-      requiredNodeLabels: scenario.assertions.requiredNodeLabels,
-      title: scenario.title,
-      type: "flowchart",
+      requestedType: "flowchart",
     });
   });
 
@@ -41,11 +38,11 @@ describe("scenario prompts", () => {
     expect(prompt.user).not.toContain(
       "Every node must have id, label, and kind",
     );
-    expect(prompt.user).toContain("Required node labels:");
-    expect(prompt.user).toContain("- QA Manager final review");
-    expect(prompt.user).toContain("Required decision branch labels:");
-    expect(prompt.user).toContain("- retest");
-    expect(prompt.user).toContain('"title":"Pharma batch disposition"');
+    expect(prompt.user).toContain("caller explicitly requires flowchart");
+    expect(prompt.system).toContain(
+      "List every measurable scenario requirement",
+    );
+    expect(prompt.user).toContain('"requestedKind":"flowchart"');
   });
 
   it("keeps a flattened prompt for stdin-based generator commands", () => {

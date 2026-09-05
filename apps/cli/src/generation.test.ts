@@ -154,8 +154,13 @@ function generatedArtifactStoreLayer(created: BuiltDiagram[]) {
 
 const originalFetch = globalThis.fetch;
 
-function stubFetch(handler: () => Response | Promise<Response>): void {
-  globalThis.fetch = (() => Promise.resolve().then(handler)) as typeof fetch;
+function stubFetch(
+  handler: (request: Request) => Response | Promise<Response>,
+): void {
+  globalThis.fetch = ((input, init) =>
+    Promise.resolve().then(() =>
+      handler(new Request(input as RequestInfo | URL, init)),
+    )) as typeof fetch;
 }
 
 function jsonResponse(body: unknown, status: number): Response {
@@ -167,13 +172,13 @@ function jsonResponse(body: unknown, status: number): Response {
 
 function runGenerate(
   created: BuiltDiagram[],
-  type: "flowchart" | "mindmap" | "sequence",
+  type?: Parameters<typeof generateDiagram>[0]["type"],
 ) {
   return generateDiagram({
     endpoint: DEFAULT_GENERATE_ENDPOINT,
     model: DEFAULT_GENERATION_MODEL,
     prompt: "Create a diagram",
-    type,
+    ...(type ? { type } : {}),
   }).pipe(Effect.provide(capturingStoreLayer(created)));
 }
 
@@ -239,6 +244,23 @@ describe("prompt-assisted generation over the public generate API", () => {
         );
       }
       assert.strictEqual(created.length, 1);
+    }),
+  );
+
+  it.effect("omits type from the API request for model selection", () =>
+    Effect.gen(function* () {
+      const body = yield* Effect.promise(() => buildSuccessBody(sequenceInput));
+      let requestBody: Record<string, unknown> | undefined;
+      stubFetch(async (request) => {
+        requestBody = (await request.json()) as Record<string, unknown>;
+        return new Response(body, { status: 200 });
+      });
+      const created: BuiltDiagram[] = [];
+
+      const result = yield* runGenerate(created);
+
+      assert.strictEqual(result.diagram.document.type, "sequence");
+      assert.isFalse(Object.hasOwn(requestBody ?? {}, "type"));
     }),
   );
 
@@ -387,6 +409,38 @@ describe("prompt-assisted generation over the public generate API", () => {
       }
       assert.strictEqual(created.length, 0);
     }),
+  );
+
+  it.effect(
+    "maps unsupported model-selected kinds to a clear typed error",
+    () =>
+      Effect.gen(function* () {
+        stubFetch(() =>
+          jsonResponse(
+            {
+              ok: false,
+              status: "unsupported_diagram_type",
+              issues: [
+                {
+                  message: "Sketchi does not natively support er generation.",
+                  hint: "Request a flowchart, mindmap, or sequence diagram instead.",
+                },
+              ],
+            },
+            422,
+          ),
+        );
+        const created: BuiltDiagram[] = [];
+
+        const error = yield* Effect.flip(runGenerate(created, "er"));
+
+        assert.strictEqual(error._tag, "CliGenerationError");
+        if (error._tag === "CliGenerationError") {
+          assert.strictEqual(error.code, "unsupported_diagram_type");
+          assert.match(error.message, /er generation/u);
+        }
+        assert.strictEqual(created.length, 0);
+      }),
   );
 
   it.effect("maps an endpoint timeout to a typed timeout failure", () =>

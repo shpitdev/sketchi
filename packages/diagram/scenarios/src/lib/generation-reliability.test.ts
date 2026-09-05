@@ -75,14 +75,12 @@ describe("generation reliability scenario registry", () => {
       ),
     ).toMatchObject({
       id: "reliability-curriculum-depth-four",
-      requiredBranchLabels: [],
-      requiredNodeLabels: [],
-      type: "mindmap",
+      requestedType: "mindmap",
     });
     expect(
       toDiagramGenerationPrompt(
         getGenerationScenario("reliability-release-train-brutal"),
-      ).type,
+      ).requestedType,
     ).toBe("flowchart");
   });
 });

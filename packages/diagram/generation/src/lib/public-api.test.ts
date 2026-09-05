@@ -43,18 +43,7 @@ const prompt: DiagramGenerationPrompt = {
   id: "pharma-batch-disposition",
   request:
     "Create a flowchart for pharma batch disposition. A batch is received, QA reviews the Certificate of Analysis, and then decides whether it passes specs. Passing goes to QA Manager final review and packaging. Retest goes through investigation and returns to final review. Reject ends at reject batch.",
-  requiredBranchLabels: ["yes", "retest", "reject"],
-  requiredNodeLabels: [
-    "Batch received",
-    "QA reviews Certificate of Analysis",
-    "Passes specs?",
-    "QA Manager final review",
-    "Send to packaging",
-    "Investigate retesting",
-    "Reject batch",
-  ],
-  title: "Pharma batch disposition",
-  type: "flowchart",
+  requestedType: "flowchart",
 };
 const expectedDiagram = {
   id: "pharma-batch-disposition-fixture",
@@ -101,66 +90,29 @@ const expectedDiagram = {
   layout: { direction: "TB", edgeRouting: "orthogonal" },
   style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
 };
-const expectedText = JSON.stringify(
-  {
-    ...expectedDiagram,
-    style: { accentColor: "#0f766e", backgroundColor: "#ffffff" },
-  },
-  null,
-  2,
-);
-const expectedSystem = [
-  "You are creating a Sketchi typed intermediate diagram.",
-  "",
-  "Flowchart IR rules:",
-  "- Return only compact, minified JSON on one line. Do not use markdown.",
-  '- Use type "flowchart".',
-  '- Every node must have id, label, and kind: "start", "process", "decision", or "end".',
-  "- Use exactly one start node and at least one end node.",
-  "- Every non-end node must have at least one outgoing edge.",
-  "- Every end node must have zero outgoing edges.",
-  "- Every decision node must have at least two outgoing edges.",
-  "- Every outgoing edge from a decision node must have a non-empty unique label.",
-  "- When the scenario describes a retry, resubmission, return, or feedback loop, include a real back-edge from the loop path to the intended earlier process or decision; naming a loop or drawing a one-way list is insufficient.",
-  "- Loop-back edges must target a process or decision node, never the start node; start nodes have no incoming edges.",
-  "- Self-loop edges are forbidden. Model every retry or re-check as a decision whose retry branch routes back to an earlier distinct process or decision node.",
-  '- Minimal loop example: decision "Retry?" --"yes"--> process "Try again" --> decision "Retry?"; decision "Retry?" --"no"--> end.',
-  "- Honor every explicit count or minimum for nodes, steps, decisions, branches, ends, and loops; never return fewer. For a rich scenario without an explicit count, include the major actions and decisions rather than collapsing them into a short summary.",
-  "- Edges must use existing node ids.",
-  '- Use layout { "direction": "TB", "edgeRouting": "orthogonal" } unless the prompt says otherwise.',
-].join("\n");
-const expectedUser = [
-  "Scenario:",
-  prompt.request,
-  "",
-  "Required node labels:",
-  ...prompt.requiredNodeLabels.map((label) => `- ${label}`),
-  "",
-  "Required decision branch labels:",
-  ...prompt.requiredBranchLabels.map((label) => `- ${label}`),
-  "",
-  "Use these required labels exactly unless the scenario explicitly asks for a clearer synonym.",
-  "",
-  "Expected JSON shape:",
-  JSON.stringify({
-    id: "short-kebab-case-id",
-    title: "Pharma batch disposition",
-    type: "flowchart",
-    nodes: [
-      { id: "start-id", label: "Human label", kind: "start" },
-      { id: "decision-id", label: "Question?", kind: "decision" },
-    ],
-    edges: [
-      {
-        id: "edge-id",
-        source: "decision-id",
-        target: "target-id",
-        label: "yes",
-      },
-    ],
-    layout: { direction: "TB", edgeRouting: "orthogonal" },
-  }),
-].join("\n");
+function generationResponseText(
+  diagram: Readonly<Record<string, unknown>>,
+  requirements: ReadonlyArray<Record<string, unknown>> = [],
+): string {
+  const { title, type, ...diagramWithoutTitle } = diagram;
+  return JSON.stringify(
+    {
+      title,
+      intent: { requestedKind: type, nativeKind: type, requirements },
+      diagram: { ...diagramWithoutTitle, type },
+    },
+    null,
+    2,
+  );
+}
+
+const expectedText = generationResponseText({
+  ...expectedDiagram,
+  style: { accentColor: "#0f766e", backgroundColor: "#ffffff" },
+});
+const expectedMessages = buildDiagramGenerationMessages(prompt);
+const expectedSystem = expectedMessages.system;
+const expectedUser = expectedMessages.user;
 const expectedGeminiBody = {
   contents: [{ role: "user", parts: [{ text: expectedUser }] }],
   generationConfig: {
@@ -240,49 +192,63 @@ describe("diagram generation prompt mapping", () => {
   it("maps mindmap requests to the mindmap IR contract", () => {
     const messages = buildDiagramGenerationMessages({
       ...prompt,
-      type: "mindmap",
+      requestedType: "mindmap",
     });
 
-    expect(messages.system).toContain('Use type "mindmap".');
+    expect(messages.system).toContain('Use diagram type "mindmap".');
     expect(messages.system).toContain("one nested root topic");
-    expect(messages.system).toContain("required top-level diagram id");
+    expect(messages.system).toContain("Return the diagram id");
     expect(messages.system).toContain("Do not return flat nodes");
-    expect(messages.system).toContain("derived topic/node/edge ids");
+    expect(messages.system).toContain("derived ids");
     expect(messages.system).toContain("2-4 children per major topic");
-    expect(messages.system).toContain("2-3 levels of meaningful depth");
+    expect(messages.system).toContain("2-3 meaningful levels");
     expect(messages.user).toContain('"type":"mindmap"');
   });
 
   it("maps sequence requests to the native sequence contract", () => {
     const messages = buildDiagramGenerationMessages({
       ...prompt,
-      type: "sequence",
+      requestedType: "sequence",
     });
 
-    expect(messages.system).toContain('Use type "sequence".');
+    expect(messages.system).toContain('Use diagram type "sequence".');
     expect(messages.system).toContain("ordered participants");
     expect(messages.system).toContain("chronological messages");
     expect(messages.user).toContain('"type":"sequence"');
+  });
+
+  it("gives omitted-type selection only schema-valid response examples", () => {
+    const messages = buildDiagramGenerationMessages({
+      id: "model-selected-kind",
+      request: "Create the diagram kind that best fits this scenario",
+    });
+
+    expect(messages.user).toContain("Supported response example:");
+    expect(messages.user).toContain("Unsupported response example:");
+    expect(messages.user).toContain(
+      '"requestedKind":"er","nativeKind":null,"requirements":[]',
+    );
+    expect(messages.user).not.toContain(
+      '"requirements":["typed count, depth, or label requirements"]',
+    );
   });
 
   it("requires real loop topology and flowchart richness", () => {
     const messages = buildDiagramGenerationMessages(prompt);
 
     expect(messages.system).toContain(
-      "include a real back-edge from the loop path",
+      "include a real back-edge to an earlier distinct process or decision",
     );
     expect(messages.system).toContain(
-      "Loop-back edges must target a process or decision node, never the start node",
+      "Never target start and never use a self-loop",
     );
-    expect(messages.system).toContain("start nodes have no incoming edges");
-    expect(messages.system).toContain("Self-loop edges are forbidden");
     expect(messages.system).toContain(
-      "retry branch routes back to an earlier distinct process or decision node",
+      "List every measurable scenario requirement once",
     );
-    expect(messages.system).toContain('decision "Retry?" --"yes"-->');
     expect(messages.system).toContain(
-      "Honor every explicit count or minimum for nodes, steps, decisions, branches, ends, and loops",
+      'Use "cycles" for loops and retry cycles; never invent another target name.',
     );
+    expect(messages.system).toContain("deterministically checks the plan");
   });
 
   it("keeps the Gemini REST body byte-for-byte stable", () => {
@@ -381,7 +347,7 @@ describe("pure candidate behavior", () => {
     const candidate = candidateFromText({
       model: "fixture",
       provider: "fixture",
-      text: JSON.stringify({
+      text: generationResponseText({
         id: "login-sequence",
         title: "Login sequence",
         type: "sequence",
@@ -407,11 +373,138 @@ describe("pure candidate behavior", () => {
     }
   });
 
-  it("normalizes empty optional edge labels before schema validation", () => {
+  it("requires the typed response envelope instead of accepting legacy raw IR", () => {
+    const candidate = candidateFromText({
+      model: "fixture",
+      provider: "fixture",
+      text: JSON.stringify(expectedDiagram),
+    });
+
+    expect(candidate.diagram).toBeUndefined();
+    expect(candidate.diagnostics[0]).toContain("response_schema_error");
+  });
+
+  it("uses a deterministic id-based title fallback for invalid model titles", () => {
+    const candidate = candidateFromText({
+      model: "fixture",
+      provider: "fixture",
+      text: generationResponseText({
+        ...expectedDiagram,
+        id: "release-approval-flow",
+        title: "x".repeat(61),
+      }),
+    });
+
+    expect(candidate.diagram?.title).toBe("Release approval flow");
+  });
+
+  it("preserves a supported typed rejection without inventing a diagram", () => {
     const candidate = candidateFromText({
       model: "fixture",
       provider: "fixture",
       text: JSON.stringify({
+        title: "Service architecture",
+        intent: {
+          requestedKind: "architecture",
+          nativeKind: null,
+          requirements: [],
+        },
+      }),
+    });
+
+    expect(candidate.error).toBeUndefined();
+    expect(candidate.diagram).toBeUndefined();
+    expect(candidate.intent?.requestedKind).toBe("architecture");
+  });
+
+  it("enforces sequence message counts and labels from the typed plan", () => {
+    const sequence = {
+      id: "login-sequence",
+      title: "Login sequence",
+      type: "sequence",
+      participants: [
+        { id: "browser", label: "Browser" },
+        { id: "api", label: "API" },
+      ],
+      messages: [
+        {
+          id: "login",
+          source: "browser",
+          target: "api",
+          label: "Login request",
+        },
+      ],
+    };
+    const candidate = enforceCandidateRequestRequirements(
+      candidateFromText({
+        model: "fixture",
+        provider: "fixture",
+        text: generationResponseText(sequence, [
+          {
+            comparator: "exact",
+            kind: "count",
+            target: "messages",
+            value: 2,
+          },
+          { kind: "label", target: "message", value: "Success response" },
+        ]),
+      }),
+      { model: "fixture", prompt: { ...prompt, requestedType: "sequence" } },
+    );
+
+    expect(candidate.diagram).toBeUndefined();
+    expect(candidate.diagnostics).toEqual(
+      expect.arrayContaining([
+        "requirement_count_not_met: messages must be exactly 2, but the generated sequence contained 1.",
+        'requirement_label_not_met: required message label "Success response" was not present.',
+      ]),
+    );
+  });
+
+  it("enforces mindmap depth and topic labels from the typed plan", () => {
+    const candidate = enforceCandidateRequestRequirements(
+      candidateFromText({
+        model: "fixture",
+        provider: "fixture",
+        text: generationResponseText(
+          {
+            id: "launch-map",
+            title: "Launch map",
+            type: "mindmap",
+            root: {
+              children: [{ children: [], label: "Product" }],
+              label: "Launch",
+            },
+            layout: { direction: "LR", edgeRouting: "curved" },
+          },
+          [
+            {
+              comparator: "minimum",
+              kind: "depth",
+              target: "topic_levels",
+              value: 3,
+            },
+            { kind: "label", target: "topic", value: "Operations" },
+          ],
+        ),
+      }),
+      { model: "fixture", prompt: { ...prompt, requestedType: "mindmap" } },
+    );
+
+    expect(candidate.diagram).toBeUndefined();
+    expect(candidate.diagnostics).toEqual(
+      expect.arrayContaining([
+        "requirement_count_not_met: topic_levels must be at least 3, but the generated mindmap contained 2.",
+        'requirement_label_not_met: required topic label "Operations" was not present.',
+      ]),
+    );
+  });
+
+  it("normalizes empty optional edge labels before schema validation", () => {
+    const candidate = candidateFromText({
+      model: "fixture",
+      provider: "fixture",
+      text: generationResponseText({
         ...expectedDiagram,
         edges: expectedDiagram.edges.map((edge, index) =>
           index === 0 ? { ...edge, label: "" } : edge,
@@ -431,7 +524,14 @@ describe("pure candidate behavior", () => {
       candidateFromText({
         model: "fixture",
         provider: "fixture",
-        text: expectedText,
+        text: generationResponseText(expectedDiagram, [
+          {
+            comparator: "minimum",
+            kind: "count",
+            target: "nodes",
+            value: 18,
+          },
+        ]),
       }),
       {
         model: "fixture",
@@ -444,7 +544,7 @@ describe("pure candidate behavior", () => {
 
     expect(candidate.diagram).toBeUndefined();
     expect(candidate.diagnostics).toContain(
-      "request_minimum_not_met: requested at least 18 steps, but the generated flowchart contained 4. Hint: return a complete diagram with at least 18 nodes.",
+      "requirement_count_not_met: nodes must be at least 18, but the generated flowchart contained 4.",
     );
   });
 
@@ -453,7 +553,14 @@ describe("pure candidate behavior", () => {
       candidateFromText({
         model: "fixture",
         provider: "fixture",
-        text: expectedText,
+        text: generationResponseText(expectedDiagram, [
+          {
+            comparator: "minimum",
+            kind: "count",
+            target: "decision_nodes",
+            value: 5,
+          },
+        ]),
       }),
       {
         model: "fixture",
@@ -466,7 +573,7 @@ describe("pure candidate behavior", () => {
 
     expect(candidate.diagram).toBeUndefined();
     expect(candidate.diagnostics).toContain(
-      "request_minimum_not_met: requested at least 5 decision nodes, but the generated flowchart contained 1. Hint: return a complete diagram with at least 5 decision nodes.",
+      "requirement_count_not_met: decision_nodes must be at least 5, but the generated flowchart contained 1.",
     );
   });
 
@@ -475,19 +582,29 @@ describe("pure candidate behavior", () => {
       candidateFromText({
         model: "fixture",
         provider: "fixture",
-        text: JSON.stringify({
-          ...expectedDiagram,
-          nodes: expectedDiagram.nodes.filter(
-            (node) => node.id === "received" || node.id === "packaging",
-          ),
-          edges: [
+        text: generationResponseText(
+          {
+            ...expectedDiagram,
+            nodes: expectedDiagram.nodes.filter(
+              (node) => node.id === "received" || node.id === "packaging",
+            ),
+            edges: [
+              {
+                id: "received-to-packaging",
+                source: "received",
+                target: "packaging",
+              },
+            ],
+          },
+          [
             {
-              id: "received-to-packaging",
-              source: "received",
-              target: "packaging",
+              comparator: "minimum",
+              kind: "count",
+              target: "cycles",
+              value: 1,
             },
           ],
-        }),
+        ),
       }),
       {
         model: "fixture",
@@ -500,7 +617,7 @@ describe("pure candidate behavior", () => {
 
     expect(candidate.diagram).toBeUndefined();
     expect(candidate.diagnostics).toContain(
-      "request_loop_not_met: prompt requires a retry or loop, but the generated flowchart contains no directed cycle. Hint: add a real back-edge from the loop path to the intended process or decision node, never the start node.",
+      "requirement_count_not_met: cycles must be at least 1, but the generated flowchart contained 0.",
     );
   });
 
@@ -508,7 +625,7 @@ describe("pure candidate behavior", () => {
     const candidate = candidateFromText({
       model: "fixture",
       provider: "fixture",
-      text: JSON.stringify({
+      text: generationResponseText({
         id: "launch-map",
         title: "Launch map",
         type: "mindmap",
@@ -551,7 +668,7 @@ describe("pure candidate behavior", () => {
     const candidate = candidateFromText({
       model: "fixture",
       provider: "fixture",
-      text: JSON.stringify({
+      text: generationResponseText({
         id: "launch-map",
         layout: { direction: "LR", edgeRouting: "curved" },
         root: {
@@ -591,7 +708,7 @@ describe("pure candidate behavior", () => {
     const candidate = candidateFromText({
       model: "fixture",
       provider: "fixture",
-      text: JSON.stringify({
+      text: generationResponseText({
         id: "broken-loop",
         title: "Broken loop",
         type: "flowchart",
@@ -695,7 +812,7 @@ layer(successfulClientLayer)("Cloudflare Google AI Studio live layer", (it) => {
   );
 });
 
-const invalidDiagramText = JSON.stringify({
+const invalidDiagramText = generationResponseText({
   id: "invalid-retry",
   title: "Invalid retry",
   type: "flowchart",
@@ -711,7 +828,7 @@ const invalidDiagramText = JSON.stringify({
   layout: { direction: "TB", edgeRouting: "orthogonal" },
 });
 
-const startIncomingDiagramText = JSON.stringify({
+const startIncomingDiagramText = generationResponseText({
   id: "expense-resubmission",
   title: "Expense resubmission",
   type: "flowchart",
@@ -757,7 +874,7 @@ const startIncomingDiagramText = JSON.stringify({
   layout: { direction: "TB", edgeRouting: "orthogonal" },
 });
 
-const selfLoopDiagramText = JSON.stringify({
+const selfLoopDiagramText = generationResponseText({
   id: "returns-fraud-review",
   title: "Returns fraud review",
   type: "flowchart",
@@ -781,7 +898,18 @@ const selfLoopDiagramText = JSON.stringify({
   layout: { direction: "TB", edgeRouting: "orthogonal" },
 });
 
-function returnsDiagramText(nodeCount: number, selfLoop: boolean): string {
+const returnsRequirements = [
+  { comparator: "minimum", kind: "count", target: "nodes", value: 18 },
+  { kind: "label", target: "branch", value: "re-check" },
+  { kind: "label", target: "node", value: "Fraud check?" },
+  { kind: "label", target: "node", value: "Return closed" },
+] as const;
+
+function returnsDiagramText(
+  nodeCount: number,
+  selfLoop: boolean,
+  requirements: ReadonlyArray<Record<string, unknown>> = returnsRequirements,
+): string {
   const processCount = nodeCount - 3;
   const processNodes = Array.from({ length: processCount }, (_, index) => ({
     id: `step-${index + 1}`,
@@ -794,38 +922,41 @@ function returnsDiagramText(nodeCount: number, selfLoop: boolean): string {
     target: processNodes[index + 1]?.id ?? "fraud-check",
   }));
   const lastProcessId = processNodes.at(-1)?.id ?? "fraud-review";
-  return JSON.stringify({
-    id: "returns-minimum-repair",
-    title: "Ecommerce returns",
-    type: "flowchart",
-    nodes: [
-      { id: "start", kind: "start", label: "Return initiated" },
-      ...processNodes,
-      { id: "fraud-check", kind: "decision", label: "Fraud check?" },
-      { id: "done", kind: "end", label: "Return closed" },
-    ],
-    edges: [
-      {
-        id: "start-step",
-        source: "start",
-        target: processNodes[0]?.id ?? "fraud-check",
-      },
-      ...processEdges,
-      {
-        id: "fraud-recheck",
-        source: "fraud-check",
-        target: selfLoop ? "fraud-check" : lastProcessId,
-        label: "re-check",
-      },
-      {
-        id: "fraud-clear",
-        source: "fraud-check",
-        target: "done",
-        label: "clear",
-      },
-    ],
-    layout: { direction: "TB", edgeRouting: "orthogonal" },
-  });
+  return generationResponseText(
+    {
+      id: "returns-minimum-repair",
+      title: "Ecommerce returns",
+      type: "flowchart",
+      nodes: [
+        { id: "start", kind: "start", label: "Return initiated" },
+        ...processNodes,
+        { id: "fraud-check", kind: "decision", label: "Fraud check?" },
+        { id: "done", kind: "end", label: "Return closed" },
+      ],
+      edges: [
+        {
+          id: "start-step",
+          source: "start",
+          target: processNodes[0]?.id ?? "fraud-check",
+        },
+        ...processEdges,
+        {
+          id: "fraud-recheck",
+          source: "fraud-check",
+          target: selfLoop ? "fraud-check" : lastProcessId,
+          label: "re-check",
+        },
+        {
+          id: "fraud-clear",
+          source: "fraud-check",
+          target: "done",
+          label: "clear",
+        },
+      ],
+      layout: { direction: "TB", edgeRouting: "orthogonal" },
+    },
+    requirements,
+  );
 }
 
 function geminiTextResponse(text: string): Response {
@@ -1029,10 +1160,7 @@ const returnsMinimumPrompt: DiagramGenerationPrompt = {
   id: "returns-minimum-repair",
   request:
     "Create an ecommerce returns flowchart with at least 18 distinct steps and a fraud review loop.",
-  requiredBranchLabels: ["re-check", "clear"],
-  requiredNodeLabels: ["Fraud check?", "Return closed"],
-  title: "Ecommerce returns",
-  type: "flowchart",
+  requestedType: "flowchart",
 };
 let compactingRepairCalls = 0;
 const compactingRepairRun = vi.fn<CloudflareAiGateway["run"]>(async () => {
@@ -1042,7 +1170,7 @@ const compactingRepairRun = vi.fn<CloudflareAiGateway["run"]>(async () => {
   }
   return geminiTextResponse(
     compactingRepairCalls === 2
-      ? returnsDiagramText(16, false)
+      ? returnsDiagramText(16, false, returnsRequirements.slice(1))
       : returnsDiagramText(18, false),
   );
 });
@@ -1080,8 +1208,9 @@ layer(compactingRepairClientLayer)("repair-introduced violations", (it) => {
           expect.arrayContaining([
             expect.stringContaining("flowchart.self_loop:"),
             expect.stringContaining(
-              "request_minimum_not_met: requested at least 18 steps",
+              "requirement_count_not_met: nodes must be at least 18",
             ),
+            "intent_requirements_changed: semantic repair altered or omitted the original typed requirement plan.",
             "repair_failed: semantic repair attempt 1 failed.",
             "repair_succeeded: semantic repair attempt 2 succeeded.",
           ]),
@@ -1097,22 +1226,94 @@ layer(compactingRepairClientLayer)("repair-introduced violations", (it) => {
           "Original hard requirements (all remain mandatory):",
         );
         expect(firstRepairBody).toContain(
-          "Parsed minimum: at least 18 nodes (from the original request for at least 18 steps).",
+          "Preserve the typed intent plan and make the corrected artifact satisfy every plan entry.",
         );
-        expect(firstRepairBody).toContain(
-          "Required decision branch label: re-check",
-        );
-        expect(firstRepairBody).toContain("Required node label: Fraud check?");
+        expect(firstRepairBody).toContain("re-check");
+        expect(firstRepairBody).toContain("Fraud check?");
 
         const secondRepairBody = JSON.stringify(
           compactingRepairRun.mock.calls[2]?.[0].query,
         );
         expect(secondRepairBody).toContain(
-          "request_minimum_not_met: requested at least 18 steps",
+          "requirement_count_not_met: nodes must be at least 18",
         );
-        expect(secondRepairBody).toContain("Parsed minimum: at least 18 nodes");
+        expect(secondRepairBody).toContain(
+          "intent_requirements_changed: semantic repair altered or omitted the original typed requirement plan.",
+        );
+        expect(secondRepairBody).toContain(
+          "Preserve the typed intent plan and make the corrected artifact satisfy every plan entry.",
+        );
       }),
   );
+});
+
+const unsupportedRepairText = JSON.stringify({
+  title: "Order data model",
+  intent: { requestedKind: "er", nativeKind: null, requirements: [] },
+});
+let unsupportedRepairCalls = 0;
+const unsupportedRepairRun = vi.fn<CloudflareAiGateway["run"]>(async () => {
+  unsupportedRepairCalls += 1;
+  return geminiTextResponse(
+    unsupportedRepairCalls === 1
+      ? '{"intent":{"requestedKind":"er"'
+      : unsupportedRepairText,
+  );
+});
+const unsupportedRepairClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      Layer.succeed(CloudflareAiGatewayBinding, {
+        gateway: () => ({ getUrl: vi.fn(), run: unsupportedRepairRun }),
+      }),
+      configLayer,
+      retryPolicyLayer,
+    ),
+  ),
+);
+
+layer(unsupportedRepairClientLayer)("unsupported semantic repair", (it) => {
+  it.effect("retains a valid unsupported repair as the terminal result", () => {
+    const { probe, sink } = makeTelemetryTestSink();
+    const telemetryLayer = makeWorkersTelemetryLayer({
+      resource: { serviceName: "sketchi-generation-unsupported-repair-test" },
+      sink,
+    });
+    return Effect.gen(function* () {
+      unsupportedRepairCalls = 0;
+      unsupportedRepairRun.mockClear();
+      const client = yield* DiagramGenerationClient;
+      const candidate = yield* client.generate({
+        model: "google/gemini-3.1-flash-lite",
+        prompt: {
+          id: "unsupported-er-repair",
+          request: "Create an entity relationship diagram for orders.",
+        },
+      });
+
+      assert.strictEqual(unsupportedRepairRun.mock.calls.length, 2);
+      assert.isUndefined(candidate.diagram);
+      assert.isUndefined(candidate.error);
+      assert.strictEqual(candidate.text, unsupportedRepairText);
+      assert.strictEqual(candidate.intent?.requestedKind, "er");
+      assert.isNull(candidate.intent?.nativeKind);
+      expect(candidate.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("json_parse_error:"),
+          "repair_succeeded: semantic repair attempt 1 succeeded.",
+        ]),
+      );
+      const repairs = probe.events.filter(
+        (event): event is TelemetryMetricEvent =>
+          event.event === "effect.metric" &&
+          event.metric === "sketchi_generation_repairs",
+      );
+      assert.deepStrictEqual(
+        repairs.map((event) => event.attributes["outcome"]),
+        ["attempted", "succeeded"],
+      );
+    }).pipe(Effect.provide(telemetryLayer));
+  });
 });
 
 let failedRepairCalls = 0;

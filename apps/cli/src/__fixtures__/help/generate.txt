@@ -13,7 +13,9 @@ Network and options:
   Endpoint: https://playground.sketchi.app/api/v1/generate
   The model call, schema validation, and quality gate run server-side; the finished diagram
   and Excalidraw artifact are returned over plain HTTPS. Sketchi sends no credentials.
-  --type defaults to flowchart; --model defaults to gemini-3.1-flash-lite.
+  Without --type, the model selects flowchart, mindmap, or sequence from the request.
+  Explicit er, architecture, swimlane, and state-machine requests fail with a typed unsupported error.
+  --model defaults to gemini-3.1-flash-lite.
   Override the endpoint for preview or local testing with SKETCHI_GENERATE_ENDPOINT
   or --endpoint URL. --format defaults to png. Without --dest, the artifact is written as
   <generated-id>.png, <generated-id>.excalidraw, or <generated-id>.scene.json in the current
@@ -37,13 +39,13 @@ USAGE
   sketchi generate [flags]
 
 FLAGS
-  --output text|json                   Result presentation format. (choices: text, json)
-  --prompt TEXT                        Diagram request text sent directly without interactive prompts.
-  --type flowchart|mindmap|sequence    Requested canonical diagram type; default flowchart. (choices: flowchart, mindmap, sequence)
-  --model MODEL                        Server-routed generation model id; default gemini-3.1-flash-lite.
-  --endpoint URL                       Unauthenticated generate API URL; defaults to the production Sketchi endpoint.
-  --format png|excalidraw|scene        Artifact exported after generation; default png. (choices: png, excalidraw, scene)
-  --dest PATH|-                        Artifact destination; defaults from the generated id, or - for stdout.
+  --output text|json               Result presentation format. (choices: text, json)
+  --prompt TEXT                    Diagram request text sent directly without interactive prompts.
+  --type TYPE                      Authoritative type; unsupported native requests fail clearly; omit for model selection. (choices: flowchart, mindmap, sequence, er, architecture, swimlane, state-machine)
+  --model MODEL                    Server-routed generation model id; default gemini-3.1-flash-lite.
+  --endpoint URL                   Unauthenticated generate API URL; defaults to the production Sketchi endpoint.
+  --format png|excalidraw|scene    Artifact exported after generation; default png. (choices: png, excalidraw, scene)
+  --dest PATH|-                    Artifact destination; defaults from the generated id, or - for stdout.
 
 GLOBAL FLAGS
   --help, -h                          Show help information

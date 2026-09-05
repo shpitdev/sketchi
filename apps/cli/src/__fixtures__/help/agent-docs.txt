@@ -23,13 +23,13 @@ Semantic color patch example:
   sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
-  sketchi generate [--prompt TEXT] [--type flowchart|mindmap|sequence] [--model MODEL]
+  sketchi generate [--prompt TEXT] [--type flowchart|mindmap|sequence|er|architecture|swimlane|state-machine] [--model MODEL]
   sketchi share DIAGRAM_ID [--open]
   sketchi pull DIAGRAM_ID --link URL|-
   generate makes one unauthenticated HTTPS POST to the public Sketchi generate API at https://playground.sketchi.app/api/v1/generate
   and needs no token, key, account, or login. The model call, validation, and quality gate
   run server-side; the finished diagram and Excalidraw artifact come back and are committed
-  through the same local store as create. The default type is flowchart and default model is
+  through the same local store as create. Without --type, the model selects a supported native type; the default model is
   gemini-3.1-flash-lite. Override the endpoint for preview or local testing with
   SKETCHI_GENERATE_ENDPOINT or --endpoint URL.
 

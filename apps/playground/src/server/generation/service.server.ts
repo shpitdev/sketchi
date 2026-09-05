@@ -31,7 +31,7 @@ export interface GenerateDiagramServiceInput {
   readonly cacheMode?: DiagramGenerationCacheMode;
   readonly model?: string;
   readonly prompt: string;
-  readonly type: DiagramGenerationType;
+  readonly type?: DiagramGenerationType;
 }
 
 export interface PlaygroundGenerationShape {
@@ -59,12 +59,6 @@ function envString(
   return typeof value === "string" && value.trim().length > 0
     ? value.trim()
     : fallback;
-}
-
-/** Human-readable title derived from the free-text prompt. */
-export function titleFromPrompt(prompt: string): string {
-  const title = prompt.replace(/\s+/gu, " ").trim().slice(0, 80);
-  return title || "Generated Sketchi diagram";
 }
 
 /** Convert a validated flowchart IR candidate into a canonical document input. */
@@ -183,10 +177,7 @@ export const PlaygroundGenerationLive = Layer.succeed(PlaygroundGeneration, {
       prompt: {
         id: "sketchi-generate",
         request: input.prompt,
-        requiredBranchLabels: [] as string[],
-        requiredNodeLabels: [] as string[],
-        title: titleFromPrompt(input.prompt),
-        type: input.type,
+        ...(input.type ? { requestedType: input.type } : {}),
       },
     };
 

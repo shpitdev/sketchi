@@ -25,11 +25,24 @@ export const FixtureGenerationClientLayer = Layer.succeed(
               scenarioId: request.prompt.id,
             }),
         });
+        const { title, type, ...diagram } = scenario.expectedDiagram;
         const candidate = candidateFromText({
           cacheMode: request.cacheMode ?? "default",
           model: "fixture",
           provider: "fixture",
-          text: JSON.stringify(scenario.expectedDiagram, null, 2),
+          text: JSON.stringify(
+            {
+              title,
+              intent: {
+                requestedKind: type,
+                nativeKind: type,
+                requirements: [],
+              },
+              diagram: { ...diagram, type },
+            },
+            null,
+            2,
+          ),
         });
         const finishedAt = yield* Clock.currentTimeMillis;
 

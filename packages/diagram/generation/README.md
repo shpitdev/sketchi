@@ -6,7 +6,8 @@ Model-facing generation helpers for Sketchi diagram candidates.
 flowchart LR
   Prompt["generation prompt contract"] --> Messages["prompt messages"]
   Messages --> Gemini["Gemini request body"]
-  Gemini --> Candidate["candidate text + usage"]
+  Gemini --> Intent["typed intent + requirement plan + IR"]
+  Intent --> Candidate["validated candidate + diagnostics"]
   Candidate --> Core["diagram-core parse"]
 ```
 
@@ -17,6 +18,7 @@ flowchart LR
 | Gemini REST body mapping                  | artifact persistence          |
 | Effect client contract and runtime layers | UI streaming                  |
 | candidate parsing and diagnostics         | final grading/revision policy |
+| deterministic intent-plan enforcement     | artifact persistence          |
 
 ## Commands
 

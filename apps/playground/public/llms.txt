@@ -29,7 +29,9 @@ POST /api/v1/sequences/build
 Build one diagram from a typed spec and store the result as an artifact.
 
 POST /api/v1/generate
-Generate a diagram from a prompt rather than a prebuilt spec.
+Generate a flowchart, mindmap, or sequence diagram from a prompt rather than a
+prebuilt spec. Omit type for model selection, or pass a supported type as an
+authoritative constraint. Unsupported native types return a typed error.
 
 GET /api/v1/artifacts/{artifactId}?format=scene
 GET /api/v1/artifacts/{artifactId}?format=excalidraw

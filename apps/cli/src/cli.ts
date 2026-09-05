@@ -38,6 +38,7 @@ import {
   SKETCHI_GENERATE_ENDPOINT_ENV,
   resolveGenerateEndpoint,
   type GenerateDiagramResult,
+  type GenerationType,
 } from "./generation.js";
 import {
   Argument,
@@ -115,13 +116,13 @@ Semantic color patch example:
   sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
-  sketchi generate [--prompt TEXT] [--type flowchart|mindmap|sequence] [--model MODEL]
+  sketchi generate [--prompt TEXT] [--type flowchart|mindmap|sequence|er|architecture|swimlane|state-machine] [--model MODEL]
   sketchi share DIAGRAM_ID [--open]
   sketchi pull DIAGRAM_ID --link URL|-
   generate makes one unauthenticated HTTPS POST to the public Sketchi generate API at ${DEFAULT_GENERATE_ENDPOINT}
   and needs no token, key, account, or login. The model call, validation, and quality gate
   run server-side; the finished diagram and Excalidraw artifact come back and are committed
-  through the same local store as create. The default type is flowchart and default model is
+  through the same local store as create. Without --type, the model selects a supported native type; the default model is
   ${DEFAULT_GENERATION_MODEL}. Override the endpoint for preview or local testing with
   ${SKETCHI_GENERATE_ENDPOINT_ENV} or --endpoint URL.
 
@@ -392,6 +393,10 @@ function listText(diagrams: ReadonlyArray<DiagramSummary>): string {
   ].join("\n");
 }
 
+function isNativeGenerationType(value: string): value is GenerationType {
+  return value === "flowchart" || value === "mindmap" || value === "sequence";
+}
+
 const GENERATE_HELP = `Create one persisted diagram and export its PNG by default. With no --prompt, Sketchi opens a short wizard only when stdin and stdout are human TTYs, output is text, and CI is absent. Pipes, redirects, CI, and --output json never prompt or block; pass --prompt for every script and automation path. This is one of Sketchi's three explicit network commands (generate, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
 
 Everyday wizard:
@@ -406,7 +411,9 @@ Network and options:
   Endpoint: ${DEFAULT_GENERATE_ENDPOINT}
   The model call, schema validation, and quality gate run server-side; the finished diagram
   and Excalidraw artifact are returned over plain HTTPS. Sketchi sends no credentials.
-  --type defaults to flowchart; --model defaults to ${DEFAULT_GENERATION_MODEL}.
+  Without --type, the model selects flowchart, mindmap, or sequence from the request.
+  Explicit er, architecture, swimlane, and state-machine requests fail with a typed unsupported error.
+  --model defaults to ${DEFAULT_GENERATION_MODEL}.
   Override the endpoint for preview or local testing with ${SKETCHI_GENERATE_ENDPOINT_ENV}
   or --endpoint URL. --format defaults to png. Without --dest, the artifact is written as
   <generated-id>.png, <generated-id>.excalidraw, or <generated-id>.scene.json in the current
@@ -438,11 +445,19 @@ const generateCommand = Command.make(
       ),
     ),
     type: Flag.optional(
-      Flag.choice("type", ["flowchart", "mindmap", "sequence"]).pipe(
+      Flag.choice("type", [
+        "flowchart",
+        "mindmap",
+        "sequence",
+        "er",
+        "architecture",
+        "swimlane",
+        "state-machine",
+      ]).pipe(
         Flag.withDescription(
-          "Requested canonical diagram type; default flowchart.",
+          "Authoritative type; unsupported native requests fail clearly; omit for model selection.",
         ),
-        Flag.withMetavar("flowchart|mindmap|sequence"),
+        Flag.withMetavar("TYPE"),
       ),
     ),
     model: Flag.string("model").pipe(
@@ -501,6 +516,16 @@ const generateCommand = Command.make(
             "a file path when --prompt is omitted; pass --prompt to write an artifact to stdout",
           );
         }
+        if (
+          suppliedType !== undefined &&
+          !isNativeGenerationType(suppliedType)
+        ) {
+          return yield* invalidFlagValue(
+            "type",
+            suppliedType,
+            "flowchart, mindmap, or sequence in the interactive wizard; pass --prompt to receive the typed unsupported-type error",
+          );
+        }
         const wizard = yield* GenerateWizard;
         yield* reportGenerateOperation(
           output,
@@ -539,7 +564,7 @@ const generateCommand = Command.make(
           endpoint: input.endpoint,
           model: input.model,
           prompt: suppliedPrompt,
-          type: suppliedType ?? "flowchart",
+          ...(suppliedType ? { type: suppliedType } : {}),
           format: suppliedFormat ?? "png",
           destination:
             suppliedDestination === undefined

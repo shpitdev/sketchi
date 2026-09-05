@@ -76,12 +76,27 @@ describe("eval harness scenario generation composition", () => {
 
   it("adapts a maintained scenario before calling the generation client", async () => {
     const scenario = getScenario("sketchi-onboarding-decision-flow");
+    const { title, type, ...diagram } = scenario.expectedDiagram;
     const responseBody = {
       candidates: [
         {
           content: {
             parts: [
-              { text: JSON.stringify(scenario.expectedDiagram, null, 2) },
+              {
+                text: JSON.stringify(
+                  {
+                    title,
+                    intent: {
+                      requestedKind: type,
+                      nativeKind: type,
+                      requirements: [],
+                    },
+                    diagram: { ...diagram, type },
+                  },
+                  null,
+                  2,
+                ),
+              },
             ],
             role: "model",
           },

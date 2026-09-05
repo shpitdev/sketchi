@@ -21,12 +21,18 @@ export const DEFAULT_GENERATE_ENDPOINT =
 export const SKETCHI_GENERATE_ENDPOINT_ENV = "SKETCHI_GENERATE_ENDPOINT";
 
 export type GenerationType = "flowchart" | "mindmap" | "sequence";
+export type RequestedGenerationType =
+  | GenerationType
+  | "architecture"
+  | "er"
+  | "state-machine"
+  | "swimlane";
 
 export interface GenerateDiagramInput {
   readonly endpoint: string;
   readonly model: string;
   readonly prompt: string;
-  readonly type: GenerationType;
+  readonly type?: RequestedGenerationType;
 }
 
 export interface GenerateDiagramResult {
@@ -141,6 +147,17 @@ function endpointFailure(status: number, text: string): CliGenerationError {
           "Refine the prompt with concrete content, then retry.",
         details,
       });
+    case "unsupported_diagram_type":
+      return CliGenerationError.make({
+        code: "unsupported_diagram_type",
+        message:
+          firstIssue?.message ??
+          "Sketchi does not natively support the requested diagram type.",
+        hint:
+          firstIssue?.hint ??
+          "Request a flowchart, mindmap, or sequence diagram instead.",
+        details,
+      });
     default:
       return CliGenerationError.make({
         code: "provider_failure",
@@ -233,7 +250,7 @@ const requestGeneration = Effect.fn("sketchi.cli.generate.request")(function* (
         },
         body: JSON.stringify({
           prompt: input.prompt,
-          type: input.type,
+          ...(input.type ? { type: input.type } : {}),
           model: input.model,
         }),
         signal,

@@ -64,6 +64,18 @@ const sequenceIr = {
   ],
 };
 
+function generationText(
+  diagram: Readonly<Record<string, unknown>>,
+  requirements: ReadonlyArray<Record<string, unknown>> = [],
+): string {
+  const { title, type, ...diagramWithoutTitle } = diagram;
+  return JSON.stringify({
+    title,
+    intent: { requestedKind: type, nativeKind: type, requirements },
+    diagram: { ...diagramWithoutTitle, type },
+  });
+}
+
 function fakeAiGateway(
   text: string,
   observeRun?: (input: Parameters<CloudflareAiGateway["run"]>[0]) => void,
@@ -115,7 +127,7 @@ function generateRequest(env: StudioEnv, body: unknown): Promise<Response> {
 
 describe("public generate endpoint", () => {
   it("generates and returns a built flowchart with inline artifacts", async () => {
-    const env: StudioEnv = { AI: fakeAiGateway(JSON.stringify(flowchartIr)) };
+    const env: StudioEnv = { AI: fakeAiGateway(generationText(flowchartIr)) };
     const response = await generateRequest(env, {
       prompt: "Map release approval with pass and revise branches",
       type: "flowchart",
@@ -135,7 +147,7 @@ describe("public generate endpoint", () => {
   });
 
   it("generates and returns a native sequence with inline artifacts", async () => {
-    const env: StudioEnv = { AI: fakeAiGateway(JSON.stringify(sequenceIr)) };
+    const env: StudioEnv = { AI: fakeAiGateway(generationText(sequenceIr)) };
     const response = await generateRequest(env, {
       prompt: "Show Browser, API, and Database login interactions",
       type: "sequence",
@@ -158,10 +170,69 @@ describe("public generate endpoint", () => {
     expect(diagram.excalidraw).toBeTruthy();
   });
 
+  it("lets the model select a native type when type is omitted", async () => {
+    const env: StudioEnv = { AI: fakeAiGateway(generationText(sequenceIr)) };
+    const response = await generateRequest(env, {
+      prompt: "Show Browser, API, and Database login interactions",
+    });
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      diagram: { document: { type: string } };
+    };
+    expect(body.diagram.document.type).toBe("sequence");
+  });
+
+  it.each(["er", "architecture", "swimlane", "state-machine"])(
+    "fails clearly when model-selected %s generation is unsupported",
+    async (requestedKind) => {
+      const env: StudioEnv = {
+        AI: fakeAiGateway(
+          JSON.stringify({
+            title: "Unsupported diagram",
+            intent: { requestedKind, nativeKind: null, requirements: [] },
+          }),
+        ),
+      };
+      const response = await generateRequest(env, {
+        prompt: `Create an ${requestedKind} diagram`,
+      });
+
+      expect(response.status).toBe(422);
+      const body = (await response.json()) as {
+        status: string;
+        issues: ReadonlyArray<{ message: string }>;
+      };
+      expect(body.status).toBe("unsupported_diagram_type");
+      expect(body.issues[0]?.message).toContain(requestedKind);
+    },
+  );
+
+  it.each(["er", "architecture", "swimlane", "state-machine"])(
+    "rejects explicit unsupported type %s before provider dispatch",
+    async (type) => {
+      let dispatched = false;
+      const env: StudioEnv = {
+        AI: fakeAiGateway(generationText(flowchartIr), () => {
+          dispatched = true;
+        }),
+      };
+      const response = await generateRequest(env, {
+        prompt: `Create an ${type} diagram`,
+        type,
+      });
+
+      expect(response.status).toBe(422);
+      const body = (await response.json()) as { status: string };
+      expect(body.status).toBe("unsupported_diagram_type");
+      expect(dispatched).toBe(false);
+    },
+  );
+
   it("requests fresh provider output for reliability probes", async () => {
     const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];
     const env: StudioEnv = {
-      AI: fakeAiGateway(JSON.stringify(flowchartIr), (input) => {
+      AI: fakeAiGateway(generationText(flowchartIr), (input) => {
         observedRuns.push(input);
       }),
     };
@@ -185,7 +256,7 @@ describe("public generate endpoint", () => {
   });
 
   it("rejects an empty prompt with a typed invalid-input contract", async () => {
-    const env: StudioEnv = { AI: fakeAiGateway(JSON.stringify(flowchartIr)) };
+    const env: StudioEnv = { AI: fakeAiGateway(generationText(flowchartIr)) };
     const response = await generateRequest(env, { prompt: "   " });
 
     expect(response.status).toBe(400);
@@ -204,7 +275,7 @@ describe("public generate endpoint", () => {
   });
 
   it("rejects a generated diagram whose type does not match the request", async () => {
-    const env: StudioEnv = { AI: fakeAiGateway(JSON.stringify(flowchartIr)) };
+    const env: StudioEnv = { AI: fakeAiGateway(generationText(flowchartIr)) };
     const response = await generateRequest(env, {
       prompt: "Organize launch readiness",
       type: "mindmap",
@@ -212,7 +283,7 @@ describe("public generate endpoint", () => {
 
     expect(response.status).toBe(422);
     const body = (await response.json()) as Record<string, unknown>;
-    expect(body.status).toBe("invalid_generated_document");
+    expect(body.status).toBe("quality_failed");
   });
 
   it("treats non-JSON model output as malformed output", async () => {
@@ -238,7 +309,7 @@ describe("public generate endpoint", () => {
       ],
     };
     const env: StudioEnv = {
-      AI: fakeAiGateway(JSON.stringify(invalidFlowchart)),
+      AI: fakeAiGateway(generationText(invalidFlowchart)),
     };
     const response = await generateRequest(env, {
       prompt: "Map a release flow with a retry loop",
