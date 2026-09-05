@@ -10,7 +10,7 @@ import {
   CliFilesystemError,
   CliStorageError,
 } from "./errors.js";
-import { CliPngRenderer } from "./png-renderer.js";
+import { CliPngRenderer, type HeadlessPngRenderError } from "./png-renderer.js";
 import { DiagramStore } from "./storage.js";
 
 export class DiagramExporter extends Context.Service<
@@ -26,19 +26,30 @@ export class DiagramExporter extends Context.Service<
   }
 >()("@sketchi/cli/DiagramExporter") {}
 
-function renderFailed() {
+function renderFailed(diagramId: string, error?: HeadlessPngRenderError) {
+  const recoveryCommand = `sketchi export ${diagramId} --format png --dest ${diagramId}.png`;
   return CliExportError.make({
-    code: "render_failed",
+    code: error?.code ?? "invalid_render_artifact",
     format: "png",
-    message: "Unable to render the stored diagram as PNG.",
-    hint: "Verify the stored scene and Excalidraw artifacts, then retry.",
+    diagramId,
+    storagePath: `~/.sketchi/diagrams/${diagramId}`,
+    recoveryCommand,
+    message:
+      error?.message ?? "Unable to read the stored PNG source artifacts.",
+    hint: `The canonical record is preserved. Retry with: ${recoveryCommand}`,
+    details: error
+      ? [`stage:${error.stage}`, ...error.details]
+      : ["stage:artifact"],
   });
 }
 
-function decodeJson(bytes: Uint8Array): Effect.Effect<unknown, CliExportError> {
+function decodeJson(
+  diagramId: string,
+  bytes: Uint8Array,
+): Effect.Effect<unknown, CliExportError> {
   return Effect.try({
     try: () => JSON.parse(new TextDecoder().decode(bytes)),
-    catch: renderFailed,
+    catch: () => renderFailed(diagramId),
   });
 }
 
@@ -49,25 +60,31 @@ export const DiagramExporterLive = Layer.effect(
     const renderer = yield* CliPngRenderer;
 
     const renderStoredPng = Effect.fn("sketchi.cli.export.renderPng")(
-      function* (artifacts: {
-        readonly scene?: Uint8Array;
-        readonly excalidraw: Uint8Array;
-      }) {
-        const excalidrawJson = yield* decodeJson(artifacts.excalidraw);
+      function* (
+        diagramId: string,
+        artifacts: {
+          readonly scene?: Uint8Array;
+          readonly excalidraw: Uint8Array;
+        },
+      ) {
+        const excalidrawJson = yield* decodeJson(
+          diagramId,
+          artifacts.excalidraw,
+        );
         const excalidraw = ExcalidrawFileSchema.safeParse(excalidrawJson);
-        if (!excalidraw.success) return yield* renderFailed();
+        if (!excalidraw.success) return yield* renderFailed(diagramId);
         const scene = artifacts.scene
           ? RenderedDiagramSceneSchema.safeParse(
-              yield* decodeJson(artifacts.scene),
+              yield* decodeJson(diagramId, artifacts.scene),
             )
           : undefined;
-        if (scene && !scene.success) return yield* renderFailed();
+        if (scene && !scene.success) return yield* renderFailed(diagramId);
         const png = yield* renderer
           .renderPng({
             ...(scene?.success ? { scene: scene.data } : {}),
             excalidraw: excalidraw.data,
           })
-          .pipe(Effect.mapError(renderFailed));
+          .pipe(Effect.mapError((error) => renderFailed(diagramId, error)));
         return png instanceof Uint8Array ? png : new Uint8Array(png);
       },
     );
@@ -79,7 +96,7 @@ export const DiagramExporterLive = Layer.effect(
       const source = yield* store.readExportSource(diagramId, format);
       return source._tag === "StoredArtifact"
         ? source.bytes
-        : yield* renderStoredPng(source);
+        : yield* renderStoredPng(diagramId, source);
     });
 
     return { exportArtifact };

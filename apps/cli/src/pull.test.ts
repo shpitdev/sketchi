@@ -123,14 +123,20 @@ describe("pull transaction", () => {
                     Effect.fail(
                       HeadlessPngRenderError.make({
                         cause: new Error("renderer must not be reached"),
+                        code: "rasterization_failed",
+                        stage: "rasterization",
                         message: "renderer must not be reached",
+                        details: [],
                       }),
                     ),
                   renderPng: () =>
                     Effect.fail(
                       HeadlessPngRenderError.make({
                         cause: new Error("renderer must not be reached"),
+                        code: "rasterization_failed",
+                        stage: "rasterization",
                         message: "renderer must not be reached",
+                        details: [],
                       }),
                     ),
                 }),
@@ -193,7 +199,10 @@ describe("pull transaction", () => {
                     Effect.fail(
                       HeadlessPngRenderError.make({
                         cause: new Error("probe failed"),
+                        code: "rasterization_failed",
+                        stage: "rasterization",
                         message: "probe failed",
+                        details: [],
                       }),
                     ),
                 }),

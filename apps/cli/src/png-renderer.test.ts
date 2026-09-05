@@ -10,6 +10,8 @@ import { DiagramBuilder, DiagramBuilderLive } from "./builder.js";
 import {
   canonicalDocument,
   flowchartInput,
+  largeFlowchartInput,
+  largeMindmapInput,
   mindmapInput,
 } from "./__tests__/fixtures.js";
 import { CliPngRenderer, CliPngRendererLive } from "./png-renderer.js";
@@ -108,6 +110,25 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))(
         assertInkHasPadding(wide);
         assert.isAbove(inkBounds(wide).width, inkBounds(normal).width);
       }),
+    );
+
+    it.effect(
+      "exports the preserved 20-node flowchart and 29-topic mindmap repros",
+      () =>
+        Effect.gen(function* () {
+          const builder = yield* DiagramBuilder;
+          const renderer = yield* CliPngRenderer;
+          for (const input of [largeFlowchartInput, largeMindmapInput]) {
+            const built = yield* builder.build(canonicalDocument(input));
+            const png = yield* renderer.renderPng({
+              scene: built.scene,
+              excalidraw: built.excalidraw,
+            });
+            assert.isAbove(png.byteLength, 1_000);
+            assertInkHasPadding(png);
+          }
+        }),
+      15_000,
     );
 
     it.effect("fails instead of silently dropping unsupported glyphs", () =>

@@ -96,7 +96,7 @@ describe("diagram export orchestration", () => {
     );
   });
 
-  it.effect("maps renderer resource failures to render_failed", () => {
+  it.effect("surfaces typed render diagnostics and recovery identity", () => {
     const store = missingPngStoreLayer();
     return Effect.gen(function* () {
       const exporter = yield* DiagramExporter;
@@ -105,7 +105,12 @@ describe("diagram export orchestration", () => {
       );
       assert.strictEqual(error._tag, "CliExportError");
       if (error._tag === "CliExportError") {
-        assert.strictEqual(error.code, "render_failed");
+        assert.strictEqual(error.code, "rasterization_failed");
+        assert.strictEqual(error.diagramId, "release-flow");
+        assert.strictEqual(
+          error.recoveryCommand,
+          "sketchi export release-flow --format png --dest release-flow.png",
+        );
       }
     }).pipe(
       Effect.provide(
@@ -114,7 +119,10 @@ describe("diagram export orchestration", () => {
             Effect.fail(
               HeadlessPngRenderError.make({
                 cause: new Error("missing embedded font"),
-                message: "Unable to render PNG.",
+                code: "rasterization_failed",
+                stage: "rasterization",
+                message: "Unable to rasterize the stored diagram as PNG.",
+                details: [],
               }),
             ),
           normalizeExcalidraw: () => Effect.die("unused normalize"),

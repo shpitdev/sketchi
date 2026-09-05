@@ -3,10 +3,11 @@ import { Resvg, initWasm, type ResvgRenderOptions } from "@resvg/resvg-wasm";
 import * as Linkedom from "linkedom";
 
 import type { PngRenderInput } from "./png-renderer.js";
+import { HeadlessPngRenderError } from "./render-diagnostics.js";
 import {
+  adaptivePngExportScale,
   PNG_EXPORT_PADDING,
-  PNG_EXPORT_SCALE,
-  renderLimitFailure,
+  renderLimitDiagnostic,
   renderedSvgLimitFailure,
 } from "./render-limits.js";
 
@@ -313,11 +314,8 @@ function addTitle(
     "viewBox",
     `${canvasMinX} ${minY - TITLE_HEIGHT} ${canvasWidth} ${height + TITLE_HEIGHT}`,
   );
-  svg.setAttribute("width", String(canvasWidth * PNG_EXPORT_SCALE));
-  svg.setAttribute(
-    "height",
-    String((height + TITLE_HEIGHT) * PNG_EXPORT_SCALE),
-  );
+  svg.setAttribute("width", String(canvasWidth));
+  svg.setAttribute("height", String(height + TITLE_HEIGHT));
 
   const background = svg.ownerDocument.createElementNS(SVG_NAMESPACE, "rect");
   background.setAttribute("x", String(canvasMinX));
@@ -371,13 +369,38 @@ export async function renderPngBytes(
 ): Promise<Uint8Array> {
   const decodedExcalidraw = ExcalidrawFileSchema.safeParse(input.excalidraw);
   if (!decodedExcalidraw.success) {
-    throw new Error("Stored Excalidraw data failed schema validation.");
+    throw HeadlessPngRenderError.make({
+      cause: new Error("Stored Excalidraw data failed schema validation."),
+      code: "invalid_render_artifact",
+      stage: "artifact",
+      message: "Stored Excalidraw data failed schema validation.",
+      details: decodedExcalidraw.error.issues
+        .slice(0, 8)
+        .map((issue) => issue.message),
+    });
   }
-  const sizeFailure = renderLimitFailure(
+  const sizeFailure = renderLimitDiagnostic(
     decodedExcalidraw.data.elements,
     input.scene ? TITLE_HEIGHT : 0,
   );
-  if (sizeFailure) throw new Error(sizeFailure);
+  if (sizeFailure) {
+    throw HeadlessPngRenderError.make({
+      cause: new Error(sizeFailure.message),
+      code: "render_limit_exceeded",
+      stage: "geometry",
+      message: "The diagram exceeds a safe PNG rendering limit.",
+      details: [
+        `limit:${sizeFailure.code}`,
+        sizeFailure.message,
+        ...(sizeFailure.observed === undefined
+          ? []
+          : [`observed:${String(Math.ceil(sizeFailure.observed))}`]),
+        ...(sizeFailure.limit === undefined
+          ? []
+          : [`limit_value:${String(sizeFailure.limit)}`]),
+      ],
+    });
+  }
   const textValues = [
     ...(input.scene ? [input.scene.title] : []),
     ...decodedExcalidraw.data.elements.flatMap((element) =>
@@ -389,9 +412,15 @@ export async function renderPngBytes(
   for (const text of textValues) {
     const unsupported = unsupportedGlyph(text);
     if (unsupported) {
-      throw new Error(
-        `The bundled Excalifont does not support glyph ${unsupported}.`,
-      );
+      throw HeadlessPngRenderError.make({
+        cause: new Error(
+          `The bundled Excalifont does not support glyph ${unsupported}.`,
+        ),
+        code: "unsupported_render_glyph",
+        stage: "font",
+        message: "The bundled Excalifont cannot render every diagram glyph.",
+        details: [`glyph:${unsupported}`],
+      });
     }
   }
 
@@ -412,7 +441,7 @@ export async function renderPngBytes(
       ...restored.appState,
       exportBackground: true,
       exportEmbedScene: false,
-      exportScale: PNG_EXPORT_SCALE,
+      exportScale: 1,
       viewBackgroundColor:
         input.scene?.backgroundColor ??
         decodedExcalidraw.data.appState["viewBackgroundColor"] ??
@@ -425,10 +454,41 @@ export async function renderPngBytes(
   if (input.scene) {
     addTitle(svg, input.scene.title, input.scene.backgroundColor);
   }
-  const svgWidth = Number.parseFloat(svg.getAttribute("width") ?? "");
-  const svgHeight = Number.parseFloat(svg.getAttribute("height") ?? "");
+  const baseSvgWidth = Number.parseFloat(svg.getAttribute("width") ?? "");
+  const baseSvgHeight = Number.parseFloat(svg.getAttribute("height") ?? "");
+  const exportScale = adaptivePngExportScale(baseSvgWidth, baseSvgHeight);
+  if (typeof exportScale !== "number") {
+    throw HeadlessPngRenderError.make({
+      cause: new Error(exportScale.message),
+      code: "render_limit_exceeded",
+      stage: "geometry",
+      message: "The diagram exceeds a safe PNG rendering limit.",
+      details: [
+        `limit:${exportScale.code}`,
+        exportScale.message,
+        ...(exportScale.observed === undefined
+          ? []
+          : [`observed:${String(Math.ceil(exportScale.observed))}`]),
+        ...(exportScale.limit === undefined
+          ? []
+          : [`limit_value:${String(exportScale.limit)}`]),
+      ],
+    });
+  }
+  const svgWidth = baseSvgWidth * exportScale;
+  const svgHeight = baseSvgHeight * exportScale;
+  svg.setAttribute("width", String(svgWidth));
+  svg.setAttribute("height", String(svgHeight));
   const svgFailure = renderedSvgLimitFailure(svgWidth, svgHeight);
-  if (svgFailure) throw new Error(svgFailure);
+  if (svgFailure) {
+    throw HeadlessPngRenderError.make({
+      cause: new Error(svgFailure),
+      code: "render_limit_exceeded",
+      stage: "geometry",
+      message: "The diagram exceeds a safe PNG rendering limit.",
+      details: [svgFailure],
+    });
+  }
   const rasterizer = new Resvg(svg.outerHTML, fontOptions);
   try {
     const rendered = rasterizer.render();

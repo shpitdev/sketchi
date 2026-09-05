@@ -1,18 +1,12 @@
 import type { PatchableScene } from "@sketchi/diagram-agent";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
+
+import { HeadlessPngRenderError } from "./render-diagnostics.js";
 
 export interface PngRenderInput {
   readonly scene?: PatchableScene;
   readonly excalidraw: unknown;
 }
-
-export class HeadlessPngRenderError extends Schema.TaggedErrorClass<HeadlessPngRenderError>()(
-  "HeadlessPngRenderError",
-  {
-    cause: Schema.Defect(),
-    message: Schema.String,
-  },
-) {}
 
 export class CliPngRenderer extends Context.Service<
   CliPngRenderer,
@@ -35,10 +29,15 @@ function renderPng(
       return runtime.renderPngBytes(input);
     },
     catch: (cause) =>
-      HeadlessPngRenderError.make({
-        cause,
-        message: "Unable to render the stored Excalidraw artifact as PNG.",
-      }),
+      cause instanceof HeadlessPngRenderError
+        ? cause
+        : HeadlessPngRenderError.make({
+            cause,
+            code: "rasterization_failed",
+            stage: "rasterization",
+            message: "Unable to rasterize the stored diagram as PNG.",
+            details: [],
+          }),
   });
 }
 
@@ -51,10 +50,15 @@ function normalizeExcalidraw(
       return runtime.normalizeExcalidrawArtifact(input);
     },
     catch: (cause) =>
-      HeadlessPngRenderError.make({
-        cause,
-        message: "Unable to restore the Excalidraw share artifact.",
-      }),
+      cause instanceof HeadlessPngRenderError
+        ? cause
+        : HeadlessPngRenderError.make({
+            cause,
+            code: "invalid_render_artifact",
+            stage: "artifact",
+            message: "Unable to restore the Excalidraw share artifact.",
+            details: [],
+          }),
   });
 }
 
@@ -62,3 +66,5 @@ export const CliPngRendererLive = Layer.succeed(CliPngRenderer, {
   renderPng,
   normalizeExcalidraw,
 });
+
+export { HeadlessPngRenderError } from "./render-diagnostics.js";

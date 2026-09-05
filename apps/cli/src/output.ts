@@ -60,6 +60,9 @@ interface ErrorView {
   readonly message: string;
   readonly hint: string;
   readonly details?: ReadonlyArray<string>;
+  readonly diagramId?: string;
+  readonly storagePath?: string;
+  readonly recoveryCommand?: string;
 }
 
 function failureView(error: CliFailure): ErrorView {
@@ -98,7 +101,17 @@ function failureView(error: CliFailure): ErrorView {
     case "CliStorageError":
       return { code: error.code, message: error.message, hint: error.hint };
     case "CliExportError":
-      return { code: error.code, message: error.message, hint: error.hint };
+      return {
+        code: error.code,
+        message: error.message,
+        hint: error.hint,
+        ...(error.details ? { details: error.details } : {}),
+        ...(error.diagramId ? { diagramId: error.diagramId } : {}),
+        ...(error.storagePath ? { storagePath: error.storagePath } : {}),
+        ...(error.recoveryCommand
+          ? { recoveryCommand: error.recoveryCommand }
+          : {}),
+      };
     case "CliShareError":
       return {
         code: error.code,
@@ -115,6 +128,9 @@ function textError(error: ErrorView): string {
     [
       `error: ${error.code}`,
       error.message,
+      ...(error.diagramId ? [`diagram: ${error.diagramId}`] : []),
+      ...(error.storagePath ? [`storage: ${error.storagePath}`] : []),
+      ...(error.recoveryCommand ? [`recovery: ${error.recoveryCommand}`] : []),
       `next: ${error.hint}`,
       ...(details ? ["details:", details] : []),
     ].join("\n") + "\n"
