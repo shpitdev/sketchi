@@ -108,11 +108,14 @@ Canonical flowchart example:
 Canonical mindmap example:
   {"type":"mindmap","spec":{"id":"launch-map","title":"Launch plan","root":{"label":"Launch","children":[{"label":"Product"},{"label":"Operations"}]}}}
 
+Canonical sequence example:
+  {"type":"sequence","spec":{"id":"checkout-sequence","title":"Checkout sequence","participants":[{"id":"browser","label":"Browser"},{"id":"api","label":"API"}],"messages":[{"id":"request","source":"browser","target":"api","label":"Submit checkout"}]}}
+
 Semantic color patch example:
   sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
-  sketchi generate [--prompt TEXT] [--type flowchart|mindmap] [--model MODEL]
+  sketchi generate [--prompt TEXT] [--type flowchart|mindmap|sequence] [--model MODEL]
   sketchi share DIAGRAM_ID [--open]
   sketchi pull DIAGRAM_ID --link URL|-
   generate makes one unauthenticated HTTPS POST to the public Sketchi generate API at ${DEFAULT_GENERATE_ENDPOINT}
@@ -392,7 +395,7 @@ function listText(diagrams: ReadonlyArray<DiagramSummary>): string {
 const GENERATE_HELP = `Create one persisted diagram and export its PNG by default. With no --prompt, Sketchi opens a short wizard only when stdin and stdout are human TTYs, output is text, and CI is absent. Pipes, redirects, CI, and --output json never prompt or block; pass --prompt for every script and automation path. This is one of Sketchi's three explicit network commands (generate, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
 
 Everyday wizard:
-  The wizard asks only for prompt text, flowchart (default) or mind map, and a PNG destination.
+  The wizard asks only for prompt text, flowchart (default), mind map, or sequence diagram, and a PNG destination.
   Current directory writes <cwd>/<generated-id>.png. Project diagrams folder means exactly the
   directory where Sketchi was run: <cwd>/diagrams/<generated-id>.png, with no Git detection; the
   diagrams folder is created only after generation succeeds. Explicit --type and file --dest values
@@ -435,11 +438,11 @@ const generateCommand = Command.make(
       ),
     ),
     type: Flag.optional(
-      Flag.choice("type", ["flowchart", "mindmap"]).pipe(
+      Flag.choice("type", ["flowchart", "mindmap", "sequence"]).pipe(
         Flag.withDescription(
           "Requested canonical diagram type; default flowchart.",
         ),
-        Flag.withMetavar("flowchart|mindmap"),
+        Flag.withMetavar("flowchart|mindmap|sequence"),
       ),
     ),
     model: Flag.string("model").pipe(
@@ -560,6 +563,11 @@ const generateCommand = Command.make(
       command:
         'sketchi generate --prompt "Organize launch readiness" --type mindmap --format excalidraw --dest launch.excalidraw --output json',
       description: "Generate a mindmap and write editable Excalidraw.",
+    },
+    {
+      command:
+        'sketchi generate --prompt "Show Browser calling API" --type sequence --dest request-sequence.png',
+      description: "Generate a native sequence diagram and write its PNG.",
     },
   ]),
 );

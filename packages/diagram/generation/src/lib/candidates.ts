@@ -39,6 +39,44 @@ export const DiagramGenerationCacheModeSchema = Schema.Literals([
 export type DiagramGenerationCacheMode =
   typeof DiagramGenerationCacheModeSchema.Type;
 
+export class GeneratedSequenceParticipant extends Schema.Class<GeneratedSequenceParticipant>(
+  "GeneratedSequenceParticipant",
+)({
+  id: Schema.NonEmptyString,
+  label: Schema.NonEmptyString,
+  kind: Schema.optionalKey(Schema.NonEmptyString),
+}) {}
+
+export class GeneratedSequenceMessage extends Schema.Class<GeneratedSequenceMessage>(
+  "GeneratedSequenceMessage",
+)({
+  id: Schema.NonEmptyString,
+  source: Schema.NonEmptyString,
+  target: Schema.NonEmptyString,
+  label: Schema.NonEmptyString,
+  type: Schema.optionalKey(Schema.Literals(["message", "return"])),
+  style: Schema.optionalKey(Schema.Literals(["solid", "dashed"])),
+}) {}
+
+export class GeneratedSequenceDiagram extends Schema.Class<GeneratedSequenceDiagram>(
+  "GeneratedSequenceDiagram",
+)({
+  id: Schema.NonEmptyString,
+  title: Schema.NonEmptyString,
+  type: Schema.Literal("sequence"),
+  participants: Schema.Array(GeneratedSequenceParticipant).pipe(
+    Schema.mutable,
+    Schema.check(Schema.isMinLength(1)),
+  ),
+  messages: Schema.Array(GeneratedSequenceMessage).pipe(Schema.mutable),
+  style: Schema.optionalKey(
+    Schema.Struct({
+      accentColor: Schema.String,
+      backgroundColor: Schema.String,
+    }),
+  ),
+}) {}
+
 export class DiagramGenerationUsage extends Schema.Class<DiagramGenerationUsage>(
   "DiagramGenerationUsage",
 )({
@@ -53,7 +91,11 @@ export class DiagramGenerationCandidate extends Schema.Class<DiagramGenerationCa
   cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
   diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
   diagram: Schema.optional(
-    Schema.Union([FlowchartDiagramSchema, MindmapDiagramSchema]),
+    Schema.Union([
+      FlowchartDiagramSchema,
+      MindmapDiagramSchema,
+      GeneratedSequenceDiagram,
+    ]),
   ),
   durationMs: Schema.optional(Schema.Number),
   error: Schema.optional(Schema.String),
@@ -200,8 +242,11 @@ export function parseGeneratedFlowchart(text: string): FlowchartDiagram {
 
 export function parseGeneratedDiagram(
   text: string,
-): FlowchartDiagram | MindmapDiagram {
+): FlowchartDiagram | MindmapDiagram | GeneratedSequenceDiagram {
   const extracted = extractJsonObject(text);
+  if (isUnknownRecord(extracted) && extracted["type"] === "sequence") {
+    return parseGeneratedSequence(extracted);
+  }
   if (isUnknownRecord(extracted) && extracted["type"] === "mindmap") {
     if ("root" in extracted) {
       const nested = safeParseDiagramSchema(GeneratedMindmapTree, extracted);
@@ -219,11 +264,56 @@ interface CandidateParseFailure {
 }
 
 interface CandidateParseSuccess {
-  readonly diagram: FlowchartDiagram | MindmapDiagram;
+  readonly diagram:
+    | FlowchartDiagram
+    | MindmapDiagram
+    | GeneratedSequenceDiagram;
   readonly success: true;
 }
 
 type CandidateParseResult = CandidateParseFailure | CandidateParseSuccess;
+
+function parseGeneratedSequence(input: unknown): GeneratedSequenceDiagram {
+  const decoded = safeParseDiagramSchema(GeneratedSequenceDiagram, input);
+  if (!decoded.success) {
+    throw new DiagramValidationError(
+      decoded.error.issues[0]?.message ??
+        "Generated sequence diagram schema validation failed.",
+    );
+  }
+  const participantIds = new Set<string>();
+  for (const participant of decoded.data.participants) {
+    if (participantIds.has(participant.id)) {
+      throw new DiagramValidationError(
+        `Duplicate sequence participant id "${participant.id}" is not allowed.`,
+      );
+    }
+    participantIds.add(participant.id);
+  }
+  const messageIds = new Set<string>();
+  for (const message of decoded.data.messages) {
+    if (messageIds.has(message.id)) {
+      throw new DiagramValidationError(
+        `Duplicate sequence message id "${message.id}" is not allowed.`,
+      );
+    }
+    messageIds.add(message.id);
+    if (
+      !participantIds.has(message.source) ||
+      !participantIds.has(message.target)
+    ) {
+      throw new DiagramValidationError(
+        `Sequence message "${message.id}" references an unknown participant.`,
+      );
+    }
+    if (message.source === message.target) {
+      throw new DiagramValidationError(
+        `Sequence message "${message.id}" cannot target its source participant.`,
+      );
+    }
+  }
+  return decoded.data;
+}
 
 function schemaIssueDiagnostic(issue: {
   readonly message: string;
@@ -308,6 +398,25 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
     }
     try {
       return { diagram: validateMindmapDiagram(decoded.data), success: true };
+    } catch (error) {
+      return diagramValidationFailure(error);
+    }
+  }
+
+  if (isUnknownRecord(extracted) && extracted["type"] === "sequence") {
+    const decoded = safeParseDiagramSchema(GeneratedSequenceDiagram, extracted);
+    if (!decoded.success) {
+      const diagnostics = decoded.error.issues.map(schemaIssueDiagnostic);
+      return {
+        diagnostics,
+        error:
+          diagnostics[0] ??
+          "Generated sequence diagram schema validation failed.",
+        success: false,
+      };
+    }
+    try {
+      return { diagram: parseGeneratedSequence(extracted), success: true };
     } catch (error) {
       return diagramValidationFailure(error);
     }
@@ -463,6 +572,7 @@ export function enforceCandidateRequestRequirements(
   if (!diagram || diagram.type !== request.prompt.type) {
     return candidate;
   }
+  if (diagram.type === "sequence") return candidate;
   const requestDiagnostics = [
     ...explicitRequestMinimums(request.prompt.request, request.prompt.type)
       .map((minimum) => {

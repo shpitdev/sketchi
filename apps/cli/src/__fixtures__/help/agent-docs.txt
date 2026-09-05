@@ -16,11 +16,14 @@ Canonical flowchart example:
 Canonical mindmap example:
   {"type":"mindmap","spec":{"id":"launch-map","title":"Launch plan","root":{"label":"Launch","children":[{"label":"Product"},{"label":"Operations"}]}}}
 
+Canonical sequence example:
+  {"type":"sequence","spec":{"id":"checkout-sequence","title":"Checkout sequence","participants":[{"id":"browser","label":"Browser"},{"id":"api","label":"API"}],"messages":[{"id":"request","source":"browser","target":"api","label":"Submit checkout"}]}}
+
 Semantic color patch example:
   sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
-  sketchi generate [--prompt TEXT] [--type flowchart|mindmap] [--model MODEL]
+  sketchi generate [--prompt TEXT] [--type flowchart|mindmap|sequence] [--model MODEL]
   sketchi share DIAGRAM_ID [--open]
   sketchi pull DIAGRAM_ID --link URL|-
   generate makes one unauthenticated HTTPS POST to the public Sketchi generate API at https://playground.sketchi.app/api/v1/generate

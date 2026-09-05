@@ -1,6 +1,10 @@
 import "@tanstack/react-start/server-only";
 
-import type { FlowchartDiagram, MindmapDiagram } from "@sketchi/diagram-core";
+import {
+  SKETCHI_DIAGRAM_STYLE,
+  type FlowchartDiagram,
+  type MindmapDiagram,
+} from "@sketchi/diagram-core";
 import {
   CloudflareAiGatewayBinding,
   CloudflareGoogleAiStudioClientLive,
@@ -11,6 +15,7 @@ import {
   type DiagramGenerationCandidate,
   type DiagramGenerationError,
   type DiagramGenerationType,
+  type GeneratedSequenceDiagram,
   DiagramGenerationPolicyLive,
 } from "@sketchi/diagram-generation";
 import { Context, Effect, Layer } from "effect";
@@ -119,6 +124,22 @@ export function mindmapDocumentInput(diagram: MindmapDiagram): unknown {
       root: topic(root.id),
       layout: { direction: diagram.layout.direction },
       style: diagram.style,
+    },
+  };
+}
+
+/** Convert a validated sequence candidate into the native Code Mode contract. */
+export function sequenceDocumentInput(
+  diagram: GeneratedSequenceDiagram,
+): unknown {
+  return {
+    type: "sequence",
+    spec: {
+      id: diagram.id,
+      title: diagram.title,
+      participants: diagram.participants,
+      messages: diagram.messages,
+      style: diagram.style ?? SKETCHI_DIAGRAM_STYLE,
     },
   };
 }

@@ -253,6 +253,18 @@ describe("diagram generation prompt mapping", () => {
     expect(messages.user).toContain('"type":"mindmap"');
   });
 
+  it("maps sequence requests to the native sequence contract", () => {
+    const messages = buildDiagramGenerationMessages({
+      ...prompt,
+      type: "sequence",
+    });
+
+    expect(messages.system).toContain('Use type "sequence".');
+    expect(messages.system).toContain("ordered participants");
+    expect(messages.system).toContain("chronological messages");
+    expect(messages.user).toContain('"type":"sequence"');
+  });
+
   it("requires real loop topology and flowchart richness", () => {
     const messages = buildDiagramGenerationMessages(prompt);
 
@@ -365,6 +377,36 @@ describe("pure candidate behavior", () => {
     expect(candidate.diagram?.style).toEqual(expectedDiagram.style);
   });
 
+  it("parses and validates native sequence candidates", () => {
+    const candidate = candidateFromText({
+      model: "fixture",
+      provider: "fixture",
+      text: JSON.stringify({
+        id: "login-sequence",
+        title: "Login sequence",
+        type: "sequence",
+        participants: [
+          { id: "browser", label: "Browser" },
+          { id: "api", label: "API" },
+        ],
+        messages: [
+          {
+            id: "login",
+            source: "browser",
+            target: "api",
+            label: "Login request",
+          },
+        ],
+      }),
+    });
+
+    expect(candidate.error).toBeUndefined();
+    expect(candidate.diagram?.type).toBe("sequence");
+    if (candidate.diagram?.type === "sequence") {
+      expect(candidate.diagram.messages).toHaveLength(1);
+    }
+  });
+
   it("normalizes empty optional edge labels before schema validation", () => {
     const candidate = candidateFromText({
       model: "fixture",
@@ -378,7 +420,10 @@ describe("pure candidate behavior", () => {
     });
 
     expect(candidate.error).toBeUndefined();
-    expect(candidate.diagram?.edges[0]?.label).toBeUndefined();
+    expect(candidate.diagram?.type).toBe("flowchart");
+    if (candidate.diagram?.type === "flowchart") {
+      expect(candidate.diagram.edges[0]?.label).toBeUndefined();
+    }
   });
 
   it("turns an explicitly undersized valid result into semantic repair input", () => {
@@ -525,18 +570,21 @@ describe("pure candidate behavior", () => {
     });
 
     expect(candidate.error).toBeUndefined();
-    expect(candidate.diagram?.nodes.map((node) => node.id)).toEqual([
-      "topic-0",
-      "topic-0-0",
-      "topic-0-0-0",
-      "topic-0-1",
-    ]);
-    expect(candidate.diagram?.edges[1]).toMatchObject({
-      id: "branch-0-0-0",
-      metadata: { depth: 2, siblingIndex: 0 },
-      source: "topic-0-0",
-      target: "topic-0-0-0",
-    });
+    expect(candidate.diagram?.type).toBe("mindmap");
+    if (candidate.diagram?.type === "mindmap") {
+      expect(candidate.diagram.nodes.map((node) => node.id)).toEqual([
+        "topic-0",
+        "topic-0-0",
+        "topic-0-0-0",
+        "topic-0-1",
+      ]);
+      expect(candidate.diagram.edges[1]).toMatchObject({
+        id: "branch-0-0-0",
+        metadata: { depth: 2, siblingIndex: 0 },
+        source: "topic-0-0",
+        target: "topic-0-0-0",
+      });
+    }
   });
 
   it("captures every flowchart validator issue with its repair hint", () => {
@@ -1024,7 +1072,10 @@ layer(compactingRepairClientLayer)("repair-introduced violations", (it) => {
         });
 
         assert.strictEqual(compactingRepairRun.mock.calls.length, 3);
-        assert.strictEqual(candidate.diagram?.nodes.length, 18);
+        assert.strictEqual(candidate.diagram?.type, "flowchart");
+        if (candidate.diagram?.type === "flowchart") {
+          assert.strictEqual(candidate.diagram.nodes.length, 18);
+        }
         expect(candidate.diagnostics).toEqual(
           expect.arrayContaining([
             expect.stringContaining("flowchart.self_loop:"),

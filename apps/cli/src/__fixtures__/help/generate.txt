@@ -2,7 +2,7 @@ DESCRIPTION
   Create one persisted diagram and export its PNG by default. With no --prompt, Sketchi opens a short wizard only when stdin and stdout are human TTYs, output is text, and CI is absent. Pipes, redirects, CI, and --output json never prompt or block; pass --prompt for every script and automation path. This is one of Sketchi's three explicit network commands (generate, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
 
 Everyday wizard:
-  The wizard asks only for prompt text, flowchart (default) or mind map, and a PNG destination.
+  The wizard asks only for prompt text, flowchart (default), mind map, or sequence diagram, and a PNG destination.
   Current directory writes <cwd>/<generated-id>.png. Project diagrams folder means exactly the
   directory where Sketchi was run: <cwd>/diagrams/<generated-id>.png, with no Git detection; the
   diagrams folder is created only after generation succeeds. Explicit --type and file --dest values
@@ -37,13 +37,13 @@ USAGE
   sketchi generate [flags]
 
 FLAGS
-  --output text|json               Result presentation format. (choices: text, json)
-  --prompt TEXT                    Diagram request text sent directly without interactive prompts.
-  --type flowchart|mindmap         Requested canonical diagram type; default flowchart. (choices: flowchart, mindmap)
-  --model MODEL                    Server-routed generation model id; default gemini-3.1-flash-lite.
-  --endpoint URL                   Unauthenticated generate API URL; defaults to the production Sketchi endpoint.
-  --format png|excalidraw|scene    Artifact exported after generation; default png. (choices: png, excalidraw, scene)
-  --dest PATH|-                    Artifact destination; defaults from the generated id, or - for stdout.
+  --output text|json                   Result presentation format. (choices: text, json)
+  --prompt TEXT                        Diagram request text sent directly without interactive prompts.
+  --type flowchart|mindmap|sequence    Requested canonical diagram type; default flowchart. (choices: flowchart, mindmap, sequence)
+  --model MODEL                        Server-routed generation model id; default gemini-3.1-flash-lite.
+  --endpoint URL                       Unauthenticated generate API URL; defaults to the production Sketchi endpoint.
+  --format png|excalidraw|scene        Artifact exported after generation; default png. (choices: png, excalidraw, scene)
+  --dest PATH|-                        Artifact destination; defaults from the generated id, or - for stdout.
 
 GLOBAL FLAGS
   --help, -h                          Show help information
@@ -56,3 +56,6 @@ EXAMPLES
 
   # Generate a mindmap and write editable Excalidraw.
   sketchi generate --prompt "Organize launch readiness" --type mindmap --format excalidraw --dest launch.excalidraw --output json
+
+  # Generate a native sequence diagram and write its PNG.
+  sketchi generate --prompt "Show Browser calling API" --type sequence --dest request-sequence.png

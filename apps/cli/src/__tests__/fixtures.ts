@@ -35,6 +35,47 @@ export const mindmapInput = {
   },
 } as const;
 
+export const sequenceInput = {
+  type: "sequence",
+  spec: {
+    id: "checkout-sequence",
+    title: "Checkout request sequence",
+    participants: [
+      { id: "browser", label: "Browser" },
+      { id: "api", label: "API" },
+      { id: "database", label: "Database" },
+    ],
+    messages: [
+      {
+        id: "login",
+        source: "browser",
+        target: "api",
+        label: "Login request",
+      },
+      {
+        id: "lookup",
+        source: "api",
+        target: "database",
+        label: "Look up user",
+      },
+      {
+        id: "record",
+        source: "database",
+        target: "api",
+        label: "User record",
+        type: "return",
+      },
+      {
+        id: "success",
+        source: "api",
+        target: "browser",
+        label: "Authentication success",
+        type: "return",
+      },
+    ],
+  },
+} as const;
+
 /** Compact canonical fixtures derived from the 2026-09-04 production probes. */
 export const largeFlowchartInput = {
   type: "flowchart",

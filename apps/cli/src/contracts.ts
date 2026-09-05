@@ -20,7 +20,7 @@ export class DiagramRecordManifest extends Schema.Class<DiagramRecordManifest>(
 )({
   schemaVersion: Schema.Literal(RECORD_SCHEMA_VERSION),
   id: Schema.String,
-  type: Schema.Literals(["flowchart", "mindmap"]),
+  type: Schema.Literals(["flowchart", "mindmap", "sequence"]),
   title: Schema.String,
   revision: Schema.Int.check(Schema.isGreaterThan(0)),
   authority: Schema.Literals(["canonical", "patched", "detached"]).pipe(

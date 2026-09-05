@@ -10,6 +10,7 @@ import {
   canonicalDocument,
   flowchartInput,
   mindmapInput,
+  sequenceInput,
 } from "./__tests__/fixtures.js";
 
 const builderLayer = DiagramBuilderLive.pipe(
@@ -25,7 +26,7 @@ const builderLayer = DiagramBuilderLive.pipe(
 
 layer(builderLayer)("Effect-native Code Mode builder layer", (it) => {
   it.effect(
-    "builds both canonical document types into stored offline artifacts",
+    "builds every canonical document type into stored offline artifacts",
     () =>
       Effect.gen(function* () {
         const builder = yield* DiagramBuilder;
@@ -33,6 +34,7 @@ layer(builderLayer)("Effect-native Code Mode builder layer", (it) => {
           canonicalDocument(flowchartInput),
         );
         const mindmap = yield* builder.build(canonicalDocument(mindmapInput));
+        const sequence = yield* builder.build(canonicalDocument(sequenceInput));
 
         assert.strictEqual(flowchart.type, "flowchart");
         assert.isAbove(flowchart.scene.elements.length, 0);
@@ -40,6 +42,9 @@ layer(builderLayer)("Effect-native Code Mode builder layer", (it) => {
         assert.strictEqual(mindmap.type, "mindmap");
         assert.isAbove(mindmap.scene.elements.length, 0);
         assert.strictEqual(mindmap.png, undefined);
+        assert.strictEqual(sequence.type, "sequence");
+        assert.isAbove(sequence.scene.elements.length, 0);
+        assert.strictEqual(sequence.excalidraw.type, "excalidraw");
       }),
   );
 

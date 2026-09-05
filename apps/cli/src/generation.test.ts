@@ -17,7 +17,11 @@ import {
 } from "./generation.js";
 import { DiagramStore } from "./storage.js";
 import { CliPngRendererLive } from "./png-renderer.js";
-import { flowchartInput, mindmapInput } from "./__tests__/fixtures.js";
+import {
+  flowchartInput,
+  mindmapInput,
+  sequenceInput,
+} from "./__tests__/fixtures.js";
 
 const builderLayer = DiagramBuilderLive.pipe(
   Layer.provide(
@@ -161,7 +165,10 @@ function jsonResponse(body: unknown, status: number): Response {
   });
 }
 
-function runGenerate(created: BuiltDiagram[], type: "flowchart" | "mindmap") {
+function runGenerate(
+  created: BuiltDiagram[],
+  type: "flowchart" | "mindmap" | "sequence",
+) {
   return generateDiagram({
     endpoint: DEFAULT_GENERATE_ENDPOINT,
     model: DEFAULT_GENERATION_MODEL,
@@ -214,8 +221,29 @@ describe("prompt-assisted generation over the public generate API", () => {
     }),
   );
 
+  it.effect("persists a native sequence returned by the endpoint", () =>
+    Effect.gen(function* () {
+      const body = yield* Effect.promise(() => buildSuccessBody(sequenceInput));
+      stubFetch(() => new Response(body, { status: 200 }));
+      const created: BuiltDiagram[] = [];
+
+      const result = yield* runGenerate(created, "sequence");
+
+      assert.strictEqual(result.diagram.document.type, "sequence");
+      if (result.diagram.document.type === "sequence") {
+        assert.deepStrictEqual(
+          result.diagram.document.spec.participants.map(
+            (participant) => participant.label,
+          ),
+          ["Browser", "API", "Database"],
+        );
+      }
+      assert.strictEqual(created.length, 1);
+    }),
+  );
+
   it.effect(
-    "exports generated flowchart and mindmap responses directly to PNG",
+    "exports every generated canonical response directly to PNG",
     () => {
       const created: BuiltDiagram[] = [];
       const storeLayer = generatedArtifactStoreLayer(created);
@@ -226,8 +254,9 @@ describe("prompt-assisted generation over the public generate API", () => {
         for (const [type, input] of [
           ["flowchart", flowchartInput],
           ["mindmap", mindmapInput],
+          ["sequence", sequenceInput],
         ] satisfies ReadonlyArray<
-          readonly ["flowchart" | "mindmap", unknown]
+          readonly ["flowchart" | "mindmap" | "sequence", unknown]
         >) {
           const body = yield* Effect.promise(() => buildSuccessBody(input));
           stubFetch(() => new Response(body, { status: 200 }));

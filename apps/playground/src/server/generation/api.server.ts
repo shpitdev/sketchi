@@ -3,6 +3,7 @@ import "@tanstack/react-start/server-only";
 import type {
   BuildFlowchartResult,
   BuildMindmapResult,
+  BuildSequenceDiagramResult,
 } from "@sketchi/diagram-agent";
 import {
   extractJsonObject,
@@ -23,12 +24,16 @@ import {
   flowchartDocumentInput,
   mindmapDocumentInput,
   PlaygroundGeneration,
+  sequenceDocumentInput,
 } from "./service.server";
 
 export const MAX_GENERATE_REQUEST_BYTES = 32 * 1024;
 export const MAX_GENERATE_PROMPT_LENGTH = 8_000;
 
-type BuildResult = BuildFlowchartResult | BuildMindmapResult;
+type BuildResult =
+  | BuildFlowchartResult
+  | BuildMindmapResult
+  | BuildSequenceDiagramResult;
 type BuiltArtifact = Extract<BuildResult, { readonly ok: true }>["artifact"];
 
 type GenerateFailureStatus =
@@ -75,7 +80,7 @@ type GenerateResult = GenerateSuccess | GenerateFailure;
 const GenerateRequestSchema = Schema.Struct({
   cacheMode: Schema.optional(Schema.Literals(["default", "fresh"])),
   prompt: Schema.String,
-  type: Schema.optional(Schema.Literals(["flowchart", "mindmap"])),
+  type: Schema.optional(Schema.Literals(["flowchart", "mindmap", "sequence"])),
   model: Schema.optional(Schema.String),
 });
 const decodeGenerateRequest = Schema.decodeUnknownResult(
@@ -263,6 +268,7 @@ function buildFailure(
     case "invalid_input":
     case "invalid_flowchart":
     case "invalid_mindmap":
+    case "invalid_sequence":
       return failure("invalid_generated_document", issues);
     case "quality_failed":
       return failure("quality_failed", issues);
@@ -358,8 +364,8 @@ export const handleGenerateDiagramRequest = Effect.fn(
         issue(
           "invalid_input",
           "input",
-          "The generate request must include a string prompt and an optional type of flowchart or mindmap.",
-          'Send { "prompt": "...", "type": "flowchart" }.',
+          "The generate request must include a string prompt and an optional type of flowchart, mindmap, or sequence.",
+          'Send { "prompt": "...", "type": "sequence" }.',
         ),
       ]),
     );
@@ -437,7 +443,9 @@ export const handleGenerateDiagramRequest = Effect.fn(
   const documentInput =
     candidate.diagram.type === "flowchart"
       ? flowchartDocumentInput(candidate.diagram)
-      : mindmapDocumentInput(candidate.diagram);
+      : candidate.diagram.type === "mindmap"
+        ? mindmapDocumentInput(candidate.diagram)
+        : sequenceDocumentInput(candidate.diagram);
   const spec = (documentInput as { readonly spec?: unknown } | undefined)?.spec;
   const buildOptions = {
     artifactFormats: ["scene", "excalidraw"],
@@ -445,7 +453,9 @@ export const handleGenerateDiagramRequest = Effect.fn(
   };
   const buildResult: BuildResult = yield* type === "flowchart"
     ? codeMode.buildFlowchart({ spec, options: buildOptions })
-    : codeMode.buildMindmap({ spec, options: buildOptions });
+    : type === "mindmap"
+      ? codeMode.buildMindmap({ spec, options: buildOptions })
+      : codeMode.buildSequenceDiagram({ spec, options: buildOptions });
   if (!buildResult.ok) {
     return yield* finish({ prompt, type, spec }, buildFailure(buildResult));
   }

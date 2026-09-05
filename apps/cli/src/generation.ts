@@ -20,7 +20,7 @@ export const DEFAULT_GENERATE_ENDPOINT =
   "https://playground.sketchi.app/api/v1/generate";
 export const SKETCHI_GENERATE_ENDPOINT_ENV = "SKETCHI_GENERATE_ENDPOINT";
 
-export type GenerationType = "flowchart" | "mindmap";
+export type GenerationType = "flowchart" | "mindmap" | "sequence";
 
 export interface GenerateDiagramInput {
   readonly endpoint: string;

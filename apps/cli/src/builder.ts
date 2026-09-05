@@ -5,8 +5,10 @@ import {
   RenderedDiagramSceneSchema,
   buildFlowchart,
   buildMindmap,
+  buildSequenceDiagram,
   type BuildFlowchartResult,
   type BuildMindmapResult,
+  type BuildSequenceDiagramResult,
   type CodeModeIssue,
   type ExcalidrawFile,
   type PatchableScene,
@@ -25,7 +27,10 @@ import {
   CliValidationError,
 } from "./errors.js";
 
-type BuildResult = BuildFlowchartResult | BuildMindmapResult;
+type BuildResult =
+  | BuildFlowchartResult
+  | BuildMindmapResult
+  | BuildSequenceDiagramResult;
 type BuiltArtifact = Extract<BuildResult, { readonly ok: true }>["artifact"];
 
 export class DiagramBuilder extends Context.Service<
@@ -56,6 +61,7 @@ function failureFromBuild(
     result.status === "invalid_input" ||
     result.status === "invalid_flowchart" ||
     result.status === "invalid_mindmap" ||
+    result.status === "invalid_sequence" ||
     result.status === "quality_failed"
   ) {
     return CliValidationError.make({ message, hint, details });
@@ -142,8 +148,19 @@ export const DiagramBuilderLive = Layer.effect(
           Effect.provideService(CodeModeArtifactStorage, artifactStorage),
           Effect.provideService(CodeModeRuntimeEnvironment, environment),
         );
-      } else {
+      } else if (document.type === "mindmap") {
         result = yield* buildMindmap({
+          spec: document.spec,
+          options: {
+            artifactFormats: ["scene", "excalidraw"],
+            inlineArtifacts: ["scene", "excalidraw"],
+          },
+        }).pipe(
+          Effect.provideService(CodeModeArtifactStorage, artifactStorage),
+          Effect.provideService(CodeModeRuntimeEnvironment, environment),
+        );
+      } else {
+        result = yield* buildSequenceDiagram({
           spec: document.spec,
           options: {
             artifactFormats: ["scene", "excalidraw"],

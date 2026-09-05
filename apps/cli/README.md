@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Typed, deterministic diagrams from your terminal.</strong><br />
-  Create, inspect, revise, and export local flowcharts and mindmaps—or turn one prompt into validated, editable Excalidraw.
+  Create, inspect, revise, and export local flowcharts, mindmaps, and sequence diagrams—or turn one prompt into validated, editable Excalidraw.
 </p>
 
 <p align="center">
@@ -53,7 +53,7 @@ sketchi generate --prompt "Map release approval with pass and revise branches"
 
 With no `--prompt`, Sketchi opens a short wizard only when both standard input
 and standard output are human terminals, output is text, and CI is absent. It
-asks for prompt text, flowchart (the default) or mind map, and where to save the
+asks for prompt text, flowchart (the default), mind map, or sequence diagram, and where to save the
 PNG. The choices are the current directory, a `diagrams/` folder under exactly
 the directory where Sketchi was run, or a custom path with the same semantics as
 `--dest`. Sketchi does not inspect Git, and it creates `diagrams/` only after
@@ -70,6 +70,8 @@ written back into the record. Choose another artifact or destination explicitly:
 
 ```sh
 sketchi generate --prompt "Organize launch readiness" --type mindmap --format excalidraw --dest launch.excalidraw
+
+sketchi generate --prompt "Show Browser calling API and API returning success" --type sequence --dest request-sequence.png
 sketchi generate --prompt "Map release approval" --dest - > release.png
 sketchi generate --prompt "Map release approval" --output json
 ```

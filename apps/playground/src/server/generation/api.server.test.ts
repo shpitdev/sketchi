@@ -32,6 +32,38 @@ const flowchartIr = {
   style: { accentColor: "#0f766e", backgroundColor: "#ffffff" },
 };
 
+const sequenceIr = {
+  id: "generated-login-sequence",
+  title: "Login sequence",
+  type: "sequence",
+  participants: [
+    { id: "browser", label: "Browser" },
+    { id: "api", label: "API" },
+    { id: "database", label: "Database" },
+  ],
+  messages: [
+    {
+      id: "login",
+      source: "browser",
+      target: "api",
+      label: "Login request",
+    },
+    {
+      id: "lookup",
+      source: "api",
+      target: "database",
+      label: "Look up user",
+    },
+    {
+      id: "record",
+      source: "database",
+      target: "api",
+      label: "User record",
+      type: "return",
+    },
+  ],
+};
+
 function fakeAiGateway(
   text: string,
   observeRun?: (input: Parameters<CloudflareAiGateway["run"]>[0]) => void,
@@ -100,6 +132,30 @@ describe("public generate endpoint", () => {
     expect(diagram.excalidraw).toBeTruthy();
     const generation = body.generation as { provider: string };
     expect(generation.provider).toBe("cloudflare-google-ai-studio");
+  });
+
+  it("generates and returns a native sequence with inline artifacts", async () => {
+    const env: StudioEnv = { AI: fakeAiGateway(JSON.stringify(sequenceIr)) };
+    const response = await generateRequest(env, {
+      prompt: "Show Browser, API, and Database login interactions",
+      type: "sequence",
+    });
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as Record<string, unknown>;
+    const diagram = body.diagram as Record<string, unknown>;
+    const document = diagram.document as {
+      type: string;
+      spec: {
+        participants: ReadonlyArray<unknown>;
+        messages: ReadonlyArray<unknown>;
+      };
+    };
+    expect(document.type).toBe("sequence");
+    expect(document.spec.participants).toHaveLength(3);
+    expect(document.spec.messages).toHaveLength(3);
+    expect(diagram.scene).toBeTruthy();
+    expect(diagram.excalidraw).toBeTruthy();
   });
 
   it("requests fresh provider output for reliability probes", async () => {

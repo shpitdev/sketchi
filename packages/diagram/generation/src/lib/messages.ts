@@ -6,6 +6,7 @@ export type DiagramGenerationRole = typeof DiagramGenerationRoleSchema.Type;
 export const DiagramGenerationTypeSchema = Schema.Literals([
   "flowchart",
   "mindmap",
+  "sequence",
 ]);
 export type DiagramGenerationType = typeof DiagramGenerationTypeSchema.Type;
 
@@ -62,6 +63,16 @@ const MINDMAP_IR_INSTRUCTIONS = [
   'Use layout { "direction": "LR", "edgeRouting": "curved" } unless the prompt says right-to-left.',
 ];
 
+const SEQUENCE_IR_INSTRUCTIONS = [
+  "Return only compact, minified JSON on one line. Do not use markdown.",
+  'Use type "sequence".',
+  "Return ordered participants with stable ids and human labels.",
+  "Return chronological messages with stable ids, participant source and target ids, and concise labels.",
+  'Use message type "message" for calls and "return" for responses; dashed style is appropriate for responses.',
+  "Every message source and target must reference a participant, and self-messages are not supported.",
+  "Honor every explicit participant and message count and preserve the requested order.",
+];
+
 function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
   if (prompt.type === "mindmap") {
     return JSON.stringify({
@@ -73,6 +84,27 @@ function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
         children: [{ label: "Child topic", children: [] }],
       },
       layout: { direction: "LR", edgeRouting: "curved" },
+    });
+  }
+
+  if (prompt.type === "sequence") {
+    return JSON.stringify({
+      id: "short-kebab-case-id",
+      title: prompt.title,
+      type: "sequence",
+      participants: [
+        { id: "client", label: "Client" },
+        { id: "service", label: "Service" },
+      ],
+      messages: [
+        {
+          id: "request",
+          source: "client",
+          target: "service",
+          label: "Request",
+          type: "message",
+        },
+      ],
     });
   }
 
@@ -107,11 +139,18 @@ function requiredList(title: string, values: readonly string[]): string[] {
 export function buildDiagramGenerationMessages(
   prompt: DiagramGenerationPrompt,
 ): DiagramGenerationMessages {
-  const diagramName = prompt.type === "flowchart" ? "Flowchart" : "Mindmap";
+  const diagramName =
+    prompt.type === "flowchart"
+      ? "Flowchart"
+      : prompt.type === "mindmap"
+        ? "Mindmap"
+        : "Sequence diagram";
   const instructions =
     prompt.type === "flowchart"
       ? FLOWCHART_IR_INSTRUCTIONS
-      : MINDMAP_IR_INSTRUCTIONS;
+      : prompt.type === "mindmap"
+        ? MINDMAP_IR_INSTRUCTIONS
+        : SEQUENCE_IR_INSTRUCTIONS;
   const system = [
     "You are creating a Sketchi typed intermediate diagram.",
     "",

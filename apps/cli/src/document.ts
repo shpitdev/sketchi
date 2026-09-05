@@ -1,6 +1,7 @@
 import {
   FlowchartSpec,
   MindmapSpec,
+  SequenceDiagramSpec,
 } from "@sketchi/diagram-agent";
 import { Effect, Schema, SchemaIssue } from "effect";
 
@@ -31,7 +32,8 @@ function pathSegment(value: unknown): PropertyKey | undefined {
 
 export type CanonicalDiagramDocument =
   | { readonly type: "flowchart"; readonly spec: FlowchartSpec }
-  | { readonly type: "mindmap"; readonly spec: MindmapSpec };
+  | { readonly type: "mindmap"; readonly spec: MindmapSpec }
+  | { readonly type: "sequence"; readonly spec: SequenceDiagramSpec };
 
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 const decodeFlowchartSpec = Schema.decodeUnknownEffect(FlowchartSpec, {
@@ -40,25 +42,26 @@ const decodeFlowchartSpec = Schema.decodeUnknownEffect(FlowchartSpec, {
 const decodeMindmapSpec = Schema.decodeUnknownEffect(MindmapSpec, {
   errors: "all",
 });
+const decodeSequenceSpec = Schema.decodeUnknownEffect(SequenceDiagramSpec, {
+  errors: "all",
+});
 
 function validationError(details: ReadonlyArray<string>) {
   return CliValidationError.make({
     message: "The canonical diagram document is invalid.",
-    hint: 'Use {"type":"flowchart","spec":...} or {"type":"mindmap","spec":...}.',
+    hint: 'Use {"type":"flowchart","spec":...}, {"type":"mindmap","spec":...}, or {"type":"sequence","spec":...}.',
     details,
   });
 }
 
 function schemaDetails(issue: SchemaIssue.Issue): ReadonlyArray<string> {
-  return formatSchemaIssue(issue).issues.map(
-    (detail) => {
-      const path = (detail.path ?? []).flatMap((segment) => {
-        const normalized = pathSegment(segment);
-        return normalized === undefined ? [] : [normalized];
-      });
-      return `${pathForIssue(["spec", ...path])}: ${detail.message}`;
-    },
-  );
+  return formatSchemaIssue(issue).issues.map((detail) => {
+    const path = (detail.path ?? []).flatMap((segment) => {
+      const normalized = pathSegment(segment);
+      return normalized === undefined ? [] : [normalized];
+    });
+    return `${pathForIssue(["spec", ...path])}: ${detail.message}`;
+  });
 }
 
 function flowchartDocument(spec: FlowchartSpec): CanonicalDiagramDocument {
@@ -67,6 +70,10 @@ function flowchartDocument(spec: FlowchartSpec): CanonicalDiagramDocument {
 
 function mindmapDocument(spec: MindmapSpec): CanonicalDiagramDocument {
   return { type: "mindmap", spec };
+}
+
+function sequenceDocument(spec: SequenceDiagramSpec): CanonicalDiagramDocument {
+  return { type: "sequence", spec };
 }
 
 function documentFields(
@@ -105,8 +112,14 @@ export const decodeCanonicalDiagramDocument = Effect.fn(
     );
     return mindmapDocument(spec);
   }
+  if (fields.type === "sequence") {
+    const spec = yield* decodeSequenceSpec(fields.spec).pipe(
+      Effect.mapError((error) => validationError(schemaDetails(error.issue))),
+    );
+    return sequenceDocument(spec);
+  }
   return yield* validationError([
-    'document.type: Expected "flowchart" or "mindmap".',
+    'document.type: Expected "flowchart", "mindmap", or "sequence".',
   ]);
 });
 

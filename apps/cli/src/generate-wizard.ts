@@ -93,6 +93,11 @@ const askType = Effect.tryPromise({
           label: "Mind map",
           hint: "best for ideas and topics",
         },
+        {
+          value: "sequence",
+          label: "Sequence diagram",
+          hint: "best for ordered participant interactions",
+        },
       ],
     }),
   catch: promptFailure,
