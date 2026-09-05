@@ -5,7 +5,7 @@ MCP. `buildFlowchart` owns the complete accepted-artifact vertical: request
 decode, FlowchartSpec normalization, semantic validation, quality assessment,
 deterministic rendering, export validation, and one artifact-storage service
 write. The package exports `buildFlowchart`, `buildMindmap`,
-`buildSequenceDiagram`, `getArtifact`, and
+`buildSequenceDiagram`, `createCanvas`, `getArtifact`, and
 `applyDiagramPatch` as Effect programs.
 
 ```mermaid

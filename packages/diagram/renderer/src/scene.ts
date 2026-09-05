@@ -1,73 +1,29 @@
 import {
+  CANVAS_SPEC_VERSION,
+  type CanvasConnectorElement,
+  type CanvasElement,
+  type CanvasFrameElement,
+  type CanvasLineElement,
+  type CanvasPoint,
+  type CanvasShapeElement,
+  type CanvasShapeKind,
+  type CanvasSpec,
+  type CanvasTextElement,
   type DiagramEdge,
   type DiagramNode,
   type IntermediateDiagram,
   parseIntermediateDiagram,
 } from "@sketchi/diagram-core";
 
-export type NodeSceneShape = "rectangle" | "ellipse" | "diamond" | "circle";
-
-export type SceneElement =
-  | NodeSceneElement
-  | TextSceneElement
-  | ArrowSceneElement;
-
-export interface NodeSceneElement {
-  type: "node";
-  id: string;
-  nodeId: string;
-  kind?: string;
-  rendererRole?: "sequence-lifeline";
-  shape: NodeSceneShape;
-  fillColor?: string;
-  strokeColor?: string;
-  textColor?: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  label: string;
-}
-
-export interface TextSceneElement {
-  type: "text";
-  id: string;
-  containerId?: string;
-  textColor?: string;
-  x: number;
-  y: number;
-  text: string;
-  fontSize: number;
-  maxWidth?: number;
-}
-
-export interface ArrowSceneElement {
-  type: "arrow";
-  id: string;
-  edgeId: string;
-  sourceNodeId: string;
-  targetNodeId: string;
-  strokeColor?: string;
-  strokeStyle?: "dashed" | "dotted" | "solid";
-  textColor?: string;
-  points: readonly [ScenePoint, ...ScenePoint[]];
-  label?: string;
-}
-
-export interface ScenePoint {
-  x: number;
-  y: number;
-}
-
-export interface RenderedDiagramScene {
-  diagramId: string;
-  title: string;
-  width: number;
-  height: number;
-  accentColor: string;
-  backgroundColor: string;
-  elements: SceneElement[];
-}
+export type NodeSceneShape = CanvasShapeKind;
+export type SceneElement = CanvasElement;
+export type NodeSceneElement = CanvasShapeElement;
+export type TextSceneElement = CanvasTextElement;
+export type ArrowSceneElement = CanvasConnectorElement;
+export type LineSceneElement = CanvasLineElement;
+export type FrameSceneElement = CanvasFrameElement;
+export type ScenePoint = CanvasPoint;
+export type RenderedDiagramScene = CanvasSpec;
 
 const MIN_NODE_WIDTH = 184;
 const MIN_NODE_HEIGHT = 72;
@@ -1627,21 +1583,25 @@ function sceneMinimum(elements: readonly SceneElement[]): ScenePoint {
 
 function scenePoints(elements: readonly SceneElement[]): ScenePoint[] {
   return elements.flatMap((element): ScenePoint[] => {
-    if (element.type === "arrow") {
+    if (element.type === "arrow" || element.type === "line") {
       return [...element.points];
+    }
+
+    if (element.type === "text") {
+      return [
+        { x: element.x, y: element.y },
+        {
+          x: element.x + (element.maxWidth ?? element.text.length),
+          y: element.y + element.fontSize,
+        },
+      ];
     }
 
     return [
       { x: element.x, y: element.y },
       {
-        x:
-          element.x +
-          (element.type === "node"
-            ? element.width
-            : (element.maxWidth ?? element.text.length)),
-        y:
-          element.y +
-          (element.type === "node" ? element.height : element.fontSize),
+        x: element.x + element.width,
+        y: element.y + element.height,
       },
     ];
   });
@@ -1663,6 +1623,19 @@ function translatePoints(
   ];
 }
 
+function translateLinePoints(
+  points: readonly [ScenePoint, ScenePoint, ...ScenePoint[]],
+  dx: number,
+  dy: number,
+): [ScenePoint, ScenePoint, ...ScenePoint[]] {
+  const [first, second, ...rest] = points;
+  return [
+    translatePoint(first, dx, dy),
+    translatePoint(second, dx, dy),
+    ...rest.map((point) => translatePoint(point, dx, dy)),
+  ];
+}
+
 function translateElement(
   element: SceneElement,
   dx: number,
@@ -1672,6 +1645,13 @@ function translateElement(
     return {
       ...element,
       points: translatePoints(element.points, dx, dy),
+    };
+  }
+
+  if (element.type === "line") {
+    return {
+      ...element,
+      points: translateLinePoints(element.points, dx, dy),
     };
   }
 
@@ -1728,8 +1708,15 @@ export function renderIntermediateDiagram(
     ...labels,
   ]);
   const bounds = sceneBounds(elements);
+  const zOrder = [
+    ...nodeShapes.map((element) => element.id),
+    ...labels.map((element) => element.id),
+    ...edgeArrows.map((element) => element.id),
+  ];
 
   return {
+    kind: "canvas",
+    version: CANVAS_SPEC_VERSION,
     diagramId: diagram.id,
     title: diagram.title,
     width: bounds.width,
@@ -1737,5 +1724,8 @@ export function renderIntermediateDiagram(
     accentColor: diagram.style.accentColor,
     backgroundColor: diagram.style.backgroundColor,
     elements,
+    layers: [],
+    layouts: [],
+    zOrder,
   };
 }

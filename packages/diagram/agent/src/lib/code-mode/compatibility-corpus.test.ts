@@ -43,6 +43,68 @@ import {
 } from "./runtime";
 
 const POST_BASELINE_SCENE_FIELDS = new Set(["rendererRole", "strokeStyle"]);
+const CANVAS_SPEC_ADDED_FIELDS = new Set([
+  "kind",
+  "version",
+  "layers",
+  "layouts",
+  "zOrder",
+]);
+const CANVAS_SHAPE_ADDITIONS = new Set(["polygon"]);
+const CANVAS_SCHEMA_ENUM_ADDITIONS = new Set(["canvas", "element", "layer"]);
+const CANVAS_ELEMENT_SCHEMA_ADDED_FIELDS = {
+  node: new Set([
+    "frameId",
+    "groupIds",
+    "layerId",
+    "locked",
+    "opacity",
+    "zIndex",
+    "fillStyle",
+    "roughness",
+    "strokeWidth",
+    "points",
+  ]),
+  text: new Set([
+    "frameId",
+    "groupIds",
+    "layerId",
+    "locked",
+    "opacity",
+    "zIndex",
+    "fontFamily",
+    "textAlign",
+    "verticalAlign",
+  ]),
+  arrow: new Set([
+    "frameId",
+    "groupIds",
+    "layerId",
+    "locked",
+    "opacity",
+    "zIndex",
+    "fillColor",
+    "fillStyle",
+    "roughness",
+    "strokeWidth",
+    "startArrowhead",
+    "endArrowhead",
+  ]),
+};
+const CANVAS_PATCH_OPERATION_ADDITIONS = new Set<string>(
+  DIAGRAM_PATCH_OPERATION_NAMES.slice(6),
+);
+const CANVAS_ISSUE_CODE_ADDITIONS = new Set([
+  "duplicate_element_id",
+  "duplicate_layer_id",
+  "invalid_canvas_binding",
+  "invalid_canvas_composition",
+  "invalid_canvas_geometry",
+  "invalid_polygon",
+  "canvas_limit_exceeded",
+  "invalid_z_order",
+  "unknown_layout_target",
+]);
 const FROZEN_FIXTURE_HASHES = {
   v1: "c668b53ee90043a06c640d06cc28253496d50e7431c916b523fcd4157b91ae55",
   v2: "52858006d02386fa0aac993ce35afca219aaae9860144836b0884e7770f948d9",
@@ -92,19 +154,174 @@ function normalizeBrandPaletteAgainstFrozen(
     .replaceAll("#1a1712", "#1e1e1e");
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isCanvasSpecValue(value: Record<string, unknown>): boolean {
+  return (
+    value["kind"] === "canvas" &&
+    value["version"] === 1 &&
+    Array.isArray(value["elements"])
+  );
+}
+
+function isCanvasSpecSchemaProperties(value: Record<string, unknown>): boolean {
+  return [
+    "diagramId",
+    "title",
+    "width",
+    "height",
+    "accentColor",
+    "backgroundColor",
+    "elements",
+  ].every((key) => Object.hasOwn(value, key));
+}
+
+function isCanvasElementValue(value: Record<string, unknown>): boolean {
+  return (
+    typeof value["id"] === "string" &&
+    !Object.hasOwn(value, "seed") &&
+    ["node", "text", "arrow", "line", "frame"].includes(
+      String(value["type"]),
+    )
+  );
+}
+
+function isApprovedCanvasArrayAddition(value: string): boolean {
+  return (
+    CANVAS_SPEC_ADDED_FIELDS.has(value) ||
+    CANVAS_SHAPE_ADDITIONS.has(value) ||
+    CANVAS_SCHEMA_ENUM_ADDITIONS.has(value) ||
+    CANVAS_PATCH_OPERATION_ADDITIONS.has(value) ||
+    CANVAS_ISSUE_CODE_ADDITIONS.has(value)
+  );
+}
+
+function canvasElementSchemaType(
+  value: Record<string, unknown>,
+): "arrow" | "node" | "text" | undefined {
+  const typeSchema = value["type"];
+  if (!isRecord(typeSchema)) return undefined;
+  const type = typeSchema["const"];
+  return type === "arrow" || type === "node" || type === "text"
+    ? type
+    : undefined;
+}
+
+function isAddedCanvasElementSchema(value: unknown): boolean {
+  if (!isRecord(value) || !isRecord(value["properties"])) return false;
+  const typeSchema = value["properties"]["type"];
+  return (
+    isRecord(typeSchema) &&
+    (typeSchema["const"] === "line" || typeSchema["const"] === "frame")
+  );
+}
+
+function isCanvasPatchOperationSchema(value: unknown): boolean {
+  if (!isRecord(value) || !isRecord(value["properties"])) return false;
+  const operation = value["properties"]["op"];
+  return (
+    isRecord(operation) &&
+    typeof operation["const"] === "string" &&
+    CANVAS_PATCH_OPERATION_ADDITIONS.has(operation["const"])
+  );
+}
+
+function normalizeCanvasMigrationAgainstFrozen(
+  value: unknown,
+  frozen: unknown,
+): unknown {
+  if (Array.isArray(value) && Array.isArray(frozen)) {
+    const normalized = value.filter((entry) => {
+      if (isCanvasPatchOperationSchema(entry)) return false;
+      return (
+        typeof entry !== "string" ||
+        frozen.includes(entry) ||
+        !isApprovedCanvasArrayAddition(entry)
+      );
+    });
+    return normalized.map((entry, index) =>
+      normalizeCanvasMigrationAgainstFrozen(entry, frozen[index]),
+    );
+  }
+  if (isRecord(value) && isRecord(frozen)) {
+    const canvasSpecValue = isCanvasSpecValue(value);
+    const canvasSpecSchemaProperties = isCanvasSpecSchemaProperties(value);
+    const canvasElementValue = isCanvasElementValue(value);
+    return Object.fromEntries(
+      Object.entries(value).flatMap(([key, entry]) => {
+        if (
+          (CANVAS_SPEC_ADDED_FIELDS.has(key) &&
+            (canvasSpecValue || canvasSpecSchemaProperties)) ||
+          (canvasElementValue && POST_BASELINE_SCENE_FIELDS.has(key))
+        ) {
+          return [];
+        }
+        return [
+          [
+            key,
+            key === "sizeBytes" && value["format"] === "scene"
+              ? frozen[key]
+              : normalizeCanvasMigrationAgainstFrozen(entry, frozen[key]),
+          ],
+        ];
+      }),
+    );
+  }
+  if (typeof value === "string" && typeof frozen === "string") {
+    if (
+      (frozen.startsWith("Invalid discriminator value. Expected") ||
+        frozen.startsWith("Use one of: setDefaultStyle")) &&
+      DIAGRAM_PATCH_OPERATION_NAMES.slice(0, 6).every((name) =>
+        value.includes(name),
+      )
+    ) {
+      return [...CANVAS_PATCH_OPERATION_ADDITIONS].reduce(
+        (message, name) =>
+          message
+            .replaceAll(` | "${name}"`, "")
+            .replaceAll(` | '${name}'`, "")
+            .replaceAll(`, "${name}"`, "")
+            .replace(new RegExp(`, ${name}(?=,|\\.|$)`, "g"), ""),
+        value,
+      );
+    }
+    try {
+      const currentJson: unknown = JSON.parse(value);
+      const frozenJson: unknown = JSON.parse(frozen);
+      return JSON.stringify(
+        normalizeCanvasMigrationAgainstFrozen(currentJson, frozenJson),
+      );
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+
 function withoutPostBaselineSceneFields(
   value: unknown,
   isSchemaProperties = false,
 ): unknown {
   if (Array.isArray(value)) {
-    return value.map((item) => withoutPostBaselineSceneFields(item));
+    return value
+      .filter((item) => !isAddedCanvasElementSchema(item))
+      .map((item) => withoutPostBaselineSceneFields(item));
   }
-  if (value === null || typeof value !== "object") {
+  if (!isRecord(value)) {
     return value;
   }
+  const schemaType = isSchemaProperties
+    ? canvasElementSchemaType(value)
+    : undefined;
+  const addedElementFields = schemaType
+    ? CANVAS_ELEMENT_SCHEMA_ADDED_FIELDS[schemaType]
+    : undefined;
   return Object.fromEntries(
     Object.entries(value).flatMap(([key, nested]) =>
-      isSchemaProperties && POST_BASELINE_SCENE_FIELDS.has(key)
+      isSchemaProperties &&
+      (POST_BASELINE_SCENE_FIELDS.has(key) || addedElementFields?.has(key))
         ? []
         : [[key, withoutPostBaselineSceneFields(nested, key === "properties")]],
     ),
@@ -1196,6 +1413,48 @@ afterEach(() => {
 });
 
 describe("pre-Effect Code Mode compatibility corpus", () => {
+  it("normalizes only explicitly approved CanvasSpec compatibility additions", () => {
+    const frozen = {
+      codes: ["legacy_code"],
+      order: ["first", "second"],
+      scene: { diagramId: "legacy", elements: [] },
+    };
+
+    expect(
+      normalizeCanvasMigrationAgainstFrozen(
+        {
+          codes: [
+            "legacy_code",
+            "invalid_canvas_geometry",
+            "unexpected_code",
+          ],
+          order: ["second", "first"],
+          scene: {
+            kind: "canvas",
+            version: 1,
+            diagramId: "legacy",
+            elements: [],
+            layers: [],
+            layouts: [],
+            zOrder: [],
+            unexpectedField: true,
+          },
+          unexpectedTopLevel: true,
+        },
+        frozen,
+      ),
+    ).toEqual({
+      codes: ["legacy_code", "unexpected_code"],
+      order: ["second", "first"],
+      scene: {
+        diagramId: "legacy",
+        elements: [],
+        unexpectedField: true,
+      },
+      unexpectedTopLevel: true,
+    });
+  });
+
   it("preserves the frozen v1 and v2 fixture lineage byte-for-byte", async () => {
     const fixtureRoot = new URL("./fixtures/", import.meta.url);
     const [v1, v2] = await Promise.all([
@@ -1299,8 +1558,11 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
       artifactProvenance: toCodeModeJsonSchema(ArtifactProvenanceSchema),
     });
     expect(
-      normalizeBrandPaletteAgainstFrozen(
-        currentSchemas,
+      normalizeCanvasMigrationAgainstFrozen(
+        normalizeBrandPaletteAgainstFrozen(
+          currentSchemas,
+          fixture.publicContract.mcpVisible.schemas,
+        ),
         fixture.publicContract.mcpVisible.schemas,
       ),
     ).toEqual(fixture.publicContract.mcpVisible.schemas);
@@ -1330,7 +1592,10 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
       },
     };
     expect(
-      normalizeBrandPaletteAgainstFrozen(normalizedCorpus, frozen),
+      normalizeCanvasMigrationAgainstFrozen(
+        normalizeBrandPaletteAgainstFrozen(normalizedCorpus, frozen),
+        frozen,
+      ),
     ).toEqual(frozen);
   });
 
@@ -1349,8 +1614,12 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
       "request_too_large",
       "patch_preserve_connectivity_failed",
     ];
-    expect([...directlyReachableCodes, ...boundaryOnlyCodes].sort()).toEqual(
-      [...CodeModeIssueCodeSchema.options].sort(),
+    expect(
+      CodeModeIssueCodeSchema.options
+        .filter((code) => !CANVAS_ISSUE_CODE_ADDITIONS.has(code))
+        .toSorted(),
+    ).toEqual(
+      [...directlyReachableCodes, ...boundaryOnlyCodes].toSorted(),
     );
 
     const corpus = {
@@ -1376,6 +1645,11 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
     const frozen = Schema.decodeUnknownSync(Schema.Unknown)(
       JSON.parse(await readFile(fixturePath, "utf8")),
     );
-    expect(normalizeBrandPaletteAgainstFrozen(corpus, frozen)).toEqual(frozen);
+    expect(
+      normalizeCanvasMigrationAgainstFrozen(
+        normalizeBrandPaletteAgainstFrozen(corpus, frozen),
+        frozen,
+      ),
+    ).toEqual(frozen);
   });
 });

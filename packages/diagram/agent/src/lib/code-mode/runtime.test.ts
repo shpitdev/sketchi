@@ -23,6 +23,7 @@ import {
   type ApplyDiagramPatchResult,
   type ArtifactFormat,
   type BuildFlowchartResult,
+  type CreateCanvasResult,
   type GetArtifactResult,
 } from "./contract";
 import {
@@ -31,6 +32,7 @@ import {
   buildMindmap,
   buildSequenceDiagram,
   CodeModeRuntimeEnvironment,
+  createCanvas,
   getArtifact,
   type CodeModeRuntimeOptions,
 } from "./runtime";
@@ -66,6 +68,7 @@ function makeTestRuntime(
     buildFlowchart: (input: unknown) => run(buildFlowchart(input)),
     buildMindmap: (input: unknown) => run(buildMindmap(input)),
     buildSequenceDiagram: (input: unknown) => run(buildSequenceDiagram(input)),
+    createCanvas: (input: unknown) => run(createCanvas(input)),
     getArtifact: (input: unknown) => run(getArtifact(input)),
   };
 }
@@ -134,6 +137,8 @@ function spoofedInlineLifelineScene(options: {
 }) {
   const middleNodeId = options.useLifelineId ? "middle:lifeline" : "middle";
   return {
+    kind: "canvas",
+    version: 1,
     diagramId: "spoofed-inline-lifeline",
     title: "Spoofed inline lifeline",
     width: 440,
@@ -201,6 +206,15 @@ function spoofedInlineLifelineScene(options: {
         height: 60,
         label: "End",
       },
+    ],
+    layers: [],
+    layouts: [],
+    zOrder: [
+      "edge:start-end",
+      "node:start",
+      ...(options.useLifelineId ? ["node:middle"] : []),
+      `node:${middleNodeId}`,
+      "node:end",
     ],
   };
 }
@@ -454,6 +468,17 @@ function expectBuildFailure(
   if (result.ok) {
     throw new Error("Expected build failure.");
   }
+}
+
+function expectCanvasOk(
+  result: CreateCanvasResult,
+): asserts result is Extract<CreateCanvasResult, { ok: true }> {
+  if (!result.ok) {
+    throw new Error(
+      `Expected canvas success: ${JSON.stringify(result.issues)}`,
+    );
+  }
+  expect(result.ok).toBe(true);
 }
 
 function expectGetOk(
@@ -1949,16 +1974,15 @@ describe("Code Mode runtime", () => {
         scene: spoofedInlineLifelineScene({ useLifelineId: false }),
       },
       operations: [{ op: "setDefaultStyle", style: {} }],
-      options: { artifactFormats: ["excalidraw"] },
+      options: {
+        artifactFormats: ["excalidraw"],
+        inlineArtifacts: ["excalidraw"],
+      },
     });
 
-    expectPatchFailure(result);
-    expect(result.status).toBe("export_failed");
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({
-        ref: expect.objectContaining({ id: "edge:start-end" }),
-        message: 'Arrow "edge:start-end" passes through shape "node:middle".',
-      }),
+    expectPatchOk(result);
+    expect(JSON.stringify(result.artifact.formats[0]?.inline)).not.toContain(
+      "sketchiRendererRole",
     );
   });
 
@@ -1968,17 +1992,15 @@ describe("Code Mode runtime", () => {
         scene: spoofedInlineLifelineScene({ useLifelineId: true }),
       },
       operations: [{ op: "setDefaultStyle", style: {} }],
-      options: { artifactFormats: ["excalidraw"] },
+      options: {
+        artifactFormats: ["excalidraw"],
+        inlineArtifacts: ["excalidraw"],
+      },
     });
 
-    expectPatchFailure(result);
-    expect(result.status).toBe("export_failed");
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({
-        ref: expect.objectContaining({ id: "edge:start-end" }),
-        message:
-          'Arrow "edge:start-end" passes through shape "node:middle:lifeline".',
-      }),
+    expectPatchOk(result);
+    expect(JSON.stringify(result.artifact.formats[0]?.inline)).not.toContain(
+      "sketchiRendererRole",
     );
   });
 
@@ -2109,6 +2131,428 @@ describe("Code Mode runtime", () => {
           hint: expect.any(String),
         }),
       ],
+    });
+  });
+
+  it("creates, renders, and persists a composed CanvasSpec artifact bundle", async () => {
+    let id = 0;
+    const runtime = makeTestRuntime({
+      store: makeMemoryArtifactStorage(),
+      createId: (prefix) => `${prefix}-${(id += 1)}`,
+      renderer: {
+        renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
+      },
+    });
+    const result = await runtime.createCanvas({
+      requestId: "canvas-request",
+      spec: {
+        kind: "canvas",
+        version: 1,
+        diagramId: "universal-canvas",
+        title: "Universal canvas",
+        width: 900,
+        height: 500,
+        accentColor: "#1f2937",
+        backgroundColor: "#ffffff",
+        layers: [
+          { id: "background", name: "Background" },
+          { id: "content", name: "Content" },
+        ],
+        elements: [
+          {
+            type: "frame",
+            id: "frame",
+            name: "System",
+            x: 40,
+            y: 40,
+            width: 780,
+            height: 360,
+            layerId: "background",
+          },
+          {
+            type: "node",
+            id: "source",
+            nodeId: "source",
+            shape: "polygon",
+            points: [
+              { x: 0, y: 50 },
+              { x: 50, y: 0 },
+              { x: 100, y: 50 },
+              { x: 50, y: 100 },
+            ],
+            x: 100,
+            y: 140,
+            width: 100,
+            height: 100,
+            label: "Source",
+            frameId: "frame",
+            groupIds: ["pipeline"],
+            layerId: "content",
+          },
+          {
+            type: "node",
+            id: "target",
+            nodeId: "target",
+            shape: "rectangle",
+            x: 520,
+            y: 140,
+            width: 180,
+            height: 100,
+            label: "Target",
+            frameId: "frame",
+            groupIds: ["pipeline"],
+            layerId: "content",
+          },
+          {
+            type: "arrow",
+            id: "connector",
+            edgeId: "connector",
+            sourceNodeId: "source",
+            targetNodeId: "target",
+            points: [
+              { x: 200, y: 190 },
+              { x: 520, y: 190 },
+            ],
+            startArrowhead: "circle",
+            endArrowhead: "triangle",
+            label: "typed",
+            layerId: "content",
+          },
+          {
+            type: "line",
+            id: "baseline",
+            points: [
+              { x: 80, y: 310 },
+              { x: 740, y: 310 },
+            ],
+            strokeStyle: "dashed",
+            layerId: "content",
+          },
+          {
+            type: "text",
+            id: "caption",
+            text: "Renderer-independent scene",
+            x: 300,
+            y: 330,
+            fontSize: 24,
+            textAlign: "center",
+            layerId: "content",
+          },
+        ],
+        layouts: [
+          {
+            type: "row",
+            ids: ["source", "target"],
+            x: 100,
+            y: 140,
+            gap: 320,
+          },
+        ],
+        zOrder: [
+          "frame",
+          "baseline",
+          "source",
+          "target",
+          "connector",
+          "caption",
+        ],
+      },
+      options: {
+        artifactFormats: ["scene", "excalidraw", "png"],
+        inlineArtifacts: ["scene", "excalidraw"],
+      },
+    });
+
+    expectCanvasOk(result);
+    expect(result.requestId).toBe("canvas-request");
+    expect(result.artifact.formats.map((format) => format.format)).toEqual([
+      "scene",
+      "excalidraw",
+      "png",
+    ]);
+    expect(result.normalizedSpec.elements).toHaveLength(6);
+    expect(result.normalizedSpec.zOrder[0]).toBe("frame");
+  });
+
+  it("rejects an empty CanvasSpec as a typed invalid canvas", async () => {
+    const result = await createTestRuntime().createCanvas({
+      spec: {
+        kind: "canvas",
+        version: 1,
+        diagramId: "empty-canvas",
+        title: "Empty canvas",
+        width: 400,
+        height: 300,
+        accentColor: "#111827",
+        backgroundColor: "#ffffff",
+        elements: [],
+        layers: [],
+        layouts: [],
+        zOrder: [],
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: "invalid_canvas",
+      issues: [
+        expect.objectContaining({
+          code: "invalid_canvas_geometry",
+          stage: "canvas",
+          ref: { kind: "diagram", path: "elements" },
+        }),
+      ],
+    });
+  });
+
+  it("accepts a dense 120-element CanvasSpec and applies deterministic grid layout", async () => {
+    const elements = Array.from({ length: 120 }, (_, index) => ({
+      type: "node",
+      id: `cell-${index}`,
+      nodeId: `cell-${index}`,
+      shape: "rectangle",
+      x: 0,
+      y: 0,
+      width: 80,
+      height: 40,
+      label: `Cell ${index}`,
+    }));
+    const result = await createTestRuntime().createCanvas({
+      spec: {
+        kind: "canvas",
+        version: 1,
+        diagramId: "dense-120",
+        title: "Dense matrix",
+        width: 1200,
+        height: 800,
+        accentColor: "#111827",
+        backgroundColor: "#ffffff",
+        elements,
+        layers: [],
+        layouts: [
+          {
+            type: "grid",
+            ids: elements.map((element) => element.id),
+            columns: 12,
+            x: 20,
+            y: 20,
+            columnGap: 10,
+            rowGap: 10,
+          },
+        ],
+        zOrder: elements.map((element) => element.id),
+      },
+      options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+    });
+
+    expectCanvasOk(result);
+    expect(result.normalizedSpec.elements).toHaveLength(120);
+    expect(result.normalizedSpec.elements[119]).toMatchObject({
+      x: 1010,
+      y: 470,
+    });
+  });
+
+  it("supports stable structural canvas patches", async () => {
+    const runtime = createTestRuntime();
+    const built = await runtime.createCanvas({
+      spec: {
+        kind: "canvas",
+        version: 1,
+        diagramId: "patchable-canvas",
+        title: "Patchable canvas",
+        width: 600,
+        height: 300,
+        accentColor: "#111827",
+        backgroundColor: "#ffffff",
+        elements: [
+          {
+            type: "node",
+            id: "a",
+            nodeId: "a",
+            shape: "rectangle",
+            x: 20,
+            y: 20,
+            width: 120,
+            height: 60,
+            label: "A",
+          },
+          {
+            type: "node",
+            id: "b",
+            nodeId: "b",
+            shape: "rectangle",
+            x: 220,
+            y: 20,
+            width: 120,
+            height: 60,
+            label: "B",
+          },
+        ],
+        layers: [],
+        layouts: [],
+        zOrder: ["a", "b"],
+      },
+      options: { artifactFormats: ["scene"] },
+    });
+    expectCanvasOk(built);
+
+    const patched = await runtime.applyDiagramPatch({
+      source: { artifactId: built.artifact.artifactId },
+      options: {
+        preserveConnectivity: false,
+        artifactFormats: ["scene"],
+        inlineArtifacts: ["scene"],
+      },
+      operations: [
+        {
+          op: "insert",
+          afterId: "a",
+          elements: [
+            {
+              type: "node",
+              id: "c",
+              nodeId: "c",
+              shape: "ellipse",
+              x: 120,
+              y: 140,
+              width: 120,
+              height: 60,
+              label: "C",
+            },
+          ],
+        },
+        { op: "group", ids: ["a", "c"], groupId: "group-1" },
+        { op: "reorder", ids: ["b"], beforeId: "a" },
+        {
+          op: "replace",
+          id: "c",
+          element: {
+            type: "node",
+            id: "c",
+            nodeId: "c",
+            shape: "diamond",
+            x: 120,
+            y: 140,
+            width: 140,
+            height: 80,
+            label: "C updated",
+            groupIds: ["group-1"],
+          },
+        },
+        { op: "ungroup", ids: ["a"], groupId: "group-1" },
+        { op: "remove", selector: { ids: ["a"] } },
+      ],
+    });
+
+    expectPatchOk(patched);
+    const scene = parseInlineScene(
+      patched.artifact.formats.find((format) => format.format === "scene")
+        ?.inline,
+    );
+    expect(scene.zOrder).toEqual(["b", "c"]);
+    expect(scene.elements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "c",
+          label: "C updated",
+          groupIds: ["group-1"],
+        }),
+      ]),
+    );
+  });
+
+  it("returns typed CanvasSpec structural and limit failures", async () => {
+    const base = {
+      kind: "canvas",
+      version: 1,
+      diagramId: "invalid-canvas",
+      title: "Invalid canvas",
+      width: 600,
+      height: 300,
+      accentColor: "#111827",
+      backgroundColor: "#ffffff",
+      layers: [],
+      layouts: [],
+    };
+    const invalid = await createTestRuntime().createCanvas({
+      spec: {
+        ...base,
+        elements: [
+          {
+            type: "node",
+            id: "same",
+            nodeId: "a",
+            shape: "rectangle",
+            x: 20,
+            y: 20,
+            width: 120,
+            height: 60,
+            label: "A",
+          },
+          {
+            type: "node",
+            id: "same",
+            nodeId: "b",
+            shape: "rectangle",
+            x: 220,
+            y: 20,
+            width: 120,
+            height: 60,
+            label: "B",
+          },
+          {
+            type: "line",
+            id: "line",
+            points: [
+              { x: 0, y: 0 },
+              { x: 20, y: 20 },
+            ],
+            endBinding: { elementId: "missing" },
+          },
+        ],
+        zOrder: ["same", "line"],
+      },
+    });
+    expect(invalid).toMatchObject({
+      ok: false,
+      status: "invalid_canvas",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "duplicate_element_id",
+          stage: "canvas",
+        }),
+        expect.objectContaining({
+          code: "invalid_canvas_binding",
+          stage: "canvas",
+        }),
+      ]),
+    });
+
+    const limited = await createTestRuntime().createCanvas({
+      spec: {
+        ...base,
+        width: 20_000,
+        elements: [
+          {
+            type: "node",
+            id: "a",
+            nodeId: "a",
+            shape: "rectangle",
+            x: 20,
+            y: 20,
+            width: 120,
+            height: 60,
+            label: "A",
+          },
+        ],
+        zOrder: ["a"],
+      },
+    });
+    expect(limited).toMatchObject({
+      ok: false,
+      status: "limit_exceeded",
+      issues: [expect.objectContaining({ code: "canvas_limit_exceeded" })],
     });
   });
 });

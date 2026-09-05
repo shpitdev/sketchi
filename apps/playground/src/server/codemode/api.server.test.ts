@@ -11,6 +11,7 @@ import {
   handleBuildFlowchartRequest as handleBuildFlowchartRequestEffect,
   handleBuildMindmapRequest as handleBuildMindmapRequestEffect,
   handleBuildSequenceDiagramRequest as handleBuildSequenceDiagramRequestEffect,
+  handleCreateCanvasRequest as handleCreateCanvasRequestEffect,
   handleGetArtifactRequest as handleGetArtifactRequestEffect,
   handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
 } from "./api.server";
@@ -46,6 +47,13 @@ function handleBuildMindmapRequest(env: StudioEnv, request: Request) {
 function handleBuildSequenceDiagramRequest(env: StudioEnv, request: Request) {
   return runPlaygroundEffect(
     handleBuildSequenceDiagramRequestEffect(request),
+    testBoundary(env, request),
+  );
+}
+
+function handleCreateCanvasRequest(env: StudioEnv, request: Request) {
+  return runPlaygroundEffect(
+    handleCreateCanvasRequestEffect(request),
     testBoundary(env, request),
   );
 }
@@ -300,6 +308,91 @@ function delay(ms: number): Promise<void> {
 }
 
 describe("Code Mode API handlers", () => {
+  it("creates a CanvasSpec through the normal Worker route", async () => {
+    const response = await handleCreateCanvasRequest(
+      {},
+      postRequest("https://studio.test/api/v1/canvases/create", {
+        requestId: "canvas-http",
+        spec: {
+          kind: "canvas",
+          version: 1,
+          diagramId: "http-canvas",
+          title: "HTTP canvas",
+          width: 480,
+          height: 320,
+          accentColor: "#111827",
+          backgroundColor: "#ffffff",
+          elements: [
+            {
+              type: "node",
+              id: "card",
+              nodeId: "card",
+              shape: "rectangle",
+              x: 40,
+              y: 40,
+              width: 240,
+              height: 120,
+              label: "Canvas",
+            },
+          ],
+          layers: [],
+          layouts: [],
+          zOrder: ["card"],
+        },
+        options: {
+          artifactFormats: ["scene", "excalidraw"],
+          inlineArtifacts: ["scene"],
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      status: "accepted",
+      requestId: "canvas-http",
+      normalizedSpec: { kind: "canvas", version: 1 },
+      artifact: {
+        diagramId: "http-canvas",
+        formats: [{ format: "scene" }, { format: "excalidraw" }],
+      },
+    });
+  });
+
+  it("returns typed HTTP 422 for an empty CanvasSpec", async () => {
+    const response = await handleCreateCanvasRequest(
+      {},
+      postRequest("https://studio.test/api/v1/canvases/create", {
+        spec: {
+          kind: "canvas",
+          version: 1,
+          diagramId: "empty-http-canvas",
+          title: "Empty HTTP canvas",
+          width: 480,
+          height: 320,
+          accentColor: "#111827",
+          backgroundColor: "#ffffff",
+          elements: [],
+          layers: [],
+          layouts: [],
+          zOrder: [],
+        },
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      status: "invalid_canvas",
+      issues: [
+        expect.objectContaining({
+          code: "invalid_canvas_geometry",
+          stage: "canvas",
+        }),
+      ],
+    });
+  });
+
   it("builds a public sequence diagram through the no-auth HTTP handler", async () => {
     const response = await handleBuildSequenceDiagramRequest(
       {},

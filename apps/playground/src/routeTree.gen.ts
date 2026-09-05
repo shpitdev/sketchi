@@ -25,6 +25,7 @@ import { Route as ApiStudioProjectsRouteImport } from "./routes/api/studio/proje
 import { Route as ApiV1SequencesBuildRouteImport } from "./routes/api/v1/sequences/build";
 import { Route as ApiV1MindmapsBuildRouteImport } from "./routes/api/v1/mindmaps/build";
 import { Route as ApiV1FlowchartsBuildRouteImport } from "./routes/api/v1/flowcharts/build";
+import { Route as ApiV1CanvasesCreateRouteImport } from "./routes/api/v1/canvases/create";
 import { Route as ApiV1ArtifactsArtifactIdRouteImport } from "./routes/api/v1/artifacts/$artifactId";
 import { Route as ApiStudioProjectsProjectIdRouteImport } from "./routes/api/studio/projects_/$projectId";
 import { Route as ApiStudioProjectsFromArtifactRouteImport } from "./routes/api/studio/projects/from-artifact";
@@ -111,6 +112,11 @@ const ApiV1FlowchartsBuildRoute = ApiV1FlowchartsBuildRouteImport.update({
   path: "/api/v1/flowcharts/build",
   getParentRoute: () => rootRouteImport,
 } as any);
+const ApiV1CanvasesCreateRoute = ApiV1CanvasesCreateRouteImport.update({
+  id: "/api/v1/canvases/create",
+  path: "/api/v1/canvases/create",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ApiV1ArtifactsArtifactIdRoute =
   ApiV1ArtifactsArtifactIdRouteImport.update({
     id: "/api/v1/artifacts/$artifactId",
@@ -160,6 +166,7 @@ export interface FileRoutesByFullPath {
   "/api/studio/projects/from-artifact": typeof ApiStudioProjectsFromArtifactRoute;
   "/api/studio/projects/$projectId": typeof ApiStudioProjectsProjectIdRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
+  "/api/v1/canvases/create": typeof ApiV1CanvasesCreateRoute;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
   "/api/v1/mindmaps/build": typeof ApiV1MindmapsBuildRoute;
   "/api/v1/sequences/build": typeof ApiV1SequencesBuildRoute;
@@ -183,6 +190,7 @@ export interface FileRoutesByTo {
   "/api/studio/projects/from-artifact": typeof ApiStudioProjectsFromArtifactRoute;
   "/api/studio/projects/$projectId": typeof ApiStudioProjectsProjectIdRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
+  "/api/v1/canvases/create": typeof ApiV1CanvasesCreateRoute;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
   "/api/v1/mindmaps/build": typeof ApiV1MindmapsBuildRoute;
   "/api/v1/sequences/build": typeof ApiV1SequencesBuildRoute;
@@ -207,6 +215,7 @@ export interface FileRoutesById {
   "/api/studio/projects/from-artifact": typeof ApiStudioProjectsFromArtifactRoute;
   "/api/studio/projects_/$projectId": typeof ApiStudioProjectsProjectIdRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
+  "/api/v1/canvases/create": typeof ApiV1CanvasesCreateRoute;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
   "/api/v1/mindmaps/build": typeof ApiV1MindmapsBuildRoute;
   "/api/v1/sequences/build": typeof ApiV1SequencesBuildRoute;
@@ -232,6 +241,7 @@ export interface FileRouteTypes {
     | "/api/studio/projects/from-artifact"
     | "/api/studio/projects/$projectId"
     | "/api/v1/artifacts/$artifactId"
+    | "/api/v1/canvases/create"
     | "/api/v1/flowcharts/build"
     | "/api/v1/mindmaps/build"
     | "/api/v1/sequences/build"
@@ -255,6 +265,7 @@ export interface FileRouteTypes {
     | "/api/studio/projects/from-artifact"
     | "/api/studio/projects/$projectId"
     | "/api/v1/artifacts/$artifactId"
+    | "/api/v1/canvases/create"
     | "/api/v1/flowcharts/build"
     | "/api/v1/mindmaps/build"
     | "/api/v1/sequences/build"
@@ -278,6 +289,7 @@ export interface FileRouteTypes {
     | "/api/studio/projects/from-artifact"
     | "/api/studio/projects_/$projectId"
     | "/api/v1/artifacts/$artifactId"
+    | "/api/v1/canvases/create"
     | "/api/v1/flowcharts/build"
     | "/api/v1/mindmaps/build"
     | "/api/v1/sequences/build"
@@ -301,6 +313,7 @@ export interface RootRouteChildren {
   ApiStudioDiagramsDiagramIdRoute: typeof ApiStudioDiagramsDiagramIdRoute;
   ApiStudioProjectsProjectIdRoute: typeof ApiStudioProjectsProjectIdRoute;
   ApiV1ArtifactsArtifactIdRoute: typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
+  ApiV1CanvasesCreateRoute: typeof ApiV1CanvasesCreateRoute;
   ApiV1FlowchartsBuildRoute: typeof ApiV1FlowchartsBuildRoute;
   ApiV1MindmapsBuildRoute: typeof ApiV1MindmapsBuildRoute;
   ApiV1SequencesBuildRoute: typeof ApiV1SequencesBuildRoute;
@@ -420,6 +433,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiV1FlowchartsBuildRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/api/v1/canvases/create": {
+      id: "/api/v1/canvases/create";
+      path: "/api/v1/canvases/create";
+      fullPath: "/api/v1/canvases/create";
+      preLoaderRoute: typeof ApiV1CanvasesCreateRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/api/v1/artifacts/$artifactId": {
       id: "/api/v1/artifacts/$artifactId";
       path: "/api/v1/artifacts/$artifactId";
@@ -500,6 +520,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiStudioDiagramsDiagramIdRoute: ApiStudioDiagramsDiagramIdRoute,
   ApiStudioProjectsProjectIdRoute: ApiStudioProjectsProjectIdRoute,
   ApiV1ArtifactsArtifactIdRoute: ApiV1ArtifactsArtifactIdRouteWithChildren,
+  ApiV1CanvasesCreateRoute: ApiV1CanvasesCreateRoute,
   ApiV1FlowchartsBuildRoute: ApiV1FlowchartsBuildRoute,
   ApiV1MindmapsBuildRoute: ApiV1MindmapsBuildRoute,
   ApiV1SequencesBuildRoute: ApiV1SequencesBuildRoute,

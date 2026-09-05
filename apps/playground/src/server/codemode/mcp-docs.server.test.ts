@@ -37,7 +37,9 @@ describe("Code Mode MCP docs", () => {
   });
 
   it("emits a complete semantic-builder public type contract", () => {
-    expect(SKETCHI_CODE_MODE_VERSION).toBe("2026-07-23");
+    expect(SKETCHI_CODE_MODE_VERSION).toBe("2026-09-04");
+    expect(SKETCHI_CODE_MODE_TYPES).toContain("interface CanvasSpec");
+    expect(SKETCHI_CODE_MODE_TYPES).toContain("type CreateCanvasResult");
     expect(SKETCHI_CODE_MODE_TYPES).toContain("interface BuildMindmapRequest");
     expect(SKETCHI_CODE_MODE_TYPES).toContain("type BuildMindmapResult");
     expect(SKETCHI_CODE_MODE_TYPES).toContain(
@@ -47,7 +49,7 @@ describe("Code Mode MCP docs", () => {
       "type BuildSequenceDiagramResult",
     );
     expect(SKETCHI_CODE_MODE_TYPES).toContain(
-      'stage: "input" | "flowchart" | "mindmap"',
+      'stage: "input" | "canvas" | "flowchart" | "mindmap"',
     );
     expect(SKETCHI_CODE_MODE_TYPES).toContain("type CodeModeIssueCode");
     expect(SKETCHI_CODE_MODE_TYPES).toContain("code: CodeModeIssueCode");
@@ -62,6 +64,7 @@ describe("Code Mode MCP docs", () => {
       "buildFlowchart",
       "buildMindmap",
       "buildSequenceDiagram",
+      "createCanvas",
       "getArtifact",
       "applyDiagramPatch",
     ]) {
@@ -86,6 +89,9 @@ describe("Code Mode MCP docs", () => {
     expect(sequenceDocs.examples[0]?.code).toContain(
       "sketchi.buildSequenceDiagram",
     );
+    const canvasDocs = getCodeModeDocs({ topic: "createCanvas" });
+    expect(canvasDocs.content).toContain("never raw Excalidraw JSON");
+    expect(canvasDocs.examples[0]?.code).toContain("sketchi.createCanvas");
   });
 
   it("keeps the published catalog complete for bounded build failures", () => {
@@ -95,6 +101,8 @@ describe("Code Mode MCP docs", () => {
       "type BuildMindmapResult",
       "interface BuildSequenceDiagramRequest",
       "buildSequenceDiagram",
+      "createCanvas",
+      "CreateCanvasRequest",
       '"request_too_large"',
       '"nonterminating_node"',
       '"flowchart_too_large"',
@@ -103,8 +111,8 @@ describe("Code Mode MCP docs", () => {
     ]) {
       expect(catalog).toContain(declaration);
     }
-    expect(catalog).toContain("flowchart, mindmap, or sequence artifact");
-    expect(catalog).toContain("matching `buildFlowchart`,");
+    expect(catalog).toContain("arbitrary typed canvas artifact");
+    expect(catalog).toContain("CanvasSpec v1");
     expect(catalog).toContain("24 nodes");
     expect(catalog).toContain("64 edges");
     expect(catalog).toContain("256 KiB");

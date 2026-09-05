@@ -202,6 +202,49 @@ function normalizeSketchiPaletteAgainstExactBase(
     .replaceAll("#1a1712", "#1e1e1e");
 }
 
+function normalizeCanvasMigrationAgainstExactBase(
+  value: unknown,
+  exactBase: unknown,
+): unknown {
+  if (Array.isArray(value) && Array.isArray(exactBase)) {
+    return value.map((entry, index) =>
+      normalizeCanvasMigrationAgainstExactBase(entry, exactBase[index]),
+    );
+  }
+  if (isRecord(value) && isRecord(exactBase)) {
+    const isCanvasSpec =
+      value["kind"] === "canvas" &&
+      value["version"] === 1 &&
+      Array.isArray(value["elements"]);
+    const isCanvasElement =
+      typeof value["id"] === "string" &&
+      !Object.hasOwn(value, "seed") &&
+      ["node", "text", "arrow", "line", "frame"].includes(
+        String(value["type"]),
+      );
+    return Object.fromEntries(
+      Object.entries(value).flatMap(([key, entry]) =>
+        (isCanvasSpec &&
+          ["kind", "version", "layers", "layouts", "zOrder"].includes(key)) ||
+        (isCanvasElement && ["rendererRole", "strokeStyle"].includes(key))
+          ? []
+          : [
+              [
+                key,
+                key === "sizeBytes" && value["format"] === "scene"
+                  ? exactBase[key]
+                  : normalizeCanvasMigrationAgainstExactBase(
+                      entry,
+                      exactBase[key],
+                    ),
+              ],
+            ],
+      ),
+    );
+  }
+  return value;
+}
+
 async function jsonObservation(
   response: Response,
   replacements: ReadonlyMap<string, string>,
@@ -244,6 +287,39 @@ afterEach(() => {
 });
 
 describe("exact-base Code Mode HTTP artifact compatibility corpus", () => {
+  it("does not hide unrelated HTTP contract drift", () => {
+    expect(
+      normalizeCanvasMigrationAgainstExactBase(
+        {
+          order: ["second", "first"],
+          scene: {
+            kind: "canvas",
+            version: 1,
+            diagramId: "legacy",
+            elements: [],
+            layers: [],
+            layouts: [],
+            zOrder: [],
+            unexpectedField: true,
+          },
+          unexpectedTopLevel: true,
+        },
+        {
+          order: ["first", "second"],
+          scene: { diagramId: "legacy", elements: [] },
+        },
+      ),
+    ).toEqual({
+      order: ["second", "first"],
+      scene: {
+        diagramId: "legacy",
+        elements: [],
+        unexpectedField: true,
+      },
+      unexpectedTopLevel: true,
+    });
+  });
+
   it("captures build, patch, get, raw, mindmap, and persisted encodings", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-07-20T12:34:56.789Z"));
@@ -373,7 +449,10 @@ describe("exact-base Code Mode HTTP artifact compatibility corpus", () => {
     const exactBase = JSON.parse(await readFile(fixturePath, "utf8"));
     expect(
       `${JSON.stringify(
-        normalizeSketchiPaletteAgainstExactBase(corpus, exactBase),
+        normalizeCanvasMigrationAgainstExactBase(
+          normalizeSketchiPaletteAgainstExactBase(corpus, exactBase),
+          exactBase,
+        ),
         null,
         2,
       )}\n`,

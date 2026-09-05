@@ -197,6 +197,8 @@ export function builtDiagram(
     title,
     document,
     scene: {
+      kind: "canvas",
+      version: 1,
       diagramId: id,
       title,
       width: 640,
@@ -204,6 +206,9 @@ export function builtDiagram(
       accentColor: "#7c3aed",
       backgroundColor: "#ffffff",
       elements: [],
+      layers: [],
+      layouts: [],
+      zOrder: [],
     },
     excalidraw: {
       type: "excalidraw",

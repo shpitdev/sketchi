@@ -174,6 +174,16 @@ const BUILD_SEQUENCE_CODE = `async () => sketchi.buildSequenceDiagram({
   }
 })`;
 
+const CREATE_CANVAS_CODE = `async () => sketchi.createCanvas({
+  spec: {
+    kind: "canvas", version: 1, diagramId: "mcp-canvas", title: "MCP canvas",
+    width: 480, height: 320, accentColor: "#111827", backgroundColor: "#ffffff",
+    elements: [{ type: "node", id: "card", nodeId: "card", shape: "rectangle", x: 40, y: 40, width: 220, height: 100, label: "Canvas" }],
+    layers: [], layouts: [], zOrder: ["card"]
+  },
+  options: { artifactFormats: ["scene", "excalidraw"], inlineArtifacts: ["scene"] }
+})`;
+
 const ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE = `async () => ({
   ok: true,
   status: "accepted",
@@ -509,6 +519,21 @@ describe("Sketchi Code Mode MCP server", () => {
       },
     });
   });
+  it("exposes createCanvas inside the Code Mode namespace", async () => {
+    const result = await executeSketchiCodeMode(
+      {},
+      { code: CREATE_CANVAS_CODE },
+      { executor: createInProcessExecutor() },
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      result: {
+        ok: true,
+        status: "accepted",
+        normalizedSpec: { kind: "canvas", version: 1, diagramId: "mcp-canvas" },
+      },
+    });
+  });
   it("normalizes common LLM execute input wrappers", () => {
     expect(normalizeSketchiExecuteCode("async () => { return 1; };")).toBe(
       "async () => { return 1; }",
@@ -692,6 +717,7 @@ describe("Sketchi Code Mode MCP server", () => {
       "buildFlowchart",
       "buildMindmap",
       "buildSequenceDiagram",
+      "createCanvas",
       "getArtifact",
       "applyDiagramPatch",
       "patchOperations",

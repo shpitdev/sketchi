@@ -83,6 +83,10 @@ export const DEPLOY_PIPELINE_SCENE = {
       };
     }
 
+    if (element.type !== "text") {
+      return element;
+    }
+
     return {
       ...element,
       fontSize: 15,

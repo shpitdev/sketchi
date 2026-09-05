@@ -6,6 +6,7 @@ import {
   type BuildFlowchartResult,
   type BuildMindmapResult,
   type BuildSequenceDiagramResult,
+  type CreateCanvasResult,
   type GetArtifactResult,
   type StoredArtifactFormat,
 } from "@sketchi/diagram-agent";
@@ -109,7 +110,7 @@ async function readBoundedBuildJson(
 }
 
 function requestTooLargeResult(
-  diagramType: "Flowchart" | "Mindmap" | "Sequence diagram",
+  diagramType: "Canvas" | "Flowchart" | "Mindmap" | "Sequence diagram",
 ) {
   return {
     ok: false as const,
@@ -171,6 +172,22 @@ function sequenceBuildStatus(result: BuildSequenceDiagramResult): number {
     case "invalid_sequence":
     case "quality_failed":
       return 422;
+    case "render_failed":
+    case "export_failed":
+    case "storage_failed":
+      return 500;
+  }
+}
+
+function canvasCreateStatus(result: CreateCanvasResult): number {
+  if (result.ok) return 200;
+  switch (result.status) {
+    case "invalid_input":
+      return 400;
+    case "invalid_canvas":
+      return 422;
+    case "limit_exceeded":
+      return 413;
     case "render_failed":
     case "export_failed":
     case "storage_failed":
@@ -503,6 +520,68 @@ export const handleBuildSequenceDiagramRequest = Effect.fn(
     context: usageContext,
     durationMs: finishedAt - startedAt,
     operation: "buildSequenceDiagram",
+    requestBody,
+    responseBody: result,
+    statusCode: status,
+    surface: "api",
+  });
+  return jsonResponse(
+    result,
+    status,
+    codeModeUsageResponseHeaders(usageContext),
+  );
+});
+
+export const handleCreateCanvasRequest = Effect.fn(
+  "playground.http.createCanvas",
+)(function* (request: Request) {
+  const clock = yield* PlaygroundClock;
+  const codeMode = yield* PlaygroundCodeMode;
+  const usage = yield* PlaygroundCodeModeUsage;
+  const usageContext = yield* usage.createContext;
+  const startedAt = yield* clock.nowMillis;
+  const boundedRequest = yield* requestRead(() =>
+    readBoundedBuildJson(request),
+  );
+  if (!boundedRequest.ok) {
+    const result = requestTooLargeResult("Canvas");
+    const finishedAt = yield* clock.nowMillis;
+    yield* usage.capture({
+      context: usageContext,
+      durationMs: finishedAt - startedAt,
+      operation: "createCanvas",
+      requestBody: boundedRequest.body,
+      responseBody: result,
+      statusCode: 413,
+      surface: "api",
+    });
+    return jsonResponse(
+      result,
+      413,
+      codeModeUsageResponseHeaders(usageContext),
+    );
+  }
+
+  const requestBody = boundedRequest.body;
+  const codeModeInput = yield* Effect.promise(() =>
+    decodeCodeModeHttpInput(
+      CodeModeHttpSchemas.createCanvas.input,
+      requestBody,
+    ),
+  );
+  const result = yield* withTelemetryCorrelation(
+    codeMode.createCanvas(codeModeInput),
+    {
+      attemptId: usageContext.attemptId,
+      runId: usageContext.runId,
+    },
+  );
+  const status = canvasCreateStatus(result);
+  const finishedAt = yield* clock.nowMillis;
+  yield* usage.capture({
+    context: usageContext,
+    durationMs: finishedAt - startedAt,
+    operation: "createCanvas",
     requestBody,
     responseBody: result,
     statusCode: status,

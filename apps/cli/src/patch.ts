@@ -67,6 +67,8 @@ export const decodePatchInput = Effect.fn("sketchi.cli.patch.decodeInput")(
       requestId: "cli-patch-validation",
       source: {
         scene: {
+          kind: "canvas",
+          version: 1,
           diagramId: "validation",
           title: "Validation",
           width: 1,
@@ -74,6 +76,9 @@ export const decodePatchInput = Effect.fn("sketchi.cli.patch.decodeInput")(
           accentColor: "#000000",
           backgroundColor: "#ffffff",
           elements: [],
+          layers: [],
+          layouts: [],
+          zOrder: [],
         },
       },
     });

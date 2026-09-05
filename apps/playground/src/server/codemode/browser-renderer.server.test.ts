@@ -8,6 +8,7 @@ import {
   type TelemetrySpanEvent,
 } from "@sketchi/observability";
 import { Cause, Effect, Exit, Fiber } from "effect";
+import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import { TestClock } from "effect/testing";
 import { beforeEach, expect, vi } from "vitest";
 
@@ -24,16 +25,24 @@ vi.mock("@cloudflare/playwright", () => ({
 
 const browserBinding: CloudflareBrowserRunBinding = { fetch };
 
-function renderInput() {
+function renderInput(): {
+  scene: RenderedDiagramScene;
+  excalidraw: { appState: Record<string, unknown>; elements: never[] };
+} {
   return {
     scene: {
+      kind: "canvas",
+      version: 1,
       accentColor: "#000000",
       backgroundColor: "#ffffff",
       diagramId: "test-diagram",
       elements: [],
+      layers: [],
+      layouts: [],
       height: 120,
       title: "Test diagram",
       width: 180,
+      zOrder: [],
     },
     excalidraw: {
       appState: {},

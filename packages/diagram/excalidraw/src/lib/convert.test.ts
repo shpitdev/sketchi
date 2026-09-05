@@ -7,6 +7,7 @@ import {
   mindmapFixture,
   pharmaBatchDispositionFlowchart,
   parseFlowchartDiagram,
+  type CanvasSpec,
 } from "@sketchi/diagram-core";
 import {
   renderIntermediateDiagram,
@@ -131,6 +132,421 @@ function expectFlowchartExportValid(
 }
 
 describe("convertSceneToExcalidraw", () => {
+  it("renders a node label when no explicit bound text is present", () => {
+    const scene: CanvasSpec = {
+      kind: "canvas",
+      version: 1,
+      diagramId: "automatic-label",
+      title: "Automatic label",
+      width: 320,
+      height: 200,
+      accentColor: "#2563eb",
+      backgroundColor: "#ffffff",
+      layers: [],
+      layouts: [],
+      elements: [
+        {
+          type: "node",
+          id: "service",
+          nodeId: "service",
+          shape: "rectangle",
+          x: 40,
+          y: 60,
+          width: 180,
+          height: 80,
+          label: "API service",
+        },
+      ],
+      zOrder: ["service"],
+    };
+
+    const converted = convertSceneToExcalidraw(scene);
+    const label = converted.elements.find(
+      (element) => element.id === "__sketchi_node_label__service",
+    );
+
+    expect(label).toMatchObject({
+      type: "text",
+      text: "API service",
+      containerId: "service",
+    });
+    expect(converted.elements.map((element) => element.type)).toEqual([
+      "rectangle",
+      "text",
+    ]);
+    expect(validateExcalidrawScene(converted)).toEqual({
+      ok: true,
+      issues: [],
+    });
+  });
+
+  it("converts CanvasSpec polygons, frames, standalone text, bound lines, and z-order", () => {
+    const canvas: CanvasSpec = {
+      kind: "canvas",
+      version: 1,
+      diagramId: "converter-canvas",
+      title: "Converter canvas",
+      width: 600,
+      height: 400,
+      accentColor: "#111827",
+      backgroundColor: "#ffffff",
+      layers: [{ id: "content" }],
+      layouts: [],
+      elements: [
+        {
+          type: "frame",
+          id: "frame",
+          name: "Group",
+          x: 20,
+          y: 20,
+          width: 500,
+          height: 300,
+        },
+        {
+          type: "node",
+          id: "polygon",
+          nodeId: "polygon-node",
+          shape: "polygon",
+          points: [
+            { x: 0, y: 50 },
+            { x: 50, y: 0 },
+            { x: 100, y: 50 },
+            { x: 50, y: 100 },
+          ],
+          x: 80,
+          y: 100,
+          width: 100,
+          height: 100,
+          label: "Polygon",
+          frameId: "frame",
+          groupIds: ["group"],
+        },
+        {
+          type: "line",
+          id: "bound-line",
+          points: [
+            { x: 180, y: 150 },
+            { x: 520, y: 150 },
+          ],
+          startBinding: { elementId: "polygon" },
+          endBinding: { elementId: "frame" },
+          endArrowhead: "triangle",
+          strokeStyle: "dotted",
+        },
+        {
+          type: "text",
+          id: "note",
+          text: "Standalone",
+          x: 280,
+          y: 260,
+          fontSize: 22,
+          fontFamily: "mono",
+          textAlign: "left",
+          opacity: 80,
+        },
+      ],
+      zOrder: ["frame", "polygon", "bound-line", "note"],
+    };
+
+    const exported = convertSceneToExcalidraw(canvas);
+
+    expect(exported.elements.map((element) => element.id)).toEqual([
+      "frame",
+      "polygon",
+      "__sketchi_node_label__polygon",
+      "bound-line",
+      "note",
+    ]);
+    expect(
+      exported.elements.find((element) => element.id === "polygon"),
+    ).toMatchObject({
+      type: "line",
+      frameId: "frame",
+      groupIds: ["group"],
+      customData: { sketchiShape: "polygon" },
+    });
+    expect(
+      exported.elements.find((element) => element.id === "bound-line"),
+    ).toMatchObject({
+      type: "arrow",
+      endArrowhead: "triangle",
+      strokeStyle: "dotted",
+      startBinding: { elementId: "polygon" },
+      endBinding: { elementId: "frame" },
+    });
+    expect(
+      exported.elements.find((element) => element.id === "note"),
+    ).toMatchObject({
+      type: "text",
+      containerId: null,
+      fontFamily: 3,
+      textAlign: "left",
+      opacity: 80,
+    });
+    expect(validateExcalidrawScene(exported)).toEqual({ ok: true, issues: [] });
+  });
+
+  it("preserves standalone arrows and bound polylines as valid exports", () => {
+    const canvas: CanvasSpec = {
+      kind: "canvas",
+      version: 1,
+      diagramId: "line-arrows",
+      title: "Line arrows",
+      width: 480,
+      height: 300,
+      accentColor: "#111827",
+      backgroundColor: "#ffffff",
+      layers: [],
+      layouts: [],
+      elements: [
+        {
+          type: "node",
+          id: "left",
+          nodeId: "left",
+          shape: "rectangle",
+          x: 20,
+          y: 40,
+          width: 100,
+          height: 80,
+          label: "Left",
+        },
+        {
+          type: "node",
+          id: "right",
+          nodeId: "right",
+          shape: "rectangle",
+          x: 340,
+          y: 40,
+          width: 100,
+          height: 80,
+          label: "Right",
+        },
+        {
+          type: "line",
+          id: "standalone",
+          points: [
+            { x: 40, y: 220 },
+            { x: 200, y: 220 },
+          ],
+          endArrowhead: "arrow",
+        },
+        {
+          type: "line",
+          id: "partially-bound",
+          points: [
+            { x: 120, y: 100 },
+            { x: 240, y: 160 },
+          ],
+          startBinding: { elementId: "left" },
+          endArrowhead: "triangle",
+        },
+        {
+          type: "line",
+          id: "bound-polyline",
+          points: [
+            { x: 120, y: 80 },
+            { x: 230, y: 80 },
+            { x: 230, y: 100 },
+            { x: 340, y: 100 },
+          ],
+          startBinding: { elementId: "left" },
+          endBinding: { elementId: "right" },
+          endArrowhead: "arrow",
+        },
+      ],
+      zOrder: [
+        "left",
+        "right",
+        "standalone",
+        "partially-bound",
+        "bound-polyline",
+      ],
+    };
+
+    const exported = convertSceneToExcalidraw(canvas);
+
+    expect(
+      exported.elements.find((element) => element.id === "standalone"),
+    ).toMatchObject({
+      type: "arrow",
+      startBinding: null,
+      endBinding: null,
+    });
+    expect(
+      exported.elements.find((element) => element.id === "partially-bound"),
+    ).toMatchObject({
+      type: "arrow",
+      startBinding: { elementId: "left" },
+      endBinding: null,
+    });
+    expect(
+      exported.elements.find((element) => element.id === "bound-polyline"),
+    ).toMatchObject({
+      type: "arrow",
+      elbowed: true,
+      fixedSegments: [],
+      roundness: null,
+    });
+    expect(validateExcalidrawScene(exported)).toEqual({ ok: true, issues: [] });
+  });
+
+  it("omits hidden layers and locks every exported element on locked layers", () => {
+    const canvas: CanvasSpec = {
+      kind: "canvas",
+      version: 1,
+      diagramId: "layer-semantics",
+      title: "Layer semantics",
+      width: 480,
+      height: 300,
+      accentColor: "#111827",
+      backgroundColor: "#ffffff",
+      layers: [
+        { id: "hidden", visible: false },
+        { id: "locked", locked: true },
+      ],
+      layouts: [],
+      elements: [
+        {
+          type: "node",
+          id: "hidden-node",
+          nodeId: "hidden-node",
+          shape: "rectangle",
+          x: 20,
+          y: 20,
+          width: 100,
+          height: 60,
+          label: "Hidden",
+          layerId: "hidden",
+        },
+        {
+          type: "node",
+          id: "locked-node",
+          nodeId: "locked-node",
+          shape: "rectangle",
+          x: 180,
+          y: 20,
+          width: 120,
+          height: 60,
+          label: "Locked",
+          layerId: "locked",
+          locked: false,
+        },
+        {
+          type: "line",
+          id: "locked-arrow",
+          points: [
+            { x: 180, y: 160 },
+            { x: 320, y: 160 },
+          ],
+          endArrowhead: "arrow",
+          label: "Locked label",
+          layerId: "locked",
+        },
+      ],
+      zOrder: ["hidden-node", "locked-node", "locked-arrow"],
+    };
+
+    const exported = convertSceneToExcalidraw(canvas);
+
+    expect(exported.elements.map((element) => element.id)).not.toContain(
+      "hidden-node",
+    );
+    expect(exported.elements.map((element) => element.id)).not.toContain(
+      "__sketchi_node_label__hidden-node",
+    );
+    expect(exported.elements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "locked-node", locked: true }),
+        expect.objectContaining({
+          id: "__sketchi_node_label__locked-node",
+          locked: true,
+        }),
+        expect.objectContaining({ id: "locked-arrow", locked: true }),
+        expect.objectContaining({ id: "locked-arrow:label", locked: true }),
+      ]),
+    );
+    expect(validateExcalidrawScene(exported)).toEqual({ ok: true, issues: [] });
+  });
+
+  it("uses explicit arrow-bound text instead of a derived connector label", () => {
+    const canvas: CanvasSpec = {
+      kind: "canvas",
+      version: 1,
+      diagramId: "bound-arrow-text",
+      title: "Bound arrow text",
+      width: 400,
+      height: 200,
+      accentColor: "#111827",
+      backgroundColor: "#ffffff",
+      layers: [],
+      layouts: [],
+      elements: [
+        {
+          type: "node",
+          id: "source",
+          nodeId: "source",
+          shape: "rectangle",
+          x: 20,
+          y: 60,
+          width: 100,
+          height: 60,
+          label: "Source",
+        },
+        {
+          type: "node",
+          id: "target",
+          nodeId: "target",
+          shape: "rectangle",
+          x: 280,
+          y: 60,
+          width: 100,
+          height: 60,
+          label: "Target",
+        },
+        {
+          type: "arrow",
+          id: "request",
+          edgeId: "request",
+          sourceNodeId: "source",
+          targetNodeId: "target",
+          points: [
+            { x: 120, y: 90 },
+            { x: 280, y: 90 },
+          ],
+          label: "derived fallback",
+        },
+        {
+          type: "text",
+          id: "request-label",
+          containerId: "request",
+          x: 200,
+          y: 90,
+          text: "POST /events",
+          fontSize: 14,
+        },
+      ],
+      zOrder: ["source", "target", "request", "request-label"],
+    };
+
+    const exported = convertSceneToExcalidraw(canvas);
+    expect(
+      exported.elements.find((element) => element.id === "request"),
+    ).toMatchObject({
+      boundElements: [{ id: "request-label", type: "text" }],
+    });
+    expect(
+      exported.elements.find((element) => element.id === "request-label"),
+    ).toMatchObject({
+      type: "text",
+      containerId: "request",
+      text: "POST /events",
+    });
+    expect(
+      exported.elements.some((element) => element.id === "request:label"),
+    ).toBe(false);
+    expect(validateExcalidrawScene(exported)).toEqual({ ok: true, issues: [] });
+  });
+
   it("exports the horizontal mindmap fixture with valid arrow bindings", () => {
     const exported = convertSceneToExcalidraw(
       renderIntermediateDiagram(mindmapFixture),
@@ -1137,6 +1553,8 @@ describe("convertSceneToExcalidraw", () => {
 
   it("reports routes through ordinary nodes claiming lifeline identity", () => {
     const scene = convertSceneToExcalidraw({
+      kind: "canvas",
+      version: 1,
       diagramId: "through-node-route",
       title: "Through-node route",
       width: 420,
@@ -1189,6 +1607,14 @@ describe("convertSceneToExcalidraw", () => {
           height: 60,
           label: "End",
         },
+      ],
+      layers: [],
+      layouts: [],
+      zOrder: [
+        "edge:start-end",
+        "node:start",
+        "node:middle:lifeline",
+        "node:end",
       ],
     });
 

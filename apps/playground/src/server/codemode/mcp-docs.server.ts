@@ -19,6 +19,7 @@ const CodeModeDocsTopicContract = Schema.Literals([
   "buildFlowchart",
   "buildMindmap",
   "buildSequenceDiagram",
+  "createCanvas",
   "getArtifact",
   "applyDiagramPatch",
   "patchOperations",
@@ -117,7 +118,7 @@ interface CatalogEntry {
   examples?: CodeExample[];
 }
 
-export const SKETCHI_CODE_MODE_VERSION = "2026-07-23";
+export const SKETCHI_CODE_MODE_VERSION = "2026-09-04";
 
 const CODE_MODE_ISSUE_CODE_TYPE = CodeModeIssueCodeSchema.options
   .map((code, index) => `${index === 0 ? "  " : "  | "}"${code}"`)
@@ -126,14 +127,17 @@ const CODE_MODE_ISSUE_CODE_TYPE = CodeModeIssueCodeSchema.options
 const PATCH_OPERATION_SUMMARY = [
   "- setDefaultStyle: set fallback strokeColor, fillColor, textColor, or backgroundColor for the scene.",
   "- setStyle: style selected nodes, edges, labels, or scopes.",
-  "- setShape: change selected node shapes to rectangle, diamond, ellipse, or circle.",
+  "- setShape: change selected node shapes to rectangle, diamond, ellipse, circle, or polygon.",
   "- translate: move selected nodes/edges/text by dx and dy; connectivity is preserved by default.",
   "- replaceText: replace selected node labels, edge labels, or text elements. Use this for label edits.",
   "- rerouteEdges: reroute selected edges after movement or shape changes.",
+  "- insert/remove/replace: structurally edit elements while retaining stable ids.",
+  "- reorder: move existing ids in the explicit back-to-front zOrder.",
+  "- group/ungroup: add or remove stable composition group ids.",
 ].join("\n");
 
 const PATCH_REQUEST_SHAPE = `interface ApplyDiagramPatchRequest {
-  source: { artifactId: string; format?: "scene" } | { scene: RenderedDiagramScene };
+  source: { artifactId: string; format?: "scene" } | { scene: CanvasSpec };
   operations: DiagramPatchOperation[];
   intent?: string;
   options?: { inlineArtifacts?: ["scene", "excalidraw"]; artifactFormats?: ["scene", "excalidraw", "png"]; preserveConnectivity?: boolean };
@@ -142,10 +146,16 @@ const PATCH_REQUEST_SHAPE = `interface ApplyDiagramPatchRequest {
 type DiagramPatchOperation =
   | { op: "setDefaultStyle"; style: DiagramStylePatch }
   | { op: "setStyle"; selector: DiagramSelector; style: DiagramStylePatch }
-  | { op: "setShape"; selector: DiagramSelector; shape: "rectangle" | "diamond" | "ellipse" | "circle" }
+  | { op: "setShape"; selector: DiagramSelector; shape: DiagramShape }
   | { op: "translate"; selector: DiagramSelector; dx: number; dy: number }
   | { op: "replaceText"; selector: DiagramSelector; text: string }
-  | { op: "rerouteEdges"; selector?: DiagramSelector };
+  | { op: "rerouteEdges"; selector?: DiagramSelector }
+  | { op: "insert"; elements: CanvasElement[]; beforeId?: string; afterId?: string }
+  | { op: "remove"; selector: DiagramSelector }
+  | { op: "replace"; id: string; element: CanvasElement }
+  | { op: "reorder"; ids: string[]; beforeId?: string; afterId?: string }
+  | { op: "group"; ids: string[]; groupId: string }
+  | { op: "ungroup"; ids: string[]; groupId?: string };
 
 // Primary public path:
 {
@@ -161,7 +171,13 @@ const PATCH_OPERATIONS_EXAMPLE = `[
   { op: "setShape", selector: { nodeIds: ["gate"] }, shape: "diamond" },
   { op: "translate", selector: { nodeIds: ["gate"] }, dx: 24, dy: -12 },
   { op: "replaceText", selector: { nodeIds: ["ship"] }, text: "Ship to production" },
-  { op: "rerouteEdges", selector: { scope: "edges" } }
+  { op: "rerouteEdges", selector: { scope: "edges" } },
+  { op: "insert", afterId: "gate", elements: [{ type: "text", id: "note", text: "Review", x: 10, y: 10, fontSize: 18 }] },
+  { op: "replace", id: "note", element: { type: "text", id: "note", text: "Approved", x: 10, y: 10, fontSize: 18 } },
+  { op: "reorder", ids: ["note"], beforeId: "gate" },
+  { op: "group", ids: ["gate", "note"], groupId: "approval-group" },
+  { op: "ungroup", ids: ["note"], groupId: "approval-group" },
+  { op: "remove", selector: { ids: ["note"] } }
 ]`;
 
 const FULL_PATCH_REQUEST_EXAMPLE = `{
@@ -185,6 +201,7 @@ export const SKETCHI_CODE_MODE_TYPES = `declare const sketchi: {
   buildFlowchart(input: BuildFlowchartRequest): Promise<BuildFlowchartResult>;
   buildMindmap(input: BuildMindmapRequest): Promise<BuildMindmapResult>;
   buildSequenceDiagram(input: BuildSequenceDiagramRequest): Promise<BuildSequenceDiagramResult>;
+  createCanvas(input: CreateCanvasRequest): Promise<CreateCanvasResult>;
   getArtifact(input: GetArtifactRequest): Promise<GetArtifactResult>;
   applyDiagramPatch(input: ApplyDiagramPatchRequest): Promise<ApplyDiagramPatchResult>;
 };
@@ -192,7 +209,25 @@ export const SKETCHI_CODE_MODE_TYPES = `declare const sketchi: {
 type FlowchartNodeKind = "start" | "process" | "decision" | "end";
 type ArtifactFormat = "scene" | "excalidraw" | "png";
 type InlineArtifactFormat = "scene" | "excalidraw";
-type DiagramShape = "rectangle" | "diamond" | "ellipse" | "circle";
+type DiagramShape = "rectangle" | "diamond" | "ellipse" | "circle" | "polygon";
+type CanvasPoint = { x: number; y: number };
+type CanvasComposition = { frameId?: string; groupIds?: string[]; layerId?: string; locked?: boolean; opacity?: number; zIndex?: number };
+type CanvasStyle = { strokeColor?: string; fillColor?: string; textColor?: string; strokeStyle?: "solid" | "dashed" | "dotted"; strokeWidth?: 1 | 2 | 4; fillStyle?: "hachure" | "cross-hatch" | "solid"; roughness?: 0 | 1 | 2 };
+type CanvasElement =
+  | (CanvasComposition & CanvasStyle & { type: "node"; id: string; nodeId: string; shape: DiagramShape; x: number; y: number; width: number; height: number; label: string; points?: CanvasPoint[] })
+  | (CanvasComposition & { type: "text"; id: string; text: string; x: number; y: number; fontSize: number; containerId?: string; textColor?: string; fontFamily?: "hand" | "mono" | "sans"; maxWidth?: number; textAlign?: "left" | "center" | "right"; verticalAlign?: "top" | "middle" | "bottom" })
+  | (CanvasComposition & CanvasStyle & { type: "arrow"; id: string; edgeId: string; sourceNodeId: string; targetNodeId: string; points: CanvasPoint[]; label?: string; startArrowhead?: CanvasArrowhead; endArrowhead?: CanvasArrowhead })
+  | (CanvasComposition & CanvasStyle & { type: "line"; id: string; points: CanvasPoint[]; label?: string; startBinding?: CanvasBinding; endBinding?: CanvasBinding; startArrowhead?: CanvasArrowhead; endArrowhead?: CanvasArrowhead })
+  | (CanvasComposition & CanvasStyle & { type: "frame"; id: string; name?: string; x: number; y: number; width: number; height: number });
+type CanvasArrowhead = "arrow" | "bar" | "circle" | "diamond" | "triangle" | null;
+type CanvasBinding = { elementId: string; focus?: number; gap?: number };
+type CanvasLayout =
+  | { type: "row" | "column" | "stack"; ids: string[]; x?: number; y?: number; gap?: number }
+  | { type: "grid"; ids: string[]; columns: number; x?: number; y?: number; columnGap?: number; rowGap?: number }
+  | { type: "align"; ids: string[]; axis: "x" | "y"; alignment: "start" | "center" | "end" }
+  | { type: "distribute"; ids: string[]; axis: "x" | "y"; gap?: number };
+interface CanvasSpec { kind: "canvas"; version: 1; diagramId: string; title: string; width: number; height: number; accentColor: string; backgroundColor: string; elements: CanvasElement[]; layers?: Array<{ id: string; name?: string; locked?: boolean; visible?: boolean }>; layouts?: CanvasLayout[]; zOrder?: string[]; }
+interface CreateCanvasRequest { requestId?: string; spec: CanvasSpec; options?: { artifactFormats?: ArtifactFormat[]; inlineArtifacts?: InlineArtifactFormat[] } }
 
 interface MindmapTopic { label: string; children?: MindmapTopic[]; }
 interface MindmapSpec {
@@ -291,7 +326,13 @@ type DiagramPatchOperation =
   | { op: "setShape"; selector: DiagramSelector; shape: DiagramShape }
   | { op: "translate"; selector: DiagramSelector; dx: number; dy: number }
   | { op: "replaceText"; selector: DiagramSelector; text: string }
-  | { op: "rerouteEdges"; selector?: DiagramSelector };
+  | { op: "rerouteEdges"; selector?: DiagramSelector }
+  | { op: "insert"; elements: CanvasElement[]; beforeId?: string; afterId?: string }
+  | { op: "remove"; selector: DiagramSelector }
+  | { op: "replace"; id: string; element: CanvasElement }
+  | { op: "reorder"; ids: string[]; beforeId?: string; afterId?: string }
+  | { op: "group"; ids: string[]; groupId: string }
+  | { op: "ungroup"; ids: string[]; groupId?: string };
 
 interface DiagramStylePatch {
   strokeColor?: string;
@@ -322,8 +363,8 @@ ${CODE_MODE_ISSUE_CODE_TYPE};
 interface CodeModeIssue {
   code: CodeModeIssueCode;
   severity: "error" | "warning";
-  stage: "input" | "flowchart" | "mindmap" | "quality" | "render" | "export" | "storage";
-  ref?: { kind: "request" | "diagram" | "node" | "edge" | "artifact"; id?: string; path?: string };
+  stage: "input" | "canvas" | "flowchart" | "mindmap" | "quality" | "render" | "export" | "storage";
+  ref?: { kind: "request" | "diagram" | "element" | "layer" | "node" | "edge" | "artifact"; id?: string; path?: string };
   message: string;
   hint: string;
 }
@@ -339,6 +380,10 @@ type BuildMindmapResult =
 type BuildSequenceDiagramResult =
   | { ok: true; status: "accepted"; buildId: string; normalizedSpec: unknown; quality: unknown; artifact: ArtifactBundle; issues: CodeModeIssue[] }
   | { ok: false; status: string; issues: CodeModeIssue[]; normalizedSpec?: unknown; quality?: unknown; partial?: unknown };
+
+type CreateCanvasResult =
+  | { ok: true; status: "accepted"; buildId: string; normalizedSpec: CanvasSpec; artifact: ArtifactBundle; issues: CodeModeIssue[] }
+  | { ok: false; status: string; issues: CodeModeIssue[]; normalizedSpec?: CanvasSpec; partial?: unknown };
 
 type GetArtifactResult =
   | { ok: true; artifactId: string; diagramId: string; format: ArtifactFormat; mimeType: string; inline?: unknown; sizeBytes?: number; url?: string; expiresAt?: string; provenance?: ArtifactProvenance }
@@ -436,6 +481,24 @@ const SEQUENCE_DIAGRAM_EXAMPLE = `async () => sketchi.buildSequenceDiagram({
       { source: "store", target: "payments", label: "Authorize payment" },
       { source: "payments", target: "store", label: "Approved", type: "return" }
     ]
+  },
+  options: { artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: ["excalidraw"] }
+})`;
+
+const CREATE_CANVAS_EXAMPLE = `async () => sketchi.createCanvas({
+  spec: {
+    kind: "canvas", version: 1, diagramId: "erd", title: "Commerce ERD",
+    width: 960, height: 560, accentColor: "#1f2937", backgroundColor: "#ffffff",
+    layers: [{ id: "entities", name: "Entities" }, { id: "relations", name: "Relations" }],
+    elements: [
+      { type: "node", id: "users", nodeId: "users", shape: "rectangle", x: 80, y: 80, width: 220, height: 160, label: "users\\nid PK\\nemail UNIQUE", layerId: "entities", fillColor: "#dbeafe" },
+      { type: "node", id: "orders", nodeId: "orders", shape: "rectangle", x: 380, y: 80, width: 220, height: 160, label: "orders\\nid PK\\nuser_id FK", layerId: "entities", fillColor: "#dcfce7" },
+      { type: "node", id: "items", nodeId: "items", shape: "rectangle", x: 680, y: 80, width: 220, height: 160, label: "order_items\\norder_id FK\\nsku", layerId: "entities", fillColor: "#fef3c7" },
+      { type: "arrow", id: "users-orders", edgeId: "users-orders", sourceNodeId: "users", targetNodeId: "orders", points: [{x:300,y:160},{x:380,y:160}], label: "1:N", layerId: "relations", startArrowhead: "bar", endArrowhead: "arrow" },
+      { type: "arrow", id: "orders-items", edgeId: "orders-items", sourceNodeId: "orders", targetNodeId: "items", points: [{x:600,y:160},{x:680,y:160}], label: "1:N", layerId: "relations", startArrowhead: "bar", endArrowhead: "arrow" }
+    ],
+    layouts: [{ type: "row", ids: ["users", "orders", "items"], x: 80, y: 80, gap: 80 }],
+    zOrder: ["users", "orders", "items", "users-orders", "orders-items"]
   },
   options: { artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: ["excalidraw"] }
 })`;
@@ -564,7 +627,7 @@ const catalog: CatalogEntry[] = [
     content: [
       "Sketchi Code Mode MCP is for external agent harnesses: Codex, Claude Code, OpenCode, and similar clients.",
       "The server exposes a small contract: docs, search, and execute. execute runs JavaScript against a typed sketchi client.",
-      "The public sketchi client has five operations: buildFlowchart, buildMindmap, buildSequenceDiagram, getArtifact, and applyDiagramPatch.",
+      "The public sketchi client has six operations: buildFlowchart, buildMindmap, buildSequenceDiagram, createCanvas, getArtifact, and applyDiagramPatch.",
       "The final deliverable is the accepted Sketchi artifact bundle: return the artifactId, format list, and Excalidraw/PNG artifact URLs instead of creating a separate Markdown, Mermaid, or prose-only diagram artifact.",
       "Use docs({ topic }) for full request envelopes and examples. Use search({ query }) to discover operation-specific topics such as patchOperations.",
       "Studio chat, HTTP, and MCP share the canonical semantic builder request/result contracts. Convex threads and user artifact lineage remain outside this harness surface.",
@@ -577,15 +640,15 @@ const catalog: CatalogEntry[] = [
     topic: "execute",
     keywords: ["execute", "code", "javascript", "typescript", "sandbox"],
     snippet:
-      "Run an async JavaScript arrow function with sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.buildSequenceDiagram, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
+      "Run an async JavaScript arrow function with the typed sketchi builders, createCanvas, artifact retrieval, and patching operations.",
     content: [
       "execute({ code }) runs an async JavaScript arrow function.",
       "This matches the Code Mode pattern: typed host tools are exposed as a namespace inside the sandbox, here sketchi.*.",
-      "Cloudflare Code Mode exposes typed namespace methods in generated code; this server follows that shape with sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.buildSequenceDiagram, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
+      "Cloudflare Code Mode exposes typed namespace methods in generated code; this server follows that shape with sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.buildSequenceDiagram, sketchi.createCanvas, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
       "Pass the function expression itself. A trailing semicolon and outer markdown code fence are accepted, but examples omit them so copied code is canonical.",
       "Write JavaScript only: no TypeScript annotations, interfaces, generics, imports, or named wrapper functions. Use the canonical shape async () => { const result = await sketchi.buildFlowchart(...); return result; }.",
       "Do not define a named function and then call it. Put the arrow function body directly in code.",
-      "Inside code, call sketchi.buildFlowchart(input) for process graphs, sketchi.buildMindmap(input) for topic hierarchies, or sketchi.buildSequenceDiagram(input) for chronological participant interactions, then sketchi.getArtifact(input) or sketchi.applyDiagramPatch(input) as needed.",
+      "Inside code, use a semantic builder for its supported diagram family, or sketchi.createCanvas(input) for arbitrary typed scenes such as ERDs, architecture maps, timelines, charts, dashboards, and wireframes; then retrieve or patch the accepted artifact as needed.",
       "The sandbox must not receive secrets, storage bindings, model credentials, or raw network access.",
       "Call sketchi methods sequentially when possible so a harness can inspect structured failures and retry deliberately.",
       "For user-facing completion, return the accepted Sketchi artifactId plus Excalidraw and PNG URLs from the MCP result. Do not synthesize a Mermaid or Markdown replacement after Sketchi accepts an artifact.",
@@ -697,6 +760,45 @@ const catalog: CatalogEntry[] = [
     ],
   },
   {
+    id: "createCanvas",
+    kind: "operation",
+    title: "createCanvas",
+    topic: "createCanvas",
+    keywords: [
+      "canvas",
+      "arbitrary",
+      "erd",
+      "architecture",
+      "timeline",
+      "dashboard",
+      "chart",
+      "wireframe",
+      "grid",
+      "layers",
+      "groups",
+      "polygon",
+    ],
+    snippet:
+      "Create an arbitrary visualization from the versioned, renderer-independent CanvasSpec IR.",
+    content: [
+      "createCanvas is the one general-purpose host function for agent-authored diagrams and visualizations. It accepts CanvasSpec v1, never raw Excalidraw JSON.",
+      "CanvasSpec supports bound and standalone text, rectangle/ellipse/diamond/circle/polygon shapes, lines and bound connectors with arrowheads, frames, groups, layers, explicit back-to-front zOrder, and deterministic row/column/grid/stack/align/distribute layouts.",
+      "Every element needs a unique stable id. Connectors bind through shape nodeId values; line bindings and text containers use element ids.",
+      "Generic validation enforces size, reference, geometry, and composition invariants. Intentional overlap is allowed.",
+      "CanvasSpec does not accept SVG, HTML, scripts, data URLs, external URLs, or executable payloads. Use only the typed primitives in the contract.",
+      "Limits: 600 elements, 64 layers, 128 layout primitives, 256 points per element, 16 groups per element, 4096 characters per text element, 16384 canvas units per dimension, and 1.5 MB serialized input.",
+      "Use applyDiagramPatch structural operations for iterative edits without regenerating the whole scene.",
+      "The repository examples include executable ERD, architecture, timeline, dashboard/chart, wireframe, and dense 120-element cases.",
+    ].join("\n"),
+    examples: [
+      {
+        title: "Commerce ERD with layers, bindings, layout, and z-order",
+        language: "js",
+        code: CREATE_CANVAS_EXAMPLE,
+      },
+    ],
+  },
+  {
     id: "getArtifact",
     kind: "operation",
     title: "getArtifact",
@@ -722,7 +824,7 @@ const catalog: CatalogEntry[] = [
       "Hosted MCP/API responses include url fields for raw artifact downloads. Excalidraw URLs return importable JSON; PNG URLs return image bytes.",
       "Pass inline: true only when the harness needs scene or Excalidraw JSON in the MCP response.",
       "To fetch raw artifact bytes, request GET /api/v1/artifacts/{artifactId}?format=excalidraw&raw=true or format=png&raw=true from the Studio API.",
-      "Use the artifactId returned by buildFlowchart, buildMindmap, buildSequenceDiagram, or applyDiagramPatch.",
+      "Use the artifactId returned by buildFlowchart, buildMindmap, buildSequenceDiagram, createCanvas, or applyDiagramPatch.",
     ].join("\n"),
   },
   {
@@ -741,7 +843,7 @@ const catalog: CatalogEntry[] = [
       "reroute",
     ],
     snippet:
-      "Apply deterministic non-structural visual changes to an accepted artifact.",
+      "Apply deterministic visual or structural changes to an accepted artifact.",
     content: [
       "applyDiagramPatch modifies styling, shape, text, layout translation, and edge routes.",
       "Request envelope:",
@@ -749,7 +851,7 @@ const catalog: CatalogEntry[] = [
       "Selectors can target nodeIds, edgeIds, labels, element ids, kinds, or broad scopes.",
       `Supported operation names: ${DIAGRAM_PATCH_OPERATION_NAMES.join(", ")}.`,
       PATCH_OPERATION_SUMMARY,
-      "Patch operations do not create or delete structure. Re-run the matching semantic builder for process, hierarchy, or sequence structure changes.",
+      "For a CanvasSpec, insert, remove, replace, reorder, group, and ungroup support iterative structural editing. Stable ids are mandatory; connectivity is preserved unless options.preserveConnectivity is false.",
       "For color changes, use 6-digit hex strings such as #7c3aed.",
       "For hosted visual proof after a patch, include png in artifactFormats and fetch the raw Studio API artifact bytes.",
       "If export returns arrow_overlap, first rebuild the FlowchartSpec into a cleaner DAG. rerouteEdges preserves connectivity, but it cannot reliably fix a graph with a long upward return edge.",
@@ -798,7 +900,7 @@ const catalog: CatalogEntry[] = [
       "Use replaceText for label edits. Do not use setText, setLabel, rename, relabel, text, updateLabel, or setNodeLabel.",
       "Op-specific shapes:",
       PATCH_REQUEST_SHAPE,
-      "Every operation except setDefaultStyle needs a selector unless noted otherwise. A selector can use nodeIds, edgeIds, ids, labels, kinds, or scope.",
+      "Selection-based operations use nodeIds, edgeIds, ids, labels, kinds, or scope. Structural insert/replace/reorder/group operations use stable element ids directly.",
       "For style patches, node and edge colors use strokeColor, fillColor, textColor, and backgroundColor. FlowchartSpec top-level style uses accentColor and backgroundColor.",
       "If a shape change causes arrow_overlap or text_overflow during export, retry with rerouteEdges, translate, or rebuild the FlowchartSpec with more space.",
       "For complex flowcharts, the most reliable repair is usually structural: keep edges flowing in the declared layout direction and avoid connecting a bottom node back to an early terminal.",
@@ -826,7 +928,7 @@ const catalog: CatalogEntry[] = [
       "First get the semantic graph accepted, then apply visual patches.",
     content: [
       "For mixed requests like 'circle connected to a purple decision diamond', split the task.",
-      "Step 1: choose buildFlowchart for a process graph, buildMindmap for a nested topic hierarchy, or buildSequenceDiagram for chronological participant interactions.",
+      "Step 1: choose buildFlowchart for a process graph, buildMindmap for a nested topic hierarchy, buildSequenceDiagram for chronological participant interactions, or createCanvas for any other diagram or visualization.",
       "Step 2: inspect issues. If not accepted, repair the spec and call the same build operation again.",
       "Step 3: once accepted, use applyDiagramPatch for circle, diamond, color, movement, rerouteEdges, or replaceText tweaks.",
       "For broad architecture prompts, keep the first build small and readable: one start, a mostly monotonic spine, a few decision or branch points, and separate terminal nodes for separate outcomes.",
@@ -889,7 +991,7 @@ const catalog: CatalogEntry[] = [
     kind: "example",
     title: "Executable examples",
     topic: "examples",
-    keywords: ["examples", "sample", "purple", "diamond", "approval"],
+    keywords: ["examples", "sample", "canvas", "erd", "dashboard", "wireframe"],
     snippet:
       "Runnable examples for accepted graph, patch, artifact retrieval, and repair feedback.",
     content:
@@ -920,6 +1022,11 @@ const catalog: CatalogEntry[] = [
         language: "js",
         code: SEQUENCE_DIAGRAM_EXAMPLE,
       },
+      {
+        title: "Commerce ERD through createCanvas",
+        language: "js",
+        code: CREATE_CANVAS_EXAMPLE,
+      },
     ],
   },
   {
@@ -931,7 +1038,7 @@ const catalog: CatalogEntry[] = [
     snippet:
       "When Sketchi accepts an artifact, the final result is that artifact bundle, not a recreated Markdown diagram.",
     content:
-      "Do not create a Markdown, Mermaid, local file, Antigravity artifact, or prose-only artifact after buildFlowchart, buildMindmap, buildSequenceDiagram, or applyDiagramPatch succeeds. Do not call getArtifact for scene just to make a local summary. Paste execute.artifactDelivery.finalResponseText when present, or return the Sketchi artifactId, available formats, and raw Excalidraw/PNG URLs so the caller can open the actual generated artifact.",
+      "Do not create a Markdown, Mermaid, local file, Antigravity artifact, or prose-only artifact after buildFlowchart, buildMindmap, buildSequenceDiagram, createCanvas, or applyDiagramPatch succeeds. Do not call getArtifact for scene just to make a local summary. Paste execute.artifactDelivery.finalResponseText when present, or return the Sketchi artifactId, available formats, and raw Excalidraw/PNG URLs so the caller can open the actual generated artifact.",
   },
   {
     id: "raw-excalidraw-non-goal",
@@ -942,7 +1049,7 @@ const catalog: CatalogEntry[] = [
     snippet:
       "Native Excalidraw is an output format. Prefer semantic FlowchartSpec, MindmapSpec, or SequenceDiagramSpec input.",
     content:
-      "Do not use coordinates, scene data, or native Excalidraw JSON as build input. Use FlowchartSpec, nested MindmapSpec, or SequenceDiagramSpec with its matching builder; scene and Excalidraw remain intentional output formats, and applyDiagramPatch handles deterministic visual changes.",
+      "Do not use native Excalidraw JSON as build input. Use FlowchartSpec, nested MindmapSpec, SequenceDiagramSpec, or the renderer-independent CanvasSpec v1; scene and Excalidraw remain intentional output formats, and applyDiagramPatch handles deterministic edits.",
   },
   {
     id: "managed-thread-non-goal",

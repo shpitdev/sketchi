@@ -7,9 +7,9 @@ Mode sandbox calls curated host APIs. The host APIs are normal Worker APIs backe
 by the shared diagram packages.
 
 The goal is not to make every internal function callable. The goal is to let
-Claude Code, Codex, OpenCode, and similar harnesses build a correct flowchart
-artifact through one clear contract, get structured repair feedback when they
-are wrong, and retrieve the finished artifact.
+Claude Code, Codex, OpenCode, and similar harnesses build a correct semantic
+diagram or arbitrary typed canvas artifact through one clear contract, get
+structured repair feedback when they are wrong, and retrieve the result.
 
 ## Implementation Plan
 
@@ -23,7 +23,8 @@ in [Code Mode Next PR Plan](codemode-next-pr-plan.md).
 - Do not expose `validate`, `grade`, `render`, or `export` as public operations.
 - Use normal host APIs as the source of truth for request and response shapes.
 - Register curated Code Mode functions over those host APIs.
-- Start with `buildFlowchart` and `getArtifact`.
+- Use the family-specific semantic builders when they fit; use one typed
+  `createCanvas` host function for arbitrary visualizations.
 - Define `applyDiagramPatch` up front as the first deterministic mutation
   operation for styling, shape, text, and layout changes.
 - Agents must get the semantic flow and connectivity accepted before applying
@@ -49,6 +50,7 @@ flowchart LR
   McpServer --> Execute
   Execute --> Sandbox
   Sandbox -->|"sketchi.buildFlowchart(...)"| HostApi
+  Sandbox -->|"sketchi.createCanvas(...)"| HostApi
   Sandbox -->|"sketchi.applyDiagramPatch(...)"| HostApi
   HostApi --> Packages
   HostApi --> Artifact
@@ -160,6 +162,7 @@ interface DocsRequest {
     | "buildFlowchart"
     | "buildMindmap"
     | "buildSequenceDiagram"
+    | "createCanvas"
     | "getArtifact"
     | "applyDiagramPatch"
     | "patchOperations"
@@ -237,6 +240,7 @@ declare const sketchi: {
   buildSequenceDiagram(
     input: BuildSequenceDiagramRequest,
   ): Promise<BuildSequenceDiagramResult>;
+  createCanvas(input: CreateCanvasRequest): Promise<CreateCanvasResult>;
   getArtifact(input: GetArtifactRequest): Promise<GetArtifactResult>;
   applyDiagramPatch(
     input: ApplyDiagramPatchRequest,
@@ -257,15 +261,18 @@ flowchart LR
   Code["sandbox<br/>sketchi.*"]
   Dispatcher["host dispatcher"]
   Build["POST /api/v1/{flowcharts,mindmaps,sequences}/build"]
+  Canvas["POST /api/v1/canvases/create"]
   Artifact["GET /api/v1/artifacts/:artifactId"]
   Patch["POST /api/v1/artifacts/:artifactId/patch"]
   Runtime["shared runtime"]
 
   Code --> Dispatcher
   Dispatcher --> Build
+  Dispatcher --> Canvas
   Dispatcher --> Artifact
   Dispatcher --> Patch
   Build --> Runtime
+  Canvas --> Runtime
   Artifact --> Runtime
   Patch --> Runtime
 ```
@@ -275,6 +282,7 @@ flowchart LR
 | `POST /api/v1/flowcharts/build`            | `sketchi.buildFlowchart(input)`       | Yes                   |
 | `POST /api/v1/mindmaps/build`              | `sketchi.buildMindmap(input)`         | Yes                   |
 | `POST /api/v1/sequences/build`             | `sketchi.buildSequenceDiagram(input)` | Yes                   |
+| `POST /api/v1/canvases/create`             | `sketchi.createCanvas(input)`         | Yes                   |
 | `GET /api/v1/artifacts/:artifactId`        | `sketchi.getArtifact(input)`          | Yes                   |
 | `POST /api/v1/artifacts/:artifactId/patch` | `sketchi.applyDiagramPatch(input)`    | Yes                   |
 | validate IR                                | none                                  | No, internal to build |
@@ -833,7 +841,7 @@ as a manifest plus one object per format. A patched artifact manifest records
 `provenance.sourceArtifactId`, so every stored format resolves to the same
 durable source reference; root build artifacts omit provenance. Studio Worker
 deployments bind `SKETCHI_ARTIFACTS` to R2 so
-`buildFlowchart/buildMindmap/buildSequenceDiagram -> getArtifact -> applyDiagramPatch` can cross request
+`buildFlowchart/buildMindmap/buildSequenceDiagram/createCanvas -> getArtifact -> applyDiagramPatch` can cross request
 boundaries.
 
 | Environment       | Bucket                                         |
@@ -908,7 +916,7 @@ interface GetArtifactFailure {
 ## `applyDiagramPatch`
 
 `applyDiagramPatch` is the codemod-style operation for deterministic visual
-changes after a flowchart, mindmap, or sequence artifact has already been accepted. It should handle
+changes after a flowchart, mindmap, sequence, or canvas artifact has already been accepted. It should handle
 common user requests such as changing colors, switching node shapes, shifting a
 group, replacing text, or rerouting edges without asking the agent to edit raw
 Excalidraw JSON.
@@ -1015,6 +1023,37 @@ type DiagramPatchOperation =
   | {
       op: "rerouteEdges";
       selector?: DiagramSelector;
+    }
+  | {
+      op: "insert";
+      elements: CanvasElement[];
+      beforeId?: string;
+      afterId?: string;
+    }
+  | {
+      op: "remove";
+      selector: DiagramSelector;
+    }
+  | {
+      op: "replace";
+      id: string;
+      element: CanvasElement;
+    }
+  | {
+      op: "reorder";
+      ids: string[];
+      beforeId?: string;
+      afterId?: string;
+    }
+  | {
+      op: "group";
+      ids: string[];
+      groupId: string;
+    }
+  | {
+      op: "ungroup";
+      ids: string[];
+      groupId?: string;
     };
 
 interface DiagramSelector {
@@ -1033,14 +1072,13 @@ interface DiagramStylePatch {
   backgroundColor?: HexColor;
 }
 
-type DiagramShape = "rectangle" | "diamond" | "ellipse" | "circle";
+type DiagramShape = "rectangle" | "diamond" | "ellipse" | "circle" | "polygon";
 ```
 
-The first patch operation set is deliberately non-structural. It can restyle,
-reshape, move, rename, and reroute existing elements, but it cannot create or
-delete nodes or edges. If a user asks to change the graph itself, the agent
-should repair the semantic spec and call the matching `buildFlowchart`,
-`buildMindmap`, or `buildSequenceDiagram` operation again.
+Canvas artifacts additionally support insert, remove, replace, reorder, group,
+and ungroup operations with stable element ids. Connectivity remains protected
+by default and may be changed only when `preserveConnectivity` is explicitly
+false. See [CanvasSpec v1](canvas-spec.md) for the canonical scene contract.
 
 ```ts
 type ApplyDiagramPatchResult =
@@ -1249,6 +1287,7 @@ flowchart TB
   Internal["internal runtime"]
 
   Public --> Build["buildFlowchart"]
+  Public --> Canvas["createCanvas"]
   Public --> Artifact["getArtifact"]
   Public --> Patch["applyDiagramPatch"]
 
@@ -1271,7 +1310,6 @@ Out of scope for this document:
 - OpenAPI search/execute over a large generated spec.
 - Direct public tools for validation, grading, rendering, or export.
 - Agent-facing raw Excalidraw editing as the primary mutation contract.
-- Structural patch operations that add or delete nodes and edges.
 
 ## References
 

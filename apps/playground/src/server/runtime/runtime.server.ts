@@ -218,6 +218,7 @@ function normalizedRequestRoute(pathname: string): string {
     "/api/studio/projects",
     "/api/studio/projects/from-artifact",
     "/api/v1/flowcharts/build",
+    "/api/v1/canvases/create",
     "/api/v1/generate",
     "/api/v1/mindmaps/build",
     "/api/v1/sequences/build",

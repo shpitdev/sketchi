@@ -1,8 +1,11 @@
 import {
   SEQUENCE_LIFELINE_ROLE,
   type ArrowSceneElement,
+  type FrameSceneElement,
+  type LineSceneElement,
   type NodeSceneElement,
   type RenderedDiagramScene,
+  type SceneElement,
   type TextSceneElement,
 } from "@sketchi/diagram-renderer";
 import { SKETCHI_DIAGRAM_PALETTE } from "@sketchi/diagram-core";
@@ -147,23 +150,34 @@ function stableSeed(input: string): number {
   return Math.abs(hash) || 1;
 }
 
-function elementBase(id: string, index: string) {
+function elementBase(
+  id: string,
+  index: string,
+  element?: RenderedDiagramScene["elements"][number],
+) {
   const seed = stableSeed(id);
   return {
     id,
     angle: 0,
-    fillStyle: "solid",
-    frameId: null,
-    groupIds: [],
+    fillStyle:
+      element && "fillStyle" in element
+        ? (element.fillStyle ?? "solid")
+        : "solid",
+    frameId: element?.frameId ?? null,
+    groupIds: [...(element?.groupIds ?? [])],
     index,
     isDeleted: false,
     link: null,
-    locked: false,
-    opacity: 100,
-    roughness: 1,
+    locked: element?.locked ?? false,
+    opacity: element?.opacity ?? 100,
+    roughness: element && "roughness" in element ? (element.roughness ?? 1) : 1,
     seed,
-    strokeStyle: "solid",
-    strokeWidth: 2,
+    strokeStyle:
+      element && "strokeStyle" in element
+        ? (element.strokeStyle ?? "solid")
+        : "solid",
+    strokeWidth:
+      element && "strokeWidth" in element ? (element.strokeWidth ?? 2) : 2,
     updated: 1,
     version: 1,
     versionNonce: seed + 1,
@@ -183,10 +197,12 @@ function textHeight(text: string, fontSize: number): number {
 }
 
 function textElement(input: {
-  containerId: string;
+  containerId?: string;
+  element?: TextSceneElement;
   fontSize: number;
   id: string;
   index: string;
+  locked?: boolean;
   maxWidth: number;
   textColor?: string;
   text: string;
@@ -200,7 +216,8 @@ function textElement(input: {
   const height = textHeight(input.text, input.fontSize);
 
   return {
-    ...elementBase(input.id, input.index),
+    ...elementBase(input.id, input.index, input.element),
+    ...(input.locked === undefined ? {} : { locked: input.locked }),
     type: "text",
     x: input.x - width / 2,
     y: input.y - height / 2,
@@ -208,16 +225,21 @@ function textElement(input: {
     height,
     backgroundColor: "transparent",
     boundElements: null,
-    containerId: input.containerId,
-    fontFamily: 5,
+    containerId: input.containerId ?? null,
+    fontFamily:
+      input.element?.fontFamily === "mono"
+        ? 3
+        : input.element?.fontFamily === "sans"
+          ? 2
+          : 5,
     fontSize: input.fontSize,
     lineHeight: TEXT_LINE_HEIGHT,
     originalText: input.text,
     roundness: null,
     strokeColor: input.textColor ?? DEFAULT_TEXT_COLOR,
     text: input.text,
-    textAlign: "center",
-    verticalAlign: "middle",
+    textAlign: input.element?.textAlign ?? "center",
+    verticalAlign: input.element?.verticalAlign ?? "middle",
     autoResize: true,
   };
 }
@@ -236,12 +258,42 @@ function shapeElement(input: {
   const shapeType =
     input.shape.shape === "circle" ? "ellipse" : input.shape.shape;
   const boundElements = [
-    ...(input.text ? [{ id: input.text.id, type: "text" }] : []),
+    ...(input.text && input.shape.shape !== "polygon"
+      ? [{ id: input.text.id, type: "text" }]
+      : []),
     ...input.arrowIds.map((id) => ({ id, type: "arrow" })),
   ];
 
+  if (input.shape.shape === "polygon") {
+    const points = input.shape.points ?? [
+      { x: input.shape.width / 2, y: 0 },
+      { x: input.shape.width, y: input.shape.height },
+      { x: 0, y: input.shape.height },
+    ];
+    const [first, ...rest] = points;
+    return {
+      ...elementBase(input.shape.id, input.index, input.shape),
+      type: "line",
+      x: input.shape.x,
+      y: input.shape.y,
+      width: input.shape.width,
+      height: input.shape.height,
+      backgroundColor: input.shape.fillColor ?? "transparent",
+      boundElements: input.arrowIds.map((id) => ({ id, type: "arrow" })),
+      customData: { sketchiShape: "polygon" },
+      endArrowhead: null,
+      endBinding: null,
+      lastCommittedPoint: null,
+      points: [...points, first].map((point) => [point.x, point.y]),
+      roundness: null,
+      startArrowhead: null,
+      startBinding: null,
+      strokeColor: input.shape.strokeColor ?? input.scene.accentColor,
+    };
+  }
+
   return {
-    ...elementBase(input.shape.id, input.index),
+    ...elementBase(input.shape.id, input.index, input.shape),
     type: shapeType,
     x: input.shape.x,
     y: input.shape.y,
@@ -267,24 +319,30 @@ function arrowElement(input: {
   scene: RenderedDiagramScene;
   sourceShape: ExcalidrawElement | undefined;
   targetShape: ExcalidrawElement | undefined;
+  text?: TextSceneElement;
 }): ExcalidrawElement {
   const start = input.arrow.points[0];
   const end = lastArrowPoint(input.arrow);
   const elbowed = input.arrow.points.length > 2;
 
   return {
-    ...elementBase(input.arrow.id, input.index),
+    ...elementBase(input.arrow.id, input.index, input.arrow),
     type: "arrow",
     x: start.x,
     y: start.y,
     width: end.x - start.x,
     height: end.y - start.y,
     backgroundColor: "transparent",
-    boundElements: input.arrow.label
-      ? [{ id: `${input.arrow.id}:label`, type: "text" }]
-      : null,
+    boundElements: input.text
+      ? [{ id: input.text.id, type: "text" }]
+      : input.arrow.label
+        ? [{ id: `${input.arrow.id}:label`, type: "text" }]
+        : null,
     elbowed,
-    endArrowhead: "arrow",
+    endArrowhead:
+      input.arrow.endArrowhead === undefined
+        ? "arrow"
+        : input.arrow.endArrowhead,
     endBinding: bindingForShape(input.targetShape, end),
     ...(elbowed
       ? {
@@ -298,10 +356,99 @@ function arrowElement(input: {
       point.y - start.y,
     ]),
     roundness: elbowed ? null : { type: 2 },
-    startArrowhead: null,
+    startArrowhead: input.arrow.startArrowhead ?? null,
     startBinding: bindingForShape(input.sourceShape, start),
     strokeColor: input.arrow.strokeColor ?? input.scene.accentColor,
     strokeStyle: input.arrow.strokeStyle ?? "solid",
+  };
+}
+
+function bindingForLine(
+  binding: LineSceneElement["startBinding"],
+  elementsById: ReadonlyMap<string, ExcalidrawElement>,
+  point: { x: number; y: number },
+) {
+  if (!binding) return null;
+  const shape = elementsById.get(binding.elementId);
+  if (!shape) return null;
+  return {
+    elementId: binding.elementId,
+    focus: binding.focus ?? 0,
+    gap: binding.gap ?? 0,
+    fixedPoint: fixedPointForShape(shape, point),
+  };
+}
+
+function lineElement(input: {
+  element: LineSceneElement;
+  elementsById: ReadonlyMap<string, ExcalidrawElement>;
+  index: string;
+  scene: RenderedDiagramScene;
+}): ExcalidrawElement {
+  const [start, ...rest] = input.element.points;
+  const end = rest[rest.length - 1] ?? start;
+  const hasArrow =
+    input.element.startArrowhead !== undefined ||
+    input.element.endArrowhead !== undefined ||
+    input.element.startBinding !== undefined ||
+    input.element.endBinding !== undefined;
+  const elbowed = hasArrow && input.element.points.length > 2;
+  return {
+    ...elementBase(input.element.id, input.index, input.element),
+    type: hasArrow ? "arrow" : "line",
+    x: start.x,
+    y: start.y,
+    width: end.x - start.x,
+    height: end.y - start.y,
+    backgroundColor: input.element.fillColor ?? "transparent",
+    boundElements: null,
+    ...(hasArrow ? { elbowed } : {}),
+    endArrowhead: input.element.endArrowhead ?? null,
+    endBinding: bindingForLine(
+      input.element.endBinding,
+      input.elementsById,
+      end,
+    ),
+    ...(elbowed
+      ? {
+          fixedSegments: [],
+          startIsSpecial: null,
+          endIsSpecial: null,
+        }
+      : {}),
+    points: input.element.points.map((point) => [
+      point.x - start.x,
+      point.y - start.y,
+    ]),
+    roundness:
+      input.element.points.length > 2 && !elbowed ? { type: 2 } : null,
+    startArrowhead: input.element.startArrowhead ?? null,
+    startBinding: bindingForLine(
+      input.element.startBinding,
+      input.elementsById,
+      start,
+    ),
+    strokeColor: input.element.strokeColor ?? input.scene.accentColor,
+  };
+}
+
+function frameElement(input: {
+  element: FrameSceneElement;
+  index: string;
+  scene: RenderedDiagramScene;
+}): ExcalidrawElement {
+  return {
+    ...elementBase(input.element.id, input.index, input.element),
+    type: "frame",
+    x: input.element.x,
+    y: input.element.y,
+    width: input.element.width,
+    height: input.element.height,
+    backgroundColor: input.element.fillColor ?? "transparent",
+    boundElements: null,
+    name: input.element.name ?? null,
+    roundness: null,
+    strokeColor: input.element.strokeColor ?? input.scene.accentColor,
   };
 }
 
@@ -320,6 +467,9 @@ function arrowLabelElement(input: {
     index: input.index,
     containerId: input.arrow.id,
     fontSize: 13,
+    ...(input.arrow.locked === undefined
+      ? {}
+      : { locked: input.arrow.locked }),
     maxWidth: ARROW_LABEL_WIDTH,
     ...(input.arrow.textColor ? { textColor: input.arrow.textColor } : {}),
     text: input.arrow.label,
@@ -328,15 +478,30 @@ function arrowLabelElement(input: {
   });
 }
 
-function collectArrowsByNode(
+function collectBoundArrowsByElement(
+  nodes: readonly NodeSceneElement[],
   arrows: readonly ArrowSceneElement[],
+  lines: readonly LineSceneElement[],
 ): Map<string, string[]> {
   const result = new Map<string, string[]>();
+  const elementIdByNodeId = new Map(
+    nodes.map((node) => [node.nodeId, node.id]),
+  );
 
   for (const arrow of arrows) {
     for (const nodeId of [arrow.sourceNodeId, arrow.targetNodeId]) {
-      const shapeId = `node:${nodeId}`;
+      const shapeId = elementIdByNodeId.get(nodeId);
+      if (!shapeId) continue;
       result.set(shapeId, [...(result.get(shapeId) ?? []), arrow.id]);
+    }
+  }
+  for (const line of lines) {
+    for (const binding of [line.startBinding, line.endBinding]) {
+      if (!binding) continue;
+      result.set(binding.elementId, [
+        ...(result.get(binding.elementId) ?? []),
+        line.id,
+      ]);
     }
   }
 
@@ -361,17 +526,114 @@ function isArrow(
   return element.type === "arrow";
 }
 
+function isLine(
+  element: RenderedDiagramScene["elements"][number],
+): element is LineSceneElement {
+  return element.type === "line";
+}
+
+function isFrame(
+  element: RenderedDiagramScene["elements"][number],
+): element is FrameSceneElement {
+  return element.type === "frame";
+}
+
+function applyLayerSemantics(scene: RenderedDiagramScene): SceneElement[] {
+  const layersById = new Map(scene.layers.map((layer) => [layer.id, layer]));
+  const layerVisibleElements = scene.elements.filter((element) => {
+    const layer = element.layerId ? layersById.get(element.layerId) : undefined;
+    return layer?.visible !== false;
+  });
+  const visibleNodeIds = new Set(
+    layerVisibleElements.flatMap((element) =>
+      element.type === "node" ? [element.nodeId] : [],
+    ),
+  );
+  const connectionSafeElements = layerVisibleElements.filter(
+    (element) =>
+      element.type !== "arrow" ||
+      (visibleNodeIds.has(element.sourceNodeId) &&
+        visibleNodeIds.has(element.targetNodeId)),
+  );
+  const visibleContainerIds = new Set(
+    connectionSafeElements.flatMap((element) =>
+      element.type === "text" ? [] : [element.id],
+    ),
+  );
+  const visibleElements = connectionSafeElements.filter(
+    (element) =>
+      element.type !== "text" ||
+      !element.containerId ||
+      visibleContainerIds.has(element.containerId),
+  );
+  const visibleElementIds = new Set(
+    visibleElements.map((element) => element.id),
+  );
+
+  return visibleElements.map((element) => {
+    const layer = element.layerId ? layersById.get(element.layerId) : undefined;
+    return {
+      ...element,
+      ...(element.frameId && !visibleElementIds.has(element.frameId)
+        ? { frameId: undefined }
+        : {}),
+      ...(layer?.locked === true ? { locked: true } : {}),
+    };
+  });
+}
+
 export function convertSceneToExcalidraw(
   scene: RenderedDiagramScene,
 ): ExcalidrawScene {
-  const nodes = scene.elements.filter(isNode);
-  const textByContainerId = new Map(
-    scene.elements
-      .filter(isText)
-      .map((element) => [element.containerId ?? "", element]),
+  const sourceElements = applyLayerSemantics(scene);
+  const nodes = sourceElements.filter(isNode);
+  const textElements = sourceElements.filter(isText);
+  const usedElementIds = new Set(sourceElements.map((element) => element.id));
+  const generatedLabelSourceIds = new Map<string, string>();
+  const explicitlyLabeledNodeIds = new Set(
+    textElements.flatMap((element) =>
+      element.containerId ? [element.containerId] : [],
+    ),
   );
-  const arrows = scene.elements.filter(isArrow);
-  const arrowsByNode = collectArrowsByNode(arrows);
+  for (const node of nodes) {
+    if (
+      explicitlyLabeledNodeIds.has(node.id) ||
+      node.rendererRole === SEQUENCE_LIFELINE_ROLE
+    ) {
+      continue;
+    }
+    const baseId = `__sketchi_node_label__${node.id}`;
+    let id = baseId;
+    let suffix = 2;
+    while (usedElementIds.has(id)) {
+      id = `${baseId}:${suffix}`;
+      suffix += 1;
+    }
+    usedElementIds.add(id);
+    generatedLabelSourceIds.set(id, node.id);
+    textElements.push({
+      type: "text",
+      id,
+      containerId: node.id,
+      ...(node.frameId ? { frameId: node.frameId } : {}),
+      ...(node.groupIds ? { groupIds: [...node.groupIds] } : {}),
+      ...(node.layerId ? { layerId: node.layerId } : {}),
+      ...(node.locked !== undefined ? { locked: node.locked } : {}),
+      ...(node.opacity !== undefined ? { opacity: node.opacity } : {}),
+      ...(node.textColor ? { textColor: node.textColor } : {}),
+      x: node.x + node.width / 2,
+      y: node.y + node.height / 2,
+      text: node.label,
+      fontSize: 16,
+      maxWidth: Math.max(1, node.width - TEXT_HORIZONTAL_PADDING),
+    });
+  }
+  const textByContainerId = new Map(
+    textElements.map((element) => [element.containerId ?? "", element]),
+  );
+  const arrows = sourceElements.filter(isArrow);
+  const lines = sourceElements.filter(isLine);
+  const arrowsByElement = collectBoundArrowsByElement(nodes, arrows, lines);
   const shapeElementsByNodeId = new Map<string, ExcalidrawElement>();
   const elements: ExcalidrawElement[] = [];
   let previousIndex: string | null = null;
@@ -386,7 +648,7 @@ export function convertSceneToExcalidraw(
     const shape = shapeElement({
       scene,
       shape: node,
-      arrowIds: arrowsByNode.get(node.id) ?? [],
+      arrowIds: arrowsByElement.get(node.id) ?? [],
       index: nextIndex(),
       ...(text ? { text } : {}),
     });
@@ -395,15 +657,32 @@ export function convertSceneToExcalidraw(
     elements.push(shape);
   }
 
-  for (const text of scene.elements.filter(isText)) {
-    if (!text.containerId) {
-      continue;
-    }
+  for (const frame of sourceElements.filter(isFrame)) {
+    const renderedFrame = frameElement({
+      element: frame,
+      index: nextIndex(),
+      scene,
+    });
+    const arrowIds = arrowsByElement.get(frame.id) ?? [];
+    renderedFrame.boundElements = arrowIds.length
+      ? arrowIds.map((id) => ({ id, type: "arrow" }))
+      : null;
+    elements.push(renderedFrame);
+  }
+
+  for (const text of textElements) {
+    const supportedContainer =
+      text.containerId &&
+      (nodes.some(
+        (node) => node.id === text.containerId && node.shape !== "polygon",
+      ) ||
+        arrows.some((arrow) => arrow.id === text.containerId));
     elements.push(
       textElement({
+        element: text,
         id: text.id,
         index: nextIndex(),
-        containerId: text.containerId,
+        ...(supportedContainer ? { containerId: text.containerId } : {}),
         fontSize: text.fontSize,
         maxWidth: text.maxWidth ?? 160,
         ...(text.textColor ? { textColor: text.textColor } : {}),
@@ -415,6 +694,7 @@ export function convertSceneToExcalidraw(
   }
 
   for (const arrow of arrows) {
+    const text = textByContainerId.get(arrow.id);
     elements.push(
       arrowElement({
         arrow,
@@ -422,14 +702,68 @@ export function convertSceneToExcalidraw(
         index: nextIndex(),
         sourceShape: shapeElementsByNodeId.get(arrow.sourceNodeId),
         targetShape: shapeElementsByNodeId.get(arrow.targetNodeId),
+        ...(text ? { text } : {}),
       }),
     );
-    const label = arrow.label
-      ? arrowLabelElement({ arrow, index: nextIndex() })
-      : null;
+    const label =
+      arrow.label && !text
+        ? arrowLabelElement({ arrow, index: nextIndex() })
+        : null;
     if (label) {
       elements.push(label);
     }
+  }
+
+  const excalidrawElementsById = new Map(
+    elements.map((element) => [element.id, element]),
+  );
+  for (const line of lines) {
+    elements.push(
+      lineElement({
+        element: line,
+        elementsById: excalidrawElementsById,
+        index: nextIndex(),
+        scene,
+      }),
+    );
+    if (line.label) {
+      const start = line.points[0];
+      const end = line.points[line.points.length - 1] ?? start;
+      elements.push(
+        textElement({
+          id: `${line.id}:label`,
+          index: nextIndex(),
+          fontSize: 13,
+          ...(line.locked === undefined ? {} : { locked: line.locked }),
+          maxWidth: ARROW_LABEL_WIDTH,
+          ...(line.textColor ? { textColor: line.textColor } : {}),
+          text: line.label,
+          x: (start.x + end.x) / 2,
+          y: (start.y + end.y) / 2 - 10,
+        }),
+      );
+    }
+  }
+
+  const zOrder = new Map(scene.zOrder.map((id, index) => [id, index]));
+  const sourceIdForElement = (element: ExcalidrawElement): string => {
+    if (zOrder.has(element.id)) return element.id;
+    const generatedLabelSourceId = generatedLabelSourceIds.get(element.id);
+    if (generatedLabelSourceId) return generatedLabelSourceId;
+    return element.id.endsWith(":label")
+      ? element.id.slice(0, -":label".length)
+      : element.id;
+  };
+  elements.sort((left, right) => {
+    const leftOrder =
+      zOrder.get(sourceIdForElement(left)) ?? Number.MAX_SAFE_INTEGER;
+    const rightOrder =
+      zOrder.get(sourceIdForElement(right)) ?? Number.MAX_SAFE_INTEGER;
+    return leftOrder - rightOrder;
+  });
+  previousIndex = null;
+  for (const element of elements) {
+    element.index = nextIndex();
   }
 
   return {
@@ -711,13 +1045,24 @@ function segmentCrossesShapeInterior(
   );
 }
 
+function isBindableShape(element: ExcalidrawElement): boolean {
+  if (SHAPE_TYPES.has(element.type) || element.type === "frame") return true;
+  const customData = element.customData;
+  return (
+    element.type === "line" &&
+    customData !== null &&
+    typeof customData === "object" &&
+    (customData as Record<string, unknown>)["sketchiShape"] === "polygon"
+  );
+}
+
 function arrowSegmentsThroughShapes(
   elements: readonly ExcalidrawElement[],
 ): ExcalidrawSceneValidationIssue[] {
   const segments = elements
     .filter((element) => element.type === "arrow")
     .flatMap(arrowSegments);
-  const shapes = elements.filter((element) => SHAPE_TYPES.has(element.type));
+  const shapes = elements.filter(isBindableShape);
   const issues: ExcalidrawSceneValidationIssue[] = [];
   const seen = new Set<string>();
 
@@ -868,12 +1213,10 @@ export function validateExcalidrawScene(
     scene.elements.map((element) => [element.id, element]),
   );
   const shapeIds = new Set(
-    scene.elements
-      .filter((element) => SHAPE_TYPES.has(element.type))
-      .map((element) => element.id),
+    scene.elements.filter(isBindableShape).map((element) => element.id),
   );
 
-  if (shapeIds.size === 0) {
+  if (scene.elements.length === 0) {
     issues.push({
       code: "empty-scene",
       message: "Excalidraw scene must contain at least one shape.",
@@ -906,6 +1249,9 @@ export function validateExcalidrawScene(
       }
 
       for (const bindingKey of ["startBinding", "endBinding"] as const) {
+        if (element[bindingKey] === null || element[bindingKey] === undefined) {
+          continue;
+        }
         const shapeId = bindingElementId(element, bindingKey);
         if (!(shapeId && shapeIds.has(shapeId))) {
           issues.push({
@@ -975,7 +1321,7 @@ export function validateExcalidrawScene(
         typeof container.height === "number" ? container.height : 0;
 
       if (
-        SHAPE_TYPES.has(container.type) &&
+        isBindableShape(container) &&
         (textWidth + TEXT_HORIZONTAL_PADDING > containerWidth ||
           textHeightValue + TEXT_VERTICAL_PADDING > containerHeight)
       ) {

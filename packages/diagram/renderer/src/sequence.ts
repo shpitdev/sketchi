@@ -1,3 +1,4 @@
+import { CANVAS_SPEC_VERSION } from "@sketchi/diagram-core";
 import type {
   ArrowSceneElement,
   NodeSceneElement,
@@ -62,7 +63,10 @@ interface SequenceLifelineStructureNode {
 interface SequenceLifelineStructureScene {
   readonly elements: readonly (
     | SequenceLifelineStructureNode
-    | { readonly type: "arrow" | "text"; readonly id: string }
+    | {
+        readonly type: "arrow" | "frame" | "line" | "text";
+        readonly id: string;
+      }
   )[];
 }
 
@@ -208,7 +212,22 @@ export function renderSequenceDiagram(
     },
   );
 
+  const elements = [
+    ...messageArrows,
+    ...lifelines,
+    ...headers,
+    ...headerLabels,
+  ];
+  const zOrder = [
+    ...lifelines.map((element) => element.id),
+    ...headers.map((element) => element.id),
+    ...headerLabels.map((element) => element.id),
+    ...messageArrows.map((element) => element.id),
+  ];
+
   return {
+    kind: "canvas",
+    version: CANVAS_SPEC_VERSION,
     diagramId: input.id,
     title: input.title,
     width:
@@ -218,6 +237,9 @@ export function renderSequenceDiagram(
     height: lifelineY + lifelineHeight + PADDING,
     accentColor: input.style.accentColor,
     backgroundColor: input.style.backgroundColor,
-    elements: [...messageArrows, ...lifelines, ...headers, ...headerLabels],
+    elements,
+    layers: [],
+    layouts: [],
+    zOrder,
   };
 }

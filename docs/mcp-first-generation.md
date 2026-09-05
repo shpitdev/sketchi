@@ -69,18 +69,19 @@ flowchart TB
   Internal --> Scenario["run scenario"]
 ```
 
-| Capability              | First public shape                   | Notes                                                                |
-| ----------------------- | ------------------------------------ | -------------------------------------------------------------------- |
-| Build a flowchart spec  | `buildFlowchart`                     | One call folds normalize, validate, grade, render, export, and store |
-| Retrieve an artifact    | `getArtifact`                        | Uses artifact id, not diagram id alone                               |
-| Patch an artifact       | `applyDiagramPatch`                  | Deterministic non-structural style, shape, text, and layout codemods |
-| Normalize model output  | internal to `buildFlowchart`         | Public callers get structured `Issue[]`                              |
-| Validate IR             | internal to `buildFlowchart`         | Not a standalone external tool                                       |
-| Grade artifact quality  | internal to `buildFlowchart`         | Returned as part of `BuildFlowchartResult`                           |
-| Render proof/export     | internal to `buildFlowchart`         | Scene, Excalidraw, and hosted PNG artifacts                          |
-| Draft from prompt       | later                                | Needs free-prompt generation contract                                |
-| Revise supplied diagram | later or internal eval               | Caller owns state in this phase                                      |
-| Run scenarios           | CLI/eval surface, not public MCP API | Useful for regression and examples                                   |
+| Capability                | First public shape                   | Notes                                                                |
+| ------------------------- | ------------------------------------ | -------------------------------------------------------------------- |
+| Build a flowchart spec    | `buildFlowchart`                     | One call folds normalize, validate, grade, render, export, and store |
+| Build an arbitrary canvas | `createCanvas`                       | One versioned typed scene IR for general diagrams and visualizations |
+| Retrieve an artifact      | `getArtifact`                        | Uses artifact id, not diagram id alone                               |
+| Patch an artifact         | `applyDiagramPatch`                  | Deterministic style, geometry, and structural canvas operations      |
+| Normalize model output    | internal to `buildFlowchart`         | Public callers get structured `Issue[]`                              |
+| Validate IR               | internal to `buildFlowchart`         | Not a standalone external tool                                       |
+| Grade artifact quality    | internal to `buildFlowchart`         | Returned as part of `BuildFlowchartResult`                           |
+| Render proof/export       | internal to `buildFlowchart`         | Scene, Excalidraw, and hosted PNG artifacts                          |
+| Draft from prompt         | later                                | Needs free-prompt generation contract                                |
+| Revise supplied diagram   | later or internal eval               | Caller owns state in this phase                                      |
+| Run scenarios             | CLI/eval surface, not public MCP API | Useful for regression and examples                                   |
 
 Do not expose internal pipeline steps as public MCP tools just because Code Mode
 can call code. Code Mode is still an external API boundary; keep it product

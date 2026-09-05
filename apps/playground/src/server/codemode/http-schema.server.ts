@@ -11,6 +11,8 @@ import {
   BuildSequenceDiagramResultSchema,
   GetArtifactRequestSchema,
   GetArtifactResultSchema,
+  CreateCanvasRequestSchema,
+  CreateCanvasResultSchema,
 } from "@sketchi/diagram-agent";
 import type { Schema } from "effect";
 
@@ -32,6 +34,10 @@ export const CodeModeHttpSchemas = {
   buildSequenceDiagram: {
     input: toPlaygroundStandardSchema(BuildSequenceDiagramRequestSchema),
     output: toPlaygroundStandardSchema(BuildSequenceDiagramResultSchema),
+  },
+  createCanvas: {
+    input: toPlaygroundStandardSchema(CreateCanvasRequestSchema),
+    output: toPlaygroundStandardSchema(CreateCanvasResultSchema),
   },
   getArtifact: {
     input: toPlaygroundStandardSchema(GetArtifactRequestSchema),

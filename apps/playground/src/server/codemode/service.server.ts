@@ -8,6 +8,7 @@ import {
   CodeModeArtifactStorage,
   CodeModeRuntimeEnvironment,
   getArtifact,
+  createCanvas,
   makeMemoryArtifactStorage,
   makeObjectBucketArtifactStorage,
   type ApplyDiagramPatchResult,
@@ -18,6 +19,7 @@ import {
   type CodeModeArtifactStorageError,
   type CodeModeArtifactStorageShape,
   type CodeModeRuntimeOptions,
+  type CreateCanvasResult,
   type GetArtifactResult,
   type StoredArtifactFormat,
 } from "@sketchi/diagram-agent";
@@ -53,6 +55,9 @@ export interface PlaygroundCodeModeShape {
   readonly buildSequenceDiagram: (
     input: unknown,
   ) => Effect.Effect<BuildSequenceDiagramResult, never, CodeModeRequestContext>;
+  readonly createCanvas: (
+    input: unknown,
+  ) => Effect.Effect<CreateCanvasResult, never, CodeModeRequestContext>;
   readonly getArtifact: (
     input: unknown,
   ) => Effect.Effect<GetArtifactResult, never, CodeModeRequestContext>;
@@ -175,6 +180,9 @@ export const PlaygroundCodeModeLive = Layer.effect(
       buildSequenceDiagram: Effect.fn(
         "playground.codeMode.buildSequenceDiagram",
       )((input) => provideRequestCodeMode(buildSequenceDiagram(input))),
+      createCanvas: Effect.fn("playground.codeMode.createCanvas")((input) =>
+        provideRequestCodeMode(createCanvas(input)),
+      ),
       getArtifact: Effect.fn("playground.codeMode.getArtifact")((input) =>
         provideRequestCodeMode(getArtifact(input)),
       ),

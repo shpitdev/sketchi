@@ -34,8 +34,7 @@ const runtimeResults = vi.hoisted(() => {
 });
 
 vi.mock("./service.server", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("./service.server")>();
+  const actual = await importOriginal<typeof import("./service.server")>();
   return {
     ...actual,
     PlaygroundCodeModeLive: Layer.succeed(actual.PlaygroundCodeMode, {
@@ -51,6 +50,8 @@ vi.mock("./service.server", async (importOriginal) => {
         Effect.succeed(runtimeResults.getBuildMindmap() as BuildMindmapResult),
       buildSequenceDiagram: () =>
         Effect.die("Sequence diagrams are outside the frozen v1 corpus."),
+      createCanvas: () =>
+        Effect.die("Canvas creation is outside the frozen v1 corpus."),
       getArtifact: () =>
         Effect.succeed(runtimeResults.getGetArtifact() as GetArtifactResult),
       readStoredArtifact: () => Effect.succeed(null),

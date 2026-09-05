@@ -12,7 +12,11 @@ import type {
   StandardJSONSchemaV1,
   StandardSchemaV1,
 } from "@standard-schema/spec";
-import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/diagram-core";
+import {
+  CANVAS_LIMITS,
+  CANVAS_SPEC_VERSION,
+  SKETCHI_DIAGRAM_STYLE,
+} from "@sketchi/diagram-core";
 
 import { cleanToolString } from "../clean-tool-string.js";
 
@@ -383,6 +387,15 @@ export const CODE_MODE_ISSUE_CODES: readonly [
   "unsupported_patch_operation",
   "patch_preserve_connectivity_failed",
   "patch_output_invalid",
+  "duplicate_element_id",
+  "duplicate_layer_id",
+  "invalid_canvas_binding",
+  "invalid_canvas_composition",
+  "invalid_canvas_geometry",
+  "invalid_polygon",
+  "canvas_limit_exceeded",
+  "invalid_z_order",
+  "unknown_layout_target",
 ] = [
   "missing_field",
   "invalid_type",
@@ -425,6 +438,15 @@ export const CODE_MODE_ISSUE_CODES: readonly [
   "unsupported_patch_operation",
   "patch_preserve_connectivity_failed",
   "patch_output_invalid",
+  "duplicate_element_id",
+  "duplicate_layer_id",
+  "invalid_canvas_binding",
+  "invalid_canvas_composition",
+  "invalid_canvas_geometry",
+  "invalid_polygon",
+  "canvas_limit_exceeded",
+  "invalid_z_order",
+  "unknown_layout_target",
 ];
 
 export const CodeModeIssueCodeSchema = Object.assign(
@@ -438,10 +460,13 @@ const CodeModeIssueKindSchema = literals([
   "diagram",
   "node",
   "edge",
+  "element",
+  "layer",
   "artifact",
 ]);
 const CodeModeIssueStageSchema = literals([
   "input",
+  "canvas",
   "flowchart",
   "mindmap",
   "quality",
@@ -493,6 +518,12 @@ export const DIAGRAM_PATCH_OPERATION_NAMES: readonly [
   "translate",
   "replaceText",
   "rerouteEdges",
+  "insert",
+  "remove",
+  "replace",
+  "reorder",
+  "group",
+  "ungroup",
 ] = [
   "setDefaultStyle",
   "setStyle",
@@ -500,6 +531,12 @@ export const DIAGRAM_PATCH_OPERATION_NAMES: readonly [
   "translate",
   "replaceText",
   "rerouteEdges",
+  "insert",
+  "remove",
+  "replace",
+  "reorder",
+  "group",
+  "ungroup",
 ];
 export const DiagramPatchOperationNameSchema = Object.assign(
   withParser(literals(DIAGRAM_PATCH_OPERATION_NAMES)),
@@ -858,9 +895,7 @@ const mindmapStyleDefault = {
 };
 const MindmapStyleWithDefault = Schema.Struct({
   accentColor: hexColor(defaultAccentColor).pipe(
-    Schema.withDecodingDefault(
-      Effect.succeed(mindmapStyleDefault.accentColor),
-    ),
+    Schema.withDecodingDefault(Effect.succeed(mindmapStyleDefault.accentColor)),
   ),
   backgroundColor: hexColor(mindmapStyleDefault.backgroundColor).pipe(
     Schema.withDecodingDefault(
@@ -905,20 +940,78 @@ export class ScenePoint extends Schema.Class<ScenePoint>("ScenePoint")(
 ) {}
 export const ScenePointSchema = withParser(ScenePoint);
 
+const CanvasCompositionFields = {
+  frameId: optionalContract(NonEmptyString).pipe(Schema.mutableKey),
+  groupIds: optionalContract(
+    Schema.Array(NonEmptyString)
+      .pipe(Schema.mutable)
+      .annotate({ maxItems: CANVAS_LIMITS.maxGroupsPerElement }),
+  ).pipe(Schema.mutableKey),
+  layerId: optionalContract(NonEmptyString).pipe(Schema.mutableKey),
+  locked: optionalContract(Schema.Boolean).pipe(Schema.mutableKey),
+  opacity: optionalContract(
+    Schema.Number.annotate({ minimum: 0, maximum: 100 }).check(
+      Schema.isFinite(),
+      Schema.isBetween({ minimum: 0, maximum: 100 }),
+    ),
+  ).pipe(Schema.mutableKey),
+  zIndex: optionalContract(Schema.Int).pipe(Schema.mutableKey),
+};
+
+const CanvasStrokeFields = {
+  fillColor: optionalContract(HexColor).pipe(Schema.mutableKey),
+  fillStyle: optionalContract(
+    literals(["cross-hatch", "hachure", "solid"]),
+  ).pipe(Schema.mutableKey),
+  roughness: optionalContract(literals([0, 1, 2])).pipe(Schema.mutableKey),
+  strokeColor: optionalContract(HexColor).pipe(Schema.mutableKey),
+  strokeStyle: optionalContract(literals(["dashed", "dotted", "solid"])).pipe(
+    Schema.mutableKey,
+  ),
+  strokeWidth: optionalContract(literals([1, 2, 4])).pipe(Schema.mutableKey),
+};
+
+const CanvasArrowhead = Schema.NullOr(
+  literals(["arrow", "bar", "circle", "diamond", "triangle"]),
+);
+
+const CanvasPointList = Schema.Array(ScenePoint)
+  .pipe(Schema.mutable)
+  .annotate({
+    minItems: 2,
+    maxItems: CANVAS_LIMITS.maxPointsPerElement,
+  })
+  .check(
+    Schema.makeFilter((value) => value.length >= 2, {
+      message: "Too small: expected array to have >=2 items",
+    }),
+    Schema.makeFilter(
+      (value) => value.length <= CANVAS_LIMITS.maxPointsPerElement,
+      {
+        message: `Too big: expected array to have <=${CANVAS_LIMITS.maxPointsPerElement} items`,
+      },
+    ),
+  );
+
 export class NodeSceneElement extends Schema.Class<NodeSceneElement>(
   "NodeSceneElement",
 )(
   {
+    ...CanvasCompositionFields,
+    ...CanvasStrokeFields,
     type: stringLiteral("node"),
     id: RequiredNonEmptyString,
     nodeId: RequiredNonEmptyString,
     kind: optionalContract(NonEmptyString),
     rendererRole: optionalContract(literals(["sequence-lifeline"])),
-    shape: literals(["rectangle", "ellipse", "diamond", "circle"]).pipe(
-      Schema.mutableKey,
-    ),
-    fillColor: optionalContract(HexColor).pipe(Schema.mutableKey),
-    strokeColor: optionalContract(HexColor).pipe(Schema.mutableKey),
+    shape: literals([
+      "rectangle",
+      "ellipse",
+      "diamond",
+      "circle",
+      "polygon",
+    ]).pipe(Schema.mutableKey),
+    points: optionalContract(CanvasPointList).pipe(Schema.mutableKey),
     textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
     x: FiniteNumber.pipe(Schema.mutableKey),
     y: FiniteNumber.pipe(Schema.mutableKey),
@@ -933,6 +1026,7 @@ export class TextSceneElement extends Schema.Class<TextSceneElement>(
   "TextSceneElement",
 )(
   {
+    ...CanvasCompositionFields,
     type: stringLiteral("text"),
     id: RequiredNonEmptyString,
     containerId: optionalContract(NonEmptyString),
@@ -941,7 +1035,10 @@ export class TextSceneElement extends Schema.Class<TextSceneElement>(
     y: FiniteNumber.pipe(Schema.mutableKey),
     text: RequiredNonEmptyString.pipe(Schema.mutableKey),
     fontSize: PositiveNumber,
+    fontFamily: optionalContract(literals(["hand", "mono", "sans"])),
     maxWidth: optionalContract(PositiveNumber),
+    textAlign: optionalContract(literals(["center", "left", "right"])),
+    verticalAlign: optionalContract(literals(["bottom", "middle", "top"])),
   },
   { identifier: undefined },
 ) {}
@@ -950,25 +1047,133 @@ export class ArrowSceneElement extends Schema.Class<ArrowSceneElement>(
   "ArrowSceneElement",
 )(
   {
+    ...CanvasCompositionFields,
+    ...CanvasStrokeFields,
     type: stringLiteral("arrow"),
     id: RequiredNonEmptyString,
     edgeId: RequiredNonEmptyString,
     sourceNodeId: RequiredNonEmptyString,
     targetNodeId: RequiredNonEmptyString.pipe(Schema.mutableKey),
-    strokeColor: optionalContract(HexColor).pipe(Schema.mutableKey),
-    strokeStyle: optionalContract(
-      literals(["dashed", "dotted", "solid"]),
-    ).pipe(Schema.mutableKey),
+    startArrowhead: optionalContract(CanvasArrowhead).pipe(Schema.mutableKey),
+    endArrowhead: optionalContract(CanvasArrowhead).pipe(Schema.mutableKey),
     textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
-    points: requiredArray(Schema.Array(ScenePoint).pipe(Schema.mutable))
-      .annotate({ minItems: 2 })
-      .check(
-        Schema.makeFilter((value) => value.length >= 2, {
-          message: "Too small: expected array to have >=2 items",
-        }),
-      )
-      .pipe(Schema.mutableKey),
+    points: requiredArray(CanvasPointList).pipe(Schema.mutableKey),
     label: optionalContract(NonEmptyString).pipe(Schema.mutableKey),
+  },
+  { identifier: undefined },
+) {}
+
+export class CanvasLineBinding extends Schema.Class<CanvasLineBinding>(
+  "CanvasLineBinding",
+)(
+  {
+    elementId: RequiredNonEmptyString,
+    focus: optionalContract(FiniteNumber),
+    gap: optionalContract(FiniteNumber),
+  },
+  { identifier: undefined },
+) {}
+
+export class LineSceneElement extends Schema.Class<LineSceneElement>(
+  "LineSceneElement",
+)(
+  {
+    ...CanvasCompositionFields,
+    ...CanvasStrokeFields,
+    type: stringLiteral("line"),
+    id: RequiredNonEmptyString,
+    points: requiredArray(CanvasPointList).pipe(Schema.mutableKey),
+    startBinding: optionalContract(CanvasLineBinding).pipe(Schema.mutableKey),
+    endBinding: optionalContract(CanvasLineBinding).pipe(Schema.mutableKey),
+    startArrowhead: optionalContract(CanvasArrowhead).pipe(Schema.mutableKey),
+    endArrowhead: optionalContract(CanvasArrowhead).pipe(Schema.mutableKey),
+    label: optionalContract(NonEmptyString).pipe(Schema.mutableKey),
+    textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
+  },
+  { identifier: undefined },
+) {}
+
+export class FrameSceneElement extends Schema.Class<FrameSceneElement>(
+  "FrameSceneElement",
+)(
+  {
+    ...CanvasCompositionFields,
+    ...CanvasStrokeFields,
+    type: stringLiteral("frame"),
+    id: RequiredNonEmptyString,
+    name: optionalContract(NonEmptyString).pipe(Schema.mutableKey),
+    x: FiniteNumber.pipe(Schema.mutableKey),
+    y: FiniteNumber.pipe(Schema.mutableKey),
+    width: PositiveNumber.pipe(Schema.mutableKey),
+    height: PositiveNumber.pipe(Schema.mutableKey),
+  },
+  { identifier: undefined },
+) {}
+
+export class CanvasLayer extends Schema.Class<CanvasLayer>("CanvasLayer")(
+  {
+    id: RequiredNonEmptyString,
+    name: optionalContract(NonEmptyString),
+    locked: optionalContract(Schema.Boolean),
+    visible: optionalContract(Schema.Boolean),
+  },
+  { identifier: undefined },
+) {}
+
+const CanvasLayoutIds = requiredArray(nonEmptyArray(NonEmptyString));
+
+export class CanvasFlowLayout extends Schema.Class<CanvasFlowLayout>(
+  "CanvasFlowLayout",
+)(
+  {
+    type: literals(["row", "column", "stack"]),
+    ids: CanvasLayoutIds,
+    x: optionalContract(FiniteNumber),
+    y: optionalContract(FiniteNumber),
+    gap: optionalContract(FiniteNumber),
+  },
+  { identifier: undefined },
+) {}
+
+export class CanvasGridLayout extends Schema.Class<CanvasGridLayout>(
+  "CanvasGridLayout",
+)(
+  {
+    type: stringLiteral("grid"),
+    ids: CanvasLayoutIds,
+    columns: Schema.Int.annotate({ minimum: 1 }).check(
+      Schema.makeFilter((value) => value >= 1, {
+        message: "Too small: expected number to be >=1",
+      }),
+    ),
+    x: optionalContract(FiniteNumber),
+    y: optionalContract(FiniteNumber),
+    columnGap: optionalContract(FiniteNumber),
+    rowGap: optionalContract(FiniteNumber),
+  },
+  { identifier: undefined },
+) {}
+
+export class CanvasAlignLayout extends Schema.Class<CanvasAlignLayout>(
+  "CanvasAlignLayout",
+)(
+  {
+    type: stringLiteral("align"),
+    ids: CanvasLayoutIds,
+    axis: literals(["x", "y"]),
+    alignment: literals(["center", "end", "start"]),
+  },
+  { identifier: undefined },
+) {}
+
+export class CanvasDistributeLayout extends Schema.Class<CanvasDistributeLayout>(
+  "CanvasDistributeLayout",
+)(
+  {
+    type: stringLiteral("distribute"),
+    ids: CanvasLayoutIds,
+    axis: literals(["x", "y"]),
+    gap: optionalContract(FiniteNumber),
   },
   { identifier: undefined },
 ) {}
@@ -976,15 +1181,46 @@ export class ArrowSceneElement extends Schema.Class<ArrowSceneElement>(
 export const NodeSceneElementSchema = withParser(NodeSceneElement);
 export const TextSceneElementSchema = withParser(TextSceneElement);
 export const ArrowSceneElementSchema = withParser(ArrowSceneElement);
+export const LineSceneElementSchema = withParser(LineSceneElement);
+export const FrameSceneElementSchema = withParser(FrameSceneElement);
 export const SceneElementSchema = Schema.Union(
-  [NodeSceneElement, TextSceneElement, ArrowSceneElement],
+  [
+    NodeSceneElement,
+    TextSceneElement,
+    ArrowSceneElement,
+    LineSceneElement,
+    FrameSceneElement,
+  ],
   { mode: "oneOf" },
 );
 
-export class RenderedDiagramScene extends Schema.Class<RenderedDiagramScene>(
-  "RenderedDiagramScene",
-)(
+const CanvasLayoutSchema = Schema.Union(
+  [
+    CanvasFlowLayout,
+    CanvasGridLayout,
+    CanvasAlignLayout,
+    CanvasDistributeLayout,
+  ],
+  { mode: "oneOf" },
+);
+
+const EmptyCanvasLayers = Schema.Array(CanvasLayer)
+  .pipe(Schema.mutable)
+  .annotate({ default: [], maxItems: CANVAS_LIMITS.maxLayers })
+  .pipe(Schema.withDecodingDefault(Effect.succeed([])));
+const EmptyCanvasLayouts = Schema.Array(CanvasLayoutSchema)
+  .pipe(Schema.mutable)
+  .annotate({ default: [], maxItems: CANVAS_LIMITS.maxLayouts })
+  .pipe(Schema.withDecodingDefault(Effect.succeed([])));
+const EmptyCanvasZOrder = Schema.Array(NonEmptyString)
+  .pipe(Schema.mutable)
+  .annotate({ default: [], maxItems: CANVAS_LIMITS.maxZOrderEntries })
+  .pipe(Schema.withDecodingDefault(Effect.succeed([])));
+
+export class CanvasSpec extends Schema.Class<CanvasSpec>("CanvasSpec")(
   {
+    kind: stringLiteral("canvas"),
+    version: numberLiteral(CANVAS_SPEC_VERSION),
     diagramId: RequiredNonEmptyString,
     title: RequiredNonEmptyString,
     width: PositiveNumber.pipe(Schema.mutableKey),
@@ -992,13 +1228,32 @@ export class RenderedDiagramScene extends Schema.Class<RenderedDiagramScene>(
     accentColor: HexColor.pipe(Schema.mutableKey),
     backgroundColor: HexColor.pipe(Schema.mutableKey),
     elements: requiredArray(
-      Schema.Array(SceneElementSchema).pipe(Schema.mutable),
+      Schema.Array(SceneElementSchema)
+        .pipe(Schema.mutable)
+        .annotate({ maxItems: CANVAS_LIMITS.maxElements }),
     ),
+    layers: EmptyCanvasLayers,
+    layouts: EmptyCanvasLayouts,
+    zOrder: EmptyCanvasZOrder,
   },
   { identifier: undefined },
 ) {}
-export const RenderedDiagramSceneSchema = withParser(RenderedDiagramScene);
-export type PatchableScene = RenderedDiagramScene;
+export const CanvasSpecSchema = withParser(CanvasSpec);
+export type RenderedDiagramScene = CanvasSpec;
+export const RenderedDiagramSceneSchema = CanvasSpecSchema;
+export type PatchableScene = CanvasSpec;
+
+export class CreateCanvasRequest extends Schema.Class<CreateCanvasRequest>(
+  "CreateCanvasRequest",
+)(
+  {
+    requestId: optionalContract(NonEmptyString),
+    spec: requiredObject(CanvasSpec),
+    options: optionalContract(BuildFlowchartOptions),
+  },
+  { identifier: undefined },
+) {}
+export const CreateCanvasRequestSchema = withParser(CreateCanvasRequest);
 
 const ExcalidrawElement = Schema.Record(Schema.String, Schema.Unknown).check(
   Schema.makeFilter(
@@ -1087,7 +1342,8 @@ export const DIAGRAM_SHAPES: readonly [
   "diamond",
   "ellipse",
   "circle",
-] = ["rectangle", "diamond", "ellipse", "circle"];
+  "polygon",
+] = ["rectangle", "diamond", "ellipse", "circle", "polygon"];
 export const DiagramShapeSchema = Object.assign(
   withParser(literals(DIAGRAM_SHAPES)),
   { options: DIAGRAM_SHAPES },
@@ -1154,6 +1410,75 @@ export class RerouteEdgesOperation extends Schema.Class<RerouteEdgesOperation>(
   { identifier: undefined },
 ) {}
 
+const PatchElementIds = requiredArray(nonEmptyArray(NonEmptyString));
+
+export class InsertElementsOperation extends Schema.Class<InsertElementsOperation>(
+  "InsertElementsOperation",
+)(
+  {
+    op: stringLiteral("insert"),
+    elements: requiredArray(nonEmptyArray(SceneElementSchema)),
+    beforeId: optionalContract(NonEmptyString),
+    afterId: optionalContract(NonEmptyString),
+  },
+  { identifier: undefined },
+) {}
+
+export class RemoveElementsOperation extends Schema.Class<RemoveElementsOperation>(
+  "RemoveElementsOperation",
+)(
+  {
+    op: stringLiteral("remove"),
+    selector: requiredObject(DiagramSelector),
+  },
+  { identifier: undefined },
+) {}
+
+export class ReplaceElementOperation extends Schema.Class<ReplaceElementOperation>(
+  "ReplaceElementOperation",
+)(
+  {
+    op: stringLiteral("replace"),
+    id: RequiredNonEmptyString,
+    element: requiredObject(SceneElementSchema),
+  },
+  { identifier: undefined },
+) {}
+
+export class ReorderElementsOperation extends Schema.Class<ReorderElementsOperation>(
+  "ReorderElementsOperation",
+)(
+  {
+    op: stringLiteral("reorder"),
+    ids: PatchElementIds,
+    beforeId: optionalContract(NonEmptyString),
+    afterId: optionalContract(NonEmptyString),
+  },
+  { identifier: undefined },
+) {}
+
+export class GroupElementsOperation extends Schema.Class<GroupElementsOperation>(
+  "GroupElementsOperation",
+)(
+  {
+    op: stringLiteral("group"),
+    ids: PatchElementIds,
+    groupId: RequiredNonEmptyString,
+  },
+  { identifier: undefined },
+) {}
+
+export class UngroupElementsOperation extends Schema.Class<UngroupElementsOperation>(
+  "UngroupElementsOperation",
+)(
+  {
+    op: stringLiteral("ungroup"),
+    ids: PatchElementIds,
+    groupId: optionalContract(NonEmptyString),
+  },
+  { identifier: undefined },
+) {}
+
 export const DiagramPatchOperationSchema = Schema.Union(
   [
     SetDefaultStyleOperation,
@@ -1162,6 +1487,12 @@ export const DiagramPatchOperationSchema = Schema.Union(
     TranslateOperation,
     ReplaceTextOperation,
     RerouteEdgesOperation,
+    InsertElementsOperation,
+    RemoveElementsOperation,
+    ReplaceElementOperation,
+    ReorderElementsOperation,
+    GroupElementsOperation,
+    UngroupElementsOperation,
   ],
   { mode: "oneOf" },
 ).annotate({
@@ -1185,7 +1516,7 @@ export class InlineScenePatchSource extends Schema.Class<InlineScenePatchSource>
   "InlineScenePatchSource",
 )(
   {
-    scene: requiredObject(RenderedDiagramScene),
+    scene: requiredObject(CanvasSpec),
   },
   { identifier: undefined },
 ) {}
@@ -1593,3 +1924,46 @@ export const ApplyDiagramPatchResultSchema = Schema.Union([
   ApplyDiagramPatchRejected,
 ]);
 export type ApplyDiagramPatchResult = typeof ApplyDiagramPatchResultSchema.Type;
+
+export class CreateCanvasAccepted extends Schema.Class<CreateCanvasAccepted>(
+  "CreateCanvasAccepted",
+)(
+  {
+    ok: booleanLiteral(true),
+    status: stringLiteral("accepted"),
+    buildId: Schema.String,
+    requestId: optionalContract(Schema.String),
+    normalizedSpec: CanvasSpec,
+    artifact: ArtifactBundleSchema,
+    issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+  },
+  { identifier: undefined },
+) {}
+
+export class CreateCanvasRejected extends Schema.Class<CreateCanvasRejected>(
+  "CreateCanvasRejected",
+)(
+  {
+    ok: booleanLiteral(false),
+    status: literals([
+      "invalid_input",
+      "invalid_canvas",
+      "limit_exceeded",
+      "render_failed",
+      "export_failed",
+      "storage_failed",
+    ]),
+    buildId: optionalContract(Schema.String),
+    requestId: optionalContract(Schema.String),
+    normalizedSpec: optionalContract(CanvasSpec),
+    partial: optionalContract(PartialArtifactBundleSchema),
+    issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+  },
+  { identifier: undefined },
+) {}
+
+export const CreateCanvasResultSchema = Schema.Union([
+  CreateCanvasAccepted,
+  CreateCanvasRejected,
+]);
+export type CreateCanvasResult = typeof CreateCanvasResultSchema.Type;

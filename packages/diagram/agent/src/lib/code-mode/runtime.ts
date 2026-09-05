@@ -1,14 +1,18 @@
 import {
+  CANVAS_LIMITS,
   FLOWCHART_MAX_ISSUES,
   FlowchartDiagramSchema,
   SKETCHI_DIAGRAM_PALETTE,
   SKETCHI_DIAGRAM_STYLE,
+  compileCanvasSpec,
+  getCanvasValidationIssues,
   getFlowchartValidationIssues,
   parseMindmapDiagram,
   validateFlowchartDiagram,
   type FlowchartDiagram,
   type FlowchartValidationIssueRef,
   type MindmapDiagram,
+  type CanvasValidationIssue,
 } from "@sketchi/diagram-core";
 import {
   convertSceneToExcalidraw,
@@ -45,6 +49,7 @@ import {
   BuildFlowchartRequestSchema,
   BuildMindmapRequestSchema,
   BuildSequenceDiagramRequestSchema,
+  CreateCanvasRequestSchema,
   DIAGRAM_PATCH_OPERATION_NAMES,
   GetArtifactRequestSchema,
   RenderedDiagramSceneSchema,
@@ -57,6 +62,8 @@ import {
   type BuildMindmapResult,
   type BuildSequenceDiagramRequest,
   type BuildSequenceDiagramResult,
+  type CreateCanvasRequest,
+  type CreateCanvasResult,
   type CodeModeIssue,
   type CodeModeIssueCode,
   type CodeModeIssueRef,
@@ -151,6 +158,7 @@ type CodeModeBoundaryOperation =
   | "buildFlowchart"
   | "buildMindmap"
   | "buildSequenceDiagram"
+  | "createCanvas"
   | "getArtifact";
 
 interface ObservableCodeModeResult {
@@ -181,6 +189,7 @@ function artifactKindForOperation(
   if (operation === "buildFlowchart") return "flowchart";
   if (operation === "buildMindmap") return "mindmap";
   if (operation === "buildSequenceDiagram") return "sequence";
+  if (operation === "createCanvas") return "canvas";
   if (operation === "applyDiagramPatch") return "patch";
   return undefined;
 }
@@ -711,6 +720,47 @@ class BuildSequenceDiagramFailure extends Schema.TaggedErrorClass<BuildSequenceD
   }
 }
 
+type CreateCanvasFailureStatus = Extract<
+  CreateCanvasResult,
+  { ok: false }
+>["status"];
+
+interface CreateCanvasFailureContext {
+  readonly buildId?: string;
+  readonly requestId?: string;
+  readonly normalizedSpec?: CreateCanvasRequest["spec"];
+  readonly partial?: PartialArtifactBundle;
+  readonly issues: CodeModeIssue[];
+}
+
+class CreateCanvasFailure extends Schema.TaggedErrorClass<CreateCanvasFailure>()(
+  "CreateCanvasFailure",
+  {
+    message: Schema.String,
+    status: Schema.Literals([
+      "invalid_input",
+      "invalid_canvas",
+      "limit_exceeded",
+      "render_failed",
+      "export_failed",
+      "storage_failed",
+    ]),
+  },
+) {
+  readonly context: CreateCanvasFailureContext;
+
+  constructor(input: {
+    readonly status: CreateCanvasFailureStatus;
+    readonly context: CreateCanvasFailureContext;
+  }) {
+    super({
+      message: input.context.issues[0]?.message ?? input.status,
+      status: input.status,
+    });
+    this.context = input.context;
+  }
+}
+
 type GetArtifactFailureStatus = Extract<
   GetArtifactResult,
   { ok: false }
@@ -1146,10 +1196,70 @@ function exportIssues(
   });
 }
 
+function canvasIssueCode(
+  validationIssue: CanvasValidationIssue,
+): CodeModeIssueCode {
+  switch (validationIssue.code) {
+    case "duplicate_element_id":
+      return "duplicate_element_id";
+    case "duplicate_layer_id":
+      return "duplicate_layer_id";
+    case "empty_canvas":
+      return "invalid_canvas_geometry";
+    case "invalid_binding":
+      return "invalid_canvas_binding";
+    case "invalid_composition":
+      return "invalid_canvas_composition";
+    case "invalid_geometry":
+      return "invalid_canvas_geometry";
+    case "invalid_polygon":
+      return "invalid_polygon";
+    case "limit_exceeded":
+      return "canvas_limit_exceeded";
+    case "missing_z_order_element":
+    case "unknown_z_order_element":
+      return "invalid_z_order";
+    case "unknown_layout_target":
+      return "unknown_layout_target";
+  }
+}
+
+function canvasValidationIssues(
+  validationIssues: readonly CanvasValidationIssue[],
+): CodeModeIssue[] {
+  return validationIssues.slice(0, MAX_INPUT_ISSUES).map((validationIssue) =>
+    issue({
+      code: canvasIssueCode(validationIssue),
+      stage: "canvas",
+      ref: validationIssue.elementId
+        ? {
+            kind: "element",
+            id: validationIssue.elementId,
+            path: validationIssue.path,
+          }
+        : { kind: "diagram", path: validationIssue.path },
+      message: validationIssue.message,
+      hint: "Repair the referenced CanvasSpec field and call createCanvas again.",
+    }),
+  );
+}
+
+function canvasExportIssues(
+  validationIssues: ReturnType<typeof validateExcalidrawScene>["issues"],
+): CodeModeIssue[] {
+  return exportIssues(
+    validationIssues.filter(
+      (validationIssue) =>
+        validationIssue.code !== "overlapping-arrow-segment" &&
+        validationIssue.code !== "arrow-segment-through-node",
+    ),
+  );
+}
+
 function normalizePatchableScene(
   scene: PatchableScene,
 ): RenderedDiagramScene | null {
-  const elements: RenderedDiagramScene["elements"] = [];
+  const elements: Array<RenderedDiagramScene["elements"][number]> = [];
 
   for (const element of scene.elements) {
     if (element.type === "arrow") {
@@ -1165,6 +1275,7 @@ function normalizePatchableScene(
         ...rest,
       ];
       elements.push({
+        ...element,
         type: "arrow",
         id: element.id,
         edgeId: element.edgeId,
@@ -1180,42 +1291,82 @@ function normalizePatchableScene(
     }
 
     if (element.type === "node") {
+      const polygonPoints = element.points;
+      if (
+        element.shape === "polygon" &&
+        (!polygonPoints ||
+          !polygonPoints[0] ||
+          !polygonPoints[1] ||
+          !polygonPoints[2])
+      ) {
+        return null;
+      }
       elements.push({
         type: "node",
         id: element.id,
         nodeId: element.nodeId,
         ...(element.kind ? { kind: element.kind } : {}),
-        ...(element.rendererRole === "sequence-lifeline" &&
-        isStructurallyValidSequenceLifeline(scene, element)
-          ? { rendererRole: element.rendererRole }
-          : {}),
         shape: element.shape,
         ...(element.fillColor ? { fillColor: element.fillColor } : {}),
         ...(element.strokeColor ? { strokeColor: element.strokeColor } : {}),
-        ...(element.textColor ? { textColor: element.textColor } : {}),
         x: element.x,
         y: element.y,
         width: element.width,
         height: element.height,
         label: element.label,
+        ...(element.frameId ? { frameId: element.frameId } : {}),
+        ...(element.groupIds ? { groupIds: [...element.groupIds] } : {}),
+        ...(element.layerId ? { layerId: element.layerId } : {}),
+        ...(element.locked !== undefined ? { locked: element.locked } : {}),
+        ...(element.opacity !== undefined ? { opacity: element.opacity } : {}),
+        ...(element.zIndex !== undefined ? { zIndex: element.zIndex } : {}),
+        ...(element.fillStyle ? { fillStyle: element.fillStyle } : {}),
+        ...(element.roughness !== undefined
+          ? { roughness: element.roughness }
+          : {}),
+        ...(element.strokeStyle ? { strokeStyle: element.strokeStyle } : {}),
+        ...(element.strokeWidth !== undefined
+          ? { strokeWidth: element.strokeWidth }
+          : {}),
+        ...(element.rendererRole === "sequence-lifeline" &&
+        isStructurallyValidSequenceLifeline(scene, element)
+          ? { rendererRole: element.rendererRole }
+          : { rendererRole: undefined }),
+        ...(element.textColor ? { textColor: element.textColor } : {}),
+        ...(element.shape === "polygon" &&
+        polygonPoints?.[0] &&
+        polygonPoints[1] &&
+        polygonPoints[2]
+          ? {
+              points: [
+                polygonPoints[0],
+                polygonPoints[1],
+                polygonPoints[2],
+                ...polygonPoints.slice(3),
+              ],
+            }
+          : { points: undefined }),
       });
       continue;
     }
 
-    elements.push({
-      type: "text",
-      id: element.id,
-      ...(element.containerId ? { containerId: element.containerId } : {}),
-      ...(element.textColor ? { textColor: element.textColor } : {}),
-      x: element.x,
-      y: element.y,
-      text: element.text,
-      fontSize: element.fontSize,
-      ...(element.maxWidth ? { maxWidth: element.maxWidth } : {}),
-    });
+    if (element.type === "line") {
+      const first = element.points[0];
+      const second = element.points[1];
+      if (!first || !second) return null;
+      elements.push({
+        ...element,
+        points: [first, second, ...element.points.slice(2)],
+      });
+      continue;
+    }
+
+    elements.push(structuredClone(element));
   }
 
   return {
+    kind: scene.kind,
+    version: scene.version,
     diagramId: scene.diagramId,
     title: scene.title,
     width: scene.width,
@@ -1223,6 +1374,9 @@ function normalizePatchableScene(
     accentColor: scene.accentColor,
     backgroundColor: scene.backgroundColor,
     elements,
+    layers: structuredClone(scene.layers),
+    layouts: structuredClone(scene.layouts),
+    zOrder: [...scene.zOrder],
   };
 }
 
@@ -1232,10 +1386,19 @@ function cloneScene(scene: PatchableScene): PatchableScene {
 
 function sourceConnectivity(scene: PatchableScene): string[] {
   return scene.elements
-    .filter((element) => element.type === "arrow")
-    .map(
-      (arrow) => `${arrow.edgeId}:${arrow.sourceNodeId}->${arrow.targetNodeId}`,
-    )
+    .flatMap((element) => {
+      if (element.type === "arrow") {
+        return [
+          `arrow:${element.id}:${element.sourceNodeId}->${element.targetNodeId}`,
+        ];
+      }
+      if (element.type === "line") {
+        return [
+          `line:${element.id}:${element.startBinding?.elementId ?? ""}->${element.endBinding?.elementId ?? ""}`,
+        ];
+      }
+      return [];
+    })
     .sort();
 }
 
@@ -1518,6 +1681,15 @@ function applyShape(
   const resizedNodeIds: string[] = [];
   for (const node of targets.nodes) {
     node.shape = operation.shape;
+    node.points =
+      operation.shape === "polygon"
+        ? [
+            { x: node.width / 2, y: 0 },
+            { x: node.width, y: node.height / 2 },
+            { x: node.width / 2, y: node.height },
+            { x: 0, y: node.height / 2 },
+          ]
+        : undefined;
     if (operation.shape === "circle") {
       const size = Math.max(node.width, node.height);
       node.x -= (size - node.width) / 2;
@@ -1711,8 +1883,231 @@ function recomputeSceneBounds(scene: PatchableScene): void {
       ys.push(point.y);
     }
   }
+  for (const element of scene.elements) {
+    if (element.type === "line") {
+      for (const point of element.points) {
+        xs.push(point.x);
+        ys.push(point.y);
+      }
+    }
+    if (element.type === "frame") {
+      xs.push(element.x + element.width);
+      ys.push(element.y + element.height);
+    }
+  }
   scene.width = Math.max(...xs) + SCENE_PADDING;
   scene.height = Math.max(...ys) + SCENE_PADDING;
+}
+
+function patchTargetIds(
+  scene: PatchableScene,
+  selector: DiagramSelector,
+): Set<string> {
+  const targets = resolveTargets(scene, selector);
+  const ids = new Set([
+    ...targets.nodes.map((element) => element.id),
+    ...targets.arrows.map((element) => element.id),
+    ...targets.texts.map((element) => element.id),
+  ]);
+  const explicitIds = new Set(selector.ids ?? []);
+  for (const element of scene.elements) {
+    if (explicitIds.has(element.id)) ids.add(element.id);
+  }
+  return ids;
+}
+
+function anchoredIndex(
+  order: readonly string[],
+  beforeId: string | undefined,
+  afterId: string | undefined,
+): number | undefined {
+  if (beforeId && afterId) return undefined;
+  if (beforeId) {
+    const index = order.indexOf(beforeId);
+    return index >= 0 ? index : undefined;
+  }
+  if (afterId) {
+    const index = order.indexOf(afterId);
+    return index >= 0 ? index + 1 : undefined;
+  }
+  return order.length;
+}
+
+function structuralOperationIssue(
+  operation: DiagramPatchOperation,
+  message: string,
+): CodeModeIssue[] {
+  return [
+    issue({
+      code: "patch_output_invalid",
+      stage: "canvas",
+      ref: { kind: "request", path: "operations" },
+      message,
+      hint: `Repair the ${operation.op} operation and preserve unique, stable element ids.`,
+    }),
+  ];
+}
+
+function applyInsert(
+  scene: PatchableScene,
+  operation: Extract<DiagramPatchOperation, { op: "insert" }>,
+): CodeModeIssue[] {
+  const existingIds = new Set(scene.elements.map((element) => element.id));
+  const insertedIds = operation.elements.map((element) => element.id);
+  if (
+    new Set(insertedIds).size !== insertedIds.length ||
+    insertedIds.some((id) => existingIds.has(id))
+  ) {
+    return structuralOperationIssue(
+      operation,
+      "Inserted elements must use ids that are unique within the canvas.",
+    );
+  }
+  const index = anchoredIndex(
+    scene.zOrder,
+    operation.beforeId,
+    operation.afterId,
+  );
+  if (index === undefined) {
+    return structuralOperationIssue(
+      operation,
+      "Insert specifies an unknown anchor or both beforeId and afterId.",
+    );
+  }
+  scene.elements.push(
+    ...operation.elements.map((element) => structuredClone(element)),
+  );
+  scene.zOrder.splice(index, 0, ...insertedIds);
+  return [];
+}
+
+function applyRemove(
+  scene: PatchableScene,
+  operation: Extract<DiagramPatchOperation, { op: "remove" }>,
+): CodeModeIssue[] {
+  const removedIds = patchTargetIds(scene, operation.selector);
+  if (removedIds.size === 0) return [targetIssue(operation)];
+  const removedNodeIds = new Set(
+    scene.elements.flatMap((element) =>
+      element.type === "node" && removedIds.has(element.id)
+        ? [element.nodeId]
+        : [],
+    ),
+  );
+  for (const element of scene.elements) {
+    if (
+      (element.type === "text" &&
+        element.containerId &&
+        removedIds.has(element.containerId)) ||
+      (element.type === "arrow" &&
+        (removedNodeIds.has(element.sourceNodeId) ||
+          removedNodeIds.has(element.targetNodeId))) ||
+      (element.type === "line" &&
+        ((element.startBinding &&
+          removedIds.has(element.startBinding.elementId)) ||
+          (element.endBinding && removedIds.has(element.endBinding.elementId))))
+    ) {
+      removedIds.add(element.id);
+    }
+  }
+  const retained = scene.elements
+    .filter((element) => !removedIds.has(element.id))
+    .map((element) =>
+      element.frameId && removedIds.has(element.frameId)
+        ? { ...element, frameId: undefined }
+        : element,
+    );
+  scene.elements.splice(0, scene.elements.length, ...retained);
+  const retainedOrder = scene.zOrder.filter((id) => !removedIds.has(id));
+  scene.zOrder.splice(0, scene.zOrder.length, ...retainedOrder);
+  const layouts = scene.layouts
+    .map((layout) => ({
+      ...layout,
+      ids: layout.ids.filter((id) => !removedIds.has(id)),
+    }))
+    .filter((layout) => layout.ids.length > 0);
+  scene.layouts.splice(0, scene.layouts.length, ...layouts);
+  recomputeSceneBounds(scene);
+  return [];
+}
+
+function applyReplace(
+  scene: PatchableScene,
+  operation: Extract<DiagramPatchOperation, { op: "replace" }>,
+): CodeModeIssue[] {
+  const index = scene.elements.findIndex(
+    (element) => element.id === operation.id,
+  );
+  if (index < 0) return [targetIssue(operation)];
+  if (operation.element.id !== operation.id) {
+    return structuralOperationIssue(
+      operation,
+      "Replacement element id must match the stable id being replaced.",
+    );
+  }
+  scene.elements.splice(index, 1, structuredClone(operation.element));
+  recomputeSceneBounds(scene);
+  return [];
+}
+
+function applyReorder(
+  scene: PatchableScene,
+  operation: Extract<DiagramPatchOperation, { op: "reorder" }>,
+): CodeModeIssue[] {
+  const selected = new Set(operation.ids);
+  if (
+    selected.size !== operation.ids.length ||
+    operation.ids.some((id) => !scene.zOrder.includes(id))
+  ) {
+    return structuralOperationIssue(
+      operation,
+      "Reorder ids must be unique ids already present in zOrder.",
+    );
+  }
+  const remaining = scene.zOrder.filter((id) => !selected.has(id));
+  const index = anchoredIndex(remaining, operation.beforeId, operation.afterId);
+  if (index === undefined) {
+    return structuralOperationIssue(
+      operation,
+      "Reorder specifies an unknown anchor or both beforeId and afterId.",
+    );
+  }
+  remaining.splice(index, 0, ...operation.ids);
+  scene.zOrder.splice(0, scene.zOrder.length, ...remaining);
+  return [];
+}
+
+function applyGroup(
+  scene: PatchableScene,
+  operation: Extract<DiagramPatchOperation, { op: "group" | "ungroup" }>,
+): CodeModeIssue[] {
+  const ids = new Set(operation.ids);
+  if (
+    operation.ids.some(
+      (id) => !scene.elements.some((element) => element.id === id),
+    )
+  ) {
+    return [targetIssue(operation)];
+  }
+  const grouped = scene.elements.map((element) => {
+    if (!ids.has(element.id)) return element;
+    if (operation.op === "group") {
+      return {
+        ...element,
+        groupIds: [
+          ...new Set([...(element.groupIds ?? []), operation.groupId]),
+        ],
+      };
+    }
+    return {
+      ...element,
+      groupIds: operation.groupId
+        ? (element.groupIds ?? []).filter((id) => id !== operation.groupId)
+        : [],
+    };
+  });
+  scene.elements.splice(0, scene.elements.length, ...grouped);
+  return [];
 }
 
 function applyPatchOperation(
@@ -1731,6 +2126,17 @@ function applyPatchOperation(
       return applyReplaceText(scene, operation);
     case "rerouteEdges":
       return applyRerouteEdges(scene, operation);
+    case "insert":
+      return applyInsert(scene, operation);
+    case "remove":
+      return applyRemove(scene, operation);
+    case "replace":
+      return applyReplace(scene, operation);
+    case "reorder":
+      return applyReorder(scene, operation);
+    case "group":
+    case "ungroup":
+      return applyGroup(scene, operation);
   }
 }
 
@@ -1916,6 +2322,22 @@ function buildSequenceDiagramFailureResult(
       ? { normalizedSpec: error.context.normalizedSpec }
       : {}),
     ...(error.context.quality ? { quality: error.context.quality } : {}),
+    ...(error.context.partial ? { partial: error.context.partial } : {}),
+    issues: error.context.issues,
+  };
+}
+
+function createCanvasFailureResult(
+  error: CreateCanvasFailure,
+): Extract<CreateCanvasResult, { ok: false }> {
+  return {
+    ok: false,
+    status: error.status,
+    ...(error.context.buildId ? { buildId: error.context.buildId } : {}),
+    ...(error.context.requestId ? { requestId: error.context.requestId } : {}),
+    ...(error.context.normalizedSpec
+      ? { normalizedSpec: error.context.normalizedSpec }
+      : {}),
     ...(error.context.partial ? { partial: error.context.partial } : {}),
     issues: error.context.issues,
   };
@@ -2279,6 +2701,157 @@ const buildSequenceDiagramWorkflow = Effect.fn(
     issues: [],
   } satisfies Extract<BuildSequenceDiagramResult, { ok: true }>;
 });
+
+const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
+  function* (input: unknown) {
+    const parsed = yield* Effect.sync(() =>
+      CreateCanvasRequestSchema.safeParse(input),
+    ).pipe(Effect.withSpan("codeMode.createCanvas.parse"));
+    if (!parsed.success) {
+      return yield* new CreateCanvasFailure({
+        status: "invalid_input",
+        context: { issues: inputIssues(parsed.error) },
+      });
+    }
+
+    const environment = yield* CodeModeRuntimeEnvironment;
+    const store = yield* CodeModeArtifactStorage;
+    const request = parsed.data;
+    const buildId = yield* Effect.sync(() => environment.createId("build"));
+    const baseContext = {
+      buildId,
+      ...responseRequestId(request.requestId),
+    };
+    if (jsonSizeBytes(request.spec) > CANVAS_LIMITS.maxSerializedBytes) {
+      return yield* new CreateCanvasFailure({
+        status: "limit_exceeded",
+        context: {
+          ...baseContext,
+          issues: [
+            issue({
+              code: "canvas_limit_exceeded",
+              stage: "canvas",
+              ref: { kind: "request", path: "spec" },
+              message: `CanvasSpec exceeds ${CANVAS_LIMITS.maxSerializedBytes} serialized bytes.`,
+              hint: "Split the visualization into a smaller canvas or reduce repeated text and points.",
+            }),
+          ],
+        },
+      });
+    }
+
+    const normalized = yield* Effect.sync(() =>
+      normalizePatchableScene(request.spec),
+    ).pipe(Effect.withSpan("codeMode.createCanvas.normalize"));
+    if (!normalized) {
+      return yield* new CreateCanvasFailure({
+        status: "invalid_canvas",
+        context: {
+          ...baseContext,
+          issues: [
+            issue({
+              code: "invalid_canvas_geometry",
+              stage: "canvas",
+              ref: { kind: "request", path: "spec.elements" },
+              message: "CanvasSpec contains an invalid point list.",
+              hint: "Provide at least two points for lines/connectors and three points for polygons.",
+            }),
+          ],
+        },
+      });
+    }
+
+    const scene = yield* Effect.sync(() => compileCanvasSpec(normalized)).pipe(
+      Effect.withSpan("codeMode.createCanvas.layout"),
+    );
+    const validationIssues = yield* Effect.sync(() =>
+      getCanvasValidationIssues(scene),
+    ).pipe(Effect.withSpan("codeMode.createCanvas.validate"));
+    if (validationIssues.length > 0) {
+      const issues = canvasValidationIssues(validationIssues);
+      return yield* new CreateCanvasFailure({
+        status: issues.some((entry) => entry.code === "canvas_limit_exceeded")
+          ? "limit_exceeded"
+          : "invalid_canvas",
+        context: { ...baseContext, normalizedSpec: scene, issues },
+      });
+    }
+
+    const { excalidraw, validation } = yield* Effect.sync(() => {
+      const excalidrawScene = convertSceneToExcalidraw(scene);
+      return {
+        excalidraw: excalidrawScene,
+        validation: validateExcalidrawScene(excalidrawScene),
+      };
+    }).pipe(Effect.withSpan("codeMode.createCanvas.exportValidate"));
+    const exportValidationIssues = canvasExportIssues(validation.issues);
+    const exportContext = {
+      ...baseContext,
+      normalizedSpec: scene,
+      partial: scenePartial(scene),
+    };
+    if (exportValidationIssues.length > 0) {
+      return yield* new CreateCanvasFailure({
+        status: "export_failed",
+        context: { ...exportContext, issues: exportValidationIssues },
+      });
+    }
+
+    const storedFormats = yield* storedArtifactsForFormats({
+      formats: requestedFormats(request.options),
+      scene,
+      excalidraw,
+      renderer: environment.renderer,
+    }).pipe(
+      Effect.mapError(
+        (error) =>
+          new CreateCanvasFailure({
+            status: "export_failed",
+            context: {
+              ...exportContext,
+              issues: artifactExportIssues(error),
+            },
+          }),
+      ),
+    );
+    const artifactId = yield* Effect.sync(() =>
+      environment.createId("artifact"),
+    );
+    const artifact = yield* withTelemetryCorrelation(
+      store.write({
+        artifactId,
+        diagramId: scene.diagramId,
+        formats: storedFormats,
+        inlineFormats: requestedInlineFormats(request.options),
+      }),
+      {
+        artifactId,
+        ...(request.requestId ? { requestId: request.requestId } : {}),
+      },
+    ).pipe(
+      Effect.mapError(
+        (error) =>
+          new CreateCanvasFailure({
+            status: "storage_failed",
+            context: {
+              ...exportContext,
+              issues: [storageFailureIssue(error, "storage_write_failed")],
+            },
+          }),
+      ),
+    );
+
+    return {
+      ok: true,
+      status: "accepted",
+      buildId,
+      ...responseRequestId(request.requestId),
+      normalizedSpec: scene,
+      artifact: withArtifactUrls(artifact, environment.artifactUrl),
+      issues: [],
+    } satisfies Extract<CreateCanvasResult, { ok: true }>;
+  },
+);
 
 const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
   function* (input: unknown) {
@@ -2645,6 +3218,20 @@ const applyDiagramPatchWorkflow = Effect.fn(
     });
   }
 
+  const structuralIssues = yield* Effect.sync(() =>
+    getCanvasValidationIssues(renderedScene),
+  ).pipe(Effect.withSpan("codeMode.applyDiagramPatch.validate"));
+  if (structuralIssues.length > 0) {
+    return yield* new ApplyDiagramPatchFailure({
+      status: "render_failed",
+      context: {
+        ...sourceContext,
+        partial: scenePartial(renderedScene),
+        issues: canvasValidationIssues(structuralIssues),
+      },
+    });
+  }
+
   const { excalidraw, validation } = yield* Effect.sync(() => {
     const excalidrawScene = convertSceneToExcalidraw(renderedScene);
     return {
@@ -2656,10 +3243,11 @@ const applyDiagramPatchWorkflow = Effect.fn(
     ...sourceContext,
     partial: scenePartial(renderedScene),
   };
-  if (!validation.ok) {
+  const exportValidationIssues = canvasExportIssues(validation.issues);
+  if (exportValidationIssues.length > 0) {
     return yield* new ApplyDiagramPatchFailure({
       status: "export_failed",
-      context: { ...exportContext, issues: exportIssues(validation.issues) },
+      context: { ...exportContext, issues: exportValidationIssues },
     });
   }
 
@@ -2777,6 +3365,21 @@ export const buildSequenceDiagram: (
     codeModeResultBoundary(
       buildSequenceDiagramWorkflow(input),
       buildSequenceDiagramFailureResult,
+    ),
+  ),
+);
+
+export const createCanvas: (
+  input: unknown,
+) => CodeModeWorkflowEffect<CreateCanvasResult> = Effect.fn(
+  "codeMode.createCanvas",
+)((input: unknown) =>
+  observeCodeModeBoundary(
+    "createCanvas",
+    input,
+    codeModeResultBoundary(
+      createCanvasWorkflow(input),
+      createCanvasFailureResult,
     ),
   ),
 );
