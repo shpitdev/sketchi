@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.5.0
+
+### Minor Changes
+
+- [#318](https://github.com/shpitdev/sketchi/pull/318) [`5bb5d20`](https://github.com/shpitdev/sketchi/commit/5bb5d202770520b76b39d27cc1cd97e7dc60eb3c) Thanks [@anandpant](https://github.com/anandpant)! - Add native sequence generation, model-selected diagram types, deterministic intent-plan validation, and adaptive PNG export scaling for large diagrams.
+
 ## 0.4.3
 
 ### Patch Changes
