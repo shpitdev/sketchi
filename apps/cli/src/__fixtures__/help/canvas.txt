@@ -1,0 +1,42 @@
+DESCRIPTION
+  Build a complete Universal CanvasSpec through Sketchi's public create-canvas API, preserve the validated scene and Excalidraw result in the local store, and export PNG by default. This command is direct and noninteractive: pass exactly one CanvasSpec with --file PATH, --file - for piped stdin, or --json VALUE.
+
+Network and options:
+  Endpoint: https://playground.sketchi.app/api/v1/canvases/create
+  Override it for preview or local testing with SKETCHI_CANVAS_ENDPOINT or --endpoint URL.
+  The request asks the server for scene and Excalidraw artifacts, validates the typed response,
+  stores the normalized CanvasSpec plus Excalidraw output, then exports locally. --format defaults
+  to png; --dest defaults to <diagramId>.png, <diagramId>.excalidraw, or
+  <diagramId>.scene.json. Use --dest - for artifact-only stdout and --output json for a stable
+  status envelope on stderr.
+
+Input and failures:
+  Input must be the CanvasSpec object itself, not a create-canvas request wrapper and not raw
+  Excalidraw JSON. Interactive stdin is rejected with exit 2. Invalid JSON or CanvasSpec exits 3;
+  a typed server rejection exits 4; network/endpoint failure exits 10; malformed response exits 12.
+  The local record is committed before export, so a destination failure reports a concrete
+  sketchi export recovery command. The existing sketchi create command remains the strictly
+  offline path for accepted flowchart, mindmap, and sequence documents.
+
+USAGE
+  sketchi canvas [flags]
+
+FLAGS
+  --output text|json               Result presentation format. (choices: text, json)
+  --file PATH|-                    Read one CanvasSpec document from PATH, or stdin with -.
+  --json VALUE                     Read one CanvasSpec document from inline JSON.
+  --endpoint URL                   Unauthenticated create-canvas API URL; defaults to production.
+  --format png|excalidraw|scene    Artifact exported after the canvas is created. (choices: png, excalidraw, scene)
+  --dest PATH|-                    Artifact destination; defaults from diagramId, or - for stdout.
+
+GLOBAL FLAGS
+  --help, -h                          Show help information
+  --version, -v                       Show version information
+  --completions <bash|zsh|fish|sh>    Print shell completion script (choices: bash, zsh, fish, sh)
+
+EXAMPLES
+  # Build a CanvasSpec, store it locally, and write its PNG.
+  sketchi canvas --file canvas.json --output json
+
+  # Read CanvasSpec from stdin and export editable Excalidraw.
+  sketchi canvas --file - --format excalidraw --dest canvas.excalidraw

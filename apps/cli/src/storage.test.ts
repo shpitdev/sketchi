@@ -9,8 +9,9 @@ import {
 } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
+import { CanvasSpec } from "@sketchi/diagram-agent";
 import { assert, describe, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Layer, Ref } from "effect";
+import { Deferred, Effect, Fiber, Layer, Ref, Schema } from "effect";
 import { FastCheck, TestClock } from "effect/testing";
 
 import { type BuiltDiagram } from "./contracts.js";
@@ -126,10 +127,7 @@ function pngWithTrailingIdatBytes(): Uint8Array {
       const view = new DataView(bytes.buffer);
       view.setUint32(offset, length + trailingBytes.length);
       const crcOffset = dataEnd + trailingBytes.length;
-      view.setUint32(
-        crcOffset,
-        crc32(bytes.subarray(typeOffset, crcOffset)),
-      );
+      view.setUint32(crcOffset, crc32(bytes.subarray(typeOffset, crcOffset)));
       return bytes;
     }
     offset += length + 12;
@@ -277,6 +275,54 @@ describe("diagram storage", () => {
         );
       }).pipe(Effect.provide(storeLayer(root))),
     ),
+  );
+
+  it.effect(
+    "round-trips a Universal Canvas record through the shared store",
+    () =>
+      withTestRoot((root) =>
+        Effect.gen(function* () {
+          const store = yield* DiagramStore;
+          const spec = Schema.decodeUnknownSync(CanvasSpec)({
+            kind: "canvas",
+            version: 1,
+            diagramId: "stored-canvas",
+            title: "Stored Canvas",
+            width: 480,
+            height: 320,
+            accentColor: "#2563eb",
+            backgroundColor: "#ffffff",
+            elements: [
+              {
+                type: "text",
+                id: "heading",
+                x: 40,
+                y: 40,
+                text: "Stored Canvas",
+                fontSize: 28,
+              },
+            ],
+            layers: [],
+            layouts: [],
+            zOrder: ["heading"],
+          });
+          const diagram: BuiltDiagram = {
+            id: spec.diagramId,
+            type: "canvas",
+            title: spec.title,
+            document: { type: "canvas", spec },
+            scene: spec,
+            excalidraw: builtDiagram().excalidraw,
+          };
+
+          const created = yield* store.create(diagram);
+          const shown = yield* store.show(spec.diagramId);
+
+          assert.strictEqual(created.manifest.type, "canvas");
+          assert.strictEqual(shown.document.type, "canvas");
+          assert.deepStrictEqual(shown.document, diagram.document);
+        }).pipe(Effect.provide(storeLayer(root))),
+      ),
   );
 
   it.effect(

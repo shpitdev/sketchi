@@ -9,7 +9,11 @@ import { parseJsonPatchInput } from "./patch.js";
 
 export interface InputReadOptions {
   readonly maxBytes?: number;
-  readonly content: "JSON document" | "patch request" | "share link";
+  readonly content:
+    | "CanvasSpec document"
+    | "JSON document"
+    | "patch request"
+    | "share link";
 }
 
 export class InputReader extends Context.Service<

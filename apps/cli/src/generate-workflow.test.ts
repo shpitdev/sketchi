@@ -1,11 +1,11 @@
 import { assert, describe, it } from "@effect/vitest";
 
 import { CliExportError, CliFilesystemError } from "./errors.js";
-import { preserveGeneratedRecordOnExportFailure } from "./generate-workflow.js";
+import { preserveCreatedRecordOnExportFailure } from "./generate-workflow.js";
 
 describe("post-generation export recovery", () => {
   it("attaches the persisted identity and a concrete retry to write failures", () => {
-    const failure = preserveGeneratedRecordOnExportFailure(
+    const failure = preserveCreatedRecordOnExportFailure(
       CliExportError.make({
         code: "export_write_failed",
         format: "proof.png",
@@ -25,11 +25,11 @@ describe("post-generation export recovery", () => {
       failure.recoveryCommand,
       "sketchi export release-approval --format png --dest release-approval.png",
     );
-    assert.include(failure.hint, "The canonical record is preserved.");
+    assert.include(failure.hint, "The local record is preserved.");
   });
 
   it("turns a destination filesystem failure into a recoverable export error", () => {
-    const failure = preserveGeneratedRecordOnExportFailure(
+    const failure = preserveCreatedRecordOnExportFailure(
       CliFilesystemError.make({
         cause: new Error("permission denied"),
         operation: "mkdir",

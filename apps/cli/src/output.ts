@@ -89,6 +89,13 @@ function failureView(error: CliFailure): ErrorView {
         hint: error.hint,
         details: error.details,
       };
+    case "CliCanvasError":
+      return {
+        code: error.code,
+        message: error.message,
+        hint: error.hint,
+        details: error.details,
+      };
     case "CliGenerationError":
       return {
         code: error.code,

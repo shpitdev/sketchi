@@ -37,6 +37,7 @@ import {
 import {
   type CanonicalDiagramDocument,
   decodeCanonicalDiagramDocument,
+  decodeStoredDiagramDocument,
   encodeJson,
 } from "./document.js";
 import {
@@ -1062,7 +1063,7 @@ const DiagramStoreLive = Layer.effect(
               diagramId,
             ),
         });
-        return yield* decodeCanonicalDiagramDocument(parsed).pipe(
+        return yield* decodeStoredDiagramDocument(parsed).pipe(
           Effect.mapError(() =>
             storageError(
               "corrupt_record",
@@ -1732,16 +1733,16 @@ const DiagramStoreLive = Layer.effect(
         return yield* revisionNotFound(diagramId, revision);
       }
       if (legacyKind !== "file") return yield* unsafeEntry(legacy, diagramId);
-      const document = yield* decodeDocument(legacy, diagramId).pipe(
-        Effect.mapError((error) =>
-          error._tag === "CliStorageError"
-            ? storageError(
-                "corrupt_revision",
-                `Diagram "${diagramId}" revision ${String(revision)} is corrupt.`,
-                "Choose another revision or repair the legacy revision file.",
-                diagramId,
-              )
-            : error,
+      const document = yield* decodeCanonicalDiagramDocument(
+        yield* readArchivedJson(legacy, diagramId, revision),
+      ).pipe(
+        Effect.mapError(() =>
+          storageError(
+            "corrupt_revision",
+            `Diagram "${diagramId}" revision ${String(revision)} is corrupt.`,
+            "Choose another revision or repair the legacy revision file.",
+            diagramId,
+          ),
         ),
       );
       return {

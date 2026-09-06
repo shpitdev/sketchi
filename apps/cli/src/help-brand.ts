@@ -63,7 +63,10 @@ const TILE_MATERIALS = {
     dark: { red: 222, green: 152, blue: 158, ansi256: 175 },
     light: { red: 222, green: 152, blue: 158, ansi256: 175 },
   },
-} as const satisfies Record<string, Record<HelpBrandOptions["background"], Color>>;
+} as const satisfies Record<
+  string,
+  Record<HelpBrandOptions["background"], Color>
+>;
 
 const TILE_WIDTH = 16;
 const LOCKUP_GAP = 2;
@@ -306,6 +309,12 @@ export function renderRootHelp(options: HelpBrandOptions): string {
         "Writes <generated-id>.png in this directory. No account or API key needed.",
         options,
       ),
+      width,
+    ),
+    action(
+      "canvas",
+      "Build and export a typed Universal CanvasSpec.",
+      options,
       width,
     ),
     "",

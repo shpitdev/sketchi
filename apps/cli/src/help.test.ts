@@ -79,6 +79,7 @@ describe("golden product help", () => {
     "root",
     "docs",
     "generate",
+    "canvas",
     "create",
     "show",
     "edit",
@@ -128,6 +129,7 @@ describe("golden product help", () => {
     });
 
     expect(output).toContain("Canonical flowchart example");
+    expect(output).toContain("Universal CanvasSpec example");
     expect(output).toContain("Share/pull safety limits");
     expect(output).toContain("stdout contains only artifact bytes");
     await expect(output).toMatchFileSnapshot(
@@ -249,6 +251,8 @@ describe("golden product help", () => {
   it("keeps parser-level exclusivity failures in the JSON usage envelope", () => {
     for (const args of [
       ["generate", "--output", "json"],
+      ["canvas", "--output", "json"],
+      ["canvas", "--file", "a.json", "--json", "{}", "--output", "json"],
       ["create", "--output", "json"],
       ["create", "--file", "a.json", "--json", "{}", "--output", "json"],
       ["edit", "release-flow", "--output", "json"],

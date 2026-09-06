@@ -1,4 +1,5 @@
 import {
+  CanvasSpec,
   FlowchartSpec,
   MindmapSpec,
   SequenceDiagramSpec,
@@ -35,6 +36,13 @@ export type CanonicalDiagramDocument =
   | { readonly type: "mindmap"; readonly spec: MindmapSpec }
   | { readonly type: "sequence"; readonly spec: SequenceDiagramSpec };
 
+export type CanvasDiagramDocument = {
+  readonly type: "canvas";
+  readonly spec: CanvasSpec;
+};
+
+export type DiagramDocument = CanonicalDiagramDocument | CanvasDiagramDocument;
+
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 const decodeFlowchartSpec = Schema.decodeUnknownEffect(FlowchartSpec, {
   errors: "all",
@@ -43,6 +51,9 @@ const decodeMindmapSpec = Schema.decodeUnknownEffect(MindmapSpec, {
   errors: "all",
 });
 const decodeSequenceSpec = Schema.decodeUnknownEffect(SequenceDiagramSpec, {
+  errors: "all",
+});
+const decodeCanvasSpec = Schema.decodeUnknownEffect(CanvasSpec, {
   errors: "all",
 });
 
@@ -74,6 +85,10 @@ function mindmapDocument(spec: MindmapSpec): CanonicalDiagramDocument {
 
 function sequenceDocument(spec: SequenceDiagramSpec): CanonicalDiagramDocument {
   return { type: "sequence", spec };
+}
+
+function canvasDocument(spec: CanvasSpec): CanvasDiagramDocument {
+  return { type: "canvas", spec };
 }
 
 function documentFields(
@@ -138,6 +153,20 @@ export const parseJsonDocument = Effect.fn("sketchi.cli.document.parseJson")(
     return yield* decodeCanonicalDiagramDocument(input);
   },
 );
+
+/** Decode every document shape that the local store can own. */
+export const decodeStoredDiagramDocument = Effect.fn(
+  "sketchi.cli.document.decodeStored",
+)(function* (input: unknown) {
+  const fields = documentFields(input);
+  if (fields?.type !== "canvas") {
+    return yield* decodeCanonicalDiagramDocument(input);
+  }
+  const spec = yield* decodeCanvasSpec(fields.spec).pipe(
+    Effect.mapError((error) => validationError(schemaDetails(error.issue))),
+  );
+  return canvasDocument(spec);
+});
 
 export function encodeJson(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;

@@ -58,6 +58,21 @@ export class CliGenerationError extends Schema.TaggedErrorClass<CliGenerationErr
   },
 ) {}
 
+export class CliCanvasError extends Schema.TaggedErrorClass<CliCanvasError>()(
+  "CliCanvasError",
+  {
+    code: Schema.Literals([
+      "canvas_rejected",
+      "endpoint_failure",
+      "malformed_response",
+      "network_failure",
+    ]),
+    message: Schema.String,
+    hint: Schema.String,
+    details: Schema.Array(Schema.String),
+  },
+) {}
+
 export class CliInteractiveError extends Schema.TaggedErrorClass<CliInteractiveError>()(
   "CliInteractiveError",
   {
@@ -138,6 +153,7 @@ export type CliFailure =
   | CliInputError
   | CliValidationError
   | CliBuildError
+  | CliCanvasError
   | CliGenerationError
   | CliInteractiveError
   | CliStorageError
@@ -162,6 +178,16 @@ export function exitCodeForFailure(error: CliFailure): number {
         case "generation_timeout":
           return 11;
         case "malformed_output":
+          return 12;
+      }
+    case "CliCanvasError":
+      switch (error.code) {
+        case "canvas_rejected":
+          return 4;
+        case "endpoint_failure":
+        case "network_failure":
+          return 10;
+        case "malformed_response":
           return 12;
       }
     case "CliInteractiveError":

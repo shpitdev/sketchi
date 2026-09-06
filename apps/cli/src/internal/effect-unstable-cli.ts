@@ -27,6 +27,7 @@ const cliVersion =
 
 const PUBLIC_COMMANDS = new Set([
   "generate",
+  "canvas",
   "docs",
   "create",
   "show",

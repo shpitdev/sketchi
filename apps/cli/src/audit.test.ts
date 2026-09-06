@@ -80,7 +80,7 @@ describe("CLI dependency and public-surface audit", () => {
     assert.notInclude(source, "NormalizedMindmapSchema");
   });
 
-  it("confines network boundaries to the three credential-free HTTPS commands", async () => {
+  it("confines network boundaries to the four credential-free HTTPS commands", async () => {
     const files = await sourceFiles(join(workspaceRoot, "apps/cli/src"));
     const fetchFiles: string[] = [];
     let cliSource = "";
@@ -93,7 +93,11 @@ describe("CLI dependency and public-surface audit", () => {
     }
     assert.deepStrictEqual(
       fetchFiles.map((file) => file.slice(workspaceRoot.length + 1)),
-      ["apps/cli/src/generation.ts", "apps/cli/src/share.ts"],
+      [
+        "apps/cli/src/canvas.ts",
+        "apps/cli/src/generation.ts",
+        "apps/cli/src/share.ts",
+      ],
     );
     assert.notInclude(cliSource, "GOOGLE_GENERATIVE_AI_API_KEY");
     assert.notInclude(cliSource, "CF_AIG_TOKEN");
@@ -109,6 +113,15 @@ describe("CLI dependency and public-surface audit", () => {
       "https://playground.sketchi.app/api/v1/generate",
     );
     assert.notInclude(generationSource, "@sketchi/diagram-generation");
+
+    const canvasSource = await readFile(
+      join(workspaceRoot, "apps/cli/src/canvas.ts"),
+      "utf8",
+    );
+    assert.include(
+      canvasSource,
+      "https://playground.sketchi.app/api/v1/canvases/create",
+    );
 
     const shareProtocolSource = await readFile(
       join(workspaceRoot, "apps/cli/src/share-protocol.ts"),
@@ -152,6 +165,7 @@ describe("CLI dependency and public-surface audit", () => {
     );
     assert.deepStrictEqual(commands, [
       "generate",
+      "canvas",
       "docs",
       "create",
       "show",
@@ -206,6 +220,7 @@ describe("CLI dependency and public-surface audit", () => {
     assert.notInclude(bundle, "sourceMappingURL");
     assert.notInclude(bundle, "CF_AIG_TOKEN");
     assert.include(bundle, "playground.sketchi.app/api/v1/generate");
+    assert.include(bundle, "playground.sketchi.app/api/v1/canvases/create");
     assert.include(readme, "Typed, deterministic diagrams from your terminal.");
     assert.include(readme, "npm install -g sketchi");
   });

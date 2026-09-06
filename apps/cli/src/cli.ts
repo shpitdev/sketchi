@@ -6,6 +6,14 @@ import { Cause, Effect, Layer, Option } from "effect";
 
 import { DiagramBuilder, DiagramBuilderLive } from "./builder.js";
 import {
+  createCanvasDiagram,
+  DEFAULT_CANVAS_ENDPOINT,
+  readCanvasSpecInput,
+  resolveCanvasEndpoint,
+  SKETCHI_CANVAS_ENDPOINT_ENV,
+  type CreateCanvasDiagramResult,
+} from "./canvas.js";
+import {
   type DiagramFormat,
   type DiagramSummary,
   type OutputFormat,
@@ -22,6 +30,7 @@ import {
 import { DiagramExporter, DiagramExporterLive } from "./exporter.js";
 import { LocalFileSystem, LocalFileSystemLive } from "./filesystem.js";
 import {
+  exportCreatedDiagram,
   runGenerateWorkflow,
   type GenerateWorkflowResult,
   type GenerationDestination,
@@ -94,8 +103,10 @@ import {
 const AGENT_DOCS = `Sketchi CLI contracts for agents and automation.
 
 Command map:
-  Start with generate for prompt-to-PNG. Use show, edit, patch, list, restore, and export for
-  local records. Use create for accepted canonical JSON. Share and pull are explicit network
+  Start with generate for prompt-to-PNG or canvas for an authored CanvasSpec. Use show, list,
+  and export for every local record. Edit and patch support canonical flowchart, mindmap, and
+  sequence records. Use create for accepted canonical JSON.
+  Share and pull are explicit network
   boundaries for Excalidraw links. Run sketchi COMMAND --help for every flag and example.
 
 Manual JSON workflow (strictly offline):
@@ -112,11 +123,15 @@ Canonical mindmap example:
 Canonical sequence example:
   {"type":"sequence","spec":{"id":"checkout-sequence","title":"Checkout sequence","participants":[{"id":"browser","label":"Browser"},{"id":"api","label":"API"}],"messages":[{"id":"request","source":"browser","target":"api","label":"Submit checkout"}]}}
 
+Universal CanvasSpec example:
+  {"kind":"canvas","version":1,"diagramId":"release-board","title":"Release board","width":640,"height":360,"accentColor":"#2563eb","backgroundColor":"#ffffff","elements":[{"type":"node","id":"ready","nodeId":"ready","shape":"rectangle","x":40,"y":40,"width":240,"height":120,"label":"Ready to release"}],"layers":[],"layouts":[],"zOrder":["ready"]}
+
 Semantic color patch example:
   sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
   sketchi generate [--prompt TEXT] [--type flowchart|mindmap|sequence|er|architecture|swimlane|state-machine] [--model MODEL]
+  sketchi canvas --file PATH|- [--format png|excalidraw|scene] [--dest PATH|-]
   sketchi share DIAGRAM_ID [--open]
   sketchi pull DIAGRAM_ID --link URL|-
   generate makes one unauthenticated HTTPS POST to the public Sketchi generate API at ${DEFAULT_GENERATE_ENDPOINT}
@@ -125,9 +140,12 @@ Explicit network commands (one credential-free HTTPS request each):
   through the same local store as create. Without --type, the model selects a supported native type; the default model is
   ${DEFAULT_GENERATION_MODEL}. Override the endpoint for preview or local testing with
   ${SKETCHI_GENERATE_ENDPOINT_ENV} or --endpoint URL.
+  canvas submits the CanvasSpec object itself to ${DEFAULT_CANVAS_ENDPOINT}, validates the typed
+  response, stores the normalized scene and Excalidraw artifact, and exports locally. Override its
+  endpoint with ${SKETCHI_CANVAS_ENDPOINT_ENV} or --endpoint URL.
 
 Input and output contracts:
-  create/edit/patch require exactly one of --file PATH|- or --json VALUE. --file - reads one
+  create/edit/patch/canvas require exactly one of --file PATH|- or --json VALUE. --file - reads one
   noninteractive UTF-8 JSON document from stdin and exits with usage code 2 on a TTY.
   --json is inline input only. --prompt is always direct and noninteractive. With no --prompt,
   generate opens a short prompt/type/PNG-destination wizard only when stdin and stdout are human
@@ -159,7 +177,7 @@ Offline boundary and storage:
   A pulled record is detached: diagram.excalidraw is authoritative while document.json and
   scene.json remain non-authoritative provenance. A patched record makes scene.json authoritative
   while retaining document.json as provenance. show/list expose these states; edit refuses both.
-  Formats are scene, excalidraw, and png. generate persists the canonical record before exporting
+  Formats are scene, excalidraw, and png. generate and canvas persist the local record before exporting
   the requested artifact; a later destination failure leaves that record recoverable. If no PNG is
   stored, export deterministically renders one on demand from the local scene and Excalidraw artifacts,
   without a browser, network, or record write.
@@ -168,7 +186,7 @@ Exit codes and errors:
   0 success; 1 internal failure; 2 usage or interactive stdin; 3 invalid input/document;
   4 build/export construction failure; 5 diagram not found; 6 conflict/busy;
   7 filesystem/storage failure; 8 unavailable format, render, destination, or write failure;
-  10 generate network/endpoint failure; 11 generate timeout; 12 malformed generate output;
+  10 generate/canvas network or endpoint failure; 11 generate timeout; 12 malformed remote output;
   13 Excalidraw transport, timeout, HTTP, or API-shape failure.
   Text errors start with "error: CODE". JSON errors use {"ok":false,"command":...,"error":...}.
   Errors never include stacks.
@@ -176,8 +194,9 @@ Exit codes and errors:
 Revision recovery and next steps:
   edit, pull, and restore archive the complete prior authority state before atomic replacement.
   Use restore --revision N to recover through the CLI without consuming the selected snapshot.
-  Start with generate for a prompt or create for accepted JSON. Use the returned id with show/list,
-  edit with a complete replacement document, then export another stored artifact when needed.`;
+  Start with generate for a prompt, canvas for CanvasSpec, or create for accepted canonical JSON.
+  Every returned id supports show, list, and export. Edit and patch are only for flowchart,
+  mindmap, and sequence records; create a new canvas to replace a Universal CanvasSpec.`;
 
 const HUMAN_HELP =
   "Turn one prompt into a validated PNG and editable local diagram.";
@@ -397,7 +416,7 @@ function isNativeGenerationType(value: string): value is GenerationType {
   return value === "flowchart" || value === "mindmap" || value === "sequence";
 }
 
-const GENERATE_HELP = `Create one persisted diagram and export its PNG by default. With no --prompt, Sketchi opens a short wizard only when stdin and stdout are human TTYs, output is text, and CI is absent. Pipes, redirects, CI, and --output json never prompt or block; pass --prompt for every script and automation path. This is one of Sketchi's three explicit network commands (generate, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
+const GENERATE_HELP = `Create one persisted diagram and export its PNG by default. With no --prompt, Sketchi opens a short wizard only when stdin and stdout are human TTYs, output is text, and CI is absent. Pipes, redirects, CI, and --output json never prompt or block; pass --prompt for every script and automation path. This is one of Sketchi's four explicit network commands (generate, canvas, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
 
 Everyday wizard:
   The wizard asks only for prompt text, flowchart (default), mind map, or sequence diagram, and a PNG destination.
@@ -593,6 +612,128 @@ const generateCommand = Command.make(
       command:
         'sketchi generate --prompt "Show Browser calling API" --type sequence --dest request-sequence.png',
       description: "Generate a native sequence diagram and write its PNG.",
+    },
+  ]),
+);
+
+interface CanvasCommandResult extends CreateCanvasDiagramResult {
+  readonly artifact: GenerateWorkflowResult["artifact"];
+}
+
+function canvasData(result: CanvasCommandResult) {
+  return {
+    ...storedData(result.diagram),
+    remoteArtifactId: result.artifactId,
+    export: exportData(result.artifact),
+  };
+}
+
+function canvasText(result: CanvasCommandResult): string {
+  const hint = displayHint(result.artifact);
+  return [
+    summaryText("created", result.diagram).replace(/^created:/u, "canvas:"),
+    `remote artifact: ${result.artifactId}`,
+    `format: ${result.artifact.format}`,
+    `destination: ${result.artifact.destination}`,
+    `bytes: ${String(result.artifact.sizeBytes)}`,
+    ...(hint ? [`hint: ${hint}`] : []),
+  ].join("\n");
+}
+
+const CANVAS_HELP = `Build a complete Universal CanvasSpec through Sketchi's public create-canvas API, preserve the validated scene and Excalidraw result in the local store, and export PNG by default. This command is direct and noninteractive: pass exactly one CanvasSpec with --file PATH, --file - for piped stdin, or --json VALUE.
+
+Network and options:
+  Endpoint: ${DEFAULT_CANVAS_ENDPOINT}
+  Override it for preview or local testing with ${SKETCHI_CANVAS_ENDPOINT_ENV} or --endpoint URL.
+  The request asks the server for scene and Excalidraw artifacts, validates the typed response,
+  stores the normalized CanvasSpec plus Excalidraw output, then exports locally. --format defaults
+  to png; --dest defaults to <diagramId>.png, <diagramId>.excalidraw, or
+  <diagramId>.scene.json. Use --dest - for artifact-only stdout and --output json for a stable
+  status envelope on stderr.
+
+Input and failures:
+  Input must be the CanvasSpec object itself, not a create-canvas request wrapper and not raw
+  Excalidraw JSON. Interactive stdin is rejected with exit 2. Invalid JSON or CanvasSpec exits 3;
+  a typed server rejection exits 4; network/endpoint failure exits 10; malformed response exits 12.
+  The local record is committed before export, so a destination failure reports a concrete
+  sketchi export recovery command. The existing sketchi create command remains the strictly
+  offline path for accepted flowchart, mindmap, and sequence documents.`;
+
+const canvasCommand = Command.make(
+  "canvas",
+  {
+    ...exclusiveInputSourceFlags("CanvasSpec document"),
+    endpoint: Flag.string("endpoint").pipe(
+      Flag.withDefault(resolveCanvasEndpoint()),
+      Flag.withDescription(
+        "Unauthenticated create-canvas API URL; defaults to production.",
+      ),
+      Flag.withMetavar("URL"),
+    ),
+    format: Flag.choice("format", ["png", "excalidraw", "scene"]).pipe(
+      Flag.withDefault("png"),
+      Flag.withDescription("Artifact exported after the canvas is created."),
+      Flag.withMetavar("png|excalidraw|scene"),
+    ),
+    destination: Flag.optional(
+      Flag.string("dest").pipe(
+        Flag.withDescription(
+          "Artifact destination; defaults from diagramId, or - for stdout.",
+        ),
+        Flag.withMetavar("PATH|-"),
+      ),
+    ),
+  },
+  ({ destination, endpoint, format, source }) =>
+    Effect.gen(function* () {
+      const { output } = yield* rootCommand;
+      const operation = Effect.gen(function* () {
+        const spec = yield* readCanvasSpecInput(source);
+        const created = yield* createCanvasDiagram({ endpoint, spec });
+        const artifact = yield* exportCreatedDiagram(
+          created.diagram,
+          format,
+          Option.match(destination, {
+            onNone: () => ({ _tag: "Default" }),
+            onSome: (path) => ({ _tag: "Custom", path }),
+          }),
+        );
+        return { ...created, artifact } satisfies CanvasCommandResult;
+      });
+      yield* operation.pipe(
+        Effect.matchEffect({
+          onFailure: (error) => reportFailure("canvas", output, error),
+          onSuccess: (result) =>
+            Effect.gen(function* () {
+              const writer = yield* OutputWriter;
+              if (result.artifact.stdoutBytes) {
+                yield* writer.stdout(result.artifact.stdoutBytes);
+              }
+              yield* reportSuccess(
+                "canvas",
+                output,
+                canvasData(result),
+                canvasText(result),
+                result.artifact.destination === "-" ? "stderr" : "stdout",
+              );
+            }),
+        }),
+      );
+    }),
+).pipe(
+  Command.withDescription(CANVAS_HELP),
+  Command.withShortDescription(
+    "Build and export a typed Universal CanvasSpec.",
+  ),
+  Command.withExamples([
+    {
+      command: "sketchi canvas --file canvas.json --output json",
+      description: "Build a CanvasSpec, store it locally, and write its PNG.",
+    },
+    {
+      command:
+        "sketchi canvas --file - --format excalidraw --dest canvas.excalidraw",
+      description: "Read CanvasSpec from stdin and export editable Excalidraw.",
     },
   ]),
 );
@@ -1069,6 +1210,7 @@ const exportCommand = Command.make(
 export const sketchiCommand = rootCommand.pipe(
   Command.withSubcommands([
     generateCommand,
+    canvasCommand,
     docsCommand,
     createCommand,
     showCommand,

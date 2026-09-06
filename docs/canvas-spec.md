@@ -8,6 +8,20 @@ Agents call `sketchi.createCanvas({ spec, options })` through the existing Code
 Mode `execute` surface. There is no diagram-specific MCP tool and raw
 Excalidraw JSON is never accepted as input.
 
+The published CLI exposes the same production contract without requiring MCP:
+
+```sh
+sketchi canvas --file canvas.json --output json
+cat canvas.json | sketchi canvas --file - --format excalidraw --dest canvas.excalidraw
+```
+
+The command defaults to
+`https://playground.sketchi.app/api/v1/canvases/create`, validates input and
+response with the shared CanvasSpec/CreateCanvas schemas, stores the returned
+diagram locally, and exports PNG, Excalidraw, or scene consistently with
+`generate`. `SKETCHI_CANVAS_ENDPOINT` and `--endpoint` are intended only for
+preview and local testing.
+
 ## Capabilities
 
 - Shapes: rectangle, ellipse, diamond, circle, and polygon.

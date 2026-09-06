@@ -17,7 +17,7 @@
 
 Sketchi stores canonical diagram documents and authoritative Excalidraw artifacts
 under `~/.sketchi/diagrams`. Its manual and recovery workflows stay local;
-generation and encrypted snapshot exchange are explicit, credential-free network
+generation, Universal Canvas compilation, and encrypted snapshot exchange are explicit, credential-free network
 commands.
 
 ## Install
@@ -83,7 +83,27 @@ sketchi generate --prompt "Map release approval" --output json
 `--format` accepts `png`, `excalidraw`, or `scene`; their default names are
 `<id>.png`, `<id>.excalidraw`, and `<id>.scene.json`. With `--dest -`, stdout
 contains artifact bytes only and the text or JSON status envelope moves to
-stderr. Generation, sharing, and pulling are the CLI's three network commands.
+stderr. Generation, Universal Canvas compilation, sharing, and pulling are the CLI's four network commands.
+
+## Build a Universal CanvasSpec
+
+`canvas` sends an already-authored, typed CanvasSpec to Sketchi's public
+create-canvas API, validates the response, preserves the normalized scene and
+editable Excalidraw artifact in the local store, and exports PNG by default:
+
+```sh
+sketchi canvas --file canvas.json --output json
+printf '%s' "$CANVAS_SPEC" | sketchi canvas --file - --format excalidraw --dest canvas.excalidraw
+```
+
+The input is the CanvasSpec object itself—not a request wrapper and not raw
+Excalidraw JSON. The command never prompts, so files and piped stdin are safe for
+agents and scripts. `--format` and `--dest` have the same behavior as `generate`.
+The endpoint defaults to
+`https://playground.sketchi.app/api/v1/canvases/create`; use `--endpoint URL` or
+`SKETCHI_CANVAS_ENDPOINT` only for preview and local testing. The existing
+`create` command remains the separate, strictly offline command for accepted
+flowchart, mindmap, and sequence documents.
 
 ## Create and work with a diagram offline
 
@@ -259,7 +279,7 @@ to human text TTYs and is never enabled by JSON output, pipes, redirects, or CI.
 After exporting PNG to a file, agents can follow the returned hint to display
 that path as an inline Markdown image for the user.
 
-`generate`, `share`, and `pull` are deliberately separate, explicit network
+`generate`, `canvas`, `share`, and `pull` are deliberately separate, explicit network
 commands. They remain credential-free and each makes one HTTPS request. Share
 is randomized by its key and IV; pull depends on remote availability and
 untrusted input, so neither belongs to determinism claims.
@@ -279,6 +299,7 @@ sketchi docs
 sketchi create --help
 sketchi patch --help
 sketchi generate --help
+sketchi canvas --help
 sketchi share --help
 sketchi pull --help
 sketchi restore --help

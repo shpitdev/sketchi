@@ -5,6 +5,7 @@ START HERE
   sketchi generate  interactive
   sketchi generate --prompt "Map release approval with pass and revise branches"
   Writes <generated-id>.png in this directory. No account or API key needed.
+  canvas    Build and export a typed Universal CanvasSpec.
 
 WORK WITH A DIAGRAM
   show      Inspect a local diagram.

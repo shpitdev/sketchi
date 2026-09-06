@@ -1,8 +1,10 @@
 Sketchi CLI contracts for agents and automation.
 
 Command map:
-  Start with generate for prompt-to-PNG. Use show, edit, patch, list, restore, and export for
-  local records. Use create for accepted canonical JSON. Share and pull are explicit network
+  Start with generate for prompt-to-PNG or canvas for an authored CanvasSpec. Use show, list,
+  and export for every local record. Edit and patch support canonical flowchart, mindmap, and
+  sequence records. Use create for accepted canonical JSON.
+  Share and pull are explicit network
   boundaries for Excalidraw links. Run sketchi COMMAND --help for every flag and example.
 
 Manual JSON workflow (strictly offline):
@@ -19,11 +21,15 @@ Canonical mindmap example:
 Canonical sequence example:
   {"type":"sequence","spec":{"id":"checkout-sequence","title":"Checkout sequence","participants":[{"id":"browser","label":"Browser"},{"id":"api","label":"API"}],"messages":[{"id":"request","source":"browser","target":"api","label":"Submit checkout"}]}}
 
+Universal CanvasSpec example:
+  {"kind":"canvas","version":1,"diagramId":"release-board","title":"Release board","width":640,"height":360,"accentColor":"#2563eb","backgroundColor":"#ffffff","elements":[{"type":"node","id":"ready","nodeId":"ready","shape":"rectangle","x":40,"y":40,"width":240,"height":120,"label":"Ready to release"}],"layers":[],"layouts":[],"zOrder":["ready"]}
+
 Semantic color patch example:
   sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
   sketchi generate [--prompt TEXT] [--type flowchart|mindmap|sequence|er|architecture|swimlane|state-machine] [--model MODEL]
+  sketchi canvas --file PATH|- [--format png|excalidraw|scene] [--dest PATH|-]
   sketchi share DIAGRAM_ID [--open]
   sketchi pull DIAGRAM_ID --link URL|-
   generate makes one unauthenticated HTTPS POST to the public Sketchi generate API at https://playground.sketchi.app/api/v1/generate
@@ -32,9 +38,12 @@ Explicit network commands (one credential-free HTTPS request each):
   through the same local store as create. Without --type, the model selects a supported native type; the default model is
   gemini-3.1-flash-lite. Override the endpoint for preview or local testing with
   SKETCHI_GENERATE_ENDPOINT or --endpoint URL.
+  canvas submits the CanvasSpec object itself to https://playground.sketchi.app/api/v1/canvases/create, validates the typed
+  response, stores the normalized scene and Excalidraw artifact, and exports locally. Override its
+  endpoint with SKETCHI_CANVAS_ENDPOINT or --endpoint URL.
 
 Input and output contracts:
-  create/edit/patch require exactly one of --file PATH|- or --json VALUE. --file - reads one
+  create/edit/patch/canvas require exactly one of --file PATH|- or --json VALUE. --file - reads one
   noninteractive UTF-8 JSON document from stdin and exits with usage code 2 on a TTY.
   --json is inline input only. --prompt is always direct and noninteractive. With no --prompt,
   generate opens a short prompt/type/PNG-destination wizard only when stdin and stdout are human
@@ -66,7 +75,7 @@ Offline boundary and storage:
   A pulled record is detached: diagram.excalidraw is authoritative while document.json and
   scene.json remain non-authoritative provenance. A patched record makes scene.json authoritative
   while retaining document.json as provenance. show/list expose these states; edit refuses both.
-  Formats are scene, excalidraw, and png. generate persists the canonical record before exporting
+  Formats are scene, excalidraw, and png. generate and canvas persist the local record before exporting
   the requested artifact; a later destination failure leaves that record recoverable. If no PNG is
   stored, export deterministically renders one on demand from the local scene and Excalidraw artifacts,
   without a browser, network, or record write.
@@ -75,7 +84,7 @@ Exit codes and errors:
   0 success; 1 internal failure; 2 usage or interactive stdin; 3 invalid input/document;
   4 build/export construction failure; 5 diagram not found; 6 conflict/busy;
   7 filesystem/storage failure; 8 unavailable format, render, destination, or write failure;
-  10 generate network/endpoint failure; 11 generate timeout; 12 malformed generate output;
+  10 generate/canvas network or endpoint failure; 11 generate timeout; 12 malformed remote output;
   13 Excalidraw transport, timeout, HTTP, or API-shape failure.
   Text errors start with "error: CODE". JSON errors use {"ok":false,"command":...,"error":...}.
   Errors never include stacks.
@@ -83,5 +92,6 @@ Exit codes and errors:
 Revision recovery and next steps:
   edit, pull, and restore archive the complete prior authority state before atomic replacement.
   Use restore --revision N to recover through the CLI without consuming the selected snapshot.
-  Start with generate for a prompt or create for accepted JSON. Use the returned id with show/list,
-  edit with a complete replacement document, then export another stored artifact when needed.
+  Start with generate for a prompt, canvas for CanvasSpec, or create for accepted canonical JSON.
+  Every returned id supports show, list, and export. Edit and patch are only for flowchart,
+  mindmap, and sequence records; create a new canvas to replace a Universal CanvasSpec.

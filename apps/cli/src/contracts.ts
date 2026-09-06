@@ -1,7 +1,7 @@
 import type { ExcalidrawFile, PatchableScene } from "@sketchi/diagram-agent";
 import { Effect, Schema } from "effect";
 
-import type { CanonicalDiagramDocument } from "./document.js";
+import type { DiagramDocument } from "./document.js";
 
 export const RECORD_SCHEMA_VERSION = 1;
 export const MANIFEST_FILE = "manifest.json";
@@ -20,7 +20,7 @@ export class DiagramRecordManifest extends Schema.Class<DiagramRecordManifest>(
 )({
   schemaVersion: Schema.Literal(RECORD_SCHEMA_VERSION),
   id: Schema.String,
-  type: Schema.Literals(["flowchart", "mindmap", "sequence"]),
+  type: Schema.Literals(["canvas", "flowchart", "mindmap", "sequence"]),
   title: Schema.String,
   revision: Schema.Int.check(Schema.isGreaterThan(0)),
   authority: Schema.Literals(["canonical", "patched", "detached"]).pipe(
@@ -31,9 +31,9 @@ export class DiagramRecordManifest extends Schema.Class<DiagramRecordManifest>(
 
 export interface BuiltDiagram {
   readonly id: string;
-  readonly type: CanonicalDiagramDocument["type"];
+  readonly type: DiagramDocument["type"];
   readonly title: string;
-  readonly document: CanonicalDiagramDocument;
+  readonly document: DiagramDocument;
   readonly scene: PatchableScene;
   readonly excalidraw: ExcalidrawFile;
   readonly png?: Uint8Array;
@@ -51,7 +51,7 @@ export interface PatchedDiagramArtifacts {
 
 export interface StoredDiagram {
   readonly manifest: DiagramRecordManifest;
-  readonly document: CanonicalDiagramDocument;
+  readonly document: DiagramDocument;
   readonly revisions: ReadonlyArray<string>;
   readonly authority: DiagramAuthority;
   readonly documentAuthoritative: boolean;
@@ -59,7 +59,7 @@ export interface StoredDiagram {
 
 export interface DiagramSummary {
   readonly id: string;
-  readonly type: CanonicalDiagramDocument["type"];
+  readonly type: DiagramDocument["type"];
   readonly title: string;
   readonly revision: number;
   readonly formats: ReadonlyArray<DiagramFormat>;
