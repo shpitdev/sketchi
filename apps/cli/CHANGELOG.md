@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.6.0
+
+### Minor Changes
+
+- [#321](https://github.com/shpitdev/sketchi/pull/321) [`641849e`](https://github.com/shpitdev/sketchi/commit/641849e8dba066c2c405cc444aa610a24e94e3f7) Thanks [@anandpant](https://github.com/anandpant)! - Add the noninteractive `sketchi canvas` command for typed Universal CanvasSpec creation, local persistence, and artifact export through the public production API.
+
 ## 0.5.0
 
 ### Minor Changes
