@@ -173,7 +173,7 @@ repository migration and its historical before tree are recorded in the
 ## Quick Start
 
 Prerequisites: Node.js compatible with the pinned toolchain, Corepack, and pnpm
-`11.5.0`.
+`11.11.0`.
 
 ```sh
 pnpm install

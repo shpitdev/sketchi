@@ -9,17 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as DocsRouteImport } from './routes/docs'
-import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AgentsOpencodeRouteImport } from './routes/agents/opencode'
-import { Route as AgentsCodexRouteImport } from './routes/agents/codex'
-import { Route as AgentsClaudeCodeRouteImport } from './routes/agents/claude-code'
+import { Route as AgentsRouteImport } from './routes/agents'
+import { Route as DocsRouteImport } from './routes/docs'
 import { Route as AgentsAntigravityRouteImport } from './routes/agents/antigravity'
+import { Route as AgentsClaudeCodeRouteImport } from './routes/agents/claude-code'
+import { Route as AgentsCodexRouteImport } from './routes/agents/codex'
+import { Route as AgentsOpencodeRouteImport } from './routes/agents/opencode'
 
-const DocsRoute = DocsRouteImport.update({
-  id: '/docs',
-  path: '/docs',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgentsRoute = AgentsRouteImport.update({
@@ -27,19 +27,14 @@ const AgentsRoute = AgentsRouteImport.update({
   path: '/agents',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const DocsRoute = DocsRouteImport.update({
+  id: '/docs',
+  path: '/docs',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AgentsOpencodeRoute = AgentsOpencodeRouteImport.update({
-  id: '/opencode',
-  path: '/opencode',
-  getParentRoute: () => AgentsRoute,
-} as any)
-const AgentsCodexRoute = AgentsCodexRouteImport.update({
-  id: '/codex',
-  path: '/codex',
+const AgentsAntigravityRoute = AgentsAntigravityRouteImport.update({
+  id: '/antigravity',
+  path: '/antigravity',
   getParentRoute: () => AgentsRoute,
 } as any)
 const AgentsClaudeCodeRoute = AgentsClaudeCodeRouteImport.update({
@@ -47,9 +42,14 @@ const AgentsClaudeCodeRoute = AgentsClaudeCodeRouteImport.update({
   path: '/claude-code',
   getParentRoute: () => AgentsRoute,
 } as any)
-const AgentsAntigravityRoute = AgentsAntigravityRouteImport.update({
-  id: '/antigravity',
-  path: '/antigravity',
+const AgentsCodexRoute = AgentsCodexRouteImport.update({
+  id: '/codex',
+  path: '/codex',
+  getParentRoute: () => AgentsRoute,
+} as any)
+const AgentsOpencodeRoute = AgentsOpencodeRouteImport.update({
+  id: '/opencode',
+  path: '/opencode',
   getParentRoute: () => AgentsRoute,
 } as any)
 
@@ -119,11 +119,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/docs': {
-      id: '/docs'
-      path: '/docs'
-      fullPath: '/docs'
-      preLoaderRoute: typeof DocsRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agents': {
@@ -133,25 +133,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/docs': {
+      id: '/docs'
+      path: '/docs'
+      fullPath: '/docs'
+      preLoaderRoute: typeof DocsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/agents/opencode': {
-      id: '/agents/opencode'
-      path: '/opencode'
-      fullPath: '/agents/opencode'
-      preLoaderRoute: typeof AgentsOpencodeRouteImport
-      parentRoute: typeof AgentsRoute
-    }
-    '/agents/codex': {
-      id: '/agents/codex'
-      path: '/codex'
-      fullPath: '/agents/codex'
-      preLoaderRoute: typeof AgentsCodexRouteImport
+    '/agents/antigravity': {
+      id: '/agents/antigravity'
+      path: '/antigravity'
+      fullPath: '/agents/antigravity'
+      preLoaderRoute: typeof AgentsAntigravityRouteImport
       parentRoute: typeof AgentsRoute
     }
     '/agents/claude-code': {
@@ -161,11 +154,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentsClaudeCodeRouteImport
       parentRoute: typeof AgentsRoute
     }
-    '/agents/antigravity': {
-      id: '/agents/antigravity'
-      path: '/antigravity'
-      fullPath: '/agents/antigravity'
-      preLoaderRoute: typeof AgentsAntigravityRouteImport
+    '/agents/codex': {
+      id: '/agents/codex'
+      path: '/codex'
+      fullPath: '/agents/codex'
+      preLoaderRoute: typeof AgentsCodexRouteImport
+      parentRoute: typeof AgentsRoute
+    }
+    '/agents/opencode': {
+      id: '/agents/opencode'
+      path: '/opencode'
+      fullPath: '/agents/opencode'
+      preLoaderRoute: typeof AgentsOpencodeRouteImport
       parentRoute: typeof AgentsRoute
     }
   }

@@ -9,37 +9,32 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from "./routes/__root";
-import { Route as ProjectsRouteImport } from "./routes/projects";
-import { Route as McpRouteImport } from "./routes/mcp";
-import { Route as CodemodeExportHarnessRouteImport } from "./routes/codemode-export-harness";
 import { Route as IndexRouteImport } from "./routes/index";
-import { Route as ProjectsProjectIdRouteImport } from "./routes/projects_/$projectId";
-import { Route as ExamplesExampleIdRouteImport } from "./routes/examples/$exampleId";
-import { Route as DiagramsDiagramIdRouteImport } from "./routes/diagrams/$diagramId";
-import { Route as ArtifactsArtifactIdRouteImport } from "./routes/artifacts/$artifactId";
+import { Route as CodemodeExportHarnessRouteImport } from "./routes/codemode-export-harness";
+import { Route as McpRouteImport } from "./routes/mcp";
+import { Route as ProjectsRouteImport } from "./routes/projects";
 import { Route as ApiChatRouteImport } from "./routes/api/chat";
-import { Route as DiagramsDiagramIdEditRouteImport } from "./routes/diagrams_/$diagramId/edit";
-import { Route as ArtifactsArtifactIdEditRouteImport } from "./routes/artifacts_/$artifactId/edit";
-import { Route as ApiV1GenerateRouteImport } from "./routes/api/v1/generate";
+import { Route as ArtifactsArtifactIdRouteImport } from "./routes/artifacts/$artifactId";
+import { Route as DiagramsDiagramIdRouteImport } from "./routes/diagrams/$diagramId";
+import { Route as ExamplesExampleIdRouteImport } from "./routes/examples/$exampleId";
+import { Route as ProjectsProjectIdRouteImport } from "./routes/projects_/$projectId";
 import { Route as ApiStudioProjectsRouteImport } from "./routes/api/studio/projects";
-import { Route as ApiV1SequencesBuildRouteImport } from "./routes/api/v1/sequences/build";
-import { Route as ApiV1MindmapsBuildRouteImport } from "./routes/api/v1/mindmaps/build";
-import { Route as ApiV1FlowchartsBuildRouteImport } from "./routes/api/v1/flowcharts/build";
-import { Route as ApiV1CanvasesCreateRouteImport } from "./routes/api/v1/canvases/create";
-import { Route as ApiV1ArtifactsArtifactIdRouteImport } from "./routes/api/v1/artifacts/$artifactId";
-import { Route as ApiStudioProjectsProjectIdRouteImport } from "./routes/api/studio/projects_/$projectId";
-import { Route as ApiStudioProjectsFromArtifactRouteImport } from "./routes/api/studio/projects/from-artifact";
+import { Route as ApiV1GenerateRouteImport } from "./routes/api/v1/generate";
+import { Route as ArtifactsArtifactIdEditRouteImport } from "./routes/artifacts_/$artifactId/edit";
+import { Route as DiagramsDiagramIdEditRouteImport } from "./routes/diagrams_/$diagramId/edit";
 import { Route as ApiStudioDiagramsDiagramIdRouteImport } from "./routes/api/studio/diagrams/$diagramId";
+import { Route as ApiStudioProjectsFromArtifactRouteImport } from "./routes/api/studio/projects/from-artifact";
+import { Route as ApiStudioProjectsProjectIdRouteImport } from "./routes/api/studio/projects_/$projectId";
+import { Route as ApiV1ArtifactsArtifactIdRouteImport } from "./routes/api/v1/artifacts/$artifactId";
+import { Route as ApiV1CanvasesCreateRouteImport } from "./routes/api/v1/canvases/create";
+import { Route as ApiV1FlowchartsBuildRouteImport } from "./routes/api/v1/flowcharts/build";
+import { Route as ApiV1MindmapsBuildRouteImport } from "./routes/api/v1/mindmaps/build";
+import { Route as ApiV1SequencesBuildRouteImport } from "./routes/api/v1/sequences/build";
 import { Route as ApiV1ArtifactsArtifactIdPatchRouteImport } from "./routes/api/v1/artifacts/$artifactId/patch";
 
-const ProjectsRoute = ProjectsRouteImport.update({
-  id: "/projects",
-  path: "/projects",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const McpRoute = McpRouteImport.update({
-  id: "/mcp",
-  path: "/mcp",
+const IndexRoute = IndexRouteImport.update({
+  id: "/",
+  path: "/",
   getParentRoute: () => rootRouteImport,
 } as any);
 const CodemodeExportHarnessRoute = CodemodeExportHarnessRouteImport.update({
@@ -47,29 +42,14 @@ const CodemodeExportHarnessRoute = CodemodeExportHarnessRouteImport.update({
   path: "/codemode-export-harness",
   getParentRoute: () => rootRouteImport,
 } as any);
-const IndexRoute = IndexRouteImport.update({
-  id: "/",
-  path: "/",
+const McpRoute = McpRouteImport.update({
+  id: "/mcp",
+  path: "/mcp",
   getParentRoute: () => rootRouteImport,
 } as any);
-const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
-  id: "/projects_/$projectId",
-  path: "/projects/$projectId",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ExamplesExampleIdRoute = ExamplesExampleIdRouteImport.update({
-  id: "/examples/$exampleId",
-  path: "/examples/$exampleId",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const DiagramsDiagramIdRoute = DiagramsDiagramIdRouteImport.update({
-  id: "/diagrams/$diagramId",
-  path: "/diagrams/$diagramId",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ArtifactsArtifactIdRoute = ArtifactsArtifactIdRouteImport.update({
-  id: "/artifacts/$artifactId",
-  path: "/artifacts/$artifactId",
+const ProjectsRoute = ProjectsRouteImport.update({
+  id: "/projects",
+  path: "/projects",
   getParentRoute: () => rootRouteImport,
 } as any);
 const ApiChatRoute = ApiChatRouteImport.update({
@@ -77,19 +57,24 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: "/api/chat",
   getParentRoute: () => rootRouteImport,
 } as any);
-const DiagramsDiagramIdEditRoute = DiagramsDiagramIdEditRouteImport.update({
-  id: "/diagrams_/$diagramId/edit",
-  path: "/diagrams/$diagramId/edit",
+const ArtifactsArtifactIdRoute = ArtifactsArtifactIdRouteImport.update({
+  id: "/artifacts/$artifactId",
+  path: "/artifacts/$artifactId",
   getParentRoute: () => rootRouteImport,
 } as any);
-const ArtifactsArtifactIdEditRoute = ArtifactsArtifactIdEditRouteImport.update({
-  id: "/artifacts_/$artifactId/edit",
-  path: "/artifacts/$artifactId/edit",
+const DiagramsDiagramIdRoute = DiagramsDiagramIdRouteImport.update({
+  id: "/diagrams/$diagramId",
+  path: "/diagrams/$diagramId",
   getParentRoute: () => rootRouteImport,
 } as any);
-const ApiV1GenerateRoute = ApiV1GenerateRouteImport.update({
-  id: "/api/v1/generate",
-  path: "/api/v1/generate",
+const ExamplesExampleIdRoute = ExamplesExampleIdRouteImport.update({
+  id: "/examples/$exampleId",
+  path: "/examples/$exampleId",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
+  id: "/projects_/$projectId",
+  path: "/projects/$projectId",
   getParentRoute: () => rootRouteImport,
 } as any);
 const ApiStudioProjectsRoute = ApiStudioProjectsRouteImport.update({
@@ -97,36 +82,25 @@ const ApiStudioProjectsRoute = ApiStudioProjectsRouteImport.update({
   path: "/api/studio/projects",
   getParentRoute: () => rootRouteImport,
 } as any);
-const ApiV1SequencesBuildRoute = ApiV1SequencesBuildRouteImport.update({
-  id: "/api/v1/sequences/build",
-  path: "/api/v1/sequences/build",
+const ApiV1GenerateRoute = ApiV1GenerateRouteImport.update({
+  id: "/api/v1/generate",
+  path: "/api/v1/generate",
   getParentRoute: () => rootRouteImport,
 } as any);
-const ApiV1MindmapsBuildRoute = ApiV1MindmapsBuildRouteImport.update({
-  id: "/api/v1/mindmaps/build",
-  path: "/api/v1/mindmaps/build",
+const ArtifactsArtifactIdEditRoute = ArtifactsArtifactIdEditRouteImport.update({
+  id: "/artifacts_/$artifactId/edit",
+  path: "/artifacts/$artifactId/edit",
   getParentRoute: () => rootRouteImport,
 } as any);
-const ApiV1FlowchartsBuildRoute = ApiV1FlowchartsBuildRouteImport.update({
-  id: "/api/v1/flowcharts/build",
-  path: "/api/v1/flowcharts/build",
+const DiagramsDiagramIdEditRoute = DiagramsDiagramIdEditRouteImport.update({
+  id: "/diagrams_/$diagramId/edit",
+  path: "/diagrams/$diagramId/edit",
   getParentRoute: () => rootRouteImport,
 } as any);
-const ApiV1CanvasesCreateRoute = ApiV1CanvasesCreateRouteImport.update({
-  id: "/api/v1/canvases/create",
-  path: "/api/v1/canvases/create",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ApiV1ArtifactsArtifactIdRoute =
-  ApiV1ArtifactsArtifactIdRouteImport.update({
-    id: "/api/v1/artifacts/$artifactId",
-    path: "/api/v1/artifacts/$artifactId",
-    getParentRoute: () => rootRouteImport,
-  } as any);
-const ApiStudioProjectsProjectIdRoute =
-  ApiStudioProjectsProjectIdRouteImport.update({
-    id: "/api/studio/projects_/$projectId",
-    path: "/api/studio/projects/$projectId",
+const ApiStudioDiagramsDiagramIdRoute =
+  ApiStudioDiagramsDiagramIdRouteImport.update({
+    id: "/api/studio/diagrams/$diagramId",
+    path: "/api/studio/diagrams/$diagramId",
     getParentRoute: () => rootRouteImport,
   } as any);
 const ApiStudioProjectsFromArtifactRoute =
@@ -135,12 +109,38 @@ const ApiStudioProjectsFromArtifactRoute =
     path: "/from-artifact",
     getParentRoute: () => ApiStudioProjectsRoute,
   } as any);
-const ApiStudioDiagramsDiagramIdRoute =
-  ApiStudioDiagramsDiagramIdRouteImport.update({
-    id: "/api/studio/diagrams/$diagramId",
-    path: "/api/studio/diagrams/$diagramId",
+const ApiStudioProjectsProjectIdRoute =
+  ApiStudioProjectsProjectIdRouteImport.update({
+    id: "/api/studio/projects_/$projectId",
+    path: "/api/studio/projects/$projectId",
     getParentRoute: () => rootRouteImport,
   } as any);
+const ApiV1ArtifactsArtifactIdRoute =
+  ApiV1ArtifactsArtifactIdRouteImport.update({
+    id: "/api/v1/artifacts/$artifactId",
+    path: "/api/v1/artifacts/$artifactId",
+    getParentRoute: () => rootRouteImport,
+  } as any);
+const ApiV1CanvasesCreateRoute = ApiV1CanvasesCreateRouteImport.update({
+  id: "/api/v1/canvases/create",
+  path: "/api/v1/canvases/create",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ApiV1FlowchartsBuildRoute = ApiV1FlowchartsBuildRouteImport.update({
+  id: "/api/v1/flowcharts/build",
+  path: "/api/v1/flowcharts/build",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ApiV1MindmapsBuildRoute = ApiV1MindmapsBuildRouteImport.update({
+  id: "/api/v1/mindmaps/build",
+  path: "/api/v1/mindmaps/build",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ApiV1SequencesBuildRoute = ApiV1SequencesBuildRouteImport.update({
+  id: "/api/v1/sequences/build",
+  path: "/api/v1/sequences/build",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ApiV1ArtifactsArtifactIdPatchRoute =
   ApiV1ArtifactsArtifactIdPatchRouteImport.update({
     id: "/patch",
@@ -321,18 +321,11 @@ export interface RootRouteChildren {
 
 declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
-    "/projects": {
-      id: "/projects";
-      path: "/projects";
-      fullPath: "/projects";
-      preLoaderRoute: typeof ProjectsRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/mcp": {
-      id: "/mcp";
-      path: "/mcp";
-      fullPath: "/mcp";
-      preLoaderRoute: typeof McpRouteImport;
+    "/": {
+      id: "/";
+      path: "/";
+      fullPath: "/";
+      preLoaderRoute: typeof IndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/codemode-export-harness": {
@@ -342,39 +335,18 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof CodemodeExportHarnessRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/": {
-      id: "/";
-      path: "/";
-      fullPath: "/";
-      preLoaderRoute: typeof IndexRouteImport;
+    "/mcp": {
+      id: "/mcp";
+      path: "/mcp";
+      fullPath: "/mcp";
+      preLoaderRoute: typeof McpRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/projects_/$projectId": {
-      id: "/projects_/$projectId";
-      path: "/projects/$projectId";
-      fullPath: "/projects/$projectId";
-      preLoaderRoute: typeof ProjectsProjectIdRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/examples/$exampleId": {
-      id: "/examples/$exampleId";
-      path: "/examples/$exampleId";
-      fullPath: "/examples/$exampleId";
-      preLoaderRoute: typeof ExamplesExampleIdRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/diagrams/$diagramId": {
-      id: "/diagrams/$diagramId";
-      path: "/diagrams/$diagramId";
-      fullPath: "/diagrams/$diagramId";
-      preLoaderRoute: typeof DiagramsDiagramIdRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/artifacts/$artifactId": {
-      id: "/artifacts/$artifactId";
-      path: "/artifacts/$artifactId";
-      fullPath: "/artifacts/$artifactId";
-      preLoaderRoute: typeof ArtifactsArtifactIdRouteImport;
+    "/projects": {
+      id: "/projects";
+      path: "/projects";
+      fullPath: "/projects";
+      preLoaderRoute: typeof ProjectsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/api/chat": {
@@ -384,25 +356,32 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiChatRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/diagrams_/$diagramId/edit": {
-      id: "/diagrams_/$diagramId/edit";
-      path: "/diagrams/$diagramId/edit";
-      fullPath: "/diagrams/$diagramId/edit";
-      preLoaderRoute: typeof DiagramsDiagramIdEditRouteImport;
+    "/artifacts/$artifactId": {
+      id: "/artifacts/$artifactId";
+      path: "/artifacts/$artifactId";
+      fullPath: "/artifacts/$artifactId";
+      preLoaderRoute: typeof ArtifactsArtifactIdRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/artifacts_/$artifactId/edit": {
-      id: "/artifacts_/$artifactId/edit";
-      path: "/artifacts/$artifactId/edit";
-      fullPath: "/artifacts/$artifactId/edit";
-      preLoaderRoute: typeof ArtifactsArtifactIdEditRouteImport;
+    "/diagrams/$diagramId": {
+      id: "/diagrams/$diagramId";
+      path: "/diagrams/$diagramId";
+      fullPath: "/diagrams/$diagramId";
+      preLoaderRoute: typeof DiagramsDiagramIdRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/api/v1/generate": {
-      id: "/api/v1/generate";
-      path: "/api/v1/generate";
-      fullPath: "/api/v1/generate";
-      preLoaderRoute: typeof ApiV1GenerateRouteImport;
+    "/examples/$exampleId": {
+      id: "/examples/$exampleId";
+      path: "/examples/$exampleId";
+      fullPath: "/examples/$exampleId";
+      preLoaderRoute: typeof ExamplesExampleIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/projects_/$projectId": {
+      id: "/projects_/$projectId";
+      path: "/projects/$projectId";
+      fullPath: "/projects/$projectId";
+      preLoaderRoute: typeof ProjectsProjectIdRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/api/studio/projects": {
@@ -412,46 +391,32 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiStudioProjectsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/api/v1/sequences/build": {
-      id: "/api/v1/sequences/build";
-      path: "/api/v1/sequences/build";
-      fullPath: "/api/v1/sequences/build";
-      preLoaderRoute: typeof ApiV1SequencesBuildRouteImport;
+    "/api/v1/generate": {
+      id: "/api/v1/generate";
+      path: "/api/v1/generate";
+      fullPath: "/api/v1/generate";
+      preLoaderRoute: typeof ApiV1GenerateRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/api/v1/mindmaps/build": {
-      id: "/api/v1/mindmaps/build";
-      path: "/api/v1/mindmaps/build";
-      fullPath: "/api/v1/mindmaps/build";
-      preLoaderRoute: typeof ApiV1MindmapsBuildRouteImport;
+    "/artifacts_/$artifactId/edit": {
+      id: "/artifacts_/$artifactId/edit";
+      path: "/artifacts/$artifactId/edit";
+      fullPath: "/artifacts/$artifactId/edit";
+      preLoaderRoute: typeof ArtifactsArtifactIdEditRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/api/v1/flowcharts/build": {
-      id: "/api/v1/flowcharts/build";
-      path: "/api/v1/flowcharts/build";
-      fullPath: "/api/v1/flowcharts/build";
-      preLoaderRoute: typeof ApiV1FlowchartsBuildRouteImport;
+    "/diagrams_/$diagramId/edit": {
+      id: "/diagrams_/$diagramId/edit";
+      path: "/diagrams/$diagramId/edit";
+      fullPath: "/diagrams/$diagramId/edit";
+      preLoaderRoute: typeof DiagramsDiagramIdEditRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/api/v1/canvases/create": {
-      id: "/api/v1/canvases/create";
-      path: "/api/v1/canvases/create";
-      fullPath: "/api/v1/canvases/create";
-      preLoaderRoute: typeof ApiV1CanvasesCreateRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/artifacts/$artifactId": {
-      id: "/api/v1/artifacts/$artifactId";
-      path: "/api/v1/artifacts/$artifactId";
-      fullPath: "/api/v1/artifacts/$artifactId";
-      preLoaderRoute: typeof ApiV1ArtifactsArtifactIdRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/studio/projects_/$projectId": {
-      id: "/api/studio/projects_/$projectId";
-      path: "/api/studio/projects/$projectId";
-      fullPath: "/api/studio/projects/$projectId";
-      preLoaderRoute: typeof ApiStudioProjectsProjectIdRouteImport;
+    "/api/studio/diagrams/$diagramId": {
+      id: "/api/studio/diagrams/$diagramId";
+      path: "/api/studio/diagrams/$diagramId";
+      fullPath: "/api/studio/diagrams/$diagramId";
+      preLoaderRoute: typeof ApiStudioDiagramsDiagramIdRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/api/studio/projects/from-artifact": {
@@ -461,11 +426,46 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiStudioProjectsFromArtifactRouteImport;
       parentRoute: typeof ApiStudioProjectsRoute;
     };
-    "/api/studio/diagrams/$diagramId": {
-      id: "/api/studio/diagrams/$diagramId";
-      path: "/api/studio/diagrams/$diagramId";
-      fullPath: "/api/studio/diagrams/$diagramId";
-      preLoaderRoute: typeof ApiStudioDiagramsDiagramIdRouteImport;
+    "/api/studio/projects_/$projectId": {
+      id: "/api/studio/projects_/$projectId";
+      path: "/api/studio/projects/$projectId";
+      fullPath: "/api/studio/projects/$projectId";
+      preLoaderRoute: typeof ApiStudioProjectsProjectIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/api/v1/artifacts/$artifactId": {
+      id: "/api/v1/artifacts/$artifactId";
+      path: "/api/v1/artifacts/$artifactId";
+      fullPath: "/api/v1/artifacts/$artifactId";
+      preLoaderRoute: typeof ApiV1ArtifactsArtifactIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/api/v1/canvases/create": {
+      id: "/api/v1/canvases/create";
+      path: "/api/v1/canvases/create";
+      fullPath: "/api/v1/canvases/create";
+      preLoaderRoute: typeof ApiV1CanvasesCreateRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/api/v1/flowcharts/build": {
+      id: "/api/v1/flowcharts/build";
+      path: "/api/v1/flowcharts/build";
+      fullPath: "/api/v1/flowcharts/build";
+      preLoaderRoute: typeof ApiV1FlowchartsBuildRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/api/v1/mindmaps/build": {
+      id: "/api/v1/mindmaps/build";
+      path: "/api/v1/mindmaps/build";
+      fullPath: "/api/v1/mindmaps/build";
+      preLoaderRoute: typeof ApiV1MindmapsBuildRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/api/v1/sequences/build": {
+      id: "/api/v1/sequences/build";
+      path: "/api/v1/sequences/build";
+      fullPath: "/api/v1/sequences/build";
+      preLoaderRoute: typeof ApiV1SequencesBuildRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/api/v1/artifacts/$artifactId/patch": {
