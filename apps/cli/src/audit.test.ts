@@ -21,16 +21,13 @@ async function sourceFiles(directory: string): Promise<ReadonlyArray<string>> {
 }
 
 describe("CLI dependency and public-surface audit", () => {
-  it("pins the exact Effect v4 beta dependencies without alternate CLI frameworks", async () => {
+  it("pins the exact stable Effect v4 dependencies without alternate CLI frameworks", async () => {
     const manifest = JSON.parse(
       await readFile(join(workspaceRoot, "apps/cli/package.json"), "utf8"),
     );
 
-    assert.strictEqual(manifest.dependencies.effect, "4.0.0-beta.99");
-    assert.strictEqual(
-      manifest.dependencies["@effect/platform-node"],
-      "4.0.0-beta.99",
-    );
+    assert.strictEqual(manifest.dependencies.effect, "4.0.1");
+    assert.strictEqual(manifest.dependencies["@effect/platform-node"], "4.0.1");
     assert.strictEqual(
       manifest.dependencies["@sketchi/diagram-agent"],
       "workspace:*",
@@ -45,18 +42,18 @@ describe("CLI dependency and public-surface audit", () => {
     assert.deepStrictEqual(Object.keys(manifest.bin), ["sketchi"]);
   });
 
-  it("isolates the sole unstable CLI import behind the internal adapter", async () => {
+  it("isolates the stable Effect CLI import behind the internal adapter", async () => {
     const files = await sourceFiles(join(workspaceRoot, "apps/cli/src"));
     const directImports: string[] = [];
     for (const file of files) {
       const text = await readFile(file, "utf8");
-      if (/from\s+["']effect\/unstable\/cli["']/u.test(text))
-        directImports.push(file);
+      assert.notMatch(text, /from\s+["']effect\/unstable\/cli["']/u);
+      if (/from\s+["']effect\/cli["']/u.test(text)) directImports.push(file);
     }
 
     assert.deepStrictEqual(
       directImports.map((file) => file.slice(workspaceRoot.length + 1)),
-      ["apps/cli/src/internal/effect-unstable-cli.ts"],
+      ["apps/cli/src/internal/effect-cli.ts"],
     );
   });
 

@@ -38,28 +38,28 @@
       }
     },
     "test": {
-      "executor": "@nx/vitest:test",
-      "outputs": ["{options.reportsDirectory}"],
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/coverage/tools/sketchi-generators"],
       "options": {
-        "reportsDirectory": "coverage/tools/sketchi-generators"
+        "command": "vitest run --config tools/sketchi-generators/vitest.config.mts"
       }
     },
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {
         "commands": [
-          "tsc -p tools/sketchi-generators/tsconfig.lib.json --noEmit",
-          "tsc -p tools/sketchi-generators/tsconfig.spec.json --noEmit"
+          "tsc6 -p tools/sketchi-generators/tsconfig.lib.json --noEmit",
+          "tsc6 -p tools/sketchi-generators/tsconfig.spec.json --noEmit"
         ],
         "parallel": false
       }
     },
-    "typecheck-tsgo": {
+    "typecheck-native": {
       "executor": "nx:run-commands",
       "options": {
         "commands": [
-          "tsgo -p tools/sketchi-generators/tsconfig.lib.json --noEmit",
-          "tsgo -p tools/sketchi-generators/tsconfig.spec.json --noEmit"
+          "tsc -p tools/sketchi-generators/tsconfig.lib.json --noEmit",
+          "tsc -p tools/sketchi-generators/tsconfig.spec.json --noEmit"
         ],
         "parallel": false
       }

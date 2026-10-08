@@ -16,10 +16,7 @@ import {
 } from "ai";
 import { Effect, Schema } from "effect";
 
-import {
-  PlaygroundAiModel,
-  StudioAiModelError,
-} from "../ai/model.server";
+import { PlaygroundAiModel, StudioAiModelError } from "../ai/model.server";
 import { PlaygroundCodeMode } from "../codemode/service.server";
 import {
   type PlaygroundCallbackEffect,
@@ -35,7 +32,7 @@ import {
   type StudioBuildFlowchartInput,
 } from "./studio-flowchart-tool.server";
 
-export class StudioAgentRequestError extends Schema.TaggedErrorClass<StudioAgentRequestError>()(
+export class StudioAgentRequestError extends Schema.TaggedError<StudioAgentRequestError>()(
   "StudioAgentRequestError",
   {
     cause: Schema.Defect(),

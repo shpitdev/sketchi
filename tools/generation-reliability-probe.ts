@@ -45,7 +45,7 @@ interface ProbeRunResult extends StructuralFidelityResult {
   readonly statusCode: number;
 }
 
-export class GenerationProbeRequestError extends Schema.TaggedErrorClass<GenerationProbeRequestError>()(
+export class GenerationProbeRequestError extends Schema.TaggedError<GenerationProbeRequestError>()(
   "GenerationProbeRequestError",
   {
     cause: Schema.Defect(),

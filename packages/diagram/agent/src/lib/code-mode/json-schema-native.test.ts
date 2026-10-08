@@ -6,10 +6,11 @@ const annotationKeys = new Set(["const", "minItems", "minLength"]);
 function jsonSchema(schema: Schema.Constraint) {
   return Schema.toJsonSchemaDocument(Schema.toType(schema), {
     includeAnnotationKey: (key) => annotationKeys.has(key),
+    onExcessProperty: "error",
   }).schema;
 }
 
-describe("Effect beta.99 native JSON Schema primitives", () => {
+describe("Effect 4 stable native JSON Schema primitives", () => {
   it("uses exact property optionality without a null schema", () => {
     const schema = Schema.Struct({ value: Schema.optionalKey(Schema.String) });
 
@@ -21,14 +22,12 @@ describe("Effect beta.99 native JSON Schema primitives", () => {
     expect(Schema.decodeUnknownSync(schema)({})).toEqual({});
     expect(() =>
       Schema.decodeUnknownSync(schema)({ value: undefined }),
-    ).toThrow("Expected string, got undefined");
+    ).toThrow('Expected string\n  at ["value"]');
   });
 
   it("emits parameterized string and literal constraints without allOf", () => {
     const minimumLength = 1;
-    const nonEmpty = Schema.String.annotate({
-      minLength: minimumLength,
-    }).check(Schema.makeFilter((value) => value.length >= minimumLength));
+    const nonEmpty = Schema.String.check(Schema.isMinLength(minimumLength));
     const literalValue = "node";
     const literal = Schema.Literal(literalValue).pipe(
       Schema.decodeTo(
@@ -56,9 +55,9 @@ describe("Effect beta.99 native JSON Schema primitives", () => {
 
   it("emits array and default annotations structurally", () => {
     const minimumItems = 1;
-    const array = Schema.Array(Schema.String)
-      .annotate({ minItems: minimumItems })
-      .check(Schema.makeFilter((value) => value.length >= minimumItems));
+    const array = Schema.Array(Schema.String).check(
+      Schema.isMinLength(minimumItems),
+    );
     const defaultValue = "x";
     const defaulted = Schema.String.annotate({
       default: defaultValue,
@@ -75,7 +74,7 @@ describe("Effect beta.99 native JSON Schema primitives", () => {
     });
   });
 
-  it("records default-key input behavior for both beta.99 helpers", () => {
+  it("records default-key input behavior for both stable helpers", () => {
     const defaultValue = "x";
     const defaultKey = Schema.Struct({
       value: Schema.String.annotate({ default: defaultValue }).pipe(
@@ -92,7 +91,7 @@ describe("Effect beta.99 native JSON Schema primitives", () => {
     expect(Schema.decodeUnknownSync(defaultKey)({})).toEqual({ value: "x" });
     expect(() =>
       Schema.decodeUnknownSync(defaultKey)({ value: undefined }),
-    ).toThrow("Expected string, got undefined");
+    ).toThrow('Expected string\n  at ["value"]');
     expect(
       Schema.decodeUnknownSync(defaultValueOrUndefined)({ value: undefined }),
     ).toEqual({ value: "x" });
@@ -113,7 +112,11 @@ describe("Effect beta.99 native JSON Schema primitives", () => {
     });
     const schema = Schema.Struct({ root: TopicReference });
 
-    expect(Schema.toJsonSchemaDocument(Schema.toType(schema))).toEqual({
+    expect(
+      Schema.toJsonSchemaDocument(Schema.toType(schema), {
+        onExcessProperty: "error",
+      }),
+    ).toEqual({
       dialect: "draft-2020-12",
       schema: {
         type: "object",

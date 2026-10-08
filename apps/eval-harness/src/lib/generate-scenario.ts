@@ -64,7 +64,7 @@ export class GenerateScenarioValidationIssue extends Schema.Class<GenerateScenar
   message: Schema.String,
 }) {}
 
-export class GenerateScenarioInputValidationError extends Schema.TaggedErrorClass<GenerateScenarioInputValidationError>()(
+export class GenerateScenarioInputValidationError extends Schema.TaggedError<GenerateScenarioInputValidationError>()(
   "GenerateScenarioInputValidationError",
   {
     cause: Schema.Defect(),
@@ -374,15 +374,14 @@ export function runGenerateScenarioCandidatesForInput(
 }
 
 export const generateScenarioCandidates = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     Schema.decodeUnknownSync(GenerateScenarioInputSchema, { errors: "all" })(
       input,
     ),
   )
   .handler(async ({ data }) => {
-    const { getEvalHarnessBindings } = await import(
-      "./cloudflare-bindings.server"
-    );
+    const { getEvalHarnessBindings } =
+      await import("./cloudflare-bindings.server");
 
     return runGenerateScenarioCandidatesForInput(
       data,

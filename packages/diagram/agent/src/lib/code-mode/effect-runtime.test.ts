@@ -11,7 +11,6 @@ import {
   type TelemetrySpanEvent,
 } from "@sketchi/observability";
 import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
-import { FastCheck } from "effect/testing";
 
 import { CodeModeArtifactStorageMemory } from "./artifacts";
 import {
@@ -30,6 +29,10 @@ import {
 
 const renderingStarted = Promise.withResolvers<void>();
 const patchOperationNames = new Set<string>(DIAGRAM_PATCH_OPERATION_NAMES);
+const UnsupportedPatchOperationSchema = Schema.String.check(
+  Schema.isBetweenLength(1, 40),
+  Schema.makeFilter((operation) => !patchOperationNames.has(operation)),
+);
 
 const runtimeLayer = Layer.mergeAll(
   CodeModeArtifactStorageMemory,
@@ -329,9 +332,7 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
   it.effect.prop(
     "keeps arbitrary unsupported patch operations on the canonical schema issue path",
     {
-      operation: FastCheck.string({ minLength: 1, maxLength: 40 }).filter(
-        (operation) => !patchOperationNames.has(operation),
-      ),
+      operation: UnsupportedPatchOperationSchema,
     },
     ({ operation }) =>
       Effect.gen(function* () {

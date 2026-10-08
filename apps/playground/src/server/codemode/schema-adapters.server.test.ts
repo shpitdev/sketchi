@@ -1,6 +1,5 @@
 import { assert, describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
-import { FastCheck } from "effect/testing";
+import { Effect, Schema } from "effect";
 
 import {
   ApplyDiagramPatchRequestSchema,
@@ -15,6 +14,16 @@ import {
   CodeModeHttpSchemas,
   decodeCodeModeHttpInput,
 } from "./http-schema.server";
+
+const SearchRequestInputSchema = Schema.Struct({
+  query: Schema.String.check(Schema.isPattern(/^[A-Za-z][A-Za-z ]{0,79}$/u)),
+  limit: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 20 })),
+});
+const GetArtifactInputSchema = Schema.Struct({
+  artifactId: Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{1,80}$/u)),
+  format: Schema.Literals(["scene", "excalidraw", "png"]),
+  inline: Schema.Boolean,
+});
 
 describe("Playground Effect schema adapters", () => {
   it("keeps every route input structurally equal to the frozen package authority", () => {
@@ -49,10 +58,7 @@ describe("Playground Effect schema adapters", () => {
   it.effect.prop(
     "accepts every generated MCP search request through Standard Schema",
     {
-      input: FastCheck.record({
-        query: FastCheck.stringMatching(/^[A-Za-z][A-Za-z ]{0,79}$/),
-        limit: FastCheck.integer({ min: 1, max: 20 }),
-      }),
+      input: SearchRequestInputSchema,
     },
     ({ input }) =>
       Effect.promise(async () => {
@@ -68,11 +74,7 @@ describe("Playground Effect schema adapters", () => {
   it.effect.prop(
     "preserves generated package inputs at the HTTP adapter",
     {
-      input: FastCheck.record({
-        artifactId: FastCheck.stringMatching(/^[A-Za-z0-9_-]{1,80}$/),
-        format: FastCheck.constantFrom("scene", "excalidraw", "png"),
-        inline: FastCheck.boolean(),
-      }),
+      input: GetArtifactInputSchema,
     },
     ({ input }) =>
       Effect.promise(async () => {

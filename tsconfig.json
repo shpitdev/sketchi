@@ -19,5 +19,8 @@
     { "path": "./apps/icons" },
     { "path": "./apps/playground" },
     { "path": "./apps/web" }
-  ]
+  ],
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0"
+  }
 }

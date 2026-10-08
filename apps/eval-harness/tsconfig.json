@@ -4,7 +4,8 @@
     "composite": true,
     "rootDir": "src",
     "tsBuildInfoFile": ".output/tsconfig.tsbuildinfo",
-    "types": ["node", "vite/client"]
+    "types": ["node", "vite/client"],
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.tsx"]
 }

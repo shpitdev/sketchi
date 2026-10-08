@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@tanstack/react-hotkeys": "0.10.0",
-    "fflate": "0.8.2"
+    "@tanstack/react-hotkeys": "0.13.0",
+    "fflate": "0.8.3"
   }
 }

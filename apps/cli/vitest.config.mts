@@ -1,5 +1,3 @@
-import { nxCopyAssetsPlugin } from "@nx/vite/plugins/nx-copy-assets.plugin";
-import { nxViteTsPaths } from "@nx/vite/plugins/nx-tsconfig-paths.plugin";
 import { readFileSync } from "node:fs";
 import { defineConfig } from "vitest/config";
 
@@ -18,9 +16,8 @@ const excalifontFiles = [
 ];
 
 export default defineConfig(() => ({
-  root: __dirname,
+  root: import.meta.dirname,
   cacheDir: "../../node_modules/.vite/apps/cli",
-  plugins: [nxViteTsPaths(), nxCopyAssetsPlugin(["*.md"])],
   resolve: {
     alias: {
       "@excalidraw/excalidraw": new URL(

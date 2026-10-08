@@ -168,7 +168,7 @@ export function assertAggregateMatches(responseBody, expectedValue) {
   }
 }
 
-export class R2CatalogSmokeError extends Schema.TaggedErrorClass()(
+export class R2CatalogSmokeError extends Schema.TaggedError()(
   "R2CatalogSmokeError",
   {
     cause: Schema.optionalKey(Schema.Defect()),

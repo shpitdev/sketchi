@@ -26,8 +26,7 @@ export interface ToolProcessOutput {
 }
 
 export interface ToolProcessResult
-  extends ToolProcessOutput,
-    ToolProcessTerminal {
+  extends ToolProcessOutput, ToolProcessTerminal {
   readonly durationMs: number;
   readonly timedOut: boolean;
 }
@@ -39,7 +38,7 @@ export interface ToolProcessPolicy {
   readonly timeoutMs: number;
 }
 
-export class ToolProcessPolicyError extends Schema.TaggedErrorClass<ToolProcessPolicyError>()(
+export class ToolProcessPolicyError extends Schema.TaggedError<ToolProcessPolicyError>()(
   "ToolProcessPolicyError",
   {
     field: Schema.String,
@@ -48,7 +47,7 @@ export class ToolProcessPolicyError extends Schema.TaggedErrorClass<ToolProcessP
   },
 ) {}
 
-export class ToolProcessSpawnError extends Schema.TaggedErrorClass<ToolProcessSpawnError>()(
+export class ToolProcessSpawnError extends Schema.TaggedError<ToolProcessSpawnError>()(
   "ToolProcessSpawnError",
   {
     cause: Schema.Defect(),
@@ -57,7 +56,7 @@ export class ToolProcessSpawnError extends Schema.TaggedErrorClass<ToolProcessSp
   },
 ) {}
 
-export class ToolProcessControlError extends Schema.TaggedErrorClass<ToolProcessControlError>()(
+export class ToolProcessControlError extends Schema.TaggedError<ToolProcessControlError>()(
   "ToolProcessControlError",
   {
     cause: Schema.Defect(),
@@ -67,7 +66,7 @@ export class ToolProcessControlError extends Schema.TaggedErrorClass<ToolProcess
   },
 ) {}
 
-export class ToolProcessExitError extends Schema.TaggedErrorClass<ToolProcessExitError>()(
+export class ToolProcessExitError extends Schema.TaggedError<ToolProcessExitError>()(
   "ToolProcessExitError",
   {
     command: Schema.String,
@@ -433,12 +432,10 @@ export const runToolProcess = Effect.fn("diagramScenarios.runToolProcess")(
         const process = yield* spawner.spawn(spec);
         const settled = yield* Effect.gen(function* () {
           const deadline = yield* process.awaitExit.pipe(
-            Effect.map(
-              (terminal): ProcessDeadline => ({
-                _tag: "Completed",
-                terminal,
-              }),
-            ),
+            Effect.map((terminal): ProcessDeadline => ({
+              _tag: "Completed",
+              terminal,
+            })),
             Effect.raceFirst(
               Effect.sleep(policy.timeoutMs).pipe(
                 Effect.as<ProcessDeadline>({ _tag: "TimedOut" }),

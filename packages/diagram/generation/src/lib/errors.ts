@@ -8,7 +8,7 @@ import type {
 } from "./candidates.js";
 import { DiagramGenerationProviderIdSchema } from "./candidates.js";
 
-export class DiagramGenerationConfigurationError extends Schema.TaggedErrorClass<DiagramGenerationConfigurationError>()(
+export class DiagramGenerationConfigurationError extends Schema.TaggedError<DiagramGenerationConfigurationError>()(
   "DiagramGenerationConfigurationError",
   {
     message: Schema.String,
@@ -16,7 +16,7 @@ export class DiagramGenerationConfigurationError extends Schema.TaggedErrorClass
   },
 ) {}
 
-export class DiagramGenerationInputError extends Schema.TaggedErrorClass<DiagramGenerationInputError>()(
+export class DiagramGenerationInputError extends Schema.TaggedError<DiagramGenerationInputError>()(
   "DiagramGenerationInputError",
   {
     cause: Schema.Defect(),
@@ -26,7 +26,7 @@ export class DiagramGenerationInputError extends Schema.TaggedErrorClass<Diagram
   },
 ) {}
 
-export class DiagramGenerationTransportError extends Schema.TaggedErrorClass<DiagramGenerationTransportError>()(
+export class DiagramGenerationTransportError extends Schema.TaggedError<DiagramGenerationTransportError>()(
   "DiagramGenerationTransportError",
   {
     cause: Schema.Defect(),
@@ -37,7 +37,7 @@ export class DiagramGenerationTransportError extends Schema.TaggedErrorClass<Dia
   },
 ) {}
 
-export class DiagramGenerationHttpError extends Schema.TaggedErrorClass<DiagramGenerationHttpError>()(
+export class DiagramGenerationHttpError extends Schema.TaggedError<DiagramGenerationHttpError>()(
   "DiagramGenerationHttpError",
   {
     diagnostics: Schema.Array(Schema.String),
@@ -49,7 +49,7 @@ export class DiagramGenerationHttpError extends Schema.TaggedErrorClass<DiagramG
   },
 ) {}
 
-export class DiagramGenerationResponseError extends Schema.TaggedErrorClass<DiagramGenerationResponseError>()(
+export class DiagramGenerationResponseError extends Schema.TaggedError<DiagramGenerationResponseError>()(
   "DiagramGenerationResponseError",
   {
     cause: Schema.Defect(),
@@ -58,7 +58,7 @@ export class DiagramGenerationResponseError extends Schema.TaggedErrorClass<Diag
   },
 ) {}
 
-export class DiagramGenerationTimeoutError extends Schema.TaggedErrorClass<DiagramGenerationTimeoutError>()(
+export class DiagramGenerationTimeoutError extends Schema.TaggedError<DiagramGenerationTimeoutError>()(
   "DiagramGenerationTimeoutError",
   {
     message: Schema.String,

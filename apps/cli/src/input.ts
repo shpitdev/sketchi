@@ -4,16 +4,13 @@ import { Stdio } from "effect/Stdio";
 import { parseJsonDocument } from "./document.js";
 import { CliInputError } from "./errors.js";
 import { LocalFileSystem } from "./filesystem.js";
-import type { InputSource } from "./internal/effect-unstable-cli.js";
+import type { InputSource } from "./internal/effect-cli.js";
 import { parseJsonPatchInput } from "./patch.js";
 
 export interface InputReadOptions {
   readonly maxBytes?: number;
   readonly content:
-    | "CanvasSpec document"
-    | "JSON document"
-    | "patch request"
-    | "share link";
+    "CanvasSpec document" | "JSON document" | "patch request" | "share link";
 }
 
 export class InputReader extends Context.Service<

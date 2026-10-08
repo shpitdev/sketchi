@@ -59,7 +59,7 @@ import {
   invalidFlagValue,
   missingRequiredFlag,
   runEffectCommand,
-} from "./internal/effect-unstable-cli.js";
+} from "./internal/effect-cli.js";
 import {
   InputReader,
   InputReaderLive,
@@ -201,7 +201,7 @@ Revision recovery and next steps:
 const HUMAN_HELP =
   "Turn one prompt into a validated PNG and editable local diagram.";
 
-const outputFlag = Flag.choice("output", ["text", "json"]).pipe(
+const outputFlag = Flag.Literals("output", ["text", "json"]).pipe(
   Flag.withDefault("text"),
   Flag.withDescription("Result presentation format."),
   Flag.withMetavar("text|json"),
@@ -456,7 +456,7 @@ const generateCommand = Command.make(
   "generate",
   {
     prompt: Flag.optional(
-      Flag.string("prompt").pipe(
+      Flag.String("prompt").pipe(
         Flag.withDescription(
           "Diagram request text sent directly without interactive prompts.",
         ),
@@ -464,7 +464,7 @@ const generateCommand = Command.make(
       ),
     ),
     type: Flag.optional(
-      Flag.choice("type", [
+      Flag.Literals("type", [
         "flowchart",
         "mindmap",
         "sequence",
@@ -479,14 +479,14 @@ const generateCommand = Command.make(
         Flag.withMetavar("TYPE"),
       ),
     ),
-    model: Flag.string("model").pipe(
+    model: Flag.String("model").pipe(
       Flag.withDefault(DEFAULT_GENERATION_MODEL),
       Flag.withDescription(
         `Server-routed generation model id; default ${DEFAULT_GENERATION_MODEL}.`,
       ),
       Flag.withMetavar("MODEL"),
     ),
-    endpoint: Flag.string("endpoint").pipe(
+    endpoint: Flag.String("endpoint").pipe(
       Flag.withDefault(resolveGenerateEndpoint()),
       Flag.withDescription(
         "Unauthenticated generate API URL; defaults to the production Sketchi endpoint.",
@@ -494,7 +494,7 @@ const generateCommand = Command.make(
       Flag.withMetavar("URL"),
     ),
     format: Flag.optional(
-      Flag.choice("format", ["png", "excalidraw", "scene"]).pipe(
+      Flag.Literals("format", ["png", "excalidraw", "scene"]).pipe(
         Flag.withDescription(
           "Artifact exported after generation; default png.",
         ),
@@ -502,7 +502,7 @@ const generateCommand = Command.make(
       ),
     ),
     destination: Flag.optional(
-      Flag.string("dest").pipe(
+      Flag.String("dest").pipe(
         Flag.withDescription(
           "Artifact destination; defaults from the generated id, or - for stdout.",
         ),
@@ -663,20 +663,20 @@ const canvasCommand = Command.make(
   "canvas",
   {
     ...exclusiveInputSourceFlags("CanvasSpec document"),
-    endpoint: Flag.string("endpoint").pipe(
+    endpoint: Flag.String("endpoint").pipe(
       Flag.withDefault(resolveCanvasEndpoint()),
       Flag.withDescription(
         "Unauthenticated create-canvas API URL; defaults to production.",
       ),
       Flag.withMetavar("URL"),
     ),
-    format: Flag.choice("format", ["png", "excalidraw", "scene"]).pipe(
+    format: Flag.Literals("format", ["png", "excalidraw", "scene"]).pipe(
       Flag.withDefault("png"),
       Flag.withDescription("Artifact exported after the canvas is created."),
       Flag.withMetavar("png|excalidraw|scene"),
     ),
     destination: Flag.optional(
-      Flag.string("dest").pipe(
+      Flag.String("dest").pipe(
         Flag.withDescription(
           "Artifact destination; defaults from diagramId, or - for stdout.",
         ),
@@ -778,7 +778,7 @@ const createCommand = Command.make(
 
 const showCommand = Command.make(
   "show",
-  { diagramId: Argument.string("diagram-id") },
+  { diagramId: Argument.String("diagram-id") },
   ({ diagramId }) =>
     Effect.gen(function* () {
       const { output } = yield* rootCommand;
@@ -804,7 +804,7 @@ const showCommand = Command.make(
 const editCommand = Command.make(
   "edit",
   {
-    diagramId: Argument.string("diagram-id"),
+    diagramId: Argument.String("diagram-id"),
     ...exclusiveInputSourceFlags(),
   },
   ({ diagramId, source }) =>
@@ -849,7 +849,7 @@ const editCommand = Command.make(
 const patchCommand = Command.make(
   "patch",
   {
-    diagramId: Argument.string("diagram-id"),
+    diagramId: Argument.String("diagram-id"),
     ...exclusiveInputSourceFlags("patch request"),
   },
   ({ diagramId, source }) =>
@@ -924,8 +924,8 @@ interface ShareResult {
 const shareCommand = Command.make(
   "share",
   {
-    diagramId: Argument.string("diagram-id"),
-    open: Flag.boolean("open").pipe(
+    diagramId: Argument.String("diagram-id"),
+    open: Flag.Boolean("open").pipe(
       Flag.withDescription(
         "Hand the bearer link to the default OS browser opener.",
       ),
@@ -994,7 +994,7 @@ const shareCommand = Command.make(
 const pullCommand = Command.make(
   "pull",
   {
-    diagramId: Argument.string("diagram-id"),
+    diagramId: Argument.String("diagram-id"),
     link: exactlyOnceStringFlag(
       "link",
       "URL|-",
@@ -1041,8 +1041,8 @@ const pullCommand = Command.make(
 const restoreCommand = Command.make(
   "restore",
   {
-    diagramId: Argument.string("diagram-id"),
-    revision: Flag.integer("revision").pipe(
+    diagramId: Argument.String("diagram-id"),
+    revision: Flag.Int("revision").pipe(
       Flag.filter(
         (revision) => revision > 0,
         (revision) => `Expected a positive revision, got ${String(revision)}`,
@@ -1141,12 +1141,12 @@ function displayHint(result: ExportResult): string | undefined {
 const exportCommand = Command.make(
   "export",
   {
-    diagramId: Argument.string("diagram-id"),
-    format: Flag.choice("format", ["scene", "excalidraw", "png"]).pipe(
+    diagramId: Argument.String("diagram-id"),
+    format: Flag.Literals("format", ["scene", "excalidraw", "png"]).pipe(
       Flag.withDescription("Artifact format to export or render on demand."),
       Flag.withMetavar("scene|excalidraw|png"),
     ),
-    destination: Flag.string("dest").pipe(
+    destination: Flag.String("dest").pipe(
       Flag.withDescription("Artifact byte destination path, or - for stdout."),
       Flag.withMetavar("PATH|-"),
     ),

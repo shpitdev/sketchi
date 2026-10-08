@@ -7,7 +7,7 @@ import {
 } from "@sketchi/diagram-generation";
 import { Effect, Schema } from "effect";
 
-class LiveGeneratorError extends Schema.TaggedErrorClass<LiveGeneratorError>()(
+class LiveGeneratorError extends Schema.TaggedError<LiveGeneratorError>()(
   "LiveGeneratorError",
   {
     cause: Schema.optionalKey(Schema.Defect()),

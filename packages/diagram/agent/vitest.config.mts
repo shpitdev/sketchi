@@ -1,11 +1,8 @@
 import { defineConfig } from "vitest/config";
-import { nxViteTsPaths } from "@nx/vite/plugins/nx-tsconfig-paths.plugin";
-import { nxCopyAssetsPlugin } from "@nx/vite/plugins/nx-copy-assets.plugin";
 
 export default defineConfig(() => ({
-  root: __dirname,
+  root: import.meta.dirname,
   cacheDir: "../../../node_modules/.vite/packages/diagram/agent",
-  plugins: [nxViteTsPaths(), nxCopyAssetsPlugin(["*.md"])],
   resolve: {
     alias: {
       "@sketchi/diagram-core": new URL("../core/src/index.ts", import.meta.url)
@@ -16,6 +13,10 @@ export default defineConfig(() => ({
       ).pathname,
       "@sketchi/diagram-renderer": new URL(
         "../renderer/src/index.ts",
+        import.meta.url,
+      ).pathname,
+      "@sketchi/observability": new URL(
+        "../../observability/src/index.ts",
         import.meta.url,
       ).pathname,
     },

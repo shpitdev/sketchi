@@ -1,8 +1,10 @@
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
+const executablePath = process.env["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"];
+
 export default defineConfig({
-  root: __dirname,
+  root: import.meta.dirname,
   cacheDir: "../../node_modules/.vite/packages/svg-excalidraw-browser",
   test: {
     name: "svg-excalidraw-browser",
@@ -12,7 +14,11 @@ export default defineConfig({
     browser: {
       enabled: true,
       headless: true,
-      provider: playwright(),
+      provider: playwright({
+        ...(executablePath === undefined
+          ? {}
+          : { launchOptions: { executablePath } }),
+      }),
       instances: [{ browser: "chromium" }],
     },
   },

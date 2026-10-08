@@ -1,0 +1,8 @@
+# Exact project tools; native pnpm is selected directly without Corepack.
+[tools]
+node = "26.10.0"
+"aqua:pnpm/pnpm" = "12.10.1"
+
+[settings]
+# Keep the selected tools ahead of inherited global launchers.
+activate_aggressive = true

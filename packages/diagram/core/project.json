@@ -9,7 +9,7 @@
       "executor": "nx:run-commands",
       "outputs": ["{projectRoot}/dist"],
       "options": {
-        "command": "tsc -p packages/diagram/core/tsconfig.lib.json"
+        "command": "tsc6 -p packages/diagram/core/tsconfig.lib.json"
       }
     },
     "test": {
@@ -22,13 +22,13 @@
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsc -p packages/diagram/core/tsconfig.json --noEmit"
+        "command": "tsc6 -p packages/diagram/core/tsconfig.json --noEmit"
       }
     },
-    "typecheck-tsgo": {
+    "typecheck-native": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsgo -p packages/diagram/core/tsconfig.json --noEmit"
+        "command": "tsc -p packages/diagram/core/tsconfig.json --noEmit"
       }
     }
   }

@@ -67,7 +67,7 @@ const BrowserRenderingOperationSchema = Schema.Literals([
   "waitForHarness",
 ]);
 
-export class BrowserRenderingFailure extends Schema.TaggedErrorClass<BrowserRenderingFailure>()(
+export class BrowserRenderingFailure extends Schema.TaggedError<BrowserRenderingFailure>()(
   "BrowserRenderingFailure",
   {
     cause: Schema.Defect(),
@@ -76,7 +76,7 @@ export class BrowserRenderingFailure extends Schema.TaggedErrorClass<BrowserRend
   },
 ) {}
 
-export class BrowserRenderingTimeout extends Schema.TaggedErrorClass<BrowserRenderingTimeout>()(
+export class BrowserRenderingTimeout extends Schema.TaggedError<BrowserRenderingTimeout>()(
   "BrowserRenderingTimeout",
   {
     durationMs: Schema.Number,
@@ -88,8 +88,7 @@ export interface CloudflareBrowserRunRendererOptions {
   assetOrigin?: string;
 }
 
-export interface CloudflareBrowserRunArtifactRenderer
-  extends CodeModeArtifactRenderer {
+export interface CloudflareBrowserRunArtifactRenderer extends CodeModeArtifactRenderer {
   readonly renderPng: (
     input: Parameters<CodeModeArtifactRenderer["renderPng"]>[0],
   ) => Effect.Effect<
@@ -116,12 +115,7 @@ export const PlaygroundBrowserRenderingLive = Layer.succeed(
 );
 
 type BrowserRenderingOperation =
-  | "base64"
-  | "evaluate"
-  | "goto"
-  | "launch"
-  | "newPage"
-  | "waitForHarness";
+  "base64" | "evaluate" | "goto" | "launch" | "newPage" | "waitForHarness";
 
 function browserFailure(operation: BrowserRenderingOperation) {
   return (cause: unknown) =>

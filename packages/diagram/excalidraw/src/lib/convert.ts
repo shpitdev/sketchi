@@ -420,8 +420,7 @@ function lineElement(input: {
       point.x - start.x,
       point.y - start.y,
     ]),
-    roundness:
-      input.element.points.length > 2 && !elbowed ? { type: 2 } : null,
+    roundness: input.element.points.length > 2 && !elbowed ? { type: 2 } : null,
     startArrowhead: input.element.startArrowhead ?? null,
     startBinding: bindingForLine(
       input.element.startBinding,
@@ -467,9 +466,7 @@ function arrowLabelElement(input: {
     index: input.index,
     containerId: input.arrow.id,
     fontSize: 13,
-    ...(input.arrow.locked === undefined
-      ? {}
-      : { locked: input.arrow.locked }),
+    ...(input.arrow.locked === undefined ? {} : { locked: input.arrow.locked }),
     maxWidth: ARROW_LABEL_WIDTH,
     ...(input.arrow.textColor ? { textColor: input.arrow.textColor } : {}),
     text: input.arrow.label,
@@ -572,11 +569,12 @@ function applyLayerSemantics(scene: RenderedDiagramScene): SceneElement[] {
 
   return visibleElements.map((element) => {
     const layer = element.layerId ? layersById.get(element.layerId) : undefined;
+    const visibleElement =
+      element.frameId && !visibleElementIds.has(element.frameId)
+        ? (({ frameId: _hiddenFrameId, ...rest }) => rest)(element)
+        : element;
     return {
-      ...element,
-      ...(element.frameId && !visibleElementIds.has(element.frameId)
-        ? { frameId: undefined }
-        : {}),
+      ...visibleElement,
       ...(layer?.locked === true ? { locked: true } : {}),
     };
   });

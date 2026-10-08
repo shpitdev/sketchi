@@ -59,22 +59,11 @@ jobs:
       group: app-production-${{ matrix.project }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         if: ${{ github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project }}
 
-      - uses: pnpm/action-setup@v5
+      - uses: ./.github/actions/setup-workspace
         if: ${{ github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project }}
-        with:
-          version: 11.5.0
-
-      - uses: actions/setup-node@v6
-        if: ${{ github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project }}
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - if: ${{ github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project }}
-        run: pnpm install --frozen-lockfile
 
       - if: ${{ github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project }}
         run: pnpm run test:deploy-scripts

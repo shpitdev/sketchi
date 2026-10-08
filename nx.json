@@ -40,7 +40,7 @@
       "inputs": ["default", "^production"],
       "dependsOn": ["^build"]
     },
-    "typecheck-tsgo": {
+    "typecheck-native": {
       "inputs": ["default", "^production"],
       "dependsOn": ["^build"]
     },
@@ -48,17 +48,15 @@
       "cache": true,
       "dependsOn": ["^build"],
       "inputs": ["production", "^production"]
-    },
-    "@nx/vitest:test": {
-      "cache": true,
-      "inputs": ["default", "^production"]
     }
   },
   "release": {
     "projects": ["sketchi-cli"],
-    "releaseTagPattern": "cli-v{version}",
     "changelog": {
       "workspaceChangelog": false
+    },
+    "releaseTag": {
+      "pattern": "cli-v{version}"
     }
   },
   "analytics": false

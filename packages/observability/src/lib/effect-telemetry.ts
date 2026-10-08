@@ -142,9 +142,7 @@ export interface TelemetryMetricEvent extends TelemetryEventBase {
 }
 
 export type TelemetryEvent =
-  | TelemetryLogEvent
-  | TelemetryMetricEvent
-  | TelemetrySpanEvent;
+  TelemetryLogEvent | TelemetryMetricEvent | TelemetrySpanEvent;
 
 export interface TelemetrySink {
   readonly shutdown: (resource: TelemetryResource) => void;
@@ -497,7 +495,8 @@ function makeTelemetryLogger(
 ) {
   return Logger.make(({ fiber, logLevel, message }) => {
     const safeMessage = safeLogMessage(message);
-    const currentSpan = fiber.currentSpan;
+    const parentSpan = Context.getOrUndefined(fiber.context, Tracer.ParentSpan);
+    const currentSpan = parentSpan?._tag === "Span" ? parentSpan : undefined;
     exporter.write({
       annotations: safeRecord(
         fiber.getRef(References.CurrentLogAnnotations),

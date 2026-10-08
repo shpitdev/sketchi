@@ -3,7 +3,8 @@ import { Schema } from "effect";
 const NonEmptyString = Schema.NonEmptyString;
 
 export const StudioRecordIdSchema = Schema.String.check(
-  Schema.isPattern(/^[a-z0-9_-]{6,80}$/i),
+  Schema.isBetweenLength(6, 80),
+  Schema.isPattern(/^[a-z0-9_-]{6,80}$/iu),
 ).pipe(Schema.brand("StudioRecordId"));
 export type StudioRecordId = typeof StudioRecordIdSchema.Type;
 

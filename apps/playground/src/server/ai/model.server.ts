@@ -14,7 +14,7 @@ const DEFAULT_GATEWAY_ID = "google-ai-studio";
 const DEFAULT_MODEL = "google/gemini-3.1-flash-lite";
 const SHIM_BASE_URL = "https://sketchi-gateway.invalid/v1beta";
 
-export class StudioAiModelError extends Schema.TaggedErrorClass<StudioAiModelError>()(
+export class StudioAiModelError extends Schema.TaggedError<StudioAiModelError>()(
   "StudioAiModelError",
   {
     cause: Schema.Defect(),

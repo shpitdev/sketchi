@@ -325,7 +325,7 @@ const CodeModeExecutionStageSchema = Schema.Literals([
   "input",
 ]);
 
-export class CodeModeExecutionError extends Schema.TaggedErrorClass<CodeModeExecutionError>()(
+export class CodeModeExecutionError extends Schema.TaggedError<CodeModeExecutionError>()(
   "CodeModeExecutionError",
   {
     cause: Schema.Defect(),
@@ -350,15 +350,14 @@ function createDefaultCodeModeExecutor() {
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const { DynamicWorkerExecutor } = (await import(
-          "@cloudflare/codemode"
-        )) as unknown as {
-          DynamicWorkerExecutor: new (options: {
-            loader: unknown;
-            timeout?: number;
-            globalOutbound?: unknown;
-          }) => SketchiCodeModeExecutor;
-        };
+        const { DynamicWorkerExecutor } =
+          (await import("@cloudflare/codemode")) as unknown as {
+            DynamicWorkerExecutor: new (options: {
+              loader: unknown;
+              timeout?: number;
+              globalOutbound?: unknown;
+            }) => SketchiCodeModeExecutor;
+          };
         return new DynamicWorkerExecutor({
           loader: env.LOADER,
           globalOutbound: null,
@@ -605,7 +604,7 @@ function createExecutionContext(
   };
 }
 
-export class McpTransportError extends Schema.TaggedErrorClass<McpTransportError>()(
+export class McpTransportError extends Schema.TaggedError<McpTransportError>()(
   "McpTransportError",
   {
     cause: Schema.Defect(),

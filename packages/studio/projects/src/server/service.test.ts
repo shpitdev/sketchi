@@ -5,7 +5,7 @@ import {
   type TelemetryMetricEvent,
   type TelemetrySpanEvent,
 } from "@sketchi/observability";
-import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
+import { Arbitrary, Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 
 import {
   AuthenticatedStudioOwner,
@@ -41,17 +41,47 @@ const owner = AuthenticatedStudioOwner.make({
   subjectId: "user_effect_tests",
 });
 
+const StudioRecordIdArbitrary = Arbitrary.array(
+  Arbitrary.schema(
+    Schema.Literals([
+      ..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-",
+      "K",
+      "ſ",
+    ]),
+  ),
+  { minLength: 6, maxLength: 80 },
+).pipe(Arbitrary.map((characters) => makeStudioRecordId(characters.join(""))));
+
+const roundTripStudioRecordId = (id: typeof StudioRecordIdSchema.Type) =>
+  Effect.gen(function* () {
+    const encoded = yield* Schema.encodeEffect(StudioRecordIdSchema)(id);
+    const decoded =
+      yield* Schema.decodeUnknownEffect(StudioRecordIdSchema)(encoded);
+    assert.strictEqual(decoded, id);
+  });
+
 describe("Studio schema contracts", () => {
   it.effect.prop(
     "round-trips arbitrary branded record identifiers",
-    { id: StudioRecordIdSchema },
-    ({ id }) =>
-      Effect.gen(function* () {
-        const encoded = yield* Schema.encodeEffect(StudioRecordIdSchema)(id);
-        const decoded =
-          yield* Schema.decodeUnknownEffect(StudioRecordIdSchema)(encoded);
-        assert.strictEqual(decoded, id);
-      }),
+    { id: StudioRecordIdArbitrary },
+    ({ id }) => roundTripStudioRecordId(id),
+  );
+
+  it.effect.prop(
+    "replays the formerly exhausting arbitrary seed",
+    { id: StudioRecordIdArbitrary },
+    ({ id }) => roundTripStudioRecordId(id),
+    { arbitrary: { runs: 100, seed: 2170006779794489 } },
+  );
+
+  it.each(["AAAAAK", "AAAAAſ", "AAAAAK", "AAAAAS"])(
+    "preserves fold-aware identifier acceptance for %s",
+    (id) => assert.strictEqual(makeStudioRecordId(id), id),
+  );
+
+  it.each(["AAAAA", "AAAAA!", "AAAAAé"])(
+    "rejects an out-of-contract identifier %s",
+    (id) => assert.throws(() => makeStudioRecordId(id)),
   );
 });
 

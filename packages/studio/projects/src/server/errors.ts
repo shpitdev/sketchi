@@ -10,7 +10,7 @@ const StudioResourceKind = Schema.Literals([
 
 export type StudioResourceKind = typeof StudioResourceKind.Type;
 
-export class StudioNotFoundError extends Schema.TaggedErrorClass<StudioNotFoundError>()(
+export class StudioNotFoundError extends Schema.TaggedError<StudioNotFoundError>()(
   "StudioNotFoundError",
   {
     id: Schema.String,
@@ -18,7 +18,7 @@ export class StudioNotFoundError extends Schema.TaggedErrorClass<StudioNotFoundE
   },
 ) {}
 
-export class StudioDecodeError extends Schema.TaggedErrorClass<StudioDecodeError>()(
+export class StudioDecodeError extends Schema.TaggedError<StudioDecodeError>()(
   "StudioDecodeError",
   {
     cause: Schema.Defect(),
@@ -28,7 +28,7 @@ export class StudioDecodeError extends Schema.TaggedErrorClass<StudioDecodeError
   },
 ) {}
 
-export class StudioSessionError extends Schema.TaggedErrorClass<StudioSessionError>()(
+export class StudioSessionError extends Schema.TaggedError<StudioSessionError>()(
   "StudioSessionError",
   {
     cause: Schema.Defect(),
@@ -36,7 +36,7 @@ export class StudioSessionError extends Schema.TaggedErrorClass<StudioSessionErr
   },
 ) {}
 
-export class StudioOwnershipError extends Schema.TaggedErrorClass<StudioOwnershipError>()(
+export class StudioOwnershipError extends Schema.TaggedError<StudioOwnershipError>()(
   "StudioOwnershipError",
   {
     id: Schema.String,
@@ -44,7 +44,7 @@ export class StudioOwnershipError extends Schema.TaggedErrorClass<StudioOwnershi
   },
 ) {}
 
-export class StudioStorageError extends Schema.TaggedErrorClass<StudioStorageError>()(
+export class StudioStorageError extends Schema.TaggedError<StudioStorageError>()(
   "StudioStorageError",
   {
     cause: Schema.Defect(),
@@ -54,7 +54,7 @@ export class StudioStorageError extends Schema.TaggedErrorClass<StudioStorageErr
   },
 ) {}
 
-export class StudioSourceArtifactError extends Schema.TaggedErrorClass<StudioSourceArtifactError>()(
+export class StudioSourceArtifactError extends Schema.TaggedError<StudioSourceArtifactError>()(
   "StudioSourceArtifactError",
   {
     artifactId: Schema.String,
@@ -65,7 +65,7 @@ export class StudioSourceArtifactError extends Schema.TaggedErrorClass<StudioSou
   },
 ) {}
 
-export class StudioInvalidInputError extends Schema.TaggedErrorClass<StudioInvalidInputError>()(
+export class StudioInvalidInputError extends Schema.TaggedError<StudioInvalidInputError>()(
   "StudioInvalidInputError",
   {
     cause: Schema.optionalKey(Schema.Defect()),
@@ -80,13 +80,10 @@ export type StudioPersistenceError =
   | StudioStorageError;
 
 export type StudioProjectsError =
-  | StudioPersistenceError
-  | StudioSourceArtifactError;
+  StudioPersistenceError | StudioSourceArtifactError;
 
 export type StudioHttpError =
-  | StudioInvalidInputError
-  | StudioProjectsError
-  | StudioSessionError;
+  StudioInvalidInputError | StudioProjectsError | StudioSessionError;
 
 export function failureMessage(cause: unknown, fallback: string): string {
   return cause instanceof Error ? cause.message : fallback;

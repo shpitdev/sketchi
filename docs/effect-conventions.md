@@ -1,15 +1,16 @@
 # Effect conventions
 
 Sketchi exact-pins `effect` and every `@effect/*` package to the approved
-`4.0.0-beta.99` substrate. Effect owns
+`4.0.1` stable substrate. Effect owns
 effectful orchestration in `diagram-generation`, `diagram-agent`,
 `diagram-scenarios`, `studio/projects`, `observability`, and the Worker runtime
 boundaries in `playground` and `eval-harness`. Parsing, formatting, IR
 validation, rendering, React/TanStack surfaces, and generators stay pure or
 framework-native.
 
-There is no `@effect/cli` dependency. Beta upgrades happen only in dedicated
-changes with full proof.
+There is no separate `@effect/cli` dependency; the CLI uses the stable
+`effect/cli` export. Effect upgrades happen only in dedicated changes with full
+proof.
 
 ## Operations and observability
 
@@ -66,7 +67,7 @@ or R2 SQL verification queries.
 
 ## Failures, resilience, and cancellation
 
-- Expected failures use `Schema.TaggedErrorClass`. Wrap an SDK, fetch, or other
+- Expected failures use `Schema.TaggedError`. Wrap an SDK, fetch, or other
   foreign failure once at its boundary and retain the original cause.
 - Retry only errors explicitly classified as transient. Policies use bounded
   `Schedule` retries, per-attempt timeouts, and bounded `Effect.forEach`
@@ -90,7 +91,7 @@ or R2 SQL verification queries.
 ## Structural closure
 
 `tools/project-graph.test.ts` is the executable boundary inventory. It pins the
-allowed manifests and unstable adapter, rejects Effect v3 and Zod source
+allowed manifests and unstable imports, rejects Effect v3 and Zod source
 imports, enumerates runtime host edges, and enumerates the remaining native
 Promise sites and counts. The TypeScript type-checker gate resolves
 Promise/PromiseLike identity and assignability for async returns, awaits,

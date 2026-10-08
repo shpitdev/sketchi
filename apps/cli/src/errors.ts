@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-export class CliFilesystemError extends Schema.TaggedErrorClass<CliFilesystemError>()(
+export class CliFilesystemError extends Schema.TaggedError<CliFilesystemError>()(
   "CliFilesystemError",
   {
     cause: Schema.Defect(),
@@ -10,7 +10,7 @@ export class CliFilesystemError extends Schema.TaggedErrorClass<CliFilesystemErr
   },
 ) {}
 
-export class CliInputError extends Schema.TaggedErrorClass<CliInputError>()(
+export class CliInputError extends Schema.TaggedError<CliInputError>()(
   "CliInputError",
   {
     code: Schema.Literals([
@@ -23,7 +23,7 @@ export class CliInputError extends Schema.TaggedErrorClass<CliInputError>()(
   },
 ) {}
 
-export class CliValidationError extends Schema.TaggedErrorClass<CliValidationError>()(
+export class CliValidationError extends Schema.TaggedError<CliValidationError>()(
   "CliValidationError",
   {
     message: Schema.String,
@@ -32,7 +32,7 @@ export class CliValidationError extends Schema.TaggedErrorClass<CliValidationErr
   },
 ) {}
 
-export class CliBuildError extends Schema.TaggedErrorClass<CliBuildError>()(
+export class CliBuildError extends Schema.TaggedError<CliBuildError>()(
   "CliBuildError",
   {
     status: Schema.String,
@@ -42,7 +42,7 @@ export class CliBuildError extends Schema.TaggedErrorClass<CliBuildError>()(
   },
 ) {}
 
-export class CliGenerationError extends Schema.TaggedErrorClass<CliGenerationError>()(
+export class CliGenerationError extends Schema.TaggedError<CliGenerationError>()(
   "CliGenerationError",
   {
     code: Schema.Literals([
@@ -58,7 +58,7 @@ export class CliGenerationError extends Schema.TaggedErrorClass<CliGenerationErr
   },
 ) {}
 
-export class CliCanvasError extends Schema.TaggedErrorClass<CliCanvasError>()(
+export class CliCanvasError extends Schema.TaggedError<CliCanvasError>()(
   "CliCanvasError",
   {
     code: Schema.Literals([
@@ -73,7 +73,7 @@ export class CliCanvasError extends Schema.TaggedErrorClass<CliCanvasError>()(
   },
 ) {}
 
-export class CliInteractiveError extends Schema.TaggedErrorClass<CliInteractiveError>()(
+export class CliInteractiveError extends Schema.TaggedError<CliInteractiveError>()(
   "CliInteractiveError",
   {
     code: Schema.Literals(["cancelled", "prompt_failed"]),
@@ -82,7 +82,7 @@ export class CliInteractiveError extends Schema.TaggedErrorClass<CliInteractiveE
   },
 ) {}
 
-export class CliStorageError extends Schema.TaggedErrorClass<CliStorageError>()(
+export class CliStorageError extends Schema.TaggedError<CliStorageError>()(
   "CliStorageError",
   {
     code: Schema.Literals([
@@ -106,7 +106,7 @@ export class CliStorageError extends Schema.TaggedErrorClass<CliStorageError>()(
   },
 ) {}
 
-export class CliShareError extends Schema.TaggedErrorClass<CliShareError>()(
+export class CliShareError extends Schema.TaggedError<CliShareError>()(
   "CliShareError",
   {
     code: Schema.Literals([
@@ -125,7 +125,7 @@ export class CliShareError extends Schema.TaggedErrorClass<CliShareError>()(
   },
 ) {}
 
-export class CliExportError extends Schema.TaggedErrorClass<CliExportError>()(
+export class CliExportError extends Schema.TaggedError<CliExportError>()(
   "CliExportError",
   {
     code: Schema.Literals([

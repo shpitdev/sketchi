@@ -4,8 +4,7 @@ import {
   MindmapSpec,
   SequenceDiagramSpec,
 } from "@sketchi/diagram-agent";
-import { Effect } from "effect";
-import { FastCheck } from "effect/testing";
+import { Effect, Schema } from "effect";
 
 import {
   documentId,
@@ -17,6 +16,10 @@ import {
   mindmapInput,
   sequenceInput,
 } from "./__tests__/fixtures.js";
+
+const PathSafeStorageIdSchema = Schema.String.check(
+  Schema.isPattern(/^[a-z0-9][a-z0-9._-]{0,48}$/u),
+);
 
 describe("canonical document decoding", () => {
   it.effect("decodes all canonical documents through package authority", () =>
@@ -75,13 +78,7 @@ describe("canonical document decoding", () => {
   it.effect.prop(
     "accepts every generated path-safe storage id without rewriting it",
     {
-      id: FastCheck.tuple(
-        FastCheck.constantFrom(..."abcdefghijklmnopqrstuvwxyz0123456789"),
-        FastCheck.array(
-          FastCheck.constantFrom(..."abcdefghijklmnopqrstuvwxyz0123456789._-"),
-          { maxLength: 48 },
-        ),
-      ).map(([head, tail]) => `${head}${tail.join("")}`),
+      id: PathSafeStorageIdSchema,
     },
     ({ id }) =>
       Effect.gen(function* () {

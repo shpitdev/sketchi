@@ -172,7 +172,7 @@ interface CodeModeUsageIssueAnalyticsRow {
 
 const CodeModeUsageSinkSchema = Schema.Literals(["analytics", "artifacts"]);
 
-export class CodeModeUsageCaptureError extends Schema.TaggedErrorClass<CodeModeUsageCaptureError>()(
+export class CodeModeUsageCaptureError extends Schema.TaggedError<CodeModeUsageCaptureError>()(
   "CodeModeUsageCaptureError",
   {
     cause: Schema.Defect(),
@@ -182,9 +182,7 @@ export class CodeModeUsageCaptureError extends Schema.TaggedErrorClass<CodeModeU
 ) {}
 
 type UsageRequestContext =
-  | PlaygroundRequestServices
-  | PlaygroundClock
-  | PlaygroundIds;
+  PlaygroundRequestServices | PlaygroundClock | PlaygroundIds;
 
 export interface PlaygroundCodeModeUsageShape {
   readonly capture: (

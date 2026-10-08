@@ -30,7 +30,7 @@ import {
 
 export const MAX_CODE_MODE_BUILD_REQUEST_BYTES = 256 * 1024;
 
-export class CodeModeHttpRequestError extends Schema.TaggedErrorClass<CodeModeHttpRequestError>()(
+export class CodeModeHttpRequestError extends Schema.TaggedError<CodeModeHttpRequestError>()(
   "CodeModeHttpRequestError",
   {
     cause: Schema.Defect(),
@@ -598,16 +598,19 @@ export const handleGetArtifactRequest = Effect.fn(
   "playground.http.getArtifact",
 )(function* (request: Request, artifactId: string) {
   const codeMode = yield* PlaygroundCodeMode;
+  const format = formatFromUrl(request);
+  const raw = rawFromUrl(request);
+  const inline = raw ? false : inlineFromUrl(request);
   const input = yield* Effect.promise(() =>
     decodeCodeModeHttpInput(CodeModeHttpSchemas.getArtifact.input, {
       artifactId,
-      format: formatFromUrl(request),
-      inline: rawFromUrl(request) ? false : inlineFromUrl(request),
+      ...(format === undefined ? {} : { format }),
+      ...(inline === undefined ? {} : { inline }),
     }),
   );
   const result = yield* codeMode.getArtifact(input);
 
-  if (!result.ok || !rawFromUrl(request)) {
+  if (!result.ok || !raw) {
     return jsonResponse(result, getStatus(result));
   }
 

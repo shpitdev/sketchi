@@ -11,7 +11,7 @@
       "options": {
         "commands": [
           "vite build --config packages/diagram/ui/vite.config.ts",
-          "tsc -p packages/diagram/ui/tsconfig.lib.json"
+          "tsc6 -p packages/diagram/ui/tsconfig.lib.json"
         ],
         "parallel": false
       }
@@ -48,13 +48,13 @@
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsc -p packages/diagram/ui/tsconfig.json --noEmit"
+        "command": "tsc6 -p packages/diagram/ui/tsconfig.json --noEmit"
       }
     },
-    "typecheck-tsgo": {
+    "typecheck-native": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsgo -p packages/diagram/ui/tsconfig.json --noEmit"
+        "command": "tsc -p packages/diagram/ui/tsconfig.json --noEmit"
       }
     }
   }

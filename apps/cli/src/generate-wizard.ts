@@ -1,4 +1,12 @@
-import { cancel, intro, isCancel, select, spinner, text } from "@clack/prompts";
+import {
+  CANCEL_SYMBOL,
+  cancel,
+  intro,
+  isCancel,
+  select,
+  spinner,
+  text,
+} from "@clack/prompts";
 import { Context, Effect, Exit, Layer, type Scope } from "effect";
 import isCI from "is-ci";
 
@@ -53,8 +61,8 @@ function promptFailure(): CliInteractiveError {
   });
 }
 
-function unwrapPrompt<A>(
-  value: A | symbol,
+function unwrapPrompt<A extends string>(
+  value: A | typeof CANCEL_SYMBOL,
 ): Effect.Effect<A, CliInteractiveError> {
   if (isCancel(value)) {
     return Effect.sync(() => cancel("Generation cancelled.")).pipe(

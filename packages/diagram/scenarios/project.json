@@ -9,7 +9,7 @@
       "executor": "nx:run-commands",
       "outputs": ["{projectRoot}/dist"],
       "options": {
-        "command": "tsc -p packages/diagram/scenarios/tsconfig.lib.json"
+        "command": "tsc6 -p packages/diagram/scenarios/tsconfig.lib.json"
       }
     },
     "scenario": {
@@ -29,13 +29,13 @@
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsc -p packages/diagram/scenarios/tsconfig.json --noEmit"
+        "command": "tsc6 -p packages/diagram/scenarios/tsconfig.json --noEmit"
       }
     },
-    "typecheck-tsgo": {
+    "typecheck-native": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsgo -p packages/diagram/scenarios/tsconfig.json --noEmit"
+        "command": "tsc -p packages/diagram/scenarios/tsconfig.json --noEmit"
       }
     }
   }

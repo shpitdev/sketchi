@@ -8,7 +8,7 @@ import { Effect, Schema, SchemaIssue } from "effect";
 import type { BuiltDiagram, StoredDiagram } from "./contracts.js";
 import { validateStorageId } from "./document.js";
 import { CliCanvasError, CliInputError, CliValidationError } from "./errors.js";
-import type { InputSource } from "./internal/effect-unstable-cli.js";
+import type { InputSource } from "./internal/effect-cli.js";
 import { InputReader } from "./input.js";
 import { DiagramStore } from "./storage.js";
 

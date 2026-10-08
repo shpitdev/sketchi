@@ -32,7 +32,7 @@ import {
   ToolProcessSpawnError,
 } from "./internal/tool-process.js";
 
-class ScenarioToolError extends Schema.TaggedErrorClass<ScenarioToolError>()(
+class ScenarioToolError extends Schema.TaggedError<ScenarioToolError>()(
   "ScenarioToolError",
   {
     cause: Schema.optionalKey(Schema.Defect()),
@@ -40,7 +40,7 @@ class ScenarioToolError extends Schema.TaggedErrorClass<ScenarioToolError>()(
   },
 ) {}
 
-export class ScenarioCliUsageError extends Schema.TaggedErrorClass<ScenarioCliUsageError>()(
+export class ScenarioCliUsageError extends Schema.TaggedError<ScenarioCliUsageError>()(
   "ScenarioCliUsageError",
   {
     cause: Schema.optionalKey(Schema.Defect()),

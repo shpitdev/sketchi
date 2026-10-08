@@ -20,18 +20,11 @@ jobs:
   required:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: pnpm/action-setup@v5
-        with:
-          version: 11.5.0
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-workspace
       - name: Install Chromium for real browser-backed tests
         run: pnpm exec playwright install --with-deps chromium
       - name: Verify deploy, onboarding, and cutover contracts
@@ -40,17 +33,19 @@ jobs:
         run: pnpm run test:tools
       - name: Run canonical workspace gates
         run: pnpm nx run-many -t lint,typecheck,test,build
+      - name: Verify stable native TypeScript lane
+        run: pnpm nx run-many -t typecheck-native
       - name: Dry-run every Worker deployment
         run: pnpm run test:wrangler-dry-runs
       - name: Verify root TypeScript project references
-        run: pnpm exec tsc -b --pretty false
+        run: pnpm exec tsc6 -b --pretty false
       - name: Build canonical diagram UI Storybook
         run: pnpm nx build-storybook diagram-ui
       - name: Run SVG corpus renderer
         run: pnpm nx run svg-excalidraw:corpus-renderer
       - name: Upload SVG corpus renderer report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: svg-native-corpus-${{ github.event.pull_request.head.sha || github.sha }}
           path: .memory/svg-native-corpus

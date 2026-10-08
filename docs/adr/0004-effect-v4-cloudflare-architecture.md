@@ -40,9 +40,10 @@ interruptible Effect polling and fetch boundaries. Executable Node hosts use
 and lets scoped process-tree and remote-resource finalizers finish before exit.
 
 The repository exact-pins `effect` and every `@effect/*` dependency to the
-approved `4.0.0-beta.99` version. Upgrades are dedicated changes, never
-incidental range movement. Unstable modules require one reviewed
-package-internal adapter; the current sole adapter is the CLI adapter.
+approved `4.0.1` stable version. Upgrades are dedicated changes, never
+incidental range movement. The repository currently has no unstable Effect
+imports; any future unstable module requires one reviewed package-internal
+adapter.
 
 ## Consequences
 

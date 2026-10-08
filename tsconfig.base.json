@@ -30,6 +30,7 @@
       "@sketchi/studio-projects/server": [
         "./packages/studio/projects/src/server.ts"
       ]
-    }
+    },
+    "noUncheckedSideEffectImports": false
   }
 }

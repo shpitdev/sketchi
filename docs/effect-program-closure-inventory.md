@@ -80,10 +80,10 @@ descendant is killed, and a scope cleanup marker is written before exit.
 Approved production runtime boundaries are exactly the CLI host, Playground
 runtime composition root, eval-harness server-function host, both internal
 scenario hosts, and harness-eval host. Runtime execution below those files is a
-test failure. The single unstable import is the internal public-CLI adapter.
+test failure. The repository has no unstable Effect imports.
 
 Every direct `effect` or `@effect/*` declaration uses the exact approved
-`4.0.0-beta.99` version; the lockfile contains no Effect v3. Effect-bearing
+`4.0.1` version; the lockfile contains no Effect v3. Effect-bearing
 manifests are an exact allowlist. Source imports no Zod. Shared/domain schemas
 are Effect Schema contracts; Standard Schema or synchronous decoders appear
 only at framework edges.

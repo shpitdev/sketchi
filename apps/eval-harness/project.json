@@ -50,13 +50,13 @@
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsc -p apps/eval-harness/tsconfig.json --noEmit"
+        "command": "tsc6 -p apps/eval-harness/tsconfig.json --noEmit"
       }
     },
-    "typecheck-tsgo": {
+    "typecheck-native": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsgo -p apps/eval-harness/tsconfig.json --noEmit"
+        "command": "tsc -p apps/eval-harness/tsconfig.json --noEmit"
       }
     }
   }

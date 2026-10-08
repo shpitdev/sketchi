@@ -1,11 +1,8 @@
-import { nxCopyAssetsPlugin } from "@nx/vite/plugins/nx-copy-assets.plugin";
-import { nxViteTsPaths } from "@nx/vite/plugins/nx-tsconfig-paths.plugin";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig(() => ({
-  root: __dirname,
+  root: import.meta.dirname,
   cacheDir: "../../../node_modules/.vite/packages/diagram/excalidraw",
-  plugins: [nxViteTsPaths(), nxCopyAssetsPlugin(["*.md"])],
   resolve: {
     alias: {
       "@sketchi/diagram-core": new URL("../core/src/index.ts", import.meta.url)

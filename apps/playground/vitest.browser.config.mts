@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 const source = (path: string) => new URL(path, import.meta.url).pathname;
+const executablePath = process.env["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"];
 
 export default defineConfig({
   cacheDir: source("../../node_modules/.vite/apps/playground-browser"),
@@ -52,7 +53,11 @@ export default defineConfig({
     browser: {
       enabled: true,
       headless: true,
-      provider: playwright(),
+      provider: playwright({
+        ...(executablePath === undefined
+          ? {}
+          : { launchOptions: { executablePath } }),
+      }),
       instances: [{ browser: "chromium" }],
       viewport: { height: 577, width: 1280 },
     },

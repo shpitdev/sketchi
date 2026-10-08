@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Context, Effect, Schema } from "effect";
 import { readFile } from "node:fs/promises";
+import { CANVAS_LIMITS } from "@sketchi/diagram-core";
 
 import {
   ARTIFACT_MIME_TYPES,
@@ -182,9 +183,7 @@ function isCanvasElementValue(value: Record<string, unknown>): boolean {
   return (
     typeof value["id"] === "string" &&
     !Object.hasOwn(value, "seed") &&
-    ["node", "text", "arrow", "line", "frame"].includes(
-      String(value["type"]),
-    )
+    ["node", "text", "arrow", "line", "frame"].includes(String(value["type"]))
   );
 }
 
@@ -254,7 +253,11 @@ function normalizeCanvasMigrationAgainstFrozen(
         if (
           (CANVAS_SPEC_ADDED_FIELDS.has(key) &&
             (canvasSpecValue || canvasSpecSchemaProperties)) ||
-          (canvasElementValue && POST_BASELINE_SCENE_FIELDS.has(key))
+          (canvasElementValue && POST_BASELINE_SCENE_FIELDS.has(key)) ||
+          (key === "maxItems" &&
+            value["minItems"] === 2 &&
+            entry === CANVAS_LIMITS.maxPointsPerElement &&
+            !Object.hasOwn(frozen, key))
         ) {
           return [];
         }
@@ -598,17 +601,13 @@ function persistedObjects(bucket: RecordingBucket) {
 }
 
 type BuildFlowchartStatus =
-  | "accepted"
-  | Extract<BuildFlowchartResult, { ok: false }>["status"];
+  "accepted" | Extract<BuildFlowchartResult, { ok: false }>["status"];
 type BuildMindmapStatus =
-  | "accepted"
-  | Extract<BuildMindmapResult, { ok: false }>["status"];
+  "accepted" | Extract<BuildMindmapResult, { ok: false }>["status"];
 type GetArtifactStatus =
-  | "accepted"
-  | Extract<GetArtifactResult, { ok: false }>["status"];
+  "accepted" | Extract<GetArtifactResult, { ok: false }>["status"];
 type ApplyDiagramPatchStatus =
-  | "accepted"
-  | Extract<ApplyDiagramPatchResult, { ok: false }>["status"];
+  "accepted" | Extract<ApplyDiagramPatchResult, { ok: false }>["status"];
 
 const publicStatusFamilies = {
   buildFlowchart: [
@@ -904,9 +903,11 @@ async function buildIssueCompatibilityMatrix(
   });
   const unlabeledDecisionBranch = await flowchart({
     ...base,
-    edges: base.edges.map((edge) =>
-      edge.source === "approve" ? { ...edge, label: undefined } : edge,
-    ),
+    edges: base.edges.map((edge) => {
+      if (edge.source !== "approve") return edge;
+      const { label: _label, ...unlabeledEdge } = edge;
+      return unlabeledEdge;
+    }),
   });
   const duplicateDecisionBranchLabel = await flowchart({
     ...base,
@@ -1423,11 +1424,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
     expect(
       normalizeCanvasMigrationAgainstFrozen(
         {
-          codes: [
-            "legacy_code",
-            "invalid_canvas_geometry",
-            "unexpected_code",
-          ],
+          codes: ["legacy_code", "invalid_canvas_geometry", "unexpected_code"],
           order: ["second", "first"],
           scene: {
             kind: "canvas",
@@ -1618,9 +1615,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
       CodeModeIssueCodeSchema.options
         .filter((code) => !CANVAS_ISSUE_CODE_ADDITIONS.has(code))
         .toSorted(),
-    ).toEqual(
-      [...directlyReachableCodes, ...boundaryOnlyCodes].toSorted(),
-    );
+    ).toEqual([...directlyReachableCodes, ...boundaryOnlyCodes].toSorted());
 
     const corpus = {
       version: 2,

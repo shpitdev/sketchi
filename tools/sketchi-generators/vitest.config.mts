@@ -1,21 +1,18 @@
-import { defineConfig } from 'vitest/config';
-import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
-import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
+import { defineConfig } from "vitest/config";
 
 export default defineConfig(() => ({
-  root: __dirname,
-  cacheDir: '../../node_modules/.vite/tools/sketchi-generators',
-  plugins: [nxViteTsPaths(), nxCopyAssetsPlugin(['*.md'])],
+  root: import.meta.dirname,
+  cacheDir: "../../node_modules/.vite/tools/sketchi-generators",
   test: {
-    name: 'sketchi-generators',
+    name: "sketchi-generators",
     watch: false,
     globals: true,
-    environment: 'jsdom',
-    include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    reporters: ['default'],
+    environment: "jsdom",
+    include: ["{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
+    reporters: ["default"],
     coverage: {
-      reportsDirectory: '../../coverage/tools/sketchi-generators',
-      provider: 'v8' as const,
-    }
+      reportsDirectory: "../../coverage/tools/sketchi-generators",
+      provider: "v8" as const,
+    },
   },
 }));

@@ -40,7 +40,7 @@ const ArtifactStorageOperationSchema = Schema.Literals([
   "write",
 ]);
 
-export class CodeModeArtifactStorageError extends Schema.TaggedErrorClass<CodeModeArtifactStorageError>()(
+export class CodeModeArtifactStorageError extends Schema.TaggedError<CodeModeArtifactStorageError>()(
   "CodeModeArtifactStorageError",
   {
     cause: Schema.Defect(),

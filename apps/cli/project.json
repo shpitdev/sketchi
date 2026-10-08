@@ -25,14 +25,14 @@
       "executor": "nx:run-commands",
       "dependsOn": ["^build"],
       "options": {
-        "command": "tsc -p apps/cli/tsconfig.json --noEmit"
+        "command": "tsc6 -p apps/cli/tsconfig.json --noEmit"
       }
     },
-    "typecheck-tsgo": {
+    "typecheck-native": {
       "executor": "nx:run-commands",
       "dependsOn": ["^build"],
       "options": {
-        "command": "tsgo -p apps/cli/tsconfig.json --noEmit"
+        "command": "tsc -p apps/cli/tsconfig.json --noEmit"
       }
     },
     "package": {

@@ -63,9 +63,10 @@ The approved runtime edges are mechanically checked:
 - the two internal scenario tool entrypoints;
 - the internal harness-eval entrypoint.
 
-The only reviewed unstable Effect import is the package-internal CLI adapter at
-`apps/cli/src/internal/effect-unstable-cli.ts`. Process management uses stable
-core Effect APIs plus a scoped Node adapter, not an unstable process API.
+The CLI imports the stable `effect/cli` surface through the package-internal
+`apps/cli/src/internal/effect-cli.ts` adapter. The repository has no unstable
+Effect imports. Process management uses stable core Effect APIs plus a scoped
+Node adapter.
 
 See [Effect conventions](effect-conventions.md), the
 [program-closure inventory](effect-program-closure-inventory.md), and

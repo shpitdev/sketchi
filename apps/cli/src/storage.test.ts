@@ -12,7 +12,7 @@ import { join, resolve } from "node:path";
 import { CanvasSpec } from "@sketchi/diagram-agent";
 import { assert, describe, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Ref, Schema } from "effect";
-import { FastCheck, TestClock } from "effect/testing";
+import { TestClock } from "effect/testing";
 
 import { type BuiltDiagram } from "./contracts.js";
 import { CliFilesystemError, exitCodeForFailure } from "./errors.js";
@@ -32,6 +32,9 @@ const validPng = Uint8Array.from(
     "base64",
   ),
 );
+const SafeStorageIdsSchema = Schema.Array(
+  Schema.String.check(Schema.isPattern(/^[a-z]-[0-9]{3}$/u)),
+).check(Schema.isBetweenLength(1, 8), Schema.isUnique());
 
 function crc32(bytes: Uint8Array): number {
   let crc = 0xffffffff;
@@ -1823,15 +1826,7 @@ describe("diagram storage", () => {
   it.effect.prop(
     "lists arbitrary safe ids in deterministic ascending order",
     {
-      ids: FastCheck.uniqueArray(
-        FastCheck.tuple(
-          FastCheck.constantFrom(..."abcdefghijklmnopqrstuvwxyz"),
-          FastCheck.integer({ min: 0, max: 999 }),
-        ).map(
-          ([prefix, suffix]) => `${prefix}-${String(suffix).padStart(3, "0")}`,
-        ),
-        { minLength: 1, maxLength: 8 },
-      ),
+      ids: SafeStorageIdsSchema,
     },
     ({ ids }) =>
       withTestRoot((root) =>
@@ -1851,7 +1846,7 @@ describe("diagram storage", () => {
           );
         }).pipe(Effect.provide(storeLayer(root))),
       ),
-    { timeout: 20_000, fastCheck: { numRuns: 12 } },
+    { timeout: 20_000, arbitrary: { runs: 12 } },
   );
 
   it.effect("orders uppercase and punctuation by code unit", () =>

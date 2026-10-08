@@ -23,18 +23,9 @@ export const CANVAS_LIMITS = Object.freeze({
 export type CanvasStrokeStyle = "dashed" | "dotted" | "solid";
 export type CanvasFillStyle = "cross-hatch" | "hachure" | "solid";
 export type CanvasArrowhead =
-  | "arrow"
-  | "bar"
-  | "circle"
-  | "diamond"
-  | "triangle"
-  | null;
+  "arrow" | "bar" | "circle" | "diamond" | "triangle" | null;
 export type CanvasShapeKind =
-  | "rectangle"
-  | "ellipse"
-  | "diamond"
-  | "circle"
-  | "polygon";
+  "rectangle" | "ellipse" | "diamond" | "circle" | "polygon";
 
 export interface CanvasPoint {
   readonly x: number;
@@ -42,36 +33,33 @@ export interface CanvasPoint {
 }
 
 export interface CanvasElementComposition {
-  readonly frameId?: string | undefined;
-  readonly groupIds?: string[] | undefined;
-  readonly layerId?: string | undefined;
-  readonly locked?: boolean | undefined;
-  readonly opacity?: number | undefined;
-  readonly zIndex?: number | undefined;
+  readonly frameId?: string;
+  readonly groupIds?: string[];
+  readonly layerId?: string;
+  readonly locked?: boolean;
+  readonly opacity?: number;
+  readonly zIndex?: number;
 }
 
 export interface CanvasStrokeStyleFields {
-  readonly fillColor?: string | undefined;
-  readonly fillStyle?: CanvasFillStyle | undefined;
-  readonly roughness?: 0 | 1 | 2 | undefined;
-  readonly strokeColor?: string | undefined;
-  readonly strokeStyle?: CanvasStrokeStyle | undefined;
-  readonly strokeWidth?: 1 | 2 | 4 | undefined;
+  readonly fillColor?: string;
+  readonly fillStyle?: CanvasFillStyle;
+  readonly roughness?: 0 | 1 | 2;
+  readonly strokeColor?: string;
+  readonly strokeStyle?: CanvasStrokeStyle;
+  readonly strokeWidth?: 1 | 2 | 4;
 }
 
 export interface CanvasShapeElement
-  extends CanvasElementComposition,
-    CanvasStrokeStyleFields {
+  extends CanvasElementComposition, CanvasStrokeStyleFields {
   readonly type: "node";
   readonly id: string;
   readonly nodeId: string;
-  readonly kind?: string | undefined;
-  readonly rendererRole?: "sequence-lifeline" | undefined;
+  readonly kind?: string;
+  readonly rendererRole?: "sequence-lifeline";
   readonly shape: CanvasShapeKind;
-  readonly points?:
-    | [CanvasPoint, CanvasPoint, CanvasPoint, ...CanvasPoint[]]
-    | undefined;
-  readonly textColor?: string | undefined;
+  readonly points?: [CanvasPoint, CanvasPoint, CanvasPoint, ...CanvasPoint[]];
+  readonly textColor?: string;
   readonly x: number;
   readonly y: number;
   readonly width: number;
@@ -82,59 +70,56 @@ export interface CanvasShapeElement
 export interface CanvasTextElement extends CanvasElementComposition {
   readonly type: "text";
   readonly id: string;
-  readonly containerId?: string | undefined;
-  readonly textColor?: string | undefined;
+  readonly containerId?: string;
+  readonly textColor?: string;
   readonly x: number;
   readonly y: number;
   readonly text: string;
   readonly fontSize: number;
-  readonly fontFamily?: "hand" | "mono" | "sans" | undefined;
-  readonly maxWidth?: number | undefined;
-  readonly textAlign?: "center" | "left" | "right" | undefined;
-  readonly verticalAlign?: "bottom" | "middle" | "top" | undefined;
+  readonly fontFamily?: "hand" | "mono" | "sans";
+  readonly maxWidth?: number;
+  readonly textAlign?: "center" | "left" | "right";
+  readonly verticalAlign?: "bottom" | "middle" | "top";
 }
 
 export interface CanvasConnectorElement
-  extends CanvasElementComposition,
-    CanvasStrokeStyleFields {
+  extends CanvasElementComposition, CanvasStrokeStyleFields {
   readonly type: "arrow";
   readonly id: string;
   readonly edgeId: string;
   readonly sourceNodeId: string;
   readonly targetNodeId: string;
-  readonly startArrowhead?: CanvasArrowhead | undefined;
-  readonly endArrowhead?: CanvasArrowhead | undefined;
-  readonly textColor?: string | undefined;
+  readonly startArrowhead?: CanvasArrowhead;
+  readonly endArrowhead?: CanvasArrowhead;
+  readonly textColor?: string;
   readonly points: [CanvasPoint, ...CanvasPoint[]];
-  readonly label?: string | undefined;
+  readonly label?: string;
 }
 
 export interface CanvasLineBinding {
   readonly elementId: string;
-  readonly focus?: number | undefined;
-  readonly gap?: number | undefined;
+  readonly focus?: number;
+  readonly gap?: number;
 }
 
 export interface CanvasLineElement
-  extends CanvasElementComposition,
-    CanvasStrokeStyleFields {
+  extends CanvasElementComposition, CanvasStrokeStyleFields {
   readonly type: "line";
   readonly id: string;
   readonly points: [CanvasPoint, CanvasPoint, ...CanvasPoint[]];
-  readonly startBinding?: CanvasLineBinding | undefined;
-  readonly endBinding?: CanvasLineBinding | undefined;
-  readonly startArrowhead?: CanvasArrowhead | undefined;
-  readonly endArrowhead?: CanvasArrowhead | undefined;
-  readonly label?: string | undefined;
-  readonly textColor?: string | undefined;
+  readonly startBinding?: CanvasLineBinding;
+  readonly endBinding?: CanvasLineBinding;
+  readonly startArrowhead?: CanvasArrowhead;
+  readonly endArrowhead?: CanvasArrowhead;
+  readonly label?: string;
+  readonly textColor?: string;
 }
 
 export interface CanvasFrameElement
-  extends CanvasElementComposition,
-    CanvasStrokeStyleFields {
+  extends CanvasElementComposition, CanvasStrokeStyleFields {
   readonly type: "frame";
   readonly id: string;
-  readonly name?: string | undefined;
+  readonly name?: string;
   readonly x: number;
   readonly y: number;
   readonly width: number;
@@ -150,9 +135,9 @@ export type CanvasElement =
 
 export interface CanvasLayer {
   readonly id: string;
-  readonly name?: string | undefined;
-  readonly locked?: boolean | undefined;
-  readonly visible?: boolean | undefined;
+  readonly name?: string;
+  readonly locked?: boolean;
+  readonly visible?: boolean;
 }
 
 interface CanvasLayoutBase {
@@ -161,18 +146,18 @@ interface CanvasLayoutBase {
 
 export interface CanvasFlowLayout extends CanvasLayoutBase {
   readonly type: "row" | "column" | "stack";
-  readonly x?: number | undefined;
-  readonly y?: number | undefined;
-  readonly gap?: number | undefined;
+  readonly x?: number;
+  readonly y?: number;
+  readonly gap?: number;
 }
 
 export interface CanvasGridLayout extends CanvasLayoutBase {
   readonly type: "grid";
   readonly columns: number;
-  readonly x?: number | undefined;
-  readonly y?: number | undefined;
-  readonly columnGap?: number | undefined;
-  readonly rowGap?: number | undefined;
+  readonly x?: number;
+  readonly y?: number;
+  readonly columnGap?: number;
+  readonly rowGap?: number;
 }
 
 export interface CanvasAlignLayout extends CanvasLayoutBase {
@@ -184,7 +169,7 @@ export interface CanvasAlignLayout extends CanvasLayoutBase {
 export interface CanvasDistributeLayout extends CanvasLayoutBase {
   readonly type: "distribute";
   readonly axis: "x" | "y";
-  readonly gap?: number | undefined;
+  readonly gap?: number;
 }
 
 export type CanvasLayout =
@@ -221,7 +206,7 @@ export interface CanvasValidationIssue {
     | "missing_z_order_element"
     | "unknown_layout_target"
     | "unknown_z_order_element";
-  readonly elementId?: string | undefined;
+  readonly elementId?: string;
   readonly message: string;
   readonly path: string;
 }

@@ -1,6 +1,6 @@
 /**
- * Reviewed boundary for Effect v4 beta's unstable CLI package.
- * No other Sketchi CLI source may import `effect/unstable/cli` directly.
+ * Reviewed boundary for Effect's stable CLI package.
+ * No other Sketchi CLI source may import `effect/cli` directly.
  */
 import { Console, Effect } from "effect";
 import {
@@ -12,7 +12,7 @@ import {
   Flag,
   GlobalFlag,
   Param,
-} from "effect/unstable/cli";
+} from "effect/cli";
 
 import { redactShareLinks } from "../redaction.js";
 import { renderRootHelp, terminalRootHelp } from "../help-brand.js";
@@ -53,12 +53,12 @@ function inlineSource(value: string): InputSource {
 }
 
 export function exclusiveInputSourceFlags(content = "canonical document") {
-  const file = Flag.string("file").pipe(
+  const file = Flag.String("file").pipe(
     Flag.withMetavar("PATH|-"),
     Flag.withDescription(`Read one ${content} from PATH, or stdin with -.`),
     Flag.map(fileSource),
   );
-  const json = Flag.string("json").pipe(
+  const json = Flag.String("json").pipe(
     Flag.withMetavar("VALUE"),
     Flag.withDescription(`Read one ${content} from inline JSON.`),
     Flag.map(inlineSource),
@@ -99,7 +99,7 @@ export function exactlyOnceStringFlag(
   metavar: string,
   description: string,
 ) {
-  const base = Flag.string(name).pipe(
+  const base = Flag.String(name).pipe(
     Flag.withMetavar(metavar),
     Flag.withDescription(description),
   );

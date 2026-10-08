@@ -33,9 +33,9 @@ jobs:
       version: ${{ steps.check.outputs.version }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: ./.github/actions/setup-workspace
         with:
-          node-version: 24.13.0
+          install-dependencies: "false"
       - name: Decide whether the exact source CLI version is unpublished
         id: check
         run: |
@@ -92,17 +92,7 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
-        with:
-          version: 11.5.0
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: 24.13.0
-          cache: pnpm
-      # node 24.13.0 bundles npm 11.12.0, which already supports OIDC trusted
-      # publishing (>= 11.5.1). No npm upgrade: the bundled npm is pinned by the
-      # node version, keeping the publishing toolchain deterministic.
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-workspace
       - name: Build and run the offline packaging smoke
         run: pnpm exec nx run sketchi-cli:smoke
       - name: Publish sketchi to npm via OIDC trusted publishing

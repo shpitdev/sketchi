@@ -574,7 +574,7 @@ export interface CodeModeArtifactRenderer {
   }): Effect.Effect<ArrayBuffer | Uint8Array, unknown>;
 }
 
-class CodeModeArtifactExportError extends Schema.TaggedErrorClass<CodeModeArtifactExportError>()(
+class CodeModeArtifactExportError extends Schema.TaggedError<CodeModeArtifactExportError>()(
   "CodeModeArtifactExportError",
   {
     cause: Schema.Defect(),
@@ -608,7 +608,7 @@ interface BuildFlowchartFailureContext {
   readonly issues: CodeModeIssue[];
 }
 
-class BuildFlowchartFailure extends Schema.TaggedErrorClass<BuildFlowchartFailure>()(
+class BuildFlowchartFailure extends Schema.TaggedError<BuildFlowchartFailure>()(
   "BuildFlowchartFailure",
   {
     message: Schema.String,
@@ -650,7 +650,7 @@ interface BuildMindmapFailureContext {
   readonly issues: CodeModeIssue[];
 }
 
-class BuildMindmapFailure extends Schema.TaggedErrorClass<BuildMindmapFailure>()(
+class BuildMindmapFailure extends Schema.TaggedError<BuildMindmapFailure>()(
   "BuildMindmapFailure",
   {
     message: Schema.String,
@@ -692,7 +692,7 @@ interface BuildSequenceDiagramFailureContext {
   readonly issues: CodeModeIssue[];
 }
 
-class BuildSequenceDiagramFailure extends Schema.TaggedErrorClass<BuildSequenceDiagramFailure>()(
+class BuildSequenceDiagramFailure extends Schema.TaggedError<BuildSequenceDiagramFailure>()(
   "BuildSequenceDiagramFailure",
   {
     message: Schema.String,
@@ -733,7 +733,7 @@ interface CreateCanvasFailureContext {
   readonly issues: CodeModeIssue[];
 }
 
-class CreateCanvasFailure extends Schema.TaggedErrorClass<CreateCanvasFailure>()(
+class CreateCanvasFailure extends Schema.TaggedError<CreateCanvasFailure>()(
   "CreateCanvasFailure",
   {
     message: Schema.String,
@@ -766,7 +766,7 @@ type GetArtifactFailureStatus = Extract<
   { ok: false }
 >["status"];
 
-class GetArtifactFailure extends Schema.TaggedErrorClass<GetArtifactFailure>()(
+class GetArtifactFailure extends Schema.TaggedError<GetArtifactFailure>()(
   "GetArtifactFailure",
   {
     message: Schema.String,
@@ -806,7 +806,7 @@ interface ApplyDiagramPatchFailureContext {
   readonly issues: CodeModeIssue[];
 }
 
-class ApplyDiagramPatchFailure extends Schema.TaggedErrorClass<ApplyDiagramPatchFailure>()(
+class ApplyDiagramPatchFailure extends Schema.TaggedError<ApplyDiagramPatchFailure>()(
   "ApplyDiagramPatchFailure",
   {
     message: Schema.String,
@@ -1331,7 +1331,7 @@ function normalizePatchableScene(
         ...(element.rendererRole === "sequence-lifeline" &&
         isStructurallyValidSequenceLifeline(scene, element)
           ? { rendererRole: element.rendererRole }
-          : { rendererRole: undefined }),
+          : {}),
         ...(element.textColor ? { textColor: element.textColor } : {}),
         ...(element.shape === "polygon" &&
         polygonPoints?.[0] &&
@@ -1345,7 +1345,7 @@ function normalizePatchableScene(
                 ...polygonPoints.slice(3),
               ],
             }
-          : { points: undefined }),
+          : {}),
       });
       continue;
     }
@@ -1441,11 +1441,11 @@ function labelsMatch(
 function selectorHasFilters(selector: DiagramSelector | undefined): boolean {
   return Boolean(
     selector &&
-      ((selector.ids?.length ?? 0) > 0 ||
-        (selector.nodeIds?.length ?? 0) > 0 ||
-        (selector.edgeIds?.length ?? 0) > 0 ||
-        (selector.kinds?.length ?? 0) > 0 ||
-        (selector.labels?.length ?? 0) > 0),
+    ((selector.ids?.length ?? 0) > 0 ||
+      (selector.nodeIds?.length ?? 0) > 0 ||
+      (selector.edgeIds?.length ?? 0) > 0 ||
+      (selector.kinds?.length ?? 0) > 0 ||
+      (selector.labels?.length ?? 0) > 0),
   );
 }
 
@@ -1681,15 +1681,16 @@ function applyShape(
   const resizedNodeIds: string[] = [];
   for (const node of targets.nodes) {
     node.shape = operation.shape;
-    node.points =
-      operation.shape === "polygon"
-        ? [
-            { x: node.width / 2, y: 0 },
-            { x: node.width, y: node.height / 2 },
-            { x: node.width / 2, y: node.height },
-            { x: 0, y: node.height / 2 },
-          ]
-        : undefined;
+    if (operation.shape === "polygon") {
+      node.points = [
+        { x: node.width / 2, y: 0 },
+        { x: node.width, y: node.height / 2 },
+        { x: node.width / 2, y: node.height },
+        { x: 0, y: node.height / 2 },
+      ];
+    } else {
+      delete node.points;
+    }
     if (operation.shape === "circle") {
       const size = Math.max(node.width, node.height);
       node.x -= (size - node.width) / 2;
@@ -2012,11 +2013,13 @@ function applyRemove(
   }
   const retained = scene.elements
     .filter((element) => !removedIds.has(element.id))
-    .map((element) =>
-      element.frameId && removedIds.has(element.frameId)
-        ? { ...element, frameId: undefined }
-        : element,
-    );
+    .map((element) => {
+      if (element.frameId && removedIds.has(element.frameId)) {
+        const { frameId: _removedFrameId, ...retainedElement } = element;
+        return retainedElement;
+      }
+      return element;
+    });
   scene.elements.splice(0, scene.elements.length, ...retained);
   const retainedOrder = scene.zOrder.filter((id) => !removedIds.has(id));
   scene.zOrder.splice(0, scene.zOrder.length, ...retainedOrder);

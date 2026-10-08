@@ -16,7 +16,7 @@ import {
 } from "@sketchi/diagram-scenarios/internal/tool-process";
 import { Effect, Schema } from "effect";
 
-class HarnessFilesystemError extends Schema.TaggedErrorClass<HarnessFilesystemError>()(
+class HarnessFilesystemError extends Schema.TaggedError<HarnessFilesystemError>()(
   "HarnessFilesystemError",
   {
     cause: Schema.Defect(),
@@ -25,7 +25,7 @@ class HarnessFilesystemError extends Schema.TaggedErrorClass<HarnessFilesystemEr
   },
 ) {}
 
-export class HarnessEvalUsageError extends Schema.TaggedErrorClass<HarnessEvalUsageError>()(
+export class HarnessEvalUsageError extends Schema.TaggedError<HarnessEvalUsageError>()(
   "HarnessEvalUsageError",
   {
     cause: Schema.optionalKey(Schema.Defect()),

@@ -1,12 +1,10 @@
 import {
   Effect,
-  Option,
   Result,
   Schema,
   SchemaAST,
   SchemaGetter,
   SchemaIssue,
-  SchemaParser,
 } from "effect";
 import type {
   StandardJSONSchemaV1,
@@ -31,7 +29,7 @@ export class ContractSchemaIssue extends Schema.Class<ContractSchemaIssue>(
   { identifier: undefined },
 ) {}
 
-export class ContractSchemaError extends Schema.TaggedErrorClass<ContractSchemaError>()(
+export class ContractSchemaError extends Schema.TaggedError<ContractSchemaError>()(
   "ContractSchemaError",
   { issues: Schema.Array(Schema.toEncoded(ContractSchemaIssue)) },
 ) {}
@@ -60,7 +58,7 @@ const contractLeafHook: SchemaIssue.LeafHook = (issue) => {
   if (issue._tag !== "InvalidType") {
     return SchemaIssue.defaultLeafHook(issue);
   }
-  const actual = Option.isSome(issue.actual) ? issue.actual.value : undefined;
+  const actual = SchemaIssue.hasInput(issue) ? issue.input : undefined;
   return `Invalid input: expected ${expectedType(issue.ast)}, received ${actualType(actual)}`;
 };
 
@@ -115,7 +113,10 @@ export function safeParseContract<S extends Schema.ConstraintDecoder<unknown>>(
   schema: S,
   input: unknown,
 ): ContractSafeParseResult<S["Type"]> {
-  const result = Schema.decodeUnknownResult(schema, { errors: "all" })(input);
+  const result = Schema.decodeUnknownResult(schema, {
+    errors: "all",
+    reportInput: true,
+  })(input);
   return Result.isSuccess(result)
     ? { data: result.success, success: true }
     : {
@@ -143,6 +144,8 @@ function withParser<S extends Schema.ConstraintDecoder<unknown>>(schema: S) {
 }
 
 const codeModeJsonSchemaAnnotationKeys = new Set([
+  "x-sketchi-default",
+  "x-sketchi-one-of",
   "const",
   "exclusiveMaximum",
   "exclusiveMinimum",
@@ -154,25 +157,81 @@ const codeModeJsonSchemaAnnotationKeys = new Set([
   "pattern",
 ]);
 
+const contractDefaultAnnotation = "x-sketchi-default";
+const contractOneOfAnnotation = "x-sketchi-one-of";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Effect 4 preserves soundness by downgrading `oneOf` to `anyOf` whenever a
+ * branch contains a JSON Schema approximation. Our tagged scene and patch
+ * unions remain mutually exclusive because every branch has a distinct
+ * discriminator, so retain their established public contract. Effect also
+ * renders property annotations on class-backed defaults through `allOf`; fold
+ * those metadata-only annotations back into the property schema.
+ */
+function normalizeCodeModeJsonSchema(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeCodeModeJsonSchema);
+  }
+  if (!isRecord(value)) return value;
+
+  const normalized = Object.fromEntries(
+    Object.entries(value).map(([key, nested]) => [
+      key,
+      normalizeCodeModeJsonSchema(nested),
+    ]),
+  );
+
+  const forceOneOf = normalized[contractOneOfAnnotation] === true;
+  delete normalized[contractOneOfAnnotation];
+  if (forceOneOf && Array.isArray(normalized["anyOf"])) {
+    normalized["oneOf"] = normalized["anyOf"];
+    delete normalized["anyOf"];
+  }
+
+  const allOf = normalized["allOf"];
+  if (Array.isArray(allOf)) {
+    const remaining: unknown[] = [];
+    for (const clause of allOf) {
+      if (
+        isRecord(clause) &&
+        Object.hasOwn(clause, contractDefaultAnnotation)
+      ) {
+        normalized["default"] = clause[contractDefaultAnnotation];
+      } else {
+        remaining.push(clause);
+      }
+    }
+    if (remaining.length === 0) delete normalized["allOf"];
+    else normalized["allOf"] = remaining;
+  }
+
+  return normalized;
+}
+
 export function toCodeModeJsonSchema(
   schema: Schema.Constraint,
 ): Record<string, unknown> {
   const document = Schema.toJsonSchemaDocument(Schema.toType(schema), {
     includeAnnotationKey: (key) => codeModeJsonSchemaAnnotationKeys.has(key),
+    onExcessProperty: "error",
   });
-  return {
+  return normalizeCodeModeJsonSchema({
     $schema: "https://json-schema.org/draft/2020-12/schema",
     ...document.schema,
     ...(Object.keys(document.definitions).length === 0
       ? {}
       : { $defs: document.definitions }),
-  };
+  }) as Record<string, unknown>;
 }
 
 function nonEmptyString() {
   const minimumLength = 1;
-  return Schema.String.annotate({ minLength: minimumLength }).check(
-    Schema.makeFilter((value) => value.length >= minimumLength, {
+  return Schema.String.check(
+    Schema.isMinLength(minimumLength, {
       message: "Too small: expected string to have >=1 characters",
     }),
   );
@@ -182,36 +241,17 @@ function nonEmptyArray<S extends Schema.Constraint>(schema: S) {
   const minimumLength = 1;
   return Schema.Array(schema)
     .pipe(Schema.mutable)
-    .annotate({ minItems: minimumLength })
     .check(
-      Schema.makeFilter((value) => value.length >= minimumLength, {
+      Schema.isMinLength(minimumLength, {
         message: "Too small: expected array to have >=1 items",
       }),
     );
 }
 
-function optionalContract<S extends Schema.Constraint>(schema: S) {
-  const present = Schema.declareConstructor<
-    S["Type"] | undefined,
-    S["Encoded"] | undefined
-  >()(
-    [schema],
-    ([value]) =>
-      (input, _ast, options) =>
-        input === undefined
-          ? Effect.succeed(undefined)
-          : SchemaParser.decodeUnknownEffect(value)(input, options),
-    {
-      toCodecJson: ([value]) =>
-        Schema.link<S["Encoded"] | undefined>()(value, {
-          decode: SchemaGetter.passthrough({ strict: false }),
-          encode: new SchemaGetter.Getter((input) =>
-            Effect.succeed(Option.filter(input, (item) => item !== undefined)),
-          ),
-        }),
-    },
-  );
-  return Schema.optionalKey(present);
+function optionalContract<S extends Schema.Constraint>(
+  schema: S,
+): Schema.optionalKey<S> {
+  return Schema.optionalKey(schema);
 }
 
 function requiredString<S extends Schema.Top>(schema: S): S["Rebuild"] {
@@ -252,60 +292,55 @@ function literals<
 }
 
 function stringLiteral<const Value extends string>(value: Value) {
-  return Schema.Literal(value).pipe(
-    Schema.decodeTo(
-      Schema.String.annotate({ const: value }).pipe(
-        Schema.refine((input): input is Value => input === value, {
-          message: `Invalid literal value, expected ${JSON.stringify(value)}`,
-        }),
-      ),
-    ),
-  );
+  return literalDeclaration<string, Value>(value, Schema.String);
 }
 
 function numberLiteral<const Value extends number>(value: Value) {
-  return Schema.Literal(value).pipe(
-    Schema.decodeTo(
-      Schema.Number.annotate({ const: value }).pipe(
-        Schema.refine((input): input is Value => input === value, {
-          message: `Invalid literal value, expected ${JSON.stringify(value)}`,
-        }),
-      ),
-    ),
-  );
+  return literalDeclaration<number, Value>(value, Schema.Number);
 }
 
 function booleanLiteral<const Value extends boolean>(value: Value) {
-  return Schema.Literal(value).pipe(
-    Schema.decodeTo(
-      Schema.Boolean.annotate({ const: value }).pipe(
-        Schema.refine((input): input is Value => input === value, {
-          message: `Invalid literal value, expected ${JSON.stringify(value)}`,
+  return literalDeclaration<boolean, Value>(value, Schema.Boolean);
+}
+
+function literalDeclaration<
+  Primitive extends string | number | boolean,
+  const Value extends Primitive,
+>(value: Value, primitive: Schema.Codec<Primitive>) {
+  const declaration = Schema.declareConstructor<Value>()(
+    [],
+    () => (input, ast, options) =>
+      input === value
+        ? Effect.succeed(value)
+        : Effect.fail(new SchemaIssue.InvalidType(ast, input, options)),
+    {
+      message: `Invalid literal value, expected ${JSON.stringify(value)}`,
+      toCodecJson: () =>
+        Schema.link<Value>()(primitive.annotate({ const: value }), {
+          decode: SchemaGetter.transform(() => value),
+          encode: SchemaGetter.transform((input) => input as Primitive),
         }),
-      ),
-    ),
+    },
   );
+  return Schema.Literal(value).pipe(Schema.decodeTo(declaration));
 }
 
 const NonEmptyString = nonEmptyString();
 const RequiredNonEmptyString = requiredString(NonEmptyString);
 const FiniteNumber = Schema.Finite;
 const positiveThreshold = 0;
-const PositiveNumber = Schema.Number.annotate({
-  exclusiveMinimum: positiveThreshold,
-}).check(
+const PositiveNumber = Schema.Number.check(
   Schema.isFinite(),
-  Schema.makeFilter((value) => value > positiveThreshold, {
+  Schema.isGreaterThan(positiveThreshold, {
     message: "Too small: expected number to be >0",
   }),
 );
-const hexColorPattern = /^#[0-9a-fA-F]{6}$/;
+const hexColorPattern = /^#[0-9a-fA-F]{6}$/u;
 function hexColor(defaultValue?: string) {
-  return Schema.String.annotate({
-    pattern: hexColorPattern.source,
-    ...(defaultValue === undefined ? {} : { default: defaultValue }),
-  }).check(
-    Schema.makeFilter((value) => hexColorPattern.test(value), {
+  return Schema.String.annotate(
+    defaultValue === undefined ? {} : { default: defaultValue },
+  ).check(
+    Schema.isPattern(hexColorPattern, {
       message: `Invalid string: must match pattern /${hexColorPattern.source}/`,
     }),
   );
@@ -571,7 +606,9 @@ const FlowchartDirection = literals(["TB", "LR"]);
 const flowchartDirectionDefault = "TB";
 const FlowchartDirectionWithDefault = FlowchartDirection.annotate({
   default: flowchartDirectionDefault,
-}).pipe(Schema.withDecodingDefault(Effect.succeed(flowchartDirectionDefault)));
+}).pipe(
+  Schema.withDecodingDefaultKey(Effect.succeed(flowchartDirectionDefault)),
+);
 
 export class FlowchartSpecLayout extends Schema.Class<FlowchartSpecLayout>(
   "FlowchartSpecLayout",
@@ -584,11 +621,11 @@ export class FlowchartSpecLayout extends Schema.Class<FlowchartSpecLayout>(
 
 const defaultAccentColor = SKETCHI_DIAGRAM_STYLE.accentColor;
 const DefaultAccentColor = hexColor(defaultAccentColor).pipe(
-  Schema.withDecodingDefault(Effect.succeed(defaultAccentColor)),
+  Schema.withDecodingDefaultKey(Effect.succeed(defaultAccentColor)),
 );
 const defaultBackgroundColor = SKETCHI_DIAGRAM_STYLE.backgroundColor;
 const DefaultBackgroundColor = hexColor(defaultBackgroundColor).pipe(
-  Schema.withDecodingDefault(Effect.succeed(defaultBackgroundColor)),
+  Schema.withDecodingDefaultKey(Effect.succeed(defaultBackgroundColor)),
 );
 
 export class FlowchartSpecStyle extends Schema.Class<FlowchartSpecStyle>(
@@ -601,24 +638,32 @@ export class FlowchartSpecStyle extends Schema.Class<FlowchartSpecStyle>(
   { identifier: undefined },
 ) {}
 
-const flowchartEdgesDefault: FlowchartSpecEdge[] = [];
+const flowchartEdgesDefault: Array<typeof FlowchartSpecEdge.Encoded> = [];
 const FlowchartEdgesWithDefault = Schema.Array(FlowchartSpecEdge)
   .pipe(Schema.mutable)
   .annotate({ default: flowchartEdgesDefault })
-  .pipe(Schema.withDecodingDefault(Effect.succeed(flowchartEdgesDefault)));
+  .pipe(Schema.withDecodingDefaultKey(Effect.succeed(flowchartEdgesDefault)));
 const flowchartLayoutDefault: { readonly direction: "TB" } = {
   direction: "TB",
 };
 const FlowchartLayoutWithDefault = FlowchartSpecLayout.annotate({
   default: flowchartLayoutDefault,
-}).pipe(Schema.withDecodingDefault(Effect.succeed(flowchartLayoutDefault)));
+}).pipe(
+  Schema.withDecodingDefaultKey(Effect.succeed(flowchartLayoutDefault)),
+  Schema.annotateKey({
+    [contractDefaultAnnotation]: flowchartLayoutDefault,
+  }),
+);
 const flowchartStyleDefault = {
   accentColor: SKETCHI_DIAGRAM_STYLE.accentColor,
   backgroundColor: SKETCHI_DIAGRAM_STYLE.backgroundColor,
 };
 const FlowchartStyleWithDefault = FlowchartSpecStyle.annotate({
   default: flowchartStyleDefault,
-}).pipe(Schema.withDecodingDefault(Effect.succeed(flowchartStyleDefault)));
+}).pipe(
+  Schema.withDecodingDefaultKey(Effect.succeed(flowchartStyleDefault)),
+  Schema.annotateKey({ [contractDefaultAnnotation]: flowchartStyleDefault }),
+);
 export class FlowchartSpec extends Schema.Class<FlowchartSpec>("FlowchartSpec")(
   {
     id: optionalContract(NonEmptyString),
@@ -661,25 +706,25 @@ export class SequenceMessageSpec extends Schema.Class<SequenceMessageSpec>(
   { identifier: undefined },
 ) {}
 
-const sequenceMessagesDefault: SequenceMessageSpec[] = [];
+const sequenceMessagesDefault: Array<typeof SequenceMessageSpec.Encoded> = [];
 const SequenceMessagesWithDefault = Schema.Array(SequenceMessageSpec)
   .pipe(Schema.mutable)
   .annotate({ default: sequenceMessagesDefault })
-  .pipe(Schema.withDecodingDefault(Effect.succeed(sequenceMessagesDefault)));
+  .pipe(Schema.withDecodingDefaultKey(Effect.succeed(sequenceMessagesDefault)));
 const sequenceStyleDefault = {
   accentColor: SKETCHI_DIAGRAM_STYLE.accentColor,
   backgroundColor: SKETCHI_DIAGRAM_STYLE.backgroundColor,
 };
 const SequenceStyleWithDefault = Schema.Struct({
   accentColor: hexColor(defaultAccentColor).pipe(
-    Schema.withDecodingDefault(Effect.succeed(defaultAccentColor)),
+    Schema.withDecodingDefaultKey(Effect.succeed(defaultAccentColor)),
   ),
   backgroundColor: hexColor(defaultBackgroundColor).pipe(
-    Schema.withDecodingDefault(Effect.succeed(defaultBackgroundColor)),
+    Schema.withDecodingDefaultKey(Effect.succeed(defaultBackgroundColor)),
   ),
 })
   .annotate({ default: sequenceStyleDefault })
-  .pipe(Schema.withDecodingDefault(Effect.succeed(sequenceStyleDefault)));
+  .pipe(Schema.withDecodingDefaultKey(Effect.succeed(sequenceStyleDefault)));
 
 export class SequenceDiagramSpec extends Schema.Class<SequenceDiagramSpec>(
   "SequenceDiagramSpec",
@@ -708,15 +753,12 @@ const InlineArtifactsOption = optionalContract(
 const minimumQualityScore = 0;
 const maximumQualityScore = 10;
 const QualityScoreOption = optionalContract(
-  Schema.Number.annotate({
-    minimum: minimumQualityScore,
-    maximum: maximumQualityScore,
-  }).check(
+  Schema.Number.check(
     Schema.isFinite(),
-    Schema.makeFilter((value) => value >= minimumQualityScore, {
+    Schema.isGreaterThanOrEqualTo(minimumQualityScore, {
       message: `Too small: expected number to be >=${minimumQualityScore}`,
     }),
-    Schema.makeFilter((value) => value <= maximumQualityScore, {
+    Schema.isLessThanOrEqualTo(maximumQualityScore, {
       message: `Too big: expected number to be <=${maximumQualityScore}`,
     }),
   ),
@@ -845,10 +887,8 @@ function hasSemanticText(value: string): boolean {
 }
 
 const semanticTextMinimumLength = 1;
-const MindmapSemanticString = Schema.String.annotate({
-  minLength: semanticTextMinimumLength,
-}).check(
-  Schema.makeFilter((value) => value.length >= semanticTextMinimumLength, {
+const MindmapSemanticString = Schema.String.check(
+  Schema.isMinLength(semanticTextMinimumLength, {
     message: `Too small: expected string to have >=${semanticTextMinimumLength} characters`,
   }),
   Schema.makeFilter(hasSemanticText, {
@@ -878,7 +918,7 @@ export class MindmapSpecLayout extends Schema.Class<MindmapSpecLayout>(
   {
     direction: literals(["LR", "RL"])
       .annotate({ default: "LR" })
-      .pipe(Schema.withDecodingDefault(Effect.succeed("LR"))),
+      .pipe(Schema.withDecodingDefaultKey(Effect.succeed("LR"))),
   },
   { identifier: undefined },
 ) {}
@@ -888,23 +928,28 @@ const mindmapLayoutDefault: { readonly direction: "LR" } = {
 };
 const MindmapLayoutWithDefault = MindmapSpecLayout.annotate({
   default: mindmapLayoutDefault,
-}).pipe(Schema.withDecodingDefault(Effect.succeed(mindmapLayoutDefault)));
+}).pipe(
+  Schema.withDecodingDefaultKey(Effect.succeed(mindmapLayoutDefault)),
+  Schema.annotateKey({ [contractDefaultAnnotation]: mindmapLayoutDefault }),
+);
 const mindmapStyleDefault = {
   accentColor: SKETCHI_DIAGRAM_STYLE.accentColor,
   backgroundColor: SKETCHI_DIAGRAM_STYLE.backgroundColor,
 };
 const MindmapStyleWithDefault = Schema.Struct({
   accentColor: hexColor(defaultAccentColor).pipe(
-    Schema.withDecodingDefault(Effect.succeed(mindmapStyleDefault.accentColor)),
+    Schema.withDecodingDefaultKey(
+      Effect.succeed(mindmapStyleDefault.accentColor),
+    ),
   ),
   backgroundColor: hexColor(mindmapStyleDefault.backgroundColor).pipe(
-    Schema.withDecodingDefault(
+    Schema.withDecodingDefaultKey(
       Effect.succeed(mindmapStyleDefault.backgroundColor),
     ),
   ),
 })
   .annotate({ default: mindmapStyleDefault })
-  .pipe(Schema.withDecodingDefault(Effect.succeed(mindmapStyleDefault)));
+  .pipe(Schema.withDecodingDefaultKey(Effect.succeed(mindmapStyleDefault)));
 
 const MindmapSpecContract = Schema.Struct({
   id: optionalContract(NonEmptyString),
@@ -950,7 +995,7 @@ const CanvasCompositionFields = {
   layerId: optionalContract(NonEmptyString).pipe(Schema.mutableKey),
   locked: optionalContract(Schema.Boolean).pipe(Schema.mutableKey),
   opacity: optionalContract(
-    Schema.Number.annotate({ minimum: 0, maximum: 100 }).check(
+    Schema.Number.check(
       Schema.isFinite(),
       Schema.isBetween({ minimum: 0, maximum: 100 }),
     ),
@@ -977,20 +1022,13 @@ const CanvasArrowhead = Schema.NullOr(
 
 const CanvasPointList = Schema.Array(ScenePoint)
   .pipe(Schema.mutable)
-  .annotate({
-    minItems: 2,
-    maxItems: CANVAS_LIMITS.maxPointsPerElement,
-  })
   .check(
-    Schema.makeFilter((value) => value.length >= 2, {
+    Schema.isMinLength(2, {
       message: "Too small: expected array to have >=2 items",
     }),
-    Schema.makeFilter(
-      (value) => value.length <= CANVAS_LIMITS.maxPointsPerElement,
-      {
-        message: `Too big: expected array to have <=${CANVAS_LIMITS.maxPointsPerElement} items`,
-      },
-    ),
+    Schema.isMaxLength(CANVAS_LIMITS.maxPointsPerElement, {
+      message: `Too big: expected array to have <=${CANVAS_LIMITS.maxPointsPerElement} items`,
+    }),
   );
 
 export class NodeSceneElement extends Schema.Class<NodeSceneElement>(
@@ -1141,8 +1179,8 @@ export class CanvasGridLayout extends Schema.Class<CanvasGridLayout>(
   {
     type: stringLiteral("grid"),
     ids: CanvasLayoutIds,
-    columns: Schema.Int.annotate({ minimum: 1 }).check(
-      Schema.makeFilter((value) => value >= 1, {
+    columns: Schema.Int.check(
+      Schema.isGreaterThanOrEqualTo(1, {
         message: "Too small: expected number to be >=1",
       }),
     ),
@@ -1192,7 +1230,7 @@ export const SceneElementSchema = Schema.Union(
     FrameSceneElement,
   ],
   { mode: "oneOf" },
-);
+).annotate({ [contractOneOfAnnotation]: true });
 
 const CanvasLayoutSchema = Schema.Union(
   [
@@ -1207,15 +1245,15 @@ const CanvasLayoutSchema = Schema.Union(
 const EmptyCanvasLayers = Schema.Array(CanvasLayer)
   .pipe(Schema.mutable)
   .annotate({ default: [], maxItems: CANVAS_LIMITS.maxLayers })
-  .pipe(Schema.withDecodingDefault(Effect.succeed([])));
+  .pipe(Schema.withDecodingDefaultKey(Effect.succeed([])));
 const EmptyCanvasLayouts = Schema.Array(CanvasLayoutSchema)
   .pipe(Schema.mutable)
   .annotate({ default: [], maxItems: CANVAS_LIMITS.maxLayouts })
-  .pipe(Schema.withDecodingDefault(Effect.succeed([])));
+  .pipe(Schema.withDecodingDefaultKey(Effect.succeed([])));
 const EmptyCanvasZOrder = Schema.Array(NonEmptyString)
   .pipe(Schema.mutable)
   .annotate({ default: [], maxItems: CANVAS_LIMITS.maxZOrderEntries })
-  .pipe(Schema.withDecodingDefault(Effect.succeed([])));
+  .pipe(Schema.withDecodingDefaultKey(Effect.succeed([])));
 
 export class CanvasSpec extends Schema.Class<CanvasSpec>("CanvasSpec")(
   {
@@ -1496,6 +1534,7 @@ export const DiagramPatchOperationSchema = Schema.Union(
   ],
   { mode: "oneOf" },
 ).annotate({
+  [contractOneOfAnnotation]: true,
   message: `Invalid discriminator value. Expected ${DIAGRAM_PATCH_OPERATION_NAMES.map(
     (name) => `'${name}'`,
   ).join(" | ")}`,
@@ -1548,9 +1587,7 @@ export class ApplyDiagramPatchRequest extends Schema.Class<ApplyDiagramPatchRequ
     source: DiagramPatchSourceSchema.annotateKey({
       messageMissingKey: "Invalid input",
     }),
-    operations: requiredArray(nonEmptyArray(DiagramPatchOperationSchema)).pipe(
-      Schema.annotateEncoded({ minItems: 1 }),
-    ),
+    operations: requiredArray(nonEmptyArray(DiagramPatchOperationSchema)),
     options: optionalContract(ApplyDiagramPatchOptions),
     intent: optionalContract(NonEmptyString),
   },

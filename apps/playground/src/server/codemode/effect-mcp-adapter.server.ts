@@ -169,19 +169,34 @@ function filterIssue(
   path: ReadonlyArray<PropertyKey>,
 ): McpValidationIssue {
   const message = "Invalid input";
-  const metadata = issue.filter.annotations?.meta;
-  if (!isRecord(metadata) || typeof metadata._tag !== "string") {
+  const representation = issue.filter.annotations?.representation;
+  const legacyMetadata = issue.filter.annotations?.meta;
+  const metadata = isRecord(representation) ? representation : legacyMetadata;
+  if (!isRecord(metadata)) {
     return { code: "custom", path, message };
   }
+  const representationId = metadata["id"];
+  const tag =
+    typeof representationId === "string"
+      ? representationId.replace("effect/schema/", "")
+      : metadata["_tag"];
+  if (typeof tag !== "string") {
+    return { code: "custom", path, message };
+  }
+  const payload = isRecord(metadata["payload"])
+    ? metadata["payload"]
+    : metadata;
 
-  const origin = actualType(issue.actual);
-  switch (metadata._tag) {
+  const origin = actualType(
+    SchemaIssue.hasInput(issue) ? issue.input : undefined,
+  );
+  switch (tag) {
     case "isInt":
       return invalidTypeIssue("int", path, "safeint");
     case "isFinite":
       return invalidTypeIssue("number", path);
     case "isMinLength": {
-      const minimum = numberField(metadata, "minLength");
+      const minimum = numberField(payload, "minLength");
       return minimum === undefined
         ? { code: "custom", path, message }
         : {
@@ -194,7 +209,7 @@ function filterIssue(
           };
     }
     case "isMaxLength": {
-      const maximum = numberField(metadata, "maxLength");
+      const maximum = numberField(payload, "maxLength");
       return maximum === undefined
         ? { code: "custom", path, message }
         : {
@@ -208,28 +223,34 @@ function filterIssue(
     }
     case "isGreaterThan":
     case "isGreaterThanOrEqualTo": {
-      const minimum = numberField(metadata, "minimum");
+      const minimum = numberField(
+        payload,
+        tag === "isGreaterThan" ? "exclusiveMinimum" : "minimum",
+      );
       return minimum === undefined
         ? { code: "custom", path, message }
         : {
             origin,
             code: "too_small",
             minimum,
-            inclusive: metadata._tag === "isGreaterThanOrEqualTo",
+            inclusive: tag === "isGreaterThanOrEqualTo",
             path,
             message,
           };
     }
     case "isLessThan":
     case "isLessThanOrEqualTo": {
-      const maximum = numberField(metadata, "maximum");
+      const maximum = numberField(
+        payload,
+        tag === "isLessThan" ? "exclusiveMaximum" : "maximum",
+      );
       return maximum === undefined
         ? { code: "custom", path, message }
         : {
             origin,
             code: "too_big",
             maximum,
-            inclusive: metadata._tag === "isLessThanOrEqualTo",
+            inclusive: tag === "isLessThanOrEqualTo",
             path,
             message,
           };
@@ -306,6 +327,7 @@ function decodeEffectSchema<
   | { readonly value: InputSchema["Type"] } {
   const result = SchemaParser.decodeUnknownResult(schema, {
     errors: "all",
+    reportInput: true,
   })(input);
   return Result.isFailure(result)
     ? { issues: validationIssues(result.failure) }

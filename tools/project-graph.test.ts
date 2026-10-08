@@ -85,9 +85,7 @@ const intendedCompositeReferences = [
   "packages/svg-excalidraw/tsconfig.lib.json",
   "tools/sketchi-generators/tsconfig.lib.json",
 ];
-const reviewedEffectUnstableAdapterPaths = [
-  "apps/cli/src/internal/effect-unstable-cli.ts",
-];
+const reviewedEffectUnstableAdapterPaths: string[] = [];
 const effectDependencyManifestPaths = [
   "apps/cli/package.json",
   "apps/eval-harness/package.json",
@@ -202,7 +200,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 const approvedManagedPromiseFiles = Object.keys(
   approvedManagedPromiseSiteCounts,
 ).sort();
-const approvedEffectDependencyVersions = new Set(["4.0.0-beta.99"]);
+const approvedEffectDependencyVersions = new Set(["4.0.1"]);
 const diagramPackages = [
   {
     name: "diagram-agent",
@@ -735,10 +733,8 @@ describe("diagram generation project boundaries", () => {
     const rootManifest = readJsonFile<PackageManifest>(
       path.join(workspaceRoot, "package.json"),
     );
-    expect(rootManifest.dependencies?.["effect"]).toBe("4.0.0-beta.99");
-    expect(rootManifest.devDependencies?.["@effect/vitest"]).toBe(
-      "4.0.0-beta.99",
-    );
+    expect(rootManifest.dependencies?.["effect"]).toBe("4.0.1");
+    expect(rootManifest.devDependencies?.["@effect/vitest"]).toBe("4.0.1");
     expect(
       readFileSync(path.join(workspaceRoot, "pnpm-lock.yaml"), "utf8"),
     ).not.toContain("effect@3.");
@@ -932,8 +928,8 @@ describe("Effect structural guards", () => {
       invalidEffectDependencyPins({
         dependencies: {
           "@effect/platform": "^4.0.0",
-          "@effect/platform-node": "4.0.0-beta.99",
-          effect: "4.0.0-beta.99",
+          "@effect/platform-node": "4.0.1",
+          effect: "4.0.1",
         },
       }),
     ).toEqual([{ dependency: "@effect/platform", version: "^4.0.0" }]);

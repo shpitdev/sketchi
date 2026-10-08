@@ -12,9 +12,9 @@
 <p align="center">
   <a href="https://sketchi.app/"><img alt="Website" src="https://img.shields.io/badge/sketchi.app-live-765264" /></a>
   <a href="https://www.npmjs.com/package/sketchi"><img alt="npm version" src="https://img.shields.io/npm/v/sketchi?logo=npm&color=CB3837" /></a>
-  <a href="https://nx.dev/"><img alt="Nx" src="https://img.shields.io/badge/Nx-22-143055?logo=nx" /></a>
+  <a href="https://nx.dev/"><img alt="Nx" src="https://img.shields.io/badge/Nx-23-143055?logo=nx" /></a>
   <a href="https://workers.cloudflare.com/"><img alt="Cloudflare Workers" src="https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white" /></a>
-  <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white" /></a>
+  <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white" /></a>
   <a href="https://excalidraw.com/"><img alt="Excalidraw" src="https://img.shields.io/badge/output-Excalidraw-6965DB" /></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2F855A" /></a>
 </p>
@@ -172,11 +172,17 @@ repository migration and its historical before tree are recorded in the
 
 ## Quick Start
 
-Prerequisites: Node.js compatible with the pinned toolchain, Corepack, and pnpm
-`11.5.0`.
+The project-local [mise](https://mise.jdx.dev/) configuration pins Node 26.10.0
+and native pnpm 12.10.1. The workspace uses stable native TypeScript 7.0.2 as
+`tsc` while the `typescript` module and `tsc6` expose the supported TypeScript
+6.0.3 compiler API for Nx and ESLint through the official
+`@typescript/typescript6@6.0.2` compatibility package. Activate mise in your
+shell, then install the exact tools and dependencies:
 
 ```sh
-pnpm install
+mise trust
+mise install
+mise exec -- pnpm install
 pnpm dev
 ```
 
@@ -188,13 +194,19 @@ a `dev` target in parallel through Portless.
 Required workspace proof:
 
 ```sh
+pnpm run toolchain:verify
 pnpm run test:deploy-scripts
 pnpm run test:tools
 pnpm nx run-many -t lint,typecheck,test,build
+pnpm nx run-many -t typecheck-native
 pnpm run test:wrangler-dry-runs
 pnpm nx build-storybook diagram-ui
-pnpm exec tsc -b --pretty false
+pnpm exec tsc6 -b --pretty false
 ```
+
+The [MCP SDK compatibility note](docs/mcp-sdk-compatibility.md) records the
+bounded server-only exception that keeps the deployed handlers on the patched
+SDK while Cloudflare's exact peer metadata remains stale.
 
 For a CLI change that should ship, run `pnpm changeset` and commit the generated
 changeset with the change. Changesets maintains a Version Packages PR on `main`;

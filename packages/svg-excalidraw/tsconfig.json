@@ -3,7 +3,8 @@
   "compilerOptions": {
     "composite": true,
     "rootDir": ".",
-    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "src/**/*.ts",
