@@ -5,11 +5,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { withCors } from "./cors-policy.js";
-import {
-  getIconDetail,
-  parseIconLimit,
-  searchIconResults,
-} from "./api.server.js";
+import { getIconDetail, searchIconResults } from "./api.server.js";
 import type { IconSourceLoader } from "./catalog.server.js";
 
 const SEARCH_ICONS_TOOL = {
@@ -130,9 +126,7 @@ export function createIconMcpServer(options: IconMcpServerOptions): Server {
       const collection = optionalString(input, "collection");
       const result = searchIconResults({
         ...(collection ? { collection } : {}),
-        limit: parseIconLimit(
-          typeof limitValue === "number" ? String(limitValue) : null,
-        ),
+        ...(typeof limitValue === "number" ? { limit: limitValue } : {}),
         origin,
         ...(q ? { query: q } : {}),
       });

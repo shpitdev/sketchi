@@ -1,6 +1,7 @@
 import { BrandIcon } from "../brand-icon/index.js";
 import { CopyButton } from "../copy-button/index.js";
 import {
+  REPO_URL,
   CLI_NODE_REQUIREMENT,
   CLI_NPM_URL,
   CLI_PACKAGE_NAME,
@@ -30,11 +31,9 @@ const defaultNav: readonly DocsNavEntry[] = [
   { href: "#faq", label: "FAQ" },
 ];
 
-const DEFAULT_REPO_URL = "https://github.com/shpitdev/sketchi";
-
 export function DocsView({
   nav = defaultNav,
-  repoUrl = DEFAULT_REPO_URL,
+  repoUrl = REPO_URL,
   surfaceUrls = DEFAULT_WEB_SURFACE_URLS,
 }: DocsViewProps) {
   const liveExampleUrl = `${surfaceUrls.playground}/examples/how-it-works`;

@@ -3,26 +3,21 @@ import type {
   DiagramGenerationCandidateSummary,
   DiagramGenerationProviderId,
 } from "@sketchi/diagram-generation";
-import type { ExcalidrawScene } from "@sketchi/diagram-excalidraw";
 import {
-  buildScenarioPromptParts,
   evaluateScenarioFixture,
   evaluateScenarioOutput,
   flowchartScenarios,
   type DiagramScenario,
   type ScenarioEvaluation,
 } from "@sketchi/diagram-scenarios";
-import { Store, useStore } from "@tanstack/react-store";
-import { useCallback, useMemo } from "react";
+import { useStore } from "@tanstack/react-store";
+import { useMemo, useState } from "react";
 
-import { ExcalidrawSceneCanvas } from "../excalidraw-scene-canvas/index.js";
-import { GenerationRunPanel } from "../generation-run-panel/index.js";
-import { JsonCodeEditor } from "../json-code-editor/index.js";
-import { PromptMessageViewer } from "../prompt-message-viewer/index.js";
-import {
-  ScenarioSuitePanel,
-  type ScenarioSuitePanelResult,
-} from "../scenario-suite-panel/index.js";
+import type { ScenarioSuitePanelResult } from "../scenario-suite-panel/index.js";
+import { createPlaygroundStore } from "./playground-store.js";
+import { PlaygroundControls } from "./playground-controls.js";
+import { PlaygroundCanvas } from "./playground-canvas.js";
+import { PlaygroundInspector } from "./playground-inspector.js";
 
 export interface ScenarioGenerationRequest {
   cacheMode: DiagramGenerationCacheMode;
@@ -43,31 +38,9 @@ export interface ScenarioPlaygroundProps {
   scenarios?: readonly DiagramScenario[];
 }
 
-interface EvaluationState {
+export interface EvaluationState {
   error?: string;
   result?: ScenarioEvaluation;
-}
-
-type InspectorPanel = "ir" | "prompt" | "excalidraw";
-type PlaygroundMode = "deterministic" | "llm";
-
-interface PlaygroundState {
-  cacheMode: DiagramGenerationCacheMode;
-  candidateText: string;
-  canvasRevision: number;
-  editedExcalidrawScene: ExcalidrawScene | undefined;
-  editedExcalidrawSceneSignature: string | undefined;
-  generationCandidates: readonly DiagramGenerationCandidateSummary[];
-  generationError: string | undefined;
-  generationRunToken: number;
-  generationStatus: "idle" | "running" | "complete" | "error";
-  inspectorPanel: InspectorPanel;
-  mode: PlaygroundMode;
-  scenarioId: string;
-  selectedSuiteScenarioIds: readonly string[];
-  suiteError: string | undefined;
-  suiteResults: readonly ScenarioSuitePanelResult[];
-  suiteStatus: "idle" | "running" | "complete" | "error";
 }
 
 function evaluateCandidate(
@@ -90,41 +63,9 @@ function evaluateCandidate(
   }
 }
 
-function formatJson(value: unknown): string {
-  return JSON.stringify(value, null, 2);
-}
-
 const defaultGenerationProviders: readonly DiagramGenerationProviderId[] = [
   "cloudflare-google-ai-studio",
 ];
-
-function createInitialState(
-  scenarios: readonly DiagramScenario[],
-  initialScenarioId?: string,
-): PlaygroundState {
-  const selectedScenario =
-    scenarios.find((scenario) => scenario.id === initialScenarioId) ??
-    scenarios[0];
-
-  return {
-    cacheMode: "default",
-    candidateText: "",
-    canvasRevision: 0,
-    editedExcalidrawScene: undefined,
-    editedExcalidrawSceneSignature: undefined,
-    generationCandidates: [],
-    generationError: undefined,
-    generationRunToken: 0,
-    generationStatus: "idle",
-    inspectorPanel: "ir",
-    mode: "deterministic",
-    scenarioId: selectedScenario?.id ?? "",
-    selectedSuiteScenarioIds: selectedScenario ? [selectedScenario.id] : [],
-    suiteError: undefined,
-    suiteResults: [],
-    suiteStatus: "idle",
-  };
-}
 
 function pickCandidateText(
   candidates: readonly DiagramGenerationCandidateSummary[],
@@ -139,17 +80,6 @@ function pickCandidateText(
     validCandidate?.text ??
     candidates.find((candidate) => candidate.text)?.text
   );
-}
-
-function replaceSuiteResult(
-  results: readonly ScenarioSuitePanelResult[],
-  nextResult: ScenarioSuitePanelResult,
-): ScenarioSuitePanelResult[] {
-  const nextResults = results.filter(
-    (result) => result.scenarioId !== nextResult.scenarioId,
-  );
-
-  return [...nextResults, nextResult];
 }
 
 function suiteRunResult(
@@ -198,20 +128,13 @@ function summarizeSuiteRun(
   });
 }
 
-function toggleId(ids: readonly string[], id: string): string[] {
-  return ids.includes(id)
-    ? ids.filter((existingId) => existingId !== id)
-    : [...ids, id];
-}
-
 export function ScenarioPlayground({
   initialScenarioId,
   onGenerateScenario,
   scenarios = flowchartScenarios,
 }: ScenarioPlaygroundProps) {
-  const store = useMemo(
-    () => new Store(createInitialState(scenarios, initialScenarioId)),
-    [initialScenarioId, scenarios],
+  const [{ store, actions }] = useState(() =>
+    createPlaygroundStore(scenarios, initialScenarioId),
   );
   const state = useStore(store, (current) => current);
   const selectedScenario =
@@ -230,9 +153,6 @@ export function ScenarioPlayground({
         : undefined,
     [selectedScenario, state.candidateText],
   );
-  const promptParts = selectedScenario
-    ? buildScenarioPromptParts(selectedScenario)
-    : undefined;
   const activeEvaluation: EvaluationState =
     state.mode === "llm"
       ? (candidateEvaluation ?? {})
@@ -240,13 +160,8 @@ export function ScenarioPlayground({
         ? { result: fixtureEvaluation }
         : {};
   const activeResult = activeEvaluation?.result;
-  const checks = activeResult?.checks ?? [];
-  const displayedScene =
-    state.editedExcalidrawScene ?? activeResult?.excalidrawScene;
   const busy =
     state.generationStatus === "running" || state.suiteStatus === "running";
-  const mainPanelLabel =
-    state.mode === "llm" ? "Live candidate" : "Fixture conversion";
   const statusOk =
     state.mode === "llm"
       ? Boolean(candidateEvaluation?.result?.ok) && !candidateEvaluation?.error
@@ -268,56 +183,6 @@ export function ScenarioPlayground({
       : statusLabel === "Ready" || statusLabel === "Running"
         ? "sketchi-scenario-playground__status sketchi-scenario-playground__status--ready"
         : "sketchi-scenario-playground__status sketchi-scenario-playground__status--failed";
-  const inspectorTabs: Array<{ id: InspectorPanel; label: string }> =
-    state.mode === "llm"
-      ? [
-          { id: "ir", label: "Candidate IR" },
-          { id: "prompt", label: "Messages" },
-          { id: "excalidraw", label: "Excalidraw JSON" },
-        ]
-      : [
-          { id: "ir", label: "Fixture IR" },
-          { id: "excalidraw", label: "Excalidraw JSON" },
-        ];
-
-  function setMode(mode: PlaygroundMode) {
-    store.setState((current) =>
-      current.mode === mode
-        ? current
-        : {
-            ...current,
-            editedExcalidrawScene: undefined,
-            editedExcalidrawSceneSignature: undefined,
-            inspectorPanel:
-              mode === "deterministic"
-                ? current.inspectorPanel === "prompt"
-                  ? "ir"
-                  : current.inspectorPanel
-                : current.candidateText.trim().length > 0
-                  ? "ir"
-                  : "prompt",
-            mode,
-          },
-    );
-  }
-
-  function resetScenario(nextScenario: DiagramScenario) {
-    store.setState((current) => ({
-      ...current,
-      candidateText: "",
-      canvasRevision: current.canvasRevision + 1,
-      editedExcalidrawScene: undefined,
-      editedExcalidrawSceneSignature: undefined,
-      generationCandidates: [],
-      generationError: undefined,
-      generationRunToken: current.generationRunToken + 1,
-      generationStatus:
-        current.generationStatus === "running" ? "running" : "idle",
-      inspectorPanel: current.mode === "llm" ? "prompt" : "ir",
-      scenarioId: nextScenario.id,
-    }));
-  }
-
   async function runScenario(
     scenario: DiagramScenario,
     focusCandidate: boolean,
@@ -337,33 +202,14 @@ export function ScenarioPlayground({
       generationResult.candidates,
     );
 
-    store.setState((current) => ({
-      ...current,
-      suiteResults: replaceSuiteResult(current.suiteResults, suiteSummary),
-    }));
-
-    if (
-      !focusCandidate ||
-      store.state.scenarioId !== scenario.id ||
-      store.state.generationRunToken !== runToken
-    ) {
-      return generationResult;
-    }
-
-    const nextCandidateText = pickCandidateText(generationResult.candidates);
-
-    store.setState((current) => ({
-      ...current,
-      candidateText: nextCandidateText ?? "",
-      canvasRevision: current.canvasRevision + 1,
-      editedExcalidrawScene: undefined,
-      editedExcalidrawSceneSignature: undefined,
-      generationCandidates: generationResult.candidates,
-      generationError: undefined,
-      generationStatus: "complete",
-      inspectorPanel: "ir",
-      mode: "llm",
-    }));
+    actions.updateSuiteResult(suiteSummary);
+    actions.applyRunResult(
+      scenario.id,
+      generationResult,
+      runToken,
+      focusCandidate,
+      pickCandidateText(generationResult.candidates) ?? "",
+    );
 
     return generationResult;
   }
@@ -378,36 +224,14 @@ export function ScenarioPlayground({
       return;
     }
 
-    const runToken = store.state.generationRunToken + 1;
-    store.setState((current) => ({
-      ...current,
-      generationRunToken: runToken,
-      generationError: undefined,
-      generationStatus: "running",
-      mode: "llm",
-      suiteError: undefined,
-    }));
+    const runToken = actions.startGeneration();
 
     try {
       await runScenario(selectedScenario, true);
     } catch (error) {
-      if (
-        store.state.scenarioId !== selectedScenario.id ||
-        store.state.generationRunToken !== runToken
-      )
-        return;
-      store.setState((current) => ({
-        ...current,
-        generationError:
-          error instanceof Error ? error.message : "Generation failed.",
-        generationStatus: "error",
-      }));
+      actions.failGeneration(selectedScenario.id, runToken, error);
     } finally {
-      store.setState((current) =>
-        current.generationStatus === "running"
-          ? { ...current, generationStatus: "idle" }
-          : current,
-      );
+      actions.finishGeneration();
     }
   }
 
@@ -428,57 +252,25 @@ export function ScenarioPlayground({
       return;
     }
 
-    store.setState((current) => ({
-      ...current,
-      mode: "llm",
-      suiteError: undefined,
-      suiteStatus: "running",
-    }));
+    actions.startSuite();
 
     try {
       for (const scenario of selectedScenarios) {
-        store.setState((current) => ({
-          ...current,
-          suiteResults: replaceSuiteResult(current.suiteResults, {
-            message: "Running",
-            scenarioId: scenario.id,
-            status: "running",
-            title: scenario.title,
-          }),
-        }));
+        actions.updateSuiteResult({
+          message: "Running",
+          scenarioId: scenario.id,
+          status: "running",
+          title: scenario.title,
+        });
 
         await runScenario(scenario, scenario.id === selectedScenario?.id);
       }
 
-      store.setState((current) => ({
-        ...current,
-        suiteStatus: "complete",
-      }));
+      actions.completeSuite();
     } catch (error) {
-      store.setState((current) => ({
-        ...current,
-        suiteError:
-          error instanceof Error ? error.message : "Scenario suite failed.",
-        suiteStatus: "error",
-      }));
+      actions.failSuite(error);
     }
   }
-
-  const handleSceneChange = useCallback(
-    (scene: ExcalidrawScene) => {
-      const signature = JSON.stringify(scene);
-      store.setState((current) =>
-        current.editedExcalidrawSceneSignature === signature
-          ? current
-          : {
-              ...current,
-              editedExcalidrawScene: scene,
-              editedExcalidrawSceneSignature: signature,
-            },
-      );
-    },
-    [store],
-  );
 
   return (
     <section className="sketchi-scenario-playground">
@@ -491,276 +283,34 @@ export function ScenarioPlayground({
       </header>
 
       <div className="sketchi-scenario-playground__layout">
-        <aside className="sketchi-scenario-playground__controls">
-          <div
-            aria-label="Scenario type"
-            className="sketchi-scenario-playground__mode-tabs"
-            role="tablist"
-          >
-            <button
-              aria-selected={state.mode === "deterministic"}
-              onClick={() => setMode("deterministic")}
-              role="tab"
-              type="button"
-            >
-              Fixture conversion
-            </button>
-            <button
-              aria-selected={state.mode === "llm"}
-              onClick={() => setMode("llm")}
-              role="tab"
-              type="button"
-            >
-              Live generation
-            </button>
-          </div>
-
-          {state.mode === "deterministic" ? (
-            <label className="sketchi-scenario-playground__scenario-selector">
-              Scenario
-              <select
-                value={selectedScenario?.id}
-                onChange={(event) => {
-                  const nextScenario = scenarios.find(
-                    (scenario) => scenario.id === event.target.value,
-                  );
-                  if (nextScenario) {
-                    resetScenario(nextScenario);
-                  }
-                }}
-              >
-                {scenarios.map((scenario) => (
-                  <option key={scenario.id} value={scenario.id}>
-                    {scenario.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-
-          {selectedScenario ? (
-            <section className="sketchi-scenario-playground__scenario-card">
-              <h2>{selectedScenario.title}</h2>
-              <p>{selectedScenario.description}</p>
-              <div>
-                <span>{selectedScenario.difficulty}</span>
-                <span>
-                  {selectedScenario.expectedDiagram.nodes.length} nodes
-                </span>
-                <span>
-                  {selectedScenario.expectedDiagram.edges.length} edges
-                </span>
-              </div>
-            </section>
-          ) : null}
-
-          {state.mode === "llm" ? (
-            <GenerationRunPanel
-              cacheMode={state.cacheMode}
-              candidates={state.generationCandidates}
-              disabled={!onGenerateScenario || busy}
-              {...(state.generationError
-                ? { error: state.generationError }
-                : {})}
-              onCacheModeChange={(cacheMode) =>
-                store.setState((current) => ({
-                  ...current,
-                  cacheMode,
-                }))
-              }
-              onRun={runGeneration}
-              running={state.generationStatus === "running"}
-            />
-          ) : null}
-
-          <section className="sketchi-scenario-playground__checks">
-            <h2>
-              {state.mode === "llm" ? "Candidate checks" : "Fixture checks"}
-            </h2>
-            {state.mode === "llm" && !hasCandidateText ? (
-              <p className="sketchi-scenario-playground__muted">
-                No candidate run yet.
-              </p>
-            ) : null}
-            {activeEvaluation?.error ? (
-              <p className="sketchi-scenario-playground__error">
-                {activeEvaluation.error}
-              </p>
-            ) : null}
-            <ul>
-              {checks.map((check) => (
-                <li key={check.id} data-pass={check.passed}>
-                  <span>{check.passed ? "Pass" : "Fail"}</span>
-                  {check.message}
-                </li>
-              ))}
-            </ul>
-          </section>
-        </aside>
-
-        <main className="sketchi-scenario-playground__main">
-          <div className="sketchi-scenario-playground__canvas-header">
-            <h2>{selectedScenario?.title ?? "Scenario"}</h2>
-            <span>{mainPanelLabel}</span>
-          </div>
-          {displayedScene && activeResult ? (
-            <ExcalidrawSceneCanvas
-              onSceneChange={handleSceneChange}
-              revision={`${state.mode}:${state.canvasRevision}`}
-              scene={activeResult.excalidrawScene}
-              title={activeResult.diagram.title}
-            />
-          ) : (
-            <div className="sketchi-scenario-playground__empty-canvas">
-              {state.mode === "llm"
-                ? "No live candidate yet"
-                : "No generated diagram"}
-            </div>
-          )}
-        </main>
-
-        <aside
-          className={[
-            "sketchi-scenario-playground__inspector",
-            state.mode === "llm"
-              ? "sketchi-scenario-playground__inspector--with-suite"
-              : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <div
-            aria-label="Inspector"
-            className="sketchi-scenario-playground__tabs"
-            role="tablist"
-          >
-            {inspectorTabs.map((tab) => (
-              <button
-                aria-selected={state.inspectorPanel === tab.id}
-                key={tab.id}
-                onClick={() =>
-                  store.setState((current) => ({
-                    ...current,
-                    inspectorPanel: tab.id,
-                  }))
-                }
-                role="tab"
-                type="button"
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="sketchi-scenario-playground__inspector-body">
-            {state.inspectorPanel === "ir" &&
-            state.mode === "llm" &&
-            !hasCandidateText ? (
-              <div className="sketchi-scenario-playground__empty-inspector">
-                No candidate run yet
-              </div>
-            ) : null}
-
-            {state.inspectorPanel === "ir" &&
-            (state.mode !== "llm" || hasCandidateText) ? (
-              <JsonCodeEditor
-                id={state.mode === "llm" ? "candidate-ir" : "fixture-ir"}
-                label={state.mode === "llm" ? "Candidate IR" : "Fixture IR"}
-                maxHeight="min(340px, calc(100vh - 420px))"
-                minHeight="180px"
-                {...(state.mode === "llm"
-                  ? {
-                      onChange: (value: string) =>
-                        store.setState((current) => ({
-                          ...current,
-                          candidateText: value,
-                          canvasRevision: current.canvasRevision + 1,
-                          editedExcalidrawScene: undefined,
-                          editedExcalidrawSceneSignature: undefined,
-                        })),
-                    }
-                  : {})}
-                readOnly={state.mode !== "llm"}
-                value={
-                  state.mode === "llm"
-                    ? state.candidateText
-                    : formatJson(selectedScenario?.expectedDiagram ?? {})
-                }
-              />
-            ) : null}
-
-            {state.inspectorPanel === "prompt" && state.mode === "llm" ? (
-              <PromptMessageViewer
-                messages={promptParts?.messages ?? []}
-                title="Prompt messages"
-              />
-            ) : null}
-
-            {state.inspectorPanel === "excalidraw" ? (
-              <JsonCodeEditor
-                id="excalidraw-json"
-                label="Excalidraw JSON"
-                maxHeight="min(340px, calc(100vh - 420px))"
-                minHeight="180px"
-                readOnly
-                value={formatJson(displayedScene ?? {})}
-              />
-            ) : null}
-          </div>
-
-          {state.mode === "llm" ? (
-            <ScenarioSuitePanel
-              batchControlsOpen={state.selectedSuiteScenarioIds.length > 1}
-              disabled={!onGenerateScenario || busy}
-              {...(selectedScenario
-                ? { activeScenarioId: selectedScenario.id }
-                : {})}
-              {...(state.suiteError ? { error: state.suiteError } : {})}
-              onActivateScenario={(scenarioId) => {
-                const nextScenario = scenarios.find(
-                  (scenario) => scenario.id === scenarioId,
-                );
-
-                if (nextScenario) {
-                  resetScenario(nextScenario);
-                }
-              }}
-              onClearSelection={() =>
-                store.setState((current) => ({
-                  ...current,
-                  selectedSuiteScenarioIds: [],
-                }))
-              }
-              onRunSelected={runSelectedSuite}
-              onSelectAll={() =>
-                store.setState((current) => ({
-                  ...current,
-                  selectedSuiteScenarioIds: scenarios.map(
-                    (scenario) => scenario.id,
-                  ),
-                }))
-              }
-              onToggleScenario={(scenarioId) =>
-                store.setState((current) => ({
-                  ...current,
-                  selectedSuiteScenarioIds: toggleId(
-                    current.selectedSuiteScenarioIds,
-                    scenarioId,
-                  ),
-                }))
-              }
-              results={state.suiteResults}
-              running={state.suiteStatus === "running"}
-              scenarios={scenarios.map((scenario) => ({
-                difficulty: scenario.difficulty,
-                id: scenario.id,
-                title: scenario.title,
-              }))}
-              selectedScenarioIds={state.selectedSuiteScenarioIds}
-              title="Eval scenario set"
-            />
-          ) : null}
-        </aside>
+        <PlaygroundControls
+          actions={actions}
+          activeEvaluation={activeEvaluation}
+          busy={busy}
+          canGenerate={Boolean(onGenerateScenario)}
+          hasCandidateText={hasCandidateText}
+          runGeneration={runGeneration}
+          scenarios={scenarios}
+          selectedScenario={selectedScenario}
+          state={state}
+        />
+        <PlaygroundCanvas
+          actions={actions}
+          activeResult={activeResult}
+          selectedScenario={selectedScenario}
+          state={state}
+        />
+        <PlaygroundInspector
+          actions={actions}
+          activeResult={activeResult}
+          busy={busy}
+          canGenerate={Boolean(onGenerateScenario)}
+          hasCandidateText={hasCandidateText}
+          runSelectedSuite={runSelectedSuite}
+          scenarios={scenarios}
+          selectedScenario={selectedScenario}
+          state={state}
+        />
       </div>
     </section>
   );

@@ -1,11 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useAsyncResource } from "@/features/resources/use-async-resource";
 
 import {
   fetchStudioProjects,
   studioDiagramUrl,
   studioProjectUrl,
-  type StudioProjectSummary,
 } from "@sketchi/studio-projects/client";
 import { StudioBrand } from "@/components/studio-brand";
 
@@ -13,40 +12,12 @@ export const Route = createFileRoute("/projects")({
   component: ProjectsRoute,
 });
 
-type ProjectsState =
-  | { status: "loading" }
-  | { message: string; status: "error" }
-  | { projects: StudioProjectSummary[]; status: "ready" };
-
 function ProjectsRoute() {
-  const [state, setState] = useState<ProjectsState>({ status: "loading" });
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setState({ status: "loading" });
-    void fetchStudioProjects()
-      .then((projects) => {
-        if (!cancelled) {
-          setState({ projects, status: "ready" });
-        }
-      })
-      .catch((caught) => {
-        if (!cancelled) {
-          setState({
-            message:
-              caught instanceof Error
-                ? caught.message
-                : "Studio projects could not be loaded.",
-            status: "error",
-          });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const state = useAsyncResource(
+    (signal) => fetchStudioProjects(signal).then((projects) => ({ projects })),
+    [],
+    "Studio projects could not be loaded.",
+  );
 
   return (
     <main className="studio-workspace">

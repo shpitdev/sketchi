@@ -11,6 +11,8 @@
 /** Public package name. Never the workspace name `@sketchi/cli`. */
 export const CLI_PACKAGE_NAME = "sketchi";
 
+export const REPO_URL = "https://github.com/shpitdev/sketchi";
+
 export const CLI_NPM_URL = `https://www.npmjs.com/package/${CLI_PACKAGE_NAME}`;
 
 /**

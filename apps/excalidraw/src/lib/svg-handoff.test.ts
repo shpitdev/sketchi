@@ -1,17 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import { parseSvgHandoff } from "./svg-handoff";
+import { parseSvgHandoff, validateSvgHandoffSearch } from "./svg-handoff";
 
 describe("parseSvgHandoff", () => {
   it("accepts preview-aware public Sketchi SVG URLs and typed controls", () => {
     expect(
-      parseSvgHandoff({
-        svg: "https://sketchi-icons-pr-91.dimethyl.workers.dev/output/upload-ready/svg/auth-identity/workos.svg",
-        roughness: "2",
-        fillStyle: "hachure",
-        colorMode: "monochrome",
-        color: "#5F3DC4",
-      }),
+      parseSvgHandoff(
+        validateSvgHandoffSearch({
+          svg: "https://sketchi-icons-pr-91.dimethyl.workers.dev/output/upload-ready/svg/auth-identity/workos.svg",
+          roughness: "2",
+          fillStyle: "hachure",
+          colorMode: "monochrome",
+          color: "#5F3DC4",
+        }),
+      ),
     ).toEqual({
       kind: "valid",
       handoff: {
@@ -48,6 +50,47 @@ describe("parseSvgHandoff", () => {
     "http://sketchi-icons.dimethyl.workers.dev/output/upload-ready/svg/auth/workos.svg",
   ])("rejects non-contract source %s", (svg) => {
     expect(parseSvgHandoff({ svg })).toMatchObject({ kind: "invalid" });
+  });
+
+  it("normalizes invalid options once before applying defaults", () => {
+    const svg =
+      "https://icons.sketchi.app/output/upload-ready/svg/auth-identity/workos.svg";
+    expect(
+      parseSvgHandoff(
+        validateSvgHandoffSearch({
+          svg,
+          color: "red",
+          colorMode: "unknown",
+          fillStyle: "unknown",
+          roughness: "9",
+        }),
+      ),
+    ).toMatchObject({
+      handoff: {
+        options: {
+          roughness: 1,
+          fillStyle: "solid",
+          colorProfile: { kind: "preserve" },
+        },
+      },
+    });
+    expect(
+      parseSvgHandoff(
+        validateSvgHandoffSearch({
+          svg,
+          colorMode: "monochrome",
+          color: "bad",
+          roughness: "0",
+        }),
+      ),
+    ).toMatchObject({
+      handoff: {
+        options: {
+          roughness: 0,
+          colorProfile: { kind: "monochrome", color: "#1e1e1e" },
+        },
+      },
+    });
   });
 
   it("returns the sample workspace contract when no handoff exists", () => {

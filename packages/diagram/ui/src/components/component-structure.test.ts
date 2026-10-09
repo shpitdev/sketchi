@@ -32,9 +32,16 @@ describe("Diagram UI component structure", () => {
       expect(existsSync(join(componentsRoot, componentName, "index.ts"))).toBe(
         true,
       );
-      expect(packageIndex).toContain(
-        `export * from "./components/${componentName}/index.js";`,
-      );
+      const exportStatement = `export * from "./components/${componentName}/index.js";`;
+      if (
+        ["generation-workspace", "flowchart-validation-panel"].includes(
+          componentName,
+        )
+      ) {
+        expect(packageIndex).not.toContain(exportStatement);
+      } else {
+        expect(packageIndex).toContain(exportStatement);
+      }
     }
   });
 

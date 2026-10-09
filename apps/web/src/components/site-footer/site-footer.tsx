@@ -1,4 +1,4 @@
-import { CLI_NPM_URL } from "../../lib/cli-package";
+import { CLI_NPM_URL, REPO_URL } from "../../lib/cli-package";
 import {
   DEFAULT_WEB_SURFACE_URLS,
   type WebSurfaceUrls,
@@ -13,13 +13,12 @@ export interface SiteFooterProps {
   surfaceUrls?: WebSurfaceUrls;
 }
 
-const DEFAULT_REPO_URL = "https://github.com/shpitdev/sketchi";
 const DEFAULT_LLMS_TXT_URL = "/llms.txt";
 
 export function SiteFooter({
   llmsTxtUrl = DEFAULT_LLMS_TXT_URL,
   npmUrl = CLI_NPM_URL,
-  repoUrl = DEFAULT_REPO_URL,
+  repoUrl = REPO_URL,
   surfaceUrls = DEFAULT_WEB_SURFACE_URLS,
 }: SiteFooterProps) {
   return (

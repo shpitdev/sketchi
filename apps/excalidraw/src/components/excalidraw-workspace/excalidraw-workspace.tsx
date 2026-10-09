@@ -6,7 +6,7 @@ import {
 } from "@sketchi/diagram-core";
 import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
-import { ExcalidrawSceneCanvas } from "@sketchi/diagram-ui";
+import { copyText, ExcalidrawSceneCanvas } from "@sketchi/diagram-ui";
 import { useEffect, useMemo, useState } from "react";
 
 import { DiagramInspector } from "../diagram-inspector/index.js";
@@ -90,7 +90,7 @@ export function ExcalidrawWorkspace({
     }
 
     try {
-      await navigator.clipboard.writeText(irJson);
+      await copyText(irJson);
       setCopyState("copied");
     } catch {
       setCopyState("error");

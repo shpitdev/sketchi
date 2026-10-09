@@ -155,19 +155,15 @@ export async function mapWithConcurrency<Item, Result>(
 
 export function createIconZip(
   icons: readonly { readonly slug: string; readonly svg: string }[],
-): Promise<Blob> {
-  return createIconZipBytes(icons).then((archive) => {
-    const bytes = new Uint8Array(archive.byteLength);
-    bytes.set(archive);
-    return new Blob([bytes.buffer], { type: "application/zip" });
-  });
+): Blob {
+  return new Blob([createIconZipBytes(icons)], { type: "application/zip" });
 }
 
 export function createIconZipBytes(
   icons: readonly { readonly slug: string; readonly svg: string }[],
-): Promise<Uint8Array> {
+): Uint8Array<ArrayBuffer> {
   const files = Object.fromEntries(
     icons.map((icon) => [`${icon.slug}.svg`, strToU8(icon.svg)]),
   );
-  return Promise.resolve(zipSync(files, { level: 6 }));
+  return zipSync(files, { level: 6 });
 }

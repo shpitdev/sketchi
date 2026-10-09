@@ -31,28 +31,36 @@ function isAllowedIconPath(pathname: string): boolean {
   );
 }
 
-function roughness(value: unknown): NativeRoughness {
-  return value === "0" || value === 0
-    ? 0
-    : value === "2" || value === 2
-      ? 2
-      : 1;
-}
-
-function fillStyle(value: unknown): NativeFillStyle {
-  return value === "hachure" ? "hachure" : "solid";
-}
-
 export interface SvgHandoffSearch {
-  readonly color?: unknown;
-  readonly colorMode?: unknown;
-  readonly fillStyle?: unknown;
-  readonly roughness?: unknown;
-  readonly svg?: unknown;
+  readonly color?: string | undefined;
+  readonly colorMode?: "monochrome" | "preserve" | undefined;
+  readonly fillStyle?: NativeFillStyle | undefined;
+  readonly roughness?: NativeRoughness | undefined;
+  readonly svg?: string | undefined;
+}
+
+export function validateSvgHandoffSearch(
+  search: Record<string, unknown>,
+): SvgHandoffSearch {
+  return {
+    color:
+      typeof search.color === "string" && /^#[0-9a-f]{6}$/i.test(search.color)
+        ? search.color.toLowerCase()
+        : undefined,
+    colorMode: search.colorMode === "monochrome" ? "monochrome" : undefined,
+    fillStyle: search.fillStyle === "hachure" ? "hachure" : undefined,
+    roughness:
+      search.roughness === 0 || search.roughness === "0"
+        ? 0
+        : search.roughness === 2 || search.roughness === "2"
+          ? 2
+          : undefined,
+    svg: typeof search.svg === "string" ? search.svg : undefined,
+  };
 }
 
 export function parseSvgHandoff(search: SvgHandoffSearch): SvgHandoffResult {
-  if (typeof search.svg !== "string" || search.svg.length === 0) {
+  if (!search.svg) {
     return { kind: "absent" };
   }
   let source: URL;
@@ -77,18 +85,15 @@ export function parseSvgHandoff(search: SvgHandoffSearch): SvgHandoffResult {
     };
   }
   const monochrome = search.colorMode === "monochrome";
-  const color =
-    typeof search.color === "string" && /^#[0-9a-f]{6}$/i.test(search.color)
-      ? search.color.toLowerCase()
-      : "#1e1e1e";
+  const color = search.color ?? "#1e1e1e";
   return {
     handoff: {
       options: {
         colorProfile: monochrome
           ? { color, kind: "monochrome" }
           : { kind: "preserve" },
-        fillStyle: fillStyle(search.fillStyle),
-        roughness: roughness(search.roughness),
+        fillStyle: search.fillStyle ?? "solid",
+        roughness: search.roughness ?? 1,
       },
       sourceUrl: source.href,
     },

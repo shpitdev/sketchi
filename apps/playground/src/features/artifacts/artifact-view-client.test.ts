@@ -18,6 +18,17 @@ describe("artifact review fetch", () => {
       "Artifact could not be loaded.",
     );
   });
+  it("forwards cancellation to the artifact fetch", async () => {
+    const signal = new AbortController().signal;
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ ok: true, inline: DEPLOY_PIPELINE_SCENE }),
+      );
+    vi.stubGlobal("fetch", fetcher);
+    await fetchArtifactReview("valid", signal);
+    expect(fetcher).toHaveBeenCalledWith(expect.any(String), { signal });
+  });
   it("still loads a valid scene", async () => {
     vi.stubGlobal(
       "fetch",

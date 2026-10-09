@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { CLI_NPM_URL } from "../../lib/cli-package";
+import { CLI_NPM_URL, REPO_URL } from "../../lib/cli-package";
 import {
   DEFAULT_WEB_SURFACE_URLS,
   type WebSurfaceUrls,
@@ -25,13 +25,11 @@ const defaultNavItems: readonly SiteHeaderNavItem[] = [
   { href: "/docs", label: "Docs" },
 ];
 
-const DEFAULT_REPO_URL = "https://github.com/shpitdev/sketchi";
-
 export function SiteHeader({
   activePath,
   navItems = defaultNavItems,
   npmUrl = CLI_NPM_URL,
-  repoUrl = DEFAULT_REPO_URL,
+  repoUrl = REPO_URL,
   surfaceUrls = DEFAULT_WEB_SURFACE_URLS,
 }: SiteHeaderProps) {
   const [open, setOpen] = useState(false);

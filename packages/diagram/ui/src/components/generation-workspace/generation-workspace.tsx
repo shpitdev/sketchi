@@ -1,11 +1,13 @@
+import { useMemo } from "react";
+
 import {
   type IntermediateDiagram,
   parseFlowchartDiagram,
-  validateIntermediateDiagram
+  validateIntermediateDiagram,
 } from "@sketchi/diagram-core";
 import {
   convertSceneToExcalidraw,
-  validateExcalidrawScene
+  validateExcalidrawScene,
 } from "@sketchi/diagram-excalidraw";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 
@@ -21,36 +23,45 @@ const statusLabels = {
   idle: "Idle",
   generating: "Generating",
   ready: "Ready",
-  error: "Needs attention"
+  error: "Needs attention",
 };
 
 export function GenerationWorkspace({
   diagram,
-  status = "ready"
+  status = "ready",
 }: GenerationWorkspaceProps) {
-  let validationMessage = "Validated diagram IR";
+  const { validationMessage, scene, realSceneIssueCount, realSceneMessage } =
+    useMemo(() => {
+      let validationMessage = "Validated diagram IR";
 
-  try {
-    if (diagram.type === "flowchart") {
-      parseFlowchartDiagram(diagram);
-      validationMessage = "Validated flowchart IR";
-    } else {
-      validateIntermediateDiagram(diagram);
-    }
-  } catch (error) {
-    validationMessage =
-      error instanceof Error ? error.message : "Diagram validation failed";
-  }
+      try {
+        if (diagram.type === "flowchart") {
+          parseFlowchartDiagram(diagram);
+          validationMessage = "Validated flowchart IR";
+        } else {
+          validateIntermediateDiagram(diagram);
+        }
+      } catch (error) {
+        validationMessage =
+          error instanceof Error ? error.message : "Diagram validation failed";
+      }
 
-  const scene = renderIntermediateDiagram(diagram);
-  const realSceneValidation = validateExcalidrawScene(
-    convertSceneToExcalidraw(scene)
-  );
-  const realSceneIssueCount = realSceneValidation.issues.length;
-  const realSceneMessage =
-    realSceneIssueCount === 0
-      ? "All arrows are bound"
-      : `${realSceneIssueCount} real-scene issues`;
+      const scene = renderIntermediateDiagram(diagram);
+      const realSceneValidation = validateExcalidrawScene(
+        convertSceneToExcalidraw(scene),
+      );
+      const realSceneIssueCount = realSceneValidation.issues.length;
+      const realSceneMessage =
+        realSceneIssueCount === 0
+          ? "All arrows are bound"
+          : `${realSceneIssueCount} real-scene issues`;
+      return {
+        validationMessage,
+        scene,
+        realSceneIssueCount,
+        realSceneMessage,
+      };
+    }, [diagram]);
 
   return (
     <section className="sketchi-generation-workspace">

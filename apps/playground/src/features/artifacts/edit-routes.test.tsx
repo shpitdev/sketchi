@@ -35,6 +35,11 @@ vi.mock("@sketchi/studio-projects/client", () => ({
 vi.mock("./artifact-view-client", async (original) => ({
   ...(await original<typeof import("./artifact-view-client")>()),
   fetchArtifactScene: async () => DEPLOY_PIPELINE_SCENE,
+  fetchDiagramScene: async () => ({
+    diagram: { id: "diagram", artifactId: "artifact" },
+    project: { id: "project" },
+    scene: DEPLOY_PIPELINE_SCENE,
+  }),
 }));
 import { Route as ArtifactRoute } from "../../routes/artifacts_/$artifactId/edit";
 import { Route as DiagramRoute } from "../../routes/diagrams_/$diagramId/edit";

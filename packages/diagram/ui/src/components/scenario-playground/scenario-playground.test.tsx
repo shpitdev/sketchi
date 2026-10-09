@@ -85,6 +85,24 @@ import {
 } from "./scenario-playground";
 
 describe("ScenarioPlayground", () => {
+  it("retains user state when the scenarios array identity changes", () => {
+    const { rerender } = render(
+      <ScenarioPlayground scenarios={[...flowchartScenarios]} />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Live generation" }));
+    rerender(<ScenarioPlayground scenarios={[...flowchartScenarios]} />);
+    expect(
+      screen
+        .getByRole("tab", { name: "Live generation" })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByRole("tab", { name: "Messages" })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+  });
+
   it("renders maintained scenarios and their checks", () => {
     render(<ScenarioPlayground />);
 

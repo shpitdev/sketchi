@@ -1,10 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useAsyncResource } from "@/features/resources/use-async-resource";
 
 import {
   fetchStudioProjectDetails,
   studioDiagramUrl,
-  type StudioProjectDetails,
 } from "@sketchi/studio-projects/client";
 import { IconActionBar, IconLink } from "@/components/sketch-icons";
 import { StudioBrand } from "@/components/studio-brand";
@@ -13,41 +12,16 @@ export const Route = createFileRoute("/projects_/$projectId")({
   component: ProjectRoute,
 });
 
-type ProjectState =
-  | { status: "loading" }
-  | { message: string; status: "error" }
-  | { details: StudioProjectDetails; status: "ready" };
-
 function ProjectRoute() {
   const { projectId } = Route.useParams();
-  const [state, setState] = useState<ProjectState>({ status: "loading" });
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setState({ status: "loading" });
-    void fetchStudioProjectDetails(projectId)
-      .then((details) => {
-        if (!cancelled) {
-          setState({ details, status: "ready" });
-        }
-      })
-      .catch((caught) => {
-        if (!cancelled) {
-          setState({
-            message:
-              caught instanceof Error
-                ? caught.message
-                : "Studio project could not be loaded.",
-            status: "error",
-          });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
+  const state = useAsyncResource(
+    (signal) =>
+      fetchStudioProjectDetails(projectId, signal).then((details) => ({
+        details,
+      })),
+    [projectId],
+    "Studio project could not be loaded.",
+  );
 
   return (
     <main className="studio-workspace">

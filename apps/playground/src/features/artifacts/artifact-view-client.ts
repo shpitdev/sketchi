@@ -3,16 +3,12 @@ import {
   type ArtifactProvenance,
   type GetArtifactResult,
 } from "@sketchi/diagram-agent";
+import { fetchStudioDiagramDetails } from "@sketchi/studio-projects/client";
 import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 
-export type ArtifactViewState =
-  | { status: "loading" }
-  | {
-      provenance?: ArtifactProvenance;
-      scene: RenderedDiagramScene;
-      status: "ready";
-    }
-  | { message: string; status: "error" };
+import type { AsyncResource } from "@/features/resources/use-async-resource";
+
+export type ArtifactViewState = AsyncResource<ArtifactReview>;
 
 export interface ArtifactReview {
   provenance?: ArtifactProvenance;
@@ -42,11 +38,13 @@ export function artifactRouteUrls(artifactId: string): ArtifactRouteUrls {
 
 export async function fetchArtifactReview(
   artifactId: string,
+  signal?: AbortSignal,
 ): Promise<ArtifactReview> {
   const response = await fetch(
     `/api/v1/artifacts/${encodeURIComponent(
       artifactId,
     )}?format=scene&inline=true`,
+    signal ? { signal } : {},
   );
   if (!response.ok) throw new Error("Artifact could not be loaded.");
   let payload: unknown;
@@ -73,6 +71,16 @@ export async function fetchArtifactReview(
 
 export async function fetchArtifactScene(
   artifactId: string,
+  signal?: AbortSignal,
 ): Promise<RenderedDiagramScene> {
-  return (await fetchArtifactReview(artifactId)).scene;
+  return (await fetchArtifactReview(artifactId, signal)).scene;
+}
+
+export async function fetchDiagramScene(
+  diagramId: string,
+  signal: AbortSignal,
+) {
+  const details = await fetchStudioDiagramDetails(diagramId, signal);
+  const scene = await fetchArtifactScene(details.diagram.artifactId, signal);
+  return { ...details, scene };
 }

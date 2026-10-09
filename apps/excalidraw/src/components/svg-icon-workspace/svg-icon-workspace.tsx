@@ -1,5 +1,6 @@
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import {
+  downloadBlob,
   ExcalidrawSceneCanvas,
   type ExcalidrawSceneCanvasProps,
 } from "@sketchi/diagram-ui";
@@ -105,14 +106,10 @@ function saveLibrary(
       name,
     },
   ]);
-  const url = URL.createObjectURL(
+  downloadBlob(
     new Blob([contents], { type: "application/vnd.excalidrawlib+json" }),
+    `${name.replace(/\.svg$/i, "")}.excalidrawlib`,
   );
-  const anchor = document.createElement("a");
-  anchor.download = `${name.replace(/\.svg$/i, "")}.excalidrawlib`;
-  anchor.href = url;
-  anchor.click();
-  URL.revokeObjectURL(url);
 }
 
 export function SvgIconWorkspace({

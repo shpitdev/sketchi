@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useAsyncResource } from "@/features/resources/use-async-resource";
 import {
   artifactRouteUrls,
   fetchArtifactScene,
-  type ArtifactViewState,
 } from "@/features/artifacts/artifact-view-client";
 import { EditableArtifactStage } from "@/features/artifacts/editable-artifact-stage";
 
@@ -13,35 +12,13 @@ export const Route = createFileRoute("/artifacts_/$artifactId/edit")({
 
 function ArtifactEditRoute() {
   const { artifactId } = Route.useParams();
-  const [state, setState] = useState<ArtifactViewState>({ status: "loading" });
+  const state = useAsyncResource(
+    (signal) =>
+      fetchArtifactScene(artifactId, signal).then((scene) => ({ scene })),
+    [artifactId],
+    "Artifact could not be loaded.",
+  );
   const urls = artifactRouteUrls(artifactId);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setState({ status: "loading" });
-    void fetchArtifactScene(artifactId)
-      .then((scene) => {
-        if (!cancelled) {
-          setState({ scene, status: "ready" });
-        }
-      })
-      .catch((caught) => {
-        if (!cancelled) {
-          setState({
-            message:
-              caught instanceof Error
-                ? caught.message
-                : "Artifact could not be loaded.",
-            status: "error",
-          });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [artifactId]);
 
   return (
     <EditableArtifactStage

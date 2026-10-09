@@ -1,16 +1,36 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AgentDetailPage, AgentsPage } from "./-agent-pages";
+import { Route as AgentsDefinition } from "./agents";
+import { Route as AntigravityDefinition } from "./agents/antigravity";
 
-const previewSurfaceUrls = {
+const AgentsRoute = AgentsDefinition.options.component;
+const AntigravityRoute = AntigravityDefinition.options.component;
+if (!AgentsRoute || !AntigravityRoute)
+  throw new Error("Missing agent route component.");
+
+const previewSurfaceUrls = vi.hoisted(() => ({
   icons: "https://sketchi-icons-pr-456.dimethyl.workers.dev",
   playground: "https://sketchi-studio-pr-456.dimethyl.workers.dev",
-};
+}));
 
-describe("AgentsPage", () => {
+const routeState = vi.hoisted(() => ({ pathname: "/agents" }));
+vi.mock("../lib/surface-urls-rpc", () => ({ getWebSurfaceUrls: vi.fn() }));
+vi.mock("@tanstack/react-router", () => ({
+  createFileRoute: () => (options: object) => ({
+    options,
+    useLoaderData: () => previewSurfaceUrls,
+  }),
+  useRouterState: () => routeState.pathname,
+  Outlet: () => <AntigravityRoute />,
+}));
+beforeEach(() => {
+  routeState.pathname = "/agents";
+});
+
+describe("AgentsRoute", () => {
   it("uses configured preview surface URLs in shared chrome", () => {
-    render(<AgentsPage surfaceUrls={previewSurfaceUrls} />);
+    render(<AgentsRoute />);
 
     expect(
       screen
@@ -30,14 +50,10 @@ describe("AgentsPage", () => {
   });
 });
 
-describe("AgentDetailPage", () => {
+describe("Agent detail route", () => {
   it("renders an agent-specific route inside shared chrome", () => {
-    render(
-      <AgentDetailPage
-        agentId="antigravity"
-        surfaceUrls={previewSurfaceUrls}
-      />,
-    );
+    routeState.pathname = "/agents/antigravity";
+    render(<AgentsRoute />);
 
     expect(
       screen.getByRole("heading", { name: "Antigravity", level: 1 }),

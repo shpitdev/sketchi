@@ -13,9 +13,7 @@ export type SketchIconName =
   | "scene"
   | "drawing"
   | "review"
-  | "project"
-  | "projects"
-  | "playground";
+  | "project";
 
 const glyphs: Record<SketchIconName, ReactElement> = {
   // Open in a bigger view — a card with an arrow leaving the corner.
@@ -73,20 +71,6 @@ const glyphs: Record<SketchIconName, ReactElement> = {
   project: (
     <>
       <path d="M4.4 7.3c0-.9.7-1.6 1.6-1.6h3l2 2h7c.9 0 1.6.7 1.6 1.6v7.4c0 .9-.7 1.6-1.6 1.6H6c-.9 0-1.6-.7-1.6-1.6V7.3z" />
-    </>
-  ),
-  // Stacked folders — the projects list.
-  projects: (
-    <>
-      <path d="M7 6.4h2.6l1.7 1.7h5.9c.8 0 1.4.6 1.4 1.4v.6" />
-      <path d="M4.4 10c0-.8.6-1.4 1.4-1.4h3l1.7 1.7h6.3c.8 0 1.4.6 1.4 1.4v5.5c0 .8-.6 1.4-1.4 1.4H5.8c-.8 0-1.4-.6-1.4-1.4V10z" />
-    </>
-  ),
-  // A board with a drawn squiggle — back to the playground.
-  playground: (
-    <>
-      <path d="M4.6 5.4h14.8c.4 0 .7.3.7.7v10.5c0 .4-.3.7-.7.7H4.6c-.4 0-.7-.3-.7-.7V6.1c0-.4.3-.7.7-.7z" />
-      <path d="M7 13.6c1.6-2.9 2.7-3 3.8-.4.9 2 2 1.4 3.1-.2 1-1.5 2.2-1.4 3.1.5" />
     </>
   ),
 };

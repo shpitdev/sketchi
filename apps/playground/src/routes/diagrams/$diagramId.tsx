@@ -1,67 +1,22 @@
 import { ArtifactCanvas } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useAsyncResource } from "@/features/resources/use-async-resource";
 
-import { fetchArtifactScene } from "@/features/artifacts/artifact-view-client";
+import { fetchDiagramScene } from "@/features/artifacts/artifact-view-client";
 import { IconActionBar, IconLink } from "@/components/sketch-icons";
 import { StudioBrand } from "@/components/studio-brand";
-import {
-  fetchStudioDiagramDetails,
-  type StudioDiagramSummary,
-  type StudioProjectSummary,
-} from "@sketchi/studio-projects/client";
-import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 
 export const Route = createFileRoute("/diagrams/$diagramId")({
   component: DiagramRoute,
 });
 
-type DiagramState =
-  | { status: "loading" }
-  | { message: string; status: "error" }
-  | {
-      diagram: StudioDiagramSummary;
-      project: StudioProjectSummary;
-      scene: RenderedDiagramScene;
-      status: "ready";
-    };
-
 function DiagramRoute() {
   const { diagramId } = Route.useParams();
-  const [state, setState] = useState<DiagramState>({ status: "loading" });
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setState({ status: "loading" });
-    void fetchStudioDiagramDetails(diagramId)
-      .then(async (details) => {
-        const scene = await fetchArtifactScene(details.diagram.artifactId);
-        if (!cancelled) {
-          setState({
-            diagram: details.diagram,
-            project: details.project,
-            scene,
-            status: "ready",
-          });
-        }
-      })
-      .catch((caught) => {
-        if (!cancelled) {
-          setState({
-            message:
-              caught instanceof Error
-                ? caught.message
-                : "Studio diagram could not be loaded.",
-            status: "error",
-          });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [diagramId]);
+  const state = useAsyncResource(
+    (signal) => fetchDiagramScene(diagramId, signal),
+    [diagramId],
+    "Studio diagram could not be loaded.",
+  );
 
   return (
     <main className="artifact-view">

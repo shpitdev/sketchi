@@ -2,7 +2,8 @@ import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@sketchi/diagram-ui", () => ({
+vi.mock("@sketchi/diagram-ui", async (original) => ({
+  ...(await original<typeof import("@sketchi/diagram-ui")>()),
   ExcalidrawSceneCanvas: ({
     onChange,
     scene,
@@ -57,13 +58,11 @@ const blockedSvg =
 
 describe("SvgIconWorkspace", () => {
   it("renders a URL-imported SVG as an editable native scene", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(supportedSvg, {
-          headers: { "content-type": "image/svg+xml" },
-        }),
-      );
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(supportedSvg, {
+        headers: { "content-type": "image/svg+xml" },
+      }),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     render(<SvgIconWorkspace handoff={handoff} />);

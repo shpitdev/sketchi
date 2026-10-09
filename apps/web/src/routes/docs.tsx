@@ -1,10 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { DocsView } from "../components/docs-view/index.js";
-import { SiteFooter } from "../components/site-footer/index.js";
-import { SiteHeader } from "../components/site-header/index.js";
+import { SiteShell } from "../components/site-shell/site-shell.js";
 import { pageMeta } from "../lib/site-meta";
-import type { WebSurfaceUrls } from "../lib/surface-urls";
 import { getWebSurfaceUrls } from "../lib/surface-urls-rpc";
 
 export const Route = createFileRoute("/docs")({
@@ -21,22 +19,9 @@ export const Route = createFileRoute("/docs")({
 
 function DocsRoute() {
   const surfaceUrls = Route.useLoaderData();
-
-  return <DocsPage surfaceUrls={surfaceUrls} />;
-}
-
-export interface DocsPageProps {
-  surfaceUrls: WebSurfaceUrls;
-}
-
-export function DocsPage({ surfaceUrls }: DocsPageProps) {
   return (
-    <div className="sketchi-web">
-      <SiteHeader activePath="/docs" surfaceUrls={surfaceUrls} />
-      <main>
-        <DocsView surfaceUrls={surfaceUrls} />
-      </main>
-      <SiteFooter surfaceUrls={surfaceUrls} />
-    </div>
+    <SiteShell activePath="/docs" surfaceUrls={surfaceUrls}>
+      <DocsView surfaceUrls={surfaceUrls} />
+    </SiteShell>
   );
 }

@@ -1,11 +1,11 @@
+import { useAsyncResource } from "@/features/resources/use-async-resource";
 import { ArtifactCanvas } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import {
   artifactRouteUrls,
   fetchArtifactReview,
-  type ArtifactViewState,
 } from "@/features/artifacts/artifact-view-client";
 import { ArtifactSourceLink } from "@/components/artifact-source-link";
 import { createStudioProjectFromArtifact } from "@sketchi/studio-projects/client";
@@ -24,9 +24,11 @@ type StudioSaveState =
 
 function ArtifactRoute() {
   const { artifactId } = Route.useParams();
-  const [state, setState] = useState<ArtifactViewState>({
-    status: "loading",
-  });
+  const state = useAsyncResource(
+    (signal) => fetchArtifactReview(artifactId, signal),
+    [artifactId],
+    "Artifact could not be loaded.",
+  );
   const [saveState, setSaveState] = useState<StudioSaveState>({
     status: "idle",
   });
@@ -51,39 +53,11 @@ function ArtifactRoute() {
       });
   }, [artifactId]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    setState({ status: "loading" });
-    void fetchArtifactReview(artifactId)
-      .then((artifact) => {
-        if (!cancelled) {
-          setState({
-            ...artifact,
-            status: "ready",
-          });
-        }
-      })
-      .catch((caught) => {
-        if (!cancelled) {
-          setState({
-            message:
-              caught instanceof Error
-                ? caught.message
-                : "Artifact could not be loaded.",
-            status: "error",
-          });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [artifactId]);
-
-  useEffect(() => {
+  const [saveArtifactId, setSaveArtifactId] = useState(artifactId);
+  if (saveArtifactId !== artifactId) {
+    setSaveArtifactId(artifactId);
     setSaveState({ status: "idle" });
-  }, [artifactId]);
+  }
 
   return (
     <main className="artifact-view">

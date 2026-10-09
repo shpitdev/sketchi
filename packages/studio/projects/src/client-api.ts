@@ -11,8 +11,13 @@ import {
   type StudioProjectSummary,
 } from "./contracts.js";
 
-export async function fetchStudioProjects(): Promise<StudioProjectSummary[]> {
-  const response = await fetch("/api/studio/projects");
+export async function fetchStudioProjects(
+  signal?: AbortSignal,
+): Promise<StudioProjectSummary[]> {
+  const response = await fetch(
+    "/api/studio/projects",
+    signal ? { signal } : {},
+  );
   const payload: unknown = await response.json();
   const parsed = Schema.decodeUnknownResult(StudioProjectsListResponseSchema)(
     payload,
@@ -27,9 +32,11 @@ export async function fetchStudioProjects(): Promise<StudioProjectSummary[]> {
 
 export async function fetchStudioProjectDetails(
   projectId: string,
+  signal?: AbortSignal,
 ): Promise<StudioProjectDetails> {
   const response = await fetch(
     `/api/studio/projects/${encodeURIComponent(projectId)}`,
+    signal ? { signal } : {},
   );
   const payload: unknown = await response.json();
   const parsed = Schema.decodeUnknownResult(StudioProjectDetailsResponseSchema)(
@@ -43,12 +50,16 @@ export async function fetchStudioProjectDetails(
   return parsed.success.details;
 }
 
-export async function fetchStudioDiagramDetails(diagramId: string): Promise<{
+export async function fetchStudioDiagramDetails(
+  diagramId: string,
+  signal?: AbortSignal,
+): Promise<{
   diagram: StudioDiagramSummary;
   project: StudioProjectSummary;
 }> {
   const response = await fetch(
     `/api/studio/diagrams/${encodeURIComponent(diagramId)}`,
+    signal ? { signal } : {},
   );
   const payload: unknown = await response.json();
   const parsed = Schema.decodeUnknownResult(StudioDiagramDetailsResponseSchema)(

@@ -5,7 +5,7 @@ import {
 } from "@tanstack/react-router";
 
 import { AgentSetupView } from "../components/agent-setup-view/index.js";
-import { AgentsShell } from "./-agent-pages.js";
+import { SiteShell } from "../components/site-shell/site-shell.js";
 import { pageMeta } from "../lib/site-meta";
 import { getWebSurfaceUrls } from "../lib/surface-urls-rpc";
 
@@ -37,8 +37,8 @@ function AgentsRoute() {
   });
 
   return (
-    <AgentsShell surfaceUrls={surfaceUrls}>
+    <SiteShell activePath="/agents" surfaceUrls={surfaceUrls}>
       {pathname === "/agents" ? <AgentSetupView /> : <Outlet />}
-    </AgentsShell>
+    </SiteShell>
   );
 }
