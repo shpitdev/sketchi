@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.6.2
+
+### Patch Changes
+
+- [#337](https://github.com/shpitdev/sketchi/pull/337) [`4bfbd96`](https://github.com/shpitdev/sketchi/commit/4bfbd968045cab7c6e7f9f9e61581fbd7baba0b8) Thanks [@anandpant](https://github.com/anandpant)! - List and show stored diagrams faster by avoiding PNG decompression during metadata reads. PNGs are still fully validated when written or consumed; command behavior is otherwise unchanged.
+
 ## 0.6.1
 
 ### Patch Changes
