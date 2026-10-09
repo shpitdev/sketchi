@@ -255,16 +255,18 @@ function pathSubpaths(
   let current: Point = { x: 0, y: 0 };
   let start: Point = current;
   let closed = false;
+  let hasDrawingCommand = false;
   let depthExceeded = false;
 
   const finish = () => {
-    const subpath = canonicalSubpath(closed, points);
+    const subpath = hasDrawingCommand ? canonicalSubpath(closed, points) : null;
     if (subpath) {
       subpaths.push(subpath);
       metrics.flattenedSegments += Math.max(0, subpath.points.length - 1);
     }
     points = [];
     closed = false;
+    hasDrawingCommand = false;
   };
 
   for (const command of normalizedCommands(pathData)) {
@@ -282,9 +284,11 @@ function pathSubpaths(
       start = current;
       appendPoint(points, transformPoint(current, matrix));
     } else if (command.type === SVGPathData.LINE_TO) {
+      hasDrawingCommand = true;
       current = { x: command.x, y: command.y };
       appendPoint(points, transformPoint(current, matrix));
     } else if (command.type === SVGPathData.CURVE_TO) {
+      hasDrawingCommand = true;
       const end = { x: command.x, y: command.y };
       metrics.cubicSegments += 1;
       depthExceeded =
@@ -299,11 +303,13 @@ function pathSubpaths(
         ) || depthExceeded;
       current = end;
     } else if (command.type === SVGPathData.ARC) {
+      hasDrawingCommand = true;
       metrics.arcSegments += 1;
       depthExceeded =
         flattenArc(command, current, matrix, options, points) || depthExceeded;
       current = { x: command.x, y: command.y };
     } else if (command.type === SVGPathData.CLOSE_PATH && points.length > 0) {
+      hasDrawingCommand = true;
       appendPoint(points, transformPoint(start, matrix));
       current = start;
       closed = true;
@@ -454,6 +460,64 @@ function rectPath(
   ].join(" ");
 }
 
+function isMoveOnlyPath(pathData: string): boolean {
+  const numberPattern = /[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/y;
+  let cursor = 0;
+  const skipWhitespace = () => {
+    while (cursor < pathData.length && /\s/.test(pathData[cursor] ?? "")) {
+      cursor += 1;
+    }
+  };
+  while (cursor < pathData.length) {
+    if (pathData[cursor] !== "M" && pathData[cursor] !== "m") {
+      return false;
+    }
+    cursor += 1;
+    // One coordinate pair per move; additional pairs are implicit lines.
+    for (let coordinate = 0; coordinate < 2; coordinate += 1) {
+      skipWhitespace();
+      if (coordinate === 1 && pathData[cursor] === ",") {
+        cursor += 1;
+        skipWhitespace();
+      }
+      numberPattern.lastIndex = cursor;
+      const number = numberPattern.exec(pathData);
+      if (!number || !Number.isFinite(Number(number[0]))) {
+        return false;
+      }
+      cursor = numberPattern.lastIndex;
+    }
+    skipWhitespace();
+  }
+  return true;
+}
+
+/** Prove no rendering without parsing path commands or flattening geometry. */
+export function isNonRenderingPrimitive(
+  name: SvgPrimitiveName,
+  attributes: SvgAttributes,
+  viewport: SvgViewport,
+): boolean {
+  if (name === "path") {
+    const pathData = attributes.d?.trim();
+    return !pathData || isMoveOnlyPath(pathData);
+  }
+  if (name === "polygon" || name === "polyline") {
+    return !attributes.points?.trim();
+  }
+  const isZeroLength = (attribute: string, reference: number): boolean =>
+    parseLength(attributes[attribute] ?? "0", reference) === 0;
+  return (
+    (name === "rect" &&
+      (isZeroLength("width", viewport.width) ||
+        isZeroLength("height", viewport.height))) ||
+    (name === "circle" && isZeroLength("r", viewportDiagonal(viewport))) ||
+    (name === "ellipse" &&
+      (isZeroLength("rx", viewport.width) ||
+        isZeroLength("ry", viewport.height)))
+  );
+}
+
 export function flattenPrimitive(
   name: SvgPrimitiveName,
   attributes: SvgAttributes,
@@ -468,6 +532,11 @@ export function flattenPrimitive(
     cubicSegments: 0,
     flattenedSegments: 0,
   };
+  // A zero dimension suppresses the primitive before positions or other lengths
+  // matter. Unsupported lengths on otherwise rendered geometry still diagnose.
+  if (isNonRenderingPrimitive(name, attributes, viewport)) {
+    return { diagnostics, metrics, subpaths: [] };
+  }
   const length = (attribute: string, referenceOverride?: number): number => {
     const value = attributes[attribute];
     if (value === undefined) return 0;
@@ -542,7 +611,7 @@ export function flattenPrimitive(
         );
       }
     } else {
-      const radius = length("r");
+      const radius = name === "circle" ? length("r") : 0;
       subpaths = ellipseSubpath(
         length("cx"),
         length("cy"),

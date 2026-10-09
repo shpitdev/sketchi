@@ -1,7 +1,7 @@
 import { fnv1a32 } from "@sketchi/diagram-core";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 
-import { flattenPrimitive } from "./flatten";
+import { flattenPrimitive, isNonRenderingPrimitive } from "./flatten";
 import { withoutClosingPoint } from "./geometry";
 import { parseLength, type SvgViewport } from "./length";
 import {
@@ -63,6 +63,7 @@ interface WalkContext {
   readonly ancestry: readonly SvgElementDescriptor[];
   readonly matrix: Matrix;
   readonly paint: PaintContext;
+  readonly pendingDiagnostics: readonly SvgDiagnostic[];
   readonly viewport: SvgViewport;
 }
 
@@ -622,6 +623,21 @@ function symbolViewport(
   useAttributes: SvgAttributes,
   parentViewport: SvgViewport,
 ): SymbolViewportResult {
+  const width = parseLength(
+    styleProperty(useAttributes, "width") ??
+      styleProperty(symbol.attributes, "width") ??
+      undefined,
+    parentViewport.width,
+  );
+  const height = parseLength(
+    styleProperty(useAttributes, "height") ??
+      styleProperty(symbol.attributes, "height") ??
+      undefined,
+    parentViewport.height,
+  );
+  if (width === 0 || height === 0) {
+    return { kind: "hidden" };
+  }
   if (
     symbol.attributes.x !== undefined ||
     symbol.attributes.y !== undefined ||
@@ -650,18 +666,6 @@ function symbolViewport(
       message: `Symbol #${symbol.attributes.id ?? "(anonymous)"} requires a finite positive viewBox.`,
     };
   }
-  const width = parseLength(
-    styleProperty(useAttributes, "width") ??
-      styleProperty(symbol.attributes, "width") ??
-      undefined,
-    parentViewport.width,
-  );
-  const height = parseLength(
-    styleProperty(useAttributes, "height") ??
-      styleProperty(symbol.attributes, "height") ??
-      undefined,
-    parentViewport.height,
-  );
   if (width === null || height === null) {
     return {
       kind: "unsupported",
@@ -673,9 +677,6 @@ function symbolViewport(
       kind: "unsupported",
       message: `Symbol #${symbol.attributes.id ?? "(anonymous)"} has a negative viewport dimension.`,
     };
-  }
-  if (width === 0 || height === 0) {
-    return { kind: "hidden" };
   }
   const preserveAspectRatio =
     symbol.attributes.preserveAspectRatio ?? "xMidYMid meet";
@@ -784,6 +785,87 @@ function nodePath(parent: string, child: SvgNode, index: number): string {
   return `${parent}/${child.name}${id}[${index}]`;
 }
 
+function useTargetMayRender(
+  root: SvgNode,
+  context: WalkContext,
+  state: Pick<ParserState, "cssRules" | "ids">,
+): boolean {
+  // This conservative check has its own budget. It never expands shapes, emits
+  // diagnostics, or changes the main use-expansion counters/limit flag.
+  let remainingNodes = 512;
+  const visit = (
+    node: SvgNode,
+    paint: PaintContext,
+    ancestry: readonly SvgElementDescriptor[],
+    viewport: SvgViewport,
+    depth: number,
+    referencedSymbolRoot = false,
+  ): boolean => {
+    if (depth >= 64 || remainingNodes <= 0) return true;
+    remainingNodes -= 1;
+    const nextAncestry = [...ancestry, descriptor(node.name, node.attributes)];
+    const computed = computeElementStyle(
+      paint,
+      node.attributes,
+      nextAncestry,
+      state.cssRules,
+      viewport,
+    );
+    if (
+      !(referencedSymbolRoot ? paint.displayed : computed.paint.displayed) ||
+      computed.paint.opacity === 0
+    )
+      return false;
+    if (
+      NON_RENDERING.has(node.name) ||
+      (node.name === "symbol" && !referencedSymbolRoot)
+    )
+      return false;
+    const nextPaint = referencedSymbolRoot
+      ? { ...computed.paint, displayed: paint.displayed }
+      : computed.paint;
+    if (node.name === "use") {
+      const reference =
+        node.attributes.href ?? node.attributes["xlink:href"] ?? "";
+      const target = reference.startsWith("#")
+        ? state.ids.get(reference.slice(1))
+        : undefined;
+      if (!target) return true;
+      const symbol =
+        target.name === "symbol"
+          ? symbolViewport(target, node.attributes, viewport)
+          : null;
+      if (symbol?.kind === "hidden") return false;
+      return visit(
+        target,
+        nextPaint,
+        nextAncestry,
+        symbol?.kind === "mapped" ? symbol.viewport : viewport,
+        depth + 1,
+        target.name === "symbol",
+      );
+    }
+    if (CONTAINERS.has(node.name)) {
+      return node.children.some((child) =>
+        visit(child, nextPaint, nextAncestry, viewport, depth + 1),
+      );
+    }
+    if (computed.paint.visibility !== "visible") return false;
+    return (
+      !isPrimitiveName(node.name) ||
+      !isNonRenderingPrimitive(node.name, node.attributes, viewport)
+    );
+  };
+  return visit(
+    root,
+    context.paint,
+    context.ancestry,
+    context.viewport,
+    0,
+    root.name === "symbol",
+  );
+}
+
 function walkNode(
   node: SvgNode,
   sourcePath: string,
@@ -808,13 +890,58 @@ function walkNode(
     context.viewport,
   );
   if (
-    !(referencedSymbolRoot ? context.paint.displayed : computed.paint.displayed)
+    !(referencedSymbolRoot
+      ? context.paint.displayed
+      : computed.paint.displayed) ||
+    computed.paint.opacity === 0
   ) {
     return;
   }
+  // Containers and use instances may have no rendered descendants. Keep their
+  // diagnostics pending, including through visibility overrides, until geometry
+  // actually renders.
+  const pendingDiagnostics = [...context.pendingDiagnostics];
+  if (node.name === "svg" && context.ancestry.length === 0) {
+    const dimensions = [
+      {
+        property: "width",
+        value: computed.width,
+        reference: context.viewport.width,
+      },
+      {
+        property: "height",
+        value: computed.height,
+        reference: context.viewport.height,
+      },
+    ].map((dimension) => ({
+      ...dimension,
+      length: parseLength(dimension.value, dimension.reference),
+    }));
+    if (dimensions.some((dimension) => dimension.length === 0)) {
+      return;
+    }
+    for (const dimension of dimensions) {
+      if (
+        dimension.length === null &&
+        parseLength(
+          node.attributes[dimension.property],
+          dimension.reference,
+        ) === 0
+      ) {
+        pendingDiagnostics.push(
+          diagnostic({
+            code: "unsupported-presentation-property",
+            elementId: node.attributes.id ?? null,
+            message: `Unsupported presentation property: ${dimension.property}`,
+            severity: "warning",
+            sourcePath,
+          }),
+        );
+      }
+    }
+  }
   if (computed.invalidStrokeWidth) {
-    pushDiagnostic(
-      state,
+    pendingDiagnostics.push(
       diagnostic({
         code: "unsupported-presentation-property",
         elementId: node.attributes.id ?? null,
@@ -825,8 +952,7 @@ function walkNode(
     );
   }
   for (const property of computed.unsupportedProperties) {
-    pushDiagnostic(
-      state,
+    pendingDiagnostics.push(
       diagnostic({
         code: "unsupported-presentation-property",
         elementId: node.attributes.id ?? null,
@@ -834,7 +960,6 @@ function walkNode(
         severity: "warning",
         sourcePath,
       }),
-      `unsupported-presentation-property:${property}:${sourcePath}`,
     );
   }
   const localClipId = extractUrlId(computed.clipPath);
@@ -848,6 +973,7 @@ function walkNode(
     activeClips,
     ancestry,
     matrix,
+    pendingDiagnostics,
     viewport: context.viewport,
     paint: referencedSymbolRoot
       ? { ...computed.paint, displayed: context.paint.displayed }
@@ -890,6 +1016,45 @@ function walkNode(
     if (!referenceNode) {
       return;
     }
+    const x = parseLength(node.attributes.x ?? "0", context.viewport.width);
+    const y = parseLength(node.attributes.y ?? "0", context.viewport.height);
+    const symbol =
+      referenceNode.name === "symbol"
+        ? symbolViewport(referenceNode, node.attributes, context.viewport)
+        : null;
+    if (symbol?.kind === "hidden") return;
+    if (x === null || y === null || symbol?.kind === "unsupported") {
+      if (useTargetMayRender(referenceNode, nextContext, state)) {
+        pendingDiagnostics.forEach((entry) => pushDiagnostic(state, entry));
+        if (x === null || y === null) {
+          pushDiagnostic(
+            state,
+            diagnostic({
+              code: "invalid-geometry",
+              elementId: node.attributes.id ?? null,
+              feature: "use",
+              message: "Invalid SVG use x/y length.",
+              severity: "warning",
+              sourcePath,
+            }),
+          );
+        }
+        if (symbol?.kind === "unsupported") {
+          pushDiagnostic(
+            state,
+            diagnostic({
+              code: "symbol-viewport-unsupported",
+              elementId: node.attributes.id ?? null,
+              feature: "use",
+              message: symbol.message,
+              severity: "warning",
+              sourcePath,
+            }),
+          );
+        }
+      }
+      return;
+    }
     if (useStack.length >= state.useExpansion.maxDepth) {
       exceedExpansionLimit(
         state,
@@ -908,55 +1073,21 @@ function walkNode(
     }
     state.useExpansions += 1;
     state.usesResolved += 1;
-    const x = parseLength(node.attributes.x ?? "0", context.viewport.width);
-    const y = parseLength(node.attributes.y ?? "0", context.viewport.height);
-    if (x === null || y === null) {
-      pushDiagnostic(
-        state,
-        diagnostic({
-          code: "invalid-geometry",
-          elementId: node.attributes.id ?? null,
-          feature: "use",
-          message: "Invalid SVG use x/y length.",
-          severity: "warning",
-          sourcePath,
-        }),
-      );
-      return;
-    }
     const translatedMatrix = multiplyMatrices(matrix, [1, 0, 0, 1, x, y]);
     let referenceMatrix = translatedMatrix;
     let referenceViewport = context.viewport;
-    if (referenceNode.name === "symbol") {
-      const viewport = symbolViewport(
-        referenceNode,
-        node.attributes,
-        context.viewport,
-      );
-      if (viewport.kind === "unsupported") {
-        pushDiagnostic(
-          state,
-          diagnostic({
-            code: "symbol-viewport-unsupported",
-            elementId: node.attributes.id ?? null,
-            feature: "use",
-            message: viewport.message,
-            severity: "warning",
-            sourcePath,
-          }),
-        );
-        return;
-      }
-      if (viewport.kind === "hidden") {
-        return;
-      }
-      referenceMatrix = multiplyMatrices(translatedMatrix, viewport.matrix);
-      referenceViewport = viewport.viewport;
+    if (symbol?.kind === "mapped") {
+      referenceMatrix = multiplyMatrices(translatedMatrix, symbol.matrix);
+      referenceViewport = symbol.viewport;
     }
     walkNode(
       referenceNode,
       `${sourcePath}->#${referenceId}`,
-      { ...nextContext, matrix: referenceMatrix, viewport: referenceViewport },
+      {
+        ...nextContext,
+        matrix: referenceMatrix,
+        viewport: referenceViewport,
+      },
       state,
       [...useStack, referenceId],
       referenceNode.name === "symbol",
@@ -996,7 +1127,11 @@ function walkNode(
     );
     return;
   }
+  if (computed.paint.visibility !== "visible") {
+    return;
+  }
   if (!isPrimitiveName(node.name)) {
+    pendingDiagnostics.forEach((entry) => pushDiagnostic(state, entry));
     if (!NON_RENDERING.has(node.name)) {
       pushDiagnostic(
         state,
@@ -1011,7 +1146,7 @@ function walkNode(
     }
     return;
   }
-  if (computed.paint.visibility !== "visible") {
+  if (isNonRenderingPrimitive(node.name, node.attributes, context.viewport)) {
     return;
   }
   if (state.shapes.length >= state.useExpansion.maxShapes) {
@@ -1022,7 +1157,6 @@ function walkNode(
     );
     return;
   }
-
   const flattened = flattenPrimitive(
     node.name,
     node.attributes,
@@ -1035,6 +1169,7 @@ function walkNode(
   if (flattened.subpaths.length === 0) {
     return;
   }
+  pendingDiagnostics.forEach((entry) => pushDiagnostic(state, entry));
   state.cubicSegments += flattened.metrics.cubicSegments;
   state.arcSegments += flattened.metrics.arcSegments;
   state.flattenedSegments += flattened.metrics.flattenedSegments;
@@ -1162,8 +1297,9 @@ export function parseSvg(
       return parseFailure("Expected an SVG root element.");
     }
 
+    const viewportDiagnostics: SvgDiagnostic[] = [];
+    const viewBox = parseViewBox(root, viewportDiagnostics);
     const initialDiagnostics: SvgDiagnostic[] = [];
-    const viewBox = parseViewBox(root, initialDiagnostics);
     const ids = new Map<string, SvgNode>();
     collectIds(root, root.name, ids, initialDiagnostics);
     const css = parseCssRules(collectStyles(root, root.name));
@@ -1199,6 +1335,7 @@ export function parseSvg(
         ancestry: [],
         matrix: IDENTITY_MATRIX,
         paint: DEFAULT_PAINT_CONTEXT,
+        pendingDiagnostics: viewportDiagnostics,
         viewport: {
           minX: viewBox[0],
           minY: viewBox[1],

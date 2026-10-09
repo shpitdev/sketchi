@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { corpusFixtures } from "../../tests/corpus-fixtures";
 import {
@@ -11,6 +11,7 @@ import {
 } from "../../tests/determinism-fixtures";
 import { inspectSvgCapabilities } from "./capabilities";
 import { convertSvgToExcalidraw } from "./convert";
+import * as flatten from "./flatten";
 import { filledRegionsForShape } from "./native";
 import {
   constructNativeTrace,
@@ -722,6 +723,302 @@ describe("canonical SVG parser", () => {
     expect(document.shapes.map((shape) => shape.elementId)).toEqual([
       "restored",
     ]);
+  });
+
+  it.each([
+    '<rect visibility="hidden" width="10em" height="10" stroke-width="4pt" stroke-dasharray="2 2"/>',
+    '<rect visibility="collapse" width="10" height="10" style="stroke-width:4pt;stroke-linecap:round"/>',
+    '<g visibility="hidden" stroke-width="4pt" stroke-dasharray="2 2"><rect width="10em" height="10"/><circle r="5em"/></g>',
+    '<g visibility="hidden" stroke-width="4pt"><defs><rect id="target" width="10" height="10"/></defs><use href="#target" x="10em"/></g>',
+    '<defs><symbol id="hidden-symbol" viewBox="0 0 10 10"><rect width="10" height="10"/></symbol></defs><use visibility="hidden" href="#hidden-symbol" width="10em" height="10" stroke-width="4pt"/>',
+    '<g opacity="0" stroke-width="4pt"><rect opacity="1" width="10em" height="10"/></g>',
+    '<defs stroke-width="4pt" stroke-dasharray="2 2"><rect width="10em" height="10"/></defs>',
+    '<symbol stroke-width="4pt" stroke-dasharray="2 2"><rect width="10em" height="10"/></symbol>',
+    '<g stroke-width="4pt" stroke-dasharray="2 2"/>',
+    '<g stroke-width="4pt" stroke-dasharray="2 2"><rect visibility="hidden" width="10" height="10"/></g>',
+    '<rect width="0" height="10pt" x="10em" stroke-width="4pt" stroke-dasharray="2 2"/>',
+    '<rect width="10pt" height="0" y="10em" stroke-width="4pt"/>',
+    '<rect height="10pt" stroke-width="4pt"/>',
+    '<circle r="0" cx="10em" stroke-width="4pt"/>',
+    '<circle cy="10em" stroke-width="4pt"/>',
+    '<ellipse rx="0" ry="10pt" cx="10em" stroke-width="4pt"/>',
+    '<ellipse rx="10pt" ry="0" cy="10em" stroke-width="4pt"/>',
+    '<path d="" stroke-width="4pt" stroke-dasharray="2 2"/>',
+    '<path d="M0 0 M10 10" stroke-width="4pt" stroke-dasharray="2 2"/>',
+    '<polygon points=" " stroke-width="4pt" stroke-dasharray="2 2"/>',
+    '<polyline stroke-width="4pt" stroke-dasharray="2 2"/>',
+    '<defs><g id="empty"/></defs><use href="#empty" x="10em" stroke-width="4pt"/>',
+    '<defs><symbol id="empty-symbol" viewBox="0 0 10 10"/></defs><use href="#empty-symbol" width="10em" height="10"/>',
+    '<defs><symbol id="zero" viewBox="0 0 10 10"><rect width="10em" height="10"/></symbol></defs><use href="#zero" width="0" height="10pt" x="10em" stroke-width="4pt"/>',
+  ])("converts visible siblings of non-rendering elements: %s", (hidden) => {
+    const document = mustParse(`<svg viewBox="0 0 100 100">${hidden}
+      <rect id="visible" width="10" height="10"/>
+    </svg>`);
+    expect(document.diagnostics).toEqual([]);
+    expect(document.shapes.map((shape) => shape.elementId)).toEqual([
+      "visible",
+    ]);
+    expect(inspectSvgCapabilities(document).nativeTrace).toBe("supported");
+    const result = convertSvgToExcalidraw(document);
+    expect(result.ok).toBe(true);
+    expect(result.elements).toHaveLength(1);
+  });
+
+  it.each([
+    '<svg display="none" width="10em" stroke-width="4pt"><rect width="10" height="10"/></svg>',
+    '<svg visibility="hidden" width="10em" stroke-width="4pt"><rect width="10" height="10"/></svg>',
+    '<svg width="0" height="10em" stroke-width="4pt"><rect width="10" height="10"/></svg>',
+    '<svg viewBox="0 0 100 100" width="10em" height="0" stroke-width="4pt"><rect width="10" height="10"/></svg>',
+  ])(
+    "skips length and presentation diagnostics on hidden roots: %s",
+    (source) => {
+      const document = mustParse(source);
+      expect(document.diagnostics).toEqual([]);
+      expect(document.shapes).toEqual([]);
+      expect(inspectSvgCapabilities(document).nativeTrace).toBe("supported");
+    },
+  );
+
+  it.each([
+    '<svg viewBox="0 0 100 100" width="0" style="width:100px">',
+    '<svg viewBox="0 0 100 100" height="0" style="height:100px">',
+    '<svg viewBox="0 0 100 100" width="0"><style>svg { width:100px }</style>',
+    '<svg viewBox="0 0 100 100" height="0"><style>svg { height:100px }</style>',
+    '<svg viewBox="0 0 100 100" width="0" style="width:0"><style>svg { width:100px !important }</style>',
+    '<svg viewBox="0 0 100 100" width="0" style="width:100px"><style>svg { width:0 }</style>',
+  ])(
+    "preserves geometry when CSS overrides a zero root dimension: %s",
+    (root) => {
+      const document = mustParse(`${root}<rect width="10" height="10"/></svg>`);
+      expect(document.diagnostics).toEqual([]);
+      expect(document.shapes).toHaveLength(1);
+      const result = convertSvgToExcalidraw(document);
+      expect(result.ok).toBe(true);
+      expect(result.elements).toHaveLength(1);
+    },
+  );
+
+  it.each([
+    '<svg viewBox="0 0 100 100" width="100" style="width:0">',
+    '<svg viewBox="0 0 100 100" height="100"><style>svg { height:0 }</style>',
+  ])(
+    "suppresses geometry when the effective CSS root dimension is zero: %s",
+    (root) => {
+      const document = mustParse(`${root}<rect width="10" height="10"/></svg>`);
+      expect(document.diagnostics).toEqual([]);
+      expect(document.shapes).toEqual([]);
+    },
+  );
+
+  it.each([
+    '<svg viewBox="0 0 100 100" width="0" style="width:calc(100px)">',
+    '<svg viewBox="0 0 100 100" height="0"><style>svg { height:10em }</style>',
+  ])(
+    "blocks unresolved CSS overrides instead of silently dropping geometry: %s",
+    (root) => {
+      const document = mustParse(`${root}<rect width="10" height="10"/></svg>`);
+      expect(document.shapes).toHaveLength(1);
+      expect(document.diagnostics).toEqual([
+        expect.objectContaining({ code: "unsupported-presentation-property" }),
+      ]);
+      expect(convertSvgToExcalidraw(document)).toMatchObject({ ok: false });
+    },
+  );
+
+  it.each([
+    '<rect width="10" height="10" stroke-width="4pt"/>',
+    '<g visibility="hidden" stroke-width="4pt"><rect visibility="visible" width="10" height="10"/></g>',
+    '<g stroke-dasharray="2 2"><rect width="10" height="10"/></g>',
+    '<defs><g id="target"><rect width="10" height="10"/></g></defs><use href="#target" x="10em"/>',
+  ])(
+    "still blocks unsupported semantics on rendered elements: %s",
+    (element) => {
+      const document = mustParse(`<svg>${element}</svg>`);
+      expect(inspectSvgCapabilities(document).nativeTrace).toBe("unsupported");
+      expect(convertSvgToExcalidraw(document)).toMatchObject({
+        ok: false,
+        elements: [],
+      });
+    },
+  );
+
+  it("does not parse the unused r attribute on a rendered ellipse", () => {
+    const document = mustParse('<svg><ellipse rx="10" ry="5" r="4pt"/></svg>');
+    expect(document.diagnostics).toEqual([]);
+    expect(document.shapes).toHaveLength(1);
+    expect(convertSvgToExcalidraw(document).ok).toBe(true);
+  });
+
+  it("does not count non-rendering primitives against the shape limit", () => {
+    const flattenSpy = vi.spyOn(flatten, "flattenPrimitive");
+    try {
+      const document = mustParse(
+        `<svg>
+        <rect width="10" height="10"/>
+        <circle r="0" cx="10em" stroke-width="4pt"/>
+        <rect width="0" height="10em" stroke-width="4pt"/>
+        <polyline points=" " stroke-width="4pt"/>
+        <polygon stroke-width="4pt"/>
+        <path d=" " stroke-width="4pt"/>
+        <path d="M0 0 M10 10" stroke-width="4pt"/>
+        <path d="M.1.2 m1e2-3" stroke-width="4pt"/>
+        <path visibility="hidden" d="M0 0C0 1e20 1e20 0 1e20 1e20" stroke-width="4pt"/>
+        </svg>`,
+        "shape-limit.svg",
+        undefined,
+        { maxShapes: 1 },
+      );
+      expect(document.diagnostics).toEqual([]);
+      expect(document.shapes).toHaveLength(1);
+      expect(flattenSpy).toHaveBeenCalledTimes(1);
+      expect(convertSvgToExcalidraw(document).ok).toBe(true);
+    } finally {
+      flattenSpy.mockRestore();
+    }
+  });
+
+  it("rejects an over-budget pathological path before flattening it", () => {
+    const originalFlatten = flatten.flattenPrimitive;
+    const flattenSpy = vi
+      .spyOn(flatten, "flattenPrimitive")
+      .mockImplementation((...args) => {
+        if (args[1].id === "pathological") {
+          throw new Error("Over-budget path reached adaptive flattening");
+        }
+        return originalFlatten(...args);
+      });
+    try {
+      const document = mustParse(
+        `<svg>
+        <rect width="10" height="10"/>
+        <path id="pathological" d="M0 0${"C0 1e20 1e20 0 1e20 1e20A1e20 1e20 0 1 1 0 0".repeat(16)}"/>
+      </svg>`,
+        "over-budget.svg",
+        { maxDepth: 26, tolerance: 0.01 },
+        { maxShapes: 1 },
+      );
+      expect(document.shapes).toHaveLength(1);
+      expect(document.diagnostics).toEqual([
+        expect.objectContaining({
+          code: "use-expansion-limit-exceeded",
+          message: "SVG shape expansion exceeded maxShapes=1.",
+        }),
+      ]);
+      expect(flattenSpy).toHaveBeenCalledTimes(1);
+      expect(flattenSpy.mock.calls[0]?.[0]).toBe("rect");
+      expect(convertSvgToExcalidraw(document)).toMatchObject({ ok: false });
+    } finally {
+      flattenSpy.mockRestore();
+    }
+  });
+
+  it("does not mistake an incomplete decimal move for non-rendering geometry", () => {
+    const document = mustParse('<svg><path d="M1.2"/></svg>');
+    expect(document.diagnostics).toEqual([
+      expect.objectContaining({ code: "parse-error" }),
+    ]);
+    expect(convertSvgToExcalidraw(document)).toMatchObject({ ok: false });
+  });
+
+  it("does not spend expansion limits on an unsupported use of an empty chain", () => {
+    const flattenSpy = vi.spyOn(flatten, "flattenPrimitive");
+    try {
+      const document = mustParse(
+        `<svg><defs>
+        <g id="empty"/>
+        <g id="a"><use href="#empty"/></g>
+        <g id="b"><use href="#a"/></g>
+        <g id="c"><use href="#b"/></g>
+        <rect id="tile" width="10" height="10"/>
+      </defs>
+        <use href="#c" x="10em"/>
+        <rect id="visible" width="10" height="10"/>
+        <use href="#tile"/>
+      </svg>`,
+        "unsupported-empty-chain.svg",
+        undefined,
+        { maxDepth: 1, maxExpansions: 1 },
+      );
+      expect(document.diagnostics).toEqual([]);
+      expect(document.shapes.map((shape) => shape.elementId)).toEqual([
+        "visible",
+        "tile",
+      ]);
+      expect(document.metrics.usesResolved).toBe(1);
+      expect(flattenSpy).toHaveBeenCalledTimes(2);
+      const result = convertSvgToExcalidraw(document);
+      expect(result.ok).toBe(true);
+      expect(result.elements).toHaveLength(2);
+    } finally {
+      flattenSpy.mockRestore();
+    }
+  });
+
+  it.each(['x="10em"', 'y="4pt"', 'width="10em" height="10"'])(
+    "never flattens a target with unsupported use geometry: %s",
+    (attributes) => {
+      const originalFlatten = flatten.flattenPrimitive;
+      const flattenSpy = vi
+        .spyOn(flatten, "flattenPrimitive")
+        .mockImplementation((...args) => {
+          if (args[1].id === "pathological") {
+            throw new Error(
+              "Unsupported use target reached adaptive flattening",
+            );
+          }
+          return originalFlatten(...args);
+        });
+      try {
+        const viewportAttributes = attributes.startsWith("width")
+          ? attributes
+          : `width="10" height="10" ${attributes}`;
+        const document = mustParse(`<svg><defs>
+        <symbol id="target" overflow="visible" viewBox="0 0 100 100">
+          <path id="pathological" d="M0 0C0 1e20 1e20 0 1e20 1e20"/>
+        </symbol>
+      </defs><use href="#target" ${viewportAttributes}/>
+        <rect id="visible" width="10" height="10"/>
+      </svg>`);
+        expect(document.shapes.map((shape) => shape.elementId)).toEqual([
+          "visible",
+        ]);
+        expect(document.diagnostics).toHaveLength(1);
+        expect(document.diagnostics[0]?.code).toBe(
+          attributes.startsWith("width")
+            ? "symbol-viewport-unsupported"
+            : "invalid-geometry",
+        );
+        expect(document.metrics.usesResolved).toBe(0);
+        expect(flattenSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        flattenSpy.mockRestore();
+      }
+    },
+  );
+
+  it("bounds unsupported-use render checks without poisoning main expansion", () => {
+    const document = mustParse(
+      `<svg><defs>
+      <g id="cycle"><use href="#cycle"/></g>
+      <rect id="tile" width="10" height="10"/>
+    </defs>
+      <use href="#cycle" x="10em"/>
+      <rect id="visible" width="10" height="10"/>
+      <use href="#tile"/>
+    </svg>`,
+      "unsupported-cycle.svg",
+      undefined,
+      { maxDepth: 1, maxExpansions: 1 },
+    );
+    expect(document.diagnostics).toEqual([
+      expect.objectContaining({ code: "invalid-geometry" }),
+    ]);
+    expect(document.shapes.map((shape) => shape.elementId)).toEqual([
+      "visible",
+      "tile",
+    ]);
+    expect(document.metrics.usesResolved).toBe(1);
+    expect(convertSvgToExcalidraw(document)).toMatchObject({ ok: false });
   });
 
   it.each([

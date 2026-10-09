@@ -57,9 +57,11 @@ export interface PaintContext {
 
 export interface ComputedElementStyle {
   readonly clipPath: string | null;
+  readonly height: string | undefined;
   readonly invalidStrokeWidth: boolean;
   readonly paint: PaintContext;
   readonly unsupportedProperties: readonly string[];
+  readonly width: string | undefined;
 }
 
 const ZERO_SPECIFICITY: CssSpecificity = { classes: 0, ids: 0, types: 0 };
@@ -89,11 +91,13 @@ const PRESENTATION_PROPERTIES = new Set([
   "fill",
   "fill-opacity",
   "fill-rule",
+  "height",
   "opacity",
   "stroke",
   "stroke-opacity",
   "stroke-width",
   "visibility",
+  "width",
 ]);
 
 const UNSUPPORTED_PRESENTATION_PROPERTIES = new Set([
@@ -466,6 +470,8 @@ export function computeElementStyle(
   return {
     invalidStrokeWidth: strokeWidth === null || strokeWidth < 0,
     clipPath: values.get("clip-path")?.value ?? null,
+    height: values.get("height")?.value,
+    width: values.get("width")?.value,
     paint: {
       color,
       displayed: parent.displayed && display !== "none",
