@@ -36,6 +36,8 @@ describe("generation reliability scenario registry", () => {
     expect(manuscript.prompt).not.toContain("self-loop");
     expect(manuscript.prompt).toContain("a separate resubmission process");
     expect(manuscript.assertions).toMatchObject({
+      minNodeCount: 18,
+      minEndCount: 4,
       requiredCyclePaths: [
         {
           branchLabels: ["revision requested"],
@@ -62,6 +64,12 @@ describe("generation reliability scenario registry", () => {
         {
           branchLabels: ["accepted"],
           branchSourceNodeLabels: expect.arrayContaining(["editorial triage"]),
+        },
+        {
+          terminalNodeLabels: ["final rejection", "final reject"],
+        },
+        {
+          terminalNodeLabels: ["retraction", "retracted"],
         },
       ],
     });

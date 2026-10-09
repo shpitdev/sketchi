@@ -3,6 +3,11 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { NodeRuntime } from "@effect/platform-node";
+import {
+  candidateFromText,
+  enforceCandidateRequestRequirements,
+  extractJsonObject,
+} from "@sketchi/diagram-generation";
 import { Effect, Schema } from "effect";
 
 import {
@@ -13,9 +18,11 @@ import {
 import {
   evaluateScenarioDiagram,
   evaluateScenarioFixture,
-  evaluateScenarioOutput,
 } from "./lib/evaluate.js";
-import { buildScenarioPrompt } from "./lib/prompt.js";
+import {
+  buildScenarioPrompt,
+  toDiagramGenerationPrompt,
+} from "./lib/prompt.js";
 import {
   type DiagramScenario,
   flowchartScenarios,
@@ -179,12 +186,64 @@ function readText(filePath: string) {
   });
 }
 
-function parseCandidate(candidateOutput: string) {
-  return Effect.try({
-    try: () => JSON.parse(candidateOutput) as unknown,
-    catch: (cause) => scenarioToolError("Candidate output is not JSON.", cause),
-  });
+interface ScenarioRunEvaluation {
+  readonly candidateOutput: string;
+  readonly evaluation?: ReturnType<typeof evaluateScenarioFixture>;
+  readonly error?: string;
 }
+
+const isResponseEnvelope = Schema.is(Schema.Struct({ intent: Schema.Unknown }));
+
+const evaluateCandidate = Effect.fn("diagramScenarios.evaluateCandidate")(
+  function (
+    scenario: DiagramScenario,
+    candidateOutput: string,
+  ): Effect.Effect<ScenarioRunEvaluation> {
+    return Effect.try({
+      try: () => {
+        let diagram: unknown = extractJsonObject(candidateOutput);
+        if (isResponseEnvelope(diagram)) {
+          const request = {
+            model: "command",
+            prompt: toDiagramGenerationPrompt(scenario),
+          };
+          const candidate = enforceCandidateRequestRequirements(
+            candidateFromText({
+              model: request.model,
+              provider: "fixture",
+              text: candidateOutput,
+            }),
+            request,
+          );
+          if (candidate.error || !candidate.diagram) {
+            throw new Error(
+              [
+                candidate.error ?? "No generated diagram.",
+                ...candidate.diagnostics,
+              ].join(" "),
+            );
+          }
+          diagram = candidate.diagram;
+        }
+        return {
+          candidateOutput,
+          evaluation: evaluateScenarioDiagram(scenario, diagram),
+        };
+      },
+      catch: (cause) =>
+        scenarioToolError(
+          cause instanceof Error
+            ? cause.message
+            : "Unable to evaluate candidate.",
+          cause,
+        ),
+    }).pipe(
+      Effect.catch((error) =>
+        Effect.succeed({ candidateOutput, error: error.message }),
+      ),
+    );
+  },
+);
 
 function outputPathForScenario(input: {
   readonly out: string | undefined;
@@ -236,10 +295,7 @@ function evaluateScenario(
     readonly useFixture: boolean;
   },
 ): Effect.Effect<
-  {
-    readonly candidateOutput: string;
-    readonly evaluation: ReturnType<typeof evaluateScenarioFixture>;
-  },
+  ScenarioRunEvaluation,
   | ScenarioToolError
   | ToolProcessControlError
   | ToolProcessExitError
@@ -249,21 +305,13 @@ function evaluateScenario(
 > {
   if (input.useFixture) {
     const candidateOutput = JSON.stringify(scenario.expectedDiagram, null, 2);
-    return Effect.succeed({
-      candidateOutput,
-      evaluation: evaluateScenarioFixture(scenario),
-    });
+    return evaluateCandidate(scenario, candidateOutput);
   }
 
   if (input.input) {
     return readText(input.input).pipe(
       Effect.flatMap((candidateOutput) =>
-        parseCandidate(candidateOutput).pipe(
-          Effect.map((candidate) => ({
-            candidateOutput,
-            evaluation: evaluateScenarioDiagram(scenario, candidate),
-          })),
-        ),
+        evaluateCandidate(scenario, candidateOutput),
       ),
     );
   }
@@ -275,10 +323,9 @@ function evaluateScenario(
       buildScenarioPrompt(scenario),
       { repeat: input.repeat, runIndex: input.runIndex },
     ).pipe(
-      Effect.map((candidateOutput) => ({
-        candidateOutput,
-        evaluation: evaluateScenarioOutput(scenario, candidateOutput),
-      })),
+      Effect.flatMap((candidateOutput) =>
+        evaluateCandidate(scenario, candidateOutput),
+      ),
     );
   }
 
@@ -372,20 +419,26 @@ export const runScenarioCli = Effect.fn("diagramScenarios.cli")(function* (
           scenarioId: scenario.id,
         });
         return Effect.all([
-          out ? writeJson(out, result.evaluation.excalidrawScene) : Effect.void,
+          out && result.evaluation
+            ? writeJson(out, result.evaluation.excalidrawScene)
+            : Effect.void,
           candidateOut
             ? writeText(candidateOut, result.candidateOutput)
             : Effect.void,
         ]).pipe(
           Effect.as({
-            scenarioId: result.evaluation.scenarioId,
+            scenarioId: scenario.id,
             runIndex,
             runNumber: runIndex + 1,
-            ok: result.evaluation.ok,
-            checks: result.evaluation.checks,
-            excalidrawIssues: result.evaluation.excalidrawValidation.issues,
+            ok: result.evaluation?.ok ?? false,
+            ...(result.error
+              ? { error: result.error, errorTag: "ScenarioToolError" }
+              : {}),
+            checks: result.evaluation?.checks ?? [],
+            excalidrawIssues:
+              result.evaluation?.excalidrawValidation.issues ?? [],
             candidateOut,
-            out,
+            out: result.evaluation ? out : undefined,
           }),
         );
       }),

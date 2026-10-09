@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
+import { NodeRuntime } from "@effect/platform-node";
 import {
   type DiagramGenerationCandidateSummary,
   DiagramGenerationScenarioOutput,
@@ -105,70 +107,81 @@ function writeResponseSidecar(response: DiagramGenerationScenarioOutput) {
   );
 }
 
-const main = Effect.gen(function* () {
-  yield* readStdin();
-  const scenarioId = yield* requiredEnv("SKETCHI_SCENARIO_ID");
-  const playgroundUrl = yield* requiredEnv("SKETCHI_PLAYGROUND_URL");
-  const cacheMode = process.env.SKETCHI_SCENARIO_CACHE_MODE ?? "fresh";
-  const response = yield* Effect.tryPromise({
-    try: (signal) =>
-      fetch(endpointUrl(playgroundUrl), {
-        body: JSON.stringify({
-          cacheMode,
-          providers: ["cloudflare-google-ai-studio"],
-          scenarioId,
+export const runLiveGenerator = Effect.fn("diagramScenarios.liveGenerator")(
+  function* () {
+    yield* readStdin();
+    const scenarioId = yield* requiredEnv("SKETCHI_SCENARIO_ID");
+    const playgroundUrl = yield* requiredEnv("SKETCHI_PLAYGROUND_URL");
+    const cacheMode = process.env.SKETCHI_SCENARIO_CACHE_MODE ?? "fresh";
+    const response = yield* Effect.tryPromise({
+      try: (signal) =>
+        fetch(endpointUrl(playgroundUrl), {
+          body: JSON.stringify({
+            cacheMode,
+            providers: ["cloudflare-google-ai-studio"],
+            scenarioId,
+          }),
+          headers: { "Content-Type": "application/json" },
+          method: "POST",
+          signal,
         }),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-        signal,
-      }),
-    catch: (cause) =>
-      LiveGeneratorError.make({
-        cause,
-        message: "Unable to reach the eval harness Worker.",
-      }),
-  });
-  const unknownData = yield* Effect.tryPromise({
-    try: (_signal) => response.json(),
-    catch: (cause) =>
-      LiveGeneratorError.make({
-        cause,
-        message: "The eval harness returned an invalid JSON response.",
-      }),
-  });
-  if (!response.ok) {
-    const error =
-      typeof unknownData === "object" &&
-      unknownData !== null &&
-      "error" in unknownData &&
-      typeof unknownData.error === "string"
-        ? unknownData.error
-        : `Scenario generation failed with HTTP ${response.status}.`;
-    return yield* Effect.fail(LiveGeneratorError.make({ message: error }));
-  }
-  const generationOutput = yield* Schema.decodeUnknownEffect(
-    DiagramGenerationScenarioOutput,
-  )(unknownData).pipe(
-    Effect.mapError((cause) =>
-      LiveGeneratorError.make({
-        cause,
-        message: "The eval harness response did not match its schema.",
-      }),
-    ),
-  );
-  yield* writeResponseSidecar(generationOutput);
-  const candidate = pickCandidate(generationOutput.candidates);
-  if (!candidate) {
-    return yield* Effect.fail(
-      LiveGeneratorError.make({
-        message: `No candidate text returned for ${scenarioId}.`,
-      }),
+      catch: (cause) =>
+        LiveGeneratorError.make({
+          cause,
+          message: "Unable to reach the eval harness Worker.",
+        }),
+    });
+    const unknownData = yield* Effect.tryPromise({
+      try: (_signal) => response.json(),
+      catch: (cause) =>
+        LiveGeneratorError.make({
+          cause,
+          message: "The eval harness returned an invalid JSON response.",
+        }),
+    });
+    if (!response.ok) {
+      const error =
+        typeof unknownData === "object" &&
+        unknownData !== null &&
+        "error" in unknownData &&
+        typeof unknownData.error === "string"
+          ? unknownData.error
+          : `Scenario generation failed with HTTP ${response.status}.`;
+      return yield* Effect.fail(LiveGeneratorError.make({ message: error }));
+    }
+    const generationOutput = yield* Schema.decodeUnknownEffect(
+      DiagramGenerationScenarioOutput,
+    )(unknownData).pipe(
+      Effect.mapError((cause) =>
+        LiveGeneratorError.make({
+          cause,
+          message: "The eval harness response did not match its schema.",
+        }),
+      ),
     );
-  }
-  process.stdout.write(`${(candidate.diagramText ?? candidate.text).trim()}\n`);
-});
+    yield* writeResponseSidecar(generationOutput);
+    const candidate = pickCandidate(generationOutput.candidates);
+    if (!candidate) {
+      return yield* Effect.fail(
+        LiveGeneratorError.make({
+          message: `No candidate text returned for ${scenarioId}.`,
+        }),
+      );
+    }
+    process.stdout.write(`${candidate.text.trim()}\n`);
+  },
+);
 
-Effect.runPromise(main).catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+const main = runLiveGenerator().pipe(
+  Effect.catch((error) =>
+    Effect.sync(() => {
+      console.error(error.message);
+      process.exitCode = 1;
+    }),
+  ),
+);
+
+const entryPointPath = process.argv[1];
+if (entryPointPath && import.meta.url === pathToFileURL(entryPointPath).href) {
+  NodeRuntime.runMain(main);
+}

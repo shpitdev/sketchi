@@ -137,6 +137,7 @@ export function usage(): string {
     "  pnpm nx scenario diagram-scenarios -- --scenario pharma-batch-disposition --input candidate.json",
     '  SKETCHI_GENERATOR_COMMAND="your-llm-command" pnpm nx scenario diagram-scenarios -- --all --repeat 5 --candidate-out-dir .memory/candidates --report-out .memory/report.json',
     "",
-    "When --generator-command is used directly, put it last. The scenario prompt is written to stdin, SKETCHI_SCENARIO_ID is set, and JSON IR is expected on stdout.",
+    "When --generator-command is used directly, put it last. The scenario prompt is written to stdin and SKETCHI_SCENARIO_ID is set.",
+    "On stdout, prefer the typed JSON response envelope { title, intent, diagram }; bare JSON diagram IR is also accepted. --input accepts the same formats.",
   ].join("\n");
 }

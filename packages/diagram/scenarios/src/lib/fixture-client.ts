@@ -2,6 +2,7 @@ import {
   candidateFromText,
   DiagramGenerationClient,
   DiagramGenerationInputError,
+  enforceCandidateRequestRequirements,
   errorMessage,
 } from "@sketchi/diagram-generation";
 import { Clock, Effect, Layer } from "effect";
@@ -36,7 +37,24 @@ export const FixtureGenerationClientLayer = Layer.succeed(
               intent: {
                 requestedKind: type,
                 nativeKind: type,
-                requirements: [],
+                requirements: [
+                  {
+                    kind: "count",
+                    target: "nodes",
+                    comparator: "minimum",
+                    value: scenario.assertions.minNodeCount,
+                  },
+                  ...scenario.assertions.requiredNodeLabels.map((value) => ({
+                    kind: "label",
+                    target: "node",
+                    value,
+                  })),
+                  ...scenario.assertions.requiredBranchLabels.map((value) => ({
+                    kind: "label",
+                    target: "branch",
+                    value,
+                  })),
+                ],
               },
               diagram: { ...diagram, type },
             },
@@ -47,7 +65,7 @@ export const FixtureGenerationClientLayer = Layer.succeed(
         const finishedAt = yield* Clock.currentTimeMillis;
 
         return {
-          ...candidate,
+          ...enforceCandidateRequestRequirements(candidate, request),
           durationMs: Math.round(finishedAt - startedAt),
         };
       },

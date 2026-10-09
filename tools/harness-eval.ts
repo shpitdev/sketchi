@@ -14,7 +14,7 @@ import {
   runToolProcess,
   ToolProcessSpawnerLive,
 } from "@sketchi/diagram-scenarios/internal/tool-process";
-import { Effect, Schema } from "effect";
+import { Cause, Effect, Exit, Schema } from "effect";
 
 class HarnessFilesystemError extends Schema.TaggedError<HarnessFilesystemError>()(
   "HarnessFilesystemError",
@@ -156,10 +156,15 @@ interface HarnessRunReport {
   toolCalls: HarnessToolCall[];
 }
 
+type HarnessReportStatus = "running" | "complete" | "interrupted" | "failed";
+
 interface HarnessReport {
+  expectedRuns: number;
+  status: HarnessReportStatus;
+  requestedMcpUrl: string;
   generatedAt: string;
   harness: HarnessName;
-  mcpUrl: string;
+  mcpUrl: string | null;
   model?: string;
   ok: boolean;
   repeat: number;
@@ -179,7 +184,6 @@ interface HarnessReport {
 }
 
 const DEFAULT_MCP_URL = "https://sketchi-studio.dimethyl.workers.dev/mcp";
-const DEFAULT_ANTIGRAVITY_MODEL = "gemini-3.5-flash";
 const DEFAULT_OPENCODE_MODEL = "opencode-go/kimi-k2.7-code";
 const DEFAULT_CLAUDE_MODEL = "sonnet";
 const COMMAND_CLOSE_GRACE_MS = 1_000;
@@ -190,7 +194,7 @@ const DEFAULT_TIMEOUT_MS = 180_000;
 function usage(): string {
   return [
     "Usage:",
-    "  pnpm eval:harness -- --harness antigravity --model gemini-3.5-flash --scenario repo-package-interaction-flow",
+    "  pnpm eval:harness -- --harness antigravity --scenario repo-package-interaction-flow --antigravity-conversation-id <id>",
     "  pnpm eval:harness -- --harness opencode --model opencode-go/kimi-k2.7-code --scenario sketchi-onboarding-decision-flow",
     "  pnpm eval:harness -- --harness opencode --model opencode-go/kimi-k2.7-code --all --repeat 3",
     "  pnpm eval:harness -- --harness claude --scenario pharma-batch-disposition",
@@ -208,6 +212,8 @@ function usage(): string {
     "  --report-out <path>",
     "  --candidate-out-dir <dir>",
     "  --events-out-dir <dir>",
+    "",
+    "Antigravity supports offline replay only; its effective MCP endpoint is unknown.",
   ].join("\n");
 }
 
@@ -306,6 +312,13 @@ function parseOptionsUnsafe(argv: readonly string[]): HarnessEvalOptions {
     throw new Error(
       "--antigravity-conversation-id can only be used with --harness antigravity.",
     );
+  }
+
+  if (options.harness === "antigravity" && !options.antigravityConversationId) {
+    throw HarnessEvalUsageError.make({
+      message:
+        "Antigravity cannot select an MCP endpoint through this runner. Use Claude/OpenCode, or --antigravity-conversation-id for offline replay with an unknown effective endpoint.",
+    });
   }
 
   return options;
@@ -526,7 +539,7 @@ function readOptionalText(filePath: string): Effect.Effect<string | undefined> {
   return Effect.tryPromise({
     try: () => readFile(filePath, "utf8"),
     catch: () => undefined,
-  }).pipe(Effect.catchAll(() => Effect.succeed(undefined)));
+  }).pipe(Effect.catch(() => Effect.succeed(undefined)));
 }
 
 function listFilesRecursive(dir: string): Effect.Effect<string[]> {
@@ -534,6 +547,7 @@ function listFilesRecursive(dir: string): Effect.Effect<string[]> {
     try: () => readdir(dir, { withFileTypes: true }),
     catch: () => undefined,
   }).pipe(
+    Effect.catch(() => Effect.succeed([])),
     Effect.flatMap((entries) => {
       if (!entries) return Effect.succeed([]);
       return Effect.forEach(entries, (entry) => {
@@ -802,22 +816,10 @@ export function commandForRun(input: {
   timeoutMs: number;
 }): CommandSpec {
   if (input.harness === "antigravity") {
-    const model = input.model ?? DEFAULT_ANTIGRAVITY_MODEL;
-    const timeoutSeconds = Math.max(1, Math.ceil(input.timeoutMs / 1000));
-    return {
-      args: [
-        "--print-timeout",
-        `${timeoutSeconds}s`,
-        "--dangerously-skip-permissions",
-        "--model",
-        model,
-        "--print",
-        input.prompt,
-      ],
-      command: "agy",
-      env: envWithLocalToolPath(),
-      prompt: input.prompt,
-    };
+    throw HarnessEvalUsageError.make({
+      message:
+        "Antigravity cannot select an MCP endpoint through this runner. Use Claude/OpenCode, or --antigravity-conversation-id for offline replay with an unknown effective endpoint.",
+    });
   }
 
   if (input.harness === "opencode") {
@@ -1113,11 +1115,26 @@ function successfulMcpToolCallCount(toolCalls: HarnessToolCall[]): number {
   return seen.size;
 }
 
-function parseJsonPayload(value: unknown): unknown | undefined {
+function parseJsonPayload(value: unknown): readonly unknown[] {
   if (typeof value === "string") {
-    return maybeParseJsonObject(value);
+    const parsed = maybeParseJsonObject(value);
+    return parsed === undefined ? [] : [parsed];
   }
-  return isRecord(value) ? value : undefined;
+  if (Array.isArray(value)) {
+    return value.flatMap((block) =>
+      isRecord(block) && block.type === "text"
+        ? parseJsonPayload(block.text)
+        : [],
+    );
+  }
+  if (!isRecord(value)) return [];
+  if (value.structuredContent !== undefined || Array.isArray(value.content)) {
+    return [
+      ...parseJsonPayload(value.structuredContent),
+      ...parseJsonPayload(value.content),
+    ];
+  }
+  return [value];
 }
 
 function acceptedBuildResultFrom(
@@ -1257,11 +1274,20 @@ function mcpArtifactFromPayload(input: {
   payload: unknown;
   toolName: string;
 }): HarnessMcpArtifactProof | undefined {
-  const payload = parseJsonPayload(input.payload);
-  if (!isRecord(payload)) {
-    return undefined;
+  for (const payload of parseJsonPayload(input.payload)) {
+    if (!isRecord(payload)) continue;
+    const proof = mcpArtifactFromParsedPayload({ ...input, payload });
+    if (proof) return proof;
   }
+  return undefined;
+}
 
+function mcpArtifactFromParsedPayload(input: {
+  callId?: string;
+  payload: Record<string, unknown>;
+  toolName: string;
+}): HarnessMcpArtifactProof | undefined {
+  const payload = input.payload;
   const compactProof = artifactProofFromCompactResult({
     ...(input.callId ? { callId: input.callId } : {}),
     result: payload,
@@ -1565,6 +1591,35 @@ function reportableMcpArtifact(
   return report;
 }
 
+function explicitFinalArtifactId(
+  finalJson: unknown,
+  finalText: string,
+): string | undefined {
+  if (isRecord(finalJson)) {
+    const artifactId = stringValue(finalJson.artifactId);
+    if (artifactId) return artifactId;
+  }
+  return /artifact[ _-]?id["'`\s]*[:=]["'`\s]*([\w-]+)/iu.exec(finalText)?.[1];
+}
+
+function deliversProof(
+  finalJson: unknown,
+  finalText: string,
+  proof: HarnessMcpArtifactProof,
+): boolean {
+  const delivery = [
+    finalText,
+    finalJson === undefined ? "" : JSON.stringify(finalJson),
+  ].join("\n");
+  const tokens = delivery.match(/[\w-]+/gu) ?? [];
+  return (
+    tokens.some((token) => token === proof.artifactId) ||
+    Object.values(proof.artifactUrls).some(
+      (url) => url.length > 0 && delivery.includes(url),
+    )
+  );
+}
+
 export function outputContractErrors(input: {
   finalJson: unknown | undefined;
   finalText: string;
@@ -1575,26 +1630,35 @@ export function outputContractErrors(input: {
       "No successful sketchi-code-mode execute artifact was observed in the harness event stream.",
     ];
   }
-
+  const explicitId = explicitFinalArtifactId(input.finalJson, input.finalText);
+  if (explicitId && explicitId !== input.proof.artifactId) {
+    return ["Final artifact ID did not match the observed Sketchi artifact."];
+  }
+  if (!deliversProof(input.finalJson, input.finalText, input.proof)) {
+    return [
+      "Final response did not deliver the observed Sketchi artifact ID or URL.",
+    ];
+  }
   return [];
 }
 
-function proofForFinalOutput(
+export function proofForFinalOutput(
   summary: HarnessOutputSummary,
 ): HarnessMcpArtifactProof | undefined {
-  const finalArtifactId = isRecord(summary.finalJson)
-    ? stringValue(summary.finalJson.artifactId)
-    : undefined;
+  const finalArtifactId = explicitFinalArtifactId(
+    summary.finalJson,
+    summary.finalText,
+  );
   if (finalArtifactId) {
-    const matchingProof = summary.mcpArtifacts
+    return summary.mcpArtifacts
       .toReversed()
       .find((proof) => proof.artifactId === finalArtifactId);
-    if (matchingProof) {
-      return matchingProof;
-    }
   }
-
-  return summary.mcpArtifacts.at(-1);
+  return summary.mcpArtifacts
+    .toReversed()
+    .find((proof) =>
+      deliversProof(summary.finalJson, summary.finalText, proof),
+    );
 }
 
 function writeText(
@@ -1682,14 +1746,31 @@ function runHarnessScenario(input: {
       runNumber: input.runNumber,
       scenario: input.scenario,
     });
-    const command = commandForRun({
-      harness: input.options.harness,
-      mcpUrl: input.options.mcpUrl,
-      model: input.options.model,
-      prompt,
-      scenarioId: input.scenario.id,
-      timeoutMs: input.options.timeoutMs,
-    });
+    const command = input.options.antigravityConversationId
+      ? {
+          ...replayCommandForReport(input.options.antigravityConversationId),
+          env: {},
+          prompt,
+        }
+      : yield* Effect.try({
+          try: () =>
+            commandForRun({
+              harness: input.options.harness,
+              mcpUrl: input.options.mcpUrl,
+              model: input.options.model,
+              prompt,
+              scenarioId: input.scenario.id,
+              timeoutMs: input.options.timeoutMs,
+            }),
+          catch: (cause) =>
+            HarnessEvalUsageError.make({
+              cause,
+              message:
+                cause instanceof Error
+                  ? cause.message
+                  : "Unable to configure harness command.",
+            }),
+        });
     const result: SpawnResult = input.options.antigravityConversationId
       ? {
           durationMs: 0,
@@ -1858,7 +1939,8 @@ function runHarnessScenario(input: {
   });
 }
 
-function summarizeReport(input: {
+export function summarizeReport(input: {
+  status: HarnessReportStatus;
   harness: HarnessName;
   mcpUrl: string;
   model?: string;
@@ -1868,11 +1950,17 @@ function summarizeReport(input: {
 }): HarnessReport {
   const okCount = input.results.filter((result) => result.ok).length;
   return {
+    expectedRuns: input.repeat * input.scenarioCount,
+    status: input.status,
+    requestedMcpUrl: input.mcpUrl,
     generatedAt: new Date().toISOString(),
     harness: input.harness,
-    mcpUrl: input.mcpUrl,
+    mcpUrl: input.harness === "antigravity" ? null : input.mcpUrl,
     ...(input.model ? { model: input.model } : {}),
-    ok: okCount === input.results.length,
+    ok:
+      input.status === "complete" &&
+      input.results.length === input.repeat * input.scenarioCount &&
+      okCount === input.results.length,
     repeat: input.repeat,
     results: input.results,
     scenarioCount: input.scenarioCount,
@@ -1917,8 +2005,10 @@ function scenariosFor(
   });
 }
 
-const main = Effect.gen(function* () {
-  const options = yield* parseOptions(process.argv.slice(2));
+export const runHarnessEval = Effect.fn("harnessEval.run")(function* (
+  argv: readonly string[],
+) {
+  const options = yield* parseOptions(argv);
   const scenarios = yield* scenariosFor(options);
   const outputDir =
     options.reportOut === undefined
@@ -1929,9 +2019,11 @@ const main = Effect.gen(function* () {
         )
       : path.dirname(options.reportOut);
   const results: HarnessRunReport[] = [];
+  let status: HarnessReportStatus = "running";
   const reportOut = options.reportOut ?? path.join(outputDir, "report.json");
   const writeCurrentReport = () => {
     const report = summarizeReport({
+      status,
       harness: options.harness,
       mcpUrl: options.mcpUrl,
       model: options.model,
@@ -1942,38 +2034,49 @@ const main = Effect.gen(function* () {
     return writeJson(reportOut, report).pipe(Effect.as(report));
   };
 
-  for (let repeatIndex = 0; repeatIndex < options.repeat; repeatIndex += 1) {
-    for (const scenario of scenarios) {
-      const runNumber = repeatIndex + 1;
-      console.error(
-        `harness=${options.harness} scenario=${scenario.id} run=${runNumber}/${options.repeat}`,
-      );
-      results.push(
-        yield* runHarnessScenario({
-          options,
-          outputDir,
-          repeat: options.repeat,
-          runNumber,
-          scenario,
-        }),
-      );
+  yield* Effect.scoped(
+    Effect.gen(function* () {
+      yield* Effect.addFinalizer((exit) => {
+        if (Exit.isSuccess(exit)) return Effect.void;
+        status = Cause.hasInterrupts(exit.cause) ? "interrupted" : "failed";
+        return writeCurrentReport().pipe(Effect.ignore);
+      });
       yield* writeCurrentReport();
-    }
-  }
-
-  const report = yield* writeCurrentReport();
-  console.log(JSON.stringify({ ...report, reportOut }, null, 2));
-
-  if (!report.ok) {
-    process.exitCode = 1;
-  }
+      for (
+        let repeatIndex = 0;
+        repeatIndex < options.repeat;
+        repeatIndex += 1
+      ) {
+        for (const scenario of scenarios) {
+          const runNumber = repeatIndex + 1;
+          console.error(
+            `harness=${options.harness} scenario=${scenario.id} run=${runNumber}/${options.repeat}`,
+          );
+          results.push(
+            yield* runHarnessScenario({
+              options,
+              outputDir,
+              repeat: options.repeat,
+              runNumber,
+              scenario,
+            }),
+          );
+          yield* writeCurrentReport();
+        }
+      }
+      status = "complete";
+      const report = yield* writeCurrentReport();
+      console.log(JSON.stringify({ ...report, reportOut }, null, 2));
+      if (!report.ok) process.exitCode = 1;
+    }),
+  );
 });
 
 export function harnessEvalExitCode(error: { readonly _tag?: string }): number {
   return error._tag === "HarnessEvalUsageError" ? 2 : 1;
 }
 
-const handledMain = main.pipe(
+const handledMain = runHarnessEval(process.argv.slice(2)).pipe(
   Effect.catch((error) =>
     Effect.sync(() => {
       console.error(error.message);

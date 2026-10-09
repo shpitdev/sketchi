@@ -157,6 +157,101 @@ function makeFakeProcessLayer(options: {
 }
 
 describe("runToolProcess", () => {
+  for (const ignoresSigterm of [false, true]) {
+    it.live(
+      `returns timeout metadata for a blocked 2 MiB stdin write after ${ignoresSigterm ? "SIGKILL escalation" : "SIGTERM"}`,
+      () =>
+        Effect.gen(function* () {
+          const result = yield* runToolProcess(
+            {
+              args: [
+                "-e",
+                [
+                  ignoresSigterm ? "process.on('SIGTERM', () => {});" : "",
+                  "process.stdout.write('READY\\n');",
+                  "setInterval(() => {}, 1000);",
+                ].join(""),
+              ],
+              command: process.execPath,
+              env: process.env,
+              stdin: "x".repeat(2 * 1024 * 1024),
+            },
+            realProcessPolicy,
+          ).pipe(Effect.provide(ToolProcessSpawnerLive));
+          assert.isTrue(result.timedOut);
+          assert.strictEqual(result.exitCode, null);
+          assert.strictEqual(
+            result.signal,
+            ignoresSigterm ? "SIGKILL" : "SIGTERM",
+          );
+          assert.include(result.stdout, "READY");
+        }),
+    );
+  }
+  it.live(
+    "returns a typed failure when a child exits before reading a large prompt",
+    () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          runToolProcess(
+            {
+              args: ["-e", "process.exit(0)"],
+              command: process.execPath,
+              env: process.env,
+              stdin: "x".repeat(2 * 1024 * 1024),
+            },
+            realProcessPolicy,
+          ).pipe(Effect.provide(ToolProcessSpawnerLive)),
+        );
+        assert.strictEqual(error._tag, "ToolProcessSpawnError");
+        assert.include(error.message, "stdin");
+      }),
+  );
+
+  for (const interrupted of [false, true]) {
+    it.live.runIf(process.platform !== "win32")(
+      `preserves descendant SIGTERM cleanup grace on ${interrupted ? "interruption" : "timeout"} after leader exit`,
+      () =>
+        withProcessFixture(({ pidFile }) =>
+          Effect.gen(function* () {
+            const cleanedFile = `${pidFile}.cleaned`;
+            const descendantScript = [
+              "const { writeFileSync } = require('node:fs');",
+              `process.on('SIGTERM', () => setTimeout(() => { writeFileSync(${JSON.stringify(cleanedFile)}, 'cleaned'); process.exit(0); }, 200));`,
+              "process.stdout.write('READY\\n');",
+              "setInterval(() => {}, 1000);",
+            ].join("");
+            const parentScript = [
+              "const { spawn } = require('node:child_process');",
+              "const { writeFileSync } = require('node:fs');",
+              `const child = spawn(process.execPath, ['-e', ${JSON.stringify(descendantScript)}], { stdio: ['ignore', 'pipe', 'inherit'] });`,
+              `child.stdout.once('data', () => writeFileSync(${JSON.stringify(pidFile)}, String(child.pid)));`,
+              "process.on('SIGTERM', () => process.exit(0));",
+              "setInterval(() => {}, 1000);",
+            ].join("");
+            const fiber = yield* runToolProcess(
+              {
+                args: ["-e", parentScript],
+                command: process.execPath,
+                env: process.env,
+              },
+              {
+                ...realProcessPolicy,
+                hardKillGraceMs: 1_000,
+                timeoutMs: interrupted ? 10_000 : 500,
+              },
+            ).pipe(Effect.provide(ToolProcessSpawnerLive), Effect.forkChild);
+            yield* waitForPid(pidFile);
+            if (interrupted) yield* Fiber.interrupt(fiber);
+            else assert.isTrue((yield* Fiber.join(fiber)).timedOut);
+            const cleaned = yield* Effect.tryPromise(() =>
+              readFile(cleanedFile, "utf8"),
+            );
+            assert.strictEqual(cleaned, "cleaned");
+          }),
+        ),
+    );
+  }
   it.effect("returns successful output and releases the scoped process", () =>
     Effect.gen(function* () {
       const harness = yield* makeFakeProcessLayer({});

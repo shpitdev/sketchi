@@ -1,8 +1,10 @@
-import path from "node:path";
-
 import { getScenario } from "@sketchi/diagram-scenarios";
-import { ToolProcessSpawnerLive } from "@sketchi/diagram-scenarios/internal/tool-process";
-import { Cause, Effect } from "effect";
+import {
+  ToolProcessSpawner,
+  ToolProcessSpawnerLive,
+  ToolProcessSpawnError,
+} from "@sketchi/diagram-scenarios/internal/tool-process";
+import { Cause, Deferred, Effect, Fiber, Layer, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -14,6 +16,9 @@ import {
   parseOptions,
   runCommand,
   summarizeHarnessStdout,
+  proofForFinalOutput,
+  runHarnessEval,
+  summarizeReport,
 } from "./harness-eval";
 
 function runCommandLive(...args: Parameters<typeof runCommand>) {
@@ -75,43 +80,36 @@ describe("harness-eval", () => {
     }
   });
 
-  it("places Antigravity print-mode flags before the print prompt", () => {
-    const originalHome = process.env.HOME;
-    process.env.HOME = "/home/sketchi-test";
-
-    try {
-      const command = commandForRun({
+  it("rejects Antigravity endpoint selection that cannot be honored", () => {
+    expect(() =>
+      commandForRun({
         harness: "antigravity",
         mcpUrl: "https://studio.test/mcp",
-        model: "gemini-3.5-flash",
         prompt: "Draw the scenario",
         scenarioId: "demo",
         timeoutMs: 240_000,
-      });
-
-      expect(command.args).toEqual([
-        "--print-timeout",
-        "240s",
-        "--dangerously-skip-permissions",
-        "--model",
-        "gemini-3.5-flash",
-        "--print",
-        "Draw the scenario",
-      ]);
-      expect(command.env.PATH?.split(path.delimiter)).toEqual(
-        expect.arrayContaining([
-          path.join("/home/sketchi-test", ".local", "bin"),
-          path.dirname(process.execPath),
-        ]),
-      );
-    } finally {
-      if (originalHome === undefined) {
-        delete process.env.HOME;
-      } else {
-        process.env.HOME = originalHome;
-      }
-    }
+      }),
+    ).toThrow("cannot select an MCP endpoint");
   });
+
+  it.each(["opencode", "claude"] as const)(
+    "configures the effective endpoint for %s",
+    (harness) => {
+      const endpoint = "https://preview.test/mcp";
+      const command = commandForRun({
+        harness,
+        mcpUrl: endpoint,
+        prompt: "Draw",
+        scenarioId: "demo",
+        timeoutMs: 240_000,
+      });
+      expect(
+        harness === "opencode"
+          ? command.env.OPENCODE_CONFIG_CONTENT
+          : command.args.join(" "),
+      ).toContain(endpoint);
+    },
+  );
 
   it("settles when a CLI parent exits but inherited stdio stays open", async () => {
     const started = Date.now();
@@ -843,7 +841,7 @@ describe("harness-eval", () => {
     ).toEqual([]);
   });
 
-  it("does not fail accepted MCP proof over final chat formatting", () => {
+  it("rejects chat that does not deliver the observed artifact", () => {
     const proof = summarizeHarnessStdout(
       JSON.stringify({
         type: "tool_use",
@@ -865,8 +863,330 @@ describe("harness-eval", () => {
           "Created a Markdown report in diagram_info.md. Please open that instead.",
         proof,
       }),
+    ).toEqual([
+      "Final response did not deliver the observed Sketchi artifact ID or URL.",
+    ]);
+  });
+
+  it.each(
+    [
+      [{ type: "text", text: JSON.stringify(acceptedMcpOutput) }],
+      [
+        { type: "text", text: "Sketchi artifact ready." },
+        { type: "text", text: JSON.stringify(acceptedMcpOutput) },
+      ],
+      [
+        { type: "text", text: '{"unrelated":true}' },
+        { type: "text", text: JSON.stringify(acceptedMcpOutput) },
+      ],
+    ].map((content) => [content]),
+  )("extracts Claude proof from MCP text-block arrays %#", (content) => {
+    const stdout = [
+      {
+        type: "assistant",
+        message: {
+          content: [
+            {
+              id: "tool_blocks",
+              type: "tool_use",
+              name: "mcp__sketchi-code-mode__execute",
+            },
+          ],
+        },
+      },
+      {
+        type: "user",
+        message: {
+          content: [
+            { type: "tool_result", tool_use_id: "tool_blocks", content },
+          ],
+        },
+      },
+    ]
+      .map((event) => JSON.stringify(event))
+      .join("\n");
+    expect(summarizeHarnessStdout(stdout).mcpArtifacts[0]?.artifactId).toBe(
+      "artifact_demo",
+    );
+  });
+
+  it("prefers structured MCP content over text blocks", () => {
+    const summary = summarizeHarnessStdout("", [
+      {
+        structuredContent: acceptedMcpOutput,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              ...acceptedMcpOutput,
+              result: {
+                ...acceptedMcpOutput.result,
+                artifact: {
+                  ...acceptedMcpOutput.result.artifact,
+                  artifactId: "artifact_stale",
+                },
+              },
+            }),
+          },
+        ],
+      },
+    ]);
+    expect(summary.mcpArtifacts[0]?.artifactId).toBe("artifact_demo");
+  });
+
+  it.each([
+    [undefined, ""],
+    [{ artifactId: "artifact_wrong" }, '{"artifactId":"artifact_wrong"}'],
+    [undefined, "Artifact ID: artifact_wrong"],
+    [undefined, "Created artifact_demo_wrong"],
+  ])(
+    "rejects missing or mismatched final artifact delivery %#",
+    (finalJson, finalText) => {
+      const proof = summarizeHarnessStdout("", [acceptedMcpOutput])
+        .mcpArtifacts[0];
+      expect(outputContractErrors({ finalJson, finalText, proof })).not.toEqual(
+        [],
+      );
+    },
+  );
+
+  it("accepts URL-only delivery without a JSON formatting requirement", () => {
+    const proof = summarizeHarnessStdout("", [acceptedMcpOutput])
+      .mcpArtifacts[0];
+    expect(
+      outputContractErrors({
+        finalJson: undefined,
+        finalText:
+          "Open [your diagram](https://studio.test/api/v1/artifacts/artifact_demo?format=png&raw=true)",
+        proof,
+      }),
     ).toEqual([]);
   });
+
+  it("does not fall back to the last artifact for an explicitly unmatched final ID", () => {
+    const summary = summarizeHarnessStdout(
+      JSON.stringify({
+        type: "text",
+        part: { text: '{"artifactId":"artifact_wrong"}' },
+      }),
+      [acceptedMcpOutput],
+    );
+    expect(proofForFinalOutput(summary)).toBeUndefined();
+  });
+
+  it("selects an earlier artifact when its URL is delivered", () => {
+    const summary = summarizeHarnessStdout(
+      JSON.stringify({
+        type: "text",
+        part: {
+          text: "https://studio.test/api/v1/artifacts/artifact_demo?format=png&raw=true",
+        },
+      }),
+      [
+        acceptedMcpOutput,
+        {
+          ...acceptedMcpOutput,
+          result: {
+            ...acceptedMcpOutput.result,
+            artifact: {
+              ...acceptedMcpOutput.result.artifact,
+              artifactId: "artifact_later",
+              formats: [],
+            },
+          },
+        },
+      ],
+    );
+    expect(proofForFinalOutput(summary)?.artifactId).toBe("artifact_demo");
+  });
+
+  it("rejects new Antigravity runs before spawning and marks replay endpoints unknown", async () => {
+    const error = await Effect.runPromise(
+      Effect.flip(
+        parseOptions([
+          "--harness",
+          "antigravity",
+          "--scenario",
+          "demo",
+          "--mcp-url",
+          "https://preview.test/mcp",
+        ]),
+      ),
+    );
+    expect(error).toBeInstanceOf(HarnessEvalUsageError);
+    const options = await Effect.runPromise(
+      parseOptions([
+        "--harness",
+        "antigravity",
+        "--scenario",
+        "demo",
+        "--antigravity-conversation-id",
+        "fixture",
+      ]),
+    );
+    expect(options.antigravityConversationId).toBe("fixture");
+    expect(
+      summarizeReport({
+        harness: "antigravity",
+        mcpUrl: "https://requested.test/mcp",
+        repeat: 1,
+        scenarioCount: 1,
+        status: "running",
+        results: [],
+      }),
+    ).toMatchObject({
+      mcpUrl: null,
+      requestedMcpUrl: "https://requested.test/mcp",
+      ok: false,
+    });
+  });
+
+  it("does not accept incomplete cardinality even when marked complete", () => {
+    expect(
+      summarizeReport({
+        harness: "opencode",
+        mcpUrl: "offline",
+        repeat: 3,
+        scenarioCount: 1,
+        status: "complete",
+        results: [],
+      }).ok,
+    ).toBe(false);
+  });
+
+  for (const mode of ["complete", "interrupted", "failed"] as const) {
+    it(`persists ${mode} suite status and requires all expected offline runs`, async () => {
+      await Effect.runPromise(
+        Effect.scoped(
+          Effect.gen(function* () {
+            const previousExitCode = process.exitCode;
+            yield* Effect.addFinalizer(() =>
+              Effect.sync(() => {
+                process.exitCode = previousExitCode;
+              }),
+            );
+            yield* Effect.tryPromise(() =>
+              mkdir(".memory", { recursive: true }),
+            );
+            const directory = yield* Effect.acquireRelease(
+              Effect.tryPromise(() =>
+                mkdtemp(path.join(".memory", "harness-suite-")),
+              ),
+              (value) =>
+                Effect.tryPromise(() =>
+                  rm(value, { recursive: true, force: true }),
+                ).pipe(Effect.ignore),
+            );
+            const secondRun = yield* Deferred.make<void>();
+            let spawnCount = 0;
+            const selected = getScenario("sketchi-onboarding-decision-flow");
+            const stdout = [
+              {
+                type: "tool_use",
+                part: {
+                  type: "tool",
+                  tool: "sketchi-code-mode_execute",
+                  state: {
+                    status: "completed",
+                    output: JSON.stringify({
+                      ...acceptedMcpOutput,
+                      result: {
+                        ...acceptedMcpOutput.result,
+                        normalizedSpec: selected.expectedDiagram,
+                      },
+                    }),
+                  },
+                },
+              },
+              {
+                type: "text",
+                part: { text: '{"artifactId":"artifact_demo"}' },
+              },
+            ]
+              .map((event) => JSON.stringify(event))
+              .join("\n");
+            const terminal = Effect.succeed({ exitCode: 0, signal: null });
+            const layer = Layer.succeed(ToolProcessSpawner, {
+              spawn: () =>
+                Effect.gen(function* () {
+                  spawnCount += 1;
+                  if (spawnCount === 2) {
+                    yield* Deferred.succeed(secondRun, undefined);
+                    if (mode === "interrupted") return yield* Effect.never;
+                    if (mode === "failed")
+                      return yield* ToolProcessSpawnError.make({
+                        cause: new Error("offline spawn failure"),
+                        command: "offline",
+                        message: "offline spawn failure",
+                      });
+                  }
+                  return {
+                    awaitExit: terminal,
+                    awaitClose: terminal,
+                    output: Effect.succeed({ stdout, stderr: "" }),
+                    kill: () => Effect.succeed(false),
+                  };
+                }),
+            });
+            const reportOut = path.join(directory, "report.json");
+            const fiber = yield* runHarnessEval([
+              "--harness",
+              "opencode",
+              "--scenario",
+              selected.id,
+              "--repeat",
+              "3",
+              "--mcp-url",
+              "https://offline.invalid/mcp",
+              "--report-out",
+              reportOut,
+            ]).pipe(Effect.provide(layer), Effect.forkChild);
+            yield* Deferred.await(secondRun);
+            const Report = Schema.fromJsonString(
+              Schema.Struct({
+                expectedRuns: Schema.Number,
+                status: Schema.String,
+                ok: Schema.Boolean,
+                mcpUrl: Schema.String,
+                summary: Schema.Struct({
+                  totalRuns: Schema.Number,
+                  okCount: Schema.Number,
+                }),
+              }),
+            );
+            const readReport = Effect.tryPromise(() =>
+              readFile(reportOut, "utf8"),
+            ).pipe(Effect.flatMap(Schema.decodeUnknownEffect(Report)));
+            if (mode === "interrupted") {
+              expect(yield* readReport).toMatchObject({
+                status: "running",
+                ok: false,
+                expectedRuns: 3,
+                summary: { totalRuns: 1, okCount: 1 },
+              });
+              yield* Fiber.interrupt(fiber);
+            }
+            const exit = yield* Fiber.await(fiber);
+            expect(exit._tag).toBe(mode === "complete" ? "Success" : "Failure");
+            if (mode === "interrupted" && exit._tag === "Failure") {
+              expect(Cause.hasInterrupts(exit.cause)).toBe(true);
+              expect(Cause.findError(exit.cause)._tag).toBe("Failure");
+            }
+            expect(yield* readReport).toMatchObject({
+              status: mode,
+              ok: mode === "complete",
+              expectedRuns: 3,
+              mcpUrl: "https://offline.invalid/mcp",
+              summary: {
+                totalRuns: mode === "complete" ? 3 : 1,
+                okCount: mode === "complete" ? 3 : 1,
+              },
+            });
+          }),
+        ),
+      );
+    });
+  }
 
   const edgeIdCases: Array<[string, (edgeId: string) => string | undefined]> = [
     ["omit optional edge ids", () => undefined],
@@ -924,3 +1244,5 @@ describe("harness-eval", () => {
     ]);
   });
 });
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import path from "node:path";

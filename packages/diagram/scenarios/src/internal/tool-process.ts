@@ -78,6 +78,8 @@ export class ToolProcessExitError extends Schema.TaggedError<ToolProcessExitErro
 ) {}
 
 export interface RunningToolProcess {
+  /** Owned tree lifetime, independent of the leader's exit and stdio close. */
+  readonly awaitTreeExit?: Effect.Effect<void, ToolProcessControlError>;
   readonly awaitClose: Effect.Effect<
     ToolProcessTerminal,
     ToolProcessSpawnError
@@ -109,11 +111,15 @@ interface NodeProcessState {
   readonly closeSubscribers: Set<ProcessSubscriber>;
   readonly command: string;
   readonly exitSubscribers: Set<ProcessSubscriber>;
+  readonly inputSubscribers: Set<ProcessSubscriber>;
+  readonly removeListeners: () => void;
   readonly processGroupId: number | undefined;
   readonly stderr: Buffer[];
   readonly stdout: Buffer[];
   closeEvent: ProcessEvent | undefined;
   exitEvent: ProcessEvent | undefined;
+  inputEvent: ProcessEvent | undefined;
+  terminationStarted: boolean;
 }
 
 function errorMessage(cause: unknown, fallback: string): string {
@@ -175,36 +181,64 @@ function makeNodeProcessState(spec: ToolProcessSpec): NodeProcessState {
     closeSubscribers: new Set(),
     command: spec.command,
     exitSubscribers: new Set(),
+    inputSubscribers: new Set(),
+    removeListeners: () => {
+      child.stdin.off("error", onInputError);
+      child.stdout.off("data", onStdout);
+      child.stderr.off("data", onStderr);
+      child.off("error", onError);
+      child.off("exit", onExit);
+      child.off("close", onClose);
+    },
     processGroupId: ownsProcessGroup ? child.pid : undefined,
     stderr: [],
     stdout: [],
     closeEvent: undefined,
     exitEvent: undefined,
+    inputEvent: undefined,
+    terminationStarted: false,
   };
 
-  child.stdout.on("data", (chunk: Buffer) => state.stdout.push(chunk));
-  child.stderr.on("data", (chunk: Buffer) => state.stderr.push(chunk));
-  child.on("error", (cause) => {
+  const onStdout = (chunk: Buffer) => state.stdout.push(chunk);
+  const onStderr = (chunk: Buffer) => state.stderr.push(chunk);
+  const fail = (cause: unknown, message: string) => {
     const error = ToolProcessSpawnError.make({
       cause,
       command: spec.command,
-      message: errorMessage(cause, `Unable to start ${spec.command}.`),
+      message,
     });
     const event: ProcessEvent = { _tag: "Failure", error };
-    state.exitEvent ??= event;
-    state.closeEvent ??= event;
+    state.exitEvent = event;
+    state.closeEvent = event;
+    state.inputEvent = event;
     notify(state.exitSubscribers, event);
     notify(state.closeSubscribers, event);
-  });
-  child.on("exit", (exitCode, signal) => {
+    notify(state.inputSubscribers, event);
+  };
+  const onError = (cause: Error) =>
+    fail(cause, errorMessage(cause, `Unable to start ${spec.command}.`));
+  const settleInput = () => {
+    state.inputEvent ??= {
+      _tag: "Terminal",
+      terminal: { exitCode: null, signal: null },
+    };
+    notify(state.inputSubscribers, state.inputEvent);
+  };
+  const onInputError = (cause: Error) => {
+    // Closing the owned tree can fail a buffered write; keep its timeout/exit result.
+    if (state.terminationStarted) settleInput();
+    else
+      fail(cause, `Unable to write stdin to ${spec.command}: ${cause.message}`);
+  };
+  const onExit = (exitCode: number | null, signal: NodeJS.Signals | null) => {
     const event: ProcessEvent = {
       _tag: "Terminal",
       terminal: { exitCode, signal },
     };
     state.exitEvent ??= event;
     notify(state.exitSubscribers, state.exitEvent);
-  });
-  child.on("close", (exitCode, signal) => {
+  };
+  const onClose = (exitCode: number | null, signal: NodeJS.Signals | null) => {
     const event: ProcessEvent = {
       _tag: "Terminal",
       terminal: { exitCode, signal },
@@ -212,9 +246,22 @@ function makeNodeProcessState(spec: ToolProcessSpec): NodeProcessState {
     state.exitEvent ??= event;
     state.closeEvent ??= event;
     notify(state.exitSubscribers, state.exitEvent);
-    notify(state.closeSubscribers, event);
-  });
-  child.stdin.end(spec.stdin);
+    notify(state.closeSubscribers, state.closeEvent);
+  };
+  child.stdout.on("data", onStdout);
+  child.stderr.on("data", onStderr);
+  child.on("error", onError);
+  child.on("exit", onExit);
+  child.on("close", onClose);
+  child.stdin.on("error", onInputError);
+  try {
+    child.stdin.end(spec.stdin, (cause?: Error | null) => {
+      if (cause) return onInputError(cause);
+      settleInput();
+    });
+  } catch (cause) {
+    fail(cause, `Unable to write stdin to ${spec.command}.`);
+  }
 
   return state;
 }
@@ -237,6 +284,8 @@ function signalNodeProcessTree(
 ): boolean {
   const pid = state.child.pid;
   if (pid === undefined) return false;
+  if (signal === "SIGTERM" || signal === "SIGKILL")
+    state.terminationStarted = true;
 
   if (process.platform === "win32") {
     const result = spawnSync(
@@ -266,9 +315,48 @@ function signalNodeProcessTree(
 }
 
 function makeRunningToolProcess(state: NodeProcessState): RunningToolProcess {
+  const awaitInput = waitForEvent(
+    () => state.inputEvent,
+    state.inputSubscribers,
+  );
   return {
-    awaitClose: waitForEvent(() => state.closeEvent, state.closeSubscribers),
-    awaitExit: waitForEvent(() => state.exitEvent, state.exitSubscribers),
+    awaitTreeExit: Effect.gen(function* () {
+      const processGroupId = state.processGroupId;
+      if (processGroupId === undefined) {
+        yield* waitForEvent(() => state.exitEvent, state.exitSubscribers).pipe(
+          Effect.ignore,
+        );
+        return;
+      }
+      while (
+        yield* Effect.try({
+          try: () => {
+            try {
+              process.kill(-processGroupId, 0);
+              return true;
+            } catch (cause) {
+              if (errorCode(cause) === "ESRCH") return false;
+              throw cause;
+            }
+          },
+          catch: (cause) =>
+            ToolProcessControlError.make({
+              cause,
+              command: state.command,
+              message: "Unable to inspect process group.",
+              signal: "0",
+            }),
+        })
+      )
+        yield* Effect.sleep(10);
+    }),
+    awaitClose: waitForEvent(
+      () => state.closeEvent,
+      state.closeSubscribers,
+    ).pipe(Effect.flatMap((terminal) => awaitInput.pipe(Effect.as(terminal)))),
+    awaitExit: waitForEvent(() => state.exitEvent, state.exitSubscribers).pipe(
+      Effect.flatMap((terminal) => awaitInput.pipe(Effect.as(terminal))),
+    ),
     kill: (signal) =>
       Effect.try({
         try: () => signalNodeProcessTree(state, signal),
@@ -310,11 +398,22 @@ function releaseNodeProcess(state: NodeProcessState): Effect.Effect<void> {
 
   return forceKill.pipe(
     Effect.andThen(
-      Effect.sync(() => {
-        state.child.stdout.destroy();
-        state.child.stderr.destroy();
-        state.closeSubscribers.clear();
-        state.exitSubscribers.clear();
+      Effect.callback<void>((resume) => {
+        const cleanup = () => {
+          state.removeListeners();
+          state.child.stdout.destroy();
+          state.child.stderr.destroy();
+          state.closeSubscribers.clear();
+          state.exitSubscribers.clear();
+          state.inputSubscribers.clear();
+          resume(Effect.void);
+        };
+        // Keep the owned error listener until pending writes have been cancelled.
+        if (state.child.stdin.closed) cleanup();
+        else {
+          state.child.stdin.once("close", cleanup);
+          state.child.stdin.destroy();
+        }
       }),
     ),
   );
@@ -387,24 +486,28 @@ function terminateProcess(
     exitCode: null,
     signal: null,
   };
+  const awaitTreeExit: Effect.Effect<
+    void,
+    ToolProcessControlError | ToolProcessSpawnError
+  > = process.awaitTreeExit ?? process.awaitExit.pipe(Effect.as(undefined));
 
   return process
     .kill("SIGTERM")
     .pipe(
       Effect.andThen(
-        awaitSettled(process, policy.closeGraceMs).pipe(
+        awaitTreeExit.pipe(
           Effect.raceFirst(
             Effect.sleep(policy.hardKillGraceMs).pipe(
               Effect.andThen(process.kill("SIGKILL")),
-              Effect.andThen(
-                awaitSettled(process, policy.closeGraceMs).pipe(
-                  Effect.raceFirst(
-                    Effect.sleep(policy.forceSettleGraceMs).pipe(
-                      Effect.as(forceSettled),
-                    ),
-                  ),
-                ),
-              ),
+            ),
+          ),
+        ),
+      ),
+      Effect.andThen(
+        awaitSettled(process, policy.closeGraceMs).pipe(
+          Effect.raceFirst(
+            Effect.sleep(policy.forceSettleGraceMs).pipe(
+              Effect.as(forceSettled),
             ),
           ),
         ),

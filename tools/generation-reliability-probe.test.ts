@@ -3,11 +3,13 @@ import {
   type GenerationReliabilityScenario,
 } from "@sketchi/diagram-scenarios";
 import { describe, expect, it } from "vitest";
+import { Cause, Effect } from "effect";
 
 import {
   evaluateStructuralFidelity,
   generationProbeRequestTimeoutMs,
   selectProbeScenarios,
+  runProbe,
 } from "./generation-reliability-probe";
 
 function scenario(id: string): GenerationReliabilityScenario {
@@ -37,103 +39,281 @@ describe("generation reliability structural assertions", () => {
     expect(generationProbeRequestTimeoutMs()).toBeGreaterThan(policyBudgetMs);
   });
 
-  it("requires distinct labeled cycles and labeled terminal outcomes", () => {
+  it("bounds response body consumption and aborts the stalled loopback request", async () => {
+    let requestClosed = false;
+    const server = createServer((_request, response) => {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.write('{"ok":');
+      response.on("close", () => {
+        requestClosed = true;
+      });
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    try {
+      const address = server.address();
+      if (!address || typeof address === "string")
+        throw new Error("Missing loopback address.");
+      const exit = await Effect.runPromise(
+        Effect.exit(
+          runProbe(
+            `http://127.0.0.1:${address.port}`,
+            scenario("reliability-expense-resubmission-loop"),
+            1,
+            40,
+          ).pipe(Effect.timeout(300)),
+        ),
+      );
+      expect(exit._tag).toBe("Failure");
+      if (exit._tag === "Failure") {
+        const failure = Cause.findError(exit.cause);
+        expect(failure._tag).toBe("Success");
+        if (failure._tag === "Success") {
+          expect(failure.success._tag).toBe("GenerationProbeRequestError");
+          expect(failure.success.message).toContain("timed out after 40 ms");
+        }
+      }
+      await Effect.runPromise(Effect.sleep(20));
+      expect(requestClosed).toBe(true);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+  });
+
+  const undersizedManuscript = {
+    type: "flowchart",
+    spec: {
+      nodes: [
+        { id: "start", label: "Submission", kind: "start" },
+        {
+          id: "decision-a",
+          label: "Reviews complete?",
+          kind: "decision",
+        },
+        {
+          id: "work-a",
+          label: "Author revision and resubmission",
+          kind: "process",
+        },
+        {
+          id: "decision-b",
+          label: "Plagiarism flag?",
+          kind: "decision",
+        },
+        {
+          id: "work-b",
+          label: "Ethics investigation",
+          kind: "process",
+        },
+        {
+          id: "decision-c",
+          label: "Editorial triage",
+          kind: "decision",
+        },
+        {
+          id: "decision-d",
+          label: "Proof approved?",
+          kind: "decision",
+        },
+        { id: "end-a", label: "Desk rejection", kind: "end" },
+        { id: "end-b", label: "Final rejection", kind: "end" },
+        { id: "end-c", label: "Publication", kind: "end" },
+        ...Array.from({ length: 5 }, (_, index) => ({
+          id: `extra-${index}`,
+          label: `Review work ${index}`,
+          kind: "process",
+        })),
+      ],
+      edges: [
+        { source: "start", target: "decision-a" },
+        {
+          source: "decision-a",
+          target: "work-a",
+          label: "revision requested",
+        },
+        { source: "work-a", target: "decision-a" },
+        {
+          source: "decision-a",
+          target: "decision-b",
+          label: "reviews complete",
+        },
+        {
+          source: "decision-b",
+          target: "work-b",
+          label: "plagiarism flagged",
+        },
+        { source: "work-b", target: "decision-c" },
+        { source: "decision-b", target: "decision-c", label: "clear" },
+        {
+          source: "decision-c",
+          target: "decision-b",
+          label: "ethics cleared",
+        },
+        { source: "decision-c", target: "end-a", label: "desk reject" },
+        { source: "decision-c", target: "decision-d", label: "accepted" },
+        { source: "decision-d", target: "end-b", label: "retract" },
+        { source: "decision-d", target: "end-c", label: "publish" },
+        {
+          source: "decision-d",
+          target: "extra-0",
+          label: "extended review",
+        },
+        { source: "extra-0", target: "extra-1" },
+        { source: "extra-1", target: "extra-2" },
+        { source: "extra-2", target: "extra-3" },
+        { source: "extra-3", target: "extra-4" },
+        { source: "extra-4", target: "end-c" },
+        { source: "extra-1", target: "extra-3" },
+      ],
+    },
+  };
+
+  it("rejects the old 15-node manuscript fixture missing retraction", () => {
     const result = evaluateStructuralFidelity(
       scenario("reliability-manuscript-interacting-loops"),
-      {
-        type: "flowchart",
-        spec: {
-          nodes: [
-            { id: "start", label: "Submission", kind: "start" },
-            {
-              id: "decision-a",
-              label: "Reviews complete?",
-              kind: "decision",
-            },
-            {
-              id: "work-a",
-              label: "Author revision and resubmission",
-              kind: "process",
-            },
-            {
-              id: "decision-b",
-              label: "Plagiarism flag?",
-              kind: "decision",
-            },
-            {
-              id: "work-b",
-              label: "Ethics investigation",
-              kind: "process",
-            },
-            {
-              id: "decision-c",
-              label: "Editorial triage",
-              kind: "decision",
-            },
-            {
-              id: "decision-d",
-              label: "Proof approved?",
-              kind: "decision",
-            },
-            { id: "end-a", label: "Desk rejection", kind: "end" },
-            { id: "end-b", label: "Final rejection", kind: "end" },
-            { id: "end-c", label: "Publication", kind: "end" },
-            ...Array.from({ length: 5 }, (_, index) => ({
-              id: `extra-${index}`,
-              label: `Review work ${index}`,
-              kind: "process",
-            })),
-          ],
-          edges: [
-            { source: "start", target: "decision-a" },
-            {
-              source: "decision-a",
-              target: "work-a",
-              label: "revision requested",
-            },
-            { source: "work-a", target: "decision-a" },
-            {
-              source: "decision-a",
-              target: "decision-b",
-              label: "reviews complete",
-            },
-            {
-              source: "decision-b",
-              target: "work-b",
-              label: "plagiarism flagged",
-            },
-            { source: "work-b", target: "decision-c" },
-            { source: "decision-b", target: "decision-c", label: "clear" },
-            {
-              source: "decision-c",
-              target: "decision-b",
-              label: "ethics cleared",
-            },
-            { source: "decision-c", target: "end-a", label: "desk reject" },
-            { source: "decision-c", target: "decision-d", label: "accepted" },
-            { source: "decision-d", target: "end-b", label: "retract" },
-            { source: "decision-d", target: "end-c", label: "publish" },
-            {
-              source: "decision-d",
-              target: "extra-0",
-              label: "extended review",
-            },
-            { source: "extra-0", target: "extra-1" },
-            { source: "extra-1", target: "extra-2" },
-            { source: "extra-2", target: "extra-3" },
-            { source: "extra-3", target: "extra-4" },
-            { source: "extra-4", target: "end-c" },
-            { source: "extra-1", target: "extra-3" },
-          ],
-        },
-      },
+      undersizedManuscript,
     );
+    expect(result.passed).toBe(false);
+    expect(result.failures).toContain("Expected >=18 nodes.");
+    expect(result.failures).toContain("Expected >=4 ends.");
+  });
 
-    expect(result.details.cycleDecisionCount).toBe(3);
-    expect(result.details.distinctCycleCount).toBe(2);
+  const compliantManuscript = {
+    ...undersizedManuscript,
+    spec: {
+      nodes: [
+        ...undersizedManuscript.spec.nodes.map((node) =>
+          node.id === "work-a" ? { ...node, label: "Author revision" } : node,
+        ),
+        { id: "resubmission", label: "Resubmission", kind: "process" },
+        { id: "rounds", label: "Rounds exhausted?", kind: "decision" },
+        { id: "retract-end", label: "Retraction", kind: "end" },
+      ],
+      edges: [
+        ...undersizedManuscript.spec.edges.filter(
+          (edge) =>
+            !(edge.source === "work-a" && edge.target === "decision-a") &&
+            !(edge.source === "decision-d" && edge.target === "end-b"),
+        ),
+        { source: "work-a", target: "resubmission" },
+        { source: "resubmission", target: "rounds" },
+        { source: "rounds", target: "decision-a", label: "more rounds" },
+        { source: "rounds", target: "end-b", label: "rounds exhausted" },
+        { source: "work-b", target: "retract-end", label: "retract" },
+      ],
+    },
+  };
+
+  it("accepts 18 manuscript steps and four distinct terminal outcomes", () => {
+    const result = evaluateStructuralFidelity(
+      scenario("reliability-manuscript-interacting-loops"),
+      compliantManuscript,
+    );
+    expect(result.details.nodeCount).toBe(18);
+    expect(result.details.endCount).toBe(4);
     expect(result.details.requiredCyclePathCount).toBe(2);
-    expect(result.details.requiredTerminalPathCount).toBe(2);
+    expect(result.details.requiredTerminalPathCount).toBe(4);
     expect(result.passed).toBe(true);
+  });
+
+  it.each(["end-a", "end-b", "end-c", "retract-end"])(
+    "requires the named terminal outcome %s even when counts pass",
+    (endId) => {
+      const candidate = {
+        ...compliantManuscript,
+        spec: {
+          ...compliantManuscript.spec,
+          nodes: compliantManuscript.spec.nodes.map((node) =>
+            node.id === endId ? { ...node, label: "Other outcome" } : node,
+          ),
+        },
+      };
+      expect(
+        evaluateStructuralFidelity(
+          scenario("reliability-manuscript-interacting-loops"),
+          candidate,
+        ).passed,
+      ).toBe(false);
+    },
+  );
+
+  const expense = {
+    type: "flowchart",
+    spec: {
+      nodes: [
+        { id: "start", label: "Start", kind: "start" },
+        { id: "submission", label: "Expense submission", kind: "process" },
+        { id: "manager", label: "Manager approval", kind: "decision" },
+        { id: "finance", label: "Finance audit", kind: "decision" },
+        { id: "resubmit", label: "Resubmission", kind: "process" },
+        { id: "reimbursed", label: "Reimbursed", kind: "end" },
+        { id: "rejected", label: "Rejected", kind: "end" },
+      ],
+      edges: [
+        { source: "start", target: "submission" },
+        { source: "submission", target: "manager" },
+        { source: "manager", target: "finance", label: "approved" },
+        { source: "manager", target: "resubmit", label: "rejected" },
+        { source: "finance", target: "reimbursed", label: "approved" },
+        { source: "finance", target: "resubmit", label: "rejected" },
+        { source: "resubmit", target: "submission" },
+      ],
+    },
+  };
+
+  it("accepts expense resubmission from both decisions", () => {
+    expect(
+      evaluateStructuralFidelity(
+        scenario("reliability-expense-resubmission-loop"),
+        expense,
+      ).passed,
+    ).toBe(true);
+  });
+
+  it.each(["manager", "finance"])(
+    "rejects a terminating %s rejection even when the other decision loops",
+    (source) => {
+      const candidate = {
+        ...expense,
+        spec: {
+          ...expense.spec,
+          edges: expense.spec.edges.map((edge) =>
+            edge.source === source && edge.label === "rejected"
+              ? { ...edge, target: "rejected" }
+              : edge,
+          ),
+        },
+      };
+      expect(
+        evaluateStructuralFidelity(
+          scenario("reliability-expense-resubmission-loop"),
+          candidate,
+        ).passed,
+      ).toBe(false);
+    },
+  );
+
+  it("checks every matching rejection branch, not just one per decision", () => {
+    const candidate = {
+      ...expense,
+      spec: {
+        ...expense.spec,
+        edges: [
+          ...expense.spec.edges,
+          { source: "manager", target: "rejected", label: "rejected" },
+        ],
+      },
+    };
+    expect(
+      evaluateStructuralFidelity(
+        scenario("reliability-expense-resubmission-loop"),
+        candidate,
+      ).passed,
+    ).toBe(false);
   });
 
   it("requires every expense-loop waypoint group", () => {
@@ -141,7 +321,7 @@ describe("generation reliability structural assertions", () => {
     if (selected.diagramType !== "flowchart") {
       throw new Error("Expected an expense flowchart scenario.");
     }
-    const requiredPath = selected.assertions.requiredCyclePaths?.[0];
+    const requiredPath = selected.assertions.requiredCyclePaths?.[1];
     if (!requiredPath) throw new Error("Missing expense cycle assertion.");
 
     const result = evaluateStructuralFidelity(
@@ -186,7 +366,7 @@ describe("generation reliability structural assertions", () => {
     if (selected.diagramType !== "flowchart") {
       throw new Error("Expected an expense flowchart scenario.");
     }
-    const requiredPath = selected.assertions.requiredCyclePaths?.[0];
+    const requiredPath = selected.assertions.requiredCyclePaths?.[1];
     if (!requiredPath) throw new Error("Missing expense cycle assertion.");
 
     const result = evaluateStructuralFidelity(
@@ -517,3 +697,4 @@ describe("generation reliability structural assertions", () => {
     expect(result.passed).toBe(true);
   });
 });
+import { createServer } from "node:http";

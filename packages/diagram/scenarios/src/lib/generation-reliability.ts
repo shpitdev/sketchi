@@ -10,12 +10,14 @@ export interface FlowchartReliabilityAssertions {
 }
 
 export interface FlowchartRequiredCyclePath {
+  readonly quantifier?: "every";
   readonly branchLabels: readonly string[];
   readonly branchSourceNodeLabels: readonly string[];
   readonly cycleNodeLabelGroups: readonly (readonly string[])[];
 }
 
 export interface FlowchartRequiredTerminalPath {
+  readonly terminalNodeLabels?: readonly string[];
   readonly branchLabels: readonly string[];
   readonly branchSourceNodeLabels: readonly string[];
   readonly terminalNodeLabelGroups: readonly (readonly string[])[];
@@ -45,8 +47,7 @@ export interface MindmapReliabilityScenario extends ReliabilityScenarioBase {
 }
 
 export type GenerationReliabilityScenario =
-  | FlowchartReliabilityScenario
-  | MindmapReliabilityScenario;
+  FlowchartReliabilityScenario | MindmapReliabilityScenario;
 
 export const generationReliabilityScenarios = [
   {
@@ -66,16 +67,33 @@ export const generationReliabilityScenarios = [
       minNodeCount: 6,
       requiredCyclePaths: [
         {
+          quantifier: "every",
           branchLabels: ["rejected"],
           branchSourceNodeLabels: [
             "manager approval",
             "manager approved",
             "manager decision",
             "manager review",
+          ],
+          cycleNodeLabelGroups: [
+            [
+              "expense submission",
+              "submit expense",
+              "submits expense",
+              "expense submitted",
+            ],
+            ["resubmission", "resubmit"],
+          ],
+        },
+        {
+          quantifier: "every",
+          branchLabels: ["rejected"],
+          branchSourceNodeLabels: [
             "finance approval",
             "finance approved",
             "finance audit",
             "finance decision",
+            "finance review",
           ],
           cycleNodeLabelGroups: [
             [
@@ -133,8 +151,8 @@ export const generationReliabilityScenarios = [
       minCycleDecisionCount: 2,
       minDecisionCount: 4,
       minEdgeCount: 18,
-      minEndCount: 3,
-      minNodeCount: 15,
+      minEndCount: 4,
+      minNodeCount: 18,
       minDistinctCycleCount: 2,
       requiredCyclePaths: [
         {
@@ -171,6 +189,7 @@ export const generationReliabilityScenarios = [
             "desk reject",
           ],
           terminalNodeLabelGroups: [["desk rejection", "desk reject"]],
+          terminalNodeLabels: ["desk rejection", "desk reject"],
         },
         {
           branchLabels: ["accepted"],
@@ -185,6 +204,32 @@ export const generationReliabilityScenarios = [
             "accept manuscript",
           ],
           terminalNodeLabelGroups: [["publication", "published"]],
+          terminalNodeLabels: ["publication", "published"],
+        },
+        {
+          branchLabels: ["rounds exhausted", "final reject", "rejected"],
+          branchSourceNodeLabels: [
+            "rounds exhausted",
+            "revision round",
+            "max rounds",
+            "final decision",
+            "acceptance decision",
+            "editorial decision",
+          ],
+          terminalNodeLabelGroups: [["final rejection", "final reject"]],
+          terminalNodeLabels: ["final rejection", "final reject"],
+        },
+        {
+          branchLabels: ["retract", "retraction", "misconduct confirmed"],
+          branchSourceNodeLabels: [
+            "ethics investigation",
+            "ethics review",
+            "ethics decision",
+            "plagiarism flag",
+            "plagiarism detected",
+          ],
+          terminalNodeLabelGroups: [["retraction", "retracted"]],
+          terminalNodeLabels: ["retraction", "retracted"],
         },
       ],
     },

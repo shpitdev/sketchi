@@ -1,12 +1,326 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Cause, Effect, Exit } from "effect";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { Cause, Effect, Exit, Layer, Schema } from "effect";
 
 import {
   runScenarioCli,
   ScenarioCliUsageError,
   scenarioCliExitCode,
 } from "./cli.js";
-import { ToolProcessSpawnerLive } from "./internal/tool-process.js";
+import {
+  ToolProcessSpawner,
+  ToolProcessSpawnerLive,
+} from "./internal/tool-process.js";
+import { getScenario } from "./lib/scenarios.js";
+
+const scenario = getScenario("sketchi-onboarding-decision-flow");
+function generatedEnvelope(requirements: readonly unknown[] = []) {
+  const { title, ...diagram } = scenario.expectedDiagram;
+  return JSON.stringify({
+    title,
+    intent: {
+      requestedKind: "flowchart",
+      nativeKind: "flowchart",
+      requirements,
+    },
+    diagram,
+  });
+}
+
+function withCandidate(
+  output: string,
+  use: (directory: string) => Effect.Effect<void, unknown, ToolProcessSpawner>,
+) {
+  const terminal = Effect.succeed({ exitCode: 0, signal: null });
+  const layer = Layer.succeed(ToolProcessSpawner, {
+    spawn: () =>
+      Effect.succeed({
+        awaitExit: terminal,
+        awaitClose: terminal,
+        kill: () => Effect.succeed(false),
+        output: Effect.succeed({ stdout: output, stderr: "" }),
+      }),
+  });
+  return Effect.scoped(
+    Effect.gen(function* () {
+      const previousExitCode = process.exitCode;
+      yield* Effect.addFinalizer(() =>
+        Effect.sync(() => {
+          process.exitCode = previousExitCode;
+        }),
+      );
+      yield* Effect.tryPromise(() => mkdir(".memory", { recursive: true }));
+      const directory = yield* Effect.acquireRelease(
+        Effect.tryPromise(() => mkdtemp(path.join(".memory", "scenario-cli-"))),
+        (value) =>
+          Effect.tryPromise(() =>
+            rm(value, { recursive: true, force: true }),
+          ).pipe(Effect.ignore),
+      );
+      yield* use(directory);
+    }),
+  ).pipe(Effect.provide(layer));
+}
+
+const Report = Schema.fromJsonString(
+  Schema.Struct({
+    ok: Schema.Boolean,
+    error: Schema.optionalKey(Schema.String),
+    checks: Schema.Array(
+      Schema.Struct({ id: Schema.String, passed: Schema.Boolean }),
+    ),
+  }),
+);
+
+describe("scenario CLI candidate decoding", () => {
+  it.live("accepts bare IR emitted by an offline generator command", () =>
+    withCandidate("", (directory) =>
+      Effect.gen(function* () {
+        const generatorPath = path.join(directory, "generator.mjs");
+        const reportPath = path.join(directory, "report.json");
+        const output = JSON.stringify(scenario.expectedDiagram);
+        yield* Effect.tryPromise(() =>
+          writeFile(
+            generatorPath,
+            [
+              "process.stdin.resume();",
+              `process.stdin.once('end', () => process.stdout.write(${JSON.stringify(output)}));`,
+            ].join("\n"),
+          ),
+        );
+        const quote = (value: string) =>
+          "'" + value.replaceAll("'", "'\\''") + "'";
+        yield* runScenarioCli([
+          "--scenario",
+          scenario.id,
+          "--report-out",
+          reportPath,
+          "--candidate-out-dir",
+          directory,
+          "--generator-command",
+          `${quote(process.execPath)} ${quote(generatorPath)}`,
+        ]).pipe(Effect.provide(ToolProcessSpawnerLive));
+        const report = yield* Schema.decodeUnknownEffect(Report)(
+          yield* Effect.tryPromise(() => readFile(reportPath, "utf8")),
+        );
+        assert.isTrue(report.ok);
+        assert.isUndefined(report.error);
+        assert.strictEqual(
+          yield* Effect.tryPromise(() =>
+            readFile(
+              path.join(directory, `${scenario.id}.candidate.txt`),
+              "utf8",
+            ),
+          ),
+          output,
+        );
+      }),
+    ),
+  );
+
+  for (const source of ["generator", "input"]) {
+    it.live(`enforces scenario requirements on bare IR from ${source}`, () => {
+      const output = JSON.stringify({
+        ...scenario.expectedDiagram,
+        nodes: scenario.expectedDiagram.nodes.map((node) =>
+          node.label === "Scope clear?"
+            ? { ...node, label: "Different decision" }
+            : node,
+        ),
+      });
+      return withCandidate(output, (directory) =>
+        Effect.gen(function* () {
+          const reportPath = path.join(directory, "report.json");
+          const inputPath = path.join(directory, "candidate.json");
+          yield* Effect.tryPromise(() => writeFile(inputPath, output));
+          yield* runScenarioCli([
+            "--scenario",
+            scenario.id,
+            "--report-out",
+            reportPath,
+            ...(source === "input"
+              ? ["--input", inputPath]
+              : ["--generator-command", "offline-generator"]),
+          ]);
+          const report = yield* Schema.decodeUnknownEffect(Report)(
+            yield* Effect.tryPromise(() => readFile(reportPath, "utf8")),
+          );
+          assert.isFalse(report.ok);
+          assert.isUndefined(report.error);
+          assert.isTrue(
+            report.checks.some(
+              (check) =>
+                check.id === "node-label:Scope clear?" && !check.passed,
+            ),
+          );
+          assert.strictEqual(process.exitCode, 1);
+        }),
+      );
+    });
+  }
+  it.live(
+    "grades and replays the saved response envelope requested by the generator prompt",
+    () =>
+      withCandidate(generatedEnvelope(), (directory) =>
+        Effect.gen(function* () {
+          const reportPath = path.join(directory, "report.json");
+          yield* runScenarioCli([
+            "--scenario",
+            scenario.id,
+            "--report-out",
+            reportPath,
+            "--candidate-out-dir",
+            directory,
+            "--generator-command",
+            "offline-generator",
+          ]);
+          const report = yield* Schema.decodeUnknownEffect(Report)(
+            yield* Effect.tryPromise(() => readFile(reportPath, "utf8")),
+          );
+          assert.isTrue(report.ok);
+          const replayPath = path.join(directory, "replay.json");
+          yield* runScenarioCli([
+            "--scenario",
+            scenario.id,
+            "--input",
+            path.join(directory, `${scenario.id}.candidate.txt`),
+            "--report-out",
+            replayPath,
+          ]);
+          const replay = yield* Schema.decodeUnknownEffect(Report)(
+            yield* Effect.tryPromise(() => readFile(replayPath, "utf8")),
+          );
+          assert.isTrue(replay.ok);
+          assert.isUndefined(replay.error);
+        }),
+      ),
+  );
+
+  it.live("still accepts bare IR input files", () =>
+    withCandidate("", (directory) =>
+      Effect.gen(function* () {
+        const inputPath = path.join(directory, "bare.json");
+        const reportPath = path.join(directory, "report.json");
+        yield* Effect.tryPromise(() =>
+          writeFile(inputPath, JSON.stringify(scenario.expectedDiagram)),
+        );
+        yield* runScenarioCli([
+          "--scenario",
+          scenario.id,
+          "--input",
+          inputPath,
+          "--report-out",
+          reportPath,
+        ]);
+        const report = yield* Schema.decodeUnknownEffect(Report)(
+          yield* Effect.tryPromise(() => readFile(reportPath, "utf8")),
+        );
+        assert.isTrue(report.ok);
+      }),
+    ),
+  );
+
+  it.live("enforces the typed requirements when replaying an envelope", () =>
+    withCandidate("", (directory) =>
+      Effect.gen(function* () {
+        const inputPath = path.join(directory, "candidate.txt");
+        const reportPath = path.join(directory, "report.json");
+        const output = generatedEnvelope([
+          { kind: "count", target: "nodes", comparator: "minimum", value: 18 },
+        ]);
+        yield* Effect.tryPromise(() =>
+          writeFile(
+            inputPath,
+            `Generated candidate:\n\`\`\`json\n${output}\n\`\`\``,
+          ),
+        );
+        yield* runScenarioCli([
+          "--scenario",
+          scenario.id,
+          "--input",
+          inputPath,
+          "--report-out",
+          reportPath,
+        ]);
+        const report = yield* Schema.decodeUnknownEffect(Report)(
+          yield* Effect.tryPromise(() => readFile(reportPath, "utf8")),
+        );
+        assert.isFalse(report.ok);
+        assert.include(report.error ?? "", "requirement_count_not_met");
+        assert.strictEqual(process.exitCode, 1);
+      }),
+    ),
+  );
+
+  for (const [label, output] of [
+    ["invalid JSON", "not a diagram"],
+    [
+      "invalid IR",
+      '{"title":"Bad","intent":{"requestedKind":"flowchart","nativeKind":"flowchart","requirements":[]},"diagram":{}}',
+    ],
+    [
+      "unsatisfied typed requirement",
+      generatedEnvelope([
+        { kind: "count", target: "nodes", comparator: "minimum", value: 18 },
+      ]),
+    ],
+    [
+      "conflicting type",
+      JSON.stringify({
+        title: "Conflicting mindmap",
+        intent: {
+          requestedKind: "mindmap",
+          nativeKind: "mindmap",
+          requirements: [],
+        },
+        diagram: {
+          id: "conflict",
+          type: "mindmap",
+          layout: { direction: "LR", edgeRouting: "curved" },
+          root: { label: "Root", children: [{ label: "Topic", children: [] }] },
+        },
+      }),
+    ],
+  ]) {
+    it.live(
+      `preserves failed-run candidate and report evidence for ${label}`,
+      () =>
+        withCandidate(output ?? "", (directory) =>
+          Effect.gen(function* () {
+            const reportPath = path.join(directory, "report.json");
+            yield* runScenarioCli([
+              "--scenario",
+              scenario.id,
+              "--report-out",
+              reportPath,
+              "--candidate-out-dir",
+              directory,
+              "--generator-command",
+              "offline-generator",
+            ]);
+            const report = yield* Schema.decodeUnknownEffect(Report)(
+              yield* Effect.tryPromise(() => readFile(reportPath, "utf8")),
+            );
+            assert.isFalse(report.ok);
+            assert.isDefined(report.error);
+            if (label === "conflicting type")
+              assert.include(report.error ?? "", "explicit_type_not_met");
+            assert.strictEqual(
+              yield* Effect.tryPromise(() =>
+                readFile(
+                  path.join(directory, `${scenario.id}.candidate.txt`),
+                  "utf8",
+                ),
+              ),
+              output,
+            );
+            assert.strictEqual(process.exitCode, 1);
+          }),
+        ),
+    );
+  }
+});
 
 describe("scenario CLI expected failures", () => {
   it.effect("maps an unknown scenario to a typed usage failure", () =>

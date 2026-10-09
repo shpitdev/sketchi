@@ -207,61 +207,88 @@ function flowchartFidelity(
   }).length;
   const requiredCyclePaths = scenario.assertions.requiredCyclePaths ?? [];
   const requiredCycleFingerprints = requiredCyclePaths.map((required) => {
-    for (const edge of flowEdges) {
-      if (!labelMatches(edge.label, required.branchLabels)) continue;
-      const branchSourceLabel = stringValue(
-        nodesById.get(edge.source) ?? {},
-        "label",
-      );
-      if (!labelMatches(branchSourceLabel, required.branchSourceNodeLabels)) {
-        continue;
-      }
+    const matchingEdges = flowEdges.filter(
+      (edge) =>
+        labelMatches(edge.label, required.branchLabels) &&
+        labelMatches(
+          stringValue(nodesById.get(edge.source) ?? {}, "label"),
+          required.branchSourceNodeLabels,
+        ),
+    );
+    const fingerprints = matchingEdges.map((edge) => {
       const returnPath = findPathIncludingLabelGroups(
         edge.target,
         edge.source,
         required.cycleNodeLabelGroups,
         [edge.source],
       );
-      if (!returnPath) continue;
-      const cycleNodeIds = new Set([edge.source, ...returnPath]);
-      return [...cycleNodeIds].sort().join("|");
+      return returnPath
+        ? [...new Set([edge.source, ...returnPath])].sort().join("|")
+        : undefined;
+    });
+    if (required.quantifier === "every") {
+      if (
+        fingerprints.length === 0 ||
+        fingerprints.some((fingerprint) => fingerprint === undefined)
+      )
+        return undefined;
+      return fingerprints.filter((fingerprint) => fingerprint !== undefined);
     }
-    return undefined;
+    const fingerprint = fingerprints.find((value) => value !== undefined);
+    return fingerprint === undefined ? undefined : [fingerprint];
   });
   const requiredCyclePathCount = requiredCycleFingerprints.filter(
-    (fingerprint) => fingerprint !== undefined,
+    (fingerprints) => fingerprints !== undefined,
   ).length;
   const distinctCycleCount = new Set(
-    requiredCycleFingerprints.filter(
-      (fingerprint) => fingerprint !== undefined,
-    ),
+    requiredCycleFingerprints.flatMap((fingerprints) => fingerprints ?? []),
   ).size;
   const endIds = ends.flatMap((node) => {
     const id = stringValue(node, "id");
     return id ? [id] : [];
   });
   const requiredTerminalPaths = scenario.assertions.requiredTerminalPaths ?? [];
-  const requiredTerminalPathCount = requiredTerminalPaths.filter((required) =>
-    flowEdges.some((edge) => {
-      if (!labelMatches(edge.label, required.branchLabels)) return false;
-      const branchSourceLabel = stringValue(
-        nodesById.get(edge.source) ?? {},
-        "label",
-      );
-      if (!labelMatches(branchSourceLabel, required.branchSourceNodeLabels)) {
-        return false;
-      }
-      if (findPath(edge.target, edge.source)) return false;
-      return endIds.some(
-        (endId) =>
-          findPathIncludingLabelGroups(
-            edge.target,
-            endId,
-            required.terminalNodeLabelGroups,
-          ) !== undefined,
-      );
-    }),
-  ).length;
+  const terminalCandidates = requiredTerminalPaths.map((required) =>
+    endIds.filter(
+      (endId) =>
+        (!required.terminalNodeLabels ||
+          labelMatches(
+            stringValue(nodesById.get(endId) ?? {}, "label"),
+            required.terminalNodeLabels,
+          )) &&
+        flowEdges.some((edge) => {
+          if (!labelMatches(edge.label, required.branchLabels)) return false;
+          const branchSourceLabel = stringValue(
+            nodesById.get(edge.source) ?? {},
+            "label",
+          );
+          if (
+            !labelMatches(branchSourceLabel, required.branchSourceNodeLabels)
+          ) {
+            return false;
+          }
+          if (findPath(edge.target, edge.source)) return false;
+          return (
+            findPathIncludingLabelGroups(
+              edge.target,
+              endId,
+              required.terminalNodeLabelGroups,
+            ) !== undefined
+          );
+        }),
+    ),
+  );
+  const matchTerminals = (index: number, used: ReadonlySet<string>): number => {
+    const candidates = terminalCandidates[index];
+    if (!candidates) return 0;
+    return Math.max(
+      matchTerminals(index + 1, used),
+      ...candidates
+        .filter((id) => !used.has(id))
+        .map((id) => 1 + matchTerminals(index + 1, new Set([...used, id]))),
+    );
+  };
+  const requiredTerminalPathCount = matchTerminals(0, new Set());
   const unlabeledDecisionBranches = decisions.reduce((count, decision) => {
     const id = stringValue(decision, "id");
     if (!id) return count + 1;
@@ -406,15 +433,16 @@ export function selectProbeScenarios(
     : generationReliabilityScenarios;
 }
 
-const runProbe = Effect.fn("generationReliabilityProbe.run")(function* (
+export const runProbe = Effect.fn("generationReliabilityProbe.run")(function* (
   endpoint: string,
   scenario: GenerationReliabilityScenario,
   runNumber: number,
+  timeoutMs = REQUEST_TIMEOUT_MS,
 ) {
   const startedAt = yield* Clock.currentTimeMillis;
-  const response = yield* Effect.tryPromise({
-    try: (signal) =>
-      fetch(endpoint, {
+  const { response, body } = yield* Effect.tryPromise({
+    try: async (signal) => {
+      const response = await fetch(endpoint, {
         body: JSON.stringify({
           cacheMode: "fresh",
           prompt: scenario.prompt,
@@ -427,7 +455,10 @@ const runProbe = Effect.fn("generationReliabilityProbe.run")(function* (
         },
         method: "POST",
         signal,
-      }),
+      });
+      const body: unknown = await response.json();
+      return { response, body };
+    },
     catch: (cause) =>
       GenerationProbeRequestError.make({
         cause,
@@ -435,24 +466,16 @@ const runProbe = Effect.fn("generationReliabilityProbe.run")(function* (
       }),
   }).pipe(
     Effect.timeoutOrElse({
-      duration: REQUEST_TIMEOUT_MS,
+      duration: timeoutMs,
       orElse: () =>
         Effect.fail(
           GenerationProbeRequestError.make({
             cause: new Error("Request timed out."),
-            message: `Request for ${scenario.id} timed out after ${REQUEST_TIMEOUT_MS} ms.`,
+            message: `Request for ${scenario.id} timed out after ${timeoutMs} ms.`,
           }),
         ),
     }),
   );
-  const body = yield* Effect.tryPromise({
-    try: () => response.json(),
-    catch: (cause) =>
-      GenerationProbeRequestError.make({
-        cause,
-        message: `Response for ${scenario.id} was not JSON.`,
-      }),
-  });
   const finishedAt = yield* Clock.currentTimeMillis;
   const durationMs = Math.round(finishedAt - startedAt);
   if (!response.ok || !isUnknownRecord(body) || body["ok"] !== true) {
