@@ -1576,8 +1576,59 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
     const frozen = Schema.decodeUnknownSync(Schema.Unknown)(
       JSON.parse(await readFile(fixturePath, "utf8")),
     );
+    const qualityFailed = corpus.failures.buildFlowchart.qualityFailed;
+    if (qualityFailed.ok) {
+      throw new Error("Low-quality flowchart must remain rejected.");
+    }
+    expect(qualityFailed.quality).toEqual({
+      accepted: false,
+      score: 7.5,
+      threshold: 10,
+      summary: { nodeCount: 3, edgeCount: 2 },
+      checks: [
+        {
+          code: "generic_label",
+          passed: false,
+          severity: "warning",
+          message: 'generic label(s) say nothing: "Task", "Process"',
+          refs: [
+            { kind: "node", id: "start" },
+            { kind: "node", id: "work" },
+          ],
+        },
+        {
+          code: "weak_title",
+          passed: false,
+          severity: "warning",
+          message: "give the diagram a specific title",
+          refs: [{ kind: "diagram", id: "flowchart", path: "spec.title" }],
+        },
+      ],
+    });
+    // Assert the revised report above, then compare its historical encoding
+    // against the immutable fixture. Every other corpus field stays exact.
     const normalizedCorpus = {
       ...corpus,
+      failures: {
+        ...corpus.failures,
+        buildFlowchart: {
+          ...corpus.failures.buildFlowchart,
+          qualityFailed: {
+            ...qualityFailed,
+            quality: {
+              ...qualityFailed.quality,
+              checks: qualityFailed.quality?.checks.map((check) => ({
+                ...check,
+                code:
+                  check.code === "weak_title"
+                    ? "quality_below_threshold"
+                    : check.code,
+                refs: [],
+              })),
+            },
+          },
+        },
+      },
       publicContract: {
         ...corpus.publicContract,
         mcpVisible: {

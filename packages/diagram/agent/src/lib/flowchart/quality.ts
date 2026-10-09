@@ -5,11 +5,6 @@ import type { QualityCheck, QualityReport } from "../code-mode/contract.js";
 const GENERIC_LABEL = /^(node|step|item|box|thing|process|task)\s*\d*$/i;
 const GENERIC_TITLE = /^(diagram|untitled|flowchart|chart|sketch)$/i;
 
-interface QualityFinding {
-  message: string;
-  severity: QualityCheck["severity"];
-}
-
 function connectedComponentCount(diagram: FlowchartDiagram): number {
   const adjacency = new Map<string, string[]>();
   for (const node of diagram.nodes) {
@@ -45,38 +40,34 @@ function connectedComponentCount(diagram: FlowchartDiagram): number {
   return components;
 }
 
-function isDecision(node: FlowchartDiagram["nodes"][number]): boolean {
-  return node.kind === "decision" || node.label.endsWith("?");
-}
-
-function qualityCode(message: string): string {
-  if (message.includes("generic label")) {
-    return "generic_label";
-  }
-  if (message.includes("shorten label")) {
-    return "label_too_long";
-  }
-  if (message.includes("disconnected")) {
-    return "disconnected_graph";
-  }
-  return "quality_below_threshold";
+function nodeRefs(nodes: FlowchartDiagram["nodes"]): QualityCheck["refs"] {
+  return nodes.map((node) => ({ kind: "node", id: node.id }));
 }
 
 /**
  * Deterministic quality assessment shared by every canonical flowchart host.
- * This preserves the established scoring behavior while returning the
- * canonical QualityReport directly instead of a legacy tool-grade envelope.
+ * Each check carries an explicit code and references for targeted repairs.
  */
 export function assessFlowchartQuality(
   diagram: FlowchartDiagram,
   threshold: number,
 ): QualityReport {
-  const findings: QualityFinding[] = [];
+  const checks: QualityCheck[] = [];
   let penalty = 0;
 
-  const fault = (points: number, message: string, error = false) => {
+  const fault = (
+    points: number,
+    message: string,
+    details: Pick<QualityCheck, "code" | "refs">,
+    error = false,
+  ) => {
     penalty += points;
-    findings.push({ severity: error ? "error" : "warning", message });
+    checks.push({
+      ...details,
+      passed: false,
+      severity: error ? "error" : "warning",
+      message,
+    });
   };
 
   const degree = new Map<string, number>();
@@ -88,7 +79,12 @@ export function assessFlowchartQuality(
   }
 
   if (diagram.nodes.length > 1 && diagram.edges.length === 0) {
-    fault(5, "no edges at all — every node floats unconnected", true);
+    fault(
+      5,
+      "no edges at all — every node floats unconnected",
+      { code: "disconnected_graph", refs: nodeRefs(diagram.nodes) },
+      true,
+    );
   } else {
     const orphans = diagram.nodes.filter(
       (node) => (degree.get(node.id) ?? 0) === 0,
@@ -97,19 +93,31 @@ export function assessFlowchartQuality(
       fault(
         Math.min(1.5 * orphans.length, 4.5),
         `unconnected node(s): ${orphans.map((node) => node.id).join(", ")}`,
+        { code: "disconnected_graph", refs: nodeRefs(orphans) },
         true,
       );
     }
     const components = connectedComponentCount(diagram);
     if (components > 1 && orphans.length === 0) {
-      fault(2, `diagram splits into ${components} disconnected islands`, true);
+      fault(
+        2,
+        `diagram splits into ${components} disconnected islands`,
+        { code: "disconnected_graph", refs: nodeRefs(diagram.nodes) },
+        true,
+      );
     }
   }
 
   if (diagram.nodes.length < 3) {
-    fault(2, "too sparse — a useful flow needs at least 3 nodes");
+    fault(2, "too sparse — a useful flow needs at least 3 nodes", {
+      code: "graph_too_sparse",
+      refs: [{ kind: "diagram", id: diagram.id, path: "spec.nodes" }],
+    });
   } else if (diagram.nodes.length > 24) {
-    fault(2, "too dense — trim or merge nodes (24 max)");
+    fault(2, "too dense — trim or merge nodes (24 max)", {
+      code: "graph_too_dense",
+      refs: [{ kind: "diagram", id: diagram.id, path: "spec.nodes" }],
+    });
   }
 
   const labelCounts = new Map<string, number>();
@@ -126,24 +134,45 @@ export function assessFlowchartQuality(
       `duplicate label(s): ${duplicates
         .map(([label]) => `"${label}"`)
         .join(", ")}`,
+      {
+        code: "duplicate_label",
+        refs: nodeRefs(
+          diagram.nodes.filter(
+            (node) =>
+              (labelCounts.get(node.label.trim().toLowerCase()) ?? 0) > 1,
+          ),
+        ),
+      },
     );
   }
 
   let underBranched = 0;
   let unlabeledBranches = 0;
-  for (const node of diagram.nodes.filter(isDecision)) {
+  for (const node of diagram.nodes) {
+    if (node.kind !== "decision") {
+      if (node.label.endsWith("?")) {
+        fault(
+          0,
+          `question label on non-decision node "${node.id}"; use kind "decision" only for branch points`,
+          { code: "question_label_not_decision", refs: nodeRefs([node]) },
+        );
+      }
+      continue;
+    }
     const branches = outgoing.get(node.id) ?? [];
     if (branches.length < 2) {
       underBranched += 1;
-      findings.push({
-        severity: "error",
-        message: `decision "${node.id}" needs at least 2 outgoing branches`,
-      });
+      fault(
+        0,
+        `decision "${node.id}" needs at least 2 outgoing branches`,
+        { code: "underbranched_decision", refs: nodeRefs([node]) },
+        true,
+      );
     } else if (branches.some((edge) => !edge.label)) {
       unlabeledBranches += 1;
-      findings.push({
-        severity: "warning",
-        message: `label every branch out of decision "${node.id}" (yes/no, …)`,
+      fault(0, `label every branch out of decision "${node.id}" (yes/no, …)`, {
+        code: "unlabeled_decision_branch",
+        refs: nodeRefs([node]),
       });
     }
   }
@@ -155,6 +184,7 @@ export function assessFlowchartQuality(
     fault(
       Math.min(0.5 * longLabels.length, 2),
       `shorten label(s): ${longLabels.map((node) => node.id).join(", ")}`,
+      { code: "label_too_long", refs: nodeRefs(longLabels) },
     );
   }
 
@@ -167,6 +197,7 @@ export function assessFlowchartQuality(
       `generic label(s) say nothing: ${genericLabels
         .map((node) => `"${node.label}"`)
         .join(", ")}`,
+      { code: "generic_label", refs: nodeRefs(genericLabels) },
     );
   }
 
@@ -174,18 +205,13 @@ export function assessFlowchartQuality(
     diagram.title.trim().length < 4 ||
     GENERIC_TITLE.test(diagram.title.trim())
   ) {
-    fault(0.5, "give the diagram a specific title");
+    fault(0.5, "give the diagram a specific title", {
+      code: "weak_title",
+      refs: [{ kind: "diagram", id: diagram.id, path: "spec.title" }],
+    });
   }
 
   const score = Math.max(0, Math.round((10 - penalty) * 10) / 10);
-  const checks: QualityCheck[] = findings.map((finding) => ({
-    code: qualityCode(finding.message),
-    passed: false,
-    severity: finding.severity,
-    message: finding.message,
-    refs: [],
-  }));
-
   return {
     accepted:
       score >= threshold && !checks.some((check) => check.severity === "error"),

@@ -155,11 +155,7 @@ export const runDiagramGenerationWithPolicy = Effect.fn(
       });
       const repairRequest = truncated
         ? { ...request, cacheMode: "fresh" as const }
-        : buildRepairRequest(
-            request,
-            { ...latestCandidate, diagnostics },
-            repairAttempt,
-          );
+        : buildRepairRequest(request, latestCandidate, repairAttempt);
       const attemptedDiagnostic = `repair_attempted: ${truncated ? "regenerated a truncated response" : "requested a corrected response"} (attempt ${repairAttempt}).`;
       const repairResult = yield* Effect.result(
         executeModelCall(repairRequest),
@@ -312,8 +308,6 @@ function buildRepairRequest(
     prompt: {
       ...request.prompt,
       request: [
-        request.prompt.request,
-        "",
         `Repair attempt ${repairAttempt}: return a complete corrected diagram that satisfies every validator diagnostic below.`,
         "PRESERVE all existing nodes and labels except the minimal edit needed to fix the listed issues. Do not compact, summarize, remove, combine, rename, or relabel unaffected content.",
         "",
