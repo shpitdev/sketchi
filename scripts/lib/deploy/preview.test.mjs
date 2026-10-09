@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   extractPreviewUrl,
+  normalizePrNumber,
   normalizeWorkersDevSubdomain,
   previewCommentBody,
   previewProjectConfig,
@@ -87,6 +88,36 @@ test("previewWorkerName rejects invalid numbers and identity mismatches", () => 
       }),
     /Worker identity mismatch/,
   );
+});
+
+test("PR numbers require entire decimal inputs and positive safe integers", () => {
+  for (const value of [42, "42", "0042", Number.MAX_SAFE_INTEGER]) {
+    assert.equal(normalizePrNumber(value), Number(value));
+  }
+  for (const value of [
+    "42oops",
+    "42.9",
+    "4e2",
+    "9007199254740993",
+    Number.MAX_SAFE_INTEGER + 1,
+    "",
+    " 42",
+    "42\n",
+    "+42",
+    0,
+    -1,
+  ]) {
+    assert.throws(() => normalizePrNumber(value), /positive.*integer/);
+    assert.throws(
+      () =>
+        previewWorkerName({
+          projectId: "web",
+          prNumber: value,
+          workerName: "sketchi-web",
+        }),
+      /positive.*integer/,
+    );
+  }
 });
 
 test("normalizeWorkersDevSubdomain accepts account subdomain or host", () => {
@@ -248,6 +279,17 @@ test("extractPreviewUrl prefers the URL for the requested Worker", () => {
     extractPreviewUrl(log, "sketchi-studio-pr-42"),
     "https://sketchi-studio-pr-42.account.workers.dev",
   );
+});
+
+test("extractPreviewUrl fails closed for an unmatched explicit Worker", () => {
+  const log =
+    "https://other-worker.account.workers.dev\nhttps://last-worker.account.workers.dev";
+  assert.equal(extractPreviewUrl(log, "sketchi-web-pr-42"), null);
+  assert.equal(
+    extractPreviewUrl(log),
+    "https://last-worker.account.workers.dev",
+  );
+  assert.equal(extractPreviewUrl("no URL"), null);
 });
 
 test("previewCommentBody exposes project and Worker identities separately", () => {

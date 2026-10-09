@@ -4,7 +4,7 @@ export const <%= propertyName %>DiagramType = "<%= typeValue %>" as const;
 
 export const <%= fixtureName %> = parseIntermediateDiagram({
   id: "<%= typeValue %>-example",
-  title: "<%= title %>",
+  title: <%- titleLiteral %>,
   type: <%= propertyName %>DiagramType,
   nodes: [
     { id: "root", label: "<%= className %>" },

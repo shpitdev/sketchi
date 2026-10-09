@@ -18,7 +18,11 @@ function requiredEnv(name) {
 
 async function githubRequest(path, options = {}) {
   const token = requiredEnv("GITHUB_TOKEN");
-  const response = await fetch(`https://api.github.com/${path}`, {
+  const url = new URL(path, "https://api.github.com/");
+  if (url.origin !== "https://api.github.com") {
+    throw new Error("GitHub pagination must remain on api.github.com.");
+  }
+  const response = await fetch(url.href, {
     ...options,
     headers: {
       Accept: "application/vnd.github+json",
@@ -35,7 +39,14 @@ async function githubRequest(path, options = {}) {
     );
   }
 
-  return response.status === 204 ? null : response.json();
+  const nextLink = response.headers
+    .get("link")
+    ?.split(",")
+    .find((link) => /;\s*rel="next"/.test(link));
+  return {
+    data: response.status === 204 ? null : await response.json(),
+    nextUrl: nextLink?.match(/<([^>]+)>/)?.[1] ?? null,
+  };
 }
 
 export async function upsertPreviewComment() {
@@ -44,6 +55,8 @@ export async function upsertPreviewComment() {
   const project = previewProjectConfig(requiredEnv("PREVIEW_PROJECT_ID"));
   const marker =
     process.env.PREVIEW_COMMENT_MARKER?.trim() || project.commentMarker;
+  const botLogin =
+    process.env.PREVIEW_COMMENT_BOT_LOGIN?.trim() || "github-actions[bot]";
   const runId = process.env.GITHUB_RUN_ID?.trim();
   const serverUrl =
     process.env.GITHUB_SERVER_URL?.trim() || "https://github.com";
@@ -60,23 +73,30 @@ export async function upsertPreviewComment() {
     status: process.env.PREVIEW_STATUS,
     workerName: project.workerName,
   });
-  const comments = await githubRequest(
-    `repos/${repository}/issues/${prNumber}/comments?per_page=100`,
-  );
-  const existingComment = comments.find((comment) =>
-    String(comment.body ?? "").includes(marker),
-  );
-
-  if (existingComment) {
-    await githubRequest(
-      `repos/${repository}/issues/comments/${existingComment.id}`,
-      {
-        body: JSON.stringify({ body }),
-        method: "PATCH",
-      },
+  let commentsUrl = `repos/${repository}/issues/${prNumber}/comments?per_page=100`;
+  while (commentsUrl) {
+    const { data: comments, nextUrl } = await githubRequest(commentsUrl);
+    const existingComment = comments.find(
+      (comment) =>
+        comment.user?.type === "Bot" &&
+        comment.user.login === botLogin &&
+        (comment.body === marker ||
+          comment.body?.startsWith(`${marker}\n`) ||
+          comment.body?.startsWith(`${marker}\r\n`)),
     );
-    process.stdout.write(`Updated preview comment ${existingComment.id}.\n`);
-    return;
+
+    if (existingComment) {
+      await githubRequest(
+        `repos/${repository}/issues/comments/${existingComment.id}`,
+        {
+          body: JSON.stringify({ body }),
+          method: "PATCH",
+        },
+      );
+      process.stdout.write(`Updated preview comment ${existingComment.id}.\n`);
+      return;
+    }
+    commentsUrl = nextUrl;
   }
 
   await githubRequest(`repos/${repository}/issues/${prNumber}/comments`, {

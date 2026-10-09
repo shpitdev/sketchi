@@ -76,10 +76,18 @@ export function previewProjectConfig(project) {
 }
 
 export function normalizePrNumber(value) {
-  const prNumber = Number.parseInt(String(value ?? ""), 10);
+  const input = String(value ?? "");
+  const prNumber = Number(input);
 
-  if (!Number.isInteger(prNumber) || prNumber < 1) {
-    throw new Error("PR number must be a positive integer.");
+  if (
+    !input ||
+    /[^0-9]/.test(input) ||
+    !Number.isSafeInteger(prNumber) ||
+    prNumber < 1
+  ) {
+    throw new Error(
+      "PR number must be a positive integer within the safe integer range.",
+    );
   }
 
   return prNumber;
@@ -238,11 +246,11 @@ export function extractPreviewUrl(logText, workerName = "") {
   const urls = [
     ...logText.matchAll(/https:\/\/[a-z0-9][a-z0-9.-]*\.workers\.dev\b/g),
   ].map(([url]) => url);
-  const workerUrl = workerName
-    ? urls.findLast((url) => url.includes(`://${workerName}.`))
-    : undefined;
+  if (workerName) {
+    return urls.findLast((url) => url.includes(`://${workerName}.`)) ?? null;
+  }
 
-  return workerUrl ?? urls.at(-1) ?? null;
+  return urls.at(-1) ?? null;
 }
 
 export function previewCommentBody(input) {

@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
+import { readFileSync } from "node:fs";
 import {
   mkdir,
   mkdtemp,
@@ -23,9 +24,13 @@ const bundleReportPath = resolve(
   ".memory/cli-bundle-report.json",
 );
 
-if (process.versions.node !== "24.13.0") {
+const requiredNodeVersion = JSON.parse(
+  readFileSync(resolve(workspaceRoot, "package.json"), "utf8"),
+).engines.node;
+
+if (process.versions.node !== requiredNodeVersion) {
   throw new Error(
-    `CLI smoke requires Node 24.13.0; received ${process.versions.node}.`,
+    `CLI smoke requires Node ${requiredNodeVersion}; received ${process.versions.node}.`,
   );
 }
 

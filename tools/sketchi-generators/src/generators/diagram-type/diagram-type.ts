@@ -78,7 +78,7 @@ export async function diagramTypeGenerator(
     className: normalizedName.className,
     fixtureName,
     propertyName: normalizedName.propertyName,
-    title,
+    titleLiteral: JSON.stringify(title),
     typeValue,
   };
 
