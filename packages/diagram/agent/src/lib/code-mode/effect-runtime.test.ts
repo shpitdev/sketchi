@@ -17,6 +17,8 @@ import {
   BuildFlowchartRequestSchema,
   BuildSequenceDiagramRequestSchema,
   DIAGRAM_PATCH_OPERATION_NAMES,
+  DiagramPatchOperationSchema,
+  safeParseContract,
   MindmapTopicSchema,
   RenderedDiagramSceneSchema,
   toCodeModeJsonSchema,
@@ -86,10 +88,29 @@ describe("Code Mode telemetry", () => {
             event.event === "effect.metric",
         );
         assert.deepInclude(
-          spans.find(
-            (span) => span.name === "codeMode.buildFlowchart.normalize",
-          )?.attributes,
+          spans.find((span) => span.name === "codeMode.artifacts.store")
+            ?.attributes,
           { "sketchi.request_id": "request-effect-telemetry" },
+        );
+        assert.isTrue(
+          spans.some((span) => span.name === "codeMode.buildFlowchart.render"),
+        );
+        assert.isTrue(
+          spans.some(
+            (span) => span.name === "codeMode.artifacts.exportAndStore",
+          ),
+        );
+        assert.isFalse(
+          spans.some((span) =>
+            /\.(parse|normalize|validate|quality|preflight|operations)$/.test(
+              span.name,
+            ),
+          ),
+        );
+        assert.deepInclude(
+          spans.find((span) => span.name === "codeMode.artifacts.store")
+            ?.attributes,
+          { "sketchi.artifact_id": "artifact-effect-test" },
         );
         assert.deepInclude(
           metrics.find(
@@ -109,6 +130,46 @@ describe("Code Mode telemetry", () => {
       }).pipe(Effect.provide(Layer.merge(runtimeLayer, telemetryLayer)));
     },
   );
+});
+
+describe("structured contract issue metadata", () => {
+  it("retains literal-union kind when display wording changes", () => {
+    const result = safeParseContract(
+      Schema.Literals(["scene", "png"]).annotate({
+        message: "Choose a supported format.",
+      }),
+      "svg",
+    );
+    assert.isFalse(result.success);
+    if (result.success)
+      return assert.fail("Invalid format unexpectedly decoded.");
+    assert.deepInclude(result.error.issues[0], {
+      issueTag: "AnyOf",
+      astKind: "LiteralUnion",
+      message: "Choose a supported format.",
+    });
+  });
+  it("retains discriminator paths when display wording changes", () => {
+    const schema = Schema.Struct({
+      operations: Schema.Array(
+        DiagramPatchOperationSchema.annotate({
+          message: "Choose a supported operation.",
+        }),
+      ),
+    });
+    const result = safeParseContract(schema, {
+      operations: [{ op: "unknown" }],
+    });
+    assert.isFalse(result.success);
+    if (result.success)
+      return assert.fail("Invalid operation unexpectedly decoded.");
+    assert.deepInclude(result.error.issues[0], {
+      issueTag: "AnyOf",
+      astKind: "Union",
+      message: "Choose a supported operation.",
+      path: ["operations", 0, "op"],
+    });
+  });
 });
 
 layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
@@ -166,16 +227,22 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
       assert.deepStrictEqual(failure.error.issues, [
         {
           code: "custom",
+          issueTag: "Filter",
+          astKind: "String",
           message: "Too small: expected string to have >=1 characters",
           path: ["requestId"],
         },
         {
           code: "custom",
+          issueTag: "Filter",
+          astKind: "String",
           message: "Too small: expected string to have >=1 characters",
           path: ["spec", "title"],
         },
         {
           code: "custom",
+          issueTag: "Filter",
+          astKind: "Arrays",
           message: "Too small: expected array to have >=1 items",
           path: ["spec", "nodes"],
         },

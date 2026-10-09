@@ -45,6 +45,12 @@ import {
   type StoredArtifactFormat,
 } from "./artifacts.js";
 import {
+  BuildFlowchartRejected,
+  BuildMindmapRejected,
+  BuildSequenceDiagramRejected,
+  CreateCanvasRejected,
+  GetArtifactRejected,
+  ApplyDiagramPatchRejected,
   ApplyDiagramPatchRequestSchema,
   BuildFlowchartRequestSchema,
   BuildMindmapRequestSchema,
@@ -64,6 +70,9 @@ import {
   type BuildSequenceDiagramResult,
   type CreateCanvasRequest,
   type CreateCanvasResult,
+  CodeModeIssueSchema,
+  safeParseContract,
+  type ContractSchemaIssue,
   type CodeModeIssue,
   type CodeModeIssueCode,
   type CodeModeIssueRef,
@@ -567,21 +576,35 @@ function sequenceQuality(
   };
 }
 
-export interface CodeModeArtifactRenderer {
+export class CodeModeArtifactRenderFailed extends Schema.TaggedError<CodeModeArtifactRenderFailed>()(
+  "CodeModeArtifactRenderFailed",
+  { cause: Schema.Defect(), message: Schema.String },
+) {}
+
+/** Implementations may retain their own tagged renderer failures. */
+type TaggedArtifactRenderFailure = Pick<
+  CodeModeArtifactRenderFailed,
+  "message"
+> & {
+  readonly _tag: string;
+};
+
+export interface CodeModeArtifactRenderer<
+  E extends TaggedArtifactRenderFailure = TaggedArtifactRenderFailure,
+> {
   renderPng(input: {
     scene: RenderedDiagramScene;
     excalidraw: unknown;
-  }): Effect.Effect<ArrayBuffer | Uint8Array, unknown>;
+  }): Effect.Effect<ArrayBuffer | Uint8Array, E>;
 }
 
-class CodeModeArtifactExportError extends Schema.TaggedError<CodeModeArtifactExportError>()(
-  "CodeModeArtifactExportError",
-  {
-    cause: Schema.Defect(),
-    message: Schema.String,
-    optionPath: Schema.Boolean,
-  },
+class CodeModeArtifactRendererNotConfigured extends Schema.TaggedError<CodeModeArtifactRendererNotConfigured>()(
+  "CodeModeArtifactRendererNotConfigured",
+  { message: Schema.String },
 ) {}
+
+type ArtifactExportError =
+  CodeModeArtifactRendererNotConfigured | CodeModeArtifactRenderFailed;
 
 interface SelectorTargets {
   arrows: PatchableArrow[];
@@ -594,247 +617,113 @@ interface SourceScene {
   sourceArtifactId?: string;
 }
 
-type BuildFlowchartFailureStatus = Extract<
-  BuildFlowchartResult,
-  { ok: false }
->["status"];
+const FailureContextSchema = Schema.Struct({
+  issues: Schema.Array(Schema.toEncoded(CodeModeIssueSchema)).pipe(
+    Schema.mutable,
+  ),
+});
 
-interface BuildFlowchartFailureContext {
-  readonly buildId?: string;
-  readonly requestId?: string;
-  readonly normalizedSpec?: NormalizedFlowchartSpec;
-  readonly quality?: QualityReport;
-  readonly partial?: PartialArtifactBundle;
-  readonly issues: CodeModeIssue[];
+class ArtifactExportFailure extends Schema.TaggedError<ArtifactExportFailure>()(
+  "ArtifactExportFailure",
+  {
+    status: Schema.Literal("export_failed"),
+    issues: FailureContextSchema.fields.issues,
+  },
+) {}
+
+class ArtifactStorageFailure extends Schema.TaggedError<ArtifactStorageFailure>()(
+  "ArtifactStorageFailure",
+  {
+    status: Schema.Literal("storage_failed"),
+    cause: Schema.Defect(),
+    issues: FailureContextSchema.fields.issues,
+  },
+) {}
+
+function workflowFailure<
+  const Tag extends string,
+  const Statuses extends readonly string[],
+  C extends { readonly issues: CodeModeIssue[] },
+>(
+  tag: Tag,
+  status: Schema.Literals<Statuses>,
+  context: Schema.Codec<C, unknown>,
+) {
+  class WorkflowFailure extends Schema.TaggedError<WorkflowFailure>()(tag, {
+    message: Schema.String,
+    status,
+    context,
+  }) {
+    constructor(input: {
+      readonly status: Statuses[number];
+      readonly context: C;
+    }) {
+      // Failure context can contain the normalized input that failed validation.
+      super(
+        {
+          ...input,
+          message: input.context.issues[0]?.message ?? input.status,
+        },
+        { disableChecks: true },
+      );
+    }
+  }
+  return WorkflowFailure;
 }
 
-class BuildFlowchartFailure extends Schema.TaggedError<BuildFlowchartFailure>()(
+const BuildFlowchartFailure = workflowFailure(
   "BuildFlowchartFailure",
-  {
-    message: Schema.String,
-    status: Schema.Literals([
-      "invalid_input",
-      "invalid_flowchart",
-      "quality_failed",
-      "render_failed",
-      "export_failed",
-      "storage_failed",
-    ]),
-  },
-) {
-  readonly context: BuildFlowchartFailureContext;
+  BuildFlowchartRejected.fields.status,
+  BuildFlowchartRejected.mapFields(({ ok, status, ...context }) => ({
+    ...context,
+    ...FailureContextSchema.fields,
+  })),
+);
 
-  constructor(input: {
-    readonly status: BuildFlowchartFailureStatus;
-    readonly context: BuildFlowchartFailureContext;
-  }) {
-    super({
-      message: input.context.issues[0]?.message ?? input.status,
-      status: input.status,
-    });
-    this.context = input.context;
-  }
-}
-
-type BuildMindmapFailureStatus = Extract<
-  BuildMindmapResult,
-  { ok: false }
->["status"];
-
-interface BuildMindmapFailureContext {
-  readonly buildId?: string;
-  readonly requestId?: string;
-  readonly normalizedSpec?: NormalizedMindmapSpec;
-  readonly quality?: QualityReport;
-  readonly partial?: PartialArtifactBundle;
-  readonly issues: CodeModeIssue[];
-}
-
-class BuildMindmapFailure extends Schema.TaggedError<BuildMindmapFailure>()(
+const BuildMindmapFailure = workflowFailure(
   "BuildMindmapFailure",
-  {
-    message: Schema.String,
-    status: Schema.Literals([
-      "invalid_input",
-      "invalid_mindmap",
-      "quality_failed",
-      "render_failed",
-      "export_failed",
-      "storage_failed",
-    ]),
-  },
-) {
-  readonly context: BuildMindmapFailureContext;
+  BuildMindmapRejected.fields.status,
+  BuildMindmapRejected.mapFields(({ ok, status, ...context }) => ({
+    ...context,
+    ...FailureContextSchema.fields,
+  })),
+);
 
-  constructor(input: {
-    readonly status: BuildMindmapFailureStatus;
-    readonly context: BuildMindmapFailureContext;
-  }) {
-    super({
-      message: input.context.issues[0]?.message ?? input.status,
-      status: input.status,
-    });
-    this.context = input.context;
-  }
-}
-
-type BuildSequenceDiagramFailureStatus = Extract<
-  BuildSequenceDiagramResult,
-  { ok: false }
->["status"];
-
-interface BuildSequenceDiagramFailureContext {
-  readonly buildId?: string;
-  readonly requestId?: string;
-  readonly normalizedSpec?: NormalizedSequenceDiagramSpec;
-  readonly quality?: QualityReport;
-  readonly partial?: PartialArtifactBundle;
-  readonly issues: CodeModeIssue[];
-}
-
-class BuildSequenceDiagramFailure extends Schema.TaggedError<BuildSequenceDiagramFailure>()(
+const BuildSequenceDiagramFailure = workflowFailure(
   "BuildSequenceDiagramFailure",
-  {
-    message: Schema.String,
-    status: Schema.Literals([
-      "invalid_input",
-      "invalid_sequence",
-      "quality_failed",
-      "render_failed",
-      "export_failed",
-      "storage_failed",
-    ]),
-  },
-) {
-  readonly context: BuildSequenceDiagramFailureContext;
+  BuildSequenceDiagramRejected.fields.status,
+  BuildSequenceDiagramRejected.mapFields(({ ok, status, ...context }) => ({
+    ...context,
+    ...FailureContextSchema.fields,
+  })),
+);
 
-  constructor(input: {
-    readonly status: BuildSequenceDiagramFailureStatus;
-    readonly context: BuildSequenceDiagramFailureContext;
-  }) {
-    super({
-      message: input.context.issues[0]?.message ?? input.status,
-      status: input.status,
-    });
-    this.context = input.context;
-  }
-}
-
-type CreateCanvasFailureStatus = Extract<
-  CreateCanvasResult,
-  { ok: false }
->["status"];
-
-interface CreateCanvasFailureContext {
-  readonly buildId?: string;
-  readonly requestId?: string;
-  readonly normalizedSpec?: CreateCanvasRequest["spec"];
-  readonly partial?: PartialArtifactBundle;
-  readonly issues: CodeModeIssue[];
-}
-
-class CreateCanvasFailure extends Schema.TaggedError<CreateCanvasFailure>()(
+const CreateCanvasFailure = workflowFailure(
   "CreateCanvasFailure",
-  {
-    message: Schema.String,
-    status: Schema.Literals([
-      "invalid_input",
-      "invalid_canvas",
-      "limit_exceeded",
-      "render_failed",
-      "export_failed",
-      "storage_failed",
-    ]),
-  },
-) {
-  readonly context: CreateCanvasFailureContext;
+  CreateCanvasRejected.fields.status,
+  CreateCanvasRejected.mapFields(({ ok, status, ...context }) => ({
+    ...context,
+    ...FailureContextSchema.fields,
+  })),
+);
 
-  constructor(input: {
-    readonly status: CreateCanvasFailureStatus;
-    readonly context: CreateCanvasFailureContext;
-  }) {
-    super({
-      message: input.context.issues[0]?.message ?? input.status,
-      status: input.status,
-    });
-    this.context = input.context;
-  }
-}
-
-type GetArtifactFailureStatus = Extract<
-  GetArtifactResult,
-  { ok: false }
->["status"];
-
-class GetArtifactFailure extends Schema.TaggedError<GetArtifactFailure>()(
+const GetArtifactFailure = workflowFailure(
   "GetArtifactFailure",
-  {
-    message: Schema.String,
-    status: Schema.Literals([
-      "invalid_input",
-      "not_found",
-      "format_unavailable",
-      "expired",
-      "storage_failed",
-    ]),
-  },
-) {
-  readonly issues: CodeModeIssue[];
+  GetArtifactRejected.fields.status,
+  GetArtifactRejected.mapFields(({ ok, status, ...context }) => ({
+    ...context,
+    ...FailureContextSchema.fields,
+  })),
+);
 
-  constructor(input: {
-    readonly status: GetArtifactFailureStatus;
-    readonly issues: CodeModeIssue[];
-  }) {
-    super({
-      message: input.issues[0]?.message ?? input.status,
-      status: input.status,
-    });
-    this.issues = input.issues;
-  }
-}
-
-type ApplyDiagramPatchFailureStatus = Extract<
-  ApplyDiagramPatchResult,
-  { ok: false }
->["status"];
-
-interface ApplyDiagramPatchFailureContext {
-  readonly patchId?: string;
-  readonly requestId?: string;
-  readonly sourceArtifactId?: string;
-  readonly partial?: PartialArtifactBundle;
-  readonly issues: CodeModeIssue[];
-}
-
-class ApplyDiagramPatchFailure extends Schema.TaggedError<ApplyDiagramPatchFailure>()(
+const ApplyDiagramPatchFailure = workflowFailure(
   "ApplyDiagramPatchFailure",
-  {
-    message: Schema.String,
-    status: Schema.Literals([
-      "invalid_input",
-      "source_unavailable",
-      "target_not_found",
-      "unsupported_operation",
-      "connectivity_changed",
-      "render_failed",
-      "export_failed",
-      "storage_failed",
-    ]),
-  },
-) {
-  readonly context: ApplyDiagramPatchFailureContext;
-
-  constructor(input: {
-    readonly status: ApplyDiagramPatchFailureStatus;
-    readonly context: ApplyDiagramPatchFailureContext;
-  }) {
-    super({
-      message: input.context.issues[0]?.message ?? input.status,
-      status: input.status,
-    });
-    this.context = input.context;
-  }
-}
+  ApplyDiagramPatchRejected.fields.status,
+  ApplyDiagramPatchRejected.mapFields(({ ok, status, ...context }) => ({
+    ...context,
+    ...FailureContextSchema.fields,
+  })),
+);
 
 type PatchableElement = PatchableScene["elements"][number];
 type PatchableNode = Extract<PatchableElement, { type: "node" }>;
@@ -864,7 +753,7 @@ function issue(input: {
   };
 }
 
-function pathForZodIssue(path: readonly PropertyKey[]): string {
+function pathForContractIssue(path: readonly PropertyKey[]): string {
   if (path.length === 0) {
     return "input";
   }
@@ -873,31 +762,26 @@ function pathForZodIssue(path: readonly PropertyKey[]): string {
     .join(".");
 }
 
-interface ContractIssueLike {
-  readonly message: string;
-  readonly path: readonly PropertyKey[];
-}
-
-interface ContractErrorLike {
-  readonly issues: readonly ContractIssueLike[];
-}
+type ContractIssueLike = typeof ContractSchemaIssue.Encoded;
+type ContractErrorLike = ContractSchemaError;
 
 function codeForContractIssue(
   contractIssue: ContractIssueLike,
 ): CodeModeIssueCode {
-  const path = pathForZodIssue(contractIssue.path);
-  if (isPatchOperationNamePath(path)) {
-    return "unsupported_patch_operation";
-  }
-  if (contractIssue.message.startsWith("Invalid input: expected")) {
+  const path = pathForContractIssue(contractIssue.path);
+  if (isPatchOperationNamePath(path)) return "unsupported_patch_operation";
+  if (
+    contractIssue.issueTag === "InvalidType" ||
+    (contractIssue.issueTag === "MissingKey" &&
+      contractIssue.missingKeyCode === "invalid_type")
+  )
     return "invalid_type";
-  }
-  if (contractIssue.message.startsWith("Invalid option:")) {
+  if (
+    contractIssue.astKind === "LiteralUnion" &&
+    contractIssue.issueTag === "AnyOf"
+  )
     return "invalid_enum";
-  }
-  if (path.toLowerCase().includes("color")) {
-    return "invalid_color";
-  }
+  if (path.toLowerCase().includes("color")) return "invalid_color";
   return path === "input" ? "invalid_type" : "missing_field";
 }
 
@@ -905,7 +789,7 @@ function isPatchOperationNamePath(path: string): boolean {
   return /^operations\.\[\d+\]\.op$/.test(path);
 }
 
-function hintForZodIssue(path: string): string {
+function hintForContractIssue(path: string): string {
   if (isPatchOperationNamePath(path)) {
     return [
       `Use one of: ${DIAGRAM_PATCH_OPERATION_NAMES.join(", ")}.`,
@@ -924,13 +808,13 @@ function inputIssues(error: ContractSchemaError): CodeModeIssue[] {
   const issues = error.issues
     .slice(0, MAX_INPUT_ISSUES)
     .map((contractIssue) => {
-      const path = pathForZodIssue(contractIssue.path);
+      const path = pathForContractIssue(contractIssue.path);
       return issue({
         code: codeForContractIssue(contractIssue),
         stage: "input",
         ref: { kind: "request", path },
         message: contractIssue.message,
-        hint: hintForZodIssue(path),
+        hint: hintForContractIssue(path),
       });
     });
   if (error.issues.length > MAX_INPUT_ISSUES) {
@@ -993,7 +877,7 @@ function flowchartSchemaRef(
   contractIssue: ContractIssueLike,
   spec: NormalizedFlowchartSpec,
 ): CodeModeIssueRef {
-  const path = pathForZodIssue(contractIssue.path);
+  const path = pathForContractIssue(contractIssue.path);
   const specPath = path === "input" ? "spec" : `spec.${path}`;
   const [collection, index] = contractIssue.path;
   if (collection === "nodes" && typeof index === "number") {
@@ -1105,7 +989,7 @@ function dataForArtifactFormat(
     renderer?: CodeModeArtifactRenderer | undefined;
   },
   format: ArtifactFormat,
-): Effect.Effect<unknown, CodeModeArtifactExportError> {
+): Effect.Effect<unknown, ArtifactExportError> {
   if (format === "scene") {
     return Effect.succeed(input.scene);
   }
@@ -1116,12 +1000,8 @@ function dataForArtifactFormat(
 
   if (!input.renderer) {
     return Effect.fail(
-      CodeModeArtifactExportError.make({
-        cause: new Error(
-          "PNG artifact rendering is not configured for this runtime.",
-        ),
+      CodeModeArtifactRendererNotConfigured.make({
         message: "PNG artifact rendering is not configured for this runtime.",
-        optionPath: true,
       }),
     );
   }
@@ -1133,12 +1013,7 @@ function dataForArtifactFormat(
     })
     .pipe(
       Effect.mapError((cause) =>
-        CodeModeArtifactExportError.make({
-          cause,
-          message:
-            cause instanceof Error ? cause.message : "Artifact export failed.",
-          optionPath: false,
-        }),
+        CodeModeArtifactRenderFailed.make({ cause, message: cause.message }),
       ),
     );
 }
@@ -1151,20 +1026,19 @@ function sizeBytesForArtifactData(data: unknown): number {
   return jsonSizeBytes(data);
 }
 
-function artifactExportIssues(
-  error: CodeModeArtifactExportError,
-): CodeModeIssue[] {
+function artifactExportIssues(error: ArtifactExportError): CodeModeIssue[] {
   return [
     issue({
       code: "render_failed",
       stage: "export",
-      ...(error.optionPath
+      ...(error._tag === "CodeModeArtifactRendererNotConfigured"
         ? { ref: { kind: "artifact", path: "options.artifactFormats" } }
         : {}),
       message: error.message,
-      hint: error.optionPath
-        ? "Use the hosted Studio Code Mode runtime with its Cloudflare Browser Run binding, or omit png from artifactFormats."
-        : "Retry the request; if it keeps failing, inspect the configured renderer.",
+      hint:
+        error._tag === "CodeModeArtifactRendererNotConfigured"
+          ? "Use the hosted Studio Code Mode runtime with its Cloudflare Browser Run binding, or omit png from artifactFormats."
+          : "Retry the request; if it keeps failing, inspect the configured renderer.",
     }),
   ];
 }
@@ -2285,93 +2159,11 @@ function scenePartial(scene: RenderedDiagramScene): PartialArtifactBundle {
   };
 }
 
-function buildFlowchartFailureResult(
-  error: BuildFlowchartFailure,
-): Extract<BuildFlowchartResult, { ok: false }> {
-  return {
-    ok: false,
-    status: error.status,
-    ...(error.context.buildId ? { buildId: error.context.buildId } : {}),
-    ...(error.context.requestId ? { requestId: error.context.requestId } : {}),
-    ...(error.context.normalizedSpec
-      ? { normalizedSpec: error.context.normalizedSpec }
-      : {}),
-    ...(error.context.quality ? { quality: error.context.quality } : {}),
-    ...(error.context.partial ? { partial: error.context.partial } : {}),
-    issues: error.context.issues,
-  };
-}
-
-function buildMindmapFailureResult(
-  error: BuildMindmapFailure,
-): Extract<BuildMindmapResult, { ok: false }> {
-  return {
-    ok: false,
-    status: error.status,
-    ...(error.context.buildId ? { buildId: error.context.buildId } : {}),
-    ...(error.context.requestId ? { requestId: error.context.requestId } : {}),
-    ...(error.context.normalizedSpec
-      ? { normalizedSpec: error.context.normalizedSpec }
-      : {}),
-    ...(error.context.quality ? { quality: error.context.quality } : {}),
-    ...(error.context.partial ? { partial: error.context.partial } : {}),
-    issues: error.context.issues,
-  };
-}
-
-function buildSequenceDiagramFailureResult(
-  error: BuildSequenceDiagramFailure,
-): Extract<BuildSequenceDiagramResult, { ok: false }> {
-  return {
-    ok: false,
-    status: error.status,
-    ...(error.context.buildId ? { buildId: error.context.buildId } : {}),
-    ...(error.context.requestId ? { requestId: error.context.requestId } : {}),
-    ...(error.context.normalizedSpec
-      ? { normalizedSpec: error.context.normalizedSpec }
-      : {}),
-    ...(error.context.quality ? { quality: error.context.quality } : {}),
-    ...(error.context.partial ? { partial: error.context.partial } : {}),
-    issues: error.context.issues,
-  };
-}
-
-function createCanvasFailureResult(
-  error: CreateCanvasFailure,
-): Extract<CreateCanvasResult, { ok: false }> {
-  return {
-    ok: false,
-    status: error.status,
-    ...(error.context.buildId ? { buildId: error.context.buildId } : {}),
-    ...(error.context.requestId ? { requestId: error.context.requestId } : {}),
-    ...(error.context.normalizedSpec
-      ? { normalizedSpec: error.context.normalizedSpec }
-      : {}),
-    ...(error.context.partial ? { partial: error.context.partial } : {}),
-    issues: error.context.issues,
-  };
-}
-
-function getArtifactFailureResult(
-  error: GetArtifactFailure,
-): Extract<GetArtifactResult, { ok: false }> {
-  return { ok: false, status: error.status, issues: error.issues };
-}
-
-function applyDiagramPatchFailureResult(
-  error: ApplyDiagramPatchFailure,
-): Extract<ApplyDiagramPatchResult, { ok: false }> {
-  return {
-    ok: false,
-    status: error.status,
-    ...(error.context.patchId ? { patchId: error.context.patchId } : {}),
-    ...(error.context.requestId ? { requestId: error.context.requestId } : {}),
-    ...(error.context.sourceArtifactId
-      ? { sourceArtifactId: error.context.sourceArtifactId }
-      : {}),
-    ...(error.context.partial ? { partial: error.context.partial } : {}),
-    issues: error.context.issues,
-  };
+function failureResult<Status extends string, Context>(error: {
+  readonly status: Status;
+  readonly context: Context;
+}) {
+  return { ok: false as const, status: error.status, ...error.context };
 }
 
 function storageFailureIssue(
@@ -2381,11 +2173,76 @@ function storageFailureIssue(
   return storageIssue(error.message, code);
 }
 
+const exportAndStoreScene = Effect.fn("codeMode.artifacts.exportAndStore")(
+  function* (input: {
+    scene: RenderedDiagramScene;
+    formats: readonly ArtifactFormat[];
+    inlineFormats: InlineArtifactFormat[];
+    requestId?: string;
+    provenance?: ArtifactBundle["provenance"];
+    validationIssues: typeof exportIssues;
+  }) {
+    const environment = yield* CodeModeRuntimeEnvironment;
+    const store = yield* CodeModeArtifactStorage;
+    const { excalidraw, validation } = yield* Effect.sync(() => {
+      const excalidraw = convertSceneToExcalidraw(input.scene);
+      return { excalidraw, validation: validateExcalidrawScene(excalidraw) };
+    }).pipe(Effect.withSpan("codeMode.artifacts.exportValidate"));
+    const issues = input.validationIssues(validation.issues);
+    if (issues.length > 0) {
+      return yield* new ArtifactExportFailure({
+        status: "export_failed",
+        issues,
+      });
+    }
+    const formats = yield* storedArtifactsForFormats({
+      formats: input.formats,
+      scene: input.scene,
+      excalidraw,
+      renderer: environment.renderer,
+    }).pipe(
+      Effect.mapError(
+        (error) =>
+          new ArtifactExportFailure({
+            status: "export_failed",
+            issues: artifactExportIssues(error),
+          }),
+      ),
+    );
+    const artifactId = yield* Effect.sync(() =>
+      environment.createId("artifact"),
+    );
+    const artifact = yield* withTelemetryCorrelation(
+      store
+        .write({
+          artifactId,
+          diagramId: input.scene.diagramId,
+          formats,
+          inlineFormats: input.inlineFormats,
+          ...(input.provenance ? { provenance: input.provenance } : {}),
+        })
+        .pipe(Effect.withSpan("codeMode.artifacts.store")),
+      {
+        artifactId,
+        ...(input.requestId ? { requestId: input.requestId } : {}),
+      },
+    ).pipe(
+      Effect.mapError(
+        (cause) =>
+          new ArtifactStorageFailure({
+            status: "storage_failed",
+            cause,
+            issues: [storageFailureIssue(cause, "storage_write_failed")],
+          }),
+      ),
+    );
+    return withArtifactUrls(artifact, environment.artifactUrl);
+  },
+);
+
 const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
   function* (input: unknown) {
-    const preflightIssues = yield* Effect.sync(() =>
-      preflightMindmapInput(input),
-    ).pipe(Effect.withSpan("codeMode.buildMindmap.preflight"));
+    const preflightIssues = preflightMindmapInput(input);
     if (preflightIssues.length > 0) {
       return yield* new BuildMindmapFailure({
         status: "invalid_mindmap",
@@ -2393,9 +2250,7 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
       });
     }
 
-    const parsed = yield* Effect.sync(() =>
-      BuildMindmapRequestSchema.safeParse(input),
-    ).pipe(Effect.withSpan("codeMode.buildMindmap.parse"));
+    const parsed = BuildMindmapRequestSchema.safeParse(input);
     if (!parsed.success) {
       return yield* new BuildMindmapFailure({
         status: "invalid_input",
@@ -2404,20 +2259,16 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
     }
 
     const environment = yield* CodeModeRuntimeEnvironment;
-    const store = yield* CodeModeArtifactStorage;
+
     const request = parsed.data;
     const buildId = yield* Effect.sync(() => environment.createId("build"));
-    const normalizedSpec = yield* Effect.sync(() =>
-      normalizeMindmapSpec(request.spec),
-    ).pipe(Effect.withSpan("codeMode.buildMindmap.normalize"));
+    const normalizedSpec = normalizeMindmapSpec(request.spec);
     const baseContext = {
       buildId,
       ...responseRequestId(request.requestId),
       normalizedSpec,
     };
-    const validationIssues = yield* Effect.sync(() =>
-      validateNormalizedMindmap(normalizedSpec),
-    ).pipe(Effect.withSpan("codeMode.buildMindmap.validate"));
+    const validationIssues = validateNormalizedMindmap(normalizedSpec);
     if (validationIssues.length > 0) {
       return yield* new BuildMindmapFailure({
         status: "invalid_mindmap",
@@ -2446,13 +2297,11 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
             ],
           },
         }),
-    }).pipe(Effect.withSpan("codeMode.buildMindmap.canonicalize"));
-    const quality = yield* Effect.sync(() =>
-      mindmapQuality(
-        diagram,
-        request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-      ),
-    ).pipe(Effect.withSpan("codeMode.buildMindmap.quality"));
+    });
+    const quality = mindmapQuality(
+      diagram,
+      request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+    );
     const qualityContext = { ...baseContext, quality };
     if (!quality.accepted) {
       return yield* new BuildMindmapFailure({
@@ -2483,67 +2332,26 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
           },
         }),
     }).pipe(Effect.withSpan("codeMode.buildMindmap.render"));
-    const { excalidraw, exportValidation } = yield* Effect.sync(() => {
-      const excalidrawScene = convertSceneToExcalidraw(scene);
-      return {
-        excalidraw: excalidrawScene,
-        exportValidation: validateExcalidrawScene(excalidrawScene),
-      };
-    }).pipe(Effect.withSpan("codeMode.buildMindmap.exportValidate"));
-    const exportContext = {
-      ...qualityContext,
-      partial: scenePartial(scene),
-    };
-    if (!exportValidation.ok) {
-      return yield* new BuildMindmapFailure({
-        status: "export_failed",
-        context: {
-          ...exportContext,
-          issues: exportIssues(exportValidation.issues),
-        },
-      });
-    }
-
-    const storedFormats = yield* storedArtifactsForFormats({
-      formats: requestedFormats(request.options),
+    const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+    const artifact = yield* exportAndStoreScene({
       scene,
-      excalidraw,
-      renderer: environment.renderer,
+      formats: requestedFormats(request.options),
+      inlineFormats: requestedInlineFormats(request.options),
+      ...(request.requestId ? { requestId: request.requestId } : {}),
+      validationIssues: exportIssues,
     }).pipe(
       Effect.mapError(
         (error) =>
           new BuildMindmapFailure({
-            status: "export_failed",
+            status: error.status,
             context: {
-              ...exportContext,
-              issues: artifactExportIssues(error),
-            },
-          }),
-      ),
-    );
-    const artifactId = yield* Effect.sync(() =>
-      environment.createId("artifact"),
-    );
-    const artifact = yield* withTelemetryCorrelation(
-      store.write({
-        artifactId,
-        diagramId: scene.diagramId,
-        formats: storedFormats,
-        inlineFormats: requestedInlineFormats(request.options),
-      }),
-      {
-        artifactId,
-        ...(request.requestId ? { requestId: request.requestId } : {}),
-      },
-    ).pipe(
-      Effect.mapError(
-        (error) =>
-          new BuildMindmapFailure({
-            status: "storage_failed",
-            context: {
-              ...qualityContext,
-              partial: { diagramId: scene.diagramId },
-              issues: [storageFailureIssue(error, "storage_write_failed")],
+              ...(error.status === "export_failed"
+                ? exportContext
+                : {
+                    ...qualityContext,
+                    partial: { diagramId: scene.diagramId },
+                  }),
+              issues: error.issues,
             },
           }),
       ),
@@ -2556,7 +2364,7 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
       ...responseRequestId(request.requestId),
       normalizedSpec,
       quality,
-      artifact: withArtifactUrls(artifact, environment.artifactUrl),
+      artifact,
       issues: [],
     } satisfies Extract<BuildMindmapResult, { ok: true }>;
   },
@@ -2565,12 +2373,7 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
 const buildSequenceDiagramWorkflow = Effect.fn(
   "codeMode.buildSequenceDiagram.workflow",
 )(function* (input: unknown) {
-  yield* Effect.void.pipe(
-    Effect.withSpan("codeMode.buildSequenceDiagram.preflight"),
-  );
-  const parsed = yield* Effect.sync(() =>
-    BuildSequenceDiagramRequestSchema.safeParse(input),
-  ).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.parse"));
+  const parsed = BuildSequenceDiagramRequestSchema.safeParse(input);
   if (!parsed.success) {
     return yield* new BuildSequenceDiagramFailure({
       status: "invalid_input",
@@ -2579,20 +2382,16 @@ const buildSequenceDiagramWorkflow = Effect.fn(
   }
 
   const environment = yield* CodeModeRuntimeEnvironment;
-  const store = yield* CodeModeArtifactStorage;
+
   const request = parsed.data;
   const buildId = yield* Effect.sync(() => environment.createId("build"));
-  const normalizedSpec = yield* Effect.sync(() =>
-    normalizeSequenceDiagramSpec(request.spec),
-  ).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.normalize"));
+  const normalizedSpec = normalizeSequenceDiagramSpec(request.spec);
   const baseContext = {
     buildId,
     ...responseRequestId(request.requestId),
     normalizedSpec,
   };
-  const validationIssues = yield* Effect.sync(() =>
-    validateNormalizedSequenceDiagram(normalizedSpec),
-  ).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.validate"));
+  const validationIssues = validateNormalizedSequenceDiagram(normalizedSpec);
   if (validationIssues.length > 0) {
     return yield* new BuildSequenceDiagramFailure({
       status: "invalid_sequence",
@@ -2600,12 +2399,10 @@ const buildSequenceDiagramWorkflow = Effect.fn(
     });
   }
 
-  const quality = yield* Effect.sync(() =>
-    sequenceQuality(
-      normalizedSpec,
-      request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-    ),
-  ).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.quality"));
+  const quality = sequenceQuality(
+    normalizedSpec,
+    request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+  );
   const qualityContext = { ...baseContext, quality };
   if (!quality.accepted) {
     return yield* new BuildSequenceDiagramFailure({
@@ -2636,9 +2433,7 @@ const buildSequenceDiagramWorkflow = Effect.fn(
         },
       }),
   }).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.render"));
-  const canvasIssues = yield* Effect.sync(() =>
-    getCanvasValidationIssues(scene),
-  ).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.canvasValidate"));
+  const canvasIssues = getCanvasValidationIssues(scene);
   if (canvasIssues.length > 0) {
     return yield* new BuildSequenceDiagramFailure({
       status: "render_failed",
@@ -2651,64 +2446,23 @@ const buildSequenceDiagramWorkflow = Effect.fn(
       },
     });
   }
-  const { excalidraw, validation } = yield* Effect.sync(() => {
-    const excalidrawScene = convertSceneToExcalidraw(scene);
-    return {
-      excalidraw: excalidrawScene,
-      validation: validateExcalidrawScene(excalidrawScene),
-    };
-  }).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.exportValidate"));
-  const exportContext = {
-    ...qualityContext,
-    partial: scenePartial(scene),
-  };
-  if (!validation.ok) {
-    return yield* new BuildSequenceDiagramFailure({
-      status: "export_failed",
-      context: {
-        ...exportContext,
-        issues: exportIssues(validation.issues),
-      },
-    });
-  }
-
-  const storedFormats = yield* storedArtifactsForFormats({
-    formats: requestedFormats(request.options),
+  const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+  const artifact = yield* exportAndStoreScene({
     scene,
-    excalidraw,
-    renderer: environment.renderer,
+    formats: requestedFormats(request.options),
+    inlineFormats: requestedInlineFormats(request.options),
+    ...(request.requestId ? { requestId: request.requestId } : {}),
+    validationIssues: exportIssues,
   }).pipe(
     Effect.mapError(
       (error) =>
         new BuildSequenceDiagramFailure({
-          status: "export_failed",
+          status: error.status,
           context: {
-            ...exportContext,
-            issues: artifactExportIssues(error),
-          },
-        }),
-    ),
-  );
-  const artifactId = yield* Effect.sync(() => environment.createId("artifact"));
-  const artifact = yield* withTelemetryCorrelation(
-    store.write({
-      artifactId,
-      diagramId: scene.diagramId,
-      formats: storedFormats,
-      inlineFormats: requestedInlineFormats(request.options),
-    }),
-    {
-      artifactId,
-      ...(request.requestId ? { requestId: request.requestId } : {}),
-    },
-  ).pipe(
-    Effect.mapError(
-      (error) =>
-        new BuildSequenceDiagramFailure({
-          status: "storage_failed",
-          context: {
-            ...qualityContext,
-            issues: [storageFailureIssue(error, "storage_write_failed")],
+            ...(error.status === "export_failed"
+              ? exportContext
+              : qualityContext),
+            issues: error.issues,
           },
         }),
     ),
@@ -2721,7 +2475,7 @@ const buildSequenceDiagramWorkflow = Effect.fn(
     ...responseRequestId(request.requestId),
     normalizedSpec,
     quality,
-    artifact: withArtifactUrls(artifact, environment.artifactUrl),
+    artifact,
     issues: [],
   } satisfies Extract<BuildSequenceDiagramResult, { ok: true }>;
 });
@@ -2764,16 +2518,15 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
   function* (input: unknown) {
     const environment = yield* CodeModeRuntimeEnvironment;
     const buildId = yield* Effect.sync(() => environment.createId("build"));
-    const rawInput = yield* Effect.sync(() => {
-      const raw = Schema.decodeUnknownResult(RawCreateCanvasInput)(input);
-      if (!Result.isSuccess(raw)) return undefined;
-      return {
-        spec: raw.success.spec,
-        requestId: Schema.is(Schema.String)(raw.success.requestId)
-          ? raw.success.requestId
-          : undefined,
-      };
-    });
+    const raw = Schema.decodeUnknownResult(RawCreateCanvasInput)(input);
+    const rawInput = Result.isSuccess(raw)
+      ? {
+          spec: raw.success.spec,
+          requestId: Schema.is(Schema.String)(raw.success.requestId)
+            ? raw.success.requestId
+            : undefined,
+        }
+      : undefined;
     if (rawInput) {
       const rawIssue = yield* serializedCanvasLimitIssue(rawInput.spec, "spec");
       if (rawIssue) {
@@ -2790,9 +2543,7 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
         });
       }
     }
-    const parsed = yield* Effect.sync(() =>
-      CreateCanvasRequestSchema.safeParse(input),
-    ).pipe(Effect.withSpan("codeMode.createCanvas.parse"));
+    const parsed = CreateCanvasRequestSchema.safeParse(input);
     if (!parsed.success) {
       return yield* new CreateCanvasFailure({
         status: "invalid_input",
@@ -2800,15 +2551,12 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
       });
     }
 
-    const store = yield* CodeModeArtifactStorage;
     const request = parsed.data;
     const baseContext = {
       buildId,
       ...responseRequestId(request.requestId),
     };
-    const normalized = yield* Effect.sync(() =>
-      normalizePatchableScene(request.spec),
-    ).pipe(Effect.withSpan("codeMode.createCanvas.normalize"));
+    const normalized = normalizePatchableScene(request.spec);
     if (!normalized) {
       return yield* new CreateCanvasFailure({
         status: "invalid_canvas",
@@ -2827,10 +2575,8 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
       });
     }
 
-    const inputLimits = yield* Effect.sync(() =>
-      getCanvasValidationIssues(normalized).filter(
-        (entry) => entry.code === "limit_exceeded",
-      ),
+    const inputLimits = getCanvasValidationIssues(normalized).filter(
+      (entry) => entry.code === "limit_exceeded",
     );
     if (inputLimits.length > 0) {
       return yield* new CreateCanvasFailure({
@@ -2841,12 +2587,8 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
         },
       });
     }
-    const scene = yield* Effect.sync(() => compileCanvasSpec(normalized)).pipe(
-      Effect.withSpan("codeMode.createCanvas.layout"),
-    );
-    const validationIssues = yield* Effect.sync(() =>
-      getCanvasValidationIssues(scene),
-    ).pipe(Effect.withSpan("codeMode.createCanvas.validate"));
+    const scene = compileCanvasSpec(normalized);
+    const validationIssues = getCanvasValidationIssues(scene);
     if (validationIssues.length > 0) {
       const issues = canvasValidationIssues(validationIssues);
       return yield* new CreateCanvasFailure({
@@ -2857,65 +2599,25 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
       });
     }
 
-    const { excalidraw, validation } = yield* Effect.sync(() => {
-      const excalidrawScene = convertSceneToExcalidraw(scene);
-      return {
-        excalidraw: excalidrawScene,
-        validation: validateExcalidrawScene(excalidrawScene),
-      };
-    }).pipe(Effect.withSpan("codeMode.createCanvas.exportValidate"));
-    const exportValidationIssues = canvasExportIssues(validation.issues);
     const exportContext = {
       ...baseContext,
       normalizedSpec: scene,
       partial: scenePartial(scene),
     };
-    if (exportValidationIssues.length > 0) {
-      return yield* new CreateCanvasFailure({
-        status: "export_failed",
-        context: { ...exportContext, issues: exportValidationIssues },
-      });
-    }
-
-    const storedFormats = yield* storedArtifactsForFormats({
-      formats: requestedFormats(request.options),
+    const artifact = yield* exportAndStoreScene({
       scene,
-      excalidraw,
-      renderer: environment.renderer,
+      formats: requestedFormats(request.options),
+      inlineFormats: requestedInlineFormats(request.options),
+      ...(request.requestId ? { requestId: request.requestId } : {}),
+      validationIssues: canvasExportIssues,
     }).pipe(
       Effect.mapError(
         (error) =>
           new CreateCanvasFailure({
-            status: "export_failed",
+            status: error.status,
             context: {
               ...exportContext,
-              issues: artifactExportIssues(error),
-            },
-          }),
-      ),
-    );
-    const artifactId = yield* Effect.sync(() =>
-      environment.createId("artifact"),
-    );
-    const artifact = yield* withTelemetryCorrelation(
-      store.write({
-        artifactId,
-        diagramId: scene.diagramId,
-        formats: storedFormats,
-        inlineFormats: requestedInlineFormats(request.options),
-      }),
-      {
-        artifactId,
-        ...(request.requestId ? { requestId: request.requestId } : {}),
-      },
-    ).pipe(
-      Effect.mapError(
-        (error) =>
-          new CreateCanvasFailure({
-            status: "storage_failed",
-            context: {
-              ...exportContext,
-              issues: [storageFailureIssue(error, "storage_write_failed")],
+              issues: error.issues,
             },
           }),
       ),
@@ -2927,7 +2629,7 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
       buildId,
       ...responseRequestId(request.requestId),
       normalizedSpec: scene,
-      artifact: withArtifactUrls(artifact, environment.artifactUrl),
+      artifact,
       issues: [],
     } satisfies Extract<CreateCanvasResult, { ok: true }>;
   },
@@ -2935,9 +2637,7 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
 
 const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
   function* (input: unknown) {
-    const parsed = yield* Effect.sync(() =>
-      BuildFlowchartRequestSchema.safeParse(input),
-    ).pipe(Effect.withSpan("codeMode.buildFlowchart.parse"));
+    const parsed = BuildFlowchartRequestSchema.safeParse(input);
     if (!parsed.success) {
       return yield* new BuildFlowchartFailure({
         status: "invalid_input",
@@ -2946,21 +2646,20 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
     }
 
     const environment = yield* CodeModeRuntimeEnvironment;
-    const store = yield* CodeModeArtifactStorage;
+
     const request = parsed.data;
-    const formats = requestedFormats(request.options);
+
     const buildId = yield* Effect.sync(() => environment.createId("build"));
-    const normalizedSpec = yield* Effect.sync(() =>
-      normalizeFlowchartSpec(request.spec),
-    ).pipe(Effect.withSpan("codeMode.buildFlowchart.normalize"));
+    const normalizedSpec = normalizeFlowchartSpec(request.spec);
     const baseContext = {
       buildId,
       ...responseRequestId(request.requestId),
       normalizedSpec,
     };
-    const parsedDiagram = yield* Effect.sync(() =>
-      FlowchartDiagramSchema.safeParse(flowchartDiagramInput(normalizedSpec)),
-    ).pipe(Effect.withSpan("codeMode.buildFlowchart.parseCanonical"));
+    const parsedDiagram = safeParseContract(
+      FlowchartDiagramSchema,
+      flowchartDiagramInput(normalizedSpec),
+    );
     if (!parsedDiagram.success) {
       return yield* new BuildFlowchartFailure({
         status: "invalid_flowchart",
@@ -2971,25 +2670,19 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
       });
     }
     const diagram = parsedDiagram.data;
-    const validationIssues = yield* Effect.sync(() =>
-      canonicalFlowchartIssues(diagram),
-    ).pipe(Effect.withSpan("codeMode.buildFlowchart.validate"));
+    const validationIssues = canonicalFlowchartIssues(diagram);
     if (validationIssues.length > 0) {
       return yield* new BuildFlowchartFailure({
         status: "invalid_flowchart",
         context: { ...baseContext, issues: validationIssues },
       });
     }
-    yield* Effect.sync(() => validateFlowchartDiagram(diagram)).pipe(
-      Effect.withSpan("codeMode.buildFlowchart.assertValid"),
-    );
+    validateFlowchartDiagram(diagram);
 
-    const quality = yield* Effect.sync(() =>
-      assessFlowchartQuality(
-        diagram,
-        request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-      ),
-    ).pipe(Effect.withSpan("codeMode.buildFlowchart.quality"));
+    const quality = assessFlowchartQuality(
+      diagram,
+      request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+    );
     const qualityContext = { ...baseContext, quality };
     if (!quality.accepted) {
       return yield* new BuildFlowchartFailure({
@@ -3020,66 +2713,23 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
           },
         }),
     }).pipe(Effect.withSpan("codeMode.buildFlowchart.render"));
-    const { excalidraw, validation } = yield* Effect.sync(() => {
-      const excalidrawScene = convertSceneToExcalidraw(scene);
-      return {
-        excalidraw: excalidrawScene,
-        validation: validateExcalidrawScene(excalidrawScene),
-      };
-    }).pipe(Effect.withSpan("codeMode.buildFlowchart.exportValidate"));
-    const exportContext = {
-      ...qualityContext,
-      partial: scenePartial(scene),
-    };
-    if (!validation.ok) {
-      return yield* new BuildFlowchartFailure({
-        status: "export_failed",
-        context: {
-          ...exportContext,
-          issues: exportIssues(validation.issues),
-        },
-      });
-    }
-
-    const storedFormats = yield* storedArtifactsForFormats({
-      formats,
+    const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+    const artifact = yield* exportAndStoreScene({
       scene,
-      excalidraw,
-      renderer: environment.renderer,
+      formats: requestedFormats(request.options),
+      inlineFormats: requestedInlineFormats(request.options),
+      ...(request.requestId ? { requestId: request.requestId } : {}),
+      validationIssues: exportIssues,
     }).pipe(
       Effect.mapError(
         (error) =>
           new BuildFlowchartFailure({
-            status: "export_failed",
+            status: error.status,
             context: {
-              ...exportContext,
-              issues: artifactExportIssues(error),
-            },
-          }),
-      ),
-    );
-    const artifactId = yield* Effect.sync(() =>
-      environment.createId("artifact"),
-    );
-    const artifact = yield* withTelemetryCorrelation(
-      store.write({
-        artifactId,
-        diagramId: scene.diagramId,
-        formats: storedFormats,
-        inlineFormats: requestedInlineFormats(request.options),
-      }),
-      {
-        artifactId,
-        ...(request.requestId ? { requestId: request.requestId } : {}),
-      },
-    ).pipe(
-      Effect.mapError(
-        (error) =>
-          new BuildFlowchartFailure({
-            status: "storage_failed",
-            context: {
-              ...qualityContext,
-              issues: [storageFailureIssue(error, "storage_write_failed")],
+              ...(error.status === "export_failed"
+                ? exportContext
+                : qualityContext),
+              issues: error.issues,
             },
           }),
       ),
@@ -3092,7 +2742,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
       ...responseRequestId(request.requestId),
       normalizedSpec,
       quality,
-      artifact: withArtifactUrls(artifact, environment.artifactUrl),
+      artifact,
       issues: [],
     } satisfies Extract<BuildFlowchartResult, { ok: true }>;
   },
@@ -3100,13 +2750,13 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
 
 const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(
   function* (input: unknown) {
-    const parsed = yield* Effect.sync(() =>
-      GetArtifactRequestSchema.safeParse(input),
-    ).pipe(Effect.withSpan("codeMode.getArtifact.parse"));
+    const parsed = GetArtifactRequestSchema.safeParse(input);
     if (!parsed.success) {
       return yield* new GetArtifactFailure({
         status: "invalid_input",
-        issues: inputIssues(parsed.error),
+        context: {
+          issues: inputIssues(parsed.error),
+        },
       });
     }
 
@@ -3118,22 +2768,26 @@ const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(
         (error) =>
           new GetArtifactFailure({
             status: "storage_failed",
-            issues: [storageFailureIssue(error, "storage_read_failed")],
+            context: {
+              issues: [storageFailureIssue(error, "storage_read_failed")],
+            },
           }),
       ),
     );
     if (!manifest) {
       return yield* new GetArtifactFailure({
         status: "not_found",
-        issues: [
-          issue({
-            code: "patch_source_unavailable",
-            stage: "storage",
-            ref: { kind: "artifact", id: request.artifactId },
-            message: `Artifact "${request.artifactId}" was not found.`,
-            hint: "Use the artifactId returned by buildFlowchart or applyDiagramPatch.",
-          }),
-        ],
+        context: {
+          issues: [
+            issue({
+              code: "patch_source_unavailable",
+              stage: "storage",
+              ref: { kind: "artifact", id: request.artifactId },
+              message: `Artifact "${request.artifactId}" was not found.`,
+              hint: "Use the artifactId returned by buildFlowchart or applyDiagramPatch.",
+            }),
+          ],
+        },
       });
     }
 
@@ -3141,15 +2795,17 @@ const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(
     if (!manifest.formats.some((entry) => entry.format === format)) {
       return yield* new GetArtifactFailure({
         status: "format_unavailable",
-        issues: [
-          issue({
-            code: "unsupported_artifact_format",
-            stage: "storage",
-            ref: { kind: "artifact", id: request.artifactId },
-            message: `Artifact "${request.artifactId}" does not include format "${format}".`,
-            hint: "Request a format listed in the artifact bundle.",
-          }),
-        ],
+        context: {
+          issues: [
+            issue({
+              code: "unsupported_artifact_format",
+              stage: "storage",
+              ref: { kind: "artifact", id: request.artifactId },
+              message: `Artifact "${request.artifactId}" does not include format "${format}".`,
+              hint: "Request a format listed in the artifact bundle.",
+            }),
+          ],
+        },
       });
     }
 
@@ -3158,22 +2814,26 @@ const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(
         (error) =>
           new GetArtifactFailure({
             status: "storage_failed",
-            issues: [storageFailureIssue(error, "storage_read_failed")],
+            context: {
+              issues: [storageFailureIssue(error, "storage_read_failed")],
+            },
           }),
       ),
     );
     if (!artifact) {
       return yield* new GetArtifactFailure({
         status: "format_unavailable",
-        issues: [
-          issue({
-            code: "patch_source_unavailable",
-            stage: "storage",
-            ref: { kind: "artifact", id: request.artifactId },
-            message: `Artifact "${request.artifactId}" format "${format}" could not be read.`,
-            hint: "Retry retrieval or rebuild the artifact.",
-          }),
-        ],
+        context: {
+          issues: [
+            issue({
+              code: "patch_source_unavailable",
+              stage: "storage",
+              ref: { kind: "artifact", id: request.artifactId },
+              message: `Artifact "${request.artifactId}" format "${format}" could not be read.`,
+              hint: "Retry retrieval or rebuild the artifact.",
+            }),
+          ],
+        },
       });
     }
 
@@ -3203,9 +2863,7 @@ const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(
 const applyDiagramPatchWorkflow = Effect.fn(
   "codeMode.applyDiagramPatch.workflow",
 )(function* (input: unknown) {
-  const raw = yield* Effect.sync(() =>
-    Schema.decodeUnknownResult(RawInlinePatchInput)(input),
-  );
+  const raw = Schema.decodeUnknownResult(RawInlinePatchInput)(input);
   const rawIssue = Result.isSuccess(raw)
     ? yield* serializedCanvasLimitIssue(
         raw.success.source.scene,
@@ -3218,9 +2876,7 @@ const applyDiagramPatchWorkflow = Effect.fn(
       context: { issues: [rawIssue] },
     });
   }
-  const parsed = yield* Effect.sync(() =>
-    ApplyDiagramPatchRequestSchema.safeParse(input),
-  ).pipe(Effect.withSpan("codeMode.applyDiagramPatch.parse"));
+  const parsed = ApplyDiagramPatchRequestSchema.safeParse(input);
   if (!parsed.success) {
     return yield* new ApplyDiagramPatchFailure({
       status: "invalid_input",
@@ -3229,14 +2885,14 @@ const applyDiagramPatchWorkflow = Effect.fn(
   }
 
   const environment = yield* CodeModeRuntimeEnvironment;
-  const store = yield* CodeModeArtifactStorage;
+
   const request = parsed.data;
   const patchId = yield* Effect.sync(() => environment.createId("patch"));
   const baseContext = {
     patchId,
     ...responseRequestId(request.requestId),
   };
-  const formats = requestedFormats(request.options);
+
   const source = yield* resolvePatchSource(request).pipe(
     Effect.mapError(
       (error) =>
@@ -3253,24 +2909,24 @@ const applyDiagramPatchWorkflow = Effect.fn(
       : {}),
   };
   const scene = source.scene;
-  const sourceLimits = yield* Effect.sync(() => {
-    // Count limits must hold even when malformed geometry cannot normalize.
-    if (scene.elements.length > CANVAS_LIMITS.maxElements) {
-      return [
-        {
-          code: "limit_exceeded",
-          message: `Canvas exceeds ${CANVAS_LIMITS.maxElements} elements.`,
-          path: "elements",
-        } satisfies CanvasValidationIssue,
-      ];
-    }
+  let sourceLimits: CanvasValidationIssue[];
+  // Count limits must hold even when malformed geometry cannot normalize.
+  if (scene.elements.length > CANVAS_LIMITS.maxElements) {
+    sourceLimits = [
+      {
+        code: "limit_exceeded",
+        message: `Canvas exceeds ${CANVAS_LIMITS.maxElements} elements.`,
+        path: "elements",
+      },
+    ];
+  } else {
     const normalizedSource = normalizePatchableScene(scene);
-    return normalizedSource
+    sourceLimits = normalizedSource
       ? getCanvasValidationIssues(normalizedSource).filter(
           (entry) => entry.code === "limit_exceeded",
         )
       : [];
-  });
+  }
   if (sourceLimits.length > 0) {
     return yield* new ApplyDiagramPatchFailure({
       status: "invalid_input",
@@ -3281,13 +2937,11 @@ const applyDiagramPatchWorkflow = Effect.fn(
     });
   }
   const beforeConnectivity = sourceConnectivity(scene);
-  const patchIssues = yield* Effect.sync(() => {
-    for (const operation of request.operations) {
-      const operationIssues = applyPatchOperation(scene, operation);
-      if (operationIssues.length > 0) return operationIssues;
-    }
-    return [];
-  }).pipe(Effect.withSpan("codeMode.applyDiagramPatch.operations"));
+  let patchIssues: CodeModeIssue[] = [];
+  for (const operation of request.operations) {
+    patchIssues = applyPatchOperation(scene, operation);
+    if (patchIssues.length > 0) break;
+  }
   if (patchIssues.length > 0) {
     return yield* new ApplyDiagramPatchFailure({
       status:
@@ -3319,9 +2973,7 @@ const applyDiagramPatchWorkflow = Effect.fn(
     }
   }
 
-  const renderedScene = yield* Effect.sync(() =>
-    normalizePatchableScene(scene),
-  ).pipe(Effect.withSpan("codeMode.applyDiagramPatch.normalize"));
+  const renderedScene = normalizePatchableScene(scene);
   if (!renderedScene) {
     return yield* new ApplyDiagramPatchFailure({
       status: "render_failed",
@@ -3340,9 +2992,7 @@ const applyDiagramPatchWorkflow = Effect.fn(
     });
   }
 
-  const structuralIssues = yield* Effect.sync(() =>
-    getCanvasValidationIssues(renderedScene),
-  ).pipe(Effect.withSpan("codeMode.applyDiagramPatch.validate"));
+  const structuralIssues = getCanvasValidationIssues(renderedScene);
   if (structuralIssues.length > 0) {
     return yield* new ApplyDiagramPatchFailure({
       status: "render_failed",
@@ -3354,62 +3004,29 @@ const applyDiagramPatchWorkflow = Effect.fn(
     });
   }
 
-  const { excalidraw, validation } = yield* Effect.sync(() => {
-    const excalidrawScene = convertSceneToExcalidraw(renderedScene);
-    return {
-      excalidraw: excalidrawScene,
-      validation: validateExcalidrawScene(excalidrawScene),
-    };
-  }).pipe(Effect.withSpan("codeMode.applyDiagramPatch.exportValidate"));
   const exportContext = {
     ...sourceContext,
     partial: scenePartial(renderedScene),
   };
-  const exportValidationIssues = canvasExportIssues(validation.issues);
-  if (exportValidationIssues.length > 0) {
-    return yield* new ApplyDiagramPatchFailure({
-      status: "export_failed",
-      context: { ...exportContext, issues: exportValidationIssues },
-    });
-  }
-
-  const storedFormats = yield* storedArtifactsForFormats({
-    formats,
+  const artifact = yield* exportAndStoreScene({
     scene: renderedScene,
-    excalidraw,
-    renderer: environment.renderer,
+    formats: requestedFormats(request.options),
+    inlineFormats: requestedInlineFormats(request.options),
+    ...(request.requestId ? { requestId: request.requestId } : {}),
+    validationIssues: canvasExportIssues,
+    ...(source.sourceArtifactId
+      ? { provenance: { sourceArtifactId: source.sourceArtifactId } }
+      : {}),
   }).pipe(
     Effect.mapError(
       (error) =>
         new ApplyDiagramPatchFailure({
-          status: "export_failed",
-          context: { ...exportContext, issues: artifactExportIssues(error) },
-        }),
-    ),
-  );
-  const artifactId = yield* Effect.sync(() => environment.createId("artifact"));
-  const artifact = yield* withTelemetryCorrelation(
-    store.write({
-      artifactId,
-      diagramId: renderedScene.diagramId,
-      formats: storedFormats,
-      inlineFormats: requestedInlineFormats(request.options),
-      ...(source.sourceArtifactId
-        ? { provenance: { sourceArtifactId: source.sourceArtifactId } }
-        : {}),
-    }),
-    {
-      artifactId,
-      ...(request.requestId ? { requestId: request.requestId } : {}),
-    },
-  ).pipe(
-    Effect.mapError(
-      (error) =>
-        new ApplyDiagramPatchFailure({
-          status: "storage_failed",
+          status: error.status,
           context: {
-            ...sourceContext,
-            issues: [storageFailureIssue(error, "storage_write_failed")],
+            ...(error.status === "export_failed"
+              ? exportContext
+              : sourceContext),
+            issues: error.issues,
           },
         }),
     ),
@@ -3423,22 +3040,10 @@ const applyDiagramPatchWorkflow = Effect.fn(
     ...(source.sourceArtifactId
       ? { sourceArtifactId: source.sourceArtifactId }
       : {}),
-    artifact: withArtifactUrls(artifact, environment.artifactUrl),
+    artifact,
     issues: [],
   } satisfies Extract<ApplyDiagramPatchResult, { ok: true }>;
 });
-
-function codeModeResultBoundary<A, E, R, B>(
-  program: Effect.Effect<A, E, R>,
-  onFailure: (error: E) => B,
-): Effect.Effect<A | B, never, R> {
-  return program.pipe(
-    Effect.match({
-      onFailure,
-      onSuccess: (result) => result,
-    }),
-  );
-}
 
 type CodeModeWorkflowEffect<A> = Effect.Effect<
   A,
@@ -3446,92 +3051,76 @@ type CodeModeWorkflowEffect<A> = Effect.Effect<
   CodeModeArtifactStorage | CodeModeRuntimeEnvironment
 >;
 
+function boundary<
+  A extends ObservableCodeModeResult,
+  E,
+  B extends ObservableCodeModeResult,
+>(
+  operation: CodeModeBoundaryOperation,
+  workflow: (
+    input: unknown,
+  ) => Effect.Effect<
+    A,
+    E,
+    CodeModeArtifactStorage | CodeModeRuntimeEnvironment
+  >,
+  onFailure: (error: E) => B,
+): (input: unknown) => CodeModeWorkflowEffect<A | B> {
+  return Effect.fn(`codeMode.${operation}`)((input: unknown) =>
+    observeCodeModeBoundary(
+      operation,
+      input,
+      workflow(input).pipe(
+        Effect.match({ onFailure, onSuccess: (result) => result }),
+      ),
+    ),
+  );
+}
+
 export const buildFlowchart: (
   input: unknown,
-) => CodeModeWorkflowEffect<BuildFlowchartResult> = Effect.fn(
-  "codeMode.buildFlowchart",
-)((input: unknown) =>
-  observeCodeModeBoundary(
-    "buildFlowchart",
-    input,
-    codeModeResultBoundary(
-      buildFlowchartWorkflow(input),
-      buildFlowchartFailureResult,
-    ),
-  ),
+) => CodeModeWorkflowEffect<BuildFlowchartResult> = boundary(
+  "buildFlowchart",
+  buildFlowchartWorkflow,
+  failureResult,
 );
 
 export const buildMindmap: (
   input: unknown,
-) => CodeModeWorkflowEffect<BuildMindmapResult> = Effect.fn(
-  "codeMode.buildMindmap",
-)((input: unknown) =>
-  observeCodeModeBoundary(
-    "buildMindmap",
-    input,
-    codeModeResultBoundary(
-      buildMindmapWorkflow(input),
-      buildMindmapFailureResult,
-    ),
-  ),
+) => CodeModeWorkflowEffect<BuildMindmapResult> = boundary(
+  "buildMindmap",
+  buildMindmapWorkflow,
+  failureResult,
 );
 
 export const buildSequenceDiagram: (
   input: unknown,
-) => CodeModeWorkflowEffect<BuildSequenceDiagramResult> = Effect.fn(
-  "codeMode.buildSequenceDiagram",
-)((input: unknown) =>
-  observeCodeModeBoundary(
-    "buildSequenceDiagram",
-    input,
-    codeModeResultBoundary(
-      buildSequenceDiagramWorkflow(input),
-      buildSequenceDiagramFailureResult,
-    ),
-  ),
+) => CodeModeWorkflowEffect<BuildSequenceDiagramResult> = boundary(
+  "buildSequenceDiagram",
+  buildSequenceDiagramWorkflow,
+  failureResult,
 );
 
 export const createCanvas: (
   input: unknown,
-) => CodeModeWorkflowEffect<CreateCanvasResult> = Effect.fn(
-  "codeMode.createCanvas",
-)((input: unknown) =>
-  observeCodeModeBoundary(
-    "createCanvas",
-    input,
-    codeModeResultBoundary(
-      createCanvasWorkflow(input),
-      createCanvasFailureResult,
-    ),
-  ),
+) => CodeModeWorkflowEffect<CreateCanvasResult> = boundary(
+  "createCanvas",
+  createCanvasWorkflow,
+  failureResult,
 );
 
 export const getArtifact: (
   input: unknown,
-) => CodeModeWorkflowEffect<GetArtifactResult> = Effect.fn(
-  "codeMode.getArtifact",
-)((input: unknown) =>
-  observeCodeModeBoundary(
-    "getArtifact",
-    input,
-    codeModeResultBoundary(
-      getArtifactWorkflow(input),
-      getArtifactFailureResult,
-    ),
-  ),
+) => CodeModeWorkflowEffect<GetArtifactResult> = boundary(
+  "getArtifact",
+  getArtifactWorkflow,
+  failureResult,
 );
 
 export const applyDiagramPatch: (
   input: unknown,
-) => CodeModeWorkflowEffect<ApplyDiagramPatchResult> = Effect.fn(
-  "codeMode.applyDiagramPatch",
-)((input: unknown) =>
-  observeCodeModeBoundary(
-    "applyDiagramPatch",
-    input,
-    codeModeResultBoundary(
-      applyDiagramPatchWorkflow(input),
-      applyDiagramPatchFailureResult,
-    ),
-  ),
+) => CodeModeWorkflowEffect<ApplyDiagramPatchResult> = boundary(
+  "applyDiagramPatch",
+  applyDiagramPatchWorkflow,
+  failureResult,
 );

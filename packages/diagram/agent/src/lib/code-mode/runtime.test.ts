@@ -38,6 +38,7 @@ import {
   buildMindmap,
   buildSequenceDiagram,
   CodeModeRuntimeEnvironment,
+  CodeModeArtifactRenderFailed,
   createCanvas,
   getArtifact,
   type CodeModeRuntimeOptions,
@@ -3241,6 +3242,150 @@ describe("final-review correlation and sequence canvas bounds", () => {
         });
         expect(writes).toBe(0);
       }
+    },
+  );
+});
+
+describe("shared artifact export-and-store boundary", () => {
+  const operations = [
+    "buildFlowchart",
+    "buildMindmap",
+    "buildSequenceDiagram",
+    "createCanvas",
+    "applyDiagramPatch",
+  ] as const;
+  function request(
+    operation: (typeof operations)[number],
+    formats: ArtifactFormat[],
+  ) {
+    const options = { artifactFormats: formats };
+    const canvas = geometryCanvas([geometryNode("box", 20, 20)]);
+    switch (operation) {
+      case "buildFlowchart":
+        return { requestId: "shared-tail", spec: approvalSpec(), options };
+      case "buildMindmap":
+        return {
+          requestId: "shared-tail",
+          spec: {
+            title: "Mindmap",
+            root: { label: "Root", children: [{ label: "Child" }] },
+          },
+          options,
+        };
+      case "buildSequenceDiagram":
+        return {
+          requestId: "shared-tail",
+          spec: checkoutSequenceSpec(),
+          options,
+        };
+      case "createCanvas":
+        return { requestId: "shared-tail", spec: canvas, options };
+      case "applyDiagramPatch":
+        return {
+          requestId: "shared-tail",
+          source: { scene: canvas },
+          operations: [
+            {
+              op: "setStyle",
+              selector: { ids: ["box"] },
+              style: { strokeColor: "#111111" },
+            },
+          ],
+          options,
+        };
+    }
+  }
+
+  it.each(operations)(
+    "preserves %s storage-failure context and correlation ids",
+    async (operation) => {
+      let writeCalls = 0;
+      const runtime = makeTestRuntime({
+        store: {
+          read: () => Effect.succeed(null),
+          readManifest: () => Effect.succeed(null),
+          write: () => {
+            writeCalls += 1;
+            return Effect.fail(
+              new CodeModeArtifactStorageError({
+                cause: new Error("storage unavailable"),
+                message: "storage unavailable",
+                operation: "write",
+              }),
+            );
+          },
+        },
+      });
+      const result = await runtime[operation](request(operation, ["scene"]));
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error("Expected storage failure.");
+      expect(result).toMatchObject({
+        status: "storage_failed",
+        requestId: "shared-tail",
+        issues: [
+          {
+            code: "storage_write_failed",
+            stage: "storage",
+            message: "storage unavailable",
+          },
+        ],
+      });
+      expect(writeCalls).toBe(1);
+      if (operation === "buildMindmap")
+        expect(result).toHaveProperty("partial", {
+          diagramId: expect.any(String),
+        });
+      else if (operation === "createCanvas")
+        expect(result).toHaveProperty("partial.formats.0.inline");
+      else expect(result).not.toHaveProperty("partial");
+      expect(result).toHaveProperty(
+        operation === "applyDiagramPatch" ? "patchId" : "buildId",
+      );
+    },
+  );
+
+  it.each(operations)(
+    "maps %s tagged renderer failures without writing artifacts",
+    async (operation) => {
+      let writeCalls = 0;
+      const runtime = makeTestRuntime({
+        renderer: {
+          renderPng: () =>
+            Effect.fail(
+              new CodeModeArtifactRenderFailed({
+                cause: new Error("PNG failed"),
+                message: "PNG failed",
+              }),
+            ),
+        },
+        store: {
+          read: () => Effect.succeed(null),
+          readManifest: () => Effect.succeed(null),
+          write: () => {
+            writeCalls += 1;
+            return Effect.die("Export failure must not write.");
+          },
+        },
+      });
+      const result = await runtime[operation](request(operation, ["png"]));
+      expect(result).toMatchObject({
+        ok: false,
+        status: "export_failed",
+        requestId: "shared-tail",
+        issues: [
+          {
+            code: "render_failed",
+            severity: "error",
+            stage: "export",
+            message: "PNG failed",
+            hint: "Retry the request; if it keeps failing, inspect the configured renderer.",
+          },
+        ],
+      });
+      if (result.ok) throw new Error("Expected export failure.");
+      expect(result.issues[0]).not.toHaveProperty("ref");
+      expect(result).toHaveProperty("partial.formats.0.inline");
+      expect(writeCalls).toBe(0);
     },
   );
 });

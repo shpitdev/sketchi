@@ -23,6 +23,18 @@ export class ContractSchemaIssue extends Schema.Class<ContractSchemaIssue>(
 )(
   {
     code: stringLiteral("custom"),
+    issueTag: Schema.Literals([
+      "Filter",
+      "InvalidType",
+      "InvalidValue",
+      "MissingKey",
+      "UnexpectedKey",
+      "Forbidden",
+      "OneOf",
+      "AnyOf",
+    ]),
+    astKind: Schema.optionalKey(Schema.String),
+    missingKeyCode: Schema.optionalKey(Schema.Literal("invalid_type")),
     message: Schema.String,
     path: Schema.Array(Schema.PropertyKey),
   },
@@ -66,45 +78,79 @@ const contractFormatter = SchemaIssue.makeFormatterStandardSchemaV1({
   leafHook: contractLeafHook,
 });
 
-function isPropertyKey(value: unknown): value is PropertyKey {
-  return (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "symbol"
-  );
-}
-
-function pathSegment(value: unknown): PropertyKey | undefined {
-  if (isPropertyKey(value)) return value;
-  if (value !== null && typeof value === "object" && "key" in value) {
-    return isPropertyKey(value.key) ? value.key : undefined;
-  }
-  return undefined;
-}
-
 function contractIssues(
   error: Schema.SchemaError,
 ): ReadonlyArray<typeof ContractSchemaIssue.Encoded> {
-  const issues = contractFormatter(error.issue).issues.map(
-    (issue): typeof ContractSchemaIssue.Encoded => {
-      const path = (issue.path ?? []).flatMap((segment) => {
-        const normalized = pathSegment(segment);
-        return normalized === undefined ? [] : [normalized];
-      });
-      return {
+  const issues: Array<typeof ContractSchemaIssue.Encoded> = [];
+  const visit = (
+    node: SchemaIssue.Issue,
+    path: readonly PropertyKey[],
+    ast?: SchemaAST.AST,
+  ): void => {
+    switch (node._tag) {
+      case "Pointer":
+        return visit(node.issue, [...path, ...node.path], ast);
+      case "Encoding":
+        return visit(node.issue, path, ast);
+      case "Composite":
+        for (const child of node.issues) visit(child, path, node.ast);
+        return;
+      case "AnyOf":
+        if (node.issues.length > 0) {
+          for (const child of node.issues) visit(child, path, node.ast);
+          return;
+        }
+        break;
+      case "Filter":
+        if (
+          SchemaIssue.defaultCheckHook(node) === undefined &&
+          node.issue._tag !== "InvalidValue"
+        ) {
+          return visit(node.issue, path, ast);
+        }
+        break;
+    }
+    const nodeAst = "ast" in node ? node.ast : ast;
+    const missingKeyCode =
+      node._tag === "MissingKey" &&
+      node.annotations?.[contractMissingKeyCodeAnnotation] === "invalid_type"
+        ? ("invalid_type" as const)
+        : undefined;
+    const astKind =
+      nodeAst &&
+      SchemaAST.isUnion(nodeAst) &&
+      nodeAst.types.every(SchemaAST.isLiteral)
+        ? "LiteralUnion"
+        : nodeAst?._tag;
+    const discriminator =
+      nodeAst?.annotations?.[contractDiscriminatorAnnotation];
+    const issuePath =
+      typeof discriminator === "string" ? [...path, discriminator] : path;
+    for (const formatted of contractFormatter(node).issues) {
+      issues.push({
         code: "custom",
-        message: issue.message,
-        path: issue.message.startsWith("Invalid discriminator value.")
-          ? [...path, "op"]
-          : path,
-      };
-    },
-  );
+        issueTag: node._tag,
+        ...(missingKeyCode ? { missingKeyCode } : {}),
+        ...(astKind ? { astKind } : {}),
+        message: formatted.message,
+        path: issuePath,
+      });
+    }
+  };
+  visit(error.issue, []);
   if (
     issues.length > 1 &&
     issues.every((issue) => issue.path[0] === "source")
   ) {
-    return [{ code: "custom", message: "Invalid input", path: ["source"] }];
+    return [
+      {
+        code: "custom",
+        issueTag: "AnyOf",
+        astKind: "Union",
+        message: "Invalid input",
+        path: ["source"],
+      },
+    ];
   }
   return issues;
 }
@@ -127,18 +173,13 @@ export function safeParseContract<S extends Schema.ConstraintDecoder<unknown>>(
       };
 }
 
-export function parseContract<S extends Schema.ConstraintDecoder<unknown>>(
-  schema: S,
-  input: unknown,
-): S["Type"] {
-  const result = safeParseContract(schema, input);
-  if (result.success) return result.data;
-  throw result.error;
-}
-
 function withParser<S extends Schema.ConstraintDecoder<unknown>>(schema: S) {
   return Object.assign(schema, {
-    parse: (input: unknown) => parseContract(schema, input),
+    parse: (input: unknown): S["Type"] => {
+      const result = safeParseContract(schema, input);
+      if (result.success) return result.data;
+      throw result.error;
+    },
     safeParse: (input: unknown) => safeParseContract(schema, input),
   });
 }
@@ -160,6 +201,8 @@ const codeModeJsonSchemaAnnotationKeys = new Set([
 
 const contractDefaultAnnotation = "x-sketchi-default";
 const contractOneOfAnnotation = "x-sketchi-one-of";
+const contractDiscriminatorAnnotation = "codeModeDiscriminator";
+const contractMissingKeyCodeAnnotation = "codeModeMissingKeyCode";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -258,6 +301,7 @@ function optionalContract<S extends Schema.Constraint>(
 function requiredString<S extends Schema.Top>(schema: S): S["Rebuild"] {
   return schema.pipe(
     Schema.annotateKey({
+      [contractMissingKeyCodeAnnotation]: "invalid_type",
       messageMissingKey: "Invalid input: expected string, received undefined",
     }),
   );
@@ -266,6 +310,7 @@ function requiredString<S extends Schema.Top>(schema: S): S["Rebuild"] {
 function requiredObject<S extends Schema.Top>(schema: S): S["Rebuild"] {
   return schema.pipe(
     Schema.annotateKey({
+      [contractMissingKeyCodeAnnotation]: "invalid_type",
       messageMissingKey: "Invalid input: expected object, received undefined",
     }),
   );
@@ -274,6 +319,7 @@ function requiredObject<S extends Schema.Top>(schema: S): S["Rebuild"] {
 function requiredArray<S extends Schema.Top>(schema: S): S["Rebuild"] {
   return schema.pipe(
     Schema.annotateKey({
+      [contractMissingKeyCodeAnnotation]: "invalid_type",
       messageMissingKey: "Invalid input: expected array, received undefined",
     }),
   );
@@ -350,15 +396,8 @@ const HexColor = hexColor();
 
 export const HexColorSchema = withParser(HexColor);
 
-export const ARTIFACT_FORMATS: readonly ["excalidraw", "scene", "png"] = [
-  "excalidraw",
-  "scene",
-  "png",
-];
-export const INLINE_ARTIFACT_FORMATS: readonly ["excalidraw", "scene"] = [
-  "excalidraw",
-  "scene",
-];
+export const ARTIFACT_FORMATS = ["excalidraw", "scene", "png"] as const;
+export const INLINE_ARTIFACT_FORMATS = ["excalidraw", "scene"] as const;
 
 export const ArtifactFormatSchema = Object.assign(
   withParser(literals(ARTIFACT_FORMATS)),
@@ -381,7 +420,7 @@ export class ArtifactProvenance extends Schema.Class<ArtifactProvenance>(
 ) {}
 export const ArtifactProvenanceSchema = withParser(ArtifactProvenance);
 
-export const CODE_MODE_ISSUE_CODES: readonly [
+export const CODE_MODE_ISSUE_CODES = [
   "missing_field",
   "invalid_type",
   "invalid_enum",
@@ -432,58 +471,7 @@ export const CODE_MODE_ISSUE_CODES: readonly [
   "canvas_limit_exceeded",
   "invalid_z_order",
   "unknown_layout_target",
-] = [
-  "missing_field",
-  "invalid_type",
-  "invalid_enum",
-  "invalid_color",
-  "duplicate_node_id",
-  "duplicate_edge_id",
-  "missing_edge_source",
-  "missing_edge_target",
-  "self_loop",
-  "missing_start",
-  "multiple_starts",
-  "missing_end",
-  "start_has_incoming",
-  "end_has_outgoing",
-  "unreachable_node",
-  "nonterminating_node",
-  "missing_outgoing_edge",
-  "underbranched_decision",
-  "unlabeled_decision_branch",
-  "duplicate_decision_branch_label",
-  "disconnected_graph",
-  "flowchart_too_large",
-  "mindmap_too_deep",
-  "mindmap_too_large",
-  "request_too_large",
-  "generic_label",
-  "label_too_long",
-  "quality_below_threshold",
-  "render_failed",
-  "text_overflow",
-  "arrow_binding_invalid",
-  "arrow_overlap",
-  "export_invalid_scene",
-  "storage_read_failed",
-  "storage_write_failed",
-  "unsupported_artifact_format",
-  "patch_source_unavailable",
-  "unknown_patch_target",
-  "unsupported_patch_operation",
-  "patch_preserve_connectivity_failed",
-  "patch_output_invalid",
-  "duplicate_element_id",
-  "duplicate_layer_id",
-  "invalid_canvas_binding",
-  "invalid_canvas_composition",
-  "invalid_canvas_geometry",
-  "invalid_polygon",
-  "canvas_limit_exceeded",
-  "invalid_z_order",
-  "unknown_layout_target",
-];
+] as const;
 
 export const CodeModeIssueCodeSchema = Object.assign(
   withParser(literals(CODE_MODE_ISSUE_CODES)),
@@ -536,18 +524,18 @@ export class CodeModeIssue extends Schema.Class<CodeModeIssue>("CodeModeIssue")(
 ) {}
 export const CodeModeIssueSchema = withParser(CodeModeIssue);
 
-export const FLOWCHART_NODE_KINDS: readonly [
+export const FLOWCHART_NODE_KINDS = [
   "start",
   "process",
   "decision",
   "end",
-] = ["start", "process", "decision", "end"];
+] as const;
 export const FlowchartNodeKindSchema = Object.assign(
   withParser(literals(FLOWCHART_NODE_KINDS)),
   { options: FLOWCHART_NODE_KINDS },
 );
 
-export const DIAGRAM_PATCH_OPERATION_NAMES: readonly [
+export const DIAGRAM_PATCH_OPERATION_NAMES = [
   "setDefaultStyle",
   "setStyle",
   "setShape",
@@ -560,20 +548,7 @@ export const DIAGRAM_PATCH_OPERATION_NAMES: readonly [
   "reorder",
   "group",
   "ungroup",
-] = [
-  "setDefaultStyle",
-  "setStyle",
-  "setShape",
-  "translate",
-  "replaceText",
-  "rerouteEdges",
-  "insert",
-  "remove",
-  "replace",
-  "reorder",
-  "group",
-  "ungroup",
-];
+] as const;
 export const DiagramPatchOperationNameSchema = Object.assign(
   withParser(literals(DIAGRAM_PATCH_OPERATION_NAMES)),
   { options: DIAGRAM_PATCH_OPERATION_NAMES },
@@ -655,15 +630,15 @@ const FlowchartLayoutWithDefault = FlowchartSpecLayout.annotate({
     [contractDefaultAnnotation]: flowchartLayoutDefault,
   }),
 );
-const flowchartStyleDefault = {
+const diagramStyleDefault = {
   accentColor: SKETCHI_DIAGRAM_STYLE.accentColor,
   backgroundColor: SKETCHI_DIAGRAM_STYLE.backgroundColor,
 };
-const FlowchartStyleWithDefault = FlowchartSpecStyle.annotate({
-  default: flowchartStyleDefault,
+const DiagramStyleWithDefault = FlowchartSpecStyle.annotate({
+  default: diagramStyleDefault,
 }).pipe(
-  Schema.withDecodingDefaultKey(Effect.succeed(flowchartStyleDefault)),
-  Schema.annotateKey({ [contractDefaultAnnotation]: flowchartStyleDefault }),
+  Schema.withDecodingDefaultKey(Effect.succeed(diagramStyleDefault)),
+  Schema.annotateKey({ [contractDefaultAnnotation]: diagramStyleDefault }),
 );
 export class FlowchartSpec extends Schema.Class<FlowchartSpec>("FlowchartSpec")(
   {
@@ -672,7 +647,7 @@ export class FlowchartSpec extends Schema.Class<FlowchartSpec>("FlowchartSpec")(
     nodes: requiredArray(nonEmptyArray(FlowchartSpecNode)),
     edges: FlowchartEdgesWithDefault,
     layout: FlowchartLayoutWithDefault,
-    style: FlowchartStyleWithDefault,
+    style: DiagramStyleWithDefault,
   },
   { identifier: undefined },
 ) {}
@@ -712,21 +687,6 @@ const SequenceMessagesWithDefault = Schema.Array(SequenceMessageSpec)
   .pipe(Schema.mutable)
   .annotate({ default: sequenceMessagesDefault })
   .pipe(Schema.withDecodingDefaultKey(Effect.succeed(sequenceMessagesDefault)));
-const sequenceStyleDefault = {
-  accentColor: SKETCHI_DIAGRAM_STYLE.accentColor,
-  backgroundColor: SKETCHI_DIAGRAM_STYLE.backgroundColor,
-};
-const SequenceStyleWithDefault = Schema.Struct({
-  accentColor: hexColor(defaultAccentColor).pipe(
-    Schema.withDecodingDefaultKey(Effect.succeed(defaultAccentColor)),
-  ),
-  backgroundColor: hexColor(defaultBackgroundColor).pipe(
-    Schema.withDecodingDefaultKey(Effect.succeed(defaultBackgroundColor)),
-  ),
-})
-  .annotate({ default: sequenceStyleDefault })
-  .pipe(Schema.withDecodingDefaultKey(Effect.succeed(sequenceStyleDefault)));
-
 export class SequenceDiagramSpec extends Schema.Class<SequenceDiagramSpec>(
   "SequenceDiagramSpec",
 )(
@@ -735,7 +695,7 @@ export class SequenceDiagramSpec extends Schema.Class<SequenceDiagramSpec>(
     title: RequiredNonEmptyString,
     participants: requiredArray(nonEmptyArray(SequenceParticipantSpec)),
     messages: SequenceMessagesWithDefault,
-    style: SequenceStyleWithDefault,
+    style: DiagramStyleWithDefault,
   },
   { identifier: undefined },
 ) {}
@@ -814,48 +774,29 @@ export type BuildFlowchartToolInput = ModelBuildFlowchartToolInput & {
     readonly style?: typeof FlowchartSpecStyle.Type;
   };
 };
-type BuildFlowchartToolInputContractWithLegacyType = Omit<
-  typeof BuildFlowchartToolInputContract,
-  "Type"
-> & {
-  readonly Type: BuildFlowchartToolInput;
-};
 const BuildFlowchartToolInputStandardSchema = Schema.toStandardSchemaV1(
   BuildFlowchartToolInputContract,
   { leafHook: contractLeafHook, parseOptions: { errors: "all" } },
 );
-Object.assign(BuildFlowchartToolInputStandardSchema["~standard"], {
-  jsonSchema: {
-    input: () =>
-      toCodeModeJsonSchema(BuildFlowchartToolInputContract) as Record<
-        string,
-        unknown
-      >,
-    output: () =>
-      toCodeModeJsonSchema(BuildFlowchartToolInputContract) as Record<
-        string,
-        unknown
-      >,
+export const BuildFlowchartToolInputSchema = Object.assign(
+  BuildFlowchartToolInputStandardSchema,
+  {
+    "~standard": {
+      ...BuildFlowchartToolInputStandardSchema["~standard"],
+      jsonSchema: {
+        input: () => toCodeModeJsonSchema(BuildFlowchartToolInputContract),
+        output: () => toCodeModeJsonSchema(BuildFlowchartToolInputContract),
+      },
+    },
   },
-});
-export const BuildFlowchartToolInputSchema: StandardSchemaV1<
+) satisfies StandardSchemaV1<
   typeof BuildFlowchartToolInputContract.Encoded,
   BuildFlowchartToolInput
 > &
   StandardJSONSchemaV1<
     typeof BuildFlowchartToolInputContract.Encoded,
     BuildFlowchartToolInput
-  > &
-  BuildFlowchartToolInputContractWithLegacyType =
-  BuildFlowchartToolInputStandardSchema as unknown as BuildFlowchartToolInputContractWithLegacyType &
-    StandardSchemaV1<
-      typeof BuildFlowchartToolInputContract.Encoded,
-      BuildFlowchartToolInput
-    > &
-    StandardJSONSchemaV1<
-      typeof BuildFlowchartToolInputContract.Encoded,
-      BuildFlowchartToolInput
-    >;
+  >;
 export const BuildFlowchartRequestSchema = Object.assign(
   withParser(BuildFlowchartRequest),
   {
@@ -933,31 +874,12 @@ const MindmapLayoutWithDefault = MindmapSpecLayout.annotate({
   Schema.withDecodingDefaultKey(Effect.succeed(mindmapLayoutDefault)),
   Schema.annotateKey({ [contractDefaultAnnotation]: mindmapLayoutDefault }),
 );
-const mindmapStyleDefault = {
-  accentColor: SKETCHI_DIAGRAM_STYLE.accentColor,
-  backgroundColor: SKETCHI_DIAGRAM_STYLE.backgroundColor,
-};
-const MindmapStyleWithDefault = Schema.Struct({
-  accentColor: hexColor(defaultAccentColor).pipe(
-    Schema.withDecodingDefaultKey(
-      Effect.succeed(mindmapStyleDefault.accentColor),
-    ),
-  ),
-  backgroundColor: hexColor(mindmapStyleDefault.backgroundColor).pipe(
-    Schema.withDecodingDefaultKey(
-      Effect.succeed(mindmapStyleDefault.backgroundColor),
-    ),
-  ),
-})
-  .annotate({ default: mindmapStyleDefault })
-  .pipe(Schema.withDecodingDefaultKey(Effect.succeed(mindmapStyleDefault)));
-
 const MindmapSpecContract = Schema.Struct({
   id: optionalContract(NonEmptyString),
   title: requiredString(MindmapSemanticString),
   root: MindmapTopicReference,
   layout: MindmapLayoutWithDefault,
-  style: MindmapStyleWithDefault,
+  style: DiagramStyleWithDefault,
 });
 export class MindmapSpec extends Schema.Class<MindmapSpec>("MindmapSpec")(
   MindmapSpecContract,
@@ -1378,13 +1300,13 @@ export class DiagramStylePatch extends Schema.Class<DiagramStylePatch>(
 ) {}
 export const DiagramStylePatchSchema = withParser(DiagramStylePatch);
 
-export const DIAGRAM_SHAPES: readonly [
+export const DIAGRAM_SHAPES = [
   "rectangle",
   "diamond",
   "ellipse",
   "circle",
   "polygon",
-] = ["rectangle", "diamond", "ellipse", "circle", "polygon"];
+] as const;
 export const DiagramShapeSchema = Object.assign(
   withParser(literals(DIAGRAM_SHAPES)),
   { options: DIAGRAM_SHAPES },
@@ -1538,6 +1460,7 @@ export const DiagramPatchOperationSchema = Schema.Union(
   { mode: "oneOf" },
 ).annotate({
   [contractOneOfAnnotation]: true,
+  [contractDiscriminatorAnnotation]: "op",
   message: `Invalid discriminator value. Expected ${DIAGRAM_PATCH_OPERATION_NAMES.map(
     (name) => `'${name}'`,
   ).join(" | ")}`,
@@ -1600,36 +1523,25 @@ export const ApplyDiagramPatchRequestSchema = withParser(
   ApplyDiagramPatchRequest,
 );
 
-export interface NormalizedFlowchartSpec {
-  readonly id: string;
-  readonly title: string;
-  readonly nodes: FlowchartSpecNode[];
-  readonly edges: Array<FlowchartSpecEdge & { readonly id: string }>;
-  readonly layout: Required<FlowchartSpecLayout>;
-  readonly style: Required<FlowchartSpecStyle>;
-}
+export type NormalizedFlowchartSpec = typeof NormalizedFlowchartSpecSchema.Type;
+export type NormalizedMindmapSpec = typeof NormalizedMindmapSpecSchema.Type;
+export type NormalizedSequenceDiagramSpec =
+  typeof NormalizedSequenceDiagramSpecSchema.Type;
 
-export interface NormalizedMindmapTopic {
-  readonly id: string;
-  readonly label: string;
-  readonly children: NormalizedMindmapTopic[];
-}
-
-export interface NormalizedMindmapSpec {
-  readonly id: string;
-  readonly title: string;
-  readonly root: NormalizedMindmapTopic;
-  readonly layout: { readonly direction: "LR" | "RL" };
-  readonly style: Required<FlowchartSpecStyle>;
-}
-
-export interface NormalizedSequenceDiagramSpec {
-  readonly id: string;
-  readonly title: string;
-  readonly participants: SequenceParticipantSpec[];
-  readonly messages: Array<SequenceMessageSpec & { readonly id: string }>;
-  readonly style: Required<FlowchartSpecStyle>;
-}
+export class NormalizedMindmapTopic extends Schema.Class<NormalizedMindmapTopic>(
+  "NormalizedMindmapTopic",
+)(
+  {
+    id: NonEmptyString,
+    label: NonEmptyString,
+    children: Schema.Array(
+      Schema.suspend(
+        (): Schema.Codec<NormalizedMindmapTopic> => NormalizedMindmapTopic,
+      ),
+    ).pipe(Schema.mutable),
+  },
+  { identifier: undefined },
+) {}
 
 export interface QualityCheck {
   readonly code: string;
@@ -1683,21 +1595,10 @@ const NormalizedFlowchartSpecSchema = Schema.Struct({
   layout: Schema.Struct({ direction: FlowchartDirection }),
   style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
-const NormalizedMindmapTopicSchema: Schema.Codec<NormalizedMindmapTopic> =
-  Schema.Struct({
-    id: NonEmptyString,
-    label: NonEmptyString,
-    children: Schema.Array(
-      Schema.suspend(
-        (): Schema.Codec<NormalizedMindmapTopic> =>
-          NormalizedMindmapTopicSchema,
-      ),
-    ).pipe(Schema.mutable),
-  });
 const NormalizedMindmapSpecSchema = Schema.Struct({
   id: NonEmptyString,
   title: NonEmptyString,
-  root: NormalizedMindmapTopicSchema,
+  root: NormalizedMindmapTopic,
   layout: Schema.Struct({ direction: literals(["LR", "RL"]) }),
   style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
