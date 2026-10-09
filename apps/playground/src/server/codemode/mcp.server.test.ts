@@ -1,8 +1,9 @@
+import validationFixtures from "./fixtures/mcp-validation-issues-v2.json";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Context, Effect, Option, Schema } from "effect";
 
 import type {
@@ -19,10 +20,18 @@ import {
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 import { PlaygroundCodeMode } from "./service.server";
 import {
+  CodeModeDocsRequestSchema,
+  CodeModeDocsResultSchema,
+  CodeModeSearchRequestSchema,
+  CodeModeSearchResultSchema,
+} from "./mcp-docs.server";
+import {
   createEffectMcpServer,
-  defineEffectMcpTool,
+  makeEffectMcpTool,
 } from "./effect-mcp-adapter.server";
 import {
+  ExecuteRequestSchema,
+  ExecuteResultSchema,
   createSketchiMcpServer as createSketchiMcpServerEffect,
   executeSketchiCodeMode as executeSketchiCodeModeEffect,
   handleSketchiMcpRequest as handleSketchiMcpRequestEffect,
@@ -597,144 +606,32 @@ describe("Sketchi Code Mode MCP server", () => {
         name: "search",
         arguments: { query: "", limit: 21 },
       });
-      expect(invalidSearch).toEqual({
-        isError: true,
-        content: [
-          {
-            type: "text",
-            text: `MCP error -32602: Input validation error: Invalid arguments for tool search: [
-  {
-    "origin": "string",
-    "code": "too_small",
-    "minimum": 1,
-    "inclusive": true,
-    "path": [
-      "query"
-    ],
-    "message": "Invalid input"
-  },
-  {
-    "origin": "number",
-    "code": "too_big",
-    "maximum": 20,
-    "inclusive": true,
-    "path": [
-      "limit"
-    ],
-    "message": "Invalid input"
-  }
-]`,
-          },
-        ],
-      });
+      expect(invalidSearch).toEqual(validationFixtures.invalidSearch);
 
-      // These complete payloads were captured from the parent production MCP
-      // Worker at playground.sketchi.app/mcp.
+      // Standard Schema issues deliberately replace the parent Zod-shaped payloads.
       const invalidExecuteType = await client.callTool({
         name: "execute",
         arguments: { code: 123 },
       });
-      expect(invalidExecuteType).toEqual({
-        content: [
-          {
-            type: "text",
-            text: `MCP error -32602: Input validation error: Invalid arguments for tool execute: [
-  {
-    "expected": "string",
-    "code": "invalid_type",
-    "path": [
-      "code"
-    ],
-    "message": "Invalid input"
-  }
-]`,
-          },
-        ],
-        isError: true,
-      });
+      expect(invalidExecuteType).toEqual(validationFixtures.invalidExecuteType);
 
       const missingExecuteCode = await client.callTool({
         name: "execute",
         arguments: {},
       });
-      expect(missingExecuteCode).toEqual({
-        content: [
-          {
-            type: "text",
-            text: `MCP error -32602: Input validation error: Invalid arguments for tool execute: [
-  {
-    "expected": "string",
-    "code": "invalid_type",
-    "path": [
-      "code"
-    ],
-    "message": "Invalid input"
-  }
-]`,
-          },
-        ],
-        isError: true,
-      });
+      expect(missingExecuteCode).toEqual(validationFixtures.missingExecuteCode);
 
       const invalidSearchLimit = await client.callTool({
         name: "search",
         arguments: { query: "diagram", limit: 1.5 },
       });
-      expect(invalidSearchLimit).toEqual({
-        content: [
-          {
-            type: "text",
-            text: `MCP error -32602: Input validation error: Invalid arguments for tool search: [
-  {
-    "expected": "int",
-    "format": "safeint",
-    "code": "invalid_type",
-    "path": [
-      "limit"
-    ],
-    "message": "Invalid input"
-  }
-]`,
-          },
-        ],
-        isError: true,
-      });
+      expect(invalidSearchLimit).toEqual(validationFixtures.invalidSearchLimit);
 
       const invalidDocsTopic = await client.callTool({
         name: "docs",
         arguments: { topic: "bogus" },
       });
-      expect(invalidDocsTopic).toEqual({
-        content: [
-          {
-            type: "text",
-            text: `MCP error -32602: Input validation error: Invalid arguments for tool docs: [
-  {
-    "code": "invalid_value",
-    "values": [
-      "overview",
-      "execute",
-      "buildFlowchart",
-      "buildMindmap",
-      "buildSequenceDiagram",
-      "createCanvas",
-      "getArtifact",
-      "applyDiagramPatch",
-      "patchOperations",
-      "agentSequence",
-      "issues",
-      "examples"
-    ],
-    "path": [
-      "topic"
-    ],
-    "message": "Invalid input"
-  }
-]`,
-          },
-        ],
-        isError: true,
-      });
+      expect(invalidDocsTopic).toEqual(validationFixtures.invalidDocsTopic);
 
       const unknownTool = await client.callTool({
         name: "missing",
@@ -792,24 +689,20 @@ describe("Sketchi Code Mode MCP server", () => {
     }
   });
 
-  it("preserves the complete parent rejection payload for invalid tool output", async () => {
-    const invalidOutput = defineEffectMcpTool(
-      "invalid-output",
-      {
-        title: "Invalid output fixture",
-        description: "Exercises MCP output validation.",
-        inputSchema: toPlaygroundStandardSchema(
-          Schema.Struct({ ok: Schema.optionalKey(Schema.Boolean) }),
-        ),
-        outputSchema: toPlaygroundStandardSchema(
-          Schema.Struct({ value: Schema.String }),
-        ),
-      },
-      () => ({
-        content: [{ type: "text", text: "invalid" }],
-        structuredContent: { value: 1 },
-      }),
-    );
+  it("returns Standard Schema issues for invalid tool output", async () => {
+    const invalidOutput = makeEffectMcpTool("invalid-output", {
+      title: "Invalid output fixture",
+      description: "Exercises MCP output validation.",
+      inputSchema: toPlaygroundStandardSchema(
+        Schema.Struct({ ok: Schema.optionalKey(Schema.Boolean) }),
+      ),
+      outputSchema: toPlaygroundStandardSchema(
+        Schema.Struct({ value: Schema.String }),
+      ),
+    }).bind(() => ({
+      content: [{ type: "text", text: "invalid" }],
+      structuredContent: { value: 1 },
+    }));
     const server = createEffectMcpServer({
       name: "effect-mcp-output-validation-test",
       tools: [invalidOutput],
@@ -830,26 +723,8 @@ describe("Sketchi Code Mode MCP server", () => {
         name: "invalid-output",
         arguments: {},
       });
-      // Captured from the parent high-level MCP adapter after bundling it with
-      // the Playground Worker's production build pipeline.
-      expect(response).toEqual({
-        content: [
-          {
-            type: "text",
-            text: `MCP error -32602: Output validation error: Invalid structured content for tool invalid-output: [
-  {
-    "expected": "string",
-    "code": "invalid_type",
-    "path": [
-      "value"
-    ],
-    "message": "Invalid input"
-  }
-]`,
-          },
-        ],
-        isError: true,
-      });
+      // Keep the complete MCP envelope and Standard Schema issue paths pinned.
+      expect(response).toEqual(validationFixtures.invalidOutput);
     } finally {
       await client.close();
       await server.close();
@@ -1296,5 +1171,31 @@ describe("Sketchi Code Mode MCP server", () => {
     expect(result.artifactDelivery?.sceneUrl).toContain(
       "https://studio.test/api/v1/artifacts/",
     );
+  });
+});
+
+describe("MCP module-scope tool definitions", () => {
+  it("binds new request handlers without regenerating any tool schema", async () => {
+    const spies = [
+      CodeModeDocsRequestSchema,
+      CodeModeSearchRequestSchema,
+      ExecuteRequestSchema,
+    ].map((schema) => vi.spyOn(schema["~standard"].jsonSchema, "input"));
+    spies.push(
+      ...[
+        CodeModeDocsResultSchema,
+        CodeModeSearchResultSchema,
+        ExecuteResultSchema,
+      ].map((schema) => vi.spyOn(schema["~standard"].jsonSchema, "output")),
+    );
+    try {
+      const first = await createSketchiMcpServer({});
+      const second = await createSketchiMcpServer({});
+      for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+      await first.close();
+      await second.close();
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
   });
 });

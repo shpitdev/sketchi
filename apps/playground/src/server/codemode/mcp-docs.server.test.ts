@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
+import ts from "typescript";
+import { generateCodeModeTypes, jsonSchemaType } from "./mcp-docs/types";
 import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagram-agent";
 import {
   getCodeModeDocs,
@@ -38,21 +40,17 @@ describe("Code Mode MCP docs", () => {
 
   it("emits a complete semantic-builder public type contract", () => {
     expect(SKETCHI_CODE_MODE_VERSION).toBe("2026-09-04");
-    expect(SKETCHI_CODE_MODE_TYPES).toContain("interface CanvasSpec");
-    expect(SKETCHI_CODE_MODE_TYPES).toContain("type CreateCanvasResult");
-    expect(SKETCHI_CODE_MODE_TYPES).toContain("interface BuildMindmapRequest");
-    expect(SKETCHI_CODE_MODE_TYPES).toContain("type BuildMindmapResult");
-    expect(SKETCHI_CODE_MODE_TYPES).toContain(
-      "interface BuildSequenceDiagramRequest",
-    );
-    expect(SKETCHI_CODE_MODE_TYPES).toContain(
-      "type BuildSequenceDiagramResult",
-    );
-    expect(SKETCHI_CODE_MODE_TYPES).toContain(
-      'stage: "input" | "canvas" | "flowchart" | "mindmap"',
-    );
-    expect(SKETCHI_CODE_MODE_TYPES).toContain("type CodeModeIssueCode");
-    expect(SKETCHI_CODE_MODE_TYPES).toContain("code: CodeModeIssueCode");
+    for (const operation of [
+      "BuildFlowchart",
+      "BuildMindmap",
+      "BuildSequenceDiagram",
+      "CreateCanvas",
+      "GetArtifact",
+      "ApplyDiagramPatch",
+    ]) {
+      expect(SKETCHI_CODE_MODE_TYPES).toContain(`type ${operation}Request =`);
+      expect(SKETCHI_CODE_MODE_TYPES).toContain(`type ${operation}Result =`);
+    }
     for (const issueCode of [
       "nonterminating_node",
       "flowchart_too_large",
@@ -92,6 +90,82 @@ describe("Code Mode MCP docs", () => {
     const canvasDocs = getCodeModeDocs({ topic: "createCanvas" });
     expect(canvasDocs.content).toContain("never raw Excalidraw JSON");
     expect(canvasDocs.examples[0]?.code).toContain("sketchi.createCanvas");
+  });
+
+  it("pins every generated field, optionality, literal and recursive reference to the package schemas", async () => {
+    const generated = generateCodeModeTypes();
+    expect(SKETCHI_CODE_MODE_TYPES).toBe(generated);
+    await expect(generated).toMatchFileSnapshot(
+      `${process.cwd()}/apps/playground/src/server/codemode/mcp-docs/code-mode-types.generated.txt`,
+    );
+    const source = ts.createSourceFile(
+      "code-mode-types.ts",
+      `${generated}
+        type Assert<T extends true> = T;
+        type Same<A, B> = [A] extends [B] ? [B] extends [A] ? true : false : false;
+        type OptionalKeys<T> = {
+          [K in keyof T]-?: {} extends Pick<T, K> ? K : never
+        }[keyof T];
+        type FlowchartRequestDefaults = Assert<
+          "edges" | "layout" | "style" extends OptionalKeys<BuildFlowchartRequest["spec"]> ? true : false
+        >;
+        type FlowchartResultDefaults = Assert<
+          Extract<OptionalKeys<Extract<BuildFlowchartResult, { ok: true }>["normalizedSpec"]>, "edges" | "layout" | "style"> extends never ? true : false
+        >;
+        type CanvasRequestVersion = Assert<Same<CreateCanvasRequest["spec"]["version"], 1>>;
+      `,
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const options: ts.CompilerOptions = {
+      noEmit: true,
+      types: [],
+      skipLibCheck: true,
+      target: ts.ScriptTarget.ESNext,
+    };
+    const host = ts.createCompilerHost(options);
+    const getSourceFile = host.getSourceFile;
+    host.getSourceFile = (file, ...args) =>
+      file === "code-mode-types.ts" ? source : getSourceFile(file, ...args);
+    const program = ts.createProgram({
+      rootNames: ["code-mode-types.ts"],
+      options,
+      host,
+    });
+    expect(
+      ts
+        .getPreEmitDiagnostics(program)
+        .map((diagnostic) =>
+          ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
+        ),
+    ).toEqual([]);
+  });
+
+  it("reflects field-level schema changes and rejects unsupported shapes", () => {
+    expect(
+      jsonSchemaType(
+        {
+          type: "object",
+          additionalProperties: false,
+          properties: { label: { type: "string" } },
+          required: ["label"],
+        },
+        "Test",
+      ),
+    ).toBe('{ "label": string; }');
+    expect(
+      jsonSchemaType(
+        {
+          type: "object",
+          additionalProperties: false,
+          properties: { label: { type: "number" } },
+        },
+        "Test",
+      ),
+    ).toBe('{ "label"?: number; }');
+    expect(() => jsonSchemaType({ type: "future" }, "Test")).toThrow(
+      "Unsupported Code Mode JSON Schema type",
+    );
   });
 
   it("keeps the published catalog complete for bounded build failures", () => {
@@ -184,7 +258,7 @@ describe("Code Mode MCP docs", () => {
     expect(docs.content).toContain("Supported operation names");
     expect(docs.content).toContain("replaceText");
     expect(docs.content).toContain("strokeColor");
-    expect(docs.content).toContain("interface ApplyDiagramPatchRequest");
+    expect(docs.content).toContain("type ApplyDiagramPatchRequest =");
     expect(docs.content).toContain('"png"');
     expect(docs.content).toContain("hosted visual proof");
     expect(docs.content).not.toContain("{ excalidraw: unknown }");

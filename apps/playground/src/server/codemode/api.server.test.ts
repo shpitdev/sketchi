@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Effect } from "effect";
 
 import type {
+  BuildFlowchartResult,
   CodeModeObjectBucket,
   CodeModeObjectBucketObject,
 } from "@sketchi/diagram-agent";
@@ -15,7 +16,7 @@ import {
   handleGetArtifactRequest as handleGetArtifactRequestEffect,
   handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
 } from "./api.server";
-import { CodeModeHttpSchemas } from "./http-schema.server";
+import { PlaygroundCodeMode } from "./service.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
 import { runPlaygroundEffect } from "../runtime/runtime.server";
 
@@ -1127,25 +1128,35 @@ describe("artifact patch request boundaries", () => {
   });
 });
 
-describe("HTTP schema decode failures", () => {
-  it("maps a rejected decode to a typed HTTP response instead of a defect", async () => {
-    const validate = vi
-      .spyOn(CodeModeHttpSchemas.buildFlowchart.input["~standard"], "validate")
-      .mockRejectedValue(new Error("private decode failure"));
-    try {
-      const response = await handleBuildFlowchartRequest(
-        {},
-        postRequest("https://studio.test/api/v1/flowcharts/build", {
-          spec: approvalSpec(),
-        }),
-      );
-      expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({
+describe("HTTP package validation authority", () => {
+  it("passes the bounded body unchanged to the package operation", async () => {
+    const body = { spec: approvalSpec(), callerMetadata: "not a schema field" };
+    const request = postRequest(
+      "https://studio.test/api/v1/flowcharts/build",
+      body,
+    );
+    const operation = vi.fn((input: unknown) => {
+      expect(input).toEqual(body);
+      const result: BuildFlowchartResult = {
         ok: false,
-        error: "The request could not be decoded.",
-      });
-    } finally {
-      validate.mockRestore();
-    }
+        status: "invalid_input",
+        issues: [],
+      };
+      return Effect.succeed(result);
+    });
+    const response = await runPlaygroundEffect(
+      Effect.gen(function* () {
+        const codeMode = yield* PlaygroundCodeMode;
+        return yield* handleBuildFlowchartRequestEffect(request).pipe(
+          Effect.provideService(PlaygroundCodeMode, {
+            ...codeMode,
+            buildFlowchart: operation,
+          }),
+        );
+      }),
+      testBoundary({}, request),
+    );
+    expect(response.status).toBe(400);
+    expect(operation).toHaveBeenCalledOnce();
   });
 });

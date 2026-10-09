@@ -31,7 +31,7 @@ import {
 } from "./mcp-docs.server";
 import {
   createEffectMcpServer,
-  defineEffectMcpTool,
+  makeEffectMcpTool,
 } from "./effect-mcp-adapter.server";
 import { PlaygroundCodeModeUsage } from "./usage-events.server";
 
@@ -515,76 +515,67 @@ export function makeSketchiCodeModeProvider(
   };
 }
 
+const docs = makeEffectMcpTool("docs", {
+  title: "Sketchi Code Mode docs",
+  description:
+    "Read the harness-first Sketchi Code Mode MCP contract and usage guidance.",
+  inputSchema: CodeModeDocsRequestSchema,
+  outputSchema: CodeModeDocsResultSchema,
+  annotations: {
+    readOnlyHint: true,
+    idempotentHint: true,
+  },
+}).bind((input) => jsonResult(getCodeModeDocs(input)));
+
+const search = makeEffectMcpTool("search", {
+  title: "Search Sketchi Code Mode docs",
+  description:
+    "Search Sketchi Code Mode operations, schemas, examples, non-goals, and repair hints.",
+  inputSchema: CodeModeSearchRequestSchema,
+  outputSchema: CodeModeSearchResultSchema,
+  annotations: {
+    readOnlyHint: true,
+    idempotentHint: true,
+  },
+}).bind((input) => jsonResult(searchCodeModeDocs(input)));
+
+const executeDefinition = makeEffectMcpTool("execute", {
+  title: "Execute Sketchi Code Mode",
+  description: [
+    "Run an async JavaScript arrow function for an external agent harness.",
+    "Write JavaScript only: no TypeScript syntax, annotations, interfaces, generics, imports, or named wrapper functions.",
+    "Use the canonical shape: async () => { const result = await sketchi.buildFlowchart(...); return result; }",
+    "Code fences and trailing expression semicolons are normalized before execution.",
+    "The sandbox exposes sketchi.createCanvas, sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.buildSequenceDiagram, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
+    "First get the semantic graph accepted, then use patch operations for deterministic visual changes.",
+    "For final user-facing output, return accepted Sketchi artifact ids, format refs, and Excalidraw/PNG URLs. Do not recreate accepted diagrams as Markdown or Mermaid artifacts.",
+    "When artifactDelivery is available, the first text content block is the final user-facing answer; copy it verbatim and stop.",
+    "When execute returns artifactDelivery, paste artifactDelivery.finalResponseText as the final chat response and stop.",
+    "Do not call write_to_file/Create, create an Antigravity artifact, or inspect nested inline JSON after artifactDelivery is present.",
+    "",
+    SKETCHI_CODE_MODE_TYPES,
+  ].join("\n"),
+  inputSchema: ExecuteRequestSchema,
+  outputSchema: ExecuteResultSchema,
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
+  },
+});
+
 export function createSketchiMcpServer(
   runToolEffect: PlaygroundRequestRunner,
   options: CodeModeMcpOptions = {},
 ): Server {
-  const docs = defineEffectMcpTool(
-    "docs",
-    {
-      title: "Sketchi Code Mode docs",
-      description:
-        "Read the harness-first Sketchi Code Mode MCP contract and usage guidance.",
-      inputSchema: CodeModeDocsRequestSchema,
-      outputSchema: CodeModeDocsResultSchema,
-      annotations: {
-        readOnlyHint: true,
-        idempotentHint: true,
-      },
-    },
-    (input) => jsonResult(getCodeModeDocs(input)),
-  );
-
-  const search = defineEffectMcpTool(
-    "search",
-    {
-      title: "Search Sketchi Code Mode docs",
-      description:
-        "Search Sketchi Code Mode operations, schemas, examples, non-goals, and repair hints.",
-      inputSchema: CodeModeSearchRequestSchema,
-      outputSchema: CodeModeSearchResultSchema,
-      annotations: {
-        readOnlyHint: true,
-        idempotentHint: true,
-      },
-    },
-    (input) => jsonResult(searchCodeModeDocs(input)),
-  );
-
-  const execute = defineEffectMcpTool(
-    "execute",
-    {
-      title: "Execute Sketchi Code Mode",
-      description: [
-        "Run an async JavaScript arrow function for an external agent harness.",
-        "Write JavaScript only: no TypeScript syntax, annotations, interfaces, generics, imports, or named wrapper functions.",
-        "Use the canonical shape: async () => { const result = await sketchi.buildFlowchart(...); return result; }",
-        "Code fences and trailing expression semicolons are normalized before execution.",
-        "The sandbox exposes sketchi.createCanvas, sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.buildSequenceDiagram, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
-        "First get the semantic graph accepted, then use patch operations for deterministic visual changes.",
-        "For final user-facing output, return accepted Sketchi artifact ids, format refs, and Excalidraw/PNG URLs. Do not recreate accepted diagrams as Markdown or Mermaid artifacts.",
-        "When artifactDelivery is available, the first text content block is the final user-facing answer; copy it verbatim and stop.",
-        "When execute returns artifactDelivery, paste artifactDelivery.finalResponseText as the final chat response and stop.",
-        "Do not call write_to_file/Create, create an Antigravity artifact, or inspect nested inline JSON after artifactDelivery is present.",
-        "",
-        SKETCHI_CODE_MODE_TYPES,
-      ].join("\n"),
-      inputSchema: ExecuteRequestSchema,
-      outputSchema: ExecuteResultSchema,
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
-        openWorldHint: false,
-      },
-    },
-    (input) =>
-      runToolEffect(executeSketchiCodeMode(input, runToolEffect, options)).then(
-        (result) =>
-          jsonResult(result, {
-            includeFinalResponseText: true,
-          }),
-      ),
+  const execute = executeDefinition.bind((input) =>
+    runToolEffect(executeSketchiCodeMode(input, runToolEffect, options)).then(
+      (result) =>
+        jsonResult(result, {
+          includeFinalResponseText: true,
+        }),
+    ),
   );
 
   return createEffectMcpServer({

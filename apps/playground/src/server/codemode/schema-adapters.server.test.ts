@@ -2,18 +2,12 @@ import { assert, describe, expect, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 
 import {
-  ApplyDiagramPatchRequestSchema,
-  BuildFlowchartRequestSchema,
-  BuildMindmapRequestSchema,
+  BuildFlowchartResultSchema,
   GetArtifactRequestSchema,
-  toCodeModeJsonSchema,
 } from "@sketchi/diagram-agent";
 
 import { CodeModeSearchRequestSchema } from "./mcp-docs.server";
-import {
-  CodeModeHttpSchemas,
-  decodeCodeModeHttpInput,
-} from "./http-schema.server";
+import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 
 const SearchRequestInputSchema = Schema.Struct({
   query: Schema.String.check(Schema.isPattern(/^[A-Za-z][A-Za-z ]{0,79}$/u)),
@@ -26,35 +20,6 @@ const GetArtifactInputSchema = Schema.Struct({
 });
 
 describe("Playground Effect schema adapters", () => {
-  it("keeps every route input structurally equal to the frozen package authority", () => {
-    const schemaPairs = [
-      {
-        packageSchema: ApplyDiagramPatchRequestSchema,
-        routeSchema: CodeModeHttpSchemas.applyDiagramPatch.input,
-      },
-      {
-        packageSchema: BuildFlowchartRequestSchema,
-        routeSchema: CodeModeHttpSchemas.buildFlowchart.input,
-      },
-      {
-        packageSchema: BuildMindmapRequestSchema,
-        routeSchema: CodeModeHttpSchemas.buildMindmap.input,
-      },
-      {
-        packageSchema: GetArtifactRequestSchema,
-        routeSchema: CodeModeHttpSchemas.getArtifact.input,
-      },
-    ];
-
-    for (const { packageSchema, routeSchema } of schemaPairs) {
-      expect(
-        routeSchema["~standard"].jsonSchema.input({
-          target: "draft-2020-12",
-        }),
-      ).toEqual(toCodeModeJsonSchema(packageSchema));
-    }
-  });
-
   it.effect.prop(
     "accepts every generated MCP search request through Standard Schema",
     {
@@ -72,16 +37,18 @@ describe("Playground Effect schema adapters", () => {
   );
 
   it.effect.prop(
-    "preserves generated package inputs at the HTTP adapter",
+    "preserves generated package inputs through Standard Schema",
     {
       input: GetArtifactInputSchema,
     },
     ({ input }) =>
       Effect.promise(async () => {
-        const decoded = await decodeCodeModeHttpInput(
-          CodeModeHttpSchemas.getArtifact.input,
-          input,
-        );
+        const result = await toPlaygroundStandardSchema(
+          GetArtifactRequestSchema,
+        )["~standard"].validate(input);
+        if ("issues" in result)
+          return assert.fail("Expected a valid package input.");
+        const decoded = result.value;
         if (decoded === null || typeof decoded !== "object") {
           return assert.fail("Standard Schema returned a non-object input.");
         }
@@ -113,9 +80,9 @@ describe("Playground Effect schema adapters", () => {
 
   it.effect("validates canonical route repair issues at the output edge", () =>
     Effect.promise(async () => {
-      const result = await CodeModeHttpSchemas.buildFlowchart.output[
-        "~standard"
-      ].validate({
+      const result = await toPlaygroundStandardSchema(
+        BuildFlowchartResultSchema,
+      )["~standard"].validate({
         ok: false,
         status: "invalid_input",
         issues: [

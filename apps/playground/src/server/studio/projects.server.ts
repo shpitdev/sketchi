@@ -1,6 +1,11 @@
 import "@tanstack/react-start/server-only";
 
-import { RenderedDiagramSceneSchema } from "@sketchi/diagram-agent";
+import {
+  CodeModeArtifactStorage,
+  CodeModeRuntimeEnvironment,
+  getArtifact,
+  RenderedDiagramSceneSchema,
+} from "@sketchi/diagram-agent";
 import {
   handleCreateFromArtifactRequestEffect,
   handleGetDiagramRequestEffect,
@@ -14,6 +19,8 @@ import {
   makeStudioSessionServiceLayer,
   MemoryStudioObjectBucket,
   StudioPersistencePolicyLive,
+  StudioProjects,
+  StudioSessionService,
   StudioProjectsLive,
   StudioSourceArtifactError,
   StudioSourceArtifactStore,
@@ -21,12 +28,11 @@ import {
 } from "@sketchi/studio-projects/server";
 import { Context, Effect, Layer } from "effect";
 
-import { PlaygroundCodeMode } from "../codemode/service.server";
+import { artifactStoreForBindings } from "../codemode/service.server";
 import {
   PlaygroundBindings,
   PlaygroundClock,
   PlaygroundIds,
-  PlaygroundRequestMetadata,
 } from "../runtime/context.server";
 
 export class PlaygroundStudioLocalBucket extends Context.Service<
@@ -39,25 +45,21 @@ export const PlaygroundStudioLocalBucketLive = Layer.effect(
   Effect.sync(() => new MemoryStudioObjectBucket()),
 );
 
-type PlaygroundStudioRequestContext =
-  | PlaygroundBindings
-  | PlaygroundRequestMetadata;
-
 export interface PlaygroundStudioShape {
   readonly createFromArtifact: (
     request: Request,
-  ) => Effect.Effect<Response, never, PlaygroundStudioRequestContext>;
+  ) => Effect.Effect<Response, never, PlaygroundBindings>;
   readonly getDiagram: (
     request: Request,
     diagramId: string,
-  ) => Effect.Effect<Response, never, PlaygroundStudioRequestContext>;
+  ) => Effect.Effect<Response, never, PlaygroundBindings>;
   readonly getProject: (
     request: Request,
     projectId: string,
-  ) => Effect.Effect<Response, never, PlaygroundStudioRequestContext>;
+  ) => Effect.Effect<Response, never, PlaygroundBindings>;
   readonly listProjects: (
     request: Request,
-  ) => Effect.Effect<Response, never, PlaygroundStudioRequestContext>;
+  ) => Effect.Effect<Response, never, PlaygroundBindings>;
 }
 
 export class PlaygroundStudio extends Context.Service<
@@ -95,64 +97,13 @@ export const PlaygroundStudioLayer = Layer.effect(
   PlaygroundStudio,
   Effect.gen(function* () {
     const clock = yield* PlaygroundClock;
-    const codeMode = yield* PlaygroundCodeMode;
+    const localStorage = yield* CodeModeArtifactStorage;
     const ids = yield* PlaygroundIds;
     const localBucket = yield* PlaygroundStudioLocalBucket;
 
-    const runStudioHandler = Effect.fn(
-      "playground.studio.provideRequestServices",
-    )(function* (
-      handler: Effect.Effect<
-        Response,
-        never,
-        | import("@sketchi/studio-projects/server").StudioProjects
-        | import("@sketchi/studio-projects/server").StudioSessionService
-      >,
-    ) {
-      const env = yield* PlaygroundBindings;
-      const metadata = yield* PlaygroundRequestMetadata;
-      const sourceArtifactLayer = Layer.succeed(StudioSourceArtifactStore, {
-        load: Effect.fn("playground.studio.sourceArtifact.load")(function* (
-          artifactId: string,
-        ) {
-          const artifact = yield* codeMode
-            .getArtifact({ artifactId, format: "scene", inline: true })
-            .pipe(
-              Effect.provideService(PlaygroundBindings, env),
-              Effect.provideService(PlaygroundIds, ids),
-              Effect.provideService(PlaygroundRequestMetadata, metadata),
-            );
-          if (!artifact.ok) {
-            return yield* Effect.fail(
-              StudioSourceArtifactError.make({
-                artifactId,
-                code: artifact.status,
-                message: `Playground artifact "${artifactId}" is not available for Studio persistence.`,
-                status: artifact.status === "storage_failed" ? 500 : 404,
-              }),
-            );
-          }
-
-          const scene = RenderedDiagramSceneSchema.safeParse(artifact.inline);
-          if (!scene.success) {
-            return yield* Effect.fail(
-              StudioSourceArtifactError.make({
-                artifactId,
-                code: "invalid_scene",
-                message: `Playground artifact "${artifactId}" does not include a renderable scene.`,
-                status: 422,
-              }),
-            );
-          }
-          return {
-            diagramId: artifact.diagramId,
-            title: scene.data.title,
-          };
-        }),
-      });
-      const dependencies = Layer.mergeAll(
-        makeStudioObjectStoreLayer(studioBucketForBindings(env, localBucket)),
-        sourceArtifactLayer,
+    const scope = yield* Effect.scope;
+    const dependencies = yield* Layer.build(
+      Layer.mergeAll(
         StudioPersistencePolicyLive,
         makeStudioRecordFactoryLayer({
           createId: (kind) => makeStudioRecordId(ids.create(kind)),
@@ -161,11 +112,92 @@ export const PlaygroundStudioLayer = Layer.effect(
         makeStudioSessionServiceLayer({
           createSessionId: () => ids.create("anon"),
         }),
+      ),
+    );
+    const session = Context.get(dependencies, StudioSessionService);
+    const servicesByBucket = new WeakMap<
+      object,
+      Effect.Effect<Context.Context<StudioProjects>>
+    >();
+
+    const studioServicesForBindings = Effect.fn(
+      "playground.studio.servicesForBindings",
+    )(function* (env: Context.Service.Shape<typeof PlaygroundBindings>) {
+      const binding = env.SKETCHI_ARTIFACTS ?? localBucket;
+      let services = servicesByBucket.get(binding);
+      if (!services) {
+        const storage = artifactStoreForBindings(env, localStorage);
+        const sourceArtifacts = StudioSourceArtifactStore.of({
+          load: Effect.fn("playground.studio.sourceArtifact.load")(function* (
+            artifactId: string,
+          ) {
+            // Source persistence consumes only the stored scene and diagram id;
+            // HTTP URL/correlation metadata is not part of this lookup.
+            const artifact = yield* getArtifact({
+              artifactId,
+              format: "scene",
+              inline: true,
+            }).pipe(
+              Effect.provideService(CodeModeArtifactStorage, storage),
+              Effect.provideService(CodeModeRuntimeEnvironment, {
+                createId: ids.create,
+              }),
+            );
+            if (!artifact.ok) {
+              return yield* StudioSourceArtifactError.make({
+                artifactId,
+                code: artifact.status,
+                message: `Playground artifact "${artifactId}" is not available for Studio persistence.`,
+                status: artifact.status === "storage_failed" ? 500 : 404,
+              });
+            }
+            const scene = RenderedDiagramSceneSchema.safeParse(artifact.inline);
+            if (!scene.success) {
+              return yield* StudioSourceArtifactError.make({
+                artifactId,
+                code: "invalid_scene",
+                message: `Playground artifact "${artifactId}" does not include a renderable scene.`,
+                status: 422,
+              });
+            }
+            return { diagramId: artifact.diagramId, title: scene.data.title };
+          }),
+        });
+        const appLayer = StudioProjectsLive.pipe(
+          Layer.provide(
+            Layer.merge(
+              makeStudioObjectStoreLayer(
+                studioBucketForBindings(env, localBucket),
+              ),
+              Layer.succeed(StudioSourceArtifactStore, sourceArtifacts),
+            ),
+          ),
+        );
+        services = yield* Effect.cached(
+          Layer.buildWithScope(appLayer, scope).pipe(
+            Effect.provide(dependencies),
+          ),
+        );
+        servicesByBucket.set(binding, services);
+      }
+      return yield* services;
+    });
+
+    const runStudioHandler = Effect.fn(
+      "playground.studio.provideRequestServices",
+    )(function* (
+      handler: Effect.Effect<
+        Response,
+        never,
+        StudioProjects | StudioSessionService
+      >,
+    ) {
+      const env = yield* PlaygroundBindings;
+      const services = yield* studioServicesForBindings(env);
+      return yield* handler.pipe(
+        Effect.provide(services),
+        Effect.provideService(StudioSessionService, session),
       );
-      const appLayer = StudioProjectsLive.pipe(
-        Layer.provideMerge(dependencies),
-      );
-      return yield* handler.pipe(Effect.provide(appLayer));
     });
 
     return PlaygroundStudio.of({

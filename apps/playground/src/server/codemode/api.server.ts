@@ -1,13 +1,11 @@
 import "@tanstack/react-start/server-only";
 
 import {
-  type ApplyDiagramPatchResult,
   type ArtifactFormat,
   type BuildFlowchartResult,
   type BuildMindmapResult,
   type BuildSequenceDiagramResult,
   type CreateCanvasResult,
-  type GetArtifactResult,
   type StoredArtifactFormat,
 } from "@sketchi/diagram-agent";
 import {
@@ -15,15 +13,17 @@ import {
   type ExcalidrawScene,
 } from "@sketchi/diagram-excalidraw";
 import { withTelemetryCorrelation } from "@sketchi/observability";
-import { Effect, Schema } from "effect";
+import { Context, Effect, Schema } from "effect";
 
 import { readBoundedJson } from "../runtime/request-body.server";
-import { PlaygroundClock } from "../runtime/context.server";
-import { PlaygroundCodeMode } from "./service.server";
 import {
-  CodeModeHttpSchemas,
-  decodeCodeModeHttpInput,
-} from "./http-schema.server";
+  PlaygroundBindings,
+  PlaygroundClock,
+  PlaygroundIds,
+  PlaygroundRequestMetadata,
+} from "../runtime/context.server";
+import { PlaygroundCodeMode } from "./service.server";
+import { resultHttpStatus } from "../runtime/http-status.server";
 import {
   codeModeUsageResponseHeaders,
   PlaygroundCodeModeUsage,
@@ -75,106 +75,6 @@ function requestTooLargeResult(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function buildStatus(result: BuildFlowchartResult): number {
-  if (result.ok) {
-    return 200;
-  }
-  switch (result.status) {
-    case "invalid_input":
-      return 400;
-    case "invalid_flowchart":
-    case "quality_failed":
-      return 422;
-    case "render_failed":
-    case "export_failed":
-    case "storage_failed":
-      return 500;
-  }
-}
-
-function mindmapBuildStatus(result: BuildMindmapResult): number {
-  if (result.ok) return 200;
-  switch (result.status) {
-    case "invalid_input":
-      return 400;
-    case "invalid_mindmap":
-    case "quality_failed":
-      return 422;
-    case "render_failed":
-    case "export_failed":
-    case "storage_failed":
-      return 500;
-  }
-}
-
-function sequenceBuildStatus(result: BuildSequenceDiagramResult): number {
-  if (result.ok) return 200;
-  switch (result.status) {
-    case "invalid_input":
-      return 400;
-    case "invalid_sequence":
-    case "quality_failed":
-      return 422;
-    case "render_failed":
-    case "export_failed":
-    case "storage_failed":
-      return 500;
-  }
-}
-
-function canvasCreateStatus(result: CreateCanvasResult): number {
-  if (result.ok) return 200;
-  switch (result.status) {
-    case "invalid_input":
-      return 400;
-    case "invalid_canvas":
-      return 422;
-    case "limit_exceeded":
-      return 413;
-    case "render_failed":
-    case "export_failed":
-    case "storage_failed":
-      return 500;
-  }
-}
-
-function getStatus(result: GetArtifactResult): number {
-  if (result.ok) {
-    return 200;
-  }
-  switch (result.status) {
-    case "invalid_input":
-      return 400;
-    case "not_found":
-    case "format_unavailable":
-      return 404;
-    case "expired":
-      return 410;
-    case "storage_failed":
-      return 500;
-  }
-}
-
-function patchStatus(result: ApplyDiagramPatchResult): number {
-  if (result.ok) {
-    return 200;
-  }
-  switch (result.status) {
-    case "invalid_input":
-      return 400;
-    case "source_unavailable":
-    case "target_not_found":
-      return 404;
-    case "unsupported_operation":
-    case "connectivity_changed":
-      return 422;
-    case "render_failed":
-    case "export_failed":
-    case "storage_failed":
-      return 500;
-  }
 }
 
 function formatFromUrl(request: Request): string | undefined {
@@ -279,292 +179,98 @@ function rawArtifactResponse(input: {
   });
 }
 
-function requestRead<A>(run: () => Promise<A>) {
-  return Effect.tryPromise({
-    try: run,
-    catch: (cause) =>
-      CodeModeHttpRequestError.make({
-        cause,
-        message: "Code Mode request could not be decoded.",
-      }),
+type BuildResult =
+  | BuildFlowchartResult
+  | BuildMindmapResult
+  | BuildSequenceDiagramResult
+  | CreateCanvasResult;
+
+type BuildOperation =
+  "buildFlowchart" | "buildMindmap" | "buildSequenceDiagram" | "createCanvas";
+
+function makeBuildHandler({
+  operation,
+  label,
+  run,
+}: {
+  readonly operation: BuildOperation;
+  readonly label: "Flowchart" | "Mindmap" | "Sequence diagram" | "Canvas";
+  readonly run: (
+    codeMode: Context.Service.Shape<typeof PlaygroundCodeMode>,
+    input: unknown,
+  ) => Effect.Effect<
+    BuildResult,
+    never,
+    PlaygroundBindings | PlaygroundIds | PlaygroundRequestMetadata
+  >;
+}) {
+  return Effect.fn(`playground.http.${operation}`)(function* (
+    request: Request,
+  ) {
+    const clock = yield* PlaygroundClock;
+    const codeMode = yield* PlaygroundCodeMode;
+    const usage = yield* PlaygroundCodeModeUsage;
+    const usageContext = yield* usage.createContext;
+    const startedAt = yield* clock.nowMillis;
+    const bounded = yield* readBoundedJson(
+      request,
+      MAX_CODE_MODE_BUILD_REQUEST_BYTES,
+    );
+    if (bounded._tag === "InvalidJson") {
+      return yield* CodeModeHttpRequestError.make({
+        cause: undefined,
+        message: "The request body was not valid JSON.",
+      });
+    }
+    const tooLarge = bounded._tag === "TooLarge";
+    const requestBody =
+      bounded._tag === "Body"
+        ? bounded.body
+        : { omitted: true, reason: "request_too_large" };
+    const result = tooLarge
+      ? requestTooLargeResult(label)
+      : yield* withTelemetryCorrelation(run(codeMode, requestBody), {
+          attemptId: usageContext.attemptId,
+          runId: usageContext.runId,
+        });
+    const status = tooLarge ? 413 : resultHttpStatus(result);
+    const finishedAt = yield* clock.nowMillis;
+    yield* usage.capture({
+      context: usageContext,
+      durationMs: finishedAt - startedAt,
+      operation,
+      requestBody,
+      responseBody: result,
+      statusCode: status,
+      surface: "api",
+    });
+    return jsonResponse(
+      result,
+      status,
+      codeModeUsageResponseHeaders(usageContext),
+    );
   });
 }
 
-export const handleBuildFlowchartRequest = Effect.fn(
-  "playground.http.buildFlowchart",
-)(function* (request: Request) {
-  const clock = yield* PlaygroundClock;
-  const codeMode = yield* PlaygroundCodeMode;
-  const usage = yield* PlaygroundCodeModeUsage;
-  const usageContext = yield* usage.createContext;
-  const startedAt = yield* clock.nowMillis;
-  const boundedRequest = yield* readBoundedJson(
-    request,
-    MAX_CODE_MODE_BUILD_REQUEST_BYTES,
-  );
-  if (boundedRequest._tag === "InvalidJson") {
-    return yield* CodeModeHttpRequestError.make({
-      cause: undefined,
-      message: "The request body was not valid JSON.",
-    });
-  }
-  if (boundedRequest._tag === "TooLarge") {
-    const result = requestTooLargeResult("Flowchart");
-    const finishedAt = yield* clock.nowMillis;
-    yield* usage.capture({
-      context: usageContext,
-      durationMs: finishedAt - startedAt,
-      operation: "buildFlowchart",
-      requestBody: { omitted: true, reason: "request_too_large" },
-      responseBody: result,
-      statusCode: 413,
-      surface: "api",
-    });
-    return jsonResponse(
-      result,
-      413,
-      codeModeUsageResponseHeaders(usageContext),
-    );
-  }
-
-  const requestBody = boundedRequest.body;
-  const codeModeInput = yield* requestRead(() =>
-    decodeCodeModeHttpInput(
-      CodeModeHttpSchemas.buildFlowchart.input,
-      requestBody,
-    ),
-  );
-  const result = yield* withTelemetryCorrelation(
-    codeMode.buildFlowchart(codeModeInput),
-    {
-      attemptId: usageContext.attemptId,
-      runId: usageContext.runId,
-    },
-  );
-  const status = buildStatus(result);
-  const finishedAt = yield* clock.nowMillis;
-  yield* usage.capture({
-    context: usageContext,
-    durationMs: finishedAt - startedAt,
-    operation: "buildFlowchart",
-    requestBody,
-    responseBody: result,
-    statusCode: status,
-    surface: "api",
-  });
-
-  return jsonResponse(
-    result,
-    status,
-    codeModeUsageResponseHeaders(usageContext),
-  );
+export const handleBuildFlowchartRequest = makeBuildHandler({
+  operation: "buildFlowchart",
+  label: "Flowchart",
+  run: (codeMode, input) => codeMode.buildFlowchart(input),
 });
-
-export const handleBuildMindmapRequest = Effect.fn(
-  "playground.http.buildMindmap",
-)(function* (request: Request) {
-  const clock = yield* PlaygroundClock;
-  const codeMode = yield* PlaygroundCodeMode;
-  const usage = yield* PlaygroundCodeModeUsage;
-  const usageContext = yield* usage.createContext;
-  const startedAt = yield* clock.nowMillis;
-  const boundedRequest = yield* readBoundedJson(
-    request,
-    MAX_CODE_MODE_BUILD_REQUEST_BYTES,
-  );
-  if (boundedRequest._tag === "InvalidJson") {
-    return yield* CodeModeHttpRequestError.make({
-      cause: undefined,
-      message: "The request body was not valid JSON.",
-    });
-  }
-  if (boundedRequest._tag === "TooLarge") {
-    const result = requestTooLargeResult("Mindmap");
-    const finishedAt = yield* clock.nowMillis;
-    yield* usage.capture({
-      context: usageContext,
-      durationMs: finishedAt - startedAt,
-      operation: "buildMindmap",
-      requestBody: { omitted: true, reason: "request_too_large" },
-      responseBody: result,
-      statusCode: 413,
-      surface: "api",
-    });
-    return jsonResponse(
-      result,
-      413,
-      codeModeUsageResponseHeaders(usageContext),
-    );
-  }
-
-  const requestBody = boundedRequest.body;
-  const codeModeInput = yield* requestRead(() =>
-    decodeCodeModeHttpInput(
-      CodeModeHttpSchemas.buildMindmap.input,
-      requestBody,
-    ),
-  );
-  const result = yield* withTelemetryCorrelation(
-    codeMode.buildMindmap(codeModeInput),
-    {
-      attemptId: usageContext.attemptId,
-      runId: usageContext.runId,
-    },
-  );
-  const status = mindmapBuildStatus(result);
-  const finishedAt = yield* clock.nowMillis;
-  yield* usage.capture({
-    context: usageContext,
-    durationMs: finishedAt - startedAt,
-    operation: "buildMindmap",
-    requestBody,
-    responseBody: result,
-    statusCode: status,
-    surface: "api",
-  });
-  return jsonResponse(
-    result,
-    status,
-    codeModeUsageResponseHeaders(usageContext),
-  );
+export const handleBuildMindmapRequest = makeBuildHandler({
+  operation: "buildMindmap",
+  label: "Mindmap",
+  run: (codeMode, input) => codeMode.buildMindmap(input),
 });
-
-export const handleBuildSequenceDiagramRequest = Effect.fn(
-  "playground.http.buildSequenceDiagram",
-)(function* (request: Request) {
-  const clock = yield* PlaygroundClock;
-  const codeMode = yield* PlaygroundCodeMode;
-  const usage = yield* PlaygroundCodeModeUsage;
-  const usageContext = yield* usage.createContext;
-  const startedAt = yield* clock.nowMillis;
-  const boundedRequest = yield* readBoundedJson(
-    request,
-    MAX_CODE_MODE_BUILD_REQUEST_BYTES,
-  );
-  if (boundedRequest._tag === "InvalidJson") {
-    return yield* CodeModeHttpRequestError.make({
-      cause: undefined,
-      message: "The request body was not valid JSON.",
-    });
-  }
-  if (boundedRequest._tag === "TooLarge") {
-    const result = requestTooLargeResult("Sequence diagram");
-    const finishedAt = yield* clock.nowMillis;
-    yield* usage.capture({
-      context: usageContext,
-      durationMs: finishedAt - startedAt,
-      operation: "buildSequenceDiagram",
-      requestBody: { omitted: true, reason: "request_too_large" },
-      responseBody: result,
-      statusCode: 413,
-      surface: "api",
-    });
-    return jsonResponse(
-      result,
-      413,
-      codeModeUsageResponseHeaders(usageContext),
-    );
-  }
-
-  const requestBody = boundedRequest.body;
-  const codeModeInput = yield* requestRead(() =>
-    decodeCodeModeHttpInput(
-      CodeModeHttpSchemas.buildSequenceDiagram.input,
-      requestBody,
-    ),
-  );
-  const result = yield* withTelemetryCorrelation(
-    codeMode.buildSequenceDiagram(codeModeInput),
-    {
-      attemptId: usageContext.attemptId,
-      runId: usageContext.runId,
-    },
-  );
-  const status = sequenceBuildStatus(result);
-  const finishedAt = yield* clock.nowMillis;
-  yield* usage.capture({
-    context: usageContext,
-    durationMs: finishedAt - startedAt,
-    operation: "buildSequenceDiagram",
-    requestBody,
-    responseBody: result,
-    statusCode: status,
-    surface: "api",
-  });
-  return jsonResponse(
-    result,
-    status,
-    codeModeUsageResponseHeaders(usageContext),
-  );
+export const handleBuildSequenceDiagramRequest = makeBuildHandler({
+  operation: "buildSequenceDiagram",
+  label: "Sequence diagram",
+  run: (codeMode, input) => codeMode.buildSequenceDiagram(input),
 });
-
-export const handleCreateCanvasRequest = Effect.fn(
-  "playground.http.createCanvas",
-)(function* (request: Request) {
-  const clock = yield* PlaygroundClock;
-  const codeMode = yield* PlaygroundCodeMode;
-  const usage = yield* PlaygroundCodeModeUsage;
-  const usageContext = yield* usage.createContext;
-  const startedAt = yield* clock.nowMillis;
-  const boundedRequest = yield* readBoundedJson(
-    request,
-    MAX_CODE_MODE_BUILD_REQUEST_BYTES,
-  );
-  if (boundedRequest._tag === "InvalidJson") {
-    return yield* CodeModeHttpRequestError.make({
-      cause: undefined,
-      message: "The request body was not valid JSON.",
-    });
-  }
-  if (boundedRequest._tag === "TooLarge") {
-    const result = requestTooLargeResult("Canvas");
-    const finishedAt = yield* clock.nowMillis;
-    yield* usage.capture({
-      context: usageContext,
-      durationMs: finishedAt - startedAt,
-      operation: "createCanvas",
-      requestBody: { omitted: true, reason: "request_too_large" },
-      responseBody: result,
-      statusCode: 413,
-      surface: "api",
-    });
-    return jsonResponse(
-      result,
-      413,
-      codeModeUsageResponseHeaders(usageContext),
-    );
-  }
-
-  const requestBody = boundedRequest.body;
-  const codeModeInput = yield* requestRead(() =>
-    decodeCodeModeHttpInput(
-      CodeModeHttpSchemas.createCanvas.input,
-      requestBody,
-    ),
-  );
-  const result = yield* withTelemetryCorrelation(
-    codeMode.createCanvas(codeModeInput),
-    {
-      attemptId: usageContext.attemptId,
-      runId: usageContext.runId,
-    },
-  );
-  const status = canvasCreateStatus(result);
-  const finishedAt = yield* clock.nowMillis;
-  yield* usage.capture({
-    context: usageContext,
-    durationMs: finishedAt - startedAt,
-    operation: "createCanvas",
-    requestBody,
-    responseBody: result,
-    statusCode: status,
-    surface: "api",
-  });
-  return jsonResponse(
-    result,
-    status,
-    codeModeUsageResponseHeaders(usageContext),
-  );
+export const handleCreateCanvasRequest = makeBuildHandler({
+  operation: "createCanvas",
+  label: "Canvas",
+  run: (codeMode, input) => codeMode.createCanvas(input),
 });
 
 export const handleGetArtifactRequest = Effect.fn(
@@ -574,17 +280,15 @@ export const handleGetArtifactRequest = Effect.fn(
   const format = formatFromUrl(request);
   const raw = rawFromUrl(request);
   const inline = raw ? false : inlineFromUrl(request);
-  const input = yield* requestRead(() =>
-    decodeCodeModeHttpInput(CodeModeHttpSchemas.getArtifact.input, {
-      artifactId,
-      ...(format === undefined ? {} : { format }),
-      ...(inline === undefined ? {} : { inline }),
-    }),
-  );
+  const input = {
+    artifactId,
+    ...(format === undefined ? {} : { format }),
+    ...(inline === undefined ? {} : { inline }),
+  };
   const result = yield* codeMode.getArtifact(input);
 
   if (!result.ok || !raw) {
-    return jsonResponse(result, getStatus(result));
+    return jsonResponse(result, resultHttpStatus(result));
   }
 
   const readResult = yield* codeMode
@@ -711,21 +415,15 @@ export const handlePatchArtifactRequest = Effect.fn(
         source: { artifactId },
         operations: [],
       };
-  const input = yield* requestRead(() =>
-    decodeCodeModeHttpInput(
-      CodeModeHttpSchemas.applyDiagramPatch.input,
-      routeInput,
-    ),
-  );
   const result = yield* withTelemetryCorrelation(
-    codeMode.applyDiagramPatch(input),
+    codeMode.applyDiagramPatch(routeInput),
     {
       artifactId,
       attemptId: usageContext.attemptId,
       runId: usageContext.runId,
     },
   );
-  const status = patchStatus(result);
+  const status = resultHttpStatus(result);
   const finishedAt = yield* clock.nowMillis;
 
   yield* usage.capture({

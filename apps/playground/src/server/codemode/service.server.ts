@@ -81,7 +81,7 @@ const PlaygroundLocalArtifactStorageLive = Layer.effect(
   Effect.sync(makeMemoryArtifactStorage),
 );
 
-function artifactStoreForBindings(
+export function artifactStoreForBindings(
   env: Context.Service.Shape<typeof PlaygroundBindings>,
   localStorage: CodeModeArtifactStorageShape,
 ): CodeModeArtifactStorageShape {

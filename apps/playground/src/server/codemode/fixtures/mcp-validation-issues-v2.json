@@ -1,0 +1,56 @@
+{
+  "invalidSearch": {
+    "content": [
+      {
+        "type": "text",
+        "text": "MCP error -32602: Input validation error: Invalid arguments for tool search: [\n  {\n    \"path\": [\n      \"query\"\n    ],\n    \"message\": \"Too small: expected string to have >=1 characters\"\n  },\n  {\n    \"path\": [\n      \"limit\"\n    ],\n    \"message\": \"Too big: expected number to be <=20\"\n  }\n]"
+      }
+    ],
+    "isError": true
+  },
+  "invalidExecuteType": {
+    "content": [
+      {
+        "type": "text",
+        "text": "MCP error -32602: Input validation error: Invalid arguments for tool execute: [\n  {\n    \"path\": [\n      \"code\"\n    ],\n    \"message\": \"Expected string\"\n  }\n]"
+      }
+    ],
+    "isError": true
+  },
+  "missingExecuteCode": {
+    "content": [
+      {
+        "type": "text",
+        "text": "MCP error -32602: Input validation error: Invalid arguments for tool execute: [\n  {\n    \"path\": [\n      \"code\"\n    ],\n    \"message\": \"Missing key\"\n  }\n]"
+      }
+    ],
+    "isError": true
+  },
+  "invalidSearchLimit": {
+    "content": [
+      {
+        "type": "text",
+        "text": "MCP error -32602: Input validation error: Invalid arguments for tool search: [\n  {\n    \"path\": [\n      \"limit\"\n    ],\n    \"message\": \"Expected an integer\"\n  }\n]"
+      }
+    ],
+    "isError": true
+  },
+  "invalidDocsTopic": {
+    "content": [
+      {
+        "type": "text",
+        "text": "MCP error -32602: Input validation error: Invalid arguments for tool docs: [\n  {\n    \"path\": [\n      \"topic\"\n    ],\n    \"message\": \"Expected \\\"overview\\\" | \\\"execute\\\" | \\\"buildFlowchart\\\" | \\\"buildMindmap\\\" | \\\"buildSequenceDiagram\\\" | \\\"createCanvas\\\" | \\\"getArtifact\\\" | \\\"applyDiagramPatch\\\" | \\\"patchOperations\\\" | \\\"agentSequence\\\" | \\\"issues\\\" | \\\"examples\\\"\"\n  }\n]"
+      }
+    ],
+    "isError": true
+  },
+  "invalidOutput": {
+    "content": [
+      {
+        "type": "text",
+        "text": "MCP error -32602: Output validation error: Invalid structured content for tool invalid-output: [\n  {\n    \"path\": [\n      \"value\"\n    ],\n    \"message\": \"Expected string\"\n  }\n]"
+      }
+    ],
+    "isError": true
+  }
+}

@@ -4,14 +4,12 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { LanguageModel } from "ai";
 import { Context, Effect, Layer, Schema } from "effect";
 
-import type { StudioEnv } from "../bindings/studio-env.server";
+import { aiEnvironment } from "../bindings/ai-env.server";
 import {
   PlaygroundBindings,
   PlaygroundRequestMetadata,
 } from "../runtime/context.server";
 
-const DEFAULT_GATEWAY_ID = "google-ai-studio";
-const DEFAULT_MODEL = "google/gemini-3.1-flash-lite";
 const SHIM_BASE_URL = "https://sketchi-gateway.invalid/v1beta";
 
 export class StudioAiModelError extends Schema.TaggedError<StudioAiModelError>()(
@@ -35,17 +33,6 @@ export class PlaygroundAiModel extends Context.Service<
   PlaygroundAiModelShape
 >()("@sketchi/playground/PlaygroundAiModel") {}
 
-function envString(
-  env: StudioEnv,
-  key: "SKETCHI_AI_GATEWAY_ID" | "SKETCHI_AI_MODEL",
-  fallback: string,
-): string {
-  const value = env[key];
-  return typeof value === "string" && value.trim().length > 0
-    ? value.trim()
-    : fallback;
-}
-
 function stripGoogleModelPrefix(model: string): string {
   return model.replace(/^google-ai-studio\//, "").replace(/^google\//, "");
 }
@@ -60,12 +47,9 @@ const createStudioModel = Effect.fn("playground.ai.model")(function* () {
           "AI binding is not configured in this Worker environment (env.AI).",
         );
       }
-      const gateway = env.AI.gateway(
-        envString(env, "SKETCHI_AI_GATEWAY_ID", DEFAULT_GATEWAY_ID),
-      );
-      const modelId = stripGoogleModelPrefix(
-        envString(env, "SKETCHI_AI_MODEL", DEFAULT_MODEL),
-      );
+      const config = aiEnvironment(env);
+      const gateway = env.AI.gateway(config.gatewayId);
+      const modelId = stripGoogleModelPrefix(config.model);
       const gatewayFetch: typeof fetch = async (input, init) => {
         const url = new URL(
           typeof input === "string"

@@ -15,6 +15,7 @@ import {
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { Effect, Result, Schema } from "effect";
 
+import { resultHttpStatus } from "../runtime/http-status.server";
 import { readBoundedJson } from "../runtime/request-body.server";
 import { PlaygroundCodeMode } from "../codemode/service.server";
 import {
@@ -33,9 +34,7 @@ export const MAX_GENERATE_REQUEST_BYTES = 32 * 1024;
 export const MAX_GENERATE_PROMPT_LENGTH = 8_000;
 
 type BuildResult =
-  | BuildFlowchartResult
-  | BuildMindmapResult
-  | BuildSequenceDiagramResult;
+  BuildFlowchartResult | BuildMindmapResult | BuildSequenceDiagramResult;
 type BuiltArtifact = Extract<BuildResult, { readonly ok: true }>["artifact"];
 
 type GenerateFailureStatus =
@@ -117,27 +116,6 @@ function failure(
   issues: ReadonlyArray<GenerateIssue>,
 ): GenerateFailure {
   return { ok: false, status, issues };
-}
-
-function generateHttpStatus(result: GenerateResult): number {
-  if (result.ok) return 200;
-  switch (result.status) {
-    case "invalid_input":
-      return 400;
-    case "malformed_output":
-    case "unsupported_diagram_type":
-    case "invalid_generated_document":
-    case "quality_failed":
-      return 422;
-    case "provider_failed":
-      return 502;
-    case "generation_timeout":
-      return 504;
-    case "render_failed":
-    case "export_failed":
-    case "storage_failed":
-      return 500;
-  }
 }
 
 function jsonResponse(
@@ -317,7 +295,7 @@ export const handleGenerateDiagramRequest = Effect.fn(
 
   const finish = (requestBody: unknown, result: GenerateResult) =>
     Effect.gen(function* () {
-      const status = generateHttpStatus(result);
+      const status = resultHttpStatus(result);
       const finishedAt = yield* clock.nowMillis;
       yield* usage.capture({
         context: usageContext,

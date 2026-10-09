@@ -9,6 +9,7 @@ import {
   CloudflareAiGatewayBinding,
   CloudflareGoogleAiStudioClientLive,
   CloudflareGoogleAiStudioConfig,
+  type CloudflareAiGatewayProvider,
   type DiagramGenerationCacheMode,
   DiagramGenerationClient,
   DiagramGenerationConfigurationError,
@@ -20,12 +21,11 @@ import {
 } from "@sketchi/diagram-generation";
 import { Context, Effect, Layer } from "effect";
 
+import { aiEnvironment } from "../bindings/ai-env.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
 import { PlaygroundBindings } from "../runtime/context.server";
 
 const GENERATION_PROVIDER = "cloudflare-google-ai-studio" as const;
-const DEFAULT_GATEWAY_ID = "google-ai-studio";
-const DEFAULT_MODEL = "google/gemini-3.1-flash-lite";
 
 export interface GenerateDiagramServiceInput {
   readonly cacheMode?: DiagramGenerationCacheMode;
@@ -49,17 +49,6 @@ export class PlaygroundGeneration extends Context.Service<
   PlaygroundGeneration,
   PlaygroundGenerationShape
 >()("@sketchi/playground/PlaygroundGeneration") {}
-
-function envString(
-  env: StudioEnv,
-  key: "SKETCHI_AI_GATEWAY_ID" | "SKETCHI_AI_MODEL",
-  fallback: string,
-): string {
-  const value = env[key];
-  return typeof value === "string" && value.trim().length > 0
-    ? value.trim()
-    : fallback;
-}
 
 /** Convert a validated flowchart IR candidate into a canonical document input. */
 export function flowchartDocumentInput(diagram: FlowchartDiagram): unknown {
@@ -138,51 +127,78 @@ export function sequenceDocumentInput(
   };
 }
 
-export const PlaygroundGenerationLive = Layer.succeed(PlaygroundGeneration, {
-  defaultModel: (env) => envString(env, "SKETCHI_AI_MODEL", DEFAULT_MODEL),
-  generate: Effect.fn("playground.generation.generate")(function* (input) {
-    const env = yield* PlaygroundBindings;
-    const model =
-      input.model?.trim() || envString(env, "SKETCHI_AI_MODEL", DEFAULT_MODEL);
-    const gatewayId = envString(
-      env,
-      "SKETCHI_AI_GATEWAY_ID",
-      DEFAULT_GATEWAY_ID,
-    );
+export const PlaygroundGenerationLive = Layer.effect(
+  PlaygroundGeneration,
+  Effect.gen(function* () {
+    const scope = yield* Effect.scope;
+    const clients = new WeakMap<
+      CloudflareAiGatewayProvider,
+      Map<
+        string,
+        Effect.Effect<Context.Service.Shape<typeof DiagramGenerationClient>>
+      >
+    >();
 
-    if (!env.AI) {
-      return yield* DiagramGenerationConfigurationError.make({
-        message:
-          "AI Gateway generation is not configured in this Worker environment (env.AI).",
-        provider: GENERATION_PROVIDER,
-      });
-    }
+    // Bindings may differ in local/test hosts. Each binding/configuration is
+    // initialized once and owned by the host scope, not by a request scope.
+    const clientForBindings = Effect.fn(
+      "playground.generation.clientForBindings",
+    )(function* (ai: CloudflareAiGatewayProvider, gatewayId: string) {
+      let byGateway = clients.get(ai);
+      if (!byGateway) {
+        byGateway = new Map();
+        clients.set(ai, byGateway);
+      }
+      let client = byGateway.get(gatewayId);
+      if (!client) {
+        const clientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              Layer.succeed(CloudflareAiGatewayBinding, ai),
+              Layer.succeed(CloudflareGoogleAiStudioConfig, {
+                collectLog: true,
+                gatewayId,
+              }),
+              DiagramGenerationPolicyLive,
+            ),
+          ),
+        );
+        client = yield* Effect.cached(
+          Layer.buildWithScope(clientLayer, scope).pipe(
+            Effect.map((context) =>
+              Context.get(context, DiagramGenerationClient),
+            ),
+          ),
+        );
+        byGateway.set(gatewayId, client);
+      }
+      return yield* client;
+    });
 
-    const clientLayer = CloudflareGoogleAiStudioClientLive.pipe(
-      Layer.provide(
-        Layer.mergeAll(
-          Layer.succeed(CloudflareAiGatewayBinding, env.AI),
-          Layer.succeed(CloudflareGoogleAiStudioConfig, {
-            collectLog: true,
-            gatewayId,
-          }),
-          DiagramGenerationPolicyLive,
-        ),
-      ),
-    );
-
-    const request = {
-      ...(input.cacheMode ? { cacheMode: input.cacheMode } : {}),
-      model,
-      prompt: {
-        id: "sketchi-generate",
-        request: input.prompt,
-        ...(input.type ? { requestedType: input.type } : {}),
-      },
-    };
-
-    return yield* Effect.flatMap(DiagramGenerationClient, (client) =>
-      client.generate(request),
-    ).pipe(Effect.provide(clientLayer));
+    return PlaygroundGeneration.of({
+      defaultModel: (env) => aiEnvironment(env).model,
+      generate: Effect.fn("playground.generation.generate")(function* (input) {
+        const env = yield* PlaygroundBindings;
+        const config = aiEnvironment(env);
+        const model = input.model?.trim() || config.model;
+        if (!env.AI) {
+          return yield* DiagramGenerationConfigurationError.make({
+            message:
+              "AI Gateway generation is not configured in this Worker environment (env.AI).",
+            provider: GENERATION_PROVIDER,
+          });
+        }
+        const client = yield* clientForBindings(env.AI, config.gatewayId);
+        return yield* client.generate({
+          ...(input.cacheMode ? { cacheMode: input.cacheMode } : {}),
+          model,
+          prompt: {
+            id: "sketchi-generate",
+            request: input.prompt,
+            ...(input.type ? { requestedType: input.type } : {}),
+          },
+        });
+      }),
+    });
   }),
-});
+);

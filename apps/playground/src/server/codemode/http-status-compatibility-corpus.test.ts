@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { Effect, Layer } from "effect";
-import type {
-  ApplyDiagramPatchResult,
-  BuildFlowchartResult,
-  BuildMindmapResult,
-  GetArtifactResult,
+import {
+  CodeModeArtifactStorage,
+  makeMemoryArtifactStorage,
+  type ApplyDiagramPatchResult,
+  type BuildFlowchartResult,
+  type BuildMindmapResult,
+  type GetArtifactResult,
 } from "@sketchi/diagram-agent";
 
 const runtimeResults = vi.hoisted(() => {
@@ -55,7 +57,11 @@ vi.mock("./service.server", async (importOriginal) => {
       getArtifact: () =>
         Effect.succeed(runtimeResults.getGetArtifact() as GetArtifactResult),
       readStoredArtifact: () => Effect.succeed(null),
-    }),
+    }).pipe(
+      Layer.provideMerge(
+        Layer.succeed(CodeModeArtifactStorage, makeMemoryArtifactStorage()),
+      ),
+    ),
   };
 });
 
