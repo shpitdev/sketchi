@@ -27,7 +27,7 @@ import {
 } from "../contracts.js";
 import { makeStudioJsonPersistence, StudioObjectStore } from "./bucket.js";
 import type { StudioProjectsError } from "./errors.js";
-import { StudioSessionService } from "./session.js";
+import { ensureOwner } from "./session.js";
 import { StudioSourceArtifactStore } from "./source-artifacts.js";
 
 const STUDIO_PREFIX = "studio";
@@ -132,10 +132,8 @@ const StudioProjectIndexEntrySchema = StudioProjectIndexEntry;
 
 export interface StudioProjectCreateSuccess {
   diagram: StudioDiagramSummary;
-  diagramRecord: StudioDiagramRecord;
   ok: true;
   project: StudioProjectSummary;
-  projectRecord: StudioProjectRecord;
   urls: {
     diagram: string;
     edit: string;
@@ -174,38 +172,16 @@ export class StudioProjects extends Context.Service<
 
 export class StudioPersistencePolicyConfig extends Schema.Class<StudioPersistencePolicyConfig>(
   "StudioPersistencePolicyConfig",
-)({ listingConcurrency: Schema.Number }) {}
+)({ listingConcurrency: Schema.Int.check(Schema.isGreaterThan(0)) }) {}
 
 export class StudioPersistencePolicy extends Context.Service<
   StudioPersistencePolicy,
   StudioPersistencePolicyConfig
 >()("@sketchi/studio-projects/StudioPersistencePolicy") {}
 
-const INVALID_LISTING_CONCURRENCY_MESSAGE =
-  "Studio listing concurrency must be a finite positive integer.";
-
-function validateStudioPersistencePolicy(
-  config: StudioPersistencePolicyConfig,
-): StudioPersistencePolicyConfig {
-  if (
-    !Number.isSafeInteger(config.listingConcurrency) ||
-    config.listingConcurrency <= 0
-  ) {
-    throw new TypeError(INVALID_LISTING_CONCURRENCY_MESSAGE);
-  }
-
-  return Object.freeze({
-    listingConcurrency: config.listingConcurrency,
-  });
-}
-
-export const studioPersistencePolicyDefaults = validateStudioPersistencePolicy({
-  listingConcurrency: 8,
-});
-
 export const StudioPersistencePolicyLive = Layer.succeed(
   StudioPersistencePolicy,
-  studioPersistencePolicyDefaults,
+  StudioPersistencePolicyConfig.make({ listingConcurrency: 8 }),
 );
 
 export interface StudioRecordFactoryShape {
@@ -294,7 +270,6 @@ export const StudioProjectsLive = Layer.effect(
   Effect.gen(function* () {
     const objectStore = yield* StudioObjectStore;
     const sourceArtifacts = yield* StudioSourceArtifactStore;
-    const sessions = yield* StudioSessionService;
     const policy = yield* StudioPersistencePolicy;
     const recordFactory = yield* StudioRecordFactory;
     const json = makeStudioJsonPersistence(objectStore);
@@ -398,9 +373,9 @@ export const StudioProjectsLive = Layer.effect(
           (projectId) =>
             readProjectRecord(projectId).pipe(
               Effect.flatMap((record) =>
-                sessions
-                  .ensureOwner(record.owner, session, "project", record.id)
-                  .pipe(Effect.as(record)),
+                ensureOwner(record.owner, session, "project", record.id).pipe(
+                  Effect.as(record),
+                ),
               ),
               Effect.catchTags({
                 StudioNotFoundError: () => Effect.succeed(null),
@@ -421,21 +396,16 @@ export const StudioProjectsLive = Layer.effect(
     const getProject = Effect.fn("studioPersistence.projects.getProject")(
       function* (session: StudioOwner, projectId: string) {
         const project = yield* readProjectRecord(projectId);
-        yield* sessions.ensureOwner(
-          project.owner,
-          session,
-          "project",
-          project.id,
-        );
+        yield* ensureOwner(project.owner, session, "project", project.id);
 
         const diagrams = yield* Effect.forEach(
           project.diagramIds,
           (diagramId) =>
             readDiagramRecord(diagramId).pipe(
               Effect.flatMap((diagram) =>
-                sessions
-                  .ensureOwner(diagram.owner, session, "diagram", diagram.id)
-                  .pipe(Effect.as(diagram)),
+                ensureOwner(diagram.owner, session, "diagram", diagram.id).pipe(
+                  Effect.as(diagram),
+                ),
               ),
               Effect.catchTags({
                 StudioNotFoundError: () => Effect.succeed(null),
@@ -457,19 +427,9 @@ export const StudioProjectsLive = Layer.effect(
     const getDiagram = Effect.fn("studioPersistence.projects.getDiagram")(
       function* (session: StudioOwner, diagramId: string) {
         const diagram = yield* readDiagramRecord(diagramId);
-        yield* sessions.ensureOwner(
-          diagram.owner,
-          session,
-          "diagram",
-          diagram.id,
-        );
+        yield* ensureOwner(diagram.owner, session, "diagram", diagram.id);
         const project = yield* readProjectRecord(diagram.projectId);
-        yield* sessions.ensureOwner(
-          project.owner,
-          session,
-          "project",
-          project.id,
-        );
+        yield* ensureOwner(project.owner, session, "project", project.id);
 
         return {
           diagram: diagramSummary(diagram),
@@ -526,16 +486,26 @@ export const StudioProjectsLive = Layer.effect(
             project,
           );
           yield* writeOwnerProjectEntry(input.session, project.id, createdAt);
-        }),
+        }).pipe(
+          Effect.onError(() =>
+            Effect.forEach(
+              [
+                studioOwnerProjectEntryKey(input.session, project.id),
+                studioProjectRecordKey(project.id),
+                studioDiagramRecordKey(diagram.id),
+              ],
+              (key) => objectStore.delete(key).pipe(Effect.ignore),
+              { discard: true },
+            ),
+          ),
+        ),
         { artifactId: input.artifactId, projectId: project.id },
       );
 
       return {
         diagram: diagramSummary(diagram),
-        diagramRecord: diagram,
         ok: true,
         project: projectSummary(project),
-        projectRecord: project,
         urls: {
           diagram: studioDiagramUrl(diagram.id),
           edit: studioDiagramEditUrl(diagram.id),
@@ -574,24 +544,12 @@ export function makeStudioPersistencePolicyLayer(
 ) {
   return Layer.succeed(
     StudioPersistencePolicy,
-    validateStudioPersistencePolicy(config),
+    StudioPersistencePolicyConfig.make(config),
   );
-}
-
-export function makeStudioPersistencePolicyTestLayer(
-  config: StudioPersistencePolicyConfig,
-) {
-  return makeStudioPersistencePolicyLayer(config);
 }
 
 export function makeStudioRecordFactoryLayer(
   factory: StudioRecordFactoryShape,
 ) {
   return Layer.succeed(StudioRecordFactory, factory);
-}
-
-export function makeStudioRecordFactoryTestLayer(
-  factory: StudioRecordFactoryShape,
-) {
-  return makeStudioRecordFactoryLayer(factory);
 }

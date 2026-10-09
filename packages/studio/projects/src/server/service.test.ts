@@ -20,20 +20,28 @@ import {
   MemoryStudioObjectBucket,
   StudioObjectStore,
   type StudioObjectStoreShape,
+  type StudioObjectBucketBody,
 } from "./bucket.js";
 import { StudioOwnershipError, StudioSourceArtifactError } from "./errors.js";
 import {
   makeStudioPersistencePolicyLayer,
-  makeStudioPersistencePolicyTestLayer,
-  makeStudioRecordFactoryTestLayer,
+  makeStudioRecordFactoryLayer,
   StudioPersistencePolicy,
+  StudioPersistencePolicyConfig,
   StudioProjects,
   StudioProjectsLive,
   studioOwnerKey,
+  studioOwnerProjectEntryKey,
   studioOwnerProjectsPrefix,
+  studioDiagramRecordKey,
   studioProjectRecordKey,
 } from "./service.js";
-import { StudioSessionService, StudioSessionServiceLive } from "./session.js";
+import {
+  ensureOwner,
+  makeStudioSessionServiceLayer,
+  StudioSessionService,
+  StudioSessionServiceLive,
+} from "./session.js";
 import { makeStudioSourceArtifactStoreTestLayer } from "./source-artifacts.js";
 
 const owner = AuthenticatedStudioOwner.make({
@@ -86,13 +94,31 @@ describe("Studio schema contracts", () => {
 });
 
 describe("StudioPersistencePolicy", () => {
+  it.each([
+    0,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    -1,
+    1.5,
+    Number.MAX_SAFE_INTEGER + 1,
+  ])(
+    "rejects invalid concurrency %s through the schema itself",
+    (listingConcurrency) => {
+      assert.throws(() =>
+        StudioPersistencePolicyConfig.make({ listingConcurrency }),
+      );
+      assert.isTrue(
+        Schema.decodeUnknownResult(StudioPersistencePolicyConfig)({
+          listingConcurrency,
+        })._tag === "Failure",
+      );
+    },
+  );
   it.each([0, Number.NaN, Number.POSITIVE_INFINITY, -1, 1.5])(
     "rejects invalid listing concurrency %s",
     (listingConcurrency) => {
-      assert.throws(
-        () => makeStudioPersistencePolicyLayer({ listingConcurrency }),
-        TypeError,
-        "Studio listing concurrency must be a finite positive integer.",
+      assert.throws(() =>
+        makeStudioPersistencePolicyLayer({ listingConcurrency }),
       );
     },
   );
@@ -136,9 +162,8 @@ function projectLayer(options: {
   const dependencies = Layer.mergeAll(
     objectStoreLayer,
     sourceLayer,
-    StudioSessionServiceLive,
-    makeStudioPersistencePolicyTestLayer({ listingConcurrency: 2 }),
-    makeStudioRecordFactoryTestLayer({
+    makeStudioPersistencePolicyLayer({ listingConcurrency: 2 }),
+    makeStudioRecordFactoryLayer({
       createId: (kind) =>
         makeStudioRecordId(
           kind === "proj" ? "proj_effecttest" : "dia_effecttest",
@@ -152,6 +177,110 @@ function projectLayer(options: {
 
 describe("StudioProjects Effect service", () => {
   const bucket = new MemoryStudioObjectBucket();
+
+  for (const failedWrite of [1, 2, 3]) {
+    for (const failCleanup of [false, true]) {
+      it.effect(
+        `compensates write ${failedWrite} failure (cleanup failure: ${failCleanup}) without replacing its cause`,
+        () => {
+          const failure = new Error("partial R2 write failure");
+          const deleted: string[] = [];
+          let writes = 0;
+          class PartialWriteBucket extends MemoryStudioObjectBucket {
+            override async put(key: string, value: StudioObjectBucketBody) {
+              await super.put(key, value);
+              writes += 1;
+              if (writes === failedWrite) throw failure;
+              return null;
+            }
+            override async delete(key: string) {
+              deleted.push(key);
+              if (
+                failCleanup &&
+                key === studioProjectRecordKey("proj_effecttest")
+              ) {
+                throw new Error("cleanup failed");
+              }
+              return super.delete(key);
+            }
+          }
+          const partialBucket = new PartialWriteBucket();
+          partialBucket.objects.set("unrelated.json", "preserved");
+          return Effect.gen(function* () {
+            const projects = yield* StudioProjects;
+            const error = yield* Effect.flip(
+              projects.createFromArtifact({
+                artifactId: "artifact-partial",
+                session: owner,
+              }),
+            );
+            assert.strictEqual(error._tag, "StudioStorageError");
+            if (error._tag === "StudioStorageError") {
+              assert.strictEqual(error.cause, failure);
+              assert.strictEqual(error.operation, "put");
+            }
+            assert.deepStrictEqual(deleted, [
+              studioOwnerProjectEntryKey(owner, "proj_effecttest"),
+              studioProjectRecordKey("proj_effecttest"),
+              studioDiagramRecordKey("dia_effecttest"),
+            ]);
+            const expected = new Map([["unrelated.json", "preserved"]]);
+            if (failCleanup && failedWrite >= 2) {
+              const key = studioProjectRecordKey("proj_effecttest");
+              const record = partialBucket.objects.get(key);
+              assert.isString(record);
+              if (typeof record === "string") expected.set(key, record);
+            }
+            assert.deepStrictEqual(partialBucket.objects, expected);
+          }).pipe(Effect.provide(projectLayer({ bucket: partialBucket })));
+        },
+      );
+    }
+  }
+
+  it.effect(
+    "compensates an interrupted partial create without translating cancellation",
+    () => {
+      const records = new Map<string, StudioObjectBucketBody>();
+      const deleted: string[] = [];
+      let writes = 0;
+      const objectStore: StudioObjectStoreShape = {
+        delete: (key) =>
+          Effect.sync(() => {
+            deleted.push(key);
+            records.delete(key);
+          }),
+        getText: () => Effect.succeed(null),
+        list: () => Effect.succeed({ objects: [], truncated: false }),
+        put: (key, value) =>
+          Effect.sync(() => {
+            records.set(key, value);
+            writes += 1;
+          }).pipe(
+            Effect.andThen(
+              Effect.suspend(() => (writes === 2 ? Effect.never : Effect.void)),
+            ),
+          ),
+      };
+      return Effect.gen(function* () {
+        const projects = yield* StudioProjects;
+        const fiber = yield* Effect.forkChild(
+          projects.createFromArtifact({
+            artifactId: "artifact-cancelled",
+            session: owner,
+          }),
+        );
+        while (writes < 2) yield* Effect.yieldNow;
+        yield* Fiber.interrupt(fiber);
+        const exit = yield* Fiber.await(fiber);
+        assert.isTrue(Exit.isFailure(exit));
+        if (Exit.isFailure(exit))
+          assert.isTrue(Cause.hasInterrupts(exit.cause));
+        assert.strictEqual(records.size, 0);
+        assert.lengthOf(deleted, 3);
+      }).pipe(Effect.provide(projectLayer({ objectStore })));
+    },
+  );
 
   it.effect("correlates persistence spans and typed boundary metrics", () => {
     const { probe, sink } = makeTelemetryTestSink();
@@ -447,23 +576,59 @@ describe("StudioProjects Effect service", () => {
 describe("StudioSessionService", () => {
   it.layer(StudioSessionServiceLive)("live session layer", (it) => {
     it.effect(
-      "models malformed session cookies as typed session failures",
+      "replaces malformed session cookies with a fresh anonymous session",
+      () =>
+        Effect.gen(function* () {
+          const sessions = yield* StudioSessionService;
+          const resolution = yield* sessions.resolve(
+            new Request("https://studio.test/api/studio/projects", {
+              headers: { Cookie: "sketchi_studio_session=%E0%A4%A" },
+            }),
+          );
+
+          assert.strictEqual(resolution.session.kind, "anonymous");
+          assert.include(resolution.setCookie, "sketchi_studio_session=anon_");
+          assert.strictEqual(resolution.publicSession.kind, "anonymous");
+        }),
+    );
+  });
+
+  it.layer(
+    makeStudioSessionServiceLayer({
+      createSessionId: () => "proj_abcdefghijklmnop",
+    }),
+  )("invalid session factory", (it) => {
+    it.effect(
+      "keeps a generated invalid session id as a typed configuration failure",
       () =>
         Effect.gen(function* () {
           const sessions = yield* StudioSessionService;
           const error = yield* Effect.flip(
             sessions.resolve(
-              new Request("https://studio.test/api/studio/projects", {
-                headers: { Cookie: "sketchi_studio_session=%E0%A4%A" },
-              }),
+              new Request("https://studio.test/api/studio/projects"),
             ),
           );
-
           assert.strictEqual(error._tag, "StudioSessionError");
-          if (error._tag === "StudioSessionError") {
-            assert.instanceOf(error.cause, URIError);
-          }
+          assert.instanceOf(error.cause, Error);
         }),
     );
   });
+
+  it.effect(
+    "checks matching and mismatched owners without a session service",
+    () =>
+      Effect.gen(function* () {
+        yield* ensureOwner(owner, owner, "project", "proj_effecttest");
+        const otherOwner = AuthenticatedStudioOwner.make({
+          kind: "authenticated",
+          subjectId: "user_other",
+        });
+        const error = yield* Effect.flip(
+          ensureOwner(owner, otherOwner, "project", "proj_effecttest"),
+        );
+        assert.instanceOf(error, StudioOwnershipError);
+        assert.strictEqual(error.id, "proj_effecttest");
+        assert.strictEqual(error.resource, "project");
+      }),
+  );
 });

@@ -1,14 +1,13 @@
 import { nanoid } from "nanoid";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Option, Schema } from "effect";
 
 import {
   AnonymousStudioAuthStatus,
   AnonymousStudioOwner,
   AnonymousStudioPublicSession,
+  AnonymousStudioSessionIdSchema,
   AuthenticatedStudioAuthStatus,
-  AuthenticatedStudioOwner,
   AuthenticatedStudioPublicSession,
-  makeStudioRecordId,
   type StudioAuthStatus,
   type StudioOwner,
   type StudioPublicSession,
@@ -22,7 +21,6 @@ import {
 
 const STUDIO_SESSION_COOKIE = "sketchi_studio_session";
 const SESSION_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
-const ANONYMOUS_SESSION_PATTERN = /^anon_[a-zA-Z0-9_-]{12,64}$/;
 
 export interface StudioSessionResolution {
   auth: StudioAuthStatus;
@@ -32,12 +30,6 @@ export interface StudioSessionResolution {
 }
 
 export interface StudioSessionServiceShape {
-  readonly ensureOwner: (
-    actual: StudioOwner,
-    expected: StudioOwner,
-    resource: StudioResourceKind,
-    id: string,
-  ) => Effect.Effect<void, StudioOwnershipError>;
   readonly resolve: (
     request: Request,
   ) => Effect.Effect<StudioSessionResolution, StudioSessionError>;
@@ -88,7 +80,7 @@ function cookieValue(request: Request, name: string): string | undefined {
     const [rawName, ...rawValue] = part.trim().split("=");
     if (rawName === name) {
       const value = rawValue.join("=");
-      return value.length > 0 ? decodeURIComponent(value) : undefined;
+      return value.length > 0 ? value : undefined;
     }
   }
 
@@ -100,22 +92,6 @@ function sessionCookie(sessionId: string, request: Request): string {
   return `${STUDIO_SESSION_COOKIE}=${encodeURIComponent(
     sessionId,
   )}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_COOKIE_MAX_AGE_SECONDS}${secure}`;
-}
-
-export function createAuthenticatedStudioSession(input: {
-  displayName?: string;
-  subjectId: string;
-}): StudioOwner {
-  return input.displayName
-    ? AuthenticatedStudioOwner.make({
-        displayName: input.displayName,
-        kind: "authenticated",
-        subjectId: input.subjectId,
-      })
-    : AuthenticatedStudioOwner.make({
-        kind: "authenticated",
-        subjectId: input.subjectId,
-      });
 }
 
 export function studioOwnersMatch(
@@ -139,12 +115,14 @@ export function resolveStudioSession(
   request: Request,
   createSessionId: () => string = () => `anon_${nanoid(24)}`,
 ): StudioSessionResolution {
-  const existingSessionId = cookieValue(request, STUDIO_SESSION_COOKIE);
+  const existingSessionId = Schema.decodeUnknownOption(
+    AnonymousStudioSessionIdSchema,
+  )(cookieValue(request, STUDIO_SESSION_COOKIE));
 
-  if (existingSessionId && ANONYMOUS_SESSION_PATTERN.test(existingSessionId)) {
+  if (Option.isSome(existingSessionId)) {
     const session = AnonymousStudioOwner.make({
       kind: "anonymous",
-      sessionId: makeStudioRecordId(existingSessionId),
+      sessionId: existingSessionId.value,
     });
     return {
       auth: authStatus(session),
@@ -155,7 +133,9 @@ export function resolveStudioSession(
 
   const session = AnonymousStudioOwner.make({
     kind: "anonymous",
-    sessionId: makeStudioRecordId(createSessionId()),
+    sessionId: Schema.decodeUnknownSync(AnonymousStudioSessionIdSchema)(
+      createSessionId(),
+    ),
   });
 
   return {
@@ -166,18 +146,19 @@ export function resolveStudioSession(
   };
 }
 
+export function ensureOwner(
+  actual: StudioOwner,
+  expected: StudioOwner,
+  resource: StudioResourceKind,
+  id: string,
+): Effect.Effect<void, StudioOwnershipError> {
+  return studioOwnersMatch(actual, expected)
+    ? Effect.void
+    : Effect.fail(StudioOwnershipError.make({ id, resource }));
+}
+
 function makeStudioSessionService(createSessionId: () => string) {
   return StudioSessionService.of({
-    ensureOwner: Effect.fn("studioPersistence.session.ensureOwner")(function* (
-      actual: StudioOwner,
-      expected: StudioOwner,
-      resource: StudioResourceKind,
-      id: string,
-    ) {
-      if (!studioOwnersMatch(actual, expected)) {
-        return yield* Effect.fail(StudioOwnershipError.make({ id, resource }));
-      }
-    }),
     resolve: Effect.fn("studioPersistence.session.resolve")(function* (
       request: Request,
     ) {
@@ -208,10 +189,4 @@ export function makeStudioSessionServiceLayer(options: {
     StudioSessionService,
     makeStudioSessionService(options.createSessionId),
   );
-}
-
-export function makeStudioSessionServiceTestLayer(
-  service: StudioSessionServiceShape,
-) {
-  return Layer.succeed(StudioSessionService, service);
 }

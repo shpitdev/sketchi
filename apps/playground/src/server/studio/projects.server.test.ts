@@ -174,8 +174,7 @@ describe("Studio project app adapter", () => {
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toMatchObject({
       code: "storage_failed",
-      message:
-        "Studio persistence requires an object bucket with list support.",
+      message: "Studio persistence failed.",
       ok: false,
     });
   });

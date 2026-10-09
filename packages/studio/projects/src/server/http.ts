@@ -1,7 +1,14 @@
 import { Context, Effect, Schema } from "effect";
 
-import { CreateStudioProjectFromArtifactRequestSchema } from "../contracts.js";
-import { StudioInvalidInputError, type StudioHttpError } from "./errors.js";
+import {
+  CreateStudioProjectFromArtifactRequestSchema,
+  StudioRecordIdSchema,
+} from "../contracts.js";
+import {
+  StudioInvalidInputError,
+  StudioNotFoundError,
+  type StudioHttpError,
+} from "./errors.js";
 import { StudioProjects } from "./service.js";
 import {
   StudioSessionService,
@@ -106,7 +113,7 @@ function failureResponse(
         resolution,
         {
           code: "storage_failed",
-          message: error.message,
+          message: "Studio persistence failed.",
           ok: false,
         },
         500,
@@ -124,7 +131,11 @@ function failureResponse(
     case "StudioStorageError":
       return jsonWithSession(
         resolution,
-        { code: "storage_failed", message: error.message, ok: false },
+        {
+          code: "storage_failed",
+          message: "Studio persistence failed.",
+          ok: false,
+        },
         500,
       );
   }
@@ -215,7 +226,11 @@ export const handleGetProjectRequestEffect = Effect.fn(
   "studioPersistence.http.getProject",
 )(function* (request: Request, projectId: string) {
   return yield* withStudioSession(request, "project", (resolution, projects) =>
-    projects.getProject(resolution.session, projectId).pipe(
+    Schema.decodeUnknownEffect(StudioRecordIdSchema)(projectId).pipe(
+      Effect.mapError(() =>
+        StudioNotFoundError.make({ id: projectId, resource: "project" }),
+      ),
+      Effect.flatMap((id) => projects.getProject(resolution.session, id)),
       Effect.map((details) =>
         jsonWithSession(resolution, {
           auth: resolution.auth,
@@ -232,7 +247,11 @@ export const handleGetDiagramRequestEffect = Effect.fn(
   "studioPersistence.http.getDiagram",
 )(function* (request: Request, diagramId: string) {
   return yield* withStudioSession(request, "diagram", (resolution, projects) =>
-    projects.getDiagram(resolution.session, diagramId).pipe(
+    Schema.decodeUnknownEffect(StudioRecordIdSchema)(diagramId).pipe(
+      Effect.mapError(() =>
+        StudioNotFoundError.make({ id: diagramId, resource: "diagram" }),
+      ),
+      Effect.flatMap((id) => projects.getDiagram(resolution.session, id)),
       Effect.map((details) =>
         jsonWithSession(resolution, {
           auth: resolution.auth,

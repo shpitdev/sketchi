@@ -187,7 +187,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
   "packages/diagram/ui/src/components/scenario-playground/scenario-playground.tsx": 10,
   "packages/observability/vitest.config.mts": 1,
   "packages/studio/projects/src/client-api.ts": 20,
-  "packages/studio/projects/src/server/bucket.ts": 23,
+  "packages/studio/projects/src/server/bucket.ts": 22,
   "packages/studio/projects/src/server/http.ts": 2,
   "scripts/pipelines/r2-catalog-smoke.mjs": 10,
   "tools/generation-reliability-probe.ts": 4,

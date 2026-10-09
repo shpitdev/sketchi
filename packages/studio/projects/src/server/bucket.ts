@@ -91,7 +91,8 @@ export function makeStudioObjectStoreLayer(bucket: StudioObjectBucket) {
     delete: Effect.fn("studioPersistence.objectStore.delete")(function* (
       key: string,
     ) {
-      if (!bucket.delete) {
+      const deleteObject = bucket.delete?.bind(bucket);
+      if (!deleteObject) {
         return yield* Effect.fail(
           storageError(
             "delete",
@@ -101,7 +102,7 @@ export function makeStudioObjectStoreLayer(bucket: StudioObjectBucket) {
       }
 
       yield* Effect.tryPromise({
-        try: () => bucket.delete?.(key) ?? Promise.resolve(),
+        try: () => deleteObject(key),
         catch: storageError("delete", key),
       });
     }),
@@ -187,12 +188,6 @@ export class MemoryStudioObjectBucket implements StudioObjectBucket {
       truncated: false,
     };
   }
-}
-
-export function makeMemoryStudioObjectStoreTestLayer(
-  bucket: MemoryStudioObjectBucket,
-) {
-  return makeStudioObjectStoreLayer(bucket);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

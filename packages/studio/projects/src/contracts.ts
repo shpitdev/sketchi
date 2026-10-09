@@ -12,6 +12,11 @@ export function makeStudioRecordId(input: string): StudioRecordId {
   return Schema.decodeUnknownSync(StudioRecordIdSchema)(input);
 }
 
+export const AnonymousStudioSessionIdSchema = StudioRecordIdSchema.check(
+  Schema.isPattern(/^anon_/),
+  Schema.isBetweenLength(17, 69),
+);
+
 export const IsoDateStringSchema = NonEmptyString.pipe(
   Schema.brand("IsoDateString"),
 );
@@ -25,7 +30,7 @@ export class AnonymousStudioOwner extends Schema.Class<AnonymousStudioOwner>(
   "AnonymousStudioOwner",
 )({
   kind: Schema.Literal("anonymous"),
-  sessionId: StudioRecordIdSchema,
+  sessionId: AnonymousStudioSessionIdSchema,
 }) {}
 
 export class AuthenticatedStudioOwner extends Schema.Class<AuthenticatedStudioOwner>(

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
+import { vi } from "vitest";
 
 import {
   handleCreateFromArtifactRequestEffect,
@@ -310,18 +311,87 @@ describe("Studio project HTTP runtime edge", () => {
     );
   });
 
-  it("maps malformed session cookies to a stable public failure", async () => {
-    const { server } = createTestServer();
-    const response = await server.handleListProjectsRequest(
-      new Request("https://studio.test/api/studio/projects", {
-        headers: { Cookie: "sketchi_studio_session=%E0%A4%A" },
-      }),
+  it.each([
+    "%E0%A4%A",
+    "",
+    "not-a-session",
+    "anon_short",
+    `anon_${"a".repeat(81)}`,
+    "anon_abcdefghijkl!",
+  ])(
+    "replaces an invalid session cookie (%s) with a usable session",
+    async (cookie) => {
+      const { server } = createTestServer();
+      const response = await server.handleListProjectsRequest(
+        new Request("https://studio.test/api/studio/projects", {
+          headers: { Cookie: `sketchi_studio_session=${cookie}` },
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        auth: { status: "anonymous" },
+        ok: true,
+        projects: [],
+        session: { kind: "anonymous" },
+      });
+      const setCookie = response.headers.get("set-cookie");
+      expect(setCookie).toMatch(/^sketchi_studio_session=anon_/);
+      const reused = await server.handleListProjectsRequest(
+        new Request("https://studio.test/api/studio/projects", {
+          headers: { Cookie: setCookie?.split(";")[0] ?? "" },
+        }),
+      );
+      expect(reused.status).toBe(200);
+      expect(reused.headers.get("set-cookie")).toBeNull();
+    },
+  );
+
+  it.each(["x".repeat(1100), "short", "proj_invalid!", "../project"])(
+    "rejects invalid route id %s before reading storage",
+    async (id) => {
+      const { bucket, server } = createTestServer();
+      const read = vi.spyOn(bucket, "get");
+      const request = new Request("https://studio.test/api/studio/projects");
+      const project = await server.handleGetProjectRequest(request, id);
+      const diagram = await server.handleGetDiagramRequest(request, id);
+
+      expect(project.status).toBe(404);
+      expect(diagram.status).toBe(404);
+      await expect(project.json()).resolves.toEqual({
+        code: "not_found",
+        message: "Studio project was not found for this session.",
+        ok: false,
+      });
+      await expect(diagram.json()).resolves.toEqual({
+        code: "not_found",
+        message: "Studio diagram was not found for this session.",
+        ok: false,
+      });
+      expect(read).not.toHaveBeenCalled();
+      expect(project.headers.get("set-cookie")).toContain(
+        "sketchi_studio_session=anon_",
+      );
+      expect(diagram.headers.get("set-cookie")).toContain(
+        "sketchi_studio_session=anon_",
+      );
+    },
+  );
+
+  it("conceals storage exception details in the public failure", async () => {
+    const { bucket, server } = createTestServer();
+    vi.spyOn(bucket, "get").mockRejectedValue(
+      new Error("private R2 binding details"),
+    );
+    const response = await server.handleGetProjectRequest(
+      new Request("https://studio.test/api/studio/projects/proj_failed"),
+      "proj_failed",
     );
 
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({
       code: "storage_failed",
-      message: "Studio session could not be resolved.",
+      message: "Studio persistence failed.",
       ok: false,
     });
   });
@@ -419,40 +489,29 @@ describe("Studio project HTTP runtime edge", () => {
   });
 
   it.each([
-    [
-      "schema-invalid JSON",
-      JSON.stringify({ id: "proj_corrupt" }),
-      "Stored Studio data could not be decoded.",
-    ],
-    [
-      "syntactically invalid JSON",
-      "{not-json",
-      "Expected property name or '}' in JSON at position 1 (line 1 column 2)",
-    ],
-    ["empty bytes", "", "Unexpected end of JSON input"],
-  ])(
-    "maps %s to typed corruption instead of not-found",
-    async (_, bytes, expectedMessage) => {
-      const bucket = new MemoryStudioObjectBucket();
-      const { server } = createTestServer(bucket);
-      await bucket.put(studioProjectRecordKey("proj_corrupt"), bytes);
+    ["schema-invalid JSON", JSON.stringify({ id: "proj_corrupt" })],
+    ["syntactically invalid JSON", "{not-json"],
+    ["empty bytes", ""],
+  ])("maps %s to typed corruption instead of not-found", async (_, bytes) => {
+    const bucket = new MemoryStudioObjectBucket();
+    const { server } = createTestServer(bucket);
+    await bucket.put(studioProjectRecordKey("proj_corrupt"), bytes);
 
-      const response = await server.handleGetProjectRequest(
-        requestWithSession(
-          "https://studio.test/api/studio/projects/proj_corrupt",
-          "anon_abcdefghijklmnop",
-        ),
-        "proj_corrupt",
-      );
+    const response = await server.handleGetProjectRequest(
+      requestWithSession(
+        "https://studio.test/api/studio/projects/proj_corrupt",
+        "anon_abcdefghijklmnop",
+      ),
+      "proj_corrupt",
+    );
 
-      expect(response.status).toBe(500);
-      await expect(response.json()).resolves.toEqual({
-        code: "storage_failed",
-        message: expectedMessage,
-        ok: false,
-      });
-    },
-  );
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      code: "storage_failed",
+      message: "Studio persistence failed.",
+      ok: false,
+    });
+  });
 
   it("propagates request cancellation without committing records", async () => {
     const bucket = new MemoryStudioObjectBucket();
