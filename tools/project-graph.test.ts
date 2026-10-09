@@ -103,7 +103,7 @@ const approvedRuntimeBoundaryFiles = [
   "apps/playground/src/server/runtime/runtime.server.ts",
   "packages/diagram/scenarios/src/cli.ts",
   "packages/diagram/scenarios/src/live-generator.ts",
-  "scripts/pipelines/r2-catalog-smoke.mjs",
+  "scripts/pipelines/r2-catalog-smoke.ts",
   "tools/generation-reliability-probe.ts",
   "tools/harness-eval.ts",
 ];
@@ -189,7 +189,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
   "packages/studio/projects/src/client-api.ts": 20,
   "packages/studio/projects/src/server/bucket.ts": 22,
   "packages/studio/projects/src/server/http.ts": 2,
-  "scripts/pipelines/r2-catalog-smoke.mjs": 10,
+  "scripts/pipelines/r2-catalog-smoke.ts": 20,
   "tools/generation-reliability-probe.ts": 4,
   "tools/harness-eval.ts": 8,
   "tools/sketchi-generators/src/generators/diagram-type/diagram-type.spec.ts": 6,
@@ -300,7 +300,22 @@ const promiseTypeAnchorPath = path.join(
   ".memory",
   "promise-type-anchor.d.ts",
 );
+const runtimeExports: Record<string, readonly string[]> = {
+  __runtimeEffect: [
+    "runSync",
+    "runSyncExit",
+    "runPromise",
+    "runPromiseExit",
+    "runFork",
+    "runCallback",
+  ],
+  __runtimeManaged: ["make", "makeEffect"],
+  __runtimeNode: ["runMain"],
+};
 const promiseTypeAnchorSource = [
+  'import * as __runtimeEffect from "effect/Effect";',
+  'import * as __runtimeManaged from "effect/ManagedRuntime";',
+  'import * as __runtimeNode from "@effect/platform-node/NodeRuntime";',
   "declare const __promiseLikeAnchor: PromiseLike<any>;",
   "declare const __promiseConstructorAnchor: PromiseConstructor;",
 ].join("\n");
@@ -311,6 +326,9 @@ const promiseTypeCheckingSourcePaths: Record<string, string[]> = {
   "@sketchi/diagram-generation": ["packages/diagram/generation/src/index.ts"],
   "@sketchi/diagram-renderer": ["packages/diagram/renderer/src/index.ts"],
   "@sketchi/diagram-scenarios": ["packages/diagram/scenarios/src/index.ts"],
+  "@sketchi/diagram-scenarios/internal/tool-process": [
+    "packages/diagram/scenarios/src/internal/tool-process.ts",
+  ],
   "@sketchi/diagram-ui": ["packages/diagram/ui/src/index.ts"],
   "@sketchi/observability": ["packages/observability/src/index.ts"],
   "@sketchi/svg-excalidraw": ["packages/svg-excalidraw/src/index.ts"],
@@ -498,6 +516,59 @@ function promiseOrchestrationSites(
   };
   visit(sourceFile);
   return sites;
+}
+
+function runtimeBoundaryCalls(
+  program: ts.Program,
+  sourceFile: ts.SourceFile,
+): ts.CallExpression[] {
+  const checker = program.getTypeChecker();
+  const anchor = program.getSourceFile(promiseTypeAnchorPath);
+  if (!anchor) throw new Error("Runtime type-checker anchor was not loaded.");
+  const declarations = new Set<ts.SignatureDeclaration>();
+  for (const statement of anchor.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    const binding = statement.importClause?.namedBindings;
+    if (!binding || !ts.isNamespaceImport(binding)) continue;
+    const names = runtimeExports[binding.name.text];
+    if (!names) continue;
+    const alias = checker.getSymbolAtLocation(binding.name);
+    if (!alias)
+      throw new Error(`Unresolved runtime anchor ${binding.name.text}.`);
+    const module = checker.getAliasedSymbol(alias);
+    for (const symbol of checker.getExportsOfModule(module)) {
+      if (!names.includes(symbol.name)) continue;
+      const type = checker.getTypeOfSymbolAtLocation(symbol, binding.name);
+      for (const signature of checker.getSignaturesOfType(
+        type,
+        ts.SignatureKind.Call,
+      )) {
+        const declaration = signature.getDeclaration();
+        if (declaration) declarations.add(declaration);
+      }
+    }
+  }
+  const calls: ts.CallExpression[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      const declaration = checker.getResolvedSignature(node)?.getDeclaration();
+      if (declaration && declarations.has(declaration)) calls.push(node);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return calls;
+}
+
+function runtimeProbeCalls(sourceText: string): ts.CallExpression[] {
+  const probePath = path.join(workspaceRoot, ".memory", "runtime-probe.ts");
+  const program = createTypeCheckedProgram(
+    [probePath],
+    new Map([[probePath, sourceText]]),
+  );
+  const source = program.getSourceFile(probePath);
+  if (!source) throw new Error("Runtime probe source was not loaded.");
+  return runtimeBoundaryCalls(program, source);
 }
 
 function promiseProbeSites(
@@ -744,7 +815,7 @@ describe("diagram generation project boundaries", () => {
         ...["apps", "packages", "tools"].map(
           (root) => `${root}/**/*.{ts,tsx,mts,cts,js,mjs}`,
         ),
-        "scripts/pipelines/r2-catalog-smoke.mjs",
+        "scripts/pipelines/r2-catalog-smoke.ts",
       ],
       {
         cwd: workspaceRoot,
@@ -770,7 +841,7 @@ describe("diagram generation project boundaries", () => {
         ...["apps", "packages", "tools"].map(
           (root) => `${root}/**/*.{ts,tsx,mts,cts,js,mjs}`,
         ),
-        "scripts/pipelines/r2-catalog-smoke.mjs",
+        "scripts/pipelines/r2-catalog-smoke.ts",
       ],
       {
         cwd: workspaceRoot,
@@ -822,17 +893,72 @@ describe("diagram generation project boundaries", () => {
     expect(managedPromiseSiteCounts).toEqual(approvedManagedPromiseSiteCounts);
 
     const runtimeBoundaryFiles = sourceFiles
-      .filter((sourceFile) =>
-        /Effect\.run(?:Callback|Fork|Promise|PromiseExit|Sync|SyncExit)\s*\(|ManagedRuntime\.(?:make|makeEffect)\s*\(|NodeRuntime\.runMain\s*\(/.test(
-          readFileSync(path.join(workspaceRoot, sourceFile), "utf8"),
-        ),
-      )
+      .filter((sourceFile) => {
+        const parsedSource = promiseProgram.getSourceFile(
+          path.join(workspaceRoot, sourceFile),
+        );
+        if (!parsedSource)
+          throw new Error(`Type checker did not load ${sourceFile}.`);
+        return runtimeBoundaryCalls(promiseProgram, parsedSource).length > 0;
+      })
       .sort();
     expect(runtimeBoundaryFiles).toEqual(approvedRuntimeBoundaryFiles);
   }, 20_000);
 });
 
 describe("Effect structural guards", () => {
+  it.each([
+    [
+      "aliased runSync",
+      'import { Effect as E } from "effect"; E.runSync(E.succeed(1));',
+    ],
+    [
+      "aliased runPromise",
+      'import { Effect as E } from "effect"; E.runPromise(E.succeed(1));',
+    ],
+    [
+      "destructured runSync",
+      'import { Effect } from "effect"; const { runSync: execute } = Effect; execute(Effect.succeed(1));',
+    ],
+    [
+      "computed runFork",
+      'import { Effect as E } from "effect"; E["runFork"](E.succeed(1));',
+    ],
+    [
+      "detached runCallback",
+      'import { Effect as E } from "effect"; const execute = E.runCallback; execute(E.succeed(1));',
+    ],
+    [
+      "aliased ManagedRuntime.make",
+      'import { ManagedRuntime as M, Layer } from "effect"; M.make(Layer.empty);',
+    ],
+    [
+      "destructured ManagedRuntime.make",
+      'import { ManagedRuntime as M, Layer } from "effect"; const { make: create } = M; create(Layer.empty);',
+    ],
+    [
+      "computed ManagedRuntime.make",
+      'import { ManagedRuntime as M, Layer } from "effect"; M["make"](Layer.empty);',
+    ],
+    [
+      "aliased NodeRuntime.runMain",
+      'import { NodeRuntime as N } from "@effect/platform-node"; import { Effect as E } from "effect"; N.runMain(E.void);',
+    ],
+  ])(
+    "detects %s runtime boundary by resolved signature",
+    (_name, sourceText) => {
+      expect(runtimeProbeCalls(sourceText)).toHaveLength(1);
+    },
+  );
+
+  it("does not confuse unrelated same-named functions with Effect runtimes", () => {
+    expect(
+      runtimeProbeCalls(
+        "const Effect = { runSync: (value: number) => value }; const ManagedRuntime = { make: () => 1 }; Effect.runSync(1); ManagedRuntime.make();",
+      ),
+    ).toEqual([]);
+  });
+
   it.each([
     ["top-level await fetch", "await fetch('https://example.test')"],
     [

@@ -55,6 +55,8 @@ or R2 SQL verification queries.
   finalizers before exit. `Effect.runPromise` is not a Node main-loop adapter.
 - Parameterized layer construction is restricted to runtime bindings. Build it
   once at the edge and reuse the resulting layer.
+- `scripts/pipelines/r2-catalog-smoke.ts` runs through `jiti` and uses the
+  shared `diagram-scenarios` tool-process service, not a local runner.
 - Node child processes are scoped resources. Timeout is measured until process
   exit; close receives a separate bounded grace for inherited stdio. Timeout or
   interruption targets the owned process group/tree with SIGTERM, escalates to

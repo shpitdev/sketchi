@@ -28,7 +28,7 @@ rg --hidden --files-with-matches \
 
 | Classification                      | Exhaustive scope                                                                                                                                                                                                                                                                                                                           | Rationale                                                                                                                                                                                                                    |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Effect-authoritative                | effectful code in `apps/cli`, `apps/eval-harness/src/lib`, `apps/playground/src/server`, `packages/diagram/{agent,generation,scenarios}`, `packages/observability`, `packages/studio/projects/src/server`, `tools/harness-eval.ts`, and `scripts/pipelines/r2-catalog-smoke.mjs`                                                           | I/O, time, concurrency, resources, expected failures, and orchestration return Effect. Throws inside pure parsers/constructors are defects or are captured immediately at the Effect boundary.                               |
+| Effect-authoritative                | effectful code in `apps/cli`, `apps/eval-harness/src/lib`, `apps/playground/src/server`, `packages/diagram/{agent,generation,scenarios}`, `packages/observability`, `packages/studio/projects/src/server`, `tools/harness-eval.ts`, and `scripts/pipelines/r2-catalog-smoke.ts`                                                            | I/O, time, concurrency, resources, expected failures, and orchestration return Effect. Throws inside pure parsers/constructors are defects or are captured immediately at the Effect boundary.                               |
 | Pure                                | `packages/diagram/{core,renderer,excalidraw}`, `packages/svg-excalidraw`, deterministic scenario grading/argv helpers, contract fixtures, and ordinary unit-test data                                                                                                                                                                      | Synchronous validation, geometry, layout, formatting, and test assertions own no resource or async lifecycle. Effect Schema imports in the three core contract files define data; they do not make the algorithms effectful. |
 | Framework edge                      | TanStack route/server-function adapters, React components/hooks, AI SDK/MCP callbacks, Cloudflare binding adapters, app Vite/Storybook config, and browser/component tests. Hidden Storybook configs are explicitly `apps/{excalidraw,icons,native-conversion-storybook}/.storybook/main.ts` and `packages/diagram/ui/.storybook/main.ts`. | The host requires Promise callbacks or browser-native Promise APIs. Each server adapter decodes/imports, invokes one approved Effect runtime, and encodes; product workflow does not live here.                              |
 | Generated                           | `routeTree.gen.ts`, generated Cloudflare binding declarations, icon review/output assets, generator templates/fixtures, and build output excluded by the scan                                                                                                                                                                              | Regenerated from an upstream tool or data set; never an orchestration authority.                                                                                                                                             |
@@ -67,13 +67,14 @@ unresolvable constructs: deliberate `any`/`unknown` laundering, `eval`, and
 generated runtime code. Those remain explicit code-review responsibilities.
 
 The R2 catalog smoke owns real remote resources and is not deployment
-plumbing. Its Wrangler child process is scoped and process-group terminated;
-provisioning registers cleanup before the first remote mutation; readiness and
-query polling use interruptible Effect time; fetches forward cancellation; and
-cleanup runs as an uninterruptible scope finalizer. Its focused test interrupts
-a real command tree and proves the descendant is gone. An OS-level SIGTERM
-regression additionally proves the Node main fiber is interrupted, its stubborn
-descendant is killed, and a scope cleanup marker is written before exit.
+plumbing. The `jiti` entrypoint uses the shared
+`diagram-scenarios` tool-process service with bounded exit, stdio-close, and
+SIGTERM/SIGKILL budgets. Per-resource finalizers register before mutation and
+only release successfully created resources, in dependency-safe LIFO order.
+Readiness and query polling use interruptible Effect time; fetches forward
+cancellation through body reads; cleanup is best-effort and scoped. Shared
+process-service tests own process-tree interruption and OS-signal coverage;
+the smoke tests cover resource ownership and polling with offline fakes.
 
 ## Runtime and schema audit
 

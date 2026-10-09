@@ -7,7 +7,12 @@ import {
   r2SqlErrorSummary,
   requireToken,
   sqlStringLiteral,
-} from "./r2-catalog-smoke.mjs";
+  R2SqlQueryError,
+  isTransientHttpStatus,
+  retryAfterDelayMs,
+  pollRetryDelayMs,
+} from "./r2-sql.ts";
+import { setTimeout as sleep } from "node:timers/promises";
 
 const DEFAULT_ACCOUNT_ID = "75f9660f39e4dafe8b95980b87e7399a";
 const DEFAULT_NAMESPACE = "sketchi_codemode";
@@ -198,13 +203,14 @@ async function verifyRun(options) {
   const verification = await pollVerificationAttempts({
     attempts,
     delayMs,
-    queryAttempt: (attempt) =>
+    queryAttempt: (attempt, signal) =>
       queryTargets({
         accountId,
         attempt,
         attempts,
         requireIssues,
         runIds,
+        signal,
         token,
       }),
   });
@@ -273,6 +279,8 @@ export async function pollVerificationAttempts({
   delayMs,
   queryAttempt,
   sleepFn = sleep,
+  attemptTimeoutMs = 30_000,
+  signal,
 }) {
   let result;
   let missingRows = [];
@@ -280,7 +288,11 @@ export async function pollVerificationAttempts({
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      result = await queryAttempt(attempt);
+      const attemptSignal = AbortSignal.any([
+        ...(signal ? [signal] : []),
+        AbortSignal.timeout(attemptTimeoutMs),
+      ]);
+      result = await abortableAttempt(queryAttempt, attempt, attemptSignal);
       missingRows = requiredMissingRows(result);
       lastError = undefined;
 
@@ -288,7 +300,15 @@ export async function pollVerificationAttempts({
         return { ok: true, result };
       }
     } catch (error) {
-      lastError = error;
+      if (signal?.aborted) throw signal.reason;
+      lastError =
+        error?.name === "TimeoutError"
+          ? R2SqlQueryError.make({
+              cause: error,
+              message: "Catalog polling attempt timed out.",
+              retryable: true,
+            })
+          : error;
       missingRows = [];
       result = {
         attempt,
@@ -297,10 +317,16 @@ export async function pollVerificationAttempts({
         error: errorMessage(error),
         targets: [],
       };
+      if (!(lastError instanceof R2SqlQueryError) || !lastError.retryable)
+        break;
     }
 
     if (attempt < attempts) {
-      await sleepFn(delayMs);
+      await sleepFn(
+        pollRetryDelayMs(lastError, delayMs, attemptTimeoutMs),
+        undefined,
+        { signal },
+      );
     }
   }
 
@@ -318,6 +344,7 @@ async function queryTargets({
   attempts,
   requireIssues,
   runIds,
+  signal,
   token,
 }) {
   const checkedAt = new Date().toISOString();
@@ -336,12 +363,14 @@ async function queryTargets({
       accountId,
       query: countQuery(target, runId),
       target,
+      signal,
       token,
     });
     const details = await runR2SqlQuery({
       accountId,
       query: detailQuery(target, runId),
       target,
+      signal,
       token,
     });
     const totalRows = Number(count.result.rows?.[0]?.total_rows ?? 0);
@@ -372,11 +401,27 @@ async function writeVerificationResult(outputDir, result) {
   );
 }
 
-async function sleep(delayMs) {
-  if (delayMs > 0) {
-    await new Promise((resolve) => {
-      setTimeout(resolve, delayMs);
-    });
+// Bound even an adapter that does not settle on abort, and always detach listeners.
+async function abortableAttempt(queryAttempt, attempt, signal) {
+  signal.throwIfAborted();
+  let onAbort;
+  const aborted = new Promise((_, reject) => {
+    onAbort = () =>
+      reject(
+        signal.reason?.name === "TimeoutError"
+          ? R2SqlQueryError.make({
+              cause: signal.reason,
+              message: "Catalog polling attempt timed out.",
+              retryable: true,
+            })
+          : signal.reason,
+      );
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+  try {
+    return await Promise.race([queryAttempt(attempt, signal), aborted]);
+  } finally {
+    signal.removeEventListener("abort", onAbort);
   }
 }
 
@@ -384,23 +429,67 @@ function errorMessage(error) {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function runR2SqlQuery({ accountId, query, target, token }) {
-  const response = await fetch(r2SqlApiUrl(accountId, target.bucket), {
-    body: JSON.stringify({
-      query,
-      warehouse: warehouseName(accountId, target),
-    }),
-    headers: {
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-    },
-    method: "POST",
-  });
-  const body = await response.json();
-  if (!response.ok || !isR2SqlSuccess(body)) {
-    throw new Error(
-      `${target.environment}/${target.kind} R2 SQL failed with HTTP ${response.status}: ${r2SqlErrorSummary(body)}.`,
-    );
+export async function runR2SqlQuery({
+  accountId,
+  query,
+  target,
+  token,
+  signal,
+}) {
+  let response;
+  let bodyText;
+  try {
+    response = await fetch(r2SqlApiUrl(accountId, target.bucket), {
+      body: JSON.stringify({
+        query,
+        warehouse: warehouseName(accountId, target),
+      }),
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      method: "POST",
+      signal,
+    });
+    // Status is authoritative even when an error body is HTML, not JSON.
+    if (!response.ok) {
+      await response.body?.cancel();
+      const retryAfterMs = retryAfterDelayMs(
+        response.headers.get("retry-after"),
+        Date.now(),
+      );
+      throw R2SqlQueryError.make({
+        status: response.status,
+        message: `${target.environment}/${target.kind} R2 SQL failed with HTTP ${response.status}.`,
+        retryable: isTransientHttpStatus(response.status),
+        ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+      });
+    }
+    bodyText = await response.text();
+  } catch (cause) {
+    if (signal?.aborted) throw signal.reason;
+    if (cause instanceof R2SqlQueryError) throw cause;
+    throw R2SqlQueryError.make({
+      cause,
+      message: "R2 SQL request or body read failed.",
+      retryable: true,
+    });
+  }
+  let body;
+  try {
+    body = JSON.parse(bodyText);
+  } catch (cause) {
+    throw R2SqlQueryError.make({
+      cause,
+      message: "Malformed R2 SQL response.",
+      retryable: false,
+    });
+  }
+  if (!isR2SqlSuccess(body)) {
+    throw R2SqlQueryError.make({
+      message: `${target.environment}/${target.kind} R2 SQL failed: ${r2SqlErrorSummary(body)}.`,
+      retryable: false,
+    });
   }
   return body;
 }

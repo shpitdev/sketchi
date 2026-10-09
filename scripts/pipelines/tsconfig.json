@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@sketchi/diagram-scenarios/internal/tool-process": [
+        "../../packages/diagram/scenarios/src/internal/tool-process.ts"
+      ]
+    }
+  },
+  "include": ["*.ts", "*.mts"]
+}
