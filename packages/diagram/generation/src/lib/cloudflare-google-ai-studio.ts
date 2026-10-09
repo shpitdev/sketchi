@@ -1,8 +1,7 @@
-import { Clock, Context, Effect, Layer, Schema } from "effect";
+import { Clock, Context, Effect, Layer, Result, Schema } from "effect";
 
 import {
   candidateFromText,
-  enforceCandidateRequestRequirements,
   responseErrorDiagnostic,
   type DiagramGenerationCacheMode,
   type DiagramGenerationRequest,
@@ -167,26 +166,23 @@ const runGatewayAttempt = Effect.fn(
   const usage = extractGeminiUsage(raw);
   const finishReason = extractGeminiFinishReason(raw);
 
-  return enforceCandidateRequestRequirements(
-    candidateFromText({
-      diagnostics:
-        finishReason === "MAX_TOKENS"
-          ? [
-              "output_truncated: Gemini stopped at the maximum output-token budget; regenerate the complete diagram.",
-            ]
-          : [],
-      model,
-      provider: "cloudflare-google-ai-studio",
-      raw,
-      text,
-      ...(finishReason === "MAX_TOKENS"
-        ? { error: "Gemini output was truncated." }
-        : {}),
-      cacheMode: request.cacheMode ?? "default",
-      ...(usage ? { usage } : {}),
-    }),
-    request,
-  );
+  return candidateFromText({
+    diagnostics:
+      finishReason === "MAX_TOKENS"
+        ? [
+            "output_truncated: Gemini stopped at the maximum output-token budget; regenerate the complete diagram.",
+          ]
+        : [],
+    model,
+    provider: "cloudflare-google-ai-studio",
+    raw,
+    text,
+    ...(finishReason === "MAX_TOKENS"
+      ? { error: "Gemini output was truncated." }
+      : {}),
+    cacheMode: request.cacheMode ?? "default",
+    ...(usage ? { usage } : {}),
+  });
 });
 
 export const CloudflareGoogleAiStudioClientLive = Layer.effect(
@@ -196,6 +192,22 @@ export const CloudflareGoogleAiStudioClientLive = Layer.effect(
     const ai = yield* CloudflareAiGatewayBinding;
     const config = yield* CloudflareGoogleAiStudioConfig;
     const policy = yield* DiagramGenerationPolicy;
+    const gateway = yield* Effect.result(
+      Effect.try({
+        try: () => ai.gateway(config.gatewayId),
+        catch: (cause) =>
+          DiagramGenerationTransportError.make({
+            cause,
+            message: errorMessage(
+              cause,
+              "AI Gateway could not be initialized.",
+            ),
+            operation: "ai.gateway",
+            provider: "cloudflare-google-ai-studio",
+            retryable: false,
+          }),
+      }),
+    );
     return {
       provider: "cloudflare-google-ai-studio",
       generate: Effect.fn("diagramGeneration.generate")(function* (
@@ -209,27 +221,13 @@ export const CloudflareGoogleAiStudioClientLive = Layer.effect(
         });
         return yield* runDiagramGenerationWithPolicy(
           (attemptRequest) =>
-            Effect.gen(function* () {
-              const gateway = yield* Effect.try({
-                try: () => ai.gateway(config.gatewayId),
-                catch: (cause) =>
-                  DiagramGenerationTransportError.make({
-                    cause,
-                    message: errorMessage(
-                      cause,
-                      "AI Gateway could not be initialized.",
-                    ),
-                    operation: "ai.gateway",
-                    provider: "cloudflare-google-ai-studio",
-                    retryable: false,
-                  }),
-              });
-              return runGatewayAttempt(
-                gateway,
-                config.collectLog,
-                attemptRequest,
-              );
-            }),
+            Result.isSuccess(gateway)
+              ? runGatewayAttempt(
+                  gateway.success,
+                  config.collectLog,
+                  attemptRequest,
+                )
+              : Effect.fail(gateway.failure),
           request,
           "cloudflare-google-ai-studio",
           policy,

@@ -63,7 +63,7 @@ function runRepairs(initialDiagnostics: string[]) {
         throw new Error("Unexpected generation attempt.");
       }
       requests.push(callRequest);
-      return yield* Effect.succeed(Effect.succeed(candidate));
+      return yield* Effect.succeed(candidate);
     },
   );
   return runDiagramGenerationWithPolicy(prepareAttempt, request, "fixture", {
@@ -113,6 +113,45 @@ describe("generation repair prompts", () => {
         }),
     );
   }
+
+  it.effect(
+    "enforces the original candidate before deciding whether to repair",
+    () =>
+      Effect.gen(function* () {
+        const candidate: DiagramGenerationCandidate = {
+          provider: "fixture",
+          model: request.model,
+          text: "parsed response",
+          diagnostics: [],
+          diagram: acceptedDiagram,
+          intent: {
+            requestedKind: "flowchart",
+            nativeKind: "flowchart",
+            requirements: [
+              { kind: "label", target: "node", value: "Missing required step" },
+            ],
+          },
+        };
+        const result = yield* runDiagramGenerationWithPolicy(
+          () => Effect.succeed(candidate),
+          request,
+          "fixture",
+          {
+            concurrency: 1,
+            maxRepairAttempts: 0,
+            maxRetries: 0,
+            requestTimeoutMs: 1000,
+            retryDelayMs: 1,
+          },
+        );
+        expect(result.diagram).toBeUndefined();
+        expect(result.error).toBe(
+          "Generated diagram did not satisfy its typed intent contract.",
+        );
+        expect(result.diagnostics).toHaveLength(1);
+        expect(result.diagnostics[0]).toContain("Missing required step");
+      }),
+  );
 
   it.effect("includes the original scenario once in each repair prompt", () =>
     Effect.gen(function* () {

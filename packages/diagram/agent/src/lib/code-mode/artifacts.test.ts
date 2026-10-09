@@ -6,7 +6,7 @@ import {
   CodeModeArtifactStorage,
   CodeModeArtifactStorageMemory,
   jsonSizeBytes,
-  makeCodeModeArtifactStorageR2Layer,
+  makeObjectBucketArtifactStorage,
   type ArtifactWriteInput,
   type CodeModeArtifactStorageShape,
   type CodeModeObjectBucket,
@@ -134,77 +134,100 @@ layer(CodeModeArtifactStorageMemory)("memory artifact storage layer", (it) => {
 });
 
 const r2Bucket = new MemoryBucket();
-layer(makeCodeModeArtifactStorageR2Layer(r2Bucket, { prefix: "codemode" }))(
-  "R2 artifact storage layer",
-  (it) => {
-    it.effect("substitutes without changing the storage workflow", () =>
-      Effect.gen(function* () {
-        const result = yield* storageRoundTrip();
+layer(
+  Layer.succeed(
+    CodeModeArtifactStorage,
+    makeObjectBucketArtifactStorage(r2Bucket, { prefix: "codemode" }),
+  ),
+)("R2 artifact storage layer", (it) => {
+  it.effect("substitutes without changing the storage workflow", () =>
+    Effect.gen(function* () {
+      const result = yield* storageRoundTrip();
 
-        expect(result.manifest).toMatchObject({
-          artifactId: "artifact-child",
-          provenance: { sourceArtifactId: "artifact-parent" },
-          formats: [
-            { format: "scene" },
-            { format: "excalidraw" },
-            { format: "png" },
-          ],
-        });
-        expect(result.scene).toMatchObject({ format: "scene" });
-        expect(result.excalidraw).toMatchObject({ format: "excalidraw" });
-        expect(result.png).toMatchObject({ format: "png", sizeBytes: 4 });
-        assert.deepStrictEqual([...r2Bucket.objects.keys()].sort(), [
-          "codemode/artifact-child/excalidraw.json",
-          "codemode/artifact-child/manifest.json",
-          "codemode/artifact-child/png.png",
-          "codemode/artifact-child/scene.json",
-        ]);
-      }),
-    );
-  },
-);
+      expect(result.manifest).toMatchObject({
+        artifactId: "artifact-child",
+        provenance: { sourceArtifactId: "artifact-parent" },
+        formats: [
+          { format: "scene" },
+          { format: "excalidraw" },
+          { format: "png" },
+        ],
+      });
+      expect(result.scene).toMatchObject({ format: "scene" });
+      expect(result.excalidraw).toMatchObject({ format: "excalidraw" });
+      expect(result.png).toMatchObject({ format: "png", sizeBytes: 4 });
+      assert.deepStrictEqual([...r2Bucket.objects.keys()].sort(), [
+        "codemode/artifact-child/excalidraw.json",
+        "codemode/artifact-child/manifest.json",
+        "codemode/artifact-child/png.png",
+        "codemode/artifact-child/scene.json",
+      ]);
+    }),
+  );
+});
 
-layer(makeCodeModeArtifactStorageR2Layer(new FailingBucket()))(
-  "typed R2 storage failure",
-  (it) => {
-    it.effect("keeps the binding failure in the typed error channel", () =>
-      Effect.gen(function* () {
-        const storage = yield* CodeModeArtifactStorage;
-        const error = yield* storage.write(writeInput()).pipe(Effect.flip);
+layer(
+  Layer.succeed(
+    CodeModeArtifactStorage,
+    makeObjectBucketArtifactStorage(new FailingBucket()),
+  ),
+)("typed R2 storage failure", (it) => {
+  it.effect("keeps the binding failure in the typed error channel", () =>
+    Effect.gen(function* () {
+      const storage = yield* CodeModeArtifactStorage;
+      const error = yield* storage.write(writeInput()).pipe(Effect.flip);
 
-        assert.strictEqual(error._tag, "CodeModeArtifactStorageError");
-        assert.strictEqual(error.operation, "write");
-        assert.strictEqual(error.message, "R2 write denied");
-      }),
-    );
-  },
+      assert.strictEqual(error._tag, "CodeModeArtifactStorageError");
+      assert.strictEqual(error.operation, "write");
+      assert.strictEqual(error.message, "R2 write denied");
+    }),
+  );
+});
+
+it.effect("rejects non-binary PNG data without publishing its manifest", () =>
+  Effect.gen(function* () {
+    const bucket = new MemoryBucket();
+    const storage = makeObjectBucketArtifactStorage(bucket);
+    const input = writeInput();
+    input.formats = [
+      {
+        format: "png",
+        mimeType: "image/png",
+        sizeBytes: 0,
+        data: "not binary",
+      },
+    ];
+    const error = yield* Effect.flip(storage.write(input));
+    assert.strictEqual(error._tag, "CodeModeArtifactStorageError");
+    assert.strictEqual(error.operation, "write");
+    assert.strictEqual(error.message, "PNG artifact data must be binary.");
+    assert.strictEqual(bucket.objects.size, 0);
+  }),
 );
 
 const hangingBucket = new HangingBucket();
-layer(makeCodeModeArtifactStorageR2Layer(hangingBucket))(
-  "artifact storage interruption",
-  (it) => {
-    it.effect("preserves interruption and does not publish a manifest", () =>
-      Effect.gen(function* () {
-        const storage = yield* CodeModeArtifactStorage;
-        const fiber = yield* Effect.forkChild(storage.write(writeInput()));
-        yield* Effect.promise(() => hangingBucket.writeStarted.promise);
-        yield* Fiber.interrupt(fiber);
-        const exit = yield* Fiber.await(fiber);
+layer(
+  Layer.succeed(
+    CodeModeArtifactStorage,
+    makeObjectBucketArtifactStorage(hangingBucket),
+  ),
+)("artifact storage interruption", (it) => {
+  it.effect("preserves interruption and does not publish a manifest", () =>
+    Effect.gen(function* () {
+      const storage = yield* CodeModeArtifactStorage;
+      const fiber = yield* Effect.forkChild(storage.write(writeInput()));
+      yield* Effect.promise(() => hangingBucket.writeStarted.promise);
+      yield* Fiber.interrupt(fiber);
+      const exit = yield* Fiber.await(fiber);
 
-        if (Exit.isSuccess(exit)) {
-          return assert.fail(
-            "Interrupted storage write unexpectedly succeeded.",
-          );
-        }
-        assert.isTrue(Cause.hasInterrupts(exit.cause));
-        assert.isFalse(
-          hangingBucket.objects.has("artifact-child/manifest.json"),
-        );
-      }),
-    );
-  },
-);
+      if (Exit.isSuccess(exit)) {
+        return assert.fail("Interrupted storage write unexpectedly succeeded.");
+      }
+      assert.isTrue(Cause.hasInterrupts(exit.cause));
+      assert.isFalse(hangingBucket.objects.has("artifact-child/manifest.json"));
+    }),
+  );
+});
 
 it.effect("releases memory storage state when its layer scope closes", () =>
   Effect.gen(function* () {

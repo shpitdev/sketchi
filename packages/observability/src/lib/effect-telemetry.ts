@@ -15,6 +15,26 @@ const TELEMETRY_SCHEMA = "sketchi.effect.telemetry.v1";
 const MAX_IDENTIFIER_LENGTH = 128;
 const MAX_MESSAGE_LENGTH = 256;
 
+export interface TelemetryCorrelationInput {
+  readonly artifactId?: string;
+  readonly attemptId?: string;
+  readonly projectId?: string;
+  readonly requestId?: string;
+  readonly runId?: string;
+  readonly scenarioId?: string;
+  readonly traceId?: string;
+}
+
+const correlationFields = [
+  ["artifactId", "sketchi.artifact_id"],
+  ["attemptId", "sketchi.attempt_id"],
+  ["projectId", "sketchi.project_id"],
+  ["requestId", "sketchi.request_id"],
+  ["runId", "sketchi.run_id"],
+  ["scenarioId", "sketchi.scenario_id"],
+  ["traceId", "sketchi.trace_id"],
+] satisfies readonly (readonly [keyof TelemetryCorrelationInput, string])[];
+
 const safeLogMessages = new Set([
   "Browser Rendering session cleanup failed",
   "Code Mode usage capture failed",
@@ -51,13 +71,7 @@ const safeFieldNames = new Set([
 const safeAnnotationNames = new Set([
   "request.method",
   "request.route",
-  "sketchi.artifact_id",
-  "sketchi.attempt_id",
-  "sketchi.project_id",
-  "sketchi.request_id",
-  "sketchi.run_id",
-  "sketchi.scenario_id",
-  "sketchi.trace_id",
+  ...correlationFields.map(([, annotation]) => annotation),
   ...safeFieldNames,
 ]);
 
@@ -65,16 +79,6 @@ export interface TelemetryResource {
   readonly environment?: string;
   readonly serviceName: string;
   readonly serviceVersion?: string;
-}
-
-export interface TelemetryCorrelationInput {
-  readonly artifactId?: string;
-  readonly attemptId?: string;
-  readonly projectId?: string;
-  readonly requestId?: string;
-  readonly runId?: string;
-  readonly scenarioId?: string;
-  readonly traceId?: string;
 }
 
 export interface TelemetryMetricAttributes {
@@ -87,16 +91,6 @@ export interface TelemetryMetricAttributes {
   readonly sink?: string;
   readonly surface?: string;
   readonly timeoutKind?: string;
-}
-
-interface NormalizedTelemetryCorrelation {
-  readonly artifactId?: string;
-  readonly attemptId?: string;
-  readonly projectId?: string;
-  readonly requestId?: string;
-  readonly runId?: string;
-  readonly scenarioId?: string;
-  readonly traceId?: string;
 }
 
 interface TelemetryEventBase {
@@ -127,6 +121,7 @@ export interface TelemetryLogEvent extends TelemetryEventBase {
   readonly fields: Readonly<Record<string, boolean | number | string>>;
   readonly level: string;
   readonly message: string;
+  readonly message_dropped?: true;
   readonly span_id?: string;
   readonly trace_id?: string;
 }
@@ -171,7 +166,7 @@ export const TelemetryExporter = Context.Reference<TelemetryExporterShape>(
 );
 
 export const TelemetryCorrelation =
-  Context.Reference<NormalizedTelemetryCorrelation>(
+  Context.Reference<TelemetryCorrelationInput>(
     "@sketchi/observability/TelemetryCorrelation",
     { defaultValue: () => ({}) },
   );
@@ -214,37 +209,26 @@ function boundedFieldValue(value: string): string | undefined {
 
 function normalizedCorrelation(
   input: TelemetryCorrelationInput,
-): NormalizedTelemetryCorrelation {
-  const artifactId = boundedIdentifier(input.artifactId);
-  const attemptId = boundedIdentifier(input.attemptId);
-  const projectId = boundedIdentifier(input.projectId);
-  const requestId = boundedIdentifier(input.requestId);
-  const runId = boundedIdentifier(input.runId);
-  const scenarioId = boundedIdentifier(input.scenarioId);
-  const traceId = boundedIdentifier(input.traceId);
-  return {
-    ...(artifactId ? { artifactId } : {}),
-    ...(attemptId ? { attemptId } : {}),
-    ...(projectId ? { projectId } : {}),
-    ...(requestId ? { requestId } : {}),
-    ...(runId ? { runId } : {}),
-    ...(scenarioId ? { scenarioId } : {}),
-    ...(traceId ? { traceId } : {}),
-  };
+): TelemetryCorrelationInput {
+  const normalized: {
+    -readonly [K in keyof TelemetryCorrelationInput]?: string;
+  } = {};
+  for (const [key] of correlationFields) {
+    const value = boundedIdentifier(input[key]);
+    if (value) normalized[key] = value;
+  }
+  return normalized;
 }
 
 function correlationAnnotations(
-  input: NormalizedTelemetryCorrelation,
+  input: TelemetryCorrelationInput,
 ): Record<string, string> {
-  return {
-    ...(input.artifactId ? { "sketchi.artifact_id": input.artifactId } : {}),
-    ...(input.attemptId ? { "sketchi.attempt_id": input.attemptId } : {}),
-    ...(input.projectId ? { "sketchi.project_id": input.projectId } : {}),
-    ...(input.requestId ? { "sketchi.request_id": input.requestId } : {}),
-    ...(input.runId ? { "sketchi.run_id": input.runId } : {}),
-    ...(input.scenarioId ? { "sketchi.scenario_id": input.scenarioId } : {}),
-    ...(input.traceId ? { "sketchi.trace_id": input.traceId } : {}),
-  };
+  const annotations: Record<string, string> = {};
+  for (const [key, annotation] of correlationFields) {
+    const value = input[key];
+    if (value) annotations[annotation] = value;
+  }
+  return annotations;
 }
 
 export function withTelemetryCorrelation<A, E, R>(
@@ -253,10 +237,7 @@ export function withTelemetryCorrelation<A, E, R>(
 ): Effect.Effect<A, E, R> {
   return Effect.gen(function* () {
     const parent = yield* TelemetryCorrelation;
-    const correlation = normalizedCorrelation({
-      ...parent,
-      ...normalizedCorrelation(input),
-    });
+    const correlation = { ...parent, ...normalizedCorrelation(input) };
     const annotations = correlationAnnotations(correlation);
     return yield* effect.pipe(
       Effect.provideService(TelemetryCorrelation, correlation),
@@ -352,21 +333,28 @@ function safeSpanAttributes(
 function safeLogMessage(message: unknown): {
   readonly fields: Record<string, boolean | number | string>;
   readonly message: string;
+  readonly message_dropped?: true;
 } {
   const values = Array.isArray(message) ? message : [message];
   let text = "Effect log event";
   const fields: Record<string, boolean | number | string> = {};
+  let dropped = false;
   for (const value of values) {
     if (typeof value === "string" && text === "Effect log event") {
       const candidate = boundedMessage(value);
-      text = safeLogMessages.has(candidate) ? candidate : "Effect log event";
+      if (safeLogMessages.has(candidate)) text = candidate;
+      else dropped = true;
       continue;
     }
     if (isRecord(value)) {
       Object.assign(fields, safeRecord(value, safeFieldNames));
     }
   }
-  return { fields, message: text };
+  return {
+    fields,
+    message: text,
+    ...(dropped ? { message_dropped: true } : {}),
+  };
 }
 
 function errorTag(value: unknown): string | undefined {
@@ -506,6 +494,7 @@ function makeTelemetryLogger(
       fields: safeMessage.fields,
       level: logLevel,
       message: safeMessage.message,
+      ...(safeMessage.message_dropped ? { message_dropped: true } : {}),
       resource: resourceFields(resource),
       schema: TELEMETRY_SCHEMA,
       ...(currentSpan

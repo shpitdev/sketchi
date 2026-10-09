@@ -21,58 +21,121 @@ import {
 } from "./generate-scenario";
 
 describe("eval harness scenario generation composition", () => {
-  it.effect(
-    "preserves the invalid-provider issue contract with Effect Schema",
-    () =>
-      Effect.gen(function* () {
-        const exit = yield* Effect.exit(
-          decodeGenerateScenarioInput({
-            providers: ["unsupported"],
-            scenarioId: "sketchi-onboarding-decision-flow",
-          }),
-        );
-        assert.isTrue(Exit.isFailure(exit));
-        if (Exit.isFailure(exit)) {
-          const error = Cause.findError(exit.cause);
-          assert.strictEqual(error._tag, "Success");
-          if (error._tag === "Success") {
-            assert.instanceOf(
-              error.success,
-              GenerateScenarioInputValidationError,
-            );
-            if (error.success instanceof GenerateScenarioInputValidationError) {
-              const expectedIssues = [
-                {
-                  code: "invalid_value",
-                  message:
-                    'Invalid option: expected one of "fixture"|"cloudflare-google-ai-studio"|"google-ai-studio"',
-                  path: ["providers", 0],
-                  values: [
-                    "fixture",
-                    "cloudflare-google-ai-studio",
-                    "google-ai-studio",
-                  ],
-                },
-              ];
-              assert.deepStrictEqual(
-                JSON.parse(JSON.stringify(error.success.issues)),
-                expectedIssues,
-              );
-              assert.deepStrictEqual(
-                JSON.parse(
-                  JSON.stringify(generateScenarioErrorPayload(error.success)),
-                ),
-                { error: JSON.stringify(error.success.issues, null, 2) },
-              );
-              assert.strictEqual(
-                error.success.message,
-                '[\n  {\n    "code": "invalid_value",\n    "values": [\n      "fixture",\n      "cloudflare-google-ai-studio",\n      "google-ai-studio"\n    ],\n    "path": [\n      "providers",\n      0\n    ],\n    "message": "Invalid option: expected one of \\"fixture\\"|\\"cloudflare-google-ai-studio\\"|\\"google-ai-studio\\""\n  }\n]',
-              );
-            }
+  it.effect("formats invalid-provider paths from Effect Schema issues", () =>
+    Effect.gen(function* () {
+      const exit = yield* Effect.exit(
+        decodeGenerateScenarioInput({
+          providers: ["unsupported"],
+          scenarioId: "sketchi-onboarding-decision-flow",
+        }),
+      );
+      assert.isTrue(Exit.isFailure(exit));
+      if (Exit.isFailure(exit)) {
+        const error = Cause.findError(exit.cause);
+        assert.strictEqual(error._tag, "Success");
+        if (error._tag === "Success") {
+          assert.instanceOf(
+            error.success,
+            GenerateScenarioInputValidationError,
+          );
+          if (error.success instanceof GenerateScenarioInputValidationError) {
+            expect(error.success.issues).toEqual([
+              { path: ["providers", 0], message: expect.any(String) },
+            ]);
+            const payload = generateScenarioErrorPayload(error.success);
+            expect(typeof payload.error).toBe("string");
+            expect(JSON.parse(payload.error)).toEqual(error.success.issues);
           }
         }
-      }),
+      }
+    }),
   );
+
+  it("reuses one lazy runtime for concurrent requests with the same bindings", async () => {
+    const gateway = vi.fn(() => ({
+      getUrl: vi.fn(),
+      run: vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ error: { message: "invalid request" } }),
+            { status: 400 },
+          ),
+      ),
+    }));
+    const bindings = { AI: { gateway } };
+    expect(gateway).not.toHaveBeenCalled();
+    const input = { scenarioId: "sketchi-onboarding-decision-flow" };
+    const results = await Promise.all([
+      runGenerateScenarioCandidatesForInput(input, bindings),
+      runGenerateScenarioCandidatesForInput(input, bindings),
+      runGenerateScenarioCandidatesForInput(input, bindings),
+    ]);
+    expect(gateway).toHaveBeenCalledTimes(1);
+    for (const result of results)
+      expect(result.candidates[0]?.error).toBe("HTTP 400");
+    await runGenerateScenarioCandidatesForInput(input, { AI: { gateway } });
+    expect(gateway).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps scenario correlation on root spans in a shared runtime", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const bindings = {};
+    try {
+      const scenarioIds = ["unknown-one", "unknown-two"];
+      await Promise.all(
+        scenarioIds.map((scenarioId) =>
+          runGenerateScenarioCandidatesForInput({ scenarioId }, bindings),
+        ),
+      );
+      for (const scenarioId of scenarioIds) {
+        expect(log).toHaveBeenCalledWith(
+          expect.objectContaining({
+            event: "effect.span",
+            name: "evalHarness.generateScenarioCandidates",
+            attributes: expect.objectContaining({
+              "sketchi.scenario_id": scenarioId,
+            }),
+          }),
+        );
+      }
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it("forwards request cancellation through the runtime to the gateway", async () => {
+    const started = Promise.withResolvers<AbortSignal>();
+    const controller = new AbortController();
+    const bindings = {
+      AI: {
+        gateway: () => ({
+          getUrl: vi.fn(),
+          run: vi.fn(
+            (_data: unknown, options?: { signal?: AbortSignal }) =>
+              new Promise<Response>((_resolve, reject) => {
+                const signal = options?.signal;
+                if (!signal)
+                  return reject(new Error("Missing upstream AbortSignal."));
+                signal.addEventListener("abort", () => reject(signal.reason), {
+                  once: true,
+                });
+                started.resolve(signal);
+              }),
+          ),
+        }),
+      },
+    };
+    const result = runGenerateScenarioCandidatesForInput(
+      { scenarioId: "sketchi-onboarding-decision-flow" },
+      bindings,
+      controller.signal,
+    );
+    const rejection = expect(result).rejects.toBeDefined();
+    const upstreamSignal = await started.promise;
+    controller.abort();
+    await rejection;
+    expect(upstreamSignal.aborted).toBe(true);
+  });
 
   it("adapts a maintained scenario before calling the generation client", async () => {
     const scenario = getScenario("sketchi-onboarding-decision-flow");
@@ -179,7 +242,7 @@ describe("eval harness scenario generation composition", () => {
           diagramValid: false,
           error:
             'Provider "cloudflare-google-ai-studio" is not configured in this Worker environment.',
-          model: "google/gemini-3.1-flash-lite",
+          model: "gemini-3.1-flash-lite",
           provider: "cloudflare-google-ai-studio",
           text: "",
         },
@@ -254,7 +317,7 @@ describe("eval harness scenario generation composition", () => {
           diagnostics: ["gateway factory unavailable"],
           diagramValid: false,
           error: "gateway factory unavailable",
-          model: "google/gemini-3.1-flash-lite",
+          model: "gemini-3.1-flash-lite",
           provider: "cloudflare-google-ai-studio",
           text: "",
         },
@@ -284,7 +347,7 @@ describe("eval harness scenario generation composition", () => {
           diagnostics: ['Unknown scenario "unknown-scenario".'],
           diagramValid: false,
           error: 'Unknown scenario "unknown-scenario".',
-          model: "google/gemini-3.1-flash-lite",
+          model: "gemini-3.1-flash-lite",
           provider: "cloudflare-google-ai-studio",
           text: "",
         },
@@ -292,7 +355,7 @@ describe("eval harness scenario generation composition", () => {
       model: "google/gemini-3.1-flash-lite",
       scenarioId: "unknown-scenario",
     });
-    expect(gateway).not.toHaveBeenCalled();
+    expect(gateway).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -343,6 +406,7 @@ layer(concurrencyLayer)("eval generation policy", (it) => {
             "cloudflare-google-ai-studio",
           ],
           scenarioId: concurrencyScenario.id,
+          cacheMode: "default",
         }),
       );
       yield* TestClock.adjust("5 seconds");

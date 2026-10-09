@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { stripGoogleModelPrefix } from "./gemini.js";
 
 import type {
   DiagramGenerationCacheMode,
@@ -123,9 +124,7 @@ export function generationErrorToCandidate(
       diagnostics: [...error.diagnostics],
       durationMs: error.durationMs,
       error: `HTTP ${error.status}`,
-      model: request.model
-        .replace(/^google-ai-studio\//, "")
-        .replace(/^google\//, ""),
+      model: stripGoogleModelPrefix(request.model),
       provider: error.provider,
       raw: error.raw,
       text: "",
@@ -134,7 +133,7 @@ export function generationErrorToCandidate(
 
   return baseErrorCandidate(
     error.provider,
-    request.model,
+    stripGoogleModelPrefix(request.model),
     error.message,
     cacheMode,
   );

@@ -144,16 +144,8 @@ function bundleFromFormats(input: {
   };
 }
 
-function cloneData<T>(value: T): T {
-  return structuredClone(value);
-}
-
 export function jsonSizeBytes(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value)).length;
-}
-
-function binarySizeBytes(value: ArrayBuffer | Uint8Array): number {
-  return value.byteLength;
 }
 
 function errorMessage(cause: unknown, fallback: string): string {
@@ -191,28 +183,19 @@ function makeMemoryArtifactStorageState(): MemoryArtifactStorageState {
     storage: {
       read: Effect.fn("codeMode.artifacts.memory.read")(
         function* (artifactId, format) {
-          return yield* Effect.try({
-            try: () => {
-              const artifact = artifacts.get(`${artifactId}:${format}`);
-              return artifact
-                ? {
-                    ...artifact,
-                    data: cloneData(artifact.data),
-                  }
-                : null;
-            },
-            catch: storageError("read"),
+          return yield* Effect.sync(() => {
+            const artifact = artifacts.get(`${artifactId}:${format}`);
+            return artifact
+              ? { ...artifact, data: structuredClone(artifact.data) }
+              : null;
           });
         },
       ),
       readManifest: Effect.fn("codeMode.artifacts.memory.readManifest")(
         function* (artifactId) {
-          return yield* Effect.try({
-            try: () => {
-              const manifest = manifests.get(artifactId);
-              return manifest ? cloneData(manifest) : null;
-            },
-            catch: storageError("readManifest"),
+          return yield* Effect.sync(() => {
+            const manifest = manifests.get(artifactId);
+            return manifest ? structuredClone(manifest) : null;
           });
         },
       ),
@@ -222,7 +205,7 @@ function makeMemoryArtifactStorageState(): MemoryArtifactStorageState {
           try: () => {
             const refs = input.formats.map(manifestRef);
             const storedProvenance = input.provenance
-              ? cloneData(input.provenance)
+              ? structuredClone(input.provenance)
               : undefined;
             const manifest: StoredArtifactManifest = {
               artifactId: input.artifactId,
@@ -236,7 +219,7 @@ function makeMemoryArtifactStorageState(): MemoryArtifactStorageState {
             for (const artifact of input.formats) {
               artifacts.set(`${input.artifactId}:${artifact.format}`, {
                 ...artifact,
-                data: cloneData(artifact.data),
+                data: structuredClone(artifact.data),
               });
             }
 
@@ -248,7 +231,7 @@ function makeMemoryArtifactStorageState(): MemoryArtifactStorageState {
               diagramId: input.diagramId,
               formats,
               ...(input.provenance
-                ? { provenance: cloneData(input.provenance) }
+                ? { provenance: structuredClone(input.provenance) }
                 : {}),
             });
           },
@@ -324,15 +307,21 @@ function isArtifactProvenance(value: unknown): value is ArtifactProvenance {
 
 function bodyForArtifact(
   artifact: StoredArtifactFormat,
-): CodeModeObjectBucketBody {
-  if (artifact.format !== "png") return JSON.stringify(artifact.data);
+): Effect.Effect<CodeModeObjectBucketBody, CodeModeArtifactStorageError> {
+  if (artifact.format !== "png")
+    return Effect.try({
+      try: () => JSON.stringify(artifact.data),
+      catch: storageError("write"),
+    });
   if (
     artifact.data instanceof ArrayBuffer ||
     artifact.data instanceof Uint8Array
   ) {
-    return artifact.data;
+    return Effect.succeed(artifact.data);
   }
-  throw new Error("PNG artifact data must be binary.");
+  return Effect.fail(
+    storageError("write")(new Error("PNG artifact data must be binary.")),
+  );
 }
 
 function readBinaryArtifact(
@@ -375,7 +364,7 @@ export function makeObjectBucketArtifactStorage(
             format,
             mimeType: ARTIFACT_MIME_TYPES[format],
             data,
-            sizeBytes: object.size ?? binarySizeBytes(data),
+            sizeBytes: object.size ?? data.byteLength,
           };
         }
 
@@ -430,10 +419,7 @@ export function makeObjectBucketArtifactStorage(
         input.formats,
         (artifact) =>
           Effect.gen(function* () {
-            const body = yield* Effect.try({
-              try: () => bodyForArtifact(artifact),
-              catch: storageError("write"),
-            });
+            const body = yield* bodyForArtifact(artifact);
             yield* Effect.tryPromise({
               try: () =>
                 bucket.put(
@@ -467,16 +453,6 @@ export function makeObjectBucketArtifactStorage(
       });
     }),
   };
-}
-
-export function makeCodeModeArtifactStorageR2Layer(
-  bucket: CodeModeObjectBucket,
-  options: ObjectBucketArtifactStorageOptions = {},
-) {
-  return Layer.succeed(
-    CodeModeArtifactStorage,
-    makeObjectBucketArtifactStorage(bucket, options),
-  );
 }
 
 export function storageIssue(

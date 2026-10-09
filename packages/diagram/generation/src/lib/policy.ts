@@ -1,5 +1,14 @@
 import { recordMetric, withTelemetryCorrelation } from "@sketchi/observability";
-import { Clock, Effect, Metric, Ref, Result, Schedule } from "effect";
+import {
+  Cause,
+  Clock,
+  Effect,
+  Exit,
+  Metric,
+  Ref,
+  Result,
+  Schedule,
+} from "effect";
 
 import {
   type DiagramGenerationCandidate,
@@ -61,10 +70,7 @@ export const runDiagramGenerationWithPolicy = Effect.fn(
 )(function* (
   prepareAttempt: (
     request: DiagramGenerationRequest,
-  ) => Effect.Effect<
-    Effect.Effect<DiagramGenerationCandidate, DiagramGenerationError>,
-    DiagramGenerationError
-  >,
+  ) => Effect.Effect<DiagramGenerationCandidate, DiagramGenerationError>,
   request: DiagramGenerationRequest,
   provider: DiagramGenerationProviderId,
   policy: DiagramGenerationPolicyConfig,
@@ -72,7 +78,7 @@ export const runDiagramGenerationWithPolicy = Effect.fn(
   const startedAt = yield* Clock.currentTimeMillis;
   const executeModelCall = Effect.fn("diagramGeneration.executeModelCall")(
     function* (callRequest: DiagramGenerationRequest) {
-      const attempt = yield* prepareAttempt(callRequest);
+      const attempt = prepareAttempt(callRequest);
       const attemptRef = yield* Ref.make(0);
       const previousErrorTagRef = yield* Ref.make("initial");
       const measuredAttempt = Effect.gen(function* () {
@@ -80,10 +86,6 @@ export const runDiagramGenerationWithPolicy = Effect.fn(
           attemptRef,
           (value) => value + 1,
         );
-        yield* recordMetric(generationAttempts, 1, {
-          operation: "generate",
-          provider,
-        });
         if (attemptNumber > 1) {
           const previousErrorTag = yield* Ref.get(previousErrorTagRef);
           yield* recordMetric(generationRetries, 1, {
@@ -100,6 +102,24 @@ export const runDiagramGenerationWithPolicy = Effect.fn(
           });
         }
         return yield* attempt.pipe(
+          Effect.onExit((exit) => {
+            const failure = Exit.isFailure(exit)
+              ? Cause.findError(exit.cause)
+              : undefined;
+            // Initialization is not an upstream call, even when its error is replayed.
+            if (
+              failure &&
+              Result.isSuccess(failure) &&
+              failure.success._tag === "DiagramGenerationTransportError" &&
+              failure.success.operation === "ai.gateway"
+            ) {
+              return Effect.void;
+            }
+            return recordMetric(generationAttempts, 1, {
+              operation: "generate",
+              provider,
+            });
+          }),
           Effect.annotateSpans({ attempt: attemptNumber }),
           Effect.timeoutOrElse({
             duration: policy.requestTimeoutMs,
@@ -126,7 +146,10 @@ export const runDiagramGenerationWithPolicy = Effect.fn(
   );
 
   const operation = Effect.gen(function* () {
-    const originalCandidate = yield* executeModelCall(request);
+    const originalCandidate = enforceCandidateRequestRequirements(
+      yield* executeModelCall(request),
+      request,
+    );
     const originalRequirements =
       originalCandidate.intent?.requirements ??
       decodedIntentFromText(originalCandidate.text)?.requirements;

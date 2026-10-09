@@ -13,7 +13,6 @@ import {
   DiagramGenerationProviderIdSchema,
   DiagramGenerationPolicy,
   DiagramGenerationPolicyLive,
-  diagramGenerationProviderIds,
   errorMessage,
   generationErrorToCandidate,
   summarizeGenerationCandidate,
@@ -27,7 +26,15 @@ import {
   withTelemetryCorrelation,
 } from "@sketchi/observability";
 import { createServerFn } from "@tanstack/react-start";
-import { Context, Effect, Layer, Schema } from "effect";
+import {
+  Context,
+  Effect,
+  Layer,
+  ManagedRuntime,
+  Schema,
+  SchemaIssue,
+} from "effect";
+import { getRequest } from "@tanstack/react-start/server";
 
 const DEFAULT_GATEWAY_ID = "google-ai-studio";
 const DEFAULT_MODEL = "google/gemini-3.1-flash-lite";
@@ -44,31 +51,23 @@ export const GenerateScenarioInputSchema = Schema.Struct({
   scenarioId: Schema.String.check(Schema.isMinLength(1)),
 });
 
-export type GenerateScenarioInput = typeof GenerateScenarioInputSchema.Encoded;
-
-export type GenerateScenarioOutput = DiagramGenerationScenarioOutput;
-
-const GenerateScenarioIssuePathSegmentSchema = Schema.Union([
-  Schema.String,
-  Schema.Int,
-]);
-
-export class GenerateScenarioValidationIssue extends Schema.Class<GenerateScenarioValidationIssue>(
-  "GenerateScenarioValidationIssue",
-)({
-  code: Schema.String,
-  values: Schema.optional(Schema.Array(Schema.String).pipe(Schema.mutable)),
-  path: Schema.Array(GenerateScenarioIssuePathSegmentSchema).pipe(
-    Schema.mutable,
-  ),
-  message: Schema.String,
-}) {}
-
 export class GenerateScenarioInputValidationError extends Schema.TaggedError<GenerateScenarioInputValidationError>()(
   "GenerateScenarioInputValidationError",
   {
     cause: Schema.Defect(),
-    issues: Schema.Array(GenerateScenarioValidationIssue).pipe(Schema.mutable),
+    issues: Schema.Array(
+      Schema.Struct({
+        message: Schema.String,
+        path: Schema.optional(
+          Schema.Array(
+            Schema.Union([
+              Schema.PropertyKey,
+              Schema.Struct({ key: Schema.PropertyKey }),
+            ]),
+          ),
+        ),
+      }),
+    ),
     message: Schema.String,
   },
 ) {}
@@ -91,108 +90,14 @@ function envString(
     : fallback;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function invalidValueMessage(values: readonly string[]): string {
-  return `Invalid option: expected one of ${values.map((value) => JSON.stringify(value)).join("|")}`;
-}
-
-function generateScenarioValidationIssues(
-  input: unknown,
-): GenerateScenarioValidationIssue[] {
-  if (!isRecord(input)) {
-    return [
-      new GenerateScenarioValidationIssue({
-        code: "invalid_type",
-        message: "Invalid input: expected object",
-        path: [],
-      }),
-    ];
-  }
-
-  const issues: GenerateScenarioValidationIssue[] = [];
-  if (
-    input.cacheMode !== undefined &&
-    input.cacheMode !== "default" &&
-    input.cacheMode !== "fresh"
-  ) {
-    const values = ["default", "fresh"];
-    issues.push(
-      new GenerateScenarioValidationIssue({
-        code: "invalid_value",
-        message: invalidValueMessage(values),
-        path: ["cacheMode"],
-        values,
-      }),
-    );
-  }
-
-  if (input.providers !== undefined) {
-    if (Array.isArray(input.providers)) {
-      input.providers.forEach((provider, index) => {
-        if (
-          typeof provider !== "string" ||
-          !diagramGenerationProviderIds.some(
-            (candidate) => candidate === provider,
-          )
-        ) {
-          const values = [...diagramGenerationProviderIds];
-          issues.push(
-            new GenerateScenarioValidationIssue({
-              code: "invalid_value",
-              message: invalidValueMessage(values),
-              path: ["providers", index],
-              values,
-            }),
-          );
-        }
-      });
-    } else {
-      issues.push(
-        new GenerateScenarioValidationIssue({
-          code: "invalid_type",
-          message: "Invalid input: expected array",
-          path: ["providers"],
-        }),
-      );
-    }
-  }
-
-  if (typeof input.scenarioId !== "string") {
-    issues.push(
-      new GenerateScenarioValidationIssue({
-        code: "invalid_type",
-        message: "Invalid input: expected string",
-        path: ["scenarioId"],
-      }),
-    );
-  } else if (input.scenarioId.length < 1) {
-    issues.push(
-      new GenerateScenarioValidationIssue({
-        code: "too_small",
-        message: "Too small: expected string to have >=1 characters",
-        path: ["scenarioId"],
-      }),
-    );
-  }
-
-  return issues.length > 0
-    ? issues
-    : [
-        new GenerateScenarioValidationIssue({
-          code: "invalid_input",
-          message: "Invalid scenario generation input.",
-          path: [],
-        }),
-      ];
-}
-
 export function decodeGenerateScenarioInput(input: unknown) {
-  return Schema.decodeUnknownEffect(GenerateScenarioInputSchema)(input).pipe(
+  return Schema.decodeUnknownEffect(GenerateScenarioInputSchema, {
+    errors: "all",
+  })(input).pipe(
     Effect.mapError((cause) => {
-      const issues = generateScenarioValidationIssues(input);
+      const { issues } = SchemaIssue.makeFormatterStandardSchemaV1()(
+        cause.issue,
+      );
       return GenerateScenarioInputValidationError.make({
         cause,
         issues,
@@ -268,12 +173,14 @@ const runClient = Effect.fn("evalHarness.generateScenario.runClient")(
   },
 );
 
-export const generateScenarioCandidatesForInput = Effect.fn(
+const generateScenarioCandidatesEffect = Effect.fn(
   "evalHarness.generateScenarioCandidates",
-)(function* (input: unknown, model = DEFAULT_MODEL) {
+)(function* (
+  data: typeof GenerateScenarioInputSchema.Type,
+  model = DEFAULT_MODEL,
+) {
   const client = yield* DiagramGenerationClient;
   const policy = yield* DiagramGenerationPolicy;
-  const data = yield* decodeGenerateScenarioInput(input);
   yield* Effect.annotateCurrentSpan({
     cacheMode: data.cacheMode,
     model,
@@ -310,6 +217,18 @@ export const generateScenarioCandidatesForInput = Effect.fn(
   };
 });
 
+export function generateScenarioCandidatesForInput(
+  data: typeof GenerateScenarioInputSchema.Type,
+  model = DEFAULT_MODEL,
+) {
+  return withTelemetryCorrelation(
+    generateScenarioCandidatesEffect(data, model),
+    {
+      scenarioId: data.scenarioId,
+    },
+  );
+}
+
 function generationClientLayer(bindings: EvalHarnessEnv, gatewayId: string) {
   if (!bindings.AI) {
     return Layer.mergeAll(
@@ -345,10 +264,7 @@ function generationClientLayer(bindings: EvalHarnessEnv, gatewayId: string) {
   return Layer.mergeAll(clientLayer, DiagramGenerationPolicyLive);
 }
 
-export function runGenerateScenarioCandidatesForInput(
-  input: unknown,
-  bindings: EvalHarnessEnv,
-): Promise<GenerateScenarioOutput> {
+function makeGenerationRuntime(bindings: EvalHarnessEnv) {
   const gatewayId = envString(
     bindings,
     "SKETCHI_AI_GATEWAY_ID",
@@ -358,33 +274,51 @@ export function runGenerateScenarioCandidatesForInput(
   const telemetryLayer = makeWorkersTelemetryLayer({
     resource: { serviceName: "sketchi-eval-harness" },
   });
-
-  return Effect.runPromise(
-    withTelemetryCorrelation(generateScenarioCandidatesForInput(input, model), {
-      scenarioId:
-        isRecord(input) && typeof input.scenarioId === "string"
-          ? input.scenarioId
-          : "unknown",
-    }).pipe(
-      Effect.provide(
-        Layer.merge(generationClientLayer(bindings, gatewayId), telemetryLayer),
-      ),
+  return {
+    model,
+    runtime: ManagedRuntime.make(
+      Layer.merge(generationClientLayer(bindings, gatewayId), telemetryLayer),
     ),
+  };
+}
+
+const generationRuntimes = new WeakMap<
+  EvalHarnessEnv,
+  ReturnType<typeof makeGenerationRuntime>
+>();
+
+function generationRuntime(bindings: EvalHarnessEnv) {
+  const cached = generationRuntimes.get(bindings);
+  if (cached) return cached;
+  const runtime = makeGenerationRuntime(bindings);
+  generationRuntimes.set(bindings, runtime);
+  return runtime;
+}
+
+export function runGenerateScenarioCandidatesForInput(
+  input: unknown,
+  bindings: EvalHarnessEnv,
+  signal?: AbortSignal,
+): Promise<DiagramGenerationScenarioOutput> {
+  const { model, runtime } = generationRuntime(bindings);
+  return runtime.runPromise(
+    decodeGenerateScenarioInput(input).pipe(
+      Effect.flatMap((data) => generateScenarioCandidatesForInput(data, model)),
+    ),
+    signal ? { signal } : undefined,
   );
 }
 
 export const generateScenarioCandidates = createServerFn({ method: "POST" })
   .validator((input: unknown) =>
-    Schema.decodeUnknownSync(GenerateScenarioInputSchema, { errors: "all" })(
-      input,
-    ),
+    Effect.runSync(decodeGenerateScenarioInput(input)),
   )
   .handler(async ({ data }) => {
     const { getEvalHarnessBindings } =
       await import("./cloudflare-bindings.server");
 
-    return runGenerateScenarioCandidatesForInput(
-      data,
-      getEvalHarnessBindings(),
-    );
+    const { model, runtime } = generationRuntime(getEvalHarnessBindings());
+    return runtime.runPromise(generateScenarioCandidatesForInput(data, model), {
+      signal: getRequest().signal,
+    });
   });

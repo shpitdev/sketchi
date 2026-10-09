@@ -4,7 +4,18 @@ import {
   type TelemetryCorrelationInput,
 } from "@sketchi/observability";
 import { nanoid } from "nanoid";
-import { Clock, Context, Effect, Layer, Metric, Schema } from "effect";
+import {
+  Cause,
+  Clock,
+  Context,
+  Duration,
+  Effect,
+  Exit,
+  Layer,
+  Metric,
+  Option,
+  Schema,
+} from "effect";
 
 import {
   IsoDateStringSchema,
@@ -67,56 +78,38 @@ function observeStudioPersistence<A>(
   correlation: TelemetryCorrelationInput,
   effect: Effect.Effect<A, StudioProjectsError>,
 ): Effect.Effect<A, StudioProjectsError> {
-  const observed = Effect.gen(function* () {
-    const startedAt = yield* Clock.currentTimeMillis;
-    return yield* effect.pipe(
-      Effect.tap(() =>
-        Effect.gen(function* () {
-          const finishedAt = yield* Clock.currentTimeMillis;
-          yield* recordMetric(studioPersistenceRequests, 1, {
-            operation,
-            outcome: "success",
-            surface: "studio",
-          });
-          yield* recordMetric(
-            studioPersistenceDuration,
-            finishedAt - startedAt,
-            {
-              operation,
-              outcome: "success",
-              surface: "studio",
-            },
-          );
-        }),
-      ),
-      Effect.tapError((error) =>
-        Effect.gen(function* () {
-          const finishedAt = yield* Clock.currentTimeMillis;
-          yield* recordMetric(studioPersistenceRequests, 1, {
-            failureCategory: error._tag,
-            operation,
-            outcome: "failure",
-            surface: "studio",
-          });
-          yield* recordMetric(studioPersistenceFailures, 1, {
-            failureCategory: error._tag,
-            operation,
-            surface: "studio",
-          });
-          yield* recordMetric(
-            studioPersistenceDuration,
-            finishedAt - startedAt,
-            {
-              failureCategory: error._tag,
-              operation,
-              outcome: "failure",
-              surface: "studio",
-            },
-          );
-        }),
-      ),
-    );
-  });
+  const observed = effect.pipe(
+    Effect.exit,
+    Effect.timed,
+    Effect.onExit((timedExit) =>
+      Effect.gen(function* () {
+        if (Exit.isFailure(timedExit)) return;
+        const [duration, exit] = timedExit.value;
+        const error = Exit.isFailure(exit)
+          ? Option.getOrUndefined(Cause.findErrorOption(exit.cause))
+          : undefined;
+        if (Exit.isFailure(exit) && !error) return;
+        const attributes = {
+          ...(error ? { failureCategory: error._tag } : {}),
+          operation,
+          surface: "studio",
+        };
+        const outcomeAttributes = {
+          ...attributes,
+          outcome: Exit.isSuccess(exit) ? "success" : "failure",
+        };
+        yield* recordMetric(studioPersistenceRequests, 1, outcomeAttributes);
+        if (error)
+          yield* recordMetric(studioPersistenceFailures, 1, attributes);
+        yield* recordMetric(
+          studioPersistenceDuration,
+          Duration.toMillis(duration),
+          outcomeAttributes,
+        );
+      }),
+    ),
+    Effect.flatMap(([, exit]) => exit),
+  );
   return withTelemetryCorrelation(observed, correlation);
 }
 

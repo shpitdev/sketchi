@@ -1,68 +1,34 @@
-import { Schema } from "effect";
-
+import { isUnknownRecord, objectValue } from "./unknown-record.js";
 import type { DiagramGenerationUsage } from "./candidates.js";
 import { buildDiagramGenerationMessages } from "./messages.js";
-import type { DiagramGenerationMessage } from "./messages.js";
 import type { DiagramGenerationRequest } from "./candidates.js";
 
-export class GeminiTextPart extends Schema.Class<GeminiTextPart>(
-  "GeminiTextPart",
-)({ text: Schema.String }) {}
-
-export class GeminiContent extends Schema.Class<GeminiContent>("GeminiContent")(
-  {
-    parts: Schema.Array(GeminiTextPart).pipe(Schema.mutable),
-    role: Schema.Literals(["model", "user"]),
-  },
-) {}
-
-export class GeminiGenerationConfig extends Schema.Class<GeminiGenerationConfig>(
-  "GeminiGenerationConfig",
-)({
-  maxOutputTokens: Schema.Number,
-  response_mime_type: Schema.Literal("application/json"),
-  temperature: Schema.Number,
-}) {}
-
-export class GeminiSystemInstruction extends Schema.Class<GeminiSystemInstruction>(
-  "GeminiSystemInstruction",
-)({ parts: Schema.Array(GeminiTextPart).pipe(Schema.mutable) }) {}
-
-export class GeminiGenerateContentBody extends Schema.Class<GeminiGenerateContentBody>(
-  "GeminiGenerateContentBody",
-)({
-  contents: Schema.Array(GeminiContent).pipe(Schema.mutable),
-  generationConfig: GeminiGenerationConfig,
-  system_instruction: GeminiSystemInstruction,
-}) {}
+export interface GeminiTextPart {
+  text: string;
+}
+export interface GeminiContent {
+  parts: GeminiTextPart[];
+  role: "model" | "user";
+}
+export interface GeminiGenerationConfig {
+  maxOutputTokens: number;
+  response_mime_type: "application/json";
+  temperature: number;
+}
+export interface GeminiSystemInstruction {
+  parts: GeminiTextPart[];
+}
+export interface GeminiGenerateContentBody {
+  contents: GeminiContent[];
+  generationConfig: GeminiGenerationConfig;
+  system_instruction: GeminiSystemInstruction;
+}
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 16_384;
 const DEFAULT_TEMPERATURE = 0.1;
 
-function messageContent(
-  messages: readonly DiagramGenerationMessage[],
-  role: DiagramGenerationMessage["role"],
-): string {
-  return messages
-    .filter((message) => message.role === role)
-    .map((message) => message.content)
-    .join("\n\n");
-}
-
 function numberUsage(value: unknown): number | undefined {
   return typeof value === "number" ? value : undefined;
-}
-
-interface UnknownRecord {
-  readonly [key: string]: unknown;
-}
-
-function isUnknownRecord(value: unknown): value is UnknownRecord {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function objectValue(value: unknown, key: string): unknown {
-  return isUnknownRecord(value) ? value[key] : undefined;
 }
 
 export function stripGoogleModelPrefix(model: string): string {
@@ -72,9 +38,7 @@ export function stripGoogleModelPrefix(model: string): string {
 export function buildGeminiGenerateContentBody(
   request: DiagramGenerationRequest,
 ): GeminiGenerateContentBody {
-  const prompt = buildDiagramGenerationMessages(request.prompt);
-  const system = messageContent(prompt.messages, "system");
-  const user = messageContent(prompt.messages, "user");
+  const { system, user } = buildDiagramGenerationMessages(request.prompt);
 
   return {
     contents: [

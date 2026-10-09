@@ -6,8 +6,6 @@ import {
   type MindmapDiagram,
   MindmapDiagramSchema,
   SKETCHI_DIAGRAM_STYLE,
-  parseFlowchartDiagram,
-  parseMindmapDiagram,
   safeParseDiagramSchema,
   validateFlowchartDiagram,
   validateMindmapDiagram,
@@ -20,6 +18,7 @@ import {
   GeneratedDiagramResponse,
   modelTitleOrFallback,
 } from "./intent.js";
+import { isUnknownRecord, objectValue } from "./unknown-record.js";
 import { DiagramGenerationPrompt } from "./messages.js";
 import {
   GeneratedMindmapTree,
@@ -181,18 +180,6 @@ export function extractJsonObject(text: string): unknown {
   }
 }
 
-function objectValue(value: unknown, key: string): unknown {
-  return isUnknownRecord(value) ? value[key] : undefined;
-}
-
-interface UnknownRecord {
-  readonly [key: string]: unknown;
-}
-
-function isUnknownRecord(value: unknown): value is UnknownRecord {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
 function withSketchiDiagramStyle(input: unknown): unknown {
   return isUnknownRecord(input)
     ? { ...input, style: { ...SKETCHI_DIAGRAM_STYLE } }
@@ -245,29 +232,6 @@ export function responseErrorDiagnostic(raw: unknown): string | undefined {
   return message.length > 280 ? `${message.slice(0, 277)}...` : message;
 }
 
-export function parseGeneratedFlowchart(text: string): FlowchartDiagram {
-  return parseFlowchartDiagram(
-    normalizeGeneratedFlowchartInput(extractJsonObject(text)),
-  );
-}
-
-export function parseGeneratedDiagram(
-  text: string,
-): FlowchartDiagram | MindmapDiagram | GeneratedSequenceDiagram {
-  const extracted = extractJsonObject(text);
-  if (isUnknownRecord(extracted) && extracted["type"] === "sequence") {
-    return parseGeneratedSequence(extracted);
-  }
-  if (isUnknownRecord(extracted) && extracted["type"] === "mindmap") {
-    if ("root" in extracted) {
-      const nested = safeParseDiagramSchema(GeneratedMindmapTree, extracted);
-      if (nested.success) return generatedMindmapTreeToDiagram(nested.data);
-    }
-    return parseMindmapDiagram(withSketchiDiagramStyle(extracted));
-  }
-  return parseFlowchartDiagram(normalizeGeneratedFlowchartInput(extracted));
-}
-
 interface CandidateParseFailure {
   readonly diagnostics: readonly string[];
   readonly error: string;
@@ -285,16 +249,11 @@ interface CandidateParseSuccess {
 
 type CandidateParseResult = CandidateParseFailure | CandidateParseSuccess;
 
-function parseGeneratedSequence(input: unknown): GeneratedSequenceDiagram {
-  const decoded = safeParseDiagramSchema(GeneratedSequenceDiagram, input);
-  if (!decoded.success) {
-    throw new DiagramValidationError(
-      decoded.error.issues[0]?.message ??
-        "Generated sequence diagram schema validation failed.",
-    );
-  }
+function parseGeneratedSequence(
+  decoded: GeneratedSequenceDiagram,
+): GeneratedSequenceDiagram {
   const participantIds = new Set<string>();
-  for (const participant of decoded.data.participants) {
+  for (const participant of decoded.participants) {
     if (participantIds.has(participant.id)) {
       throw new DiagramValidationError(
         `Duplicate sequence participant id "${participant.id}" is not allowed.`,
@@ -303,7 +262,7 @@ function parseGeneratedSequence(input: unknown): GeneratedSequenceDiagram {
     participantIds.add(participant.id);
   }
   const messageIds = new Set<string>();
-  for (const message of decoded.data.messages) {
+  for (const message of decoded.messages) {
     if (messageIds.has(message.id)) {
       throw new DiagramValidationError(
         `Duplicate sequence message id "${message.id}" is not allowed.`,
@@ -324,7 +283,7 @@ function parseGeneratedSequence(input: unknown): GeneratedSequenceDiagram {
       );
     }
   }
-  return decoded.data;
+  return decoded;
 }
 
 function schemaIssueDiagnostic(issue: {
@@ -439,98 +398,61 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
     title: modelTitleOrFallback(title, id, intent.nativeKind),
   };
 
-  if (intent.nativeKind === "mindmap") {
-    if ("root" in titledDiagram) {
-      const decoded = safeParseDiagramSchema(
-        GeneratedMindmapTree,
+  const parsers = {
+    flowchart: () =>
+      decodeAndValidate(
+        FlowchartDiagramSchema,
+        normalizeGeneratedFlowchartInput(titledDiagram),
+        validateFlowchartDiagram,
+        intent,
+      ),
+    mindmap: () =>
+      "root" in titledDiagram
+        ? decodeAndValidate(
+            GeneratedMindmapTree,
+            titledDiagram,
+            generatedMindmapTreeToDiagram,
+            intent,
+            "Generated mindmap schema validation failed.",
+          )
+        : decodeAndValidate(
+            MindmapDiagramSchema,
+            withSketchiDiagramStyle(titledDiagram),
+            validateMindmapDiagram,
+            intent,
+          ),
+    sequence: () =>
+      decodeAndValidate(
+        GeneratedSequenceDiagram,
         titledDiagram,
-      );
-      if (!decoded.success) {
-        const diagnostics = decoded.error.issues.map(schemaIssueDiagnostic);
-        return {
-          diagnostics,
-          error:
-            diagnostics[0] ?? "Generated mindmap schema validation failed.",
-          success: false,
-        };
-      }
-      try {
-        return {
-          diagram: generatedMindmapTreeToDiagram(decoded.data),
-          intent,
-          success: true,
-        };
-      } catch (error) {
-        return diagramValidationFailure(error);
-      }
-    }
-    const decoded = safeParseDiagramSchema(
-      MindmapDiagramSchema,
-      withSketchiDiagramStyle(titledDiagram),
-    );
-    if (!decoded.success) {
-      const diagnostics = decoded.error.issues.map(schemaIssueDiagnostic);
-      return {
-        diagnostics,
-        error: diagnostics[0] ?? "Generated diagram schema validation failed.",
-        success: false,
-      };
-    }
-    try {
-      return {
-        diagram: validateMindmapDiagram(decoded.data),
+        parseGeneratedSequence,
         intent,
-        success: true,
-      };
-    } catch (error) {
-      return diagramValidationFailure(error);
-    }
-  }
+        "Generated sequence diagram schema validation failed.",
+      ),
+  };
+  return parsers[intent.nativeKind]();
+}
 
-  if (intent.nativeKind === "sequence") {
-    const decoded = safeParseDiagramSchema(
-      GeneratedSequenceDiagram,
-      titledDiagram,
-    );
-    if (!decoded.success) {
-      const diagnostics = decoded.error.issues.map(schemaIssueDiagnostic);
-      return {
-        diagnostics,
-        error:
-          diagnostics[0] ??
-          "Generated sequence diagram schema validation failed.",
-        success: false,
-      };
-    }
-    try {
-      return {
-        diagram: parseGeneratedSequence(titledDiagram),
-        intent,
-        success: true,
-      };
-    } catch (error) {
-      return diagramValidationFailure(error);
-    }
-  }
-
-  const decoded = safeParseDiagramSchema(
-    FlowchartDiagramSchema,
-    normalizeGeneratedFlowchartInput(titledDiagram),
-  );
+function decodeAndValidate<S extends Schema.ConstraintDecoder<unknown>>(
+  schema: S,
+  input: unknown,
+  validate: (
+    decoded: S["Type"],
+  ) => NonNullable<CandidateParseSuccess["diagram"]>,
+  intent: GeneratedDiagramIntent,
+  schemaFailureMessage = "Generated diagram schema validation failed.",
+): CandidateParseResult {
+  const decoded = safeParseDiagramSchema(schema, input);
   if (!decoded.success) {
     const diagnostics = decoded.error.issues.map(schemaIssueDiagnostic);
     return {
       diagnostics,
-      error: diagnostics[0] ?? "Generated diagram schema validation failed.",
+      error: diagnostics[0] ?? schemaFailureMessage,
       success: false,
     };
   }
   try {
-    return {
-      diagram: validateFlowchartDiagram(decoded.data),
-      intent,
-      success: true,
-    };
+    return { diagram: validate(decoded.data), intent, success: true };
   } catch (error) {
     return diagramValidationFailure(error);
   }

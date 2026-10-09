@@ -54,6 +54,53 @@ describe("Workers Effect telemetry", () => {
   });
 
   it.effect(
+    "annotates every correlation field and preserves valid parent IDs",
+    () => {
+      const { probe, sink } = makeTelemetryTestSink();
+      const telemetryLayer = makeWorkersTelemetryLayer({
+        resource: { serviceName: "sketchi-correlation-test" },
+        sink,
+      });
+      return withTelemetryCorrelation(
+        withTelemetryCorrelation(
+          Effect.logInfo("Retrying diagram generation", {
+            operation: "generate",
+          }),
+          { requestId: "not a valid ID", scenarioId: " scenario_child " },
+        ),
+        {
+          artifactId: "artifact_parent",
+          attemptId: "attempt_parent",
+          projectId: "project_parent",
+          requestId: "request_parent",
+          runId: "run_parent",
+          scenarioId: "scenario_parent",
+          traceId: "trace_parent",
+        },
+      ).pipe(
+        Effect.provide(telemetryLayer),
+        Effect.tap(() =>
+          Effect.sync(() => {
+            const log = probe.events.find(isLogEvent);
+            assert.deepStrictEqual(log?.annotations, {
+              "sketchi.artifact_id": "artifact_parent",
+              "sketchi.attempt_id": "attempt_parent",
+              "sketchi.project_id": "project_parent",
+              "sketchi.request_id": "request_parent",
+              "sketchi.run_id": "run_parent",
+              "sketchi.scenario_id": "scenario_child",
+              "sketchi.trace_id": "trace_parent",
+            });
+            assert.strictEqual(log?.message, "Retrying diagram generation");
+            assert.isUndefined(log?.message_dropped);
+            assert.deepStrictEqual(log?.fields, { operation: "generate" });
+          }),
+        ),
+      );
+    },
+  );
+
+  it.effect(
     "exports bounded spans, logs, annotations, and metric updates",
     () => {
       const { probe, sink } = makeTelemetryTestSink();
@@ -119,6 +166,7 @@ describe("Workers Effect telemetry", () => {
         );
         assert.strictEqual(logs[0]?.fields["operation"], "buildFlowchart");
         assert.strictEqual(logs[0]?.message, "Effect log event");
+        assert.isTrue(logs[0]?.message_dropped);
         assert.notInclude(
           JSON.stringify(probe.events),
           "full secret prompt must not be exported",
