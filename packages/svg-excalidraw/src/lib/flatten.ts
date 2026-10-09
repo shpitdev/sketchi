@@ -4,9 +4,14 @@ import {
   type SVGCommand,
 } from "svg-pathdata";
 
-import { signedArea } from "./geometry";
+import {
+  pointToSegmentDistance,
+  signedArea,
+  squaredDistance,
+} from "./geometry";
+import { parseLength, viewportDiagonal, type SvgViewport } from "./length";
 import type { SvgAttributes } from "./style";
-import { numericTokens, transformPoint } from "./transform";
+import { parseNumberList, transformPoint } from "./transform";
 import type {
   CanonicalSubpath,
   EffectiveAdaptiveFlatteningOptions,
@@ -36,9 +41,7 @@ const POINT_EPSILON = 1e-10;
 
 function diagnostic(
   code:
-    | "adaptive-flattening-depth-exceeded"
-    | "invalid-geometry"
-    | "parse-error",
+    "adaptive-flattening-depth-exceeded" | "invalid-geometry" | "parse-error",
   message: string,
   sourcePath: string,
 ): SvgDiagnostic {
@@ -52,44 +55,8 @@ function diagnostic(
   };
 }
 
-function finiteLength(value: string | undefined, fallback: number): number {
-  const match = /^\s*([-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?)/.exec(
-    value ?? "",
-  );
-  const parsed = Number(match?.[1]);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 function midpoint(left: Point, right: Point): Point {
   return { x: (left.x + right.x) / 2, y: (left.y + right.y) / 2 };
-}
-
-function squaredDistance(left: Point, right: Point): number {
-  const dx = left.x - right.x;
-  const dy = left.y - right.y;
-  return dx * dx + dy * dy;
-}
-
-function pointSegmentDistance(point: Point, start: Point, end: Point): number {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const denominator = dx * dx + dy * dy;
-  if (denominator <= POINT_EPSILON) {
-    return Math.sqrt(squaredDistance(point, start));
-  }
-  const projection = Math.max(
-    0,
-    Math.min(
-      1,
-      ((point.x - start.x) * dx + (point.y - start.y) * dy) / denominator,
-    ),
-  );
-  return Math.sqrt(
-    squaredDistance(point, {
-      x: start.x + projection * dx,
-      y: start.y + projection * dy,
-    }),
-  );
 }
 
 function cubicFlatness(
@@ -99,8 +66,8 @@ function cubicFlatness(
   end: Point,
 ): number {
   return Math.max(
-    pointSegmentDistance(control1, start, end),
-    pointSegmentDistance(control2, start, end),
+    pointToSegmentDistance(control1, { start, end }, POINT_EPSILON),
+    pointToSegmentDistance(control2, { start, end }, POINT_EPSILON),
   );
 }
 
@@ -301,6 +268,14 @@ function pathSubpaths(
   };
 
   for (const command of normalizedCommands(pathData)) {
+    if (
+      points.length === 0 &&
+      command.type !== SVGPathData.MOVE_TO &&
+      command.type !== SVGPathData.CLOSE_PATH
+    ) {
+      start = current;
+      appendPoint(points, transformPoint(current, matrix));
+    }
     if (command.type === SVGPathData.MOVE_TO) {
       finish();
       current = { x: command.x, y: command.y };
@@ -328,10 +303,11 @@ function pathSubpaths(
       depthExceeded =
         flattenArc(command, current, matrix, options, points) || depthExceeded;
       current = { x: command.x, y: command.y };
-    } else if (command.type === SVGPathData.CLOSE_PATH) {
+    } else if (command.type === SVGPathData.CLOSE_PATH && points.length > 0) {
       appendPoint(points, transformPoint(start, matrix));
       current = start;
       closed = true;
+      finish();
     }
   }
   finish();
@@ -352,8 +328,21 @@ function pointsSubpath(
   matrix: Matrix,
   closed: boolean,
   metrics: MutableFlatteningMetrics,
+  sourcePath: string,
+  diagnostics: SvgDiagnostic[],
 ): readonly CanonicalSubpath[] {
-  const values = numericTokens(value ?? "");
+  if (!value?.trim()) return [];
+  const values = parseNumberList(value);
+  if (!values || values.length % 2 !== 0) {
+    diagnostics.push(
+      diagnostic(
+        "invalid-geometry",
+        "Points must be a list of finite coordinate pairs.",
+        sourcePath,
+      ),
+    );
+    return [];
+  }
   const points: Point[] = [];
   for (let index = 0; index + 1 < values.length; index += 2) {
     appendPoint(
@@ -425,18 +414,21 @@ function ellipseSubpath(
   return subpath ? [subpath] : [];
 }
 
-function rectPath(attributes: SvgAttributes): string | null {
-  const x = finiteLength(attributes.x, 0);
-  const y = finiteLength(attributes.y, 0);
-  const width = finiteLength(attributes.width, 0);
-  const height = finiteLength(attributes.height, 0);
+function rectPath(
+  length: (attribute: string, reference?: number) => number,
+  attributes: SvgAttributes,
+): string | null {
+  const x = length("x");
+  const y = length("y");
+  const width = length("width");
+  const height = length("height");
   if (width <= 0 || height <= 0) {
     return null;
   }
   const specifiedRadiusX =
-    attributes.rx === undefined ? null : finiteLength(attributes.rx, 0);
+    attributes.rx === undefined ? null : length("rx", width);
   const specifiedRadiusY =
-    attributes.ry === undefined ? null : finiteLength(attributes.ry, 0);
+    attributes.ry === undefined ? null : length("ry", height);
   const radiusX = Math.min(
     width / 2,
     Math.max(0, specifiedRadiusX ?? specifiedRadiusY ?? 0),
@@ -468,12 +460,35 @@ export function flattenPrimitive(
   matrix: Matrix,
   options: EffectiveAdaptiveFlatteningOptions,
   sourcePath: string,
+  viewport: SvgViewport,
 ): FlattenedPrimitive {
   const diagnostics: SvgDiagnostic[] = [];
   const metrics: MutableFlatteningMetrics = {
     arcSegments: 0,
     cubicSegments: 0,
     flattenedSegments: 0,
+  };
+  const length = (attribute: string, referenceOverride?: number): number => {
+    const value = attributes[attribute];
+    if (value === undefined) return 0;
+    const reference =
+      referenceOverride ??
+      (["y", "y1", "y2", "cy", "height", "ry"].includes(attribute)
+        ? viewport.height
+        : attribute === "r"
+          ? viewportDiagonal(viewport)
+          : viewport.width);
+    const parsed = parseLength(value, reference);
+    if (parsed === null) {
+      diagnostics.push(
+        diagnostic(
+          "invalid-geometry",
+          `Invalid SVG length for ${attribute}: ${value}`,
+          sourcePath,
+        ),
+      );
+    }
+    return parsed ?? 0;
   };
   try {
     let subpaths: readonly CanonicalSubpath[] = [];
@@ -494,16 +509,20 @@ export function flattenPrimitive(
         matrix,
         name === "polygon",
         metrics,
+        sourcePath,
+        diagnostics,
       );
     } else if (name === "line") {
       subpaths = pointsSubpath(
-        `${finiteLength(attributes.x1, 0)},${finiteLength(attributes.y1, 0)} ${finiteLength(attributes.x2, 0)},${finiteLength(attributes.y2, 0)}`,
+        `${length("x1")},${length("y1")} ${length("x2")},${length("y2")}`,
         matrix,
         false,
         metrics,
+        sourcePath,
+        diagnostics,
       );
     } else if (name === "rect") {
-      const path = rectPath(attributes);
+      const path = rectPath(length, attributes);
       if (!path) {
         diagnostics.push(
           diagnostic(
@@ -523,12 +542,12 @@ export function flattenPrimitive(
         );
       }
     } else {
-      const radius = finiteLength(attributes.r, 0);
+      const radius = length("r");
       subpaths = ellipseSubpath(
-        finiteLength(attributes.cx, 0),
-        finiteLength(attributes.cy, 0),
-        name === "circle" ? radius : finiteLength(attributes.rx, 0),
-        name === "circle" ? radius : finiteLength(attributes.ry, 0),
+        length("cx"),
+        length("cy"),
+        name === "circle" ? radius : length("rx"),
+        name === "circle" ? radius : length("ry"),
         matrix,
         options,
         sourcePath,

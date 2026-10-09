@@ -26,12 +26,6 @@ export function transformedStrokeScale(matrix: Matrix): number {
   return Math.sqrt(Math.abs(matrix[0] * matrix[3] - matrix[1] * matrix[2]));
 }
 
-export function numericTokens(value: string): readonly number[] {
-  return (
-    value.match(/[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g)?.map(Number) ?? []
-  );
-}
-
 function transformDiagnostic(
   message: string,
   sourcePath: string,
@@ -46,7 +40,7 @@ function transformDiagnostic(
   };
 }
 
-function transformArguments(value: string): readonly number[] | null {
+export function parseNumberList(value: string): readonly number[] | null {
   const numberPattern = /[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/y;
   const values: number[] = [];
   let cursor = 0;
@@ -105,7 +99,7 @@ export function parseTransform(
   for (const match of value.matchAll(/([A-Za-z]+)\s*\(([^)]*)\)/g)) {
     consumed += match[0];
     const operation = match[1]?.toLowerCase() ?? "";
-    const values = transformArguments(match[2] ?? "");
+    const values = parseNumberList(match[2] ?? "");
     let next: Matrix | null = null;
 
     if (operation === "matrix" && values?.length === 6) {

@@ -563,11 +563,15 @@ function outputContainsPoint(
   );
 }
 
-function pointToSegmentDistance(point: Point, segment: RingSegment): number {
+export function pointToSegmentDistance(
+  point: Point,
+  segment: Pick<RingSegment, "start" | "end">,
+  squaredLengthEpsilon = 0,
+): number {
   const dx = segment.end.x - segment.start.x;
   const dy = segment.end.y - segment.start.y;
   const lengthSquared = dx * dx + dy * dy;
-  if (lengthSquared === 0) {
+  if (lengthSquared <= squaredLengthEpsilon) {
     return Math.hypot(point.x - segment.start.x, point.y - segment.start.y);
   }
   const projection = Math.max(
@@ -954,7 +958,7 @@ export function regionsFromRings(
   });
 }
 
-function squaredDistance(left: Point, right: Point): number {
+export function squaredDistance(left: Point, right: Point): number {
   const dx = left.x - right.x;
   const dy = left.y - right.y;
   return dx * dx + dy * dy;

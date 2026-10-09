@@ -1,5 +1,10 @@
 import {
   CANVAS_SPEC_VERSION,
+  type AxisAlignedSegment,
+  isSharedBoundStem,
+  segmentCrossesBoundsInterior,
+  segmentsFromPoints,
+  segmentsOverlapInterior,
   type CanvasConnectorElement,
   type CanvasElement,
   type CanvasFrameElement,
@@ -57,17 +62,10 @@ interface EdgeBuckets {
   outgoing: Map<string, DiagramEdge[]>;
 }
 
-interface RouteSegment {
+interface RouteSegment extends AxisAlignedSegment {
   arrowId: string;
-  isFirstSegment: boolean;
-  isLastSegment: boolean;
-  max: number;
-  min: number;
-  orientation: "horizontal" | "vertical";
-  segmentIndex: number;
-  sourceNodeId: string;
-  staticCoordinate: number;
-  targetNodeId: string;
+  startBindingId: string;
+  endBindingId: string;
 }
 
 type VisitState = "visited" | "visiting";
@@ -935,51 +933,6 @@ function compactPoints(
   return [first, ...compacted.slice(1)];
 }
 
-function betweenInterior(value: number, min: number, max: number): boolean {
-  return value > min + 0.01 && value < max - 0.01;
-}
-
-function rangesOverlapInterior(
-  leftMin: number,
-  leftMax: number,
-  rightMin: number,
-  rightMax: number,
-): boolean {
-  return Math.min(leftMax, rightMax) - Math.max(leftMin, rightMin) > 0.01;
-}
-
-function segmentCrossesNode(
-  start: ScenePoint,
-  end: ScenePoint,
-  shape: NodeSceneElement,
-): boolean {
-  if (start.y === end.y) {
-    return (
-      betweenInterior(start.y, shape.y, shape.y + shape.height) &&
-      rangesOverlapInterior(
-        Math.min(start.x, end.x),
-        Math.max(start.x, end.x),
-        shape.x,
-        shape.x + shape.width,
-      )
-    );
-  }
-
-  if (start.x === end.x) {
-    return (
-      betweenInterior(start.x, shape.x, shape.x + shape.width) &&
-      rangesOverlapInterior(
-        Math.min(start.y, end.y),
-        Math.max(start.y, end.y),
-        shape.y,
-        shape.y + shape.height,
-      )
-    );
-  }
-
-  return false;
-}
-
 function routeCrossesNode(
   points: readonly ScenePoint[],
   shapes: readonly NodeSceneElement[],
@@ -995,18 +948,11 @@ function routeNodeCrossingCount(
 ): number {
   let crossingCount = 0;
 
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const start = points[index];
-    const end = points[index + 1];
-
-    if (!start || !end) {
-      continue;
-    }
-
+  for (const segment of segmentsFromPoints(points)) {
     for (const shape of shapes) {
       if (
         !ignoredNodeIds.has(shape.nodeId) &&
-        segmentCrossesNode(start, end, shape)
+        segmentCrossesBoundsInterior(segment, shape)
       ) {
         crossingCount += 1;
       }
@@ -1039,70 +985,12 @@ function routeSegments(input: {
   sourceNodeId: string;
   targetNodeId: string;
 }): RouteSegment[] {
-  const segments: RouteSegment[] = [];
-
-  for (let index = 0; index < input.points.length - 1; index += 1) {
-    const start = input.points[index];
-    const end = input.points[index + 1];
-
-    if (!start || !end) {
-      continue;
-    }
-
-    if (start.y === end.y) {
-      segments.push({
-        arrowId: input.arrowId,
-        isFirstSegment: index === 0,
-        isLastSegment: index === input.points.length - 2,
-        max: Math.max(start.x, end.x),
-        min: Math.min(start.x, end.x),
-        orientation: "horizontal",
-        segmentIndex: index,
-        sourceNodeId: input.sourceNodeId,
-        staticCoordinate: start.y,
-        targetNodeId: input.targetNodeId,
-      });
-      continue;
-    }
-
-    if (start.x === end.x) {
-      segments.push({
-        arrowId: input.arrowId,
-        isFirstSegment: index === 0,
-        isLastSegment: index === input.points.length - 2,
-        max: Math.max(start.y, end.y),
-        min: Math.min(start.y, end.y),
-        orientation: "vertical",
-        segmentIndex: index,
-        sourceNodeId: input.sourceNodeId,
-        staticCoordinate: start.x,
-        targetNodeId: input.targetNodeId,
-      });
-    }
-  }
-
-  return segments.filter((segment) => segment.max - segment.min > 0.01);
-}
-
-function routeSegmentOverlapLength(
-  left: RouteSegment,
-  right: RouteSegment,
-): number {
-  return Math.min(left.max, right.max) - Math.max(left.min, right.min);
-}
-
-function isSharedBoundRouteStem(
-  left: RouteSegment,
-  right: RouteSegment,
-): boolean {
-  return (
-    (left.isFirstSegment &&
-      right.isFirstSegment &&
-      left.sourceNodeId === right.sourceNodeId) ||
-    (left.isLastSegment &&
-      right.isLastSegment &&
-      left.targetNodeId === right.targetNodeId)
-  );
+  return segmentsFromPoints(input.points).map((segment) => ({
+    ...segment,
+    arrowId: input.arrowId,
+    startBindingId: input.sourceNodeId,
+    endBindingId: input.targetNodeId,
+  }));
 }
 
 function routeArrowOverlapCount(
@@ -1130,11 +1018,8 @@ function routeArrowOverlapCount(
     for (const existing of existingSegments) {
       if (
         candidate.arrowId === existing.arrowId ||
-        candidate.orientation !== existing.orientation ||
-        Math.abs(candidate.staticCoordinate - existing.staticCoordinate) >
-          0.01 ||
-        isSharedBoundRouteStem(candidate, existing) ||
-        routeSegmentOverlapLength(candidate, existing) <= 0.01
+        isSharedBoundStem(candidate, existing) ||
+        !segmentsOverlapInterior(candidate, existing)
       ) {
         continue;
       }
@@ -1172,12 +1057,7 @@ function routeSelfOverlapCount(
     ) {
       const right = segments[rightIndex];
 
-      if (
-        !right ||
-        left.orientation !== right.orientation ||
-        Math.abs(left.staticCoordinate - right.staticCoordinate) > 0.01 ||
-        routeSegmentOverlapLength(left, right) <= 0.01
-      ) {
+      if (!right || !segmentsOverlapInterior(left, right)) {
         continue;
       }
 
@@ -1313,92 +1193,37 @@ function chooseBestRoute(
     return [{ x: 0, y: 0 }];
   }
 
-  return candidates.slice(1).reduce((best, candidate) => {
-    const bestCrossingCount = routeNodeCrossingCount(
-      best,
-      shapes,
-      ignoredNodeIds,
-    );
-    const candidateCrossingCount = routeNodeCrossingCount(
-      candidate,
-      shapes,
-      ignoredNodeIds,
-    );
-
-    if (candidateCrossingCount < bestCrossingCount) {
-      return candidate;
+  const routeScore = (
+    candidate: [ScenePoint, ...ScenePoint[]],
+  ): readonly number[] => [
+    routeNodeCrossingCount(candidate, shapes, ignoredNodeIds),
+    routeSelfOverlapCount(candidate, route),
+    routeArrowOverlapCount(candidate, existingArrows, route),
+    -endpointStubScore(candidate, route),
+    routeBacktrackDistance(candidate),
+    routeTargetOvershootDistance(candidate),
+    routeLength(candidate),
+  ];
+  const isLowerScore = (
+    candidate: readonly number[],
+    best: readonly number[],
+  ) => {
+    for (let index = 0; index < candidate.length; index += 1) {
+      const difference = (candidate[index] ?? 0) - (best[index] ?? 0);
+      if (difference !== 0) return difference < 0;
     }
-
-    if (bestCrossingCount < candidateCrossingCount) {
-      return best;
+    return false;
+  };
+  let best = first;
+  let bestScore = routeScore(first);
+  for (const candidate of candidates.slice(1)) {
+    const score = routeScore(candidate);
+    if (isLowerScore(score, bestScore)) {
+      best = candidate;
+      bestScore = score;
     }
-
-    const bestSelfOverlapCount = routeSelfOverlapCount(best, route);
-    const candidateSelfOverlapCount = routeSelfOverlapCount(candidate, route);
-
-    if (candidateSelfOverlapCount < bestSelfOverlapCount) {
-      return candidate;
-    }
-
-    if (bestSelfOverlapCount < candidateSelfOverlapCount) {
-      return best;
-    }
-
-    const bestArrowOverlapCount = routeArrowOverlapCount(
-      best,
-      existingArrows,
-      route,
-    );
-    const candidateArrowOverlapCount = routeArrowOverlapCount(
-      candidate,
-      existingArrows,
-      route,
-    );
-
-    if (candidateArrowOverlapCount < bestArrowOverlapCount) {
-      return candidate;
-    }
-
-    if (bestArrowOverlapCount < candidateArrowOverlapCount) {
-      return best;
-    }
-
-    const bestEndpointStubScore = endpointStubScore(best, route);
-    const candidateEndpointStubScore = endpointStubScore(candidate, route);
-
-    if (candidateEndpointStubScore > bestEndpointStubScore) {
-      return candidate;
-    }
-
-    if (bestEndpointStubScore > candidateEndpointStubScore) {
-      return best;
-    }
-
-    const bestBacktrackDistance = routeBacktrackDistance(best);
-    const candidateBacktrackDistance = routeBacktrackDistance(candidate);
-
-    if (candidateBacktrackDistance < bestBacktrackDistance) {
-      return candidate;
-    }
-
-    if (bestBacktrackDistance < candidateBacktrackDistance) {
-      return best;
-    }
-
-    const bestTargetOvershootDistance = routeTargetOvershootDistance(best);
-    const candidateTargetOvershootDistance =
-      routeTargetOvershootDistance(candidate);
-
-    if (candidateTargetOvershootDistance < bestTargetOvershootDistance) {
-      return candidate;
-    }
-
-    if (bestTargetOvershootDistance < candidateTargetOvershootDistance) {
-      return best;
-    }
-
-    return routeLength(candidate) < routeLength(best) ? candidate : best;
-  }, first);
+  }
+  return best;
 }
 
 function exteriorLaneRoute(
@@ -1500,61 +1325,37 @@ function exteriorLaneRoute(
       end,
     ]);
   };
-  const horizontalCandidates = [
-    ...stubDistances.map((stubDistance) =>
-      routeForHorizontalLane(preferredLocalY, stubDistance),
-    ),
-    ...stubDistances.map((stubDistance) =>
-      routeForHorizontalLane(alternateLocalY, stubDistance),
-    ),
-    ...stubDistances.map((stubDistance) =>
-      routeForVerticalLane(preferredLocalX, stubDistance),
-    ),
-    ...stubDistances.map((stubDistance) =>
-      routeForVerticalLane(alternateLocalX, stubDistance),
-    ),
-    ...stubDistances.map((stubDistance) =>
-      routeForHorizontalLane(preferredY, stubDistance),
-    ),
-    ...stubDistances.map((stubDistance) =>
-      routeForHorizontalLane(alternateY, stubDistance),
-    ),
-    ...stubDistances.map((stubDistance) =>
-      routeForVerticalLane(preferredX, stubDistance),
-    ),
-    ...stubDistances.map((stubDistance) =>
-      routeForVerticalLane(alternateX, stubDistance),
-    ),
+  type LaneGenerator = (
+    lane: number,
+    stubDistance: number,
+  ) => [ScenePoint, ...ScenePoint[]];
+  const horizontalLanes: readonly (readonly [number, LaneGenerator])[] = [
+    [preferredLocalY, routeForHorizontalLane],
+    [alternateLocalY, routeForHorizontalLane],
+    [preferredY, routeForHorizontalLane],
+    [alternateY, routeForHorizontalLane],
   ];
-  const verticalCandidates = [
-    ...stubDistances.map((stubDistance) =>
-      routeForVerticalLane(preferredLocalX, stubDistance),
-    ),
-    ...stubDistances.map((stubDistance) =>
-      routeForVerticalLane(alternateLocalX, stubDistance),
-    ),
-    ...stubDistances.map((stubDistance) =>
-      routeForHorizontalLane(preferredLocalY, stubDistance),
-    ),
-    ...stubDistances.map((stubDistance) =>
-      routeForHorizontalLane(alternateLocalY, stubDistance),
-    ),
-    ...stubDistances.map((stubDistance) =>
-      routeForVerticalLane(preferredX, stubDistance),
-    ),
-    ...stubDistances.map((stubDistance) =>
-      routeForVerticalLane(alternateX, stubDistance),
-    ),
-    ...stubDistances.map((stubDistance) =>
-      routeForHorizontalLane(preferredY, stubDistance),
-    ),
-    ...stubDistances.map((stubDistance) =>
-      routeForHorizontalLane(alternateY, stubDistance),
-    ),
+  const verticalLanes: readonly (readonly [number, LaneGenerator])[] = [
+    [preferredLocalX, routeForVerticalLane],
+    [alternateLocalX, routeForVerticalLane],
+    [preferredX, routeForVerticalLane],
+    [alternateX, routeForVerticalLane],
   ];
+  const [preferredLanes, alternateLanes] = horizontalDominant
+    ? [horizontalLanes, verticalLanes]
+    : [verticalLanes, horizontalLanes];
+  const lanes = [
+    ...preferredLanes.slice(0, 2),
+    ...alternateLanes.slice(0, 2),
+    ...preferredLanes.slice(2),
+    ...alternateLanes.slice(2),
+  ];
+  const candidates = lanes.flatMap(([lane, generator]) =>
+    stubDistances.map((distance) => generator(lane, distance)),
+  );
 
   return chooseBestRoute(
-    horizontalDominant ? horizontalCandidates : verticalCandidates,
+    candidates,
     shapes,
     ignoredNodeIds,
     route,

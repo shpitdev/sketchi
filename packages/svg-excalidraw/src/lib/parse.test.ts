@@ -10,6 +10,7 @@ import {
   diagnosticDeterminismFixture,
 } from "../../tests/determinism-fixtures";
 import { inspectSvgCapabilities } from "./capabilities";
+import { convertSvgToExcalidraw } from "./convert";
 import { filledRegionsForShape } from "./native";
 import {
   constructNativeTrace,
@@ -103,6 +104,309 @@ describe("canonical SVG parser", () => {
     );
     expect(document.shapes[0]?.subpaths[0]).toMatchObject({ closed: true });
     expect(document.shapes[4]?.subpaths[0]).toMatchObject({ closed: false });
+  });
+
+  it("skips absent and blank point lists without blocking rendered geometry", () => {
+    const document = mustParse(`<svg viewBox="0 0 100 100">
+      <polyline/><polygon points=""/>
+      <polygon/><polyline points=""/>
+      <polyline points="  "/><polygon points="  "/>
+      <rect width="10" height="10"/>
+    </svg>`);
+    expect(document.diagnostics).toEqual([]);
+    expect(document.shapes.map((shape) => shape.sourceElement)).toEqual([
+      "rect",
+    ]);
+    expect(inspectSvgCapabilities(document).nativeTrace).toBe("supported");
+    const result = convertSvgToExcalidraw(document);
+    expect(result.ok).toBe(true);
+    expect(result.elements).toHaveLength(1);
+  });
+
+  it.each([
+    '<polyline points=","/>',
+    '<polygon points="0,0 10"/>',
+  ])("still blocks genuinely malformed point lists: %s", (element) => {
+    const document = mustParse(
+      `<svg>${element}<rect width="10" height="10"/></svg>`,
+    );
+    expect(document.diagnostics.map((entry) => entry.code)).toContain(
+      "invalid-geometry",
+    );
+    expect(convertSvgToExcalidraw(document)).toMatchObject({
+      ok: false,
+      elements: [],
+    });
+  });
+
+  it.each([
+    '<svg viewBox="0 0 100 100"><svg x="50" y="50" width="50" height="50" viewBox="0 0 10 10"><rect width="10" height="10"/></svg></svg>',
+    '<svg viewBox="0 0 100 100"><defs><svg id="nested" viewBox="0 0 10 10"><rect width="10" height="10"/></svg></defs><use href="#nested" width="50" height="50"/></svg>',
+  ])("blocks unrepresented nested SVG viewports: %s", (source) => {
+    const document = mustParse(source);
+    expect(document.shapes).toEqual([]);
+    expect(document.diagnostics).toEqual([
+      expect.objectContaining({ code: "unsupported-element" }),
+    ]);
+    expect(inspectSvgCapabilities(document).nativeTrace).toBe("unsupported");
+    expect(convertSvgToExcalidraw(document)).toMatchObject({
+      ok: false,
+      elements: [],
+    });
+  });
+
+  it("does not erase a clip containing an unrepresented nested SVG viewport", () => {
+    const document = mustParse(`<svg viewBox="0 0 100 100"><defs>
+      <clipPath id="c"><svg x="50" y="50" width="50" height="50" viewBox="0 0 100 100">
+        <rect width="100" height="100"/>
+      </svg></clipPath></defs><rect width="100" height="100" clip-path="url(#c)"/></svg>`);
+    expect(document.diagnostics.map((entry) => entry.code)).toContain(
+      "native-unsupported-clip",
+    );
+    expect(convertSvgToExcalidraw(document)).toMatchObject({
+      ok: false,
+      elements: [],
+    });
+  });
+
+  it.each([
+    [200, 100],
+    [100, 200],
+  ])(
+    "keeps a percentage clip constraining in a %s root / %s symbol viewport",
+    (rootSize, symbolSize) => {
+      const document =
+        mustParse(`<svg viewBox="0 0 ${rootSize} ${rootSize}"><defs>
+      <clipPath id="quarter"><rect width="50%" height="50%"/></clipPath>
+      <symbol id="s" overflow="visible" viewBox="0 0 ${symbolSize} ${symbolSize}">
+        <rect width="100%" height="100%" clip-path="url(#quarter)"/>
+      </symbol></defs><use href="#s" width="100" height="100"/></svg>`);
+      expect(firstShape(document).clipPathIds).toEqual(["quarter"]);
+      expect(document.diagnostics.map((entry) => entry.code)).not.toContain(
+        "trivial-clip-removed",
+      );
+      expect(document.diagnostics.map((entry) => entry.code)).toContain(
+        "native-unsupported-clip",
+      );
+      expect(convertSvgToExcalidraw(document)).toMatchObject({
+        ok: false,
+        elements: [],
+      });
+    },
+  );
+
+  it("classifies a percentage clip separately for each referencing viewport", () => {
+    const document = mustParse(`<svg viewBox="0 0 200 200"><defs>
+      <clipPath id="full"><rect x="10" y="20" width="100%" height="100%"/></clipPath>
+      <symbol id="s" overflow="visible" viewBox="10 20 100 100">
+        <rect x="10" y="20" width="100" height="100" clip-path="url(#full)"/>
+      </symbol></defs><use href="#s" width="100" height="100"/>
+      <rect width="200" height="200" clip-path="url(#full)"/>
+    </svg>`);
+    expect(document.shapes[0]?.clipPathIds).toEqual([]);
+    expect(document.shapes[1]?.clipPathIds).toEqual(["full"]);
+    expect(
+      document.diagnostics.filter(
+        (entry) => entry.code === "trivial-clip-removed",
+      ),
+    ).toHaveLength(1);
+    expect(
+      document.diagnostics.filter(
+        (entry) => entry.code === "native-unsupported-clip",
+      ),
+    ).toHaveLength(1);
+    expect(convertSvgToExcalidraw(document)).toMatchObject({
+      ok: false,
+      elements: [],
+    });
+  });
+
+  it("retains the clip application viewport across a use-to-symbol viewport change", () => {
+    const document = mustParse(`<svg viewBox="0 0 200 200"><defs>
+      <clipPath id="root-full"><rect width="100%" height="100%"/></clipPath>
+      <symbol id="s" overflow="visible" viewBox="10 20 100 100">
+        <rect x="10" y="20" width="100" height="100"/>
+      </symbol></defs><use href="#s" width="100" height="100" clip-path="url(#root-full)"/></svg>`);
+    expect(firstShape(document).clipPathIds).toEqual([]);
+    expect(document.diagnostics.map((entry) => entry.code)).toEqual([
+      "trivial-clip-removed",
+    ]);
+    expect(convertSvgToExcalidraw(document).ok).toBe(true);
+  });
+
+  it("uses a valid viewBox without parsing unused physical root dimensions", () => {
+    const document = mustParse(
+      '<svg viewBox="0 0 200 100" width="12cm" height="4cm"><rect width="100%" height="100%"/></svg>',
+    );
+    expect(document.viewBox).toEqual([0, 0, 200, 100]);
+    expect(document.diagnostics).toEqual([]);
+    expect(firstShape(document).subpaths[0]?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 200, y: 0 },
+      { x: 200, y: 100 },
+      { x: 0, y: 100 },
+      { x: 0, y: 0 },
+    ]);
+    expect(convertSvgToExcalidraw(document).ok).toBe(true);
+  });
+
+  it("resolves a rectangle's percentage corner radius against its own width", () => {
+    const document = mustParse(
+      '<svg viewBox="0 0 200 200"><rect width="100" height="100" rx="10%"/></svg>',
+    );
+    const points = firstShape(document).subpaths[0]?.points;
+    expect(points?.slice(0, 2)).toEqual([
+      { x: 10, y: 0 },
+      { x: 90, y: 0 },
+    ]);
+    expect(points).toContainEqual({ x: 100, y: 10 });
+    expect(document.diagnostics).toEqual([]);
+    expect(convertSvgToExcalidraw(document).ok).toBe(true);
+  });
+
+  it("resolves rx and ry independently against the rectangle's used percentage dimensions", () => {
+    const document = mustParse(
+      '<svg viewBox="0 0 200 200"><rect width="50%" height="25%" rx="10%" ry="20%"/></svg>',
+    );
+    const points = firstShape(document).subpaths[0]?.points;
+    expect(points?.slice(0, 2)).toEqual([
+      { x: 10, y: 0 },
+      { x: 90, y: 0 },
+    ]);
+    expect(points).toContainEqual({ x: 100, y: 10 });
+    expect(points).toContainEqual({ x: 100, y: 40 });
+    expect(document.diagnostics).toEqual([]);
+    expect(convertSvgToExcalidraw(document).ok).toBe(true);
+  });
+
+  it("resolves px and percentage lengths against the current viewport", () => {
+    const document =
+      mustParse(`<svg width="100%" height="100%" viewBox="0 0 200 100">
+      <defs><rect id="tile" width="10" height="10"/></defs>
+      <rect width="100%" height="50%" stroke="#000" stroke-width="4px"/>
+      <use href="#tile" x="10px" y="10%" style="stroke:#000;stroke-width:3px"/>
+      <line x1="25%" y1="25%" x2="75%" y2="75%" stroke="#000" stroke-width="10%"/>
+    </svg>`);
+    expect(document.diagnostics).toEqual([]);
+    expect(document.viewBox).toEqual([0, 0, 200, 100]);
+    expect(document.shapes[0]?.strokeWidth).toBe(4);
+    expect(document.shapes[0]?.subpaths[0]?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 200, y: 0 },
+      { x: 200, y: 50 },
+      { x: 0, y: 50 },
+      { x: 0, y: 0 },
+    ]);
+    expect(document.shapes[1]?.strokeWidth).toBe(3);
+    expect(document.shapes[1]?.subpaths[0]?.points[0]).toEqual({
+      x: 10,
+      y: 10,
+    });
+    expect(document.shapes[2]?.subpaths[0]?.points).toEqual([
+      { x: 50, y: 25 },
+      { x: 150, y: 75 },
+    ]);
+    expect(document.shapes[2]?.strokeWidth).toBeCloseTo(
+      Math.hypot(200, 100) / Math.SQRT2 / 10,
+    );
+    expect(
+      mustParse(
+        '<svg width="200px" height="100px"><rect width="100%" height="100%"/></svg>',
+      ).viewBox,
+    ).toEqual([0, 0, 200, 100]);
+  });
+
+  it.each([
+    [
+      '<svg viewBox="0 0 100 100"><rect width="50 %" height="10"/></svg>',
+      "invalid-geometry",
+    ],
+    [
+      '<svg><rect width="50" height="10" stroke="#000" stroke-width="10 px"/></svg>',
+      "unsupported-presentation-property",
+    ],
+  ])("blocks whitespace between a length and its unit: %s", (source, code) => {
+    const document = mustParse(source);
+    expect(document.diagnostics.map((entry) => entry.code)).toContain(code);
+    expect(inspectSvgCapabilities(document).nativeTrace).toBe("unsupported");
+    expect(convertSvgToExcalidraw(document)).toMatchObject({
+      ok: false,
+      elements: [],
+    });
+  });
+
+  it("accepts case-insensitive px units and surrounding length whitespace", () => {
+    const document = mustParse(
+      '<svg width=" 20Px " height=" 30pX "><rect x=" 0 " width=" 10PX " height=" 50% " stroke="#000" stroke-width=" 2PX "/></svg>',
+    );
+    expect(document.viewBox).toEqual([0, 0, 20, 30]);
+    expect(document.diagnostics).toEqual([]);
+    expect(firstShape(document).subpaths[0]?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 15 },
+      { x: 0, y: 15 },
+      { x: 0, y: 0 },
+    ]);
+    expect(firstShape(document).strokeWidth).toBe(2);
+    expect(convertSvgToExcalidraw(document).ok).toBe(true);
+  });
+
+  it.each([
+    '<svg width="2em"><rect width="10" height="10"/></svg>',
+    '<svg><rect width="10em" height="10"/></svg>',
+    '<svg><rect width="10" height="10" stroke-width="4pt"/></svg>',
+    '<svg><defs><rect id="r" width="10" height="10"/></defs><use href="#r" x="10em"/></svg>',
+    '<svg viewBox="0 0 10px 10"><rect width="10" height="10"/></svg>',
+    '<svg><polygon points="0,0 10px,0 10,10"/></svg>',
+  ])(
+    "diagnoses unsupported lengths and malformed numeric lists: %s",
+    (source) => {
+      const document = mustParse(source);
+      expect(document.diagnostics.length).toBeGreaterThan(0);
+      expect(inspectSvgCapabilities(document).nativeTrace).toBe("unsupported");
+    },
+  );
+
+  it.each(["c5 0 10 5 15 5", "a5 5 0 0 1 10 0", "l10 0"])(
+    "starts continued %s commands at the transformed close point",
+    (continuation) => {
+      const document = mustParse(
+        `<svg><path transform="translate(2 3)" d="M10 10l5 0l0 5zz ${continuation}" fill="none" stroke="#000"/></svg>`,
+      );
+      const subpaths = firstShape(document).subpaths;
+      expect(subpaths).toHaveLength(2);
+      expect(subpaths[0]?.closed).toBe(true);
+      expect(subpaths[1]?.closed).toBe(false);
+      expect(subpaths[1]?.points[0]).toEqual({ x: 12, y: 13 });
+    },
+  );
+
+  it("opens a new subpath at the start point after close without a move", () => {
+    const document = mustParse(
+      '<svg><path d="M0 0 L10 0 L10 10 Z L20 20 L30 20" fill="none" stroke="#000"/></svg>',
+    );
+    expect(firstShape(document).subpaths).toEqual([
+      {
+        closed: true,
+        points: [
+          { x: 0, y: 0 },
+          { x: 10, y: 0 },
+          { x: 10, y: 10 },
+          { x: 0, y: 0 },
+        ],
+        signedArea: 50,
+      },
+      {
+        closed: false,
+        points: [
+          { x: 0, y: 0 },
+          { x: 20, y: 20 },
+          { x: 30, y: 20 },
+        ],
+        signedArea: -100,
+      },
+    ]);
   });
 
   it("composes complete nested transform lists in SVG order", () => {
@@ -312,15 +616,30 @@ describe("canonical SVG parser", () => {
     ]);
   });
 
+  it("resolves symbol percentages in its own user viewport", () => {
+    const document = mustParse(`<svg viewBox="0 0 200 100"><defs>
+      <symbol id="s" overflow="visible" viewBox="0 0 10 20" preserveAspectRatio="none">
+        <rect width="100%" height="50%"/>
+      </symbol></defs><use href="#s" width="50%" height="100%"/></svg>`);
+    expect(document.diagnostics).toEqual([]);
+    expect(firstShape(document).subpaths[0]?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 50 },
+      { x: 0, y: 50 },
+      { x: 0, y: 0 },
+    ]);
+  });
+
   it("blocks symbol viewport forms it cannot map safely", () => {
     const document = mustParse(`
       <svg><defs>
         <symbol id="clipped" viewBox="0 0 10 10"><rect width="10" height="10"/></symbol>
-        <symbol id="percentage" overflow="visible" viewBox="0 0 10 10"><rect width="10" height="10"/></symbol>
+        <symbol id="units" overflow="visible" viewBox="0 0 10 10"><rect width="10" height="10"/></symbol>
         <symbol id="negative" overflow="visible" viewBox="0 0 10 10"><rect width="10" height="10"/></symbol>
       </defs>
       <use href="#clipped" width="100" height="100"/>
-      <use href="#percentage" width="100%" height="100"/>
+      <use href="#units" width="100em" height="100"/>
       <use href="#negative" width="-1" height="100"/>
       </svg>
     `);
@@ -369,6 +688,23 @@ describe("canonical SVG parser", () => {
         }),
       ]),
     );
+  });
+
+  it("skips presentation diagnostics for display-suppressed subtrees", () => {
+    const document = mustParse(`<svg viewBox="0 0 100 100">
+      <g display="none" stroke-width="4pt" stroke-dasharray="2 2">
+        <rect display="inline" width="20" height="20" stroke-width="10em"/>
+      </g>
+      <rect id="visible" width="10" height="10"/>
+    </svg>`);
+    expect(document.diagnostics).toEqual([]);
+    expect(document.shapes.map((shape) => shape.elementId)).toEqual([
+      "visible",
+    ]);
+    expect(inspectSvgCapabilities(document).nativeTrace).toBe("supported");
+    const result = convertSvgToExcalidraw(document);
+    expect(result.ok).toBe(true);
+    expect(result.elements).toHaveLength(1);
   });
 
   it("keeps display suppression irreversible but allows visibility overrides", () => {

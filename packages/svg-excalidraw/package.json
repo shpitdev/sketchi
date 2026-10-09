@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@excalidraw/excalidraw": "0.18.1",
+    "@sketchi/diagram-core": "workspace:*",
     "clipper-lib": "6.4.2",
     "earcut": "3.2.4",
     "fast-xml-parser": "5.11.2",

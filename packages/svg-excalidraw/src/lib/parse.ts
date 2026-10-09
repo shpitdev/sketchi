@@ -1,10 +1,14 @@
+import { fnv1a32 } from "@sketchi/diagram-core";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 
 import { flattenPrimitive } from "./flatten";
+import { withoutClosingPoint } from "./geometry";
+import { parseLength, type SvgViewport } from "./length";
 import {
   computeElementStyle,
   DEFAULT_PAINT_CONTEXT,
   descriptor,
+  normalizeHexColor,
   parseCssRules,
   resolvePaint,
   type CssRule,
@@ -15,7 +19,7 @@ import {
 import {
   IDENTITY_MATRIX,
   multiplyMatrices,
-  numericTokens,
+  parseNumberList,
   parseTransform,
   transformedStrokeScale,
 } from "./transform";
@@ -44,11 +48,14 @@ interface SvgNode {
 interface ClipApplication {
   readonly id: string;
   readonly sourcePath: string;
+  readonly viewport: SvgViewport;
 }
 
 interface ClipDefinition {
-  readonly id: string;
-  readonly nonConstrainingCanvas: boolean;
+  readonly node: SvgNode;
+  readonly sourcePath: string;
+  readonly usesViewportLengths: boolean;
+  readonly trivialByViewport: Map<string, boolean>;
 }
 
 interface WalkContext {
@@ -56,6 +63,7 @@ interface WalkContext {
   readonly ancestry: readonly SvgElementDescriptor[];
   readonly matrix: Matrix;
   readonly paint: PaintContext;
+  readonly viewport: SvgViewport;
 }
 
 interface ParserState {
@@ -224,15 +232,6 @@ function exceedExpansionLimit(
   );
 }
 
-function sourceHash(source: string): string {
-  let hash = 2166136261;
-  for (const character of source) {
-    hash ^= character.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
-}
-
 function effectiveFlattening(
   options: SvgParseOptions["flattening"],
 ): EffectiveAdaptiveFlatteningOptions {
@@ -395,17 +394,6 @@ function styleProperty(
   return null;
 }
 
-function normalizeHexColor(value: string): string | null {
-  const normalized = value.trim().toLowerCase();
-  if (/^#[0-9a-f]{6}$/.test(normalized)) {
-    return normalized;
-  }
-  const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(normalized);
-  return short
-    ? `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`
-    : null;
-}
-
 function gradientStops(node: SvgNode): readonly string[] {
   const own =
     node.name === "stop"
@@ -437,30 +425,48 @@ function collectGradients(root: SvgNode): ReadonlyMap<string, string> {
 
 function parseViewBox(
   root: SvgNode,
+  diagnostics: SvgDiagnostic[],
 ): readonly [number, number, number, number] {
-  const numbers = numericTokens(root.attributes.viewBox ?? "");
-  const width = Number(root.attributes.width);
-  const height = Number(root.attributes.height);
-  return [
-    numbers[0] ?? 0,
-    numbers[1] ?? 0,
-    numbers[2] ?? (Number.isFinite(width) && width > 0 ? width : 512),
-    numbers[3] ?? (Number.isFinite(height) && height > 0 ? height : 512),
-  ];
-}
-
-function pointsEqual(left: Point, right: Point): boolean {
-  return (
-    Math.abs(left.x - right.x) <= 1e-7 && Math.abs(left.y - right.y) <= 1e-7
-  );
-}
-
-function withoutClosingPoint(points: readonly Point[]): readonly Point[] {
-  const first = points[0];
-  const last = points.at(-1);
-  return first && last && pointsEqual(first, last)
-    ? points.slice(0, -1)
-    : points;
+  const value = root.attributes.viewBox;
+  const numbers = value === undefined ? null : strictNumberList(value, 4);
+  const validViewBox =
+    numbers && (numbers[2] ?? 0) > 0 && (numbers[3] ?? 0) > 0 ? numbers : null;
+  if (value !== undefined && !validViewBox) {
+    diagnostics.push(
+      diagnostic({
+        code: "invalid-geometry",
+        message: `Invalid SVG viewBox: ${value}`,
+        severity: "warning",
+        sourcePath: root.name,
+      }),
+    );
+  }
+  if (validViewBox) {
+    return [
+      validViewBox[0] ?? 0,
+      validViewBox[1] ?? 0,
+      validViewBox[2] ?? 512,
+      validViewBox[3] ?? 512,
+    ];
+  }
+  const dimension = (name: "width" | "height") => {
+    const value = root.attributes[name];
+    if (value === undefined) return 512;
+    const parsed = parseLength(value, null);
+    if (parsed === null || parsed <= 0) {
+      diagnostics.push(
+        diagnostic({
+          code: "invalid-geometry",
+          message: `Invalid SVG length for ${name}: ${value}`,
+          severity: "warning",
+          sourcePath: root.name,
+        }),
+      );
+      return 512;
+    }
+    return parsed;
+  };
+  return [0, 0, dimension("width"), dimension("height")];
 }
 
 function isAxisAlignedRectangle(points: readonly Point[]): boolean {
@@ -499,7 +505,10 @@ function clipRectangle(
   cssRules: readonly CssRule[],
   flattening: EffectiveAdaptiveFlatteningOptions,
   sourcePath: string,
+  viewport: SvgViewport,
 ): readonly Point[] | null {
+  // An unmapped nested viewport cannot prove that a clip is non-constraining.
+  if (node.name === "svg") return null;
   const transform = parseTransform(node.attributes.transform, sourcePath);
   if (transform.diagnostics.length > 0) {
     return null;
@@ -511,6 +520,7 @@ function clipRectangle(
     node.attributes,
     nextAncestry,
     cssRules,
+    viewport,
   );
   if (!computed.paint.displayed) {
     return null;
@@ -525,12 +535,17 @@ function clipRectangle(
       nextMatrix,
       flattening,
       sourcePath,
+      viewport,
     );
     const points =
       flattened.subpaths.length === 1
         ? (flattened.subpaths[0]?.points ?? null)
         : null;
-    return points && isAxisAlignedRectangle(points) ? points : null;
+    return flattened.diagnostics.length === 0 &&
+      points &&
+      isAxisAlignedRectangle(points)
+      ? points
+      : null;
   }
   const candidates = node.children.flatMap((child, index) => {
     const rectangle = clipRectangle(
@@ -541,53 +556,34 @@ function clipRectangle(
       cssRules,
       flattening,
       `${sourcePath}/${child.name}[${index}]`,
+      viewport,
     );
     return rectangle ? [rectangle] : [];
   });
   return candidates.length === 1 ? (candidates[0] ?? null) : null;
 }
 
+function clipUsesViewportLengths(node: SvgNode): boolean {
+  return (
+    Object.entries(node.attributes).some(
+      ([name, value]) =>
+        /^(?:x|y|width|height|rx|ry|cx|cy|r|x1|y1|x2|y2)$/.test(name) &&
+        value.includes("%"),
+    ) || node.children.some(clipUsesViewportLengths)
+  );
+}
+
 function collectClipDefinitions(
   root: SvgNode,
-  flattening: EffectiveAdaptiveFlatteningOptions,
-  cssRules: readonly CssRule[],
 ): ReadonlyMap<string, ClipDefinition> {
   const clips = new Map<string, ClipDefinition>();
-  const viewBox = parseViewBox(root);
   const visit = (node: SvgNode, sourcePath: string) => {
     if (node.name === "clipPath" && node.attributes.id) {
-      const rectangle =
-        node.attributes.clipPathUnits === "objectBoundingBox"
-          ? null
-          : clipRectangle(
-              node,
-              IDENTITY_MATRIX,
-              DEFAULT_PAINT_CONTEXT,
-              [],
-              cssRules,
-              flattening,
-              sourcePath,
-            );
-      const open = rectangle ? withoutClosingPoint(rectangle) : [];
-      const minX = Math.min(...open.map((point) => point.x));
-      const maxX = Math.max(...open.map((point) => point.x));
-      const minY = Math.min(...open.map((point) => point.y));
-      const maxY = Math.max(...open.map((point) => point.y));
-      const approximately = (left: number, right: number) =>
-        Math.abs(left - right) <= 0.01;
-      const matchesCanvas =
-        rectangle !== null &&
-        ((approximately(minX, 0) &&
-          approximately(minY, 0) &&
-          approximately(maxX, 100) &&
-          approximately(maxY, 100)) ||
-          (approximately(minX, viewBox[0]) &&
-            approximately(minY, viewBox[1]) &&
-            approximately(maxX, viewBox[0] + viewBox[2]) &&
-            approximately(maxY, viewBox[1] + viewBox[3])));
       clips.set(node.attributes.id, {
-        id: node.attributes.id,
-        nonConstrainingCanvas: matchesCanvas,
+        node,
+        sourcePath,
+        usesViewportLengths: clipUsesViewportLengths(node),
+        trivialByViewport: new Map(),
       });
     }
     node.children.forEach((child, index) =>
@@ -608,31 +604,23 @@ function strictNumberList(
   value: string,
   expectedCount: number,
 ): readonly number[] | null {
-  const tokens = value.trim().split(/[\s,]+/);
-  if (tokens.length !== expectedCount) {
-    return null;
-  }
-  const numbers = tokens.map(Number);
-  return numbers.every(Number.isFinite) ? numbers : null;
-}
-
-function viewportLength(value: string | undefined): number | null {
-  const match =
-    /^\s*([-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?)\s*(?:px)?\s*$/.exec(
-      value ?? "",
-    );
-  const parsed = Number(match?.[1]);
-  return Number.isFinite(parsed) ? parsed : null;
+  const numbers = parseNumberList(value);
+  return numbers?.length === expectedCount ? numbers : null;
 }
 
 type SymbolViewportResult =
   | { readonly kind: "hidden" }
-  | { readonly kind: "mapped"; readonly matrix: Matrix }
+  | {
+      readonly kind: "mapped";
+      readonly matrix: Matrix;
+      readonly viewport: SvgViewport;
+    }
   | { readonly kind: "unsupported"; readonly message: string };
 
 function symbolViewport(
   symbol: SvgNode,
   useAttributes: SvgAttributes,
+  parentViewport: SvgViewport,
 ): SymbolViewportResult {
   if (
     symbol.attributes.x !== undefined ||
@@ -662,15 +650,17 @@ function symbolViewport(
       message: `Symbol #${symbol.attributes.id ?? "(anonymous)"} requires a finite positive viewBox.`,
     };
   }
-  const width = viewportLength(
+  const width = parseLength(
     styleProperty(useAttributes, "width") ??
       styleProperty(symbol.attributes, "width") ??
       undefined,
+    parentViewport.width,
   );
-  const height = viewportLength(
+  const height = parseLength(
     styleProperty(useAttributes, "height") ??
       styleProperty(symbol.attributes, "height") ??
       undefined,
+    parentViewport.height,
   );
   if (width === null || height === null) {
     return {
@@ -698,6 +688,7 @@ function symbolViewport(
     const scaleY = height / viewHeight;
     return {
       kind: "mapped",
+      viewport: { minX, minY, width: viewWidth, height: viewHeight },
       matrix: [scaleX, 0, 0, scaleY, -minX * scaleX, -minY * scaleY],
     };
   }
@@ -723,6 +714,7 @@ function symbolViewport(
     match[2] === "YMin" ? 0 : match[2] === "YMid" ? remainingY / 2 : remainingY;
   return {
     kind: "mapped",
+    viewport: { minX, minY, width: viewWidth, height: viewHeight },
     matrix: [
       scale,
       0,
@@ -734,12 +726,57 @@ function symbolViewport(
   };
 }
 
-function clipIsTrivial(definition: ClipDefinition | undefined): boolean {
-  // The corpus normalizer emits a known full-canvas 100x100 clip. Only that
-  // structural case (or an exact root-viewBox rectangle) is safe to erase.
-  // A clip that merely appears to contain sampled points remains diagnostic:
-  // the unsampled source curve could still cross its boundary.
-  return definition?.nonConstrainingCanvas ?? false;
+function clipIsTrivial(
+  definition: ClipDefinition | undefined,
+  viewport: SvgViewport,
+  state: ParserState,
+): boolean {
+  if (
+    !definition ||
+    definition.node.attributes.clipPathUnits === "objectBoundingBox"
+  )
+    return false;
+  const viewportKey = [
+    viewport.minX,
+    viewport.minY,
+    viewport.width,
+    viewport.height,
+  ].join(":");
+  const cached = definition.trivialByViewport.get(viewportKey);
+  if (cached !== undefined) return cached;
+  const rectangle = clipRectangle(
+    definition.node,
+    IDENTITY_MATRIX,
+    DEFAULT_PAINT_CONTEXT,
+    [],
+    state.cssRules,
+    state.flattening,
+    definition.sourcePath,
+    viewport,
+  );
+  const open = rectangle ? withoutClosingPoint(rectangle) : [];
+  const minX = Math.min(...open.map((point) => point.x));
+  const maxX = Math.max(...open.map((point) => point.x));
+  const minY = Math.min(...open.map((point) => point.y));
+  const maxY = Math.max(...open.map((point) => point.y));
+  const approximately = (left: number, right: number) =>
+    Math.abs(left - right) <= 0.01;
+  // Only absolute geometry can use the corpus normalizer's known 100x100
+  // exception. Percentage clips must match their application viewport itself.
+  // Sampled geometry alone cannot prove that a clip is non-constraining.
+  const matchesCanvas =
+    rectangle !== null &&
+    ((!definition.usesViewportLengths &&
+      approximately(minX, 0) &&
+      approximately(minY, 0) &&
+      approximately(maxX, 100) &&
+      approximately(maxY, 100)) ||
+      (approximately(minX, viewport.minX) &&
+        approximately(minY, viewport.minY) &&
+        approximately(maxX, viewport.minX + viewport.width) &&
+        approximately(maxY, viewport.minY + viewport.height)));
+  definition.trivialByViewport.set(viewportKey, matchesCanvas);
+  return matchesCanvas;
 }
 
 function nodePath(parent: string, child: SvgNode, index: number): string {
@@ -768,7 +805,25 @@ function walkNode(
     node.attributes,
     ancestry,
     state.cssRules,
+    context.viewport,
   );
+  if (
+    !(referencedSymbolRoot ? context.paint.displayed : computed.paint.displayed)
+  ) {
+    return;
+  }
+  if (computed.invalidStrokeWidth) {
+    pushDiagnostic(
+      state,
+      diagnostic({
+        code: "unsupported-presentation-property",
+        elementId: node.attributes.id ?? null,
+        message: "Unsupported presentation property: stroke-width",
+        severity: "warning",
+        sourcePath,
+      }),
+    );
+  }
   for (const property of computed.unsupportedProperties) {
     pushDiagnostic(
       state,
@@ -782,19 +837,18 @@ function walkNode(
       `unsupported-presentation-property:${property}:${sourcePath}`,
     );
   }
-  if (
-    !(referencedSymbolRoot ? context.paint.displayed : computed.paint.displayed)
-  ) {
-    return;
-  }
   const localClipId = extractUrlId(computed.clipPath);
   const activeClips = localClipId
-    ? [...context.activeClips, { id: localClipId, sourcePath }]
+    ? [
+        ...context.activeClips,
+        { id: localClipId, sourcePath, viewport: context.viewport },
+      ]
     : context.activeClips;
   const nextContext: WalkContext = {
     activeClips,
     ancestry,
     matrix,
+    viewport: context.viewport,
     paint: referencedSymbolRoot
       ? { ...computed.paint, displayed: context.paint.displayed }
       : computed.paint,
@@ -854,19 +908,31 @@ function walkNode(
     }
     state.useExpansions += 1;
     state.usesResolved += 1;
-    const x = Number(node.attributes.x ?? 0);
-    const y = Number(node.attributes.y ?? 0);
-    const translatedMatrix = multiplyMatrices(matrix, [
-      1,
-      0,
-      0,
-      1,
-      Number.isFinite(x) ? x : 0,
-      Number.isFinite(y) ? y : 0,
-    ]);
+    const x = parseLength(node.attributes.x ?? "0", context.viewport.width);
+    const y = parseLength(node.attributes.y ?? "0", context.viewport.height);
+    if (x === null || y === null) {
+      pushDiagnostic(
+        state,
+        diagnostic({
+          code: "invalid-geometry",
+          elementId: node.attributes.id ?? null,
+          feature: "use",
+          message: "Invalid SVG use x/y length.",
+          severity: "warning",
+          sourcePath,
+        }),
+      );
+      return;
+    }
+    const translatedMatrix = multiplyMatrices(matrix, [1, 0, 0, 1, x, y]);
     let referenceMatrix = translatedMatrix;
+    let referenceViewport = context.viewport;
     if (referenceNode.name === "symbol") {
-      const viewport = symbolViewport(referenceNode, node.attributes);
+      const viewport = symbolViewport(
+        referenceNode,
+        node.attributes,
+        context.viewport,
+      );
       if (viewport.kind === "unsupported") {
         pushDiagnostic(
           state,
@@ -885,11 +951,12 @@ function walkNode(
         return;
       }
       referenceMatrix = multiplyMatrices(translatedMatrix, viewport.matrix);
+      referenceViewport = viewport.viewport;
     }
     walkNode(
       referenceNode,
       `${sourcePath}->#${referenceId}`,
-      { ...nextContext, matrix: referenceMatrix },
+      { ...nextContext, matrix: referenceMatrix, viewport: referenceViewport },
       state,
       [...useStack, referenceId],
       referenceNode.name === "symbol",
@@ -901,6 +968,20 @@ function walkNode(
     return;
   }
   if (node.name === "symbol" && !referencedSymbolRoot) {
+    return;
+  }
+  if (node.name === "svg" && context.ancestry.length > 0) {
+    pushDiagnostic(
+      state,
+      diagnostic({
+        code: "unsupported-element",
+        elementId: node.attributes.id ?? null,
+        message:
+          "Nested SVG viewports and their clipping are not represented in native conversion.",
+        severity: "warning",
+        sourcePath,
+      }),
+    );
     return;
   }
   if (CONTAINERS.has(node.name)) {
@@ -948,6 +1029,7 @@ function walkNode(
     matrix,
     state.flattening,
     sourcePath,
+    context.viewport,
   );
   flattened.diagnostics.forEach((entry) => pushDiagnostic(state, entry));
   if (flattened.subpaths.length === 0) {
@@ -959,7 +1041,13 @@ function walkNode(
 
   const realClipIds: string[] = [];
   for (const application of activeClips) {
-    if (clipIsTrivial(state.clipDefinitions.get(application.id))) {
+    if (
+      clipIsTrivial(
+        state.clipDefinitions.get(application.id),
+        application.viewport,
+        state,
+      )
+    ) {
       pushDiagnostic(
         state,
         diagnostic({
@@ -1075,6 +1163,7 @@ export function parseSvg(
     }
 
     const initialDiagnostics: SvgDiagnostic[] = [];
+    const viewBox = parseViewBox(root, initialDiagnostics);
     const ids = new Map<string, SvgNode>();
     collectIds(root, root.name, ids, initialDiagnostics);
     const css = parseCssRules(collectStyles(root, root.name));
@@ -1085,7 +1174,7 @@ export function parseSvg(
     const useExpansion = effectiveUseExpansion(options.useExpansion);
     const state: ParserState = {
       arcSegments: 0,
-      clipDefinitions: collectClipDefinitions(root, flattening, css.rules),
+      clipDefinitions: collectClipDefinitions(root),
       cssRules: css.rules,
       cubicSegments: 0,
       diagnostics: [],
@@ -1110,6 +1199,12 @@ export function parseSvg(
         ancestry: [],
         matrix: IDENTITY_MATRIX,
         paint: DEFAULT_PAINT_CONTEXT,
+        viewport: {
+          minX: viewBox[0],
+          minY: viewBox[1],
+          width: viewBox[2],
+          height: viewBox[3],
+        },
       },
       state,
       [],
@@ -1145,10 +1240,10 @@ export function parseSvg(
         usesResolved: state.usesResolved,
       },
       shapes: state.shapes,
-      sourceHash: sourceHash(source),
+      sourceHash: fnv1a32(source, "hex"),
       sourceName: options.sourceName ?? "inline.svg",
       useExpansion,
-      viewBox: parseViewBox(root),
+      viewBox,
     };
     return { diagnostics, document, ok: true };
   } catch (error) {
@@ -1167,5 +1262,5 @@ export function deterministicDocumentJson(
 export function deterministicDocumentChecksum(
   document: CanonicalSvgDocument,
 ): string {
-  return sourceHash(deterministicDocumentJson(document));
+  return fnv1a32(deterministicDocumentJson(document), "hex");
 }

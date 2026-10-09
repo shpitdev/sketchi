@@ -735,6 +735,9 @@ importers:
       '@excalidraw/excalidraw':
         specifier: 0.18.1
         version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@sketchi/diagram-core':
+        specifier: workspace:*
+        version: link:../diagram/core
       clipper-lib:
         specifier: 6.4.2
         version: 6.4.2

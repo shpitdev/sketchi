@@ -1,3 +1,4 @@
+import { parseLength, viewportDiagonal, type SvgViewport } from "./length";
 import type { CanonicalPaint, PaintSource, SvgDiagnostic } from "./types";
 
 export type SvgAttributes = Readonly<Record<string, string>>;
@@ -56,6 +57,7 @@ export interface PaintContext {
 
 export interface ComputedElementStyle {
   readonly clipPath: string | null;
+  readonly invalidStrokeWidth: boolean;
   readonly paint: PaintContext;
   readonly unsupportedProperties: readonly string[];
 }
@@ -404,11 +406,6 @@ function opacity(value: string | undefined, fallback: number): number {
   );
 }
 
-function finiteNumber(value: string | undefined, fallback: number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 function inheritedValue(
   local: CascadedValue | undefined,
   parent: InheritedValue,
@@ -428,6 +425,7 @@ export function computeElementStyle(
   attributes: SvgAttributes,
   ancestry: readonly SvgElementDescriptor[],
   rules: readonly CssRule[],
+  viewport: SvgViewport,
 ): ComputedElementStyle {
   const values = cascadedValues(attributes, ancestry, rules);
   const fill = inheritedValue(values.get("fill"), parent.fill, "#000000");
@@ -456,7 +454,17 @@ export function computeElementStyle(
         : visibility === "initial"
           ? "visible"
           : parent.visibility;
+  const strokeWidthValue = values.get("stroke-width")?.value;
+  const strokeWidth =
+    strokeWidthValue === undefined ||
+    strokeWidthValue === "inherit" ||
+    strokeWidthValue === "unset"
+      ? parent.strokeWidth
+      : strokeWidthValue === "initial"
+        ? 1
+        : parseLength(strokeWidthValue, viewportDiagonal(viewport));
   return {
+    invalidStrokeWidth: strokeWidth === null || strokeWidth < 0,
     clipPath: values.get("clip-path")?.value ?? null,
     paint: {
       color,
@@ -467,10 +475,7 @@ export function computeElementStyle(
       opacity: parent.opacity * opacity(values.get("opacity")?.value, 1),
       stroke,
       strokeOpacity,
-      strokeWidth: finiteNumber(
-        values.get("stroke-width")?.value,
-        parent.strokeWidth,
-      ),
+      strokeWidth: strokeWidth ?? parent.strokeWidth,
       visibility: computedVisibility,
     },
     unsupportedProperties: [...UNSUPPORTED_PRESENTATION_PROPERTIES]
@@ -485,7 +490,7 @@ export function computeElementStyle(
   };
 }
 
-function normalizeHexColor(value: string): string | null {
+export function normalizeHexColor(value: string): string | null {
   const normalized = value.trim().toLowerCase();
   if (/^#[0-9a-f]{6}$/.test(normalized)) {
     return normalized;

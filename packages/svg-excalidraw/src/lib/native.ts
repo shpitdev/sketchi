@@ -1,3 +1,4 @@
+import { fnv1a32 } from "@sketchi/diagram-core";
 import type { ExcalidrawLinearElement } from "@excalidraw/excalidraw/element/types";
 import { generateKeyBetween } from "fractional-indexing";
 
@@ -35,15 +36,6 @@ type UnbrandedLineElement = Omit<
   readonly points: readonly (readonly [number, number])[];
 };
 
-function stableSeed(input: string): number {
-  let hash = 2166136261;
-  for (const character of input) {
-    hash ^= character.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return Math.abs(hash) || 1;
-}
-
 function bounds(points: readonly Point[]): {
   readonly height: number;
   readonly minX: number;
@@ -78,7 +70,7 @@ function lineElement(input: {
   readonly strokeWidth: number;
 }): ExcalidrawLinearElement {
   const elementBounds = bounds(input.points);
-  const seed = stableSeed(input.id);
+  const seed = fnv1a32(input.id, "seed");
   const element = {
     id: input.id,
     type: "line",
@@ -319,11 +311,5 @@ export function deterministicTraceJson(result: NativeTraceResult): string {
 }
 
 export function deterministicTraceChecksum(result: NativeTraceResult): string {
-  const json = deterministicTraceJson(result);
-  let hash = 2166136261;
-  for (const character of json) {
-    hash ^= character.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
+  return fnv1a32(deterministicTraceJson(result), "hex");
 }
