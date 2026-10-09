@@ -1,10 +1,19 @@
-import { Effect } from "effect";
+import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
+import { Effect, FileSystem } from "effect";
+
+import { makeLocalFileSystem } from "../filesystem.js";
 
 import type { BuiltDiagram } from "../contracts.js";
 import {
   decodeCanonicalDiagramDocument,
   type CanonicalDiagramDocument,
 } from "../document.js";
+
+export const localFileSystemLive = Effect.runSync(
+  Effect.map(FileSystem.FileSystem, makeLocalFileSystem).pipe(
+    Effect.provide(NodeFileSystem.layer),
+  ),
+);
 
 export const flowchartInput = {
   type: "flowchart",

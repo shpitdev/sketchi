@@ -1,4 +1,4 @@
-import { Chalk } from "chalk";
+import { Chalk, type ChalkInstance } from "chalk";
 import stringWidth from "string-width";
 import wrapAnsi from "wrap-ansi";
 
@@ -38,7 +38,9 @@ const WORDMARK_GLYPHS: Readonly<Record<string, readonly string[]>> = {
   i: ["#", ".", "#", "#", "#", "#", "#", "."],
 };
 
-const TILE_MATERIALS = {
+const TILE_MATERIALS: Readonly<
+  Record<string, Record<HelpBrandOptions["background"], Color>>
+> = {
   p: {
     dark: { red: 158, green: 124, blue: 140, ansi256: 138 },
     light: { red: 143, green: 112, blue: 127, ansi256: 96 },
@@ -63,10 +65,7 @@ const TILE_MATERIALS = {
     dark: { red: 222, green: 152, blue: 158, ansi256: 175 },
     light: { red: 222, green: 152, blue: 158, ansi256: 175 },
   },
-} as const satisfies Record<
-  string,
-  Record<HelpBrandOptions["background"], Color>
->;
+};
 
 const TILE_WIDTH = 16;
 const LOCKUP_GAP = 2;
@@ -122,54 +121,50 @@ export interface HelpBrandOptions {
   readonly width?: number;
 }
 
-function styled(
-  text: string,
-  color: Color,
-  options: HelpBrandOptions,
-  emphasis: "plain" | "bold" = "plain",
-): string {
-  if (options.colors === "none") return text;
-  const chalk = new Chalk({ level: options.colors === "truecolor" ? 3 : 2 });
-  const paint =
+function painter(options: HelpBrandOptions) {
+  const chalk = new Chalk({
+    level:
+      options.colors === "none" ? 0 : options.colors === "truecolor" ? 3 : 2,
+  });
+  const foreground = (color: Color, base: ChalkInstance = chalk) =>
     options.colors === "truecolor"
-      ? chalk.rgb(color.red, color.green, color.blue)
-      : chalk.ansi256(color.ansi256);
-  return emphasis === "bold" ? paint.bold(text) : paint(text);
+      ? base.rgb(color.red, color.green, color.blue)
+      : base.ansi256(color.ansi256);
+  const background = (color: Color) =>
+    options.colors === "truecolor"
+      ? chalk.bgRgb(color.red, color.green, color.blue)
+      : chalk.bgAnsi256(color.ansi256);
+  const text = (value: string, color: Color, bold = false) => {
+    const ink = foreground(color);
+    return bold ? ink.bold(value) : ink(value);
+  };
+  return {
+    foreground,
+    pair: (top: Color, bottom: Color) =>
+      foreground(top, background(bottom))("▀"),
+    heading: (value: string) => text(value, BRAND[options.background], true),
+    command: (value: string) =>
+      text(value, FOREGROUND[options.background], true),
+    description: (value: string) => text(value, MUTED[options.background]),
+  };
 }
 
-function heading(text: string, options: HelpBrandOptions): string {
-  return styled(text, BRAND[options.background], options, "bold");
-}
-
-function command(text: string, options: HelpBrandOptions): string {
-  return styled(text, FOREGROUND[options.background], options, "bold");
-}
-
-function description(text: string, options: HelpBrandOptions): string {
-  return styled(text, MUTED[options.background], options);
-}
-
-function paint(
-  color: Color,
-  options: HelpBrandOptions,
-): (text: string) => string {
-  const chalk = new Chalk({ level: options.colors === "truecolor" ? 3 : 2 });
-  return options.colors === "truecolor"
-    ? chalk.rgb(color.red, color.green, color.blue)
-    : chalk.ansi256(color.ansi256);
-}
+type Painter = ReturnType<typeof painter>;
 
 function tileColor(
   pixel: string,
   options: HelpBrandOptions,
 ): Color | undefined {
-  const material = TILE_MATERIALS[pixel as keyof typeof TILE_MATERIALS];
+  const material = TILE_MATERIALS[pixel];
   return material === undefined ? undefined : material[options.background];
 }
 
 // Two pixel rows per cell: the upper half block carries the top pixel as
 // foreground and the lower pixel as background, so square pixels stay square.
-function tileRows(options: HelpBrandOptions): readonly string[] {
+function tileRows(
+  options: HelpBrandOptions,
+  colors: Painter,
+): readonly string[] {
   const rows: string[] = [];
   for (let y = 0; y < PENCIL_TILE.length; y += 2) {
     let row = "";
@@ -177,31 +172,22 @@ function tileRows(options: HelpBrandOptions): readonly string[] {
       const top = tileColor(PENCIL_TILE[y]?.[x] ?? " ", options);
       const bottom = tileColor(PENCIL_TILE[y + 1]?.[x] ?? " ", options);
       if (top === undefined && bottom === undefined) row += " ";
-      else if (top === undefined) row += paint(bottom as Color, options)("▄");
-      else if (bottom === undefined) row += paint(top, options)("▀");
-      else row += paintPair(top, bottom, options);
+      else if (top === undefined && bottom !== undefined)
+        row += colors.foreground(bottom)("▄");
+      else if (top !== undefined && bottom === undefined)
+        row += colors.foreground(top)("▀");
+      else if (top !== undefined && bottom !== undefined)
+        row += colors.pair(top, bottom);
     }
     rows.push(row);
   }
   return rows;
 }
 
-function paintPair(
-  top: Color,
-  bottom: Color,
+function wordmarkRows(
   options: HelpBrandOptions,
-): string {
-  const chalk = new Chalk({ level: options.colors === "truecolor" ? 3 : 2 });
-  const background =
-    options.colors === "truecolor"
-      ? chalk.bgRgb(bottom.red, bottom.green, bottom.blue)
-      : chalk.bgAnsi256(bottom.ansi256);
-  return options.colors === "truecolor"
-    ? background.rgb(top.red, top.green, top.blue)("▀")
-    : background.ansi256(top.ansi256)("▀");
-}
-
-function wordmarkRows(options: HelpBrandOptions): readonly string[] {
+  colors: Painter,
+): readonly string[] {
   const pixels = Array.from({ length: 8 }, (_, y) =>
     [..."sketchi"]
       .map(
@@ -219,33 +205,30 @@ function wordmarkRows(options: HelpBrandOptions): readonly string[] {
       const bottom = pixels[y + 1]?.[x] === "#";
       row += top && bottom ? "█" : top ? "▀" : bottom ? "▄" : " ";
     }
-    rows.push(options.colors === "none" ? row : paint(ink, options)(row));
+    rows.push(options.colors === "none" ? row : colors.foreground(ink)(row));
   }
   return rows;
 }
 
 const WORDMARK_WIDTH = 30;
 
-function brandLockup(options: HelpBrandOptions): string {
+function brandLockup(options: HelpBrandOptions, colors: Painter): string {
   const width = Math.max(32, options.width ?? 80);
-  const tagline = wrappedLine("  ", description(TAGLINE, options), width);
+  const tagline = wrappedLine("  ", colors.description(TAGLINE), width);
 
   // The mark is a colour asset. Pipes, NO_COLOR and non-UTF-8 locales get the
   // word itself rather than block art that would be noise there.
   if (options.colors === "none" || options.unicode === false) {
-    return [
-      `  ${styled("sketchi", FOREGROUND[options.background], options, "bold")}`,
-      tagline,
-    ].join("\n");
+    return [`  ${colors.command("sketchi")}`, tagline].join("\n");
   }
 
-  const wordmark = wordmarkRows(options);
+  const wordmark = wordmarkRows(options, colors);
   if (width < 2 + TILE_WIDTH + LOCKUP_GAP + WORDMARK_WIDTH) {
     return [...wordmark.map((row) => `  ${row}`), "", tagline].join("\n");
   }
 
   // Centre the four-cell wordmark against the eight-cell tile.
-  const tile = tileRows(options);
+  const tile = tileRows(options, colors);
   const offset = (tile.length - wordmark.length) / 2;
   const gap = " ".repeat(LOCKUP_GAP);
   return [
@@ -274,61 +257,60 @@ function wrappedLine(
 function action(
   name: string,
   text: string,
-  options: HelpBrandOptions,
+  colors: Painter,
   width: number,
   labelWidth = 8,
 ): string {
   if (width < 52) {
     return [
-      `  ${command(name, options)}`,
-      wrappedLine("    ", description(text, options), width),
+      `  ${colors.command(name)}`,
+      wrappedLine("    ", colors.description(text), width),
     ].join("\n");
   }
   const label = name.padEnd(labelWidth);
-  const prefix = `  ${command(label, options)}  `;
-  return wrappedLine(prefix, description(text, options), width);
+  const prefix = `  ${colors.command(label)}  `;
+  return wrappedLine(prefix, colors.description(text), width);
 }
 
 export function renderRootHelp(options: HelpBrandOptions): string {
+  const colors = painter(options);
   const width = Math.max(32, options.width ?? 80);
   const example =
     'sketchi generate --prompt "Map release approval with pass and revise branches"';
   return [
-    brandLockup(options),
+    brandLockup(options, colors),
     "",
-    heading("START HERE", options),
+    colors.heading("START HERE"),
     wrappedLine(
-      `  ${command("sketchi generate", options)}  `,
-      description("interactive", options),
+      `  ${colors.command("sketchi generate")}  `,
+      colors.description("interactive"),
       width,
     ),
-    wrappedLine("  ", command(example, options), width),
+    wrappedLine("  ", colors.command(example), width),
     wrappedLine(
       "  ",
-      description(
+      colors.description(
         "Writes <generated-id>.png in this directory. No account or API key needed.",
-        options,
       ),
       width,
     ),
     action(
       "canvas",
       "Build and export a typed Universal CanvasSpec.",
-      options,
+      colors,
       width,
     ),
     "",
-    heading("WORK WITH A DIAGRAM", options),
-    action("show", "Inspect a local diagram.", options, width),
-    action("edit", "Replace its canonical document.", options, width),
-    action("export", "Write PNG, Excalidraw, or scene bytes.", options, width),
-    action("share", "Create an encrypted Excalidraw link.", options, width),
+    colors.heading("WORK WITH A DIAGRAM"),
+    action("show", "Inspect a local diagram.", colors, width),
+    action("edit", "Replace its canonical document.", colors, width),
+    action("export", "Write PNG, Excalidraw, or scene bytes.", colors, width),
+    action("share", "Create an encrypted Excalidraw link.", colors, width),
     "",
     wrappedLine(
       "",
-      description(
+      colors.description(
         "sketchi docs for every command.  Add --output json for automation.",
-        options,
       ),
       width,
     ),
@@ -431,43 +413,24 @@ export function terminalRootHelp(): string {
       ? 80
       : process.stdout.columns;
   const unicode = terminalSupportsUnicode();
-  if (
+  const disabled =
     process.env["NO_COLOR"] !== undefined ||
     process.env["TERM"] === "dumb" ||
     process.env["TERM"] === "ansi" ||
-    process.stdout.isTTY !== true
-  ) {
-    return renderRootHelp({
-      colors: "none",
-      background: "dark",
-      unicode,
-      width,
-    });
-  }
-  const colors = process.stdout.hasColors(2 ** 24)
-    ? "truecolor"
-    : process.stdout.hasColors(256)
-      ? "ansi256"
-      : "none";
-  if (colors === "none") {
-    return renderRootHelp({
-      colors: "none",
-      background: "dark",
-      unicode,
-      width,
-    });
-  }
-  const palette = terminalPalette(colors);
-  if (!palette.readable) {
-    return renderRootHelp({
-      colors: "none",
-      background: palette.background,
-      unicode,
-      width,
-    });
-  }
+    process.stdout.isTTY !== true;
+  const colors = disabled
+    ? "none"
+    : process.stdout.hasColors(2 ** 24)
+      ? "truecolor"
+      : process.stdout.hasColors(256)
+        ? "ansi256"
+        : "none";
+  const palette =
+    colors === "none"
+      ? ({ background: "dark", readable: true } satisfies TerminalPalette)
+      : terminalPalette(colors);
   return renderRootHelp({
-    colors,
+    colors: palette.readable ? colors : "none",
     background: palette.background,
     unicode,
     width,

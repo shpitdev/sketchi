@@ -1,19 +1,8 @@
 import { constants } from "node:fs";
-import {
-  mkdir,
-  link,
-  lstat,
-  mkdtemp,
-  open,
-  realpath,
-  readdir,
-  rename,
-  rm,
-  unlink,
-} from "node:fs/promises";
+import { open } from "node:fs/promises";
 import { join } from "node:path";
 
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, FileSystem, Layer, type PlatformError } from "effect";
 
 import { CliFilesystemError } from "./errors.js";
 
@@ -101,222 +90,223 @@ function hasCode(cause: unknown, code: string): boolean {
   );
 }
 
-function entryKind(entry: {
-  isFile(): boolean;
-  isDirectory(): boolean;
-  isSymbolicLink(): boolean;
-}): LocalEntryKind {
-  if (entry.isFile()) return "file";
-  if (entry.isDirectory()) return "directory";
-  if (entry.isSymbolicLink()) return "symbolic-link";
-  return "other";
+function platformCause(error: PlatformError.PlatformError): unknown {
+  return error.reason.cause ?? error;
 }
 
-export const localFileSystemLive = {
-  makeDirectory: (path, recursive = false) =>
-    Effect.tryPromise({
-      try: () => mkdir(path, { recursive }).then(() => undefined),
-      catch: (cause) => filesystemError("make-directory", path, cause),
-    }),
-  tryWriteText: (path, value) =>
-    Effect.tryPromise({
-      try: async () => {
-        try {
+/** Node stat follows links; probe readLink first so entry classification does not. */
+export function makeLocalFileSystem(
+  fs: FileSystem.FileSystem,
+): typeof LocalFileSystem.Service {
+  const kind = Effect.fn("sketchi.cli.fs.kind")(function* (path: string) {
+    const link = yield* fs.readLink(path).pipe(Effect.result);
+    if (link._tag === "Success") return "symbolic-link";
+    const cause = platformCause(link.failure);
+    if (hasCode(cause, "ENOENT")) return "missing";
+    if (hasCode(cause, "ELOOP")) return "symbolic-link";
+    if (!hasCode(cause, "EINVAL"))
+      return yield* filesystemError("stat", path, cause);
+    return yield* fs.stat(path).pipe(
+      Effect.map((info): LocalEntryKind => {
+        if (info.type === "File") return "file";
+        if (info.type === "Directory") return "directory";
+        if (info.type === "SymbolicLink") return "symbolic-link";
+        return "other";
+      }),
+      Effect.catch((error) => {
+        const cause = platformCause(error);
+        if (hasCode(cause, "ENOENT"))
+          return Effect.succeed<LocalEntryKind | "missing">("missing");
+        if (hasCode(cause, "ELOOP"))
+          return Effect.succeed<LocalEntryKind | "missing">("symbolic-link");
+        return Effect.fail(filesystemError("stat", path, cause));
+      }),
+    );
+  });
+  const mapError =
+    (operation: string, path: string) => (error: PlatformError.PlatformError) =>
+      filesystemError(operation, path, platformCause(error));
+  return {
+    makeDirectory: (path, recursive = false) =>
+      fs
+        .makeDirectory(path, { recursive })
+        .pipe(Effect.mapError(mapError("make-directory", path))),
+    tryWriteText: (path, value) =>
+      Effect.tryPromise({
+        try: async (signal) => {
+          try {
+            const handle = await open(
+              path,
+              constants.O_WRONLY |
+                constants.O_CREAT |
+                constants.O_EXCL |
+                constants.O_NOFOLLOW,
+              0o600,
+            );
+            try {
+              await handle.writeFile(value, { encoding: "utf8", signal });
+              await handle.sync();
+            } finally {
+              await handle.close();
+            }
+            return true;
+          } catch (cause) {
+            if (hasCode(cause, "EEXIST")) return false;
+            throw cause;
+          }
+        },
+        catch: (cause) => filesystemError("write-exclusive", path, cause),
+      }),
+    tryLinkFile: (source, destination) =>
+      fs.link(source, destination).pipe(
+        Effect.as(true),
+        Effect.catch((error) => {
+          const cause = platformCause(error);
+          return hasCode(cause, "EEXIST") || hasCode(cause, "ENOENT")
+            ? Effect.succeed(false)
+            : Effect.fail(
+                filesystemError(
+                  "link-exclusive",
+                  `${source} -> ${destination}`,
+                  cause,
+                ),
+              );
+        }),
+      ),
+    makeTempDirectory: (parent, prefix) =>
+      fs
+        .makeTempDirectory({ directory: parent, prefix })
+        .pipe(Effect.mapError(mapError("make-temp-directory", parent))),
+    list: (path) =>
+      fs.readDirectory(path).pipe(
+        Effect.mapError(mapError("read-directory", path)),
+        Effect.flatMap((names) =>
+          Effect.forEach(names, (name) =>
+            kind(join(path, name)).pipe(
+              // Directory names are a snapshot; vanished entries are not unsafe.
+              Effect.map((entryKind): LocalEntry[] =>
+                entryKind === "missing" ? [] : [{ name, kind: entryKind }],
+              ),
+            ),
+          ).pipe(Effect.map((entries) => entries.flat())),
+        ),
+      ),
+    kind,
+    realPath: (path) =>
+      fs.realPath(path).pipe(Effect.mapError(mapError("resolve", path))),
+    readText: (path) =>
+      Effect.tryPromise({
+        try: async (signal) => {
           const handle = await open(
             path,
-            constants.O_WRONLY |
-              constants.O_CREAT |
-              constants.O_EXCL |
-              constants.O_NOFOLLOW,
-            0o600,
+            constants.O_RDONLY | constants.O_NOFOLLOW,
           );
           try {
-            await handle.writeFile(value, { encoding: "utf8" });
+            return await handle.readFile({ encoding: "utf8", signal });
+          } finally {
+            await handle.close();
+          }
+        },
+        catch: (cause) => filesystemError("read", path, cause),
+      }),
+    readBytes: (path) =>
+      Effect.tryPromise({
+        try: async (signal) => {
+          const handle = await open(
+            path,
+            constants.O_RDONLY | constants.O_NOFOLLOW,
+          );
+          try {
+            return new Uint8Array(await handle.readFile({ signal }));
+          } finally {
+            await handle.close();
+          }
+        },
+        catch: (cause) => filesystemError("read", path, cause),
+      }),
+    writeText: (path, value, replace = false) =>
+      Effect.tryPromise({
+        try: async (signal) => {
+          const flags =
+            constants.O_WRONLY |
+            constants.O_CREAT |
+            constants.O_NOFOLLOW |
+            (replace ? constants.O_TRUNC : constants.O_EXCL);
+          const handle = await open(path, flags, 0o600);
+          try {
+            await handle.writeFile(value, { encoding: "utf8", signal });
             await handle.sync();
           } finally {
             await handle.close();
           }
-          return true;
-        } catch (cause) {
-          if (hasCode(cause, "EEXIST")) return false;
-          throw cause;
-        }
-      },
-      catch: (cause) => filesystemError("write-exclusive", path, cause),
-    }),
-  tryLinkFile: (source, destination) =>
-    Effect.tryPromise({
-      try: async () => {
-        try {
-          await link(source, destination);
-          return true;
-        } catch (cause) {
-          if (hasCode(cause, "EEXIST") || hasCode(cause, "ENOENT")) {
-            return false;
+        },
+        catch: (cause) => filesystemError("write", path, cause),
+      }),
+    writeBytes: (path, value, replace = false) =>
+      Effect.tryPromise({
+        try: async (signal) => {
+          const flags =
+            constants.O_WRONLY |
+            constants.O_CREAT |
+            constants.O_NOFOLLOW |
+            (replace ? constants.O_TRUNC : constants.O_EXCL);
+          const handle = await open(path, flags, 0o600);
+          try {
+            await handle.writeFile(value, { signal });
+            await handle.sync();
+          } finally {
+            await handle.close();
           }
-          throw cause;
-        }
-      },
-      catch: (cause) =>
-        filesystemError("link-exclusive", `${source} -> ${destination}`, cause),
-    }),
-  makeTempDirectory: (parent, prefix) =>
-    Effect.tryPromise({
-      try: () => mkdtemp(join(parent, prefix)),
-      catch: (cause) => filesystemError("make-temp-directory", parent, cause),
-    }),
-  list: (path) =>
-    Effect.tryPromise({
-      try: async () => {
-        const entries = await readdir(path, { withFileTypes: true });
-        return entries.map((entry) => ({
-          name: entry.name,
-          kind: entryKind(entry),
-        }));
-      },
-      catch: (cause) => filesystemError("read-directory", path, cause),
-    }),
-  kind: (path) =>
-    Effect.tryPromise({
-      try: async () => {
-        try {
-          const info = await lstat(path);
-          if (info.isFile()) return "file";
-          if (info.isDirectory()) return "directory";
-          if (info.isSymbolicLink()) return "symbolic-link";
-          return "other";
-        } catch (cause) {
-          if (hasCode(cause, "ENOENT")) return "missing";
-          if (hasCode(cause, "ELOOP")) return "symbolic-link";
-          throw cause;
-        }
-      },
-      catch: (cause) => filesystemError("stat", path, cause),
-    }),
-  realPath: (path) =>
-    Effect.tryPromise({
-      try: () => realpath(path),
-      catch: (cause) => filesystemError("resolve", path, cause),
-    }),
-  readText: (path) =>
-    Effect.tryPromise({
-      try: async () => {
-        const handle = await open(
-          path,
-          constants.O_RDONLY | constants.O_NOFOLLOW,
-        );
-        try {
-          return await handle.readFile({ encoding: "utf8" });
-        } finally {
-          await handle.close();
-        }
-      },
-      catch: (cause) => filesystemError("read", path, cause),
-    }),
-  readBytes: (path) =>
-    Effect.tryPromise({
-      try: async () => {
-        const handle = await open(
-          path,
-          constants.O_RDONLY | constants.O_NOFOLLOW,
-        );
-        try {
-          return new Uint8Array(await handle.readFile());
-        } finally {
-          await handle.close();
-        }
-      },
-      catch: (cause) => filesystemError("read", path, cause),
-    }),
-  writeText: (path, value, replace = false) =>
-    Effect.tryPromise({
-      try: async () => {
-        const flags =
-          constants.O_WRONLY |
-          constants.O_CREAT |
-          constants.O_NOFOLLOW |
-          (replace ? constants.O_TRUNC : constants.O_EXCL);
-        const handle = await open(path, flags, 0o600);
-        try {
-          await handle.writeFile(value, { encoding: "utf8" });
-          await handle.sync();
-        } finally {
-          await handle.close();
-        }
-      },
-      catch: (cause) => filesystemError("write", path, cause),
-    }),
-  writeBytes: (path, value, replace = false) =>
-    Effect.tryPromise({
-      try: async () => {
-        const flags =
-          constants.O_WRONLY |
-          constants.O_CREAT |
-          constants.O_NOFOLLOW |
-          (replace ? constants.O_TRUNC : constants.O_EXCL);
-        const handle = await open(path, flags, 0o600);
-        try {
-          await handle.writeFile(value);
-          await handle.sync();
-        } finally {
-          await handle.close();
-        }
-      },
-      catch: (cause) => filesystemError("write", path, cause),
-    }),
-  rename: (source, destination) =>
-    Effect.tryPromise({
-      try: () => rename(source, destination),
-      catch: (cause) =>
-        filesystemError("rename", `${source} -> ${destination}`, cause),
-    }),
-  tryRenameDirectory: (source, destination) =>
-    Effect.tryPromise({
-      try: async () => {
-        try {
-          await rename(source, destination);
-          return true;
-        } catch (cause) {
-          if (hasCode(cause, "EEXIST") || hasCode(cause, "ENOTEMPTY")) {
-            return false;
-          }
-          if (hasCode(cause, "EPERM")) {
-            try {
-              if ((await lstat(destination)).isDirectory()) return false;
-            } catch {
-              // Preserve the original rename failure when no directory won.
-            }
-          }
-          throw cause;
-        }
-      },
-      catch: (cause) =>
-        filesystemError(
-          "rename-exclusive-directory",
-          `${source} -> ${destination}`,
-          cause,
+        },
+        catch: (cause) => filesystemError("write", path, cause),
+      }),
+    rename: (source, destination) =>
+      fs
+        .rename(source, destination)
+        .pipe(
+          Effect.mapError(mapError("rename", `${source} -> ${destination}`)),
         ),
-    }),
-  removeFile: (path) =>
-    Effect.tryPromise({
-      try: async () => {
-        try {
-          await unlink(path);
-          return true;
-        } catch (cause) {
-          if (hasCode(cause, "ENOENT")) return false;
-          throw cause;
-        }
-      },
-      catch: (cause) => filesystemError("remove-file", path, cause),
-    }),
-  remove: (path) =>
-    Effect.tryPromise({
-      try: () => rm(path, { recursive: true, force: true }),
-      catch: (cause) => filesystemError("remove", path, cause),
-    }),
-} satisfies (typeof LocalFileSystem)["Service"];
+    tryRenameDirectory: (source, destination) =>
+      fs.rename(source, destination).pipe(
+        Effect.as(true),
+        Effect.catch((error) =>
+          Effect.gen(function* () {
+            const cause = platformCause(error);
+            if (hasCode(cause, "EEXIST") || hasCode(cause, "ENOTEMPTY"))
+              return false;
+            if (
+              hasCode(cause, "EPERM") &&
+              (yield* kind(destination).pipe(
+                Effect.catch(() => Effect.succeed("missing")),
+              )) === "directory"
+            )
+              return false;
+            return yield* filesystemError(
+              "rename-exclusive-directory",
+              `${source} -> ${destination}`,
+              cause,
+            );
+          }),
+        ),
+      ),
+    removeFile: (path) =>
+      fs.remove(path).pipe(
+        Effect.as(true),
+        Effect.catch((error) => {
+          const cause = platformCause(error);
+          return hasCode(cause, "ENOENT")
+            ? Effect.succeed(false)
+            : Effect.fail(filesystemError("remove-file", path, cause));
+        }),
+      ),
+    remove: (path) =>
+      fs
+        .remove(path, { recursive: true, force: true })
+        .pipe(Effect.mapError(mapError("remove", path))),
+  };
+}
 
-const LocalFileSystemLive = Layer.succeed(LocalFileSystem, localFileSystemLive);
-
-export { LocalFileSystemLive };
+export const LocalFileSystemLive = Layer.effect(
+  LocalFileSystem,
+  Effect.map(FileSystem.FileSystem, makeLocalFileSystem),
+);

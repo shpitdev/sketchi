@@ -5,7 +5,8 @@ import { assert, describe, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
 import { exitCodeForFailure } from "./errors.js";
-import { LocalFileSystem, localFileSystemLive } from "./filesystem.js";
+import { localFileSystemLive } from "./__tests__/fixtures.js";
+import { LocalFileSystem } from "./filesystem.js";
 import { CliPngRenderer, HeadlessPngRenderError } from "./png-renderer.js";
 import { pullIntoStore } from "./pull.js";
 import { ExcalidrawShare } from "./share.js";

@@ -33,6 +33,7 @@ import {
   exportCreatedDiagram,
   runGenerateWorkflow,
   type GenerateWorkflowResult,
+  type GeneratedArtifact,
   type GenerationDestination,
 } from "./generate-workflow.js";
 import {
@@ -56,6 +57,7 @@ import {
   cliErrorExitCode,
   exactlyOnceStringFlag,
   exclusiveInputSourceFlags,
+  resolveInputSource,
   invalidFlagValue,
   missingRequiredFlag,
   runEffectCommand,
@@ -75,6 +77,7 @@ import {
   reportFailure,
   reportSuccess,
   runReported,
+  runReportedArtifact,
 } from "./output.js";
 import { CliPngRenderer, CliPngRendererLive } from "./png-renderer.js";
 import { DiagramPatcher, DiagramPatcherLive } from "./patch.js";
@@ -290,7 +293,7 @@ function summaryText(
     `title: ${diagram.manifest.title}`,
     `revision: ${String(diagram.manifest.revision)}`,
     `authority: ${diagram.authority}`,
-    `document authoritative: ${String(diagram.documentAuthoritative)}`,
+    `document authoritative: ${String(diagram.authority === "canonical")}`,
     `formats: ${diagram.manifest.formats.join(",")}`,
     `storage: ${storageLocation(diagram.manifest.id)}`,
   ].join("\n");
@@ -359,24 +362,14 @@ function reportGenerateOperation<E extends CliFailure, R>(
   output: OutputFormat,
   operation: Effect.Effect<GenerateCommandResult, E, R>,
 ) {
-  return operation.pipe(
-    Effect.matchEffect({
-      onFailure: (error) => reportFailure("generate", output, error),
-      onSuccess: (result) =>
-        Effect.gen(function* () {
-          const writer = yield* OutputWriter;
-          if (result.artifact.stdoutBytes) {
-            yield* writer.stdout(result.artifact.stdoutBytes);
-          }
-          yield* reportSuccess(
-            "generate",
-            output,
-            generatedArtifactData(result),
-            generatedArtifactText(result),
-            result.artifact.destination === "-" ? "stderr" : "stdout",
-          );
-        }),
-    }),
+  return runReportedArtifact(
+    "generate",
+    output,
+    operation,
+    (result) => result.artifact,
+    generatedArtifactText,
+    generatedArtifactData,
+    (result) => (result.artifact.destination === "-" ? "stderr" : "stdout"),
   );
 }
 
@@ -388,7 +381,7 @@ function showText(diagram: StoredDiagram): string {
     `title: ${diagram.manifest.title}`,
     `revision: ${String(diagram.manifest.revision)}`,
     `authority: ${diagram.authority}`,
-    `document authoritative: ${String(diagram.documentAuthoritative)}`,
+    `document authoritative: ${String(diagram.authority === "canonical")}`,
     `formats: ${diagram.manifest.formats.join(",")}`,
     `revisions: ${revisions.length === 0 ? "none" : revisions.join(",")}`,
     "document:",
@@ -697,9 +690,10 @@ const canvasCommand = Command.make(
       ),
     ),
   },
-  ({ destination, endpoint, format, source }) =>
+  ({ destination, endpoint, format, fileInput, jsonInput }) =>
     Effect.gen(function* () {
       const { output } = yield* rootCommand;
+      const source = yield* resolveInputSource({ fileInput, jsonInput });
       const operation = Effect.gen(function* () {
         const spec = yield* readCanvasSpecInput(source);
         const created = yield* createCanvasDiagram({ endpoint, spec });
@@ -713,24 +707,14 @@ const canvasCommand = Command.make(
         );
         return { ...created, artifact } satisfies CanvasCommandResult;
       });
-      yield* operation.pipe(
-        Effect.matchEffect({
-          onFailure: (error) => reportFailure("canvas", output, error),
-          onSuccess: (result) =>
-            Effect.gen(function* () {
-              const writer = yield* OutputWriter;
-              if (result.artifact.stdoutBytes) {
-                yield* writer.stdout(result.artifact.stdoutBytes);
-              }
-              yield* reportSuccess(
-                "canvas",
-                output,
-                canvasData(result),
-                canvasText(result),
-                result.artifact.destination === "-" ? "stderr" : "stdout",
-              );
-            }),
-        }),
+      yield* runReportedArtifact(
+        "canvas",
+        output,
+        operation,
+        (result) => result.artifact,
+        canvasText,
+        canvasData,
+        (result) => (result.artifact.destination === "-" ? "stderr" : "stdout"),
       );
     }),
 ).pipe(
@@ -754,9 +738,10 @@ const canvasCommand = Command.make(
 const createCommand = Command.make(
   "create",
   exclusiveInputSourceFlags(),
-  ({ source }) =>
+  ({ fileInput, jsonInput }) =>
     Effect.gen(function* () {
       const { output } = yield* rootCommand;
+      const source = yield* resolveInputSource({ fileInput, jsonInput });
       const builder = yield* DiagramBuilder;
       const store = yield* DiagramStore;
       const operation = Effect.gen(function* () {
@@ -820,9 +805,10 @@ const editCommand = Command.make(
     diagramId: Argument.String("diagram-id"),
     ...exclusiveInputSourceFlags(),
   },
-  ({ diagramId, source }) =>
+  ({ diagramId, fileInput, jsonInput }) =>
     Effect.gen(function* () {
       const { output } = yield* rootCommand;
+      const source = yield* resolveInputSource({ fileInput, jsonInput });
       const builder = yield* DiagramBuilder;
       const store = yield* DiagramStore;
       const operation = Effect.gen(function* () {
@@ -865,9 +851,10 @@ const patchCommand = Command.make(
     diagramId: Argument.String("diagram-id"),
     ...exclusiveInputSourceFlags("patch request"),
   },
-  ({ diagramId, source }) =>
+  ({ diagramId, fileInput, jsonInput }) =>
     Effect.gen(function* () {
       const { output } = yield* rootCommand;
+      const source = yield* resolveInputSource({ fileInput, jsonInput });
       const patcher = yield* DiagramPatcher;
       const store = yield* DiagramStore;
       const operation = Effect.gen(function* () {
@@ -1037,7 +1024,7 @@ const pullCommand = Command.make(
           id: diagram.manifest.id,
           revision: diagram.manifest.revision,
           authority: diagram.authority,
-          documentAuthoritative: diagram.documentAuthoritative,
+          documentAuthoritative: diagram.authority === "canonical",
           formats: diagram.manifest.formats,
           revisions: revisionLocations(diagram),
           sourceIdentity,
@@ -1100,7 +1087,7 @@ const restoreCommand = Command.make(
           restoredFromRevision: result.restoredFromRevision,
           revision: result.diagram.manifest.revision,
           authority: result.diagram.authority,
-          documentAuthoritative: result.diagram.documentAuthoritative,
+          documentAuthoritative: result.diagram.authority === "canonical",
           formats: result.diagram.manifest.formats,
           revisions: revisionLocations(result.diagram),
         }),
@@ -1113,15 +1100,7 @@ const restoreCommand = Command.make(
   Command.withShortDescription("Restore a retained diagram revision."),
 );
 
-interface ExportResult {
-  readonly id: string;
-  readonly format: DiagramFormat;
-  readonly destination: string;
-  readonly sizeBytes: number;
-  readonly stdoutBytes?: Uint8Array;
-}
-
-function exportData(result: ExportResult) {
+function exportData(result: GeneratedArtifact) {
   const hint = displayHint(result);
   return {
     id: result.id,
@@ -1132,7 +1111,7 @@ function exportData(result: ExportResult) {
   };
 }
 
-function displayHint(result: ExportResult): string | undefined {
+function displayHint(result: GeneratedArtifact): string | undefined {
   const markdownDestination = [...result.destination]
     .map((character) => {
       const codePoint = character.codePointAt(0) ?? 0;
@@ -1180,25 +1159,23 @@ const exportCommand = Command.make(
           ...(destination === "-" ? { stdoutBytes: bytes } : {}),
         };
       });
-      yield* operation.pipe(
-        Effect.matchEffect({
-          onFailure: (error) => reportFailure("export", output, error),
-          onSuccess: (result) =>
-            Effect.gen(function* () {
-              const writer = yield* OutputWriter;
-              if (result.stdoutBytes) yield* writer.stdout(result.stdoutBytes);
-              const data = exportData(result);
-              const hint = displayHint(result);
-              const text = [
-                `exported: ${result.id}`,
-                `format: ${result.format}`,
-                `destination: ${result.destination}`,
-                `bytes: ${String(result.sizeBytes)}`,
-                ...(hint ? [`hint: ${hint}`] : []),
-              ].join("\n");
-              yield* reportSuccess("export", output, data, text, "stderr");
-            }),
-        }),
+      yield* runReportedArtifact(
+        "export",
+        output,
+        operation,
+        (result) => result,
+        (result) => {
+          const hint = displayHint(result);
+          return [
+            `exported: ${result.id}`,
+            `format: ${result.format}`,
+            `destination: ${result.destination}`,
+            `bytes: ${String(result.sizeBytes)}`,
+            ...(hint ? [`hint: ${hint}`] : []),
+          ].join("\n");
+        },
+        exportData,
+        () => "stderr",
       );
     }),
 ).pipe(

@@ -54,7 +54,6 @@ export interface StoredDiagram {
   readonly document: DiagramDocument;
   readonly revisions: ReadonlyArray<string>;
   readonly authority: DiagramAuthority;
-  readonly documentAuthoritative: boolean;
 }
 
 export interface DiagramSummary {
@@ -86,7 +85,7 @@ export function summaryFromStored(diagram: StoredDiagram): DiagramSummary {
     revision: diagram.manifest.revision,
     formats: diagram.manifest.formats,
     authority: diagram.authority,
-    documentAuthoritative: diagram.documentAuthoritative,
+    documentAuthoritative: diagram.authority === "canonical",
   };
 }
 

@@ -9,11 +9,16 @@ import {
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
-import { canonicalDocument, flowchartInput } from "./__tests__/fixtures.js";
+import {
+  canonicalDocument,
+  flowchartInput,
+  localFileSystemLive,
+} from "./__tests__/fixtures.js";
 import { DiagramBuilder, DiagramBuilderLive } from "./builder.js";
+import { summaryFromStored } from "./contracts.js";
 import { encodeJson } from "./document.js";
 import { CliFilesystemError } from "./errors.js";
-import { LocalFileSystem, localFileSystemLive } from "./filesystem.js";
+import { LocalFileSystem } from "./filesystem.js";
 import {
   DiagramPatcher,
   DiagramPatcherLive,
@@ -276,7 +281,7 @@ describe("offline semantic patch workflow", () => {
 
           assert.strictEqual(committed.manifest.revision, 2);
           assert.strictEqual(shown.authority, "patched");
-          assert.isFalse(shown.documentAuthoritative);
+          assert.isFalse(summaryFromStored(shown).documentAuthoritative);
           assert.deepStrictEqual(shown.manifest.formats, [
             "scene",
             "excalidraw",
@@ -368,7 +373,9 @@ describe("offline semantic patch workflow", () => {
 
           const restoredPatched = yield* store.restore("release-flow", 2);
           assert.strictEqual(restoredPatched.diagram.authority, "patched");
-          assert.isFalse(restoredPatched.diagram.documentAuthoritative);
+          assert.isFalse(
+            summaryFromStored(restoredPatched.diagram).documentAuthoritative,
+          );
           assert.deepStrictEqual(restoredPatched.diagram.manifest.formats, [
             "scene",
             "excalidraw",
@@ -376,7 +383,9 @@ describe("offline semantic patch workflow", () => {
 
           const restored = yield* store.restore("release-flow", 1);
           assert.strictEqual(restored.diagram.authority, "canonical");
-          assert.isTrue(restored.diagram.documentAuthoritative);
+          assert.isTrue(
+            summaryFromStored(restored.diagram).documentAuthoritative,
+          );
           assert.deepStrictEqual(restored.diagram.manifest.formats, [
             "scene",
             "excalidraw",

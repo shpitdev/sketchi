@@ -1,6 +1,7 @@
 import { Context, Effect, Layer, Schema, Stream } from "effect";
 import { Stdio } from "effect/Stdio";
 
+import type { GeneratedArtifact } from "./generate-workflow.js";
 import type { OutputFormat } from "./contracts.js";
 import { encodeJson } from "./document.js";
 import {
@@ -189,6 +190,38 @@ export function runReported<A, E extends CliFailure, R>(
     }),
   );
 }
+
+/** Write artifact bytes first, then the command's status on its chosen stream. */
+export const runReportedArtifact = Effect.fn("sketchi.cli.output.artifact")(
+  function* <A, E extends CliFailure, R>(
+    command: string,
+    format: OutputFormat,
+    operation: Effect.Effect<A, E, R>,
+    artifact: (value: A) => GeneratedArtifact,
+    renderText: (value: A) => string,
+    renderData: (value: A) => unknown,
+    statusStream: (value: A) => "stdout" | "stderr",
+  ) {
+    return yield* operation.pipe(
+      Effect.matchEffect({
+        onFailure: (error) => reportFailure(command, format, error),
+        onSuccess: (value) =>
+          Effect.gen(function* () {
+            const writer = yield* OutputWriter;
+            const bytes = artifact(value).stdoutBytes;
+            if (bytes) yield* writer.stdout(bytes);
+            yield* reportSuccess(
+              command,
+              format,
+              renderData(value),
+              renderText(value),
+              statusStream(value),
+            );
+          }),
+      }),
+    );
+  },
+);
 
 export function internalErrorText(format: OutputFormat): string {
   const error = {

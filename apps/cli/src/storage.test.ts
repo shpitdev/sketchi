@@ -14,16 +14,21 @@ import { assert, describe, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Ref, Schema } from "effect";
 import { TestClock } from "effect/testing";
 
-import { type BuiltDiagram } from "./contracts.js";
+import { summaryFromStored, type BuiltDiagram } from "./contracts.js";
+import { encodeJson } from "./document.js";
 import { CliFilesystemError, exitCodeForFailure } from "./errors.js";
-import { LocalFileSystem, localFileSystemLive } from "./filesystem.js";
+import { LocalFileSystem } from "./filesystem.js";
 import {
   DiagramStore,
   DiagramStoreLive,
   makeStorageRootLayer,
   writeExportFile,
 } from "./storage.js";
-import { builtDiagram, canonicalDocument } from "./__tests__/fixtures.js";
+import {
+  builtDiagram,
+  canonicalDocument,
+  localFileSystemLive,
+} from "./__tests__/fixtures.js";
 
 const testParent = resolve(process.cwd(), ".memory/cli-tests");
 const validPng = Uint8Array.from(
@@ -335,6 +340,7 @@ describe("diagram storage", () => {
           yield* Effect.promise(() => readFile(manifestPath, "utf8")),
         );
         delete manifest.authority;
+        manifest.documentAuthoritative = false;
         yield* Effect.promise(() =>
           writeFile(manifestPath, `${JSON.stringify(manifest)}\n`),
         );
@@ -342,7 +348,7 @@ describe("diagram storage", () => {
         const shown = yield* store.show("release-flow");
         const listed = yield* store.list();
         assert.strictEqual(shown.authority, "canonical");
-        assert.isTrue(shown.documentAuthoritative);
+        assert.isTrue(summaryFromStored(shown).documentAuthoritative);
         assert.strictEqual(listed[0]?.authority, "canonical");
         assert.isTrue(listed[0]?.documentAuthoritative);
       }).pipe(Effect.provide(storeLayer(root))),
@@ -494,7 +500,7 @@ describe("diagram storage", () => {
           );
           assert.strictEqual(detached.manifest.revision, 2);
           assert.strictEqual(detached.authority, "detached");
-          assert.isFalse(detached.documentAuthoritative);
+          assert.isFalse(summaryFromStored(detached).documentAuthoritative);
           assert.deepStrictEqual(detached.manifest.formats, ["excalidraw"]);
           assert.deepStrictEqual(detached.revisions, ["000001/"]);
           assert.strictEqual(
@@ -670,14 +676,16 @@ describe("diagram storage", () => {
       ),
   );
 
-  it.effect("preserves archived bytes except the manifest revision value", () =>
-    withTestRoot((root) =>
-      Effect.gen(function* () {
-        const store = yield* DiagramStore;
-        yield* store.create(builtDiagram());
-        yield* store.replaceWithDetached("release-flow", detachedBytes());
-        const snapshot = join(root, "release-flow/revisions/000001");
-        const legacyManifest = `{
+  it.effect(
+    "normalizes legacy manifests while preserving archived artifacts",
+    () =>
+      withTestRoot((root) =>
+        Effect.gen(function* () {
+          const store = yield* DiagramStore;
+          yield* store.create(builtDiagram());
+          yield* store.replaceWithDetached("release-flow", detachedBytes());
+          const snapshot = join(root, "release-flow/revisions/000001");
+          const legacyManifest = `{
   "schemaVersion": 1,
   "id": "release-flow",
   "type": "flowchart",
@@ -686,44 +694,50 @@ describe("diagram storage", () => {
   "formats": [ "scene", "excalidraw" ]
 }
 `;
-        yield* Effect.promise(() =>
-          writeFile(join(snapshot, "manifest.json"), legacyManifest),
-        );
-        const archivedFiles = [
-          "document.json",
-          "scene.json",
-          "diagram.excalidraw",
-        ];
-        const archivedBytes = new Map(
           yield* Effect.promise(() =>
-            Promise.all(
-              archivedFiles.map(
-                async (file) =>
-                  [file, await readFile(join(snapshot, file))] as const,
+            writeFile(join(snapshot, "manifest.json"), legacyManifest),
+          );
+          const archivedFiles = [
+            "document.json",
+            "scene.json",
+            "diagram.excalidraw",
+          ];
+          const archivedBytes = new Map(
+            yield* Effect.promise(() =>
+              Promise.all(
+                archivedFiles.map(
+                  async (file) =>
+                    [file, await readFile(join(snapshot, file))] as const,
+                ),
               ),
             ),
-          ),
-        );
-
-        const restored = yield* store.restore("release-flow", 1);
-        assert.strictEqual(restored.diagram.manifest.revision, 3);
-        assert.strictEqual(restored.diagram.authority, "canonical");
-        assert.strictEqual(
-          yield* Effect.promise(() =>
-            readFile(join(root, "release-flow/manifest.json"), "utf8"),
-          ),
-          legacyManifest.replace('"revision" : 1', '"revision" : 3'),
-        );
-        for (const [file, bytes] of archivedBytes) {
-          assert.deepStrictEqual(
-            yield* Effect.promise(() =>
-              readFile(join(root, "release-flow", file)),
-            ),
-            bytes,
           );
-        }
-      }).pipe(Effect.provide(storeLayer(root))),
-    ),
+
+          const restored = yield* store.restore("release-flow", 1);
+          assert.strictEqual(restored.diagram.manifest.revision, 3);
+          assert.strictEqual(restored.diagram.authority, "canonical");
+          assert.strictEqual(
+            yield* Effect.promise(() =>
+              readFile(join(root, "release-flow/manifest.json"), "utf8"),
+            ),
+            encodeJson({ ...restored.diagram.manifest }),
+          );
+          assert.strictEqual(
+            yield* Effect.promise(() =>
+              readFile(join(snapshot, "manifest.json"), "utf8"),
+            ),
+            legacyManifest,
+          );
+          for (const [file, bytes] of archivedBytes) {
+            assert.deepStrictEqual(
+              yield* Effect.promise(() =>
+                readFile(join(root, "release-flow", file)),
+              ),
+              bytes,
+            );
+          }
+        }).pipe(Effect.provide(storeLayer(root))),
+      ),
   );
 
   it.effect("enumerates and restores mixed legacy and full revisions", () =>
@@ -981,7 +995,32 @@ describe("diagram storage", () => {
       ),
   );
 
-  it.effect("rejects invalid compressed data in a current stored PNG", () =>
+  it.effect("validates PNG writes before committing create or edit", () =>
+    withTestRoot((root) =>
+      Effect.gen(function* () {
+        const store = yield* DiagramStore;
+        const invalid = builtDiagram({ png: invalidIdatPng() });
+        const creation = yield* Effect.flip(store.create(invalid));
+        assert.strictEqual(creation._tag, "CliStorageError");
+        assert.strictEqual(
+          yield* localFileSystemLive.kind(join(root, "release-flow")),
+          "missing",
+        );
+        yield* store.create(builtDiagram({ png: validPng }));
+        const before = yield* Effect.promise(() =>
+          snapshotTree(join(root, "release-flow")),
+        );
+        const editing = yield* Effect.flip(store.edit("release-flow", invalid));
+        assert.strictEqual(editing._tag, "CliStorageError");
+        assert.deepStrictEqual(
+          yield* Effect.promise(() => snapshotTree(join(root, "release-flow"))),
+          before,
+        );
+      }).pipe(Effect.provide(storeLayer(root))),
+    ),
+  );
+
+  it.effect("reads PNG metadata cheaply but validates PNG consumption", () =>
     withTestRoot((root) =>
       Effect.gen(function* () {
         const store = yield* DiagramStore;
@@ -996,7 +1035,15 @@ describe("diagram storage", () => {
           );
           const before = yield* Effect.promise(() => snapshotTree(record));
 
-          const failure = yield* Effect.flip(store.show("release-flow"));
+          const shown = yield* store.show("release-flow");
+          assert.strictEqual(shown.manifest.revision, 1);
+          const listed = yield* store.list();
+          assert.strictEqual(listed[0]?.revision, 1);
+          const scene = yield* store.readExportSource("release-flow", "scene");
+          assert.strictEqual(scene._tag, "StoredArtifact");
+          const failure = yield* Effect.flip(
+            store.readExportSource("release-flow", "png"),
+          );
 
           assert.strictEqual(failure._tag, "CliStorageError");
           if (failure._tag === "CliStorageError") {

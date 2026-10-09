@@ -85,3 +85,41 @@ describe("requested output format", () => {
     }
   });
 });
+
+// Exercise the public combinators through the packaged command, including repeats.
+describe("input-source exclusivity", () => {
+  it.each(["canvas", "create", "edit", "patch"])(
+    "keeps %s duplicate sources in the JSON usage envelope",
+    (command) => {
+      const environment: NodeJS.ProcessEnv = { ...process.env };
+      delete environment["FORCE_COLOR"];
+      delete environment["NO_COLOR"];
+      for (const flag of ["--file", "--json"]) {
+        const result = spawnSync(
+          process.execPath,
+          [
+            resolve("apps/cli/dist/sketchi.js"),
+            command,
+            ...(["edit", "patch"].includes(command) ? ["release-flow"] : []),
+            flag,
+            "first",
+            flag,
+            "second",
+            "--output",
+            "json",
+          ],
+          { encoding: "utf8", env: environment },
+        );
+        assert.strictEqual(result.status, 2);
+        assert.strictEqual(result.stdout, "");
+        const error = JSON.parse(result.stderr).error;
+        assert.strictEqual(error.code, "usage_error");
+        assert.include(error.message, "more than one source provided");
+        assert.include(
+          error.message,
+          "exactly one of --file PATH|- or --json VALUE",
+        );
+      }
+    },
+  );
+});

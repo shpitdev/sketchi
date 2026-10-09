@@ -71,7 +71,6 @@ function stored(diagram: BuiltDiagram): StoredDiagram {
       formats: ["scene", "excalidraw"],
     },
     authority: "canonical",
-    documentAuthoritative: true,
     document: diagram.document,
     revisions: [],
   };

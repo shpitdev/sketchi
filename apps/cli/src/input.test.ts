@@ -1,3 +1,4 @@
+import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Layer, Stream } from "effect";
 import * as Stdio from "effect/Stdio";
@@ -7,7 +8,7 @@ import { InputReader, makeInputReaderLayer } from "./input.js";
 
 function inputLayer(stdin: Stream.Stream<Uint8Array>, tty: boolean) {
   const dependencies = Layer.mergeAll(
-    LocalFileSystemLive,
+    LocalFileSystemLive.pipe(Layer.provide(NodeFileSystem.layer)),
     Stdio.layerTest({ stdin }),
   );
   return makeInputReaderLayer(() => tty).pipe(Layer.provide(dependencies));

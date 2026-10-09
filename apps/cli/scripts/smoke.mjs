@@ -38,13 +38,14 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function run(file, args, options = {}) {
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+
+function assertPng(bytes, label) {
+  assert(bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE), label);
+}
+
+function collect(child) {
   return new Promise((complete, reject) => {
-    const child = spawn(file, args, {
-      cwd: options.cwd ?? workspaceRoot,
-      env: options.env ?? process.env,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
     const stdout = [];
     const stderr = [];
     child.stdout.on("data", (chunk) => stdout.push(chunk));
@@ -58,9 +59,19 @@ function run(file, args, options = {}) {
         stderr: Buffer.concat(stderr),
       }),
     );
-    if (options.input !== undefined) child.stdin.end(options.input);
-    else child.stdin.end();
   });
+}
+
+function run(file, args, options = {}) {
+  const child = spawn(file, args, {
+    cwd: options.cwd ?? workspaceRoot,
+    env: options.env ?? process.env,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const result = collect(child);
+  if (options.input !== undefined) child.stdin.end(options.input);
+  else child.stdin.end();
+  return result;
 }
 
 function shellQuote(value) {
@@ -68,49 +79,36 @@ function shellQuote(value) {
 }
 
 function runTty(file, args, options = {}) {
-  return new Promise((complete, reject) => {
-    const command = [
-      "stty cols 100",
-      [file, ...args].map(shellQuote).join(" "),
-    ].join("; ");
-    const child = spawn(
-      "script",
-      ["--quiet", "--return", "--command", command, "/dev/null"],
-      {
-        cwd: options.cwd ?? workspaceRoot,
-        env: { ...(options.env ?? process.env), SHELL: "/bin/bash" },
-        stdio: ["pipe", "pipe", "pipe"],
+  const command = [
+    "stty cols 100",
+    [file, ...args].map(shellQuote).join(" "),
+  ].join("; ");
+  const child = spawn(
+    "script",
+    ["--quiet", "--return", "--command", command, "/dev/null"],
+    {
+      cwd: options.cwd ?? workspaceRoot,
+      env: { ...(options.env ?? process.env), SHELL: "/bin/bash" },
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
+  const result = collect(child);
+  const steps = options.steps ?? [];
+  const send = (index) => {
+    if (index >= steps.length) {
+      child.stdin.end();
+      return;
+    }
+    setTimeout(
+      () => {
+        child.stdin.write(steps[index]);
+        send(index + 1);
       },
+      index === 0 ? 400 : 600,
     );
-    const stdout = [];
-    const stderr = [];
-    child.stdout.on("data", (chunk) => stdout.push(chunk));
-    child.stderr.on("data", (chunk) => stderr.push(chunk));
-    child.on("error", reject);
-    child.on("close", (code, signal) =>
-      complete({
-        code: code ?? -1,
-        signal,
-        stdout: Buffer.concat(stdout),
-        stderr: Buffer.concat(stderr),
-      }),
-    );
-    const steps = options.steps ?? [];
-    const send = (index) => {
-      if (index >= steps.length) {
-        child.stdin.end();
-        return;
-      }
-      setTimeout(
-        () => {
-          child.stdin.write(steps[index]);
-          send(index + 1);
-        },
-        index === 0 ? 400 : 600,
-      );
-    };
-    send(0);
-  });
+  };
+  send(0);
+  return result;
 }
 
 function parseJson(buffer, label) {
@@ -586,12 +584,7 @@ try {
   );
   const generatedPngPath = resolve(fixtureRoot, "generated-release-flow.png");
   const generatedPng = await readFile(generatedPngPath);
-  assert(
-    generatedPng
-      .subarray(0, 8)
-      .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
-    "Generate did not write a PNG by default.",
-  );
+  assertPng(generatedPng, "Generate did not write a PNG by default.");
   assertInkHasPadding(generatedPng, "default generated PNG");
   assert(
     !(await readdir(generatedRecord)).includes("diagram.png"),
@@ -634,11 +627,11 @@ try {
     assert(
       wizardCurrent.stdout.includes(
         Buffer.from("created: generated-release-flow"),
-      ) &&
-        wizardCurrent.stdout.includes(Buffer.from(generatedPngPath)) &&
-        (await readFile(generatedPngPath))
-          .subarray(0, 8)
-          .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+      ) && wizardCurrent.stdout.includes(Buffer.from(generatedPngPath)),
+      "Wizard current-directory default did not create and summarize its PNG.",
+    );
+    assertPng(
+      await readFile(generatedPngPath),
       "Wizard current-directory default did not create and summarize its PNG.",
     );
     await rm(generatedRecord, { force: true, recursive: true });
@@ -653,10 +646,8 @@ try {
     ]);
     expectExit(wizardProject, 0, "wizard project-diagrams PNG");
     const projectPng = resolve(diagramsDirectory, "generated-release-flow.png");
-    assert(
-      (await readFile(projectPng))
-        .subarray(0, 8)
-        .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+    assertPng(
+      await readFile(projectPng),
       "Wizard did not create the cwd diagrams folder after generation.",
     );
     await rm(generatedRecord, { force: true, recursive: true });
@@ -669,10 +660,8 @@ try {
       `${customPng}\r`,
     ]);
     expectExit(wizardCustom, 0, "wizard custom PNG");
-    assert(
-      (await readFile(customPng))
-        .subarray(0, 8)
-        .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+    assertPng(
+      await readFile(customPng),
       "Wizard custom destination did not reuse --dest semantics.",
     );
     assert(
@@ -702,10 +691,11 @@ try {
       presetRequest?.type === "mindmap" &&
         presetRequest.model === "preset-model" &&
         !wizardPreset.stdout.includes(Buffer.from("Diagram type")) &&
-        !wizardPreset.stdout.includes(Buffer.from("Save the PNG")) &&
-        (await readFile(presetPng))
-          .subarray(0, 8)
-          .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+        !wizardPreset.stdout.includes(Buffer.from("Save the PNG")),
+      "Wizard discarded an explicit type, format, model, or destination preset.",
+    );
+    assertPng(
+      await readFile(presetPng),
       "Wizard discarded an explicit type, format, model, or destination preset.",
     );
     await rm(generatedRecord, { force: true, recursive: true });
@@ -1133,12 +1123,7 @@ try {
     "PNG file export omitted the agent display hint.",
   );
   const firstPng = await readFile(pngDestination);
-  assert(
-    firstPng
-      .subarray(0, 8)
-      .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
-    "PNG file export did not write a PNG signature.",
-  );
+  assertPng(firstPng, "PNG file export did not write a PNG signature.");
   assertInkHasPadding(firstPng, "PNG file export");
 
   const newlineDestination = resolve(
@@ -1268,10 +1253,8 @@ try {
     "json",
   ]);
   expectExit(stdoutPng, 0, "PNG stdout export");
-  assert(
-    stdoutPng.stdout
-      .subarray(0, 8)
-      .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+  assertPng(
+    stdoutPng.stdout,
     "PNG stdout export did not keep stdout byte-only.",
   );
   const stdoutPngStatus = parseJson(stdoutPng.stderr, "PNG stdout status");

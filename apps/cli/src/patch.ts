@@ -1,18 +1,18 @@
 import {
-  ApplyDiagramPatchRequestSchema,
+  ApplyDiagramPatchRequest,
+  safeParseContract,
   CodeModeArtifactStorage,
   CodeModeRuntimeEnvironment,
-  ExcalidrawFileSchema,
-  RenderedDiagramSceneSchema,
   applyDiagramPatch,
-  type ApplyDiagramPatchRequest,
-  type ApplyDiagramPatchResult,
-  type CodeModeIssue,
-  type ExcalidrawFile,
   type PatchableScene,
 } from "@sketchi/diagram-agent";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 
+import {
+  codeModeFailure,
+  decodeInlineArtifacts,
+  withCodeMode,
+} from "./code-mode-artifacts.js";
 import type { PatchedDiagramArtifacts } from "./contracts.js";
 import {
   CliBuildError,
@@ -27,10 +27,11 @@ export interface CliPatchInput {
   readonly intent?: string;
 }
 
-type PatchArtifact = Extract<
-  ApplyDiagramPatchResult,
-  { readonly ok: true }
->["artifact"];
+const PatchInput = Schema.Struct({
+  operations: ApplyDiagramPatchRequest.fields.operations,
+  options: ApplyDiagramPatchRequest.fields.options,
+  intent: ApplyDiagramPatchRequest.fields.intent,
+});
 
 function validationError(
   message: string,
@@ -62,26 +63,7 @@ export const decodePatchInput = Effect.fn("sketchi.cli.patch.decodeInput")(
         ["requestId: The CLI owns the patch request id."],
       );
     }
-    const parsed = ApplyDiagramPatchRequestSchema.safeParse({
-      ...input,
-      requestId: "cli-patch-validation",
-      source: {
-        scene: {
-          kind: "canvas",
-          version: 1,
-          diagramId: "validation",
-          title: "Validation",
-          width: 1,
-          height: 1,
-          accentColor: "#000000",
-          backgroundColor: "#ffffff",
-          elements: [],
-          layers: [],
-          layouts: [],
-          zOrder: [],
-        },
-      },
-    });
+    const parsed = safeParseContract(PatchInput, input);
     if (!parsed.success) {
       return yield* validationError(
         "The diagram patch request is invalid.",
@@ -125,90 +107,6 @@ export class DiagramPatcher extends Context.Service<
   }
 >()("@sketchi/cli/DiagramPatcher") {}
 
-function issueDetail(issue: CodeModeIssue): string {
-  const path = issue.ref?.path ? ` (${issue.ref.path})` : "";
-  return `${issue.code}${path}: ${issue.message}`;
-}
-
-function patchFailure(
-  result: Extract<ApplyDiagramPatchResult, { readonly ok: false }>,
-): CliBuildError | CliStorageError | CliValidationError {
-  const first = result.issues[0];
-  const message =
-    first?.message ?? `Code Mode patch failed with ${result.status}.`;
-  const hint = first?.hint ?? "Repair the patch request and retry.";
-  const details = result.issues.map(issueDetail);
-  if (
-    result.status === "invalid_input" ||
-    result.status === "target_not_found" ||
-    result.status === "unsupported_operation" ||
-    result.status === "connectivity_changed"
-  ) {
-    return CliValidationError.make({ message, hint, details });
-  }
-  if (result.status === "storage_failed") {
-    return CliStorageError.make({
-      code: "storage_commit_failed",
-      message,
-      hint,
-    });
-  }
-  return CliBuildError.make({
-    status: result.status,
-    message,
-    hint,
-    details,
-  });
-}
-
-function inlineArtifact(
-  artifact: PatchArtifact,
-  format: "scene" | "excalidraw",
-): Effect.Effect<unknown, CliBuildError> {
-  const ref = artifact.formats.find((candidate) => candidate.format === format);
-  if (ref?.inline !== undefined) return Effect.succeed(ref.inline);
-  return Effect.fail(
-    CliBuildError.make({
-      status: "missing_inline_artifact",
-      message: `Code Mode did not return the patched ${format} artifact inline.`,
-      hint: "Retry the offline patch with the required artifact formats.",
-      details: [format],
-    }),
-  );
-}
-
-function decodeScene(
-  value: unknown,
-): Effect.Effect<PatchableScene, CliBuildError> {
-  const decoded = RenderedDiagramSceneSchema.safeParse(value);
-  return decoded.success
-    ? Effect.succeed(decoded.data)
-    : Effect.fail(
-        CliBuildError.make({
-          status: "invalid_scene_artifact",
-          message: "Code Mode returned an invalid patched scene artifact.",
-          hint: "Inspect the Code Mode patch/export boundary.",
-          details: decoded.error.issues.map((issue) => issue.message),
-        }),
-      );
-}
-
-function decodeExcalidraw(
-  value: unknown,
-): Effect.Effect<ExcalidrawFile, CliBuildError> {
-  const decoded = ExcalidrawFileSchema.safeParse(value);
-  return decoded.success
-    ? Effect.succeed(decoded.data)
-    : Effect.fail(
-        CliBuildError.make({
-          status: "invalid_excalidraw_artifact",
-          message: "Code Mode returned an invalid patched Excalidraw artifact.",
-          hint: "Inspect the Code Mode patch/export boundary.",
-          details: decoded.error.issues.map((issue) => issue.message),
-        }),
-      );
-}
-
 export const DiagramPatcherLive = Layer.effect(
   DiagramPatcher,
   Effect.gen(function* () {
@@ -220,28 +118,23 @@ export const DiagramPatcherLive = Layer.effect(
       input: CliPatchInput,
       requestId: string,
     ) {
-      const result = yield* applyDiagramPatch({
-        requestId,
-        source: { scene },
-        operations: input.operations,
-        options: {
-          ...input.options,
-          artifactFormats: ["scene", "excalidraw"],
-          inlineArtifacts: ["scene", "excalidraw"],
-        },
-        ...(input.intent ? { intent: input.intent } : {}),
-      }).pipe(
-        Effect.provideService(CodeModeArtifactStorage, artifactStorage),
-        Effect.provideService(CodeModeRuntimeEnvironment, environment),
+      const result = yield* withCodeMode(
+        artifactStorage,
+        environment,
+        (options) =>
+          applyDiagramPatch({
+            requestId,
+            source: { scene },
+            operations: input.operations,
+            options: { ...input.options, ...options },
+            ...(input.intent ? { intent: input.intent } : {}),
+          }),
       );
-      if (!result.ok) return yield* patchFailure(result);
-      const patchedScene = yield* inlineArtifact(result.artifact, "scene").pipe(
-        Effect.flatMap(decodeScene),
-      );
-      const excalidraw = yield* inlineArtifact(
+      if (!result.ok) return yield* codeModeFailure(result, "patch");
+      const { scene: patchedScene, excalidraw } = yield* decodeInlineArtifacts(
         result.artifact,
-        "excalidraw",
-      ).pipe(Effect.flatMap(decodeExcalidraw));
+        "patch",
+      );
       return {
         scene: patchedScene,
         excalidraw,

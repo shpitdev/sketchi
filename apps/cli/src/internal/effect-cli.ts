@@ -2,7 +2,7 @@
  * Reviewed boundary for Effect's stable CLI package.
  * No other Sketchi CLI source may import `effect/cli` directly.
  */
-import { Console, Effect } from "effect";
+import { Console, Effect, Option } from "effect";
 import {
   Argument,
   CliConfig,
@@ -11,7 +11,6 @@ import {
   Command,
   Flag,
   GlobalFlag,
-  Param,
 } from "effect/cli";
 
 import type { OutputFormat } from "../contracts.js";
@@ -45,81 +44,65 @@ export type InputSource =
   | { readonly _tag: "File"; readonly path: string }
   | { readonly _tag: "InlineJson"; readonly value: string };
 
-function fileSource(path: string): InputSource {
-  return { _tag: "File", path };
-}
-
-function inlineSource(value: string): InputSource {
-  return { _tag: "InlineJson", value };
-}
-
 export function exclusiveInputSourceFlags(content = "canonical document") {
-  const file = Flag.String("file").pipe(
-    Flag.withMetavar("PATH|-"),
-    Flag.withDescription(`Read one ${content} from PATH, or stdin with -.`),
-    Flag.map(fileSource),
-  );
-  const json = Flag.String("json").pipe(
-    Flag.withMetavar("VALUE"),
-    Flag.withDescription(`Read one ${content} from inline JSON.`),
-    Flag.map(inlineSource),
-  );
-  const source = Object.assign(
-    Object.create(Object.getPrototypeOf(file)),
-    file,
-    {
-      parse: (args: Param.ParsedArgs) => {
-        const fileCount = args.flags["file"]?.length ?? 0;
-        const jsonCount = args.flags["json"]?.length ?? 0;
-        if (fileCount === 1 && jsonCount === 0) return file.parse(args);
-        if (fileCount === 0 && jsonCount === 1) return json.parse(args);
-        return Effect.fail(
-          new CliError.InvalidValue({
-            option: "file/--json",
-            value:
-              fileCount === 0 && jsonCount === 0
-                ? "neither provided"
-                : "more than one source provided",
-            expected: "exactly one of --file PATH|- or --json VALUE",
-            kind: "flag",
-          }),
-        );
-      },
-    },
-  ) as Flag.Flag<InputSource>;
   return {
-    source,
-    // This optional declaration registers --json in parser metadata and help.
-    // `source.parse` owns the exact-one validation and typed result.
-    jsonInput: Flag.optional(json),
+    fileInput: Flag.String("file").pipe(
+      Flag.withMetavar("PATH|-"),
+      Flag.withDescription(`Read one ${content} from PATH, or stdin with -.`),
+      Flag.atLeast(1),
+      Flag.optional,
+    ),
+    jsonInput: Flag.String("json").pipe(
+      Flag.withMetavar("VALUE"),
+      Flag.withDescription(`Read one ${content} from inline JSON.`),
+      Flag.atLeast(1),
+      Flag.optional,
+    ),
   };
 }
+
+export const resolveInputSource = Effect.fn("sketchi.cli.input.source")(
+  function* (input: {
+    readonly fileInput: Option.Option<ReadonlyArray<string>>;
+    readonly jsonInput: Option.Option<ReadonlyArray<string>>;
+  }) {
+    const files = Option.getOrElse(input.fileInput, () => []);
+    const json = Option.getOrElse(input.jsonInput, () => []);
+    if (files.length === 1 && json.length === 0)
+      return { _tag: "File", path: files[0]! } satisfies InputSource;
+    if (files.length === 0 && json.length === 1)
+      return { _tag: "InlineJson", value: json[0]! } satisfies InputSource;
+    return yield* invalidFlagValue(
+      "file/--json",
+      files.length === 0 && json.length === 0
+        ? "neither provided"
+        : "more than one source provided",
+      "exactly one of --file PATH|- or --json VALUE",
+    );
+  },
+);
 
 export function exactlyOnceStringFlag(
   name: string,
   metavar: string,
   description: string,
 ) {
-  const base = Flag.String(name).pipe(
+  return Flag.String(name).pipe(
     Flag.withMetavar(metavar),
     Flag.withDescription(description),
-  );
-  return Object.assign(Object.create(Object.getPrototypeOf(base)), base, {
-    parse: (args: Param.ParsedArgs) =>
-      (args.flags[name]?.length ?? 0) === 1
-        ? base.parse(args)
+    Flag.atLeast(0),
+    Flag.mapEffect((values) =>
+      values.length === 1
+        ? Effect.succeed(values[0]!)
         : Effect.fail(
-            new CliError.InvalidValue({
-              option: name,
-              value:
-                (args.flags[name]?.length ?? 0) === 0
-                  ? "not provided"
-                  : "provided more than once",
-              expected: `exactly one --${name} ${metavar}`,
-              kind: "flag",
-            }),
+            invalidFlagValue(
+              name,
+              values.length === 0 ? "not provided" : "provided more than once",
+              `exactly one --${name} ${metavar}`,
+            ),
           ),
-  }) as Flag.Flag<string>;
+    ),
+  );
 }
 
 export function missingRequiredFlag(name: string) {

@@ -1,9 +1,6 @@
-import {
-  ExcalidrawFileSchema,
-  RenderedDiagramSceneSchema,
-} from "@sketchi/diagram-agent";
 import { Context, Effect, Layer } from "effect";
 
+import { decodeInlineArtifacts } from "./code-mode-artifacts.js";
 import type { DiagramFormat } from "./contracts.js";
 import {
   CliExportError,
@@ -67,25 +64,27 @@ export const DiagramExporterLive = Layer.effect(
           readonly excalidraw: Uint8Array;
         },
       ) {
-        const excalidrawJson = yield* decodeJson(
-          diagramId,
-          artifacts.excalidraw,
-        );
-        const excalidraw = ExcalidrawFileSchema.safeParse(excalidrawJson);
-        if (!excalidraw.success) return yield* renderFailed(diagramId);
-        const scene = artifacts.scene
-          ? RenderedDiagramSceneSchema.safeParse(
-              yield* decodeJson(diagramId, artifacts.scene),
-            )
-          : undefined;
-        if (scene && !scene.success) return yield* renderFailed(diagramId);
+        const formats = [
+          {
+            format: "excalidraw",
+            inline: yield* decodeJson(diagramId, artifacts.excalidraw),
+          },
+        ];
+        if (artifacts.scene)
+          formats.unshift({
+            format: "scene",
+            inline: yield* decodeJson(diagramId, artifacts.scene),
+          });
+        const decoded = yield* decodeInlineArtifacts(
+          { formats },
+          "export",
+        ).pipe(Effect.mapError(() => renderFailed(diagramId)));
         const png = yield* renderer
           .renderPng({
-            ...(scene?.success ? { scene: scene.data } : {}),
-            excalidraw: excalidraw.data,
+            ...decoded,
           })
           .pipe(Effect.mapError((error) => renderFailed(diagramId, error)));
-        return png instanceof Uint8Array ? png : new Uint8Array(png);
+        return png;
       },
     );
 
