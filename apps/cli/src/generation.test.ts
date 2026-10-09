@@ -3,12 +3,13 @@ import {
   makeCodeModeRuntimeEnvironmentLayer,
 } from "@sketchi/diagram-agent";
 import { afterEach, assert, describe, expect, it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Deferred, Effect, Fiber, Layer } from "effect";
+import { TestClock } from "effect/testing";
 
 import { DiagramBuilder, DiagramBuilderLive } from "./builder.js";
 import type { BuiltDiagram, StoredDiagram } from "./contracts.js";
 import { decodeCanonicalDiagramDocument, encodeJson } from "./document.js";
-import { CliStorageError } from "./errors.js";
+import { CliStorageError, exitCodeForFailure } from "./errors.js";
 import { DiagramExporter, DiagramExporterLive } from "./exporter.js";
 import {
   DEFAULT_GENERATE_ENDPOINT,
@@ -183,6 +184,136 @@ function runGenerate(
 }
 
 describe("prompt-assisted generation over the public generate API", () => {
+  it.effect("keeps response-stream I/O failures in the network exit class", () =>
+    Effect.gen(function* () {
+      globalThis.fetch = () => Promise.resolve(new Response(new ReadableStream<Uint8Array>({
+        start(controller) { controller.error(new Error("connection closed")); },
+      })));
+      const created: BuiltDiagram[] = [];
+      const error = yield* Effect.flip(runGenerate(created));
+      assert.strictEqual(error._tag, "CliGenerationError");
+      if (error._tag === "CliGenerationError") {
+        assert.strictEqual(error.code, "provider_failure");
+        assert.strictEqual(exitCodeForFailure(error), 10);
+      }
+      assert.strictEqual(created.length, 0);
+    }),
+  );
+  for (const stall of ["headers", "body"] as const) {
+    it.effect(`bounds stalled generation ${stall} without persisting`, () =>
+      Effect.gen(function* () {
+        const started = yield* Deferred.make<void>();
+        let signal: AbortSignal | null | undefined;
+        let bodyCancelled = false;
+        globalThis.fetch = (_input, init) => {
+          signal = init?.signal;
+          if (stall === "headers")
+            return new Promise<Response>(() => {
+              Deferred.doneUnsafe(started, Effect.void);
+            });
+          return Promise.resolve(
+            new Response(
+              new ReadableStream<Uint8Array>({
+                pull() {
+                  Deferred.doneUnsafe(started, Effect.void);
+                },
+                cancel() {
+                  bodyCancelled = true;
+                },
+              }),
+            ),
+          );
+        };
+        const created: BuiltDiagram[] = [];
+        const fiber = yield* Effect.flip(runGenerate(created)).pipe(
+          Effect.forkChild,
+        );
+        yield* Deferred.await(started);
+        yield* TestClock.adjust("90 seconds");
+        assert.isDefined(fiber.pollUnsafe());
+        const error = yield* Fiber.join(fiber);
+        assert.strictEqual(error._tag, "CliGenerationError");
+        if (error._tag === "CliGenerationError") {
+          assert.strictEqual(error.code, "generation_timeout");
+          assert.strictEqual(exitCodeForFailure(error), 11);
+        }
+        assert.isTrue(stall === "headers" ? signal?.aborted : bodyCancelled);
+        assert.strictEqual(created.length, 0);
+      }),
+    );
+  }
+
+  it.effect(
+    "rejects oversized generation bodies before buffering or persisting",
+    () =>
+      Effect.gen(function* () {
+        let cancelled = false;
+        globalThis.fetch = () =>
+          Promise.resolve(
+            new Response(
+              new ReadableStream<Uint8Array>({
+                start(controller) {
+                  controller.enqueue(new Uint8Array(16 * 1024 * 1024 + 1));
+                },
+                cancel() {
+                  cancelled = true;
+                },
+              }),
+            ),
+          );
+        const created: BuiltDiagram[] = [];
+        const error = yield* Effect.flip(runGenerate(created));
+        assert.strictEqual(error._tag, "CliGenerationError");
+        if (error._tag === "CliGenerationError")
+          assert.strictEqual(error.code, "malformed_output");
+        assert.isTrue(cancelled);
+        assert.strictEqual(created.length, 0);
+      }),
+  );
+
+  it.effect(
+    "rejects malformed generation metadata rather than inventing a model",
+    () =>
+      Effect.gen(function* () {
+        const text = yield* Effect.promise(() =>
+          buildSuccessBody(flowchartInput),
+        );
+        const body = JSON.parse(text);
+        body.generation.model = 123;
+        stubFetch(() => jsonResponse(body, 200));
+        const created: BuiltDiagram[] = [];
+        const error = yield* Effect.flip(runGenerate(created));
+        assert.strictEqual(error._tag, "CliGenerationError");
+        if (error._tag === "CliGenerationError")
+          assert.strictEqual(error.code, "malformed_output");
+        assert.strictEqual(created.length, 0);
+      }),
+  );
+
+  for (const body of [
+    { status: "provider_failure", issues: "bad" },
+    { status: "provider_failure", issues: [null] },
+    { status: 123 },
+    "not-json",
+  ]) {
+    it.effect(
+      `rejects malformed endpoint errors: ${JSON.stringify(body)}`,
+      () =>
+        Effect.gen(function* () {
+          stubFetch(
+            () =>
+              new Response(
+                typeof body === "string" ? body : JSON.stringify(body),
+                { status: 503 },
+              ),
+          );
+          const error = yield* Effect.flip(runGenerate([]));
+          assert.strictEqual(error._tag, "CliGenerationError");
+          if (error._tag === "CliGenerationError")
+            assert.strictEqual(error.code, "malformed_output");
+        }),
+    );
+  }
   afterEach(() => {
     globalThis.fetch = originalFetch;
   });

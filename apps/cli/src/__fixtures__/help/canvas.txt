@@ -13,7 +13,8 @@ Network and options:
 Input and failures:
   Input must be the CanvasSpec object itself, not a create-canvas request wrapper and not raw
   Excalidraw JSON. Interactive stdin is rejected with exit 2. Invalid JSON or CanvasSpec exits 3;
-  a typed server rejection exits 4; network/endpoint failure exits 10; malformed response exits 12.
+  a typed server rejection exits 4; network/endpoint failure exits 10; a request timeout after
+  90 seconds exits 11 (canvas_timeout); malformed response exits 12.
   The local record is committed before export, so a destination failure reports a concrete
   sketchi export recovery command. The existing sketchi create command remains the strictly
   offline path for accepted flowchart, mindmap, and sequence documents.

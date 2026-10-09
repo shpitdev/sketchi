@@ -6,6 +6,7 @@ import {
   join,
   relative,
   resolve,
+  sep,
 } from "node:path";
 import { inflateSync } from "node:zlib";
 
@@ -13,7 +14,7 @@ import {
   ExcalidrawFileSchema,
   RenderedDiagramSceneSchema,
 } from "@sketchi/diagram-agent";
-import { Context, Effect, Layer, Schedule, Schema } from "effect";
+import { Context, Effect, Layer, Result, Schedule, Schema } from "effect";
 
 import {
   DOCUMENT_FILE,
@@ -26,7 +27,7 @@ import {
   SCENE_FILE,
   type BuiltDiagram,
   type DiagramFormat,
-  type DiagramSummary,
+  type DiagramListEntry,
   type PatchedDiagramArtifacts,
   type PatchSource,
   type StoredDiagram,
@@ -360,7 +361,7 @@ export class DiagramStore extends Context.Service<
       diagramId: string,
     ) => Effect.Effect<StoredDiagram, CliFilesystemError | CliStorageError>;
     readonly list: () => Effect.Effect<
-      ReadonlyArray<DiagramSummary>,
+      ReadonlyArray<DiagramListEntry>,
       CliFilesystemError | CliStorageError
     >;
     readonly readExportSource: (
@@ -688,10 +689,9 @@ const DiagramStoreLive = Layer.effect(
     });
 
     const recoverStages = Effect.fn("sketchi.cli.storage.recoverStages")(
-      function* () {
-        yield* ensureRoot();
-        const entries = [...(yield* fs.list(root.path))].sort((left, right) =>
-          compareCodeUnits(left.name, right.name),
+      function* (rootEntries?: ReadonlyArray<LocalEntry>) {
+        const entries = [...(rootEntries ?? (yield* fs.list(root.path)))].sort(
+          (left, right) => compareCodeUnits(left.name, right.name),
         );
         for (const entry of entries) {
           if (!entry.name.startsWith(".stage.")) continue;
@@ -706,9 +706,8 @@ const DiagramStoreLive = Layer.effect(
     const recoverRecordTransactions = Effect.fn(
       "sketchi.cli.storage.recoverRecordTransactions",
     )(function* (diagramId: string) {
-      yield* ensureRoot();
-      yield* recoverStages();
       const backupPrefix = `${BACKUP_PREFIX}${encodedId(diagramId)}.`;
+      // Transaction entries can change after discovery; inspect them under lock.
       const entries = [...(yield* fs.list(root.path))]
         .filter((entry) => entry.name.startsWith(backupPrefix))
         .sort((left, right) => compareCodeUnits(left.name, right.name));
@@ -851,7 +850,6 @@ const DiagramStoreLive = Layer.effect(
       Effect.fn("sketchi.cli.storage.acquireLockOnce")(function* (
         diagramId: string,
       ) {
-        yield* ensureRoot();
         const directory = yield* initializeLockDirectory(diagramId);
         const snapshot = yield* readLockEntries(directory, diagramId);
         const releasedOwnerTokens = new Set(
@@ -969,18 +967,11 @@ const DiagramStoreLive = Layer.effect(
         token,
         releasedOwnerToken: lock.token,
       });
-      const markerInstalled = yield* fs.writeText(freePath, marker).pipe(
-        Effect.as(true),
+      const markerInstalled = yield* fs.tryWriteText(freePath, marker).pipe(
         Effect.catch(() =>
-          fs.tryWriteText(freePath, marker).pipe(
-            Effect.flatMap((written) =>
-              written
-                ? Effect.succeed(true)
-                : fs.kind(freePath).pipe(Effect.map((kind) => kind === "file")),
-            ),
-            Effect.catch(() => Effect.succeed(false)),
-          ),
+          fs.kind(freePath).pipe(Effect.map((kind) => kind === "file")),
         ),
+        Effect.catch(() => Effect.succeed(false)),
       );
       if (!markerInstalled) {
         const released = yield* fs.removeFile(lock.ownerPath);
@@ -1009,18 +1000,63 @@ const DiagramStoreLive = Layer.effect(
       );
     });
 
+    const notFound = (diagramId: string) =>
+      storageError(
+        "diagram_not_found",
+        `Diagram "${diagramId}" does not exist.`,
+        "Run sketchi list to discover stored diagram ids.",
+        diagramId,
+      );
+
     const withLock = <A, E>(
       diagramId: string,
       use: Effect.Effect<A, E>,
       waitForWriter = false,
+      rootPrepared = false,
     ): Effect.Effect<A, E | CliFilesystemError | CliStorageError> =>
-      Effect.acquireUseRelease(
-        acquireLock(diagramId, waitForWriter),
-        () => recoverRecordTransactions(diagramId).pipe(Effect.andThen(use)),
-        (lock) =>
-          // The protected result is authoritative; lock cleanup is recoverable.
-          releaseLock(diagramId, lock).pipe(Effect.catch(() => Effect.void)),
-      );
+      Effect.gen(function* () {
+        if (waitForWriter) {
+          const path = recordPath(root.path, diagramId);
+          const kind = yield* fs.kind(path);
+          if (kind === "missing") {
+            const rootKind = yield* fs.kind(root.path);
+            if (rootKind === "missing") return yield* notFound(diagramId);
+            if (rootKind !== "directory")
+              return yield* unsafeEntry(root.path, diagramId);
+            // A writer holds this persistent lock directory throughout its
+            // rename gap. Let the locked load decide whether the record exists.
+            const directory = lockDirectory(diagramId);
+            const lockKind = yield* fs.kind(directory);
+            if (lockKind === "missing") {
+              const entries = yield* fs.list(root.path);
+              const prefix = `${BACKUP_PREFIX}${encodedId(diagramId)}.`;
+              if (
+                !entries.some(
+                  (entry) =>
+                    entry.name === diagramId || entry.name.startsWith(prefix),
+                )
+              ) {
+                return yield* notFound(diagramId);
+              }
+            } else if (lockKind !== "directory") {
+              return yield* unsafeEntry(directory, diagramId);
+            }
+          } else if (kind !== "directory") {
+            return yield* unsafeEntry(path, diagramId);
+          }
+        }
+        if (!rootPrepared) {
+          yield* ensureRoot();
+          yield* recoverStages();
+        }
+        return yield* Effect.acquireUseRelease(
+          acquireLock(diagramId, waitForWriter),
+          () => recoverRecordTransactions(diagramId).pipe(Effect.andThen(use)),
+          (lock) =>
+            // The protected result is authoritative; lock cleanup is recoverable.
+            releaseLock(diagramId, lock).pipe(Effect.catch(() => Effect.void)),
+        );
+      });
 
     const decodeManifest = Effect.fn("sketchi.cli.storage.decodeManifest")(
       function* (path: string, diagramId: string) {
@@ -1967,9 +2003,10 @@ const DiagramStoreLive = Layer.effect(
 
     const list = Effect.fn("sketchi.cli.storage.list")(function* () {
       yield* ensureRoot();
-      yield* recoverStages();
+      const entries = yield* fs.list(root.path);
+      yield* recoverStages(entries);
       const diagramIds = new Set<string>();
-      for (const entry of yield* fs.list(root.path)) {
+      for (const entry of entries) {
         if (isVisibleRecord(entry)) {
           diagramIds.add(entry.name);
           continue;
@@ -1978,12 +2015,32 @@ const DiagramStoreLive = Layer.effect(
         const id = decodedId(entry.name.split(".")[2] ?? "");
         if (id) diagramIds.add(id);
       }
-      const summaries: DiagramSummary[] = [];
-      for (const diagramId of [...diagramIds].sort(compareCodeUnits)) {
-        const stored = yield* show(diagramId);
-        summaries.push(summaryFromStored(stored));
-      }
-      return summaries;
+      return yield* Effect.forEach(
+        [...diagramIds].sort(compareCodeUnits),
+        (diagramId) =>
+          withLock(diagramId, loadUnlocked(diagramId), true, true).pipe(
+            Effect.result,
+            Effect.map((result): DiagramListEntry => {
+              if (Result.isSuccess(result))
+                return summaryFromStored(result.success);
+              const error = result.failure;
+              return {
+                id: diagramId,
+                status: "unavailable",
+                code:
+                  error._tag === "CliStorageError"
+                    ? error.code
+                    : "filesystem_error",
+                message: error.message,
+                hint:
+                  error._tag === "CliStorageError"
+                    ? error.hint
+                    : "Check local paths and permissions, then retry.",
+              };
+            }),
+          ),
+        { concurrency: 4 },
+      );
     });
 
     const readExportSource = Effect.fn("sketchi.cli.storage.readExportSource")(
@@ -2091,8 +2148,11 @@ export const writeExportFile = Effect.fn("sketchi.cli.export.writeFile")(
     const destinationFromRoot = relative(resolvedRoot, resolvedDestination);
     if (
       destinationFromRoot === "" ||
-      (!destinationFromRoot.startsWith("..") &&
-        !isAbsolute(destinationFromRoot))
+      !(
+        destinationFromRoot === ".." ||
+        destinationFromRoot.startsWith(".." + sep) ||
+        isAbsolute(destinationFromRoot)
+      )
     ) {
       return yield* CliExportError.make({
         code: "invalid_destination",

@@ -193,26 +193,3 @@ export function adaptivePngExportScale(
     Math.floor(maximumScale * 1_000) / 1_000,
   );
 }
-
-export function renderedSvgLimitFailure(
-  width: number,
-  height: number,
-): string | undefined {
-  if (
-    !Number.isFinite(width) ||
-    !Number.isFinite(height) ||
-    width <= 0 ||
-    height <= 0
-  ) {
-    return "rendered SVG dimensions are invalid";
-  }
-  if (
-    width > MAX_RENDER_CANVAS_DIMENSION * PNG_EXPORT_SCALE ||
-    height > MAX_RENDER_CANVAS_DIMENSION * PNG_EXPORT_SCALE
-  ) {
-    return "rendered SVG dimension exceeds the PNG limit";
-  }
-  return width * height > MAX_RENDER_OUTPUT_PIXELS
-    ? `PNG output exceeds ${String(MAX_RENDER_OUTPUT_PIXELS)} pixels`
-    : undefined;
-}

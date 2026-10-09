@@ -8,7 +8,6 @@ import {
   adaptivePngExportScale,
   PNG_EXPORT_PADDING,
   renderLimitDiagnostic,
-  renderedSvgLimitFailure,
 } from "./render-limits.js";
 
 declare const __SKETCHI_EXCALIFONT_BASE64__: ReadonlyArray<string>;
@@ -479,16 +478,6 @@ export async function renderPngBytes(
   const svgHeight = baseSvgHeight * exportScale;
   svg.setAttribute("width", String(svgWidth));
   svg.setAttribute("height", String(svgHeight));
-  const svgFailure = renderedSvgLimitFailure(svgWidth, svgHeight);
-  if (svgFailure) {
-    throw HeadlessPngRenderError.make({
-      cause: new Error(svgFailure),
-      code: "render_limit_exceeded",
-      stage: "geometry",
-      message: "The diagram exceeds a safe PNG rendering limit.",
-      details: [svgFailure],
-    });
-  }
   const rasterizer = new Resvg(svg.outerHTML, fontOptions);
   try {
     const rendered = rasterizer.render();

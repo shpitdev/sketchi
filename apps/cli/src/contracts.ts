@@ -67,6 +67,17 @@ export interface DiagramSummary {
   readonly documentAuthoritative: boolean;
 }
 
+/** Failed entries deliberately carry no inferred record metadata. */
+export interface DiagramListFailure extends Partial<DiagramSummary> {
+  readonly id: string;
+  readonly status: "unavailable";
+  readonly code: string;
+  readonly message: string;
+  readonly hint: string;
+}
+
+export type DiagramListEntry = DiagramSummary | DiagramListFailure;
+
 export function summaryFromStored(diagram: StoredDiagram): DiagramSummary {
   return {
     id: diagram.manifest.id,

@@ -63,6 +63,7 @@ export class CliCanvasError extends Schema.TaggedError<CliCanvasError>()(
   {
     code: Schema.Literals([
       "canvas_rejected",
+      "canvas_timeout",
       "endpoint_failure",
       "malformed_response",
       "network_failure",
@@ -187,6 +188,8 @@ export function exitCodeForFailure(error: CliFailure): number {
         case "endpoint_failure":
         case "network_failure":
           return 10;
+        case "canvas_timeout":
+          return 11;
         case "malformed_response":
           return 12;
       }

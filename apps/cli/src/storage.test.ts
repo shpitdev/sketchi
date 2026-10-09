@@ -222,6 +222,109 @@ function storageFailure(operation: string, path: string) {
 }
 
 describe("diagram storage", () => {
+  it.live(
+    "lists healthy, corrupt, and busy entries with one discovery scan plus locked recovery scans",
+    () =>
+      withTestRoot((root) =>
+        Effect.gen(function* () {
+          const store = yield* DiagramStore;
+          for (const id of ["healthy", "corrupt", "busy"]) {
+            const document = canonicalDocument({
+              ...canonicalDocument(),
+              spec: { ...canonicalDocument().spec, id },
+            });
+            yield* store.create(builtDiagram({ id, document }));
+          }
+          yield* Effect.promise(() =>
+            writeFile(join(root, "corrupt", "manifest.json"), "{"),
+          );
+          const busyLock = join(
+            root,
+            ".locks",
+            `${Buffer.from("busy").toString("base64url")}.lock`,
+          );
+          yield* Effect.promise(async () => {
+            for (const entry of await readdir(busyLock))
+              await rm(join(busyLock, entry));
+            await writeFile(
+              join(busyLock, "owner.busy.json"),
+              JSON.stringify({ pid: process.pid, token: "busy" }),
+            );
+          });
+          let rootScans = 0;
+          const attempted = yield* Deferred.make<void>();
+          const observingFilesystem: (typeof LocalFileSystem)["Service"] = {
+            ...localFileSystemLive,
+            list: (path) => {
+              if (path === root) rootScans += 1;
+              return localFileSystemLive
+                .list(path)
+                .pipe(
+                  Effect.tap(() =>
+                    path === busyLock
+                      ? Deferred.succeed(attempted, undefined)
+                      : Effect.void,
+                  ),
+                );
+            },
+          };
+          const reader = yield* DiagramStore.pipe(
+            Effect.provide(storeLayer(root, observingFilesystem)),
+          );
+          const fiber = yield* reader.list().pipe(Effect.forkChild);
+          yield* Deferred.await(attempted);
+          const entries = yield* Fiber.join(fiber);
+          assert.deepStrictEqual(
+            entries.map(({ id }) => id),
+            ["busy", "corrupt", "healthy"],
+          );
+          assert.deepStrictEqual(
+            entries
+              .filter((entry) => "status" in entry)
+              .map((entry) => ("code" in entry ? entry.code : undefined)),
+            ["diagram_busy", "corrupt_record"],
+          );
+          assert.strictEqual(
+            entries.find(({ id }) => id === "healthy")?.revision,
+            1,
+          );
+          // Discovery runs once; healthy/corrupt acquire locks and scan current
+          // transactions. Busy never acquires its lock or runs recovery.
+          assert.strictEqual(rootScans, 3);
+        }).pipe(Effect.provide(storeLayer(root))),
+      ),
+  );
+
+  it.effect("does not create storage or locks when reading unknown ids", () =>
+    withTestRoot((sandbox) =>
+      Effect.gen(function* () {
+        for (const root of [join(sandbox, "fresh"), sandbox]) {
+          const store = yield* DiagramStore.pipe(
+            Effect.provide(storeLayer(root)),
+          );
+          for (const read of [
+            store.show("typo").pipe(Effect.asVoid),
+            store.readRevision("typo", 1).pipe(Effect.asVoid),
+            store.readExportSource("typo", "scene").pipe(Effect.asVoid),
+            store.readPatchSource("typo").pipe(Effect.asVoid),
+          ]) {
+            const error = yield* Effect.flip(read);
+            assert.strictEqual(error._tag, "CliStorageError");
+            if (error._tag === "CliStorageError")
+              assert.strictEqual(error.code, "diagram_not_found");
+          }
+          assert.strictEqual(
+            yield* localFileSystemLive.kind(join(root, ".locks")),
+            "missing",
+          );
+        }
+        assert.strictEqual(
+          yield* localFileSystemLive.kind(join(sandbox, "fresh")),
+          "missing",
+        );
+      }),
+    ),
+  );
   it.effect("migrates manifests without authority as canonical records", () =>
     withTestRoot((root) =>
       Effect.gen(function* () {
@@ -1186,15 +1289,15 @@ describe("diagram storage", () => {
     () =>
       withTestRoot((root) =>
         Effect.gen(function* () {
-          let failReleaseMarker = true;
+          let releaseAttempts = 0;
           const failingFilesystem: (typeof LocalFileSystem)["Service"] = {
             ...localFileSystemLive,
-            writeText: (path, value, replace) => {
-              if (failReleaseMarker && path.includes(".lock/free.")) {
-                failReleaseMarker = false;
+            tryWriteText: (path, value) => {
+              if (path.includes(".lock/free.")) {
+                releaseAttempts += 1;
                 return Effect.fail(storageFailure("write", path));
               }
-              return localFileSystemLive.writeText(path, value, replace);
+              return localFileSystemLive.tryWriteText(path, value);
             },
           };
           const failingStore = yield* Effect.gen(function* () {
@@ -1208,6 +1311,7 @@ describe("diagram storage", () => {
             baseStore.create(builtDiagram()),
           );
 
+          assert.strictEqual(releaseAttempts, 1);
           assert.strictEqual(created.manifest.revision, 1);
           assert.strictEqual(shown.manifest.revision, 1);
           assert.strictEqual(shown.document.spec.title, "Release approval");
@@ -1729,9 +1833,7 @@ describe("diagram storage", () => {
           const showFiber = yield* Effect.flip(
             reader.show("release-flow"),
           ).pipe(Effect.forkChild);
-          const listFiber = yield* Effect.flip(reader.list()).pipe(
-            Effect.forkChild,
-          );
+          const listFiber = yield* reader.list().pipe(Effect.forkChild);
           const exportFiber = yield* Effect.flip(
             reader.readExportSource("release-flow", "scene"),
           ).pipe(Effect.forkChild);
@@ -1741,7 +1843,6 @@ describe("diagram storage", () => {
 
           const errors = yield* Effect.all([
             Fiber.join(showFiber),
-            Fiber.join(listFiber),
             Fiber.join(exportFiber),
           ]);
           for (const error of errors) {
@@ -1750,6 +1851,11 @@ describe("diagram storage", () => {
               assert.strictEqual(error.code, "diagram_busy");
             }
           }
+          const entries = yield* Fiber.join(listFiber);
+          assert.strictEqual(entries.length, 1);
+          assert.isTrue("status" in entries[0]!);
+          if ("status" in entries[0]!)
+            assert.strictEqual(entries[0].code, "diagram_busy");
           assert.strictEqual(yield* Ref.get(attempts), 153);
         }).pipe(Effect.provide(storeLayer(root))),
       ),
@@ -1802,6 +1908,7 @@ describe("diagram storage", () => {
             await symlink(record, recordAlias, "dir");
           });
           for (const destination of [
+            join(diagramsRoot, "..diagram.png"),
             join(record, "diagram.png"),
             join(alias, "release-flow", "diagram.png"),
             join(recordAlias, "diagram.png"),

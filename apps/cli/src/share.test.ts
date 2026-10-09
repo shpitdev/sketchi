@@ -1,7 +1,8 @@
 import { strict as assert } from "node:assert";
 
 import { afterEach, describe, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Deferred, Effect, Fiber } from "effect";
+import { TestClock } from "effect/testing";
 
 import {
   LinkOpener,
@@ -17,6 +18,81 @@ afterEach(() => {
 });
 
 describe("Excalidraw share transport", () => {
+  for (const operation of ["upload", "download"] as const) {
+    it.effect(`aborts ${operation} fetch on interruption`, () =>
+      Effect.gen(function* () {
+        const started = yield* Deferred.make<void>();
+        let requestSignal: AbortSignal | null | undefined;
+        globalThis.fetch = (_input, init) => {
+          requestSignal = init?.signal;
+          return new Promise<Response>(() => {
+            Deferred.doneUnsafe(started, Effect.void);
+          });
+        };
+        const transport = yield* ShareTransport;
+        const fiber = yield* (
+          operation === "upload"
+            ? transport.upload(new Uint8Array())
+            : transport.download("fixture_id")
+        ).pipe(Effect.forkChild);
+        yield* Deferred.await(started);
+        yield* Fiber.interrupt(fiber);
+        assert.equal(requestSignal?.aborted, true);
+      }).pipe(Effect.provide(ShareTransportLive)),
+    );
+  }
+
+  it.effect("cancels a stalled response body on interruption", () =>
+    Effect.gen(function* () {
+      const reading = yield* Deferred.make<void>();
+      let cancelled = false;
+      globalThis.fetch = () =>
+        Promise.resolve(
+          new Response(
+            new ReadableStream<Uint8Array>(
+              {
+                pull() {
+                  Deferred.doneUnsafe(reading, Effect.void);
+                },
+                cancel() {
+                  cancelled = true;
+                },
+              },
+              { highWaterMark: 0 },
+            ),
+          ),
+        );
+      const transport = yield* ShareTransport;
+      const fiber = yield* transport
+        .download("fixture_id")
+        .pipe(Effect.forkChild);
+      yield* Deferred.await(reading);
+      yield* Fiber.interrupt(fiber);
+      assert.equal(cancelled, true);
+    }).pipe(Effect.provide(ShareTransportLive)),
+  );
+
+  it.effect("bounds a stalled download and aborts its fetch", () =>
+    Effect.gen(function* () {
+      const started = yield* Deferred.make<void>();
+      let requestSignal: AbortSignal | null | undefined;
+      globalThis.fetch = (_input, init) => {
+        requestSignal = init?.signal;
+        return new Promise<Response>(() => {
+          Deferred.doneUnsafe(started, Effect.void);
+        });
+      };
+      const transport = yield* ShareTransport;
+      const fiber = yield* Effect.flip(transport.download("fixture_id")).pipe(
+        Effect.forkChild,
+      );
+      yield* Deferred.await(started);
+      yield* TestClock.adjust("15 seconds");
+      assert.notEqual(fiber.pollUnsafe(), undefined);
+      assert.equal((yield* Fiber.join(fiber)).code, "share_timeout");
+      assert.equal(requestSignal?.aborted, true);
+    }).pipe(Effect.provide(ShareTransportLive)),
+  );
   it.effect("uploads once to the pinned endpoint without redirects", () => {
     let calls = 0;
     globalThis.fetch = (input, init) => {
@@ -132,12 +208,53 @@ function fakeChild(
     },
     kill: () => {
       killed.value = true;
+      queueMicrotask(() => exitListener?.(null));
       return true;
     },
   };
 }
 
 describe("default browser opener", () => {
+  it.effect("escalates a timed-out opener that ignores SIGTERM", () => {
+    const signals: NodeJS.Signals[] = [];
+    return Effect.gen(function* () {
+      const opener = yield* LinkOpener;
+      const fiber = yield* opener
+        .open("https://excalidraw.com/")
+        .pipe(Effect.forkChild);
+      yield* TestClock.adjust("4 seconds");
+      assert.deepEqual(yield* Fiber.join(fiber), {
+        status: "unconfirmed",
+        reason: "timeout",
+      });
+      assert.deepEqual(signals, ["SIGTERM", "SIGKILL"]);
+    }).pipe(
+      Effect.provide(
+        makeLinkOpenerLayer(() => ({
+          onError: () => {},
+          onExit: () => {},
+          kill: (signal) => {
+            signals.push(signal);
+            return true;
+          },
+        })),
+      ),
+    );
+  });
+  it.effect("kills a pending opener on interruption", () => {
+    const killed = { value: false };
+    return Effect.gen(function* () {
+      const opener = yield* LinkOpener;
+      const fiber = yield* opener
+        .open("https://excalidraw.com/")
+        .pipe(Effect.forkChild);
+      yield* Effect.yieldNow;
+      yield* Fiber.interrupt(fiber);
+      assert.equal(killed.value, true);
+    }).pipe(
+      Effect.provide(makeLinkOpenerLayer(() => fakeChild("silent", killed))),
+    );
+  });
   it.effect("uses positional arguments with ignored stdio and no shell", () => {
     const captured: Array<unknown> = [];
     const killed = { value: false };
@@ -180,14 +297,17 @@ describe("default browser opener", () => {
           assert.deepEqual(result, { status: "unconfirmed", reason });
         }
         const killed = { value: false };
-        const timedOut = yield* Effect.gen(function* () {
+        const timeoutFiber = yield* Effect.gen(function* () {
           const opener = yield* LinkOpener;
           return yield* opener.open("https://excalidraw.com/");
         }).pipe(
           Effect.provide(
             makeLinkOpenerLayer(() => fakeChild("silent", killed), "linux", 1),
           ),
+          Effect.forkChild,
         );
+        yield* TestClock.adjust("1 millis");
+        const timedOut = yield* Fiber.join(timeoutFiber);
         assert.deepEqual(timedOut, {
           status: "unconfirmed",
           reason: "timeout",

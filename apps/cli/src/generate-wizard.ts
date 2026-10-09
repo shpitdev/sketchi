@@ -32,7 +32,6 @@ export interface GenerateWizardPresets {
 
 export interface GenerationActivity {
   readonly succeed: (message: string) => Effect.Effect<void>;
-  readonly fail: (message: string) => Effect.Effect<void>;
 }
 
 export class GenerateWizard extends Context.Service<
@@ -73,8 +72,9 @@ function unwrapPrompt<A extends string>(
 }
 
 const askText = Effect.tryPromise({
-  try: () =>
+  try: (signal) =>
     text({
+      signal,
       message: "What should Sketchi draw?",
       placeholder: "Map release approval with pass and revise branches",
       validate: (value) =>
@@ -86,8 +86,9 @@ const askText = Effect.tryPromise({
 }).pipe(Effect.flatMap(unwrapPrompt));
 
 const askType = Effect.tryPromise({
-  try: () =>
+  try: (signal) =>
     select<GenerationType>({
+      signal,
       message: "Diagram type",
       initialValue: "flowchart",
       options: [
@@ -114,8 +115,9 @@ const askType = Effect.tryPromise({
 type DestinationChoice = "current" | "project" | "custom";
 
 const askDestinationChoice = Effect.tryPromise({
-  try: () =>
+  try: (signal) =>
     select<DestinationChoice>({
+      signal,
       message: "Save the PNG",
       initialValue: "current",
       options: [
@@ -152,8 +154,9 @@ export function validateCustomDestination(
 }
 
 const askCustomDestination = Effect.tryPromise({
-  try: () =>
+  try: (signal) =>
     text({
+      signal,
       message: "PNG destination",
       placeholder: "./diagram.png",
       validate: validateCustomDestination,
@@ -196,12 +199,6 @@ const activity = Effect.acquireRelease(
           finished = true;
           indicator.stop(message);
         }),
-      fail: (message: string) =>
-        Effect.sync(() => {
-          if (finished) return;
-          finished = true;
-          indicator.error(message);
-        }),
       finish: (exit: Exit.Exit<unknown, unknown>) =>
         Effect.sync(() => {
           if (finished) return;
@@ -215,7 +212,6 @@ const activity = Effect.acquireRelease(
 ).pipe(
   Effect.map((progress) => ({
     succeed: progress.succeed,
-    fail: progress.fail,
   })),
 );
 
@@ -233,8 +229,6 @@ export function makeGenerateWizardTestLayer(
     activity: Effect.succeed({
       succeed: (message: string) =>
         Effect.sync(() => events.push(`success:${message}`)),
-      fail: (message: string) =>
-        Effect.sync(() => events.push(`failure:${message}`)),
     }),
   });
 }

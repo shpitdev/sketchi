@@ -248,6 +248,8 @@ describe("golden product help", () => {
     },
   );
 
+  // Twelve sequential CLI launches need three times the default five-second
+  // budget used by the four-launch JSON-help test, with the same assertions.
   it("keeps parser-level exclusivity failures in the JSON usage envelope", () => {
     for (const args of [
       ["generate", "--output", "json"],
@@ -310,7 +312,7 @@ describe("golden product help", () => {
         error: { code: "usage_error" },
       });
     }
-  });
+  }, 15_000);
 
   it("redacts bearer-shaped values from parser and typed error envelopes", () => {
     const bearer =
@@ -334,7 +336,13 @@ describe("golden product help", () => {
       });
 
       expect([2, 3]).toContain(result.status);
-      expect(result.stdout).toBe("");
+      // An invalid first --output value uses text usage output; later flags do
+      // not change presentation. Text mode includes the normal usage help.
+      if (args[5] === bearer) {
+        expect(result.stdout).toMatch(/^DESCRIPTION/u);
+        expect(result.stderr).toMatch(/^error: usage_error/u);
+      } else expect(result.stdout).toBe("");
+      expect(result.stdout).not.toContain(bearer);
       expect(result.stderr).not.toContain(bearer);
       expect(result.stderr).toContain("[redacted-share-link]");
     }

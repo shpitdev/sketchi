@@ -1,8 +1,9 @@
 import { spawn } from "node:child_process";
 
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 
 import { CliShareError } from "./errors.js";
+import { readBoundedBody, readBoundedText } from "./response-body.js";
 import {
   EXCALIDRAW_GET_ENDPOINT,
   EXCALIDRAW_POST_ENDPOINT,
@@ -35,41 +36,6 @@ function shareFailure(
   return CliShareError.make({ code, message, hint, details: [] });
 }
 
-async function readBoundedBody(
-  response: Response,
-  limit: number,
-): Promise<Uint8Array> {
-  const declaredLength = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > limit) {
-    throw new Error("response body exceeds limit");
-  }
-  if (!response.body) return new Uint8Array();
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const next = await reader.read();
-      if (next.done) break;
-      size += next.value.byteLength;
-      if (size > limit) {
-        await reader.cancel();
-        throw new Error("response body exceeds limit");
-      }
-      chunks.push(next.value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const body = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return body;
-}
-
 function timeoutFailure() {
   return shareFailure(
     "share_timeout",
@@ -86,23 +52,29 @@ function transportFailure() {
   );
 }
 
-async function requestWithTimeout<A>(
+const request = Effect.fn("sketchi.cli.share.request")(function* (
   url: string,
   init: RequestInit,
-  consume: (response: Response) => Promise<A>,
-): Promise<A> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), SHARE_BACKEND_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, {
-      ...init,
-      redirect: "error",
-      signal: controller.signal,
-    });
-    return await consume(response);
-  } finally {
-    clearTimeout(timer);
-  }
+) {
+  return yield* Effect.tryPromise({
+    try: (signal) => fetch(url, { ...init, redirect: "error", signal }),
+    catch: transportFailure,
+  });
+});
+
+const decodeUploadResponse = Schema.decodeUnknownEffect(
+  Schema.Struct({ id: Schema.String, data: Schema.String }),
+);
+const decodeUploadJson = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(Schema.Unknown),
+);
+
+function apiChangedFailure() {
+  return shareFailure(
+    "share_api_changed",
+    "The Excalidraw storage API returned an unexpected response.",
+    "The unofficial API may have changed; update Sketchi compatibility before retrying.",
+  );
 }
 
 export class ShareTransport extends Context.Service<
@@ -114,76 +86,61 @@ export class ShareTransport extends Context.Service<
 >()("@sketchi/cli/ShareTransport") {}
 
 export const ShareTransportLive = Layer.succeed(ShareTransport, {
-  upload: (body) =>
-    Effect.tryPromise({
-      try: async () => {
-        return await requestWithTimeout(
-          EXCALIDRAW_POST_ENDPOINT,
-          {
-            method: "POST",
-            body: Uint8Array.from(body),
-          },
-          async (response) => {
-            const responseBody = await readBoundedBody(
-              response,
-              MAX_POST_RESPONSE_BYTES,
-            );
-            if (!response.ok) throw new Error("upload HTTP failure");
-            const value: unknown = JSON.parse(
-              new TextDecoder("utf-8", { fatal: true }).decode(responseBody),
-            );
-            if (
-              typeof value !== "object" ||
-              value === null ||
-              !("id" in value) ||
-              typeof value.id !== "string" ||
-              !/^[A-Za-z0-9_-]{1,128}$/.test(value.id) ||
-              !("data" in value) ||
-              value.data !== `${EXCALIDRAW_GET_ENDPOINT}${value.id}`
-            ) {
-              throw shareFailure(
-                "share_api_changed",
-                "The Excalidraw storage API returned an unexpected response.",
-                "The unofficial API may have changed; update Sketchi compatibility before retrying.",
-              );
-            }
-            return value.id;
-          },
-        );
-      },
-      catch: (cause) => {
-        if (cause instanceof CliShareError) return cause;
-        return cause instanceof DOMException && cause.name === "AbortError"
-          ? timeoutFailure()
-          : transportFailure();
-      },
+  upload: Effect.fn("sketchi.cli.share.transport.upload")(
+    function* (body: Uint8Array) {
+      const response = yield* request(EXCALIDRAW_POST_ENDPOINT, {
+        method: "POST",
+        body: Uint8Array.from(body),
+      });
+      const text = yield* readBoundedText(
+        response,
+        MAX_POST_RESPONSE_BYTES,
+        transportFailure,
+      );
+      if (!response.ok) return yield* transportFailure();
+      const parsed = yield* decodeUploadJson(text).pipe(
+        Effect.mapError(transportFailure),
+      );
+      const value = yield* decodeUploadResponse(parsed).pipe(
+        Effect.mapError(apiChangedFailure),
+      );
+      if (
+        !/^[A-Za-z0-9_-]{1,128}$/.test(value.id) ||
+        value.data !== `${EXCALIDRAW_GET_ENDPOINT}${value.id}`
+      ) {
+        return yield* apiChangedFailure();
+      }
+      return value.id;
+    },
+    Effect.timeoutOrElse({
+      duration: SHARE_BACKEND_TIMEOUT_MS,
+      orElse: () => Effect.fail(timeoutFailure()),
     }),
-  download: (id) =>
-    Effect.tryPromise({
-      try: async () => {
-        return await requestWithTimeout(
-          `${EXCALIDRAW_GET_ENDPOINT}${id}`,
-          { method: "GET" },
-          async (response) => {
-            if (response.status === 404) {
-              throw shareFailure(
-                "share_link_unavailable",
-                "The Excalidraw share link is unavailable.",
-                "Verify the complete bearer link or ask its sender to export a new link.",
-              );
-            }
-            if (!response.ok) throw new Error("download HTTP failure");
-            return await readBoundedBody(response, MAX_SHARE_BODY_BYTES);
-          },
+  ),
+  download: Effect.fn("sketchi.cli.share.transport.download")(
+    function* (id: string) {
+      const response = yield* request(`${EXCALIDRAW_GET_ENDPOINT}${id}`, {
+        method: "GET",
+      });
+      if (response.status === 404) {
+        return yield* shareFailure(
+          "share_link_unavailable",
+          "The Excalidraw share link is unavailable.",
+          "Verify the complete bearer link or ask its sender to export a new link.",
         );
-      },
-      catch: (cause) => {
-        if (cause instanceof CliShareError) return cause;
-        return cause instanceof DOMException && cause.name === "AbortError"
-          ? timeoutFailure()
-          : transportFailure();
-      },
+      }
+      if (!response.ok) return yield* transportFailure();
+      return yield* readBoundedBody(
+        response,
+        MAX_SHARE_BODY_BYTES,
+        transportFailure,
+      );
+    },
+    Effect.timeoutOrElse({
+      duration: SHARE_BACKEND_TIMEOUT_MS,
+      orElse: () => Effect.fail(timeoutFailure()),
     }),
+  ),
 });
 
 export class LinkOpener extends Context.Service<
@@ -194,7 +151,7 @@ export class LinkOpener extends Context.Service<
 interface OpenerChild {
   onError(listener: () => void): void;
   onExit(listener: (code: number | null) => void): void;
-  kill(): boolean;
+  kill(signal: NodeJS.Signals): boolean;
 }
 
 type SpawnOpener = (
@@ -202,6 +159,22 @@ type SpawnOpener = (
   args: ReadonlyArray<string>,
   options: { readonly shell: false; readonly stdio: "ignore" },
 ) => OpenerChild;
+
+const terminateOpener = Effect.fn("sketchi.cli.share.terminateOpener")(
+  (child: OpenerChild) =>
+    Effect.callback<void>((resume) => {
+      child.onExit(() => resume(Effect.void));
+      child.onError(() => resume(Effect.void));
+      if (!child.kill("SIGTERM")) resume(Effect.void);
+    }).pipe(
+      Effect.timeout("250 millis"),
+      Effect.catchTag("TimeoutError", () =>
+        Effect.sync(() => {
+          child.kill("SIGKILL");
+        }),
+      ),
+    ),
+);
 
 function openerCommand(
   link: string,
@@ -233,7 +206,7 @@ export function makeLinkOpenerLayer(
       onExit: (listener) => {
         child.once("exit", listener);
       },
-      kill: () => child.kill(),
+      kill: (signal) => child.kill(signal),
     };
   },
   platform: NodeJS.Platform = process.platform,
@@ -241,36 +214,38 @@ export function makeLinkOpenerLayer(
 ) {
   return Layer.succeed(LinkOpener, {
     open: (link) =>
-      Effect.promise(
-        () =>
-          new Promise<OpenResult>((resolve) => {
-            const target = openerCommand(link, platform);
-            const child = spawnOpener(target.command, target.args, {
-              shell: false,
-              stdio: "ignore",
-            });
-            let settled = false;
-            const complete = (result: OpenResult) => {
-              if (settled) return;
-              settled = true;
-              clearTimeout(timer);
-              resolve(result);
-            };
-            child.onError(() =>
-              complete({ status: "unconfirmed", reason: "missing_executable" }),
-            );
-            child.onExit((code) =>
-              complete(
-                code === 0
-                  ? { status: "accepted" }
-                  : { status: "unconfirmed", reason: "nonzero_exit" },
-              ),
-            );
-            const timer = setTimeout(() => {
-              child.kill();
-              complete({ status: "unconfirmed", reason: "timeout" });
-            }, waitMs);
+      Effect.callback<OpenResult>((resume) => {
+        const target = openerCommand(link, platform);
+        const child = spawnOpener(target.command, target.args, {
+          shell: false,
+          stdio: "ignore",
+        });
+        child.onError(() =>
+          resume(
+            Effect.succeed({
+              status: "unconfirmed",
+              reason: "missing_executable",
+            }),
+          ),
+        );
+        child.onExit((code) =>
+          resume(
+            Effect.succeed(
+              code === 0
+                ? { status: "accepted" }
+                : { status: "unconfirmed", reason: "nonzero_exit" },
+            ),
+          ),
+        );
+        return terminateOpener(child);
+      }).pipe(
+        Effect.timeout(waitMs),
+        Effect.catchTag("TimeoutError", () =>
+          Effect.succeed<OpenResult>({
+            status: "unconfirmed",
+            reason: "timeout",
           }),
+        ),
       ),
   });
 }

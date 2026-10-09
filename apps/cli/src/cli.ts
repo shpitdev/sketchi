@@ -15,7 +15,7 @@ import {
 } from "./canvas.js";
 import {
   type DiagramFormat,
-  type DiagramSummary,
+  type DiagramListEntry,
   type OutputFormat,
   type StoredDiagram,
   summaryFromStored,
@@ -59,6 +59,7 @@ import {
   invalidFlagValue,
   missingRequiredFlag,
   runEffectCommand,
+  requestedOutputFormat,
 } from "./internal/effect-cli.js";
 import {
   InputReader,
@@ -78,6 +79,7 @@ import {
 import { CliPngRenderer, CliPngRendererLive } from "./png-renderer.js";
 import { DiagramPatcher, DiagramPatcherLive } from "./patch.js";
 import { preflightPullTarget, pullIntoStore } from "./pull.js";
+import { API_REQUEST_TIMEOUT } from "./response-body.js";
 import {
   MAX_RENDER_CANVAS_AREA,
   MAX_RENDER_CANVAS_DIMENSION,
@@ -186,8 +188,8 @@ Exit codes and errors:
   0 success; 1 internal failure; 2 usage or interactive stdin; 3 invalid input/document;
   4 build/export construction failure; 5 diagram not found; 6 conflict/busy;
   7 filesystem/storage failure; 8 unavailable format, render, destination, or write failure;
-  10 generate/canvas network or endpoint failure; 11 generate timeout; 12 malformed remote output;
-  13 Excalidraw transport, timeout, HTTP, or API-shape failure.
+  10 generate/canvas network or endpoint failure; 11 generate/canvas timeout;
+  12 malformed remote output; 13 Excalidraw transport, timeout, HTTP, or API-shape failure.
   Text errors start with "error: CODE". JSON errors use {"ok":false,"command":...,"error":...}.
   Errors never include stacks.
 
@@ -394,20 +396,30 @@ function showText(diagram: StoredDiagram): string {
   ].join("\n");
 }
 
-function listText(diagrams: ReadonlyArray<DiagramSummary>): string {
+function listText(diagrams: ReadonlyArray<DiagramListEntry>): string {
   if (diagrams.length === 0) return "no diagrams";
   return [
     "id\ttype\trevision\tauthority\tdocument-authoritative\tformats\ttitle",
     ...diagrams.map((diagram) =>
-      [
-        diagram.id,
-        diagram.type,
-        String(diagram.revision),
-        diagram.authority,
-        String(diagram.documentAuthoritative),
-        diagram.formats.join(","),
-        diagram.title,
-      ].join("\t"),
+      "status" in diagram
+        ? [
+            diagram.id,
+            `unavailable:${diagram.code}`,
+            "-",
+            "-",
+            "-",
+            "-",
+            diagram.message,
+          ].join("\t")
+        : [
+            diagram.id,
+            diagram.type,
+            String(diagram.revision),
+            diagram.authority,
+            String(diagram.documentAuthoritative),
+            diagram.formats.join(","),
+            diagram.title,
+          ].join("\t"),
     ),
   ].join("\n");
 }
@@ -654,7 +666,8 @@ Network and options:
 Input and failures:
   Input must be the CanvasSpec object itself, not a create-canvas request wrapper and not raw
   Excalidraw JSON. Interactive stdin is rejected with exit 2. Invalid JSON or CanvasSpec exits 3;
-  a typed server rejection exits 4; network/endpoint failure exits 10; malformed response exits 12.
+  a typed server rejection exits 4; network/endpoint failure exits 10; a request timeout after
+  ${API_REQUEST_TIMEOUT} exits 11 (canvas_timeout); malformed response exits 12.
   The local record is committed before export, so a destination failure reports a concrete
   sketchi export recovery command. The existing sketchi create command remains the strictly
   offline path for accepted flowchart, mindmap, and sequence documents.`;
@@ -1224,16 +1237,10 @@ export const sketchiCommand = rootCommand.pipe(
   ]),
 );
 
-function requestedOutput(args: ReadonlyArray<string>): OutputFormat {
-  const index = args.lastIndexOf("--output");
-  if (index >= 0 && args[index + 1] === "json") return "json";
-  return args.some((arg) => arg === "--output=json") ? "json" : "text";
-}
-
 export const cliProgram = Effect.fn("sketchi.cli.run")(function* (
   args: ReadonlyArray<string>,
 ) {
-  const format = requestedOutput(args);
+  const format = requestedOutputFormat(args);
   return yield* runEffectCommand(sketchiCommand, args).pipe(
     Effect.matchCauseEffect({
       onFailure: (cause) =>

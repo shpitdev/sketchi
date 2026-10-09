@@ -4,7 +4,7 @@ import {
   type ExcalidrawFile,
   type PatchableScene,
 } from "@sketchi/diagram-agent";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import type { BuiltDiagram, StoredDiagram } from "./contracts.js";
 import {
@@ -14,6 +14,11 @@ import {
 } from "./document.js";
 import { CliGenerationError } from "./errors.js";
 import { DiagramStore } from "./storage.js";
+import {
+  API_REQUEST_TIMEOUT,
+  MAX_API_RESPONSE_BYTES,
+  readBoundedText,
+} from "./response-body.js";
 
 export const DEFAULT_GENERATION_MODEL = "gemini-3.1-flash-lite";
 export const DEFAULT_GENERATE_ENDPOINT =
@@ -80,34 +85,33 @@ function invalidGeneratedDocument(): CliGenerationError {
   });
 }
 
-interface EndpointErrorBody {
-  readonly status?: string;
-  readonly issues?: ReadonlyArray<{
-    readonly message?: string;
-    readonly hint?: string;
-  }>;
-}
+const EndpointErrorBody = Schema.Struct({
+  status: Schema.optionalKey(Schema.String),
+  issues: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        message: Schema.optionalKey(Schema.String),
+        hint: Schema.optionalKey(Schema.String),
+      }),
+    ),
+  ),
+});
 
-function readErrorBody(text: string): EndpointErrorBody {
-  try {
-    const parsed: unknown = JSON.parse(text);
-    return parsed !== null && typeof parsed === "object"
-      ? (parsed as EndpointErrorBody)
-      : {};
-  } catch {
-    return {};
-  }
-}
+const decodeErrorBody = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(EndpointErrorBody),
+);
 
-function endpointIssueDetails(body: EndpointErrorBody): string[] {
+function endpointIssueDetails(body: typeof EndpointErrorBody.Type): string[] {
   return (body.issues ?? []).flatMap((entry) => [
     ...(entry.message ? [entry.message] : []),
     ...(entry.hint ? [entry.hint] : []),
   ]);
 }
 
-function endpointFailure(status: number, text: string): CliGenerationError {
-  const body = readErrorBody(text);
+function endpointFailure(
+  status: number,
+  body: typeof EndpointErrorBody.Type,
+): CliGenerationError {
   const firstIssue = body.issues?.[0];
   const details = [
     `http_status:${String(status)}`,
@@ -172,51 +176,34 @@ function endpointFailure(status: number, text: string): CliGenerationError {
   }
 }
 
-interface GenerateApiSuccess {
-  readonly document: unknown;
-  readonly scene: unknown;
-  readonly excalidraw: unknown;
-  readonly model: string;
-  readonly provider: string;
-}
+const PresentValue = Schema.Unknown.check(
+  Schema.makeFilter((value) => value !== undefined),
+);
 
-function readSuccessBody(text: string): GenerateApiSuccess | undefined {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-  if (parsed === null || typeof parsed !== "object") return undefined;
-  const body = parsed as {
-    ok?: unknown;
-    diagram?: {
-      document?: unknown;
-      scene?: unknown;
-      excalidraw?: unknown;
-    };
-    generation?: { model?: unknown; provider?: unknown };
-  };
-  if (
-    body.ok !== true ||
-    !body.diagram ||
-    body.diagram.document === undefined ||
-    body.diagram.scene === undefined ||
-    body.diagram.excalidraw === undefined
-  ) {
-    return undefined;
-  }
-  return {
-    document: body.diagram.document,
-    scene: body.diagram.scene,
-    excalidraw: body.diagram.excalidraw,
-    model:
-      typeof body.generation?.model === "string" ? body.generation.model : "",
-    provider:
-      typeof body.generation?.provider === "string"
-        ? body.generation.provider
-        : "cloudflare-google-ai-studio",
-  };
+const GenerateApiSuccess = Schema.Struct({
+  ok: Schema.Literal(true),
+  diagram: Schema.Struct({
+    document: PresentValue,
+    scene: PresentValue,
+    excalidraw: PresentValue,
+  }),
+  generation: Schema.Struct({
+    model: Schema.NonEmptyString,
+    provider: Schema.NonEmptyString,
+  }),
+});
+
+const decodeSuccessBody = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(GenerateApiSuccess),
+);
+
+function timeoutFailure(): CliGenerationError {
+  return CliGenerationError.make({
+    code: "generation_timeout",
+    message: "The Sketchi generate API request timed out.",
+    hint: "Retry once; if it persists, try a shorter prompt.",
+    details: [],
+  });
 }
 
 function decodeScene(
@@ -237,39 +224,47 @@ function decodeExcalidraw(
     : Effect.fail(malformedResponse());
 }
 
-const requestGeneration = Effect.fn("sketchi.cli.generate.request")(function* (
-  input: GenerateDiagramInput,
-) {
-  const response = yield* Effect.tryPromise({
-    try: (signal) =>
-      globalThis.fetch(input.endpoint, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-sketchi-client": "sketchi-cli",
-        },
-        body: JSON.stringify({
-          prompt: input.prompt,
-          ...(input.type ? { type: input.type } : {}),
-          model: input.model,
+const requestGeneration = Effect.fn("sketchi.cli.generate.request")(
+  function* (input: GenerateDiagramInput) {
+    const response = yield* Effect.tryPromise({
+      try: (signal) =>
+        globalThis.fetch(input.endpoint, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-sketchi-client": "sketchi-cli",
+          },
+          body: JSON.stringify({
+            prompt: input.prompt,
+            ...(input.type ? { type: input.type } : {}),
+            model: input.model,
+          }),
+          signal,
         }),
-        signal,
-      }),
-    catch: () => networkFailure(),
-  });
-  const text = yield* Effect.tryPromise({
-    try: () => response.text(),
-    catch: () => networkFailure(),
-  });
-  if (!response.ok) {
-    return yield* Effect.fail(endpointFailure(response.status, text));
-  }
-  const success = readSuccessBody(text);
-  if (!success) {
-    return yield* Effect.fail(malformedResponse());
-  }
-  return success;
-});
+      catch: () => networkFailure(),
+    });
+    const text = yield* readBoundedText(
+      response,
+      MAX_API_RESPONSE_BYTES,
+      malformedResponse,
+      networkFailure,
+    );
+    if (!response.ok) {
+      const body = yield* decodeErrorBody(text).pipe(
+        Effect.mapError(malformedResponse),
+      );
+      return yield* endpointFailure(response.status, body);
+    }
+    const success = yield* decodeSuccessBody(text).pipe(
+      Effect.mapError(malformedResponse),
+    );
+    return { ...success.diagram, ...success.generation };
+  },
+  Effect.timeoutOrElse({
+    duration: API_REQUEST_TIMEOUT,
+    orElse: () => Effect.fail(timeoutFailure()),
+  }),
+);
 
 export const generateDiagram = Effect.fn("sketchi.cli.generate")(function* (
   input: GenerateDiagramInput,
@@ -298,7 +293,7 @@ export const generateDiagram = Effect.fn("sketchi.cli.generate")(function* (
 
   return {
     diagram,
-    model: response.model || input.model,
+    model: response.model,
     provider: response.provider,
   } satisfies GenerateDiagramResult;
 });

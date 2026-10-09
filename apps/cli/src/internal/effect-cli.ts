@@ -14,6 +14,7 @@ import {
   Param,
 } from "effect/cli";
 
+import type { OutputFormat } from "../contracts.js";
 import { redactShareLinks } from "../redaction.js";
 import { renderRootHelp, terminalRootHelp } from "../help-brand.js";
 
@@ -138,6 +139,20 @@ export function invalidFlagValue(
   });
 }
 
+/** Match the parser: the first --output value wins, before the -- separator. */
+export function requestedOutputFormat(
+  args: ReadonlyArray<string>,
+): OutputFormat {
+  for (const [index, argument] of args.entries()) {
+    if (argument === "--") break;
+    if (argument === "--output")
+      return args[index + 1] === "json" ? "json" : "text";
+    if (argument.startsWith("--output="))
+      return argument === "--output=json" ? "json" : "text";
+  }
+  return "text";
+}
+
 export function runEffectCommand<
   const Name extends string,
   Input,
@@ -156,12 +171,7 @@ export function runEffectCommand<
       argument === "--version" ||
       argument === "-v",
   );
-  const jsonOutput =
-    args.some((argument) => argument === "--output=json") ||
-    args.some(
-      (argument, index) =>
-        argument === "--output" && args[index + 1] === "json",
-    );
+  const jsonOutput = requestedOutputFormat(args) === "json";
   const commandName = args.find((argument) => PUBLIC_COMMANDS.has(argument));
   const usesOnlyRootOutputFlags = args.every(
     (argument, index) =>

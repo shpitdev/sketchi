@@ -11,6 +11,11 @@ import { CliCanvasError, CliInputError, CliValidationError } from "./errors.js";
 import type { InputSource } from "./internal/effect-cli.js";
 import { InputReader } from "./input.js";
 import { DiagramStore } from "./storage.js";
+import {
+  API_REQUEST_TIMEOUT,
+  MAX_API_RESPONSE_BYTES,
+  readBoundedText,
+} from "./response-body.js";
 
 export const DEFAULT_CANVAS_ENDPOINT =
   "https://playground.sketchi.app/api/v1/canvases/create";
@@ -161,66 +166,80 @@ function rejectedCanvas(
   });
 }
 
-const requestCanvas = Effect.fn("sketchi.cli.canvas.request")(function* (
-  input: CreateCanvasInput,
-) {
-  const response = yield* Effect.tryPromise({
-    try: (signal) =>
-      globalThis.fetch(input.endpoint, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-sketchi-client": "sketchi-cli",
-        },
-        body: JSON.stringify({
-          spec: input.spec,
-          options: {
-            artifactFormats: ["scene", "excalidraw"],
-            inlineArtifacts: ["excalidraw"],
+const requestCanvas = Effect.fn("sketchi.cli.canvas.request")(
+  function* (input: CreateCanvasInput) {
+    const response = yield* Effect.tryPromise({
+      try: (signal) =>
+        globalThis.fetch(input.endpoint, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-sketchi-client": "sketchi-cli",
           },
+          body: JSON.stringify({
+            spec: input.spec,
+            options: {
+              artifactFormats: ["scene", "excalidraw"],
+              inlineArtifacts: ["excalidraw"],
+            },
+          }),
+          signal,
         }),
-        signal,
-      }),
-    catch: networkFailure,
-  });
-  const text = yield* Effect.tryPromise({
-    try: () => response.text(),
-    catch: networkFailure,
-  });
-  const parsed: unknown = yield* Effect.try({
-    try: () => JSON.parse(text),
-    catch: () => malformedResponse(),
-  });
-  const result = yield* decodeCreateCanvasResult(parsed).pipe(
-    Effect.mapError((error) =>
-      response.ok
-        ? malformedResponse(schemaDetails(error))
-        : endpointFailure(response.status),
-    ),
-  );
-  if (!result.ok) {
-    switch (result.status) {
-      case "export_failed":
-      case "render_failed":
-      case "storage_failed":
-        return yield* serverCanvasFailure(
-          result.status,
-          response.status,
-          result.issues,
-        );
-      case "invalid_canvas":
-      case "invalid_input":
-      case "limit_exceeded":
-        return yield* rejectedCanvas(
-          result.status,
-          response.status,
-          result.issues,
-        );
+      catch: networkFailure,
+    });
+    const text = yield* readBoundedText(
+      response,
+      MAX_API_RESPONSE_BYTES,
+      malformedResponse,
+      networkFailure,
+    );
+    const parsed: unknown = yield* Effect.try({
+      try: () => JSON.parse(text),
+      catch: () => malformedResponse(),
+    });
+    const result = yield* decodeCreateCanvasResult(parsed).pipe(
+      Effect.mapError((error) =>
+        response.ok
+          ? malformedResponse(schemaDetails(error))
+          : endpointFailure(response.status),
+      ),
+    );
+    if (!result.ok) {
+      switch (result.status) {
+        case "export_failed":
+        case "render_failed":
+        case "storage_failed":
+          return yield* serverCanvasFailure(
+            result.status,
+            response.status,
+            result.issues,
+          );
+        case "invalid_canvas":
+        case "invalid_input":
+        case "limit_exceeded":
+          return yield* rejectedCanvas(
+            result.status,
+            response.status,
+            result.issues,
+          );
+      }
     }
-  }
-  if (!response.ok) return yield* endpointFailure(response.status);
-  return result;
-});
+    if (!response.ok) return yield* endpointFailure(response.status);
+    return result;
+  },
+  Effect.timeoutOrElse({
+    duration: API_REQUEST_TIMEOUT,
+    orElse: () =>
+      Effect.fail(
+        CliCanvasError.make({
+          code: "canvas_timeout",
+          message: "The Sketchi canvas API request timed out.",
+          hint: "Retry once; if it persists, check the endpoint and try a smaller canvas.",
+          details: [],
+        }),
+      ),
+  }),
+);
 
 export const createCanvasDiagram = Effect.fn("sketchi.cli.canvas.create")(
   function* (input: CreateCanvasInput) {

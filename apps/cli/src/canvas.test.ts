@@ -1,6 +1,7 @@
 import { CanvasSpec, CreateCanvasRequestSchema } from "@sketchi/diagram-agent";
 import { afterEach, assert, describe, it } from "@effect/vitest";
-import { Effect, Layer, Schema } from "effect";
+import { Deferred, Effect, Fiber, Layer, Schema } from "effect";
+import { TestClock } from "effect/testing";
 
 import {
   createCanvasDiagram,
@@ -112,6 +113,116 @@ function acceptedResponse(): Response {
 const originalFetch = globalThis.fetch;
 
 describe("Universal Canvas public API client", () => {
+  it.effect(
+    "keeps response-stream I/O failures in the network exit class",
+    () => {
+      const created: BuiltDiagram[] = [];
+      globalThis.fetch = () =>
+        Promise.resolve(
+          new Response(
+            new ReadableStream<Uint8Array>({
+              start(controller) {
+                controller.error(new Error("connection closed"));
+              },
+            }),
+          ),
+        );
+      return Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          createCanvasDiagram({
+            endpoint: DEFAULT_CANVAS_ENDPOINT,
+            spec: canvasSpec,
+          }),
+        );
+        assert.strictEqual(error._tag, "CliCanvasError");
+        if (error._tag === "CliCanvasError") {
+          assert.strictEqual(error.code, "network_failure");
+          assert.strictEqual(exitCodeForFailure(error), 10);
+        }
+        assert.strictEqual(created.length, 0);
+      }).pipe(Effect.provide(capturingStoreLayer(created)));
+    },
+  );
+  for (const stall of ["headers", "body"] as const) {
+    it.effect(`bounds stalled canvas ${stall} without persisting`, () => {
+      const created: BuiltDiagram[] = [];
+      return Effect.gen(function* () {
+        const started = yield* Deferred.make<void>();
+        let signal: AbortSignal | null | undefined;
+        let bodyCancelled = false;
+        globalThis.fetch = (_input, init) => {
+          signal = init?.signal;
+          if (stall === "headers")
+            return new Promise<Response>(() => {
+              Deferred.doneUnsafe(started, Effect.void);
+            });
+          return Promise.resolve(
+            new Response(
+              new ReadableStream<Uint8Array>({
+                pull() {
+                  Deferred.doneUnsafe(started, Effect.void);
+                },
+                cancel() {
+                  bodyCancelled = true;
+                },
+              }),
+            ),
+          );
+        };
+        const fiber = yield* Effect.flip(
+          createCanvasDiagram({
+            endpoint: DEFAULT_CANVAS_ENDPOINT,
+            spec: canvasSpec,
+          }),
+        ).pipe(Effect.forkChild);
+        yield* Deferred.await(started);
+        yield* TestClock.adjust("90 seconds");
+        assert.isDefined(fiber.pollUnsafe());
+        const error = yield* Fiber.join(fiber);
+        assert.strictEqual(error._tag, "CliCanvasError");
+        if (error._tag === "CliCanvasError") {
+          assert.strictEqual(error.code, "canvas_timeout");
+          assert.strictEqual(exitCodeForFailure(error), 11);
+        }
+        assert.isTrue(stall === "headers" ? signal?.aborted : bodyCancelled);
+        assert.strictEqual(created.length, 0);
+      }).pipe(Effect.provide(capturingStoreLayer(created)));
+    });
+  }
+
+  it.effect(
+    "rejects oversized canvas bodies before buffering or persisting",
+    () => {
+      const created: BuiltDiagram[] = [];
+      let cancelled = false;
+      globalThis.fetch = () =>
+        Promise.resolve(
+          new Response(
+            new ReadableStream<Uint8Array>({
+              start(controller) {
+                controller.enqueue(new Uint8Array(16 * 1024 * 1024 + 1));
+              },
+              cancel() {
+                cancelled = true;
+              },
+            }),
+          ),
+        );
+      return Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          createCanvasDiagram({
+            endpoint: DEFAULT_CANVAS_ENDPOINT,
+            spec: canvasSpec,
+          }),
+        );
+        assert.strictEqual(error._tag, "CliCanvasError");
+        if (error._tag === "CliCanvasError")
+          assert.strictEqual(error.code, "malformed_response");
+        assert.isTrue(cancelled);
+        assert.strictEqual(created.length, 0);
+      }).pipe(Effect.provide(capturingStoreLayer(created)));
+    },
+  );
   afterEach(() => {
     globalThis.fetch = originalFetch;
   });
