@@ -151,6 +151,7 @@ const codeModeJsonSchemaAnnotationKeys = new Set([
   "exclusiveMinimum",
   "maximum",
   "maxLength",
+  "maxItems",
   "minimum",
   "minItems",
   "minLength",
@@ -985,6 +986,8 @@ export class ScenePoint extends Schema.Class<ScenePoint>("ScenePoint")(
 ) {}
 export const ScenePointSchema = withParser(ScenePoint);
 
+// Count limits are advertised here and enforced before compilation/patching by
+// the runtime's canvas validator, preserving limit-specific failure responses.
 const CanvasCompositionFields = {
   frameId: optionalContract(NonEmptyString).pipe(Schema.mutableKey),
   groupIds: optionalContract(

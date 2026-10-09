@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { Context, Effect } from "effect";
 
 import {
+  CANVAS_LIMITS,
+  type CanvasSpec,
+  type CanvasShapeElement,
   FLOWCHART_MAX_EDGES,
   FLOWCHART_MAX_ISSUES,
   FLOWCHART_MAX_NODES,
@@ -19,6 +22,9 @@ import {
   type CodeModeObjectBucketObject,
 } from "./artifacts";
 import {
+  CanvasSpecSchema,
+  CreateCanvasRequestSchema,
+  toCodeModeJsonSchema,
   RenderedDiagramSceneSchema,
   type ApplyDiagramPatchResult,
   type ArtifactFormat,
@@ -2555,4 +2561,686 @@ describe("Code Mode runtime", () => {
       issues: [expect.objectContaining({ code: "canvas_limit_exceeded" })],
     });
   });
+});
+
+function geometryCanvas(elements: CanvasSpec["elements"] = []): CanvasSpec {
+  return {
+    kind: "canvas",
+    version: 1,
+    diagramId: "geometry",
+    title: "Geometry",
+    width: 600,
+    height: 600,
+    accentColor: "#111827",
+    backgroundColor: "#ffffff",
+    layers: [],
+    layouts: [],
+    elements,
+    zOrder: elements.map(({ id }) => id),
+  };
+}
+
+function geometryNode(id: string, x: number, y: number): CanvasShapeElement {
+  return {
+    type: "node",
+    id,
+    nodeId: id,
+    shape: "rectangle",
+    x,
+    y,
+    width: 100,
+    height: 60,
+    label: id,
+  };
+}
+
+function densePointElements(count: number): CanvasSpec["elements"] {
+  return Array.from({ length: count }, (_, index) => ({
+    type: "line",
+    id: `line-${index}`,
+    points: [
+      { x: 0, y: 0 },
+      { x: 1, y: 1 },
+      ...Array.from({ length: 254 }, () => ({ x: 1, y: 1 })),
+    ],
+  }));
+}
+
+describe("canvas geometry and input bounds", () => {
+  it.each([
+    { x: 300, y: 0, start: { x: 100, y: 30 }, end: { x: 300, y: 30 } },
+    { x: 0, y: 300, start: { x: 50, y: 60 }, end: { x: 50, y: 300 } },
+  ])(
+    "reroutes to the near target edge for a pair at $x,$y",
+    async ({ x, y, start, end }) => {
+      const result = await createTestRuntime().applyDiagramPatch({
+        source: {
+          scene: geometryCanvas([
+            geometryNode("a", 0, 0),
+            geometryNode("b", x, y),
+            {
+              type: "arrow",
+              id: "ab",
+              edgeId: "ab",
+              sourceNodeId: "a",
+              targetNodeId: "b",
+              points: [start, end],
+            },
+          ]),
+        },
+        operations: [{ op: "rerouteEdges" }],
+        options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+      });
+      expectPatchOk(result);
+      const scene = parseInlineScene(result.artifact.formats[0]?.inline);
+      const arrow = scene.elements.find(({ id }) => id === "ab");
+      if (!arrow || arrow.type !== "arrow")
+        throw new Error("Expected ab arrow");
+      expect(arrow.points[0]).toEqual(start);
+      expect(arrow.points.at(-1)).toEqual(end);
+    },
+  );
+
+  it("cascades removal through an inserted label ordered before its arrow", async () => {
+    const result = await createTestRuntime().applyDiagramPatch({
+      source: {
+        scene: geometryCanvas([
+          geometryNode("a", 0, 0),
+          geometryNode("b", 300, 0),
+        ]),
+      },
+      operations: [
+        {
+          op: "insert",
+          elements: [
+            {
+              type: "text",
+              id: "label-a2",
+              containerId: "a2",
+              x: 200,
+              y: 30,
+              text: "edge",
+              fontSize: 13,
+            },
+            {
+              type: "arrow",
+              id: "a2",
+              edgeId: "a2",
+              sourceNodeId: "a",
+              targetNodeId: "b",
+              points: [
+                { x: 100, y: 30 },
+                { x: 300, y: 30 },
+              ],
+            },
+          ],
+        },
+        { op: "remove", selector: { ids: ["a"] } },
+      ],
+      options: {
+        preserveConnectivity: false,
+        artifactFormats: ["scene"],
+        inlineArtifacts: ["scene"],
+      },
+    });
+    expectPatchOk(result);
+    const scene = parseInlineScene(result.artifact.formats[0]?.inline);
+    expect(scene.elements.map(({ id }) => id)).toEqual(["b"]);
+    expect(scene.zOrder).toEqual(["b"]);
+  });
+
+  it("recomputes bounds after inserting 599 lines with 256 points", async () => {
+    const result = await createTestRuntime().applyDiagramPatch({
+      source: { scene: geometryCanvas([geometryNode("a", 0, 0)]) },
+      operations: [
+        {
+          op: "insert",
+          elements: densePointElements(CANVAS_LIMITS.maxElements - 1),
+        },
+        { op: "translate", selector: { nodeIds: ["a"] }, dx: 10, dy: 10 },
+      ],
+      options: {
+        preserveConnectivity: false,
+        artifactFormats: ["scene"],
+        inlineArtifacts: ["scene"],
+      },
+    });
+    expectPatchOk(result);
+    const scene = parseInlineScene(result.artifact.formats[0]?.inline);
+    expect(scene.elements).toHaveLength(600);
+    expect(scene).toMatchObject({ width: 648, height: 648 });
+  }, 15000);
+
+  it("rejects a raw 600x256-point canvas before decode in both workflows", async () => {
+    const scene = geometryCanvas(densePointElements(CANVAS_LIMITS.maxElements));
+    const runtime = createTestRuntime();
+    expect(await runtime.createCanvas({ spec: scene })).toMatchObject({
+      ok: false,
+      status: "limit_exceeded",
+      issues: [
+        expect.objectContaining({
+          code: "canvas_limit_exceeded",
+          ref: { kind: "request", path: "spec" },
+        }),
+      ],
+    });
+    expect(
+      await runtime.applyDiagramPatch({
+        source: { scene },
+        operations: [{ op: "translate", dx: 1, dy: 1 }],
+      }),
+    ).toMatchObject({
+      ok: false,
+      status: "invalid_input",
+      issues: [
+        expect.objectContaining({
+          code: "canvas_limit_exceeded",
+          ref: { kind: "request", path: "source.scene" },
+        }),
+      ],
+    });
+  });
+
+  it("counts raw unknown fields and UTF-8 bytes before schema decoding", async () => {
+    const scene = {
+      ...geometryCanvas([geometryNode("a", 0, 0)]),
+      ignored: "💡".repeat(CANVAS_LIMITS.maxSerializedBytes / 4),
+    };
+    expect(
+      await createTestRuntime().createCanvas({ spec: scene }),
+    ).toMatchObject({ ok: false, status: "limit_exceeded" });
+    expect(
+      await createTestRuntime().applyDiagramPatch({
+        source: { scene },
+        operations: [{ op: "setDefaultStyle", style: {} }],
+      }),
+    ).toMatchObject({
+      ok: false,
+      status: "invalid_input",
+      issues: [expect.objectContaining({ code: "canvas_limit_exceeded" })],
+    });
+  });
+
+  it.each(["createCanvas", "applyDiagramPatch"])(
+    "returns a typed rejection for deeply nested unknown fields in %s",
+    async (operation) => {
+      // A Date leaf selects the recursive serializer even with Node's fast path.
+      let nested: unknown = new Date(0);
+      for (let depth = 0; depth < 10_000; depth += 1) nested = [nested];
+      const scene = {
+        ...geometryCanvas([geometryNode("a", 0, 0)]),
+        ignored: nested,
+      };
+      const memory = makeMemoryArtifactStorage();
+      let writes = 0;
+      const store: CodeModeArtifactStorageShape = {
+        ...memory,
+        write(input) {
+          writes += 1;
+          return memory.write(input);
+        },
+      };
+      const runtime = makeTestRuntime({ store });
+      const result =
+        operation === "createCanvas"
+          ? await runtime.createCanvas({
+              requestId: "deep-canvas-request",
+              spec: scene,
+            })
+          : await runtime.applyDiagramPatch({
+              source: { scene },
+              operations: [{ op: "setDefaultStyle", style: {} }],
+            });
+      expect(result).toMatchObject({
+        ok: false,
+        status: "invalid_input",
+        issues: [
+          expect.objectContaining({
+            code: "invalid_type",
+            stage: "input",
+            ref: {
+              kind: "request",
+              path: operation === "createCanvas" ? "spec" : "source.scene",
+            },
+          }),
+        ],
+      });
+      if (operation === "createCanvas") {
+        expect(result).toMatchObject({
+          buildId: "build-test",
+          requestId: "deep-canvas-request",
+        });
+      }
+      expect(writes).toBe(0);
+    },
+  );
+
+  it("checks inline source limits before applying removal operations", async () => {
+    const scene = {
+      ...geometryCanvas([geometryNode("a", 0, 0)]),
+      width: 20000,
+    };
+    const result = await createTestRuntime().applyDiagramPatch({
+      source: { scene },
+      operations: [{ op: "remove", selector: { ids: ["a"] } }],
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      status: "invalid_input",
+      issues: expect.arrayContaining([
+        expect.objectContaining({ code: "canvas_limit_exceeded" }),
+      ]),
+    });
+  });
+
+  it("rejects a tall authored label as invalid_canvas before export", async () => {
+    const scene = geometryCanvas([
+      {
+        ...geometryNode("a", 0, 0),
+        width: 200,
+        height: 30,
+        label: "one\ntwo\nthree",
+      },
+    ]);
+    expect(
+      await createTestRuntime().createCanvas({ spec: scene }),
+    ).toMatchObject({
+      ok: false,
+      status: "invalid_canvas",
+      issues: [
+        expect.objectContaining({
+          code: "invalid_canvas_geometry",
+          ref: { kind: "element", id: "a", path: "elements[0].label" },
+        }),
+      ],
+    });
+  });
+
+  it.each([
+    ["elements", CANVAS_LIMITS.maxElements, () => geometryNode("a", 0, 0)],
+    ["layers", CANVAS_LIMITS.maxLayers, () => ({ id: "layer" })],
+    ["layouts", CANVAS_LIMITS.maxLayouts, () => ({ type: "row", ids: ["a"] })],
+    ["zOrder", CANVAS_LIMITS.maxZOrderEntries, () => "a"],
+  ])(
+    "advertises the $0 limit while leaving count failures to the runtime",
+    (field, limit, item) => {
+      const scene = geometryCanvas([geometryNode("a", 0, 0)]);
+      expect(
+        CanvasSpecSchema.safeParse({
+          ...scene,
+          [field]: Array.from({ length: limit + 1 }, () => item()),
+        }).success,
+      ).toBe(true);
+      expect(
+        CanvasSpecSchema.safeParse({
+          ...scene,
+          [field]: Array.from({ length: limit }, () => item()),
+        }).success,
+      ).toBe(true);
+      expect(toCodeModeJsonSchema(CreateCanvasRequestSchema)).toMatchObject({
+        properties: {
+          spec: {
+            properties: {
+              [field]: expect.objectContaining({ maxItems: limit }),
+            },
+          },
+        },
+      });
+    },
+  );
+
+  it("advertises the groups-per-element limit while leaving count failures to the runtime", () => {
+    const scene = geometryCanvas([
+      {
+        ...geometryNode("a", 0, 0),
+        groupIds: Array.from(
+          { length: CANVAS_LIMITS.maxGroupsPerElement + 1 },
+          () => "g",
+        ),
+      },
+    ]);
+    expect(CanvasSpecSchema.safeParse(scene).success).toBe(true);
+    expect(
+      JSON.stringify(toCodeModeJsonSchema(CreateCanvasRequestSchema)),
+    ).toContain(`"maxItems":${CANVAS_LIMITS.maxGroupsPerElement}`);
+  });
+});
+
+describe("reviewed label-fit regressions", () => {
+  it("accepts a sequence build with a three-line participant label", async () => {
+    const result = await createTestRuntime().buildSequenceDiagram({
+      spec: {
+        ...checkoutSequenceSpec(),
+        participants: [
+          { id: "customer", label: "one\ntwo\nthree" },
+          { id: "store", label: "Store" },
+          { id: "payments", label: "Payments" },
+        ],
+      },
+      options: {
+        artifactFormats: ["scene", "excalidraw"],
+        inlineArtifacts: ["scene"],
+      },
+    });
+    expect(result).toMatchObject({ ok: true, status: "accepted", issues: [] });
+    if (!result.ok) throw new Error("Expected accepted multiline sequence");
+    const scene = parseInlineScene(
+      result.artifact.formats.find(({ format }) => format === "scene")?.inline,
+    );
+    expect(
+      scene.elements.find(({ id }) => id === "node:customer"),
+    ).toMatchObject({ height: 75 });
+  });
+
+  it("creates a canvas with a hidden overflowing bound label without changing authored node geometry", async () => {
+    const scene = geometryCanvas([
+      { ...geometryNode("a", 0, 0), label: "A" },
+      {
+        type: "text",
+        id: "hidden-label",
+        containerId: "a",
+        x: 50,
+        y: 30,
+        fontSize: 20,
+        text: "one\ntwo\nthree",
+        layerId: "hidden",
+      },
+    ]);
+    const result = await createTestRuntime().createCanvas({
+      spec: { ...scene, layers: [{ id: "hidden", visible: false }] },
+      options: {
+        artifactFormats: ["excalidraw"],
+        inlineArtifacts: ["excalidraw"],
+      },
+    });
+    expectCanvasOk(result);
+    expect(
+      result.normalizedSpec.elements.find(({ id }) => id === "a"),
+    ).toMatchObject({ width: 100, height: 60 });
+    expect(result.artifact.formats[0]?.inline).toMatchObject({
+      elements: expect.arrayContaining([
+        expect.objectContaining({ id: "a", width: 100, height: 60 }),
+        expect.objectContaining({ text: "A" }),
+      ]),
+    });
+    expect(result.artifact.formats[0]?.inline).toMatchObject({
+      elements: expect.not.arrayContaining([
+        expect.objectContaining({ id: "hidden-label" }),
+      ]),
+    });
+  });
+});
+
+describe("bot-reviewed canvas limits and coincident routes", () => {
+  it("checks oversized inline scene counts before removable malformed geometry can bypass validation", async () => {
+    const elements: CanvasSpec["elements"] = Array.from(
+      { length: CANVAS_LIMITS.maxElements },
+      (_, index) => ({
+        type: "frame",
+        id: `frame-${index}`,
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+      }),
+    );
+    const scene = {
+      ...geometryCanvas(elements),
+      elements: [
+        ...elements,
+        {
+          ...geometryNode("bad", 0, 0),
+          shape: "polygon",
+          points: [
+            { x: 0, y: 0 },
+            { x: 10, y: 10 },
+          ],
+        },
+      ],
+      zOrder: [...elements.map(({ id }) => id), "bad"],
+    };
+    const result = await createTestRuntime().applyDiagramPatch({
+      source: { scene },
+      operations: [{ op: "remove", selector: { ids: ["bad", "frame-0"] } }],
+      options: { preserveConnectivity: false, artifactFormats: ["scene"] },
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      status: "invalid_input",
+      issues: expect.arrayContaining([
+        expect.objectContaining({ code: "canvas_limit_exceeded" }),
+      ]),
+    });
+  });
+
+  it("returns limit_exceeded for 601 small elements below the byte limit", async () => {
+    const elements: CanvasSpec["elements"] = Array.from(
+      { length: CANVAS_LIMITS.maxElements + 1 },
+      (_, index) => ({
+        type: "frame",
+        id: `frame-${index}`,
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+      }),
+    );
+    const scene = geometryCanvas(elements);
+    expect(
+      new TextEncoder().encode(JSON.stringify(scene)).byteLength,
+    ).toBeLessThan(CANVAS_LIMITS.maxSerializedBytes);
+    const result = await createTestRuntime().createCanvas({ spec: scene });
+    expect(result).toMatchObject({
+      ok: false,
+      status: "limit_exceeded",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "canvas_limit_exceeded",
+          stage: "canvas",
+        }),
+      ]),
+    });
+    const boundary = await createTestRuntime().createCanvas({
+      spec: geometryCanvas(elements.slice(0, CANVAS_LIMITS.maxElements)),
+      options: { artifactFormats: ["scene"] },
+    });
+    expectCanvasOk(boundary);
+  });
+
+  it.each([
+    {
+      field: "layers",
+      value: Array.from(
+        { length: CANVAS_LIMITS.maxLayers + 1 },
+        (_, index) => ({ id: `layer-${index}` }),
+      ),
+    },
+    {
+      field: "layouts",
+      value: Array.from({ length: CANVAS_LIMITS.maxLayouts + 1 }, () => ({
+        type: "row",
+        ids: ["a"],
+      })),
+    },
+    {
+      field: "zOrder",
+      value: Array.from(
+        { length: CANVAS_LIMITS.maxZOrderEntries + 1 },
+        () => "a",
+      ),
+    },
+  ])(
+    "keeps the $field count failure limit-specific",
+    async ({ field, value }) => {
+      const scene = {
+        ...geometryCanvas([geometryNode("a", 0, 0)]),
+        [field]: value,
+      };
+      expect(
+        await createTestRuntime().createCanvas({ spec: scene }),
+      ).toMatchObject({
+        ok: false,
+        status: "limit_exceeded",
+        issues: expect.arrayContaining([
+          expect.objectContaining({
+            code: "canvas_limit_exceeded",
+            ref: { kind: "diagram", path: field },
+          }),
+        ]),
+      });
+    },
+  );
+
+  it("keeps the groups-per-element count failure limit-specific", async () => {
+    const scene = geometryCanvas([
+      {
+        ...geometryNode("a", 0, 0),
+        groupIds: Array.from(
+          { length: CANVAS_LIMITS.maxGroupsPerElement + 1 },
+          (_, index) => `group-${index}`,
+        ),
+      },
+    ]);
+    expect(
+      await createTestRuntime().createCanvas({ spec: scene }),
+    ).toMatchObject({
+      ok: false,
+      status: "limit_exceeded",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "canvas_limit_exceeded",
+          ref: { kind: "element", id: "a", path: "elements[0].groupIds" },
+        }),
+      ]),
+    });
+  });
+
+  it("still classifies malformed small canvas fields as invalid_input", async () => {
+    const scene = {
+      ...geometryCanvas([geometryNode("a", 0, 0)]),
+      layers: "not an array",
+    };
+    expect(
+      await createTestRuntime().createCanvas({ spec: scene }),
+    ).toMatchObject({ ok: false, status: "invalid_input" });
+  });
+
+  it("reroutes coincident nodes to distinct source and target faces", async () => {
+    const result = await createTestRuntime().applyDiagramPatch({
+      source: {
+        scene: geometryCanvas([
+          geometryNode("a", 0, 0),
+          geometryNode("b", 0, 0),
+          {
+            type: "arrow",
+            id: "ab",
+            edgeId: "ab",
+            sourceNodeId: "a",
+            targetNodeId: "b",
+            points: [
+              { x: 50, y: 60 },
+              { x: 50, y: 0 },
+            ],
+          },
+        ]),
+      },
+      operations: [{ op: "rerouteEdges" }],
+      options: {
+        artifactFormats: ["scene", "excalidraw"],
+        inlineArtifacts: ["scene", "excalidraw"],
+      },
+    });
+    expectPatchOk(result);
+    const scene = parseInlineScene(
+      result.artifact.formats.find(({ format }) => format === "scene")?.inline,
+    );
+    const arrow = scene.elements.find(({ id }) => id === "ab");
+    if (!arrow || arrow.type !== "arrow") throw new Error("Expected ab arrow");
+    expect(arrow.points[0]).toEqual({ x: 50, y: 60 });
+    expect(arrow.points.at(-1)).toEqual({ x: 50, y: 0 });
+    expect(
+      new Set(arrow.points.map(({ x, y }) => `${x},${y}`)).size,
+    ).toBeGreaterThan(1);
+  });
+});
+
+describe("final-review correlation and sequence canvas bounds", () => {
+  it("preserves buildId and requestId on raw-byte canvas limit failures", async () => {
+    const scene = geometryCanvas(densePointElements(CANVAS_LIMITS.maxElements));
+    expect(
+      new TextEncoder().encode(JSON.stringify(scene)).byteLength,
+    ).toBeGreaterThan(CANVAS_LIMITS.maxSerializedBytes);
+    const result = await createTestRuntime().createCanvas({
+      requestId: "oversized-canvas-request",
+      spec: scene,
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      status: "limit_exceeded",
+      buildId: "build-1",
+      requestId: "oversized-canvas-request",
+      issues: [expect.objectContaining({ code: "canvas_limit_exceeded" })],
+    });
+  });
+
+  it.each([
+    { lines: 854, accepted: true },
+    { lines: 855, accepted: false },
+  ])(
+    "enforces canvas bounds for a sequence with $lines participant label lines",
+    async ({ lines, accepted }) => {
+      const memory = makeMemoryArtifactStorage();
+      let writes = 0;
+      const store: CodeModeArtifactStorageShape = {
+        ...memory,
+        write(input) {
+          writes += 1;
+          return memory.write(input);
+        },
+      };
+      const label = Array.from({ length: lines }, () => "x").join("\n");
+      const result = await makeTestRuntime({ store }).buildSequenceDiagram({
+        requestId: "sequence-bounds-request",
+        spec: {
+          title: "Sequence canvas bounds",
+          participants: [
+            { id: "a", label },
+            { id: "b", label: "B" },
+          ],
+          messages: [{ source: "a", target: "b", label: "Continue" }],
+        },
+        options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+      });
+      if (accepted) {
+        expect(result).toMatchObject({ ok: true, status: "accepted" });
+        if (!result.ok) throw new Error("Expected within-bounds sequence");
+        const scene = parseInlineScene(result.artifact.formats[0]?.inline);
+        expect(scene.height).toBeLessThanOrEqual(CANVAS_LIMITS.maxDimension);
+        expect(writes).toBe(1);
+      } else {
+        expect(result).toMatchObject({
+          ok: false,
+          status: "render_failed",
+          buildId: "build-test",
+          requestId: "sequence-bounds-request",
+          normalizedSpec: {
+            participants: [
+              expect.objectContaining({ label }),
+              expect.anything(),
+            ],
+          },
+          issues: expect.arrayContaining([
+            expect.objectContaining({
+              code: "canvas_limit_exceeded",
+              stage: "canvas",
+              message: expect.stringContaining(
+                String(CANVAS_LIMITS.maxDimension),
+              ),
+            }),
+          ]),
+        });
+        expect(writes).toBe(0);
+      }
+    },
+  );
 });

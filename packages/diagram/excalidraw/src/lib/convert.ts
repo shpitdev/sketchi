@@ -251,10 +251,7 @@ function shapeElement(input: {
   shape: NodeSceneElement;
   text?: TextSceneElement;
 }): ExcalidrawElement {
-  const labelHeight = input.text
-    ? textHeight(input.text.text, input.text.fontSize) + TEXT_VERTICAL_PADDING
-    : 0;
-  const height = Math.max(input.shape.height, labelHeight);
+  const height = input.shape.height;
   const shapeType =
     input.shape.shape === "circle" ? "ellipse" : input.shape.shape;
   const boundElements = [

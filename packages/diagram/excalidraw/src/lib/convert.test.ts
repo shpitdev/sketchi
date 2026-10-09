@@ -8,6 +8,7 @@ import {
   pharmaBatchDispositionFlowchart,
   parseFlowchartDiagram,
   type CanvasSpec,
+  getCanvasValidationIssues,
 } from "@sketchi/diagram-core";
 import {
   renderIntermediateDiagram,
@@ -20,6 +21,111 @@ import {
   type ExcalidrawElement,
   validateExcalidrawScene,
 } from "./convert";
+
+describe("authored node geometry", () => {
+  it("exports a sequence with a three-line participant label without growing shapes", () => {
+    const scene = renderSequenceDiagram({
+      id: "multiline-sequence",
+      title: "Multiline sequence",
+      participants: [
+        { id: "a", label: "one\ntwo\nthree" },
+        { id: "b", label: "B" },
+      ],
+      messages: [{ id: "ab", source: "a", target: "b", label: "Continue" }],
+      style: { accentColor: "#111827", backgroundColor: "#ffffff" },
+    });
+    const converted = convertSceneToExcalidraw(scene);
+    expect(validateExcalidrawScene(converted)).toEqual({
+      ok: true,
+      issues: [],
+    });
+    expect(converted.elements.find(({ id }) => id === "node:a")).toMatchObject({
+      height: 75,
+    });
+    for (const element of scene.elements) {
+      if (element.type === "node") {
+        expect(
+          converted.elements.find(({ id }) => id === element.id),
+        ).toMatchObject({
+          x: element.x,
+          y: element.y,
+          width: element.width,
+          height: element.height,
+        });
+      }
+    }
+  });
+
+  it("keeps a tall label from moving a bottom-edge arrow off its 200x30 node", () => {
+    const scene: CanvasSpec = {
+      kind: "canvas",
+      version: 1,
+      diagramId: "tall-label",
+      title: "Tall label",
+      width: 400,
+      height: 400,
+      accentColor: "#111827",
+      backgroundColor: "#ffffff",
+      layers: [],
+      layouts: [],
+      zOrder: ["a", "b", "ab"],
+      elements: [
+        {
+          type: "node",
+          id: "a",
+          nodeId: "a",
+          shape: "rectangle",
+          x: 20,
+          y: 20,
+          width: 200,
+          height: 30,
+          label: "line one\nline two\nline three",
+        },
+        {
+          type: "node",
+          id: "b",
+          nodeId: "b",
+          shape: "rectangle",
+          x: 20,
+          y: 200,
+          width: 200,
+          height: 60,
+          label: "B",
+        },
+        {
+          type: "arrow",
+          id: "ab",
+          edgeId: "ab",
+          sourceNodeId: "a",
+          targetNodeId: "b",
+          points: [
+            { x: 120, y: 50 },
+            { x: 120, y: 200 },
+          ],
+        },
+      ],
+    };
+    const converted = convertSceneToExcalidraw(scene);
+    expect(converted.elements.find(({ id }) => id === "a")).toMatchObject({
+      x: 20,
+      y: 20,
+      width: 200,
+      height: 30,
+    });
+    expect(
+      firstGlobalPoint(converted.elements.find(({ id }) => id === "ab")),
+    ).toEqual({ x: 120, y: 50 });
+    expect(
+      validateExcalidrawScene(converted).issues.map(({ code }) => code),
+    ).not.toContain("arrow-endpoint-off-shape");
+    expect(getCanvasValidationIssues(scene)).toContainEqual(
+      expect.objectContaining({
+        code: "label_overflow",
+        path: "elements[0].label",
+      }),
+    );
+  });
+});
 
 function bindingFixedPoint(
   element: ExcalidrawElement | undefined,

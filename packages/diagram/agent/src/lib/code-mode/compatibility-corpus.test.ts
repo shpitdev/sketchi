@@ -303,6 +303,57 @@ function normalizeCanvasMigrationAgainstFrozen(
   return value;
 }
 
+// Preserve the exact-base captures. Apply only these intentional S4 corrections
+// to their expectations; new geometry and limit regressions assert the contract.
+function withGeometryBoundsCorrections(value: unknown): unknown {
+  if (typeof value === "string") {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return JSON.stringify(withGeometryBoundsCorrections(parsed));
+    } catch {
+      return value;
+    }
+  }
+  if (Array.isArray(value)) return value.map(withGeometryBoundsCorrections);
+  if (!isRecord(value)) return value;
+  const corrected = Object.fromEntries(
+    Object.entries(value).map(([key, nested]) => [
+      key,
+      withGeometryBoundsCorrections(nested),
+    ]),
+  );
+  if (Array.isArray(value["elements"])) {
+    if (
+      value["diagramId"] === "simple-approval-flow" &&
+      value["width"] === 632
+    ) {
+      corrected["width"] = 576;
+    }
+    if (value["diagramId"] === "launch-strategy" && value["width"] === 896) {
+      corrected["width"] = 840;
+    }
+  }
+  const items = value["items"];
+  if (
+    value["type"] === "array" &&
+    isRecord(items) &&
+    Array.isArray(items["oneOf"])
+  ) {
+    const elementTypes = items["oneOf"].flatMap((branch) => {
+      if (!isRecord(branch) || !isRecord(branch["properties"])) return [];
+      const type = branch["properties"]["type"];
+      return isRecord(type) ? [type["const"]] : [];
+    });
+    if (
+      elementTypes.length === 3 &&
+      ["node", "text", "arrow"].every((type) => elementTypes.includes(type))
+    ) {
+      corrected["maxItems"] = CANVAS_LIMITS.maxElements;
+    }
+  }
+  return corrected;
+}
+
 function withoutPostBaselineSceneFields(
   value: unknown,
   isSchemaProperties = false,
@@ -1414,6 +1465,23 @@ afterEach(() => {
 });
 
 describe("pre-Effect Code Mode compatibility corpus", () => {
+  it("updates only the approved geometry widths and scene array schema limit", () => {
+    expect(
+      withGeometryBoundsCorrections([
+        { diagramId: "simple-approval-flow", elements: [], width: 632 },
+        { diagramId: "launch-strategy", elements: [], width: 896 },
+        { diagramId: "other", elements: [], width: 632 },
+        { diagramId: "simple-approval-flow", elements: [], width: 633 },
+        { type: "array", items: { type: "string" } },
+      ]),
+    ).toEqual([
+      { diagramId: "simple-approval-flow", elements: [], width: 576 },
+      { diagramId: "launch-strategy", elements: [], width: 840 },
+      { diagramId: "other", elements: [], width: 632 },
+      { diagramId: "simple-approval-flow", elements: [], width: 633 },
+      { type: "array", items: { type: "string" } },
+    ]);
+  });
   it("normalizes only explicitly approved CanvasSpec compatibility additions", () => {
     const frozen = {
       codes: ["legacy_code"],
@@ -1560,9 +1628,13 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
           currentSchemas,
           fixture.publicContract.mcpVisible.schemas,
         ),
-        fixture.publicContract.mcpVisible.schemas,
+        withGeometryBoundsCorrections(
+          fixture.publicContract.mcpVisible.schemas,
+        ),
       ),
-    ).toEqual(fixture.publicContract.mcpVisible.schemas);
+    ).toEqual(
+      withGeometryBoundsCorrections(fixture.publicContract.mcpVisible.schemas),
+    );
   });
 
   it("matches the frozen pre-refactor public and persisted contract", async () => {
@@ -1573,8 +1645,10 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
       "./fixtures/compatibility-v1.json",
       import.meta.url,
     ).pathname;
-    const frozen = Schema.decodeUnknownSync(Schema.Unknown)(
-      JSON.parse(await readFile(fixturePath, "utf8")),
+    const frozen = withGeometryBoundsCorrections(
+      Schema.decodeUnknownSync(Schema.Unknown)(
+        JSON.parse(await readFile(fixturePath, "utf8")),
+      ),
     );
     const qualityFailed = corpus.failures.buildFlowchart.qualityFailed;
     if (qualityFailed.ok) {
@@ -1688,8 +1762,10 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
       "./fixtures/compatibility-v2.json",
       import.meta.url,
     );
-    const frozen = Schema.decodeUnknownSync(Schema.Unknown)(
-      JSON.parse(await readFile(fixturePath, "utf8")),
+    const frozen = withGeometryBoundsCorrections(
+      Schema.decodeUnknownSync(Schema.Unknown)(
+        JSON.parse(await readFile(fixturePath, "utf8")),
+      ),
     );
     expect(
       normalizeCanvasMigrationAgainstFrozen(

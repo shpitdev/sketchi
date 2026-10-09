@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   flowchartFixture,
+  mindmapFixture,
   pharmaBatchDispositionFlowchart,
   parseFlowchartDiagram,
+  getCanvasValidationIssues,
 } from "@sketchi/diagram-core";
 
 import {
@@ -11,6 +13,60 @@ import {
   renderIntermediateDiagram,
   type NodeSceneElement,
 } from "./scene";
+import { renderSequenceDiagram } from "./sequence";
+
+describe("geometry bounds regressions", () => {
+  it("keeps renderer-produced flowchart, mindmap, and sequence labels valid", () => {
+    const scenes = [
+      renderIntermediateDiagram(flowchartFixture),
+      renderIntermediateDiagram(mindmapFixture),
+      renderIntermediateDiagram(pharmaBatchDispositionFlowchart),
+      renderSequenceDiagram({
+        id: "sequence-label-fit",
+        title: "Sequence label fit",
+        participants: [
+          { id: "a", label: "Alpha" },
+          { id: "b", label: "Beta" },
+        ],
+        messages: [{ id: "ab", source: "a", target: "b", label: "Continue" }],
+        style: { accentColor: "#111827", backgroundColor: "#ffffff" },
+      }),
+    ];
+    for (const scene of scenes)
+      expect(getCanvasValidationIssues(scene)).toEqual([]);
+  });
+  it("ranks a reverse-declared chain in topological order", () => {
+    const scene = renderIntermediateDiagram({
+      ...flowchartFixture,
+      nodes: ["Z", "Y", "X", "A"].map((id) => ({ id, label: id })),
+      edges: [
+        { id: "ax", source: "A", target: "X" },
+        { id: "xy", source: "X", target: "Y" },
+        { id: "yz", source: "Y", target: "Z" },
+      ],
+      layout: { direction: "TB", edgeRouting: "orthogonal" },
+    });
+    const ys = ["A", "X", "Y", "Z"].map((id) => {
+      const node = scene.elements.find(
+        (element) => element.type === "node" && element.nodeId === id,
+      );
+      if (!node || node.type !== "node") throw new Error(`Missing node ${id}`);
+      return node.y;
+    });
+    expect(ys).toEqual([48, 216, 384, 552]);
+    expect(getCanvasValidationIssues(scene)).toEqual([]);
+  });
+
+  it("does not inflate single-node bounds with its centered label", () => {
+    const scene = renderIntermediateDiagram({
+      ...flowchartFixture,
+      nodes: [{ id: "A", label: "A" }],
+      edges: [],
+    });
+    expect(scene).toMatchObject({ width: 280, height: 168 });
+    expect(getCanvasValidationIssues(scene)).toEqual([]);
+  });
+});
 
 interface TestRouteSegment {
   max: number;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CANVAS_LIMITS,
   CANVAS_SPEC_VERSION,
   compileCanvasSpec,
   getCanvasValidationIssues,
@@ -26,6 +27,210 @@ function baseCanvas(overrides: Partial<CanvasSpec> = {}): CanvasSpec {
 }
 
 describe("CanvasSpec", () => {
+  it("ignores hidden bound labels for fit and validates the fallback node label", () => {
+    const canvas = baseCanvas({
+      elements: [
+        {
+          type: "node",
+          id: "a",
+          nodeId: "a",
+          shape: "rectangle",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 60,
+          label: "A",
+        },
+        {
+          type: "text",
+          id: "hidden-label",
+          containerId: "a",
+          x: 50,
+          y: 30,
+          fontSize: 20,
+          text: "one\ntwo\nthree",
+          layerId: "hidden",
+        },
+      ],
+      layers: [{ id: "hidden", visible: false }],
+      zOrder: ["a", "hidden-label"],
+    });
+    expect(getCanvasValidationIssues(canvas)).toEqual([]);
+    expect(
+      getCanvasValidationIssues({
+        ...canvas,
+        layers: [{ id: "hidden", visible: true }],
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        code: "label_overflow",
+        elementId: "hidden-label",
+        path: "elements[1].text",
+      }),
+    ]);
+    expect(
+      getCanvasValidationIssues({
+        ...canvas,
+        elements: canvas.elements.map((element) =>
+          element.type === "node"
+            ? { ...element, label: "one\ntwo\nthree" }
+            : element,
+        ),
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        code: "label_overflow",
+        elementId: "a",
+        path: "elements[0].label",
+      }),
+    ]);
+  });
+
+  it("does not validate label fit on nodes discarded by hidden layers", () => {
+    const canvas = baseCanvas({
+      elements: [
+        {
+          type: "node",
+          id: "a",
+          nodeId: "a",
+          shape: "rectangle",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 60,
+          label: "one\ntwo\nthree",
+          layerId: "hidden",
+        },
+        {
+          type: "text",
+          id: "label-a",
+          containerId: "a",
+          x: 50,
+          y: 30,
+          fontSize: 20,
+          text: "one\ntwo\nthree",
+        },
+      ],
+      layers: [{ id: "hidden", visible: false }],
+      zOrder: ["a", "label-a"],
+    });
+    expect(getCanvasValidationIssues(canvas)).toEqual([]);
+  });
+
+  it("compiles 600 elements with 256 points without spreading point arrays", () => {
+    const elements: CanvasSpec["elements"] = Array.from(
+      { length: CANVAS_LIMITS.maxElements },
+      (_, index) => ({
+        type: "line",
+        id: `line-${index}`,
+        points: [
+          { x: 0, y: 0 },
+          { x: 1, y: 1 },
+          ...Array.from(
+            { length: CANVAS_LIMITS.maxPointsPerElement - 2 },
+            () => ({ x: 30, y: 40 }),
+          ),
+        ],
+      }),
+    );
+    const canvas = baseCanvas({
+      elements,
+      zOrder: elements.map(({ id }) => id),
+      width: 1,
+      height: 1,
+    });
+    expect(getCanvasValidationIssues(canvas)).toEqual([]);
+    expect(compileCanvasSpec(canvas)).toMatchObject({ width: 78, height: 88 });
+  });
+
+  it("distinguishes duplicate zOrder entries from unknown elements", () => {
+    const canvas = baseCanvas({
+      elements: [
+        { type: "frame", id: "frame", x: 0, y: 0, width: 100, height: 100 },
+      ],
+      zOrder: ["frame", "frame"],
+    });
+    expect(getCanvasValidationIssues(canvas)).toEqual([
+      expect.objectContaining({
+        code: "duplicate_z_order_element",
+        elementId: "frame",
+        path: "zOrder",
+      }),
+    ]);
+  });
+
+  it("rejects labels that would grow a 200x30 node and detach its bottom arrow", () => {
+    const elements: CanvasSpec["elements"] = [
+      {
+        type: "node",
+        id: "a",
+        nodeId: "a",
+        shape: "rectangle",
+        x: 20,
+        y: 20,
+        width: 200,
+        height: 30,
+        label: "line one\nline two\nline three",
+      },
+      {
+        type: "node",
+        id: "b",
+        nodeId: "b",
+        shape: "rectangle",
+        x: 20,
+        y: 200,
+        width: 200,
+        height: 60,
+        label: "B",
+      },
+      {
+        type: "arrow",
+        id: "ab",
+        edgeId: "ab",
+        sourceNodeId: "a",
+        targetNodeId: "b",
+        points: [
+          { x: 120, y: 50 },
+          { x: 120, y: 200 },
+        ],
+      },
+    ];
+    const canvas = baseCanvas({
+      elements,
+      zOrder: elements.map(({ id }) => id),
+    });
+    expect(getCanvasValidationIssues(canvas)).toEqual([
+      expect.objectContaining({
+        code: "label_overflow",
+        elementId: "a",
+        path: "elements[0].label",
+      }),
+    ]);
+    const explicit = baseCanvas({
+      ...canvas,
+      elements: [
+        ...elements,
+        {
+          type: "text",
+          id: "label-a",
+          containerId: "a",
+          x: 120,
+          y: 35,
+          fontSize: 20,
+          text: "two\nlines",
+        },
+      ],
+      zOrder: [...canvas.zOrder, "label-a"],
+    });
+    expect(getCanvasValidationIssues(explicit)).toEqual([
+      expect.objectContaining({
+        code: "label_overflow",
+        elementId: "label-a",
+        path: "elements[3].text",
+      }),
+    ]);
+  });
+
   it("applies ordered layout primitives and synchronizes bindings deterministically", () => {
     const elements: CanvasSpec["elements"] = [
       {

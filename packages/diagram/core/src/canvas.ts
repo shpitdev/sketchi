@@ -197,11 +197,13 @@ export interface CanvasValidationIssue {
   readonly code:
     | "duplicate_element_id"
     | "duplicate_layer_id"
+    | "duplicate_z_order_element"
     | "empty_canvas"
     | "invalid_binding"
     | "invalid_composition"
     | "invalid_geometry"
     | "invalid_polygon"
+    | "label_overflow"
     | "limit_exceeded"
     | "missing_z_order_element"
     | "unknown_layout_target"
@@ -374,7 +376,7 @@ export function getCanvasValidationIssues(
   const duplicateZOrderId = findDuplicate(canvas.zOrder);
   if (duplicateZOrderId) {
     issues.push({
-      code: "unknown_z_order_element",
+      code: "duplicate_z_order_element",
       elementId: duplicateZOrderId,
       message: `zOrder contains duplicate element "${duplicateZOrderId}".`,
       path: "zOrder",
@@ -434,9 +436,60 @@ export function getCanvasValidationIssues(
       path: "elements",
     });
   }
-  const layerIds = new Set(canvas.layers.map((layer) => layer.id));
+  const layersById = new Map(canvas.layers.map((layer) => [layer.id, layer]));
+  const layerIds = new Set(layersById.keys());
+  const isLayerVisible = (element: CanvasElement) =>
+    !element.layerId || layersById.get(element.layerId)?.visible !== false;
+  const nodeLabelsByContainerId = new Map<
+    string,
+    { readonly element: CanvasTextElement; readonly index: number }
+  >();
+  for (const [index, element] of canvas.elements.entries()) {
+    if (
+      element.type === "text" &&
+      element.containerId &&
+      isLayerVisible(element)
+    ) {
+      nodeLabelsByContainerId.set(element.containerId, { element, index });
+    }
+  }
   canvas.elements.forEach((element, index) => {
     issues.push(...validateElementLimits(element, index));
+    if (
+      element.type === "node" &&
+      element.shape !== "polygon" &&
+      isLayerVisible(element)
+    ) {
+      // Match the adapter's label metrics; conversion must not resize a node.
+      const boundLabel = nodeLabelsByContainerId.get(element.id);
+      if (boundLabel || element.rendererRole !== "sequence-lifeline") {
+        const text = boundLabel?.element.text ?? element.label;
+        const fontSize = boundLabel?.element.fontSize ?? 16;
+        const maxWidth = boundLabel
+          ? (boundLabel.element.maxWidth ?? 160)
+          : Math.max(1, element.width - 24);
+        const lines = text.split("\n");
+        const estimatedWidth = lines.reduce(
+          (width, line) => Math.max(width, line.length * fontSize * 0.62),
+          0,
+        );
+        const textWidth = Math.max(1, Math.min(maxWidth, estimatedWidth));
+        const textHeight = Math.ceil(lines.length * fontSize * 1.35);
+        if (
+          textWidth + 24 > element.width ||
+          textHeight + 18 > element.height
+        ) {
+          issues.push({
+            code: "label_overflow",
+            elementId: boundLabel?.element.id ?? element.id,
+            message: `Label does not fit inside node "${element.id}" without changing its geometry.`,
+            path: boundLabel
+              ? `elements[${boundLabel.index}].text`
+              : `elements[${index}].label`,
+          });
+        }
+      }
+    }
     if (element.frameId) {
       const frame = elementsById.get(element.frameId);
       if (!frame || frame.type !== "frame") {
@@ -923,25 +976,20 @@ function computedCanvasBounds(elements: readonly CanvasElement[]): {
   readonly height: number;
   readonly width: number;
 } {
-  const positioned = elements.filter(isPositioned).map(elementBounds);
-  const pointElements = elements.filter(
-    (element): element is CanvasConnectorElement | CanvasLineElement =>
-      element.type === "arrow" || element.type === "line",
-  );
-  const maxX = Math.max(
-    1,
-    ...positioned.map((bounds) => bounds.x + bounds.width),
-    ...pointElements.flatMap((element) =>
-      element.points.map((point) => point.x),
-    ),
-  );
-  const maxY = Math.max(
-    1,
-    ...positioned.map((bounds) => bounds.y + bounds.height),
-    ...pointElements.flatMap((element) =>
-      element.points.map((point) => point.y),
-    ),
-  );
+  let maxX = 1;
+  let maxY = 1;
+  for (const element of elements) {
+    if (isPositioned(element)) {
+      const bounds = elementBounds(element);
+      maxX = Math.max(maxX, bounds.x + bounds.width);
+      maxY = Math.max(maxY, bounds.y + bounds.height);
+    } else if (element.type === "arrow" || element.type === "line") {
+      for (const point of element.points) {
+        maxX = Math.max(maxX, point.x);
+        maxY = Math.max(maxY, point.y);
+      }
+    }
+  }
   return { width: maxX + 48, height: maxY + 48 };
 }
 

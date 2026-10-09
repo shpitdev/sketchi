@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { getCanvasValidationIssues } from "@sketchi/diagram-core";
 
 import { renderSequenceDiagram } from "../sequence";
 
@@ -19,12 +20,37 @@ const sequence = {
 } as const;
 
 describe("sequence diagram renderer", () => {
+  it("fits three-line participant labels before positioning lifelines and messages", () => {
+    const scene = renderSequenceDiagram({
+      ...sequence,
+      participants: sequence.participants.map((participant, index) =>
+        index === 0
+          ? { ...participant, label: "one\ntwo\nthree" }
+          : participant,
+      ),
+    });
+    expect(
+      scene.elements.find(({ id }) => id === "node:customer"),
+    ).toMatchObject({ y: 48, height: 75 });
+    expect(
+      scene.elements.find(({ id }) => id === "label:customer"),
+    ).toMatchObject({ y: 85.5 });
+    const lifelines = scene.elements.filter(
+      (element): element is Extract<typeof element, { type: "node" }> =>
+        element.type === "node" && element.rendererRole === "sequence-lifeline",
+    );
+    expect(lifelines.map(({ y }) => y)).toEqual([123, 123, 123]);
+    const arrows = scene.elements.filter((element) => element.type === "arrow");
+    expect(arrows.map(({ points }) => points[0].y)).toEqual([187, 275, 363]);
+    expect(scene.height).toBe(467);
+    expect(getCanvasValidationIssues(scene)).toEqual([]);
+  });
+
   it("preserves participant and chronological message order", () => {
     const scene = renderSequenceDiagram(sequence);
     const headers = scene.elements.filter(
       (element): element is Extract<typeof element, { type: "node" }> =>
-        element.type === "node" &&
-        element.rendererRole !== "sequence-lifeline",
+        element.type === "node" && element.rendererRole !== "sequence-lifeline",
     );
     const messages = scene.elements.filter(
       (element) => element.type === "arrow",

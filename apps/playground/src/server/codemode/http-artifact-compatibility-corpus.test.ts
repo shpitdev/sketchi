@@ -245,6 +245,41 @@ function normalizeCanvasMigrationAgainstExactBase(
   return value;
 }
 
+// Keep the exact-base fixture intact while correcting only S4 scene bounds.
+function withApprovedSceneWidths(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withApprovedSceneWidths);
+  if (!isRecord(value)) return value;
+  const corrected = Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [
+      key,
+      withApprovedSceneWidths(entry),
+    ]),
+  );
+  if (Array.isArray(value["elements"])) {
+    if (
+      value["diagramId"] === "worker-api-approval-flow" &&
+      value["width"] === 632
+    ) {
+      corrected["width"] = 576;
+    }
+    if (value["diagramId"] === "release-plan" && value["width"] === 896) {
+      corrected["width"] = 840;
+    }
+  }
+  // Width 840 makes the mindmap's 352px height govern its initial fit zoom.
+  const body = corrected["body"];
+  if (
+    value["key"] === "codemode/<mindmap-artifact-id>/excalidraw.json" &&
+    isRecord(body) &&
+    isRecord(body["appState"]) &&
+    isRecord(body["appState"]["zoom"]) &&
+    body["appState"]["zoom"]["value"] === 0.96
+  ) {
+    body["appState"]["zoom"]["value"] = 0.97;
+  }
+  return corrected;
+}
+
 async function jsonObservation(
   response: Response,
   replacements: ReadonlyMap<string, string>,
@@ -287,6 +322,58 @@ afterEach(() => {
 });
 
 describe("exact-base Code Mode HTTP artifact compatibility corpus", () => {
+  it("corrects only the approved scene widths in nested encoding expectations", () => {
+    expect(
+      withApprovedSceneWidths({
+        raw: {
+          diagramId: "worker-api-approval-flow",
+          elements: [{ id: "node", width: 632 }],
+          width: 632,
+        },
+        persistedEncoding: [
+          { body: { diagramId: "release-plan", elements: [], width: 896 } },
+          {
+            key: "codemode/<mindmap-artifact-id>/excalidraw.json",
+            body: { appState: { zoom: { value: 0.96 } } },
+          },
+          {
+            key: "codemode/<source-artifact-id>/excalidraw.json",
+            body: { appState: { zoom: { value: 0.96 } } },
+          },
+        ],
+        unrelated: { diagramId: "other", elements: [], width: 632 },
+        unexpectedWidth: {
+          diagramId: "worker-api-approval-flow",
+          elements: [],
+          width: 633,
+        },
+      }),
+    ).toEqual({
+      raw: {
+        diagramId: "worker-api-approval-flow",
+        elements: [{ id: "node", width: 632 }],
+        width: 576,
+      },
+      persistedEncoding: [
+        { body: { diagramId: "release-plan", elements: [], width: 840 } },
+        {
+          key: "codemode/<mindmap-artifact-id>/excalidraw.json",
+          body: { appState: { zoom: { value: 0.97 } } },
+        },
+        {
+          key: "codemode/<source-artifact-id>/excalidraw.json",
+          body: { appState: { zoom: { value: 0.96 } } },
+        },
+      ],
+      unrelated: { diagramId: "other", elements: [], width: 632 },
+      unexpectedWidth: {
+        diagramId: "worker-api-approval-flow",
+        elements: [],
+        width: 633,
+      },
+    });
+  });
+
   it("does not hide unrelated HTTP contract drift", () => {
     expect(
       normalizeCanvasMigrationAgainstExactBase(
@@ -446,7 +533,9 @@ describe("exact-base Code Mode HTTP artifact compatibility corpus", () => {
       ),
     };
     const fixturePath = `${process.cwd()}/apps/playground/src/server/codemode/fixtures/http-artifact-compatibility-v1.json`;
-    const exactBase = JSON.parse(await readFile(fixturePath, "utf8"));
+    const exactBase = withApprovedSceneWidths(
+      JSON.parse(await readFile(fixturePath, "utf8")),
+    );
     expect(
       `${JSON.stringify(
         normalizeCanvasMigrationAgainstExactBase(
@@ -456,6 +545,6 @@ describe("exact-base Code Mode HTTP artifact compatibility corpus", () => {
         null,
         2,
       )}\n`,
-    ).toBe(await readFile(fixturePath, "utf8"));
+    ).toBe(`${JSON.stringify(exactBase, null, 2)}\n`);
   });
 });

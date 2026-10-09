@@ -33,7 +33,7 @@ import {
   withTelemetryCorrelation,
   type TelemetryCorrelationInput,
 } from "@sketchi/observability";
-import { Clock, Context, Effect, Layer, Metric, Schema } from "effect";
+import { Clock, Context, Effect, Layer, Metric, Result, Schema } from "effect";
 
 import {
   ARTIFACT_MIME_TYPES,
@@ -1214,9 +1214,12 @@ function canvasIssueCode(
       return "invalid_canvas_geometry";
     case "invalid_polygon":
       return "invalid_polygon";
+    case "label_overflow":
+      return "invalid_canvas_geometry";
     case "limit_exceeded":
       return "canvas_limit_exceeded";
     case "missing_z_order_element":
+    case "duplicate_z_order_element":
     case "unknown_z_order_element":
       return "invalid_z_order";
     case "unknown_layout_target":
@@ -1248,6 +1251,8 @@ function canvasExportIssues(
   validationIssues: ReturnType<typeof validateExcalidrawScene>["issues"],
 ): CodeModeIssue[] {
   return exportIssues(
+    // Canvas authoring permits intentional overlaps and connector crossings;
+    // these quality diagnostics are not hard structural export failures.
     validationIssues.filter(
       (validationIssue) =>
         validationIssue.code !== "overlapping-arrow-segment" &&
@@ -1801,21 +1806,29 @@ function nodeCenter(node: PatchableNode): PatchablePoint {
 function edgePoint(
   source: PatchableNode,
   target: PatchableNode,
-  sourceSide: boolean,
+  coincidentRole: "source" | "target",
 ): PatchablePoint {
   const sourceCenter = nodeCenter(source);
   const targetCenter = nodeCenter(target);
   const dx = targetCenter.x - sourceCenter.x;
   const dy = targetCenter.y - sourceCenter.y;
 
+  // Opposite faces prevent a route between coincident centers from collapsing.
+  if (dx === 0 && dy === 0) {
+    return {
+      x: sourceCenter.x,
+      y: coincidentRole === "source" ? source.y + source.height : source.y,
+    };
+  }
+
   if (Math.abs(dx) > Math.abs(dy)) {
-    if ((dx >= 0 && sourceSide) || (dx < 0 && !sourceSide)) {
+    if (dx >= 0) {
       return { x: source.x + source.width, y: sourceCenter.y };
     }
     return { x: source.x, y: sourceCenter.y };
   }
 
-  if ((dy >= 0 && sourceSide) || (dy < 0 && !sourceSide)) {
+  if (dy >= 0) {
     return { x: sourceCenter.x, y: source.y + source.height };
   }
   return { x: sourceCenter.x, y: source.y };
@@ -1842,8 +1855,8 @@ function rerouteArrow(
     ];
   }
 
-  const start = edgePoint(source, target, true);
-  const end = edgePoint(target, source, false);
+  const start = edgePoint(source, target, "source");
+  const end = edgePoint(target, source, "target");
   const vertical = Math.abs(end.y - start.y) >= Math.abs(end.x - start.x);
   if (vertical) {
     const midY = (start.y + end.y) / 2;
@@ -1868,36 +1881,24 @@ function applyRerouteEdges(
 }
 
 function recomputeSceneBounds(scene: PatchableScene): void {
-  const xs = [scene.width];
-  const ys = [scene.height];
-  for (const node of nodeElements(scene)) {
-    xs.push(node.x + node.width);
-    ys.push(node.y + node.height);
-  }
-  for (const text of textElements(scene)) {
-    xs.push(text.x + (text.maxWidth ?? 0));
-    ys.push(text.y + text.fontSize);
-  }
-  for (const arrow of arrowElements(scene)) {
-    for (const point of arrow.points) {
-      xs.push(point.x);
-      ys.push(point.y);
-    }
-  }
+  let maxX = scene.width;
+  let maxY = scene.height;
   for (const element of scene.elements) {
-    if (element.type === "line") {
+    if (element.type === "arrow" || element.type === "line") {
       for (const point of element.points) {
-        xs.push(point.x);
-        ys.push(point.y);
+        maxX = Math.max(maxX, point.x);
+        maxY = Math.max(maxY, point.y);
       }
-    }
-    if (element.type === "frame") {
-      xs.push(element.x + element.width);
-      ys.push(element.y + element.height);
+    } else if (element.type === "text") {
+      maxX = Math.max(maxX, element.x + (element.maxWidth ?? 0));
+      maxY = Math.max(maxY, element.y + element.fontSize);
+    } else {
+      maxX = Math.max(maxX, element.x + element.width);
+      maxY = Math.max(maxY, element.y + element.height);
     }
   }
-  scene.width = Math.max(...xs) + SCENE_PADDING;
-  scene.height = Math.max(...ys) + SCENE_PADDING;
+  scene.width = maxX + SCENE_PADDING;
+  scene.height = maxY + SCENE_PADDING;
 }
 
 function patchTargetIds(
@@ -1995,22 +1996,27 @@ function applyRemove(
         : [],
     ),
   );
-  for (const element of scene.elements) {
-    if (
-      (element.type === "text" &&
-        element.containerId &&
-        removedIds.has(element.containerId)) ||
-      (element.type === "arrow" &&
-        (removedNodeIds.has(element.sourceNodeId) ||
-          removedNodeIds.has(element.targetNodeId))) ||
-      (element.type === "line" &&
-        ((element.startBinding &&
-          removedIds.has(element.startBinding.elementId)) ||
-          (element.endBinding && removedIds.has(element.endBinding.elementId))))
-    ) {
-      removedIds.add(element.id);
+  let previousSize: number;
+  do {
+    previousSize = removedIds.size;
+    for (const element of scene.elements) {
+      if (
+        (element.type === "text" &&
+          element.containerId &&
+          removedIds.has(element.containerId)) ||
+        (element.type === "arrow" &&
+          (removedNodeIds.has(element.sourceNodeId) ||
+            removedNodeIds.has(element.targetNodeId))) ||
+        (element.type === "line" &&
+          ((element.startBinding &&
+            removedIds.has(element.startBinding.elementId)) ||
+            (element.endBinding &&
+              removedIds.has(element.endBinding.elementId))))
+      ) {
+        removedIds.add(element.id);
+      }
     }
-  }
+  } while (removedIds.size !== previousSize);
   const retained = scene.elements
     .filter((element) => !removedIds.has(element.id))
     .map((element) => {
@@ -2630,6 +2636,21 @@ const buildSequenceDiagramWorkflow = Effect.fn(
         },
       }),
   }).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.render"));
+  const canvasIssues = yield* Effect.sync(() =>
+    getCanvasValidationIssues(scene),
+  ).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.canvasValidate"));
+  if (canvasIssues.length > 0) {
+    return yield* new BuildSequenceDiagramFailure({
+      status: "render_failed",
+      context: {
+        ...qualityContext,
+        issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+          ...entry,
+          hint: "Reduce participant label lines, participants, or messages and retry buildSequenceDiagram.",
+        })),
+      },
+    });
+  }
   const { excalidraw, validation } = yield* Effect.sync(() => {
     const excalidrawScene = convertSceneToExcalidraw(scene);
     return {
@@ -2705,8 +2726,70 @@ const buildSequenceDiagramWorkflow = Effect.fn(
   } satisfies Extract<BuildSequenceDiagramResult, { ok: true }>;
 });
 
+const RawCreateCanvasInput = Schema.Struct({
+  spec: Schema.Unknown,
+  requestId: Schema.optionalKey(Schema.Unknown),
+});
+const RawInlinePatchInput = Schema.Struct({
+  source: Schema.Struct({ scene: Schema.Unknown }),
+});
+
+const serializedCanvasLimitIssue = Effect.fn("codeMode.canvas.serializedLimit")(
+  (canvas: unknown, path: "spec" | "source.scene") =>
+    Effect.try(() => jsonSizeBytes(canvas)).pipe(
+      Effect.match({
+        onFailure: () =>
+          issue({
+            code: "invalid_type",
+            stage: "input",
+            ref: { kind: "request", path },
+            message: "CanvasSpec could not be serialized as JSON.",
+            hint: "Remove non-JSON values or reduce deeply nested fields and retry.",
+          }),
+        onSuccess: (sizeBytes) =>
+          sizeBytes <= CANVAS_LIMITS.maxSerializedBytes
+            ? undefined
+            : issue({
+                code: "canvas_limit_exceeded",
+                stage: "canvas",
+                ref: { kind: "request", path },
+                message: `CanvasSpec exceeds ${CANVAS_LIMITS.maxSerializedBytes} serialized bytes.`,
+                hint: "Split the visualization into a smaller canvas or reduce repeated text and points.",
+              }),
+      }),
+    ),
+);
+
 const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
   function* (input: unknown) {
+    const environment = yield* CodeModeRuntimeEnvironment;
+    const buildId = yield* Effect.sync(() => environment.createId("build"));
+    const rawInput = yield* Effect.sync(() => {
+      const raw = Schema.decodeUnknownResult(RawCreateCanvasInput)(input);
+      if (!Result.isSuccess(raw)) return undefined;
+      return {
+        spec: raw.success.spec,
+        requestId: Schema.is(Schema.String)(raw.success.requestId)
+          ? raw.success.requestId
+          : undefined,
+      };
+    });
+    if (rawInput) {
+      const rawIssue = yield* serializedCanvasLimitIssue(rawInput.spec, "spec");
+      if (rawIssue) {
+        return yield* new CreateCanvasFailure({
+          status:
+            rawIssue.code === "canvas_limit_exceeded"
+              ? "limit_exceeded"
+              : "invalid_input",
+          context: {
+            buildId,
+            ...responseRequestId(rawInput.requestId),
+            issues: [rawIssue],
+          },
+        });
+      }
+    }
     const parsed = yield* Effect.sync(() =>
       CreateCanvasRequestSchema.safeParse(input),
     ).pipe(Effect.withSpan("codeMode.createCanvas.parse"));
@@ -2717,32 +2800,12 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
       });
     }
 
-    const environment = yield* CodeModeRuntimeEnvironment;
     const store = yield* CodeModeArtifactStorage;
     const request = parsed.data;
-    const buildId = yield* Effect.sync(() => environment.createId("build"));
     const baseContext = {
       buildId,
       ...responseRequestId(request.requestId),
     };
-    if (jsonSizeBytes(request.spec) > CANVAS_LIMITS.maxSerializedBytes) {
-      return yield* new CreateCanvasFailure({
-        status: "limit_exceeded",
-        context: {
-          ...baseContext,
-          issues: [
-            issue({
-              code: "canvas_limit_exceeded",
-              stage: "canvas",
-              ref: { kind: "request", path: "spec" },
-              message: `CanvasSpec exceeds ${CANVAS_LIMITS.maxSerializedBytes} serialized bytes.`,
-              hint: "Split the visualization into a smaller canvas or reduce repeated text and points.",
-            }),
-          ],
-        },
-      });
-    }
-
     const normalized = yield* Effect.sync(() =>
       normalizePatchableScene(request.spec),
     ).pipe(Effect.withSpan("codeMode.createCanvas.normalize"));
@@ -2764,6 +2827,20 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
       });
     }
 
+    const inputLimits = yield* Effect.sync(() =>
+      getCanvasValidationIssues(normalized).filter(
+        (entry) => entry.code === "limit_exceeded",
+      ),
+    );
+    if (inputLimits.length > 0) {
+      return yield* new CreateCanvasFailure({
+        status: "limit_exceeded",
+        context: {
+          ...baseContext,
+          issues: canvasValidationIssues(inputLimits),
+        },
+      });
+    }
     const scene = yield* Effect.sync(() => compileCanvasSpec(normalized)).pipe(
       Effect.withSpan("codeMode.createCanvas.layout"),
     );
@@ -3126,6 +3203,21 @@ const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(
 const applyDiagramPatchWorkflow = Effect.fn(
   "codeMode.applyDiagramPatch.workflow",
 )(function* (input: unknown) {
+  const raw = yield* Effect.sync(() =>
+    Schema.decodeUnknownResult(RawInlinePatchInput)(input),
+  );
+  const rawIssue = Result.isSuccess(raw)
+    ? yield* serializedCanvasLimitIssue(
+        raw.success.source.scene,
+        "source.scene",
+      )
+    : undefined;
+  if (rawIssue) {
+    return yield* new ApplyDiagramPatchFailure({
+      status: "invalid_input",
+      context: { issues: [rawIssue] },
+    });
+  }
   const parsed = yield* Effect.sync(() =>
     ApplyDiagramPatchRequestSchema.safeParse(input),
   ).pipe(Effect.withSpan("codeMode.applyDiagramPatch.parse"));
@@ -3161,6 +3253,33 @@ const applyDiagramPatchWorkflow = Effect.fn(
       : {}),
   };
   const scene = source.scene;
+  const sourceLimits = yield* Effect.sync(() => {
+    // Count limits must hold even when malformed geometry cannot normalize.
+    if (scene.elements.length > CANVAS_LIMITS.maxElements) {
+      return [
+        {
+          code: "limit_exceeded",
+          message: `Canvas exceeds ${CANVAS_LIMITS.maxElements} elements.`,
+          path: "elements",
+        } satisfies CanvasValidationIssue,
+      ];
+    }
+    const normalizedSource = normalizePatchableScene(scene);
+    return normalizedSource
+      ? getCanvasValidationIssues(normalizedSource).filter(
+          (entry) => entry.code === "limit_exceeded",
+        )
+      : [];
+  });
+  if (sourceLimits.length > 0) {
+    return yield* new ApplyDiagramPatchFailure({
+      status: "invalid_input",
+      context: {
+        ...sourceContext,
+        issues: canvasValidationIssues(sourceLimits),
+      },
+    });
+  }
   const beforeConnectivity = sourceConnectivity(scene);
   const patchIssues = yield* Effect.sync(() => {
     for (const operation of request.operations) {

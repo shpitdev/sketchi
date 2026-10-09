@@ -249,10 +249,12 @@ function insertByNodeOrder(
   queue: string[],
   nodeId: string,
   nodeOrder: ReadonlyMap<string, number>,
+  afterIndex: number,
 ): void {
   const order = nodeOrder.get(nodeId) ?? Number.MAX_SAFE_INTEGER;
   const insertionIndex = queue.findIndex(
-    (queuedNodeId) =>
+    (queuedNodeId, index) =>
+      index > afterIndex &&
       (nodeOrder.get(queuedNodeId) ?? Number.MAX_SAFE_INTEGER) > order,
   );
 
@@ -311,23 +313,26 @@ function rankNodes(
       incomingCount.set(edge.target, nextIncomingCount);
 
       if (nextIncomingCount === 0) {
-        insertByNodeOrder(queue, edge.target, nodeOrder);
+        insertByNodeOrder(queue, edge.target, nodeOrder, index);
       }
     }
   }
 
-  for (const node of diagram.nodes) {
-    if (processed.has(node.id)) {
-      continue;
+  // Feedback edges have been removed, so visit remaining predecessors first.
+  function rankRemaining(nodeId: string): number {
+    if (processed.has(nodeId)) return rankByNodeId.get(nodeId) ?? 0;
+    let rank = 0;
+    for (const edge of buckets.incoming.get(nodeId) ?? []) {
+      if (!feedbackEdges.has(edge.id)) {
+        rank = Math.max(rank, rankRemaining(edge.source) + 1);
+      }
     }
-
-    const predecessorRanks = (buckets.incoming.get(node.id) ?? [])
-      .filter((edge) => !feedbackEdges.has(edge.id))
-      .map((edge) => rankByNodeId.get(edge.source) ?? 0);
-    rankByNodeId.set(
-      node.id,
-      predecessorRanks.length > 0 ? Math.max(...predecessorRanks) + 1 : 0,
-    );
+    processed.add(nodeId);
+    rankByNodeId.set(nodeId, rank);
+    return rank;
+  }
+  for (const node of diagram.nodes) {
+    rankRemaining(node.id);
   }
 
   return rankByNodeId;
@@ -597,9 +602,7 @@ function connectionEdges(
       : { sourceEdge: "left", targetEdge: "right" };
   }
 
-  return dy > 0
-    ? { sourceEdge: "bottom", targetEdge: "top" }
-    : { sourceEdge: "top", targetEdge: "bottom" };
+  return { sourceEdge: "top", targetEdge: "bottom" };
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -1588,11 +1591,16 @@ function scenePoints(elements: readonly SceneElement[]): ScenePoint[] {
     }
 
     if (element.type === "text") {
+      // Node labels are centered and contained by their already-counted shape.
+      if (element.containerId) return [];
+      const halfWidth = (element.maxWidth ?? element.text.length) / 2;
+      const halfHeight =
+        (element.text.split("\n").length * element.fontSize * 1.35) / 2;
       return [
-        { x: element.x, y: element.y },
+        { x: element.x - halfWidth, y: element.y - halfHeight },
         {
-          x: element.x + (element.maxWidth ?? element.text.length),
-          y: element.y + element.fontSize,
+          x: element.x + halfWidth,
+          y: element.y + halfHeight,
         },
       ];
     }
@@ -1677,7 +1685,7 @@ function normalizeSceneOrigin(
 }
 
 export function renderIntermediateDiagram(
-  input: IntermediateDiagram | unknown,
+  input: unknown,
 ): RenderedDiagramScene {
   const diagram = parseIntermediateDiagram(input);
   const nodeShapes = positionNodes(diagram);

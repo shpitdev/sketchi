@@ -41,6 +41,8 @@ const MESSAGE_TOP_GAP = 64;
 const LIFELINE_BOTTOM_GAP = 56;
 const LIFELINE_WIDTH = 2;
 const LABEL_FONT_SIZE = 14;
+const LABEL_LINE_HEIGHT = 1.35;
+const LABEL_VERTICAL_PADDING = 18;
 const LAYOUT_ALIGNMENT_EPSILON = 0.01;
 
 export const SEQUENCE_LIFELINE_ROLE = "sequence-lifeline";
@@ -123,8 +125,21 @@ export function renderSequenceDiagram(
   }
 
   const columnStep = HEADER_WIDTH + PARTICIPANT_GAP;
+  // Size the shared header row before laying out lifelines and message lanes.
+  const headerHeight = input.participants.reduce(
+    (height, participant) =>
+      Math.max(
+        height,
+        Math.ceil(
+          participant.label.split("\n").length *
+            LABEL_FONT_SIZE *
+            LABEL_LINE_HEIGHT,
+        ) + LABEL_VERTICAL_PADDING,
+      ),
+    HEADER_HEIGHT,
+  );
   const headerY = PADDING;
-  const lifelineY = headerY + HEADER_HEIGHT;
+  const lifelineY = headerY + headerHeight;
   const firstMessageY = lifelineY + MESSAGE_TOP_GAP;
   const lastMessageY =
     firstMessageY + Math.max(0, input.messages.length - 1) * MESSAGE_GAP;
@@ -148,7 +163,7 @@ export function renderSequenceDiagram(
       x,
       y: headerY,
       width: HEADER_WIDTH,
-      height: HEADER_HEIGHT,
+      height: headerHeight,
       label: participant.label,
     });
     headerLabels.push({
@@ -156,7 +171,7 @@ export function renderSequenceDiagram(
       id: `label:${participant.id}`,
       containerId: `node:${participant.id}`,
       x: centerX,
-      y: headerY + HEADER_HEIGHT / 2,
+      y: headerY + headerHeight / 2,
       text: participant.label,
       fontSize: LABEL_FONT_SIZE,
       maxWidth: HEADER_WIDTH - 24,
