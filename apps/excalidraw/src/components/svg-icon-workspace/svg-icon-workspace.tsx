@@ -58,11 +58,26 @@ async function readSvgResponse(response: Response): Promise<string> {
   if (Number.isFinite(contentLength) && contentLength > MAX_SVG_BYTES) {
     throw new Error("Icon SVG exceeds the 1 MB workspace import limit.");
   }
-  const source = await response.text();
-  if (new TextEncoder().encode(source).byteLength > MAX_SVG_BYTES) {
-    throw new Error("Icon SVG exceeds the 1 MB workspace import limit.");
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let size = 0;
+  let source = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_SVG_BYTES) {
+        await reader.cancel();
+        throw new Error("Icon SVG exceeds the 1 MB workspace import limit.");
+      }
+      source += decoder.decode(value, { stream: true });
+    }
+    return source + decoder.decode();
+  } finally {
+    reader.releaseLock();
   }
-  return source;
 }
 
 function convertSource(source: string, handoff: SvgHandoff): ImportState {
@@ -124,8 +139,9 @@ export function SvgIconWorkspace({
       return;
     }
     let active = true;
+    const controller = new AbortController();
     setImportState({ kind: "loading" });
-    fetch(handoff.sourceUrl, { redirect: "error" })
+    fetch(handoff.sourceUrl, { redirect: "error", signal: controller.signal })
       .then(readSvgResponse)
       .then((source) => {
         if (active) {
@@ -149,6 +165,7 @@ export function SvgIconWorkspace({
       });
     return () => {
       active = false;
+      controller.abort();
     };
   }, [handoff.sourceUrl, initialSource]);
 

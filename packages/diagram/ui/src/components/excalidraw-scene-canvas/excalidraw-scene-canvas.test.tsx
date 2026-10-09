@@ -94,6 +94,44 @@ describe("ExcalidrawSceneCanvas", () => {
     );
   });
 
+  it("does not remount or refit on geometry and viewport changes without a new revision", async () => {
+    const scene = convertSceneToExcalidraw(
+      renderIntermediateDiagram(flowchartFixture),
+    );
+    const { rerender } = render(
+      <ExcalidrawSceneCanvas
+        scene={scene}
+        revision={1}
+        title="Stable canvas"
+      />,
+    );
+    const canvas = await screen.findByTestId("mock-excalidraw");
+    await waitFor(() =>
+      expect(excalidrawMock.scrollToContent).toHaveBeenCalled(),
+    );
+    excalidrawMock.scrollToContent.mockClear();
+    rerender(
+      <ExcalidrawSceneCanvas
+        scene={{
+          appState: { scrollX: 100, zoom: { value: 2 } },
+          elements: scene.elements.map((element) => ({ ...element, x: 200 })),
+        }}
+        revision={1}
+        title="Stable canvas"
+      />,
+    );
+    expect(screen.getByTestId("mock-excalidraw")).toBe(canvas);
+    expect(excalidrawMock.scrollToContent).not.toHaveBeenCalled();
+    rerender(
+      <ExcalidrawSceneCanvas
+        scene={scene}
+        revision={2}
+        title="Stable canvas"
+      />,
+    );
+    expect(screen.getByTestId("mock-excalidraw")).not.toBe(canvas);
+  });
+
   it("uses the Sketchi card color when a scene has no background", async () => {
     render(
       <ExcalidrawSceneCanvas

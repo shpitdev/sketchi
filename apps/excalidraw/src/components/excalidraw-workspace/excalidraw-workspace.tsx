@@ -157,6 +157,7 @@ export function ExcalidrawWorkspace({
             <WorkspaceState kind="error" message={errorMessage} />
           ) : active && scene ? (
             <ExcalidrawSceneCanvas
+              revision={active.id}
               scene={scene}
               title={`${active.title} canvas`}
               viewModeEnabled={false}

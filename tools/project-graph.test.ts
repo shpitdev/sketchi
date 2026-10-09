@@ -125,7 +125,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
   "apps/eval-harness/src/routes/api/scenario-candidates.ts": 7,
   "apps/eval-harness/src/routes/index.tsx": 4,
   "apps/excalidraw/src/components/excalidraw-workspace/excalidraw-workspace.tsx": 3,
-  "apps/excalidraw/src/components/svg-icon-workspace/svg-icon-workspace.tsx": 7,
+  "apps/excalidraw/src/components/svg-icon-workspace/svg-icon-workspace.tsx": 9,
   "apps/icons/scripts/generate-manifest.ts": 10,
   "apps/icons/src/components/icon-library/icon-library.tsx": 38,
   "apps/icons/src/lib/actions.ts": 15,

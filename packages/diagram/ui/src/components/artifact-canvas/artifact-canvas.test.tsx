@@ -3,12 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../excalidraw-scene-canvas/index.js", () => ({
   ExcalidrawSceneCanvas: ({
-    onChange,
+    onSceneChange,
     title,
     viewModeEnabled,
     zenModeEnabled,
   }: {
-    onChange?: (elements: unknown[], appState: Record<string, unknown>) => void;
+    onSceneChange?: (scene: {
+      elements: unknown[];
+      appState: Record<string, unknown>;
+    }) => void;
     title: string;
     viewModeEnabled: boolean;
     zenModeEnabled: boolean;
@@ -18,12 +21,15 @@ vi.mock("../excalidraw-scene-canvas/index.js", () => ({
       data-view-mode={String(viewModeEnabled)}
       data-zen-mode={String(zenModeEnabled)}
       onClick={() =>
-        onChange?.([{ id: "edited-node", type: "rectangle" }], {
-          scrollX: 12,
-          scrollY: 24,
-          selectedElementIds: { "edited-node": true },
-          viewBackgroundColor: "#fffdf8",
-          zoom: { value: 0.8 },
+        onSceneChange?.({
+          elements: [{ id: "edited-node", type: "rectangle" }],
+          appState: {
+            scrollX: 12,
+            scrollY: 24,
+            selectedElementIds: { "edited-node": true },
+            viewBackgroundColor: "#fffdf8",
+            zoom: { value: 0.8 },
+          },
         })
       }
       type="button"

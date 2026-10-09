@@ -2,8 +2,18 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@sketchi/diagram-ui", () => ({
-  ExcalidrawSceneCanvas: ({ title }: { title: string }) => (
-    <section aria-label={title} data-testid="mock-excalidraw-canvas" />
+  ExcalidrawSceneCanvas: ({
+    title,
+    revision,
+  }: {
+    title: string;
+    revision?: string | number;
+  }) => (
+    <section
+      aria-label={title}
+      data-testid="mock-excalidraw-canvas"
+      data-revision={revision}
+    />
   ),
 }));
 
@@ -31,6 +41,11 @@ describe("ExcalidrawWorkspace", () => {
       screen.getByLabelText("Pharma batch disposition flow canvas"),
     ).toBeTruthy();
     expect(
+      screen
+        .getByTestId("mock-excalidraw-canvas")
+        .getAttribute("data-revision"),
+    ).toBe(pharmaBatchDispositionFlowchart.id);
+    expect(
       screen.getByRole("button", { name: /Public mindmap generation/ }),
     ).toBeTruthy();
 
@@ -40,6 +55,11 @@ describe("ExcalidrawWorkspace", () => {
     expect(
       screen.getByLabelText("Sketchi onboarding decision flow canvas"),
     ).toBeTruthy();
+    expect(
+      screen
+        .getByTestId("mock-excalidraw-canvas")
+        .getAttribute("data-revision"),
+    ).toBe(flowchartFixture.id);
   });
 
   it("copies the active IR and exposes a scene download", async () => {

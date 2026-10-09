@@ -48,9 +48,15 @@ export async function fetchArtifactReview(
       artifactId,
     )}?format=scene&inline=true`,
   );
-  const payload: unknown = await response.json();
+  if (!response.ok) throw new Error("Artifact could not be loaded.");
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error("Artifact could not be loaded.");
+  }
 
-  if (!response.ok || !isGetArtifactResult(payload) || !payload.ok) {
+  if (!isGetArtifactResult(payload) || !payload.ok) {
     throw new Error("Artifact could not be loaded.");
   }
 

@@ -5,18 +5,29 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../excalidraw-scene-canvas/index.js", () => ({
   ExcalidrawSceneCanvas: ({
+    onSceneChange,
     onChange,
+    scene,
+    revision,
   }: {
     onChange?: (
-      elements: readonly Record<string, unknown>[],
+      elements: Record<string, unknown>[],
       appState: Record<string, unknown>,
     ) => void;
+    scene: unknown;
+    revision?: number | string;
+    onSceneChange?: (scene: {
+      elements: Record<string, unknown>[];
+      appState: Record<string, unknown>;
+    }) => void;
   }) => (
     <button
+      data-scene={JSON.stringify(scene)}
+      data-revision={revision}
       type="button"
-      onClick={() =>
-        onChange?.(
-          [
+      onClick={() => {
+        const edited = {
+          elements: [
             {
               height: 72,
               id: "node:draft",
@@ -26,15 +37,17 @@ vi.mock("../excalidraw-scene-canvas/index.js", () => ({
               y: 456,
             },
           ],
-          {
+          appState: {
             scrollX: 1,
             scrollY: 2,
             selectedElementIds: { "node:draft": true },
             viewBackgroundColor: "#ffffff",
             zoom: { value: 0.62 },
           },
-        )
-      }
+        };
+        if (onSceneChange) onSceneChange(edited);
+        else onChange?.(edited.elements, edited.appState);
+      }}
     >
       Mock visual edit
     </button>
@@ -110,8 +123,7 @@ describe("ScenarioPlayground", () => {
   it("shows a running status while API generation is pending", async () => {
     const scenario = getScenario("sketchi-onboarding-decision-flow");
     let resolveGeneration:
-      | ((result: ScenarioGenerationResult) => void)
-      | undefined;
+      ((result: ScenarioGenerationResult) => void) | undefined;
     const onGenerateScenario = vi.fn(
       () =>
         new Promise<ScenarioGenerationResult>((resolve) => {
@@ -218,6 +230,119 @@ describe("ScenarioPlayground", () => {
     expect(excalidrawJson.value).toContain('"node:draft": true');
     expect(excalidrawJson.value).toContain('"x": 123');
   });
+
+  it("clears visual edits only when the mode changes", async () => {
+    render(
+      <ScenarioPlayground
+        onGenerateScenario={async ({ scenarioId }) => ({
+          scenarioId,
+          candidates: [
+            {
+              diagnostics: [],
+              diagramValid: true,
+              model: "fixture",
+              provider: "cloudflare-google-ai-studio",
+              text: JSON.stringify(flowchartFixture),
+            },
+          ],
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Mock visual edit" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Fixture conversion" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Excalidraw JSON" }));
+    expect(screen.getByLabelText("Excalidraw JSON")).toHaveProperty(
+      "value",
+      expect.stringContaining('"node:draft": true'),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Live generation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    await screen.findByLabelText("Candidate IR");
+    fireEvent.click(screen.getByRole("button", { name: "Mock visual edit" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Excalidraw JSON" }));
+    expect(screen.getByLabelText("Excalidraw JSON")).toHaveProperty(
+      "value",
+      expect.stringContaining('"node:draft": true'),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Fixture conversion" }));
+    expect(screen.getByLabelText("Excalidraw JSON")).not.toHaveProperty(
+      "value",
+      expect.stringContaining('"node:draft": true'),
+    );
+  });
+
+  it("keeps the canvas base scene and revision stable across edits", () => {
+    render(<ScenarioPlayground />);
+    const canvas = screen.getByRole("button", { name: "Mock visual edit" });
+    const scene = canvas.getAttribute("data-scene");
+    const revision = canvas.getAttribute("data-revision");
+    fireEvent.click(canvas);
+    expect(canvas.getAttribute("data-scene")).toBe(scene);
+    expect(canvas.getAttribute("data-revision")).toBe(revision);
+  });
+
+  it.each(["resolve", "reject"])(
+    "does not apply an old %s to another scenario",
+    async (outcome) => {
+      const pending = Promise.withResolvers<ScenarioGenerationResult>();
+      const onGenerateScenario = vi.fn(() => pending.promise);
+      render(<ScenarioPlayground onGenerateScenario={onGenerateScenario} />);
+      fireEvent.click(screen.getByRole("tab", { name: "Live generation" }));
+      fireEvent.click(screen.getByRole("button", { name: "Run" }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /Pharma batch disposition/ }),
+      );
+      if (outcome === "resolve") {
+        pending.resolve({
+          scenarioId: flowchartScenarios[0]!.id,
+          candidates: [
+            {
+              diagnostics: [],
+              diagramValid: true,
+              model: "test",
+              provider: "cloudflare-google-ai-studio",
+              text: JSON.stringify(flowchartFixture),
+            },
+          ],
+        });
+        await waitFor(() =>
+          expect(
+            screen.getByLabelText(`${flowchartScenarios[0]!.title} result`)
+              .textContent,
+          ).toContain("Passed"),
+        );
+      } else {
+        pending.reject(new Error("Old run failed"));
+        await waitFor(() =>
+          expect(
+            screen.getByRole("button", { name: "Run" }),
+          ).not.toHaveProperty("disabled", true),
+        );
+      }
+      expect(screen.queryByLabelText("Candidate IR")).toBeNull();
+      expect(screen.queryByText("Old run failed")).toBeNull();
+    },
+  );
+
+  it.each(["Run", "Run selected"])(
+    "locks both run controls and cache settings during %s",
+    (runControl) => {
+      render(
+        <ScenarioPlayground
+          onGenerateScenario={() => new Promise(() => undefined)}
+        />,
+      );
+      fireEvent.click(screen.getByRole("tab", { name: "Live generation" }));
+      fireEvent.click(screen.getByText("Run settings"));
+      fireEvent.click(screen.getByRole("button", { name: runControl }));
+      expect(screen.getByLabelText("Fresh")).toHaveProperty("disabled", true);
+      expect(screen.getByLabelText("Default")).toHaveProperty("disabled", true);
+      for (const button of screen.getAllByRole("button", {
+        name: /^(Run|Run selected|Running)$/,
+      }))
+        expect(button).toHaveProperty("disabled", true);
+    },
+  );
 
   it("loads a generated candidate into the deterministic IR editor", async () => {
     const generatedDiagram = {

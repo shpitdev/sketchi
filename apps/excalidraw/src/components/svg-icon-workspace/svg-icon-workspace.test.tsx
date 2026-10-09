@@ -57,11 +57,13 @@ const blockedSvg =
 
 describe("SvgIconWorkspace", () => {
   it("renders a URL-imported SVG as an editable native scene", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      headers: new Headers({ "content-type": "image/svg+xml" }),
-      ok: true,
-      text: () => Promise.resolve(supportedSvg),
-    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(supportedSvg, {
+          headers: { "content-type": "image/svg+xml" },
+        }),
+      );
     vi.stubGlobal("fetch", fetchMock);
 
     render(<SvgIconWorkspace handoff={handoff} />);
@@ -71,6 +73,7 @@ describe("SvgIconWorkspace", () => {
     });
     expect(fetchMock).toHaveBeenCalledWith(handoff.sourceUrl, {
       redirect: "error",
+      signal: expect.any(AbortSignal),
     });
     expect(screen.getByText("Editable native elements")).toBeTruthy();
     expect(screen.getByText("Elements").parentElement?.textContent).toBe(
@@ -159,6 +162,61 @@ describe("SvgIconWorkspace", () => {
         "Icon SVG exceeds the 1 MB workspace import limit.",
       ),
     ).toBeTruthy();
+  });
+
+  it("aborts the old request on URL change and the active request on unmount", () => {
+    const signals: AbortSignal[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init: RequestInit) => {
+        if (init.signal) signals.push(init.signal);
+        return new Promise(() => undefined);
+      }),
+    );
+    const { rerender, unmount } = render(
+      <SvgIconWorkspace handoff={handoff} />,
+    );
+    rerender(
+      <SvgIconWorkspace
+        handoff={{
+          ...handoff,
+          sourceUrl: handoff.sourceUrl.replace("sample", "next"),
+        }}
+      />,
+    );
+    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[1]?.aborted).toBe(false);
+    unmount();
+    expect(signals[1]?.aborted).toBe(true);
+  });
+
+  it("cancels a chunked body as soon as it exceeds the byte limit", async () => {
+    const cancel = vi.fn();
+    let chunks = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        chunks += 1;
+        controller.enqueue(new Uint8Array(600_000));
+        if (chunks === 4) controller.close();
+      },
+      cancel,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(body, { headers: { "content-type": "image/svg+xml" } }),
+        ),
+    );
+    render(<SvgIconWorkspace handoff={handoff} />);
+    expect(
+      await screen.findByText(
+        "Icon SVG exceeds the 1 MB workspace import limit.",
+      ),
+    ).toBeTruthy();
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(chunks).toBeLessThan(4);
   });
 
   it("surfaces cross-origin fetch failures", async () => {

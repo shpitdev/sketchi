@@ -1,10 +1,5 @@
 import { useChat } from "@ai-sdk/react";
-import {
-  BuildFlowchartRequestSchema,
-  CodeModeIssueSchema,
-  RenderedDiagramSceneSchema,
-  type BuildFlowchartResult,
-} from "@sketchi/diagram-agent";
+import { type BuildFlowchartResult } from "@sketchi/diagram-agent";
 import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import { DiagramPreview } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
@@ -44,125 +39,17 @@ import {
   assistantAsksQuestion,
   type ReadyPlaygroundArtifact,
 } from "@/features/playground/surface";
+import {
+  buildResultOf,
+  deriveBuildState,
+  isFlowchartToolPart,
+  type FlowchartToolPart,
+} from "@/features/playground/build-result";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
   component: StudioRoute,
 });
-
-type MessagePart = UIMessage["parts"][number];
-
-interface FlowchartToolPart {
-  type: "tool-build_flowchart";
-  toolCallId: string;
-  state:
-    | "input-streaming"
-    | "input-available"
-    | "output-available"
-    | "output-error";
-  input?: unknown;
-  output?: unknown;
-  errorText?: string;
-}
-
-function isFlowchartToolPart(
-  part: MessagePart,
-): part is FlowchartToolPart & MessagePart {
-  return part.type === "tool-build_flowchart";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function isBuildFlowchartFailureStatus(
-  value: unknown,
-): value is Exclude<BuildFlowchartResult, { ok: true }>["status"] {
-  switch (value) {
-    case "invalid_input":
-    case "invalid_flowchart":
-    case "quality_failed":
-    case "render_failed":
-    case "export_failed":
-    case "storage_failed":
-      return true;
-    default:
-      return false;
-  }
-}
-
-function isBuildFlowchartResult(value: unknown): value is BuildFlowchartResult {
-  if (
-    !isRecord(value) ||
-    !Array.isArray(value.issues) ||
-    !value.issues.every((issue) => CodeModeIssueSchema.safeParse(issue).success)
-  ) {
-    return false;
-  }
-
-  if (value.ok === true) {
-    return (
-      value.status === "accepted" &&
-      typeof value.buildId === "string" &&
-      isRecord(value.normalizedSpec) &&
-      isRecord(value.quality) &&
-      isRecord(value.artifact)
-    );
-  }
-
-  return value.ok === false && isBuildFlowchartFailureStatus(value.status);
-}
-
-function buildResultOf(
-  part: FlowchartToolPart,
-): BuildFlowchartResult | undefined {
-  if (part.state !== "output-available") {
-    return undefined;
-  }
-  return isBuildFlowchartResult(part.output) ? part.output : undefined;
-}
-
-function artifactFromResponse(
-  result: BuildFlowchartResult,
-): ReadyPlaygroundArtifact | null {
-  if (!result.ok) {
-    return null;
-  }
-  const artifactId = result.artifact.artifactId;
-  const formats = new Set(
-    result.artifact.formats.map((format) => format.format),
-  );
-  if (!formats.has("scene") || !formats.has("excalidraw")) {
-    return null;
-  }
-  const encoded = encodeURIComponent(artifactId);
-
-  return {
-    artifactId,
-    exportUrls: {
-      excalidraw: `/api/v1/artifacts/${encoded}?format=excalidraw&raw=true`,
-      scene: `/api/v1/artifacts/${encoded}?format=scene&raw=true`,
-    },
-    editUrl: `/artifacts/${encoded}/edit`,
-    viewUrl: `/artifacts/${encoded}`,
-  };
-}
-
-function isRenderedDiagramScene(value: unknown): value is RenderedDiagramScene {
-  return RenderedDiagramSceneSchema.safeParse(value).success;
-}
-
-function sceneFromResult(
-  result: BuildFlowchartResult | undefined,
-): RenderedDiagramScene | null {
-  if (!result?.ok) {
-    return null;
-  }
-  const scene = result.artifact.formats.find(
-    (format) => format.format === "scene",
-  )?.inline;
-  return isRenderedDiagramScene(scene) ? scene : null;
-}
 
 function FlowchartToolCard({
   attempt,
@@ -206,7 +93,6 @@ function FlowchartToolCard({
 
 function renderAssistantParts(
   message: UIMessage,
-  onAnswer?: (answer: string) => void,
   onCompose?: () => void,
 ): ReactNode[] {
   const nodes: ReactNode[] = [];
@@ -248,12 +134,11 @@ function renderAssistantParts(
     }
   });
 
-  if (onAnswer && onCompose && assistantAsksQuestion(message)) {
+  if (onCompose && assistantAsksQuestion(message)) {
     nodes.push(
       <AssistantFollowUp
         key={`${message.id}-follow-up`}
         onCompose={onCompose}
-        onSelect={onAnswer}
       />,
     );
   }
@@ -333,7 +218,10 @@ function DiagramStage({
       </header>
       <div className="studio__stage-card">
         {scene ? (
-          <DiagramPreview scene={scene} />
+          <DiagramPreview
+            {...(artifact ? { revision: artifact.artifactId } : {})}
+            scene={scene}
+          />
         ) : (
           <StagePlaceholder generating={generating} ghostLabels={ghostLabels} />
         )}
@@ -359,51 +247,8 @@ function StudioRoute() {
   });
   const busy = status === "submitted" || status === "streaming";
 
-  const toolParts = useMemo(
-    () =>
-      messages.flatMap((message) => message.parts.filter(isFlowchartToolPart)),
-    [messages],
-  );
-  const buildMode = toolParts.length > 0;
-
-  const completedParts = useMemo(
-    () => toolParts.filter((part) => buildResultOf(part) !== undefined),
-    [toolParts],
-  );
-  const displayPart = completedParts.at(-1);
-  const activePart = toolParts.find(
-    (part) =>
-      part.state === "input-streaming" || part.state === "input-available",
-  );
-
-  const displayResult = displayPart ? buildResultOf(displayPart) : undefined;
-  const acceptedResult = useMemo(
-    () =>
-      [...completedParts]
-        .reverse()
-        .map(buildResultOf)
-        .find((result) => result?.ok),
-    [completedParts],
-  );
-  const scene = useMemo(
-    () => sceneFromResult(acceptedResult),
-    [acceptedResult],
-  );
-  const artifact = useMemo(
-    () => (acceptedResult ? artifactFromResponse(acceptedResult) : null),
-    [acceptedResult],
-  );
-
-  const ghostLabels = useMemo(() => {
-    const input = BuildFlowchartRequestSchema.safeParse(activePart?.input);
-    if (!input.success) {
-      return [];
-    }
-    return input.data.spec.nodes
-      .map((node) => node.label.trim())
-      .filter((label) => label.length > 0)
-      .slice(0, 24);
-  }, [activePart]);
+  const { buildMode, displayResult, activePart, scene, artifact, ghostLabels } =
+    useMemo(() => deriveBuildState(messages, busy), [messages, busy]);
 
   const send = useCallback(
     (text: string) => {
@@ -481,7 +326,6 @@ function StudioRoute() {
 
                     const parts = renderAssistantParts(
                       message,
-                      message.id === answerableMessageId ? send : undefined,
                       message.id === answerableMessageId
                         ? focusComposer
                         : undefined,

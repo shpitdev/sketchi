@@ -206,17 +206,9 @@ export function assistantAsksQuestion(message: UIMessage): boolean {
   return lastText?.type === "text" && lastText.text.trimEnd().endsWith("?");
 }
 
-export function AssistantFollowUp({
-  onCompose,
-  onSelect,
-}: {
-  onCompose: () => void;
-  onSelect: (answer: string) => void;
-}) {
+export function AssistantFollowUp({ onCompose }: { onCompose: () => void }) {
   return (
     <div aria-label="Answer this question" className="studio__follow-ups">
-      <Suggestion onClick={onSelect} suggestion="Yes, make that change" />
-      <Suggestion onClick={onSelect} suggestion="No, keep it as is" />
       <Suggestion onClick={onCompose} suggestion="Write another answer" />
     </div>
   );

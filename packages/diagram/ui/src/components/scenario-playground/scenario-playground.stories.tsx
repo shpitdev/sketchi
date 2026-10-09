@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { flowchartFixture } from "@sketchi/diagram-core";
+import { getScenario } from "@sketchi/diagram-scenarios";
 
 import { ScenarioPlayground } from "./scenario-playground";
 
@@ -40,5 +41,26 @@ export const GeneratedCandidate: Story = {
       ],
       scenarioId,
     }),
+  },
+};
+
+// An offline delayed result makes switching scenarios mid-run reproducible.
+export const DelayedCandidate: Story = {
+  args: {
+    onGenerateScenario: async ({ scenarioId }) => {
+      await new Promise((resolve) => window.setTimeout(resolve, 5000));
+      return {
+        candidates: [
+          {
+            diagnostics: [],
+            diagramValid: true,
+            model: "Storybook fixture",
+            provider: "cloudflare-google-ai-studio",
+            text: JSON.stringify(getScenario(scenarioId).expectedDiagram),
+          },
+        ],
+        scenarioId,
+      };
+    },
   },
 };

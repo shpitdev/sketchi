@@ -1,11 +1,9 @@
-import type { ExcalidrawProps } from "@excalidraw/excalidraw/types";
 import {
   convertSceneToExcalidraw,
-  type ExcalidrawElement,
   type ExcalidrawScene,
 } from "@sketchi/diagram-excalidraw";
 import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 
 import { ExcalidrawSceneCanvas } from "../excalidraw-scene-canvas/index.js";
 
@@ -17,26 +15,6 @@ export interface ArtifactCanvasProps {
   revision?: number | string;
   scene: RenderedDiagramScene;
   title?: string;
-}
-
-function pickExcalidrawAppState(appState: Record<string, unknown>) {
-  return {
-    scrollX: appState.scrollX,
-    scrollY: appState.scrollY,
-    selectedElementIds: appState.selectedElementIds,
-    viewBackgroundColor: appState.viewBackgroundColor,
-    zoom: appState.zoom,
-  };
-}
-
-function sceneFromExcalidrawChange(
-  elements: readonly unknown[],
-  appState: Record<string, unknown>,
-): ExcalidrawScene {
-  return {
-    appState: pickExcalidrawAppState(appState),
-    elements: elements as ExcalidrawElement[],
-  };
 }
 
 export function ArtifactCanvas({
@@ -51,27 +29,16 @@ export function ArtifactCanvas({
     () => convertSceneToExcalidraw(scene),
     [scene],
   );
-  const handleChange: NonNullable<ExcalidrawProps["onChange"]> = useCallback(
-    (elements, appState) => {
-      if (!onSceneChange) {
-        return;
-      }
-
-      onSceneChange(
-        sceneFromExcalidrawChange(
-          elements,
-          appState as unknown as Record<string, unknown>,
-        ),
-      );
-    },
-    [onSceneChange],
+  // Source scenes are immutable inputs, not the editor's live change stream.
+  const sceneRevision = useMemo(
+    () => revision ?? JSON.stringify(scene),
+    [revision, scene],
   );
-
   return (
     <div className="sketchi-artifact-canvas" data-mode={mode}>
       <ExcalidrawSceneCanvas
-        {...(editable && onSceneChange ? { onChange: handleChange } : {})}
-        {...(revision === undefined ? {} : { revision })}
+        {...(editable && onSceneChange ? { onSceneChange } : {})}
+        revision={sceneRevision}
         scene={excalidrawScene}
         title={title}
         viewModeEnabled={!editable}

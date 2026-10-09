@@ -235,21 +235,23 @@ describe("playground surface", () => {
     expect(composer.value).toBe("Map a release flow");
   });
 
-  it("offers quick and custom answers after an assistant question", () => {
-    const answers: string[] = [];
+  it("offers a custom answer without canned yes/no replies", () => {
     let composeRequests = 0;
     render(
       <AssistantFollowUp
         onCompose={() => {
           composeRequests += 1;
         }}
-        onSelect={(answer) => answers.push(answer)}
       />,
     );
 
-    screen.getByRole("button", { name: "Yes, make that change" }).click();
+    expect(
+      screen.queryByRole("button", { name: "Yes, make that change" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "No, keep it as is" }),
+    ).toBeNull();
     screen.getByRole("button", { name: "Write another answer" }).click();
-    expect(answers).toEqual(["Yes, make that change"]);
     expect(composeRequests).toBe(1);
   });
 

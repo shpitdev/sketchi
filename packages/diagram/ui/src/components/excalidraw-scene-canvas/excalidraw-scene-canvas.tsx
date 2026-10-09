@@ -19,14 +19,14 @@ type ExcalidrawComponent = ComponentType<ExcalidrawProps>;
 export interface ExcalidrawCanvasScene {
   readonly appState: Record<string, unknown>;
   readonly elements: readonly (
-    | ExcalidrawElement
-    | ExcalidrawScene["elements"][number]
+    ExcalidrawElement | ExcalidrawScene["elements"][number]
   )[];
 }
 
 export interface ExcalidrawSceneCanvasProps {
   onApiChange?: (api: ExcalidrawImperativeAPI) => void;
   onChange?: ExcalidrawProps["onChange"];
+  onSceneChange?: (scene: ExcalidrawScene) => void;
   revision?: number | string;
   scene: ExcalidrawCanvasScene;
   title: string;
@@ -34,9 +34,33 @@ export interface ExcalidrawSceneCanvasProps {
   zenModeEnabled?: boolean;
 }
 
+type ExcalidrawChange = NonNullable<ExcalidrawProps["onChange"]>;
+
+function pickExcalidrawAppState(appState: Parameters<ExcalidrawChange>[1]) {
+  return {
+    scrollX: appState.scrollX,
+    scrollY: appState.scrollY,
+    selectedElementIds: appState.selectedElementIds,
+    viewBackgroundColor: appState.viewBackgroundColor,
+    zoom: appState.zoom,
+  };
+}
+
+function sceneFromExcalidrawChange(
+  elements: Parameters<ExcalidrawChange>[0],
+  appState: Parameters<ExcalidrawChange>[1],
+): ExcalidrawScene {
+  return {
+    appState: pickExcalidrawAppState(appState),
+    // One adapter owns the native editor -> serializable scene type boundary.
+    elements: elements as unknown as ExcalidrawScene["elements"],
+  };
+}
+
 export function ExcalidrawSceneCanvas({
   onApiChange,
   onChange,
+  onSceneChange,
   revision = "scene",
   scene,
   title,
@@ -55,24 +79,13 @@ export function ExcalidrawSceneCanvas({
     },
     [onApiChange],
   );
-  const sceneKey = useMemo(
-    () =>
-      JSON.stringify({
-        appState: scene.appState,
-        elements: scene.elements.map((element) => ({
-          containerId: "containerId" in element ? element.containerId : null,
-          height: element.height,
-          id: element.id,
-          points: "points" in element ? element.points : null,
-          text: "text" in element ? element.text : null,
-          type: element.type,
-          width: element.width,
-          x: element.x,
-          y: element.y,
-        })),
-        revision,
-      }),
-    [revision, scene],
+  const sceneKey = revision;
+  const handleChange: NonNullable<ExcalidrawProps["onChange"]> = useCallback(
+    (elements, appState, files) => {
+      onChange?.(elements, appState, files);
+      onSceneChange?.(sceneFromExcalidrawChange(elements, appState));
+    },
+    [onChange, onSceneChange],
   );
   const initialData = useMemo<ExcalidrawInitialDataState>(() => {
     const elements = scene.elements as unknown as NonNullable<
@@ -135,7 +148,7 @@ export function ExcalidrawSceneCanvas({
       {Excalidraw ? (
         <Excalidraw
           key={sceneKey}
-          {...(onChange ? { onChange } : {})}
+          {...(onChange || onSceneChange ? { onChange: handleChange } : {})}
           autoFocus={false}
           excalidrawAPI={handleApiChange}
           gridModeEnabled={false}

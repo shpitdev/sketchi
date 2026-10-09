@@ -1,13 +1,9 @@
-import type { ExcalidrawProps } from "@excalidraw/excalidraw/types";
 import type {
   DiagramGenerationCacheMode,
   DiagramGenerationCandidateSummary,
   DiagramGenerationProviderId,
 } from "@sketchi/diagram-generation";
-import type {
-  ExcalidrawElement,
-  ExcalidrawScene,
-} from "@sketchi/diagram-excalidraw";
+import type { ExcalidrawScene } from "@sketchi/diagram-excalidraw";
 import {
   buildScenarioPromptParts,
   evaluateScenarioFixture,
@@ -63,6 +59,7 @@ interface PlaygroundState {
   editedExcalidrawSceneSignature: string | undefined;
   generationCandidates: readonly DiagramGenerationCandidateSummary[];
   generationError: string | undefined;
+  generationRunToken: number;
   generationStatus: "idle" | "running" | "complete" | "error";
   inspectorPanel: InspectorPanel;
   mode: PlaygroundMode;
@@ -117,6 +114,7 @@ function createInitialState(
     editedExcalidrawSceneSignature: undefined,
     generationCandidates: [],
     generationError: undefined,
+    generationRunToken: 0,
     generationStatus: "idle",
     inspectorPanel: "ir",
     mode: "deterministic",
@@ -126,36 +124,6 @@ function createInitialState(
     suiteResults: [],
     suiteStatus: "idle",
   };
-}
-
-function pickExcalidrawAppState(appState: Record<string, unknown>) {
-  return {
-    scrollX: appState.scrollX,
-    scrollY: appState.scrollY,
-    selectedElementIds: appState.selectedElementIds,
-    viewBackgroundColor: appState.viewBackgroundColor,
-    zoom: appState.zoom,
-  };
-}
-
-function sceneFromExcalidrawChange(
-  elements: readonly unknown[],
-  appState: Record<string, unknown>,
-): ExcalidrawScene {
-  return {
-    appState: pickExcalidrawAppState(appState),
-    elements: elements as ExcalidrawElement[],
-  };
-}
-
-function sceneChangeSignature(
-  elements: readonly unknown[],
-  appState: Record<string, unknown>,
-): string {
-  return JSON.stringify({
-    appState: pickExcalidrawAppState(appState),
-    elements,
-  });
 }
 
 function pickCandidateText(
@@ -275,6 +243,8 @@ export function ScenarioPlayground({
   const checks = activeResult?.checks ?? [];
   const displayedScene =
     state.editedExcalidrawScene ?? activeResult?.excalidrawScene;
+  const busy =
+    state.generationStatus === "running" || state.suiteStatus === "running";
   const mainPanelLabel =
     state.mode === "llm" ? "Live candidate" : "Fixture conversion";
   const statusOk =
@@ -311,18 +281,24 @@ export function ScenarioPlayground({
         ];
 
   function setMode(mode: PlaygroundMode) {
-    store.setState((current) => ({
-      ...current,
-      inspectorPanel:
-        mode === "deterministic"
-          ? current.inspectorPanel === "prompt"
-            ? "ir"
-            : current.inspectorPanel
-          : current.candidateText.trim().length > 0
-            ? "ir"
-            : "prompt",
-      mode,
-    }));
+    store.setState((current) =>
+      current.mode === mode
+        ? current
+        : {
+            ...current,
+            editedExcalidrawScene: undefined,
+            editedExcalidrawSceneSignature: undefined,
+            inspectorPanel:
+              mode === "deterministic"
+                ? current.inspectorPanel === "prompt"
+                  ? "ir"
+                  : current.inspectorPanel
+                : current.candidateText.trim().length > 0
+                  ? "ir"
+                  : "prompt",
+            mode,
+          },
+    );
   }
 
   function resetScenario(nextScenario: DiagramScenario) {
@@ -334,7 +310,9 @@ export function ScenarioPlayground({
       editedExcalidrawSceneSignature: undefined,
       generationCandidates: [],
       generationError: undefined,
-      generationStatus: "idle",
+      generationRunToken: current.generationRunToken + 1,
+      generationStatus:
+        current.generationStatus === "running" ? "running" : "idle",
       inspectorPanel: current.mode === "llm" ? "prompt" : "ir",
       scenarioId: nextScenario.id,
     }));
@@ -348,8 +326,9 @@ export function ScenarioPlayground({
       return undefined;
     }
 
+    const runToken = store.state.generationRunToken;
     const generationResult = await onGenerateScenario({
-      cacheMode: state.cacheMode,
+      cacheMode: store.state.cacheMode,
       providers: defaultGenerationProviders,
       scenarioId: scenario.id,
     });
@@ -363,7 +342,11 @@ export function ScenarioPlayground({
       suiteResults: replaceSuiteResult(current.suiteResults, suiteSummary),
     }));
 
-    if (!focusCandidate) {
+    if (
+      !focusCandidate ||
+      store.state.scenarioId !== scenario.id ||
+      store.state.generationRunToken !== runToken
+    ) {
       return generationResult;
     }
 
@@ -386,12 +369,19 @@ export function ScenarioPlayground({
   }
 
   async function runGeneration() {
-    if (!selectedScenario || !onGenerateScenario) {
+    if (
+      !selectedScenario ||
+      !onGenerateScenario ||
+      store.state.generationStatus === "running" ||
+      store.state.suiteStatus === "running"
+    ) {
       return;
     }
 
+    const runToken = store.state.generationRunToken + 1;
     store.setState((current) => ({
       ...current,
+      generationRunToken: runToken,
       generationError: undefined,
       generationStatus: "running",
       mode: "llm",
@@ -401,17 +391,32 @@ export function ScenarioPlayground({
     try {
       await runScenario(selectedScenario, true);
     } catch (error) {
+      if (
+        store.state.scenarioId !== selectedScenario.id ||
+        store.state.generationRunToken !== runToken
+      )
+        return;
       store.setState((current) => ({
         ...current,
         generationError:
           error instanceof Error ? error.message : "Generation failed.",
         generationStatus: "error",
       }));
+    } finally {
+      store.setState((current) =>
+        current.generationStatus === "running"
+          ? { ...current, generationStatus: "idle" }
+          : current,
+      );
     }
   }
 
   async function runSelectedSuite() {
-    if (!onGenerateScenario) {
+    if (
+      !onGenerateScenario ||
+      store.state.generationStatus === "running" ||
+      store.state.suiteStatus === "running"
+    ) {
       return;
     }
 
@@ -459,29 +464,21 @@ export function ScenarioPlayground({
     }
   }
 
-  const handleExcalidrawChange: NonNullable<ExcalidrawProps["onChange"]> =
-    useCallback(
-      (elements, appState) => {
-        const typedAppState = appState as unknown as Record<string, unknown>;
-        const signature = sceneChangeSignature(elements, typedAppState);
-
-        store.setState((current) => {
-          if (current.editedExcalidrawSceneSignature === signature) {
-            return current;
-          }
-
-          return {
-            ...current,
-            editedExcalidrawScene: sceneFromExcalidrawChange(
-              elements,
-              typedAppState,
-            ),
-            editedExcalidrawSceneSignature: signature,
-          };
-        });
-      },
-      [store],
-    );
+  const handleSceneChange = useCallback(
+    (scene: ExcalidrawScene) => {
+      const signature = JSON.stringify(scene);
+      store.setState((current) =>
+        current.editedExcalidrawSceneSignature === signature
+          ? current
+          : {
+              ...current,
+              editedExcalidrawScene: scene,
+              editedExcalidrawSceneSignature: signature,
+            },
+      );
+    },
+    [store],
+  );
 
   return (
     <section className="sketchi-scenario-playground">
@@ -561,7 +558,7 @@ export function ScenarioPlayground({
             <GenerationRunPanel
               cacheMode={state.cacheMode}
               candidates={state.generationCandidates}
-              disabled={!onGenerateScenario}
+              disabled={!onGenerateScenario || busy}
               {...(state.generationError
                 ? { error: state.generationError }
                 : {})}
@@ -608,9 +605,9 @@ export function ScenarioPlayground({
           </div>
           {displayedScene && activeResult ? (
             <ExcalidrawSceneCanvas
-              onChange={handleExcalidrawChange}
-              revision={state.canvasRevision}
-              scene={displayedScene}
+              onSceneChange={handleSceneChange}
+              revision={`${state.mode}:${state.canvasRevision}`}
+              scene={activeResult.excalidrawScene}
               title={activeResult.diagram.title}
             />
           ) : (
@@ -714,7 +711,7 @@ export function ScenarioPlayground({
           {state.mode === "llm" ? (
             <ScenarioSuitePanel
               batchControlsOpen={state.selectedSuiteScenarioIds.length > 1}
-              disabled={!onGenerateScenario}
+              disabled={!onGenerateScenario || busy}
               {...(selectedScenario
                 ? { activeScenarioId: selectedScenario.id }
                 : {})}
