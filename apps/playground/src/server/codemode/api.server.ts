@@ -17,6 +17,7 @@ import {
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { Effect, Schema } from "effect";
 
+import { readBoundedJson } from "../runtime/request-body.server";
 import { PlaygroundClock } from "../runtime/context.server";
 import { PlaygroundCodeMode } from "./service.server";
 import {
@@ -52,65 +53,9 @@ function jsonResponse(
   });
 }
 
-async function readJson(request: Request): Promise<unknown> {
-  try {
-    return await request.json();
-  } catch {
-    return {};
-  }
-}
-
-async function readBoundedBuildJson(
-  request: Request,
-): Promise<
-  | { ok: true; body: unknown }
-  | { ok: false; body: { omitted: true; reason: "request_too_large" } }
-> {
-  const contentLength = Number(request.headers.get("content-length"));
-  if (
-    Number.isFinite(contentLength) &&
-    contentLength > MAX_CODE_MODE_BUILD_REQUEST_BYTES
-  ) {
-    return {
-      ok: false,
-      body: { omitted: true, reason: "request_too_large" },
-    };
-  }
-
-  if (!request.body) return { ok: true, body: {} };
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let byteLength = 0;
-  for (;;) {
-    const chunk = await reader.read();
-    if (chunk.done) break;
-    byteLength += chunk.value.byteLength;
-    if (byteLength > MAX_CODE_MODE_BUILD_REQUEST_BYTES) {
-      await reader.cancel("Code Mode build request byte limit exceeded");
-      return {
-        ok: false,
-        body: { omitted: true, reason: "request_too_large" },
-      };
-    }
-    chunks.push(chunk.value);
-  }
-
-  const bytes = new Uint8Array(byteLength);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  const text = new TextDecoder().decode(bytes);
-  try {
-    return { ok: true, body: JSON.parse(text) };
-  } catch {
-    return { ok: true, body: {} };
-  }
-}
-
 function requestTooLargeResult(
-  diagramType: "Canvas" | "Flowchart" | "Mindmap" | "Sequence diagram",
+  diagramType:
+    "Canvas" | "Flowchart" | "Mindmap" | "Sequence diagram" | "Artifact patch",
 ) {
   return {
     ok: false as const,
@@ -340,7 +285,7 @@ function requestRead<A>(run: () => Promise<A>) {
     catch: (cause) =>
       CodeModeHttpRequestError.make({
         cause,
-        message: "Code Mode request body could not be read.",
+        message: "Code Mode request could not be decoded.",
       }),
   });
 }
@@ -353,17 +298,24 @@ export const handleBuildFlowchartRequest = Effect.fn(
   const usage = yield* PlaygroundCodeModeUsage;
   const usageContext = yield* usage.createContext;
   const startedAt = yield* clock.nowMillis;
-  const boundedRequest = yield* requestRead(() =>
-    readBoundedBuildJson(request),
+  const boundedRequest = yield* readBoundedJson(
+    request,
+    MAX_CODE_MODE_BUILD_REQUEST_BYTES,
   );
-  if (!boundedRequest.ok) {
+  if (boundedRequest._tag === "InvalidJson") {
+    return yield* CodeModeHttpRequestError.make({
+      cause: undefined,
+      message: "The request body was not valid JSON.",
+    });
+  }
+  if (boundedRequest._tag === "TooLarge") {
     const result = requestTooLargeResult("Flowchart");
     const finishedAt = yield* clock.nowMillis;
     yield* usage.capture({
       context: usageContext,
       durationMs: finishedAt - startedAt,
       operation: "buildFlowchart",
-      requestBody: boundedRequest.body,
+      requestBody: { omitted: true, reason: "request_too_large" },
       responseBody: result,
       statusCode: 413,
       surface: "api",
@@ -376,7 +328,7 @@ export const handleBuildFlowchartRequest = Effect.fn(
   }
 
   const requestBody = boundedRequest.body;
-  const codeModeInput = yield* Effect.promise(() =>
+  const codeModeInput = yield* requestRead(() =>
     decodeCodeModeHttpInput(
       CodeModeHttpSchemas.buildFlowchart.input,
       requestBody,
@@ -416,17 +368,24 @@ export const handleBuildMindmapRequest = Effect.fn(
   const usage = yield* PlaygroundCodeModeUsage;
   const usageContext = yield* usage.createContext;
   const startedAt = yield* clock.nowMillis;
-  const boundedRequest = yield* requestRead(() =>
-    readBoundedBuildJson(request),
+  const boundedRequest = yield* readBoundedJson(
+    request,
+    MAX_CODE_MODE_BUILD_REQUEST_BYTES,
   );
-  if (!boundedRequest.ok) {
+  if (boundedRequest._tag === "InvalidJson") {
+    return yield* CodeModeHttpRequestError.make({
+      cause: undefined,
+      message: "The request body was not valid JSON.",
+    });
+  }
+  if (boundedRequest._tag === "TooLarge") {
     const result = requestTooLargeResult("Mindmap");
     const finishedAt = yield* clock.nowMillis;
     yield* usage.capture({
       context: usageContext,
       durationMs: finishedAt - startedAt,
       operation: "buildMindmap",
-      requestBody: boundedRequest.body,
+      requestBody: { omitted: true, reason: "request_too_large" },
       responseBody: result,
       statusCode: 413,
       surface: "api",
@@ -439,7 +398,7 @@ export const handleBuildMindmapRequest = Effect.fn(
   }
 
   const requestBody = boundedRequest.body;
-  const codeModeInput = yield* Effect.promise(() =>
+  const codeModeInput = yield* requestRead(() =>
     decodeCodeModeHttpInput(
       CodeModeHttpSchemas.buildMindmap.input,
       requestBody,
@@ -478,17 +437,24 @@ export const handleBuildSequenceDiagramRequest = Effect.fn(
   const usage = yield* PlaygroundCodeModeUsage;
   const usageContext = yield* usage.createContext;
   const startedAt = yield* clock.nowMillis;
-  const boundedRequest = yield* requestRead(() =>
-    readBoundedBuildJson(request),
+  const boundedRequest = yield* readBoundedJson(
+    request,
+    MAX_CODE_MODE_BUILD_REQUEST_BYTES,
   );
-  if (!boundedRequest.ok) {
+  if (boundedRequest._tag === "InvalidJson") {
+    return yield* CodeModeHttpRequestError.make({
+      cause: undefined,
+      message: "The request body was not valid JSON.",
+    });
+  }
+  if (boundedRequest._tag === "TooLarge") {
     const result = requestTooLargeResult("Sequence diagram");
     const finishedAt = yield* clock.nowMillis;
     yield* usage.capture({
       context: usageContext,
       durationMs: finishedAt - startedAt,
       operation: "buildSequenceDiagram",
-      requestBody: boundedRequest.body,
+      requestBody: { omitted: true, reason: "request_too_large" },
       responseBody: result,
       statusCode: 413,
       surface: "api",
@@ -501,7 +467,7 @@ export const handleBuildSequenceDiagramRequest = Effect.fn(
   }
 
   const requestBody = boundedRequest.body;
-  const codeModeInput = yield* Effect.promise(() =>
+  const codeModeInput = yield* requestRead(() =>
     decodeCodeModeHttpInput(
       CodeModeHttpSchemas.buildSequenceDiagram.input,
       requestBody,
@@ -540,17 +506,24 @@ export const handleCreateCanvasRequest = Effect.fn(
   const usage = yield* PlaygroundCodeModeUsage;
   const usageContext = yield* usage.createContext;
   const startedAt = yield* clock.nowMillis;
-  const boundedRequest = yield* requestRead(() =>
-    readBoundedBuildJson(request),
+  const boundedRequest = yield* readBoundedJson(
+    request,
+    MAX_CODE_MODE_BUILD_REQUEST_BYTES,
   );
-  if (!boundedRequest.ok) {
+  if (boundedRequest._tag === "InvalidJson") {
+    return yield* CodeModeHttpRequestError.make({
+      cause: undefined,
+      message: "The request body was not valid JSON.",
+    });
+  }
+  if (boundedRequest._tag === "TooLarge") {
     const result = requestTooLargeResult("Canvas");
     const finishedAt = yield* clock.nowMillis;
     yield* usage.capture({
       context: usageContext,
       durationMs: finishedAt - startedAt,
       operation: "createCanvas",
-      requestBody: boundedRequest.body,
+      requestBody: { omitted: true, reason: "request_too_large" },
       responseBody: result,
       statusCode: 413,
       surface: "api",
@@ -563,7 +536,7 @@ export const handleCreateCanvasRequest = Effect.fn(
   }
 
   const requestBody = boundedRequest.body;
-  const codeModeInput = yield* Effect.promise(() =>
+  const codeModeInput = yield* requestRead(() =>
     decodeCodeModeHttpInput(
       CodeModeHttpSchemas.createCanvas.input,
       requestBody,
@@ -601,7 +574,7 @@ export const handleGetArtifactRequest = Effect.fn(
   const format = formatFromUrl(request);
   const raw = rawFromUrl(request);
   const inline = raw ? false : inlineFromUrl(request);
-  const input = yield* Effect.promise(() =>
+  const input = yield* requestRead(() =>
     decodeCodeModeHttpInput(CodeModeHttpSchemas.getArtifact.input, {
       artifactId,
       ...(format === undefined ? {} : { format }),
@@ -700,7 +673,35 @@ export const handlePatchArtifactRequest = Effect.fn(
   const usage = yield* PlaygroundCodeModeUsage;
   const usageContext = yield* usage.createContext;
   const startedAt = yield* clock.nowMillis;
-  const body = yield* requestRead(() => readJson(request));
+  const bounded = yield* readBoundedJson(
+    request,
+    MAX_CODE_MODE_BUILD_REQUEST_BYTES,
+  );
+  if (bounded._tag === "InvalidJson") {
+    return yield* CodeModeHttpRequestError.make({
+      cause: undefined,
+      message: "The request body was not valid JSON.",
+    });
+  }
+  if (bounded._tag === "TooLarge") {
+    const result = requestTooLargeResult("Artifact patch");
+    const finishedAt = yield* clock.nowMillis;
+    yield* usage.capture({
+      context: usageContext,
+      durationMs: finishedAt - startedAt,
+      operation: "applyDiagramPatch",
+      requestBody: { omitted: true, reason: "request_too_large" },
+      responseBody: result,
+      statusCode: 413,
+      surface: "api",
+    });
+    return jsonResponse(
+      result,
+      413,
+      codeModeUsageResponseHeaders(usageContext),
+    );
+  }
+  const body = bounded.body;
   const routeInput = isRecord(body)
     ? {
         ...body,
@@ -710,7 +711,7 @@ export const handlePatchArtifactRequest = Effect.fn(
         source: { artifactId },
         operations: [],
       };
-  const input = yield* Effect.promise(() =>
+  const input = yield* requestRead(() =>
     decodeCodeModeHttpInput(
       CodeModeHttpSchemas.applyDiagramPatch.input,
       routeInput,

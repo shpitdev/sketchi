@@ -89,28 +89,6 @@ function isTransientHttpStatus(status: number): boolean {
   return status === 408 || status === 425 || status === 429 || status >= 500;
 }
 
-const readResponse = Effect.fn("diagramGeneration.readResponse")(function* (
-  response: Response,
-) {
-  const text = yield* Effect.tryPromise({
-    try: (signal) =>
-      response.text().then((body) => {
-        if (signal.aborted) throw signal.reason;
-        return body;
-      }),
-    catch: (cause) =>
-      DiagramGenerationTransportError.make({
-        cause,
-        message: errorMessage(cause, "Generation response could not be read."),
-        operation: "response.text",
-        provider: "cloudflare-google-ai-studio",
-        retryable: true,
-      }),
-  });
-
-  return parseJsonResponse(text);
-});
-
 const runGatewayAttempt = Effect.fn(
   "diagramGeneration.cloudflareGoogleAiStudio.attempt",
 )(function* (
@@ -120,11 +98,11 @@ const runGatewayAttempt = Effect.fn(
 ) {
   const startedAt = yield* Clock.currentTimeMillis;
   const model = stripGoogleModelPrefix(request.model);
-  const response = yield* Effect.tryPromise({
-    try: (signal) =>
-      gateway.run(
+  const { response, raw } = yield* Effect.tryPromise({
+    try: async (signal) => {
+      const response = await gateway.run(
         {
-          endpoint: `v1beta/models/${model}:generateContent`,
+          endpoint: `v1beta/models/${encodeURIComponent(model)}:generateContent`,
           provider: "google-ai-studio",
           headers: {
             "Content-Type": "application/json",
@@ -143,7 +121,9 @@ const runGatewayAttempt = Effect.fn(
           },
           signal,
         },
-      ),
+      );
+      return { response, raw: parseJsonResponse(await response.text()) };
+    },
     catch: (cause) =>
       DiagramGenerationTransportError.make({
         cause,
@@ -153,7 +133,6 @@ const runGatewayAttempt = Effect.fn(
         retryable: true,
       }),
   });
-  const raw = yield* readResponse(response);
 
   if (!response.ok) {
     const diagnostic = responseErrorDiagnostic(raw);

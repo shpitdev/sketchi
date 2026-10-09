@@ -4,6 +4,7 @@ import type { ArtifactFormat, ArtifactFormatRef } from "@sketchi/diagram-agent";
 import { recordMetric, withTelemetryCorrelation } from "@sketchi/observability";
 import { Context, Effect, Layer, Metric, Schema } from "effect";
 
+import { correlationIdHeader } from "../runtime/correlation.server";
 import {
   PlaygroundBindings,
   PlaygroundClock,
@@ -207,11 +208,12 @@ const createCodeModeUsageContext = Effect.fn(
   const metadata = yield* PlaygroundRequestMetadata;
   return {
     attemptId:
-      headerValue(metadata.request, "x-sketchi-attempt-id") ??
+      correlationIdHeader(metadata.request, "x-sketchi-attempt-id") ??
       ids.create("attempt"),
     eventId: ids.create("event"),
     runId:
-      headerValue(metadata.request, "x-sketchi-run-id") ?? ids.create("run"),
+      correlationIdHeader(metadata.request, "x-sketchi-run-id") ??
+      ids.create("run"),
   };
 });
 
@@ -243,59 +245,79 @@ const captureCodeModeUsageEvent = Effect.fn("playground.codeModeUsage.capture")(
       "sketchi.run_id": input.context.runId,
       surface: input.surface,
     });
-    const writes: Array<Effect.Effect<void, CodeModeUsageCaptureError>> = [
-      sendCodeModeUsageAnalytics(env, event, input.responseBody),
-    ];
+    const observeWrite = (
+      write: Effect.Effect<void, CodeModeUsageCaptureError>,
+      sink: typeof CodeModeUsageSinkSchema.Type,
+    ) =>
+      write.pipe(
+        Effect.tap(() =>
+          recordMetric(usageCaptureWrites, 1, {
+            operation: input.operation,
+            outcome: "success",
+            sink,
+            surface: input.surface,
+          }),
+        ),
+        Effect.catchTag("CodeModeUsageCaptureError", (error) =>
+          Effect.gen(function* () {
+            yield* recordMetric(usageCaptureWrites, 1, {
+              failureCategory: error._tag,
+              operation: input.operation,
+              outcome: "failure",
+              sink: error.sink,
+              surface: input.surface,
+            });
+            yield* recordMetric(usageCaptureFailures, 1, {
+              failureCategory: error._tag,
+              operation: input.operation,
+              sink: error.sink,
+              surface: input.surface,
+            });
+            yield* Effect.logWarning("Code Mode usage capture failed", {
+              error_tag: error._tag,
+              operation: input.operation,
+              sink: error.sink,
+              surface: input.surface,
+            });
+          }),
+        ),
+      );
+    const writes: Array<Effect.Effect<void>> = [];
+    if (env.CODEMODE_USAGE_EVENTS || env.CODEMODE_USAGE_ISSUES) {
+      writes.push(
+        observeWrite(
+          sendCodeModeUsageAnalytics(env, event, input.responseBody),
+          "analytics",
+        ),
+      );
+    }
 
     if (env.SKETCHI_ARTIFACTS) {
       writes.push(
-        Effect.tryPromise({
-          try: () =>
-            env.SKETCHI_ARTIFACTS?.put(event.eventKey, JSON.stringify(event), {
-              httpMetadata: { contentType: "application/json" },
-            }) ?? Promise.resolve(),
-          catch: (cause) =>
-            CodeModeUsageCaptureError.make({
-              cause,
-              message: "Code Mode usage artifact persistence failed.",
-              sink: "artifacts",
-            }),
-        }).pipe(Effect.asVoid),
+        observeWrite(
+          Effect.tryPromise({
+            try: () =>
+              env.SKETCHI_ARTIFACTS?.put(
+                event.eventKey,
+                JSON.stringify(event),
+                {
+                  httpMetadata: { contentType: "application/json" },
+                },
+              ) ?? Promise.resolve(),
+            catch: (cause) =>
+              CodeModeUsageCaptureError.make({
+                cause,
+                message: "Code Mode usage artifact persistence failed.",
+                sink: "artifacts",
+              }),
+          }).pipe(Effect.asVoid),
+          "artifacts",
+        ),
       );
     }
 
     const deferredCapture = Effect.yieldNow.pipe(
       Effect.andThen(Effect.all(writes, { concurrency: 2, discard: true })),
-      Effect.tap(() =>
-        recordMetric(usageCaptureWrites, 1, {
-          operation: input.operation,
-          outcome: "success",
-          surface: input.surface,
-        }),
-      ),
-      Effect.catchTag("CodeModeUsageCaptureError", (error) =>
-        Effect.gen(function* () {
-          yield* recordMetric(usageCaptureWrites, 1, {
-            failureCategory: error._tag,
-            operation: input.operation,
-            outcome: "failure",
-            sink: error.sink,
-            surface: input.surface,
-          });
-          yield* recordMetric(usageCaptureFailures, 1, {
-            failureCategory: error._tag,
-            operation: input.operation,
-            sink: error.sink,
-            surface: input.surface,
-          });
-          yield* Effect.logWarning("Code Mode usage capture failed", {
-            error_tag: error._tag,
-            operation: input.operation,
-            sink: error.sink,
-            surface: input.surface,
-          });
-        }),
-      ),
     );
     platform.waitUntil(
       withTelemetryCorrelation(deferredCapture, {

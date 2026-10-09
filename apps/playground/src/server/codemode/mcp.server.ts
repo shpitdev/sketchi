@@ -572,7 +572,7 @@ export function createSketchiMcpServer(
       inputSchema: ExecuteRequestSchema,
       outputSchema: ExecuteResultSchema,
       annotations: {
-        readOnlyHint: true,
+        readOnlyHint: false,
         destructiveHint: false,
         idempotentHint: false,
         openWorldHint: false,
@@ -626,13 +626,20 @@ export const handleSketchiMcpRequest = Effect.fn("playground.http.mcp")(
             cause instanceof Error ? cause.message : "MCP transport failed.",
         }),
     });
-    const handler = createMcpHandler(
+    const handler: McpHttpHandler = createMcpHandler(
       createSketchiMcpServer(callbacks.runPromise, options),
       { route: "/mcp" },
-    ) as McpHttpHandler;
+    );
 
     return yield* Effect.tryPromise({
-      try: () => handler(request, env, createExecutionContext(platform)),
+      try: (signal) =>
+        handler(
+          new Request(request, {
+            signal: AbortSignal.any([signal, request.signal]),
+          }),
+          env,
+          createExecutionContext(platform),
+        ),
       catch: (cause) =>
         McpTransportError.make({
           cause,

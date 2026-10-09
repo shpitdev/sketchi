@@ -1,12 +1,14 @@
-import { assert, describe, it } from "@effect/vitest";
+import { assert, describe, expect, it } from "@effect/vitest";
 import {
   makeTelemetryTestSink,
   makeWorkersTelemetryLayer,
   type TelemetryLogEvent,
   type TelemetryMetricEvent,
 } from "@sketchi/observability";
-import { Effect, Layer } from "effect";
+import { Effect, Fiber, Layer } from "effect";
 import { TestClock } from "effect/testing";
+
+import type { CodeModeObjectBucket } from "@sketchi/diagram-agent";
 
 import {
   PlaygroundBindings,
@@ -30,6 +32,7 @@ const usageTestLayer = Layer.mergeAll(
 );
 
 function requestServices(input: {
+  bucket?: CodeModeObjectBucket;
   issuePipeline?: { send(records: readonly unknown[]): Promise<void> };
   pipeline: { send(records: readonly unknown[]): Promise<void> };
   scheduled: Array<Effect.Effect<void, never, PlaygroundRequestServices>>;
@@ -41,6 +44,7 @@ function requestServices(input: {
     effect.pipe(
       Effect.provideService(PlaygroundBindings, {
         CODEMODE_USAGE_EVENTS: input.pipeline,
+        ...(input.bucket ? { SKETCHI_ARTIFACTS: input.bucket } : {}),
         ...(input.issuePipeline
           ? { CODEMODE_USAGE_ISSUES: input.issuePipeline }
           : {}),
@@ -305,4 +309,180 @@ describe("Code Mode usage waitUntil boundary", () => {
       },
     );
   });
+});
+
+describe("usage capture sink isolation", () => {
+  it.effect(
+    "completes the artifact write while analytics never resolves",
+    () => {
+      const { probe, sink } = makeTelemetryTestSink();
+      return Effect.gen(function* () {
+        const scheduled: Array<
+          Effect.Effect<void, never, PlaygroundRequestServices>
+        > = [];
+        const analyticsStarted = Promise.withResolvers<void>();
+        const stalledAnalytics = Promise.withResolvers<void>();
+        const artifactKeys: string[] = [];
+        let captureCompleted = false;
+        const provideRequest = requestServices({
+          scheduled,
+          pipeline: {
+            send() {
+              analyticsStarted.resolve();
+              return stalledAnalytics.promise;
+            },
+          },
+          bucket: {
+            get: () => Promise.resolve(null),
+            async put(key) {
+              artifactKeys.push(key);
+            },
+          },
+        });
+        const usage = yield* PlaygroundCodeModeUsage;
+        const context = yield* provideRequest(usage.createContext);
+        yield* provideRequest(
+          usage.capture({
+            context,
+            durationMs: 1,
+            operation: "execute",
+            requestBody: {},
+            responseBody: { ok: true },
+            surface: "mcp",
+          }),
+        );
+        const deferred = scheduled[0];
+        if (!deferred) throw new Error("Expected scheduled capture");
+        const fiber = yield* Effect.forkChild(
+          provideRequest(deferred).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                captureCompleted = true;
+              }),
+            ),
+          ),
+        );
+        try {
+          yield* Effect.promise(() => analyticsStarted.promise);
+          yield* TestClock.adjust("1 second");
+          expect(artifactKeys).toHaveLength(1);
+          expect(artifactKeys[0]).toContain(
+            "/run_test/attempt_test/event_test/event.json",
+          );
+          const writes = probe.events.filter(
+            (event): event is TelemetryMetricEvent =>
+              event.event === "effect.metric" &&
+              event.metric === "sketchi_codemode_usage_capture_writes",
+          );
+          expect(writes).toEqual([
+            expect.objectContaining({
+              attributes: expect.objectContaining({
+                sink: "artifacts",
+                outcome: "success",
+              }),
+            }),
+          ]);
+          expect(captureCompleted).toBe(false);
+        } finally {
+          yield* Fiber.interrupt(fiber);
+        }
+      }).pipe(
+        Effect.provide(
+          Layer.merge(
+            usageTestLayer,
+            makeWorkersTelemetryLayer({
+              resource: { serviceName: "usage-stalled-test" },
+              sink,
+            }),
+          ),
+        ),
+      );
+    },
+  );
+  it.each([
+    { analyticsFails: true, artifactsFail: true },
+    { analyticsFails: true, artifactsFail: false },
+    { analyticsFails: false, artifactsFail: true },
+    { analyticsFails: false, artifactsFail: false },
+  ])(
+    "records each sink independently: %j",
+    async ({ analyticsFails, artifactsFail }) => {
+      const { probe, sink } = makeTelemetryTestSink();
+      const scheduled: Array<
+        Effect.Effect<void, never, PlaygroundRequestServices>
+      > = [];
+      const provideRequest = requestServices({
+        scheduled,
+        pipeline: {
+          async send() {
+            if (analyticsFails) throw new Error("analytics failed");
+          },
+        },
+        bucket: {
+          get: () => Promise.resolve(null),
+          async put() {
+            if (artifactsFail) throw new Error("artifacts failed");
+          },
+        },
+      });
+      await Effect.runPromise(
+        Effect.gen(function* () {
+          const usage = yield* PlaygroundCodeModeUsage;
+          const context = yield* provideRequest(usage.createContext);
+          yield* provideRequest(
+            usage.capture({
+              context,
+              durationMs: 1,
+              operation: "execute",
+              requestBody: {},
+              responseBody: { ok: true },
+              surface: "mcp",
+            }),
+          );
+          const deferred = scheduled[0];
+          if (!deferred) throw new Error("Expected scheduled capture");
+          yield* provideRequest(deferred);
+        }).pipe(
+          Effect.provide(
+            Layer.merge(
+              usageTestLayer,
+              makeWorkersTelemetryLayer({
+                resource: { serviceName: "usage-isolation-test" },
+                sink,
+              }),
+            ),
+          ),
+        ),
+      );
+      const writes = probe.events.filter(
+        (event): event is TelemetryMetricEvent =>
+          event.event === "effect.metric" &&
+          event.metric === "sketchi_codemode_usage_capture_writes",
+      );
+      expect(writes).toHaveLength(2);
+      expect(writes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            attributes: expect.objectContaining({
+              sink: "analytics",
+              outcome: analyticsFails ? "failure" : "success",
+            }),
+          }),
+          expect.objectContaining({
+            attributes: expect.objectContaining({
+              sink: "artifacts",
+              outcome: artifactsFail ? "failure" : "success",
+            }),
+          }),
+        ]),
+      );
+      const logs = probe.events.filter(
+        (event): event is TelemetryLogEvent => event.event === "effect.log",
+      );
+      expect(logs.map((event) => event.fields.sink).sort()).toEqual([
+        ...(analyticsFails ? ["analytics"] : []),
+        ...(artifactsFail ? ["artifacts"] : []),
+      ]);
+    },
+  );
 });

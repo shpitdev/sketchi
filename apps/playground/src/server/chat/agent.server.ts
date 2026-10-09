@@ -12,11 +12,12 @@ import {
   stepCountIs,
   streamText,
   tool,
-  type UIMessage,
+  validateUIMessages,
 } from "ai";
 import { Effect, Schema } from "effect";
 
-import { PlaygroundAiModel, StudioAiModelError } from "../ai/model.server";
+import { readBoundedJson } from "../runtime/request-body.server";
+import { PlaygroundAiModel } from "../ai/model.server";
 import { PlaygroundCodeMode } from "../codemode/service.server";
 import {
   type PlaygroundCallbackEffect,
@@ -40,19 +41,13 @@ export class StudioAgentRequestError extends Schema.TaggedError<StudioAgentReque
   },
 ) {}
 
-function isUIMessageArray(value: unknown): value is UIMessage[] {
-  return (
-    Array.isArray(value) &&
-    value.length > 0 &&
-    value.every(
-      (item) =>
-        Boolean(item) &&
-        typeof item === "object" &&
-        typeof (item as UIMessage).role === "string" &&
-        Array.isArray((item as UIMessage).parts),
-    )
-  );
-}
+export const MAX_CHAT_REQUEST_BYTES = 128 * 1024;
+export const MAX_CHAT_MESSAGES = 64;
+export const MAX_CHAT_TOTAL_CHARACTERS = 32_000;
+
+const ChatRequestSchema = Schema.Struct({
+  messages: Schema.Array(Schema.Unknown),
+});
 
 export function makeStudioFlowchartToolCallback<E>(
   executor: {
@@ -68,41 +63,48 @@ export function makeStudioFlowchartToolCallback<E>(
 
 const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(
   function* (request: Request) {
-    const body = yield* Effect.tryPromise({
-      try: () => request.json() as Promise<{ messages?: unknown }>,
+    const bounded = yield* readBoundedJson(request, MAX_CHAT_REQUEST_BYTES);
+    if (bounded._tag === "TooLarge") {
+      return new Response("Chat request is too large.", { status: 413 });
+    }
+    if (bounded._tag === "InvalidJson") {
+      return new Response("Chat request must be valid JSON.", { status: 400 });
+    }
+    const body = yield* Schema.decodeUnknownEffect(ChatRequestSchema)(
+      bounded.body,
+    ).pipe(
+      Effect.mapError((cause) =>
+        StudioAgentRequestError.make({
+          cause,
+          message: "No messages provided.",
+        }),
+      ),
+    );
+    if (body.messages.length === 0) {
+      return new Response("No messages provided.", { status: 400 });
+    }
+    // Include metadata and tool payloads in the character budget, not only text parts.
+    if (
+      body.messages.length > MAX_CHAT_MESSAGES ||
+      JSON.stringify(body.messages).length > MAX_CHAT_TOTAL_CHARACTERS
+    ) {
+      return new Response("Chat messages exceed the conversation limit.", {
+        status: 413,
+      });
+    }
+    const messages = yield* Effect.tryPromise({
+      try: () => validateUIMessages({ messages: body.messages }),
       catch: (cause) =>
         StudioAgentRequestError.make({
           cause,
-          message:
-            cause instanceof Error ? cause.message : "Chat request failed.",
+          message: "Chat messages are invalid.",
         }),
-    }).pipe(
-      Effect.catchTag("StudioAgentRequestError", (error) =>
-        Effect.succeed({ decodeError: error } as const),
-      ),
-    );
-
-    if ("decodeError" in body) {
-      return new Response(body.decodeError.message, { status: 400 });
-    }
-    const messages = body.messages;
-    if (!isUIMessageArray(messages)) {
-      return new Response("No messages provided.", { status: 400 });
-    }
+    });
 
     const ai = yield* PlaygroundAiModel;
     const callbacks = yield* PlaygroundRequestCallbacks;
     const codeMode = yield* PlaygroundCodeMode;
-    const model = yield* ai.model.pipe(
-      Effect.catchTag("StudioAiModelError", (error) =>
-        Effect.fail(
-          StudioAgentRequestError.make({
-            cause: error,
-            message: error.message,
-          }),
-        ),
-      ),
-    );
+    const model = yield* ai.model;
     const modelMessages = yield* Effect.tryPromise({
       try: () => convertToModelMessages(messages),
       catch: (cause) =>
@@ -158,8 +160,13 @@ export const handleStudioAgentRequest = Effect.fn(
   "playground.http.chat.response",
 )((request: Request) =>
   handleStudioAgentRequestWorkflow(request).pipe(
-    Effect.catchTag("StudioAgentRequestError", (error) =>
-      Effect.succeed(new Response(error.message, { status: 400 })),
-    ),
+    Effect.catchTags({
+      StudioAgentRequestError: (error) =>
+        Effect.succeed(new Response(error.message, { status: 400 })),
+      StudioAiModelError: () =>
+        Effect.succeed(
+          new Response("Chat is temporarily unavailable.", { status: 503 }),
+        ),
+    }),
   ),
 );

@@ -144,7 +144,9 @@ export class DiagramGenerationRequest extends Schema.Class<DiagramGenerationRequ
 )({
   cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
   maxOutputTokens: Schema.optional(Schema.Number),
-  model: Schema.String,
+  model: Schema.String.check(
+    Schema.isPattern(/^(?:(?:google|google-ai-studio)\/)?[A-Za-z0-9._-]{1,128}$/),
+  ),
   prompt: DiagramGenerationPrompt,
   temperature: Schema.optional(Schema.Number),
 }) {}

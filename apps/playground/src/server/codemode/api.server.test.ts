@@ -15,6 +15,7 @@ import {
   handleGetArtifactRequest as handleGetArtifactRequestEffect,
   handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
 } from "./api.server";
+import { CodeModeHttpSchemas } from "./http-schema.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
 import { runPlaygroundEffect } from "../runtime/runtime.server";
 
@@ -1103,5 +1104,48 @@ describe("Code Mode API handlers", () => {
     expect(new Uint8Array(await getResponse.arrayBuffer())).toEqual(
       new Uint8Array([137, 80, 78, 71]),
     );
+  });
+});
+
+describe("artifact patch request boundaries", () => {
+  it("caps patch bodies like build bodies", async () => {
+    const request = new Request(
+      "https://studio.test/api/v1/artifacts/id/patch",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          operations: [],
+          padding: "x".repeat(MAX_CODE_MODE_BUILD_REQUEST_BYTES),
+        }),
+      },
+    );
+    const response = await handlePatchArtifactRequest({}, request, "id");
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({
+      issues: [{ code: "request_too_large" }],
+    });
+  });
+});
+
+describe("HTTP schema decode failures", () => {
+  it("maps a rejected decode to a typed HTTP response instead of a defect", async () => {
+    const validate = vi
+      .spyOn(CodeModeHttpSchemas.buildFlowchart.input["~standard"], "validate")
+      .mockRejectedValue(new Error("private decode failure"));
+    try {
+      const response = await handleBuildFlowchartRequest(
+        {},
+        postRequest("https://studio.test/api/v1/flowcharts/build", {
+          spec: approvalSpec(),
+        }),
+      );
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        ok: false,
+        error: "The request could not be decoded.",
+      });
+    } finally {
+      validate.mockRestore();
+    }
   });
 });

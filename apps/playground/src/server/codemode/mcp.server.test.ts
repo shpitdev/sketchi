@@ -579,7 +579,7 @@ describe("Sketchi Code Mode MCP server", () => {
       expect(executeTool?.description).toContain("async () =>");
       expect(executeTool?.description).toContain("artifactDelivery");
       expect(executeTool?.annotations).toMatchObject({
-        readOnlyHint: true,
+        readOnlyHint: false,
         destructiveHint: false,
         idempotentHint: false,
         openWorldHint: false,

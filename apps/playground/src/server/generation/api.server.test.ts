@@ -329,3 +329,42 @@ describe("public generate endpoint", () => {
     );
   });
 });
+
+describe("generation request boundaries", () => {
+  it.each([
+    "gemini-2.5-flash:countTokens?x=",
+    "google/../other",
+    "x".repeat(129),
+    "",
+  ])("rejects unsafe model %s before gateway dispatch", async (model) => {
+    let calls = 0;
+    const response = await generateRequest(
+      {
+        AI: fakeAiGateway(generationText(flowchartIr), () => {
+          calls += 1;
+        }),
+      },
+      {
+        prompt: "Show release approval",
+        model,
+      },
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      status: "invalid_input",
+      issues: [{ code: "invalid_input" }],
+    });
+    expect(calls).toBe(0);
+  });
+  it.each(["__tooLarge", "__invalidJson"])(
+    "does not treat client key %s as a reader result",
+    async (key) => {
+      const response = await generateRequest(
+        { AI: fakeAiGateway(generationText(flowchartIr)) },
+        { prompt: "Show release approval", [key]: true },
+      );
+      expect(response.status).toBe(200);
+    },
+  );
+});

@@ -6,6 +6,10 @@ import {
 } from "@sketchi/observability";
 import { Context, Effect, FiberSet, Layer, ManagedRuntime, pipe } from "effect";
 
+import type { CodeModeHttpRequestError } from "../codemode/api.server";
+import type { McpTransportError } from "../codemode/mcp.server";
+import { correlationIdHeader } from "./correlation.server";
+import type { RequestBodyReadError } from "./request-body.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
 import { PlaygroundAiModelLive } from "../ai/model.server";
 import { PlaygroundCodeModeLive } from "../codemode/service.server";
@@ -97,12 +101,22 @@ export class PlaygroundRequestCallbacks extends Context.Service<
   PlaygroundRequestCallbacksShape
 >()("@sketchi/playground/PlaygroundRequestCallbacks") {}
 
+type PlaygroundHttpError =
+  CodeModeHttpRequestError | McpTransportError | RequestBodyReadError;
+type PlaygroundRequestResult<A, E> =
+  | A
+  | (unknown extends E
+      ? Response
+      : E extends PlaygroundHttpError
+        ? Response
+        : never);
+
 export interface PlaygroundRuntime {
   readonly dispose: () => Promise<void>;
   readonly run: <A, E>(
     effect: PlaygroundRequestEffect<A, E>,
     boundary: PlaygroundRequestBoundary,
-  ) => Promise<A>;
+  ) => Promise<PlaygroundRequestResult<A, E>>;
 }
 
 export {
@@ -116,13 +130,18 @@ function runWithPlaygroundRuntime<A, E>(
   runtime: ManagedRuntime.ManagedRuntime<PlaygroundHostServices, never>,
   effect: PlaygroundRequestEffect<A, E>,
   boundary: PlaygroundRequestBoundary,
-): Promise<A> {
+): Promise<PlaygroundRequestResult<A, E>>;
+function runWithPlaygroundRuntime<A, E>(
+  runtime: ManagedRuntime.ManagedRuntime<PlaygroundHostServices, never>,
+  effect: PlaygroundRequestEffect<A, E>,
+  boundary: PlaygroundRequestBoundary,
+): Promise<A | Response> {
   const program = Effect.gen(function* () {
     const ids = yield* PlaygroundIds;
     const callbackFibers = yield* PlaygroundCallbackFibers;
     const url = new URL(boundary.request.url);
     const traceId =
-      boundary.request.headers.get("x-sketchi-trace-id")?.trim() ||
+      correlationIdHeader(boundary.request, "x-sketchi-trace-id") ??
       ids.create("trace");
     const requestRoute = normalizedRequestRoute(url.pathname);
     const requestAnnotations = {
@@ -177,7 +196,31 @@ function runWithPlaygroundRuntime<A, E>(
       }),
     );
 
-    return yield* effect.pipe(
+    const httpEffect: PlaygroundRequestEffect<A, unknown> = effect;
+    const errorResponse = (
+      error: PlaygroundHttpError,
+      status: number,
+      message: string,
+    ) =>
+      Effect.logError("Playground HTTP request failed", {
+        error_tag: error._tag,
+      }).pipe(
+        Effect.as(
+          Response.json(
+            { ok: false, error: message },
+            { status, headers: { "Cache-Control": "no-store" } },
+          ),
+        ),
+      );
+    return yield* httpEffect.pipe(
+      Effect.catchTags({
+        CodeModeHttpRequestError: (error: CodeModeHttpRequestError) =>
+          errorResponse(error, 400, "The request could not be decoded."),
+        McpTransportError: (error: McpTransportError) =>
+          errorResponse(error, 500, "The MCP transport failed."),
+        RequestBodyReadError: (error: RequestBodyReadError) =>
+          errorResponse(error, 400, "The request body could not be read."),
+      }),
       Effect.provideService(PlaygroundRequestCallbacks, {
         runPromise: runRequestEffect,
       }),

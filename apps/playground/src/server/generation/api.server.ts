@@ -7,6 +7,7 @@ import type {
 } from "@sketchi/diagram-agent";
 import {
   extractJsonObject,
+  DiagramGenerationRequest,
   type DiagramGenerationCandidate,
   type DiagramGenerationError,
   type DiagramGenerationType,
@@ -14,6 +15,7 @@ import {
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { Effect, Result, Schema } from "effect";
 
+import { readBoundedJson } from "../runtime/request-body.server";
 import { PlaygroundCodeMode } from "../codemode/service.server";
 import {
   codeModeUsageResponseHeaders,
@@ -92,7 +94,7 @@ const GenerateRequestSchema = Schema.Struct({
       "swimlane",
     ]),
   ),
-  model: Schema.optional(Schema.String),
+  model: Schema.optional(DiagramGenerationRequest.fields.model),
 });
 const decodeGenerateRequest = Schema.decodeUnknownResult(
   GenerateRequestSchema,
@@ -146,41 +148,6 @@ function jsonResponse(
   const headers = new Headers(extraHeaders);
   headers.set("Cache-Control", "no-store");
   return Response.json(body, { status, headers });
-}
-
-async function readBoundedGenerateJson(request: Request): Promise<unknown> {
-  const contentLength = Number(request.headers.get("content-length"));
-  if (
-    Number.isFinite(contentLength) &&
-    contentLength > MAX_GENERATE_REQUEST_BYTES
-  ) {
-    return { __tooLarge: true };
-  }
-  if (!request.body) return {};
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let byteLength = 0;
-  for (;;) {
-    const chunk = await reader.read();
-    if (chunk.done) break;
-    byteLength += chunk.value.byteLength;
-    if (byteLength > MAX_GENERATE_REQUEST_BYTES) {
-      await reader.cancel("Generate request byte limit exceeded");
-      return { __tooLarge: true };
-    }
-    chunks.push(chunk.value);
-  }
-  const bytes = new Uint8Array(byteLength);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  try {
-    return JSON.parse(new TextDecoder().decode(bytes));
-  } catch {
-    return { __invalidJson: true };
-  }
 }
 
 function generationErrorFailure(
@@ -368,12 +335,8 @@ export const handleGenerateDiagramRequest = Effect.fn(
       );
     });
 
-  const rawBody = yield* Effect.promise(() => readBoundedGenerateJson(request));
-  if (
-    rawBody !== null &&
-    typeof rawBody === "object" &&
-    "__tooLarge" in rawBody
-  ) {
+  const bounded = yield* readBoundedJson(request, MAX_GENERATE_REQUEST_BYTES);
+  if (bounded._tag === "TooLarge") {
     return yield* finish(
       { omitted: true },
       failure("invalid_input", [
@@ -386,11 +349,7 @@ export const handleGenerateDiagramRequest = Effect.fn(
       ]),
     );
   }
-  if (
-    rawBody !== null &&
-    typeof rawBody === "object" &&
-    "__invalidJson" in rawBody
-  ) {
+  if (bounded._tag === "InvalidJson") {
     return yield* finish(
       {},
       failure("invalid_input", [
@@ -404,6 +363,7 @@ export const handleGenerateDiagramRequest = Effect.fn(
     );
   }
 
+  const rawBody = bounded.body;
   const decoded = decodeGenerateRequest(rawBody);
   if (Result.isFailure(decoded)) {
     return yield* finish(
