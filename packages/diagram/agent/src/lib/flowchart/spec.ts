@@ -1,3 +1,4 @@
+import { Schema } from "effect";
 import {
   FlowchartDiagramSchema,
   SKETCHI_DIAGRAM_STYLE,
@@ -80,9 +81,9 @@ export function flowchartDiagramInput(spec: NormalizedFlowchartSpec) {
 export function flowchartDiagramFromSpec(
   spec: FlowchartSpec,
 ): FlowchartDiagram {
-  const diagram = FlowchartDiagramSchema.parse(
-    flowchartDiagramInput(normalizeFlowchartSpec(spec)),
-  );
+  const diagram = Schema.decodeUnknownSync(FlowchartDiagramSchema, {
+    errors: "all",
+  })(flowchartDiagramInput(normalizeFlowchartSpec(spec)));
   validateFlowchartDiagram(diagram);
   return diagram;
 }

@@ -1,11 +1,4 @@
-import {
-  Effect,
-  Result,
-  Schema,
-  SchemaAST,
-  SchemaGetter,
-  SchemaIssue,
-} from "effect";
+import { Effect, Schema, SchemaAST, SchemaGetter, SchemaIssue } from "effect";
 import type {
   StandardJSONSchemaV1,
   StandardSchemaV1,
@@ -45,10 +38,6 @@ export class ContractSchemaError extends Schema.TaggedError<ContractSchemaError>
   "ContractSchemaError",
   { issues: Schema.Array(Schema.toEncoded(ContractSchemaIssue)) },
 ) {}
-
-export type ContractSafeParseResult<A> =
-  | { readonly data: A; readonly success: true }
-  | { readonly error: ContractSchemaError; readonly success: false };
 
 function actualType(value: unknown): string {
   if (value === null) return "null";
@@ -155,33 +144,10 @@ function contractIssues(
   return issues;
 }
 
-export function safeParseContract<S extends Schema.ConstraintDecoder<unknown>>(
-  schema: S,
-  input: unknown,
-): ContractSafeParseResult<S["Type"]> {
-  const result = Schema.decodeUnknownResult(schema, {
-    errors: "all",
-    reportInput: true,
-  })(input);
-  return Result.isSuccess(result)
-    ? { data: result.success, success: true }
-    : {
-        error: new ContractSchemaError({
-          issues: contractIssues(result.failure),
-        }),
-        success: false,
-      };
-}
-
-function withParser<S extends Schema.ConstraintDecoder<unknown>>(schema: S) {
-  return Object.assign(schema, {
-    parse: (input: unknown): S["Type"] => {
-      const result = safeParseContract(schema, input);
-      if (result.success) return result.data;
-      throw result.error;
-    },
-    safeParse: (input: unknown) => safeParseContract(schema, input),
-  });
+export function formatContractSchemaError(
+  error: Schema.SchemaError,
+): ContractSchemaError {
+  return new ContractSchemaError({ issues: contractIssues(error) });
 }
 
 const codeModeJsonSchemaAnnotationKeys = new Set([
@@ -394,17 +360,16 @@ function hexColor(defaultValue?: string) {
 }
 const HexColor = hexColor();
 
-export const HexColorSchema = withParser(HexColor);
+export const HexColorSchema = HexColor;
 
 export const ARTIFACT_FORMATS = ["excalidraw", "scene", "png"] as const;
 export const INLINE_ARTIFACT_FORMATS = ["excalidraw", "scene"] as const;
 
-export const ArtifactFormatSchema = Object.assign(
-  withParser(literals(ARTIFACT_FORMATS)),
-  { options: ARTIFACT_FORMATS },
-);
+export const ArtifactFormatSchema = Object.assign(literals(ARTIFACT_FORMATS), {
+  options: ARTIFACT_FORMATS,
+});
 export const InlineArtifactFormatSchema = Object.assign(
-  withParser(literals(INLINE_ARTIFACT_FORMATS)),
+  literals(INLINE_ARTIFACT_FORMATS),
   { options: INLINE_ARTIFACT_FORMATS },
 );
 export type ArtifactFormat = typeof ArtifactFormatSchema.Type;
@@ -418,7 +383,7 @@ export class ArtifactProvenance extends Schema.Class<ArtifactProvenance>(
   },
   { identifier: undefined },
 ) {}
-export const ArtifactProvenanceSchema = withParser(ArtifactProvenance);
+export const ArtifactProvenanceSchema = ArtifactProvenance;
 
 export const CODE_MODE_ISSUE_CODES = [
   "missing_field",
@@ -474,7 +439,7 @@ export const CODE_MODE_ISSUE_CODES = [
 ] as const;
 
 export const CodeModeIssueCodeSchema = Object.assign(
-  withParser(literals(CODE_MODE_ISSUE_CODES)),
+  literals(CODE_MODE_ISSUE_CODES),
   { options: CODE_MODE_ISSUE_CODES },
 );
 export type CodeModeIssueCode = typeof CodeModeIssueCodeSchema.Type;
@@ -509,7 +474,7 @@ export class CodeModeIssueRef extends Schema.Class<CodeModeIssueRef>(
   },
   { identifier: undefined },
 ) {}
-export const CodeModeIssueRefSchema = withParser(CodeModeIssueRef);
+export const CodeModeIssueRefSchema = CodeModeIssueRef;
 
 export class CodeModeIssue extends Schema.Class<CodeModeIssue>("CodeModeIssue")(
   {
@@ -522,7 +487,7 @@ export class CodeModeIssue extends Schema.Class<CodeModeIssue>("CodeModeIssue")(
   },
   { identifier: undefined },
 ) {}
-export const CodeModeIssueSchema = withParser(CodeModeIssue);
+export const CodeModeIssueSchema = CodeModeIssue;
 
 export const FLOWCHART_NODE_KINDS = [
   "start",
@@ -531,7 +496,7 @@ export const FLOWCHART_NODE_KINDS = [
   "end",
 ] as const;
 export const FlowchartNodeKindSchema = Object.assign(
-  withParser(literals(FLOWCHART_NODE_KINDS)),
+  literals(FLOWCHART_NODE_KINDS),
   { options: FLOWCHART_NODE_KINDS },
 );
 
@@ -550,7 +515,7 @@ export const DIAGRAM_PATCH_OPERATION_NAMES = [
   "ungroup",
 ] as const;
 export const DiagramPatchOperationNameSchema = Object.assign(
-  withParser(literals(DIAGRAM_PATCH_OPERATION_NAMES)),
+  literals(DIAGRAM_PATCH_OPERATION_NAMES),
   { options: DIAGRAM_PATCH_OPERATION_NAMES },
 );
 
@@ -651,11 +616,11 @@ export class FlowchartSpec extends Schema.Class<FlowchartSpec>("FlowchartSpec")(
   },
   { identifier: undefined },
 ) {}
-export const FlowchartSpecSchema = withParser(FlowchartSpec);
-export const FlowchartSpecNodeSchema = withParser(FlowchartSpecNode);
-export const FlowchartSpecEdgeSchema = withParser(FlowchartSpecEdge);
-export const FlowchartSpecLayoutSchema = withParser(FlowchartSpecLayout);
-export const FlowchartSpecStyleSchema = withParser(FlowchartSpecStyle);
+export const FlowchartSpecSchema = FlowchartSpec;
+export const FlowchartSpecNodeSchema = FlowchartSpecNode;
+export const FlowchartSpecEdgeSchema = FlowchartSpecEdge;
+export const FlowchartSpecLayoutSchema = FlowchartSpecLayout;
+export const FlowchartSpecStyleSchema = FlowchartSpecStyle;
 
 export class SequenceParticipantSpec extends Schema.Class<SequenceParticipantSpec>(
   "SequenceParticipantSpec",
@@ -699,11 +664,9 @@ export class SequenceDiagramSpec extends Schema.Class<SequenceDiagramSpec>(
   },
   { identifier: undefined },
 ) {}
-export const SequenceDiagramSpecSchema = withParser(SequenceDiagramSpec);
-export const SequenceParticipantSpecSchema = withParser(
-  SequenceParticipantSpec,
-);
-export const SequenceMessageSpecSchema = withParser(SequenceMessageSpec);
+export const SequenceDiagramSpecSchema = SequenceDiagramSpec;
+export const SequenceParticipantSpecSchema = SequenceParticipantSpec;
+export const SequenceMessageSpecSchema = SequenceMessageSpec;
 
 const ArtifactFormatsOption = optionalContract(
   nonEmptyArray(ArtifactFormatSchema),
@@ -735,8 +698,8 @@ export class BuildFlowchartOptions extends Schema.Class<BuildFlowchartOptions>(
   },
   { identifier: undefined },
 ) {}
-export const BuildFlowchartOptionsSchema = withParser(
-  optionalContract(BuildFlowchartOptions),
+export const BuildFlowchartOptionsSchema = optionalContract(
+  BuildFlowchartOptions,
 );
 
 export class BuildFlowchartRequest extends Schema.Class<BuildFlowchartRequest>(
@@ -798,7 +761,7 @@ export const BuildFlowchartToolInputSchema = Object.assign(
     BuildFlowchartToolInput
   >;
 export const BuildFlowchartRequestSchema = Object.assign(
-  withParser(BuildFlowchartRequest),
+  BuildFlowchartRequest,
   {
     omit: (_keys: { readonly options: true }) => BuildFlowchartToolInputSchema,
   },
@@ -814,9 +777,7 @@ export class BuildSequenceDiagramRequest extends Schema.Class<BuildSequenceDiagr
   },
   { identifier: undefined },
 ) {}
-export const BuildSequenceDiagramRequestSchema = withParser(
-  BuildSequenceDiagramRequest,
-);
+export const BuildSequenceDiagramRequestSchema = BuildSequenceDiagramRequest;
 
 export interface MindmapTopicInput {
   label: string;
@@ -852,7 +813,7 @@ export const MindmapTopic: Schema.Codec<MindmapTopicInput, MindmapTopicInput> =
       Schema.Array(MindmapTopicReference).pipe(Schema.mutable),
     ),
   });
-export const MindmapTopicSchema = withParser(MindmapTopicReference);
+export const MindmapTopicSchema = MindmapTopicReference;
 
 export class MindmapSpecLayout extends Schema.Class<MindmapSpecLayout>(
   "MindmapSpecLayout",
@@ -885,7 +846,7 @@ export class MindmapSpec extends Schema.Class<MindmapSpec>("MindmapSpec")(
   MindmapSpecContract,
   { identifier: undefined },
 ) {}
-export const MindmapSpecSchema = withParser(MindmapSpec);
+export const MindmapSpecSchema = MindmapSpec;
 
 const BuildMindmapRequestContract = Schema.Struct({
   requestId: optionalContract(NonEmptyString),
@@ -895,9 +856,7 @@ const BuildMindmapRequestContract = Schema.Struct({
 export class BuildMindmapRequest extends Schema.Class<BuildMindmapRequest>(
   "BuildMindmapRequest",
 )(BuildMindmapRequestContract, { identifier: undefined }) {}
-export const BuildMindmapRequestSchema = withParser(
-  BuildMindmapRequestContract,
-);
+export const BuildMindmapRequestSchema = BuildMindmapRequestContract;
 
 export class ScenePoint extends Schema.Class<ScenePoint>("ScenePoint")(
   {
@@ -906,7 +865,7 @@ export class ScenePoint extends Schema.Class<ScenePoint>("ScenePoint")(
   },
   { identifier: undefined },
 ) {}
-export const ScenePointSchema = withParser(ScenePoint);
+export const ScenePointSchema = ScenePoint;
 
 // Count limits are advertised here and enforced before compilation/patching by
 // the runtime's canvas validator, preserving limit-specific failure responses.
@@ -1141,11 +1100,11 @@ export class CanvasDistributeLayout extends Schema.Class<CanvasDistributeLayout>
   { identifier: undefined },
 ) {}
 
-export const NodeSceneElementSchema = withParser(NodeSceneElement);
-export const TextSceneElementSchema = withParser(TextSceneElement);
-export const ArrowSceneElementSchema = withParser(ArrowSceneElement);
-export const LineSceneElementSchema = withParser(LineSceneElement);
-export const FrameSceneElementSchema = withParser(FrameSceneElement);
+export const NodeSceneElementSchema = NodeSceneElement;
+export const TextSceneElementSchema = TextSceneElement;
+export const ArrowSceneElementSchema = ArrowSceneElement;
+export const LineSceneElementSchema = LineSceneElement;
+export const FrameSceneElementSchema = FrameSceneElement;
 export const SceneElementSchema = Schema.Union(
   [
     NodeSceneElement,
@@ -1201,7 +1160,7 @@ export class CanvasSpec extends Schema.Class<CanvasSpec>("CanvasSpec")(
   },
   { identifier: undefined },
 ) {}
-export const CanvasSpecSchema = withParser(CanvasSpec);
+export const CanvasSpecSchema = CanvasSpec;
 export type RenderedDiagramScene = CanvasSpec;
 export const RenderedDiagramSceneSchema = CanvasSpecSchema;
 export type PatchableScene = CanvasSpec;
@@ -1216,7 +1175,7 @@ export class CreateCanvasRequest extends Schema.Class<CreateCanvasRequest>(
   },
   { identifier: undefined },
 ) {}
-export const CreateCanvasRequestSchema = withParser(CreateCanvasRequest);
+export const CreateCanvasRequestSchema = CreateCanvasRequest;
 
 const ExcalidrawElement = Schema.Record(Schema.String, Schema.Unknown).check(
   Schema.makeFilter(
@@ -1228,7 +1187,7 @@ const ExcalidrawElement = Schema.Record(Schema.String, Schema.Unknown).check(
     { message: "Invalid input" },
   ),
 );
-export const ExcalidrawElementSchema = withParser(ExcalidrawElement);
+export const ExcalidrawElementSchema = ExcalidrawElement;
 
 export class ExcalidrawScene extends Schema.Class<ExcalidrawScene>(
   "ExcalidrawScene",
@@ -1239,7 +1198,7 @@ export class ExcalidrawScene extends Schema.Class<ExcalidrawScene>(
   },
   { identifier: undefined },
 ) {}
-export const ExcalidrawSceneSchema = withParser(ExcalidrawScene);
+export const ExcalidrawSceneSchema = ExcalidrawScene;
 
 export class ExcalidrawFile extends ExcalidrawScene.extend<ExcalidrawFile>(
   "ExcalidrawFile",
@@ -1252,7 +1211,7 @@ export class ExcalidrawFile extends ExcalidrawScene.extend<ExcalidrawFile>(
   },
   { identifier: undefined },
 ) {}
-export const ExcalidrawFileSchema = withParser(ExcalidrawFile);
+export const ExcalidrawFileSchema = ExcalidrawFile;
 
 export class GetArtifactRequest extends Schema.Class<GetArtifactRequest>(
   "GetArtifactRequest",
@@ -1264,7 +1223,7 @@ export class GetArtifactRequest extends Schema.Class<GetArtifactRequest>(
   },
   { identifier: undefined },
 ) {}
-export const GetArtifactRequestSchema = withParser(GetArtifactRequest);
+export const GetArtifactRequestSchema = GetArtifactRequest;
 
 export class DiagramSelector extends Schema.Class<DiagramSelector>(
   "DiagramSelector",
@@ -1285,7 +1244,7 @@ export class DiagramSelector extends Schema.Class<DiagramSelector>(
   },
   { identifier: undefined },
 ) {}
-export const DiagramSelectorSchema = withParser(DiagramSelector);
+export const DiagramSelectorSchema = DiagramSelector;
 
 export class DiagramStylePatch extends Schema.Class<DiagramStylePatch>(
   "DiagramStylePatch",
@@ -1298,7 +1257,7 @@ export class DiagramStylePatch extends Schema.Class<DiagramStylePatch>(
   },
   { identifier: undefined },
 ) {}
-export const DiagramStylePatchSchema = withParser(DiagramStylePatch);
+export const DiagramStylePatchSchema = DiagramStylePatch;
 
 export const DIAGRAM_SHAPES = [
   "rectangle",
@@ -1307,10 +1266,9 @@ export const DIAGRAM_SHAPES = [
   "circle",
   "polygon",
 ] as const;
-export const DiagramShapeSchema = Object.assign(
-  withParser(literals(DIAGRAM_SHAPES)),
-  { options: DIAGRAM_SHAPES },
-);
+export const DiagramShapeSchema = Object.assign(literals(DIAGRAM_SHAPES), {
+  options: DIAGRAM_SHAPES,
+});
 export type DiagramShape = typeof DiagramShapeSchema.Type;
 
 export class SetDefaultStyleOperation extends Schema.Class<SetDefaultStyleOperation>(
@@ -1501,8 +1459,8 @@ export class ApplyDiagramPatchOptions extends Schema.Class<ApplyDiagramPatchOpti
   },
   { identifier: undefined },
 ) {}
-export const ApplyDiagramPatchOptionsSchema = withParser(
-  optionalContract(ApplyDiagramPatchOptions),
+export const ApplyDiagramPatchOptionsSchema = optionalContract(
+  ApplyDiagramPatchOptions,
 );
 
 export class ApplyDiagramPatchRequest extends Schema.Class<ApplyDiagramPatchRequest>(
@@ -1519,9 +1477,7 @@ export class ApplyDiagramPatchRequest extends Schema.Class<ApplyDiagramPatchRequ
   },
   { identifier: undefined },
 ) {}
-export const ApplyDiagramPatchRequestSchema = withParser(
-  ApplyDiagramPatchRequest,
-);
+export const ApplyDiagramPatchRequestSchema = ApplyDiagramPatchRequest;
 
 export type NormalizedFlowchartSpec = typeof NormalizedFlowchartSpecSchema.Type;
 export type NormalizedMindmapSpec = typeof NormalizedMindmapSpecSchema.Type;

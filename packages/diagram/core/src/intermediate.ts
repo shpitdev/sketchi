@@ -1,4 +1,4 @@
-import { Effect, Result, Schema, SchemaIssue } from "effect";
+import { Effect, Schema } from "effect";
 
 import { DIAGRAM_TYPES } from "./types.js";
 
@@ -25,65 +25,6 @@ function withDefault<S extends Schema.Top>(schema: S, value: S["Encoded"]) {
   return schema.pipe(Schema.withDecodingDefault(Effect.succeed(value)));
 }
 
-export function parseDiagramSchema<S extends Schema.ConstraintDecoder<unknown>>(
-  schema: S,
-  input: unknown,
-): S["Type"] {
-  return Schema.decodeUnknownSync(schema, { errors: "all" })(input);
-}
-
-export interface DiagramSchemaIssue {
-  readonly message: string;
-  readonly path: readonly PropertyKey[];
-}
-
-export interface DiagramSchemaError {
-  readonly issues: readonly DiagramSchemaIssue[];
-}
-
-const diagramSchemaFormatter = SchemaIssue.makeFormatterStandardSchemaV1();
-
-function schemaIssuePath(
-  path: readonly (PropertyKey | { readonly key: PropertyKey })[] | undefined,
-): PropertyKey[] {
-  return (path ?? []).map((segment) =>
-    typeof segment === "object" ? segment.key : segment,
-  );
-}
-
-export function safeParseDiagramSchema<
-  S extends Schema.ConstraintDecoder<unknown>,
->(
-  schema: S,
-  input: unknown,
-):
-  | { readonly data: S["Type"]; readonly success: true }
-  | { readonly error: DiagramSchemaError; readonly success: false } {
-  const result = Schema.decodeUnknownResult(schema, { errors: "all" })(input);
-  if (Result.isSuccess(result)) {
-    return { data: result.success, success: true };
-  }
-  const formatted = diagramSchemaFormatter(result.failure.issue);
-  return {
-    error: {
-      issues: formatted.issues.map((issue) => ({
-        message: issue.message,
-        path: schemaIssuePath(issue.path),
-      })),
-    },
-    success: false,
-  };
-}
-
-export function withDiagramParser<S extends Schema.ConstraintDecoder<unknown>>(
-  schema: S,
-) {
-  return Object.assign(schema, {
-    parse: (input: unknown) => parseDiagramSchema(schema, input),
-    safeParse: (input: unknown) => safeParseDiagramSchema(schema, input),
-  });
-}
-
 export const DiagramTypeSchema = Schema.Literals(DIAGRAM_TYPES);
 export const LayoutDirectionSchema = Schema.Literals(["TB", "BT", "LR", "RL"]);
 export const EdgeRoutingSchema = Schema.Literals([
@@ -103,7 +44,7 @@ export class DiagramNode extends Schema.Class<DiagramNode>("DiagramNode")({
   kind: Schema.optional(NonEmptyString),
   metadata: withDefault(Metadata, {}),
 }) {}
-export const DiagramNodeSchema = withDiagramParser(DiagramNode);
+export const DiagramNodeSchema = DiagramNode;
 
 export class DiagramEdge extends Schema.Class<DiagramEdge>("DiagramEdge")({
   id: NonEmptyString,
@@ -112,7 +53,7 @@ export class DiagramEdge extends Schema.Class<DiagramEdge>("DiagramEdge")({
   label: Schema.optional(NonEmptyString),
   metadata: withDefault(Metadata, {}),
 }) {}
-export const DiagramEdgeSchema = withDiagramParser(DiagramEdge);
+export const DiagramEdgeSchema = DiagramEdge;
 
 const HexColor = Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/));
 
@@ -120,7 +61,7 @@ export class DiagramStyle extends Schema.Class<DiagramStyle>("DiagramStyle")({
   accentColor: withDefault(HexColor, SKETCHI_DIAGRAM_STYLE.accentColor),
   backgroundColor: withDefault(HexColor, SKETCHI_DIAGRAM_STYLE.backgroundColor),
 }) {}
-export const DiagramStyleSchema = withDiagramParser(DiagramStyle);
+export const DiagramStyleSchema = DiagramStyle;
 
 export class DiagramLayout extends Schema.Class<DiagramLayout>("DiagramLayout")(
   {
@@ -128,7 +69,7 @@ export class DiagramLayout extends Schema.Class<DiagramLayout>("DiagramLayout")(
     edgeRouting: withDefault(EdgeRoutingSchema, "orthogonal"),
   },
 ) {}
-export const DiagramLayoutSchema = withDiagramParser(DiagramLayout);
+export const DiagramLayoutSchema = DiagramLayout;
 
 export class IntermediateDiagram extends Schema.Class<IntermediateDiagram>(
   "IntermediateDiagram",
@@ -147,7 +88,7 @@ export class IntermediateDiagram extends Schema.Class<IntermediateDiagram>(
   style: withDefault(DiagramStyle, SKETCHI_DIAGRAM_STYLE),
   metadata: withDefault(Metadata, {}),
 }) {}
-export const IntermediateDiagramSchema = withDiagramParser(IntermediateDiagram);
+export const IntermediateDiagramSchema = IntermediateDiagram;
 
 export class DiagramValidationError extends Error {
   constructor(message: string) {
@@ -215,6 +156,8 @@ export function validateIntermediateDiagram(
 }
 
 export function parseIntermediateDiagram(input: unknown): IntermediateDiagram {
-  const diagram = parseDiagramSchema(IntermediateDiagram, input);
+  const diagram = Schema.decodeUnknownSync(IntermediateDiagram, {
+    errors: "all",
+  })(input);
   return validateIntermediateDiagram(diagram);
 }

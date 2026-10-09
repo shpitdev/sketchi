@@ -66,7 +66,12 @@ export function artifactFromResponse(
 }
 
 function isRenderedDiagramScene(value: unknown): value is RenderedDiagramScene {
-  return RenderedDiagramSceneSchema.safeParse(value).success;
+  return Result.isSuccess(
+    Schema.decodeUnknownResult(RenderedDiagramSceneSchema, {
+      errors: "all",
+      reportInput: true,
+    })(value),
+  );
 }
 
 export function sceneFromResult(
@@ -115,9 +120,12 @@ export function deriveBuildState(
             part.state === "input-available",
         )
     : undefined;
-  const input = BuildFlowchartRequestSchema.safeParse(activePart?.input);
-  const ghostLabels = input.success
-    ? input.data.spec.nodes
+  const input = Schema.decodeUnknownResult(BuildFlowchartRequestSchema, {
+    errors: "all",
+    reportInput: true,
+  })(activePart?.input);
+  const ghostLabels = Result.isSuccess(input)
+    ? input.success.spec.nodes
         .map((node) => node.label.trim())
         .filter((label) => label.length > 0)
         .slice(0, 24)

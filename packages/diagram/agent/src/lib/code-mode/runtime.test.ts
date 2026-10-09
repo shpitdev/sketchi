@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Context, Effect } from "effect";
+import { Context, Effect, Schema, Result } from "effect";
 
 import {
   CANVAS_LIMITS,
@@ -319,7 +319,9 @@ function whitespaceFlowchartCases(): Array<{
 }
 
 function canonicalCodesForSpec(spec: ReturnType<typeof approvalSpec>) {
-  const diagram = FlowchartDiagramSchema.parse({
+  const diagram = Schema.decodeUnknownSync(FlowchartDiagramSchema, {
+    errors: "all",
+  })({
     id: "canonical-parity",
     title: spec.title,
     type: "flowchart",
@@ -535,7 +537,10 @@ function throwingStore(): CodeModeArtifactStorageShape {
 }
 
 function parseInlineScene(value: unknown) {
-  return RenderedDiagramSceneSchema.parse(value);
+  return Schema.decodeUnknownSync(RenderedDiagramSceneSchema, {
+    errors: "all",
+    reportInput: true,
+  })(value);
 }
 
 class MemoryBucket implements CodeModeObjectBucket {
@@ -2867,16 +2872,26 @@ describe("canvas geometry and input bounds", () => {
     (field, limit, item) => {
       const scene = geometryCanvas([geometryNode("a", 0, 0)]);
       expect(
-        CanvasSpecSchema.safeParse({
-          ...scene,
-          [field]: Array.from({ length: limit + 1 }, () => item()),
-        }).success,
+        Result.isSuccess(
+          Schema.decodeUnknownResult(CanvasSpecSchema, {
+            errors: "all",
+            reportInput: true,
+          })({
+            ...scene,
+            [field]: Array.from({ length: limit + 1 }, () => item()),
+          }),
+        ),
       ).toBe(true);
       expect(
-        CanvasSpecSchema.safeParse({
-          ...scene,
-          [field]: Array.from({ length: limit }, () => item()),
-        }).success,
+        Result.isSuccess(
+          Schema.decodeUnknownResult(CanvasSpecSchema, {
+            errors: "all",
+            reportInput: true,
+          })({
+            ...scene,
+            [field]: Array.from({ length: limit }, () => item()),
+          }),
+        ),
       ).toBe(true);
       expect(toCodeModeJsonSchema(CreateCanvasRequestSchema)).toMatchObject({
         properties: {
@@ -2900,7 +2915,14 @@ describe("canvas geometry and input bounds", () => {
         ),
       },
     ]);
-    expect(CanvasSpecSchema.safeParse(scene).success).toBe(true);
+    expect(
+      Result.isSuccess(
+        Schema.decodeUnknownResult(CanvasSpecSchema, {
+          errors: "all",
+          reportInput: true,
+        })(scene),
+      ),
+    ).toBe(true);
     expect(
       JSON.stringify(toCodeModeJsonSchema(CreateCanvasRequestSchema)),
     ).toContain(`"maxItems":${CANVAS_LIMITS.maxGroupsPerElement}`);

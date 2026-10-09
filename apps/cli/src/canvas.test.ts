@@ -230,13 +230,14 @@ describe("Universal Canvas public API client", () => {
     "submits CanvasSpec and preserves the validated built diagram",
     () => {
       const created: BuiltDiagram[] = [];
-      let decodedRequest:
-        | ReturnType<typeof CreateCanvasRequestSchema.parse>
-        | undefined;
+      let decodedRequest: typeof CreateCanvasRequestSchema.Type | undefined;
       globalThis.fetch = (input, init) => {
         const request = new Request(input, init);
         return request.json().then((body) => {
-          decodedRequest = CreateCanvasRequestSchema.parse(body);
+          decodedRequest = Schema.decodeUnknownSync(CreateCanvasRequestSchema, {
+            errors: "all",
+            reportInput: true,
+          })(body);
           return acceptedResponse();
         });
       };

@@ -1,3 +1,4 @@
+import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { DiagramValidationError } from "../intermediate";
@@ -16,7 +17,9 @@ import {
 } from "./flowchart";
 
 function validationIssues(input: unknown) {
-  return getFlowchartValidationIssues(FlowchartDiagramSchema.parse(input));
+  return getFlowchartValidationIssues(
+    Schema.decodeUnknownSync(FlowchartDiagramSchema, { errors: "all" })(input),
+  );
 }
 
 function linearFlowchart(nodeCount: number) {

@@ -1,11 +1,12 @@
 import {
+  formatContractSchemaError,
   CodeModeArtifactStorage,
   CodeModeRuntimeEnvironment,
   ExcalidrawFileSchema,
   RenderedDiagramSceneSchema,
   type CodeModeIssue,
 } from "@sketchi/diagram-agent";
-import { Effect } from "effect";
+import { Effect, Schema, Result } from "effect";
 
 import type { PatchedDiagramArtifacts } from "./contracts.js";
 import {
@@ -123,27 +124,35 @@ const decodeArtifacts = Effect.fn("sketchi.cli.codeMode.decodeArtifacts")(
     const scene =
       operation === "export" && !sceneRef
         ? undefined
-        : RenderedDiagramSceneSchema.safeParse(yield* inline("scene"));
-    if (scene && !scene.success)
+        : Schema.decodeUnknownResult(RenderedDiagramSceneSchema, {
+            errors: "all",
+            reportInput: true,
+          })(yield* inline("scene"));
+    if (scene && !Result.isSuccess(scene))
       return yield* CliBuildError.make({
         status: "invalid_scene_artifact",
         message: `Code Mode returned an invalid ${patched}scene artifact.`,
         hint,
-        details: scene.error.issues.map((issue) => issue.message),
+        details: formatContractSchemaError(scene.failure).issues.map(
+          (issue) => issue.message,
+        ),
       });
-    const excalidraw = ExcalidrawFileSchema.safeParse(
-      yield* inline("excalidraw"),
-    );
-    if (!excalidraw.success)
+    const excalidraw = Schema.decodeUnknownResult(ExcalidrawFileSchema, {
+      errors: "all",
+      reportInput: true,
+    })(yield* inline("excalidraw"));
+    if (!Result.isSuccess(excalidraw))
       return yield* CliBuildError.make({
         status: "invalid_excalidraw_artifact",
         message: `Code Mode returned an invalid ${patched}Excalidraw artifact.`,
         hint,
-        details: excalidraw.error.issues.map((issue) => issue.message),
+        details: formatContractSchemaError(excalidraw.failure).issues.map(
+          (issue) => issue.message,
+        ),
       });
     return {
-      ...(scene?.success ? { scene: scene.data } : {}),
-      excalidraw: excalidraw.data,
+      ...(scene && Result.isSuccess(scene) ? { scene: scene.success } : {}),
+      excalidraw: excalidraw.success,
     };
   },
 );

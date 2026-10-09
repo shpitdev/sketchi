@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, Layer, Schema } from "effect";
+import { Clock, Context, Effect, Layer, Schema, Result } from "effect";
 
 import {
   ArtifactProvenanceSchema,
@@ -302,7 +302,12 @@ function isStoredArtifactManifest(
 }
 
 function isArtifactProvenance(value: unknown): value is ArtifactProvenance {
-  return ArtifactProvenanceSchema.safeParse(value).success;
+  return Result.isSuccess(
+    Schema.decodeUnknownResult(ArtifactProvenanceSchema, {
+      errors: "all",
+      reportInput: true,
+    })(value),
+  );
 }
 
 function bodyForArtifact(

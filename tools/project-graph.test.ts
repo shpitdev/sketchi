@@ -56,6 +56,7 @@ const effectMigrationReadyProjectRoots: string[] = [];
 const effectSchemaBoundaryFiles = new Set([
   "packages/diagram/core/src/intermediate.ts",
   "packages/diagram/core/src/types/flowchart.ts",
+  "packages/diagram/core/src/types/flowchart.test.ts",
   "packages/diagram/core/src/types/mindmap.ts",
 ]);
 const frameworkNativeProjectRoots = [

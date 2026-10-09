@@ -26,7 +26,7 @@ import {
   StudioSourceArtifactStore,
   type StudioObjectBucket,
 } from "@sketchi/studio-projects/server";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema, Result } from "effect";
 
 import { artifactStoreForBindings } from "../codemode/service.server";
 import {
@@ -151,8 +151,11 @@ export const PlaygroundStudioLayer = Layer.effect(
                 status: artifact.status === "storage_failed" ? 500 : 404,
               });
             }
-            const scene = RenderedDiagramSceneSchema.safeParse(artifact.inline);
-            if (!scene.success) {
+            const scene = Schema.decodeUnknownResult(
+              RenderedDiagramSceneSchema,
+              { errors: "all", reportInput: true },
+            )(artifact.inline);
+            if (!Result.isSuccess(scene)) {
               return yield* StudioSourceArtifactError.make({
                 artifactId,
                 code: "invalid_scene",
@@ -160,7 +163,10 @@ export const PlaygroundStudioLayer = Layer.effect(
                 status: 422,
               });
             }
-            return { diagramId: artifact.diagramId, title: scene.data.title };
+            return {
+              diagramId: artifact.diagramId,
+              title: scene.success.title,
+            };
           }),
         });
         const appLayer = StudioProjectsLive.pipe(

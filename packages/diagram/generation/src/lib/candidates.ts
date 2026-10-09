@@ -6,11 +6,10 @@ import {
   type MindmapDiagram,
   MindmapDiagramSchema,
   SKETCHI_DIAGRAM_STYLE,
-  safeParseDiagramSchema,
   validateFlowchartDiagram,
   validateMindmapDiagram,
 } from "@sketchi/diagram-core";
-import { Result, Schema } from "effect";
+import { Result, Schema, SchemaIssue } from "effect";
 
 import {
   type DiagramRequirement,
@@ -286,12 +285,18 @@ function parseGeneratedSequence(
   return decoded;
 }
 
+const schemaIssueFormatter = SchemaIssue.makeFormatterStandardSchemaV1();
+
 function schemaIssueDiagnostic(issue: {
   readonly message: string;
-  readonly path: readonly PropertyKey[];
+  readonly path?:
+    | readonly (PropertyKey | { readonly key: PropertyKey })[]
+    | undefined;
 }): string {
-  const path =
-    issue.path.length > 0 ? issue.path.map(String).join(".") : "diagram";
+  const segments = (issue.path ?? []).map((segment) =>
+    typeof segment === "object" ? segment.key : segment,
+  );
+  const path = segments.length > 0 ? segments.map(String).join(".") : "diagram";
   return `schema_error at ${path}: ${issue.message}`;
 }
 
@@ -442,9 +447,11 @@ function decodeAndValidate<S extends Schema.ConstraintDecoder<unknown>>(
   intent: GeneratedDiagramIntent,
   schemaFailureMessage = "Generated diagram schema validation failed.",
 ): CandidateParseResult {
-  const decoded = safeParseDiagramSchema(schema, input);
-  if (!decoded.success) {
-    const diagnostics = decoded.error.issues.map(schemaIssueDiagnostic);
+  const decoded = Schema.decodeUnknownResult(schema, { errors: "all" })(input);
+  if (Result.isFailure(decoded)) {
+    const diagnostics = schemaIssueFormatter(decoded.failure.issue).issues.map(
+      schemaIssueDiagnostic,
+    );
     return {
       diagnostics,
       error: diagnostics[0] ?? schemaFailureMessage,
@@ -452,7 +459,7 @@ function decodeAndValidate<S extends Schema.ConstraintDecoder<unknown>>(
     };
   }
   try {
-    return { diagram: validate(decoded.data), intent, success: true };
+    return { diagram: validate(decoded.success), intent, success: true };
   } catch (error) {
     return diagramValidationFailure(error);
   }

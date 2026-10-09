@@ -1,12 +1,12 @@
 import {
+  formatContractSchemaError,
   ApplyDiagramPatchRequest,
-  safeParseContract,
   CodeModeArtifactStorage,
   CodeModeRuntimeEnvironment,
   applyDiagramPatch,
   type PatchableScene,
 } from "@sketchi/diagram-agent";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer, Schema, Result } from "effect";
 
 import {
   codeModeFailure,
@@ -63,17 +63,22 @@ export const decodePatchInput = Effect.fn("sketchi.cli.patch.decodeInput")(
         ["requestId: The CLI owns the patch request id."],
       );
     }
-    const parsed = safeParseContract(PatchInput, input);
-    if (!parsed.success) {
+    const parsed = Schema.decodeUnknownResult(PatchInput, {
+      errors: "all",
+      reportInput: true,
+    })(input);
+    if (!Result.isSuccess(parsed)) {
       return yield* validationError(
         "The diagram patch request is invalid.",
-        parsed.error.issues.map((issue) => issue.message),
+        formatContractSchemaError(parsed.failure).issues.map(
+          (issue) => issue.message,
+        ),
       );
     }
     return {
-      operations: parsed.data.operations,
-      ...(parsed.data.options ? { options: parsed.data.options } : {}),
-      ...(parsed.data.intent ? { intent: parsed.data.intent } : {}),
+      operations: parsed.success.operations,
+      ...(parsed.success.options ? { options: parsed.success.options } : {}),
+      ...(parsed.success.intent ? { intent: parsed.success.intent } : {}),
     } satisfies CliPatchInput;
   },
 );

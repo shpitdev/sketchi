@@ -1,3 +1,4 @@
+import { Schema, Result } from "effect";
 import {
   RenderedDiagramSceneSchema,
   type ArtifactProvenance,
@@ -58,13 +59,16 @@ export async function fetchArtifactReview(
     throw new Error("Artifact could not be loaded.");
   }
 
-  const parsed = RenderedDiagramSceneSchema.safeParse(payload.inline);
-  if (!parsed.success) {
+  const parsed = Schema.decodeUnknownResult(RenderedDiagramSceneSchema, {
+    errors: "all",
+    reportInput: true,
+  })(payload.inline);
+  if (!Result.isSuccess(parsed)) {
     throw new Error("Artifact scene could not be rendered.");
   }
 
   return {
-    scene: parsed.data as RenderedDiagramScene,
+    scene: parsed.success as RenderedDiagramScene,
     ...(payload.provenance ? { provenance: payload.provenance } : {}),
   };
 }

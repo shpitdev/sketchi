@@ -1,9 +1,10 @@
 import {
+  formatContractSchemaError,
   CanvasSpec,
   CreateCanvasResultSchema,
   ExcalidrawFileSchema,
 } from "@sketchi/diagram-agent";
-import { Effect, Schema, SchemaIssue } from "effect";
+import { Effect, Schema, SchemaIssue, Result } from "effect";
 
 import type { BuiltDiagram, StoredDiagram } from "./contracts.js";
 import { validateStorageId } from "./document.js";
@@ -265,12 +266,13 @@ export const createCanvasDiagram = Effect.fn("sketchi.cli.canvas.create")(
     if (excalidrawReference?.inline === undefined) {
       return yield* malformedResponse(["artifact.formats.excalidraw.inline"]);
     }
-    const decodedExcalidraw = ExcalidrawFileSchema.safeParse(
-      excalidrawReference.inline,
-    );
-    if (!decodedExcalidraw.success) {
+    const decodedExcalidraw = Schema.decodeUnknownResult(ExcalidrawFileSchema, {
+      errors: "all",
+      reportInput: true,
+    })(excalidrawReference.inline);
+    if (!Result.isSuccess(decodedExcalidraw)) {
       return yield* malformedResponse(
-        decodedExcalidraw.error.issues.map(
+        formatContractSchemaError(decodedExcalidraw.failure).issues.map(
           (issue) => `${issue.path.join(".")}: ${issue.message}`,
         ),
       );
@@ -291,7 +293,7 @@ export const createCanvasDiagram = Effect.fn("sketchi.cli.canvas.create")(
       title: response.normalizedSpec.title,
       document: { type: "canvas", spec: response.normalizedSpec },
       scene: response.normalizedSpec,
-      excalidraw: decodedExcalidraw.data,
+      excalidraw: decodedExcalidraw.success,
     };
     const diagram = yield* store.create(built);
     return {

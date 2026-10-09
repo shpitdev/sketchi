@@ -45,6 +45,7 @@ import {
   type StoredArtifactFormat,
 } from "./artifacts.js";
 import {
+  formatContractSchemaError,
   BuildFlowchartRejected,
   BuildMindmapRejected,
   BuildSequenceDiagramRejected,
@@ -71,7 +72,6 @@ import {
   type CreateCanvasRequest,
   type CreateCanvasResult,
   CodeModeIssueSchema,
-  safeParseContract,
   type ContractSchemaIssue,
   type CodeModeIssue,
   type CodeModeIssueCode,
@@ -2091,8 +2091,11 @@ const resolvePatchSource = Effect.fn("codeMode.patch.resolveSource")(function* (
     });
   }
 
-  const parsed = RenderedDiagramSceneSchema.safeParse(artifact.data);
-  if (!parsed.success) {
+  const parsed = Schema.decodeUnknownResult(RenderedDiagramSceneSchema, {
+    errors: "all",
+    reportInput: true,
+  })(artifact.data);
+  if (!Result.isSuccess(parsed)) {
     return yield* new ApplyDiagramPatchFailure({
       status: "source_unavailable",
       context: {
@@ -2110,7 +2113,7 @@ const resolvePatchSource = Effect.fn("codeMode.patch.resolveSource")(function* (
   }
 
   return {
-    scene: cloneScene(parsed.data),
+    scene: cloneScene(parsed.success),
     sourceArtifactId: input.source.artifactId,
   };
 });
@@ -2250,17 +2253,22 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
       });
     }
 
-    const parsed = BuildMindmapRequestSchema.safeParse(input);
-    if (!parsed.success) {
+    const parsed = Schema.decodeUnknownResult(BuildMindmapRequestSchema, {
+      errors: "all",
+      reportInput: true,
+    })(input);
+    if (!Result.isSuccess(parsed)) {
       return yield* new BuildMindmapFailure({
         status: "invalid_input",
-        context: { issues: inputIssues(parsed.error) },
+        context: {
+          issues: inputIssues(formatContractSchemaError(parsed.failure)),
+        },
       });
     }
 
     const environment = yield* CodeModeRuntimeEnvironment;
 
-    const request = parsed.data;
+    const request = parsed.success;
     const buildId = yield* Effect.sync(() => environment.createId("build"));
     const normalizedSpec = normalizeMindmapSpec(request.spec);
     const baseContext = {
@@ -2373,17 +2381,22 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(
 const buildSequenceDiagramWorkflow = Effect.fn(
   "codeMode.buildSequenceDiagram.workflow",
 )(function* (input: unknown) {
-  const parsed = BuildSequenceDiagramRequestSchema.safeParse(input);
-  if (!parsed.success) {
+  const parsed = Schema.decodeUnknownResult(BuildSequenceDiagramRequestSchema, {
+    errors: "all",
+    reportInput: true,
+  })(input);
+  if (!Result.isSuccess(parsed)) {
     return yield* new BuildSequenceDiagramFailure({
       status: "invalid_input",
-      context: { issues: inputIssues(parsed.error) },
+      context: {
+        issues: inputIssues(formatContractSchemaError(parsed.failure)),
+      },
     });
   }
 
   const environment = yield* CodeModeRuntimeEnvironment;
 
-  const request = parsed.data;
+  const request = parsed.success;
   const buildId = yield* Effect.sync(() => environment.createId("build"));
   const normalizedSpec = normalizeSequenceDiagramSpec(request.spec);
   const baseContext = {
@@ -2543,15 +2556,20 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
         });
       }
     }
-    const parsed = CreateCanvasRequestSchema.safeParse(input);
-    if (!parsed.success) {
+    const parsed = Schema.decodeUnknownResult(CreateCanvasRequestSchema, {
+      errors: "all",
+      reportInput: true,
+    })(input);
+    if (!Result.isSuccess(parsed)) {
       return yield* new CreateCanvasFailure({
         status: "invalid_input",
-        context: { issues: inputIssues(parsed.error) },
+        context: {
+          issues: inputIssues(formatContractSchemaError(parsed.failure)),
+        },
       });
     }
 
-    const request = parsed.data;
+    const request = parsed.success;
     const baseContext = {
       buildId,
       ...responseRequestId(request.requestId),
@@ -2637,17 +2655,22 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
 
 const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
   function* (input: unknown) {
-    const parsed = BuildFlowchartRequestSchema.safeParse(input);
-    if (!parsed.success) {
+    const parsed = Schema.decodeUnknownResult(BuildFlowchartRequestSchema, {
+      errors: "all",
+      reportInput: true,
+    })(input);
+    if (!Result.isSuccess(parsed)) {
       return yield* new BuildFlowchartFailure({
         status: "invalid_input",
-        context: { issues: inputIssues(parsed.error) },
+        context: {
+          issues: inputIssues(formatContractSchemaError(parsed.failure)),
+        },
       });
     }
 
     const environment = yield* CodeModeRuntimeEnvironment;
 
-    const request = parsed.data;
+    const request = parsed.success;
 
     const buildId = yield* Effect.sync(() => environment.createId("build"));
     const normalizedSpec = normalizeFlowchartSpec(request.spec);
@@ -2656,20 +2679,23 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
       ...responseRequestId(request.requestId),
       normalizedSpec,
     };
-    const parsedDiagram = safeParseContract(
-      FlowchartDiagramSchema,
-      flowchartDiagramInput(normalizedSpec),
-    );
-    if (!parsedDiagram.success) {
+    const parsedDiagram = Schema.decodeUnknownResult(FlowchartDiagramSchema, {
+      errors: "all",
+      reportInput: true,
+    })(flowchartDiagramInput(normalizedSpec));
+    if (!Result.isSuccess(parsedDiagram)) {
       return yield* new BuildFlowchartFailure({
         status: "invalid_flowchart",
         context: {
           ...baseContext,
-          issues: flowchartSchemaIssues(parsedDiagram.error, normalizedSpec),
+          issues: flowchartSchemaIssues(
+            formatContractSchemaError(parsedDiagram.failure),
+            normalizedSpec,
+          ),
         },
       });
     }
-    const diagram = parsedDiagram.data;
+    const diagram = parsedDiagram.success;
     const validationIssues = canonicalFlowchartIssues(diagram);
     if (validationIssues.length > 0) {
       return yield* new BuildFlowchartFailure({
@@ -2750,19 +2776,22 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
 
 const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(
   function* (input: unknown) {
-    const parsed = GetArtifactRequestSchema.safeParse(input);
-    if (!parsed.success) {
+    const parsed = Schema.decodeUnknownResult(GetArtifactRequestSchema, {
+      errors: "all",
+      reportInput: true,
+    })(input);
+    if (!Result.isSuccess(parsed)) {
       return yield* new GetArtifactFailure({
         status: "invalid_input",
         context: {
-          issues: inputIssues(parsed.error),
+          issues: inputIssues(formatContractSchemaError(parsed.failure)),
         },
       });
     }
 
     const environment = yield* CodeModeRuntimeEnvironment;
     const store = yield* CodeModeArtifactStorage;
-    const request = parsed.data;
+    const request = parsed.success;
     const manifest = yield* store.readManifest(request.artifactId).pipe(
       Effect.mapError(
         (error) =>
@@ -2876,17 +2905,22 @@ const applyDiagramPatchWorkflow = Effect.fn(
       context: { issues: [rawIssue] },
     });
   }
-  const parsed = ApplyDiagramPatchRequestSchema.safeParse(input);
-  if (!parsed.success) {
+  const parsed = Schema.decodeUnknownResult(ApplyDiagramPatchRequestSchema, {
+    errors: "all",
+    reportInput: true,
+  })(input);
+  if (!Result.isSuccess(parsed)) {
     return yield* new ApplyDiagramPatchFailure({
       status: "invalid_input",
-      context: { issues: inputIssues(parsed.error) },
+      context: {
+        issues: inputIssues(formatContractSchemaError(parsed.failure)),
+      },
     });
   }
 
   const environment = yield* CodeModeRuntimeEnvironment;
 
-  const request = parsed.data;
+  const request = parsed.success;
   const patchId = yield* Effect.sync(() => environment.createId("patch"));
   const baseContext = {
     patchId,

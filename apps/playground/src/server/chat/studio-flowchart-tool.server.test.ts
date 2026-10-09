@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "@effect/vitest";
-import { Effect, Fiber } from "effect";
+import { Effect, Fiber, Schema } from "effect";
 
 import {
   BuildFlowchartResultSchema,
@@ -135,13 +135,14 @@ describe("Studio build_flowchart host", () => {
   });
 
   it("injects artifact options instead of exposing them to the model", async () => {
-    let request:
-      | ReturnType<typeof BuildFlowchartRequestSchema.parse>
-      | undefined;
+    let request: typeof BuildFlowchartRequestSchema.Type | undefined;
     const executor = await Effect.runPromise(
       makeStudioFlowchartToolExecutor((input) =>
         Effect.sync(() => {
-          request = BuildFlowchartRequestSchema.parse(input);
+          request = Schema.decodeUnknownSync(BuildFlowchartRequestSchema, {
+            errors: "all",
+            reportInput: true,
+          })(input);
           return repairResult;
         }),
       ),
@@ -278,7 +279,10 @@ describe("Studio build_flowchart host", () => {
     const executor = await Effect.runPromise(
       makeStudioFlowchartToolExecutor((input) =>
         Effect.gen(function* () {
-          const request = BuildFlowchartRequestSchema.parse(input);
+          const request = Schema.decodeUnknownSync(
+            BuildFlowchartRequestSchema,
+            { errors: "all", reportInput: true },
+          )(input);
           requestIds.push(request.requestId ?? "missing-request-id");
           if (requestIds.length === 1) {
             started.resolve(undefined);

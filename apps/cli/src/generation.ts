@@ -4,7 +4,7 @@ import {
   type ExcalidrawFile,
   type PatchableScene,
 } from "@sketchi/diagram-agent";
-import { Effect, Schema } from "effect";
+import { Effect, Schema, Result } from "effect";
 
 import type { BuiltDiagram, StoredDiagram } from "./contracts.js";
 import {
@@ -209,18 +209,24 @@ function timeoutFailure(): CliGenerationError {
 function decodeScene(
   value: unknown,
 ): Effect.Effect<PatchableScene, CliGenerationError> {
-  const decoded = RenderedDiagramSceneSchema.safeParse(value);
-  return decoded.success
-    ? Effect.succeed(decoded.data)
+  const decoded = Schema.decodeUnknownResult(RenderedDiagramSceneSchema, {
+    errors: "all",
+    reportInput: true,
+  })(value);
+  return Result.isSuccess(decoded)
+    ? Effect.succeed(decoded.success)
     : Effect.fail(malformedResponse());
 }
 
 function decodeExcalidraw(
   value: unknown,
 ): Effect.Effect<ExcalidrawFile, CliGenerationError> {
-  const decoded = ExcalidrawFileSchema.safeParse(value);
-  return decoded.success
-    ? Effect.succeed(decoded.data)
+  const decoded = Schema.decodeUnknownResult(ExcalidrawFileSchema, {
+    errors: "all",
+    reportInput: true,
+  })(value);
+  return Result.isSuccess(decoded)
+    ? Effect.succeed(decoded.success)
     : Effect.fail(malformedResponse());
 }
 

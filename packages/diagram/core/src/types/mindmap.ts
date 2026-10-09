@@ -5,9 +5,7 @@ import {
   DiagramNode,
   DiagramValidationError,
   IntermediateDiagram,
-  parseDiagramSchema,
   validateIntermediateDiagram,
-  withDiagramParser,
 } from "../intermediate.js";
 
 export const mindmapDiagramType = "mindmap" as const;
@@ -52,7 +50,7 @@ export class MindmapDiagram extends IntermediateDiagram.extend<MindmapDiagram>(
     .pipe(Schema.mutable)
     .check(Schema.isMinLength(1)),
 }) {}
-export const MindmapDiagramSchema = withDiagramParser(MindmapDiagram);
+export const MindmapDiagramSchema = MindmapDiagram;
 
 export function validateMindmapDiagram(
   diagram: MindmapDiagram,
@@ -119,7 +117,9 @@ export function validateMindmapDiagram(
 }
 
 export function parseMindmapDiagram(input: unknown): MindmapDiagram {
-  return validateMindmapDiagram(parseDiagramSchema(MindmapDiagram, input));
+  return validateMindmapDiagram(
+    Schema.decodeUnknownSync(MindmapDiagram, { errors: "all" })(input),
+  );
 }
 
 export const mindmapFixture = parseMindmapDiagram({

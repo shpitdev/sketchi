@@ -153,6 +153,7 @@ export default [
     files: [
       "packages/diagram/core/src/intermediate.ts",
       "packages/diagram/core/src/types/flowchart.ts",
+      "packages/diagram/core/src/types/flowchart.test.ts",
       "packages/diagram/core/src/types/mindmap.ts",
     ],
     rules: {

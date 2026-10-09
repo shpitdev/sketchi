@@ -1,3 +1,4 @@
+import { Schema } from "effect";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -96,7 +97,10 @@ describe("sketchi canvas command", () => {
       request.on("data", (chunk: Buffer) => chunks.push(chunk));
       request.on("end", () => {
         const parsed: unknown = JSON.parse(Buffer.concat(chunks).toString());
-        const decoded = CreateCanvasRequestSchema.parse(parsed);
+        const decoded = Schema.decodeUnknownSync(CreateCanvasRequestSchema, {
+          errors: "all",
+          reportInput: true,
+        })(parsed);
         requests.push([decoded.spec, decoded.options]);
         response.setHeader("content-type", "application/json");
         response.end(

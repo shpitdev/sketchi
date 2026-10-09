@@ -5,8 +5,6 @@ import {
   DiagramNode,
   DiagramValidationError,
   IntermediateDiagram,
-  parseDiagramSchema,
-  withDiagramParser,
 } from "../intermediate.js";
 
 export const flowchartDiagramType = "flowchart" as const;
@@ -85,7 +83,7 @@ export class FlowchartDiagram extends IntermediateDiagram.extend<FlowchartDiagra
     .pipe(Schema.mutable)
     .check(Schema.isMinLength(1)),
 }) {}
-export const FlowchartDiagramSchema = withDiagramParser(FlowchartDiagram);
+export const FlowchartDiagramSchema = FlowchartDiagram;
 
 export type FlowchartNodeKind = typeof FlowchartNodeKindSchema.Type;
 export type FlowchartValidationIssueCode =
@@ -365,7 +363,9 @@ export function validateFlowchartDiagram(
 }
 
 export function parseFlowchartDiagram(input: unknown): FlowchartDiagram {
-  return validateFlowchartDiagram(parseDiagramSchema(FlowchartDiagram, input));
+  return validateFlowchartDiagram(
+    Schema.decodeUnknownSync(FlowchartDiagram, { errors: "all" })(input),
+  );
 }
 
 export const flowchartFixture = parseFlowchartDiagram({

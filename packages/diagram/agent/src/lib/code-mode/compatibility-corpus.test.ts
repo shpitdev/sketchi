@@ -843,7 +843,7 @@ function deepMindmapSpec() {
 }
 
 async function buildIssueCompatibilityMatrix(
-  sourceScene: ReturnType<typeof RenderedDiagramSceneSchema.parse>,
+  sourceScene: typeof RenderedDiagramSceneSchema.Type,
 ) {
   const flowchart = (spec: unknown, options?: unknown) =>
     deterministicRuntime().buildFlowchart({
@@ -1245,7 +1245,10 @@ async function buildGoldenCorpus() {
   if (!getScene.ok || !getExcalidraw.ok || !getPng.ok) {
     throw new Error("Golden artifact reads must succeed.");
   }
-  const sourceScene = RenderedDiagramSceneSchema.parse(getScene.inline);
+  const sourceScene = Schema.decodeUnknownSync(RenderedDiagramSceneSchema, {
+    errors: "all",
+    reportInput: true,
+  })(getScene.inline);
 
   const mindmapBucket = new RecordingBucket();
   const mindmap = await deterministicRuntime({
@@ -1729,7 +1732,10 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
     if (!sourceGet.ok) {
       throw new Error("Compatibility source artifact must be available.");
     }
-    const sourceScene = RenderedDiagramSceneSchema.parse(sourceGet.inline);
+    const sourceScene = Schema.decodeUnknownSync(RenderedDiagramSceneSchema, {
+      errors: "all",
+      reportInput: true,
+    })(sourceGet.inline);
     const issueMatrix = await buildIssueCompatibilityMatrix(sourceScene);
     const directlyReachableCodes = Object.keys(issueMatrix);
     const boundaryOnlyCodes = [

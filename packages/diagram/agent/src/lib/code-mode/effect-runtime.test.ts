@@ -10,15 +10,15 @@ import {
   type TelemetryMetricEvent,
   type TelemetrySpanEvent,
 } from "@sketchi/observability";
-import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
+import { Cause, Effect, Exit, Fiber, Layer, Schema, Result } from "effect";
 
 import { CodeModeArtifactStorageMemory } from "./artifacts";
 import {
+  formatContractSchemaError,
   BuildFlowchartRequestSchema,
   BuildSequenceDiagramRequestSchema,
   DIAGRAM_PATCH_OPERATION_NAMES,
   DiagramPatchOperationSchema,
-  safeParseContract,
   MindmapTopicSchema,
   RenderedDiagramSceneSchema,
   toCodeModeJsonSchema,
@@ -133,17 +133,29 @@ describe("Code Mode telemetry", () => {
 });
 
 describe("structured contract issue metadata", () => {
+  it("does not attach parser facades to contract schemas", () => {
+    for (const schema of [
+      BuildFlowchartRequestSchema,
+      BuildSequenceDiagramRequestSchema,
+      MindmapTopicSchema,
+      RenderedDiagramSceneSchema,
+    ]) {
+      assert.isFalse("parse" in schema);
+      assert.isFalse("safeParse" in schema);
+    }
+  });
+
   it("retains literal-union kind when display wording changes", () => {
-    const result = safeParseContract(
+    const result = Schema.decodeUnknownResult(
       Schema.Literals(["scene", "png"]).annotate({
         message: "Choose a supported format.",
       }),
-      "svg",
-    );
-    assert.isFalse(result.success);
-    if (result.success)
+      { errors: "all", reportInput: true },
+    )("svg");
+    assert.isFalse(Result.isSuccess(result));
+    if (Result.isSuccess(result))
       return assert.fail("Invalid format unexpectedly decoded.");
-    assert.deepInclude(result.error.issues[0], {
+    assert.deepInclude(formatContractSchemaError(result.failure).issues[0], {
       issueTag: "AnyOf",
       astKind: "LiteralUnion",
       message: "Choose a supported format.",
@@ -157,13 +169,16 @@ describe("structured contract issue metadata", () => {
         }),
       ),
     });
-    const result = safeParseContract(schema, {
+    const result = Schema.decodeUnknownResult(schema, {
+      errors: "all",
+      reportInput: true,
+    })({
       operations: [{ op: "unknown" }],
     });
-    assert.isFalse(result.success);
-    if (result.success)
+    assert.isFalse(Result.isSuccess(result));
+    if (Result.isSuccess(result))
       return assert.fail("Invalid operation unexpectedly decoded.");
-    assert.deepInclude(result.error.issues[0], {
+    assert.deepInclude(formatContractSchemaError(result.failure).issues[0], {
       issueTag: "AnyOf",
       astKind: "Union",
       message: "Choose a supported operation.",
@@ -174,7 +189,10 @@ describe("structured contract issue metadata", () => {
 
 layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
   it("keeps legacy style input decodable but out of the model contract", () => {
-    const legacy = BuildFlowchartRequestSchema.parse({
+    const legacy = Schema.decodeUnknownSync(BuildFlowchartRequestSchema, {
+      errors: "all",
+      reportInput: true,
+    })({
       spec: {
         title: "Legacy style",
         nodes: [{ id: "start", kind: "start", label: "Start" }],
@@ -197,7 +215,13 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
 
   it.effect("preserves golden request encoding and failure output", () =>
     Effect.gen(function* () {
-      const decoded = BuildFlowchartRequestSchema.parse({
+      const decoded = yield* Schema.decodeUnknownEffect(
+        BuildFlowchartRequestSchema,
+        {
+          errors: "all",
+          reportInput: true,
+        },
+      )({
         spec: {
           nodes: [{ id: "start", kind: "start", label: "Start" }],
           title: "Golden flow",
@@ -216,37 +240,43 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
         },
       });
 
-      const failure = BuildFlowchartRequestSchema.safeParse({
+      const failure = Schema.decodeUnknownResult(BuildFlowchartRequestSchema, {
+        errors: "all",
+        reportInput: true,
+      })({
         requestId: "",
         spec: { nodes: [], title: "" },
       });
-      assert.isFalse(failure.success);
-      if (failure.success) {
+      assert.isFalse(Result.isSuccess(failure));
+      if (Result.isSuccess(failure)) {
         return assert.fail("Invalid golden request unexpectedly decoded.");
       }
-      assert.deepStrictEqual(failure.error.issues, [
-        {
-          code: "custom",
-          issueTag: "Filter",
-          astKind: "String",
-          message: "Too small: expected string to have >=1 characters",
-          path: ["requestId"],
-        },
-        {
-          code: "custom",
-          issueTag: "Filter",
-          astKind: "String",
-          message: "Too small: expected string to have >=1 characters",
-          path: ["spec", "title"],
-        },
-        {
-          code: "custom",
-          issueTag: "Filter",
-          astKind: "Arrays",
-          message: "Too small: expected array to have >=1 items",
-          path: ["spec", "nodes"],
-        },
-      ]);
+      assert.deepStrictEqual(
+        formatContractSchemaError(failure.failure).issues,
+        [
+          {
+            code: "custom",
+            issueTag: "Filter",
+            astKind: "String",
+            message: "Too small: expected string to have >=1 characters",
+            path: ["requestId"],
+          },
+          {
+            code: "custom",
+            issueTag: "Filter",
+            astKind: "String",
+            message: "Too small: expected string to have >=1 characters",
+            path: ["spec", "title"],
+          },
+          {
+            code: "custom",
+            issueTag: "Filter",
+            astKind: "Arrays",
+            message: "Too small: expected array to have >=1 items",
+            path: ["spec", "nodes"],
+          },
+        ],
+      );
     }),
   );
 
@@ -264,7 +294,10 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
 
   it.effect("validates and defaults the sequence diagram contract", () =>
     Effect.gen(function* () {
-      const decoded = BuildSequenceDiagramRequestSchema.parse({
+      const decoded = yield* Schema.decodeUnknownEffect(
+        BuildSequenceDiagramRequestSchema,
+        { errors: "all", reportInput: true },
+      )({
         spec: {
           title: "Checkout",
           participants: [
@@ -303,20 +336,26 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
         },
       });
 
-      const malformed = BuildSequenceDiagramRequestSchema.safeParse({
+      const malformed = Schema.decodeUnknownResult(
+        BuildSequenceDiagramRequestSchema,
+        { errors: "all", reportInput: true },
+      )({
         spec: {
           title: "Checkout",
           participants: [{ id: "store", label: "Store" }],
           messages: [{ source: "store", target: "store" }],
         },
       });
-      assert.isFalse(malformed.success);
-      if (malformed.success) {
+      assert.isFalse(Result.isSuccess(malformed));
+      if (Result.isSuccess(malformed)) {
         return assert.fail("Malformed sequence message unexpectedly decoded.");
       }
-      assert.deepInclude(malformed.error.issues[0], {
-        path: ["spec", "messages", 0, "label"],
-      });
+      assert.deepInclude(
+        formatContractSchemaError(malformed.failure).issues[0],
+        {
+          path: ["spec", "messages", 0, "label"],
+        },
+      );
     }),
   );
 
@@ -341,7 +380,10 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
         style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
       });
       const encoded = yield* Schema.encodeEffect(RenderedDiagramSceneSchema)(
-        RenderedDiagramSceneSchema.parse(rendered),
+        yield* Schema.decodeUnknownEffect(RenderedDiagramSceneSchema, {
+          errors: "all",
+          reportInput: true,
+        })(rendered),
       );
       const decoded = yield* Schema.decodeUnknownEffect(
         RenderedDiagramSceneSchema,

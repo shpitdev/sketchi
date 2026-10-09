@@ -1220,12 +1220,19 @@ const DiagramStoreLive = Layer.effect(
       const text = yield* fs.readText(scenePath);
       const decoded = yield* Effect.sync(() => {
         try {
-          return RenderedDiagramSceneSchema.safeParse(JSON.parse(text));
+          return Schema.decodeUnknownResult(RenderedDiagramSceneSchema, {
+            errors: "all",
+            reportInput: true,
+          })(JSON.parse(text));
         } catch {
           return undefined;
         }
       });
-      if (!decoded?.success || decoded.data.diagramId !== diagramId) {
+      if (
+        !decoded ||
+        Result.isFailure(decoded) ||
+        decoded.success.diagramId !== diagramId
+      ) {
         return yield* storageError(
           "corrupt_record",
           `Diagram "${diagramId}" has an invalid current scene artifact.`,
@@ -1235,7 +1242,7 @@ const DiagramStoreLive = Layer.effect(
       }
       return {
         revision: current.manifest.revision,
-        scene: decoded.data,
+        scene: decoded.success,
       } satisfies PatchSource;
     });
 
@@ -1347,11 +1354,21 @@ const DiagramStoreLive = Layer.effect(
       revision: number,
     ) {
       const value = yield* readArchivedJson(path, diagramId, revision);
-      const decoded =
+      const valid =
         kind === "scene"
-          ? RenderedDiagramSceneSchema.safeParse(value)
-          : ExcalidrawFileSchema.safeParse(value);
-      if (!decoded.success) return yield* corruptRevision(diagramId, revision);
+          ? Result.isSuccess(
+              Schema.decodeUnknownResult(RenderedDiagramSceneSchema, {
+                errors: "all",
+                reportInput: true,
+              })(value),
+            )
+          : Result.isSuccess(
+              Schema.decodeUnknownResult(ExcalidrawFileSchema, {
+                errors: "all",
+                reportInput: true,
+              })(value),
+            );
+      if (!valid) return yield* corruptRevision(diagramId, revision);
       if (kind === "excalidraw" && authority === "detached") {
         yield* validateShareScene(value).pipe(
           Effect.mapError(() => corruptRevision(diagramId, revision)),

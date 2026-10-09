@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   DiagramValidationError,
+  DiagramNodeSchema,
+  FlowchartDiagramSchema,
+  IntermediateDiagramSchema,
+  MindmapDiagramSchema,
   SKETCHI_DIAGRAM_PALETTE,
   SKETCHI_DIAGRAM_STYLE,
   flowchartFixture,
@@ -27,6 +31,18 @@ function themeToken(name: string): string {
 }
 
 describe("parseIntermediateDiagram", () => {
+  it("does not attach parser facades to diagram schemas or subclasses", () => {
+    for (const schema of [
+      DiagramNodeSchema,
+      IntermediateDiagramSchema,
+      FlowchartDiagramSchema,
+      MindmapDiagramSchema,
+    ]) {
+      expect("parse" in schema).toBe(false);
+      expect("safeParse" in schema).toBe(false);
+    }
+  });
+
   it("keeps the runtime palette synchronized with diagram-ui/theme.css", () => {
     expect(SKETCHI_DIAGRAM_PALETTE).toEqual({
       paper: themeToken("paper"),

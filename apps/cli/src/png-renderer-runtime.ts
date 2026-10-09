@@ -1,4 +1,8 @@
-import { ExcalidrawFileSchema } from "@sketchi/diagram-agent";
+import { Schema, Result } from "effect";
+import {
+  formatContractSchemaError,
+  ExcalidrawFileSchema,
+} from "@sketchi/diagram-agent";
 import { Resvg, initWasm, type ResvgRenderOptions } from "@resvg/resvg-wasm";
 import * as Linkedom from "linkedom";
 
@@ -366,20 +370,23 @@ function loadExcalidraw() {
 export async function renderPngBytes(
   input: PngRenderInput,
 ): Promise<Uint8Array> {
-  const decodedExcalidraw = ExcalidrawFileSchema.safeParse(input.excalidraw);
-  if (!decodedExcalidraw.success) {
+  const decodedExcalidraw = Schema.decodeUnknownResult(ExcalidrawFileSchema, {
+    errors: "all",
+    reportInput: true,
+  })(input.excalidraw);
+  if (!Result.isSuccess(decodedExcalidraw)) {
     throw HeadlessPngRenderError.make({
       cause: new Error("Stored Excalidraw data failed schema validation."),
       code: "invalid_render_artifact",
       stage: "artifact",
       message: "Stored Excalidraw data failed schema validation.",
-      details: decodedExcalidraw.error.issues
-        .slice(0, 8)
+      details: formatContractSchemaError(decodedExcalidraw.failure)
+        .issues.slice(0, 8)
         .map((issue) => issue.message),
     });
   }
   const sizeFailure = renderLimitDiagnostic(
-    decodedExcalidraw.data.elements,
+    decodedExcalidraw.success.elements,
     input.scene ? TITLE_HEIGHT : 0,
   );
   if (sizeFailure) {
@@ -402,7 +409,7 @@ export async function renderPngBytes(
   }
   const textValues = [
     ...(input.scene ? [input.scene.title] : []),
-    ...decodedExcalidraw.data.elements.flatMap((element) =>
+    ...decodedExcalidraw.success.elements.flatMap((element) =>
       "text" in element && typeof element["text"] === "string"
         ? [element["text"]]
         : [],
@@ -428,7 +435,7 @@ export async function renderPngBytes(
     initializeResvg(),
   ]);
   const restored = await loadFromBlob(
-    new Blob([JSON.stringify(decodedExcalidraw.data)], {
+    new Blob([JSON.stringify(decodedExcalidraw.success)], {
       type: MIME_TYPES.excalidraw,
     }),
     null,
@@ -443,7 +450,7 @@ export async function renderPngBytes(
       exportScale: 1,
       viewBackgroundColor:
         input.scene?.backgroundColor ??
-        decodedExcalidraw.data.appState["viewBackgroundColor"] ??
+        decodedExcalidraw.success.appState["viewBackgroundColor"] ??
         "#ffffff",
     },
     files: restored.files,
