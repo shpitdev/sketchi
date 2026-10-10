@@ -331,7 +331,7 @@ describe("renderIntermediateDiagram", () => {
 
     expect(draft.y).toBeGreaterThan(clear.y);
     expect(review.y).toBeGreaterThan(draft.y);
-    expect(draft.x).toBe(clear.x);
+    expect(draft.x + draft.width / 2).toBe(clear.x + clear.width / 2);
   });
 
   it("routes offset decision branches with orthogonal points", () => {

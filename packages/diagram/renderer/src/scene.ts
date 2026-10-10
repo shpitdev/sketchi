@@ -1,5 +1,8 @@
 import {
+  CANVAS_NODE_ICON,
   CANVAS_SPEC_VERSION,
+  canvasBoundTextBox,
+  canvasNodeIconBand,
   type AxisAlignedSegment,
   isSharedBoundStem,
   segmentCrossesBoundsInterior,
@@ -9,6 +12,7 @@ import {
   type CanvasElement,
   type CanvasFrameElement,
   type CanvasLineElement,
+  type CanvasNodeIcon,
   type CanvasPoint,
   type CanvasShapeElement,
   type CanvasShapeKind,
@@ -44,6 +48,16 @@ const NODE_LABEL_HORIZONTAL_PADDING = 36;
 const NODE_LABEL_VERTICAL_PADDING = 28;
 /** Eighteen average glyphs per line before wrapping. */
 const MAX_LABEL_LINE_UNITS = 18 * DEFAULT_GLYPH_UNITS;
+/** A diamond's bound-text box is half its width, so decisions wrap sooner. */
+const MAX_DIAMOND_LABEL_LINE_UNITS = 12 * DEFAULT_GLYPH_UNITS;
+/** Logo edge per shape; smaller marks keep start/end and decision nodes compact. */
+const NODE_ICON_SIZE: Readonly<Record<NodeSceneShape, number>> = {
+  circle: 24,
+  diamond: 20,
+  ellipse: 24,
+  polygon: 28,
+  rectangle: 28,
+};
 const PORT_SPACING = 18;
 const PORT_PADDING = 16;
 const RANK_SWEEP_COUNT = 4;
@@ -73,23 +87,61 @@ interface RouteSegment extends AxisAlignedSegment {
 
 type VisitState = "visited" | "visiting";
 
-function measureLabel(label: string): {
-  height: number;
-  text: string;
-  width: number;
-} {
-  const text = wrapTextToUnits(label, MAX_LABEL_LINE_UNITS);
-  const lines = text.split("\n");
-  const width = Math.ceil(
-    estimateTextWidth(text, NODE_LABEL_FONT_SIZE) +
-      NODE_LABEL_HORIZONTAL_PADDING,
-  );
-  const height = Math.ceil(
-    lines.length * NODE_LABEL_FONT_SIZE * NODE_LABEL_LINE_HEIGHT +
-      NODE_LABEL_VERTICAL_PADDING,
-  );
+interface LabelMetrics {
+  /** Padded box height used by plain nodes. */
+  readonly height: number;
+  readonly text: string;
+  /** Unpadded text height. */
+  readonly textHeight: number;
+  /** Unpadded width of the widest line (shared text-metrics estimate). */
+  readonly textWidth: number;
+  /** Padded box width used by plain nodes. */
+  readonly width: number;
+}
 
-  return { text, width, height };
+function measureLabel(label: string, maxLineUnits: number): LabelMetrics {
+  const text = wrapTextToUnits(label, maxLineUnits);
+  const lines = text.split("\n");
+  const textWidth = estimateTextWidth(text, NODE_LABEL_FONT_SIZE);
+  const textHeight = Math.ceil(
+    lines.length * NODE_LABEL_FONT_SIZE * NODE_LABEL_LINE_HEIGHT,
+  );
+  const width = Math.ceil(textWidth + NODE_LABEL_HORIZONTAL_PADDING);
+  const height = Math.ceil(textHeight + NODE_LABEL_VERTICAL_PADDING);
+
+  return { text, textHeight, textWidth, width, height };
+}
+
+/**
+ * Smallest container whose Excalidraw bound-text box holds the label and any
+ * logo band. Excalidraw re-wraps an edited label to this box (half the width of
+ * a diamond, the inscribed rectangle of an ellipse), so sizing to it keeps the
+ * stored wrap and the logo clear after editing.
+ */
+function boundTextContainerSize(
+  shape: NodeSceneShape,
+  label: LabelMetrics,
+  icon: CanvasNodeIcon | undefined,
+): { readonly height: number; readonly width: number } {
+  const padding = CANVAS_NODE_ICON.boundTextPadding * 2;
+  const textHeight = label.textHeight + canvasNodeIconBand(icon);
+  const scale =
+    shape === "diamond"
+      ? 2
+      : shape === "ellipse" || shape === "circle"
+        ? Math.SQRT2
+        : 1;
+  let width = Math.ceil((label.textWidth + padding) * scale);
+  let height = Math.ceil((textHeight + padding) * scale);
+  // Excalidraw rounds its text box, which can land just under the closed-form
+  // size; grow until the rounded box itself holds the text.
+  while (canvasBoundTextBox({ height, shape, width }).width < label.textWidth) {
+    width += 1;
+  }
+  while (canvasBoundTextBox({ height, shape, width }).height < textHeight) {
+    height += 1;
+  }
+  return { width, height };
 }
 
 function shapeForNode(node: DiagramNode): NodeSceneShape {
@@ -104,21 +156,44 @@ function shapeForNode(node: DiagramNode): NodeSceneShape {
 }
 
 function createNodeShape(node: DiagramNode): NodeSceneElement {
-  const labelMetrics = measureLabel(node.label);
   const shape = shapeForNode(node);
+  const labelMetrics = measureLabel(
+    node.label,
+    shape === "diamond" ? MAX_DIAMOND_LABEL_LINE_UNITS : MAX_LABEL_LINE_UNITS,
+  );
+  const icon = node.icon
+    ? { slug: node.icon.slug, size: NODE_ICON_SIZE[shape] }
+    : undefined;
   const shapeWidthPad = shape === "diamond" ? 32 : shape === "ellipse" ? 20 : 0;
   const shapeHeightPad = shape === "diamond" ? 32 : 0;
+  // Logo nodes and diamonds must fit Excalidraw's edit-time text box; other
+  // plain nodes keep their padded label box, which already contains it.
+  const boundText =
+    icon || shape === "diamond"
+      ? boundTextContainerSize(shape, labelMetrics, icon)
+      : { height: 0, width: 0 };
 
   return {
     type: "node",
     id: `node:${node.id}`,
     nodeId: node.id,
     ...(node.kind ? { kind: node.kind } : {}),
+    ...(icon ? { icon } : {}),
     shape,
     x: 0,
     y: 0,
-    width: Math.max(MIN_NODE_WIDTH, labelMetrics.width + shapeWidthPad),
-    height: Math.max(MIN_NODE_HEIGHT, labelMetrics.height + shapeHeightPad),
+    width: Math.max(
+      MIN_NODE_WIDTH,
+      labelMetrics.width + shapeWidthPad,
+      boundText.width,
+    ),
+    height: icon
+      ? Math.max(MIN_NODE_HEIGHT, boundText.height)
+      : Math.max(
+          MIN_NODE_HEIGHT,
+          labelMetrics.height + shapeHeightPad,
+          boundText.height,
+        ),
     label: labelMetrics.text,
   };
 }
@@ -466,6 +541,8 @@ function textForNode(shape: NodeSceneElement): TextSceneElement {
     text: shape.label,
     fontSize: NODE_LABEL_FONT_SIZE,
     maxWidth: Math.max(1, shape.width - NODE_LABEL_HORIZONTAL_PADDING),
+    // The logo sits at the top of the text box; the label stacks beneath it.
+    ...(shape.icon ? { verticalAlign: "bottom" as const } : {}),
   };
 }
 

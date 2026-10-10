@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CANVAS_NODE_ICON,
   CANVAS_SPEC_VERSION,
+  canvasBoundTextBox,
   canvasBoundTextInset,
   canvasNodeIconBand,
   canvasNodeIconBox,
@@ -90,6 +91,23 @@ describe("node icon geometry", () => {
       height: 20,
     });
     expect(canvasNodeIconBox(node("plain"))).toBeUndefined();
+  });
+
+  it("mirrors Excalidraw's bound-text box for each container shape", () => {
+    expect(canvasBoundTextBox(node("r", { width: 184, height: 80 }))).toEqual({
+      width: 174,
+      height: 70,
+    });
+    expect(
+      canvasBoundTextBox(
+        node("e", { shape: "ellipse", width: 200, height: 100 }),
+      ),
+    ).toEqual({ width: 131, height: 61 });
+    expect(
+      canvasBoundTextBox(
+        node("d", { shape: "diamond", width: 229, height: 115 }),
+      ),
+    ).toEqual({ width: 105, height: 48 });
   });
 
   it("reserves the icon plus a gap above and below it", () => {
@@ -316,9 +334,10 @@ describe("node icon validation", () => {
 
   it("counts the icon band when checking whether a label fits", () => {
     const icon = { slug: "docker", size: 28 };
-    // Fallback label: 16px text (22px tall) + 18px padding + 36px icon band.
-    const fits = node("fits", { height: 76, icon });
-    const overflows = node("overflows", { height: 75, icon });
+    // Fallback label: 16px text (22px tall) + 36px icon band inside the
+    // rectangle's 10px-padded bound-text box.
+    const fits = node("fits", { height: 68, icon });
+    const overflows = node("overflows", { height: 67, icon });
 
     expect(
       getCanvasValidationIssues(canvas([fits], { icons: { docker: DOCKER } })),

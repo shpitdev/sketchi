@@ -366,6 +366,29 @@ export function canvasBoundTextInset(
   return { x: padding, y: padding };
 }
 
+/**
+ * Size of Excalidraw's bound-text box for a container (getBoundTextMaxWidth and
+ * getBoundTextMaxHeight). Excalidraw re-wraps an edited label to this width.
+ */
+export function canvasBoundTextBox(
+  node: Pick<CanvasShapeElement, "height" | "shape" | "width">,
+): { readonly height: number; readonly width: number } {
+  const padding = CANVAS_NODE_ICON.boundTextPadding * 2;
+  if (node.shape === "ellipse" || node.shape === "circle") {
+    return {
+      width: Math.round((node.width / 2) * Math.SQRT2) - padding,
+      height: Math.round((node.height / 2) * Math.SQRT2) - padding,
+    };
+  }
+  if (node.shape === "diamond") {
+    return {
+      width: Math.round(node.width / 2) - padding,
+      height: Math.round(node.height / 2) - padding,
+    };
+  }
+  return { width: node.width - padding, height: node.height - padding };
+}
+
 /** Vertical space a node icon takes from the top of its label's text box. */
 export function canvasNodeIconBand(icon: CanvasNodeIcon | undefined): number {
   return icon ? icon.size + CANVAS_NODE_ICON.gap * 2 : 0;
@@ -457,11 +480,17 @@ function nodeLabelOverflows(
   // The adapter grows a label box past maxWidth only when glyphs would
   // otherwise outgrow its padded canvas; that growth must still fit.
   const paintedBox = boundLabelWidth(text, fontSize, maxWidth) - fontSize;
-  return (
-    textWidth + 24 > element.width ||
-    paintedBox + 24 > element.width ||
-    textHeight + 18 + canvasNodeIconBand(icon) > element.height
-  );
+  if (paintedBox + 24 > element.width) return true;
+  if (icon) {
+    // A logo node's label must fit Excalidraw's bound-text box under the logo
+    // band; plain labels keep the original padded-box rule.
+    const boundText = canvasBoundTextBox(element);
+    return (
+      estimatedWidth > boundText.width ||
+      textHeight + canvasNodeIconBand(icon) > boundText.height
+    );
+  }
+  return textWidth + 24 > element.width || textHeight + 18 > element.height;
 }
 
 /**
