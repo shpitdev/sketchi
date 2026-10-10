@@ -7,7 +7,7 @@ import {
 import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 import { copyText, ExcalidrawSceneCanvas } from "@sketchi/diagram-ui";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { DiagramInspector } from "../diagram-inspector/index.js";
 import {
@@ -27,6 +27,11 @@ const defaultDiagrams: readonly IntermediateDiagram[] = [
 
 type CopyState = "copied" | "error" | "idle";
 
+interface CopyFeedback {
+  readonly diagramId: string;
+  readonly state: Exclude<CopyState, "idle">;
+}
+
 export interface ExcalidrawWorkspaceProps {
   diagrams?: readonly IntermediateDiagram[];
   errorMessage?: string;
@@ -43,9 +48,15 @@ export function ExcalidrawWorkspace({
   const [selectedId, setSelectedId] = useState(
     initialDiagramId ?? diagrams[0]?.id ?? "",
   );
-  const [copyState, setCopyState] = useState<CopyState>("idle");
+  const [copyFeedback, setCopyFeedback] = useState<CopyFeedback | null>(null);
 
   const active = diagrams.find((item) => item.id === selectedId) ?? diagrams[0];
+  // Copy feedback belongs to the diagram it was produced for, so switching
+  // diagrams reads as idle without resetting state after render.
+  const copyState: CopyState =
+    copyFeedback && copyFeedback.diagramId === active?.id
+      ? copyFeedback.state
+      : "idle";
 
   const scene = useMemo(
     () =>
@@ -80,20 +91,17 @@ export function ExcalidrawWorkspace({
     ? `data:application/json;charset=utf-8,${encodeURIComponent(sceneJson)}`
     : undefined;
 
-  useEffect(() => {
-    setCopyState("idle");
-  }, [active?.id]);
-
   async function copyIr() {
     if (!active) {
       return;
     }
 
+    const diagramId = active.id;
     try {
       await copyText(irJson);
-      setCopyState("copied");
+      setCopyFeedback({ diagramId, state: "copied" });
     } catch {
-      setCopyState("error");
+      setCopyFeedback({ diagramId, state: "error" });
     }
   }
 
@@ -108,7 +116,7 @@ export function ExcalidrawWorkspace({
               </a>
               <button
                 className="workspace-action"
-                onClick={copyIr}
+                onClick={() => void copyIr()}
                 type="button"
               >
                 {copyState === "copied"

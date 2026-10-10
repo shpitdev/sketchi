@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const excalidrawMock = vi.hoisted(() => ({
+  editors: [] as Array<{ readonly load: () => void }>,
   props: vi.fn(),
   scrollToContent: vi.fn(),
 }));
@@ -12,17 +13,32 @@ vi.mock("@excalidraw/excalidraw", async () => {
   return {
     Excalidraw: (props: {
       excalidrawAPI?: (api: {
+        getAppState: () => object;
         scrollToContent: typeof excalidrawMock.scrollToContent;
       }) => void;
       gridModeEnabled?: boolean;
       initialData?: { appState?: Record<string, unknown> };
+      onChange?: (
+        elements: readonly unknown[],
+        appState: object,
+        files: object,
+      ) => void;
     }) => {
       excalidrawMock.props(props);
-      React.useEffect(() => {
+      // Like Excalidraw's App: hand over the API from the constructor, during
+      // render, and report changes once the mounted editor has loaded its
+      // scene (`load` stands in for that).
+      React.useState(() => {
+        const appState = {};
         props.excalidrawAPI?.({
+          getAppState: () => appState,
           scrollToContent: excalidrawMock.scrollToContent,
         });
-      }, [props.excalidrawAPI]);
+        excalidrawMock.editors.push({
+          load: () => props.onChange?.([], appState, {}),
+        });
+        return null;
+      });
 
       return <div data-testid="mock-excalidraw">Mock Excalidraw</div>;
     },
@@ -35,9 +51,22 @@ import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 
 import { ExcalidrawSceneCanvas } from "./excalidraw-scene-canvas";
 
+const fitToViewport = {
+  animate: false,
+  fitToViewport: true,
+  viewportZoomFactor: 1,
+};
+
+function loadEditor(index: number) {
+  const editor = excalidrawMock.editors[index];
+  if (!editor) throw new Error(`Editor ${index} was never constructed.`);
+  act(() => editor.load());
+}
+
 describe("ExcalidrawSceneCanvas", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    excalidrawMock.editors.length = 0;
     excalidrawMock.props.mockReset();
     excalidrawMock.scrollToContent.mockReset();
   });
@@ -65,11 +94,7 @@ describe("ExcalidrawSceneCanvas", () => {
     expect(screen.getByText("Loading canvas")).toBeTruthy();
   });
 
-  it("fits scene content after Excalidraw loads", async () => {
-    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
-      callback(0);
-      return 1;
-    });
+  it("fits the scene once the editor has loaded it, and only once", async () => {
     const scene = convertSceneToExcalidraw(
       renderIntermediateDiagram(flowchartFixture),
     );
@@ -82,13 +107,17 @@ describe("ExcalidrawSceneCanvas", () => {
     );
 
     expect(await screen.findByTestId("mock-excalidraw")).toBeTruthy();
-    await waitFor(() => {
-      expect(excalidrawMock.scrollToContent).toHaveBeenCalledWith(undefined, {
-        animate: false,
-        fitToViewport: true,
-        viewportZoomFactor: 1,
-      });
-    });
+    expect(excalidrawMock.scrollToContent).not.toHaveBeenCalled();
+
+    loadEditor(0);
+    expect(excalidrawMock.scrollToContent).toHaveBeenCalledExactlyOnceWith(
+      undefined,
+      fitToViewport,
+    );
+
+    // Later edits report changes too; they must not refit the user's view.
+    loadEditor(0);
+    expect(excalidrawMock.scrollToContent).toHaveBeenCalledOnce();
     expect(excalidrawMock.props).toHaveBeenLastCalledWith(
       expect.objectContaining({ gridModeEnabled: false }),
     );
@@ -106,9 +135,8 @@ describe("ExcalidrawSceneCanvas", () => {
       />,
     );
     const canvas = await screen.findByTestId("mock-excalidraw");
-    await waitFor(() =>
-      expect(excalidrawMock.scrollToContent).toHaveBeenCalled(),
-    );
+    loadEditor(0);
+    expect(excalidrawMock.scrollToContent).toHaveBeenCalledOnce();
     excalidrawMock.scrollToContent.mockClear();
     rerender(
       <ExcalidrawSceneCanvas
@@ -121,6 +149,7 @@ describe("ExcalidrawSceneCanvas", () => {
       />,
     );
     expect(screen.getByTestId("mock-excalidraw")).toBe(canvas);
+    expect(excalidrawMock.editors).toHaveLength(1);
     expect(excalidrawMock.scrollToContent).not.toHaveBeenCalled();
     rerender(
       <ExcalidrawSceneCanvas
@@ -130,6 +159,36 @@ describe("ExcalidrawSceneCanvas", () => {
       />,
     );
     expect(screen.getByTestId("mock-excalidraw")).not.toBe(canvas);
+  });
+
+  it("fits only the editor for the current revision", async () => {
+    const scene = { appState: {}, elements: [] };
+    const { rerender } = render(
+      <ExcalidrawSceneCanvas
+        revision={1}
+        scene={scene}
+        title="Revised canvas"
+      />,
+    );
+    await screen.findByTestId("mock-excalidraw");
+    rerender(
+      <ExcalidrawSceneCanvas
+        revision={2}
+        scene={scene}
+        title="Revised canvas"
+      />,
+    );
+    expect(excalidrawMock.editors).toHaveLength(2);
+
+    // A replaced editor that reports late does not belong to the current API.
+    loadEditor(0);
+    expect(excalidrawMock.scrollToContent).not.toHaveBeenCalled();
+
+    loadEditor(1);
+    expect(excalidrawMock.scrollToContent).toHaveBeenCalledExactlyOnceWith(
+      undefined,
+      fitToViewport,
+    );
   });
 
   it("uses the Sketchi card color when a scene has no background", async () => {

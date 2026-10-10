@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 export interface CopyButtonProps {
   /** Text written to the clipboard on click. */
@@ -14,9 +14,9 @@ export interface CopyButtonProps {
  */
 export function CopyButton({ value, label }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
+  // A reset that fires after unmount is a no-op, so the timer only needs
+  // clearing when a new copy restarts it.
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  useEffect(() => () => clearTimeout(timer.current), []);
 
   async function copy() {
     try {
@@ -34,7 +34,7 @@ export function CopyButton({ value, label }: CopyButtonProps) {
       aria-label={copied ? "Copied" : label ? `Copy ${label}` : "Copy"}
       className="copy-btn"
       data-copied={copied ? "" : undefined}
-      onClick={copy}
+      onClick={() => void copy()}
       type="button"
     >
       <span aria-hidden="true" className="copy-btn__glyph">

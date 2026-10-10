@@ -1,5 +1,6 @@
+import { QueryClient, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { IconLibrary } from "../components/icon-library/index.js";
 import { decodeIconManifest, type IconManifest } from "@sketchi/icon-catalog";
@@ -8,50 +9,50 @@ export const Route = createFileRoute("/")({
   component: HomeRoute,
 });
 
-type IconLibraryLoadState =
-  | { readonly status: "loading" }
-  | { readonly data: IconManifest; readonly status: "ready" }
-  | { readonly error: string; readonly status: "error" };
+async function loadIconManifest(signal: AbortSignal): Promise<IconManifest> {
+  const response = await fetch("/icons-manifest.json", { signal });
+  if (!response.ok) {
+    throw new Error(`Icon library returned HTTP ${response.status}.`);
+  }
+  const payload: unknown = await response.json();
+  return decodeIconManifest(payload);
+}
 
 function HomeRoute() {
-  const [loadState, setLoadState] = useState<IconLibraryLoadState>({
-    status: "loading",
-  });
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoadState({ status: "loading" });
-    void fetch("/icons-manifest.json", { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(`Icon library returned HTTP ${response.status}.`);
-        }
-        const payload: unknown = await response.json();
-        return decodeIconManifest(payload);
-      })
-      .then((data) => setLoadState({ data, status: "ready" }))
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        setLoadState({
-          error:
-            error instanceof Error
-              ? error.message
-              : "The icon library could not be loaded.",
-          status: "error",
-        });
-      });
-    return () => controller.abort();
-  }, [attempt]);
+  const [queryClient] = useState(() => new QueryClient());
+  // Route-local query: unmounting aborts the manifest request, and retry
+  // refetches through the same query instead of a manual attempt counter.
+  const manifest = useQuery(
+    {
+      gcTime: 0,
+      queryFn: ({ signal }) => loadIconManifest(signal),
+      queryKey: ["icons-manifest"],
+      refetchOnReconnect: false,
+      refetchOnWindowFocus: false,
+      retry: false,
+    },
+    queryClient,
+  );
 
   return (
     <IconLibrary
-      {...(loadState.status === "ready" ? { data: loadState.data } : {})}
-      {...(loadState.status === "error"
-        ? { errorMessage: loadState.error }
+      {...(manifest.isSuccess ? { data: manifest.data } : {})}
+      {...(manifest.isError
+        ? {
+            errorMessage:
+              manifest.error instanceof Error
+                ? manifest.error.message
+                : "The icon library could not be loaded.",
+          }
         : {})}
-      onRetry={() => setAttempt((current) => current + 1)}
-      status={loadState.status}
+      onRetry={() => void manifest.refetch()}
+      status={
+        manifest.isSuccess
+          ? "ready"
+          : manifest.isError && !manifest.isFetching
+            ? "error"
+            : "loading"
+      }
     />
   );
 }

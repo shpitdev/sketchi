@@ -11,7 +11,8 @@ import {
   type SvgDiagnostic,
   type SvgToExcalidrawResult,
 } from "@sketchi/svg-excalidraw";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { QueryClient, useQuery } from "@tanstack/react-query";
+import { useCallback, useMemo, useState } from "react";
 
 import type { SvgHandoff } from "../../lib/svg-handoff";
 import { WorkspaceTopBar } from "../workspace-top-bar/index.js";
@@ -35,11 +36,6 @@ type ImportState =
   | {
       readonly conversion: SvgToExcalidrawResult;
       readonly kind: "converted";
-    }
-  | {
-      readonly kind: "source";
-      readonly source: string;
-      readonly sourceUrl: string;
     };
 
 function sourceName(sourceUrl: string): string {
@@ -117,65 +113,43 @@ export function SvgIconWorkspace({
   initialSource,
   onEditorApi,
 }: SvgIconWorkspaceProps) {
-  const [importState, setImportState] = useState<ImportState>(
-    initialSource === undefined
-      ? { kind: "loading" }
-      : {
-          kind: "source",
-          source: initialSource,
-          sourceUrl: handoff.sourceUrl,
-        },
+  const [queryClient] = useState(() => new QueryClient());
+  // Keyed by URL: a new handoff reads as loading, and unmounting or switching
+  // sources aborts the in-flight request through the query signal.
+  const sourceQuery = useQuery(
+    {
+      enabled: initialSource === undefined,
+      gcTime: 0,
+      queryFn: ({ signal }) =>
+        fetch(handoff.sourceUrl, { redirect: "error", signal }).then(
+          readSvgResponse,
+        ),
+      queryKey: ["svg-icon-source", handoff.sourceUrl],
+      refetchOnReconnect: false,
+      refetchOnWindowFocus: false,
+      retry: false,
+    },
+    queryClient,
   );
   const [editedScene, setEditedScene] = useState<{
     readonly elements: readonly ExcalidrawElement[];
     readonly revision: string;
   } | null>(null);
 
-  useEffect(() => {
-    if (initialSource !== undefined) {
-      return;
+  const source = initialSource ?? sourceQuery.data;
+  const resolved = useMemo((): ImportState => {
+    if (source !== undefined) return convertSource(source, handoff);
+    if (sourceQuery.isError) {
+      return {
+        kind: "error",
+        message:
+          sourceQuery.error instanceof Error
+            ? sourceQuery.error.message
+            : "The icon SVG could not be loaded.",
+      };
     }
-    let active = true;
-    const controller = new AbortController();
-    setImportState({ kind: "loading" });
-    fetch(handoff.sourceUrl, { redirect: "error", signal: controller.signal })
-      .then(readSvgResponse)
-      .then((source) => {
-        if (active) {
-          setImportState({
-            kind: "source",
-            source,
-            sourceUrl: handoff.sourceUrl,
-          });
-        }
-      })
-      .catch((error) => {
-        if (active) {
-          setImportState({
-            kind: "error",
-            message:
-              error instanceof Error
-                ? error.message
-                : "The icon SVG could not be loaded.",
-          });
-        }
-      });
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [handoff.sourceUrl, initialSource]);
-
-  const resolved = useMemo(
-    () =>
-      importState.kind === "source" &&
-      importState.sourceUrl === handoff.sourceUrl
-        ? convertSource(importState.source, handoff)
-        : importState.kind === "source"
-          ? { kind: "loading" as const }
-          : importState,
-    [handoff, importState],
-  );
+    return { kind: "loading" };
+  }, [handoff, source, sourceQuery.error, sourceQuery.isError]);
   const conversion = resolved.kind === "converted" ? resolved.conversion : null;
   const ready = conversion?.ok === true;
   const diagnostics =

@@ -8,13 +8,39 @@ import type { ExcalidrawScene } from "@sketchi/diagram-excalidraw";
 import { SKETCHI_DIAGRAM_PALETTE } from "@sketchi/diagram-core";
 import {
   type ComponentType,
+  lazy,
+  Suspense,
   useCallback,
-  useEffect,
   useMemo,
-  useState,
+  useRef,
+  useSyncExternalStore,
 } from "react";
 
-type ExcalidrawComponent = ComponentType<ExcalidrawProps>;
+function CanvasUnavailable() {
+  return (
+    <div className="sketchi-excalidraw-scene-canvas__loading" role="alert">
+      Canvas unavailable
+    </div>
+  );
+}
+
+// Excalidraw reads browser globals at import time, so the editor module is only
+// requested once the canvas renders in the browser.
+const LazyExcalidraw = lazy<ComponentType<ExcalidrawProps>>(() =>
+  import("@excalidraw/excalidraw").then(
+    (module) => ({ default: module.Excalidraw }),
+    () => ({ default: CanvasUnavailable }),
+  ),
+);
+
+const subscribeToNothing = () => () => undefined;
+const inBrowser = () => true;
+const onServer = () => false;
+
+/** `false` on the server and during hydration, `true` once in the browser. */
+function useHydrated(): boolean {
+  return useSyncExternalStore(subscribeToNothing, inBrowser, onServer);
+}
 
 export interface ExcalidrawCanvasScene {
   readonly appState: Record<string, unknown>;
@@ -67,21 +93,38 @@ export function ExcalidrawSceneCanvas({
   viewModeEnabled = false,
   zenModeEnabled = true,
 }: ExcalidrawSceneCanvasProps) {
-  const [Excalidraw, setExcalidraw] = useState<ExcalidrawComponent | null>(
-    null,
-  );
-  const [excalidrawApi, setExcalidrawApi] =
-    useState<ExcalidrawImperativeAPI | null>(null);
+  const hydrated = useHydrated();
+  // Excalidraw hands over its API from its constructor, while it renders, so
+  // this only records the newest instance. Each scene revision remounts the
+  // editor with a fresh API.
+  const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
+  const fittedApiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const handleApiChange = useCallback(
     (api: ExcalidrawImperativeAPI) => {
-      setExcalidrawApi(api);
+      apiRef.current = api;
       onApiChange?.(api);
     },
     [onApiChange],
   );
   const sceneKey = revision;
+  // Excalidraw reports changes only once a mounted editor has loaded its scene.
+  // The first change from the current editor fits that scene to the viewport;
+  // a discarded or replaced instance never matches the current API's state.
   const handleChange: NonNullable<ExcalidrawProps["onChange"]> = useCallback(
     (elements, appState, files) => {
+      const api = apiRef.current;
+      if (
+        api &&
+        fittedApiRef.current !== api &&
+        api.getAppState() === appState
+      ) {
+        fittedApiRef.current = api;
+        api.scrollToContent(undefined, {
+          animate: false,
+          fitToViewport: true,
+          viewportZoomFactor: 1,
+        });
+      }
       onChange?.(elements, appState, files);
       onSceneChange?.(sceneFromExcalidrawChange(elements, appState));
     },
@@ -106,37 +149,11 @@ export function ExcalidrawSceneCanvas({
     };
   }, [scene]);
 
-  useEffect(() => {
-    let mounted = true;
-
-    import("@excalidraw/excalidraw").then((module) => {
-      if (mounted) {
-        setExcalidraw(() => module.Excalidraw);
-      }
-    });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!excalidrawApi) {
-      return;
-    }
-
-    const frameId = window.requestAnimationFrame(() => {
-      excalidrawApi.scrollToContent(undefined, {
-        animate: false,
-        fitToViewport: true,
-        viewportZoomFactor: 1,
-      });
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-    };
-  }, [excalidrawApi, sceneKey]);
+  const loadingCanvas = (
+    <div className="sketchi-excalidraw-scene-canvas__loading">
+      Loading canvas
+    </div>
+  );
 
   return (
     <section
@@ -145,29 +162,29 @@ export function ExcalidrawSceneCanvas({
       data-view-mode={viewModeEnabled}
       data-testid="excalidraw-scene-canvas"
     >
-      {Excalidraw ? (
-        <Excalidraw
-          key={sceneKey}
-          {...(onChange || onSceneChange ? { onChange: handleChange } : {})}
-          autoFocus={false}
-          excalidrawAPI={handleApiChange}
-          gridModeEnabled={false}
-          initialData={initialData}
-          name={title}
-          theme="light"
-          UIOptions={{
-            canvasActions: {
-              loadScene: false,
-              saveAsImage: true,
-            },
-          }}
-          viewModeEnabled={viewModeEnabled}
-          zenModeEnabled={zenModeEnabled}
-        />
+      {hydrated ? (
+        <Suspense fallback={loadingCanvas}>
+          <LazyExcalidraw
+            key={sceneKey}
+            onChange={handleChange}
+            autoFocus={false}
+            excalidrawAPI={handleApiChange}
+            gridModeEnabled={false}
+            initialData={initialData}
+            name={title}
+            theme="light"
+            UIOptions={{
+              canvasActions: {
+                loadScene: false,
+                saveAsImage: true,
+              },
+            }}
+            viewModeEnabled={viewModeEnabled}
+            zenModeEnabled={zenModeEnabled}
+          />
+        </Suspense>
       ) : (
-        <div className="sketchi-excalidraw-scene-canvas__loading">
-          Loading canvas
-        </div>
+        loadingCanvas
       )}
     </section>
   );

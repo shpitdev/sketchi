@@ -186,6 +186,37 @@ describe("IconLibrary", () => {
     expect(activeCards()).toHaveLength(0);
   });
 
+  it("drops the highlight when the search or collection changes", () => {
+    const { container } = render(<IconLibrary data={fixtureData} />);
+    const activeCards = () =>
+      container.querySelectorAll('[data-active="true"]');
+
+    fireEvent.keyDown(document, { key: "ArrowDown" });
+    expect(activeCards()).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText("Search icons"), {
+      target: { value: "k8s" },
+    });
+    expect(activeCards()).toHaveLength(0);
+
+    fireEvent.keyDown(document, { key: "ArrowDown" });
+    expect(activeCards()[0]?.textContent).toContain("Kubernetes");
+    fireEvent.change(screen.getByLabelText("Collection"), {
+      target: { value: "devtools-ci" },
+    });
+    expect(activeCards()).toHaveLength(0);
+  });
+
+  it("announces what each selection change did", () => {
+    const { container } = render(<IconLibrary data={fixtureData} />);
+    const toast = () => container.querySelector(".icons-toast")?.textContent;
+
+    fireEvent.click(screen.getByRole("button", { name: "Select all 3" }));
+    expect(toast()).toBe("3 icons selected.");
+
+    fireEvent.keyDown(document, { key: "d", ctrlKey: true });
+    expect(toast()).toBe("Selection cleared.");
+  });
+
   it("does not run result shortcuts while an action control is focused", () => {
     const { container } = render(<IconLibrary data={fixtureData} />);
     fireEvent.keyDown(document, { key: "ArrowDown" });

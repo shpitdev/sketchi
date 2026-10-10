@@ -88,6 +88,30 @@ describe("ExcalidrawWorkspace", () => {
     expect(download.getAttribute("href")).toContain("data:application/json");
   });
 
+  it("scopes copy feedback to the diagram it was copied from", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
+
+    render(
+      <ExcalidrawWorkspace diagrams={[flowchartFixture, mindmapFixture]} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy IR" }));
+    expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Public mindmap generation/ }),
+    );
+    expect(screen.getByRole("button", { name: "Copy IR" })).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Sketchi onboarding decision flow/ }),
+    );
+    expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy();
+  });
+
   it("renders an empty state without diagrams", () => {
     render(<ExcalidrawWorkspace diagrams={[]} />);
 

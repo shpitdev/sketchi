@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   addToSelection,
   applySelectionEvent,
+  createSelectionStore,
   describeSelectAll,
   describeSelectionNotice,
   initialSelectionState,
@@ -143,7 +144,6 @@ describe("applySelectionEvent", () => {
     const state = applySelectionEvent(filled, { slug: "c", type: "toggle" }, 2);
     expect([...state.slugs]).toEqual(["a", "b"]);
     expect(state.notice).toEqual({ kind: "full" });
-    expect(state.revision).toBeGreaterThan(filled.revision);
   });
 
   it("stays silent for ordinary toggles", () => {
@@ -192,6 +192,41 @@ describe("applySelectionEvent", () => {
       })),
     );
     expect(state.slugs.size).toBe(SELECTION_LIMIT);
+  });
+});
+
+describe("createSelectionStore", () => {
+  it("applies events from the current state and returns their notices", () => {
+    const store = createSelectionStore(2);
+    let notifications = 0;
+    const unsubscribe = store.subscribe(() => {
+      notifications += 1;
+    });
+
+    expect(store.dispatch({ slug: "a", type: "toggle" })).toBeUndefined();
+    expect(store.dispatch({ slug: "b", type: "toggle" })).toBeUndefined();
+    expect([...store.getSnapshot().slugs]).toEqual(["a", "b"]);
+
+    // Repeated refusals are each announced, even though the slugs are unchanged.
+    expect(store.dispatch({ slug: "c", type: "toggle" })).toEqual({
+      kind: "full",
+    });
+    expect(store.dispatch({ slug: "c", type: "toggle" })).toEqual({
+      kind: "full",
+    });
+    expect(notifications).toBe(4);
+
+    unsubscribe();
+    expect(store.dispatch({ type: "clear" })).toEqual({ kind: "cleared" });
+    expect(notifications).toBe(4);
+    expect(store.getSnapshot().slugs.size).toBe(0);
+  });
+
+  it("stays silent and keeps the snapshot when nothing changes", () => {
+    const store = createSelectionStore();
+    const before = store.getSnapshot();
+    expect(store.dispatch({ type: "clear" })).toBeUndefined();
+    expect(store.getSnapshot()).toBe(before);
   });
 });
 

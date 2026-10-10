@@ -7,11 +7,10 @@ import { useIconSources } from "./use-icon-sources.js";
 import { useHotkeys } from "@tanstack/react-hotkeys";
 import {
   useCallback,
-  useEffect,
   useMemo,
-  useReducer,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 
 import { SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
@@ -22,10 +21,10 @@ import {
   type SketchiIcon,
 } from "@sketchi/icon-catalog";
 import {
+  createSelectionStore,
   describeSelectionNotice,
-  initialSelectionState,
   remainingCapacity,
-  selectionReducer,
+  type SelectionEvent,
 } from "../../lib/selection.js";
 import { IconCard } from "../icon-card/index.js";
 import { IconDetail } from "../icon-detail/index.js";
@@ -75,15 +74,19 @@ export function IconLibrary({
   const [previewMode, setPreviewMode] =
     useState<PreviewMode>(initialPreviewMode);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const [activeIndex, setActiveIndex] = useState(NO_ACTIVE_INDEX);
-  const [detailSlug, setDetailSlug] = useState<string>();
-  const [selection, dispatchSelection] = useReducer(
-    selectionReducer,
-    initialSelectionState,
+  const [highlightedIndex, setHighlightedIndex] = useState(NO_ACTIVE_INDEX);
+  const [detail, setDetail] = useState<{
+    readonly opener: HTMLElement | null;
+    readonly slug: string;
+  }>();
+  const [selectionStore] = useState(() => createSelectionStore());
+  const selection = useSyncExternalStore(
+    selectionStore.subscribe,
+    selectionStore.getSnapshot,
+    selectionStore.getSnapshot,
   );
   const selectedSlugs = selection.slugs;
   const searchRef = useRef<HTMLInputElement>(null);
-  const detailOpenerRef = useRef<HTMLElement | null>(null);
   const collections = useMemo(
     () =>
       Object.entries(data.summary.collectionCounts).sort(([left], [right]) =>
@@ -99,9 +102,13 @@ export function IconLibrary({
       }).map(({ icon }) => icon),
     [collection, data.icons, query],
   );
+  // A highlight past the end of the current results (for example after the
+  // manifest changes) reads as no highlight.
+  const activeIndex =
+    highlightedIndex < results.length ? highlightedIndex : NO_ACTIVE_INDEX;
   const visibleIcons = results.slice(0, visibleCount);
-  const detailIcon = detailSlug
-    ? data.icons.find((icon) => icon.slug === detailSlug)
+  const detailIcon = detail
+    ? data.icons.find((icon) => icon.slug === detail.slug)
     : undefined;
   const selectedIcons = data.icons.filter((icon) =>
     selectedSlugs.has(icon.slug),
@@ -112,7 +119,7 @@ export function IconLibrary({
     (icon) => !selectedSlugs.has(icon.slug),
   ).length;
   const modifierLabel = useModifierLabel();
-  const closeDetail = useCallback(() => setDetailSlug(undefined), []);
+  const closeDetail = useCallback(() => setDetail(undefined), []);
 
   const {
     busyDetailAction,
@@ -127,14 +134,18 @@ export function IconLibrary({
     showNotice,
   } = useIconSources(selectedIcons);
 
-  useEffect(() => {
+  // Changing the filter starts browsing from the top of the new results.
+  const changeQuery = useCallback((nextQuery: string) => {
+    setQuery(nextQuery);
     setVisibleCount(PAGE_SIZE);
-    setActiveIndex(NO_ACTIVE_INDEX);
-  }, [collection, query]);
+    setHighlightedIndex(NO_ACTIVE_INDEX);
+  }, []);
 
-  useEffect(() => {
-    if (activeIndex >= results.length) setActiveIndex(NO_ACTIVE_INDEX);
-  }, [activeIndex, results.length]);
+  const changeCollection = useCallback((nextCollection: string) => {
+    setCollection(nextCollection);
+    setVisibleCount(PAGE_SIZE);
+    setHighlightedIndex(NO_ACTIVE_INDEX);
+  }, []);
 
   const moveActive = useCallback(
     (direction: -1 | 1) => {
@@ -145,7 +156,7 @@ export function IconLibrary({
             ? 0
             : results.length - 1
           : (activeIndex + direction + results.length) % results.length;
-      setActiveIndex(next);
+      setHighlightedIndex(next);
       setVisibleCount((count) => Math.max(count, next + 1));
       const slug = results[next]?.slug;
       if (!slug) return;
@@ -158,32 +169,36 @@ export function IconLibrary({
     [activeIndex, results],
   );
 
+  // The store reports what an event did as data; the handler that caused it
+  // announces it, so no selection update fires a side effect mid-update.
+  const dispatchSelection = useCallback(
+    (event: SelectionEvent) => {
+      const selectionNotice = selectionStore.dispatch(event);
+      if (selectionNotice) showNotice(describeSelectionNotice(selectionNotice));
+    },
+    [selectionStore, showNotice],
+  );
+
   const selectAllResults = useCallback(() => {
     dispatchSelection({
       slugs: results.map((icon) => icon.slug),
       type: "select-all",
     });
-  }, [results]);
+  }, [dispatchSelection, results]);
 
   const clearSelection = useCallback(
     () => dispatchSelection({ type: "clear" }),
-    [],
+    [dispatchSelection],
   );
-
-  // The reducer reports what happened as data; announcing it is this effect's
-  // job so that no selection update fires a side effect mid-update.
-  useEffect(() => {
-    if (selection.notice) showNotice(describeSelectionNotice(selection.notice));
-  }, [selection, showNotice]);
 
   const focusSearch = useCallback(() => searchRef.current?.focus(), []);
 
   const clearSearch = useCallback(() => {
-    setActiveIndex(NO_ACTIVE_INDEX);
+    setHighlightedIndex(NO_ACTIVE_INDEX);
     if (!query) return;
-    setQuery("");
+    changeQuery("");
     searchRef.current?.focus();
-  }, [query]);
+  }, [changeQuery, query]);
 
   /**
    * Copies the keyboard-highlighted icon. With nothing highlighted, Enter from
@@ -374,9 +389,9 @@ export function IconLibrary({
                 collection={collection}
                 collections={collections}
                 modifierLabel={modifierLabel}
-                onCollectionChange={setCollection}
+                onCollectionChange={changeCollection}
                 onPreviewModeChange={setPreviewMode}
-                onQueryChange={setQuery}
+                onQueryChange={changeQuery}
                 onSelectAll={selectAllResults}
                 pendingCount={pendingCount}
                 previewMode={previewMode}
@@ -420,8 +435,8 @@ export function IconLibrary({
                   <p>Try a brand name, common alias, or another collection.</p>
                   <button
                     onClick={() => {
-                      setQuery("");
-                      setCollection("all");
+                      changeQuery("");
+                      changeCollection("all");
                     }}
                     type="button"
                   >
@@ -446,11 +461,13 @@ export function IconLibrary({
                         key={icon.slug}
                         onCopy={(picked) => void copySvg(picked)}
                         onDetails={(picked) => {
-                          detailOpenerRef.current =
-                            document.activeElement instanceof HTMLElement
-                              ? document.activeElement
-                              : null;
-                          setDetailSlug(picked.slug);
+                          setDetail({
+                            opener:
+                              document.activeElement instanceof HTMLElement
+                                ? document.activeElement
+                                : null,
+                            slug: picked.slug,
+                          });
                         }}
                         onToggleSelected={toggleSelected}
                         previewMode={previewMode}
@@ -495,7 +512,7 @@ export function IconLibrary({
             onPreviewModeChange={setPreviewMode}
             permanentUrl={permanentSvgUrl(detailIcon.slug)}
             previewMode={previewMode}
-            returnFocusTo={detailOpenerRef.current}
+            returnFocusTo={detail?.opener ?? null}
           />
         </div>
       ) : null}

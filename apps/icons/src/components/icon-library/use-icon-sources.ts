@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   copyText,
   createIconZip,
@@ -78,13 +78,6 @@ export function useIconSources(selectedIcons: readonly SketchiIcon[]) {
     },
     [copyingSlug, getSvg, showNotice],
   );
-
-  useEffect(() => {
-    return () => {
-      if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
-      if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);
-    };
-  }, []);
 
   async function runDetailAction(action: IconDetailAction, icon: SketchiIcon) {
     setBusyDetailAction(action);

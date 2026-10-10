@@ -93,11 +93,6 @@ export type SelectionNotice =
 export interface SelectionState {
   /** Set only when the last event has something to announce. */
   readonly notice: SelectionNotice | undefined;
-  /**
-   * Bumped on every event that changes anything, so two identical notices in a
-   * row are still two distinct states for the announcing effect.
-   */
-  readonly revision: number;
   readonly slugs: ReadonlySet<string>;
 }
 
@@ -108,18 +103,15 @@ export type SelectionEvent =
 
 export const initialSelectionState: SelectionState = {
   notice: undefined,
-  revision: 0,
   slugs: new Set(),
 };
 
 /**
- * Selection lives in a reducer rather than in `useState` closures so that every
- * mutation is computed from the authoritative current state. Several toggles
- * dispatched in a single React batch each see the previous one's result; a
- * handler reading `selectedSlugs` from its render closure would instead have
- * every update in the batch overwrite the last.
+ * Every mutation is computed from the authoritative current state rather than
+ * from a render closure, so several toggles in a row each see the previous
+ * one's result instead of overwriting it.
  *
- * The reducer stays pure — notices are returned as data for an effect to
+ * The transition stays pure — notices are returned as data for the caller to
  * announce, never fired from inside the update.
  */
 export function applySelectionEvent(
@@ -127,11 +119,10 @@ export function applySelectionEvent(
   event: SelectionEvent,
   limit: number = SELECTION_LIMIT,
 ): SelectionState {
-  const revision = state.revision + 1;
   switch (event.type) {
     case "clear": {
       if (!state.slugs.size) return state;
-      return { notice: { kind: "cleared" }, revision, slugs: new Set() };
+      return { notice: { kind: "cleared" }, slugs: new Set() };
     }
     case "select-all": {
       const result = addToSelection(state.slugs, event.slugs, limit);
@@ -142,30 +133,55 @@ export function applySelectionEvent(
           kind: "selected",
           skipped: result.skipped,
         },
-        revision,
         slugs: result.selected,
       };
     }
     case "toggle": {
       const slugs = new Set(state.slugs);
       if (slugs.delete(event.slug)) {
-        return { notice: undefined, revision, slugs };
+        return { notice: undefined, slugs };
       }
       if (slugs.size >= limit) {
-        return { notice: { kind: "full" }, revision, slugs: state.slugs };
+        return { notice: { kind: "full" }, slugs: state.slugs };
       }
       slugs.add(event.slug);
-      return { notice: undefined, revision, slugs };
+      return { notice: undefined, slugs };
     }
   }
 }
 
-/** `useReducer`-shaped wrapper around {@link applySelectionEvent}. */
-export function selectionReducer(
-  state: SelectionState,
-  event: SelectionEvent,
-): SelectionState {
-  return applySelectionEvent(state, event);
+/**
+ * Selection as an external store for `useSyncExternalStore`. `dispatch`
+ * applies an event synchronously and returns the notice it produced, so the
+ * event handler that caused it can announce it directly.
+ */
+export interface SelectionStore {
+  readonly dispatch: (event: SelectionEvent) => SelectionNotice | undefined;
+  readonly getSnapshot: () => SelectionState;
+  readonly subscribe: (listener: () => void) => () => void;
+}
+
+export function createSelectionStore(
+  limit: number = SELECTION_LIMIT,
+): SelectionStore {
+  let state = initialSelectionState;
+  const listeners = new Set<() => void>();
+  return {
+    dispatch(event) {
+      const next = applySelectionEvent(state, event, limit);
+      if (next === state) return undefined;
+      state = next;
+      for (const listener of listeners) listener();
+      return next.notice;
+    },
+    getSnapshot: () => state,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
 }
 
 export function describeSelectionNotice(notice: SelectionNotice): string {
