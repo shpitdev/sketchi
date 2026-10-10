@@ -1875,3 +1875,56 @@ describe("convertSceneToExcalidraw", () => {
     ).not.toHaveProperty("customData.sketchiRendererRole");
   });
 });
+
+describe("bound label first paint", () => {
+  // Excalidraw paints restored bound text at its stored size and wrap, so
+  // anything wider than the stored width is clipped until the label is edited.
+  const converted = convertSceneToExcalidraw(
+    renderIntermediateDiagram(
+      parseFlowchartDiagram({
+        id: "label-metrics",
+        title: "Label metrics",
+        type: "flowchart",
+        nodes: [
+          { id: "start", label: "Start", kind: "start" },
+          { id: "cjk", label: "品質保証レビュー承認待ち", kind: "process" },
+          { id: "end", label: "End", kind: "end" },
+        ],
+        edges: [
+          {
+            id: "start-cjk",
+            source: "start",
+            target: "cjk",
+            label: "Escalate to the quality manager for final disposition",
+          },
+          { id: "cjk-end", source: "cjk", target: "end" },
+        ],
+        layout: { direction: "TB", edgeRouting: "orthogonal" },
+      }),
+    ),
+  );
+  const text = (id: string) => {
+    const element = converted.elements.find((entry) => entry.id === id);
+    if (!element) throw new Error(`Missing ${id}`);
+    return element;
+  };
+
+  it("wraps arrow labels to the label width and keeps the authored text", () => {
+    expect(text("edge:start-cjk:label")).toMatchObject({
+      originalText: "Escalate to the quality manager for final disposition",
+      text: "Escalate to the\nquality manager for\nfinal disposition",
+      width: 154,
+      height: 53,
+    });
+  });
+
+  it("sizes CJK node labels at a full em per glyph", () => {
+    const label = text("label:cjk");
+    expect(label.text).toBe("品質保証レビュー承認待\nち");
+    expect(label.width).toBeGreaterThanOrEqual(11 * 14);
+    expect(validateExcalidrawScene(converted)).toEqual({
+      ok: true,
+      issues: [],
+    });
+  });
+});

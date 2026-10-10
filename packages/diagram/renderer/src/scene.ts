@@ -14,10 +14,13 @@ import {
   type CanvasShapeKind,
   type CanvasSpec,
   type CanvasTextElement,
+  DEFAULT_GLYPH_UNITS,
   type DiagramEdge,
   type DiagramNode,
+  estimateTextWidth,
   type IntermediateDiagram,
   parseIntermediateDiagram,
+  wrapTextToUnits,
 } from "@sketchi/diagram-core";
 
 export type NodeSceneShape = CanvasShapeKind;
@@ -36,11 +39,11 @@ const HORIZONTAL_GAP = 112;
 const VERTICAL_GAP = 96;
 const PADDING = 48;
 const NODE_LABEL_FONT_SIZE = 14;
-const NODE_LABEL_WIDTH_FACTOR = 0.62;
 const NODE_LABEL_LINE_HEIGHT = 1.35;
 const NODE_LABEL_HORIZONTAL_PADDING = 36;
 const NODE_LABEL_VERTICAL_PADDING = 28;
-const MAX_LABEL_CHARS_PER_LINE = 18;
+/** Eighteen average glyphs per line before wrapping. */
+const MAX_LABEL_LINE_UNITS = 18 * DEFAULT_GLYPH_UNITS;
 const PORT_SPACING = 18;
 const PORT_PADDING = 16;
 const RANK_SWEEP_COUNT = 4;
@@ -70,70 +73,15 @@ interface RouteSegment extends AxisAlignedSegment {
 
 type VisitState = "visited" | "visiting";
 
-function splitLongWord(word: string, maxChars: number): string[] {
-  if (word.length <= maxChars) {
-    return [word];
-  }
-
-  const chunks: string[] = [];
-  for (let index = 0; index < word.length; index += maxChars) {
-    chunks.push(word.slice(index, index + maxChars));
-  }
-  return chunks;
-}
-
-function wrapLine(line: string, maxChars: number): string[] {
-  if (line.length <= maxChars) {
-    return [line];
-  }
-
-  const wrapped: string[] = [];
-  let current = "";
-
-  for (const word of line.split(" ")) {
-    if (word.length > maxChars) {
-      if (current) {
-        wrapped.push(current);
-        current = "";
-      }
-      wrapped.push(...splitLongWord(word, maxChars));
-      continue;
-    }
-
-    const candidate = current ? `${current} ${word}` : word;
-    if (candidate.length <= maxChars) {
-      current = candidate;
-      continue;
-    }
-
-    wrapped.push(current);
-    current = word;
-  }
-
-  if (current) {
-    wrapped.push(current);
-  }
-
-  return wrapped;
-}
-
-function wrapLabel(label: string): string {
-  return label
-    .split("\n")
-    .flatMap((line) => wrapLine(line, MAX_LABEL_CHARS_PER_LINE))
-    .join("\n");
-}
-
 function measureLabel(label: string): {
   height: number;
   text: string;
   width: number;
 } {
-  const text = wrapLabel(label);
+  const text = wrapTextToUnits(label, MAX_LABEL_LINE_UNITS);
   const lines = text.split("\n");
-  const longestLineLength = Math.max(...lines.map((line) => line.length));
   const width = Math.ceil(
-    longestLineLength * NODE_LABEL_FONT_SIZE * NODE_LABEL_WIDTH_FACTOR +
+    estimateTextWidth(text, NODE_LABEL_FONT_SIZE) +
       NODE_LABEL_HORIZONTAL_PADDING,
   );
   const height = Math.ceil(

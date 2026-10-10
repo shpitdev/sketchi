@@ -10,6 +10,7 @@ import {
 } from "@sketchi/diagram-renderer";
 import {
   AXIS_ALIGNED_EPSILON,
+  estimateTextWidth,
   fnv1a32,
   type AxisAlignedSegment,
   isSharedBoundStem,
@@ -17,6 +18,7 @@ import {
   segmentsFromPoints,
   segmentsOverlapInterior,
   SKETCHI_DIAGRAM_PALETTE,
+  wrapTextToWidth,
 } from "@sketchi/diagram-core";
 import { generateKeyBetween } from "fractional-indexing";
 
@@ -61,7 +63,6 @@ export interface ExcalidrawSceneValidationResult {
 
 const SHAPE_TYPES = new Set(["rectangle", "ellipse", "diamond"]);
 const TEXT_LINE_HEIGHT = 1.35;
-const TEXT_WIDTH_FACTOR = 0.62;
 const TEXT_HORIZONTAL_PADDING = 24;
 const TEXT_VERTICAL_PADDING = 18;
 const ARROW_LABEL_WIDTH = 160;
@@ -182,14 +183,6 @@ function elementBase(
   };
 }
 
-function estimateTextWidth(text: string, fontSize: number): number {
-  return Math.ceil(
-    Math.max(...text.split("\n").map((line) => line.length)) *
-      fontSize *
-      TEXT_WIDTH_FACTOR,
-  );
-}
-
 function textHeight(text: string, fontSize: number): number {
   return Math.ceil(text.split("\n").length * fontSize * TEXT_LINE_HEIGHT);
 }
@@ -203,14 +196,25 @@ function textElement(input: {
   maxWidth: number;
   textColor?: string;
   text: string;
+  wrap?: boolean;
   x: number;
   y: number;
 }): ExcalidrawElement {
+  // Excalidraw paints restored text at its stored wrap and size until the text
+  // is edited, so a line wider than its stored box is clipped on first paint.
+  // Connector labels have no container height to respect and wrap to fit; node
+  // labels arrive wrapped and their nodes sized by the renderer or the author.
+  const text = input.wrap
+    ? wrapTextToWidth(input.text, input.maxWidth, input.fontSize)
+    : input.text;
   const width = Math.max(
     1,
-    Math.min(input.maxWidth, estimateTextWidth(input.text, input.fontSize)),
+    Math.min(
+      input.maxWidth,
+      Math.ceil(estimateTextWidth(text, input.fontSize)),
+    ),
   );
-  const height = textHeight(input.text, input.fontSize);
+  const height = textHeight(text, input.fontSize);
 
   return {
     ...elementBase(input.id, input.element),
@@ -234,7 +238,7 @@ function textElement(input: {
     originalText: input.text,
     roundness: null,
     strokeColor: input.textColor ?? DEFAULT_TEXT_COLOR,
-    text: input.text,
+    text,
     textAlign: input.element?.textAlign ?? "center",
     verticalAlign: input.element?.verticalAlign ?? "middle",
     autoResize: true,
@@ -458,6 +462,7 @@ function arrowLabelElement(input: {
     maxWidth: ARROW_LABEL_WIDTH,
     ...(input.arrow.textColor ? { textColor: input.arrow.textColor } : {}),
     text: input.arrow.label,
+    wrap: true,
     x: (start.x + end.x) / 2,
     y: (start.y + end.y) / 2 - 10,
   });
@@ -659,12 +664,15 @@ function buildElements(
   }
 
   for (const text of textElements) {
+    const arrowContainer = arrows.some(
+      (arrow) => arrow.id === text.containerId,
+    );
     const supportedContainer =
       text.containerId &&
       (nodes.some(
         (node) => node.id === text.containerId && node.shape !== "polygon",
       ) ||
-        arrows.some((arrow) => arrow.id === text.containerId));
+        arrowContainer);
     elements.push(
       textElement({
         element: text,
@@ -674,6 +682,7 @@ function buildElements(
         maxWidth: text.maxWidth ?? 160,
         ...(text.textColor ? { textColor: text.textColor } : {}),
         text: text.text,
+        wrap: arrowContainer,
         x: text.x,
         y: text.y,
       }),
@@ -719,6 +728,7 @@ function buildElements(
           maxWidth: ARROW_LABEL_WIDTH,
           ...(line.textColor ? { textColor: line.textColor } : {}),
           text: line.label,
+          wrap: true,
           x: (start.x + end.x) / 2,
           y: (start.y + end.y) / 2 - 10,
         }),

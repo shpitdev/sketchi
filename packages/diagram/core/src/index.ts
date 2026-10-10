@@ -6,3 +6,4 @@ export * from "./types/mindmap.js";
 export * from "./types/flowchart.js";
 export * from "./segments.js";
 export * from "./hash.js";
+export * from "./text-metrics.js";
