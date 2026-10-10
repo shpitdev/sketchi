@@ -22,7 +22,7 @@ parallel Sketch-SVG system speculatively.
 
 ## Evidence the corrections rest on
 
-Census of all 1,412 corpus SVGs (`apps/icons/public/output/upload-ready/svg`):
+Census of all 1,412 corpus SVGs (`packages/icons/catalog/svg`):
 
 | Feature                            | Files                                                           | Implication                                                                                     |
 | ---------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |

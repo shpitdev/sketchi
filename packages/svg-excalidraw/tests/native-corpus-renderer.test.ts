@@ -229,10 +229,7 @@ function tolerantSilhouetteOverlap(
 }
 
 async function rendererReport() {
-  const corpusRoot = resolve(
-    process.cwd(),
-    "apps/icons/public/output/upload-ready/svg",
-  );
+  const corpusRoot = resolve(process.cwd(), "packages/icons/catalog/svg");
   const paths = readdirSync(corpusRoot, { recursive: true })
     .filter(
       (entry): entry is string =>

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import type { IconManifest } from "../../lib/data";
+import type { IconManifest } from "@sketchi/icon-catalog";
 import { IconLibrary } from "./icon-library";
 
 const data: IconManifest = {

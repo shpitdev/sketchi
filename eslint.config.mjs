@@ -121,6 +121,7 @@ export default [
       "packages/diagram/excalidraw/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
       "packages/diagram/renderer/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
       "packages/diagram/ui/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
+      "packages/icons/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
       "packages/svg-excalidraw/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
       "tools/sketchi-generators/**/*.{cjs,cts,js,jsx,mjs,mts,ts,tsx}",
     ],

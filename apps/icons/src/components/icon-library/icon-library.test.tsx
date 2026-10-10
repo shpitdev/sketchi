@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import type { IconManifest } from "../../lib/data";
+import type { IconManifest } from "@sketchi/icon-catalog";
 import { IconLibrary } from "./icon-library";
 
 const fixtureData: IconManifest = {

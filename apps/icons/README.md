@@ -4,27 +4,22 @@ Public SVG search, copy, download, HTTP API, and MCP surface for Sketchi.
 
 ## Data flow
 
-The source pipeline data stays under `pipeline-output/`, outside Vite's public
-directory. `pnpm nx generate-manifest icons` converts that source into two
-generated files:
+`@sketchi/icon-catalog` (`packages/icons/catalog`) owns the icon pipeline
+output, the SVG sources, the generated manifest, and ranked search. Before
+`dev`, `build`, and Storybook, `pnpm nx sync-catalog-assets icons` publishes
+two ignored copies into `public/`:
 
 - `public/icons-manifest.json` is the browser contract. It contains only slug,
   display name, collection, aliases, keywords, SVG path, bytes, viewBox, and an
   optional variant.
-- `src/generated/icon-catalog.json` adds a private slug-to-source map for the
-  Worker routes.
+- `public/output/upload-ready/svg/` holds the SVG files at their stable public
+  URLs. Worker routes read them through the `ASSETS` binding.
 
 The browser fetches one compact metadata manifest, then lazily loads only the
 SVGs visible in the grid. The current 1,412-icon manifest is about 385 KB raw
 and 38 KB with gzip, compared with the former 1.6 MB first-load payload. Static
 SVG paths keep grid previews on the asset layer instead of routing every image
 through the Worker.
-
-Duplicate source slugs are resolved by the explicit canonical map in
-`src/lib/manifest-generation.ts`. The chosen collection keeps the short
-slug. Every alternate receives a collection-qualified slug. Generation fails
-when a new collision has no explicit choice, which keeps public URLs
-deterministic.
 
 ## Agent access
 
@@ -40,7 +35,7 @@ used to build the manifest are not copied into the public application.
 ## Commands
 
 ```sh
-pnpm nx generate-manifest icons
+pnpm nx sync-catalog-assets icons
 pnpm nx dev icons
 pnpm nx test icons
 pnpm nx typecheck icons

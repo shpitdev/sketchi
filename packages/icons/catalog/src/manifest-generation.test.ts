@@ -3,8 +3,9 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { decodeIconManifest } from "./data";
-import { searchIcons } from "./data";
+import { iconManifest } from "./catalog";
+import { decodeIconManifest } from "./manifest";
+import { searchIcons } from "./search";
 import {
   buildIconCatalog,
   COLLISION_CANONICAL_COLLECTIONS,
@@ -217,7 +218,7 @@ describe("public icon manifest generation", () => {
   it("accounts for promoted Palantir glyph pairs in review aggregates", () => {
     const path = resolve(
       process.cwd(),
-      "apps/icons/pipeline-output/review/review-data.json",
+      "packages/icons/catalog/pipeline-output/review/review-data.json",
     );
     const review = JSON.parse(readFileSync(path, "utf8")) as ReviewData;
     const flagCounts = review.icons
@@ -277,11 +278,7 @@ describe("public icon manifest generation", () => {
   });
 
   it("ships a compact clean manifest with aliases and no review fields", () => {
-    const path = resolve(
-      process.cwd(),
-      "apps/icons/public/icons-manifest.json",
-    );
-    const source = readFileSync(path, "utf8");
+    const source = JSON.stringify(iconManifest);
     const manifest = decodeIconManifest(JSON.parse(source));
     expect(manifest.summary.totalIcons).toBe(1412);
     expect(new Set(manifest.icons.map((icon) => icon.slug)).size).toBe(

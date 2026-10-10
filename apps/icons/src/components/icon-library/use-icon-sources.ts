@@ -8,7 +8,7 @@ import {
   svgDataUri,
   svgToJsxComponent,
 } from "../../lib/actions.js";
-import type { SketchiIcon } from "../../lib/data.js";
+import type { SketchiIcon } from "@sketchi/icon-catalog";
 import { permanentSvgUrl } from "../../lib/permanent-svg-url.js";
 import type { IconDetailAction } from "../icon-detail/index.js";
 

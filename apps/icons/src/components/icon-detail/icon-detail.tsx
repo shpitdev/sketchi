@@ -1,17 +1,11 @@
 import { useEffect, useRef } from "react";
 
-import {
-  formatBytes,
-  formatCollectionLabel,
-  type SketchiIcon,
-} from "../../lib/data.js";
+import { formatCollectionLabel, type SketchiIcon } from "@sketchi/icon-catalog";
+
+import { formatBytes } from "../../lib/format-bytes.js";
 
 export type IconDetailAction =
-  | "copy-data-uri"
-  | "copy-jsx"
-  | "copy-svg"
-  | "copy-url"
-  | "download";
+  "copy-data-uri" | "copy-jsx" | "copy-svg" | "copy-url" | "download";
 
 export interface IconDetailProps {
   readonly busyAction?: IconDetailAction;

@@ -144,6 +144,7 @@ model candidate → typed diagram IR → deterministic scene → Excalidraw arti
 | `packages/diagram/excalidraw` | Persistable Excalidraw conversion and real-scene validation     |
 | `packages/diagram/scenarios`  | Maintained prompts, assertions, and local/live evals            |
 | `packages/diagram/ui`         | Shared React diagram, review, and eval UI states                |
+| `packages/icons/catalog`      | Icon manifest, ranked search, SVG sources, node-logo rules      |
 | `packages/studio/projects`    | Studio project/diagram contracts and object-bucket persistence  |
 | `packages/svg-excalidraw`     | Native SVG-to-Excalidraw conversion and library serialization   |
 

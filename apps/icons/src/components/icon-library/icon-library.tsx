@@ -20,7 +20,7 @@ import {
   searchIcons,
   type IconManifest,
   type SketchiIcon,
-} from "../../lib/data.js";
+} from "@sketchi/icon-catalog";
 import {
   describeSelectionNotice,
   initialSelectionState,
@@ -30,7 +30,7 @@ import {
 import { IconCard } from "../icon-card/index.js";
 import { IconDetail } from "../icon-detail/index.js";
 
-export type { IconManifest, SketchiIcon } from "../../lib/data.js";
+export type { IconManifest, SketchiIcon } from "@sketchi/icon-catalog";
 
 const PAGE_SIZE = 72;
 /** Nothing is highlighted until the user actually navigates with the keyboard. */

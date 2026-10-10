@@ -456,6 +456,9 @@ importers:
 
   apps/icons:
     dependencies:
+      '@sketchi/icon-catalog':
+        specifier: workspace:*
+        version: link:../../packages/icons/catalog
       '@tanstack/react-hotkeys':
         specifier: 0.13.0
         version: 0.13.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -705,6 +708,8 @@ importers:
       react-dom:
         specifier: ^19.0.0
         version: 19.3.0(react@19.3.0)
+
+  packages/icons/catalog: {}
 
   packages/observability:
     dependencies:
