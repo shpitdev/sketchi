@@ -12,7 +12,7 @@ import appStyles from "../styles/app.css?url";
 // own og:url + canonical) via `pageMeta`; these values also cover the 404 page.
 const FALLBACK_TITLE = "Sketchi: describe it, and Sketchi draws it";
 const FALLBACK_DESCRIPTION =
-  "Describe it and Sketchi draws it: turn a prompt into a clean, editable diagram, complete with the real logos of your stack. In the playground or inside your coding agent.";
+  "Turn a prompt into an editable diagram with the real logos of your stack. Use Sketchi in the playground or your coding agent.";
 
 export const Route = createRootRoute({
   head: () => ({

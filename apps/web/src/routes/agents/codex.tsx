@@ -11,7 +11,7 @@ export const Route = createFileRoute("/agents/codex")({
     pageMeta({
       title: "Codex setup - Sketchi",
       description:
-        "Add Sketchi to Codex and turn prompts into clean, editable diagrams.",
+        "Add Sketchi to Codex and turn prompts into editable diagrams.",
       path: "/agents/codex",
     }),
   component: CodexRoute,

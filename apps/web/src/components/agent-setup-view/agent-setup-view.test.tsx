@@ -9,7 +9,7 @@ describe("AgentSetupView", () => {
 
     expect(
       screen.getByRole("heading", {
-        name: "Sketch diagrams without leaving your agent.",
+        name: "Draw diagrams in your coding agent.",
       }),
     ).toBeTruthy();
     expect(screen.getByRole("link", { name: /Codex/ })).toHaveProperty(

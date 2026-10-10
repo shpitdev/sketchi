@@ -11,7 +11,7 @@ export const Route = createFileRoute("/agents/antigravity")({
     pageMeta({
       title: "Antigravity setup - Sketchi",
       description:
-        "Add Sketchi to Antigravity and turn prompts into clean, editable diagrams.",
+        "Add Sketchi to Antigravity and turn prompts into editable diagrams.",
       path: "/agents/antigravity",
     }),
   component: AntigravityRoute,

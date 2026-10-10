@@ -37,10 +37,10 @@ function AgentSetupHub() {
       <section className="agent-hero">
         <div className="sk-shell agent-hero__inner">
           <div className="agent-hero__copy">
-            <h1>Sketch diagrams without leaving your agent.</h1>
+            <h1>Draw diagrams in your coding agent.</h1>
             <p>
-              Connect it once, then ask in plain language. Your agent hands back
-              a real, editable diagram.
+              Connect Sketchi, then describe a diagram in chat. Your agent
+              returns an editable diagram.
             </p>
           </div>
           <EndpointCard />

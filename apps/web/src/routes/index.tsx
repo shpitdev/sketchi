@@ -9,7 +9,7 @@ export const Route = createFileRoute("/")({
     pageMeta({
       title: "Sketchi: describe it, and Sketchi draws it",
       description:
-        "Describe it and Sketchi draws it: turn a prompt into a clean, editable diagram, complete with the real logos of your stack. In the playground or inside your coding agent.",
+        "Turn a prompt into an editable diagram with the real logos of your stack. Use Sketchi in the playground or your coding agent.",
       path: "/",
     }),
   loader: () => getWebSurfaceUrls(),

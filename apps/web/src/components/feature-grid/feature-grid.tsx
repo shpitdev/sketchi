@@ -17,7 +17,7 @@ const clusterIcons = [
 const features: readonly Feature[] = [
   {
     glyph: <ShapesGlyph />,
-    title: "Real objects, not screenshots",
+    title: "Individual shapes and connectors",
   },
   {
     glyph: (
@@ -37,7 +37,7 @@ const features: readonly Feature[] = [
   },
   {
     glyph: <ExportGlyph />,
-    title: "Yours to edit and export",
+    title: "Edit and export your diagrams",
   },
 ];
 
@@ -50,7 +50,7 @@ export function FeatureGrid() {
     <section className="sk-section feature-grid" id="product">
       <div className="sk-shell">
         <h2 className="sk-section__title feature-grid__title">
-          Diagrams that behave like diagrams.
+          Built on Excalidraw.
         </h2>
         <div className="feature-grid__cards">
           {features.map((feature) => (
