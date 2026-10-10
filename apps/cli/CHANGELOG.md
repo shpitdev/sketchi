@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.7.0
+
+### Minor Changes
+
+- [#357](https://github.com/shpitdev/sketchi/pull/357) [`31eb8e7`](https://github.com/shpitdev/sketchi/commit/31eb8e77a012f0ef0f2b86d1a14c85b3cc732fa0) Thanks [@anandpant](https://github.com/anandpant)! - Flowchart specs accept an optional node `icon: { "slug": "docker" }` from the Sketchi logo catalog, resolved offline from logos bundled with the CLI. Unknown slugs, wordmarks, and oversized marks are dropped with an `unknown_icon` warning and never fail the build.
+
 ## 0.6.3
 
 ### Patch Changes
