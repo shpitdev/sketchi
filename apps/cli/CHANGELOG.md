@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.9.0
+
+### Minor Changes
+
+- [#367](https://github.com/shpitdev/sketchi/pull/367) [`9319c86`](https://github.com/shpitdev/sketchi/commit/9319c866476dfb0ea95df54b2e6501b68889f97e) Thanks [@anandpant](https://github.com/anandpant)! - `sketchi generate` now draws brand logos inside flowchart nodes for the technologies a prompt names, such as GitHub, Docker, or Postgres. Logos are limited to the ones the prompt mentions, and everyday words such as "stream" or "segment" never count as a product name. Unknown slugs in `create` and `edit` point at https://icons.sketchi.app. `sketchi docs` explains how to add a node `icon` by hand.
+
 ## 0.8.0
 
 ### Minor Changes
