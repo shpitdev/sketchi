@@ -29,9 +29,18 @@ Studio exposes the runtime to its model as `build_flowchart`. That host injects
 artifact formats and a three-attempt per-turn cap; it does not map into another
 flowchart schema or persist the accepted result a second time.
 
+Node logos come from the icon catalog through `CodeModeIconCatalog`. Hosts
+build one with `makeCodeModeIconCatalog`, supplying SVG bytes from wherever they
+keep them: the playground reads its Worker static assets and the CLI bundles
+them. Flowchart node icons and canvas node icons resolve to eligible catalog
+slugs; anything else is dropped with an `unknown_icon` warning, never a failed
+build. Every scene stores the normalized SVG for each icon it uses, replacing
+any authored assets.
+
 Use `CodeModeArtifactStorageMemory` for scoped in-memory storage or
 `makeCodeModeArtifactStorageR2Layer` for a Cloudflare object-bucket binding, and
-compose either with `makeCodeModeRuntimeEnvironmentLayer`. Hosts compose these
+compose either with `makeCodeModeRuntimeEnvironmentLayer` (pass `icons` to
+enable node logos). Hosts compose these
 Effect services directly and establish their execution boundary at the
 transport edge.
 

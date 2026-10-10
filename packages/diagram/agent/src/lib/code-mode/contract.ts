@@ -5,6 +5,7 @@ import type {
 } from "@standard-schema/spec";
 import {
   CANVAS_LIMITS,
+  CANVAS_NODE_ICON,
   CANVAS_SPEC_VERSION,
   SKETCHI_DIAGRAM_STYLE,
 } from "@sketchi/diagram-core";
@@ -439,6 +440,9 @@ export const CODE_MODE_ISSUE_CODES = [
   "canvas_limit_exceeded",
   "invalid_z_order",
   "unknown_layout_target",
+  "unknown_icon",
+  "invalid_canvas_icon",
+  "icon_dropped",
 ] as const;
 
 export const CodeModeIssueCodeSchema = Object.assign(
@@ -522,6 +526,27 @@ export const DiagramPatchOperationNameSchema = Object.assign(
   { options: DIAGRAM_PATCH_OPERATION_NAMES },
 );
 
+const maximumIconSlugInputLength = 128;
+const IconSlugInput = requiredString(
+  nonEmptyString().check(
+    Schema.isMaxLength(maximumIconSlugInputLength, {
+      message: `Too big: expected string to have <=${maximumIconSlugInputLength} characters`,
+    }),
+  ),
+);
+
+/**
+ * A logo from the Sketchi icon catalog (icons.sketchi.app). Use an exact catalog
+ * slug; unknown slugs are dropped with an unknown_icon warning.
+ */
+export class NodeIconSpec extends Schema.Class<NodeIconSpec>("NodeIconSpec")(
+  {
+    slug: IconSlugInput,
+  },
+  { identifier: undefined },
+) {}
+export const NodeIconSpecSchema = NodeIconSpec;
+
 export class FlowchartSpecNode extends Schema.Class<FlowchartSpecNode>(
   "FlowchartSpecNode",
 )(
@@ -530,6 +555,7 @@ export class FlowchartSpecNode extends Schema.Class<FlowchartSpecNode>(
     label: RequiredNonEmptyString,
     kind: FlowchartNodeKindSchema,
     description: optionalContract(NonEmptyString),
+    icon: optionalContract(NodeIconSpec),
   },
   { identifier: undefined },
 ) {}
@@ -918,6 +944,41 @@ const CanvasPointList = Schema.Array(ScenePoint)
     }),
   );
 
+/** A catalog logo drawn top-center inside a node; size is its square edge. */
+export class CanvasNodeIcon extends Schema.Class<CanvasNodeIcon>(
+  "CanvasNodeIcon",
+)(
+  {
+    slug: IconSlugInput.pipe(Schema.mutableKey),
+    size: Schema.Number.check(
+      Schema.isFinite(),
+      Schema.isBetween(
+        {
+          minimum: CANVAS_NODE_ICON.minSize,
+          maximum: CANVAS_NODE_ICON.maxSize,
+        },
+        {
+          message: `Expected a number between ${CANVAS_NODE_ICON.minSize} and ${CANVAS_NODE_ICON.maxSize}`,
+        },
+      ),
+    ).pipe(Schema.mutableKey),
+  },
+  { identifier: undefined },
+) {}
+export const CanvasNodeIconSchema = CanvasNodeIcon;
+
+/** Derived SVG asset for one icon slug; Sketchi replaces any authored value. */
+export class CanvasIconAsset extends Schema.Class<CanvasIconAsset>(
+  "CanvasIconAsset",
+)(
+  {
+    name: Schema.String,
+    svg: Schema.String,
+  },
+  { identifier: undefined },
+) {}
+export const CanvasIconAssetSchema = CanvasIconAsset;
+
 export class NodeSceneElement extends Schema.Class<NodeSceneElement>(
   "NodeSceneElement",
 )(
@@ -928,6 +989,7 @@ export class NodeSceneElement extends Schema.Class<NodeSceneElement>(
     id: RequiredNonEmptyString,
     nodeId: RequiredNonEmptyString,
     kind: optionalContract(NonEmptyString),
+    icon: optionalContract(CanvasNodeIcon).pipe(Schema.mutableKey),
     rendererRole: optionalContract(literals(["sequence-lifeline"])),
     shape: literals([
       "rectangle",
@@ -1156,6 +1218,9 @@ export class CanvasSpec extends Schema.Class<CanvasSpec>("CanvasSpec")(
       Schema.Array(SceneElementSchema)
         .pipe(Schema.mutable)
         .annotate({ maxItems: CANVAS_LIMITS.maxElements }),
+    ),
+    icons: optionalContract(Schema.Record(Schema.String, CanvasIconAsset)).pipe(
+      Schema.mutableKey,
     ),
     layers: EmptyCanvasLayers,
     layouts: EmptyCanvasLayouts,

@@ -62,7 +62,9 @@ export function getIconBySlug(slug: string): SketchiIcon | undefined {
 }
 
 export function getIconSourcePath(slug: string): string | undefined {
-  return catalog.sources[slug];
+  return Object.hasOwn(catalog.sources, slug)
+    ? catalog.sources[slug]
+    : undefined;
 }
 
 /** Source file of an icon relative to this package's `svg/` directory. */

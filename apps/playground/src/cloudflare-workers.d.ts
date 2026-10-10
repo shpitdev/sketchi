@@ -3,9 +3,11 @@ declare module "cloudflare:workers" {
   import type { CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
   import type { CodeModeUsagePipelineBinding } from "./server/bindings/studio-env.server";
   import type { CloudflareBrowserRunBinding } from "./server/codemode/browser-renderer.server";
+  import type { PlaygroundAssetsBinding } from "./server/codemode/icon-catalog.server";
 
   export const env: {
     AI?: CloudflareAiGatewayProvider;
+    ASSETS?: PlaygroundAssetsBinding;
     BROWSER?: CloudflareBrowserRunBinding;
     CODEMODE_USAGE_EVENTS?: CodeModeUsagePipelineBinding;
     CODEMODE_USAGE_ISSUES?: CodeModeUsagePipelineBinding;

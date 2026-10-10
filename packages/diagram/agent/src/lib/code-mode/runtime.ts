@@ -87,6 +87,11 @@ import {
   type PatchableScene,
   type QualityReport,
 } from "./contract.js";
+import {
+  embedSceneIcons,
+  resolveNodeIcons,
+  type CodeModeIconCatalog,
+} from "./icons.js";
 import { cleanToolString } from "../clean-tool-string.js";
 import { assessFlowchartQuality } from "../flowchart/quality.js";
 import {
@@ -123,6 +128,8 @@ const codeModeDuration = Metric.histogram("sketchi_codemode_duration_ms", {
 
 export interface CodeModeRuntimeOptions {
   createId?: (prefix: string) => string;
+  /** Node-logo catalog; without one, every node icon is dropped with a warning. */
+  icons?: CodeModeIconCatalog;
   renderer?: CodeModeArtifactRenderer;
   artifactUrl?: (input: {
     artifactId: string;
@@ -133,7 +140,7 @@ export interface CodeModeRuntimeOptions {
 export class CodeModeRuntimeEnvironment extends Context.Service<
   CodeModeRuntimeEnvironment,
   Required<Pick<CodeModeRuntimeOptions, "createId">> &
-    Pick<CodeModeRuntimeOptions, "artifactUrl" | "renderer">
+    Pick<CodeModeRuntimeOptions, "artifactUrl" | "icons" | "renderer">
 >()("@sketchi/diagram-agent/CodeModeRuntimeEnvironment") {}
 
 export const CodeModeRuntimeEnvironmentLive = Layer.succeed(
@@ -146,6 +153,7 @@ export function makeCodeModeRuntimeEnvironmentLayer(
 ) {
   return Layer.succeed(CodeModeRuntimeEnvironment, {
     createId: options.createId ?? defaultCreateId,
+    ...(options.icons ? { icons: options.icons } : {}),
     ...(options.renderer ? { renderer: options.renderer } : {}),
     ...(options.artifactUrl ? { artifactUrl: options.artifactUrl } : {}),
   });
@@ -1070,6 +1078,8 @@ function canvasIssueCode(
       return "invalid_canvas_composition";
     case "invalid_geometry":
       return "invalid_canvas_geometry";
+    case "invalid_icon":
+      return "invalid_canvas_icon";
     case "invalid_polygon":
       return "invalid_polygon";
     case "label_overflow":
@@ -1169,6 +1179,9 @@ function normalizePatchableScene(
         id: element.id,
         nodeId: element.nodeId,
         ...(element.kind ? { kind: element.kind } : {}),
+        ...(element.icon
+          ? { icon: { slug: element.icon.slug, size: element.icon.size } }
+          : {}),
         shape: element.shape,
         ...(element.fillColor ? { fillColor: element.fillColor } : {}),
         ...(element.strokeColor ? { strokeColor: element.strokeColor } : {}),
@@ -1241,6 +1254,12 @@ function normalizePatchableScene(
     layouts: structuredClone(scene.layouts),
     zOrder: [...scene.zOrder],
   };
+}
+
+/** The authored view of a scene: node icon references without derived SVG bytes. */
+function withoutIconAssets(scene: RenderedDiagramScene): RenderedDiagramScene {
+  const { icons: _icons, ...rest } = scene;
+  return rest;
 }
 
 function cloneScene(scene: PatchableScene): PatchableScene {
@@ -2589,7 +2608,12 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
         },
       });
     }
-    const scene = compileCanvasSpec(normalized);
+    const embedded = yield* embedSceneIcons(
+      compileCanvasSpec(normalized),
+      environment.icons,
+    );
+    const scene = embedded.scene;
+    const normalizedSpec = withoutIconAssets(scene);
     const validationIssues = getCanvasValidationIssues(scene);
     if (validationIssues.length > 0) {
       const issues = canvasValidationIssues(validationIssues);
@@ -2597,13 +2621,17 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
         status: issues.some((entry) => entry.code === "canvas_limit_exceeded")
           ? "limit_exceeded"
           : "invalid_canvas",
-        context: { ...baseContext, normalizedSpec: scene, issues },
+        context: {
+          ...baseContext,
+          normalizedSpec,
+          issues: [...embedded.issues, ...issues],
+        },
       });
     }
 
     const exportContext = {
       ...baseContext,
-      normalizedSpec: scene,
+      normalizedSpec,
       partial: scenePartial(scene),
     };
     const artifact = yield* exportAndStoreScene({
@@ -2630,9 +2658,9 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(
       status: "accepted",
       buildId,
       ...responseRequestId(request.requestId),
-      normalizedSpec: scene,
+      normalizedSpec,
       artifact,
-      issues: [],
+      issues: embedded.issues,
     } satisfies Extract<CreateCanvasResult, { ok: true }>;
   },
 );
@@ -2657,7 +2685,12 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
     const request = parsed.success;
 
     const buildId = yield* Effect.sync(() => environment.createId("build"));
-    const normalizedSpec = normalizeFlowchartSpec(request.spec);
+    const authoredSpec = normalizeFlowchartSpec(request.spec);
+    const resolvedIcons = resolveNodeIcons(
+      authoredSpec.nodes,
+      environment.icons,
+    );
+    const normalizedSpec = { ...authoredSpec, nodes: resolvedIcons.nodes };
     const baseContext = {
       buildId,
       ...responseRequestId(request.requestId),
@@ -2701,7 +2734,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
       });
     }
 
-    const scene = yield* Effect.try({
+    const renderedScene = yield* Effect.try({
       try: () => renderIntermediateDiagram(diagram),
       catch: (cause) =>
         new BuildFlowchartFailure({
@@ -2723,6 +2756,8 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
           },
         }),
     }).pipe(Effect.withSpan("codeMode.buildFlowchart.render"));
+    const embedded = yield* embedSceneIcons(renderedScene, environment.icons);
+    const scene = embedded.scene;
     const exportContext = { ...qualityContext, partial: scenePartial(scene) };
     const artifact = yield* exportAndStoreScene({
       scene,
@@ -2753,7 +2788,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(
       normalizedSpec,
       quality,
       artifact,
-      issues: [],
+      issues: [...resolvedIcons.issues, ...embedded.issues],
     } satisfies Extract<BuildFlowchartResult, { ok: true }>;
   },
 );
@@ -3010,24 +3045,29 @@ const applyDiagramPatchWorkflow = Effect.fn(
     });
   }
 
-  const structuralIssues = getCanvasValidationIssues(renderedScene);
+  const embedded = yield* embedSceneIcons(renderedScene, environment.icons);
+  const patchedScene = embedded.scene;
+  const structuralIssues = getCanvasValidationIssues(patchedScene);
   if (structuralIssues.length > 0) {
     return yield* new ApplyDiagramPatchFailure({
       status: "render_failed",
       context: {
         ...sourceContext,
-        partial: scenePartial(renderedScene),
-        issues: canvasValidationIssues(structuralIssues),
+        partial: scenePartial(patchedScene),
+        issues: [
+          ...embedded.issues,
+          ...canvasValidationIssues(structuralIssues),
+        ],
       },
     });
   }
 
   const exportContext = {
     ...sourceContext,
-    partial: scenePartial(renderedScene),
+    partial: scenePartial(patchedScene),
   };
   const artifact = yield* exportAndStoreScene({
-    scene: renderedScene,
+    scene: patchedScene,
     formats: requestedFormats(request.options),
     inlineFormats: requestedInlineFormats(request.options),
     ...(request.requestId ? { requestId: request.requestId } : {}),
@@ -3059,7 +3099,7 @@ const applyDiagramPatchWorkflow = Effect.fn(
       ? { sourceArtifactId: source.sourceArtifactId }
       : {}),
     artifact,
-    issues: [],
+    issues: embedded.issues,
   } satisfies Extract<ApplyDiagramPatchResult, { ok: true }>;
 });
 

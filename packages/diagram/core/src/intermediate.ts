@@ -1,5 +1,9 @@
 import { Effect, Schema } from "effect";
 
+import {
+  DIAGRAM_ICON_SLUG_MAX_LENGTH,
+  DIAGRAM_ICON_SLUG_PATTERN,
+} from "./icon.js";
 import { DIAGRAM_TYPES } from "./types.js";
 
 const NonEmptyString = Schema.NonEmptyString;
@@ -37,11 +41,27 @@ export type DiagramType = typeof DiagramTypeSchema.Type;
 export type LayoutDirection = typeof LayoutDirectionSchema.Type;
 export type EdgeRouting = typeof EdgeRoutingSchema.Type;
 
+/**
+ * A reference to a Sketchi icon-catalog mark drawn inside a node. Every diagram
+ * family shares this shape; resolving the slug against the catalog happens at
+ * the build boundary, so this contract checks only the slug format.
+ */
+export class DiagramIconRef extends Schema.Class<DiagramIconRef>(
+  "DiagramIconRef",
+)({
+  slug: NonEmptyString.check(
+    Schema.isPattern(DIAGRAM_ICON_SLUG_PATTERN),
+    Schema.isMaxLength(DIAGRAM_ICON_SLUG_MAX_LENGTH),
+  ),
+}) {}
+export const DiagramIconRefSchema = DiagramIconRef;
+
 export class DiagramNode extends Schema.Class<DiagramNode>("DiagramNode")({
   id: NonEmptyString,
   label: NonEmptyString,
   group: Schema.optional(NonEmptyString),
   kind: Schema.optional(NonEmptyString),
+  icon: Schema.optional(DiagramIconRef),
   metadata: withDefault(Metadata, {}),
 }) {}
 export const DiagramNodeSchema = DiagramNode;

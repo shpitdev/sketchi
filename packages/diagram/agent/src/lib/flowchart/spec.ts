@@ -47,6 +47,7 @@ export function normalizeFlowchartSpec(
       ...(node.description
         ? { description: cleanToolString(node.description) }
         : {}),
+      ...(node.icon ? { icon: { slug: cleanToolString(node.icon.slug) } } : {}),
     })),
     edges: spec.edges.map((edge, index) => ({
       id: cleanOptional(edge.id) ?? `edge-${index + 1}`,

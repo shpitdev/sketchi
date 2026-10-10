@@ -371,6 +371,9 @@ importers:
       '@sketchi/diagram-agent':
         specifier: workspace:*
         version: link:../../packages/diagram/agent
+      '@sketchi/icon-catalog':
+        specifier: workspace:*
+        version: link:../../packages/icons/catalog
       chalk:
         specifier: 6.0.1
         version: 6.0.1
@@ -501,6 +504,9 @@ importers:
       '@sketchi/diagram-ui':
         specifier: workspace:*
         version: link:../../packages/diagram/ui
+      '@sketchi/icon-catalog':
+        specifier: workspace:*
+        version: link:../../packages/icons/catalog
       '@sketchi/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -579,6 +585,9 @@ importers:
       '@sketchi/diagram-renderer':
         specifier: workspace:*
         version: link:../renderer
+      '@sketchi/icon-catalog':
+        specifier: workspace:*
+        version: link:../../icons/catalog
       '@sketchi/observability':
         specifier: workspace:*
         version: link:../../observability

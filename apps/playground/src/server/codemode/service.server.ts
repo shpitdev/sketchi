@@ -36,11 +36,10 @@ import {
   PlaygroundBrowserRenderingLive,
   type CloudflareBrowserRunRendererOptions,
 } from "./browser-renderer.server";
+import { playgroundIconCatalog } from "./icon-catalog.server";
 
 type CodeModeRequestContext =
-  | PlaygroundBindings
-  | PlaygroundIds
-  | PlaygroundRequestMetadata;
+  PlaygroundBindings | PlaygroundIds | PlaygroundRequestMetadata;
 
 export interface PlaygroundCodeModeShape {
   readonly applyDiagramPatch: (
@@ -151,6 +150,9 @@ export const PlaygroundCodeModeLive = Layer.effect(
       > = {
         createId: ids.create,
         artifactUrl: (input) => artifactUrl(metadata.origin, input),
+        ...(env.ASSETS
+          ? { icons: playgroundIconCatalog(env.ASSETS, metadata.origin) }
+          : {}),
         ...(env.BROWSER
           ? {
               renderer: browserRendering.renderer(

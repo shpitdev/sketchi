@@ -28,6 +28,7 @@ import {
 } from "./errors.js";
 import { DiagramExporter, DiagramExporterLive } from "./exporter.js";
 import { LocalFileSystemLive } from "./filesystem.js";
+import { cliIconCatalog } from "./icon-catalog.js";
 import {
   exportCreatedDiagram,
   runGenerateWorkflow,
@@ -1233,6 +1234,7 @@ const codeModeDependencies = Layer.mergeAll(
   CodeModeArtifactStorageMemory,
   makeCodeModeRuntimeEnvironmentLayer({
     createId: (prefix) => `${prefix}_offline_cli`,
+    icons: cliIconCatalog,
   }),
 );
 const diagramBuilderLayer = Layer.provide(

@@ -462,6 +462,7 @@ interface FlowchartNode {
   label: string;
   kind: "start" | "process" | "decision" | "end";
   description?: string;
+  icon?: { slug: string };
 }
 
 interface FlowchartEdge {
@@ -482,6 +483,14 @@ interface FlowchartStyle {
 
 type HexColor = `#${string}`;
 ```
+
+`icon` draws a brand logo from the Sketchi icon catalog
+(`icons.sketchi.app`) top-center inside the node, above its label. Use an exact
+catalog slug such as `docker`. Wordmarks, marks over 64 KB, and unknown slugs
+are dropped with an `unknown_icon` warning on the accepted result. A logo that
+cannot be drawn (no room above the label, a sequence lifeline, an asset that
+fails to load, or a diagram over its logo budget) is dropped with an
+`icon_dropped` warning. Icons never fail the build.
 
 Default styling is intentionally plain: black stroke, black text, and no
 decorative fill unless the caller asks for styling. Agents should not spend
@@ -1082,8 +1091,7 @@ false. See [CanvasSpec v1](canvas-spec.md) for the canonical scene contract.
 
 ```ts
 type ApplyDiagramPatchResult =
-  | ApplyDiagramPatchSuccess
-  | ApplyDiagramPatchFailure;
+  ApplyDiagramPatchSuccess | ApplyDiagramPatchFailure;
 
 interface ApplyDiagramPatchSuccess {
   ok: true;

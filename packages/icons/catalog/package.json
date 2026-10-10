@@ -13,6 +13,11 @@
       "types": "./dist/catalog.d.ts",
       "default": "./dist/catalog.js"
     },
+    "./node-logo-svgs": {
+      "types": "./dist/node-logo-svgs.d.ts",
+      "default": "./dist/node-logo-svgs.json"
+    },
+    "./node-logos/*": "./dist/node-logos/*",
     "./package.json": "./package.json"
   }
 }

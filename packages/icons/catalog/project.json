@@ -9,7 +9,7 @@
       "executor": "nx:run-commands",
       "outputs": ["{projectRoot}/dist"],
       "options": {
-        "command": "tsc6 -p packages/icons/catalog/tsconfig.lib.json"
+        "command": "tsc6 -p packages/icons/catalog/tsconfig.lib.json && jiti packages/icons/catalog/scripts/build-node-logos.ts"
       }
     },
     "generate-catalog": {

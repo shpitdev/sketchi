@@ -15,6 +15,7 @@
     "@sketchi/diagram-renderer": "workspace:*",
     "@sketchi/diagram-scenarios": "workspace:*",
     "@sketchi/diagram-ui": "workspace:*",
+    "@sketchi/icon-catalog": "workspace:*",
     "@sketchi/observability": "workspace:*",
     "@sketchi/studio-projects": "workspace:*",
     "@streamdown/cjk": "1.0.4",

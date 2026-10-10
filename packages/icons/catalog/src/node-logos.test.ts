@@ -110,6 +110,10 @@ describe("icon catalog", () => {
     expect(getIconBySlug("docker")?.name).toBe("Docker");
     expect(getIconSourceFile("docker")).toBe("devtools-ci/docker.svg");
     expect(getIconSourceFile("missing-slug")).toBeUndefined();
+    for (const slug of ["constructor", "__proto__", "toString"]) {
+      expect(getIconBySlug(slug), slug).toBeUndefined();
+      expect(getIconSourceFile(slug), slug).toBeUndefined();
+    }
     expect(readSource("docker")).toContain("<svg");
   });
 });

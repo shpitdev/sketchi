@@ -6,6 +6,7 @@
  * PNG, or another render target without changing the authored scene.
  */
 
+import { isDiagramIconSlug } from "./icon.js";
 import { boundLabelWidth, estimateTextWidth } from "./text-metrics.js";
 
 export const CANVAS_SPEC_VERSION = 1 as const;
@@ -20,6 +21,21 @@ export const CANVAS_LIMITS = Object.freeze({
   maxSerializedBytes: 1_500_000,
   maxTextLength: 4_096,
   maxZOrderEntries: 600,
+});
+
+/**
+ * Node logos sit top-center inside the node's bound-text box with the label
+ * bottom-aligned beneath them. Geometry mirrors Excalidraw's bound-text rules so
+ * editing a label in Excalidraw never moves it over the logo.
+ */
+export const CANVAS_NODE_ICON = Object.freeze({
+  /** Excalidraw BOUND_TEXT_PADDING between a container edge and its text box. */
+  boundTextPadding: 5,
+  gap: 4,
+  maxAssetBytes: 64 * 1024,
+  maxSize: 64,
+  maxTotalAssetBytes: 768 * 1024,
+  minSize: 16,
 });
 
 export type CanvasStrokeStyle = "dashed" | "dotted" | "solid";
@@ -52,12 +68,25 @@ export interface CanvasStrokeStyleFields {
   readonly strokeWidth?: 1 | 2 | 4;
 }
 
+/** An icon-catalog mark drawn inside a node; `size` is its square edge. */
+export interface CanvasNodeIcon {
+  readonly slug: string;
+  readonly size: number;
+}
+
+/** Normalized SVG markup for one icon slug, embedded so scenes render offline. */
+export interface CanvasIconAsset {
+  readonly name: string;
+  readonly svg: string;
+}
+
 export interface CanvasShapeElement
   extends CanvasElementComposition, CanvasStrokeStyleFields {
   readonly type: "node";
   readonly id: string;
   readonly nodeId: string;
   readonly kind?: string;
+  readonly icon?: CanvasNodeIcon;
   readonly rendererRole?: "sequence-lifeline";
   readonly shape: CanvasShapeKind;
   readonly points?: [CanvasPoint, CanvasPoint, CanvasPoint, ...CanvasPoint[]];
@@ -190,6 +219,8 @@ export interface CanvasSpec {
   readonly accentColor: string;
   readonly backgroundColor: string;
   readonly elements: CanvasElement[];
+  /** Assets for every node icon slug, keyed by slug; derived, never authored. */
+  readonly icons?: Readonly<Record<string, CanvasIconAsset>>;
   readonly layers: CanvasLayer[];
   readonly layouts: CanvasLayout[];
   readonly zOrder: string[];
@@ -204,6 +235,7 @@ export interface CanvasValidationIssue {
     | "invalid_binding"
     | "invalid_composition"
     | "invalid_geometry"
+    | "invalid_icon"
     | "invalid_polygon"
     | "label_overflow"
     | "limit_exceeded"
@@ -220,7 +252,7 @@ type PositionedCanvasElement = Extract<
   { readonly x: number; readonly y: number }
 >;
 
-interface CanvasElementBounds {
+export interface CanvasElementBounds {
   readonly height: number;
   readonly width: number;
   readonly x: number;
@@ -305,6 +337,263 @@ function validateElementLimits(
       elementId: element.id,
       message: `Element "${element.id}" exceeds ${CANVAS_LIMITS.maxGroupsPerElement} groups.`,
       path: `${path}.groupIds`,
+    });
+  }
+  return issues;
+}
+
+const utf8Encoder = new TextEncoder();
+
+function svgByteLength(svg: string): number {
+  return utf8Encoder.encode(svg).byteLength;
+}
+
+/** Excalidraw's inset from a container's edge to its bound-text box. */
+export function canvasBoundTextInset(
+  node: Pick<CanvasShapeElement, "height" | "shape" | "width">,
+): CanvasPoint {
+  const padding = CANVAS_NODE_ICON.boundTextPadding;
+  if (node.shape === "ellipse" || node.shape === "circle") {
+    const inset = 1 - Math.SQRT1_2;
+    return {
+      x: padding + (node.width / 2) * inset,
+      y: padding + (node.height / 2) * inset,
+    };
+  }
+  if (node.shape === "diamond") {
+    return { x: padding + node.width / 4, y: padding + node.height / 4 };
+  }
+  return { x: padding, y: padding };
+}
+
+/** Vertical space a node icon takes from the top of its label's text box. */
+export function canvasNodeIconBand(icon: CanvasNodeIcon | undefined): number {
+  return icon ? icon.size + CANVAS_NODE_ICON.gap * 2 : 0;
+}
+
+/** Absolute box of a node icon: centered at the top of its bound-text box. */
+export function canvasNodeIconBox(
+  node: Pick<
+    CanvasShapeElement,
+    "height" | "icon" | "shape" | "width" | "x" | "y"
+  >,
+): CanvasElementBounds | undefined {
+  if (!node.icon) return undefined;
+  const inset = canvasBoundTextInset(node);
+  return {
+    x: node.x + (node.width - node.icon.size) / 2,
+    y: node.y + inset.y + CANVAS_NODE_ICON.gap,
+    width: node.icon.size,
+    height: node.icon.size,
+  };
+}
+
+export interface DroppedCanvasIcon {
+  readonly elementId: string;
+  readonly index: number;
+  /**
+   * unavailable: no catalog asset; lifeline: sequence lifelines carry no logo;
+   * no_room: the label would no longer fit; budget: per-scene bytes spent.
+   */
+  readonly reason: "budget" | "lifeline" | "no_room" | "unavailable";
+  readonly slug: string;
+}
+
+export interface CanvasIconEmbedding {
+  readonly dropped: readonly DroppedCanvasIcon[];
+  readonly scene: CanvasSpec;
+}
+
+function withoutIcon(element: CanvasShapeElement): CanvasShapeElement {
+  const { icon: _icon, ...rest } = element;
+  return rest;
+}
+
+function canvasLayerVisibility(
+  canvas: CanvasSpec,
+): (element: CanvasElement) => boolean {
+  const layersById = new Map(canvas.layers.map((layer) => [layer.id, layer]));
+  return (element) =>
+    !element.layerId || layersById.get(element.layerId)?.visible !== false;
+}
+
+function visibleBoundLabels(
+  canvas: CanvasSpec,
+  isVisible: (element: CanvasElement) => boolean,
+): Map<
+  string,
+  { readonly element: CanvasTextElement; readonly index: number }
+> {
+  const labels = new Map<
+    string,
+    { readonly element: CanvasTextElement; readonly index: number }
+  >();
+  for (const [index, element] of canvas.elements.entries()) {
+    if (element.type === "text" && element.containerId && isVisible(element)) {
+      labels.set(element.containerId, { element, index });
+    }
+  }
+  return labels;
+}
+
+/**
+ * Whether a node's label overflows its box, using the adapter's label metrics
+ * (conversion must not resize a node) and the given icon's band.
+ */
+function nodeLabelOverflows(
+  element: CanvasShapeElement,
+  boundLabel: CanvasTextElement | undefined,
+  icon: CanvasNodeIcon | undefined,
+): boolean {
+  const text = boundLabel?.text ?? element.label;
+  const fontSize = boundLabel?.fontSize ?? 16;
+  const maxWidth = boundLabel
+    ? (boundLabel.maxWidth ?? 160)
+    : Math.max(1, element.width - 24);
+  const lines = text.split("\n");
+  const estimatedWidth = estimateTextWidth(text, fontSize);
+  const textWidth = Math.max(1, Math.min(maxWidth, estimatedWidth));
+  const textHeight = Math.ceil(lines.length * fontSize * 1.35);
+  // The adapter grows a label box past maxWidth only when glyphs would
+  // otherwise outgrow its padded canvas; that growth must still fit.
+  const paintedBox = boundLabelWidth(text, fontSize, maxWidth) - fontSize;
+  return (
+    textWidth + 24 > element.width ||
+    paintedBox + 24 > element.width ||
+    textHeight + 18 + canvasNodeIconBand(icon) > element.height
+  );
+}
+
+/**
+ * Embed one asset per referenced icon slug and remove icons that cannot be
+ * drawn, so an icon never fails a build and every exported scene renders
+ * without a catalog or network. Any authored `icons` map is replaced. An icon
+ * is dropped when its asset is unavailable, it sits on a sequence lifeline, or
+ * its label would no longer fit; icons past the per-scene byte budget are
+ * dropped in element order, which keeps the result deterministic.
+ */
+export function embedCanvasIcons(
+  canvas: CanvasSpec,
+  assetFor: (slug: string) => CanvasIconAsset | undefined,
+): CanvasIconEmbedding {
+  const icons = new Map<string, CanvasIconAsset>();
+  const dropped: DroppedCanvasIcon[] = [];
+  const isVisible = canvasLayerVisibility(canvas);
+  const boundLabels = visibleBoundLabels(canvas, isVisible);
+  let totalBytes = 0;
+  const elements = canvas.elements.map((element, index): CanvasElement => {
+    if (element.type !== "node" || !element.icon) return element;
+    const icon = element.icon;
+    const drop = (reason: DroppedCanvasIcon["reason"]): CanvasShapeElement => {
+      dropped.push({ elementId: element.id, index, reason, slug: icon.slug });
+      return withoutIcon(element);
+    };
+    const embedded = icons.get(icon.slug);
+    const asset =
+      embedded ??
+      (isDiagramIconSlug(icon.slug) ? assetFor(icon.slug) : undefined);
+    if (
+      typeof asset?.svg !== "string" ||
+      svgByteLength(asset.svg) > CANVAS_NODE_ICON.maxAssetBytes
+    ) {
+      return drop("unavailable");
+    }
+    if (element.rendererRole === "sequence-lifeline") return drop("lifeline");
+    if (element.shape !== "polygon" && isVisible(element)) {
+      const label = boundLabels.get(element.id)?.element;
+      if (
+        nodeLabelOverflows(element, label, icon) &&
+        !nodeLabelOverflows(element, label, undefined)
+      ) {
+        return drop("no_room");
+      }
+    }
+    if (!embedded) {
+      const bytes = svgByteLength(asset.svg);
+      if (totalBytes + bytes > CANVAS_NODE_ICON.maxTotalAssetBytes) {
+        return drop("budget");
+      }
+      totalBytes += bytes;
+      icons.set(icon.slug, { name: asset.name, svg: asset.svg });
+    }
+    return element;
+  });
+  const { icons: _authored, ...rest } = canvas;
+  return {
+    dropped,
+    scene:
+      icons.size > 0
+        ? { ...rest, elements, icons: Object.fromEntries(icons) }
+        : { ...rest, elements },
+  };
+}
+
+function validateNodeIcon(
+  canvas: CanvasSpec,
+  element: CanvasShapeElement,
+  index: number,
+): CanvasValidationIssue[] {
+  const icon = element.icon;
+  if (!icon) return [];
+  const path = `elements[${index}].icon`;
+  const issues: CanvasValidationIssue[] = [];
+  if (element.rendererRole === "sequence-lifeline") {
+    issues.push({
+      code: "invalid_icon",
+      elementId: element.id,
+      message: `Sequence lifeline "${element.id}" cannot carry an icon.`,
+      path,
+    });
+  }
+  if (!isDiagramIconSlug(icon.slug)) {
+    issues.push({
+      code: "invalid_icon",
+      elementId: element.id,
+      message: `Node "${element.id}" has an invalid icon slug "${icon.slug}".`,
+      path: `${path}.slug`,
+    });
+  } else if (!canvas.icons || !Object.hasOwn(canvas.icons, icon.slug)) {
+    issues.push({
+      code: "invalid_icon",
+      elementId: element.id,
+      message: `Node "${element.id}" references icon "${icon.slug}" without an embedded asset.`,
+      path: `${path}.slug`,
+    });
+  }
+  if (
+    !Number.isFinite(icon.size) ||
+    icon.size < CANVAS_NODE_ICON.minSize ||
+    icon.size > CANVAS_NODE_ICON.maxSize
+  ) {
+    issues.push({
+      code: "invalid_icon",
+      elementId: element.id,
+      message: `Node "${element.id}" icon size must be ${CANVAS_NODE_ICON.minSize}-${CANVAS_NODE_ICON.maxSize}.`,
+      path: `${path}.size`,
+    });
+  }
+  return issues;
+}
+
+function validateIconAssets(canvas: CanvasSpec): CanvasValidationIssue[] {
+  const issues: CanvasValidationIssue[] = [];
+  let totalBytes = 0;
+  for (const [slug, asset] of Object.entries(canvas.icons ?? {})) {
+    const bytes = svgByteLength(asset.svg);
+    totalBytes += bytes;
+    if (bytes > CANVAS_NODE_ICON.maxAssetBytes) {
+      issues.push({
+        code: "limit_exceeded",
+        message: `Icon asset "${slug}" exceeds ${CANVAS_NODE_ICON.maxAssetBytes} bytes.`,
+        path: `icons.${slug}`,
+      });
+    }
+  }
+  if (totalBytes > CANVAS_NODE_ICON.maxTotalAssetBytes) {
+    issues.push({
+      code: "limit_exceeded",
+      message: `Icon assets exceed ${CANVAS_NODE_ICON.maxTotalAssetBytes} bytes per canvas.`,
+      path: "icons",
     });
   }
   return issues;
@@ -438,51 +727,23 @@ export function getCanvasValidationIssues(
       path: "elements",
     });
   }
-  const layersById = new Map(canvas.layers.map((layer) => [layer.id, layer]));
-  const layerIds = new Set(layersById.keys());
-  const isLayerVisible = (element: CanvasElement) =>
-    !element.layerId || layersById.get(element.layerId)?.visible !== false;
-  const nodeLabelsByContainerId = new Map<
-    string,
-    { readonly element: CanvasTextElement; readonly index: number }
-  >();
-  for (const [index, element] of canvas.elements.entries()) {
-    if (
-      element.type === "text" &&
-      element.containerId &&
-      isLayerVisible(element)
-    ) {
-      nodeLabelsByContainerId.set(element.containerId, { element, index });
-    }
-  }
+  const layerIds = new Set(canvas.layers.map((layer) => layer.id));
+  const isLayerVisible = canvasLayerVisibility(canvas);
+  const nodeLabelsByContainerId = visibleBoundLabels(canvas, isLayerVisible);
+  issues.push(...validateIconAssets(canvas));
   canvas.elements.forEach((element, index) => {
     issues.push(...validateElementLimits(element, index));
+    if (element.type === "node") {
+      issues.push(...validateNodeIcon(canvas, element, index));
+    }
     if (
       element.type === "node" &&
       element.shape !== "polygon" &&
       isLayerVisible(element)
     ) {
-      // Match the adapter's label metrics; conversion must not resize a node.
       const boundLabel = nodeLabelsByContainerId.get(element.id);
       if (boundLabel || element.rendererRole !== "sequence-lifeline") {
-        const text = boundLabel?.element.text ?? element.label;
-        const fontSize = boundLabel?.element.fontSize ?? 16;
-        const maxWidth = boundLabel
-          ? (boundLabel.element.maxWidth ?? 160)
-          : Math.max(1, element.width - 24);
-        const lines = text.split("\n");
-        const estimatedWidth = estimateTextWidth(text, fontSize);
-        const textWidth = Math.max(1, Math.min(maxWidth, estimatedWidth));
-        const textHeight = Math.ceil(lines.length * fontSize * 1.35);
-        // The adapter grows a label box past maxWidth only when glyphs would
-        // otherwise outgrow its padded canvas; that growth must still fit.
-        const paintedBox =
-          boundLabelWidth(text, fontSize, maxWidth) - fontSize;
-        if (
-          textWidth + 24 > element.width ||
-          paintedBox + 24 > element.width ||
-          textHeight + 18 > element.height
-        ) {
+        if (nodeLabelOverflows(element, boundLabel?.element, element.icon)) {
           issues.push({
             code: "label_overflow",
             elementId: boundLabel?.element.id ?? element.id,

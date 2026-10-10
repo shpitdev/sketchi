@@ -47,6 +47,7 @@ const POST_BASELINE_SCENE_FIELDS = new Set(["rendererRole", "strokeStyle"]);
 const CANVAS_SPEC_ADDED_FIELDS = new Set([
   "kind",
   "version",
+  "icons",
   "layers",
   "layouts",
   "zOrder",
@@ -65,6 +66,7 @@ const CANVAS_ELEMENT_SCHEMA_ADDED_FIELDS = {
     "roughness",
     "strokeWidth",
     "points",
+    "icon",
   ]),
   text: new Set([
     "frameId",
@@ -106,6 +108,13 @@ const CANVAS_ISSUE_CODE_ADDITIONS = new Set([
   "invalid_z_order",
   "unknown_layout_target",
 ]);
+// Node logos (#288) add optional icon references; frozen captures predate them.
+const NODE_ICON_ISSUE_CODE_ADDITIONS = new Set([
+  "unknown_icon",
+  "invalid_canvas_icon",
+  "icon_dropped",
+]);
+const FLOWCHART_SPEC_NODE_ADDED_FIELDS = new Set(["icon"]);
 const FROZEN_FIXTURE_HASHES = {
   v1: "c668b53ee90043a06c640d06cc28253496d50e7431c916b523fcd4157b91ae55",
   v2: "52858006d02386fa0aac993ce35afca219aaae9860144836b0884e7770f948d9",
@@ -193,7 +202,8 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
     CANVAS_SHAPE_ADDITIONS.has(value) ||
     CANVAS_SCHEMA_ENUM_ADDITIONS.has(value) ||
     CANVAS_PATCH_OPERATION_ADDITIONS.has(value) ||
-    CANVAS_ISSUE_CODE_ADDITIONS.has(value)
+    CANVAS_ISSUE_CODE_ADDITIONS.has(value) ||
+    NODE_ICON_ISSUE_CODE_ADDITIONS.has(value)
   );
 }
 
@@ -206,6 +216,17 @@ function canvasElementSchemaType(
   return type === "arrow" || type === "node" || type === "text"
     ? type
     : undefined;
+}
+
+function isFlowchartSpecNodeSchemaProperties(
+  value: Record<string, unknown>,
+): boolean {
+  return (
+    !Object.hasOwn(value, "type") &&
+    ["id", "label", "kind", "description"].every((key) =>
+      Object.hasOwn(value, key),
+    )
+  );
 }
 
 function isAddedCanvasElementSchema(value: unknown): boolean {
@@ -371,7 +392,9 @@ function withoutPostBaselineSceneFields(
     : undefined;
   const addedElementFields = schemaType
     ? CANVAS_ELEMENT_SCHEMA_ADDED_FIELDS[schemaType]
-    : undefined;
+    : isSchemaProperties && isFlowchartSpecNodeSchemaProperties(value)
+      ? FLOWCHART_SPEC_NODE_ADDED_FIELDS
+      : undefined;
   return Object.fromEntries(
     Object.entries(value).flatMap(([key, nested]) =>
       isSchemaProperties &&
@@ -1744,7 +1767,11 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
     ];
     expect(
       CodeModeIssueCodeSchema.options
-        .filter((code) => !CANVAS_ISSUE_CODE_ADDITIONS.has(code))
+        .filter(
+          (code) =>
+            !CANVAS_ISSUE_CODE_ADDITIONS.has(code) &&
+            !NODE_ICON_ISSUE_CODE_ADDITIONS.has(code),
+        )
         .toSorted(),
     ).toEqual([...directlyReachableCodes, ...boundaryOnlyCodes].toSorted());
 

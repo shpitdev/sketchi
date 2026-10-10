@@ -10,7 +10,10 @@ import {
   SKETCHI_DIAGRAM_PALETTE,
   SKETCHI_DIAGRAM_STYLE,
   flowchartFixture,
+  mindmapFixture,
+  parseFlowchartDiagram,
   parseIntermediateDiagram,
+  parseMindmapDiagram,
 } from "./index";
 
 const themeCss = readFileSync(
@@ -69,6 +72,53 @@ describe("parseIntermediateDiagram", () => {
         nodes: [{ id: "only", label: "Only node" }],
       }).style,
     ).toEqual(SKETCHI_DIAGRAM_STYLE);
+  });
+
+  it("carries an optional icon reference on every diagram node family", () => {
+    const diagram = parseIntermediateDiagram({
+      id: "logos",
+      title: "Logos",
+      nodes: [
+        { id: "build", label: "Docker build", icon: { slug: "docker" } },
+        { id: "plain", label: "Plain step" },
+      ],
+    });
+    expect(diagram.nodes[0]?.icon).toEqual({ slug: "docker" });
+    expect(diagram.nodes[1]?.icon).toBeUndefined();
+    expect(
+      parseFlowchartDiagram({
+        ...flowchartFixture,
+        nodes: flowchartFixture.nodes.map((node, index) =>
+          index === 0 ? { ...node, icon: { slug: "github" } } : node,
+        ),
+      }).nodes[0]?.icon,
+    ).toEqual({ slug: "github" });
+    expect(
+      parseMindmapDiagram({
+        ...mindmapFixture,
+        nodes: mindmapFixture.nodes.map((node, index) =>
+          index === 0 ? { ...node, icon: { slug: "cloudflare" } } : node,
+        ),
+      }).nodes[0]?.icon,
+    ).toEqual({ slug: "cloudflare" });
+  });
+
+  it("rejects icon slugs that are not catalog-shaped", () => {
+    for (const slug of [
+      "Docker",
+      "docker logo",
+      "",
+      "-docker",
+      "a".repeat(65),
+    ]) {
+      expect(() =>
+        parseIntermediateDiagram({
+          id: "logos",
+          title: "Logos",
+          nodes: [{ id: "build", label: "Build", icon: { slug } }],
+        }),
+      ).toThrow('at ["nodes"][0]["icon"]["slug"]');
+    }
   });
 
   it("rejects duplicate node ids", () => {

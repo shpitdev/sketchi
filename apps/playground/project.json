@@ -13,13 +13,15 @@
       ],
       "options": {
         "command": "vite build --config apps/playground/vite.config.ts"
-      }
+      },
+      "dependsOn": ["^build", "sync-node-logos"]
     },
     "dev": {
       "executor": "nx:run-commands",
       "options": {
         "command": "PORTLESS_PORT=443 portless run --name playground.sketchi vite dev --config apps/playground/vite.config.ts"
-      }
+      },
+      "dependsOn": ["sync-node-logos"]
     },
     "preview": {
       "executor": "nx:run-commands",
@@ -61,6 +63,15 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "tsc -p apps/playground/tsconfig.json --noEmit"
+      }
+    },
+    "sync-node-logos": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
+      "inputs": ["{projectRoot}/scripts/sync-node-logos.ts", "^production"],
+      "outputs": ["{projectRoot}/public/node-logos"],
+      "options": {
+        "command": "jiti apps/playground/scripts/sync-node-logos.ts"
       }
     }
   }
