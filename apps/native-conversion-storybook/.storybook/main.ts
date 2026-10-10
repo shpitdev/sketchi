@@ -1,5 +1,7 @@
 import type { StorybookConfig } from "@storybook/react-vite";
 
+import { excalidrawFonts } from "../../../scripts/lib/excalidraw-fonts.mjs";
+
 const config: StorybookConfig = {
   stories: [
     "../../../packages/diagram/ui/src/components/excalidraw-scene-canvas/*.stories.tsx",
@@ -18,6 +20,7 @@ const config: StorybookConfig = {
     },
   },
   viteFinal: async (viteConfig) => {
+    viteConfig.plugins = [...(viteConfig.plugins ?? []), excalidrawFonts()];
     viteConfig.resolve ??= {};
     viteConfig.resolve.alias = {
       ...viteConfig.resolve.alias,

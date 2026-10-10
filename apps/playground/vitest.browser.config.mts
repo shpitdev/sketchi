@@ -3,12 +3,15 @@ import { playwright } from "@vitest/browser-playwright";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
+import { excalidrawFonts } from "../../scripts/lib/excalidraw-fonts.mjs";
+
 const source = (path: string) => new URL(path, import.meta.url).pathname;
 const executablePath = process.env["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"];
 
 export default defineConfig({
   cacheDir: source("../../node_modules/.vite/apps/playground-browser"),
-  plugins: [react(), tailwindcss()],
+  // Excalidraw fonts come from this server, as in the deployed apps.
+  plugins: [excalidrawFonts(), react(), tailwindcss()],
   resolve: {
     alias: [
       {

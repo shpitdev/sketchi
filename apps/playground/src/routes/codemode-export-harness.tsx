@@ -1,3 +1,4 @@
+import { loadExcalidraw } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 
@@ -17,7 +18,6 @@ interface ExcalidrawExportScene {
 }
 
 declare global {
-  var EXCALIDRAW_ASSET_PATH: string | undefined;
   var sketchiExportError: string | undefined;
   var sketchiExportPng:
     | ((scene: unknown, options: PngExportOptions) => Promise<string>)
@@ -29,11 +29,11 @@ function CodeModeExportHarnessRoute() {
   // oxlint-disable-next-line sketchi/no-react-effects -- installs the window export bridge that Browser Rendering polls; it is the page's external-system boundary
   useEffect(() => {
     let active = true;
-    globalThis.EXCALIDRAW_ASSET_PATH = "/";
     globalThis.sketchiExportError = undefined;
     globalThis.sketchiExportReady = false;
 
-    void import("@excalidraw/excalidraw")
+    // Browser Rendering exports from this origin; fonts must not come from a CDN.
+    void loadExcalidraw()
       .then(({ exportToBlob }) => {
         if (!active) {
           return;
