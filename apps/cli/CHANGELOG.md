@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.8.0
+
+### Minor Changes
+
+- [#366](https://github.com/shpitdev/sketchi/pull/366) [`71d19ca`](https://github.com/shpitdev/sketchi/commit/71d19ca947f56d74863f09fd6f778720f352ca35) Thanks [@anandpant](https://github.com/anandpant)! - Node logos now appear in exported drawings and PNGs. `sketchi export --format png` rasterizes the logo images embedded in a diagram, and `sketchi pull` keeps a shared drawing's image files instead of dropping them. PNG export also handles drawings whose image ids contain characters like `:`, and its embedded-image size limit counts only images still in the drawing.
+
 ## 0.7.0
 
 ### Minor Changes
