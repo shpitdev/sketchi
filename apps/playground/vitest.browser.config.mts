@@ -23,6 +23,14 @@ export default defineConfig({
         replacement: source("../../packages/diagram/agent/src/index.ts"),
       },
       {
+        find: /^@sketchi\/icon-catalog$/,
+        replacement: source("../../packages/icons/catalog/src/index.ts"),
+      },
+      {
+        find: /^@sketchi\/icon-catalog\/catalog$/,
+        replacement: source("../../packages/icons/catalog/src/catalog.ts"),
+      },
+      {
         find: "@sketchi/diagram-core",
         replacement: source("../../packages/diagram/core/src/index.ts"),
       },

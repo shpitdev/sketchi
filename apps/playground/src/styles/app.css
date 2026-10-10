@@ -266,33 +266,6 @@ body {
   font-weight: 500;
 }
 
-.studio__sample-brand-path {
-  align-items: center;
-  display: flex;
-  gap: 5px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.studio__sample-brand-path li {
-  align-items: center;
-  display: flex;
-}
-
-.studio__sample-brand-path li:not(:last-child)::after {
-  color: var(--accent-ink);
-  content: "\2192";
-  font-family: var(--font-mono);
-  font-size: 10px;
-  margin-left: 5px;
-}
-
-.studio__sample-brand-path img {
-  display: block;
-  object-fit: contain;
-}
-
 .studio__sample-canvas {
   min-height: 0;
   position: relative;

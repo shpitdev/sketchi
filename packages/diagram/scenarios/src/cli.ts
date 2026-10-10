@@ -201,18 +201,19 @@ const evaluateCandidate = Effect.fn("diagramScenarios.evaluateCandidate")(
   ): Effect.Effect<ScenarioRunEvaluation> {
     return Effect.try({
       try: () => {
-        let diagram: unknown = extractJsonObject(candidateOutput);
+        const diagram: unknown = extractJsonObject(candidateOutput);
         if (isResponseEnvelope(diagram)) {
           const request = {
             model: "command",
             prompt: toDiagramGenerationPrompt(scenario),
           };
+          const generated = candidateFromText({
+            model: request.model,
+            provider: "fixture",
+            text: candidateOutput,
+          });
           const candidate = enforceCandidateRequestRequirements(
-            candidateFromText({
-              model: request.model,
-              provider: "fixture",
-              text: candidateOutput,
-            }),
+            generated,
             request,
           );
           if (candidate.error || !candidate.diagram) {
@@ -223,7 +224,16 @@ const evaluateCandidate = Effect.fn("diagramScenarios.evaluateCandidate")(
               ].join(" "),
             );
           }
-          diagram = candidate.diagram;
+          // Logo checks score the model's own diagram, before placement and
+          // grounding repair it.
+          return {
+            candidateOutput,
+            evaluation: evaluateScenarioDiagram(
+              scenario,
+              candidate.diagram,
+              generated.diagram ?? candidate.diagram,
+            ),
+          };
         }
         return {
           candidateOutput,

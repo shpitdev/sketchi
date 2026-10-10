@@ -197,3 +197,26 @@ export function matchIconsInText<Icon extends SearchableIcon>(
 ): Icon[] {
   return matchIconMentions(text, icons, limit).map(({ icon }) => icon);
 }
+
+/** A logo a text names, as generation offers it to a model. */
+export interface NamedLogo {
+  readonly aliases?: readonly string[];
+  readonly name: string;
+  readonly slug: string;
+}
+
+/**
+ * The logos a text names, in order of mention, with the aliases placement
+ * matches labels against. `/api/v1/generate`, Studio chat, and the scenario
+ * evals all offer exactly this list.
+ */
+export function logosNamedInText(
+  text: string,
+  icons: readonly SearchableIcon[],
+): NamedLogo[] {
+  return matchIconsInText(text, icons).map((icon) => ({
+    ...(icon.aliases.length > 0 ? { aliases: icon.aliases } : {}),
+    name: icon.name,
+    slug: icon.slug,
+  }));
+}

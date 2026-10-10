@@ -197,6 +197,66 @@ describe("scenario CLI candidate decoding", () => {
       ),
   );
 
+  for (const { name, scenarioId, icons, failing } of [
+    {
+      name: "a model that shifts every logo one node",
+      scenarioId: "deploy-pipeline-logos",
+      icons: { build: "github", tests: "docker", passed: "cloudflare" },
+      failing: ["icons-on-named-steps"],
+    },
+    {
+      name: "a model that puts a logo on a generic step",
+      scenarioId: "sketchi-onboarding-decision-flow",
+      icons: { [scenario.expectedDiagram.nodes[0]?.id ?? ""]: "github" },
+      failing: ["icons-grounded", "icons-on-named-steps"],
+    },
+  ] as const) {
+    it.live(`scores logos before placement repairs ${name}`, () => {
+      const target = getScenario(scenarioId);
+      const { title, ...diagram } = target.expectedDiagram;
+      const modelIcons: Readonly<Record<string, string>> = icons;
+      const output = JSON.stringify({
+        title,
+        intent: {
+          requestedKind: "flowchart",
+          nativeKind: "flowchart",
+          requirements: [],
+        },
+        diagram: {
+          ...diagram,
+          nodes: diagram.nodes.map(({ icon: _icon, ...node }) =>
+            modelIcons[node.id]
+              ? { ...node, icon: { slug: modelIcons[node.id] } }
+              : node,
+          ),
+        },
+      });
+      return withCandidate(output, (directory) =>
+        Effect.gen(function* () {
+          const reportPath = path.join(directory, "report.json");
+          yield* runScenarioCli([
+            "--scenario",
+            target.id,
+            "--report-out",
+            reportPath,
+            "--generator-command",
+            "offline-generator",
+          ]);
+          const report = yield* Schema.decodeUnknownEffect(Report)(
+            yield* Effect.tryPromise(() => readFile(reportPath, "utf8")),
+          );
+          // Placement and grounding repaired the shipped diagram, so only
+          // the logo check on the model's own output fails.
+          assert.isFalse(report.ok);
+          assert.deepStrictEqual(
+            report.checks.filter((check) => !check.passed).map((check) => check.id),
+            [...failing],
+          );
+        }),
+      );
+    });
+  }
+
   it.live("still accepts bare IR input files", () =>
     withCandidate("", (directory) =>
       Effect.gen(function* () {

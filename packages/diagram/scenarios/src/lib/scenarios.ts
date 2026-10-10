@@ -8,6 +8,8 @@ import {
 export interface FlowchartScenarioAssertions {
   minEdgeCount: number;
   minNodeCount: number;
+  /** Logos the expected diagram draws; generated diagrams must include them. */
+  requiredIconSlugs: string[];
   requiredBranchLabels: string[];
   requiredEdges: FlowchartScenarioRequiredEdge[];
   requiredNodeKinds: FlowchartNodeKind[];
@@ -22,6 +24,16 @@ export interface FlowchartScenarioRequiredEdge {
 
 export type DiagramScenarioDifficulty = "smoke" | "standard" | "challenge";
 
+/**
+ * A catalog logo the scenario prompt names, exactly as `/api/v1/generate`
+ * offers it (see logosNamedInText), aliases included.
+ */
+export interface DiagramScenarioLogo {
+  readonly aliases?: readonly string[];
+  readonly name: string;
+  readonly slug: string;
+}
+
 export interface DiagramScenario {
   assertions: FlowchartScenarioAssertions;
   description: string;
@@ -29,6 +41,8 @@ export interface DiagramScenario {
   difficulty: DiagramScenarioDifficulty;
   expectedDiagram: FlowchartDiagram;
   id: string;
+  /** Logos offered to generation; generated icons must stay within them. */
+  logos: DiagramScenarioLogo[];
   prompt: string;
   tags: string[];
   title: string;
@@ -38,6 +52,7 @@ type FlowchartNodeDefinition = readonly [
   id: string,
   label: string,
   kind: FlowchartNodeKind,
+  icon?: string,
 ];
 
 type FlowchartEdgeDefinition = readonly [
@@ -53,6 +68,7 @@ interface FlowchartScenarioDefinition {
   difficulty: DiagramScenarioDifficulty;
   edges: readonly FlowchartEdgeDefinition[];
   id: string;
+  logos?: readonly DiagramScenarioLogo[];
   nodes: readonly FlowchartNodeDefinition[];
   prompt: string;
   tags: readonly string[];
@@ -90,7 +106,12 @@ function buildExpectedDiagram(
     id: definition.diagramId ?? definition.id,
     title: definition.title,
     type: "flowchart",
-    nodes: definition.nodes.map(([id, label, kind]) => ({ id, label, kind })),
+    nodes: definition.nodes.map(([id, label, kind, icon]) => ({
+      id,
+      label,
+      kind,
+      ...(icon ? { icon: { slug: icon } } : {}),
+    })),
     edges: definition.edges.map(([id, source, target, label]) => ({
       id,
       source,
@@ -117,6 +138,9 @@ function buildAssertions(
   return {
     minEdgeCount: diagram.edges.length,
     minNodeCount: diagram.nodes.length,
+    requiredIconSlugs: unique(
+      diagram.nodes.flatMap((node) => (node.icon ? [node.icon.slug] : [])),
+    ),
     requiredBranchLabels: unique(
       diagram.edges
         .map((edge) => edge.label)
@@ -147,6 +171,15 @@ function defineFlowchartScenario(
   definition: FlowchartScenarioDefinition,
 ): DiagramScenario {
   const expectedDiagram = buildExpectedDiagram(definition);
+  const logos = [...(definition.logos ?? [])];
+  const offered = new Set(logos.map((logo) => logo.slug));
+  for (const node of expectedDiagram.nodes) {
+    if (node.icon && !offered.has(node.icon.slug)) {
+      throw new Error(
+        `Scenario "${definition.id}" draws logo "${node.icon.slug}" that its prompt does not name.`,
+      );
+    }
+  }
 
   return {
     assertions: buildAssertions(expectedDiagram),
@@ -155,6 +188,7 @@ function defineFlowchartScenario(
     difficulty: definition.difficulty,
     expectedDiagram,
     id: definition.id,
+    logos,
     prompt: definition.prompt,
     tags: [...definition.tags],
     title: definition.title,
@@ -893,6 +927,76 @@ const flowchartScenarioDefinitions = [
       ["updated-grace", "payment-updated", "grace-expired", "no"],
       ["grace-pause", "grace-expired", "pause-subscription", "yes"],
       ["grace-reminder", "grace-expired", "send-reminder", "no"],
+    ],
+  },
+  {
+    id: "deploy-pipeline-logos",
+    title: "Deploy pipeline with logos",
+    difficulty: "smoke",
+    tags: ["logos", "devops", "two-branch"],
+    description:
+      "The marketing hero as a real prompt: every named technology should appear as its logo inside the matching node, and nothing else.",
+    prompt:
+      "Diagram our deploy pipeline. A push to GitHub starts it, Docker builds the image, and the test suite runs. If the tests pass, ship to Cloudflare Workers; otherwise notify the team and stop.",
+    logos: [
+      { name: "Github", slug: "github" },
+      { name: "Docker", slug: "docker" },
+      { aliases: ["Cloudflare"], name: "Cloudflare", slug: "cloudflare" },
+    ],
+    nodes: [
+      ["push", "Push to GitHub", "start", "github"],
+      ["build", "Docker builds the image", "process", "docker"],
+      ["tests", "Run the test suite", "process"],
+      ["passed", "Tests pass?", "decision"],
+      ["ship", "Ship to Cloudflare Workers", "end", "cloudflare"],
+      ["notify", "Notify the team", "end"],
+    ],
+    edges: [
+      ["push-build", "push", "build"],
+      ["build-tests", "build", "tests"],
+      ["tests-passed", "tests", "passed"],
+      ["passed-ship", "passed", "ship", "yes"],
+      ["passed-notify", "passed", "notify", "no"],
+    ],
+  },
+  {
+    id: "ai-app-stack-logos",
+    title: "AI app request path with logos",
+    difficulty: "standard",
+    tags: ["logos", "ai", "cache", "two-branch"],
+    description:
+      "A request path naming five technologies: each should carry its logo, with no logos on generic steps.",
+    prompt:
+      "Show how a request flows through our app. A Next.js page on Vercel receives the question and checks the Redis cache. On a cache hit, return the cached answer. On a miss, call the OpenAI model, store the answer in Redis, and log any errors to Sentry before returning the answer.",
+    logos: [
+      {
+        aliases: ["Next.js", "next", "next.js"],
+        name: "Next.js",
+        slug: "nextjs",
+      },
+      { aliases: ["Vercel", "zeit"], name: "Vercel", slug: "vercel" },
+      { name: "Redis", slug: "redis" },
+      { aliases: ["OpenAI"], name: "OpenAI", slug: "openai" },
+      { name: "Sentry", slug: "sentry" },
+    ],
+    nodes: [
+      ["request", "Next.js page receives question", "start", "nextjs"],
+      ["edge", "Vercel routes the request", "process", "vercel"],
+      ["cache", "Cached in Redis?", "decision", "redis"],
+      ["cached", "Return cached answer", "end"],
+      ["model", "Call the OpenAI model", "process", "openai"],
+      ["store", "Store answer in Redis", "process", "redis"],
+      ["log", "Log errors to Sentry", "process", "sentry"],
+      ["answer", "Return the answer", "end"],
+    ],
+    edges: [
+      ["request-edge", "request", "edge"],
+      ["edge-cache", "edge", "cache"],
+      ["cache-hit", "cache", "cached", "hit"],
+      ["cache-miss", "cache", "model", "miss"],
+      ["model-store", "model", "store"],
+      ["store-log", "store", "log"],
+      ["log-answer", "log", "answer"],
     ],
   },
 ] satisfies readonly FlowchartScenarioDefinition[];

@@ -13,8 +13,9 @@ import {
   renderIntermediateDiagram,
   type RenderedDiagramScene,
 } from "@sketchi/diagram-renderer";
+import { termTokens } from "@sketchi/icon-catalog";
 
-import type { DiagramScenario } from "./scenarios.js";
+import type { DiagramScenario, DiagramScenarioLogo } from "./scenarios.js";
 
 export interface ScenarioCheck {
   id: string;
@@ -73,6 +74,69 @@ function edgeMatchesExpected(
 
     return sourceMatches && targetMatches && branchMatches;
   });
+}
+
+/** What logo checks need from a scenario. */
+export interface ScenarioLogoExpectations {
+  readonly logos: readonly DiagramScenarioLogo[];
+  readonly requiredIconSlugs: readonly string[];
+}
+
+/** The label contains one of the logo's names as whole words. */
+function labelNamesLogo(label: string, logo: DiagramScenarioLogo): boolean {
+  const words = ` ${termTokens(label).join(" ")} `;
+  return [logo.slug.replaceAll("-", " "), logo.name, ...(logo.aliases ?? [])]
+    .map((term) => termTokens(term).join(" "))
+    .some((phrase) => phrase !== "" && words.includes(` ${phrase} `));
+}
+
+/**
+ * Logo checks on the model's own diagram, before generation places, drops, or
+ * grounds its logos, so they measure the model rather than the repair:
+ * recall for each named technology, precision against the prompt, and
+ * whether each logo sits on the step that names it. A logo on a generic or
+ * unnamed step ("Sync order", "Run the test suite") fails the last check.
+ */
+export function scenarioLogoChecks(
+  expected: ScenarioLogoExpectations,
+  modelDiagram: FlowchartDiagram,
+): ScenarioCheck[] {
+  const offered = new Map(expected.logos.map((logo) => [logo.slug, logo]));
+  const icons = modelDiagram.nodes.flatMap((node) =>
+    node.icon ? [{ label: node.label, slug: node.icon.slug }] : [],
+  );
+  const ungrounded = icons.filter((icon) => !offered.has(icon.slug));
+  const misplaced = icons.filter((icon) => {
+    const logo = offered.get(icon.slug);
+    return !logo || !labelNamesLogo(icon.label, logo);
+  });
+  return [
+    ...expected.requiredIconSlugs.map((slug) => ({
+      id: `icon:${slug}`,
+      passed: icons.some((icon) => icon.slug === slug),
+      message: `Expected the model to draw the "${slug}" logo.`,
+    })),
+    {
+      id: "icons-grounded",
+      passed: ungrounded.length === 0,
+      message:
+        ungrounded.length === 0
+          ? "Every logo is a technology the prompt names."
+          : `Logos the prompt does not name: ${ungrounded
+              .map((icon) => icon.slug)
+              .join(", ")}.`,
+    },
+    {
+      id: "icons-on-named-steps",
+      passed: misplaced.length === 0,
+      message:
+        misplaced.length === 0
+          ? "Every logo sits on a step that names its technology."
+          : `Logos on steps that do not name them: ${misplaced
+              .map((icon) => `"${icon.label}" (${icon.slug})`)
+              .join(", ")}.`,
+    },
+  ];
 }
 
 function flowchartChecks(
@@ -138,16 +202,33 @@ export function extractJsonCandidate(output: string): unknown {
   }
 }
 
+/**
+ * Evaluate the diagram generation returns. Pass the model's own diagram from
+ * before candidate enforcement as `modelCandidate` so logo checks score the
+ * model; it defaults to the returned diagram for unrepaired output.
+ */
 export function evaluateScenarioDiagram(
   scenario: DiagramScenario,
   candidate: unknown,
+  modelCandidate: unknown = candidate,
 ): ScenarioEvaluation {
   const diagram = parseFlowchartDiagram(candidate);
+  const modelDiagram =
+    modelCandidate === candidate
+      ? diagram
+      : parseFlowchartDiagram(modelCandidate);
   const scene = renderIntermediateDiagram(diagram);
   const excalidrawScene = convertSceneToExcalidraw(scene);
   const excalidrawValidation = validateExcalidrawScene(excalidrawScene);
   const checks = [
     ...flowchartChecks(scenario, diagram),
+    ...scenarioLogoChecks(
+      {
+        logos: scenario.logos,
+        requiredIconSlugs: scenario.assertions.requiredIconSlugs,
+      },
+      modelDiagram,
+    ),
     {
       id: "excalidraw-scene",
       passed: excalidrawValidation.ok,

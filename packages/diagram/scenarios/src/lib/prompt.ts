@@ -14,8 +14,10 @@ export type ScenarioPromptParts = DiagramGenerationMessages;
 export function toDiagramGenerationPrompt(
   scenario: GenerationPromptScenario,
 ): DiagramGenerationPrompt {
+  const logos = "logos" in scenario ? scenario.logos : [];
   return {
     id: scenario.id,
+    ...(logos.length > 0 ? { logos } : {}),
     request: scenario.prompt,
     requestedType: scenario.diagramType,
   };

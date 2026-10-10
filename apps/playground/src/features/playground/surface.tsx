@@ -22,12 +22,6 @@ const STARTERS = [
   "Map the data flow for an AI chat app with streaming",
 ];
 
-const DEPLOY_PIPELINE_BRANDS = [
-  { name: "GitHub", logo: "/brand/github.svg" },
-  { name: "Docker", logo: "/brand/docker.svg" },
-  { name: "Cloudflare", logo: "/brand/cloudflare.svg" },
-] as const;
-
 export interface ReadyPlaygroundArtifact {
   artifactId: string;
   exportUrls: {
@@ -238,21 +232,6 @@ export function PlaygroundEmptyState({
         <figure className="studio__sample">
           <figcaption className="studio__sample-caption">
             <span>Deploy pipeline</span>
-            <ul
-              aria-label="GitHub to Docker to Cloudflare"
-              className="studio__sample-brand-path"
-            >
-              {DEPLOY_PIPELINE_BRANDS.map((brand) => (
-                <li key={brand.name}>
-                  <img
-                    alt={`${brand.name} logo`}
-                    height="18"
-                    src={brand.logo}
-                    width="18"
-                  />
-                </li>
-              ))}
-            </ul>
             <span>Rendered in Sketchi</span>
           </figcaption>
           <div className="studio__sample-canvas">

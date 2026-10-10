@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { BuildFlowchartResult } from "@sketchi/diagram-agent";
+import { getCanvasValidationIssues } from "@sketchi/diagram-core";
 import {
   convertSceneToExcalidraw,
   validateExcalidrawScene,
@@ -84,7 +85,7 @@ const rejectedBuild = {
 } satisfies BuildFlowchartResult;
 
 describe("playground surface", () => {
-  it("renders a genuine generated deploy scene with brand icons", () => {
+  it("renders a genuine generated deploy scene with logos inside its nodes", () => {
     render(<PlaygroundEmptyState onSelect={() => undefined} />);
 
     expect(screen.getByText("Deploy pipeline")).toBeTruthy();
@@ -96,11 +97,24 @@ describe("playground surface", () => {
     expect(
       screen.getByTestId("diagram-preview").getAttribute("data-diagram-id"),
     ).toBe(DEPLOY_PIPELINE_SCENE.diagramId);
-    for (const brand of ["GitHub", "Docker", "Cloudflare"]) {
-      const logo = screen.getByRole("img", { name: `${brand} logo` });
-      expect(logo.closest("figcaption")).not.toBeNull();
-      expect(logo.closest(".studio__sample-canvas")).toBeNull();
-    }
+    // The marks live in the scene now, not in a caption beside it.
+    expect(screen.queryAllByRole("img", { name: /logo$/u })).toHaveLength(0);
+    expect(
+      DEPLOY_PIPELINE_SCENE.elements.flatMap((element) =>
+        element.type === "node" && element.icon
+          ? [[element.nodeId, element.icon.slug]]
+          : [],
+      ),
+    ).toEqual([
+      ["push", "github"],
+      ["build", "docker"],
+      ["deploy", "cloudflare"],
+    ]);
+    expect(Object.keys(DEPLOY_PIPELINE_SCENE.icons ?? {}).sort()).toEqual([
+      "cloudflare",
+      "docker",
+      "github",
+    ]);
 
     expect(DEPLOY_PIPELINE_SCENE.accentColor).toBe("#8f707f");
     expect(DEPLOY_PIPELINE_SCENE.backgroundColor).toBe("#fffdf8");
@@ -145,9 +159,16 @@ describe("playground surface", () => {
       "Run\ntests",
       "Cloudflare\nship",
     ]);
+    expect(getCanvasValidationIssues(DEPLOY_PIPELINE_SCENE)).toEqual([]);
+    const excalidraw = convertSceneToExcalidraw(DEPLOY_PIPELINE_SCENE);
+    expect(validateExcalidrawScene(excalidraw)).toEqual({
+      issues: [],
+      ok: true,
+    });
     expect(
-      validateExcalidrawScene(convertSceneToExcalidraw(DEPLOY_PIPELINE_SCENE)),
-    ).toEqual({ issues: [], ok: true });
+      excalidraw.elements.filter((element) => element.type === "image"),
+    ).toHaveLength(3);
+    expect(Object.keys(excalidraw.files ?? {})).toHaveLength(3);
 
     expect(document.querySelector(".studio__sample-flow")).toBeNull();
     expect(document.querySelector(".studio__sample-arrow")).toBeNull();

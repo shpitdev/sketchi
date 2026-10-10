@@ -50,7 +50,6 @@ describe("playground short viewport layout", () => {
       ".sketchi-excalidraw-scene-canvas",
     );
     const bottomBar = sampleCanvas?.querySelector(".App-bottom-bar");
-    const brandPath = screen.getByLabelText("GitHub to Docker to Cloudflare");
 
     expect(sceneCanvas).not.toBeNull();
     if (!sampleCanvas || !sceneCanvas) {
@@ -78,7 +77,9 @@ describe("playground short viewport layout", () => {
           element.type === "arrow",
       ),
     ).toHaveLength(3);
-    expect(excalidrawProps?.initialData?.elements).toHaveLength(12);
+    // 4 nodes, 4 labels, 3 arrows, 1 edge label, and 3 node logos.
+    expect(excalidrawProps?.initialData?.elements).toHaveLength(15);
+    expect(excalidrawProps?.initialData?.files).toEqual(expectedScene.files);
     expect(JSON.stringify(excalidrawProps?.initialData)).not.toMatch(
       /fix build|retry/i,
     );
@@ -89,8 +90,6 @@ describe("playground short viewport layout", () => {
     if (bottomBar) {
       expect(getComputedStyle(bottomBar).display).toBe("none");
     }
-    expect(brandPath.closest("figcaption")).not.toBeNull();
-    expect(brandPath.closest(".studio__sample-canvas")).toBeNull();
   });
 
   it("states the sample is real output without shouting it", () => {

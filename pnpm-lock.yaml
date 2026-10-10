@@ -663,6 +663,9 @@ importers:
       '@sketchi/diagram-renderer':
         specifier: workspace:*
         version: link:../renderer
+      '@sketchi/icon-catalog':
+        specifier: workspace:*
+        version: link:../../icons/catalog
       effect:
         specifier: 4.0.1
         version: 4.0.1
