@@ -5,6 +5,7 @@ import { flattenPrimitive, isNonRenderingPrimitive } from "./flatten";
 import { withoutClosingPoint } from "./geometry";
 import { parseLength, type SvgViewport } from "./length";
 import {
+  cascadedDimensions,
   computeElementStyle,
   DEFAULT_PAINT_CONTEXT,
   descriptor,
@@ -426,6 +427,7 @@ function collectGradients(root: SvgNode): ReadonlyMap<string, string> {
 
 function parseViewBox(
   root: SvgNode,
+  cssRules: readonly CssRule[],
   diagnostics: SvgDiagnostic[],
 ): readonly [number, number, number, number] {
   const value = root.attributes.viewBox;
@@ -450,7 +452,19 @@ function parseViewBox(
       validViewBox[3] ?? 512,
     ];
   }
+  // Without a viewBox the viewport is the root's used size. A CSS override
+  // decides it only when it resolves to a positive absolute length; relative
+  // or keyword sizes (100%, auto, 1em, inherit) defer to the attribute, and
+  // only an invalid attribute is diagnosed, matching the root checks in
+  // walkNode.
+  const dimensions = cascadedDimensions(
+    root.attributes,
+    [descriptor(root.name, root.attributes)],
+    cssRules,
+  );
   const dimension = (name: "width" | "height") => {
+    const cascaded = parseLength(dimensions[name], null);
+    if (cascaded !== null && cascaded > 0) return cascaded;
     const value = root.attributes[name];
     if (value === undefined) return 512;
     const parsed = parseLength(value, null);
@@ -1108,7 +1122,7 @@ function walkNode(
         code: "unsupported-element",
         elementId: node.attributes.id ?? null,
         message:
-          "Nested SVG viewports and their clipping are not represented in native conversion.",
+          "Nested <svg> elements are not supported in native conversion. Inline the nested content into the root SVG, applying its x/y/viewBox as a transform on a <g>, or embed the SVG as an image instead.",
         severity: "warning",
         sourcePath,
       }),
@@ -1297,13 +1311,13 @@ export function parseSvg(
       return parseFailure("Expected an SVG root element.");
     }
 
-    const viewportDiagnostics: SvgDiagnostic[] = [];
-    const viewBox = parseViewBox(root, viewportDiagnostics);
     const initialDiagnostics: SvgDiagnostic[] = [];
     const ids = new Map<string, SvgNode>();
     collectIds(root, root.name, ids, initialDiagnostics);
     const css = parseCssRules(collectStyles(root, root.name));
     initialDiagnostics.push(...css.diagnostics);
+    const viewportDiagnostics: SvgDiagnostic[] = [];
+    const viewBox = parseViewBox(root, css.rules, viewportDiagnostics);
     const mutableFeatureCounts = emptyFeatureCounts();
     scanFeatures(root, root.name, mutableFeatureCounts, initialDiagnostics);
     const flattening = effectiveFlattening(options.flattening);

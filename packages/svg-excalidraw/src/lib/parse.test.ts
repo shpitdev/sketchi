@@ -147,7 +147,12 @@ describe("canonical SVG parser", () => {
     const document = mustParse(source);
     expect(document.shapes).toEqual([]);
     expect(document.diagnostics).toEqual([
-      expect.objectContaining({ code: "unsupported-element" }),
+      expect.objectContaining({
+        code: "unsupported-element",
+        message: expect.stringMatching(
+          /^Nested <svg> elements are not supported in native conversion\. Inline .+ or embed the SVG as an image instead\.$/,
+        ),
+      }),
     ]);
     expect(inspectSvgCapabilities(document).nativeTrace).toBe("unsupported");
     expect(convertSvgToExcalidraw(document)).toMatchObject({
@@ -352,6 +357,27 @@ describe("canonical SVG parser", () => {
     expect(firstShape(document).strokeWidth).toBe(2);
     expect(convertSvgToExcalidraw(document).ok).toBe(true);
   });
+
+  it.each([
+    ['stroke-width="INHERIT"', 3],
+    ['stroke-width=" inherit "', 3],
+    ['style="stroke-width: Unset"', 3],
+    ['style="stroke-width: REVERT"', 3],
+    ['style="stroke-width: revert-layer"', 3],
+    ['stroke-width="5" style="stroke-width: REVERT-LAYER"', 5],
+    ['stroke-width=" initial "', 1],
+    ['style="stroke-width: Initial"', 1],
+  ])(
+    "resolves CSS-wide stroke-width keywords case-insensitively: %s",
+    (strokeWidth, expected) => {
+      const document = mustParse(
+        `<svg><g stroke-width="3"><rect width="10" height="10" stroke="#000" ${strokeWidth}/></g></svg>`,
+      );
+      expect(document.diagnostics).toEqual([]);
+      expect(firstShape(document).strokeWidth).toBe(expected);
+      expect(convertSvgToExcalidraw(document).ok).toBe(true);
+    },
+  );
 
   it.each([
     '<svg width="2em"><rect width="10" height="10"/></svg>',
@@ -795,6 +821,61 @@ describe("canonical SVG parser", () => {
       const result = convertSvgToExcalidraw(document);
       expect(result.ok).toBe(true);
       expect(result.elements).toHaveLength(1);
+    },
+  );
+
+  it("rolls revert-layer back to the presentation attribute", () => {
+    const document = mustParse(
+      '<svg><g fill="red"><rect width="10" height="10" fill="blue" style="fill: revert-layer"/><rect x="20" width="10" height="10" style="fill: revert-layer"/></g></svg>',
+    );
+    expect(document.diagnostics).toEqual([]);
+    expect(document.shapes.map((shape) => shape.fill?.color)).toEqual([
+      "blue",
+      "red",
+    ]);
+  });
+
+  it.each([
+    ['<svg width="24" height="24" style="width:100%;height:auto">', 24, 24],
+    ['<svg width="24" height="24" style="width:1em;height:inherit">', 24, 24],
+    ['<svg width="24" height="24" style="width:initial;height:unset">', 24, 24],
+    [
+      '<svg width="24" height="24"><style>svg { width: 1em; height: 1em }</style>',
+      24,
+      24,
+    ],
+    ['<svg style="width:100%;height:100%">', 512, 512],
+    ["<svg><style>svg { width: 1em; height: 1em }</style>", 512, 512],
+  ])(
+    "keeps the attribute viewport when CSS sizes the root relatively: %s",
+    (root, width, height) => {
+      const document = mustParse(`${root}<rect width="10" height="10"/></svg>`);
+      expect(document.viewBox).toEqual([0, 0, width, height]);
+      expect(document.diagnostics).toEqual([]);
+      expect(convertSvgToExcalidraw(document).ok).toBe(true);
+    },
+  );
+
+  it.each([
+    '<svg width="0" height="100" style="width:100px">',
+    '<svg width="0" height="100"><style>svg { width: 100px }</style>',
+    '<svg width="100" height="0" style="height:100px">',
+  ])(
+    "derives the root viewport from a CSS size override without a viewBox: %s",
+    (root) => {
+      const document = mustParse(
+        `${root}<rect width="100%" height="100%"/></svg>`,
+      );
+      expect(document.viewBox).toEqual([0, 0, 100, 100]);
+      expect(document.diagnostics).toEqual([]);
+      expect(firstShape(document).subpaths[0]?.points).toEqual([
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+        { x: 100, y: 100 },
+        { x: 0, y: 100 },
+        { x: 0, y: 0 },
+      ]);
+      expect(convertSvgToExcalidraw(document).ok).toBe(true);
     },
   );
 

@@ -392,6 +392,28 @@ function cascadedValues(
       values.set(declaration.property, candidate);
     }
   }
+  // Unlayered author CSS that reverts its layer rolls back to the
+  // presentation attribute, or to inheritance when there is none.
+  for (const [property, cascaded] of values) {
+    if (cssWideKeyword(cascaded.value) !== "revert-layer") {
+      continue;
+    }
+    const presentation = attributes[property];
+    if (
+      presentation === undefined ||
+      cssWideKeyword(presentation) === "revert-layer"
+    ) {
+      values.delete(property);
+    } else {
+      values.set(property, {
+        important: false,
+        order: -1,
+        source: "presentation",
+        specificity: ZERO_SPECIFICITY,
+        value: presentation,
+      });
+    }
+  }
   return values;
 }
 
@@ -410,18 +432,55 @@ function opacity(value: string | undefined, fallback: number): number {
   );
 }
 
+/**
+ * CSS-wide keywords are ASCII case-insensitive and may carry surrounding
+ * whitespace. Every supported property is inherited and has no user-agent
+ * rule, so `unset` and `revert` resolve to `inherit`. `revert-layer` is
+ * resolved during the cascade (see `cascadedValues`).
+ */
+function cssWideKeyword(
+  value: string | undefined,
+): "inherit" | "initial" | "revert-layer" | null {
+  switch (value?.trim().toLowerCase()) {
+    case "inherit":
+    case "unset":
+    case "revert":
+      return "inherit";
+    case "revert-layer":
+      return "revert-layer";
+    case "initial":
+      return "initial";
+    default:
+      return null;
+  }
+}
+
 function inheritedValue(
   local: CascadedValue | undefined,
   parent: InheritedValue,
   initial: string,
 ): InheritedValue {
-  if (!local || local.value === "inherit" || local.value === "unset") {
+  const keyword = cssWideKeyword(local?.value);
+  if (!local || keyword === "inherit") {
     return { ...parent, inherited: true };
   }
-  if (local.value === "initial") {
+  if (keyword === "initial") {
     return { inherited: false, source: "default", value: initial };
   }
   return { inherited: false, source: local.source, value: local.value };
+}
+
+/** Cascaded root sizing, resolved before the root viewport exists. */
+export function cascadedDimensions(
+  attributes: SvgAttributes,
+  ancestry: readonly SvgElementDescriptor[],
+  rules: readonly CssRule[],
+): { readonly height: string | undefined; readonly width: string | undefined } {
+  const values = cascadedValues(attributes, ancestry, rules);
+  return {
+    height: values.get("height")?.value,
+    width: values.get("width")?.value,
+  };
 }
 
 export function computeElementStyle(
@@ -449,22 +508,21 @@ export function computeElementStyle(
       ? localFillRule
       : parent.fillRule;
   const display = values.get("display")?.value;
-  const visibility = values.get("visibility")?.value;
+  const visibility = values.get("visibility")?.value.trim().toLowerCase();
   const computedVisibility =
     visibility === "visible"
       ? "visible"
       : visibility === "hidden" || visibility === "collapse"
         ? "hidden"
-        : visibility === "initial"
+        : cssWideKeyword(visibility) === "initial"
           ? "visible"
           : parent.visibility;
   const strokeWidthValue = values.get("stroke-width")?.value;
+  const strokeWidthKeyword = cssWideKeyword(strokeWidthValue);
   const strokeWidth =
-    strokeWidthValue === undefined ||
-    strokeWidthValue === "inherit" ||
-    strokeWidthValue === "unset"
+    strokeWidthValue === undefined || strokeWidthKeyword === "inherit"
       ? parent.strokeWidth
-      : strokeWidthValue === "initial"
+      : strokeWidthKeyword === "initial"
         ? 1
         : parseLength(strokeWidthValue, viewportDiagonal(viewport));
   return {
