@@ -32,7 +32,9 @@ describe("DocsView", () => {
   it("documents the CLI as the third path, with copyable install commands", () => {
     render(<DocsView />);
 
-    expect(screen.getByRole("heading", { name: "Three paths" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Ways to use Sketchi" }),
+    ).toBeTruthy();
     expect(screen.getByText("The terminal")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "The CLI" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "CLI" }).getAttribute("href")).toBe(

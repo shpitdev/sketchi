@@ -12,16 +12,16 @@ describe("MarketingHome", () => {
     ).toBeTruthy();
     expect(
       screen.getByRole("heading", {
-        name: "Diagrams that behave like diagrams.",
+        name: "Diagrams you can edit and export.",
       }),
     ).toBeTruthy();
     expect(
       screen.getByRole("heading", {
-        name: "Every logo you need, already sketched.",
+        name: "Your stack’s logos, hand-drawn.",
       }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("heading", { name: "Start with a sentence." }),
+      screen.getByRole("heading", { name: "Describe your first diagram." }),
     ).toBeTruthy();
   });
 
@@ -29,7 +29,9 @@ describe("MarketingHome", () => {
     const { container } = render(<MarketingHome />);
 
     expect(
-      screen.getByRole("heading", { name: "Or never leave the terminal." }),
+      screen.getByRole("heading", {
+        name: "Draw diagrams from your terminal.",
+      }),
     ).toBeTruthy();
     expect(container.querySelector("#cli")).toBeTruthy();
     expect(

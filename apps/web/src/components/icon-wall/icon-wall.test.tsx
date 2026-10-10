@@ -9,7 +9,7 @@ describe("IconWall", () => {
 
     expect(
       screen.getByRole("heading", {
-        name: "Every logo you need, already sketched.",
+        name: "Your stack’s logos, hand-drawn.",
       }),
     ).toBeTruthy();
     expect(

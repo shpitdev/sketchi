@@ -24,12 +24,12 @@ export function CliBand({ npmUrl = CLI_NPM_URL }: CliBandProps) {
       <div className="sk-shell cli-band__inner">
         <div className="cli-band__copy">
           <h2 className="sk-section__title cli-band__title">
-            Or never leave the terminal.
+            Draw diagrams from your terminal.
           </h2>
           <p className="cli-band__lead">
-            <code>{CLI_PACKAGE_NAME}</code> draws diagrams from your shell. No
-            account, no API key, and <code>--output json</code> on every command
-            so an agent can drive it.
+            <code>{CLI_PACKAGE_NAME}</code> draws diagrams from your shell
+            without an account or API key. Every command supports{" "}
+            <code>--output json</code> for agents.
           </p>
 
           <div className="cli-band__links">

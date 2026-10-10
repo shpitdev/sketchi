@@ -97,8 +97,8 @@ export function HomeHero({
             Sketchi <em>draws it.</em>
           </h1>
           <p className="home-hero__lead sk-rise" style={rise(1)}>
-            Turn a sentence into a clean, editable diagram, with the real logos
-            of your stack.
+            Turn a sentence into an editable diagram with the real logos of your
+            stack.
           </p>
           <div className="home-hero__actions sk-rise" style={rise(2)}>
             <a className="sk-btn sk-btn--accent" href={primaryHref}>

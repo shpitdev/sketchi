@@ -11,7 +11,7 @@ export const Route = createFileRoute("/agents/opencode")({
     pageMeta({
       title: "OpenCode setup - Sketchi",
       description:
-        "Add Sketchi to OpenCode and turn prompts into clean, editable diagrams.",
+        "Add Sketchi to OpenCode and turn prompts into editable diagrams.",
       path: "/agents/opencode",
     }),
   component: OpenCodeRoute,

@@ -21,7 +21,7 @@ export const Route = createFileRoute("/agents")({
     return pageMeta({
       title: "Agent setup - Sketchi",
       description:
-        "Add Sketchi to your coding agent — Claude Code, Codex, OpenCode, or Antigravity — and draw diagrams straight from your prompts.",
+        "Set up Sketchi in Claude Code, Codex, OpenCode, or Antigravity to draw diagrams from prompts.",
       path: "/agents",
       canonical: isLeafMatch,
     });

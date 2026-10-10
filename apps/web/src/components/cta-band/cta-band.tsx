@@ -21,14 +21,14 @@ export function CtaBand({
       <div className="sk-shell">
         <div className="cta-band__sheet">
           <span className="cta-band__caret" aria-hidden="true" />
-          <h2 className="cta-band__title">Start with a sentence.</h2>
-          <p className="cta-band__lead">No sign-up. Just type it.</p>
+          <h2 className="cta-band__title">Describe your first diagram.</h2>
+          <p className="cta-band__lead">No sign-up required.</p>
           <div className="cta-band__actions">
             <a className="sk-btn sk-btn--accent" href={playgroundHref}>
               Open the playground
             </a>
             <a className="cta-band__link" href={agentsHref}>
-              or add it to your coding agent →
+              Add to your coding agent →
             </a>
           </div>
         </div>

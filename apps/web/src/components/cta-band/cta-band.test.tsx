@@ -8,7 +8,7 @@ describe("CtaBand", () => {
     render(<CtaBand playgroundHref="https://play.example.test" />);
 
     expect(
-      screen.getByRole("heading", { name: "Start with a sentence." }),
+      screen.getByRole("heading", { name: "Describe your first diagram." }),
     ).toBeTruthy();
     const primaryAction = screen.getByRole("link", {
       name: "Open the playground",
@@ -16,7 +16,7 @@ describe("CtaBand", () => {
     expect(primaryAction).toHaveProperty("href", "https://play.example.test/");
     expect(primaryAction.classList).toContain("sk-btn--accent");
     expect(
-      screen.getByRole("link", { name: /add it to your coding agent/ }),
+      screen.getByRole("link", { name: /Add to your coding agent/ }),
     ).toHaveProperty("href", "http://localhost:3000/agents");
   });
 

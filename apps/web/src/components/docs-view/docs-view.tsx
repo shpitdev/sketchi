@@ -54,16 +54,15 @@ export function DocsView({
       <article className="docs-article">
         <h1 className="sk-section__title">How Sketchi works</h1>
         <p className="docs-article__intro">
-          Sketchi turns a plain-language prompt into a clean, editable diagram,
-          brand logos and all. You can use it three ways.
+          Sketchi turns a plain-language prompt into an editable diagram with
+          your stack’s logos. Use the playground, your coding agent, or the CLI.
         </p>
 
         <section className="docs-section" id="how">
-          <h2>Three paths</h2>
+          <h2>Ways to use Sketchi</h2>
           <p>
-            Sketchi structures and validates every request before drawing. What
-            differs between the three paths is where that happens and who keeps
-            the file.
+            Sketchi structures and validates every request before drawing. Each
+            option handles drawing and file storage differently.
           </p>
 
           <div className="docs-paths docs-paths--three">
@@ -85,12 +84,11 @@ export function DocsView({
               <ol className="docs-lane__steps">
                 <li>Ask your agent for a diagram in chat.</li>
                 <li>It calls Sketchi over MCP and gets one back.</li>
-                <li>The diagram lands in your project.</li>
+                <li>The diagram is saved in your project.</li>
               </ol>
               <p className="docs-lane__state">
-                Your harness and machine keep the file; Sketchi just draws it.
-                Setup for each agent lives on the{" "}
-                <a href="/agents">agents page</a>.
+                Your agent and machine keep the file. Find setup instructions on
+                the <a href="/agents">agents page</a>.
               </p>
             </div>
 
@@ -100,8 +98,8 @@ export function DocsView({
                 <li>
                   Run <code>sketchi generate --prompt "…"</code>.
                 </li>
-                <li>Sketchi validates it and commits a local record.</li>
-                <li>Your PNG lands in the current directory.</li>
+                <li>Sketchi validates the diagram and saves a local record.</li>
+                <li>The PNG is saved in the current directory.</li>
               </ol>
               <p className="docs-lane__state">
                 Your machine keeps the file, under{" "}
@@ -124,7 +122,7 @@ export function DocsView({
         <section className="docs-section" id="cli">
           <h2>The CLI</h2>
           <p>
-            <code>{CLI_PACKAGE_NAME}</code> is published on npm and authors
+            <code>{CLI_PACKAGE_NAME}</code> is published on npm and creates
             diagrams from your shell. Records live under{" "}
             <code>~/.sketchi/diagrams</code> with the canonical document, the
             Excalidraw artifact, and every prior revision.
@@ -221,8 +219,8 @@ export function DocsView({
         <section className="docs-section" id="open-source">
           <h2>Open source</h2>
           <p>
-            Sketchi is built in the open and MIT-licensed: the diagram engine,
-            the icon set, the agent runtime, even these pages.
+            Sketchi’s diagram engine, icon set, agent runtime, and website are
+            open source and MIT-licensed.
           </p>
           <div className="docs-callout">
             <span className="docs-callout__k">Source</span>
@@ -265,10 +263,7 @@ export function DocsView({
             </div>
             <div className="docs-defs__row">
               <dt>Are the diagrams editable?</dt>
-              <dd>
-                Yes. Every element is a real object you can move, relabel, and
-                restyle.
-              </dd>
+              <dd>Yes. You can move, relabel, and restyle every element.</dd>
             </div>
             <div className="docs-defs__row">
               <dt>Can I export?</dt>
@@ -277,7 +272,7 @@ export function DocsView({
             <div className="docs-defs__row">
               <dt>Is there a CLI?</dt>
               <dd>
-                Yes — <code>{CLI_PACKAGE_NAME}</code> on npm. See{" "}
+                Yes. Find <code>{CLI_PACKAGE_NAME}</code> on npm. See{" "}
                 <a href="#cli">the CLI section</a> for install and commands.
               </dd>
             </div>

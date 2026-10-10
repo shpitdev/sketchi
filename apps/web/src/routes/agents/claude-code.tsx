@@ -11,7 +11,7 @@ export const Route = createFileRoute("/agents/claude-code")({
     pageMeta({
       title: "Claude Code setup - Sketchi",
       description:
-        "Add Sketchi to Claude Code and turn prompts into clean, editable diagrams.",
+        "Add Sketchi to Claude Code and turn prompts into editable diagrams.",
       path: "/agents/claude-code",
     }),
   component: ClaudeCodeRoute,
