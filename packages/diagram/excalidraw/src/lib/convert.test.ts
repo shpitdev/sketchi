@@ -1927,4 +1927,53 @@ describe("bound label first paint", () => {
       issues: [],
     });
   });
+
+  it("wraps sequence participant headers inside the header", () => {
+    const sequence = convertSceneToExcalidraw(
+      renderSequenceDiagram({
+        id: "long-participants",
+        title: "Long participants",
+        participants: [
+          { id: "qa", label: "Quality Assurance Department" },
+          { id: "cjk", label: "品質保証レビュー承認待ち部門" },
+        ],
+        messages: [{ id: "m", source: "qa", target: "cjk", label: "Review" }],
+        style: { accentColor: "#111827", backgroundColor: "#ffffff" },
+      }),
+    );
+    const header = (id: string) =>
+      sequence.elements.find((element) => element.id === `label:${id}`);
+    expect(header("qa")).toMatchObject({
+      text: "Quality Assurance\nDepartment",
+    });
+    expect(header("cjk")?.text).toBe("品質保証レビュー承認待\nち部門");
+    for (const id of ["qa", "cjk"]) {
+      expect(header(id)?.width).toBeLessThanOrEqual(156);
+    }
+    expect(validateExcalidrawScene(sequence)).toEqual({ ok: true, issues: [] });
+  });
+
+  it("keeps wrapped unbound line labels at their stored width on edit", () => {
+    const scene = convertSceneToExcalidraw({
+      ...renderIntermediateDiagram(flowchartFixture),
+      elements: [
+        {
+          type: "line",
+          id: "divider",
+          points: [
+            { x: 0, y: 0 },
+            { x: 400, y: 0 },
+          ],
+          label: "Escalate to the quality manager for final disposition",
+        },
+      ],
+    } as Parameters<typeof convertSceneToExcalidraw>[0]);
+    expect(
+      scene.elements.find((element) => element.id === "divider:label"),
+    ).toMatchObject({
+      autoResize: false,
+      containerId: null,
+      text: "Escalate to the\nquality manager for\nfinal disposition",
+    });
+  });
 });

@@ -27,6 +27,37 @@ function baseCanvas(overrides: Partial<CanvasSpec> = {}): CanvasSpec {
 }
 
 describe("CanvasSpec", () => {
+  it.each([
+    ["Cell 100", 80, 40, true],
+    ["品質保証レビュー承認待ち", 200, 60, true],
+    ["Quality assurance review", 140, 60, false],
+  ])(
+    "reports a node label only when its glyphs outgrow the node: %s",
+    (label, width, height, fits) => {
+      const issues = getCanvasValidationIssues(
+        baseCanvas({
+          elements: [
+            {
+              type: "node",
+              id: "a",
+              nodeId: "a",
+              shape: "rectangle",
+              x: 0,
+              y: 0,
+              width,
+              height,
+              label,
+            },
+          ],
+          zOrder: ["a"],
+        }),
+      );
+      expect(issues.map((issue) => issue.code)).toEqual(
+        fits ? [] : ["label_overflow"],
+      );
+    },
+  );
+
   it("ignores hidden bound labels for fit and validates the fallback node label", () => {
     const canvas = baseCanvas({
       elements: [

@@ -200,7 +200,7 @@ function spoofedInlineLifelineScene(options: {
         y: 60,
         width: 100,
         height: 60,
-        label: "Ordinary middle node",
+        label: "Middle",
       },
       {
         type: "node",

@@ -1,10 +1,11 @@
 /**
  * Deterministic label metrics shared by layout, validation, and the Excalidraw
- * adapter. Widths are integer hundredths of an em so wrapping never depends on
- * floating-point accumulation. The estimates are calibrated against Excalidraw's
- * own Excalifont/Xiaolai measurement in Chromium and err wide: an estimate below
- * the painted width clips glyphs, because Excalidraw draws bound text into a
- * canvas sized from the element's stored width.
+ * adapter. Widths are integer hundredths of an em per grapheme cluster, so
+ * wrapping never depends on floating-point accumulation. The estimates are
+ * calibrated against Excalidraw's own Excalifont/Xiaolai measurement in
+ * Chromium and err wide: an estimate below the painted width clips glyphs,
+ * because Excalidraw draws bound text into a canvas sized from the element's
+ * stored width.
  */
 
 /**
@@ -17,8 +18,15 @@ const WIDE_GLYPH_UNITS = 100;
 /** Color emoji paint at ~1.25em in Chromium. */
 const EMOJI_GLYPH_UNITS = 130;
 
-const ZERO_WIDTH = /[\u200B-\u200D\u2060\uFE00-\uFE0F]/u;
-const EMOJI = /\p{Extended_Pictographic}/u;
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/**
+ * Clusters that paint as color emoji: emoji-presentation characters, anything
+ * forced to emoji presentation with VS16, flags, and keycaps. Text-presentation
+ * symbols such as © ™ ✔ ⚠ ➡ paint as ordinary glyphs.
+ */
+const EMOJI_CLUSTER = /\p{Emoji_Presentation}|\uFE0F|\p{Regional_Indicator}|\u20E3/u;
+const ZERO_WIDTH_CLUSTER = /^[\u200B-\u200D\u2060\uFE00-\uFE0F]+$/u;
 
 function isWide(codePoint: number): boolean {
   return (
@@ -37,45 +45,84 @@ function isWide(codePoint: number): boolean {
   );
 }
 
-function glyphUnits(glyph: string): number {
-  if (ZERO_WIDTH.test(glyph)) {
+function clusters(text: string): string[] {
+  return Array.from(graphemes.segment(text), (entry) => entry.segment);
+}
+
+function clusterUnits(cluster: string): number {
+  if (ZERO_WIDTH_CLUSTER.test(cluster)) {
     return 0;
   }
-  if (EMOJI.test(glyph)) {
+  if (EMOJI_CLUSTER.test(cluster)) {
     return EMOJI_GLYPH_UNITS;
   }
-  return isWide(glyph.codePointAt(0) ?? 0)
+  return isWide(cluster.codePointAt(0) ?? 0)
     ? WIDE_GLYPH_UNITS
     : DEFAULT_GLYPH_UNITS;
 }
 
 /** Estimated advance of one line in hundredths of an em. */
 export function textLineUnits(line: string): number {
-  let units = 0;
-  for (const glyph of line) {
-    units += glyphUnits(glyph);
+  return clusters(line).reduce(
+    (units, cluster) => units + clusterUnits(cluster),
+    0,
+  );
+}
+
+function lineWidth(line: string, fontSize: number): number {
+  let defaultClusters = 0;
+  let otherUnits = 0;
+  for (const cluster of clusters(line)) {
+    const units = clusterUnits(cluster);
+    if (units === DEFAULT_GLYPH_UNITS) {
+      defaultClusters += 1;
+    } else {
+      otherUnits += units;
+    }
   }
-  return units;
+  // Default-width glyphs keep the historical n * fontSize * 0.62 expression,
+  // so Latin-only layouts stay byte-identical.
+  return (
+    defaultClusters * fontSize * (DEFAULT_GLYPH_UNITS / 100) +
+    (otherUnits * fontSize) / 100
+  );
 }
 
 /** Estimated width in pixels of the widest line. */
 export function estimateTextWidth(text: string, fontSize: number): number {
-  const units = Math.max(...text.split("\n").map(textLineUnits));
-  return (units * fontSize) / 100;
+  return Math.max(...text.split("\n").map((line) => lineWidth(line, fontSize)));
+}
+
+/**
+ * Stored width of a centered bound label. Excalidraw pads each text canvas by
+ * half the font size on both sides, so the box may stay at `maxWidth` while the
+ * estimate fits within that padding; past it the box grows so no glyph clips.
+ */
+export function boundLabelWidth(
+  text: string,
+  fontSize: number,
+  maxWidth: number,
+): number {
+  const estimate = estimateTextWidth(text, fontSize);
+  return Math.max(
+    1,
+    Math.min(maxWidth, Math.ceil(estimate)),
+    Math.ceil(estimate - fontSize),
+  );
 }
 
 function splitLongWord(word: string, maxUnits: number): string[] {
   const chunks: string[] = [];
   let current = "";
   let currentUnits = 0;
-  for (const glyph of word) {
-    const units = glyphUnits(glyph);
+  for (const cluster of clusters(word)) {
+    const units = clusterUnits(cluster);
     if (current && currentUnits + units > maxUnits) {
       chunks.push(current);
       current = "";
       currentUnits = 0;
     }
-    current += glyph;
+    current += cluster;
     currentUnits += units;
   }
   if (current) {
@@ -120,8 +167,8 @@ function wrapLine(line: string, maxUnits: number): string[] {
 }
 
 /**
- * Greedy word wrap at spaces; words wider than a line break between glyphs,
- * which is also the correct break opportunity for unspaced CJK text.
+ * Greedy word wrap at spaces; words wider than a line break between grapheme
+ * clusters, which is also the correct break opportunity for unspaced CJK text.
  */
 export function wrapTextToUnits(text: string, maxUnits: number): string {
   return text
@@ -135,5 +182,8 @@ export function wrapTextToWidth(
   maxWidth: number,
   fontSize: number,
 ): string {
-  return wrapTextToUnits(text, Math.floor((maxWidth * 100) / fontSize + 1e-6));
+  return wrapTextToUnits(
+    text,
+    Math.floor((maxWidth * 100) / fontSize + 1e-6),
+  );
 }

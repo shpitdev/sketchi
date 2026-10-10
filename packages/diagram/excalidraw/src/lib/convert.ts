@@ -10,7 +10,7 @@ import {
 } from "@sketchi/diagram-renderer";
 import {
   AXIS_ALIGNED_EPSILON,
-  estimateTextWidth,
+  boundLabelWidth,
   fnv1a32,
   type AxisAlignedSegment,
   isSharedBoundStem,
@@ -207,13 +207,7 @@ function textElement(input: {
   const text = input.wrap
     ? wrapTextToWidth(input.text, input.maxWidth, input.fontSize)
     : input.text;
-  const width = Math.max(
-    1,
-    Math.min(
-      input.maxWidth,
-      Math.ceil(estimateTextWidth(text, input.fontSize)),
-    ),
-  );
+  const width = boundLabelWidth(text, input.fontSize, input.maxWidth);
   const height = textHeight(text, input.fontSize);
 
   return {
@@ -241,7 +235,9 @@ function textElement(input: {
     text,
     textAlign: input.element?.textAlign ?? "center",
     verticalAlign: input.element?.verticalAlign ?? "middle",
-    autoResize: true,
+    // Unbound text with autoResize re-flows to one line on edit; keep wrapped
+    // connector labels at their stored width instead.
+    autoResize: !(input.wrap && !input.containerId),
   };
 }
 
@@ -1198,7 +1194,11 @@ export function validateExcalidrawScene(
         continue;
       }
 
-      const textWidth = typeof element.width === "number" ? element.width : 0;
+      // A label box may reach into the fontSize/2 canvas padding on each side
+      // (see boundLabelWidth) without its glyphs leaving the container.
+      const textWidth =
+        (typeof element.width === "number" ? element.width : 0) -
+        (typeof element.fontSize === "number" ? element.fontSize : 0);
       const textHeightValue =
         typeof element.height === "number" ? element.height : 0;
       const containerWidth =
