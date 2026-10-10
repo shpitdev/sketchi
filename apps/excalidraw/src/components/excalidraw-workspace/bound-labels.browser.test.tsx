@@ -24,19 +24,6 @@ import "../../styles/app.css";
 
 afterEach(cleanup);
 
-declare global {
-  interface Window {
-    EXCALIDRAW_ASSET_PATH?: string | string[];
-  }
-}
-
-// Serve Excalidraw's own fonts from the installed package instead of its CDN
-// default, so the measurement below never depends on the network. The path is
-// a variable so Vite does not rewrite it into an asset import.
-const excalidrawAssets =
-  "../../../node_modules/@excalidraw/excalidraw/dist/prod/";
-window.EXCALIDRAW_ASSET_PATH = `/@fs${new URL(excalidrawAssets, import.meta.url).pathname}`;
-
 /**
  * Flowchart covering each bound-label container (rectangle, diamond, ellipse, arrow) with
  * unwrapped, wrapped, punctuated, long-word, CJK, and emoji labels.
