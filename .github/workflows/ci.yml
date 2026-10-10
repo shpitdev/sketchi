@@ -33,8 +33,8 @@ jobs:
         run: pnpm run test:tools
       - name: Run canonical workspace gates
         run: pnpm nx run-many -t typecheck,test,build
-      - name: Lint the repository with type-aware Oxlint
-        run: pnpm run lint
+      - name: Lint, format, and custom-rule checks
+        run: pnpm run check
       - name: Verify stable native TypeScript lane
         run: pnpm nx run-many -t typecheck-native
       - name: Dry-run every Worker deployment
