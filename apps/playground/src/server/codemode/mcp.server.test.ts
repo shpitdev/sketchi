@@ -6,109 +6,97 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { describe, expect, it, vi } from "vitest";
 import { Context, Effect, Option, Schema } from "effect";
 
-import type {
-  CodeModeObjectBucket,
-  CodeModeObjectBucketObject,
-} from "@sketchi/diagram-agent";
+import type { CodeModeObjectBucket, CodeModeObjectBucketObject } from "@sketchi/diagram-agent";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
 import { PlaygroundRequestMetadata } from "../runtime/context.server";
-import {
-  PlaygroundRequestCallbacks,
-  runPlaygroundEffect,
-} from "../runtime/runtime.server";
+import { PlaygroundRequestCallbacks, runPlaygroundEffect } from "../runtime/runtime.server";
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 import { PlaygroundCodeMode } from "./service.server";
 import {
-  CodeModeDocsRequestSchema,
-  CodeModeDocsResultSchema,
-  CodeModeSearchRequestSchema,
-  CodeModeSearchResultSchema,
+	CodeModeDocsRequestSchema,
+	CodeModeDocsResultSchema,
+	CodeModeSearchRequestSchema,
+	CodeModeSearchResultSchema,
 } from "./mcp-docs.server";
+import { createEffectMcpServer, makeEffectMcpTool } from "./effect-mcp-adapter.server";
 import {
-  createEffectMcpServer,
-  makeEffectMcpTool,
-} from "./effect-mcp-adapter.server";
-import {
-  ExecuteRequestSchema,
-  ExecuteResultSchema,
-  createSketchiMcpServer as createSketchiMcpServerEffect,
-  executeSketchiCodeMode as executeSketchiCodeModeEffect,
-  handleSketchiMcpRequest as handleSketchiMcpRequestEffect,
-  makeSketchiCodeModeProvider,
-  normalizeSketchiExecuteCode,
-  type CodeModeMcpOptions,
-  type SketchiCodeModeExecutor,
-  type SketchiCodeModeProvider,
+	ExecuteRequestSchema,
+	ExecuteResultSchema,
+	createSketchiMcpServer as createSketchiMcpServerEffect,
+	executeSketchiCodeMode as executeSketchiCodeModeEffect,
+	handleSketchiMcpRequest as handleSketchiMcpRequestEffect,
+	makeSketchiCodeModeProvider,
+	normalizeSketchiExecuteCode,
+	type CodeModeMcpOptions,
+	type SketchiCodeModeExecutor,
+	type SketchiCodeModeProvider,
 } from "./mcp.server";
 
 function testBoundary(env: StudioEnv, request: Request) {
-  return {
-    env,
-    request,
-    platform: {
-      waitUntilPromise: (promise: Promise<unknown>) => {
-        void promise;
-      },
-    },
-  };
+	return {
+		env,
+		request,
+		platform: {
+			waitUntilPromise: (promise: Promise<unknown>) => {
+				void promise;
+			},
+		},
+	};
 }
 
 function createSketchiMcpServer(
-  env: StudioEnv,
-  options: CodeModeMcpOptions & { origin?: string; request?: Request } = {},
+	env: StudioEnv,
+	options: CodeModeMcpOptions & { origin?: string; request?: Request } = {},
 ) {
-  const request =
-    options.request ??
-    new Request(`${options.origin ?? "https://studio.test"}/mcp`, {
-      method: "POST",
-    });
-  return runPlaygroundEffect(
-    Effect.gen(function* () {
-      const callbacks = yield* PlaygroundRequestCallbacks;
-      return createSketchiMcpServerEffect(
-        callbacks.runPromise,
-        options.executor ? { executor: options.executor } : {},
-      );
-    }),
-    testBoundary(env, request),
-  );
+	const request =
+		options.request ??
+		new Request(`${options.origin ?? "https://studio.test"}/mcp`, {
+			method: "POST",
+		});
+	return runPlaygroundEffect(
+		Effect.gen(function* () {
+			const callbacks = yield* PlaygroundRequestCallbacks;
+			return createSketchiMcpServerEffect(
+				callbacks.runPromise,
+				options.executor ? { executor: options.executor } : {},
+			);
+		}),
+		testBoundary(env, request),
+	);
 }
 
 function executeSketchiCodeMode(
-  env: StudioEnv,
-  input: unknown,
-  options: CodeModeMcpOptions & { origin?: string; request?: Request } = {},
+	env: StudioEnv,
+	input: unknown,
+	options: CodeModeMcpOptions & { origin?: string; request?: Request } = {},
 ) {
-  const request =
-    options.request ??
-    new Request(`${options.origin ?? "https://studio.test"}/mcp`, {
-      method: "POST",
-    });
-  const boundary = testBoundary(env, request);
-  return runPlaygroundEffect(
-    Effect.gen(function* () {
-      const callbacks = yield* PlaygroundRequestCallbacks;
-      return yield* executeSketchiCodeModeEffect(
-        input,
-        callbacks.runPromise,
-        options.executor ? { executor: options.executor } : {},
-      );
-    }),
-    boundary,
-  );
+	const request =
+		options.request ??
+		new Request(`${options.origin ?? "https://studio.test"}/mcp`, {
+			method: "POST",
+		});
+	const boundary = testBoundary(env, request);
+	return runPlaygroundEffect(
+		Effect.gen(function* () {
+			const callbacks = yield* PlaygroundRequestCallbacks;
+			return yield* executeSketchiCodeModeEffect(
+				input,
+				callbacks.runPromise,
+				options.executor ? { executor: options.executor } : {},
+			);
+		}),
+		boundary,
+	);
 }
 
 function handleSketchiMcpRequest(
-  env: StudioEnv,
-  request: Request,
-  options: CodeModeMcpOptions = {},
+	env: StudioEnv,
+	request: Request,
+	options: CodeModeMcpOptions = {},
 ) {
-  const boundary = testBoundary(env, request);
-  return runPlaygroundEffect(
-    handleSketchiMcpRequestEffect(request, options),
-    boundary,
-  );
+	const boundary = testBoundary(env, request);
+	return runPlaygroundEffect(handleSketchiMcpRequestEffect(request, options), boundary);
 }
 
 const CIRCLE_TO_DIAMOND_CODE = `async () => {
@@ -247,639 +235,582 @@ const ACCEPTED_ARTIFACT_WITH_MIXED_URLS_CODE = `async () => ({
 })`;
 
 function createInProcessExecutor(): SketchiCodeModeExecutor {
-  return {
-    async execute(code: string, providers: SketchiCodeModeProvider[]) {
-      const namespaces = Object.fromEntries(
-        providers.map((provider) => [provider.name, provider.fns]),
-      );
-      const names = Object.keys(namespaces);
-      const values = Object.values(namespaces);
-      const logs: string[] = [];
-      const sandboxConsole = {
-        log: (...args: unknown[]) => logs.push(args.map(String).join(" ")),
-      };
+	return {
+		async execute(code: string, providers: SketchiCodeModeProvider[]) {
+			const namespaces = Object.fromEntries(
+				providers.map((provider) => [provider.name, provider.fns]),
+			);
+			const names = Object.keys(namespaces);
+			const values = Object.values(namespaces);
+			const logs: string[] = [];
+			const sandboxConsole = {
+				log: (...args: unknown[]) => logs.push(args.map(String).join(" ")),
+			};
 
-      try {
-        const source = code.trim().replace(/;+\s*$/, "");
-        // oxlint-disable-next-line typescript/no-implied-eval -- stands in for the Code Mode sandbox, which evaluates code
-        const run = new Function(
-          ...names,
-          "console",
-          `"use strict"; return (${source})();`,
-        );
-        return {
-          result: await run(...values, sandboxConsole),
-          logs,
-        };
-      } catch (error) {
-        return {
-          result: null,
-          error: error instanceof Error ? error.message : String(error),
-          logs,
-        };
-      }
-    },
-  };
+			try {
+				const source = code.trim().replace(/;+\s*$/, "");
+				// oxlint-disable-next-line typescript/no-implied-eval -- stands in for the Code Mode sandbox, which evaluates code
+				const run = new Function(...names, "console", `"use strict"; return (${source})();`);
+				return {
+					result: await run(...values, sandboxConsole),
+					logs,
+				};
+			} catch (error) {
+				return {
+					result: null,
+					error: error instanceof Error ? error.message : String(error),
+					logs,
+				};
+			}
+		},
+	};
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function structuredContent(response: unknown): Record<string, unknown> {
-  if (!isRecord(response) || !isRecord(response.structuredContent)) {
-    throw new Error("MCP response did not include structured content.");
-  }
+	if (!isRecord(response) || !isRecord(response.structuredContent)) {
+		throw new Error("MCP response did not include structured content.");
+	}
 
-  return response.structuredContent;
+	return response.structuredContent;
 }
 
 function textContent(response: unknown): string[] {
-  if (!isRecord(response) || !Array.isArray(response.content)) {
-    throw new Error("MCP response did not include content.");
-  }
+	if (!isRecord(response) || !Array.isArray(response.content)) {
+		throw new Error("MCP response did not include content.");
+	}
 
-  return response.content.flatMap((item) => {
-    if (
-      !isRecord(item) ||
-      item.type !== "text" ||
-      typeof item.text !== "string"
-    ) {
-      return [];
-    }
-    return [item.text];
-  });
+	return response.content.flatMap((item) => {
+		if (!isRecord(item) || item.type !== "text" || typeof item.text !== "string") {
+			return [];
+		}
+		return [item.text];
+	});
 }
 
 class MemoryBucket implements CodeModeObjectBucket {
-  readonly objects = new Map<string, string | Uint8Array>();
+	readonly objects = new Map<string, string | Uint8Array>();
 
-  async get(key: string): Promise<CodeModeObjectBucketObject | null> {
-    const value = this.objects.get(key);
-    if (!value) {
-      return null;
-    }
-    const bytes =
-      typeof value === "string" ? new TextEncoder().encode(value) : value;
+	async get(key: string): Promise<CodeModeObjectBucketObject | null> {
+		const value = this.objects.get(key);
+		if (!value) {
+			return null;
+		}
+		const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
 
-    return {
-      size: bytes.byteLength,
-      arrayBuffer: async () => toArrayBuffer(bytes),
-      text: async () =>
-        typeof value === "string" ? value : new TextDecoder().decode(value),
-    };
-  }
+		return {
+			size: bytes.byteLength,
+			arrayBuffer: async () => toArrayBuffer(bytes),
+			text: async () => (typeof value === "string" ? value : new TextDecoder().decode(value)),
+		};
+	}
 
-  async put(
-    key: string,
-    value: string | ArrayBuffer | Uint8Array,
-  ): Promise<unknown> {
-    this.objects.set(
-      key,
-      typeof value === "string" ? value : new Uint8Array(value),
-    );
-    return null;
-  }
+	async put(key: string, value: string | ArrayBuffer | Uint8Array): Promise<unknown> {
+		this.objects.set(key, typeof value === "string" ? value : new Uint8Array(value));
+		return null;
+	}
 }
 
 class MemoryPipeline {
-  readonly batches: unknown[][] = [];
+	readonly batches: unknown[][] = [];
 
-  async send(records: readonly unknown[]): Promise<void> {
-    this.batches.push([...records]);
-  }
+	async send(records: readonly unknown[]): Promise<void> {
+		this.batches.push([...records]);
+	}
 
-  records(): unknown[] {
-    return this.batches.flat();
-  }
+	records(): unknown[] {
+		return this.batches.flat();
+	}
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  const buffer = new ArrayBuffer(bytes.byteLength);
-  new Uint8Array(buffer).set(bytes);
-  return buffer;
+	const buffer = new ArrayBuffer(bytes.byteLength);
+	new Uint8Array(buffer).set(bytes);
+	return buffer;
 }
 
-async function readBucketJson(
-  bucket: MemoryBucket,
-  key: string,
-): Promise<unknown> {
-  const object = await bucket.get(key);
-  return JSON.parse((await object?.text()) ?? "{}");
+async function readBucketJson(bucket: MemoryBucket, key: string): Promise<unknown> {
+	const object = await bucket.get(key);
+	return JSON.parse((await object?.text()) ?? "{}");
 }
 
 async function usageEventsFrom(bucket: MemoryBucket): Promise<unknown[]> {
-  const eventKeys = [...bucket.objects.keys()]
-    .filter((key) => key.startsWith("codemode/usage/"))
-    .filter((key) => key.endsWith("/event.json"))
-    .sort();
+	const eventKeys = [...bucket.objects.keys()]
+		.filter((key) => key.startsWith("codemode/usage/"))
+		.filter((key) => key.endsWith("/event.json"))
+		.sort();
 
-  return Promise.all(eventKeys.map((key) => readBucketJson(bucket, key)));
+	return Promise.all(eventKeys.map((key) => readBucketJson(bucket, key)));
 }
 
-async function waitForUsageEvents(
-  bucket: MemoryBucket,
-  count: number,
-): Promise<unknown[]> {
-  const deadline = Date.now() + 1_000;
+async function waitForUsageEvents(bucket: MemoryBucket, count: number): Promise<unknown[]> {
+	const deadline = Date.now() + 1_000;
 
-  while (Date.now() < deadline) {
-    const events = await usageEventsFrom(bucket);
-    if (events.length >= count) {
-      return events;
-    }
-    await delay(5);
-  }
+	while (Date.now() < deadline) {
+		const events = await usageEventsFrom(bucket);
+		if (events.length >= count) {
+			return events;
+		}
+		await delay(5);
+	}
 
-  throw new Error(`Expected ${count} usage event(s) to be persisted.`);
+	throw new Error(`Expected ${count} usage event(s) to be persisted.`);
 }
 
-async function waitForPipelineRecords(
-  pipeline: MemoryPipeline,
-  count: number,
-): Promise<unknown[]> {
-  const deadline = Date.now() + 1_000;
+async function waitForPipelineRecords(pipeline: MemoryPipeline, count: number): Promise<unknown[]> {
+	const deadline = Date.now() + 1_000;
 
-  while (Date.now() < deadline) {
-    const records = pipeline.records();
-    if (records.length >= count) {
-      return records;
-    }
-    await delay(5);
-  }
+	while (Date.now() < deadline) {
+		const records = pipeline.records();
+		if (records.length >= count) {
+			return records;
+		}
+		await delay(5);
+	}
 
-  throw new Error(`Expected ${count} pipeline record(s) to be sent.`);
+	throw new Error(`Expected ${count} pipeline record(s) to be sent.`);
 }
 
 function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
+	return new Promise((resolve) => {
+		setTimeout(resolve, ms);
+	});
 }
 
-function createMcpFetch(
-  options: CodeModeMcpOptions,
-  env: StudioEnv = {},
-): typeof fetch {
-  return async (input, init) => {
-    const request = new Request(input, init);
-    return handleSketchiMcpRequest(env, request, options);
-  };
+function createMcpFetch(options: CodeModeMcpOptions, env: StudioEnv = {}): typeof fetch {
+	return async (input, init) => {
+		const request = new Request(input, init);
+		return handleSketchiMcpRequest(env, request, options);
+	};
 }
 
 describe("Sketchi Code Mode MCP server", () => {
-  it("preserves the MCP request trace in provider callbacks", async () => {
-    let callbackContext:
-      | {
-          parentSpanId: string | undefined;
-          spanId: string;
-          spanName: string;
-          spanTraceId: string;
-          traceId: string;
-        }
-      | undefined;
-    const observeContext = Effect.gen(function* () {
-      const metadata = yield* PlaygroundRequestMetadata;
-      const span = yield* Effect.currentSpan;
-      const parent = Option.getOrUndefined(span.parent);
-      return {
-        parentSpanId: parent?.spanId,
-        spanName: span.name,
-        spanId: span.spanId,
-        spanTraceId: span.traceId,
-        traceId: metadata.traceId,
-      };
-    });
-    const codeMode = {
-      buildFlowchart: () =>
-        observeContext.pipe(
-          Effect.tap((context) =>
-            Effect.sync(() => {
-              callbackContext = context;
-            }),
-          ),
-          Effect.as({
-            ok: false as const,
-            status: "invalid_input" as const,
-            issues: [],
-          }),
-        ),
-    } as unknown as Context.Service.Shape<typeof PlaygroundCodeMode>;
-    const request = new Request("https://studio.test/mcp", {
-      headers: { "x-sketchi-trace-id": "trace-mcp-provider" },
-      method: "POST",
-    });
+	it("preserves the MCP request trace in provider callbacks", async () => {
+		let callbackContext:
+			| {
+					parentSpanId: string | undefined;
+					spanId: string;
+					spanName: string;
+					spanTraceId: string;
+					traceId: string;
+			  }
+			| undefined;
+		const observeContext = Effect.gen(function* () {
+			const metadata = yield* PlaygroundRequestMetadata;
+			const span = yield* Effect.currentSpan;
+			const parent = Option.getOrUndefined(span.parent);
+			return {
+				parentSpanId: parent?.spanId,
+				spanName: span.name,
+				spanId: span.spanId,
+				spanTraceId: span.traceId,
+				traceId: metadata.traceId,
+			};
+		});
+		const codeMode = {
+			buildFlowchart: () =>
+				observeContext.pipe(
+					Effect.tap((context) =>
+						Effect.sync(() => {
+							callbackContext = context;
+						}),
+					),
+					Effect.as({
+						ok: false as const,
+						status: "invalid_input" as const,
+						issues: [],
+					}),
+				),
+		} as unknown as Context.Service.Shape<typeof PlaygroundCodeMode>;
+		const request = new Request("https://studio.test/mcp", {
+			headers: { "x-sketchi-trace-id": "trace-mcp-provider" },
+			method: "POST",
+		});
 
-    const root = await runPlaygroundEffect(
-      Effect.gen(function* () {
-        const callbacks = yield* PlaygroundRequestCallbacks;
-        const requestContext = yield* observeContext;
-        const provider = makeSketchiCodeModeProvider(
-          codeMode,
-          callbacks.runPromise,
-        );
-        const buildFlowchart = provider.fns.buildFlowchart;
-        if (!buildFlowchart) {
-          throw new Error("MCP provider did not expose buildFlowchart.");
-        }
-        return {
-          callback: buildFlowchart({ spec: {} }),
-          requestContext,
-        };
-      }),
-      testBoundary({}, request),
-    );
+		const root = await runPlaygroundEffect(
+			Effect.gen(function* () {
+				const callbacks = yield* PlaygroundRequestCallbacks;
+				const requestContext = yield* observeContext;
+				const provider = makeSketchiCodeModeProvider(codeMode, callbacks.runPromise);
+				const buildFlowchart = provider.fns.buildFlowchart;
+				if (!buildFlowchart) {
+					throw new Error("MCP provider did not expose buildFlowchart.");
+				}
+				return {
+					callback: buildFlowchart({ spec: {} }),
+					requestContext,
+				};
+			}),
+			testBoundary({}, request),
+		);
 
-    await root.callback;
-    expect(callbackContext?.spanTraceId).toBe(root.requestContext.spanTraceId);
-    expect(callbackContext?.parentSpanId).toBe(root.requestContext.spanId);
-    expect(callbackContext?.spanName).toBe("playground.request.callback");
-    expect(callbackContext?.traceId).toBe("trace-mcp-provider");
-  });
+		await root.callback;
+		expect(callbackContext?.spanTraceId).toBe(root.requestContext.spanTraceId);
+		expect(callbackContext?.parentSpanId).toBe(root.requestContext.spanId);
+		expect(callbackContext?.spanName).toBe("playground.request.callback");
+		expect(callbackContext?.traceId).toBe("trace-mcp-provider");
+	});
 
-  it("exposes buildMindmap inside the Code Mode namespace", async () => {
-    const result = await executeSketchiCodeMode(
-      {},
-      { code: BUILD_MINDMAP_CODE },
-      { executor: createInProcessExecutor() },
-    );
-    expect(result).toMatchObject({
-      ok: true,
-      result: {
-        ok: true,
-        status: "accepted",
-        normalizedSpec: { root: { id: "topic-0" } },
-      },
-    });
-  });
-  it("exposes buildSequenceDiagram inside the Code Mode namespace", async () => {
-    const result = await executeSketchiCodeMode(
-      {},
-      { code: BUILD_SEQUENCE_CODE },
-      { executor: createInProcessExecutor() },
-    );
-    expect(result).toMatchObject({
-      ok: true,
-      result: {
-        ok: true,
-        status: "accepted",
-        normalizedSpec: {
-          participants: [{ id: "client" }, { id: "api" }, { id: "store" }],
-        },
-      },
-    });
-  });
-  it("exposes createCanvas inside the Code Mode namespace", async () => {
-    const result = await executeSketchiCodeMode(
-      {},
-      { code: CREATE_CANVAS_CODE },
-      { executor: createInProcessExecutor() },
-    );
-    expect(result).toMatchObject({
-      ok: true,
-      result: {
-        ok: true,
-        status: "accepted",
-        normalizedSpec: { kind: "canvas", version: 1, diagramId: "mcp-canvas" },
-      },
-    });
-  });
-  it("normalizes common LLM execute input wrappers", () => {
-    expect(normalizeSketchiExecuteCode("async () => { return 1; };")).toBe(
-      "async () => { return 1; }",
-    );
-    expect(
-      normalizeSketchiExecuteCode("```js\nasync () => { return 1; };\n```"),
-    ).toBe("async () => { return 1; }");
-  });
+	it("exposes buildMindmap inside the Code Mode namespace", async () => {
+		const result = await executeSketchiCodeMode(
+			{},
+			{ code: BUILD_MINDMAP_CODE },
+			{ executor: createInProcessExecutor() },
+		);
+		expect(result).toMatchObject({
+			ok: true,
+			result: {
+				ok: true,
+				status: "accepted",
+				normalizedSpec: { root: { id: "topic-0" } },
+			},
+		});
+	});
+	it("exposes buildSequenceDiagram inside the Code Mode namespace", async () => {
+		const result = await executeSketchiCodeMode(
+			{},
+			{ code: BUILD_SEQUENCE_CODE },
+			{ executor: createInProcessExecutor() },
+		);
+		expect(result).toMatchObject({
+			ok: true,
+			result: {
+				ok: true,
+				status: "accepted",
+				normalizedSpec: {
+					participants: [{ id: "client" }, { id: "api" }, { id: "store" }],
+				},
+			},
+		});
+	});
+	it("exposes createCanvas inside the Code Mode namespace", async () => {
+		const result = await executeSketchiCodeMode(
+			{},
+			{ code: CREATE_CANVAS_CODE },
+			{ executor: createInProcessExecutor() },
+		);
+		expect(result).toMatchObject({
+			ok: true,
+			result: {
+				ok: true,
+				status: "accepted",
+				normalizedSpec: { kind: "canvas", version: 1, diagramId: "mcp-canvas" },
+			},
+		});
+	});
+	it("normalizes common LLM execute input wrappers", () => {
+		expect(normalizeSketchiExecuteCode("async () => { return 1; };")).toBe(
+			"async () => { return 1; }",
+		);
+		expect(normalizeSketchiExecuteCode("```js\nasync () => { return 1; };\n```")).toBe(
+			"async () => { return 1; }",
+		);
+	});
 
-  it("exposes docs, search, and execute tools through the MCP protocol", async () => {
-    const client = new Client({
-      name: "sketchi-codemode-test-client",
-      version: "0.0.0",
-    });
-    const server = await createSketchiMcpServer(
-      {},
-      { executor: createInProcessExecutor() },
-    );
-    const [clientTransport, serverTransport] =
-      InMemoryTransport.createLinkedPair();
+	it("exposes docs, search, and execute tools through the MCP protocol", async () => {
+		const client = new Client({
+			name: "sketchi-codemode-test-client",
+			version: "0.0.0",
+		});
+		const server = await createSketchiMcpServer({}, { executor: createInProcessExecutor() });
+		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
-    try {
-      await server.connect(serverTransport);
-      await client.connect(clientTransport);
+		try {
+			await server.connect(serverTransport);
+			await client.connect(clientTransport);
 
-      await expect(client.ping()).resolves.toEqual({});
+			await expect(client.ping()).resolves.toEqual({});
 
-      const tools = await client.listTools();
-      expect(tools.tools.map((tool) => tool.name).sort()).toEqual([
-        "docs",
-        "execute",
-        "search",
-      ]);
-      const executeTool = tools.tools.find((tool) => tool.name === "execute");
-      expect(executeTool?.inputSchema).toMatchObject({
-        properties: {
-          code: { type: "string" },
-        },
-        required: ["code"],
-        type: "object",
-      });
-      expect(executeTool?.description).toContain("Write JavaScript only");
-      expect(executeTool?.description).toContain("async () =>");
-      expect(executeTool?.description).toContain("artifactDelivery");
-      expect(executeTool?.annotations).toMatchObject({
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
-        openWorldHint: false,
-      });
-      expect(
-        tools.tools.find((tool) => tool.name === "docs")?.outputSchema,
-      ).toBeDefined();
-      expect(
-        tools.tools.find((tool) => tool.name === "search")?.outputSchema,
-      ).toBeDefined();
-      expect(
-        tools.tools.find((tool) => tool.name === "execute")?.outputSchema,
-      ).toBeDefined();
-      const invalidSearch = await client.callTool({
-        name: "search",
-        arguments: { query: "", limit: 21 },
-      });
-      expect(invalidSearch).toEqual(validationFixtures.invalidSearch);
+			const tools = await client.listTools();
+			expect(tools.tools.map((tool) => tool.name).sort()).toEqual(["docs", "execute", "search"]);
+			const executeTool = tools.tools.find((tool) => tool.name === "execute");
+			expect(executeTool?.inputSchema).toMatchObject({
+				properties: {
+					code: { type: "string" },
+				},
+				required: ["code"],
+				type: "object",
+			});
+			expect(executeTool?.description).toContain("Write JavaScript only");
+			expect(executeTool?.description).toContain("async () =>");
+			expect(executeTool?.description).toContain("artifactDelivery");
+			expect(executeTool?.annotations).toMatchObject({
+				readOnlyHint: false,
+				destructiveHint: false,
+				idempotentHint: false,
+				openWorldHint: false,
+			});
+			expect(tools.tools.find((tool) => tool.name === "docs")?.outputSchema).toBeDefined();
+			expect(tools.tools.find((tool) => tool.name === "search")?.outputSchema).toBeDefined();
+			expect(tools.tools.find((tool) => tool.name === "execute")?.outputSchema).toBeDefined();
+			const invalidSearch = await client.callTool({
+				name: "search",
+				arguments: { query: "", limit: 21 },
+			});
+			expect(invalidSearch).toEqual(validationFixtures.invalidSearch);
 
-      // Standard Schema issues deliberately replace the parent Zod-shaped payloads.
-      const invalidExecuteType = await client.callTool({
-        name: "execute",
-        arguments: { code: 123 },
-      });
-      expect(invalidExecuteType).toEqual(validationFixtures.invalidExecuteType);
+			// Standard Schema issues deliberately replace the parent Zod-shaped payloads.
+			const invalidExecuteType = await client.callTool({
+				name: "execute",
+				arguments: { code: 123 },
+			});
+			expect(invalidExecuteType).toEqual(validationFixtures.invalidExecuteType);
 
-      const missingExecuteCode = await client.callTool({
-        name: "execute",
-        arguments: {},
-      });
-      expect(missingExecuteCode).toEqual(validationFixtures.missingExecuteCode);
+			const missingExecuteCode = await client.callTool({
+				name: "execute",
+				arguments: {},
+			});
+			expect(missingExecuteCode).toEqual(validationFixtures.missingExecuteCode);
 
-      const invalidSearchLimit = await client.callTool({
-        name: "search",
-        arguments: { query: "diagram", limit: 1.5 },
-      });
-      expect(invalidSearchLimit).toEqual(validationFixtures.invalidSearchLimit);
+			const invalidSearchLimit = await client.callTool({
+				name: "search",
+				arguments: { query: "diagram", limit: 1.5 },
+			});
+			expect(invalidSearchLimit).toEqual(validationFixtures.invalidSearchLimit);
 
-      const invalidDocsTopic = await client.callTool({
-        name: "docs",
-        arguments: { topic: "bogus" },
-      });
-      expect(invalidDocsTopic).toEqual(validationFixtures.invalidDocsTopic);
+			const invalidDocsTopic = await client.callTool({
+				name: "docs",
+				arguments: { topic: "bogus" },
+			});
+			expect(invalidDocsTopic).toEqual(validationFixtures.invalidDocsTopic);
 
-      const unknownTool = await client.callTool({
-        name: "missing",
-        arguments: {},
-      });
-      expect(unknownTool).toEqual({
-        content: [
-          {
-            type: "text",
-            text: "MCP error -32602: Tool missing not found",
-          },
-        ],
-        isError: true,
-      });
+			const unknownTool = await client.callTool({
+				name: "missing",
+				arguments: {},
+			});
+			expect(unknownTool).toEqual({
+				content: [
+					{
+						type: "text",
+						text: "MCP error -32602: Tool missing not found",
+					},
+				],
+				isError: true,
+			});
 
-      const docs = structuredContent(
-        await client.callTool({
-          name: "docs",
-          arguments: { topic: "agentSequence" },
-        }),
-      );
-      expect(docs).toMatchObject({
-        topic: "agentSequence",
-      });
-      expect(JSON.stringify(docs)).toContain("buildFlowchart");
+			const docs = structuredContent(
+				await client.callTool({
+					name: "docs",
+					arguments: { topic: "agentSequence" },
+				}),
+			);
+			expect(docs).toMatchObject({
+				topic: "agentSequence",
+			});
+			expect(JSON.stringify(docs)).toContain("buildFlowchart");
 
-      const search = structuredContent(
-        await client.callTool({
-          name: "search",
-          arguments: { query: "managed convex threads" },
-        }),
-      );
-      expect(JSON.stringify(search)).toContain("managed-thread-non-goal");
+			const search = structuredContent(
+				await client.callTool({
+					name: "search",
+					arguments: { query: "managed convex threads" },
+				}),
+			);
+			expect(JSON.stringify(search)).toContain("managed-thread-non-goal");
 
-      const execute = structuredContent(
-        await client.callTool({
-          name: "execute",
-          arguments: { code: CIRCLE_TO_DIAMOND_CODE },
-        }),
-      );
-      expect(execute).toMatchObject({
-        ok: true,
-        result: {
-          ok: true,
-          format: "excalidraw",
-          inline: {
-            type: "excalidraw",
-            version: 2,
-          },
-        },
-      });
-    } finally {
-      await client.close();
-      await server.close();
-    }
-  });
+			const execute = structuredContent(
+				await client.callTool({
+					name: "execute",
+					arguments: { code: CIRCLE_TO_DIAMOND_CODE },
+				}),
+			);
+			expect(execute).toMatchObject({
+				ok: true,
+				result: {
+					ok: true,
+					format: "excalidraw",
+					inline: {
+						type: "excalidraw",
+						version: 2,
+					},
+				},
+			});
+		} finally {
+			await client.close();
+			await server.close();
+		}
+	});
 
-  it("returns Standard Schema issues for invalid tool output", async () => {
-    const invalidOutput = makeEffectMcpTool("invalid-output", {
-      title: "Invalid output fixture",
-      description: "Exercises MCP output validation.",
-      inputSchema: toPlaygroundStandardSchema(
-        Schema.Struct({ ok: Schema.optionalKey(Schema.Boolean) }),
-      ),
-      outputSchema: toPlaygroundStandardSchema(
-        Schema.Struct({ value: Schema.String }),
-      ),
-    }).bind(() => ({
-      content: [{ type: "text", text: "invalid" }],
-      structuredContent: { value: 1 },
-    }));
-    const server = createEffectMcpServer({
-      name: "effect-mcp-output-validation-test",
-      tools: [invalidOutput],
-      version: "0.0.0",
-    });
-    const client = new Client({
-      name: "effect-mcp-output-validation-test-client",
-      version: "0.0.0",
-    });
-    const [clientTransport, serverTransport] =
-      InMemoryTransport.createLinkedPair();
+	it("returns Standard Schema issues for invalid tool output", async () => {
+		const invalidOutput = makeEffectMcpTool("invalid-output", {
+			title: "Invalid output fixture",
+			description: "Exercises MCP output validation.",
+			inputSchema: toPlaygroundStandardSchema(
+				Schema.Struct({ ok: Schema.optionalKey(Schema.Boolean) }),
+			),
+			outputSchema: toPlaygroundStandardSchema(Schema.Struct({ value: Schema.String })),
+		}).bind(() => ({
+			content: [{ type: "text", text: "invalid" }],
+			structuredContent: { value: 1 },
+		}));
+		const server = createEffectMcpServer({
+			name: "effect-mcp-output-validation-test",
+			tools: [invalidOutput],
+			version: "0.0.0",
+		});
+		const client = new Client({
+			name: "effect-mcp-output-validation-test-client",
+			version: "0.0.0",
+		});
+		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
-    try {
-      await server.connect(serverTransport);
-      await client.connect(clientTransport);
+		try {
+			await server.connect(serverTransport);
+			await client.connect(clientTransport);
 
-      const response = await client.callTool({
-        name: "invalid-output",
-        arguments: {},
-      });
-      // Keep the complete MCP envelope and Standard Schema issue paths pinned.
-      expect(response).toEqual(validationFixtures.invalidOutput);
-    } finally {
-      await client.close();
-      await server.close();
-    }
-  });
+			const response = await client.callTool({
+				name: "invalid-output",
+				arguments: {},
+			});
+			// Keep the complete MCP envelope and Standard Schema issue paths pinned.
+			expect(response).toEqual(validationFixtures.invalidOutput);
+		} finally {
+			await client.close();
+			await server.close();
+		}
+	});
 
-  it("puts artifact delivery text first in execute content for harnesses", async () => {
-    const client = new Client({
-      name: "sketchi-codemode-delivery-text-test-client",
-      version: "0.0.0",
-    });
-    const server = await createSketchiMcpServer(
-      {},
-      {
-        executor: createInProcessExecutor(),
-        origin: "https://studio.test",
-      },
-    );
-    const [clientTransport, serverTransport] =
-      InMemoryTransport.createLinkedPair();
+	it("puts artifact delivery text first in execute content for harnesses", async () => {
+		const client = new Client({
+			name: "sketchi-codemode-delivery-text-test-client",
+			version: "0.0.0",
+		});
+		const server = await createSketchiMcpServer(
+			{},
+			{
+				executor: createInProcessExecutor(),
+				origin: "https://studio.test",
+			},
+		);
+		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
-    try {
-      await server.connect(serverTransport);
-      await client.connect(clientTransport);
+		try {
+			await server.connect(serverTransport);
+			await client.connect(clientTransport);
 
-      const response = await client.callTool({
-        name: "execute",
-        arguments: { code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE },
-      });
-      const text = textContent(response);
+			const response = await client.callTool({
+				name: "execute",
+				arguments: { code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE },
+			});
+			const text = textContent(response);
 
-      expect(text).toHaveLength(2);
-      expect(text[0]).toBe(
-        "Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
-      );
-      expect(text[1]).toContain('"artifactDelivery"');
-      expect(structuredContent(response)).toMatchObject({
-        artifactDelivery: {
-          artifactId: "artifact_without_urls",
-          excalidrawUrl:
-            "https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true",
-          pngUrl:
-            "https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
-        },
-        ok: true,
-      });
-    } finally {
-      await client.close();
-      await server.close();
-    }
-  });
+			expect(text).toHaveLength(2);
+			expect(text[0]).toBe(
+				"Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
+			);
+			expect(text[1]).toContain('"artifactDelivery"');
+			expect(structuredContent(response)).toMatchObject({
+				artifactDelivery: {
+					artifactId: "artifact_without_urls",
+					excalidrawUrl:
+						"https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true",
+					pngUrl: "https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
+				},
+				ok: true,
+			});
+		} finally {
+			await client.close();
+			await server.close();
+		}
+	});
 
-  it("serves docs, search, and execute over the streamable HTTP MCP route", async () => {
-    const client = new Client({
-      name: "sketchi-codemode-http-test-client",
-      version: "0.0.0",
-    });
-    const transport = new StreamableHTTPClientTransport(
-      new URL("https://studio.test/mcp"),
-      {
-        fetch: createMcpFetch({ executor: createInProcessExecutor() }),
-      },
-    );
+	it("serves docs, search, and execute over the streamable HTTP MCP route", async () => {
+		const client = new Client({
+			name: "sketchi-codemode-http-test-client",
+			version: "0.0.0",
+		});
+		const transport = new StreamableHTTPClientTransport(new URL("https://studio.test/mcp"), {
+			fetch: createMcpFetch({ executor: createInProcessExecutor() }),
+		});
 
-    try {
-      await client.connect(transport as unknown as Transport);
+		try {
+			await client.connect(transport as unknown as Transport);
 
-      const tools = await client.listTools();
-      expect(tools.tools.map((tool) => tool.name).sort()).toEqual([
-        "docs",
-        "execute",
-        "search",
-      ]);
+			const tools = await client.listTools();
+			expect(tools.tools.map((tool) => tool.name).sort()).toEqual(["docs", "execute", "search"]);
 
-      const docs = structuredContent(
-        await client.callTool({
-          name: "docs",
-          arguments: { topic: "execute" },
-        }),
-      );
-      expect(JSON.stringify(docs)).toContain("sketchi.applyDiagramPatch");
+			const docs = structuredContent(
+				await client.callTool({
+					name: "docs",
+					arguments: { topic: "execute" },
+				}),
+			);
+			expect(JSON.stringify(docs)).toContain("sketchi.applyDiagramPatch");
 
-      const execute = structuredContent(
-        await client.callTool({
-          name: "execute",
-          arguments: { code: CIRCLE_TO_DIAMOND_CODE },
-        }),
-      );
-      expect(execute).toMatchObject({
-        ok: true,
-        result: {
-          ok: true,
-          format: "excalidraw",
-          inline: {
-            type: "excalidraw",
-            version: 2,
-          },
-          url: expect.stringContaining("https://studio.test/api/v1/artifacts/"),
-        },
-      });
-    } finally {
-      await client.close();
-    }
-  });
+			const execute = structuredContent(
+				await client.callTool({
+					name: "execute",
+					arguments: { code: CIRCLE_TO_DIAMOND_CODE },
+				}),
+			);
+			expect(execute).toMatchObject({
+				ok: true,
+				result: {
+					ok: true,
+					format: "excalidraw",
+					inline: {
+						type: "excalidraw",
+						version: 2,
+					},
+					url: expect.stringContaining("https://studio.test/api/v1/artifacts/"),
+				},
+			});
+		} finally {
+			await client.close();
+		}
+	});
 
-  it("returns structured execute errors instead of throwing tool failures", async () => {
-    await expect(
-      executeSketchiCodeMode({}, {}, { executor: createInProcessExecutor() }),
-    ).resolves.toMatchObject({
-      ok: false,
-      logs: [],
-    });
+	it("returns structured execute errors instead of throwing tool failures", async () => {
+		await expect(
+			executeSketchiCodeMode({}, {}, { executor: createInProcessExecutor() }),
+		).resolves.toMatchObject({
+			ok: false,
+			logs: [],
+		});
 
-    const result = await executeSketchiCodeMode(
-      {},
-      {
-        code: `async () => {
+		const result = await executeSketchiCodeMode(
+			{},
+			{
+				code: `async () => {
           throw new Error("generated code failed");
         }`,
-      },
-      { executor: createInProcessExecutor() },
-    );
+			},
+			{ executor: createInProcessExecutor() },
+		);
 
-    expect(result).toEqual({
-      ok: false,
-      error: "generated code failed",
-      logs: [],
-      result: null,
-    });
-  });
+		expect(result).toEqual({
+			ok: false,
+			error: "generated code failed",
+			logs: [],
+			result: null,
+		});
+	});
 
-  it("accepts execute code with a trailing arrow-function semicolon", async () => {
-    const result = await executeSketchiCodeMode(
-      {},
-      {
-        code: `${CIRCLE_TO_DIAMOND_CODE};`,
-      },
-      { executor: createInProcessExecutor() },
-    );
+	it("accepts execute code with a trailing arrow-function semicolon", async () => {
+		const result = await executeSketchiCodeMode(
+			{},
+			{
+				code: `${CIRCLE_TO_DIAMOND_CODE};`,
+			},
+			{ executor: createInProcessExecutor() },
+		);
 
-    expect(result).toMatchObject({
-      ok: true,
-      result: {
-        ok: true,
-        format: "excalidraw",
-      },
-    });
-  });
+		expect(result).toMatchObject({
+			ok: true,
+			result: {
+				ok: true,
+				format: "excalidraw",
+			},
+		});
+	});
 
-  it("adds artifactDelivery when generated code returns an accepted artifact bundle", async () => {
-    const result = await executeSketchiCodeMode(
-      {},
-      {
-        code: `async () => ({
+	it("adds artifactDelivery when generated code returns an accepted artifact bundle", async () => {
+		const result = await executeSketchiCodeMode(
+			{},
+			{
+				code: `async () => ({
           ok: true,
           status: "accepted",
           artifact: {
@@ -906,297 +837,286 @@ describe("Sketchi Code Mode MCP server", () => {
             ]
           }
         })`,
-      },
-      { executor: createInProcessExecutor() },
-    );
+			},
+			{ executor: createInProcessExecutor() },
+		);
 
-    expect(result).toMatchObject({
-      artifactDelivery: {
-        artifactId: "artifact_delivery",
-        diagramId: "diagram_delivery",
-        excalidrawUrl:
-          "https://studio.test/api/v1/artifacts/artifact_delivery?format=excalidraw&raw=true",
-        finalResponseText:
-          "Sketchi artifact ready.\nArtifact ID: artifact_delivery\nDiagram ID: diagram_delivery\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_delivery?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_delivery?format=png&raw=true",
-        formats: [
-          {
-            format: "scene",
-          },
-          {
-            format: "excalidraw",
-            mimeType: "application/vnd.excalidraw+json",
-            sizeBytes: 1234,
-          },
-          {
-            format: "png",
-            mimeType: "image/png",
-            sizeBytes: 5678,
-          },
-        ],
-        pngUrl:
-          "https://studio.test/api/v1/artifacts/artifact_delivery?format=png&raw=true",
-        sceneUrl:
-          "https://studio.test/api/v1/artifacts/artifact_delivery?format=scene&raw=true",
-      },
-      finalResponseText:
-        "Sketchi artifact ready.\nArtifact ID: artifact_delivery\nDiagram ID: diagram_delivery\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_delivery?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_delivery?format=png&raw=true",
-      ok: true,
-    });
-    expect(result.artifactDelivery?.finalResponseInstruction).toContain(
-      "Paste artifactDelivery.finalResponseText",
-    );
-  });
+		expect(result).toMatchObject({
+			artifactDelivery: {
+				artifactId: "artifact_delivery",
+				diagramId: "diagram_delivery",
+				excalidrawUrl:
+					"https://studio.test/api/v1/artifacts/artifact_delivery?format=excalidraw&raw=true",
+				finalResponseText:
+					"Sketchi artifact ready.\nArtifact ID: artifact_delivery\nDiagram ID: diagram_delivery\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_delivery?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_delivery?format=png&raw=true",
+				formats: [
+					{
+						format: "scene",
+					},
+					{
+						format: "excalidraw",
+						mimeType: "application/vnd.excalidraw+json",
+						sizeBytes: 1234,
+					},
+					{
+						format: "png",
+						mimeType: "image/png",
+						sizeBytes: 5678,
+					},
+				],
+				pngUrl: "https://studio.test/api/v1/artifacts/artifact_delivery?format=png&raw=true",
+				sceneUrl: "https://studio.test/api/v1/artifacts/artifact_delivery?format=scene&raw=true",
+			},
+			finalResponseText:
+				"Sketchi artifact ready.\nArtifact ID: artifact_delivery\nDiagram ID: diagram_delivery\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_delivery?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_delivery?format=png&raw=true",
+			ok: true,
+		});
+		expect(result.artifactDelivery?.finalResponseInstruction).toContain(
+			"Paste artifactDelivery.finalResponseText",
+		);
+	});
 
-  it("captures MCP execute usage events in the artifact bucket", async () => {
-    const bucket = new MemoryBucket();
-    const usageEventsPipeline = new MemoryPipeline();
-    const request = new Request("https://studio.test/mcp", {
-      method: "POST",
-      headers: {
-        "user-agent": "agy-test",
-        "x-sketchi-harness": "agy",
-        "x-sketchi-model": "gemini-3.5-flash",
-        "x-sketchi-reasoning-level": "medium",
-        "x-sketchi-scenario-id": "scenario-approval",
-      },
-    });
+	it("captures MCP execute usage events in the artifact bucket", async () => {
+		const bucket = new MemoryBucket();
+		const usageEventsPipeline = new MemoryPipeline();
+		const request = new Request("https://studio.test/mcp", {
+			method: "POST",
+			headers: {
+				"user-agent": "agy-test",
+				"x-sketchi-harness": "agy",
+				"x-sketchi-model": "gemini-3.5-flash",
+				"x-sketchi-reasoning-level": "medium",
+				"x-sketchi-scenario-id": "scenario-approval",
+			},
+		});
 
-    const result = await executeSketchiCodeMode(
-      {
-        CODEMODE_USAGE_EVENTS: usageEventsPipeline,
-        SKETCHI_ARTIFACTS: bucket,
-      },
-      {
-        code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE,
-      },
-      {
-        executor: createInProcessExecutor(),
-        origin: "https://studio.test",
-        request,
-      },
-    );
+		const result = await executeSketchiCodeMode(
+			{
+				CODEMODE_USAGE_EVENTS: usageEventsPipeline,
+				SKETCHI_ARTIFACTS: bucket,
+			},
+			{
+				code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE,
+			},
+			{
+				executor: createInProcessExecutor(),
+				origin: "https://studio.test",
+				request,
+			},
+		);
 
-    expect(result).toMatchObject({
-      artifactDelivery: {
-        artifactId: "artifact_without_urls",
-      },
-      ok: true,
-    });
+		expect(result).toMatchObject({
+			artifactDelivery: {
+				artifactId: "artifact_without_urls",
+			},
+			ok: true,
+		});
 
-    const usageEvents = await waitForUsageEvents(bucket, 1);
-    expect(usageEvents).toHaveLength(1);
-    expect(usageEvents[0]).toMatchObject({
-      artifactRefs: [
-        {
-          artifactId: "artifact_without_urls",
-          diagramId: "diagram_without_urls",
-        },
-      ],
-      client: {
-        harness: "agy",
-        model: "gemini-3.5-flash",
-        reasoningLevel: "medium",
-        scenarioId: "scenario-approval",
-        userAgent: "agy-test",
-      },
-      operation: "execute",
-      request: {
-        method: "POST",
-        path: "/mcp",
-      },
-      schema: "sketchi.codemode.usage.v1",
-      status: "ok",
-      surface: "mcp",
-    });
-    if (!isRecord(usageEvents[0]) || !isRecord(usageEvents[0].request)) {
-      throw new Error("Usage event did not include request metadata.");
-    }
-    if (!isRecord(usageEvents[0].request.body)) {
-      throw new Error("Usage event did not include a request snapshot.");
-    }
-    expect(usageEvents[0].request.body.value).toMatchObject({
-      code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE,
-    });
+		const usageEvents = await waitForUsageEvents(bucket, 1);
+		expect(usageEvents).toHaveLength(1);
+		expect(usageEvents[0]).toMatchObject({
+			artifactRefs: [
+				{
+					artifactId: "artifact_without_urls",
+					diagramId: "diagram_without_urls",
+				},
+			],
+			client: {
+				harness: "agy",
+				model: "gemini-3.5-flash",
+				reasoningLevel: "medium",
+				scenarioId: "scenario-approval",
+				userAgent: "agy-test",
+			},
+			operation: "execute",
+			request: {
+				method: "POST",
+				path: "/mcp",
+			},
+			schema: "sketchi.codemode.usage.v1",
+			status: "ok",
+			surface: "mcp",
+		});
+		if (!isRecord(usageEvents[0]) || !isRecord(usageEvents[0].request)) {
+			throw new Error("Usage event did not include request metadata.");
+		}
+		if (!isRecord(usageEvents[0].request.body)) {
+			throw new Error("Usage event did not include a request snapshot.");
+		}
+		expect(usageEvents[0].request.body.value).toMatchObject({
+			code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE,
+		});
 
-    const eventRows = await waitForPipelineRecords(usageEventsPipeline, 1);
-    expect(eventRows[0]).toMatchObject({
-      artifact_count: 1,
-      artifact_delivery: true,
-      artifact_formats: "scene,excalidraw,png",
-      harness: "agy",
-      issue_count: 0,
-      model: "gemini-3.5-flash",
-      operation: "execute",
-      reasoning_level: "medium",
-      request_method: "POST",
-      request_path: "/mcp",
-      scenario_id: "scenario-approval",
-      schema: "sketchi.codemode.usage.v1",
-      status: "ok",
-      surface: "mcp",
-      user_agent: "agy-test",
-    });
-    if (!isRecord(eventRows[0])) {
-      throw new Error("Usage pipeline event row was not an object.");
-    }
-    expect(eventRows[0].event_key).toMatch(/^codemode\/usage\//);
-    expect(eventRows[0].event_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-  });
+		const eventRows = await waitForPipelineRecords(usageEventsPipeline, 1);
+		expect(eventRows[0]).toMatchObject({
+			artifact_count: 1,
+			artifact_delivery: true,
+			artifact_formats: "scene,excalidraw,png",
+			harness: "agy",
+			issue_count: 0,
+			model: "gemini-3.5-flash",
+			operation: "execute",
+			reasoning_level: "medium",
+			request_method: "POST",
+			request_path: "/mcp",
+			scenario_id: "scenario-approval",
+			schema: "sketchi.codemode.usage.v1",
+			status: "ok",
+			surface: "mcp",
+			user_agent: "agy-test",
+		});
+		if (!isRecord(eventRows[0])) {
+			throw new Error("Usage pipeline event row was not an object.");
+		}
+		expect(eventRows[0].event_key).toMatch(/^codemode\/usage\//);
+		expect(eventRows[0].event_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+	});
 
-  it("synthesizes artifactDelivery URLs from the MCP origin when formats omit URLs", async () => {
-    const result = await executeSketchiCodeMode(
-      {},
-      {
-        code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE,
-      },
-      {
-        executor: createInProcessExecutor(),
-        origin: "https://studio.test",
-      },
-    );
+	it("synthesizes artifactDelivery URLs from the MCP origin when formats omit URLs", async () => {
+		const result = await executeSketchiCodeMode(
+			{},
+			{
+				code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE,
+			},
+			{
+				executor: createInProcessExecutor(),
+				origin: "https://studio.test",
+			},
+		);
 
-    expect(result).toMatchObject({
-      artifactDelivery: {
-        artifactId: "artifact_without_urls",
-        diagramId: "diagram_without_urls",
-        excalidrawUrl:
-          "https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true",
-        finalResponseText:
-          "Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
-        formats: [
-          {
-            format: "scene",
-            url: "https://studio.test/api/v1/artifacts/artifact_without_urls?format=scene&raw=true",
-          },
-          {
-            format: "excalidraw",
-            url: "https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true",
-          },
-          {
-            format: "png",
-            url: "https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
-          },
-        ],
-        pngUrl:
-          "https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
-        sceneUrl:
-          "https://studio.test/api/v1/artifacts/artifact_without_urls?format=scene&raw=true",
-      },
-      finalResponseText:
-        "Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
-      ok: true,
-    });
-  });
+		expect(result).toMatchObject({
+			artifactDelivery: {
+				artifactId: "artifact_without_urls",
+				diagramId: "diagram_without_urls",
+				excalidrawUrl:
+					"https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true",
+				finalResponseText:
+					"Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
+				formats: [
+					{
+						format: "scene",
+						url: "https://studio.test/api/v1/artifacts/artifact_without_urls?format=scene&raw=true",
+					},
+					{
+						format: "excalidraw",
+						url: "https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true",
+					},
+					{
+						format: "png",
+						url: "https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
+					},
+				],
+				pngUrl: "https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
+				sceneUrl:
+					"https://studio.test/api/v1/artifacts/artifact_without_urls?format=scene&raw=true",
+			},
+			finalResponseText:
+				"Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
+			ok: true,
+		});
+	});
 
-  it("preserves existing artifactDelivery URLs while synthesizing missing ones", async () => {
-    const result = await executeSketchiCodeMode(
-      {},
-      {
-        code: ACCEPTED_ARTIFACT_WITH_MIXED_URLS_CODE,
-      },
-      {
-        executor: createInProcessExecutor(),
-        origin: "https://studio.test",
-      },
-    );
+	it("preserves existing artifactDelivery URLs while synthesizing missing ones", async () => {
+		const result = await executeSketchiCodeMode(
+			{},
+			{
+				code: ACCEPTED_ARTIFACT_WITH_MIXED_URLS_CODE,
+			},
+			{
+				executor: createInProcessExecutor(),
+				origin: "https://studio.test",
+			},
+		);
 
-    expect(result).toMatchObject({
-      artifactDelivery: {
-        artifactId: "artifact_mixed_urls",
-        diagramId: "diagram_mixed_urls",
-        excalidrawUrl: "https://custom.test/excalidraw",
-        finalResponseText:
-          "Sketchi artifact ready.\nArtifact ID: artifact_mixed_urls\nDiagram ID: diagram_mixed_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://custom.test/excalidraw\nPNG URL: https://studio.test/api/v1/artifacts/artifact_mixed_urls?format=png&raw=true",
-        formats: [
-          {
-            format: "scene",
-            url: "https://studio.test/api/v1/artifacts/artifact_mixed_urls?format=scene&raw=true",
-          },
-          {
-            format: "excalidraw",
-            url: "https://custom.test/excalidraw",
-          },
-          {
-            format: "png",
-            url: "https://studio.test/api/v1/artifacts/artifact_mixed_urls?format=png&raw=true",
-          },
-        ],
-        pngUrl:
-          "https://studio.test/api/v1/artifacts/artifact_mixed_urls?format=png&raw=true",
-        sceneUrl:
-          "https://studio.test/api/v1/artifacts/artifact_mixed_urls?format=scene&raw=true",
-      },
-      ok: true,
-    });
-  });
+		expect(result).toMatchObject({
+			artifactDelivery: {
+				artifactId: "artifact_mixed_urls",
+				diagramId: "diagram_mixed_urls",
+				excalidrawUrl: "https://custom.test/excalidraw",
+				finalResponseText:
+					"Sketchi artifact ready.\nArtifact ID: artifact_mixed_urls\nDiagram ID: diagram_mixed_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://custom.test/excalidraw\nPNG URL: https://studio.test/api/v1/artifacts/artifact_mixed_urls?format=png&raw=true",
+				formats: [
+					{
+						format: "scene",
+						url: "https://studio.test/api/v1/artifacts/artifact_mixed_urls?format=scene&raw=true",
+					},
+					{
+						format: "excalidraw",
+						url: "https://custom.test/excalidraw",
+					},
+					{
+						format: "png",
+						url: "https://studio.test/api/v1/artifacts/artifact_mixed_urls?format=png&raw=true",
+					},
+				],
+				pngUrl: "https://studio.test/api/v1/artifacts/artifact_mixed_urls?format=png&raw=true",
+				sceneUrl: "https://studio.test/api/v1/artifacts/artifact_mixed_urls?format=scene&raw=true",
+			},
+			ok: true,
+		});
+	});
 
-  it("uses the injected MCP request origin when no override is supplied", async () => {
-    const result = await executeSketchiCodeMode(
-      {},
-      {
-        code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE,
-      },
-      {
-        executor: createInProcessExecutor(),
-      },
-    );
+	it("uses the injected MCP request origin when no override is supplied", async () => {
+		const result = await executeSketchiCodeMode(
+			{},
+			{
+				code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE,
+			},
+			{
+				executor: createInProcessExecutor(),
+			},
+		);
 
-    expect(result).toMatchObject({
-      artifactDelivery: {
-        artifactId: "artifact_without_urls",
-        diagramId: "diagram_without_urls",
-        finalResponseText:
-          "Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
-        formats: [
-          {
-            format: "scene",
-          },
-          {
-            format: "excalidraw",
-          },
-          {
-            format: "png",
-          },
-        ],
-      },
-      finalResponseText:
-        "Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
-      ok: true,
-    });
-    expect(result.artifactDelivery?.excalidrawUrl).toContain(
-      "https://studio.test/api/v1/artifacts/",
-    );
-    expect(result.artifactDelivery?.pngUrl).toContain(
-      "https://studio.test/api/v1/artifacts/",
-    );
-    expect(result.artifactDelivery?.sceneUrl).toContain(
-      "https://studio.test/api/v1/artifacts/",
-    );
-  });
+		expect(result).toMatchObject({
+			artifactDelivery: {
+				artifactId: "artifact_without_urls",
+				diagramId: "diagram_without_urls",
+				finalResponseText:
+					"Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
+				formats: [
+					{
+						format: "scene",
+					},
+					{
+						format: "excalidraw",
+					},
+					{
+						format: "png",
+					},
+				],
+			},
+			finalResponseText:
+				"Sketchi artifact ready.\nArtifact ID: artifact_without_urls\nDiagram ID: diagram_without_urls\nFormats: scene, excalidraw, png\nExcalidraw URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=excalidraw&raw=true\nPNG URL: https://studio.test/api/v1/artifacts/artifact_without_urls?format=png&raw=true",
+			ok: true,
+		});
+		expect(result.artifactDelivery?.excalidrawUrl).toContain(
+			"https://studio.test/api/v1/artifacts/",
+		);
+		expect(result.artifactDelivery?.pngUrl).toContain("https://studio.test/api/v1/artifacts/");
+		expect(result.artifactDelivery?.sceneUrl).toContain("https://studio.test/api/v1/artifacts/");
+	});
 });
 
 describe("MCP module-scope tool definitions", () => {
-  it("binds new request handlers without regenerating any tool schema", async () => {
-    const spies = [
-      CodeModeDocsRequestSchema,
-      CodeModeSearchRequestSchema,
-      ExecuteRequestSchema,
-    ].map((schema) => vi.spyOn(schema["~standard"].jsonSchema, "input"));
-    spies.push(
-      ...[
-        CodeModeDocsResultSchema,
-        CodeModeSearchResultSchema,
-        ExecuteResultSchema,
-      ].map((schema) => vi.spyOn(schema["~standard"].jsonSchema, "output")),
-    );
-    try {
-      const first = await createSketchiMcpServer({});
-      const second = await createSketchiMcpServer({});
-      for (const spy of spies) expect(spy).not.toHaveBeenCalled();
-      await first.close();
-      await second.close();
-    } finally {
-      for (const spy of spies) spy.mockRestore();
-    }
-  });
+	it("binds new request handlers without regenerating any tool schema", async () => {
+		const spies = [
+			CodeModeDocsRequestSchema,
+			CodeModeSearchRequestSchema,
+			ExecuteRequestSchema,
+		].map((schema) => vi.spyOn(schema["~standard"].jsonSchema, "input"));
+		spies.push(
+			...[CodeModeDocsResultSchema, CodeModeSearchResultSchema, ExecuteResultSchema].map((schema) =>
+				vi.spyOn(schema["~standard"].jsonSchema, "output"),
+			),
+		);
+		try {
+			const first = await createSketchiMcpServer({});
+			const second = await createSketchiMcpServer({});
+			for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+			await first.close();
+			await second.close();
+		} finally {
+			for (const spy of spies) spy.mockRestore();
+		}
+	});
 });

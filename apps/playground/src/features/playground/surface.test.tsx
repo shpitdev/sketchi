@@ -1,302 +1,257 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { BuildFlowchartResult } from "@sketchi/diagram-agent";
 import { getCanvasValidationIssues } from "@sketchi/diagram-core";
-import {
-  convertSceneToExcalidraw,
-  validateExcalidrawScene,
-} from "@sketchi/diagram-excalidraw";
+import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
 import type { UIMessage } from "ai";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@sketchi/diagram-ui", () => ({
-  DiagramPreview: ({ scene }: { scene: { diagramId: string } }) => (
-    <div data-diagram-id={scene.diagramId} data-testid="diagram-preview" />
-  ),
+	DiagramPreview: ({ scene }: { scene: { diagramId: string } }) => (
+		<div data-diagram-id={scene.diagramId} data-testid="diagram-preview" />
+	),
 }));
 
 import {
-  ArtifactActions,
-  AssistantFollowUp,
-  BuildResultDetails,
-  PlaygroundComposer,
-  PlaygroundEmptyState,
-  assistantAsksQuestion,
-  type ReadyPlaygroundArtifact,
+	ArtifactActions,
+	AssistantFollowUp,
+	BuildResultDetails,
+	PlaygroundComposer,
+	PlaygroundEmptyState,
+	assistantAsksQuestion,
+	type ReadyPlaygroundArtifact,
 } from "./surface";
-import {
-  DEPLOY_PIPELINE_SCENE,
-  DEPLOY_PIPELINE_SPEC,
-} from "./deploy-pipeline-sample";
+import { DEPLOY_PIPELINE_SCENE, DEPLOY_PIPELINE_SPEC } from "./deploy-pipeline-sample";
 
 const acceptedBuild = {
-  artifact: {
-    artifactId: "artifact_release",
-    diagramId: "release",
-    formats: [],
-  },
-  buildId: "build_release",
-  issues: [],
-  normalizedSpec: {
-    edges: [{ id: "start-done", source: "start", target: "done" }],
-    id: "release",
-    layout: { direction: "TB" },
-    nodes: [
-      { id: "start", kind: "start", label: "Start" },
-      { id: "done", kind: "end", label: "Done" },
-    ],
-    style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
-    title: "Release",
-  },
-  ok: true,
-  quality: {
-    accepted: true,
-    checks: [],
-    score: 9,
-    summary: { edgeCount: 1, nodeCount: 2 },
-    threshold: 8,
-  },
-  status: "accepted",
+	artifact: {
+		artifactId: "artifact_release",
+		diagramId: "release",
+		formats: [],
+	},
+	buildId: "build_release",
+	issues: [],
+	normalizedSpec: {
+		edges: [{ id: "start-done", source: "start", target: "done" }],
+		id: "release",
+		layout: { direction: "TB" },
+		nodes: [
+			{ id: "start", kind: "start", label: "Start" },
+			{ id: "done", kind: "end", label: "Done" },
+		],
+		style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
+		title: "Release",
+	},
+	ok: true,
+	quality: {
+		accepted: true,
+		checks: [],
+		score: 9,
+		summary: { edgeCount: 1, nodeCount: 2 },
+		threshold: 8,
+	},
+	status: "accepted",
 } satisfies BuildFlowchartResult;
 
 const artifact = {
-  artifactId: "artifact_release",
-  editUrl: "/artifacts/artifact_release/edit",
-  exportUrls: {
-    excalidraw: "/artifact.excalidraw",
-    scene: "/artifact.json",
-  },
-  viewUrl: "/artifacts/artifact_release",
+	artifactId: "artifact_release",
+	editUrl: "/artifacts/artifact_release/edit",
+	exportUrls: {
+		excalidraw: "/artifact.excalidraw",
+		scene: "/artifact.json",
+	},
+	viewUrl: "/artifacts/artifact_release",
 } satisfies ReadyPlaygroundArtifact;
 
 const rejectedBuild = {
-  issues: [
-    {
-      code: "quality_below_threshold",
-      hint: "Stop calling build_flowchart after 3 attempts and list structured issues.",
-      message: "build_flowchart failed after attempt 3 of 3.",
-      ref: { kind: "request", path: "spec" },
-      severity: "error",
-      stage: "quality",
-    },
-  ],
-  ok: false,
-  status: "quality_failed",
+	issues: [
+		{
+			code: "quality_below_threshold",
+			hint: "Stop calling build_flowchart after 3 attempts and list structured issues.",
+			message: "build_flowchart failed after attempt 3 of 3.",
+			ref: { kind: "request", path: "spec" },
+			severity: "error",
+			stage: "quality",
+		},
+	],
+	ok: false,
+	status: "quality_failed",
 } satisfies BuildFlowchartResult;
 
 describe("playground surface", () => {
-  it("renders a genuine generated deploy scene with logos inside its nodes", () => {
-    render(<PlaygroundEmptyState onSelect={() => undefined} />);
+	it("renders a genuine generated deploy scene with logos inside its nodes", () => {
+		render(<PlaygroundEmptyState onSelect={() => undefined} />);
 
-    expect(screen.getByText("Deploy pipeline")).toBeTruthy();
-    // The sample is the live renderer's output, and the caption says so. Keep
-    // the claim attached to the same figure that carries the real scene.
-    expect(
-      screen.getByText("Rendered in Sketchi").closest("figcaption"),
-    ).not.toBeNull();
-    expect(
-      screen.getByTestId("diagram-preview").getAttribute("data-diagram-id"),
-    ).toBe(DEPLOY_PIPELINE_SCENE.diagramId);
-    // The marks live in the scene now, not in a caption beside it.
-    expect(screen.queryAllByRole("img", { name: /logo$/u })).toHaveLength(0);
-    expect(
-      DEPLOY_PIPELINE_SCENE.elements.flatMap((element) =>
-        element.type === "node" && element.icon
-          ? [[element.nodeId, element.icon.slug]]
-          : [],
-      ),
-    ).toEqual([
-      ["push", "github"],
-      ["build", "docker"],
-      ["deploy", "cloudflare"],
-    ]);
-    expect(Object.keys(DEPLOY_PIPELINE_SCENE.icons ?? {}).sort()).toEqual([
-      "cloudflare",
-      "docker",
-      "github",
-    ]);
+		expect(screen.getByText("Deploy pipeline")).toBeTruthy();
+		// The sample is the live renderer's output, and the caption says so. Keep
+		// the claim attached to the same figure that carries the real scene.
+		expect(screen.getByText("Rendered in Sketchi").closest("figcaption")).not.toBeNull();
+		expect(screen.getByTestId("diagram-preview").getAttribute("data-diagram-id")).toBe(
+			DEPLOY_PIPELINE_SCENE.diagramId,
+		);
+		// The marks live in the scene now, not in a caption beside it.
+		expect(screen.queryAllByRole("img", { name: /logo$/u })).toHaveLength(0);
+		expect(
+			DEPLOY_PIPELINE_SCENE.elements.flatMap((element) =>
+				element.type === "node" && element.icon ? [[element.nodeId, element.icon.slug]] : [],
+			),
+		).toEqual([
+			["push", "github"],
+			["build", "docker"],
+			["deploy", "cloudflare"],
+		]);
+		expect(Object.keys(DEPLOY_PIPELINE_SCENE.icons ?? {}).sort()).toEqual([
+			"cloudflare",
+			"docker",
+			"github",
+		]);
 
-    expect(DEPLOY_PIPELINE_SCENE.accentColor).toBe("#8f707f");
-    expect(DEPLOY_PIPELINE_SCENE.backgroundColor).toBe("#fffdf8");
-    expect(DEPLOY_PIPELINE_SPEC.nodes.map((node) => node.label)).toEqual([
-      "GitHub push",
-      "Docker build",
-      "Run tests",
-      "Cloudflare ship",
-    ]);
-    expect(DEPLOY_PIPELINE_SPEC.nodes).toHaveLength(4);
-    expect(DEPLOY_PIPELINE_SPEC.edges).toEqual([
-      { source: "push", target: "build" },
-      { source: "build", target: "tests" },
-      { label: "pass", source: "tests", target: "deploy" },
-    ]);
-    expect(JSON.stringify(DEPLOY_PIPELINE_SPEC)).not.toMatch(
-      /fix build|retry/i,
-    );
-    expect(JSON.stringify(DEPLOY_PIPELINE_SCENE)).not.toMatch(
-      /fix build|retry/i,
-    );
-    expect(
-      DEPLOY_PIPELINE_SCENE.elements
-        .filter((element) => element.type === "node")
-        .map((element) => element.shape),
-    ).toEqual(["ellipse", "rectangle", "rectangle", "ellipse"]);
-    expect(
-      DEPLOY_PIPELINE_SCENE.elements.filter(
-        (element) => element.type === "arrow",
-      ),
-    ).toHaveLength(3);
-    expect(DEPLOY_PIPELINE_SCENE.elements).toHaveLength(11);
-    const sceneNodeLabels = DEPLOY_PIPELINE_SCENE.elements
-      .filter((element) => element.type === "text")
-      .filter((element) => element.containerId);
-    expect(sceneNodeLabels.map((element) => element.fontSize)).toEqual([
-      15, 15, 15, 15,
-    ]);
-    expect(sceneNodeLabels.map((element) => element.text)).toEqual([
-      "GitHub\npush",
-      "Docker\nbuild",
-      "Run\ntests",
-      "Cloudflare\nship",
-    ]);
-    expect(getCanvasValidationIssues(DEPLOY_PIPELINE_SCENE)).toEqual([]);
-    const excalidraw = convertSceneToExcalidraw(DEPLOY_PIPELINE_SCENE);
-    expect(validateExcalidrawScene(excalidraw)).toEqual({
-      issues: [],
-      ok: true,
-    });
-    expect(
-      excalidraw.elements.filter((element) => element.type === "image"),
-    ).toHaveLength(3);
-    expect(Object.keys(excalidraw.files ?? {})).toHaveLength(3);
+		expect(DEPLOY_PIPELINE_SCENE.accentColor).toBe("#8f707f");
+		expect(DEPLOY_PIPELINE_SCENE.backgroundColor).toBe("#fffdf8");
+		expect(DEPLOY_PIPELINE_SPEC.nodes.map((node) => node.label)).toEqual([
+			"GitHub push",
+			"Docker build",
+			"Run tests",
+			"Cloudflare ship",
+		]);
+		expect(DEPLOY_PIPELINE_SPEC.nodes).toHaveLength(4);
+		expect(DEPLOY_PIPELINE_SPEC.edges).toEqual([
+			{ source: "push", target: "build" },
+			{ source: "build", target: "tests" },
+			{ label: "pass", source: "tests", target: "deploy" },
+		]);
+		expect(JSON.stringify(DEPLOY_PIPELINE_SPEC)).not.toMatch(/fix build|retry/i);
+		expect(JSON.stringify(DEPLOY_PIPELINE_SCENE)).not.toMatch(/fix build|retry/i);
+		expect(
+			DEPLOY_PIPELINE_SCENE.elements
+				.filter((element) => element.type === "node")
+				.map((element) => element.shape),
+		).toEqual(["ellipse", "rectangle", "rectangle", "ellipse"]);
+		expect(
+			DEPLOY_PIPELINE_SCENE.elements.filter((element) => element.type === "arrow"),
+		).toHaveLength(3);
+		expect(DEPLOY_PIPELINE_SCENE.elements).toHaveLength(11);
+		const sceneNodeLabels = DEPLOY_PIPELINE_SCENE.elements
+			.filter((element) => element.type === "text")
+			.filter((element) => element.containerId);
+		expect(sceneNodeLabels.map((element) => element.fontSize)).toEqual([15, 15, 15, 15]);
+		expect(sceneNodeLabels.map((element) => element.text)).toEqual([
+			"GitHub\npush",
+			"Docker\nbuild",
+			"Run\ntests",
+			"Cloudflare\nship",
+		]);
+		expect(getCanvasValidationIssues(DEPLOY_PIPELINE_SCENE)).toEqual([]);
+		const excalidraw = convertSceneToExcalidraw(DEPLOY_PIPELINE_SCENE);
+		expect(validateExcalidrawScene(excalidraw)).toEqual({
+			issues: [],
+			ok: true,
+		});
+		expect(excalidraw.elements.filter((element) => element.type === "image")).toHaveLength(3);
+		expect(Object.keys(excalidraw.files ?? {})).toHaveLength(3);
 
-    expect(document.querySelector(".studio__sample-flow")).toBeNull();
-    expect(document.querySelector(".studio__sample-arrow")).toBeNull();
-  });
+		expect(document.querySelector(".studio__sample-flow")).toBeNull();
+		expect(document.querySelector(".studio__sample-arrow")).toBeNull();
+	});
 
-  it("keeps equal-priority starters and a separate mind map announcement", () => {
-    render(<PlaygroundEmptyState onSelect={() => undefined} />);
+	it("keeps equal-priority starters and a separate mind map announcement", () => {
+		render(<PlaygroundEmptyState onSelect={() => undefined} />);
 
-    expect(screen.getByLabelText("Starter prompts").children).toHaveLength(3);
-    expect(
-      screen.getByText("Mind maps are a new sketch type, ready to explore."),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole("link", { name: "View the example →" }),
-    ).toBeTruthy();
-  });
+		expect(screen.getByLabelText("Starter prompts").children).toHaveLength(3);
+		expect(screen.getByText("Mind maps are a new sketch type, ready to explore.")).toBeTruthy();
+		expect(screen.getByRole("link", { name: "View the example →" })).toBeTruthy();
+	});
 
-  it("keeps generation telemetry inside a closed disclosure", () => {
-    render(<BuildResultDetails pass={1} result={acceptedBuild} />);
+	it("keeps generation telemetry inside a closed disclosure", () => {
+		render(<BuildResultDetails pass={1} result={acceptedBuild} />);
 
-    const disclosure = screen.getByText("Drawing details").closest("details");
-    expect(disclosure?.hasAttribute("open")).toBe(false);
-    expect(disclosure?.textContent).toContain("9.0");
-    expect(disclosure?.textContent).toContain("Diagram items2");
-    expect(screen.queryByText(/canonical artifact/i)).toBeNull();
-    expect(screen.queryByText(/attempt 1 of 3/i)).toBeNull();
-  });
+		const disclosure = screen.getByText("Drawing details").closest("details");
+		expect(disclosure?.hasAttribute("open")).toBe(false);
+		expect(disclosure?.textContent).toContain("9.0");
+		expect(disclosure?.textContent).toContain("Diagram items2");
+		expect(screen.queryByText(/canonical artifact/i)).toBeNull();
+		expect(screen.queryByText(/attempt 1 of 3/i)).toBeNull();
+	});
 
-  it("renders visible labels for every generated-diagram action", () => {
-    render(<ArtifactActions artifact={artifact} />);
+	it("renders visible labels for every generated-diagram action", () => {
+		render(<ArtifactActions artifact={artifact} />);
 
-    for (const label of [
-      "View diagram",
-      "Edit diagram",
-      "Download JSON",
-      "Download Excalidraw",
-    ]) {
-      expect(screen.getByRole("link", { name: label }).textContent).toBe(label);
-    }
+		for (const label of ["View diagram", "Edit diagram", "Download JSON", "Download Excalidraw"]) {
+			expect(screen.getByRole("link", { name: label }).textContent).toBe(label);
+		}
 
-    expect(
-      screen
-        .getByRole("link", { name: "Download JSON" })
-        .getAttribute("download"),
-    ).toBe("artifact_release.json");
-    expect(
-      screen
-        .getByRole("link", { name: "Download Excalidraw" })
-        .getAttribute("download"),
-    ).toBe("artifact_release.excalidraw");
-  });
+		expect(screen.getByRole("link", { name: "Download JSON" }).getAttribute("download")).toBe(
+			"artifact_release.json",
+		);
+		expect(screen.getByRole("link", { name: "Download Excalidraw" }).getAttribute("download")).toBe(
+			"artifact_release.excalidraw",
+		);
+	});
 
-  it("replaces internal failure details with useful product copy", () => {
-    render(<BuildResultDetails pass={3} result={rejectedBuild} />);
+	it("replaces internal failure details with useful product copy", () => {
+		render(<BuildResultDetails pass={3} result={rejectedBuild} />);
 
-    expect(
-      screen.getByText("This draft needs another pass before it is ready."),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(
-        "Ask Sketchi to simplify the flow or try a shorter description.",
-      ),
-    ).toBeTruthy();
-    expect(screen.queryByText(/build_flowchart/i)).toBeNull();
-    expect(
-      screen.queryByText(/3 attempts|attempt 3|structured issues/i),
-    ).toBeNull();
-  });
+		expect(screen.getByText("This draft needs another pass before it is ready.")).toBeTruthy();
+		expect(
+			screen.getByText("Ask Sketchi to simplify the flow or try a shorter description."),
+		).toBeTruthy();
+		expect(screen.queryByText(/build_flowchart/i)).toBeNull();
+		expect(screen.queryByText(/3 attempts|attempt 3|structured issues/i)).toBeNull();
+	});
 
-  it("keeps a persistent accessible name on the primary composer", () => {
-    render(
-      <PlaygroundComposer
-        buildMode={false}
-        composerRef={createRef<HTMLTextAreaElement>()}
-        onSubmit={() => undefined}
-        status="ready"
-      />,
-    );
+	it("keeps a persistent accessible name on the primary composer", () => {
+		render(
+			<PlaygroundComposer
+				buildMode={false}
+				composerRef={createRef<HTMLTextAreaElement>()}
+				onSubmit={() => undefined}
+				status="ready"
+			/>,
+		);
 
-    const composer = screen.getByRole("textbox", {
-      name: "Describe your diagram",
-    }) as HTMLTextAreaElement;
-    fireEvent.change(composer, { target: { value: "Map a release flow" } });
-    expect(screen.getByLabelText("Describe your diagram")).toBe(composer);
-    expect(composer.value).toBe("Map a release flow");
-  });
+		const composer = screen.getByRole("textbox", {
+			name: "Describe your diagram",
+		}) as HTMLTextAreaElement;
+		fireEvent.change(composer, { target: { value: "Map a release flow" } });
+		expect(screen.getByLabelText("Describe your diagram")).toBe(composer);
+		expect(composer.value).toBe("Map a release flow");
+	});
 
-  it("offers a custom answer without canned yes/no replies", () => {
-    let composeRequests = 0;
-    render(
-      <AssistantFollowUp
-        onCompose={() => {
-          composeRequests += 1;
-        }}
-      />,
-    );
+	it("offers a custom answer without canned yes/no replies", () => {
+		let composeRequests = 0;
+		render(
+			<AssistantFollowUp
+				onCompose={() => {
+					composeRequests += 1;
+				}}
+			/>,
+		);
 
-    expect(
-      screen.queryByRole("button", { name: "Yes, make that change" }),
-    ).toBeNull();
-    expect(
-      screen.queryByRole("button", { name: "No, keep it as is" }),
-    ).toBeNull();
-    screen.getByRole("button", { name: "Write another answer" }).click();
-    expect(composeRequests).toBe(1);
-  });
+		expect(screen.queryByRole("button", { name: "Yes, make that change" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "No, keep it as is" })).toBeNull();
+		screen.getByRole("button", { name: "Write another answer" }).click();
+		expect(composeRequests).toBe(1);
+	});
 
-  it("recognizes only assistant messages that end in a question", () => {
-    const assistantQuestion = {
-      id: "assistant-question",
-      parts: [
-        {
-          state: "done",
-          text: "Would you like me to add a security scan?",
-          type: "text",
-        },
-      ],
-      role: "assistant",
-    } satisfies UIMessage;
-    const assistantStatement = {
-      ...assistantQuestion,
-      id: "assistant-statement",
-      parts: [
-        { state: "done", text: "The security scan is included.", type: "text" },
-      ],
-    } satisfies UIMessage;
+	it("recognizes only assistant messages that end in a question", () => {
+		const assistantQuestion = {
+			id: "assistant-question",
+			parts: [
+				{
+					state: "done",
+					text: "Would you like me to add a security scan?",
+					type: "text",
+				},
+			],
+			role: "assistant",
+		} satisfies UIMessage;
+		const assistantStatement = {
+			...assistantQuestion,
+			id: "assistant-statement",
+			parts: [{ state: "done", text: "The security scan is included.", type: "text" }],
+		} satisfies UIMessage;
 
-    expect(assistantAsksQuestion(assistantQuestion)).toBe(true);
-    expect(assistantAsksQuestion(assistantStatement)).toBe(false);
-  });
+		expect(assistantAsksQuestion(assistantQuestion)).toBe(true);
+		expect(assistantAsksQuestion(assistantStatement)).toBe(false);
+	});
 });

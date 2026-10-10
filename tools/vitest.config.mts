@@ -1,46 +1,40 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  resolve: {
-    alias: {
-      "@sketchi/diagram-scenarios/internal/tool-process": new URL(
-        "../packages/diagram/scenarios/src/internal/tool-process.ts",
-        import.meta.url,
-      ).pathname,
-      "@sketchi/diagram-core": new URL(
-        "../packages/diagram/core/src/index.ts",
-        import.meta.url,
-      ).pathname,
-      "@sketchi/diagram-excalidraw": new URL(
-        "../packages/diagram/excalidraw/src/index.ts",
-        import.meta.url,
-      ).pathname,
-      "@sketchi/diagram-generation": new URL(
-        "../packages/diagram/generation/src/index.ts",
-        import.meta.url,
-      ).pathname,
-      "@sketchi/icon-catalog": new URL(
-        "../packages/icons/catalog/src/index.ts",
-        import.meta.url,
-      ).pathname,
-      "@sketchi/observability": new URL(
-        "../packages/observability/src/index.ts",
-        import.meta.url,
-      ).pathname,
-      "@sketchi/diagram-renderer": new URL(
-        "../packages/diagram/renderer/src/index.ts",
-        import.meta.url,
-      ).pathname,
-      "@sketchi/diagram-scenarios": new URL(
-        "../packages/diagram/scenarios/src/index.ts",
-        import.meta.url,
-      ).pathname,
-    },
-  },
-  test: {
-    name: "tools",
-    environment: "node",
-    include: ["tools/**/*.test.ts"],
-    exclude: ["tools/*/src/**", "tools/*/tests/**"],
-  },
+	resolve: {
+		alias: {
+			"@sketchi/diagram-scenarios/internal/tool-process": new URL(
+				"../packages/diagram/scenarios/src/internal/tool-process.ts",
+				import.meta.url,
+			).pathname,
+			"@sketchi/diagram-core": new URL("../packages/diagram/core/src/index.ts", import.meta.url)
+				.pathname,
+			"@sketchi/diagram-excalidraw": new URL(
+				"../packages/diagram/excalidraw/src/index.ts",
+				import.meta.url,
+			).pathname,
+			"@sketchi/diagram-generation": new URL(
+				"../packages/diagram/generation/src/index.ts",
+				import.meta.url,
+			).pathname,
+			"@sketchi/icon-catalog": new URL("../packages/icons/catalog/src/index.ts", import.meta.url)
+				.pathname,
+			"@sketchi/observability": new URL("../packages/observability/src/index.ts", import.meta.url)
+				.pathname,
+			"@sketchi/diagram-renderer": new URL(
+				"../packages/diagram/renderer/src/index.ts",
+				import.meta.url,
+			).pathname,
+			"@sketchi/diagram-scenarios": new URL(
+				"../packages/diagram/scenarios/src/index.ts",
+				import.meta.url,
+			).pathname,
+		},
+	},
+	test: {
+		name: "tools",
+		environment: "node",
+		include: ["tools/**/*.test.ts"],
+		exclude: ["tools/*/src/**", "tools/*/tests/**"],
+	},
 });

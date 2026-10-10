@@ -1,118 +1,111 @@
 import { isUnknownRecord, objectValue } from "./unknown-record.js";
-import type {
-  DiagramGenerationUsage,
-  DiagramGenerationRequest,
-} from "./candidates.js";
+import type { DiagramGenerationUsage, DiagramGenerationRequest } from "./candidates.js";
 import { buildDiagramGenerationMessages } from "./messages.js";
 
 export interface GeminiTextPart {
-  text: string;
+	text: string;
 }
 export interface GeminiContent {
-  parts: GeminiTextPart[];
-  role: "model" | "user";
+	parts: GeminiTextPart[];
+	role: "model" | "user";
 }
 export interface GeminiGenerationConfig {
-  maxOutputTokens: number;
-  response_mime_type: "application/json";
-  temperature: number;
+	maxOutputTokens: number;
+	response_mime_type: "application/json";
+	temperature: number;
 }
 export interface GeminiSystemInstruction {
-  parts: GeminiTextPart[];
+	parts: GeminiTextPart[];
 }
 export interface GeminiGenerateContentBody {
-  contents: GeminiContent[];
-  generationConfig: GeminiGenerationConfig;
-  system_instruction: GeminiSystemInstruction;
+	contents: GeminiContent[];
+	generationConfig: GeminiGenerationConfig;
+	system_instruction: GeminiSystemInstruction;
 }
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 16_384;
 const DEFAULT_TEMPERATURE = 0.1;
 
 function numberUsage(value: unknown): number | undefined {
-  return typeof value === "number" ? value : undefined;
+	return typeof value === "number" ? value : undefined;
 }
 
 export function stripGoogleModelPrefix(model: string): string {
-  return model.replace(/^google-ai-studio\//, "").replace(/^google\//, "");
+	return model.replace(/^google-ai-studio\//, "").replace(/^google\//, "");
 }
 
 export function buildGeminiGenerateContentBody(
-  request: DiagramGenerationRequest,
+	request: DiagramGenerationRequest,
 ): GeminiGenerateContentBody {
-  const { system, user } = buildDiagramGenerationMessages(request.prompt);
+	const { system, user } = buildDiagramGenerationMessages(request.prompt);
 
-  return {
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: user }],
-      },
-    ],
-    generationConfig: {
-      maxOutputTokens: request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
-      response_mime_type: "application/json",
-      temperature: request.temperature ?? DEFAULT_TEMPERATURE,
-    },
-    system_instruction: {
-      parts: [{ text: system }],
-    },
-  };
+	return {
+		contents: [
+			{
+				role: "user",
+				parts: [{ text: user }],
+			},
+		],
+		generationConfig: {
+			maxOutputTokens: request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+			response_mime_type: "application/json",
+			temperature: request.temperature ?? DEFAULT_TEMPERATURE,
+		},
+		system_instruction: {
+			parts: [{ text: system }],
+		},
+	};
 }
 
 export function extractGeminiText(response: unknown): string {
-  const candidates = objectValue(response, "candidates");
-  const text = (Array.isArray(candidates) ? candidates : [])
-    .flatMap((candidate) => {
-      const parts = objectValue(objectValue(candidate, "content"), "parts");
-      return Array.isArray(parts) ? parts : [];
-    })
-    .map((part) => objectValue(part, "text"))
-    .filter((partText): partText is string => typeof partText === "string")
-    .join("\n")
-    .trim();
+	const candidates = objectValue(response, "candidates");
+	const text = (Array.isArray(candidates) ? candidates : [])
+		.flatMap((candidate) => {
+			const parts = objectValue(objectValue(candidate, "content"), "parts");
+			return Array.isArray(parts) ? parts : [];
+		})
+		.map((part) => objectValue(part, "text"))
+		.filter((partText): partText is string => typeof partText === "string")
+		.join("\n")
+		.trim();
 
-  if (!text) {
-    throw new Error("Gemini response did not include text content.");
-  }
+	if (!text) {
+		throw new Error("Gemini response did not include text content.");
+	}
 
-  return text;
+	return text;
 }
 
-export function extractGeminiUsage(
-  response: unknown,
-): DiagramGenerationUsage | undefined {
-  const usageMetadata = objectValue(response, "usageMetadata");
+export function extractGeminiUsage(response: unknown): DiagramGenerationUsage | undefined {
+	const usageMetadata = objectValue(response, "usageMetadata");
 
-  if (!isUnknownRecord(usageMetadata)) {
-    return undefined;
-  }
+	if (!isUnknownRecord(usageMetadata)) {
+		return undefined;
+	}
 
-  const inputTokens = numberUsage(usageMetadata["promptTokenCount"]);
-  const outputTokens = numberUsage(usageMetadata["candidatesTokenCount"]);
-  const totalTokens = numberUsage(usageMetadata["totalTokenCount"]);
-  const usage: DiagramGenerationUsage = {};
+	const inputTokens = numberUsage(usageMetadata["promptTokenCount"]);
+	const outputTokens = numberUsage(usageMetadata["candidatesTokenCount"]);
+	const totalTokens = numberUsage(usageMetadata["totalTokenCount"]);
+	const usage: DiagramGenerationUsage = {};
 
-  if (inputTokens !== undefined) {
-    usage.inputTokens = inputTokens;
-  }
+	if (inputTokens !== undefined) {
+		usage.inputTokens = inputTokens;
+	}
 
-  if (outputTokens !== undefined) {
-    usage.outputTokens = outputTokens;
-  }
+	if (outputTokens !== undefined) {
+		usage.outputTokens = outputTokens;
+	}
 
-  if (totalTokens !== undefined) {
-    usage.totalTokens = totalTokens;
-  }
+	if (totalTokens !== undefined) {
+		usage.totalTokens = totalTokens;
+	}
 
-  return Object.keys(usage).length > 0 ? usage : undefined;
+	return Object.keys(usage).length > 0 ? usage : undefined;
 }
 
-export function extractGeminiFinishReason(
-  response: unknown,
-): string | undefined {
-  const candidates = objectValue(response, "candidates");
-  const firstCandidate = Array.isArray(candidates) ? candidates[0] : undefined;
-  const finishReason = objectValue(firstCandidate, "finishReason");
-  return typeof finishReason === "string" ? finishReason : undefined;
+export function extractGeminiFinishReason(response: unknown): string | undefined {
+	const candidates = objectValue(response, "candidates");
+	const firstCandidate = Array.isArray(candidates) ? candidates[0] : undefined;
+	const finishReason = objectValue(firstCandidate, "finishReason");
+	return typeof finishReason === "string" ? finishReason : undefined;
 }

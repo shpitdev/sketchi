@@ -4,12 +4,12 @@ import { MarketingHome } from "./marketing-home";
 import "../../styles/app.css";
 
 const meta = {
-  title: "Web/Components/MarketingHome",
-  component: MarketingHome,
-  parameters: {
-    layout: "fullscreen",
-  },
-  tags: ["test"],
+	title: "Web/Components/MarketingHome",
+	component: MarketingHome,
+	parameters: {
+		layout: "fullscreen",
+	},
+	tags: ["test"],
 } satisfies Meta<typeof MarketingHome>;
 
 export default meta;

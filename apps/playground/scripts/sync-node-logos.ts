@@ -6,7 +6,7 @@ import { dirname, resolve } from "node:path";
 // The server's icon catalog reads them back through the ASSETS binding.
 const appRoot = resolve(import.meta.dirname, "..");
 const catalogRoot = dirname(
-  createRequire(import.meta.url).resolve("@sketchi/icon-catalog/package.json"),
+	createRequire(import.meta.url).resolve("@sketchi/icon-catalog/package.json"),
 );
 const target = resolve(appRoot, "public/node-logos");
 

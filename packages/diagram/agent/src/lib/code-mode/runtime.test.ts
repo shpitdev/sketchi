@@ -2,3412 +2,3266 @@ import { describe, expect, it } from "vitest";
 import { Context, Effect, Schema, Result } from "effect";
 
 import {
-  CANVAS_LIMITS,
-  type CanvasSpec,
-  type CanvasShapeElement,
-  FLOWCHART_MAX_EDGES,
-  FLOWCHART_MAX_ISSUES,
-  FLOWCHART_MAX_NODES,
-  FlowchartDiagramSchema,
-  SKETCHI_DIAGRAM_STYLE,
-  getFlowchartValidationIssues,
+	CANVAS_LIMITS,
+	type CanvasSpec,
+	type CanvasShapeElement,
+	FLOWCHART_MAX_EDGES,
+	FLOWCHART_MAX_ISSUES,
+	FLOWCHART_MAX_NODES,
+	FlowchartDiagramSchema,
+	SKETCHI_DIAGRAM_STYLE,
+	getFlowchartValidationIssues,
 } from "@sketchi/diagram-core";
 import {
-  CodeModeArtifactStorageError,
-  CodeModeArtifactStorage,
-  makeMemoryArtifactStorage,
-  makeObjectBucketArtifactStorage,
-  type CodeModeArtifactStorageShape,
-  type CodeModeObjectBucket,
-  type CodeModeObjectBucketObject,
+	CodeModeArtifactStorageError,
+	CodeModeArtifactStorage,
+	makeMemoryArtifactStorage,
+	makeObjectBucketArtifactStorage,
+	type CodeModeArtifactStorageShape,
+	type CodeModeObjectBucket,
+	type CodeModeObjectBucketObject,
 } from "./artifacts";
 import {
-  CanvasSpecSchema,
-  CreateCanvasRequestSchema,
-  toCodeModeJsonSchema,
-  RenderedDiagramSceneSchema,
-  type ApplyDiagramPatchResult,
-  type ArtifactFormat,
-  type BuildFlowchartResult,
-  type CreateCanvasResult,
-  type GetArtifactResult,
+	CanvasSpecSchema,
+	CreateCanvasRequestSchema,
+	toCodeModeJsonSchema,
+	RenderedDiagramSceneSchema,
+	type ApplyDiagramPatchResult,
+	type ArtifactFormat,
+	type BuildFlowchartResult,
+	type CreateCanvasResult,
+	type GetArtifactResult,
 } from "./contract";
 import {
-  applyDiagramPatch,
-  buildFlowchart,
-  buildMindmap,
-  buildSequenceDiagram,
-  CodeModeRuntimeEnvironment,
-  CodeModeArtifactRenderFailed,
-  createCanvas,
-  getArtifact,
-  type CodeModeRuntimeOptions,
+	applyDiagramPatch,
+	buildFlowchart,
+	buildMindmap,
+	buildSequenceDiagram,
+	CodeModeRuntimeEnvironment,
+	CodeModeArtifactRenderFailed,
+	createCanvas,
+	getArtifact,
+	type CodeModeRuntimeOptions,
 } from "./runtime";
 
 function makeTestRuntime(
-  options: CodeModeRuntimeOptions & {
-    readonly store?: CodeModeArtifactStorageShape;
-  } = {},
+	options: CodeModeRuntimeOptions & {
+		readonly store?: CodeModeArtifactStorageShape;
+	} = {},
 ) {
-  const storage = options.store ?? makeMemoryArtifactStorage();
-  const environment: Context.Service.Shape<typeof CodeModeRuntimeEnvironment> =
-    {
-      createId: options.createId ?? ((prefix) => `${prefix}-test`),
-      ...(options.renderer ? { renderer: options.renderer } : {}),
-      ...(options.artifactUrl ? { artifactUrl: options.artifactUrl } : {}),
-    };
-  const run = <A>(
-    program: Effect.Effect<
-      A,
-      never,
-      CodeModeArtifactStorage | CodeModeRuntimeEnvironment
-    >,
-  ) =>
-    Effect.runPromise(
-      program.pipe(
-        Effect.provideService(CodeModeArtifactStorage, storage),
-        Effect.provideService(CodeModeRuntimeEnvironment, environment),
-      ),
-    );
+	const storage = options.store ?? makeMemoryArtifactStorage();
+	const environment: Context.Service.Shape<typeof CodeModeRuntimeEnvironment> = {
+		createId: options.createId ?? ((prefix) => `${prefix}-test`),
+		...(options.renderer ? { renderer: options.renderer } : {}),
+		...(options.artifactUrl ? { artifactUrl: options.artifactUrl } : {}),
+	};
+	const run = <A>(
+		program: Effect.Effect<A, never, CodeModeArtifactStorage | CodeModeRuntimeEnvironment>,
+	) =>
+		Effect.runPromise(
+			program.pipe(
+				Effect.provideService(CodeModeArtifactStorage, storage),
+				Effect.provideService(CodeModeRuntimeEnvironment, environment),
+			),
+		);
 
-  return {
-    applyDiagramPatch: (input: unknown) => run(applyDiagramPatch(input)),
-    buildFlowchart: (input: unknown) => run(buildFlowchart(input)),
-    buildMindmap: (input: unknown) => run(buildMindmap(input)),
-    buildSequenceDiagram: (input: unknown) => run(buildSequenceDiagram(input)),
-    createCanvas: (input: unknown) => run(createCanvas(input)),
-    getArtifact: (input: unknown) => run(getArtifact(input)),
-  };
+	return {
+		applyDiagramPatch: (input: unknown) => run(applyDiagramPatch(input)),
+		buildFlowchart: (input: unknown) => run(buildFlowchart(input)),
+		buildMindmap: (input: unknown) => run(buildMindmap(input)),
+		buildSequenceDiagram: (input: unknown) => run(buildSequenceDiagram(input)),
+		createCanvas: (input: unknown) => run(createCanvas(input)),
+		getArtifact: (input: unknown) => run(getArtifact(input)),
+	};
 }
 
 function createTestRuntime() {
-  let id = 0;
-  return makeTestRuntime({
-    store: makeMemoryArtifactStorage(),
-    createId: (prefix) => `${prefix}-${(id += 1)}`,
-  });
+	let id = 0;
+	return makeTestRuntime({
+		store: makeMemoryArtifactStorage(),
+		createId: (prefix) => `${prefix}-${(id += 1)}`,
+	});
 }
 
 function approvalSpec() {
-  return {
-    title: "Simple approval flow",
-    nodes: [
-      { id: "request", label: "Request arrives", kind: "start" },
-      { id: "approve", label: "Approved?", kind: "decision" },
-      { id: "done", label: "Done", kind: "end" },
-      { id: "revise", label: "Revise", kind: "end" },
-    ],
-    edges: [
-      { source: "request", target: "approve" },
-      { source: "approve", target: "done", label: "yes" },
-      { source: "approve", target: "revise", label: "no" },
-    ],
-    layout: { direction: "TB" },
-  };
+	return {
+		title: "Simple approval flow",
+		nodes: [
+			{ id: "request", label: "Request arrives", kind: "start" },
+			{ id: "approve", label: "Approved?", kind: "decision" },
+			{ id: "done", label: "Done", kind: "end" },
+			{ id: "revise", label: "Revise", kind: "end" },
+		],
+		edges: [
+			{ source: "request", target: "approve" },
+			{ source: "approve", target: "done", label: "yes" },
+			{ source: "approve", target: "revise", label: "no" },
+		],
+		layout: { direction: "TB" },
+	};
 }
 
 function checkoutSequenceSpec() {
-  return {
-    title: "Checkout sequence",
-    participants: [
-      { id: "customer", label: "Customer" },
-      { id: "store", label: "Store" },
-      { id: "payments", label: "Payments" },
-    ],
-    messages: [
-      { source: "customer", target: "store", label: "Checkout" },
-      { source: "store", target: "payments", label: "Authorize" },
-      {
-        source: "payments",
-        target: "customer",
-        label: "Approved",
-        type: "return",
-      },
-    ],
-  };
+	return {
+		title: "Checkout sequence",
+		participants: [
+			{ id: "customer", label: "Customer" },
+			{ id: "store", label: "Store" },
+			{ id: "payments", label: "Payments" },
+		],
+		messages: [
+			{ source: "customer", target: "store", label: "Checkout" },
+			{ source: "store", target: "payments", label: "Authorize" },
+			{
+				source: "payments",
+				target: "customer",
+				label: "Approved",
+				type: "return",
+			},
+		],
+	};
 }
 
 function crossingSequenceSpec() {
-  return {
-    title: "Crossing sequence",
-    participants: [
-      { id: "a", label: "A" },
-      { id: "b", label: "B" },
-      { id: "c", label: "C" },
-    ],
-    messages: [{ source: "a", target: "c", label: "Cross B" }],
-  };
+	return {
+		title: "Crossing sequence",
+		participants: [
+			{ id: "a", label: "A" },
+			{ id: "b", label: "B" },
+			{ id: "c", label: "C" },
+		],
+		messages: [{ source: "a", target: "c", label: "Cross B" }],
+	};
 }
 
-function spoofedInlineLifelineScene(options: {
-  readonly useLifelineId: boolean;
-}) {
-  const middleNodeId = options.useLifelineId ? "middle:lifeline" : "middle";
-  return {
-    kind: "canvas",
-    version: 1,
-    diagramId: "spoofed-inline-lifeline",
-    title: "Spoofed inline lifeline",
-    width: 440,
-    height: 180,
-    accentColor: "#0f766e",
-    backgroundColor: "#ffffff",
-    elements: [
-      {
-        type: "arrow",
-        id: "edge:start-end",
-        edgeId: "start-end",
-        sourceNodeId: "start",
-        targetNodeId: "end",
-        points: [
-          { x: 120, y: 90 },
-          { x: 320, y: 90 },
-        ],
-      },
-      {
-        type: "node",
-        id: "node:start",
-        nodeId: "start",
-        shape: "rectangle",
-        x: 20,
-        y: 60,
-        width: 100,
-        height: 60,
-        label: "Start",
-      },
-      ...(options.useLifelineId
-        ? [
-            {
-              type: "node",
-              id: "node:middle",
-              nodeId: "middle",
-              shape: "rectangle",
-              x: 130,
-              y: -60,
-              width: 180,
-              height: 72,
-              label: "Middle header",
-            },
-          ]
-        : []),
-      {
-        type: "node",
-        id: `node:${middleNodeId}`,
-        nodeId: middleNodeId,
-        rendererRole: "sequence-lifeline",
-        shape: "rectangle",
-        x: 170,
-        y: 60,
-        width: 100,
-        height: 60,
-        label: "Middle",
-      },
-      {
-        type: "node",
-        id: "node:end",
-        nodeId: "end",
-        shape: "rectangle",
-        x: 320,
-        y: 60,
-        width: 100,
-        height: 60,
-        label: "End",
-      },
-    ],
-    layers: [],
-    layouts: [],
-    zOrder: [
-      "edge:start-end",
-      "node:start",
-      ...(options.useLifelineId ? ["node:middle"] : []),
-      `node:${middleNodeId}`,
-      "node:end",
-    ],
-  };
+function spoofedInlineLifelineScene(options: { readonly useLifelineId: boolean }) {
+	const middleNodeId = options.useLifelineId ? "middle:lifeline" : "middle";
+	return {
+		kind: "canvas",
+		version: 1,
+		diagramId: "spoofed-inline-lifeline",
+		title: "Spoofed inline lifeline",
+		width: 440,
+		height: 180,
+		accentColor: "#0f766e",
+		backgroundColor: "#ffffff",
+		elements: [
+			{
+				type: "arrow",
+				id: "edge:start-end",
+				edgeId: "start-end",
+				sourceNodeId: "start",
+				targetNodeId: "end",
+				points: [
+					{ x: 120, y: 90 },
+					{ x: 320, y: 90 },
+				],
+			},
+			{
+				type: "node",
+				id: "node:start",
+				nodeId: "start",
+				shape: "rectangle",
+				x: 20,
+				y: 60,
+				width: 100,
+				height: 60,
+				label: "Start",
+			},
+			...(options.useLifelineId
+				? [
+						{
+							type: "node",
+							id: "node:middle",
+							nodeId: "middle",
+							shape: "rectangle",
+							x: 130,
+							y: -60,
+							width: 180,
+							height: 72,
+							label: "Middle header",
+						},
+					]
+				: []),
+			{
+				type: "node",
+				id: `node:${middleNodeId}`,
+				nodeId: middleNodeId,
+				rendererRole: "sequence-lifeline",
+				shape: "rectangle",
+				x: 170,
+				y: 60,
+				width: 100,
+				height: 60,
+				label: "Middle",
+			},
+			{
+				type: "node",
+				id: "node:end",
+				nodeId: "end",
+				shape: "rectangle",
+				x: 320,
+				y: 60,
+				width: 100,
+				height: 60,
+				label: "End",
+			},
+		],
+		layers: [],
+		layouts: [],
+		zOrder: [
+			"edge:start-end",
+			"node:start",
+			...(options.useLifelineId ? ["node:middle"] : []),
+			`node:${middleNodeId}`,
+			"node:end",
+		],
+	};
 }
 
 function linearFlowchartSpec(nodeCount: number) {
-  const nodes = Array.from({ length: nodeCount }, (_, index) => ({
-    id: `node-${index}`,
-    label: `Concrete operation ${index}`,
-    kind: index === 0 ? "start" : index === nodeCount - 1 ? "end" : "process",
-  }));
-  return {
-    title: `Linear flow with ${nodeCount} nodes`,
-    nodes,
-    edges: nodes.slice(0, -1).map((node, index) => ({
-      source: node.id,
-      target: nodes[index + 1]?.id,
-    })),
-  };
+	const nodes = Array.from({ length: nodeCount }, (_, index) => ({
+		id: `node-${index}`,
+		label: `Concrete operation ${index}`,
+		kind: index === 0 ? "start" : index === nodeCount - 1 ? "end" : "process",
+	}));
+	return {
+		title: `Linear flow with ${nodeCount} nodes`,
+		nodes,
+		edges: nodes.slice(0, -1).map((node, index) => ({
+			source: node.id,
+			target: nodes[index + 1]?.id,
+		})),
+	};
 }
 
 function denseAcyclicFlowchartSpec(edgeCount: number) {
-  const spec = linearFlowchartSpec(FLOWCHART_MAX_NODES);
-  const chainKeys = new Set(
-    spec.edges.map((edge) => `${edge.source}->${edge.target}`),
-  );
-  const extraEdges = spec.nodes.flatMap((source, sourceIndex) =>
-    spec.nodes.slice(sourceIndex + 1).flatMap((target, targetOffset) => {
-      const key = `${source.id}->${target.id}`;
-      return chainKeys.has(key)
-        ? []
-        : [
-            {
-              source: source.id,
-              target: target.id,
-              id: `extra-${sourceIndex}-${sourceIndex + targetOffset + 1}`,
-            },
-          ];
-    }),
-  );
-  return {
-    ...spec,
-    edges: [...spec.edges, ...extraEdges].slice(0, edgeCount),
-  };
+	const spec = linearFlowchartSpec(FLOWCHART_MAX_NODES);
+	const chainKeys = new Set(spec.edges.map((edge) => `${edge.source}->${edge.target}`));
+	const extraEdges = spec.nodes.flatMap((source, sourceIndex) =>
+		spec.nodes.slice(sourceIndex + 1).flatMap((target, targetOffset) => {
+			const key = `${source.id}->${target.id}`;
+			return chainKeys.has(key)
+				? []
+				: [
+						{
+							source: source.id,
+							target: target.id,
+							id: `extra-${sourceIndex}-${sourceIndex + targetOffset + 1}`,
+						},
+					];
+		}),
+	);
+	return {
+		...spec,
+		edges: [...spec.edges, ...extraEdges].slice(0, edgeCount),
+	};
 }
 
 function whitespaceFlowchartCases(): Array<{
-  name: string;
-  path: string;
-  spec: unknown;
+	name: string;
+	path: string;
+	spec: unknown;
 }> {
-  const base = linearFlowchartSpec(3);
-  const processNodeId = base.nodes[1]?.id ?? "node-1";
-  return [
-    {
-      name: "title",
-      path: "spec.title",
-      spec: { ...base, title: "   " },
-    },
-    {
-      name: "node label",
-      path: "spec.nodes.[1].label",
-      spec: {
-        ...base,
-        nodes: base.nodes.map((node, index) =>
-          index === 1 ? { ...node, label: "   " } : node,
-        ),
-      },
-    },
-    {
-      name: "node id",
-      path: "spec.nodes.[1].id",
-      spec: {
-        ...base,
-        nodes: base.nodes.map((node, index) =>
-          index === 1 ? { ...node, id: "   " } : node,
-        ),
-        edges: base.edges.map((edge) => ({
-          ...edge,
-          source: edge.source === processNodeId ? "   " : edge.source,
-          target: edge.target === processNodeId ? "   " : edge.target,
-        })),
-      },
-    },
-    {
-      name: "optional node description",
-      path: "spec.nodes.[1].description",
-      spec: {
-        ...base,
-        nodes: base.nodes.map((node, index) =>
-          index === 1 ? { ...node, description: "   " } : node,
-        ),
-      },
-    },
-  ];
+	const base = linearFlowchartSpec(3);
+	const processNodeId = base.nodes[1]?.id ?? "node-1";
+	return [
+		{
+			name: "title",
+			path: "spec.title",
+			spec: { ...base, title: "   " },
+		},
+		{
+			name: "node label",
+			path: "spec.nodes.[1].label",
+			spec: {
+				...base,
+				nodes: base.nodes.map((node, index) => (index === 1 ? { ...node, label: "   " } : node)),
+			},
+		},
+		{
+			name: "node id",
+			path: "spec.nodes.[1].id",
+			spec: {
+				...base,
+				nodes: base.nodes.map((node, index) => (index === 1 ? { ...node, id: "   " } : node)),
+				edges: base.edges.map((edge) => ({
+					...edge,
+					source: edge.source === processNodeId ? "   " : edge.source,
+					target: edge.target === processNodeId ? "   " : edge.target,
+				})),
+			},
+		},
+		{
+			name: "optional node description",
+			path: "spec.nodes.[1].description",
+			spec: {
+				...base,
+				nodes: base.nodes.map((node, index) =>
+					index === 1 ? { ...node, description: "   " } : node,
+				),
+			},
+		},
+	];
 }
 
 function canonicalCodesForSpec(spec: ReturnType<typeof approvalSpec>) {
-  const diagram = Schema.decodeUnknownSync(FlowchartDiagramSchema, {
-    errors: "all",
-  })({
-    id: "canonical-parity",
-    title: spec.title,
-    type: "flowchart",
-    nodes: spec.nodes,
-    edges: spec.edges.map((edge, index) => ({
-      ...edge,
-      id: `edge-${index + 1}`,
-    })),
-  });
-  return getFlowchartValidationIssues(diagram).map((issue) => issue.code);
+	const diagram = Schema.decodeUnknownSync(FlowchartDiagramSchema, {
+		errors: "all",
+	})({
+		id: "canonical-parity",
+		title: spec.title,
+		type: "flowchart",
+		nodes: spec.nodes,
+		edges: spec.edges.map((edge, index) => ({
+			...edge,
+			id: `edge-${index + 1}`,
+		})),
+	});
+	return getFlowchartValidationIssues(diagram).map((issue) => issue.code);
 }
 
 function incidentEscalationOpsSpec() {
-  return {
-    id: "incident-escalation-ops",
-    title: "Incident Escalation & Operations Response",
-    nodes: [
-      { id: "alert_received", label: "Alert Received", kind: "start" },
-      { id: "triage", label: "Triage & Deduplicate", kind: "process" },
-      { id: "is_actionable", label: "Actionable Signal?", kind: "decision" },
-      { id: "auto_close", label: "Auto-Close / Suppress", kind: "end" },
-      { id: "severity", label: "Assess Severity", kind: "decision" },
-      { id: "sev1_page", label: "Page On-Call (SEV1)", kind: "process" },
-      { id: "sev2_assign", label: "Assign Owner (SEV2)", kind: "process" },
-      { id: "sev3_queue", label: "Queue Backlog (SEV3)", kind: "process" },
-      { id: "incident_bridge", label: "Open Incident Bridge", kind: "process" },
-      { id: "investigate", label: "Investigate Root Cause", kind: "process" },
-      { id: "mitigated", label: "Mitigated?", kind: "decision" },
-      { id: "reassess", label: "Reassess Severity", kind: "process" },
-      { id: "comms", label: "Notify Stakeholders", kind: "process" },
-      { id: "monitor", label: "Stable After Monitoring?", kind: "decision" },
-      { id: "postmortem", label: "Write Postmortem", kind: "process" },
-      { id: "resolved", label: "Incident Resolved", kind: "end" },
-    ],
-    edges: [
-      { source: "alert_received", target: "triage" },
-      { source: "triage", target: "is_actionable" },
-      { source: "is_actionable", target: "auto_close", label: "no" },
-      { source: "is_actionable", target: "severity", label: "yes" },
-      { source: "severity", target: "sev1_page", label: "SEV1" },
-      { source: "severity", target: "sev2_assign", label: "SEV2" },
-      { source: "severity", target: "sev3_queue", label: "SEV3" },
-      { source: "sev1_page", target: "incident_bridge" },
-      { source: "sev2_assign", target: "incident_bridge" },
-      { source: "incident_bridge", target: "investigate" },
-      { source: "sev3_queue", target: "investigate" },
-      { source: "investigate", target: "mitigated" },
-      { source: "mitigated", target: "comms", label: "yes" },
-      { source: "mitigated", target: "reassess", label: "no" },
-      { source: "reassess", target: "severity", label: "re-triage" },
-      { source: "comms", target: "monitor" },
-      { source: "monitor", target: "postmortem", label: "stable" },
-      { source: "monitor", target: "investigate", label: "regressed" },
-      { source: "postmortem", target: "resolved" },
-    ],
-    layout: { direction: "TB" },
-  };
+	return {
+		id: "incident-escalation-ops",
+		title: "Incident Escalation & Operations Response",
+		nodes: [
+			{ id: "alert_received", label: "Alert Received", kind: "start" },
+			{ id: "triage", label: "Triage & Deduplicate", kind: "process" },
+			{ id: "is_actionable", label: "Actionable Signal?", kind: "decision" },
+			{ id: "auto_close", label: "Auto-Close / Suppress", kind: "end" },
+			{ id: "severity", label: "Assess Severity", kind: "decision" },
+			{ id: "sev1_page", label: "Page On-Call (SEV1)", kind: "process" },
+			{ id: "sev2_assign", label: "Assign Owner (SEV2)", kind: "process" },
+			{ id: "sev3_queue", label: "Queue Backlog (SEV3)", kind: "process" },
+			{ id: "incident_bridge", label: "Open Incident Bridge", kind: "process" },
+			{ id: "investigate", label: "Investigate Root Cause", kind: "process" },
+			{ id: "mitigated", label: "Mitigated?", kind: "decision" },
+			{ id: "reassess", label: "Reassess Severity", kind: "process" },
+			{ id: "comms", label: "Notify Stakeholders", kind: "process" },
+			{ id: "monitor", label: "Stable After Monitoring?", kind: "decision" },
+			{ id: "postmortem", label: "Write Postmortem", kind: "process" },
+			{ id: "resolved", label: "Incident Resolved", kind: "end" },
+		],
+		edges: [
+			{ source: "alert_received", target: "triage" },
+			{ source: "triage", target: "is_actionable" },
+			{ source: "is_actionable", target: "auto_close", label: "no" },
+			{ source: "is_actionable", target: "severity", label: "yes" },
+			{ source: "severity", target: "sev1_page", label: "SEV1" },
+			{ source: "severity", target: "sev2_assign", label: "SEV2" },
+			{ source: "severity", target: "sev3_queue", label: "SEV3" },
+			{ source: "sev1_page", target: "incident_bridge" },
+			{ source: "sev2_assign", target: "incident_bridge" },
+			{ source: "incident_bridge", target: "investigate" },
+			{ source: "sev3_queue", target: "investigate" },
+			{ source: "investigate", target: "mitigated" },
+			{ source: "mitigated", target: "comms", label: "yes" },
+			{ source: "mitigated", target: "reassess", label: "no" },
+			{ source: "reassess", target: "severity", label: "re-triage" },
+			{ source: "comms", target: "monitor" },
+			{ source: "monitor", target: "postmortem", label: "stable" },
+			{ source: "monitor", target: "investigate", label: "regressed" },
+			{ source: "postmortem", target: "resolved" },
+		],
+		layout: { direction: "TB" },
+	};
 }
 
 function productionReleaseRollbackSpec() {
-  return {
-    id: "production-release-incident-response-rollback",
-    title: "Production Release Incident Response Rollback Flow",
-    nodes: [
-      { id: "start", label: "Start", kind: "start" },
-      { id: "ci_build", label: "CI Build", kind: "process" },
-      { id: "ci_gate", label: "CI Gate", kind: "decision" },
-      { id: "security_scan", label: "Security Scan", kind: "process" },
-      { id: "scan_gate", label: "Scan Gate", kind: "decision" },
-      { id: "vuln_gate", label: "Vuln Gate", kind: "decision" },
-      { id: "deploy_staging", label: "Deploy Staging", kind: "process" },
-      { id: "smoke_staging", label: "Smoke Staging", kind: "process" },
-      { id: "staging_gate", label: "Staging Gate", kind: "decision" },
-      { id: "fix_code", label: "Fix Code", kind: "process" },
-      { id: "canary_deploy", label: "Canary Deploy", kind: "process" },
-      { id: "canary_gate", label: "Canary Gate", kind: "decision" },
-      { id: "full_rollout", label: "Full Rollout", kind: "process" },
-      { id: "monitor", label: "Monitor", kind: "process" },
-      { id: "incident_gate", label: "Incident Gate", kind: "decision" },
-      { id: "severity_gate", label: "Severity Gate", kind: "decision" },
-      { id: "page_oncall", label: "Page Oncall", kind: "process" },
-      { id: "mitigate", label: "Mitigate", kind: "process" },
-      { id: "mitigation_gate", label: "Mitigation Gate", kind: "decision" },
-      { id: "rollback", label: "Rollback", kind: "process" },
-      { id: "rollback_gate", label: "Rollback Gate", kind: "decision" },
-      { id: "manual_recovery", label: "Manual Recovery", kind: "process" },
-      { id: "postmortem", label: "Postmortem", kind: "process" },
-      { id: "done", label: "Done", kind: "end" },
-    ],
-    edges: [
-      { source: "start", target: "ci_build", label: "trigger" },
-      { source: "ci_build", target: "ci_gate", label: "tests done" },
-      { source: "ci_gate", target: "security_scan", label: "green" },
-      { source: "ci_gate", target: "fix_code", label: "red" },
-      { source: "fix_code", target: "ci_build", label: "rebuild" },
-      { source: "security_scan", target: "scan_gate", label: "scan" },
-      { source: "scan_gate", target: "deploy_staging", label: "clean" },
-      { source: "scan_gate", target: "vuln_gate", label: "vulns" },
-      { source: "vuln_gate", target: "done", label: "abort" },
-      { source: "vuln_gate", target: "fix_code", label: "patch" },
-      { source: "deploy_staging", target: "smoke_staging", label: "deploy" },
-      { source: "smoke_staging", target: "staging_gate", label: "verify" },
-      { source: "staging_gate", target: "canary_deploy", label: "healthy" },
-      { source: "staging_gate", target: "fix_code", label: "failed" },
-      {
-        source: "canary_deploy",
-        target: "canary_gate",
-        label: "5 percent",
-      },
-      { source: "canary_gate", target: "full_rollout", label: "ok" },
-      { source: "canary_gate", target: "rollback", label: "regression" },
-      { source: "full_rollout", target: "monitor", label: "observe" },
-      { source: "monitor", target: "incident_gate", label: "signals" },
-      { source: "incident_gate", target: "done", label: "stable" },
-      { source: "incident_gate", target: "severity_gate", label: "incident" },
-      { source: "severity_gate", target: "page_oncall", label: "sev1" },
-      { source: "severity_gate", target: "mitigate", label: "low sev" },
-      { source: "page_oncall", target: "mitigate", label: "triage" },
-      { source: "mitigate", target: "mitigation_gate", label: "mitigate" },
-      { source: "mitigation_gate", target: "monitor", label: "worked" },
-      { source: "mitigation_gate", target: "rollback", label: "missed SLA" },
-      { source: "rollback", target: "rollback_gate", label: "rollback" },
-      { source: "rollback_gate", target: "postmortem", label: "restored" },
-      {
-        source: "rollback_gate",
-        target: "manual_recovery",
-        label: "still failing",
-      },
-      {
-        source: "manual_recovery",
-        target: "rollback_gate",
-        label: "re-verify",
-      },
-      { source: "postmortem", target: "done", label: "closed" },
-    ],
-    layout: { direction: "TB" },
-  };
+	return {
+		id: "production-release-incident-response-rollback",
+		title: "Production Release Incident Response Rollback Flow",
+		nodes: [
+			{ id: "start", label: "Start", kind: "start" },
+			{ id: "ci_build", label: "CI Build", kind: "process" },
+			{ id: "ci_gate", label: "CI Gate", kind: "decision" },
+			{ id: "security_scan", label: "Security Scan", kind: "process" },
+			{ id: "scan_gate", label: "Scan Gate", kind: "decision" },
+			{ id: "vuln_gate", label: "Vuln Gate", kind: "decision" },
+			{ id: "deploy_staging", label: "Deploy Staging", kind: "process" },
+			{ id: "smoke_staging", label: "Smoke Staging", kind: "process" },
+			{ id: "staging_gate", label: "Staging Gate", kind: "decision" },
+			{ id: "fix_code", label: "Fix Code", kind: "process" },
+			{ id: "canary_deploy", label: "Canary Deploy", kind: "process" },
+			{ id: "canary_gate", label: "Canary Gate", kind: "decision" },
+			{ id: "full_rollout", label: "Full Rollout", kind: "process" },
+			{ id: "monitor", label: "Monitor", kind: "process" },
+			{ id: "incident_gate", label: "Incident Gate", kind: "decision" },
+			{ id: "severity_gate", label: "Severity Gate", kind: "decision" },
+			{ id: "page_oncall", label: "Page Oncall", kind: "process" },
+			{ id: "mitigate", label: "Mitigate", kind: "process" },
+			{ id: "mitigation_gate", label: "Mitigation Gate", kind: "decision" },
+			{ id: "rollback", label: "Rollback", kind: "process" },
+			{ id: "rollback_gate", label: "Rollback Gate", kind: "decision" },
+			{ id: "manual_recovery", label: "Manual Recovery", kind: "process" },
+			{ id: "postmortem", label: "Postmortem", kind: "process" },
+			{ id: "done", label: "Done", kind: "end" },
+		],
+		edges: [
+			{ source: "start", target: "ci_build", label: "trigger" },
+			{ source: "ci_build", target: "ci_gate", label: "tests done" },
+			{ source: "ci_gate", target: "security_scan", label: "green" },
+			{ source: "ci_gate", target: "fix_code", label: "red" },
+			{ source: "fix_code", target: "ci_build", label: "rebuild" },
+			{ source: "security_scan", target: "scan_gate", label: "scan" },
+			{ source: "scan_gate", target: "deploy_staging", label: "clean" },
+			{ source: "scan_gate", target: "vuln_gate", label: "vulns" },
+			{ source: "vuln_gate", target: "done", label: "abort" },
+			{ source: "vuln_gate", target: "fix_code", label: "patch" },
+			{ source: "deploy_staging", target: "smoke_staging", label: "deploy" },
+			{ source: "smoke_staging", target: "staging_gate", label: "verify" },
+			{ source: "staging_gate", target: "canary_deploy", label: "healthy" },
+			{ source: "staging_gate", target: "fix_code", label: "failed" },
+			{
+				source: "canary_deploy",
+				target: "canary_gate",
+				label: "5 percent",
+			},
+			{ source: "canary_gate", target: "full_rollout", label: "ok" },
+			{ source: "canary_gate", target: "rollback", label: "regression" },
+			{ source: "full_rollout", target: "monitor", label: "observe" },
+			{ source: "monitor", target: "incident_gate", label: "signals" },
+			{ source: "incident_gate", target: "done", label: "stable" },
+			{ source: "incident_gate", target: "severity_gate", label: "incident" },
+			{ source: "severity_gate", target: "page_oncall", label: "sev1" },
+			{ source: "severity_gate", target: "mitigate", label: "low sev" },
+			{ source: "page_oncall", target: "mitigate", label: "triage" },
+			{ source: "mitigate", target: "mitigation_gate", label: "mitigate" },
+			{ source: "mitigation_gate", target: "monitor", label: "worked" },
+			{ source: "mitigation_gate", target: "rollback", label: "missed SLA" },
+			{ source: "rollback", target: "rollback_gate", label: "rollback" },
+			{ source: "rollback_gate", target: "postmortem", label: "restored" },
+			{
+				source: "rollback_gate",
+				target: "manual_recovery",
+				label: "still failing",
+			},
+			{
+				source: "manual_recovery",
+				target: "rollback_gate",
+				label: "re-verify",
+			},
+			{ source: "postmortem", target: "done", label: "closed" },
+		],
+		layout: { direction: "TB" },
+	};
 }
 
 function expectBuildOk(
-  result: BuildFlowchartResult,
+	result: BuildFlowchartResult,
 ): asserts result is Extract<BuildFlowchartResult, { ok: true }> {
-  if (!result.ok) {
-    throw new Error(`Expected build success: ${JSON.stringify(result.issues)}`);
-  }
-  expect(result.ok).toBe(true);
+	if (!result.ok) {
+		throw new Error(`Expected build success: ${JSON.stringify(result.issues)}`);
+	}
+	expect(result.ok).toBe(true);
 }
 
 function expectBuildFailure(
-  result: BuildFlowchartResult,
+	result: BuildFlowchartResult,
 ): asserts result is Extract<BuildFlowchartResult, { ok: false }> {
-  expect(result.ok).toBe(false);
-  if (result.ok) {
-    throw new Error("Expected build failure.");
-  }
+	expect(result.ok).toBe(false);
+	if (result.ok) {
+		throw new Error("Expected build failure.");
+	}
 }
 
 function expectCanvasOk(
-  result: CreateCanvasResult,
+	result: CreateCanvasResult,
 ): asserts result is Extract<CreateCanvasResult, { ok: true }> {
-  if (!result.ok) {
-    throw new Error(
-      `Expected canvas success: ${JSON.stringify(result.issues)}`,
-    );
-  }
-  expect(result.ok).toBe(true);
+	if (!result.ok) {
+		throw new Error(`Expected canvas success: ${JSON.stringify(result.issues)}`);
+	}
+	expect(result.ok).toBe(true);
 }
 
 function expectGetOk(
-  result: GetArtifactResult,
+	result: GetArtifactResult,
 ): asserts result is Extract<GetArtifactResult, { ok: true }> {
-  expect(result.ok).toBe(true);
-  if (!result.ok) {
-    throw new Error(`Expected get success: ${JSON.stringify(result.issues)}`);
-  }
+	expect(result.ok).toBe(true);
+	if (!result.ok) {
+		throw new Error(`Expected get success: ${JSON.stringify(result.issues)}`);
+	}
 }
 
 function expectPatchOk(
-  result: ApplyDiagramPatchResult,
+	result: ApplyDiagramPatchResult,
 ): asserts result is Extract<ApplyDiagramPatchResult, { ok: true }> {
-  if (!result.ok) {
-    throw new Error(`Expected patch success: ${JSON.stringify(result.issues)}`);
-  }
-  expect(result.ok).toBe(true);
+	if (!result.ok) {
+		throw new Error(`Expected patch success: ${JSON.stringify(result.issues)}`);
+	}
+	expect(result.ok).toBe(true);
 }
 
 function expectPatchFailure(
-  result: ApplyDiagramPatchResult,
+	result: ApplyDiagramPatchResult,
 ): asserts result is Extract<ApplyDiagramPatchResult, { ok: false }> {
-  expect(result.ok).toBe(false);
-  if (result.ok) {
-    throw new Error("Expected patch failure.");
-  }
+	expect(result.ok).toBe(false);
+	if (result.ok) {
+		throw new Error("Expected patch failure.");
+	}
 }
 
 function throwingStore(): CodeModeArtifactStorageShape {
-  const fail = (
-    operation: "read" | "readManifest" | "write",
-    message: string,
-  ) =>
-    Effect.fail(
-      new CodeModeArtifactStorageError({
-        cause: new Error(message),
-        message,
-        operation,
-      }),
-    );
-  return {
-    read: () => fail("read", "bucket read failed"),
-    readManifest: () => fail("readManifest", "manifest read failed"),
-    write: () => fail("write", "bucket write failed"),
-  };
+	const fail = (operation: "read" | "readManifest" | "write", message: string) =>
+		Effect.fail(
+			new CodeModeArtifactStorageError({
+				cause: new Error(message),
+				message,
+				operation,
+			}),
+		);
+	return {
+		read: () => fail("read", "bucket read failed"),
+		readManifest: () => fail("readManifest", "manifest read failed"),
+		write: () => fail("write", "bucket write failed"),
+	};
 }
 
 function parseInlineScene(value: unknown) {
-  return Schema.decodeUnknownSync(RenderedDiagramSceneSchema, {
-    errors: "all",
-    reportInput: true,
-  })(value);
+	return Schema.decodeUnknownSync(RenderedDiagramSceneSchema, {
+		errors: "all",
+		reportInput: true,
+	})(value);
 }
 
 class MemoryBucket implements CodeModeObjectBucket {
-  readonly objects = new Map<string, string | Uint8Array>();
+	readonly objects = new Map<string, string | Uint8Array>();
 
-  async get(key: string): Promise<CodeModeObjectBucketObject | null> {
-    const value = this.objects.get(key);
-    if (!value) {
-      return null;
-    }
-    const bytes =
-      typeof value === "string" ? new TextEncoder().encode(value) : value;
-    return {
-      size: bytes.byteLength,
-      arrayBuffer: async () => toArrayBuffer(bytes),
-      text: async () =>
-        typeof value === "string" ? value : new TextDecoder().decode(value),
-    };
-  }
+	async get(key: string): Promise<CodeModeObjectBucketObject | null> {
+		const value = this.objects.get(key);
+		if (!value) {
+			return null;
+		}
+		const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
+		return {
+			size: bytes.byteLength,
+			arrayBuffer: async () => toArrayBuffer(bytes),
+			text: async () => (typeof value === "string" ? value : new TextDecoder().decode(value)),
+		};
+	}
 
-  async put(
-    key: string,
-    value: string | ArrayBuffer | Uint8Array,
-  ): Promise<unknown> {
-    this.objects.set(
-      key,
-      typeof value === "string" ? value : new Uint8Array(value),
-    );
-    return null;
-  }
+	async put(key: string, value: string | ArrayBuffer | Uint8Array): Promise<unknown> {
+		this.objects.set(key, typeof value === "string" ? value : new Uint8Array(value));
+		return null;
+	}
 }
 
 class FailingPngBucket extends MemoryBucket {
-  override async put(
-    key: string,
-    value: string | ArrayBuffer | Uint8Array,
-  ): Promise<unknown> {
-    if (key.endsWith("/png.png")) {
-      throw new Error("png write failed");
-    }
+	override async put(key: string, value: string | ArrayBuffer | Uint8Array): Promise<unknown> {
+		if (key.endsWith("/png.png")) {
+			throw new Error("png write failed");
+		}
 
-    return super.put(key, value);
-  }
+		return super.put(key, value);
+	}
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  const buffer = new ArrayBuffer(bytes.byteLength);
-  new Uint8Array(buffer).set(bytes);
-  return buffer;
+	const buffer = new ArrayBuffer(bytes.byteLength);
+	new Uint8Array(buffer).set(bytes);
+	return buffer;
 }
 
 describe("Code Mode runtime", () => {
-  it("normalizes accepted legacy builder styles to the Sketchi palette", async () => {
-    const legacyStyle = {
-      accentColor: "#7c3aed",
-      backgroundColor: "#ffffff",
-    };
-    const results = await Promise.all([
-      createTestRuntime().buildFlowchart({
-        spec: { ...approvalSpec(), style: legacyStyle },
-        options: { inlineArtifacts: ["scene"] },
-      }),
-      createTestRuntime().buildMindmap({
-        spec: {
-          title: "Legacy mindmap style",
-          root: { label: "Root", children: [{ label: "Child" }] },
-          style: legacyStyle,
-        },
-        options: { inlineArtifacts: ["scene"] },
-      }),
-      createTestRuntime().buildSequenceDiagram({
-        spec: { ...checkoutSequenceSpec(), style: legacyStyle },
-        options: { inlineArtifacts: ["scene"] },
-      }),
-    ]);
-
-    for (const result of results) {
-      expect(result).toMatchObject({
-        ok: true,
-        normalizedSpec: { style: SKETCHI_DIAGRAM_STYLE },
-      });
-      if (!result.ok) throw new Error("Expected accepted branded diagram.");
-      expect(
-        result.artifact.formats.find(({ format }) => format === "scene")
-          ?.inline,
-      ).toMatchObject({
-        accentColor: SKETCHI_DIAGRAM_STYLE.accentColor,
-        backgroundColor: SKETCHI_DIAGRAM_STYLE.backgroundColor,
-      });
-    }
-  });
-
-  it("builds a nested mindmap with deterministic hierarchy ids and exports", async () => {
-    const runtime = createTestRuntime();
-    const built = await runtime.buildMindmap({
-      requestId: "mindmap-request",
-      spec: {
-        title: "Launch strategy",
-        root: {
-          label: "Launch",
-          children: [
-            {
-              label: "Product",
-              children: [{ label: "Scope" }, { label: "Quality" }],
-            },
-            { label: "Go to market", children: [{ label: "Docs" }] },
-          ],
-        },
-      },
-    });
-    expect(built).toMatchObject({
-      ok: true,
-      status: "accepted",
-      requestId: "mindmap-request",
-      normalizedSpec: {
-        id: "launch-strategy",
-        root: {
-          id: "topic-0",
-          children: [
-            {
-              id: "topic-0-0",
-              children: [{ id: "topic-0-0-0" }, { id: "topic-0-0-1" }],
-            },
-            { id: "topic-0-1" },
-          ],
-        },
-      },
-    });
-    if (!built.ok) throw new Error("Expected accepted mindmap");
-    expect(built.artifact.formats.map((format) => format.format)).toEqual([
-      "excalidraw",
-      "scene",
-    ]);
-  });
-
-  it("returns typed mindmap hierarchy failures", async () => {
-    const result = await createTestRuntime().buildMindmap({
-      spec: { title: "Empty", root: { label: "Only root" } },
-    });
-    expect(result).toMatchObject({
-      ok: false,
-      status: "invalid_mindmap",
-      issues: [{ code: "disconnected_graph", stage: "mindmap" }],
-    });
-  });
-
-  it("preflights extreme mindmap depth before recursive schema decoding", async () => {
-    const root: { label: string; children?: unknown[] } = { label: "root" };
-    let current = root;
-    for (let depth = 0; depth < 2_000; depth += 1) {
-      const child: { label: string; children?: unknown[] } = {
-        label: `depth ${depth}`,
-      };
-      current.children = [child];
-      current = child;
-    }
-    const result = await createTestRuntime().buildMindmap({
-      spec: { title: "Deep", root },
-    });
-    expect(result).toMatchObject({
-      ok: false,
-      status: "invalid_mindmap",
-      issues: [{ code: "mindmap_too_deep", stage: "mindmap" }],
-    });
-  });
-
-  it("preflights overly wide mindmaps", async () => {
-    const result = await createTestRuntime().buildMindmap({
-      spec: {
-        title: "Wide",
-        root: {
-          label: "root",
-          children: Array.from({ length: 101 }, (_, index) => ({
-            label: `topic ${index}`,
-          })),
-        },
-      },
-    });
-    expect(result).toMatchObject({
-      ok: false,
-      status: "invalid_mindmap",
-      issues: [{ code: "mindmap_too_large" }],
-    });
-  });
-
-  it("counts malformed child slots and keeps extreme-width failures bounded", async () => {
-    const result = await createTestRuntime().buildMindmap({
-      spec: {
-        title: "Malformed width",
-        root: {
-          label: "root",
-          children: Array.from({ length: 100_000 }, () => null),
-        },
-      },
-    });
-    expect(result).toMatchObject({
-      ok: false,
-      status: "invalid_mindmap",
-      issues: [{ code: "mindmap_too_large" }],
-    });
-    expect(result.issues).toHaveLength(1);
-    expect(JSON.stringify(result).length).toBeLessThan(2_000);
-  });
-
-  it("caps schema issue amplification for every Code Mode operation", async () => {
-    const result = await createTestRuntime().buildFlowchart({
-      spec: {
-        title: "Malformed",
-        nodes: Array.from({ length: 1_000 }, () => ({})),
-      },
-    });
-    expect(result).toMatchObject({ ok: false, status: "invalid_input" });
-    expect(result.issues).toHaveLength(21);
-    expect(result.issues.at(-1)?.message).toContain(
-      "additional input issues were omitted",
-    );
-  });
-
-  it.each([
-    [
-      "title",
-      { title: "  ", root: { label: "Root", children: [{ label: "Child" }] } },
-      "spec.title",
-    ],
-    [
-      "topic",
-      { title: "Valid", root: { label: "Root", children: [{ label: "''" }] } },
-      "spec.root.children.[0].label",
-    ],
-    [
-      "tool-cleaned topic",
-      {
-        title: "Valid",
-        root: { label: "Root", children: [{ label: " , title:" }] },
-      },
-      "spec.root.children.[0].label",
-    ],
-  ])(
-    "returns precise invalid_input paths for empty semantic %s strings",
-    async (_name, spec, path) => {
-      const result = await createTestRuntime().buildMindmap({ spec });
-      expect(result).toMatchObject({
-        ok: false,
-        status: "invalid_input",
-        issues: [{ stage: "input", ref: { path } }],
-      });
-    },
-  );
-
-  it("renders and exports right-to-left mindmaps", async () => {
-    const result = await createTestRuntime().buildMindmap({
-      spec: {
-        title: "RTL hierarchy",
-        layout: { direction: "RL" },
-        root: {
-          label: "Root",
-          children: [{ label: "Child", children: [{ label: "Leaf" }] }],
-        },
-      },
-      options: { inlineArtifacts: ["scene", "excalidraw"] },
-    });
-    expect(result).toMatchObject({
-      ok: true,
-      normalizedSpec: { layout: { direction: "RL" } },
-    });
-    if (!result.ok) throw new Error("Expected accepted RL mindmap");
-    const scene = parseInlineScene(
-      result.artifact.formats.find((format) => format.format === "scene")
-        ?.inline,
-    );
-    const nodes = scene.elements.filter((element) => element.type === "node");
-    const root = nodes.find((node) => node.nodeId === "topic-0");
-    const child = nodes.find((node) => node.nodeId === "topic-0-0");
-    expect(root?.x).toBeGreaterThan(child?.x ?? Number.POSITIVE_INFINITY);
-    expect(
-      result.artifact.formats.find((format) => format.format === "excalidraw")
-        ?.inline,
-    ).toBeDefined();
-  });
-
-  it("round-trips a persisted mindmap through getArtifact and patch retrieval", async () => {
-    const runtime = createTestRuntime();
-    const built = await runtime.buildMindmap({
-      spec: {
-        title: "Roadmap",
-        root: {
-          label: "Roadmap",
-          children: [{ label: "Now" }, { label: "Next" }],
-        },
-      },
-    });
-    if (!built.ok) throw new Error("Expected accepted mindmap");
-    const persisted = await runtime.getArtifact({
-      artifactId: built.artifact.artifactId,
-      format: "scene",
-      inline: true,
-    });
-    expect(persisted).toMatchObject({ ok: true, diagramId: "roadmap" });
-    const patched = await runtime.applyDiagramPatch({
-      source: { artifactId: built.artifact.artifactId },
-      operations: [
-        {
-          op: "replaceText",
-          selector: { nodeIds: ["topic-0-1"] },
-          text: "Later",
-        },
-      ],
-    });
-    if (!patched.ok) throw new Error("Expected accepted mindmap patch");
-    const retrieved = await runtime.getArtifact({
-      artifactId: patched.artifact.artifactId,
-      format: "scene",
-      inline: true,
-    });
-    expect(retrieved).toMatchObject({
-      ok: true,
-      provenance: { sourceArtifactId: built.artifact.artifactId },
-    });
-    expect(JSON.stringify(retrieved)).toContain("Later");
-  });
-  it("builds an accepted flowchart and retrieves stored formats", async () => {
-    const runtime = createTestRuntime();
-    const built = await runtime.buildFlowchart({
-      requestId: "request-1",
-      spec: approvalSpec(),
-    });
-
-    expectBuildOk(built);
-    expect(built.status).toBe("accepted");
-    expect(built.requestId).toBe("request-1");
-    expect(built.normalizedSpec.style).toEqual({
-      accentColor: "#8f707f",
-      backgroundColor: "#fffdf8",
-    });
-    expect(built.artifact.formats.map((format) => format.format)).toEqual([
-      "excalidraw",
-      "scene",
-    ]);
-
-    const inlineScene = built.artifact.formats.find(
-      (format) => format.format === "scene",
-    )?.inline;
-    expect(parseInlineScene(inlineScene).elements.length).toBeGreaterThan(0);
-
-    const excalidraw = await runtime.getArtifact({
-      artifactId: built.artifact.artifactId,
-      format: "excalidraw",
-    });
-
-    expectGetOk(excalidraw);
-    expect(excalidraw.mimeType).toBe("application/vnd.excalidraw+json");
-    expect(excalidraw).not.toHaveProperty("inline");
-
-    const inlineExcalidraw = await runtime.getArtifact({
-      artifactId: built.artifact.artifactId,
-      format: "excalidraw",
-      inline: true,
-    });
-
-    expectGetOk(inlineExcalidraw);
-    expect(inlineExcalidraw.inline).toMatchObject({
-      type: "excalidraw",
-      version: 2,
-      source: "https://sketchi.app",
-      appState: expect.any(Object),
-      elements: expect.any(Array),
-      files: {},
-    });
-  });
-
-  it("adds raw artifact URLs when the runtime is configured with a URL builder", async () => {
-    let id = 0;
-    const runtime = makeTestRuntime({
-      store: makeMemoryArtifactStorage(),
-      createId: (prefix) => `${prefix}-${(id += 1)}`,
-      artifactUrl: ({ artifactId, format }) =>
-        `https://studio.test/api/v1/artifacts/${artifactId}?format=${format}&raw=true`,
-    });
-
-    const built = await runtime.buildFlowchart({
-      spec: approvalSpec(),
-      options: {
-        artifactFormats: ["scene", "excalidraw"],
-        inlineArtifacts: ["scene"],
-      },
-    });
-
-    expectBuildOk(built);
-    expect(built.artifact.formats).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          format: "scene",
-          url: `https://studio.test/api/v1/artifacts/${built.artifact.artifactId}?format=scene&raw=true`,
-        }),
-        expect.objectContaining({
-          format: "excalidraw",
-          url: `https://studio.test/api/v1/artifacts/${built.artifact.artifactId}?format=excalidraw&raw=true`,
-        }),
-      ]),
-    );
-
-    const excalidraw = await runtime.getArtifact({
-      artifactId: built.artifact.artifactId,
-      format: "excalidraw",
-      inline: true,
-    });
-
-    expectGetOk(excalidraw);
-    expect(excalidraw).toMatchObject({
-      format: "excalidraw",
-      url: `https://studio.test/api/v1/artifacts/${built.artifact.artifactId}?format=excalidraw&raw=true`,
-      inline: {
-        type: "excalidraw",
-        version: 2,
-        files: {},
-      },
-    });
-  });
-
-  it("exports dense incident feedback flows without edge-through-node routes", async () => {
-    const runtime = createTestRuntime();
-    const built = await runtime.buildFlowchart({
-      spec: incidentEscalationOpsSpec(),
-      options: {
-        artifactFormats: ["scene", "excalidraw"],
-        inlineArtifacts: ["scene", "excalidraw"],
-      },
-    });
-
-    expectBuildOk(built);
-    expect(built.quality.summary).toEqual({ nodeCount: 16, edgeCount: 19 });
-    expect(built.artifact.formats.map((format) => format.format)).toEqual([
-      "scene",
-      "excalidraw",
-    ]);
-  });
-
-  it("exports production release rollback flows without dense route collisions", async () => {
-    const runtime = createTestRuntime();
-    const built = await runtime.buildFlowchart({
-      spec: productionReleaseRollbackSpec(),
-      options: {
-        artifactFormats: ["scene", "excalidraw"],
-        inlineArtifacts: ["scene", "excalidraw"],
-      },
-    });
-
-    expectBuildOk(built);
-    expect(built.quality.summary).toEqual({ nodeCount: 24, edgeCount: 32 });
-    expect(built.artifact.formats.map((format) => format.format)).toEqual([
-      "scene",
-      "excalidraw",
-    ]);
-  });
-
-  it("keeps missing start and end failures in parity with diagram-core", async () => {
-    const specs = [
-      {
-        expected: "missing_start",
-        spec: {
-          ...approvalSpec(),
-          nodes: approvalSpec().nodes.map((node) =>
-            node.kind === "start" ? { ...node, kind: "process" } : node,
-          ),
-        },
-      },
-      {
-        expected: "missing_end",
-        spec: {
-          ...approvalSpec(),
-          nodes: approvalSpec().nodes.map((node) =>
-            node.kind === "end" ? { ...node, kind: "process" } : node,
-          ),
-        },
-      },
-    ];
-
-    for (const { expected, spec } of specs) {
-      const canonicalCodes = canonicalCodesForSpec(spec);
-      const result = await createTestRuntime().buildFlowchart({ spec });
-      expectBuildFailure(result);
-      expect(result.status).toBe("invalid_flowchart");
-      expect(result.issues.map((issue) => issue.code)).toEqual(canonicalCodes);
-      expect(canonicalCodes).toContain(expected);
-    }
-  });
-
-  it.each(whitespaceFlowchartCases())(
-    "rejects whitespace-only $name after normalization as a bounded flowchart failure",
-    async ({ spec, path }) => {
-      const result = await createTestRuntime().buildFlowchart({ spec });
-      expectBuildFailure(result);
-
-      expect(result.status).toBe("invalid_flowchart");
-      expect(result.issues.length).toBeLessThanOrEqual(FLOWCHART_MAX_ISSUES);
-      expect(result.issues).toContainEqual(
-        expect.objectContaining({
-          stage: "flowchart",
-          ref: expect.objectContaining({ path }),
-        }),
-      );
-      expect(result.issues.map((entry) => entry.code)).not.toContain(
-        "render_failed",
-      );
-    },
-  );
-
-  it("caps normalized flowchart schema failures deterministically", async () => {
-    const base = linearFlowchartSpec(FLOWCHART_MAX_NODES);
-    const spec = {
-      ...base,
-      nodes: base.nodes.map((node) => ({ ...node, label: "   " })),
-    };
-    const first = await createTestRuntime().buildFlowchart({ spec });
-    const second = await createTestRuntime().buildFlowchart({ spec });
-    expectBuildFailure(first);
-    expectBuildFailure(second);
-
-    expect(first.status).toBe("invalid_flowchart");
-    expect(first.issues).toHaveLength(FLOWCHART_MAX_ISSUES);
-    expect(second.issues).toEqual(first.issues);
-  });
-
-  it("rejects a reachable closed cycle with typed nonterminating nodes", async () => {
-    const result = await createTestRuntime().buildFlowchart({
-      spec: {
-        title: "Closed retry cycle",
-        nodes: [
-          { id: "start", label: "Request arrives", kind: "start" },
-          { id: "route", label: "Ready?", kind: "decision" },
-          { id: "done", label: "Completed", kind: "end" },
-          { id: "retry-a", label: "Retry stage alpha", kind: "process" },
-          { id: "retry-b", label: "Retry stage beta", kind: "process" },
-        ],
-        edges: [
-          { source: "start", target: "route" },
-          { source: "route", target: "done", label: "yes" },
-          { source: "route", target: "retry-a", label: "retry" },
-          { source: "retry-a", target: "retry-b" },
-          { source: "retry-b", target: "retry-a" },
-        ],
-      },
-    });
-
-    expectBuildFailure(result);
-    expect(result.status).toBe("invalid_flowchart");
-    expect(
-      result.issues
-        .filter((issue) => issue.code === "nonterminating_node")
-        .map((issue) => issue.ref?.id),
-    ).toEqual(["retry-a", "retry-b"]);
-  });
-
-  it("accepts retry loops that retain an eventual exit", async () => {
-    const result = await createTestRuntime().buildFlowchart({
-      spec: {
-        title: "Retry with eventual exit",
-        nodes: [
-          { id: "start", label: "Start request", kind: "start" },
-          { id: "attempt", label: "Attempt operation", kind: "process" },
-          { id: "retry", label: "Succeeded?", kind: "decision" },
-          { id: "done", label: "Complete request", kind: "end" },
-        ],
-        edges: [
-          { source: "start", target: "attempt" },
-          { source: "attempt", target: "retry" },
-          { source: "retry", target: "attempt", label: "retry" },
-          { source: "retry", target: "done", label: "yes" },
-        ],
-      },
-    });
-
-    expectBuildOk(result);
-  });
-
-  it("rejects disconnected cycles from canonical start reachability", async () => {
-    const result = await createTestRuntime().buildFlowchart({
-      spec: {
-        title: "Disconnected graph",
-        nodes: [
-          { id: "start", label: "Start request", kind: "start" },
-          { id: "done", label: "Complete request", kind: "end" },
-          { id: "orphan-a", label: "Orphan alpha", kind: "process" },
-          { id: "orphan-b", label: "Orphan beta", kind: "process" },
-        ],
-        edges: [
-          { source: "start", target: "done" },
-          { source: "orphan-a", target: "orphan-b" },
-          { source: "orphan-b", target: "orphan-a" },
-        ],
-      },
-    });
-
-    expectBuildFailure(result);
-    expect(
-      result.issues
-        .filter((issue) => issue.code === "unreachable_node")
-        .map((issue) => issue.ref?.id),
-    ).toEqual(["orphan-a", "orphan-b"]);
-  });
-
-  it("rejects node and edge counts above the canonical limits", async () => {
-    for (const spec of [
-      linearFlowchartSpec(FLOWCHART_MAX_NODES + 1),
-      denseAcyclicFlowchartSpec(FLOWCHART_MAX_EDGES + 1),
-    ]) {
-      const result = await createTestRuntime().buildFlowchart({ spec });
-      expectBuildFailure(result);
-      expect(result.status).toBe("invalid_flowchart");
-      expect(result.issues).toContainEqual(
-        expect.objectContaining({ code: "flowchart_too_large" }),
-      );
-    }
-  });
-
-  it("fails semantic limits before rendering or persisting artifacts", async () => {
-    let renderCalls = 0;
-    let writeCalls = 0;
-    const store: CodeModeArtifactStorageShape = {
-      read: () => Effect.succeed(null),
-      readManifest: () => Effect.succeed(null),
-      write: () => {
-        writeCalls += 1;
-        return Effect.fail(
-          new CodeModeArtifactStorageError({
-            cause: new Error("invalid flowchart must not persist"),
-            message: "invalid flowchart must not persist",
-            operation: "write",
-          }),
-        );
-      },
-    };
-    const runtime = makeTestRuntime({
-      store,
-      renderer: {
-        renderPng: () =>
-          Effect.sync(() => {
-            renderCalls += 1;
-            return new Uint8Array([137, 80, 78, 71]);
-          }),
-      },
-    });
-    const result = await runtime.buildFlowchart({
-      spec: linearFlowchartSpec(FLOWCHART_MAX_NODES + 1),
-      options: { artifactFormats: ["png"] },
-    });
-
-    expectBuildFailure(result);
-    expect(result.status).toBe("invalid_flowchart");
-    expect(renderCalls).toBe(0);
-    expect(writeCalls).toBe(0);
-  });
-
-  it("caps canonical flowchart issue output deterministically", async () => {
-    const spec = {
-      title: "Bounded issue output",
-      nodes: [
-        { id: "start", label: "Start request", kind: "start" },
-        { id: "done", label: "Complete request", kind: "end" },
-        ...Array.from({ length: FLOWCHART_MAX_NODES - 2 }, (_, index) => ({
-          id: `orphan-${index}`,
-          label: `Orphan operation ${index}`,
-          kind: "process",
-        })),
-      ],
-      edges: [{ source: "start", target: "done" }],
-    };
-    const first = await createTestRuntime().buildFlowchart({ spec });
-    const second = await createTestRuntime().buildFlowchart({ spec });
-    expectBuildFailure(first);
-    expectBuildFailure(second);
-
-    expect(first.issues).toHaveLength(FLOWCHART_MAX_ISSUES);
-    expect(second.issues).toEqual(first.issues);
-  });
-
-  it("returns structured repair issues for invalid connectivity", async () => {
-    const runtime = createTestRuntime();
-    const built = await runtime.buildFlowchart({
-      spec: {
-        ...approvalSpec(),
-        edges: [{ source: "request", target: "approve" }],
-      },
-    });
-
-    expectBuildFailure(built);
-    expect(built.status).toBe("invalid_flowchart");
-    expect(built.issues).toContainEqual(
-      expect.objectContaining({
-        code: "underbranched_decision",
-        ref: expect.objectContaining({ id: "approve" }),
-      }),
-    );
-    expect(built.issues).toContainEqual(
-      expect.objectContaining({
-        code: "unreachable_node",
-        ref: expect.objectContaining({ id: "done" }),
-      }),
-    );
-  });
-
-  it("returns invalid input issues for malformed artifact requests", async () => {
-    const runtime = createTestRuntime();
-    const result = await runtime.getArtifact({
-      artifactId: "",
-      format: "svg",
-    });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) {
-      throw new Error("Expected get failure.");
-    }
-    expect(result.status).toBe("invalid_input");
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({ stage: "input" }),
-    );
-  });
-
-  it("reports PNG export failure when no hosted renderer is configured", async () => {
-    const runtime = createTestRuntime();
-    const result = await runtime.buildFlowchart({
-      spec: approvalSpec(),
-      options: { artifactFormats: ["png"] },
-    });
-
-    expectBuildFailure(result);
-    expect(result.status).toBe("export_failed");
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({
-        code: "render_failed",
-        message: "PNG artifact rendering is not configured for this runtime.",
-      }),
-    );
-  });
-
-  it("stores PNG artifacts through a configured renderer without inlining binary data", async () => {
-    let id = 0;
-    const runtime = makeTestRuntime({
-      store: makeMemoryArtifactStorage(),
-      createId: (prefix) => `${prefix}-${(id += 1)}`,
-      renderer: {
-        renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
-      },
-    });
-
-    const built = await runtime.buildFlowchart({
-      spec: approvalSpec(),
-      options: {
-        artifactFormats: ["scene", "png"],
-        inlineArtifacts: ["scene"],
-      },
-    });
-
-    expectBuildOk(built);
-    expect(built.artifact.formats).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          format: "scene",
-          inline: expect.any(Object),
-        }),
-        expect.objectContaining({
-          format: "png",
-          mimeType: "image/png",
-          sizeBytes: 4,
-        }),
-      ]),
-    );
-    expect(
-      built.artifact.formats.find((format) => format.format === "png"),
-    ).not.toHaveProperty("inline");
-
-    const png = await runtime.getArtifact({
-      artifactId: built.artifact.artifactId,
-      format: "png",
-    });
-
-    expectGetOk(png);
-    expect(png).toMatchObject({
-      format: "png",
-      mimeType: "image/png",
-      sizeBytes: 4,
-    });
-    expect(png).not.toHaveProperty("inline");
-
-    const explicitInlinePng = await runtime.getArtifact({
-      artifactId: built.artifact.artifactId,
-      format: "png",
-      inline: true,
-    });
-
-    expectGetOk(explicitInlinePng);
-    expect(explicitInlinePng).toMatchObject({
-      format: "png",
-      mimeType: "image/png",
-      sizeBytes: 4,
-    });
-    expect(explicitInlinePng).not.toHaveProperty("inline");
-  });
-
-  it("rejects raw Excalidraw patch sources at the request contract", async () => {
-    const runtime = createTestRuntime();
-    const result = await runtime.applyDiagramPatch({
-      source: { excalidraw: { appState: {}, elements: [] } },
-      operations: [{ op: "rerouteEdges" }],
-    });
-
-    expectPatchFailure(result);
-    expect(result.status).toBe("invalid_input");
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({
-        ref: expect.objectContaining({ path: "source" }),
-      }),
-    );
-  });
-
-  it("patches styling after the graph artifact is accepted", async () => {
-    const runtime = createTestRuntime();
-    const built = await runtime.buildFlowchart({ spec: approvalSpec() });
-    expectBuildOk(built);
-
-    const patched = await runtime.applyDiagramPatch({
-      source: { artifactId: built.artifact.artifactId },
-      intent:
-        "Make the approval decision purple after connectivity is accepted.",
-      operations: [
-        {
-          op: "setStyle",
-          selector: { nodeIds: ["approve"] },
-          style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" },
-        },
-        {
-          op: "setShape",
-          selector: { nodeIds: ["approve"] },
-          shape: "diamond",
-        },
-      ],
-    });
-
-    expectPatchOk(patched);
-    expect(patched.sourceArtifactId).toBe(built.artifact.artifactId);
-
-    const patchedScene = patched.artifact.formats.find(
-      (format) => format.format === "scene",
-    )?.inline;
-    const scene = parseInlineScene(patchedScene);
-    const approvalNode = scene.elements.find(
-      (element) => element.type === "node" && element.nodeId === "approve",
-    );
-
-    expect(approvalNode).toMatchObject({
-      shape: "diamond",
-      strokeColor: "#7c3aed",
-      fillColor: "#ede9fe",
-    });
-    expect(
-      scene.elements
-        .filter((element) => element.type === "arrow")
-        .map((arrow) => `${arrow.sourceNodeId}->${arrow.targetNodeId}`)
-        .sort(),
-    ).toEqual(["approve->done", "approve->revise", "request->approve"]);
-  });
-
-  it("renders PNG artifacts after patch operations when a renderer is configured", async () => {
-    let id = 0;
-    const runtime = makeTestRuntime({
-      store: makeMemoryArtifactStorage(),
-      createId: (prefix) => `${prefix}-${(id += 1)}`,
-      renderer: {
-        renderPng: ({ scene }) =>
-          Effect.succeed(
-            new Uint8Array([137, 80, 78, 71, scene.elements.length]),
-          ),
-      },
-    });
-    const built = await runtime.buildFlowchart({ spec: approvalSpec() });
-    expectBuildOk(built);
-
-    const patched = await runtime.applyDiagramPatch({
-      source: { artifactId: built.artifact.artifactId },
-      operations: [
-        {
-          op: "setShape",
-          selector: { nodeIds: ["approve"] },
-          shape: "diamond",
-        },
-      ],
-      options: {
-        artifactFormats: ["scene", "png"],
-        inlineArtifacts: ["scene"],
-      },
-    });
-
-    expectPatchOk(patched);
-    expect(patched.artifact.formats).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          format: "scene",
-          inline: expect.any(Object),
-        }),
-        expect.objectContaining({
-          format: "png",
-          mimeType: "image/png",
-          sizeBytes: 5,
-        }),
-      ]),
-    );
-    expect(
-      patched.artifact.formats.find((format) => format.format === "png"),
-    ).not.toHaveProperty("inline");
-  });
-
-  it("keeps patch provenance consistent across the result and later format retrieval", async () => {
-    let id = 0;
-    const runtime = makeTestRuntime({
-      store: makeMemoryArtifactStorage(),
-      createId: (prefix) => `${prefix}-${(id += 1)}`,
-      renderer: {
-        renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
-      },
-    });
-    const built = await runtime.buildFlowchart({ spec: approvalSpec() });
-    expectBuildOk(built);
-
-    expect(built.artifact).not.toHaveProperty("provenance");
-    const rootScene = await runtime.getArtifact({
-      artifactId: built.artifact.artifactId,
-      format: "scene",
-      inline: true,
-    });
-    expectGetOk(rootScene);
-    expect(rootScene).not.toHaveProperty("provenance");
-
-    const patched = await runtime.applyDiagramPatch({
-      source: { artifactId: built.artifact.artifactId },
-      operations: [
-        {
-          op: "setShape",
-          selector: { nodeIds: ["approve"] },
-          shape: "diamond",
-        },
-      ],
-      options: {
-        artifactFormats: ["scene", "excalidraw", "png"],
-        inlineArtifacts: ["scene"],
-      },
-    });
-    expectPatchOk(patched);
-
-    const provenance = {
-      sourceArtifactId: built.artifact.artifactId,
-    };
-    expect(patched.sourceArtifactId).toBe(provenance.sourceArtifactId);
-    expect(patched.artifact.provenance).toEqual(provenance);
-    if (!patched.artifact.provenance) {
-      throw new Error("Expected the patched artifact to include provenance.");
-    }
-    patched.artifact.provenance.sourceArtifactId = "artifact-mutated";
-
-    const formats: ArtifactFormat[] = ["scene", "excalidraw", "png"];
-    for (const format of formats) {
-      const retrieved = await runtime.getArtifact({
-        artifactId: patched.artifact.artifactId,
-        format,
-      });
-      expectGetOk(retrieved);
-      expect(retrieved.provenance).toEqual(provenance);
-    }
-  });
-
-  it("keeps scoped edge style patches from recoloring node labels", async () => {
-    const runtime = createTestRuntime();
-    const built = await runtime.buildFlowchart({ spec: approvalSpec() });
-    expectBuildOk(built);
-
-    const patched = await runtime.applyDiagramPatch({
-      source: { artifactId: built.artifact.artifactId },
-      operations: [
-        {
-          op: "setStyle",
-          selector: { scope: "edges" },
-          style: { strokeColor: "#7c3aed", textColor: "#7c3aed" },
-        },
-      ],
-    });
-
-    expectPatchOk(patched);
-    const scene = parseInlineScene(
-      patched.artifact.formats.find((format) => format.format === "scene")
-        ?.inline,
-    );
-
-    expect(
-      scene.elements
-        .filter((element) => element.type === "text")
-        .map((text) => text.textColor),
-    ).toEqual([undefined, undefined, undefined, undefined]);
-    expect(
-      scene.elements
-        .filter((element) => element.type === "arrow")
-        .map((arrow) => arrow.strokeColor),
-    ).toEqual(["#7c3aed", "#7c3aed", "#7c3aed"]);
-  });
-
-  it("rejects patch selectors that do not match the accepted artifact", async () => {
-    const runtime = createTestRuntime();
-    const built = await runtime.buildFlowchart({ spec: approvalSpec() });
-    expectBuildOk(built);
-
-    const patched = await runtime.applyDiagramPatch({
-      source: { artifactId: built.artifact.artifactId },
-      operations: [
-        {
-          op: "setStyle",
-          selector: { nodeIds: ["missing-node"] },
-          style: { strokeColor: "#7c3aed" },
-        },
-      ],
-    });
-
-    expectPatchFailure(patched);
-    expect(patched.status).toBe("target_not_found");
-    expect(patched.issues).toContainEqual(
-      expect.objectContaining({ code: "unknown_patch_target" }),
-    );
-  });
-
-  it("enumerates supported patch operations when the op name is invalid", async () => {
-    const runtime = createTestRuntime();
-    const built = await runtime.buildFlowchart({ spec: approvalSpec() });
-    expectBuildOk(built);
-
-    const patched = await runtime.applyDiagramPatch({
-      source: { artifactId: built.artifact.artifactId },
-      operations: [
-        {
-          op: "setText",
-          selector: { nodeIds: ["done"] },
-          text: "Ship to production",
-        },
-      ],
-    });
-
-    expectPatchFailure(patched);
-    expect(patched.status).toBe("invalid_input");
-    expect(patched.issues).toContainEqual(
-      expect.objectContaining({
-        code: "unsupported_patch_operation",
-        ref: { kind: "request", path: "operations.[0].op" },
-        hint: expect.stringContaining("replaceText"),
-      }),
-    );
-  });
-
-  it("uses replaceText to update accepted node labels", async () => {
-    const runtime = createTestRuntime();
-    const built = await runtime.buildFlowchart({ spec: approvalSpec() });
-    expectBuildOk(built);
-
-    const patched = await runtime.applyDiagramPatch({
-      source: { artifactId: built.artifact.artifactId },
-      operations: [
-        {
-          op: "replaceText",
-          selector: { nodeIds: ["done"] },
-          text: "Ship to production",
-        },
-      ],
-    });
-
-    expectPatchOk(patched);
-    const scene = parseInlineScene(
-      patched.artifact.formats.find((format) => format.format === "scene")
-        ?.inline,
-    );
-
-    expect(scene.elements).toContainEqual(
-      expect.objectContaining({
-        type: "node",
-        nodeId: "done",
-        label: "Ship to production",
-      }),
-    );
-    expect(scene.elements).toContainEqual(
-      expect.objectContaining({
-        type: "text",
-        containerId: expect.stringContaining("done"),
-        text: "Ship to production",
-      }),
-    );
-  });
-
-  it("returns structured storage failures when artifact reads throw", async () => {
-    const runtime = makeTestRuntime({
-      store: throwingStore(),
-      createId: (prefix) => `${prefix}-1`,
-    });
-
-    const artifact = await runtime.getArtifact({
-      artifactId: "artifact-1",
-      format: "scene",
-    });
-
-    expect(artifact.ok).toBe(false);
-    if (artifact.ok) {
-      throw new Error("Expected get failure.");
-    }
-    expect(artifact.status).toBe("storage_failed");
-    expect(artifact.issues).toContainEqual(
-      expect.objectContaining({
-        code: "storage_read_failed",
-        message: "manifest read failed",
-      }),
-    );
-
-    const patched = await runtime.applyDiagramPatch({
-      source: { artifactId: "artifact-1" },
-      operations: [{ op: "rerouteEdges" }],
-    });
-
-    expectPatchFailure(patched);
-    expect(patched.status).toBe("storage_failed");
-    expect(patched.issues).toContainEqual(
-      expect.objectContaining({
-        code: "storage_read_failed",
-        message: "manifest read failed",
-      }),
-    );
-  });
-
-  it("stores and retrieves artifacts through an object-bucket adapter", async () => {
-    const bucket = new MemoryBucket();
-    let id = 0;
-    const runtime = makeTestRuntime({
-      store: makeObjectBucketArtifactStorage(bucket, {
-        prefix: "codemode",
-      }),
-      createId: (prefix) => `${prefix}-${(id += 1)}`,
-    });
-
-    const built = await runtime.buildFlowchart({ spec: approvalSpec() });
-    expectBuildOk(built);
-
-    expect([...bucket.objects.keys()].sort()).toEqual([
-      "codemode/artifact-2/excalidraw.json",
-      "codemode/artifact-2/manifest.json",
-      "codemode/artifact-2/scene.json",
-    ]);
-
-    const scene = await runtime.getArtifact({
-      artifactId: built.artifact.artifactId,
-      format: "scene",
-      inline: true,
-    });
-
-    expectGetOk(scene);
-    expect(parseInlineScene(scene.inline).diagramId).toBe(
-      "simple-approval-flow",
-    );
-  });
-
-  it("rejects an object-store scene whose source manifest was not published", async () => {
-    const sourceRuntime = createTestRuntime();
-    const built = await sourceRuntime.buildFlowchart({ spec: approvalSpec() });
-    expectBuildOk(built);
-    const sourceScene = parseInlineScene(
-      built.artifact.formats.find((format) => format.format === "scene")
-        ?.inline,
-    );
-
-    const bucket = new MemoryBucket();
-    await bucket.put(
-      "codemode/artifact-partial/scene.json",
-      JSON.stringify(sourceScene),
-    );
-    let id = 0;
-    const runtime = makeTestRuntime({
-      store: makeObjectBucketArtifactStorage(bucket, { prefix: "codemode" }),
-      createId: (prefix) => `${prefix}-${(id += 1)}`,
-    });
-
-    const patched = await runtime.applyDiagramPatch({
-      source: { artifactId: "artifact-partial" },
-      operations: [{ op: "rerouteEdges" }],
-    });
-
-    expectPatchFailure(patched);
-    expect(patched.status).toBe("source_unavailable");
-    expect(patched.issues).toContainEqual(
-      expect.objectContaining({
-        code: "patch_source_unavailable",
-        message: expect.stringContaining("valid source manifest"),
-      }),
-    );
-    expect([...bucket.objects.keys()]).toEqual([
-      "codemode/artifact-partial/scene.json",
-    ]);
-  });
-
-  it("persists PNG artifacts as binary object-bucket entries", async () => {
-    const bucket = new MemoryBucket();
-    let id = 0;
-    const runtime = makeTestRuntime({
-      store: makeObjectBucketArtifactStorage(bucket, {
-        prefix: "codemode",
-      }),
-      createId: (prefix) => `${prefix}-${(id += 1)}`,
-      renderer: {
-        renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
-      },
-    });
-
-    const built = await runtime.buildFlowchart({
-      spec: approvalSpec(),
-      options: { artifactFormats: ["scene", "png"] },
-    });
-    expectBuildOk(built);
-
-    expect([...bucket.objects.keys()].sort()).toEqual([
-      "codemode/artifact-2/manifest.json",
-      "codemode/artifact-2/png.png",
-      "codemode/artifact-2/scene.json",
-    ]);
-
-    const png = await runtime.getArtifact({
-      artifactId: built.artifact.artifactId,
-      format: "png",
-    });
-
-    expectGetOk(png);
-    expect(png).toMatchObject({
-      format: "png",
-      mimeType: "image/png",
-      sizeBytes: 4,
-    });
-    expect(png).not.toHaveProperty("inline");
-  });
-
-  it("does not publish an object-bucket manifest when a format write fails", async () => {
-    const bucket = new FailingPngBucket();
-    let id = 0;
-    const runtime = makeTestRuntime({
-      store: makeObjectBucketArtifactStorage(bucket, {
-        prefix: "codemode",
-      }),
-      createId: (prefix) => `${prefix}-${(id += 1)}`,
-      renderer: {
-        renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
-      },
-    });
-
-    const built = await runtime.buildFlowchart({
-      spec: approvalSpec(),
-      options: { artifactFormats: ["scene", "png"] },
-    });
-
-    expectBuildFailure(built);
-    expect(built.status).toBe("storage_failed");
-    expect([...bucket.objects.keys()].sort()).toEqual([
-      "codemode/artifact-2/scene.json",
-    ]);
-  });
-
-  it("builds a native sequence scene and exports every requested artifact", async () => {
-    const runtime = makeTestRuntime({
-      renderer: {
-        renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
-      },
-    });
-    const result = await runtime.buildSequenceDiagram({
-      spec: checkoutSequenceSpec(),
-      options: {
-        artifactFormats: ["scene", "excalidraw", "png"],
-        inlineArtifacts: ["excalidraw"],
-      },
-    });
-
-    expect(result.issues).toEqual([]);
-    expect(result).toMatchObject({ ok: true, status: "accepted" });
-    if (!result.ok) throw new Error("Expected accepted sequence diagram.");
-    expect(result.normalizedSpec.participants.map(({ id }) => id)).toEqual([
-      "customer",
-      "store",
-      "payments",
-    ]);
-    expect(result.normalizedSpec.messages.map(({ label }) => label)).toEqual([
-      "Checkout",
-      "Authorize",
-      "Approved",
-    ]);
-    expect(result.artifact.formats.map(({ format }) => format)).toEqual([
-      "scene",
-      "excalidraw",
-      "png",
-    ]);
-    const excalidraw = result.artifact.formats.find(
-      ({ format }) => format === "excalidraw",
-    );
-    expect(excalidraw).toHaveProperty("inline");
-    expect(excalidraw?.inline).toMatchObject({
-      elements: expect.arrayContaining([
-        expect.objectContaining({
-          id: "arrow:message-3-payments-customer",
-          strokeStyle: "dashed",
-        }),
-      ]),
-    });
-  });
-
-  it("round-trips a crossing sequence through a no-op inline-scene patch", async () => {
-    const runtime = createTestRuntime();
-    const built = await runtime.buildSequenceDiagram({
-      spec: crossingSequenceSpec(),
-      options: {
-        artifactFormats: ["scene", "excalidraw"],
-        inlineArtifacts: ["scene"],
-      },
-    });
-    expect(built.ok).toBe(true);
-    if (!built.ok) throw new Error("Expected accepted sequence diagram.");
-    const sourceScene = built.artifact.formats.find(
-      ({ format }) => format === "scene",
-    )?.inline;
-    expect(sourceScene).toBeDefined();
-
-    const patched = await runtime.applyDiagramPatch({
-      source: { scene: sourceScene },
-      operations: [{ op: "setDefaultStyle", style: {} }],
-      options: {
-        artifactFormats: ["scene", "excalidraw"],
-        inlineArtifacts: ["scene", "excalidraw"],
-      },
-    });
-
-    expectPatchOk(patched);
-    expect(
-      patched.artifact.formats.find(({ format }) => format === "excalidraw")
-        ?.inline,
-    ).toMatchObject({
-      elements: expect.arrayContaining([
-        expect.objectContaining({ id: "arrow:message-1-a-c" }),
-      ]),
-    });
-  });
-
-  it("styles a crossing sequence through an inline-scene patch", async () => {
-    const runtime = createTestRuntime();
-    const built = await runtime.buildSequenceDiagram({
-      spec: crossingSequenceSpec(),
-      options: {
-        artifactFormats: ["scene"],
-        inlineArtifacts: ["scene"],
-      },
-    });
-    expect(built.ok).toBe(true);
-    if (!built.ok) throw new Error("Expected accepted sequence diagram.");
-    const sourceScene = built.artifact.formats.find(
-      ({ format }) => format === "scene",
-    )?.inline;
-
-    const patched = await runtime.applyDiagramPatch({
-      source: { scene: sourceScene },
-      operations: [
-        {
-          op: "setStyle",
-          selector: { nodeIds: ["b"] },
-          style: { fillColor: "#ede9fe", strokeColor: "#7c3aed" },
-        },
-      ],
-      options: {
-        artifactFormats: ["scene", "excalidraw"],
-        inlineArtifacts: ["scene", "excalidraw"],
-      },
-    });
-
-    expectPatchOk(patched);
-    const patchedScene = parseInlineScene(
-      patched.artifact.formats.find(({ format }) => format === "scene")?.inline,
-    );
-    expect(
-      patchedScene.elements.find(
-        (element) => element.type === "node" && element.nodeId === "b",
-      ),
-    ).toMatchObject({ fillColor: "#ede9fe", strokeColor: "#7c3aed" });
-    expect(
-      patched.artifact.formats.find(({ format }) => format === "excalidraw")
-        ?.inline,
-    ).toMatchObject({ elements: expect.any(Array) });
-  });
-
-  it("preserves crossing-sequence lifeline roles after a fractional translate patch", async () => {
-    const runtime = createTestRuntime();
-    const built = await runtime.buildSequenceDiagram({
-      spec: crossingSequenceSpec(),
-      options: {
-        artifactFormats: ["scene"],
-        inlineArtifacts: ["scene"],
-      },
-    });
-    expect(built.ok).toBe(true);
-    if (!built.ok) throw new Error("Expected accepted sequence diagram.");
-    const sourceScene = built.artifact.formats.find(
-      ({ format }) => format === "scene",
-    )?.inline;
-
-    const patched = await runtime.applyDiagramPatch({
-      source: { scene: sourceScene },
-      operations: [
-        {
-          op: "translate",
-          selector: { nodeIds: ["b:lifeline"] },
-          dx: 0.0003,
-          dy: -0.0003,
-        },
-      ],
-      options: {
-        artifactFormats: ["scene", "excalidraw"],
-        inlineArtifacts: ["scene", "excalidraw"],
-      },
-    });
-
-    expectPatchOk(patched);
-    const patchedScene = parseInlineScene(
-      patched.artifact.formats.find(({ format }) => format === "scene")?.inline,
-    );
-    expect(
-      patchedScene.elements.find(
-        (element) => element.type === "node" && element.nodeId === "b:lifeline",
-      ),
-    ).toMatchObject({ rendererRole: "sequence-lifeline" });
-    expect(
-      patched.artifact.formats.find(({ format }) => format === "excalidraw")
-        ?.inline,
-    ).toMatchObject({
-      elements: expect.arrayContaining([
-        expect.objectContaining({ id: "arrow:message-1-a-c" }),
-      ]),
-    });
-  });
-
-  it("strips a spoofed lifeline role from an ordinary inline node", async () => {
-    const result = await createTestRuntime().applyDiagramPatch({
-      source: {
-        scene: spoofedInlineLifelineScene({ useLifelineId: false }),
-      },
-      operations: [{ op: "setDefaultStyle", style: {} }],
-      options: {
-        artifactFormats: ["excalidraw"],
-        inlineArtifacts: ["excalidraw"],
-      },
-    });
-
-    expectPatchOk(result);
-    expect(JSON.stringify(result.artifact.formats[0]?.inline)).not.toContain(
-      "sketchiRendererRole",
-    );
-  });
-
-  it("does not trust a lifeline-style id without lifeline geometry", async () => {
-    const result = await createTestRuntime().applyDiagramPatch({
-      source: {
-        scene: spoofedInlineLifelineScene({ useLifelineId: true }),
-      },
-      operations: [{ op: "setDefaultStyle", style: {} }],
-      options: {
-        artifactFormats: ["excalidraw"],
-        inlineArtifacts: ["excalidraw"],
-      },
-    });
-
-    expectPatchOk(result);
-    expect(JSON.stringify(result.artifact.formats[0]?.inline)).not.toContain(
-      "sketchiRendererRole",
-    );
-  });
-
-  it("ignores renderer-owned lifeline roles in build specifications", async () => {
-    const runtime = createTestRuntime();
-    const flowchartSpec = approvalSpec();
-    const flowchart = await runtime.buildFlowchart({
-      spec: {
-        ...flowchartSpec,
-        nodes: flowchartSpec.nodes.map((node, index) =>
-          index === 0 ? { ...node, rendererRole: "sequence-lifeline" } : node,
-        ),
-      },
-      options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
-    });
-    expectBuildOk(flowchart);
-    const flowchartScene = parseInlineScene(
-      flowchart.artifact.formats.find(({ format }) => format === "scene")
-        ?.inline,
-    );
-    expect(
-      flowchartScene.elements.find(
-        (element) => element.type === "node" && element.nodeId === "request",
-      ),
-    ).not.toHaveProperty("rendererRole");
-
-    const sequenceSpec = crossingSequenceSpec();
-    const sequence = await runtime.buildSequenceDiagram({
-      spec: {
-        ...sequenceSpec,
-        participants: sequenceSpec.participants.map((participant, index) =>
-          index === 1
-            ? { ...participant, rendererRole: "sequence-lifeline" }
-            : participant,
-        ),
-      },
-      options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
-    });
-    expect(sequence.ok).toBe(true);
-    if (!sequence.ok) throw new Error("Expected accepted sequence diagram.");
-    const sequenceScene = parseInlineScene(
-      sequence.artifact.formats.find(({ format }) => format === "scene")
-        ?.inline,
-    );
-    expect(
-      sequenceScene.elements.find(
-        (element) => element.type === "node" && element.nodeId === "b",
-      ),
-    ).not.toHaveProperty("rendererRole");
-    expect(
-      sequenceScene.elements.filter(
-        (element) =>
-          element.type === "node" &&
-          element.rendererRole === "sequence-lifeline",
-      ),
-    ).toHaveLength(3);
-  });
-
-  it("returns repairable issues for invalid participant references and self messages", async () => {
-    const spec = checkoutSequenceSpec();
-    const result = await createTestRuntime().buildSequenceDiagram({
-      spec: {
-        ...spec,
-        messages: [
-          { source: "missing", target: "store", label: "Unknown sender" },
-          { source: "store", target: "store", label: "Self message" },
-        ],
-      },
-    });
-
-    expect(result).toMatchObject({
-      ok: false,
-      status: "invalid_sequence",
-      issues: expect.arrayContaining([
-        expect.objectContaining({
-          code: "missing_edge_source",
-          hint: expect.stringContaining("participant"),
-        }),
-        expect.objectContaining({
-          code: "self_loop",
-          hint: expect.stringContaining("different target"),
-        }),
-      ]),
-    });
-  });
-
-  it("returns a repairable issue for participant ids that collide with lifelines", async () => {
-    const result = await createTestRuntime().buildSequenceDiagram({
-      spec: {
-        title: "Colliding participants",
-        participants: [
-          { id: "api", label: "API" },
-          { id: "api:lifeline", label: "Worker" },
-        ],
-        messages: [],
-      },
-    });
-
-    expect(result).toMatchObject({
-      ok: false,
-      status: "invalid_sequence",
-      issues: [
-        expect.objectContaining({
-          code: "duplicate_node_id",
-          ref: { kind: "request", path: "spec.participants.[1].id" },
-          hint: expect.stringContaining("Rename the participant"),
-        }),
-      ],
-    });
-  });
-
-  it("returns structured input issues for malformed sequence messages", async () => {
-    const spec = checkoutSequenceSpec();
-    const result = await createTestRuntime().buildSequenceDiagram({
-      spec: {
-        ...spec,
-        messages: [{ source: "customer", target: "store" }],
-      },
-    });
-
-    expect(result).toMatchObject({
-      ok: false,
-      status: "invalid_input",
-      issues: [
-        expect.objectContaining({
-          code: "invalid_type",
-          ref: { kind: "request", path: expect.stringContaining("label") },
-          hint: expect.any(String),
-        }),
-      ],
-    });
-  });
-
-  it("creates, renders, and persists a composed CanvasSpec artifact bundle", async () => {
-    let id = 0;
-    const runtime = makeTestRuntime({
-      store: makeMemoryArtifactStorage(),
-      createId: (prefix) => `${prefix}-${(id += 1)}`,
-      renderer: {
-        renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
-      },
-    });
-    const result = await runtime.createCanvas({
-      requestId: "canvas-request",
-      spec: {
-        kind: "canvas",
-        version: 1,
-        diagramId: "universal-canvas",
-        title: "Universal canvas",
-        width: 900,
-        height: 500,
-        accentColor: "#1f2937",
-        backgroundColor: "#ffffff",
-        layers: [
-          { id: "background", name: "Background" },
-          { id: "content", name: "Content" },
-        ],
-        elements: [
-          {
-            type: "frame",
-            id: "frame",
-            name: "System",
-            x: 40,
-            y: 40,
-            width: 780,
-            height: 360,
-            layerId: "background",
-          },
-          {
-            type: "node",
-            id: "source",
-            nodeId: "source",
-            shape: "polygon",
-            points: [
-              { x: 0, y: 50 },
-              { x: 50, y: 0 },
-              { x: 100, y: 50 },
-              { x: 50, y: 100 },
-            ],
-            x: 100,
-            y: 140,
-            width: 100,
-            height: 100,
-            label: "Source",
-            frameId: "frame",
-            groupIds: ["pipeline"],
-            layerId: "content",
-          },
-          {
-            type: "node",
-            id: "target",
-            nodeId: "target",
-            shape: "rectangle",
-            x: 520,
-            y: 140,
-            width: 180,
-            height: 100,
-            label: "Target",
-            frameId: "frame",
-            groupIds: ["pipeline"],
-            layerId: "content",
-          },
-          {
-            type: "arrow",
-            id: "connector",
-            edgeId: "connector",
-            sourceNodeId: "source",
-            targetNodeId: "target",
-            points: [
-              { x: 200, y: 190 },
-              { x: 520, y: 190 },
-            ],
-            startArrowhead: "circle",
-            endArrowhead: "triangle",
-            label: "typed",
-            layerId: "content",
-          },
-          {
-            type: "line",
-            id: "baseline",
-            points: [
-              { x: 80, y: 310 },
-              { x: 740, y: 310 },
-            ],
-            strokeStyle: "dashed",
-            layerId: "content",
-          },
-          {
-            type: "text",
-            id: "caption",
-            text: "Renderer-independent scene",
-            x: 300,
-            y: 330,
-            fontSize: 24,
-            textAlign: "center",
-            layerId: "content",
-          },
-        ],
-        layouts: [
-          {
-            type: "row",
-            ids: ["source", "target"],
-            x: 100,
-            y: 140,
-            gap: 320,
-          },
-        ],
-        zOrder: [
-          "frame",
-          "baseline",
-          "source",
-          "target",
-          "connector",
-          "caption",
-        ],
-      },
-      options: {
-        artifactFormats: ["scene", "excalidraw", "png"],
-        inlineArtifacts: ["scene", "excalidraw"],
-      },
-    });
-
-    expectCanvasOk(result);
-    expect(result.requestId).toBe("canvas-request");
-    expect(result.artifact.formats.map((format) => format.format)).toEqual([
-      "scene",
-      "excalidraw",
-      "png",
-    ]);
-    expect(result.normalizedSpec.elements).toHaveLength(6);
-    expect(result.normalizedSpec.zOrder[0]).toBe("frame");
-  });
-
-  it("rejects an empty CanvasSpec as a typed invalid canvas", async () => {
-    const result = await createTestRuntime().createCanvas({
-      spec: {
-        kind: "canvas",
-        version: 1,
-        diagramId: "empty-canvas",
-        title: "Empty canvas",
-        width: 400,
-        height: 300,
-        accentColor: "#111827",
-        backgroundColor: "#ffffff",
-        elements: [],
-        layers: [],
-        layouts: [],
-        zOrder: [],
-      },
-    });
-
-    expect(result).toMatchObject({
-      ok: false,
-      status: "invalid_canvas",
-      issues: [
-        expect.objectContaining({
-          code: "invalid_canvas_geometry",
-          stage: "canvas",
-          ref: { kind: "diagram", path: "elements" },
-        }),
-      ],
-    });
-  });
-
-  it("accepts a dense 120-element CanvasSpec and applies deterministic grid layout", async () => {
-    const elements = Array.from({ length: 120 }, (_, index) => ({
-      type: "node",
-      id: `cell-${index}`,
-      nodeId: `cell-${index}`,
-      shape: "rectangle",
-      x: 0,
-      y: 0,
-      width: 80,
-      height: 40,
-      label: `Cell ${index}`,
-    }));
-    const result = await createTestRuntime().createCanvas({
-      spec: {
-        kind: "canvas",
-        version: 1,
-        diagramId: "dense-120",
-        title: "Dense matrix",
-        width: 1200,
-        height: 800,
-        accentColor: "#111827",
-        backgroundColor: "#ffffff",
-        elements,
-        layers: [],
-        layouts: [
-          {
-            type: "grid",
-            ids: elements.map((element) => element.id),
-            columns: 12,
-            x: 20,
-            y: 20,
-            columnGap: 10,
-            rowGap: 10,
-          },
-        ],
-        zOrder: elements.map((element) => element.id),
-      },
-      options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
-    });
-
-    expectCanvasOk(result);
-    expect(result.normalizedSpec.elements).toHaveLength(120);
-    expect(result.normalizedSpec.elements[119]).toMatchObject({
-      x: 1010,
-      y: 470,
-    });
-  });
-
-  it("supports stable structural canvas patches", async () => {
-    const runtime = createTestRuntime();
-    const built = await runtime.createCanvas({
-      spec: {
-        kind: "canvas",
-        version: 1,
-        diagramId: "patchable-canvas",
-        title: "Patchable canvas",
-        width: 600,
-        height: 300,
-        accentColor: "#111827",
-        backgroundColor: "#ffffff",
-        elements: [
-          {
-            type: "node",
-            id: "a",
-            nodeId: "a",
-            shape: "rectangle",
-            x: 20,
-            y: 20,
-            width: 120,
-            height: 60,
-            label: "A",
-          },
-          {
-            type: "node",
-            id: "b",
-            nodeId: "b",
-            shape: "rectangle",
-            x: 220,
-            y: 20,
-            width: 120,
-            height: 60,
-            label: "B",
-          },
-        ],
-        layers: [],
-        layouts: [],
-        zOrder: ["a", "b"],
-      },
-      options: { artifactFormats: ["scene"] },
-    });
-    expectCanvasOk(built);
-
-    const patched = await runtime.applyDiagramPatch({
-      source: { artifactId: built.artifact.artifactId },
-      options: {
-        preserveConnectivity: false,
-        artifactFormats: ["scene"],
-        inlineArtifacts: ["scene"],
-      },
-      operations: [
-        {
-          op: "insert",
-          afterId: "a",
-          elements: [
-            {
-              type: "node",
-              id: "c",
-              nodeId: "c",
-              shape: "ellipse",
-              x: 120,
-              y: 140,
-              width: 120,
-              height: 60,
-              label: "C",
-            },
-          ],
-        },
-        { op: "group", ids: ["a", "c"], groupId: "group-1" },
-        { op: "reorder", ids: ["b"], beforeId: "a" },
-        {
-          op: "replace",
-          id: "c",
-          element: {
-            type: "node",
-            id: "c",
-            nodeId: "c",
-            shape: "diamond",
-            x: 120,
-            y: 140,
-            width: 140,
-            height: 80,
-            label: "C updated",
-            groupIds: ["group-1"],
-          },
-        },
-        { op: "ungroup", ids: ["a"], groupId: "group-1" },
-        { op: "remove", selector: { ids: ["a"] } },
-      ],
-    });
-
-    expectPatchOk(patched);
-    const scene = parseInlineScene(
-      patched.artifact.formats.find((format) => format.format === "scene")
-        ?.inline,
-    );
-    expect(scene.zOrder).toEqual(["b", "c"]);
-    expect(scene.elements).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: "c",
-          label: "C updated",
-          groupIds: ["group-1"],
-        }),
-      ]),
-    );
-  });
-
-  it("returns typed CanvasSpec structural and limit failures", async () => {
-    const base = {
-      kind: "canvas",
-      version: 1,
-      diagramId: "invalid-canvas",
-      title: "Invalid canvas",
-      width: 600,
-      height: 300,
-      accentColor: "#111827",
-      backgroundColor: "#ffffff",
-      layers: [],
-      layouts: [],
-    };
-    const invalid = await createTestRuntime().createCanvas({
-      spec: {
-        ...base,
-        elements: [
-          {
-            type: "node",
-            id: "same",
-            nodeId: "a",
-            shape: "rectangle",
-            x: 20,
-            y: 20,
-            width: 120,
-            height: 60,
-            label: "A",
-          },
-          {
-            type: "node",
-            id: "same",
-            nodeId: "b",
-            shape: "rectangle",
-            x: 220,
-            y: 20,
-            width: 120,
-            height: 60,
-            label: "B",
-          },
-          {
-            type: "line",
-            id: "line",
-            points: [
-              { x: 0, y: 0 },
-              { x: 20, y: 20 },
-            ],
-            endBinding: { elementId: "missing" },
-          },
-        ],
-        zOrder: ["same", "line"],
-      },
-    });
-    expect(invalid).toMatchObject({
-      ok: false,
-      status: "invalid_canvas",
-      issues: expect.arrayContaining([
-        expect.objectContaining({
-          code: "duplicate_element_id",
-          stage: "canvas",
-        }),
-        expect.objectContaining({
-          code: "invalid_canvas_binding",
-          stage: "canvas",
-        }),
-      ]),
-    });
-
-    const limited = await createTestRuntime().createCanvas({
-      spec: {
-        ...base,
-        width: 20_000,
-        elements: [
-          {
-            type: "node",
-            id: "a",
-            nodeId: "a",
-            shape: "rectangle",
-            x: 20,
-            y: 20,
-            width: 120,
-            height: 60,
-            label: "A",
-          },
-        ],
-        zOrder: ["a"],
-      },
-    });
-    expect(limited).toMatchObject({
-      ok: false,
-      status: "limit_exceeded",
-      issues: [expect.objectContaining({ code: "canvas_limit_exceeded" })],
-    });
-  });
+	it("normalizes accepted legacy builder styles to the Sketchi palette", async () => {
+		const legacyStyle = {
+			accentColor: "#7c3aed",
+			backgroundColor: "#ffffff",
+		};
+		const results = await Promise.all([
+			createTestRuntime().buildFlowchart({
+				spec: { ...approvalSpec(), style: legacyStyle },
+				options: { inlineArtifacts: ["scene"] },
+			}),
+			createTestRuntime().buildMindmap({
+				spec: {
+					title: "Legacy mindmap style",
+					root: { label: "Root", children: [{ label: "Child" }] },
+					style: legacyStyle,
+				},
+				options: { inlineArtifacts: ["scene"] },
+			}),
+			createTestRuntime().buildSequenceDiagram({
+				spec: { ...checkoutSequenceSpec(), style: legacyStyle },
+				options: { inlineArtifacts: ["scene"] },
+			}),
+		]);
+
+		for (const result of results) {
+			expect(result).toMatchObject({
+				ok: true,
+				normalizedSpec: { style: SKETCHI_DIAGRAM_STYLE },
+			});
+			if (!result.ok) throw new Error("Expected accepted branded diagram.");
+			expect(
+				result.artifact.formats.find(({ format }) => format === "scene")?.inline,
+			).toMatchObject({
+				accentColor: SKETCHI_DIAGRAM_STYLE.accentColor,
+				backgroundColor: SKETCHI_DIAGRAM_STYLE.backgroundColor,
+			});
+		}
+	});
+
+	it("builds a nested mindmap with deterministic hierarchy ids and exports", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildMindmap({
+			requestId: "mindmap-request",
+			spec: {
+				title: "Launch strategy",
+				root: {
+					label: "Launch",
+					children: [
+						{
+							label: "Product",
+							children: [{ label: "Scope" }, { label: "Quality" }],
+						},
+						{ label: "Go to market", children: [{ label: "Docs" }] },
+					],
+				},
+			},
+		});
+		expect(built).toMatchObject({
+			ok: true,
+			status: "accepted",
+			requestId: "mindmap-request",
+			normalizedSpec: {
+				id: "launch-strategy",
+				root: {
+					id: "topic-0",
+					children: [
+						{
+							id: "topic-0-0",
+							children: [{ id: "topic-0-0-0" }, { id: "topic-0-0-1" }],
+						},
+						{ id: "topic-0-1" },
+					],
+				},
+			},
+		});
+		if (!built.ok) throw new Error("Expected accepted mindmap");
+		expect(built.artifact.formats.map((format) => format.format)).toEqual(["excalidraw", "scene"]);
+	});
+
+	it("returns typed mindmap hierarchy failures", async () => {
+		const result = await createTestRuntime().buildMindmap({
+			spec: { title: "Empty", root: { label: "Only root" } },
+		});
+		expect(result).toMatchObject({
+			ok: false,
+			status: "invalid_mindmap",
+			issues: [{ code: "disconnected_graph", stage: "mindmap" }],
+		});
+	});
+
+	it("preflights extreme mindmap depth before recursive schema decoding", async () => {
+		const root: { label: string; children?: unknown[] } = { label: "root" };
+		let current = root;
+		for (let depth = 0; depth < 2_000; depth += 1) {
+			const child: { label: string; children?: unknown[] } = {
+				label: `depth ${depth}`,
+			};
+			current.children = [child];
+			current = child;
+		}
+		const result = await createTestRuntime().buildMindmap({
+			spec: { title: "Deep", root },
+		});
+		expect(result).toMatchObject({
+			ok: false,
+			status: "invalid_mindmap",
+			issues: [{ code: "mindmap_too_deep", stage: "mindmap" }],
+		});
+	});
+
+	it("preflights overly wide mindmaps", async () => {
+		const result = await createTestRuntime().buildMindmap({
+			spec: {
+				title: "Wide",
+				root: {
+					label: "root",
+					children: Array.from({ length: 101 }, (_, index) => ({
+						label: `topic ${index}`,
+					})),
+				},
+			},
+		});
+		expect(result).toMatchObject({
+			ok: false,
+			status: "invalid_mindmap",
+			issues: [{ code: "mindmap_too_large" }],
+		});
+	});
+
+	it("counts malformed child slots and keeps extreme-width failures bounded", async () => {
+		const result = await createTestRuntime().buildMindmap({
+			spec: {
+				title: "Malformed width",
+				root: {
+					label: "root",
+					children: Array.from({ length: 100_000 }, () => null),
+				},
+			},
+		});
+		expect(result).toMatchObject({
+			ok: false,
+			status: "invalid_mindmap",
+			issues: [{ code: "mindmap_too_large" }],
+		});
+		expect(result.issues).toHaveLength(1);
+		expect(JSON.stringify(result).length).toBeLessThan(2_000);
+	});
+
+	it("caps schema issue amplification for every Code Mode operation", async () => {
+		const result = await createTestRuntime().buildFlowchart({
+			spec: {
+				title: "Malformed",
+				nodes: Array.from({ length: 1_000 }, () => ({})),
+			},
+		});
+		expect(result).toMatchObject({ ok: false, status: "invalid_input" });
+		expect(result.issues).toHaveLength(21);
+		expect(result.issues.at(-1)?.message).toContain("additional input issues were omitted");
+	});
+
+	it.each([
+		[
+			"title",
+			{ title: "  ", root: { label: "Root", children: [{ label: "Child" }] } },
+			"spec.title",
+		],
+		[
+			"topic",
+			{ title: "Valid", root: { label: "Root", children: [{ label: "''" }] } },
+			"spec.root.children.[0].label",
+		],
+		[
+			"tool-cleaned topic",
+			{
+				title: "Valid",
+				root: { label: "Root", children: [{ label: " , title:" }] },
+			},
+			"spec.root.children.[0].label",
+		],
+	])(
+		"returns precise invalid_input paths for empty semantic %s strings",
+		async (_name, spec, path) => {
+			const result = await createTestRuntime().buildMindmap({ spec });
+			expect(result).toMatchObject({
+				ok: false,
+				status: "invalid_input",
+				issues: [{ stage: "input", ref: { path } }],
+			});
+		},
+	);
+
+	it("renders and exports right-to-left mindmaps", async () => {
+		const result = await createTestRuntime().buildMindmap({
+			spec: {
+				title: "RTL hierarchy",
+				layout: { direction: "RL" },
+				root: {
+					label: "Root",
+					children: [{ label: "Child", children: [{ label: "Leaf" }] }],
+				},
+			},
+			options: { inlineArtifacts: ["scene", "excalidraw"] },
+		});
+		expect(result).toMatchObject({
+			ok: true,
+			normalizedSpec: { layout: { direction: "RL" } },
+		});
+		if (!result.ok) throw new Error("Expected accepted RL mindmap");
+		const scene = parseInlineScene(
+			result.artifact.formats.find((format) => format.format === "scene")?.inline,
+		);
+		const nodes = scene.elements.filter((element) => element.type === "node");
+		const root = nodes.find((node) => node.nodeId === "topic-0");
+		const child = nodes.find((node) => node.nodeId === "topic-0-0");
+		expect(root?.x).toBeGreaterThan(child?.x ?? Number.POSITIVE_INFINITY);
+		expect(
+			result.artifact.formats.find((format) => format.format === "excalidraw")?.inline,
+		).toBeDefined();
+	});
+
+	it("round-trips a persisted mindmap through getArtifact and patch retrieval", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildMindmap({
+			spec: {
+				title: "Roadmap",
+				root: {
+					label: "Roadmap",
+					children: [{ label: "Now" }, { label: "Next" }],
+				},
+			},
+		});
+		if (!built.ok) throw new Error("Expected accepted mindmap");
+		const persisted = await runtime.getArtifact({
+			artifactId: built.artifact.artifactId,
+			format: "scene",
+			inline: true,
+		});
+		expect(persisted).toMatchObject({ ok: true, diagramId: "roadmap" });
+		const patched = await runtime.applyDiagramPatch({
+			source: { artifactId: built.artifact.artifactId },
+			operations: [
+				{
+					op: "replaceText",
+					selector: { nodeIds: ["topic-0-1"] },
+					text: "Later",
+				},
+			],
+		});
+		if (!patched.ok) throw new Error("Expected accepted mindmap patch");
+		const retrieved = await runtime.getArtifact({
+			artifactId: patched.artifact.artifactId,
+			format: "scene",
+			inline: true,
+		});
+		expect(retrieved).toMatchObject({
+			ok: true,
+			provenance: { sourceArtifactId: built.artifact.artifactId },
+		});
+		expect(JSON.stringify(retrieved)).toContain("Later");
+	});
+	it("builds an accepted flowchart and retrieves stored formats", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({
+			requestId: "request-1",
+			spec: approvalSpec(),
+		});
+
+		expectBuildOk(built);
+		expect(built.status).toBe("accepted");
+		expect(built.requestId).toBe("request-1");
+		expect(built.normalizedSpec.style).toEqual({
+			accentColor: "#8f707f",
+			backgroundColor: "#fffdf8",
+		});
+		expect(built.artifact.formats.map((format) => format.format)).toEqual(["excalidraw", "scene"]);
+
+		const inlineScene = built.artifact.formats.find((format) => format.format === "scene")?.inline;
+		expect(parseInlineScene(inlineScene).elements.length).toBeGreaterThan(0);
+
+		const excalidraw = await runtime.getArtifact({
+			artifactId: built.artifact.artifactId,
+			format: "excalidraw",
+		});
+
+		expectGetOk(excalidraw);
+		expect(excalidraw.mimeType).toBe("application/vnd.excalidraw+json");
+		expect(excalidraw).not.toHaveProperty("inline");
+
+		const inlineExcalidraw = await runtime.getArtifact({
+			artifactId: built.artifact.artifactId,
+			format: "excalidraw",
+			inline: true,
+		});
+
+		expectGetOk(inlineExcalidraw);
+		expect(inlineExcalidraw.inline).toMatchObject({
+			type: "excalidraw",
+			version: 2,
+			source: "https://sketchi.app",
+			appState: expect.any(Object),
+			elements: expect.any(Array),
+			files: {},
+		});
+	});
+
+	it("adds raw artifact URLs when the runtime is configured with a URL builder", async () => {
+		let id = 0;
+		const runtime = makeTestRuntime({
+			store: makeMemoryArtifactStorage(),
+			createId: (prefix) => `${prefix}-${(id += 1)}`,
+			artifactUrl: ({ artifactId, format }) =>
+				`https://studio.test/api/v1/artifacts/${artifactId}?format=${format}&raw=true`,
+		});
+
+		const built = await runtime.buildFlowchart({
+			spec: approvalSpec(),
+			options: {
+				artifactFormats: ["scene", "excalidraw"],
+				inlineArtifacts: ["scene"],
+			},
+		});
+
+		expectBuildOk(built);
+		expect(built.artifact.formats).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					format: "scene",
+					url: `https://studio.test/api/v1/artifacts/${built.artifact.artifactId}?format=scene&raw=true`,
+				}),
+				expect.objectContaining({
+					format: "excalidraw",
+					url: `https://studio.test/api/v1/artifacts/${built.artifact.artifactId}?format=excalidraw&raw=true`,
+				}),
+			]),
+		);
+
+		const excalidraw = await runtime.getArtifact({
+			artifactId: built.artifact.artifactId,
+			format: "excalidraw",
+			inline: true,
+		});
+
+		expectGetOk(excalidraw);
+		expect(excalidraw).toMatchObject({
+			format: "excalidraw",
+			url: `https://studio.test/api/v1/artifacts/${built.artifact.artifactId}?format=excalidraw&raw=true`,
+			inline: {
+				type: "excalidraw",
+				version: 2,
+				files: {},
+			},
+		});
+	});
+
+	it("exports dense incident feedback flows without edge-through-node routes", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({
+			spec: incidentEscalationOpsSpec(),
+			options: {
+				artifactFormats: ["scene", "excalidraw"],
+				inlineArtifacts: ["scene", "excalidraw"],
+			},
+		});
+
+		expectBuildOk(built);
+		expect(built.quality.summary).toEqual({ nodeCount: 16, edgeCount: 19 });
+		expect(built.artifact.formats.map((format) => format.format)).toEqual(["scene", "excalidraw"]);
+	});
+
+	it("exports production release rollback flows without dense route collisions", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({
+			spec: productionReleaseRollbackSpec(),
+			options: {
+				artifactFormats: ["scene", "excalidraw"],
+				inlineArtifacts: ["scene", "excalidraw"],
+			},
+		});
+
+		expectBuildOk(built);
+		expect(built.quality.summary).toEqual({ nodeCount: 24, edgeCount: 32 });
+		expect(built.artifact.formats.map((format) => format.format)).toEqual(["scene", "excalidraw"]);
+	});
+
+	it("keeps missing start and end failures in parity with diagram-core", async () => {
+		const specs = [
+			{
+				expected: "missing_start",
+				spec: {
+					...approvalSpec(),
+					nodes: approvalSpec().nodes.map((node) =>
+						node.kind === "start" ? { ...node, kind: "process" } : node,
+					),
+				},
+			},
+			{
+				expected: "missing_end",
+				spec: {
+					...approvalSpec(),
+					nodes: approvalSpec().nodes.map((node) =>
+						node.kind === "end" ? { ...node, kind: "process" } : node,
+					),
+				},
+			},
+		];
+
+		for (const { expected, spec } of specs) {
+			const canonicalCodes = canonicalCodesForSpec(spec);
+			const result = await createTestRuntime().buildFlowchart({ spec });
+			expectBuildFailure(result);
+			expect(result.status).toBe("invalid_flowchart");
+			expect(result.issues.map((issue) => issue.code)).toEqual(canonicalCodes);
+			expect(canonicalCodes).toContain(expected);
+		}
+	});
+
+	it.each(whitespaceFlowchartCases())(
+		"rejects whitespace-only $name after normalization as a bounded flowchart failure",
+		async ({ spec, path }) => {
+			const result = await createTestRuntime().buildFlowchart({ spec });
+			expectBuildFailure(result);
+
+			expect(result.status).toBe("invalid_flowchart");
+			expect(result.issues.length).toBeLessThanOrEqual(FLOWCHART_MAX_ISSUES);
+			expect(result.issues).toContainEqual(
+				expect.objectContaining({
+					stage: "flowchart",
+					ref: expect.objectContaining({ path }),
+				}),
+			);
+			expect(result.issues.map((entry) => entry.code)).not.toContain("render_failed");
+		},
+	);
+
+	it("caps normalized flowchart schema failures deterministically", async () => {
+		const base = linearFlowchartSpec(FLOWCHART_MAX_NODES);
+		const spec = {
+			...base,
+			nodes: base.nodes.map((node) => ({ ...node, label: "   " })),
+		};
+		const first = await createTestRuntime().buildFlowchart({ spec });
+		const second = await createTestRuntime().buildFlowchart({ spec });
+		expectBuildFailure(first);
+		expectBuildFailure(second);
+
+		expect(first.status).toBe("invalid_flowchart");
+		expect(first.issues).toHaveLength(FLOWCHART_MAX_ISSUES);
+		expect(second.issues).toEqual(first.issues);
+	});
+
+	it("rejects a reachable closed cycle with typed nonterminating nodes", async () => {
+		const result = await createTestRuntime().buildFlowchart({
+			spec: {
+				title: "Closed retry cycle",
+				nodes: [
+					{ id: "start", label: "Request arrives", kind: "start" },
+					{ id: "route", label: "Ready?", kind: "decision" },
+					{ id: "done", label: "Completed", kind: "end" },
+					{ id: "retry-a", label: "Retry stage alpha", kind: "process" },
+					{ id: "retry-b", label: "Retry stage beta", kind: "process" },
+				],
+				edges: [
+					{ source: "start", target: "route" },
+					{ source: "route", target: "done", label: "yes" },
+					{ source: "route", target: "retry-a", label: "retry" },
+					{ source: "retry-a", target: "retry-b" },
+					{ source: "retry-b", target: "retry-a" },
+				],
+			},
+		});
+
+		expectBuildFailure(result);
+		expect(result.status).toBe("invalid_flowchart");
+		expect(
+			result.issues
+				.filter((issue) => issue.code === "nonterminating_node")
+				.map((issue) => issue.ref?.id),
+		).toEqual(["retry-a", "retry-b"]);
+	});
+
+	it("accepts retry loops that retain an eventual exit", async () => {
+		const result = await createTestRuntime().buildFlowchart({
+			spec: {
+				title: "Retry with eventual exit",
+				nodes: [
+					{ id: "start", label: "Start request", kind: "start" },
+					{ id: "attempt", label: "Attempt operation", kind: "process" },
+					{ id: "retry", label: "Succeeded?", kind: "decision" },
+					{ id: "done", label: "Complete request", kind: "end" },
+				],
+				edges: [
+					{ source: "start", target: "attempt" },
+					{ source: "attempt", target: "retry" },
+					{ source: "retry", target: "attempt", label: "retry" },
+					{ source: "retry", target: "done", label: "yes" },
+				],
+			},
+		});
+
+		expectBuildOk(result);
+	});
+
+	it("rejects disconnected cycles from canonical start reachability", async () => {
+		const result = await createTestRuntime().buildFlowchart({
+			spec: {
+				title: "Disconnected graph",
+				nodes: [
+					{ id: "start", label: "Start request", kind: "start" },
+					{ id: "done", label: "Complete request", kind: "end" },
+					{ id: "orphan-a", label: "Orphan alpha", kind: "process" },
+					{ id: "orphan-b", label: "Orphan beta", kind: "process" },
+				],
+				edges: [
+					{ source: "start", target: "done" },
+					{ source: "orphan-a", target: "orphan-b" },
+					{ source: "orphan-b", target: "orphan-a" },
+				],
+			},
+		});
+
+		expectBuildFailure(result);
+		expect(
+			result.issues
+				.filter((issue) => issue.code === "unreachable_node")
+				.map((issue) => issue.ref?.id),
+		).toEqual(["orphan-a", "orphan-b"]);
+	});
+
+	it("rejects node and edge counts above the canonical limits", async () => {
+		for (const spec of [
+			linearFlowchartSpec(FLOWCHART_MAX_NODES + 1),
+			denseAcyclicFlowchartSpec(FLOWCHART_MAX_EDGES + 1),
+		]) {
+			const result = await createTestRuntime().buildFlowchart({ spec });
+			expectBuildFailure(result);
+			expect(result.status).toBe("invalid_flowchart");
+			expect(result.issues).toContainEqual(
+				expect.objectContaining({ code: "flowchart_too_large" }),
+			);
+		}
+	});
+
+	it("fails semantic limits before rendering or persisting artifacts", async () => {
+		let renderCalls = 0;
+		let writeCalls = 0;
+		const store: CodeModeArtifactStorageShape = {
+			read: () => Effect.succeed(null),
+			readManifest: () => Effect.succeed(null),
+			write: () => {
+				writeCalls += 1;
+				return Effect.fail(
+					new CodeModeArtifactStorageError({
+						cause: new Error("invalid flowchart must not persist"),
+						message: "invalid flowchart must not persist",
+						operation: "write",
+					}),
+				);
+			},
+		};
+		const runtime = makeTestRuntime({
+			store,
+			renderer: {
+				renderPng: () =>
+					Effect.sync(() => {
+						renderCalls += 1;
+						return new Uint8Array([137, 80, 78, 71]);
+					}),
+			},
+		});
+		const result = await runtime.buildFlowchart({
+			spec: linearFlowchartSpec(FLOWCHART_MAX_NODES + 1),
+			options: { artifactFormats: ["png"] },
+		});
+
+		expectBuildFailure(result);
+		expect(result.status).toBe("invalid_flowchart");
+		expect(renderCalls).toBe(0);
+		expect(writeCalls).toBe(0);
+	});
+
+	it("caps canonical flowchart issue output deterministically", async () => {
+		const spec = {
+			title: "Bounded issue output",
+			nodes: [
+				{ id: "start", label: "Start request", kind: "start" },
+				{ id: "done", label: "Complete request", kind: "end" },
+				...Array.from({ length: FLOWCHART_MAX_NODES - 2 }, (_, index) => ({
+					id: `orphan-${index}`,
+					label: `Orphan operation ${index}`,
+					kind: "process",
+				})),
+			],
+			edges: [{ source: "start", target: "done" }],
+		};
+		const first = await createTestRuntime().buildFlowchart({ spec });
+		const second = await createTestRuntime().buildFlowchart({ spec });
+		expectBuildFailure(first);
+		expectBuildFailure(second);
+
+		expect(first.issues).toHaveLength(FLOWCHART_MAX_ISSUES);
+		expect(second.issues).toEqual(first.issues);
+	});
+
+	it("returns structured repair issues for invalid connectivity", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({
+			spec: {
+				...approvalSpec(),
+				edges: [{ source: "request", target: "approve" }],
+			},
+		});
+
+		expectBuildFailure(built);
+		expect(built.status).toBe("invalid_flowchart");
+		expect(built.issues).toContainEqual(
+			expect.objectContaining({
+				code: "underbranched_decision",
+				ref: expect.objectContaining({ id: "approve" }),
+			}),
+		);
+		expect(built.issues).toContainEqual(
+			expect.objectContaining({
+				code: "unreachable_node",
+				ref: expect.objectContaining({ id: "done" }),
+			}),
+		);
+	});
+
+	it("returns invalid input issues for malformed artifact requests", async () => {
+		const runtime = createTestRuntime();
+		const result = await runtime.getArtifact({
+			artifactId: "",
+			format: "svg",
+		});
+
+		expect(result.ok).toBe(false);
+		if (result.ok) {
+			throw new Error("Expected get failure.");
+		}
+		expect(result.status).toBe("invalid_input");
+		expect(result.issues).toContainEqual(expect.objectContaining({ stage: "input" }));
+	});
+
+	it("reports PNG export failure when no hosted renderer is configured", async () => {
+		const runtime = createTestRuntime();
+		const result = await runtime.buildFlowchart({
+			spec: approvalSpec(),
+			options: { artifactFormats: ["png"] },
+		});
+
+		expectBuildFailure(result);
+		expect(result.status).toBe("export_failed");
+		expect(result.issues).toContainEqual(
+			expect.objectContaining({
+				code: "render_failed",
+				message: "PNG artifact rendering is not configured for this runtime.",
+			}),
+		);
+	});
+
+	it("stores PNG artifacts through a configured renderer without inlining binary data", async () => {
+		let id = 0;
+		const runtime = makeTestRuntime({
+			store: makeMemoryArtifactStorage(),
+			createId: (prefix) => `${prefix}-${(id += 1)}`,
+			renderer: {
+				renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
+			},
+		});
+
+		const built = await runtime.buildFlowchart({
+			spec: approvalSpec(),
+			options: {
+				artifactFormats: ["scene", "png"],
+				inlineArtifacts: ["scene"],
+			},
+		});
+
+		expectBuildOk(built);
+		expect(built.artifact.formats).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					format: "scene",
+					inline: expect.any(Object),
+				}),
+				expect.objectContaining({
+					format: "png",
+					mimeType: "image/png",
+					sizeBytes: 4,
+				}),
+			]),
+		);
+		expect(built.artifact.formats.find((format) => format.format === "png")).not.toHaveProperty(
+			"inline",
+		);
+
+		const png = await runtime.getArtifact({
+			artifactId: built.artifact.artifactId,
+			format: "png",
+		});
+
+		expectGetOk(png);
+		expect(png).toMatchObject({
+			format: "png",
+			mimeType: "image/png",
+			sizeBytes: 4,
+		});
+		expect(png).not.toHaveProperty("inline");
+
+		const explicitInlinePng = await runtime.getArtifact({
+			artifactId: built.artifact.artifactId,
+			format: "png",
+			inline: true,
+		});
+
+		expectGetOk(explicitInlinePng);
+		expect(explicitInlinePng).toMatchObject({
+			format: "png",
+			mimeType: "image/png",
+			sizeBytes: 4,
+		});
+		expect(explicitInlinePng).not.toHaveProperty("inline");
+	});
+
+	it("rejects raw Excalidraw patch sources at the request contract", async () => {
+		const runtime = createTestRuntime();
+		const result = await runtime.applyDiagramPatch({
+			source: { excalidraw: { appState: {}, elements: [] } },
+			operations: [{ op: "rerouteEdges" }],
+		});
+
+		expectPatchFailure(result);
+		expect(result.status).toBe("invalid_input");
+		expect(result.issues).toContainEqual(
+			expect.objectContaining({
+				ref: expect.objectContaining({ path: "source" }),
+			}),
+		);
+	});
+
+	it("patches styling after the graph artifact is accepted", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+		expectBuildOk(built);
+
+		const patched = await runtime.applyDiagramPatch({
+			source: { artifactId: built.artifact.artifactId },
+			intent: "Make the approval decision purple after connectivity is accepted.",
+			operations: [
+				{
+					op: "setStyle",
+					selector: { nodeIds: ["approve"] },
+					style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" },
+				},
+				{
+					op: "setShape",
+					selector: { nodeIds: ["approve"] },
+					shape: "diamond",
+				},
+			],
+		});
+
+		expectPatchOk(patched);
+		expect(patched.sourceArtifactId).toBe(built.artifact.artifactId);
+
+		const patchedScene = patched.artifact.formats.find(
+			(format) => format.format === "scene",
+		)?.inline;
+		const scene = parseInlineScene(patchedScene);
+		const approvalNode = scene.elements.find(
+			(element) => element.type === "node" && element.nodeId === "approve",
+		);
+
+		expect(approvalNode).toMatchObject({
+			shape: "diamond",
+			strokeColor: "#7c3aed",
+			fillColor: "#ede9fe",
+		});
+		expect(
+			scene.elements
+				.filter((element) => element.type === "arrow")
+				.map((arrow) => `${arrow.sourceNodeId}->${arrow.targetNodeId}`)
+				.sort(),
+		).toEqual(["approve->done", "approve->revise", "request->approve"]);
+	});
+
+	it("renders PNG artifacts after patch operations when a renderer is configured", async () => {
+		let id = 0;
+		const runtime = makeTestRuntime({
+			store: makeMemoryArtifactStorage(),
+			createId: (prefix) => `${prefix}-${(id += 1)}`,
+			renderer: {
+				renderPng: ({ scene }) =>
+					Effect.succeed(new Uint8Array([137, 80, 78, 71, scene.elements.length])),
+			},
+		});
+		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+		expectBuildOk(built);
+
+		const patched = await runtime.applyDiagramPatch({
+			source: { artifactId: built.artifact.artifactId },
+			operations: [
+				{
+					op: "setShape",
+					selector: { nodeIds: ["approve"] },
+					shape: "diamond",
+				},
+			],
+			options: {
+				artifactFormats: ["scene", "png"],
+				inlineArtifacts: ["scene"],
+			},
+		});
+
+		expectPatchOk(patched);
+		expect(patched.artifact.formats).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					format: "scene",
+					inline: expect.any(Object),
+				}),
+				expect.objectContaining({
+					format: "png",
+					mimeType: "image/png",
+					sizeBytes: 5,
+				}),
+			]),
+		);
+		expect(patched.artifact.formats.find((format) => format.format === "png")).not.toHaveProperty(
+			"inline",
+		);
+	});
+
+	it("keeps patch provenance consistent across the result and later format retrieval", async () => {
+		let id = 0;
+		const runtime = makeTestRuntime({
+			store: makeMemoryArtifactStorage(),
+			createId: (prefix) => `${prefix}-${(id += 1)}`,
+			renderer: {
+				renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
+			},
+		});
+		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+		expectBuildOk(built);
+
+		expect(built.artifact).not.toHaveProperty("provenance");
+		const rootScene = await runtime.getArtifact({
+			artifactId: built.artifact.artifactId,
+			format: "scene",
+			inline: true,
+		});
+		expectGetOk(rootScene);
+		expect(rootScene).not.toHaveProperty("provenance");
+
+		const patched = await runtime.applyDiagramPatch({
+			source: { artifactId: built.artifact.artifactId },
+			operations: [
+				{
+					op: "setShape",
+					selector: { nodeIds: ["approve"] },
+					shape: "diamond",
+				},
+			],
+			options: {
+				artifactFormats: ["scene", "excalidraw", "png"],
+				inlineArtifacts: ["scene"],
+			},
+		});
+		expectPatchOk(patched);
+
+		const provenance = {
+			sourceArtifactId: built.artifact.artifactId,
+		};
+		expect(patched.sourceArtifactId).toBe(provenance.sourceArtifactId);
+		expect(patched.artifact.provenance).toEqual(provenance);
+		if (!patched.artifact.provenance) {
+			throw new Error("Expected the patched artifact to include provenance.");
+		}
+		patched.artifact.provenance.sourceArtifactId = "artifact-mutated";
+
+		const formats: ArtifactFormat[] = ["scene", "excalidraw", "png"];
+		for (const format of formats) {
+			const retrieved = await runtime.getArtifact({
+				artifactId: patched.artifact.artifactId,
+				format,
+			});
+			expectGetOk(retrieved);
+			expect(retrieved.provenance).toEqual(provenance);
+		}
+	});
+
+	it("keeps scoped edge style patches from recoloring node labels", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+		expectBuildOk(built);
+
+		const patched = await runtime.applyDiagramPatch({
+			source: { artifactId: built.artifact.artifactId },
+			operations: [
+				{
+					op: "setStyle",
+					selector: { scope: "edges" },
+					style: { strokeColor: "#7c3aed", textColor: "#7c3aed" },
+				},
+			],
+		});
+
+		expectPatchOk(patched);
+		const scene = parseInlineScene(
+			patched.artifact.formats.find((format) => format.format === "scene")?.inline,
+		);
+
+		expect(
+			scene.elements.filter((element) => element.type === "text").map((text) => text.textColor),
+		).toEqual([undefined, undefined, undefined, undefined]);
+		expect(
+			scene.elements
+				.filter((element) => element.type === "arrow")
+				.map((arrow) => arrow.strokeColor),
+		).toEqual(["#7c3aed", "#7c3aed", "#7c3aed"]);
+	});
+
+	it("rejects patch selectors that do not match the accepted artifact", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+		expectBuildOk(built);
+
+		const patched = await runtime.applyDiagramPatch({
+			source: { artifactId: built.artifact.artifactId },
+			operations: [
+				{
+					op: "setStyle",
+					selector: { nodeIds: ["missing-node"] },
+					style: { strokeColor: "#7c3aed" },
+				},
+			],
+		});
+
+		expectPatchFailure(patched);
+		expect(patched.status).toBe("target_not_found");
+		expect(patched.issues).toContainEqual(
+			expect.objectContaining({ code: "unknown_patch_target" }),
+		);
+	});
+
+	it("enumerates supported patch operations when the op name is invalid", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+		expectBuildOk(built);
+
+		const patched = await runtime.applyDiagramPatch({
+			source: { artifactId: built.artifact.artifactId },
+			operations: [
+				{
+					op: "setText",
+					selector: { nodeIds: ["done"] },
+					text: "Ship to production",
+				},
+			],
+		});
+
+		expectPatchFailure(patched);
+		expect(patched.status).toBe("invalid_input");
+		expect(patched.issues).toContainEqual(
+			expect.objectContaining({
+				code: "unsupported_patch_operation",
+				ref: { kind: "request", path: "operations.[0].op" },
+				hint: expect.stringContaining("replaceText"),
+			}),
+		);
+	});
+
+	it("uses replaceText to update accepted node labels", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+		expectBuildOk(built);
+
+		const patched = await runtime.applyDiagramPatch({
+			source: { artifactId: built.artifact.artifactId },
+			operations: [
+				{
+					op: "replaceText",
+					selector: { nodeIds: ["done"] },
+					text: "Ship to production",
+				},
+			],
+		});
+
+		expectPatchOk(patched);
+		const scene = parseInlineScene(
+			patched.artifact.formats.find((format) => format.format === "scene")?.inline,
+		);
+
+		expect(scene.elements).toContainEqual(
+			expect.objectContaining({
+				type: "node",
+				nodeId: "done",
+				label: "Ship to production",
+			}),
+		);
+		expect(scene.elements).toContainEqual(
+			expect.objectContaining({
+				type: "text",
+				containerId: expect.stringContaining("done"),
+				text: "Ship to production",
+			}),
+		);
+	});
+
+	it("returns structured storage failures when artifact reads throw", async () => {
+		const runtime = makeTestRuntime({
+			store: throwingStore(),
+			createId: (prefix) => `${prefix}-1`,
+		});
+
+		const artifact = await runtime.getArtifact({
+			artifactId: "artifact-1",
+			format: "scene",
+		});
+
+		expect(artifact.ok).toBe(false);
+		if (artifact.ok) {
+			throw new Error("Expected get failure.");
+		}
+		expect(artifact.status).toBe("storage_failed");
+		expect(artifact.issues).toContainEqual(
+			expect.objectContaining({
+				code: "storage_read_failed",
+				message: "manifest read failed",
+			}),
+		);
+
+		const patched = await runtime.applyDiagramPatch({
+			source: { artifactId: "artifact-1" },
+			operations: [{ op: "rerouteEdges" }],
+		});
+
+		expectPatchFailure(patched);
+		expect(patched.status).toBe("storage_failed");
+		expect(patched.issues).toContainEqual(
+			expect.objectContaining({
+				code: "storage_read_failed",
+				message: "manifest read failed",
+			}),
+		);
+	});
+
+	it("stores and retrieves artifacts through an object-bucket adapter", async () => {
+		const bucket = new MemoryBucket();
+		let id = 0;
+		const runtime = makeTestRuntime({
+			store: makeObjectBucketArtifactStorage(bucket, {
+				prefix: "codemode",
+			}),
+			createId: (prefix) => `${prefix}-${(id += 1)}`,
+		});
+
+		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+		expectBuildOk(built);
+
+		expect([...bucket.objects.keys()].sort()).toEqual([
+			"codemode/artifact-2/excalidraw.json",
+			"codemode/artifact-2/manifest.json",
+			"codemode/artifact-2/scene.json",
+		]);
+
+		const scene = await runtime.getArtifact({
+			artifactId: built.artifact.artifactId,
+			format: "scene",
+			inline: true,
+		});
+
+		expectGetOk(scene);
+		expect(parseInlineScene(scene.inline).diagramId).toBe("simple-approval-flow");
+	});
+
+	it("rejects an object-store scene whose source manifest was not published", async () => {
+		const sourceRuntime = createTestRuntime();
+		const built = await sourceRuntime.buildFlowchart({ spec: approvalSpec() });
+		expectBuildOk(built);
+		const sourceScene = parseInlineScene(
+			built.artifact.formats.find((format) => format.format === "scene")?.inline,
+		);
+
+		const bucket = new MemoryBucket();
+		await bucket.put("codemode/artifact-partial/scene.json", JSON.stringify(sourceScene));
+		let id = 0;
+		const runtime = makeTestRuntime({
+			store: makeObjectBucketArtifactStorage(bucket, { prefix: "codemode" }),
+			createId: (prefix) => `${prefix}-${(id += 1)}`,
+		});
+
+		const patched = await runtime.applyDiagramPatch({
+			source: { artifactId: "artifact-partial" },
+			operations: [{ op: "rerouteEdges" }],
+		});
+
+		expectPatchFailure(patched);
+		expect(patched.status).toBe("source_unavailable");
+		expect(patched.issues).toContainEqual(
+			expect.objectContaining({
+				code: "patch_source_unavailable",
+				message: expect.stringContaining("valid source manifest"),
+			}),
+		);
+		expect([...bucket.objects.keys()]).toEqual(["codemode/artifact-partial/scene.json"]);
+	});
+
+	it("persists PNG artifacts as binary object-bucket entries", async () => {
+		const bucket = new MemoryBucket();
+		let id = 0;
+		const runtime = makeTestRuntime({
+			store: makeObjectBucketArtifactStorage(bucket, {
+				prefix: "codemode",
+			}),
+			createId: (prefix) => `${prefix}-${(id += 1)}`,
+			renderer: {
+				renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
+			},
+		});
+
+		const built = await runtime.buildFlowchart({
+			spec: approvalSpec(),
+			options: { artifactFormats: ["scene", "png"] },
+		});
+		expectBuildOk(built);
+
+		expect([...bucket.objects.keys()].sort()).toEqual([
+			"codemode/artifact-2/manifest.json",
+			"codemode/artifact-2/png.png",
+			"codemode/artifact-2/scene.json",
+		]);
+
+		const png = await runtime.getArtifact({
+			artifactId: built.artifact.artifactId,
+			format: "png",
+		});
+
+		expectGetOk(png);
+		expect(png).toMatchObject({
+			format: "png",
+			mimeType: "image/png",
+			sizeBytes: 4,
+		});
+		expect(png).not.toHaveProperty("inline");
+	});
+
+	it("does not publish an object-bucket manifest when a format write fails", async () => {
+		const bucket = new FailingPngBucket();
+		let id = 0;
+		const runtime = makeTestRuntime({
+			store: makeObjectBucketArtifactStorage(bucket, {
+				prefix: "codemode",
+			}),
+			createId: (prefix) => `${prefix}-${(id += 1)}`,
+			renderer: {
+				renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
+			},
+		});
+
+		const built = await runtime.buildFlowchart({
+			spec: approvalSpec(),
+			options: { artifactFormats: ["scene", "png"] },
+		});
+
+		expectBuildFailure(built);
+		expect(built.status).toBe("storage_failed");
+		expect([...bucket.objects.keys()].sort()).toEqual(["codemode/artifact-2/scene.json"]);
+	});
+
+	it("builds a native sequence scene and exports every requested artifact", async () => {
+		const runtime = makeTestRuntime({
+			renderer: {
+				renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
+			},
+		});
+		const result = await runtime.buildSequenceDiagram({
+			spec: checkoutSequenceSpec(),
+			options: {
+				artifactFormats: ["scene", "excalidraw", "png"],
+				inlineArtifacts: ["excalidraw"],
+			},
+		});
+
+		expect(result.issues).toEqual([]);
+		expect(result).toMatchObject({ ok: true, status: "accepted" });
+		if (!result.ok) throw new Error("Expected accepted sequence diagram.");
+		expect(result.normalizedSpec.participants.map(({ id }) => id)).toEqual([
+			"customer",
+			"store",
+			"payments",
+		]);
+		expect(result.normalizedSpec.messages.map(({ label }) => label)).toEqual([
+			"Checkout",
+			"Authorize",
+			"Approved",
+		]);
+		expect(result.artifact.formats.map(({ format }) => format)).toEqual([
+			"scene",
+			"excalidraw",
+			"png",
+		]);
+		const excalidraw = result.artifact.formats.find(({ format }) => format === "excalidraw");
+		expect(excalidraw).toHaveProperty("inline");
+		expect(excalidraw?.inline).toMatchObject({
+			elements: expect.arrayContaining([
+				expect.objectContaining({
+					id: "arrow:message-3-payments-customer",
+					strokeStyle: "dashed",
+				}),
+			]),
+		});
+	});
+
+	it("round-trips a crossing sequence through a no-op inline-scene patch", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildSequenceDiagram({
+			spec: crossingSequenceSpec(),
+			options: {
+				artifactFormats: ["scene", "excalidraw"],
+				inlineArtifacts: ["scene"],
+			},
+		});
+		expect(built.ok).toBe(true);
+		if (!built.ok) throw new Error("Expected accepted sequence diagram.");
+		const sourceScene = built.artifact.formats.find(({ format }) => format === "scene")?.inline;
+		expect(sourceScene).toBeDefined();
+
+		const patched = await runtime.applyDiagramPatch({
+			source: { scene: sourceScene },
+			operations: [{ op: "setDefaultStyle", style: {} }],
+			options: {
+				artifactFormats: ["scene", "excalidraw"],
+				inlineArtifacts: ["scene", "excalidraw"],
+			},
+		});
+
+		expectPatchOk(patched);
+		expect(
+			patched.artifact.formats.find(({ format }) => format === "excalidraw")?.inline,
+		).toMatchObject({
+			elements: expect.arrayContaining([expect.objectContaining({ id: "arrow:message-1-a-c" })]),
+		});
+	});
+
+	it("styles a crossing sequence through an inline-scene patch", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildSequenceDiagram({
+			spec: crossingSequenceSpec(),
+			options: {
+				artifactFormats: ["scene"],
+				inlineArtifacts: ["scene"],
+			},
+		});
+		expect(built.ok).toBe(true);
+		if (!built.ok) throw new Error("Expected accepted sequence diagram.");
+		const sourceScene = built.artifact.formats.find(({ format }) => format === "scene")?.inline;
+
+		const patched = await runtime.applyDiagramPatch({
+			source: { scene: sourceScene },
+			operations: [
+				{
+					op: "setStyle",
+					selector: { nodeIds: ["b"] },
+					style: { fillColor: "#ede9fe", strokeColor: "#7c3aed" },
+				},
+			],
+			options: {
+				artifactFormats: ["scene", "excalidraw"],
+				inlineArtifacts: ["scene", "excalidraw"],
+			},
+		});
+
+		expectPatchOk(patched);
+		const patchedScene = parseInlineScene(
+			patched.artifact.formats.find(({ format }) => format === "scene")?.inline,
+		);
+		expect(
+			patchedScene.elements.find((element) => element.type === "node" && element.nodeId === "b"),
+		).toMatchObject({ fillColor: "#ede9fe", strokeColor: "#7c3aed" });
+		expect(
+			patched.artifact.formats.find(({ format }) => format === "excalidraw")?.inline,
+		).toMatchObject({ elements: expect.any(Array) });
+	});
+
+	it("preserves crossing-sequence lifeline roles after a fractional translate patch", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildSequenceDiagram({
+			spec: crossingSequenceSpec(),
+			options: {
+				artifactFormats: ["scene"],
+				inlineArtifacts: ["scene"],
+			},
+		});
+		expect(built.ok).toBe(true);
+		if (!built.ok) throw new Error("Expected accepted sequence diagram.");
+		const sourceScene = built.artifact.formats.find(({ format }) => format === "scene")?.inline;
+
+		const patched = await runtime.applyDiagramPatch({
+			source: { scene: sourceScene },
+			operations: [
+				{
+					op: "translate",
+					selector: { nodeIds: ["b:lifeline"] },
+					dx: 0.0003,
+					dy: -0.0003,
+				},
+			],
+			options: {
+				artifactFormats: ["scene", "excalidraw"],
+				inlineArtifacts: ["scene", "excalidraw"],
+			},
+		});
+
+		expectPatchOk(patched);
+		const patchedScene = parseInlineScene(
+			patched.artifact.formats.find(({ format }) => format === "scene")?.inline,
+		);
+		expect(
+			patchedScene.elements.find(
+				(element) => element.type === "node" && element.nodeId === "b:lifeline",
+			),
+		).toMatchObject({ rendererRole: "sequence-lifeline" });
+		expect(
+			patched.artifact.formats.find(({ format }) => format === "excalidraw")?.inline,
+		).toMatchObject({
+			elements: expect.arrayContaining([expect.objectContaining({ id: "arrow:message-1-a-c" })]),
+		});
+	});
+
+	it("strips a spoofed lifeline role from an ordinary inline node", async () => {
+		const result = await createTestRuntime().applyDiagramPatch({
+			source: {
+				scene: spoofedInlineLifelineScene({ useLifelineId: false }),
+			},
+			operations: [{ op: "setDefaultStyle", style: {} }],
+			options: {
+				artifactFormats: ["excalidraw"],
+				inlineArtifacts: ["excalidraw"],
+			},
+		});
+
+		expectPatchOk(result);
+		expect(JSON.stringify(result.artifact.formats[0]?.inline)).not.toContain("sketchiRendererRole");
+	});
+
+	it("does not trust a lifeline-style id without lifeline geometry", async () => {
+		const result = await createTestRuntime().applyDiagramPatch({
+			source: {
+				scene: spoofedInlineLifelineScene({ useLifelineId: true }),
+			},
+			operations: [{ op: "setDefaultStyle", style: {} }],
+			options: {
+				artifactFormats: ["excalidraw"],
+				inlineArtifacts: ["excalidraw"],
+			},
+		});
+
+		expectPatchOk(result);
+		expect(JSON.stringify(result.artifact.formats[0]?.inline)).not.toContain("sketchiRendererRole");
+	});
+
+	it("ignores renderer-owned lifeline roles in build specifications", async () => {
+		const runtime = createTestRuntime();
+		const flowchartSpec = approvalSpec();
+		const flowchart = await runtime.buildFlowchart({
+			spec: {
+				...flowchartSpec,
+				nodes: flowchartSpec.nodes.map((node, index) =>
+					index === 0 ? { ...node, rendererRole: "sequence-lifeline" } : node,
+				),
+			},
+			options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+		});
+		expectBuildOk(flowchart);
+		const flowchartScene = parseInlineScene(
+			flowchart.artifact.formats.find(({ format }) => format === "scene")?.inline,
+		);
+		expect(
+			flowchartScene.elements.find(
+				(element) => element.type === "node" && element.nodeId === "request",
+			),
+		).not.toHaveProperty("rendererRole");
+
+		const sequenceSpec = crossingSequenceSpec();
+		const sequence = await runtime.buildSequenceDiagram({
+			spec: {
+				...sequenceSpec,
+				participants: sequenceSpec.participants.map((participant, index) =>
+					index === 1 ? { ...participant, rendererRole: "sequence-lifeline" } : participant,
+				),
+			},
+			options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+		});
+		expect(sequence.ok).toBe(true);
+		if (!sequence.ok) throw new Error("Expected accepted sequence diagram.");
+		const sequenceScene = parseInlineScene(
+			sequence.artifact.formats.find(({ format }) => format === "scene")?.inline,
+		);
+		expect(
+			sequenceScene.elements.find((element) => element.type === "node" && element.nodeId === "b"),
+		).not.toHaveProperty("rendererRole");
+		expect(
+			sequenceScene.elements.filter(
+				(element) => element.type === "node" && element.rendererRole === "sequence-lifeline",
+			),
+		).toHaveLength(3);
+	});
+
+	it("returns repairable issues for invalid participant references and self messages", async () => {
+		const spec = checkoutSequenceSpec();
+		const result = await createTestRuntime().buildSequenceDiagram({
+			spec: {
+				...spec,
+				messages: [
+					{ source: "missing", target: "store", label: "Unknown sender" },
+					{ source: "store", target: "store", label: "Self message" },
+				],
+			},
+		});
+
+		expect(result).toMatchObject({
+			ok: false,
+			status: "invalid_sequence",
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: "missing_edge_source",
+					hint: expect.stringContaining("participant"),
+				}),
+				expect.objectContaining({
+					code: "self_loop",
+					hint: expect.stringContaining("different target"),
+				}),
+			]),
+		});
+	});
+
+	it("returns a repairable issue for participant ids that collide with lifelines", async () => {
+		const result = await createTestRuntime().buildSequenceDiagram({
+			spec: {
+				title: "Colliding participants",
+				participants: [
+					{ id: "api", label: "API" },
+					{ id: "api:lifeline", label: "Worker" },
+				],
+				messages: [],
+			},
+		});
+
+		expect(result).toMatchObject({
+			ok: false,
+			status: "invalid_sequence",
+			issues: [
+				expect.objectContaining({
+					code: "duplicate_node_id",
+					ref: { kind: "request", path: "spec.participants.[1].id" },
+					hint: expect.stringContaining("Rename the participant"),
+				}),
+			],
+		});
+	});
+
+	it("returns structured input issues for malformed sequence messages", async () => {
+		const spec = checkoutSequenceSpec();
+		const result = await createTestRuntime().buildSequenceDiagram({
+			spec: {
+				...spec,
+				messages: [{ source: "customer", target: "store" }],
+			},
+		});
+
+		expect(result).toMatchObject({
+			ok: false,
+			status: "invalid_input",
+			issues: [
+				expect.objectContaining({
+					code: "invalid_type",
+					ref: { kind: "request", path: expect.stringContaining("label") },
+					hint: expect.any(String),
+				}),
+			],
+		});
+	});
+
+	it("creates, renders, and persists a composed CanvasSpec artifact bundle", async () => {
+		let id = 0;
+		const runtime = makeTestRuntime({
+			store: makeMemoryArtifactStorage(),
+			createId: (prefix) => `${prefix}-${(id += 1)}`,
+			renderer: {
+				renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
+			},
+		});
+		const result = await runtime.createCanvas({
+			requestId: "canvas-request",
+			spec: {
+				kind: "canvas",
+				version: 1,
+				diagramId: "universal-canvas",
+				title: "Universal canvas",
+				width: 900,
+				height: 500,
+				accentColor: "#1f2937",
+				backgroundColor: "#ffffff",
+				layers: [
+					{ id: "background", name: "Background" },
+					{ id: "content", name: "Content" },
+				],
+				elements: [
+					{
+						type: "frame",
+						id: "frame",
+						name: "System",
+						x: 40,
+						y: 40,
+						width: 780,
+						height: 360,
+						layerId: "background",
+					},
+					{
+						type: "node",
+						id: "source",
+						nodeId: "source",
+						shape: "polygon",
+						points: [
+							{ x: 0, y: 50 },
+							{ x: 50, y: 0 },
+							{ x: 100, y: 50 },
+							{ x: 50, y: 100 },
+						],
+						x: 100,
+						y: 140,
+						width: 100,
+						height: 100,
+						label: "Source",
+						frameId: "frame",
+						groupIds: ["pipeline"],
+						layerId: "content",
+					},
+					{
+						type: "node",
+						id: "target",
+						nodeId: "target",
+						shape: "rectangle",
+						x: 520,
+						y: 140,
+						width: 180,
+						height: 100,
+						label: "Target",
+						frameId: "frame",
+						groupIds: ["pipeline"],
+						layerId: "content",
+					},
+					{
+						type: "arrow",
+						id: "connector",
+						edgeId: "connector",
+						sourceNodeId: "source",
+						targetNodeId: "target",
+						points: [
+							{ x: 200, y: 190 },
+							{ x: 520, y: 190 },
+						],
+						startArrowhead: "circle",
+						endArrowhead: "triangle",
+						label: "typed",
+						layerId: "content",
+					},
+					{
+						type: "line",
+						id: "baseline",
+						points: [
+							{ x: 80, y: 310 },
+							{ x: 740, y: 310 },
+						],
+						strokeStyle: "dashed",
+						layerId: "content",
+					},
+					{
+						type: "text",
+						id: "caption",
+						text: "Renderer-independent scene",
+						x: 300,
+						y: 330,
+						fontSize: 24,
+						textAlign: "center",
+						layerId: "content",
+					},
+				],
+				layouts: [
+					{
+						type: "row",
+						ids: ["source", "target"],
+						x: 100,
+						y: 140,
+						gap: 320,
+					},
+				],
+				zOrder: ["frame", "baseline", "source", "target", "connector", "caption"],
+			},
+			options: {
+				artifactFormats: ["scene", "excalidraw", "png"],
+				inlineArtifacts: ["scene", "excalidraw"],
+			},
+		});
+
+		expectCanvasOk(result);
+		expect(result.requestId).toBe("canvas-request");
+		expect(result.artifact.formats.map((format) => format.format)).toEqual([
+			"scene",
+			"excalidraw",
+			"png",
+		]);
+		expect(result.normalizedSpec.elements).toHaveLength(6);
+		expect(result.normalizedSpec.zOrder[0]).toBe("frame");
+	});
+
+	it("rejects an empty CanvasSpec as a typed invalid canvas", async () => {
+		const result = await createTestRuntime().createCanvas({
+			spec: {
+				kind: "canvas",
+				version: 1,
+				diagramId: "empty-canvas",
+				title: "Empty canvas",
+				width: 400,
+				height: 300,
+				accentColor: "#111827",
+				backgroundColor: "#ffffff",
+				elements: [],
+				layers: [],
+				layouts: [],
+				zOrder: [],
+			},
+		});
+
+		expect(result).toMatchObject({
+			ok: false,
+			status: "invalid_canvas",
+			issues: [
+				expect.objectContaining({
+					code: "invalid_canvas_geometry",
+					stage: "canvas",
+					ref: { kind: "diagram", path: "elements" },
+				}),
+			],
+		});
+	});
+
+	it("accepts a dense 120-element CanvasSpec and applies deterministic grid layout", async () => {
+		const elements = Array.from({ length: 120 }, (_, index) => ({
+			type: "node",
+			id: `cell-${index}`,
+			nodeId: `cell-${index}`,
+			shape: "rectangle",
+			x: 0,
+			y: 0,
+			width: 80,
+			height: 40,
+			label: `Cell ${index}`,
+		}));
+		const result = await createTestRuntime().createCanvas({
+			spec: {
+				kind: "canvas",
+				version: 1,
+				diagramId: "dense-120",
+				title: "Dense matrix",
+				width: 1200,
+				height: 800,
+				accentColor: "#111827",
+				backgroundColor: "#ffffff",
+				elements,
+				layers: [],
+				layouts: [
+					{
+						type: "grid",
+						ids: elements.map((element) => element.id),
+						columns: 12,
+						x: 20,
+						y: 20,
+						columnGap: 10,
+						rowGap: 10,
+					},
+				],
+				zOrder: elements.map((element) => element.id),
+			},
+			options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+		});
+
+		expectCanvasOk(result);
+		expect(result.normalizedSpec.elements).toHaveLength(120);
+		expect(result.normalizedSpec.elements[119]).toMatchObject({
+			x: 1010,
+			y: 470,
+		});
+	});
+
+	it("supports stable structural canvas patches", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.createCanvas({
+			spec: {
+				kind: "canvas",
+				version: 1,
+				diagramId: "patchable-canvas",
+				title: "Patchable canvas",
+				width: 600,
+				height: 300,
+				accentColor: "#111827",
+				backgroundColor: "#ffffff",
+				elements: [
+					{
+						type: "node",
+						id: "a",
+						nodeId: "a",
+						shape: "rectangle",
+						x: 20,
+						y: 20,
+						width: 120,
+						height: 60,
+						label: "A",
+					},
+					{
+						type: "node",
+						id: "b",
+						nodeId: "b",
+						shape: "rectangle",
+						x: 220,
+						y: 20,
+						width: 120,
+						height: 60,
+						label: "B",
+					},
+				],
+				layers: [],
+				layouts: [],
+				zOrder: ["a", "b"],
+			},
+			options: { artifactFormats: ["scene"] },
+		});
+		expectCanvasOk(built);
+
+		const patched = await runtime.applyDiagramPatch({
+			source: { artifactId: built.artifact.artifactId },
+			options: {
+				preserveConnectivity: false,
+				artifactFormats: ["scene"],
+				inlineArtifacts: ["scene"],
+			},
+			operations: [
+				{
+					op: "insert",
+					afterId: "a",
+					elements: [
+						{
+							type: "node",
+							id: "c",
+							nodeId: "c",
+							shape: "ellipse",
+							x: 120,
+							y: 140,
+							width: 120,
+							height: 60,
+							label: "C",
+						},
+					],
+				},
+				{ op: "group", ids: ["a", "c"], groupId: "group-1" },
+				{ op: "reorder", ids: ["b"], beforeId: "a" },
+				{
+					op: "replace",
+					id: "c",
+					element: {
+						type: "node",
+						id: "c",
+						nodeId: "c",
+						shape: "diamond",
+						x: 120,
+						y: 140,
+						width: 140,
+						height: 80,
+						label: "C updated",
+						groupIds: ["group-1"],
+					},
+				},
+				{ op: "ungroup", ids: ["a"], groupId: "group-1" },
+				{ op: "remove", selector: { ids: ["a"] } },
+			],
+		});
+
+		expectPatchOk(patched);
+		const scene = parseInlineScene(
+			patched.artifact.formats.find((format) => format.format === "scene")?.inline,
+		);
+		expect(scene.zOrder).toEqual(["b", "c"]);
+		expect(scene.elements).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					id: "c",
+					label: "C updated",
+					groupIds: ["group-1"],
+				}),
+			]),
+		);
+	});
+
+	it("returns typed CanvasSpec structural and limit failures", async () => {
+		const base = {
+			kind: "canvas",
+			version: 1,
+			diagramId: "invalid-canvas",
+			title: "Invalid canvas",
+			width: 600,
+			height: 300,
+			accentColor: "#111827",
+			backgroundColor: "#ffffff",
+			layers: [],
+			layouts: [],
+		};
+		const invalid = await createTestRuntime().createCanvas({
+			spec: {
+				...base,
+				elements: [
+					{
+						type: "node",
+						id: "same",
+						nodeId: "a",
+						shape: "rectangle",
+						x: 20,
+						y: 20,
+						width: 120,
+						height: 60,
+						label: "A",
+					},
+					{
+						type: "node",
+						id: "same",
+						nodeId: "b",
+						shape: "rectangle",
+						x: 220,
+						y: 20,
+						width: 120,
+						height: 60,
+						label: "B",
+					},
+					{
+						type: "line",
+						id: "line",
+						points: [
+							{ x: 0, y: 0 },
+							{ x: 20, y: 20 },
+						],
+						endBinding: { elementId: "missing" },
+					},
+				],
+				zOrder: ["same", "line"],
+			},
+		});
+		expect(invalid).toMatchObject({
+			ok: false,
+			status: "invalid_canvas",
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: "duplicate_element_id",
+					stage: "canvas",
+				}),
+				expect.objectContaining({
+					code: "invalid_canvas_binding",
+					stage: "canvas",
+				}),
+			]),
+		});
+
+		const limited = await createTestRuntime().createCanvas({
+			spec: {
+				...base,
+				width: 20_000,
+				elements: [
+					{
+						type: "node",
+						id: "a",
+						nodeId: "a",
+						shape: "rectangle",
+						x: 20,
+						y: 20,
+						width: 120,
+						height: 60,
+						label: "A",
+					},
+				],
+				zOrder: ["a"],
+			},
+		});
+		expect(limited).toMatchObject({
+			ok: false,
+			status: "limit_exceeded",
+			issues: [expect.objectContaining({ code: "canvas_limit_exceeded" })],
+		});
+	});
 });
 
 function geometryCanvas(elements: CanvasSpec["elements"] = []): CanvasSpec {
-  return {
-    kind: "canvas",
-    version: 1,
-    diagramId: "geometry",
-    title: "Geometry",
-    width: 600,
-    height: 600,
-    accentColor: "#111827",
-    backgroundColor: "#ffffff",
-    layers: [],
-    layouts: [],
-    elements,
-    zOrder: elements.map(({ id }) => id),
-  };
+	return {
+		kind: "canvas",
+		version: 1,
+		diagramId: "geometry",
+		title: "Geometry",
+		width: 600,
+		height: 600,
+		accentColor: "#111827",
+		backgroundColor: "#ffffff",
+		layers: [],
+		layouts: [],
+		elements,
+		zOrder: elements.map(({ id }) => id),
+	};
 }
 
 function geometryNode(id: string, x: number, y: number): CanvasShapeElement {
-  return {
-    type: "node",
-    id,
-    nodeId: id,
-    shape: "rectangle",
-    x,
-    y,
-    width: 100,
-    height: 60,
-    label: id,
-  };
+	return {
+		type: "node",
+		id,
+		nodeId: id,
+		shape: "rectangle",
+		x,
+		y,
+		width: 100,
+		height: 60,
+		label: id,
+	};
 }
 
 function densePointElements(count: number): CanvasSpec["elements"] {
-  return Array.from({ length: count }, (_, index) => ({
-    type: "line",
-    id: `line-${index}`,
-    points: [
-      { x: 0, y: 0 },
-      { x: 1, y: 1 },
-      ...Array.from({ length: 254 }, () => ({ x: 1, y: 1 })),
-    ],
-  }));
+	return Array.from({ length: count }, (_, index) => ({
+		type: "line",
+		id: `line-${index}`,
+		points: [
+			{ x: 0, y: 0 },
+			{ x: 1, y: 1 },
+			...Array.from({ length: 254 }, () => ({ x: 1, y: 1 })),
+		],
+	}));
 }
 
 describe("canvas geometry and input bounds", () => {
-  it.each([
-    { x: 300, y: 0, start: { x: 100, y: 30 }, end: { x: 300, y: 30 } },
-    { x: 0, y: 300, start: { x: 50, y: 60 }, end: { x: 50, y: 300 } },
-  ])(
-    "reroutes to the near target edge for a pair at $x,$y",
-    async ({ x, y, start, end }) => {
-      const result = await createTestRuntime().applyDiagramPatch({
-        source: {
-          scene: geometryCanvas([
-            geometryNode("a", 0, 0),
-            geometryNode("b", x, y),
-            {
-              type: "arrow",
-              id: "ab",
-              edgeId: "ab",
-              sourceNodeId: "a",
-              targetNodeId: "b",
-              points: [start, end],
-            },
-          ]),
-        },
-        operations: [{ op: "rerouteEdges" }],
-        options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
-      });
-      expectPatchOk(result);
-      const scene = parseInlineScene(result.artifact.formats[0]?.inline);
-      const arrow = scene.elements.find(({ id }) => id === "ab");
-      if (!arrow || arrow.type !== "arrow")
-        throw new Error("Expected ab arrow");
-      expect(arrow.points[0]).toEqual(start);
-      expect(arrow.points.at(-1)).toEqual(end);
-    },
-  );
+	it.each([
+		{ x: 300, y: 0, start: { x: 100, y: 30 }, end: { x: 300, y: 30 } },
+		{ x: 0, y: 300, start: { x: 50, y: 60 }, end: { x: 50, y: 300 } },
+	])("reroutes to the near target edge for a pair at $x,$y", async ({ x, y, start, end }) => {
+		const result = await createTestRuntime().applyDiagramPatch({
+			source: {
+				scene: geometryCanvas([
+					geometryNode("a", 0, 0),
+					geometryNode("b", x, y),
+					{
+						type: "arrow",
+						id: "ab",
+						edgeId: "ab",
+						sourceNodeId: "a",
+						targetNodeId: "b",
+						points: [start, end],
+					},
+				]),
+			},
+			operations: [{ op: "rerouteEdges" }],
+			options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+		});
+		expectPatchOk(result);
+		const scene = parseInlineScene(result.artifact.formats[0]?.inline);
+		const arrow = scene.elements.find(({ id }) => id === "ab");
+		if (!arrow || arrow.type !== "arrow") throw new Error("Expected ab arrow");
+		expect(arrow.points[0]).toEqual(start);
+		expect(arrow.points.at(-1)).toEqual(end);
+	});
 
-  it("cascades removal through an inserted label ordered before its arrow", async () => {
-    const result = await createTestRuntime().applyDiagramPatch({
-      source: {
-        scene: geometryCanvas([
-          geometryNode("a", 0, 0),
-          geometryNode("b", 300, 0),
-        ]),
-      },
-      operations: [
-        {
-          op: "insert",
-          elements: [
-            {
-              type: "text",
-              id: "label-a2",
-              containerId: "a2",
-              x: 200,
-              y: 30,
-              text: "edge",
-              fontSize: 13,
-            },
-            {
-              type: "arrow",
-              id: "a2",
-              edgeId: "a2",
-              sourceNodeId: "a",
-              targetNodeId: "b",
-              points: [
-                { x: 100, y: 30 },
-                { x: 300, y: 30 },
-              ],
-            },
-          ],
-        },
-        { op: "remove", selector: { ids: ["a"] } },
-      ],
-      options: {
-        preserveConnectivity: false,
-        artifactFormats: ["scene"],
-        inlineArtifacts: ["scene"],
-      },
-    });
-    expectPatchOk(result);
-    const scene = parseInlineScene(result.artifact.formats[0]?.inline);
-    expect(scene.elements.map(({ id }) => id)).toEqual(["b"]);
-    expect(scene.zOrder).toEqual(["b"]);
-  });
+	it("cascades removal through an inserted label ordered before its arrow", async () => {
+		const result = await createTestRuntime().applyDiagramPatch({
+			source: {
+				scene: geometryCanvas([geometryNode("a", 0, 0), geometryNode("b", 300, 0)]),
+			},
+			operations: [
+				{
+					op: "insert",
+					elements: [
+						{
+							type: "text",
+							id: "label-a2",
+							containerId: "a2",
+							x: 200,
+							y: 30,
+							text: "edge",
+							fontSize: 13,
+						},
+						{
+							type: "arrow",
+							id: "a2",
+							edgeId: "a2",
+							sourceNodeId: "a",
+							targetNodeId: "b",
+							points: [
+								{ x: 100, y: 30 },
+								{ x: 300, y: 30 },
+							],
+						},
+					],
+				},
+				{ op: "remove", selector: { ids: ["a"] } },
+			],
+			options: {
+				preserveConnectivity: false,
+				artifactFormats: ["scene"],
+				inlineArtifacts: ["scene"],
+			},
+		});
+		expectPatchOk(result);
+		const scene = parseInlineScene(result.artifact.formats[0]?.inline);
+		expect(scene.elements.map(({ id }) => id)).toEqual(["b"]);
+		expect(scene.zOrder).toEqual(["b"]);
+	});
 
-  it("recomputes bounds after inserting 599 lines with 256 points", async () => {
-    const result = await createTestRuntime().applyDiagramPatch({
-      source: { scene: geometryCanvas([geometryNode("a", 0, 0)]) },
-      operations: [
-        {
-          op: "insert",
-          elements: densePointElements(CANVAS_LIMITS.maxElements - 1),
-        },
-        { op: "translate", selector: { nodeIds: ["a"] }, dx: 10, dy: 10 },
-      ],
-      options: {
-        preserveConnectivity: false,
-        artifactFormats: ["scene"],
-        inlineArtifacts: ["scene"],
-      },
-    });
-    expectPatchOk(result);
-    const scene = parseInlineScene(result.artifact.formats[0]?.inline);
-    expect(scene.elements).toHaveLength(600);
-    expect(scene).toMatchObject({ width: 648, height: 648 });
-  }, 15000);
+	it("recomputes bounds after inserting 599 lines with 256 points", async () => {
+		const result = await createTestRuntime().applyDiagramPatch({
+			source: { scene: geometryCanvas([geometryNode("a", 0, 0)]) },
+			operations: [
+				{
+					op: "insert",
+					elements: densePointElements(CANVAS_LIMITS.maxElements - 1),
+				},
+				{ op: "translate", selector: { nodeIds: ["a"] }, dx: 10, dy: 10 },
+			],
+			options: {
+				preserveConnectivity: false,
+				artifactFormats: ["scene"],
+				inlineArtifacts: ["scene"],
+			},
+		});
+		expectPatchOk(result);
+		const scene = parseInlineScene(result.artifact.formats[0]?.inline);
+		expect(scene.elements).toHaveLength(600);
+		expect(scene).toMatchObject({ width: 648, height: 648 });
+	}, 15000);
 
-  it("rejects a raw 600x256-point canvas before decode in both workflows", async () => {
-    const scene = geometryCanvas(densePointElements(CANVAS_LIMITS.maxElements));
-    const runtime = createTestRuntime();
-    expect(await runtime.createCanvas({ spec: scene })).toMatchObject({
-      ok: false,
-      status: "limit_exceeded",
-      issues: [
-        expect.objectContaining({
-          code: "canvas_limit_exceeded",
-          ref: { kind: "request", path: "spec" },
-        }),
-      ],
-    });
-    expect(
-      await runtime.applyDiagramPatch({
-        source: { scene },
-        operations: [{ op: "translate", dx: 1, dy: 1 }],
-      }),
-    ).toMatchObject({
-      ok: false,
-      status: "invalid_input",
-      issues: [
-        expect.objectContaining({
-          code: "canvas_limit_exceeded",
-          ref: { kind: "request", path: "source.scene" },
-        }),
-      ],
-    });
-  });
+	it("rejects a raw 600x256-point canvas before decode in both workflows", async () => {
+		const scene = geometryCanvas(densePointElements(CANVAS_LIMITS.maxElements));
+		const runtime = createTestRuntime();
+		expect(await runtime.createCanvas({ spec: scene })).toMatchObject({
+			ok: false,
+			status: "limit_exceeded",
+			issues: [
+				expect.objectContaining({
+					code: "canvas_limit_exceeded",
+					ref: { kind: "request", path: "spec" },
+				}),
+			],
+		});
+		expect(
+			await runtime.applyDiagramPatch({
+				source: { scene },
+				operations: [{ op: "translate", dx: 1, dy: 1 }],
+			}),
+		).toMatchObject({
+			ok: false,
+			status: "invalid_input",
+			issues: [
+				expect.objectContaining({
+					code: "canvas_limit_exceeded",
+					ref: { kind: "request", path: "source.scene" },
+				}),
+			],
+		});
+	});
 
-  it("counts raw unknown fields and UTF-8 bytes before schema decoding", async () => {
-    const scene = {
-      ...geometryCanvas([geometryNode("a", 0, 0)]),
-      ignored: "💡".repeat(CANVAS_LIMITS.maxSerializedBytes / 4),
-    };
-    expect(
-      await createTestRuntime().createCanvas({ spec: scene }),
-    ).toMatchObject({ ok: false, status: "limit_exceeded" });
-    expect(
-      await createTestRuntime().applyDiagramPatch({
-        source: { scene },
-        operations: [{ op: "setDefaultStyle", style: {} }],
-      }),
-    ).toMatchObject({
-      ok: false,
-      status: "invalid_input",
-      issues: [expect.objectContaining({ code: "canvas_limit_exceeded" })],
-    });
-  });
+	it("counts raw unknown fields and UTF-8 bytes before schema decoding", async () => {
+		const scene = {
+			...geometryCanvas([geometryNode("a", 0, 0)]),
+			ignored: "💡".repeat(CANVAS_LIMITS.maxSerializedBytes / 4),
+		};
+		expect(await createTestRuntime().createCanvas({ spec: scene })).toMatchObject({
+			ok: false,
+			status: "limit_exceeded",
+		});
+		expect(
+			await createTestRuntime().applyDiagramPatch({
+				source: { scene },
+				operations: [{ op: "setDefaultStyle", style: {} }],
+			}),
+		).toMatchObject({
+			ok: false,
+			status: "invalid_input",
+			issues: [expect.objectContaining({ code: "canvas_limit_exceeded" })],
+		});
+	});
 
-  it.each(["createCanvas", "applyDiagramPatch"])(
-    "returns a typed rejection for deeply nested unknown fields in %s",
-    async (operation) => {
-      // A Date leaf selects the recursive serializer even with Node's fast path.
-      let nested: unknown = new Date(0);
-      for (let depth = 0; depth < 10_000; depth += 1) nested = [nested];
-      const scene = {
-        ...geometryCanvas([geometryNode("a", 0, 0)]),
-        ignored: nested,
-      };
-      const memory = makeMemoryArtifactStorage();
-      let writes = 0;
-      const store: CodeModeArtifactStorageShape = {
-        ...memory,
-        write(input) {
-          writes += 1;
-          return memory.write(input);
-        },
-      };
-      const runtime = makeTestRuntime({ store });
-      const result =
-        operation === "createCanvas"
-          ? await runtime.createCanvas({
-              requestId: "deep-canvas-request",
-              spec: scene,
-            })
-          : await runtime.applyDiagramPatch({
-              source: { scene },
-              operations: [{ op: "setDefaultStyle", style: {} }],
-            });
-      expect(result).toMatchObject({
-        ok: false,
-        status: "invalid_input",
-        issues: [
-          expect.objectContaining({
-            code: "invalid_type",
-            stage: "input",
-            ref: {
-              kind: "request",
-              path: operation === "createCanvas" ? "spec" : "source.scene",
-            },
-          }),
-        ],
-      });
-      if (operation === "createCanvas") {
-        expect(result).toMatchObject({
-          buildId: "build-test",
-          requestId: "deep-canvas-request",
-        });
-      }
-      expect(writes).toBe(0);
-    },
-  );
+	it.each(["createCanvas", "applyDiagramPatch"])(
+		"returns a typed rejection for deeply nested unknown fields in %s",
+		async (operation) => {
+			// A Date leaf selects the recursive serializer even with Node's fast path.
+			let nested: unknown = new Date(0);
+			for (let depth = 0; depth < 10_000; depth += 1) nested = [nested];
+			const scene = {
+				...geometryCanvas([geometryNode("a", 0, 0)]),
+				ignored: nested,
+			};
+			const memory = makeMemoryArtifactStorage();
+			let writes = 0;
+			const store: CodeModeArtifactStorageShape = {
+				...memory,
+				write(input) {
+					writes += 1;
+					return memory.write(input);
+				},
+			};
+			const runtime = makeTestRuntime({ store });
+			const result =
+				operation === "createCanvas"
+					? await runtime.createCanvas({
+							requestId: "deep-canvas-request",
+							spec: scene,
+						})
+					: await runtime.applyDiagramPatch({
+							source: { scene },
+							operations: [{ op: "setDefaultStyle", style: {} }],
+						});
+			expect(result).toMatchObject({
+				ok: false,
+				status: "invalid_input",
+				issues: [
+					expect.objectContaining({
+						code: "invalid_type",
+						stage: "input",
+						ref: {
+							kind: "request",
+							path: operation === "createCanvas" ? "spec" : "source.scene",
+						},
+					}),
+				],
+			});
+			if (operation === "createCanvas") {
+				expect(result).toMatchObject({
+					buildId: "build-test",
+					requestId: "deep-canvas-request",
+				});
+			}
+			expect(writes).toBe(0);
+		},
+	);
 
-  it("checks inline source limits before applying removal operations", async () => {
-    const scene = {
-      ...geometryCanvas([geometryNode("a", 0, 0)]),
-      width: 20000,
-    };
-    const result = await createTestRuntime().applyDiagramPatch({
-      source: { scene },
-      operations: [{ op: "remove", selector: { ids: ["a"] } }],
-    });
-    expect(result).toMatchObject({
-      ok: false,
-      status: "invalid_input",
-      issues: expect.arrayContaining([
-        expect.objectContaining({ code: "canvas_limit_exceeded" }),
-      ]),
-    });
-  });
+	it("checks inline source limits before applying removal operations", async () => {
+		const scene = {
+			...geometryCanvas([geometryNode("a", 0, 0)]),
+			width: 20000,
+		};
+		const result = await createTestRuntime().applyDiagramPatch({
+			source: { scene },
+			operations: [{ op: "remove", selector: { ids: ["a"] } }],
+		});
+		expect(result).toMatchObject({
+			ok: false,
+			status: "invalid_input",
+			issues: expect.arrayContaining([expect.objectContaining({ code: "canvas_limit_exceeded" })]),
+		});
+	});
 
-  it("rejects a tall authored label as invalid_canvas before export", async () => {
-    const scene = geometryCanvas([
-      {
-        ...geometryNode("a", 0, 0),
-        width: 200,
-        height: 30,
-        label: "one\ntwo\nthree",
-      },
-    ]);
-    expect(
-      await createTestRuntime().createCanvas({ spec: scene }),
-    ).toMatchObject({
-      ok: false,
-      status: "invalid_canvas",
-      issues: [
-        expect.objectContaining({
-          code: "invalid_canvas_geometry",
-          ref: { kind: "element", id: "a", path: "elements[0].label" },
-        }),
-      ],
-    });
-  });
+	it("rejects a tall authored label as invalid_canvas before export", async () => {
+		const scene = geometryCanvas([
+			{
+				...geometryNode("a", 0, 0),
+				width: 200,
+				height: 30,
+				label: "one\ntwo\nthree",
+			},
+		]);
+		expect(await createTestRuntime().createCanvas({ spec: scene })).toMatchObject({
+			ok: false,
+			status: "invalid_canvas",
+			issues: [
+				expect.objectContaining({
+					code: "invalid_canvas_geometry",
+					ref: { kind: "element", id: "a", path: "elements[0].label" },
+				}),
+			],
+		});
+	});
 
-  it.each([
-    ["elements", CANVAS_LIMITS.maxElements, () => geometryNode("a", 0, 0)],
-    ["layers", CANVAS_LIMITS.maxLayers, () => ({ id: "layer" })],
-    ["layouts", CANVAS_LIMITS.maxLayouts, () => ({ type: "row", ids: ["a"] })],
-    ["zOrder", CANVAS_LIMITS.maxZOrderEntries, () => "a"],
-  ])(
-    "advertises the $0 limit while leaving count failures to the runtime",
-    (field, limit, item) => {
-      const scene = geometryCanvas([geometryNode("a", 0, 0)]);
-      expect(
-        Result.isSuccess(
-          Schema.decodeUnknownResult(CanvasSpecSchema, {
-            errors: "all",
-            reportInput: true,
-          })({
-            ...scene,
-            [field]: Array.from({ length: limit + 1 }, () => item()),
-          }),
-        ),
-      ).toBe(true);
-      expect(
-        Result.isSuccess(
-          Schema.decodeUnknownResult(CanvasSpecSchema, {
-            errors: "all",
-            reportInput: true,
-          })({
-            ...scene,
-            [field]: Array.from({ length: limit }, () => item()),
-          }),
-        ),
-      ).toBe(true);
-      expect(toCodeModeJsonSchema(CreateCanvasRequestSchema)).toMatchObject({
-        properties: {
-          spec: {
-            properties: {
-              [field]: expect.objectContaining({ maxItems: limit }),
-            },
-          },
-        },
-      });
-    },
-  );
+	it.each([
+		["elements", CANVAS_LIMITS.maxElements, () => geometryNode("a", 0, 0)],
+		["layers", CANVAS_LIMITS.maxLayers, () => ({ id: "layer" })],
+		["layouts", CANVAS_LIMITS.maxLayouts, () => ({ type: "row", ids: ["a"] })],
+		["zOrder", CANVAS_LIMITS.maxZOrderEntries, () => "a"],
+	])(
+		"advertises the $0 limit while leaving count failures to the runtime",
+		(field, limit, item) => {
+			const scene = geometryCanvas([geometryNode("a", 0, 0)]);
+			expect(
+				Result.isSuccess(
+					Schema.decodeUnknownResult(CanvasSpecSchema, {
+						errors: "all",
+						reportInput: true,
+					})({
+						...scene,
+						[field]: Array.from({ length: limit + 1 }, () => item()),
+					}),
+				),
+			).toBe(true);
+			expect(
+				Result.isSuccess(
+					Schema.decodeUnknownResult(CanvasSpecSchema, {
+						errors: "all",
+						reportInput: true,
+					})({
+						...scene,
+						[field]: Array.from({ length: limit }, () => item()),
+					}),
+				),
+			).toBe(true);
+			expect(toCodeModeJsonSchema(CreateCanvasRequestSchema)).toMatchObject({
+				properties: {
+					spec: {
+						properties: {
+							[field]: expect.objectContaining({ maxItems: limit }),
+						},
+					},
+				},
+			});
+		},
+	);
 
-  it("advertises the groups-per-element limit while leaving count failures to the runtime", () => {
-    const scene = geometryCanvas([
-      {
-        ...geometryNode("a", 0, 0),
-        groupIds: Array.from(
-          { length: CANVAS_LIMITS.maxGroupsPerElement + 1 },
-          () => "g",
-        ),
-      },
-    ]);
-    expect(
-      Result.isSuccess(
-        Schema.decodeUnknownResult(CanvasSpecSchema, {
-          errors: "all",
-          reportInput: true,
-        })(scene),
-      ),
-    ).toBe(true);
-    expect(
-      JSON.stringify(toCodeModeJsonSchema(CreateCanvasRequestSchema)),
-    ).toContain(`"maxItems":${CANVAS_LIMITS.maxGroupsPerElement}`);
-  });
+	it("advertises the groups-per-element limit while leaving count failures to the runtime", () => {
+		const scene = geometryCanvas([
+			{
+				...geometryNode("a", 0, 0),
+				groupIds: Array.from({ length: CANVAS_LIMITS.maxGroupsPerElement + 1 }, () => "g"),
+			},
+		]);
+		expect(
+			Result.isSuccess(
+				Schema.decodeUnknownResult(CanvasSpecSchema, {
+					errors: "all",
+					reportInput: true,
+				})(scene),
+			),
+		).toBe(true);
+		expect(JSON.stringify(toCodeModeJsonSchema(CreateCanvasRequestSchema))).toContain(
+			`"maxItems":${CANVAS_LIMITS.maxGroupsPerElement}`,
+		);
+	});
 });
 
 describe("reviewed label-fit regressions", () => {
-  it("accepts a sequence build with a three-line participant label", async () => {
-    const result = await createTestRuntime().buildSequenceDiagram({
-      spec: {
-        ...checkoutSequenceSpec(),
-        participants: [
-          { id: "customer", label: "one\ntwo\nthree" },
-          { id: "store", label: "Store" },
-          { id: "payments", label: "Payments" },
-        ],
-      },
-      options: {
-        artifactFormats: ["scene", "excalidraw"],
-        inlineArtifacts: ["scene"],
-      },
-    });
-    expect(result).toMatchObject({ ok: true, status: "accepted", issues: [] });
-    if (!result.ok) throw new Error("Expected accepted multiline sequence");
-    const scene = parseInlineScene(
-      result.artifact.formats.find(({ format }) => format === "scene")?.inline,
-    );
-    expect(
-      scene.elements.find(({ id }) => id === "node:customer"),
-    ).toMatchObject({ height: 75 });
-  });
+	it("accepts a sequence build with a three-line participant label", async () => {
+		const result = await createTestRuntime().buildSequenceDiagram({
+			spec: {
+				...checkoutSequenceSpec(),
+				participants: [
+					{ id: "customer", label: "one\ntwo\nthree" },
+					{ id: "store", label: "Store" },
+					{ id: "payments", label: "Payments" },
+				],
+			},
+			options: {
+				artifactFormats: ["scene", "excalidraw"],
+				inlineArtifacts: ["scene"],
+			},
+		});
+		expect(result).toMatchObject({ ok: true, status: "accepted", issues: [] });
+		if (!result.ok) throw new Error("Expected accepted multiline sequence");
+		const scene = parseInlineScene(
+			result.artifact.formats.find(({ format }) => format === "scene")?.inline,
+		);
+		expect(scene.elements.find(({ id }) => id === "node:customer")).toMatchObject({ height: 75 });
+	});
 
-  it("creates a canvas with a hidden overflowing bound label without changing authored node geometry", async () => {
-    const scene = geometryCanvas([
-      { ...geometryNode("a", 0, 0), label: "A" },
-      {
-        type: "text",
-        id: "hidden-label",
-        containerId: "a",
-        x: 50,
-        y: 30,
-        fontSize: 20,
-        text: "one\ntwo\nthree",
-        layerId: "hidden",
-      },
-    ]);
-    const result = await createTestRuntime().createCanvas({
-      spec: { ...scene, layers: [{ id: "hidden", visible: false }] },
-      options: {
-        artifactFormats: ["excalidraw"],
-        inlineArtifacts: ["excalidraw"],
-      },
-    });
-    expectCanvasOk(result);
-    expect(
-      result.normalizedSpec.elements.find(({ id }) => id === "a"),
-    ).toMatchObject({ width: 100, height: 60 });
-    expect(result.artifact.formats[0]?.inline).toMatchObject({
-      elements: expect.arrayContaining([
-        expect.objectContaining({ id: "a", width: 100, height: 60 }),
-        expect.objectContaining({ text: "A" }),
-      ]),
-    });
-    expect(result.artifact.formats[0]?.inline).toMatchObject({
-      elements: expect.not.arrayContaining([
-        expect.objectContaining({ id: "hidden-label" }),
-      ]),
-    });
-  });
+	it("creates a canvas with a hidden overflowing bound label without changing authored node geometry", async () => {
+		const scene = geometryCanvas([
+			{ ...geometryNode("a", 0, 0), label: "A" },
+			{
+				type: "text",
+				id: "hidden-label",
+				containerId: "a",
+				x: 50,
+				y: 30,
+				fontSize: 20,
+				text: "one\ntwo\nthree",
+				layerId: "hidden",
+			},
+		]);
+		const result = await createTestRuntime().createCanvas({
+			spec: { ...scene, layers: [{ id: "hidden", visible: false }] },
+			options: {
+				artifactFormats: ["excalidraw"],
+				inlineArtifacts: ["excalidraw"],
+			},
+		});
+		expectCanvasOk(result);
+		expect(result.normalizedSpec.elements.find(({ id }) => id === "a")).toMatchObject({
+			width: 100,
+			height: 60,
+		});
+		expect(result.artifact.formats[0]?.inline).toMatchObject({
+			elements: expect.arrayContaining([
+				expect.objectContaining({ id: "a", width: 100, height: 60 }),
+				expect.objectContaining({ text: "A" }),
+			]),
+		});
+		expect(result.artifact.formats[0]?.inline).toMatchObject({
+			elements: expect.not.arrayContaining([expect.objectContaining({ id: "hidden-label" })]),
+		});
+	});
 });
 
 describe("bot-reviewed canvas limits and coincident routes", () => {
-  it("checks oversized inline scene counts before removable malformed geometry can bypass validation", async () => {
-    const elements: CanvasSpec["elements"] = Array.from(
-      { length: CANVAS_LIMITS.maxElements },
-      (_, index) => ({
-        type: "frame",
-        id: `frame-${index}`,
-        x: 0,
-        y: 0,
-        width: 10,
-        height: 10,
-      }),
-    );
-    const scene = {
-      ...geometryCanvas(elements),
-      elements: [
-        ...elements,
-        {
-          ...geometryNode("bad", 0, 0),
-          shape: "polygon",
-          points: [
-            { x: 0, y: 0 },
-            { x: 10, y: 10 },
-          ],
-        },
-      ],
-      zOrder: [...elements.map(({ id }) => id), "bad"],
-    };
-    const result = await createTestRuntime().applyDiagramPatch({
-      source: { scene },
-      operations: [{ op: "remove", selector: { ids: ["bad", "frame-0"] } }],
-      options: { preserveConnectivity: false, artifactFormats: ["scene"] },
-    });
-    expect(result).toMatchObject({
-      ok: false,
-      status: "invalid_input",
-      issues: expect.arrayContaining([
-        expect.objectContaining({ code: "canvas_limit_exceeded" }),
-      ]),
-    });
-  });
+	it("checks oversized inline scene counts before removable malformed geometry can bypass validation", async () => {
+		const elements: CanvasSpec["elements"] = Array.from(
+			{ length: CANVAS_LIMITS.maxElements },
+			(_, index) => ({
+				type: "frame",
+				id: `frame-${index}`,
+				x: 0,
+				y: 0,
+				width: 10,
+				height: 10,
+			}),
+		);
+		const scene = {
+			...geometryCanvas(elements),
+			elements: [
+				...elements,
+				{
+					...geometryNode("bad", 0, 0),
+					shape: "polygon",
+					points: [
+						{ x: 0, y: 0 },
+						{ x: 10, y: 10 },
+					],
+				},
+			],
+			zOrder: [...elements.map(({ id }) => id), "bad"],
+		};
+		const result = await createTestRuntime().applyDiagramPatch({
+			source: { scene },
+			operations: [{ op: "remove", selector: { ids: ["bad", "frame-0"] } }],
+			options: { preserveConnectivity: false, artifactFormats: ["scene"] },
+		});
+		expect(result).toMatchObject({
+			ok: false,
+			status: "invalid_input",
+			issues: expect.arrayContaining([expect.objectContaining({ code: "canvas_limit_exceeded" })]),
+		});
+	});
 
-  it("returns limit_exceeded for 601 small elements below the byte limit", async () => {
-    const elements: CanvasSpec["elements"] = Array.from(
-      { length: CANVAS_LIMITS.maxElements + 1 },
-      (_, index) => ({
-        type: "frame",
-        id: `frame-${index}`,
-        x: 0,
-        y: 0,
-        width: 10,
-        height: 10,
-      }),
-    );
-    const scene = geometryCanvas(elements);
-    expect(
-      new TextEncoder().encode(JSON.stringify(scene)).byteLength,
-    ).toBeLessThan(CANVAS_LIMITS.maxSerializedBytes);
-    const result = await createTestRuntime().createCanvas({ spec: scene });
-    expect(result).toMatchObject({
-      ok: false,
-      status: "limit_exceeded",
-      issues: expect.arrayContaining([
-        expect.objectContaining({
-          code: "canvas_limit_exceeded",
-          stage: "canvas",
-        }),
-      ]),
-    });
-    const boundary = await createTestRuntime().createCanvas({
-      spec: geometryCanvas(elements.slice(0, CANVAS_LIMITS.maxElements)),
-      options: { artifactFormats: ["scene"] },
-    });
-    expectCanvasOk(boundary);
-  });
+	it("returns limit_exceeded for 601 small elements below the byte limit", async () => {
+		const elements: CanvasSpec["elements"] = Array.from(
+			{ length: CANVAS_LIMITS.maxElements + 1 },
+			(_, index) => ({
+				type: "frame",
+				id: `frame-${index}`,
+				x: 0,
+				y: 0,
+				width: 10,
+				height: 10,
+			}),
+		);
+		const scene = geometryCanvas(elements);
+		expect(new TextEncoder().encode(JSON.stringify(scene)).byteLength).toBeLessThan(
+			CANVAS_LIMITS.maxSerializedBytes,
+		);
+		const result = await createTestRuntime().createCanvas({ spec: scene });
+		expect(result).toMatchObject({
+			ok: false,
+			status: "limit_exceeded",
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: "canvas_limit_exceeded",
+					stage: "canvas",
+				}),
+			]),
+		});
+		const boundary = await createTestRuntime().createCanvas({
+			spec: geometryCanvas(elements.slice(0, CANVAS_LIMITS.maxElements)),
+			options: { artifactFormats: ["scene"] },
+		});
+		expectCanvasOk(boundary);
+	});
 
-  it.each([
-    {
-      field: "layers",
-      value: Array.from(
-        { length: CANVAS_LIMITS.maxLayers + 1 },
-        (_, index) => ({ id: `layer-${index}` }),
-      ),
-    },
-    {
-      field: "layouts",
-      value: Array.from({ length: CANVAS_LIMITS.maxLayouts + 1 }, () => ({
-        type: "row",
-        ids: ["a"],
-      })),
-    },
-    {
-      field: "zOrder",
-      value: Array.from(
-        { length: CANVAS_LIMITS.maxZOrderEntries + 1 },
-        () => "a",
-      ),
-    },
-  ])(
-    "keeps the $field count failure limit-specific",
-    async ({ field, value }) => {
-      const scene = {
-        ...geometryCanvas([geometryNode("a", 0, 0)]),
-        [field]: value,
-      };
-      expect(
-        await createTestRuntime().createCanvas({ spec: scene }),
-      ).toMatchObject({
-        ok: false,
-        status: "limit_exceeded",
-        issues: expect.arrayContaining([
-          expect.objectContaining({
-            code: "canvas_limit_exceeded",
-            ref: { kind: "diagram", path: field },
-          }),
-        ]),
-      });
-    },
-  );
+	it.each([
+		{
+			field: "layers",
+			value: Array.from({ length: CANVAS_LIMITS.maxLayers + 1 }, (_, index) => ({
+				id: `layer-${index}`,
+			})),
+		},
+		{
+			field: "layouts",
+			value: Array.from({ length: CANVAS_LIMITS.maxLayouts + 1 }, () => ({
+				type: "row",
+				ids: ["a"],
+			})),
+		},
+		{
+			field: "zOrder",
+			value: Array.from({ length: CANVAS_LIMITS.maxZOrderEntries + 1 }, () => "a"),
+		},
+	])("keeps the $field count failure limit-specific", async ({ field, value }) => {
+		const scene = {
+			...geometryCanvas([geometryNode("a", 0, 0)]),
+			[field]: value,
+		};
+		expect(await createTestRuntime().createCanvas({ spec: scene })).toMatchObject({
+			ok: false,
+			status: "limit_exceeded",
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: "canvas_limit_exceeded",
+					ref: { kind: "diagram", path: field },
+				}),
+			]),
+		});
+	});
 
-  it("keeps the groups-per-element count failure limit-specific", async () => {
-    const scene = geometryCanvas([
-      {
-        ...geometryNode("a", 0, 0),
-        groupIds: Array.from(
-          { length: CANVAS_LIMITS.maxGroupsPerElement + 1 },
-          (_, index) => `group-${index}`,
-        ),
-      },
-    ]);
-    expect(
-      await createTestRuntime().createCanvas({ spec: scene }),
-    ).toMatchObject({
-      ok: false,
-      status: "limit_exceeded",
-      issues: expect.arrayContaining([
-        expect.objectContaining({
-          code: "canvas_limit_exceeded",
-          ref: { kind: "element", id: "a", path: "elements[0].groupIds" },
-        }),
-      ]),
-    });
-  });
+	it("keeps the groups-per-element count failure limit-specific", async () => {
+		const scene = geometryCanvas([
+			{
+				...geometryNode("a", 0, 0),
+				groupIds: Array.from(
+					{ length: CANVAS_LIMITS.maxGroupsPerElement + 1 },
+					(_, index) => `group-${index}`,
+				),
+			},
+		]);
+		expect(await createTestRuntime().createCanvas({ spec: scene })).toMatchObject({
+			ok: false,
+			status: "limit_exceeded",
+			issues: expect.arrayContaining([
+				expect.objectContaining({
+					code: "canvas_limit_exceeded",
+					ref: { kind: "element", id: "a", path: "elements[0].groupIds" },
+				}),
+			]),
+		});
+	});
 
-  it("still classifies malformed small canvas fields as invalid_input", async () => {
-    const scene = {
-      ...geometryCanvas([geometryNode("a", 0, 0)]),
-      layers: "not an array",
-    };
-    expect(
-      await createTestRuntime().createCanvas({ spec: scene }),
-    ).toMatchObject({ ok: false, status: "invalid_input" });
-  });
+	it("still classifies malformed small canvas fields as invalid_input", async () => {
+		const scene = {
+			...geometryCanvas([geometryNode("a", 0, 0)]),
+			layers: "not an array",
+		};
+		expect(await createTestRuntime().createCanvas({ spec: scene })).toMatchObject({
+			ok: false,
+			status: "invalid_input",
+		});
+	});
 
-  it("reroutes coincident nodes to distinct source and target faces", async () => {
-    const result = await createTestRuntime().applyDiagramPatch({
-      source: {
-        scene: geometryCanvas([
-          geometryNode("a", 0, 0),
-          geometryNode("b", 0, 0),
-          {
-            type: "arrow",
-            id: "ab",
-            edgeId: "ab",
-            sourceNodeId: "a",
-            targetNodeId: "b",
-            points: [
-              { x: 50, y: 60 },
-              { x: 50, y: 0 },
-            ],
-          },
-        ]),
-      },
-      operations: [{ op: "rerouteEdges" }],
-      options: {
-        artifactFormats: ["scene", "excalidraw"],
-        inlineArtifacts: ["scene", "excalidraw"],
-      },
-    });
-    expectPatchOk(result);
-    const scene = parseInlineScene(
-      result.artifact.formats.find(({ format }) => format === "scene")?.inline,
-    );
-    const arrow = scene.elements.find(({ id }) => id === "ab");
-    if (!arrow || arrow.type !== "arrow") throw new Error("Expected ab arrow");
-    expect(arrow.points[0]).toEqual({ x: 50, y: 60 });
-    expect(arrow.points.at(-1)).toEqual({ x: 50, y: 0 });
-    expect(
-      new Set(arrow.points.map(({ x, y }) => `${x},${y}`)).size,
-    ).toBeGreaterThan(1);
-  });
+	it("reroutes coincident nodes to distinct source and target faces", async () => {
+		const result = await createTestRuntime().applyDiagramPatch({
+			source: {
+				scene: geometryCanvas([
+					geometryNode("a", 0, 0),
+					geometryNode("b", 0, 0),
+					{
+						type: "arrow",
+						id: "ab",
+						edgeId: "ab",
+						sourceNodeId: "a",
+						targetNodeId: "b",
+						points: [
+							{ x: 50, y: 60 },
+							{ x: 50, y: 0 },
+						],
+					},
+				]),
+			},
+			operations: [{ op: "rerouteEdges" }],
+			options: {
+				artifactFormats: ["scene", "excalidraw"],
+				inlineArtifacts: ["scene", "excalidraw"],
+			},
+		});
+		expectPatchOk(result);
+		const scene = parseInlineScene(
+			result.artifact.formats.find(({ format }) => format === "scene")?.inline,
+		);
+		const arrow = scene.elements.find(({ id }) => id === "ab");
+		if (!arrow || arrow.type !== "arrow") throw new Error("Expected ab arrow");
+		expect(arrow.points[0]).toEqual({ x: 50, y: 60 });
+		expect(arrow.points.at(-1)).toEqual({ x: 50, y: 0 });
+		expect(new Set(arrow.points.map(({ x, y }) => `${x},${y}`)).size).toBeGreaterThan(1);
+	});
 });
 
 describe("final-review correlation and sequence canvas bounds", () => {
-  it("preserves buildId and requestId on raw-byte canvas limit failures", async () => {
-    const scene = geometryCanvas(densePointElements(CANVAS_LIMITS.maxElements));
-    expect(
-      new TextEncoder().encode(JSON.stringify(scene)).byteLength,
-    ).toBeGreaterThan(CANVAS_LIMITS.maxSerializedBytes);
-    const result = await createTestRuntime().createCanvas({
-      requestId: "oversized-canvas-request",
-      spec: scene,
-    });
-    expect(result).toMatchObject({
-      ok: false,
-      status: "limit_exceeded",
-      buildId: "build-1",
-      requestId: "oversized-canvas-request",
-      issues: [expect.objectContaining({ code: "canvas_limit_exceeded" })],
-    });
-  });
+	it("preserves buildId and requestId on raw-byte canvas limit failures", async () => {
+		const scene = geometryCanvas(densePointElements(CANVAS_LIMITS.maxElements));
+		expect(new TextEncoder().encode(JSON.stringify(scene)).byteLength).toBeGreaterThan(
+			CANVAS_LIMITS.maxSerializedBytes,
+		);
+		const result = await createTestRuntime().createCanvas({
+			requestId: "oversized-canvas-request",
+			spec: scene,
+		});
+		expect(result).toMatchObject({
+			ok: false,
+			status: "limit_exceeded",
+			buildId: "build-1",
+			requestId: "oversized-canvas-request",
+			issues: [expect.objectContaining({ code: "canvas_limit_exceeded" })],
+		});
+	});
 
-  it.each([
-    { lines: 854, accepted: true },
-    { lines: 855, accepted: false },
-  ])(
-    "enforces canvas bounds for a sequence with $lines participant label lines",
-    async ({ lines, accepted }) => {
-      const memory = makeMemoryArtifactStorage();
-      let writes = 0;
-      const store: CodeModeArtifactStorageShape = {
-        ...memory,
-        write(input) {
-          writes += 1;
-          return memory.write(input);
-        },
-      };
-      const label = Array.from({ length: lines }, () => "x").join("\n");
-      const result = await makeTestRuntime({ store }).buildSequenceDiagram({
-        requestId: "sequence-bounds-request",
-        spec: {
-          title: "Sequence canvas bounds",
-          participants: [
-            { id: "a", label },
-            { id: "b", label: "B" },
-          ],
-          messages: [{ source: "a", target: "b", label: "Continue" }],
-        },
-        options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
-      });
-      if (accepted) {
-        expect(result).toMatchObject({ ok: true, status: "accepted" });
-        if (!result.ok) throw new Error("Expected within-bounds sequence");
-        const scene = parseInlineScene(result.artifact.formats[0]?.inline);
-        expect(scene.height).toBeLessThanOrEqual(CANVAS_LIMITS.maxDimension);
-        expect(writes).toBe(1);
-      } else {
-        expect(result).toMatchObject({
-          ok: false,
-          status: "render_failed",
-          buildId: "build-test",
-          requestId: "sequence-bounds-request",
-          normalizedSpec: {
-            participants: [
-              expect.objectContaining({ label }),
-              expect.anything(),
-            ],
-          },
-          issues: expect.arrayContaining([
-            expect.objectContaining({
-              code: "canvas_limit_exceeded",
-              stage: "canvas",
-              message: expect.stringContaining(
-                String(CANVAS_LIMITS.maxDimension),
-              ),
-            }),
-          ]),
-        });
-        expect(writes).toBe(0);
-      }
-    },
-  );
+	it.each([
+		{ lines: 854, accepted: true },
+		{ lines: 855, accepted: false },
+	])(
+		"enforces canvas bounds for a sequence with $lines participant label lines",
+		async ({ lines, accepted }) => {
+			const memory = makeMemoryArtifactStorage();
+			let writes = 0;
+			const store: CodeModeArtifactStorageShape = {
+				...memory,
+				write(input) {
+					writes += 1;
+					return memory.write(input);
+				},
+			};
+			const label = Array.from({ length: lines }, () => "x").join("\n");
+			const result = await makeTestRuntime({ store }).buildSequenceDiagram({
+				requestId: "sequence-bounds-request",
+				spec: {
+					title: "Sequence canvas bounds",
+					participants: [
+						{ id: "a", label },
+						{ id: "b", label: "B" },
+					],
+					messages: [{ source: "a", target: "b", label: "Continue" }],
+				},
+				options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+			});
+			if (accepted) {
+				expect(result).toMatchObject({ ok: true, status: "accepted" });
+				if (!result.ok) throw new Error("Expected within-bounds sequence");
+				const scene = parseInlineScene(result.artifact.formats[0]?.inline);
+				expect(scene.height).toBeLessThanOrEqual(CANVAS_LIMITS.maxDimension);
+				expect(writes).toBe(1);
+			} else {
+				expect(result).toMatchObject({
+					ok: false,
+					status: "render_failed",
+					buildId: "build-test",
+					requestId: "sequence-bounds-request",
+					normalizedSpec: {
+						participants: [expect.objectContaining({ label }), expect.anything()],
+					},
+					issues: expect.arrayContaining([
+						expect.objectContaining({
+							code: "canvas_limit_exceeded",
+							stage: "canvas",
+							message: expect.stringContaining(String(CANVAS_LIMITS.maxDimension)),
+						}),
+					]),
+				});
+				expect(writes).toBe(0);
+			}
+		},
+	);
 });
 
 describe("shared artifact export-and-store boundary", () => {
-  const operations = [
-    "buildFlowchart",
-    "buildMindmap",
-    "buildSequenceDiagram",
-    "createCanvas",
-    "applyDiagramPatch",
-  ] as const;
-  function request(
-    operation: (typeof operations)[number],
-    formats: ArtifactFormat[],
-  ) {
-    const options = { artifactFormats: formats };
-    const canvas = geometryCanvas([geometryNode("box", 20, 20)]);
-    switch (operation) {
-      case "buildFlowchart":
-        return { requestId: "shared-tail", spec: approvalSpec(), options };
-      case "buildMindmap":
-        return {
-          requestId: "shared-tail",
-          spec: {
-            title: "Mindmap",
-            root: { label: "Root", children: [{ label: "Child" }] },
-          },
-          options,
-        };
-      case "buildSequenceDiagram":
-        return {
-          requestId: "shared-tail",
-          spec: checkoutSequenceSpec(),
-          options,
-        };
-      case "createCanvas":
-        return { requestId: "shared-tail", spec: canvas, options };
-      case "applyDiagramPatch":
-        return {
-          requestId: "shared-tail",
-          source: { scene: canvas },
-          operations: [
-            {
-              op: "setStyle",
-              selector: { ids: ["box"] },
-              style: { strokeColor: "#111111" },
-            },
-          ],
-          options,
-        };
-    }
-  }
+	const operations = [
+		"buildFlowchart",
+		"buildMindmap",
+		"buildSequenceDiagram",
+		"createCanvas",
+		"applyDiagramPatch",
+	] as const;
+	function request(operation: (typeof operations)[number], formats: ArtifactFormat[]) {
+		const options = { artifactFormats: formats };
+		const canvas = geometryCanvas([geometryNode("box", 20, 20)]);
+		switch (operation) {
+			case "buildFlowchart":
+				return { requestId: "shared-tail", spec: approvalSpec(), options };
+			case "buildMindmap":
+				return {
+					requestId: "shared-tail",
+					spec: {
+						title: "Mindmap",
+						root: { label: "Root", children: [{ label: "Child" }] },
+					},
+					options,
+				};
+			case "buildSequenceDiagram":
+				return {
+					requestId: "shared-tail",
+					spec: checkoutSequenceSpec(),
+					options,
+				};
+			case "createCanvas":
+				return { requestId: "shared-tail", spec: canvas, options };
+			case "applyDiagramPatch":
+				return {
+					requestId: "shared-tail",
+					source: { scene: canvas },
+					operations: [
+						{
+							op: "setStyle",
+							selector: { ids: ["box"] },
+							style: { strokeColor: "#111111" },
+						},
+					],
+					options,
+				};
+		}
+	}
 
-  it.each(operations)(
-    "preserves %s storage-failure context and correlation ids",
-    async (operation) => {
-      let writeCalls = 0;
-      const runtime = makeTestRuntime({
-        store: {
-          read: () => Effect.succeed(null),
-          readManifest: () => Effect.succeed(null),
-          write: () => {
-            writeCalls += 1;
-            return Effect.fail(
-              new CodeModeArtifactStorageError({
-                cause: new Error("storage unavailable"),
-                message: "storage unavailable",
-                operation: "write",
-              }),
-            );
-          },
-        },
-      });
-      const result = await runtime[operation](request(operation, ["scene"]));
-      expect(result.ok).toBe(false);
-      if (result.ok) throw new Error("Expected storage failure.");
-      expect(result).toMatchObject({
-        status: "storage_failed",
-        requestId: "shared-tail",
-        issues: [
-          {
-            code: "storage_write_failed",
-            stage: "storage",
-            message: "storage unavailable",
-          },
-        ],
-      });
-      expect(writeCalls).toBe(1);
-      if (operation === "buildMindmap")
-        expect(result).toHaveProperty("partial", {
-          diagramId: expect.any(String),
-        });
-      else if (operation === "createCanvas")
-        expect(result).toHaveProperty("partial.formats.0.inline");
-      else expect(result).not.toHaveProperty("partial");
-      expect(result).toHaveProperty(
-        operation === "applyDiagramPatch" ? "patchId" : "buildId",
-      );
-    },
-  );
+	it.each(operations)(
+		"preserves %s storage-failure context and correlation ids",
+		async (operation) => {
+			let writeCalls = 0;
+			const runtime = makeTestRuntime({
+				store: {
+					read: () => Effect.succeed(null),
+					readManifest: () => Effect.succeed(null),
+					write: () => {
+						writeCalls += 1;
+						return Effect.fail(
+							new CodeModeArtifactStorageError({
+								cause: new Error("storage unavailable"),
+								message: "storage unavailable",
+								operation: "write",
+							}),
+						);
+					},
+				},
+			});
+			const result = await runtime[operation](request(operation, ["scene"]));
+			expect(result.ok).toBe(false);
+			if (result.ok) throw new Error("Expected storage failure.");
+			expect(result).toMatchObject({
+				status: "storage_failed",
+				requestId: "shared-tail",
+				issues: [
+					{
+						code: "storage_write_failed",
+						stage: "storage",
+						message: "storage unavailable",
+					},
+				],
+			});
+			expect(writeCalls).toBe(1);
+			if (operation === "buildMindmap")
+				expect(result).toHaveProperty("partial", {
+					diagramId: expect.any(String),
+				});
+			else if (operation === "createCanvas")
+				expect(result).toHaveProperty("partial.formats.0.inline");
+			else expect(result).not.toHaveProperty("partial");
+			expect(result).toHaveProperty(operation === "applyDiagramPatch" ? "patchId" : "buildId");
+		},
+	);
 
-  it.each(operations)(
-    "maps %s tagged renderer failures without writing artifacts",
-    async (operation) => {
-      let writeCalls = 0;
-      const runtime = makeTestRuntime({
-        renderer: {
-          renderPng: () =>
-            Effect.fail(
-              new CodeModeArtifactRenderFailed({
-                cause: new Error("PNG failed"),
-                message: "PNG failed",
-              }),
-            ),
-        },
-        store: {
-          read: () => Effect.succeed(null),
-          readManifest: () => Effect.succeed(null),
-          write: () => {
-            writeCalls += 1;
-            return Effect.die("Export failure must not write.");
-          },
-        },
-      });
-      const result = await runtime[operation](request(operation, ["png"]));
-      expect(result).toMatchObject({
-        ok: false,
-        status: "export_failed",
-        requestId: "shared-tail",
-        issues: [
-          {
-            code: "render_failed",
-            severity: "error",
-            stage: "export",
-            message: "PNG failed",
-            hint: "Retry the request; if it keeps failing, inspect the configured renderer.",
-          },
-        ],
-      });
-      if (result.ok) throw new Error("Expected export failure.");
-      expect(result.issues[0]).not.toHaveProperty("ref");
-      expect(result).toHaveProperty("partial.formats.0.inline");
-      expect(writeCalls).toBe(0);
-    },
-  );
+	it.each(operations)(
+		"maps %s tagged renderer failures without writing artifacts",
+		async (operation) => {
+			let writeCalls = 0;
+			const runtime = makeTestRuntime({
+				renderer: {
+					renderPng: () =>
+						Effect.fail(
+							new CodeModeArtifactRenderFailed({
+								cause: new Error("PNG failed"),
+								message: "PNG failed",
+							}),
+						),
+				},
+				store: {
+					read: () => Effect.succeed(null),
+					readManifest: () => Effect.succeed(null),
+					write: () => {
+						writeCalls += 1;
+						return Effect.die("Export failure must not write.");
+					},
+				},
+			});
+			const result = await runtime[operation](request(operation, ["png"]));
+			expect(result).toMatchObject({
+				ok: false,
+				status: "export_failed",
+				requestId: "shared-tail",
+				issues: [
+					{
+						code: "render_failed",
+						severity: "error",
+						stage: "export",
+						message: "PNG failed",
+						hint: "Retry the request; if it keeps failing, inspect the configured renderer.",
+					},
+				],
+			});
+			if (result.ok) throw new Error("Expected export failure.");
+			expect(result.issues[0]).not.toHaveProperty("ref");
+			expect(result).toHaveProperty("partial.formats.0.inline");
+			expect(writeCalls).toBe(0);
+		},
+	);
 });

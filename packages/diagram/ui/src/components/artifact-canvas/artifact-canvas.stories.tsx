@@ -10,11 +10,11 @@ import "../../styles.css";
 const scene = renderIntermediateDiagram(flowchartFixture);
 
 const meta = {
-  title: "Diagram UI/Components/ArtifactCanvas",
-  component: ArtifactCanvas,
-  args: {
-    scene,
-  },
+	title: "Diagram UI/Components/ArtifactCanvas",
+	component: ArtifactCanvas,
+	args: {
+		scene,
+	},
 } satisfies Meta<typeof ArtifactCanvas>;
 
 export default meta;
@@ -24,20 +24,20 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const Editable: Story = {
-  args: {
-    mode: "edit",
-  },
+	args: {
+		mode: "edit",
+	},
 };
 
 export const NodeLogos: Story = {
-  args: {
-    scene: nodeLogoScene(),
-  },
+	args: {
+		scene: nodeLogoScene(),
+	},
 };
 
 export const EditableNodeLogos: Story = {
-  args: {
-    mode: "edit",
-    scene: nodeLogoScene("LR"),
-  },
+	args: {
+		mode: "edit",
+		scene: nodeLogoScene("LR"),
+	},
 };

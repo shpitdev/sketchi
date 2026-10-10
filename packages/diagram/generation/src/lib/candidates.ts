@@ -1,714 +1,648 @@
 import {
-  DiagramValidationError,
-  isDiagramIconSlug,
-  type FlowchartDiagram,
-  FlowchartDiagramSchema,
-  FlowchartValidationError,
-  type MindmapDiagram,
-  MindmapDiagramSchema,
-  SKETCHI_DIAGRAM_STYLE,
-  validateFlowchartDiagram,
-  validateMindmapDiagram,
+	DiagramValidationError,
+	isDiagramIconSlug,
+	type FlowchartDiagram,
+	FlowchartDiagramSchema,
+	FlowchartValidationError,
+	type MindmapDiagram,
+	MindmapDiagramSchema,
+	SKETCHI_DIAGRAM_STYLE,
+	validateFlowchartDiagram,
+	validateMindmapDiagram,
 } from "@sketchi/diagram-core";
 import { Result, Schema, SchemaIssue } from "effect";
 
 import {
-  type DiagramRequirement,
-  GeneratedDiagramIntent,
-  GeneratedDiagramResponse,
-  modelTitleOrFallback,
+	type DiagramRequirement,
+	GeneratedDiagramIntent,
+	GeneratedDiagramResponse,
+	modelTitleOrFallback,
 } from "./intent.js";
 import { placeNodeLogos } from "./logo-placement.js";
 import { isUnknownRecord, objectValue } from "./unknown-record.js";
 import { DiagramGenerationPrompt } from "./messages.js";
-import {
-  GeneratedMindmapTree,
-  generatedMindmapTreeToDiagram,
-} from "./mindmap-tree.js";
+import { GeneratedMindmapTree, generatedMindmapTreeToDiagram } from "./mindmap-tree.js";
 
 export const diagramGenerationProviderIds: readonly [
-  "fixture",
-  "cloudflare-google-ai-studio",
-  "google-ai-studio",
+	"fixture",
+	"cloudflare-google-ai-studio",
+	"google-ai-studio",
 ] = ["fixture", "cloudflare-google-ai-studio", "google-ai-studio"];
 
-export const DiagramGenerationProviderIdSchema = Schema.Literals(
-  diagramGenerationProviderIds,
-);
-export type DiagramGenerationProviderId =
-  typeof DiagramGenerationProviderIdSchema.Type;
+export const DiagramGenerationProviderIdSchema = Schema.Literals(diagramGenerationProviderIds);
+export type DiagramGenerationProviderId = typeof DiagramGenerationProviderIdSchema.Type;
 
-export const DiagramGenerationCacheModeSchema = Schema.Literals([
-  "default",
-  "fresh",
-]);
-export type DiagramGenerationCacheMode =
-  typeof DiagramGenerationCacheModeSchema.Type;
+export const DiagramGenerationCacheModeSchema = Schema.Literals(["default", "fresh"]);
+export type DiagramGenerationCacheMode = typeof DiagramGenerationCacheModeSchema.Type;
 
 export class GeneratedSequenceParticipant extends Schema.Class<GeneratedSequenceParticipant>(
-  "GeneratedSequenceParticipant",
+	"GeneratedSequenceParticipant",
 )({
-  id: Schema.NonEmptyString,
-  label: Schema.NonEmptyString,
-  kind: Schema.optionalKey(Schema.NonEmptyString),
+	id: Schema.NonEmptyString,
+	label: Schema.NonEmptyString,
+	kind: Schema.optionalKey(Schema.NonEmptyString),
 }) {}
 
 export class GeneratedSequenceMessage extends Schema.Class<GeneratedSequenceMessage>(
-  "GeneratedSequenceMessage",
+	"GeneratedSequenceMessage",
 )({
-  id: Schema.NonEmptyString,
-  source: Schema.NonEmptyString,
-  target: Schema.NonEmptyString,
-  label: Schema.NonEmptyString,
-  type: Schema.optionalKey(Schema.Literals(["message", "return"])),
-  style: Schema.optionalKey(Schema.Literals(["solid", "dashed"])),
+	id: Schema.NonEmptyString,
+	source: Schema.NonEmptyString,
+	target: Schema.NonEmptyString,
+	label: Schema.NonEmptyString,
+	type: Schema.optionalKey(Schema.Literals(["message", "return"])),
+	style: Schema.optionalKey(Schema.Literals(["solid", "dashed"])),
 }) {}
 
 export class GeneratedSequenceDiagram extends Schema.Class<GeneratedSequenceDiagram>(
-  "GeneratedSequenceDiagram",
+	"GeneratedSequenceDiagram",
 )({
-  id: Schema.NonEmptyString,
-  title: Schema.NonEmptyString,
-  type: Schema.Literal("sequence"),
-  participants: Schema.Array(GeneratedSequenceParticipant).pipe(
-    Schema.mutable,
-    Schema.check(Schema.isMinLength(1)),
-  ),
-  messages: Schema.Array(GeneratedSequenceMessage).pipe(Schema.mutable),
-  style: Schema.optionalKey(
-    Schema.Struct({
-      accentColor: Schema.String,
-      backgroundColor: Schema.String,
-    }),
-  ),
+	id: Schema.NonEmptyString,
+	title: Schema.NonEmptyString,
+	type: Schema.Literal("sequence"),
+	participants: Schema.Array(GeneratedSequenceParticipant).pipe(
+		Schema.mutable,
+		Schema.check(Schema.isMinLength(1)),
+	),
+	messages: Schema.Array(GeneratedSequenceMessage).pipe(Schema.mutable),
+	style: Schema.optionalKey(
+		Schema.Struct({
+			accentColor: Schema.String,
+			backgroundColor: Schema.String,
+		}),
+	),
 }) {}
 
 export class DiagramGenerationUsage extends Schema.Class<DiagramGenerationUsage>(
-  "DiagramGenerationUsage",
+	"DiagramGenerationUsage",
 )({
-  inputTokens: Schema.optional(Schema.Number).pipe(Schema.mutableKey),
-  outputTokens: Schema.optional(Schema.Number).pipe(Schema.mutableKey),
-  totalTokens: Schema.optional(Schema.Number).pipe(Schema.mutableKey),
+	inputTokens: Schema.optional(Schema.Number).pipe(Schema.mutableKey),
+	outputTokens: Schema.optional(Schema.Number).pipe(Schema.mutableKey),
+	totalTokens: Schema.optional(Schema.Number).pipe(Schema.mutableKey),
 }) {}
 
 export class DiagramGenerationCandidate extends Schema.Class<DiagramGenerationCandidate>(
-  "DiagramGenerationCandidate",
+	"DiagramGenerationCandidate",
 )({
-  cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
-  diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
-  diagram: Schema.optional(
-    Schema.Union([
-      FlowchartDiagramSchema,
-      MindmapDiagramSchema,
-      GeneratedSequenceDiagram,
-    ]),
-  ),
-  durationMs: Schema.optional(Schema.Number),
-  error: Schema.optional(Schema.String),
-  intent: Schema.optional(GeneratedDiagramIntent),
-  model: Schema.String,
-  provider: DiagramGenerationProviderIdSchema,
-  raw: Schema.optional(Schema.Unknown),
-  text: Schema.String,
-  usage: Schema.optional(DiagramGenerationUsage),
+	cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
+	diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
+	diagram: Schema.optional(
+		Schema.Union([FlowchartDiagramSchema, MindmapDiagramSchema, GeneratedSequenceDiagram]),
+	),
+	durationMs: Schema.optional(Schema.Number),
+	error: Schema.optional(Schema.String),
+	intent: Schema.optional(GeneratedDiagramIntent),
+	model: Schema.String,
+	provider: DiagramGenerationProviderIdSchema,
+	raw: Schema.optional(Schema.Unknown),
+	text: Schema.String,
+	usage: Schema.optional(DiagramGenerationUsage),
 }) {}
 
 export class DiagramGenerationCandidateSummary extends Schema.Class<DiagramGenerationCandidateSummary>(
-  "DiagramGenerationCandidateSummary",
+	"DiagramGenerationCandidateSummary",
 )({
-  cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
-  diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
-  diagramText: Schema.optional(Schema.String),
-  diagramValid: Schema.Boolean,
-  durationMs: Schema.optional(Schema.Number),
-  error: Schema.optional(Schema.String),
-  intent: Schema.optional(GeneratedDiagramIntent),
-  model: Schema.String,
-  provider: DiagramGenerationProviderIdSchema,
-  text: Schema.String,
-  usage: Schema.optional(DiagramGenerationUsage),
+	cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
+	diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
+	diagramText: Schema.optional(Schema.String),
+	diagramValid: Schema.Boolean,
+	durationMs: Schema.optional(Schema.Number),
+	error: Schema.optional(Schema.String),
+	intent: Schema.optional(GeneratedDiagramIntent),
+	model: Schema.String,
+	provider: DiagramGenerationProviderIdSchema,
+	text: Schema.String,
+	usage: Schema.optional(DiagramGenerationUsage),
 }) {}
 
 export class DiagramGenerationScenarioOutput extends Schema.Class<DiagramGenerationScenarioOutput>(
-  "DiagramGenerationScenarioOutput",
+	"DiagramGenerationScenarioOutput",
 )({
-  candidates: Schema.Array(DiagramGenerationCandidateSummary).pipe(
-    Schema.mutable,
-  ),
-  model: Schema.String,
-  scenarioId: Schema.String,
+	candidates: Schema.Array(DiagramGenerationCandidateSummary).pipe(Schema.mutable),
+	model: Schema.String,
+	scenarioId: Schema.String,
 }) {}
 
 export class DiagramGenerationRequest extends Schema.Class<DiagramGenerationRequest>(
-  "DiagramGenerationRequest",
+	"DiagramGenerationRequest",
 )({
-  cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
-  maxOutputTokens: Schema.optional(Schema.Number),
-  model: Schema.String.check(
-    Schema.isPattern(
-      /^(?:(?:google|google-ai-studio)\/)?[A-Za-z0-9._-]{1,128}$/,
-    ),
-  ),
-  prompt: DiagramGenerationPrompt,
-  temperature: Schema.optional(Schema.Number),
+	cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
+	maxOutputTokens: Schema.optional(Schema.Number),
+	model: Schema.String.check(
+		Schema.isPattern(/^(?:(?:google|google-ai-studio)\/)?[A-Za-z0-9._-]{1,128}$/),
+	),
+	prompt: DiagramGenerationPrompt,
+	temperature: Schema.optional(Schema.Number),
 }) {}
 
 export function extractJsonObject(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    const firstBrace = text.indexOf("{");
-    if (firstBrace === -1) {
-      throw new Error("Model output did not contain a JSON object.");
-    }
-    let depth = 0;
-    let escaped = false;
-    let inString = false;
-    for (let index = firstBrace; index < text.length; index += 1) {
-      const character = text[index];
-      if (inString) {
-        if (escaped) escaped = false;
-        else if (character === "\\") escaped = true;
-        else if (character === '"') inString = false;
-        continue;
-      }
-      if (character === '"') inString = true;
-      else if (character === "{") depth += 1;
-      else if (character === "}") {
-        depth -= 1;
-        if (depth === 0) return JSON.parse(text.slice(firstBrace, index + 1));
-      }
-    }
-    throw new Error("Model output did not contain one complete JSON object.");
-  }
+	try {
+		return JSON.parse(text);
+	} catch {
+		const firstBrace = text.indexOf("{");
+		if (firstBrace === -1) {
+			throw new Error("Model output did not contain a JSON object.");
+		}
+		let depth = 0;
+		let escaped = false;
+		let inString = false;
+		for (let index = firstBrace; index < text.length; index += 1) {
+			const character = text[index];
+			if (inString) {
+				if (escaped) escaped = false;
+				else if (character === "\\") escaped = true;
+				else if (character === '"') inString = false;
+				continue;
+			}
+			if (character === '"') inString = true;
+			else if (character === "{") depth += 1;
+			else if (character === "}") {
+				depth -= 1;
+				if (depth === 0) return JSON.parse(text.slice(firstBrace, index + 1));
+			}
+		}
+		throw new Error("Model output did not contain one complete JSON object.");
+	}
 }
 
 function withSketchiDiagramStyle(input: unknown): unknown {
-  return isUnknownRecord(input)
-    ? { ...input, style: { ...SKETCHI_DIAGRAM_STYLE } }
-    : input;
+	return isUnknownRecord(input) ? { ...input, style: { ...SKETCHI_DIAGRAM_STYLE } } : input;
 }
 
 /**
  * Lowercase model-authored icon slugs and drop any that are not catalog-shaped,
  * so a stray icon never fails the whole candidate.
  */
-function sanitizeGeneratedNodeIcons(
-  nodes: unknown,
-  diagnostics: string[],
-): unknown {
-  if (!Array.isArray(nodes)) return nodes;
-  return nodes.map((node) => {
-    if (!isUnknownRecord(node) || node["icon"] === undefined) return node;
-    const { icon, ...withoutIcon } = node;
-    const raw = objectValue(icon, "slug");
-    const slug = typeof raw === "string" ? raw.trim().toLowerCase() : "";
-    if (isDiagramIconSlug(slug)) return { ...withoutIcon, icon: { slug } };
-    diagnostics.push(
-      `icon_dropped: node "${String(node["id"])}" icon ${JSON.stringify(raw ?? icon)} is not a catalog slug; the node renders without a logo.`,
-    );
-    return withoutIcon;
-  });
+function sanitizeGeneratedNodeIcons(nodes: unknown, diagnostics: string[]): unknown {
+	if (!Array.isArray(nodes)) return nodes;
+	return nodes.map((node) => {
+		if (!isUnknownRecord(node) || node["icon"] === undefined) return node;
+		const { icon, ...withoutIcon } = node;
+		const raw = objectValue(icon, "slug");
+		const slug = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+		if (isDiagramIconSlug(slug)) return { ...withoutIcon, icon: { slug } };
+		diagnostics.push(
+			`icon_dropped: node "${String(node["id"])}" icon ${JSON.stringify(raw ?? icon)} is not a catalog slug; the node renders without a logo.`,
+		);
+		return withoutIcon;
+	});
 }
 
-function normalizeGeneratedFlowchartInput(
-  input: unknown,
-  diagnostics: string[],
-): unknown {
-  const styled = withSketchiDiagramStyle(input);
-  if (!isUnknownRecord(styled)) return styled;
-  const withIcons: Record<string, unknown> = {
-    ...styled,
-    nodes: sanitizeGeneratedNodeIcons(styled["nodes"], diagnostics),
-  };
-  const edges = withIcons["edges"];
-  if (!Array.isArray(edges)) {
-    return withIcons;
-  }
-  return {
-    ...withIcons,
-    edges: edges.map((edge) =>
-      isUnknownRecord(edge) &&
-      typeof edge["label"] === "string" &&
-      edge["label"].trim().length === 0
-        ? Object.fromEntries(
-            Object.entries(edge).filter(([key]) => key !== "label"),
-          )
-        : edge,
-    ),
-  };
+function normalizeGeneratedFlowchartInput(input: unknown, diagnostics: string[]): unknown {
+	const styled = withSketchiDiagramStyle(input);
+	if (!isUnknownRecord(styled)) return styled;
+	const withIcons: Record<string, unknown> = {
+		...styled,
+		nodes: sanitizeGeneratedNodeIcons(styled["nodes"], diagnostics),
+	};
+	const edges = withIcons["edges"];
+	if (!Array.isArray(edges)) {
+		return withIcons;
+	}
+	return {
+		...withIcons,
+		edges: edges.map((edge) =>
+			isUnknownRecord(edge) &&
+			typeof edge["label"] === "string" &&
+			edge["label"].trim().length === 0
+				? Object.fromEntries(Object.entries(edge).filter(([key]) => key !== "label"))
+				: edge,
+		),
+	};
 }
 
 function firstString(values: readonly unknown[]): string | undefined {
-  return values.find((value): value is string => typeof value === "string");
+	return values.find((value): value is string => typeof value === "string");
 }
 
 export function responseErrorDiagnostic(raw: unknown): string | undefined {
-  const error = objectValue(raw, "error");
-  const errors = objectValue(raw, "errors");
-  const text = objectValue(raw, "text");
-  const nestedErrorMessage = objectValue(error, "message");
-  const firstErrorMessage = Array.isArray(errors)
-    ? objectValue(errors[0], "message")
-    : undefined;
-  const message = firstString([
-    objectValue(raw, "message"),
-    nestedErrorMessage,
-    firstErrorMessage,
-    typeof error === "string" ? error : undefined,
-    typeof text === "string" ? text : undefined,
-  ]);
+	const error = objectValue(raw, "error");
+	const errors = objectValue(raw, "errors");
+	const text = objectValue(raw, "text");
+	const nestedErrorMessage = objectValue(error, "message");
+	const firstErrorMessage = Array.isArray(errors) ? objectValue(errors[0], "message") : undefined;
+	const message = firstString([
+		objectValue(raw, "message"),
+		nestedErrorMessage,
+		firstErrorMessage,
+		typeof error === "string" ? error : undefined,
+		typeof text === "string" ? text : undefined,
+	]);
 
-  if (!message) {
-    return undefined;
-  }
+	if (!message) {
+		return undefined;
+	}
 
-  return message.length > 280 ? `${message.slice(0, 277)}...` : message;
+	return message.length > 280 ? `${message.slice(0, 277)}...` : message;
 }
 
 interface CandidateParseFailure {
-  readonly diagnostics: readonly string[];
-  readonly error: string;
-  readonly success: false;
+	readonly diagnostics: readonly string[];
+	readonly error: string;
+	readonly success: false;
 }
 
 interface CandidateParseSuccess {
-  /** Non-fatal repairs applied while decoding. */
-  readonly diagnostics?: readonly string[];
-  readonly diagram?:
-    FlowchartDiagram | MindmapDiagram | GeneratedSequenceDiagram;
-  readonly intent: GeneratedDiagramIntent;
-  readonly success: true;
+	/** Non-fatal repairs applied while decoding. */
+	readonly diagnostics?: readonly string[];
+	readonly diagram?: FlowchartDiagram | MindmapDiagram | GeneratedSequenceDiagram;
+	readonly intent: GeneratedDiagramIntent;
+	readonly success: true;
 }
 
 type CandidateParseResult = CandidateParseFailure | CandidateParseSuccess;
 
-function parseGeneratedSequence(
-  decoded: GeneratedSequenceDiagram,
-): GeneratedSequenceDiagram {
-  const participantIds = new Set<string>();
-  for (const participant of decoded.participants) {
-    if (participantIds.has(participant.id)) {
-      throw new DiagramValidationError(
-        `Duplicate sequence participant id "${participant.id}" is not allowed.`,
-      );
-    }
-    participantIds.add(participant.id);
-  }
-  const messageIds = new Set<string>();
-  for (const message of decoded.messages) {
-    if (messageIds.has(message.id)) {
-      throw new DiagramValidationError(
-        `Duplicate sequence message id "${message.id}" is not allowed.`,
-      );
-    }
-    messageIds.add(message.id);
-    if (
-      !participantIds.has(message.source) ||
-      !participantIds.has(message.target)
-    ) {
-      throw new DiagramValidationError(
-        `Sequence message "${message.id}" references an unknown participant.`,
-      );
-    }
-    if (message.source === message.target) {
-      throw new DiagramValidationError(
-        `Sequence message "${message.id}" cannot target its source participant.`,
-      );
-    }
-  }
-  return decoded;
+function parseGeneratedSequence(decoded: GeneratedSequenceDiagram): GeneratedSequenceDiagram {
+	const participantIds = new Set<string>();
+	for (const participant of decoded.participants) {
+		if (participantIds.has(participant.id)) {
+			throw new DiagramValidationError(
+				`Duplicate sequence participant id "${participant.id}" is not allowed.`,
+			);
+		}
+		participantIds.add(participant.id);
+	}
+	const messageIds = new Set<string>();
+	for (const message of decoded.messages) {
+		if (messageIds.has(message.id)) {
+			throw new DiagramValidationError(
+				`Duplicate sequence message id "${message.id}" is not allowed.`,
+			);
+		}
+		messageIds.add(message.id);
+		if (!participantIds.has(message.source) || !participantIds.has(message.target)) {
+			throw new DiagramValidationError(
+				`Sequence message "${message.id}" references an unknown participant.`,
+			);
+		}
+		if (message.source === message.target) {
+			throw new DiagramValidationError(
+				`Sequence message "${message.id}" cannot target its source participant.`,
+			);
+		}
+	}
+	return decoded;
 }
 
 const schemaIssueFormatter = SchemaIssue.makeFormatterStandardSchemaV1();
 
 function schemaIssueDiagnostic(issue: {
-  readonly message: string;
-  readonly path?:
-    readonly (PropertyKey | { readonly key: PropertyKey })[] | undefined;
+	readonly message: string;
+	readonly path?: readonly (PropertyKey | { readonly key: PropertyKey })[] | undefined;
 }): string {
-  const segments = (issue.path ?? []).map((segment) =>
-    typeof segment === "object" ? segment.key : segment,
-  );
-  const path = segments.length > 0 ? segments.map(String).join(".") : "diagram";
-  return `schema_error at ${path}: ${issue.message}`;
+	const segments = (issue.path ?? []).map((segment) =>
+		typeof segment === "object" ? segment.key : segment,
+	);
+	const path = segments.length > 0 ? segments.map(String).join(".") : "diagram";
+	return `schema_error at ${path}: ${issue.message}`;
 }
 
 function diagramValidationFailure(error: unknown): CandidateParseFailure {
-  if (error instanceof FlowchartValidationError) {
-    return {
-      diagnostics: error.issues.map(
-        (entry) =>
-          `flowchart.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
-      ),
-      error: error.message,
-      success: false,
-    };
-  }
+	if (error instanceof FlowchartValidationError) {
+		return {
+			diagnostics: error.issues.map(
+				(entry) => `flowchart.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
+			),
+			error: error.message,
+			success: false,
+		};
+	}
 
-  const message =
-    error instanceof DiagramValidationError || error instanceof Error
-      ? error.message
-      : "Generated diagram parse failed.";
-  return {
-    diagnostics: [`diagram_validation_error: ${message}`],
-    error: message,
-    success: false,
-  };
+	const message =
+		error instanceof DiagramValidationError || error instanceof Error
+			? error.message
+			: "Generated diagram parse failed.";
+	return {
+		diagnostics: [`diagram_validation_error: ${message}`],
+		error: message,
+		success: false,
+	};
 }
 
 /** Decode only the typed intent envelope when artifact validation has failed. */
-export function decodedIntentFromText(
-  text: string,
-): GeneratedDiagramIntent | undefined {
-  try {
-    const response = Schema.decodeUnknownResult(GeneratedDiagramResponse)(
-      extractJsonObject(text),
-    );
-    return Result.isSuccess(response) ? response.success.intent : undefined;
-  } catch {
-    return undefined;
-  }
+export function decodedIntentFromText(text: string): GeneratedDiagramIntent | undefined {
+	try {
+		const response = Schema.decodeUnknownResult(GeneratedDiagramResponse)(extractJsonObject(text));
+		return Result.isSuccess(response) ? response.success.intent : undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 function parseCandidateDiagram(text: string): CandidateParseResult {
-  let extracted: unknown;
-  try {
-    extracted = extractJsonObject(text);
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Generated diagram parse failed.";
-    return {
-      diagnostics: [`json_parse_error: ${message}`],
-      error: message,
-      success: false,
-    };
-  }
+	let extracted: unknown;
+	try {
+		extracted = extractJsonObject(text);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : "Generated diagram parse failed.";
+		return {
+			diagnostics: [`json_parse_error: ${message}`],
+			error: message,
+			success: false,
+		};
+	}
 
-  const response = Schema.decodeUnknownResult(GeneratedDiagramResponse)(
-    extracted,
-  );
-  if (Result.isFailure(response)) {
-    const diagnostics = [`response_schema_error: ${String(response.failure)}`];
-    return {
-      diagnostics,
-      error: diagnostics[0] ?? "Generated response schema validation failed.",
-      success: false,
-    };
-  }
+	const response = Schema.decodeUnknownResult(GeneratedDiagramResponse)(extracted);
+	if (Result.isFailure(response)) {
+		const diagnostics = [`response_schema_error: ${String(response.failure)}`];
+		return {
+			diagnostics,
+			error: diagnostics[0] ?? "Generated response schema validation failed.",
+			success: false,
+		};
+	}
 
-  const { diagram: rawDiagram, intent, title } = response.success;
-  if (intent.nativeKind === null) {
-    if (rawDiagram !== undefined) {
-      return {
-        diagnostics: [
-          "intent_diagram_mismatch: nativeKind is null, but the response included a diagram. Hint: omit diagram for unsupported requests.",
-        ],
-        error: "Generated intent and diagram did not agree.",
-        success: false,
-      };
-    }
-    return { intent, success: true };
-  }
-  if (!isUnknownRecord(rawDiagram)) {
-    return {
-      diagnostics: [
-        "intent_diagram_missing: a native diagram kind requires one diagram object.",
-      ],
-      error: "Generated response omitted its native diagram.",
-      success: false,
-    };
-  }
-  if (rawDiagram["type"] !== intent.nativeKind) {
-    return {
-      diagnostics: [
-        `intent_diagram_mismatch: nativeKind is ${intent.nativeKind}, but diagram.type is ${String(rawDiagram["type"])}.`,
-      ],
-      error: "Generated intent and diagram did not agree.",
-      success: false,
-    };
-  }
+	const { diagram: rawDiagram, intent, title } = response.success;
+	if (intent.nativeKind === null) {
+		if (rawDiagram !== undefined) {
+			return {
+				diagnostics: [
+					"intent_diagram_mismatch: nativeKind is null, but the response included a diagram. Hint: omit diagram for unsupported requests.",
+				],
+				error: "Generated intent and diagram did not agree.",
+				success: false,
+			};
+		}
+		return { intent, success: true };
+	}
+	if (!isUnknownRecord(rawDiagram)) {
+		return {
+			diagnostics: ["intent_diagram_missing: a native diagram kind requires one diagram object."],
+			error: "Generated response omitted its native diagram.",
+			success: false,
+		};
+	}
+	if (rawDiagram["type"] !== intent.nativeKind) {
+		return {
+			diagnostics: [
+				`intent_diagram_mismatch: nativeKind is ${intent.nativeKind}, but diagram.type is ${String(rawDiagram["type"])}.`,
+			],
+			error: "Generated intent and diagram did not agree.",
+			success: false,
+		};
+	}
 
-  const id = typeof rawDiagram["id"] === "string" ? rawDiagram["id"] : "";
-  const titledDiagram = {
-    ...rawDiagram,
-    title: modelTitleOrFallback(title, id, intent.nativeKind),
-  };
+	const id = typeof rawDiagram["id"] === "string" ? rawDiagram["id"] : "";
+	const titledDiagram = {
+		...rawDiagram,
+		title: modelTitleOrFallback(title, id, intent.nativeKind),
+	};
 
-  const repairs: string[] = [];
-  const parsers = {
-    flowchart: () => {
-      const result = decodeAndValidate(
-        FlowchartDiagramSchema,
-        normalizeGeneratedFlowchartInput(titledDiagram, repairs),
-        validateFlowchartDiagram,
-        intent,
-      );
-      return result.success && repairs.length > 0
-        ? { ...result, diagnostics: repairs }
-        : result;
-    },
-    mindmap: () =>
-      "root" in titledDiagram
-        ? decodeAndValidate(
-            GeneratedMindmapTree,
-            titledDiagram,
-            generatedMindmapTreeToDiagram,
-            intent,
-            "Generated mindmap schema validation failed.",
-          )
-        : decodeAndValidate(
-            MindmapDiagramSchema,
-            withSketchiDiagramStyle(titledDiagram),
-            validateMindmapDiagram,
-            intent,
-          ),
-    sequence: () =>
-      decodeAndValidate(
-        GeneratedSequenceDiagram,
-        titledDiagram,
-        parseGeneratedSequence,
-        intent,
-        "Generated sequence diagram schema validation failed.",
-      ),
-  };
-  return parsers[intent.nativeKind]();
+	const repairs: string[] = [];
+	const parsers = {
+		flowchart: () => {
+			const result = decodeAndValidate(
+				FlowchartDiagramSchema,
+				normalizeGeneratedFlowchartInput(titledDiagram, repairs),
+				validateFlowchartDiagram,
+				intent,
+			);
+			return result.success && repairs.length > 0 ? { ...result, diagnostics: repairs } : result;
+		},
+		mindmap: () =>
+			"root" in titledDiagram
+				? decodeAndValidate(
+						GeneratedMindmapTree,
+						titledDiagram,
+						generatedMindmapTreeToDiagram,
+						intent,
+						"Generated mindmap schema validation failed.",
+					)
+				: decodeAndValidate(
+						MindmapDiagramSchema,
+						withSketchiDiagramStyle(titledDiagram),
+						validateMindmapDiagram,
+						intent,
+					),
+		sequence: () =>
+			decodeAndValidate(
+				GeneratedSequenceDiagram,
+				titledDiagram,
+				parseGeneratedSequence,
+				intent,
+				"Generated sequence diagram schema validation failed.",
+			),
+	};
+	return parsers[intent.nativeKind]();
 }
 
 function decodeAndValidate<S extends Schema.ConstraintDecoder<unknown>>(
-  schema: S,
-  input: unknown,
-  validate: (
-    decoded: S["Type"],
-  ) => NonNullable<CandidateParseSuccess["diagram"]>,
-  intent: GeneratedDiagramIntent,
-  schemaFailureMessage = "Generated diagram schema validation failed.",
+	schema: S,
+	input: unknown,
+	validate: (decoded: S["Type"]) => NonNullable<CandidateParseSuccess["diagram"]>,
+	intent: GeneratedDiagramIntent,
+	schemaFailureMessage = "Generated diagram schema validation failed.",
 ): CandidateParseResult {
-  const decoded = Schema.decodeUnknownResult(schema, { errors: "all" })(input);
-  if (Result.isFailure(decoded)) {
-    const diagnostics = schemaIssueFormatter(decoded.failure.issue).issues.map(
-      schemaIssueDiagnostic,
-    );
-    return {
-      diagnostics,
-      error: diagnostics[0] ?? schemaFailureMessage,
-      success: false,
-    };
-  }
-  try {
-    return { diagram: validate(decoded.success), intent, success: true };
-  } catch (error) {
-    return diagramValidationFailure(error);
-  }
+	const decoded = Schema.decodeUnknownResult(schema, { errors: "all" })(input);
+	if (Result.isFailure(decoded)) {
+		const diagnostics = schemaIssueFormatter(decoded.failure.issue).issues.map(
+			schemaIssueDiagnostic,
+		);
+		return {
+			diagnostics,
+			error: diagnostics[0] ?? schemaFailureMessage,
+			success: false,
+		};
+	}
+	try {
+		return { diagram: validate(decoded.success), intent, success: true };
+	} catch (error) {
+		return diagramValidationFailure(error);
+	}
 }
 
 export function candidateFromText(
-  input: Omit<DiagramGenerationCandidate, "diagnostics" | "text"> & {
-    diagnostics?: string[];
-    text: string;
-  },
+	input: Omit<DiagramGenerationCandidate, "diagnostics" | "text"> & {
+		diagnostics?: string[];
+		text: string;
+	},
 ): DiagramGenerationCandidate {
-  const diagnostics = [...(input.diagnostics ?? [])];
+	const diagnostics = [...(input.diagnostics ?? [])];
 
-  if (input.error) {
-    return {
-      ...input,
-      diagnostics,
-    };
-  }
+	if (input.error) {
+		return {
+			...input,
+			diagnostics,
+		};
+	}
 
-  const parsed = parseCandidateDiagram(input.text);
-  if (parsed.success) {
-    diagnostics.push(...(parsed.diagnostics ?? []));
-    return {
-      ...input,
-      diagnostics,
-      ...(parsed.diagram ? { diagram: parsed.diagram } : {}),
-      intent: parsed.intent,
-    };
-  }
+	const parsed = parseCandidateDiagram(input.text);
+	if (parsed.success) {
+		diagnostics.push(...(parsed.diagnostics ?? []));
+		return {
+			...input,
+			diagnostics,
+			...(parsed.diagram ? { diagram: parsed.diagram } : {}),
+			intent: parsed.intent,
+		};
+	}
 
-  diagnostics.push(...parsed.diagnostics);
-  return {
-    ...input,
-    diagnostics,
-    error: parsed.error,
-  };
+	diagnostics.push(...parsed.diagnostics);
+	return {
+		...input,
+		diagnostics,
+		error: parsed.error,
+	};
 }
 
 function flowchartCycleRank(diagram: FlowchartDiagram): number {
-  const adjacency = new Map<string, string[]>();
-  for (const node of diagram.nodes) adjacency.set(node.id, []);
-  for (const edge of diagram.edges)
-    adjacency.get(edge.source)?.push(edge.target);
+	const adjacency = new Map<string, string[]>();
+	for (const node of diagram.nodes) adjacency.set(node.id, []);
+	for (const edge of diagram.edges) adjacency.get(edge.source)?.push(edge.target);
 
-  let nextIndex = 0;
-  const indexes = new Map<string, number>();
-  const lowLinks = new Map<string, number>();
-  const stack: string[] = [];
-  const onStack = new Set<string>();
-  let rank = 0;
+	let nextIndex = 0;
+	const indexes = new Map<string, number>();
+	const lowLinks = new Map<string, number>();
+	const stack: string[] = [];
+	const onStack = new Set<string>();
+	let rank = 0;
 
-  const visit = (nodeId: string): void => {
-    indexes.set(nodeId, nextIndex);
-    lowLinks.set(nodeId, nextIndex);
-    nextIndex += 1;
-    stack.push(nodeId);
-    onStack.add(nodeId);
+	const visit = (nodeId: string): void => {
+		indexes.set(nodeId, nextIndex);
+		lowLinks.set(nodeId, nextIndex);
+		nextIndex += 1;
+		stack.push(nodeId);
+		onStack.add(nodeId);
 
-    for (const target of adjacency.get(nodeId) ?? []) {
-      if (!indexes.has(target)) {
-        visit(target);
-        lowLinks.set(
-          nodeId,
-          Math.min(lowLinks.get(nodeId) ?? 0, lowLinks.get(target) ?? 0),
-        );
-      } else if (onStack.has(target)) {
-        lowLinks.set(
-          nodeId,
-          Math.min(lowLinks.get(nodeId) ?? 0, indexes.get(target) ?? 0),
-        );
-      }
-    }
+		for (const target of adjacency.get(nodeId) ?? []) {
+			if (!indexes.has(target)) {
+				visit(target);
+				lowLinks.set(nodeId, Math.min(lowLinks.get(nodeId) ?? 0, lowLinks.get(target) ?? 0));
+			} else if (onStack.has(target)) {
+				lowLinks.set(nodeId, Math.min(lowLinks.get(nodeId) ?? 0, indexes.get(target) ?? 0));
+			}
+		}
 
-    if (lowLinks.get(nodeId) !== indexes.get(nodeId)) return;
-    const component = new Set<string>();
-    for (;;) {
-      const member = stack.pop();
-      if (!member) break;
-      onStack.delete(member);
-      component.add(member);
-      if (member === nodeId) break;
-    }
-    const internalEdges = diagram.edges.filter(
-      (edge) => component.has(edge.source) && component.has(edge.target),
-    ).length;
-    if (internalEdges > 0) {
-      rank += Math.max(0, internalEdges - component.size + 1);
-    }
-  };
+		if (lowLinks.get(nodeId) !== indexes.get(nodeId)) return;
+		const component = new Set<string>();
+		for (;;) {
+			const member = stack.pop();
+			if (!member) break;
+			onStack.delete(member);
+			component.add(member);
+			if (member === nodeId) break;
+		}
+		const internalEdges = diagram.edges.filter(
+			(edge) => component.has(edge.source) && component.has(edge.target),
+		).length;
+		if (internalEdges > 0) {
+			rank += Math.max(0, internalEdges - component.size + 1);
+		}
+	};
 
-  for (const node of diagram.nodes) {
-    if (!indexes.has(node.id)) visit(node.id);
-  }
-  return rank;
+	for (const node of diagram.nodes) {
+		if (!indexes.has(node.id)) visit(node.id);
+	}
+	return rank;
 }
 
 function labelsForRequirement(
-  diagram: NonNullable<DiagramGenerationCandidate["diagram"]>,
-  requirement: Extract<DiagramRequirement, { readonly kind: "label" }>,
+	diagram: NonNullable<DiagramGenerationCandidate["diagram"]>,
+	requirement: Extract<DiagramRequirement, { readonly kind: "label" }>,
 ): readonly string[] | undefined {
-  if (diagram.type === "flowchart") {
-    if (requirement.target === "node") {
-      return diagram.nodes.map((node) => node.label);
-    }
-    if (requirement.target === "branch") {
-      return diagram.edges.flatMap((edge) =>
-        edge.label === undefined ? [] : [edge.label],
-      );
-    }
-    return undefined;
-  }
-  if (diagram.type === "mindmap") {
-    return requirement.target === "topic"
-      ? diagram.nodes.map((node) => node.label)
-      : undefined;
-  }
-  if (requirement.target === "participant") {
-    return diagram.participants.map((participant) => participant.label);
-  }
-  if (requirement.target === "message") {
-    return diagram.messages.map((message) => message.label);
-  }
-  return undefined;
+	if (diagram.type === "flowchart") {
+		if (requirement.target === "node") {
+			return diagram.nodes.map((node) => node.label);
+		}
+		if (requirement.target === "branch") {
+			return diagram.edges.flatMap((edge) => (edge.label === undefined ? [] : [edge.label]));
+		}
+		return undefined;
+	}
+	if (diagram.type === "mindmap") {
+		return requirement.target === "topic" ? diagram.nodes.map((node) => node.label) : undefined;
+	}
+	if (requirement.target === "participant") {
+		return diagram.participants.map((participant) => participant.label);
+	}
+	if (requirement.target === "message") {
+		return diagram.messages.map((message) => message.label);
+	}
+	return undefined;
 }
 
 function countForRequirement(
-  diagram: NonNullable<DiagramGenerationCandidate["diagram"]>,
-  target: Extract<DiagramRequirement, { readonly kind: "count" }>["target"],
+	diagram: NonNullable<DiagramGenerationCandidate["diagram"]>,
+	target: Extract<DiagramRequirement, { readonly kind: "count" }>["target"],
 ): number | undefined {
-  if (diagram.type === "flowchart") {
-    switch (target) {
-      case "nodes":
-        return diagram.nodes.length;
-      case "decision_nodes":
-        return diagram.nodes.filter((node) => node.kind === "decision").length;
-      case "terminal_nodes":
-        return diagram.nodes.filter((node) => node.kind === "end").length;
-      case "cycles":
-        return flowchartCycleRank(diagram);
-      default:
-        return undefined;
-    }
-  }
-  if (diagram.type === "mindmap") {
-    return target === "topics" ? diagram.nodes.length : undefined;
-  }
-  if (target === "participants") return diagram.participants.length;
-  return target === "messages" ? diagram.messages.length : undefined;
+	if (diagram.type === "flowchart") {
+		switch (target) {
+			case "nodes":
+				return diagram.nodes.length;
+			case "decision_nodes":
+				return diagram.nodes.filter((node) => node.kind === "decision").length;
+			case "terminal_nodes":
+				return diagram.nodes.filter((node) => node.kind === "end").length;
+			case "cycles":
+				return flowchartCycleRank(diagram);
+			default:
+				return undefined;
+		}
+	}
+	if (diagram.type === "mindmap") {
+		return target === "topics" ? diagram.nodes.length : undefined;
+	}
+	if (target === "participants") return diagram.participants.length;
+	return target === "messages" ? diagram.messages.length : undefined;
 }
 
 function normalizeLabel(value: string): string {
-  return value.replace(/\s+/gu, " ").trim().toLocaleLowerCase("en-US");
+	return value.replace(/\s+/gu, " ").trim().toLocaleLowerCase("en-US");
 }
 
 function requirementDiagnostic(
-  diagram: NonNullable<DiagramGenerationCandidate["diagram"]>,
-  requirement: DiagramRequirement,
+	diagram: NonNullable<DiagramGenerationCandidate["diagram"]>,
+	requirement: DiagramRequirement,
 ): string | undefined {
-  if (requirement.kind === "label") {
-    const labels = labelsForRequirement(diagram, requirement);
-    if (!labels) {
-      return `requirement_target_invalid: ${requirement.target} labels do not apply to ${diagram.type}.`;
-    }
-    const expected = normalizeLabel(requirement.value);
-    if (labels.some((label) => normalizeLabel(label) === expected)) {
-      return undefined;
-    }
-    return `requirement_label_not_met: required ${requirement.target} label "${requirement.value}" was not present.`;
-  }
+	if (requirement.kind === "label") {
+		const labels = labelsForRequirement(diagram, requirement);
+		if (!labels) {
+			return `requirement_target_invalid: ${requirement.target} labels do not apply to ${diagram.type}.`;
+		}
+		const expected = normalizeLabel(requirement.value);
+		if (labels.some((label) => normalizeLabel(label) === expected)) {
+			return undefined;
+		}
+		return `requirement_label_not_met: required ${requirement.target} label "${requirement.value}" was not present.`;
+	}
 
-  const actual =
-    requirement.kind === "depth"
-      ? diagram.type === "mindmap"
-        ? Math.max(...diagram.nodes.map((node) => node.metadata.depth)) + 1
-        : undefined
-      : countForRequirement(diagram, requirement.target);
-  if (actual === undefined) {
-    return `requirement_target_invalid: ${requirement.target} does not apply to ${diagram.type}.`;
-  }
-  const satisfied =
-    requirement.comparator === "exact"
-      ? actual === requirement.value
-      : actual >= requirement.value;
-  if (satisfied) return undefined;
-  return `requirement_count_not_met: ${requirement.target} must be ${requirement.comparator === "exact" ? "exactly" : "at least"} ${requirement.value}, but the generated ${diagram.type} contained ${actual}.`;
+	const actual =
+		requirement.kind === "depth"
+			? diagram.type === "mindmap"
+				? Math.max(...diagram.nodes.map((node) => node.metadata.depth)) + 1
+				: undefined
+			: countForRequirement(diagram, requirement.target);
+	if (actual === undefined) {
+		return `requirement_target_invalid: ${requirement.target} does not apply to ${diagram.type}.`;
+	}
+	const satisfied =
+		requirement.comparator === "exact" ? actual === requirement.value : actual >= requirement.value;
+	if (satisfied) return undefined;
+	return `requirement_count_not_met: ${requirement.target} must be ${requirement.comparator === "exact" ? "exactly" : "at least"} ${requirement.value}, but the generated ${diagram.type} contained ${actual}.`;
 }
 
 function requirementsAreEqual(
-  expected: readonly DiagramRequirement[],
-  actual: readonly DiagramRequirement[],
+	expected: readonly DiagramRequirement[],
+	actual: readonly DiagramRequirement[],
 ): boolean {
-  if (expected.length !== actual.length) return false;
-  return expected.every((requirement, index) => {
-    const candidate = actual[index];
-    if (!candidate || candidate.kind !== requirement.kind) return false;
-    if (requirement.kind === "label") {
-      return (
-        candidate.kind === "label" &&
-        candidate.target === requirement.target &&
-        candidate.value === requirement.value
-      );
-    }
-    return (
-      candidate.kind === requirement.kind &&
-      candidate.comparator === requirement.comparator &&
-      candidate.target === requirement.target &&
-      candidate.value === requirement.value
-    );
-  });
+	if (expected.length !== actual.length) return false;
+	return expected.every((requirement, index) => {
+		const candidate = actual[index];
+		if (!candidate || candidate.kind !== requirement.kind) return false;
+		if (requirement.kind === "label") {
+			return (
+				candidate.kind === "label" &&
+				candidate.target === requirement.target &&
+				candidate.value === requirement.value
+			);
+		}
+		return (
+			candidate.kind === requirement.kind &&
+			candidate.comparator === requirement.comparator &&
+			candidate.target === requirement.target &&
+			candidate.value === requirement.value
+		);
+	});
 }
 
 /** Deterministically enforce the original model-authored plan against the artifact. */
@@ -718,110 +652,101 @@ function requirementsAreEqual(
  * not name, nor shifts a logo onto the wrong step.
  */
 function groundFlowchartIcons(
-  diagram: FlowchartDiagram,
-  request: DiagramGenerationRequest,
+	diagram: FlowchartDiagram,
+	request: DiagramGenerationRequest,
 ): { readonly diagnostics: string[]; readonly diagram: FlowchartDiagram } {
-  const encoded = Schema.encodeSync(FlowchartDiagramSchema)(diagram);
-  const placement = placeNodeLogos(encoded.nodes, request.prompt.logos ?? []);
-  return placement.diagnostics.length === 0
-    ? { diagnostics: [], diagram }
-    : {
-        diagnostics: placement.diagnostics,
-        diagram: Schema.decodeUnknownSync(FlowchartDiagramSchema)({
-          ...encoded,
-          nodes: placement.nodes,
-        }),
-      };
+	const encoded = Schema.encodeSync(FlowchartDiagramSchema)(diagram);
+	const placement = placeNodeLogos(encoded.nodes, request.prompt.logos ?? []);
+	return placement.diagnostics.length === 0
+		? { diagnostics: [], diagram }
+		: {
+				diagnostics: placement.diagnostics,
+				diagram: Schema.decodeUnknownSync(FlowchartDiagramSchema)({
+					...encoded,
+					nodes: placement.nodes,
+				}),
+			};
 }
 
 export function enforceCandidateRequestRequirements(
-  input: DiagramGenerationCandidate,
-  request: DiagramGenerationRequest,
-  originalRequirements?: readonly DiagramRequirement[],
+	input: DiagramGenerationCandidate,
+	request: DiagramGenerationRequest,
+	originalRequirements?: readonly DiagramRequirement[],
 ): DiagramGenerationCandidate {
-  if (!input.intent || input.error) return input;
-  const grounding =
-    input.diagram?.type === "flowchart"
-      ? groundFlowchartIcons(input.diagram, request)
-      : undefined;
-  const candidate =
-    grounding && grounding.diagnostics.length > 0
-      ? {
-          ...input,
-          diagram: grounding.diagram,
-          diagnostics: [...input.diagnostics, ...grounding.diagnostics],
-        }
-      : input;
-  const { diagram, intent } = candidate;
-  if (!intent) return candidate;
+	if (!input.intent || input.error) return input;
+	const grounding =
+		input.diagram?.type === "flowchart" ? groundFlowchartIcons(input.diagram, request) : undefined;
+	const candidate =
+		grounding && grounding.diagnostics.length > 0
+			? {
+					...input,
+					diagram: grounding.diagram,
+					diagnostics: [...input.diagnostics, ...grounding.diagnostics],
+				}
+			: input;
+	const { diagram, intent } = candidate;
+	if (!intent) return candidate;
 
-  const requestDiagnostics: string[] = [];
-  const requirements = originalRequirements ?? intent.requirements;
-  if (
-    originalRequirements &&
-    !requirementsAreEqual(originalRequirements, intent.requirements)
-  ) {
-    requestDiagnostics.push(
-      "intent_requirements_changed: semantic repair altered or omitted the original typed requirement plan.",
-    );
-  }
-  const requestedKindIsNative =
-    intent.requestedKind === "flowchart" ||
-    intent.requestedKind === "mindmap" ||
-    intent.requestedKind === "sequence";
-  if (
-    request.prompt.requestedType &&
-    (intent.requestedKind !== request.prompt.requestedType ||
-      intent.nativeKind !== request.prompt.requestedType)
-  ) {
-    requestDiagnostics.push(
-      `explicit_type_not_met: the caller required ${request.prompt.requestedType}, but the response selected requestedKind ${intent.requestedKind} and nativeKind ${String(intent.nativeKind)}.`,
-    );
-  }
-  if (
-    (intent.nativeKind === null && requestedKindIsNative) ||
-    (intent.nativeKind !== null && intent.requestedKind !== intent.nativeKind)
-  ) {
-    requestDiagnostics.push(
-      `intent_kind_mismatch: requestedKind ${intent.requestedKind} cannot be generated as nativeKind ${intent.nativeKind}.`,
-    );
-  }
-  if (diagram) {
-    requestDiagnostics.push(
-      ...requirements.flatMap((requirement) => {
-        const diagnostic = requirementDiagnostic(diagram, requirement);
-        return diagnostic ? [diagnostic] : [];
-      }),
-    );
-  }
-  if (requestDiagnostics.length === 0) return candidate;
+	const requestDiagnostics: string[] = [];
+	const requirements = originalRequirements ?? intent.requirements;
+	if (originalRequirements && !requirementsAreEqual(originalRequirements, intent.requirements)) {
+		requestDiagnostics.push(
+			"intent_requirements_changed: semantic repair altered or omitted the original typed requirement plan.",
+		);
+	}
+	const requestedKindIsNative =
+		intent.requestedKind === "flowchart" ||
+		intent.requestedKind === "mindmap" ||
+		intent.requestedKind === "sequence";
+	if (
+		request.prompt.requestedType &&
+		(intent.requestedKind !== request.prompt.requestedType ||
+			intent.nativeKind !== request.prompt.requestedType)
+	) {
+		requestDiagnostics.push(
+			`explicit_type_not_met: the caller required ${request.prompt.requestedType}, but the response selected requestedKind ${intent.requestedKind} and nativeKind ${String(intent.nativeKind)}.`,
+		);
+	}
+	if (
+		(intent.nativeKind === null && requestedKindIsNative) ||
+		(intent.nativeKind !== null && intent.requestedKind !== intent.nativeKind)
+	) {
+		requestDiagnostics.push(
+			`intent_kind_mismatch: requestedKind ${intent.requestedKind} cannot be generated as nativeKind ${intent.nativeKind}.`,
+		);
+	}
+	if (diagram) {
+		requestDiagnostics.push(
+			...requirements.flatMap((requirement) => {
+				const diagnostic = requirementDiagnostic(diagram, requirement);
+				return diagnostic ? [diagnostic] : [];
+			}),
+		);
+	}
+	if (requestDiagnostics.length === 0) return candidate;
 
-  const { diagram: _diagram, ...withoutDiagram } = candidate;
-  return {
-    ...withoutDiagram,
-    diagnostics: [...candidate.diagnostics, ...requestDiagnostics],
-    error: "Generated diagram did not satisfy its typed intent contract.",
-  };
+	const { diagram: _diagram, ...withoutDiagram } = candidate;
+	return {
+		...withoutDiagram,
+		diagnostics: [...candidate.diagnostics, ...requestDiagnostics],
+		error: "Generated diagram did not satisfy its typed intent contract.",
+	};
 }
 
 export function summarizeGenerationCandidate(
-  candidate: DiagramGenerationCandidate,
+	candidate: DiagramGenerationCandidate,
 ): DiagramGenerationCandidateSummary {
-  return {
-    diagnostics: candidate.diagnostics,
-    ...(candidate.diagram
-      ? { diagramText: JSON.stringify(candidate.diagram, null, 2) }
-      : {}),
-    diagramValid: Boolean(candidate.diagram) && !candidate.error,
-    model: candidate.model,
-    provider: candidate.provider,
-    text: candidate.text,
-    ...(candidate.cacheMode ? { cacheMode: candidate.cacheMode } : {}),
-    ...(candidate.durationMs !== undefined
-      ? { durationMs: candidate.durationMs }
-      : {}),
-    ...(candidate.error ? { error: candidate.error } : {}),
-    ...(candidate.intent ? { intent: candidate.intent } : {}),
-    ...(candidate.usage ? { usage: candidate.usage } : {}),
-  };
+	return {
+		diagnostics: candidate.diagnostics,
+		...(candidate.diagram ? { diagramText: JSON.stringify(candidate.diagram, null, 2) } : {}),
+		diagramValid: Boolean(candidate.diagram) && !candidate.error,
+		model: candidate.model,
+		provider: candidate.provider,
+		text: candidate.text,
+		...(candidate.cacheMode ? { cacheMode: candidate.cacheMode } : {}),
+		...(candidate.durationMs !== undefined ? { durationMs: candidate.durationMs } : {}),
+		...(candidate.error ? { error: candidate.error } : {}),
+		...(candidate.intent ? { intent: candidate.intent } : {}),
+		...(candidate.usage ? { usage: candidate.usage } : {}),
+	};
 }

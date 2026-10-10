@@ -9,12 +9,12 @@ import { CliApplicationLayer, cliProgram } from "./cli.js";
 const MainLayer = Layer.provideMerge(CliApplicationLayer, NodeServices.layer);
 
 const main = cliProgram(process.argv.slice(2)).pipe(
-  Effect.tap((exitCode) =>
-    Effect.sync(() => {
-      process.exitCode = exitCode;
-    }),
-  ),
-  Effect.provide(MainLayer),
+	Effect.tap((exitCode) =>
+		Effect.sync(() => {
+			process.exitCode = exitCode;
+		}),
+	),
+	Effect.provide(MainLayer),
 );
 
 NodeRuntime.runMain(main, { disableErrorReporting: true });

@@ -26,23 +26,15 @@ const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 
 /** Trees whose contents are shipped to or pasted by users. */
 const SCANNED_ROOTS = [
-  ".agents",
-  "apps/excalidraw/src",
-  "apps/icons/src",
-  "apps/playground/src",
-  "apps/web/src",
-  "plugins",
+	".agents",
+	"apps/excalidraw/src",
+	"apps/icons/src",
+	"apps/playground/src",
+	"apps/web/src",
+	"plugins",
 ];
 
-const SCANNED_EXTENSIONS = [
-  ".json",
-  ".jsonc",
-  ".md",
-  ".ts",
-  ".tsx",
-  ".yaml",
-  ".yml",
-];
+const SCANNED_EXTENSIONS = [".json", ".jsonc", ".md", ".ts", ".tsx", ".yaml", ".yml"];
 
 /**
  * Tests and stories are fixtures, not user-facing output, and they need
@@ -51,92 +43,86 @@ const SCANNED_EXTENSIONS = [
 const FIXTURE_FILE = /\.(?:test|browser\.test|stories)\.[a-z]+$/;
 
 function sourceFiles(root: string): string[] {
-  const absoluteRoot = join(repoRoot, root);
-  let entries: Dirent[];
+	const absoluteRoot = join(repoRoot, root);
+	let entries: Dirent[];
 
-  try {
-    entries = readdirSync(absoluteRoot, {
-      recursive: true,
-      withFileTypes: true,
-    });
-  } catch {
-    return [];
-  }
+	try {
+		entries = readdirSync(absoluteRoot, {
+			recursive: true,
+			withFileTypes: true,
+		});
+	} catch {
+		return [];
+	}
 
-  return entries
-    .filter(
-      (entry) =>
-        entry.isFile() &&
-        SCANNED_EXTENSIONS.some((extension) =>
-          entry.name.endsWith(extension),
-        ) &&
-        !FIXTURE_FILE.test(entry.name),
-    )
-    .map((entry) => join(entry.parentPath, entry.name));
+	return entries
+		.filter(
+			(entry) =>
+				entry.isFile() &&
+				SCANNED_EXTENSIONS.some((extension) => entry.name.endsWith(extension)) &&
+				!FIXTURE_FILE.test(entry.name),
+		)
+		.map((entry) => join(entry.parentPath, entry.name));
 }
 
 interface Offence {
-  readonly file: string;
-  readonly line: number;
-  readonly text: string;
+	readonly file: string;
+	readonly line: number;
+	readonly text: string;
 }
 
 function unmarkedWorkerHostnames(file: string): Offence[] {
-  const lines = readFileSync(file, "utf8").split("\n");
+	const lines = readFileSync(file, "utf8").split("\n");
 
-  return lines.flatMap((text, index) => {
-    if (!WORKER_HOSTNAME.test(text)) {
-      return [];
-    }
+	return lines.flatMap((text, index) => {
+		if (!WORKER_HOSTNAME.test(text)) {
+			return [];
+		}
 
-    const marked = lines
-      .slice(Math.max(0, index - MARKER_LOOKBEHIND_LINES), index + 1)
-      .some((candidate) => candidate.includes(PREVIEW_EXCEPTION_MARKER));
+		const marked = lines
+			.slice(Math.max(0, index - MARKER_LOOKBEHIND_LINES), index + 1)
+			.some((candidate) => candidate.includes(PREVIEW_EXCEPTION_MARKER));
 
-    return marked
-      ? []
-      : [
-          {
-            file: relative(repoRoot, file),
-            line: index + 1,
-            text: text.trim(),
-          },
-        ];
-  });
+		return marked
+			? []
+			: [
+					{
+						file: relative(repoRoot, file),
+						line: index + 1,
+						text: text.trim(),
+					},
+				];
+	});
 }
 
 describe("public surface URLs", () => {
-  it("never names a Worker hostname outside an annotated preview path", () => {
-    const offences = SCANNED_ROOTS.flatMap(sourceFiles).flatMap(
-      unmarkedWorkerHostnames,
-    );
+	it("never names a Worker hostname outside an annotated preview path", () => {
+		const offences = SCANNED_ROOTS.flatMap(sourceFiles).flatMap(unmarkedWorkerHostnames);
 
-    expect(
-      offences.map(
-        (offence) => `${offence.file}:${offence.line} ${offence.text}`,
-      ),
-    ).toEqual([]);
-  });
+		expect(offences.map((offence) => `${offence.file}:${offence.line} ${offence.text}`)).toEqual(
+			[],
+		);
+	});
 
-  it("keeps the preview exception reachable rather than dead", () => {
-    const marked = SCANNED_ROOTS.flatMap(sourceFiles).filter((file) =>
-      readFileSync(file, "utf8").includes(PREVIEW_EXCEPTION_MARKER),
-    );
+	it("keeps the preview exception reachable rather than dead", () => {
+		const marked = SCANNED_ROOTS.flatMap(sourceFiles).filter((file) =>
+			readFileSync(file, "utf8").includes(PREVIEW_EXCEPTION_MARKER),
+		);
 
-    expect(marked.length).toBeGreaterThan(0);
-  });
+		expect(marked.length).toBeGreaterThan(0);
+	});
 
-  it("ships agent configs that point at the public MCP endpoint", () => {
-    const configs = [
-      ".agents/mcp_config.json",
-      "plugins/sketchi-code-mode-claude/.mcp.json",
-      "plugins/sketchi-code-mode-codex/.mcp.json",
-    ];
+	it("ships agent configs that point at the public MCP endpoint", () => {
+		const configs = [
+			".agents/mcp_config.json",
+			"plugins/sketchi-code-mode-claude/.mcp.json",
+			"plugins/sketchi-code-mode-codex/.mcp.json",
+		];
 
-    for (const config of configs) {
-      const contents = readFileSync(join(repoRoot, config), "utf8");
-      expect(contents).toContain("https://playground.sketchi.app/mcp");
-      expect(contents).not.toContain("workers.dev");
-    }
-  });
+		for (const config of configs) {
+			const contents = readFileSync(join(repoRoot, config), "utf8");
+			expect(contents).toContain("https://playground.sketchi.app/mcp");
+			expect(contents).not.toContain("workers.dev");
+		}
+	});
 });

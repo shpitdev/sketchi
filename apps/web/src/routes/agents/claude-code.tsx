@@ -7,16 +7,15 @@ import { pageMeta } from "../../lib/site-meta";
 const agentId = "claude-code" satisfies AgentSetupId;
 
 export const Route = createFileRoute("/agents/claude-code")({
-  head: () =>
-    pageMeta({
-      title: "Claude Code setup - Sketchi",
-      description:
-        "Add Sketchi to Claude Code and turn prompts into editable diagrams.",
-      path: "/agents/claude-code",
-    }),
-  component: ClaudeCodeRoute,
+	head: () =>
+		pageMeta({
+			title: "Claude Code setup - Sketchi",
+			description: "Add Sketchi to Claude Code and turn prompts into editable diagrams.",
+			path: "/agents/claude-code",
+		}),
+	component: ClaudeCodeRoute,
 });
 
 function ClaudeCodeRoute() {
-  return <AgentSetupView agentId={agentId} />;
+	return <AgentSetupView agentId={agentId} />;
 }

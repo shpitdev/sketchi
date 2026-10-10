@@ -1,10 +1,10 @@
 {
-  "name": "@sketchi/icons-app",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@sketchi/icon-catalog": "workspace:*",
-    "@tanstack/react-hotkeys": "0.13.0",
-    "fflate": "0.8.3"
-  }
+	"name": "@sketchi/icons-app",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@sketchi/icon-catalog": "workspace:*",
+		"@tanstack/react-hotkeys": "0.13.0",
+		"fflate": "0.8.3"
+	}
 }

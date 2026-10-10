@@ -1,93 +1,87 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  DEFAULT_WEB_SURFACE_URLS,
-  LOCAL_WEB_SURFACE_URLS,
-  PRODUCT_SURFACE_HOSTS,
-  resolveWebSurfaceUrls,
-  surfaceLinkLabel,
+	DEFAULT_WEB_SURFACE_URLS,
+	LOCAL_WEB_SURFACE_URLS,
+	PRODUCT_SURFACE_HOSTS,
+	resolveWebSurfaceUrls,
+	surfaceLinkLabel,
 } from "./surface-urls";
 
 describe("resolveWebSurfaceUrls", () => {
-  it("uses public product URLs by default", () => {
-    expect(resolveWebSurfaceUrls()).toEqual(DEFAULT_WEB_SURFACE_URLS);
-    expect(DEFAULT_WEB_SURFACE_URLS).toEqual({
-      icons: "https://icons.sketchi.app",
-      playground: "https://playground.sketchi.app",
-    });
-  });
+	it("uses public product URLs by default", () => {
+		expect(resolveWebSurfaceUrls()).toEqual(DEFAULT_WEB_SURFACE_URLS);
+		expect(DEFAULT_WEB_SURFACE_URLS).toEqual({
+			icons: "https://icons.sketchi.app",
+			playground: "https://playground.sketchi.app",
+		});
+	});
 
-  it("never falls back to a Worker hostname", () => {
-    for (const url of Object.values(DEFAULT_WEB_SURFACE_URLS)) {
-      expect(url).not.toContain("workers.dev");
-    }
-    for (const url of Object.values(resolveWebSurfaceUrls())) {
-      expect(url).not.toContain("workers.dev");
-    }
-  });
+	it("never falls back to a Worker hostname", () => {
+		for (const url of Object.values(DEFAULT_WEB_SURFACE_URLS)) {
+			expect(url).not.toContain("workers.dev");
+		}
+		for (const url of Object.values(resolveWebSurfaceUrls())) {
+			expect(url).not.toContain("workers.dev");
+		}
+	});
 
-  it("centralizes future custom domains and local app URLs", () => {
-    expect(PRODUCT_SURFACE_HOSTS).toEqual({
-      docs: "sketchi.app/docs",
-      icons: "icons.sketchi.app",
-      playground: "playground.sketchi.app",
-    });
-    expect(LOCAL_WEB_SURFACE_URLS).toEqual({
-      icons: "http://localhost:6203",
-      playground: "http://localhost:6310",
-    });
-  });
+	it("centralizes future custom domains and local app URLs", () => {
+		expect(PRODUCT_SURFACE_HOSTS).toEqual({
+			docs: "sketchi.app/docs",
+			icons: "icons.sketchi.app",
+			playground: "playground.sketchi.app",
+		});
+		expect(LOCAL_WEB_SURFACE_URLS).toEqual({
+			icons: "http://localhost:6203",
+			playground: "http://localhost:6310",
+		});
+	});
 
-  it("uses configured preview URLs", () => {
-    expect(
-      resolveWebSurfaceUrls({
-        SKETCHI_ICONS_URL: "https://pr-42-sketchi-icons.dimethyl.workers.dev",
-        SKETCHI_PLAYGROUND_URL:
-          "https://pr-42-sketchi-studio.dimethyl.workers.dev/",
-      }),
-    ).toEqual({
-      icons: "https://pr-42-sketchi-icons.dimethyl.workers.dev",
-      playground: "https://pr-42-sketchi-studio.dimethyl.workers.dev",
-    });
-  });
+	it("uses configured preview URLs", () => {
+		expect(
+			resolveWebSurfaceUrls({
+				SKETCHI_ICONS_URL: "https://pr-42-sketchi-icons.dimethyl.workers.dev",
+				SKETCHI_PLAYGROUND_URL: "https://pr-42-sketchi-studio.dimethyl.workers.dev/",
+			}),
+		).toEqual({
+			icons: "https://pr-42-sketchi-icons.dimethyl.workers.dev",
+			playground: "https://pr-42-sketchi-studio.dimethyl.workers.dev",
+		});
+	});
 
-  it("falls back when configured URLs are not http urls", () => {
-    expect(
-      resolveWebSurfaceUrls({
-        SKETCHI_PLAYGROUND_URL: "javascript:alert(1)",
-      }).playground,
-    ).toBe(DEFAULT_WEB_SURFACE_URLS.playground);
-  });
+	it("falls back when configured URLs are not http urls", () => {
+		expect(
+			resolveWebSurfaceUrls({
+				SKETCHI_PLAYGROUND_URL: "javascript:alert(1)",
+			}).playground,
+		).toBe(DEFAULT_WEB_SURFACE_URLS.playground);
+	});
 
-  it.each([
-    "https://sketchi-playground.dimethyl.workers.dev",
-    "https://sketchi-playground.dimethyl.workers.dev./",
-    "https://pr-42-sketchi-playground.dimethyl.workers.dev",
-    "https://pr-42-sketchi-playground.dimethyl.workers.dev./",
-    "https://0123abcd-sketchi-playground.dimethyl.workers.dev",
-    "https://sketchi-playground-pr-42.dimethyl.workers.dev",
-    "https://sketchi-playground-pr-42.dimethyl.workers.dev./",
-    "https://pr-42-sketchi-playground.other-account.workers.dev",
-  ])("rejects the internal eval Worker as a configured public link", (url) => {
-    expect(
-      resolveWebSurfaceUrls({ SKETCHI_PLAYGROUND_URL: url }).playground,
-    ).toBe(DEFAULT_WEB_SURFACE_URLS.playground);
-  });
+	it.each([
+		"https://sketchi-playground.dimethyl.workers.dev",
+		"https://sketchi-playground.dimethyl.workers.dev./",
+		"https://pr-42-sketchi-playground.dimethyl.workers.dev",
+		"https://pr-42-sketchi-playground.dimethyl.workers.dev./",
+		"https://0123abcd-sketchi-playground.dimethyl.workers.dev",
+		"https://sketchi-playground-pr-42.dimethyl.workers.dev",
+		"https://sketchi-playground-pr-42.dimethyl.workers.dev./",
+		"https://pr-42-sketchi-playground.other-account.workers.dev",
+	])("rejects the internal eval Worker as a configured public link", (url) => {
+		expect(resolveWebSurfaceUrls({ SKETCHI_PLAYGROUND_URL: url }).playground).toBe(
+			DEFAULT_WEB_SURFACE_URLS.playground,
+		);
+	});
 });
 
 describe("surfaceLinkLabel", () => {
-  it("uses the hostname for absolute links", () => {
-    expect(
-      surfaceLinkLabel(
-        "https://pr-42-sketchi-studio.dimethyl.workers.dev",
-        "fallback",
-      ),
-    ).toBe("pr-42-sketchi-studio.dimethyl.workers.dev");
-  });
+	it("uses the hostname for absolute links", () => {
+		expect(surfaceLinkLabel("https://pr-42-sketchi-studio.dimethyl.workers.dev", "fallback")).toBe(
+			"pr-42-sketchi-studio.dimethyl.workers.dev",
+		);
+	});
 
-  it("uses the fallback for relative links", () => {
-    expect(surfaceLinkLabel("/docs", "sketchi.app/docs")).toBe(
-      "sketchi.app/docs",
-    );
-  });
+	it("uses the fallback for relative links", () => {
+		expect(surfaceLinkLabel("/docs", "sketchi.app/docs")).toBe("sketchi.app/docs");
+	});
 });

@@ -1,741 +1,674 @@
 import { createProjectGraphAsync, readJsonFile } from "@nx/devkit";
 import { spawnSync } from "node:child_process";
-import {
-  existsSync,
-  globSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, globSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const workspaceRoot = fileURLToPath(new URL("../", import.meta.url));
-const requiredWorkspaceGlobs = [
-  "apps/*",
-  "packages/*",
-  "packages/*/*",
-  "tools/*",
-];
+const requiredWorkspaceGlobs = ["apps/*", "packages/*", "packages/*/*", "tools/*"];
 const intendedNxProjectRoots = [
-  "apps/cli",
-  "apps/eval-harness",
-  "apps/excalidraw",
-  "apps/icons",
-  "apps/native-conversion-storybook",
-  "apps/playground",
-  "apps/web",
-  "packages/diagram/agent",
-  "packages/diagram/core",
-  "packages/diagram/excalidraw",
-  "packages/diagram/generation",
-  "packages/diagram/renderer",
-  "packages/diagram/scenarios",
-  "packages/diagram/ui",
-  "packages/icons/catalog",
-  "packages/observability",
-  "packages/studio/projects",
-  "packages/svg-excalidraw",
-  "tools/sketchi-generators",
+	"apps/cli",
+	"apps/eval-harness",
+	"apps/excalidraw",
+	"apps/icons",
+	"apps/native-conversion-storybook",
+	"apps/playground",
+	"apps/web",
+	"packages/diagram/agent",
+	"packages/diagram/core",
+	"packages/diagram/excalidraw",
+	"packages/diagram/generation",
+	"packages/diagram/renderer",
+	"packages/diagram/scenarios",
+	"packages/diagram/ui",
+	"packages/icons/catalog",
+	"packages/observability",
+	"packages/studio/projects",
+	"packages/svg-excalidraw",
+	"tools/sketchi-generators",
 ];
 const intendedWorkspacePackageRoots = intendedNxProjectRoots.filter(
-  (projectRoot) => projectRoot !== "apps/native-conversion-storybook",
+	(projectRoot) => projectRoot !== "apps/native-conversion-storybook",
 );
 const effectAuthoritativeProjectRoots = [
-  "apps/cli",
-  "apps/eval-harness",
-  "apps/playground",
-  "packages/diagram/agent",
-  "packages/diagram/generation",
-  "packages/diagram/scenarios",
-  "packages/observability",
-  "packages/studio/projects",
+	"apps/cli",
+	"apps/eval-harness",
+	"apps/playground",
+	"packages/diagram/agent",
+	"packages/diagram/generation",
+	"packages/diagram/scenarios",
+	"packages/observability",
+	"packages/studio/projects",
 ];
 const effectPureProjectRoots = [
-  "packages/diagram/core",
-  "packages/diagram/excalidraw",
-  "packages/diagram/renderer",
-  "packages/icons/catalog",
-  "packages/svg-excalidraw",
+	"packages/diagram/core",
+	"packages/diagram/excalidraw",
+	"packages/diagram/renderer",
+	"packages/icons/catalog",
+	"packages/svg-excalidraw",
 ];
 const effectMigrationReadyProjectRoots: string[] = [];
 const effectSchemaBoundaryFiles = new Set([
-  "packages/diagram/core/src/intermediate.ts",
-  "packages/diagram/core/src/types/flowchart.ts",
-  "packages/diagram/core/src/types/flowchart.test.ts",
-  "packages/diagram/core/src/types/mindmap.ts",
+	"packages/diagram/core/src/intermediate.ts",
+	"packages/diagram/core/src/types/flowchart.ts",
+	"packages/diagram/core/src/types/flowchart.test.ts",
+	"packages/diagram/core/src/types/mindmap.ts",
 ]);
 const frameworkNativeProjectRoots = [
-  "apps/excalidraw",
-  "apps/icons",
-  "apps/native-conversion-storybook",
-  "apps/web",
-  "packages/diagram/ui",
-  "tools/sketchi-generators",
+	"apps/excalidraw",
+	"apps/icons",
+	"apps/native-conversion-storybook",
+	"apps/web",
+	"packages/diagram/ui",
+	"tools/sketchi-generators",
 ];
 const intendedCompositeReferences = [
-  "apps/cli/tsconfig.json",
-  "apps/eval-harness/tsconfig.json",
-  "apps/excalidraw/tsconfig.json",
-  "apps/icons/tsconfig.json",
-  "apps/playground/tsconfig.json",
-  "apps/web/tsconfig.json",
-  "packages/diagram/agent/tsconfig.lib.json",
-  "packages/diagram/core/tsconfig.lib.json",
-  "packages/diagram/excalidraw/tsconfig.lib.json",
-  "packages/diagram/generation/tsconfig.lib.json",
-  "packages/diagram/renderer/tsconfig.lib.json",
-  "packages/diagram/scenarios/tsconfig.lib.json",
-  "packages/diagram/ui/tsconfig.lib.json",
-  "packages/icons/catalog/tsconfig.lib.json",
-  "packages/observability/tsconfig.lib.json",
-  "packages/studio/projects/tsconfig.lib.json",
-  "packages/svg-excalidraw/tsconfig.lib.json",
-  "tools/sketchi-generators/tsconfig.lib.json",
+	"apps/cli/tsconfig.json",
+	"apps/eval-harness/tsconfig.json",
+	"apps/excalidraw/tsconfig.json",
+	"apps/icons/tsconfig.json",
+	"apps/playground/tsconfig.json",
+	"apps/web/tsconfig.json",
+	"packages/diagram/agent/tsconfig.lib.json",
+	"packages/diagram/core/tsconfig.lib.json",
+	"packages/diagram/excalidraw/tsconfig.lib.json",
+	"packages/diagram/generation/tsconfig.lib.json",
+	"packages/diagram/renderer/tsconfig.lib.json",
+	"packages/diagram/scenarios/tsconfig.lib.json",
+	"packages/diagram/ui/tsconfig.lib.json",
+	"packages/icons/catalog/tsconfig.lib.json",
+	"packages/observability/tsconfig.lib.json",
+	"packages/studio/projects/tsconfig.lib.json",
+	"packages/svg-excalidraw/tsconfig.lib.json",
+	"tools/sketchi-generators/tsconfig.lib.json",
 ];
 const reviewedEffectUnstableAdapterPaths: string[] = [];
 const effectDependencyManifestPaths = [
-  "apps/cli/package.json",
-  "apps/eval-harness/package.json",
-  "package.json",
-  "packages/diagram/agent/package.json",
-  "packages/diagram/core/package.json",
-  "packages/diagram/generation/package.json",
-  "packages/diagram/scenarios/package.json",
-  "packages/observability/package.json",
-  "packages/studio/projects/package.json",
+	"apps/cli/package.json",
+	"apps/eval-harness/package.json",
+	"package.json",
+	"packages/diagram/agent/package.json",
+	"packages/diagram/core/package.json",
+	"packages/diagram/generation/package.json",
+	"packages/diagram/scenarios/package.json",
+	"packages/observability/package.json",
+	"packages/studio/projects/package.json",
 ];
 const approvedRuntimeBoundaryFiles = [
-  "apps/cli/src/main.ts",
-  "apps/eval-harness/src/lib/generate-scenario.ts",
-  "apps/playground/src/server/runtime/runtime.server.ts",
-  "packages/diagram/scenarios/src/cli.ts",
-  "packages/diagram/scenarios/src/live-generator.ts",
-  "scripts/pipelines/r2-catalog-smoke.ts",
-  "tools/generation-reliability-probe.ts",
-  "tools/harness-eval.ts",
+	"apps/cli/src/main.ts",
+	"apps/eval-harness/src/lib/generate-scenario.ts",
+	"apps/playground/src/server/runtime/runtime.server.ts",
+	"packages/diagram/scenarios/src/cli.ts",
+	"packages/diagram/scenarios/src/live-generator.ts",
+	"scripts/pipelines/r2-catalog-smoke.ts",
+	"tools/generation-reliability-probe.ts",
+	"tools/harness-eval.ts",
 ];
 const approvedManagedPromiseSiteCounts: Record<string, number> = {
-  "apps/cli/scripts/build.mjs": 27,
-  "apps/cli/scripts/bundle-report.mjs": 8,
-  "apps/cli/scripts/package.mjs": 8,
-  "apps/cli/scripts/smoke.mjs": 217,
-  "apps/cli/src/canvas.ts": 2,
-  "apps/cli/src/filesystem.ts": 41,
-  "apps/cli/src/generate-wizard.ts": 8,
-  "apps/cli/src/generation.ts": 2,
-  "apps/cli/src/png-renderer-runtime.ts": 30,
-  "apps/cli/src/png-renderer.ts": 8,
-  "apps/cli/src/response-body.ts": 2,
-  "apps/cli/src/share-protocol.ts": 12,
-  "apps/cli/src/share.ts": 2,
-  "apps/cli/vitest.config.mts": 1,
-  "apps/eval-harness/src/lib/generate-scenario.ts": 6,
-  "apps/eval-harness/src/routes/api/scenario-candidates.ts": 7,
-  "apps/eval-harness/src/routes/index.tsx": 4,
-  "apps/excalidraw/src/components/excalidraw-workspace/excalidraw-workspace.tsx": 4,
-  "apps/excalidraw/src/components/svg-icon-workspace/svg-icon-workspace.tsx": 8,
-  "apps/icons/scripts/sync-catalog-assets.ts": 8,
-  "apps/icons/src/components/icon-library/icon-library.tsx": 3,
-  "apps/icons/src/components/icon-library/selection-bar.tsx": 3,
-  "apps/icons/src/components/icon-library/use-icon-sources.ts": 31,
-  "apps/icons/src/lib/actions.ts": 10,
-  "apps/icons/src/lib/api.server.ts": 9,
-  "apps/icons/src/lib/catalog.server.ts": 6,
-  "apps/icons/src/lib/mcp.server.ts": 8,
-  "apps/icons/src/routes/api/icons/$slug.ts": 16,
-  "apps/icons/src/routes/api/icons/index.ts": 6,
-  "apps/icons/src/routes/index.tsx": 8,
-  "apps/icons/src/routes/mcp.ts": 15,
-  "apps/playground/scripts/sync-node-logos.ts": 4,
-  "apps/playground/src/components/ai-elements/code-block.tsx": 9,
-  "apps/playground/src/components/ai-elements/conversation.tsx": 1,
-  "apps/playground/src/components/ai-elements/prompt-input.tsx": 28,
-  "apps/playground/src/components/ai-elements/reasoning.tsx": 1,
-  "apps/playground/src/features/artifacts/artifact-view-client.ts": 13,
-  "apps/playground/src/features/artifacts/excalidraw-png-export.ts": 1,
-  "apps/playground/src/features/resources/use-async-resource.ts": 3,
-  "apps/playground/src/routes/api/chat.ts": 6,
-  "apps/playground/src/routes/api/studio/diagrams/$diagramId.ts": 5,
-  "apps/playground/src/routes/api/studio/projects.ts": 5,
-  "apps/playground/src/routes/api/studio/projects/from-artifact.ts": 5,
-  "apps/playground/src/routes/api/studio/projects_/$projectId.ts": 5,
-  "apps/playground/src/routes/api/v1/artifacts/$artifactId.ts": 6,
-  "apps/playground/src/routes/api/v1/artifacts/$artifactId/patch.ts": 6,
-  "apps/playground/src/routes/api/v1/canvases/create.ts": 6,
-  "apps/playground/src/routes/api/v1/flowcharts/build.ts": 6,
-  "apps/playground/src/routes/api/v1/generate.ts": 6,
-  "apps/playground/src/routes/api/v1/mindmaps/build.ts": 6,
-  "apps/playground/src/routes/api/v1/sequences/build.ts": 6,
-  "apps/playground/src/routes/artifacts/$artifactId.tsx": 3,
-  "apps/playground/src/routes/codemode-export-harness.tsx": 4,
-  "apps/playground/src/routes/index.tsx": 2,
-  "apps/playground/src/routes/mcp.ts": 14,
-  "apps/playground/src/routes/projects.tsx": 3,
-  "apps/playground/src/routes/projects_/$projectId.tsx": 3,
-  "apps/playground/src/server/ai/model.server.ts": 2,
-  "apps/playground/src/server/bindings/studio-env.server.ts": 1,
-  "apps/playground/src/server/chat/agent.server.ts": 6,
-  "apps/playground/src/server/codemode/browser-renderer.server.ts": 22,
-  "apps/playground/src/server/codemode/effect-mcp-adapter.server.ts": 11,
-  "apps/playground/src/server/codemode/icon-catalog.server.ts": 5,
-  "apps/playground/src/server/codemode/mcp.server.ts": 30,
-  "apps/playground/src/server/codemode/usage-events.server.ts": 8,
-  "apps/playground/src/server/runtime/request-body.server.ts": 9,
-  "apps/playground/src/server/runtime/runtime.server.ts": 15,
-  "apps/playground/src/server/studio/projects.server.ts": 3,
-  "apps/web/src/components/copy-button/copy-button.tsx": 4,
-  "apps/web/src/lib/surface-urls-rpc.ts": 3,
-  "apps/web/src/routes/agents.tsx": 2,
-  "apps/web/src/routes/docs.tsx": 2,
-  "apps/web/src/routes/index.tsx": 2,
-  "packages/diagram/agent/src/lib/code-mode/artifacts.ts": 18,
-  "packages/diagram/generation/src/lib/cloudflare-google-ai-studio.ts": 7,
-  "packages/diagram/scenarios/src/cli.ts": 10,
-  "packages/diagram/scenarios/src/live-generator.ts": 8,
-  "packages/diagram/scenarios/vitest.config.mts": 1,
-  "packages/diagram/ui/src/components/excalidraw-scene-canvas/excalidraw-scene-canvas.tsx": 3,
-  "packages/diagram/ui/src/components/scenario-playground/playground-controls.tsx": 2,
-  "packages/diagram/ui/src/components/scenario-playground/playground-inspector.tsx": 2,
-  "packages/diagram/ui/src/components/scenario-playground/scenario-playground.tsx": 10,
-  "packages/diagram/ui/src/lib/browser-actions.ts": 3,
-  "packages/diagram/ui/src/lib/load-excalidraw.ts": 2,
-  "packages/icons/catalog/scripts/build-node-logos.ts": 14,
-  "packages/icons/catalog/scripts/generate-catalog.ts": 8,
-  "packages/observability/vitest.config.mts": 1,
-  "packages/studio/projects/src/client-api.ts": 20,
-  "packages/studio/projects/src/server/bucket.ts": 22,
-  "packages/studio/projects/src/server/http.ts": 2,
-  "scripts/pipelines/r2-catalog-smoke.ts": 20,
-  "tools/generation-reliability-probe.ts": 5,
-  "tools/harness-eval.ts": 8,
-  "tools/sketchi-generators/src/generators/diagram-type/diagram-type.spec.ts": 6,
-  "tools/sketchi-generators/src/generators/diagram-type/diagram-type.ts": 3,
-  "tools/sketchi-generators/src/generators/ui-component/ui-component.spec.ts": 3,
-  "tools/sketchi-generators/src/generators/ui-component/ui-component.ts": 3,
+	"apps/cli/scripts/build.mjs": 27,
+	"apps/cli/scripts/bundle-report.mjs": 8,
+	"apps/cli/scripts/package.mjs": 8,
+	"apps/cli/scripts/smoke.mjs": 217,
+	"apps/cli/src/canvas.ts": 2,
+	"apps/cli/src/filesystem.ts": 41,
+	"apps/cli/src/generate-wizard.ts": 8,
+	"apps/cli/src/generation.ts": 2,
+	"apps/cli/src/png-renderer-runtime.ts": 30,
+	"apps/cli/src/png-renderer.ts": 8,
+	"apps/cli/src/response-body.ts": 2,
+	"apps/cli/src/share-protocol.ts": 12,
+	"apps/cli/src/share.ts": 2,
+	"apps/cli/vitest.config.mts": 1,
+	"apps/eval-harness/src/lib/generate-scenario.ts": 6,
+	"apps/eval-harness/src/routes/api/scenario-candidates.ts": 7,
+	"apps/eval-harness/src/routes/index.tsx": 4,
+	"apps/excalidraw/src/components/excalidraw-workspace/excalidraw-workspace.tsx": 4,
+	"apps/excalidraw/src/components/svg-icon-workspace/svg-icon-workspace.tsx": 8,
+	"apps/icons/scripts/sync-catalog-assets.ts": 8,
+	"apps/icons/src/components/icon-library/icon-library.tsx": 3,
+	"apps/icons/src/components/icon-library/selection-bar.tsx": 3,
+	"apps/icons/src/components/icon-library/use-icon-sources.ts": 31,
+	"apps/icons/src/lib/actions.ts": 10,
+	"apps/icons/src/lib/api.server.ts": 9,
+	"apps/icons/src/lib/catalog.server.ts": 6,
+	"apps/icons/src/lib/mcp.server.ts": 8,
+	"apps/icons/src/routes/api/icons/$slug.ts": 16,
+	"apps/icons/src/routes/api/icons/index.ts": 6,
+	"apps/icons/src/routes/index.tsx": 8,
+	"apps/icons/src/routes/mcp.ts": 15,
+	"apps/playground/scripts/sync-node-logos.ts": 4,
+	"apps/playground/src/components/ai-elements/code-block.tsx": 9,
+	"apps/playground/src/components/ai-elements/conversation.tsx": 1,
+	"apps/playground/src/components/ai-elements/prompt-input.tsx": 28,
+	"apps/playground/src/components/ai-elements/reasoning.tsx": 1,
+	"apps/playground/src/features/artifacts/artifact-view-client.ts": 13,
+	"apps/playground/src/features/artifacts/excalidraw-png-export.ts": 1,
+	"apps/playground/src/features/resources/use-async-resource.ts": 3,
+	"apps/playground/src/routes/api/chat.ts": 6,
+	"apps/playground/src/routes/api/studio/diagrams/$diagramId.ts": 5,
+	"apps/playground/src/routes/api/studio/projects.ts": 5,
+	"apps/playground/src/routes/api/studio/projects/from-artifact.ts": 5,
+	"apps/playground/src/routes/api/studio/projects_/$projectId.ts": 5,
+	"apps/playground/src/routes/api/v1/artifacts/$artifactId.ts": 6,
+	"apps/playground/src/routes/api/v1/artifacts/$artifactId/patch.ts": 6,
+	"apps/playground/src/routes/api/v1/canvases/create.ts": 6,
+	"apps/playground/src/routes/api/v1/flowcharts/build.ts": 6,
+	"apps/playground/src/routes/api/v1/generate.ts": 6,
+	"apps/playground/src/routes/api/v1/mindmaps/build.ts": 6,
+	"apps/playground/src/routes/api/v1/sequences/build.ts": 6,
+	"apps/playground/src/routes/artifacts/$artifactId.tsx": 3,
+	"apps/playground/src/routes/codemode-export-harness.tsx": 4,
+	"apps/playground/src/routes/index.tsx": 2,
+	"apps/playground/src/routes/mcp.ts": 14,
+	"apps/playground/src/routes/projects.tsx": 3,
+	"apps/playground/src/routes/projects_/$projectId.tsx": 3,
+	"apps/playground/src/server/ai/model.server.ts": 2,
+	"apps/playground/src/server/bindings/studio-env.server.ts": 1,
+	"apps/playground/src/server/chat/agent.server.ts": 6,
+	"apps/playground/src/server/codemode/browser-renderer.server.ts": 22,
+	"apps/playground/src/server/codemode/effect-mcp-adapter.server.ts": 11,
+	"apps/playground/src/server/codemode/icon-catalog.server.ts": 5,
+	"apps/playground/src/server/codemode/mcp.server.ts": 30,
+	"apps/playground/src/server/codemode/usage-events.server.ts": 8,
+	"apps/playground/src/server/runtime/request-body.server.ts": 9,
+	"apps/playground/src/server/runtime/runtime.server.ts": 15,
+	"apps/playground/src/server/studio/projects.server.ts": 3,
+	"apps/web/src/components/copy-button/copy-button.tsx": 4,
+	"apps/web/src/lib/surface-urls-rpc.ts": 3,
+	"apps/web/src/routes/agents.tsx": 2,
+	"apps/web/src/routes/docs.tsx": 2,
+	"apps/web/src/routes/index.tsx": 2,
+	"packages/diagram/agent/src/lib/code-mode/artifacts.ts": 18,
+	"packages/diagram/generation/src/lib/cloudflare-google-ai-studio.ts": 7,
+	"packages/diagram/scenarios/src/cli.ts": 10,
+	"packages/diagram/scenarios/src/live-generator.ts": 8,
+	"packages/diagram/scenarios/vitest.config.mts": 1,
+	"packages/diagram/ui/src/components/excalidraw-scene-canvas/excalidraw-scene-canvas.tsx": 3,
+	"packages/diagram/ui/src/components/scenario-playground/playground-controls.tsx": 2,
+	"packages/diagram/ui/src/components/scenario-playground/playground-inspector.tsx": 2,
+	"packages/diagram/ui/src/components/scenario-playground/scenario-playground.tsx": 10,
+	"packages/diagram/ui/src/lib/browser-actions.ts": 3,
+	"packages/diagram/ui/src/lib/load-excalidraw.ts": 2,
+	"packages/icons/catalog/scripts/build-node-logos.ts": 14,
+	"packages/icons/catalog/scripts/generate-catalog.ts": 8,
+	"packages/observability/vitest.config.mts": 1,
+	"packages/studio/projects/src/client-api.ts": 20,
+	"packages/studio/projects/src/server/bucket.ts": 22,
+	"packages/studio/projects/src/server/http.ts": 2,
+	"scripts/pipelines/r2-catalog-smoke.ts": 20,
+	"tools/generation-reliability-probe.ts": 5,
+	"tools/harness-eval.ts": 8,
+	"tools/sketchi-generators/src/generators/diagram-type/diagram-type.spec.ts": 6,
+	"tools/sketchi-generators/src/generators/diagram-type/diagram-type.ts": 3,
+	"tools/sketchi-generators/src/generators/ui-component/ui-component.spec.ts": 3,
+	"tools/sketchi-generators/src/generators/ui-component/ui-component.ts": 3,
 };
-const approvedManagedPromiseFiles = Object.keys(
-  approvedManagedPromiseSiteCounts,
-).sort();
+const approvedManagedPromiseFiles = Object.keys(approvedManagedPromiseSiteCounts).sort();
 const approvedEffectDependencyVersions = new Set(["4.0.1"]);
 const diagramPackages = [
-  {
-    name: "diagram-agent",
-    npmName: "@sketchi/diagram-agent",
-    root: "packages/diagram/agent",
-    oldRoot: "packages/diagram-agent",
-  },
-  {
-    name: "diagram-core",
-    npmName: "@sketchi/diagram-core",
-    root: "packages/diagram/core",
-    oldRoot: "packages/diagram-core",
-  },
-  {
-    name: "diagram-excalidraw",
-    npmName: "@sketchi/diagram-excalidraw",
-    root: "packages/diagram/excalidraw",
-    oldRoot: "packages/diagram-excalidraw",
-  },
-  {
-    name: "diagram-generation",
-    npmName: "@sketchi/diagram-generation",
-    root: "packages/diagram/generation",
-    oldRoot: "packages/diagram-generation",
-  },
-  {
-    name: "diagram-renderer",
-    npmName: "@sketchi/diagram-renderer",
-    root: "packages/diagram/renderer",
-    oldRoot: "packages/diagram-renderer",
-  },
-  {
-    name: "diagram-scenarios",
-    npmName: "@sketchi/diagram-scenarios",
-    root: "packages/diagram/scenarios",
-    oldRoot: "packages/diagram-scenarios",
-  },
-  {
-    name: "diagram-ui",
-    npmName: "@sketchi/diagram-ui",
-    root: "packages/diagram/ui",
-    oldRoot: ["packages", ["diagram", "studio", "ui"].join("-")].join("/"),
-  },
+	{
+		name: "diagram-agent",
+		npmName: "@sketchi/diagram-agent",
+		root: "packages/diagram/agent",
+		oldRoot: "packages/diagram-agent",
+	},
+	{
+		name: "diagram-core",
+		npmName: "@sketchi/diagram-core",
+		root: "packages/diagram/core",
+		oldRoot: "packages/diagram-core",
+	},
+	{
+		name: "diagram-excalidraw",
+		npmName: "@sketchi/diagram-excalidraw",
+		root: "packages/diagram/excalidraw",
+		oldRoot: "packages/diagram-excalidraw",
+	},
+	{
+		name: "diagram-generation",
+		npmName: "@sketchi/diagram-generation",
+		root: "packages/diagram/generation",
+		oldRoot: "packages/diagram-generation",
+	},
+	{
+		name: "diagram-renderer",
+		npmName: "@sketchi/diagram-renderer",
+		root: "packages/diagram/renderer",
+		oldRoot: "packages/diagram-renderer",
+	},
+	{
+		name: "diagram-scenarios",
+		npmName: "@sketchi/diagram-scenarios",
+		root: "packages/diagram/scenarios",
+		oldRoot: "packages/diagram-scenarios",
+	},
+	{
+		name: "diagram-ui",
+		npmName: "@sketchi/diagram-ui",
+		root: "packages/diagram/ui",
+		oldRoot: ["packages", ["diagram", "studio", "ui"].join("-")].join("/"),
+	},
 ];
 
 interface TsConfig {
-  compilerOptions?: {
-    composite?: boolean;
-  };
-  extends?: string;
-  references?: Array<{ path: string }>;
+	compilerOptions?: {
+		composite?: boolean;
+	};
+	extends?: string;
+	references?: Array<{ path: string }>;
 }
 
 interface PackageManifest {
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-  optionalDependencies?: Record<string, string>;
-  peerDependencies?: Record<string, string>;
+	dependencies?: Record<string, string>;
+	devDependencies?: Record<string, string>;
+	optionalDependencies?: Record<string, string>;
+	peerDependencies?: Record<string, string>;
 }
 
 type PromiseOrchestrationKind =
-  | "async function"
-  | "await expression"
-  | "Promise construction"
-  | "Promise-producing call"
-  | "Promise static call"
-  | "thenable member access";
+	| "async function"
+	| "await expression"
+	| "Promise construction"
+	| "Promise-producing call"
+	| "Promise static call"
+	| "thenable member access";
 
 interface PromiseOrchestrationSite {
-  readonly column: number;
-  readonly kind: PromiseOrchestrationKind;
-  readonly line: number;
+	readonly column: number;
+	readonly kind: PromiseOrchestrationKind;
+	readonly line: number;
 }
 
 function memberName(expression: ts.Expression): string | undefined {
-  if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
-  if (
-    ts.isElementAccessExpression(expression) &&
-    expression.argumentExpression &&
-    (ts.isStringLiteral(expression.argumentExpression) ||
-      ts.isNoSubstitutionTemplateLiteral(expression.argumentExpression))
-  ) {
-    return expression.argumentExpression.text;
-  }
-  return undefined;
+	if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
+	if (
+		ts.isElementAccessExpression(expression) &&
+		expression.argumentExpression &&
+		(ts.isStringLiteral(expression.argumentExpression) ||
+			ts.isNoSubstitutionTemplateLiteral(expression.argumentExpression))
+	) {
+		return expression.argumentExpression.text;
+	}
+	return undefined;
 }
 
 function memberReceiver(expression: ts.Expression): ts.Expression | undefined {
-  return ts.isPropertyAccessExpression(expression) ||
-    ts.isElementAccessExpression(expression)
-    ? expression.expression
-    : undefined;
+	return ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)
+		? expression.expression
+		: undefined;
 }
 
-const promiseTypeAnchorPath = path.join(
-  workspaceRoot,
-  ".memory",
-  "promise-type-anchor.d.ts",
-);
+const promiseTypeAnchorPath = path.join(workspaceRoot, ".memory", "promise-type-anchor.d.ts");
 const runtimeExports: Record<string, readonly string[]> = {
-  __runtimeEffect: [
-    "runSync",
-    "runSyncExit",
-    "runPromise",
-    "runPromiseExit",
-    "runFork",
-    "runCallback",
-  ],
-  __runtimeManaged: ["make", "makeEffect"],
-  __runtimeNode: ["runMain"],
+	__runtimeEffect: [
+		"runSync",
+		"runSyncExit",
+		"runPromise",
+		"runPromiseExit",
+		"runFork",
+		"runCallback",
+	],
+	__runtimeManaged: ["make", "makeEffect"],
+	__runtimeNode: ["runMain"],
 };
 const promiseTypeAnchorSource = [
-  'import * as __runtimeEffect from "effect/Effect";',
-  'import * as __runtimeManaged from "effect/ManagedRuntime";',
-  'import * as __runtimeNode from "@effect/platform-node/NodeRuntime";',
-  "declare const __promiseLikeAnchor: PromiseLike<any>;",
-  "declare const __promiseConstructorAnchor: PromiseConstructor;",
+	'import * as __runtimeEffect from "effect/Effect";',
+	'import * as __runtimeManaged from "effect/ManagedRuntime";',
+	'import * as __runtimeNode from "@effect/platform-node/NodeRuntime";',
+	"declare const __promiseLikeAnchor: PromiseLike<any>;",
+	"declare const __promiseConstructorAnchor: PromiseConstructor;",
 ].join("\n");
 const promiseTypeCheckingSourcePaths: Record<string, string[]> = {
-  "@sketchi/diagram-agent": ["packages/diagram/agent/src/index.ts"],
-  "@sketchi/diagram-core": ["packages/diagram/core/src/index.ts"],
-  "@sketchi/diagram-excalidraw": ["packages/diagram/excalidraw/src/index.ts"],
-  "@sketchi/diagram-generation": ["packages/diagram/generation/src/index.ts"],
-  "@sketchi/diagram-renderer": ["packages/diagram/renderer/src/index.ts"],
-  "@sketchi/diagram-scenarios": ["packages/diagram/scenarios/src/index.ts"],
-  "@sketchi/diagram-scenarios/internal/tool-process": [
-    "packages/diagram/scenarios/src/internal/tool-process.ts",
-  ],
-  "@sketchi/diagram-ui": ["packages/diagram/ui/src/index.ts"],
-  "@sketchi/observability": ["packages/observability/src/index.ts"],
-  "@sketchi/svg-excalidraw": ["packages/svg-excalidraw/src/index.ts"],
+	"@sketchi/diagram-agent": ["packages/diagram/agent/src/index.ts"],
+	"@sketchi/diagram-core": ["packages/diagram/core/src/index.ts"],
+	"@sketchi/diagram-excalidraw": ["packages/diagram/excalidraw/src/index.ts"],
+	"@sketchi/diagram-generation": ["packages/diagram/generation/src/index.ts"],
+	"@sketchi/diagram-renderer": ["packages/diagram/renderer/src/index.ts"],
+	"@sketchi/diagram-scenarios": ["packages/diagram/scenarios/src/index.ts"],
+	"@sketchi/diagram-scenarios/internal/tool-process": [
+		"packages/diagram/scenarios/src/internal/tool-process.ts",
+	],
+	"@sketchi/diagram-ui": ["packages/diagram/ui/src/index.ts"],
+	"@sketchi/observability": ["packages/observability/src/index.ts"],
+	"@sketchi/svg-excalidraw": ["packages/svg-excalidraw/src/index.ts"],
 };
 
 function createTypeCheckedProgram(
-  rootNames: readonly string[],
-  virtualSources: ReadonlyMap<string, string> = new Map(),
+	rootNames: readonly string[],
+	virtualSources: ReadonlyMap<string, string> = new Map(),
 ): ts.Program {
-  const configPath = path.join(workspaceRoot, "tsconfig.base.json");
-  const config = ts.readConfigFile(configPath, (fileName) =>
-    ts.sys.readFile(fileName),
-  );
-  if (config.error) {
-    throw new Error(
-      ts.flattenDiagnosticMessageText(config.error.messageText, "\n"),
-    );
-  }
-  const parsed = ts.parseJsonConfigFileContent(
-    config.config,
-    ts.sys,
-    workspaceRoot,
-    { allowJs: true, checkJs: false, noEmit: true },
-    configPath,
-  );
-  const compilerOptions: ts.CompilerOptions = {
-    ...parsed.options,
-    baseUrl: workspaceRoot,
-    paths: {
-      ...parsed.options.paths,
-      ...promiseTypeCheckingSourcePaths,
-    },
-  };
-  const sources = new Map(virtualSources);
-  sources.set(promiseTypeAnchorPath, promiseTypeAnchorSource);
-  const host = ts.createCompilerHost(compilerOptions, true);
-  const defaultDirectoryExists = host.directoryExists?.bind(host);
-  const defaultFileExists = host.fileExists.bind(host);
-  const defaultGetSourceFile = host.getSourceFile.bind(host);
-  const defaultReadFile = host.readFile.bind(host);
-  host.fileExists = (fileName) =>
-    sources.has(path.resolve(fileName)) || defaultFileExists(fileName);
-  host.directoryExists = (directoryName) => {
-    const resolvedDirectory = `${path.resolve(directoryName)}${path.sep}`;
-    return (
-      [...sources.keys()].some((fileName) =>
-        path.resolve(fileName).startsWith(resolvedDirectory),
-      ) || defaultDirectoryExists?.(directoryName) === true
-    );
-  };
-  host.readFile = (fileName) =>
-    sources.get(path.resolve(fileName)) ?? defaultReadFile(fileName);
-  host.getSourceFile = (fileName, languageVersion, onError, shouldCreate) => {
-    const sourceText = sources.get(path.resolve(fileName));
-    return sourceText === undefined
-      ? defaultGetSourceFile(fileName, languageVersion, onError, shouldCreate)
-      : ts.createSourceFile(fileName, sourceText, languageVersion, true);
-  };
-  return ts.createProgram({
-    host,
-    options: compilerOptions,
-    rootNames: [...rootNames, promiseTypeAnchorPath],
-  });
+	const configPath = path.join(workspaceRoot, "tsconfig.base.json");
+	const config = ts.readConfigFile(configPath, (fileName) => ts.sys.readFile(fileName));
+	if (config.error) {
+		throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, "\n"));
+	}
+	const parsed = ts.parseJsonConfigFileContent(
+		config.config,
+		ts.sys,
+		workspaceRoot,
+		{ allowJs: true, checkJs: false, noEmit: true },
+		configPath,
+	);
+	const compilerOptions: ts.CompilerOptions = {
+		...parsed.options,
+		baseUrl: workspaceRoot,
+		paths: {
+			...parsed.options.paths,
+			...promiseTypeCheckingSourcePaths,
+		},
+	};
+	const sources = new Map(virtualSources);
+	sources.set(promiseTypeAnchorPath, promiseTypeAnchorSource);
+	const host = ts.createCompilerHost(compilerOptions, true);
+	const defaultDirectoryExists = host.directoryExists?.bind(host);
+	const defaultFileExists = host.fileExists.bind(host);
+	const defaultGetSourceFile = host.getSourceFile.bind(host);
+	const defaultReadFile = host.readFile.bind(host);
+	host.fileExists = (fileName) =>
+		sources.has(path.resolve(fileName)) || defaultFileExists(fileName);
+	host.directoryExists = (directoryName) => {
+		const resolvedDirectory = `${path.resolve(directoryName)}${path.sep}`;
+		return (
+			[...sources.keys()].some((fileName) =>
+				path.resolve(fileName).startsWith(resolvedDirectory),
+			) || defaultDirectoryExists?.(directoryName) === true
+		);
+	};
+	host.readFile = (fileName) => sources.get(path.resolve(fileName)) ?? defaultReadFile(fileName);
+	host.getSourceFile = (fileName, languageVersion, onError, shouldCreate) => {
+		const sourceText = sources.get(path.resolve(fileName));
+		return sourceText === undefined
+			? defaultGetSourceFile(fileName, languageVersion, onError, shouldCreate)
+			: ts.createSourceFile(fileName, sourceText, languageVersion, true);
+	};
+	return ts.createProgram({
+		host,
+		options: compilerOptions,
+		rootNames: [...rootNames, promiseTypeAnchorPath],
+	});
 }
 
 function declaredVariableType(
-  checker: ts.TypeChecker,
-  sourceFile: ts.SourceFile,
-  variableName: string,
+	checker: ts.TypeChecker,
+	sourceFile: ts.SourceFile,
+	variableName: string,
 ): ts.Type {
-  for (const statement of sourceFile.statements) {
-    if (!ts.isVariableStatement(statement)) continue;
-    for (const declaration of statement.declarationList.declarations) {
-      if (
-        ts.isIdentifier(declaration.name) &&
-        declaration.name.text === variableName
-      ) {
-        return checker.getTypeAtLocation(declaration.name);
-      }
-    }
-  }
-  throw new Error(`Missing type-checker anchor ${variableName}.`);
+	for (const statement of sourceFile.statements) {
+		if (!ts.isVariableStatement(statement)) continue;
+		for (const declaration of statement.declarationList.declarations) {
+			if (ts.isIdentifier(declaration.name) && declaration.name.text === variableName) {
+				return checker.getTypeAtLocation(declaration.name);
+			}
+		}
+	}
+	throw new Error(`Missing type-checker anchor ${variableName}.`);
 }
 
 function promiseOrchestrationSites(
-  program: ts.Program,
-  sourceFile: ts.SourceFile,
+	program: ts.Program,
+	sourceFile: ts.SourceFile,
 ): PromiseOrchestrationSite[] {
-  const checker = program.getTypeChecker();
-  const anchorFile = program.getSourceFile(promiseTypeAnchorPath);
-  if (!anchorFile)
-    throw new Error("Promise type-checker anchor was not loaded.");
-  const promiseLikeType = declaredVariableType(
-    checker,
-    anchorFile,
-    "__promiseLikeAnchor",
-  );
-  const promiseConstructorType = declaredVariableType(
-    checker,
-    anchorFile,
-    "__promiseConstructorAnchor",
-  );
-  const sites: PromiseOrchestrationSite[] = [];
-  const record = (node: ts.Node, kind: PromiseOrchestrationKind): void => {
-    const location = sourceFile.getLineAndCharacterOfPosition(node.getStart());
-    sites.push({
-      column: location.character + 1,
-      kind,
-      line: location.line + 1,
-    });
-  };
-  const isUsableType = (type: ts.Type): boolean =>
-    (type.flags &
-      (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never)) ===
-    0;
-  const isPromiseLikeType = (type: ts.Type): boolean => {
-    if (!isUsableType(type)) return false;
-    if (type.isUnionOrIntersection()) {
-      return type.types.some(isPromiseLikeType);
-    }
-    const nonNullableType = checker.getNonNullableType(type);
-    return (
-      isUsableType(nonNullableType) &&
-      checker.isTypeAssignableTo(nonNullableType, promiseLikeType)
-    );
-  };
-  const isPromiseLike = (node: ts.Node): boolean =>
-    isPromiseLikeType(checker.getTypeAtLocation(node));
-  const isPromiseConstructor = (node: ts.Node): boolean => {
-    const type = checker.getTypeAtLocation(node);
-    return (
-      isUsableType(type) &&
-      checker.isTypeAssignableTo(type, promiseConstructorType)
-    );
-  };
+	const checker = program.getTypeChecker();
+	const anchorFile = program.getSourceFile(promiseTypeAnchorPath);
+	if (!anchorFile) throw new Error("Promise type-checker anchor was not loaded.");
+	const promiseLikeType = declaredVariableType(checker, anchorFile, "__promiseLikeAnchor");
+	const promiseConstructorType = declaredVariableType(
+		checker,
+		anchorFile,
+		"__promiseConstructorAnchor",
+	);
+	const sites: PromiseOrchestrationSite[] = [];
+	const record = (node: ts.Node, kind: PromiseOrchestrationKind): void => {
+		const location = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+		sites.push({
+			column: location.character + 1,
+			kind,
+			line: location.line + 1,
+		});
+	};
+	const isUsableType = (type: ts.Type): boolean =>
+		(type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never)) === 0;
+	const isPromiseLikeType = (type: ts.Type): boolean => {
+		if (!isUsableType(type)) return false;
+		if (type.isUnionOrIntersection()) {
+			return type.types.some(isPromiseLikeType);
+		}
+		const nonNullableType = checker.getNonNullableType(type);
+		return (
+			isUsableType(nonNullableType) && checker.isTypeAssignableTo(nonNullableType, promiseLikeType)
+		);
+	};
+	const isPromiseLike = (node: ts.Node): boolean =>
+		isPromiseLikeType(checker.getTypeAtLocation(node));
+	const isPromiseConstructor = (node: ts.Node): boolean => {
+		const type = checker.getTypeAtLocation(node);
+		return isUsableType(type) && checker.isTypeAssignableTo(type, promiseConstructorType);
+	};
 
-  const visit = (node: ts.Node): void => {
-    if (ts.isFunctionLike(node)) {
-      const signature = checker.getSignatureFromDeclaration(node);
-      if (
-        signature &&
-        isPromiseLikeType(checker.getReturnTypeOfSignature(signature))
-      ) {
-        record(node, "async function");
-      }
-    }
-    if (ts.isAwaitExpression(node) && isPromiseLike(node.expression)) {
-      record(node, "await expression");
-    }
-    if (
-      ts.isNewExpression(node) &&
-      (isPromiseLike(node) || isPromiseConstructor(node.expression))
-    ) {
-      record(node, "Promise construction");
-    }
-    if (ts.isCallExpression(node)) {
-      const expression = node.expression;
-      const receiver = memberReceiver(expression);
-      if (receiver && isPromiseConstructor(receiver)) {
-        record(node, "Promise static call");
-      } else if (
-        receiver &&
-        ["then", "catch", "finally"].includes(memberName(expression) ?? "") &&
-        isPromiseLike(receiver)
-      ) {
-        record(node, "thenable member access");
-      } else if (isPromiseLike(node)) {
-        record(node, "Promise-producing call");
-      }
-    }
-    if (
-      (ts.isPropertyAccessExpression(node) ||
-        ts.isElementAccessExpression(node)) &&
-      ["then", "catch", "finally"].includes(memberName(node) ?? "") &&
-      isPromiseLike(node.expression) &&
-      !(ts.isCallExpression(node.parent) && node.parent.expression === node)
-    ) {
-      record(node, "thenable member access");
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  return sites;
+	const visit = (node: ts.Node): void => {
+		if (ts.isFunctionLike(node)) {
+			const signature = checker.getSignatureFromDeclaration(node);
+			if (signature && isPromiseLikeType(checker.getReturnTypeOfSignature(signature))) {
+				record(node, "async function");
+			}
+		}
+		if (ts.isAwaitExpression(node) && isPromiseLike(node.expression)) {
+			record(node, "await expression");
+		}
+		if (
+			ts.isNewExpression(node) &&
+			(isPromiseLike(node) || isPromiseConstructor(node.expression))
+		) {
+			record(node, "Promise construction");
+		}
+		if (ts.isCallExpression(node)) {
+			const expression = node.expression;
+			const receiver = memberReceiver(expression);
+			if (receiver && isPromiseConstructor(receiver)) {
+				record(node, "Promise static call");
+			} else if (
+				receiver &&
+				["then", "catch", "finally"].includes(memberName(expression) ?? "") &&
+				isPromiseLike(receiver)
+			) {
+				record(node, "thenable member access");
+			} else if (isPromiseLike(node)) {
+				record(node, "Promise-producing call");
+			}
+		}
+		if (
+			(ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
+			["then", "catch", "finally"].includes(memberName(node) ?? "") &&
+			isPromiseLike(node.expression) &&
+			!(ts.isCallExpression(node.parent) && node.parent.expression === node)
+		) {
+			record(node, "thenable member access");
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(sourceFile);
+	return sites;
 }
 
-function runtimeBoundaryCalls(
-  program: ts.Program,
-  sourceFile: ts.SourceFile,
-): ts.CallExpression[] {
-  const checker = program.getTypeChecker();
-  const anchor = program.getSourceFile(promiseTypeAnchorPath);
-  if (!anchor) throw new Error("Runtime type-checker anchor was not loaded.");
-  const declarations = new Set<ts.SignatureDeclaration>();
-  for (const statement of anchor.statements) {
-    if (!ts.isImportDeclaration(statement)) continue;
-    const binding = statement.importClause?.namedBindings;
-    if (!binding || !ts.isNamespaceImport(binding)) continue;
-    const names = runtimeExports[binding.name.text];
-    if (!names) continue;
-    const alias = checker.getSymbolAtLocation(binding.name);
-    if (!alias)
-      throw new Error(`Unresolved runtime anchor ${binding.name.text}.`);
-    const module = checker.getAliasedSymbol(alias);
-    for (const symbol of checker.getExportsOfModule(module)) {
-      if (!names.includes(symbol.name)) continue;
-      const type = checker.getTypeOfSymbolAtLocation(symbol, binding.name);
-      for (const signature of checker.getSignaturesOfType(
-        type,
-        ts.SignatureKind.Call,
-      )) {
-        const declaration = signature.getDeclaration();
-        if (declaration) declarations.add(declaration);
-      }
-    }
-  }
-  const calls: ts.CallExpression[] = [];
-  const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node)) {
-      const declaration = checker.getResolvedSignature(node)?.getDeclaration();
-      if (declaration && declarations.has(declaration)) calls.push(node);
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  return calls;
+function runtimeBoundaryCalls(program: ts.Program, sourceFile: ts.SourceFile): ts.CallExpression[] {
+	const checker = program.getTypeChecker();
+	const anchor = program.getSourceFile(promiseTypeAnchorPath);
+	if (!anchor) throw new Error("Runtime type-checker anchor was not loaded.");
+	const declarations = new Set<ts.SignatureDeclaration>();
+	for (const statement of anchor.statements) {
+		if (!ts.isImportDeclaration(statement)) continue;
+		const binding = statement.importClause?.namedBindings;
+		if (!binding || !ts.isNamespaceImport(binding)) continue;
+		const names = runtimeExports[binding.name.text];
+		if (!names) continue;
+		const alias = checker.getSymbolAtLocation(binding.name);
+		if (!alias) throw new Error(`Unresolved runtime anchor ${binding.name.text}.`);
+		const module = checker.getAliasedSymbol(alias);
+		for (const symbol of checker.getExportsOfModule(module)) {
+			if (!names.includes(symbol.name)) continue;
+			const type = checker.getTypeOfSymbolAtLocation(symbol, binding.name);
+			for (const signature of checker.getSignaturesOfType(type, ts.SignatureKind.Call)) {
+				const declaration = signature.getDeclaration();
+				if (declaration) declarations.add(declaration);
+			}
+		}
+	}
+	const calls: ts.CallExpression[] = [];
+	const visit = (node: ts.Node): void => {
+		if (ts.isCallExpression(node)) {
+			const declaration = checker.getResolvedSignature(node)?.getDeclaration();
+			if (declaration && declarations.has(declaration)) calls.push(node);
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(sourceFile);
+	return calls;
 }
 
 function runtimeProbeCalls(sourceText: string): ts.CallExpression[] {
-  const probePath = path.join(workspaceRoot, ".memory", "runtime-probe.ts");
-  const program = createTypeCheckedProgram(
-    [probePath],
-    new Map([[probePath, sourceText]]),
-  );
-  const source = program.getSourceFile(probePath);
-  if (!source) throw new Error("Runtime probe source was not loaded.");
-  return runtimeBoundaryCalls(program, source);
+	const probePath = path.join(workspaceRoot, ".memory", "runtime-probe.ts");
+	const program = createTypeCheckedProgram([probePath], new Map([[probePath, sourceText]]));
+	const source = program.getSourceFile(probePath);
+	if (!source) throw new Error("Runtime probe source was not loaded.");
+	return runtimeBoundaryCalls(program, source);
 }
 
 function promiseProbeSites(
-  sourceText: string,
-  supportingSources: Readonly<Record<string, string>> = {},
+	sourceText: string,
+	supportingSources: Readonly<Record<string, string>> = {},
 ): PromiseOrchestrationSite[] {
-  const probeDirectory = path.join(workspaceRoot, ".memory", "promise-probe");
-  const probePath = path.join(probeDirectory, "probe.ts");
-  const virtualSources = new Map<string, string>([
-    [probePath, sourceText],
-    ...Object.entries(supportingSources).map(
-      ([fileName, contents]) =>
-        [path.join(probeDirectory, fileName), contents] as const,
-    ),
-  ]);
-  const program = createTypeCheckedProgram(
-    [...virtualSources.keys()],
-    virtualSources,
-  );
-  const sourceFile = program.getSourceFile(probePath);
-  if (!sourceFile) throw new Error("Promise probe source was not loaded.");
-  return promiseOrchestrationSites(program, sourceFile);
+	const probeDirectory = path.join(workspaceRoot, ".memory", "promise-probe");
+	const probePath = path.join(probeDirectory, "probe.ts");
+	const virtualSources = new Map<string, string>([
+		[probePath, sourceText],
+		...Object.entries(supportingSources).map(
+			([fileName, contents]) => [path.join(probeDirectory, fileName), contents] as const,
+		),
+	]);
+	const program = createTypeCheckedProgram([...virtualSources.keys()], virtualSources);
+	const sourceFile = program.getSourceFile(probePath);
+	if (!sourceFile) throw new Error("Promise probe source was not loaded.");
+	return promiseOrchestrationSites(program, sourceFile);
 }
 
 function invalidEffectDependencyPins(
-  manifest: PackageManifest,
+	manifest: PackageManifest,
 ): Array<{ dependency: string; version: string }> {
-  const invalid: Array<{ dependency: string; version: string }> = [];
-  for (const dependencies of [
-    manifest.dependencies,
-    manifest.devDependencies,
-    manifest.optionalDependencies,
-    manifest.peerDependencies,
-  ]) {
-    for (const [dependency, version] of Object.entries(dependencies ?? {})) {
-      if (
-        (dependency === "effect" || dependency.startsWith("@effect/")) &&
-        !approvedEffectDependencyVersions.has(version)
-      ) {
-        invalid.push({ dependency, version });
-      }
-    }
-  }
-  return invalid;
+	const invalid: Array<{ dependency: string; version: string }> = [];
+	for (const dependencies of [
+		manifest.dependencies,
+		manifest.devDependencies,
+		manifest.optionalDependencies,
+		manifest.peerDependencies,
+	]) {
+		for (const [dependency, version] of Object.entries(dependencies ?? {})) {
+			if (
+				(dependency === "effect" || dependency.startsWith("@effect/")) &&
+				!approvedEffectDependencyVersions.has(version)
+			) {
+				invalid.push({ dependency, version });
+			}
+		}
+	}
+	return invalid;
 }
 
 function normalizeWorkspacePath(filePath: string): string {
-  return filePath.replaceAll(path.sep, "/").replace(/^\.\//, "");
+	return filePath.replaceAll(path.sep, "/").replace(/^\.\//, "");
 }
 
 function workspacePackageGlobs(): string[] {
-  const workspaceYaml = readFileSync(
-    path.join(workspaceRoot, "pnpm-workspace.yaml"),
-    "utf8",
-  );
-  const lines = workspaceYaml.split("\n");
-  const packagesLine = lines.findIndex((line) => line === "packages:");
-  expect(packagesLine).toBeGreaterThanOrEqual(0);
+	const workspaceYaml = readFileSync(path.join(workspaceRoot, "pnpm-workspace.yaml"), "utf8");
+	const lines = workspaceYaml.split("\n");
+	const packagesLine = lines.findIndex((line) => line === "packages:");
+	expect(packagesLine).toBeGreaterThanOrEqual(0);
 
-  const globs: string[] = [];
-  for (const line of lines.slice(packagesLine + 1)) {
-    const match = line.match(/^\s{2}-\s+["']([^"']+)["']\s*$/);
-    if (match?.[1]) {
-      globs.push(match[1]);
-      continue;
-    }
-    if (line.trim()) break;
-  }
-  return globs;
+	const globs: string[] = [];
+	for (const line of lines.slice(packagesLine + 1)) {
+		const match = line.match(/^\s{2}-\s+["']([^"']+)["']\s*$/);
+		if (match?.[1]) {
+			globs.push(match[1]);
+			continue;
+		}
+		if (line.trim()) break;
+	}
+	return globs;
 }
 
 function resolveTsConfigPath(configPath: string): string {
-  const absolutePath = path.resolve(workspaceRoot, configPath);
-  if (path.extname(absolutePath)) return absolutePath;
-  return path.join(absolutePath, "tsconfig.json");
+	const absolutePath = path.resolve(workspaceRoot, configPath);
+	if (path.extname(absolutePath)) return absolutePath;
+	return path.join(absolutePath, "tsconfig.json");
 }
 
 function isCompositeTsConfig(configPath: string): boolean {
-  const absolutePath = resolveTsConfigPath(configPath);
-  const config = readJsonFile<TsConfig>(absolutePath);
-  if (config.compilerOptions?.composite !== undefined) {
-    return config.compilerOptions.composite;
-  }
-  if (!config.extends) return false;
+	const absolutePath = resolveTsConfigPath(configPath);
+	const config = readJsonFile<TsConfig>(absolutePath);
+	if (config.compilerOptions?.composite !== undefined) {
+		return config.compilerOptions.composite;
+	}
+	if (!config.extends) return false;
 
-  const parentPath = path.resolve(path.dirname(absolutePath), config.extends);
-  return isCompositeTsConfig(parentPath);
+	const parentPath = path.resolve(path.dirname(absolutePath), config.extends);
+	return isCompositeTsConfig(parentPath);
 }
 
 function projectReferenceConfig(projectRoot: string): string | undefined {
-  for (const configName of ["tsconfig.lib.json", "tsconfig.json"]) {
-    const configPath = path.posix.join(projectRoot, configName);
-    if (
-      existsSync(path.join(workspaceRoot, configPath)) &&
-      isCompositeTsConfig(configPath)
-    ) {
-      return configPath;
-    }
-  }
-  return undefined;
+	for (const configName of ["tsconfig.lib.json", "tsconfig.json"]) {
+		const configPath = path.posix.join(projectRoot, configName);
+		if (existsSync(path.join(workspaceRoot, configPath)) && isCompositeTsConfig(configPath)) {
+			return configPath;
+		}
+	}
+	return undefined;
 }
 
 interface OxlintOverride {
-  readonly files: readonly string[];
-  readonly rules?: Readonly<Record<string, unknown>>;
+	readonly files: readonly string[];
+	readonly rules?: Readonly<Record<string, unknown>>;
 }
 
 interface OxlintRestrictedImportOptions {
-  readonly paths?: ReadonlyArray<{ readonly name: string }>;
-  readonly patterns?: ReadonlyArray<{ readonly group: readonly string[] }>;
+	readonly paths?: ReadonlyArray<{ readonly name: string }>;
+	readonly patterns?: ReadonlyArray<{ readonly group: readonly string[] }>;
 }
 
 interface OxlintRestrictedImportTypeOptions {
-  readonly modules?: ReadonlyArray<{ readonly name: string }>;
+	readonly modules?: ReadonlyArray<{ readonly name: string }>;
 }
 
 interface OxlintConfig {
-  readonly overrides?: readonly OxlintOverride[];
-  readonly rules?: Readonly<Record<string, unknown>>;
+	readonly overrides?: readonly OxlintOverride[];
+	readonly rules?: Readonly<Record<string, unknown>>;
 }
 
 interface OxlintReport {
-  readonly diagnostics: ReadonlyArray<{
-    readonly code?: string | null;
-    readonly filename: string;
-  }>;
+	readonly diagnostics: ReadonlyArray<{
+		readonly code?: string | null;
+		readonly filename: string;
+	}>;
 }
 
 function readOxlintConfig(): OxlintConfig {
-  const configPath = path.join(workspaceRoot, ".oxlintrc.json");
-  const parsed = ts.parseConfigFileTextToJson(
-    configPath,
-    readFileSync(configPath, "utf8"),
-  );
-  if (parsed.error) {
-    throw new Error(
-      ts.flattenDiagnosticMessageText(parsed.error.messageText, "\n"),
-    );
-  }
-  const config: OxlintConfig = parsed.config;
-  return config;
+	const configPath = path.join(workspaceRoot, ".oxlintrc.json");
+	const parsed = ts.parseConfigFileTextToJson(configPath, readFileSync(configPath, "utf8"));
+	if (parsed.error) {
+		throw new Error(ts.flattenDiagnosticMessageText(parsed.error.messageText, "\n"));
+	}
+	const config: OxlintConfig = parsed.config;
+	return config;
 }
 
 function readOxlintOverrides(): readonly OxlintOverride[] {
-  return readOxlintConfig().overrides ?? [];
+	return readOxlintConfig().overrides ?? [];
 }
 
 function ruleOptions<Options>(rule: unknown): Options | undefined {
-  if (!Array.isArray(rule)) return undefined;
-  const options: Options | undefined = rule[1];
-  return options;
+	if (!Array.isArray(rule)) return undefined;
+	const options: Options | undefined = rule[1];
+	return options;
 }
 
 /**
@@ -743,746 +676,638 @@ function ruleOptions<Options>(rule: unknown): Options | undefined {
  * `paths` entries plus `patterns` groups without their trailing `/**`.
  */
 function restrictedImportModules(rule: unknown): string[] {
-  const options = ruleOptions<OxlintRestrictedImportOptions>(rule);
-  return [
-    ...new Set([
-      ...(options?.paths ?? []).map(({ name }) => name),
-      ...(options?.patterns ?? []).flatMap(({ group }) =>
-        group.map((pattern) => pattern.replace(/\/\*\*$/, "")),
-      ),
-    ]),
-  ].sort();
+	const options = ruleOptions<OxlintRestrictedImportOptions>(rule);
+	return [
+		...new Set([
+			...(options?.paths ?? []).map(({ name }) => name),
+			...(options?.patterns ?? []).flatMap(({ group }) =>
+				group.map((pattern) => pattern.replace(/\/\*\*$/, "")),
+			),
+		]),
+	].sort();
 }
 
 /** Files of the overrides whose `no-restricted-imports` patterns match. */
 function restrictedImportOverrideFiles(
-  matches: (patterns: readonly string[]) => boolean,
+	matches: (patterns: readonly string[]) => boolean,
 ): string[] {
-  return readOxlintOverrides()
-    .filter((override) => {
-      const rule = override.rules?.["eslint/no-restricted-imports"];
-      if (!Array.isArray(rule)) return false;
-      const options: OxlintRestrictedImportOptions | undefined = rule[1];
-      return matches(
-        (options?.patterns ?? []).flatMap((pattern) => pattern.group),
-      );
-    })
-    .flatMap((override) => override.files)
-    .sort();
+	return readOxlintOverrides()
+		.filter((override) => {
+			const rule = override.rules?.["eslint/no-restricted-imports"];
+			if (!Array.isArray(rule)) return false;
+			const options: OxlintRestrictedImportOptions | undefined = rule[1];
+			return matches((options?.patterns ?? []).flatMap((pattern) => pattern.group));
+		})
+		.flatMap((override) => override.files)
+		.sort();
 }
 
 function firstMissingDirectory(directory: string): string | undefined {
-  let missing: string | undefined;
-  for (
-    let current = directory;
-    !existsSync(current);
-    current = path.dirname(current)
-  ) {
-    missing = current;
-  }
-  return missing;
+	let missing: string | undefined;
+	for (let current = directory; !existsSync(current); current = path.dirname(current)) {
+		missing = current;
+	}
+	return missing;
 }
 
 /**
  * Lints throwaway files through the real Oxlint CLI and repository config,
  * returning the sorted rule codes reported for each requested path.
  */
-function lintProbes(
-  probes: Readonly<Record<string, string>>,
-): Record<string, string[]> {
-  const files = Object.entries(probes).map(([filePath, source]) => {
-    const extension = path.extname(filePath);
-    const probePath = `${filePath.slice(0, -extension.length)}-${process.pid}${extension}`;
-    return { filePath, probePath, source };
-  });
-  const createdDirectories: string[] = [];
-  try {
-    for (const { probePath, source } of files) {
-      const absolutePath = path.join(workspaceRoot, probePath);
-      const missing = firstMissingDirectory(path.dirname(absolutePath));
-      if (missing) createdDirectories.push(missing);
-      mkdirSync(path.dirname(absolutePath), { recursive: true });
-      writeFileSync(absolutePath, `${source}\n`);
-    }
-    const result = spawnSync(
-      path.join(workspaceRoot, "node_modules", ".bin", "oxlint"),
-      ["--format", "json", ...files.map(({ probePath }) => probePath)],
-      { cwd: workspaceRoot, encoding: "utf8" },
-    );
-    if (result.error) throw result.error;
-    const report: OxlintReport = JSON.parse(result.stdout);
-    return Object.fromEntries(
-      files.map(({ filePath, probePath }) => [
-        filePath,
-        report.diagnostics
-          .filter((diagnostic) => diagnostic.filename === probePath)
-          .map((diagnostic) => diagnostic.code ?? "unknown")
-          .sort(),
-      ]),
-    );
-  } finally {
-    for (const { probePath } of files) {
-      rmSync(path.join(workspaceRoot, probePath), { force: true });
-    }
-    for (const directory of createdDirectories) {
-      rmSync(directory, { force: true, recursive: true });
-    }
-  }
+function lintProbes(probes: Readonly<Record<string, string>>): Record<string, string[]> {
+	const files = Object.entries(probes).map(([filePath, source]) => {
+		const extension = path.extname(filePath);
+		const probePath = `${filePath.slice(0, -extension.length)}-${process.pid}${extension}`;
+		return { filePath, probePath, source };
+	});
+	const createdDirectories: string[] = [];
+	try {
+		for (const { probePath, source } of files) {
+			const absolutePath = path.join(workspaceRoot, probePath);
+			const missing = firstMissingDirectory(path.dirname(absolutePath));
+			if (missing) createdDirectories.push(missing);
+			mkdirSync(path.dirname(absolutePath), { recursive: true });
+			writeFileSync(absolutePath, `${source}\n`);
+		}
+		const result = spawnSync(
+			path.join(workspaceRoot, "node_modules", ".bin", "oxlint"),
+			["--format", "json", ...files.map(({ probePath }) => probePath)],
+			{ cwd: workspaceRoot, encoding: "utf8" },
+		);
+		if (result.error) throw result.error;
+		const report: OxlintReport = JSON.parse(result.stdout);
+		return Object.fromEntries(
+			files.map(({ filePath, probePath }) => [
+				filePath,
+				report.diagnostics
+					.filter((diagnostic) => diagnostic.filename === probePath)
+					.map((diagnostic) => diagnostic.code ?? "unknown")
+					.sort(),
+			]),
+		);
+	} finally {
+		for (const { probePath } of files) {
+			rmSync(path.join(workspaceRoot, probePath), { force: true });
+		}
+		for (const directory of createdDirectories) {
+			rmSync(directory, { force: true, recursive: true });
+		}
+	}
 }
 
 describe("diagram package layout", () => {
-  it("discovers the existing Nx projects at their nested roots", async () => {
-    const graph = await createProjectGraphAsync({ exitOnError: true });
+	it("discovers the existing Nx projects at their nested roots", async () => {
+		const graph = await createProjectGraphAsync({ exitOnError: true });
 
-    for (const diagramPackage of diagramPackages) {
-      expect(graph.nodes[diagramPackage.name]?.data.root).toBe(
-        diagramPackage.root,
-      );
-    }
-  });
+		for (const diagramPackage of diagramPackages) {
+			expect(graph.nodes[diagramPackage.name]?.data.root).toBe(diagramPackage.root);
+		}
+	});
 
-  it("uses the approved npm identities and removes old active directories", () => {
-    for (const diagramPackage of diagramPackages) {
-      const packageRoot = path.join(workspaceRoot, diagramPackage.root);
-      const packageJson = readJsonFile<{ name: string }>(
-        path.join(packageRoot, "package.json"),
-      );
+	it("uses the approved npm identities and removes old active directories", () => {
+		for (const diagramPackage of diagramPackages) {
+			const packageRoot = path.join(workspaceRoot, diagramPackage.root);
+			const packageJson = readJsonFile<{ name: string }>(path.join(packageRoot, "package.json"));
 
-      expect(existsSync(packageRoot)).toBe(true);
-      expect(packageJson.name).toBe(diagramPackage.npmName);
-      expect(existsSync(path.join(workspaceRoot, diagramPackage.oldRoot))).toBe(
-        false,
-      );
-    }
-    expect(
-      existsSync(path.join(workspaceRoot, "packages/svg-excalidraw")),
-    ).toBe(true);
-  });
+			expect(existsSync(packageRoot)).toBe(true);
+			expect(packageJson.name).toBe(diagramPackage.npmName);
+			expect(existsSync(path.join(workspaceRoot, diagramPackage.oldRoot))).toBe(false);
+		}
+		expect(existsSync(path.join(workspaceRoot, "packages/svg-excalidraw"))).toBe(true);
+	});
 });
 
 describe("diagram generation project boundaries", () => {
-  it("keeps production generation independent from eval scenarios", async () => {
-    const graph = await createProjectGraphAsync({ exitOnError: true });
-    const generationTargets =
-      graph.dependencies["diagram-generation"]?.map(
-        (dependency) => dependency.target,
-      ) ?? [];
-    const scenarioTargets =
-      graph.dependencies["diagram-scenarios"]?.map(
-        (dependency) => dependency.target,
-      ) ?? [];
+	it("keeps production generation independent from eval scenarios", async () => {
+		const graph = await createProjectGraphAsync({ exitOnError: true });
+		const generationTargets =
+			graph.dependencies["diagram-generation"]?.map((dependency) => dependency.target) ?? [];
+		const scenarioTargets =
+			graph.dependencies["diagram-scenarios"]?.map((dependency) => dependency.target) ?? [];
 
-    expect(generationTargets).not.toContain("diagram-scenarios");
-    expect(scenarioTargets).toContain("diagram-generation");
-  });
+		expect(generationTargets).not.toContain("diagram-scenarios");
+		expect(scenarioTargets).toContain("diagram-generation");
+	});
 
-  it("classifies every project and lints Effect out of pure and framework-native code", () => {
-    const classifiedRoots = [
-      ...effectAuthoritativeProjectRoots,
-      ...effectPureProjectRoots,
-      ...effectMigrationReadyProjectRoots,
-      ...frameworkNativeProjectRoots,
-    ].sort();
-    expect(classifiedRoots).toEqual(intendedNxProjectRoots);
-    expect(new Set(classifiedRoots).size).toBe(classifiedRoots.length);
+	it("classifies every project and lints Effect out of pure and framework-native code", () => {
+		const classifiedRoots = [
+			...effectAuthoritativeProjectRoots,
+			...effectPureProjectRoots,
+			...effectMigrationReadyProjectRoots,
+			...frameworkNativeProjectRoots,
+		].sort();
+		expect(classifiedRoots).toEqual(intendedNxProjectRoots);
+		expect(new Set(classifiedRoots).size).toBe(classifiedRoots.length);
 
-    // Oxlint enforces the import restriction; these overrides must track the
-    // classification above exactly.
-    expect(
-      restrictedImportOverrideFiles((patterns) =>
-        patterns.includes("@effect/**"),
-      ),
-    ).toEqual(
-      [...effectPureProjectRoots, ...frameworkNativeProjectRoots]
-        .sort()
-        .map((projectRoot) => `${projectRoot}/**`),
-    );
-    expect(
-      restrictedImportOverrideFiles(
-        (patterns) =>
-          patterns.includes("effect/unstable/**") &&
-          !patterns.includes("@effect/**"),
-      ),
-    ).toEqual([...effectSchemaBoundaryFiles].sort());
+		// Oxlint enforces the import restriction; these overrides must track the
+		// classification above exactly.
+		expect(restrictedImportOverrideFiles((patterns) => patterns.includes("@effect/**"))).toEqual(
+			[...effectPureProjectRoots, ...frameworkNativeProjectRoots]
+				.sort()
+				.map((projectRoot) => `${projectRoot}/**`),
+		);
+		expect(
+			restrictedImportOverrideFiles(
+				(patterns) => patterns.includes("effect/unstable/**") && !patterns.includes("@effect/**"),
+			),
+		).toEqual([...effectSchemaBoundaryFiles].sort());
 
-    // Patterns must cover deep subpaths such as @effect/platform-node/NodeRuntime.
-    const config = readOxlintConfig();
-    const scopes = [
-      { name: "base rules", rules: config.rules },
-      ...(config.overrides ?? []).map((override) => ({
-        name: override.files.join(", "),
-        rules: override.rules,
-      })),
-    ].filter(({ rules }) => rules?.["eslint/no-restricted-imports"]);
-    expect(scopes.length).toBeGreaterThan(1);
-    for (const { name, rules } of scopes) {
-      const patterns = (
-        ruleOptions<OxlintRestrictedImportOptions>(
-          rules?.["eslint/no-restricted-imports"],
-        )?.patterns ?? []
-      ).flatMap(({ group }) => group);
-      expect(
-        patterns.filter((pattern) => !pattern.endsWith("/**")),
-        `${name} has a single-segment pattern`,
-      ).toEqual([]);
+		// Patterns must cover deep subpaths such as @effect/platform-node/NodeRuntime.
+		const config = readOxlintConfig();
+		const scopes = [
+			{ name: "base rules", rules: config.rules },
+			...(config.overrides ?? []).map((override) => ({
+				name: override.files.join(", "),
+				rules: override.rules,
+			})),
+		].filter(({ rules }) => rules?.["eslint/no-restricted-imports"]);
+		expect(scopes.length).toBeGreaterThan(1);
+		for (const { name, rules } of scopes) {
+			const patterns = (
+				ruleOptions<OxlintRestrictedImportOptions>(rules?.["eslint/no-restricted-imports"])
+					?.patterns ?? []
+			).flatMap(({ group }) => group);
+			expect(
+				patterns.filter((pattern) => !pattern.endsWith("/**")),
+				`${name} has a single-segment pattern`,
+			).toEqual([]);
 
-      // `import("…")` types bypass no-restricted-imports, so the Sketchi rule
-      // must restrict exactly the same modules in the same scope.
-      expect(
-        (
-          ruleOptions<OxlintRestrictedImportTypeOptions>(
-            rules?.["sketchi/no-restricted-import-types"],
-          )?.modules ?? []
-        )
-          .map((module) => module.name)
-          .sort(),
-        `${name} import-type restrictions`,
-      ).toEqual(
-        restrictedImportModules(rules?.["eslint/no-restricted-imports"]),
-      );
-    }
-  });
+			// `import("…")` types bypass no-restricted-imports, so the Sketchi rule
+			// must restrict exactly the same modules in the same scope.
+			expect(
+				(
+					ruleOptions<OxlintRestrictedImportTypeOptions>(
+						rules?.["sketchi/no-restricted-import-types"],
+					)?.modules ?? []
+				)
+					.map((module) => module.name)
+					.sort(),
+				`${name} import-type restrictions`,
+			).toEqual(restrictedImportModules(rules?.["eslint/no-restricted-imports"]));
+		}
+	});
 
-  it("pins one Effect v4 substrate and rejects unreviewed unstable imports", () => {
-    const packageJsonPaths = [
-      "package.json",
-      ...globSync(
-        requiredWorkspaceGlobs.map(
-          (workspaceGlob) => `${workspaceGlob}/package.json`,
-        ),
-        { cwd: workspaceRoot },
-      ),
-    ];
+	it("pins one Effect v4 substrate and rejects unreviewed unstable imports", () => {
+		const packageJsonPaths = [
+			"package.json",
+			...globSync(
+				requiredWorkspaceGlobs.map((workspaceGlob) => `${workspaceGlob}/package.json`),
+				{ cwd: workspaceRoot },
+			),
+		];
 
-    for (const packageJsonPath of packageJsonPaths) {
-      const manifest = readJsonFile<PackageManifest>(
-        path.join(workspaceRoot, packageJsonPath),
-      );
-      expect(
-        invalidEffectDependencyPins(manifest),
-        `${packageJsonPath} has a non-exact or unapproved Effect dependency`,
-      ).toEqual([]);
-      for (const dependencies of [
-        manifest.dependencies,
-        manifest.devDependencies,
-        manifest.optionalDependencies,
-        manifest.peerDependencies,
-      ]) {
-        expect(dependencies?.["@effect/cli"]).toBeUndefined();
-      }
-    }
+		for (const packageJsonPath of packageJsonPaths) {
+			const manifest = readJsonFile<PackageManifest>(path.join(workspaceRoot, packageJsonPath));
+			expect(
+				invalidEffectDependencyPins(manifest),
+				`${packageJsonPath} has a non-exact or unapproved Effect dependency`,
+			).toEqual([]);
+			for (const dependencies of [
+				manifest.dependencies,
+				manifest.devDependencies,
+				manifest.optionalDependencies,
+				manifest.peerDependencies,
+			]) {
+				expect(dependencies?.["@effect/cli"]).toBeUndefined();
+			}
+		}
 
-    const actualEffectManifestPaths = packageJsonPaths
-      .filter((packageJsonPath) => {
-        const manifest = readJsonFile<PackageManifest>(
-          path.join(workspaceRoot, packageJsonPath),
-        );
-        return [
-          manifest.dependencies,
-          manifest.devDependencies,
-          manifest.optionalDependencies,
-          manifest.peerDependencies,
-        ].some((dependencies) =>
-          Object.keys(dependencies ?? {}).some(
-            (dependency) =>
-              dependency === "effect" || dependency.startsWith("@effect/"),
-          ),
-        );
-      })
-      .sort();
-    expect(actualEffectManifestPaths).toEqual(effectDependencyManifestPaths);
+		const actualEffectManifestPaths = packageJsonPaths
+			.filter((packageJsonPath) => {
+				const manifest = readJsonFile<PackageManifest>(path.join(workspaceRoot, packageJsonPath));
+				return [
+					manifest.dependencies,
+					manifest.devDependencies,
+					manifest.optionalDependencies,
+					manifest.peerDependencies,
+				].some((dependencies) =>
+					Object.keys(dependencies ?? {}).some(
+						(dependency) => dependency === "effect" || dependency.startsWith("@effect/"),
+					),
+				);
+			})
+			.sort();
+		expect(actualEffectManifestPaths).toEqual(effectDependencyManifestPaths);
 
-    const rootManifest = readJsonFile<PackageManifest>(
-      path.join(workspaceRoot, "package.json"),
-    );
-    expect(rootManifest.dependencies?.["effect"]).toBe("4.0.1");
-    expect(rootManifest.devDependencies?.["@effect/vitest"]).toBe("4.0.1");
-    expect(
-      readFileSync(path.join(workspaceRoot, "pnpm-lock.yaml"), "utf8"),
-    ).not.toContain("effect@3.");
+		const rootManifest = readJsonFile<PackageManifest>(path.join(workspaceRoot, "package.json"));
+		expect(rootManifest.dependencies?.["effect"]).toBe("4.0.1");
+		expect(rootManifest.devDependencies?.["@effect/vitest"]).toBe("4.0.1");
+		expect(readFileSync(path.join(workspaceRoot, "pnpm-lock.yaml"), "utf8")).not.toContain(
+			"effect@3.",
+		);
 
-    // Oxlint rejects unstable Effect imports everywhere except reviewed
-    // adapters; every adapter that exists must be on the reviewed list.
-    expect(
-      globSync(
-        ["apps", "packages", "tools"].map(
-          (root) => `${root}/**/src/internal/effect-unstable-*.ts`,
-        ),
-        { cwd: workspaceRoot, exclude: ["**/node_modules/**"] },
-      ).sort(),
-    ).toEqual(reviewedEffectUnstableAdapterPaths);
-  });
+		// Oxlint rejects unstable Effect imports everywhere except reviewed
+		// adapters; every adapter that exists must be on the reviewed list.
+		expect(
+			globSync(
+				["apps", "packages", "tools"].map((root) => `${root}/**/src/internal/effect-unstable-*.ts`),
+				{ cwd: workspaceRoot, exclude: ["**/node_modules/**"] },
+			).sort(),
+		).toEqual(reviewedEffectUnstableAdapterPaths);
+	});
 
-  it("keeps Zod out of every workspace manifest", () => {
-    const manifestPaths = [
-      "package.json",
-      ...globSync(
-        requiredWorkspaceGlobs.map(
-          (workspaceGlob) => `${workspaceGlob}/package.json`,
-        ),
-        { cwd: workspaceRoot },
-      ),
-    ];
-    for (const manifestPath of manifestPaths) {
-      const manifest = readJsonFile<PackageManifest>(
-        path.join(workspaceRoot, manifestPath),
-      );
-      for (const dependencies of [
-        manifest.dependencies,
-        manifest.devDependencies,
-        manifest.optionalDependencies,
-        manifest.peerDependencies,
-      ]) {
-        expect(
-          Object.keys(dependencies ?? {}).filter(
-            (dependency) =>
-              dependency === "zod" || dependency.startsWith("zod/"),
-          ),
-          `${manifestPath} declares Zod`,
-        ).toEqual([]);
-      }
-    }
-  });
+	it("keeps Zod out of every workspace manifest", () => {
+		const manifestPaths = [
+			"package.json",
+			...globSync(
+				requiredWorkspaceGlobs.map((workspaceGlob) => `${workspaceGlob}/package.json`),
+				{ cwd: workspaceRoot },
+			),
+		];
+		for (const manifestPath of manifestPaths) {
+			const manifest = readJsonFile<PackageManifest>(path.join(workspaceRoot, manifestPath));
+			for (const dependencies of [
+				manifest.dependencies,
+				manifest.devDependencies,
+				manifest.optionalDependencies,
+				manifest.peerDependencies,
+			]) {
+				expect(
+					Object.keys(dependencies ?? {}).filter(
+						(dependency) => dependency === "zod" || dependency.startsWith("zod/"),
+					),
+					`${manifestPath} declares Zod`,
+				).toEqual([]);
+			}
+		}
+	});
 
-  it("prevents unmanaged Promise and runtime regressions", () => {
-    const sourceFiles = globSync(
-      [
-        ...["apps", "packages", "tools"].map(
-          (root) => `${root}/**/*.{ts,tsx,mts,cts,js,mjs}`,
-        ),
-        "scripts/pipelines/r2-catalog-smoke.ts",
-      ],
-      {
-        cwd: workspaceRoot,
-        exclude: [
-          "**/dist/**",
-          "**/.output/**",
-          "**/.wrangler/**",
-          "**/*.test.*",
-          "**/*.stories.*",
-          "**/__tests__/**",
-          "**/routeTree.gen.ts",
-        ],
-      },
-    );
+	it("prevents unmanaged Promise and runtime regressions", () => {
+		const sourceFiles = globSync(
+			[
+				...["apps", "packages", "tools"].map((root) => `${root}/**/*.{ts,tsx,mts,cts,js,mjs}`),
+				"scripts/pipelines/r2-catalog-smoke.ts",
+			],
+			{
+				cwd: workspaceRoot,
+				exclude: [
+					"**/dist/**",
+					"**/.output/**",
+					"**/.wrangler/**",
+					"**/*.test.*",
+					"**/*.stories.*",
+					"**/__tests__/**",
+					"**/routeTree.gen.ts",
+				],
+			},
+		);
 
-    const promiseProgram = createTypeCheckedProgram(
-      sourceFiles.map((sourceFile) => path.join(workspaceRoot, sourceFile)),
-    );
-    const managedPromiseSites = Object.fromEntries(
-      sourceFiles
-        .map((sourceFile) => {
-          const absolutePath = path.join(workspaceRoot, sourceFile);
-          const parsedSource = promiseProgram.getSourceFile(absolutePath);
-          if (!parsedSource) {
-            throw new Error(`Type checker did not load ${sourceFile}.`);
-          }
-          return [
-            sourceFile,
-            promiseOrchestrationSites(promiseProgram, parsedSource),
-          ] as const;
-        })
-        .filter(([, sites]) => sites.length > 0),
-    );
-    const managedPromiseFiles = Object.keys(managedPromiseSites).sort();
-    const managedPromiseSiteCounts = Object.fromEntries(
-      managedPromiseFiles.map((sourceFile) => [
-        sourceFile,
-        managedPromiseSites[sourceFile]?.length ?? 0,
-      ]),
-    );
-    expect(managedPromiseFiles).toEqual(approvedManagedPromiseFiles);
-    expect(managedPromiseSiteCounts).toEqual(approvedManagedPromiseSiteCounts);
+		const promiseProgram = createTypeCheckedProgram(
+			sourceFiles.map((sourceFile) => path.join(workspaceRoot, sourceFile)),
+		);
+		const managedPromiseSites = Object.fromEntries(
+			sourceFiles
+				.map((sourceFile) => {
+					const absolutePath = path.join(workspaceRoot, sourceFile);
+					const parsedSource = promiseProgram.getSourceFile(absolutePath);
+					if (!parsedSource) {
+						throw new Error(`Type checker did not load ${sourceFile}.`);
+					}
+					return [sourceFile, promiseOrchestrationSites(promiseProgram, parsedSource)] as const;
+				})
+				.filter(([, sites]) => sites.length > 0),
+		);
+		const managedPromiseFiles = Object.keys(managedPromiseSites).sort();
+		const managedPromiseSiteCounts = Object.fromEntries(
+			managedPromiseFiles.map((sourceFile) => [
+				sourceFile,
+				managedPromiseSites[sourceFile]?.length ?? 0,
+			]),
+		);
+		expect(managedPromiseFiles).toEqual(approvedManagedPromiseFiles);
+		expect(managedPromiseSiteCounts).toEqual(approvedManagedPromiseSiteCounts);
 
-    const runtimeBoundaryFiles = sourceFiles
-      .filter((sourceFile) => {
-        const parsedSource = promiseProgram.getSourceFile(
-          path.join(workspaceRoot, sourceFile),
-        );
-        if (!parsedSource)
-          throw new Error(`Type checker did not load ${sourceFile}.`);
-        return runtimeBoundaryCalls(promiseProgram, parsedSource).length > 0;
-      })
-      .sort();
-    expect(runtimeBoundaryFiles).toEqual(approvedRuntimeBoundaryFiles);
-  }, 20_000);
+		const runtimeBoundaryFiles = sourceFiles
+			.filter((sourceFile) => {
+				const parsedSource = promiseProgram.getSourceFile(path.join(workspaceRoot, sourceFile));
+				if (!parsedSource) throw new Error(`Type checker did not load ${sourceFile}.`);
+				return runtimeBoundaryCalls(promiseProgram, parsedSource).length > 0;
+			})
+			.sort();
+		expect(runtimeBoundaryFiles).toEqual(approvedRuntimeBoundaryFiles);
+	}, 20_000);
 });
 
 describe("Effect structural guards", () => {
-  it.each([
-    [
-      "aliased runSync",
-      'import { Effect as E } from "effect"; E.runSync(E.succeed(1));',
-    ],
-    [
-      "aliased runPromise",
-      'import { Effect as E } from "effect"; E.runPromise(E.succeed(1));',
-    ],
-    [
-      "destructured runSync",
-      'import { Effect } from "effect"; const { runSync: execute } = Effect; execute(Effect.succeed(1));',
-    ],
-    [
-      "computed runFork",
-      'import { Effect as E } from "effect"; E["runFork"](E.succeed(1));',
-    ],
-    [
-      "detached runCallback",
-      'import { Effect as E } from "effect"; const execute = E.runCallback; execute(E.succeed(1));',
-    ],
-    [
-      "aliased ManagedRuntime.make",
-      'import { ManagedRuntime as M, Layer } from "effect"; M.make(Layer.empty);',
-    ],
-    [
-      "destructured ManagedRuntime.make",
-      'import { ManagedRuntime as M, Layer } from "effect"; const { make: create } = M; create(Layer.empty);',
-    ],
-    [
-      "computed ManagedRuntime.make",
-      'import { ManagedRuntime as M, Layer } from "effect"; M["make"](Layer.empty);',
-    ],
-    [
-      "aliased NodeRuntime.runMain",
-      'import { NodeRuntime as N } from "@effect/platform-node"; import { Effect as E } from "effect"; N.runMain(E.void);',
-    ],
-  ])(
-    "detects %s runtime boundary by resolved signature",
-    (_name, sourceText) => {
-      expect(runtimeProbeCalls(sourceText)).toHaveLength(1);
-    },
-  );
+	it.each([
+		["aliased runSync", 'import { Effect as E } from "effect"; E.runSync(E.succeed(1));'],
+		["aliased runPromise", 'import { Effect as E } from "effect"; E.runPromise(E.succeed(1));'],
+		[
+			"destructured runSync",
+			'import { Effect } from "effect"; const { runSync: execute } = Effect; execute(Effect.succeed(1));',
+		],
+		["computed runFork", 'import { Effect as E } from "effect"; E["runFork"](E.succeed(1));'],
+		[
+			"detached runCallback",
+			'import { Effect as E } from "effect"; const execute = E.runCallback; execute(E.succeed(1));',
+		],
+		[
+			"aliased ManagedRuntime.make",
+			'import { ManagedRuntime as M, Layer } from "effect"; M.make(Layer.empty);',
+		],
+		[
+			"destructured ManagedRuntime.make",
+			'import { ManagedRuntime as M, Layer } from "effect"; const { make: create } = M; create(Layer.empty);',
+		],
+		[
+			"computed ManagedRuntime.make",
+			'import { ManagedRuntime as M, Layer } from "effect"; M["make"](Layer.empty);',
+		],
+		[
+			"aliased NodeRuntime.runMain",
+			'import { NodeRuntime as N } from "@effect/platform-node"; import { Effect as E } from "effect"; N.runMain(E.void);',
+		],
+	])("detects %s runtime boundary by resolved signature", (_name, sourceText) => {
+		expect(runtimeProbeCalls(sourceText)).toHaveLength(1);
+	});
 
-  it("does not confuse unrelated same-named functions with Effect runtimes", () => {
-    expect(
-      runtimeProbeCalls(
-        "const Effect = { runSync: (value: number) => value }; const ManagedRuntime = { make: () => 1 }; Effect.runSync(1); ManagedRuntime.make();",
-      ),
-    ).toEqual([]);
-  });
+	it("does not confuse unrelated same-named functions with Effect runtimes", () => {
+		expect(
+			runtimeProbeCalls(
+				"const Effect = { runSync: (value: number) => value }; const ManagedRuntime = { make: () => 1 }; Effect.runSync(1); ManagedRuntime.make();",
+			),
+		).toEqual([]);
+	});
 
-  it.each([
-    ["top-level await fetch", "await fetch('https://example.test')"],
-    [
-      "exported arrow returning fetch",
-      "export const request = () => fetch('https://example.test')",
-    ],
-    [
-      "computed then consumer",
-      'declare function foreign(): PromiseLike<number>; foreign()["then"]((value) => value)',
-    ],
-    ["async function", "export async function request() {}"],
-    ["Promise construction", "new Promise(() => {})"],
-    ["qualified Promise construction", "new globalThis.Promise(() => {})"],
-    ["Promise resolve", "Promise.resolve(1)"],
-    [
-      "aliased Promise resolve",
-      "const NativePromise = Promise; NativePromise.resolve(1)",
-    ],
-    ["Promise withResolvers", "Promise.withResolvers()"],
-    [
-      "direct then consumer",
-      "declare const pending: Promise<number>; pending.then((value) => value)",
-    ],
-    [
-      "computed catch consumer",
-      'declare const pending: Promise<number>; pending["catch"](() => 0)',
-    ],
-    [
-      "direct finally consumer",
-      "declare const pending: Promise<number>; pending.finally(() => {})",
-    ],
-    [
-      "indirect thenable",
-      'declare function foreign(): PromiseLike<number>; const indirect = foreign; indirect()["then"]((value) => value)',
-    ],
-    [
-      "detached thenable member access",
-      "declare const pending: PromiseLike<number>; const detachedThen = pending.then",
-    ],
-    [
-      "Promise-containing call union",
-      "declare function maybe(): number | Promise<number>; maybe()",
-    ],
-    [
-      "optional-chained Promise union consumer",
-      "declare const pending: Promise<number> | undefined; pending?.then((value) => value)",
-    ],
-    [
-      "MaybePromise alias",
-      "type MaybePromise<T> = T | Promise<T>; declare function maybe(): MaybePromise<number>; maybe()",
-    ],
-    [
-      "generic instantiated to a Promise union",
-      "declare function instantiate<T>(): T; instantiate<string | Promise<number>>()",
-    ],
-    ["dynamic import", "import('./foreign.js')"],
-  ])("detects %s orchestration", (_name, sourceText) => {
-    expect(promiseProbeSites(sourceText)).not.toEqual([]);
-  });
+	it.each([
+		["top-level await fetch", "await fetch('https://example.test')"],
+		[
+			"exported arrow returning fetch",
+			"export const request = () => fetch('https://example.test')",
+		],
+		[
+			"computed then consumer",
+			'declare function foreign(): PromiseLike<number>; foreign()["then"]((value) => value)',
+		],
+		["async function", "export async function request() {}"],
+		["Promise construction", "new Promise(() => {})"],
+		["qualified Promise construction", "new globalThis.Promise(() => {})"],
+		["Promise resolve", "Promise.resolve(1)"],
+		["aliased Promise resolve", "const NativePromise = Promise; NativePromise.resolve(1)"],
+		["Promise withResolvers", "Promise.withResolvers()"],
+		[
+			"direct then consumer",
+			"declare const pending: Promise<number>; pending.then((value) => value)",
+		],
+		[
+			"computed catch consumer",
+			'declare const pending: Promise<number>; pending["catch"](() => 0)',
+		],
+		[
+			"direct finally consumer",
+			"declare const pending: Promise<number>; pending.finally(() => {})",
+		],
+		[
+			"indirect thenable",
+			'declare function foreign(): PromiseLike<number>; const indirect = foreign; indirect()["then"]((value) => value)',
+		],
+		[
+			"detached thenable member access",
+			"declare const pending: PromiseLike<number>; const detachedThen = pending.then",
+		],
+		[
+			"Promise-containing call union",
+			"declare function maybe(): number | Promise<number>; maybe()",
+		],
+		[
+			"optional-chained Promise union consumer",
+			"declare const pending: Promise<number> | undefined; pending?.then((value) => value)",
+		],
+		[
+			"MaybePromise alias",
+			"type MaybePromise<T> = T | Promise<T>; declare function maybe(): MaybePromise<number>; maybe()",
+		],
+		[
+			"generic instantiated to a Promise union",
+			"declare function instantiate<T>(): T; instantiate<string | Promise<number>>()",
+		],
+		["dynamic import", "import('./foreign.js')"],
+	])("detects %s orchestration", (_name, sourceText) => {
+		expect(promiseProbeSites(sourceText)).not.toEqual([]);
+	});
 
-  it("detects an import-renamed Promise constructor by type identity", () => {
-    expect(
-      promiseProbeSites(
-        'import { ReexportedPromise as ImportedPromise } from "./promise-reexport.js"; ImportedPromise.resolve(1)',
-        {
-          "promise-source.ts":
-            "export const NativePromise = globalThis.Promise;",
-          "promise-reexport.ts":
-            'export { NativePromise as ReexportedPromise } from "./promise-source.js";',
-        },
-      ),
-    ).not.toEqual([]);
-  });
+	it("detects an import-renamed Promise constructor by type identity", () => {
+		expect(
+			promiseProbeSites(
+				'import { ReexportedPromise as ImportedPromise } from "./promise-reexport.js"; ImportedPromise.resolve(1)',
+				{
+					"promise-source.ts": "export const NativePromise = globalThis.Promise;",
+					"promise-reexport.ts":
+						'export { NativePromise as ReexportedPromise } from "./promise-source.js";',
+				},
+			),
+		).not.toEqual([]);
+	});
 
-  it("does not confuse Effect error operators with Promise consumers", () => {
-    expect(
-      promiseProbeSites(
-        "Effect.catch(program, recover); Effect['finally'](program, cleanup)",
-      ),
-    ).toEqual([]);
-  });
+	it("does not confuse Effect error operators with Promise consumers", () => {
+		expect(
+			promiseProbeSites("Effect.catch(program, recover); Effect['finally'](program, cleanup)"),
+		).toEqual([]);
+	});
 
-  it("documents that deliberate any laundering is outside the gate", () => {
-    expect(
-      promiseProbeSites(
-        "const deliberatelyErased: any = Promise; deliberatelyErased.resolve(1)",
-      ),
-    ).toEqual([]);
-  });
+	it("documents that deliberate any laundering is outside the gate", () => {
+		expect(
+			promiseProbeSites("const deliberatelyErased: any = Promise; deliberatelyErased.resolve(1)"),
+		).toEqual([]);
+	});
 
-  it("rejects a ranged pin for any @effect package", () => {
-    expect(
-      invalidEffectDependencyPins({
-        dependencies: {
-          "@effect/platform": "^4.0.0",
-          "@effect/platform-node": "4.0.1",
-          effect: "4.0.1",
-        },
-      }),
-    ).toEqual([{ dependency: "@effect/platform", version: "^4.0.0" }]);
-  });
+	it("rejects a ranged pin for any @effect package", () => {
+		expect(
+			invalidEffectDependencyPins({
+				dependencies: {
+					"@effect/platform": "^4.0.0",
+					"@effect/platform-node": "4.0.1",
+					effect: "4.0.1",
+				},
+			}),
+		).toEqual([{ dependency: "@effect/platform", version: "^4.0.0" }]);
+	});
 });
 
 describe("workspace project membership", () => {
-  it("keeps pnpm importers aligned with package-backed Nx roots", async () => {
-    const graph = await createProjectGraphAsync({ exitOnError: true });
-    const globs = workspacePackageGlobs();
-    const pnpmRoots = globSync(
-      globs.map((workspaceGlob) => `${workspaceGlob}/package.json`),
-      { cwd: workspaceRoot },
-    )
-      .map((packageJsonPath) =>
-        normalizeWorkspacePath(path.dirname(packageJsonPath)),
-      )
-      .sort();
-    const nxPackageRoots = Object.values(graph.nodes)
-      .map((node) => node.data.root)
-      .filter((projectRoot) =>
-        existsSync(path.join(workspaceRoot, projectRoot, "package.json")),
-      )
-      .sort();
-    const nxRoots = Object.values(graph.nodes)
-      .map((node) => node.data.root)
-      .sort();
+	it("keeps pnpm importers aligned with package-backed Nx roots", async () => {
+		const graph = await createProjectGraphAsync({ exitOnError: true });
+		const globs = workspacePackageGlobs();
+		const pnpmRoots = globSync(
+			globs.map((workspaceGlob) => `${workspaceGlob}/package.json`),
+			{ cwd: workspaceRoot },
+		)
+			.map((packageJsonPath) => normalizeWorkspacePath(path.dirname(packageJsonPath)))
+			.sort();
+		const nxPackageRoots = Object.values(graph.nodes)
+			.map((node) => node.data.root)
+			.filter((projectRoot) => existsSync(path.join(workspaceRoot, projectRoot, "package.json")))
+			.sort();
+		const nxRoots = Object.values(graph.nodes)
+			.map((node) => node.data.root)
+			.sort();
 
-    expect(globs).toEqual(requiredWorkspaceGlobs);
-    expect(nxRoots).toEqual(intendedNxProjectRoots);
-    expect(nxPackageRoots).toEqual(intendedWorkspacePackageRoots);
-    expect(pnpmRoots).toEqual(intendedWorkspacePackageRoots);
-  });
+		expect(globs).toEqual(requiredWorkspaceGlobs);
+		expect(nxRoots).toEqual(intendedNxProjectRoots);
+		expect(nxPackageRoots).toEqual(intendedWorkspacePackageRoots);
+		expect(pnpmRoots).toEqual(intendedWorkspacePackageRoots);
+	});
 
-  it("references every composite app, package, and generator project", async () => {
-    const graph = await createProjectGraphAsync({ exitOnError: true });
-    const rootConfig = readJsonFile<TsConfig>(
-      path.join(workspaceRoot, "tsconfig.json"),
-    );
-    const actualReferences = (rootConfig.references ?? [])
-      .map(({ path: referencePath }) =>
-        normalizeWorkspacePath(
-          path.relative(workspaceRoot, resolveTsConfigPath(referencePath)),
-        ),
-      )
-      .sort();
-    const discoveredCompositeReferences = Object.values(graph.nodes)
-      .map((node) => projectReferenceConfig(node.data.root))
-      .filter((configPath): configPath is string => configPath !== undefined)
-      .sort();
+	it("references every composite app, package, and generator project", async () => {
+		const graph = await createProjectGraphAsync({ exitOnError: true });
+		const rootConfig = readJsonFile<TsConfig>(path.join(workspaceRoot, "tsconfig.json"));
+		const actualReferences = (rootConfig.references ?? [])
+			.map(({ path: referencePath }) =>
+				normalizeWorkspacePath(path.relative(workspaceRoot, resolveTsConfigPath(referencePath))),
+			)
+			.sort();
+		const discoveredCompositeReferences = Object.values(graph.nodes)
+			.map((node) => projectReferenceConfig(node.data.root))
+			.filter((configPath): configPath is string => configPath !== undefined)
+			.sort();
 
-    expect(new Set(actualReferences).size).toBe(actualReferences.length);
-    expect(actualReferences).toEqual(intendedCompositeReferences);
-    expect(discoveredCompositeReferences).toEqual(intendedCompositeReferences);
-    for (const referencePath of actualReferences) {
-      expect(isCompositeTsConfig(referencePath)).toBe(true);
-    }
-    expect(actualReferences).not.toContain(
-      "apps/native-conversion-storybook/tsconfig.json",
-    );
-  });
+		expect(new Set(actualReferences).size).toBe(actualReferences.length);
+		expect(actualReferences).toEqual(intendedCompositeReferences);
+		expect(discoveredCompositeReferences).toEqual(intendedCompositeReferences);
+		for (const referencePath of actualReferences) {
+			expect(isCompositeTsConfig(referencePath)).toBe(true);
+		}
+		expect(actualReferences).not.toContain("apps/native-conversion-storybook/tsconfig.json");
+	});
 
-  it("tags every Nx project without allowing app dependency drift", async () => {
-    const graph = await createProjectGraphAsync({ exitOnError: true });
+	it("tags every Nx project without allowing app dependency drift", async () => {
+		const graph = await createProjectGraphAsync({ exitOnError: true });
 
-    for (const node of Object.values(graph.nodes)) {
-      const tags = node.data.tags ?? [];
-      expect(tags.filter((tag) => tag.startsWith("scope:"))).toHaveLength(1);
-      expect(tags.some((tag) => tag.startsWith("type:"))).toBe(true);
-    }
+		for (const node of Object.values(graph.nodes)) {
+			const tags = node.data.tags ?? [];
+			expect(tags.filter((tag) => tag.startsWith("scope:"))).toHaveLength(1);
+			expect(tags.some((tag) => tag.startsWith("type:"))).toBe(true);
+		}
 
-    for (const [source, dependencies] of Object.entries(graph.dependencies)) {
-      for (const dependency of dependencies) {
-        const targetTags = graph.nodes[dependency.target]?.data.tags ?? [];
-        if (!targetTags.includes("scope:app")) continue;
+		for (const [source, dependencies] of Object.entries(graph.dependencies)) {
+			for (const dependency of dependencies) {
+				const targetTags = graph.nodes[dependency.target]?.data.tags ?? [];
+				if (!targetTags.includes("scope:app")) continue;
 
-        expect(graph.nodes[source]?.data.tags).toContain("scope:composition");
-      }
-    }
+				expect(graph.nodes[source]?.data.tags).toContain("scope:composition");
+			}
+		}
 
-    const composedApps = new Set(
-      (graph.dependencies["native-conversion-storybook"] ?? [])
-        .map((dependency) => dependency.target)
-        .filter((target) =>
-          graph.nodes[target]?.data.tags?.includes("scope:app"),
-        ),
-    );
-    expect([...composedApps].sort()).toEqual(["excalidraw", "icons"]);
-  });
+		const composedApps = new Set(
+			(graph.dependencies["native-conversion-storybook"] ?? [])
+				.map((dependency) => dependency.target)
+				.filter((target) => graph.nodes[target]?.data.tags?.includes("scope:app")),
+		);
+		expect([...composedApps].sort()).toEqual(["excalidraw", "icons"]);
+	});
 
-  it("enforces project boundaries in source, config, and Storybook files", () => {
-    const results = lintProbes({
-      "packages/diagram/agent/.storybook/boundary-probe.ts":
-        'import "@sketchi/diagram-scenarios";',
-      "packages/diagram/agent/vitest.boundary-probe.mts":
-        'import "@sketchi/diagram-scenarios";',
-      "apps/web/vite.boundary-probe.ts":
-        'import "../playground/src/routeTree.gen";',
-      "apps/web/vite.boundary-allowed-probe.ts": [
-        'import { localViteCacheDir } from "../../tools/local-dev-ports";',
-        'import { workerProjectConfig } from "../../scripts/lib/worker-apps.mjs";',
-        'void localViteCacheDir(workerProjectConfig("web").projectId);',
-      ].join("\n"),
-    });
+	it("enforces project boundaries in source, config, and Storybook files", () => {
+		const results = lintProbes({
+			"packages/diagram/agent/.storybook/boundary-probe.ts": 'import "@sketchi/diagram-scenarios";',
+			"packages/diagram/agent/vitest.boundary-probe.mts": 'import "@sketchi/diagram-scenarios";',
+			"apps/web/vite.boundary-probe.ts": 'import "../playground/src/routeTree.gen";',
+			"apps/web/vite.boundary-allowed-probe.ts": [
+				'import { localViteCacheDir } from "../../tools/local-dev-ports";',
+				'import { workerProjectConfig } from "../../scripts/lib/worker-apps.mjs";',
+				'void localViteCacheDir(workerProjectConfig("web").projectId);',
+			].join("\n"),
+		});
 
-    for (const filePath of [
-      "packages/diagram/agent/.storybook/boundary-probe.ts",
-      "packages/diagram/agent/vitest.boundary-probe.mts",
-      "apps/web/vite.boundary-probe.ts",
-    ]) {
-      expect(results[filePath], filePath).toContain(
-        "@nx(enforce-module-boundaries)",
-      );
-    }
-    expect(results["apps/web/vite.boundary-allowed-probe.ts"]).toEqual([]);
-  });
+		for (const filePath of [
+			"packages/diagram/agent/.storybook/boundary-probe.ts",
+			"packages/diagram/agent/vitest.boundary-probe.mts",
+			"apps/web/vite.boundary-probe.ts",
+		]) {
+			expect(results[filePath], filePath).toContain("@nx(enforce-module-boundaries)");
+		}
+		expect(results["apps/web/vite.boundary-allowed-probe.ts"]).toEqual([]);
+	});
 
-  it("enforces Effect, Zod, and React effect policy through Oxlint", () => {
-    const results = lintProbes({
-      "packages/diagram/core/src/effect-probe.ts":
-        'import { Effect } from "effect";\nvoid Effect;',
-      "packages/svg-excalidraw/src/effect-probe.ts":
-        'import * as Node from "@effect/platform-node";\nvoid Node;',
-      "packages/diagram/agent/src/stable-effect-probe.ts":
-        'import { Effect } from "effect";\nvoid Effect;',
-      "packages/diagram/agent/src/unstable-effect-probe.ts":
-        'import * as Http from "effect/unstable/http";\nvoid Http;',
-      "packages/diagram/agent/src/internal/effect-unstable-probe.ts":
-        'import * as Http from "effect/unstable/http";\nvoid Http;',
-      "packages/diagram/renderer/src/deep-effect-probe.ts": [
-        'import * as NodeRuntime from "@effect/platform-node/NodeRuntime";',
-        'import * as HttpClient from "effect/http/HttpClient";',
-        "void NodeRuntime;",
-        "void HttpClient;",
-      ].join("\n"),
-      "packages/diagram/renderer/src/effect-type-probe.ts": [
-        'export type EffectModule = typeof import("effect");',
-        'export type Runtime = typeof import("@effect/platform-node/NodeRuntime");',
-      ].join("\n"),
-      "packages/diagram/agent/src/deep-unstable-effect-probe.ts": [
-        'import * as Client from "effect/unstable/http/HttpClient";',
-        'export type Unstable = typeof import("effect/unstable/http");',
-        "void Client;",
-      ].join("\n"),
-      "scripts/zod-probe.ts": 'import { z } from "zod";\nvoid z;',
-      "scripts/deep-zod-probe.ts":
-        'import * as Core from "zod/v4/core";\nvoid Core;',
-      "apps/web/src/react-effect-probe.tsx": [
-        'import { useEffect as useMountEffect } from "react";',
-        "export function Probe() {",
-        "  useMountEffect(() => {}, []);",
-        "  return null;",
-        "}",
-      ].join("\n"),
-    });
+	it("enforces Effect, Zod, and React effect policy through Oxlint", () => {
+		const results = lintProbes({
+			"packages/diagram/core/src/effect-probe.ts": 'import { Effect } from "effect";\nvoid Effect;',
+			"packages/svg-excalidraw/src/effect-probe.ts":
+				'import * as Node from "@effect/platform-node";\nvoid Node;',
+			"packages/diagram/agent/src/stable-effect-probe.ts":
+				'import { Effect } from "effect";\nvoid Effect;',
+			"packages/diagram/agent/src/unstable-effect-probe.ts":
+				'import * as Http from "effect/unstable/http";\nvoid Http;',
+			"packages/diagram/agent/src/internal/effect-unstable-probe.ts":
+				'import * as Http from "effect/unstable/http";\nvoid Http;',
+			"packages/diagram/renderer/src/deep-effect-probe.ts": [
+				'import * as NodeRuntime from "@effect/platform-node/NodeRuntime";',
+				'import * as HttpClient from "effect/http/HttpClient";',
+				"void NodeRuntime;",
+				"void HttpClient;",
+			].join("\n"),
+			"packages/diagram/renderer/src/effect-type-probe.ts": [
+				'export type EffectModule = typeof import("effect");',
+				'export type Runtime = typeof import("@effect/platform-node/NodeRuntime");',
+			].join("\n"),
+			"packages/diagram/agent/src/deep-unstable-effect-probe.ts": [
+				'import * as Client from "effect/unstable/http/HttpClient";',
+				'export type Unstable = typeof import("effect/unstable/http");',
+				"void Client;",
+			].join("\n"),
+			"scripts/zod-probe.ts": 'import { z } from "zod";\nvoid z;',
+			"scripts/deep-zod-probe.ts": 'import * as Core from "zod/v4/core";\nvoid Core;',
+			"apps/web/src/react-effect-probe.tsx": [
+				'import { useEffect as useMountEffect } from "react";',
+				"export function Probe() {",
+				"  useMountEffect(() => {}, []);",
+				"  return null;",
+				"}",
+			].join("\n"),
+		});
 
-    expect(results["packages/diagram/core/src/effect-probe.ts"]).toEqual([
-      "eslint(no-restricted-imports)",
-    ]);
-    expect(results["packages/svg-excalidraw/src/effect-probe.ts"]).toEqual([
-      "eslint(no-restricted-imports)",
-    ]);
-    expect(
-      results["packages/diagram/agent/src/stable-effect-probe.ts"],
-    ).toEqual([]);
-    expect(
-      results["packages/diagram/agent/src/unstable-effect-probe.ts"],
-    ).toEqual(["eslint(no-restricted-imports)"]);
-    expect(
-      results["packages/diagram/agent/src/internal/effect-unstable-probe.ts"],
-    ).toEqual([]);
-    expect(
-      results["packages/diagram/renderer/src/deep-effect-probe.ts"],
-    ).toEqual([
-      "eslint(no-restricted-imports)",
-      "eslint(no-restricted-imports)",
-    ]);
-    expect(
-      results["packages/diagram/renderer/src/effect-type-probe.ts"],
-    ).toEqual([
-      "sketchi(no-restricted-import-types)",
-      "sketchi(no-restricted-import-types)",
-    ]);
-    expect(
-      results["packages/diagram/agent/src/deep-unstable-effect-probe.ts"],
-    ).toEqual([
-      "eslint(no-restricted-imports)",
-      "sketchi(no-restricted-import-types)",
-    ]);
-    expect(results["scripts/zod-probe.ts"]).toEqual([
-      "eslint(no-restricted-imports)",
-    ]);
-    expect(results["scripts/deep-zod-probe.ts"]).toEqual([
-      "eslint(no-restricted-imports)",
-    ]);
-    expect(results["apps/web/src/react-effect-probe.tsx"]).toEqual([
-      "sketchi(no-react-effects)",
-    ]);
-  });
+		expect(results["packages/diagram/core/src/effect-probe.ts"]).toEqual([
+			"eslint(no-restricted-imports)",
+		]);
+		expect(results["packages/svg-excalidraw/src/effect-probe.ts"]).toEqual([
+			"eslint(no-restricted-imports)",
+		]);
+		expect(results["packages/diagram/agent/src/stable-effect-probe.ts"]).toEqual([]);
+		expect(results["packages/diagram/agent/src/unstable-effect-probe.ts"]).toEqual([
+			"eslint(no-restricted-imports)",
+		]);
+		expect(results["packages/diagram/agent/src/internal/effect-unstable-probe.ts"]).toEqual([]);
+		expect(results["packages/diagram/renderer/src/deep-effect-probe.ts"]).toEqual([
+			"eslint(no-restricted-imports)",
+			"eslint(no-restricted-imports)",
+		]);
+		expect(results["packages/diagram/renderer/src/effect-type-probe.ts"]).toEqual([
+			"sketchi(no-restricted-import-types)",
+			"sketchi(no-restricted-import-types)",
+		]);
+		expect(results["packages/diagram/agent/src/deep-unstable-effect-probe.ts"]).toEqual([
+			"eslint(no-restricted-imports)",
+			"sketchi(no-restricted-import-types)",
+		]);
+		expect(results["scripts/zod-probe.ts"]).toEqual(["eslint(no-restricted-imports)"]);
+		expect(results["scripts/deep-zod-probe.ts"]).toEqual(["eslint(no-restricted-imports)"]);
+		expect(results["apps/web/src/react-effect-probe.tsx"]).toEqual(["sketchi(no-react-effects)"]);
+	});
 
-  it("requires a reason on every lint suppression", () => {
-    const directive = /(?:oxlint|eslint)-disable(?:-next-line|-line)?\b(.*)/g;
-    const unreasoned: string[] = [];
-    for (const sourceFile of globSync(
-      ["apps", "packages", "scripts", "tools"].map(
-        (root) => `${root}/**/*.{ts,tsx,mts,cts,js,mjs,cjs}`,
-      ),
-      {
-        cwd: workspaceRoot,
-        exclude: [
-          "**/node_modules/**",
-          "**/dist/**",
-          "**/.output/**",
-          "**/.wrangler/**",
-          "**/routeTree.gen.ts",
-        ],
-      },
-    )) {
-      const source = readFileSync(path.join(workspaceRoot, sourceFile), "utf8");
-      for (const match of source.matchAll(directive)) {
-        if (!/\s--\s+\S/.test(match[1] ?? "")) {
-          unreasoned.push(`${sourceFile}: ${match[0].trim()}`);
-        }
-      }
-    }
-    expect(unreasoned).toEqual([]);
-  });
+	it("requires a reason on every lint suppression", () => {
+		const directive = /(?:oxlint|eslint)-disable(?:-next-line|-line)?\b(.*)/g;
+		const unreasoned: string[] = [];
+		for (const sourceFile of globSync(
+			["apps", "packages", "scripts", "tools"].map(
+				(root) => `${root}/**/*.{ts,tsx,mts,cts,js,mjs,cjs}`,
+			),
+			{
+				cwd: workspaceRoot,
+				exclude: [
+					"**/node_modules/**",
+					"**/dist/**",
+					"**/.output/**",
+					"**/.wrangler/**",
+					"**/routeTree.gen.ts",
+				],
+			},
+		)) {
+			const source = readFileSync(path.join(workspaceRoot, sourceFile), "utf8");
+			for (const match of source.matchAll(directive)) {
+				if (!/\s--\s+\S/.test(match[1] ?? "")) {
+					unreasoned.push(`${sourceFile}: ${match[0].trim()}`);
+				}
+			}
+		}
+		expect(unreasoned).toEqual([]);
+	});
 });

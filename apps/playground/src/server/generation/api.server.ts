@@ -1,16 +1,16 @@
 import "@tanstack/react-start/server-only";
 
 import type {
-  BuildFlowchartResult,
-  BuildMindmapResult,
-  BuildSequenceDiagramResult,
+	BuildFlowchartResult,
+	BuildMindmapResult,
+	BuildSequenceDiagramResult,
 } from "@sketchi/diagram-agent";
 import {
-  extractJsonObject,
-  DiagramGenerationRequest,
-  type DiagramGenerationCandidate,
-  type DiagramGenerationError,
-  type DiagramGenerationType,
+	extractJsonObject,
+	DiagramGenerationRequest,
+	type DiagramGenerationCandidate,
+	type DiagramGenerationError,
+	type DiagramGenerationType,
 } from "@sketchi/diagram-generation";
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { Effect, Result, Schema } from "effect";
@@ -19,487 +19,457 @@ import { resultHttpStatus } from "../runtime/http-status.server";
 import { readBoundedJson } from "../runtime/request-body.server";
 import { PlaygroundCodeMode } from "../codemode/service.server";
 import {
-  codeModeUsageResponseHeaders,
-  PlaygroundCodeModeUsage,
+	codeModeUsageResponseHeaders,
+	PlaygroundCodeModeUsage,
 } from "../codemode/usage-events.server";
 import { PlaygroundBindings, PlaygroundClock } from "../runtime/context.server";
 import {
-  flowchartDocumentInput,
-  mindmapDocumentInput,
-  PlaygroundGeneration,
-  sequenceDocumentInput,
+	flowchartDocumentInput,
+	mindmapDocumentInput,
+	PlaygroundGeneration,
+	sequenceDocumentInput,
 } from "./service.server";
 
 export const MAX_GENERATE_REQUEST_BYTES = 32 * 1024;
 export const MAX_GENERATE_PROMPT_LENGTH = 8_000;
 
-type BuildResult =
-  BuildFlowchartResult | BuildMindmapResult | BuildSequenceDiagramResult;
+type BuildResult = BuildFlowchartResult | BuildMindmapResult | BuildSequenceDiagramResult;
 type BuiltArtifact = Extract<BuildResult, { readonly ok: true }>["artifact"];
 
 type GenerateFailureStatus =
-  | "invalid_input"
-  | "provider_failed"
-  | "generation_timeout"
-  | "unsupported_diagram_type"
-  | "malformed_output"
-  | "invalid_generated_document"
-  | "quality_failed"
-  | "render_failed"
-  | "export_failed"
-  | "storage_failed";
+	| "invalid_input"
+	| "provider_failed"
+	| "generation_timeout"
+	| "unsupported_diagram_type"
+	| "malformed_output"
+	| "invalid_generated_document"
+	| "quality_failed"
+	| "render_failed"
+	| "export_failed"
+	| "storage_failed";
 
 interface GenerateIssue {
-  readonly code: string;
-  readonly severity: "error";
-  readonly stage: "input" | "generation" | "build";
-  readonly message: string;
-  readonly hint: string;
+	readonly code: string;
+	readonly severity: "error";
+	readonly stage: "input" | "generation" | "build";
+	readonly message: string;
+	readonly hint: string;
 }
 
 interface GenerateFailure {
-  readonly ok: false;
-  readonly status: GenerateFailureStatus;
-  readonly issues: ReadonlyArray<GenerateIssue>;
+	readonly ok: false;
+	readonly status: GenerateFailureStatus;
+	readonly issues: ReadonlyArray<GenerateIssue>;
 }
 
 interface GenerateSuccess {
-  readonly ok: true;
-  readonly status: "generated";
-  readonly diagram: {
-    readonly document: {
-      readonly type: DiagramGenerationType;
-      readonly spec: unknown;
-    };
-    readonly scene: unknown;
-    readonly excalidraw: unknown;
-  };
-  readonly generation: { readonly model: string; readonly provider: string };
+	readonly ok: true;
+	readonly status: "generated";
+	readonly diagram: {
+		readonly document: {
+			readonly type: DiagramGenerationType;
+			readonly spec: unknown;
+		};
+		readonly scene: unknown;
+		readonly excalidraw: unknown;
+	};
+	readonly generation: { readonly model: string; readonly provider: string };
 }
 
 type GenerateResult = GenerateSuccess | GenerateFailure;
 
 const GenerateRequestSchema = Schema.Struct({
-  cacheMode: Schema.optional(Schema.Literals(["default", "fresh"])),
-  prompt: Schema.String,
-  type: Schema.optional(
-    Schema.Literals([
-      "architecture",
-      "er",
-      "flowchart",
-      "mindmap",
-      "sequence",
-      "state-machine",
-      "swimlane",
-    ]),
-  ),
-  model: Schema.optional(DiagramGenerationRequest.fields.model),
+	cacheMode: Schema.optional(Schema.Literals(["default", "fresh"])),
+	prompt: Schema.String,
+	type: Schema.optional(
+		Schema.Literals([
+			"architecture",
+			"er",
+			"flowchart",
+			"mindmap",
+			"sequence",
+			"state-machine",
+			"swimlane",
+		]),
+	),
+	model: Schema.optional(DiagramGenerationRequest.fields.model),
 });
-const decodeGenerateRequest = Schema.decodeUnknownResult(
-  GenerateRequestSchema,
-  {
-    errors: "all",
-  },
-);
+const decodeGenerateRequest = Schema.decodeUnknownResult(GenerateRequestSchema, {
+	errors: "all",
+});
 
 function issue(
-  code: string,
-  stage: GenerateIssue["stage"],
-  message: string,
-  hint: string,
+	code: string,
+	stage: GenerateIssue["stage"],
+	message: string,
+	hint: string,
 ): GenerateIssue {
-  return { code, severity: "error", stage, message, hint };
+	return { code, severity: "error", stage, message, hint };
 }
 
 function failure(
-  status: GenerateFailureStatus,
-  issues: ReadonlyArray<GenerateIssue>,
+	status: GenerateFailureStatus,
+	issues: ReadonlyArray<GenerateIssue>,
 ): GenerateFailure {
-  return { ok: false, status, issues };
+	return { ok: false, status, issues };
 }
 
-function jsonResponse(
-  body: unknown,
-  status: number,
-  extraHeaders: HeadersInit = {},
-): Response {
-  const headers = new Headers(extraHeaders);
-  headers.set("Cache-Control", "no-store");
-  return Response.json(body, { status, headers });
+function jsonResponse(body: unknown, status: number, extraHeaders: HeadersInit = {}): Response {
+	const headers = new Headers(extraHeaders);
+	headers.set("Cache-Control", "no-store");
+	return Response.json(body, { status, headers });
 }
 
-function generationErrorFailure(
-  error: DiagramGenerationError,
-): GenerateFailure {
-  switch (error._tag) {
-    case "DiagramGenerationConfigurationError":
-    case "DiagramGenerationHttpError":
-    case "DiagramGenerationTransportError":
-      return failure("provider_failed", [
-        issue(
-          "provider_failed",
-          "generation",
-          "The generation provider could not complete the request.",
-          "Retry once; if it persists, try a shorter or clearer prompt.",
-        ),
-      ]);
-    case "DiagramGenerationTimeoutError":
-      return failure("generation_timeout", [
-        issue(
-          "generation_timeout",
-          "generation",
-          "The generation provider did not respond in time.",
-          "Retry once; if it persists, try a shorter prompt.",
-        ),
-      ]);
-    case "DiagramGenerationResponseError":
-      return failure("malformed_output", [
-        issue(
-          "malformed_output",
-          "generation",
-          "The generation provider returned an unreadable response.",
-          "Retry once; if it persists, try another prompt.",
-        ),
-      ]);
-    case "DiagramGenerationInputError":
-      return failure("invalid_input", [
-        issue(
-          "invalid_input",
-          "input",
-          "The generation request could not be prepared.",
-          "Send a concrete prompt describing one diagram.",
-        ),
-      ]);
-  }
+function generationErrorFailure(error: DiagramGenerationError): GenerateFailure {
+	switch (error._tag) {
+		case "DiagramGenerationConfigurationError":
+		case "DiagramGenerationHttpError":
+		case "DiagramGenerationTransportError":
+			return failure("provider_failed", [
+				issue(
+					"provider_failed",
+					"generation",
+					"The generation provider could not complete the request.",
+					"Retry once; if it persists, try a shorter or clearer prompt.",
+				),
+			]);
+		case "DiagramGenerationTimeoutError":
+			return failure("generation_timeout", [
+				issue(
+					"generation_timeout",
+					"generation",
+					"The generation provider did not respond in time.",
+					"Retry once; if it persists, try a shorter prompt.",
+				),
+			]);
+		case "DiagramGenerationResponseError":
+			return failure("malformed_output", [
+				issue(
+					"malformed_output",
+					"generation",
+					"The generation provider returned an unreadable response.",
+					"Retry once; if it persists, try another prompt.",
+				),
+			]);
+		case "DiagramGenerationInputError":
+			return failure("invalid_input", [
+				issue(
+					"invalid_input",
+					"input",
+					"The generation request could not be prepared.",
+					"Send a concrete prompt describing one diagram.",
+				),
+			]);
+	}
 }
 
 function malformedCandidateFailure(
-  candidate: DiagramGenerationCandidate,
+	candidate: DiagramGenerationCandidate,
 ): GenerateFailure | undefined {
-  if (candidate.diagram || candidate.intent?.nativeKind === null) {
-    return undefined;
-  }
-  const canParse = (() => {
-    try {
-      extractJsonObject(candidate.text);
-      return true;
-    } catch {
-      return false;
-    }
-  })();
-  const diagnostics = candidate.diagnostics.slice(0, 8);
-  return failure(
-    "malformed_output",
-    diagnostics.length > 0
-      ? diagnostics.map((diagnostic) =>
-          issue(
-            "malformed_output",
-            "generation",
-            diagnostic,
-            "Return one complete diagram JSON object that resolves this diagnostic.",
-          ),
-        )
-      : [
-          issue(
-            "malformed_output",
-            "generation",
-            canParse
-              ? "The generation provider output did not describe a valid diagram."
-              : "The generation provider output did not contain one JSON object.",
-            "Retry once; if it persists, try another prompt.",
-          ),
-        ],
-  );
+	if (candidate.diagram || candidate.intent?.nativeKind === null) {
+		return undefined;
+	}
+	const canParse = (() => {
+		try {
+			extractJsonObject(candidate.text);
+			return true;
+		} catch {
+			return false;
+		}
+	})();
+	const diagnostics = candidate.diagnostics.slice(0, 8);
+	return failure(
+		"malformed_output",
+		diagnostics.length > 0
+			? diagnostics.map((diagnostic) =>
+					issue(
+						"malformed_output",
+						"generation",
+						diagnostic,
+						"Return one complete diagram JSON object that resolves this diagnostic.",
+					),
+				)
+			: [
+					issue(
+						"malformed_output",
+						"generation",
+						canParse
+							? "The generation provider output did not describe a valid diagram."
+							: "The generation provider output did not contain one JSON object.",
+						"Retry once; if it persists, try another prompt.",
+					),
+				],
+	);
 }
 
 function unsupportedCandidateFailure(
-  candidate: DiagramGenerationCandidate,
+	candidate: DiagramGenerationCandidate,
 ): GenerateFailure | undefined {
-  const intent = candidate.intent;
-  if (!intent || intent.nativeKind !== null || candidate.error)
-    return undefined;
-  return failure("unsupported_diagram_type", [
-    issue(
-      "unsupported_diagram_type",
-      "generation",
-      `Sketchi does not natively support ${intent.requestedKind} generation.`,
-      "Request a flowchart, mindmap, or sequence diagram instead.",
-    ),
-  ]);
+	const intent = candidate.intent;
+	if (!intent || intent.nativeKind !== null || candidate.error) return undefined;
+	return failure("unsupported_diagram_type", [
+		issue(
+			"unsupported_diagram_type",
+			"generation",
+			`Sketchi does not natively support ${intent.requestedKind} generation.`,
+			"Request a flowchart, mindmap, or sequence diagram instead.",
+		),
+	]);
 }
 
-function rejectedIntentFailure(
-  candidate: DiagramGenerationCandidate,
-): GenerateFailure | undefined {
-  if (!candidate.intent || !candidate.error) return undefined;
-  const diagnostics = candidate.diagnostics.slice(0, 8);
-  return failure(
-    "quality_failed",
-    diagnostics.map((diagnostic) =>
-      issue(
-        "intent_contract_not_met",
-        "generation",
-        diagnostic,
-        "Return one artifact that satisfies the typed intent plan and explicit type authority.",
-      ),
-    ),
-  );
+function rejectedIntentFailure(candidate: DiagramGenerationCandidate): GenerateFailure | undefined {
+	if (!candidate.intent || !candidate.error) return undefined;
+	const diagnostics = candidate.diagnostics.slice(0, 8);
+	return failure(
+		"quality_failed",
+		diagnostics.map((diagnostic) =>
+			issue(
+				"intent_contract_not_met",
+				"generation",
+				diagnostic,
+				"Return one artifact that satisfies the typed intent plan and explicit type authority.",
+			),
+		),
+	);
 }
 
-function buildFailure(
-  result: Extract<BuildResult, { ok: false }>,
-): GenerateFailure {
-  const issues = result.issues.map((entry) =>
-    issue(
-      entry.code,
-      "build",
-      entry.message,
-      entry.hint ?? "Refine the prompt and retry.",
-    ),
-  );
-  switch (result.status) {
-    case "invalid_input":
-    case "invalid_flowchart":
-    case "invalid_mindmap":
-    case "invalid_sequence":
-      return failure("invalid_generated_document", issues);
-    case "quality_failed":
-      return failure("quality_failed", issues);
-    case "render_failed":
-      return failure("render_failed", issues);
-    case "export_failed":
-      return failure("export_failed", issues);
-    case "storage_failed":
-      return failure("storage_failed", issues);
-  }
+function buildFailure(result: Extract<BuildResult, { ok: false }>): GenerateFailure {
+	const issues = result.issues.map((entry) =>
+		issue(entry.code, "build", entry.message, entry.hint ?? "Refine the prompt and retry."),
+	);
+	switch (result.status) {
+		case "invalid_input":
+		case "invalid_flowchart":
+		case "invalid_mindmap":
+		case "invalid_sequence":
+			return failure("invalid_generated_document", issues);
+		case "quality_failed":
+			return failure("quality_failed", issues);
+		case "render_failed":
+			return failure("render_failed", issues);
+		case "export_failed":
+			return failure("export_failed", issues);
+		case "storage_failed":
+			return failure("storage_failed", issues);
+	}
 }
 
-function inlineArtifact(
-  artifact: BuiltArtifact,
-  format: "scene" | "excalidraw",
-): unknown {
-  const ref = artifact.formats.find((candidate) => candidate.format === format);
-  return ref?.inline;
+function inlineArtifact(artifact: BuiltArtifact, format: "scene" | "excalidraw"): unknown {
+	const ref = artifact.formats.find((candidate) => candidate.format === format);
+	return ref?.inline;
 }
 
-export const handleGenerateDiagramRequest = Effect.fn(
-  "playground.http.generate",
-)(function* (request: Request) {
-  const clock = yield* PlaygroundClock;
-  const codeMode = yield* PlaygroundCodeMode;
-  const generation = yield* PlaygroundGeneration;
-  const usage = yield* PlaygroundCodeModeUsage;
-  const env = yield* PlaygroundBindings;
-  const usageContext = yield* usage.createContext;
-  const startedAt = yield* clock.nowMillis;
+export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate")(function* (
+	request: Request,
+) {
+	const clock = yield* PlaygroundClock;
+	const codeMode = yield* PlaygroundCodeMode;
+	const generation = yield* PlaygroundGeneration;
+	const usage = yield* PlaygroundCodeModeUsage;
+	const env = yield* PlaygroundBindings;
+	const usageContext = yield* usage.createContext;
+	const startedAt = yield* clock.nowMillis;
 
-  const finish = (requestBody: unknown, result: GenerateResult) =>
-    Effect.gen(function* () {
-      const status = resultHttpStatus(result);
-      const finishedAt = yield* clock.nowMillis;
-      yield* usage.capture({
-        context: usageContext,
-        durationMs: finishedAt - startedAt,
-        operation: "generateDiagram",
-        requestBody,
-        responseBody: result,
-        statusCode: status,
-        surface: "api",
-      });
-      return jsonResponse(
-        result,
-        status,
-        codeModeUsageResponseHeaders(usageContext),
-      );
-    });
+	const finish = (requestBody: unknown, result: GenerateResult) =>
+		Effect.gen(function* () {
+			const status = resultHttpStatus(result);
+			const finishedAt = yield* clock.nowMillis;
+			yield* usage.capture({
+				context: usageContext,
+				durationMs: finishedAt - startedAt,
+				operation: "generateDiagram",
+				requestBody,
+				responseBody: result,
+				statusCode: status,
+				surface: "api",
+			});
+			return jsonResponse(result, status, codeModeUsageResponseHeaders(usageContext));
+		});
 
-  const bounded = yield* readBoundedJson(request, MAX_GENERATE_REQUEST_BYTES);
-  if (bounded._tag === "TooLarge") {
-    return yield* finish(
-      { omitted: true },
-      failure("invalid_input", [
-        issue(
-          "request_too_large",
-          "input",
-          `The generate request exceeds the ${MAX_GENERATE_REQUEST_BYTES}-byte limit.`,
-          "Send a shorter prompt.",
-        ),
-      ]),
-    );
-  }
-  if (bounded._tag === "InvalidJson") {
-    return yield* finish(
-      {},
-      failure("invalid_input", [
-        issue(
-          "invalid_json",
-          "input",
-          "The generate request body was not valid JSON.",
-          "Send a JSON object with a prompt field.",
-        ),
-      ]),
-    );
-  }
+	const bounded = yield* readBoundedJson(request, MAX_GENERATE_REQUEST_BYTES);
+	if (bounded._tag === "TooLarge") {
+		return yield* finish(
+			{ omitted: true },
+			failure("invalid_input", [
+				issue(
+					"request_too_large",
+					"input",
+					`The generate request exceeds the ${MAX_GENERATE_REQUEST_BYTES}-byte limit.`,
+					"Send a shorter prompt.",
+				),
+			]),
+		);
+	}
+	if (bounded._tag === "InvalidJson") {
+		return yield* finish(
+			{},
+			failure("invalid_input", [
+				issue(
+					"invalid_json",
+					"input",
+					"The generate request body was not valid JSON.",
+					"Send a JSON object with a prompt field.",
+				),
+			]),
+		);
+	}
 
-  const rawBody = bounded.body;
-  const decoded = decodeGenerateRequest(rawBody);
-  if (Result.isFailure(decoded)) {
-    return yield* finish(
-      rawBody,
-      failure("invalid_input", [
-        issue(
-          "invalid_input",
-          "input",
-          "The generate request must include a string prompt and an optional type of flowchart, mindmap, or sequence.",
-          'Send { "prompt": "...", "type": "sequence" }.',
-        ),
-      ]),
-    );
-  }
-  const input = decoded.success;
-  const prompt = input.prompt.trim();
-  if (!prompt || prompt.length > MAX_GENERATE_PROMPT_LENGTH) {
-    return yield* finish(
-      rawBody,
-      failure("invalid_input", [
-        issue(
-          "invalid_input",
-          "input",
-          prompt
-            ? `The prompt exceeds the ${MAX_GENERATE_PROMPT_LENGTH}-character limit.`
-            : "The prompt must not be empty.",
-          "Send a concrete prompt describing one diagram.",
-        ),
-      ]),
-    );
-  }
-  if (
-    input.type &&
-    input.type !== "flowchart" &&
-    input.type !== "mindmap" &&
-    input.type !== "sequence"
-  ) {
-    return yield* finish(
-      rawBody,
-      failure("unsupported_diagram_type", [
-        issue(
-          "unsupported_diagram_type",
-          "input",
-          `Sketchi does not natively support ${input.type} generation.`,
-          "Request a flowchart, mindmap, or sequence diagram instead.",
-        ),
-      ]),
-    );
-  }
-  const generationInput = {
-    ...(input.cacheMode ? { cacheMode: input.cacheMode } : {}),
-    prompt,
-    ...(input.type ? { type: input.type } : {}),
-    ...(input.model ? { model: input.model } : {}),
-  };
+	const rawBody = bounded.body;
+	const decoded = decodeGenerateRequest(rawBody);
+	if (Result.isFailure(decoded)) {
+		return yield* finish(
+			rawBody,
+			failure("invalid_input", [
+				issue(
+					"invalid_input",
+					"input",
+					"The generate request must include a string prompt and an optional type of flowchart, mindmap, or sequence.",
+					'Send { "prompt": "...", "type": "sequence" }.',
+				),
+			]),
+		);
+	}
+	const input = decoded.success;
+	const prompt = input.prompt.trim();
+	if (!prompt || prompt.length > MAX_GENERATE_PROMPT_LENGTH) {
+		return yield* finish(
+			rawBody,
+			failure("invalid_input", [
+				issue(
+					"invalid_input",
+					"input",
+					prompt
+						? `The prompt exceeds the ${MAX_GENERATE_PROMPT_LENGTH}-character limit.`
+						: "The prompt must not be empty.",
+					"Send a concrete prompt describing one diagram.",
+				),
+			]),
+		);
+	}
+	if (
+		input.type &&
+		input.type !== "flowchart" &&
+		input.type !== "mindmap" &&
+		input.type !== "sequence"
+	) {
+		return yield* finish(
+			rawBody,
+			failure("unsupported_diagram_type", [
+				issue(
+					"unsupported_diagram_type",
+					"input",
+					`Sketchi does not natively support ${input.type} generation.`,
+					"Request a flowchart, mindmap, or sequence diagram instead.",
+				),
+			]),
+		);
+	}
+	const generationInput = {
+		...(input.cacheMode ? { cacheMode: input.cacheMode } : {}),
+		prompt,
+		...(input.type ? { type: input.type } : {}),
+		...(input.model ? { model: input.model } : {}),
+	};
 
-  const candidateResult = yield* withTelemetryCorrelation(
-    generation.generate(generationInput),
-    { attemptId: usageContext.attemptId, runId: usageContext.runId },
-  ).pipe(
-    Effect.match({
-      onFailure: (error) => ({ ok: false as const, error }),
-      onSuccess: (candidate) => ({ ok: true as const, candidate }),
-    }),
-  );
-  if (!candidateResult.ok) {
-    return yield* finish(
-      generationInput,
-      generationErrorFailure(candidateResult.error),
-    );
-  }
-  const candidate = candidateResult.candidate;
-  const unsupported = unsupportedCandidateFailure(candidate);
-  if (unsupported) {
-    return yield* finish(generationInput, unsupported);
-  }
-  const rejectedIntent = rejectedIntentFailure(candidate);
-  if (rejectedIntent) {
-    return yield* finish(generationInput, rejectedIntent);
-  }
-  const malformed = malformedCandidateFailure(candidate);
-  if (malformed || !candidate.diagram) {
-    return yield* finish(
-      generationInput,
-      malformed ??
-        failure("malformed_output", [
-          issue(
-            "malformed_output",
-            "generation",
-            "The generation provider output did not describe a valid diagram.",
-            "Retry once; if it persists, try another prompt.",
-          ),
-        ]),
-    );
-  }
-  if (input.type && candidate.diagram.type !== input.type) {
-    return yield* finish(
-      generationInput,
-      failure("invalid_generated_document", [
-        issue(
-          "invalid_generated_document",
-          "generation",
-          `The generation provider returned a ${candidate.diagram.type} for a ${input.type} request.`,
-          "Retry once; if it persists, rephrase the prompt.",
-        ),
-      ]),
-    );
-  }
-  const type: DiagramGenerationType = candidate.diagram.type;
+	const candidateResult = yield* withTelemetryCorrelation(generation.generate(generationInput), {
+		attemptId: usageContext.attemptId,
+		runId: usageContext.runId,
+	}).pipe(
+		Effect.match({
+			onFailure: (error) => ({ ok: false as const, error }),
+			onSuccess: (candidate) => ({ ok: true as const, candidate }),
+		}),
+	);
+	if (!candidateResult.ok) {
+		return yield* finish(generationInput, generationErrorFailure(candidateResult.error));
+	}
+	const candidate = candidateResult.candidate;
+	const unsupported = unsupportedCandidateFailure(candidate);
+	if (unsupported) {
+		return yield* finish(generationInput, unsupported);
+	}
+	const rejectedIntent = rejectedIntentFailure(candidate);
+	if (rejectedIntent) {
+		return yield* finish(generationInput, rejectedIntent);
+	}
+	const malformed = malformedCandidateFailure(candidate);
+	if (malformed || !candidate.diagram) {
+		return yield* finish(
+			generationInput,
+			malformed ??
+				failure("malformed_output", [
+					issue(
+						"malformed_output",
+						"generation",
+						"The generation provider output did not describe a valid diagram.",
+						"Retry once; if it persists, try another prompt.",
+					),
+				]),
+		);
+	}
+	if (input.type && candidate.diagram.type !== input.type) {
+		return yield* finish(
+			generationInput,
+			failure("invalid_generated_document", [
+				issue(
+					"invalid_generated_document",
+					"generation",
+					`The generation provider returned a ${candidate.diagram.type} for a ${input.type} request.`,
+					"Retry once; if it persists, rephrase the prompt.",
+				),
+			]),
+		);
+	}
+	const type: DiagramGenerationType = candidate.diagram.type;
 
-  const documentInput =
-    candidate.diagram.type === "flowchart"
-      ? flowchartDocumentInput(candidate.diagram)
-      : candidate.diagram.type === "mindmap"
-        ? mindmapDocumentInput(candidate.diagram)
-        : sequenceDocumentInput(candidate.diagram);
-  const spec = (documentInput as { readonly spec?: unknown } | undefined)?.spec;
-  const buildOptions = {
-    artifactFormats: ["scene", "excalidraw"],
-    inlineArtifacts: ["scene", "excalidraw"],
-  };
-  const buildResult: BuildResult = yield* type === "flowchart"
-    ? codeMode.buildFlowchart({ spec, options: buildOptions })
-    : type === "mindmap"
-      ? codeMode.buildMindmap({ spec, options: buildOptions })
-      : codeMode.buildSequenceDiagram({ spec, options: buildOptions });
-  if (!buildResult.ok) {
-    return yield* finish({ prompt, type, spec }, buildFailure(buildResult));
-  }
+	const documentInput =
+		candidate.diagram.type === "flowchart"
+			? flowchartDocumentInput(candidate.diagram)
+			: candidate.diagram.type === "mindmap"
+				? mindmapDocumentInput(candidate.diagram)
+				: sequenceDocumentInput(candidate.diagram);
+	const spec = (documentInput as { readonly spec?: unknown } | undefined)?.spec;
+	const buildOptions = {
+		artifactFormats: ["scene", "excalidraw"],
+		inlineArtifacts: ["scene", "excalidraw"],
+	};
+	const buildResult: BuildResult = yield* type === "flowchart"
+		? codeMode.buildFlowchart({ spec, options: buildOptions })
+		: type === "mindmap"
+			? codeMode.buildMindmap({ spec, options: buildOptions })
+			: codeMode.buildSequenceDiagram({ spec, options: buildOptions });
+	if (!buildResult.ok) {
+		return yield* finish({ prompt, type, spec }, buildFailure(buildResult));
+	}
 
-  const scene = inlineArtifact(buildResult.artifact, "scene");
-  const excalidraw = inlineArtifact(buildResult.artifact, "excalidraw");
-  if (scene === undefined || excalidraw === undefined) {
-    return yield* finish(
-      { prompt, type, spec },
-      failure("export_failed", [
-        issue(
-          "missing_inline_artifact",
-          "build",
-          "The generated diagram was built without the inline scene or Excalidraw artifact.",
-          "Retry once; if it persists, report the prompt.",
-        ),
-      ]),
-    );
-  }
+	const scene = inlineArtifact(buildResult.artifact, "scene");
+	const excalidraw = inlineArtifact(buildResult.artifact, "excalidraw");
+	if (scene === undefined || excalidraw === undefined) {
+		return yield* finish(
+			{ prompt, type, spec },
+			failure("export_failed", [
+				issue(
+					"missing_inline_artifact",
+					"build",
+					"The generated diagram was built without the inline scene or Excalidraw artifact.",
+					"Retry once; if it persists, report the prompt.",
+				),
+			]),
+		);
+	}
 
-  const success: GenerateSuccess = {
-    ok: true,
-    status: "generated",
-    diagram: {
-      document: { type, spec },
-      scene,
-      excalidraw,
-    },
-    generation: {
-      model: candidate.model || generation.defaultModel(env),
-      provider: candidate.provider,
-    },
-  };
-  return yield* finish({ prompt, type, spec }, success);
+	const success: GenerateSuccess = {
+		ok: true,
+		status: "generated",
+		diagram: {
+			document: { type, spec },
+			scene,
+			excalidraw,
+		},
+		generation: {
+			model: candidate.model || generation.defaultModel(env),
+			provider: candidate.provider,
+		},
+	};
+	return yield* finish({ prompt, type, spec }, success);
 });

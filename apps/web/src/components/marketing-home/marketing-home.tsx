@@ -4,25 +4,20 @@ import { FeatureGrid } from "../feature-grid/index.js";
 import { HomeHero } from "../home-hero/index.js";
 import { IconWall } from "../icon-wall/index.js";
 import { SiteShell } from "../site-shell/site-shell.js";
-import {
-  DEFAULT_WEB_SURFACE_URLS,
-  type WebSurfaceUrls,
-} from "../../lib/surface-urls";
+import { DEFAULT_WEB_SURFACE_URLS, type WebSurfaceUrls } from "../../lib/surface-urls";
 
 export interface MarketingHomeProps {
-  surfaceUrls?: WebSurfaceUrls;
+	surfaceUrls?: WebSurfaceUrls;
 }
 
-export function MarketingHome({
-  surfaceUrls = DEFAULT_WEB_SURFACE_URLS,
-}: MarketingHomeProps) {
-  return (
-    <SiteShell activePath="/" surfaceUrls={surfaceUrls}>
-      <HomeHero primaryHref={surfaceUrls.playground} />
-      <FeatureGrid />
-      <CliBand />
-      <IconWall iconsHref={surfaceUrls.icons} />
-      <CtaBand playgroundHref={surfaceUrls.playground} />
-    </SiteShell>
-  );
+export function MarketingHome({ surfaceUrls = DEFAULT_WEB_SURFACE_URLS }: MarketingHomeProps) {
+	return (
+		<SiteShell activePath="/" surfaceUrls={surfaceUrls}>
+			<HomeHero primaryHref={surfaceUrls.playground} />
+			<FeatureGrid />
+			<CliBand />
+			<IconWall iconsHref={surfaceUrls.icons} />
+			<CtaBand playgroundHref={surfaceUrls.playground} />
+		</SiteShell>
+	);
 }

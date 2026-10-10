@@ -30,68 +30,60 @@ const EMOJI_CLUSTER = /\p{Emoji_Presentation}|\uFE0F|\p{Regional_Indicator}|\u20
 const ZERO_WIDTH_CLUSTER = /^[\uFE00-\uFE0F\u200B-\u200D\u2060]+$/u;
 
 function isWide(codePoint: number): boolean {
-  return (
-    (codePoint >= 0x1100 && codePoint <= 0x115f) ||
-    (codePoint >= 0x2e80 && codePoint <= 0x303e) ||
-    (codePoint >= 0x3041 && codePoint <= 0x33ff) ||
-    (codePoint >= 0x3400 && codePoint <= 0x4dbf) ||
-    (codePoint >= 0x4e00 && codePoint <= 0x9fff) ||
-    (codePoint >= 0xa000 && codePoint <= 0xa4cf) ||
-    (codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
-    (codePoint >= 0xf900 && codePoint <= 0xfaff) ||
-    (codePoint >= 0xfe30 && codePoint <= 0xfe4f) ||
-    (codePoint >= 0xff00 && codePoint <= 0xff60) ||
-    (codePoint >= 0xffe0 && codePoint <= 0xffe6) ||
-    (codePoint >= 0x20000 && codePoint <= 0x3fffd)
-  );
+	return (
+		(codePoint >= 0x1100 && codePoint <= 0x115f) ||
+		(codePoint >= 0x2e80 && codePoint <= 0x303e) ||
+		(codePoint >= 0x3041 && codePoint <= 0x33ff) ||
+		(codePoint >= 0x3400 && codePoint <= 0x4dbf) ||
+		(codePoint >= 0x4e00 && codePoint <= 0x9fff) ||
+		(codePoint >= 0xa000 && codePoint <= 0xa4cf) ||
+		(codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
+		(codePoint >= 0xf900 && codePoint <= 0xfaff) ||
+		(codePoint >= 0xfe30 && codePoint <= 0xfe4f) ||
+		(codePoint >= 0xff00 && codePoint <= 0xff60) ||
+		(codePoint >= 0xffe0 && codePoint <= 0xffe6) ||
+		(codePoint >= 0x20000 && codePoint <= 0x3fffd)
+	);
 }
 
 function clusters(text: string): string[] {
-  return Array.from(graphemes.segment(text), (entry) => entry.segment);
+	return Array.from(graphemes.segment(text), (entry) => entry.segment);
 }
 
 function clusterUnits(cluster: string): number {
-  if (ZERO_WIDTH_CLUSTER.test(cluster)) {
-    return 0;
-  }
-  if (EMOJI_CLUSTER.test(cluster)) {
-    return EMOJI_GLYPH_UNITS;
-  }
-  return isWide(cluster.codePointAt(0) ?? 0)
-    ? WIDE_GLYPH_UNITS
-    : DEFAULT_GLYPH_UNITS;
+	if (ZERO_WIDTH_CLUSTER.test(cluster)) {
+		return 0;
+	}
+	if (EMOJI_CLUSTER.test(cluster)) {
+		return EMOJI_GLYPH_UNITS;
+	}
+	return isWide(cluster.codePointAt(0) ?? 0) ? WIDE_GLYPH_UNITS : DEFAULT_GLYPH_UNITS;
 }
 
 /** Estimated advance of one line in hundredths of an em. */
 export function textLineUnits(line: string): number {
-  return clusters(line).reduce(
-    (units, cluster) => units + clusterUnits(cluster),
-    0,
-  );
+	return clusters(line).reduce((units, cluster) => units + clusterUnits(cluster), 0);
 }
 
 function lineWidth(line: string, fontSize: number): number {
-  let defaultClusters = 0;
-  let otherUnits = 0;
-  for (const cluster of clusters(line)) {
-    const units = clusterUnits(cluster);
-    if (units === DEFAULT_GLYPH_UNITS) {
-      defaultClusters += 1;
-    } else {
-      otherUnits += units;
-    }
-  }
-  // Default-width glyphs keep the historical n * fontSize * 0.62 expression,
-  // so Latin-only layouts stay byte-identical.
-  return (
-    defaultClusters * fontSize * (DEFAULT_GLYPH_UNITS / 100) +
-    (otherUnits * fontSize) / 100
-  );
+	let defaultClusters = 0;
+	let otherUnits = 0;
+	for (const cluster of clusters(line)) {
+		const units = clusterUnits(cluster);
+		if (units === DEFAULT_GLYPH_UNITS) {
+			defaultClusters += 1;
+		} else {
+			otherUnits += units;
+		}
+	}
+	// Default-width glyphs keep the historical n * fontSize * 0.62 expression,
+	// so Latin-only layouts stay byte-identical.
+	return defaultClusters * fontSize * (DEFAULT_GLYPH_UNITS / 100) + (otherUnits * fontSize) / 100;
 }
 
 /** Estimated width in pixels of the widest line. */
 export function estimateTextWidth(text: string, fontSize: number): number {
-  return Math.max(...text.split("\n").map((line) => lineWidth(line, fontSize)));
+	return Math.max(...text.split("\n").map((line) => lineWidth(line, fontSize)));
 }
 
 /**
@@ -99,72 +91,64 @@ export function estimateTextWidth(text: string, fontSize: number): number {
  * half the font size on both sides, so the box may stay at `maxWidth` while the
  * estimate fits within that padding; past it the box grows so no glyph clips.
  */
-export function boundLabelWidth(
-  text: string,
-  fontSize: number,
-  maxWidth: number,
-): number {
-  const estimate = estimateTextWidth(text, fontSize);
-  return Math.max(
-    1,
-    Math.min(maxWidth, Math.ceil(estimate)),
-    Math.ceil(estimate - fontSize),
-  );
+export function boundLabelWidth(text: string, fontSize: number, maxWidth: number): number {
+	const estimate = estimateTextWidth(text, fontSize);
+	return Math.max(1, Math.min(maxWidth, Math.ceil(estimate)), Math.ceil(estimate - fontSize));
 }
 
 function splitLongWord(word: string, maxUnits: number): string[] {
-  const chunks: string[] = [];
-  let current = "";
-  let currentUnits = 0;
-  for (const cluster of clusters(word)) {
-    const units = clusterUnits(cluster);
-    if (current && currentUnits + units > maxUnits) {
-      chunks.push(current);
-      current = "";
-      currentUnits = 0;
-    }
-    current += cluster;
-    currentUnits += units;
-  }
-  if (current) {
-    chunks.push(current);
-  }
-  return chunks;
+	const chunks: string[] = [];
+	let current = "";
+	let currentUnits = 0;
+	for (const cluster of clusters(word)) {
+		const units = clusterUnits(cluster);
+		if (current && currentUnits + units > maxUnits) {
+			chunks.push(current);
+			current = "";
+			currentUnits = 0;
+		}
+		current += cluster;
+		currentUnits += units;
+	}
+	if (current) {
+		chunks.push(current);
+	}
+	return chunks;
 }
 
 function wrapLine(line: string, maxUnits: number): string[] {
-  if (textLineUnits(line) <= maxUnits) {
-    return [line];
-  }
+	if (textLineUnits(line) <= maxUnits) {
+		return [line];
+	}
 
-  const wrapped: string[] = [];
-  let current = "";
+	const wrapped: string[] = [];
+	let current = "";
 
-  for (const word of line.split(" ")) {
-    if (textLineUnits(word) > maxUnits) {
-      if (current) {
-        wrapped.push(current);
-        current = "";
-      }
-      wrapped.push(...splitLongWord(word, maxUnits));
-      continue;
-    }
+	for (const word of line.split(" ")) {
+		if (textLineUnits(word) > maxUnits) {
+			if (current) {
+				wrapped.push(current);
+				current = "";
+			}
+			wrapped.push(...splitLongWord(word, maxUnits));
+			continue;
+		}
 
-    const candidate = current ? `${current} ${word}` : word;
-    if (textLineUnits(candidate) <= maxUnits) {
-      current = candidate;
-      continue;
-    }
+		const candidate = current ? `${current} ${word}` : word;
+		if (textLineUnits(candidate) <= maxUnits) {
+			current = candidate;
+			continue;
+		}
 
-    wrapped.push(current);
-    current = word;
-  }
+		wrapped.push(current);
+		current = word;
+	}
 
-  if (current) {
-    wrapped.push(current);
-  }
+	if (current) {
+		wrapped.push(current);
+	}
 
-  return wrapped;
+	return wrapped;
 }
 
 /**
@@ -172,19 +156,12 @@ function wrapLine(line: string, maxUnits: number): string[] {
  * clusters, which is also the correct break opportunity for unspaced CJK text.
  */
 export function wrapTextToUnits(text: string, maxUnits: number): string {
-  return text
-    .split("\n")
-    .flatMap((line) => wrapLine(line, maxUnits))
-    .join("\n");
+	return text
+		.split("\n")
+		.flatMap((line) => wrapLine(line, maxUnits))
+		.join("\n");
 }
 
-export function wrapTextToWidth(
-  text: string,
-  maxWidth: number,
-  fontSize: number,
-): string {
-  return wrapTextToUnits(
-    text,
-    Math.floor((maxWidth * 100) / fontSize + 1e-6),
-  );
+export function wrapTextToWidth(text: string, maxWidth: number, fontSize: number): string {
+	return wrapTextToUnits(text, Math.floor((maxWidth * 100) / fontSize + 1e-6));
 }

@@ -12,25 +12,17 @@ const distributionDirectory = resolve(workspaceRoot, "apps/cli/dist");
 
 await rm(packageDirectory, { force: true, recursive: true });
 await mkdir(packageDirectory, { recursive: true });
-await run(
-  "npm",
-  ["pack", distributionDirectory, "--pack-destination", packageDirectory],
-  {
-    cwd: workspaceRoot,
-    env: {
-      ...process.env,
-      npm_config_audit: "false",
-      npm_config_fund: "false",
-    },
-  },
-);
+await run("npm", ["pack", distributionDirectory, "--pack-destination", packageDirectory], {
+	cwd: workspaceRoot,
+	env: {
+		...process.env,
+		npm_config_audit: "false",
+		npm_config_fund: "false",
+	},
+});
 
-const archives = (await readdir(packageDirectory)).filter((name) =>
-  name.endsWith(".tgz"),
-);
+const archives = (await readdir(packageDirectory)).filter((name) => name.endsWith(".tgz"));
 if (archives.length !== 1) {
-  throw new Error(
-    `Expected one CLI package archive, found ${String(archives.length)}.`,
-  );
+	throw new Error(`Expected one CLI package archive, found ${String(archives.length)}.`);
 }
 process.stdout.write(`${resolve(packageDirectory, archives[0])}\n`);

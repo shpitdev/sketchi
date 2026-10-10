@@ -7,16 +7,15 @@ import { pageMeta } from "../../lib/site-meta";
 const agentId = "opencode" satisfies AgentSetupId;
 
 export const Route = createFileRoute("/agents/opencode")({
-  head: () =>
-    pageMeta({
-      title: "OpenCode setup - Sketchi",
-      description:
-        "Add Sketchi to OpenCode and turn prompts into editable diagrams.",
-      path: "/agents/opencode",
-    }),
-  component: OpenCodeRoute,
+	head: () =>
+		pageMeta({
+			title: "OpenCode setup - Sketchi",
+			description: "Add Sketchi to OpenCode and turn prompts into editable diagrams.",
+			path: "/agents/opencode",
+		}),
+	component: OpenCodeRoute,
 });
 
 function OpenCodeRoute() {
-  return <AgentSetupView agentId={agentId} />;
+	return <AgentSetupView agentId={agentId} />;
 }

@@ -3,6 +3,6 @@ import { mindmapFixture } from "./types/mindmap.js";
 import { parseIntermediateDiagram } from "./intermediate.js";
 
 export const diagramFixtures = [
-  parseIntermediateDiagram(flowchartFixture),
-  parseIntermediateDiagram(mindmapFixture),
+	parseIntermediateDiagram(flowchartFixture),
+	parseIntermediateDiagram(mindmapFixture),
 ];

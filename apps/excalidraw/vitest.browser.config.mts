@@ -8,51 +8,49 @@ const source = (path: string) => new URL(path, import.meta.url).pathname;
 const executablePath = process.env["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"];
 
 export default defineConfig({
-  cacheDir: source("../../node_modules/.vite/apps/excalidraw-browser"),
-  // Excalidraw fonts come from this server, as in the deployed apps.
-  plugins: [excalidrawFonts(), react()],
-  resolve: {
-    alias: [
-      {
-        find: "@sketchi/diagram-ui/styles.css",
-        replacement: source("../../packages/diagram/ui/src/styles.css"),
-      },
-      {
-        find: "@sketchi/diagram-core",
-        replacement: source("../../packages/diagram/core/src/index.ts"),
-      },
-      {
-        find: "@sketchi/diagram-renderer",
-        replacement: source("../../packages/diagram/renderer/src/index.ts"),
-      },
-      {
-        find: "@sketchi/diagram-excalidraw",
-        replacement: source("../../packages/diagram/excalidraw/src/index.ts"),
-      },
-      {
-        find: "@sketchi/diagram-ui",
-        replacement: source("../../packages/diagram/ui/src/index.ts"),
-      },
-      {
-        find: "@sketchi/svg-excalidraw",
-        replacement: source("../../packages/svg-excalidraw/src/index.ts"),
-      },
-    ],
-  },
-  test: {
-    name: "excalidraw-browser",
-    watch: false,
-    attachmentsDir: "../../.memory/vitest-attachments/excalidraw",
-    include: ["apps/excalidraw/src/**/*.browser.test.tsx"],
-    browser: {
-      enabled: true,
-      headless: true,
-      provider: playwright(
-        executablePath === undefined
-          ? {}
-          : { launchOptions: { executablePath } },
-      ),
-      instances: [{ browser: "chromium" }],
-    },
-  },
+	cacheDir: source("../../node_modules/.vite/apps/excalidraw-browser"),
+	// Excalidraw fonts come from this server, as in the deployed apps.
+	plugins: [excalidrawFonts(), react()],
+	resolve: {
+		alias: [
+			{
+				find: "@sketchi/diagram-ui/styles.css",
+				replacement: source("../../packages/diagram/ui/src/styles.css"),
+			},
+			{
+				find: "@sketchi/diagram-core",
+				replacement: source("../../packages/diagram/core/src/index.ts"),
+			},
+			{
+				find: "@sketchi/diagram-renderer",
+				replacement: source("../../packages/diagram/renderer/src/index.ts"),
+			},
+			{
+				find: "@sketchi/diagram-excalidraw",
+				replacement: source("../../packages/diagram/excalidraw/src/index.ts"),
+			},
+			{
+				find: "@sketchi/diagram-ui",
+				replacement: source("../../packages/diagram/ui/src/index.ts"),
+			},
+			{
+				find: "@sketchi/svg-excalidraw",
+				replacement: source("../../packages/svg-excalidraw/src/index.ts"),
+			},
+		],
+	},
+	test: {
+		name: "excalidraw-browser",
+		watch: false,
+		attachmentsDir: "../../.memory/vitest-attachments/excalidraw",
+		include: ["apps/excalidraw/src/**/*.browser.test.tsx"],
+		browser: {
+			enabled: true,
+			headless: true,
+			provider: playwright(
+				executablePath === undefined ? {} : { launchOptions: { executablePath } },
+			),
+			instances: [{ browser: "chromium" }],
+		},
+	},
 });

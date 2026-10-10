@@ -5,102 +5,92 @@ import ts from "typescript";
 import { generateCodeModeTypes, jsonSchemaType } from "./mcp-docs/types";
 import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagram-agent";
 import {
-  getCodeModeDocs,
-  searchCodeModeDocs,
-  SKETCHI_CODE_MODE_TYPES,
-  SKETCHI_CODE_MODE_VERSION,
+	getCodeModeDocs,
+	searchCodeModeDocs,
+	SKETCHI_CODE_MODE_TYPES,
+	SKETCHI_CODE_MODE_VERSION,
 } from "./mcp-docs.server";
 
 describe("Code Mode MCP docs", () => {
-  it("documents the harness-first execute contract", () => {
-    const docs = getCodeModeDocs({ topic: "execute" });
+	it("documents the harness-first execute contract", () => {
+		const docs = getCodeModeDocs({ topic: "execute" });
 
-    expect(docs.content).toContain("typed host tools");
-    expect(docs.content).toContain("sketchi.buildFlowchart");
-    expect(docs.content).toContain("sketchi.buildMindmap");
-    expect(docs.content).toContain("sketchi.buildSequenceDiagram");
-    expect(docs.content).toContain("sketchi.getArtifact");
-    expect(docs.content).toContain("sketchi.applyDiagramPatch");
-    expect(docs.content).toContain("Excalidraw and PNG URLs");
-    expect(docs.content).toContain("artifactDelivery");
-    expect(docs.content).toContain("finalResponseText");
-    expect(docs.content).toContain("Do not synthesize a Mermaid");
-    expect(docs.content).toContain("Do not call file/create/artifact tools");
-    expect(docs.examples.map((example) => example.code)).not.toEqual(
-      expect.arrayContaining([expect.stringMatching(/};\s*$/)]),
-    );
-    expect(docs.examples).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          title: "Accepted graph followed by visual patch",
-        }),
-      ]),
-    );
-  });
+		expect(docs.content).toContain("typed host tools");
+		expect(docs.content).toContain("sketchi.buildFlowchart");
+		expect(docs.content).toContain("sketchi.buildMindmap");
+		expect(docs.content).toContain("sketchi.buildSequenceDiagram");
+		expect(docs.content).toContain("sketchi.getArtifact");
+		expect(docs.content).toContain("sketchi.applyDiagramPatch");
+		expect(docs.content).toContain("Excalidraw and PNG URLs");
+		expect(docs.content).toContain("artifactDelivery");
+		expect(docs.content).toContain("finalResponseText");
+		expect(docs.content).toContain("Do not synthesize a Mermaid");
+		expect(docs.content).toContain("Do not call file/create/artifact tools");
+		expect(docs.examples.map((example) => example.code)).not.toEqual(
+			expect.arrayContaining([expect.stringMatching(/};\s*$/)]),
+		);
+		expect(docs.examples).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					title: "Accepted graph followed by visual patch",
+				}),
+			]),
+		);
+	});
 
-  it("emits a complete semantic-builder public type contract", () => {
-    expect(SKETCHI_CODE_MODE_VERSION).toBe("2026-09-04");
-    for (const operation of [
-      "BuildFlowchart",
-      "BuildMindmap",
-      "BuildSequenceDiagram",
-      "CreateCanvas",
-      "GetArtifact",
-      "ApplyDiagramPatch",
-    ]) {
-      expect(SKETCHI_CODE_MODE_TYPES).toContain(`type ${operation}Request =`);
-      expect(SKETCHI_CODE_MODE_TYPES).toContain(`type ${operation}Result =`);
-    }
-    for (const issueCode of [
-      "nonterminating_node",
-      "flowchart_too_large",
-      "request_too_large",
-    ]) {
-      expect(SKETCHI_CODE_MODE_TYPES).toContain(`"${issueCode}"`);
-    }
-    for (const operation of [
-      "buildFlowchart",
-      "buildMindmap",
-      "buildSequenceDiagram",
-      "createCanvas",
-      "getArtifact",
-      "applyDiagramPatch",
-    ]) {
-      expect(SKETCHI_CODE_MODE_TYPES).toContain(`${operation}(`);
-      expect(getCodeModeDocs({ topic: "overview" }).content).toContain(
-        operation,
-      );
-      expect(getCodeModeDocs({ topic: "execute" }).content).toContain(
-        operation,
-      );
-    }
-    expect(getCodeModeDocs({ topic: "buildMindmap" }).content).toContain(
-      "Do not supply coordinates, edges, or Excalidraw JSON",
-    );
-    expect(getCodeModeDocs({ topic: "buildMindmap" }).content).toContain(
-      "intentional output formats",
-    );
-    const sequenceDocs = getCodeModeDocs({ topic: "buildSequenceDiagram" });
-    expect(sequenceDocs.content).toContain("preserved left-to-right");
-    expect(sequenceDocs.content).toContain("preserved top-to-bottom");
-    expect(sequenceDocs.content).toContain("Self-referential messages");
-    expect(sequenceDocs.examples[0]?.code).toContain(
-      "sketchi.buildSequenceDiagram",
-    );
-    const canvasDocs = getCodeModeDocs({ topic: "createCanvas" });
-    expect(canvasDocs.content).toContain("never raw Excalidraw JSON");
-    expect(canvasDocs.examples[0]?.code).toContain("sketchi.createCanvas");
-  });
+	it("emits a complete semantic-builder public type contract", () => {
+		expect(SKETCHI_CODE_MODE_VERSION).toBe("2026-09-04");
+		for (const operation of [
+			"BuildFlowchart",
+			"BuildMindmap",
+			"BuildSequenceDiagram",
+			"CreateCanvas",
+			"GetArtifact",
+			"ApplyDiagramPatch",
+		]) {
+			expect(SKETCHI_CODE_MODE_TYPES).toContain(`type ${operation}Request =`);
+			expect(SKETCHI_CODE_MODE_TYPES).toContain(`type ${operation}Result =`);
+		}
+		for (const issueCode of ["nonterminating_node", "flowchart_too_large", "request_too_large"]) {
+			expect(SKETCHI_CODE_MODE_TYPES).toContain(`"${issueCode}"`);
+		}
+		for (const operation of [
+			"buildFlowchart",
+			"buildMindmap",
+			"buildSequenceDiagram",
+			"createCanvas",
+			"getArtifact",
+			"applyDiagramPatch",
+		]) {
+			expect(SKETCHI_CODE_MODE_TYPES).toContain(`${operation}(`);
+			expect(getCodeModeDocs({ topic: "overview" }).content).toContain(operation);
+			expect(getCodeModeDocs({ topic: "execute" }).content).toContain(operation);
+		}
+		expect(getCodeModeDocs({ topic: "buildMindmap" }).content).toContain(
+			"Do not supply coordinates, edges, or Excalidraw JSON",
+		);
+		expect(getCodeModeDocs({ topic: "buildMindmap" }).content).toContain(
+			"intentional output formats",
+		);
+		const sequenceDocs = getCodeModeDocs({ topic: "buildSequenceDiagram" });
+		expect(sequenceDocs.content).toContain("preserved left-to-right");
+		expect(sequenceDocs.content).toContain("preserved top-to-bottom");
+		expect(sequenceDocs.content).toContain("Self-referential messages");
+		expect(sequenceDocs.examples[0]?.code).toContain("sketchi.buildSequenceDiagram");
+		const canvasDocs = getCodeModeDocs({ topic: "createCanvas" });
+		expect(canvasDocs.content).toContain("never raw Excalidraw JSON");
+		expect(canvasDocs.examples[0]?.code).toContain("sketchi.createCanvas");
+	});
 
-  it("pins every generated field, optionality, literal and recursive reference to the package schemas", async () => {
-    const generated = generateCodeModeTypes();
-    expect(SKETCHI_CODE_MODE_TYPES).toBe(generated);
-    await expect(generated).toMatchFileSnapshot(
-      `${process.cwd()}/apps/playground/src/server/codemode/mcp-docs/code-mode-types.generated.txt`,
-    );
-    const source = ts.createSourceFile(
-      "code-mode-types.ts",
-      `${generated}
+	it("pins every generated field, optionality, literal and recursive reference to the package schemas", async () => {
+		const generated = generateCodeModeTypes();
+		expect(SKETCHI_CODE_MODE_TYPES).toBe(generated);
+		await expect(generated).toMatchFileSnapshot(
+			`${process.cwd()}/apps/playground/src/server/codemode/mcp-docs/code-mode-types.generated.txt`,
+		);
+		const source = ts.createSourceFile(
+			"code-mode-types.ts",
+			`${generated}
         type Assert<T extends true> = T;
         type Same<A, B> = [A] extends [B] ? [B] extends [A] ? true : false : false;
         type OptionalKeys<T> = {
@@ -114,187 +104,173 @@ describe("Code Mode MCP docs", () => {
         >;
         type CanvasRequestVersion = Assert<Same<CreateCanvasRequest["spec"]["version"], 1>>;
       `,
-      ts.ScriptTarget.Latest,
-      true,
-    );
-    const options: ts.CompilerOptions = {
-      noEmit: true,
-      types: [],
-      skipLibCheck: true,
-      target: ts.ScriptTarget.ESNext,
-    };
-    const host = ts.createCompilerHost(options);
-    const getSourceFile = host.getSourceFile.bind(host);
-    host.getSourceFile = (file, ...args) =>
-      file === "code-mode-types.ts" ? source : getSourceFile(file, ...args);
-    const program = ts.createProgram({
-      rootNames: ["code-mode-types.ts"],
-      options,
-      host,
-    });
-    expect(
-      ts
-        .getPreEmitDiagnostics(program)
-        .map((diagnostic) =>
-          ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
-        ),
-    ).toEqual([]);
-  });
+			ts.ScriptTarget.Latest,
+			true,
+		);
+		const options: ts.CompilerOptions = {
+			noEmit: true,
+			types: [],
+			skipLibCheck: true,
+			target: ts.ScriptTarget.ESNext,
+		};
+		const host = ts.createCompilerHost(options);
+		const getSourceFile = host.getSourceFile.bind(host);
+		host.getSourceFile = (file, ...args) =>
+			file === "code-mode-types.ts" ? source : getSourceFile(file, ...args);
+		const program = ts.createProgram({
+			rootNames: ["code-mode-types.ts"],
+			options,
+			host,
+		});
+		expect(
+			ts
+				.getPreEmitDiagnostics(program)
+				.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n")),
+		).toEqual([]);
+	});
 
-  it("reflects field-level schema changes and rejects unsupported shapes", () => {
-    expect(
-      jsonSchemaType(
-        {
-          type: "object",
-          additionalProperties: false,
-          properties: { label: { type: "string" } },
-          required: ["label"],
-        },
-        "Test",
-      ),
-    ).toBe('{ "label": string; }');
-    expect(
-      jsonSchemaType(
-        {
-          type: "object",
-          additionalProperties: false,
-          properties: { label: { type: "number" } },
-        },
-        "Test",
-      ),
-    ).toBe('{ "label"?: number; }');
-    expect(() => jsonSchemaType({ type: "future" }, "Test")).toThrow(
-      "Unsupported Code Mode JSON Schema type",
-    );
-  });
+	it("reflects field-level schema changes and rejects unsupported shapes", () => {
+		expect(
+			jsonSchemaType(
+				{
+					type: "object",
+					additionalProperties: false,
+					properties: { label: { type: "string" } },
+					required: ["label"],
+				},
+				"Test",
+			),
+		).toBe('{ "label": string; }');
+		expect(
+			jsonSchemaType(
+				{
+					type: "object",
+					additionalProperties: false,
+					properties: { label: { type: "number" } },
+				},
+				"Test",
+			),
+		).toBe('{ "label"?: number; }');
+		expect(() => jsonSchemaType({ type: "future" }, "Test")).toThrow(
+			"Unsupported Code Mode JSON Schema type",
+		);
+	});
 
-  it("keeps the published catalog complete for bounded build failures", () => {
-    const catalog = readFileSync("docs/mcp-tool-catalog.md", "utf8");
-    for (const declaration of [
-      "interface BuildMindmapRequest",
-      "type BuildMindmapResult",
-      "interface BuildSequenceDiagramRequest",
-      "buildSequenceDiagram",
-      "createCanvas",
-      "CreateCanvasRequest",
-      '"request_too_large"',
-      '"nonterminating_node"',
-      '"flowchart_too_large"',
-      '"mindmap_too_deep"',
-      '"mindmap_too_large"',
-    ]) {
-      expect(catalog).toContain(declaration);
-    }
-    expect(catalog).toContain("arbitrary typed canvas artifact");
-    expect(catalog).toContain("CanvasSpec v1");
-    expect(catalog).toContain("24 nodes");
-    expect(catalog).toContain("64 edges");
-    expect(catalog).toContain("256 KiB");
-  });
+	it("keeps the published catalog complete for bounded build failures", () => {
+		const catalog = readFileSync("docs/mcp-tool-catalog.md", "utf8");
+		for (const declaration of [
+			"interface BuildMindmapRequest",
+			"type BuildMindmapResult",
+			"interface BuildSequenceDiagramRequest",
+			"buildSequenceDiagram",
+			"createCanvas",
+			"CreateCanvasRequest",
+			'"request_too_large"',
+			'"nonterminating_node"',
+			'"flowchart_too_large"',
+			'"mindmap_too_deep"',
+			'"mindmap_too_large"',
+		]) {
+			expect(catalog).toContain(declaration);
+		}
+		expect(catalog).toContain("arbitrary typed canvas artifact");
+		expect(catalog).toContain("CanvasSpec v1");
+		expect(catalog).toContain("24 nodes");
+		expect(catalog).toContain("64 edges");
+		expect(catalog).toContain("256 KiB");
+	});
 
-  it("searches operation guidance and non-goals", () => {
-    const patchResults = searchCodeModeDocs({
-      query: "purple diamond selector",
-    });
-    expect(patchResults.results.map((result) => result.id)).toContain(
-      "applyDiagramPatch",
-    );
+	it("searches operation guidance and non-goals", () => {
+		const patchResults = searchCodeModeDocs({
+			query: "purple diamond selector",
+		});
+		expect(patchResults.results.map((result) => result.id)).toContain("applyDiagramPatch");
 
-    const logoResults = searchCodeModeDocs({ query: "brand logo" });
-    expect(logoResults.results.map((result) => result.id)).toContain(
-      "searchIcons",
-    );
-    expect(getCodeModeDocs({ topic: "buildFlowchart" }).content).toContain(
-      "sketchi.searchIcons",
-    );
-    expect(SKETCHI_CODE_MODE_TYPES).toContain(
-      "searchIcons(input: SearchIconsRequest): Promise<SearchIconsResult>;",
-    );
+		const logoResults = searchCodeModeDocs({ query: "brand logo" });
+		expect(logoResults.results.map((result) => result.id)).toContain("searchIcons");
+		expect(getCodeModeDocs({ topic: "buildFlowchart" }).content).toContain("sketchi.searchIcons");
+		expect(SKETCHI_CODE_MODE_TYPES).toContain(
+			"searchIcons(input: SearchIconsRequest): Promise<SearchIconsResult>;",
+		);
 
-    const managedResults = searchCodeModeDocs({
-      query: "convex managed threads",
-    });
-    expect(managedResults.results.map((result) => result.id)).toContain(
-      "managed-thread-non-goal",
-    );
+		const managedResults = searchCodeModeDocs({
+			query: "convex managed threads",
+		});
+		expect(managedResults.results.map((result) => result.id)).toContain("managed-thread-non-goal");
 
-    const finalArtifactResults = searchCodeModeDocs({
-      query: "do not create markdown mermaid final artifact url",
-    });
-    expect(finalArtifactResults.results.map((result) => result.id)).toContain(
-      "no-mermaid-wrapper-non-goal",
-    );
+		const finalArtifactResults = searchCodeModeDocs({
+			query: "do not create markdown mermaid final artifact url",
+		});
+		expect(finalArtifactResults.results.map((result) => result.id)).toContain(
+			"no-mermaid-wrapper-non-goal",
+		);
 
-    const boundedFlowchartResults = searchCodeModeDocs({
-      query: "nonterminating cycle 24 nodes 64 edges request_too_large",
-    });
-    expect(boundedFlowchartResults.results.map((result) => result.id)).toEqual(
-      expect.arrayContaining(["buildFlowchart", "issues"]),
-    );
+		const boundedFlowchartResults = searchCodeModeDocs({
+			query: "nonterminating cycle 24 nodes 64 edges request_too_large",
+		});
+		expect(boundedFlowchartResults.results.map((result) => result.id)).toEqual(
+			expect.arrayContaining(["buildFlowchart", "issues"]),
+		);
 
-    const sequenceResults = searchCodeModeDocs({
-      query: "chronological participant lifeline messages",
-    });
-    expect(sequenceResults.results.map((result) => result.id)).toContain(
-      "buildSequenceDiagram",
-    );
-  });
+		const sequenceResults = searchCodeModeDocs({
+			query: "chronological participant lifeline messages",
+		});
+		expect(sequenceResults.results.map((result) => result.id)).toContain("buildSequenceDiagram");
+	});
 
-  it("documents importable Excalidraw artifact URLs", () => {
-    const docs = getCodeModeDocs({ topic: "getArtifact" });
+	it("documents importable Excalidraw artifact URLs", () => {
+		const docs = getCodeModeDocs({ topic: "getArtifact" });
 
-    expect(docs.content).toContain("importable Excalidraw file JSON");
-    expect(docs.content).toContain("url fields");
-    expect(docs.content).toContain("format=excalidraw&raw=true");
-    expect(docs.content).toContain("format=png&raw=true");
-  });
+		expect(docs.content).toContain("importable Excalidraw file JSON");
+		expect(docs.content).toContain("url fields");
+		expect(docs.content).toContain("format=excalidraw&raw=true");
+		expect(docs.content).toContain("format=png&raw=true");
+	});
 
-  it("documents broad architecture prompt shaping", () => {
-    const docs = getCodeModeDocs({ topic: "buildFlowchart" });
+	it("documents broad architecture prompt shaping", () => {
+		const docs = getCodeModeDocs({ topic: "buildFlowchart" });
 
-    expect(docs.content).toContain("broad or vague repo/system architecture");
-    expect(docs.content).toContain("8-14 high-signal nodes");
-    expect(docs.content).toContain("single readable spine");
-    expect(docs.content).toContain("group related packages into layers");
-    expect(docs.content).toContain("24 nodes");
-    expect(docs.content).toContain("64 edges");
-    expect(docs.content).toContain("nonterminating_node");
-    expect(docs.content).toContain("request_too_large");
-  });
+		expect(docs.content).toContain("broad or vague repo/system architecture");
+		expect(docs.content).toContain("8-14 high-signal nodes");
+		expect(docs.content).toContain("single readable spine");
+		expect(docs.content).toContain("group related packages into layers");
+		expect(docs.content).toContain("24 nodes");
+		expect(docs.content).toContain("64 edges");
+		expect(docs.content).toContain("nonterminating_node");
+		expect(docs.content).toContain("request_too_large");
+	});
 
-  it("documents patch envelopes and operation names for harness discovery", () => {
-    const docs = getCodeModeDocs({ topic: "applyDiagramPatch" });
+	it("documents patch envelopes and operation names for harness discovery", () => {
+		const docs = getCodeModeDocs({ topic: "applyDiagramPatch" });
 
-    expect(docs.content).toContain("source: { artifactId");
-    expect(docs.content).toContain("Supported operation names");
-    expect(docs.content).toContain("replaceText");
-    expect(docs.content).toContain("strokeColor");
-    expect(docs.content).toContain("type ApplyDiagramPatchRequest =");
-    expect(docs.content).toContain('"png"');
-    expect(docs.content).toContain("hosted visual proof");
-    expect(docs.content).not.toContain("{ excalidraw: unknown }");
-    expect(docs.content).not.toContain('format?: "scene" | "excalidraw"');
-    expect(docs.examples).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          code: expect.stringContaining('op: "replaceText"'),
-        }),
-      ]),
-    );
+		expect(docs.content).toContain("source: { artifactId");
+		expect(docs.content).toContain("Supported operation names");
+		expect(docs.content).toContain("replaceText");
+		expect(docs.content).toContain("strokeColor");
+		expect(docs.content).toContain("type ApplyDiagramPatchRequest =");
+		expect(docs.content).toContain('"png"');
+		expect(docs.content).toContain("hosted visual proof");
+		expect(docs.content).not.toContain("{ excalidraw: unknown }");
+		expect(docs.content).not.toContain('format?: "scene" | "excalidraw"');
+		expect(docs.examples).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: expect.stringContaining('op: "replaceText"'),
+				}),
+			]),
+		);
 
-    const operationResults = searchCodeModeDocs({
-      query: "setText setLabel rename label operation",
-    });
-    expect(operationResults.results.map((result) => result.id)).toContain(
-      "patchOperations",
-    );
+		const operationResults = searchCodeModeDocs({
+			query: "setText setLabel rename label operation",
+		});
+		expect(operationResults.results.map((result) => result.id)).toContain("patchOperations");
 
-    const operationDocs = getCodeModeDocs({ topic: "patchOperations" });
-    for (const operationName of DIAGRAM_PATCH_OPERATION_NAMES) {
-      expect(operationDocs.content).toContain(operationName);
-      expect(
-        operationDocs.examples.map((example) => example.code).join("\n"),
-      ).toContain(operationName);
-    }
-  });
+		const operationDocs = getCodeModeDocs({ topic: "patchOperations" });
+		for (const operationName of DIAGRAM_PATCH_OPERATION_NAMES) {
+			expect(operationDocs.content).toContain(operationName);
+			expect(operationDocs.examples.map((example) => example.code).join("\n")).toContain(
+				operationName,
+			);
+		}
+	});
 });

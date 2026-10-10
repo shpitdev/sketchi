@@ -1,15 +1,15 @@
 {
-  "name": "@sketchi/eval-harness",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@sketchi/diagram-core": "workspace:*",
-    "@sketchi/diagram-excalidraw": "workspace:*",
-    "@sketchi/diagram-generation": "workspace:*",
-    "@sketchi/diagram-renderer": "workspace:*",
-    "@sketchi/diagram-scenarios": "workspace:*",
-    "@sketchi/diagram-ui": "workspace:*",
-    "@sketchi/observability": "workspace:*",
-    "effect": "4.0.1"
-  }
+	"name": "@sketchi/eval-harness",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@sketchi/diagram-core": "workspace:*",
+		"@sketchi/diagram-excalidraw": "workspace:*",
+		"@sketchi/diagram-generation": "workspace:*",
+		"@sketchi/diagram-renderer": "workspace:*",
+		"@sketchi/diagram-scenarios": "workspace:*",
+		"@sketchi/diagram-ui": "workspace:*",
+		"@sketchi/observability": "workspace:*",
+		"effect": "4.0.1"
+	}
 }

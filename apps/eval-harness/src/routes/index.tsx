@@ -2,8 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 
 import type {
-  DiagramGenerationCacheMode,
-  DiagramGenerationProviderId,
+	DiagramGenerationCacheMode,
+	DiagramGenerationProviderId,
 } from "@sketchi/diagram-generation";
 import { ScenarioPlayground } from "@sketchi/diagram-ui";
 import "@sketchi/diagram-ui/styles.css";
@@ -11,27 +11,27 @@ import "@sketchi/diagram-ui/styles.css";
 import { generateScenarioCandidates } from "../lib/generate-scenario";
 
 export const Route = createFileRoute("/")({
-  component: HomeRoute,
+	component: HomeRoute,
 });
 
 function HomeRoute() {
-  const generationMutation = useMutation({
-    mutationFn: (input: {
-      cacheMode: DiagramGenerationCacheMode;
-      providers: DiagramGenerationProviderId[];
-      scenarioId: string;
-    }) => generateScenarioCandidates({ data: input }),
-  });
+	const generationMutation = useMutation({
+		mutationFn: (input: {
+			cacheMode: DiagramGenerationCacheMode;
+			providers: DiagramGenerationProviderId[];
+			scenarioId: string;
+		}) => generateScenarioCandidates({ data: input }),
+	});
 
-  return (
-    <ScenarioPlayground
-      onGenerateScenario={(request) =>
-        generationMutation.mutateAsync({
-          cacheMode: request.cacheMode,
-          providers: [...request.providers],
-          scenarioId: request.scenarioId,
-        })
-      }
-    />
-  );
+	return (
+		<ScenarioPlayground
+			onGenerateScenario={(request) =>
+				generationMutation.mutateAsync({
+					cacheMode: request.cacheMode,
+					providers: [...request.providers],
+					scenarioId: request.scenarioId,
+				})
+			}
+		/>
+	);
 }

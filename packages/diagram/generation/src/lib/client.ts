@@ -1,46 +1,46 @@
 import { Context, type Effect, Layer, Schema } from "effect";
 
 import type {
-  DiagramGenerationCandidate,
-  DiagramGenerationProviderId,
-  DiagramGenerationRequest,
+	DiagramGenerationCandidate,
+	DiagramGenerationProviderId,
+	DiagramGenerationRequest,
 } from "./candidates.js";
 import type { DiagramGenerationError } from "./errors.js";
 
 export class DiagramGenerationClient extends Context.Service<
-  DiagramGenerationClient,
-  {
-    readonly generate: (
-      request: DiagramGenerationRequest,
-    ) => Effect.Effect<DiagramGenerationCandidate, DiagramGenerationError>;
-    readonly provider: DiagramGenerationProviderId;
-  }
+	DiagramGenerationClient,
+	{
+		readonly generate: (
+			request: DiagramGenerationRequest,
+		) => Effect.Effect<DiagramGenerationCandidate, DiagramGenerationError>;
+		readonly provider: DiagramGenerationProviderId;
+	}
 >()("@sketchi/diagram-generation/DiagramGenerationClient") {}
 
 export class DiagramGenerationPolicyConfig extends Schema.Class<DiagramGenerationPolicyConfig>(
-  "DiagramGenerationPolicyConfig",
+	"DiagramGenerationPolicyConfig",
 )({
-  concurrency: Schema.Number,
-  maxRepairAttempts: Schema.Number,
-  maxRetries: Schema.Number,
-  requestTimeoutMs: Schema.Number,
-  retryDelayMs: Schema.Number,
+	concurrency: Schema.Number,
+	maxRepairAttempts: Schema.Number,
+	maxRetries: Schema.Number,
+	requestTimeoutMs: Schema.Number,
+	retryDelayMs: Schema.Number,
 }) {}
 
 export class DiagramGenerationPolicy extends Context.Service<
-  DiagramGenerationPolicy,
-  DiagramGenerationPolicyConfig
+	DiagramGenerationPolicy,
+	DiagramGenerationPolicyConfig
 >()("@sketchi/diagram-generation/DiagramGenerationPolicy") {}
 
 export const diagramGenerationPolicyDefaults: DiagramGenerationPolicyConfig = {
-  concurrency: 2,
-  maxRepairAttempts: 2,
-  maxRetries: 2,
-  requestTimeoutMs: 30_000,
-  retryDelayMs: 250,
+	concurrency: 2,
+	maxRepairAttempts: 2,
+	maxRetries: 2,
+	requestTimeoutMs: 30_000,
+	retryDelayMs: 250,
 };
 
 export const DiagramGenerationPolicyLive = Layer.succeed(
-  DiagramGenerationPolicy,
-  diagramGenerationPolicyDefaults,
+	DiagramGenerationPolicy,
+	diagramGenerationPolicyDefaults,
 );

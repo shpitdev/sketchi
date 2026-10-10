@@ -5,5 +5,5 @@ import { env } from "cloudflare:workers";
 import type { EvalHarnessEnv } from "./generate-scenario";
 
 export function getEvalHarnessBindings(): EvalHarnessEnv {
-  return env;
+	return env;
 }
