@@ -14,15 +14,16 @@ Convex, Vercel, Bun, or Turborepo stack.
 
 ## Delegated agents
 
-- Use Codex `gpt-5.6-sol` for planning, implementation, and independent review,
-  with reasoning effort set explicitly for the task.
+- Use Codex `gpt-6.1-sol` for planning, implementation, and independent review,
+  with reasoning effort set explicitly for the task; use `gpt-6-astra` for
+  harder slices.
 - Fable may act as the primary delivery orchestrator from the canonical root.
   In that role it may inspect repository and external state, maintain coordination
   artifacts, create and clean Herdr worktrees, launch and steer agents, route
   review findings, run proof, manage GitHub issues and Graphite PRs, merge green
   slices, and verify main and production/runtime surfaces.
 - Keep implementation and independent review delegated to separate Codex
-  `gpt-5.6-sol` agents with explicit reasoning effort. Fable should remain the
+  `gpt-6.1-sol` (or `gpt-6-astra`) agents with explicit reasoning effort. Fable should remain the
   coordinator and must not directly implement product/source/test changes or
   substitute its own assessment for the required independent review.
 
@@ -31,6 +32,7 @@ Convex, Vercel, Bun, or Turborepo stack.
 Before pushing meaningful changes, run:
 
 - `pnpm nx run-many -t typecheck,test,build`
+- `pnpm run lint`
 - `pnpm nx build-storybook diagram-ui`
 
 For UI-affecting changes, run the web app locally and verify the changed flow against the real page.

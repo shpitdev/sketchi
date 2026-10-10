@@ -22,5 +22,5 @@
       "@sketchi/observability": ["../packages/observability/src/index.ts"]
     }
   },
-  "include": ["*.ts", "*.mts"]
+  "include": ["*.ts", "*.mts", "oxlint/*.ts"]
 }

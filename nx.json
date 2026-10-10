@@ -12,19 +12,11 @@
       "!{projectRoot}/tsconfig.spec.json"
     ],
     "sharedGlobals": [
-      "{workspaceRoot}/eslint.config.mjs",
+      "{workspaceRoot}/.oxlintrc.json",
       "{workspaceRoot}/nx.json",
       "{workspaceRoot}/tsconfig.base.json"
     ]
   },
-  "plugins": [
-    {
-      "plugin": "@nx/eslint/plugin",
-      "options": {
-        "targetName": "lint"
-      }
-    }
-  ],
   "targetDefaults": {
     "build": {
       "inputs": ["production", "^production"],
@@ -32,9 +24,6 @@
     },
     "test": {
       "inputs": ["default", "^production"]
-    },
-    "lint": {
-      "inputs": ["default", "{workspaceRoot}/eslint.config.mjs"]
     },
     "typecheck": {
       "inputs": ["default", "^production"],

@@ -26,6 +26,7 @@ declare global {
 }
 
 function CodeModeExportHarnessRoute() {
+  // oxlint-disable-next-line sketchi/no-react-effects -- installs the window export bridge that Browser Rendering polls; it is the page's external-system boundary
   useEffect(() => {
     let active = true;
     globalThis.EXCALIDRAW_ASSET_PATH = "/";

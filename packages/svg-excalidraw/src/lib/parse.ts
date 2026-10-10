@@ -1038,6 +1038,7 @@ function walkNode(
         : null;
     if (symbol?.kind === "hidden") return;
     if (x === null || y === null || symbol?.kind === "unsupported") {
+      // oxlint-disable-next-line react-hooks/rules-of-hooks -- an SVG <use> predicate, not a React hook
       if (useTargetMayRender(referenceNode, nextContext, state)) {
         pendingDiagnostics.forEach((entry) => pushDiagnostic(state, entry));
         if (x === null || y === null) {

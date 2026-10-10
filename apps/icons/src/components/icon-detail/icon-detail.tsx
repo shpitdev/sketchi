@@ -47,6 +47,7 @@ export function IconDetail({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
 
+  // oxlint-disable-next-line sketchi/no-react-effects -- modal focus trap: subscribes to window keydown and restores focus to the opener on close
   useEffect(() => {
     closeButtonRef.current?.focus();
 

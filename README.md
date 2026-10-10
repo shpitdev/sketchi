@@ -176,7 +176,7 @@ repository migration and its historical before tree are recorded in the
 The project-local [mise](https://mise.jdx.dev/) configuration pins Node 26.10.0
 and native pnpm 12.10.1. The workspace uses stable native TypeScript 7.0.2 as
 `tsc` while the `typescript` module and `tsc6` expose the supported TypeScript
-6.0.3 compiler API for Nx and ESLint through the official
+6.0.3 compiler API for Nx and the repository tooling tests through the official
 `@typescript/typescript6@6.0.2` compatibility package. Activate mise in your
 shell, then install the exact tools and dependencies:
 
@@ -198,12 +198,20 @@ Required workspace proof:
 pnpm run toolchain:verify
 pnpm run test:deploy-scripts
 pnpm run test:tools
-pnpm nx run-many -t lint,typecheck,test,build
+pnpm nx run-many -t typecheck,test,build
+pnpm run lint
 pnpm nx run-many -t typecheck-native
 pnpm run test:wrangler-dry-runs
 pnpm nx build-storybook diagram-ui
 pnpm exec tsc6 -b --pretty false
 ```
+
+`pnpm run lint` builds the package declarations that type-aware rules resolve,
+then runs [Oxlint](https://oxc.rs/docs/guide/usage/linter) over the whole
+repository with zero warnings allowed. `.oxlintrc.json` holds the rule set, the
+Nx module boundaries, and the Effect and Zod import policy; Sketchi's own rules
+live in `tools/oxlint` and run with `pnpm run test:lint-rules`. Every
+suppression is a single-line `oxlint-disable-next-line <rule> -- <reason>`.
 
 The [MCP SDK compatibility note](docs/mcp-sdk-compatibility.md) records the
 bounded server-only exception that keeps the deployed handlers on the patched
@@ -280,7 +288,7 @@ docs/                             architecture, boundaries, and runbooks
 ```
 
 pnpm, Nx, and the root TypeScript solution all cover the same package-backed
-projects. Nx tags plus lint enforce package/app, runtime/eval, persistence/UI,
+projects. Nx tags plus Oxlint enforce package/app, runtime/eval, persistence/UI,
 and explicit composition boundaries across source, config, and Storybook
 files. Required CI also dry-runs every mapped Worker from its generated build
 configuration; see the

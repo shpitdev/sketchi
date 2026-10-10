@@ -103,16 +103,20 @@ to the Cloudflare execution context where required.
 
 ## Workspace enforcement and proof
 
-pnpm, Nx, TypeScript project references, and ESLint agree on one explicit
-project inventory. Structural tests enforce package rings, exact Effect pins,
-the sole unstable adapter, runtime-boundary ownership, no Zod source authority,
-and no unmanaged Promise orchestration outside reviewed framework/foreign
-edges. Wrangler dry-runs cover every mapped Worker.
+pnpm, Nx, TypeScript project references, and the Oxlint Nx boundary rule agree
+on one explicit project inventory. Type-aware Oxlint enforces package rings,
+Effect-free pure and framework-native projects, reviewed unstable Effect
+adapters, no Zod, and no direct React effects outside reasoned synchronization
+adapters. Structural tests keep that lint configuration in sync with the project
+classification, prove each rule rejects a real violation, and enforce exact
+Effect pins, runtime-boundary ownership, and no unmanaged Promise orchestration
+outside reviewed framework/foreign edges. Wrangler dry-runs cover every mapped
+Worker.
 
-Meaningful changes run the full Nx typecheck/test/build/lint graph, the
-composite TypeScript build, Storybook, tool/deploy/onboarding tests, corpus
-rendering, Worker dry-runs, bundle reports, packaged CLI smoke, and applicable
-preview runtime probes.
+Meaningful changes run the full Nx typecheck/test/build graph, repository-wide
+type-aware Oxlint, the composite TypeScript build, Storybook,
+tool/deploy/onboarding tests, corpus rendering, Worker dry-runs, bundle reports,
+packaged CLI smoke, and applicable preview runtime probes.
 
 ## Deployment map
 

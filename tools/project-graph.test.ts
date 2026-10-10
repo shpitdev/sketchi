@@ -1,6 +1,13 @@
 import { createProjectGraphAsync, readJsonFile } from "@nx/devkit";
-import { ESLint } from "eslint";
-import { existsSync, globSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  existsSync,
+  globSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as ts from "typescript";
@@ -675,6 +682,149 @@ function projectReferenceConfig(projectRoot: string): string | undefined {
   return undefined;
 }
 
+interface OxlintOverride {
+  readonly files: readonly string[];
+  readonly rules?: Readonly<Record<string, unknown>>;
+}
+
+interface OxlintRestrictedImportOptions {
+  readonly paths?: ReadonlyArray<{ readonly name: string }>;
+  readonly patterns?: ReadonlyArray<{ readonly group: readonly string[] }>;
+}
+
+interface OxlintRestrictedImportTypeOptions {
+  readonly modules?: ReadonlyArray<{ readonly name: string }>;
+}
+
+interface OxlintConfig {
+  readonly overrides?: readonly OxlintOverride[];
+  readonly rules?: Readonly<Record<string, unknown>>;
+}
+
+interface OxlintReport {
+  readonly diagnostics: ReadonlyArray<{
+    readonly code?: string | null;
+    readonly filename: string;
+  }>;
+}
+
+function readOxlintConfig(): OxlintConfig {
+  const configPath = path.join(workspaceRoot, ".oxlintrc.json");
+  const parsed = ts.parseConfigFileTextToJson(
+    configPath,
+    readFileSync(configPath, "utf8"),
+  );
+  if (parsed.error) {
+    throw new Error(
+      ts.flattenDiagnosticMessageText(parsed.error.messageText, "\n"),
+    );
+  }
+  const config: OxlintConfig = parsed.config;
+  return config;
+}
+
+function readOxlintOverrides(): readonly OxlintOverride[] {
+  return readOxlintConfig().overrides ?? [];
+}
+
+function ruleOptions<Options>(rule: unknown): Options | undefined {
+  if (!Array.isArray(rule)) return undefined;
+  const options: Options | undefined = rule[1];
+  return options;
+}
+
+/**
+ * Modules a `no-restricted-imports` configuration blocks, as bare names:
+ * `paths` entries plus `patterns` groups without their trailing `/**`.
+ */
+function restrictedImportModules(rule: unknown): string[] {
+  const options = ruleOptions<OxlintRestrictedImportOptions>(rule);
+  return [
+    ...new Set([
+      ...(options?.paths ?? []).map(({ name }) => name),
+      ...(options?.patterns ?? []).flatMap(({ group }) =>
+        group.map((pattern) => pattern.replace(/\/\*\*$/, "")),
+      ),
+    ]),
+  ].sort();
+}
+
+/** Files of the overrides whose `no-restricted-imports` patterns match. */
+function restrictedImportOverrideFiles(
+  matches: (patterns: readonly string[]) => boolean,
+): string[] {
+  return readOxlintOverrides()
+    .filter((override) => {
+      const rule = override.rules?.["eslint/no-restricted-imports"];
+      if (!Array.isArray(rule)) return false;
+      const options: OxlintRestrictedImportOptions | undefined = rule[1];
+      return matches(
+        (options?.patterns ?? []).flatMap((pattern) => pattern.group),
+      );
+    })
+    .flatMap((override) => override.files)
+    .sort();
+}
+
+function firstMissingDirectory(directory: string): string | undefined {
+  let missing: string | undefined;
+  for (
+    let current = directory;
+    !existsSync(current);
+    current = path.dirname(current)
+  ) {
+    missing = current;
+  }
+  return missing;
+}
+
+/**
+ * Lints throwaway files through the real Oxlint CLI and repository config,
+ * returning the sorted rule codes reported for each requested path.
+ */
+function lintProbes(
+  probes: Readonly<Record<string, string>>,
+): Record<string, string[]> {
+  const files = Object.entries(probes).map(([filePath, source]) => {
+    const extension = path.extname(filePath);
+    const probePath = `${filePath.slice(0, -extension.length)}-${process.pid}${extension}`;
+    return { filePath, probePath, source };
+  });
+  const createdDirectories: string[] = [];
+  try {
+    for (const { probePath, source } of files) {
+      const absolutePath = path.join(workspaceRoot, probePath);
+      const missing = firstMissingDirectory(path.dirname(absolutePath));
+      if (missing) createdDirectories.push(missing);
+      mkdirSync(path.dirname(absolutePath), { recursive: true });
+      writeFileSync(absolutePath, `${source}\n`);
+    }
+    const result = spawnSync(
+      path.join(workspaceRoot, "node_modules", ".bin", "oxlint"),
+      ["--format", "json", ...files.map(({ probePath }) => probePath)],
+      { cwd: workspaceRoot, encoding: "utf8" },
+    );
+    if (result.error) throw result.error;
+    const report: OxlintReport = JSON.parse(result.stdout);
+    return Object.fromEntries(
+      files.map(({ filePath, probePath }) => [
+        filePath,
+        report.diagnostics
+          .filter((diagnostic) => diagnostic.filename === probePath)
+          .map((diagnostic) => diagnostic.code ?? "unknown")
+          .sort(),
+      ]),
+    );
+  } finally {
+    for (const { probePath } of files) {
+      rmSync(path.join(workspaceRoot, probePath), { force: true });
+    }
+    for (const directory of createdDirectories) {
+      rmSync(directory, { force: true, recursive: true });
+    }
+  }
+}
+
 describe("diagram package layout", () => {
   it("discovers the existing Nx projects at their nested roots", async () => {
     const graph = await createProjectGraphAsync({ exitOnError: true });
@@ -721,7 +871,7 @@ describe("diagram generation project boundaries", () => {
     expect(scenarioTargets).toContain("diagram-generation");
   });
 
-  it("classifies every project and confines Effect to authoritative or schema-boundary code", () => {
+  it("classifies every project and lints Effect out of pure and framework-native code", () => {
     const classifiedRoots = [
       ...effectAuthoritativeProjectRoots,
       ...effectPureProjectRoots,
@@ -731,28 +881,60 @@ describe("diagram generation project boundaries", () => {
     expect(classifiedRoots).toEqual(intendedNxProjectRoots);
     expect(new Set(classifiedRoots).size).toBe(classifiedRoots.length);
 
-    for (const projectRoot of [
-      ...effectPureProjectRoots,
-      ...frameworkNativeProjectRoots,
-    ]) {
-      const sourceFiles = globSync(
-        `${projectRoot}/**/*.{ts,tsx,mts,cts,js,mjs}`,
-        {
-          cwd: workspaceRoot,
-          exclude: ["**/dist/**", "**/.output/**", "**/.wrangler/**"],
-        },
-      );
+    // Oxlint enforces the import restriction; these overrides must track the
+    // classification above exactly.
+    expect(
+      restrictedImportOverrideFiles((patterns) =>
+        patterns.includes("@effect/**"),
+      ),
+    ).toEqual(
+      [...effectPureProjectRoots, ...frameworkNativeProjectRoots]
+        .sort()
+        .map((projectRoot) => `${projectRoot}/**`),
+    );
+    expect(
+      restrictedImportOverrideFiles(
+        (patterns) =>
+          patterns.includes("effect/unstable/**") &&
+          !patterns.includes("@effect/**"),
+      ),
+    ).toEqual([...effectSchemaBoundaryFiles].sort());
 
-      for (const sourceFile of sourceFiles) {
-        if (effectSchemaBoundaryFiles.has(sourceFile)) continue;
-        const source = readFileSync(
-          path.join(workspaceRoot, sourceFile),
-          "utf8",
-        );
-        expect(source, `${sourceFile} imports Effect`).not.toMatch(
-          /(?:from\s+|import\s*\()["'](?:effect(?:\/[^"']*)?|@effect\/[^"']+)["']/,
-        );
-      }
+    // Patterns must cover deep subpaths such as @effect/platform-node/NodeRuntime.
+    const config = readOxlintConfig();
+    const scopes = [
+      { name: "base rules", rules: config.rules },
+      ...(config.overrides ?? []).map((override) => ({
+        name: override.files.join(", "),
+        rules: override.rules,
+      })),
+    ].filter(({ rules }) => rules?.["eslint/no-restricted-imports"]);
+    expect(scopes.length).toBeGreaterThan(1);
+    for (const { name, rules } of scopes) {
+      const patterns = (
+        ruleOptions<OxlintRestrictedImportOptions>(
+          rules?.["eslint/no-restricted-imports"],
+        )?.patterns ?? []
+      ).flatMap(({ group }) => group);
+      expect(
+        patterns.filter((pattern) => !pattern.endsWith("/**")),
+        `${name} has a single-segment pattern`,
+      ).toEqual([]);
+
+      // `import("…")` types bypass no-restricted-imports, so the Sketchi rule
+      // must restrict exactly the same modules in the same scope.
+      expect(
+        (
+          ruleOptions<OxlintRestrictedImportTypeOptions>(
+            rules?.["sketchi/no-restricted-import-types"],
+          )?.modules ?? []
+        )
+          .map((module) => module.name)
+          .sort(),
+        `${name} import-type restrictions`,
+      ).toEqual(
+        restrictedImportModules(rules?.["eslint/no-restricted-imports"]),
+      );
     }
   });
 
@@ -814,32 +996,50 @@ describe("diagram generation project boundaries", () => {
       readFileSync(path.join(workspaceRoot, "pnpm-lock.yaml"), "utf8"),
     ).not.toContain("effect@3.");
 
-    const sourceFiles = globSync(
-      [
-        ...["apps", "packages", "tools"].map(
-          (root) => `${root}/**/*.{ts,tsx,mts,cts,js,mjs}`,
+    // Oxlint rejects unstable Effect imports everywhere except reviewed
+    // adapters; every adapter that exists must be on the reviewed list.
+    expect(
+      globSync(
+        ["apps", "packages", "tools"].map(
+          (root) => `${root}/**/src/internal/effect-unstable-*.ts`,
         ),
-        "scripts/pipelines/r2-catalog-smoke.ts",
-      ],
-      {
-        cwd: workspaceRoot,
-        exclude: ["**/dist/**", "**/.output/**", "**/.wrangler/**"],
-      },
-    );
-    const unstableImportPaths = sourceFiles
-      .filter((sourceFile) =>
-        /["']effect\/unstable\//.test(
-          readFileSync(path.join(workspaceRoot, sourceFile), "utf8"),
+        { cwd: workspaceRoot, exclude: ["**/node_modules/**"] },
+      ).sort(),
+    ).toEqual(reviewedEffectUnstableAdapterPaths);
+  });
+
+  it("keeps Zod out of every workspace manifest", () => {
+    const manifestPaths = [
+      "package.json",
+      ...globSync(
+        requiredWorkspaceGlobs.map(
+          (workspaceGlob) => `${workspaceGlob}/package.json`,
         ),
-      )
-      .sort();
-    expect(unstableImportPaths).toEqual(reviewedEffectUnstableAdapterPaths);
-    for (const sourceFile of unstableImportPaths) {
-      expect(sourceFile).toMatch(/\/src\/internal\/effect-unstable-[^/]+\.ts$/);
+        { cwd: workspaceRoot },
+      ),
+    ];
+    for (const manifestPath of manifestPaths) {
+      const manifest = readJsonFile<PackageManifest>(
+        path.join(workspaceRoot, manifestPath),
+      );
+      for (const dependencies of [
+        manifest.dependencies,
+        manifest.devDependencies,
+        manifest.optionalDependencies,
+        manifest.peerDependencies,
+      ]) {
+        expect(
+          Object.keys(dependencies ?? {}).filter(
+            (dependency) =>
+              dependency === "zod" || dependency.startsWith("zod/"),
+          ),
+          `${manifestPath} declares Zod`,
+        ).toEqual([]);
+      }
     }
   });
 
-  it("prevents unmanaged Promise, schema, and runtime regressions", () => {
+  it("prevents unmanaged Promise and runtime regressions", () => {
     const sourceFiles = globSync(
       [
         ...["apps", "packages", "tools"].map(
@@ -860,13 +1060,6 @@ describe("diagram generation project boundaries", () => {
         ],
       },
     );
-
-    const zodImports = sourceFiles.filter((sourceFile) =>
-      /(?:from\s+|import\s*\()["']zod(?:\/[^"']*)?["']/.test(
-        readFileSync(path.join(workspaceRoot, sourceFile), "utf8"),
-      ),
-    );
-    expect(zodImports).toEqual([]);
 
     const promiseProgram = createTypeCheckedProgram(
       sourceFiles.map((sourceFile) => path.join(workspaceRoot, sourceFile)),
@@ -1122,14 +1315,13 @@ describe("workspace project membership", () => {
     );
   });
 
-  it("tags and lints every Nx project without allowing app dependency drift", async () => {
+  it("tags every Nx project without allowing app dependency drift", async () => {
     const graph = await createProjectGraphAsync({ exitOnError: true });
 
     for (const node of Object.values(graph.nodes)) {
       const tags = node.data.tags ?? [];
       expect(tags.filter((tag) => tag.startsWith("scope:"))).toHaveLength(1);
       expect(tags.some((tag) => tag.startsWith("type:"))).toBe(true);
-      expect(node.data.targets?.lint).toBeDefined();
     }
 
     for (const [source, dependencies] of Object.entries(graph.dependencies)) {
@@ -1151,45 +1343,141 @@ describe("workspace project membership", () => {
     expect([...composedApps].sort()).toEqual(["excalidraw", "icons"]);
   });
 
-  it("enforces project boundaries in source, config, and Storybook files", async () => {
-    const eslint = new ESLint({ cwd: workspaceRoot });
-    const forbiddenImports = [
-      {
-        filePath: "packages/diagram/agent/.storybook/boundary-probe.ts",
-        source: 'import "@sketchi/diagram-scenarios";',
-      },
-      {
-        filePath: "packages/diagram/agent/vitest.boundary-probe.mts",
-        source: 'import "@sketchi/diagram-scenarios";',
-      },
-      {
-        filePath: "apps/web/vite.boundary-probe.ts",
-        source: 'import "../playground/src/routeTree.gen";',
-      },
-    ];
-
-    for (const { filePath, source } of forbiddenImports) {
-      const [result] = await eslint.lintText(source, {
-        filePath: path.join(workspaceRoot, filePath),
-      });
-      expect(result?.messages).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            ruleId: "@nx/enforce-module-boundaries",
-            severity: 2,
-          }),
-        ]),
-      );
-    }
-
-    const [workspaceConfigResult] = await eslint.lintText(
-      [
+  it("enforces project boundaries in source, config, and Storybook files", () => {
+    const results = lintProbes({
+      "packages/diagram/agent/.storybook/boundary-probe.ts":
+        'import "@sketchi/diagram-scenarios";',
+      "packages/diagram/agent/vitest.boundary-probe.mts":
+        'import "@sketchi/diagram-scenarios";',
+      "apps/web/vite.boundary-probe.ts":
+        'import "../playground/src/routeTree.gen";',
+      "apps/web/vite.boundary-allowed-probe.ts": [
         'import { localViteCacheDir } from "../../tools/local-dev-ports";',
         'import { workerProjectConfig } from "../../scripts/lib/worker-apps.mjs";',
         'void localViteCacheDir(workerProjectConfig("web").projectId);',
       ].join("\n"),
-      { filePath: path.join(workspaceRoot, "apps/web/vite.config.ts") },
-    );
-    expect(workspaceConfigResult?.messages).toEqual([]);
+    });
+
+    for (const filePath of [
+      "packages/diagram/agent/.storybook/boundary-probe.ts",
+      "packages/diagram/agent/vitest.boundary-probe.mts",
+      "apps/web/vite.boundary-probe.ts",
+    ]) {
+      expect(results[filePath], filePath).toContain(
+        "@nx(enforce-module-boundaries)",
+      );
+    }
+    expect(results["apps/web/vite.boundary-allowed-probe.ts"]).toEqual([]);
+  });
+
+  it("enforces Effect, Zod, and React effect policy through Oxlint", () => {
+    const results = lintProbes({
+      "packages/diagram/core/src/effect-probe.ts":
+        'import { Effect } from "effect";\nvoid Effect;',
+      "packages/svg-excalidraw/src/effect-probe.ts":
+        'import * as Node from "@effect/platform-node";\nvoid Node;',
+      "packages/diagram/agent/src/stable-effect-probe.ts":
+        'import { Effect } from "effect";\nvoid Effect;',
+      "packages/diagram/agent/src/unstable-effect-probe.ts":
+        'import * as Http from "effect/unstable/http";\nvoid Http;',
+      "packages/diagram/agent/src/internal/effect-unstable-probe.ts":
+        'import * as Http from "effect/unstable/http";\nvoid Http;',
+      "packages/diagram/renderer/src/deep-effect-probe.ts": [
+        'import * as NodeRuntime from "@effect/platform-node/NodeRuntime";',
+        'import * as HttpClient from "effect/http/HttpClient";',
+        "void NodeRuntime;",
+        "void HttpClient;",
+      ].join("\n"),
+      "packages/diagram/renderer/src/effect-type-probe.ts": [
+        'export type EffectModule = typeof import("effect");',
+        'export type Runtime = typeof import("@effect/platform-node/NodeRuntime");',
+      ].join("\n"),
+      "packages/diagram/agent/src/deep-unstable-effect-probe.ts": [
+        'import * as Client from "effect/unstable/http/HttpClient";',
+        'export type Unstable = typeof import("effect/unstable/http");',
+        "void Client;",
+      ].join("\n"),
+      "scripts/zod-probe.ts": 'import { z } from "zod";\nvoid z;',
+      "scripts/deep-zod-probe.ts":
+        'import * as Core from "zod/v4/core";\nvoid Core;',
+      "apps/web/src/react-effect-probe.tsx": [
+        'import { useEffect as useMountEffect } from "react";',
+        "export function Probe() {",
+        "  useMountEffect(() => {}, []);",
+        "  return null;",
+        "}",
+      ].join("\n"),
+    });
+
+    expect(results["packages/diagram/core/src/effect-probe.ts"]).toEqual([
+      "eslint(no-restricted-imports)",
+    ]);
+    expect(results["packages/svg-excalidraw/src/effect-probe.ts"]).toEqual([
+      "eslint(no-restricted-imports)",
+    ]);
+    expect(
+      results["packages/diagram/agent/src/stable-effect-probe.ts"],
+    ).toEqual([]);
+    expect(
+      results["packages/diagram/agent/src/unstable-effect-probe.ts"],
+    ).toEqual(["eslint(no-restricted-imports)"]);
+    expect(
+      results["packages/diagram/agent/src/internal/effect-unstable-probe.ts"],
+    ).toEqual([]);
+    expect(
+      results["packages/diagram/renderer/src/deep-effect-probe.ts"],
+    ).toEqual([
+      "eslint(no-restricted-imports)",
+      "eslint(no-restricted-imports)",
+    ]);
+    expect(
+      results["packages/diagram/renderer/src/effect-type-probe.ts"],
+    ).toEqual([
+      "sketchi(no-restricted-import-types)",
+      "sketchi(no-restricted-import-types)",
+    ]);
+    expect(
+      results["packages/diagram/agent/src/deep-unstable-effect-probe.ts"],
+    ).toEqual([
+      "eslint(no-restricted-imports)",
+      "sketchi(no-restricted-import-types)",
+    ]);
+    expect(results["scripts/zod-probe.ts"]).toEqual([
+      "eslint(no-restricted-imports)",
+    ]);
+    expect(results["scripts/deep-zod-probe.ts"]).toEqual([
+      "eslint(no-restricted-imports)",
+    ]);
+    expect(results["apps/web/src/react-effect-probe.tsx"]).toEqual([
+      "sketchi(no-react-effects)",
+    ]);
+  });
+
+  it("requires a reason on every lint suppression", () => {
+    const directive = /(?:oxlint|eslint)-disable(?:-next-line|-line)?\b(.*)/g;
+    const unreasoned: string[] = [];
+    for (const sourceFile of globSync(
+      ["apps", "packages", "scripts", "tools"].map(
+        (root) => `${root}/**/*.{ts,tsx,mts,cts,js,mjs,cjs}`,
+      ),
+      {
+        cwd: workspaceRoot,
+        exclude: [
+          "**/node_modules/**",
+          "**/dist/**",
+          "**/.output/**",
+          "**/.wrangler/**",
+          "**/routeTree.gen.ts",
+        ],
+      },
+    )) {
+      const source = readFileSync(path.join(workspaceRoot, sourceFile), "utf8");
+      for (const match of source.matchAll(directive)) {
+        if (!/\s--\s+\S/.test(match[1] ?? "")) {
+          unreasoned.push(`${sourceFile}: ${match[0].trim()}`);
+        }
+      }
+    }
+    expect(unreasoned).toEqual([]);
   });
 });
