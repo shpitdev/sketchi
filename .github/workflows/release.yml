@@ -43,6 +43,18 @@ jobs:
           local_version="$(node -p "require('./apps/cli/package.json').version")"
           echo "version=$local_version" >> "$GITHUB_OUTPUT"
 
+          # The tag job runs only after a successful publish, so an existing tag
+          # means this version was already released. Check it first: npm stages
+          # trusted publishes (pending 2FA approval, then processing), and during
+          # that window `npm view` still reports the version as missing. A failed
+          # ls-remote fails the job under `set -e` instead of guessing.
+          tag="cli-v$local_version"
+          if [ -n "$(git ls-remote --tags origin "refs/tags/$tag")" ]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "$tag exists, so sketchi@$local_version was already published; skipping release."
+            exit 0
+          fi
+
           # Query the registry for this EXACT version, not the latest dist-tag, so
           # a rolled-back or re-pointed `latest` cannot trigger repeated
           # duplicate-publish attempts. Capture stdout/exit separately so we can
@@ -96,8 +108,25 @@ jobs:
       - name: Build and run the offline packaging smoke
         run: pnpm exec nx run sketchi-cli:smoke
       - name: Publish sketchi to npm via OIDC trusted publishing
-        run: npm publish --access public
         working-directory: apps/cli/dist
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Keep the log outside the package directory being published.
+          log="$RUNNER_TEMP/npm-publish.log"
+          if npm publish --access public 2>&1 | tee "$log"; then
+            exit 0
+          fi
+          # A rerun after a publish that npm staged (awaiting approval or still
+          # processing) gets E409 for the same version. That version is already
+          # released, so continue to the tag and GitHub Release jobs.
+          if grep -q 'code E409' "$log" &&
+            grep -qF "Cannot publish over previously staged version \"$VERSION\"" "$log"; then
+            echo "sketchi@$VERSION is already staged on npm; treating it as published."
+            exit 0
+          fi
+          exit 1
 
   tag:
     needs: [guard, verify, publish]
