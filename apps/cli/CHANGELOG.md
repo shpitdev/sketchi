@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.6.3
+
+### Patch Changes
+
+- [#355](https://github.com/shpitdev/sketchi/pull/355) [`c2786fb`](https://github.com/shpitdev/sketchi/commit/c2786fb9e0352166e33f33070a548b32d46cd061) Thanks [@anandpant](https://github.com/anandpant)! - Generated diagrams no longer clip CJK, emoji, or long connector labels when opened in Excalidraw. Nodes are sized for wide glyphs, long edge labels wrap, long sequence participant names wrap inside their headers, and a label that would still overflow its node is reported instead of clipped. Latin-only layouts keep their exact previous widths. Text-style symbols such as © ™ ✔ ⚠ keep the default width; only emoji-presentation glyphs count as emoji.
+
 ## 0.6.2
 
 ### Patch Changes
