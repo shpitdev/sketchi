@@ -1,5 +1,5 @@
 {
-  "name": "@sketchi/web",
-  "private": true,
-  "type": "module"
+	"name": "@sketchi/web",
+	"private": true,
+	"type": "module"
 }

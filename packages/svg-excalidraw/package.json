@@ -1,27 +1,27 @@
 {
-  "name": "@sketchi/svg-excalidraw",
-  "private": true,
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
-  },
-  "dependencies": {
-    "@excalidraw/excalidraw": "0.18.1",
-    "@sketchi/diagram-core": "workspace:*",
-    "clipper-lib": "6.4.2",
-    "earcut": "3.2.4",
-    "fast-xml-parser": "5.11.2",
-    "fractional-indexing": "4.0.0",
-    "svg-pathdata": "9.0.0"
-  },
-  "devDependencies": {
-    "@types/clipper-lib": "6.4.0",
-    "@types/earcut": "3.0.0",
-    "sharp": "0.35.5"
-  }
+	"name": "@sketchi/svg-excalidraw",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"dependencies": {
+		"@excalidraw/excalidraw": "0.18.1",
+		"@sketchi/diagram-core": "workspace:*",
+		"clipper-lib": "6.4.2",
+		"earcut": "3.2.4",
+		"fast-xml-parser": "5.11.2",
+		"fractional-indexing": "4.0.0",
+		"svg-pathdata": "9.0.0"
+	},
+	"devDependencies": {
+		"@types/clipper-lib": "6.4.0",
+		"@types/earcut": "3.0.0",
+		"sharp": "0.35.5"
+	}
 }

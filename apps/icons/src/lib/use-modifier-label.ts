@@ -7,5 +7,5 @@ const getServerSnapshot = () => "Ctrl";
 
 /** Platform is immutable; the server snapshot keeps hydration consistent. */
 export function useModifierLabel(): string {
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+	return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

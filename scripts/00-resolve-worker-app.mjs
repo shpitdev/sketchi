@@ -5,43 +5,43 @@ import { pathToFileURL } from "node:url";
 import { workerProjectConfig } from "./lib/worker-apps.mjs";
 
 function readFlag(args, name, fallback) {
-  const index = args.indexOf(name);
+	const index = args.indexOf(name);
 
-  if (index === -1) {
-    return fallback;
-  }
+	if (index === -1) {
+		return fallback;
+	}
 
-  const value = args[index + 1];
-  if (!value) {
-    throw new Error(`Missing value for ${name}.`);
-  }
+	const value = args[index + 1];
+	if (!value) {
+		throw new Error(`Missing value for ${name}.`);
+	}
 
-  return value;
+	return value;
 }
 
 function writeOutputs(outputs) {
-  const text = Object.entries(outputs)
-    .map(([key, value]) => `${key}=${value}`)
-    .join("\n");
+	const text = Object.entries(outputs)
+		.map(([key, value]) => `${key}=${value}`)
+		.join("\n");
 
-  process.stdout.write(`${text}\n`);
+	process.stdout.write(`${text}\n`);
 
-  if (process.env.GITHUB_OUTPUT) {
-    appendFileSync(process.env.GITHUB_OUTPUT, `${text}\n`);
-  }
+	if (process.env.GITHUB_OUTPUT) {
+		appendFileSync(process.env.GITHUB_OUTPUT, `${text}\n`);
+	}
 }
 
 export function resolveWorkerApp(args = process.argv.slice(2)) {
-  const project = workerProjectConfig(readFlag(args, "--project"));
+	const project = workerProjectConfig(readFlag(args, "--project"));
 
-  writeOutputs({
-    build_output_path: project.buildOutputPath,
-    project_id: project.projectId,
-    worker_config_path: project.generatedWranglerConfigPath,
-    worker_name: project.workerName,
-  });
+	writeOutputs({
+		build_output_path: project.buildOutputPath,
+		project_id: project.projectId,
+		worker_config_path: project.generatedWranglerConfigPath,
+		worker_name: project.workerName,
+	});
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  resolveWorkerApp();
+	resolveWorkerApp();
 }

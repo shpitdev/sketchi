@@ -1,11 +1,11 @@
 export class DurableObject {
-  ctx: unknown;
-  env: unknown;
+	ctx: unknown;
+	env: unknown;
 
-  constructor(ctx?: unknown, env?: unknown) {
-    this.ctx = ctx;
-    this.env = env;
-  }
+	constructor(ctx?: unknown, env?: unknown) {
+		this.ctx = ctx;
+		this.env = env;
+	}
 }
 
 export class RpcTarget {}
@@ -15,5 +15,5 @@ export const env = {};
 export const exports: Record<string, unknown> = {};
 
 export function waitUntil(promise: Promise<unknown>): void {
-  void promise;
+	void promise;
 }

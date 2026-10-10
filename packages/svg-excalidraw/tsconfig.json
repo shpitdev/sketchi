@@ -6,11 +6,6 @@
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
     "ignoreDeprecations": "6.0"
   },
-  "include": [
-    "src/**/*.ts",
-    "tests/**/*.ts",
-    "vitest.config.mts",
-    "vitest.browser.config.mts"
-  ],
+  "include": ["src/**/*.ts", "tests/**/*.ts", "vitest.config.mts", "vitest.browser.config.mts"],
   "references": []
 }

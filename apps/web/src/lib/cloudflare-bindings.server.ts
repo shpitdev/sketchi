@@ -5,5 +5,5 @@ import { env } from "cloudflare:workers";
 import type { WebSurfaceEnv } from "./surface-urls";
 
 export function getWebBindings(): WebSurfaceEnv {
-  return env;
+	return env;
 }

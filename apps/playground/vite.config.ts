@@ -6,10 +6,7 @@ import react from "@vitejs/plugin-react";
 import agents from "agents/vite";
 import { defineConfig, type Plugin } from "vite";
 
-import {
-  localInspectorPort,
-  localViteCacheDir,
-} from "../../tools/local-dev-ports";
+import { localInspectorPort, localViteCacheDir } from "../../tools/local-dev-ports";
 import { excalidrawFonts } from "../../scripts/lib/excalidraw-fonts.mjs";
 import { workerProjectConfig } from "../../scripts/lib/worker-apps.mjs";
 
@@ -18,134 +15,107 @@ const workerProject = workerProjectConfig("playground");
 const playgroundServerSourceSegment = "/apps/playground/src/server/";
 
 function enforceClientServerBoundary(): Plugin {
-  return {
-    name: "playground-client-server-boundary",
-    apply: "build",
-    applyToEnvironment: (environment) => environment.name === "client",
-    generateBundle(_options, bundle) {
-      const serverModuleIds = Object.values(bundle)
-        .flatMap((output) =>
-          output.type === "chunk" ? Object.keys(output.modules) : [],
-        )
-        .map((moduleId) => moduleId.replaceAll("\\", "/"))
-        .filter((moduleId) => moduleId.includes(playgroundServerSourceSegment));
+	return {
+		name: "playground-client-server-boundary",
+		apply: "build",
+		applyToEnvironment: (environment) => environment.name === "client",
+		generateBundle(_options, bundle) {
+			const serverModuleIds = Object.values(bundle)
+				.flatMap((output) => (output.type === "chunk" ? Object.keys(output.modules) : []))
+				.map((moduleId) => moduleId.replaceAll("\\", "/"))
+				.filter((moduleId) => moduleId.includes(playgroundServerSourceSegment));
 
-      if (serverModuleIds.length > 0) {
-        this.error(
-          `Playground server modules entered the client bundle:\n${serverModuleIds.join("\n")}`,
-        );
-      }
-    },
-  };
+			if (serverModuleIds.length > 0) {
+				this.error(
+					`Playground server modules entered the client bundle:\n${serverModuleIds.join("\n")}`,
+				);
+			}
+		},
+	};
 }
 
 export default defineConfig({
-  root: new URL(".", import.meta.url).pathname,
-  build: {
-    emptyOutDir: true,
-    outDir: new URL(`../../${workerProject.buildOutputPath}`, import.meta.url)
-      .pathname,
-  },
-  cacheDir: localViteCacheDir("playground"),
-  publicDir: new URL("./public", import.meta.url).pathname,
-  plugins: [
-    excalidrawFonts(),
-    enforceClientServerBoundary(),
-    agents(),
-    codemode(),
-    cloudflare({
-      configPath: new URL("./wrangler.jsonc", import.meta.url).pathname,
-      inspectorPort: localInspectorPort(6210),
-      viteEnvironment: {
-        name: "ssr",
-      },
-    }),
-    tanstackStart({
-      router: {
-        quoteStyle: "double",
-        semicolons: true,
-      },
-      srcDirectory: "src",
-    }),
-    react(),
-    tailwindcss(),
-  ],
-  resolve: {
-    alias: [
-      {
-        find: /^@\//,
-        replacement: new URL("./src/", import.meta.url).pathname,
-      },
-      {
-        find: "@sketchi/diagram-agent",
-        replacement: new URL(
-          "../../packages/diagram/agent/src/index.ts",
-          import.meta.url,
-        ).pathname,
-      },
-      {
-        find: "@sketchi/studio-projects/client",
-        replacement: new URL(
-          "../../packages/studio/projects/src/client.ts",
-          import.meta.url,
-        ).pathname,
-      },
-      {
-        find: "@sketchi/studio-projects/server",
-        replacement: new URL(
-          "../../packages/studio/projects/src/server.ts",
-          import.meta.url,
-        ).pathname,
-      },
-      {
-        find: "@sketchi/diagram-core",
-        replacement: new URL(
-          "../../packages/diagram/core/src/index.ts",
-          import.meta.url,
-        ).pathname,
-      },
-      {
-        find: "@sketchi/diagram-renderer",
-        replacement: new URL(
-          "../../packages/diagram/renderer/src/index.ts",
-          import.meta.url,
-        ).pathname,
-      },
-      {
-        find: "@sketchi/diagram-generation",
-        replacement: new URL(
-          "../../packages/diagram/generation/src/index.ts",
-          import.meta.url,
-        ).pathname,
-      },
-      {
-        find: "@sketchi/diagram-excalidraw",
-        replacement: new URL(
-          "../../packages/diagram/excalidraw/src/index.ts",
-          import.meta.url,
-        ).pathname,
-      },
-      {
-        find: "@sketchi/diagram-scenarios",
-        replacement: new URL(
-          "../../packages/diagram/scenarios/src/index.ts",
-          import.meta.url,
-        ).pathname,
-      },
-      {
-        find: "@sketchi/diagram-ui/styles.css",
-        replacement: new URL(
-          "../../packages/diagram/ui/src/styles.css",
-          import.meta.url,
-        ).pathname,
-      },
-      {
-        find: "@sketchi/diagram-ui",
-        replacement: new URL(
-          "../../packages/diagram/ui/src/index.ts",
-          import.meta.url,
-        ).pathname,
-      },
-    ],
-  },
+	root: new URL(".", import.meta.url).pathname,
+	build: {
+		emptyOutDir: true,
+		outDir: new URL(`../../${workerProject.buildOutputPath}`, import.meta.url).pathname,
+	},
+	cacheDir: localViteCacheDir("playground"),
+	publicDir: new URL("./public", import.meta.url).pathname,
+	plugins: [
+		excalidrawFonts(),
+		enforceClientServerBoundary(),
+		agents(),
+		codemode(),
+		cloudflare({
+			configPath: new URL("./wrangler.jsonc", import.meta.url).pathname,
+			inspectorPort: localInspectorPort(6210),
+			viteEnvironment: {
+				name: "ssr",
+			},
+		}),
+		tanstackStart({
+			router: {
+				quoteStyle: "double",
+				semicolons: true,
+			},
+			srcDirectory: "src",
+		}),
+		react(),
+		tailwindcss(),
+	],
+	resolve: {
+		alias: [
+			{
+				find: /^@\//,
+				replacement: new URL("./src/", import.meta.url).pathname,
+			},
+			{
+				find: "@sketchi/diagram-agent",
+				replacement: new URL("../../packages/diagram/agent/src/index.ts", import.meta.url).pathname,
+			},
+			{
+				find: "@sketchi/studio-projects/client",
+				replacement: new URL("../../packages/studio/projects/src/client.ts", import.meta.url)
+					.pathname,
+			},
+			{
+				find: "@sketchi/studio-projects/server",
+				replacement: new URL("../../packages/studio/projects/src/server.ts", import.meta.url)
+					.pathname,
+			},
+			{
+				find: "@sketchi/diagram-core",
+				replacement: new URL("../../packages/diagram/core/src/index.ts", import.meta.url).pathname,
+			},
+			{
+				find: "@sketchi/diagram-renderer",
+				replacement: new URL("../../packages/diagram/renderer/src/index.ts", import.meta.url)
+					.pathname,
+			},
+			{
+				find: "@sketchi/diagram-generation",
+				replacement: new URL("../../packages/diagram/generation/src/index.ts", import.meta.url)
+					.pathname,
+			},
+			{
+				find: "@sketchi/diagram-excalidraw",
+				replacement: new URL("../../packages/diagram/excalidraw/src/index.ts", import.meta.url)
+					.pathname,
+			},
+			{
+				find: "@sketchi/diagram-scenarios",
+				replacement: new URL("../../packages/diagram/scenarios/src/index.ts", import.meta.url)
+					.pathname,
+			},
+			{
+				find: "@sketchi/diagram-ui/styles.css",
+				replacement: new URL("../../packages/diagram/ui/src/styles.css", import.meta.url).pathname,
+			},
+			{
+				find: "@sketchi/diagram-ui",
+				replacement: new URL("../../packages/diagram/ui/src/index.ts", import.meta.url).pathname,
+			},
+		],
+	},
 });

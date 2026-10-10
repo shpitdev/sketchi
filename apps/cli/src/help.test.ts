@@ -8,430 +8,372 @@ const binary = resolve(process.cwd(), "apps/cli/dist/sketchi.js");
 const helpHome = resolve(process.cwd(), ".memory/cli-help-home");
 
 function cliEnvironment(): NodeJS.ProcessEnv {
-  const environment: NodeJS.ProcessEnv = { ...process.env, HOME: helpHome };
-  delete environment["NO_COLOR"];
-  delete environment["FORCE_COLOR"];
-  return environment;
+	const environment: NodeJS.ProcessEnv = { ...process.env, HOME: helpHome };
+	delete environment["NO_COLOR"];
+	delete environment["FORCE_COLOR"];
+	return environment;
 }
 
 function help(command?: string): string {
-  return execFileSync(
-    process.execPath,
-    [binary, ...(command ? [command] : []), "--help"],
-    {
-      encoding: "utf8",
-      env: cliEnvironment(),
-    },
-  );
+	return execFileSync(process.execPath, [binary, ...(command ? [command] : []), "--help"], {
+		encoding: "utf8",
+		env: cliEnvironment(),
+	});
 }
 
 function completions(shell: "bash" | "zsh"): string {
-  return execFileSync(process.execPath, [binary, "--completions", shell], {
-    encoding: "utf8",
-    env: cliEnvironment(),
-  });
+	return execFileSync(process.execPath, [binary, "--completions", shell], {
+		encoding: "utf8",
+		env: cliEnvironment(),
+	});
 }
 
 function ttyHelp({
-  colorForegroundBackground,
-  colorTerminal = "truecolor",
-  noColor,
-  terminal = "xterm-256color",
+	colorForegroundBackground,
+	colorTerminal = "truecolor",
+	noColor,
+	terminal = "xterm-256color",
 }: {
-  readonly colorForegroundBackground: string | undefined;
-  readonly colorTerminal?: string | null;
-  readonly noColor?: string;
-  readonly terminal?: string;
+	readonly colorForegroundBackground: string | undefined;
+	readonly colorTerminal?: string | null;
+	readonly noColor?: string;
+	readonly terminal?: string;
 }): string {
-  const command = [
-    JSON.stringify(process.execPath),
-    JSON.stringify(binary),
-    "--help",
-  ].join(" ");
-  const environment: NodeJS.ProcessEnv = {
-    ...cliEnvironment(),
-    TERM: terminal,
-    ...(noColor === undefined ? {} : { NO_COLOR: noColor }),
-  };
-  if (colorForegroundBackground === undefined) delete environment["COLORFGBG"];
-  else environment["COLORFGBG"] = colorForegroundBackground;
-  delete environment["CI"];
-  delete environment["GITHUB_ACTIONS"];
-  if (colorTerminal === null) delete environment["COLORTERM"];
-  else environment["COLORTERM"] = colorTerminal;
-  const terminalCommand =
-    colorForegroundBackground === undefined
-      ? `stty cols 80; env -u COLORFGBG ${command}`
-      : `stty cols 80; ${command}`;
+	const command = [JSON.stringify(process.execPath), JSON.stringify(binary), "--help"].join(" ");
+	const environment: NodeJS.ProcessEnv = {
+		...cliEnvironment(),
+		TERM: terminal,
+		...(noColor === undefined ? {} : { NO_COLOR: noColor }),
+	};
+	if (colorForegroundBackground === undefined) delete environment["COLORFGBG"];
+	else environment["COLORFGBG"] = colorForegroundBackground;
+	delete environment["CI"];
+	delete environment["GITHUB_ACTIONS"];
+	if (colorTerminal === null) delete environment["COLORTERM"];
+	else environment["COLORTERM"] = colorTerminal;
+	const terminalCommand =
+		colorForegroundBackground === undefined
+			? `stty cols 80; env -u COLORFGBG ${command}`
+			: `stty cols 80; ${command}`;
 
-  return spawnSync(
-    "script",
-    ["--quiet", "--return", "--command", terminalCommand, "/dev/null"],
-    {
-      encoding: "utf8",
-      env: environment,
-    },
-  ).stdout;
+	return spawnSync("script", ["--quiet", "--return", "--command", terminalCommand, "/dev/null"], {
+		encoding: "utf8",
+		env: environment,
+	}).stdout;
 }
 
 describe("golden product help", () => {
-  for (const command of [
-    "root",
-    "docs",
-    "generate",
-    "canvas",
-    "create",
-    "show",
-    "edit",
-    "patch",
-    "list",
-    "restore",
-    "share",
-    "pull",
-    "export",
-  ] as const) {
-    it(`keeps ${command} help stable`, async () => {
-      await expect(
-        help(command === "root" ? undefined : command),
-      ).toMatchFileSnapshot(`./__fixtures__/help/${command}.txt`);
-    });
-  }
+	for (const command of [
+		"root",
+		"docs",
+		"generate",
+		"canvas",
+		"create",
+		"show",
+		"edit",
+		"patch",
+		"list",
+		"restore",
+		"share",
+		"pull",
+		"export",
+	] as const) {
+		it(`keeps ${command} help stable`, async () => {
+			await expect(help(command === "root" ? undefined : command)).toMatchFileSnapshot(
+				`./__fixtures__/help/${command}.txt`,
+			);
+		});
+	}
 
-  it("keeps the default help concise and points to the detailed docs", () => {
-    const output = help();
+	it("keeps the default help concise and points to the detailed docs", () => {
+		const output = help();
 
-    expect(output).toContain(
-      'sketchi generate --prompt "Map release approval with pass and revise branches"',
-    );
-    expect(output).toContain("sketchi docs");
-    expect(output).toContain("START HERE");
-    expect(output).toContain("WORK WITH A DIAGRAM");
-    expect(output).not.toContain("create      Create a local diagram");
-    expect(output).not.toContain("GLOBAL FLAGS");
-    expect(output).not.toContain("Canonical flowchart example");
-    expect(output).not.toContain("Share/pull safety limits");
-    expect(output.split("\n").length).toBeLessThan(60);
-  });
+		expect(output).toContain(
+			'sketchi generate --prompt "Map release approval with pass and revise branches"',
+		);
+		expect(output).toContain("sketchi docs");
+		expect(output).toContain("START HERE");
+		expect(output).toContain("WORK WITH A DIAGRAM");
+		expect(output).not.toContain("create      Create a local diagram");
+		expect(output).not.toContain("GLOBAL FLAGS");
+		expect(output).not.toContain("Canonical flowchart example");
+		expect(output).not.toContain("Share/pull safety limits");
+		expect(output.split("\n").length).toBeLessThan(60);
+	});
 
-  it("uses the same human help when invoked without arguments", () => {
-    expect(
-      execFileSync(process.execPath, [binary], {
-        encoding: "utf8",
-        env: cliEnvironment(),
-      }),
-    ).toBe(help());
-  });
+	it("uses the same human help when invoked without arguments", () => {
+		expect(
+			execFileSync(process.execPath, [binary], {
+				encoding: "utf8",
+				env: cliEnvironment(),
+			}),
+		).toBe(help());
+	});
 
-  it("keeps the detailed agent contracts on the explicit docs command", async () => {
-    const output = execFileSync(process.execPath, [binary, "docs"], {
-      encoding: "utf8",
-      env: cliEnvironment(),
-    });
+	it("keeps the detailed agent contracts on the explicit docs command", async () => {
+		const output = execFileSync(process.execPath, [binary, "docs"], {
+			encoding: "utf8",
+			env: cliEnvironment(),
+		});
 
-    expect(output).toContain("Canonical flowchart example");
-    expect(output).toContain("Universal CanvasSpec example");
-    expect(output).toContain("Share/pull safety limits");
-    expect(output).toContain("stdout contains only artifact bytes");
-    await expect(output).toMatchFileSnapshot(
-      "./__fixtures__/help/agent-docs.txt",
-    );
-  });
+		expect(output).toContain("Canonical flowchart example");
+		expect(output).toContain("Universal CanvasSpec example");
+		expect(output).toContain("Share/pull safety limits");
+		expect(output).toContain("stdout contains only artifact bytes");
+		await expect(output).toMatchFileSnapshot("./__fixtures__/help/agent-docs.txt");
+	});
 
-  it("wraps agent documentation in the shared JSON success envelope", () => {
-    const output = execFileSync(
-      process.execPath,
-      [binary, "docs", "--output", "json"],
-      { encoding: "utf8", env: cliEnvironment() },
-    );
+	it("wraps agent documentation in the shared JSON success envelope", () => {
+		const output = execFileSync(process.execPath, [binary, "docs", "--output", "json"], {
+			encoding: "utf8",
+			env: cliEnvironment(),
+		});
 
-    expect(JSON.parse(output)).toMatchObject({
-      ok: true,
-      command: "docs",
-      data: {
-        documentation: expect.stringContaining("Canonical flowchart example"),
-      },
-    });
-  });
+		expect(JSON.parse(output)).toMatchObject({
+			ok: true,
+			command: "docs",
+			data: {
+				documentation: expect.stringContaining("Canonical flowchart example"),
+			},
+		});
+	});
 
-  it("brands automatic root help when only text output is selected", () => {
-    expect(
-      execFileSync(process.execPath, [binary, "--output", "text"], {
-        encoding: "utf8",
-        env: cliEnvironment(),
-      }),
-    ).toBe(help());
-  });
+	it("brands automatic root help when only text output is selected", () => {
+		expect(
+			execFileSync(process.execPath, [binary, "--output", "text"], {
+				encoding: "utf8",
+				env: cliEnvironment(),
+			}),
+		).toBe(help());
+	});
 
-  it("wraps every root JSON help combination without ANSI or empty output", () => {
-    for (const args of [
-      ["--output", "json"],
-      ["--output=json"],
-      ["--help", "--output", "json"],
-      ["--output=json", "--help"],
-    ]) {
-      const output = execFileSync(process.execPath, [binary, ...args], {
-        encoding: "utf8",
-        env: cliEnvironment(),
-      });
+	it("wraps every root JSON help combination without ANSI or empty output", () => {
+		for (const args of [
+			["--output", "json"],
+			["--output=json"],
+			["--help", "--output", "json"],
+			["--output=json", "--help"],
+		]) {
+			const output = execFileSync(process.execPath, [binary, ...args], {
+				encoding: "utf8",
+				env: cliEnvironment(),
+			});
 
-      expect(JSON.parse(output)).toMatchObject({
-        ok: true,
-        command: "sketchi",
-        data: {
-          help: expect.stringContaining(
-            'sketchi generate --prompt "Map release approval with pass and revise branches"',
-          ),
-        },
-      });
-      expect(output).not.toContain("\u001b");
-    }
-  });
+			expect(JSON.parse(output)).toMatchObject({
+				ok: true,
+				command: "sketchi",
+				data: {
+					help: expect.stringContaining(
+						'sketchi generate --prompt "Map release approval with pass and revise branches"',
+					),
+				},
+			});
+			expect(output).not.toContain("\u001b");
+		}
+	});
 
-  it("chooses readable dark and light truecolor wordmarks", () => {
-    const dark = ttyHelp({ colorForegroundBackground: "15;0" });
-    expect(dark).toContain("\u001b[38;2;246;241;231m\u001b[1msketchi");
-    expect(dark).toContain("\u001b[38;2;195;154;172m\u001b[1mSTART HERE");
-    expect(ttyHelp({ colorForegroundBackground: "0;15" })).toContain(
-      "\u001b[38;2;26;23;18m\u001b[1msketchi",
-    );
-  });
+	it("chooses readable dark and light truecolor wordmarks", () => {
+		const dark = ttyHelp({ colorForegroundBackground: "15;0" });
+		expect(dark).toContain("\u001b[38;2;246;241;231m\u001b[1msketchi");
+		expect(dark).toContain("\u001b[38;2;195;154;172m\u001b[1mSTART HERE");
+		expect(ttyHelp({ colorForegroundBackground: "0;15" })).toContain(
+			"\u001b[38;2;26;23;18m\u001b[1msketchi",
+		);
+	});
 
-  it("disables color for NO_COLOR, 4-bit terminals, and pipes", () => {
-    expect(
-      ttyHelp({ colorForegroundBackground: "15;0", noColor: "1" }),
-    ).not.toContain("\u001b");
-    expect(
-      ttyHelp({
-        colorForegroundBackground: "15;0",
-        colorTerminal: null,
-        terminal: "ansi",
-      }),
-    ).not.toContain("\u001b");
-    expect(help()).not.toContain("\u001b");
-  });
+	it("disables color for NO_COLOR, 4-bit terminals, and pipes", () => {
+		expect(ttyHelp({ colorForegroundBackground: "15;0", noColor: "1" })).not.toContain("\u001b");
+		expect(
+			ttyHelp({
+				colorForegroundBackground: "15;0",
+				colorTerminal: null,
+				terminal: "ansi",
+			}),
+		).not.toContain("\u001b");
+		expect(help()).not.toContain("\u001b");
+	});
 
-  it("uses ANSI-256 colors only when its exact palette is readable", () => {
-    expect(
-      ttyHelp({
-        colorForegroundBackground: "15;0",
-        colorTerminal: null,
-      }),
-    ).toContain("\u001b[38;5;255m\u001b[1msketchi");
-  });
+	it("uses ANSI-256 colors only when its exact palette is readable", () => {
+		expect(
+			ttyHelp({
+				colorForegroundBackground: "15;0",
+				colorTerminal: null,
+			}),
+		).toContain("\u001b[38;5;255m\u001b[1msketchi");
+	});
 
-  // COLORFGBG is set by a minority of terminals, so an absent or malformed
-  // value must still paint: it only costs us light-background detection.
-  it.each([undefined, "unknown", "15;"])(
-    "paints the dark palette when the background is unknown (%s)",
-    (colorForegroundBackground) => {
-      const output = ttyHelp({ colorForegroundBackground });
+	// COLORFGBG is set by a minority of terminals, so an absent or malformed
+	// value must still paint: it only costs us light-background detection.
+	it.each([undefined, "unknown", "15;"])(
+		"paints the dark palette when the background is unknown (%s)",
+		(colorForegroundBackground) => {
+			const output = ttyHelp({ colorForegroundBackground });
 
-      expect(output).toContain("\u001b[38;2;158;124;140m");
-      expect(output).toContain("\u001b[38;2;195;154;172m\u001b[1mSTART HERE");
-      expect(output).not.toContain("\u001b[38;2;143;112;127m");
-    },
-  );
+			expect(output).toContain("\u001b[38;2;158;124;140m");
+			expect(output).toContain("\u001b[38;2;195;154;172m\u001b[1mSTART HERE");
+			expect(output).not.toContain("\u001b[38;2;143;112;127m");
+		},
+	);
 
-  it.each(["0;7", "0;10", "0;14", "0;46", "0;82"])(
-    "uses terminal-default text for unreadable ANSI-256 background %s",
-    (colorForegroundBackground) => {
-      expect(
-        ttyHelp({ colorForegroundBackground, colorTerminal: null }),
-      ).not.toContain("\u001b");
-    },
-  );
+	it.each(["0;7", "0;10", "0;14", "0;46", "0;82"])(
+		"uses terminal-default text for unreadable ANSI-256 background %s",
+		(colorForegroundBackground) => {
+			expect(ttyHelp({ colorForegroundBackground, colorTerminal: null })).not.toContain("\u001b");
+		},
+	);
 
-  it.each(["15;12", "15;13"])(
-    "uses terminal-default text for unreadable truecolor background %s",
-    (colorForegroundBackground) => {
-      expect(ttyHelp({ colorForegroundBackground })).not.toContain("\u001b");
-    },
-  );
+	it.each(["15;12", "15;13"])(
+		"uses terminal-default text for unreadable truecolor background %s",
+		(colorForegroundBackground) => {
+			expect(ttyHelp({ colorForegroundBackground })).not.toContain("\u001b");
+		},
+	);
 
-  // Twelve sequential CLI launches need three times the default five-second
-  // budget used by the four-launch JSON-help test, with the same assertions.
-  it("keeps parser-level exclusivity failures in the JSON usage envelope", () => {
-    for (const args of [
-      ["generate", "--output", "json"],
-      ["canvas", "--output", "json"],
-      ["canvas", "--file", "a.json", "--json", "{}", "--output", "json"],
-      ["create", "--output", "json"],
-      ["create", "--file", "a.json", "--json", "{}", "--output", "json"],
-      ["edit", "release-flow", "--output", "json"],
-      ["patch", "release-flow", "--output", "json"],
-      [
-        "patch",
-        "release-flow",
-        "--file",
-        "a.json",
-        "--json",
-        "{}",
-        "--output",
-        "json",
-      ],
-      [
-        "edit",
-        "release-flow",
-        "--file",
-        "a.json",
-        "--json",
-        "{}",
-        "--output",
-        "json",
-      ],
-      ["pull", "release-flow", "--output", "json"],
-      [
-        "pull",
-        "release-flow",
-        "--link",
-        "https://excalidraw.com/#json=one,AAAAAAAAAAAAAAAAAAAAAA",
-        "--link",
-        "https://excalidraw.com/#json=two,AAAAAAAAAAAAAAAAAAAAAA",
-        "--output",
-        "json",
-      ],
-      [
-        "restore",
-        "release-flow",
-        "--revision",
-        "not-a-number",
-        "--output",
-        "json",
-      ],
-    ]) {
-      const result = spawnSync(process.execPath, [binary, ...args], {
-        encoding: "utf8",
-        env: cliEnvironment(),
-      });
+	// Twelve sequential CLI launches need three times the default five-second
+	// budget used by the four-launch JSON-help test, with the same assertions.
+	it("keeps parser-level exclusivity failures in the JSON usage envelope", () => {
+		for (const args of [
+			["generate", "--output", "json"],
+			["canvas", "--output", "json"],
+			["canvas", "--file", "a.json", "--json", "{}", "--output", "json"],
+			["create", "--output", "json"],
+			["create", "--file", "a.json", "--json", "{}", "--output", "json"],
+			["edit", "release-flow", "--output", "json"],
+			["patch", "release-flow", "--output", "json"],
+			["patch", "release-flow", "--file", "a.json", "--json", "{}", "--output", "json"],
+			["edit", "release-flow", "--file", "a.json", "--json", "{}", "--output", "json"],
+			["pull", "release-flow", "--output", "json"],
+			[
+				"pull",
+				"release-flow",
+				"--link",
+				"https://excalidraw.com/#json=one,AAAAAAAAAAAAAAAAAAAAAA",
+				"--link",
+				"https://excalidraw.com/#json=two,AAAAAAAAAAAAAAAAAAAAAA",
+				"--output",
+				"json",
+			],
+			["restore", "release-flow", "--revision", "not-a-number", "--output", "json"],
+		]) {
+			const result = spawnSync(process.execPath, [binary, ...args], {
+				encoding: "utf8",
+				env: cliEnvironment(),
+			});
 
-      expect(result.status).toBe(2);
-      expect(result.stdout).toBe("");
-      expect(JSON.parse(result.stderr)).toMatchObject({
-        ok: false,
-        command: args[0],
-        error: { code: "usage_error" },
-      });
-    }
-  }, 15_000);
+			expect(result.status).toBe(2);
+			expect(result.stdout).toBe("");
+			expect(JSON.parse(result.stderr)).toMatchObject({
+				ok: false,
+				command: args[0],
+				error: { code: "usage_error" },
+			});
+		}
+	}, 15_000);
 
-  it("redacts bearer-shaped values from parser and typed error envelopes", () => {
-    const bearer =
-      "https://excalidraw.com/#json=AAAAAAAAAAAAAAAAAAAAAA,BBBBBBBBBBBBBBBBBBBBBB";
-    for (const args of [
-      [
-        "pull",
-        "missing",
-        "--link",
-        bearer,
-        "--output",
-        bearer,
-        "--output",
-        "json",
-      ],
-      ["pull", bearer, "--link", bearer, "--output", "json"],
-    ]) {
-      const result = spawnSync(process.execPath, [binary, ...args], {
-        encoding: "utf8",
-        env: cliEnvironment(),
-      });
+	it("redacts bearer-shaped values from parser and typed error envelopes", () => {
+		const bearer = "https://excalidraw.com/#json=AAAAAAAAAAAAAAAAAAAAAA,BBBBBBBBBBBBBBBBBBBBBB";
+		for (const args of [
+			["pull", "missing", "--link", bearer, "--output", bearer, "--output", "json"],
+			["pull", bearer, "--link", bearer, "--output", "json"],
+		]) {
+			const result = spawnSync(process.execPath, [binary, ...args], {
+				encoding: "utf8",
+				env: cliEnvironment(),
+			});
 
-      expect([2, 3]).toContain(result.status);
-      // An invalid first --output value uses text usage output; later flags do
-      // not change presentation. Text mode includes the normal usage help.
-      if (args[5] === bearer) {
-        expect(result.stdout).toMatch(/^DESCRIPTION/u);
-        expect(result.stderr).toMatch(/^error: usage_error/u);
-      } else expect(result.stdout).toBe("");
-      expect(result.stdout).not.toContain(bearer);
-      expect(result.stderr).not.toContain(bearer);
-      expect(result.stderr).toContain("[redacted-share-link]");
-    }
-  });
+			expect([2, 3]).toContain(result.status);
+			// An invalid first --output value uses text usage output; later flags do
+			// not change presentation. Text mode includes the normal usage help.
+			if (args[5] === bearer) {
+				expect(result.stdout).toMatch(/^DESCRIPTION/u);
+				expect(result.stderr).toMatch(/^error: usage_error/u);
+			} else expect(result.stdout).toBe("");
+			expect(result.stdout).not.toContain(bearer);
+			expect(result.stderr).not.toContain(bearer);
+			expect(result.stderr).toContain("[redacted-share-link]");
+		}
+	});
 
-  it("checks a pull target before reading a TTY-backed --link -", () => {
-    mkdirSync(helpHome, { recursive: true });
-    const ttyHome = mkdtempSync(resolve(helpHome, "tty-"));
-    const command = [
-      JSON.stringify(process.execPath),
-      JSON.stringify(binary),
-      "pull",
-      "missing",
-      "--link",
-      "-",
-      "--output",
-      "json",
-    ].join(" ");
-    try {
-      const result = spawnSync(
-        "script",
-        ["--quiet", "--return", "--command", command, "/dev/null"],
-        {
-          encoding: "utf8",
-          env: { ...cliEnvironment(), HOME: ttyHome },
-        },
-      );
+	it("checks a pull target before reading a TTY-backed --link -", () => {
+		mkdirSync(helpHome, { recursive: true });
+		const ttyHome = mkdtempSync(resolve(helpHome, "tty-"));
+		const command = [
+			JSON.stringify(process.execPath),
+			JSON.stringify(binary),
+			"pull",
+			"missing",
+			"--link",
+			"-",
+			"--output",
+			"json",
+		].join(" ");
+		try {
+			const result = spawnSync(
+				"script",
+				["--quiet", "--return", "--command", command, "/dev/null"],
+				{
+					encoding: "utf8",
+					env: { ...cliEnvironment(), HOME: ttyHome },
+				},
+			);
 
-      expect(result.status).toBe(5);
-      expect(result.stdout).toContain('"code": "diagram_not_found"');
-      expect(result.stdout).not.toContain("interactive_stdin");
-    } finally {
-      rmSync(ttyHome, { force: true, recursive: true });
-    }
-  });
+			expect(result.status).toBe(5);
+			expect(result.stdout).toContain('"code": "diagram_not_found"');
+			expect(result.stdout).not.toContain("interactive_stdin");
+		} finally {
+			rmSync(ttyHome, { force: true, recursive: true });
+		}
+	});
 
-  it("generates installable zsh completions from the built bundle", () => {
-    const output = completions("zsh");
+	it("generates installable zsh completions from the built bundle", () => {
+		const output = completions("zsh");
 
-    expect(output).toMatch(/^#compdef sketchi\n/u);
-    expect(output).toContain("###-begin-sketchi-completions-###");
-    expect(output).toContain("compdef _sketchi sketchi");
-    expect(output).toContain("###-end-sketchi-completions-###");
-  });
+		expect(output).toMatch(/^#compdef sketchi\n/u);
+		expect(output).toContain("###-begin-sketchi-completions-###");
+		expect(output).toContain("compdef _sketchi sketchi");
+		expect(output).toContain("###-end-sketchi-completions-###");
+	});
 
-  it("generates installable bash completions from the built bundle", () => {
-    const output = completions("bash");
+	it("generates installable bash completions from the built bundle", () => {
+		const output = completions("bash");
 
-    expect(output).toMatch(/^###-begin-sketchi-completions-###\n/u);
-    expect(output).toContain("complete -F _sketchi sketchi");
-    expect(output).toContain("###-end-sketchi-completions-###");
-  });
+		expect(output).toMatch(/^###-begin-sketchi-completions-###\n/u);
+		expect(output).toContain("complete -F _sketchi sketchi");
+		expect(output).toContain("###-end-sketchi-completions-###");
+	});
 
-  it("reports unsupported completion shells as a text usage error", () => {
-    const result = spawnSync(
-      process.execPath,
-      [binary, "--completions", "powershell"],
-      {
-        encoding: "utf8",
-        env: cliEnvironment(),
-      },
-    );
+	it("reports unsupported completion shells as a text usage error", () => {
+		const result = spawnSync(process.execPath, [binary, "--completions", "powershell"], {
+			encoding: "utf8",
+			env: cliEnvironment(),
+		});
 
-    expect(result.status).toBe(2);
-    expect(result.stdout).toBe("");
-    expect(result.stderr).toContain("error: usage_error");
-    expect(result.stderr).toContain("powershell");
-    expect(result.stderr).toContain('"bash" | "zsh" | "fish" | "sh"');
-  });
+		expect(result.status).toBe(2);
+		expect(result.stdout).toBe("");
+		expect(result.stderr).toContain("error: usage_error");
+		expect(result.stderr).toContain("powershell");
+		expect(result.stderr).toContain('"bash" | "zsh" | "fish" | "sh"');
+	});
 
-  it("reports unsupported completion shells in the JSON usage envelope", () => {
-    const result = spawnSync(
-      process.execPath,
-      [binary, "--output", "json", "--completions", "powershell"],
-      {
-        encoding: "utf8",
-        env: cliEnvironment(),
-      },
-    );
+	it("reports unsupported completion shells in the JSON usage envelope", () => {
+		const result = spawnSync(
+			process.execPath,
+			[binary, "--output", "json", "--completions", "powershell"],
+			{
+				encoding: "utf8",
+				env: cliEnvironment(),
+			},
+		);
 
-    expect(result.status).toBe(2);
-    expect(result.stdout).toBe("");
-    expect(JSON.parse(result.stderr)).toMatchObject({
-      ok: false,
-      command: "sketchi",
-      error: {
-        code: "usage_error",
-        message: expect.stringContaining('"bash" | "zsh" | "fish" | "sh"'),
-      },
-    });
-  });
+		expect(result.status).toBe(2);
+		expect(result.stdout).toBe("");
+		expect(JSON.parse(result.stderr)).toMatchObject({
+			ok: false,
+			command: "sketchi",
+			error: {
+				code: "usage_error",
+				message: expect.stringContaining('"bash" | "zsh" | "fish" | "sh"'),
+			},
+		});
+	});
 });

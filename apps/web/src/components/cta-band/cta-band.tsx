@@ -1,10 +1,10 @@
 import { DEFAULT_WEB_SURFACE_URLS } from "../../lib/surface-urls";
 
 export interface CtaBandProps {
-  /** Link to the no-signup playground. */
-  playgroundHref?: string;
-  /** Link to the agent setup hub. */
-  agentsHref?: string;
+	/** Link to the no-signup playground. */
+	playgroundHref?: string;
+	/** Link to the agent setup hub. */
+	agentsHref?: string;
 }
 
 /**
@@ -13,26 +13,26 @@ export interface CtaBandProps {
  * not the answer for. The CLI has its own section above.
  */
 export function CtaBand({
-  playgroundHref = DEFAULT_WEB_SURFACE_URLS.playground,
-  agentsHref = "/agents",
+	playgroundHref = DEFAULT_WEB_SURFACE_URLS.playground,
+	agentsHref = "/agents",
 }: CtaBandProps) {
-  return (
-    <section className="cta-band">
-      <div className="sk-shell">
-        <div className="cta-band__sheet">
-          <span className="cta-band__caret" aria-hidden="true" />
-          <h2 className="cta-band__title">Describe your first diagram.</h2>
-          <p className="cta-band__lead">No sign-up required.</p>
-          <div className="cta-band__actions">
-            <a className="sk-btn sk-btn--accent" href={playgroundHref}>
-              Open the playground
-            </a>
-            <a className="cta-band__link" href={agentsHref}>
-              Add to your coding agent →
-            </a>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
+	return (
+		<section className="cta-band">
+			<div className="sk-shell">
+				<div className="cta-band__sheet">
+					<span className="cta-band__caret" aria-hidden="true" />
+					<h2 className="cta-band__title">Describe your first diagram.</h2>
+					<p className="cta-band__lead">No sign-up required.</p>
+					<div className="cta-band__actions">
+						<a className="sk-btn sk-btn--accent" href={playgroundHref}>
+							Open the playground
+						</a>
+						<a className="cta-band__link" href={agentsHref}>
+							Add to your coding agent →
+						</a>
+					</div>
+				</div>
+			</div>
+		</section>
+	);
 }

@@ -7,109 +7,93 @@ import { LocalFileSystemLive } from "./filesystem.js";
 import { InputReader, makeInputReaderLayer } from "./input.js";
 
 function inputLayer(stdin: Stream.Stream<Uint8Array>, tty: boolean) {
-  const dependencies = Layer.mergeAll(
-    LocalFileSystemLive.pipe(Layer.provide(NodeFileSystem.layer)),
-    Stdio.layerTest({ stdin }),
-  );
-  return makeInputReaderLayer(() => tty).pipe(Layer.provide(dependencies));
+	const dependencies = Layer.mergeAll(
+		LocalFileSystemLive.pipe(Layer.provide(NodeFileSystem.layer)),
+		Stdio.layerTest({ stdin }),
+	);
+	return makeInputReaderLayer(() => tty).pipe(Layer.provide(dependencies));
 }
 
 describe("input reader", () => {
-  it.effect(
-    "rejects interactive --file - promptly with usage input failure",
-    () =>
-      Effect.gen(function* () {
-        const program = Effect.gen(function* () {
-          const reader = yield* InputReader;
-          return yield* Effect.flip(reader.read({ _tag: "File", path: "-" }));
-        });
-        const error = yield* program.pipe(
-          Effect.provide(inputLayer(Stream.never, true)),
-        );
+	it.effect("rejects interactive --file - promptly with usage input failure", () =>
+		Effect.gen(function* () {
+			const program = Effect.gen(function* () {
+				const reader = yield* InputReader;
+				return yield* Effect.flip(reader.read({ _tag: "File", path: "-" }));
+			});
+			const error = yield* program.pipe(Effect.provide(inputLayer(Stream.never, true)));
 
-        assert.strictEqual(error.code, "interactive_stdin");
-      }),
-  );
+			assert.strictEqual(error.code, "interactive_stdin");
+		}),
+	);
 
-  it.effect("collects noninteractive UTF-8 stdin", () =>
-    Effect.gen(function* () {
-      const bytes = new TextEncoder().encode('{"type":"mindmap"}');
-      const program = Effect.gen(function* () {
-        const reader = yield* InputReader;
-        return yield* reader.read({ _tag: "File", path: "-" });
-      });
-      const value = yield* program.pipe(
-        Effect.provide(
-          inputLayer(Stream.make(bytes.slice(0, 7), bytes.slice(7)), false),
-        ),
-      );
+	it.effect("collects noninteractive UTF-8 stdin", () =>
+		Effect.gen(function* () {
+			const bytes = new TextEncoder().encode('{"type":"mindmap"}');
+			const program = Effect.gen(function* () {
+				const reader = yield* InputReader;
+				return yield* reader.read({ _tag: "File", path: "-" });
+			});
+			const value = yield* program.pipe(
+				Effect.provide(inputLayer(Stream.make(bytes.slice(0, 7), bytes.slice(7)), false)),
+			);
 
-      assert.strictEqual(value, '{"type":"mindmap"}');
-    }),
-  );
+			assert.strictEqual(value, '{"type":"mindmap"}');
+		}),
+	);
 
-  it.effect("fails bounded stdin before collecting an oversized link", () =>
-    Effect.gen(function* () {
-      const program = Effect.gen(function* () {
-        const reader = yield* InputReader;
-        return yield* Effect.flip(
-          reader.read(
-            { _tag: "File", path: "-" },
-            { content: "share link", maxBytes: 4 },
-          ),
-        );
-      });
-      const error = yield* program.pipe(
-        Effect.provide(
-          inputLayer(
-            Stream.make(
-              new TextEncoder().encode("1234"),
-              new TextEncoder().encode("5"),
-            ),
-            false,
-          ),
-        ),
-      );
+	it.effect("fails bounded stdin before collecting an oversized link", () =>
+		Effect.gen(function* () {
+			const program = Effect.gen(function* () {
+				const reader = yield* InputReader;
+				return yield* Effect.flip(
+					reader.read({ _tag: "File", path: "-" }, { content: "share link", maxBytes: 4 }),
+				);
+			});
+			const error = yield* program.pipe(
+				Effect.provide(
+					inputLayer(
+						Stream.make(new TextEncoder().encode("1234"), new TextEncoder().encode("5")),
+						false,
+					),
+				),
+			);
 
-      assert.strictEqual(error.code, "input_read_failed");
-      assert.include(error.message, "4 byte limit");
-    }),
-  );
+			assert.strictEqual(error.code, "input_read_failed");
+			assert.include(error.message, "4 byte limit");
+		}),
+	);
 
-  it.effect("reports invalid UTF-8 through the typed input channel", () =>
-    Effect.gen(function* () {
-      const program = Effect.gen(function* () {
-        const reader = yield* InputReader;
-        return yield* Effect.flip(reader.read({ _tag: "File", path: "-" }));
-      });
-      const error = yield* program.pipe(
-        Effect.provide(inputLayer(Stream.make(new Uint8Array([0xff])), false)),
-      );
+	it.effect("reports invalid UTF-8 through the typed input channel", () =>
+		Effect.gen(function* () {
+			const program = Effect.gen(function* () {
+				const reader = yield* InputReader;
+				return yield* Effect.flip(reader.read({ _tag: "File", path: "-" }));
+			});
+			const error = yield* program.pipe(
+				Effect.provide(inputLayer(Stream.make(new Uint8Array([0xff])), false)),
+			);
 
-      assert.strictEqual(error._tag, "CliInputError");
-      assert.strictEqual(error.code, "input_read_failed");
-    }),
-  );
+			assert.strictEqual(error._tag, "CliInputError");
+			assert.strictEqual(error.code, "input_read_failed");
+		}),
+	);
 
-  it.effect(
-    "maps local file read failures without leaking filesystem causes",
-    () =>
-      Effect.gen(function* () {
-        const program = Effect.gen(function* () {
-          const reader = yield* InputReader;
-          return yield* Effect.flip(
-            reader.read({
-              _tag: "File",
-              path: ".memory/missing-cli-input.json",
-            }),
-          );
-        });
-        const error = yield* program.pipe(
-          Effect.provide(inputLayer(Stream.empty, false)),
-        );
+	it.effect("maps local file read failures without leaking filesystem causes", () =>
+		Effect.gen(function* () {
+			const program = Effect.gen(function* () {
+				const reader = yield* InputReader;
+				return yield* Effect.flip(
+					reader.read({
+						_tag: "File",
+						path: ".memory/missing-cli-input.json",
+					}),
+				);
+			});
+			const error = yield* program.pipe(Effect.provide(inputLayer(Stream.empty, false)));
 
-        assert.strictEqual(error.code, "input_read_failed");
-        assert.notInclude(error.message, "ENOENT");
-      }),
-  );
+			assert.strictEqual(error.code, "input_read_failed");
+			assert.notInclude(error.message, "ENOENT");
+		}),
+	);
 });

@@ -7,18 +7,16 @@ import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 import { DiagramInspector } from "./diagram-inspector";
 import "../../styles/app.css";
 
-const scene = convertSceneToExcalidraw(
-  renderIntermediateDiagram(pharmaBatchDispositionFlowchart),
-);
+const scene = convertSceneToExcalidraw(renderIntermediateDiagram(pharmaBatchDispositionFlowchart));
 
 const meta = {
-  title: "Excalidraw/Components/DiagramInspector",
-  component: DiagramInspector,
-  args: {
-    diagram: pharmaBatchDispositionFlowchart,
-    scene,
-  },
-  tags: ["test"],
+	title: "Excalidraw/Components/DiagramInspector",
+	component: DiagramInspector,
+	args: {
+		diagram: pharmaBatchDispositionFlowchart,
+		scene,
+	},
+	tags: ["test"],
 } satisfies Meta<typeof DiagramInspector>;
 
 export default meta;

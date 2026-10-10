@@ -1,5 +1,5 @@
 export interface DiagramTypeGeneratorSchema {
-  name: string;
-  title?: string;
-  skipFormat?: boolean;
+	name: string;
+	title?: string;
+	skipFormat?: boolean;
 }

@@ -7,16 +7,15 @@ import { pageMeta } from "../../lib/site-meta";
 const agentId = "antigravity" satisfies AgentSetupId;
 
 export const Route = createFileRoute("/agents/antigravity")({
-  head: () =>
-    pageMeta({
-      title: "Antigravity setup - Sketchi",
-      description:
-        "Add Sketchi to Antigravity and turn prompts into editable diagrams.",
-      path: "/agents/antigravity",
-    }),
-  component: AntigravityRoute,
+	head: () =>
+		pageMeta({
+			title: "Antigravity setup - Sketchi",
+			description: "Add Sketchi to Antigravity and turn prompts into editable diagrams.",
+			path: "/agents/antigravity",
+		}),
+	component: AntigravityRoute,
 });
 
 function AntigravityRoute() {
-  return <AgentSetupView agentId={agentId} />;
+	return <AgentSetupView agentId={agentId} />;
 }

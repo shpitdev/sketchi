@@ -1,25 +1,25 @@
 {
-  "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "sketchi-icons",
-  "compatibility_date": "2026-06-06",
-  "compatibility_flags": ["nodejs_compat"],
-  "main": "@tanstack/react-start/server-entry",
-  "assets": {
-    "binding": "ASSETS",
-  },
-  "observability": {
-    "enabled": true,
-  },
-  "workers_dev": true,
-  "vars": {
-    "SKETCHI_APP_SURFACE": "icons",
-  },
-  "previews": {
-    "vars": {
-      "SKETCHI_APP_SURFACE": "icons",
-    },
-    "observability": {
-      "enabled": true,
-    },
-  },
+	"$schema": "../../node_modules/wrangler/config-schema.json",
+	"name": "sketchi-icons",
+	"compatibility_date": "2026-06-06",
+	"compatibility_flags": ["nodejs_compat"],
+	"main": "@tanstack/react-start/server-entry",
+	"assets": {
+		"binding": "ASSETS"
+	},
+	"observability": {
+		"enabled": true
+	},
+	"workers_dev": true,
+	"vars": {
+		"SKETCHI_APP_SURFACE": "icons"
+	},
+	"previews": {
+		"vars": {
+			"SKETCHI_APP_SURFACE": "icons"
+		},
+		"observability": {
+			"enabled": true
+		}
+	}
 }

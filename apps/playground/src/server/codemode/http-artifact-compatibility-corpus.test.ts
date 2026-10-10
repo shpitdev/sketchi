@@ -2,548 +2,497 @@ import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
-  CodeModeObjectBucket,
-  CodeModeObjectBucketBody,
-  CodeModeObjectBucketObject,
+	CodeModeObjectBucket,
+	CodeModeObjectBucketBody,
+	CodeModeObjectBucketObject,
 } from "@sketchi/diagram-agent";
 
 import {
-  handleBuildFlowchartRequest as handleBuildFlowchartRequestEffect,
-  handleBuildMindmapRequest as handleBuildMindmapRequestEffect,
-  handleGetArtifactRequest as handleGetArtifactRequestEffect,
-  handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
+	handleBuildFlowchartRequest as handleBuildFlowchartRequestEffect,
+	handleBuildMindmapRequest as handleBuildMindmapRequestEffect,
+	handleGetArtifactRequest as handleGetArtifactRequestEffect,
+	handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
 } from "./api.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
 import { runPlaygroundEffect } from "../runtime/runtime.server";
 
 function testBoundary(env: StudioEnv, request: Request) {
-  return {
-    env,
-    request,
-    platform: {
-      waitUntilPromise: (promise: Promise<unknown>) => {
-        void promise;
-      },
-    },
-  };
+	return {
+		env,
+		request,
+		platform: {
+			waitUntilPromise: (promise: Promise<unknown>) => {
+				void promise;
+			},
+		},
+	};
 }
 
 function handleBuildFlowchartRequest(env: StudioEnv, request: Request) {
-  return runPlaygroundEffect(
-    handleBuildFlowchartRequestEffect(request),
-    testBoundary(env, request),
-  );
+	return runPlaygroundEffect(
+		handleBuildFlowchartRequestEffect(request),
+		testBoundary(env, request),
+	);
 }
 
 function handleBuildMindmapRequest(env: StudioEnv, request: Request) {
-  return runPlaygroundEffect(
-    handleBuildMindmapRequestEffect(request),
-    testBoundary(env, request),
-  );
+	return runPlaygroundEffect(handleBuildMindmapRequestEffect(request), testBoundary(env, request));
 }
 
-function handleGetArtifactRequest(
-  env: StudioEnv,
-  request: Request,
-  artifactId: string,
-) {
-  return runPlaygroundEffect(
-    handleGetArtifactRequestEffect(request, artifactId),
-    testBoundary(env, request),
-  );
+function handleGetArtifactRequest(env: StudioEnv, request: Request, artifactId: string) {
+	return runPlaygroundEffect(
+		handleGetArtifactRequestEffect(request, artifactId),
+		testBoundary(env, request),
+	);
 }
 
-function handlePatchArtifactRequest(
-  env: StudioEnv,
-  request: Request,
-  artifactId: string,
-) {
-  return runPlaygroundEffect(
-    handlePatchArtifactRequestEffect(request, artifactId),
-    testBoundary(env, request),
-  );
+function handlePatchArtifactRequest(env: StudioEnv, request: Request, artifactId: string) {
+	return runPlaygroundEffect(
+		handlePatchArtifactRequestEffect(request, artifactId),
+		testBoundary(env, request),
+	);
 }
 
 interface StoredObject {
-  readonly body: CodeModeObjectBucketBody;
-  readonly contentType?: string;
+	readonly body: CodeModeObjectBucketBody;
+	readonly contentType?: string;
 }
 
 class RecordingBucket implements CodeModeObjectBucket {
-  readonly objects = new Map<string, StoredObject>();
+	readonly objects = new Map<string, StoredObject>();
 
-  async get(key: string): Promise<CodeModeObjectBucketObject | null> {
-    const object = this.objects.get(key);
-    if (!object) return null;
-    const bytes =
-      typeof object.body === "string"
-        ? new TextEncoder().encode(object.body)
-        : new Uint8Array(object.body);
-    return {
-      size: bytes.byteLength,
-      arrayBuffer: async () => bytes.slice().buffer,
-      text: async () => new TextDecoder().decode(bytes),
-    };
-  }
+	async get(key: string): Promise<CodeModeObjectBucketObject | null> {
+		const object = this.objects.get(key);
+		if (!object) return null;
+		const bytes =
+			typeof object.body === "string"
+				? new TextEncoder().encode(object.body)
+				: new Uint8Array(object.body);
+		return {
+			size: bytes.byteLength,
+			arrayBuffer: async () => bytes.slice().buffer,
+			text: async () => new TextDecoder().decode(bytes),
+		};
+	}
 
-  async put(
-    key: string,
-    value: CodeModeObjectBucketBody,
-    options?: { httpMetadata?: { contentType?: string } },
-  ): Promise<unknown> {
-    this.objects.set(key, {
-      body: typeof value === "string" ? value : new Uint8Array(value).slice(),
-      ...(options?.httpMetadata?.contentType
-        ? { contentType: options.httpMetadata.contentType }
-        : {}),
-    });
-    return null;
-  }
+	async put(
+		key: string,
+		value: CodeModeObjectBucketBody,
+		options?: { httpMetadata?: { contentType?: string } },
+	): Promise<unknown> {
+		this.objects.set(key, {
+			body: typeof value === "string" ? value : new Uint8Array(value).slice(),
+			...(options?.httpMetadata?.contentType
+				? { contentType: options.httpMetadata.contentType }
+				: {}),
+		});
+		return null;
+	}
 }
 
 function approvalSpec() {
-  return {
-    title: "Worker API approval flow",
-    nodes: [
-      { id: "request", label: "Request arrives", kind: "start" },
-      { id: "approve", label: "Approved?", kind: "decision" },
-      { id: "done", label: "Done", kind: "end" },
-      { id: "revise", label: "Revise", kind: "end" },
-    ],
-    edges: [
-      { source: "request", target: "approve" },
-      { source: "approve", target: "done", label: "yes" },
-      { source: "approve", target: "revise", label: "no" },
-    ],
-  };
+	return {
+		title: "Worker API approval flow",
+		nodes: [
+			{ id: "request", label: "Request arrives", kind: "start" },
+			{ id: "approve", label: "Approved?", kind: "decision" },
+			{ id: "done", label: "Done", kind: "end" },
+			{ id: "revise", label: "Revise", kind: "end" },
+		],
+		edges: [
+			{ source: "request", target: "approve" },
+			{ source: "approve", target: "done", label: "yes" },
+			{ source: "approve", target: "revise", label: "no" },
+		],
+	};
 }
 
 function postRequest(url: string, body: unknown): Request {
-  return new Request(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+	return new Request(url, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(body),
+	});
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function stringField(value: unknown, field: string): string {
-  if (isRecord(value) && typeof value[field] === "string") {
-    return value[field];
-  }
-  throw new Error(`Compatibility response did not contain ${field}.`);
+	if (isRecord(value) && typeof value[field] === "string") {
+		return value[field];
+	}
+	throw new Error(`Compatibility response did not contain ${field}.`);
 }
 
 function artifactIdFrom(value: unknown): string {
-  if (isRecord(value) && isRecord(value.artifact)) {
-    return stringField(value.artifact, "artifactId");
-  }
-  throw new Error("Compatibility response did not contain an artifact.");
+	if (isRecord(value) && isRecord(value.artifact)) {
+		return stringField(value.artifact, "artifactId");
+	}
+	throw new Error("Compatibility response did not contain an artifact.");
 }
 
-function normalizeStrings(
-  value: unknown,
-  replacements: ReadonlyMap<string, string>,
-): unknown {
-  if (typeof value === "string") {
-    let normalized = value;
-    for (const [actual, replacement] of replacements) {
-      normalized = normalized.replaceAll(actual, replacement);
-    }
-    return normalized;
-  }
-  if (Array.isArray(value)) {
-    return value.map((entry) => normalizeStrings(entry, replacements));
-  }
-  if (isRecord(value)) {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [
-        key,
-        normalizeStrings(entry, replacements),
-      ]),
-    );
-  }
-  return value;
+function normalizeStrings(value: unknown, replacements: ReadonlyMap<string, string>): unknown {
+	if (typeof value === "string") {
+		let normalized = value;
+		for (const [actual, replacement] of replacements) {
+			normalized = normalized.replaceAll(actual, replacement);
+		}
+		return normalized;
+	}
+	if (Array.isArray(value)) {
+		return value.map((entry) => normalizeStrings(entry, replacements));
+	}
+	if (isRecord(value)) {
+		return Object.fromEntries(
+			Object.entries(value).map(([key, entry]) => [key, normalizeStrings(entry, replacements)]),
+		);
+	}
+	return value;
 }
 
-function normalizeSketchiPaletteAgainstExactBase(
-  value: unknown,
-  exactBase: unknown,
-): unknown {
-  if (Array.isArray(value) && Array.isArray(exactBase)) {
-    return value.map((entry, index) =>
-      normalizeSketchiPaletteAgainstExactBase(entry, exactBase[index]),
-    );
-  }
-  if (isRecord(value) && isRecord(exactBase)) {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [
-        key,
-        normalizeSketchiPaletteAgainstExactBase(entry, exactBase[key]),
-      ]),
-    );
-  }
-  if (typeof value !== "string" || typeof exactBase !== "string") {
-    return value;
-  }
+function normalizeSketchiPaletteAgainstExactBase(value: unknown, exactBase: unknown): unknown {
+	if (Array.isArray(value) && Array.isArray(exactBase)) {
+		return value.map((entry, index) =>
+			normalizeSketchiPaletteAgainstExactBase(entry, exactBase[index]),
+		);
+	}
+	if (isRecord(value) && isRecord(exactBase)) {
+		return Object.fromEntries(
+			Object.entries(value).map(([key, entry]) => [
+				key,
+				normalizeSketchiPaletteAgainstExactBase(entry, exactBase[key]),
+			]),
+		);
+	}
+	if (typeof value !== "string" || typeof exactBase !== "string") {
+		return value;
+	}
 
-  let normalized = value;
-  if (exactBase.includes("#000000")) {
-    normalized = normalized.replaceAll("#8f707f", "#000000");
-  } else if (exactBase.includes("#7c3aed")) {
-    normalized = normalized.replaceAll("#8f707f", "#7c3aed");
-  }
-  return normalized
-    .replaceAll("#fffdf8", "#ffffff")
-    .replaceAll("#1a1712", "#1e1e1e");
+	let normalized = value;
+	if (exactBase.includes("#000000")) {
+		normalized = normalized.replaceAll("#8f707f", "#000000");
+	} else if (exactBase.includes("#7c3aed")) {
+		normalized = normalized.replaceAll("#8f707f", "#7c3aed");
+	}
+	return normalized.replaceAll("#fffdf8", "#ffffff").replaceAll("#1a1712", "#1e1e1e");
 }
 
-function normalizeCanvasMigrationAgainstExactBase(
-  value: unknown,
-  exactBase: unknown,
-): unknown {
-  if (Array.isArray(value) && Array.isArray(exactBase)) {
-    return value.map((entry, index) =>
-      normalizeCanvasMigrationAgainstExactBase(entry, exactBase[index]),
-    );
-  }
-  if (isRecord(value) && isRecord(exactBase)) {
-    const isCanvasSpec =
-      value["kind"] === "canvas" &&
-      value["version"] === 1 &&
-      Array.isArray(value["elements"]);
-    const isCanvasElement =
-      typeof value["id"] === "string" &&
-      !Object.hasOwn(value, "seed") &&
-      ["node", "text", "arrow", "line", "frame"].includes(
-        String(value["type"]),
-      );
-    return Object.fromEntries(
-      Object.entries(value).flatMap(([key, entry]) =>
-        (isCanvasSpec &&
-          ["kind", "version", "layers", "layouts", "zOrder"].includes(key)) ||
-        (isCanvasElement && ["rendererRole", "strokeStyle"].includes(key))
-          ? []
-          : [
-              [
-                key,
-                key === "sizeBytes" && value["format"] === "scene"
-                  ? exactBase[key]
-                  : normalizeCanvasMigrationAgainstExactBase(
-                      entry,
-                      exactBase[key],
-                    ),
-              ],
-            ],
-      ),
-    );
-  }
-  return value;
+function normalizeCanvasMigrationAgainstExactBase(value: unknown, exactBase: unknown): unknown {
+	if (Array.isArray(value) && Array.isArray(exactBase)) {
+		return value.map((entry, index) =>
+			normalizeCanvasMigrationAgainstExactBase(entry, exactBase[index]),
+		);
+	}
+	if (isRecord(value) && isRecord(exactBase)) {
+		const isCanvasSpec =
+			value["kind"] === "canvas" && value["version"] === 1 && Array.isArray(value["elements"]);
+		const isCanvasElement =
+			typeof value["id"] === "string" &&
+			!Object.hasOwn(value, "seed") &&
+			["node", "text", "arrow", "line", "frame"].includes(String(value["type"]));
+		return Object.fromEntries(
+			Object.entries(value).flatMap(([key, entry]) =>
+				(isCanvasSpec && ["kind", "version", "layers", "layouts", "zOrder"].includes(key)) ||
+				(isCanvasElement && ["rendererRole", "strokeStyle"].includes(key))
+					? []
+					: [
+							[
+								key,
+								key === "sizeBytes" && value["format"] === "scene"
+									? exactBase[key]
+									: normalizeCanvasMigrationAgainstExactBase(entry, exactBase[key]),
+							],
+						],
+			),
+		);
+	}
+	return value;
 }
 
 // Keep the exact-base fixture intact while correcting only S4 scene bounds.
 function withApprovedSceneWidths(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(withApprovedSceneWidths);
-  if (!isRecord(value)) return value;
-  const corrected = Object.fromEntries(
-    Object.entries(value).map(([key, entry]) => [
-      key,
-      withApprovedSceneWidths(entry),
-    ]),
-  );
-  if (Array.isArray(value["elements"])) {
-    if (
-      value["diagramId"] === "worker-api-approval-flow" &&
-      value["width"] === 632
-    ) {
-      corrected["width"] = 576;
-    }
-    if (value["diagramId"] === "release-plan" && value["width"] === 896) {
-      corrected["width"] = 840;
-    }
-  }
-  // Width 840 makes the mindmap's 352px height govern its initial fit zoom.
-  const body = corrected["body"];
-  if (
-    value["key"] === "codemode/<mindmap-artifact-id>/excalidraw.json" &&
-    isRecord(body) &&
-    isRecord(body["appState"]) &&
-    isRecord(body["appState"]["zoom"]) &&
-    body["appState"]["zoom"]["value"] === 0.96
-  ) {
-    body["appState"]["zoom"]["value"] = 0.97;
-  }
-  return corrected;
+	if (Array.isArray(value)) return value.map(withApprovedSceneWidths);
+	if (!isRecord(value)) return value;
+	const corrected = Object.fromEntries(
+		Object.entries(value).map(([key, entry]) => [key, withApprovedSceneWidths(entry)]),
+	);
+	if (Array.isArray(value["elements"])) {
+		if (value["diagramId"] === "worker-api-approval-flow" && value["width"] === 632) {
+			corrected["width"] = 576;
+		}
+		if (value["diagramId"] === "release-plan" && value["width"] === 896) {
+			corrected["width"] = 840;
+		}
+	}
+	// Width 840 makes the mindmap's 352px height govern its initial fit zoom.
+	const body = corrected["body"];
+	if (
+		value["key"] === "codemode/<mindmap-artifact-id>/excalidraw.json" &&
+		isRecord(body) &&
+		isRecord(body["appState"]) &&
+		isRecord(body["appState"]["zoom"]) &&
+		body["appState"]["zoom"]["value"] === 0.96
+	) {
+		body["appState"]["zoom"]["value"] = 0.97;
+	}
+	return corrected;
 }
 
-async function jsonObservation(
-  response: Response,
-  replacements: ReadonlyMap<string, string>,
-) {
-  return {
-    status: response.status,
-    cacheControl: response.headers.get("cache-control"),
-    body: normalizeStrings(await response.json(), replacements),
-  };
+async function jsonObservation(response: Response, replacements: ReadonlyMap<string, string>) {
+	return {
+		status: response.status,
+		cacheControl: response.headers.get("cache-control"),
+		body: normalizeStrings(await response.json(), replacements),
+	};
 }
 
 function persistedArtifactObjects(
-  bucket: RecordingBucket,
-  artifactIds: readonly string[],
-  replacements: ReadonlyMap<string, string>,
+	bucket: RecordingBucket,
+	artifactIds: readonly string[],
+	replacements: ReadonlyMap<string, string>,
 ) {
-  return [...bucket.objects.entries()]
-    .filter(([key]) =>
-      artifactIds.some((artifactId) =>
-        key.startsWith(`codemode/${artifactId}/`),
-      ),
-    )
-    .map(([key, object]) => {
-      const body =
-        typeof object.body === "string"
-          ? normalizeStrings(JSON.parse(object.body), replacements)
-          : [...new Uint8Array(object.body)];
-      return {
-        key: normalizeStrings(key, replacements),
-        ...(object.contentType ? { contentType: object.contentType } : {}),
-        encoding: typeof object.body === "string" ? "utf8-json" : "bytes",
-        body,
-      };
-    })
-    .sort((left, right) => String(left.key).localeCompare(String(right.key)));
+	return [...bucket.objects.entries()]
+		.filter(([key]) => artifactIds.some((artifactId) => key.startsWith(`codemode/${artifactId}/`)))
+		.map(([key, object]) => {
+			const body =
+				typeof object.body === "string"
+					? normalizeStrings(JSON.parse(object.body), replacements)
+					: [...new Uint8Array(object.body)];
+			return {
+				key: normalizeStrings(key, replacements),
+				...(object.contentType ? { contentType: object.contentType } : {}),
+				encoding: typeof object.body === "string" ? "utf8-json" : "bytes",
+				body,
+			};
+		})
+		.sort((left, right) => String(left.key).localeCompare(String(right.key)));
 }
 
 afterEach(() => {
-  vi.useRealTimers();
+	vi.useRealTimers();
 });
 
 describe("exact-base Code Mode HTTP artifact compatibility corpus", () => {
-  it("corrects only the approved scene widths in nested encoding expectations", () => {
-    expect(
-      withApprovedSceneWidths({
-        raw: {
-          diagramId: "worker-api-approval-flow",
-          elements: [{ id: "node", width: 632 }],
-          width: 632,
-        },
-        persistedEncoding: [
-          { body: { diagramId: "release-plan", elements: [], width: 896 } },
-          {
-            key: "codemode/<mindmap-artifact-id>/excalidraw.json",
-            body: { appState: { zoom: { value: 0.96 } } },
-          },
-          {
-            key: "codemode/<source-artifact-id>/excalidraw.json",
-            body: { appState: { zoom: { value: 0.96 } } },
-          },
-        ],
-        unrelated: { diagramId: "other", elements: [], width: 632 },
-        unexpectedWidth: {
-          diagramId: "worker-api-approval-flow",
-          elements: [],
-          width: 633,
-        },
-      }),
-    ).toEqual({
-      raw: {
-        diagramId: "worker-api-approval-flow",
-        elements: [{ id: "node", width: 632 }],
-        width: 576,
-      },
-      persistedEncoding: [
-        { body: { diagramId: "release-plan", elements: [], width: 840 } },
-        {
-          key: "codemode/<mindmap-artifact-id>/excalidraw.json",
-          body: { appState: { zoom: { value: 0.97 } } },
-        },
-        {
-          key: "codemode/<source-artifact-id>/excalidraw.json",
-          body: { appState: { zoom: { value: 0.96 } } },
-        },
-      ],
-      unrelated: { diagramId: "other", elements: [], width: 632 },
-      unexpectedWidth: {
-        diagramId: "worker-api-approval-flow",
-        elements: [],
-        width: 633,
-      },
-    });
-  });
+	it("corrects only the approved scene widths in nested encoding expectations", () => {
+		expect(
+			withApprovedSceneWidths({
+				raw: {
+					diagramId: "worker-api-approval-flow",
+					elements: [{ id: "node", width: 632 }],
+					width: 632,
+				},
+				persistedEncoding: [
+					{ body: { diagramId: "release-plan", elements: [], width: 896 } },
+					{
+						key: "codemode/<mindmap-artifact-id>/excalidraw.json",
+						body: { appState: { zoom: { value: 0.96 } } },
+					},
+					{
+						key: "codemode/<source-artifact-id>/excalidraw.json",
+						body: { appState: { zoom: { value: 0.96 } } },
+					},
+				],
+				unrelated: { diagramId: "other", elements: [], width: 632 },
+				unexpectedWidth: {
+					diagramId: "worker-api-approval-flow",
+					elements: [],
+					width: 633,
+				},
+			}),
+		).toEqual({
+			raw: {
+				diagramId: "worker-api-approval-flow",
+				elements: [{ id: "node", width: 632 }],
+				width: 576,
+			},
+			persistedEncoding: [
+				{ body: { diagramId: "release-plan", elements: [], width: 840 } },
+				{
+					key: "codemode/<mindmap-artifact-id>/excalidraw.json",
+					body: { appState: { zoom: { value: 0.97 } } },
+				},
+				{
+					key: "codemode/<source-artifact-id>/excalidraw.json",
+					body: { appState: { zoom: { value: 0.96 } } },
+				},
+			],
+			unrelated: { diagramId: "other", elements: [], width: 632 },
+			unexpectedWidth: {
+				diagramId: "worker-api-approval-flow",
+				elements: [],
+				width: 633,
+			},
+		});
+	});
 
-  it("does not hide unrelated HTTP contract drift", () => {
-    expect(
-      normalizeCanvasMigrationAgainstExactBase(
-        {
-          order: ["second", "first"],
-          scene: {
-            kind: "canvas",
-            version: 1,
-            diagramId: "legacy",
-            elements: [],
-            layers: [],
-            layouts: [],
-            zOrder: [],
-            unexpectedField: true,
-          },
-          unexpectedTopLevel: true,
-        },
-        {
-          order: ["first", "second"],
-          scene: { diagramId: "legacy", elements: [] },
-        },
-      ),
-    ).toEqual({
-      order: ["second", "first"],
-      scene: {
-        diagramId: "legacy",
-        elements: [],
-        unexpectedField: true,
-      },
-      unexpectedTopLevel: true,
-    });
-  });
+	it("does not hide unrelated HTTP contract drift", () => {
+		expect(
+			normalizeCanvasMigrationAgainstExactBase(
+				{
+					order: ["second", "first"],
+					scene: {
+						kind: "canvas",
+						version: 1,
+						diagramId: "legacy",
+						elements: [],
+						layers: [],
+						layouts: [],
+						zOrder: [],
+						unexpectedField: true,
+					},
+					unexpectedTopLevel: true,
+				},
+				{
+					order: ["first", "second"],
+					scene: { diagramId: "legacy", elements: [] },
+				},
+			),
+		).toEqual({
+			order: ["second", "first"],
+			scene: {
+				diagramId: "legacy",
+				elements: [],
+				unexpectedField: true,
+			},
+			unexpectedTopLevel: true,
+		});
+	});
 
-  it("captures build, patch, get, raw, mindmap, and persisted encodings", async () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date("2026-07-20T12:34:56.789Z"));
-    const bucket = new RecordingBucket();
-    const env = { SKETCHI_ARTIFACTS: bucket };
+	it("captures build, patch, get, raw, mindmap, and persisted encodings", async () => {
+		vi.useFakeTimers({ toFake: ["Date"] });
+		vi.setSystemTime(new Date("2026-07-20T12:34:56.789Z"));
+		const bucket = new RecordingBucket();
+		const env = { SKETCHI_ARTIFACTS: bucket };
 
-    const buildResponse = await handleBuildFlowchartRequest(
-      env,
-      postRequest("https://studio.test/api/v1/flowcharts/build", {
-        requestId: "http-build-request",
-        spec: approvalSpec(),
-      }),
-    );
-    const buildBody: unknown = await buildResponse.json();
-    const sourceArtifactId = artifactIdFrom(buildBody);
-    const buildId = stringField(buildBody, "buildId");
+		const buildResponse = await handleBuildFlowchartRequest(
+			env,
+			postRequest("https://studio.test/api/v1/flowcharts/build", {
+				requestId: "http-build-request",
+				spec: approvalSpec(),
+			}),
+		);
+		const buildBody: unknown = await buildResponse.json();
+		const sourceArtifactId = artifactIdFrom(buildBody);
+		const buildId = stringField(buildBody, "buildId");
 
-    const patchResponse = await handlePatchArtifactRequest(
-      env,
-      postRequest(
-        `https://studio.test/api/v1/artifacts/${sourceArtifactId}/patch`,
-        {
-          requestId: "http-patch-request",
-          operations: [
-            {
-              op: "setStyle",
-              selector: { nodeIds: ["approve"] },
-              style: { fillColor: "#ede9fe", strokeColor: "#7c3aed" },
-            },
-          ],
-        },
-      ),
-      sourceArtifactId,
-    );
-    const patchBody: unknown = await patchResponse.json();
-    const childArtifactId = artifactIdFrom(patchBody);
-    const patchId = stringField(patchBody, "patchId");
+		const patchResponse = await handlePatchArtifactRequest(
+			env,
+			postRequest(`https://studio.test/api/v1/artifacts/${sourceArtifactId}/patch`, {
+				requestId: "http-patch-request",
+				operations: [
+					{
+						op: "setStyle",
+						selector: { nodeIds: ["approve"] },
+						style: { fillColor: "#ede9fe", strokeColor: "#7c3aed" },
+					},
+				],
+			}),
+			sourceArtifactId,
+		);
+		const patchBody: unknown = await patchResponse.json();
+		const childArtifactId = artifactIdFrom(patchBody);
+		const patchId = stringField(patchBody, "patchId");
 
-    const replacements = new Map([
-      [sourceArtifactId, "<source-artifact-id>"],
-      [childArtifactId, "<child-artifact-id>"],
-      [buildId, "<build-id>"],
-      [patchId, "<patch-id>"],
-    ]);
+		const replacements = new Map([
+			[sourceArtifactId, "<source-artifact-id>"],
+			[childArtifactId, "<child-artifact-id>"],
+			[buildId, "<build-id>"],
+			[patchId, "<patch-id>"],
+		]);
 
-    const getResponse = await handleGetArtifactRequest(
-      env,
-      new Request(
-        `https://studio.test/api/v1/artifacts/${childArtifactId}?format=scene&inline=true`,
-      ),
-      childArtifactId,
-    );
-    const rawResponse = await handleGetArtifactRequest(
-      env,
-      new Request(
-        `https://studio.test/api/v1/artifacts/${childArtifactId}?format=excalidraw&raw=true`,
-      ),
-      childArtifactId,
-    );
-    const rawBody: unknown = await rawResponse.json();
+		const getResponse = await handleGetArtifactRequest(
+			env,
+			new Request(
+				`https://studio.test/api/v1/artifacts/${childArtifactId}?format=scene&inline=true`,
+			),
+			childArtifactId,
+		);
+		const rawResponse = await handleGetArtifactRequest(
+			env,
+			new Request(
+				`https://studio.test/api/v1/artifacts/${childArtifactId}?format=excalidraw&raw=true`,
+			),
+			childArtifactId,
+		);
+		const rawBody: unknown = await rawResponse.json();
 
-    const mindmapResponse = await handleBuildMindmapRequest(
-      env,
-      postRequest("https://studio.test/api/v1/mindmaps/build", {
-        requestId: "http-mindmap-request",
-        spec: {
-          title: "Release plan",
-          root: {
-            label: "Release",
-            children: [
-              {
-                label: "Engineering",
-                children: [{ label: "Verification" }],
-              },
-              { label: "Launch", children: [{ label: "Documentation" }] },
-            ],
-          },
-        },
-      }),
-    );
-    const mindmapBody: unknown = await mindmapResponse.json();
-    const mindmapArtifactId = artifactIdFrom(mindmapBody);
-    const mindmapBuildId = stringField(mindmapBody, "buildId");
-    replacements.set(mindmapArtifactId, "<mindmap-artifact-id>");
-    replacements.set(mindmapBuildId, "<mindmap-build-id>");
+		const mindmapResponse = await handleBuildMindmapRequest(
+			env,
+			postRequest("https://studio.test/api/v1/mindmaps/build", {
+				requestId: "http-mindmap-request",
+				spec: {
+					title: "Release plan",
+					root: {
+						label: "Release",
+						children: [
+							{
+								label: "Engineering",
+								children: [{ label: "Verification" }],
+							},
+							{ label: "Launch", children: [{ label: "Documentation" }] },
+						],
+					},
+				},
+			}),
+		);
+		const mindmapBody: unknown = await mindmapResponse.json();
+		const mindmapArtifactId = artifactIdFrom(mindmapBody);
+		const mindmapBuildId = stringField(mindmapBody, "buildId");
+		replacements.set(mindmapArtifactId, "<mindmap-artifact-id>");
+		replacements.set(mindmapBuildId, "<mindmap-build-id>");
 
-    const corpus = {
-      version: 1,
-      lineage: {
-        exactBase: "486e7169255354b8dc79cfa86e30c508721f5425",
-        captureRule:
-          "All observations were produced by the exact-base production HTTP handlers and object-bucket adapter.",
-      },
-      build: {
-        status: buildResponse.status,
-        cacheControl: buildResponse.headers.get("cache-control"),
-        body: normalizeStrings(buildBody, replacements),
-      },
-      patch: {
-        status: patchResponse.status,
-        cacheControl: patchResponse.headers.get("cache-control"),
-        body: normalizeStrings(patchBody, replacements),
-      },
-      get: await jsonObservation(getResponse, replacements),
-      raw: {
-        status: rawResponse.status,
-        cacheControl: rawResponse.headers.get("cache-control"),
-        contentDisposition: normalizeStrings(
-          rawResponse.headers.get("content-disposition"),
-          replacements,
-        ),
-        contentType: rawResponse.headers.get("content-type"),
-        body: normalizeStrings(rawBody, replacements),
-      },
-      mindmap: {
-        status: mindmapResponse.status,
-        cacheControl: mindmapResponse.headers.get("cache-control"),
-        body: normalizeStrings(mindmapBody, replacements),
-      },
-      persistedEncoding: persistedArtifactObjects(
-        bucket,
-        [sourceArtifactId, childArtifactId, mindmapArtifactId],
-        replacements,
-      ),
-    };
-    const fixturePath = `${process.cwd()}/apps/playground/src/server/codemode/fixtures/http-artifact-compatibility-v1.json`;
-    const exactBase = withApprovedSceneWidths(
-      JSON.parse(await readFile(fixturePath, "utf8")),
-    );
-    expect(
-      `${JSON.stringify(
-        normalizeCanvasMigrationAgainstExactBase(
-          normalizeSketchiPaletteAgainstExactBase(corpus, exactBase),
-          exactBase,
-        ),
-        null,
-        2,
-      )}\n`,
-    ).toBe(`${JSON.stringify(exactBase, null, 2)}\n`);
-  });
+		const corpus = {
+			version: 1,
+			lineage: {
+				exactBase: "486e7169255354b8dc79cfa86e30c508721f5425",
+				captureRule:
+					"All observations were produced by the exact-base production HTTP handlers and object-bucket adapter.",
+			},
+			build: {
+				status: buildResponse.status,
+				cacheControl: buildResponse.headers.get("cache-control"),
+				body: normalizeStrings(buildBody, replacements),
+			},
+			patch: {
+				status: patchResponse.status,
+				cacheControl: patchResponse.headers.get("cache-control"),
+				body: normalizeStrings(patchBody, replacements),
+			},
+			get: await jsonObservation(getResponse, replacements),
+			raw: {
+				status: rawResponse.status,
+				cacheControl: rawResponse.headers.get("cache-control"),
+				contentDisposition: normalizeStrings(
+					rawResponse.headers.get("content-disposition"),
+					replacements,
+				),
+				contentType: rawResponse.headers.get("content-type"),
+				body: normalizeStrings(rawBody, replacements),
+			},
+			mindmap: {
+				status: mindmapResponse.status,
+				cacheControl: mindmapResponse.headers.get("cache-control"),
+				body: normalizeStrings(mindmapBody, replacements),
+			},
+			persistedEncoding: persistedArtifactObjects(
+				bucket,
+				[sourceArtifactId, childArtifactId, mindmapArtifactId],
+				replacements,
+			),
+		};
+		const fixturePath = `${process.cwd()}/apps/playground/src/server/codemode/fixtures/http-artifact-compatibility-v1.json`;
+		const exactBase = withApprovedSceneWidths(JSON.parse(await readFile(fixturePath, "utf8")));
+		expect(
+			`${JSON.stringify(
+				normalizeCanvasMigrationAgainstExactBase(
+					normalizeSketchiPaletteAgainstExactBase(corpus, exactBase),
+					exactBase,
+				),
+				null,
+				2,
+			)}\n`,
+		).toBe(`${JSON.stringify(exactBase, null, 2)}\n`);
+	});
 });

@@ -1,52 +1,52 @@
 {
-  "$schema": "./node_modules/nx/schemas/nx-schema.json",
-  "namedInputs": {
-    "default": ["{projectRoot}/**/*", "sharedGlobals"],
-    "production": [
-      "default",
-      "!{projectRoot}/**/*.test.ts",
-      "!{projectRoot}/**/*.test.tsx",
-      "!{projectRoot}/**/*.stories.tsx",
-      "!{projectRoot}/.storybook/**/*",
-      "!{projectRoot}/**/?(*.)+(spec|test).[jt]s?(x)?(.snap)",
-      "!{projectRoot}/tsconfig.spec.json"
-    ],
-    "sharedGlobals": [
-      "{workspaceRoot}/.oxlintrc.json",
-      "{workspaceRoot}/nx.json",
-      "{workspaceRoot}/tsconfig.base.json"
-    ]
-  },
-  "targetDefaults": {
-    "build": {
-      "inputs": ["production", "^production"],
-      "dependsOn": ["^build"]
-    },
-    "test": {
-      "inputs": ["default", "^production"]
-    },
-    "typecheck": {
-      "inputs": ["default", "^production"],
-      "dependsOn": ["^build"]
-    },
-    "typecheck-native": {
-      "inputs": ["default", "^production"],
-      "dependsOn": ["^build"]
-    },
-    "@nx/js:tsc": {
-      "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
-    }
-  },
-  "release": {
-    "projects": ["sketchi-cli"],
-    "changelog": {
-      "workspaceChangelog": false
-    },
-    "releaseTag": {
-      "pattern": "cli-v{version}"
-    }
-  },
-  "analytics": false
+	"$schema": "./node_modules/nx/schemas/nx-schema.json",
+	"namedInputs": {
+		"default": ["{projectRoot}/**/*", "sharedGlobals"],
+		"production": [
+			"default",
+			"!{projectRoot}/**/*.test.ts",
+			"!{projectRoot}/**/*.test.tsx",
+			"!{projectRoot}/**/*.stories.tsx",
+			"!{projectRoot}/.storybook/**/*",
+			"!{projectRoot}/**/?(*.)+(spec|test).[jt]s?(x)?(.snap)",
+			"!{projectRoot}/tsconfig.spec.json"
+		],
+		"sharedGlobals": [
+			"{workspaceRoot}/.oxlintrc.json",
+			"{workspaceRoot}/nx.json",
+			"{workspaceRoot}/tsconfig.base.json"
+		]
+	},
+	"targetDefaults": {
+		"build": {
+			"inputs": ["production", "^production"],
+			"dependsOn": ["^build"]
+		},
+		"test": {
+			"inputs": ["default", "^production"]
+		},
+		"typecheck": {
+			"inputs": ["default", "^production"],
+			"dependsOn": ["^build"]
+		},
+		"typecheck-native": {
+			"inputs": ["default", "^production"],
+			"dependsOn": ["^build"]
+		},
+		"@nx/js:tsc": {
+			"cache": true,
+			"dependsOn": ["^build"],
+			"inputs": ["production", "^production"]
+		}
+	},
+	"release": {
+		"projects": ["sketchi-cli"],
+		"changelog": {
+			"workspaceChangelog": false
+		},
+		"releaseTag": {
+			"pattern": "cli-v{version}"
+		}
+	},
+	"analytics": false
 }

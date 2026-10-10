@@ -1,108 +1,98 @@
 import {
-  CodeModeArtifactStorageMemory,
-  makeCodeModeRuntimeEnvironmentLayer,
+	CodeModeArtifactStorageMemory,
+	makeCodeModeRuntimeEnvironmentLayer,
 } from "@sketchi/diagram-agent";
 import { Cause, Effect, Layer, Option } from "effect";
 
 import { DiagramBuilder, DiagramBuilderLive } from "./builder.js";
 import {
-  createCanvasDiagram,
-  DEFAULT_CANVAS_ENDPOINT,
-  readCanvasSpecInput,
-  resolveCanvasEndpoint,
-  SKETCHI_CANVAS_ENDPOINT_ENV,
-  type CreateCanvasDiagramResult,
+	createCanvasDiagram,
+	DEFAULT_CANVAS_ENDPOINT,
+	readCanvasSpecInput,
+	resolveCanvasEndpoint,
+	SKETCHI_CANVAS_ENDPOINT_ENV,
+	type CreateCanvasDiagramResult,
 } from "./canvas.js";
 import {
-  type DiagramListEntry,
-  type OutputFormat,
-  type StoredDiagram,
-  summaryFromStored,
+	type DiagramListEntry,
+	type OutputFormat,
+	type StoredDiagram,
+	summaryFromStored,
 } from "./contracts.js";
 import { encodeJson, validateStorageId } from "./document.js";
 import {
-  type CliFailure,
-  CliFilesystemError,
-  CliShareError,
-  CliValidationError,
+	type CliFailure,
+	CliFilesystemError,
+	CliShareError,
+	CliValidationError,
 } from "./errors.js";
 import { DiagramExporter, DiagramExporterLive } from "./exporter.js";
 import { LocalFileSystemLive } from "./filesystem.js";
 import { cliIconCatalog } from "./icon-catalog.js";
 import {
-  exportCreatedDiagram,
-  runGenerateWorkflow,
-  type GenerateWorkflowResult,
-  type GeneratedArtifact,
-  type GenerationDestination,
+	exportCreatedDiagram,
+	runGenerateWorkflow,
+	type GenerateWorkflowResult,
+	type GeneratedArtifact,
+	type GenerationDestination,
 } from "./generate-workflow.js";
 import {
-  GenerateWizard,
-  GenerateWizardLive,
-  liveGenerateWizardAvailable,
-  type WizardDestination,
+	GenerateWizard,
+	GenerateWizardLive,
+	liveGenerateWizardAvailable,
+	type WizardDestination,
 } from "./generate-wizard.js";
 import {
-  DEFAULT_GENERATE_ENDPOINT,
-  DEFAULT_GENERATION_MODEL,
-  SKETCHI_GENERATE_ENDPOINT_ENV,
-  resolveGenerateEndpoint,
-  type GenerateDiagramResult,
-  type GenerationType,
+	DEFAULT_GENERATE_ENDPOINT,
+	DEFAULT_GENERATION_MODEL,
+	SKETCHI_GENERATE_ENDPOINT_ENV,
+	resolveGenerateEndpoint,
+	type GenerateDiagramResult,
+	type GenerationType,
 } from "./generation.js";
 import {
-  Argument,
-  Command,
-  Flag,
-  cliErrorExitCode,
-  exactlyOnceStringFlag,
-  exclusiveInputSourceFlags,
-  resolveInputSource,
-  invalidFlagValue,
-  missingRequiredFlag,
-  runEffectCommand,
-  requestedOutputFormat,
+	Argument,
+	Command,
+	Flag,
+	cliErrorExitCode,
+	exactlyOnceStringFlag,
+	exclusiveInputSourceFlags,
+	resolveInputSource,
+	invalidFlagValue,
+	missingRequiredFlag,
+	runEffectCommand,
+	requestedOutputFormat,
 } from "./internal/effect-cli.js";
+import { InputReader, InputReaderLive, readDocumentInput, readPatchInput } from "./input.js";
 import {
-  InputReader,
-  InputReaderLive,
-  readDocumentInput,
-  readPatchInput,
-} from "./input.js";
-import {
-  CliCommandExit,
-  OutputWriter,
-  OutputWriterLive,
-  internalErrorText,
-  reportFailure,
-  reportSuccess,
-  runReported,
-  runReportedArtifact,
+	CliCommandExit,
+	OutputWriter,
+	OutputWriterLive,
+	internalErrorText,
+	reportFailure,
+	reportSuccess,
+	runReported,
+	runReportedArtifact,
 } from "./output.js";
 import { CliPngRendererLive } from "./png-renderer.js";
 import { DiagramPatcher, DiagramPatcherLive } from "./patch.js";
 import { preflightPullTarget, pullIntoStore } from "./pull.js";
 import { API_REQUEST_TIMEOUT } from "./response-body.js";
 import {
-  MAX_RENDER_CANVAS_AREA,
-  MAX_RENDER_CANVAS_DIMENSION,
-  MAX_RENDER_ELEMENT_DIMENSION,
-  MAX_RENDER_OUTPUT_PIXELS,
+	MAX_RENDER_CANVAS_AREA,
+	MAX_RENDER_CANVAS_DIMENSION,
+	MAX_RENDER_ELEMENT_DIMENSION,
+	MAX_RENDER_OUTPUT_PIXELS,
 } from "./render-limits.js";
 import {
-  ExcalidrawShare,
-  ExcalidrawShareLive,
-  LinkOpener,
-  LinkOpenerLive,
-  ShareTransportLive,
+	ExcalidrawShare,
+	ExcalidrawShareLive,
+	LinkOpener,
+	LinkOpenerLive,
+	ShareTransportLive,
 } from "./share.js";
 import { MAX_SHARE_LINK_LENGTH } from "./share-protocol.js";
-import {
-  DiagramStore,
-  DiagramStoreLive,
-  StorageRootLive,
-  writeExportFile,
-} from "./storage.js";
+import { DiagramStore, DiagramStoreLive, StorageRootLive, writeExportFile } from "./storage.js";
 
 const AGENT_DOCS = `Sketchi CLI contracts for agents and automation.
 
@@ -207,222 +197,197 @@ Revision recovery and next steps:
   Every returned id supports show, list, and export. Edit and patch are only for flowchart,
   mindmap, and sequence records; create a new canvas to replace a Universal CanvasSpec.`;
 
-const HUMAN_HELP =
-  "Turn one prompt into a validated PNG and editable local diagram.";
+const HUMAN_HELP = "Turn one prompt into a validated PNG and editable local diagram.";
 
 const outputFlag = Flag.Literals("output", ["text", "json"]).pipe(
-  Flag.withDefault("text"),
-  Flag.withDescription("Result presentation format."),
-  Flag.withMetavar("text|json"),
+	Flag.withDefault("text"),
+	Flag.withDescription("Result presentation format."),
+	Flag.withMetavar("text|json"),
 );
 
 const rootCommand = Command.make("sketchi").pipe(
-  Command.withSharedFlags({ output: outputFlag }),
-  Command.withDescription(HUMAN_HELP),
-  Command.withShortDescription(
-    "Turn a prompt into a validated PNG and editable local diagram.",
-  ),
+	Command.withSharedFlags({ output: outputFlag }),
+	Command.withDescription(HUMAN_HELP),
+	Command.withShortDescription("Turn a prompt into a validated PNG and editable local diagram."),
 );
 
 const docsCommand = Command.make("docs", {}, () =>
-  Effect.gen(function* () {
-    const { output } = yield* rootCommand;
-    yield* reportSuccess(
-      "docs",
-      output,
-      { documentation: AGENT_DOCS },
-      AGENT_DOCS,
-    );
-  }),
+	Effect.gen(function* () {
+		const { output } = yield* rootCommand;
+		yield* reportSuccess("docs", output, { documentation: AGENT_DOCS }, AGENT_DOCS);
+	}),
 ).pipe(
-  Command.withDescription(
-    "Print the complete CLI contracts for agents, automation, storage, formats, safety limits, and errors.",
-  ),
-  Command.withShortDescription(
-    "Print complete agent and automation documentation.",
-  ),
+	Command.withDescription(
+		"Print the complete CLI contracts for agents, automation, storage, formats, safety limits, and errors.",
+	),
+	Command.withShortDescription("Print complete agent and automation documentation."),
 );
 
 function storageLocation(id: string): string {
-  return `~/.sketchi/diagrams/${id}`;
+	return `~/.sketchi/diagrams/${id}`;
 }
 
 function revisionLocations(diagram: StoredDiagram): ReadonlyArray<string> {
-  return diagram.revisions.map(
-    (revision) =>
-      `${storageLocation(diagram.manifest.id)}/revisions/${revision}`,
-  );
+	return diagram.revisions.map(
+		(revision) => `${storageLocation(diagram.manifest.id)}/revisions/${revision}`,
+	);
 }
 
 function storedData(diagram: StoredDiagram) {
-  return {
-    ...summaryFromStored(diagram),
-    storagePath: storageLocation(diagram.manifest.id),
-    revisions: revisionLocations(diagram),
-    document: diagram.document,
-  };
+	return {
+		...summaryFromStored(diagram),
+		storagePath: storageLocation(diagram.manifest.id),
+		revisions: revisionLocations(diagram),
+		document: diagram.document,
+	};
 }
 
 const SHARE_HINT =
-  "this immutable link is a bearer snapshot: anyone with the full URL can decrypt it, so share it only with the intended user. Browser edits do not update this link; after editing, choose Save to… → Export to Link and return the new link for sketchi pull.";
+	"this immutable link is a bearer snapshot: anyone with the full URL can decrypt it, so share it only with the intended user. Browser edits do not update this link; after editing, choose Save to… → Export to Link and return the new link for sketchi pull.";
 
 function unsupportedPulledScene() {
-  return CliShareError.make({
-    code: "unsupported_scene",
-    message:
-      "The linked Excalidraw scene cannot be rendered by this Sketchi CLI.",
-    hint: "Use only the supported v1 elements and Excalifont text, then export a new link.",
-    details: [],
-  });
+	return CliShareError.make({
+		code: "unsupported_scene",
+		message: "The linked Excalidraw scene cannot be rendered by this Sketchi CLI.",
+		hint: "Use only the supported v1 elements and Excalifont text, then export a new link.",
+		details: [],
+	});
 }
 
-const readLinkInput = Effect.fn("sketchi.cli.pull.readLink")(function* (
-  link: string,
-) {
-  if (link !== "-") return link;
-  const reader = yield* InputReader;
-  return (yield* reader.read(
-    { _tag: "File", path: "-" },
-    { content: "share link", maxBytes: MAX_SHARE_LINK_LENGTH },
-  )).trim();
+const readLinkInput = Effect.fn("sketchi.cli.pull.readLink")(function* (link: string) {
+	if (link !== "-") return link;
+	const reader = yield* InputReader;
+	return (yield* reader.read(
+		{ _tag: "File", path: "-" },
+		{ content: "share link", maxBytes: MAX_SHARE_LINK_LENGTH },
+	)).trim();
 });
 
-function summaryText(
-  action: "created" | "edited" | "patched",
-  diagram: StoredDiagram,
-): string {
-  return [
-    `${action}: ${diagram.manifest.id}`,
-    `type: ${diagram.manifest.type}`,
-    `title: ${diagram.manifest.title}`,
-    `revision: ${String(diagram.manifest.revision)}`,
-    `authority: ${diagram.authority}`,
-    `document authoritative: ${String(diagram.authority === "canonical")}`,
-    `formats: ${diagram.manifest.formats.join(",")}`,
-    `storage: ${storageLocation(diagram.manifest.id)}`,
-  ].join("\n");
+function summaryText(action: "created" | "edited" | "patched", diagram: StoredDiagram): string {
+	return [
+		`${action}: ${diagram.manifest.id}`,
+		`type: ${diagram.manifest.type}`,
+		`title: ${diagram.manifest.title}`,
+		`revision: ${String(diagram.manifest.revision)}`,
+		`authority: ${diagram.authority}`,
+		`document authoritative: ${String(diagram.authority === "canonical")}`,
+		`formats: ${diagram.manifest.formats.join(",")}`,
+		`storage: ${storageLocation(diagram.manifest.id)}`,
+	].join("\n");
 }
 
 function generatedData(result: GenerateDiagramResult) {
-  return {
-    ...storedData(result.diagram),
-    generation: { model: result.model, provider: result.provider },
-  };
+	return {
+		...storedData(result.diagram),
+		generation: { model: result.model, provider: result.provider },
+	};
 }
 
 function generatedText(result: GenerateDiagramResult): string {
-  return [
-    summaryText("created", result.diagram).replace(/^created:/u, "generated:"),
-    `provider: ${result.provider}`,
-    `model: ${result.model}`,
-  ].join("\n");
+	return [
+		summaryText("created", result.diagram).replace(/^created:/u, "generated:"),
+		`provider: ${result.provider}`,
+		`model: ${result.model}`,
+	].join("\n");
 }
 
 interface GenerateCommandResult extends GenerateWorkflowResult {
-  readonly interactive: boolean;
+	readonly interactive: boolean;
 }
 
 function generatedArtifactData(result: GenerateCommandResult) {
-  return {
-    ...generatedData(result.generated),
-    export: exportData(result.artifact),
-  };
+	return {
+		...generatedData(result.generated),
+		export: exportData(result.artifact),
+	};
 }
 
 function generatedArtifactText(result: GenerateCommandResult): string {
-  if (result.interactive) {
-    return [
-      `created: ${result.generated.diagram.manifest.id}`,
-      `artifact: ${result.artifact.destination}`,
-      "next:",
-      `  sketchi show ${result.generated.diagram.manifest.id}`,
-      `  sketchi export ${result.generated.diagram.manifest.id} --format excalidraw --dest ${result.generated.diagram.manifest.id}.excalidraw`,
-    ].join("\n");
-  }
-  const hint = displayHint(result.artifact);
-  return [
-    generatedText(result.generated),
-    `format: ${result.artifact.format}`,
-    `destination: ${result.artifact.destination}`,
-    `bytes: ${String(result.artifact.sizeBytes)}`,
-    ...(hint ? [`hint: ${hint}`] : []),
-  ].join("\n");
+	if (result.interactive) {
+		return [
+			`created: ${result.generated.diagram.manifest.id}`,
+			`artifact: ${result.artifact.destination}`,
+			"next:",
+			`  sketchi show ${result.generated.diagram.manifest.id}`,
+			`  sketchi export ${result.generated.diagram.manifest.id} --format excalidraw --dest ${result.generated.diagram.manifest.id}.excalidraw`,
+		].join("\n");
+	}
+	const hint = displayHint(result.artifact);
+	return [
+		generatedText(result.generated),
+		`format: ${result.artifact.format}`,
+		`destination: ${result.artifact.destination}`,
+		`bytes: ${String(result.artifact.sizeBytes)}`,
+		...(hint ? [`hint: ${hint}`] : []),
+	].join("\n");
 }
 
-function wizardDestination(
-  destination: WizardDestination,
-): GenerationDestination {
-  switch (destination._tag) {
-    case "CurrentDirectory":
-      return { _tag: "CurrentDirectory", cwd: process.cwd() };
-    case "ProjectDiagrams":
-      return { _tag: "ProjectDiagrams", cwd: process.cwd() };
-    case "Custom":
-      return destination;
-  }
+function wizardDestination(destination: WizardDestination): GenerationDestination {
+	switch (destination._tag) {
+		case "CurrentDirectory":
+			return { _tag: "CurrentDirectory", cwd: process.cwd() };
+		case "ProjectDiagrams":
+			return { _tag: "ProjectDiagrams", cwd: process.cwd() };
+		case "Custom":
+			return destination;
+	}
 }
 
 function reportGenerateOperation<E extends CliFailure, R>(
-  output: OutputFormat,
-  operation: Effect.Effect<GenerateCommandResult, E, R>,
+	output: OutputFormat,
+	operation: Effect.Effect<GenerateCommandResult, E, R>,
 ) {
-  return runReportedArtifact(
-    "generate",
-    output,
-    operation,
-    (result) => result.artifact,
-    generatedArtifactText,
-    generatedArtifactData,
-    (result) => (result.artifact.destination === "-" ? "stderr" : "stdout"),
-  );
+	return runReportedArtifact(
+		"generate",
+		output,
+		operation,
+		(result) => result.artifact,
+		generatedArtifactText,
+		generatedArtifactData,
+		(result) => (result.artifact.destination === "-" ? "stderr" : "stdout"),
+	);
 }
 
 function showText(diagram: StoredDiagram): string {
-  const revisions = revisionLocations(diagram);
-  return [
-    `id: ${diagram.manifest.id}`,
-    `type: ${diagram.manifest.type}`,
-    `title: ${diagram.manifest.title}`,
-    `revision: ${String(diagram.manifest.revision)}`,
-    `authority: ${diagram.authority}`,
-    `document authoritative: ${String(diagram.authority === "canonical")}`,
-    `formats: ${diagram.manifest.formats.join(",")}`,
-    `revisions: ${revisions.length === 0 ? "none" : revisions.join(",")}`,
-    "document:",
-    encodeJson(diagram.document).trimEnd(),
-  ].join("\n");
+	const revisions = revisionLocations(diagram);
+	return [
+		`id: ${diagram.manifest.id}`,
+		`type: ${diagram.manifest.type}`,
+		`title: ${diagram.manifest.title}`,
+		`revision: ${String(diagram.manifest.revision)}`,
+		`authority: ${diagram.authority}`,
+		`document authoritative: ${String(diagram.authority === "canonical")}`,
+		`formats: ${diagram.manifest.formats.join(",")}`,
+		`revisions: ${revisions.length === 0 ? "none" : revisions.join(",")}`,
+		"document:",
+		encodeJson(diagram.document).trimEnd(),
+	].join("\n");
 }
 
 function listText(diagrams: ReadonlyArray<DiagramListEntry>): string {
-  if (diagrams.length === 0) return "no diagrams";
-  return [
-    "id\ttype\trevision\tauthority\tdocument-authoritative\tformats\ttitle",
-    ...diagrams.map((diagram) =>
-      "status" in diagram
-        ? [
-            diagram.id,
-            `unavailable:${diagram.code}`,
-            "-",
-            "-",
-            "-",
-            "-",
-            diagram.message,
-          ].join("\t")
-        : [
-            diagram.id,
-            diagram.type,
-            String(diagram.revision),
-            diagram.authority,
-            String(diagram.documentAuthoritative),
-            diagram.formats.join(","),
-            diagram.title,
-          ].join("\t"),
-    ),
-  ].join("\n");
+	if (diagrams.length === 0) return "no diagrams";
+	return [
+		"id\ttype\trevision\tauthority\tdocument-authoritative\tformats\ttitle",
+		...diagrams.map((diagram) =>
+			"status" in diagram
+				? [diagram.id, `unavailable:${diagram.code}`, "-", "-", "-", "-", diagram.message].join(
+						"\t",
+					)
+				: [
+						diagram.id,
+						diagram.type,
+						String(diagram.revision),
+						diagram.authority,
+						String(diagram.documentAuthoritative),
+						diagram.formats.join(","),
+						diagram.title,
+					].join("\t"),
+		),
+	].join("\n");
 }
 
 function isNativeGenerationType(value: string): value is GenerationType {
-  return value === "flowchart" || value === "mindmap" || value === "sequence";
+	return value === "flowchart" || value === "mindmap" || value === "sequence";
 }
 
 const GENERATE_HELP = `Create one persisted diagram and export its PNG by default. With no --prompt, Sketchi opens a short wizard only when stdin and stdout are human TTYs, output is text, and CI is absent. Pipes, redirects, CI, and --output json never prompt or block; pass --prompt for every script and automation path. This is one of Sketchi's four explicit network commands (generate, canvas, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
@@ -462,191 +427,181 @@ Errors and next steps:
   canonical JSON examples, and full error contracts, run sketchi docs.`;
 
 const generateCommand = Command.make(
-  "generate",
-  {
-    prompt: Flag.optional(
-      Flag.String("prompt").pipe(
-        Flag.withDescription(
-          "Diagram request text sent directly without interactive prompts.",
-        ),
-        Flag.withMetavar("TEXT"),
-      ),
-    ),
-    type: Flag.optional(
-      Flag.Literals("type", [
-        "flowchart",
-        "mindmap",
-        "sequence",
-        "er",
-        "architecture",
-        "swimlane",
-        "state-machine",
-      ]).pipe(
-        Flag.withDescription(
-          "Authoritative type; unsupported native requests fail clearly; omit for model selection.",
-        ),
-        Flag.withMetavar("TYPE"),
-      ),
-    ),
-    model: Flag.String("model").pipe(
-      Flag.withDefault(DEFAULT_GENERATION_MODEL),
-      Flag.withDescription(
-        `Server-routed generation model id; default ${DEFAULT_GENERATION_MODEL}.`,
-      ),
-      Flag.withMetavar("MODEL"),
-    ),
-    endpoint: Flag.String("endpoint").pipe(
-      Flag.withDefault(resolveGenerateEndpoint()),
-      Flag.withDescription(
-        "Unauthenticated generate API URL; defaults to the production Sketchi endpoint.",
-      ),
-      Flag.withMetavar("URL"),
-    ),
-    format: Flag.optional(
-      Flag.Literals("format", ["png", "excalidraw", "scene"]).pipe(
-        Flag.withDescription(
-          "Artifact exported after generation; default png.",
-        ),
-        Flag.withMetavar("png|excalidraw|scene"),
-      ),
-    ),
-    destination: Flag.optional(
-      Flag.String("dest").pipe(
-        Flag.withDescription(
-          "Artifact destination; defaults from the generated id, or - for stdout.",
-        ),
-        Flag.withMetavar("PATH|-"),
-      ),
-    ),
-  },
-  (input) =>
-    Effect.gen(function* () {
-      const { output } = yield* rootCommand;
-      const suppliedPrompt = Option.getOrUndefined(input.prompt);
-      const suppliedType = Option.getOrUndefined(input.type);
-      const suppliedFormat = Option.getOrUndefined(input.format);
-      const suppliedDestination = Option.getOrUndefined(input.destination);
-      if (suppliedPrompt === undefined) {
-        if (!liveGenerateWizardAvailable(output)) {
-          return yield* missingRequiredFlag("prompt");
-        }
-        if (suppliedFormat !== undefined && suppliedFormat !== "png") {
-          return yield* invalidFlagValue(
-            "format",
-            suppliedFormat,
-            "png when --prompt is omitted; pass --prompt for excalidraw or scene generation",
-          );
-        }
-        if (suppliedDestination === "-") {
-          return yield* invalidFlagValue(
-            "dest",
-            suppliedDestination,
-            "a file path when --prompt is omitted; pass --prompt to write an artifact to stdout",
-          );
-        }
-        if (
-          suppliedType !== undefined &&
-          !isNativeGenerationType(suppliedType)
-        ) {
-          return yield* invalidFlagValue(
-            "type",
-            suppliedType,
-            "flowchart, mindmap, or sequence in the interactive wizard; pass --prompt to receive the typed unsupported-type error",
-          );
-        }
-        const wizard = yield* GenerateWizard;
-        yield* reportGenerateOperation(
-          output,
-          Effect.scoped(
-            Effect.gen(function* () {
-              const answers = yield* wizard.ask({
-                ...(suppliedType === undefined ? {} : { type: suppliedType }),
-                ...(suppliedDestination === undefined
-                  ? {}
-                  : {
-                      destination: {
-                        _tag: "Custom",
-                        path: suppliedDestination,
-                      },
-                    }),
-              });
-              const activity = yield* wizard.activity;
-              const result = yield* runGenerateWorkflow({
-                endpoint: input.endpoint,
-                model: input.model,
-                prompt: answers.prompt,
-                type: answers.type,
-                format: "png",
-                destination: wizardDestination(answers.destination),
-              });
-              yield* activity.succeed("Diagram ready");
-              return { ...result, interactive: true };
-            }),
-          ),
-        );
-        return;
-      }
-      yield* reportGenerateOperation(
-        output,
-        runGenerateWorkflow({
-          endpoint: input.endpoint,
-          model: input.model,
-          prompt: suppliedPrompt,
-          ...(suppliedType ? { type: suppliedType } : {}),
-          format: suppliedFormat ?? "png",
-          destination:
-            suppliedDestination === undefined
-              ? { _tag: "Default" }
-              : { _tag: "Custom", path: suppliedDestination },
-        }).pipe(Effect.map((result) => ({ ...result, interactive: false }))),
-      );
-    }),
+	"generate",
+	{
+		prompt: Flag.optional(
+			Flag.String("prompt").pipe(
+				Flag.withDescription("Diagram request text sent directly without interactive prompts."),
+				Flag.withMetavar("TEXT"),
+			),
+		),
+		type: Flag.optional(
+			Flag.Literals("type", [
+				"flowchart",
+				"mindmap",
+				"sequence",
+				"er",
+				"architecture",
+				"swimlane",
+				"state-machine",
+			]).pipe(
+				Flag.withDescription(
+					"Authoritative type; unsupported native requests fail clearly; omit for model selection.",
+				),
+				Flag.withMetavar("TYPE"),
+			),
+		),
+		model: Flag.String("model").pipe(
+			Flag.withDefault(DEFAULT_GENERATION_MODEL),
+			Flag.withDescription(
+				`Server-routed generation model id; default ${DEFAULT_GENERATION_MODEL}.`,
+			),
+			Flag.withMetavar("MODEL"),
+		),
+		endpoint: Flag.String("endpoint").pipe(
+			Flag.withDefault(resolveGenerateEndpoint()),
+			Flag.withDescription(
+				"Unauthenticated generate API URL; defaults to the production Sketchi endpoint.",
+			),
+			Flag.withMetavar("URL"),
+		),
+		format: Flag.optional(
+			Flag.Literals("format", ["png", "excalidraw", "scene"]).pipe(
+				Flag.withDescription("Artifact exported after generation; default png."),
+				Flag.withMetavar("png|excalidraw|scene"),
+			),
+		),
+		destination: Flag.optional(
+			Flag.String("dest").pipe(
+				Flag.withDescription(
+					"Artifact destination; defaults from the generated id, or - for stdout.",
+				),
+				Flag.withMetavar("PATH|-"),
+			),
+		),
+	},
+	(input) =>
+		Effect.gen(function* () {
+			const { output } = yield* rootCommand;
+			const suppliedPrompt = Option.getOrUndefined(input.prompt);
+			const suppliedType = Option.getOrUndefined(input.type);
+			const suppliedFormat = Option.getOrUndefined(input.format);
+			const suppliedDestination = Option.getOrUndefined(input.destination);
+			if (suppliedPrompt === undefined) {
+				if (!liveGenerateWizardAvailable(output)) {
+					return yield* missingRequiredFlag("prompt");
+				}
+				if (suppliedFormat !== undefined && suppliedFormat !== "png") {
+					return yield* invalidFlagValue(
+						"format",
+						suppliedFormat,
+						"png when --prompt is omitted; pass --prompt for excalidraw or scene generation",
+					);
+				}
+				if (suppliedDestination === "-") {
+					return yield* invalidFlagValue(
+						"dest",
+						suppliedDestination,
+						"a file path when --prompt is omitted; pass --prompt to write an artifact to stdout",
+					);
+				}
+				if (suppliedType !== undefined && !isNativeGenerationType(suppliedType)) {
+					return yield* invalidFlagValue(
+						"type",
+						suppliedType,
+						"flowchart, mindmap, or sequence in the interactive wizard; pass --prompt to receive the typed unsupported-type error",
+					);
+				}
+				const wizard = yield* GenerateWizard;
+				yield* reportGenerateOperation(
+					output,
+					Effect.scoped(
+						Effect.gen(function* () {
+							const answers = yield* wizard.ask({
+								...(suppliedType === undefined ? {} : { type: suppliedType }),
+								...(suppliedDestination === undefined
+									? {}
+									: {
+											destination: {
+												_tag: "Custom",
+												path: suppliedDestination,
+											},
+										}),
+							});
+							const activity = yield* wizard.activity;
+							const result = yield* runGenerateWorkflow({
+								endpoint: input.endpoint,
+								model: input.model,
+								prompt: answers.prompt,
+								type: answers.type,
+								format: "png",
+								destination: wizardDestination(answers.destination),
+							});
+							yield* activity.succeed("Diagram ready");
+							return { ...result, interactive: true };
+						}),
+					),
+				);
+				return;
+			}
+			yield* reportGenerateOperation(
+				output,
+				runGenerateWorkflow({
+					endpoint: input.endpoint,
+					model: input.model,
+					prompt: suppliedPrompt,
+					...(suppliedType ? { type: suppliedType } : {}),
+					format: suppliedFormat ?? "png",
+					destination:
+						suppliedDestination === undefined
+							? { _tag: "Default" }
+							: { _tag: "Custom", path: suppliedDestination },
+				}).pipe(Effect.map((result) => ({ ...result, interactive: false }))),
+			);
+		}),
 ).pipe(
-  Command.withDescription(GENERATE_HELP),
-  Command.withShortDescription(
-    "Create a PNG with the wizard or a direct --prompt.",
-  ),
-  Command.withExamples([
-    {
-      command:
-        'sketchi generate --prompt "Map release approval with pass and revise branches"',
-      description: `Generate a flowchart with ${DEFAULT_GENERATION_MODEL} and write its PNG.`,
-    },
-    {
-      command:
-        'sketchi generate --prompt "Organize launch readiness" --type mindmap --format excalidraw --dest launch.excalidraw --output json',
-      description: "Generate a mindmap and write editable Excalidraw.",
-    },
-    {
-      command:
-        'sketchi generate --prompt "Show Browser calling API" --type sequence --dest request-sequence.png',
-      description: "Generate a native sequence diagram and write its PNG.",
-    },
-  ]),
+	Command.withDescription(GENERATE_HELP),
+	Command.withShortDescription("Create a PNG with the wizard or a direct --prompt."),
+	Command.withExamples([
+		{
+			command: 'sketchi generate --prompt "Map release approval with pass and revise branches"',
+			description: `Generate a flowchart with ${DEFAULT_GENERATION_MODEL} and write its PNG.`,
+		},
+		{
+			command:
+				'sketchi generate --prompt "Organize launch readiness" --type mindmap --format excalidraw --dest launch.excalidraw --output json',
+			description: "Generate a mindmap and write editable Excalidraw.",
+		},
+		{
+			command:
+				'sketchi generate --prompt "Show Browser calling API" --type sequence --dest request-sequence.png',
+			description: "Generate a native sequence diagram and write its PNG.",
+		},
+	]),
 );
 
 interface CanvasCommandResult extends CreateCanvasDiagramResult {
-  readonly artifact: GenerateWorkflowResult["artifact"];
+	readonly artifact: GenerateWorkflowResult["artifact"];
 }
 
 function canvasData(result: CanvasCommandResult) {
-  return {
-    ...storedData(result.diagram),
-    remoteArtifactId: result.artifactId,
-    export: exportData(result.artifact),
-  };
+	return {
+		...storedData(result.diagram),
+		remoteArtifactId: result.artifactId,
+		export: exportData(result.artifact),
+	};
 }
 
 function canvasText(result: CanvasCommandResult): string {
-  const hint = displayHint(result.artifact);
-  return [
-    summaryText("created", result.diagram).replace(/^created:/u, "canvas:"),
-    `remote artifact: ${result.artifactId}`,
-    `format: ${result.artifact.format}`,
-    `destination: ${result.artifact.destination}`,
-    `bytes: ${String(result.artifact.sizeBytes)}`,
-    ...(hint ? [`hint: ${hint}`] : []),
-  ].join("\n");
+	const hint = displayHint(result.artifact);
+	return [
+		summaryText("created", result.diagram).replace(/^created:/u, "canvas:"),
+		`remote artifact: ${result.artifactId}`,
+		`format: ${result.artifact.format}`,
+		`destination: ${result.artifact.destination}`,
+		`bytes: ${String(result.artifact.sizeBytes)}`,
+		...(hint ? [`hint: ${hint}`] : []),
+	].join("\n");
 }
 
 const CANVAS_HELP = `Build a complete Universal CanvasSpec through Sketchi's public create-canvas API, preserve the validated scene and Excalidraw result in the local store, and export PNG by default. This command is direct and noninteractive: pass exactly one CanvasSpec with --file PATH, --file - for piped stdin, or --json VALUE.
@@ -670,611 +625,577 @@ Input and failures:
   offline path for accepted flowchart, mindmap, and sequence documents.`;
 
 const canvasCommand = Command.make(
-  "canvas",
-  {
-    ...exclusiveInputSourceFlags("CanvasSpec document"),
-    endpoint: Flag.String("endpoint").pipe(
-      Flag.withDefault(resolveCanvasEndpoint()),
-      Flag.withDescription(
-        "Unauthenticated create-canvas API URL; defaults to production.",
-      ),
-      Flag.withMetavar("URL"),
-    ),
-    format: Flag.Literals("format", ["png", "excalidraw", "scene"]).pipe(
-      Flag.withDefault("png"),
-      Flag.withDescription("Artifact exported after the canvas is created."),
-      Flag.withMetavar("png|excalidraw|scene"),
-    ),
-    destination: Flag.optional(
-      Flag.String("dest").pipe(
-        Flag.withDescription(
-          "Artifact destination; defaults from diagramId, or - for stdout.",
-        ),
-        Flag.withMetavar("PATH|-"),
-      ),
-    ),
-  },
-  ({ destination, endpoint, format, fileInput, jsonInput }) =>
-    Effect.gen(function* () {
-      const { output } = yield* rootCommand;
-      const source = yield* resolveInputSource({ fileInput, jsonInput });
-      const operation = Effect.gen(function* () {
-        const spec = yield* readCanvasSpecInput(source);
-        const created = yield* createCanvasDiagram({ endpoint, spec });
-        const artifact = yield* exportCreatedDiagram(
-          created.diagram,
-          format,
-          Option.match(destination, {
-            onNone: () => ({ _tag: "Default" }),
-            onSome: (path) => ({ _tag: "Custom", path }),
-          }),
-        );
-        return { ...created, artifact } satisfies CanvasCommandResult;
-      });
-      yield* runReportedArtifact(
-        "canvas",
-        output,
-        operation,
-        (result) => result.artifact,
-        canvasText,
-        canvasData,
-        (result) => (result.artifact.destination === "-" ? "stderr" : "stdout"),
-      );
-    }),
+	"canvas",
+	{
+		...exclusiveInputSourceFlags("CanvasSpec document"),
+		endpoint: Flag.String("endpoint").pipe(
+			Flag.withDefault(resolveCanvasEndpoint()),
+			Flag.withDescription("Unauthenticated create-canvas API URL; defaults to production."),
+			Flag.withMetavar("URL"),
+		),
+		format: Flag.Literals("format", ["png", "excalidraw", "scene"]).pipe(
+			Flag.withDefault("png"),
+			Flag.withDescription("Artifact exported after the canvas is created."),
+			Flag.withMetavar("png|excalidraw|scene"),
+		),
+		destination: Flag.optional(
+			Flag.String("dest").pipe(
+				Flag.withDescription("Artifact destination; defaults from diagramId, or - for stdout."),
+				Flag.withMetavar("PATH|-"),
+			),
+		),
+	},
+	({ destination, endpoint, format, fileInput, jsonInput }) =>
+		Effect.gen(function* () {
+			const { output } = yield* rootCommand;
+			const source = yield* resolveInputSource({ fileInput, jsonInput });
+			const operation = Effect.gen(function* () {
+				const spec = yield* readCanvasSpecInput(source);
+				const created = yield* createCanvasDiagram({ endpoint, spec });
+				const artifact = yield* exportCreatedDiagram(
+					created.diagram,
+					format,
+					Option.match(destination, {
+						onNone: () => ({ _tag: "Default" }),
+						onSome: (path) => ({ _tag: "Custom", path }),
+					}),
+				);
+				return { ...created, artifact } satisfies CanvasCommandResult;
+			});
+			yield* runReportedArtifact(
+				"canvas",
+				output,
+				operation,
+				(result) => result.artifact,
+				canvasText,
+				canvasData,
+				(result) => (result.artifact.destination === "-" ? "stderr" : "stdout"),
+			);
+		}),
 ).pipe(
-  Command.withDescription(CANVAS_HELP),
-  Command.withShortDescription(
-    "Build and export a typed Universal CanvasSpec.",
-  ),
-  Command.withExamples([
-    {
-      command: "sketchi canvas --file canvas.json --output json",
-      description: "Build a CanvasSpec, store it locally, and write its PNG.",
-    },
-    {
-      command:
-        "sketchi canvas --file - --format excalidraw --dest canvas.excalidraw",
-      description: "Read CanvasSpec from stdin and export editable Excalidraw.",
-    },
-  ]),
+	Command.withDescription(CANVAS_HELP),
+	Command.withShortDescription("Build and export a typed Universal CanvasSpec."),
+	Command.withExamples([
+		{
+			command: "sketchi canvas --file canvas.json --output json",
+			description: "Build a CanvasSpec, store it locally, and write its PNG.",
+		},
+		{
+			command: "sketchi canvas --file - --format excalidraw --dest canvas.excalidraw",
+			description: "Read CanvasSpec from stdin and export editable Excalidraw.",
+		},
+	]),
 );
 
 const createCommand = Command.make(
-  "create",
-  exclusiveInputSourceFlags(),
-  ({ fileInput, jsonInput }) =>
-    Effect.gen(function* () {
-      const { output } = yield* rootCommand;
-      const source = yield* resolveInputSource({ fileInput, jsonInput });
-      const builder = yield* DiagramBuilder;
-      const store = yield* DiagramStore;
-      const operation = Effect.gen(function* () {
-        const document = yield* readDocumentInput(source);
-        const built = yield* builder.build(document);
-        return yield* store.create(built);
-      });
-      yield* runReported(
-        "create",
-        output,
-        operation,
-        (diagram) => summaryText("created", diagram),
-        storedData,
-      );
-    }),
+	"create",
+	exclusiveInputSourceFlags(),
+	({ fileInput, jsonInput }) =>
+		Effect.gen(function* () {
+			const { output } = yield* rootCommand;
+			const source = yield* resolveInputSource({ fileInput, jsonInput });
+			const builder = yield* DiagramBuilder;
+			const store = yield* DiagramStore;
+			const operation = Effect.gen(function* () {
+				const document = yield* readDocumentInput(source);
+				const built = yield* builder.build(document);
+				return yield* store.create(built);
+			});
+			yield* runReported(
+				"create",
+				output,
+				operation,
+				(diagram) => summaryText("created", diagram),
+				storedData,
+			);
+		}),
 ).pipe(
-  Command.withDescription(
-    "Create one local diagram from exactly one canonical document source. The document is validated and built before the record directory is committed atomically. --file - rejects an interactive TTY with exit 2.",
-  ),
-  Command.withShortDescription("Create a local diagram from canonical JSON."),
-  Command.withExamples([
-    {
-      command: "sketchi create --file diagram.json",
-      description: "Create from a UTF-8 JSON file.",
-    },
-    {
-      command: "printf '%s' '{...}' | sketchi create --file - --output json",
-      description: "Create from noninteractive stdin with a JSON result.",
-    },
-  ]),
+	Command.withDescription(
+		"Create one local diagram from exactly one canonical document source. The document is validated and built before the record directory is committed atomically. --file - rejects an interactive TTY with exit 2.",
+	),
+	Command.withShortDescription("Create a local diagram from canonical JSON."),
+	Command.withExamples([
+		{
+			command: "sketchi create --file diagram.json",
+			description: "Create from a UTF-8 JSON file.",
+		},
+		{
+			command: "printf '%s' '{...}' | sketchi create --file - --output json",
+			description: "Create from noninteractive stdin with a JSON result.",
+		},
+	]),
 );
 
 const showCommand = Command.make(
-  "show",
-  { diagramId: Argument.String("diagram-id") },
-  ({ diagramId }) =>
-    Effect.gen(function* () {
-      const { output } = yield* rootCommand;
-      const store = yield* DiagramStore;
-      const operation = validateStorageId(diagramId).pipe(
-        Effect.flatMap((id) => store.show(id)),
-      );
-      yield* runReported("show", output, operation, showText, storedData);
-    }),
+	"show",
+	{ diagramId: Argument.String("diagram-id") },
+	({ diagramId }) =>
+		Effect.gen(function* () {
+			const { output } = yield* rootCommand;
+			const store = yield* DiagramStore;
+			const operation = validateStorageId(diagramId).pipe(Effect.flatMap((id) => store.show(id)));
+			yield* runReported("show", output, operation, showText, storedData);
+		}),
 ).pipe(
-  Command.withDescription(
-    "Show current authority, documentAuthoritative state, retained document provenance, manifest formats, and recoverable revision paths for DIAGRAM_ID. This is strictly offline and does not rebuild or mutate the record.",
-  ),
-  Command.withShortDescription("Inspect one local diagram."),
-  Command.withExamples([
-    {
-      command: "sketchi show release-flow --output json",
-      description: "Read a record as a stable JSON envelope.",
-    },
-  ]),
+	Command.withDescription(
+		"Show current authority, documentAuthoritative state, retained document provenance, manifest formats, and recoverable revision paths for DIAGRAM_ID. This is strictly offline and does not rebuild or mutate the record.",
+	),
+	Command.withShortDescription("Inspect one local diagram."),
+	Command.withExamples([
+		{
+			command: "sketchi show release-flow --output json",
+			description: "Read a record as a stable JSON envelope.",
+		},
+	]),
 );
 
 const editCommand = Command.make(
-  "edit",
-  {
-    diagramId: Argument.String("diagram-id"),
-    ...exclusiveInputSourceFlags(),
-  },
-  ({ diagramId, fileInput, jsonInput }) =>
-    Effect.gen(function* () {
-      const { output } = yield* rootCommand;
-      const source = yield* resolveInputSource({ fileInput, jsonInput });
-      const builder = yield* DiagramBuilder;
-      const store = yield* DiagramStore;
-      const operation = Effect.gen(function* () {
-        const id = yield* validateStorageId(diagramId);
-        const document = yield* readDocumentInput(source);
-        const built = yield* builder.build(document);
-        if (built.id !== id) {
-          return yield* CliValidationError.make({
-            message: `Edited document id "${built.id}" does not match "${id}".`,
-            hint: "Keep spec.id equal to the diagram id being edited.",
-            details: ["spec.id"],
-          });
-        }
-        return yield* store.edit(id, built);
-      });
-      yield* runReported(
-        "edit",
-        output,
-        operation,
-        (diagram) => summaryText("edited", diagram),
-        storedData,
-      );
-    }),
+	"edit",
+	{
+		diagramId: Argument.String("diagram-id"),
+		...exclusiveInputSourceFlags(),
+	},
+	({ diagramId, fileInput, jsonInput }) =>
+		Effect.gen(function* () {
+			const { output } = yield* rootCommand;
+			const source = yield* resolveInputSource({ fileInput, jsonInput });
+			const builder = yield* DiagramBuilder;
+			const store = yield* DiagramStore;
+			const operation = Effect.gen(function* () {
+				const id = yield* validateStorageId(diagramId);
+				const document = yield* readDocumentInput(source);
+				const built = yield* builder.build(document);
+				if (built.id !== id) {
+					return yield* CliValidationError.make({
+						message: `Edited document id "${built.id}" does not match "${id}".`,
+						hint: "Keep spec.id equal to the diagram id being edited.",
+						details: ["spec.id"],
+					});
+				}
+				return yield* store.edit(id, built);
+			});
+			yield* runReported(
+				"edit",
+				output,
+				operation,
+				(diagram) => summaryText("edited", diagram),
+				storedData,
+			);
+		}),
 ).pipe(
-  Command.withDescription(
-    "Replace the complete canonical document for DIAGRAM_ID. Sketchi validates and builds first, preserves the prior full authority state under revisions/, and atomically swaps the record. Patched and detached records refuse edit because their canonical document is no longer authoritative. The new spec.id must match DIAGRAM_ID.",
-  ),
-  Command.withShortDescription("Replace a canonical diagram document."),
-  Command.withExamples([
-    {
-      command: "sketchi edit release-flow --file revised.json",
-      description: "Replace a document and retain the prior revision.",
-    },
-  ]),
+	Command.withDescription(
+		"Replace the complete canonical document for DIAGRAM_ID. Sketchi validates and builds first, preserves the prior full authority state under revisions/, and atomically swaps the record. Patched and detached records refuse edit because their canonical document is no longer authoritative. The new spec.id must match DIAGRAM_ID.",
+	),
+	Command.withShortDescription("Replace a canonical diagram document."),
+	Command.withExamples([
+		{
+			command: "sketchi edit release-flow --file revised.json",
+			description: "Replace a document and retain the prior revision.",
+		},
+	]),
 );
 
 const patchCommand = Command.make(
-  "patch",
-  {
-    diagramId: Argument.String("diagram-id"),
-    ...exclusiveInputSourceFlags("patch request"),
-  },
-  ({ diagramId, fileInput, jsonInput }) =>
-    Effect.gen(function* () {
-      const { output } = yield* rootCommand;
-      const source = yield* resolveInputSource({ fileInput, jsonInput });
-      const patcher = yield* DiagramPatcher;
-      const store = yield* DiagramStore;
-      const operation = Effect.gen(function* () {
-        const id = yield* validateStorageId(diagramId);
-        const input = yield* readPatchInput(source);
-        const current = yield* store.readPatchSource(id);
-        const artifacts = yield* patcher.patch(
-          current.scene,
-          input,
-          `cli-patch-${id}-${String(current.revision + 1)}`,
-        );
-        return yield* store.commitPatch(id, current.revision, artifacts);
-      });
-      yield* runReported(
-        "patch",
-        output,
-        operation,
-        (diagram) => summaryText("patched", diagram),
-        storedData,
-      );
-    }),
+	"patch",
+	{
+		diagramId: Argument.String("diagram-id"),
+		...exclusiveInputSourceFlags("patch request"),
+	},
+	({ diagramId, fileInput, jsonInput }) =>
+		Effect.gen(function* () {
+			const { output } = yield* rootCommand;
+			const source = yield* resolveInputSource({ fileInput, jsonInput });
+			const patcher = yield* DiagramPatcher;
+			const store = yield* DiagramStore;
+			const operation = Effect.gen(function* () {
+				const id = yield* validateStorageId(diagramId);
+				const input = yield* readPatchInput(source);
+				const current = yield* store.readPatchSource(id);
+				const artifacts = yield* patcher.patch(
+					current.scene,
+					input,
+					`cli-patch-${id}-${String(current.revision + 1)}`,
+				);
+				return yield* store.commitPatch(id, current.revision, artifacts);
+			});
+			yield* runReported(
+				"patch",
+				output,
+				operation,
+				(diagram) => summaryText("patched", diagram),
+				storedData,
+			);
+		}),
 ).pipe(
-  Command.withDescription(
-    "Apply Sketchi semantic setStyle, setDefaultStyle, setShape, translate, replaceText, or rerouteEdges operations to the current stored scene. The CLI owns source and requestId; input contains operations plus optional options or intent. The prior full revision is recoverable, document.json remains unchanged provenance, stale stored PNG is removed, and the patched scene becomes authoritative. This command is strictly offline. Edit remains blocked until a canonical revision is restored.",
-  ),
-  Command.withShortDescription("Apply semantic edits to a stored diagram."),
-  Command.withExamples([
-    {
-      command:
-        'sketchi patch release-flow --json \'{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}\'',
-      description: "Color selected nodes through semantic ids.",
-    },
-    {
-      command: "sketchi patch release-flow --file patch.json --output json",
-      description:
-        "Patch from a file, then export or restore the reported diagram revision.",
-    },
-  ]),
+	Command.withDescription(
+		"Apply Sketchi semantic setStyle, setDefaultStyle, setShape, translate, replaceText, or rerouteEdges operations to the current stored scene. The CLI owns source and requestId; input contains operations plus optional options or intent. The prior full revision is recoverable, document.json remains unchanged provenance, stale stored PNG is removed, and the patched scene becomes authoritative. This command is strictly offline. Edit remains blocked until a canonical revision is restored.",
+	),
+	Command.withShortDescription("Apply semantic edits to a stored diagram."),
+	Command.withExamples([
+		{
+			command:
+				'sketchi patch release-flow --json \'{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}\'',
+			description: "Color selected nodes through semantic ids.",
+		},
+		{
+			command: "sketchi patch release-flow --file patch.json --output json",
+			description: "Patch from a file, then export or restore the reported diagram revision.",
+		},
+	]),
 );
 
 const listCommand = Command.make("list", {}, () =>
-  Effect.gen(function* () {
-    const { output } = yield* rootCommand;
-    const store = yield* DiagramStore;
-    yield* runReported("list", output, store.list(), listText);
-  }),
+	Effect.gen(function* () {
+		const { output } = yield* rootCommand;
+		const store = yield* DiagramStore;
+		yield* runReported("list", output, store.list(), listText);
+	}),
 ).pipe(
-  Command.withDescription(
-    "List local diagrams in ascending id order with type, revision, authority, documentAuthoritative, current stored formats, and retained title provenance. The command is deterministic, strictly offline, and read-only.",
-  ),
-  Command.withShortDescription("List local diagrams."),
-  Command.withExamples([
-    {
-      command: "sketchi list --output json",
-      description: "List records as a stable JSON envelope.",
-    },
-  ]),
+	Command.withDescription(
+		"List local diagrams in ascending id order with type, revision, authority, documentAuthoritative, current stored formats, and retained title provenance. The command is deterministic, strictly offline, and read-only.",
+	),
+	Command.withShortDescription("List local diagrams."),
+	Command.withExamples([
+		{
+			command: "sketchi list --output json",
+			description: "List records as a stable JSON envelope.",
+		},
+	]),
 );
 
 const shareCommand = Command.make(
-  "share",
-  {
-    diagramId: Argument.String("diagram-id"),
-    open: Flag.Boolean("open").pipe(
-      Flag.withDescription(
-        "Hand the bearer link to the default OS browser opener.",
-      ),
-    ),
-  },
-  ({ diagramId, open }) =>
-    Effect.gen(function* () {
-      const { output } = yield* rootCommand;
-      const store = yield* DiagramStore;
-      const sharing = yield* ExcalidrawShare;
-      const opener = yield* LinkOpener;
-      const operation = Effect.gen(function* () {
-        const id = yield* validateStorageId(diagramId);
-        const source = yield* store.readExportSource(id, "excalidraw");
-        if (source._tag !== "StoredArtifact") {
-          return yield* CliShareError.make({
-            code: "unsupported_scene",
-            message: `Diagram "${id}" has no authoritative Excalidraw artifact.`,
-            hint: "Restore or rebuild the diagram before sharing it.",
-            details: [],
-          });
-        }
-        const artifact: unknown = yield* Effect.try({
-          try: () => JSON.parse(new TextDecoder().decode(source.bytes)),
-          catch: unsupportedPulledScene,
-        });
-        const result = yield* sharing.share(artifact);
-        const openResult = open
-          ? yield* opener.open(result.link)
-          : { status: "not_requested" as const };
-        return { id, link: result.link, open: openResult, hint: SHARE_HINT };
-      });
-      yield* operation.pipe(
-        Effect.matchEffect({
-          onFailure: (error) => reportFailure("share", output, error),
-          onSuccess: (result) =>
-            Effect.gen(function* () {
-              yield* reportSuccess(
-                "share",
-                output,
-                result,
-                [
-                  `shared: ${result.id}`,
-                  `link: ${result.link}`,
-                  `open: ${result.open.status}`,
-                  `hint: ${result.hint}`,
-                ].join("\n"),
-              );
-              if (output === "text" && result.open.status === "unconfirmed") {
-                const writer = yield* OutputWriter;
-                yield* writer.stderr(
-                  "notice: the OS browser opener could not be confirmed; the share link is still valid.\n",
-                );
-              }
-            }),
-        }),
-      );
-    }),
+	"share",
+	{
+		diagramId: Argument.String("diagram-id"),
+		open: Flag.Boolean("open").pipe(
+			Flag.withDescription("Hand the bearer link to the default OS browser opener."),
+		),
+	},
+	({ diagramId, open }) =>
+		Effect.gen(function* () {
+			const { output } = yield* rootCommand;
+			const store = yield* DiagramStore;
+			const sharing = yield* ExcalidrawShare;
+			const opener = yield* LinkOpener;
+			const operation = Effect.gen(function* () {
+				const id = yield* validateStorageId(diagramId);
+				const source = yield* store.readExportSource(id, "excalidraw");
+				if (source._tag !== "StoredArtifact") {
+					return yield* CliShareError.make({
+						code: "unsupported_scene",
+						message: `Diagram "${id}" has no authoritative Excalidraw artifact.`,
+						hint: "Restore or rebuild the diagram before sharing it.",
+						details: [],
+					});
+				}
+				const artifact: unknown = yield* Effect.try({
+					try: () => JSON.parse(new TextDecoder().decode(source.bytes)),
+					catch: unsupportedPulledScene,
+				});
+				const result = yield* sharing.share(artifact);
+				const openResult = open
+					? yield* opener.open(result.link)
+					: { status: "not_requested" as const };
+				return { id, link: result.link, open: openResult, hint: SHARE_HINT };
+			});
+			yield* operation.pipe(
+				Effect.matchEffect({
+					onFailure: (error) => reportFailure("share", output, error),
+					onSuccess: (result) =>
+						Effect.gen(function* () {
+							yield* reportSuccess(
+								"share",
+								output,
+								result,
+								[
+									`shared: ${result.id}`,
+									`link: ${result.link}`,
+									`open: ${result.open.status}`,
+									`hint: ${result.hint}`,
+								].join("\n"),
+							);
+							if (output === "text" && result.open.status === "unconfirmed") {
+								const writer = yield* OutputWriter;
+								yield* writer.stderr(
+									"notice: the OS browser opener could not be confirmed; the share link is still valid.\n",
+								);
+							}
+						}),
+				}),
+			);
+		}),
 ).pipe(
-  Command.withDescription(
-    `Encrypt and upload the current authoritative Excalidraw artifact as one immutable excalidraw.com bearer snapshot. This makes exactly one credential-free HTTPS request. The storage service can observe connection metadata, timing, and ciphertext size; retention is uncontrolled, and Sketchi cannot revoke or delete a link. Anyone with the full URL can decrypt it. Supported elements: rectangle, ellipse, diamond, arrow, line, freedraw, text; text must use Excalifont fontFamily 5; files and images are rejected. Render limits: element dimension ${String(MAX_RENDER_ELEMENT_DIMENSION)}, canvas dimension ${String(MAX_RENDER_CANVAS_DIMENSION)}, canvas area ${String(MAX_RENDER_CANVAS_AREA)}, final PNG pixels ${String(MAX_RENDER_OUTPUT_PIXELS)}. --open is opt-in and only confirms whether the OS accepted the request.`,
-  ),
-  Command.withShortDescription("Share an encrypted Excalidraw snapshot."),
+	Command.withDescription(
+		`Encrypt and upload the current authoritative Excalidraw artifact as one immutable excalidraw.com bearer snapshot. This makes exactly one credential-free HTTPS request. The storage service can observe connection metadata, timing, and ciphertext size; retention is uncontrolled, and Sketchi cannot revoke or delete a link. Anyone with the full URL can decrypt it. Supported elements: rectangle, ellipse, diamond, arrow, line, freedraw, text; text must use Excalifont fontFamily 5; files and images are rejected. Render limits: element dimension ${String(MAX_RENDER_ELEMENT_DIMENSION)}, canvas dimension ${String(MAX_RENDER_CANVAS_DIMENSION)}, canvas area ${String(MAX_RENDER_CANVAS_AREA)}, final PNG pixels ${String(MAX_RENDER_OUTPUT_PIXELS)}. --open is opt-in and only confirms whether the OS accepted the request.`,
+	),
+	Command.withShortDescription("Share an encrypted Excalidraw snapshot."),
 );
 
 const pullCommand = Command.make(
-  "pull",
-  {
-    diagramId: Argument.String("diagram-id"),
-    link: exactlyOnceStringFlag(
-      "link",
-      "URL|-",
-      "Excalidraw bearer share URL, or - for noninteractive stdin.",
-    ),
-  },
-  ({ diagramId, link }) =>
-    Effect.gen(function* () {
-      const { output } = yield* rootCommand;
-      const operation = Effect.gen(function* () {
-        const target = yield* preflightPullTarget(diagramId);
-        const suppliedLink = yield* readLinkInput(link);
-        return yield* pullIntoStore(diagramId, suppliedLink, target);
-      });
-      yield* runReported(
-        "pull",
-        output,
-        operation,
-        ({ diagram }) =>
-          [
-            `pulled: ${diagram.manifest.id}`,
-            `revision: ${String(diagram.manifest.revision)}`,
-            `authority: ${diagram.authority}`,
-            "source identity: unverified",
-          ].join("\n"),
-        ({ diagram, sourceIdentity }) => ({
-          id: diagram.manifest.id,
-          revision: diagram.manifest.revision,
-          authority: diagram.authority,
-          documentAuthoritative: diagram.authority === "canonical",
-          formats: diagram.manifest.formats,
-          revisions: revisionLocations(diagram),
-          sourceIdentity,
-        }),
-      );
-    }),
+	"pull",
+	{
+		diagramId: Argument.String("diagram-id"),
+		link: exactlyOnceStringFlag(
+			"link",
+			"URL|-",
+			"Excalidraw bearer share URL, or - for noninteractive stdin.",
+		),
+	},
+	({ diagramId, link }) =>
+		Effect.gen(function* () {
+			const { output } = yield* rootCommand;
+			const operation = Effect.gen(function* () {
+				const target = yield* preflightPullTarget(diagramId);
+				const suppliedLink = yield* readLinkInput(link);
+				return yield* pullIntoStore(diagramId, suppliedLink, target);
+			});
+			yield* runReported(
+				"pull",
+				output,
+				operation,
+				({ diagram }) =>
+					[
+						`pulled: ${diagram.manifest.id}`,
+						`revision: ${String(diagram.manifest.revision)}`,
+						`authority: ${diagram.authority}`,
+						"source identity: unverified",
+					].join("\n"),
+				({ diagram, sourceIdentity }) => ({
+					id: diagram.manifest.id,
+					revision: diagram.manifest.revision,
+					authority: diagram.authority,
+					documentAuthoritative: diagram.authority === "canonical",
+					formats: diagram.manifest.formats,
+					revisions: revisionLocations(diagram),
+					sourceIdentity,
+				}),
+			);
+		}),
 ).pipe(
-  Command.withDescription(
-    `Fetch exactly one current-format excalidraw.com bearer snapshot, decrypt it locally, restore and strictly validate it, prove detached PNG renderability, then atomically preserve the prior full record and replace diagram.excalidraw as detached authority. The link carries no trusted Sketchi identity and may be unrelated to DIAGRAM_ID. This makes exactly one credential-free HTTPS request and never echoes or stores the input link or key. Supported elements: rectangle, ellipse, diamond, arrow, line, freedraw, text; text must use Excalifont fontFamily 5; files, images, external resources, and other fonts are rejected. Render limits: element dimension ${String(MAX_RENDER_ELEMENT_DIMENSION)}, canvas dimension ${String(MAX_RENDER_CANVAS_DIMENSION)}, canvas area ${String(MAX_RENDER_CANVAS_AREA)}, final PNG pixels ${String(MAX_RENDER_OUTPUT_PIXELS)}.`,
-  ),
-  Command.withShortDescription("Pull browser edits from an Excalidraw link."),
+	Command.withDescription(
+		`Fetch exactly one current-format excalidraw.com bearer snapshot, decrypt it locally, restore and strictly validate it, prove detached PNG renderability, then atomically preserve the prior full record and replace diagram.excalidraw as detached authority. The link carries no trusted Sketchi identity and may be unrelated to DIAGRAM_ID. This makes exactly one credential-free HTTPS request and never echoes or stores the input link or key. Supported elements: rectangle, ellipse, diamond, arrow, line, freedraw, text; text must use Excalifont fontFamily 5; files, images, external resources, and other fonts are rejected. Render limits: element dimension ${String(MAX_RENDER_ELEMENT_DIMENSION)}, canvas dimension ${String(MAX_RENDER_CANVAS_DIMENSION)}, canvas area ${String(MAX_RENDER_CANVAS_AREA)}, final PNG pixels ${String(MAX_RENDER_OUTPUT_PIXELS)}.`,
+	),
+	Command.withShortDescription("Pull browser edits from an Excalidraw link."),
 );
 
 const restoreCommand = Command.make(
-  "restore",
-  {
-    diagramId: Argument.String("diagram-id"),
-    revision: Flag.Int("revision").pipe(
-      Flag.filter(
-        (revision) => revision > 0,
-        (revision) => `Expected a positive revision, got ${String(revision)}`,
-      ),
-      Flag.withMetavar("N"),
-      Flag.withDescription(
-        "Archived revision number to restore without consuming it.",
-      ),
-    ),
-  },
-  ({ diagramId, revision }) =>
-    Effect.gen(function* () {
-      const { output } = yield* rootCommand;
-      const store = yield* DiagramStore;
-      const builder = yield* DiagramBuilder;
-      const operation = Effect.gen(function* () {
-        const id = yield* validateStorageId(diagramId);
-        const selected = yield* store.readRevision(id, revision);
-        const restored =
-          selected._tag === "LegacyDocument"
-            ? yield* builder
-                .build(selected.document)
-                .pipe(
-                  Effect.flatMap((built) => store.restore(id, revision, built)),
-                )
-            : yield* store.restore(id, revision);
-        return restored;
-      });
-      yield* runReported(
-        "restore",
-        output,
-        operation,
-        (result) =>
-          [
-            `restored: ${result.diagram.manifest.id}`,
-            `from revision: ${String(result.restoredFromRevision)}`,
-            `revision: ${String(result.diagram.manifest.revision)}`,
-            `authority: ${result.diagram.authority}`,
-          ].join("\n"),
-        (result) => ({
-          id: result.diagram.manifest.id,
-          restoredFromRevision: result.restoredFromRevision,
-          revision: result.diagram.manifest.revision,
-          authority: result.diagram.authority,
-          documentAuthoritative: result.diagram.authority === "canonical",
-          formats: result.diagram.manifest.formats,
-          revisions: revisionLocations(result.diagram),
-        }),
-      );
-    }),
+	"restore",
+	{
+		diagramId: Argument.String("diagram-id"),
+		revision: Flag.Int("revision").pipe(
+			Flag.filter(
+				(revision) => revision > 0,
+				(revision) => `Expected a positive revision, got ${String(revision)}`,
+			),
+			Flag.withMetavar("N"),
+			Flag.withDescription("Archived revision number to restore without consuming it."),
+		),
+	},
+	({ diagramId, revision }) =>
+		Effect.gen(function* () {
+			const { output } = yield* rootCommand;
+			const store = yield* DiagramStore;
+			const builder = yield* DiagramBuilder;
+			const operation = Effect.gen(function* () {
+				const id = yield* validateStorageId(diagramId);
+				const selected = yield* store.readRevision(id, revision);
+				const restored =
+					selected._tag === "LegacyDocument"
+						? yield* builder
+								.build(selected.document)
+								.pipe(Effect.flatMap((built) => store.restore(id, revision, built)))
+						: yield* store.restore(id, revision);
+				return restored;
+			});
+			yield* runReported(
+				"restore",
+				output,
+				operation,
+				(result) =>
+					[
+						`restored: ${result.diagram.manifest.id}`,
+						`from revision: ${String(result.restoredFromRevision)}`,
+						`revision: ${String(result.diagram.manifest.revision)}`,
+						`authority: ${result.diagram.authority}`,
+					].join("\n"),
+				(result) => ({
+					id: result.diagram.manifest.id,
+					restoredFromRevision: result.restoredFromRevision,
+					revision: result.diagram.manifest.revision,
+					authority: result.diagram.authority,
+					documentAuthoritative: result.diagram.authority === "canonical",
+					formats: result.diagram.manifest.formats,
+					revisions: revisionLocations(result.diagram),
+				}),
+			);
+		}),
 ).pipe(
-  Command.withDescription(
-    "Strictly offline recovery. Archive the current full state first, then restore revision N byte-for-byte without consuming it and commit at the next monotonic revision. Full snapshots restore artifacts and authority without rebuilding; legacy document-only revisions rebuild only while the record remains canonical.",
-  ),
-  Command.withShortDescription("Restore a retained diagram revision."),
+	Command.withDescription(
+		"Strictly offline recovery. Archive the current full state first, then restore revision N byte-for-byte without consuming it and commit at the next monotonic revision. Full snapshots restore artifacts and authority without rebuilding; legacy document-only revisions rebuild only while the record remains canonical.",
+	),
+	Command.withShortDescription("Restore a retained diagram revision."),
 );
 
 function exportData(result: GeneratedArtifact) {
-  const hint = displayHint(result);
-  return {
-    id: result.id,
-    format: result.format,
-    destination: result.destination,
-    sizeBytes: result.sizeBytes,
-    ...(hint ? { hint } : {}),
-  };
+	const hint = displayHint(result);
+	return {
+		id: result.id,
+		format: result.format,
+		destination: result.destination,
+		sizeBytes: result.sizeBytes,
+		...(hint ? { hint } : {}),
+	};
 }
 
 function displayHint(result: GeneratedArtifact): string | undefined {
-  const markdownDestination = [...result.destination]
-    .map((character) => {
-      const codePoint = character.codePointAt(0) ?? 0;
-      return codePoint < 0x20 ||
-        (codePoint >= 0x80 && codePoint <= 0x9f) ||
-        codePoint === 0x7f ||
-        codePoint === 0x2028 ||
-        codePoint === 0x2029 ||
-        "%<>#?\\".includes(character)
-        ? encodeURIComponent(character)
-        : character;
-    })
-    .join("");
-  return result.format === "png" && result.destination !== "-"
-    ? `to show this diagram to the user, display the exported file as an inline markdown image, e.g. ![${result.id}](<${markdownDestination}>)`
-    : undefined;
+	const markdownDestination = [...result.destination]
+		.map((character) => {
+			const codePoint = character.codePointAt(0) ?? 0;
+			return codePoint < 0x20 ||
+				(codePoint >= 0x80 && codePoint <= 0x9f) ||
+				codePoint === 0x7f ||
+				codePoint === 0x2028 ||
+				codePoint === 0x2029 ||
+				"%<>#?\\".includes(character)
+				? encodeURIComponent(character)
+				: character;
+		})
+		.join("");
+	return result.format === "png" && result.destination !== "-"
+		? `to show this diagram to the user, display the exported file as an inline markdown image, e.g. ![${result.id}](<${markdownDestination}>)`
+		: undefined;
 }
 
 const exportCommand = Command.make(
-  "export",
-  {
-    diagramId: Argument.String("diagram-id"),
-    format: Flag.Literals("format", ["scene", "excalidraw", "png"]).pipe(
-      Flag.withDescription("Artifact format to export or render on demand."),
-      Flag.withMetavar("scene|excalidraw|png"),
-    ),
-    destination: Flag.String("dest").pipe(
-      Flag.withDescription("Artifact byte destination path, or - for stdout."),
-      Flag.withMetavar("PATH|-"),
-    ),
-  },
-  ({ destination, diagramId, format }) =>
-    Effect.gen(function* () {
-      const { output } = yield* rootCommand;
-      const exporter = yield* DiagramExporter;
-      const operation = Effect.gen(function* () {
-        const id = yield* validateStorageId(diagramId);
-        const bytes = yield* exporter.exportArtifact(id, format);
-        if (destination !== "-") yield* writeExportFile(destination, bytes);
-        return {
-          id,
-          format,
-          destination,
-          sizeBytes: bytes.byteLength,
-          ...(destination === "-" ? { stdoutBytes: bytes } : {}),
-        };
-      });
-      yield* runReportedArtifact(
-        "export",
-        output,
-        operation,
-        (result) => result,
-        (result) => {
-          const hint = displayHint(result);
-          return [
-            `exported: ${result.id}`,
-            `format: ${result.format}`,
-            `destination: ${result.destination}`,
-            `bytes: ${String(result.sizeBytes)}`,
-            ...(hint ? [`hint: ${hint}`] : []),
-          ].join("\n");
-        },
-        exportData,
-        () => "stderr",
-      );
-    }),
+	"export",
+	{
+		diagramId: Argument.String("diagram-id"),
+		format: Flag.Literals("format", ["scene", "excalidraw", "png"]).pipe(
+			Flag.withDescription("Artifact format to export or render on demand."),
+			Flag.withMetavar("scene|excalidraw|png"),
+		),
+		destination: Flag.String("dest").pipe(
+			Flag.withDescription("Artifact byte destination path, or - for stdout."),
+			Flag.withMetavar("PATH|-"),
+		),
+	},
+	({ destination, diagramId, format }) =>
+		Effect.gen(function* () {
+			const { output } = yield* rootCommand;
+			const exporter = yield* DiagramExporter;
+			const operation = Effect.gen(function* () {
+				const id = yield* validateStorageId(diagramId);
+				const bytes = yield* exporter.exportArtifact(id, format);
+				if (destination !== "-") yield* writeExportFile(destination, bytes);
+				return {
+					id,
+					format,
+					destination,
+					sizeBytes: bytes.byteLength,
+					...(destination === "-" ? { stdoutBytes: bytes } : {}),
+				};
+			});
+			yield* runReportedArtifact(
+				"export",
+				output,
+				operation,
+				(result) => result,
+				(result) => {
+					const hint = displayHint(result);
+					return [
+						`exported: ${result.id}`,
+						`format: ${result.format}`,
+						`destination: ${result.destination}`,
+						`bytes: ${String(result.sizeBytes)}`,
+						...(hint ? [`hint: ${hint}`] : []),
+					].join("\n");
+				},
+				exportData,
+				() => "stderr",
+			);
+		}),
 ).pipe(
-  Command.withDescription(
-    "Strictly offline export of a current stored artifact or on-demand PNG. Canonical PNG uses scene plus Excalidraw; detached PNG restores diagram.excalidraw directly, uses its viewBackgroundColor, and adds no stale canonical title. Detached scene export is unavailable. Rendering never starts a browser or network request and never writes the PNG back. Status always uses stderr, so --dest - leaves stdout byte-only. Render or write failures exit 8.",
-  ),
-  Command.withShortDescription("Export scene, Excalidraw, or PNG bytes."),
-  Command.withExamples([
-    {
-      command:
-        "sketchi export release-flow --format excalidraw --dest release.excalidraw",
-      description: "Write an Excalidraw artifact atomically to a file.",
-    },
-    {
-      command:
-        "sketchi export release-flow --format scene --dest - > scene.json",
-      description: "Pipe raw scene bytes without status contamination.",
-    },
-  ]),
+	Command.withDescription(
+		"Strictly offline export of a current stored artifact or on-demand PNG. Canonical PNG uses scene plus Excalidraw; detached PNG restores diagram.excalidraw directly, uses its viewBackgroundColor, and adds no stale canonical title. Detached scene export is unavailable. Rendering never starts a browser or network request and never writes the PNG back. Status always uses stderr, so --dest - leaves stdout byte-only. Render or write failures exit 8.",
+	),
+	Command.withShortDescription("Export scene, Excalidraw, or PNG bytes."),
+	Command.withExamples([
+		{
+			command: "sketchi export release-flow --format excalidraw --dest release.excalidraw",
+			description: "Write an Excalidraw artifact atomically to a file.",
+		},
+		{
+			command: "sketchi export release-flow --format scene --dest - > scene.json",
+			description: "Pipe raw scene bytes without status contamination.",
+		},
+	]),
 );
 
 export const sketchiCommand = rootCommand.pipe(
-  Command.withSubcommands([
-    generateCommand,
-    canvasCommand,
-    docsCommand,
-    createCommand,
-    showCommand,
-    editCommand,
-    patchCommand,
-    listCommand,
-    restoreCommand,
-    shareCommand,
-    pullCommand,
-    exportCommand,
-  ]),
+	Command.withSubcommands([
+		generateCommand,
+		canvasCommand,
+		docsCommand,
+		createCommand,
+		showCommand,
+		editCommand,
+		patchCommand,
+		listCommand,
+		restoreCommand,
+		shareCommand,
+		pullCommand,
+		exportCommand,
+	]),
 );
 
-export const cliProgram = Effect.fn("sketchi.cli.run")(function* (
-  args: ReadonlyArray<string>,
-) {
-  const format = requestedOutputFormat(args);
-  return yield* runEffectCommand(sketchiCommand, args).pipe(
-    Effect.matchCauseEffect({
-      onFailure: (cause) =>
-        Effect.gen(function* () {
-          const failure = Option.getOrUndefined(Cause.findErrorOption(cause));
-          if (failure instanceof CliCommandExit) return failure.exitCode;
-          if (failure instanceof CliFilesystemError) return 7;
-          const parserExit = cliErrorExitCode(failure);
-          if (parserExit !== undefined) return parserExit;
-          const writer = yield* OutputWriter;
-          yield* writer
-            .stderr(internalErrorText(format))
-            .pipe(Effect.catch(() => Effect.void));
-          return 1;
-        }),
-      onSuccess: () => Effect.succeed(0),
-    }),
-  );
+export const cliProgram = Effect.fn("sketchi.cli.run")(function* (args: ReadonlyArray<string>) {
+	const format = requestedOutputFormat(args);
+	return yield* runEffectCommand(sketchiCommand, args).pipe(
+		Effect.matchCauseEffect({
+			onFailure: (cause) =>
+				Effect.gen(function* () {
+					const failure = Option.getOrUndefined(Cause.findErrorOption(cause));
+					if (failure instanceof CliCommandExit) return failure.exitCode;
+					if (failure instanceof CliFilesystemError) return 7;
+					const parserExit = cliErrorExitCode(failure);
+					if (parserExit !== undefined) return parserExit;
+					const writer = yield* OutputWriter;
+					yield* writer.stderr(internalErrorText(format)).pipe(Effect.catch(() => Effect.void));
+					return 1;
+				}),
+			onSuccess: () => Effect.succeed(0),
+		}),
+	);
 });
 
 const codeModeDependencies = Layer.mergeAll(
-  CodeModeArtifactStorageMemory,
-  makeCodeModeRuntimeEnvironmentLayer({
-    createId: (prefix) => `${prefix}_offline_cli`,
-    icons: cliIconCatalog,
-  }),
+	CodeModeArtifactStorageMemory,
+	makeCodeModeRuntimeEnvironmentLayer({
+		createId: (prefix) => `${prefix}_offline_cli`,
+		icons: cliIconCatalog,
+	}),
 );
-const diagramBuilderLayer = Layer.provide(
-  DiagramBuilderLive,
-  codeModeDependencies,
-);
-const diagramPatcherLayer = Layer.provide(
-  DiagramPatcherLive,
-  codeModeDependencies,
-);
-const storageDependencies = Layer.mergeAll(
-  LocalFileSystemLive,
-  StorageRootLive,
-);
+const diagramBuilderLayer = Layer.provide(DiagramBuilderLive, codeModeDependencies);
+const diagramPatcherLayer = Layer.provide(DiagramPatcherLive, codeModeDependencies);
+const storageDependencies = Layer.mergeAll(LocalFileSystemLive, StorageRootLive);
 const diagramStoreLayer = Layer.provide(DiagramStoreLive, storageDependencies);
 const diagramExporterLayer = Layer.provide(
-  DiagramExporterLive,
-  Layer.mergeAll(diagramStoreLayer, CliPngRendererLive),
+	DiagramExporterLive,
+	Layer.mergeAll(diagramStoreLayer, CliPngRendererLive),
 );
-const excalidrawShareLayer = Layer.provide(
-  ExcalidrawShareLive,
-  ShareTransportLive,
-);
+const excalidrawShareLayer = Layer.provide(ExcalidrawShareLive, ShareTransportLive);
 
 export const CliApplicationLayer = Layer.mergeAll(
-  LocalFileSystemLive,
-  StorageRootLive,
-  diagramBuilderLayer,
-  diagramPatcherLayer,
-  diagramStoreLayer,
-  diagramExporterLayer,
-  CliPngRendererLive,
-  excalidrawShareLayer,
-  LinkOpenerLive,
-  InputReaderLive.pipe(Layer.provide(LocalFileSystemLive)),
-  OutputWriterLive,
-  GenerateWizardLive,
+	LocalFileSystemLive,
+	StorageRootLive,
+	diagramBuilderLayer,
+	diagramPatcherLayer,
+	diagramStoreLayer,
+	diagramExporterLayer,
+	CliPngRendererLive,
+	excalidrawShareLayer,
+	LinkOpenerLive,
+	InputReaderLive.pipe(Layer.provide(LocalFileSystemLive)),
+	OutputWriterLive,
+	GenerateWizardLive,
 );

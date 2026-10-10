@@ -4,183 +4,183 @@ import { pathToFileURL } from "node:url";
 
 import { NodeRuntime } from "@effect/platform-node";
 import {
-  evaluateScenarioDiagram,
-  flowchartScenarios,
-  getScenario,
-  type DiagramScenario,
-  type ScenarioEvaluation,
+	evaluateScenarioDiagram,
+	flowchartScenarios,
+	getScenario,
+	type DiagramScenario,
+	type ScenarioEvaluation,
 } from "@sketchi/diagram-scenarios";
 import {
-  runToolProcess,
-  ToolProcessSpawnerLive,
+	runToolProcess,
+	ToolProcessSpawnerLive,
 } from "@sketchi/diagram-scenarios/internal/tool-process";
 import { Cause, Effect, Exit, Schema } from "effect";
 
 class HarnessFilesystemError extends Schema.TaggedError<HarnessFilesystemError>()(
-  "HarnessFilesystemError",
-  {
-    cause: Schema.Defect(),
-    message: Schema.String,
-    path: Schema.String,
-  },
+	"HarnessFilesystemError",
+	{
+		cause: Schema.Defect(),
+		message: Schema.String,
+		path: Schema.String,
+	},
 ) {}
 
 export class HarnessEvalUsageError extends Schema.TaggedError<HarnessEvalUsageError>()(
-  "HarnessEvalUsageError",
-  {
-    cause: Schema.optionalKey(Schema.Defect()),
-    message: Schema.String,
-  },
+	"HarnessEvalUsageError",
+	{
+		cause: Schema.optionalKey(Schema.Defect()),
+		message: Schema.String,
+	},
 ) {}
 
 type HarnessName = "antigravity" | "claude" | "opencode";
 
 interface HarnessEvalOptions {
-  all: boolean;
-  antigravityConversationId?: string;
-  candidateOutDir?: string;
-  deliveryOnly: boolean;
-  eventsOutDir?: string;
-  harness: HarnessName;
-  mcpUrl: string;
-  model?: string;
-  reportOut?: string;
-  repeat: number;
-  scenarioId?: string;
-  timeoutMs: number;
+	all: boolean;
+	antigravityConversationId?: string;
+	candidateOutDir?: string;
+	deliveryOnly: boolean;
+	eventsOutDir?: string;
+	harness: HarnessName;
+	mcpUrl: string;
+	model?: string;
+	reportOut?: string;
+	repeat: number;
+	scenarioId?: string;
+	timeoutMs: number;
 }
 
 interface CommandSpec {
-  args: string[];
-  command: string;
-  cwd?: string;
-  env: NodeJS.ProcessEnv;
-  prompt: string;
+	args: string[];
+	command: string;
+	cwd?: string;
+	env: NodeJS.ProcessEnv;
+	prompt: string;
 }
 
 interface SpawnResult {
-  durationMs: number;
-  exitCode: number | null;
-  signal: NodeJS.Signals | null;
-  stderr: string;
-  stdout: string;
-  timedOut: boolean;
+	durationMs: number;
+	exitCode: number | null;
+	signal: NodeJS.Signals | null;
+	stderr: string;
+	stdout: string;
+	timedOut: boolean;
 }
 
 interface HarnessTokens {
-  cacheRead?: number;
-  cacheWrite?: number;
-  input?: number;
-  output?: number;
-  reasoning?: number;
-  total?: number;
+	cacheRead?: number;
+	cacheWrite?: number;
+	input?: number;
+	output?: number;
+	reasoning?: number;
+	total?: number;
 }
 
 interface HarnessStep {
-  cost?: number;
-  reason?: string;
-  tokens?: HarnessTokens;
+	cost?: number;
+	reason?: string;
+	tokens?: HarnessTokens;
 }
 
 interface HarnessToolCall {
-  callId?: string;
-  name: string;
-  status?: string;
+	callId?: string;
+	name: string;
+	status?: string;
 }
 
 interface HarnessMcpArtifactProof {
-  artifactId: string;
-  artifactFormats: string[];
-  artifactUrls: Record<string, string>;
-  buildId?: string;
-  buildOk: boolean;
-  normalizedSpec?: unknown;
-  qualityAccepted?: boolean;
-  qualityScore?: number;
-  status: string;
-  toolCallId?: string;
-  toolName: string;
+	artifactId: string;
+	artifactFormats: string[];
+	artifactUrls: Record<string, string>;
+	buildId?: string;
+	buildOk: boolean;
+	normalizedSpec?: unknown;
+	qualityAccepted?: boolean;
+	qualityScore?: number;
+	status: string;
+	toolCallId?: string;
+	toolName: string;
 }
 
 type HarnessMcpArtifactReport = Omit<HarnessMcpArtifactProof, "normalizedSpec">;
 
 interface HarnessOutputSummary {
-  eventCount: number;
-  finalJson?: unknown;
-  finalText: string;
-  mcpArtifacts: HarnessMcpArtifactProof[];
-  stepCosts: number[];
-  steps: HarnessStep[];
-  toolCalls: HarnessToolCall[];
+	eventCount: number;
+	finalJson?: unknown;
+	finalText: string;
+	mcpArtifacts: HarnessMcpArtifactProof[];
+	stepCosts: number[];
+	steps: HarnessStep[];
+	toolCalls: HarnessToolCall[];
 }
 
 interface HarnessCandidateEvaluation {
-  checks: ScenarioEvaluation["checks"];
-  error?: string;
-  excalidrawIssues: ScenarioEvaluation["excalidrawValidation"]["issues"];
-  ok: boolean;
+	checks: ScenarioEvaluation["checks"];
+	error?: string;
+	excalidrawIssues: ScenarioEvaluation["excalidrawValidation"]["issues"];
+	ok: boolean;
 }
 
 interface HarnessRunReport {
-  candidateOut?: string;
-  command: {
-    args: string[];
-    command: string;
-  };
-  conversationId?: string;
-  difficulty: DiagramScenario["difficulty"];
-  durationMs: number;
-  error?: string;
-  eventsOut?: string;
-  evaluation: HarnessCandidateEvaluation;
-  exitCode: number | null;
-  finalJson?: unknown;
-  finalText: string;
-  harness: HarnessName;
-  mcpArtifact?: HarnessMcpArtifactReport;
-  mcpArtifactCount: number;
-  mcpToolCallCount: number;
-  model?: string;
-  ok: boolean;
-  outputContractErrors: string[];
-  rawEventCount: number;
-  runNumber: number;
-  scenarioId: string;
-  signal: NodeJS.Signals | null;
-  stderrOut?: string;
-  transcriptOut?: string;
-  wrapperArtifactFiles: string[];
-  stepCosts: number[];
-  steps: HarnessStep[];
-  timedOut: boolean;
-  toolCalls: HarnessToolCall[];
+	candidateOut?: string;
+	command: {
+		args: string[];
+		command: string;
+	};
+	conversationId?: string;
+	difficulty: DiagramScenario["difficulty"];
+	durationMs: number;
+	error?: string;
+	eventsOut?: string;
+	evaluation: HarnessCandidateEvaluation;
+	exitCode: number | null;
+	finalJson?: unknown;
+	finalText: string;
+	harness: HarnessName;
+	mcpArtifact?: HarnessMcpArtifactReport;
+	mcpArtifactCount: number;
+	mcpToolCallCount: number;
+	model?: string;
+	ok: boolean;
+	outputContractErrors: string[];
+	rawEventCount: number;
+	runNumber: number;
+	scenarioId: string;
+	signal: NodeJS.Signals | null;
+	stderrOut?: string;
+	transcriptOut?: string;
+	wrapperArtifactFiles: string[];
+	stepCosts: number[];
+	steps: HarnessStep[];
+	timedOut: boolean;
+	toolCalls: HarnessToolCall[];
 }
 
 type HarnessReportStatus = "running" | "complete" | "interrupted" | "failed";
 
 interface HarnessReport {
-  expectedRuns: number;
-  status: HarnessReportStatus;
-  requestedMcpUrl: string;
-  generatedAt: string;
-  harness: HarnessName;
-  mcpUrl: string | null;
-  model?: string;
-  ok: boolean;
-  repeat: number;
-  results: HarnessRunReport[];
-  scenarioCount: number;
-  summary: {
-    failedEvaluations: Array<{
-      runNumber: number;
-      scenarioId: string;
-    }>;
-    mcpToolCallCount: number;
-    okCount: number;
-    totalCost: number;
-    totalDurationMs: number;
-    totalRuns: number;
-  };
+	expectedRuns: number;
+	status: HarnessReportStatus;
+	requestedMcpUrl: string;
+	generatedAt: string;
+	harness: HarnessName;
+	mcpUrl: string | null;
+	model?: string;
+	ok: boolean;
+	repeat: number;
+	results: HarnessRunReport[];
+	scenarioCount: number;
+	summary: {
+		failedEvaluations: Array<{
+			runNumber: number;
+			scenarioId: string;
+		}>;
+		mcpToolCallCount: number;
+		okCount: number;
+		totalCost: number;
+		totalDurationMs: number;
+		totalRuns: number;
+	};
 }
 
 const DEFAULT_MCP_URL = "https://sketchi-studio.dimethyl.workers.dev/mcp";
@@ -192,1884 +192,1752 @@ const COMMAND_FORCE_SETTLE_GRACE_MS = 2_000;
 const DEFAULT_TIMEOUT_MS = 180_000;
 
 function usage(): string {
-  return [
-    "Usage:",
-    "  pnpm eval:harness -- --harness antigravity --scenario repo-package-interaction-flow --antigravity-conversation-id <id>",
-    "  pnpm eval:harness -- --harness opencode --model opencode-go/kimi-k2.7-code --scenario sketchi-onboarding-decision-flow",
-    "  pnpm eval:harness -- --harness opencode --model opencode-go/kimi-k2.7-code --all --repeat 3",
-    "  pnpm eval:harness -- --harness claude --scenario pharma-batch-disposition",
-    "",
-    "Options:",
-    "  --harness antigravity|opencode|claude",
-    "  --model <model>",
-    "  --scenario <scenario-id>",
-    "  --all",
-    "  --repeat <n>",
-    "  --mcp-url <url>",
-    "  --timeout-ms <ms>",
-    "  --antigravity-conversation-id <id>",
-    "  --delivery-only",
-    "  --report-out <path>",
-    "  --candidate-out-dir <dir>",
-    "  --events-out-dir <dir>",
-    "",
-    "Antigravity supports offline replay only; its effective MCP endpoint is unknown.",
-  ].join("\n");
+	return [
+		"Usage:",
+		"  pnpm eval:harness -- --harness antigravity --scenario repo-package-interaction-flow --antigravity-conversation-id <id>",
+		"  pnpm eval:harness -- --harness opencode --model opencode-go/kimi-k2.7-code --scenario sketchi-onboarding-decision-flow",
+		"  pnpm eval:harness -- --harness opencode --model opencode-go/kimi-k2.7-code --all --repeat 3",
+		"  pnpm eval:harness -- --harness claude --scenario pharma-batch-disposition",
+		"",
+		"Options:",
+		"  --harness antigravity|opencode|claude",
+		"  --model <model>",
+		"  --scenario <scenario-id>",
+		"  --all",
+		"  --repeat <n>",
+		"  --mcp-url <url>",
+		"  --timeout-ms <ms>",
+		"  --antigravity-conversation-id <id>",
+		"  --delivery-only",
+		"  --report-out <path>",
+		"  --candidate-out-dir <dir>",
+		"  --events-out-dir <dir>",
+		"",
+		"Antigravity supports offline replay only; its effective MCP endpoint is unknown.",
+	].join("\n");
 }
 
 function parseOptionsUnsafe(argv: readonly string[]): HarnessEvalOptions {
-  const options: HarnessEvalOptions = {
-    all: false,
-    deliveryOnly: false,
-    harness: "opencode",
-    mcpUrl: DEFAULT_MCP_URL,
-    repeat: 1,
-    timeoutMs: DEFAULT_TIMEOUT_MS,
-  };
+	const options: HarnessEvalOptions = {
+		all: false,
+		deliveryOnly: false,
+		harness: "opencode",
+		mcpUrl: DEFAULT_MCP_URL,
+		repeat: 1,
+		timeoutMs: DEFAULT_TIMEOUT_MS,
+	};
 
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    const next = argv[index + 1];
+	for (let index = 0; index < argv.length; index += 1) {
+		const arg = argv[index];
+		const next = argv[index + 1];
 
-    if (arg === "--") {
-      continue;
-    }
+		if (arg === "--") {
+			continue;
+		}
 
-    if (arg === "--harness" && isHarnessName(next)) {
-      options.harness = next;
-      index += 1;
-      continue;
-    }
-    if (arg === "--model" && next) {
-      options.model = next;
-      index += 1;
-      continue;
-    }
-    if (arg === "--scenario" && next) {
-      options.scenarioId = next;
-      index += 1;
-      continue;
-    }
-    if (arg === "--all") {
-      options.all = true;
-      continue;
-    }
-    if (arg === "--delivery-only") {
-      options.deliveryOnly = true;
-      continue;
-    }
-    if (arg === "--repeat" && next) {
-      const repeat = Number.parseInt(next, 10);
-      if (!Number.isInteger(repeat) || repeat < 1) {
-        throw new Error("--repeat must be a positive integer.");
-      }
-      options.repeat = repeat;
-      index += 1;
-      continue;
-    }
-    if (arg === "--mcp-url" && next) {
-      options.mcpUrl = next;
-      index += 1;
-      continue;
-    }
-    if (arg === "--timeout-ms" && next) {
-      const timeoutMs = Number.parseInt(next, 10);
-      if (!Number.isInteger(timeoutMs) || timeoutMs < 1_000) {
-        throw new Error("--timeout-ms must be an integer >= 1000.");
-      }
-      options.timeoutMs = timeoutMs;
-      index += 1;
-      continue;
-    }
-    if (arg === "--antigravity-conversation-id" && next) {
-      options.antigravityConversationId = next;
-      index += 1;
-      continue;
-    }
-    if (arg === "--report-out" && next) {
-      options.reportOut = next;
-      index += 1;
-      continue;
-    }
-    if (arg === "--candidate-out-dir" && next) {
-      options.candidateOutDir = next;
-      index += 1;
-      continue;
-    }
-    if (arg === "--events-out-dir" && next) {
-      options.eventsOutDir = next;
-      index += 1;
-      continue;
-    }
+		if (arg === "--harness" && isHarnessName(next)) {
+			options.harness = next;
+			index += 1;
+			continue;
+		}
+		if (arg === "--model" && next) {
+			options.model = next;
+			index += 1;
+			continue;
+		}
+		if (arg === "--scenario" && next) {
+			options.scenarioId = next;
+			index += 1;
+			continue;
+		}
+		if (arg === "--all") {
+			options.all = true;
+			continue;
+		}
+		if (arg === "--delivery-only") {
+			options.deliveryOnly = true;
+			continue;
+		}
+		if (arg === "--repeat" && next) {
+			const repeat = Number.parseInt(next, 10);
+			if (!Number.isInteger(repeat) || repeat < 1) {
+				throw new Error("--repeat must be a positive integer.");
+			}
+			options.repeat = repeat;
+			index += 1;
+			continue;
+		}
+		if (arg === "--mcp-url" && next) {
+			options.mcpUrl = next;
+			index += 1;
+			continue;
+		}
+		if (arg === "--timeout-ms" && next) {
+			const timeoutMs = Number.parseInt(next, 10);
+			if (!Number.isInteger(timeoutMs) || timeoutMs < 1_000) {
+				throw new Error("--timeout-ms must be an integer >= 1000.");
+			}
+			options.timeoutMs = timeoutMs;
+			index += 1;
+			continue;
+		}
+		if (arg === "--antigravity-conversation-id" && next) {
+			options.antigravityConversationId = next;
+			index += 1;
+			continue;
+		}
+		if (arg === "--report-out" && next) {
+			options.reportOut = next;
+			index += 1;
+			continue;
+		}
+		if (arg === "--candidate-out-dir" && next) {
+			options.candidateOutDir = next;
+			index += 1;
+			continue;
+		}
+		if (arg === "--events-out-dir" && next) {
+			options.eventsOutDir = next;
+			index += 1;
+			continue;
+		}
 
-    throw new Error(`Unknown or incomplete argument "${arg}".\n\n${usage()}`);
-  }
+		throw new Error(`Unknown or incomplete argument "${arg}".\n\n${usage()}`);
+	}
 
-  if (!options.all && !options.scenarioId) {
-    throw new Error(`Missing --scenario or --all.\n\n${usage()}`);
-  }
-  if (options.antigravityConversationId && options.harness !== "antigravity") {
-    throw new Error(
-      "--antigravity-conversation-id can only be used with --harness antigravity.",
-    );
-  }
+	if (!options.all && !options.scenarioId) {
+		throw new Error(`Missing --scenario or --all.\n\n${usage()}`);
+	}
+	if (options.antigravityConversationId && options.harness !== "antigravity") {
+		throw new Error("--antigravity-conversation-id can only be used with --harness antigravity.");
+	}
 
-  if (options.harness === "antigravity" && !options.antigravityConversationId) {
-    throw HarnessEvalUsageError.make({
-      message:
-        "Antigravity cannot select an MCP endpoint through this runner. Use Claude/OpenCode, or --antigravity-conversation-id for offline replay with an unknown effective endpoint.",
-    });
-  }
+	if (options.harness === "antigravity" && !options.antigravityConversationId) {
+		throw HarnessEvalUsageError.make({
+			message:
+				"Antigravity cannot select an MCP endpoint through this runner. Use Claude/OpenCode, or --antigravity-conversation-id for offline replay with an unknown effective endpoint.",
+		});
+	}
 
-  return options;
+	return options;
 }
 
 export function parseOptions(argv: readonly string[]) {
-  return Effect.try({
-    try: () => parseOptionsUnsafe(argv),
-    catch: (cause) =>
-      HarnessEvalUsageError.make({
-        cause,
-        message:
-          cause instanceof Error ? cause.message : "Unable to parse options.",
-      }),
-  });
+	return Effect.try({
+		try: () => parseOptionsUnsafe(argv),
+		catch: (cause) =>
+			HarnessEvalUsageError.make({
+				cause,
+				message: cause instanceof Error ? cause.message : "Unable to parse options.",
+			}),
+	});
 }
 
 function isHarnessName(value: string | undefined): value is HarnessName {
-  return value === "antigravity" || value === "claude" || value === "opencode";
+	return value === "antigravity" || value === "claude" || value === "opencode";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function stringValue(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
+	return typeof value === "string" ? value : undefined;
 }
 
 function numberValue(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : undefined;
+	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function cleanQuotedString(value: unknown): string | undefined {
-  const raw = stringValue(value);
-  if (!raw) {
-    return undefined;
-  }
+	const raw = stringValue(value);
+	if (!raw) {
+		return undefined;
+	}
 
-  try {
-    const parsed = JSON.parse(raw);
-    if (typeof parsed === "string") {
-      return parsed;
-    }
-  } catch {
-    // Not a quoted JSON string; use the original value.
-  }
+	try {
+		const parsed = JSON.parse(raw);
+		if (typeof parsed === "string") {
+			return parsed;
+		}
+	} catch {
+		// Not a quoted JSON string; use the original value.
+	}
 
-  return raw;
+	return raw;
 }
 
 const TRAILING_TOOL_KEY_FRAGMENT =
-  /[,;]\s*(?:id|label|kind|group|source|target|title|direction|nodes|edges)\s*:?\s*$/i;
+	/[,;]\s*(?:id|label|kind|group|source|target|title|direction|nodes|edges)\s*:?\s*$/i;
 
 function cleanToolString(value: string): string {
-  let cleaned = value.trim();
-  for (;;) {
-    const next = cleaned.replace(TRAILING_TOOL_KEY_FRAGMENT, "").trim();
-    if (next === cleaned) {
-      return cleaned;
-    }
-    cleaned = next;
-  }
+	let cleaned = value.trim();
+	for (;;) {
+		const next = cleaned.replace(TRAILING_TOOL_KEY_FRAGMENT, "").trim();
+		if (next === cleaned) {
+			return cleaned;
+		}
+		cleaned = next;
+	}
 }
 
 function cleanOptionalToolString(value: unknown): string | undefined {
-  const raw = cleanQuotedString(value);
-  if (raw === undefined) {
-    return undefined;
-  }
-  const cleaned = cleanToolString(raw);
-  return cleaned.length > 0 ? cleaned : undefined;
+	const raw = cleanQuotedString(value);
+	if (raw === undefined) {
+		return undefined;
+	}
+	const cleaned = cleanToolString(raw);
+	return cleaned.length > 0 ? cleaned : undefined;
 }
 
 function antigravityRoot(): string | undefined {
-  return process.env.HOME
-    ? path.join(process.env.HOME, ".gemini", "antigravity-cli")
-    : undefined;
+	return process.env.HOME ? path.join(process.env.HOME, ".gemini", "antigravity-cli") : undefined;
 }
 
 function antigravityAuthError(stdout: string): string | undefined {
-  if (
-    stdout.includes("Authentication required.") &&
-    stdout.includes("Error: authentication timed out.")
-  ) {
-    return "Antigravity authentication timed out before MCP tools could run. Complete Agy CLI auth, then rerun the harness eval.";
-  }
-  return undefined;
+	if (
+		stdout.includes("Authentication required.") &&
+		stdout.includes("Error: authentication timed out.")
+	) {
+		return "Antigravity authentication timed out before MCP tools could run. Complete Agy CLI auth, then rerun the harness eval.";
+	}
+	return undefined;
 }
 
 function readJsonFile(filePath: string) {
-  return readOptionalText(filePath).pipe(
-    Effect.map((text) => {
-      if (text === undefined) return undefined;
-      try {
-        return JSON.parse(text) as unknown;
-      } catch {
-        return undefined;
-      }
-    }),
-  );
+	return readOptionalText(filePath).pipe(
+		Effect.map((text) => {
+			if (text === undefined) return undefined;
+			try {
+				return JSON.parse(text) as unknown;
+			} catch {
+				return undefined;
+			}
+		}),
+	);
 }
 
-function readAntigravityConversationId(
-  cwd: string,
-): Effect.Effect<string | undefined> {
-  const root = antigravityRoot();
-  if (!root) {
-    return Effect.succeed(undefined);
-  }
+function readAntigravityConversationId(cwd: string): Effect.Effect<string | undefined> {
+	const root = antigravityRoot();
+	if (!root) {
+		return Effect.succeed(undefined);
+	}
 
-  return readJsonFile(path.join(root, "cache", "last_conversations.json")).pipe(
-    Effect.map((value) =>
-      isRecord(value) ? stringValue(value[cwd]) : undefined,
-    ),
-  );
+	return readJsonFile(path.join(root, "cache", "last_conversations.json")).pipe(
+		Effect.map((value) => (isRecord(value) ? stringValue(value[cwd]) : undefined)),
+	);
 }
 
 function outputPathsFromTranscript(transcript: string): string[] {
-  const paths = new Set<string>();
-  const pattern = /file:\/\/([^\s"')]+\/output\.txt)/g;
+	const paths = new Set<string>();
+	const pattern = /file:\/\/([^\s"')]+\/output\.txt)/g;
 
-  for (const match of transcript.matchAll(pattern)) {
-    const filePath = match[1];
-    if (filePath) {
-      paths.add(decodeURIComponent(filePath));
-    }
-  }
+	for (const match of transcript.matchAll(pattern)) {
+		const filePath = match[1];
+		if (filePath) {
+			paths.add(decodeURIComponent(filePath));
+		}
+	}
 
-  return [...paths];
+	return [...paths];
 }
 
 function looksLikeWrapperArtifactPath(filePath: string): boolean {
-  const extension = path.extname(filePath).toLowerCase();
-  return [
-    ".excalidraw",
-    ".json",
-    ".markdown",
-    ".md",
-    ".mermaid",
-    ".mmd",
-    ".png",
-    ".svg",
-  ].includes(extension);
+	const extension = path.extname(filePath).toLowerCase();
+	return [".excalidraw", ".json", ".markdown", ".md", ".mermaid", ".mmd", ".png", ".svg"].includes(
+		extension,
+	);
 }
 
 function stringArgumentsFrom(value: unknown): string[] {
-  if (!isRecord(value)) {
-    return [];
-  }
+	if (!isRecord(value)) {
+		return [];
+	}
 
-  return Object.values(value)
-    .map(cleanQuotedString)
-    .filter((argument): argument is string => Boolean(argument));
+	return Object.values(value)
+		.map(cleanQuotedString)
+		.filter((argument): argument is string => Boolean(argument));
 }
 
 function wrapperArtifactPathsFromTranscript(transcript: string): string[] {
-  const paths = new Set<string>();
-  const fileUrlPattern = /file:\/\/([^\s"')]+)/g;
+	const paths = new Set<string>();
+	const fileUrlPattern = /file:\/\/([^\s"')]+)/g;
 
-  for (const event of parseJsonLines(transcript)) {
-    if (!isRecord(event)) {
-      continue;
-    }
+	for (const event of parseJsonLines(transcript)) {
+		if (!isRecord(event)) {
+			continue;
+		}
 
-    const calls = Array.isArray(event.tool_calls) ? event.tool_calls : [];
-    for (const call of calls.filter(isRecord)) {
-      const toolName = stringValue(call.name)?.toLowerCase();
-      if (
-        !toolName ||
-        (!toolName.includes("write_to_file") &&
-          !toolName.includes("create_file") &&
-          toolName !== "create")
-      ) {
-        continue;
-      }
+		const calls = Array.isArray(event.tool_calls) ? event.tool_calls : [];
+		for (const call of calls.filter(isRecord)) {
+			const toolName = stringValue(call.name)?.toLowerCase();
+			if (
+				!toolName ||
+				(!toolName.includes("write_to_file") &&
+					!toolName.includes("create_file") &&
+					toolName !== "create")
+			) {
+				continue;
+			}
 
-      for (const argument of stringArgumentsFrom(call.args)) {
-        if (
-          looksLikeWrapperArtifactPath(argument) &&
-          !isAntigravityInternalFile(argument)
-        ) {
-          paths.add(argument);
-        }
-      }
-    }
+			for (const argument of stringArgumentsFrom(call.args)) {
+				if (looksLikeWrapperArtifactPath(argument) && !isAntigravityInternalFile(argument)) {
+					paths.add(argument);
+				}
+			}
+		}
 
-    for (const text of textFromEvent(event)) {
-      for (const match of text.matchAll(fileUrlPattern)) {
-        const filePath = match[1];
-        if (
-          filePath &&
-          looksLikeWrapperArtifactPath(filePath) &&
-          !isAntigravityInternalFile(filePath)
-        ) {
-          paths.add(decodeURIComponent(filePath));
-        }
-      }
-    }
-  }
+		for (const text of textFromEvent(event)) {
+			for (const match of text.matchAll(fileUrlPattern)) {
+				const filePath = match[1];
+				if (
+					filePath &&
+					looksLikeWrapperArtifactPath(filePath) &&
+					!isAntigravityInternalFile(filePath)
+				) {
+					paths.add(decodeURIComponent(filePath));
+				}
+			}
+		}
+	}
 
-  return [...paths];
+	return [...paths];
 }
 
 function isAntigravityInternalFile(filePath: string): boolean {
-  return (
-    filePath.includes(`${path.sep}.git${path.sep}`) ||
-    filePath.endsWith(`${path.sep}.gitignore`) ||
-    filePath.includes(
-      `${path.sep}.gemini${path.sep}antigravity-cli${path.sep}builtin${path.sep}`,
-    )
-  );
+	return (
+		filePath.includes(`${path.sep}.git${path.sep}`) ||
+		filePath.endsWith(`${path.sep}.gitignore`) ||
+		filePath.includes(`${path.sep}.gemini${path.sep}antigravity-cli${path.sep}builtin${path.sep}`)
+	);
 }
 
 function readOptionalText(filePath: string): Effect.Effect<string | undefined> {
-  return Effect.tryPromise({
-    try: () => readFile(filePath, "utf8"),
-    catch: () => undefined,
-  }).pipe(Effect.catch(() => Effect.succeed(undefined)));
+	return Effect.tryPromise({
+		try: () => readFile(filePath, "utf8"),
+		catch: () => undefined,
+	}).pipe(Effect.catch(() => Effect.succeed(undefined)));
 }
 
 function listFilesRecursive(dir: string): Effect.Effect<string[]> {
-  return Effect.tryPromise({
-    try: () => readdir(dir, { withFileTypes: true }),
-    catch: () => undefined,
-  }).pipe(
-    Effect.catch(() => Effect.succeed([])),
-    Effect.flatMap((entries) => {
-      if (!entries) return Effect.succeed([]);
-      return Effect.forEach(entries, (entry) => {
-        const filePath = path.join(dir, entry.name);
-        if (entry.isDirectory()) return listFilesRecursive(filePath);
-        return Effect.succeed(entry.isFile() ? [filePath] : []);
-      }).pipe(Effect.map((paths) => paths.flat()));
-    }),
-  );
+	return Effect.tryPromise({
+		try: () => readdir(dir, { withFileTypes: true }),
+		catch: () => undefined,
+	}).pipe(
+		Effect.catch(() => Effect.succeed([])),
+		Effect.flatMap((entries) => {
+			if (!entries) return Effect.succeed([]);
+			return Effect.forEach(entries, (entry) => {
+				const filePath = path.join(dir, entry.name);
+				if (entry.isDirectory()) return listFilesRecursive(filePath);
+				return Effect.succeed(entry.isFile() ? [filePath] : []);
+			}).pipe(Effect.map((paths) => paths.flat()));
+		}),
+	);
 }
 
 interface AntigravityEvidence {
-  conversationId?: string;
-  outputTexts: string[];
-  transcriptOut?: string;
-  transcriptText?: string;
-  wrapperArtifactFiles: string[];
+	conversationId?: string;
+	outputTexts: string[];
+	transcriptOut?: string;
+	transcriptText?: string;
+	wrapperArtifactFiles: string[];
 }
 
 function readAntigravityEvidenceForConversation(input: {
-  conversationId: string;
-  outputDir: string;
-  root: string;
-  stem: string;
+	conversationId: string;
+	outputDir: string;
+	root: string;
+	stem: string;
 }): Effect.Effect<AntigravityEvidence, HarnessFilesystemError> {
-  const brainDir = path.join(input.root, "brain", input.conversationId);
-  const transcriptPath = path.join(
-    brainDir,
-    ".system_generated",
-    "logs",
-    "transcript.jsonl",
-  );
-  return Effect.gen(function* () {
-    const transcriptText = yield* readOptionalText(transcriptPath);
-    if (!transcriptText) {
-      return {
-        conversationId: input.conversationId,
-        outputTexts: [],
-        wrapperArtifactFiles: [],
-      };
-    }
+	const brainDir = path.join(input.root, "brain", input.conversationId);
+	const transcriptPath = path.join(brainDir, ".system_generated", "logs", "transcript.jsonl");
+	return Effect.gen(function* () {
+		const transcriptText = yield* readOptionalText(transcriptPath);
+		if (!transcriptText) {
+			return {
+				conversationId: input.conversationId,
+				outputTexts: [],
+				wrapperArtifactFiles: [],
+			};
+		}
 
-    const transcriptOut = path.join(input.outputDir, `${input.stem}.agy.jsonl`);
-    yield* writeText(transcriptOut, transcriptText);
-    const outputTexts = (yield* Effect.forEach(
-      outputPathsFromTranscript(transcriptText),
-      readOptionalText,
-      { concurrency: "unbounded" },
-    )).filter((text): text is string => Boolean(text));
-    const brainWrapperFiles = (yield* listFilesRecursive(brainDir)).filter(
-      (filePath) =>
-        !filePath.includes(`${path.sep}.system_generated${path.sep}`) &&
-        !isAntigravityInternalFile(filePath),
-    );
-    const wrapperArtifactFiles = [
-      ...new Set([
-        ...brainWrapperFiles,
-        ...wrapperArtifactPathsFromTranscript(transcriptText),
-      ]),
-    ];
+		const transcriptOut = path.join(input.outputDir, `${input.stem}.agy.jsonl`);
+		yield* writeText(transcriptOut, transcriptText);
+		const outputTexts = (yield* Effect.forEach(
+			outputPathsFromTranscript(transcriptText),
+			readOptionalText,
+			{ concurrency: "unbounded" },
+		)).filter((text): text is string => Boolean(text));
+		const brainWrapperFiles = (yield* listFilesRecursive(brainDir)).filter(
+			(filePath) =>
+				!filePath.includes(`${path.sep}.system_generated${path.sep}`) &&
+				!isAntigravityInternalFile(filePath),
+		);
+		const wrapperArtifactFiles = [
+			...new Set([...brainWrapperFiles, ...wrapperArtifactPathsFromTranscript(transcriptText)]),
+		];
 
-    return {
-      conversationId: input.conversationId,
-      outputTexts,
-      transcriptOut,
-      transcriptText,
-      wrapperArtifactFiles,
-    };
-  });
+		return {
+			conversationId: input.conversationId,
+			outputTexts,
+			transcriptOut,
+			transcriptText,
+			wrapperArtifactFiles,
+		};
+	});
 }
 
 function readAntigravityEvidence(input: {
-  beforeConversationId?: string | undefined;
-  cwd: string;
-  outputDir: string;
-  stem: string;
+	beforeConversationId?: string | undefined;
+	cwd: string;
+	outputDir: string;
+	stem: string;
 }): Effect.Effect<AntigravityEvidence, HarnessFilesystemError> {
-  const root = antigravityRoot();
-  return readAntigravityConversationId(input.cwd).pipe(
-    Effect.flatMap((conversationId) => {
-      if (
-        !root ||
-        !conversationId ||
-        conversationId === input.beforeConversationId
-      ) {
-        return Effect.succeed({
-          outputTexts: [],
-          wrapperArtifactFiles: [],
-        });
-      }
-      return readAntigravityEvidenceForConversation({
-        conversationId,
-        outputDir: input.outputDir,
-        root,
-        stem: input.stem,
-      });
-    }),
-  );
+	const root = antigravityRoot();
+	return readAntigravityConversationId(input.cwd).pipe(
+		Effect.flatMap((conversationId) => {
+			if (!root || !conversationId || conversationId === input.beforeConversationId) {
+				return Effect.succeed({
+					outputTexts: [],
+					wrapperArtifactFiles: [],
+				});
+			}
+			return readAntigravityEvidenceForConversation({
+				conversationId,
+				outputDir: input.outputDir,
+				root,
+				stem: input.stem,
+			});
+		}),
+	);
 }
 
 function stableRunStem(input: {
-  harness: HarnessName;
-  repeat: number;
-  runNumber: number;
-  scenarioId: string;
+	harness: HarnessName;
+	repeat: number;
+	runNumber: number;
+	scenarioId: string;
 }): string {
-  const suffix =
-    input.repeat > 1 ? `.run-${String(input.runNumber).padStart(3, "0")}` : "";
-  return `${input.harness}.${input.scenarioId}${suffix}`;
+	const suffix = input.repeat > 1 ? `.run-${String(input.runNumber).padStart(3, "0")}` : "";
+	return `${input.harness}.${input.scenarioId}${suffix}`;
 }
 
 function mcpConfigContent(mcpUrl: string): string {
-  return JSON.stringify({
-    mcp: {
-      "sketchi-code-mode": {
-        enabled: true,
-        oauth: false,
-        timeout: 30_000,
-        type: "remote",
-        url: mcpUrl,
-      },
-    },
-  });
+	return JSON.stringify({
+		mcp: {
+			"sketchi-code-mode": {
+				enabled: true,
+				oauth: false,
+				timeout: 30_000,
+				type: "remote",
+				url: mcpUrl,
+			},
+		},
+	});
 }
 
-function envWithLocalToolPath(
-  extraEnv: NodeJS.ProcessEnv = {},
-): NodeJS.ProcessEnv {
-  const pathEntries = [
-    process.env.HOME ? path.join(process.env.HOME, ".local", "bin") : undefined,
-    path.dirname(process.execPath),
-    process.env.PATH,
-  ]
-    .filter((entry): entry is string => Boolean(entry))
-    .flatMap((entry) => entry.split(path.delimiter))
-    .filter((entry) => entry.length > 0);
+function envWithLocalToolPath(extraEnv: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+	const pathEntries = [
+		process.env.HOME ? path.join(process.env.HOME, ".local", "bin") : undefined,
+		path.dirname(process.execPath),
+		process.env.PATH,
+	]
+		.filter((entry): entry is string => Boolean(entry))
+		.flatMap((entry) => entry.split(path.delimiter))
+		.filter((entry) => entry.length > 0);
 
-  return {
-    ...process.env,
-    ...extraEnv,
-    PATH: [...new Set(pathEntries)].join(path.delimiter),
-  };
+	return {
+		...process.env,
+		...extraEnv,
+		PATH: [...new Set(pathEntries)].join(path.delimiter),
+	};
 }
 
 function claudeMcpConfig(mcpUrl: string): string {
-  return JSON.stringify({
-    mcpServers: {
-      "sketchi-code-mode": {
-        type: "http",
-        url: mcpUrl,
-      },
-    },
-  });
+	return JSON.stringify({
+		mcpServers: {
+			"sketchi-code-mode": {
+				type: "http",
+				url: mcpUrl,
+			},
+		},
+	});
 }
 
 function buildHarnessPrompt(input: {
-  harness: HarnessName;
-  model?: string | undefined;
-  runNumber: number;
-  scenario: DiagramScenario;
+	harness: HarnessName;
+	model?: string | undefined;
+	runNumber: number;
+	scenario: DiagramScenario;
 }): string {
-  const requiredLabels = input.scenario.assertions.requiredNodeLabels
-    .map((label) => `- ${label}`)
-    .join("\n");
-  const requiredBranches = input.scenario.assertions.requiredBranchLabels
-    .map((label) => `- ${label}`)
-    .join("\n");
-  const requiredEdges = input.scenario.assertions.requiredEdges
-    .map((edge) => {
-      const label = edge.label ? ` labeled "${edge.label}"` : "";
-      return `- "${edge.sourceLabel}" -> "${edge.targetLabel}"${label}`;
-    })
-    .join("\n");
+	const requiredLabels = input.scenario.assertions.requiredNodeLabels
+		.map((label) => `- ${label}`)
+		.join("\n");
+	const requiredBranches = input.scenario.assertions.requiredBranchLabels
+		.map((label) => `- ${label}`)
+		.join("\n");
+	const requiredEdges = input.scenario.assertions.requiredEdges
+		.map((edge) => {
+			const label = edge.label ? ` labeled "${edge.label}"` : "";
+			return `- "${edge.sourceLabel}" -> "${edge.targetLabel}"${label}`;
+		})
+		.join("\n");
 
-  return [
-    "You are evaluating the public Sketchi Code Mode MCP server.",
-    "Use the sketchi-code-mode MCP tools, not local repo code, to create a flowchart artifact for this scenario.",
-    "Do not write files. Do not use raw Mermaid or raw Excalidraw JSON as the source of truth.",
-    "",
-    `Harness: ${input.harness}`,
-    `Model: ${input.model ?? "default"}`,
-    `Run number: ${input.runNumber}`,
-    `Scenario id: ${input.scenario.id}`,
-    `Scenario title: ${input.scenario.title}`,
-    `Scenario difficulty: ${input.scenario.difficulty}`,
-    `Scenario prompt: ${input.scenario.prompt}`,
-    "",
-    "Tool restrictions:",
-    "- Use only sketchi-code-mode MCP tools and your final chat response.",
-    "- In Antigravity, invoke MCP tools through `call_mcp_tool` only.",
-    '- For docs/search: call `call_mcp_tool` with ServerName "sketchi-code-mode", ToolName "docs" or "search", and Arguments as a JSON string.',
-    '- For execute: call `call_mcp_tool` with ServerName "sketchi-code-mode", ToolName "execute", and Arguments as a JSON string containing the JavaScript `code`.',
-    "- Do not guess alternate tool names such as mcp, mcp_execute, execute, sketchi-code-mode:docs, or mcp_sketchi_code_mode_execute.",
-    "- Do not run shell commands, scripts, package managers, or local MCP clients.",
-    "- Do not inspect repository files, browser cache files, or Antigravity internal files.",
-    "- Do not search the web.",
-    "- Do not create, define, or invoke subagents.",
-    "- Do not write files.",
-    "- If tool syntax is unclear, use sketchi-code-mode docs/search MCP tools only.",
-    "",
-    "Required node labels:",
-    requiredLabels,
-    "",
-    "Required decision branch labels:",
-    requiredBranches.length > 0 ? requiredBranches : "- none",
-    "",
-    "Required edges:",
-    requiredEdges,
-    "",
-    "Execution rules:",
-    "- Call the MCP execute tool with JavaScript that uses sketchi.buildFlowchart.",
-    '- Request artifactFormats ["scene", "excalidraw", "png"] and inlineArtifacts ["excalidraw"].',
-    "- If buildFlowchart returns ok:false, repair the FlowchartSpec and try again.",
-    "- Stop after at most 3 build attempts.",
-    "- The run is not complete after an MCP tool call.",
-    "- After the accepted buildFlowchart result, emit the final JSON object.",
-    "- Final artifactId must exactly match artifact.artifactId returned by the accepted MCP execute result.",
-    "- Final JSON must include artifactFormats from the accepted MCP artifact bundle.",
-    "- Final JSON must include excalidrawUrl and pngUrl from artifact format refs or getArtifact responses.",
-    "- Preserve the requested semantic graph over visual preference.",
-    "- Do not create or describe a separate Markdown/Mermaid diagram as the final artifact.",
-    "- Final response must be JSON only, no markdown, no prose.",
-    "",
-    "Final JSON shape:",
-    JSON.stringify(
-      {
-        artifactId: "...",
-        artifactFormats: ["scene", "excalidraw", "png"],
-        attempts: 1,
-        buildOk: true,
-        diagramId: "...",
-        excalidrawUrl:
-          "https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/...?...",
-        harness: input.harness,
-        issues: [],
-        model: input.model ?? "default",
-        normalizedSpec: {
-          edges: [],
-          id: input.scenario.id,
-          layout: { direction: "TB" },
-          nodes: [],
-          style: {
-            accentColor: "#000000",
-            backgroundColor: "#ffffff",
-          },
-          title: input.scenario.title,
-        },
-        pngUrl:
-          "https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/...?...",
-        qualityScore: 10,
-        scenarioId: input.scenario.id,
-        status: "accepted",
-      },
-      null,
-      2,
-    ),
-  ].join("\n");
+	return [
+		"You are evaluating the public Sketchi Code Mode MCP server.",
+		"Use the sketchi-code-mode MCP tools, not local repo code, to create a flowchart artifact for this scenario.",
+		"Do not write files. Do not use raw Mermaid or raw Excalidraw JSON as the source of truth.",
+		"",
+		`Harness: ${input.harness}`,
+		`Model: ${input.model ?? "default"}`,
+		`Run number: ${input.runNumber}`,
+		`Scenario id: ${input.scenario.id}`,
+		`Scenario title: ${input.scenario.title}`,
+		`Scenario difficulty: ${input.scenario.difficulty}`,
+		`Scenario prompt: ${input.scenario.prompt}`,
+		"",
+		"Tool restrictions:",
+		"- Use only sketchi-code-mode MCP tools and your final chat response.",
+		"- In Antigravity, invoke MCP tools through `call_mcp_tool` only.",
+		'- For docs/search: call `call_mcp_tool` with ServerName "sketchi-code-mode", ToolName "docs" or "search", and Arguments as a JSON string.',
+		'- For execute: call `call_mcp_tool` with ServerName "sketchi-code-mode", ToolName "execute", and Arguments as a JSON string containing the JavaScript `code`.',
+		"- Do not guess alternate tool names such as mcp, mcp_execute, execute, sketchi-code-mode:docs, or mcp_sketchi_code_mode_execute.",
+		"- Do not run shell commands, scripts, package managers, or local MCP clients.",
+		"- Do not inspect repository files, browser cache files, or Antigravity internal files.",
+		"- Do not search the web.",
+		"- Do not create, define, or invoke subagents.",
+		"- Do not write files.",
+		"- If tool syntax is unclear, use sketchi-code-mode docs/search MCP tools only.",
+		"",
+		"Required node labels:",
+		requiredLabels,
+		"",
+		"Required decision branch labels:",
+		requiredBranches.length > 0 ? requiredBranches : "- none",
+		"",
+		"Required edges:",
+		requiredEdges,
+		"",
+		"Execution rules:",
+		"- Call the MCP execute tool with JavaScript that uses sketchi.buildFlowchart.",
+		'- Request artifactFormats ["scene", "excalidraw", "png"] and inlineArtifacts ["excalidraw"].',
+		"- If buildFlowchart returns ok:false, repair the FlowchartSpec and try again.",
+		"- Stop after at most 3 build attempts.",
+		"- The run is not complete after an MCP tool call.",
+		"- After the accepted buildFlowchart result, emit the final JSON object.",
+		"- Final artifactId must exactly match artifact.artifactId returned by the accepted MCP execute result.",
+		"- Final JSON must include artifactFormats from the accepted MCP artifact bundle.",
+		"- Final JSON must include excalidrawUrl and pngUrl from artifact format refs or getArtifact responses.",
+		"- Preserve the requested semantic graph over visual preference.",
+		"- Do not create or describe a separate Markdown/Mermaid diagram as the final artifact.",
+		"- Final response must be JSON only, no markdown, no prose.",
+		"",
+		"Final JSON shape:",
+		JSON.stringify(
+			{
+				artifactId: "...",
+				artifactFormats: ["scene", "excalidraw", "png"],
+				attempts: 1,
+				buildOk: true,
+				diagramId: "...",
+				excalidrawUrl: "https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/...?...",
+				harness: input.harness,
+				issues: [],
+				model: input.model ?? "default",
+				normalizedSpec: {
+					edges: [],
+					id: input.scenario.id,
+					layout: { direction: "TB" },
+					nodes: [],
+					style: {
+						accentColor: "#000000",
+						backgroundColor: "#ffffff",
+					},
+					title: input.scenario.title,
+				},
+				pngUrl: "https://sketchi-studio.dimethyl.workers.dev/api/v1/artifacts/...?...",
+				qualityScore: 10,
+				scenarioId: input.scenario.id,
+				status: "accepted",
+			},
+			null,
+			2,
+		),
+	].join("\n");
 }
 
 export function commandForRun(input: {
-  harness: HarnessName;
-  mcpUrl: string;
-  model?: string | undefined;
-  prompt: string;
-  scenarioId: string;
-  timeoutMs: number;
+	harness: HarnessName;
+	mcpUrl: string;
+	model?: string | undefined;
+	prompt: string;
+	scenarioId: string;
+	timeoutMs: number;
 }): CommandSpec {
-  if (input.harness === "antigravity") {
-    throw HarnessEvalUsageError.make({
-      message:
-        "Antigravity cannot select an MCP endpoint through this runner. Use Claude/OpenCode, or --antigravity-conversation-id for offline replay with an unknown effective endpoint.",
-    });
-  }
+	if (input.harness === "antigravity") {
+		throw HarnessEvalUsageError.make({
+			message:
+				"Antigravity cannot select an MCP endpoint through this runner. Use Claude/OpenCode, or --antigravity-conversation-id for offline replay with an unknown effective endpoint.",
+		});
+	}
 
-  if (input.harness === "opencode") {
-    const model = input.model ?? DEFAULT_OPENCODE_MODEL;
-    return {
-      args: [
-        "run",
-        "--model",
-        model,
-        "--format",
-        "json",
-        "--title",
-        `sketchi-harness-${input.scenarioId}`,
-        "--dir",
-        process.cwd(),
-        input.prompt,
-      ],
-      command: "opencode",
-      env: envWithLocalToolPath({
-        OPENCODE_CONFIG_CONTENT: mcpConfigContent(input.mcpUrl),
-      }),
-      prompt: input.prompt,
-    };
-  }
+	if (input.harness === "opencode") {
+		const model = input.model ?? DEFAULT_OPENCODE_MODEL;
+		return {
+			args: [
+				"run",
+				"--model",
+				model,
+				"--format",
+				"json",
+				"--title",
+				`sketchi-harness-${input.scenarioId}`,
+				"--dir",
+				process.cwd(),
+				input.prompt,
+			],
+			command: "opencode",
+			env: envWithLocalToolPath({
+				OPENCODE_CONFIG_CONTENT: mcpConfigContent(input.mcpUrl),
+			}),
+			prompt: input.prompt,
+		};
+	}
 
-  const model = input.model ?? DEFAULT_CLAUDE_MODEL;
-  return {
-    args: [
-      "-p",
-      input.prompt,
-      "--output-format",
-      "stream-json",
-      "--verbose",
-      "--model",
-      model,
-      "--mcp-config",
-      claudeMcpConfig(input.mcpUrl),
-      "--strict-mcp-config",
-      "--permission-mode",
-      "bypassPermissions",
-      "--no-session-persistence",
-    ],
-    command: "claude",
-    env: envWithLocalToolPath(),
-    prompt: input.prompt,
-  };
+	const model = input.model ?? DEFAULT_CLAUDE_MODEL;
+	return {
+		args: [
+			"-p",
+			input.prompt,
+			"--output-format",
+			"stream-json",
+			"--verbose",
+			"--model",
+			model,
+			"--mcp-config",
+			claudeMcpConfig(input.mcpUrl),
+			"--strict-mcp-config",
+			"--permission-mode",
+			"bypassPermissions",
+			"--no-session-persistence",
+		],
+		command: "claude",
+		env: envWithLocalToolPath(),
+		prompt: input.prompt,
+	};
 }
 
 export function runCommand(spec: CommandSpec, timeoutMs: number) {
-  return runToolProcess(
-    {
-      args: spec.args,
-      command: spec.command,
-      ...(spec.cwd ? { cwd: spec.cwd } : {}),
-      env: spec.env,
-    },
-    {
-      closeGraceMs: COMMAND_CLOSE_GRACE_MS,
-      forceSettleGraceMs: COMMAND_FORCE_SETTLE_GRACE_MS,
-      hardKillGraceMs: COMMAND_HARD_KILL_GRACE_MS,
-      timeoutMs,
-    },
-  );
+	return runToolProcess(
+		{
+			args: spec.args,
+			command: spec.command,
+			...(spec.cwd ? { cwd: spec.cwd } : {}),
+			env: spec.env,
+		},
+		{
+			closeGraceMs: COMMAND_CLOSE_GRACE_MS,
+			forceSettleGraceMs: COMMAND_FORCE_SETTLE_GRACE_MS,
+			hardKillGraceMs: COMMAND_HARD_KILL_GRACE_MS,
+			timeoutMs,
+		},
+	);
 }
 
 function parseJsonLines(stdout: string): unknown[] {
-  const events: unknown[] = [];
-  for (const line of stdout.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed.length === 0) {
-      continue;
-    }
-    try {
-      events.push(JSON.parse(trimmed));
-    } catch {
-      // Human-readable non-JSON lines from wrappers are ignored here but remain
-      // in the persisted raw stdout evidence.
-    }
-  }
-  return events;
+	const events: unknown[] = [];
+	for (const line of stdout.split("\n")) {
+		const trimmed = line.trim();
+		if (trimmed.length === 0) {
+			continue;
+		}
+		try {
+			events.push(JSON.parse(trimmed));
+		} catch {
+			// Human-readable non-JSON lines from wrappers are ignored here but remain
+			// in the persisted raw stdout evidence.
+		}
+	}
+	return events;
 }
 
 function tokensFrom(value: unknown): HarnessTokens | undefined {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-  const cache = isRecord(value.cache) ? value.cache : undefined;
-  const input = numberValue(value.input) ?? numberValue(value.input_tokens);
-  const output = numberValue(value.output) ?? numberValue(value.output_tokens);
-  const cacheRead =
-    numberValue(cache?.read) ?? numberValue(value.cache_read_input_tokens);
-  const cacheWrite =
-    numberValue(cache?.write) ?? numberValue(value.cache_creation_input_tokens);
-  const reasoning = numberValue(value.reasoning);
-  const total = numberValue(value.total);
-  return {
-    ...(input === undefined ? {} : { input }),
-    ...(output === undefined ? {} : { output }),
-    ...(reasoning === undefined ? {} : { reasoning }),
-    ...(total === undefined ? {} : { total }),
-    ...(cacheRead === undefined ? {} : { cacheRead }),
-    ...(cacheWrite === undefined ? {} : { cacheWrite }),
-  };
+	if (!isRecord(value)) {
+		return undefined;
+	}
+	const cache = isRecord(value.cache) ? value.cache : undefined;
+	const input = numberValue(value.input) ?? numberValue(value.input_tokens);
+	const output = numberValue(value.output) ?? numberValue(value.output_tokens);
+	const cacheRead = numberValue(cache?.read) ?? numberValue(value.cache_read_input_tokens);
+	const cacheWrite = numberValue(cache?.write) ?? numberValue(value.cache_creation_input_tokens);
+	const reasoning = numberValue(value.reasoning);
+	const total = numberValue(value.total);
+	return {
+		...(input === undefined ? {} : { input }),
+		...(output === undefined ? {} : { output }),
+		...(reasoning === undefined ? {} : { reasoning }),
+		...(total === undefined ? {} : { total }),
+		...(cacheRead === undefined ? {} : { cacheRead }),
+		...(cacheWrite === undefined ? {} : { cacheWrite }),
+	};
 }
 
 function maybeParseJsonObject(text: string): unknown {
-  const trimmed = text.trim();
-  if (trimmed.length === 0) {
-    return undefined;
-  }
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    const firstBrace = trimmed.indexOf("{");
-    const lastBrace = trimmed.lastIndexOf("}");
-    if (firstBrace === -1 || lastBrace <= firstBrace) {
-      return undefined;
-    }
-    try {
-      return JSON.parse(trimmed.slice(firstBrace, lastBrace + 1));
-    } catch {
-      return undefined;
-    }
-  }
+	const trimmed = text.trim();
+	if (trimmed.length === 0) {
+		return undefined;
+	}
+	try {
+		return JSON.parse(trimmed);
+	} catch {
+		const firstBrace = trimmed.indexOf("{");
+		const lastBrace = trimmed.lastIndexOf("}");
+		if (firstBrace === -1 || lastBrace <= firstBrace) {
+			return undefined;
+		}
+		try {
+			return JSON.parse(trimmed.slice(firstBrace, lastBrace + 1));
+		} catch {
+			return undefined;
+		}
+	}
 }
 
 function finalJsonFromTextParts(textParts: string[]): {
-  finalJson?: unknown;
-  finalText: string;
+	finalJson?: unknown;
+	finalText: string;
 } {
-  let lastTextIndex = -1;
-  for (let index = textParts.length - 1; index >= 0; index -= 1) {
-    if ((textParts[index]?.trim() ?? "").length > 0) {
-      lastTextIndex = index;
-      break;
-    }
-  }
-  if (lastTextIndex === -1) {
-    return { finalText: "" };
-  }
+	let lastTextIndex = -1;
+	for (let index = textParts.length - 1; index >= 0; index -= 1) {
+		if ((textParts[index]?.trim() ?? "").length > 0) {
+			lastTextIndex = index;
+			break;
+		}
+	}
+	if (lastTextIndex === -1) {
+		return { finalText: "" };
+	}
 
-  const finalText = textParts[lastTextIndex]?.trim() ?? "";
-  const parsedFinal = maybeParseJsonObject(finalText);
-  if (parsedFinal !== undefined) {
-    return { finalJson: parsedFinal, finalText };
-  }
+	const finalText = textParts[lastTextIndex]?.trim() ?? "";
+	const parsedFinal = maybeParseJsonObject(finalText);
+	if (parsedFinal !== undefined) {
+		return { finalJson: parsedFinal, finalText };
+	}
 
-  if (!finalText.includes("{") && !finalText.includes("}")) {
-    return { finalText };
-  }
+	if (!finalText.includes("{") && !finalText.includes("}")) {
+		return { finalText };
+	}
 
-  let suffix = "";
-  for (let index = lastTextIndex; index >= 0; index -= 1) {
-    suffix = `${textParts[index] ?? ""}${suffix}`;
-    const parsed = maybeParseJsonObject(suffix);
-    if (parsed !== undefined) {
-      return { finalJson: parsed, finalText: suffix.trim() };
-    }
-  }
+	let suffix = "";
+	for (let index = lastTextIndex; index >= 0; index -= 1) {
+		suffix = `${textParts[index] ?? ""}${suffix}`;
+		const parsed = maybeParseJsonObject(suffix);
+		if (parsed !== undefined) {
+			return { finalJson: parsed, finalText: suffix.trim() };
+		}
+	}
 
-  return { finalText };
+	return { finalText };
 }
 
 function isAntigravityToolOutputEvent(type: string | undefined): boolean {
-  return [
-    "CODE_ACTION",
-    "ERROR_MESSAGE",
-    "GREP_SEARCH",
-    "LIST_DIR",
-    "MCP_TOOL",
-    "RUN_COMMAND",
-    "VIEW_FILE",
-  ].includes(type ?? "");
+	return [
+		"CODE_ACTION",
+		"ERROR_MESSAGE",
+		"GREP_SEARCH",
+		"LIST_DIR",
+		"MCP_TOOL",
+		"RUN_COMMAND",
+		"VIEW_FILE",
+	].includes(type ?? "");
 }
 
 function textFromEvent(event: unknown): string[] {
-  if (!isRecord(event)) {
-    return [];
-  }
-  const part = isRecord(event.part) ? event.part : undefined;
-  const eventType = stringValue(event.type);
-  const isToolOutput = isAntigravityToolOutputEvent(eventType);
-  const messageRecord = isRecord(event.message) ? event.message : undefined;
-  const content = Array.isArray(messageRecord?.content)
-    ? messageRecord.content
-    : [];
-  const result = isToolOutput ? undefined : stringValue(event.result);
-  const eventContent = isToolOutput ? undefined : stringValue(event.content);
-  const text = stringValue(part?.text);
-  const message = isToolOutput ? undefined : stringValue(event.message);
-  const contentText = isToolOutput
-    ? []
-    : content
-        .filter(isRecord)
-        .map((item) =>
-          stringValue(item.type) === "text"
-            ? stringValue(item.text)
-            : undefined,
-        );
-  return [result, eventContent, text, message, ...contentText].filter(
-    (value): value is string => Boolean(value),
-  );
+	if (!isRecord(event)) {
+		return [];
+	}
+	const part = isRecord(event.part) ? event.part : undefined;
+	const eventType = stringValue(event.type);
+	const isToolOutput = isAntigravityToolOutputEvent(eventType);
+	const messageRecord = isRecord(event.message) ? event.message : undefined;
+	const content = Array.isArray(messageRecord?.content) ? messageRecord.content : [];
+	const result = isToolOutput ? undefined : stringValue(event.result);
+	const eventContent = isToolOutput ? undefined : stringValue(event.content);
+	const text = stringValue(part?.text);
+	const message = isToolOutput ? undefined : stringValue(event.message);
+	const contentText = isToolOutput
+		? []
+		: content
+				.filter(isRecord)
+				.map((item) => (stringValue(item.type) === "text" ? stringValue(item.text) : undefined));
+	return [result, eventContent, text, message, ...contentText].filter((value): value is string =>
+		Boolean(value),
+	);
 }
 
 function toolCallsFromEvent(event: unknown): HarnessToolCall[] {
-  if (!isRecord(event)) {
-    return [];
-  }
-  const calls: HarnessToolCall[] = [];
-  const part = isRecord(event.part) ? event.part : undefined;
-  const type = stringValue(event.type) ?? stringValue(part?.type);
+	if (!isRecord(event)) {
+		return [];
+	}
+	const calls: HarnessToolCall[] = [];
+	const part = isRecord(event.part) ? event.part : undefined;
+	const type = stringValue(event.type) ?? stringValue(part?.type);
 
-  if (type === "tool_use" || type === "tool") {
-    const toolName = stringValue(part?.tool) ?? stringValue(event.tool);
-    if (toolName) {
-      const state = isRecord(part?.state) ? part?.state : undefined;
-      const status = stringValue(state?.status);
-      const callId = stringValue(part?.callID);
-      calls.push({
-        ...(callId ? { callId } : {}),
-        name: toolName,
-        ...(status ? { status } : {}),
-      });
-    }
-  }
+	if (type === "tool_use" || type === "tool") {
+		const toolName = stringValue(part?.tool) ?? stringValue(event.tool);
+		if (toolName) {
+			const state = isRecord(part?.state) ? part?.state : undefined;
+			const status = stringValue(state?.status);
+			const callId = stringValue(part?.callID);
+			calls.push({
+				...(callId ? { callId } : {}),
+				name: toolName,
+				...(status ? { status } : {}),
+			});
+		}
+	}
 
-  const messageRecord = isRecord(event.message) ? event.message : undefined;
-  const content = Array.isArray(messageRecord?.content)
-    ? messageRecord.content
-    : [];
-  for (const item of content.filter(isRecord)) {
-    if (stringValue(item.type) !== "tool_use") {
-      continue;
-    }
-    const name = stringValue(item.name);
-    const callId = stringValue(item.id);
-    if (name) {
-      calls.push({
-        ...(callId ? { callId } : {}),
-        name,
-      });
-    }
-  }
+	const messageRecord = isRecord(event.message) ? event.message : undefined;
+	const content = Array.isArray(messageRecord?.content) ? messageRecord.content : [];
+	for (const item of content.filter(isRecord)) {
+		if (stringValue(item.type) !== "tool_use") {
+			continue;
+		}
+		const name = stringValue(item.name);
+		const callId = stringValue(item.id);
+		if (name) {
+			calls.push({
+				...(callId ? { callId } : {}),
+				name,
+			});
+		}
+	}
 
-  const agyToolCalls = Array.isArray(event.tool_calls) ? event.tool_calls : [];
-  const agyStatus = stringValue(event.status);
-  for (const call of agyToolCalls.filter(isRecord)) {
-    const name = stringValue(call.name);
-    const args = isRecord(call.args) ? call.args : undefined;
-    if (name === "call_mcp_tool") {
-      const serverName = cleanQuotedString(args?.ServerName);
-      const toolName = cleanQuotedString(args?.ToolName);
-      if (serverName && toolName) {
-        calls.push({
-          name: `mcp(${serverName}/${toolName})`,
-          ...(agyStatus ? { status: agyStatus } : {}),
-        });
-      }
-      continue;
-    }
-    if (name) {
-      calls.push({
-        name,
-        ...(agyStatus ? { status: agyStatus } : {}),
-      });
-    }
-  }
+	const agyToolCalls = Array.isArray(event.tool_calls) ? event.tool_calls : [];
+	const agyStatus = stringValue(event.status);
+	for (const call of agyToolCalls.filter(isRecord)) {
+		const name = stringValue(call.name);
+		const args = isRecord(call.args) ? call.args : undefined;
+		if (name === "call_mcp_tool") {
+			const serverName = cleanQuotedString(args?.ServerName);
+			const toolName = cleanQuotedString(args?.ToolName);
+			if (serverName && toolName) {
+				calls.push({
+					name: `mcp(${serverName}/${toolName})`,
+					...(agyStatus ? { status: agyStatus } : {}),
+				});
+			}
+			continue;
+		}
+		if (name) {
+			calls.push({
+				name,
+				...(agyStatus ? { status: agyStatus } : {}),
+			});
+		}
+	}
 
-  return calls;
+	return calls;
 }
 
 function successfulMcpToolCallCount(toolCalls: HarnessToolCall[]): number {
-  const seen = new Set<string>();
+	const seen = new Set<string>();
 
-  for (const call of toolCalls) {
-    if (!call.name.includes("sketchi-code-mode")) {
-      continue;
-    }
-    const status = call.status?.toLowerCase();
-    if (status && status !== "completed" && status !== "done") {
-      continue;
-    }
-    const key = call.callId ?? `${call.name}:${seen.size}`;
-    seen.add(key);
-  }
+	for (const call of toolCalls) {
+		if (!call.name.includes("sketchi-code-mode")) {
+			continue;
+		}
+		const status = call.status?.toLowerCase();
+		if (status && status !== "completed" && status !== "done") {
+			continue;
+		}
+		const key = call.callId ?? `${call.name}:${seen.size}`;
+		seen.add(key);
+	}
 
-  return seen.size;
+	return seen.size;
 }
 
 function parseJsonPayload(value: unknown): readonly unknown[] {
-  if (typeof value === "string") {
-    const parsed = maybeParseJsonObject(value);
-    return parsed === undefined ? [] : [parsed];
-  }
-  if (Array.isArray(value)) {
-    return value.flatMap((block) =>
-      isRecord(block) && block.type === "text"
-        ? parseJsonPayload(block.text)
-        : [],
-    );
-  }
-  if (!isRecord(value)) return [];
-  if (value.structuredContent !== undefined || Array.isArray(value.content)) {
-    return [
-      ...parseJsonPayload(value.structuredContent),
-      ...parseJsonPayload(value.content),
-    ];
-  }
-  return [value];
+	if (typeof value === "string") {
+		const parsed = maybeParseJsonObject(value);
+		return parsed === undefined ? [] : [parsed];
+	}
+	if (Array.isArray(value)) {
+		return value.flatMap((block) =>
+			isRecord(block) && block.type === "text" ? parseJsonPayload(block.text) : [],
+		);
+	}
+	if (!isRecord(value)) return [];
+	if (value.structuredContent !== undefined || Array.isArray(value.content)) {
+		return [...parseJsonPayload(value.structuredContent), ...parseJsonPayload(value.content)];
+	}
+	return [value];
 }
 
-function acceptedBuildResultFrom(
-  value: unknown,
-): Record<string, unknown> | undefined {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-  if (isRecord(value.artifact) && value.ok === true) {
-    return value;
-  }
-  if (
-    value.ok === true &&
-    stringValue(value.artifactId) &&
-    Array.isArray(value.formats)
-  ) {
-    return value;
-  }
-  return acceptedBuildResultFrom(value.result);
+function acceptedBuildResultFrom(value: unknown): Record<string, unknown> | undefined {
+	if (!isRecord(value)) {
+		return undefined;
+	}
+	if (isRecord(value.artifact) && value.ok === true) {
+		return value;
+	}
+	if (value.ok === true && stringValue(value.artifactId) && Array.isArray(value.formats)) {
+		return value;
+	}
+	return acceptedBuildResultFrom(value.result);
 }
 
-function compactArtifactResultFrom(
-  value: unknown,
-): Record<string, unknown> | undefined {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-  if (
-    stringValue(value.artifactId) &&
-    Array.isArray(value.artifactFormats) &&
-    (value.buildOk === true || stringValue(value.status) === "accepted")
-  ) {
-    return value;
-  }
-  return compactArtifactResultFrom(value.result);
+function compactArtifactResultFrom(value: unknown): Record<string, unknown> | undefined {
+	if (!isRecord(value)) {
+		return undefined;
+	}
+	if (
+		stringValue(value.artifactId) &&
+		Array.isArray(value.artifactFormats) &&
+		(value.buildOk === true || stringValue(value.status) === "accepted")
+	) {
+		return value;
+	}
+	return compactArtifactResultFrom(value.result);
 }
 
 function artifactFormatsFrom(artifact: Record<string, unknown> | undefined) {
-  const formats = Array.isArray(artifact?.formats) ? artifact.formats : [];
-  return formats.filter(isRecord).map((formatRef) => ({
-    format: stringValue(formatRef.format),
-    url: stringValue(formatRef.url),
-  }));
+	const formats = Array.isArray(artifact?.formats) ? artifact.formats : [];
+	return formats.filter(isRecord).map((formatRef) => ({
+		format: stringValue(formatRef.format),
+		url: stringValue(formatRef.url),
+	}));
 }
 
 function artifactProofFromDelivery(input: {
-  callId?: string;
-  delivery: unknown;
-  toolName: string;
+	callId?: string;
+	delivery: unknown;
+	toolName: string;
 }): HarnessMcpArtifactProof | undefined {
-  if (!isRecord(input.delivery)) {
-    return undefined;
-  }
+	if (!isRecord(input.delivery)) {
+		return undefined;
+	}
 
-  const artifactId = stringValue(input.delivery.artifactId);
-  const artifactFormats = artifactFormatsFrom(input.delivery);
-  if (!artifactId || artifactFormats.length === 0) {
-    return undefined;
-  }
+	const artifactId = stringValue(input.delivery.artifactId);
+	const artifactFormats = artifactFormatsFrom(input.delivery);
+	if (!artifactId || artifactFormats.length === 0) {
+		return undefined;
+	}
 
-  return {
-    artifactId,
-    artifactFormats: artifactFormats
-      .map((formatRef) => formatRef.format)
-      .filter((format): format is string => Boolean(format)),
-    artifactUrls: Object.fromEntries(
-      artifactFormats
-        .filter((formatRef): formatRef is { format: string; url: string } =>
-          Boolean(formatRef.format && formatRef.url),
-        )
-        .map((formatRef) => [formatRef.format, formatRef.url]),
-    ),
-    buildOk: true,
-    ...(stringValue(input.delivery.diagramId)
-      ? {
-          normalizedSpec: {
-            id: stringValue(input.delivery.diagramId),
-          },
-        }
-      : {}),
-    status: "accepted",
-    ...(input.callId ? { toolCallId: input.callId } : {}),
-    toolName: input.toolName,
-  };
+	return {
+		artifactId,
+		artifactFormats: artifactFormats
+			.map((formatRef) => formatRef.format)
+			.filter((format): format is string => Boolean(format)),
+		artifactUrls: Object.fromEntries(
+			artifactFormats
+				.filter((formatRef): formatRef is { format: string; url: string } =>
+					Boolean(formatRef.format && formatRef.url),
+				)
+				.map((formatRef) => [formatRef.format, formatRef.url]),
+		),
+		buildOk: true,
+		...(stringValue(input.delivery.diagramId)
+			? {
+					normalizedSpec: {
+						id: stringValue(input.delivery.diagramId),
+					},
+				}
+			: {}),
+		status: "accepted",
+		...(input.callId ? { toolCallId: input.callId } : {}),
+		toolName: input.toolName,
+	};
 }
 
 function artifactProofFromCompactResult(input: {
-  callId?: string;
-  result: unknown;
-  toolName: string;
+	callId?: string;
+	result: unknown;
+	toolName: string;
 }): HarnessMcpArtifactProof | undefined {
-  const result = compactArtifactResultFrom(input.result);
-  if (!result) {
-    return undefined;
-  }
+	const result = compactArtifactResultFrom(input.result);
+	if (!result) {
+		return undefined;
+	}
 
-  const artifactId = stringValue(result.artifactId);
-  const artifactFormats = Array.isArray(result.artifactFormats)
-    ? result.artifactFormats.filter(
-        (format): format is string => typeof format === "string",
-      )
-    : [];
-  const status = stringValue(result.status) ?? "accepted";
-  if (!artifactId || artifactFormats.length === 0 || status !== "accepted") {
-    return undefined;
-  }
+	const artifactId = stringValue(result.artifactId);
+	const artifactFormats = Array.isArray(result.artifactFormats)
+		? result.artifactFormats.filter((format): format is string => typeof format === "string")
+		: [];
+	const status = stringValue(result.status) ?? "accepted";
+	if (!artifactId || artifactFormats.length === 0 || status !== "accepted") {
+		return undefined;
+	}
 
-  const sceneUrl = stringValue(result.sceneUrl);
-  const excalidrawUrl = stringValue(result.excalidrawUrl);
-  const pngUrl = stringValue(result.pngUrl);
-  const qualityScore = numberValue(result.qualityScore);
-  return {
-    artifactId,
-    artifactFormats,
-    artifactUrls: {
-      ...(sceneUrl ? { scene: sceneUrl } : {}),
-      ...(excalidrawUrl ? { excalidraw: excalidrawUrl } : {}),
-      ...(pngUrl ? { png: pngUrl } : {}),
-    },
-    buildOk: true,
-    ...(result.normalizedSpec === undefined
-      ? {}
-      : { normalizedSpec: result.normalizedSpec }),
-    ...(qualityScore === undefined ? {} : { qualityScore }),
-    status,
-    ...(input.callId ? { toolCallId: input.callId } : {}),
-    toolName: input.toolName,
-  };
+	const sceneUrl = stringValue(result.sceneUrl);
+	const excalidrawUrl = stringValue(result.excalidrawUrl);
+	const pngUrl = stringValue(result.pngUrl);
+	const qualityScore = numberValue(result.qualityScore);
+	return {
+		artifactId,
+		artifactFormats,
+		artifactUrls: {
+			...(sceneUrl ? { scene: sceneUrl } : {}),
+			...(excalidrawUrl ? { excalidraw: excalidrawUrl } : {}),
+			...(pngUrl ? { png: pngUrl } : {}),
+		},
+		buildOk: true,
+		...(result.normalizedSpec === undefined ? {} : { normalizedSpec: result.normalizedSpec }),
+		...(qualityScore === undefined ? {} : { qualityScore }),
+		status,
+		...(input.callId ? { toolCallId: input.callId } : {}),
+		toolName: input.toolName,
+	};
 }
 
 function mcpArtifactFromPayload(input: {
-  callId?: string;
-  payload: unknown;
-  toolName: string;
+	callId?: string;
+	payload: unknown;
+	toolName: string;
 }): HarnessMcpArtifactProof | undefined {
-  for (const payload of parseJsonPayload(input.payload)) {
-    if (!isRecord(payload)) continue;
-    const proof = mcpArtifactFromParsedPayload({ ...input, payload });
-    if (proof) return proof;
-  }
-  return undefined;
+	for (const payload of parseJsonPayload(input.payload)) {
+		if (!isRecord(payload)) continue;
+		const proof = mcpArtifactFromParsedPayload({ ...input, payload });
+		if (proof) return proof;
+	}
+	return undefined;
 }
 
 function mcpArtifactFromParsedPayload(input: {
-  callId?: string;
-  payload: Record<string, unknown>;
-  toolName: string;
+	callId?: string;
+	payload: Record<string, unknown>;
+	toolName: string;
 }): HarnessMcpArtifactProof | undefined {
-  const payload = input.payload;
-  const compactProof = artifactProofFromCompactResult({
-    ...(input.callId ? { callId: input.callId } : {}),
-    result: payload,
-    toolName: input.toolName,
-  });
-  if (compactProof) {
-    return compactProof;
-  }
+	const payload = input.payload;
+	const compactProof = artifactProofFromCompactResult({
+		...(input.callId ? { callId: input.callId } : {}),
+		result: payload,
+		toolName: input.toolName,
+	});
+	if (compactProof) {
+		return compactProof;
+	}
 
-  const result = acceptedBuildResultFrom(payload);
-  if (!result || payload.ok !== true) {
-    return artifactProofFromDelivery({
-      ...(input.callId ? { callId: input.callId } : {}),
-      delivery: payload.artifactDelivery,
-      toolName: input.toolName,
-    });
-  }
+	const result = acceptedBuildResultFrom(payload);
+	if (!result || payload.ok !== true) {
+		return artifactProofFromDelivery({
+			...(input.callId ? { callId: input.callId } : {}),
+			delivery: payload.artifactDelivery,
+			toolName: input.toolName,
+		});
+	}
 
-  const artifact = isRecord(result.artifact) ? result.artifact : result;
-  const quality = isRecord(result.quality) ? result.quality : undefined;
-  const artifactId = stringValue(artifact?.artifactId);
-  const artifactFormats = artifactFormatsFrom(artifact);
-  const status = stringValue(result.status) ?? "accepted";
-  const normalizedSpec = result.normalizedSpec;
-  const buildOk = result.ok === true;
-  const buildId = stringValue(result.buildId);
-  const qualityScore = numberValue(quality?.score);
+	const artifact = isRecord(result.artifact) ? result.artifact : result;
+	const quality = isRecord(result.quality) ? result.quality : undefined;
+	const artifactId = stringValue(artifact?.artifactId);
+	const artifactFormats = artifactFormatsFrom(artifact);
+	const status = stringValue(result.status) ?? "accepted";
+	const normalizedSpec = result.normalizedSpec;
+	const buildOk = result.ok === true;
+	const buildId = stringValue(result.buildId);
+	const qualityScore = numberValue(quality?.score);
 
-  if (!buildOk || status !== "accepted" || !artifactId) {
-    return undefined;
-  }
+	if (!buildOk || status !== "accepted" || !artifactId) {
+		return undefined;
+	}
 
-  return {
-    artifactId,
-    artifactFormats: artifactFormats
-      .map((formatRef) => formatRef.format)
-      .filter((format): format is string => Boolean(format)),
-    artifactUrls: Object.fromEntries(
-      artifactFormats
-        .filter((formatRef): formatRef is { format: string; url: string } =>
-          Boolean(formatRef.format && formatRef.url),
-        )
-        .map((formatRef) => [formatRef.format, formatRef.url]),
-    ),
-    ...(buildId ? { buildId } : {}),
-    buildOk,
-    ...(normalizedSpec === undefined ? {} : { normalizedSpec }),
-    ...(quality?.accepted === true ? { qualityAccepted: true } : {}),
-    ...(qualityScore === undefined ? {} : { qualityScore }),
-    status,
-    ...(input.callId ? { toolCallId: input.callId } : {}),
-    toolName: input.toolName,
-  };
+	return {
+		artifactId,
+		artifactFormats: artifactFormats
+			.map((formatRef) => formatRef.format)
+			.filter((format): format is string => Boolean(format)),
+		artifactUrls: Object.fromEntries(
+			artifactFormats
+				.filter((formatRef): formatRef is { format: string; url: string } =>
+					Boolean(formatRef.format && formatRef.url),
+				)
+				.map((formatRef) => [formatRef.format, formatRef.url]),
+		),
+		...(buildId ? { buildId } : {}),
+		buildOk,
+		...(normalizedSpec === undefined ? {} : { normalizedSpec }),
+		...(quality?.accepted === true ? { qualityAccepted: true } : {}),
+		...(qualityScore === undefined ? {} : { qualityScore }),
+		status,
+		...(input.callId ? { toolCallId: input.callId } : {}),
+		toolName: input.toolName,
+	};
 }
 
 function mcpArtifactsFromEvent(input: {
-  event: unknown;
-  toolNamesById: Map<string, string>;
+	event: unknown;
+	toolNamesById: Map<string, string>;
 }): HarnessMcpArtifactProof[] {
-  if (!isRecord(input.event)) {
-    return [];
-  }
-  const proofs: HarnessMcpArtifactProof[] = [];
-  const part = isRecord(input.event.part) ? input.event.part : undefined;
-  const state = isRecord(part?.state) ? part.state : undefined;
-  const toolName = stringValue(part?.tool) ?? stringValue(input.event.tool);
-  const callId = stringValue(part?.callID);
+	if (!isRecord(input.event)) {
+		return [];
+	}
+	const proofs: HarnessMcpArtifactProof[] = [];
+	const part = isRecord(input.event.part) ? input.event.part : undefined;
+	const state = isRecord(part?.state) ? part.state : undefined;
+	const toolName = stringValue(part?.tool) ?? stringValue(input.event.tool);
+	const callId = stringValue(part?.callID);
 
-  if (toolName?.includes("sketchi-code-mode_execute") && state?.output) {
-    const proof = mcpArtifactFromPayload({
-      ...(callId ? { callId } : {}),
-      payload: state.output,
-      toolName,
-    });
-    if (proof) {
-      proofs.push(proof);
-    }
-  }
+	if (toolName?.includes("sketchi-code-mode_execute") && state?.output) {
+		const proof = mcpArtifactFromPayload({
+			...(callId ? { callId } : {}),
+			payload: state.output,
+			toolName,
+		});
+		if (proof) {
+			proofs.push(proof);
+		}
+	}
 
-  if (stringValue(input.event.type) === "MCP_TOOL") {
-    const content = stringValue(input.event.content);
-    if (content) {
-      const proof = mcpArtifactFromPayload({
-        payload: content,
-        toolName: "mcp(sketchi-code-mode/execute)",
-      });
-      if (proof) {
-        proofs.push(proof);
-      }
-    }
-  }
+	if (stringValue(input.event.type) === "MCP_TOOL") {
+		const content = stringValue(input.event.content);
+		if (content) {
+			const proof = mcpArtifactFromPayload({
+				payload: content,
+				toolName: "mcp(sketchi-code-mode/execute)",
+			});
+			if (proof) {
+				proofs.push(proof);
+			}
+		}
+	}
 
-  const messageRecord = isRecord(input.event.message)
-    ? input.event.message
-    : undefined;
-  const content = Array.isArray(messageRecord?.content)
-    ? messageRecord.content
-    : [];
+	const messageRecord = isRecord(input.event.message) ? input.event.message : undefined;
+	const content = Array.isArray(messageRecord?.content) ? messageRecord.content : [];
 
-  for (const item of content.filter(isRecord)) {
-    if (stringValue(item.type) === "tool_use") {
-      const id = stringValue(item.id);
-      const name = stringValue(item.name);
-      if (id && name) {
-        input.toolNamesById.set(id, name);
-      }
-      continue;
-    }
+	for (const item of content.filter(isRecord)) {
+		if (stringValue(item.type) === "tool_use") {
+			const id = stringValue(item.id);
+			const name = stringValue(item.name);
+			if (id && name) {
+				input.toolNamesById.set(id, name);
+			}
+			continue;
+		}
 
-    if (stringValue(item.type) !== "tool_result") {
-      continue;
-    }
+		if (stringValue(item.type) !== "tool_result") {
+			continue;
+		}
 
-    const resultCallId = stringValue(item.tool_use_id);
-    const resultToolName = resultCallId
-      ? input.toolNamesById.get(resultCallId)
-      : undefined;
-    if (!resultToolName?.includes("sketchi-code-mode__execute")) {
-      continue;
-    }
+		const resultCallId = stringValue(item.tool_use_id);
+		const resultToolName = resultCallId ? input.toolNamesById.get(resultCallId) : undefined;
+		if (!resultToolName?.includes("sketchi-code-mode__execute")) {
+			continue;
+		}
 
-    const proof =
-      mcpArtifactFromPayload({
-        ...(resultCallId ? { callId: resultCallId } : {}),
-        payload: item.structuredContent,
-        toolName: resultToolName,
-      }) ??
-      mcpArtifactFromPayload({
-        ...(resultCallId ? { callId: resultCallId } : {}),
-        payload: item.content,
-        toolName: resultToolName,
-      });
-    if (proof) {
-      proofs.push(proof);
-    }
-  }
+		const proof =
+			mcpArtifactFromPayload({
+				...(resultCallId ? { callId: resultCallId } : {}),
+				payload: item.structuredContent,
+				toolName: resultToolName,
+			}) ??
+			mcpArtifactFromPayload({
+				...(resultCallId ? { callId: resultCallId } : {}),
+				payload: item.content,
+				toolName: resultToolName,
+			});
+		if (proof) {
+			proofs.push(proof);
+		}
+	}
 
-  return proofs;
+	return proofs;
 }
 
 function stepFromEvent(event: unknown): HarnessStep | undefined {
-  if (!isRecord(event)) {
-    return undefined;
-  }
-  const part = isRecord(event.part) ? event.part : undefined;
-  const type = stringValue(event.type) ?? stringValue(part?.type);
+	if (!isRecord(event)) {
+		return undefined;
+	}
+	const part = isRecord(event.part) ? event.part : undefined;
+	const type = stringValue(event.type) ?? stringValue(part?.type);
 
-  if (type === "step_finish" || type === "step-finish") {
-    const tokens = tokensFrom(part?.tokens ?? event.tokens);
-    const cost = numberValue(part?.cost ?? event.cost);
-    const reason = stringValue(part?.reason ?? event.reason);
-    return {
-      ...(cost === undefined ? {} : { cost }),
-      ...(reason ? { reason } : {}),
-      ...(tokens === undefined ? {} : { tokens }),
-    };
-  }
+	if (type === "step_finish" || type === "step-finish") {
+		const tokens = tokensFrom(part?.tokens ?? event.tokens);
+		const cost = numberValue(part?.cost ?? event.cost);
+		const reason = stringValue(part?.reason ?? event.reason);
+		return {
+			...(cost === undefined ? {} : { cost }),
+			...(reason ? { reason } : {}),
+			...(tokens === undefined ? {} : { tokens }),
+		};
+	}
 
-  if (type === "result") {
-    const tokens = tokensFrom(event.usage);
-    const cost = numberValue(event.total_cost_usd);
-    const reason = stringValue(event.terminal_reason);
-    return {
-      ...(cost === undefined ? {} : { cost }),
-      ...(reason ? { reason } : {}),
-      ...(tokens === undefined ? {} : { tokens }),
-    };
-  }
+	if (type === "result") {
+		const tokens = tokensFrom(event.usage);
+		const cost = numberValue(event.total_cost_usd);
+		const reason = stringValue(event.terminal_reason);
+		return {
+			...(cost === undefined ? {} : { cost }),
+			...(reason ? { reason } : {}),
+			...(tokens === undefined ? {} : { tokens }),
+		};
+	}
 
-  return undefined;
+	return undefined;
 }
 
 export function summarizeHarnessStdout(
-  stdout: string,
-  extraPayloads: readonly unknown[] = [],
+	stdout: string,
+	extraPayloads: readonly unknown[] = [],
 ): HarnessOutputSummary {
-  const events = parseJsonLines(stdout);
-  const textParts: string[] = [];
-  const mcpArtifacts: HarnessMcpArtifactProof[] = [];
-  const toolCalls: HarnessToolCall[] = [];
-  const toolNamesById = new Map<string, string>();
-  const steps: HarnessStep[] = [];
+	const events = parseJsonLines(stdout);
+	const textParts: string[] = [];
+	const mcpArtifacts: HarnessMcpArtifactProof[] = [];
+	const toolCalls: HarnessToolCall[] = [];
+	const toolNamesById = new Map<string, string>();
+	const steps: HarnessStep[] = [];
 
-  for (const event of events) {
-    textParts.push(...textFromEvent(event));
-    toolCalls.push(...toolCallsFromEvent(event));
-    mcpArtifacts.push(
-      ...mcpArtifactsFromEvent({
-        event,
-        toolNamesById,
-      }),
-    );
-    const step = stepFromEvent(event);
-    if (step) {
-      steps.push(step);
-    }
-  }
+	for (const event of events) {
+		textParts.push(...textFromEvent(event));
+		toolCalls.push(...toolCallsFromEvent(event));
+		mcpArtifacts.push(
+			...mcpArtifactsFromEvent({
+				event,
+				toolNamesById,
+			}),
+		);
+		const step = stepFromEvent(event);
+		if (step) {
+			steps.push(step);
+		}
+	}
 
-  for (const payload of extraPayloads) {
-    const proof = mcpArtifactFromPayload({
-      payload,
-      toolName: "mcp(sketchi-code-mode/execute)",
-    });
-    if (proof) {
-      mcpArtifacts.push(proof);
-    }
-  }
+	for (const payload of extraPayloads) {
+		const proof = mcpArtifactFromPayload({
+			payload,
+			toolName: "mcp(sketchi-code-mode/execute)",
+		});
+		if (proof) {
+			mcpArtifacts.push(proof);
+		}
+	}
 
-  const { finalJson, finalText } = finalJsonFromTextParts(textParts);
-  return {
-    eventCount: events.length,
-    ...(finalJson === undefined ? {} : { finalJson }),
-    finalText,
-    mcpArtifacts,
-    stepCosts: steps
-      .map((step) => step.cost)
-      .filter((value): value is number => value !== undefined),
-    steps,
-    toolCalls,
-  };
+	const { finalJson, finalText } = finalJsonFromTextParts(textParts);
+	return {
+		eventCount: events.length,
+		...(finalJson === undefined ? {} : { finalJson }),
+		finalText,
+		mcpArtifacts,
+		stepCosts: steps
+			.map((step) => step.cost)
+			.filter((value): value is number => value !== undefined),
+		steps,
+		toolCalls,
+	};
 }
 
 function normalizedSpecFrom(value: unknown): unknown {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-  if (isRecord(value.normalizedSpec)) {
-    return value.normalizedSpec;
-  }
-  if (isRecord(value.result)) {
-    return normalizedSpecFrom(value.result);
-  }
-  return undefined;
+	if (!isRecord(value)) {
+		return undefined;
+	}
+	if (isRecord(value.normalizedSpec)) {
+		return value.normalizedSpec;
+	}
+	if (isRecord(value.result)) {
+		return normalizedSpecFrom(value.result);
+	}
+	return undefined;
 }
 
 function specToFlowchartCandidate(spec: unknown): unknown {
-  if (!isRecord(spec)) {
-    return spec;
-  }
-  const layout = isRecord(spec.layout) ? spec.layout : {};
-  const edges = Array.isArray(spec.edges)
-    ? spec.edges.map((edge, index) =>
-        isRecord(edge)
-          ? {
-              ...edge,
-              id: cleanOptionalToolString(edge.id) ?? `edge-${index + 1}`,
-            }
-          : edge,
-      )
-    : spec.edges;
-  return {
-    id: spec.id,
-    title: spec.title,
-    type: "flowchart",
-    nodes: spec.nodes,
-    edges,
-    layout: {
-      direction: layout.direction ?? "TB",
-      edgeRouting: "orthogonal",
-    },
-    style: spec.style,
-  };
+	if (!isRecord(spec)) {
+		return spec;
+	}
+	const layout = isRecord(spec.layout) ? spec.layout : {};
+	const edges = Array.isArray(spec.edges)
+		? spec.edges.map((edge, index) =>
+				isRecord(edge)
+					? {
+							...edge,
+							id: cleanOptionalToolString(edge.id) ?? `edge-${index + 1}`,
+						}
+					: edge,
+			)
+		: spec.edges;
+	return {
+		id: spec.id,
+		title: spec.title,
+		type: "flowchart",
+		nodes: spec.nodes,
+		edges,
+		layout: {
+			direction: layout.direction ?? "TB",
+			edgeRouting: "orthogonal",
+		},
+		style: spec.style,
+	};
 }
 
 export function evaluateHarnessJson(
-  scenario: DiagramScenario,
-  value: unknown,
+	scenario: DiagramScenario,
+	value: unknown,
 ): HarnessCandidateEvaluation {
-  const spec = normalizedSpecFrom(value);
-  try {
-    const evaluation = evaluateScenarioDiagram(
-      scenario,
-      specToFlowchartCandidate(spec ?? value),
-    );
-    return {
-      checks: evaluation.checks,
-      excalidrawIssues: evaluation.excalidrawValidation.issues,
-      ok: evaluation.ok,
-    };
-  } catch (error) {
-    return {
-      checks: [],
-      error: error instanceof Error ? error.message : String(error),
-      excalidrawIssues: [],
-      ok: false,
-    };
-  }
+	const spec = normalizedSpecFrom(value);
+	try {
+		const evaluation = evaluateScenarioDiagram(scenario, specToFlowchartCandidate(spec ?? value));
+		return {
+			checks: evaluation.checks,
+			excalidrawIssues: evaluation.excalidrawValidation.issues,
+			ok: evaluation.ok,
+		};
+	} catch (error) {
+		return {
+			checks: [],
+			error: error instanceof Error ? error.message : String(error),
+			excalidrawIssues: [],
+			ok: false,
+		};
+	}
 }
 
-function reportableMcpArtifact(
-  proof: HarnessMcpArtifactProof,
-): HarnessMcpArtifactReport {
-  const { normalizedSpec: _normalizedSpec, ...report } = proof;
-  return report;
+function reportableMcpArtifact(proof: HarnessMcpArtifactProof): HarnessMcpArtifactReport {
+	const { normalizedSpec: _normalizedSpec, ...report } = proof;
+	return report;
 }
 
-function explicitFinalArtifactId(
-  finalJson: unknown,
-  finalText: string,
-): string | undefined {
-  if (isRecord(finalJson)) {
-    const artifactId = stringValue(finalJson.artifactId);
-    if (artifactId) return artifactId;
-  }
-  return /artifact[ _-]?id["'`\s]*[:=]["'`\s]*([\w-]+)/iu.exec(finalText)?.[1];
+function explicitFinalArtifactId(finalJson: unknown, finalText: string): string | undefined {
+	if (isRecord(finalJson)) {
+		const artifactId = stringValue(finalJson.artifactId);
+		if (artifactId) return artifactId;
+	}
+	return /artifact[ _-]?id["'`\s]*[:=]["'`\s]*([\w-]+)/iu.exec(finalText)?.[1];
 }
 
 function deliversProof(
-  finalJson: unknown,
-  finalText: string,
-  proof: HarnessMcpArtifactProof,
+	finalJson: unknown,
+	finalText: string,
+	proof: HarnessMcpArtifactProof,
 ): boolean {
-  const delivery = [
-    finalText,
-    finalJson === undefined ? "" : JSON.stringify(finalJson),
-  ].join("\n");
-  const tokens = delivery.match(/[\w-]+/gu) ?? [];
-  return (
-    tokens.some((token) => token === proof.artifactId) ||
-    Object.values(proof.artifactUrls).some(
-      (url) => url.length > 0 && delivery.includes(url),
-    )
-  );
+	const delivery = [finalText, finalJson === undefined ? "" : JSON.stringify(finalJson)].join("\n");
+	const tokens = delivery.match(/[\w-]+/gu) ?? [];
+	return (
+		tokens.some((token) => token === proof.artifactId) ||
+		Object.values(proof.artifactUrls).some((url) => url.length > 0 && delivery.includes(url))
+	);
 }
 
 export function outputContractErrors(input: {
-  finalJson: unknown;
-  finalText: string;
-  proof: HarnessMcpArtifactProof | undefined;
+	finalJson: unknown;
+	finalText: string;
+	proof: HarnessMcpArtifactProof | undefined;
 }): string[] {
-  if (!input.proof) {
-    return [
-      "No successful sketchi-code-mode execute artifact was observed in the harness event stream.",
-    ];
-  }
-  const explicitId = explicitFinalArtifactId(input.finalJson, input.finalText);
-  if (explicitId && explicitId !== input.proof.artifactId) {
-    return ["Final artifact ID did not match the observed Sketchi artifact."];
-  }
-  if (!deliversProof(input.finalJson, input.finalText, input.proof)) {
-    return [
-      "Final response did not deliver the observed Sketchi artifact ID or URL.",
-    ];
-  }
-  return [];
+	if (!input.proof) {
+		return [
+			"No successful sketchi-code-mode execute artifact was observed in the harness event stream.",
+		];
+	}
+	const explicitId = explicitFinalArtifactId(input.finalJson, input.finalText);
+	if (explicitId && explicitId !== input.proof.artifactId) {
+		return ["Final artifact ID did not match the observed Sketchi artifact."];
+	}
+	if (!deliversProof(input.finalJson, input.finalText, input.proof)) {
+		return ["Final response did not deliver the observed Sketchi artifact ID or URL."];
+	}
+	return [];
 }
 
 export function proofForFinalOutput(
-  summary: HarnessOutputSummary,
+	summary: HarnessOutputSummary,
 ): HarnessMcpArtifactProof | undefined {
-  const finalArtifactId = explicitFinalArtifactId(
-    summary.finalJson,
-    summary.finalText,
-  );
-  if (finalArtifactId) {
-    return summary.mcpArtifacts
-      .toReversed()
-      .find((proof) => proof.artifactId === finalArtifactId);
-  }
-  return summary.mcpArtifacts
-    .toReversed()
-    .find((proof) =>
-      deliversProof(summary.finalJson, summary.finalText, proof),
-    );
+	const finalArtifactId = explicitFinalArtifactId(summary.finalJson, summary.finalText);
+	if (finalArtifactId) {
+		return summary.mcpArtifacts.toReversed().find((proof) => proof.artifactId === finalArtifactId);
+	}
+	return summary.mcpArtifacts
+		.toReversed()
+		.find((proof) => deliversProof(summary.finalJson, summary.finalText, proof));
 }
 
-function writeText(
-  filePath: string,
-  text: string,
-): Effect.Effect<void, HarnessFilesystemError> {
-  const prepare = Effect.tryPromise({
-    try: () => mkdir(path.dirname(filePath), { recursive: true }),
-    catch: (cause) =>
-      HarnessFilesystemError.make({
-        cause,
-        message: `Unable to prepare ${filePath}.`,
-        path: filePath,
-      }),
-  });
-  return prepare.pipe(
-    Effect.andThen(
-      Effect.tryPromise({
-        try: () => writeFile(filePath, text),
-        catch: (cause) =>
-          HarnessFilesystemError.make({
-            cause,
-            message: `Unable to write ${filePath}.`,
-            path: filePath,
-          }),
-      }),
-    ),
-  );
+function writeText(filePath: string, text: string): Effect.Effect<void, HarnessFilesystemError> {
+	const prepare = Effect.tryPromise({
+		try: () => mkdir(path.dirname(filePath), { recursive: true }),
+		catch: (cause) =>
+			HarnessFilesystemError.make({
+				cause,
+				message: `Unable to prepare ${filePath}.`,
+				path: filePath,
+			}),
+	});
+	return prepare.pipe(
+		Effect.andThen(
+			Effect.tryPromise({
+				try: () => writeFile(filePath, text),
+				catch: (cause) =>
+					HarnessFilesystemError.make({
+						cause,
+						message: `Unable to write ${filePath}.`,
+						path: filePath,
+					}),
+			}),
+		),
+	);
 }
 
 function writeJson(filePath: string, value: unknown) {
-  return writeText(filePath, `${JSON.stringify(value, null, 2)}\n`);
+	return writeText(filePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 function redactedCommandForReport(spec: CommandSpec): {
-  args: string[];
-  command: string;
+	args: string[];
+	command: string;
 } {
-  const args = spec.args.map((arg) =>
-    arg === spec.prompt ? "<eval prompt>" : arg,
-  );
-  return {
-    args,
-    command: spec.command,
-  };
+	const args = spec.args.map((arg) => (arg === spec.prompt ? "<eval prompt>" : arg));
+	return {
+		args,
+		command: spec.command,
+	};
 }
 
 function replayCommandForReport(conversationId: string): {
-  args: string[];
-  command: string;
+	args: string[];
+	command: string;
 } {
-  return {
-    args: ["<replay>", conversationId],
-    command: "agy",
-  };
+	return {
+		args: ["<replay>", conversationId],
+		command: "agy",
+	};
 }
 
 function runHarnessScenario(input: {
-  options: HarnessEvalOptions;
-  outputDir: string;
-  repeat: number;
-  runNumber: number;
-  scenario: DiagramScenario;
+	options: HarnessEvalOptions;
+	outputDir: string;
+	repeat: number;
+	runNumber: number;
+	scenario: DiagramScenario;
 }) {
-  return Effect.gen(function* () {
-    const stem = stableRunStem({
-      harness: input.options.harness,
-      repeat: input.repeat,
-      runNumber: input.runNumber,
-      scenarioId: input.scenario.id,
-    });
-    const eventsDir = input.options.eventsOutDir ?? input.outputDir;
-    const candidateDir = input.options.candidateOutDir ?? input.outputDir;
-    const eventsOut = path.join(eventsDir, `${stem}.stdout.jsonl`);
-    const stderrOut = path.join(eventsDir, `${stem}.stderr.txt`);
-    const candidateOut = path.join(candidateDir, `${stem}.candidate.json`);
-    const beforeAntigravityConversationId =
-      input.options.harness === "antigravity" &&
-      !input.options.antigravityConversationId
-        ? yield* readAntigravityConversationId(process.cwd())
-        : undefined;
-    const prompt = buildHarnessPrompt({
-      harness: input.options.harness,
-      model: input.options.model,
-      runNumber: input.runNumber,
-      scenario: input.scenario,
-    });
-    const command = input.options.antigravityConversationId
-      ? {
-          ...replayCommandForReport(input.options.antigravityConversationId),
-          env: {},
-          prompt,
-        }
-      : yield* Effect.try({
-          try: () =>
-            commandForRun({
-              harness: input.options.harness,
-              mcpUrl: input.options.mcpUrl,
-              model: input.options.model,
-              prompt,
-              scenarioId: input.scenario.id,
-              timeoutMs: input.options.timeoutMs,
-            }),
-          catch: (cause) =>
-            HarnessEvalUsageError.make({
-              cause,
-              message:
-                cause instanceof Error
-                  ? cause.message
-                  : "Unable to configure harness command.",
-            }),
-        });
-    const result: SpawnResult = input.options.antigravityConversationId
-      ? {
-          durationMs: 0,
-          exitCode: 0,
-          signal: null,
-          stderr: "",
-          stdout: "",
-          timedOut: false,
-        }
-      : yield* runCommand(command, input.options.timeoutMs);
-    const antigravityRootForReplay = antigravityRoot();
-    const antigravityEvidence =
-      input.options.antigravityConversationId && antigravityRootForReplay
-        ? yield* readAntigravityEvidenceForConversation({
-            conversationId: input.options.antigravityConversationId,
-            outputDir: eventsDir,
-            root: antigravityRootForReplay,
-            stem,
-          })
-        : input.options.harness === "antigravity"
-          ? yield* readAntigravityEvidence({
-              beforeConversationId: beforeAntigravityConversationId,
-              cwd: process.cwd(),
-              outputDir: eventsDir,
-              stem,
-            })
-          : {
-              outputTexts: [],
-              wrapperArtifactFiles: [],
-            };
-    const combinedStdout = [result.stdout, antigravityEvidence.transcriptText]
-      .filter((text): text is string => Boolean(text))
-      .join("\n");
-    const summary = summarizeHarnessStdout(
-      combinedStdout,
-      antigravityEvidence.outputTexts,
-    );
-    const mcpProof = proofForFinalOutput(summary);
-    const authError =
-      input.options.harness === "antigravity"
-        ? antigravityAuthError(result.stdout)
-        : undefined;
-    const outputErrors = [
-      ...(authError
-        ? [authError]
-        : outputContractErrors({
-            finalJson: summary.finalJson,
-            finalText: summary.finalText,
-            proof: mcpProof,
-          })),
-      ...(antigravityEvidence.wrapperArtifactFiles.length === 0
-        ? []
-        : [
-            `Antigravity created wrapper artifact file(s): ${antigravityEvidence.wrapperArtifactFiles.join(
-              ", ",
-            )}. Return the Sketchi artifact delivery in chat instead.`,
-          ]),
-    ].filter((message): message is string => Boolean(message));
-    const artifactEvaluation = authError
-      ? {
-          checks: [],
-          error: authError,
-          excalidrawIssues: [],
-          ok: false,
-        }
-      : input.options.deliveryOnly
-        ? {
-            checks: [],
-            ...(mcpProof
-              ? {}
-              : {
-                  error:
-                    "No successful sketchi-code-mode execute artifact was observed in the harness event stream.",
-                }),
-            excalidrawIssues: [],
-            ok: Boolean(mcpProof),
-          }
-        : mcpProof
-          ? evaluateHarnessJson(
-              input.scenario,
-              mcpProof.normalizedSpec === undefined
-                ? summary.finalJson
-                : {
-                    normalizedSpec: mcpProof.normalizedSpec,
-                  },
-            )
-          : {
-              checks: [],
-              error:
-                "No successful sketchi-code-mode execute artifact was observed in the harness event stream.",
-              excalidrawIssues: [],
-              ok: false,
-            };
-    const evaluation: HarnessCandidateEvaluation =
-      outputErrors.length === 0
-        ? artifactEvaluation
-        : {
-            ...artifactEvaluation,
-            error: [...new Set([artifactEvaluation.error, ...outputErrors])]
-              .filter((message): message is string => Boolean(message))
-              .join(" "),
-            ok: false,
-          };
+	return Effect.gen(function* () {
+		const stem = stableRunStem({
+			harness: input.options.harness,
+			repeat: input.repeat,
+			runNumber: input.runNumber,
+			scenarioId: input.scenario.id,
+		});
+		const eventsDir = input.options.eventsOutDir ?? input.outputDir;
+		const candidateDir = input.options.candidateOutDir ?? input.outputDir;
+		const eventsOut = path.join(eventsDir, `${stem}.stdout.jsonl`);
+		const stderrOut = path.join(eventsDir, `${stem}.stderr.txt`);
+		const candidateOut = path.join(candidateDir, `${stem}.candidate.json`);
+		const beforeAntigravityConversationId =
+			input.options.harness === "antigravity" && !input.options.antigravityConversationId
+				? yield* readAntigravityConversationId(process.cwd())
+				: undefined;
+		const prompt = buildHarnessPrompt({
+			harness: input.options.harness,
+			model: input.options.model,
+			runNumber: input.runNumber,
+			scenario: input.scenario,
+		});
+		const command = input.options.antigravityConversationId
+			? {
+					...replayCommandForReport(input.options.antigravityConversationId),
+					env: {},
+					prompt,
+				}
+			: yield* Effect.try({
+					try: () =>
+						commandForRun({
+							harness: input.options.harness,
+							mcpUrl: input.options.mcpUrl,
+							model: input.options.model,
+							prompt,
+							scenarioId: input.scenario.id,
+							timeoutMs: input.options.timeoutMs,
+						}),
+					catch: (cause) =>
+						HarnessEvalUsageError.make({
+							cause,
+							message:
+								cause instanceof Error ? cause.message : "Unable to configure harness command.",
+						}),
+				});
+		const result: SpawnResult = input.options.antigravityConversationId
+			? {
+					durationMs: 0,
+					exitCode: 0,
+					signal: null,
+					stderr: "",
+					stdout: "",
+					timedOut: false,
+				}
+			: yield* runCommand(command, input.options.timeoutMs);
+		const antigravityRootForReplay = antigravityRoot();
+		const antigravityEvidence =
+			input.options.antigravityConversationId && antigravityRootForReplay
+				? yield* readAntigravityEvidenceForConversation({
+						conversationId: input.options.antigravityConversationId,
+						outputDir: eventsDir,
+						root: antigravityRootForReplay,
+						stem,
+					})
+				: input.options.harness === "antigravity"
+					? yield* readAntigravityEvidence({
+							beforeConversationId: beforeAntigravityConversationId,
+							cwd: process.cwd(),
+							outputDir: eventsDir,
+							stem,
+						})
+					: {
+							outputTexts: [],
+							wrapperArtifactFiles: [],
+						};
+		const combinedStdout = [result.stdout, antigravityEvidence.transcriptText]
+			.filter((text): text is string => Boolean(text))
+			.join("\n");
+		const summary = summarizeHarnessStdout(combinedStdout, antigravityEvidence.outputTexts);
+		const mcpProof = proofForFinalOutput(summary);
+		const authError =
+			input.options.harness === "antigravity" ? antigravityAuthError(result.stdout) : undefined;
+		const outputErrors = [
+			...(authError
+				? [authError]
+				: outputContractErrors({
+						finalJson: summary.finalJson,
+						finalText: summary.finalText,
+						proof: mcpProof,
+					})),
+			...(antigravityEvidence.wrapperArtifactFiles.length === 0
+				? []
+				: [
+						`Antigravity created wrapper artifact file(s): ${antigravityEvidence.wrapperArtifactFiles.join(
+							", ",
+						)}. Return the Sketchi artifact delivery in chat instead.`,
+					]),
+		].filter((message): message is string => Boolean(message));
+		const artifactEvaluation = authError
+			? {
+					checks: [],
+					error: authError,
+					excalidrawIssues: [],
+					ok: false,
+				}
+			: input.options.deliveryOnly
+				? {
+						checks: [],
+						...(mcpProof
+							? {}
+							: {
+									error:
+										"No successful sketchi-code-mode execute artifact was observed in the harness event stream.",
+								}),
+						excalidrawIssues: [],
+						ok: Boolean(mcpProof),
+					}
+				: mcpProof
+					? evaluateHarnessJson(
+							input.scenario,
+							mcpProof.normalizedSpec === undefined
+								? summary.finalJson
+								: {
+										normalizedSpec: mcpProof.normalizedSpec,
+									},
+						)
+					: {
+							checks: [],
+							error:
+								"No successful sketchi-code-mode execute artifact was observed in the harness event stream.",
+							excalidrawIssues: [],
+							ok: false,
+						};
+		const evaluation: HarnessCandidateEvaluation =
+			outputErrors.length === 0
+				? artifactEvaluation
+				: {
+						...artifactEvaluation,
+						error: [...new Set([artifactEvaluation.error, ...outputErrors])]
+							.filter((message): message is string => Boolean(message))
+							.join(" "),
+						ok: false,
+					};
 
-    yield* writeText(eventsOut, combinedStdout);
-    yield* writeText(stderrOut, result.stderr);
-    yield* writeJson(candidateOut, {
-      ...(antigravityEvidence.conversationId
-        ? { conversationId: antigravityEvidence.conversationId }
-        : {}),
-      finalJson: summary.finalJson,
-      finalText: summary.finalText,
-      mcpArtifact: mcpProof ? reportableMcpArtifact(mcpProof) : undefined,
-      outputContractErrors: outputErrors,
-      ...(antigravityEvidence.transcriptOut
-        ? { transcriptOut: antigravityEvidence.transcriptOut }
-        : {}),
-      wrapperArtifactFiles: antigravityEvidence.wrapperArtifactFiles,
-    });
+		yield* writeText(eventsOut, combinedStdout);
+		yield* writeText(stderrOut, result.stderr);
+		yield* writeJson(candidateOut, {
+			...(antigravityEvidence.conversationId
+				? { conversationId: antigravityEvidence.conversationId }
+				: {}),
+			finalJson: summary.finalJson,
+			finalText: summary.finalText,
+			mcpArtifact: mcpProof ? reportableMcpArtifact(mcpProof) : undefined,
+			outputContractErrors: outputErrors,
+			...(antigravityEvidence.transcriptOut
+				? { transcriptOut: antigravityEvidence.transcriptOut }
+				: {}),
+			wrapperArtifactFiles: antigravityEvidence.wrapperArtifactFiles,
+		});
 
-    const runError = evaluation.error;
+		const runError = evaluation.error;
 
-    return {
-      candidateOut,
-      command: input.options.antigravityConversationId
-        ? replayCommandForReport(input.options.antigravityConversationId)
-        : redactedCommandForReport(command),
-      ...(antigravityEvidence.conversationId
-        ? { conversationId: antigravityEvidence.conversationId }
-        : {}),
-      difficulty: input.scenario.difficulty,
-      durationMs: result.durationMs,
-      ...(runError ? { error: runError } : {}),
-      eventsOut,
-      evaluation,
-      exitCode: result.exitCode,
-      ...(summary.finalJson === undefined
-        ? {}
-        : { finalJson: summary.finalJson }),
-      finalText: summary.finalText,
-      harness: input.options.harness,
-      ...(mcpProof ? { mcpArtifact: reportableMcpArtifact(mcpProof) } : {}),
-      mcpArtifactCount: summary.mcpArtifacts.length,
-      mcpToolCallCount: successfulMcpToolCallCount(summary.toolCalls),
-      ...(input.options.model ? { model: input.options.model } : {}),
-      ok:
-        result.exitCode === 0 &&
-        !result.timedOut &&
-        outputErrors.length === 0 &&
-        evaluation.ok,
-      outputContractErrors: outputErrors,
-      rawEventCount: summary.eventCount,
-      runNumber: input.runNumber,
-      scenarioId: input.scenario.id,
-      signal: result.signal,
-      stderrOut,
-      ...(antigravityEvidence.transcriptOut
-        ? { transcriptOut: antigravityEvidence.transcriptOut }
-        : {}),
-      wrapperArtifactFiles: antigravityEvidence.wrapperArtifactFiles,
-      stepCosts: summary.stepCosts,
-      steps: summary.steps,
-      timedOut: result.timedOut,
-      toolCalls: summary.toolCalls,
-    } satisfies HarnessRunReport;
-  });
+		return {
+			candidateOut,
+			command: input.options.antigravityConversationId
+				? replayCommandForReport(input.options.antigravityConversationId)
+				: redactedCommandForReport(command),
+			...(antigravityEvidence.conversationId
+				? { conversationId: antigravityEvidence.conversationId }
+				: {}),
+			difficulty: input.scenario.difficulty,
+			durationMs: result.durationMs,
+			...(runError ? { error: runError } : {}),
+			eventsOut,
+			evaluation,
+			exitCode: result.exitCode,
+			...(summary.finalJson === undefined ? {} : { finalJson: summary.finalJson }),
+			finalText: summary.finalText,
+			harness: input.options.harness,
+			...(mcpProof ? { mcpArtifact: reportableMcpArtifact(mcpProof) } : {}),
+			mcpArtifactCount: summary.mcpArtifacts.length,
+			mcpToolCallCount: successfulMcpToolCallCount(summary.toolCalls),
+			...(input.options.model ? { model: input.options.model } : {}),
+			ok: result.exitCode === 0 && !result.timedOut && outputErrors.length === 0 && evaluation.ok,
+			outputContractErrors: outputErrors,
+			rawEventCount: summary.eventCount,
+			runNumber: input.runNumber,
+			scenarioId: input.scenario.id,
+			signal: result.signal,
+			stderrOut,
+			...(antigravityEvidence.transcriptOut
+				? { transcriptOut: antigravityEvidence.transcriptOut }
+				: {}),
+			wrapperArtifactFiles: antigravityEvidence.wrapperArtifactFiles,
+			stepCosts: summary.stepCosts,
+			steps: summary.steps,
+			timedOut: result.timedOut,
+			toolCalls: summary.toolCalls,
+		} satisfies HarnessRunReport;
+	});
 }
 
 export function summarizeReport(input: {
-  status: HarnessReportStatus;
-  harness: HarnessName;
-  mcpUrl: string;
-  model?: string | undefined;
-  repeat: number;
-  results: HarnessRunReport[];
-  scenarioCount: number;
+	status: HarnessReportStatus;
+	harness: HarnessName;
+	mcpUrl: string;
+	model?: string | undefined;
+	repeat: number;
+	results: HarnessRunReport[];
+	scenarioCount: number;
 }): HarnessReport {
-  const okCount = input.results.filter((result) => result.ok).length;
-  return {
-    expectedRuns: input.repeat * input.scenarioCount,
-    status: input.status,
-    requestedMcpUrl: input.mcpUrl,
-    generatedAt: new Date().toISOString(),
-    harness: input.harness,
-    mcpUrl: input.harness === "antigravity" ? null : input.mcpUrl,
-    ...(input.model ? { model: input.model } : {}),
-    ok:
-      input.status === "complete" &&
-      input.results.length === input.repeat * input.scenarioCount &&
-      okCount === input.results.length,
-    repeat: input.repeat,
-    results: input.results,
-    scenarioCount: input.scenarioCount,
-    summary: {
-      failedEvaluations: input.results
-        .filter((result) => !result.ok)
-        .map((result) => ({
-          runNumber: result.runNumber,
-          scenarioId: result.scenarioId,
-        })),
-      mcpToolCallCount: input.results.reduce(
-        (sum, result) => sum + result.mcpToolCallCount,
-        0,
-      ),
-      okCount,
-      totalCost: input.results.reduce(
-        (sum, result) =>
-          sum + result.stepCosts.reduce((costSum, cost) => costSum + cost, 0),
-        0,
-      ),
-      totalDurationMs: input.results.reduce(
-        (sum, result) => sum + result.durationMs,
-        0,
-      ),
-      totalRuns: input.results.length,
-    },
-  };
+	const okCount = input.results.filter((result) => result.ok).length;
+	return {
+		expectedRuns: input.repeat * input.scenarioCount,
+		status: input.status,
+		requestedMcpUrl: input.mcpUrl,
+		generatedAt: new Date().toISOString(),
+		harness: input.harness,
+		mcpUrl: input.harness === "antigravity" ? null : input.mcpUrl,
+		...(input.model ? { model: input.model } : {}),
+		ok:
+			input.status === "complete" &&
+			input.results.length === input.repeat * input.scenarioCount &&
+			okCount === input.results.length,
+		repeat: input.repeat,
+		results: input.results,
+		scenarioCount: input.scenarioCount,
+		summary: {
+			failedEvaluations: input.results
+				.filter((result) => !result.ok)
+				.map((result) => ({
+					runNumber: result.runNumber,
+					scenarioId: result.scenarioId,
+				})),
+			mcpToolCallCount: input.results.reduce((sum, result) => sum + result.mcpToolCallCount, 0),
+			okCount,
+			totalCost: input.results.reduce(
+				(sum, result) => sum + result.stepCosts.reduce((costSum, cost) => costSum + cost, 0),
+				0,
+			),
+			totalDurationMs: input.results.reduce((sum, result) => sum + result.durationMs, 0),
+			totalRuns: input.results.length,
+		},
+	};
 }
 
 function scenariosFor(
-  options: HarnessEvalOptions,
+	options: HarnessEvalOptions,
 ): Effect.Effect<readonly DiagramScenario[], HarnessEvalUsageError> {
-  if (options.all) return Effect.succeed(flowchartScenarios);
-  return Effect.try({
-    try: () => [getScenario(options.scenarioId ?? "")],
-    catch: (cause) =>
-      HarnessEvalUsageError.make({
-        cause,
-        message:
-          cause instanceof Error ? cause.message : "Unknown eval scenario.",
-      }),
-  });
+	if (options.all) return Effect.succeed(flowchartScenarios);
+	return Effect.try({
+		try: () => [getScenario(options.scenarioId ?? "")],
+		catch: (cause) =>
+			HarnessEvalUsageError.make({
+				cause,
+				message: cause instanceof Error ? cause.message : "Unknown eval scenario.",
+			}),
+	});
 }
 
-export const runHarnessEval = Effect.fn("harnessEval.run")(function* (
-  argv: readonly string[],
-) {
-  const options = yield* parseOptions(argv);
-  const scenarios = yield* scenariosFor(options);
-  const outputDir =
-    options.reportOut === undefined
-      ? path.join(
-          ".memory",
-          "harness-evals",
-          new Date().toISOString().replace(/[:.]/g, "-"),
-        )
-      : path.dirname(options.reportOut);
-  const results: HarnessRunReport[] = [];
-  let status: HarnessReportStatus = "running";
-  const reportOut = options.reportOut ?? path.join(outputDir, "report.json");
-  const writeCurrentReport = () => {
-    const report = summarizeReport({
-      status,
-      harness: options.harness,
-      mcpUrl: options.mcpUrl,
-      model: options.model,
-      repeat: options.repeat,
-      results,
-      scenarioCount: scenarios.length,
-    });
-    return writeJson(reportOut, report).pipe(Effect.as(report));
-  };
+export const runHarnessEval = Effect.fn("harnessEval.run")(function* (argv: readonly string[]) {
+	const options = yield* parseOptions(argv);
+	const scenarios = yield* scenariosFor(options);
+	const outputDir =
+		options.reportOut === undefined
+			? path.join(".memory", "harness-evals", new Date().toISOString().replace(/[:.]/g, "-"))
+			: path.dirname(options.reportOut);
+	const results: HarnessRunReport[] = [];
+	let status: HarnessReportStatus = "running";
+	const reportOut = options.reportOut ?? path.join(outputDir, "report.json");
+	const writeCurrentReport = () => {
+		const report = summarizeReport({
+			status,
+			harness: options.harness,
+			mcpUrl: options.mcpUrl,
+			model: options.model,
+			repeat: options.repeat,
+			results,
+			scenarioCount: scenarios.length,
+		});
+		return writeJson(reportOut, report).pipe(Effect.as(report));
+	};
 
-  yield* Effect.scoped(
-    Effect.gen(function* () {
-      yield* Effect.addFinalizer((exit) => {
-        if (Exit.isSuccess(exit)) return Effect.void;
-        status = Cause.hasInterrupts(exit.cause) ? "interrupted" : "failed";
-        return writeCurrentReport().pipe(Effect.ignore);
-      });
-      yield* writeCurrentReport();
-      for (
-        let repeatIndex = 0;
-        repeatIndex < options.repeat;
-        repeatIndex += 1
-      ) {
-        for (const scenario of scenarios) {
-          const runNumber = repeatIndex + 1;
-          console.error(
-            `harness=${options.harness} scenario=${scenario.id} run=${runNumber}/${options.repeat}`,
-          );
-          results.push(
-            yield* runHarnessScenario({
-              options,
-              outputDir,
-              repeat: options.repeat,
-              runNumber,
-              scenario,
-            }),
-          );
-          yield* writeCurrentReport();
-        }
-      }
-      status = "complete";
-      const report = yield* writeCurrentReport();
-      console.log(JSON.stringify({ ...report, reportOut }, null, 2));
-      if (!report.ok) process.exitCode = 1;
-    }),
-  );
+	yield* Effect.scoped(
+		Effect.gen(function* () {
+			yield* Effect.addFinalizer((exit) => {
+				if (Exit.isSuccess(exit)) return Effect.void;
+				status = Cause.hasInterrupts(exit.cause) ? "interrupted" : "failed";
+				return writeCurrentReport().pipe(Effect.ignore);
+			});
+			yield* writeCurrentReport();
+			for (let repeatIndex = 0; repeatIndex < options.repeat; repeatIndex += 1) {
+				for (const scenario of scenarios) {
+					const runNumber = repeatIndex + 1;
+					console.error(
+						`harness=${options.harness} scenario=${scenario.id} run=${runNumber}/${options.repeat}`,
+					);
+					results.push(
+						yield* runHarnessScenario({
+							options,
+							outputDir,
+							repeat: options.repeat,
+							runNumber,
+							scenario,
+						}),
+					);
+					yield* writeCurrentReport();
+				}
+			}
+			status = "complete";
+			const report = yield* writeCurrentReport();
+			console.log(JSON.stringify({ ...report, reportOut }, null, 2));
+			if (!report.ok) process.exitCode = 1;
+		}),
+	);
 });
 
 export function harnessEvalExitCode(error: { readonly _tag?: string }): number {
-  return error._tag === "HarnessEvalUsageError" ? 2 : 1;
+	return error._tag === "HarnessEvalUsageError" ? 2 : 1;
 }
 
 const handledMain = runHarnessEval(process.argv.slice(2)).pipe(
-  Effect.catch((error) =>
-    Effect.sync(() => {
-      console.error(error.message);
-      process.exitCode = harnessEvalExitCode(error);
-    }),
-  ),
+	Effect.catch((error) =>
+		Effect.sync(() => {
+			console.error(error.message);
+			process.exitCode = harnessEvalExitCode(error);
+		}),
+	),
 );
 
 const entryPointPath = process.argv[1];
 
 if (entryPointPath && import.meta.url === pathToFileURL(entryPointPath).href) {
-  NodeRuntime.runMain(handledMain.pipe(Effect.provide(ToolProcessSpawnerLive)));
+	NodeRuntime.runMain(handledMain.pipe(Effect.provide(ToolProcessSpawnerLive)));
 }

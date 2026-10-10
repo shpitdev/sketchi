@@ -9,51 +9,39 @@ const packageIndex = readFileSync(join(uiSourceRoot, "index.ts"), "utf-8");
 const packageStyles = readFileSync(join(uiSourceRoot, "styles.css"), "utf-8");
 
 function componentFileExists(componentName: string, suffix: string): boolean {
-  return existsSync(
-    join(componentsRoot, componentName, `${componentName}${suffix}`),
-  );
+	return existsSync(join(componentsRoot, componentName, `${componentName}${suffix}`));
 }
 
 describe("Diagram UI component structure", () => {
-  it("keeps reusable components generated, tested, story-backed, and exported", () => {
-    const componentNames = readdirSync(componentsRoot, {
-      withFileTypes: true,
-    })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name)
-      .sort();
+	it("keeps reusable components generated, tested, story-backed, and exported", () => {
+		const componentNames = readdirSync(componentsRoot, {
+			withFileTypes: true,
+		})
+			.filter((entry) => entry.isDirectory())
+			.map((entry) => entry.name)
+			.sort();
 
-    expect(componentNames.length).toBeGreaterThan(0);
+		expect(componentNames.length).toBeGreaterThan(0);
 
-    for (const componentName of componentNames) {
-      expect(componentFileExists(componentName, ".tsx")).toBe(true);
-      expect(componentFileExists(componentName, ".test.tsx")).toBe(true);
-      expect(componentFileExists(componentName, ".stories.tsx")).toBe(true);
-      expect(existsSync(join(componentsRoot, componentName, "index.ts"))).toBe(
-        true,
-      );
-      const exportStatement = `export * from "./components/${componentName}/index.js";`;
-      if (
-        ["generation-workspace", "flowchart-validation-panel"].includes(
-          componentName,
-        )
-      ) {
-        expect(packageIndex).not.toContain(exportStatement);
-      } else {
-        expect(packageIndex).toContain(exportStatement);
-      }
-    }
-  });
+		for (const componentName of componentNames) {
+			expect(componentFileExists(componentName, ".tsx")).toBe(true);
+			expect(componentFileExists(componentName, ".test.tsx")).toBe(true);
+			expect(componentFileExists(componentName, ".stories.tsx")).toBe(true);
+			expect(existsSync(join(componentsRoot, componentName, "index.ts"))).toBe(true);
+			const exportStatement = `export * from "./components/${componentName}/index.js";`;
+			if (["generation-workspace", "flowchart-validation-panel"].includes(componentName)) {
+				expect(packageIndex).not.toContain(exportStatement);
+			} else {
+				expect(packageIndex).toContain(exportStatement);
+			}
+		}
+	});
 
-  it("removes empty mobile chrome without hiding editable controls", () => {
-    expect(packageStyles).toContain("@container (min-width: 700px)");
-    expect(packageStyles).toContain(
-      '.sketchi-excalidraw-scene-canvas[data-view-mode="true"]',
-    );
-    expect(packageStyles).toContain(
-      '.sketchi-excalidraw-scene-canvas[data-view-mode="false"]',
-    );
-    expect(packageStyles).toContain(".main-menu-trigger");
-    expect(packageStyles).toContain("width: max-content;");
-  });
+	it("removes empty mobile chrome without hiding editable controls", () => {
+		expect(packageStyles).toContain("@container (min-width: 700px)");
+		expect(packageStyles).toContain('.sketchi-excalidraw-scene-canvas[data-view-mode="true"]');
+		expect(packageStyles).toContain('.sketchi-excalidraw-scene-canvas[data-view-mode="false"]');
+		expect(packageStyles).toContain(".main-menu-trigger");
+		expect(packageStyles).toContain("width: max-content;");
+	});
 });

@@ -1,28 +1,25 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig(() => ({
-  root: import.meta.dirname,
-  cacheDir: "../../../node_modules/.vite/packages/diagram/generation",
-  resolve: {
-    alias: {
-      "@sketchi/diagram-core": new URL("../core/src/index.ts", import.meta.url)
-        .pathname,
-      "@sketchi/observability": new URL(
-        "../../observability/src/index.ts",
-        import.meta.url,
-      ).pathname,
-    },
-  },
-  test: {
-    name: "diagram-generation",
-    watch: false,
-    globals: true,
-    environment: "node",
-    include: ["{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
-    reporters: ["default"],
-    coverage: {
-      reportsDirectory: "../../../coverage/packages/diagram/generation",
-      provider: "v8" as const,
-    },
-  },
+	root: import.meta.dirname,
+	cacheDir: "../../../node_modules/.vite/packages/diagram/generation",
+	resolve: {
+		alias: {
+			"@sketchi/diagram-core": new URL("../core/src/index.ts", import.meta.url).pathname,
+			"@sketchi/observability": new URL("../../observability/src/index.ts", import.meta.url)
+				.pathname,
+		},
+	},
+	test: {
+		name: "diagram-generation",
+		watch: false,
+		globals: true,
+		environment: "node",
+		include: ["{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
+		reporters: ["default"],
+		coverage: {
+			reportsDirectory: "../../../coverage/packages/diagram/generation",
+			provider: "v8" as const,
+		},
+	},
 }));

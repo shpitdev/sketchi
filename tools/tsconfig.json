@@ -4,18 +4,10 @@
     "allowImportingTsExtensions": true,
     "paths": {
       "@sketchi/diagram-core": ["../packages/diagram/core/src/index.ts"],
-      "@sketchi/diagram-excalidraw": [
-        "../packages/diagram/excalidraw/src/index.ts"
-      ],
-      "@sketchi/diagram-generation": [
-        "../packages/diagram/generation/src/index.ts"
-      ],
-      "@sketchi/diagram-renderer": [
-        "../packages/diagram/renderer/src/index.ts"
-      ],
-      "@sketchi/diagram-scenarios": [
-        "../packages/diagram/scenarios/src/index.ts"
-      ],
+      "@sketchi/diagram-excalidraw": ["../packages/diagram/excalidraw/src/index.ts"],
+      "@sketchi/diagram-generation": ["../packages/diagram/generation/src/index.ts"],
+      "@sketchi/diagram-renderer": ["../packages/diagram/renderer/src/index.ts"],
+      "@sketchi/diagram-scenarios": ["../packages/diagram/scenarios/src/index.ts"],
       "@sketchi/diagram-scenarios/internal/tool-process": [
         "../packages/diagram/scenarios/src/internal/tool-process.ts"
       ],

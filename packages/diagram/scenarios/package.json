@@ -1,27 +1,27 @@
 {
-  "name": "@sketchi/diagram-scenarios",
-  "private": true,
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    },
-    "./internal/tool-process": {
-      "types": "./dist/internal/tool-process.d.ts",
-      "default": "./dist/internal/tool-process.js"
-    }
-  },
-  "dependencies": {
-    "@effect/platform-node": "4.0.1",
-    "@sketchi/diagram-core": "workspace:*",
-    "@sketchi/diagram-excalidraw": "workspace:*",
-    "@sketchi/diagram-generation": "workspace:*",
-    "@sketchi/diagram-renderer": "workspace:*",
-    "@sketchi/icon-catalog": "workspace:*",
-    "effect": "4.0.1",
-    "tslib": "^2.8.1"
-  }
+	"name": "@sketchi/diagram-scenarios",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./internal/tool-process": {
+			"types": "./dist/internal/tool-process.d.ts",
+			"default": "./dist/internal/tool-process.js"
+		}
+	},
+	"dependencies": {
+		"@effect/platform-node": "4.0.1",
+		"@sketchi/diagram-core": "workspace:*",
+		"@sketchi/diagram-excalidraw": "workspace:*",
+		"@sketchi/diagram-generation": "workspace:*",
+		"@sketchi/diagram-renderer": "workspace:*",
+		"@sketchi/icon-catalog": "workspace:*",
+		"effect": "4.0.1",
+		"tslib": "^2.8.1"
+	}
 }

@@ -2,103 +2,91 @@ import { BrandIcon } from "../brand-icon/index.js";
 import { DEFAULT_WEB_SURFACE_URLS } from "../../lib/surface-urls";
 
 export interface IconWallProps {
-  /** Link to the full icon library surface. */
-  iconsHref?: string;
+	/** Link to the full icon library surface. */
+	iconsHref?: string;
 }
 
 const rowOne = [
-  "react",
-  "typescript",
-  "nextjs",
-  "tailwindcss",
-  "nodejs",
-  "python",
-  "go",
-  "rust",
-  "graphql",
-  "prisma",
-  "figma",
-  "linear",
-  "notion",
-  "slack",
+	"react",
+	"typescript",
+	"nextjs",
+	"tailwindcss",
+	"nodejs",
+	"python",
+	"go",
+	"rust",
+	"graphql",
+	"prisma",
+	"figma",
+	"linear",
+	"notion",
+	"slack",
 ];
 
 const rowTwo = [
-  "cloudflare",
-  "aws",
-  "googlecloud",
-  "vercel",
-  "docker",
-  "kubernetes",
-  "postgresql",
-  "redis",
-  "mongodb",
-  "supabase",
-  "github",
-  "openai",
-  "anthropic",
+	"cloudflare",
+	"aws",
+	"googlecloud",
+	"vercel",
+	"docker",
+	"kubernetes",
+	"postgresql",
+	"redis",
+	"mongodb",
+	"supabase",
+	"github",
+	"openai",
+	"anthropic",
 ];
 
 function label(slug: string): string {
-  return slug.charAt(0).toUpperCase() + slug.slice(1);
+	return slug.charAt(0).toUpperCase() + slug.slice(1);
 }
 
-function Rail({
-  slugs,
-  reverse,
-}: {
-  slugs: readonly string[];
-  reverse?: boolean;
-}) {
-  return (
-    <div className="icon-rail">
-      <div
-        className={`icon-rail__track${
-          reverse ? " icon-rail__track--reverse" : ""
-        }`}
-      >
-        {[0, 1].map((cycle) => (
-          <div className="icon-rail__cycle" data-icon-cycle key={cycle}>
-            {slugs.map((slug) => (
-              <BrandIcon
-                key={slug}
-                label={label(slug)}
-                loading="eager"
-                size={30}
-                src={`/brand/${slug}.svg`}
-                tile
-              />
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+function Rail({ slugs, reverse }: { slugs: readonly string[]; reverse?: boolean }) {
+	return (
+		<div className="icon-rail">
+			<div className={`icon-rail__track${reverse ? " icon-rail__track--reverse" : ""}`}>
+				{[0, 1].map((cycle) => (
+					<div className="icon-rail__cycle" data-icon-cycle key={cycle}>
+						{slugs.map((slug) => (
+							<BrandIcon
+								key={slug}
+								label={label(slug)}
+								loading="eager"
+								size={30}
+								src={`/brand/${slug}.svg`}
+								tile
+							/>
+						))}
+					</div>
+				))}
+			</div>
+		</div>
+	);
 }
 
 /**
  * A moving wall of Sketchi's own brand icons — the library made tangible.
  */
-export function IconWall({
-  iconsHref = DEFAULT_WEB_SURFACE_URLS.icons,
-}: IconWallProps) {
-  return (
-    <section className="sk-section icon-wall" id="icons">
-      <div className="sk-shell">
-        <div className="icon-wall__head">
-          <h2 className="sk-section__title icon-wall__title">
-            Your stack’s logos, already sketched.
-          </h2>
-          <a className="sk-btn sk-btn--ghost" href={iconsHref}>
-            Browse the library →
-          </a>
-        </div>
+export function IconWall({ iconsHref = DEFAULT_WEB_SURFACE_URLS.icons }: IconWallProps) {
+	return (
+		<section className="sk-section icon-wall" id="icons">
+			<div className="sk-shell">
+				<div className="icon-wall__head">
+					<h2 className="sk-section__title icon-wall__title">
+						Your stack’s logos, already sketched.
+					</h2>
+					<a className="sk-btn sk-btn--ghost" href={iconsHref}>
+						Browse the library →
+					</a>
+				</div>
 
-        <div className="icon-wall__rails" aria-hidden="true">
-          <Rail slugs={rowOne} />
-          <Rail reverse slugs={rowTwo} />
-        </div>
-      </div>
-    </section>
-  );
+				<div className="icon-wall__rails" aria-hidden="true">
+					<Rail slugs={rowOne} />
+					<Rail reverse slugs={rowTwo} />
+				</div>
+			</div>
+		</section>
+	);
 }

@@ -6,25 +6,21 @@ import { describe, expect, it } from "vitest";
 
 import { DiagramInspector } from "./diagram-inspector";
 
-const scene = convertSceneToExcalidraw(
-  renderIntermediateDiagram(flowchartFixture),
-);
+const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
 
 describe("DiagramInspector", () => {
-  it("shows the overview drawn from the diagram", () => {
-    render(<DiagramInspector diagram={flowchartFixture} scene={scene} />);
+	it("shows the overview drawn from the diagram", () => {
+		render(<DiagramInspector diagram={flowchartFixture} scene={scene} />);
 
-    expect(screen.getByRole("tab", { name: "Typed IR" })).toBeTruthy();
-    expect(screen.getByText("Edge routing")).toBeTruthy();
-    expect(screen.getByText(flowchartFixture.layout.direction)).toBeTruthy();
-  });
+		expect(screen.getByRole("tab", { name: "Typed IR" })).toBeTruthy();
+		expect(screen.getByText("Edge routing")).toBeTruthy();
+		expect(screen.getByText(flowchartFixture.layout.direction)).toBeTruthy();
+	});
 
-  it("reports the converted scene on the scene tab", () => {
-    render(<DiagramInspector diagram={flowchartFixture} scene={scene} />);
+	it("reports the converted scene on the scene tab", () => {
+		render(<DiagramInspector diagram={flowchartFixture} scene={scene} />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Scene" }));
-    expect(
-      screen.getByText(`${scene.elements.length} Excalidraw elements`),
-    ).toBeTruthy();
-  });
+		fireEvent.click(screen.getByRole("tab", { name: "Scene" }));
+		expect(screen.getByText(`${scene.elements.length} Excalidraw elements`)).toBeTruthy();
+	});
 });

@@ -1,19 +1,19 @@
 {
-  "apps": {
-    "apps/excalidraw": {
-      "name": "excalidraw.sketchi"
-    },
-    "apps/icons": {
-      "name": "icons.sketchi"
-    },
-    "apps/eval-harness": {
-      "name": "eval-harness.sketchi"
-    },
-    "apps/playground": {
-      "name": "playground.sketchi"
-    },
-    "apps/web": {
-      "name": "sketchi"
-    }
-  }
+	"apps": {
+		"apps/excalidraw": {
+			"name": "excalidraw.sketchi"
+		},
+		"apps/icons": {
+			"name": "icons.sketchi"
+		},
+		"apps/eval-harness": {
+			"name": "eval-harness.sketchi"
+		},
+		"apps/playground": {
+			"name": "playground.sketchi"
+		},
+		"apps/web": {
+			"name": "sketchi"
+		}
+	}
 }

@@ -16,83 +16,83 @@ export type OutputFormat = "text" | "json";
 export type DiagramAuthority = "canonical" | "patched" | "detached";
 
 export class DiagramRecordManifest extends Schema.Class<DiagramRecordManifest>(
-  "DiagramRecordManifest",
+	"DiagramRecordManifest",
 )({
-  schemaVersion: Schema.Literal(RECORD_SCHEMA_VERSION),
-  id: Schema.String,
-  type: Schema.Literals(["canvas", "flowchart", "mindmap", "sequence"]),
-  title: Schema.String,
-  revision: Schema.Int.check(Schema.isGreaterThan(0)),
-  authority: Schema.Literals(["canonical", "patched", "detached"]).pipe(
-    Schema.withDecodingDefaultKey(Effect.succeed("canonical")),
-  ),
-  formats: Schema.Array(Schema.Literals(["scene", "excalidraw", "png"])),
+	schemaVersion: Schema.Literal(RECORD_SCHEMA_VERSION),
+	id: Schema.String,
+	type: Schema.Literals(["canvas", "flowchart", "mindmap", "sequence"]),
+	title: Schema.String,
+	revision: Schema.Int.check(Schema.isGreaterThan(0)),
+	authority: Schema.Literals(["canonical", "patched", "detached"]).pipe(
+		Schema.withDecodingDefaultKey(Effect.succeed("canonical")),
+	),
+	formats: Schema.Array(Schema.Literals(["scene", "excalidraw", "png"])),
 }) {}
 
 export interface BuiltDiagram {
-  readonly id: string;
-  readonly type: DiagramDocument["type"];
-  readonly title: string;
-  readonly document: DiagramDocument;
-  readonly scene: PatchableScene;
-  readonly excalidraw: ExcalidrawFile;
-  readonly png?: Uint8Array;
+	readonly id: string;
+	readonly type: DiagramDocument["type"];
+	readonly title: string;
+	readonly document: DiagramDocument;
+	readonly scene: PatchableScene;
+	readonly excalidraw: ExcalidrawFile;
+	readonly png?: Uint8Array;
 }
 
 export interface PatchSource {
-  readonly revision: number;
-  readonly scene: PatchableScene;
+	readonly revision: number;
+	readonly scene: PatchableScene;
 }
 
 export interface PatchedDiagramArtifacts {
-  readonly scene: PatchableScene;
-  readonly excalidraw: ExcalidrawFile;
+	readonly scene: PatchableScene;
+	readonly excalidraw: ExcalidrawFile;
 }
 
 export interface StoredDiagram {
-  readonly manifest: DiagramRecordManifest;
-  readonly document: DiagramDocument;
-  readonly revisions: ReadonlyArray<string>;
-  readonly authority: DiagramAuthority;
+	readonly manifest: DiagramRecordManifest;
+	readonly document: DiagramDocument;
+	readonly revisions: ReadonlyArray<string>;
+	readonly authority: DiagramAuthority;
 }
 
 export interface DiagramSummary {
-  readonly id: string;
-  readonly type: DiagramDocument["type"];
-  readonly title: string;
-  readonly revision: number;
-  readonly formats: ReadonlyArray<DiagramFormat>;
-  readonly authority: DiagramAuthority;
-  readonly documentAuthoritative: boolean;
+	readonly id: string;
+	readonly type: DiagramDocument["type"];
+	readonly title: string;
+	readonly revision: number;
+	readonly formats: ReadonlyArray<DiagramFormat>;
+	readonly authority: DiagramAuthority;
+	readonly documentAuthoritative: boolean;
 }
 
 /** Failed entries deliberately carry no inferred record metadata. */
 export interface DiagramListFailure extends Partial<DiagramSummary> {
-  readonly id: string;
-  readonly status: "unavailable";
-  readonly code: string;
-  readonly message: string;
-  readonly hint: string;
+	readonly id: string;
+	readonly status: "unavailable";
+	readonly code: string;
+	readonly message: string;
+	readonly hint: string;
 }
 
 export type DiagramListEntry = DiagramSummary | DiagramListFailure;
 
 export function summaryFromStored(diagram: StoredDiagram): DiagramSummary {
-  return {
-    id: diagram.manifest.id,
-    type: diagram.manifest.type,
-    title: diagram.manifest.title,
-    revision: diagram.manifest.revision,
-    formats: diagram.manifest.formats,
-    authority: diagram.authority,
-    documentAuthoritative: diagram.authority === "canonical",
-  };
+	return {
+		id: diagram.manifest.id,
+		type: diagram.manifest.type,
+		title: diagram.manifest.title,
+		revision: diagram.manifest.revision,
+		formats: diagram.manifest.formats,
+		authority: diagram.authority,
+		documentAuthoritative: diagram.authority === "canonical",
+	};
 }
 
 export function revisionFileName(revision: number): string {
-  return `${String(revision).padStart(6, "0")}.json`;
+	return `${String(revision).padStart(6, "0")}.json`;
 }
 
 export function revisionDirectoryName(revision: number): string {
-  return String(revision).padStart(6, "0");
+	return String(revision).padStart(6, "0");
 }

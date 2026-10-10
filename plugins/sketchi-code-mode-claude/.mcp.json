@@ -1,8 +1,8 @@
 {
-  "mcpServers": {
-    "sketchi-code-mode": {
-      "type": "http",
-      "url": "https://playground.sketchi.app/mcp"
-    }
-  }
+	"mcpServers": {
+		"sketchi-code-mode": {
+			"type": "http",
+			"url": "https://playground.sketchi.app/mcp"
+		}
+	}
 }

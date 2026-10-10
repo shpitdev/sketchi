@@ -1,95 +1,89 @@
 {
-  "name": "icons",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/icons/src",
-  "projectType": "application",
-  "tags": ["scope:app", "type:app"],
-  "targets": {
-    "build": {
-      "executor": "nx:run-commands",
-      "dependsOn": ["sync-catalog-assets"],
-      "outputs": [
-        "{workspaceRoot}/dist/apps/icons",
-        "{projectRoot}/.wrangler/deploy/config.json"
-      ],
-      "options": {
-        "command": "vite build --config apps/icons/vite.config.ts"
-      }
-    },
-    "build-storybook": {
-      "executor": "@nx/storybook:build",
-      "outputs": ["{workspaceRoot}/storybook-static/icons"],
-      "options": {
-        "configDir": "apps/icons/.storybook",
-        "outputDir": "storybook-static/icons"
-      },
-      "dependsOn": ["sync-catalog-assets"]
-    },
-    "cf-typegen": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "wrangler types --config apps/icons/wrangler.jsonc"
-      }
-    },
-    "deploy": {
-      "executor": "nx:run-commands",
-      "dependsOn": ["build"],
-      "options": {
-        "command": "wrangler deploy --config dist/apps/icons/server/wrangler.json"
-      }
-    },
-    "dev": {
-      "executor": "nx:run-commands",
-      "dependsOn": ["sync-catalog-assets"],
-      "options": {
-        "command": "PORTLESS_PORT=443 portless run --name icons.sketchi vite dev --config apps/icons/vite.config.ts"
-      }
-    },
-    "preview": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "vite preview --config apps/icons/vite.config.ts --host 127.0.0.1 --port 6303"
-      }
-    },
-    "storybook": {
-      "executor": "@nx/storybook:storybook",
-      "options": {
-        "configDir": "apps/icons/.storybook",
-        "port": 6009
-      },
-      "dependsOn": ["sync-catalog-assets"]
-    },
-    "sync-catalog-assets": {
-      "executor": "nx:run-commands",
-      "dependsOn": ["^build"],
-      "inputs": ["{projectRoot}/scripts/sync-catalog-assets.ts", "^production"],
-      "outputs": [
-        "{projectRoot}/public/icons-manifest.json",
-        "{projectRoot}/public/output"
-      ],
-      "options": {
-        "command": "jiti apps/icons/scripts/sync-catalog-assets.ts"
-      }
-    },
-    "test": {
-      "executor": "nx:run-commands",
-      "dependsOn": ["build"],
-      "outputs": ["{workspaceRoot}/coverage/apps/icons"],
-      "options": {
-        "command": "vitest run --config apps/icons/vitest.config.ts"
-      }
-    },
-    "typecheck": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "tsc6 -p apps/icons/tsconfig.json --noEmit"
-      }
-    },
-    "typecheck-native": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "tsc -p apps/icons/tsconfig.json --noEmit"
-      }
-    }
-  }
+	"name": "icons",
+	"$schema": "../../node_modules/nx/schemas/project-schema.json",
+	"sourceRoot": "apps/icons/src",
+	"projectType": "application",
+	"tags": ["scope:app", "type:app"],
+	"targets": {
+		"build": {
+			"executor": "nx:run-commands",
+			"dependsOn": ["sync-catalog-assets"],
+			"outputs": ["{workspaceRoot}/dist/apps/icons", "{projectRoot}/.wrangler/deploy/config.json"],
+			"options": {
+				"command": "vite build --config apps/icons/vite.config.ts"
+			}
+		},
+		"build-storybook": {
+			"executor": "@nx/storybook:build",
+			"outputs": ["{workspaceRoot}/storybook-static/icons"],
+			"options": {
+				"configDir": "apps/icons/.storybook",
+				"outputDir": "storybook-static/icons"
+			},
+			"dependsOn": ["sync-catalog-assets"]
+		},
+		"cf-typegen": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "wrangler types --config apps/icons/wrangler.jsonc"
+			}
+		},
+		"deploy": {
+			"executor": "nx:run-commands",
+			"dependsOn": ["build"],
+			"options": {
+				"command": "wrangler deploy --config dist/apps/icons/server/wrangler.json"
+			}
+		},
+		"dev": {
+			"executor": "nx:run-commands",
+			"dependsOn": ["sync-catalog-assets"],
+			"options": {
+				"command": "PORTLESS_PORT=443 portless run --name icons.sketchi vite dev --config apps/icons/vite.config.ts"
+			}
+		},
+		"preview": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vite preview --config apps/icons/vite.config.ts --host 127.0.0.1 --port 6303"
+			}
+		},
+		"storybook": {
+			"executor": "@nx/storybook:storybook",
+			"options": {
+				"configDir": "apps/icons/.storybook",
+				"port": 6009
+			},
+			"dependsOn": ["sync-catalog-assets"]
+		},
+		"sync-catalog-assets": {
+			"executor": "nx:run-commands",
+			"dependsOn": ["^build"],
+			"inputs": ["{projectRoot}/scripts/sync-catalog-assets.ts", "^production"],
+			"outputs": ["{projectRoot}/public/icons-manifest.json", "{projectRoot}/public/output"],
+			"options": {
+				"command": "jiti apps/icons/scripts/sync-catalog-assets.ts"
+			}
+		},
+		"test": {
+			"executor": "nx:run-commands",
+			"dependsOn": ["build"],
+			"outputs": ["{workspaceRoot}/coverage/apps/icons"],
+			"options": {
+				"command": "vitest run --config apps/icons/vitest.config.ts"
+			}
+		},
+		"typecheck": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "tsc6 -p apps/icons/tsconfig.json --noEmit"
+			}
+		},
+		"typecheck-native": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "tsc -p apps/icons/tsconfig.json --noEmit"
+			}
+		}
+	}
 }

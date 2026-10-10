@@ -1,7 +1,4 @@
-import type {
-  CloudflareAiGateway,
-  CloudflareAiGatewayProvider,
-} from "@sketchi/diagram-generation";
+import type { CloudflareAiGateway, CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
 import { describe, expect, it } from "vitest";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
@@ -9,422 +6,409 @@ import { runPlaygroundEffect } from "../runtime/runtime.server";
 import { handleGenerateDiagramRequest } from "./api.server";
 
 const flowchartIr = {
-  id: "generated-release-flow",
-  title: "Generated release flow",
-  type: "flowchart",
-  nodes: [
-    { id: "start", label: "Change proposed", kind: "start" },
-    { id: "review", label: "Review evidence", kind: "process" },
-    { id: "decision", label: "Evidence complete?", kind: "decision" },
-    { id: "approve", label: "Approve release", kind: "process" },
-    { id: "revise", label: "Request revision", kind: "process" },
-    { id: "end", label: "Release recorded", kind: "end" },
-  ],
-  edges: [
-    { id: "e1", source: "start", target: "review" },
-    { id: "e2", source: "review", target: "decision" },
-    { id: "e3", source: "decision", target: "approve", label: "Complete" },
-    { id: "e4", source: "decision", target: "revise", label: "Incomplete" },
-    { id: "e5", source: "approve", target: "end" },
-    { id: "e6", source: "revise", target: "end" },
-  ],
-  layout: { direction: "TB", edgeRouting: "orthogonal" },
-  style: { accentColor: "#0f766e", backgroundColor: "#ffffff" },
+	id: "generated-release-flow",
+	title: "Generated release flow",
+	type: "flowchart",
+	nodes: [
+		{ id: "start", label: "Change proposed", kind: "start" },
+		{ id: "review", label: "Review evidence", kind: "process" },
+		{ id: "decision", label: "Evidence complete?", kind: "decision" },
+		{ id: "approve", label: "Approve release", kind: "process" },
+		{ id: "revise", label: "Request revision", kind: "process" },
+		{ id: "end", label: "Release recorded", kind: "end" },
+	],
+	edges: [
+		{ id: "e1", source: "start", target: "review" },
+		{ id: "e2", source: "review", target: "decision" },
+		{ id: "e3", source: "decision", target: "approve", label: "Complete" },
+		{ id: "e4", source: "decision", target: "revise", label: "Incomplete" },
+		{ id: "e5", source: "approve", target: "end" },
+		{ id: "e6", source: "revise", target: "end" },
+	],
+	layout: { direction: "TB", edgeRouting: "orthogonal" },
+	style: { accentColor: "#0f766e", backgroundColor: "#ffffff" },
 };
 
 const sequenceIr = {
-  id: "generated-login-sequence",
-  title: "Login sequence",
-  type: "sequence",
-  participants: [
-    { id: "browser", label: "Browser" },
-    { id: "api", label: "API" },
-    { id: "database", label: "Database" },
-  ],
-  messages: [
-    {
-      id: "login",
-      source: "browser",
-      target: "api",
-      label: "Login request",
-    },
-    {
-      id: "lookup",
-      source: "api",
-      target: "database",
-      label: "Look up user",
-    },
-    {
-      id: "record",
-      source: "database",
-      target: "api",
-      label: "User record",
-      type: "return",
-    },
-  ],
+	id: "generated-login-sequence",
+	title: "Login sequence",
+	type: "sequence",
+	participants: [
+		{ id: "browser", label: "Browser" },
+		{ id: "api", label: "API" },
+		{ id: "database", label: "Database" },
+	],
+	messages: [
+		{
+			id: "login",
+			source: "browser",
+			target: "api",
+			label: "Login request",
+		},
+		{
+			id: "lookup",
+			source: "api",
+			target: "database",
+			label: "Look up user",
+		},
+		{
+			id: "record",
+			source: "database",
+			target: "api",
+			label: "User record",
+			type: "return",
+		},
+	],
 };
 
 function generationText(
-  diagram: Readonly<Record<string, unknown>>,
-  requirements: ReadonlyArray<Record<string, unknown>> = [],
+	diagram: Readonly<Record<string, unknown>>,
+	requirements: ReadonlyArray<Record<string, unknown>> = [],
 ): string {
-  const { title, type, ...diagramWithoutTitle } = diagram;
-  return JSON.stringify({
-    title,
-    intent: { requestedKind: type, nativeKind: type, requirements },
-    diagram: { ...diagramWithoutTitle, type },
-  });
+	const { title, type, ...diagramWithoutTitle } = diagram;
+	return JSON.stringify({
+		title,
+		intent: { requestedKind: type, nativeKind: type, requirements },
+		diagram: { ...diagramWithoutTitle, type },
+	});
 }
 
 function fakeAiGateway(
-  text: string,
-  observeRun?: (input: Parameters<CloudflareAiGateway["run"]>[0]) => void,
+	text: string,
+	observeRun?: (input: Parameters<CloudflareAiGateway["run"]>[0]) => void,
 ): CloudflareAiGatewayProvider {
-  return {
-    gateway: () => ({
-      run: (input) => {
-        observeRun?.(input);
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({
-              candidates: [{ content: { parts: [{ text }] } }],
-            }),
-            { status: 200, headers: { "content-type": "application/json" } },
-          ),
-        );
-      },
-      getUrl: () => Promise.resolve("https://gateway.invalid"),
-    }),
-  };
+	return {
+		gateway: () => ({
+			run: (input) => {
+				observeRun?.(input);
+				return Promise.resolve(
+					new Response(
+						JSON.stringify({
+							candidates: [{ content: { parts: [{ text }] } }],
+						}),
+						{ status: 200, headers: { "content-type": "application/json" } },
+					),
+				);
+			},
+			getUrl: () => Promise.resolve("https://gateway.invalid"),
+		}),
+	};
 }
 
 function testBoundary(env: StudioEnv, request: Request) {
-  return {
-    env,
-    request,
-    platform: {
-      waitUntilPromise: (promise: Promise<unknown>) => {
-        void promise;
-      },
-    },
-  };
+	return {
+		env,
+		request,
+		platform: {
+			waitUntilPromise: (promise: Promise<unknown>) => {
+				void promise;
+			},
+		},
+	};
 }
 
 function generateRequest(env: StudioEnv, body: unknown): Promise<Response> {
-  const request = new Request(
-    "https://playground.sketchi.app/api/v1/generate",
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    },
-  );
-  return runPlaygroundEffect(
-    handleGenerateDiagramRequest(request),
-    testBoundary(env, request),
-  );
+	const request = new Request("https://playground.sketchi.app/api/v1/generate", {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify(body),
+	});
+	return runPlaygroundEffect(handleGenerateDiagramRequest(request), testBoundary(env, request));
 }
 
 describe("public generate endpoint", () => {
-  it("generates and returns a built flowchart with inline artifacts", async () => {
-    const env: StudioEnv = { AI: fakeAiGateway(generationText(flowchartIr)) };
-    const response = await generateRequest(env, {
-      prompt: "Map release approval with pass and revise branches",
-      type: "flowchart",
-    });
+	it("generates and returns a built flowchart with inline artifacts", async () => {
+		const env: StudioEnv = { AI: fakeAiGateway(generationText(flowchartIr)) };
+		const response = await generateRequest(env, {
+			prompt: "Map release approval with pass and revise branches",
+			type: "flowchart",
+		});
 
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as Record<string, unknown>;
-    expect(body.ok).toBe(true);
-    expect(body.status).toBe("generated");
-    const diagram = body.diagram as Record<string, unknown>;
-    const document = diagram.document as { type: string };
-    expect(document.type).toBe("flowchart");
-    expect(diagram.scene).toBeTruthy();
-    expect(diagram.excalidraw).toBeTruthy();
-    const generation = body.generation as { provider: string };
-    expect(generation.provider).toBe("cloudflare-google-ai-studio");
-  });
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as Record<string, unknown>;
+		expect(body.ok).toBe(true);
+		expect(body.status).toBe("generated");
+		const diagram = body.diagram as Record<string, unknown>;
+		const document = diagram.document as { type: string };
+		expect(document.type).toBe("flowchart");
+		expect(diagram.scene).toBeTruthy();
+		expect(diagram.excalidraw).toBeTruthy();
+		const generation = body.generation as { provider: string };
+		expect(generation.provider).toBe("cloudflare-google-ai-studio");
+	});
 
-  it("generates and returns a native sequence with inline artifacts", async () => {
-    const env: StudioEnv = { AI: fakeAiGateway(generationText(sequenceIr)) };
-    const response = await generateRequest(env, {
-      prompt: "Show Browser, API, and Database login interactions",
-      type: "sequence",
-    });
+	it("generates and returns a native sequence with inline artifacts", async () => {
+		const env: StudioEnv = { AI: fakeAiGateway(generationText(sequenceIr)) };
+		const response = await generateRequest(env, {
+			prompt: "Show Browser, API, and Database login interactions",
+			type: "sequence",
+		});
 
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as Record<string, unknown>;
-    const diagram = body.diagram as Record<string, unknown>;
-    const document = diagram.document as {
-      type: string;
-      spec: {
-        participants: ReadonlyArray<unknown>;
-        messages: ReadonlyArray<unknown>;
-      };
-    };
-    expect(document.type).toBe("sequence");
-    expect(document.spec.participants).toHaveLength(3);
-    expect(document.spec.messages).toHaveLength(3);
-    expect(diagram.scene).toBeTruthy();
-    expect(diagram.excalidraw).toBeTruthy();
-  });
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as Record<string, unknown>;
+		const diagram = body.diagram as Record<string, unknown>;
+		const document = diagram.document as {
+			type: string;
+			spec: {
+				participants: ReadonlyArray<unknown>;
+				messages: ReadonlyArray<unknown>;
+			};
+		};
+		expect(document.type).toBe("sequence");
+		expect(document.spec.participants).toHaveLength(3);
+		expect(document.spec.messages).toHaveLength(3);
+		expect(diagram.scene).toBeTruthy();
+		expect(diagram.excalidraw).toBeTruthy();
+	});
 
-  it("lets the model select a native type when type is omitted", async () => {
-    const env: StudioEnv = { AI: fakeAiGateway(generationText(sequenceIr)) };
-    const response = await generateRequest(env, {
-      prompt: "Show Browser, API, and Database login interactions",
-    });
+	it("lets the model select a native type when type is omitted", async () => {
+		const env: StudioEnv = { AI: fakeAiGateway(generationText(sequenceIr)) };
+		const response = await generateRequest(env, {
+			prompt: "Show Browser, API, and Database login interactions",
+		});
 
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as {
-      diagram: { document: { type: string } };
-    };
-    expect(body.diagram.document.type).toBe("sequence");
-  });
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as {
+			diagram: { document: { type: string } };
+		};
+		expect(body.diagram.document.type).toBe("sequence");
+	});
 
-  it.each(["er", "architecture", "swimlane", "state-machine"])(
-    "fails clearly when model-selected %s generation is unsupported",
-    async (requestedKind) => {
-      const env: StudioEnv = {
-        AI: fakeAiGateway(
-          JSON.stringify({
-            title: "Unsupported diagram",
-            intent: { requestedKind, nativeKind: null, requirements: [] },
-          }),
-        ),
-      };
-      const response = await generateRequest(env, {
-        prompt: `Create an ${requestedKind} diagram`,
-      });
+	it.each(["er", "architecture", "swimlane", "state-machine"])(
+		"fails clearly when model-selected %s generation is unsupported",
+		async (requestedKind) => {
+			const env: StudioEnv = {
+				AI: fakeAiGateway(
+					JSON.stringify({
+						title: "Unsupported diagram",
+						intent: { requestedKind, nativeKind: null, requirements: [] },
+					}),
+				),
+			};
+			const response = await generateRequest(env, {
+				prompt: `Create an ${requestedKind} diagram`,
+			});
 
-      expect(response.status).toBe(422);
-      const body = (await response.json()) as {
-        status: string;
-        issues: ReadonlyArray<{ message: string }>;
-      };
-      expect(body.status).toBe("unsupported_diagram_type");
-      expect(body.issues[0]?.message).toContain(requestedKind);
-    },
-  );
+			expect(response.status).toBe(422);
+			const body = (await response.json()) as {
+				status: string;
+				issues: ReadonlyArray<{ message: string }>;
+			};
+			expect(body.status).toBe("unsupported_diagram_type");
+			expect(body.issues[0]?.message).toContain(requestedKind);
+		},
+	);
 
-  it.each(["er", "architecture", "swimlane", "state-machine"])(
-    "rejects explicit unsupported type %s before provider dispatch",
-    async (type) => {
-      let dispatched = false;
-      const env: StudioEnv = {
-        AI: fakeAiGateway(generationText(flowchartIr), () => {
-          dispatched = true;
-        }),
-      };
-      const response = await generateRequest(env, {
-        prompt: `Create an ${type} diagram`,
-        type,
-      });
+	it.each(["er", "architecture", "swimlane", "state-machine"])(
+		"rejects explicit unsupported type %s before provider dispatch",
+		async (type) => {
+			let dispatched = false;
+			const env: StudioEnv = {
+				AI: fakeAiGateway(generationText(flowchartIr), () => {
+					dispatched = true;
+				}),
+			};
+			const response = await generateRequest(env, {
+				prompt: `Create an ${type} diagram`,
+				type,
+			});
 
-      expect(response.status).toBe(422);
-      const body = (await response.json()) as { status: string };
-      expect(body.status).toBe("unsupported_diagram_type");
-      expect(dispatched).toBe(false);
-    },
-  );
+			expect(response.status).toBe(422);
+			const body = (await response.json()) as { status: string };
+			expect(body.status).toBe("unsupported_diagram_type");
+			expect(dispatched).toBe(false);
+		},
+	);
 
-  it("grounds generated node logos in the technologies the prompt names", async () => {
-    const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];
-    const logoIr = {
-      ...flowchartIr,
-      nodes: flowchartIr.nodes.map((node) =>
-        node.id === "start"
-          ? { ...node, icon: { slug: "github" } }
-          : node.id === "review"
-            ? { ...node, icon: { slug: "kubernetes" } }
-            : node,
-      ),
-    };
-    const assetRequests: string[] = [];
-    const env: StudioEnv = {
-      AI: fakeAiGateway(generationText(logoIr), (input) => {
-        observedRuns.push(input);
-      }),
-      ASSETS: {
-        fetch: async (input) => {
-          const path = new URL(input instanceof Request ? input.url : input)
-            .pathname;
-          assetRequests.push(path);
-          return new Response(
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M0 0h1"/></svg>',
-          );
-        },
-      },
-    };
-    const response = await generateRequest(env, {
-      prompt: "Push to GitHub, build with Docker, then release",
-      type: "flowchart",
-    });
+	it("grounds generated node logos in the technologies the prompt names", async () => {
+		const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];
+		const logoIr = {
+			...flowchartIr,
+			nodes: flowchartIr.nodes.map((node) =>
+				node.id === "start"
+					? { ...node, icon: { slug: "github" } }
+					: node.id === "review"
+						? { ...node, icon: { slug: "kubernetes" } }
+						: node,
+			),
+		};
+		const assetRequests: string[] = [];
+		const env: StudioEnv = {
+			AI: fakeAiGateway(generationText(logoIr), (input) => {
+				observedRuns.push(input);
+			}),
+			ASSETS: {
+				fetch: async (input) => {
+					const path = new URL(input instanceof Request ? input.url : input).pathname;
+					assetRequests.push(path);
+					return new Response(
+						'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M0 0h1"/></svg>',
+					);
+				},
+			},
+		};
+		const response = await generateRequest(env, {
+			prompt: "Push to GitHub, build with Docker, then release",
+			type: "flowchart",
+		});
 
-    expect(response.status).toBe(200);
-    const providerRequest = JSON.stringify(observedRuns[0]);
-    expect(providerRequest).toContain("- github: Github");
-    expect(providerRequest).toContain("- docker: Docker");
-    expect(providerRequest).not.toContain("- kubernetes:");
-    const body = (await response.json()) as {
-      diagram: {
-        document: { spec: { nodes: Array<{ id: string; icon?: unknown }> } };
-        excalidraw: { elements: Array<{ type: string }>; files: object };
-        scene: { icons?: Record<string, unknown> };
-      };
-    };
-    expect(
-      body.diagram.document.spec.nodes
-        .filter((node) => node.icon)
-        .map((node) => [node.id, node.icon]),
-    ).toEqual([["start", { slug: "github" }]]);
-    expect(Object.keys(body.diagram.scene.icons ?? {})).toEqual(["github"]);
-    expect(
-      body.diagram.excalidraw.elements.filter(
-        (element) => element.type === "image",
-      ),
-    ).toHaveLength(1);
-    expect(Object.keys(body.diagram.excalidraw.files)).toHaveLength(1);
-    expect(assetRequests).toEqual(["/node-logos/github.svg"]);
-  });
+		expect(response.status).toBe(200);
+		const providerRequest = JSON.stringify(observedRuns[0]);
+		expect(providerRequest).toContain("- github: Github");
+		expect(providerRequest).toContain("- docker: Docker");
+		expect(providerRequest).not.toContain("- kubernetes:");
+		const body = (await response.json()) as {
+			diagram: {
+				document: { spec: { nodes: Array<{ id: string; icon?: unknown }> } };
+				excalidraw: { elements: Array<{ type: string }>; files: object };
+				scene: { icons?: Record<string, unknown> };
+			};
+		};
+		expect(
+			body.diagram.document.spec.nodes
+				.filter((node) => node.icon)
+				.map((node) => [node.id, node.icon]),
+		).toEqual([["start", { slug: "github" }]]);
+		expect(Object.keys(body.diagram.scene.icons ?? {})).toEqual(["github"]);
+		expect(
+			body.diagram.excalidraw.elements.filter((element) => element.type === "image"),
+		).toHaveLength(1);
+		expect(Object.keys(body.diagram.excalidraw.files)).toHaveLength(1);
+		expect(assetRequests).toEqual(["/node-logos/github.svg"]);
+	});
 
-  it("requests fresh provider output for reliability probes", async () => {
-    const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];
-    const env: StudioEnv = {
-      AI: fakeAiGateway(generationText(flowchartIr), (input) => {
-        observedRuns.push(input);
-      }),
-    };
-    const response = await generateRequest(env, {
-      cacheMode: "fresh",
-      prompt: "Map release approval with pass and revise branches",
-      type: "flowchart",
-    });
+	it("requests fresh provider output for reliability probes", async () => {
+		const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];
+		const env: StudioEnv = {
+			AI: fakeAiGateway(generationText(flowchartIr), (input) => {
+				observedRuns.push(input);
+			}),
+		};
+		const response = await generateRequest(env, {
+			cacheMode: "fresh",
+			prompt: "Map release approval with pass and revise branches",
+			type: "flowchart",
+		});
 
-    expect(response.status).toBe(200);
-    expect(observedRuns).toHaveLength(1);
-    expect(observedRuns[0]).toEqual(
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          "Cache-Control": "no-store",
-          "cf-aig-skip-cache": "true",
-          Pragma: "no-cache",
-        }),
-      }),
-    );
-  });
+		expect(response.status).toBe(200);
+		expect(observedRuns).toHaveLength(1);
+		expect(observedRuns[0]).toEqual(
+			expect.objectContaining({
+				headers: expect.objectContaining({
+					"Cache-Control": "no-store",
+					"cf-aig-skip-cache": "true",
+					Pragma: "no-cache",
+				}),
+			}),
+		);
+	});
 
-  it("rejects an empty prompt with a typed invalid-input contract", async () => {
-    const env: StudioEnv = { AI: fakeAiGateway(generationText(flowchartIr)) };
-    const response = await generateRequest(env, { prompt: "   " });
+	it("rejects an empty prompt with a typed invalid-input contract", async () => {
+		const env: StudioEnv = { AI: fakeAiGateway(generationText(flowchartIr)) };
+		const response = await generateRequest(env, { prompt: "   " });
 
-    expect(response.status).toBe(400);
-    const body = (await response.json()) as Record<string, unknown>;
-    expect(body.ok).toBe(false);
-    expect(body.status).toBe("invalid_input");
-  });
+		expect(response.status).toBe(400);
+		const body = (await response.json()) as Record<string, unknown>;
+		expect(body.ok).toBe(false);
+		expect(body.status).toBe("invalid_input");
+	});
 
-  it("reports a provider failure when the AI binding is missing", async () => {
-    const response = await generateRequest({}, { prompt: "Any diagram" });
+	it("reports a provider failure when the AI binding is missing", async () => {
+		const response = await generateRequest({}, { prompt: "Any diagram" });
 
-    expect(response.status).toBe(502);
-    const body = (await response.json()) as Record<string, unknown>;
-    expect(body.ok).toBe(false);
-    expect(body.status).toBe("provider_failed");
-  });
+		expect(response.status).toBe(502);
+		const body = (await response.json()) as Record<string, unknown>;
+		expect(body.ok).toBe(false);
+		expect(body.status).toBe("provider_failed");
+	});
 
-  it("rejects a generated diagram whose type does not match the request", async () => {
-    const env: StudioEnv = { AI: fakeAiGateway(generationText(flowchartIr)) };
-    const response = await generateRequest(env, {
-      prompt: "Organize launch readiness",
-      type: "mindmap",
-    });
+	it("rejects a generated diagram whose type does not match the request", async () => {
+		const env: StudioEnv = { AI: fakeAiGateway(generationText(flowchartIr)) };
+		const response = await generateRequest(env, {
+			prompt: "Organize launch readiness",
+			type: "mindmap",
+		});
 
-    expect(response.status).toBe(422);
-    const body = (await response.json()) as Record<string, unknown>;
-    expect(body.status).toBe("quality_failed");
-  });
+		expect(response.status).toBe(422);
+		const body = (await response.json()) as Record<string, unknown>;
+		expect(body.status).toBe("quality_failed");
+	});
 
-  it("treats non-JSON model output as malformed output", async () => {
-    const env: StudioEnv = { AI: fakeAiGateway("not a diagram") };
-    const response = await generateRequest(env, {
-      prompt: "Map a flow",
-      type: "flowchart",
-    });
+	it("treats non-JSON model output as malformed output", async () => {
+		const env: StudioEnv = { AI: fakeAiGateway("not a diagram") };
+		const response = await generateRequest(env, {
+			prompt: "Map a flow",
+			type: "flowchart",
+		});
 
-    expect(response.status).toBe(422);
-    const body = (await response.json()) as Record<string, unknown>;
-    expect(body.status).toBe("malformed_output");
-  });
+		expect(response.status).toBe(422);
+		const body = (await response.json()) as Record<string, unknown>;
+		expect(body.status).toBe("malformed_output");
+	});
 
-  it("returns bounded validator diagnostics for malformed diagrams", async () => {
-    const invalidFlowchart = {
-      ...flowchartIr,
-      edges: [
-        ...flowchartIr.edges.map((edge) =>
-          edge.id === "e4" ? { ...edge, label: "Complete" } : edge,
-        ),
-        { id: "end-retry", source: "end", target: "review" },
-      ],
-    };
-    const env: StudioEnv = {
-      AI: fakeAiGateway(generationText(invalidFlowchart)),
-    };
-    const response = await generateRequest(env, {
-      prompt: "Map a release flow with a retry loop",
-      type: "flowchart",
-    });
+	it("returns bounded validator diagnostics for malformed diagrams", async () => {
+		const invalidFlowchart = {
+			...flowchartIr,
+			edges: [
+				...flowchartIr.edges.map((edge) =>
+					edge.id === "e4" ? { ...edge, label: "Complete" } : edge,
+				),
+				{ id: "end-retry", source: "end", target: "review" },
+			],
+		};
+		const env: StudioEnv = {
+			AI: fakeAiGateway(generationText(invalidFlowchart)),
+		};
+		const response = await generateRequest(env, {
+			prompt: "Map a release flow with a retry loop",
+			type: "flowchart",
+		});
 
-    expect(response.status).toBe(422);
-    const body = (await response.json()) as {
-      status: string;
-      issues: ReadonlyArray<{ message: string }>;
-    };
-    expect(body.status).toBe("malformed_output");
-    expect(body.issues.length).toBeGreaterThan(1);
-    expect(body.issues.length).toBeLessThanOrEqual(8);
-    expect(body.issues.map((entry) => entry.message).join("\n")).toContain(
-      "end_has_outgoing",
-    );
-  });
+		expect(response.status).toBe(422);
+		const body = (await response.json()) as {
+			status: string;
+			issues: ReadonlyArray<{ message: string }>;
+		};
+		expect(body.status).toBe("malformed_output");
+		expect(body.issues.length).toBeGreaterThan(1);
+		expect(body.issues.length).toBeLessThanOrEqual(8);
+		expect(body.issues.map((entry) => entry.message).join("\n")).toContain("end_has_outgoing");
+	});
 });
 
 describe("generation request boundaries", () => {
-  it.each([
-    "gemini-2.5-flash:countTokens?x=",
-    "google/../other",
-    "x".repeat(129),
-    "",
-  ])("rejects unsafe model %s before gateway dispatch", async (model) => {
-    let calls = 0;
-    const response = await generateRequest(
-      {
-        AI: fakeAiGateway(generationText(flowchartIr), () => {
-          calls += 1;
-        }),
-      },
-      {
-        prompt: "Show release approval",
-        model,
-      },
-    );
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({
-      ok: false,
-      status: "invalid_input",
-      issues: [{ code: "invalid_input" }],
-    });
-    expect(calls).toBe(0);
-  });
-  it.each(["__tooLarge", "__invalidJson"])(
-    "does not treat client key %s as a reader result",
-    async (key) => {
-      const response = await generateRequest(
-        { AI: fakeAiGateway(generationText(flowchartIr)) },
-        { prompt: "Show release approval", [key]: true },
-      );
-      expect(response.status).toBe(200);
-    },
-  );
+	it.each(["gemini-2.5-flash:countTokens?x=", "google/../other", "x".repeat(129), ""])(
+		"rejects unsafe model %s before gateway dispatch",
+		async (model) => {
+			let calls = 0;
+			const response = await generateRequest(
+				{
+					AI: fakeAiGateway(generationText(flowchartIr), () => {
+						calls += 1;
+					}),
+				},
+				{
+					prompt: "Show release approval",
+					model,
+				},
+			);
+			expect(response.status).toBe(400);
+			expect(await response.json()).toMatchObject({
+				ok: false,
+				status: "invalid_input",
+				issues: [{ code: "invalid_input" }],
+			});
+			expect(calls).toBe(0);
+		},
+	);
+	it.each(["__tooLarge", "__invalidJson"])(
+		"does not treat client key %s as a reader result",
+		async (key) => {
+			const response = await generateRequest(
+				{ AI: fakeAiGateway(generationText(flowchartIr)) },
+				{ prompt: "Show release approval", [key]: true },
+			);
+			expect(response.status).toBe(200);
+		},
+	);
 });

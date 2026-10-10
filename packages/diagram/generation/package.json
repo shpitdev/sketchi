@@ -1,20 +1,20 @@
 {
-  "name": "@sketchi/diagram-generation",
-  "private": true,
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
-  },
-  "dependencies": {
-    "@sketchi/diagram-core": "workspace:*",
-    "@sketchi/icon-catalog": "workspace:*",
-    "@sketchi/observability": "workspace:*",
-    "effect": "4.0.1",
-    "tslib": "^2.8.1"
-  }
+	"name": "@sketchi/diagram-generation",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"dependencies": {
+		"@sketchi/diagram-core": "workspace:*",
+		"@sketchi/icon-catalog": "workspace:*",
+		"@sketchi/observability": "workspace:*",
+		"effect": "4.0.1",
+		"tslib": "^2.8.1"
+	}
 }

@@ -7,32 +7,28 @@ const DocsRoute = Route.options.component;
 if (!DocsRoute) throw new Error("Missing docs route component.");
 
 const previewSurfaceUrls = vi.hoisted(() => ({
-  icons: "https://pr-123-sketchi-icons.dimethyl.workers.dev",
-  playground: "https://pr-123-sketchi-studio.dimethyl.workers.dev",
+	icons: "https://pr-123-sketchi-icons.dimethyl.workers.dev",
+	playground: "https://pr-123-sketchi-studio.dimethyl.workers.dev",
 }));
 
 vi.mock("../lib/surface-urls-rpc", () => ({ getWebSurfaceUrls: vi.fn() }));
 vi.mock("@tanstack/react-router", () => ({
-  createFileRoute: () => (options: object) => ({
-    options,
-    useLoaderData: () => previewSurfaceUrls,
-  }),
+	createFileRoute: () => (options: object) => ({
+		options,
+		useLoaderData: () => previewSurfaceUrls,
+	}),
 }));
 
 describe("DocsRoute", () => {
-  it("uses configured preview surface URLs in the header and footer", () => {
-    render(<DocsRoute />);
+	it("uses configured preview surface URLs in the header and footer", () => {
+		render(<DocsRoute />);
 
-    expect(
-      screen
-        .getAllByRole("link", { name: "Icons" })
-        .map((link) => link.getAttribute("href")),
-    ).toContain(previewSurfaceUrls.icons);
-    expect(
-      screen
-        .getAllByRole("link", { name: "Playground" })
-        .map((link) => link.getAttribute("href")),
-    ).toEqual([previewSurfaceUrls.playground, previewSurfaceUrls.playground]);
-    expect(screen.queryByRole("link", { name: "Excalidraw app" })).toBeNull();
-  });
+		expect(
+			screen.getAllByRole("link", { name: "Icons" }).map((link) => link.getAttribute("href")),
+		).toContain(previewSurfaceUrls.icons);
+		expect(
+			screen.getAllByRole("link", { name: "Playground" }).map((link) => link.getAttribute("href")),
+		).toEqual([previewSurfaceUrls.playground, previewSurfaceUrls.playground]);
+		expect(screen.queryByRole("link", { name: "Excalidraw app" })).toBeNull();
+	});
 });

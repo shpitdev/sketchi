@@ -3,89 +3,68 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-import {
-  localInspectorPort,
-  localViteCacheDir,
-} from "../../tools/local-dev-ports";
+import { localInspectorPort, localViteCacheDir } from "../../tools/local-dev-ports";
 import { excalidrawFonts } from "../../scripts/lib/excalidraw-fonts.mjs";
 import { workerProjectConfig } from "../../scripts/lib/worker-apps.mjs";
 
 const workerProject = workerProjectConfig("eval-harness");
 
 export default defineConfig({
-  root: new URL(".", import.meta.url).pathname,
-  build: {
-    emptyOutDir: true,
-    outDir: new URL(`../../${workerProject.buildOutputPath}`, import.meta.url)
-      .pathname,
-  },
-  cacheDir: localViteCacheDir("eval-harness"),
-  publicDir: new URL("./public", import.meta.url).pathname,
-  plugins: [
-    excalidrawFonts(),
-    cloudflare({
-      configPath: new URL("./wrangler.jsonc", import.meta.url).pathname,
-      inspectorPort: localInspectorPort(6200),
-      viteEnvironment: {
-        name: "ssr",
-      },
-    }),
-    tanstackStart({
-      srcDirectory: "src",
-    }),
-    react(),
-  ],
-  resolve: {
-    alias: [
-      {
-        find: "@sketchi/diagram-ui/styles.css",
-        replacement: new URL(
-          "../../packages/diagram/ui/src/styles.css",
-          import.meta.url,
-        ).pathname,
-      },
-      {
-        find: "@sketchi/diagram-core",
-        replacement: new URL(
-          "../../packages/diagram/core/src/index.ts",
-          import.meta.url,
-        ).pathname,
-      },
-      {
-        find: "@sketchi/diagram-renderer",
-        replacement: new URL(
-          "../../packages/diagram/renderer/src/index.ts",
-          import.meta.url,
-        ).pathname,
-      },
-      {
-        find: "@sketchi/diagram-generation",
-        replacement: new URL(
-          "../../packages/diagram/generation/src/index.ts",
-          import.meta.url,
-        ).pathname,
-      },
-      {
-        find: "@sketchi/diagram-excalidraw",
-        replacement: new URL(
-          "../../packages/diagram/excalidraw/src/index.ts",
-          import.meta.url,
-        ).pathname,
-      },
-      {
-        find: "@sketchi/diagram-scenarios",
-        replacement: new URL(
-          "../../packages/diagram/scenarios/src/index.ts",
-          import.meta.url,
-        ).pathname,
-      },
-      {
-        find: "@sketchi/diagram-ui",
-        replacement: new URL(
-          "../../packages/diagram/ui/src/index.ts",
-          import.meta.url,
-        ).pathname,
-      },
-    ],
-  },
+	root: new URL(".", import.meta.url).pathname,
+	build: {
+		emptyOutDir: true,
+		outDir: new URL(`../../${workerProject.buildOutputPath}`, import.meta.url).pathname,
+	},
+	cacheDir: localViteCacheDir("eval-harness"),
+	publicDir: new URL("./public", import.meta.url).pathname,
+	plugins: [
+		excalidrawFonts(),
+		cloudflare({
+			configPath: new URL("./wrangler.jsonc", import.meta.url).pathname,
+			inspectorPort: localInspectorPort(6200),
+			viteEnvironment: {
+				name: "ssr",
+			},
+		}),
+		tanstackStart({
+			srcDirectory: "src",
+		}),
+		react(),
+	],
+	resolve: {
+		alias: [
+			{
+				find: "@sketchi/diagram-ui/styles.css",
+				replacement: new URL("../../packages/diagram/ui/src/styles.css", import.meta.url).pathname,
+			},
+			{
+				find: "@sketchi/diagram-core",
+				replacement: new URL("../../packages/diagram/core/src/index.ts", import.meta.url).pathname,
+			},
+			{
+				find: "@sketchi/diagram-renderer",
+				replacement: new URL("../../packages/diagram/renderer/src/index.ts", import.meta.url)
+					.pathname,
+			},
+			{
+				find: "@sketchi/diagram-generation",
+				replacement: new URL("../../packages/diagram/generation/src/index.ts", import.meta.url)
+					.pathname,
+			},
+			{
+				find: "@sketchi/diagram-excalidraw",
+				replacement: new URL("../../packages/diagram/excalidraw/src/index.ts", import.meta.url)
+					.pathname,
+			},
+			{
+				find: "@sketchi/diagram-scenarios",
+				replacement: new URL("../../packages/diagram/scenarios/src/index.ts", import.meta.url)
+					.pathname,
+			},
+			{
+				find: "@sketchi/diagram-ui",
+				replacement: new URL("../../packages/diagram/ui/src/index.ts", import.meta.url).pathname,
+			},
+		],
+	},
 });
