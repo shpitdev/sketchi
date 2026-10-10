@@ -199,6 +199,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
   "packages/diagram/ui/src/components/scenario-playground/playground-inspector.tsx": 2,
   "packages/diagram/ui/src/components/scenario-playground/scenario-playground.tsx": 10,
   "packages/diagram/ui/src/lib/browser-actions.ts": 3,
+  "packages/diagram/ui/src/lib/load-excalidraw.ts": 2,
   "packages/icons/catalog/scripts/generate-catalog.ts": 6,
   "packages/observability/vitest.config.mts": 1,
   "packages/studio/projects/src/client-api.ts": 20,
