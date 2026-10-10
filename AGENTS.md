@@ -32,7 +32,7 @@ Convex, Vercel, Bun, or Turborepo stack.
 Before pushing meaningful changes, run:
 
 - `pnpm nx run-many -t typecheck,test,build`
-- `pnpm run lint`
+- `pnpm run check`
 - `pnpm nx build-storybook diagram-ui`
 
 For UI-affecting changes, run the web app locally and verify the changed flow against the real page.

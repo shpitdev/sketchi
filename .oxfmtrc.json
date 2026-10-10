@@ -1,0 +1,55 @@
+{
+	"$schema": "./node_modules/oxfmt/configuration_schema.json",
+	"useTabs": true,
+	"tabWidth": 2,
+	"printWidth": 100,
+	"singleQuote": false,
+	"jsxSingleQuote": false,
+	"quoteProps": "as-needed",
+	"trailingComma": "all",
+	"semi": true,
+	"arrowParens": "always",
+	"bracketSameLine": false,
+	"bracketSpacing": true,
+	"sortImports": false,
+	"sortPackageJson": false,
+	// Every exclusion is generated output, a byte-exact fixture, vendored
+	// upstream code, a raw artifact, or prose. README.md documents the list.
+	"ignorePatterns": [
+		// Generated
+		"**/routeTree.gen.ts",
+		"**/cloudflare-workers.d.ts",
+		"**/CHANGELOG.md",
+		"pnpm-lock.yaml",
+		"packages/icons/catalog/src/generated/**",
+		// Byte-exact fixtures and frozen compatibility corpora
+		"apps/cli/src/__fixtures__/**",
+		"apps/playground/src/server/codemode/fixtures/**",
+		"packages/diagram/agent/src/lib/code-mode/fixtures/**",
+		// Vendored shadcn and AI Elements registry components
+		"apps/playground/src/components/ai-elements/**",
+		"apps/playground/src/components/ui/**",
+		// Raw pipeline artifacts, and state that editor and agent tools rewrite
+		"packages/icons/catalog/pipeline-output/**",
+		".agents/**",
+		".memory/**",
+		".vscode/**",
+		// Prose
+		"**/*.md",
+		"docs/**"
+	],
+	"overrides": [
+		{
+			"files": ["**/*.{json,jsonc}"],
+			"options": {
+				"trailingComma": "none"
+			}
+		},
+		{
+			"files": ["**/tsconfig*.json"],
+			"options": {
+				"useTabs": false
+			}
+		}
+	]
+}

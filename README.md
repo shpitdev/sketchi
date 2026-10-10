@@ -199,19 +199,33 @@ pnpm run toolchain:verify
 pnpm run test:deploy-scripts
 pnpm run test:tools
 pnpm nx run-many -t typecheck,test,build
-pnpm run lint
+pnpm run check
 pnpm nx run-many -t typecheck-native
 pnpm run test:wrangler-dry-runs
 pnpm nx build-storybook diagram-ui
 pnpm exec tsc6 -b --pretty false
 ```
 
-`pnpm run lint` builds the package declarations that type-aware rules resolve,
-then runs [Oxlint](https://oxc.rs/docs/guide/usage/linter) over the whole
-repository with zero warnings allowed. `.oxlintrc.json` holds the rule set, the
-Nx module boundaries, and the Effect and Zod import policy; Sketchi's own rules
-live in `tools/oxlint` and run with `pnpm run test:lint-rules`. Every
-suppression is a single-line `oxlint-disable-next-line <rule> -- <reason>`.
+`pnpm run check` is the local quality gate: lint, format check, and the custom
+lint-rule tests.
+
+- `pnpm run lint` builds the package declarations that type-aware rules resolve,
+  then runs [Oxlint](https://oxc.rs/docs/guide/usage/linter) over the whole
+  repository with zero warnings allowed. `.oxlintrc.json` holds the rule set, the
+  Nx module boundaries, and the Effect and Zod import policy; Sketchi's own rules
+  live in `tools/oxlint` and run with `pnpm run test:lint-rules`. Every
+  suppression is a single-line `oxlint-disable-next-line <rule> -- <reason>`.
+- `pnpm run format` applies [Oxfmt](https://oxc.rs/docs/guide/usage/formatter):
+  tabs, 100 columns, double quotes, semicolons, trailing commas, and spaces in
+  `tsconfig` files, with no import or `package.json` sorting.
+  `pnpm run format:check` verifies it.
+- Oxfmt never touches generated output (route trees, Wrangler types, changeset
+  changelogs, the lockfile, the generated icon catalog), byte-exact fixtures
+  and frozen compatibility corpora, vendored shadcn and AI Elements components,
+  raw icon pipeline artifacts, files rewritten by editor or agent tools, or prose
+  (Markdown and `docs/`). `.oxfmtrc.json` lists the exact paths, and
+  `tools/formatting.test.ts` proves each exclusion matches real files and is never
+  formatted.
 
 The [MCP SDK compatibility note](docs/mcp-sdk-compatibility.md) records the
 bounded server-only exception that keeps the deployed handlers on the patched
