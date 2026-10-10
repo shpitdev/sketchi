@@ -56,8 +56,10 @@ jobs:
           - excalidraw
           - icons
     concurrency:
-      group: app-production-${{ matrix.project }}
+      # Shared with PR previews, including uploads bound to different Pipeline streams.
+      group: ${{ matrix.project == 'playground' && 'cloudflare-pipeline-bound-upload' || format('app-production-{0}', matrix.project) }}
       cancel-in-progress: false
+      queue: ${{ matrix.project == 'playground' && 'max' || 'single' }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         if: ${{ github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project }}
