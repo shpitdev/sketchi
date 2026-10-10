@@ -1,128 +1,112 @@
 # App Preview Deploys
 
-## Current Matrix
+## Official Worker Previews
 
-| Project ID     | Preview Worker                   | Production Worker    | Product route status                                     |
-| -------------- | -------------------------------- | -------------------- | -------------------------------------------------------- |
-| `web`          | `sketchi-web-pr-<number>`        | `sketchi-web`        | `sketchi.app`, `www.sketchi.app`                         |
-| `playground`   | `sketchi-studio-pr-<number>`     | `sketchi-studio`     | `playground.sketchi.app`; authenticated Studio unexposed |
-| `icons`        | `sketchi-icons-pr-<number>`      | `sketchi-icons`      | `icons.sketchi.app`                                      |
-| `eval-harness` | `sketchi-playground-pr-<number>` | `sketchi-playground` | internal eval harness                                    |
-| `excalidraw`   | `sketchi-excalidraw-pr-<number>` | `sketchi-excalidraw` | internal rendering workspace                             |
+GitHub Actions builds each Nx app and runs `wrangler preview --name pr-<number>`
+against its existing Worker. It no longer creates a separate Worker per PR.
 
-`scripts/lib/worker-apps.mjs` records `projectId`, `workerName`, and
-`previewWorkerPrefix` as separate fields. Preview, production, cleanup, and
-domain-detach helpers validate the selected project/Worker pair and fail closed
-on a mismatch. Repository project renames do not rename durable Cloudflare
-Workers, buckets, bindings, or Pipeline streams.
+| Project        | Worker               | Stable Preview hostname                                |
+| -------------- | -------------------- | ------------------------------------------------------ |
+| `web`          | `sketchi-web`        | `pr-<number>-sketchi-web.<account>.workers.dev`        |
+| `playground`   | `sketchi-studio`     | `pr-<number>-sketchi-studio.<account>.workers.dev`     |
+| `icons`        | `sketchi-icons`      | `pr-<number>-sketchi-icons.<account>.workers.dev`      |
+| `eval-harness` | `sketchi-playground` | `pr-<number>-sketchi-playground.<account>.workers.dev` |
+| `excalidraw`   | `sketchi-excalidraw` | `pr-<number>-sketchi-excalidraw.<account>.workers.dev` |
 
-Each Worker build is isolated under `dist/apps/<project>/`: browser assets go to
-`client/`, Worker code and the generated deploy snapshot go to `server/`, and
-the generated config is `server/wrangler.json`. The Cloudflare Vite plugin's
-deploy redirect is also isolated at `apps/<project>/.wrangler/deploy/config.json`.
-Parallel Nx builds therefore never write another app's deployable output.
+Cloudflare's [Worker Previews](https://developers.cloudflare.com/workers/previews/)
+provide branch-specific bindings, variables, secrets, and observability under an
+existing Worker. They are separate from production versions/deployments, so they
+cannot accidentally become a production version through `wrangler versions deploy`.
+[Version URLs](https://developers.cloudflare.com/workers/versions-and-deployments/version-urls/)
+created by `wrangler versions upload --preview-alias` use version resources and
+are not branch-isolated environments. We use Previews, not version aliases.
+Workers Builds supports Previews too, but this repo retains GitHub Actions and Nx
+as its build system.
 
-```mermaid
-flowchart LR
-  PR["Pull request"] --> Matrix["preview matrix"]
-  Matrix --> Resolve["resolve project ID and Worker identity"]
-  Resolve --> Build["pnpm nx build <project-id>"]
-  Build --> Config["generated preview wrangler config"]
-  Config --> Deploy["wrangler deploy --keep-vars --no-x-provision"]
-  Deploy --> Comment["sticky PR comment"]
-  Closed["PR closed"] --> Cleanup["delete preview Worker"]
-```
+## Data isolation
 
-## Preview Workflow
+Each app declares a `previews` block in its checked-in Wrangler config. Production
+settings stay at the top level. Previews do not inherit production variables or
+bindings. Studio's Preview R2 bucket and both Pipeline streams are the existing
+preview resources listed below; no data resources are created by this workflow.
+AI, Browser Run, and Worker Loader bindings are configured explicitly where needed.
+Assets and compatibility settings remain at the top level as required by Wrangler.
 
-Pull requests to `main` deploy matrix apps to PR-specific Cloudflare Workers.
+The workflow uses `--ignore-base-config` to exclude dashboard Preview base settings
+when a PR Preview is created. It does not import production secrets or upload
+secrets. These apps use configured API bindings without Worker secrets. If a future
+feature requires secrets, provision preview-only credentials through a separately
+reviewed change. Do not copy production secrets into the Preview base.
 
-- uses the same pnpm 11.5.0, Node 24, `pnpm install --frozen-lockfile` setup as
-  the required `ci` workflow;
-- builds each Nx app in an isolated matrix job;
-- reads the project-scoped `dist/apps/<project>/server/wrangler.json` build snapshot;
-- writes `dist/apps/<project>/server/wrangler.preview.json` with the preview Worker
-  name and no custom production routes;
-- runs `wrangler deploy --keep-vars --no-x-provision`;
-- writes or updates one sticky PR comment per app with the preview URL and an
-  explicit public/internal surface policy.
+`scripts/01-validate-preview-config.mjs` checks the generated build config before
+upload: Worker identity, explicit runtime bindings, and that `previews` binds every
+production R2 bucket and Pipeline stream binding to a non-production target (the
+R2 target must match the top-level `preview_bucket_name`). Any other `previews`
+field, such as KV, D1, or service bindings, fails until its isolation is reviewed.
+Cloudflare [resources and isolation](https://developers.cloudflare.com/workers/previews/resources/)
+explains that R2 and Pipelines isolation depends on binding separate resources;
+service bindings currently call the target Worker's production deployment.
 
-For the `web` preview, the workflow also reads the account workers.dev
-subdomain from Cloudflare and injects sibling preview URLs into the generated
-Wrangler vars. `SKETCHI_PLAYGROUND_URL` maps from the `playground` project to
-its durable `sketchi-studio-pr-<number>` preview Worker;
-`apps/eval-harness` remains the internal eval harness.
+## Workflow and comments
 
-- `SKETCHI_ICONS_URL`
-- `SKETCHI_PLAYGROUND_URL`
+Same-repository pull requests to `main` deploy all five apps. Forks are excluded.
+Manual dispatch takes an open same-repository PR number and resolves its head SHA
+before checkout; the same SHA appears in deploy metadata and comments.
 
-That keeps Web preview navigation inside the same PR's preview Workers instead
-of sending reviewers to production domains.
+- The shared mise setup uses the repository's exact Node/pnpm pins and a frozen lockfile.
+- Each build writes assets to `dist/apps/<project>/client` and the deploy snapshot
+  to `dist/apps/<project>/server/wrangler.json`. There is no transformed preview config.
+- `wrangler preview` writes a `preview` entry to its structured output file
+  (`WRANGLER_OUTPUT_FILE_PATH`) with the stable Preview URL and an immutable
+  deployment URL. The URL reader checks the Worker and Preview name and comments
+  only the stable workers.dev URL. Missing or disabled Preview URLs fail the job.
+- One owned sticky bot comment per app reports status, commit, URL, and workflow run.
+- Web receives sibling official Preview URLs through `--var` so its Icons and
+  Playground links stay on the same PR. These overrides affect only the Preview.
 
-Preview comments intentionally distinguish product previews from internal tool
-previews. `web`, `playground`, and `icons` are public-product previews.
-`eval-harness` and `excalidraw` are internal previews only; their comments exist
-for reviewer smoke tests and cleanup visibility, not public navigation.
+`web`, `playground`, and `icons` are public product surfaces. `eval-harness` and
+`excalidraw` remain internal and are not linked from public navigation.
 
-## Required Configuration
+Pipeline-bound Playground uploads share `cloudflare-pipeline-bound-upload` with
+production. `queue: max` queues pending jobs without cancelling active uploads;
+other apps retain their per-app/per-PR concurrency policies.
 
-- `CHROMATIC_PROJECT_TOKEN`: `staging` environment secret for Storybook
-  publish and visual checks.
-- `GRAPHITE_TOKEN`: optional repository secret only if Graphite CI optimization
-  is reintroduced; the canonical required and preview workflows do not depend
-  on it.
-- `CLOUDFLARE_ACCOUNT_ID`: `staging` environment variable or secret.
-- `CLOUDFLARE_API_TOKEN`: `staging` environment secret with Workers
-  edit/deploy access.
+## Required configuration
 
-| Source                                  | Target                          | Purpose                                        |
-| --------------------------------------- | ------------------------------- | ---------------------------------------------- |
-| Infisical `sketchi` `/github` `staging` | GitHub `staging` environment    | CI, Graphite optimizer, and PR preview deploys |
-| Infisical `sketchi` `/github` `prod`    | GitHub `production` environment | production deploys                             |
+- GitHub `staging`: `CLOUDFLARE_ACCOUNT_ID` variable or secret and
+  `CLOUDFLARE_API_TOKEN` secret with Workers edit/deploy and bound-resource access.
+- GitHub `production`: separate production credentials for production deploys.
+- `CHROMATIC_PROJECT_TOKEN`: staging secret for the CI Storybook gate.
 
-The canonical source for those GitHub Actions values is the Infisical `sketchi`
-project under `/github`, synced to GitHub environment secrets:
+Infisical project `sketchi`, path `/github`, is the source of GitHub environment
+secrets: `staging` maps to GitHub `staging`; `prod` maps to GitHub `production`.
+Do not combine both environments in repository-wide secrets. `GRAPHITE_TOKEN` is
+optional and is not required by these workflows.
 
-- `staging`: GitHub `staging` environment for CI and PR preview deploys.
-- `prod`: GitHub `production` environment for production deploys.
+The existing Workers must have workers.dev Preview URLs enabled. If disabled,
+apply that setting through the normal production/operator workflow, not by
+publishing PR code with `wrangler deploy`. Missing Cloudflare credentials produce
+an `unconfigured` comment rather than a successful preview claim.
 
-Do not sync both Infisical environments into the same repository-secret
-namespace; environment-scoped GitHub secrets keep preview and production values
-from overwriting each other when the values eventually diverge.
+## Cleanup and legacy Workers
 
-Cloudflare documents that non-interactive CI deploys require an API token and
-account ID. The token should stay in GitHub Secrets, not in source control.
-Preview deploys pass `--no-x-provision` so CI only uploads explicit Worker
-configuration. Preview deploys must not create, discover, or mutate KV, D1, or
-R2 resources.
+Closing a PR runs `cleanup-preview`, which deletes Preview `pr-<number>` from each
+of the five Workers through the Cloudflare Previews API and marks the sticky
+comment `deleted`. A missing Preview (HTTP 404) counts as already deleted. The job
+shares `deploy-preview`'s concurrency group, so a queued deploy cannot recreate a
+Preview after it is deleted. Cloudflare also evicts the least recently deployed
+Preview at its limit (100 Free / 500 Paid per Worker; 100 deployments per Preview).
 
-## Cleanup
+Legacy `sketchi-*-pr-*` Workers from the previous per-PR Worker flow are untouched
+by this migration. Remove them separately; this workflow never deletes a Worker.
 
-Cleanup runs automatically when a PR closes and deletes the PR-specific Worker.
-Manual cleanup is also available:
+## Operational scripts
 
-```sh
-CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... \
-  node scripts/04-delete-preview-worker.mjs \
-    --project eval-harness \
-    --pr-number 123
-```
-
-## Operational Scripts
-
-The deploy command scripts are numbered because they are operational steps:
-
-- `scripts/00-resolve-worker-app.mjs`
-- `scripts/01-prepare-preview-deploy.mjs`
-- `scripts/02-extract-preview-url.mjs`
-- `scripts/03-upsert-preview-comment.mjs`
-- `scripts/04-delete-preview-worker.mjs`
-- `scripts/05-prepare-production-domain-deploy.mjs`
-
-Pass `--project eval-harness`, `--project playground`, `--project web`,
-`--project excalidraw`, or `--project icons` to the resolve, prepare, domain,
-and cleanup scripts. Project selection is required; deploy helpers do not
-default to a project or accept an independent Worker override.
+- `00-resolve-worker-app.mjs`: resolve and validate project/Worker identity.
+- `01-validate-preview-config.mjs`: validate the built Preview settings and PR name.
+- `02-extract-preview-url.mjs`: read the Preview entry from Wrangler's output file; production still parses its deploy log.
+- `03-upsert-preview-comment.mjs`: update only the owned, anchored bot comment.
+- `05-prepare-production-domain-deploy.mjs`: prepare an explicitly requested production domain config.
 
 ## Production Worker Deploys
 
@@ -142,23 +126,24 @@ to Cloudflare Pipelines:
 
 | Surface                  | Binding                 | Remote target                                  |
 | ------------------------ | ----------------------- | ---------------------------------------------- |
-| Studio preview Workers   | `SKETCHI_ARTIFACTS`     | `sketchi-studio-codemode-artifacts-preview`    |
+| Studio Previews          | `SKETCHI_ARTIFACTS`     | `sketchi-studio-codemode-artifacts-preview`    |
 | Studio production Worker | `SKETCHI_ARTIFACTS`     | `sketchi-studio-codemode-artifacts-production` |
-| Studio preview Workers   | `CODEMODE_USAGE_EVENTS` | `e9fc3bcd35314fa39fc6a89018207acc`             |
-| Studio preview Workers   | `CODEMODE_USAGE_ISSUES` | `d95a1767edf246af8c637c5b9bf5a5c5`             |
+| Studio Previews          | `CODEMODE_USAGE_EVENTS` | `e9fc3bcd35314fa39fc6a89018207acc`             |
+| Studio Previews          | `CODEMODE_USAGE_ISSUES` | `d95a1767edf246af8c637c5b9bf5a5c5`             |
 | Studio production Worker | `CODEMODE_USAGE_EVENTS` | `d9044253316f4273a60298098f444a62`             |
 | Studio production Worker | `CODEMODE_USAGE_ISSUES` | `f687dab6e7d742c1a76834089e709462`             |
 
-Preview Wrangler configs rewrite the Studio artifact binding to the preview
-bucket and the Studio Pipeline bindings to preview streams. Production deploys
+The checked-in `previews` block binds Studio Previews directly to the preview
+bucket and preview Pipeline streams. There is no generated resource rewrite. Production deploys
 keep production buckets and production streams. All Worker-bound buckets and
 streams must exist before their Workers deploy. The downstream R2 Data Catalog
 sinks are long-lived Cloudflare Pipeline resources, not Worker bindings. They
 write into `sketchi-codemode-usage-analytics-production-v4` and
 `sketchi-codemode-usage-analytics-preview-v4`; run
 `pnpm r2sql:codemode:resources` to print the sink, pipeline, bucket, and table
-map. Preview deploys disable Wrangler resource provisioning, so the CI token
-does not need R2 object read access just to deploy the Worker.
+map. Preview resources are named explicitly and must already exist; the command does
+not provision data resources. The CI token does not need R2 object read access
+just to deploy.
 
 R2 Data Catalog verification must prove an aggregate R2 SQL data scan through
 the direct R2 SQL API, not just `SHOW TABLES` or `DESCRIBE`, because
@@ -173,8 +158,8 @@ issue-run-id options are supplied.
 
 Wrangler accepts Pipeline stream names in local dry-runs, but the deploy API
 requires stream IDs for Worker bindings. Keep `apps/playground/wrangler.jsonc` on
-the production stream IDs and keep the preview deploy helper's ID rewrite table
-in sync with Cloudflare Pipeline stream creation.
+the production stream IDs and keep `previews.pipelines`
+on the preview stream IDs. The validator rejects Previews bound to production targets.
 
 Custom domains are a post-merge operator action. The production workflow writes
 a generated `dist/apps/<project>/server/wrangler.domains.json` config from

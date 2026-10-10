@@ -7,8 +7,8 @@ const DocsRoute = Route.options.component;
 if (!DocsRoute) throw new Error("Missing docs route component.");
 
 const previewSurfaceUrls = vi.hoisted(() => ({
-  icons: "https://sketchi-icons-pr-123.dimethyl.workers.dev",
-  playground: "https://sketchi-studio-pr-123.dimethyl.workers.dev",
+  icons: "https://pr-123-sketchi-icons.dimethyl.workers.dev",
+  playground: "https://pr-123-sketchi-studio.dimethyl.workers.dev",
 }));
 
 vi.mock("../lib/surface-urls-rpc", () => ({ getWebSurfaceUrls: vi.fn() }));

@@ -10,8 +10,8 @@ if (!AgentsRoute || !AntigravityRoute)
   throw new Error("Missing agent route component.");
 
 const previewSurfaceUrls = vi.hoisted(() => ({
-  icons: "https://sketchi-icons-pr-456.dimethyl.workers.dev",
-  playground: "https://sketchi-studio-pr-456.dimethyl.workers.dev",
+  icons: "https://pr-456-sketchi-icons.dimethyl.workers.dev",
+  playground: "https://pr-456-sketchi-studio.dimethyl.workers.dev",
 }));
 
 const routeState = vi.hoisted(() => ({ pathname: "/agents" }));

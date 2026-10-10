@@ -4,18 +4,6 @@ import {
   workerProjectConfig,
 } from "../worker-apps.mjs";
 
-const MAX_WORKER_NAME_LENGTH = 63;
-
-const webPreviewSurfaceProjects = {
-  SKETCHI_ICONS_URL: "icons",
-  SKETCHI_PLAYGROUND_URL: "playground",
-};
-
-const previewPipelineStreams = {
-  d9044253316f4273a60298098f444a62: "e9fc3bcd35314fa39fc6a89018207acc",
-  f687dab6e7d742c1a76834089e709462: "d95a1767edf246af8c637c5b9bf5a5c5",
-};
-
 export const previewProjects = {
   excalidraw: {
     commentMarker: "<!-- sketchi-excalidraw-preview -->",
@@ -93,153 +81,145 @@ export function normalizePrNumber(value) {
   return prNumber;
 }
 
-export function previewWorkerName(input) {
-  const prNumber = normalizePrNumber(input.prNumber);
-  const project = requireWorkerIdentity(input.projectId, input.workerName);
-  const workerName = `${project.previewWorkerPrefix}-${prNumber}`;
-
-  if (
-    workerName.length > MAX_WORKER_NAME_LENGTH ||
-    !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(workerName)
-  ) {
-    throw new Error(
-      `Invalid preview worker name "${workerName}". Use a shorter alphanumeric/hyphen prefix.`,
-    );
-  }
-
-  return workerName;
+export function previewName(prNumber) {
+  return `pr-${normalizePrNumber(prNumber)}`;
 }
 
-export function normalizeWorkersDevSubdomain(value) {
-  const trimmed = String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/\.workers\.dev$/, "");
+const previewDataResources = {
+  pipelines: "stream",
+  r2_buckets: "bucket_name",
+};
 
-  if (!trimmed) {
-    return null;
-  }
-
-  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(trimmed)) {
-    throw new Error(
-      `Invalid workers.dev subdomain "${value}". Expected an account subdomain such as "example".`,
-    );
-  }
-
-  return trimmed;
-}
-
-function previewWorkerUrl(projectId, prNumber, workersDevSubdomain) {
+export function validatePreviewConfig(config, projectId) {
   const project = previewProjectConfig(projectId);
-  const workerName = previewWorkerName({
-    projectId: project.projectId,
-    prNumber,
-    workerName: project.workerName,
-  });
-
-  return `https://${workerName}.${workersDevSubdomain}.workers.dev`;
+  assertWranglerWorkerIdentity(config, projectId, project.workerName);
+  const previews = config.previews;
+  if (!previews || typeof previews !== "object") {
+    throw new Error(
+      "Explicit previews settings are required; production bindings must not be inherited.",
+    );
+  }
+  const allowed = new Set([
+    "vars",
+    "ai",
+    "browser",
+    "worker_loaders",
+    "observability",
+    "r2_buckets",
+    "pipelines",
+  ]);
+  for (const field of Object.keys(previews)) {
+    if (!allowed.has(field))
+      throw new Error(
+        `Review Preview isolation before adding previews.${field}.`,
+      );
+  }
+  for (const field of ["ai", "browser", "worker_loaders"]) {
+    const required = config[field];
+    if (
+      (Array.isArray(required) ? required.length > 0 : required) &&
+      JSON.stringify(previews[field]) !== JSON.stringify(required)
+    ) {
+      throw new Error(
+        `Preview runtime binding ${field} must be configured explicitly.`,
+      );
+    }
+  }
+  if (previews.vars?.SKETCHI_APP_SURFACE !== config.vars?.SKETCHI_APP_SURFACE) {
+    throw new Error("Preview must retain the selected application surface.");
+  }
+  // Previews must bind every data binding production has, and none of them
+  // may name a production bucket or stream.
+  for (const [field, resource] of Object.entries(previewDataResources)) {
+    const production = config[field] ?? [];
+    const preview = previews[field] ?? [];
+    const bindingNames = (list) =>
+      list
+        .map(({ binding }) => binding)
+        .sort()
+        .join();
+    if (bindingNames(preview) !== bindingNames(production)) {
+      throw new Error(
+        `previews.${field} must bind exactly the production binding names.`,
+      );
+    }
+    const productionTargets = new Set(production.map((b) => b[resource]));
+    for (const binding of preview) {
+      const declared = production.find(
+        (b) => b.binding === binding.binding,
+      )?.preview_bucket_name;
+      if (
+        productionTargets.has(binding[resource]) ||
+        (declared && binding[resource] !== declared)
+      ) {
+        throw new Error(
+          `Preview ${field} binding ${binding.binding} must target its non-production ${resource}.`,
+        );
+      }
+    }
+  }
+  return project;
 }
 
-function webPreviewVars(input) {
-  const project = previewProjectConfig(input.projectId);
-  requireWorkerIdentity(project.projectId, input.workerName);
-  const workersDevSubdomain = normalizeWorkersDevSubdomain(
-    input.workersDevSubdomain,
-  );
-
-  if (project.projectId !== "web" || !workersDevSubdomain) {
-    return {};
+export function webPreviewUrls(prNumber, subdomain) {
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(subdomain ?? "")) {
+    throw new Error(
+      "A valid workers.dev account subdomain is required for Web preview navigation.",
+    );
   }
-
+  const name = previewName(prNumber);
   return Object.fromEntries(
-    Object.entries(webPreviewSurfaceProjects).map(([envName, projectId]) => [
-      envName,
-      previewWorkerUrl(projectId, input.prNumber, workersDevSubdomain),
+    [
+      ["icons_preview_url", "icons"],
+      ["playground_preview_url", "playground"],
+    ].map(([key, projectId]) => [
+      key,
+      `https://${name}-${previewProjectConfig(projectId).workerName}.${subdomain}.workers.dev`,
     ]),
   );
 }
 
-export function previewWranglerConfig(config, identity) {
-  const project = assertWranglerWorkerIdentity(
-    config,
-    identity.projectId,
-    identity.workerName,
-  );
-  const previewName = previewWorkerName({
-    projectId: project.projectId,
-    prNumber: identity.prNumber,
-    workerName: project.workerName,
-  });
-  const nextConfig = structuredClone(config);
-
-  nextConfig.name = previewName;
-  nextConfig.topLevelName = previewName;
-  nextConfig.workers_dev = true;
-  nextConfig.preview_urls = false;
-  nextConfig.r2_buckets = previewR2Buckets(nextConfig.r2_buckets);
-  nextConfig.pipelines = previewPipelines(nextConfig.pipelines);
-
-  delete nextConfig.route;
-  delete nextConfig.routes;
-  delete nextConfig.domains;
-  delete nextConfig.custom_domain;
-  delete nextConfig.custom_domains;
-
-  const previewVars = webPreviewVars(identity);
-  if (Object.keys(previewVars).length > 0) {
-    nextConfig.vars = {
-      ...(nextConfig.vars ?? {}),
-      ...previewVars,
-    };
+// Read the `preview` entry Wrangler writes to WRANGLER_OUTPUT_FILE_PATH,
+// never a URL scraped from logs or a production URL.
+export function officialPreviewUrl(outputText, workerName, name) {
+  const entry = outputText
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => JSON.parse(line))
+    .findLast(({ type }) => type === "preview");
+  if (
+    entry?.worker_name !== workerName ||
+    entry.preview_name !== name ||
+    entry.preview_slug !== name ||
+    !entry.preview_id ||
+    !entry.deployment_id
+  ) {
+    throw new Error(
+      "Preview result does not match the requested Worker and PR preview.",
+    );
   }
-
-  return nextConfig;
-}
-
-function previewR2Buckets(buckets) {
-  if (!Array.isArray(buckets)) {
-    return buckets;
-  }
-
-  return buckets.map((bucket) => {
-    if (
-      bucket &&
-      typeof bucket === "object" &&
-      typeof bucket.preview_bucket_name === "string" &&
-      bucket.preview_bucket_name.length > 0
-    ) {
-      return {
-        ...bucket,
-        bucket_name: bucket.preview_bucket_name,
-      };
+  const url = entry.preview_urls?.find((value) => {
+    try {
+      const parsed = new URL(value);
+      return (
+        parsed.protocol === "https:" &&
+        parsed.hostname.startsWith(`${name}-${workerName}.`) &&
+        parsed.hostname.endsWith(".workers.dev") &&
+        parsed.pathname === "/" &&
+        !parsed.search &&
+        !parsed.hash &&
+        !parsed.username &&
+        !parsed.password
+      );
+    } catch {
+      return false;
     }
-
-    return bucket;
   });
-}
-
-function previewPipelines(pipelines) {
-  if (!Array.isArray(pipelines)) {
-    return pipelines;
-  }
-
-  return pipelines.map((pipeline) => {
-    if (!pipeline || typeof pipeline !== "object") {
-      return pipeline;
-    }
-
-    return {
-      ...pipeline,
-      ...(typeof pipeline.stream === "string" &&
-      previewPipelineStreams[pipeline.stream]
-        ? { stream: previewPipelineStreams[pipeline.stream] }
-        : {}),
-      ...(typeof pipeline.pipeline === "string" &&
-      previewPipelineStreams[pipeline.pipeline]
-        ? { pipeline: previewPipelineStreams[pipeline.pipeline] }
-        : {}),
-    };
-  });
+  if (!url)
+    throw new Error(
+      "No active workers.dev Preview URL. Enable previews on the production Worker; do not deploy PR code to production.",
+    );
+  return url;
 }
 
 export function extractPreviewUrl(logText, workerName = "") {
@@ -259,7 +239,7 @@ export function previewCommentBody(input) {
   const status = (input.status ?? "ready").trim().toLowerCase();
   const runUrl = input.runUrl?.trim();
   const previewUrl = input.previewUrl?.trim();
-  const previewName = input.previewWorkerName?.trim();
+  const previewName = input.previewName?.trim();
   const sha = input.sha?.trim();
   const marker = input.marker?.trim() || project.commentMarker;
   const lines = [
@@ -282,7 +262,7 @@ export function previewCommentBody(input) {
   }
 
   if (previewName) {
-    lines.push(`- Preview Worker: \`${previewName}\``);
+    lines.push(`- Preview: \`${previewName}\``);
   }
 
   if (sha) {
@@ -291,10 +271,6 @@ export function previewCommentBody(input) {
 
   if (runUrl) {
     lines.push(`- Workflow run: ${runUrl}`);
-  }
-
-  if (status === "deleted") {
-    lines.push("", "Preview Worker cleanup has completed.");
   }
 
   if (status === "unconfigured") {

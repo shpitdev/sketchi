@@ -5,7 +5,6 @@ import test from "node:test";
 
 import { extractPreviewUrlCommand } from "../../02-extract-preview-url.mjs";
 import { upsertPreviewComment } from "../../03-upsert-preview-comment.mjs";
-import { deletePreviewWorker } from "../../04-delete-preview-worker.mjs";
 
 const marker = "<!-- sketchi-web-preview -->";
 const commentsUrl =
@@ -42,28 +41,6 @@ function mockGithub(t, responses, extraEnv = {}) {
   return calls;
 }
 
-test("cleanup command rejects malformed PR targets before any request", async (t) => {
-  t.mock.method(globalThis, "fetch", () =>
-    assert.fail("must not contact Cloudflare"),
-  );
-  for (const value of ["42oops", "42.9", "4e2", "9007199254740993"]) {
-    await assert.rejects(
-      deletePreviewWorker(["--project", "web", "--pr-number", value]),
-      /positive.*integer/,
-    );
-    await assert.rejects(
-      deletePreviewWorker([
-        "--dry-run",
-        "--project",
-        "web",
-        "--pr-number",
-        value,
-      ]),
-      /positive.*integer/,
-    );
-  }
-});
-
 test("URL command rejects an unrelated Worker without emitting an output", (t) => {
   const memory = new URL("../../../.memory/", import.meta.url);
   mkdirSync(memory, { recursive: true });
@@ -73,8 +50,7 @@ test("URL command rejects an unrelated Worker without emitting an output", (t) =
   writeFileSync(logPath, "https://other-worker.account.workers.dev\n");
   const output = t.mock.method(process.stdout, "write", () => true);
   assert.throws(
-    () =>
-      extractPreviewUrlCommand([logPath, "--worker-name", "sketchi-web-pr-42"]),
+    () => extractPreviewUrlCommand([logPath, "--worker-name", "sketchi-web"]),
     /Failed to parse preview URL/,
   );
   assert.equal(output.mock.callCount(), 0);

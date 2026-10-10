@@ -98,10 +98,10 @@ test("pull request events retain their immutable event head SHA", async () => {
 
 test("deploy checkout, metadata, and comments share the resolved PR SHA", () => {
   const deploy = workflow.jobs["deploy-preview"];
+  const cleanup = workflow.jobs["cleanup-preview"];
   const resolvedSha = "${{ needs.resolve-preview-pr.outputs.sha }}";
   const resolvedNumber = "${{ needs.resolve-preview-pr.outputs.pr_number }}";
   assert.equal(deploy.needs, "resolve-preview-pr");
-  assert.equal(workflow.jobs["cleanup-preview"].needs, "resolve-preview-pr");
   assert.equal(
     deploy.steps.find(({ uses }) => uses?.startsWith("actions/checkout@")).with
       .ref,
@@ -116,7 +116,8 @@ test("deploy checkout, metadata, and comments share the resolved PR SHA", () => 
   assert.ok(
     deploy.steps.find(({ id }) => id === "deploy").run.includes(resolvedSha),
   );
-  for (const job of [deploy, workflow.jobs["cleanup-preview"]]) {
+  assert.equal(cleanup.needs, "resolve-preview-pr");
+  for (const job of [deploy, cleanup]) {
     assert.equal(
       job.steps.find(({ uses }) => uses?.startsWith("actions/checkout@")).with
         .ref,
@@ -126,4 +127,67 @@ test("deploy checkout, metadata, and comments share the resolved PR SHA", () => 
       assert.equal(step.env.PR_NUMBER, resolvedNumber);
     }
   }
+});
+
+test("official Previews never create, deploy, or delete per-PR Workers", () => {
+  const deployStep = workflow.jobs["deploy-preview"].steps.find(
+    ({ id }) => id === "deploy",
+  );
+  const deploy = deployStep.run;
+  assert.match(deploy, /wrangler preview/);
+  assert.match(deploy, /--ignore-base-config/);
+  const output = deployStep.env.WRANGLER_OUTPUT_FILE_PATH;
+  assert.match(output, /\.ndjson$/);
+  assert.match(deploy, /rm -f "\$WRANGLER_OUTPUT_FILE_PATH"/);
+  assert.ok(
+    workflow.jobs["deploy-preview"].steps
+      .find(({ id }) => id === "preview-url")
+      .run.includes(output),
+    "the URL step reads the output file the deploy step writes",
+  );
+  assert.doesNotMatch(
+    deploy,
+    /wrangler (deploy|versions)|--keep-vars|--no-x-provision/,
+  );
+  assert.match(
+    deploy,
+    /--config "\$\{\{ steps.worker-app.outputs.worker_config_path \}\}"/,
+  );
+  assert.match(deploy, /--var "SKETCHI_PLAYGROUND_URL:/);
+  assert.match(deploy, /--var "SKETCHI_ICONS_URL:/);
+
+  const cleanup = workflow.jobs["cleanup-preview"].steps.find(
+    ({ id }) => id === "cleanup",
+  );
+  assert.equal(
+    cleanup.env.WORKER_NAME,
+    "${{ steps.worker-app.outputs.worker_name }}",
+  );
+  assert.match(
+    cleanup.run,
+    /--request DELETE[\s\S]*\/workers\/workers\/\$\{WORKER_NAME\}\/previews\/\$\{preview_name\}"/,
+  );
+  assert.match(cleanup.run, /preview_name="pr-\$\{PR_NUMBER\}"/);
+  assert.match(cleanup.run, /404\)/);
+  assert.doesNotMatch(cleanup.run, /workers\/scripts|wrangler (delete|deploy)/);
+});
+
+test("closing a PR deletes its Previews and never deploys", () => {
+  assert.ok(workflow.on.pull_request.types.includes("closed"));
+  assert.match(
+    workflow.jobs["deploy-preview"].if,
+    /github\.event\.action != 'closed'/,
+  );
+  assert.match(
+    workflow.jobs["cleanup-preview"].if,
+    /github\.event\.action == 'closed'/,
+  );
+  assert.deepEqual(
+    workflow.jobs["cleanup-preview"].strategy.matrix.project,
+    workflow.jobs["deploy-preview"].strategy.matrix.project,
+  );
+  assert.deepEqual(
+    workflow.jobs["cleanup-preview"].concurrency,
+    workflow.jobs["deploy-preview"].concurrency,
+  );
 });

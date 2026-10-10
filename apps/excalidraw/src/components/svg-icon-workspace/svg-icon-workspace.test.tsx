@@ -49,7 +49,7 @@ const handoff: SvgHandoff = {
     roughness: 1,
   },
   sourceUrl:
-    "https://sketchi-icons-pr-91.dimethyl.workers.dev/output/upload-ready/svg/testing/sample.svg",
+    "https://pr-91-sketchi-icons.dimethyl.workers.dev/output/upload-ready/svg/testing/sample.svg",
 };
 const supportedSvg =
   '<svg viewBox="0 0 20 20"><path fill="#f00" d="M0 0H20V20H0Z"/></svg>';

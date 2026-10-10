@@ -11,4 +11,12 @@
   "vars": {
     "SKETCHI_APP_SURFACE": "excalidraw",
   },
+  "previews": {
+    "vars": {
+      "SKETCHI_APP_SURFACE": "excalidraw",
+    },
+    "observability": {
+      "enabled": true,
+    },
+  },
 }
