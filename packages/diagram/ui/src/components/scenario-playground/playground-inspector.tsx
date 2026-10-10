@@ -150,7 +150,7 @@ export function PlaygroundInspector({
             }
           }}
           onClearSelection={() => actions.selectSuiteScenarios([])}
-          onRunSelected={runSelectedSuite}
+          onRunSelected={() => void runSelectedSuite()}
           onSelectAll={() =>
             actions.selectSuiteScenarios(
               scenarios.map((scenario) => scenario.id),

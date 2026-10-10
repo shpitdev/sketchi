@@ -83,12 +83,9 @@ const convertBlobUrlToDataUrl = async (url: string): Promise<string | null> => {
     const response = await fetch(url);
     const blob = await response.blob();
     // FileReader uses callback-based API, wrapping in Promise is necessary
-    // oxlint-disable-next-line eslint-plugin-promise(avoid-new)
-    return new Promise((resolve) => {
+    return await new Promise((resolve) => {
       const reader = new FileReader();
-      // oxlint-disable-next-line eslint-plugin-unicorn(prefer-add-event-listener)
       reader.onloadend = () => resolve(reader.result as string);
-      // oxlint-disable-next-line eslint-plugin-unicorn(prefer-add-event-listener)
       reader.onerror = () => resolve(null);
       reader.readAsDataURL(blob);
     });
@@ -119,11 +116,8 @@ const captureScreenshot = async (): Promise<File | null> => {
     video.srcObject = stream;
 
     // Video element uses callback-based API, wrapping in Promise is necessary
-    // oxlint-disable-next-line eslint-plugin-promise(avoid-new)
     await new Promise<void>((resolve, reject) => {
-      // oxlint-disable-next-line eslint-plugin-unicorn(prefer-add-event-listener)
       video.onloadedmetadata = () => resolve();
-      // oxlint-disable-next-line eslint-plugin-unicorn(prefer-add-event-listener)
       video.onerror = () => reject(new Error("Failed to load screen stream"));
     });
 
@@ -145,7 +139,6 @@ const captureScreenshot = async (): Promise<File | null> => {
 
     context.drawImage(video, 0, 0, width, height);
     // canvas.toBlob uses callback-based API, wrapping in Promise is necessary
-    // oxlint-disable-next-line eslint-plugin-promise(avoid-new)
     const blob = await new Promise<Blob | null>((resolve) => {
       canvas.toBlob(resolve, "image/png");
     });
@@ -258,7 +251,6 @@ export const PromptInputProvider = ({
     (FileUIPart & { id: string })[]
   >([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  // oxlint-disable-next-line eslint(no-empty-function)
   const openRef = useRef<() => void>(() => {});
 
   const add = useCallback((files: File[] | FileList) => {
@@ -1364,8 +1356,7 @@ export const PromptInputTabLabel = ({
   className,
   ...props
 }: PromptInputTabLabelProps) => (
-  // Content provided via children in props
-  // oxlint-disable-next-line eslint-plugin-jsx-a11y(heading-has-content)
+  // oxlint-disable-next-line jsx-a11y/heading-has-content -- content arrives through children in props
   <h3
     className={cn(
       "mb-2 px-3 font-medium text-muted-foreground text-xs",

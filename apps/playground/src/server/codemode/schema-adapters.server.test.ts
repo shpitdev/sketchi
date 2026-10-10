@@ -1,4 +1,4 @@
-import { assert, describe, expect, it } from "@effect/vitest";
+import { assert, describe, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 
 import {

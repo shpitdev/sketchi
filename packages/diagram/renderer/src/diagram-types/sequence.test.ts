@@ -62,7 +62,7 @@ describe("sequence diagram renderer", () => {
       "payments",
     ]);
     expect(headers.map((header) => header.x)).toEqual(
-      [...headers.map((header) => header.x)].sort((a, b) => a - b),
+      headers.map((header) => header.x).sort((a, b) => a - b),
     );
     expect(messages.map((message) => message.edgeId)).toEqual([
       "start",
@@ -70,7 +70,7 @@ describe("sequence diagram renderer", () => {
       "receipt",
     ]);
     expect(messages.map((message) => message.points[0].y)).toEqual(
-      [...messages.map((message) => message.points[0].y)].sort((a, b) => a - b),
+      messages.map((message) => message.points[0].y).sort((a, b) => a - b),
     );
     expect(
       scene.elements.filter(

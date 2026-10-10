@@ -729,10 +729,10 @@ describe("convertSceneToExcalidraw", () => {
       value: expect.any(Number),
     });
     expect(
-      Number((scene.appState.zoom as { value: number }).value),
+      (scene.appState.zoom as { value: number }).value,
     ).toBeGreaterThanOrEqual(0.42);
     expect(
-      Number((scene.appState.zoom as { value: number }).value),
+      (scene.appState.zoom as { value: number }).value,
     ).toBeLessThanOrEqual(0.5);
   });
 
@@ -1967,7 +1967,7 @@ describe("bound label first paint", () => {
           label: "Escalate to the quality manager for final disposition",
         },
       ],
-    } as Parameters<typeof convertSceneToExcalidraw>[0]);
+    });
     expect(
       scene.elements.find((element) => element.id === "divider:label"),
     ).toMatchObject({

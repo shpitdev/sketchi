@@ -545,7 +545,9 @@ describe("Studio project HTTP runtime edge", () => {
     await sourceStarted;
     controller.abort();
 
-    await expect(response).rejects.toThrow();
+    await expect(response).rejects.toThrow(
+      "All fibers interrupted without error",
+    );
     expect(sourceInterrupted).toBe(true);
     expect(bucket.objects.size).toBe(0);
   });

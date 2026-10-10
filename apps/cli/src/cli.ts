@@ -14,7 +14,6 @@ import {
   type CreateCanvasDiagramResult,
 } from "./canvas.js";
 import {
-  type DiagramFormat,
   type DiagramListEntry,
   type OutputFormat,
   type StoredDiagram,
@@ -28,7 +27,7 @@ import {
   CliValidationError,
 } from "./errors.js";
 import { DiagramExporter, DiagramExporterLive } from "./exporter.js";
-import { LocalFileSystem, LocalFileSystemLive } from "./filesystem.js";
+import { LocalFileSystemLive } from "./filesystem.js";
 import {
   exportCreatedDiagram,
   runGenerateWorkflow,
@@ -79,7 +78,7 @@ import {
   runReported,
   runReportedArtifact,
 } from "./output.js";
-import { CliPngRenderer, CliPngRendererLive } from "./png-renderer.js";
+import { CliPngRendererLive } from "./png-renderer.js";
 import { DiagramPatcher, DiagramPatcherLive } from "./patch.js";
 import { preflightPullTarget, pullIntoStore } from "./pull.js";
 import { API_REQUEST_TIMEOUT } from "./response-body.js";
@@ -95,7 +94,6 @@ import {
   LinkOpener,
   LinkOpenerLive,
   ShareTransportLive,
-  type OpenResult,
 } from "./share.js";
 import { MAX_SHARE_LINK_LENGTH } from "./share-protocol.js";
 import {
@@ -913,13 +911,6 @@ const listCommand = Command.make("list", {}, () =>
     },
   ]),
 );
-
-interface ShareResult {
-  readonly id: string;
-  readonly link: string;
-  readonly open: OpenResult;
-  readonly hint: string;
-}
 
 const shareCommand = Command.make(
   "share",

@@ -12,11 +12,11 @@ import {
 import { inspectSvgCapabilities } from "./capabilities";
 import { convertSvgToExcalidraw } from "./convert";
 import * as flatten from "./flatten";
-import { filledRegionsForShape } from "./native";
 import {
   constructNativeTrace,
   deterministicTraceJson,
   deterministicTraceChecksum,
+  filledRegionsForShape,
   PROVISIONAL_POINT_BUDGET,
 } from "./native";
 import { deterministicDocumentChecksum, parseSvg } from "./parse";

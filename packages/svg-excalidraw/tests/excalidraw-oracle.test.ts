@@ -297,8 +297,8 @@ describe("real Excalidraw renderer oracle", () => {
     const hole = counterRegion?.holes[0];
     expect(hole).toBeDefined();
     const holeCenter = centroid(hole ?? []);
-    const combinations = [
-      ...(["keyhole", "triangulation"] as const).flatMap((strategy) =>
+    const combinations = (["keyhole", "triangulation"] as const).flatMap(
+      (strategy) =>
         ([0, 1, 2] as const).flatMap((roughness) =>
           (["solid", "hachure"] as const).map((fillStyle) => ({
             strategy,
@@ -306,8 +306,7 @@ describe("real Excalidraw renderer oracle", () => {
             fillStyle,
           })),
         ),
-      ),
-    ];
+    );
     const evidence = [];
 
     for (const options of combinations) {

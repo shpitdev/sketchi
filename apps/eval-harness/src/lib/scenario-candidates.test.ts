@@ -83,9 +83,16 @@ describe("scenario candidates HTTP adapter", () => {
               const signal = options?.signal;
               if (!signal)
                 return reject(new Error("Missing upstream AbortSignal."));
-              signal.addEventListener("abort", () => reject(signal.reason), {
-                once: true,
-              });
+              signal.addEventListener(
+                "abort",
+                () =>
+                  reject(
+                    signal.reason instanceof Error
+                      ? signal.reason
+                      : new Error("Upstream request aborted."),
+                  ),
+                { once: true },
+              );
               started.resolve(signal);
             }),
         }),

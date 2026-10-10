@@ -12,7 +12,6 @@ import {
   makeIsoDateString,
   makeStudioRecordId,
   StudioRecordIdSchema,
-  type StudioOwner,
   type StudioProjectRecord,
 } from "../contracts.js";
 import {

@@ -74,11 +74,9 @@ describe("ScenarioSuitePanel", () => {
     );
 
     expect(
-      (
-        screen.getByRole("button", {
-          name: "Run selected",
-        }) as HTMLButtonElement
-      ).disabled,
+      screen.getByRole<HTMLButtonElement>("button", {
+        name: "Run selected",
+      }).disabled,
     ).toBe(true);
   });
 });

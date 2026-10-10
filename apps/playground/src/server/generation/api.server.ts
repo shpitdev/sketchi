@@ -277,7 +277,7 @@ function buildFailure(
 function inlineArtifact(
   artifact: BuiltArtifact,
   format: "scene" | "excalidraw",
-): unknown | undefined {
+): unknown {
   const ref = artifact.formats.find((candidate) => candidate.format === format);
   return ref?.inline;
 }

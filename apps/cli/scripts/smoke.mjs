@@ -309,6 +309,7 @@ try {
     .trim()
     .split("\n")
     .sort();
+  /** @type {{ files: Array<{ path: string }> }} */
   const bundleReport = parseJson(
     await readFile(bundleReportPath),
     "CLI bundle report",

@@ -12,8 +12,8 @@ import type {
 } from "../code-mode/contract.js";
 import { cleanToolString } from "../clean-tool-string.js";
 
-const FLOWCHART_TYPE: "flowchart" = "flowchart";
-const ORTHOGONAL_ROUTING: "orthogonal" = "orthogonal";
+const FLOWCHART_TYPE = "flowchart" as const;
+const ORTHOGONAL_ROUTING = "orthogonal" as const;
 
 function slugify(value: string): string {
   return value

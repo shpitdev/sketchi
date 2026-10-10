@@ -925,7 +925,7 @@ function tokensFrom(value: unknown): HarnessTokens | undefined {
   };
 }
 
-function maybeParseJsonObject(text: string): unknown | undefined {
+function maybeParseJsonObject(text: string): unknown {
   const trimmed = text.trim();
   if (trimmed.length === 0) {
     return undefined;
@@ -1500,7 +1500,7 @@ export function summarizeHarnessStdout(
   };
 }
 
-function normalizedSpecFrom(value: unknown): unknown | undefined {
+function normalizedSpecFrom(value: unknown): unknown {
   if (!isRecord(value)) {
     return undefined;
   }
@@ -1604,7 +1604,7 @@ function deliversProof(
 }
 
 export function outputContractErrors(input: {
-  finalJson: unknown | undefined;
+  finalJson: unknown;
   finalText: string;
   proof: HarnessMcpArtifactProof | undefined;
 }): string[] {

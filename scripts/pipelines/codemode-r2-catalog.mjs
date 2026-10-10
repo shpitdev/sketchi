@@ -407,6 +407,7 @@ async function abortableAttempt(queryAttempt, attempt, signal) {
   let onAbort;
   const aborted = new Promise((_, reject) => {
     onAbort = () =>
+      // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- both branches are Errors; this script sits outside a TypeScript project, so the R2SqlQueryError import is untyped
       reject(
         signal.reason?.name === "TimeoutError"
           ? R2SqlQueryError.make({

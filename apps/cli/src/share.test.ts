@@ -13,6 +13,11 @@ import {
 
 const originalFetch = globalThis.fetch;
 
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  return input instanceof URL ? input.href : input.url;
+}
+
 afterEach(() => {
   globalThis.fetch = originalFetch;
 });
@@ -97,7 +102,10 @@ describe("Excalidraw share transport", () => {
     let calls = 0;
     globalThis.fetch = (input, init) => {
       calls += 1;
-      assert.equal(String(input), "https://json.excalidraw.com/api/v2/post/");
+      assert.equal(
+        requestUrl(input),
+        "https://json.excalidraw.com/api/v2/post/",
+      );
       assert.equal(init?.method, "POST");
       assert.equal(init?.redirect, "error");
       assert.equal(init?.body instanceof Uint8Array, true);
@@ -124,7 +132,7 @@ describe("Excalidraw share transport", () => {
   it.effect("constructs the pinned GET URL and maps 404 generically", () => {
     globalThis.fetch = (input, init) => {
       assert.equal(
-        String(input),
+        requestUrl(input),
         "https://json.excalidraw.com/api/v2/fixture_id",
       );
       assert.equal(init?.method, "GET");

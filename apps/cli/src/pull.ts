@@ -57,6 +57,6 @@ export const pullIntoStore = Effect.fn("sketchi.cli.pullIntoStore")(function* (
     new TextEncoder().encode(encodeJson(normalized)),
     target.observed.manifest.revision,
   );
-  const sourceIdentity: "unverified" = "unverified";
+  const sourceIdentity = "unverified" as const;
   return { diagram, sourceIdentity };
 });

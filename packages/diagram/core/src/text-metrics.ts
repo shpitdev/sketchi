@@ -26,7 +26,8 @@ const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
  * symbols such as © ™ ✔ ⚠ ➡ paint as ordinary glyphs.
  */
 const EMOJI_CLUSTER = /\p{Emoji_Presentation}|\uFE0F|\p{Regional_Indicator}|\u20E3/u;
-const ZERO_WIDTH_CLUSTER = /^[\u200B-\u200D\u2060\uFE00-\uFE0F]+$/u;
+// Variation selectors lead the class so none reads as combining with a neighbor.
+const ZERO_WIDTH_CLUSTER = /^[\uFE00-\uFE0F\u200B-\u200D\u2060]+$/u;
 
 function isWide(codePoint: number): boolean {
   return (

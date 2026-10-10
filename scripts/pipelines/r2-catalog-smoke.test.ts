@@ -275,6 +275,19 @@ function withFixture<A, E, R>(
     }),
   );
 }
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  return input instanceof URL ? input.href : input.url;
+}
+
+function requestJson(options: RequestInit | undefined): unknown {
+  const body = options?.body;
+  if (typeof body !== "string") {
+    throw new TypeError("Expected a JSON string request body.");
+  }
+  return JSON.parse(body);
+}
+
 function withFetch<A, E, R>(
   fetchFn: typeof fetch,
   use: Effect.Effect<A, E, R>,
@@ -356,7 +369,7 @@ for (const [failure, expectedDeletes] of [
           const apiUrls: string[] = [];
           const exit = yield* withFetch(
             async (url) => {
-              apiUrls.push(String(url));
+              apiUrls.push(requestUrl(url));
               return new Response(
                 JSON.stringify({ success: true, result: [] }),
               );
@@ -702,16 +715,14 @@ test.effect(
         const events: string[] = [];
         yield* withFetch(
           async (url, options) => {
-            const value = String(url);
+            const value = requestUrl(url);
             urls.push(value);
             if (value.includes("/objects")) {
               events.push(
                 options?.method === "DELETE" ? "purge-objects" : "list-objects",
               );
               if (options?.method === "DELETE") {
-                assert.deepEqual(JSON.parse(String(options.body)), [
-                  "owned-object",
-                ]);
+                assert.deepEqual(requestJson(options), ["owned-object"]);
                 return new Response(JSON.stringify({ success: true }));
               }
               return new Response(
@@ -724,7 +735,8 @@ test.effect(
             if (value.includes("/r2-sql/")) {
               assert.ok(value.includes("/accounts/explicit-account/"));
               assert.equal(
-                JSON.parse(String(options?.body)).warehouse,
+                (requestJson(options) as { readonly warehouse?: unknown })
+                  .warehouse,
                 "explicit-account_sketchi-r2sql-test",
               );
               return queryResponse();

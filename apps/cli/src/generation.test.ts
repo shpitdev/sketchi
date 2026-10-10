@@ -2,7 +2,7 @@ import {
   CodeModeArtifactStorageMemory,
   makeCodeModeRuntimeEnvironmentLayer,
 } from "@sketchi/diagram-agent";
-import { afterEach, assert, describe, expect, it } from "@effect/vitest";
+import { afterEach, assert, describe, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer } from "effect";
 import { TestClock } from "effect/testing";
 
@@ -157,10 +157,8 @@ const originalFetch = globalThis.fetch;
 function stubFetch(
   handler: (request: Request) => Response | Promise<Response>,
 ): void {
-  globalThis.fetch = ((input, init) =>
-    Promise.resolve().then(() =>
-      handler(new Request(input as RequestInfo | URL, init)),
-    )) as typeof fetch;
+  globalThis.fetch = (input, init) =>
+    Promise.resolve().then(() => handler(new Request(input, init)));
 }
 
 function jsonResponse(body: unknown, status: number): Response {
@@ -435,8 +433,7 @@ describe("prompt-assisted generation over the public generate API", () => {
 
   it.effect("maps a network-down failure to a typed provider error", () =>
     Effect.gen(function* () {
-      globalThis.fetch = (() =>
-        Promise.reject(new Error("NETWORK_DOWN"))) as typeof fetch;
+      globalThis.fetch = () => Promise.reject(new Error("NETWORK_DOWN"));
       const created: BuiltDiagram[] = [];
 
       const error = yield* Effect.flip(runGenerate(created, "flowchart"));

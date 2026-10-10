@@ -145,7 +145,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
   "apps/icons/src/routes/mcp.ts": 15,
   "apps/playground/src/components/ai-elements/code-block.tsx": 9,
   "apps/playground/src/components/ai-elements/conversation.tsx": 1,
-  "apps/playground/src/components/ai-elements/prompt-input.tsx": 27,
+  "apps/playground/src/components/ai-elements/prompt-input.tsx": 28,
   "apps/playground/src/components/ai-elements/reasoning.tsx": 1,
   "apps/playground/src/features/artifacts/artifact-view-client.ts": 13,
   "apps/playground/src/features/resources/use-async-resource.ts": 3,
@@ -188,8 +188,8 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
   "packages/diagram/scenarios/src/live-generator.ts": 8,
   "packages/diagram/scenarios/vitest.config.mts": 1,
   "packages/diagram/ui/src/components/excalidraw-scene-canvas/excalidraw-scene-canvas.tsx": 3,
-  "packages/diagram/ui/src/components/scenario-playground/playground-controls.tsx": 1,
-  "packages/diagram/ui/src/components/scenario-playground/playground-inspector.tsx": 1,
+  "packages/diagram/ui/src/components/scenario-playground/playground-controls.tsx": 2,
+  "packages/diagram/ui/src/components/scenario-playground/playground-inspector.tsx": 2,
   "packages/diagram/ui/src/components/scenario-playground/scenario-playground.tsx": 10,
   "packages/diagram/ui/src/lib/browser-actions.ts": 3,
   "packages/icons/catalog/scripts/generate-catalog.ts": 6,
@@ -347,7 +347,9 @@ function createTypeCheckedProgram(
   virtualSources: ReadonlyMap<string, string> = new Map(),
 ): ts.Program {
   const configPath = path.join(workspaceRoot, "tsconfig.base.json");
-  const config = ts.readConfigFile(configPath, ts.sys.readFile);
+  const config = ts.readConfigFile(configPath, (fileName) =>
+    ts.sys.readFile(fileName),
+  );
   if (config.error) {
     throw new Error(
       ts.flattenDiagnosticMessageText(config.error.messageText, "\n"),

@@ -18,6 +18,7 @@ const checkGuard = () => {
     guard.startsWith("const requiredNodeVersion ="),
     "smoke must derive its Node requirement",
   );
+  // oxlint-disable-next-line typescript/no-implied-eval -- evaluates the guard extracted from the smoke script to prove its behavior
   return new Function(
     "readFileSync",
     "resolve",

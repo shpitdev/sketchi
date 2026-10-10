@@ -36,6 +36,7 @@ function concurrency(job, project, prNumber = 42) {
       key,
       typeof value === "string"
         ? value.replace(/\$\{\{\s*([\s\S]*?)\s*\}\}/g, (_, expression) =>
+            // oxlint-disable-next-line typescript/no-implied-eval -- evaluates workflow expressions the way GitHub Actions would
             new Function(
               "matrix",
               "needs",

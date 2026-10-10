@@ -14,7 +14,7 @@ const config: StorybookConfig = {
   viteFinal: async (config) => {
     config.resolve ??= {};
     config.resolve.alias = {
-      ...(config.resolve.alias ?? {}),
+      ...config.resolve.alias,
       "@sketchi/diagram-core": new URL(
         "../../../packages/diagram/core/src/index.ts",
         import.meta.url,

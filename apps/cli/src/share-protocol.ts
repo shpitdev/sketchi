@@ -487,10 +487,7 @@ export function encodeSharePayload(
         ENCODING_METADATA.byteLength -
         12 -
         16;
-      const compressed = await deflateShareContents(
-        data,
-        maximumCompressedBytes,
-      );
+      const compressed = deflateShareContents(data, maximumCompressedBytes);
       const iv = Uint8Array.from(
         fixedIv ?? crypto.getRandomValues(new Uint8Array(12)),
       );

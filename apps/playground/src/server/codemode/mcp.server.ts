@@ -391,60 +391,62 @@ export const executeSketchiCodeMode = Effect.fn(
   const usageContext = yield* usage.createContext;
   const startedAt = yield* clock.nowMillis;
 
-  const executed = yield* Effect.gen(function* () {
-    const parsed = yield* Effect.try({
-      try: () => Schema.decodeUnknownSync(ExecuteRequestContract)(input),
-      catch: (cause) =>
-        CodeModeExecutionError.make({
-          cause,
-          message: cause instanceof Error ? cause.message : String(cause),
-          stage: "input",
-        }),
-    });
-    const executor =
-      options.executor ?? (yield* createDefaultCodeModeExecutor());
-    const execution = yield* Effect.tryPromise({
-      try: () =>
-        executor.execute(normalizeSketchiExecuteCode(parsed.code), [
-          makeSketchiCodeModeProvider(codeMode, runToolEffect, {
-            attemptId: usageContext.attemptId,
-            runId: usageContext.runId,
+  const executed: SketchiCodeModeExecuteOutput = yield* Effect.gen(
+    function* () {
+      const parsed = yield* Effect.try({
+        try: () => Schema.decodeUnknownSync(ExecuteRequestContract)(input),
+        catch: (cause) =>
+          CodeModeExecutionError.make({
+            cause,
+            message: cause instanceof Error ? cause.message : String(cause),
+            stage: "input",
           }),
-        ]),
-      catch: (cause) =>
-        CodeModeExecutionError.make({
-          cause,
-          message: cause instanceof Error ? cause.message : String(cause),
-          stage: "execute",
-        }),
-    });
-    const artifactDelivery = artifactDeliveryFrom(execution.result, {
-      origin: metadata.origin,
-    });
+      });
+      const executor =
+        options.executor ?? (yield* createDefaultCodeModeExecutor());
+      const execution = yield* Effect.tryPromise({
+        try: () =>
+          executor.execute(normalizeSketchiExecuteCode(parsed.code), [
+            makeSketchiCodeModeProvider(codeMode, runToolEffect, {
+              attemptId: usageContext.attemptId,
+              runId: usageContext.runId,
+            }),
+          ]),
+        catch: (cause) =>
+          CodeModeExecutionError.make({
+            cause,
+            message: cause instanceof Error ? cause.message : String(cause),
+            stage: "execute",
+          }),
+      });
+      const artifactDelivery = artifactDeliveryFrom(execution.result, {
+        origin: metadata.origin,
+      });
 
-    if (execution.error) {
+      if (execution.error) {
+        return {
+          ...(artifactDelivery ? { artifactDelivery } : {}),
+          ...(artifactDelivery
+            ? { finalResponseText: artifactDelivery.finalResponseText }
+            : {}),
+          ok: false,
+          error: execution.error,
+          logs: execution.logs ?? [],
+          result: execution.result,
+        };
+      }
+
       return {
         ...(artifactDelivery ? { artifactDelivery } : {}),
         ...(artifactDelivery
           ? { finalResponseText: artifactDelivery.finalResponseText }
           : {}),
-        ok: false,
-        error: execution.error,
-        logs: execution.logs ?? [],
+        ok: true,
         result: execution.result,
+        logs: execution.logs ?? [],
       };
-    }
-
-    return {
-      ...(artifactDelivery ? { artifactDelivery } : {}),
-      ...(artifactDelivery
-        ? { finalResponseText: artifactDelivery.finalResponseText }
-        : {}),
-      ok: true,
-      result: execution.result,
-      logs: execution.logs ?? [],
-    };
-  }).pipe(
+    },
+  ).pipe(
     Effect.catchTag("CodeModeExecutionError", (error) =>
       Effect.succeed({
         ok: false as const,
@@ -467,7 +469,7 @@ export const executeSketchiCodeMode = Effect.fn(
     responseBody: executed,
     surface: "mcp",
   });
-  return executed as SketchiCodeModeExecuteOutput;
+  return executed;
 });
 
 export function makeSketchiCodeModeProvider(

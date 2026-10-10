@@ -171,12 +171,10 @@ export function HomeHero({
                       node.variant ? ` sketch-node--${node.variant}` : ""
                     }`}
                     key={node.id}
-                    style={
-                      {
-                        left: `${node.left}%`,
-                        top: `${node.top}%`,
-                      } as CSSProperties
-                    }
+                    style={{
+                      left: `${node.left}%`,
+                      top: `${node.top}%`,
+                    }}
                   >
                     {node.icon ? (
                       <img

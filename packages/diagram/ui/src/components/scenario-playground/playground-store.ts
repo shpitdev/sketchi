@@ -81,13 +81,13 @@ export function createPlaygroundStore(
 ) {
   const store = new Store(createInitialState(scenarios, initialScenarioId));
   const actions = {
-    setCacheMode(cacheMode: DiagramGenerationCacheMode) {
+    setCacheMode: (cacheMode: DiagramGenerationCacheMode) => {
       store.setState((current) => ({ ...current, cacheMode }));
     },
-    selectInspector(inspectorPanel: InspectorPanel) {
+    selectInspector: (inspectorPanel: InspectorPanel) => {
       store.setState((current) => ({ ...current, inspectorPanel }));
     },
-    toggleSuiteScenario(scenarioId: string) {
+    toggleSuiteScenario: (scenarioId: string) => {
       store.setState((current) => ({
         ...current,
         selectedSuiteScenarioIds: toggleId(
@@ -96,10 +96,10 @@ export function createPlaygroundStore(
         ),
       }));
     },
-    selectSuiteScenarios(selectedSuiteScenarioIds: readonly string[]) {
+    selectSuiteScenarios: (selectedSuiteScenarioIds: readonly string[]) => {
       store.setState((current) => ({ ...current, selectedSuiteScenarioIds }));
     },
-    setCandidateText(candidateText: string) {
+    setCandidateText: (candidateText: string) => {
       store.setState((current) => ({
         ...current,
         candidateText,
@@ -108,7 +108,7 @@ export function createPlaygroundStore(
         editedExcalidrawSceneSignature: undefined,
       }));
     },
-    setScene(scene: ExcalidrawScene) {
+    setScene: (scene: ExcalidrawScene) => {
       const signature = JSON.stringify(scene);
       store.setState((current) =>
         current.editedExcalidrawSceneSignature === signature
@@ -120,7 +120,7 @@ export function createPlaygroundStore(
             },
       );
     },
-    setMode(mode: PlaygroundMode) {
+    setMode: (mode: PlaygroundMode) => {
       store.setState((current) =>
         current.mode === mode
           ? current
@@ -141,7 +141,7 @@ export function createPlaygroundStore(
       );
     },
 
-    selectScenario(nextScenario: DiagramScenario) {
+    selectScenario: (nextScenario: DiagramScenario) => {
       store.setState((current) => ({
         ...current,
         candidateText: "",
@@ -158,7 +158,7 @@ export function createPlaygroundStore(
       }));
     },
 
-    startGeneration() {
+    startGeneration: () => {
       const runToken = store.state.generationRunToken + 1;
       store.setState((current) => ({
         ...current,
@@ -170,7 +170,7 @@ export function createPlaygroundStore(
       }));
       return runToken;
     },
-    failGeneration(scenarioId: string, runToken: number, error: unknown) {
+    failGeneration: (scenarioId: string, runToken: number, error: unknown) => {
       if (
         store.state.scenarioId !== scenarioId ||
         store.state.generationRunToken !== runToken
@@ -183,26 +183,26 @@ export function createPlaygroundStore(
         generationStatus: "error",
       }));
     },
-    finishGeneration() {
+    finishGeneration: () => {
       store.setState((current) =>
         current.generationStatus === "running"
           ? { ...current, generationStatus: "idle" }
           : current,
       );
     },
-    updateSuiteResult(result: ScenarioSuitePanelResult) {
+    updateSuiteResult: (result: ScenarioSuitePanelResult) => {
       store.setState((current) => ({
         ...current,
         suiteResults: replaceSuiteResult(current.suiteResults, result),
       }));
     },
-    applyRunResult(
+    applyRunResult: (
       scenarioId: string,
       result: ScenarioGenerationResult,
       runToken: number,
       focusCandidate: boolean,
       candidateText: string,
-    ) {
+    ) => {
       if (
         !focusCandidate ||
         store.state.scenarioId !== scenarioId ||
@@ -222,7 +222,7 @@ export function createPlaygroundStore(
         mode: "llm",
       }));
     },
-    startSuite() {
+    startSuite: () => {
       store.setState((current) => ({
         ...current,
         mode: "llm",
@@ -230,10 +230,10 @@ export function createPlaygroundStore(
         suiteStatus: "running",
       }));
     },
-    completeSuite() {
+    completeSuite: () => {
       store.setState((current) => ({ ...current, suiteStatus: "complete" }));
     },
-    failSuite(error: unknown) {
+    failSuite: (error: unknown) => {
       store.setState((current) => ({
         ...current,
         suiteError:

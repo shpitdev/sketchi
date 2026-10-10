@@ -263,7 +263,7 @@ function shapeElement(input: {
       { x: input.shape.width, y: input.shape.height },
       { x: 0, y: input.shape.height },
     ];
-    const [first, ...rest] = points;
+    const [first] = points;
     return {
       ...elementBase(input.shape.id, input.shape),
       type: "line",
@@ -903,9 +903,9 @@ function overlappingArrowSegments(
 
       const key = [
         left.arrowId,
-        left.segmentIndex,
+        String(left.segmentIndex),
         right.arrowId,
-        right.segmentIndex,
+        String(right.segmentIndex),
       ]
         .sort()
         .join(":");

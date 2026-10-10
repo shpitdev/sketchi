@@ -25,7 +25,6 @@ import {
 } from "../studio/projects.server";
 import {
   PlaygroundBindings,
-  PlaygroundClock,
   PlaygroundClockLive,
   PlaygroundIds,
   PlaygroundIdsLive,

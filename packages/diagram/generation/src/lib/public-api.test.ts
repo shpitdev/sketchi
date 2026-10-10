@@ -1460,9 +1460,16 @@ const interruptedRepairRun = vi.fn<CloudflareAiGateway["run"]>(
     }
     interruptedRepairSignals.push(signal);
     return new Promise<Response>((_resolve, reject) => {
-      signal.addEventListener("abort", () => reject(signal.reason), {
-        once: true,
-      });
+      signal.addEventListener(
+        "abort",
+        () =>
+          reject(
+            signal.reason instanceof Error
+              ? signal.reason
+              : new Error("Repair request aborted."),
+          ),
+        { once: true },
+      );
     });
   },
 );
@@ -1787,7 +1794,11 @@ const timeoutRun = vi.fn<CloudflareAiGateway["run"]>((_data, options) => {
       "abort",
       () => {
         activeUpstreamRequests -= 1;
-        reject(signal.reason);
+        reject(
+          signal.reason instanceof Error
+            ? signal.reason
+            : new Error("Upstream request aborted."),
+        );
       },
       { once: true },
     );

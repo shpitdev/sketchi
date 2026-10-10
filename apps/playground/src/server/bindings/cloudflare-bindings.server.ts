@@ -3,13 +3,12 @@ import "@tanstack/react-start/server-only";
 import { env, waitUntil } from "cloudflare:workers";
 
 import type { PlaygroundRequestBoundary } from "../runtime/runtime.server";
-import type { StudioEnv } from "./studio-env.server";
 
 export function getPlaygroundRequestBoundary(
   request: Request,
 ): PlaygroundRequestBoundary {
   return {
-    env: env as unknown as StudioEnv,
+    env,
     request,
     platform: {
       waitUntilPromise: waitUntil,

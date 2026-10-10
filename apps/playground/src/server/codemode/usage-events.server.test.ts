@@ -479,7 +479,7 @@ describe("usage capture sink isolation", () => {
       const logs = probe.events.filter(
         (event): event is TelemetryLogEvent => event.event === "effect.log",
       );
-      expect(logs.map((event) => event.fields.sink).sort()).toEqual([
+      expect(logs.map((event) => String(event.fields.sink)).sort()).toEqual([
         ...(analyticsFails ? ["analytics"] : []),
         ...(artifactsFail ? ["artifacts"] : []),
       ]);

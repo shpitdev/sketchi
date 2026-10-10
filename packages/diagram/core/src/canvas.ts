@@ -8,7 +8,7 @@
 
 import { boundLabelWidth, estimateTextWidth } from "./text-metrics.js";
 
-export const CANVAS_SPEC_VERSION: 1 = 1;
+export const CANVAS_SPEC_VERSION = 1 as const;
 
 export const CANVAS_LIMITS = Object.freeze({
   maxDimension: 16_384,

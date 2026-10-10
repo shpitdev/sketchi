@@ -261,6 +261,7 @@ function createInProcessExecutor(): SketchiCodeModeExecutor {
 
       try {
         const source = code.trim().replace(/;+\s*$/, "");
+        // oxlint-disable-next-line typescript/no-implied-eval -- stands in for the Code Mode sandbox, which evaluates code
         const run = new Function(
           ...names,
           "console",

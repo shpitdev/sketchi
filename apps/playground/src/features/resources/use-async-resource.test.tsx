@@ -71,6 +71,7 @@ describe("useAsyncResource", () => {
   it.each([new Error("Specific failure."), "unexpected failure"])(
     "maps errors once without retrying",
     async (error) => {
+      // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- the string case proves non-Error rejections map to the fallback message
       const load = vi.fn(() => Promise.reject(error));
       const { result } = renderHook(() =>
         useAsyncResource(load, [], "Load failed."),

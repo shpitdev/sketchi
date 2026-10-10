@@ -116,9 +116,16 @@ describe("eval harness scenario generation composition", () => {
                 const signal = options?.signal;
                 if (!signal)
                   return reject(new Error("Missing upstream AbortSignal."));
-                signal.addEventListener("abort", () => reject(signal.reason), {
-                  once: true,
-                });
+                signal.addEventListener(
+                  "abort",
+                  () =>
+                    reject(
+                      signal.reason instanceof Error
+                        ? signal.reason
+                        : new Error("Upstream request aborted."),
+                    ),
+                  { once: true },
+                );
                 started.resolve(signal);
               }),
           ),
@@ -130,6 +137,7 @@ describe("eval harness scenario generation composition", () => {
       bindings,
       controller.signal,
     );
+    // oxlint-disable-next-line vitest/valid-expect -- attached before the abort and awaited below
     const rejection = expect(result).rejects.toBeDefined();
     const upstreamSignal = await started.promise;
     controller.abort();

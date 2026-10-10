@@ -206,10 +206,8 @@ describe("ScenarioPlayground", () => {
       }).length,
     ).toBeGreaterThan(0);
     expect(
-      (
-        screen.getByLabelText(
-          "Include Pharma batch disposition",
-        ) as HTMLInputElement
+      screen.getByLabelText<HTMLInputElement>(
+        "Include Pharma batch disposition",
       ).checked,
     ).toBe(false);
   });
@@ -391,7 +389,7 @@ describe("ScenarioPlayground", () => {
       scenarioId: "sketchi-onboarding-decision-flow",
     });
     expect(
-      (screen.getByLabelText("Candidate IR") as HTMLTextAreaElement).value,
+      screen.getByLabelText<HTMLTextAreaElement>("Candidate IR").value,
     ).toContain("Generated onboarding flow");
     expect(
       screen.getByLabelText("Sketchi onboarding decision flow result")

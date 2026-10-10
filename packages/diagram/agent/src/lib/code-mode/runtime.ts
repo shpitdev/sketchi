@@ -2,7 +2,6 @@ import {
   CANVAS_LIMITS,
   FLOWCHART_MAX_ISSUES,
   FlowchartDiagramSchema,
-  SKETCHI_DIAGRAM_PALETTE,
   SKETCHI_DIAGRAM_STYLE,
   compileCanvasSpec,
   getCanvasValidationIssues,
@@ -69,7 +68,6 @@ import {
   type BuildMindmapResult,
   type BuildSequenceDiagramRequest,
   type BuildSequenceDiagramResult,
-  type CreateCanvasRequest,
   type CreateCanvasResult,
   CodeModeIssueSchema,
   type ContractSchemaIssue,
@@ -99,9 +97,6 @@ import {
 const DEFAULT_BUILD_FORMATS: ArtifactFormat[] = ["excalidraw", "scene"];
 const DEFAULT_INLINE_FORMATS: InlineArtifactFormat[] = ["scene"];
 const DEFAULT_MIN_QUALITY_SCORE = 8;
-const DEFAULT_BACKGROUND = SKETCHI_DIAGRAM_PALETTE.card;
-const DEFAULT_STROKE = SKETCHI_DIAGRAM_PALETTE.accent;
-const DEFAULT_TEXT = SKETCHI_DIAGRAM_PALETTE.ink;
 const SCENE_PADDING = 48;
 const MAX_MINDMAP_DEPTH = 8;
 const MAX_MINDMAP_TOPICS = 100;
@@ -612,11 +607,6 @@ interface SelectorTargets {
   texts: PatchableText[];
 }
 
-interface SourceScene {
-  scene: PatchableScene;
-  sourceArtifactId?: string;
-}
-
 const FailureContextSchema = Schema.Struct({
   issues: Schema.Array(Schema.toEncoded(CodeModeIssueSchema)).pipe(
     Schema.mutable,
@@ -942,19 +932,13 @@ function CodeModeIssueCodeFromString(value: string): CodeModeIssueCode {
 }
 
 function requestedFormats(
-  input:
-    | BuildFlowchartRequest["options"]
-    | BuildSequenceDiagramRequest["options"]
-    | ApplyDiagramPatchRequest["options"],
+  input: BuildFlowchartRequest["options"] | ApplyDiagramPatchRequest["options"],
 ): ArtifactFormat[] {
   return input?.artifactFormats ?? DEFAULT_BUILD_FORMATS;
 }
 
 function requestedInlineFormats(
-  input:
-    | BuildFlowchartRequest["options"]
-    | BuildSequenceDiagramRequest["options"]
-    | ApplyDiagramPatchRequest["options"],
+  input: BuildFlowchartRequest["options"] | ApplyDiagramPatchRequest["options"],
 ): InlineArtifactFormat[] {
   return input?.inlineArtifacts ?? DEFAULT_INLINE_FORMATS;
 }

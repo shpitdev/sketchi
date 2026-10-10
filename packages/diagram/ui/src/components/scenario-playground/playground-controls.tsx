@@ -94,7 +94,7 @@ export function PlaygroundControls({
           disabled={!canGenerate || busy}
           {...(state.generationError ? { error: state.generationError } : {})}
           onCacheModeChange={actions.setCacheMode}
-          onRun={runGeneration}
+          onRun={() => void runGeneration()}
           running={state.generationStatus === "running"}
         />
       ) : null}

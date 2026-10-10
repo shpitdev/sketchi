@@ -111,8 +111,8 @@ const CloudflareResponse = Schema.Struct({
     Schema.Struct({ cursor: Schema.optionalKey(Schema.String) }),
   ),
 });
-export function normalizePipelineNamePart(value: unknown) {
-  const normalized = String(value ?? "")
+export function normalizePipelineNamePart(value: string) {
+  const normalized = value
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9_]+/g, "_")
@@ -176,8 +176,8 @@ export function cloudflareErrorSummary(responseBody: unknown) {
   return r2SqlErrorSummary(responseBody);
 }
 
-export function redactSecrets(text: unknown, secrets: readonly string[] = []) {
-  let redacted = String(text ?? "");
+export function redactSecrets(text: string, secrets: readonly string[] = []) {
+  let redacted = text;
   for (const secret of secrets) {
     if (secret) {
       redacted = redacted.split(secret).join("[redacted]");
@@ -186,14 +186,11 @@ export function redactSecrets(text: unknown, secrets: readonly string[] = []) {
   return redacted;
 }
 
-export function streamEndpointFrom(output: unknown) {
-  return String(output ?? "").match(
-    /https:\/\/[a-f0-9]+\.ingest\.cloudflare\.com/,
-  )?.[0];
+export function streamEndpointFrom(output: string) {
+  return output.match(/https:\/\/[a-f0-9]+\.ingest\.cloudflare\.com/)?.[0];
 }
 
-export function parseWranglerJsonOutput(output: unknown): unknown {
-  const text = String(output ?? "");
+export function parseWranglerJsonOutput(text: string): unknown {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start === -1 || end === -1 || end < start) {

@@ -140,7 +140,9 @@ describe("editable artifact stage", () => {
     expect(blob).toBeInstanceOf(Blob);
     if (!(blob instanceof Blob)) throw new Error("Expected download blob");
     expect(JSON.parse(await blob.text()).elements[0].x).toBe(200);
-    act(() => vi.runAllTimers());
+    act(() => {
+      vi.runAllTimers();
+    });
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:edited");
     expect(link.getAttribute("href")).toContain("/api/v1/artifacts/artifact");
   });

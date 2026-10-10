@@ -98,6 +98,9 @@ function contractIssues(
           return visit(node.issue, path, ast);
         }
         break;
+      default:
+        // Leaf issues are formatted below.
+        break;
     }
     const nodeAst = "ast" in node ? node.ast : ast;
     const missingKeyCode =

@@ -46,11 +46,11 @@ export default defineConfig({
     browser: {
       enabled: true,
       headless: true,
-      provider: playwright({
-        ...(executablePath === undefined
+      provider: playwright(
+        executablePath === undefined
           ? {}
-          : { launchOptions: { executablePath } }),
-      }),
+          : { launchOptions: { executablePath } },
+      ),
       instances: [{ browser: "chromium" }],
     },
   },

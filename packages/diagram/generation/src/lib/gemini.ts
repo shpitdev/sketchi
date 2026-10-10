@@ -1,7 +1,9 @@
 import { isUnknownRecord, objectValue } from "./unknown-record.js";
-import type { DiagramGenerationUsage } from "./candidates.js";
+import type {
+  DiagramGenerationUsage,
+  DiagramGenerationRequest,
+} from "./candidates.js";
 import { buildDiagramGenerationMessages } from "./messages.js";
-import type { DiagramGenerationRequest } from "./candidates.js";
 
 export interface GeminiTextPart {
   text: string;

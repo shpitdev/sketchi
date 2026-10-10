@@ -135,6 +135,7 @@ export function ScenarioSuitePanel({
           const activateScenario = () => onActivateScenario?.(scenario.id);
 
           return (
+            // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- the row click only widens the pointer target; keyboard users activate the row's scenario button
             <li
               data-active={active}
               data-status={label}

@@ -332,7 +332,7 @@ function bodyForArtifact(
 function readBinaryArtifact(
   object: CodeModeObjectBucketObject,
 ): Effect.Effect<ArrayBuffer, CodeModeArtifactStorageError> {
-  const arrayBuffer = object.arrayBuffer;
+  const arrayBuffer = object.arrayBuffer?.bind(object);
   if (!arrayBuffer) {
     return Effect.fail(
       CodeModeArtifactStorageError.make({
@@ -343,7 +343,7 @@ function readBinaryArtifact(
     );
   }
   return Effect.tryPromise({
-    try: () => arrayBuffer.call(object),
+    try: () => arrayBuffer(),
     catch: storageError("read"),
   });
 }

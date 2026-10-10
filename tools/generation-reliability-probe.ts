@@ -180,7 +180,7 @@ function flowchartFidelity(
     while (pending.length > 0) {
       const current = pending.shift();
       if (!current) continue;
-      const stateKey = `${current.id}|${[...current.matchedGroups].sort().join(",")}`;
+      const stateKey = `${current.id}|${[...current.matchedGroups].sort((left, right) => left - right).join(",")}`;
       if (visited.has(stateKey)) continue;
       visited.add(stateKey);
       if (current.id === destination) {
@@ -493,7 +493,7 @@ export const runProbe = Effect.fn("generationReliabilityProbe.run")(function* (
       details: {},
       durationMs,
       failures: [
-        `HTTP ${response.status}; status=${String(status ?? "unknown")} ${message}`.trim(),
+        `HTTP ${response.status}; status=${typeof status === "string" || typeof status === "number" ? String(status) : "unknown"} ${message}`.trim(),
       ],
       passed: false,
       runNumber,

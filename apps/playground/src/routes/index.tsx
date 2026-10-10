@@ -314,6 +314,7 @@ function StudioRoute() {
             ) : (
               <Conversation className="studio__conversation">
                 <ConversationContent>
+                  {/* oxlint-disable-next-line react/refs -- focusComposer only runs from the answer chip's click handler */}
                   {messages.map((message) => {
                     if (message.role === "user") {
                       const text = userText(message);

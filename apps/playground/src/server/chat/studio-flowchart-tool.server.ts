@@ -13,8 +13,7 @@ import { Effect, Metric, Ref, Semaphore } from "effect";
 
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 
-export const STUDIO_BUILD_FLOWCHART_TOOL_NAME: "build_flowchart" =
-  "build_flowchart";
+export const STUDIO_BUILD_FLOWCHART_TOOL_NAME = "build_flowchart" as const;
 
 export const STUDIO_BUILD_FLOWCHART_TOOL_DESCRIPTION =
   "Build and persist one canonical flowchart artifact. Pass { spec: FlowchartSpec }; the host supplies artifact options. If rejected, repair every structured issue and retry, up to three total attempts.";

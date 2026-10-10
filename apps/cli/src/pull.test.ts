@@ -5,7 +5,7 @@ import { assert, describe, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
 import { exitCodeForFailure } from "./errors.js";
-import { localFileSystemLive } from "./__tests__/fixtures.js";
+import { localFileSystemLive, builtDiagram } from "./__tests__/fixtures.js";
 import { LocalFileSystem } from "./filesystem.js";
 import { CliPngRenderer, HeadlessPngRenderError } from "./png-renderer.js";
 import { pullIntoStore } from "./pull.js";
@@ -15,7 +15,6 @@ import {
   DiagramStoreLive,
   makeStorageRootLayer,
 } from "./storage.js";
-import { builtDiagram } from "./__tests__/fixtures.js";
 
 const testParent = resolve(process.cwd(), ".memory/cli-tests");
 const rendererProbeScene = builtDiagram().excalidraw;

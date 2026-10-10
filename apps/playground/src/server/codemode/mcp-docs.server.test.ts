@@ -124,7 +124,7 @@ describe("Code Mode MCP docs", () => {
       target: ts.ScriptTarget.ESNext,
     };
     const host = ts.createCompilerHost(options);
-    const getSourceFile = host.getSourceFile;
+    const getSourceFile = host.getSourceFile.bind(host);
     host.getSourceFile = (file, ...args) =>
       file === "code-mode-types.ts" ? source : getSourceFile(file, ...args);
     const program = ts.createProgram({
