@@ -4,10 +4,10 @@ import {
   CANVAS_NODE_ICON,
   canvasBoundTextInset,
   canvasNodeIconBox,
+  deployPipelineLogoFlowchart,
   embedCanvasIcons,
   flowchartFixture,
   getCanvasValidationIssues,
-  parseFlowchartDiagram,
   pharmaBatchDispositionFlowchart,
   segmentCrossesBoundsInterior,
   segmentsFromPoints,
@@ -24,46 +24,10 @@ const LABEL_LINE_HEIGHT = 1.35;
 const LABEL_WIDTH_FACTOR = 0.62;
 
 function deployPipeline(direction: LayoutDirection) {
-  return parseFlowchartDiagram({
-    id: "deploy-pipeline",
-    title: "Deploy pipeline",
-    type: "flowchart",
-    nodes: [
-      {
-        id: "push",
-        label: "Push to GitHub",
-        kind: "start",
-        icon: { slug: "github" },
-      },
-      {
-        id: "build",
-        label: "Build the Docker image",
-        kind: "process",
-        icon: { slug: "docker" },
-      },
-      {
-        id: "tests",
-        label: "Tests pass?",
-        kind: "decision",
-        icon: { slug: "vitest" },
-      },
-      { id: "fix", label: "Fix the failing tests", kind: "process" },
-      {
-        id: "ship",
-        label: "Ship to Cloudflare Workers",
-        kind: "end",
-        icon: { slug: "cloudflare" },
-      },
-    ],
-    edges: [
-      { id: "push-build", source: "push", target: "build" },
-      { id: "build-tests", source: "build", target: "tests" },
-      { id: "tests-ship", source: "tests", target: "ship", label: "yes" },
-      { id: "tests-fix", source: "tests", target: "fix", label: "no" },
-      { id: "fix-build", source: "fix", target: "build" },
-    ],
-    layout: { direction, edgeRouting: "orthogonal" },
-  });
+  return {
+    ...deployPipelineLogoFlowchart,
+    layout: { ...deployPipelineLogoFlowchart.layout, direction },
+  };
 }
 
 function nodes(scene: CanvasSpec): CanvasShapeElement[] {

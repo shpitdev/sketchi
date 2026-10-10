@@ -6,6 +6,7 @@ import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 
 import { ExcalidrawSceneCanvas } from "./excalidraw-scene-canvas";
+import { nodeLogoScene } from "./node-logo-scene.fixtures";
 
 const scene = convertSceneToExcalidraw(
   renderIntermediateDiagram(flowchartFixture),
@@ -62,6 +63,27 @@ export const EditableEmbed: Story = {
   args: {
     scene: wideFlowchartScene,
     title: "Editable wide Sketchi flowchart",
+    viewModeEnabled: false,
+    zenModeEnabled: false,
+  },
+  tags: ["test"],
+};
+
+/** Real GitHub, Docker, Vitest, and Cloudflare marks inside their nodes. */
+export const NodeLogos: Story = {
+  args: {
+    scene: convertSceneToExcalidraw(nodeLogoScene("TB")),
+    title: "Deploy pipeline with node logos",
+    viewModeEnabled: true,
+    zenModeEnabled: true,
+  },
+  tags: ["test"],
+};
+
+export const EditableNodeLogosLeftToRight: Story = {
+  args: {
+    scene: convertSceneToExcalidraw(nodeLogoScene("LR")),
+    title: "Editable left-to-right deploy pipeline with node logos",
     viewModeEnabled: false,
     zenModeEnabled: false,
   },

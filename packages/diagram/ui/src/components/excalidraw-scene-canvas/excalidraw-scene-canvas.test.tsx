@@ -46,7 +46,11 @@ vi.mock("@excalidraw/excalidraw", async () => {
 });
 
 import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
-import { flowchartFixture } from "@sketchi/diagram-core";
+import {
+  deployPipelineLogoFlowchart,
+  embedCanvasIcons,
+  flowchartFixture,
+} from "@sketchi/diagram-core";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 
 import { ExcalidrawSceneCanvas } from "./excalidraw-scene-canvas";
@@ -188,6 +192,43 @@ describe("ExcalidrawSceneCanvas", () => {
     expect(excalidrawMock.scrollToContent).toHaveBeenCalledExactlyOnceWith(
       undefined,
       fitToViewport,
+    );
+  });
+
+  it("hands node-logo files to Excalidraw with the first frame and on change", async () => {
+    const scene = convertSceneToExcalidraw(
+      embedCanvasIcons(
+        renderIntermediateDiagram(deployPipelineLogoFlowchart),
+        (slug) => ({
+          name: slug,
+          svg: '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"/>',
+        }),
+      ).scene,
+    );
+    const onSceneChange = vi.fn();
+    render(
+      <ExcalidrawSceneCanvas
+        onSceneChange={onSceneChange}
+        scene={scene}
+        title="Deploy pipeline"
+      />,
+    );
+
+    expect(await screen.findByTestId("mock-excalidraw")).toBeTruthy();
+    expect(Object.keys(scene.files ?? {})).toHaveLength(4);
+    const props = excalidrawMock.props.mock.lastCall?.[0] as {
+      initialData: { files?: unknown };
+      onChange: (elements: unknown, appState: unknown, files: unknown) => void;
+    };
+    expect(props.initialData.files).toEqual(scene.files);
+
+    props.onChange(
+      scene.elements,
+      { viewBackgroundColor: "#fff" },
+      scene.files,
+    );
+    expect(onSceneChange).toHaveBeenCalledWith(
+      expect.objectContaining({ files: scene.files }),
     );
   });
 

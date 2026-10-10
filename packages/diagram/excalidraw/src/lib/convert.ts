@@ -11,6 +11,9 @@ import {
 import {
   AXIS_ALIGNED_EPSILON,
   boundLabelWidth,
+  canvasBoundTextBox,
+  canvasBoundTextInset,
+  canvasNodeIconBox,
   fnv1a32,
   type AxisAlignedSegment,
   isSharedBoundStem,
@@ -27,9 +30,21 @@ export type ExcalidrawElement = Record<string, unknown> & {
   type: string;
 };
 
+/** Excalidraw BinaryFileData: the image bytes an `image` element points at. */
+export interface ExcalidrawBinaryFile {
+  created: number;
+  dataURL: string;
+  id: string;
+  lastRetrieved?: number;
+  mimeType: string;
+  version?: number;
+}
+
 export interface ExcalidrawScene {
   appState: Record<string, unknown>;
   elements: ExcalidrawElement[];
+  /** Image files keyed by fileId; absent on scenes stored before node logos. */
+  files?: Record<string, ExcalidrawBinaryFile>;
 }
 
 export interface ExcalidrawFile {
@@ -47,6 +62,7 @@ export interface ExcalidrawSceneValidationIssue {
     | "empty-scene"
     | "invalid-elbow-binding"
     | "arrow-segment-through-node"
+    | "missing-image-file"
     | "missing-arrow-binding"
     | "missing-bound-arrow"
     | "missing-container"
@@ -187,7 +203,20 @@ function textHeight(text: string, fontSize: number): number {
   return Math.ceil(text.split("\n").length * fontSize * TEXT_LINE_HEIGHT);
 }
 
+/** Excalidraw computeBoundTextPosition for top- and bottom-aligned labels. */
+function boundTextTop(
+  container: NodeSceneElement,
+  height: number,
+  verticalAlign: "bottom" | "top",
+): number {
+  const top = container.y + canvasBoundTextInset(container).y;
+  return verticalAlign === "top"
+    ? top
+    : top + canvasBoundTextBox(container).height - height;
+}
+
 function textElement(input: {
+  container?: NodeSceneElement;
   containerId?: string;
   element?: TextSceneElement;
   fontSize: number;
@@ -209,13 +238,17 @@ function textElement(input: {
     : input.text;
   const width = boundLabelWidth(text, input.fontSize, input.maxWidth);
   const height = textHeight(text, input.fontSize);
+  const verticalAlign = input.element?.verticalAlign;
 
   return {
     ...elementBase(input.id, input.element),
     ...(input.locked === undefined ? {} : { locked: input.locked }),
     type: "text",
     x: input.x - width / 2,
-    y: input.y - height / 2,
+    y:
+      input.container && (verticalAlign === "bottom" || verticalAlign === "top")
+        ? boundTextTop(input.container, height, verticalAlign)
+        : input.y - height / 2,
     width,
     height,
     backgroundColor: "transparent",
@@ -238,6 +271,62 @@ function textElement(input: {
     // Unbound text with autoResize re-flows to one line on edit; keep wrapped
     // connector labels at their stored width instead.
     autoResize: !(input.wrap && !input.containerId),
+  };
+}
+
+function utf8Base64(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  }
+  return btoa(binary);
+}
+
+/** Content-addressed so equal artwork shares one file across scenes. */
+function iconFileId(slug: string, svg: string): string {
+  return `sketchi-icon-${slug}-${fnv1a32(svg, "hex", "utf16")}`;
+}
+
+function iconFile(id: string, svg: string): ExcalidrawBinaryFile {
+  return {
+    id,
+    mimeType: "image/svg+xml",
+    dataURL: `data:image/svg+xml;base64,${utf8Base64(svg)}`,
+    created: 1,
+    lastRetrieved: 1,
+  };
+}
+
+/** Group that moves a node's shape, label, and logo together. */
+function logoGroupId(node: NodeSceneElement): string {
+  return `${node.id}:logo`;
+}
+
+function iconImageElement(input: {
+  fileId: string;
+  id: string;
+  node: NodeSceneElement;
+}): ExcalidrawElement | null {
+  const box = canvasNodeIconBox(input.node);
+  if (!box || !input.node.icon) return null;
+  return {
+    ...elementBase(input.id, input.node),
+    groupIds: [logoGroupId(input.node), ...(input.node.groupIds ?? [])],
+    type: "image",
+    x: box.x,
+    y: box.y,
+    width: box.width,
+    height: box.height,
+    backgroundColor: "transparent",
+    boundElements: null,
+    crop: null,
+    customData: { sketchiNodeIcon: input.node.icon.slug },
+    fileId: input.fileId,
+    roundness: null,
+    scale: [1, 1],
+    status: "saved",
+    strokeColor: "transparent",
   };
 }
 
@@ -619,12 +708,34 @@ function synthesizeNodeLabels(sourceElements: readonly SceneElement[]): {
   return { textElements, generatedLabelSourceIds };
 }
 
+function iconElementId(
+  node: NodeSceneElement,
+  usedElementIds: Set<string>,
+): string {
+  const baseId = `${node.id}:icon`;
+  let id = baseId;
+  let suffix = 2;
+  while (usedElementIds.has(id)) {
+    id = `${baseId}:${suffix}`;
+    suffix += 1;
+  }
+  usedElementIds.add(id);
+  return id;
+}
+
 function buildElements(
   scene: RenderedDiagramScene,
   sourceElements: readonly SceneElement[],
   textElements: readonly TextSceneElement[],
+  files: Record<string, ExcalidrawBinaryFile>,
+  generatedSourceIds: Map<string, string>,
 ): ExcalidrawElement[] {
   const nodes = sourceElements.filter(isNode);
+  const usedElementIds = new Set([
+    ...sourceElements.map((element) => element.id),
+    ...textElements.map((element) => element.id),
+  ]);
+  const logoNodesById = new Map<string, NodeSceneElement>();
   const textByContainerId = new Map<string, TextSceneElement>();
   for (const text of textElements) {
     if (text.containerId) textByContainerId.set(text.containerId, text);
@@ -645,6 +756,21 @@ function buildElements(
 
     shapeElementsByNodeId.set(node.nodeId, shape);
     elements.push(shape);
+
+    const asset =
+      node.icon && scene.icons && Object.hasOwn(scene.icons, node.icon.slug)
+        ? scene.icons[node.icon.slug]
+        : undefined;
+    if (!node.icon || typeof asset?.svg !== "string") continue;
+    const fileId = iconFileId(node.icon.slug, asset.svg);
+    const id = iconElementId(node, usedElementIds);
+    const image = iconImageElement({ fileId, id, node });
+    if (!image) continue;
+    files[fileId] ??= iconFile(fileId, asset.svg);
+    shape.groupIds = [logoGroupId(node), ...(node.groupIds ?? [])];
+    generatedSourceIds.set(id, node.id);
+    logoNodesById.set(node.id, node);
+    elements.push(image);
   }
 
   for (const frame of sourceElements.filter(isFrame)) {
@@ -660,29 +786,34 @@ function buildElements(
   }
 
   for (const text of textElements) {
+    const containerNode = nodes.find(
+      (node) => node.id === text.containerId && node.shape !== "polygon",
+    );
     const arrowContainer = arrows.some(
       (arrow) => arrow.id === text.containerId,
     );
     const supportedContainer =
-      text.containerId &&
-      (nodes.some(
-        (node) => node.id === text.containerId && node.shape !== "polygon",
-      ) ||
-        arrowContainer);
-    elements.push(
-      textElement({
-        element: text,
-        id: text.id,
-        ...(supportedContainer ? { containerId: text.containerId } : {}),
-        fontSize: text.fontSize,
-        maxWidth: text.maxWidth ?? 160,
-        ...(text.textColor ? { textColor: text.textColor } : {}),
-        text: text.text,
-        wrap: arrowContainer,
-        x: text.x,
-        y: text.y,
-      }),
-    );
+      text.containerId && (containerNode || arrowContainer);
+    const label = textElement({
+      ...(containerNode ? { container: containerNode } : {}),
+      element: text,
+      id: text.id,
+      ...(supportedContainer ? { containerId: text.containerId } : {}),
+      fontSize: text.fontSize,
+      maxWidth: text.maxWidth ?? 160,
+      ...(text.textColor ? { textColor: text.textColor } : {}),
+      text: text.text,
+      wrap: arrowContainer,
+      x: text.x,
+      y: text.y,
+    });
+    const logoNode = containerNode
+      ? logoNodesById.get(containerNode.id)
+      : undefined;
+    if (logoNode) {
+      label.groupIds = [logoGroupId(logoNode), ...(text.groupIds ?? [])];
+    }
+    elements.push(label);
   }
 
   for (const arrow of arrows) {
@@ -738,13 +869,13 @@ function buildElements(
 function applyZOrder(
   scene: RenderedDiagramScene,
   elements: ExcalidrawElement[],
-  generatedLabelSourceIds: ReadonlyMap<string, string>,
+  generatedSourceIds: ReadonlyMap<string, string>,
 ): void {
   const zOrder = new Map(scene.zOrder.map((id, index) => [id, index]));
   const sourceIdForElement = (element: ExcalidrawElement): string => {
     if (zOrder.has(element.id)) return element.id;
-    const generatedLabelSourceId = generatedLabelSourceIds.get(element.id);
-    if (generatedLabelSourceId) return generatedLabelSourceId;
+    const generatedSourceId = generatedSourceIds.get(element.id);
+    if (generatedSourceId) return generatedSourceId;
     return element.id.endsWith(":label")
       ? element.id.slice(0, -":label".length)
       : element.id;
@@ -770,8 +901,17 @@ export function convertSceneToExcalidraw(
   const sourceElements = applyLayerSemantics(scene);
   const { textElements, generatedLabelSourceIds } =
     synthesizeNodeLabels(sourceElements);
-  const elements = buildElements(scene, sourceElements, textElements);
-  applyZOrder(scene, elements, generatedLabelSourceIds);
+  const files: Record<string, ExcalidrawBinaryFile> = {};
+  // Generated labels and logos sort with the scene element they belong to.
+  const generatedSourceIds = new Map(generatedLabelSourceIds);
+  const elements = buildElements(
+    scene,
+    sourceElements,
+    textElements,
+    files,
+    generatedSourceIds,
+  );
+  applyZOrder(scene, elements, generatedSourceIds);
   return {
     appState: {
       viewBackgroundColor: scene.backgroundColor,
@@ -780,6 +920,7 @@ export function convertSceneToExcalidraw(
       },
     },
     elements,
+    files,
   };
 }
 
@@ -793,7 +934,7 @@ export function createExcalidrawFile(
     source: options.source ?? DEFAULT_EXCALIDRAW_EXPORT_SOURCE,
     elements: scene.elements,
     appState: scene.appState,
-    files: {},
+    files: scene.files ?? {},
   };
 }
 
@@ -1106,6 +1247,19 @@ export function validateExcalidrawScene(
   }
 
   for (const element of scene.elements) {
+    if (
+      element.type === "image" &&
+      (typeof element.fileId !== "string" ||
+        !scene.files ||
+        !Object.hasOwn(scene.files, element.fileId))
+    ) {
+      issues.push({
+        code: "missing-image-file",
+        elementId: element.id,
+        message: `Image "${element.id}" references a file missing from the scene.`,
+      });
+    }
+
     if (element.type === "arrow") {
       const isElbowed = element.elbowed === true;
       const points = Array.isArray(element.points) ? element.points : [];

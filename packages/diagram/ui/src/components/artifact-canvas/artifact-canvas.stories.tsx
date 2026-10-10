@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { flowchartFixture } from "@sketchi/diagram-core";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 
+import { nodeLogoScene } from "../excalidraw-scene-canvas/node-logo-scene.fixtures";
 import { ArtifactCanvas } from "./artifact-canvas";
 import "../../styles.css";
 
@@ -25,5 +26,18 @@ export const Default: Story = {};
 export const Editable: Story = {
   args: {
     mode: "edit",
+  },
+};
+
+export const NodeLogos: Story = {
+  args: {
+    scene: nodeLogoScene(),
+  },
+};
+
+export const EditableNodeLogos: Story = {
+  args: {
+    mode: "edit",
+    scene: nodeLogoScene("LR"),
   },
 };

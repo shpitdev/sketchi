@@ -699,6 +699,9 @@ importers:
       '@sketchi/diagram-scenarios':
         specifier: workspace:*
         version: link:../scenarios
+      '@sketchi/icon-catalog':
+        specifier: workspace:*
+        version: link:../../icons/catalog
       '@tanstack/react-hotkeys':
         specifier: 0.13.0
         version: 0.13.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)

@@ -18,6 +18,7 @@
       "default": "./dist/node-logo-svgs.json"
     },
     "./node-logos/*": "./dist/node-logos/*",
+    "./svg/*": "./svg/*",
     "./package.json": "./package.json"
   }
 }

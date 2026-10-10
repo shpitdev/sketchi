@@ -1,5 +1,6 @@
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type {
+  BinaryFiles,
   ExcalidrawImperativeAPI,
   ExcalidrawInitialDataState,
   ExcalidrawProps,
@@ -48,6 +49,8 @@ export interface ExcalidrawCanvasScene {
   readonly elements: readonly (
     ExcalidrawElement | ExcalidrawScene["elements"][number]
   )[];
+  /** Image files (node logos, pasted images) keyed by fileId. */
+  readonly files?: ExcalidrawScene["files"];
 }
 
 export interface ExcalidrawSceneCanvasProps {
@@ -76,11 +79,13 @@ function pickExcalidrawAppState(appState: Parameters<ExcalidrawChange>[1]) {
 function sceneFromExcalidrawChange(
   elements: Parameters<ExcalidrawChange>[0],
   appState: Parameters<ExcalidrawChange>[1],
+  files: Parameters<ExcalidrawChange>[2],
 ): ExcalidrawScene {
   return {
     appState: pickExcalidrawAppState(appState),
     // One adapter owns the native editor -> serializable scene type boundary.
     elements: elements as unknown as ExcalidrawScene["elements"],
+    files,
   };
 }
 
@@ -127,7 +132,7 @@ export function ExcalidrawSceneCanvas({
         });
       }
       onChange?.(elements, appState, files);
-      onSceneChange?.(sceneFromExcalidrawChange(elements, appState));
+      onSceneChange?.(sceneFromExcalidrawChange(elements, appState, files));
     },
     [onChange, onSceneChange],
   );
@@ -146,6 +151,8 @@ export function ExcalidrawSceneCanvas({
     return {
       elements,
       appState,
+      // Files ship with the first frame so logos paint without a reload.
+      ...(scene.files ? { files: scene.files as unknown as BinaryFiles } : {}),
       scrollToContent: true,
     };
   }, [scene]);

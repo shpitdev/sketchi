@@ -444,6 +444,51 @@ export const pharmaBatchDispositionFlowchart = parseFlowchartDiagram({
   },
 });
 
+/** A deploy flow whose nodes carry catalog logos, like the marketing hero. */
+export const deployPipelineLogoFlowchart = parseFlowchartDiagram({
+  id: "deploy-pipeline-logos",
+  title: "Deploy pipeline",
+  type: flowchartDiagramType,
+  nodes: [
+    {
+      id: "push",
+      label: "Push to GitHub",
+      kind: "start",
+      icon: { slug: "github" },
+    },
+    {
+      id: "build",
+      label: "Build the Docker image",
+      kind: "process",
+      icon: { slug: "docker" },
+    },
+    {
+      id: "tests",
+      label: "Tests pass?",
+      kind: "decision",
+      icon: { slug: "vitest" },
+    },
+    { id: "fix", label: "Fix the failing tests", kind: "process" },
+    {
+      id: "ship",
+      label: "Ship to Cloudflare Workers",
+      kind: "end",
+      icon: { slug: "cloudflare" },
+    },
+  ],
+  edges: [
+    { id: "push-build", source: "push", target: "build" },
+    { id: "build-tests", source: "build", target: "tests" },
+    { id: "tests-ship", source: "tests", target: "ship", label: "yes" },
+    { id: "tests-fix", source: "tests", target: "fix", label: "no" },
+    { id: "fix-build", source: "fix", target: "build" },
+  ],
+  layout: {
+    direction: "TB",
+    edgeRouting: "orthogonal",
+  },
+});
+
 export const flowchartEvaluationFixtures = [
   flowchartFixture,
   pharmaBatchDispositionFlowchart,
