@@ -712,11 +712,13 @@ function iconElementId(
   node: NodeSceneElement,
   usedElementIds: Set<string>,
 ): string {
-  const baseId = `${node.id}:icon`;
+  // Excalidraw's SVG export selects per-element image symbols by id, so the
+  // id must be a valid CSS identifier fragment (node ids contain colons).
+  const baseId = `${node.id.replace(/[^\w-]/gu, "-")}-icon`;
   let id = baseId;
   let suffix = 2;
   while (usedElementIds.has(id)) {
-    id = `${baseId}:${suffix}`;
+    id = `${baseId}-${suffix}`;
     suffix += 1;
   }
   usedElementIds.add(id);

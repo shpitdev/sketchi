@@ -8,6 +8,8 @@ export const MAX_RENDER_OUTPUT_PIXELS = 25_165_824;
 export const PNG_EXPORT_SCALE = 2;
 export const PNG_EXPORT_MIN_SCALE = 1;
 export const PNG_EXPORT_PADDING = 20;
+/** Embedded image data (node logos, pasted images) decoded into the raster. */
+export const MAX_RENDER_FILE_BYTES = 8 * 1024 * 1024;
 
 export interface RenderLimitDiagnostic {
   readonly code:
@@ -16,7 +18,8 @@ export interface RenderLimitDiagnostic {
     | "canvas_dimension"
     | "canvas_area"
     | "output_dimension"
-    | "output_pixels";
+    | "output_pixels"
+    | "file_bytes";
   readonly message: string;
   readonly observed?: number;
   readonly limit?: number;
@@ -139,6 +142,41 @@ export function renderLimitDiagnostic(
     );
   }
   return undefined;
+}
+
+/**
+ * Bound the image data URLs a drawing asks the rasterizer to decode: files
+ * referenced by live image elements. Files left behind by deleted or removed
+ * images are never decoded, so they don't count.
+ */
+export function renderFilesDiagnostic(
+  files: Readonly<Record<string, unknown>>,
+  elements: ReadonlyArray<unknown>,
+): RenderLimitDiagnostic | undefined {
+  const fileIds = new Set(
+    elements.flatMap((element) =>
+      isUnknownRecord(element) &&
+      element["type"] === "image" &&
+      element["isDeleted"] !== true &&
+      typeof element["fileId"] === "string"
+        ? [element["fileId"]]
+        : [],
+    ),
+  );
+  let bytes = 0;
+  for (const fileId of fileIds) {
+    const file = Object.hasOwn(files, fileId) ? files[fileId] : undefined;
+    const dataURL = isUnknownRecord(file) ? file["dataURL"] : undefined;
+    if (typeof dataURL === "string") bytes += dataURL.length;
+  }
+  return bytes > MAX_RENDER_FILE_BYTES
+    ? diagnostic(
+        "file_bytes",
+        `embedded image data exceeds ${String(MAX_RENDER_FILE_BYTES)} bytes`,
+        bytes,
+        MAX_RENDER_FILE_BYTES,
+      )
+    : undefined;
 }
 
 export function renderLimitFailure(

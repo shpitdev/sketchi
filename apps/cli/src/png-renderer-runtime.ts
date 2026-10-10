@@ -8,9 +8,11 @@ import * as Linkedom from "linkedom";
 
 import type { PngRenderInput } from "./png-renderer.js";
 import { HeadlessPngRenderError } from "./render-diagnostics.js";
+import { withSelectorSafeImageIds } from "./render-image-ids.js";
 import {
   adaptivePngExportScale,
   PNG_EXPORT_PADDING,
+  renderFilesDiagnostic,
   renderLimitDiagnostic,
 } from "./render-limits.js";
 
@@ -103,23 +105,23 @@ function installHeadlessDom(): void {
 
     error: DOMException | null = null;
     onabort:
-      | ((this: FileReader, event: ProgressEvent<FileReader>) => unknown)
-      | null = null;
+      ((this: FileReader, event: ProgressEvent<FileReader>) => unknown) | null =
+      null;
     onerror:
-      | ((this: FileReader, event: ProgressEvent<FileReader>) => unknown)
-      | null = null;
+      ((this: FileReader, event: ProgressEvent<FileReader>) => unknown) | null =
+      null;
     onload:
-      | ((this: FileReader, event: ProgressEvent<FileReader>) => unknown)
-      | null = null;
+      ((this: FileReader, event: ProgressEvent<FileReader>) => unknown) | null =
+      null;
     onloadend:
-      | ((this: FileReader, event: ProgressEvent<FileReader>) => unknown)
-      | null = null;
+      ((this: FileReader, event: ProgressEvent<FileReader>) => unknown) | null =
+      null;
     onloadstart:
-      | ((this: FileReader, event: ProgressEvent<FileReader>) => unknown)
-      | null = null;
+      ((this: FileReader, event: ProgressEvent<FileReader>) => unknown) | null =
+      null;
     onprogress:
-      | ((this: FileReader, event: ProgressEvent<FileReader>) => unknown)
-      | null = null;
+      ((this: FileReader, event: ProgressEvent<FileReader>) => unknown) | null =
+      null;
     readyState = 0;
     result: string | ArrayBuffer | null = null;
 
@@ -357,8 +359,7 @@ function initializeResvg(): Promise<void> {
 }
 
 let excalidrawModule:
-  | Promise<typeof import("@excalidraw/excalidraw")>
-  | undefined;
+  Promise<typeof import("@excalidraw/excalidraw")> | undefined;
 function loadExcalidraw() {
   if (!excalidrawModule) {
     installHeadlessDom();
@@ -385,10 +386,15 @@ export async function renderPngBytes(
         .map((issue) => issue.message),
     });
   }
-  const sizeFailure = renderLimitDiagnostic(
-    decodedExcalidraw.success.elements,
-    input.scene ? TITLE_HEIGHT : 0,
-  );
+  const sizeFailure =
+    renderLimitDiagnostic(
+      decodedExcalidraw.success.elements,
+      input.scene ? TITLE_HEIGHT : 0,
+    ) ??
+    renderFilesDiagnostic(
+      decodedExcalidraw.success.files,
+      decodedExcalidraw.success.elements,
+    );
   if (sizeFailure) {
     throw HeadlessPngRenderError.make({
       cause: new Error(sizeFailure.message),
@@ -442,7 +448,7 @@ export async function renderPngBytes(
     null,
   );
   const svg = await exportToSvg({
-    elements: restored.elements,
+    elements: withSelectorSafeImageIds(restored.elements),
     appState: {
       ...restored.appState,
       exportBackground: true,
@@ -455,6 +461,9 @@ export async function renderPngBytes(
     },
     files: restored.files,
     exportPadding: PNG_EXPORT_PADDING,
+    // Reused images become <symbol> sized width="100%", which resvg resolves
+    // against the root viewport and clips; per-element images keep their size.
+    reuseImages: false,
     skipInliningFonts: true,
   });
   if (input.scene) {
@@ -535,6 +544,7 @@ export async function normalizeExcalidrawArtifact(
           ? inputAppState.lockedMultiSelections
           : {},
     },
-    files: {},
+    // Image files (node logos, pasted images) travel with their elements.
+    files: restored.files,
   };
 }

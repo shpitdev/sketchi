@@ -53,10 +53,10 @@ describe("node logos in Excalidraw output", () => {
     );
 
     expect(images.map((image) => image.id)).toEqual(
-      logoNodes.map((node) => `${node.id}:icon`),
+      logoNodes.map((node) => `node-${node.nodeId}-icon`),
     );
     for (const node of logoNodes) {
-      const image = byId(excalidraw.elements, `${node.id}:icon`);
+      const image = byId(excalidraw.elements, `node-${node.nodeId}-icon`);
       const box = canvasNodeIconBox(node);
       const file = excalidraw.files?.[String(image.fileId)];
 
@@ -87,7 +87,7 @@ describe("node logos in Excalidraw output", () => {
 
     for (const nodeId of ["push", "build", "tests", "ship"]) {
       const shape = byId(excalidraw.elements, `node:${nodeId}`);
-      const image = byId(excalidraw.elements, `node:${nodeId}:icon`);
+      const image = byId(excalidraw.elements, `node-${nodeId}-icon`);
       const label = byId(excalidraw.elements, `label:${nodeId}`);
       const group = `node:${nodeId}:logo`;
 
@@ -100,7 +100,7 @@ describe("node logos in Excalidraw output", () => {
     }
     expect(byId(excalidraw.elements, "node:fix").groupIds).toEqual([]);
     expect(
-      excalidraw.elements.some((element) => element.id === "node:fix:icon"),
+      excalidraw.elements.some((element) => element.id === "node-fix-icon"),
     ).toBe(false);
   });
 
@@ -113,7 +113,7 @@ describe("node logos in Excalidraw output", () => {
         element.type === "node" && element.icon !== undefined,
     )) {
       const label = byId(excalidraw.elements, `label:${node.nodeId}`);
-      const image = byId(excalidraw.elements, `${node.id}:icon`);
+      const image = byId(excalidraw.elements, `node-${node.nodeId}-icon`);
       const bottom =
         node.y + canvasBoundTextInset(node).y + canvasBoundTextBox(node).height;
 
@@ -198,7 +198,7 @@ describe("node logos in Excalidraw output", () => {
     });
 
     expect(
-      excalidraw.elements.some((element) => element.id === "node:build:icon"),
+      excalidraw.elements.some((element) => element.id === "node-build-icon"),
     ).toBe(false);
     expect(byId(excalidraw.elements, "node:build").groupIds).toEqual([]);
     expect(
@@ -207,7 +207,7 @@ describe("node logos in Excalidraw output", () => {
       expect.arrayContaining([
         expect.objectContaining({
           code: "missing-image-file",
-          elementId: "node:push:icon",
+          elementId: "node-push-icon",
         }),
       ]),
     );
