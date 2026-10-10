@@ -41,13 +41,13 @@ describe("resolveWebSurfaceUrls", () => {
   it("uses configured preview URLs", () => {
     expect(
       resolveWebSurfaceUrls({
-        SKETCHI_ICONS_URL: "https://sketchi-icons-pr-42.dimethyl.workers.dev",
+        SKETCHI_ICONS_URL: "https://pr-42-sketchi-icons.dimethyl.workers.dev",
         SKETCHI_PLAYGROUND_URL:
-          "https://sketchi-studio-pr-42.dimethyl.workers.dev/",
+          "https://pr-42-sketchi-studio.dimethyl.workers.dev/",
       }),
     ).toEqual({
-      icons: "https://sketchi-icons-pr-42.dimethyl.workers.dev",
-      playground: "https://sketchi-studio-pr-42.dimethyl.workers.dev",
+      icons: "https://pr-42-sketchi-icons.dimethyl.workers.dev",
+      playground: "https://pr-42-sketchi-studio.dimethyl.workers.dev",
     });
   });
 
@@ -62,8 +62,12 @@ describe("resolveWebSurfaceUrls", () => {
   it.each([
     "https://sketchi-playground.dimethyl.workers.dev",
     "https://sketchi-playground.dimethyl.workers.dev./",
+    "https://pr-42-sketchi-playground.dimethyl.workers.dev",
+    "https://pr-42-sketchi-playground.dimethyl.workers.dev./",
+    "https://0123abcd-sketchi-playground.dimethyl.workers.dev",
     "https://sketchi-playground-pr-42.dimethyl.workers.dev",
     "https://sketchi-playground-pr-42.dimethyl.workers.dev./",
+    "https://pr-42-sketchi-playground.other-account.workers.dev",
   ])("rejects the internal eval Worker as a configured public link", (url) => {
     expect(
       resolveWebSurfaceUrls({ SKETCHI_PLAYGROUND_URL: url }).playground,
@@ -75,10 +79,10 @@ describe("surfaceLinkLabel", () => {
   it("uses the hostname for absolute links", () => {
     expect(
       surfaceLinkLabel(
-        "https://sketchi-studio-pr-42.dimethyl.workers.dev",
+        "https://pr-42-sketchi-studio.dimethyl.workers.dev",
         "fallback",
       ),
-    ).toBe("sketchi-studio-pr-42.dimethyl.workers.dev");
+    ).toBe("pr-42-sketchi-studio.dimethyl.workers.dev");
   });
 
   it("uses the fallback for relative links", () => {

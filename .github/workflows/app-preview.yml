@@ -12,16 +12,8 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: PR number to deploy or clean up.
+        description: Open same-repository PR number to preview.
         required: true
-      action:
-        description: Deploy or cleanup.
-        required: true
-        default: deploy
-        type: choice
-        options:
-          - deploy
-          - cleanup
 
 permissions:
   contents: read
@@ -47,7 +39,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
-          PREVIEW_ACTION: ${{ github.event.action == 'closed' && 'cleanup' || inputs.action || 'deploy' }}
+          PREVIEW_ACTION: ${{ github.event.action == 'closed' && 'cleanup' || 'deploy' }}
           EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
@@ -90,7 +82,7 @@ jobs:
       (github.event_name == 'pull_request' &&
         github.event.action != 'closed' &&
         github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name == 'workflow_dispatch' && inputs.action == 'deploy')
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: staging
     strategy:
@@ -167,14 +159,14 @@ jobs:
           )"
           echo "workers_dev_subdomain=${subdomain}" >> "$GITHUB_OUTPUT"
 
-      - name: Prepare preview Wrangler config
-        id: prepare
+      - name: Validate explicit Preview settings
+        id: preview-settings
         env:
           CF_PREVIEW_WORKERS_SUBDOMAIN: ${{ steps.workers-subdomain.outputs.workers_dev_subdomain }}
           PREVIEW_PROJECT_ID: ${{ matrix.project }}
           PR_NUMBER: ${{ needs.resolve-preview-pr.outputs.pr_number }}
         run: >-
-          node scripts/01-prepare-preview-deploy.mjs
+          node scripts/01-validate-preview-config.mjs
           --project "$PREVIEW_PROJECT_ID"
           --pr-number "$PR_NUMBER"
           --config "${{ steps.worker-app.outputs.worker_config_path }}"
@@ -187,37 +179,66 @@ jobs:
           PR_NUMBER: ${{ needs.resolve-preview-pr.outputs.pr_number }}
           PREVIEW_STATUS: unconfigured
           PREVIEW_SHA: ${{ needs.resolve-preview-pr.outputs.sha }}
-          PREVIEW_WORKER_NAME: ${{ steps.prepare.outputs.preview_worker_name }}
+          PREVIEW_NAME: ${{ steps.preview-settings.outputs.preview_name }}
         run: node scripts/03-upsert-preview-comment.mjs
 
-      - name: Deploy preview Worker
+      - name: Re-check PR is open
         if: steps.credentials.outputs.configured == 'true'
+        id: still-open
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.resolve-preview-pr.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          # This job holds its concurrency lock now. If the PR closed while it was
+          # queued, cleanup may already have run, so deploying would recreate the Preview.
+          state="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq .state)"
+          if [ "$state" = open ]; then
+            echo "open=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "open=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::PR #${PR_NUMBER} is ${state}; skipping the Preview deploy."
+          fi
+
+      - name: Deploy official Worker Preview
+        if: steps.credentials.outputs.configured == 'true' && steps.still-open.outputs.open == 'true'
         id: deploy
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          PROJECT_ID: ${{ steps.prepare.outputs.project_id }}
-          WORKER_NAME: ${{ steps.prepare.outputs.worker_name }}
+          PROJECT_ID: ${{ matrix.project }}
+          WORKER_NAME: ${{ steps.worker-app.outputs.worker_name }}
+          WRANGLER_OUTPUT_FILE_PATH: .memory/wrangler-${{ matrix.project }}-preview.ndjson
         run: |
           set -euo pipefail
           mkdir -p .memory
-          pnpm exec wrangler deploy \
-            --config "${{ steps.prepare.outputs.preview_config_path }}" \
-            --keep-vars \
-            --no-x-provision \
-            --message "PR #${{ needs.resolve-preview-pr.outputs.pr_number }} project ${PROJECT_ID} Worker ${WORKER_NAME} preview ${{ needs.resolve-preview-pr.outputs.sha }}" \
-            2>&1 | tee ".memory/wrangler-${{ matrix.project }}-preview-deploy.log"
+          rm -f "$WRANGLER_OUTPUT_FILE_PATH"
+          # CLI vars apply to the Preview only. They never rewrite production settings.
+          preview_args=()
+          if [ "$PROJECT_ID" = web ]; then
+            preview_args+=(
+              --var "SKETCHI_ICONS_URL:${{ steps.preview-settings.outputs.icons_preview_url }}"
+              --var "SKETCHI_PLAYGROUND_URL:${{ steps.preview-settings.outputs.playground_preview_url }}"
+            )
+          fi
+          pnpm exec wrangler preview \
+            --config "${{ steps.worker-app.outputs.worker_config_path }}" \
+            --name "${{ steps.preview-settings.outputs.preview_name }}" \
+            --ignore-base-config \
+            "${preview_args[@]}" \
+            --message "PR #${{ needs.resolve-preview-pr.outputs.pr_number }} project ${PROJECT_ID} Worker ${WORKER_NAME} preview ${{ needs.resolve-preview-pr.outputs.sha }}"
 
       - name: Extract preview URL
-        if: steps.credentials.outputs.configured == 'true'
+        if: steps.credentials.outputs.configured == 'true' && steps.still-open.outputs.open == 'true'
         id: preview-url
         run: |
           node scripts/02-extract-preview-url.mjs \
-            ".memory/wrangler-${{ matrix.project }}-preview-deploy.log" \
-            --worker-name "${{ steps.prepare.outputs.preview_worker_name }}"
+            ".memory/wrangler-${{ matrix.project }}-preview.ndjson" \
+            --worker-name "${{ steps.worker-app.outputs.worker_name }}" \
+            --preview-name "${{ steps.preview-settings.outputs.preview_name }}"
 
       - name: Comment preview URL
-        if: steps.credentials.outputs.configured == 'true'
+        if: steps.credentials.outputs.configured == 'true' && steps.still-open.outputs.open == 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PREVIEW_PROJECT_ID: ${{ matrix.project }}
@@ -225,7 +246,7 @@ jobs:
           PREVIEW_STATUS: ready
           PREVIEW_URL: ${{ steps.preview-url.outputs.preview_url }}
           PREVIEW_SHA: ${{ needs.resolve-preview-pr.outputs.sha }}
-          PREVIEW_WORKER_NAME: ${{ steps.prepare.outputs.preview_worker_name }}
+          PREVIEW_NAME: ${{ steps.preview-settings.outputs.preview_name }}
         run: node scripts/03-upsert-preview-comment.mjs
 
       - name: Comment preview failure
@@ -236,16 +257,15 @@ jobs:
           PR_NUMBER: ${{ needs.resolve-preview-pr.outputs.pr_number }}
           PREVIEW_STATUS: failed
           PREVIEW_SHA: ${{ needs.resolve-preview-pr.outputs.sha }}
-          PREVIEW_WORKER_NAME: ${{ steps.prepare.outputs.preview_worker_name }}
+          PREVIEW_NAME: ${{ steps.preview-settings.outputs.preview_name }}
         run: node scripts/03-upsert-preview-comment.mjs
 
   cleanup-preview:
     needs: resolve-preview-pr
     if: >-
-      (github.event_name == 'pull_request' &&
-        github.event.action == 'closed' &&
-        github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name == 'workflow_dispatch' && inputs.action == 'cleanup')
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     environment: staging
     strategy:
@@ -258,8 +278,11 @@ jobs:
           - excalidraw
           - icons
     concurrency:
-      group: app-preview-${{ matrix.project }}-pr-${{ needs.resolve-preview-pr.outputs.pr_number }}
-      cancel-in-progress: false
+      # Same queue as deploy-preview. Deploys also re-check the PR state once they
+      # hold the lock, so one that was waiting when the PR closed skips the upload.
+      group: ${{ matrix.project == 'playground' && 'cloudflare-pipeline-bound-upload' || format('app-preview-{0}-pr-{1}', matrix.project, needs.resolve-preview-pr.outputs.pr_number) }}
+      cancel-in-progress: ${{ matrix.project != 'playground' }}
+      queue: ${{ matrix.project == 'playground' && 'max' || 'single' }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -269,38 +292,24 @@ jobs:
         with:
           install-dependencies: "false"
 
-      - name: Check Cloudflare credentials
-        id: credentials
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ] && [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "configured=false" >> "$GITHUB_OUTPUT"
-          echo "::warning::Cloudflare preview cleanup credentials are not configured. Nothing was deleted."
-
-      - name: Delete preview Worker
-        if: steps.credentials.outputs.configured == 'true'
+      - name: Delete official Worker Preview
         id: cleanup
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           PREVIEW_PROJECT_ID: ${{ matrix.project }}
           PR_NUMBER: ${{ needs.resolve-preview-pr.outputs.pr_number }}
-        run: node scripts/04-delete-preview-worker.mjs --project "$PREVIEW_PROJECT_ID" --pr-number "$PR_NUMBER"
+        # Fails, after recording `deletion-pending`, if the Preview URL keeps serving.
+        run: node scripts/04-delete-preview.mjs --project "$PREVIEW_PROJECT_ID" --pr-number "$PR_NUMBER"
 
       - name: Comment preview cleanup
-        if: steps.credentials.outputs.configured == 'true'
+        if: ${{ !cancelled() && steps.cleanup.outputs.comment_status != '' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PREVIEW_PROJECT_ID: ${{ matrix.project }}
           PR_NUMBER: ${{ needs.resolve-preview-pr.outputs.pr_number }}
-          PREVIEW_STATUS: deleted
+          PREVIEW_STATUS: ${{ steps.cleanup.outputs.comment_status }}
+          PREVIEW_URL: ${{ steps.cleanup.outputs.comment_status == 'deletion-pending' && steps.cleanup.outputs.preview_url || '' }}
           PREVIEW_SHA: ${{ needs.resolve-preview-pr.outputs.sha }}
-          PREVIEW_WORKER_NAME: ${{ steps.cleanup.outputs.preview_worker_name }}
+          PREVIEW_NAME: ${{ steps.cleanup.outputs.preview_name }}
         run: node scripts/03-upsert-preview-comment.mjs

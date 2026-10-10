@@ -1,7 +1,6 @@
 const workerProjects = {
   excalidraw: {
     buildOutputPath: "dist/apps/excalidraw",
-    previewWorkerPrefix: "sketchi-excalidraw-pr",
     projectId: "excalidraw",
     projectRoot: "apps/excalidraw",
     workerName: "sketchi-excalidraw",
@@ -9,7 +8,6 @@ const workerProjects = {
   },
   "eval-harness": {
     buildOutputPath: "dist/apps/eval-harness",
-    previewWorkerPrefix: "sketchi-playground-pr",
     projectId: "eval-harness",
     projectRoot: "apps/eval-harness",
     workerName: "sketchi-playground",
@@ -17,7 +15,6 @@ const workerProjects = {
   },
   icons: {
     buildOutputPath: "dist/apps/icons",
-    previewWorkerPrefix: "sketchi-icons-pr",
     projectId: "icons",
     projectRoot: "apps/icons",
     workerName: "sketchi-icons",
@@ -25,7 +22,6 @@ const workerProjects = {
   },
   playground: {
     buildOutputPath: "dist/apps/playground",
-    previewWorkerPrefix: "sketchi-studio-pr",
     projectId: "playground",
     projectRoot: "apps/playground",
     workerName: "sketchi-studio",
@@ -33,7 +29,6 @@ const workerProjects = {
   },
   web: {
     buildOutputPath: "dist/apps/web",
-    previewWorkerPrefix: "sketchi-web-pr",
     projectId: "web",
     projectRoot: "apps/web",
     workerName: "sketchi-web",
@@ -65,7 +60,6 @@ export function workerProjectConfig(project) {
   return {
     ...config,
     generatedWranglerConfigPath: `${serverOutputPath}/wrangler.json`,
-    previewWranglerConfigPath: `${serverOutputPath}/wrangler.preview.json`,
     productionDomainWranglerConfigPath: `${serverOutputPath}/wrangler.domains.json`,
     serverOutputPath,
   };

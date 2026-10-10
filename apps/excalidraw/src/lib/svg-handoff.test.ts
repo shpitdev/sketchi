@@ -7,7 +7,7 @@ describe("parseSvgHandoff", () => {
     expect(
       parseSvgHandoff(
         validateSvgHandoffSearch({
-          svg: "https://sketchi-icons-pr-91.dimethyl.workers.dev/output/upload-ready/svg/auth-identity/workos.svg",
+          svg: "https://pr-91-sketchi-icons.dimethyl.workers.dev/output/upload-ready/svg/auth-identity/workos.svg",
           roughness: "2",
           fillStyle: "hachure",
           colorMode: "monochrome",
@@ -18,7 +18,7 @@ describe("parseSvgHandoff", () => {
       kind: "valid",
       handoff: {
         sourceUrl:
-          "https://sketchi-icons-pr-91.dimethyl.workers.dev/output/upload-ready/svg/auth-identity/workos.svg",
+          "https://pr-91-sketchi-icons.dimethyl.workers.dev/output/upload-ready/svg/auth-identity/workos.svg",
         options: {
           roughness: 2,
           fillStyle: "hachure",
@@ -43,6 +43,8 @@ describe("parseSvgHandoff", () => {
   it.each([
     "https://example.com/output/upload-ready/svg/auth/workos.svg",
     "https://sketchi-icons.attacker.workers.dev/output/upload-ready/svg/auth/workos.svg",
+    "https://evil-sketchi-icons.dimethyl.workers.dev/output/upload-ready/svg/auth/workos.svg",
+    "https://pr-91-sketchi-studio.dimethyl.workers.dev/output/upload-ready/svg/auth/workos.svg",
     "https://sketchi-icons.dimethyl.workers.dev:444/output/upload-ready/svg/auth/workos.svg",
     "https://sketchi-icons.dimethyl.workers.dev/output/upload-ready/svg/auth/workos.svg?raw=1",
     "https://sketchi-icons.dimethyl.workers.dev/output/review/review-data.json",

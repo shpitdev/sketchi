@@ -69,18 +69,18 @@ describe("SiteFooter", () => {
     render(
       <SiteFooter
         surfaceUrls={{
-          icons: "https://sketchi-icons-pr-42.dimethyl.workers.dev",
-          playground: "https://sketchi-studio-pr-42.dimethyl.workers.dev",
+          icons: "https://pr-42-sketchi-icons.dimethyl.workers.dev",
+          playground: "https://pr-42-sketchi-studio.dimethyl.workers.dev",
         }}
       />,
     );
 
     expect(
       screen.getByRole("link", { name: "Playground" }).getAttribute("href"),
-    ).toBe("https://sketchi-studio-pr-42.dimethyl.workers.dev");
+    ).toBe("https://pr-42-sketchi-studio.dimethyl.workers.dev");
     expect(
       screen.getByRole("link", { name: "Icons" }).getAttribute("href"),
-    ).toBe("https://sketchi-icons-pr-42.dimethyl.workers.dev");
+    ).toBe("https://pr-42-sketchi-icons.dimethyl.workers.dev");
     expect(
       screen.getByRole("link", { name: "Claude Code" }).getAttribute("href"),
     ).toBe("/agents/claude-code");

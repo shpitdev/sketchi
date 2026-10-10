@@ -17,10 +17,10 @@ export type SvgHandoffResult =
 function isAllowedIconHost(hostname: string): boolean {
   return (
     hostname === "icons.sketchi.app" ||
-    // sketchi-allow-workers-dev: PR preview Icons Workers have no custom
-    // domain, so handoff from a preview must keep working. Matched, never
-    // rendered — production links use the public host above.
-    /^sketchi-icons(?:-pr-\d+)?\.dimethyl\.workers\.dev$/.test(hostname) ||
+    // sketchi-allow-workers-dev: PR Previews of the Icons Worker have no
+    // custom domain, so handoff from a preview must keep working. Matched,
+    // never rendered — production links use the public host above.
+    /^(?:pr-\d+-)?sketchi-icons\.dimethyl\.workers\.dev$/.test(hostname) ||
     /^(?:[a-z0-9-]+\.)*icons\.sketchi\.localhost$/.test(hostname)
   );
 }

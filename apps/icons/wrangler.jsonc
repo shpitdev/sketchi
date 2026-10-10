@@ -14,4 +14,12 @@
   "vars": {
     "SKETCHI_APP_SURFACE": "icons",
   },
+  "previews": {
+    "vars": {
+      "SKETCHI_APP_SURFACE": "icons",
+    },
+    "observability": {
+      "enabled": true,
+    },
+  },
 }

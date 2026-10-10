@@ -22,16 +22,18 @@ export const LOCAL_WEB_SURFACE_URLS: WebSurfaceUrls = {
 // Worker hostnames are an implementation detail and must never reach a user.
 // The defaults are the public product hosts; a PR preview is the one place a
 // Worker hostname is the correct link target, and it only ever arrives through
-// the SKETCHI_*_URL vars the preview workflow injects into the PR Worker.
+// the SKETCHI_*_URL vars the preview workflow injects into the PR Preview.
 export const DEFAULT_WEB_SURFACE_URLS: WebSurfaceUrls = {
   icons: `https://${PRODUCT_SURFACE_HOSTS.icons}`,
   playground: `https://${PRODUCT_SURFACE_HOSTS.playground}`,
 };
 
 // sketchi-allow-workers-dev: rejection pattern for the internal eval Worker,
-// which is never a public link target. This value is matched, never rendered.
+// its legacy per-PR Workers (`sketchi-playground-pr-<n>`), and its Previews
+// (`pr-<n>-sketchi-playground`), which are never public link targets. This
+// value is matched, never rendered.
 const INTERNAL_EVAL_WORKER_HOST =
-  /^sketchi-playground(?:-pr(?:-[a-z0-9-]+)?)?\.dimethyl\.workers\.dev$/i;
+  /^(?:[a-z0-9-]+-)?sketchi-playground(?:-pr(?:-[a-z0-9-]+)?)?\.[a-z0-9-]+\.workers\.dev$/i;
 
 function cleanHttpUrl(value: unknown, fallback: string): string {
   if (typeof value !== "string") {

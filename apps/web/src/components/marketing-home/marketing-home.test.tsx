@@ -43,8 +43,8 @@ describe("MarketingHome", () => {
     render(
       <MarketingHome
         surfaceUrls={{
-          icons: "https://sketchi-icons-pr-42.dimethyl.workers.dev",
-          playground: "https://sketchi-studio-pr-42.dimethyl.workers.dev",
+          icons: "https://pr-42-sketchi-icons.dimethyl.workers.dev",
+          playground: "https://pr-42-sketchi-studio.dimethyl.workers.dev",
         }}
       />,
     );
@@ -53,7 +53,7 @@ describe("MarketingHome", () => {
       name: "Open the playground",
     })) {
       expect(link.getAttribute("href")).toBe(
-        "https://sketchi-studio-pr-42.dimethyl.workers.dev",
+        "https://pr-42-sketchi-studio.dimethyl.workers.dev",
       );
     }
 
@@ -61,6 +61,6 @@ describe("MarketingHome", () => {
       screen
         .getByRole("link", { name: /Browse the library/ })
         .getAttribute("href"),
-    ).toBe("https://sketchi-icons-pr-42.dimethyl.workers.dev");
+    ).toBe("https://pr-42-sketchi-icons.dimethyl.workers.dev");
   });
 });

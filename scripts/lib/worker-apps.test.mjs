@@ -67,7 +67,6 @@ test("Worker projects have isolated build and generated config paths", () => {
   const uniqueFields = [
     "buildOutputPath",
     "generatedWranglerConfigPath",
-    "previewWranglerConfigPath",
     "productionDomainWranglerConfigPath",
     "projectRoot",
   ];
@@ -84,10 +83,6 @@ test("Worker projects have isolated build and generated config paths", () => {
     assert.equal(
       project.generatedWranglerConfigPath,
       `${project.buildOutputPath}/server/wrangler.json`,
-    );
-    assert.equal(
-      project.previewWranglerConfigPath,
-      `${project.buildOutputPath}/server/wrangler.preview.json`,
     );
     assert.equal(
       project.productionDomainWranglerConfigPath,
@@ -113,33 +108,15 @@ test("project IDs resolve independently to durable Worker identities", async () 
   const playground = workerProjectConfig("playground");
   assert.equal(playground.projectId, "playground");
   assert.equal(playground.workerName, "sketchi-studio");
-  assert.equal(playground.previewWorkerPrefix, "sketchi-studio-pr");
   assert.notEqual(playground.projectId, playground.workerName);
 });
 
 test("final eval and public Playground projects retain their durable Workers", () => {
-  assert.deepEqual(
-    {
-      previewWorkerPrefix:
-        workerProjectConfig("eval-harness").previewWorkerPrefix,
-      workerName: workerProjectConfig("eval-harness").workerName,
-    },
-    {
-      previewWorkerPrefix: "sketchi-playground-pr",
-      workerName: "sketchi-playground",
-    },
+  assert.equal(
+    workerProjectConfig("eval-harness").workerName,
+    "sketchi-playground",
   );
-  assert.deepEqual(
-    {
-      previewWorkerPrefix:
-        workerProjectConfig("playground").previewWorkerPrefix,
-      workerName: workerProjectConfig("playground").workerName,
-    },
-    {
-      previewWorkerPrefix: "sketchi-studio-pr",
-      workerName: "sketchi-studio",
-    },
-  );
+  assert.equal(workerProjectConfig("playground").workerName, "sketchi-studio");
 });
 
 test("identity validation fails closed on project, Worker, or Wrangler drift", () => {

@@ -39,5 +39,5 @@ Playground or persisted Studio surface.
 
 The Nx and private npm project identities are `eval-harness` and
 `@sketchi/eval-harness`. Deployment intentionally retains the durable
-`sketchi-playground` Worker, `sketchi-playground-pr-*` preview prefix,
+`sketchi-playground` Worker (PR Previews are `pr-<n>` Previews of it),
 `SKETCHI_APP_SURFACE=playground`, and `/api/scenario-candidates` contract.

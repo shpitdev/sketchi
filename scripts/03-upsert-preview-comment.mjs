@@ -66,7 +66,7 @@ export async function upsertPreviewComment() {
   const body = previewCommentBody({
     marker,
     previewUrl: process.env.PREVIEW_URL,
-    previewWorkerName: process.env.PREVIEW_WORKER_NAME,
+    previewName: process.env.PREVIEW_NAME,
     projectId: project.projectId,
     runUrl,
     sha: process.env.PREVIEW_SHA ?? process.env.GITHUB_SHA,

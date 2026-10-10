@@ -20,7 +20,7 @@ const meta = {
         roughness: 2,
       },
       sourceUrl:
-        "https://sketchi-icons-pr-91.dimethyl.workers.dev/output/upload-ready/svg/storybook/native-fixture.svg",
+        "https://pr-91-sketchi-icons.dimethyl.workers.dev/output/upload-ready/svg/storybook/native-fixture.svg",
     },
     initialSource: supportedSvg,
   },

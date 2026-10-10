@@ -11,4 +11,12 @@
   "vars": {
     "SKETCHI_APP_SURFACE": "web",
   },
+  "previews": {
+    "vars": {
+      "SKETCHI_APP_SURFACE": "web",
+    },
+    "observability": {
+      "enabled": true,
+    },
+  },
 }
