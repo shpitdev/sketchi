@@ -50,7 +50,7 @@ export function FeatureGrid() {
     <section className="sk-section feature-grid" id="product">
       <div className="sk-shell">
         <h2 className="sk-section__title feature-grid__title">
-          Diagrams you can edit and export.
+          Built on Excalidraw.
         </h2>
         <div className="feature-grid__cards">
           {features.map((feature) => (

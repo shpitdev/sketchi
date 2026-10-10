@@ -12,12 +12,12 @@ describe("MarketingHome", () => {
     ).toBeTruthy();
     expect(
       screen.getByRole("heading", {
-        name: "Diagrams you can edit and export.",
+        name: "Built on Excalidraw.",
       }),
     ).toBeTruthy();
     expect(
       screen.getByRole("heading", {
-        name: "Your stack’s logos, hand-drawn.",
+        name: "Your stack’s logos, already sketched.",
       }),
     ).toBeTruthy();
     expect(

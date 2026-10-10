@@ -87,7 +87,7 @@ export function IconWall({
       <div className="sk-shell">
         <div className="icon-wall__head">
           <h2 className="sk-section__title icon-wall__title">
-            Your stack’s logos, hand-drawn.
+            Your stack’s logos, already sketched.
           </h2>
           <a className="sk-btn sk-btn--ghost" href={iconsHref}>
             Browse the library →

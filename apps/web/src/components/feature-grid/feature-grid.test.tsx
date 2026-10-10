@@ -8,6 +8,9 @@ describe("FeatureGrid", () => {
     render(<FeatureGrid />);
 
     expect(
+      screen.getByRole("heading", { name: "Built on Excalidraw." }),
+    ).toBeTruthy();
+    expect(
       screen.getByRole("heading", { name: "Individual shapes and connectors" }),
     ).toBeTruthy();
     expect(
