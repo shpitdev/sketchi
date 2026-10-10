@@ -78,6 +78,13 @@ function shellQuote(value) {
   return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
+const TTY_PROMPT_TIMEOUT_MS = 30_000;
+
+/**
+ * Runs a command under a pseudo-terminal. Each step waits until its prompt
+ * text has rendered after the previous step's prompt before typing, so the
+ * keystrokes never race the interactive prompt setup.
+ */
 function runTty(file, args, options = {}) {
   const command = [
     "stty cols 100",
@@ -94,21 +101,52 @@ function runTty(file, args, options = {}) {
   );
   const result = collect(child);
   const steps = options.steps ?? [];
-  const send = (index) => {
-    if (index >= steps.length) {
-      child.stdin.end();
-      return;
-    }
-    setTimeout(
-      () => {
-        child.stdin.write(steps[index]);
-        send(index + 1);
-      },
-      index === 0 ? 400 : 600,
-    );
+  const chunks = [];
+  let searchFrom = 0;
+  let stepIndex = 0;
+  let stalledPrompt = null;
+  let stallTimer;
+  const armStallTimer = () => {
+    clearTimeout(stallTimer);
+    const step = steps[stepIndex];
+    if (!step) return;
+    stallTimer = setTimeout(() => {
+      stalledPrompt = step.prompt;
+      child.kill("SIGKILL");
+    }, TTY_PROMPT_TIMEOUT_MS);
   };
-  send(0);
-  return result;
+  const advance = () => {
+    const output = Buffer.concat(chunks);
+    while (stepIndex < steps.length) {
+      const step = steps[stepIndex];
+      const found = output.indexOf(Buffer.from(step.prompt), searchFrom);
+      if (found < 0) return;
+      searchFrom = found + Buffer.byteLength(step.prompt);
+      child.stdin.write(step.input);
+      stepIndex += 1;
+      armStallTimer();
+    }
+    clearTimeout(stallTimer);
+    if (!child.stdin.writableEnded) child.stdin.end();
+  };
+  if (steps.length === 0) {
+    child.stdin.end();
+  } else {
+    child.stdout.on("data", (chunk) => {
+      chunks.push(chunk);
+      advance();
+    });
+    armStallTimer();
+  }
+  return result.then((completed) => {
+    clearTimeout(stallTimer);
+    if (stalledPrompt !== null) {
+      throw new Error(
+        `TTY prompt "${stalledPrompt}" did not render within ${String(TTY_PROMPT_TIMEOUT_MS)}ms: ${completed.stdout.toString("utf8")}`,
+      );
+    }
+    return completed;
+  });
 }
 
 function parseJson(buffer, label) {
@@ -600,28 +638,32 @@ try {
   };
   delete wizardEnvironment.CI;
   delete wizardEnvironment.GITHUB_ACTIONS;
+  const wizardRequests = [];
+  const wizardServer = makeSuccessServer(wizardRequests);
+  await new Promise((ready) => wizardServer.listen(0, "127.0.0.1", ready));
+  const wizardPort = wizardServer.address().port;
   const runWizard = (steps, extraArguments = []) =>
     runTty(
       binary,
       [
         "generate",
         "--endpoint",
-        `http://127.0.0.1:${String(successPort)}/api/v1/generate`,
+        `http://127.0.0.1:${String(wizardPort)}/api/v1/generate`,
         ...extraArguments,
       ],
       { cwd: fixtureRoot, env: wizardEnvironment, steps },
     );
-
-  const wizardRequests = [];
-  const wizardServer = makeSuccessServer(wizardRequests);
-  await new Promise((ready) =>
-    wizardServer.listen(successPort, "127.0.0.1", ready),
-  );
+  const describeStep = (input) => ({
+    prompt: "What should Sketchi draw?",
+    input,
+  });
+  const typeStep = (input) => ({ prompt: "Diagram type", input });
+  const destinationStep = (input) => ({ prompt: "Save the PNG", input });
   try {
     const wizardCurrent = await runWizard([
-      "Create a release flow.\r",
-      "\r",
-      "\r",
+      describeStep("Create a release flow.\r"),
+      typeStep("\r"),
+      destinationStep("\r"),
     ]);
     expectExit(wizardCurrent, 0, "wizard current-directory PNG");
     assert(
@@ -640,9 +682,9 @@ try {
     const diagramsDirectory = resolve(fixtureRoot, "diagrams");
     await rm(diagramsDirectory, { force: true, recursive: true });
     const wizardProject = await runWizard([
-      "Create a release flow.\r",
-      "\r",
-      "\u001b[B\r",
+      describeStep("Create a release flow.\r"),
+      typeStep("\r"),
+      destinationStep("\u001b[B\r"),
     ]);
     expectExit(wizardProject, 0, "wizard project-diagrams PNG");
     const projectPng = resolve(diagramsDirectory, "generated-release-flow.png");
@@ -654,10 +696,10 @@ try {
 
     const customPng = resolve(fixtureRoot, "wizard-custom.png");
     const wizardCustom = await runWizard([
-      "Create a release flow.\r",
-      "\u001b[B\r",
-      "\u001b[B\u001b[B\r",
-      `${customPng}\r`,
+      describeStep("Create a release flow.\r"),
+      typeStep("\u001b[B\r"),
+      destinationStep("\u001b[B\u001b[B\r"),
+      { prompt: "PNG destination", input: `${customPng}\r` },
     ]);
     expectExit(wizardCustom, 0, "wizard custom PNG");
     assertPng(
@@ -673,7 +715,7 @@ try {
     const presetPng = resolve(fixtureRoot, "wizard-preset.png");
     const requestCountBeforePreset = wizardRequests.length;
     const wizardPreset = await runWizard(
-      ["Create a preset release map.\r"],
+      [describeStep("Create a preset release map.\r")],
       [
         "--type",
         "mindmap",
@@ -727,7 +769,7 @@ try {
     const wizardCancellation = await runTty(binary, ["generate"], {
       cwd: fixtureRoot,
       env: wizardEnvironment,
-      steps: ["\u0003"],
+      steps: [describeStep("\u0003")],
     });
     expectExit(wizardCancellation, 2, "wizard cancellation");
     assert(
