@@ -620,7 +620,7 @@ function readAntigravityEvidenceForConversation(input: {
 }
 
 function readAntigravityEvidence(input: {
-  beforeConversationId?: string;
+  beforeConversationId?: string | undefined;
   cwd: string;
   outputDir: string;
   stem: string;
@@ -705,7 +705,7 @@ function claudeMcpConfig(mcpUrl: string): string {
 
 function buildHarnessPrompt(input: {
   harness: HarnessName;
-  model?: string;
+  model?: string | undefined;
   runNumber: number;
   scenario: DiagramScenario;
 }): string {
@@ -810,7 +810,7 @@ function buildHarnessPrompt(input: {
 export function commandForRun(input: {
   harness: HarnessName;
   mcpUrl: string;
-  model?: string;
+  model?: string | undefined;
   prompt: string;
   scenarioId: string;
   timeoutMs: number;
@@ -913,15 +913,13 @@ function tokensFrom(value: unknown): HarnessTokens | undefined {
     numberValue(cache?.read) ?? numberValue(value.cache_read_input_tokens);
   const cacheWrite =
     numberValue(cache?.write) ?? numberValue(value.cache_creation_input_tokens);
+  const reasoning = numberValue(value.reasoning);
+  const total = numberValue(value.total);
   return {
     ...(input === undefined ? {} : { input }),
     ...(output === undefined ? {} : { output }),
-    ...(numberValue(value.reasoning) === undefined
-      ? {}
-      : { reasoning: numberValue(value.reasoning) }),
-    ...(numberValue(value.total) === undefined
-      ? {}
-      : { total: numberValue(value.total) }),
+    ...(reasoning === undefined ? {} : { reasoning }),
+    ...(total === undefined ? {} : { total }),
     ...(cacheRead === undefined ? {} : { cacheRead }),
     ...(cacheWrite === undefined ? {} : { cacheWrite }),
   };
@@ -1039,10 +1037,9 @@ function toolCallsFromEvent(event: unknown): HarnessToolCall[] {
     if (toolName) {
       const state = isRecord(part?.state) ? part?.state : undefined;
       const status = stringValue(state?.status);
+      const callId = stringValue(part?.callID);
       calls.push({
-        ...(stringValue(part?.callID)
-          ? { callId: stringValue(part?.callID) }
-          : {}),
+        ...(callId ? { callId } : {}),
         name: toolName,
         ...(status ? { status } : {}),
       });
@@ -1068,6 +1065,7 @@ function toolCallsFromEvent(event: unknown): HarnessToolCall[] {
   }
 
   const agyToolCalls = Array.isArray(event.tool_calls) ? event.tool_calls : [];
+  const agyStatus = stringValue(event.status);
   for (const call of agyToolCalls.filter(isRecord)) {
     const name = stringValue(call.name);
     const args = isRecord(call.args) ? call.args : undefined;
@@ -1077,9 +1075,7 @@ function toolCallsFromEvent(event: unknown): HarnessToolCall[] {
       if (serverName && toolName) {
         calls.push({
           name: `mcp(${serverName}/${toolName})`,
-          ...(stringValue(event.status)
-            ? { status: stringValue(event.status) }
-            : {}),
+          ...(agyStatus ? { status: agyStatus } : {}),
         });
       }
       continue;
@@ -1087,9 +1083,7 @@ function toolCallsFromEvent(event: unknown): HarnessToolCall[] {
     if (name) {
       calls.push({
         name,
-        ...(stringValue(event.status)
-          ? { status: stringValue(event.status) }
-          : {}),
+        ...(agyStatus ? { status: agyStatus } : {}),
       });
     }
   }
@@ -1242,27 +1236,23 @@ function artifactProofFromCompactResult(input: {
     return undefined;
   }
 
+  const sceneUrl = stringValue(result.sceneUrl);
+  const excalidrawUrl = stringValue(result.excalidrawUrl);
+  const pngUrl = stringValue(result.pngUrl);
+  const qualityScore = numberValue(result.qualityScore);
   return {
     artifactId,
     artifactFormats,
     artifactUrls: {
-      ...(stringValue(result.sceneUrl)
-        ? { scene: stringValue(result.sceneUrl) }
-        : {}),
-      ...(stringValue(result.excalidrawUrl)
-        ? { excalidraw: stringValue(result.excalidrawUrl) }
-        : {}),
-      ...(stringValue(result.pngUrl)
-        ? { png: stringValue(result.pngUrl) }
-        : {}),
+      ...(sceneUrl ? { scene: sceneUrl } : {}),
+      ...(excalidrawUrl ? { excalidraw: excalidrawUrl } : {}),
+      ...(pngUrl ? { png: pngUrl } : {}),
     },
     buildOk: true,
     ...(result.normalizedSpec === undefined
       ? {}
       : { normalizedSpec: result.normalizedSpec }),
-    ...(numberValue(result.qualityScore) === undefined
-      ? {}
-      : { qualityScore: numberValue(result.qualityScore) }),
+    ...(qualityScore === undefined ? {} : { qualityScore }),
     status,
     ...(input.callId ? { toolCallId: input.callId } : {}),
     toolName: input.toolName,
@@ -1313,6 +1303,8 @@ function mcpArtifactFromParsedPayload(input: {
   const status = stringValue(result.status) ?? "accepted";
   const normalizedSpec = result.normalizedSpec;
   const buildOk = result.ok === true;
+  const buildId = stringValue(result.buildId);
+  const qualityScore = numberValue(quality?.score);
 
   if (!buildOk || status !== "accepted" || !artifactId) {
     return undefined;
@@ -1330,15 +1322,11 @@ function mcpArtifactFromParsedPayload(input: {
         )
         .map((formatRef) => [formatRef.format, formatRef.url]),
     ),
-    ...(stringValue(result.buildId)
-      ? { buildId: stringValue(result.buildId) }
-      : {}),
+    ...(buildId ? { buildId } : {}),
     buildOk,
     ...(normalizedSpec === undefined ? {} : { normalizedSpec }),
     ...(quality?.accepted === true ? { qualityAccepted: true } : {}),
-    ...(numberValue(quality?.score) === undefined
-      ? {}
-      : { qualityScore: numberValue(quality?.score) }),
+    ...(qualityScore === undefined ? {} : { qualityScore }),
     status,
     ...(input.callId ? { toolCallId: input.callId } : {}),
     toolName: input.toolName,
@@ -1440,11 +1428,10 @@ function stepFromEvent(event: unknown): HarnessStep | undefined {
   if (type === "step_finish" || type === "step-finish") {
     const tokens = tokensFrom(part?.tokens ?? event.tokens);
     const cost = numberValue(part?.cost ?? event.cost);
+    const reason = stringValue(part?.reason ?? event.reason);
     return {
       ...(cost === undefined ? {} : { cost }),
-      ...(stringValue(part?.reason ?? event.reason)
-        ? { reason: stringValue(part?.reason ?? event.reason) }
-        : {}),
+      ...(reason ? { reason } : {}),
       ...(tokens === undefined ? {} : { tokens }),
     };
   }
@@ -1452,11 +1439,10 @@ function stepFromEvent(event: unknown): HarnessStep | undefined {
   if (type === "result") {
     const tokens = tokensFrom(event.usage);
     const cost = numberValue(event.total_cost_usd);
+    const reason = stringValue(event.terminal_reason);
     return {
       ...(cost === undefined ? {} : { cost }),
-      ...(stringValue(event.terminal_reason)
-        ? { reason: stringValue(event.terminal_reason) }
-        : {}),
+      ...(reason ? { reason } : {}),
       ...(tokens === undefined ? {} : { tokens }),
     };
   }
@@ -1582,11 +1568,8 @@ export function evaluateHarnessJson(
 }
 
 function reportableMcpArtifact(
-  proof: HarnessMcpArtifactProof | undefined,
-): HarnessMcpArtifactReport | undefined {
-  if (!proof) {
-    return undefined;
-  }
+  proof: HarnessMcpArtifactProof,
+): HarnessMcpArtifactReport {
   const { normalizedSpec: _normalizedSpec, ...report } = proof;
   return report;
 }
@@ -1883,7 +1866,7 @@ function runHarnessScenario(input: {
         : {}),
       finalJson: summary.finalJson,
       finalText: summary.finalText,
-      mcpArtifact: reportableMcpArtifact(mcpProof),
+      mcpArtifact: mcpProof ? reportableMcpArtifact(mcpProof) : undefined,
       outputContractErrors: outputErrors,
       ...(antigravityEvidence.transcriptOut
         ? { transcriptOut: antigravityEvidence.transcriptOut }
@@ -1943,7 +1926,7 @@ export function summarizeReport(input: {
   status: HarnessReportStatus;
   harness: HarnessName;
   mcpUrl: string;
-  model?: string;
+  model?: string | undefined;
   repeat: number;
   results: HarnessRunReport[];
   scenarioCount: number;

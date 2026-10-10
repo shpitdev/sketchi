@@ -28,7 +28,7 @@
     "r2sql:smoke": "JITI_TSCONFIG_PATHS=scripts/pipelines/tsconfig.json jiti scripts/pipelines/r2-catalog-smoke.ts",
     "r2sql:codemode:resources": "node scripts/pipelines/codemode-r2-catalog.mjs resources",
     "r2sql:codemode:verify-run": "node scripts/pipelines/codemode-r2-catalog.mjs verify-run",
-    "test:tools": "vitest run --config tools/vitest.config.mts",
+    "test:tools": "tsc -p tools/tsconfig.json --noEmit && vitest run --config tools/vitest.config.mts",
     "storybook": "nx storybook diagram-ui",
     "storybook:excalidraw": "nx storybook excalidraw",
     "storybook:icons": "nx storybook icons",

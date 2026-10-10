@@ -391,13 +391,7 @@ function createTypeCheckedProgram(
     const sourceText = sources.get(path.resolve(fileName));
     return sourceText === undefined
       ? defaultGetSourceFile(fileName, languageVersion, onError, shouldCreate)
-      : ts.createSourceFile(
-          fileName,
-          sourceText,
-          languageVersion,
-          true,
-          ts.getScriptKindFromFileName(fileName),
-        );
+      : ts.createSourceFile(fileName, sourceText, languageVersion, true);
   };
   return ts.createProgram({
     host,

@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, type Dirent } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -52,7 +52,7 @@ const FIXTURE_FILE = /\.(?:test|browser\.test|stories)\.[a-z]+$/;
 
 function sourceFiles(root: string): string[] {
   const absoluteRoot = join(repoRoot, root);
-  let entries: ReturnType<typeof readdirSync>;
+  let entries: Dirent[];
 
   try {
     entries = readdirSync(absoluteRoot, {
