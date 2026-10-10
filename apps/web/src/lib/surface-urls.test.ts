@@ -65,6 +65,9 @@ describe("resolveWebSurfaceUrls", () => {
     "https://pr-42-sketchi-playground.dimethyl.workers.dev",
     "https://pr-42-sketchi-playground.dimethyl.workers.dev./",
     "https://0123abcd-sketchi-playground.dimethyl.workers.dev",
+    "https://sketchi-playground-pr-42.dimethyl.workers.dev",
+    "https://sketchi-playground-pr-42.dimethyl.workers.dev./",
+    "https://pr-42-sketchi-playground.other-account.workers.dev",
   ])("rejects the internal eval Worker as a configured public link", (url) => {
     expect(
       resolveWebSurfaceUrls({ SKETCHI_PLAYGROUND_URL: url }).playground,

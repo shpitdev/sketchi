@@ -292,50 +292,24 @@ jobs:
         with:
           install-dependencies: "false"
 
-      - name: Resolve Worker project and identity
-        id: worker-app
-        env:
-          WORKER_PROJECT: ${{ matrix.project }}
-        run: node scripts/00-resolve-worker-app.mjs --project "$WORKER_PROJECT"
-
       - name: Delete official Worker Preview
         id: cleanup
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PREVIEW_PROJECT_ID: ${{ matrix.project }}
           PR_NUMBER: ${{ needs.resolve-preview-pr.outputs.pr_number }}
-          WORKER_NAME: ${{ steps.worker-app.outputs.worker_name }}
-        run: |
-          set -euo pipefail
-          if [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ] || [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
-            echo "::warning::Cloudflare credentials are not configured. Nothing was deleted."
-            exit 0
-          fi
-          preview_name="pr-${PR_NUMBER}"
-          echo "preview_name=${preview_name}" >> "$GITHUB_OUTPUT"
-          # Deletes only this PR's Preview of the production Worker. 404 means it is already gone.
-          status="$(
-            curl --silent --show-error --output .preview-delete.json --write-out '%{http_code}' \
-              --request DELETE \
-              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/workers/${WORKER_NAME}/previews/${preview_name}"
-          )"
-          case "$status" in
-            2??) echo "Deleted Preview ${preview_name} of ${WORKER_NAME}." ;;
-            404) echo "Preview ${preview_name} of ${WORKER_NAME} does not exist." ;;
-            *)
-              cat .preview-delete.json
-              exit 1
-              ;;
-          esac
+        # Fails, after recording `deletion-pending`, if the Preview URL keeps serving.
+        run: node scripts/04-delete-preview.mjs --project "$PREVIEW_PROJECT_ID" --pr-number "$PR_NUMBER"
 
       - name: Comment preview cleanup
-        if: steps.cleanup.outputs.preview_name != ''
+        if: ${{ !cancelled() && steps.cleanup.outputs.comment_status != '' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PREVIEW_PROJECT_ID: ${{ matrix.project }}
           PR_NUMBER: ${{ needs.resolve-preview-pr.outputs.pr_number }}
-          PREVIEW_STATUS: deleted
+          PREVIEW_STATUS: ${{ steps.cleanup.outputs.comment_status }}
+          PREVIEW_URL: ${{ steps.cleanup.outputs.comment_status == 'deletion-pending' && steps.cleanup.outputs.preview_url || '' }}
           PREVIEW_SHA: ${{ needs.resolve-preview-pr.outputs.sha }}
           PREVIEW_NAME: ${{ steps.cleanup.outputs.preview_name }}
         run: node scripts/03-upsert-preview-comment.mjs

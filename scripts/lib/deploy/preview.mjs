@@ -303,5 +303,12 @@ export function previewCommentBody(input) {
     );
   }
 
+  if (status === "deletion-pending") {
+    lines.push(
+      "",
+      "Deletion pending: Cloudflare deleted this Preview, but its URL is still reachable and serves this PR's code ([cloudflare/workers-sdk#15945](https://github.com/cloudflare/workers-sdk/issues/15945)). The cleanup job failed so this stays visible.",
+    );
+  }
+
   return `${lines.join("\n")}\n`;
 }

@@ -165,20 +165,29 @@ test("official Previews never create, deploy, or delete per-PR Workers", () => {
   assert.match(deploy, /--var "SKETCHI_PLAYGROUND_URL:/);
   assert.match(deploy, /--var "SKETCHI_ICONS_URL:/);
 
-  const cleanup = workflow.jobs["cleanup-preview"].steps.find(
-    ({ id }) => id === "cleanup",
-  );
+  const cleanupSteps = workflow.jobs["cleanup-preview"].steps;
+  const cleanup = cleanupSteps.find(({ id }) => id === "cleanup");
   assert.equal(
-    cleanup.env.WORKER_NAME,
-    "${{ steps.worker-app.outputs.worker_name }}",
-  );
-  assert.match(
     cleanup.run,
-    /--request DELETE[\s\S]*\/workers\/workers\/\$\{WORKER_NAME\}\/previews\/\$\{preview_name\}"/,
+    'node scripts/04-delete-preview.mjs --project "$PREVIEW_PROJECT_ID" --pr-number "$PR_NUMBER"',
   );
-  assert.match(cleanup.run, /preview_name="pr-\$\{PR_NUMBER\}"/);
-  assert.match(cleanup.run, /404\)/);
-  assert.doesNotMatch(cleanup.run, /workers\/scripts|wrangler (delete|deploy)/);
+  const deleteScript = readFileSync(
+    new URL("../../04-delete-preview.mjs", import.meta.url),
+    "utf8",
+  );
+  assert.match(deleteScript, /\/workers\/workers\/\$\{project\.workerName\}/);
+  assert.doesNotMatch(deleteScript, /workers\/scripts|wrangler/);
+
+  // The comment reports what the script verified, including a failed cleanup.
+  const comment = cleanupSteps.find(
+    ({ name }) => name === "Comment preview cleanup",
+  );
+  assert.match(comment.if, /!cancelled\(\)/);
+  assert.match(comment.if, /steps\.cleanup\.outputs\.comment_status != ''/);
+  assert.equal(
+    comment.env.PREVIEW_STATUS,
+    "${{ steps.cleanup.outputs.comment_status }}",
+  );
 });
 
 test("closing a PR deletes its Previews and never deploys", () => {

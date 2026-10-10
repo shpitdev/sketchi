@@ -28,11 +28,12 @@ export const DEFAULT_WEB_SURFACE_URLS: WebSurfaceUrls = {
   playground: `https://${PRODUCT_SURFACE_HOSTS.playground}`,
 };
 
-// sketchi-allow-workers-dev: rejection pattern for the internal eval Worker
-// and its Previews, which are never public link targets. This value is
-// matched, never rendered.
+// sketchi-allow-workers-dev: rejection pattern for the internal eval Worker,
+// its legacy per-PR Workers (`sketchi-playground-pr-<n>`), and its Previews
+// (`pr-<n>-sketchi-playground`), which are never public link targets. This
+// value is matched, never rendered.
 const INTERNAL_EVAL_WORKER_HOST =
-  /^(?:[a-z0-9-]+-)?sketchi-playground\.dimethyl\.workers\.dev$/i;
+  /^(?:[a-z0-9-]+-)?sketchi-playground(?:-pr(?:-[a-z0-9-]+)?)?\.[a-z0-9-]+\.workers\.dev$/i;
 
 function cleanHttpUrl(value: unknown, fallback: string): string {
   if (typeof value !== "string") {

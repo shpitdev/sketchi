@@ -93,9 +93,16 @@ an `unconfigured` comment rather than a successful preview claim.
 
 ## Cleanup and legacy Workers
 
-Closing a PR runs `cleanup-preview`, which deletes Preview `pr-<number>` from each
-of the five Workers through the Cloudflare Previews API and marks the sticky
-comment `deleted`. A missing Preview (HTTP 404) counts as already deleted. The job
+Closing a PR runs `cleanup-preview`. `scripts/04-delete-preview.mjs` deletes
+Preview `pr-<number>` from each of the five Workers through the Cloudflare Previews
+API; a missing Preview (HTTP 404) counts as already deleted. A successful delete
+can leave the Preview hostname serving the deleted code
+([cloudflare/workers-sdk#15945](https://github.com/cloudflare/workers-sdk/issues/15945)),
+so the script then checks the Preview URL every 10 seconds for up to 2 minutes until
+Cloudflare answers with its no-Preview 404 (`x-preview-user-error: true`). Only then
+is the sticky comment marked `deleted`. If the URL still serves, the comment is
+marked `deletion-pending` with the reachable URL and the job fails, so the leak
+stays visible. The job
 shares `deploy-preview`'s concurrency group. Once a deploy job holds that lock, it
 re-checks the PR state right before `wrangler preview` and skips the upload if the
 PR has closed, so a deploy that was queued at close time doesn't recreate the
@@ -112,6 +119,7 @@ by this migration. Remove them separately; this workflow never deletes a Worker.
 - `01-validate-preview-config.mjs`: validate the built Preview settings and PR name.
 - `02-extract-preview-url.mjs`: read the Preview entry from Wrangler's output file; production still parses its deploy log.
 - `03-upsert-preview-comment.mjs`: update only the owned, anchored bot comment.
+- `04-delete-preview.mjs`: delete a PR's Preview and confirm its URL stopped serving.
 - `05-prepare-production-domain-deploy.mjs`: prepare an explicitly requested production domain config.
 
 ## Production Worker Deploys

@@ -1,10 +1,18 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
 import { extractPreviewUrlCommand } from "../../02-extract-preview-url.mjs";
 import { upsertPreviewComment } from "../../03-upsert-preview-comment.mjs";
+import { deletePreview } from "../../04-delete-preview.mjs";
 
 const marker = "<!-- sketchi-web-preview -->";
 const commentsUrl =
@@ -167,4 +175,129 @@ test("upsert refuses pagination outside the GitHub API origin", async (t) => {
   ]);
   await assert.rejects(upsertPreviewComment(), /must remain on api.github.com/);
   assert.equal(calls.length, 1);
+});
+
+const workerApi =
+  "https://api.cloudflare.com/client/v4/accounts/acct/workers/workers/sketchi-web";
+const previewUrl = "https://pr-42-sketchi-web.dimethyl.workers.dev";
+
+// `served` lists what the Preview hostname answers on each check: "retired" is
+// Cloudflare's no-Preview 404; a number is the app's own response status.
+function mockCloudflare(t, { deleteStatus = 200, served = [], env = {} } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "preview-delete-"));
+  const output = join(dir, "output");
+  writeFileSync(output, "");
+  const originalEnv = process.env;
+  process.env = {
+    ...originalEnv,
+    CLOUDFLARE_ACCOUNT_ID: "acct",
+    CLOUDFLARE_API_TOKEN: "offline-test-token",
+    GITHUB_OUTPUT: output,
+    ...env,
+  };
+  t.after(() => {
+    process.env = originalEnv;
+    rmSync(dir, { force: true, recursive: true });
+  });
+  t.mock.method(process.stdout, "write", () => true);
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options = {}) => {
+    const href = String(url);
+    calls.push(`${options.method ?? "GET"} ${href.replace(/\?.*/, "")}`);
+    if (href === workerApi) {
+      return Response.json({
+        result: {
+          subdomain: {
+            preview_url_suffix: "-sketchi-web.dimethyl.workers.dev",
+          },
+        },
+      });
+    }
+    if (href === `${workerApi}/previews/pr-42`) {
+      return Response.json({}, { status: deleteStatus });
+    }
+    if (href.startsWith(`${previewUrl}/?sketchi-cleanup=`)) {
+      const next = served.shift();
+      assert.ok(next !== undefined, "unexpected Preview URL check");
+      return next === "retired"
+        ? new Response("There is nothing here yet", {
+            headers: { "x-preview-user-error": "true" },
+            status: 404,
+          })
+        : new Response("app", { status: next });
+    }
+    assert.fail(`unexpected request ${href}`);
+  });
+  return { calls, outputs: () => readFileSync(output, "utf8") };
+}
+
+const cleanupArgs = ["--project", "web", "--pr-number", "42"];
+
+test("cleanup reports deletion only after the Preview URL stops serving", async (t) => {
+  const cloudflare = mockCloudflare(t, { served: [200, 200, "retired"] });
+  const waits = [];
+  await deletePreview(cleanupArgs, {
+    attempts: 5,
+    intervalMs: 7,
+    wait: async (ms) => waits.push(ms),
+  });
+  assert.deepEqual(cloudflare.calls, [
+    `GET ${workerApi}`,
+    `DELETE ${workerApi}/previews/pr-42`,
+    `GET ${previewUrl}/`,
+    `GET ${previewUrl}/`,
+    `GET ${previewUrl}/`,
+  ]);
+  assert.deepEqual(waits, [7, 7]);
+  assert.equal(
+    cloudflare.outputs(),
+    `comment_status=deleted\npreview_name=pr-42\npreview_url=${previewUrl}\n`,
+  );
+});
+
+test("cleanup fails as deletion-pending when a deleted Preview keeps serving", async (t) => {
+  // An app 404 without Cloudflare's marker header is still the Preview serving.
+  const cloudflare = mockCloudflare(t, { served: [200, 404, 200] });
+  await assert.rejects(
+    deletePreview(cleanupArgs, { attempts: 3, wait: async () => {} }),
+    /still serves after 3 checks \(cloudflare\/workers-sdk#15945\)/,
+  );
+  assert.equal(
+    cloudflare.outputs(),
+    `comment_status=deletion-pending\npreview_name=pr-42\npreview_url=${previewUrl}\n`,
+  );
+});
+
+test("cleanup treats an already-deleted Preview as deleted once its URL is retired", async (t) => {
+  const cloudflare = mockCloudflare(t, {
+    deleteStatus: 404,
+    served: ["retired"],
+  });
+  await deletePreview(cleanupArgs, { wait: async () => {} });
+  assert.match(cloudflare.outputs(), /^comment_status=deleted\n/);
+});
+
+test("cleanup surfaces delete failures without checking or reporting the URL", async (t) => {
+  const cloudflare = mockCloudflare(t, { deleteStatus: 500 });
+  await assert.rejects(
+    deletePreview(cleanupArgs, { wait: async () => {} }),
+    /HTTP 500/,
+  );
+  assert.equal(cloudflare.calls.length, 2);
+  assert.equal(cloudflare.outputs(), "");
+});
+
+test("cleanup rejects malformed PR targets and skips without credentials", async (t) => {
+  const cloudflare = mockCloudflare(t, {
+    env: { CLOUDFLARE_API_TOKEN: "" },
+  });
+  for (const value of ["42oops", "42.9", "4e2", "9007199254740993"]) {
+    await assert.rejects(
+      deletePreview(["--project", "web", "--pr-number", value]),
+      /positive.*integer/,
+    );
+  }
+  await deletePreview(cleanupArgs);
+  assert.deepEqual(cloudflare.calls, []);
+  assert.equal(cloudflare.outputs(), "");
 });

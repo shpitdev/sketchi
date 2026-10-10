@@ -301,3 +301,19 @@ test("previewCommentBody exposes project and Worker identities separately", () =
     ].join("\n"),
   );
 });
+
+test("previewCommentBody keeps a still-reachable deleted Preview visible", () => {
+  const body = previewCommentBody({
+    previewName: "pr-42",
+    previewUrl: "https://pr-42-sketchi-web.dimethyl.workers.dev",
+    projectId: "web",
+    status: "deletion-pending",
+    workerName: "sketchi-web",
+  });
+  assert.match(body, /Status: `deletion-pending`/);
+  assert.match(
+    body,
+    /- URL: https:\/\/pr-42-sketchi-web\.dimethyl\.workers\.dev/,
+  );
+  assert.match(body, /still reachable[\s\S]*cloudflare\/workers-sdk#15945/);
+});
