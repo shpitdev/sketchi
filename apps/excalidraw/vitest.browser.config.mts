@@ -8,6 +8,8 @@ const executablePath = process.env["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"];
 export default defineConfig({
   cacheDir: source("../../node_modules/.vite/apps/excalidraw-browser"),
   plugins: [react()],
+  // Serve the app's public assets (vendored Excalifont) like the real app does.
+  publicDir: source("./public"),
   resolve: {
     alias: [
       {

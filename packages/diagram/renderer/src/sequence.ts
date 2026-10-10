@@ -1,4 +1,4 @@
-import { CANVAS_SPEC_VERSION } from "@sketchi/diagram-core";
+import { CANVAS_SPEC_VERSION, wrapTextToWidth } from "@sketchi/diagram-core";
 import type {
   ArrowSceneElement,
   NodeSceneElement,
@@ -35,6 +35,7 @@ export interface SequenceDiagramInput {
 const PADDING = 48;
 const HEADER_WIDTH = 180;
 const HEADER_HEIGHT = 72;
+const HEADER_LABEL_WIDTH = HEADER_WIDTH - 24;
 const PARTICIPANT_GAP = 140;
 const MESSAGE_GAP = 88;
 const MESSAGE_TOP_GAP = 64;
@@ -125,13 +126,21 @@ export function renderSequenceDiagram(
   }
 
   const columnStep = HEADER_WIDTH + PARTICIPANT_GAP;
+  const headerLabelById = new Map(
+    input.participants.map((participant) => [
+      participant.id,
+      wrapTextToWidth(participant.label, HEADER_LABEL_WIDTH, LABEL_FONT_SIZE),
+    ]),
+  );
   // Size the shared header row before laying out lifelines and message lanes.
   const headerHeight = input.participants.reduce(
     (height, participant) =>
       Math.max(
         height,
         Math.ceil(
-          participant.label.split("\n").length *
+          (headerLabelById.get(participant.id) ?? participant.label).split(
+            "\n",
+          ).length *
             LABEL_FONT_SIZE *
             LABEL_LINE_HEIGHT,
         ) + LABEL_VERTICAL_PADDING,
@@ -164,7 +173,7 @@ export function renderSequenceDiagram(
       y: headerY,
       width: HEADER_WIDTH,
       height: headerHeight,
-      label: participant.label,
+      label: headerLabelById.get(participant.id) ?? participant.label,
     });
     headerLabels.push({
       type: "text",
@@ -172,9 +181,9 @@ export function renderSequenceDiagram(
       containerId: `node:${participant.id}`,
       x: centerX,
       y: headerY + headerHeight / 2,
-      text: participant.label,
+      text: headerLabelById.get(participant.id) ?? participant.label,
       fontSize: LABEL_FONT_SIZE,
-      maxWidth: HEADER_WIDTH - 24,
+      maxWidth: HEADER_LABEL_WIDTH,
     });
     lifelines.push({
       type: "node",

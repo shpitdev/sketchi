@@ -6,6 +6,8 @@
  * PNG, or another render target without changing the authored scene.
  */
 
+import { boundLabelWidth, estimateTextWidth } from "./text-metrics.js";
+
 export const CANVAS_SPEC_VERSION: 1 = 1;
 
 export const CANVAS_LIMITS = Object.freeze({
@@ -469,14 +471,16 @@ export function getCanvasValidationIssues(
           ? (boundLabel.element.maxWidth ?? 160)
           : Math.max(1, element.width - 24);
         const lines = text.split("\n");
-        const estimatedWidth = lines.reduce(
-          (width, line) => Math.max(width, line.length * fontSize * 0.62),
-          0,
-        );
+        const estimatedWidth = estimateTextWidth(text, fontSize);
         const textWidth = Math.max(1, Math.min(maxWidth, estimatedWidth));
         const textHeight = Math.ceil(lines.length * fontSize * 1.35);
+        // The adapter grows a label box past maxWidth only when glyphs would
+        // otherwise outgrow its padded canvas; that growth must still fit.
+        const paintedBox =
+          boundLabelWidth(text, fontSize, maxWidth) - fontSize;
         if (
           textWidth + 24 > element.width ||
+          paintedBox + 24 > element.width ||
           textHeight + 18 > element.height
         ) {
           issues.push({
@@ -639,8 +643,7 @@ function elementBounds(element: PositionedCanvasElement): CanvasElementBounds {
       x: element.x,
       y: element.y,
       width:
-        element.maxWidth ??
-        Math.max(...lines.map((line) => line.length)) * element.fontSize * 0.62,
+        element.maxWidth ?? estimateTextWidth(element.text, element.fontSize),
       height: lines.length * element.fontSize * 1.35,
     };
   }
