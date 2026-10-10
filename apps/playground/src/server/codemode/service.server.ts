@@ -10,6 +10,7 @@ import {
   getArtifact,
   createCanvas,
   makeMemoryArtifactStorage,
+  searchIcons,
   makeObjectBucketArtifactStorage,
   type ApplyDiagramPatchResult,
   type ArtifactFormat,
@@ -21,6 +22,7 @@ import {
   type CodeModeRuntimeOptions,
   type CreateCanvasResult,
   type GetArtifactResult,
+  type SearchIconsResult,
   type StoredArtifactFormat,
 } from "@sketchi/diagram-agent";
 import { Context, Effect, Layer } from "effect";
@@ -60,6 +62,9 @@ export interface PlaygroundCodeModeShape {
   readonly getArtifact: (
     input: unknown,
   ) => Effect.Effect<GetArtifactResult, never, CodeModeRequestContext>;
+  readonly searchIcons: (
+    input: unknown,
+  ) => Effect.Effect<SearchIconsResult, never, CodeModeRequestContext>;
   readonly readStoredArtifact: (
     artifactId: string,
     format: ArtifactFormat,
@@ -187,6 +192,9 @@ export const PlaygroundCodeModeLive = Layer.effect(
       ),
       getArtifact: Effect.fn("playground.codeMode.getArtifact")((input) =>
         provideRequestCodeMode(getArtifact(input)),
+      ),
+      searchIcons: Effect.fn("playground.codeMode.searchIcons")((input) =>
+        provideRequestCodeMode(searchIcons(input)),
       ),
       readStoredArtifact: Effect.fn("playground.codeMode.readStoredArtifact")(
         function* (artifactId, format) {

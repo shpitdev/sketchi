@@ -19,6 +19,7 @@ import {
   CodeModeRuntimeEnvironment,
   createCanvas,
   makeCodeModeRuntimeEnvironmentLayer,
+  searchIcons,
 } from "./runtime";
 
 function catalogIcon(
@@ -55,6 +56,7 @@ function fixtureCatalog(): CodeModeIconCatalog {
       catalogIcon("github-text", "GitHub Wordmark", { variant: "text" }),
       catalogIcon("tanstack", "TanStack", { bytes: 498_897 }),
     ],
+    slugLookup: "sketchi.searchIcons({ q })",
     loadSvg: (icon) => {
       const source = SOURCES[icon.slug];
       return source
@@ -94,6 +96,7 @@ function runtime(icons: CodeModeIconCatalog | null = fixtureCatalog()) {
     applyDiagramPatch: (input: unknown) => provide(applyDiagramPatch(input)),
     buildFlowchart: (input: unknown) => provide(buildFlowchart(input)),
     createCanvas: (input: unknown) => provide(createCanvas(input)),
+    searchIcons: (input: unknown) => provide(searchIcons(input)),
   };
 }
 
@@ -201,7 +204,7 @@ describe("buildFlowchart icons", () => {
         code: "unknown_icon",
         severity: "warning",
         ref: { kind: "node", id: "build", path: "nodes.icon.slug" },
-        hint: expect.stringContaining('"docker" (Docker)'),
+        hint: 'Use an exact slug, for example "docker" (Docker), or look one up with sketchi.searchIcons({ q }).',
       }),
       expect.objectContaining({
         code: "unknown_icon",
@@ -424,5 +427,38 @@ describe("applyDiagramPatch icons", () => {
     const node = scene.elements.find((element) => element.id === "push");
     expect(node).toMatchObject({ x: 70, icon: { slug: "github", size: 28 } });
     expect(scene.icons?.["github"]?.name).toBe("GitHub");
+  });
+});
+
+describe("searchIcons", () => {
+  it("returns ranked node logos for a query", async () => {
+    const result = await runtime().searchIcons({ q: "  Git ", limit: 5 });
+
+    expect(result).toEqual({
+      ok: true,
+      status: "accepted",
+      query: "Git",
+      icons: [{ collection: "devtools-ci", name: "GitHub", slug: "github" }],
+      issues: [],
+    });
+  });
+
+  it("rejects malformed requests with input issues", async () => {
+    const result = await runtime().searchIcons({ limit: 500 });
+
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe("invalid_input");
+    expect(result.issues.map((entry) => entry.ref?.path)).toEqual(
+      expect.arrayContaining(["q", "limit"]),
+    );
+  });
+
+  it("returns no logos with a warning when the host has no catalog", async () => {
+    const result = await runtime(null).searchIcons({ q: "docker" });
+
+    expect(result).toMatchObject({ ok: true, icons: [] });
+    expect(result.issues).toEqual([
+      expect.objectContaining({ code: "unknown_icon", severity: "warning" }),
+    ]);
   });
 });

@@ -229,6 +229,66 @@ describe("public generate endpoint", () => {
     },
   );
 
+  it("grounds generated node logos in the technologies the prompt names", async () => {
+    const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];
+    const logoIr = {
+      ...flowchartIr,
+      nodes: flowchartIr.nodes.map((node) =>
+        node.id === "start"
+          ? { ...node, icon: { slug: "github" } }
+          : node.id === "review"
+            ? { ...node, icon: { slug: "kubernetes" } }
+            : node,
+      ),
+    };
+    const assetRequests: string[] = [];
+    const env: StudioEnv = {
+      AI: fakeAiGateway(generationText(logoIr), (input) => {
+        observedRuns.push(input);
+      }),
+      ASSETS: {
+        fetch: async (input) => {
+          const path = new URL(input instanceof Request ? input.url : input)
+            .pathname;
+          assetRequests.push(path);
+          return new Response(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M0 0h1"/></svg>',
+          );
+        },
+      },
+    };
+    const response = await generateRequest(env, {
+      prompt: "Push to GitHub, build with Docker, then release",
+      type: "flowchart",
+    });
+
+    expect(response.status).toBe(200);
+    const providerRequest = JSON.stringify(observedRuns[0]);
+    expect(providerRequest).toContain("- github: Github");
+    expect(providerRequest).toContain("- docker: Docker");
+    expect(providerRequest).not.toContain("- kubernetes:");
+    const body = (await response.json()) as {
+      diagram: {
+        document: { spec: { nodes: Array<{ id: string; icon?: unknown }> } };
+        excalidraw: { elements: Array<{ type: string }>; files: object };
+        scene: { icons?: Record<string, unknown> };
+      };
+    };
+    expect(
+      body.diagram.document.spec.nodes
+        .filter((node) => node.icon)
+        .map((node) => [node.id, node.icon]),
+    ).toEqual([["start", { slug: "github" }]]);
+    expect(Object.keys(body.diagram.scene.icons ?? {})).toEqual(["github"]);
+    expect(
+      body.diagram.excalidraw.elements.filter(
+        (element) => element.type === "image",
+      ),
+    ).toHaveLength(1);
+    expect(Object.keys(body.diagram.excalidraw.files)).toHaveLength(1);
+    expect(assetRequests).toEqual(["/node-logos/github.svg"]);
+  });
+
   it("requests fresh provider output for reliability probes", async () => {
     const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];
     const env: StudioEnv = {

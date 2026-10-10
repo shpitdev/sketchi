@@ -57,6 +57,8 @@ vi.mock("./service.server", async (importOriginal) => {
       getArtifact: () =>
         Effect.succeed(runtimeResults.getGetArtifact() as GetArtifactResult),
       readStoredArtifact: () => Effect.succeed(null),
+      searchIcons: () =>
+        Effect.die("Icon search is outside the frozen v1 corpus."),
     }).pipe(
       Layer.provideMerge(
         Layer.succeed(CodeModeArtifactStorage, makeMemoryArtifactStorage()),

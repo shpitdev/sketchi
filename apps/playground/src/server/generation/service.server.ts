@@ -22,6 +22,7 @@ import {
 import { Context, Effect, Layer } from "effect";
 
 import { aiEnvironment } from "../bindings/ai-env.server";
+import { logosNamedIn } from "../codemode/icon-catalog.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
 import { PlaygroundBindings } from "../runtime/context.server";
 
@@ -62,6 +63,7 @@ export function flowchartDocumentInput(diagram: FlowchartDiagram): unknown {
         label: node.label,
         kind: node.kind,
         ...(node.description ? { description: node.description } : {}),
+        ...(node.icon ? { icon: { slug: node.icon.slug } } : {}),
       })),
       edges: diagram.edges.map((edge) => ({
         id: edge.id,
@@ -189,11 +191,13 @@ export const PlaygroundGenerationLive = Layer.effect(
           });
         }
         const client = yield* clientForBindings(env.AI, config.gatewayId);
+        const logos = logosNamedIn(input.prompt);
         return yield* client.generate({
           ...(input.cacheMode ? { cacheMode: input.cacheMode } : {}),
           model,
           prompt: {
             id: "sketchi-generate",
+            ...(logos.length > 0 ? { logos } : {}),
             request: input.prompt,
             ...(input.type ? { requestedType: input.type } : {}),
           },

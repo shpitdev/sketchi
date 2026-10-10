@@ -1,3 +1,4 @@
+import { resolveNodeIcons } from "@sketchi/diagram-agent";
 import { nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
 import nodeLogoSvgs from "@sketchi/icon-catalog/node-logo-svgs";
 import { Effect } from "effect";
@@ -23,5 +24,14 @@ describe("CLI icon catalog", () => {
       expect(cliIconCatalog.get(slug), slug).toBeUndefined();
     }
     expect(cliIconCatalog.search("kubernetes", 3)[0]?.slug).toBe("kubernetes");
+  });
+
+  it("points unknown slugs at the catalog site, not a sandbox operation", () => {
+    const { issues } = resolveNodeIcons(
+      [{ id: "build", icon: { slug: "dockr" } }],
+      cliIconCatalog,
+    );
+    expect(issues[0]?.hint).toContain("https://icons.sketchi.app");
+    expect(issues[0]?.hint).not.toContain("searchIcons");
   });
 });

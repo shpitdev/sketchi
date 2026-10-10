@@ -6,8 +6,14 @@ export interface IconSearchOptions {
   readonly query?: string;
 }
 
-export interface RankedIcon {
-  readonly icon: SketchiIcon;
+/** The icon fields ranked search reads. */
+export type SearchableIcon = Pick<
+  SketchiIcon,
+  "aliases" | "collection" | "keywords" | "name" | "slug"
+>;
+
+export interface RankedIcon<Icon extends SearchableIcon = SketchiIcon> {
+  readonly icon: Icon;
   readonly rank: number;
 }
 
@@ -20,7 +26,7 @@ function containsQuery(values: readonly string[], query: string): boolean {
 }
 
 function iconSearchTermRank(
-  icon: SketchiIcon,
+  icon: SearchableIcon,
   searchTerm: string,
 ): number | null {
   const slug = normalizeIconQuery(icon.slug);
@@ -53,7 +59,7 @@ function iconSearchTermRank(
 }
 
 export function iconSearchRank(
-  icon: SketchiIcon,
+  icon: SearchableIcon,
   normalizedQuery: string,
 ): number | null {
   if (normalizedQuery.length === 0) {
@@ -81,10 +87,10 @@ export function iconSearchRank(
   return combinedRank;
 }
 
-export function searchIcons(
-  icons: readonly SketchiIcon[],
+export function searchIcons<Icon extends SearchableIcon = SketchiIcon>(
+  icons: readonly Icon[],
   options: IconSearchOptions = {},
-): readonly RankedIcon[] {
+): readonly RankedIcon<Icon>[] {
   const normalizedQuery = normalizeIconQuery(options.query ?? "");
   const collection = options.collection?.trim();
   const limit = options.limit ?? Number.POSITIVE_INFINITY;

@@ -7,10 +7,21 @@ export const DiagramGenerationTypeSchema = Schema.Literals([
 ]);
 export type DiagramGenerationType = typeof DiagramGenerationTypeSchema.Type;
 
+/** A catalog logo the prompt names; the only slugs a node icon may use. */
+export class DiagramGenerationLogo extends Schema.Class<DiagramGenerationLogo>(
+  "DiagramGenerationLogo",
+)({
+  aliases: Schema.optionalKey(Schema.Array(Schema.String)),
+  name: Schema.String,
+  slug: Schema.String,
+}) {}
+
 export class DiagramGenerationPrompt extends Schema.Class<DiagramGenerationPrompt>(
   "DiagramGenerationPrompt",
 )({
   id: Schema.String,
+  /** Logos for technologies the prompt names, in order of mention. */
+  logos: Schema.optionalKey(Schema.Array(DiagramGenerationLogo)),
   request: Schema.String,
   requestedType: Schema.optionalKey(DiagramGenerationTypeSchema),
 }) {}
@@ -210,6 +221,26 @@ function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
   });
 }
 
+/** Flowcharts are the only family that draws node logos today. */
+function logoSection(prompt: DiagramGenerationPrompt): string[] {
+  const logos = prompt.logos ?? [];
+  if (
+    logos.length === 0 ||
+    (prompt.requestedType !== undefined && prompt.requestedType !== "flowchart")
+  ) {
+    return [];
+  }
+  return [
+    "",
+    "Available logos (flowchart only):",
+    ...logos.map(
+      (logo) =>
+        `- ${logo.slug}: ${logo.name}${logo.aliases?.length ? ` (also ${logo.aliases.join(", ")})` : ""}`,
+    ),
+    'A flowchart node about one of these technologies may set "icon": { "slug": "<slug>" } using a slug from this list exactly. Put each logo on the node whose label names that technology. Omit icon on every other node. Never invent a slug.',
+  ];
+}
+
 export function buildDiagramGenerationMessages(
   prompt: DiagramGenerationPrompt,
 ): DiagramGenerationMessages {
@@ -241,6 +272,7 @@ export function buildDiagramGenerationMessages(
     "",
     "Expected JSON shape (adapt the intent plan and diagram to the scenario):",
     expectedJsonShape(prompt),
+    ...logoSection(prompt),
   ].join("\n");
 
   return { system, user };

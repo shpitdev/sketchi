@@ -50,6 +50,11 @@ export interface CodeModeIconCatalog {
   readonly loadSvg: (
     icon: CodeModeCatalogIcon,
   ) => Effect.Effect<string, CodeModeIconLoadError>;
+  /**
+   * Where this host's agents look up exact slugs, quoted in unknown_icon
+   * hints: `sketchi.searchIcons({ q })` in Code Mode, the catalog site offline.
+   */
+  readonly slugLookup: string;
 }
 
 function catalogIcon(icon: SketchiIcon): CodeModeCatalogIcon {
@@ -61,6 +66,7 @@ export function makeCodeModeIconCatalog(options: {
   readonly loadSvg: (
     icon: CodeModeCatalogIcon,
   ) => Effect.Effect<string, CodeModeIconLoadError>;
+  readonly slugLookup: string;
 }): CodeModeIconCatalog {
   const eligible = options.icons.filter(isNodeLogoEligible);
   const bySlug = new Map(
@@ -73,6 +79,7 @@ export function makeCodeModeIconCatalog(options: {
         catalogIcon(icon),
       ),
     loadSvg: options.loadSvg,
+    slugLookup: options.slugLookup,
   };
 }
 
@@ -107,10 +114,10 @@ function iconSuggestions(
 function suggestionHint(catalog: CodeModeIconCatalog, slug: string): string {
   const suggestions = iconSuggestions(catalog, slug);
   return suggestions.length > 0
-    ? `Use an exact Sketchi icon slug, for example ${suggestions
+    ? `Use an exact slug, for example ${suggestions
         .map((icon) => `"${icon.slug}" (${icon.name})`)
-        .join(", ")}.`
-    : "Look up an exact slug with the icons.sketchi.app search API or its search_icons MCP tool, or omit icon.";
+        .join(", ")}, or look one up with ${catalog.slugLookup}.`
+    : `Look up an exact slug with ${catalog.slugLookup}, or omit icon.`;
 }
 
 function unknownIconIssue(input: {

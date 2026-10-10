@@ -1,5 +1,6 @@
 import {
   DiagramValidationError,
+  isDiagramIconSlug,
   type FlowchartDiagram,
   FlowchartDiagramSchema,
   FlowchartValidationError,
@@ -17,6 +18,7 @@ import {
   GeneratedDiagramResponse,
   modelTitleOrFallback,
 } from "./intent.js";
+import { placeNodeLogos } from "./logo-placement.js";
 import { isUnknownRecord, objectValue } from "./unknown-record.js";
 import { DiagramGenerationPrompt } from "./messages.js";
 import {
@@ -143,7 +145,9 @@ export class DiagramGenerationRequest extends Schema.Class<DiagramGenerationRequ
   cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
   maxOutputTokens: Schema.optional(Schema.Number),
   model: Schema.String.check(
-    Schema.isPattern(/^(?:(?:google|google-ai-studio)\/)?[A-Za-z0-9._-]{1,128}$/),
+    Schema.isPattern(
+      /^(?:(?:google|google-ai-studio)\/)?[A-Za-z0-9._-]{1,128}$/,
+    ),
   ),
   prompt: DiagramGenerationPrompt,
   temperature: Schema.optional(Schema.Number),
@@ -185,14 +189,45 @@ function withSketchiDiagramStyle(input: unknown): unknown {
     : input;
 }
 
-function normalizeGeneratedFlowchartInput(input: unknown): unknown {
+/**
+ * Lowercase model-authored icon slugs and drop any that are not catalog-shaped,
+ * so a stray icon never fails the whole candidate.
+ */
+function sanitizeGeneratedNodeIcons(
+  nodes: unknown,
+  diagnostics: string[],
+): unknown {
+  if (!Array.isArray(nodes)) return nodes;
+  return nodes.map((node) => {
+    if (!isUnknownRecord(node) || node["icon"] === undefined) return node;
+    const { icon, ...withoutIcon } = node;
+    const raw = objectValue(icon, "slug");
+    const slug = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+    if (isDiagramIconSlug(slug)) return { ...withoutIcon, icon: { slug } };
+    diagnostics.push(
+      `icon_dropped: node "${String(node["id"])}" icon ${JSON.stringify(raw ?? icon)} is not a catalog slug; the node renders without a logo.`,
+    );
+    return withoutIcon;
+  });
+}
+
+function normalizeGeneratedFlowchartInput(
+  input: unknown,
+  diagnostics: string[],
+): unknown {
   const styled = withSketchiDiagramStyle(input);
-  if (!isUnknownRecord(styled) || !Array.isArray(styled["edges"])) {
-    return styled;
+  if (!isUnknownRecord(styled)) return styled;
+  const withIcons: Record<string, unknown> = {
+    ...styled,
+    nodes: sanitizeGeneratedNodeIcons(styled["nodes"], diagnostics),
+  };
+  const edges = withIcons["edges"];
+  if (!Array.isArray(edges)) {
+    return withIcons;
   }
   return {
-    ...styled,
-    edges: styled["edges"].map((edge) =>
+    ...withIcons,
+    edges: edges.map((edge) =>
       isUnknownRecord(edge) &&
       typeof edge["label"] === "string" &&
       edge["label"].trim().length === 0
@@ -238,10 +273,10 @@ interface CandidateParseFailure {
 }
 
 interface CandidateParseSuccess {
+  /** Non-fatal repairs applied while decoding. */
+  readonly diagnostics?: readonly string[];
   readonly diagram?:
-    | FlowchartDiagram
-    | MindmapDiagram
-    | GeneratedSequenceDiagram;
+    FlowchartDiagram | MindmapDiagram | GeneratedSequenceDiagram;
   readonly intent: GeneratedDiagramIntent;
   readonly success: true;
 }
@@ -290,8 +325,7 @@ const schemaIssueFormatter = SchemaIssue.makeFormatterStandardSchemaV1();
 function schemaIssueDiagnostic(issue: {
   readonly message: string;
   readonly path?:
-    | readonly (PropertyKey | { readonly key: PropertyKey })[]
-    | undefined;
+    readonly (PropertyKey | { readonly key: PropertyKey })[] | undefined;
 }): string {
   const segments = (issue.path ?? []).map((segment) =>
     typeof segment === "object" ? segment.key : segment,
@@ -403,14 +437,19 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
     title: modelTitleOrFallback(title, id, intent.nativeKind),
   };
 
+  const repairs: string[] = [];
   const parsers = {
-    flowchart: () =>
-      decodeAndValidate(
+    flowchart: () => {
+      const result = decodeAndValidate(
         FlowchartDiagramSchema,
-        normalizeGeneratedFlowchartInput(titledDiagram),
+        normalizeGeneratedFlowchartInput(titledDiagram, repairs),
         validateFlowchartDiagram,
         intent,
-      ),
+      );
+      return result.success && repairs.length > 0
+        ? { ...result, diagnostics: repairs }
+        : result;
+    },
     mindmap: () =>
       "root" in titledDiagram
         ? decodeAndValidate(
@@ -482,6 +521,7 @@ export function candidateFromText(
 
   const parsed = parseCandidateDiagram(input.text);
   if (parsed.success) {
+    diagnostics.push(...(parsed.diagnostics ?? []));
     return {
       ...input,
       diagnostics,
@@ -672,13 +712,48 @@ function requirementsAreEqual(
 }
 
 /** Deterministically enforce the original model-authored plan against the artifact. */
+/**
+ * Place logos the prompt offered on the nodes that name them and drop the rest,
+ * so a generated diagram never brands a node with a technology the user did
+ * not name, nor shifts a logo onto the wrong step.
+ */
+function groundFlowchartIcons(
+  diagram: FlowchartDiagram,
+  request: DiagramGenerationRequest,
+): { readonly diagnostics: string[]; readonly diagram: FlowchartDiagram } {
+  const encoded = Schema.encodeSync(FlowchartDiagramSchema)(diagram);
+  const placement = placeNodeLogos(encoded.nodes, request.prompt.logos ?? []);
+  return placement.diagnostics.length === 0
+    ? { diagnostics: [], diagram }
+    : {
+        diagnostics: placement.diagnostics,
+        diagram: Schema.decodeUnknownSync(FlowchartDiagramSchema)({
+          ...encoded,
+          nodes: placement.nodes,
+        }),
+      };
+}
+
 export function enforceCandidateRequestRequirements(
-  candidate: DiagramGenerationCandidate,
+  input: DiagramGenerationCandidate,
   request: DiagramGenerationRequest,
   originalRequirements?: readonly DiagramRequirement[],
 ): DiagramGenerationCandidate {
+  if (!input.intent || input.error) return input;
+  const grounding =
+    input.diagram?.type === "flowchart"
+      ? groundFlowchartIcons(input.diagram, request)
+      : undefined;
+  const candidate =
+    grounding && grounding.diagnostics.length > 0
+      ? {
+          ...input,
+          diagram: grounding.diagram,
+          diagnostics: [...input.diagnostics, ...grounding.diagnostics],
+        }
+      : input;
   const { diagram, intent } = candidate;
-  if (!intent || candidate.error) return candidate;
+  if (!intent) return candidate;
 
   const requestDiagnostics: string[] = [];
   const requirements = originalRequirements ?? intent.requirements;

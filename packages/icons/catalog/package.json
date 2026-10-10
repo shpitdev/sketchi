@@ -13,6 +13,10 @@
       "types": "./dist/catalog.d.ts",
       "default": "./dist/catalog.js"
     },
+    "./generic-prompts": {
+      "types": "./dist/generic-prompts.d.ts",
+      "default": "./dist/generic-prompts.js"
+    },
     "./node-logo-svgs": {
       "types": "./dist/node-logo-svgs.d.ts",
       "default": "./dist/node-logo-svgs.json"
@@ -20,5 +24,8 @@
     "./node-logos/*": "./dist/node-logos/*",
     "./svg/*": "./svg/*",
     "./package.json": "./package.json"
+  },
+  "devDependencies": {
+    "wordlist-english": "1.2.1"
   }
 }

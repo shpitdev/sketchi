@@ -5,11 +5,31 @@ import {
   makeCodeModeIconCatalog,
   type CodeModeIconCatalog,
 } from "@sketchi/diagram-agent";
-import { iconManifest } from "@sketchi/icon-catalog/catalog";
+import { matchIconsInText } from "@sketchi/icon-catalog";
+import { iconManifest, nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
 import { Effect } from "effect";
 
 /** Static-asset path of normalized node-logo SVGs (see scripts/sync-node-logos.ts). */
 export const NODE_LOGO_ASSET_PATH = "/node-logos/";
+
+/** A node logo the user named, offered to a model as the only usable slugs. */
+export interface NamedLogo {
+  readonly aliases?: readonly string[];
+  readonly name: string;
+  readonly slug: string;
+}
+
+/**
+ * Catalog logos for technologies a text names. Generation may only put these
+ * on nodes, which keeps every logo grounded in the user's words.
+ */
+export function logosNamedIn(text: string): NamedLogo[] {
+  return matchIconsInText(text, nodeLogoIcons).map((icon) => ({
+    ...(icon.aliases.length > 0 ? { aliases: icon.aliases } : {}),
+    name: icon.name,
+    slug: icon.slug,
+  }));
+}
 
 export interface PlaygroundAssetsBinding {
   fetch(input: Request | URL | string, init?: RequestInit): Promise<Response>;
@@ -61,6 +81,7 @@ export function playgroundIconCatalog(
             slug: icon.slug,
           }),
       }),
+    slugLookup: "sketchi.searchIcons({ q })",
   });
   byOrigin.set(origin, catalog);
   return catalog;

@@ -23,4 +23,6 @@ export const cliIconCatalog = makeCodeModeIconCatalog({
         )
       : Effect.succeed(svg);
   },
+  // The offline runtime has no search operation; the catalog site does.
+  slugLookup: "https://icons.sketchi.app",
 });

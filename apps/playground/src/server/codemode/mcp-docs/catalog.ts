@@ -282,7 +282,7 @@ export const catalog: CatalogEntry[] = [
     content: [
       "Sketchi Code Mode MCP is for external agent harnesses: Codex, Claude Code, OpenCode, and similar clients.",
       "The server exposes a small contract: docs, search, and execute. execute runs JavaScript against a typed sketchi client.",
-      "The public sketchi client has six operations: buildFlowchart, buildMindmap, buildSequenceDiagram, createCanvas, getArtifact, and applyDiagramPatch.",
+      "The public sketchi client has seven operations: buildFlowchart, buildMindmap, buildSequenceDiagram, createCanvas, getArtifact, applyDiagramPatch, and searchIcons.",
       "The final deliverable is the accepted Sketchi artifact bundle: return the artifactId, format list, and Excalidraw/PNG artifact URLs instead of creating a separate Markdown, Mermaid, or prose-only diagram artifact.",
       "Use docs({ topic }) for full request envelopes and examples. Use search({ query }) to discover operation-specific topics such as patchOperations.",
       "Studio chat, HTTP, and MCP share the canonical semantic builder request/result contracts. Convex threads and user artifact lineage remain outside this harness surface.",
@@ -299,7 +299,7 @@ export const catalog: CatalogEntry[] = [
     content: [
       "execute({ code }) runs an async JavaScript arrow function.",
       "This matches the Code Mode pattern: typed host tools are exposed as a namespace inside the sandbox, here sketchi.*.",
-      "Cloudflare Code Mode exposes typed namespace methods in generated code; this server follows that shape with sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.buildSequenceDiagram, sketchi.createCanvas, sketchi.getArtifact, and sketchi.applyDiagramPatch.",
+      "Cloudflare Code Mode exposes typed namespace methods in generated code; this server follows that shape with sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.buildSequenceDiagram, sketchi.createCanvas, sketchi.getArtifact, sketchi.applyDiagramPatch, and sketchi.searchIcons.",
       "Pass the function expression itself. A trailing semicolon and outer markdown code fence are accepted, but examples omit them so copied code is canonical.",
       "Write JavaScript only: no TypeScript annotations, interfaces, generics, imports, or named wrapper functions. Use the canonical shape async () => { const result = await sketchi.buildFlowchart(...); return result; }.",
       "Do not define a named function and then call it. Put the arrow function body directly in code.",
@@ -349,6 +349,7 @@ export const catalog: CatalogEntry[] = [
       'For normal harness output, request artifactFormats: ["scene", "excalidraw", "png"] and inlineArtifacts: ["excalidraw"]. The scene is an internal patch source; Excalidraw and PNG are the user-facing artifacts.',
       "Request png when the agent needs hosted visual proof. PNG artifacts are stored binary outputs and are never inlined in MCP JSON responses.",
       "Use stable node ids. Decision nodes need meaningful labeled outgoing branches, usually yes/no.",
+      'Brand logos: when a node is about a named technology (GitHub, Docker, Postgres), call sketchi.searchIcons({ q: "docker" }) and set that node\'s icon to { slug } with an exact returned slug. The logo is drawn above the label. Never guess a slug: unknown slugs are dropped with an unknown_icon warning, and logos that cannot be drawn are dropped with icon_dropped. Neither fails the build.',
       `Flowcharts are bounded to ${FLOWCHART_MAX_NODES} nodes and ${FLOWCHART_MAX_EDGES} edges. Larger graphs fail with flowchart_too_large before render or persistence.`,
       "Every node must be reachable from the single start, and every reachable node must be able to reach an end. Closed cycles fail with nonterminating_node; retry loops remain valid when they retain an eventual exit to an end.",
       "Studio HTTP build requests are bounded to 256 KiB, including streamed bodies without Content-Length. Oversized requests return HTTP 413 with request_too_large in the normal failure envelope.",
@@ -358,6 +359,48 @@ export const catalog: CatalogEntry[] = [
       "If buildFlowchart returns ok: false, repair the spec from issues and call buildFlowchart again.",
       "Do not use applyDiagramPatch until buildFlowchart returns an accepted artifact.",
     ].join("\n"),
+  },
+  {
+    id: "searchIcons",
+    kind: "operation",
+    title: "searchIcons",
+    // Logos are part of building flowcharts; the docs topic list is frozen.
+    topic: "buildFlowchart",
+    keywords: ["icon", "icons", "logo", "logos", "brand", "slug", "search"],
+    snippet:
+      "Find exact logo slugs for flowchart and canvas nodes before setting node icons.",
+    content: [
+      "searchIcons({ q, limit? }) ranks the Sketchi logo catalog by exact slug, name prefix, alias, then substring. Aliases such as k8s and psql work.",
+      "It returns { ok: true, query, icons: [{ slug, name, collection }] }. limit defaults to 10 and is capped at 25.",
+      'Use a returned slug as a FlowchartSpec node icon ({ icon: { slug: "docker" } }) or a CanvasSpec node icon ({ icon: { slug: "docker", size: 28 } }).',
+      "Only compact brand marks are searchable: wordmarks and very large SVGs are excluded because they cannot be drawn inside a node.",
+      "Search once per technology, then build. Do not invent slugs; a slug that searchIcons did not return is dropped with an unknown_icon warning.",
+    ].join("\n"),
+    examples: [
+      {
+        title: "Flowchart with logos",
+        language: "js",
+        code: `async () => {
+  const docker = await sketchi.searchIcons({ q: "docker", limit: 1 });
+  const github = await sketchi.searchIcons({ q: "github", limit: 1 });
+  return sketchi.buildFlowchart({
+    spec: {
+      title: "Deploy pipeline",
+      nodes: [
+        { id: "push", label: "Push to GitHub", kind: "start", icon: { slug: github.icons[0].slug } },
+        { id: "build", label: "Build the image", kind: "process", icon: { slug: docker.icons[0].slug } },
+        { id: "ship", label: "Ship", kind: "end" }
+      ],
+      edges: [
+        { source: "push", target: "build" },
+        { source: "build", target: "ship" }
+      ]
+    },
+    options: { artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: ["excalidraw"] }
+  });
+}`,
+      },
+    ],
   },
   {
     id: "buildMindmap",

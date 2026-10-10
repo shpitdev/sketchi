@@ -56,6 +56,10 @@ import {
   BuildMindmapRequestSchema,
   BuildSequenceDiagramRequestSchema,
   CreateCanvasRequestSchema,
+  DEFAULT_ICON_SEARCH_LIMIT,
+  SearchIconsRejected,
+  SearchIconsRequestSchema,
+  type SearchIconsResult,
   DIAGRAM_PATCH_OPERATION_NAMES,
   GetArtifactRequestSchema,
   RenderedDiagramSceneSchema,
@@ -171,7 +175,8 @@ type CodeModeBoundaryOperation =
   | "buildMindmap"
   | "buildSequenceDiagram"
   | "createCanvas"
-  | "getArtifact";
+  | "getArtifact"
+  | "searchIcons";
 
 interface ObservableCodeModeResult {
   readonly ok: boolean;
@@ -709,6 +714,15 @@ const GetArtifactFailure = workflowFailure(
   "GetArtifactFailure",
   GetArtifactRejected.fields.status,
   GetArtifactRejected.mapFields(({ ok, status, ...context }) => ({
+    ...context,
+    ...FailureContextSchema.fields,
+  })),
+);
+
+const SearchIconsFailure = workflowFailure(
+  "SearchIconsFailure",
+  SearchIconsRejected.fields.status,
+  SearchIconsRejected.mapFields(({ ok, status, ...context }) => ({
     ...context,
     ...FailureContextSchema.fields,
   })),
@@ -3103,6 +3117,52 @@ const applyDiagramPatchWorkflow = Effect.fn(
   } satisfies Extract<ApplyDiagramPatchResult, { ok: true }>;
 });
 
+const searchIconsWorkflow = Effect.fn("codeMode.searchIcons.workflow")(
+  function* (input: unknown) {
+    const parsed = Schema.decodeUnknownResult(SearchIconsRequestSchema, {
+      errors: "all",
+      reportInput: true,
+    })(input);
+    if (!Result.isSuccess(parsed)) {
+      return yield* new SearchIconsFailure({
+        status: "invalid_input",
+        context: {
+          issues: inputIssues(formatContractSchemaError(parsed.failure)),
+        },
+      });
+    }
+    const environment = yield* CodeModeRuntimeEnvironment;
+    const query = cleanToolString(parsed.success.q);
+    const icons =
+      environment.icons?.search(
+        query,
+        parsed.success.limit ?? DEFAULT_ICON_SEARCH_LIMIT,
+      ) ?? [];
+    return {
+      ok: true,
+      status: "accepted",
+      query,
+      icons: icons.map(({ collection, name, slug }) => ({
+        collection,
+        name,
+        slug,
+      })),
+      issues: environment.icons
+        ? []
+        : [
+            issue({
+              code: "unknown_icon",
+              severity: "warning",
+              stage: "input",
+              ref: { kind: "request", path: "q" },
+              message: "This Sketchi runtime has no icon catalog.",
+              hint: "Omit node icons on this host.",
+            }),
+          ],
+    } satisfies Extract<SearchIconsResult, { ok: true }>;
+  },
+);
+
 type CodeModeWorkflowEffect<A> = Effect.Effect<
   A,
   never,
@@ -3172,6 +3232,15 @@ export const getArtifact: (
 ) => CodeModeWorkflowEffect<GetArtifactResult> = boundary(
   "getArtifact",
   getArtifactWorkflow,
+  failureResult,
+);
+
+/** Ranked node-logo search; use a returned slug as a node `icon.slug`. */
+export const searchIcons: (
+  input: unknown,
+) => CodeModeWorkflowEffect<SearchIconsResult> = boundary(
+  "searchIcons",
+  searchIconsWorkflow,
   failureResult,
 );
 

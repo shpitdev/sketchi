@@ -627,6 +627,9 @@ importers:
       '@sketchi/diagram-core':
         specifier: workspace:*
         version: link:../core
+      '@sketchi/icon-catalog':
+        specifier: workspace:*
+        version: link:../../icons/catalog
       '@sketchi/observability':
         specifier: workspace:*
         version: link:../../observability
@@ -718,7 +721,11 @@ importers:
         specifier: ^19.0.0
         version: 19.3.0(react@19.3.0)
 
-  packages/icons/catalog: {}
+  packages/icons/catalog:
+    devDependencies:
+      wordlist-english:
+        specifier: 1.2.1
+        version: 1.2.1
 
   packages/observability:
     dependencies:
@@ -10366,6 +10373,9 @@ packages:
   word-wrap@1.2.5:
     resolution: {integrity: sha512-BN22B5eaMMI9UMtjrGd5g5eCYPpCPDUy0FJXbYsaT5zYxjFOckS53SQDE3pWkVoWpHXVb3BrYcEN4Twa55B5cA==}
     engines: {node: '>=0.10.0'}
+
+  wordlist-english@1.2.1:
+    resolution: {integrity: sha512-vaiQQiu95UeON0WZFtiTrWfZmIiUd2rhrhMCBeEzwq3oTVzHCX8naGCqv/smSspE9kH2sN+E8lZyV0JZjqSzGw==}
 
   workerd@1.20261006.1:
     resolution: {integrity: sha512-8MadBuffZ5NdpLwZjUmsqT5QlaKXq4gjgT6wzcKeynZTICNXyePhc+5QVoKiK7+MMhFTLNrRO2KXLlpk8Q6BkA==}
@@ -20895,6 +20905,8 @@ snapshots:
   why-is-node-running@3.2.1: {}
 
   word-wrap@1.2.5: {}
+
+  wordlist-english@1.2.1: {}
 
   workerd@1.20261006.1:
     optionalDependencies:

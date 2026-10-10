@@ -200,6 +200,17 @@ describe("Code Mode MCP docs", () => {
       "applyDiagramPatch",
     );
 
+    const logoResults = searchCodeModeDocs({ query: "brand logo" });
+    expect(logoResults.results.map((result) => result.id)).toContain(
+      "searchIcons",
+    );
+    expect(getCodeModeDocs({ topic: "buildFlowchart" }).content).toContain(
+      "sketchi.searchIcons",
+    );
+    expect(SKETCHI_CODE_MODE_TYPES).toContain(
+      "searchIcons(input: SearchIconsRequest): Promise<SearchIconsResult>;",
+    );
+
     const managedResults = searchCodeModeDocs({
       query: "convex managed threads",
     });

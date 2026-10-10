@@ -12,6 +12,8 @@ import {
   CreateCanvasResultSchema,
   GetArtifactRequestSchema,
   GetArtifactResultSchema,
+  SearchIconsRequestSchema,
+  SearchIconsResultSchema,
   toCodeModeJsonSchema,
 } from "@sketchi/diagram-agent";
 
@@ -39,6 +41,10 @@ export const codeModeContracts = {
   applyDiagramPatch: {
     input: ApplyDiagramPatchRequestSchema,
     output: ApplyDiagramPatchResultSchema,
+  },
+  searchIcons: {
+    input: SearchIconsRequestSchema,
+    output: SearchIconsResultSchema,
   },
 };
 

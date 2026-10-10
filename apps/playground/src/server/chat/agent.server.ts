@@ -1,10 +1,10 @@
 import "@tanstack/react-start/server-only";
 
 import {
-  DIAGRAM_AGENT_SYSTEM_PROMPT,
   DIAGRAM_AGENT_TEMPERATURE,
   MAX_AGENT_OUTPUT_TOKENS,
   MAX_AGENT_STEPS,
+  MAX_FLOWCHART_BUILD_ATTEMPTS,
   type BuildFlowchartResult,
 } from "@sketchi/diagram-agent";
 import {
@@ -18,6 +18,7 @@ import { Effect, Schema } from "effect";
 
 import { readBoundedJson } from "../runtime/request-body.server";
 import { PlaygroundAiModel } from "../ai/model.server";
+import { logosNamedIn } from "../codemode/icon-catalog.server";
 import { PlaygroundCodeMode } from "../codemode/service.server";
 import {
   type PlaygroundCallbackEffect,
@@ -30,6 +31,7 @@ import {
   STUDIO_BUILD_FLOWCHART_TOOL_NAME,
   StudioBuildFlowchartInputSchema,
   StudioBuildFlowchartOutputSchema,
+  studioSystemPrompt,
   type StudioBuildFlowchartInput,
 } from "./studio-flowchart-tool.server";
 
@@ -59,6 +61,27 @@ export function makeStudioFlowchartToolCallback<E>(
 ) {
   return (input: StudioBuildFlowchartInput) =>
     runToolEffect(executor.execute(input));
+}
+
+function userText(
+  messages: ReadonlyArray<{
+    readonly role: string;
+    readonly parts: ReadonlyArray<{
+      readonly type: string;
+      readonly text?: unknown;
+    }>;
+  }>,
+): string {
+  return messages
+    .filter((message) => message.role === "user")
+    .flatMap((message) =>
+      message.parts.flatMap((part) =>
+        part.type === "text" && typeof part.text === "string"
+          ? [part.text]
+          : [],
+      ),
+    )
+    .join("\n");
 }
 
 const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(
@@ -114,15 +137,19 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(
             cause instanceof Error ? cause.message : "Chat request failed.",
         }),
     });
+    // Logos come only from what the user wrote, across the conversation.
+    const logos = logosNamedIn(userText(messages));
     const executor = yield* makeStudioFlowchartToolExecutor(
       codeMode.buildFlowchart,
+      MAX_FLOWCHART_BUILD_ATTEMPTS,
+      logos,
     );
 
     return yield* Effect.try({
       try: () => {
         const result = streamText({
           model,
-          system: DIAGRAM_AGENT_SYSTEM_PROMPT,
+          system: studioSystemPrompt(logos),
           messages: modelMessages,
           tools: {
             [STUDIO_BUILD_FLOWCHART_TOOL_NAME]: tool({

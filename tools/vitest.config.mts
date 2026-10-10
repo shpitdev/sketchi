@@ -19,6 +19,10 @@ export default defineConfig({
         "../packages/diagram/generation/src/index.ts",
         import.meta.url,
       ).pathname,
+      "@sketchi/icon-catalog": new URL(
+        "../packages/icons/catalog/src/index.ts",
+        import.meta.url,
+      ).pathname,
       "@sketchi/observability": new URL(
         "../packages/observability/src/index.ts",
         import.meta.url,

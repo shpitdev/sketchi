@@ -7,7 +7,9 @@ import {
   buildFlowchart,
   CodeModeArtifactStorage,
   CodeModeRuntimeEnvironment,
+  DIAGRAM_AGENT_SYSTEM_PROMPT,
   makeMemoryArtifactStorage,
+  MAX_FLOWCHART_BUILD_ATTEMPTS,
   type BuildFlowchartResult,
   type FlowchartSpec,
   toCodeModeJsonSchema,
@@ -17,6 +19,7 @@ import {
   makeStudioFlowchartToolExecutor,
   StudioBuildFlowchartInputSchema,
   StudioBuildFlowchartOutputSchema,
+  studioSystemPrompt,
 } from "./studio-flowchart-tool.server";
 
 function acceptedSpec(): FlowchartSpec {
@@ -401,4 +404,121 @@ describe("Studio build_flowchart host", () => {
         expect(yield* executor.attempts).toBe(2);
       }),
   );
+});
+
+describe("Studio chat node logos", () => {
+  it("lists only the logos the user named in the system prompt", () => {
+    expect(studioSystemPrompt([])).toBe(DIAGRAM_AGENT_SYSTEM_PROMPT);
+    const prompt = studioSystemPrompt([
+      { name: "Github", slug: "github" },
+      { name: "Docker", slug: "docker" },
+    ]);
+    expect(prompt.startsWith(DIAGRAM_AGENT_SYSTEM_PROMPT)).toBe(true);
+    expect(prompt).toContain("github (Github), docker (Docker)");
+    expect(prompt).toContain("Never invent a slug.");
+  });
+
+  it("drops icons for technologies the user never named before building", async () => {
+    const received: unknown[] = [];
+    const accepted = await Effect.runPromise(
+      deterministicRuntime(countingStore())({ spec: acceptedSpec() }),
+    );
+    const executor = await Effect.runPromise(
+      makeStudioFlowchartToolExecutor(
+        (input) =>
+          Effect.sync(() => {
+            received.push(input);
+            return accepted;
+          }),
+        MAX_FLOWCHART_BUILD_ATTEMPTS,
+        [{ name: "Github", slug: "github" }],
+      ),
+    );
+    const spec = acceptedSpec();
+    const result = await Effect.runPromise(
+      executor.execute({
+        spec: {
+          ...spec,
+          nodes: spec.nodes.map((node, index) =>
+            index === 0
+              ? { ...node, icon: { slug: "GitHub" } }
+              : index === 1
+                ? { ...node, icon: { slug: "kubernetes" } }
+                : node,
+          ),
+        },
+      }),
+    );
+
+    const built = received[0] as { spec: FlowchartSpec };
+    expect(built.spec.nodes.map((node) => node.icon)).toEqual(
+      spec.nodes.map((_, index) =>
+        index === 0 ? { slug: "github" } : undefined,
+      ),
+    );
+    expect(result.issues[0]).toMatchObject({
+      code: "unknown_icon",
+      severity: "warning",
+      ref: { kind: "node", id: spec.nodes[1]?.id, path: "nodes.icon.slug" },
+    });
+  });
+
+  it("moves logos onto the nodes whose labels name them", async () => {
+    const received: unknown[] = [];
+    const accepted = await Effect.runPromise(
+      deterministicRuntime(countingStore())({ spec: acceptedSpec() }),
+    );
+    const executor = await Effect.runPromise(
+      makeStudioFlowchartToolExecutor(
+        (input) =>
+          Effect.sync(() => {
+            received.push(input);
+            return accepted;
+          }),
+        MAX_FLOWCHART_BUILD_ATTEMPTS,
+        [
+          { name: "Github", slug: "github" },
+          { aliases: ["postgres"], name: "PostgreSQL", slug: "postgresql" },
+        ],
+      ),
+    );
+    const spec = acceptedSpec();
+    const labels: Record<string, string> = {
+      start: "Open release on GitHub",
+      publish: "Record release in Postgres",
+    };
+    // The model shifted both logos down one node.
+    const icons: Record<string, string> = {
+      review: "github",
+      revise: "postgresql",
+    };
+    const result = await Effect.runPromise(
+      executor.execute({
+        spec: {
+          ...spec,
+          nodes: spec.nodes.map((node) => ({
+            ...node,
+            label: labels[node.id] ?? node.label,
+            ...(icons[node.id] ? { icon: { slug: icons[node.id] ?? "" } } : {}),
+          })),
+        },
+      }),
+    );
+
+    const built = received[0] as { spec: FlowchartSpec };
+    expect(
+      Object.fromEntries(
+        built.spec.nodes.map((node) => [node.id, node.icon?.slug]),
+      ),
+    ).toEqual({
+      start: "github",
+      review: undefined,
+      publish: "postgresql",
+      revise: undefined,
+      done: undefined,
+    });
+    expect(
+      result.issues.filter((issue) => issue.code === "unknown_icon"),
+    ).toEqual([]);
+  });
 });

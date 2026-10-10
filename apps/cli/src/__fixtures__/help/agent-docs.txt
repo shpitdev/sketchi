@@ -15,6 +15,11 @@ Manual JSON workflow (strictly offline):
 Canonical flowchart example:
   {"type":"flowchart","spec":{"id":"release-flow","title":"Release approval","nodes":[{"id":"start","label":"Change proposed","kind":"start"},{"id":"review","label":"Review evidence","kind":"process"},{"id":"end","label":"Release approved","kind":"end"}],"edges":[{"source":"start","target":"review"},{"source":"review","target":"end"}]}}
 
+Node logos:
+  A flowchart node may set "icon":{"slug":"docker"} to draw a brand logo above its label. Slugs
+  come from the Sketchi icon catalog (https://icons.sketchi.app) and resolve offline. Unknown
+  slugs, wordmarks, and logos that do not fit are dropped with a warning; they never fail a build.
+
 Canonical mindmap example:
   {"type":"mindmap","spec":{"id":"launch-map","title":"Launch plan","root":{"label":"Launch","children":[{"label":"Product"},{"label":"Operations"}]}}}
 

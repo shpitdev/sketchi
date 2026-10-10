@@ -536,8 +536,8 @@ const IconSlugInput = requiredString(
 );
 
 /**
- * A logo from the Sketchi icon catalog (icons.sketchi.app). Use an exact catalog
- * slug; unknown slugs are dropped with an unknown_icon warning.
+ * A logo from the Sketchi icon catalog. Use an exact slug returned by
+ * sketchi.searchIcons; unknown slugs are dropped with an unknown_icon warning.
  */
 export class NodeIconSpec extends Schema.Class<NodeIconSpec>("NodeIconSpec")(
   {
@@ -1932,3 +1932,79 @@ export const CreateCanvasResultSchema = Schema.Union([
   CreateCanvasRejected,
 ]);
 export type CreateCanvasResult = typeof CreateCanvasResultSchema.Type;
+
+const maximumIconQueryLength = 120;
+const minimumIconSearchLimit = 1;
+const maximumIconSearchLimit = 25;
+export const DEFAULT_ICON_SEARCH_LIMIT = 10;
+
+/** Ranked search over the logos a node may carry (see NodeIconSpec). */
+export class SearchIconsRequest extends Schema.Class<SearchIconsRequest>(
+  "SearchIconsRequest",
+)(
+  {
+    q: requiredString(
+      nonEmptyString().check(
+        Schema.isMaxLength(maximumIconQueryLength, {
+          message: `Too big: expected string to have <=${maximumIconQueryLength} characters`,
+        }),
+      ),
+    ),
+    limit: optionalContract(
+      Schema.Int.check(
+        Schema.isBetween(
+          {
+            minimum: minimumIconSearchLimit,
+            maximum: maximumIconSearchLimit,
+          },
+          {
+            message: `Expected an integer between ${minimumIconSearchLimit} and ${maximumIconSearchLimit}`,
+          },
+        ),
+      ),
+    ),
+  },
+  { identifier: undefined },
+) {}
+export const SearchIconsRequestSchema = SearchIconsRequest;
+
+export class SearchIconsMatch extends Schema.Class<SearchIconsMatch>(
+  "SearchIconsMatch",
+)(
+  {
+    slug: Schema.String,
+    name: Schema.String,
+    collection: Schema.String,
+  },
+  { identifier: undefined },
+) {}
+
+export class SearchIconsAccepted extends Schema.Class<SearchIconsAccepted>(
+  "SearchIconsAccepted",
+)(
+  {
+    ok: booleanLiteral(true),
+    status: stringLiteral("accepted"),
+    query: Schema.String,
+    icons: Schema.Array(SearchIconsMatch).pipe(Schema.mutable),
+    issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+  },
+  { identifier: undefined },
+) {}
+
+export class SearchIconsRejected extends Schema.Class<SearchIconsRejected>(
+  "SearchIconsRejected",
+)(
+  {
+    ok: booleanLiteral(false),
+    status: literals(["invalid_input"]),
+    issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+  },
+  { identifier: undefined },
+) {}
+
+export const SearchIconsResultSchema = Schema.Union([
+  SearchIconsAccepted,
+  SearchIconsRejected,
+]);
+export type SearchIconsResult = typeof SearchIconsResultSchema.Type;
