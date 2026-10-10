@@ -10,6 +10,7 @@ import {
   localInspectorPort,
   localViteCacheDir,
 } from "../../tools/local-dev-ports";
+import { excalidrawFonts } from "../../scripts/lib/excalidraw-fonts.mjs";
 import { workerProjectConfig } from "../../scripts/lib/worker-apps.mjs";
 
 const workerProject = workerProjectConfig("playground");
@@ -48,6 +49,7 @@ export default defineConfig({
   cacheDir: localViteCacheDir("playground"),
   publicDir: new URL("./public", import.meta.url).pathname,
   plugins: [
+    excalidrawFonts(),
     enforceClientServerBoundary(),
     agents(),
     codemode(),

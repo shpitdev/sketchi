@@ -175,11 +175,12 @@
         "@nx/enforce-module-boundaries": [
           "error",
           {
-            // Vite configs consume these two non-project workspace inputs. Keep
-            // the exceptions exact so every project-to-project import is still
-            // checked, including imports from config and Storybook files.
+            // Vite and Storybook configs consume these non-project workspace
+            // inputs. Keep the exceptions exact so every project-to-project
+            // import is still checked, including imports from config files.
             "allow": [
               "^\\.\\./\\.\\./scripts/lib/worker-apps\\.mjs$",
+              "^(\\.\\./){2,4}scripts/lib/excalidraw-fonts\\.mjs$",
               "^\\.\\./\\.\\./tools/local-dev-ports$"
             ],
             "depConstraints": [

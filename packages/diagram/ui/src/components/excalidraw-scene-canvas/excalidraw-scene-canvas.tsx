@@ -6,6 +6,7 @@ import type {
 } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawScene } from "@sketchi/diagram-excalidraw";
 import { SKETCHI_DIAGRAM_PALETTE } from "@sketchi/diagram-core";
+import { loadExcalidraw } from "../../lib/load-excalidraw.js";
 import {
   type ComponentType,
   lazy,
@@ -27,7 +28,7 @@ function CanvasUnavailable() {
 // Excalidraw reads browser globals at import time, so the editor module is only
 // requested once the canvas renders in the browser.
 const LazyExcalidraw = lazy<ComponentType<ExcalidrawProps>>(() =>
-  import("@excalidraw/excalidraw").then(
+  loadExcalidraw().then(
     (module) => ({ default: module.Excalidraw }),
     () => ({ default: CanvasUnavailable }),
   ),

@@ -7,6 +7,7 @@ import {
   localInspectorPort,
   localViteCacheDir,
 } from "../../tools/local-dev-ports";
+import { excalidrawFonts } from "../../scripts/lib/excalidraw-fonts.mjs";
 import { workerProjectConfig } from "../../scripts/lib/worker-apps.mjs";
 
 const workerProject = workerProjectConfig("eval-harness");
@@ -21,6 +22,7 @@ export default defineConfig({
   cacheDir: localViteCacheDir("eval-harness"),
   publicDir: new URL("./public", import.meta.url).pathname,
   plugins: [
+    excalidrawFonts(),
     cloudflare({
       configPath: new URL("./wrangler.jsonc", import.meta.url).pathname,
       inspectorPort: localInspectorPort(6200),
