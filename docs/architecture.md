@@ -39,6 +39,7 @@ from `scripts/lib/worker-apps.mjs`.
 | Model generation    | `packages/diagram/generation`            | typed provider service, retry, timeout, decode, and candidate summaries          |
 | Product build       | `packages/diagram/agent`                 | canonical normalize, validate, quality, render, export, and artifact transaction |
 | Scenario evaluation | `packages/diagram/scenarios`             | maintained scenarios, pure grading, and internal Effect tooling                  |
+| Icon catalog        | `packages/icons/catalog`                 | icon manifest, ranked search, SVG sources, and node-logo eligibility             |
 | Studio persistence  | `packages/studio/projects`               | typed ownership and scoped R2 persistence services                               |
 | Telemetry           | `packages/observability`                 | scoped Workers-compatible tracing, logs, and metrics                             |
 | UI                  | `packages/diagram/ui` and app components | React rendering and local view state                                             |

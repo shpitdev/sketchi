@@ -1,10 +1,8 @@
+import { searchIcons, type SketchiIcon } from "@sketchi/icon-catalog";
+import { getIconBySlug, iconManifest } from "@sketchi/icon-catalog/catalog";
+
+import type { IconSourceLoader } from "./catalog.server.js";
 import { corsJson, corsPreflight, corsText } from "./cors-policy.js";
-import {
-  getIconBySlug,
-  iconManifest,
-  type IconSourceLoader,
-} from "./catalog.server.js";
-import { searchIcons, type SketchiIcon } from "./data.js";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;

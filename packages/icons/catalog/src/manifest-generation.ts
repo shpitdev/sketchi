@@ -1,4 +1,8 @@
-import type { IconManifest, SketchiIcon, SketchiIconViewBox } from "./data.js";
+import type {
+  IconManifest,
+  SketchiIcon,
+  SketchiIconViewBox,
+} from "./manifest.js";
 
 interface SourceIcon {
   readonly baseSlug?: string;

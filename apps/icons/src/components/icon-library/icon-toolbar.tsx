@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import { formatCollectionLabel, type SketchiIcon } from "../../lib/data.js";
+import { formatCollectionLabel, type SketchiIcon } from "@sketchi/icon-catalog";
 import { selectAllLabel } from "../../lib/selection.js";
 
 export function IconToolbar({

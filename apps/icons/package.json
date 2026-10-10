@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@sketchi/icon-catalog": "workspace:*",
     "@tanstack/react-hotkeys": "0.13.0",
     "fflate": "0.8.3"
   }

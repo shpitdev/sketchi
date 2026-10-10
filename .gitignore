@@ -16,3 +16,7 @@ packages/**/src/**/*.d.ts
 packages/**/src/**/*.d.ts.map
 
 vitest.config.*.timestamp*
+
+# Generated from @sketchi/icon-catalog by the icons sync-catalog-assets target.
+apps/icons/public/icons-manifest.json
+apps/icons/public/output/

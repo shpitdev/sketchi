@@ -1,10 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const corpusRoot = resolve(
-  process.cwd(),
-  "apps/icons/public/output/upload-ready/svg",
-);
+const corpusRoot = resolve(process.cwd(), "packages/icons/catalog/svg");
 
 function corpusFixture(relativePath: string): {
   readonly source: string;

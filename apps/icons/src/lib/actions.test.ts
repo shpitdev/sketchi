@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { SketchiIcon } from "./data";
-import {
-  componentNameForIcon,
-  svgDataUri,
-  svgToJsxComponent,
-} from "./actions";
+import type { SketchiIcon } from "@sketchi/icon-catalog";
+import { componentNameForIcon, svgDataUri, svgToJsxComponent } from "./actions";
 
 const icon: SketchiIcon = {
   aliases: [],

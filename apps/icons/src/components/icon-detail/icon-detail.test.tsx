@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { SketchiIcon } from "../../lib/data";
+import type { SketchiIcon } from "@sketchi/icon-catalog";
 import { IconDetail } from "./icon-detail";
 
 const icon: SketchiIcon = {
