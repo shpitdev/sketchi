@@ -1,9 +1,7 @@
 import {
   buildDiagramGenerationMessages,
-  type DiagramGenerationMessage,
   type DiagramGenerationMessages,
   type DiagramGenerationPrompt,
-  type DiagramGenerationRole,
 } from "@sketchi/diagram-generation";
 
 import type { DiagramScenario } from "./scenarios.js";
@@ -11,8 +9,6 @@ import type { GenerationReliabilityScenario } from "./generation-reliability.js"
 
 type GenerationPromptScenario = DiagramScenario | GenerationReliabilityScenario;
 
-export type ScenarioPromptRole = DiagramGenerationRole;
-export type ScenarioPromptMessage = DiagramGenerationMessage;
 export type ScenarioPromptParts = DiagramGenerationMessages;
 
 export function toDiagramGenerationPrompt(

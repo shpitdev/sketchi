@@ -14,8 +14,9 @@ const meta = {
   title: "Diagram UI/Components/PromptMessageViewer",
   component: PromptMessageViewer,
   args: {
-    messages: promptParts.messages,
+    system: promptParts.system,
     title: "Prompt messages",
+    user: promptParts.user,
   },
 } satisfies Meta<typeof PromptMessageViewer>;
 

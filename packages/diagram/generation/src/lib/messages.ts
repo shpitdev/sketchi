@@ -1,21 +1,11 @@
 import { Schema } from "effect";
 
-export const DiagramGenerationRoleSchema = Schema.Literals(["system", "user"]);
-export type DiagramGenerationRole = typeof DiagramGenerationRoleSchema.Type;
-
 export const DiagramGenerationTypeSchema = Schema.Literals([
   "flowchart",
   "mindmap",
   "sequence",
 ]);
 export type DiagramGenerationType = typeof DiagramGenerationTypeSchema.Type;
-
-export class DiagramGenerationMessage extends Schema.Class<DiagramGenerationMessage>(
-  "DiagramGenerationMessage",
-)({
-  content: Schema.String,
-  role: DiagramGenerationRoleSchema,
-}) {}
 
 export class DiagramGenerationPrompt extends Schema.Class<DiagramGenerationPrompt>(
   "DiagramGenerationPrompt",
@@ -25,10 +15,10 @@ export class DiagramGenerationPrompt extends Schema.Class<DiagramGenerationPromp
   requestedType: Schema.optionalKey(DiagramGenerationTypeSchema),
 }) {}
 
+/** Provider adapters map these onto their own system and user channels. */
 export class DiagramGenerationMessages extends Schema.Class<DiagramGenerationMessages>(
   "DiagramGenerationMessages",
 )({
-  messages: Schema.Tuple([DiagramGenerationMessage, DiagramGenerationMessage]),
   system: Schema.String,
   user: Schema.String,
 }) {}
@@ -253,12 +243,5 @@ export function buildDiagramGenerationMessages(
     expectedJsonShape(prompt),
   ].join("\n");
 
-  return {
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: user },
-    ],
-    system,
-    user,
-  };
+  return { system, user };
 }

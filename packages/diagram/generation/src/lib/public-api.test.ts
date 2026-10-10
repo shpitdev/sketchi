@@ -180,10 +180,6 @@ describe("diagram generation prompt mapping", () => {
 
   it("keeps the provider-facing prompt messages byte-for-byte stable", () => {
     expect(buildDiagramGenerationMessages(prompt)).toEqual({
-      messages: [
-        { role: "system", content: expectedSystem },
-        { role: "user", content: expectedUser },
-      ],
       system: expectedSystem,
       user: expectedUser,
     });

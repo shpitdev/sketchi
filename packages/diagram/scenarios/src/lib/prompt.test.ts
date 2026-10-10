@@ -21,16 +21,9 @@ describe("scenario prompts", () => {
   it("separates system instructions from the user scenario", () => {
     const prompt = buildScenarioPromptParts(scenario);
 
-    expect(prompt.messages).toEqual([
-      expect.objectContaining({
-        role: "system",
-        content: expect.stringContaining("Flowchart IR rules:"),
-      }),
-      expect.objectContaining({
-        role: "user",
-        content: expect.stringContaining("Scenario:"),
-      }),
-    ]);
+    expect(Object.keys(prompt).sort()).toEqual(["system", "user"]);
+    expect(prompt.system).toContain("Flowchart IR rules:");
+    expect(prompt.user).toContain("Scenario:");
     expect(prompt.system).not.toContain(scenario.prompt);
     expect(prompt.system).toContain("Every node must have id, label, and kind");
     expect(prompt.user).toContain(scenario.prompt);

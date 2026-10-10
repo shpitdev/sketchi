@@ -7,11 +7,9 @@ describe("PromptMessageViewer", () => {
   it("renders separated prompt messages", () => {
     render(
       <PromptMessageViewer
-        messages={[
-          { role: "system", content: "Return only JSON." },
-          { role: "user", content: "Create a flowchart." },
-        ]}
+        system="Return only JSON."
         title="Prompt parts"
+        user="Create a flowchart."
       />,
     );
 

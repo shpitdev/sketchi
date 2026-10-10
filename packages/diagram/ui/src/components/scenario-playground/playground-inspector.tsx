@@ -110,10 +110,13 @@ export function PlaygroundInspector({
           />
         ) : null}
 
-        {state.inspectorPanel === "prompt" && state.mode === "llm" ? (
+        {state.inspectorPanel === "prompt" &&
+        state.mode === "llm" &&
+        promptParts ? (
           <PromptMessageViewer
-            messages={promptParts?.messages ?? []}
+            system={promptParts.system}
             title="Prompt messages"
+            user={promptParts.user}
           />
         ) : null}
 
