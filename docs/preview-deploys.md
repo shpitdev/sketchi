@@ -41,8 +41,11 @@ reviewed change. Do not copy production secrets into the Preview base.
 `scripts/01-validate-preview-config.mjs` checks the generated build config before
 upload: Worker identity, explicit runtime bindings, and that `previews` binds every
 production R2 bucket and Pipeline stream binding to a non-production target (the
-R2 target must match the top-level `preview_bucket_name`). Any other `previews`
-field, such as KV, D1, or service bindings, fails until its isolation is reviewed.
+R2 target must match the top-level `preview_bucket_name`). Each binding entry may
+only use reviewed keys (Pipelines: `binding`, `stream`, `remote`; R2: `binding`,
+`bucket_name`, `remote`, `jurisdiction`), because Wrangler also forwards the legacy
+Pipelines `pipeline` key. Any other `previews` field, such as KV, D1, or service
+bindings, fails until its isolation is reviewed.
 Cloudflare [resources and isolation](https://developers.cloudflare.com/workers/previews/resources/)
 explains that R2 and Pipelines isolation depends on binding separate resources;
 service bindings currently call the target Worker's production deployment.
@@ -93,8 +96,11 @@ an `unconfigured` comment rather than a successful preview claim.
 Closing a PR runs `cleanup-preview`, which deletes Preview `pr-<number>` from each
 of the five Workers through the Cloudflare Previews API and marks the sticky
 comment `deleted`. A missing Preview (HTTP 404) counts as already deleted. The job
-shares `deploy-preview`'s concurrency group, so a queued deploy cannot recreate a
-Preview after it is deleted. Cloudflare also evicts the least recently deployed
+shares `deploy-preview`'s concurrency group. Once a deploy job holds that lock, it
+re-checks the PR state right before `wrangler preview` and skips the upload if the
+PR has closed, so a deploy that was queued at close time doesn't recreate the
+Preview. A PR that closes during the upload itself is still handled: its cleanup
+job waits for the same lock and deletes the Preview afterwards. Cloudflare also evicts the least recently deployed
 Preview at its limit (100 Free / 500 Paid per Worker; 100 deployments per Preview).
 
 Legacy `sketchi-*-pr-*` Workers from the previous per-PR Worker flow are untouched

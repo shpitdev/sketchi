@@ -119,6 +119,10 @@ test("Preview validation rejects production targets, missing bindings, and unrev
       config.previews.r2_buckets[0].bucket_name = "unreviewed-bucket";
     },
     (config) => {
+      config.previews.r2_buckets[0].preview_bucket_name =
+        config.r2_buckets[0].bucket_name;
+    },
+    (config) => {
       config.previews.pipelines[0].stream = config.pipelines[1].stream;
     },
     (config) => {
@@ -134,6 +138,46 @@ test("Preview validation rejects production targets, missing bindings, and unrev
     mutate(config);
     assert.throws(() => validatePreviewConfig(config, "playground"));
   }
+});
+
+test("Preview Pipelines reject the legacy pipeline key, alone or next to a preview stream", async () => {
+  const original = await unstable_readConfig({
+    config: workerProjectConfig("playground").wranglerInputConfigPath,
+  });
+  const productionStream = original.pipelines[0].stream;
+  const previewStream = original.previews.pipelines[0].stream;
+  for (const entry of [
+    { pipeline: productionStream },
+    { pipeline: previewStream },
+    { stream: previewStream, pipeline: productionStream },
+  ]) {
+    const config = structuredClone(original);
+    config.previews.pipelines[0] = {
+      binding: config.previews.pipelines[0].binding,
+      ...entry,
+    };
+    assert.throws(
+      () => validatePreviewConfig(config, "playground"),
+      /unreviewed keys: pipeline/,
+    );
+  }
+});
+
+test("Preview data bindings reject production targets named by the legacy pipeline key", async () => {
+  const config = structuredClone(
+    await unstable_readConfig({
+      config: workerProjectConfig("playground").wranglerInputConfigPath,
+    }),
+  );
+  const { stream } = config.previews.pipelines[0];
+  config.pipelines[0] = {
+    binding: config.pipelines[0].binding,
+    pipeline: stream,
+  };
+  assert.throws(
+    () => validatePreviewConfig(config, "playground"),
+    /non-production stream/,
+  );
 });
 
 test("Web links stay on official sibling previews of the same PR", () => {

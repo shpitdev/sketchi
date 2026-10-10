@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 const require = createRequire(import.meta.resolve("nx/package.json"));
@@ -190,4 +199,58 @@ test("closing a PR deletes its Previews and never deploys", () => {
     workflow.jobs["cleanup-preview"].concurrency,
     workflow.jobs["deploy-preview"].concurrency,
   );
+});
+
+// Run the re-check step with a stub `gh` that reports the given PR state.
+function recheckPrState(state) {
+  const step = workflow.jobs["deploy-preview"].steps.find(
+    ({ id }) => id === "still-open",
+  );
+  const dir = mkdtempSync(path.join(tmpdir(), "preview-recheck-"));
+  try {
+    const gh = path.join(dir, "gh");
+    writeFileSync(
+      gh,
+      `#!/usr/bin/env bash\necho "$*" > "${dir}/gh-args"\necho ${state}\n`,
+    );
+    chmodSync(gh, 0o755);
+    const output = path.join(dir, "output");
+    writeFileSync(output, "");
+    const result = spawnSync("bash", ["-c", step.run], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GITHUB_OUTPUT: output,
+        GITHUB_REPOSITORY: "shpitdev/sketchi",
+        PATH: `${dir}:${process.env.PATH}`,
+        PR_NUMBER: "42",
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    return {
+      args: readFileSync(path.join(dir, "gh-args"), "utf8").trim(),
+      output: readFileSync(output, "utf8"),
+    };
+  } finally {
+    rmSync(dir, { force: true, recursive: true });
+  }
+}
+
+test("deploys re-check the PR state after taking the lock and skip closed PRs", () => {
+  const steps = workflow.jobs["deploy-preview"].steps;
+  const recheck = steps.findIndex(({ id }) => id === "still-open");
+  const build = steps.findIndex(({ run }) => run?.includes("pnpm nx build"));
+  assert.ok(recheck > build, "re-check after the build, not before");
+  assert.equal(steps[recheck + 1].id, "deploy");
+  for (const step of steps.filter(
+    ({ id, name }) =>
+      ["deploy", "preview-url"].includes(id) || name === "Comment preview URL",
+  )) {
+    assert.match(step.if, /steps\.still-open\.outputs\.open == 'true'/);
+  }
+
+  const open = recheckPrState("open");
+  assert.equal(open.args, "api repos/shpitdev/sketchi/pulls/42 --jq .state");
+  assert.equal(open.output, "open=true\n");
+  assert.equal(recheckPrState("closed").output, "open=false\n");
 });

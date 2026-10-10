@@ -85,9 +85,19 @@ export function previewName(prNumber) {
   return `pr-${normalizePrNumber(prNumber)}`;
 }
 
-const previewDataResources = {
-  pipelines: "stream",
-  r2_buckets: "bucket_name",
+// Keys Wrangler forwards for each Preview data binding. It also forwards the
+// legacy Pipelines `pipeline` key, so Previews may only name a `stream`.
+const previewDataBindings = {
+  pipelines: {
+    allowedKeys: ["binding", "stream", "remote"],
+    productionTargetKeys: ["stream", "pipeline"],
+    target: "stream",
+  },
+  r2_buckets: {
+    allowedKeys: ["binding", "bucket_name", "remote", "jurisdiction"],
+    productionTargetKeys: ["bucket_name"],
+    target: "bucket_name",
+  },
 };
 
 export function validatePreviewConfig(config, projectId) {
@@ -130,7 +140,7 @@ export function validatePreviewConfig(config, projectId) {
   }
   // Previews must bind every data binding production has, and none of them
   // may name a production bucket or stream.
-  for (const [field, resource] of Object.entries(previewDataResources)) {
+  for (const [field, spec] of Object.entries(previewDataBindings)) {
     const production = config[field] ?? [];
     const preview = previews[field] ?? [];
     const bindingNames = (list) =>
@@ -143,17 +153,30 @@ export function validatePreviewConfig(config, projectId) {
         `previews.${field} must bind exactly the production binding names.`,
       );
     }
-    const productionTargets = new Set(production.map((b) => b[resource]));
+    const productionTargets = new Set(
+      production.flatMap((b) => spec.productionTargetKeys.map((key) => b[key])),
+    );
     for (const binding of preview) {
+      const unreviewed = Object.keys(binding).filter(
+        (key) => !spec.allowedKeys.includes(key),
+      );
+      if (unreviewed.length > 0) {
+        throw new Error(
+          `Preview ${field} binding ${binding.binding} has unreviewed keys: ${unreviewed.join(", ")}.`,
+        );
+      }
+      const target = binding[spec.target];
       const declared = production.find(
         (b) => b.binding === binding.binding,
       )?.preview_bucket_name;
       if (
-        productionTargets.has(binding[resource]) ||
-        (declared && binding[resource] !== declared)
+        typeof target !== "string" ||
+        !target ||
+        productionTargets.has(target) ||
+        (declared && target !== declared)
       ) {
         throw new Error(
-          `Preview ${field} binding ${binding.binding} must target its non-production ${resource}.`,
+          `Preview ${field} binding ${binding.binding} must target its non-production ${spec.target}.`,
         );
       }
     }

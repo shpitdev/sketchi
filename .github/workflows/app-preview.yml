@@ -182,8 +182,26 @@ jobs:
           PREVIEW_NAME: ${{ steps.preview-settings.outputs.preview_name }}
         run: node scripts/03-upsert-preview-comment.mjs
 
-      - name: Deploy official Worker Preview
+      - name: Re-check PR is open
         if: steps.credentials.outputs.configured == 'true'
+        id: still-open
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.resolve-preview-pr.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          # This job holds its concurrency lock now. If the PR closed while it was
+          # queued, cleanup may already have run, so deploying would recreate the Preview.
+          state="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq .state)"
+          if [ "$state" = open ]; then
+            echo "open=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "open=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::PR #${PR_NUMBER} is ${state}; skipping the Preview deploy."
+          fi
+
+      - name: Deploy official Worker Preview
+        if: steps.credentials.outputs.configured == 'true' && steps.still-open.outputs.open == 'true'
         id: deploy
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -211,7 +229,7 @@ jobs:
             --message "PR #${{ needs.resolve-preview-pr.outputs.pr_number }} project ${PROJECT_ID} Worker ${WORKER_NAME} preview ${{ needs.resolve-preview-pr.outputs.sha }}"
 
       - name: Extract preview URL
-        if: steps.credentials.outputs.configured == 'true'
+        if: steps.credentials.outputs.configured == 'true' && steps.still-open.outputs.open == 'true'
         id: preview-url
         run: |
           node scripts/02-extract-preview-url.mjs \
@@ -220,7 +238,7 @@ jobs:
             --preview-name "${{ steps.preview-settings.outputs.preview_name }}"
 
       - name: Comment preview URL
-        if: steps.credentials.outputs.configured == 'true'
+        if: steps.credentials.outputs.configured == 'true' && steps.still-open.outputs.open == 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PREVIEW_PROJECT_ID: ${{ matrix.project }}
@@ -260,8 +278,8 @@ jobs:
           - excalidraw
           - icons
     concurrency:
-      # Same queue as deploy-preview, so a queued deploy cannot recreate the
-      # Preview after it is deleted.
+      # Same queue as deploy-preview. Deploys also re-check the PR state once they
+      # hold the lock, so one that was waiting when the PR closed skips the upload.
       group: ${{ matrix.project == 'playground' && 'cloudflare-pipeline-bound-upload' || format('app-preview-{0}-pr-{1}', matrix.project, needs.resolve-preview-pr.outputs.pr_number) }}
       cancel-in-progress: ${{ matrix.project != 'playground' }}
       queue: ${{ matrix.project == 'playground' && 'max' || 'single' }}
