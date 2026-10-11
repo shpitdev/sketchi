@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.11.0
+
+### Minor Changes
+
+- [#379](https://github.com/shpitdev/sketchi/pull/379) [`6cc6b39`](https://github.com/shpitdev/sketchi/commit/6cc6b391463e6372952b7737796e7aeb4bfeb62a) Thanks [@anandpant](https://github.com/anandpant)! - `sketchi generate --type` now lists and accepts only the diagram types Sketchi draws: flowchart, mindmap, and sequence. Help no longer advertises ER, architecture, swimlane, or state-machine. Without `--type`, a prompt that asks for another kind of diagram still fails with the typed `unsupported_diagram_type` error instead of being coerced. `sketchi create` and the generate builder now take their document types from one shared family registry.
+
 ## 0.10.0
 
 ### Minor Changes
