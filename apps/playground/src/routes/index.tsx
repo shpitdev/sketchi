@@ -1,5 +1,4 @@
 import { useChat } from "@ai-sdk/react";
-import { type BuildFlowchartResult } from "@sketchi/diagram-agent";
 import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import { DiagramPreview } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
@@ -34,8 +33,10 @@ import {
 import {
 	buildResultOf,
 	deriveBuildState,
-	isFlowchartToolPart,
-	type FlowchartToolPart,
+	diagramToolCardStatus,
+	isDiagramToolPart,
+	type DiagramToolPart,
+	type StudioBuildResult,
 } from "@/features/playground/build-result";
 import { cn } from "@/lib/utils";
 
@@ -43,22 +44,21 @@ export const Route = createFileRoute("/")({
 	component: StudioRoute,
 });
 
-function FlowchartToolCard({ attempt, part }: { attempt: number; part: FlowchartToolPart }) {
+function DiagramToolCard({
+	active,
+	attempt,
+	part,
+}: {
+	active: boolean;
+	attempt: number;
+	part: DiagramToolPart;
+}) {
 	const result = buildResultOf(part);
-	const title =
-		part.state === "input-streaming"
-			? "Drawing your flowchart"
-			: part.state === "input-available"
-				? "Checking your flowchart"
-				: part.state === "output-error"
-					? "Couldn’t finish the diagram"
-					: result?.ok
-						? "Diagram ready"
-						: "Diagram needs changes";
+	const { stopped, title } = diagramToolCardStatus(part, active);
 
 	return (
 		<Tool className="studio__tool" defaultOpen={false}>
-			<ToolHeader state={part.state} title={title} type="tool-build_flowchart" />
+			<ToolHeader state={part.state} stopped={stopped} title={title} type={part.type} />
 			<ToolContent>
 				{result ? <BuildResultDetails pass={attempt} result={result} /> : null}
 				{part.input === undefined ? null : <ToolInput input={part.input} />}
@@ -73,7 +73,11 @@ function FlowchartToolCard({ attempt, part }: { attempt: number; part: Flowchart
 	);
 }
 
-function renderAssistantParts(message: UIMessage, onCompose?: () => void): ReactNode[] {
+function renderAssistantParts(
+	message: UIMessage,
+	active: boolean,
+	onCompose?: () => void,
+): ReactNode[] {
 	const nodes: ReactNode[] = [];
 	let attempt = 0;
 
@@ -99,9 +103,11 @@ function renderAssistantParts(message: UIMessage, onCompose?: () => void): React
 			return;
 		}
 
-		if (isFlowchartToolPart(part)) {
+		if (isDiagramToolPart(part)) {
 			attempt += 1;
-			nodes.push(<FlowchartToolCard attempt={attempt} key={part.toolCallId} part={part} />);
+			nodes.push(
+				<DiagramToolCard active={active} attempt={attempt} key={part.toolCallId} part={part} />,
+			);
 		}
 	});
 
@@ -130,8 +136,8 @@ function StagePlaceholder({
 		<div className="studio__stage-placeholder">
 			<p className="studio__stage-placeholder-text">
 				{generating
-					? "Drawing your flowchart…"
-					: "This version needs a few changes. Ask Sketchi to revise it or try another flow."}
+					? "Drawing your diagram…"
+					: "This version needs a few changes. Ask Sketchi to revise it or try another request."}
 			</p>
 			{ghostLabels.length > 0 ? (
 				<div className="studio__ghosts">
@@ -156,7 +162,7 @@ function DiagramStage({
 	artifact: ReadyPlaygroundArtifact | null;
 	generating: boolean;
 	ghostLabels: string[];
-	result: BuildFlowchartResult | undefined;
+	result: StudioBuildResult | undefined;
 	scene: RenderedDiagramScene | null;
 }) {
 	const title = scene?.title ?? result?.normalizedSpec?.title ?? "Warming up the pencil";
@@ -285,6 +291,8 @@ function StudioRoute() {
 
 										const parts = renderAssistantParts(
 											message,
+											// Only the latest assistant message can still be drawing.
+											busy && message.id === latestMessage?.id,
 											message.id === answerableMessageId ? focusComposer : undefined,
 										);
 										return parts.length > 0 ? (

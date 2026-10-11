@@ -4,8 +4,6 @@ import {
 	DIAGRAM_AGENT_TEMPERATURE,
 	MAX_AGENT_OUTPUT_TOKENS,
 	MAX_AGENT_STEPS,
-	MAX_FLOWCHART_BUILD_ATTEMPTS,
-	type BuildFlowchartResult,
 } from "@sketchi/diagram-agent";
 import { convertToModelMessages, stepCountIs, streamText, tool, validateUIMessages } from "ai";
 import { Effect, Schema } from "effect";
@@ -26,8 +24,15 @@ import {
 	StudioBuildFlowchartInputSchema,
 	StudioBuildFlowchartOutputSchema,
 	studioSystemPrompt,
-	type StudioBuildFlowchartInput,
 } from "./studio-flowchart-tool.server";
+import {
+	makeStudioSequenceToolExecutor,
+	STUDIO_BUILD_SEQUENCE_TOOL_DESCRIPTION,
+	STUDIO_BUILD_SEQUENCE_TOOL_NAME,
+	StudioBuildSequenceInputSchema,
+	StudioBuildSequenceOutputSchema,
+} from "./studio-sequence-tool.server";
+import { makeStudioBuildTurn } from "./studio-build-tool.server";
 
 export class StudioAgentRequestError extends Schema.TaggedError<StudioAgentRequestError>()(
 	"StudioAgentRequestError",
@@ -45,15 +50,14 @@ const ChatRequestSchema = Schema.Struct({
 	messages: Schema.Array(Schema.Unknown),
 });
 
-export function makeStudioFlowchartToolCallback<E>(
+/** Run a Studio build tool's effect inside the chat request's runtime. */
+export function makeStudioBuildToolCallback<Input, Result, E>(
 	executor: {
-		readonly execute: (
-			input: StudioBuildFlowchartInput,
-		) => PlaygroundCallbackEffect<BuildFlowchartResult, E>;
+		readonly execute: (input: Input) => PlaygroundCallbackEffect<Result, E>;
 	},
 	runToolEffect: PlaygroundRequestRunner,
 ) {
-	return (input: StudioBuildFlowchartInput) => runToolEffect(executor.execute(input));
+	return (input: Input) => runToolEffect(executor.execute(input));
 }
 
 function userText(
@@ -128,11 +132,15 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 	});
 	// Logos come only from what the user wrote, across the conversation.
 	const logos = logosNamedIn(userText(messages));
-	const executor = yield* makeStudioFlowchartToolExecutor(
-		codeMode.buildFlowchart,
-		MAX_FLOWCHART_BUILD_ATTEMPTS,
+	// One budget for the turn: both tools share attempts and the accepted artifact.
+	const turn = yield* makeStudioBuildTurn();
+	const flowchartExecutor = yield* makeStudioFlowchartToolExecutor(codeMode.buildFlowchart, {
 		logos,
-	);
+		turn,
+	});
+	const sequenceExecutor = yield* makeStudioSequenceToolExecutor(codeMode.buildSequenceDiagram, {
+		turn,
+	});
 
 	return yield* Effect.try({
 		try: () => {
@@ -145,7 +153,13 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 						description: STUDIO_BUILD_FLOWCHART_TOOL_DESCRIPTION,
 						inputSchema: StudioBuildFlowchartInputSchema,
 						outputSchema: StudioBuildFlowchartOutputSchema,
-						execute: makeStudioFlowchartToolCallback(executor, callbacks.runPromise),
+						execute: makeStudioBuildToolCallback(flowchartExecutor, callbacks.runPromise),
+					}),
+					[STUDIO_BUILD_SEQUENCE_TOOL_NAME]: tool({
+						description: STUDIO_BUILD_SEQUENCE_TOOL_DESCRIPTION,
+						inputSchema: StudioBuildSequenceInputSchema,
+						outputSchema: StudioBuildSequenceOutputSchema,
+						execute: makeStudioBuildToolCallback(sequenceExecutor, callbacks.runPromise),
 					}),
 				},
 				stopWhen: stepCountIs(MAX_AGENT_STEPS),

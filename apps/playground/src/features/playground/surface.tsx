@@ -1,4 +1,4 @@
-import type { BuildFlowchartResult } from "@sketchi/diagram-agent";
+import type { BuildFlowchartResult, BuildSequenceDiagramResult } from "@sketchi/diagram-agent";
 import { DiagramPreview } from "@sketchi/diagram-ui";
 import type { ChatStatus, UIMessage } from "ai";
 import type { RefObject } from "react";
@@ -19,8 +19,10 @@ import { DEPLOY_PIPELINE_SCENE } from "./deploy-pipeline-sample";
 const STARTERS = [
 	"Sketch a login flow with retries and a fraud check",
 	"Diagram a CI/CD pipeline from commit to production",
-	"Map the data flow for an AI chat app with streaming",
+	"Show checkout as a sequence diagram: browser, API, payments",
 ];
+
+type StudioBuildResult = BuildFlowchartResult | BuildSequenceDiagramResult;
 
 export interface ReadyPlaygroundArtifact {
 	artifactId: string;
@@ -58,7 +60,7 @@ export function ArtifactActions({ artifact }: { artifact: ReadyPlaygroundArtifac
 	);
 }
 
-function resultSummary(result: BuildFlowchartResult): {
+function resultSummary(result: StudioBuildResult): {
 	connectionCount?: number;
 	itemCount?: number;
 	score?: number;
@@ -70,22 +72,14 @@ function resultSummary(result: BuildFlowchartResult): {
 			score: result.quality.score,
 		};
 	}
-	if (result.normalizedSpec) {
-		return {
-			connectionCount: result.normalizedSpec.edges.length,
-			itemCount: result.normalizedSpec.nodes.length,
-		};
-	}
-	return {};
+	const spec = result.normalizedSpec;
+	if (!spec) return {};
+	return "participants" in spec
+		? { connectionCount: spec.messages.length, itemCount: spec.participants.length }
+		: { connectionCount: spec.edges.length, itemCount: spec.nodes.length };
 }
 
-export function BuildResultDetails({
-	pass,
-	result,
-}: {
-	pass: number;
-	result: BuildFlowchartResult;
-}) {
+export function BuildResultDetails({ pass, result }: { pass: number; result: StudioBuildResult }) {
 	const summary = resultSummary(result);
 	const guidance = result.ok ? null : failureCopy(result.status);
 
@@ -137,7 +131,7 @@ export function BuildResultDetails({
 	);
 }
 
-function failureCopy(status: Exclude<BuildFlowchartResult, { ok: true }>["status"]): {
+function failureCopy(status: Exclude<StudioBuildResult, { ok: true }>["status"]): {
 	hint: string;
 	message: string;
 } {
@@ -148,6 +142,7 @@ function failureCopy(status: Exclude<BuildFlowchartResult, { ok: true }>["status
 				hint: "Describe the main steps and how they connect, then try again.",
 			};
 		case "invalid_flowchart":
+		case "invalid_sequence":
 			return {
 				message: "This draft needs a clearer structure before it can be drawn.",
 				hint: "Clarify the steps or simplify the connections, then try again.",

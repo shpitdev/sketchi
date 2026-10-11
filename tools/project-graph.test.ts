@@ -107,6 +107,7 @@ const approvedRuntimeBoundaryFiles = [
 	"scripts/pipelines/r2-catalog-smoke.ts",
 	"tools/generation-reliability-probe.ts",
 	"tools/harness-eval.ts",
+	"tools/studio-routing-eval.ts",
 ];
 const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/cli/scripts/build.mjs": 27,
@@ -206,6 +207,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"tools/sketchi-generators/src/generators/diagram-type/diagram-type.ts": 3,
 	"tools/sketchi-generators/src/generators/ui-component/ui-component.spec.ts": 3,
 	"tools/sketchi-generators/src/generators/ui-component/ui-component.ts": 3,
+	"tools/studio-routing-eval.ts": 4,
 };
 const approvedManagedPromiseFiles = Object.keys(approvedManagedPromiseSiteCounts).sort();
 const approvedEffectDependencyVersions = new Set(["4.0.1"]);

@@ -9,7 +9,6 @@ import {
 	CodeModeRuntimeEnvironment,
 	DIAGRAM_AGENT_SYSTEM_PROMPT,
 	makeMemoryArtifactStorage,
-	MAX_FLOWCHART_BUILD_ATTEMPTS,
 	type BuildFlowchartResult,
 	type FlowchartSpec,
 	toCodeModeJsonSchema,
@@ -326,7 +325,7 @@ describe("Studio build_flowchart host", () => {
 			status: "quality_failed",
 			issues: [
 				expect.objectContaining({
-					hint: "Explain that the draft needs another pass and invite the user to simplify or clarify the flow.",
+					hint: "Explain that the draft needs another pass and invite the user to simplify or clarify the request.",
 					message: "The diagram still needs changes before it can be shared.",
 				}),
 			],
@@ -404,8 +403,7 @@ describe("Studio chat node logos", () => {
 						received.push(input);
 						return accepted;
 					}),
-				MAX_FLOWCHART_BUILD_ATTEMPTS,
-				[{ name: "Github", slug: "github" }],
+				{ logos: [{ name: "Github", slug: "github" }] },
 			),
 		);
 		const spec = acceptedSpec();
@@ -447,11 +445,12 @@ describe("Studio chat node logos", () => {
 						received.push(input);
 						return accepted;
 					}),
-				MAX_FLOWCHART_BUILD_ATTEMPTS,
-				[
-					{ name: "Github", slug: "github" },
-					{ aliases: ["postgres"], name: "PostgreSQL", slug: "postgresql" },
-				],
+				{
+					logos: [
+						{ name: "Github", slug: "github" },
+						{ aliases: ["postgres"], name: "PostgreSQL", slug: "postgresql" },
+					],
+				},
 			),
 		);
 		const spec = acceptedSpec();

@@ -25,9 +25,10 @@ flowchart LR
 | Deterministic render/export/persistence pipeline         | Managed chat threads            |
 | Effect storage service, layers, and Code Mode operations | Studio presentation state       |
 
-Studio exposes the runtime to its model as `build_flowchart`. That host injects
-artifact formats and a three-attempt per-turn cap; it does not map into another
-flowchart schema or persist the accepted result a second time.
+Studio exposes the runtime to its model as `build_flowchart` and
+`build_sequence_diagram`. That host injects artifact formats and a three-attempt
+per-turn cap per tool; it does not map into another schema or persist the
+accepted result a second time.
 
 Node logos come from the icon catalog through `CodeModeIconCatalog`. Hosts
 build one with `makeCodeModeIconCatalog`, supplying SVG bytes from wherever they

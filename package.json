@@ -22,6 +22,7 @@
 		"dev:playground": "pnpm nx dev playground",
 		"dev:web": "pnpm nx dev web",
 		"eval:harness": "jiti tools/harness-eval.ts",
+		"eval:studio-routing": "jiti tools/studio-routing-eval.ts",
 		"check": "pnpm run lint && pnpm run format:check && pnpm run test:lint-rules",
 		"format": "oxfmt",
 		"format:check": "oxfmt --check",

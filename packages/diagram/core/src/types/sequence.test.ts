@@ -4,6 +4,9 @@ import { parseCanonicalDiagram } from "../diagram";
 import { parseIntermediateDiagram, SKETCHI_DIAGRAM_STYLE } from "../intermediate";
 import {
 	type SequenceDiagram,
+	SEQUENCE_MAX_ISSUES,
+	SEQUENCE_MAX_MESSAGES,
+	SEQUENCE_MAX_PARTICIPANTS,
 	SequenceValidationError,
 	apiRequestSequence,
 	getSequenceValidationIssues,
@@ -293,5 +296,28 @@ describe("Sequence diagram type", () => {
 				messages: [],
 			}),
 		).toEqual([["lifeline_id_collision", "participants.[1].id"]]);
+	});
+
+	it("rejects oversized diagrams and caps the issue list", () => {
+		const participants = Array.from({ length: SEQUENCE_MAX_PARTICIPANTS + 1 }, (_, index) => ({
+			id: `p${index}`,
+			label: `Participant ${index}`,
+		}));
+		const messages = Array.from({ length: SEQUENCE_MAX_MESSAGES + 1 }, (_, index) => ({
+			id: `m${index}`,
+			source: "p0",
+			// Every message also targets a missing participant.
+			target: `ghost${index}`,
+			label: `Message ${index}`,
+		}));
+		const issues = getSequenceValidationIssues({ ...sequenceFixture, participants, messages });
+		expect(issues).toHaveLength(SEQUENCE_MAX_ISSUES);
+		expect(issues.slice(0, 2).map((issue) => [issue.code, issue.path])).toEqual([
+			["sequence_too_large", "participants"],
+			["sequence_too_large", "messages"],
+		]);
+		expect(
+			issueCodes({ ...sequenceFixture, participants: participants.slice(0, -1), messages: [] }),
+		).toEqual([]);
 	});
 });

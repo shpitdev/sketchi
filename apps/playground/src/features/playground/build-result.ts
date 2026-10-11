@@ -1,8 +1,11 @@
 import {
 	BuildFlowchartRequestSchema,
 	BuildFlowchartResultSchema,
+	BuildSequenceDiagramResultSchema,
+	BuildSequenceDiagramToolInputSchema,
 	RenderedDiagramSceneSchema,
 	type BuildFlowchartResult,
+	type BuildSequenceDiagramResult,
 } from "@sketchi/diagram-agent";
 import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import { Result, Schema } from "effect";
@@ -11,8 +14,41 @@ import type { ReadyPlaygroundArtifact } from "./surface";
 
 type MessagePart = UIMessage["parts"][number];
 
-export interface FlowchartToolPart {
-	type: "tool-build_flowchart";
+/** A canonical build result from any Studio build tool. */
+export type StudioBuildResult = BuildFlowchartResult | BuildSequenceDiagramResult;
+
+const BUILD_TOOLS = {
+	"tool-build_flowchart": {
+		family: "flowchart",
+		decodeResult: Schema.decodeUnknownResult(BuildFlowchartResultSchema),
+		labels: (input: unknown) => {
+			const decoded = Schema.decodeUnknownResult(BuildFlowchartRequestSchema, {
+				errors: "all",
+				reportInput: true,
+			})(input);
+			return Result.isSuccess(decoded) ? decoded.success.spec.nodes.map((node) => node.label) : [];
+		},
+	},
+	"tool-build_sequence_diagram": {
+		family: "sequence",
+		decodeResult: Schema.decodeUnknownResult(BuildSequenceDiagramResultSchema),
+		labels: (input: unknown) => {
+			const decoded = Schema.decodeUnknownResult(BuildSequenceDiagramToolInputSchema, {
+				errors: "all",
+				reportInput: true,
+			})(input);
+			return Result.isSuccess(decoded)
+				? decoded.success.spec.participants.map((participant) => participant.label)
+				: [];
+		},
+	},
+} as const;
+
+export type DiagramToolPartType = keyof typeof BUILD_TOOLS;
+export type DiagramToolFamily = (typeof BUILD_TOOLS)[DiagramToolPartType]["family"];
+
+export interface DiagramToolPart {
+	type: DiagramToolPartType;
 	toolCallId: string;
 	state: "input-streaming" | "input-available" | "output-available" | "output-error";
 	input?: unknown;
@@ -20,19 +56,54 @@ export interface FlowchartToolPart {
 	errorText?: string;
 }
 
-export function isFlowchartToolPart(part: MessagePart): part is FlowchartToolPart & MessagePart {
-	return part.type === "tool-build_flowchart";
+export function isDiagramToolPart(part: MessagePart): part is DiagramToolPart & MessagePart {
+	return Object.hasOwn(BUILD_TOOLS, part.type);
 }
 
-const decodeBuildResult = Schema.decodeUnknownResult(BuildFlowchartResultSchema);
+export function diagramToolFamily(part: DiagramToolPart): DiagramToolFamily {
+	return BUILD_TOOLS[part.type].family;
+}
 
-export function buildResultOf(part: FlowchartToolPart): BuildFlowchartResult | undefined {
+const FAMILY_NAMES: Readonly<Record<DiagramToolFamily, string>> = {
+	flowchart: "flowchart",
+	sequence: "sequence diagram",
+};
+
+/**
+ * The tool card heading. A call still waiting for input when its run is no
+ * longer active was stopped, and never finishes drawing.
+ */
+export function diagramToolCardStatus(
+	part: DiagramToolPart,
+	active: boolean,
+): { readonly stopped: boolean; readonly title: string } {
+	const family = FAMILY_NAMES[diagramToolFamily(part)];
+	if (part.state === "input-streaming" || part.state === "input-available") {
+		if (!active) return { stopped: true, title: `Stopped drawing your ${family}` };
+		return {
+			stopped: false,
+			title:
+				part.state === "input-streaming" ? `Drawing your ${family}` : `Checking your ${family}`,
+		};
+	}
+	if (part.state === "output-error") {
+		return { stopped: false, title: "Couldn’t finish the diagram" };
+	}
+	return {
+		stopped: false,
+		title: buildResultOf(part)?.ok ? "Diagram ready" : "Diagram needs changes",
+	};
+}
+
+export function buildResultOf(part: DiagramToolPart): StudioBuildResult | undefined {
 	if (part.state !== "output-available") return undefined;
-	const decoded = decodeBuildResult(part.output);
+	const decoded: Result.Result<StudioBuildResult, unknown> = BUILD_TOOLS[part.type].decodeResult(
+		part.output,
+	);
 	return Result.isSuccess(decoded) ? decoded.success : undefined;
 }
 
-export function artifactFromResponse(result: BuildFlowchartResult): ReadyPlaygroundArtifact | null {
+export function artifactFromResponse(result: StudioBuildResult): ReadyPlaygroundArtifact | null {
 	if (!result.ok) {
 		return null;
 	}
@@ -64,7 +135,7 @@ function isRenderedDiagramScene(value: unknown): value is RenderedDiagramScene {
 }
 
 export function sceneFromResult(
-	result: BuildFlowchartResult | undefined,
+	result: StudioBuildResult | undefined,
 ): RenderedDiagramScene | null {
 	if (!result?.ok) {
 		return null;
@@ -74,9 +145,9 @@ export function sceneFromResult(
 }
 
 export interface PlaygroundBuildState {
-	activePart: FlowchartToolPart | undefined;
-	acceptedResult: BuildFlowchartResult | undefined;
-	displayResult: BuildFlowchartResult | undefined;
+	activePart: DiagramToolPart | undefined;
+	acceptedResult: StudioBuildResult | undefined;
+	displayResult: StudioBuildResult | undefined;
 	buildMode: boolean;
 	scene: RenderedDiagramScene | null;
 	artifact: ReadyPlaygroundArtifact | null;
@@ -87,23 +158,20 @@ export function deriveBuildState(
 	messages: readonly UIMessage[],
 	busy: boolean,
 ): PlaygroundBuildState {
-	const toolParts = messages.flatMap((message) => message.parts.filter(isFlowchartToolPart));
+	const toolParts = messages.flatMap((message) => message.parts.filter(isDiagramToolPart));
 	const results = toolParts.map(buildResultOf).filter((result) => result !== undefined);
 	const displayResult = results.at(-1);
 	const acceptedResult = [...results].reverse().find((result) => result.ok);
 	const latestAssistant = messages.findLast((message) => message.role === "assistant");
 	const activePart = busy
 		? latestAssistant?.parts
-				.filter(isFlowchartToolPart)
+				.filter(isDiagramToolPart)
 				.find((part) => part.state === "input-streaming" || part.state === "input-available")
 		: undefined;
-	const input = Schema.decodeUnknownResult(BuildFlowchartRequestSchema, {
-		errors: "all",
-		reportInput: true,
-	})(activePart?.input);
-	const ghostLabels = Result.isSuccess(input)
-		? input.success.spec.nodes
-				.map((node) => node.label.trim())
+	const ghostLabels = activePart
+		? BUILD_TOOLS[activePart.type]
+				.labels(activePart.input)
+				.map((label) => label.trim())
 				.filter((label) => label.length > 0)
 				.slice(0, 24)
 		: [];

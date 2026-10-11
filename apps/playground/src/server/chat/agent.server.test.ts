@@ -5,7 +5,7 @@ import type { BuildFlowchartResult } from "@sketchi/diagram-agent";
 
 import { PlaygroundRequestMetadata } from "../runtime/context.server";
 import { PlaygroundRequestCallbacks, runPlaygroundEffect } from "../runtime/runtime.server";
-import { handleStudioAgentRequest, makeStudioFlowchartToolCallback } from "./agent.server";
+import { handleStudioAgentRequest, makeStudioBuildToolCallback } from "./agent.server";
 
 const repairResult: BuildFlowchartResult = {
 	ok: false,
@@ -45,7 +45,7 @@ describe("Studio agent request callbacks", () => {
 			Effect.gen(function* () {
 				const callbacks = yield* PlaygroundRequestCallbacks;
 				const requestContext = yield* observeContext;
-				const execute = makeStudioFlowchartToolCallback(
+				const execute = makeStudioBuildToolCallback(
 					{
 						execute: () =>
 							observeContext.pipe(

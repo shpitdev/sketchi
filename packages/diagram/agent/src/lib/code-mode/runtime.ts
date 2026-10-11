@@ -457,6 +457,7 @@ function toSequenceDiagram(spec: NormalizedSequenceDiagramSpec): SequenceDiagram
 
 /** Code Mode's published issue codes for diagram-core's sequence invariants. */
 const SEQUENCE_ISSUE_CODES = {
+	sequence_too_large: "sequence_too_large",
 	duplicate_participant_id: "duplicate_node_id",
 	lifeline_id_collision: "duplicate_node_id",
 	duplicate_message_id: "duplicate_edge_id",

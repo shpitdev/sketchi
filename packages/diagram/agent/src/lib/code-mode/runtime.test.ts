@@ -2099,6 +2099,29 @@ describe("Code Mode runtime", () => {
 		});
 	});
 
+	it("rejects oversized sequence diagrams with sequence_too_large", async () => {
+		const result = await createTestRuntime().buildSequenceDiagram({
+			spec: {
+				title: "Too many participants",
+				participants: Array.from({ length: 13 }, (_, index) => ({
+					id: `p${index}`,
+					label: `Participant ${index}`,
+				})),
+				messages: [{ source: "p0", target: "p1", label: "Hello" }],
+			},
+		});
+		expect(result).toMatchObject({
+			ok: false,
+			status: "invalid_sequence",
+			issues: [
+				expect.objectContaining({
+					code: "sequence_too_large",
+					ref: { kind: "request", path: "spec.participants" },
+				}),
+			],
+		});
+	});
+
 	it("returns a repairable issue for participant ids that collide with lifelines", async () => {
 		const result = await createTestRuntime().buildSequenceDiagram({
 			spec: {

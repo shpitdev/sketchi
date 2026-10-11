@@ -20,6 +20,11 @@ export function sequenceActivationId(participantId: string, callMessageId: strin
 	return `${sequenceLifelineId(participantId)}:activation:${callMessageId}`;
 }
 
+/** Wider or longer diagrams stop reading as one sequence; split them instead. */
+export const SEQUENCE_MAX_PARTICIPANTS = 12;
+export const SEQUENCE_MAX_MESSAGES = 40;
+export const SEQUENCE_MAX_ISSUES = 20;
+
 export const SequenceMessageTypeSchema = Schema.Literals(SEQUENCE_MESSAGE_TYPES);
 export const SequenceMessageStyleSchema = Schema.Literals(SEQUENCE_MESSAGE_STYLES);
 export type SequenceMessageType = typeof SequenceMessageTypeSchema.Type;
@@ -67,6 +72,7 @@ export class SequenceDiagram extends Schema.Class<SequenceDiagram>("SequenceDiag
 export const SequenceDiagramSchema = SequenceDiagram;
 
 export const SequenceValidationIssueCodeSchema = Schema.Literals([
+	"sequence_too_large",
 	"duplicate_participant_id",
 	"lifeline_id_collision",
 	"duplicate_message_id",
@@ -88,6 +94,22 @@ export class SequenceValidationIssue extends Schema.Class<SequenceValidationIssu
 
 export function getSequenceValidationIssues(diagram: SequenceDiagram): SequenceValidationIssue[] {
 	const issues: SequenceValidationIssue[] = [];
+	if (diagram.participants.length > SEQUENCE_MAX_PARTICIPANTS) {
+		issues.push({
+			code: "sequence_too_large",
+			path: "participants",
+			message: `Sequence diagram has ${diagram.participants.length} participants; the supported maximum is ${SEQUENCE_MAX_PARTICIPANTS}.`,
+			hint: "Combine minor actors or split the interaction into several diagrams.",
+		});
+	}
+	if (diagram.messages.length > SEQUENCE_MAX_MESSAGES) {
+		issues.push({
+			code: "sequence_too_large",
+			path: "messages",
+			message: `Sequence diagram has ${diagram.messages.length} messages; the supported maximum is ${SEQUENCE_MAX_MESSAGES}.`,
+			hint: "Split the interaction into phases or drop lower-signal messages.",
+		});
+	}
 	const participantIndexById = new Map<string, number>();
 	diagram.participants.forEach((participant, index) => {
 		if (participantIndexById.has(participant.id)) {
@@ -152,7 +174,7 @@ export function getSequenceValidationIssues(diagram: SequenceDiagram): SequenceV
 			});
 		}
 	});
-	return issues;
+	return issues.slice(0, SEQUENCE_MAX_ISSUES);
 }
 
 /**

@@ -39,7 +39,7 @@ const safeLogMessages = new Set([
 	"Browser Rendering session cleanup failed",
 	"Code Mode usage capture failed",
 	"Retrying diagram generation",
-	"Retrying Studio flowchart repair",
+	"Retrying Studio diagram repair",
 ]);
 
 const safeFieldNames = new Set([

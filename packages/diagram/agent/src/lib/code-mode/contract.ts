@@ -383,6 +383,7 @@ export const CODE_MODE_ISSUE_CODES = [
 	"flowchart_too_large",
 	"mindmap_too_deep",
 	"mindmap_too_large",
+	"sequence_too_large",
 	"request_too_large",
 	"generic_label",
 	"label_too_long",
@@ -745,6 +746,23 @@ export class BuildSequenceDiagramRequest extends Schema.Class<BuildSequenceDiagr
 	{ identifier: undefined },
 ) {}
 export const BuildSequenceDiagramRequestSchema = BuildSequenceDiagramRequest;
+
+/**
+ * What a chat model passes to a sequence build tool: the host supplies artifact
+ * options, and style is always the Sketchi palette.
+ */
+export const BuildSequenceDiagramToolInputSchema = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(
+		SequenceDiagramSpec.mapFields(({ id, title, participants, messages }) => ({
+			id,
+			title,
+			participants,
+			messages,
+		})),
+	),
+});
+export type BuildSequenceDiagramToolInput = typeof BuildSequenceDiagramToolInputSchema.Type;
 
 export interface MindmapTopicInput {
 	label: string;
