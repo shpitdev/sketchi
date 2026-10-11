@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.12.0
+
+### Minor Changes
+
+- [#380](https://github.com/shpitdev/sketchi/pull/380) [`ac83f4d`](https://github.com/shpitdev/sketchi/commit/ac83f4d0d8f526bdc0bbd697d25a9cae143aeecf) Thanks [@anandpant](https://github.com/anandpant)! - Sequence diagrams now draw brand logos in participant headers. In `sketchi create`, a participant may set `"icon": { "slug": "github" }`. `sketchi generate` places logos only on participants whose labels name a technology the prompt mentions. The logos appear in PNG and Excalidraw exports, using the same catalog, offline resolution, and drop-with-a-warning rules as flowchart node logos.
+
 ## 0.11.0
 
 ### Minor Changes
