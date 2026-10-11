@@ -5,6 +5,7 @@ import isCI from "is-ci";
 import type { OutputFormat } from "./contracts.js";
 import { CliInteractiveError } from "./errors.js";
 import type { GenerationType } from "./generation.js";
+import { GENERATION_TYPE_OPTIONS } from "./generation-types.js";
 
 export type WizardDestination =
 	| { readonly _tag: "CurrentDirectory" }
@@ -81,23 +82,7 @@ const askType = Effect.tryPromise({
 			signal,
 			message: "Diagram type",
 			initialValue: "flowchart",
-			options: [
-				{
-					value: "flowchart",
-					label: "Flowchart",
-					hint: "best for processes and decisions",
-				},
-				{
-					value: "mindmap",
-					label: "Mind map",
-					hint: "best for ideas and topics",
-				},
-				{
-					value: "sequence",
-					label: "Sequence diagram",
-					hint: "best for ordered participant interactions",
-				},
-			],
+			options: [...GENERATION_TYPE_OPTIONS],
 		}),
 	catch: promptFailure,
 }).pipe(Effect.flatMap(unwrapPrompt));

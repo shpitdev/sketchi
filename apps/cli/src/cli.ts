@@ -1,4 +1,5 @@
 import {
+	CANONICAL_DOCUMENT_TYPES,
 	CodeModeArtifactStorageMemory,
 	makeCodeModeRuntimeEnvironmentLayer,
 } from "@sketchi/diagram-agent";
@@ -19,7 +20,7 @@ import {
 	type StoredDiagram,
 	summaryFromStored,
 } from "./contracts.js";
-import { encodeJson, validateStorageId } from "./document.js";
+import { alternativeList, encodeJson, validateStorageId } from "./document.js";
 import {
 	type CliFailure,
 	CliFilesystemError,
@@ -48,7 +49,6 @@ import {
 	SKETCHI_GENERATE_ENDPOINT_ENV,
 	resolveGenerateEndpoint,
 	type GenerateDiagramResult,
-	type GenerationType,
 } from "./generation.js";
 import {
 	Argument,
@@ -129,7 +129,7 @@ Semantic color patch example:
   sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
-  sketchi generate [--prompt TEXT] [--type flowchart|mindmap|sequence|er|architecture|swimlane|state-machine] [--model MODEL]
+  sketchi generate [--prompt TEXT] [--type ${CANONICAL_DOCUMENT_TYPES.join("|")}] [--model MODEL]
   sketchi canvas --file PATH|- [--format png|excalidraw|scene] [--dest PATH|-]
   sketchi share DIAGRAM_ID [--open]
   sketchi pull DIAGRAM_ID --link URL|-
@@ -386,10 +386,6 @@ function listText(diagrams: ReadonlyArray<DiagramListEntry>): string {
 	].join("\n");
 }
 
-function isNativeGenerationType(value: string): value is GenerationType {
-	return value === "flowchart" || value === "mindmap" || value === "sequence";
-}
-
 const GENERATE_HELP = `Create one persisted diagram and export its PNG by default. With no --prompt, Sketchi opens a short wizard only when stdin and stdout are human TTYs, output is text, and CI is absent. Pipes, redirects, CI, and --output json never prompt or block; pass --prompt for every script and automation path. This is one of Sketchi's four explicit network commands (generate, canvas, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
 
 Everyday wizard:
@@ -404,8 +400,8 @@ Network and options:
   Endpoint: ${DEFAULT_GENERATE_ENDPOINT}
   The model call, schema validation, and quality gate run server-side; the finished diagram
   and Excalidraw artifact are returned over plain HTTPS. Sketchi sends no credentials.
-  Without --type, the model selects flowchart, mindmap, or sequence from the request.
-  Explicit er, architecture, swimlane, and state-machine requests fail with a typed unsupported error.
+  Without --type, the model selects ${alternativeList([...CANONICAL_DOCUMENT_TYPES])} from the request;
+  a request for any other kind of diagram fails with a typed unsupported error.
   --model defaults to ${DEFAULT_GENERATION_MODEL}.
   Override the endpoint for preview or local testing with ${SKETCHI_GENERATE_ENDPOINT_ENV}
   or --endpoint URL. --format defaults to png. Without --dest, the artifact is written as
@@ -436,18 +432,8 @@ const generateCommand = Command.make(
 			),
 		),
 		type: Flag.optional(
-			Flag.Literals("type", [
-				"flowchart",
-				"mindmap",
-				"sequence",
-				"er",
-				"architecture",
-				"swimlane",
-				"state-machine",
-			]).pipe(
-				Flag.withDescription(
-					"Authoritative type; unsupported native requests fail clearly; omit for model selection.",
-				),
+			Flag.Literals("type", CANONICAL_DOCUMENT_TYPES).pipe(
+				Flag.withDescription("Authoritative diagram type; omit for model selection."),
 				Flag.withMetavar("TYPE"),
 			),
 		),
@@ -503,13 +489,6 @@ const generateCommand = Command.make(
 						"dest",
 						suppliedDestination,
 						"a file path when --prompt is omitted; pass --prompt to write an artifact to stdout",
-					);
-				}
-				if (suppliedType !== undefined && !isNativeGenerationType(suppliedType)) {
-					return yield* invalidFlagValue(
-						"type",
-						suppliedType,
-						"flowchart, mindmap, or sequence in the interactive wizard; pass --prompt to receive the typed unsupported-type error",
 					);
 				}
 				const wizard = yield* GenerateWizard;

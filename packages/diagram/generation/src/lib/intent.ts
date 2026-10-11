@@ -1,12 +1,19 @@
+import { DIAGRAM_TYPES, type DiagramTypeValue } from "@sketchi/diagram-core";
 import { Result, Schema } from "effect";
 
-import { type DiagramGenerationType, DiagramGenerationTypeSchema } from "./messages.js";
+/** Generation produces every canonical family natively, and nothing else. */
+export const DiagramGenerationTypeSchema = Schema.Literals(DIAGRAM_TYPES);
+export type DiagramGenerationType = DiagramTypeValue;
 
+/**
+ * Kinds a model may recognize but Sketchi does not draw. Promoting one to a
+ * canonical family means removing it here (docs/diagram-families.md).
+ */
 export const UnsupportedDiagramIntentKindSchema = Schema.Literals([
-	"architecture",
 	"er",
-	"state-machine",
+	"architecture",
 	"swimlane",
+	"state-machine",
 ]);
 export type UnsupportedDiagramIntentKind = typeof UnsupportedDiagramIntentKindSchema.Type;
 

@@ -9,8 +9,8 @@ import type { DiagramTypeGeneratorSchema } from "./schema";
 describe("diagram-type generator", () => {
 	let tree: Tree;
 	const options: DiagramTypeGeneratorSchema = {
-		name: "mindmap",
-		title: "Generated mindmap",
+		name: "timeline",
+		title: "Generated timeline",
 		skipFormat: true,
 	};
 
@@ -18,36 +18,29 @@ describe("diagram-type generator", () => {
 		tree = createTreeWithEmptyWorkspace();
 		tree.write(
 			"packages/diagram/core/src/types.ts",
-			`export const DIAGRAM_TYPES = [
-  "architecture",
-  "flowchart"
-] as const;
+			`export const DIAGRAM_TYPES = ["flowchart", "mindmap", "sequence"] as const;
+
+export type DiagramTypeValue = (typeof DIAGRAM_TYPES)[number];
+
+export const GRAPH_DIAGRAM_TYPES = [
+	"flowchart",
+	"mindmap",
+] as const satisfies readonly DiagramTypeValue[];
 `,
 		);
 		tree.write("packages/diagram/core/src/index.ts", "");
 	});
 
-	it.each([
-		"Generated mindmap",
-		"Research & Development",
-		"Say \"hello\" and 'goodbye'",
-		String.raw`C:\new\diagram`,
-		"Line one\nLine two",
-	])("creates diagram contracts and round-trips title %j in valid TypeScript", async (title) => {
-		await diagramTypeGenerator(tree, { ...options, title });
+	function registry(name: string): string[] {
+		const source = tree.read("packages/diagram/core/src/types.ts", "utf-8") ?? "";
+		const start = source.indexOf(`export const ${name} = [`);
+		const entries = source.slice(start, source.indexOf("]", start));
+		return [...entries.matchAll(/"([^"]+)"/gu)].map((match) => match[1] ?? "");
+	}
 
-		expect(tree.read("packages/diagram/core/src/types.ts", "utf-8")).toContain('"mindmap"');
-		expect(tree.exists("packages/diagram/core/src/types/mindmap.ts")).toBe(true);
-		expect(tree.exists("packages/diagram/renderer/src/diagram-types/mindmap.test.ts")).toBe(true);
-		expect(tree.exists("packages/diagram/ui/src/diagram-types/mindmap.stories.tsx")).toBe(true);
-		expect(tree.read("packages/diagram/core/src/index.ts", "utf-8")).toContain(
-			'export * from "./types/mindmap.js";',
-		);
-
-		const source = tree.read("packages/diagram/core/src/types/mindmap.ts", "utf-8");
-		if (source === null) throw new Error("Missing generated module");
+	function runGeneratedModule(source: string): Record<string, { title: string }> {
 		const compiled = ts.transpileModule(source, {
-			fileName: "mindmap.ts",
+			fileName: "timeline.ts",
 			reportDiagnostics: true,
 			compilerOptions: {
 				module: ts.ModuleKind.CommonJS,
@@ -63,22 +56,62 @@ describe("diagram-type generator", () => {
 		runInNewContext(compiled.outputText, {
 			exports: generatedExports,
 			require: (specifier: string) => {
+				if (specifier === "effect") {
+					return {
+						Schema: {
+							Literal: (value: string) => value,
+							decodeUnknownSync: () => (input: unknown) => input,
+						},
+					};
+				}
 				expect(specifier).toBe("../intermediate.js");
-				return { parseIntermediateDiagram: (diagram: unknown) => diagram };
+				return {
+					IntermediateDiagram: { extend: () => () => class {} },
+					validateIntermediateDiagram: (diagram: unknown) => diagram,
+				};
 			},
 		});
-		expect(generatedExports.mindmapFixture?.title).toBe(title);
+		return generatedExports;
+	}
+
+	it.each([
+		"Generated timeline",
+		"Research & Development",
+		"Say \"hello\" and 'goodbye'",
+		String.raw`C:\new\diagram`,
+		"Line one\nLine two",
+	])("registers a compilable contract and round-trips title %j", async (title) => {
+		const printChecklist = await diagramTypeGenerator(tree, { ...options, title });
+
+		expect(registry("DIAGRAM_TYPES")).toEqual(["flowchart", "mindmap", "sequence", "timeline"]);
+		expect(registry("GRAPH_DIAGRAM_TYPES")).toEqual(["flowchart", "mindmap", "timeline"]);
+		expect(tree.exists("packages/diagram/core/src/types/timeline.test.ts")).toBe(true);
+		expect(tree.exists("packages/diagram/renderer/src/diagram-types/timeline.test.ts")).toBe(true);
+		expect(tree.exists("packages/diagram/ui/src/diagram-types/timeline.stories.tsx")).toBe(true);
+		expect(tree.read("packages/diagram/core/src/index.ts", "utf-8")).toContain(
+			'export * from "./types/timeline.js";',
+		);
+
+		const source = tree.read("packages/diagram/core/src/types/timeline.ts", "utf-8") ?? "";
+		expect(source).toContain("export class TimelineDiagram extends IntermediateDiagram.extend");
+		expect(runGeneratedModule(source).timelineFixture?.title).toBe(title);
+
+		const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+		printChecklist();
+		expect(info.mock.calls.flat().join("\n")).toContain("docs/diagram-families.md");
+		info.mockRestore();
 	});
 
 	it("does not duplicate a diagram type that is already in the registry", async () => {
-		await diagramTypeGenerator(tree, {
-			name: "flowchart",
-			skipFormat: true,
-		});
+		tree.write(
+			"packages/diagram/core/src/types.ts",
+			`export const DIAGRAM_TYPES = ["flowchart", "timeline"] as const;
+export const GRAPH_DIAGRAM_TYPES = ["flowchart", "timeline"] as const;
+`,
+		);
+		await diagramTypeGenerator(tree, { name: "timeline", skipFormat: true });
 
-		const registry = tree.read("packages/diagram/core/src/types.ts", "utf-8");
-
-		expect((registry ?? "").match(/"flowchart"/g)).toHaveLength(1);
-		expect(tree.exists("packages/diagram/core/src/types/flowchart.ts")).toBe(true);
+		expect(registry("DIAGRAM_TYPES")).toEqual(["flowchart", "timeline"]);
+		expect(registry("GRAPH_DIAGRAM_TYPES")).toEqual(["flowchart", "timeline"]);
 	});
 });

@@ -1,17 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { <%= fixtureName %> } from "@sketchi/diagram-core";
+import { <%= fixtureName %>, getCanvasValidationIssues } from "@sketchi/diagram-core";
 
-import { renderIntermediateDiagram } from "../scene.js";
+import { renderDiagram } from "../diagram.js";
 
 describe("<%= className %> renderer contract", () => {
-  it("renders the generated fixture into deterministic scene elements", () => {
-    const scene = renderIntermediateDiagram(<%= fixtureName %>);
+  it("renders the generated fixture into a valid deterministic scene", () => {
+    const scene = renderDiagram(<%= fixtureName %>);
 
     expect(scene.diagramId).toBe("<%= typeValue %>-example");
-    expect(scene.elements.filter((element) => element.type === "node"))
-      .toHaveLength(<%= fixtureName %>.nodes.length);
-    expect(scene.elements.filter((element) => element.type === "arrow"))
-      .toHaveLength(<%= fixtureName %>.edges.length);
+    expect(getCanvasValidationIssues(scene)).toEqual([]);
+    expect(renderDiagram(<%= fixtureName %>)).toEqual(scene);
   });
 });

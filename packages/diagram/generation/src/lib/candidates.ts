@@ -1,6 +1,7 @@
 import {
 	type CanonicalDiagram,
 	CanonicalDiagramSchema,
+	DIAGRAM_TYPES,
 	DiagramValidationError,
 	isDiagramIconSlug,
 	type FlowchartDiagram,
@@ -626,10 +627,7 @@ export function enforceCandidateRequestRequirements(
 			"intent_requirements_changed: semantic repair altered or omitted the original typed requirement plan.",
 		);
 	}
-	const requestedKindIsNative =
-		intent.requestedKind === "flowchart" ||
-		intent.requestedKind === "mindmap" ||
-		intent.requestedKind === "sequence";
+	const requestedKindIsNative = DIAGRAM_TYPES.some((type) => type === intent.requestedKind);
 	if (
 		request.prompt.requestedType &&
 		(intent.requestedKind !== request.prompt.requestedType ||

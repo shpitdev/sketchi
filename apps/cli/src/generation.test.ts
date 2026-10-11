@@ -522,7 +522,7 @@ describe("prompt-assisted generation over the public generate API", () => {
 			);
 			const created: BuiltDiagram[] = [];
 
-			const error = yield* Effect.flip(runGenerate(created, "er"));
+			const error = yield* Effect.flip(runGenerate(created));
 
 			assert.strictEqual(error._tag, "CliGenerationError");
 			if (error._tag === "CliGenerationError") {

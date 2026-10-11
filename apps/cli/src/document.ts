@@ -1,8 +1,9 @@
 import {
+	CANONICAL_DOCUMENT_SPECS,
+	CANONICAL_DOCUMENT_TYPES,
+	type CanonicalDiagramDocument,
 	CanvasSpec,
-	FlowchartSpec,
-	MindmapSpec,
-	SequenceDiagramSpec,
+	isCanonicalDocumentType,
 } from "@sketchi/diagram-agent";
 import { Effect, Schema, SchemaIssue } from "effect";
 
@@ -25,10 +26,7 @@ function pathSegment(value: unknown): PropertyKey | undefined {
 	return undefined;
 }
 
-export type CanonicalDiagramDocument =
-	| { readonly type: "flowchart"; readonly spec: FlowchartSpec }
-	| { readonly type: "mindmap"; readonly spec: MindmapSpec }
-	| { readonly type: "sequence"; readonly spec: SequenceDiagramSpec };
+export type { CanonicalDiagramDocument };
 
 export type CanvasDiagramDocument = {
 	readonly type: "canvas";
@@ -38,15 +36,17 @@ export type CanvasDiagramDocument = {
 export type DiagramDocument = CanonicalDiagramDocument | CanvasDiagramDocument;
 
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1();
-const decodeFlowchartSpec = Schema.decodeUnknownEffect(FlowchartSpec, {
-	errors: "all",
-});
-const decodeMindmapSpec = Schema.decodeUnknownEffect(MindmapSpec, {
-	errors: "all",
-});
-const decodeSequenceSpec = Schema.decodeUnknownEffect(SequenceDiagramSpec, {
-	errors: "all",
-});
+/** `a, b, or c` for a list of alternatives. */
+export function alternativeList(values: readonly string[]): string {
+	if (values.length < 2) return values.join("");
+	return `${values.slice(0, -1).join(", ")}${values.length > 2 ? "," : ""} or ${values.at(-1)}`;
+}
+
+const canonicalTypeList = alternativeList(CANONICAL_DOCUMENT_TYPES.map((type) => `"${type}"`));
+const canonicalDocumentHint = `Use ${alternativeList(
+	CANONICAL_DOCUMENT_TYPES.map((type) => `{"type":"${type}","spec":...}`),
+)}.`;
+
 const decodeCanvasSpec = Schema.decodeUnknownEffect(CanvasSpec, {
 	errors: "all",
 });
@@ -54,7 +54,7 @@ const decodeCanvasSpec = Schema.decodeUnknownEffect(CanvasSpec, {
 function validationError(details: ReadonlyArray<string>) {
 	return CliValidationError.make({
 		message: "The canonical diagram document is invalid.",
-		hint: 'Use {"type":"flowchart","spec":...}, {"type":"mindmap","spec":...}, or {"type":"sequence","spec":...}.',
+		hint: canonicalDocumentHint,
 		details,
 	});
 }
@@ -67,18 +67,6 @@ function schemaDetails(issue: SchemaIssue.Issue): ReadonlyArray<string> {
 		});
 		return `${pathForIssue(["spec", ...path])}: ${detail.message}`;
 	});
-}
-
-function flowchartDocument(spec: FlowchartSpec): CanonicalDiagramDocument {
-	return { type: "flowchart", spec };
-}
-
-function mindmapDocument(spec: MindmapSpec): CanonicalDiagramDocument {
-	return { type: "mindmap", spec };
-}
-
-function sequenceDocument(spec: SequenceDiagramSpec): CanonicalDiagramDocument {
-	return { type: "sequence", spec };
 }
 
 function canvasDocument(spec: CanvasSpec): CanvasDiagramDocument {
@@ -106,27 +94,15 @@ export const decodeCanonicalDiagramDocument = Effect.fn("sketchi.cli.document.de
 		if (!fields) {
 			return yield* validationError(["document: Expected an object with type and spec."]);
 		}
-		if (fields.type === "flowchart") {
-			const spec = yield* decodeFlowchartSpec(fields.spec).pipe(
-				Effect.mapError((error) => validationError(schemaDetails(error.issue))),
-			);
-			return flowchartDocument(spec);
+		if (isCanonicalDocumentType(fields.type)) {
+			const type = fields.type;
+			const spec: unknown = yield* Schema.decodeUnknownEffect(CANONICAL_DOCUMENT_SPECS[type], {
+				errors: "all",
+			})(fields.spec).pipe(Effect.mapError((error) => validationError(schemaDetails(error.issue))));
+			// The registry pairs each family with its spec schema.
+			return { type, spec } as CanonicalDiagramDocument;
 		}
-		if (fields.type === "mindmap") {
-			const spec = yield* decodeMindmapSpec(fields.spec).pipe(
-				Effect.mapError((error) => validationError(schemaDetails(error.issue))),
-			);
-			return mindmapDocument(spec);
-		}
-		if (fields.type === "sequence") {
-			const spec = yield* decodeSequenceSpec(fields.spec).pipe(
-				Effect.mapError((error) => validationError(schemaDetails(error.issue))),
-			);
-			return sequenceDocument(spec);
-		}
-		return yield* validationError([
-			'document.type: Expected "flowchart", "mindmap", or "sequence".',
-		]);
+		return yield* validationError([`document.type: Expected ${canonicalTypeList}.`]);
 	},
 );
 

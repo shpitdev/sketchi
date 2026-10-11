@@ -57,8 +57,9 @@ describe("CLI dependency and public-surface audit", () => {
 
 		assert.notInclude(source, "CanonicalDiagramDocumentSchema");
 		assert.notMatch(source, /from\s+["']zod["']/u);
-		assert.include(adapter, "Schema.decodeUnknownEffect(FlowchartSpec");
-		assert.include(adapter, "Schema.decodeUnknownEffect(MindmapSpec");
+		// Each family's authoring spec comes from the diagram-agent family registry.
+		assert.include(adapter, "Schema.decodeUnknownEffect(CANONICAL_DOCUMENT_SPECS[type]");
+		assert.include(adapter, "isCanonicalDocumentType(fields.type)");
 		assert.notInclude(adapter, "Schema.Struct");
 		assert.notInclude(adapter, "Schema.Union");
 		assert.notInclude(source, "NormalizedFlowchartSchema");

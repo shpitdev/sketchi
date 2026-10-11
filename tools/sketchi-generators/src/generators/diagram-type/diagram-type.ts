@@ -1,4 +1,11 @@
-import { formatFiles, generateFiles, joinPathFragments, names, type Tree } from "@nx/devkit";
+import {
+	formatFiles,
+	generateFiles,
+	joinPathFragments,
+	logger,
+	names,
+	type Tree,
+} from "@nx/devkit";
 import path from "node:path";
 
 import type { DiagramTypeGeneratorSchema } from "./schema";
@@ -18,37 +25,40 @@ function appendExport(tree: Tree, indexPath: string, exportPath: string) {
 	tree.write(indexPath, `${existing.trimEnd()}\n${exportLine}\n`);
 }
 
+/** Append a literal to the `export const <registry> = [...] as const` array. */
+function addToRegistryArray(registry: string, name: string, typeValue: string): string {
+	const declaration = registry.indexOf(`export const ${name} = [`);
+	if (declaration === -1) {
+		throw new Error(`Could not find ${name} in the diagram type registry.`);
+	}
+	const markerIndex = registry.indexOf("]", declaration);
+	const entries = registry.slice(declaration, markerIndex);
+	if (entries.includes(`"${typeValue}"`)) {
+		return registry;
+	}
+	const beforeMarker = registry.slice(0, markerIndex).trimEnd();
+	const separator = beforeMarker.endsWith("[") || beforeMarker.endsWith(",") ? "" : ",";
+	return `${beforeMarker}${separator}\n\t"${typeValue}",\n${registry.slice(markerIndex)}`;
+}
+
+/**
+ * Register the family in DIAGRAM_TYPES and, because the scaffold is a node/edge
+ * contract, in GRAPH_DIAGRAM_TYPES.
+ */
 function addDiagramTypeToRegistry(tree: Tree, typeValue: string) {
 	const registryPath = joinPathFragments(CORE_ROOT, "types.ts");
-
-	if (!tree.exists(registryPath)) {
-		throw new Error(`Missing diagram type registry at ${registryPath}.`);
-	}
-
-	const registry = tree.read(registryPath, "utf-8");
+	const registry = tree.exists(registryPath) ? tree.read(registryPath, "utf-8") : null;
 	if (registry === null) {
 		throw new Error(`Missing diagram type registry at ${registryPath}.`);
 	}
-
-	if (registry.includes(`"${typeValue}"`)) {
-		return;
-	}
-
-	const marker = "] as const;";
-	const markerIndex = registry.indexOf(marker);
-
-	if (markerIndex === -1) {
-		throw new Error(`Could not update diagram type registry at ${registryPath}.`);
-	}
-
-	const beforeMarker = registry.slice(0, markerIndex);
-	const afterMarker = registry.slice(markerIndex);
-	const beforeInsertion = beforeMarker.trimEnd().endsWith(",")
-		? beforeMarker
-		: beforeMarker.replace(/(\S)(\s*)$/, "$1,$2");
-	const nextRegistry = `${beforeInsertion}  "${typeValue}",\n${afterMarker}`;
-
-	tree.write(registryPath, nextRegistry);
+	tree.write(
+		registryPath,
+		addToRegistryArray(
+			addToRegistryArray(registry, "DIAGRAM_TYPES", typeValue),
+			"GRAPH_DIAGRAM_TYPES",
+			typeValue,
+		),
+	);
 }
 
 export async function diagramTypeGenerator(tree: Tree, options: DiagramTypeGeneratorSchema) {
@@ -94,6 +104,18 @@ export async function diagramTypeGenerator(tree: Tree, options: DiagramTypeGener
 	if (!options.skipFormat) {
 		await formatFiles(tree);
 	}
+
+	return () => {
+		logger.info(
+			[
+				`Scaffolded the "${typeValue}" contract, its tests, and a Storybook story.`,
+				"The compiler and tools/diagram-families.test.ts now fail until every pipeline stage exists:",
+				"contract registry, renderer, Excalidraw conversion, generation prompt and parsing,",
+				"Code Mode build, CLI dispatch, maintained scenarios, and Storybook.",
+				"Follow docs/diagram-families.md.",
+			].join("\n"),
+		);
+	};
 }
 
 export default diagramTypeGenerator;

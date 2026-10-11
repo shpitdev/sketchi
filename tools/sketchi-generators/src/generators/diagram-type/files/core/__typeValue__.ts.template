@@ -1,8 +1,33 @@
-import { parseIntermediateDiagram } from "../intermediate.js";
+import { Schema } from "effect";
+
+import { IntermediateDiagram, validateIntermediateDiagram } from "../intermediate.js";
 
 export const <%= propertyName %>DiagramType = "<%= typeValue %>" as const;
 
-export const <%= fixtureName %> = parseIntermediateDiagram({
+/**
+ * The canonical <%= typeValue %> contract, scaffolded as a node/edge graph.
+ * Replace it with the family's own shape (see sequence.ts) when nodes and
+ * edges do not describe it, and follow docs/diagram-families.md.
+ */
+export class <%= className %>Diagram extends IntermediateDiagram.extend<<%= className %>Diagram>(
+  "<%= className %>Diagram",
+)({
+  type: Schema.Literal(<%= propertyName %>DiagramType),
+}) {}
+export const <%= className %>DiagramSchema = <%= className %>Diagram;
+
+export function validate<%= className %>Diagram(diagram: <%= className %>Diagram): <%= className %>Diagram {
+  validateIntermediateDiagram(diagram);
+  return diagram;
+}
+
+export function parse<%= className %>Diagram(input: unknown): <%= className %>Diagram {
+  return validate<%= className %>Diagram(
+    Schema.decodeUnknownSync(<%= className %>Diagram, { errors: "all" })(input),
+  );
+}
+
+export const <%= fixtureName %> = parse<%= className %>Diagram({
   id: "<%= typeValue %>-example",
   title: <%- titleLiteral %>,
   type: <%= propertyName %>DiagramType,
@@ -28,9 +53,5 @@ export const <%= fixtureName %> = parseIntermediateDiagram({
   layout: {
     direction: "LR",
     edgeRouting: "orthogonal"
-  },
-  style: {
-    accentColor: "#7c3aed",
-    backgroundColor: "#ffffff"
   }
 });

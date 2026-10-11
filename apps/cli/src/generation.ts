@@ -1,4 +1,5 @@
 import {
+	type CANONICAL_DOCUMENT_TYPES,
 	ExcalidrawFileSchema,
 	RenderedDiagramSceneSchema,
 	type ExcalidrawFile,
@@ -16,19 +17,14 @@ export const DEFAULT_GENERATION_MODEL = "gemini-3.1-flash-lite";
 export const DEFAULT_GENERATE_ENDPOINT = "https://playground.sketchi.app/api/v1/generate";
 export const SKETCHI_GENERATE_ENDPOINT_ENV = "SKETCHI_GENERATE_ENDPOINT";
 
-export type GenerationType = "flowchart" | "mindmap" | "sequence";
-export type RequestedGenerationType =
-	| GenerationType
-	| "architecture"
-	| "er"
-	| "state-machine"
-	| "swimlane";
+/** Generation requests any canonical diagram family, and only those. */
+export type GenerationType = (typeof CANONICAL_DOCUMENT_TYPES)[number];
 
 export interface GenerateDiagramInput {
 	readonly endpoint: string;
 	readonly model: string;
 	readonly prompt: string;
-	readonly type?: RequestedGenerationType;
+	readonly type?: GenerationType;
 }
 
 export interface GenerateDiagramResult {

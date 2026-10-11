@@ -64,10 +64,10 @@ that wizard question. Explicit `--format png` may proceed; another format or
 Scripts, pipes, redirected streams, CI, and `--output json` never prompt or
 block. They must pass `--prompt`; omitting it retains the deterministic usage
 error. Passing `--prompt` is always direct and noninteractive.
-Without `--type`, the generation model selects flowchart, mindmap, or sequence
-from the request. An explicit supported `--type` remains authoritative.
-Explicit ER, architecture, swimlane, and state-machine requests return a typed
-unsupported-type error instead of being coerced into a flowchart.
+`--type` accepts only flowchart, mindmap, or sequence and is authoritative.
+Without it, the generation model selects one of those from the request; a
+request for any other kind of diagram returns a typed unsupported-type error
+instead of being coerced into a supported one.
 
 The PNG is rendered locally from the returned validated artifacts and is not
 written back into the record. Choose another artifact or destination explicitly:

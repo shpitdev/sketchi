@@ -1,39 +1,35 @@
 import "@tanstack/react-start/server-only";
 
-import type {
-	BuildFlowchartResult,
-	BuildMindmapResult,
-	BuildSequenceDiagramResult,
+import {
+	type BuildFlowchartOptions,
+	type CanonicalBuildResult,
+	type CanonicalDiagramDocument,
+	canonicalDocumentFromDiagram,
 } from "@sketchi/diagram-agent";
 import {
 	extractJsonObject,
-	DiagramGenerationRequest,
 	type DiagramGenerationCandidate,
 	type DiagramGenerationError,
 	type DiagramGenerationType,
 } from "@sketchi/diagram-generation";
 import { withTelemetryCorrelation } from "@sketchi/observability";
-import { Effect, Result, Schema } from "effect";
+import { Effect, Result } from "effect";
 
 import { resultHttpStatus } from "../runtime/http-status.server";
 import { readBoundedJson } from "../runtime/request-body.server";
-import { PlaygroundCodeMode } from "../codemode/service.server";
+import { PlaygroundCodeMode, type PlaygroundCodeModeShape } from "../codemode/service.server";
 import {
 	codeModeUsageResponseHeaders,
 	PlaygroundCodeModeUsage,
 } from "../codemode/usage-events.server";
 import { PlaygroundBindings, PlaygroundClock } from "../runtime/context.server";
-import {
-	flowchartDocumentInput,
-	mindmapDocumentInput,
-	PlaygroundGeneration,
-	sequenceDocumentInput,
-} from "./service.server";
+import { decodeGenerateRequest, GENERATE_REQUEST_COPY, isNativeGenerateType } from "./request";
+import { PlaygroundGeneration } from "./service.server";
 
 export const MAX_GENERATE_REQUEST_BYTES = 32 * 1024;
 export const MAX_GENERATE_PROMPT_LENGTH = 8_000;
 
-type BuildResult = BuildFlowchartResult | BuildMindmapResult | BuildSequenceDiagramResult;
+type BuildResult = CanonicalBuildResult;
 type BuiltArtifact = Extract<BuildResult, { readonly ok: true }>["artifact"];
 
 type GenerateFailureStatus =
@@ -77,26 +73,6 @@ interface GenerateSuccess {
 }
 
 type GenerateResult = GenerateSuccess | GenerateFailure;
-
-const GenerateRequestSchema = Schema.Struct({
-	cacheMode: Schema.optional(Schema.Literals(["default", "fresh"])),
-	prompt: Schema.String,
-	type: Schema.optional(
-		Schema.Literals([
-			"architecture",
-			"er",
-			"flowchart",
-			"mindmap",
-			"sequence",
-			"state-machine",
-			"swimlane",
-		]),
-	),
-	model: Schema.optional(DiagramGenerationRequest.fields.model),
-});
-const decodeGenerateRequest = Schema.decodeUnknownResult(GenerateRequestSchema, {
-	errors: "all",
-});
 
 function issue(
 	code: string,
@@ -212,7 +188,7 @@ function unsupportedCandidateFailure(
 			"unsupported_diagram_type",
 			"generation",
 			`Sketchi does not natively support ${intent.requestedKind} generation.`,
-			"Request a flowchart, mindmap, or sequence diagram instead.",
+			GENERATE_REQUEST_COPY.requestSupportedType,
 		),
 	]);
 }
@@ -257,6 +233,23 @@ function buildFailure(result: Extract<BuildResult, { ok: false }>): GenerateFail
 function inlineArtifact(artifact: BuiltArtifact, format: "scene" | "excalidraw"): unknown {
 	const ref = artifact.formats.find((candidate) => candidate.format === format);
 	return ref?.inline;
+}
+
+/** Build a generated document with its family's Code Mode operation. */
+function buildWithCodeMode(
+	codeMode: PlaygroundCodeModeShape,
+	document: CanonicalDiagramDocument,
+	options: NonNullable<BuildFlowchartOptions>,
+) {
+	const request = { spec: document.spec, options };
+	switch (document.type) {
+		case "flowchart":
+			return codeMode.buildFlowchart(request);
+		case "mindmap":
+			return codeMode.buildMindmap(request);
+		case "sequence":
+			return codeMode.buildSequenceDiagram(request);
+	}
 }
 
 export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate")(function* (
@@ -323,7 +316,7 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 				issue(
 					"invalid_input",
 					"input",
-					"The generate request must include a string prompt and an optional type of flowchart, mindmap, or sequence.",
+					GENERATE_REQUEST_COPY.invalidInput,
 					'Send { "prompt": "...", "type": "sequence" }.',
 				),
 			]),
@@ -346,12 +339,7 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 			]),
 		);
 	}
-	if (
-		input.type &&
-		input.type !== "flowchart" &&
-		input.type !== "mindmap" &&
-		input.type !== "sequence"
-	) {
+	if (input.type && !isNativeGenerateType(input.type)) {
 		return yield* finish(
 			rawBody,
 			failure("unsupported_diagram_type", [
@@ -359,7 +347,7 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 					"unsupported_diagram_type",
 					"input",
 					`Sketchi does not natively support ${input.type} generation.`,
-					"Request a flowchart, mindmap, or sequence diagram instead.",
+					GENERATE_REQUEST_COPY.requestSupportedType,
 				),
 			]),
 		);
@@ -422,22 +410,12 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 	}
 	const type: DiagramGenerationType = candidate.diagram.type;
 
-	const documentInput =
-		candidate.diagram.type === "flowchart"
-			? flowchartDocumentInput(candidate.diagram)
-			: candidate.diagram.type === "mindmap"
-				? mindmapDocumentInput(candidate.diagram)
-				: sequenceDocumentInput(candidate.diagram);
-	const spec = (documentInput as { readonly spec?: unknown } | undefined)?.spec;
-	const buildOptions = {
+	const document = canonicalDocumentFromDiagram(candidate.diagram);
+	const spec = document.spec;
+	const buildResult: BuildResult = yield* buildWithCodeMode(codeMode, document, {
 		artifactFormats: ["scene", "excalidraw"],
 		inlineArtifacts: ["scene", "excalidraw"],
-	};
-	const buildResult: BuildResult = yield* type === "flowchart"
-		? codeMode.buildFlowchart({ spec, options: buildOptions })
-		: type === "mindmap"
-			? codeMode.buildMindmap({ spec, options: buildOptions })
-			: codeMode.buildSequenceDiagram({ spec, options: buildOptions });
+	});
 	if (!buildResult.ok) {
 		return yield* finish({ prompt, type, spec }, buildFailure(buildResult));
 	}

@@ -33,5 +33,11 @@ barrel exports, and registry coverage move together.
 
 ```sh
 pnpm nx g @sketchi/generators:ui-component StatusBadge
-pnpm nx g @sketchi/generators:diagram-type mindmap --title "Sketchi mindmap fixture"
+pnpm nx g @sketchi/generators:diagram-type timeline --title "Sketchi timeline fixture"
 ```
+
+The diagram-type generator scaffolds and registers a new family's contract,
+tests, and story. It is the first step of
+[docs/diagram-families.md](../../docs/diagram-families.md); the compiler and
+`tools/diagram-families.test.ts` fail until the family completes every
+pipeline stage.

@@ -3,6 +3,7 @@
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "paths": {
+      "@sketchi/diagram-agent": ["../packages/diagram/agent/src/index.ts"],
       "@sketchi/diagram-core": ["../packages/diagram/core/src/index.ts"],
       "@sketchi/diagram-excalidraw": ["../packages/diagram/excalidraw/src/index.ts"],
       "@sketchi/diagram-generation": ["../packages/diagram/generation/src/index.ts"],

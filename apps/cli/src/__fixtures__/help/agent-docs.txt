@@ -33,7 +33,7 @@ Semantic color patch example:
   sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
-  sketchi generate [--prompt TEXT] [--type flowchart|mindmap|sequence|er|architecture|swimlane|state-machine] [--model MODEL]
+  sketchi generate [--prompt TEXT] [--type flowchart|mindmap|sequence] [--model MODEL]
   sketchi canvas --file PATH|- [--format png|excalidraw|scene] [--dest PATH|-]
   sketchi share DIAGRAM_ID [--open]
   sketchi pull DIAGRAM_ID --link URL|-

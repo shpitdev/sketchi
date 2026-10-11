@@ -38,4 +38,5 @@ pnpm nx build diagram-core
 All generation, rendering, scenario, and app surfaces should pass diagram data
 through this package before rendering or exporting. Add new diagram types here
 first so invalid references, missing labels, and diagram-specific invariants
-fail before they reach UI or artifact code.
+fail before they reach UI or artifact code, then complete every stage in
+[docs/diagram-families.md](../../../docs/diagram-families.md).

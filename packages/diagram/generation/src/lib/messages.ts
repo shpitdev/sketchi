@@ -1,7 +1,17 @@
+import { DIAGRAM_TYPES, type DiagramTypeValue } from "@sketchi/diagram-core";
 import { Schema } from "effect";
 
-export const DiagramGenerationTypeSchema = Schema.Literals(["flowchart", "mindmap", "sequence"]);
-export type DiagramGenerationType = typeof DiagramGenerationTypeSchema.Type;
+import { DiagramGenerationTypeSchema, UnsupportedDiagramIntentKindSchema } from "./intent.js";
+
+/** `a, b, or c` for a list of alternatives. */
+export function listAlternatives(values: readonly string[]): string {
+	return values.length < 2
+		? values.join("")
+		: `${values.slice(0, -1).join(", ")}, or ${values.at(-1)}`;
+}
+
+const NATIVE_KINDS = DIAGRAM_TYPES.map((type) => `"${type}"`);
+const UNSUPPORTED_KINDS: readonly string[] = UnsupportedDiagramIntentKindSchema.literals;
 
 /** A catalog logo the prompt names; the only slugs a node icon may use. */
 export class DiagramGenerationLogo extends Schema.Class<DiagramGenerationLogo>(
@@ -33,8 +43,8 @@ export class DiagramGenerationMessages extends Schema.Class<DiagramGenerationMes
 const COMMON_INSTRUCTIONS = [
 	"Return only compact, minified JSON on one line. Do not use markdown.",
 	"Author one concise title of at most 60 characters. Do not copy the whole scenario into the title.",
-	'Set intent.requestedKind to the diagram kind the scenario actually requests: "flowchart", "mindmap", "sequence", "er", "architecture", "swimlane", or "state-machine".',
-	'Sketchi supports only nativeKind "flowchart", "mindmap", or "sequence". If the requested kind is er, architecture, swimlane, or state-machine, set nativeKind to null, omit diagram, and never coerce it into a supported kind.',
+	`Set intent.requestedKind to the diagram kind the scenario actually requests: ${listAlternatives([...NATIVE_KINDS, ...UNSUPPORTED_KINDS.map((kind) => `"${kind}"`)])}.`,
+	`Sketchi supports only nativeKind ${listAlternatives(NATIVE_KINDS)}. If the requested kind is ${listAlternatives(UNSUPPORTED_KINDS)}, set nativeKind to null, omit diagram, and never coerce it into a supported kind.`,
 	"When nativeKind is null, return an empty requirements array because there is no native artifact to validate.",
 	"List every measurable scenario requirement once in intent.requirements. Convert counts and minimums into count requirements, hierarchy depth into topic_levels, and required names or branch/message text into label requirements.",
 	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
@@ -71,6 +81,78 @@ const SEQUENCE_IR_INSTRUCTIONS = [
 	"Every message source and target must reference a participant, and self-messages are not supported.",
 	"Use at most 12 participants and 40 messages.",
 ];
+
+/** Model-facing IR rules for each canonical family, in registry order. */
+const IR_INSTRUCTIONS = {
+	flowchart: { title: "Flowchart IR rules", rules: FLOWCHART_IR_INSTRUCTIONS },
+	mindmap: { title: "Mindmap IR rules", rules: MINDMAP_IR_INSTRUCTIONS },
+	sequence: { title: "Sequence IR rules", rules: SEQUENCE_IR_INSTRUCTIONS },
+} as const satisfies Record<DiagramTypeValue, { title: string; rules: readonly string[] }>;
+
+/** The JSON shape shown for an explicitly requested family. */
+const FAMILY_EXAMPLES = {
+	flowchart: {
+		diagram: {
+			id: "short-kebab-case-id",
+			type: "flowchart",
+			nodes: [
+				{ id: "start-id", label: "Human label", kind: "start" },
+				{ id: "decision-id", label: "Question?", kind: "decision" },
+			],
+			edges: [
+				{
+					id: "edge-id",
+					source: "decision-id",
+					target: "target-id",
+					label: "yes",
+				},
+			],
+			layout: { direction: "TB", edgeRouting: "orthogonal" },
+		},
+		requirements: [
+			{ kind: "count", target: "nodes", comparator: "minimum", value: 8 },
+			{ kind: "label", target: "branch", value: "retry" },
+		],
+	},
+	mindmap: {
+		diagram: {
+			id: "short-kebab-case-id",
+			type: "mindmap",
+			root: {
+				label: "Root topic",
+				children: [{ label: "Child topic", children: [] }],
+			},
+			layout: { direction: "LR", edgeRouting: "curved" },
+		},
+		requirements: [
+			{ kind: "count", target: "topics", comparator: "minimum", value: 8 },
+			{ kind: "label", target: "topic", value: "Operations" },
+		],
+	},
+	sequence: {
+		diagram: {
+			id: "short-kebab-case-id",
+			type: "sequence",
+			participants: [
+				{ id: "client", label: "Client" },
+				{ id: "service", label: "Service" },
+			],
+			messages: [
+				{
+					id: "request",
+					source: "client",
+					target: "service",
+					label: "Request",
+					type: "message",
+				},
+			],
+		},
+		requirements: [
+			{ kind: "count", target: "messages", comparator: "minimum", value: 4 },
+			{ kind: "label", target: "participant", value: "Service" },
+		],
+	},
+} as const satisfies Record<DiagramTypeValue, { diagram: object; requirements: readonly object[] }>;
 
 function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
 	const selectedType = prompt.requestedType;
@@ -131,83 +213,7 @@ function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
 			`Unsupported response example: ${JSON.stringify(unsupportedExample)}`,
 		].join("\n");
 	}
-	const diagram =
-		selectedType === "mindmap"
-			? {
-					id: "short-kebab-case-id",
-					type: "mindmap",
-					root: {
-						label: "Root topic",
-						children: [{ label: "Child topic", children: [] }],
-					},
-					layout: { direction: "LR", edgeRouting: "curved" },
-				}
-			: selectedType === "sequence"
-				? {
-						id: "short-kebab-case-id",
-						type: "sequence",
-						participants: [
-							{ id: "client", label: "Client" },
-							{ id: "service", label: "Service" },
-						],
-						messages: [
-							{
-								id: "request",
-								source: "client",
-								target: "service",
-								label: "Request",
-								type: "message",
-							},
-						],
-					}
-				: {
-						id: "short-kebab-case-id",
-						type: "flowchart",
-						nodes: [
-							{ id: "start-id", label: "Human label", kind: "start" },
-							{ id: "decision-id", label: "Question?", kind: "decision" },
-						],
-						edges: [
-							{
-								id: "edge-id",
-								source: "decision-id",
-								target: "target-id",
-								label: "yes",
-							},
-						],
-						layout: { direction: "TB", edgeRouting: "orthogonal" },
-					};
-	const requirements =
-		selectedType === "mindmap"
-			? [
-					{
-						kind: "count",
-						target: "topics",
-						comparator: "minimum",
-						value: 8,
-					},
-					{ kind: "label", target: "topic", value: "Operations" },
-				]
-			: selectedType === "sequence"
-				? [
-						{
-							kind: "count",
-							target: "messages",
-							comparator: "minimum",
-							value: 4,
-						},
-						{ kind: "label", target: "participant", value: "Service" },
-					]
-				: [
-						{
-							kind: "count",
-							target: "nodes",
-							comparator: "minimum",
-							value: 8,
-						},
-						{ kind: "label", target: "branch", value: "retry" },
-					];
-
+	const { diagram, requirements } = FAMILY_EXAMPLES[selectedType];
 	return JSON.stringify({
 		title: "Concise model-authored title",
 		intent: {
@@ -248,15 +254,11 @@ export function buildDiagramGenerationMessages(
 		"",
 		"Response contract:",
 		...COMMON_INSTRUCTIONS.map((instruction) => `- ${instruction}`),
-		"",
-		"Flowchart IR rules:",
-		...FLOWCHART_IR_INSTRUCTIONS.map((instruction) => `- ${instruction}`),
-		"",
-		"Mindmap IR rules:",
-		...MINDMAP_IR_INSTRUCTIONS.map((instruction) => `- ${instruction}`),
-		"",
-		"Sequence IR rules:",
-		...SEQUENCE_IR_INSTRUCTIONS.map((instruction) => `- ${instruction}`),
+		...DIAGRAM_TYPES.flatMap((type) => [
+			"",
+			`${IR_INSTRUCTIONS[type].title}:`,
+			...IR_INSTRUCTIONS[type].rules.map((instruction) => `- ${instruction}`),
+		]),
 	].join("\n");
 	const typeAuthority = explicitType
 		? `The caller explicitly requires ${explicitType}. Set both intent.requestedKind and intent.nativeKind to ${explicitType}, and return that diagram type.`
