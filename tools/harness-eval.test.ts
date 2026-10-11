@@ -1,4 +1,4 @@
-import { getScenario } from "@sketchi/diagram-scenarios";
+import { getFlowchartScenario } from "@sketchi/diagram-scenarios";
 import {
 	ToolProcessSpawner,
 	ToolProcessSpawnerLive,
@@ -1049,7 +1049,7 @@ describe("harness-eval", () => {
 						);
 						const secondRun = yield* Deferred.make<void>();
 						let spawnCount = 0;
-						const selected = getScenario("sketchi-onboarding-decision-flow");
+						const selected = getFlowchartScenario("sketchi-onboarding-decision-flow");
 						const stdout = [
 							{
 								type: "tool_use",
@@ -1168,7 +1168,7 @@ describe("harness-eval", () => {
 	];
 
 	it.each(edgeIdCases)("grades accepted flowchart specs that %s", (_label, idForEdge) => {
-		const scenario = getScenario("loan-application-underwriting");
+		const scenario = getFlowchartScenario("loan-application-underwriting");
 		const candidate = {
 			normalizedSpec: {
 				...scenario.expectedDiagram,

@@ -1,4 +1,4 @@
-import commonWordsJson from "./generated/common-words.json";
+import commonWordsJson from "./generated/common-words.json" with { type: "json" };
 import { searchIcons, type SearchableIcon } from "./search.js";
 
 /** Most catalog terms a prompt can offer one diagram. */

@@ -7,14 +7,57 @@ import {
 } from "@sketchi/diagram-generation";
 import { Clock, Effect, Layer } from "effect";
 
-import { getScenario } from "./scenarios.js";
+import { type DiagramScenario, getDiagramScenario } from "./diagram-scenarios.js";
+
+/** The typed intent plan a well-behaved model would author for the scenario. */
+function fixtureRequirements(scenario: DiagramScenario): readonly Record<string, unknown>[] {
+	if (scenario.diagramType === "sequence") {
+		return [
+			{
+				kind: "count",
+				target: "participants",
+				comparator: "minimum",
+				value: scenario.assertions.minParticipantCount,
+			},
+			{
+				kind: "count",
+				target: "messages",
+				comparator: "minimum",
+				value: scenario.assertions.minMessageCount,
+			},
+			...scenario.expectedDiagram.participants.map((participant) => ({
+				kind: "label",
+				target: "participant",
+				value: participant.label,
+			})),
+		];
+	}
+	return [
+		{
+			kind: "count",
+			target: "nodes",
+			comparator: "minimum",
+			value: scenario.assertions.minNodeCount,
+		},
+		...scenario.assertions.requiredNodeLabels.map((value) => ({
+			kind: "label",
+			target: "node",
+			value,
+		})),
+		...scenario.assertions.requiredBranchLabels.map((value) => ({
+			kind: "label",
+			target: "branch",
+			value,
+		})),
+	];
+}
 
 export const FixtureGenerationClientLayer = Layer.succeed(DiagramGenerationClient, {
 	provider: "fixture",
 	generate: Effect.fn("diagramGeneration.fixture.generate")(function* (request) {
 		const startedAt = yield* Clock.currentTimeMillis;
 		const scenario = yield* Effect.try({
-			try: () => getScenario(request.prompt.id),
+			try: () => getDiagramScenario(request.prompt.id),
 			catch: (cause) =>
 				DiagramGenerationInputError.make({
 					cause,
@@ -34,24 +77,7 @@ export const FixtureGenerationClientLayer = Layer.succeed(DiagramGenerationClien
 					intent: {
 						requestedKind: type,
 						nativeKind: type,
-						requirements: [
-							{
-								kind: "count",
-								target: "nodes",
-								comparator: "minimum",
-								value: scenario.assertions.minNodeCount,
-							},
-							...scenario.assertions.requiredNodeLabels.map((value) => ({
-								kind: "label",
-								target: "node",
-								value,
-							})),
-							...scenario.assertions.requiredBranchLabels.map((value) => ({
-								kind: "label",
-								target: "branch",
-								value,
-							})),
-						],
+						requirements: fixtureRequirements(scenario),
 					},
 					diagram: { ...diagram, type },
 				},

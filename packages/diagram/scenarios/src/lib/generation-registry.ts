@@ -2,12 +2,12 @@ import {
 	generationReliabilityScenarios,
 	type GenerationReliabilityScenario,
 } from "./generation-reliability.js";
-import { flowchartScenarios, type DiagramScenario } from "./scenarios.js";
+import { type DiagramScenario, diagramScenarios } from "./diagram-scenarios.js";
 
 export type RegisteredGenerationScenario = DiagramScenario | GenerationReliabilityScenario;
 
 export const generationScenarioRegistry: readonly RegisteredGenerationScenario[] = [
-	...flowchartScenarios,
+	...diagramScenarios,
 	...generationReliabilityScenarios,
 ];
 

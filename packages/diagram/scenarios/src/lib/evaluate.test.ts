@@ -8,9 +8,9 @@ import {
 	evaluateScenarioOutput,
 	extractJsonCandidate,
 } from "./evaluate";
-import { flowchartScenarios, getScenario } from "./scenarios";
+import { flowchartScenarios, getFlowchartScenario } from "./scenarios";
 
-const onboardingScenario = getScenario("sketchi-onboarding-decision-flow");
+const onboardingScenario = getFlowchartScenario("sketchi-onboarding-decision-flow");
 const MOVE_DELTA = { x: 48, y: 32 };
 
 function numericBounds(element: ExcalidrawElement | undefined) {

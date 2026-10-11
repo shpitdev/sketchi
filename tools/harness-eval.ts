@@ -6,8 +6,8 @@ import { NodeRuntime } from "@effect/platform-node";
 import {
 	evaluateScenarioDiagram,
 	flowchartScenarios,
-	getScenario,
-	type DiagramScenario,
+	getFlowchartScenario,
+	type FlowchartScenario,
 	type ScenarioEvaluation,
 } from "@sketchi/diagram-scenarios";
 import {
@@ -128,7 +128,7 @@ interface HarnessRunReport {
 		command: string;
 	};
 	conversationId?: string;
-	difficulty: DiagramScenario["difficulty"];
+	difficulty: FlowchartScenario["difficulty"];
 	durationMs: number;
 	error?: string;
 	eventsOut?: string;
@@ -669,7 +669,7 @@ function buildHarnessPrompt(input: {
 	harness: HarnessName;
 	model?: string | undefined;
 	runNumber: number;
-	scenario: DiagramScenario;
+	scenario: FlowchartScenario;
 }): string {
 	const requiredLabels = input.scenario.assertions.requiredNodeLabels
 		.map((label) => `- ${label}`)
@@ -1470,7 +1470,7 @@ function specToFlowchartCandidate(spec: unknown): unknown {
 }
 
 export function evaluateHarnessJson(
-	scenario: DiagramScenario,
+	scenario: FlowchartScenario,
 	value: unknown,
 ): HarnessCandidateEvaluation {
 	const spec = normalizedSpecFrom(value);
@@ -1604,7 +1604,7 @@ function runHarnessScenario(input: {
 	outputDir: string;
 	repeat: number;
 	runNumber: number;
-	scenario: DiagramScenario;
+	scenario: FlowchartScenario;
 }) {
 	return Effect.gen(function* () {
 		const stem = stableRunStem({
@@ -1854,10 +1854,10 @@ export function summarizeReport(input: {
 
 function scenariosFor(
 	options: HarnessEvalOptions,
-): Effect.Effect<readonly DiagramScenario[], HarnessEvalUsageError> {
+): Effect.Effect<readonly FlowchartScenario[], HarnessEvalUsageError> {
 	if (options.all) return Effect.succeed(flowchartScenarios);
 	return Effect.try({
-		try: () => [getScenario(options.scenarioId ?? "")],
+		try: () => [getFlowchartScenario(options.scenarioId ?? "")],
 		catch: (cause) =>
 			HarnessEvalUsageError.make({
 				cause,

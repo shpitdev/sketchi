@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { buildScenarioPrompt, buildScenarioPromptParts, toDiagramGenerationPrompt } from "./prompt";
-import { getScenario } from "./scenarios";
+import { getFlowchartScenario } from "./scenarios";
 
-const scenario = getScenario("pharma-batch-disposition");
+const scenario = getFlowchartScenario("pharma-batch-disposition");
 
 describe("scenario prompts", () => {
 	it("explicitly adapts maintained scenarios to the generation prompt contract", () => {

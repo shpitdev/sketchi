@@ -13,7 +13,11 @@ import { Effect, Schema } from "effect";
 import { parseCliOptions, resolveGeneratorCommand, usage } from "./lib/cli-options.js";
 import { evaluateScenarioDiagram, evaluateScenarioFixture } from "./lib/evaluate.js";
 import { buildScenarioPrompt, toDiagramGenerationPrompt } from "./lib/prompt.js";
-import { type DiagramScenario, flowchartScenarios, getScenario } from "./lib/scenarios.js";
+import {
+	type DiagramScenario,
+	diagramScenarios,
+	getDiagramScenario,
+} from "./lib/diagram-scenarios.js";
 import {
 	requireSuccessfulToolProcess,
 	runToolProcess,
@@ -68,9 +72,9 @@ function selectScenarios(
 	all: boolean,
 	scenarioId: string | undefined,
 ): Effect.Effect<readonly DiagramScenario[], ScenarioCliUsageError> {
-	if (all) return Effect.succeed(flowchartScenarios);
+	if (all) return Effect.succeed(diagramScenarios);
 	return Effect.try({
-		try: () => [getScenario(scenarioId ?? "")],
+		try: () => [getDiagramScenario(scenarioId ?? "")],
 		catch: (cause) =>
 			scenarioUsageError(cause instanceof Error ? cause.message : "Unknown scenario.", cause),
 	});
@@ -179,20 +183,37 @@ const evaluateCandidate = Effect.fn("diagramScenarios.evaluateCandidate")(functi
 					text: candidateOutput,
 				});
 				const candidate = enforceCandidateRequestRequirements(generated, request);
-				if (candidate.error || !candidate.diagram) {
+				const modelDiagram = generated.diagram;
+				if (!modelDiagram || modelDiagram.type !== scenario.diagramType) {
 					throw new Error(
 						[candidate.error ?? "No generated diagram.", ...candidate.diagnostics].join(" "),
 					);
 				}
-				// Logo checks score the model's own diagram, before placement and
-				// grounding repair it.
+				// Score the model's own diagram even when enforcement rejects it, so a
+				// broken intent plan does not hide the structural signal; the
+				// enforcement verdict is its own check.
+				const evaluation = evaluateScenarioDiagram(
+					scenario,
+					candidate.diagram ?? modelDiagram,
+					modelDiagram,
+				);
+				const enforcementDiagnostics = candidate.diagnostics.filter(
+					(diagnostic) => !generated.diagnostics.includes(diagnostic),
+				);
+				const intentCheck = {
+					id: "intent-contract",
+					passed: !candidate.error,
+					message: candidate.error
+						? [candidate.error, ...enforcementDiagnostics].join(" ")
+						: "The diagram satisfies its typed intent plan.",
+				};
 				return {
 					candidateOutput,
-					evaluation: evaluateScenarioDiagram(
-						scenario,
-						candidate.diagram,
-						generated.diagram ?? candidate.diagram,
-					),
+					evaluation: {
+						...evaluation,
+						checks: [...evaluation.checks, intentCheck],
+						ok: evaluation.ok && intentCheck.passed,
+					},
 				};
 			}
 			return {
@@ -291,8 +312,9 @@ export const runScenarioCli = Effect.fn("diagramScenarios.cli")(function* (
 	if (options.list) {
 		console.log(
 			JSON.stringify(
-				flowchartScenarios.map((scenario) => ({
+				diagramScenarios.map((scenario) => ({
 					id: scenario.id,
+					diagramType: scenario.diagramType,
 					title: scenario.title,
 					description: scenario.description,
 					difficulty: scenario.difficulty,

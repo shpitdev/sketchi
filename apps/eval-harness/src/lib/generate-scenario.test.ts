@@ -4,7 +4,7 @@ import {
 	DiagramGenerationClient,
 	DiagramGenerationPolicy,
 } from "@sketchi/diagram-generation";
-import { getScenario, toDiagramGenerationPrompt } from "@sketchi/diagram-scenarios";
+import { getFlowchartScenario, toDiagramGenerationPrompt } from "@sketchi/diagram-scenarios";
 import { assert, describe, expect, it, layer, vi } from "@effect/vitest";
 import { Cause, Effect, Fiber, Layer, Exit } from "effect";
 import { TestClock } from "effect/testing";
@@ -135,7 +135,7 @@ describe("eval harness scenario generation composition", () => {
 	});
 
 	it("adapts a maintained scenario before calling the generation client", async () => {
-		const scenario = getScenario("sketchi-onboarding-decision-flow");
+		const scenario = getFlowchartScenario("sketchi-onboarding-decision-flow");
 		const { title, type, ...diagram } = scenario.expectedDiagram;
 		const responseBody = {
 			candidates: [
@@ -358,7 +358,7 @@ describe("eval harness scenario generation composition", () => {
 let activeGenerationCount = 0;
 let generationCallCount = 0;
 let maxActiveGenerationCount = 0;
-const concurrencyScenario = getScenario("sketchi-onboarding-decision-flow");
+const concurrencyScenario = getFlowchartScenario("sketchi-onboarding-decision-flow");
 const concurrencyLayer = Layer.mergeAll(
 	Layer.succeed(DiagramGenerationClient, {
 		provider: "cloudflare-google-ai-studio",

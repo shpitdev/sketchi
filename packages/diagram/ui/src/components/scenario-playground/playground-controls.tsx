@@ -1,4 +1,4 @@
-import type { DiagramScenario } from "@sketchi/diagram-scenarios";
+import type { FlowchartScenario } from "@sketchi/diagram-scenarios";
 import { GenerationRunPanel } from "../generation-run-panel/index.js";
 import type { EvaluationState } from "./scenario-playground.js";
 import type { PlaygroundActions, PlaygroundState } from "./playground-store.js";
@@ -10,8 +10,8 @@ interface PlaygroundControlsProps {
 	canGenerate: boolean;
 	hasCandidateText: boolean;
 	runGeneration: () => Promise<void>;
-	scenarios: readonly DiagramScenario[];
-	selectedScenario: DiagramScenario | undefined;
+	scenarios: readonly FlowchartScenario[];
+	selectedScenario: FlowchartScenario | undefined;
 	state: PlaygroundState;
 }
 

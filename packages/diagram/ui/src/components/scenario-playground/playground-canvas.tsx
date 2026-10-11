@@ -1,4 +1,4 @@
-import type { DiagramScenario, ScenarioEvaluation } from "@sketchi/diagram-scenarios";
+import type { FlowchartScenario, ScenarioEvaluation } from "@sketchi/diagram-scenarios";
 import { ExcalidrawSceneCanvas } from "../excalidraw-scene-canvas/index.js";
 import type { PlaygroundActions, PlaygroundState } from "./playground-store.js";
 
@@ -10,7 +10,7 @@ export function PlaygroundCanvas({
 }: {
 	actions: PlaygroundActions;
 	activeResult: ScenarioEvaluation | undefined;
-	selectedScenario: DiagramScenario | undefined;
+	selectedScenario: FlowchartScenario | undefined;
 	state: PlaygroundState;
 }) {
 	const mainPanelLabel = state.mode === "llm" ? "Live candidate" : "Fixture conversion";

@@ -1,4 +1,4 @@
-import generatedCatalogJson from "./generated/icon-catalog.json";
+import generatedCatalogJson from "./generated/icon-catalog.json" with { type: "json" };
 import { decodeIconManifest, type IconManifest, type SketchiIcon } from "./manifest.js";
 import { isNodeLogoEligible } from "./node-logos.js";
 

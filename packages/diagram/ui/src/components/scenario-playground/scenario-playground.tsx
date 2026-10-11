@@ -7,7 +7,7 @@ import {
 	evaluateScenarioFixture,
 	evaluateScenarioOutput,
 	flowchartScenarios,
-	type DiagramScenario,
+	type FlowchartScenario,
 	type ScenarioEvaluation,
 } from "@sketchi/diagram-scenarios";
 import { useStore } from "@tanstack/react-store";
@@ -33,7 +33,7 @@ export interface ScenarioGenerationResult {
 export interface ScenarioPlaygroundProps {
 	initialScenarioId?: string;
 	onGenerateScenario?: (request: ScenarioGenerationRequest) => Promise<ScenarioGenerationResult>;
-	scenarios?: readonly DiagramScenario[];
+	scenarios?: readonly FlowchartScenario[];
 }
 
 export interface EvaluationState {
@@ -41,7 +41,7 @@ export interface EvaluationState {
 	result?: ScenarioEvaluation;
 }
 
-function evaluateCandidate(scenario: DiagramScenario, candidateText: string): EvaluationState {
+function evaluateCandidate(scenario: FlowchartScenario, candidateText: string): EvaluationState {
 	if (candidateText.trim().length === 0) {
 		return {};
 	}
@@ -86,7 +86,7 @@ function suiteRunResult(
 }
 
 function summarizeSuiteRun(
-	scenario: DiagramScenario,
+	scenario: FlowchartScenario,
 	candidates: readonly DiagramGenerationCandidateSummary[],
 ): ScenarioSuitePanelResult {
 	const firstCandidate = candidates[0];
@@ -163,7 +163,7 @@ export function ScenarioPlayground({
 			: statusLabel === "Ready" || statusLabel === "Running"
 				? "sketchi-scenario-playground__status sketchi-scenario-playground__status--ready"
 				: "sketchi-scenario-playground__status sketchi-scenario-playground__status--failed";
-	async function runScenario(scenario: DiagramScenario, focusCandidate: boolean) {
+	async function runScenario(scenario: FlowchartScenario, focusCandidate: boolean) {
 		if (!onGenerateScenario) {
 			return undefined;
 		}

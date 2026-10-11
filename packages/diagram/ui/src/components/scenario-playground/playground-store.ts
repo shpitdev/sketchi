@@ -3,7 +3,7 @@ import type {
 	DiagramGenerationCandidateSummary,
 } from "@sketchi/diagram-generation";
 import type { ExcalidrawScene } from "@sketchi/diagram-excalidraw";
-import type { DiagramScenario } from "@sketchi/diagram-scenarios";
+import type { FlowchartScenario } from "@sketchi/diagram-scenarios";
 import { Store } from "@tanstack/react-store";
 import type { ScenarioSuitePanelResult } from "../scenario-suite-panel/index.js";
 import type { ScenarioGenerationResult } from "./scenario-playground.js";
@@ -31,7 +31,7 @@ export interface PlaygroundState {
 }
 
 function createInitialState(
-	scenarios: readonly DiagramScenario[],
+	scenarios: readonly FlowchartScenario[],
 	initialScenarioId?: string,
 ): PlaygroundState {
 	const selectedScenario =
@@ -71,7 +71,7 @@ function toggleId(ids: readonly string[], id: string): string[] {
 }
 
 export function createPlaygroundStore(
-	scenarios: readonly DiagramScenario[],
+	scenarios: readonly FlowchartScenario[],
 	initialScenarioId?: string,
 ) {
 	const store = new Store(createInitialState(scenarios, initialScenarioId));
@@ -133,7 +133,7 @@ export function createPlaygroundStore(
 			);
 		},
 
-		selectScenario: (nextScenario: DiagramScenario) => {
+		selectScenario: (nextScenario: FlowchartScenario) => {
 			store.setState((current) => ({
 				...current,
 				candidateText: "",

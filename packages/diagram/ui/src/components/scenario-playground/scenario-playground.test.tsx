@@ -1,5 +1,5 @@
 import { flowchartFixture } from "@sketchi/diagram-core";
-import { flowchartScenarios, getScenario } from "@sketchi/diagram-scenarios";
+import { flowchartScenarios, getFlowchartScenario } from "@sketchi/diagram-scenarios";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -128,7 +128,7 @@ describe("ScenarioPlayground", () => {
 	});
 
 	it("shows a running status while API generation is pending", async () => {
-		const scenario = getScenario("sketchi-onboarding-decision-flow");
+		const scenario = getFlowchartScenario("sketchi-onboarding-decision-flow");
 		let resolveGeneration: ((result: ScenarioGenerationResult) => void) | undefined;
 		const onGenerateScenario = vi.fn(
 			() =>
@@ -361,7 +361,7 @@ describe("ScenarioPlayground", () => {
 
 	it("runs the full prompt suite against generated candidates", async () => {
 		const onGenerateScenario = vi.fn(async ({ scenarioId }: ScenarioGenerationRequest) => {
-			const scenario = getScenario(scenarioId);
+			const scenario = getFlowchartScenario(scenarioId);
 
 			return {
 				candidates: [
@@ -395,7 +395,7 @@ describe("ScenarioPlayground", () => {
 
 	it("uses the fresh cache mode for selected LLM suite runs", async () => {
 		const onGenerateScenario = vi.fn(async ({ scenarioId }: ScenarioGenerationRequest) => {
-			const scenario = getScenario(scenarioId);
+			const scenario = getFlowchartScenario(scenarioId);
 
 			return {
 				candidates: [

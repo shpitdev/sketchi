@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { flowchartFixture } from "@sketchi/diagram-core";
-import { getScenario } from "@sketchi/diagram-scenarios";
+import { getFlowchartScenario } from "@sketchi/diagram-scenarios";
 
 import { ScenarioPlayground } from "./scenario-playground";
 
@@ -56,7 +56,7 @@ export const DelayedCandidate: Story = {
 						diagramValid: true,
 						model: "Storybook fixture",
 						provider: "cloudflare-google-ai-studio",
-						text: JSON.stringify(getScenario(scenarioId).expectedDiagram),
+						text: JSON.stringify(getFlowchartScenario(scenarioId).expectedDiagram),
 					},
 				],
 				scenarioId,

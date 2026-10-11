@@ -28,6 +28,22 @@ pnpm nx build diagram-scenarios
 pnpm nx scenario diagram-scenarios -- --scenario pharma-batch-disposition --fixture --out .memory/pharma-batch.excalidraw
 ```
 
+## Families
+
+`diagramScenarios` holds every maintained scenario, discriminated by
+`diagramType`; the CLI (`--list`, `--all`, `--scenario`), the fixture client,
+and the eval harness use it.
+
+- Flowchart scenarios check nodes, branches, edges, and logos.
+- Sequence scenarios check participants, required messages and their
+  chronological order, calls answered by returns (activation bars), and that
+  no return is stray.
+
+Checks that measure the model (logos, sequence structure) score the model's own
+diagram from before candidate enforcement, so a repair never hides a model
+regression. Run one with
+`pnpm nx scenario diagram-scenarios -- --scenario checkout-payment-sequence --fixture`.
+
 ## Usage
 
 Generation packages, playground routes, and harness evals use these scenarios as

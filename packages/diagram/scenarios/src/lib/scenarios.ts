@@ -34,7 +34,7 @@ export interface DiagramScenarioLogo {
 	readonly slug: string;
 }
 
-export interface DiagramScenario {
+export interface FlowchartScenario {
 	assertions: FlowchartScenarioAssertions;
 	description: string;
 	diagramType: "flowchart";
@@ -155,7 +155,7 @@ function buildAssertions(diagram: FlowchartDiagram): FlowchartScenarioAssertions
 	};
 }
 
-function defineFlowchartScenario(definition: FlowchartScenarioDefinition): DiagramScenario {
+function defineFlowchartScenario(definition: FlowchartScenarioDefinition): FlowchartScenario {
 	const expectedDiagram = buildExpectedDiagram(definition);
 	const logos = [...(definition.logos ?? [])];
 	const offered = new Set(logos.map((logo) => logo.slug));
@@ -978,7 +978,7 @@ export const flowchartScenarios = flowchartScenarioDefinitions.map(defineFlowcha
 
 export type FlowchartScenarioId = (typeof flowchartScenarioDefinitions)[number]["id"];
 
-export function getScenario(id: string): DiagramScenario {
+export function getFlowchartScenario(id: string): FlowchartScenario {
 	const scenario = flowchartScenarios.find((candidate) => candidate.id === id);
 
 	if (!scenario) {

@@ -9,12 +9,12 @@ import { describe, expect, it } from "vitest";
 import { evaluateScenarioDiagram, evaluateScenarioFixture, scenarioLogoChecks } from "./evaluate";
 import { FixtureGenerationClientLayer } from "./fixture-client";
 import { buildScenarioPrompt, toDiagramGenerationPrompt } from "./prompt";
-import { flowchartScenarios, getScenario } from "./scenarios";
+import { flowchartScenarios, getFlowchartScenario } from "./scenarios";
 
 const logoScenarioIds = ["deploy-pipeline-logos", "ai-app-stack-logos"];
 
 function check(id: string, scenarioId: string, diagram: unknown) {
-	return evaluateScenarioDiagram(getScenario(scenarioId), diagram).checks.find(
+	return evaluateScenarioDiagram(getFlowchartScenario(scenarioId), diagram).checks.find(
 		(entry) => entry.id === id,
 	);
 }
@@ -24,31 +24,33 @@ describe("scenario logos", () => {
 		for (const scenario of flowchartScenarios) {
 			expect(scenario.logos, scenario.id).toEqual(logosNamedInText(scenario.prompt, nodeLogoIcons));
 		}
-		expect(getScenario("ai-app-stack-logos").logos[0]?.aliases).toContain("next.js");
-		expect(toDiagramGenerationPrompt(getScenario("ai-app-stack-logos")).logos).toEqual(
-			getScenario("ai-app-stack-logos").logos,
+		expect(getFlowchartScenario("ai-app-stack-logos").logos[0]?.aliases).toContain("next.js");
+		expect(toDiagramGenerationPrompt(getFlowchartScenario("ai-app-stack-logos")).logos).toEqual(
+			getFlowchartScenario("ai-app-stack-logos").logos,
 		);
 	});
 
 	it("offers logos in the model prompt only for logo scenarios", () => {
 		for (const id of logoScenarioIds) {
-			expect(buildScenarioPrompt(getScenario(id))).toContain("Available logos (flowchart only):");
+			expect(buildScenarioPrompt(getFlowchartScenario(id))).toContain(
+				"Available logos (flowchart only):",
+			);
 		}
-		expect(buildScenarioPrompt(getScenario("sketchi-onboarding-decision-flow"))).not.toContain(
-			"Available logos",
-		);
+		expect(
+			buildScenarioPrompt(getFlowchartScenario("sketchi-onboarding-decision-flow")),
+		).not.toContain("Available logos");
 	});
 
 	it("passes the maintained logo fixtures with recall and grounding checks", () => {
 		for (const id of logoScenarioIds) {
-			const evaluation = evaluateScenarioFixture(getScenario(id));
+			const evaluation = evaluateScenarioFixture(getFlowchartScenario(id));
 			expect(evaluation.ok, id).toBe(true);
 			expect(evaluation.checks.filter((entry) => entry.id.startsWith("icon:"))).not.toHaveLength(0);
 		}
 	});
 
 	it("fails recall when a named logo is missing and grounding when one is invented", () => {
-		const scenario = getScenario("deploy-pipeline-logos");
+		const scenario = getFlowchartScenario("deploy-pipeline-logos");
 		const withoutDocker = {
 			...scenario.expectedDiagram,
 			nodes: scenario.expectedDiagram.nodes.map((node) =>
@@ -69,8 +71,8 @@ describe("scenario logos", () => {
 		});
 		expect(
 			check("icons-grounded", "sketchi-onboarding-decision-flow", {
-				...getScenario("sketchi-onboarding-decision-flow").expectedDiagram,
-				nodes: getScenario("sketchi-onboarding-decision-flow").expectedDiagram.nodes.map(
+				...getFlowchartScenario("sketchi-onboarding-decision-flow").expectedDiagram,
+				nodes: getFlowchartScenario("sketchi-onboarding-decision-flow").expectedDiagram.nodes.map(
 					(node, index) => (index === 0 ? { ...node, icon: { slug: "github" } } : node),
 				),
 			})?.passed,
@@ -79,7 +81,7 @@ describe("scenario logos", () => {
 });
 
 describe("logo checks on the model's diagram", () => {
-	const scenario = getScenario("deploy-pipeline-logos");
+	const scenario = getFlowchartScenario("deploy-pipeline-logos");
 	const expected = {
 		logos: scenario.logos,
 		requiredIconSlugs: scenario.assertions.requiredIconSlugs,
@@ -102,7 +104,7 @@ describe("logo checks on the model's diagram", () => {
 	});
 
 	it("offers nothing for generic prompts and fails any logo on their steps", () => {
-		const generic = getScenario("sketchi-onboarding-decision-flow");
+		const generic = getFlowchartScenario("sketchi-onboarding-decision-flow");
 		const falsePositives = ["processing", "sync", "stream", "segment", "magic"];
 		for (const [index, prompt] of GENERIC_PROMPTS.entries()) {
 			const logos = logosNamedInText(prompt, nodeLogoIcons);
@@ -134,7 +136,7 @@ describe("logo checks on the model's diagram", () => {
 layer(FixtureGenerationClientLayer)("fixture generation with logos", (it) => {
 	it.effect("keeps grounded logos through candidate enforcement", () =>
 		Effect.gen(function* () {
-			const scenario = getScenario("deploy-pipeline-logos");
+			const scenario = getFlowchartScenario("deploy-pipeline-logos");
 			const client = yield* DiagramGenerationClient;
 			const candidate = yield* client.generate({
 				model: "fixture",

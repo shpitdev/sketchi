@@ -1,6 +1,6 @@
 import {
 	buildScenarioPromptParts,
-	type DiagramScenario,
+	type FlowchartScenario,
 	type ScenarioEvaluation,
 } from "@sketchi/diagram-scenarios";
 import { JsonCodeEditor } from "../json-code-editor/index.js";
@@ -25,8 +25,8 @@ export function PlaygroundInspector({
 	canGenerate: boolean;
 	hasCandidateText: boolean;
 	runSelectedSuite: () => Promise<void>;
-	scenarios: readonly DiagramScenario[];
-	selectedScenario: DiagramScenario | undefined;
+	scenarios: readonly FlowchartScenario[];
+	selectedScenario: FlowchartScenario | undefined;
 	state: PlaygroundState;
 }) {
 	const promptParts = selectedScenario ? buildScenarioPromptParts(selectedScenario) : undefined;

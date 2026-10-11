@@ -5,13 +5,13 @@ import { vi } from "vitest";
 
 import { FixtureGenerationClientLayer } from "./fixture-client";
 import { toDiagramGenerationPrompt } from "./prompt";
-import { getScenario } from "./scenarios";
-import * as scenarios from "./scenarios";
+import * as diagramScenarios from "./diagram-scenarios";
+import { getFlowchartScenario } from "./scenarios";
 
 layer(FixtureGenerationClientLayer)("scenario fixture generation client", (it) => {
 	it.effect("returns the maintained expected diagram for an adapted scenario", () =>
 		Effect.gen(function* () {
-			const scenario = getScenario("sketchi-onboarding-decision-flow");
+			const scenario = getFlowchartScenario("sketchi-onboarding-decision-flow");
 			const client = yield* DiagramGenerationClient;
 			const candidate = yield* client.generate({
 				model: "fixture",
@@ -27,7 +27,7 @@ layer(FixtureGenerationClientLayer)("scenario fixture generation client", (it) =
 		Effect.gen(function* () {
 			const client = yield* DiagramGenerationClient;
 			const maintainedPrompt = toDiagramGenerationPrompt(
-				getScenario("sketchi-onboarding-decision-flow"),
+				getFlowchartScenario("sketchi-onboarding-decision-flow"),
 			);
 			const error = yield* Effect.flip(
 				client.generate({
@@ -47,7 +47,7 @@ layer(FixtureGenerationClientLayer)("scenario fixture generation client", (it) =
 			const candidate = yield* client.generate({
 				model: "fixture",
 				prompt: {
-					...toDiagramGenerationPrompt(getScenario("sketchi-onboarding-decision-flow")),
+					...toDiagramGenerationPrompt(getFlowchartScenario("sketchi-onboarding-decision-flow")),
 					requestedType: "mindmap",
 				},
 			});
@@ -61,8 +61,8 @@ layer(FixtureGenerationClientLayer)("scenario fixture generation client", (it) =
 
 	it.effect("checks the maintained typed count plan against fixture IR", () =>
 		Effect.gen(function* () {
-			const scenario = getScenario("sketchi-onboarding-decision-flow");
-			const getter = vi.spyOn(scenarios, "getScenario").mockReturnValue({
+			const scenario = getFlowchartScenario("sketchi-onboarding-decision-flow");
+			const getter = vi.spyOn(diagramScenarios, "getDiagramScenario").mockReturnValue({
 				...scenario,
 				assertions: {
 					...scenario.assertions,

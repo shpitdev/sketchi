@@ -5,9 +5,10 @@ import { Cause, Effect, Exit, Layer, Schema } from "effect";
 
 import { runScenarioCli, ScenarioCliUsageError, scenarioCliExitCode } from "./cli.js";
 import { ToolProcessSpawner, ToolProcessSpawnerLive } from "./internal/tool-process.js";
-import { getScenario } from "./lib/scenarios.js";
+import { getFlowchartScenario } from "./lib/scenarios.js";
+import { getSequenceScenario } from "./lib/sequence-scenarios.js";
 
-const scenario = getScenario("sketchi-onboarding-decision-flow");
+const scenario = getFlowchartScenario("sketchi-onboarding-decision-flow");
 function generatedEnvelope(requirements: readonly unknown[] = []) {
 	const { title, ...diagram } = scenario.expectedDiagram;
 	return JSON.stringify({
@@ -58,7 +59,13 @@ const Report = Schema.fromJsonString(
 	Schema.Struct({
 		ok: Schema.Boolean,
 		error: Schema.optionalKey(Schema.String),
-		checks: Schema.Array(Schema.Struct({ id: Schema.String, passed: Schema.Boolean })),
+		checks: Schema.Array(
+			Schema.Struct({
+				id: Schema.String,
+				message: Schema.optionalKey(Schema.String),
+				passed: Schema.Boolean,
+			}),
+		),
 	}),
 );
 
@@ -103,6 +110,40 @@ describe("scenario CLI candidate decoding", () => {
 			}),
 		),
 	);
+
+	it.live("scores a sequence response envelope on the model's chronological structure", () => {
+		const sequence = getSequenceScenario("checkout-payment-sequence");
+		const { title, ...diagram } = sequence.expectedDiagram;
+		const [submit, charge, approved, confirmation] = diagram.messages;
+		const output = JSON.stringify({
+			title,
+			intent: { requestedKind: "sequence", nativeKind: "sequence", requirements: [] },
+			diagram: { ...diagram, messages: [submit, approved, charge, confirmation] },
+		});
+		return withCandidate(output, (directory) =>
+			Effect.gen(function* () {
+				const reportPath = path.join(directory, "report.json");
+				yield* runScenarioCli([
+					"--scenario",
+					sequence.id,
+					"--report-out",
+					reportPath,
+					"--generator-command",
+					"offline-generator",
+				]);
+				const report = yield* Schema.decodeUnknownEffect(Report)(
+					yield* Effect.tryPromise(() => readFile(reportPath, "utf8")),
+				);
+				assert.isFalse(report.ok);
+				assert.isUndefined(report.error);
+				assert.deepStrictEqual(
+					report.checks.filter((check) => !check.passed).map((check) => check.id),
+					["message-order", "answered-calls", "returns-answer-calls"],
+				);
+				assert.strictEqual(process.exitCode, 1);
+			}),
+		);
+	});
 
 	for (const source of ["generator", "input"]) {
 		it.live(`enforces scenario requirements on bare IR from ${source}`, () => {
@@ -190,7 +231,7 @@ describe("scenario CLI candidate decoding", () => {
 		},
 	] as const) {
 		it.live(`scores logos before placement repairs ${name}`, () => {
-			const target = getScenario(scenarioId);
+			const target = getFlowchartScenario(scenarioId);
 			const { title, ...diagram } = target.expectedDiagram;
 			const modelIcons: Readonly<Record<string, string>> = icons;
 			const output = JSON.stringify({
@@ -280,7 +321,9 @@ describe("scenario CLI candidate decoding", () => {
 					yield* Effect.tryPromise(() => readFile(reportPath, "utf8")),
 				);
 				assert.isFalse(report.ok);
-				assert.include(report.error ?? "", "requirement_count_not_met");
+				const intentCheck = report.checks.find((check) => check.id === "intent-contract");
+				assert.isFalse(intentCheck?.passed);
+				assert.include(intentCheck?.message ?? "", "requirement_count_not_met");
 				assert.strictEqual(process.exitCode, 1);
 			}),
 		),
@@ -332,7 +375,17 @@ describe("scenario CLI candidate decoding", () => {
 						yield* Effect.tryPromise(() => readFile(reportPath, "utf8")),
 					);
 					assert.isFalse(report.ok);
-					assert.isDefined(report.error);
+					if (label === "unsatisfied typed requirement") {
+						// The model's diagram is still scored; enforcement fails its own check.
+						assert.isUndefined(report.error);
+						assert.isTrue(report.checks.some((check) => check.id === "min-node-count"));
+						assert.deepStrictEqual(
+							report.checks.filter((check) => !check.passed).map((check) => check.id),
+							["intent-contract"],
+						);
+					} else {
+						assert.isDefined(report.error);
+					}
 					if (label === "conflicting type")
 						assert.include(report.error ?? "", "explicit_type_not_met");
 					assert.strictEqual(

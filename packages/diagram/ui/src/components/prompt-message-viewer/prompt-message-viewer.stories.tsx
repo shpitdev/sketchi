@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { buildScenarioPromptParts, getScenario } from "@sketchi/diagram-scenarios";
+import { buildScenarioPromptParts, getFlowchartScenario } from "@sketchi/diagram-scenarios";
 
 import { PromptMessageViewer } from "./prompt-message-viewer";
 
-const promptParts = buildScenarioPromptParts(getScenario("pharma-batch-disposition"));
+const promptParts = buildScenarioPromptParts(getFlowchartScenario("pharma-batch-disposition"));
 
 const meta = {
 	title: "Diagram UI/Components/PromptMessageViewer",
