@@ -1,5 +1,4 @@
 import {
-	SEQUENCE_LIFELINE_ROLE,
 	type ArrowSceneElement,
 	type FrameSceneElement,
 	type LineSceneElement,
@@ -11,6 +10,7 @@ import {
 import {
 	AXIS_ALIGNED_EPSILON,
 	boundLabelWidth,
+	CANVAS_RENDERER_ROLES,
 	canvasBoundTextBox,
 	canvasBoundTextInset,
 	canvasNodeIconBox,
@@ -363,8 +363,8 @@ function shapeElement(input: {
 		boundElements: boundElements.length > 0 ? boundElements : null,
 		roundness: shapeType === "rectangle" ? { type: 3 } : null,
 		strokeColor: input.shape.strokeColor ?? input.scene.accentColor,
-		...(input.shape.rendererRole === SEQUENCE_LIFELINE_ROLE
-			? { customData: { sketchiRendererRole: SEQUENCE_LIFELINE_ROLE } }
+		...(input.shape.rendererRole
+			? { customData: { sketchiRendererRole: input.shape.rendererRole } }
 			: {}),
 	};
 }
@@ -606,7 +606,7 @@ function synthesizeNodeLabels(sourceElements: readonly SceneElement[]): {
 		textElements.flatMap((element) => (element.containerId ? [element.containerId] : [])),
 	);
 	for (const node of nodes) {
-		if (explicitlyLabeledNodeIds.has(node.id) || node.rendererRole === SEQUENCE_LIFELINE_ROLE) {
+		if (explicitlyLabeledNodeIds.has(node.id) || node.rendererRole) {
 			continue;
 		}
 		const baseId = `__sketchi_node_label__${node.id}`;
@@ -978,7 +978,7 @@ function arrowSegmentsThroughShapes(
 	for (const segment of segments) {
 		for (const shape of shapes) {
 			if (
-				isSequenceLifelineShape(shape) ||
+				isSequenceStructureShape(shape) ||
 				shape.id === segment.startBindingId ||
 				shape.id === segment.endBindingId
 			) {
@@ -1007,13 +1007,12 @@ function arrowSegmentsThroughShapes(
 	return issues;
 }
 
-function isSequenceLifelineShape(element: ExcalidrawElement): boolean {
+/** Messages may cross other participants' lifelines and activation bars. */
+function isSequenceStructureShape(element: ExcalidrawElement): boolean {
 	const customData = element.customData;
-	return (
-		customData !== null &&
-		typeof customData === "object" &&
-		(customData as Record<string, unknown>)["sketchiRendererRole"] === SEQUENCE_LIFELINE_ROLE
-	);
+	if (customData === null || typeof customData !== "object") return false;
+	const role = (customData as Record<string, unknown>)["sketchiRendererRole"];
+	return CANVAS_RENDERER_ROLES.some((candidate) => candidate === role);
 }
 
 function arrowEndpoint(element: ExcalidrawElement, key: BindingKey) {

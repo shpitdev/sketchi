@@ -3,10 +3,13 @@ import { describe, expect, it } from "vitest";
 import { generateKeyBetween } from "fractional-indexing";
 
 import {
+	apiRequestSequence,
 	flowchartFixture,
 	mindmapFixture,
 	pharmaBatchDispositionFlowchart,
 	parseFlowchartDiagram,
+	parseSequenceDiagram,
+	sequenceFixture,
 	type CanvasSpec,
 	getCanvasValidationIssues,
 } from "@sketchi/diagram-core";
@@ -1765,6 +1768,52 @@ describe("convertSceneToExcalidraw", () => {
 		expect(scene.elements.find((element) => element.id === "node:middle")).not.toHaveProperty(
 			"customData.sketchiRendererRole",
 		);
+	});
+
+	it("exports activation bars as unlabeled bound shapes that other messages may cross", () => {
+		const nested = parseSequenceDiagram({
+			id: "oauth",
+			title: "OAuth callback",
+			type: "sequence",
+			participants: [
+				{ id: "client", label: "Client" },
+				{ id: "api", label: "API" },
+				{ id: "auth", label: "Auth" },
+			],
+			messages: [
+				{ id: "login", source: "client", target: "api", label: "Log in" },
+				{ id: "authorize", source: "api", target: "auth", label: "Authorize" },
+				{ id: "callback", source: "auth", target: "api", label: "Callback" },
+				{ id: "ack", source: "api", target: "auth", label: "Ack", type: "return" },
+				{ id: "token", source: "auth", target: "api", label: "Token", type: "return" },
+				{ id: "direct", source: "auth", target: "client", label: "Direct notice" },
+				{ id: "session", source: "api", target: "client", label: "Session", type: "return" },
+			],
+		});
+		for (const diagram of [sequenceFixture, apiRequestSequence, nested]) {
+			const scene = convertSceneToExcalidraw(renderSequenceDiagram(diagram));
+			expect(validateExcalidrawScene(scene), diagram.id).toEqual({ ok: true, issues: [] });
+		}
+
+		const scene = convertSceneToExcalidraw(renderSequenceDiagram(sequenceFixture));
+		const bar = scene.elements.find(
+			(element) => element.id === "node:store:lifeline:activation:checkout",
+		);
+		expect(bar).toMatchObject({
+			type: "rectangle",
+			customData: { sketchiRendererRole: "sequence-activation" },
+			boundElements: expect.arrayContaining([
+				{ id: "arrow:checkout", type: "arrow" },
+				{ id: "arrow:receipt", type: "arrow" },
+			]),
+		});
+		expect(
+			scene.elements.some(
+				(element) =>
+					element.type === "text" &&
+					element.containerId === "node:store:lifeline:activation:checkout",
+			),
+		).toBe(false);
 	});
 });
 

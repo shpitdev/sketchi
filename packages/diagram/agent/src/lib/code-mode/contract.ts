@@ -3,6 +3,7 @@ import type { StandardJSONSchemaV1, StandardSchemaV1 } from "@standard-schema/sp
 import {
 	CANVAS_LIMITS,
 	CANVAS_NODE_ICON,
+	CANVAS_RENDERER_ROLES,
 	CANVAS_SPEC_VERSION,
 	SEQUENCE_MESSAGE_STYLES,
 	SEQUENCE_MESSAGE_TYPES,
@@ -906,7 +907,7 @@ export class NodeSceneElement extends Schema.Class<NodeSceneElement>("NodeSceneE
 		nodeId: RequiredNonEmptyString,
 		kind: optionalContract(NonEmptyString),
 		icon: optionalContract(CanvasNodeIcon).pipe(Schema.mutableKey),
-		rendererRole: optionalContract(literals(["sequence-lifeline"])),
+		rendererRole: optionalContract(literals(CANVAS_RENDERER_ROLES)),
 		shape: literals(["rectangle", "ellipse", "diamond", "circle", "polygon"]).pipe(
 			Schema.mutableKey,
 		),

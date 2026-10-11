@@ -1809,6 +1809,101 @@ describe("Code Mode runtime", () => {
 		});
 	});
 
+	it("keeps activation bars and their bound messages through an inline-scene patch", async () => {
+		const runtime = createTestRuntime();
+		const spec = checkoutSequenceSpec();
+		const built = await runtime.buildSequenceDiagram({
+			spec: {
+				...spec,
+				messages: [
+					...spec.messages.slice(0, 2),
+					{ source: "payments", target: "store", label: "Approved", type: "return" },
+					{ source: "store", target: "customer", label: "Receipt", type: "return" },
+				],
+			},
+			options: { artifactFormats: ["scene", "excalidraw"], inlineArtifacts: ["scene"] },
+		});
+		if (!built.ok) throw new Error("Expected accepted sequence diagram.");
+		const sourceScene = parseInlineScene(
+			built.artifact.formats.find(({ format }) => format === "scene")?.inline,
+		);
+		const bars = (scene: typeof sourceScene) =>
+			scene.elements.flatMap((element) =>
+				element.type === "node" && element.rendererRole === "sequence-activation"
+					? [element.nodeId]
+					: [],
+			);
+		expect(bars(sourceScene)).toEqual([
+			"store:lifeline:activation:message-1-customer-store",
+			"payments:lifeline:activation:message-2-store-payments",
+		]);
+
+		const patched = await runtime.applyDiagramPatch({
+			source: { scene: sourceScene },
+			operations: [{ op: "setDefaultStyle", style: {} }],
+			options: { artifactFormats: ["scene", "excalidraw"], inlineArtifacts: ["scene"] },
+		});
+		expectPatchOk(patched);
+		const patchedScene = parseInlineScene(
+			patched.artifact.formats.find(({ format }) => format === "scene")?.inline,
+		);
+		expect(bars(patchedScene)).toEqual(bars(sourceScene));
+		expect(
+			patchedScene.elements.find(
+				(element) => element.type === "arrow" && element.edgeId === "message-1-customer-store",
+			),
+		).toMatchObject({ targetNodeId: "store:lifeline:activation:message-1-customer-store" });
+	});
+
+	it("keeps doubly nested activation bars through an inline-scene patch", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildSequenceDiagram({
+			spec: {
+				title: "Deep nesting",
+				participants: [
+					{ id: "a", label: "A" },
+					{ id: "b", label: "B" },
+					{ id: "c", label: "C" },
+				],
+				messages: [
+					{ id: "q1", source: "a", target: "b", label: "First" },
+					{ id: "q2", source: "c", target: "b", label: "Second" },
+					{ id: "q3", source: "a", target: "b", label: "Third" },
+					{ id: "r3", source: "b", target: "a", label: "Third done", type: "return" },
+					{ id: "r2", source: "b", target: "c", label: "Second done", type: "return" },
+					{ id: "r1", source: "b", target: "a", label: "First done", type: "return" },
+				],
+			},
+			options: { artifactFormats: ["scene", "excalidraw"], inlineArtifacts: ["scene"] },
+		});
+		if (!built.ok) throw new Error("Expected accepted sequence diagram.");
+		const sourceScene = parseInlineScene(
+			built.artifact.formats.find(({ format }) => format === "scene")?.inline,
+		);
+
+		const patched = await runtime.applyDiagramPatch({
+			source: { scene: sourceScene },
+			operations: [{ op: "setDefaultStyle", style: {} }],
+			options: { artifactFormats: ["scene", "excalidraw"], inlineArtifacts: ["scene"] },
+		});
+		expectPatchOk(patched);
+		expect(patched.issues).toEqual([]);
+		const patchedScene = parseInlineScene(
+			patched.artifact.formats.find(({ format }) => format === "scene")?.inline,
+		);
+		expect(
+			patchedScene.elements.flatMap((element) =>
+				element.type === "node" && element.nodeId.includes(":activation:")
+					? [[element.nodeId, element.rendererRole]]
+					: [],
+			),
+		).toEqual([
+			["b:lifeline:activation:q1", "sequence-activation"],
+			["b:lifeline:activation:q2", "sequence-activation"],
+			["b:lifeline:activation:q3", "sequence-activation"],
+		]);
+	});
+
 	it("styles a crossing sequence through an inline-scene patch", async () => {
 		const runtime = createTestRuntime();
 		const built = await runtime.buildSequenceDiagram({

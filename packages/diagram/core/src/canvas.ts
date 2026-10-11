@@ -78,13 +78,25 @@ export interface CanvasIconAsset {
 	readonly svg: string;
 }
 
+/**
+ * Structural shapes the sequence renderer derives: lifelines and activation
+ * bars. They carry no label or icon and are not obstacles for messages.
+ */
+export const CANVAS_RENDERER_ROLES = ["sequence-lifeline", "sequence-activation"] as const;
+export type CanvasRendererRole = (typeof CANVAS_RENDERER_ROLES)[number];
+
+const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
+	"sequence-activation": "Sequence activation",
+	"sequence-lifeline": "Sequence lifeline",
+};
+
 export interface CanvasShapeElement extends CanvasElementComposition, CanvasStrokeStyleFields {
 	readonly type: "node";
 	readonly id: string;
 	readonly nodeId: string;
 	readonly kind?: string;
 	readonly icon?: CanvasNodeIcon;
-	readonly rendererRole?: "sequence-lifeline";
+	readonly rendererRole?: CanvasRendererRole;
 	readonly shape: CanvasShapeKind;
 	readonly points?: [CanvasPoint, CanvasPoint, CanvasPoint, ...CanvasPoint[]];
 	readonly textColor?: string;
@@ -396,7 +408,8 @@ export interface DroppedCanvasIcon {
 	readonly elementId: string;
 	readonly index: number;
 	/**
-	 * unavailable: no catalog asset; lifeline: sequence lifelines carry no logo;
+	 * unavailable: no catalog asset; lifeline: sequence lifelines and activation
+	 * bars carry no logo;
 	 * no_room: the label would no longer fit; budget: per-scene bytes spent.
 	 */
 	readonly reason: "budget" | "lifeline" | "no_room" | "unavailable";
@@ -466,7 +479,8 @@ function nodeLabelOverflows(
  * Embed one asset per referenced icon slug and remove icons that cannot be
  * drawn, so an icon never fails a build and every exported scene renders
  * without a catalog or network. Any authored `icons` map is replaced. An icon
- * is dropped when its asset is unavailable, it sits on a sequence lifeline, or
+ * is dropped when its asset is unavailable, it sits on a sequence lifeline or
+ * activation bar, or
  * its label would no longer fit; icons past the per-scene byte budget are
  * dropped in element order, which keeps the result deterministic.
  */
@@ -494,7 +508,7 @@ export function embedCanvasIcons(
 		) {
 			return drop("unavailable");
 		}
-		if (element.rendererRole === "sequence-lifeline") return drop("lifeline");
+		if (element.rendererRole) return drop("lifeline");
 		if (element.shape !== "polygon" && isVisible(element)) {
 			const label = boundLabels.get(element.id)?.element;
 			if (
@@ -533,11 +547,11 @@ function validateNodeIcon(
 	if (!icon) return [];
 	const path = `elements[${index}].icon`;
 	const issues: CanvasValidationIssue[] = [];
-	if (element.rendererRole === "sequence-lifeline") {
+	if (element.rendererRole) {
 		issues.push({
 			code: "invalid_icon",
 			elementId: element.id,
-			message: `Sequence lifeline "${element.id}" cannot carry an icon.`,
+			message: `${RENDERER_ROLE_NAMES[element.rendererRole]} "${element.id}" cannot carry an icon.`,
 			path,
 		});
 	}
@@ -715,7 +729,7 @@ export function getCanvasValidationIssues(canvas: CanvasSpec): CanvasValidationI
 		}
 		if (element.type === "node" && element.shape !== "polygon" && isLayerVisible(element)) {
 			const boundLabel = nodeLabelsByContainerId.get(element.id);
-			if (boundLabel || element.rendererRole !== "sequence-lifeline") {
+			if (boundLabel || element.rendererRole === undefined) {
 				if (nodeLabelOverflows(element, boundLabel?.element, element.icon)) {
 					issues.push({
 						code: "label_overflow",

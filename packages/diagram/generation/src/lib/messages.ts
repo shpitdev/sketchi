@@ -67,6 +67,7 @@ const SEQUENCE_IR_INSTRUCTIONS = [
 	"Return ordered participants with stable ids and human labels.",
 	"Return chronological messages with stable ids, participant source and target ids, and concise labels.",
 	'Use message type "message" for calls and "return" for responses; dashed style is appropriate for responses.',
+	"Answer a call with a later return from the callee back to the caller; Sketchi draws the callee's activation bar from the call to its return. Leave fire-and-forget events unanswered.",
 	"Every message source and target must reference a participant, and self-messages are not supported.",
 ];
 

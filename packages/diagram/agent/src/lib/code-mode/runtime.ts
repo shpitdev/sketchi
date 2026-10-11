@@ -25,6 +25,7 @@ import {
 import {
 	renderIntermediateDiagram,
 	renderSequenceDiagram,
+	isStructurallyValidSequenceActivation,
 	isStructurallyValidSequenceLifeline,
 	type RenderedDiagramScene,
 	type ScenePoint,
@@ -1087,8 +1088,10 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 				...(element.roughness !== undefined ? { roughness: element.roughness } : {}),
 				...(element.strokeStyle ? { strokeStyle: element.strokeStyle } : {}),
 				...(element.strokeWidth !== undefined ? { strokeWidth: element.strokeWidth } : {}),
-				...(element.rendererRole === "sequence-lifeline" &&
-				isStructurallyValidSequenceLifeline(scene, element)
+				...((element.rendererRole === "sequence-lifeline" &&
+					isStructurallyValidSequenceLifeline(scene, element)) ||
+				(element.rendererRole === "sequence-activation" &&
+					isStructurallyValidSequenceActivation(scene, element))
 					? { rendererRole: element.rendererRole }
 					: {}),
 				...(element.textColor ? { textColor: element.textColor } : {}),
