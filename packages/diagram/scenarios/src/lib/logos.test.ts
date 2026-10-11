@@ -32,9 +32,7 @@ describe("scenario logos", () => {
 
 	it("offers logos in the model prompt only for logo scenarios", () => {
 		for (const id of logoScenarioIds) {
-			expect(buildScenarioPrompt(getFlowchartScenario(id))).toContain(
-				"Available logos (flowchart only):",
-			);
+			expect(buildScenarioPrompt(getFlowchartScenario(id))).toContain("Available logos:");
 		}
 		expect(
 			buildScenarioPrompt(getFlowchartScenario("sketchi-onboarding-decision-flow")),

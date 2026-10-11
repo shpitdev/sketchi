@@ -5,10 +5,11 @@ import {
 	canvasBoundTextInset,
 	canvasNodeIconBox,
 	deployPipelineLogoFlowchart,
+	deployWebhookLogoSequence,
 	embedCanvasIcons,
 	type CanvasShapeElement,
 } from "@sketchi/diagram-core";
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import { renderIntermediateDiagram, renderSequenceDiagram } from "@sketchi/diagram-renderer";
 
 import {
 	convertSceneToExcalidraw,
@@ -193,5 +194,35 @@ describe("node logos in Excalidraw output", () => {
 				}),
 			]),
 		);
+	});
+});
+
+describe("sequence participant logos in Excalidraw output", () => {
+	it("draws each participant logo as an image in its header and keeps the scene valid", () => {
+		const scene = embedCanvasIcons(renderSequenceDiagram(deployWebhookLogoSequence), (slug) => ({
+			name: slug,
+			svg: svgFor(slug),
+		})).scene;
+		const excalidraw = convertSceneToExcalidraw(scene);
+		const images = excalidraw.elements.filter((element) => element.type === "image");
+
+		expect(images.map((image) => image.id)).toEqual([
+			"node-github-icon",
+			"node-worker-icon",
+			"node-docker-icon",
+		]);
+		for (const participantId of ["github", "worker", "docker"]) {
+			const header = scene.elements.find(
+				(element): element is CanvasShapeElement =>
+					element.type === "node" && element.nodeId === participantId,
+			);
+			const box = header ? canvasNodeIconBox(header) : undefined;
+			expect(byId(excalidraw.elements, `node-${participantId}-icon`)).toMatchObject({
+				x: box?.x,
+				y: box?.y,
+			});
+		}
+		expect(Object.keys(excalidraw.files ?? {})).toHaveLength(3);
+		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
 	});
 });

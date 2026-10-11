@@ -191,4 +191,49 @@ describe("Studio build_sequence_diagram host", () => {
 		});
 		expect(runtime.writes()).toBe(0);
 	});
+
+	it("places the user's named logos on participants and drops the rest before building", async () => {
+		const received: unknown[] = [];
+		const runtime = deterministicRuntime();
+		const executor = await Effect.runPromise(
+			makeStudioSequenceToolExecutor(
+				(input) => {
+					received.push(input);
+					return runtime.build(input);
+				},
+				{
+					logos: [
+						{ name: "Stripe", slug: "stripe" },
+						{ name: "GitHub", slug: "github" },
+					],
+				},
+			),
+		);
+		const result = await Effect.runPromise(
+			executor.execute({
+				spec: {
+					...checkout.spec,
+					participants: [
+						{ id: "browser", label: "Browser", icon: { slug: "stripe" } },
+						{ id: "api", label: "API", icon: { slug: "kubernetes" } },
+						{ id: "payments", label: "Stripe payments" },
+					],
+				},
+			}),
+		);
+
+		const built = received[0] as StudioBuildSequenceInput;
+		expect(built.spec.participants.map((participant) => participant.icon?.slug)).toEqual([
+			undefined,
+			undefined,
+			"stripe",
+		]);
+		// Grounding reports the unnamed logo; this test runtime has no catalog, so
+		// Code Mode also drops "stripe" with its own warning.
+		expect(result.issues.map((issue) => [issue.code, issue.ref?.id])).toEqual([
+			["unknown_icon", "api"],
+			["unknown_icon", "payments"],
+		]);
+		expect(result.issues[0]?.message).toContain("not a technology the user named");
+	});
 });

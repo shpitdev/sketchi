@@ -25,6 +25,8 @@ interface PlaceableNode {
 export function placeNodeLogos<Node extends PlaceableNode>(
 	nodes: readonly Node[],
 	logos: readonly OfferedLogo[],
+	/** Sequence diagrams place logos on participants rather than nodes. */
+	noun: "node" | "participant" = "node",
 ): { readonly diagnostics: string[]; readonly nodes: Node[] } {
 	const terms = logos.map((logo) => ({
 		aliases: logo.aliases ?? [],
@@ -47,7 +49,7 @@ export function placeNodeLogos<Node extends PlaceableNode>(
 		if (named) {
 			if (chosen !== named) {
 				diagnostics.push(
-					`icon_placed: node "${node.id}" names ${named}, so it draws that logo${chosen ? ` instead of "${chosen}"` : ""}.`,
+					`icon_placed: ${noun} "${node.id}" names ${named}, so it draws that logo${chosen ? ` instead of "${chosen}"` : ""}.`,
 				);
 			}
 			return { ...withoutIcon, icon: { slug: named } } as Node;
@@ -56,8 +58,8 @@ export function placeNodeLogos<Node extends PlaceableNode>(
 		if (offered.has(chosen) && !namedByLabels.has(chosen)) return node;
 		diagnostics.push(
 			offered.has(chosen)
-				? `icon_dropped: node "${node.id}" logo "${chosen}" belongs to the node whose label names it.`
-				: `icon_not_in_prompt: node "${node.id}" icon "${chosen}" is not a logo the prompt names; the node renders without a logo.`,
+				? `icon_dropped: ${noun} "${node.id}" logo "${chosen}" belongs to the ${noun} whose label names it.`
+				: `icon_not_in_prompt: ${noun} "${node.id}" icon "${chosen}" is not a logo the prompt names; the ${noun} renders without a logo.`,
 		);
 		return withoutIcon as Node;
 	});

@@ -1,4 +1,5 @@
 import {
+	canvasNodeIconBand,
 	CANVAS_SPEC_VERSION,
 	SEQUENCE_LIFELINE_SUFFIX,
 	type SequenceActivation,
@@ -29,6 +30,8 @@ const LABEL_FONT_SIZE = 14;
 const LABEL_LINE_HEIGHT = 1.35;
 const LABEL_VERTICAL_PADDING = 18;
 const LAYOUT_ALIGNMENT_EPSILON = 0.01;
+/** Participant logos match the size flowchart rectangles draw. */
+const HEADER_ICON_SIZE = 28;
 const ACTIVATION_WIDTH = 12;
 /** Each nested activation shifts right by half a bar, as in UML. */
 const ACTIVATION_NEST_OFFSET = ACTIVATION_WIDTH / 2;
@@ -154,7 +157,8 @@ export function renderSequenceDiagram(diagram: SequenceDiagram): RenderedDiagram
 			wrapTextToWidth(participant.label, HEADER_LABEL_WIDTH, LABEL_FONT_SIZE),
 		]),
 	);
-	// Size the shared header row before laying out lifelines and message lanes.
+	// Size the shared header row before laying out lifelines and message lanes;
+	// a participant logo sits above its label inside the header.
 	const headerHeight = input.participants.reduce(
 		(height, participant) =>
 			Math.max(
@@ -163,7 +167,11 @@ export function renderSequenceDiagram(diagram: SequenceDiagram): RenderedDiagram
 					(headerLabelById.get(participant.id) ?? participant.label).split("\n").length *
 						LABEL_FONT_SIZE *
 						LABEL_LINE_HEIGHT,
-				) + LABEL_VERTICAL_PADDING,
+				) +
+					LABEL_VERTICAL_PADDING +
+					canvasNodeIconBand(
+						participant.icon ? { slug: participant.icon.slug, size: HEADER_ICON_SIZE } : undefined,
+					),
 			),
 		HEADER_HEIGHT,
 	);
@@ -186,6 +194,9 @@ export function renderSequenceDiagram(diagram: SequenceDiagram): RenderedDiagram
 			id: `node:${participant.id}`,
 			nodeId: participant.id,
 			...(participant.kind ? { kind: participant.kind } : {}),
+			...(participant.icon
+				? { icon: { slug: participant.icon.slug, size: HEADER_ICON_SIZE } }
+				: {}),
 			shape: "rectangle",
 			x,
 			y: headerY,
@@ -202,6 +213,8 @@ export function renderSequenceDiagram(diagram: SequenceDiagram): RenderedDiagram
 			text: headerLabelById.get(participant.id) ?? participant.label,
 			fontSize: LABEL_FONT_SIZE,
 			maxWidth: HEADER_LABEL_WIDTH,
+			// The logo sits at the top of the header; the label stacks beneath it.
+			...(participant.icon ? { verticalAlign: "bottom" as const } : {}),
 		});
 		lifelines.push({
 			type: "node",

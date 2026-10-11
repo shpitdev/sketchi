@@ -25,6 +25,8 @@ export interface SequenceScenarioAssertions {
 	readonly minParticipantCount: number;
 	/** Messages that must appear, in this chronological order. */
 	readonly orderedMessages: readonly SequenceScenarioMessage[];
+	/** Logos the expected diagram draws; generated diagrams must include them. */
+	readonly requiredIconSlugs: readonly string[];
 	/** Participants that must appear; each entry lists label alternatives. */
 	readonly requiredParticipants: readonly (readonly string[])[];
 	/** Fire-and-forget calls that must appear and that no return may answer. */
@@ -45,7 +47,7 @@ export interface SequenceScenario {
 	readonly title: string;
 }
 
-type ParticipantDefinition = readonly [id: string, label: string];
+type ParticipantDefinition = readonly [id: string, label: string, icon?: string];
 type MessageDefinition = readonly [
 	id: string,
 	source: string,
@@ -56,24 +58,41 @@ type MessageDefinition = readonly [
 
 interface SequenceScenarioDefinition extends Omit<
 	SequenceScenario,
-	"diagramType" | "expectedDiagram" | "logos"
+	"assertions" | "diagramType" | "expectedDiagram" | "logos"
 > {
+	readonly assertions: Omit<SequenceScenarioAssertions, "requiredIconSlugs">;
 	readonly logos?: readonly DiagramScenarioLogo[];
 	readonly messages: readonly MessageDefinition[];
 	readonly participants: readonly ParticipantDefinition[];
 }
 
 function defineSequenceScenario(definition: SequenceScenarioDefinition): SequenceScenario {
-	const { messages, participants, logos, ...scenario } = definition;
+	const { assertions, messages, participants, logos, ...scenario } = definition;
+	const offered = new Set((logos ?? []).map((logo) => logo.slug));
+	for (const [id, , icon] of participants) {
+		if (icon && !offered.has(icon)) {
+			throw new Error(
+				`Scenario "${definition.id}" draws logo "${icon}" on "${id}" that its prompt does not name.`,
+			);
+		}
+	}
 	return {
 		...scenario,
+		assertions: {
+			...assertions,
+			requiredIconSlugs: participants.flatMap(([, , icon]) => (icon ? [icon] : [])),
+		},
 		diagramType: "sequence",
 		logos: [...(logos ?? [])],
 		expectedDiagram: parseSequenceDiagram({
 			id: definition.id,
 			title: definition.title,
 			type: "sequence",
-			participants: participants.map(([id, label]) => ({ id, label })),
+			participants: participants.map(([id, label, icon]) => ({
+				id,
+				label,
+				...(icon ? { icon: { slug: icon } } : {}),
+			})),
 			messages: messages.map(([id, source, target, label, type]) => ({
 				id,
 				source,
@@ -255,6 +274,57 @@ const sequenceScenarioDefinitions = [
 					type: "return",
 				},
 				{ source: ["checkout"], target: ["fulfillment"], label: ["ship", "fulfil"] },
+			],
+		},
+	},
+	{
+		id: "deploy-webhook-logos-sequence",
+		title: "Deploy webhook with logos",
+		difficulty: "standard",
+		tags: ["sequence", "logos", "webhook"],
+		description:
+			"Named technologies should appear as logos on the participants that are those technologies, and nowhere else.",
+		prompt:
+			"Sequence diagram of a deploy webhook. A developer pushes a commit to GitHub. GitHub sends a push webhook to a Cloudflare Worker. The Worker asks Docker to build the image and gets the image digest back, then answers the GitHub webhook with 202 Accepted.",
+		logos: [
+			{ name: "Github", slug: "github" },
+			{ aliases: ["Cloudflare"], name: "Cloudflare", slug: "cloudflare" },
+			{ name: "Docker", slug: "docker" },
+		],
+		participants: [
+			["developer", "Developer"],
+			["github", "GitHub", "github"],
+			["worker", "Cloudflare Worker", "cloudflare"],
+			["docker", "Docker", "docker"],
+		],
+		messages: [
+			["push", "developer", "github", "Push commit"],
+			["webhook", "github", "worker", "Push webhook"],
+			["build", "worker", "docker", "Build image"],
+			["digest", "docker", "worker", "Image digest", "return"],
+			["accepted", "worker", "github", "202 Accepted", "return"],
+		],
+		assertions: {
+			minAnsweredCalls: 2,
+			minMessageCount: 5,
+			minParticipantCount: 4,
+			requiredParticipants: [["developer"], ["github"], ["worker", "cloudflare"], ["docker"]],
+			orderedMessages: [
+				{ source: ["developer"], target: ["github"], label: ["push", "commit"] },
+				{ source: ["github"], target: ["worker", "cloudflare"], label: ["webhook", "push"] },
+				{ source: ["worker", "cloudflare"], target: ["docker"], label: ["build"] },
+				{
+					source: ["docker"],
+					target: ["worker", "cloudflare"],
+					label: ["digest", "image"],
+					type: "return",
+				},
+				{
+					source: ["worker", "cloudflare"],
+					target: ["github"],
+					label: ["202", "accepted"],
+					type: "return",
+				},
 			],
 		},
 	},

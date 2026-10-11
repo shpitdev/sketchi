@@ -90,16 +90,23 @@ function labelNamesLogo(label: string, logo: DiagramScenarioLogo): boolean {
  * Logo checks on the model's own diagram, before generation places, drops, or
  * grounds its logos, so they measure the model rather than the repair:
  * recall for each named technology, precision against the prompt, and
- * whether each logo sits on the step that names it. A logo on a generic or
- * unnamed step ("Sync order", "Run the test suite") fails the last check.
+ * whether each logo sits on the flowchart step or sequence participant that
+ * names it. A logo on a generic or unnamed one ("Sync order", "Run the test
+ * suite", "Developer") fails the last check.
  */
 export function scenarioLogoChecks(
 	expected: ScenarioLogoExpectations,
-	modelDiagram: FlowchartDiagram,
+	modelDiagram: FlowchartDiagram | SequenceDiagram,
 ): ScenarioCheck[] {
 	const offered = new Map(expected.logos.map((logo) => [logo.slug, logo]));
-	const icons = modelDiagram.nodes.flatMap((node) =>
-		node.icon ? [{ label: node.label, slug: node.icon.slug }] : [],
+	// Flowcharts draw logos on nodes; sequence diagrams on participants.
+	const owner = modelDiagram.type === "flowchart" ? "step" : "participant";
+	const elements: readonly {
+		readonly icon?: { readonly slug: string } | undefined;
+		readonly label: string;
+	}[] = modelDiagram.type === "flowchart" ? modelDiagram.nodes : modelDiagram.participants;
+	const icons = elements.flatMap((element) =>
+		element.icon ? [{ label: element.label, slug: element.icon.slug }] : [],
 	);
 	const ungrounded = icons.filter((icon) => !offered.has(icon.slug));
 	const misplaced = icons.filter((icon) => {
@@ -125,8 +132,8 @@ export function scenarioLogoChecks(
 			passed: misplaced.length === 0,
 			message:
 				misplaced.length === 0
-					? "Every logo sits on a step that names its technology."
-					: `Logos on steps that do not name them: ${misplaced
+					? `Every logo sits on a ${owner} that names its technology.`
+					: `Logos on ${owner}s that do not name them: ${misplaced
 							.map((icon) => `"${icon.label}" (${icon.slug})`)
 							.join(", ")}.`,
 		},
@@ -380,7 +387,13 @@ export function evaluateScenarioDiagram(
 		const diagram = parseSequenceDiagram(candidate);
 		const modelDiagram =
 			modelCandidate === candidate ? diagram : parseSequenceDiagram(modelCandidate);
-		return evaluation(scenario.id, diagram, sequenceScenarioChecks(scenario, modelDiagram));
+		return evaluation(scenario.id, diagram, [
+			...sequenceScenarioChecks(scenario, modelDiagram),
+			...scenarioLogoChecks(
+				{ logos: scenario.logos, requiredIconSlugs: scenario.assertions.requiredIconSlugs },
+				modelDiagram,
+			),
+		]);
 	}
 	const diagram = parseFlowchartDiagram(candidate);
 	const modelDiagram =

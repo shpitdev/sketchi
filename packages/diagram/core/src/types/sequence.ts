@@ -1,6 +1,11 @@
 import { Effect, Schema } from "effect";
 
-import { DiagramStyle, DiagramValidationError, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
+import {
+	DiagramIconRef,
+	DiagramStyle,
+	DiagramValidationError,
+	SKETCHI_DIAGRAM_STYLE,
+} from "../intermediate.js";
 
 export const sequenceDiagramType = "sequence" as const;
 
@@ -34,6 +39,8 @@ export class SequenceParticipant extends Schema.Class<SequenceParticipant>("Sequ
 	id: Schema.NonEmptyString,
 	label: Schema.NonEmptyString,
 	kind: Schema.optionalKey(Schema.NonEmptyString),
+	/** The participant's logo, drawn in its header; shared with flowchart nodes. */
+	icon: Schema.optionalKey(DiagramIconRef),
 }) {}
 export const SequenceParticipantSchema = SequenceParticipant;
 
@@ -318,5 +325,25 @@ export const apiRequestSequence = parseSequenceDiagram({
 		{ id: "rows", source: "database", target: "api", label: "Order rows", type: "return" },
 		{ id: "track", source: "api", target: "analytics", label: "Track request" },
 		{ id: "response", source: "api", target: "browser", label: "200 OK", type: "return" },
+	],
+});
+
+/** A deploy webhook whose participants carry catalog logos. */
+export const deployWebhookLogoSequence = parseSequenceDiagram({
+	id: "deploy-webhook-logos",
+	title: "Deploy webhook",
+	type: sequenceDiagramType,
+	participants: [
+		{ id: "developer", label: "Developer" },
+		{ id: "github", label: "GitHub", icon: { slug: "github" } },
+		{ id: "worker", label: "Cloudflare Worker", icon: { slug: "cloudflare" } },
+		{ id: "docker", label: "Docker build", icon: { slug: "docker" } },
+	],
+	messages: [
+		{ id: "push", source: "developer", target: "github", label: "git push" },
+		{ id: "webhook", source: "github", target: "worker", label: "Push webhook" },
+		{ id: "build", source: "worker", target: "docker", label: "Build image" },
+		{ id: "digest", source: "docker", target: "worker", label: "Image digest", type: "return" },
+		{ id: "accepted", source: "worker", target: "github", label: "202 Accepted", type: "return" },
 	],
 });

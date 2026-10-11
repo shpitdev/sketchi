@@ -2,9 +2,11 @@ import "@tanstack/react-start/server-only";
 
 import {
 	MAX_DIAGRAM_BUILD_ATTEMPTS,
+	normalizeIconSlug,
 	type BuildFlowchartOptions,
 	type CodeModeIssue,
 } from "@sketchi/diagram-agent";
+import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagram-generation";
 import { recordMetric } from "@sketchi/observability";
 import { Effect, Metric, Ref, Semaphore } from "effect";
 
@@ -79,6 +81,59 @@ export const turnAlreadyAcceptedIssue: CodeModeIssue = {
 	message: "A diagram was already saved for this request.",
 	hint: "Do not build another diagram this turn. Describe the saved diagram and offer one refinement.",
 };
+
+interface LogoElement {
+	readonly icon?: { readonly slug: string } | undefined;
+	readonly id: string;
+	readonly label: string;
+}
+
+/**
+ * Place the user's named logos on the flowchart nodes or sequence participants
+ * whose labels name them, and drop logos for technologies the user never
+ * named, before the build.
+ */
+export function groundOfferedLogos<Element extends LogoElement>(
+	elements: readonly Element[],
+	logos: readonly OfferedLogo[],
+	owner: { readonly noun: "node" | "participant"; readonly path: "nodes" | "participants" },
+): {
+	readonly changed: boolean;
+	readonly elements: Element[];
+	readonly issues: CodeModeIssue[];
+} {
+	const offered = new Set(logos.map((logo) => logo.slug));
+	const issues: CodeModeIssue[] = elements.flatMap((element) =>
+		element.icon && !offered.has(normalizeIconSlug(element.icon.slug))
+			? [
+					{
+						code: "unknown_icon" as const,
+						severity: "warning" as const,
+						stage: "input" as const,
+						ref: {
+							kind: "node" as const,
+							id: element.id,
+							path: `${owner.path}.icon.slug`,
+						},
+						message: `Icon "${element.icon.slug}" on ${owner.noun} "${element.id}" is not a technology the user named; the ${owner.noun} renders without a logo.`,
+						hint: "Only use logos from the NODE LOGOS list.",
+					},
+				]
+			: [],
+	);
+	const placement = placeNodeLogos(
+		elements.map((element) =>
+			element.icon ? { ...element, icon: { slug: normalizeIconSlug(element.icon.slug) } } : element,
+		),
+		logos,
+		owner.noun,
+	);
+	return {
+		changed: placement.diagnostics.length > 0 || issues.length > 0,
+		elements: placement.nodes,
+		issues,
+	};
+}
 
 /**
  * Per-agent-turn guard around one canonical Code Mode build. Studio owns only

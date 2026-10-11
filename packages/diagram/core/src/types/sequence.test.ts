@@ -9,6 +9,7 @@ import {
 	SEQUENCE_MAX_PARTICIPANTS,
 	SequenceValidationError,
 	apiRequestSequence,
+	deployWebhookLogoSequence,
 	getSequenceValidationIssues,
 	parseSequenceDiagram,
 	sequenceActivations,
@@ -319,5 +320,19 @@ describe("Sequence diagram type", () => {
 		expect(
 			issueCodes({ ...sequenceFixture, participants: participants.slice(0, -1), messages: [] }),
 		).toEqual([]);
+	});
+
+	it("accepts participant logos through the shared icon contract and rejects malformed slugs", () => {
+		expect(
+			deployWebhookLogoSequence.participants.map((participant) => participant.icon?.slug),
+		).toEqual([undefined, "github", "cloudflare", "docker"]);
+		expect(parseCanonicalDiagram(deployWebhookLogoSequence)).toEqual(deployWebhookLogoSequence);
+		expect(() =>
+			parseSequenceDiagram({
+				...deployWebhookLogoSequence,
+				participants: [{ id: "api", label: "API", icon: { slug: "Not A Slug" } }],
+				messages: [],
+			}),
+		).toThrow(/participants/u);
 	});
 });

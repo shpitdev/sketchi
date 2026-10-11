@@ -146,6 +146,55 @@ describe("sequence eval matching", () => {
 	});
 });
 
+describe("sequence participant logo evals", () => {
+	const scenario = getSequenceScenario("deploy-webhook-logos-sequence");
+	const withIcons = (icons: Record<string, string | undefined>): SequenceDiagram => ({
+		...scenario.expectedDiagram,
+		participants: scenario.expectedDiagram.participants.map(({ icon: _icon, ...participant }) =>
+			icons[participant.id]
+				? { ...participant, icon: { slug: icons[participant.id] ?? "" } }
+				: participant,
+		),
+	});
+
+	it("requires each named technology's logo on the participant that is that technology", () => {
+		expect(scenario.assertions.requiredIconSlugs).toEqual(["github", "cloudflare", "docker"]);
+		expect(
+			evaluateScenarioFixture(scenario).checks.filter((check) => check.id.startsWith("icon")),
+		).toEqual([
+			expect.objectContaining({ id: "icon:github", passed: true }),
+			expect.objectContaining({ id: "icon:cloudflare", passed: true }),
+			expect.objectContaining({ id: "icon:docker", passed: true }),
+			expect.objectContaining({ id: "icons-grounded", passed: true }),
+			expect.objectContaining({ id: "icons-on-named-steps", passed: true }),
+		]);
+	});
+
+	it("fails recall, grounding, and placement on the model's own participants", () => {
+		expect(
+			failedChecks(scenario.id, withIcons({ github: "github", worker: "cloudflare" })),
+		).toEqual(["icon:docker"]);
+		expect(
+			failedChecks(
+				scenario.id,
+				withIcons({
+					developer: "github",
+					github: "github",
+					worker: "cloudflare",
+					docker: "kubernetes",
+				}),
+			),
+		).toEqual(["icon:docker", "icons-grounded", "icons-on-named-steps"]);
+		const placement = evaluateScenarioDiagram(
+			scenario,
+			withIcons({ developer: "github", github: "github", worker: "cloudflare", docker: "docker" }),
+		).checks.find((check) => check.id === "icons-on-named-steps");
+		expect(placement?.message).toBe(
+			'Logos on participants that do not name them: "Developer" (github).',
+		);
+	});
+});
+
 layer(FixtureGenerationClientLayer)("fixture generation for sequence scenarios", (it) => {
 	it.effect("returns the maintained sequence through candidate enforcement", () =>
 		Effect.gen(function* () {

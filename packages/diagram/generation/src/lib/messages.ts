@@ -225,23 +225,33 @@ function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
 	});
 }
 
-/** Flowcharts are the only family that draws node logos today. */
+/** Families that draw catalog logos, and which element carries them. */
+const LOGO_TARGETS = {
+	flowchart: { element: "flowchart node", owner: "node" },
+	sequence: { element: "sequence participant", owner: "participant" },
+} as const;
+
 function logoSection(prompt: DiagramGenerationPrompt): string[] {
 	const logos = prompt.logos ?? [];
-	if (
-		logos.length === 0 ||
-		(prompt.requestedType !== undefined && prompt.requestedType !== "flowchart")
-	) {
+	const targets =
+		prompt.requestedType === undefined
+			? Object.values(LOGO_TARGETS)
+			: prompt.requestedType === "flowchart" || prompt.requestedType === "sequence"
+				? [LOGO_TARGETS[prompt.requestedType]]
+				: [];
+	if (logos.length === 0 || targets.length === 0) {
 		return [];
 	}
+	const element = targets.map((target) => target.element).join(" or ");
+	const owner = targets.map((target) => target.owner).join(" or ");
 	return [
 		"",
-		"Available logos (flowchart only):",
+		"Available logos:",
 		...logos.map(
 			(logo) =>
 				`- ${logo.slug}: ${logo.name}${logo.aliases?.length ? ` (also ${logo.aliases.join(", ")})` : ""}`,
 		),
-		'A flowchart node about one of these technologies may set "icon": { "slug": "<slug>" } using a slug from this list exactly. Put each logo on the node whose label names that technology. Omit icon on every other node. Never invent a slug.',
+		`A ${element} about one of these technologies may set "icon": { "slug": "<slug>" } using a slug from this list exactly. Put each logo on the ${owner} whose label names that technology. Omit icon on every other ${owner}. Never invent a slug.`,
 	];
 }
 

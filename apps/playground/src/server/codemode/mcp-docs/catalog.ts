@@ -446,6 +446,7 @@ export const catalog: CatalogEntry[] = [
 			'A message with type "return" from the callee back to its caller answers the latest open call between them; Sketchi draws the callee\'s activation bar from that call to its return, nesting re-entrant calls. Calls nobody answers draw no bar.',
 			"Every message source and target must reference a declared participant id. Self-referential messages are rejected with structured issues and repair hints.",
 			"A sequence diagram may have at most 12 participants and 40 messages; larger ones are rejected with sequence_too_large.",
+			"A participant may set icon: { slug } with an exact slug from sketchi.searchIcons; its logo is drawn in the participant header and exported as an Excalidraw image. Unknown slugs are dropped with an unknown_icon warning, never a failed build.",
 			'Request envelope: { spec: SequenceDiagramSpec, options?: { artifactFormats?: ["scene", "excalidraw", "png"], inlineArtifacts?: ["scene", "excalidraw"], minQualityScore?: number } }.',
 			"Request scene, Excalidraw, and PNG for full artifact delivery; inline Excalidraw when the harness needs importable JSON in the response.",
 		].join("\n"),

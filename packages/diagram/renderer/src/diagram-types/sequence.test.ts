@@ -3,6 +3,8 @@ import {
 	type SequenceDiagram,
 	SequenceValidationError,
 	apiRequestSequence,
+	deployWebhookLogoSequence,
+	embedCanvasIcons,
 	getCanvasValidationIssues,
 	parseSequenceDiagram,
 	sequenceFixture,
@@ -296,5 +298,40 @@ describe("sequence diagram renderer", () => {
 			false,
 		);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
+	});
+
+	it("draws participant logos above their labels and grows the shared header row", () => {
+		const plain = renderSequenceDiagram({
+			...deployWebhookLogoSequence,
+			participants: deployWebhookLogoSequence.participants.map(({ icon: _icon, ...rest }) => rest),
+		});
+		const scene = renderSequenceDiagram(deployWebhookLogoSequence);
+		const header = (id: string) =>
+			scene.elements.find(
+				(element): element is NodeSceneElement => element.type === "node" && element.nodeId === id,
+			);
+		expect(header("github")?.icon).toEqual({ slug: "github", size: 28 });
+		expect(header("developer")?.icon).toBeUndefined();
+		// Every header shares one height, tall enough for the logo band.
+		expect(header("developer")?.height).toBe(header("github")?.height);
+		// A one-line label box (19px text + 18px padding) plus the 36px logo band.
+		expect(header("github")?.height).toBeGreaterThanOrEqual(19 + 18 + 36);
+		expect(header("github")?.height).toBeGreaterThan(
+			plain.elements.find(
+				(element): element is NodeSceneElement =>
+					element.type === "node" && element.nodeId === "github",
+			)?.height ?? Infinity,
+		);
+		expect(scene.elements.find((element) => element.id === "label:github")).toMatchObject({
+			verticalAlign: "bottom",
+		});
+		expect(scene.elements.find((element) => element.id === "label:developer")).not.toHaveProperty(
+			"verticalAlign",
+		);
+		const svg =
+			'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h1"/></svg>';
+		const embedded = embedCanvasIcons(scene, (slug) => ({ name: slug, svg }));
+		expect(embedded.dropped).toEqual([]);
+		expect(getCanvasValidationIssues(embedded.scene)).toEqual([]);
 	});
 });

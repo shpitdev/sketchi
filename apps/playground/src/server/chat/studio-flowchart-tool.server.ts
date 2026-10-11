@@ -4,16 +4,19 @@ import {
 	BuildFlowchartRequestSchema,
 	BuildFlowchartResultSchema,
 	DIAGRAM_AGENT_SYSTEM_PROMPT,
-	normalizeIconSlug,
 	type BuildFlowchartResult,
 	type BuildFlowchartToolInput,
 	type CodeModeIssue,
 } from "@sketchi/diagram-agent";
-import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagram-generation";
+import type { OfferedLogo } from "@sketchi/diagram-generation";
 import type { Effect } from "effect";
 
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
-import { makeStudioBuildToolExecutor, type StudioBuildTurn } from "./studio-build-tool.server";
+import {
+	groundOfferedLogos,
+	makeStudioBuildToolExecutor,
+	type StudioBuildTurn,
+} from "./studio-build-tool.server";
 
 export const STUDIO_BUILD_FLOWCHART_TOOL_NAME = "build_flowchart" as const;
 
@@ -44,14 +47,10 @@ export function studioSystemPrompt(
 		`- Logos for technologies the user named: ${logos
 			.map((logo) => `${logo.slug} (${logo.name})`)
 			.join(", ")}.`,
-		'- When a node is about one of these technologies, set its icon to { "slug": "<slug>" } with a slug from this list exactly. Leave icon off every other node. Never invent a slug.',
+		'- When a flowchart node or sequence participant is about one of these technologies, set its icon to { "slug": "<slug>" } with a slug from this list exactly. Leave icon off every other node and participant. Never invent a slug.',
 	].join("\n");
 }
 
-/**
- * Place the user's named logos on the nodes whose labels name them and drop
- * logos for technologies the user never named, before the build.
- */
 function groundSpecIcons(
 	input: StudioBuildFlowchartInput,
 	logos: readonly OfferedLogo[],
@@ -59,37 +58,13 @@ function groundSpecIcons(
 	readonly input: StudioBuildFlowchartInput;
 	readonly issues: CodeModeIssue[];
 } {
-	const offered = new Set(logos.map((logo) => logo.slug));
-	const issues: CodeModeIssue[] = input.spec.nodes.flatMap((node) =>
-		node.icon && !offered.has(normalizeIconSlug(node.icon.slug))
-			? [
-					{
-						code: "unknown_icon" as const,
-						severity: "warning" as const,
-						stage: "input" as const,
-						ref: {
-							kind: "node" as const,
-							id: node.id,
-							path: "nodes.icon.slug",
-						},
-						message: `Icon "${node.icon.slug}" on node "${node.id}" is not a technology the user named; the node renders without a logo.`,
-						hint: "Only use logos from the NODE LOGOS list.",
-					},
-				]
-			: [],
-	);
-	const placement = placeNodeLogos(
-		input.spec.nodes.map((node) =>
-			node.icon ? { ...node, icon: { slug: normalizeIconSlug(node.icon.slug) } } : node,
-		),
-		logos,
-	);
-	return placement.diagnostics.length > 0 || issues.length > 0
+	const grounded = groundOfferedLogos(input.spec.nodes, logos, { noun: "node", path: "nodes" });
+	return grounded.changed
 		? {
-				input: { ...input, spec: { ...input.spec, nodes: placement.nodes } },
-				issues,
+				input: { ...input, spec: { ...input.spec, nodes: grounded.elements } },
+				issues: grounded.issues,
 			}
-		: { input, issues };
+		: { input, issues: grounded.issues };
 }
 
 /** Studio's build_flowchart tool over the shared buildFlowchart vertical. */

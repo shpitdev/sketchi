@@ -6,10 +6,15 @@ import {
 	type BuildSequenceDiagramResult,
 	type BuildSequenceDiagramToolInput,
 } from "@sketchi/diagram-agent";
+import type { OfferedLogo } from "@sketchi/diagram-generation";
 import type { Effect } from "effect";
 
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
-import { makeStudioBuildToolExecutor, type StudioBuildTurn } from "./studio-build-tool.server";
+import {
+	groundOfferedLogos,
+	makeStudioBuildToolExecutor,
+	type StudioBuildTurn,
+} from "./studio-build-tool.server";
 
 export const STUDIO_BUILD_SEQUENCE_TOOL_NAME = "build_sequence_diagram" as const;
 
@@ -28,11 +33,24 @@ export type StudioBuildSequenceInput = BuildSequenceDiagramToolInput;
 /** Studio's build_sequence_diagram tool over the shared buildSequenceDiagram vertical. */
 export function makeStudioSequenceToolExecutor<E, R>(
 	buildSequenceDiagram: (input: unknown) => Effect.Effect<BuildSequenceDiagramResult, E, R>,
-	options: { readonly turn?: StudioBuildTurn } = {},
+	options: { readonly logos?: readonly OfferedLogo[]; readonly turn?: StudioBuildTurn } = {},
 ) {
+	const logos = options.logos ?? [];
 	return makeStudioBuildToolExecutor<StudioBuildSequenceInput, BuildSequenceDiagramResult, E, R>({
 		build: buildSequenceDiagram,
 		rejected: (issue) => ({ ok: false, status: "quality_failed", issues: [issue] }),
+		ground: (input) => {
+			const grounded = groundOfferedLogos(input.spec.participants, logos, {
+				noun: "participant",
+				path: "participants",
+			});
+			return grounded.changed
+				? {
+						input: { ...input, spec: { ...input.spec, participants: grounded.elements } },
+						issues: grounded.issues,
+					}
+				: { input, issues: grounded.issues };
+		},
 		operation: "buildSequenceDiagram",
 		...(options.turn ? { turn: options.turn } : {}),
 	});

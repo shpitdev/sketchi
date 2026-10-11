@@ -614,6 +614,7 @@ export class SequenceParticipantSpec extends Schema.Class<SequenceParticipantSpe
 		id: RequiredNonEmptyString,
 		label: RequiredNonEmptyString,
 		kind: optionalContract(NonEmptyString),
+		icon: optionalContract(NodeIconSpec),
 	},
 	{ identifier: undefined },
 ) {}

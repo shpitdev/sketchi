@@ -9,6 +9,7 @@ import { CodeModeIconLoadError, makeCodeModeIconCatalog, type CodeModeIconCatalo
 import {
 	applyDiagramPatch,
 	buildFlowchart,
+	buildSequenceDiagram,
 	CodeModeRuntimeEnvironment,
 	createCanvas,
 	makeCodeModeRuntimeEnvironmentLayer,
@@ -82,6 +83,7 @@ function runtime(icons: CodeModeIconCatalog | null = fixtureCatalog()) {
 	return {
 		applyDiagramPatch: (input: unknown) => provide(applyDiagramPatch(input)),
 		buildFlowchart: (input: unknown) => provide(buildFlowchart(input)),
+		buildSequenceDiagram: (input: unknown) => provide(buildSequenceDiagram(input)),
 		createCanvas: (input: unknown) => provide(createCanvas(input)),
 		searchIcons: (input: unknown) => provide(searchIcons(input)),
 	};
@@ -429,5 +431,61 @@ describe("searchIcons", () => {
 		expect(result.issues).toEqual([
 			expect.objectContaining({ code: "unknown_icon", severity: "warning" }),
 		]);
+	});
+});
+
+describe("sequence participant logos", () => {
+	const spec = {
+		title: "Deploy webhook",
+		participants: [
+			{ id: "developer", label: "Developer" },
+			{ id: "github", label: "GitHub", icon: { slug: " GitHub " } },
+			{ id: "docker", label: "Docker build", icon: { slug: "docker" } },
+			{ id: "queue", label: "Queue", icon: { slug: "not-a-logo" } },
+		],
+		messages: [
+			{ source: "developer", target: "github", label: "git push" },
+			{ source: "github", target: "docker", label: "Build image" },
+			{ source: "docker", target: "github", label: "Digest", type: "return" },
+			{ source: "github", target: "queue", label: "Enqueue deploy" },
+		],
+	};
+
+	it("embeds catalog logos in participant headers and exports them as images", async () => {
+		const result = await runtime().buildSequenceDiagram({
+			spec,
+			options: {
+				artifactFormats: ["scene", "excalidraw"],
+				inlineArtifacts: ["scene", "excalidraw"],
+			},
+		});
+		if (!result.ok) throw new Error(JSON.stringify(result.issues));
+
+		expect(result.normalizedSpec.participants.map((participant) => participant.icon?.slug)).toEqual(
+			[undefined, "github", "docker", undefined],
+		);
+		expect(result.issues).toEqual([
+			expect.objectContaining({
+				code: "unknown_icon",
+				severity: "warning",
+				ref: { kind: "node", id: "queue", path: "participants.icon.slug" },
+				message: expect.stringContaining('participant "queue"'),
+			}),
+		]);
+		const scene = Schema.decodeUnknownSync(RenderedDiagramSceneSchema)(
+			result.artifact.formats.find((format) => format.format === "scene")?.inline,
+		);
+		expect(Object.keys(scene.icons ?? {}).sort()).toEqual(["docker", "github"]);
+		const headers = scene.elements.filter(
+			(element) => element.type === "node" && element.icon !== undefined,
+		);
+		expect(headers.map((element) => element.type === "node" && element.nodeId)).toEqual([
+			"github",
+			"docker",
+		]);
+		const excalidraw = result.artifact.formats.find((format) => format.format === "excalidraw")
+			?.inline as { elements: { type: string }[]; files?: Record<string, unknown> };
+		expect(excalidraw.elements.filter((element) => element.type === "image")).toHaveLength(2);
+		expect(Object.keys(excalidraw.files ?? {})).toHaveLength(2);
 	});
 });

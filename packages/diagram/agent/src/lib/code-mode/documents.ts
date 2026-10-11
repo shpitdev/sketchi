@@ -138,6 +138,7 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 						id: participant.id,
 						label: participant.label,
 						...(participant.kind ? { kind: participant.kind } : {}),
+						...(participant.icon ? { icon: { slug: participant.icon.slug } } : {}),
 					})),
 					messages: diagram.messages.map((message) => ({
 						id: message.id,

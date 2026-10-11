@@ -1,10 +1,15 @@
 import {
 	deployPipelineLogoFlowchart,
+	deployWebhookLogoSequence,
 	embedCanvasIcons,
 	type CanvasIconAsset,
 	type LayoutDirection,
 } from "@sketchi/diagram-core";
-import { renderIntermediateDiagram, type RenderedDiagramScene } from "@sketchi/diagram-renderer";
+import {
+	renderIntermediateDiagram,
+	renderSequenceDiagram,
+	type RenderedDiagramScene,
+} from "@sketchi/diagram-renderer";
 import { normalizeNodeLogoSvg } from "@sketchi/icon-catalog";
 import cloudflare from "@sketchi/icon-catalog/svg/cloud-vendors/cloudflare.svg?raw";
 import docker from "@sketchi/icon-catalog/svg/devtools-ci/docker.svg?raw";
@@ -18,6 +23,10 @@ const NODE_LOGOS: Readonly<Record<string, CanvasIconAsset>> = {
 	vitest: { name: "Vitest", svg: normalizeNodeLogoSvg(vitest) },
 };
 
+function nodeLogo(slug: string): CanvasIconAsset | undefined {
+	return Object.hasOwn(NODE_LOGOS, slug) ? NODE_LOGOS[slug] : undefined;
+}
+
 /** The deploy-pipeline fixture with real catalog marks embedded. */
 export function nodeLogoScene(direction: LayoutDirection = "TB"): RenderedDiagramScene {
 	return embedCanvasIcons(
@@ -25,6 +34,11 @@ export function nodeLogoScene(direction: LayoutDirection = "TB"): RenderedDiagra
 			...deployPipelineLogoFlowchart,
 			layout: { ...deployPipelineLogoFlowchart.layout, direction },
 		}),
-		(slug) => (Object.hasOwn(NODE_LOGOS, slug) ? NODE_LOGOS[slug] : undefined),
+		nodeLogo,
 	).scene;
+}
+
+/** The deploy-webhook sequence with real catalog marks in its participant headers. */
+export function participantLogoScene(): RenderedDiagramScene {
+	return embedCanvasIcons(renderSequenceDiagram(deployWebhookLogoSequence), nodeLogo).scene;
 }

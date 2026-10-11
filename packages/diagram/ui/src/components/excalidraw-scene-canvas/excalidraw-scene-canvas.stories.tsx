@@ -6,7 +6,7 @@ import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 
 import { ExcalidrawSceneCanvas } from "./excalidraw-scene-canvas";
-import { nodeLogoScene } from "./node-logo-scene.fixtures";
+import { nodeLogoScene, participantLogoScene } from "./node-logo-scene.fixtures";
 
 const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
 
@@ -84,6 +84,17 @@ export const EditableNodeLogosLeftToRight: Story = {
 		title: "Editable left-to-right deploy pipeline with node logos",
 		viewModeEnabled: false,
 		zenModeEnabled: false,
+	},
+	tags: ["test"],
+};
+
+/** GitHub, Cloudflare, and Docker marks in sequence participant headers. */
+export const SequenceParticipantLogos: Story = {
+	args: {
+		scene: convertSceneToExcalidraw(participantLogoScene()),
+		title: "Deploy webhook sequence with participant logos",
+		viewModeEnabled: true,
+		zenModeEnabled: true,
 	},
 	tags: ["test"],
 };

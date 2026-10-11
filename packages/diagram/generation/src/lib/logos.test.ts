@@ -77,11 +77,22 @@ function candidate(icons: Record<string, unknown>) {
 }
 
 describe("generation logo guidance", () => {
-	it("lists only the scenario's logos for flowcharts", () => {
+	it("lists only the prompt's logos for flowcharts and sequence diagrams", () => {
 		const { user } = buildDiagramGenerationMessages(request().prompt);
-		expect(user).toContain("Available logos (flowchart only):");
+		expect(user).toContain("Available logos:");
 		expect(user).toContain("- github: GitHub\n- docker: Docker");
+		expect(user).toContain("A flowchart node or sequence participant about one of these");
 		expect(user).toContain("Never invent a slug.");
+
+		const flowchart = buildDiagramGenerationMessages(
+			request({ requestedType: "flowchart" }).prompt,
+		);
+		expect(flowchart.user).toContain("A flowchart node about one of these");
+		expect(flowchart.user).not.toContain("participant");
+
+		const sequence = buildDiagramGenerationMessages(request({ requestedType: "sequence" }).prompt);
+		expect(sequence.user).toContain("A sequence participant about one of these");
+		expect(sequence.user).toContain("Put each logo on the participant whose label names");
 	});
 
 	it("adds nothing when no logos apply or another family is required", () => {
@@ -134,5 +145,73 @@ describe("generated node icons", () => {
 			request({ logos: [] }),
 		);
 		expect(nodeIcons(enforced).every((icon) => !icon)).toBe(true);
+	});
+});
+
+function sequenceCandidate(icons: Record<string, unknown>) {
+	const participant = (id: string, label: string) => ({
+		id,
+		label,
+		...(icons[id] === undefined ? {} : { icon: icons[id] }),
+	});
+	return candidateFromText({
+		model: "gemini-test",
+		provider: "fixture",
+		text: JSON.stringify({
+			title: "Deploy",
+			intent: { requestedKind: "sequence", nativeKind: "sequence", requirements: [] },
+			diagram: {
+				id: "deploy",
+				type: "sequence",
+				participants: [
+					participant("dev", "Developer"),
+					participant("repo", "GitHub repository"),
+					participant("builder", "Docker builder"),
+				],
+				messages: [
+					{ id: "push", source: "dev", target: "repo", label: "git push" },
+					{ id: "build", source: "repo", target: "builder", label: "Build image" },
+				],
+			},
+		}),
+	});
+}
+
+function participantIcons(result: { readonly diagram?: unknown }) {
+	const diagram = result.diagram as
+		| {
+				readonly type: string;
+				readonly participants: ReadonlyArray<{ readonly icon?: unknown }>;
+		  }
+		| undefined;
+	if (diagram?.type !== "sequence") throw new Error("Expected a sequence diagram.");
+	return diagram.participants.map((participant) => participant.icon);
+}
+
+describe("generated sequence participant logos", () => {
+	it("normalizes participant slugs and drops malformed ones without failing", () => {
+		const result = sequenceCandidate({ repo: { slug: " GitHub " }, builder: "docker" });
+		expect(result.error).toBeUndefined();
+		expect(participantIcons(result)).toEqual([undefined, { slug: "github" }, undefined]);
+		expect(result.diagnostics).toEqual([
+			expect.stringContaining('icon_dropped: participant "builder"'),
+		]);
+	});
+
+	it("places offered logos on the participants that name them and drops the rest", () => {
+		const enforced = enforceCandidateRequestRequirements(
+			sequenceCandidate({ dev: { slug: "docker" }, repo: { slug: "kubernetes" } }),
+			request({ requestedType: "sequence" }),
+		);
+		expect(enforced.error).toBeUndefined();
+		expect(participantIcons(enforced)).toEqual([undefined, { slug: "github" }, { slug: "docker" }]);
+		expect(enforced.diagnostics).toEqual(
+			expect.arrayContaining([
+				expect.stringContaining(
+					'icon_dropped: participant "dev" logo "docker" belongs to the participant whose label names it.',
+				),
+				expect.stringContaining('icon_placed: participant "repo" names github'),
+			]),
+		);
 	});
 });

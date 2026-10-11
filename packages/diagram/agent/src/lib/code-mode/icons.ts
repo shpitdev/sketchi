@@ -139,6 +139,8 @@ export function resolveNodeIcons<
 >(
 	nodes: readonly Node[],
 	catalog: CodeModeIconCatalog | undefined,
+	/** Sequence diagrams draw logos on participants rather than nodes. */
+	owner: { readonly noun: string; readonly path: string } = { noun: "node", path: "nodes" },
 ): { readonly issues: CodeModeIssue[]; readonly nodes: Node[] } {
 	const issues: CodeModeIssue[] = [];
 	const resolved = nodes.map((node) => {
@@ -150,8 +152,8 @@ export function resolveNodeIcons<
 		issues.push(
 			unknownIconIssue({
 				catalog,
-				message: `Icon "${node.icon.slug}" on node "${node.id}" is not a Sketchi node logo; the node renders without a logo.`,
-				ref: { kind: "node", id: node.id, path: "nodes.icon.slug" },
+				message: `Icon "${node.icon.slug}" on ${owner.noun} "${node.id}" is not a Sketchi node logo; the ${owner.noun} renders without a logo.`,
+				ref: { kind: "node", id: node.id, path: `${owner.path}.icon.slug` },
 				slug,
 			}),
 		);
@@ -189,8 +191,8 @@ function droppedIconIssue(input: {
 			hint: "Use fewer distinct logos in one diagram.",
 		},
 		lifeline: {
-			message: `Sequence lifeline "${dropped.elementId}" cannot carry a logo; the logo was dropped.`,
-			hint: "Put logos on nodes, not on sequence lifelines.",
+			message: `Sequence lifeline or activation "${dropped.elementId}" cannot carry a logo; the logo was dropped.`,
+			hint: "Put logos on nodes or sequence participants, not on lifelines.",
 		},
 		no_room: {
 			message: `${subject} does not fit above its label; the node renders without a logo.`,

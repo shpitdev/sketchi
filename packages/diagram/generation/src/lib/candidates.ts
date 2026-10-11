@@ -138,7 +138,11 @@ function withSketchiDiagramStyle(input: unknown): unknown {
  * Lowercase model-authored icon slugs and drop any that are not catalog-shaped,
  * so a stray icon never fails the whole candidate.
  */
-function sanitizeGeneratedNodeIcons(nodes: unknown, diagnostics: string[]): unknown {
+function sanitizeGeneratedNodeIcons(
+	nodes: unknown,
+	diagnostics: string[],
+	noun: "node" | "participant" = "node",
+): unknown {
 	if (!Array.isArray(nodes)) return nodes;
 	return nodes.map((node) => {
 		if (!isUnknownRecord(node) || node["icon"] === undefined) return node;
@@ -147,7 +151,7 @@ function sanitizeGeneratedNodeIcons(nodes: unknown, diagnostics: string[]): unkn
 		const slug = typeof raw === "string" ? raw.trim().toLowerCase() : "";
 		if (isDiagramIconSlug(slug)) return { ...withoutIcon, icon: { slug } };
 		diagnostics.push(
-			`icon_dropped: node "${String(node["id"])}" icon ${JSON.stringify(raw ?? icon)} is not a catalog slug; the node renders without a logo.`,
+			`icon_dropped: ${noun} "${String(node["id"])}" icon ${JSON.stringify(raw ?? icon)} is not a catalog slug; the ${noun} renders without a logo.`,
 		);
 		return withoutIcon;
 	});
@@ -173,6 +177,15 @@ function normalizeGeneratedFlowchartInput(input: unknown, diagnostics: string[])
 				? Object.fromEntries(Object.entries(edge).filter(([key]) => key !== "label"))
 				: edge,
 		),
+	};
+}
+
+function normalizeGeneratedSequenceInput(input: unknown, diagnostics: string[]): unknown {
+	const styled = withSketchiDiagramStyle(input);
+	if (!isUnknownRecord(styled)) return styled;
+	return {
+		...styled,
+		participants: sanitizeGeneratedNodeIcons(styled["participants"], diagnostics, "participant"),
 	};
 }
 
@@ -348,13 +361,15 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 						validateMindmapDiagram,
 						intent,
 					),
-		sequence: () =>
-			decodeAndValidate(
+		sequence: () => {
+			const result = decodeAndValidate(
 				SequenceDiagramSchema,
-				withSketchiDiagramStyle(titledDiagram),
+				normalizeGeneratedSequenceInput(titledDiagram, repairs),
 				validateSequenceDiagram,
 				intent,
-			),
+			);
+			return result.success && repairs.length > 0 ? { ...result, diagnostics: repairs } : result;
+		},
 	};
 	return parsers[intent.nativeKind]();
 }
@@ -578,37 +593,54 @@ function requirementsAreEqual(
 	});
 }
 
-/** Deterministically enforce the original model-authored plan against the artifact. */
 /**
- * Place logos the prompt offered on the nodes that name them and drop the rest,
- * so a generated diagram never brands a node with a technology the user did
- * not name, nor shifts a logo onto the wrong step.
+ * Place logos the prompt offered on the flowchart nodes or sequence
+ * participants that name them and drop the rest, so a generated diagram never
+ * brands an element with a technology the user did not name, nor shifts a
+ * logo onto the wrong one.
  */
-function groundFlowchartIcons(
-	diagram: FlowchartDiagram,
+function groundDiagramIcons(
+	diagram: CanonicalDiagram,
 	request: DiagramGenerationRequest,
-): { readonly diagnostics: string[]; readonly diagram: FlowchartDiagram } {
-	const encoded = Schema.encodeSync(FlowchartDiagramSchema)(diagram);
-	const placement = placeNodeLogos(encoded.nodes, request.prompt.logos ?? []);
-	return placement.diagnostics.length === 0
-		? { diagnostics: [], diagram }
-		: {
-				diagnostics: placement.diagnostics,
-				diagram: Schema.decodeUnknownSync(FlowchartDiagramSchema)({
-					...encoded,
-					nodes: placement.nodes,
-				}),
-			};
+): { readonly diagnostics: string[]; readonly diagram: CanonicalDiagram } {
+	const logos = request.prompt.logos ?? [];
+	if (diagram.type === "flowchart") {
+		const encoded = Schema.encodeSync(FlowchartDiagramSchema)(diagram);
+		const placement = placeNodeLogos(encoded.nodes, logos);
+		return placement.diagnostics.length === 0
+			? { diagnostics: [], diagram }
+			: {
+					diagnostics: placement.diagnostics,
+					diagram: Schema.decodeUnknownSync(FlowchartDiagramSchema)({
+						...encoded,
+						nodes: placement.nodes,
+					}),
+				};
+	}
+	if (diagram.type === "sequence") {
+		const encoded = Schema.encodeSync(SequenceDiagramSchema)(diagram);
+		const placement = placeNodeLogos(encoded.participants, logos, "participant");
+		return placement.diagnostics.length === 0
+			? { diagnostics: [], diagram }
+			: {
+					diagnostics: placement.diagnostics,
+					diagram: Schema.decodeUnknownSync(SequenceDiagramSchema)({
+						...encoded,
+						participants: placement.nodes,
+					}),
+				};
+	}
+	return { diagnostics: [], diagram };
 }
 
+/** Deterministically enforce the original model-authored plan against the artifact. */
 export function enforceCandidateRequestRequirements(
 	input: DiagramGenerationCandidate,
 	request: DiagramGenerationRequest,
 	originalRequirements?: readonly DiagramRequirement[],
 ): DiagramGenerationCandidate {
 	if (!input.intent || input.error) return input;
-	const grounding =
-		input.diagram?.type === "flowchart" ? groundFlowchartIcons(input.diagram, request) : undefined;
+	const grounding = input.diagram ? groundDiagramIcons(input.diagram, request) : undefined;
 	const candidate =
 		grounding && grounding.diagnostics.length > 0
 			? {

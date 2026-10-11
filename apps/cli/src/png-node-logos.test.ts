@@ -113,6 +113,42 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG node logos
 		}),
 	);
 
+	it.effect("rasterizes sequence participant logos into the PNG", () =>
+		Effect.gen(function* () {
+			const builder = yield* DiagramBuilder;
+			const renderer = yield* CliPngRenderer;
+			const built = yield* builder.build(
+				canonicalDocument({
+					type: "sequence",
+					spec: {
+						id: "deploy-webhook",
+						title: "Deploy webhook",
+						participants: [
+							{ id: "developer", label: "Developer" },
+							{ id: "worker", label: "Cloudflare Worker", icon: { slug: "cloudflare" } },
+							{ id: "docker", label: "Docker", icon: { slug: "docker" } },
+						],
+						messages: [
+							{ source: "developer", target: "worker", label: "Deploy" },
+							{ source: "worker", target: "docker", label: "Build image" },
+							{ source: "docker", target: "worker", label: "Digest", type: "return" },
+						],
+					},
+				}),
+			);
+			assert.lengthOf(
+				built.excalidraw.elements.filter((element) => element["type"] === "image"),
+				2,
+			);
+
+			const counts = brandPixelCounts(
+				yield* renderer.renderPng({ scene: built.scene, excalidraw: built.excalidraw }),
+			);
+			assert.isAbove(counts.docker, 400, "Docker participant logo painted");
+			assert.isAbove(counts.cloudflare, 180, "Cloudflare participant logo painted");
+		}),
+	);
+
 	it.effect("renders drawings whose image ids contain selector syntax", () =>
 		Effect.gen(function* () {
 			const builder = yield* DiagramBuilder;

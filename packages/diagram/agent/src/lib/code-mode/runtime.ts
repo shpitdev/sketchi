@@ -429,6 +429,7 @@ function normalizeSequenceDiagramSpec(
 			id: cleanToolString(participant.id),
 			label: cleanToolString(participant.label),
 			...(participant.kind ? { kind: cleanToolString(participant.kind) } : {}),
+			...(participant.icon ? { icon: { slug: participant.icon.slug } } : {}),
 		})),
 		messages: spec.messages.map((message, index) => ({
 			id:
@@ -2201,7 +2202,12 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 
 	const request = parsed.success;
 	const buildId = yield* Effect.sync(() => environment.createId("build"));
-	const normalizedSpec = normalizeSequenceDiagramSpec(request.spec);
+	const authoredSpec = normalizeSequenceDiagramSpec(request.spec);
+	const resolvedIcons = resolveNodeIcons(authoredSpec.participants, environment.icons, {
+		noun: "participant",
+		path: "participants",
+	});
+	const normalizedSpec = { ...authoredSpec, participants: resolvedIcons.nodes };
 	const baseContext = {
 		buildId,
 		...responseRequestId(request.requestId),
@@ -2227,7 +2233,7 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 		});
 	}
 
-	const scene = yield* Effect.try({
+	const renderedScene = yield* Effect.try({
 		try: () => renderSequenceDiagram(toSequenceDiagram(normalizedSpec)),
 		catch: (cause) =>
 			new BuildSequenceDiagramFailure({
@@ -2247,6 +2253,8 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 				},
 			}),
 	}).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.render"));
+	const embedded = yield* embedSceneIcons(renderedScene, environment.icons);
+	const scene = embedded.scene;
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildSequenceDiagramFailure({
@@ -2288,7 +2296,7 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 		normalizedSpec,
 		quality,
 		artifact,
-		issues: [],
+		issues: [...resolvedIcons.issues, ...embedded.issues],
 	} satisfies Extract<BuildSequenceDiagramResult, { ok: true }>;
 });
 

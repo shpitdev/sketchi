@@ -139,6 +139,7 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 		turn,
 	});
 	const sequenceExecutor = yield* makeStudioSequenceToolExecutor(codeMode.buildSequenceDiagram, {
+		logos,
 		turn,
 	});
 
