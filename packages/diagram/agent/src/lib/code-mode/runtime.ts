@@ -7,6 +7,8 @@ import {
 	getCanvasValidationIssues,
 	getFlowchartValidationIssues,
 	parseMindmapDiagram,
+	parseSequenceDiagram,
+	sequenceLifelineId,
 	validateFlowchartDiagram,
 	type FlowchartDiagram,
 	type FlowchartValidationIssueRef,
@@ -23,7 +25,6 @@ import {
 	renderIntermediateDiagram,
 	renderSequenceDiagram,
 	isStructurallyValidSequenceLifeline,
-	sequenceLifelineId,
 	type RenderedDiagramScene,
 	type ScenePoint,
 } from "@sketchi/diagram-renderer";
@@ -2272,7 +2273,7 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 	}
 
 	const scene = yield* Effect.try({
-		try: () => renderSequenceDiagram(normalizedSpec),
+		try: () => renderSequenceDiagram(parseSequenceDiagram({ ...normalizedSpec, type: "sequence" })),
 		catch: (cause) =>
 			new BuildSequenceDiagramFailure({
 				status: "render_failed",

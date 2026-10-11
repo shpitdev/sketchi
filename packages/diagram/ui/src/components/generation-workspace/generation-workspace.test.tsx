@@ -6,14 +6,14 @@ vi.mock("@excalidraw/excalidraw", () => ({
 }));
 
 import * as renderer from "@sketchi/diagram-renderer";
-import { flowchartFixture } from "@sketchi/diagram-core";
+import { flowchartFixture, sequenceFixture } from "@sketchi/diagram-core";
 
 import { GenerationWorkspace } from "./generation-workspace";
 
 afterEach(() => vi.restoreAllMocks());
 describe("GenerationWorkspace", () => {
 	it("reuses layout and validation when only status changes", () => {
-		const renderDiagram = vi.spyOn(renderer, "renderIntermediateDiagram");
+		const renderDiagram = vi.spyOn(renderer, "renderDiagram");
 		const { rerender } = render(<GenerationWorkspace diagram={flowchartFixture} status="ready" />);
 		rerender(<GenerationWorkspace diagram={flowchartFixture} status="generating" />);
 		expect(renderDiagram).toHaveBeenCalledTimes(1);
@@ -28,6 +28,16 @@ describe("GenerationWorkspace", () => {
 		expect(screen.getByText("5 nodes")).toBeTruthy();
 		expect(screen.getByText("5 edges")).toBeTruthy();
 		expect(screen.getByText("Validated flowchart IR")).toBeTruthy();
+		expect(screen.getByText("All arrows are bound")).toBeTruthy();
+	});
+
+	it("renders a sequence diagram with participant and message counts", () => {
+		render(<GenerationWorkspace diagram={sequenceFixture} />);
+
+		expect(screen.getByRole("heading", { name: "Checkout sequence" })).toBeTruthy();
+		expect(screen.getByText("3 participants")).toBeTruthy();
+		expect(screen.getByText("4 messages")).toBeTruthy();
+		expect(screen.getByText("Validated sequence IR")).toBeTruthy();
 		expect(screen.getByText("All arrows are bound")).toBeTruthy();
 	});
 });

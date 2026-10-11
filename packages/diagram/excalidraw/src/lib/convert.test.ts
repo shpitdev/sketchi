@@ -22,6 +22,7 @@ import {
 describe("authored node geometry", () => {
 	it("exports a sequence with a three-line participant label without growing shapes", () => {
 		const scene = renderSequenceDiagram({
+			type: "sequence",
 			id: "multiline-sequence",
 			title: "Multiline sequence",
 			participants: [
@@ -1733,6 +1734,7 @@ describe("convertSceneToExcalidraw", () => {
 	it("accepts sequence messages that cross intermediate lifelines", () => {
 		const scene = convertSceneToExcalidraw(
 			renderSequenceDiagram({
+				type: "sequence",
 				id: "cross-lifeline",
 				title: "Cross lifeline",
 				participants: [
@@ -1821,6 +1823,7 @@ describe("bound label first paint", () => {
 	it("wraps sequence participant headers inside the header", () => {
 		const sequence = convertSceneToExcalidraw(
 			renderSequenceDiagram({
+				type: "sequence",
 				id: "long-participants",
 				title: "Long participants",
 				participants: [

@@ -1,36 +1,17 @@
-import { CANVAS_SPEC_VERSION, wrapTextToWidth } from "@sketchi/diagram-core";
+import {
+	CANVAS_SPEC_VERSION,
+	SEQUENCE_LIFELINE_SUFFIX,
+	type SequenceDiagram,
+	sequenceLifelineId,
+	validateSequenceDiagram,
+	wrapTextToWidth,
+} from "@sketchi/diagram-core";
 import type {
 	ArrowSceneElement,
 	NodeSceneElement,
 	RenderedDiagramScene,
 	TextSceneElement,
 } from "./scene.js";
-
-export interface SequenceParticipant {
-	readonly id: string;
-	readonly label: string;
-	readonly kind?: string | undefined;
-}
-
-export interface SequenceMessage {
-	readonly id: string;
-	readonly source: string;
-	readonly target: string;
-	readonly label: string;
-	readonly type?: string | undefined;
-	readonly style?: string | undefined;
-}
-
-export interface SequenceDiagramInput {
-	readonly id: string;
-	readonly title: string;
-	readonly participants: readonly SequenceParticipant[];
-	readonly messages: readonly SequenceMessage[];
-	readonly style: {
-		readonly accentColor: string;
-		readonly backgroundColor: string;
-	};
-}
 
 const PADDING = 48;
 const HEADER_WIDTH = 180;
@@ -47,10 +28,6 @@ const LABEL_VERTICAL_PADDING = 18;
 const LAYOUT_ALIGNMENT_EPSILON = 0.01;
 
 export const SEQUENCE_LIFELINE_ROLE = "sequence-lifeline";
-
-export function sequenceLifelineId(participantId: string): string {
-	return `${participantId}:lifeline`;
-}
 
 interface SequenceLifelineStructureNode {
 	readonly type: "node";
@@ -77,7 +54,7 @@ export function isStructurallyValidSequenceLifeline(
 	scene: SequenceLifelineStructureScene,
 	element: SequenceLifelineStructureNode,
 ): boolean {
-	const suffix = ":lifeline";
+	const suffix = SEQUENCE_LIFELINE_SUFFIX;
 	if (
 		!element.nodeId.endsWith(suffix) ||
 		element.id !== `node:${element.nodeId}` ||
@@ -108,18 +85,12 @@ export function isStructurallyValidSequenceLifeline(
 	);
 }
 
-/** Render a validated semantic sequence specification without graph normalization. */
-export function renderSequenceDiagram(input: SequenceDiagramInput): RenderedDiagramScene {
-	const participantIds = new Set(input.participants.map((participant) => participant.id));
-	for (const participant of input.participants) {
-		const generatedLifelineId = sequenceLifelineId(participant.id);
-		if (participantIds.has(generatedLifelineId)) {
-			throw new Error(
-				`Sequence participant "${generatedLifelineId}" collides with the generated lifeline for "${participant.id}".`,
-			);
-		}
-	}
-
+/**
+ * Render a canonical sequence diagram: participants become ordered header
+ * columns with lifelines, and messages become rows in chronological order.
+ */
+export function renderSequenceDiagram(diagram: SequenceDiagram): RenderedDiagramScene {
+	const input = validateSequenceDiagram(diagram);
 	const columnStep = HEADER_WIDTH + PARTICIPANT_GAP;
 	const headerLabelById = new Map(
 		input.participants.map((participant) => [
@@ -193,14 +164,9 @@ export function renderSequenceDiagram(input: SequenceDiagramInput): RenderedDiag
 	});
 
 	const messageArrows: ArrowSceneElement[] = input.messages.map((message, index) => {
-		const sourceX = centerXByParticipant.get(message.source);
-		const targetX = centerXByParticipant.get(message.target);
-		if (sourceX === undefined || targetX === undefined) {
-			throw new Error(`Sequence message "${message.id}" references an unknown participant.`);
-		}
-		if (sourceX === targetX) {
-			throw new Error(`Sequence message "${message.id}" cannot target its source participant.`);
-		}
+		// Validation guarantees both participants exist and differ.
+		const sourceX = centerXByParticipant.get(message.source) ?? 0;
+		const targetX = centerXByParticipant.get(message.target) ?? 0;
 		const y = firstMessageY + index * MESSAGE_GAP;
 		const direction = targetX > sourceX ? 1 : -1;
 		return {

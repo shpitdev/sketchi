@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 
 import { DIAGRAM_ICON_SLUG_MAX_LENGTH, DIAGRAM_ICON_SLUG_PATTERN } from "./icon.js";
-import { DIAGRAM_TYPES } from "./types.js";
+import { DIAGRAM_TYPES, GRAPH_DIAGRAM_TYPES } from "./types.js";
 
 const NonEmptyString = Schema.NonEmptyString;
 const Metadata = Schema.Record(Schema.String, Schema.Unknown);
@@ -27,10 +27,13 @@ function withDefault<S extends Schema.Top>(schema: S, value: S["Encoded"]) {
 }
 
 export const DiagramTypeSchema = Schema.Literals(DIAGRAM_TYPES);
+/** Sequence diagrams have their own contract; only graph families use nodes and edges. */
+export const GraphDiagramTypeSchema = Schema.Literals(GRAPH_DIAGRAM_TYPES);
 export const LayoutDirectionSchema = Schema.Literals(["TB", "BT", "LR", "RL"]);
 export const EdgeRoutingSchema = Schema.Literals(["straight", "orthogonal", "curved"]);
 
 export type DiagramType = typeof DiagramTypeSchema.Type;
+export type GraphDiagramType = typeof GraphDiagramTypeSchema.Type;
 export type LayoutDirection = typeof LayoutDirectionSchema.Type;
 export type EdgeRouting = typeof EdgeRoutingSchema.Type;
 
@@ -83,7 +86,7 @@ export const DiagramLayoutSchema = DiagramLayout;
 export class IntermediateDiagram extends Schema.Class<IntermediateDiagram>("IntermediateDiagram")({
 	id: NonEmptyString,
 	title: NonEmptyString,
-	type: withDefault(DiagramTypeSchema, "flowchart"),
+	type: withDefault(GraphDiagramTypeSchema, "flowchart"),
 	nodes: Schema.Array(DiagramNode).pipe(Schema.mutable).check(Schema.isMinLength(1)),
 	edges: withDefault(Schema.Array(DiagramEdge).pipe(Schema.mutable), []),
 	layout: withDefault(DiagramLayout, {

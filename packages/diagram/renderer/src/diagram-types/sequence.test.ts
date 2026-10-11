@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { getCanvasValidationIssues } from "@sketchi/diagram-core";
+import {
+	type SequenceDiagram,
+	SequenceValidationError,
+	getCanvasValidationIssues,
+	parseSequenceDiagram,
+	sequenceFixture,
+} from "@sketchi/diagram-core";
 
+import { renderDiagram } from "../diagram";
 import { renderSequenceDiagram } from "../sequence";
 
-const sequence = {
+const sequence = parseSequenceDiagram({
 	id: "checkout-sequence",
 	title: "Checkout sequence",
+	type: "sequence",
 	participants: [
 		{ id: "customer", label: "Customer" },
 		{ id: "store", label: "Store" },
@@ -17,9 +25,23 @@ const sequence = {
 		{ id: "receipt", source: "payments", target: "customer", label: "Receipt" },
 	],
 	style: { accentColor: "#000000", backgroundColor: "#ffffff" },
-} as const;
+});
+
+function unvalidated(overrides: Partial<SequenceDiagram>): SequenceDiagram {
+	return { ...sequence, ...overrides };
+}
 
 describe("sequence diagram renderer", () => {
+	it("renders the canonical fixture through the family dispatch", () => {
+		const scene = renderDiagram(sequenceFixture);
+		expect(scene).toEqual(renderSequenceDiagram(sequenceFixture));
+		expect(scene.diagramId).toBe("checkout-sequence");
+		expect(scene.elements.filter((element) => element.type === "arrow")).toHaveLength(
+			sequenceFixture.messages.length,
+		);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+	});
+
 	it("fits three-line participant labels before positioning lifelines and messages", () => {
 		const scene = renderSequenceDiagram({
 			...sequence,
@@ -66,25 +88,27 @@ describe("sequence diagram renderer", () => {
 		).toHaveLength(3);
 	});
 
-	it("rejects self messages cleanly", () => {
+	it("rejects self messages with the core validation error", () => {
 		expect(() =>
-			renderSequenceDiagram({
-				...sequence,
-				messages: [{ id: "self", source: "store", target: "store", label: "Retry" }],
-			}),
-		).toThrow(/cannot target its source/);
+			renderSequenceDiagram(
+				unvalidated({
+					messages: [{ id: "self", source: "store", target: "store", label: "Retry" }],
+				}),
+			),
+		).toThrow(SequenceValidationError);
 	});
 
 	it("rejects participant ids that collide with generated lifelines", () => {
 		expect(() =>
-			renderSequenceDiagram({
-				...sequence,
-				participants: [
-					{ id: "api", label: "API" },
-					{ id: "api:lifeline", label: "Worker" },
-				],
-				messages: [],
-			}),
+			renderSequenceDiagram(
+				unvalidated({
+					participants: [
+						{ id: "api", label: "API" },
+						{ id: "api:lifeline", label: "Worker" },
+					],
+					messages: [],
+				}),
+			),
 		).toThrow(/collides with the generated lifeline/);
 	});
 });

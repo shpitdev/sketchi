@@ -18,6 +18,7 @@ describe("geometry bounds regressions", () => {
 			renderIntermediateDiagram(mindmapFixture),
 			renderIntermediateDiagram(pharmaBatchDispositionFlowchart),
 			renderSequenceDiagram({
+				type: "sequence",
 				id: "sequence-label-fit",
 				title: "Sequence label fit",
 				participants: [

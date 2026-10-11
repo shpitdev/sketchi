@@ -316,6 +316,7 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
 	it.effect("preserves sequence stroke styles through scene encoding", () =>
 		Effect.gen(function* () {
 			const rendered = renderSequenceDiagram({
+				type: "sequence",
 				id: "return-message",
 				title: "Return message",
 				participants: [

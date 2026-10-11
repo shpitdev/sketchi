@@ -153,6 +153,7 @@ const agentCanvas: CanvasSpec = {
 };
 
 const sequence = renderSequenceDiagram({
+	type: "sequence",
 	id: "long-participants",
 	title: "Long participants",
 	participants: [

@@ -280,10 +280,12 @@
 		{
 			// Diagram-core's schema boundary files may use stable Effect Schema.
 			"files": [
+				"packages/diagram/core/src/diagram.ts",
 				"packages/diagram/core/src/intermediate.ts",
 				"packages/diagram/core/src/types/flowchart.ts",
 				"packages/diagram/core/src/types/flowchart.test.ts",
-				"packages/diagram/core/src/types/mindmap.ts"
+				"packages/diagram/core/src/types/mindmap.ts",
+				"packages/diagram/core/src/types/sequence.ts"
 			],
 			"rules": {
 				"eslint/no-restricted-imports": [

@@ -7,9 +7,16 @@ flowchart LR
   Fixtures["fixtures"] --> Registry["diagram type registry"]
   Registry --> Flowchart["flowchart contract"]
   Registry --> Mindmap["mindmap contract"]
+  Registry --> Sequence["sequence contract"]
   Flowchart --> Consumers["generation, rendering, UI"]
   Mindmap --> Consumers
+  Sequence --> Consumers
 ```
+
+Flowchart and mindmap share the node/edge `IntermediateDiagram` graph.
+Sequence diagrams keep their own `SequenceDiagram` contract: ordered
+participants and chronologically ordered messages, never a graph.
+`CanonicalDiagramSchema` and `parseCanonicalDiagram` accept any family.
 
 | Owns                            | Does not own                |
 | ------------------------------- | --------------------------- |

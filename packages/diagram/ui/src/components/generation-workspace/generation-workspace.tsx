@@ -1,18 +1,14 @@
 import { useMemo } from "react";
 
-import {
-	type IntermediateDiagram,
-	parseFlowchartDiagram,
-	validateIntermediateDiagram,
-} from "@sketchi/diagram-core";
+import { type CanonicalDiagram, validateCanonicalDiagram } from "@sketchi/diagram-core";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import { renderDiagram } from "@sketchi/diagram-renderer";
 
 import { DiagramPreview } from "../diagram-preview/index.js";
 import { FlowchartValidationPanel } from "../flowchart-validation-panel/index.js";
 
 export interface GenerationWorkspaceProps {
-	diagram: IntermediateDiagram;
+	diagram: CanonicalDiagram;
 	status?: "idle" | "generating" | "ready" | "error";
 }
 
@@ -23,22 +19,28 @@ const statusLabels = {
 	error: "Needs attention",
 };
 
+function diagramCounts(diagram: CanonicalDiagram) {
+	return diagram.type === "sequence"
+		? {
+				nodeCount: diagram.participants.length,
+				nodeNoun: "participants",
+				edgeCount: diagram.messages.length,
+				edgeNoun: "messages",
+			}
+		: { nodeCount: diagram.nodes.length, edgeCount: diagram.edges.length };
+}
+
 export function GenerationWorkspace({ diagram, status = "ready" }: GenerationWorkspaceProps) {
 	const { validationMessage, scene, realSceneIssueCount, realSceneMessage } = useMemo(() => {
-		let validationMessage = "Validated diagram IR";
+		let validationMessage = `Validated ${diagram.type} IR`;
 
 		try {
-			if (diagram.type === "flowchart") {
-				parseFlowchartDiagram(diagram);
-				validationMessage = "Validated flowchart IR";
-			} else {
-				validateIntermediateDiagram(diagram);
-			}
+			validateCanonicalDiagram(diagram);
 		} catch (error) {
 			validationMessage = error instanceof Error ? error.message : "Diagram validation failed";
 		}
 
-		const scene = renderIntermediateDiagram(diagram);
+		const scene = renderDiagram(diagram);
 		const realSceneValidation = validateExcalidrawScene(convertSceneToExcalidraw(scene));
 		const realSceneIssueCount = realSceneValidation.issues.length;
 		const realSceneMessage =
@@ -64,9 +66,8 @@ export function GenerationWorkspace({ diagram, status = "ready" }: GenerationWor
 			</header>
 
 			<FlowchartValidationPanel
-				edgeCount={diagram.edges.length}
+				{...diagramCounts(diagram)}
 				intermediateMessage={validationMessage}
-				nodeCount={diagram.nodes.length}
 				realSceneIssueCount={realSceneIssueCount}
 				realSceneMessage={realSceneMessage}
 			/>
