@@ -6,14 +6,15 @@ import {
 	compileCanvasSpec,
 	getCanvasValidationIssues,
 	getFlowchartValidationIssues,
+	getSequenceValidationIssues,
 	parseMindmapDiagram,
-	parseSequenceDiagram,
-	sequenceLifelineId,
 	validateFlowchartDiagram,
 	type FlowchartDiagram,
 	type FlowchartValidationIssueRef,
 	type MindmapDiagram,
 	type CanvasValidationIssue,
+	type SequenceDiagram,
+	type SequenceValidationIssueCode,
 } from "@sketchi/diagram-core";
 import {
 	convertSceneToExcalidraw,
@@ -442,96 +443,46 @@ function normalizeSequenceDiagramSpec(
 	};
 }
 
+function toSequenceDiagram(spec: NormalizedSequenceDiagramSpec): SequenceDiagram {
+	return {
+		id: spec.id,
+		title: spec.title,
+		type: "sequence",
+		participants: spec.participants,
+		messages: spec.messages,
+		style: spec.style,
+	};
+}
+
+/** Code Mode's published issue codes for diagram-core's sequence invariants. */
+const SEQUENCE_ISSUE_CODES = {
+	duplicate_participant_id: "duplicate_node_id",
+	lifeline_id_collision: "duplicate_node_id",
+	duplicate_message_id: "duplicate_edge_id",
+	missing_message_source: "missing_edge_source",
+	missing_message_target: "missing_edge_target",
+	self_message: "self_loop",
+} as const satisfies Record<SequenceValidationIssueCode, CodeModeIssueCode>;
+
+/**
+ * Code Mode requests nest the diagram under `spec`, so hints that name a field
+ * keep the published request path rather than diagram-core's.
+ */
+const SEQUENCE_ISSUE_HINTS: Partial<Record<SequenceValidationIssueCode, string>> = {
+	missing_message_source: "Use the id of a participant declared in spec.participants.",
+	missing_message_target: "Use the id of a participant declared in spec.participants.",
+};
+
 function validateNormalizedSequenceDiagram(spec: NormalizedSequenceDiagramSpec): CodeModeIssue[] {
-	const issues: CodeModeIssue[] = [];
-	const participantIds = new Set<string>();
-	spec.participants.forEach((participant, index) => {
-		if (participantIds.has(participant.id)) {
-			issues.push(
-				issue({
-					code: "duplicate_node_id",
-					stage: "input",
-					ref: { kind: "request", path: `spec.participants.[${index}].id` },
-					message: `Participant id "${participant.id}" is duplicated.`,
-					hint: "Give every participant a unique stable id and update message references.",
-				}),
-			);
-		}
-		participantIds.add(participant.id);
-	});
-
-	const participantIndexById = new Map(
-		spec.participants.map((participant, index) => [participant.id, index]),
+	return getSequenceValidationIssues(toSequenceDiagram(spec)).map((entry) =>
+		issue({
+			code: SEQUENCE_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: SEQUENCE_ISSUE_HINTS[entry.code] ?? entry.hint,
+		}),
 	);
-	spec.participants.forEach((participant) => {
-		const generatedLifelineId = sequenceLifelineId(participant.id);
-		const collisionIndex = participantIndexById.get(generatedLifelineId);
-		if (collisionIndex === undefined) {
-			return;
-		}
-		issues.push(
-			issue({
-				code: "duplicate_node_id",
-				stage: "input",
-				ref: {
-					kind: "request",
-					path: `spec.participants.[${collisionIndex}].id`,
-				},
-				message: `Participant id "${generatedLifelineId}" collides with the generated lifeline for "${participant.id}".`,
-				hint: "Rename the participant so its id does not equal another participant id followed by :lifeline.",
-			}),
-		);
-	});
-
-	const messageIds = new Set<string>();
-	spec.messages.forEach((message, index) => {
-		if (messageIds.has(message.id)) {
-			issues.push(
-				issue({
-					code: "duplicate_edge_id",
-					stage: "input",
-					ref: { kind: "request", path: `spec.messages.[${index}].id` },
-					message: `Message id "${message.id}" is duplicated.`,
-					hint: "Give every message a unique id or omit message ids to generate them deterministically.",
-				}),
-			);
-		}
-		messageIds.add(message.id);
-		if (!participantIds.has(message.source)) {
-			issues.push(
-				issue({
-					code: "missing_edge_source",
-					stage: "input",
-					ref: { kind: "request", path: `spec.messages.[${index}].source` },
-					message: `Message source "${message.source}" is not a participant.`,
-					hint: "Use the id of a participant declared in spec.participants.",
-				}),
-			);
-		}
-		if (!participantIds.has(message.target)) {
-			issues.push(
-				issue({
-					code: "missing_edge_target",
-					stage: "input",
-					ref: { kind: "request", path: `spec.messages.[${index}].target` },
-					message: `Message target "${message.target}" is not a participant.`,
-					hint: "Use the id of a participant declared in spec.participants.",
-				}),
-			);
-		}
-		if (message.source === message.target) {
-			issues.push(
-				issue({
-					code: "self_loop",
-					stage: "input",
-					ref: { kind: "request", path: `spec.messages.[${index}]` },
-					message: `Message "${message.id}" is self-referential.`,
-					hint: "Choose a different target participant; self messages are not supported.",
-				}),
-			);
-		}
-	});
-	return issues;
 }
 
 function sequenceQuality(spec: NormalizedSequenceDiagramSpec, threshold: number): QualityReport {
@@ -2273,7 +2224,7 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 	}
 
 	const scene = yield* Effect.try({
-		try: () => renderSequenceDiagram(parseSequenceDiagram({ ...normalizedSpec, type: "sequence" })),
+		try: () => renderSequenceDiagram(toSequenceDiagram(normalizedSpec)),
 		catch: (cause) =>
 			new BuildSequenceDiagramFailure({
 				status: "render_failed",

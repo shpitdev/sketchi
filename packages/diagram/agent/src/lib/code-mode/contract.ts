@@ -4,6 +4,8 @@ import {
 	CANVAS_LIMITS,
 	CANVAS_NODE_ICON,
 	CANVAS_SPEC_VERSION,
+	SEQUENCE_MESSAGE_STYLES,
+	SEQUENCE_MESSAGE_TYPES,
 	SKETCHI_DIAGRAM_STYLE,
 } from "@sketchi/diagram-core";
 
@@ -598,6 +600,11 @@ export const FlowchartSpecEdgeSchema = FlowchartSpecEdge;
 export const FlowchartSpecLayoutSchema = FlowchartSpecLayout;
 export const FlowchartSpecStyleSchema = FlowchartSpecStyle;
 
+/**
+ * The authoring form of diagram-core's canonical SequenceDiagram: message ids
+ * are optional and style is defaulted. buildSequenceDiagram normalizes it into
+ * the core contract, which owns every sequence invariant.
+ */
 export class SequenceParticipantSpec extends Schema.Class<SequenceParticipantSpec>(
 	"SequenceParticipantSpec",
 )(
@@ -615,8 +622,8 @@ export class SequenceMessageSpec extends Schema.Class<SequenceMessageSpec>("Sequ
 		source: RequiredNonEmptyString,
 		target: RequiredNonEmptyString,
 		label: RequiredNonEmptyString,
-		type: optionalContract(literals(["message", "return"])),
-		style: optionalContract(literals(["solid", "dashed"])),
+		type: optionalContract(literals(SEQUENCE_MESSAGE_TYPES)),
+		style: optionalContract(literals(SEQUENCE_MESSAGE_STYLES)),
 	},
 	{ identifier: undefined },
 ) {}

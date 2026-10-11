@@ -1,14 +1,18 @@
 import {
+	type CanonicalDiagram,
+	CanonicalDiagramSchema,
 	DiagramValidationError,
 	isDiagramIconSlug,
 	type FlowchartDiagram,
 	FlowchartDiagramSchema,
 	FlowchartValidationError,
-	type MindmapDiagram,
 	MindmapDiagramSchema,
 	SKETCHI_DIAGRAM_STYLE,
+	SequenceDiagramSchema,
+	SequenceValidationError,
 	validateFlowchartDiagram,
 	validateMindmapDiagram,
+	validateSequenceDiagram,
 } from "@sketchi/diagram-core";
 import { Result, Schema, SchemaIssue } from "effect";
 
@@ -35,44 +39,6 @@ export type DiagramGenerationProviderId = typeof DiagramGenerationProviderIdSche
 export const DiagramGenerationCacheModeSchema = Schema.Literals(["default", "fresh"]);
 export type DiagramGenerationCacheMode = typeof DiagramGenerationCacheModeSchema.Type;
 
-export class GeneratedSequenceParticipant extends Schema.Class<GeneratedSequenceParticipant>(
-	"GeneratedSequenceParticipant",
-)({
-	id: Schema.NonEmptyString,
-	label: Schema.NonEmptyString,
-	kind: Schema.optionalKey(Schema.NonEmptyString),
-}) {}
-
-export class GeneratedSequenceMessage extends Schema.Class<GeneratedSequenceMessage>(
-	"GeneratedSequenceMessage",
-)({
-	id: Schema.NonEmptyString,
-	source: Schema.NonEmptyString,
-	target: Schema.NonEmptyString,
-	label: Schema.NonEmptyString,
-	type: Schema.optionalKey(Schema.Literals(["message", "return"])),
-	style: Schema.optionalKey(Schema.Literals(["solid", "dashed"])),
-}) {}
-
-export class GeneratedSequenceDiagram extends Schema.Class<GeneratedSequenceDiagram>(
-	"GeneratedSequenceDiagram",
-)({
-	id: Schema.NonEmptyString,
-	title: Schema.NonEmptyString,
-	type: Schema.Literal("sequence"),
-	participants: Schema.Array(GeneratedSequenceParticipant).pipe(
-		Schema.mutable,
-		Schema.check(Schema.isMinLength(1)),
-	),
-	messages: Schema.Array(GeneratedSequenceMessage).pipe(Schema.mutable),
-	style: Schema.optionalKey(
-		Schema.Struct({
-			accentColor: Schema.String,
-			backgroundColor: Schema.String,
-		}),
-	),
-}) {}
-
 export class DiagramGenerationUsage extends Schema.Class<DiagramGenerationUsage>(
 	"DiagramGenerationUsage",
 )({
@@ -86,9 +52,7 @@ export class DiagramGenerationCandidate extends Schema.Class<DiagramGenerationCa
 )({
 	cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
 	diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
-	diagram: Schema.optional(
-		Schema.Union([FlowchartDiagramSchema, MindmapDiagramSchema, GeneratedSequenceDiagram]),
-	),
+	diagram: Schema.optional(CanonicalDiagramSchema),
 	durationMs: Schema.optional(Schema.Number),
 	error: Schema.optional(Schema.String),
 	intent: Schema.optional(GeneratedDiagramIntent),
@@ -245,44 +209,12 @@ interface CandidateParseFailure {
 interface CandidateParseSuccess {
 	/** Non-fatal repairs applied while decoding. */
 	readonly diagnostics?: readonly string[];
-	readonly diagram?: FlowchartDiagram | MindmapDiagram | GeneratedSequenceDiagram;
+	readonly diagram?: CanonicalDiagram;
 	readonly intent: GeneratedDiagramIntent;
 	readonly success: true;
 }
 
 type CandidateParseResult = CandidateParseFailure | CandidateParseSuccess;
-
-function parseGeneratedSequence(decoded: GeneratedSequenceDiagram): GeneratedSequenceDiagram {
-	const participantIds = new Set<string>();
-	for (const participant of decoded.participants) {
-		if (participantIds.has(participant.id)) {
-			throw new DiagramValidationError(
-				`Duplicate sequence participant id "${participant.id}" is not allowed.`,
-			);
-		}
-		participantIds.add(participant.id);
-	}
-	const messageIds = new Set<string>();
-	for (const message of decoded.messages) {
-		if (messageIds.has(message.id)) {
-			throw new DiagramValidationError(
-				`Duplicate sequence message id "${message.id}" is not allowed.`,
-			);
-		}
-		messageIds.add(message.id);
-		if (!participantIds.has(message.source) || !participantIds.has(message.target)) {
-			throw new DiagramValidationError(
-				`Sequence message "${message.id}" references an unknown participant.`,
-			);
-		}
-		if (message.source === message.target) {
-			throw new DiagramValidationError(
-				`Sequence message "${message.id}" cannot target its source participant.`,
-			);
-		}
-	}
-	return decoded;
-}
 
 const schemaIssueFormatter = SchemaIssue.makeFormatterStandardSchemaV1();
 
@@ -298,10 +230,11 @@ function schemaIssueDiagnostic(issue: {
 }
 
 function diagramValidationFailure(error: unknown): CandidateParseFailure {
-	if (error instanceof FlowchartValidationError) {
+	if (error instanceof FlowchartValidationError || error instanceof SequenceValidationError) {
+		const family = error instanceof FlowchartValidationError ? "flowchart" : "sequence";
 		return {
 			diagnostics: error.issues.map(
-				(entry) => `flowchart.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
+				(entry) => `${family}.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
 			),
 			error: error.message,
 			success: false,
@@ -416,11 +349,10 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 					),
 		sequence: () =>
 			decodeAndValidate(
-				GeneratedSequenceDiagram,
-				titledDiagram,
-				parseGeneratedSequence,
+				SequenceDiagramSchema,
+				withSketchiDiagramStyle(titledDiagram),
+				validateSequenceDiagram,
 				intent,
-				"Generated sequence diagram schema validation failed.",
 			),
 	};
 	return parsers[intent.nativeKind]();

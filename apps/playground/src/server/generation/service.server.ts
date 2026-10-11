@@ -1,10 +1,6 @@
 import "@tanstack/react-start/server-only";
 
-import {
-	SKETCHI_DIAGRAM_STYLE,
-	type FlowchartDiagram,
-	type MindmapDiagram,
-} from "@sketchi/diagram-core";
+import type { FlowchartDiagram, MindmapDiagram, SequenceDiagram } from "@sketchi/diagram-core";
 import {
 	CloudflareAiGatewayBinding,
 	CloudflareGoogleAiStudioClientLive,
@@ -16,7 +12,6 @@ import {
 	type DiagramGenerationCandidate,
 	type DiagramGenerationError,
 	type DiagramGenerationType,
-	type GeneratedSequenceDiagram,
 	DiagramGenerationPolicyLive,
 } from "@sketchi/diagram-generation";
 import { Context, Effect, Layer } from "effect";
@@ -106,16 +101,27 @@ export function mindmapDocumentInput(diagram: MindmapDiagram): unknown {
 	};
 }
 
-/** Convert a validated sequence candidate into the native Code Mode contract. */
-export function sequenceDocumentInput(diagram: GeneratedSequenceDiagram): unknown {
+/** Convert a validated sequence candidate into a canonical document input. */
+export function sequenceDocumentInput(diagram: SequenceDiagram): unknown {
 	return {
 		type: "sequence",
 		spec: {
 			id: diagram.id,
 			title: diagram.title,
-			participants: diagram.participants,
-			messages: diagram.messages,
-			style: diagram.style ?? SKETCHI_DIAGRAM_STYLE,
+			participants: diagram.participants.map((participant) => ({
+				id: participant.id,
+				label: participant.label,
+				...(participant.kind ? { kind: participant.kind } : {}),
+			})),
+			messages: diagram.messages.map((message) => ({
+				id: message.id,
+				source: message.source,
+				target: message.target,
+				label: message.label,
+				...(message.type ? { type: message.type } : {}),
+				...(message.style ? { style: message.style } : {}),
+			})),
+			style: diagram.style,
 		},
 	};
 }

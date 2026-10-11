@@ -1991,7 +1991,10 @@ describe("Code Mode runtime", () => {
 			issues: expect.arrayContaining([
 				expect.objectContaining({
 					code: "missing_edge_source",
-					hint: expect.stringContaining("participant"),
+					ref: { kind: "request", path: "spec.messages.[0].source" },
+					message: 'Message source "missing" is not a participant.',
+					// Published Code Mode wording names the request field.
+					hint: "Use the id of a participant declared in spec.participants.",
 				}),
 				expect.objectContaining({
 					code: "self_loop",

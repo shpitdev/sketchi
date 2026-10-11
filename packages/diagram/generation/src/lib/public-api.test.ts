@@ -6,6 +6,7 @@ import {
 	type TelemetryMetricEvent,
 	type TelemetrySpanEvent,
 } from "@sketchi/observability";
+import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/diagram-core";
 import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 import { TestClock } from "effect/testing";
 
@@ -345,7 +346,36 @@ describe("pure candidate behavior", () => {
 		expect(candidate.diagram?.type).toBe("sequence");
 		if (candidate.diagram?.type === "sequence") {
 			expect(candidate.diagram.messages).toHaveLength(1);
+			expect(candidate.diagram.style).toEqual(SKETCHI_DIAGRAM_STYLE);
 		}
+	});
+
+	it("reports sequence invariants with the core contract's issue codes and hints", () => {
+		const candidate = candidateFromText({
+			model: "fixture",
+			provider: "fixture",
+			text: generationResponseText({
+				id: "retry-sequence",
+				title: "Retry sequence",
+				type: "sequence",
+				participants: [
+					{ id: "worker", label: "Worker" },
+					{ id: "queue", label: "Queue" },
+				],
+				messages: [
+					{ id: "poll", source: "worker", target: "queue", label: "Poll" },
+					{ id: "retry", source: "worker", target: "worker", label: "Retry" },
+					{ id: "ack", source: "queue", target: "billing", label: "Ack" },
+				],
+				style: { accentColor: "#0f766e", backgroundColor: "#ffffff" },
+			}),
+		});
+
+		expect(candidate.diagram).toBeUndefined();
+		expect(candidate.diagnostics).toEqual([
+			'sequence.self_message: Message "retry" is self-referential. Hint: Choose a different target participant; self messages are not supported.',
+			'sequence.missing_message_target: Message target "billing" is not a participant. Hint: Use the id of a participant declared in participants.',
+		]);
 	});
 
 	it("requires the typed response envelope instead of accepting legacy raw IR", () => {
