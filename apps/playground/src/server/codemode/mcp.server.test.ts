@@ -1,3 +1,4 @@
+import { setImmediate } from "node:timers";
 import validationFixtures from "./fixtures/mcp-validation-issues-v2.json";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -762,6 +763,371 @@ describe("Sketchi Code Mode MCP server", () => {
 		}
 	});
 
+	it("reports every build over MCP when the script returns unrelated data", async () => {
+		const bucket = new MemoryBucket();
+		const server = await createSketchiMcpServer(
+			{ SKETCHI_ARTIFACTS: bucket },
+			{ executor: createInProcessExecutor() },
+		);
+		const client = new Client({ name: "build-receipt-test", version: "1" });
+		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+		await server.connect(serverTransport);
+		await client.connect(clientTransport);
+		try {
+			const response = await client.callTool({
+				name: "execute",
+				arguments: {
+					code: `async () => {
+                await (${CIRCLE_TO_DIAMOND_CODE})();
+                await (${BUILD_MINDMAP_CODE})();
+                await (${BUILD_SEQUENCE_CODE})();
+                await (${CREATE_CANVAS_CODE})();
+                await sketchi.buildFlowchart({ spec: {} });
+                return { iconLookups: [], status: "script-finished" };
+            }`,
+				},
+			});
+			const output = structuredContent(response);
+			expect(output.result).toEqual({ iconLookups: [], status: "script-finished" });
+			expect(output.builds).toEqual([
+				...["buildFlowchart", "buildMindmap", "buildSequenceDiagram", "createCanvas"].map(
+					(operation) =>
+						expect.objectContaining({
+							operation,
+							ok: true,
+							status: "accepted",
+							buildId: expect.any(String),
+							normalizedSpec: expect.any(Object),
+							artifact: expect.objectContaining({
+								artifactId: expect.any(String),
+								formats: expect.any(Array),
+							}),
+						}),
+				),
+				expect.objectContaining({
+					operation: "buildFlowchart",
+					ok: false,
+					status: "invalid_input",
+					issues: expect.any(Array),
+				}),
+			]);
+			if (!Array.isArray(output.builds)) throw new Error("Missing build receipts");
+			expect(output.builds[0]).toMatchObject({
+				quality: { accepted: true, score: expect.any(Number) },
+			});
+			expect(JSON.stringify(output.builds)).not.toContain('"inline":');
+			expect(new TextEncoder().encode(JSON.stringify(output)).byteLength).toBeLessThan(1_000_000);
+			const events = await waitForUsageEvents(bucket, 1);
+			expect(events).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						operation: "execute",
+						artifactRefs: output.builds
+							.filter(isRecord)
+							.filter((build) => isRecord(build.artifact))
+							.map((build) =>
+								expect.objectContaining({
+									artifactId: isRecord(build.artifact) ? build.artifact.artifactId : undefined,
+								}),
+							),
+						response: {
+							body: expect.objectContaining({
+								value: expect.objectContaining({ builds: output.builds }),
+							}),
+						},
+					}),
+				]),
+			);
+		} finally {
+			await client.close();
+			await server.close();
+		}
+	});
+
+	it.each(["return undefined;", 'throw new Error("after build");'])(
+		"retains build receipts after %s",
+		async (ending) => {
+			const output = await executeSketchiCodeMode(
+				{},
+				{ code: `async () => { await (${BUILD_MINDMAP_CODE})(); ${ending} }` },
+				{ executor: createInProcessExecutor() },
+			);
+			expect(output.builds).toEqual([
+				expect.objectContaining({
+					operation: "buildMindmap",
+					ok: true,
+					normalizedSpec: expect.any(Object),
+				}),
+			]);
+		},
+	);
+
+	it.each([false, true])(
+		"settles successful executions but preserves an executor timeout (timeout=%s)",
+		async (timedOut) => {
+			const writeStarted = Promise.withResolvers<void>();
+			const releaseWrite = Promise.withResolvers<void>();
+			const scriptReturned = Promise.withResolvers<void>();
+			class GatedBucket extends MemoryBucket {
+				override async put(key: string, value: string | ArrayBuffer | Uint8Array) {
+					if (!key.startsWith("codemode/usage/")) {
+						writeStarted.resolve();
+						await releaseWrite.promise;
+					}
+					return super.put(key, value);
+				}
+			}
+			const bucket = new GatedBucket();
+			let launched: Promise<unknown> | undefined;
+			const execution = executeSketchiCodeMode(
+				{ SKETCHI_ARTIFACTS: bucket },
+				{ code: "async () => {}" },
+				{
+					executor: {
+						async execute(_code, providers) {
+							const build = providers[0]?.fns.buildMindmap;
+							if (!build) throw new Error("Missing builder");
+							launched = build({
+								spec: {
+									title: "Pending persistence",
+									root: { label: "Root", children: [{ label: "Child" }] },
+								},
+							});
+							await writeStarted.promise;
+							scriptReturned.resolve();
+							return timedOut ? { result: null, error: "Execution timed out" } : { result: "done" };
+						},
+					},
+				},
+			);
+			try {
+				await scriptReturned.promise;
+				await new Promise<void>((resolve) => setImmediate(resolve));
+				if (!timedOut) releaseWrite.resolve();
+				// On timeout this must return while storage remains blocked.
+				const output = await execution;
+				expect(output.builds).toEqual([
+					expect.objectContaining({
+						operation: "buildMindmap",
+						ok: !timedOut,
+						status: timedOut ? "incomplete" : "accepted",
+					}),
+				]);
+				if (timedOut) expect(output).toMatchObject({ ok: false, error: "Execution timed out" });
+				const events = await waitForUsageEvents(bucket, 1);
+				expect(events).toEqual([
+					expect.objectContaining({
+						response: {
+							body: expect.objectContaining({
+								value: expect.objectContaining({ builds: output.builds }),
+							}),
+						},
+					}),
+				]);
+				releaseWrite.resolve();
+				await launched;
+				// A late completion must not mutate the already-published timeout snapshot.
+				if (timedOut) expect(output.builds[0]?.status).toBe("incomplete");
+			} finally {
+				releaseWrite.resolve();
+				await launched;
+			}
+		},
+	);
+
+	it.each([1, 2])(
+		"counts issues once per build, not per returned copy (%i builds)",
+		async (count) => {
+			const events = new MemoryPipeline();
+			const issues = new MemoryPipeline();
+			const output = await executeSketchiCodeMode(
+				{ CODEMODE_USAGE_EVENTS: events, CODEMODE_USAGE_ISSUES: issues },
+				{
+					code: `async () => { let built; for (let i = 0; i < ${count}; i++) built = await sketchi.buildFlowchart({spec:{}}); return built; }`,
+				},
+				{ executor: createInProcessExecutor() },
+			);
+			const issueCount = output.builds.reduce((total, build) => total + build.issues.length, 0);
+			expect(issueCount).toBeGreaterThan(0);
+			expect(await waitForPipelineRecords(events, 1)).toEqual([
+				expect.objectContaining({ issue_count: issueCount }),
+			]);
+			expect(await waitForPipelineRecords(issues, issueCount)).toHaveLength(issueCount);
+		},
+	);
+
+	it("does not duplicate warnings from an accepted build returned directly", async () => {
+		const events = new MemoryPipeline();
+		const issues = new MemoryPipeline();
+		const output = await executeSketchiCodeMode(
+			{ CODEMODE_USAGE_EVENTS: events, CODEMODE_USAGE_ISSUES: issues },
+			{
+				code: `async () => sketchi.buildFlowchart({spec:{title:"Warning receipt",nodes:[{id:"a",label:"Begin",kind:"start",icon:{slug:"not-a-real-logo"}},{id:"b",label:"Finish",kind:"end"}],edges:[{source:"a",target:"b"}]}})`,
+			},
+			{ executor: createInProcessExecutor() },
+		);
+		const build = output.builds[0];
+		expect(build).toMatchObject({ ok: true, buildId: expect.any(String) });
+		if (!build || !isRecord(build.quality) || !Array.isArray(build.quality.checks))
+			throw new Error("Missing quality report");
+		expect(build.issues.length).toBeGreaterThan(0);
+		const count = build.issues.length + build.quality.checks.length;
+		expect(await waitForPipelineRecords(events, 1)).toEqual([
+			expect.objectContaining({ issue_count: count }),
+		]);
+		expect(await waitForPipelineRecords(issues, count)).toHaveLength(count);
+	});
+
+	it("preserves non-build issues alongside canonical build receipt issues", async () => {
+		const events = new MemoryPipeline();
+		const issues = new MemoryPipeline();
+		const output = await executeSketchiCodeMode(
+			{ CODEMODE_USAGE_EVENTS: events, CODEMODE_USAGE_ISSUES: issues },
+			{
+				code: `async () => { const built = await sketchi.buildFlowchart({spec:{}}); const extra = await sketchi.searchIcons({q:""}); return { built, extra }; }`,
+			},
+			{ executor: createInProcessExecutor() },
+		);
+		if (
+			!isRecord(output.result) ||
+			!isRecord(output.result.extra) ||
+			!Array.isArray(output.result.extra.issues)
+		)
+			throw new Error("Expected search issues");
+		const count =
+			output.builds.reduce((total, build) => total + build.issues.length, 0) +
+			output.result.extra.issues.length;
+		expect(await waitForPipelineRecords(events, 1)).toEqual([
+			expect.objectContaining({ issue_count: count }),
+		]);
+		expect(await waitForPipelineRecords(issues, count)).toHaveLength(count);
+	});
+
+	it("waits for sandbox builds whose RPC arrives after the script returns", async () => {
+		const executor = createInProcessExecutor();
+		const output = await executeSketchiCodeMode(
+			{},
+			{
+				code: `async () => { (${BUILD_MINDMAP_CODE})(); return { ok: false, reason: "optional step skipped" }; }`,
+			},
+			{
+				executor: {
+					execute(code, providers) {
+						return executor.execute(
+							code,
+							providers.map((provider) => ({
+								...provider,
+								fns: Object.fromEntries(
+									Object.entries(provider.fns).map(([name, fn]) => [
+										name,
+										async (...args: unknown[]) => {
+											await new Promise<void>((resolve) => setImmediate(resolve));
+											return fn(...args);
+										},
+									]),
+								),
+							})),
+						);
+					},
+				},
+			},
+		);
+		expect(output.result).toEqual({ ok: false, reason: "optional step skipped" });
+		expect(output.builds).toEqual([
+			expect.objectContaining({ operation: "buildMindmap", ok: true }),
+		]);
+	});
+
+	it("keeps concurrent receipts in call order and isolates them from script mutation", async () => {
+		const output = await executeSketchiCodeMode(
+			{},
+			{
+				code: `async () => {
+            const results = await Promise.all([(${BUILD_MINDMAP_CODE})(), (${BUILD_SEQUENCE_CODE})()]);
+            results[0].normalizedSpec.title = "mutated by script";
+            results[0].quality.score = -1;
+            return { done: true };
+        }`,
+			},
+			{ executor: createInProcessExecutor() },
+		);
+		expect(output.builds).toEqual([
+			expect.objectContaining({
+				index: 0,
+				operation: "buildMindmap",
+				normalizedSpec: expect.objectContaining({ title: "Code Mode mindmap" }),
+				quality: expect.objectContaining({ accepted: true, score: expect.any(Number) }),
+			}),
+			expect.objectContaining({ index: 1, operation: "buildSequenceDiagram" }),
+		]);
+		expect(JSON.stringify(output.builds)).not.toContain('"score":-1');
+	});
+
+	it("retains completed builds when the executor itself rejects", async () => {
+		const output = await executeSketchiCodeMode(
+			{},
+			{ code: "async () => {}" },
+			{
+				executor: {
+					async execute(_code, providers) {
+						const build = providers[0]?.fns.buildMindmap;
+						if (!build) throw new Error("Missing builder");
+						await build({
+							spec: {
+								title: "Completed before rejection",
+								root: { label: "Root", children: [{ label: "Child" }] },
+							},
+						});
+						throw new Error("Executor rejected");
+					},
+				},
+			},
+		);
+		expect(output).toMatchObject({
+			ok: false,
+			error: "Executor rejected",
+			builds: [expect.objectContaining({ ok: true, operation: "buildMindmap" })],
+		});
+	});
+
+	it.each([950_000, 1_000_000])(
+		"keeps artifact refs and enforces the snapshot cap with %i bytes of script output",
+		async (size) => {
+			const bucket = new MemoryBucket();
+			const output = await executeSketchiCodeMode(
+				{ SKETCHI_ARTIFACTS: bucket },
+				{
+					code: `async () => {
+            await (${BUILD_MINDMAP_CODE})();
+            return "x".repeat(${size});
+        }`,
+				},
+				{ executor: createInProcessExecutor() },
+			);
+			expect(output.builds).toHaveLength(1);
+			const events = await waitForUsageEvents(bucket, 1);
+			expect(events).toEqual([
+				expect.objectContaining({
+					artifactRefs: [
+						expect.objectContaining({ artifactId: output.builds[0]?.artifact?.artifactId }),
+					],
+					response: {
+						body: expect.objectContaining(
+							size < 1_000_000
+								? {
+										value: expect.objectContaining({ builds: output.builds }),
+										sizeBytes: expect.any(Number),
+									}
+								: { omittedReason: "snapshot_too_large", sizeBytes: expect.any(Number) },
+						),
+					},
+				}),
+			]);
+			if (size < 1_000_000)
+				expect(new TextEncoder().encode(JSON.stringify(output)).byteLength).toBeLessThan(1_000_000);
+		},
+	);
+
 	it("returns structured execute errors instead of throwing tool failures", async () => {
 		await expect(
 			executeSketchiCodeMode({}, {}, { executor: createInProcessExecutor() }),
@@ -781,6 +1147,7 @@ describe("Sketchi Code Mode MCP server", () => {
 		);
 
 		expect(result).toEqual({
+			builds: [],
 			ok: false,
 			error: "generated code failed",
 			logs: [],

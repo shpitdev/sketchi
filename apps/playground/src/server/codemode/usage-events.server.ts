@@ -480,7 +480,14 @@ function snapshotFrom(value: unknown): CodeModeUsageSnapshot {
 }
 
 function artifactRefsFrom(value: unknown): CodeModeUsageArtifactRef[] {
+	const builds = recordValue(value, "builds");
 	return uniqueArtifactRefs([
+		...(Array.isArray(builds)
+			? builds.flatMap((build) => [
+					...artifactRefCandidates(recordValue(build, "artifact")),
+					...artifactRefCandidates(recordValue(build, "partial")),
+				])
+			: []),
 		...artifactRefCandidates(value),
 		...artifactRefCandidates(recordValue(value, "result")),
 		...artifactRefCandidates(recordValue(value, "artifactDelivery")),
@@ -616,8 +623,38 @@ function okFromResponse(value: unknown): boolean {
 
 function issueSummariesFrom(value: unknown): CodeModeUsageIssueSummary[] {
 	const summaries: CodeModeUsageIssueSummary[] = [];
-	collectIssueSummaries(value, "response", summaries, 0);
+	const builds = recordValue(value, "builds");
+	if (!isRecord(value) || !Array.isArray(builds)) {
+		collectIssueSummaries(value, "response", summaries, 0);
+		return summaries;
+	}
+	// Receipts are canonical; preserve distinct attempts even when their issues are identical.
+	const receipts = builds.filter(isRecord);
+	collectIssueSummaries(builds, "response.builds", summaries, 1);
+	for (const [key, child] of Object.entries(value)) {
+		if (key !== "builds")
+			collectIssueSummaries(child, childPath("response", key), summaries, 1, receipts);
+	}
 	return summaries;
+}
+
+function copiesBuildReceipt(
+	value: Record<string, unknown>,
+	receipts: readonly Record<string, unknown>[],
+): boolean {
+	return receipts.some((receipt) => {
+		if (typeof value.buildId === "string") return value.buildId === receipt.buildId;
+		// Invalid input may fail before an id is assigned. Match the complete diagnostic envelope.
+		if (
+			receipt.buildId !== undefined ||
+			value.ok !== receipt.ok ||
+			value.status !== receipt.status ||
+			!Array.isArray(value.issues)
+		)
+			return false;
+		const issues = serializeSnapshot(value.issues);
+		return issues !== undefined && issues === serializeSnapshot(receipt.issues);
+	});
 }
 
 function collectIssueSummaries(
@@ -625,6 +662,7 @@ function collectIssueSummaries(
 	path: string,
 	summaries: CodeModeUsageIssueSummary[],
 	depth: number,
+	receipts: readonly Record<string, unknown>[] = [],
 ): void {
 	if (depth > MAX_ISSUE_DEPTH || summaries.length >= MAX_ISSUE_ROWS) {
 		return;
@@ -632,7 +670,7 @@ function collectIssueSummaries(
 
 	if (Array.isArray(value)) {
 		for (const [index, item] of value.entries()) {
-			collectIssueSummaries(item, `${path}[${index}]`, summaries, depth + 1);
+			collectIssueSummaries(item, `${path}[${index}]`, summaries, depth + 1, receipts);
 			if (summaries.length >= MAX_ISSUE_ROWS) {
 				return;
 			}
@@ -650,8 +688,10 @@ function collectIssueSummaries(
 		return;
 	}
 
+	const copiedBuild = copiesBuildReceipt(value, receipts);
 	for (const [key, child] of Object.entries(value)) {
-		collectIssueSummaries(child, childPath(path, key), summaries, depth + 1);
+		if (copiedBuild && (key === "issues" || key === "quality")) continue;
+		collectIssueSummaries(child, childPath(path, key), summaries, depth + 1, receipts);
 		if (summaries.length >= MAX_ISSUE_ROWS) {
 			return;
 		}

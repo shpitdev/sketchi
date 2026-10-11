@@ -31,6 +31,92 @@ const failedToolResult: unknown = JSON.parse(
 );
 
 describe("MCP scenario adapter", () => {
+	it.each([
+		undefined,
+		null,
+		"done",
+		{ built: flowchart.result },
+		{ ok: false, reason: "optional step skipped" },
+		{ ok: true, status: "accepted", artifact: {} },
+	])("grades build receipts when result is %j", (result) => {
+		const value = {
+			structuredContent: {
+				ok: true,
+				result,
+				builds: [{ ...flowchart.result, operation: "buildFlowchart" }],
+			},
+		};
+		expect(candidateFromMcpResult(value, "flowchart")).toEqual(
+			candidateFromMcpResult(flowchart, "flowchart"),
+		);
+		expect(normalizedSpecFrom(value)).toEqual(flowchart.result.normalizedSpec);
+	});
+	it("grades an accepted flowchart when the script returns a searchIcons validation failure", () => {
+		// await sketchi.buildFlowchart(...); return sketchi.searchIcons({ q: "" });
+		const value = {
+			structuredContent: {
+				ok: true,
+				result: {
+					ok: false,
+					status: "invalid_input",
+					issues: [{ code: "invalid_input", message: "Query must not be empty" }],
+				},
+				builds: [{ ...flowchart.result, operation: "buildFlowchart" }],
+			},
+		};
+		expect(candidateFromMcpResult(value, "flowchart")).toEqual(
+			candidateFromMcpResult(flowchart, "flowchart"),
+		);
+		expect(normalizedSpecFrom(value)).toEqual(flowchart.result.normalizedSpec);
+	});
+	it("uses the last matching build attempt, including rejection, without masking execute errors", () => {
+		const builds = [
+			{ ...flowchart.result, operation: "buildFlowchart" },
+			{ ok: false, status: "invalid_input", operation: "buildFlowchart" },
+		];
+		expect(candidateFromMcpResult({ ok: true, result: null, builds }, "flowchart")).toMatchObject({
+			ok: false,
+		});
+		expect(normalizedSpecFrom({ ok: true, builds })).toBeUndefined();
+		expect(
+			candidateFromMcpResult({ ok: false, builds: builds.slice(0, 1) }, "flowchart"),
+		).toMatchObject({ ok: false });
+	});
+	it("preserves a returned pre-ID rejection matched to a receipt before a later success", () => {
+		const rejected = {
+			ok: false,
+			status: "invalid_input",
+			issues: [{ code: "missing_field", message: "Missing spec.nodes" }],
+		};
+		const value = {
+			ok: true,
+			result: structuredClone(rejected),
+			builds: [
+				{ ...rejected, operation: "buildFlowchart" },
+				{ ...flowchart.result, operation: "buildFlowchart" },
+			],
+		};
+		expect(candidateFromMcpResult(value, "flowchart")).toMatchObject({ ok: false });
+		expect(normalizedSpecFrom(value)).toBeUndefined();
+	});
+	it("keeps an explicitly returned build authoritative and selects receipts by diagram family", () => {
+		const builds = [
+			{ ...flowchart.result, operation: "buildFlowchart" },
+			{ ...sequence.result, operation: "buildSequenceDiagram" },
+		];
+		expect(candidateFromMcpResult({ ok: true, result: null, builds }, "flowchart")).toEqual(
+			candidateFromMcpResult(flowchart, "flowchart"),
+		);
+		expect(candidateFromMcpResult({ ok: true, result: null, builds }, "sequence")).toEqual(
+			candidateFromMcpResult(sequence, "sequence"),
+		);
+		expect(
+			candidateFromMcpResult(
+				{ ok: true, result: { ...flowchart.result, ok: false }, builds },
+				"flowchart",
+			),
+		).toMatchObject({ ok: false });
+	});
 	it("recognizes protocol-level failures without structuredContent and retains their error text", () => {
 		expect(candidateFromMcpResult(failedToolResult, "flowchart")).toEqual({
 			ok: false,

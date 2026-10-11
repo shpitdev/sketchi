@@ -112,7 +112,7 @@ describe("scenario CLI candidate decoding", () => {
 		["flowchart", "incident-escalation"],
 		["sequence", "checkout-payment-sequence"],
 	] as const) {
-		for (const shape of ["structuredContent", "build", "tool-result"] as const) {
+		for (const shape of ["structuredContent", "build", "tool-result", "build-receipts"] as const) {
 			it.live(`grades a captured ${family} execute ${shape} through --input`, () =>
 				withCandidate("", (directory) =>
 					Effect.gen(function* () {
@@ -124,11 +124,25 @@ describe("scenario CLI candidate decoding", () => {
 							),
 						);
 						const input =
-							shape === "build"
-								? fixture.result
-								: shape === "tool-result"
-									? { structuredContent: fixture }
-									: fixture;
+							shape === "build-receipts"
+								? {
+										structuredContent: {
+											ok: true,
+											result: { summary: "done" },
+											builds: [
+												{
+													...fixture.result,
+													operation:
+														family === "sequence" ? "buildSequenceDiagram" : "buildFlowchart",
+												},
+											],
+										},
+									}
+								: shape === "build"
+									? fixture.result
+									: shape === "tool-result"
+										? { structuredContent: fixture }
+										: fixture;
 						const inputPath = path.join(directory, "execute.json");
 						const reportPath = path.join(directory, "report.json");
 						yield* Effect.tryPromise(() => writeFile(inputPath, JSON.stringify(input)));

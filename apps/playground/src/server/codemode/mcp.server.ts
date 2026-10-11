@@ -1,8 +1,17 @@
 import "@tanstack/react-start/server-only";
 
+import {
+	CodeModeIssueSchema,
+	type ArtifactBundle,
+	type PartialArtifactBundle,
+	type BuildFlowchartResult,
+	type BuildMindmapResult,
+	type BuildSequenceDiagramResult,
+	type CreateCanvasResult,
+} from "@sketchi/diagram-agent";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { withTelemetryCorrelation, type TelemetryCorrelationInput } from "@sketchi/observability";
-import { Context, Effect, Schema } from "effect";
+import { Context, Deferred, Effect, Schema } from "effect";
 
 import {
 	PlaygroundBindings,
@@ -90,7 +99,77 @@ const ExecuteArtifactDeliveryContract = Schema.Struct({
 	sceneUrl: Schema.optionalKey(Schema.String),
 });
 
+const ExecuteBuildArtifactContract = Schema.Struct({
+	artifactId: Schema.optionalKey(Schema.String),
+	diagramId: Schema.optionalKey(Schema.String),
+	formats: ExecuteArtifactDeliveryContract.fields.formats,
+});
+const ExecuteBuildContract = Schema.Struct({
+	index: Schema.Number,
+	operation: Schema.Literals([
+		"buildFlowchart",
+		"buildMindmap",
+		"buildSequenceDiagram",
+		"createCanvas",
+	]),
+	ok: Schema.Boolean,
+	status: Schema.String,
+	buildId: Schema.optionalKey(Schema.String),
+	requestId: Schema.optionalKey(Schema.String),
+	normalizedSpec: Schema.optionalKey(Schema.Unknown),
+	quality: Schema.optionalKey(Schema.Unknown),
+	artifact: Schema.optionalKey(ExecuteBuildArtifactContract),
+	partial: Schema.optionalKey(ExecuteBuildArtifactContract),
+	issues: Schema.Array(CodeModeIssueSchema).pipe(Schema.mutable),
+});
+type ExecuteBuild = typeof ExecuteBuildContract.Type;
+interface BuildObserver {
+	started(
+		index: number,
+		operation: ExecuteBuild["operation"],
+		completion: Effect.Effect<void>,
+	): void;
+	completed(build: ExecuteBuild): void;
+}
+type BuildOperation = ExecuteBuild["operation"];
+type BuildResult =
+	| BuildFlowchartResult
+	| BuildMindmapResult
+	| BuildSequenceDiagramResult
+	| CreateCanvasResult;
+
+// Receipts carry references, not a second copy of the potentially large inline scene/export.
+function buildArtifactReference(artifact: ArtifactBundle | PartialArtifactBundle) {
+	return {
+		...(artifact.artifactId ? { artifactId: artifact.artifactId } : {}),
+		...(artifact.diagramId ? { diagramId: artifact.diagramId } : {}),
+		formats: artifactFormatsFrom(artifact.formats),
+	};
+}
+
+function buildReceipt(operation: BuildOperation, index: number, result: BuildResult): ExecuteBuild {
+	const { ok, status, buildId, requestId, normalizedSpec, issues } = result;
+	// Copy before handing the result to script code, which may mutate it.
+	return structuredClone({
+		index,
+		operation,
+		ok,
+		status,
+		...(buildId === undefined ? {} : { buildId }),
+		...(requestId === undefined ? {} : { requestId }),
+		...(normalizedSpec === undefined ? {} : { normalizedSpec }),
+		...("quality" in result && result.quality ? { quality: result.quality } : {}),
+		...(result.ok
+			? { artifact: buildArtifactReference(result.artifact) }
+			: result.partial
+				? { partial: buildArtifactReference(result.partial) }
+				: {}),
+		issues,
+	});
+}
+
 const ExecuteResultContract = Schema.Struct({
+	builds: Schema.Array(ExecuteBuildContract).pipe(Schema.mutable),
 	artifactDelivery: Schema.optionalKey(ExecuteArtifactDeliveryContract),
 	finalResponseText: Schema.optionalKey(Schema.String),
 	ok: Schema.Boolean,
@@ -115,6 +194,35 @@ export function normalizeSketchiExecuteCode(code: string): string {
 	return stripCodeFence(code.trim())
 		.trim()
 		.replace(/;+\s*$/, "");
+}
+
+/** Wait in the sandbox too: an unawaited RPC may not have reached the host yet. */
+function trackSandboxBuilds(code: string): string {
+	return `async () => {
+      const pendingBuilds = [];
+      const trackedSketchi = new Proxy(sketchi, {
+        get(target, name) {
+          const method = target[name];
+          if (!["buildFlowchart", "buildMindmap", "buildSequenceDiagram", "createCanvas"].includes(name)) return method;
+          return (...args) => {
+            const pending = method(...args);
+            pendingBuilds.push(pending);
+            return pending;
+          };
+        }
+      });
+      try {
+        return await ((sketchi) => (
+${code}
+        )())(trackedSketchi);
+      } finally {
+        for (let index = 0; index < pendingBuilds.length;) {
+          const batch = pendingBuilds.slice(index);
+          index = pendingBuilds.length;
+          await Promise.allSettled(batch);
+        }
+      }
+    }`;
 }
 
 function finalResponseTextFromResult(value: Record<string, unknown>) {
@@ -357,6 +465,8 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 	const usage = yield* PlaygroundCodeModeUsage;
 	const usageContext = yield* usage.createContext;
 	const startedAt = yield* clock.nowMillis;
+	const builds: ExecuteBuild[] = [];
+	const pendingBuilds: Effect.Effect<void>[] = [];
 
 	const executed: SketchiCodeModeExecuteOutput = yield* Effect.gen(function* () {
 		const parsed = yield* Effect.try({
@@ -371,11 +481,24 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 		const executor = options.executor ?? (yield* createDefaultCodeModeExecutor());
 		const execution = yield* Effect.tryPromise({
 			try: () =>
-				executor.execute(normalizeSketchiExecuteCode(parsed.code), [
-					makeSketchiCodeModeProvider(codeMode, runToolEffect, {
-						attemptId: usageContext.attemptId,
-						runId: usageContext.runId,
-					}),
+				executor.execute(trackSandboxBuilds(normalizeSketchiExecuteCode(parsed.code)), [
+					makeSketchiCodeModeProvider(
+						codeMode,
+						runToolEffect,
+						{
+							attemptId: usageContext.attemptId,
+							runId: usageContext.runId,
+						},
+						{
+							started: (index, operation, completion) => {
+								builds[index] = { index, operation, ok: false, status: "incomplete", issues: [] };
+								pendingBuilds.push(completion);
+							},
+							completed: (build) => {
+								builds[build.index] = build;
+							},
+						},
+					),
 				]),
 			catch: (cause) =>
 				CodeModeExecutionError.make({
@@ -414,6 +537,14 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 				logs: [] as string[],
 			}),
 		),
+		// Do not turn executor timeouts/aborts into an unbounded wait for stalled host work.
+		// Started but unfinished attempts remain visible as incomplete receipts.
+		Effect.tap((output) =>
+			output.ok
+				? Effect.forEach(pendingBuilds, (completion) => completion, { discard: true })
+				: Effect.void,
+		),
+		Effect.map((output) => ({ ...output, builds: [...builds].sort((a, b) => a.index - b.index) })),
 		(executionEffect) =>
 			withTelemetryCorrelation(executionEffect, {
 				attemptId: usageContext.attemptId,
@@ -436,20 +567,33 @@ export function makeSketchiCodeModeProvider(
 	codeMode: Context.Service.Shape<typeof PlaygroundCodeMode>,
 	runToolEffect: PlaygroundRequestRunner,
 	correlation: TelemetryCorrelationInput = {},
+	observer?: BuildObserver,
 ): SketchiCodeModeProvider {
+	let nextBuildIndex = 0;
+	// Keep receipt capture inside the existing request callback span.
+	const build = Effect.fnUntraced(function* (operation: BuildOperation, request: unknown) {
+		const index = nextBuildIndex++;
+		const settled = yield* Deferred.make<void>();
+		observer?.started(index, operation, Deferred.await(settled));
+		return yield* Effect.gen(function* () {
+			const result = yield* codeMode[operation](request);
+			observer?.completed(buildReceipt(operation, index, result));
+			return result;
+		}).pipe(Effect.ensuring(Deferred.succeed(settled, undefined)));
+	});
 	return {
 		name: "sketchi",
 		fns: {
 			buildFlowchart: (request) =>
-				runToolEffect(withTelemetryCorrelation(codeMode.buildFlowchart(request), correlation)),
+				runToolEffect(withTelemetryCorrelation(build("buildFlowchart", request), correlation)),
 			buildMindmap: (request) =>
-				runToolEffect(withTelemetryCorrelation(codeMode.buildMindmap(request), correlation)),
+				runToolEffect(withTelemetryCorrelation(build("buildMindmap", request), correlation)),
 			buildSequenceDiagram: (request) =>
 				runToolEffect(
-					withTelemetryCorrelation(codeMode.buildSequenceDiagram(request), correlation),
+					withTelemetryCorrelation(build("buildSequenceDiagram", request), correlation),
 				),
 			createCanvas: (request) =>
-				runToolEffect(withTelemetryCorrelation(codeMode.createCanvas(request), correlation)),
+				runToolEffect(withTelemetryCorrelation(build("createCanvas", request), correlation)),
 			getArtifact: (request) =>
 				runToolEffect(withTelemetryCorrelation(codeMode.getArtifact(request), correlation)),
 			applyDiagramPatch: (request) =>
@@ -495,6 +639,7 @@ const executeDefinition = makeEffectMcpTool("execute", {
 		"First get the semantic graph accepted, then use patch operations for deterministic visual changes.",
 		"For final user-facing output, return accepted Sketchi artifact ids, format refs, and Excalidraw/PNG URLs. Do not recreate accepted diagrams as Markdown or Mermaid artifacts.",
 		"When artifactDelivery is available, the first text content block is the final user-facing answer; copy it verbatim and stop.",
+		"structuredContent.builds records every semantic or canvas build attempt in call order, independently of the script return value in result, without duplicating inline exports.",
 		"When execute returns artifactDelivery, paste artifactDelivery.finalResponseText as the final chat response and stop.",
 		"Do not call write_to_file/Create, create an Antigravity artifact, or inspect nested inline JSON after artifactDelivery is present.",
 		"",

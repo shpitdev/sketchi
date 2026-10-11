@@ -5,13 +5,65 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+// Pre-ID failures have no build markers. Only a matching receipt establishes provenance.
+function matchesRejectedReceipt(
+	returned: Record<string, unknown>,
+	receipt: Record<string, unknown>,
+): boolean {
+	if (
+		returned.ok !== false ||
+		receipt.ok !== false ||
+		returned.status !== receipt.status ||
+		!Array.isArray(returned.issues) ||
+		returned.issues.length === 0
+	)
+		return false;
+	try {
+		return JSON.stringify(returned.issues) === JSON.stringify(receipt.issues);
+	} catch {
+		return false;
+	}
+}
+
+/** Prefer an explicit build; otherwise use the last matching attempt, not the last success. */
+function buildFrom(
+	value: Record<string, unknown>,
+	diagramType?: DiagramScenario["diagramType"],
+): Record<string, unknown> {
+	if (value.ok === false || value.isError === true) return value;
+	if (isRecord(value.structuredContent)) return buildFrom(value.structuredContent, diagramType);
+	if (isRecord(value.normalizedSpec) || typeof value.buildId === "string") return value;
+	const returned = isRecord(value.result) ? buildFrom(value.result, diagramType) : undefined;
+	if (
+		returned &&
+		(isRecord(returned.normalizedSpec) ||
+			typeof returned.buildId === "string" ||
+			(typeof returned.operation === "string" &&
+				["buildFlowchart", "buildMindmap", "buildSequenceDiagram", "createCanvas"].includes(
+					returned.operation,
+				)))
+	)
+		return returned;
+	const operation = diagramType === "sequence" ? "buildSequenceDiagram" : "buildFlowchart";
+	const receipts = Array.isArray(value.builds)
+		? value.builds.filter(
+				(build): build is Record<string, unknown> =>
+					isRecord(build) && (diagramType === undefined || build.operation === operation),
+			)
+		: [];
+	const explicitRejection = returned
+		? receipts.findLast((receipt) => matchesRejectedReceipt(returned, receipt))
+		: undefined;
+	if (explicitRejection) return explicitRejection;
+	const receipt = receipts.at(-1);
+	return isRecord(receipt) ? receipt : (returned ?? value);
+}
+
 /** Extract the build spec from a build, execute payload, or MCP tool result. */
 export function normalizedSpecFrom(value: unknown): unknown {
 	if (!isRecord(value)) return undefined;
-	if (isRecord(value.normalizedSpec)) return value.normalizedSpec;
-	if (isRecord(value.structuredContent)) return normalizedSpecFrom(value.structuredContent);
-	if (isRecord(value.result)) return normalizedSpecFrom(value.result);
-	return undefined;
+	const build = buildFrom(value);
+	return isRecord(build.normalizedSpec) ? build.normalizedSpec : undefined;
 }
 
 function cleanEdgeId(value: unknown): string | undefined {
@@ -109,6 +161,7 @@ export function candidateFromMcpResult(
 		!isRecord(value) ||
 		![
 			"structuredContent",
+			"builds",
 			"result",
 			"normalizedSpec",
 			"ok",
@@ -121,22 +174,11 @@ export function candidateFromMcpResult(
 	) {
 		return undefined;
 	}
-	let build = value;
-	for (;;) {
-		if (build.ok === false || build.isError === true) {
-			return rejected(
-				`MCP execute/build failed${typeof build.status === "string" ? ` (${build.status})` : ""}. ${failureDetails(build)}`.trim(),
-			);
-		}
-		if (isRecord(build.structuredContent)) {
-			build = build.structuredContent;
-			continue;
-		}
-		if (isRecord(build.result)) {
-			build = build.result;
-			continue;
-		}
-		break;
+	const build = buildFrom(value, diagramType);
+	if (build.ok === false || build.isError === true) {
+		return rejected(
+			`MCP execute/build failed${typeof build.status === "string" ? ` (${build.status})` : ""}. ${failureDetails(build)}`.trim(),
+		);
 	}
 	if (
 		build.ok !== true ||
