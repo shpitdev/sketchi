@@ -7,6 +7,17 @@ import { runScenarioCli, ScenarioCliUsageError, scenarioCliExitCode } from "./cl
 import { ToolProcessSpawner, ToolProcessSpawnerLive } from "./internal/tool-process.js";
 import { getFlowchartScenario } from "./lib/scenarios.js";
 import { getSequenceScenario } from "./lib/sequence-scenarios.js";
+import { diagramScenarios } from "./lib/diagram-scenarios.js";
+import { vi } from "vitest";
+
+const ExecuteFixture = Schema.Struct({
+	ok: Schema.Boolean,
+	result: Schema.Struct({
+		ok: Schema.Boolean,
+		status: Schema.String,
+		normalizedSpec: Schema.Unknown,
+	}),
+});
 
 const scenario = getFlowchartScenario("sketchi-onboarding-decision-flow");
 function generatedEnvelope(requirements: readonly unknown[] = []) {
@@ -70,6 +81,147 @@ const Report = Schema.fromJsonString(
 );
 
 describe("scenario CLI candidate decoding", () => {
+	it.live("lists exact user prompts for every scenario", () =>
+		Effect.sync(() => {
+			const log = vi.spyOn(console, "log").mockImplementation(() => {});
+			return log;
+		}).pipe(
+			Effect.flatMap((log) =>
+				runScenarioCli(["--list"]).pipe(
+					Effect.andThen(
+						Effect.sync(() => {
+							const output = Schema.decodeUnknownSync(
+								Schema.fromJsonString(
+									Schema.Array(Schema.Struct({ id: Schema.String, prompt: Schema.String })),
+								),
+							)(log.mock.calls[0]?.[0]);
+							assert.deepStrictEqual(
+								output,
+								diagramScenarios.map(({ id, prompt }) => ({ id, prompt })),
+							);
+						}),
+					),
+					Effect.ensuring(Effect.sync(() => log.mockRestore())),
+				),
+			),
+			Effect.provide(ToolProcessSpawnerLive),
+		),
+	);
+
+	for (const [family, scenarioId] of [
+		["flowchart", "incident-escalation"],
+		["sequence", "checkout-payment-sequence"],
+	] as const) {
+		for (const shape of ["structuredContent", "build", "tool-result"] as const) {
+			it.live(`grades a captured ${family} execute ${shape} through --input`, () =>
+				withCandidate("", (directory) =>
+					Effect.gen(function* () {
+						const fixture = yield* Schema.decodeUnknownEffect(
+							Schema.fromJsonString(ExecuteFixture),
+						)(
+							yield* Effect.tryPromise(() =>
+								readFile(new URL(`./lib/fixtures/${family}-execute.json`, import.meta.url), "utf8"),
+							),
+						);
+						const input =
+							shape === "build"
+								? fixture.result
+								: shape === "tool-result"
+									? { structuredContent: fixture }
+									: fixture;
+						const inputPath = path.join(directory, "execute.json");
+						const reportPath = path.join(directory, "report.json");
+						yield* Effect.tryPromise(() => writeFile(inputPath, JSON.stringify(input)));
+						yield* runScenarioCli([
+							"--scenario",
+							scenarioId,
+							"--input",
+							inputPath,
+							"--report-out",
+							reportPath,
+						]);
+						const report = yield* Schema.decodeUnknownEffect(Report)(
+							yield* Effect.tryPromise(() => readFile(reportPath, "utf8")),
+						);
+						assert.isUndefined(report.error);
+						assert.deepStrictEqual(
+							report.checks.find((check) => check.id === "mcp-build-accepted"),
+							{
+								id: "mcp-build-accepted",
+								passed: true,
+								message: "MCP build was accepted and returned a normalizedSpec.",
+							},
+						);
+						assert.isTrue(
+							report.checks.some(
+								(check) =>
+									check.id === (family === "flowchart" ? "min-node-count" : "message-order"),
+							),
+						);
+						if (family === "sequence") assert.isTrue(report.ok);
+						else {
+							assert.isFalse(report.ok);
+							assert.isFalse(
+								report.checks.find((check) => check.id === "node-label:Alert created")?.passed,
+							);
+							assert.strictEqual(process.exitCode, 1);
+						}
+					}),
+				),
+			);
+		}
+	}
+
+	for (const [name, input, message] of [
+		[
+			"protocol-level MCP failure",
+			{ content: [{ type: "text", text: "Error: Code execution timed out" }], isError: true },
+			"Code execution timed out",
+		],
+		[
+			"execute failure",
+			{ ok: false, error: "Code execution timed out", logs: [] },
+			"Code execution timed out",
+		],
+		[
+			"unaccepted build",
+			{
+				ok: true,
+				result: { ok: false, status: "quality_failed", normalizedSpec: scenario.expectedDiagram },
+			},
+			"quality_failed",
+		],
+		["missing spec", { ok: true, status: "accepted" }, "normalizedSpec"],
+	] as const) {
+		it.live(`reports ${name} as a failing check without crashing`, () =>
+			withCandidate("", (directory) =>
+				Effect.gen(function* () {
+					const inputPath = path.join(directory, "execute.json");
+					const reportPath = path.join(directory, "report.json");
+					yield* Effect.tryPromise(() => writeFile(inputPath, JSON.stringify(input)));
+					yield* runScenarioCli([
+						"--scenario",
+						scenario.id,
+						"--input",
+						inputPath,
+						"--report-out",
+						reportPath,
+					]);
+					const report = yield* Schema.decodeUnknownEffect(Report)(
+						yield* Effect.tryPromise(() => readFile(reportPath, "utf8")),
+					);
+					assert.isFalse(report.ok);
+					assert.isUndefined(report.error);
+					assert.strictEqual(report.checks.length, 1);
+					assert.strictEqual(report.checks[0]?.id, "mcp-build-accepted");
+					assert.isFalse(report.checks[0]?.passed);
+					assert.include(report.checks[0]?.message ?? "", message);
+					assert.strictEqual(process.exitCode, 1);
+				}),
+			),
+		);
+	}
+
 	it.live("accepts bare IR emitted by an offline generator command", () =>
 		withCandidate("", (directory) =>
 			Effect.gen(function* () {

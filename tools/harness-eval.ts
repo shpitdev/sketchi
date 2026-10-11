@@ -5,6 +5,8 @@ import { pathToFileURL } from "node:url";
 import { NodeRuntime } from "@effect/platform-node";
 import {
 	evaluateScenarioDiagram,
+	normalizedSpecFrom,
+	specToFlowchartCandidate,
 	flowchartScenarios,
 	getFlowchartScenario,
 	type FlowchartScenario,
@@ -365,29 +367,6 @@ function cleanQuotedString(value: unknown): string | undefined {
 	}
 
 	return raw;
-}
-
-const TRAILING_TOOL_KEY_FRAGMENT =
-	/[,;]\s*(?:id|label|kind|group|source|target|title|direction|nodes|edges)\s*:?\s*$/i;
-
-function cleanToolString(value: string): string {
-	let cleaned = value.trim();
-	for (;;) {
-		const next = cleaned.replace(TRAILING_TOOL_KEY_FRAGMENT, "").trim();
-		if (next === cleaned) {
-			return cleaned;
-		}
-		cleaned = next;
-	}
-}
-
-function cleanOptionalToolString(value: unknown): string | undefined {
-	const raw = cleanQuotedString(value);
-	if (raw === undefined) {
-		return undefined;
-	}
-	const cleaned = cleanToolString(raw);
-	return cleaned.length > 0 ? cleaned : undefined;
 }
 
 function antigravityRoot(): string | undefined {
@@ -1424,48 +1403,6 @@ export function summarizeHarnessStdout(
 			.filter((value): value is number => value !== undefined),
 		steps,
 		toolCalls,
-	};
-}
-
-function normalizedSpecFrom(value: unknown): unknown {
-	if (!isRecord(value)) {
-		return undefined;
-	}
-	if (isRecord(value.normalizedSpec)) {
-		return value.normalizedSpec;
-	}
-	if (isRecord(value.result)) {
-		return normalizedSpecFrom(value.result);
-	}
-	return undefined;
-}
-
-function specToFlowchartCandidate(spec: unknown): unknown {
-	if (!isRecord(spec)) {
-		return spec;
-	}
-	const layout = isRecord(spec.layout) ? spec.layout : {};
-	const edges = Array.isArray(spec.edges)
-		? spec.edges.map((edge, index) =>
-				isRecord(edge)
-					? {
-							...edge,
-							id: cleanOptionalToolString(edge.id) ?? `edge-${index + 1}`,
-						}
-					: edge,
-			)
-		: spec.edges;
-	return {
-		id: spec.id,
-		title: spec.title,
-		type: "flowchart",
-		nodes: spec.nodes,
-		edges,
-		layout: {
-			direction: layout.direction ?? "TB",
-			edgeRouting: "orthogonal",
-		},
-		style: spec.style,
 	};
 }
 

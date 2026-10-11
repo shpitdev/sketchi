@@ -11,7 +11,12 @@ import {
 import { Effect, Schema } from "effect";
 
 import { parseCliOptions, resolveGeneratorCommand, usage } from "./lib/cli-options.js";
-import { evaluateScenarioDiagram, evaluateScenarioFixture } from "./lib/evaluate.js";
+import {
+	evaluateScenarioDiagram,
+	evaluateScenarioFixture,
+	type ScenarioCheck,
+} from "./lib/evaluate.js";
+import { candidateFromMcpResult } from "./lib/mcp-results.js";
 import { buildScenarioPrompt, toDiagramGenerationPrompt } from "./lib/prompt.js";
 import {
 	type DiagramScenario,
@@ -159,6 +164,7 @@ function readText(filePath: string) {
 
 interface ScenarioRunEvaluation {
 	readonly candidateOutput: string;
+	readonly checks?: readonly ScenarioCheck[];
 	readonly evaluation?: ReturnType<typeof evaluateScenarioFixture>;
 	readonly error?: string;
 }
@@ -172,6 +178,15 @@ const evaluateCandidate = Effect.fn("diagramScenarios.evaluateCandidate")(functi
 	return Effect.try({
 		try: () => {
 			const diagram: unknown = extractJsonObject(candidateOutput);
+			const mcp = candidateFromMcpResult(diagram, scenario.diagramType);
+			if (mcp) {
+				if (!mcp.ok) return { candidateOutput, checks: [mcp.check] };
+				const evaluation = evaluateScenarioDiagram(scenario, mcp.diagram);
+				return {
+					candidateOutput,
+					evaluation: { ...evaluation, checks: [...evaluation.checks, mcp.check] },
+				};
+			}
 			if (isResponseEnvelope(diagram)) {
 				const request = {
 					model: "command",
@@ -317,6 +332,7 @@ export const runScenarioCli = Effect.fn("diagramScenarios.cli")(function* (
 					diagramType: scenario.diagramType,
 					title: scenario.title,
 					description: scenario.description,
+					prompt: scenario.prompt,
 					difficulty: scenario.difficulty,
 					tags: scenario.tags,
 				})),
@@ -389,7 +405,7 @@ export const runScenarioCli = Effect.fn("diagramScenarios.cli")(function* (
 						runNumber: runIndex + 1,
 						ok: result.evaluation?.ok ?? false,
 						...(result.error ? { error: result.error, errorTag: "ScenarioToolError" } : {}),
-						checks: result.evaluation?.checks ?? [],
+						checks: result.evaluation?.checks ?? result.checks ?? [],
 						excalidrawIssues: result.evaluation?.excalidrawValidation.issues ?? [],
 						candidateOut,
 						out: result.evaluation ? out : undefined,

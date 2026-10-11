@@ -1,0 +1,149 @@
+{
+	"ok": true,
+	"result": {
+		"ok": true,
+		"status": "accepted",
+		"normalizedSpec": {
+			"id": "incident-escalation",
+			"title": "Incident Escalation Flowchart",
+			"nodes": [
+				{
+					"id": "alert",
+					"label": "Monitoring creates alert",
+					"kind": "start"
+				},
+				{
+					"id": "ack",
+					"label": "Responder acknowledges alert",
+					"kind": "process"
+				},
+				{
+					"id": "severity",
+					"label": "Assess incident severity",
+					"kind": "decision"
+				},
+				{
+					"id": "bridge",
+					"label": "Open incident bridge",
+					"kind": "process"
+				},
+				{
+					"id": "mitigate",
+					"label": "Mitigate impact",
+					"kind": "process"
+				},
+				{
+					"id": "comms",
+					"label": "Send customer communications",
+					"kind": "process"
+				},
+				{
+					"id": "resolved_bridge",
+					"label": "Incident resolved via bridge",
+					"kind": "end"
+				},
+				{
+					"id": "triage",
+					"label": "Triage queue: assess incident",
+					"kind": "process"
+				},
+				{
+					"id": "fix",
+					"label": "Fix available?",
+					"kind": "decision"
+				},
+				{
+					"id": "resolved_triage",
+					"label": "Incident resolved via triage fix",
+					"kind": "end"
+				},
+				{
+					"id": "monitor_low",
+					"label": "Monitor low-severity incident",
+					"kind": "process"
+				},
+				{
+					"id": "resolved_low",
+					"label": "Incident resolved by monitoring",
+					"kind": "end"
+				}
+			],
+			"edges": [
+				{
+					"id": "e1",
+					"source": "alert",
+					"target": "ack"
+				},
+				{
+					"id": "e2",
+					"source": "ack",
+					"target": "severity"
+				},
+				{
+					"id": "e3",
+					"source": "severity",
+					"target": "bridge",
+					"label": "High"
+				},
+				{
+					"id": "e4",
+					"source": "severity",
+					"target": "triage",
+					"label": "Medium"
+				},
+				{
+					"id": "e5",
+					"source": "severity",
+					"target": "monitor_low",
+					"label": "Low"
+				},
+				{
+					"id": "e6",
+					"source": "bridge",
+					"target": "mitigate"
+				},
+				{
+					"id": "e7",
+					"source": "mitigate",
+					"target": "comms"
+				},
+				{
+					"id": "e8",
+					"source": "comms",
+					"target": "resolved_bridge"
+				},
+				{
+					"id": "e9",
+					"source": "triage",
+					"target": "fix"
+				},
+				{
+					"id": "e10",
+					"source": "fix",
+					"target": "resolved_triage",
+					"label": "Yes"
+				},
+				{
+					"id": "e11",
+					"source": "fix",
+					"target": "bridge",
+					"label": "No: escalate"
+				},
+				{
+					"id": "e12",
+					"source": "monitor_low",
+					"target": "resolved_low"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		},
+		"issues": []
+	},
+	"logs": []
+}

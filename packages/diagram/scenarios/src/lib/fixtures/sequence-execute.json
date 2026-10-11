@@ -1,0 +1,63 @@
+{
+	"ok": true,
+	"result": {
+		"ok": true,
+		"status": "accepted",
+		"normalizedSpec": {
+			"id": "checkout-sequence",
+			"title": "Checkout sequence",
+			"participants": [
+				{
+					"id": "browser",
+					"label": "Browser"
+				},
+				{
+					"id": "store",
+					"label": "Store API"
+				},
+				{
+					"id": "payment",
+					"label": "Payment Service"
+				}
+			],
+			"messages": [
+				{
+					"id": "m1",
+					"source": "browser",
+					"target": "store",
+					"label": "Submit order",
+					"type": "message"
+				},
+				{
+					"id": "m2",
+					"source": "store",
+					"target": "payment",
+					"label": "Charge card",
+					"type": "message"
+				},
+				{
+					"id": "m3",
+					"source": "payment",
+					"target": "store",
+					"label": "Charge approved",
+					"type": "return",
+					"style": "dashed"
+				},
+				{
+					"id": "m4",
+					"source": "store",
+					"target": "browser",
+					"label": "Order confirmation",
+					"type": "return",
+					"style": "dashed"
+				}
+			],
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		},
+		"issues": []
+	},
+	"logs": []
+}
