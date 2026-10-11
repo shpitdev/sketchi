@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 import ts from "typescript";
+import { catalog } from "./mcp-docs/catalog";
 import { generateCodeModeTypes, jsonSchemaType } from "./mcp-docs/types";
 import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagram-agent";
 import {
@@ -12,6 +13,23 @@ import {
 } from "./mcp-docs.server";
 
 describe("Code Mode MCP docs", () => {
+	it("does not advertise palette inputs in docs, examples, or search", () => {
+		for (const entry of catalog) {
+			const docs = getCodeModeDocs({ topic: entry.topic });
+			const search = searchCodeModeDocs({ query: entry.id, limit: 20 });
+			const prose = docs.content
+				.split("\n")
+				.filter((line) => !line.startsWith("type "))
+				.join("\n");
+			expect(JSON.stringify({ prose, examples: docs.examples, search })).not.toMatch(
+				/optional style|top-level style|style:\s*\{\s*accentColor/,
+			);
+		}
+		for (const topic of ["buildFlowchart", "buildMindmap", "buildSequenceDiagram"] as const) {
+			expect(getCodeModeDocs({ topic }).content).toContain("fixed Sketchi palette");
+		}
+	});
+
 	it("documents the harness-first execute contract", () => {
 		const docs = getCodeModeDocs({ topic: "execute" });
 
@@ -97,11 +115,15 @@ describe("Code Mode MCP docs", () => {
           [K in keyof T]-?: {} extends Pick<T, K> ? K : never
         }[keyof T];
         type FlowchartRequestDefaults = Assert<
-          "edges" | "layout" | "style" extends OptionalKeys<BuildFlowchartRequest["spec"]> ? true : false
+          "edges" | "layout" extends OptionalKeys<BuildFlowchartRequest["spec"]> ? true : false
         >;
         type FlowchartResultDefaults = Assert<
           Extract<OptionalKeys<Extract<BuildFlowchartResult, { ok: true }>["normalizedSpec"]>, "edges" | "layout" | "style"> extends never ? true : false
         >;
+        type FlowchartPaletteNotAnInput = Assert<"style" extends keyof BuildFlowchartRequest["spec"] ? false : true>;
+        type MindmapPaletteNotAnInput = Assert<"style" extends keyof BuildMindmapRequest["spec"] ? false : true>;
+        type SequencePaletteNotAnInput = Assert<"style" extends keyof BuildSequenceDiagramRequest["spec"] ? false : true>;
+        type SequenceMessageStyle = Assert<Same<NonNullable<BuildSequenceDiagramRequest["spec"]["messages"]>[number]["style"], "solid" | "dashed" | undefined>>;
         type CanvasRequestVersion = Assert<Same<CreateCanvasRequest["spec"]["version"], 1>>;
       `,
 			ts.ScriptTarget.Latest,

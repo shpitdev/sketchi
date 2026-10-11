@@ -10,6 +10,9 @@ import {
 	BuildSequenceDiagramResultSchema,
 	CreateCanvasRequestSchema,
 	CreateCanvasResultSchema,
+	FlowchartSpecSchema,
+	MindmapSpecSchema,
+	SequenceDiagramSpecSchema,
 	GetArtifactRequestSchema,
 	GetArtifactResultSchema,
 	SearchIconsRequestSchema,
@@ -19,15 +22,43 @@ import {
 
 export const codeModeContracts = {
 	buildFlowchart: {
-		input: BuildFlowchartRequestSchema,
+		input: Schema.Struct({
+			...BuildFlowchartRequestSchema.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: FlowchartSpecSchema.mapFields(({ id, title, nodes, edges, layout }) => ({
+				id,
+				title,
+				nodes,
+				edges,
+				layout,
+			})),
+		}),
 		output: BuildFlowchartResultSchema,
 	},
 	buildMindmap: {
-		input: BuildMindmapRequestSchema,
+		input: Schema.Struct({
+			...BuildMindmapRequestSchema.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: MindmapSpecSchema.mapFields(({ id, title, root, layout }) => ({
+				id,
+				title,
+				root,
+				layout,
+			})),
+		}),
 		output: BuildMindmapResultSchema,
 	},
 	buildSequenceDiagram: {
-		input: BuildSequenceDiagramRequestSchema,
+		input: Schema.Struct({
+			...BuildSequenceDiagramRequestSchema.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: SequenceDiagramSpecSchema.mapFields(({ id, title, participants, messages }) => ({
+				id,
+				title,
+				participants,
+				messages,
+			})),
+		}),
 		output: BuildSequenceDiagramResultSchema,
 	},
 	createCanvas: {

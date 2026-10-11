@@ -343,7 +343,7 @@ export const catalog: CatalogEntry[] = [
 		],
 		snippet: "Create the semantic flowchart first. Fix issues before styling or shape changes.",
 		content: [
-			"buildFlowchart accepts a compact FlowchartSpec: title, nodes, edges, optional layout, and optional style.",
+			"buildFlowchart accepts a compact FlowchartSpec: title, nodes, edges, and optional layout. Builds use the fixed Sketchi palette.",
 			'Request envelope: { spec: FlowchartSpec, options?: { artifactFormats?: ["scene", "excalidraw", "png"], inlineArtifacts?: ["scene", "excalidraw"], minQualityScore?: number } }.',
 			'For normal harness output, request artifactFormats: ["scene", "excalidraw", "png"] and inlineArtifacts: ["excalidraw"]. The scene is an internal patch source; Excalidraw and PNG are the user-facing artifacts.',
 			"Request png when the agent needs hosted visual proof. PNG artifacts are stored binary outputs and are never inlined in MCP JSON responses.",
@@ -408,7 +408,7 @@ export const catalog: CatalogEntry[] = [
 		keywords: ["build", "mindmap", "topic", "hierarchy", "tree", "branch"],
 		snippet: "Create a mindmap from a semantic nested topic hierarchy.",
 		content: [
-			"buildMindmap accepts a semantic MindmapSpec with one nested root topic. Do not supply coordinates, edges, or Excalidraw JSON.",
+			"buildMindmap accepts a semantic MindmapSpec with one nested root topic. Do not supply coordinates, edges, or Excalidraw JSON. Builds use the fixed Sketchi palette.",
 			"The semantic-input restriction does not limit outputs: scene, Excalidraw, and PNG remain intentional output formats selected through artifact options.",
 			"Children remain in caller order and receive deterministic path identifiers such as topic-0-1-0.",
 			'Request envelope: { spec: MindmapSpec, options?: { artifactFormats?: ["scene", "excalidraw", "png"], inlineArtifacts?: ["scene", "excalidraw"], minQualityScore?: number } }.',
@@ -440,7 +440,7 @@ export const catalog: CatalogEntry[] = [
 		],
 		snippet: "Create a native sequence diagram from ordered participants and messages.",
 		content: [
-			"buildSequenceDiagram accepts a semantic SequenceDiagramSpec with ordered participants and chronological messages.",
+			"buildSequenceDiagram accepts a semantic SequenceDiagramSpec with ordered participants and chronological messages. Builds use the fixed Sketchi palette.",
 			"Use a sequence diagram when time-ordered interactions between actors or systems are the main idea. Use buildFlowchart for decisions and process paths; use buildMindmap for nested topic hierarchy.",
 			"Participant order is preserved left-to-right. Message order is preserved top-to-bottom.",
 			'A message with type "return" from the callee back to its caller answers the latest open call between them; Sketchi draws the callee\'s activation bar from that call to its return, nesting re-entrant calls. Calls nobody answers draw no bar.',
@@ -580,7 +580,7 @@ export const catalog: CatalogEntry[] = [
 			"Op-specific shapes:",
 			PATCH_REQUEST_SHAPE,
 			"Selection-based operations use nodeIds, edgeIds, ids, labels, kinds, or scope. Structural insert/replace/reorder/group operations use stable element ids directly.",
-			"For style patches, node and edge colors use strokeColor, fillColor, textColor, and backgroundColor. FlowchartSpec top-level style uses accentColor and backgroundColor.",
+			"For style patches, node and edge colors use strokeColor, fillColor, textColor, and backgroundColor.",
 			"If a shape change causes arrow_overlap or text_overflow during export, retry with rerouteEdges, translate, or rebuild the FlowchartSpec with more space.",
 			"For complex flowcharts, the most reliable repair is usually structural: keep edges flowing in the declared layout direction and avoid connecting a bottom node back to an early terminal.",
 		].join("\n"),
