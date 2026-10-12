@@ -540,7 +540,11 @@ describe("Sketchi Code Mode MCP server", () => {
 			expect(executeTool?.description).toContain("async () =>");
 			expect(executeTool?.description).toContain("artifactDelivery");
 			expect(executeTool?.description).toContain("sequence participant.icon");
-			expect(executeTool?.description).toContain("split 'X on Y'");
+			expect(executeTool?.description).toContain("When the prompt names technologies");
+			expect(executeTool?.description).toContain(
+				"keep every requested step and decision in a separate node",
+			);
+			expect(executeTool?.description).toContain("preserving the prompt's step wording and order");
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,
