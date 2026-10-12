@@ -307,6 +307,19 @@ export function scenarioLogoChecks(
 }
 
 function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram): ScenarioCheck[] {
+	// An action immediately before its sole terminal end represents the same
+	// end step. Never accept starts/decisions, branches, or intervening work.
+	const terminalActions = new Set(
+		diagram.nodes
+			.filter((node) => {
+				if (node.kind !== "process") return false;
+				const outgoing = diagram.edges.filter((edge) => edge.source === node.id);
+				if (outgoing.length !== 1) return false;
+				const target = diagram.nodes.find((candidate) => candidate.id === outgoing[0]!.target);
+				return target?.kind === "end" && !diagram.edges.some((edge) => edge.source === target.id);
+			})
+			.map((node) => node.id),
+	);
 	const matchedNodes = new Map(
 		scenario.assertions.requiredNodes.map((expected) => [
 			expected.id,
@@ -314,7 +327,9 @@ function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram)
 				diagram.nodes
 					.filter(
 						(node) =>
-							node.kind === expected.kind && flowchartLabelMatches(node.label, expected.labels),
+							(node.kind === expected.kind ||
+								(expected.kind === "end" && terminalActions.has(node.id))) &&
+							flowchartLabelMatches(node.label, expected.labels),
 					)
 					.map((node) => node.id),
 			),

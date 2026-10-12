@@ -97,6 +97,106 @@ function expectClosePoint(actual: { x: number; y: number }, expected: { x: numbe
 }
 
 describe("diagram scenario evaluation", () => {
+	it.each([
+		["restaurant-waitlist", "keep-waiting", "Ready: do not keep waiting"],
+		["loan-application-underwriting", "income-verification", "Verify address; income not verified"],
+	])("rejects reviewed false positives for %s: %s", (scenarioId, nodeId, label) => {
+		const scenario = getFlowchartScenario(scenarioId);
+		const result = evaluateScenarioDiagram(scenario, {
+			...scenario.expectedDiagram,
+			nodes: scenario.expectedDiagram.nodes.map((node) =>
+				node.id === nodeId ? { ...node, label } : node,
+			),
+		});
+		expect(result.ok).toBe(false);
+		expect(result.checks).toContainEqual(
+			expect.objectContaining({
+				id: `node-label:${scenario.assertions.requiredNodes.find((node) => node.id === nodeId)!.label}`,
+				passed: false,
+			}),
+		);
+	});
+	it.each([
+		["loan-application-underwriting", "income-verification", "Verify income"],
+		["data-import-validation", "file-uploaded", "Upload file"],
+		["expense-reimbursement", "reject-expense", "Expense rejected"],
+		["expense-reimbursement", "approve-payment", "Expense paid"],
+		["incident-escalation", "monitor", "Monitoring (low severity)"],
+		["incident-escalation", "monitor", "Monitoring: low-severity incident"],
+	])("accepts captured label wording for %s: %s", (scenarioId, nodeId, label) => {
+		const scenario = getFlowchartScenario(scenarioId);
+		expect(
+			evaluateScenarioDiagram(scenario, {
+				...scenario.expectedDiagram,
+				nodes: scenario.expectedDiagram.nodes.map((node) =>
+					node.id === nodeId ? { ...node, label } : node,
+				),
+			}).ok,
+		).toBe(true);
+	});
+
+	it("accepts a terminal action split into a process and its single direct end", () => {
+		const scenario = getFlowchartScenario("incident-response-code-mode-proof");
+		const candidate = {
+			...scenario.expectedDiagram,
+			nodes: [
+				...scenario.expectedDiagram.nodes.map((node) =>
+					node.id === "vendor-escalation" ? { ...node, kind: "process" } : node,
+				),
+				{ id: "provider-end", label: "End", kind: "end" },
+			],
+			edges: [
+				...scenario.expectedDiagram.edges,
+				{ id: "provider-done", source: "vendor-escalation", target: "provider-end" },
+			],
+		};
+		expect(evaluateScenarioDiagram(scenario, candidate).ok).toBe(true);
+	});
+
+	it.each(["indirect-end", "extra-continuation"])(
+		"rejects an end-step substitute with %s",
+		(variant) => {
+			const scenario = getFlowchartScenario("incident-response-code-mode-proof");
+			const candidate = {
+				...scenario.expectedDiagram,
+				nodes: [
+					...scenario.expectedDiagram.nodes.map((node) =>
+						node.id === "vendor-escalation" ? { ...node, kind: "process" } : node,
+					),
+					{ id: "provider-end", label: "End", kind: "end" },
+					...(variant === "indirect-end"
+						? [{ id: "intermediate", label: "More work", kind: "process" }]
+						: []),
+				],
+				edges: [
+					...scenario.expectedDiagram.edges,
+					{
+						id: "provider-done",
+						source: "vendor-escalation",
+						target: variant === "indirect-end" ? "intermediate" : "provider-end",
+					},
+					...(variant === "indirect-end"
+						? [{ id: "indirect", source: "intermediate", target: "provider-end" }]
+						: [{ id: "continue", source: "vendor-escalation", target: "collect-evidence" }]),
+				],
+			};
+			expect(evaluateScenarioDiagram(scenario, candidate).checks).toContainEqual(
+				expect.objectContaining({ id: "node-label:Escalate to provider", passed: false }),
+			);
+		},
+	);
+
+	it("does not relax the canonical single-start requirement", () => {
+		expect(() =>
+			evaluateScenarioDiagram(onboardingScenario, {
+				...onboardingScenario.expectedDiagram,
+				nodes: onboardingScenario.expectedDiagram.nodes.map((node) =>
+					node.id === "prompt" ? { ...node, kind: "process" } : node,
+				),
+			}),
+		).toThrow("Flowchart must contain exactly one start node");
+	});
+
 	it("accepts prompt-derived wording throughout the maintained catalog", () => {
 		for (const scenario of flowchartScenarios) {
 			const labels = new Map(

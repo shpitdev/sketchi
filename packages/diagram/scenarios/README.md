@@ -50,9 +50,18 @@ regression when that original diagram is available. Run one with
 
 Each fixture node declares any-of label alternatives using words from its
 scenario prompt. The catalog validates that grounding when loaded. A model
-node must match an alternative **and that step's node kind**. Case,
-punctuation, hyphens, and whitespace are normalized; matching uses whole
-words, so `ineligible` cannot satisfy `eligible`.
+node must match an alternative **and that step's node kind**. An expected end
+step also accepts a process whose sole outgoing edge leads directly to an end
+node; no decision/start substitute, intermediate work, or additional continuation
+is allowed. All canonical graph validation and exclusive ownership checks remain.
+Case, punctuation, hyphens, and whitespace are normalized. Every content-word
+lemma in an alternative must appear in a single label clause, in any order.
+Unnegated qualifier segments may combine across parentheses, colons, and commas:
+`Monitoring (low severity)` and `Monitoring: low-severity incident` both match
+`monitoring low severity`. A segment containing any negator is a hard boundary;
+its words cannot contribute to a positive alternative, nor can matching jump
+across it. Semicolons and other sentence/action separators do not combine clauses.
+Whole words prevent `ineligible` from satisfying `eligible`.
 
 Action steps require action-bearing alternatives (`acknowledges`, not just
 `responder`; `sends customer communications`, not just `communications`).
@@ -60,20 +69,26 @@ Named stages or destinations use their names when the prompt supplies no
 action, rather than inventing a fixture-only verb. Decision alternatives
 retain the prompt's criterion, such as `scope clear` or `payment succeeds`.
 
-`flowchart-labels.ts` lists the finite word aliases used on both sides:
+`flowchart-labels.ts` lists the finite lemma table used on both sides:
 `comms` → `communications`, `rollback` → `roll back`, `retesting` → `retest`,
-and explicit catalog inflections such as `classifies` → `classify` and
-`refunded` → `refund`. There is no general prefix, fuzzy, or semantic matcher.
+and explicit inflections such as `classifies` → `classify`, `refunded` → `refund`,
+`verification` → `verify`, `uploaded` → `upload`, and `payment`/`paid` → `pay`.
+Thus `Verify income` matches `income verification`, and `Expense paid` matches
+`payment`. The explicit stopword set removes articles, auxiliaries, conjunctions,
+and common prepositions, but retains criterion/condition words and negators.
+Stopword-only alternatives never match. There is no suffix guessing, general
+prefix, fuzzy, or semantic matcher; sequence and logo matching are unchanged.
 Adjacent `not`, `no`, `never`, `without`, `cannot`, and explicit ignore/skip/omit
 forms reject a match. Contracted negatives such as `isn't` normalize to `not`;
 `fails to` and `unable to` also reject a positive action. The guard examines
-preceding words in the same clause, extending over explicit auxiliary/adverb
+preceding words for each required lemma in the same clause, extending over explicit auxiliary/adverb
 forms such as `not yet been successfully`. Commas, colons, semicolons, arrows,
 parentheses, slashes, spaced dashes, sentence punctuation, sentence line breaks,
 and explicit conjunctions (`and`, `or`, `then`, `but`, `so`, `otherwise`) reset
 that context.
 Periods inside names such as `Next.js` are not sentence boundaries, and a
-separator after `not` or its auxiliary/adverb chain retains negation. Thus
+formatting wrap after `not` or its auxiliary/adverb chain retains negation.
+Commas, colons, and semicolons always reset negation context. Thus
 `Incident not resolved` fails, but `No fix: incident resolved` can pass.
 When the prompt itself specifies a negative precondition followed by a
 positive action, the catalog includes that complete phrase as an alternative.
@@ -85,7 +100,11 @@ incoming connections. Examples include
 vendor`, and short fallback clauses such as `If not, monitor stock`.
 Those conditions do not negate the action;
 `Failed tests do not block release` still fails. These are explicit prompt
-alternatives, not inferred causal or semantic matches.
+alternatives, not inferred causal or semantic matches. A negative operator is
+exempt only when it immediately governs the same precondition word as in the
+alternative, allowing auxiliary/adverb gaps. The `not` in `not ready` cannot
+exempt the consequence in `Ready do not keep waiting`. Neither `Income not
+verified` nor `Verify address; income not verified` matches `income verification`.
 
 Each required edge must directly connect a matching source node to a matching
 target node, with an any-of branch-label match when a label is required.
