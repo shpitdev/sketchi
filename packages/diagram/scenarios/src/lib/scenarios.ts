@@ -5,6 +5,8 @@ import {
 	parseFlowchartDiagram,
 } from "@sketchi/diagram-core";
 
+import { flowchartLabelWords } from "./flowchart-labels.js";
+
 export interface FlowchartScenarioAssertions {
 	minEdgeCount: number;
 	minNodeCount: number;
@@ -13,12 +15,24 @@ export interface FlowchartScenarioAssertions {
 	requiredBranchLabels: string[];
 	requiredEdges: FlowchartScenarioRequiredEdge[];
 	requiredNodeKinds: FlowchartNodeKind[];
+	requiredNodes: FlowchartScenarioRequiredNode[];
+	/** Fixture wording for diagnostic IDs and fixture intent, not label matching. */
 	requiredNodeLabels: string[];
+}
+
+export interface FlowchartScenarioRequiredNode {
+	id: string;
+	kind: FlowchartNodeKind;
+	label: string;
+	labels: readonly string[];
 }
 
 export interface FlowchartScenarioRequiredEdge {
 	label?: string;
+	labels?: readonly string[];
+	sourceId: string;
 	sourceLabel: string;
+	targetId: string;
 	targetLabel: string;
 }
 
@@ -52,6 +66,7 @@ type FlowchartNodeDefinition = readonly [
 	id: string,
 	label: string,
 	kind: FlowchartNodeKind,
+	labels: readonly [string, ...string[]],
 	icon?: string,
 ];
 
@@ -60,6 +75,7 @@ type FlowchartEdgeDefinition = readonly [
 	source: string,
 	target: string,
 	label?: string,
+	labels?: readonly [string, ...string[]],
 ];
 
 interface FlowchartScenarioDefinition {
@@ -104,7 +120,7 @@ function buildExpectedDiagram(definition: FlowchartScenarioDefinition): Flowchar
 		id: definition.diagramId ?? definition.id,
 		title: definition.title,
 		type: "flowchart",
-		nodes: definition.nodes.map(([id, label, kind, icon]) => ({
+		nodes: definition.nodes.map(([id, label, kind, _labels, icon]) => ({
 			id,
 			label,
 			kind,
@@ -124,10 +140,25 @@ function buildExpectedDiagram(definition: FlowchartScenarioDefinition): Flowchar
 	});
 }
 
-function buildAssertions(diagram: FlowchartDiagram): FlowchartScenarioAssertions {
+function buildAssertions(
+	definition: FlowchartScenarioDefinition,
+	diagram: FlowchartDiagram,
+): FlowchartScenarioAssertions {
 	const nodeKinds = new Set(diagram.nodes.map((node) => node.kind));
 	const requiredNodeKinds = FLOWCHART_NODE_KIND_ORDER.filter((kind) => nodeKinds.has(kind));
 	const nodesById = new Map(diagram.nodes.map((node) => [node.id, node]));
+	const promptWords = new Set(flowchartLabelWords(definition.prompt));
+	const requiredNodes = definition.nodes.map(([id, label, kind, labels]) => {
+		for (const alternative of labels) {
+			const words = flowchartLabelWords(alternative);
+			if (words.length === 0 || words.some((word) => !promptWords.has(word))) {
+				throw new Error(
+					`Scenario "${definition.id}" node "${id}" has an ungrounded alternative "${alternative}".`,
+				);
+			}
+		}
+		return { id, label, kind, labels };
+	});
 
 	return {
 		minEdgeCount: diagram.edges.length,
@@ -136,21 +167,24 @@ function buildAssertions(diagram: FlowchartDiagram): FlowchartScenarioAssertions
 		requiredBranchLabels: unique(
 			diagram.edges.map((edge) => edge.label).filter((label): label is string => Boolean(label)),
 		),
-		requiredEdges: diagram.edges.map((edge) => {
-			const source = nodesById.get(edge.source);
-			const target = nodesById.get(edge.target);
+		requiredEdges: definition.edges.map(([id, sourceId, targetId, label, labels]) => {
+			const source = nodesById.get(sourceId);
+			const target = nodesById.get(targetId);
 
 			if (!source || !target) {
-				throw new Error(`Scenario "${diagram.id}" has unresolved assertion edge "${edge.id}".`);
+				throw new Error(`Scenario "${diagram.id}" has unresolved assertion edge "${id}".`);
 			}
 
 			return {
+				sourceId,
 				sourceLabel: source.label,
+				targetId,
 				targetLabel: target.label,
-				...(edge.label ? { label: edge.label } : {}),
+				...(label ? { label, labels: labels ?? [label] } : {}),
 			};
 		}),
 		requiredNodeKinds,
+		requiredNodes,
 		requiredNodeLabels: diagram.nodes.map((node) => node.label),
 	};
 }
@@ -168,7 +202,7 @@ function defineFlowchartScenario(definition: FlowchartScenarioDefinition): Flowc
 	}
 
 	return {
-		assertions: buildAssertions(expectedDiagram),
+		assertions: buildAssertions(definition, expectedDiagram),
 		description: definition.description,
 		diagramType: "flowchart",
 		difficulty: definition.difficulty,
@@ -193,11 +227,11 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a flowchart for a Sketchi diagram request. The flow starts when a prompt is received, extracts requirements, asks whether the scope is clear, drafts typed IR when clear, and otherwise moves to review. End at review.",
 		nodes: [
-			["prompt", "Prompt received", "start"],
-			["requirements", "Extract requirements", "process"],
-			["clear", "Scope clear?", "decision"],
-			["draft", "Draft typed IR", "process"],
-			["review", "Review diagram", "end"],
+			["prompt", "Prompt received", "start", ["prompt received", "prompt is received"]],
+			["requirements", "Extract requirements", "process", ["extracts requirements"]],
+			["clear", "Scope clear?", "decision", ["scope clear", "scope is clear"]],
+			["draft", "Draft typed IR", "process", ["drafts typed IR"]],
+			["review", "Review diagram", "end", ["review", "otherwise moves to review"]],
 		],
 		edges: [
 			["prompt-requirements", "prompt", "requirements"],
@@ -217,18 +251,23 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a flowchart for pharma batch disposition. A batch is received, QA reviews the Certificate of Analysis, and then decides whether it passes specs. Passing goes to QA Manager final review and packaging. Retest goes through investigation and returns to final review. Reject ends at reject batch.",
 		nodes: [
-			["batch-received", "Batch received", "start"],
-			["qa-review", "QA reviews Certificate of Analysis", "process"],
-			["passes-specs", "Passes specs?", "decision"],
-			["final-review", "QA Manager final review", "process"],
-			["packaging", "Send to packaging", "end"],
-			["investigate", "Investigate retesting", "process"],
-			["reject", "Reject batch", "end"],
+			["batch-received", "Batch received", "start", ["batch received", "batch is received"]],
+			[
+				"qa-review",
+				"QA reviews Certificate of Analysis",
+				"process",
+				["QA reviews", "reviews Certificate of Analysis"],
+			],
+			["passes-specs", "Passes specs?", "decision", ["passes specs"]],
+			["final-review", "QA Manager final review", "process", ["final review"]],
+			["packaging", "Send to packaging", "end", ["packaging"]],
+			["investigate", "Investigate retesting", "process", ["investigation"]],
+			["reject", "Reject batch", "end", ["reject batch", "reject ends at reject batch"]],
 		],
 		edges: [
 			["batch-qa", "batch-received", "qa-review"],
 			["qa-specs", "qa-review", "passes-specs"],
-			["specs-pass", "passes-specs", "final-review", "yes"],
+			["specs-pass", "passes-specs", "final-review", "yes", ["yes", "passing"]],
 			["specs-investigate", "passes-specs", "investigate", "retest"],
 			["specs-reject", "passes-specs", "reject", "reject"],
 			["review-packaging", "final-review", "packaging"],
@@ -245,13 +284,13 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a diagram that showcases how the various packages in this repo interact. Show the high-level path from an app request through the agent, core diagram model, renderer, Excalidraw export, and hosted artifact response.",
 		nodes: [
-			["app-request", "App or MCP request", "start"],
-			["diagram-agent", "diagram-agent orchestrates", "process"],
-			["diagram-core", "diagram-core validates IR", "process"],
-			["diagram-renderer", "diagram-renderer lays out scene", "process"],
-			["diagram-excalidraw", "diagram-excalidraw exports file", "process"],
-			["artifact-store", "Artifact store saves formats", "process"],
-			["studio-api", "Studio API returns artifact URLs", "end"],
+			["app-request", "App or MCP request", "start", ["app request", "request"]],
+			["diagram-agent", "diagram-agent orchestrates", "process", ["agent"]],
+			["diagram-core", "diagram-core validates IR", "process", ["core"]],
+			["diagram-renderer", "diagram-renderer lays out scene", "process", ["renderer"]],
+			["diagram-excalidraw", "diagram-excalidraw exports file", "process", ["Excalidraw export"]],
+			["artifact-store", "Artifact store saves formats", "process", ["artifact"]],
+			["studio-api", "Studio API returns artifact URLs", "end", ["response", "artifact"]],
 		],
 		edges: [
 			["request-agent", "app-request", "diagram-agent"],
@@ -272,16 +311,37 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a support ticket triage flowchart. A ticket is received, the team classifies it, decides if it is a production outage, and pages on-call for outages. Paged outages end when the outage is resolved. Non-outages check whether a known fix exists. Known fixes are sent to the customer and end as customer resolved. Unknown fixes escalate to engineering and end as engineering resolved.",
 		nodes: [
-			["ticket-received", "Ticket received", "start"],
-			["classify-ticket", "Classify ticket", "process"],
-			["production-outage", "Production outage?", "decision"],
-			["page-on-call", "Page on-call", "process"],
-			["known-fix", "Known fix exists?", "decision"],
-			["send-fix", "Send fix to customer", "process"],
-			["outage-resolved", "Outage resolved", "end"],
-			["escalate-engineering", "Escalate to engineering", "process"],
-			["customer-resolved", "Customer resolved", "end"],
-			["engineering-resolved", "Engineering resolved", "end"],
+			["ticket-received", "Ticket received", "start", ["ticket received", "ticket is received"]],
+			["classify-ticket", "Classify ticket", "process", ["classifies"]],
+			["production-outage", "Production outage?", "decision", ["production outage"]],
+			["page-on-call", "Page on-call", "process", ["pages on-call"]],
+			[
+				"known-fix",
+				"Known fix exists?",
+				"decision",
+				["known fix exists", "non-outages check whether a known fix exists"],
+			],
+			["send-fix", "Send fix to customer", "process", ["sent"]],
+			["outage-resolved", "Outage resolved", "end", ["outage resolved", "outage is resolved"]],
+			[
+				"escalate-engineering",
+				"Escalate to engineering",
+				"process",
+				[
+					"escalate to engineering",
+					"unknown fixes escalate to engineering and end as engineering resolved",
+				],
+			],
+			["customer-resolved", "Customer resolved", "end", ["customer resolved"]],
+			[
+				"engineering-resolved",
+				"Engineering resolved",
+				"end",
+				[
+					"engineering resolved",
+					"unknown fixes escalate to engineering and end as engineering resolved",
+				],
+			],
 		],
 		edges: [
 			["ticket-classify", "ticket-received", "classify-ticket"],
@@ -305,14 +365,29 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a return authorization flowchart for an ecommerce order. A return request starts the flow, the system verifies the return window, and decides if the return is eligible. Eligible returns get a return label and item inspection. Inspection decides whether the item condition is acceptable. Acceptable items are refunded. Ineligible or unacceptable returns end as rejected returns.",
 		nodes: [
-			["return-request", "Return request received", "start"],
-			["verify-window", "Verify return window", "process"],
-			["eligible", "Return eligible?", "decision"],
-			["issue-label", "Issue return label", "process"],
-			["inspect-item", "Inspect returned item", "process"],
-			["condition-ok", "Condition acceptable?", "decision"],
-			["refund", "Refund customer", "end"],
-			["reject-return", "Reject return", "end"],
+			["return-request", "Return request received", "start", ["return request"]],
+			[
+				"verify-window",
+				"Verify return window",
+				"process",
+				["verifies the return window", "verifies return window"],
+			],
+			["eligible", "Return eligible?", "decision", ["eligible"]],
+			["issue-label", "Issue return label", "process", ["return label"]],
+			["inspect-item", "Inspect returned item", "process", ["inspection"]],
+			[
+				"condition-ok",
+				"Condition acceptable?",
+				"decision",
+				["condition acceptable", "condition is acceptable"],
+			],
+			["refund", "Refund customer", "end", ["refunded"]],
+			[
+				"reject-return",
+				"Reject return",
+				"end",
+				["rejected returns", "ineligible or unacceptable returns end as rejected returns"],
+			],
 		],
 		edges: [
 			["request-window", "return-request", "verify-window"],
@@ -335,16 +410,26 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create an incident escalation flowchart. Monitoring creates an alert and the responder acknowledges it. A severity decision sends high severity incidents to an incident bridge, medium severity incidents to a triage queue, and low severity incidents to monitoring. The bridge mitigates impact, sends customer communications, and resolves the incident. Triage checks whether there is a fix. If yes, resolve the incident. If no, escalate to the incident bridge. Monitoring low severity incidents ends as resolved.",
 		nodes: [
-			["alert-created", "Alert created", "start"],
-			["acknowledge", "Responder acknowledges", "process"],
-			["severity", "Severity?", "decision"],
-			["incident-bridge", "Open incident bridge", "process"],
-			["mitigate", "Mitigate impact", "process"],
-			["customer-comms", "Send customer comms", "process"],
-			["triage-queue", "Triage queue", "process"],
-			["fix-found", "Fix available?", "decision"],
-			["monitor", "Monitor low severity", "process"],
-			["resolved", "Incident resolved", "end"],
+			[
+				"alert-created",
+				"Alert created",
+				"start",
+				["creates an alert", "creates alert", "alert created"],
+			],
+			["acknowledge", "Responder acknowledges", "process", ["acknowledges"]],
+			["severity", "Severity?", "decision", ["severity"]],
+			[
+				"incident-bridge",
+				"Open incident bridge",
+				"process",
+				["incident bridge", "if no, escalate to the incident bridge"],
+			],
+			["mitigate", "Mitigate impact", "process", ["mitigates impact"]],
+			["customer-comms", "Send customer comms", "process", ["sends customer communications"]],
+			["triage-queue", "Triage queue", "process", ["triage queue"]],
+			["fix-found", "Fix available?", "decision", ["fix"]],
+			["monitor", "Monitor low severity", "process", ["monitoring low severity"]],
+			["resolved", "Incident resolved", "end", ["resolved", "resolve"]],
 		],
 		edges: [
 			["alert-ack", "alert-created", "acknowledge"],
@@ -371,21 +456,41 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create an incident response escalation flow. An alert is received, triaged, and checked for whether it is a real incident. False alarms close. Real incidents are declared, stakeholders are notified, logs and deploy evidence are collected, then root cause is classified as deploy, code, or provider. Deploy issues roll back, code issues prepare a hotfix, and provider issues escalate to the provider. Rollback and hotfix paths both check whether the service is stable. Stable service goes to monitoring and then resolved. Unstable service escalates and loops back to collect fresh evidence.",
 		nodes: [
-			["alert", "Alert received", "start"],
-			["triage", "Triage signal", "process"],
-			["confirmed", "Real incident?", "decision"],
-			["false-alarm", "Close as false alarm", "end"],
-			["declare", "Declare incident", "process"],
-			["notify", "Notify stakeholders", "process"],
-			["collect-evidence", "Collect logs and deploy evidence", "process"],
-			["root-cause", "Root cause known?", "decision"],
-			["rollback", "Rollback release", "process"],
-			["hotfix", "Prepare hotfix", "process"],
-			["vendor-escalation", "Escalate to provider", "end"],
-			["stable", "Service stable?", "decision"],
-			["monitor", "Monitor recovery", "process"],
-			["resolved-success", "Resolved", "end"],
-			["escalate-failure", "Escalate", "process"],
+			["alert", "Alert received", "start", ["alert received", "alert is received"]],
+			["triage", "Triage signal", "process", ["triaged"]],
+			["confirmed", "Real incident?", "decision", ["real incident"]],
+			["false-alarm", "Close as false alarm", "end", ["close", "false alarms close"]],
+			["declare", "Declare incident", "process", ["declared"]],
+			["notify", "Notify stakeholders", "process", ["notified"]],
+			[
+				"collect-evidence",
+				"Collect logs and deploy evidence",
+				"process",
+				[
+					"collect logs",
+					"collect evidence",
+					"collect fresh evidence",
+					"logs and deploy evidence collected",
+				],
+			],
+			["root-cause", "Root cause known?", "decision", ["root cause"]],
+			["rollback", "Rollback release", "process", ["roll back"]],
+			["hotfix", "Prepare hotfix", "process", ["prepare hotfix", "prepare a hotfix"]],
+			[
+				"vendor-escalation",
+				"Escalate to provider",
+				"end",
+				["escalate to provider", "escalate to the provider"],
+			],
+			["stable", "Service stable?", "decision", ["service stable", "service is stable"]],
+			["monitor", "Monitor recovery", "process", ["monitoring"]],
+			["resolved-success", "Resolved", "end", ["resolved"]],
+			[
+				"escalate-failure",
+				"Escalate",
+				"process",
+				["escalates", "unstable service escalates and loops back to collect fresh evidence"],
+			],
 		],
 		edges: [
 			["alert-triage", "alert", "triage"],
@@ -416,15 +521,45 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create an invoice approval flowchart. An invoice is received and matched to a purchase order. If it does not match, route it to exception review and decide whether the exception is resolved. Unresolved exceptions reject the invoice. Resolved or matched invoices decide whether the amount is over the approval threshold. Amounts over threshold require director approval before payment. Amounts under threshold schedule payment directly.",
 		nodes: [
-			["invoice-received", "Invoice received", "start"],
-			["match-po", "Match purchase order", "process"],
-			["po-matches", "PO matches?", "decision"],
-			["exception-review", "Exception review", "process"],
-			["exception-resolved", "Exception resolved?", "decision"],
-			["threshold", "Amount over threshold?", "decision"],
-			["director-approval", "Director approval", "process"],
-			["schedule-payment", "Schedule payment", "end"],
-			["reject-invoice", "Reject invoice", "end"],
+			[
+				"invoice-received",
+				"Invoice received",
+				"start",
+				["invoice received", "invoice is received"],
+			],
+			[
+				"match-po",
+				"Match purchase order",
+				"process",
+				["match purchase order", "matched to a purchase order"],
+			],
+			["po-matches", "PO matches?", "decision", ["match"]],
+			[
+				"exception-review",
+				"Exception review",
+				"process",
+				["exception review", "if it does not match, route it to exception review"],
+			],
+			[
+				"exception-resolved",
+				"Exception resolved?",
+				"decision",
+				["exception resolved", "exception is resolved"],
+			],
+			[
+				"threshold",
+				"Amount over threshold?",
+				"decision",
+				["over threshold", "over the approval threshold"],
+			],
+			["director-approval", "Director approval", "process", ["director approval"]],
+			["schedule-payment", "Schedule payment", "end", ["schedule payment", "payment scheduled"]],
+			[
+				"reject-invoice",
+				"Reject invoice",
+				"end",
+				["reject invoice", "reject the invoice", "unresolved exceptions reject the invoice"],
+			],
 		],
 		edges: [
 			["invoice-match", "invoice-received", "match-po"],
@@ -448,14 +583,38 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a feature flag rollout flowchart. A flag is ready, then enabled internally. If internal checks are healthy, enable the beta cohort. If internal checks fail, roll back the feature. Beta also checks health. Healthy beta results ramp to all users and completes rollout. Unhealthy beta rolls back the feature.",
 		nodes: [
-			["flag-ready", "Flag ready", "start"],
-			["enable-internal", "Enable internal users", "process"],
-			["internal-healthy", "Internal healthy?", "decision"],
-			["enable-beta", "Enable beta cohort", "process"],
-			["beta-healthy", "Beta healthy?", "decision"],
-			["ramp-all", "Ramp to all users", "process"],
-			["complete", "Rollout complete", "end"],
-			["rollback", "Rollback feature", "end"],
+			["flag-ready", "Flag ready", "start", ["flag ready", "flag is ready"]],
+			["enable-internal", "Enable internal users", "process", ["enabled internally"]],
+			[
+				"internal-healthy",
+				"Internal healthy?",
+				"decision",
+				["internal healthy", "internal checks healthy", "internal checks are healthy"],
+			],
+			[
+				"enable-beta",
+				"Enable beta cohort",
+				"process",
+				["enable beta cohort", "enable the beta cohort"],
+			],
+			[
+				"beta-healthy",
+				"Beta healthy?",
+				"decision",
+				["beta healthy", "healthy beta", "beta checks health"],
+			],
+			["ramp-all", "Ramp to all users", "process", ["ramp to all users"]],
+			["complete", "Rollout complete", "end", ["completes rollout", "rollout complete"]],
+			[
+				"rollback",
+				"Rollback feature",
+				"end",
+				[
+					"roll back",
+					"if internal checks fail, roll back the feature",
+					"unhealthy beta rolls back the feature",
+				],
+			],
 		],
 		edges: [
 			["ready-internal", "flag-ready", "enable-internal"],
@@ -478,15 +637,43 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a patient intake scheduling flowchart. A patient requests an appointment, the clinic collects intake information, and asks whether there are urgent symptoms. Urgent symptoms go to nurse triage and then a same-day appointment. Non-urgent requests check whether insurance is valid. Valid insurance schedules a routine appointment. Invalid insurance asks if the patient accepts self-pay. Self-pay schedules routine care; otherwise refer to billing.",
 		nodes: [
-			["patient-request", "Patient requests appointment", "start"],
-			["collect-info", "Collect intake information", "process"],
-			["urgent", "Urgent symptoms?", "decision"],
-			["nurse-triage", "Nurse triage", "process"],
-			["same-day", "Same-day appointment", "end"],
-			["insurance-valid", "Insurance valid?", "decision"],
-			["self-pay", "Accepts self-pay?", "decision"],
-			["routine", "Schedule routine appointment", "end"],
-			["billing", "Refer to billing", "end"],
+			[
+				"patient-request",
+				"Patient requests appointment",
+				"start",
+				["requests appointment", "requests an appointment"],
+			],
+			["collect-info", "Collect intake information", "process", ["collects intake information"]],
+			["urgent", "Urgent symptoms?", "decision", ["urgent symptoms"]],
+			["nurse-triage", "Nurse triage", "process", ["nurse triage"]],
+			["same-day", "Same-day appointment", "end", ["same-day appointment"]],
+			[
+				"insurance-valid",
+				"Insurance valid?",
+				"decision",
+				[
+					"insurance valid",
+					"insurance is valid",
+					"non-urgent requests check whether insurance is valid",
+				],
+			],
+			[
+				"self-pay",
+				"Accepts self-pay?",
+				"decision",
+				["accepts self-pay", "invalid insurance asks if the patient accepts self-pay"],
+			],
+			[
+				"routine",
+				"Schedule routine appointment",
+				"end",
+				[
+					"schedule routine appointment",
+					"schedules routine care",
+					"schedules a routine appointment",
+				],
+			],
+			["billing", "Refer to billing", "end", ["refer to billing", "otherwise refer to billing"]],
 		],
 		edges: [
 			["request-info", "patient-request", "collect-info"],
@@ -510,16 +697,36 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a content moderation flowchart. A report is received and an automated scan runs. If severe harm is detected, remove the content and escalate to safety. If not severe, decide whether there is a policy violation. No violation restores content. Violations go to human review, then decide whether action is needed. Needed action limits content; otherwise restore content.",
 		nodes: [
-			["report-received", "Report received", "start"],
-			["automated-scan", "Automated scan", "process"],
-			["severe-harm", "Severe harm?", "decision"],
-			["remove-content", "Remove content", "process"],
-			["safety-escalation", "Safety escalation", "end"],
-			["policy-violation", "Policy violation?", "decision"],
-			["human-review", "Human review", "process"],
-			["action-needed", "Action needed?", "decision"],
-			["limit-content", "Limit content", "end"],
-			["restore-content", "Restore content", "end"],
+			["report-received", "Report received", "start", ["report received", "report is received"]],
+			["automated-scan", "Automated scan", "process", ["automated scan"]],
+			["severe-harm", "Severe harm?", "decision", ["severe harm"]],
+			["remove-content", "Remove content", "process", ["remove content", "remove the content"]],
+			[
+				"safety-escalation",
+				"Safety escalation",
+				"end",
+				["safety escalation", "escalate to safety"],
+			],
+			[
+				"policy-violation",
+				"Policy violation?",
+				"decision",
+				["policy violation", "if not severe, decide whether there is a policy violation"],
+			],
+			["human-review", "Human review", "process", ["human review"]],
+			["action-needed", "Action needed?", "decision", ["action needed", "action is needed"]],
+			["limit-content", "Limit content", "end", ["limits content"]],
+			[
+				"restore-content",
+				"Restore content",
+				"end",
+				[
+					"restore content",
+					"restores content",
+					"no violation restores content",
+					"otherwise restore content",
+				],
+			],
 		],
 		edges: [
 			["report-scan", "report-received", "automated-scan"],
@@ -544,17 +751,37 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a data import validation flowchart. A file is uploaded and parsed. If parsing fails, reject the file. If parsing succeeds, validate the schema. Invalid schema returns mapping errors. Valid schema deduplicates records. If duplicates are found, merge duplicates before importing. If not, import records directly.",
 		nodes: [
-			["file-uploaded", "File uploaded", "start"],
-			["parse-file", "Parse file", "process"],
-			["parse-success", "Parse successful?", "decision"],
-			["validate-schema", "Validate schema", "process"],
-			["schema-valid", "Schema valid?", "decision"],
-			["deduplicate", "Deduplicate records", "process"],
-			["duplicates-found", "Duplicates found?", "decision"],
-			["merge-duplicates", "Merge duplicates", "process"],
-			["import-records", "Import records", "end"],
-			["reject-file", "Reject file", "end"],
-			["mapping-errors", "Return mapping errors", "end"],
+			["file-uploaded", "File uploaded", "start", ["file uploaded", "file is uploaded"]],
+			["parse-file", "Parse file", "process", ["parse file", "file parsed"]],
+			["parse-success", "Parse successful?", "decision", ["parsing succeeds", "parse successful"]],
+			["validate-schema", "Validate schema", "process", ["validate schema", "validate the schema"]],
+			["schema-valid", "Schema valid?", "decision", ["schema valid", "valid schema"]],
+			["deduplicate", "Deduplicate records", "process", ["deduplicates records"]],
+			[
+				"duplicates-found",
+				"Duplicates found?",
+				"decision",
+				["duplicates found", "duplicates are found"],
+			],
+			["merge-duplicates", "Merge duplicates", "process", ["merge duplicates"]],
+			[
+				"import-records",
+				"Import records",
+				"end",
+				["import records", "importing", "if not, import records directly"],
+			],
+			[
+				"reject-file",
+				"Reject file",
+				"end",
+				["reject file", "reject the file", "if parsing fails, reject the file"],
+			],
+			[
+				"mapping-errors",
+				"Return mapping errors",
+				"end",
+				["returns mapping errors", "invalid schema returns mapping errors"],
+			],
 		],
 		edges: [
 			["upload-parse", "file-uploaded", "parse-file"],
@@ -580,16 +807,35 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a password reset security flowchart. A reset is requested. If the account does not exist, show a generic response. If it exists, send the reset email and wait for the link click. If the link is not clicked, expire the token. If clicked, run a risk check. High risk requires step-up verification before resetting the password. Low risk resets the password directly.",
 		nodes: [
-			["reset-requested", "Reset requested", "start"],
-			["account-exists", "Account exists?", "decision"],
-			["generic-response", "Show generic response", "end"],
-			["send-email", "Send reset email", "process"],
-			["link-clicked", "Link clicked?", "decision"],
-			["expire-token", "Expire token", "end"],
-			["risk-check", "Run risk check", "process"],
-			["risk-high", "Risk high?", "decision"],
-			["step-up", "Step-up verification", "process"],
-			["reset-password", "Reset password", "end"],
+			["reset-requested", "Reset requested", "start", ["reset requested", "reset is requested"]],
+			["account-exists", "Account exists?", "decision", ["account exists"]],
+			[
+				"generic-response",
+				"Show generic response",
+				"end",
+				[
+					"show generic response",
+					"show a generic response",
+					"if the account does not exist, show a generic response",
+				],
+			],
+			["send-email", "Send reset email", "process", ["send reset email", "send the reset email"]],
+			["link-clicked", "Link clicked?", "decision", ["link clicked", "link click"]],
+			[
+				"expire-token",
+				"Expire token",
+				"end",
+				["expire token", "expire the token", "if the link is not clicked, expire the token"],
+			],
+			["risk-check", "Run risk check", "process", ["run risk check", "run a risk check"]],
+			["risk-high", "Risk high?", "decision", ["risk high", "high risk"]],
+			["step-up", "Step-up verification", "process", ["step-up verification"]],
+			[
+				"reset-password",
+				"Reset password",
+				"end",
+				["reset password", "resetting the password", "password reset"],
+			],
 		],
 		edges: [
 			["request-account", "reset-requested", "account-exists"],
@@ -613,14 +859,48 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a warehouse reorder flowchart. A stock count is updated, then the system decides whether inventory is below the reorder point. If not, monitor stock. If yes, check supplier availability. Available suppliers create a purchase order and await delivery. Unavailable suppliers use a substitute supplier before creating the purchase order.",
 		nodes: [
-			["stock-updated", "Stock count updated", "start"],
-			["below-reorder", "Below reorder point?", "decision"],
-			["monitor-stock", "Monitor stock", "end"],
-			["check-supplier", "Check supplier availability", "process"],
-			["supplier-available", "Supplier available?", "decision"],
-			["substitute-supplier", "Use substitute supplier", "process"],
-			["purchase-order", "Create purchase order", "process"],
-			["await-delivery", "Await delivery", "end"],
+			[
+				"stock-updated",
+				"Stock count updated",
+				"start",
+				["stock count updated", "stock count is updated"],
+			],
+			[
+				"below-reorder",
+				"Below reorder point?",
+				"decision",
+				["below reorder point", "below the reorder point"],
+			],
+			["monitor-stock", "Monitor stock", "end", ["monitor stock", "if not, monitor stock"]],
+			["check-supplier", "Check supplier availability", "process", ["check supplier availability"]],
+			[
+				"supplier-available",
+				"Supplier available?",
+				"decision",
+				["supplier available", "available supplier"],
+			],
+			[
+				"substitute-supplier",
+				"Use substitute supplier",
+				"process",
+				[
+					"use substitute supplier",
+					"use a substitute supplier",
+					"unavailable suppliers use a substitute supplier before creating the purchase order",
+				],
+			],
+			[
+				"purchase-order",
+				"Create purchase order",
+				"process",
+				[
+					"create purchase order",
+					"create a purchase order",
+					"creating the purchase order",
+					"unavailable suppliers use a substitute supplier before creating the purchase order",
+				],
+			],
+			["await-delivery", "Await delivery", "end", ["await delivery"]],
 		],
 		edges: [
 			["stock-below", "stock-updated", "below-reorder"],
@@ -643,16 +923,51 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a loan application underwriting flowchart. An application is submitted and identity is verified. Failed identity verification declines the application. Verified identity goes to credit review. Acceptable credit moves to income verification. Unacceptable credit goes to manual underwriting, where an exception approval decision either continues to income verification or declines. Income verification approves the loan.",
 		nodes: [
-			["application-submitted", "Application submitted", "start"],
-			["verify-identity", "Verify identity", "process"],
-			["identity-verified", "Identity verified?", "decision"],
-			["credit-review", "Credit review", "process"],
-			["credit-acceptable", "Credit acceptable?", "decision"],
-			["manual-underwrite", "Manual underwriting", "process"],
-			["exception-approved", "Exception approved?", "decision"],
-			["income-verification", "Income verification", "process"],
-			["approve-loan", "Approve loan", "end"],
-			["decline-application", "Decline application", "end"],
+			[
+				"application-submitted",
+				"Application submitted",
+				"start",
+				["application submitted", "application is submitted"],
+			],
+			["verify-identity", "Verify identity", "process", ["verify identity", "identity verified"]],
+			[
+				"identity-verified",
+				"Identity verified?",
+				"decision",
+				["identity verified", "verified identity"],
+			],
+			["credit-review", "Credit review", "process", ["credit review"]],
+			[
+				"credit-acceptable",
+				"Credit acceptable?",
+				"decision",
+				["credit acceptable", "acceptable credit"],
+			],
+			[
+				"manual-underwrite",
+				"Manual underwriting",
+				"process",
+				["manual underwriting", "unacceptable credit goes to manual underwriting"],
+			],
+			[
+				"exception-approved",
+				"Exception approved?",
+				"decision",
+				["exception approval", "exception approved"],
+			],
+			["income-verification", "Income verification", "process", ["income verification"]],
+			["approve-loan", "Approve loan", "end", ["approve loan", "approves the loan"]],
+			[
+				"decline-application",
+				"Decline application",
+				"end",
+				[
+					"decline application",
+					"declines the application",
+					"application declined",
+					"failed identity verification declines the application",
+				],
+			],
 		],
 		edges: [
 			["application-identity", "application-submitted", "verify-identity"],
@@ -678,14 +993,58 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a customer offboarding retention flowchart. A customer requests cancellation and the team collects a cancellation reason. If the customer is eligible for a save offer, present the offer and decide whether it is accepted. Accepted offers retain the customer. Declined offers confirm cancellation and close the account. If the customer is not eligible for a save offer, confirm cancellation directly and close the account.",
 		nodes: [
-			["cancel-request", "Cancellation requested", "start"],
-			["collect-reason", "Collect cancellation reason", "process"],
-			["save-eligible", "Save offer eligible?", "decision"],
-			["present-offer", "Present save offer", "process"],
-			["offer-accepted", "Offer accepted?", "decision"],
-			["retain-customer", "Retain customer", "end"],
-			["confirm-cancel", "Confirm cancellation", "process"],
-			["close-account", "Close account", "end"],
+			[
+				"cancel-request",
+				"Cancellation requested",
+				"start",
+				["cancellation requested", "requests cancellation"],
+			],
+			[
+				"collect-reason",
+				"Collect cancellation reason",
+				"process",
+				["collect cancellation reason", "collects a cancellation reason"],
+			],
+			[
+				"save-eligible",
+				"Save offer eligible?",
+				"decision",
+				["save offer eligible", "eligible for a save offer"],
+			],
+			[
+				"present-offer",
+				"Present save offer",
+				"process",
+				["present save offer", "present the offer", "present offer"],
+			],
+			["offer-accepted", "Offer accepted?", "decision", ["offer accepted", "offer is accepted"]],
+			[
+				"retain-customer",
+				"Retain customer",
+				"end",
+				["retain customer", "retains the customer", "customer retained"],
+			],
+			[
+				"confirm-cancel",
+				"Confirm cancellation",
+				"process",
+				[
+					"confirm cancellation",
+					"declined offers confirm cancellation and close the account",
+					"if the customer is not eligible for a save offer, confirm cancellation directly and close the account",
+				],
+			],
+			[
+				"close-account",
+				"Close account",
+				"end",
+				[
+					"close account",
+					"close the account",
+					"declined offers confirm cancellation and close the account",
+					"if the customer is not eligible for a save offer, confirm cancellation directly and close the account",
+				],
+			],
 		],
 		edges: [
 			["cancel-reason", "cancel-request", "collect-reason"],
@@ -708,17 +1067,32 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a bug report routing flowchart. A bug is filed and the team tries to reproduce it. If it cannot be reproduced, request more details. If reproduced, decide whether it has security impact. Security issues go to security triage, then a hotfix branch, then release fix. Non-security issues decide whether priority is high. High priority goes to the sprint backlog and releases a fix. Low priority goes to the regular backlog.",
 		nodes: [
-			["bug-filed", "Bug filed", "start"],
-			["reproduce", "Reproduce issue", "process"],
-			["reproduced", "Reproduced?", "decision"],
-			["request-details", "Request more details", "end"],
-			["security-impact", "Security impact?", "decision"],
-			["security-triage", "Security triage", "process"],
-			["hotfix-branch", "Hotfix branch", "process"],
-			["priority-high", "Priority high?", "decision"],
-			["sprint-backlog", "Sprint backlog", "process"],
-			["regular-backlog", "Regular backlog", "end"],
-			["release-fix", "Release fix", "end"],
+			["bug-filed", "Bug filed", "start", ["bug filed", "bug is filed"]],
+			["reproduce", "Reproduce issue", "process", ["reproduce"]],
+			["reproduced", "Reproduced?", "decision", ["reproduced"]],
+			[
+				"request-details",
+				"Request more details",
+				"end",
+				["request more details", "if it cannot be reproduced, request more details"],
+			],
+			["security-impact", "Security impact?", "decision", ["security impact"]],
+			["security-triage", "Security triage", "process", ["security triage"]],
+			["hotfix-branch", "Hotfix branch", "process", ["hotfix branch"]],
+			[
+				"priority-high",
+				"Priority high?",
+				"decision",
+				[
+					"priority high",
+					"priority is high",
+					"high priority",
+					"non-security issues decide whether priority is high",
+				],
+			],
+			["sprint-backlog", "Sprint backlog", "process", ["sprint backlog"]],
+			["regular-backlog", "Regular backlog", "end", ["regular backlog"]],
+			["release-fix", "Release fix", "end", ["release fix", "release a fix", "releases a fix"]],
 		],
 		edges: [
 			["bug-reproduce", "bug-filed", "reproduce"],
@@ -744,16 +1118,46 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create an expense reimbursement flowchart. An expense is submitted. If the receipt is missing, request a receipt. If attached, run a policy check. Expenses within policy go to manager approval and then payment. Out-of-policy expenses go to finance exception review. Approved exceptions go to manager approval; rejected exceptions reject the expense.",
 		nodes: [
-			["expense-submitted", "Expense submitted", "start"],
-			["receipt-attached", "Receipt attached?", "decision"],
-			["request-receipt", "Request receipt", "end"],
-			["policy-check", "Policy check", "process"],
-			["within-policy", "Within policy?", "decision"],
-			["finance-exception", "Finance exception review", "process"],
-			["exception-approved", "Exception approved?", "decision"],
-			["manager-approval", "Manager approval", "process"],
-			["approve-payment", "Approve payment", "end"],
-			["reject-expense", "Reject expense", "end"],
+			[
+				"expense-submitted",
+				"Expense submitted",
+				"start",
+				["expense submitted", "expense is submitted"],
+			],
+			[
+				"receipt-attached",
+				"Receipt attached?",
+				"decision",
+				["receipt attached", "receipt is attached"],
+			],
+			[
+				"request-receipt",
+				"Request receipt",
+				"end",
+				["request receipt", "request a receipt", "if the receipt is missing, request a receipt"],
+			],
+			["policy-check", "Policy check", "process", ["policy check"]],
+			["within-policy", "Within policy?", "decision", ["within policy"]],
+			[
+				"finance-exception",
+				"Finance exception review",
+				"process",
+				["finance exception review", "out-of-policy expenses go to finance exception review"],
+			],
+			[
+				"exception-approved",
+				"Exception approved?",
+				"decision",
+				["exception approved", "approved exceptions"],
+			],
+			["manager-approval", "Manager approval", "process", ["manager approval"]],
+			["approve-payment", "Approve payment", "end", ["payment"]],
+			[
+				"reject-expense",
+				"Reject expense",
+				"end",
+				["reject expense", "reject the expense", "rejected exceptions reject the expense"],
+			],
 		],
 		edges: [
 			["expense-receipt", "expense-submitted", "receipt-attached"],
@@ -777,15 +1181,48 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a restaurant waitlist flowchart. A party arrives, the host quotes a wait time, and checks whether a table is available. If available, seat the party. If not, add the party to the waitlist. When notified, decide whether the party responds. No response removes the party from the list. If they respond, check whether the table is ready. Ready seats the party; not ready keeps waiting and checks response again.",
 		nodes: [
-			["party-arrives", "Party arrives", "start"],
-			["quote-wait", "Quote wait time", "process"],
-			["table-available", "Table available?", "decision"],
-			["seat-party", "Seat party", "end"],
-			["add-waitlist", "Add to waitlist", "process"],
-			["party-responds", "Party responds?", "decision"],
-			["remove-list", "Remove from list", "end"],
-			["table-ready", "Table ready?", "decision"],
-			["keep-waiting", "Keep waiting", "process"],
+			["party-arrives", "Party arrives", "start", ["party arrives"]],
+			["quote-wait", "Quote wait time", "process", ["quote wait time", "quotes a wait time"]],
+			[
+				"table-available",
+				"Table available?",
+				"decision",
+				["table available", "table is available"],
+			],
+			["seat-party", "Seat party", "end", ["seat party", "seat the party", "seats the party"]],
+			[
+				"add-waitlist",
+				"Add to waitlist",
+				"process",
+				[
+					"add to waitlist",
+					"add the party to the waitlist",
+					"if not, add the party to the waitlist",
+				],
+			],
+			["party-responds", "Party responds?", "decision", ["party responds", "responds"]],
+			[
+				"remove-list",
+				"Remove from list",
+				"end",
+				[
+					"remove from list",
+					"removes the party",
+					"remove party",
+					"no response removes the party from the list",
+				],
+			],
+			["table-ready", "Table ready?", "decision", ["table ready", "table is ready"]],
+			[
+				"keep-waiting",
+				"Keep waiting",
+				"process",
+				[
+					"keeps waiting",
+					"not ready keeps waiting",
+					"not ready keeps waiting and checks response again",
+				],
+			],
 		],
 		edges: [
 			["arrives-quote", "party-arrives", "quote-wait"],
@@ -810,16 +1247,47 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a CI release gate flowchart. A commit is merged and the test suite runs. Failed tests block release. Passing tests build an artifact and run a security scan. A failed scan blocks release. A clean scan deploys a canary. If the canary is healthy, promote to production. If not, roll back the canary.",
 		nodes: [
-			["commit-merged", "Commit merged", "start"],
-			["run-tests", "Run test suite", "process"],
-			["tests-pass", "Tests pass?", "decision"],
-			["block-release", "Block release", "end"],
-			["build-artifact", "Build artifact", "process"],
-			["scan-clean", "Security scan clean?", "decision"],
-			["deploy-canary", "Deploy canary", "process"],
-			["canary-healthy", "Canary healthy?", "decision"],
-			["promote-production", "Promote production", "end"],
-			["rollback-canary", "Rollback canary", "end"],
+			["commit-merged", "Commit merged", "start", ["commit merged", "commit is merged"]],
+			[
+				"run-tests",
+				"Run test suite",
+				"process",
+				["run test suite", "run the test suite", "test suite runs"],
+			],
+			["tests-pass", "Tests pass?", "decision", ["tests pass", "passing tests"]],
+			[
+				"block-release",
+				"Block release",
+				"end",
+				[
+					"block release",
+					"blocks release",
+					"failed tests block release",
+					"failed scan blocks release",
+					"a failed scan blocks release",
+				],
+			],
+			["build-artifact", "Build artifact", "process", ["build artifact", "build an artifact"]],
+			[
+				"scan-clean",
+				"Security scan clean?",
+				"decision",
+				["security scan clean", "scan clean", "clean scan"],
+			],
+			["deploy-canary", "Deploy canary", "process", ["deploy canary", "deploys a canary"]],
+			["canary-healthy", "Canary healthy?", "decision", ["canary healthy", "canary is healthy"]],
+			[
+				"promote-production",
+				"Promote production",
+				"end",
+				["promote production", "promote to production"],
+			],
+			[
+				"rollback-canary",
+				"Rollback canary",
+				"end",
+				["roll back canary", "roll back the canary", "if not, roll back the canary"],
+			],
 		],
 		edges: [
 			["commit-tests", "commit-merged", "run-tests"],
@@ -844,17 +1312,55 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a procurement vendor approval flowchart. A business need is identified and quotes are collected. If there is a preferred vendor, go to risk assessment. If not, run a competitive bid first and then risk assessment. Risk that is not acceptable rejects the vendor. Acceptable risk goes to legal review. If legal approves, create the contract. If legal does not approve, renegotiate terms and repeat legal review.",
 		nodes: [
-			["need-identified", "Need identified", "start"],
-			["collect-quotes", "Collect quotes", "process"],
-			["preferred-vendor", "Preferred vendor?", "decision"],
-			["competitive-bid", "Competitive bid", "process"],
-			["risk-assessment", "Risk assessment", "process"],
-			["risk-acceptable", "Risk acceptable?", "decision"],
-			["legal-review", "Legal review", "process"],
-			["legal-approved", "Legal approved?", "decision"],
-			["renegotiate", "Renegotiate terms", "process"],
-			["create-contract", "Create contract", "end"],
-			["reject-vendor", "Reject vendor", "end"],
+			["need-identified", "Need identified", "start", ["need identified", "need is identified"]],
+			[
+				"collect-quotes",
+				"Collect quotes",
+				"process",
+				["collect quotes", "quotes collected", "quotes are collected"],
+			],
+			["preferred-vendor", "Preferred vendor?", "decision", ["preferred vendor"]],
+			[
+				"competitive-bid",
+				"Competitive bid",
+				"process",
+				["competitive bid", "if not, run a competitive bid first and then risk assessment"],
+			],
+			[
+				"risk-assessment",
+				"Risk assessment",
+				"process",
+				["risk assessment", "if not, run a competitive bid first and then risk assessment"],
+			],
+			[
+				"risk-acceptable",
+				"Risk acceptable?",
+				"decision",
+				["risk acceptable", "acceptable risk", "risk is acceptable"],
+			],
+			[
+				"legal-review",
+				"Legal review",
+				"process",
+				["legal review", "if legal does not approve, renegotiate terms and repeat legal review"],
+			],
+			["legal-approved", "Legal approved?", "decision", ["legal approved", "legal approves"]],
+			[
+				"renegotiate",
+				"Renegotiate terms",
+				"process",
+				[
+					"renegotiate terms",
+					"if legal does not approve, renegotiate terms and repeat legal review",
+				],
+			],
+			["create-contract", "Create contract", "end", ["create contract", "create the contract"]],
+			[
+				"reject-vendor",
+				"Reject vendor",
+				"end",
+				["reject vendor", "rejects the vendor", "risk that is not acceptable rejects the vendor"],
+			],
 		],
 		edges: [
 			["need-quotes", "need-identified", "collect-quotes"],
@@ -881,14 +1387,55 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Create a subscription renewal dunning flowchart. A renewal is due and the system charges payment. If payment succeeds, renew the subscription. If payment fails, send a reminder and decide whether payment was updated. Updated payment retries the charge. If not updated, decide whether the grace period has expired. Expired grace pauses the subscription; otherwise send another reminder.",
 		nodes: [
-			["renewal-due", "Renewal due", "start"],
-			["charge-payment", "Charge payment", "process"],
-			["payment-succeeded", "Payment succeeded?", "decision"],
-			["renew-subscription", "Renew subscription", "end"],
-			["send-reminder", "Send reminder", "process"],
-			["payment-updated", "Payment updated?", "decision"],
-			["grace-expired", "Grace period expired?", "decision"],
-			["pause-subscription", "Pause subscription", "end"],
+			["renewal-due", "Renewal due", "start", ["renewal due", "renewal is due"]],
+			["charge-payment", "Charge payment", "process", ["charges payment"]],
+			[
+				"payment-succeeded",
+				"Payment succeeded?",
+				"decision",
+				["payment succeeds", "payment succeeded"],
+			],
+			[
+				"renew-subscription",
+				"Renew subscription",
+				"end",
+				["renew subscription", "renew the subscription"],
+			],
+			[
+				"send-reminder",
+				"Send reminder",
+				"process",
+				[
+					"send reminder",
+					"send a reminder",
+					"send another reminder",
+					"if payment fails, send a reminder and decide whether payment was updated",
+					"otherwise send another reminder",
+				],
+			],
+			[
+				"payment-updated",
+				"Payment updated?",
+				"decision",
+				["payment updated", "payment was updated", "updated payment"],
+			],
+			[
+				"grace-expired",
+				"Grace period expired?",
+				"decision",
+				[
+					"grace period expired",
+					"grace period has expired",
+					"expired grace",
+					"if not updated, decide whether the grace period has expired",
+				],
+			],
+			[
+				"pause-subscription",
+				"Pause subscription",
+				"end",
+				["pause subscription", "pauses the subscription"],
+			],
 		],
 		edges: [
 			["renewal-charge", "renewal-due", "charge-payment"],
@@ -917,12 +1464,28 @@ const flowchartScenarioDefinitions = [
 			{ aliases: ["Cloudflare"], name: "Cloudflare", slug: "cloudflare" },
 		],
 		nodes: [
-			["push", "Push to GitHub", "start", "github"],
-			["build", "Docker builds the image", "process", "docker"],
-			["tests", "Run the test suite", "process"],
-			["passed", "Tests pass?", "decision"],
-			["ship", "Ship to Cloudflare Workers", "end", "cloudflare"],
-			["notify", "Notify the team", "end"],
+			["push", "Push to GitHub", "start", ["push to GitHub"], "github"],
+			[
+				"build",
+				"Docker builds the image",
+				"process",
+				["Docker builds", "Docker builds the image", "build Docker"],
+				"docker",
+			],
+			[
+				"tests",
+				"Run the test suite",
+				"process",
+				["run the test suite", "run test suite", "test suite runs"],
+			],
+			["passed", "Tests pass?", "decision", ["tests pass"]],
+			["ship", "Ship to Cloudflare Workers", "end", ["ship to Cloudflare Workers"], "cloudflare"],
+			[
+				"notify",
+				"Notify the team",
+				"end",
+				["notify the team", "notify team", "otherwise notify the team and stop"],
+			],
 		],
 		edges: [
 			["push-build", "push", "build"],
@@ -953,14 +1516,79 @@ const flowchartScenarioDefinitions = [
 			{ name: "Sentry", slug: "sentry" },
 		],
 		nodes: [
-			["request", "Next.js page receives question", "start", "nextjs"],
-			["edge", "Vercel routes the request", "process", "vercel"],
-			["cache", "Cached in Redis?", "decision", "redis"],
-			["cached", "Return cached answer", "end"],
-			["model", "Call the OpenAI model", "process", "openai"],
-			["store", "Store answer in Redis", "process", "redis"],
-			["log", "Log errors to Sentry", "process", "sentry"],
-			["answer", "Return the answer", "end"],
+			[
+				"request",
+				"Next.js page receives question",
+				"start",
+				[
+					"Next.js page receives question",
+					"Next.js page receives the question",
+					"receives question",
+					"receives the question",
+				],
+				"nextjs",
+			],
+			["edge", "Vercel routes the request", "process", ["Vercel"], "vercel"],
+			[
+				"cache",
+				"Cached in Redis?",
+				"decision",
+				["cached in Redis", "Redis cache", "cache hit"],
+				"redis",
+			],
+			[
+				"cached",
+				"Return cached answer",
+				"end",
+				["return cached answer", "return the cached answer", "cached answer returned"],
+			],
+			[
+				"model",
+				"Call the OpenAI model",
+				"process",
+				[
+					"call the OpenAI model",
+					"call OpenAI",
+					"call OpenAI model",
+					"on a miss, call the openai model, store the answer in redis, and log any errors to sentry before returning the answer",
+				],
+				"openai",
+			],
+			[
+				"store",
+				"Store answer in Redis",
+				"process",
+				[
+					"store answer in Redis",
+					"store the answer in Redis",
+					"answer stored in Redis",
+					"on a miss, call the openai model, store the answer in redis, and log any errors to sentry before returning the answer",
+				],
+				"redis",
+			],
+			[
+				"log",
+				"Log errors to Sentry",
+				"process",
+				[
+					"log errors to Sentry",
+					"log any errors to Sentry",
+					"Sentry logs errors",
+					"on a miss, call the openai model, store the answer in redis, and log any errors to sentry before returning the answer",
+				],
+				"sentry",
+			],
+			[
+				"answer",
+				"Return the answer",
+				"end",
+				[
+					"return the answer",
+					"return answer",
+					"answer returned",
+					"on a miss, call the openai model, store the answer in redis, and log any errors to sentry before returning the answer",
+				],
+			],
 		],
 		edges: [
 			["request-edge", "request", "edge"],

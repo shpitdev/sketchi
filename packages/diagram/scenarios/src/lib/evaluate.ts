@@ -18,6 +18,7 @@ import { termTokens } from "@sketchi/icon-catalog";
 import type { DiagramScenario } from "./diagram-scenarios.js";
 import type { FlowchartScenario, DiagramScenarioLogo } from "./scenarios.js";
 import type { SequenceScenario, SequenceScenarioMessage } from "./sequence-scenarios.js";
+import { flowchartLabelMatches } from "./flowchart-labels.js";
 
 export interface ScenarioCheck {
 	id: string;
@@ -39,37 +40,202 @@ function normalizeLabel(label: string): string {
 	return label.trim().toLowerCase();
 }
 
-function hasLabel(labels: readonly string[], expected: string): boolean {
-	const normalized = normalizeLabel(expected);
-	return labels.some((label) => normalizeLabel(label).includes(normalized));
-}
-
 function edgeMatchesExpected(
 	diagram: FlowchartDiagram,
 	expected: FlowchartScenario["assertions"]["requiredEdges"][number],
+	matchedNodes: ReadonlyMap<string, ReadonlySet<string>>,
+	paths?: { fromStart: ReadonlySet<string>; toEnd: ReadonlySet<string> },
 ): boolean {
-	const nodesById = new Map(diagram.nodes.map((node) => [node.id, node]));
-	const expectedSourceLabel = normalizeLabel(expected.sourceLabel);
-	const expectedTargetLabel = normalizeLabel(expected.targetLabel);
-	const expectedBranchLabel = expected.label ? normalizeLabel(expected.label) : null;
+	return diagram.edges.some(
+		(edge) =>
+			matchedNodes.get(expected.sourceId)?.has(edge.source) &&
+			matchedNodes.get(expected.targetId)?.has(edge.target) &&
+			(!paths || (paths.fromStart.has(edge.source) && paths.toEnd.has(edge.target))) &&
+			(!expected.labels || flowchartLabelMatches(edge.label ?? "", expected.labels)),
+	);
+}
 
-	return diagram.edges.some((edge) => {
-		const source = nodesById.get(edge.source);
-		const target = nodesById.get(edge.target);
+/** Keep split-step witnesses on a continuous scenario-valid start-to-end path. */
+function scenarioPathFinder(scenario: FlowchartScenario, diagram: FlowchartDiagram) {
+	const kinds = new Map(scenario.assertions.requiredNodes.map((node) => [node.id, node.kind]));
+	// Branch matching does not depend on ownership; do it once, not per search state.
+	const connections = diagram.edges.map((edge) => ({
+		edge,
+		expected: scenario.assertions.requiredEdges.filter(
+			(expected) => !expected.labels || flowchartLabelMatches(edge.label ?? "", expected.labels),
+		),
+	}));
+	return (
+		owners: ReadonlyMap<string, string>,
+		domains?: ReadonlyMap<string, readonly string[]>,
+	) => {
+		const steps = (node: string): readonly string[] => {
+			const owner = owners.get(node);
+			return owner === undefined ? (domains?.get(node) ?? []) : [owner];
+		};
+		const allowed = connections
+			.filter(({ edge, expected }) =>
+				steps(edge.source).some((source) =>
+					steps(edge.target).some(
+						(target) =>
+							source === target ||
+							expected.some((pair) => pair.sourceId === source && pair.targetId === target),
+					),
+				),
+			)
+			.map(({ edge }) => edge);
+		function reachable(kind: "start" | "end", reverse: boolean): Set<string> {
+			const queue = diagram.nodes
+				.filter((node) => steps(node.id).some((step) => kinds.get(step) === kind))
+				.map((node) => node.id);
+			const visited = new Set(queue);
+			for (let index = 0; index < queue.length; index += 1) {
+				for (const edge of allowed) {
+					if ((reverse ? edge.target : edge.source) !== queue[index]) continue;
+					const next = reverse ? edge.source : edge.target;
+					if (!visited.has(next)) {
+						visited.add(next);
+						queue.push(next);
+					}
+				}
+			}
+			return visited;
+		}
+		return { fromStart: reachable("start", false), toEnd: reachable("end", true) };
+	};
+}
 
-		if (!source || !target) {
+const MAX_OWNERSHIP_STATES = 10_000;
+
+/** Find edge witnesses whose model nodes have one consistent step ownership. */
+function connectedStepOwners(
+	scenario: FlowchartScenario,
+	diagram: FlowchartDiagram,
+	matchedNodes: ReadonlyMap<string, ReadonlySet<string>>,
+	findPaths: ReturnType<typeof scenarioPathFinder>,
+): { owners: Map<string, string> | undefined; exhausted: boolean } {
+	const choices = scenario.assertions.requiredEdges.map((expected) => ({
+		expected,
+		candidates: diagram.edges.filter(
+			(edge) =>
+				matchedNodes.get(expected.sourceId)?.has(edge.source) &&
+				matchedNodes.get(expected.targetId)?.has(edge.target) &&
+				(!expected.labels || flowchartLabelMatches(edge.label ?? "", expected.labels)),
+		),
+	}));
+	const domains = new Map<string, string[]>();
+	for (const [step, nodes] of matchedNodes) {
+		for (const node of nodes) domains.set(node, [...(domains.get(node) ?? []), step]);
+	}
+	const uniqueOwners = new Map(
+		[...domains]
+			.filter(([, steps]) => steps.length === 1)
+			.map(([node, steps]) => [node, steps[0]!]),
+	);
+	let visitedStates = 0;
+	let exhausted = false;
+	function enterState(): boolean {
+		if (visitedStates >= MAX_OWNERSHIP_STATES) {
+			exhausted = true;
 			return false;
 		}
-
-		const sourceMatches = normalizeLabel(source.label).includes(expectedSourceLabel);
-		const targetMatches = normalizeLabel(target.label).includes(expectedTargetLabel);
-		const branchMatches =
-			expectedBranchLabel === null
-				? true
-				: normalizeLabel(edge.label ?? "").includes(expectedBranchLabel);
-
-		return sourceMatches && targetMatches && branchMatches;
-	});
+		visitedStates += 1;
+		return true;
+	}
+	function viableCandidates(
+		choice: (typeof choices)[number],
+		owners: ReadonlyMap<string, string>,
+		paths: ReturnType<ReturnType<typeof scenarioPathFinder>>,
+	) {
+		return choice.candidates.filter((edge) => {
+			const sourceOwner = owners.get(edge.source);
+			const targetOwner = owners.get(edge.target);
+			return (
+				(sourceOwner === undefined || sourceOwner === choice.expected.sourceId) &&
+				(targetOwner === undefined || targetOwner === choice.expected.targetId) &&
+				paths.fromStart.has(edge.source) &&
+				paths.toEnd.has(edge.target)
+			);
+		});
+	}
+	function completePaths(owners: ReadonlyMap<string, string>): Map<string, string> | undefined {
+		if (!enterState()) return undefined;
+		// Relax unowned nodes to all their roles. Impossible paths can be pruned
+		// without enumerating irrelevant ambiguity or rejecting a valid assignment.
+		const possiblePaths = findPaths(owners, domains);
+		if (choices.some((choice) => viableCandidates(choice, owners, possiblePaths).length === 0))
+			return undefined;
+		const paths = findPaths(owners);
+		if (
+			choices.every(({ expected, candidates }) =>
+				candidates.some(
+					(edge) =>
+						owners.get(edge.source) === expected.sourceId &&
+						owners.get(edge.target) === expected.targetId &&
+						paths.fromStart.has(edge.source) &&
+						paths.toEnd.has(edge.target),
+				),
+			)
+		)
+			return new Map(owners);
+		const unowned = [...domains].find(
+			([node]) =>
+				!owners.has(node) && possiblePaths.fromStart.has(node) && possiblePaths.toEnd.has(node),
+		);
+		if (!unowned) return undefined;
+		for (const step of unowned[1]) {
+			const next = new Map(owners);
+			next.set(unowned[0], step);
+			const result = completePaths(next);
+			if (result) return result;
+			if (exhausted) return undefined;
+		}
+		return undefined;
+	}
+	const failed = new Set<string>();
+	function search(
+		pending: readonly number[],
+		owners: ReadonlyMap<string, string>,
+	): Map<string, string> | undefined {
+		if (pending.length === 0) return completePaths(owners);
+		if (!enterState()) return undefined;
+		const key = JSON.stringify([pending, [...owners].sort(([a], [b]) => a.localeCompare(b))]);
+		if (failed.has(key)) return undefined;
+		let selected = pending[0]!;
+		let candidates: FlowchartDiagram["edges"] | undefined;
+		const possiblePaths = findPaths(owners, domains);
+		for (const index of pending) {
+			const choice = choices[index]!;
+			const viable = viableCandidates(choice, owners, possiblePaths);
+			if (viable.length === 0) {
+				failed.add(key);
+				return undefined;
+			}
+			if (candidates === undefined || viable.length < candidates.length) {
+				selected = index;
+				candidates = viable;
+			}
+		}
+		const choice = choices[selected]!;
+		for (const edge of candidates ?? []) {
+			const next = new Map(owners);
+			next.set(edge.source, choice.expected.sourceId);
+			next.set(edge.target, choice.expected.targetId);
+			const result = search(
+				pending.filter((index) => index !== selected),
+				next,
+			);
+			if (result) return result;
+			if (exhausted) return undefined;
+		}
+		failed.add(key);
+		return undefined;
+	}
+	const owners = search(
+		choices.map((_, index) => index),
+		uniqueOwners,
+	);
+	return { owners, exhausted };
 }
 
 /** What logo checks need from a scenario. */
@@ -141,7 +307,61 @@ export function scenarioLogoChecks(
 }
 
 function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram): ScenarioCheck[] {
-	const nodeLabels = diagram.nodes.map((node) => node.label);
+	const matchedNodes = new Map(
+		scenario.assertions.requiredNodes.map((expected) => [
+			expected.id,
+			new Set(
+				diagram.nodes
+					.filter(
+						(node) =>
+							node.kind === expected.kind && flowchartLabelMatches(node.label, expected.labels),
+					)
+					.map((node) => node.id),
+			),
+		]),
+	);
+	// A node-only maximum matching supplies useful failure diagnostics if no
+	// consistent connected assignment exists; successful checks use edge witnesses.
+	const owners = new Map<string, string>();
+	function assignStep(stepId: string, visited: Set<string>): boolean {
+		for (const nodeId of matchedNodes.get(stepId) ?? []) {
+			if (visited.has(nodeId)) continue;
+			visited.add(nodeId);
+			const owner = owners.get(nodeId);
+			if (owner === undefined || assignStep(owner, visited)) {
+				owners.set(nodeId, stepId);
+				return true;
+			}
+		}
+		return false;
+	}
+	for (const step of scenario.assertions.requiredNodes) assignStep(step.id, new Set());
+	const findPaths = scenarioPathFinder(scenario, diagram);
+	const connectedSearch =
+		owners.size === scenario.assertions.requiredNodes.length
+			? connectedStepOwners(scenario, diagram, matchedNodes, findPaths)
+			: undefined;
+	const selectedOwners = connectedSearch?.owners ?? owners;
+	for (const [stepId, nodes] of matchedNodes) {
+		for (const nodeId of nodes) {
+			if (
+				!selectedOwners.has(nodeId) &&
+				[...matchedNodes.values()].filter((set) => set.has(nodeId)).length === 1
+			) {
+				selectedOwners.set(nodeId, stepId);
+			}
+		}
+	}
+	const ownedNodes = new Map(
+		scenario.assertions.requiredNodes.map((node) => [
+			node.id,
+			new Set(
+				[...selectedOwners].filter(([, stepId]) => stepId === node.id).map(([nodeId]) => nodeId),
+			),
+		]),
+	);
+	const distinctSteps = new Set(selectedOwners.values());
+	const paths = findPaths(selectedOwners);
 	const branchLabels = diagram.edges
 		.map((edge) => edge.label)
 		.filter((label): label is string => Boolean(label));
@@ -163,23 +383,35 @@ function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram)
 			passed: nodeKinds.has(kind),
 			message: `Expected at least one ${kind} node.`,
 		})),
-		...scenario.assertions.requiredNodeLabels.map((label) => ({
-			id: `node-label:${label}`,
-			passed: hasLabel(nodeLabels, label),
-			message: `Expected a node label like "${label}".`,
+		...scenario.assertions.requiredNodes.map((node) => ({
+			id: `node-label:${node.label}`,
+			passed: distinctSteps.has(node.id),
+			message: `Expected a distinct ${node.kind} node matching any of: ${node.labels.join(" | ")}.`,
 		})),
 		...scenario.assertions.requiredBranchLabels.map((label) => ({
 			id: `branch-label:${label}`,
-			passed: hasLabel(branchLabels, label),
-			message: `Expected a decision branch label like "${label}".`,
+			passed: branchLabels.some((branch) =>
+				flowchartLabelMatches(
+					branch,
+					scenario.assertions.requiredEdges
+						.filter((edge) => edge.label === label)
+						.flatMap((edge) => edge.labels ?? []),
+				),
+			),
+			message: `Expected a decision branch label like "${label}" or its alternatives.`,
 		})),
-		...scenario.assertions.requiredEdges.map((edge) => ({
-			id: `edge:${edge.sourceLabel}->${edge.targetLabel}${edge.label ? `:${edge.label}` : ""}`,
-			passed: edgeMatchesExpected(diagram, edge),
-			message: `Expected an edge from "${edge.sourceLabel}" to "${
-				edge.targetLabel
-			}"${edge.label ? ` labeled like "${edge.label}"` : ""}.`,
-		})),
+		...scenario.assertions.requiredEdges.map((edge) => {
+			const passed = edgeMatchesExpected(diagram, edge, ownedNodes, paths);
+			return {
+				id: `edge:${edge.sourceLabel}->${edge.targetLabel}${edge.label ? `:${edge.label}` : ""}`,
+				passed,
+				message:
+					`Expected an edge from "${edge.sourceLabel}" to "${edge.targetLabel}"${edge.label ? ` labeled like "${edge.label}"` : ""}.` +
+					(connectedSearch?.exhausted && !passed
+						? ` Ownership search reached its ${MAX_OWNERSHIP_STATES}-state limit; this connection was not verified.`
+						: ""),
+			};
+		}),
 	];
 }
 

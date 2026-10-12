@@ -7,7 +7,8 @@ flowchart LR
   Catalog["scenario catalog"] --> Adapter["generation prompt adapter"]
   Adapter --> Generation["diagram-generation"]
   Catalog --> Expected["expected diagram"]
-  Expected --> Checks["semantic checks"]
+  Catalog --> Checks["prompt-grounded semantic checks"]
+  Expected --> Checks
   Adapter --> CLI["scenario CLI"]
   Checks --> CLI
 ```
@@ -34,7 +35,8 @@ pnpm nx scenario diagram-scenarios -- --scenario pharma-batch-disposition --fixt
 `diagramType`; the CLI (`--list`, `--all`, `--scenario`), the fixture client,
 and the eval harness use it.
 
-- Flowchart scenarios check nodes, branches, edges, and logos.
+- Flowchart scenarios check prompt-grounded steps, node kinds, branches, direct
+  connections, and logos.
 - Sequence scenarios check participants, required messages and their
   chronological order, calls answered by returns (activation bars), and that
   no return is stray.
@@ -43,6 +45,75 @@ Checks that measure the model (logos, sequence structure) score the model's own
 diagram from before candidate enforcement, so a repair never hides a model
 regression when that original diagram is available. Run one with
 `pnpm nx scenario diagram-scenarios -- --scenario checkout-payment-sequence --fixture`.
+
+### Flowchart matching
+
+Each fixture node declares any-of label alternatives using words from its
+scenario prompt. The catalog validates that grounding when loaded. A model
+node must match an alternative **and that step's node kind**. Case,
+punctuation, hyphens, and whitespace are normalized; matching uses whole
+words, so `ineligible` cannot satisfy `eligible`.
+
+Action steps require action-bearing alternatives (`acknowledges`, not just
+`responder`; `sends customer communications`, not just `communications`).
+Named stages or destinations use their names when the prompt supplies no
+action, rather than inventing a fixture-only verb. Decision alternatives
+retain the prompt's criterion, such as `scope clear` or `payment succeeds`.
+
+`flowchart-labels.ts` lists the finite word aliases used on both sides:
+`comms` → `communications`, `rollback` → `roll back`, `retesting` → `retest`,
+and explicit catalog inflections such as `classifies` → `classify` and
+`refunded` → `refund`. There is no general prefix, fuzzy, or semantic matcher.
+Adjacent `not`, `no`, `never`, `without`, `cannot`, and explicit ignore/skip/omit
+forms reject a match. Contracted negatives such as `isn't` normalize to `not`;
+`fails to` and `unable to` also reject a positive action. The guard examines
+preceding words in the same clause, extending over explicit auxiliary/adverb
+forms such as `not yet been successfully`. Commas, colons, semicolons, arrows,
+parentheses, slashes, spaced dashes, sentence punctuation, sentence line breaks,
+and explicit conjunctions (`and`, `or`, `then`, `but`, `so`, `otherwise`) reset
+that context.
+Periods inside names such as `Next.js` are not sentence boundaries, and a
+separator after `not` or its auxiliary/adverb chain retains negation. Thus
+`Incident not resolved` fails, but `No fix: incident resolved` can pass.
+When the prompt itself specifies a negative precondition followed by a
+positive action, the catalog includes that complete phrase as an alternative.
+Every flowchart prompt is audited for negative, missing/invalid, and fallback
+conditions, with full-caption regressions for each affected step and its
+incoming connections. Examples include
+`Failed tests block release`, `No response removes the party from the list`,
+`No violation restores content`, `Risk that is not acceptable rejects the
+vendor`, and short fallback clauses such as `If not, monitor stock`.
+Those conditions do not negate the action;
+`Failed tests do not block release` still fails. These are explicit prompt
+alternatives, not inferred causal or semantic matches.
+
+Each required edge must directly connect a matching source node to a matching
+target node, with an any-of branch-label match when a label is required.
+Multiple model nodes may match one step, allowing separate resolved/review
+end nodes per path. Every required step must have a distinct matching node,
+and **all required edges must fit the same exclusive node ownership**. The
+evaluator searches joint edge witnesses, trying the most constrained edge
+first and memoizing failed ownership states. Each witness must lie on a
+start-to-end path using only required cross-step connections or continuous
+same-step segments. This permits serial intermediate splits and separate
+terminal copies, without stitching a step through an intervening different
+step or moving draft before its decision. A combined node cannot stand in
+for two steps, nor can disconnected/padded matches justify its wiring.
+Maximum bipartite matching supplies failure diagnostics when no connected
+assignment exists; successful edge checks use the connected ownership.
+Optimistic reachability prunes impossible paths before choosing ownership,
+and completion assigns only nodes that can lie on a start-to-end path.
+Search visits at most 10,000 states. If that limit prevents verification,
+failed connection messages report the limit rather than implying a proven
+wiring defect; an independently verified fallback assignment can still pass.
+Minimum node/edge counts remain lower bounds; extra nodes
+do not fail them, and padding cannot replace a missing required step.
+Required kinds, branches, connections, logo checks, and Excalidraw validation
+remain gating checks.
+
+Fixture labels remain in check IDs for stable diagnostics, but do not gate
+label wording. For example, `node-label:Review diagram` accepts an end node
+named `Review`, as the prompt requests. No exact-wording metric is emitted.
 
 ## CLI JSON contract
 
@@ -82,7 +153,7 @@ guarantee that the scenario passes.
 
 The single-scenario stdout object retains `ok` and
 `checks: [{ id, passed, message }]`, alongside its existing result metadata.
-Exit code 0 means every check passed; 1 means evaluation failed; 2 means invalid
+Exit code 0 means every gating check passed; 1 means evaluation failed; 2 means invalid
 CLI usage. `--report-out <file>` saves the same JSON report.
 
 MCP inputs grade the returned normalized diagram, including its logos and
@@ -91,6 +162,14 @@ spec: the MCP runtime can normalize slugs and drop unknown logos. Logo checks
 therefore describe the retained normalized logos, not pre-normalization model
 precision. The adapter does not add, move, or repair logos; use a generation
 response envelope when pre-enforcement model-quality evidence is needed.
+
+## Testing
+
+Vitest covers label normalization, missing steps, wrong kinds/connections/
+branches, deterministic fixture exports, and offline CLI replay of captured
+MCP results. The `ci / required` job runs these Nx tests, typechecks, builds,
+and repository lint/format gates. Capture replay is not a live MCP call;
+these checks do not establish current deployed behavior.
 
 ## Usage
 

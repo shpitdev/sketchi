@@ -1,0 +1,75 @@
+{
+	"ok": true,
+	"result": {
+		"ok": true,
+		"status": "accepted",
+		"normalizedSpec": {
+			"id": "sketchi-diagram-request-intake",
+			"title": "Sketchi diagram request intake",
+			"nodes": [
+				{
+					"id": "prompt",
+					"label": "Prompt received",
+					"kind": "start"
+				},
+				{
+					"id": "extract",
+					"label": "Extract requirements",
+					"kind": "process"
+				},
+				{
+					"id": "scope",
+					"label": "Is scope clear?",
+					"kind": "decision"
+				},
+				{
+					"id": "draft",
+					"label": "Draft typed IR",
+					"kind": "process"
+				},
+				{
+					"id": "review",
+					"label": "Review",
+					"kind": "end"
+				}
+			],
+			"edges": [
+				{
+					"id": "e1",
+					"source": "prompt",
+					"target": "extract"
+				},
+				{
+					"id": "e2",
+					"source": "extract",
+					"target": "scope"
+				},
+				{
+					"id": "e3",
+					"source": "scope",
+					"target": "draft",
+					"label": "Yes"
+				},
+				{
+					"id": "e4",
+					"source": "scope",
+					"target": "review",
+					"label": "No"
+				},
+				{
+					"id": "e5",
+					"source": "draft",
+					"target": "review"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		}
+	},
+	"logs": []
+}

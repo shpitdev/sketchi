@@ -1,4 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
+import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Cause, Effect, Exit, Layer, Schema } from "effect";
@@ -81,6 +82,90 @@ const Report = Schema.fromJsonString(
 );
 
 describe("scenario CLI candidate decoding", () => {
+	for (const connected of [false, true]) {
+		it.live(
+			`grades 24 ambiguously labeled nodes without hanging (connected: ${connected})`,
+			() =>
+				withCandidate("", (directory) =>
+					Effect.gen(function* () {
+						const scenario = getFlowchartScenario("repo-package-interaction-flow");
+						const diagram = {
+							...scenario.expectedDiagram,
+							nodes: [
+								{ id: "start", label: "App request", kind: "start" },
+								...Array.from({ length: 21 }, (_, index) => ({
+									id: `p${index}`,
+									label: "agent core renderer Excalidraw export artifact",
+									kind: "process",
+								})),
+								{ id: "bridge", label: connected ? "agent" : "Unrelated work", kind: "process" },
+								{ id: "end", label: "Hosted response", kind: "end" },
+							],
+							edges: [
+								{ id: "a", source: "start", target: "p0" },
+								{ id: "bridge-a", source: "p0", target: "bridge" },
+								{ id: "bridge-b", source: "bridge", target: "p1" },
+								{ id: "padding-start", source: "start", target: "p6" },
+								...Array.from({ length: 14 }, (_, index) => ({
+									id: `padding-${index}`,
+									source: `p${index + 6}`,
+									target: `p${index + 7}`,
+								})),
+								{ id: "padding-end", source: "p20", target: "bridge" },
+								{ id: "b", source: "p1", target: "p2" },
+								{ id: "c", source: "p2", target: "p3" },
+								{ id: "d", source: "p3", target: "p4" },
+								{ id: "e", source: "p4", target: "p5" },
+								{ id: "f", source: "p5", target: "end" },
+							],
+						};
+						const inputPath = path.join(directory, "ambiguous-build.json");
+						yield* Effect.tryPromise(() =>
+							writeFile(
+								inputPath,
+								JSON.stringify({ ok: true, status: "accepted", normalizedSpec: diagram }),
+							),
+						);
+						// A child-process deadline can interrupt synchronous search; a test
+						// runner's ordinary async timeout cannot stop an infinite recursion.
+						const result = spawnSync(
+							process.execPath,
+							[
+								"--import",
+								"jiti/register",
+								"packages/diagram/scenarios/src/cli.ts",
+								"--scenario",
+								scenario.id,
+								"--input",
+								inputPath,
+							],
+							{ encoding: "utf8", timeout: 10_000 },
+						);
+						assert.strictEqual(result.error, undefined);
+						const report = Schema.decodeUnknownSync(Report)(result.stdout);
+						assert.strictEqual(
+							result.status,
+							connected ? 0 : 1,
+							JSON.stringify(report.checks.filter((check) => !check.passed)),
+						);
+						assert.strictEqual(report.ok, connected);
+						assert.strictEqual(
+							report.checks.find((check) => check.id === "mcp-build-accepted")?.passed,
+							true,
+						);
+						assert.strictEqual(
+							report.checks
+								.filter((check) => check.id.startsWith("edge:"))
+								.every((check) => check.passed),
+							connected,
+						);
+					}),
+				),
+			// Leave time for setup/cleanup around the hard child-process deadline.
+			20_000,
+		);
+	}
+
 	it.live("lists exact user prompts for every scenario", () =>
 		Effect.sync(() => {
 			const log = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -108,19 +193,20 @@ describe("scenario CLI candidate decoding", () => {
 		),
 	);
 
-	for (const [family, scenarioId] of [
-		["flowchart", "incident-escalation"],
-		["sequence", "checkout-payment-sequence"],
+	for (const [family, scenarioId, fixtureName] of [
+		["flowchart", "incident-escalation", "flowchart-execute"],
+		["flowchart", "sketchi-onboarding-decision-flow", "onboarding-execute"],
+		["sequence", "checkout-payment-sequence", "sequence-execute"],
 	] as const) {
 		for (const shape of ["structuredContent", "build", "tool-result", "build-receipts"] as const) {
-			it.live(`grades a captured ${family} execute ${shape} through --input`, () =>
+			it.live(`grades ${scenarioId} execute ${shape} through --input`, () =>
 				withCandidate("", (directory) =>
 					Effect.gen(function* () {
 						const fixture = yield* Schema.decodeUnknownEffect(
 							Schema.fromJsonString(ExecuteFixture),
 						)(
 							yield* Effect.tryPromise(() =>
-								readFile(new URL(`./lib/fixtures/${family}-execute.json`, import.meta.url), "utf8"),
+								readFile(new URL(`./lib/fixtures/${fixtureName}.json`, import.meta.url), "utf8"),
 							),
 						);
 						const input =
@@ -172,14 +258,8 @@ describe("scenario CLI candidate decoding", () => {
 									check.id === (family === "flowchart" ? "min-node-count" : "message-order"),
 							),
 						);
-						if (family === "sequence") assert.isTrue(report.ok);
-						else {
-							assert.isFalse(report.ok);
-							assert.isFalse(
-								report.checks.find((check) => check.id === "node-label:Alert created")?.passed,
-							);
-							assert.strictEqual(process.exitCode, 1);
-						}
+						assert.isTrue(report.ok);
+						assert.isTrue(report.checks.every((check) => check.passed));
 					}),
 				),
 			);
