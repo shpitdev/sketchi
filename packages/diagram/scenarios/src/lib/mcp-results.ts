@@ -25,7 +25,7 @@ function matchesRejectedReceipt(
 	}
 }
 
-/** Prefer an explicit build; otherwise use the last matching attempt, not the last success. */
+/** Prefer a returned build's matching receipt; otherwise use the last attempt, not success. */
 function buildFrom(
 	value: Record<string, unknown>,
 	diagramType?: DiagramScenario["diagramType"],
@@ -34,6 +34,20 @@ function buildFrom(
 	if (isRecord(value.structuredContent)) return buildFrom(value.structuredContent, diagramType);
 	if (isRecord(value.normalizedSpec) || typeof value.buildId === "string") return value;
 	const returned = isRecord(value.result) ? buildFrom(value.result, diagramType) : undefined;
+	const operation = diagramType === "sequence" ? "buildSequenceDiagram" : "buildFlowchart";
+	const receipts = Array.isArray(value.builds)
+		? value.builds.filter(
+				(build): build is Record<string, unknown> =>
+					isRecord(build) && (diagramType === undefined || build.operation === operation),
+			)
+		: [];
+	// Scripts may return a lossy summary. The same build's receipt retains its
+	// normalized spec and full quality verdict, including rejected attempts.
+	const matchingReceipt =
+		typeof returned?.buildId === "string"
+			? receipts.findLast((receipt) => receipt.buildId === returned.buildId)
+			: undefined;
+	if (matchingReceipt) return matchingReceipt;
 	if (
 		returned &&
 		(isRecord(returned.normalizedSpec) ||
@@ -44,13 +58,6 @@ function buildFrom(
 				)))
 	)
 		return returned;
-	const operation = diagramType === "sequence" ? "buildSequenceDiagram" : "buildFlowchart";
-	const receipts = Array.isArray(value.builds)
-		? value.builds.filter(
-				(build): build is Record<string, unknown> =>
-					isRecord(build) && (diagramType === undefined || build.operation === operation),
-			)
-		: [];
 	const explicitRejection = returned
 		? receipts.findLast((receipt) => matchesRejectedReceipt(returned, receipt))
 		: undefined;

@@ -1,0 +1,129 @@
+{
+	"ok": true,
+	"result": {
+		"ok": true,
+		"status": "accepted",
+		"buildId": "build_bbe74010ccc3479f9abfccf4b2506898",
+		"quality": 10,
+		"issues": []
+	},
+	"builds": [
+		{
+			"ok": true,
+			"status": "accepted",
+			"buildId": "build_bbe74010ccc3479f9abfccf4b2506898",
+			"operation": "buildFlowchart",
+			"quality": {
+				"accepted": true,
+				"score": 10,
+				"threshold": 8,
+				"summary": {
+					"nodeCount": 8,
+					"edgeCount": 7
+				},
+				"checks": []
+			},
+			"normalizedSpec": {
+				"id": "deploy-pipeline",
+				"title": "Deploy pipeline",
+				"nodes": [
+					{
+						"id": "push",
+						"label": "Push to GitHub",
+						"kind": "start",
+						"icon": {
+							"slug": "github"
+						}
+					},
+					{
+						"id": "docker_build",
+						"label": "Docker builds image",
+						"kind": "process",
+						"icon": {
+							"slug": "docker"
+						}
+					},
+					{
+						"id": "run_tests",
+						"label": "Run test suite",
+						"kind": "process"
+					},
+					{
+						"id": "tests_pass",
+						"label": "Tests pass?",
+						"kind": "decision"
+					},
+					{
+						"id": "ship",
+						"label": "Ship to Cloudflare Workers",
+						"kind": "process",
+						"icon": {
+							"slug": "cloudflare"
+						}
+					},
+					{
+						"id": "deployed",
+						"label": "Deployed",
+						"kind": "end"
+					},
+					{
+						"id": "notify",
+						"label": "Notify team",
+						"kind": "process"
+					},
+					{
+						"id": "stopped",
+						"label": "Stop",
+						"kind": "end"
+					}
+				],
+				"edges": [
+					{
+						"id": "edge-1",
+						"source": "push",
+						"target": "docker_build"
+					},
+					{
+						"id": "edge-2",
+						"source": "docker_build",
+						"target": "run_tests"
+					},
+					{
+						"id": "edge-3",
+						"source": "run_tests",
+						"target": "tests_pass"
+					},
+					{
+						"id": "edge-4",
+						"source": "tests_pass",
+						"target": "ship",
+						"label": "yes"
+					},
+					{
+						"id": "edge-5",
+						"source": "ship",
+						"target": "deployed"
+					},
+					{
+						"id": "edge-6",
+						"source": "tests_pass",
+						"target": "notify",
+						"label": "no"
+					},
+					{
+						"id": "edge-7",
+						"source": "notify",
+						"target": "stopped"
+					}
+				],
+				"layout": {
+					"direction": "TB"
+				},
+				"style": {
+					"accentColor": "#8f707f",
+					"backgroundColor": "#fffdf8"
+				}
+			}
+		}
+	]
+}

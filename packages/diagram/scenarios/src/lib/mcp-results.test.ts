@@ -29,8 +29,53 @@ const flowchart = Schema.decodeUnknownSync(ExecuteFixture)(
 const failedToolResult: unknown = JSON.parse(
 	readFileSync(new URL("./fixtures/failed-tool-result.json", import.meta.url), "utf8"),
 );
+const deploySummary: unknown = JSON.parse(
+	readFileSync(new URL("./fixtures/deploy-summary-execute.json", import.meta.url), "utf8"),
+);
 
 describe("MCP scenario adapter", () => {
+	it("grades the matching receipt when a real execute returns only a build summary", () => {
+		// Captured run 20261011-234628-csyp, third execute (trimmed to grading fields).
+		const candidate = candidateFromMcpResult(deploySummary, "flowchart");
+		expect(candidate?.ok).toBe(true);
+		if (!candidate?.ok) throw new Error("Expected the accepted receipt's normalizedSpec.");
+		expect(normalizedSpecFrom(deploySummary)).toMatchObject({ title: "Deploy pipeline" });
+		expect(
+			evaluateScenarioDiagram(
+				getDiagramScenario("deploy-pipeline-logos"),
+				candidate.diagram,
+			).checks.find(({ id }) => id === "min-node-count")?.passed,
+		).toBe(true);
+	});
+	it("uses receipt quality and the returned build ID, not a later successful receipt", () => {
+		const receipt = {
+			...flowchart.result,
+			buildId: "returned-build",
+			operation: "buildFlowchart",
+			quality: { accepted: false },
+		};
+		const value = {
+			ok: true,
+			result: { ok: true, status: "accepted", buildId: receipt.buildId, quality: 10 },
+			builds: [receipt, { ...receipt, buildId: "later-build", quality: { accepted: true } }],
+		};
+		expect(candidateFromMcpResult(value, "flowchart")).toMatchObject({ ok: false });
+		expect(normalizedSpecFrom(value)).toEqual(receipt.normalizedSpec);
+	});
+	it("does not substitute a different build or diagram family's receipt for an explicit summary", () => {
+		const value = {
+			ok: true,
+			result: { ok: true, status: "accepted", buildId: "summary" },
+			builds: [
+				{ ...flowchart.result, buildId: "other", operation: "buildFlowchart" },
+				{ ...sequence.result, buildId: "summary", operation: "buildSequenceDiagram" },
+			],
+		};
+		expect(candidateFromMcpResult(value, "flowchart")).toMatchObject({
+			ok: false,
+			check: { message: "MCP build has no normalizedSpec object to grade." },
+		});
+	});
 	it.each([
 		undefined,
 		null,
