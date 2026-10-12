@@ -35,7 +35,7 @@ pnpm nx scenario diagram-scenarios -- --scenario pharma-batch-disposition --fixt
 `diagramType`; the CLI (`--list`, `--all`, `--scenario`), the fixture client,
 and the eval harness use it.
 
-- Flowchart scenarios check prompt-grounded steps, node kinds, branches, direct
+- Flowchart scenarios check prompt-grounded steps, node kinds, branches, bounded
   connections, and logos.
 - Sequence scenarios check participants, required messages and their
   chronological order, calls answered by returns (activation bars), and that
@@ -106,14 +106,27 @@ alternative, allowing auxiliary/adverb gaps. The `not` in `not ready` cannot
 exempt the consequence in `Ready do not keep waiting`. Neither `Income not
 verified` nor `Verify address; income not verified` matches `income verification`.
 
-Each required edge must directly connect a matching source node to a matching
-target node, with an any-of branch-label match when a label is required.
+Each required connection must follow a directed path from a matching source to
+a matching target through **at most two intermediate nodes**. Every intermediate
+must match no expected step's label alternatives and node kind. An elaboration
+such as a `Wait for link click` process does not stand in for the required
+`Link clicked?` decision, which still needs its own correctly typed node.
+This permits an explicit action followed by a check (`Build artifact → Run
+security scan → Scan clean?`) or preparation plus a check, while preventing
+arbitrary reachability from hiding skipped or reordered required steps.
+Two intermediates cover those small elaborations; longer paths remain unverified.
+Existing continuous same-step splits still work through exclusive ownership.
+When a branch label is required, its any-of match must appear on the **first hop**
+out of the source, not on a later edge. Contextual outcomes are finite, explicit
+alternatives on that connection, validated against prompt words with the same
+lemma table: `Acceptable`/`Unacceptable` for credit, `High`/`Low` for priority,
+and `Matched`/`Not matched` for PO matching. They are not global yes/no synonyms.
 Multiple model nodes may match one step, allowing separate resolved/review
 end nodes per path. Every required step must have a distinct matching node,
 and **all required edges must fit the same exclusive node ownership**. The
 evaluator searches joint edge witnesses, trying the most constrained edge
 first and memoizing failed ownership states. Each witness must lie on a
-start-to-end path using only required cross-step connections or continuous
+start-to-end path using only bounded required cross-step connections or continuous
 same-step segments. This permits serial intermediate splits and separate
 terminal copies, without stitching a step through an intervening different
 step or moving draft before its decision. A combined node cannot stand in

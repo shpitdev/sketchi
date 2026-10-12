@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { FlowchartDiagram } from "@sketchi/diagram-core";
 import type { ExcalidrawElement } from "@sketchi/diagram-excalidraw";
 
 import {
@@ -12,6 +13,40 @@ import { flowchartScenarios, getFlowchartScenario } from "./scenarios";
 
 const onboardingScenario = getFlowchartScenario("sketchi-onboarding-decision-flow");
 const MOVE_DELTA = { x: 48, y: 32 };
+
+function subdivideEdge(
+	diagram: FlowchartDiagram,
+	edgeId: string,
+	stages: readonly Pick<FlowchartDiagram["nodes"][number], "id" | "label" | "kind">[],
+) {
+	const edge = diagram.edges.find((candidate) => candidate.id === edgeId)!;
+	const chain = [edge.source, ...stages.map((node) => node.id), edge.target];
+	return {
+		...diagram,
+		nodes: [...diagram.nodes, ...stages],
+		edges: [
+			...diagram.edges.filter((candidate) => candidate.id !== edgeId),
+			...chain.slice(1).map((target, index) => ({
+				id: `${edgeId}-${index}`,
+				source: chain[index]!,
+				target,
+				...(index === 0 && edge.label
+					? { label: edge.label }
+					: stages[index - 1]?.kind === "decision"
+						? { label: "yes" }
+						: {}),
+			})),
+			...stages
+				.filter((node) => node.kind === "decision")
+				.map((node) => ({
+					id: `${edgeId}-${node.id}-fallback`,
+					source: node.id,
+					target: "review",
+					label: "no",
+				})),
+		],
+	};
+}
 
 function numericBounds(element: ExcalidrawElement | undefined) {
 	if (
@@ -97,6 +132,168 @@ function expectClosePoint(actual: { x: number; y: number }, expected: { x: numbe
 }
 
 describe("diagram scenario evaluation", () => {
+	it.each([1, 2])("accepts a required connection through %i unmatched stages", (count) => {
+		const stages: Parameters<typeof subdivideEdge>[2] = [
+			{ id: "extra-action", label: "Prepare workspace", kind: "process" },
+			{ id: "extra-check", label: "Workspace ready?", kind: "decision" },
+		];
+		const candidate = subdivideEdge(
+			onboardingScenario.expectedDiagram,
+			"clear-draft",
+			stages.slice(0, count),
+		);
+		expect(evaluateScenarioDiagram(onboardingScenario, candidate).ok).toBe(true);
+	});
+
+	it("rejects a path with more than two unmatched intermediate stages", () => {
+		const candidate = subdivideEdge(onboardingScenario.expectedDiagram, "clear-draft", [
+			{ id: "extra-1", label: "Prepare workspace", kind: "process" },
+			{ id: "extra-2", label: "Workspace ready?", kind: "decision" },
+			{ id: "extra-3", label: "Record readiness", kind: "process" },
+		]);
+		expect(evaluateScenarioDiagram(onboardingScenario, candidate).checks).toContainEqual(
+			expect.objectContaining({ id: "edge:Scope clear?->Draft typed IR:yes", passed: false }),
+		);
+	});
+
+	it.each(["process"] as const)(
+		"never treats a node naming another required step as an intermediate (%s)",
+		(kind) => {
+			const candidate = subdivideEdge(onboardingScenario.expectedDiagram, "clear-draft", [
+				{ id: "extra", label: "Extract requirements", kind },
+			]);
+			const result = evaluateScenarioDiagram(onboardingScenario, candidate);
+			expect(result.ok).toBe(false);
+			expect(result.checks).toContainEqual(
+				expect.objectContaining({ id: "edge:Scope clear?->Draft typed IR:yes", passed: false }),
+			);
+		},
+	);
+
+	it("allows a differently typed elaboration without using it as the required step", () => {
+		const candidate = subdivideEdge(onboardingScenario.expectedDiagram, "clear-draft", [
+			{ id: "extra", label: "Extract requirements", kind: "decision" },
+		]);
+		expect(evaluateScenarioDiagram(onboardingScenario, candidate).ok).toBe(true);
+		expect(
+			evaluateScenarioDiagram(onboardingScenario, {
+				...candidate,
+				nodes: candidate.nodes.map((node) =>
+					node.id === "requirements" ? { ...node, label: "Prepare workspace" } : node,
+				),
+			}).ok,
+		).toBe(false);
+	});
+
+	it("still rejects a missing step when unmatched stages pad its path", () => {
+		const candidate = subdivideEdge(onboardingScenario.expectedDiagram, "clear-draft", [
+			{ id: "extra", label: "Prepare workspace", kind: "process" },
+		]);
+		candidate.nodes = candidate.nodes.map((node) =>
+			node.id === "draft" ? { ...node, label: "Record readiness" } : node,
+		);
+		const result = evaluateScenarioDiagram(onboardingScenario, candidate);
+		expect(result.ok).toBe(false);
+		expect(result.checks).toContainEqual(
+			expect.objectContaining({ id: "node-label:Draft typed IR", passed: false }),
+		);
+	});
+
+	it("requires the branch caption on the first hop, not a later hop", () => {
+		const candidate = subdivideEdge(onboardingScenario.expectedDiagram, "clear-draft", [
+			{ id: "extra", label: "Prepare workspace", kind: "process" },
+		]);
+		candidate.edges = candidate.edges.map((edge) =>
+			edge.id === "clear-draft-0"
+				? { ...edge, label: "maybe" }
+				: edge.id === "clear-draft-1"
+					? { ...edge, label: "yes" }
+					: edge,
+		);
+		expect(evaluateScenarioDiagram(onboardingScenario, candidate).checks).toContainEqual(
+			expect.objectContaining({ id: "edge:Scope clear?->Draft typed IR:yes", passed: false }),
+		);
+	});
+
+	it.each([
+		[
+			"loan-application-underwriting",
+			"credit-income",
+			"credit-manual",
+			"Acceptable",
+			"Unacceptable",
+		],
+		["bug-report-routing", "priority-sprint", "priority-regular", "High", "Low"],
+		["password-reset-security", "risk-step-up", "risk-reset", "High", "Low"],
+	])(
+		"accepts prompt-grounded contextual captions in %s but not swapped outcomes",
+		(id, yes, no, positive, negative) => {
+			const scenario = getFlowchartScenario(id);
+			const candidate = {
+				...scenario.expectedDiagram,
+				edges: scenario.expectedDiagram.edges.map((edge) =>
+					edge.id === yes
+						? { ...edge, label: positive }
+						: edge.id === no
+							? { ...edge, label: negative }
+							: edge,
+				),
+			};
+			expect(evaluateScenarioDiagram(scenario, candidate).ok).toBe(true);
+			expect(
+				evaluateScenarioDiagram(scenario, {
+					...candidate,
+					edges: candidate.edges.map((edge) =>
+						edge.id === yes
+							? { ...edge, label: negative }
+							: edge.id === no
+								? { ...edge, label: positive }
+								: edge,
+					),
+				}).ok,
+			).toBe(false);
+		},
+	);
+
+	it("rejects a contextual caption that is not grounded for that decision", () => {
+		const scenario = getFlowchartScenario("loan-application-underwriting");
+		const result = evaluateScenarioDiagram(scenario, {
+			...scenario.expectedDiagram,
+			edges: scenario.expectedDiagram.edges.map((edge) =>
+				edge.id === "credit-income" ? { ...edge, label: "High" } : edge,
+			),
+		});
+		expect(result.ok).toBe(false);
+	});
+
+	it.each(
+		flowchartScenarios.flatMap((scenario) =>
+			scenario.assertions.requiredEdges.flatMap((edge) =>
+				(edge.labels ?? [])
+					.filter((label) => label !== edge.label)
+					.map((label) => ({
+						scenario,
+						edge,
+						label,
+						name: `${scenario.id}: ${edge.sourceId}->${edge.targetId}: ${label}`,
+					})),
+			),
+		),
+	)(
+		"accepts each explicit prompt-grounded branch alternative: $name",
+		({ scenario, edge, label }) => {
+			const result = evaluateScenarioDiagram(scenario, {
+				...scenario.expectedDiagram,
+				edges: scenario.expectedDiagram.edges.map((candidate) =>
+					candidate.source === edge.sourceId && candidate.target === edge.targetId
+						? { ...candidate, label }
+						: candidate,
+				),
+			});
+			expect(result.ok).toBe(true);
+		},
+	);
+
 	it.each([
 		["restaurant-waitlist", "keep-waiting", "Ready: do not keep waiting"],
 		["loan-application-underwriting", "income-verification", "Verify address; income not verified"],

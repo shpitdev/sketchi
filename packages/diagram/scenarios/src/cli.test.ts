@@ -82,9 +82,13 @@ const Report = Schema.fromJsonString(
 );
 
 describe("scenario CLI candidate decoding", () => {
-	for (const connected of [false, true]) {
+	for (const [bridgeLabel, connected] of [
+		["artifact", false],
+		["agent", true],
+		["Unrelated work", true],
+	] as const) {
 		it.live(
-			`grades 24 ambiguously labeled nodes without hanging (connected: ${connected})`,
+			`grades 24 ambiguously labeled nodes without hanging (bridge: ${bridgeLabel})`,
 			() =>
 				withCandidate("", (directory) =>
 					Effect.gen(function* () {
@@ -95,10 +99,15 @@ describe("scenario CLI candidate decoding", () => {
 								{ id: "start", label: "App request", kind: "start" },
 								...Array.from({ length: 21 }, (_, index) => ({
 									id: `p${index}`,
-									label: "agent core renderer Excalidraw export artifact",
+									// The negative path cannot complete the later steps before
+									// crossing its artifact barrier and going back to core.
+									label:
+										!connected && index >= 6
+											? "agent core"
+											: "agent core renderer Excalidraw export artifact",
 									kind: "process",
 								})),
-								{ id: "bridge", label: connected ? "agent" : "Unrelated work", kind: "process" },
+								{ id: "bridge", label: bridgeLabel, kind: "process" },
 								{ id: "end", label: "Hosted response", kind: "end" },
 							],
 							edges: [
