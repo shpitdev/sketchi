@@ -123,52 +123,6 @@ const ACCEPTANCE_LOOP_EXAMPLE = `async () => {
   return patched;
 }`;
 
-const HOSTED_APP_LOGOS_EXAMPLE = `async () => {
-  const [nextjs, vercel] = await Promise.all([
-    sketchi.searchIcons({ q: "nextjs" }),
-    sketchi.searchIcons({ q: "vercel" })
-  ]);
-  const nextIcon = nextjs.icons.find(icon => icon.slug === "nextjs");
-  const hostIcon = vercel.icons.find(icon => icon.slug === "vercel");
-  if (!nextIcon || !hostIcon) return { missingLogos: true };
-  return sketchi.buildFlowchart({
-    spec: {
-      title: "Next.js page on Vercel",
-      nodes: [
-        { id: "host", label: "Vercel routes the request", kind: "start", icon: { slug: hostIcon.slug } },
-        { id: "page", label: "Next.js page receives question", kind: "process", icon: { slug: nextIcon.slug } },
-        { id: "done", label: "Return answer", kind: "end" }
-      ],
-      edges: [{ source: "host", target: "page" }, { source: "page", target: "done" }]
-    },
-    options: { artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: ["excalidraw"] }
-  });
-}`;
-
-const SEQUENCE_LOGOS_EXAMPLE = `async () => {
-  const technologies = ["github", "cloudflare", "docker"];
-  const matches = await Promise.all(technologies.map(q => sketchi.searchIcons({ q })));
-  const icons = technologies.map((slug, index) => matches[index].icons.find(icon => icon.slug === slug));
-  if (icons.some(icon => !icon)) return { missingLogos: true };
-  return sketchi.buildSequenceDiagram({
-    spec: {
-      title: "Deploy webhook",
-      participants: [
-        { id: "developer", label: "Developer" },
-        ...technologies.map((id, index) => ({ id, label: ["GitHub", "Cloudflare Worker", "Docker"][index], icon: { slug: icons[index].slug } }))
-      ],
-      messages: [
-        { source: "developer", target: "github", label: "Push commit" },
-        { source: "github", target: "cloudflare", label: "Send deploy webhook" },
-        { source: "cloudflare", target: "docker", label: "Build image" },
-        { source: "docker", target: "cloudflare", label: "Image digest", type: "return" },
-        { source: "cloudflare", target: "github", label: "202 Accepted", type: "return" }
-      ]
-    },
-    options: { artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: ["excalidraw"] }
-  });
-}`;
-
 const SEQUENCE_DIAGRAM_EXAMPLE = `async () => sketchi.buildSequenceDiagram({
   spec: {
     title: "Checkout request",
@@ -396,8 +350,6 @@ export const catalog: CatalogEntry[] = [
 			"Request png when the agent needs hosted visual proof. PNG artifacts are stored binary outputs and are never inlined in MCP JSON responses.",
 			"Use stable node ids. Decision nodes need meaningful labeled outgoing branches, usually yes/no.",
 			'Brand logos: when a node is about a named technology (GitHub, Docker, Postgres), call sketchi.searchIcons({ q: "docker" }) and set that node\'s icon to { slug } with an exact returned slug. The logo is drawn above the label. Never guess a slug: unknown slugs are dropped with an unknown_icon warning, and logos that cannot be drawn are dropped with icon_dropped. Neither fails the build.',
-			"Each node holds one icon. When a prompt names X on Y, preserve both technologies as separate meaningful steps, e.g. Vercel routes the request -> Next.js page receives question; attach each logo to its own node. Do not hide the host only in the title or combine both brands under one icon. Preserve the requested behavior and stay within graph limits.",
-			"Before building, compare the named technologies with the icons assigned to nodes. A label or successful search alone does not attach a logo; omitted icons produce no warning. If no matching logo exists, keep the technology label and report the unavailable logo instead of substituting another brand.",
 			`Flowcharts are bounded to ${FLOWCHART_MAX_NODES} nodes and ${FLOWCHART_MAX_EDGES} edges. Larger graphs fail with flowchart_too_large before render or persistence.`,
 			"Every node must be reachable from the single start, and every reachable node must be able to reach an end. Closed cycles fail with nonterminating_node; retry loops remain valid when they retain an eventual exit to an end.",
 			"Studio HTTP build requests are bounded to 256 KiB, including streamed bodies without Content-Length. Oversized requests return HTTP 413 with request_too_large in the normal failure envelope.",
@@ -407,13 +359,6 @@ export const catalog: CatalogEntry[] = [
 			"If buildFlowchart returns ok: false, repair the spec from issues and call buildFlowchart again.",
 			"Do not use applyDiagramPatch until buildFlowchart returns an accepted artifact.",
 		].join("\n"),
-		examples: [
-			{
-				title: "Separate application and hosting logos",
-				language: "js",
-				code: HOSTED_APP_LOGOS_EXAMPLE,
-			},
-		],
 	},
 	{
 		id: "searchIcons",
@@ -422,11 +367,11 @@ export const catalog: CatalogEntry[] = [
 		// Logos are part of building flowcharts; the docs topic list is frozen.
 		topic: "buildFlowchart",
 		keywords: ["icon", "icons", "logo", "logos", "brand", "slug", "search"],
-		snippet: "Find exact logo slugs for nodes and sequence participants before building.",
+		snippet: "Find exact logo slugs for flowchart and canvas nodes before setting node icons.",
 		content: [
 			"searchIcons({ q, limit? }) ranks the Sketchi logo catalog by exact slug, name prefix, alias, then substring. Aliases such as k8s and psql work.",
 			"It returns { ok: true, query, icons: [{ slug, name, collection }] }. limit defaults to 10 and is capped at 25.",
-			'Use a returned slug as a FlowchartSpec node icon ({ icon: { slug: "docker" } }), a SequenceDiagramSpec participant icon ({ icon: { slug: "docker" } }), or a CanvasSpec node icon ({ icon: { slug: "docker", size: 28 } }).',
+			'Use a returned slug as a FlowchartSpec node icon ({ icon: { slug: "docker" } }) or a CanvasSpec node icon ({ icon: { slug: "docker", size: 28 } }).',
 			"Only compact brand marks are searchable: wordmarks and very large SVGs are excluded because they cannot be drawn inside a node.",
 			"Search once per technology, then build. Do not invent slugs; a slug that searchIcons did not return is dropped with an unknown_icon warning.",
 		].join("\n"),
@@ -502,16 +447,11 @@ export const catalog: CatalogEntry[] = [
 			'A message with type "return" from the callee back to its caller answers the latest open call between them; Sketchi draws the callee\'s activation bar from that call to its return, nesting re-entrant calls. Calls nobody answers draw no bar.',
 			"Every message source and target must reference a declared participant id. Self-referential messages are rejected with structured issues and repair hints.",
 			"A sequence diagram may have at most 12 participants and 40 messages; larger ones are rejected with sequence_too_large.",
-			"For every named technology participant (e.g. GitHub, Cloudflare Worker, Docker), call sketchi.searchIcons and set participant.icon to { slug } using a matching returned slug. Labels alone do not add logos, and omitted icons produce no warning. Leave human actors unbranded; a technology logo is drawn in the participant header and exported as an Excalidraw image. Unknown slugs are dropped with an unknown_icon warning, never a failed build.",
+			"A participant may set icon: { slug } with an exact slug from sketchi.searchIcons; its logo is drawn in the participant header and exported as an Excalidraw image. Unknown slugs are dropped with an unknown_icon warning, never a failed build.",
 			'Request envelope: { spec: SequenceDiagramSpec, options?: { artifactFormats?: ["scene", "excalidraw", "png"], inlineArtifacts?: ["scene", "excalidraw"], minQualityScore?: number } }.',
 			"Request scene, Excalidraw, and PNG for full artifact delivery; inline Excalidraw when the harness needs importable JSON in the response.",
 		].join("\n"),
 		examples: [
-			{
-				title: "Deploy webhook with participant logos",
-				language: "js",
-				code: SEQUENCE_LOGOS_EXAMPLE,
-			},
 			{
 				title: "Checkout sequence diagram",
 				language: "js",

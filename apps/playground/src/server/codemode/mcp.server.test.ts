@@ -15,7 +15,6 @@ import { PlaygroundRequestCallbacks, runPlaygroundEffect } from "../runtime/runt
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 import { PlaygroundCodeMode } from "./service.server";
 import {
-	getCodeModeDocs,
 	CodeModeDocsRequestSchema,
 	CodeModeDocsResultSchema,
 	CodeModeSearchRequestSchema,
@@ -539,8 +538,6 @@ describe("Sketchi Code Mode MCP server", () => {
 			expect(executeTool?.description).toContain("Write JavaScript only");
 			expect(executeTool?.description).toContain("async () =>");
 			expect(executeTool?.description).toContain("artifactDelivery");
-			expect(executeTool?.description).toContain("sequence participant.icon");
-			expect(executeTool?.description).toContain("split 'X on Y'");
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,
@@ -718,46 +715,6 @@ describe("Sketchi Code Mode MCP server", () => {
 			await client.close();
 			await server.close();
 		}
-	});
-
-	it.each([
-		["buildFlowchart", ["vercel", "nextjs"]],
-		["buildSequenceDiagram", ["github", "cloudflare", "docker"]],
-	] as const)("executes the %s logo example with every named technology", async (topic, slugs) => {
-		const code = getCodeModeDocs({ topic }).examples[0]?.code;
-		expect(code).toBeDefined();
-		const requested: string[] = [];
-		const output = await executeSketchiCodeMode(
-			{
-				SKETCHI_ARTIFACTS: new MemoryBucket(),
-				ASSETS: {
-					fetch: async (input) => {
-						requested.push(new URL(input instanceof Request ? input.url : input).pathname);
-						return new Response(
-							'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0H24V24H0Z"/></svg>',
-						);
-					},
-				},
-			},
-			// PNG requires the hosted browser binding; this test exercises semantic and Excalidraw output.
-			{ code: code?.replace('["scene", "excalidraw", "png"]', '["scene", "excalidraw"]') },
-			{ executor: createInProcessExecutor() },
-		);
-		expect(output.ok).toBe(true);
-		const build = output.builds[0];
-		expect(build?.ok).toBe(true);
-		expect(build?.issues).toEqual([]);
-		const spec = build?.normalizedSpec;
-		if (!isRecord(spec)) throw new Error("Missing normalized spec");
-		const items = topic === "buildFlowchart" ? spec.nodes : spec.participants;
-		if (!Array.isArray(items)) throw new Error("Missing logo-bearing items");
-		expect(
-			items.flatMap((item) => (isRecord(item) && isRecord(item.icon) ? [item.icon.slug] : [])),
-		).toEqual(slugs);
-		for (const slug of slugs) expect(requested).toContain(`/node-logos/${slug}.svg`);
-		// The exported artifact must contain an image for each logo, not just normalized metadata.
-		const serialized = JSON.stringify(output.result);
-		expect(serialized.match(/"type":"image"/g)).toHaveLength(slugs.length);
 	});
 
 	it("serves docs, search, and execute over the streamable HTTP MCP route", async () => {

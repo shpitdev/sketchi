@@ -635,7 +635,7 @@ const executeDefinition = makeEffectMcpTool("execute", {
 		"Use the canonical shape: async () => { const result = await sketchi.buildFlowchart(...); return result; }",
 		"Code fences and trailing expression semicolons are normalized before execution.",
 		"The sandbox exposes sketchi.createCanvas, sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.buildSequenceDiagram, sketchi.getArtifact, sketchi.applyDiagramPatch, and sketchi.searchIcons.",
-		"For each named technology, call sketchi.searchIcons({ q }) and set node.icon or sequence participant.icon to { slug } using a matching returned slug. One icon per node: split 'X on Y' into distinct steps for both technologies. Labels alone do not add logos; check coverage before building.",
+		"For brand logos inside nodes, call sketchi.searchIcons({ q }) and set node.icon to { slug } with an exact returned slug; never guess slugs.",
 		"First get the semantic graph accepted, then use patch operations for deterministic visual changes.",
 		"For final user-facing output, return accepted Sketchi artifact ids, format refs, and Excalidraw/PNG URLs. Do not recreate accepted diagrams as Markdown or Mermaid artifacts.",
 		"When artifactDelivery is available, the first text content block is the final user-facing answer; copy it verbatim and stop.",
