@@ -9,6 +9,8 @@ import {
 	getSequenceValidationIssues,
 	parseMindmapDiagram,
 	validateFlowchartDiagram,
+	boundLabelWidth,
+	wrapTextToWidth,
 	type FlowchartDiagram,
 	type FlowchartValidationIssueRef,
 	type MindmapDiagram,
@@ -1274,7 +1276,9 @@ function targetIssue(operation: DiagramPatchOperation): CodeModeIssue {
 }
 
 function textForContainer(scene: PatchableScene, containerId: string): PatchableText | undefined {
-	return textElements(scene).find((text) => text.containerId === containerId);
+	return textElements(scene).find(
+		(text) => text.containerId === containerId || text.id === `${containerId}:label`,
+	);
 }
 
 function centerTextOnNode(scene: PatchableScene, node: PatchableNode): void {
@@ -1301,6 +1305,18 @@ function midpoint(points: readonly PatchablePoint[]): PatchablePoint | undefined
 function syncArrowLabel(scene: PatchableScene, arrow: PatchableArrow): void {
 	const label = textForContainer(scene, arrow.id);
 	const point = midpoint(arrow.points);
+	if (label && !label.containerId) {
+		const start = arrow.points[0];
+		if (!start) return;
+		const next = arrow.points.find((point) => point.x !== start.x || point.y !== start.y);
+		if (!next) return;
+		const text = wrapTextToWidth(label.text, label.maxWidth ?? 160, label.fontSize);
+		const width = boundLabelWidth(text, label.fontSize, label.maxWidth ?? 160);
+		const height = Math.ceil(text.split("\n").length * label.fontSize * 1.35);
+		label.x = (start.x + next.x) / 2 + (start.x === next.x ? width / 2 + 8 : 0);
+		label.y = (start.y + next.y) / 2 - (start.y === next.y ? height / 2 + 5 : 0);
+		return;
+	}
 	if (!label || !point) {
 		return;
 	}
@@ -1702,7 +1718,12 @@ function applyRemove(
 		previousSize = removedIds.size;
 		for (const element of scene.elements) {
 			if (
-				(element.type === "text" && element.containerId && removedIds.has(element.containerId)) ||
+				(element.type === "text" &&
+					((element.containerId && removedIds.has(element.containerId)) ||
+						arrowElements(scene).some(
+							(arrow) =>
+								removedIds.has(arrow.id) && textForContainer(scene, arrow.id)?.id === element.id,
+						))) ||
 				(element.type === "arrow" &&
 					(removedNodeIds.has(element.sourceNodeId) || removedNodeIds.has(element.targetNodeId))) ||
 				(element.type === "line" &&

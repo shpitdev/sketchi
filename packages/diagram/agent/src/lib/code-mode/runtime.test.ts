@@ -1477,13 +1477,55 @@ describe("Code Mode runtime", () => {
 		);
 
 		expect(
-			scene.elements.filter((element) => element.type === "text").map((text) => text.textColor),
+			scene.elements
+				.filter((element) => element.type === "text")
+				.filter((text) => text.containerId)
+				.map((text) => text.textColor),
 		).toEqual([undefined, undefined, undefined, undefined]);
 		expect(
 			scene.elements
 				.filter((element) => element.type === "arrow")
 				.map((arrow) => arrow.strokeColor),
 		).toEqual(["#7c3aed", "#7c3aed", "#7c3aed"]);
+	});
+
+	it("keeps positioned branch labels associated through edge patches", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+		expectBuildOk(built);
+		const patched = await runtime.applyDiagramPatch({
+			source: { artifactId: built.artifact.artifactId },
+			operations: [
+				{
+					op: "ungroup",
+					ids: parseInlineScene(
+						built.artifact.formats.find((format) => format.format === "scene")?.inline,
+					).elements.map((e) => e.id),
+				},
+				{ op: "replaceText", selector: { labels: ["yes"], scope: "edges" }, text: "Approved" },
+				{ op: "setStyle", selector: { scope: "edges" }, style: { textColor: "#7c3aed" } },
+			],
+		});
+		expectPatchOk(patched);
+		const scene = parseInlineScene(
+			patched.artifact.formats.find((format) => format.format === "scene")?.inline,
+		);
+		const arrow = scene.elements.find((e) => e.type === "arrow" && e.label === "Approved");
+		expect(arrow).toBeDefined();
+		expect(scene.elements.find((e) => e.id === `${arrow?.id}:label`)).toMatchObject({
+			text: "Approved",
+			textColor: "#7c3aed",
+		});
+		const removed = await runtime.applyDiagramPatch({
+			source: { scene },
+			operations: [{ op: "remove", selector: { ids: [arrow!.id] } }],
+			options: { preserveConnectivity: false },
+		});
+		expectPatchOk(removed);
+		const remaining = parseInlineScene(
+			removed.artifact.formats.find((format) => format.format === "scene")?.inline,
+		);
+		expect(remaining.elements.some((e) => e.id === `${arrow!.id}:label`)).toBe(false);
 	});
 
 	it("rejects patch selectors that do not match the accepted artifact", async () => {

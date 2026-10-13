@@ -1,3 +1,5 @@
+// oxlint-disable-next-line @nx/enforce-module-boundaries -- shared test-only migration of immutable receipts; never imported by runtime code
+import { normalizeRoutingAgainstFrozen } from "../../../../../tools/testing/routing-compatibility.mjs";
 import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -487,7 +489,10 @@ describe("exact-base Code Mode HTTP artifact compatibility corpus", () => {
 		expect(
 			`${JSON.stringify(
 				normalizeCanvasMigrationAgainstExactBase(
-					normalizeSketchiPaletteAgainstExactBase(corpus, exactBase),
+					normalizeSketchiPaletteAgainstExactBase(
+						normalizeRoutingAgainstFrozen(corpus, exactBase),
+						exactBase,
+					),
 					exactBase,
 				),
 				null,

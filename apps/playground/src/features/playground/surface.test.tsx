@@ -130,7 +130,11 @@ describe("playground surface", () => {
 		expect(
 			DEPLOY_PIPELINE_SCENE.elements.filter((element) => element.type === "arrow"),
 		).toHaveLength(3);
-		expect(DEPLOY_PIPELINE_SCENE.elements).toHaveLength(11);
+		expect(
+			DEPLOY_PIPELINE_SCENE.elements.filter(
+				(element) => element.type !== "text" || element.containerId,
+			),
+		).toHaveLength(11);
 		const sceneNodeLabels = DEPLOY_PIPELINE_SCENE.elements
 			.filter((element) => element.type === "text")
 			.filter((element) => element.containerId);

@@ -1,3 +1,4 @@
+import { createBranchLabelSynchronizer } from "./branch-labels";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type {
 	BinaryFiles,
@@ -103,8 +104,10 @@ export function ExcalidrawSceneCanvas({
 	// editor with a fresh API.
 	const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
 	const fittedApiRef = useRef<ExcalidrawImperativeAPI | null>(null);
+	const synchronizeLabels = useRef(createBranchLabelSynchronizer());
 	const handleApiChange = useCallback(
 		(api: ExcalidrawImperativeAPI) => {
+			if (apiRef.current !== api) synchronizeLabels.current = createBranchLabelSynchronizer();
 			apiRef.current = api;
 			onApiChange?.(api);
 		},
@@ -125,8 +128,10 @@ export function ExcalidrawSceneCanvas({
 					viewportZoomFactor: 1,
 				});
 			}
-			onChange?.(elements, appState, files);
-			onSceneChange?.(sceneFromExcalidrawChange(elements, appState, files));
+			const synchronized = synchronizeLabels.current(elements);
+			if (api && synchronized !== elements) api.updateScene({ elements: synchronized });
+			onChange?.(synchronized, appState, files);
+			onSceneChange?.(sceneFromExcalidrawChange(synchronized, appState, files));
 		},
 		[onChange, onSceneChange],
 	);

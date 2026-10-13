@@ -393,7 +393,9 @@ function arrowElement(input: {
 		height: end.y - start.y,
 		backgroundColor: "transparent",
 		boundElements: input.text
-			? [{ id: input.text.id, type: "text" }]
+			? input.text.containerId === input.arrow.id
+				? [{ id: input.text.id, type: "text" }]
+				: null
 			: input.arrow.label
 				? [{ id: `${input.arrow.id}:label`, type: "text" }]
 				: null,
@@ -719,7 +721,9 @@ function buildElements(
 			(node) => node.id === text.containerId && node.shape !== "polygon",
 		);
 		const arrowContainer = arrows.some((arrow) => arrow.id === text.containerId);
+		const positionedArrow = arrows.find((arrow) => text.id === `${arrow.id}:label`);
 		const supportedContainer = text.containerId && (containerNode || arrowContainer);
+		const textColor = text.textColor ?? positionedArrow?.textColor;
 		const label = textElement({
 			...(containerNode ? { container: containerNode } : {}),
 			element: text,
@@ -727,9 +731,9 @@ function buildElements(
 			...(supportedContainer ? { containerId: text.containerId } : {}),
 			fontSize: text.fontSize,
 			maxWidth: text.maxWidth ?? 160,
-			...(text.textColor ? { textColor: text.textColor } : {}),
+			...(textColor ? { textColor } : {}),
 			text: text.text,
-			wrap: arrowContainer,
+			wrap: arrowContainer || Boolean(positionedArrow),
 			x: text.x,
 			y: text.y,
 		});
@@ -741,7 +745,9 @@ function buildElements(
 	}
 
 	for (const arrow of arrows) {
-		const text = textByContainerId.get(arrow.id);
+		const text =
+			textByContainerId.get(arrow.id) ??
+			textElements.find((text) => text.id === `${arrow.id}:label`);
 		elements.push(
 			arrowElement({
 				arrow,

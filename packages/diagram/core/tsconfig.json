@@ -6,5 +6,5 @@
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
     "ignoreDeprecations": "6.0"
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.json"]
 }

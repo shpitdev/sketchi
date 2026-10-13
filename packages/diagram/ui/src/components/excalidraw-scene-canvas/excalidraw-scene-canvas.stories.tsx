@@ -1,7 +1,11 @@
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { flowchartFixture, parseFlowchartDiagram } from "@sketchi/diagram-core";
+import {
+	flowchartFixture,
+	parseFlowchartDiagram,
+	parseIntermediateDiagram,
+} from "@sketchi/diagram-core";
 import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 
@@ -151,4 +155,55 @@ export const NativeEditableElement: Story = {
 		zenModeEnabled: false,
 	},
 	tags: ["test"],
+};
+
+/** Regression examples remain editable so label anchoring can be exercised. */
+export const LabeledHorizontalSkips: Story = {
+	args: {
+		title: "Labeled horizontal paths",
+		viewModeEnabled: false,
+		zenModeEnabled: false,
+		scene: convertSceneToExcalidraw(
+			renderIntermediateDiagram(
+				parseIntermediateDiagram({
+					id: "horizontal-skips",
+					title: "Paths",
+					type: "flowchart",
+					nodes: ["A", "B", "C", "D"].map((id) => ({ id, label: id, kind: "process" })),
+					edges: [
+						["A", "B"],
+						["B", "C"],
+						["C", "D"],
+						["A", "C"],
+						["B", "D"],
+					].map(([source, target], i) => ({ id: `path-${i}`, source, target, label: `Path ${i}` })),
+					layout: { direction: "LR", edgeRouting: "orthogonal" },
+				}),
+			),
+		),
+	},
+};
+export const LabeledProcessFanOut: Story = {
+	args: {
+		title: "Labeled process fan-out",
+		viewModeEnabled: false,
+		zenModeEnabled: false,
+		scene: convertSceneToExcalidraw(
+			renderIntermediateDiagram(
+				parseIntermediateDiagram({
+					id: "process-fanout",
+					title: "Fan-out",
+					type: "flowchart",
+					nodes: ["A", "B", "C"].map((id) => ({ id, label: id, kind: "process" })),
+					edges: ["B", "C"].map((target, i) => ({
+						id: target,
+						source: "A",
+						target,
+						label: ["First", "Second"][i],
+					})),
+					layout: { direction: "TB", edgeRouting: "orthogonal" },
+				}),
+			),
+		),
+	},
 };

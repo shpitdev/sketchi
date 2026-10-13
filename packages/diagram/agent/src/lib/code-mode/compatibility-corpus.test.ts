@@ -1,3 +1,5 @@
+// oxlint-disable-next-line @nx/enforce-module-boundaries -- shared test-only migration of immutable receipts; never imported by runtime code
+import { normalizeRoutingAgainstFrozen } from "../../../../../../tools/testing/routing-compatibility.mjs";
 import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Context, Effect, Schema } from "effect";
@@ -1560,7 +1562,10 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 		};
 		expect(
 			normalizeCanvasMigrationAgainstFrozen(
-				normalizeBrandPaletteAgainstFrozen(normalizedCorpus, frozen),
+				normalizeBrandPaletteAgainstFrozen(
+					normalizeRoutingAgainstFrozen(normalizedCorpus, frozen),
+					frozen,
+				),
 				frozen,
 			),
 		).toEqual(frozen);
@@ -1614,7 +1619,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 		);
 		expect(
 			normalizeCanvasMigrationAgainstFrozen(
-				normalizeBrandPaletteAgainstFrozen(corpus, frozen),
+				normalizeBrandPaletteAgainstFrozen(normalizeRoutingAgainstFrozen(corpus, frozen), frozen),
 				frozen,
 			),
 		).toEqual(frozen);

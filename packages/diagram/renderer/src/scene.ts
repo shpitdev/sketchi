@@ -4,7 +4,6 @@ import {
 	canvasBoundTextBox,
 	canvasNodeIconBand,
 	type AxisAlignedSegment,
-	isSharedBoundStem,
 	segmentCrossesBoundsInterior,
 	segmentsFromPoints,
 	segmentsOverlapInterior,
@@ -22,6 +21,8 @@ import {
 	type DiagramEdge,
 	type DiagramNode,
 	estimateTextWidth,
+	wrapTextToWidth,
+	boundLabelWidth,
 	type IntermediateDiagram,
 	parseIntermediateDiagram,
 	wrapTextToUnits,
@@ -419,8 +420,36 @@ function orderedRankShapes(
 
 function positionNodes(diagram: IntermediateDiagram): NodeSceneElement[] {
 	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
-	const shapesByNodeId = new Map(diagram.nodes.map((node) => [node.id, createNodeShape(node)]));
 	const buckets = edgeBuckets(diagram.edges);
+	const shapesByNodeId = new Map(
+		diagram.nodes.map((node) => {
+			const shape = createNodeShape(node);
+			// Allocate enough port capacity before ranking; clamping must never merge endpoints.
+			const connections =
+				(buckets.incoming.get(node.id)?.length ?? 0) + (buckets.outgoing.get(node.id)?.length ?? 0);
+			const outgoing = buckets.outgoing.get(node.id) ?? [];
+			const pitch =
+				node.kind !== "decision" && outgoing.filter((e) => e.label).length > 1
+					? Math.max(
+							PORT_SPACING,
+							...outgoing.map((e) => {
+								const metrics = branchLabelMetrics(e.label ?? "");
+								return (vertical ? metrics.width : metrics.height) + 24;
+							}),
+						)
+					: PORT_SPACING;
+			const portBreadth = PORT_PADDING * 2 + Math.max(0, connections - 1) * pitch;
+			return [
+				node.id,
+				{
+					...shape,
+					...(vertical
+						? { width: Math.max(shape.width, portBreadth) }
+						: { height: Math.max(shape.height, portBreadth) }),
+				},
+			];
+		}),
+	);
 	const feedbackEdges = feedbackEdgeIds(diagram, buckets.incoming, buckets.outgoing);
 	const rankByNodeId = rankNodes(diagram, buckets, feedbackEdges);
 	const rankedShapes = orderedRankShapes(
@@ -466,7 +495,27 @@ function positionNodes(diagram: IntermediateDiagram): NodeSceneElement[] {
 			}
 		}
 
-		rankOffset += metric.depth + VERTICAL_GAP;
+		// Horizontal labels lengthen the departure stub. Reserve room for the
+		// opposing arrival stub and a routing lane instead of forcing them to overlap.
+		const labelGap = vertical
+			? 0
+			: Math.max(
+					0,
+					...diagram.edges
+						.filter(
+							(edge) => metric.shapes.some((shape) => shape.nodeId === edge.source) && edge.label,
+						)
+						.map(
+							(edge) =>
+								branchLabelMetrics(
+									edge.label!,
+									shapesByNodeId.get(edge.source)?.kind === "decision" ? 80 : 160,
+								).width +
+								16 +
+								ROUTE_STUB_LENGTH * 2,
+						),
+				);
+		rankOffset += metric.depth + Math.max(VERTICAL_GAP, labelGap);
 	}
 
 	if (diagram.layout.direction === "BT") {
@@ -657,18 +706,10 @@ function portOffset(index: number, count: number): number {
 	return (index - (count - 1) / 2) * PORT_SPACING;
 }
 
-function interiorLaneCoordinate(start: number, end: number, offset: number) {
-	const middle = start + (end - start) / 2;
-	const min = Math.min(start, end) + PORT_SPACING;
-	const max = Math.max(start, end) - PORT_SPACING;
-
-	return min < max ? clamp(middle + offset, min, max) : middle;
-}
-
 function portOffsetsForRoutes(routes: readonly RoutedEdge[]): Map<string, number> {
 	const connectionsByPort = new Map<
 		string,
-		Array<{ edgeId: string; endpoint: "source" | "target" }>
+		Array<{ edgeId: string; endpoint: "source" | "target"; coordinate: number }>
 	>();
 
 	for (const route of routes) {
@@ -677,19 +718,56 @@ function portOffsetsForRoutes(routes: readonly RoutedEdge[]): Map<string, number
 
 		connectionsByPort.set(sourcePortKey, [
 			...(connectionsByPort.get(sourcePortKey) ?? []),
-			{ edgeId: route.edge.id, endpoint: "source" },
+			{
+				edgeId: route.edge.id,
+				endpoint: "source",
+				coordinate:
+					route.sourceEdge === "top" || route.sourceEdge === "bottom"
+						? center(route.target).x
+						: center(route.target).y,
+			},
 		]);
 		connectionsByPort.set(targetPortKey, [
 			...(connectionsByPort.get(targetPortKey) ?? []),
-			{ edgeId: route.edge.id, endpoint: "target" },
+			{
+				edgeId: route.edge.id,
+				endpoint: "target",
+				coordinate:
+					route.targetEdge === "top" || route.targetEdge === "bottom"
+						? center(route.source).x
+						: center(route.source).y,
+			},
 		]);
 	}
 
 	const offsets = new Map<string, number>();
 	for (const connections of connectionsByPort.values()) {
-		connections.forEach((connection, index) => {
-			offsets.set(connectionKey(connection), portOffset(index, connections.length));
-		});
+		const labeled = connections
+			.filter((c) => c.endpoint === "source")
+			.map((c) => routes.find((r) => r.edge.id === c.edgeId)!)
+			.filter((r) => r.edge.label);
+		const pitch =
+			labeled.length > 1 && labeled[0]!.source.kind !== "decision"
+				? Math.max(
+						PORT_SPACING,
+						...labeled.map((r) => {
+							const metrics = branchLabelMetrics(r.edge.label!);
+							return (
+								(r.sourceEdge === "top" || r.sourceEdge === "bottom"
+									? metrics.width
+									: metrics.height) + 24
+							);
+						}),
+					)
+				: PORT_SPACING;
+		connections
+			.sort((a, b) => a.coordinate - b.coordinate)
+			.forEach((connection, index) => {
+				offsets.set(
+					connectionKey(connection),
+					(portOffset(index, connections.length) * pitch) / PORT_SPACING,
+				);
+			});
 	}
 
 	return offsets;
@@ -726,7 +804,6 @@ function arrowForRoute(
 	portOffsets: ReadonlyMap<string, number>,
 	shapes: readonly NodeSceneElement[],
 	existingArrows: readonly ArrowSceneElement[],
-	direction: IntermediateDiagram["layout"]["direction"],
 ): ArrowSceneElement {
 	const { edge, source, sourceEdge, target, targetEdge } = route;
 	const portedStart = pointOnEdge(
@@ -739,58 +816,10 @@ function arrowForRoute(
 		targetEdge,
 		portOffsets.get(connectionKey({ edgeId: edge.id, endpoint: "target" })) ?? 0,
 	);
-	let points = compactPoints([portedStart, portedEnd]);
-
-	if (travelsAgainstLayout(source, target, direction)) {
-		points = exteriorLaneRoute(route, portedStart, portedEnd, shapes, existingArrows);
-	} else if (
-		edgeRouting === "orthogonal" &&
-		portedStart.x !== portedEnd.x &&
-		portedStart.y !== portedEnd.y
-	) {
-		const sideStubOffset = (route.index % 4) * PORT_SPACING;
-		const laneY = interiorLaneCoordinate(
-			portedStart.y,
-			portedEnd.y,
-			portedEnd.y < portedStart.y ? -sideStubOffset : sideStubOffset,
-		);
-		const startStub =
-			sourceEdge === "left"
-				? {
-						x: portedStart.x - ROUTE_STUB_LENGTH - sideStubOffset,
-						y: portedStart.y,
-					}
-				: sourceEdge === "right"
-					? {
-							x: portedStart.x + ROUTE_STUB_LENGTH + sideStubOffset,
-							y: portedStart.y,
-						}
-					: portedStart;
-		const endStub =
-			targetEdge === "left"
-				? {
-						x: portedEnd.x - ROUTE_STUB_LENGTH - sideStubOffset,
-						y: portedEnd.y,
-					}
-				: targetEdge === "right"
-					? {
-							x: portedEnd.x + ROUTE_STUB_LENGTH + sideStubOffset,
-							y: portedEnd.y,
-						}
-					: portedEnd;
-		const corners = [startStub, { x: startStub.x, y: laneY }, { x: endStub.x, y: laneY }, endStub];
-
-		points = compactPoints([portedStart, ...corners, portedEnd]);
-	}
-
-	if (
-		edgeRouting === "orthogonal" &&
-		(routeCrossesNode(points, shapes, new Set([source.nodeId, target.nodeId])) ||
-			routeSelfOverlapCount(points, route) > 0 ||
-			routeArrowOverlapCount(points, existingArrows, route) > 0)
-	) {
-		points = exteriorLaneRoute(route, portedStart, portedEnd, shapes, existingArrows);
-	}
+	const points =
+		edgeRouting === "orthogonal"
+			? exteriorLaneRoute(route, portedStart, portedEnd, shapes, existingArrows)
+			: compactPoints([portedStart, portedEnd]);
 
 	return {
 		type: "arrow",
@@ -801,25 +830,6 @@ function arrowForRoute(
 		points,
 		...(edge.label ? { label: edge.label } : {}),
 	};
-}
-
-function travelsAgainstLayout(
-	source: NodeSceneElement,
-	target: NodeSceneElement,
-	direction: IntermediateDiagram["layout"]["direction"],
-): boolean {
-	const sourceCenter = center(source);
-	const targetCenter = center(target);
-	switch (direction) {
-		case "TB":
-			return targetCenter.y < sourceCenter.y;
-		case "BT":
-			return targetCenter.y > sourceCenter.y;
-		case "LR":
-			return targetCenter.x < sourceCenter.x;
-		case "RL":
-			return targetCenter.x > sourceCenter.x;
-	}
 }
 
 function compactPoints(points: readonly ScenePoint[]): [ScenePoint, ...ScenePoint[]] {
@@ -843,12 +853,13 @@ function compactPoints(points: readonly ScenePoint[]): [ScenePoint, ...ScenePoin
 	return [first, ...compacted.slice(1)];
 }
 
-function routeCrossesNode(
-	points: readonly ScenePoint[],
-	shapes: readonly NodeSceneElement[],
-	ignoredNodeIds: ReadonlySet<string>,
-): boolean {
-	return routeNodeCrossingCount(points, shapes, ignoredNodeIds) > 0;
+function pointInsideBounds(point: ScenePoint, shape: NodeSceneElement): boolean {
+	return (
+		point.x >= shape.x &&
+		point.x <= shape.x + shape.width &&
+		point.y >= shape.y &&
+		point.y <= shape.y + shape.height
+	);
 }
 
 function routeNodeCrossingCount(
@@ -858,9 +869,13 @@ function routeNodeCrossingCount(
 ): number {
 	let crossingCount = 0;
 
-	for (const segment of segmentsFromPoints(points)) {
+	for (const [index, segment] of segmentsFromPoints(points).entries()) {
 		for (const shape of shapes) {
-			if (!ignoredNodeIds.has(shape.nodeId) && segmentCrossesBoundsInterior(segment, shape)) {
+			const endpointStub =
+				ignoredNodeIds.has(shape.nodeId) &&
+				((index === 0 && pointInsideBounds(points[0]!, shape)) ||
+					(index === points.length - 2 && pointInsideBounds(points.at(-1)!, shape)));
+			if (!endpointStub && segmentCrossesBoundsInterior(segment, shape)) {
 				crossingCount += 1;
 			}
 		}
@@ -923,11 +938,7 @@ function routeArrowOverlapCount(
 
 	for (const candidate of candidateSegments) {
 		for (const existing of existingSegments) {
-			if (
-				candidate.arrowId === existing.arrowId ||
-				isSharedBoundStem(candidate, existing) ||
-				!segmentsOverlapInterior(candidate, existing)
-			) {
+			if (candidate.arrowId === existing.arrowId || !segmentsOverlapInterior(candidate, existing)) {
 				continue;
 			}
 
@@ -1029,13 +1040,13 @@ function pointLeavesEdge(
 ): boolean {
 	switch (edge) {
 		case "top":
-			return candidate.y < edgePoint.y;
+			return candidate.x === edgePoint.x && edgePoint.y - candidate.y >= ROUTE_STUB_LENGTH;
 		case "right":
-			return candidate.x > edgePoint.x;
+			return candidate.y === edgePoint.y && candidate.x - edgePoint.x >= ROUTE_STUB_LENGTH;
 		case "bottom":
-			return candidate.y > edgePoint.y;
+			return candidate.x === edgePoint.x && candidate.y - edgePoint.y >= ROUTE_STUB_LENGTH;
 		case "left":
-			return candidate.x < edgePoint.x;
+			return candidate.y === edgePoint.y && edgePoint.x - candidate.x >= ROUTE_STUB_LENGTH;
 	}
 }
 
@@ -1086,10 +1097,10 @@ function chooseBestRoute(
 	}
 
 	const routeScore = (candidate: [ScenePoint, ...ScenePoint[]]): readonly number[] => [
+		-endpointStubScore(candidate, route),
 		routeNodeCrossingCount(candidate, shapes, ignoredNodeIds),
 		routeSelfOverlapCount(candidate, route),
 		routeArrowOverlapCount(candidate, existingArrows, route),
-		-endpointStubScore(candidate, route),
 		routeBacktrackDistance(candidate),
 		routeTargetOvershootDistance(candidate),
 		routeLength(candidate),
@@ -1113,6 +1124,263 @@ function chooseBestRoute(
 	return best;
 }
 
+/** Clear the bounding box even when the port is inset on a diamond or ellipse. */
+function endpointClearance(
+	shape: NodeSceneElement,
+	point: ScenePoint,
+	side: ConnectionEdge,
+	distance: number,
+): number {
+	switch (side) {
+		case "left":
+			return distance + point.x - shape.x;
+		case "right":
+			return distance + shape.x + shape.width - point.x;
+		case "top":
+			return distance + point.y - shape.y;
+		case "bottom":
+			return distance + shape.y + shape.height - point.y;
+	}
+}
+
+function sourceStubLength(route: RoutedEdge, point: ScenePoint, distance: number): number {
+	const labelSpace = route.edge.label
+		? route.sourceEdge === "left" || route.sourceEdge === "right"
+			? branchLabelMetrics(route.edge.label, route.source.kind === "decision" ? 80 : 160).width + 16
+			: Math.max(
+					40,
+					branchLabelMetrics(route.edge.label, route.source.kind === "decision" ? 80 : 160).height +
+						24,
+				)
+		: 0;
+	return endpointClearance(route.source, point, route.sourceEdge, Math.max(distance, labelSpace));
+}
+
+function assignDecisionSides(
+	routes: RoutedEdge[],
+	direction: IntermediateDiagram["layout"]["direction"],
+): void {
+	if (direction !== "TB" && direction !== "BT") return;
+	for (const source of new Set(
+		routes.filter((r) => r.source.kind === "decision").map((r) => r.source),
+	)) {
+		const branches = routes
+			.filter((r) => r.source === source)
+			.sort(
+				(a, b) =>
+					center(a.target).x - center(b.target).x ||
+					center(a.target).y - center(b.target).y ||
+					a.index - b.index,
+			);
+		if (branches.length < 2) continue;
+		branches.forEach((route, index) => {
+			const alignedBranch = branches
+				.filter((r) => Math.abs(center(r.target).x - center(source).x) < 1)
+				.sort(
+					(a, b) =>
+						Math.abs(center(a.target).y - center(source).y) -
+						Math.abs(center(b.target).y - center(source).y),
+				)[0];
+			const aligned = branches.length === 2 && route === alignedBranch;
+			const otherAligned = branches.length === 2 && alignedBranch !== undefined && !aligned;
+			route.sourceEdge = aligned
+				? direction === "TB"
+					? "bottom"
+					: "top"
+				: otherAligned
+					? center(route.target).x < center(source).x
+						? "left"
+						: "right"
+					: index === 0
+						? "left"
+						: index === branches.length - 1
+							? "right"
+							: direction === "TB"
+								? "bottom"
+								: "top";
+		});
+	}
+}
+
+function branchLabelMetrics(label: string, maxWidth = 160): { width: number; height: number } {
+	const text = wrapTextToWidth(label, maxWidth, 13);
+	return {
+		width: boundLabelWidth(text, 13, maxWidth),
+		height: Math.ceil(text.split("\n").length * 13 * 1.35),
+	};
+}
+
+function branchLabelPosition(route: RoutedEdge, start: ScenePoint): ScenePoint {
+	const stub = pointAwayFromEdge(
+		start,
+		route.sourceEdge,
+		sourceStubLength(route, start, ROUTE_STUB_LENGTH),
+	);
+	const horizontal = route.sourceEdge === "left" || route.sourceEdge === "right";
+	return {
+		x:
+			(start.x + stub.x) / 2 +
+			(horizontal
+				? 0
+				: branchLabelMetrics(route.edge.label ?? "", route.source.kind === "decision" ? 80 : 160)
+						.width /
+						2 +
+					8),
+		y:
+			(start.y + stub.y) / 2 -
+			(horizontal
+				? branchLabelMetrics(route.edge.label ?? "", route.source.kind === "decision" ? 80 : 160)
+						.height /
+						2 +
+					5
+				: 0),
+	};
+}
+
+function branchLabelObstacles(
+	routes: readonly RoutedEdge[],
+	offsets: ReadonlyMap<string, number>,
+): NodeSceneElement[] {
+	return routes
+		.filter((route) => route.edge.label)
+		.map((route) => {
+			const start = pointOnEdge(
+				route.source,
+				route.sourceEdge,
+				offsets.get(connectionKey({ edgeId: route.edge.id, endpoint: "source" })) ?? 0,
+			);
+			const position = branchLabelPosition(route, start);
+			const metrics = branchLabelMetrics(
+				route.edge.label!,
+				route.source.kind === "decision" ? 80 : 160,
+			);
+			const width = metrics.width + 12;
+			return {
+				...route.source,
+				id: `branch-label:${route.edge.id}`,
+				nodeId: `branch-label:${route.edge.id}`,
+				x: position.x - width / 2,
+				y: position.y - metrics.height / 2 - 4,
+				width,
+				height: metrics.height + 8,
+				shape: "rectangle",
+			};
+		});
+}
+
+/** Unbound, grouped text keeps its authored stub position through Excalidraw export. */
+function branchLabels(
+	arrows: ArrowSceneElement[],
+	routes: readonly RoutedEdge[],
+): TextSceneElement[] {
+	const labels: TextSceneElement[] = [];
+	for (const [index, arrow] of arrows.entries()) {
+		if (!arrow.label) continue;
+		const position = branchLabelPosition(routes[index]!, arrow.points[0]);
+		const groupIds = [`branch:${arrow.edgeId}`];
+		labels.push({
+			type: "text",
+			id: `${arrow.id}:label`,
+			text: arrow.label,
+			fontSize: 13,
+			x: position.x,
+			y: position.y,
+			maxWidth: routes[index]?.source.kind === "decision" ? 80 : 160,
+			groupIds,
+		});
+		arrows[index] = { ...arrow, groupIds };
+	}
+	return labels;
+}
+
+/** A visibility grid is the fallback when one exterior lane cannot clear every obstacle. */
+function obstacleRoute(
+	start: ScenePoint,
+	end: ScenePoint,
+	startStub: ScenePoint,
+	endStub: ScenePoint,
+	shapes: readonly NodeSceneElement[],
+	route: RoutedEdge,
+	arrows: readonly ArrowSceneElement[],
+): [ScenePoint, ...ScenePoint[]] | undefined {
+	const xs = [
+		...new Set([
+			startStub.x,
+			endStub.x,
+			...shapes.flatMap((s) => [s.x - PORT_SPACING, s.x + s.width + PORT_SPACING]),
+		]),
+	].sort((a, b) => a - b);
+	const ys = [
+		...new Set([
+			startStub.y,
+			endStub.y,
+			...shapes.flatMap((s) => [s.y - PORT_SPACING, s.y + s.height + PORT_SPACING]),
+		]),
+	].sort((a, b) => a - b);
+	const key = (x: number, y: number, axis: number) => `${x}:${y}:${axis}`;
+	type Step = { x: number; y: number; axis: number; cost: number; previous?: Step };
+	const initial: Step = {
+		x: xs.indexOf(startStub.x),
+		y: ys.indexOf(startStub.y),
+		axis: start.x === startStub.x ? 1 : 0,
+		cost: 0,
+	};
+	const pending = [initial];
+	const costs = new Map<string, number>([[key(initial.x, initial.y, initial.axis), 0]]);
+	while (pending.length) {
+		pending.sort((a, b) => b.cost - a.cost);
+		const current = pending.pop()!;
+		if (current.cost !== costs.get(key(current.x, current.y, current.axis))) continue;
+		const point = { x: xs[current.x]!, y: ys[current.y]! };
+		if (point.x === endStub.x && point.y === endStub.y) {
+			const path: ScenePoint[] = [];
+			for (let step: Step | undefined = current; step; step = step.previous)
+				path.unshift({ x: xs[step.x]!, y: ys[step.y]! });
+			const corners = path.filter(
+				(p, i) =>
+					i === 0 ||
+					i === path.length - 1 ||
+					!(
+						(path[i - 1]!.x === p.x && p.x === path[i + 1]!.x) ||
+						(path[i - 1]!.y === p.y && p.y === path[i + 1]!.y)
+					),
+			);
+			return compactPoints([start, ...corners, end]);
+		}
+		for (const [dx, dy, axis] of [
+			[-1, 0, 0],
+			[1, 0, 0],
+			[0, -1, 1],
+			[0, 1, 1],
+		] as const) {
+			const x = current.x + dx,
+				y = current.y + dy;
+			if (x < 0 || y < 0 || x >= xs.length || y >= ys.length) continue;
+			const next = { x: xs[x]!, y: ys[y]! };
+			const segment = segmentsFromPoints([point, next], 0)[0]!;
+			if (shapes.some((shape) => segmentCrossesBoundsInterior(segment, shape))) continue;
+			// Neither the departure nor the arrival may double back over its port stub.
+			if (
+				[...segmentsFromPoints([start, startStub]), ...segmentsFromPoints([endStub, end])].some(
+					(stub) => segmentsOverlapInterior(segment, stub),
+				)
+			)
+				continue;
+			const cost =
+				current.cost +
+				Math.abs(next.x - point.x) +
+				Math.abs(next.y - point.y) +
+				(axis === current.axis ? 0 : 24) +
+				routeArrowOverlapCount([point, next], arrows, route) * 10000;
+			const id = key(x, y, axis);
+			if (cost >= (costs.get(id) ?? Infinity)) continue;
+			costs.set(id, cost);
+			pending.push({ x, y, axis, cost, previous: current });
+		}
+	}
+	return undefined;
+}
+
 function exteriorLaneRoute(
 	route: RoutedEdge,
 	start: ScenePoint,
@@ -1130,10 +1398,7 @@ function exteriorLaneRoute(
 		route.sourceEdge === "left" ||
 		route.targetEdge === "left" ||
 		center(route.target).x < center(route.source).x;
-	const useUpperLane =
-		route.sourceEdge === "top" ||
-		route.targetEdge === "top" ||
-		center(route.source).y <= center(route.target).y;
+	const useUpperLane = center(route.target).y < center(route.source).y;
 	const laneOffset = route.index * PORT_SPACING;
 	const leftLaneX = minX - HORIZONTAL_GAP / 2 - laneOffset;
 	const rightLaneX = maxX + HORIZONTAL_GAP / 2 + laneOffset;
@@ -1161,11 +1426,24 @@ function exteriorLaneRoute(
 	const preferredLocalY = useUpperLane ? localUpperLaneY : localLowerLaneY;
 	const alternateLocalY = useUpperLane ? localLowerLaneY : localUpperLaneY;
 	const localStubDistance = ROUTE_STUB_LENGTH + (route.index % 4) * PORT_SPACING;
-	const stubDistances = [0, localStubDistance];
+	const stubDistances = [localStubDistance];
 	const routeForVerticalLane = (laneX: number, stubDistance: number) => {
 		const startStub =
-			stubDistance > 0 ? pointAwayFromEdge(start, route.sourceEdge, stubDistance) : start;
-		const endStub = stubDistance > 0 ? pointAwayFromEdge(end, route.targetEdge, stubDistance) : end;
+			stubDistance > 0
+				? pointAwayFromEdge(
+						start,
+						route.sourceEdge,
+						sourceStubLength(route, start, ROUTE_STUB_LENGTH),
+					)
+				: start;
+		const endStub =
+			stubDistance > 0
+				? pointAwayFromEdge(
+						end,
+						route.targetEdge,
+						endpointClearance(route.target, end, route.targetEdge, stubDistance),
+					)
+				: end;
 
 		return compactPoints([
 			start,
@@ -1178,8 +1456,21 @@ function exteriorLaneRoute(
 	};
 	const routeForHorizontalLane = (laneY: number, stubDistance: number) => {
 		const startStub =
-			stubDistance > 0 ? pointAwayFromEdge(start, route.sourceEdge, stubDistance) : start;
-		const endStub = stubDistance > 0 ? pointAwayFromEdge(end, route.targetEdge, stubDistance) : end;
+			stubDistance > 0
+				? pointAwayFromEdge(
+						start,
+						route.sourceEdge,
+						sourceStubLength(route, start, ROUTE_STUB_LENGTH),
+					)
+				: start;
+		const endStub =
+			stubDistance > 0
+				? pointAwayFromEdge(
+						end,
+						route.targetEdge,
+						endpointClearance(route.target, end, route.targetEdge, stubDistance),
+					)
+				: end;
 
 		return compactPoints([
 			start,
@@ -1212,11 +1503,36 @@ function exteriorLaneRoute(
 		...preferredLanes.slice(2),
 		...alternateLanes.slice(2),
 	];
-	const candidates = lanes.flatMap(([lane, generator]) =>
-		stubDistances.map((distance) => generator(lane, distance)),
+	const startStub = pointAwayFromEdge(
+		start,
+		route.sourceEdge,
+		sourceStubLength(route, start, ROUTE_STUB_LENGTH),
 	);
+	const endStub = pointAwayFromEdge(
+		end,
+		route.targetEdge,
+		endpointClearance(route.target, end, route.targetEdge, ROUTE_STUB_LENGTH),
+	);
+	const candidates = [
+		compactPoints([start, end]),
+		compactPoints([start, startStub, { x: startStub.x, y: endStub.y }, endStub, end]),
+		compactPoints([start, startStub, { x: endStub.x, y: startStub.y }, endStub, end]),
+		...lanes.flatMap(([lane, generator]) =>
+			stubDistances.map((distance) => generator(lane, distance)),
+		),
+	];
 
-	return chooseBestRoute(candidates, shapes, ignoredNodeIds, route, existingArrows);
+	const best = chooseBestRoute(candidates, shapes, ignoredNodeIds, route, existingArrows);
+	if (
+		routeNodeCrossingCount(best, shapes, ignoredNodeIds) ||
+		routeSelfOverlapCount(best, route) ||
+		routeArrowOverlapCount(best, existingArrows, route)
+	) {
+		const detour = obstacleRoute(start, end, startStub, endStub, shapes, route, existingArrows);
+		if (detour)
+			return chooseBestRoute([best, detour], shapes, ignoredNodeIds, route, existingArrows);
+	}
+	return best;
 }
 
 function sceneBounds(elements: readonly SceneElement[]): {
@@ -1338,7 +1654,9 @@ export function renderIntermediateDiagram(input: unknown): RenderedDiagramScene 
 	const routedEdges = diagram.edges.map((edge, index) =>
 		routeForEdge(edge, index, shapesByNodeId, diagram.layout.direction),
 	);
+	assignDecisionSides(routedEdges, diagram.layout.direction);
 	const portOffsets = portOffsetsForRoutes(routedEdges);
+	const labelObstacles = branchLabelObstacles(routedEdges, portOffsets);
 	const edgeArrows: ArrowSceneElement[] = [];
 	for (const route of routedEdges) {
 		edgeArrows.push(
@@ -1346,13 +1664,15 @@ export function renderIntermediateDiagram(input: unknown): RenderedDiagramScene 
 				route,
 				diagram.layout.edgeRouting,
 				portOffsets,
-				nodeShapes,
+				[
+					...nodeShapes,
+					...labelObstacles.filter((label) => label.nodeId !== `branch-label:${route.edge.id}`),
+				],
 				edgeArrows,
-				diagram.layout.direction,
 			),
 		);
 	}
-	const labels = nodeShapes.map(textForNode);
+	const labels = [...nodeShapes.map(textForNode), ...branchLabels(edgeArrows, routedEdges)];
 	const elements = normalizeSceneOrigin([...edgeArrows, ...nodeShapes, ...labels]);
 	const bounds = sceneBounds(elements);
 	const zOrder = [

@@ -1,0 +1,156 @@
+{
+	"id": "patient-intake-scheduling",
+	"title": "Patient Intake Scheduling",
+	"nodes": [
+		{
+			"id": "request",
+			"label": "Patient requests appointment",
+			"kind": "start"
+		},
+		{
+			"id": "collect",
+			"label": "Clinic collects intake information",
+			"kind": "process"
+		},
+		{
+			"id": "urgent",
+			"label": "Urgent symptoms?",
+			"kind": "decision"
+		},
+		{
+			"id": "triage",
+			"label": "Nurse triage",
+			"kind": "process"
+		},
+		{
+			"id": "same_day",
+			"label": "Schedule same-day appointment",
+			"kind": "process"
+		},
+		{
+			"id": "insurance",
+			"label": "Is insurance valid?",
+			"kind": "decision"
+		},
+		{
+			"id": "routine",
+			"label": "Schedule routine appointment",
+			"kind": "process"
+		},
+		{
+			"id": "self_pay_q",
+			"label": "Patient accepts self-pay?",
+			"kind": "decision"
+		},
+		{
+			"id": "self_pay",
+			"label": "Schedule routine care (self-pay)",
+			"kind": "process"
+		},
+		{
+			"id": "billing",
+			"label": "Refer to billing",
+			"kind": "process"
+		},
+		{
+			"id": "end_same_day",
+			"label": "Same-day visit booked",
+			"kind": "end"
+		},
+		{
+			"id": "end_routine",
+			"label": "Routine visit booked",
+			"kind": "end"
+		},
+		{
+			"id": "end_self_pay",
+			"label": "Self-pay visit booked",
+			"kind": "end"
+		},
+		{
+			"id": "end_billing",
+			"label": "Billing referral made",
+			"kind": "end"
+		}
+	],
+	"edges": [
+		{
+			"id": "e1",
+			"source": "request",
+			"target": "collect"
+		},
+		{
+			"id": "e2",
+			"source": "collect",
+			"target": "urgent"
+		},
+		{
+			"id": "e3",
+			"source": "urgent",
+			"target": "triage",
+			"label": "Yes"
+		},
+		{
+			"id": "e4",
+			"source": "triage",
+			"target": "same_day"
+		},
+		{
+			"id": "e5",
+			"source": "same_day",
+			"target": "end_same_day"
+		},
+		{
+			"id": "e6",
+			"source": "urgent",
+			"target": "insurance",
+			"label": "No"
+		},
+		{
+			"id": "e7",
+			"source": "insurance",
+			"target": "routine",
+			"label": "Valid"
+		},
+		{
+			"id": "e8",
+			"source": "routine",
+			"target": "end_routine"
+		},
+		{
+			"id": "e9",
+			"source": "insurance",
+			"target": "self_pay_q",
+			"label": "Invalid"
+		},
+		{
+			"id": "e10",
+			"source": "self_pay_q",
+			"target": "self_pay",
+			"label": "Yes"
+		},
+		{
+			"id": "e11",
+			"source": "self_pay",
+			"target": "end_self_pay"
+		},
+		{
+			"id": "e12",
+			"source": "self_pay_q",
+			"target": "billing",
+			"label": "No"
+		},
+		{
+			"id": "e13",
+			"source": "billing",
+			"target": "end_billing"
+		}
+	],
+	"layout": {
+		"direction": "TB"
+	},
+	"style": {
+		"accentColor": "#8f707f",
+		"backgroundColor": "#fffdf8"
+	}
+}

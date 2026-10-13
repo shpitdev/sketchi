@@ -8,6 +8,7 @@ import {
 	type CanvasSpec,
 	getCanvasValidationIssues,
 	parseFlowchartDiagram,
+	parseIntermediateDiagram,
 } from "@sketchi/diagram-core";
 import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
 import { renderIntermediateDiagram, renderSequenceDiagram } from "@sketchi/diagram-renderer";
@@ -324,10 +325,16 @@ async function expectLabelsPaintFully(
 	expect(canvas).not.toBeNull();
 	if (!canvas) return;
 	for (const [id, label] of firstPaint) {
+		// Each hit test starts outside the previous arrow/label group's selection bounds.
+		await act(async () => {
+			api.updateScene({ appState: { selectedElementIds: {}, selectedGroupIds: {} } });
+		});
+		await nextFrames();
 		const text = elementsById.get(id) as ExcalidrawTextElement;
 		const target = text.containerId ?? id;
 		const center = paintedCenter(label, elementsById.get(target));
 		const { scrollX, scrollY, zoom } = api.getAppState();
+
 		await userEvent.click(canvas, {
 			position: {
 				x: (center.x + scrollX) * zoom.value,
@@ -363,3 +370,59 @@ describe("Excalidraw labels", () => {
 		await expectLabelsPaintFully(convertSceneToExcalidraw(sequence), 3);
 	}, 60_000);
 });
+
+it("moves authored branch labels with a source node dragged on the real canvas", async () => {
+	await page.viewport(1280, 960);
+	const spec = parseIntermediateDiagram({
+		id: "drag-label",
+		title: "Drag",
+		type: "flowchart",
+		nodes: [
+			{ id: "a", label: "Source", kind: "process" },
+			{ id: "b", label: "Target", kind: "process" },
+		],
+		edges: [{ id: "ab", source: "a", target: "b", label: "Continue" }],
+		layout: { direction: "TB", edgeRouting: "orthogonal" },
+	});
+	let editorApi: ExcalidrawImperativeAPI | undefined;
+	const view = render(
+		<div style={{ height: 960, width: 1280 }}>
+			<ExcalidrawSceneCanvas
+				scene={convertSceneToExcalidraw(renderIntermediateDiagram(spec))}
+				title="Drag labels"
+				onApiChange={(api) => {
+					editorApi = api;
+				}}
+				viewModeEnabled={false}
+			/>
+		</div>,
+	);
+	const api = await waitFor(() => {
+		expect(editorApi).toBeDefined();
+		return editorApi!;
+	});
+	await nextFrames(4);
+	const source = api.getSceneElements().find((e) => e.id === "node:a")!;
+	const label = api.getSceneElements().find((e) => e.id === "edge:ab:label")!;
+	expect(source).toBeDefined();
+	expect(label).toBeDefined();
+	const before = { x: source.x, y: source.y, labelX: label.x, labelY: label.y };
+	const canvas = view.container.querySelector<HTMLCanvasElement>(
+		"canvas.excalidraw__canvas.interactive",
+	)!;
+	const { scrollX, scrollY, zoom } = api.getAppState();
+	const position = {
+		x: (source.x + source.width / 2 + scrollX) * zoom.value,
+		y: (source.y + source.height / 2 + scrollY) * zoom.value,
+	};
+	await userEvent.dragAndDrop(canvas, canvas, {
+		sourcePosition: position,
+		targetPosition: { x: position.x + 80, y: position.y + 30 },
+	});
+	await nextFrames(4);
+	const moved = api.getSceneElements().find((e) => e.id === source.id)!;
+	const movedLabel = api.getSceneElements().find((e) => e.id === label.id)!;
+	expect(moved.x - before.x).toBeGreaterThan(20);
+	expect(movedLabel.x - before.labelX).toBeCloseTo(moved.x - before.x, 0);
+	expect(movedLabel.y - before.labelY).toBeCloseTo(moved.y - before.y, 0);
+}, 30_000);

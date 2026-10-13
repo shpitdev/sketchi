@@ -207,9 +207,9 @@ describe("renderIntermediateDiagram", () => {
 		expect(scene.elements.filter((element) => element.type === "node")).toHaveLength(
 			flowchartFixture.nodes.length,
 		);
-		expect(scene.elements.filter((element) => element.type === "text")).toHaveLength(
-			flowchartFixture.nodes.length,
-		);
+		expect(
+			scene.elements.filter((element) => element.type === "text" && element.containerId),
+		).toHaveLength(flowchartFixture.nodes.length);
 		expect(scene.elements.filter((element) => element.type === "arrow")).toHaveLength(
 			flowchartFixture.edges.length,
 		);
