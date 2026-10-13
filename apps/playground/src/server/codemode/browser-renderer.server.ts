@@ -3,7 +3,7 @@ import "@tanstack/react-start/server-only";
 import type { Browser, BrowserWorker } from "@cloudflare/playwright";
 import type { CodeModeArtifactRenderer } from "@sketchi/diagram-agent";
 import { recordMetric } from "@sketchi/observability";
-import { Cause, Clock, Context, Effect, Exit, Layer, Metric, Schema } from "effect";
+import { Cause, Clock, Context, Effect, Exit, Layer, Metric, Schedule, Schema } from "effect";
 
 export type CloudflareBrowserRunBinding = BrowserWorker;
 
@@ -28,6 +28,10 @@ const browserRenderingFailures = Metric.counter("sketchi_browser_rendering_failu
 });
 const browserRenderingTimeouts = Metric.counter("sketchi_browser_rendering_timeouts", {
 	description: "Browser Rendering timeouts",
+	incremental: true,
+});
+const browserRenderingRetries = Metric.counter("sketchi_browser_rendering_retries", {
+	description: "Browser Rendering transient session retries",
 	incremental: true,
 });
 const browserRenderingDuration = Metric.histogram("sketchi_browser_rendering_duration_ms", {
@@ -105,6 +109,38 @@ function browserFailure(operation: BrowserRenderingOperation) {
 			operation,
 		});
 }
+
+function isTransientSessionFailure(error: BrowserRenderingFailure): boolean {
+	return (
+		error.operation !== "evaluate" &&
+		error.operation !== "base64" &&
+		!(error.cause instanceof Error && error.cause.name === "TimeoutError") &&
+		!/timeout|timed out/i.test(error.message) &&
+		/Browser not running|unhealthy|code: 410|code: 429|code: 5\d\d|Unable to connect|WebSocket/i.test(
+			error.message,
+		)
+	);
+}
+
+const browserRenderingRetrySchedule = Schedule.exponential(250, 3).pipe(
+	Schedule.upTo({ times: 2 }),
+	Schedule.setInputType<BrowserRenderingFailure>(),
+	Schedule.while(({ input }) => isTransientSessionFailure(input)),
+	Schedule.tap(({ input: error, attempt }) =>
+		Effect.gen(function* () {
+			yield* recordMetric(browserRenderingRetries, 1, {
+				operation: error.operation,
+				failureCategory: error._tag,
+				surface: "browser_rendering",
+			});
+			yield* Effect.logWarning("Retrying Browser Rendering session", {
+				attempt,
+				operation: error.operation,
+				failure_category: error._tag,
+			});
+		}),
+	),
+);
 
 function tryBrowserPromise<A>(
 	operation: Exclude<BrowserRenderingOperation, "base64">,
@@ -228,6 +264,8 @@ export function createCloudflareBrowserRunArtifactRenderer(
 						);
 					}),
 			).pipe(
+				// Retry the entire scope so each acquired browser closes before a fresh launch.
+				Effect.retry(browserRenderingRetrySchedule),
 				Effect.timeout(BROWSER_RENDER_TIMEOUT_MS),
 				Effect.catchTag("TimeoutError", () =>
 					Effect.fail(

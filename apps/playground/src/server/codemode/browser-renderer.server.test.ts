@@ -5,9 +5,10 @@ import {
 	makeTelemetryTestSink,
 	makeWorkersTelemetryLayer,
 	type TelemetryMetricEvent,
+	type TelemetryLogEvent,
 	type TelemetrySpanEvent,
 } from "@sketchi/observability";
-import { Cause, Effect, Exit, Fiber } from "effect";
+import { Cause, Clock, Effect, Exit, Fiber } from "effect";
 import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import { TestClock } from "effect/testing";
 import { beforeEach, expect, vi } from "vitest";
@@ -24,6 +25,19 @@ vi.mock("@cloudflare/playwright", () => ({
 }));
 
 const browserBinding: CloudflareBrowserRunBinding = { fetch };
+const transientMessage =
+	"Unable to connect to browser: code: 410: message: Browser not running (state: unhealthy)";
+
+function mockBrowser() {
+	const page = {
+		goto: vi.fn(async () => {}),
+		waitForFunction: vi.fn(async () => {}),
+		evaluate: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(btoa("PNG")),
+	};
+	const close = vi.fn(async () => {});
+	const newPage = vi.fn(async () => page);
+	return { browser: { close, newPage } as unknown as Browser, close, newPage, page };
+}
 
 function renderInput(): {
 	scene: RenderedDiagramScene;
@@ -57,6 +71,180 @@ describe("Cloudflare Browser Rendering Code Mode renderer", () => {
 	beforeEach(() => {
 		launchMock.mockReset();
 	});
+
+	it.effect("retries an unhealthy launch with backoff and retry telemetry", () => {
+		const { probe, sink } = makeTelemetryTestSink();
+		return Effect.gen(function* () {
+			const { browser, close } = mockBrowser();
+			launchMock.mockRejectedValueOnce(new Error(transientMessage)).mockResolvedValue(browser);
+			const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
+			const fiber = yield* Effect.forkChild(renderer.renderPng(renderInput()));
+			yield* TestClock.adjust(249);
+			expect(launchMock).toHaveBeenCalledTimes(1);
+			yield* TestClock.adjust(1);
+			const png = yield* Fiber.join(fiber);
+			expect(new Uint8Array(png)).toEqual(new Uint8Array([80, 78, 71]));
+			expect(launchMock).toHaveBeenCalledTimes(2);
+			expect(close).toHaveBeenCalledTimes(1);
+			const retries = probe.events.filter(
+				(event): event is TelemetryMetricEvent =>
+					event.event === "effect.metric" && event.metric === "sketchi_browser_rendering_retries",
+			);
+			expect(retries).toHaveLength(1);
+			expect(retries[0]).toMatchObject({
+				value: 1,
+				attributes: { operation: "launch", failure_category: "BrowserRenderingFailure" },
+			});
+			const warnings = probe.events.filter(
+				(event): event is TelemetryLogEvent =>
+					event.event === "effect.log" && event.level === "Warn",
+			);
+			expect(warnings).toHaveLength(1);
+			expect(warnings[0]).toMatchObject({
+				message: "Retrying Browser Rendering session",
+				fields: { operation: "launch", failure_category: "BrowserRenderingFailure", attempt: 1 },
+			});
+		}).pipe(
+			Effect.provide(
+				makeWorkersTelemetryLayer({ resource: { serviceName: "sketchi-browser-test" }, sink }),
+			),
+		);
+	});
+
+	it.effect("does not retry a non-transient launch failure", () =>
+		Effect.gen(function* () {
+			launchMock.mockRejectedValue(new Error("Invalid browser binding"));
+			const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
+			const error = yield* Effect.flip(renderer.renderPng(renderInput()));
+			expect(error).toMatchObject({ _tag: "BrowserRenderingFailure", operation: "launch" });
+			expect(launchMock).toHaveBeenCalledTimes(1);
+		}),
+	);
+
+	it.effect("surfaces the third transient failure after 250ms and 750ms backoffs", () =>
+		Effect.gen(function* () {
+			launchMock.mockRejectedValue(new Error(transientMessage));
+			const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
+			const fiber = yield* Effect.forkChild(Effect.flip(renderer.renderPng(renderInput())));
+			yield* TestClock.adjust(250);
+			expect(launchMock).toHaveBeenCalledTimes(2);
+			yield* TestClock.adjust(749);
+			expect(launchMock).toHaveBeenCalledTimes(2);
+			yield* TestClock.adjust(1);
+			const error = yield* Fiber.join(fiber);
+			expect(error).toMatchObject({
+				_tag: "BrowserRenderingFailure",
+				operation: "launch",
+				message: transientMessage,
+			});
+			expect(launchMock).toHaveBeenCalledTimes(3);
+		}),
+	);
+
+	for (const operation of ["newPage", "goto", "waitForHarness"] as const) {
+		it.effect(`closes the failed ${operation} session before launching a fresh browser`, () =>
+			Effect.gen(function* () {
+				const first = mockBrowser();
+				const second = mockBrowser();
+				const failing =
+					operation === "newPage"
+						? first.newPage
+						: operation === "goto"
+							? first.page.goto
+							: first.page.waitForFunction;
+				failing.mockRejectedValueOnce(new Error("WebSocket connection closed"));
+				launchMock.mockResolvedValueOnce(first.browser).mockImplementationOnce(async () => {
+					expect(first.close).toHaveBeenCalledTimes(1);
+					return second.browser;
+				});
+				const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
+				const fiber = yield* Effect.forkChild(renderer.renderPng(renderInput()));
+				yield* TestClock.adjust(250);
+				yield* Fiber.join(fiber);
+				expect(launchMock).toHaveBeenCalledTimes(2);
+				expect(second.close).toHaveBeenCalledTimes(1);
+			}),
+		);
+	}
+
+	for (const operation of ["evaluate", "base64", "timeout"] as const) {
+		it.effect(`does not retry a deterministic ${operation} failure`, () =>
+			Effect.gen(function* () {
+				const { browser, close, page } = mockBrowser();
+				if (operation === "evaluate") page.evaluate.mockReset().mockResolvedValue(transientMessage);
+				if (operation === "base64")
+					page.evaluate.mockReset().mockResolvedValueOnce(null).mockResolvedValueOnce("%");
+				if (operation === "timeout")
+					page.waitForFunction.mockRejectedValue(
+						Object.assign(new Error("WebSocket timed out"), { name: "TimeoutError" }),
+					);
+				launchMock.mockResolvedValue(browser);
+				const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
+				const error = yield* Effect.flip(renderer.renderPng(renderInput()));
+				expect(error).toMatchObject({
+					_tag: "BrowserRenderingFailure",
+					operation: operation === "timeout" ? "waitForHarness" : operation,
+				});
+				expect(launchMock).toHaveBeenCalledTimes(1);
+				expect(close).toHaveBeenCalledTimes(1);
+			}),
+		);
+	}
+
+	for (const end of ["timeout", "interruption"] as const) {
+		it.effect(`closes a retried session on ${end} without resetting the deadline`, () =>
+			Effect.gen(function* () {
+				const { browser, close, page } = mockBrowser();
+				const waitStarted = Promise.withResolvers<void>();
+				page.waitForFunction.mockImplementation(
+					() => new Promise<void>(() => waitStarted.resolve()),
+				);
+				launchMock.mockRejectedValueOnce(new Error(transientMessage)).mockResolvedValue(browser);
+				const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
+				const startedAt = yield* Clock.currentTimeMillis;
+				const fiber = yield* Effect.forkChild(renderer.renderPng(renderInput()));
+				yield* TestClock.adjust(250);
+				yield* Effect.promise(() => waitStarted.promise);
+				if (end === "timeout") {
+					yield* TestClock.adjust(BROWSER_RENDER_TIMEOUT_MS - 250);
+				} else {
+					yield* Fiber.interrupt(fiber);
+				}
+				const exit = yield* Fiber.await(fiber);
+				assert.isTrue(Exit.isFailure(exit));
+				if (Exit.isFailure(exit)) {
+					if (end === "timeout") {
+						const failure = Cause.findError(exit.cause);
+						expect(failure).toMatchObject({
+							_tag: "Success",
+							success: { _tag: "BrowserRenderingTimeout" },
+						});
+						expect((yield* Clock.currentTimeMillis) - startedAt).toBe(BROWSER_RENDER_TIMEOUT_MS);
+					} else {
+						assert.isTrue(Cause.hasInterrupts(exit.cause));
+					}
+				}
+				expect(launchMock).toHaveBeenCalledTimes(2);
+				expect(close).toHaveBeenCalledTimes(1);
+				expect(close).toHaveBeenCalledWith({ reason: "Code Mode PNG render interrupted" });
+			}),
+		);
+	}
+
+	it.effect("interruption during backoff does not launch another session", () =>
+		Effect.gen(function* () {
+			const { browser, close, page } = mockBrowser();
+			page.goto.mockRejectedValue(new Error(transientMessage));
+			launchMock.mockResolvedValue(browser);
+			const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
+			const fiber = yield* Effect.forkChild(renderer.renderPng(renderInput()));
+			yield* TestClock.adjust(249);
+			expect(close).toHaveBeenCalledTimes(1);
+			yield* Fiber.interrupt(fiber);
+			yield* TestClock.adjust(1_000);
+			expect(launchMock).toHaveBeenCalledTimes(1);
+		}),
+	);
 
 	it.effect("renders through the harness with boundary telemetry", () => {
 		const { probe, sink } = makeTelemetryTestSink();

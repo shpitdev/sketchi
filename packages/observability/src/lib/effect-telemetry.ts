@@ -37,6 +37,7 @@ const correlationFields = [
 
 const safeLogMessages = new Set([
 	"Browser Rendering session cleanup failed",
+	"Retrying Browser Rendering session",
 	"Code Mode usage capture failed",
 	"Retrying diagram generation",
 	"Retrying Studio diagram repair",
