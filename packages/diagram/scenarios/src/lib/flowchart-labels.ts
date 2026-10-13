@@ -75,6 +75,7 @@ const WORD_ALIASES = new Map([
 	["deploys", "deploy"],
 	["rejects", "reject"],
 	["charges", "charge"],
+	["retries", "retry"],
 	["builds", "build"],
 	["receives", "receive"],
 	["received", "receive"],

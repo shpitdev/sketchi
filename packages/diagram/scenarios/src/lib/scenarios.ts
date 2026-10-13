@@ -1411,7 +1411,7 @@ const flowchartScenarioDefinitions = [
 			"Create a subscription renewal dunning flowchart. A renewal is due and the system charges payment. If payment succeeds, renew the subscription. If payment fails, send a reminder and decide whether payment was updated. Updated payment retries the charge. If not updated, decide whether the grace period has expired. Expired grace pauses the subscription; otherwise send another reminder.",
 		nodes: [
 			["renewal-due", "Renewal due", "start", ["renewal due", "renewal is due"]],
-			["charge-payment", "Charge payment", "process", ["charges payment"]],
+			["charge-payment", "Charge payment", "process", ["charges payment", "retries the charge"]],
 			[
 				"payment-succeeded",
 				"Payment succeeded?",

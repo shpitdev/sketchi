@@ -332,6 +332,72 @@ describe("diagram scenario evaluation", () => {
 		).toBe(true);
 	});
 
+	it.each(["Retry charge", "Retries the charge"])(
+		"accepts a separate prompt-grounded dunning retry action: %s",
+		(label) => {
+			const scenario = getFlowchartScenario("subscription-renewal-dunning");
+			const candidate = {
+				...scenario.expectedDiagram,
+				nodes: [...scenario.expectedDiagram.nodes, { id: "retry-charge", label, kind: "process" }],
+				edges: [
+					...scenario.expectedDiagram.edges.map((edge) =>
+						edge.id === "updated-charge" ? { ...edge, target: "retry-charge" } : edge,
+					),
+					{ id: "retry-decision", source: "retry-charge", target: "payment-succeeded" },
+				],
+			};
+			expect(evaluateScenarioDiagram(scenario, candidate).ok).toBe(true);
+		},
+	);
+
+	it.each(["Skip retry charge", "Do not retry charge", "Retry refund", "Charge later"])(
+		"rejects a negated or different dunning retry action: %s",
+		(label) => {
+			const scenario = getFlowchartScenario("subscription-renewal-dunning");
+			const result = evaluateScenarioDiagram(scenario, {
+				...scenario.expectedDiagram,
+				nodes: [...scenario.expectedDiagram.nodes, { id: "retry-charge", label, kind: "process" }],
+				edges: [
+					...scenario.expectedDiagram.edges.map((edge) =>
+						edge.id === "updated-charge" ? { ...edge, target: "retry-charge" } : edge,
+					),
+					{ id: "retry-decision", source: "retry-charge", target: "payment-succeeded" },
+				],
+			});
+			expect(result.checks).toContainEqual(
+				expect.objectContaining({ id: "edge:Payment updated?->Charge payment:yes", passed: false }),
+			);
+		},
+	);
+
+	it.each(["wrong-branch", "bypassed-outcome"])("rejects a dunning retry with %s", (variant) => {
+		const scenario = getFlowchartScenario("subscription-renewal-dunning");
+		const result = evaluateScenarioDiagram(scenario, {
+			...scenario.expectedDiagram,
+			nodes: [
+				...scenario.expectedDiagram.nodes,
+				{ id: "retry-charge", label: "Retry charge", kind: "process" },
+			],
+			edges: [
+				...scenario.expectedDiagram.edges.map((edge) =>
+					edge.id === "updated-charge"
+						? { ...edge, target: "retry-charge", label: variant === "wrong-branch" ? "no" : "yes" }
+						: edge.id === "updated-grace" && variant === "wrong-branch"
+							? { ...edge, label: "yes" }
+							: edge,
+				),
+				{
+					id: "retry-decision",
+					source: "retry-charge",
+					target: variant === "bypassed-outcome" ? "pause-subscription" : "payment-succeeded",
+				},
+			],
+		});
+		expect(result.checks).toContainEqual(
+			expect.objectContaining({ id: "edge:Payment updated?->Charge payment:yes", passed: false }),
+		);
+	});
+
 	it("accepts a terminal action split into a process and its single direct end", () => {
 		const scenario = getFlowchartScenario("incident-response-code-mode-proof");
 		const candidate = {
