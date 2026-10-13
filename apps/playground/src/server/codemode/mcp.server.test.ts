@@ -1,4 +1,6 @@
 import { setImmediate } from "node:timers";
+import type { Browser } from "@cloudflare/playwright";
+import { launch } from "@cloudflare/playwright";
 import validationFixtures from "./fixtures/mcp-validation-issues-v2.json";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -34,6 +36,23 @@ import {
 	type SketchiCodeModeExecutor,
 	type SketchiCodeModeProvider,
 } from "./mcp.server";
+
+vi.mock("@cloudflare/playwright", () => ({ launch: vi.fn() }));
+
+function stubPngRenderer() {
+	vi.mocked(launch).mockImplementation(
+		async () =>
+			({
+				close: vi.fn(async () => {}),
+				newPage: async () => ({
+					goto: vi.fn(async () => {}),
+					waitForFunction: vi.fn(async () => {}),
+					evaluate: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(btoa("PNG")),
+				}),
+			}) as unknown as Browser,
+	);
+	return { BROWSER: { fetch }, SKETCHI_ARTIFACTS: new MemoryBucket() };
+}
 
 function testBoundary(env: StudioEnv, request: Request) {
 	return {
@@ -390,6 +409,206 @@ function createMcpFetch(options: CodeModeMcpOptions, env: StudioEnv = {}): typeo
 }
 
 describe("Sketchi Code Mode MCP server", () => {
+	const optionsOperations = [
+		[
+			"buildFlowchart",
+			{
+				spec: {
+					title: "Trailing options flow",
+					nodes: [
+						{ id: "start", label: "Start", kind: "start" },
+						{ id: "end", label: "Done", kind: "end" },
+					],
+					edges: [{ source: "start", target: "end" }],
+				},
+			},
+		],
+		[
+			"buildMindmap",
+			{
+				spec: {
+					title: "Trailing options mindmap",
+					root: { label: "Root", children: [{ label: "Child" }] },
+				},
+			},
+		],
+		[
+			"buildSequenceDiagram",
+			{
+				spec: {
+					title: "Trailing options sequence",
+					participants: [
+						{ id: "client", label: "Client" },
+						{ id: "api", label: "API" },
+					],
+					messages: [{ source: "client", target: "api", label: "Request" }],
+				},
+			},
+		],
+		[
+			"createCanvas",
+			{
+				spec: {
+					kind: "canvas",
+					version: 1,
+					diagramId: "trailing-options-canvas",
+					title: "Trailing options canvas",
+					width: 480,
+					height: 320,
+					accentColor: "#111827",
+					backgroundColor: "#ffffff",
+					elements: [
+						{
+							type: "node",
+							id: "card",
+							nodeId: "card",
+							shape: "rectangle",
+							x: 40,
+							y: 40,
+							width: 220,
+							height: 100,
+							label: "Canvas",
+						},
+					],
+					layers: [],
+					layouts: [],
+					zOrder: ["card"],
+				},
+			},
+		],
+		[
+			"applyDiagramPatch",
+			{ operations: [{ op: "setShape", selector: { nodeIds: ["start"] }, shape: "circle" }] },
+		],
+	] as const;
+
+	function optionsCode(operation: string, request: object, trailing: string) {
+		return `async () => {
+			const request = ${JSON.stringify(request)};
+			${
+				operation === "applyDiagramPatch"
+					? `const built = await sketchi.buildFlowchart(${JSON.stringify(optionsOperations[0][1])});
+			if (!built.ok) return built;
+			request.source = { artifactId: built.artifact.artifactId };`
+					: ""
+			}
+			return sketchi.${operation}(request, ${trailing});
+		}`;
+	}
+
+	it.each(optionsOperations)(
+		"honors trailing PNG options for %s through execute",
+		async (operation, request) => {
+			const output = await executeSketchiCodeMode(
+				stubPngRenderer(),
+				{
+					code: optionsCode(
+						operation,
+						request,
+						'{ artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: ["excalidraw"] }',
+					),
+				},
+				{ executor: createInProcessExecutor() },
+			);
+			expect(output.ok).toBe(true);
+			expect(output.result).toMatchObject({
+				ok: true,
+				status: "accepted",
+				artifact: {
+					formats: expect.arrayContaining([
+						expect.objectContaining({ format: "png", url: expect.any(String) }),
+						expect.objectContaining({ format: "excalidraw", inline: expect.any(Object) }),
+					]),
+				},
+			});
+			expect(output.artifactDelivery?.formats).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ format: "png", url: expect.any(String) }),
+				]),
+			);
+			expect(output.artifactDelivery?.pngUrl).toContain("https://studio.test/api/v1/artifacts/");
+			expect(output.finalResponseText).toContain(`PNG URL: ${output.artifactDelivery?.pngUrl}`);
+		},
+	);
+
+	it.each(optionsOperations)(
+		"prefers request.options keys over trailing options for %s",
+		async (operation, request) => {
+			const output = await executeSketchiCodeMode(
+				stubPngRenderer(),
+				{
+					code: optionsCode(
+						operation,
+						{ ...request, options: { artifactFormats: ["scene", "png"] } },
+						'{ artifactFormats: ["excalidraw"], inlineArtifacts: ["scene"] }',
+					),
+				},
+				{ executor: createInProcessExecutor() },
+			);
+			expect(output.result).toMatchObject({
+				ok: true,
+				artifact: {
+					formats: [
+						expect.objectContaining({ format: "scene", inline: expect.any(Object) }),
+						expect.objectContaining({ format: "png" }),
+					],
+				},
+			});
+			expect(output.artifactDelivery?.pngUrl).toBeDefined();
+		},
+	);
+
+	it.each([
+		"null",
+		"undefined",
+		"42",
+		'"png"',
+		'[{ artifactFormats: ["png"] }]',
+		"new Date()",
+		'new (class { artifactFormats = ["png"]; })()',
+	])("ignores non-plain trailing options: %s", async (trailing) => {
+		const output = await executeSketchiCodeMode(
+			{},
+			{
+				code: optionsCode("buildFlowchart", optionsOperations[0][1], trailing),
+			},
+			{ executor: createInProcessExecutor() },
+		);
+		expect(output.result).toMatchObject({
+			ok: true,
+			artifact: {
+				formats: [
+					expect.objectContaining({ format: "excalidraw" }),
+					expect.objectContaining({ format: "scene" }),
+				],
+			},
+		});
+		expect(output.artifactDelivery?.pngUrl).toBeUndefined();
+	});
+
+	it("reports a repairable export failure when trailing PNG options have no renderer", async () => {
+		const output = await executeSketchiCodeMode(
+			{},
+			{
+				code: optionsCode(
+					"buildFlowchart",
+					optionsOperations[0][1],
+					'{ artifactFormats: ["scene", "png"] }',
+				),
+			},
+			{ executor: createInProcessExecutor() },
+		);
+		expect(output.result).toMatchObject({
+			ok: false,
+			status: "export_failed",
+			issues: expect.arrayContaining([
+				expect.objectContaining({ code: "render_failed", hint: expect.any(String) }),
+			]),
+		});
+		expect(output.artifactDelivery?.pngUrl).toBeUndefined();
+		expect(output.finalResponseText).toBeUndefined();
+	});
+
 	it("preserves the MCP request trace in provider callbacks", async () => {
 		let callbackContext:
 			| {

@@ -563,6 +563,15 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 	return executed;
 });
 
+function withTrailingOptions(request: unknown, options: unknown): unknown {
+	if (!isRecord(request) || !isRecord(options)) return request;
+	const prototype = Object.getPrototypeOf(options);
+	if (prototype !== Object.prototype && prototype !== null) return request;
+	// Leave malformed documented options for the request validator to reject.
+	if (request.options !== undefined && !isRecord(request.options)) return request;
+	return { ...request, options: { ...options, ...request.options } };
+}
+
 export function makeSketchiCodeModeProvider(
 	codeMode: Context.Service.Shape<typeof PlaygroundCodeMode>,
 	runToolEffect: PlaygroundRequestRunner,
@@ -584,20 +593,43 @@ export function makeSketchiCodeModeProvider(
 	return {
 		name: "sketchi",
 		fns: {
-			buildFlowchart: (request) =>
-				runToolEffect(withTelemetryCorrelation(build("buildFlowchart", request), correlation)),
-			buildMindmap: (request) =>
-				runToolEffect(withTelemetryCorrelation(build("buildMindmap", request), correlation)),
-			buildSequenceDiagram: (request) =>
+			buildFlowchart: (request, options) =>
 				runToolEffect(
-					withTelemetryCorrelation(build("buildSequenceDiagram", request), correlation),
+					withTelemetryCorrelation(
+						build("buildFlowchart", withTrailingOptions(request, options)),
+						correlation,
+					),
 				),
-			createCanvas: (request) =>
-				runToolEffect(withTelemetryCorrelation(build("createCanvas", request), correlation)),
+			buildMindmap: (request, options) =>
+				runToolEffect(
+					withTelemetryCorrelation(
+						build("buildMindmap", withTrailingOptions(request, options)),
+						correlation,
+					),
+				),
+			buildSequenceDiagram: (request, options) =>
+				runToolEffect(
+					withTelemetryCorrelation(
+						build("buildSequenceDiagram", withTrailingOptions(request, options)),
+						correlation,
+					),
+				),
+			createCanvas: (request, options) =>
+				runToolEffect(
+					withTelemetryCorrelation(
+						build("createCanvas", withTrailingOptions(request, options)),
+						correlation,
+					),
+				),
 			getArtifact: (request) =>
 				runToolEffect(withTelemetryCorrelation(codeMode.getArtifact(request), correlation)),
-			applyDiagramPatch: (request) =>
-				runToolEffect(withTelemetryCorrelation(codeMode.applyDiagramPatch(request), correlation)),
+			applyDiagramPatch: (request, options) =>
+				runToolEffect(
+					withTelemetryCorrelation(
+						codeMode.applyDiagramPatch(withTrailingOptions(request, options)),
+						correlation,
+					),
+				),
 			searchIcons: (request) =>
 				runToolEffect(withTelemetryCorrelation(codeMode.searchIcons(request), correlation)),
 		},
