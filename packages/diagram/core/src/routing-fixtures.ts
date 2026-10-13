@@ -1,12 +1,12 @@
 import { parseFlowchartDiagram } from "./types/flowchart.js";
-import fixture0 from "./fixtures/routing/content-moderation.json";
-import fixture1 from "./fixtures/routing/data-import-validation.json";
-import fixture2 from "./fixtures/routing/incident-escalation.json";
-import fixture3 from "./fixtures/routing/invoice-approval.json";
-import fixture4 from "./fixtures/routing/loan-application-underwriting.json";
-import fixture5 from "./fixtures/routing/patient-intake-scheduling.json";
-import fixture6 from "./fixtures/routing/pharma-batch-disposition.json";
-import fixture7 from "./fixtures/routing/warehouse-reorder.json";
+import fixture0 from "./fixtures/routing/content-moderation.js";
+import fixture1 from "./fixtures/routing/data-import-validation.js";
+import fixture2 from "./fixtures/routing/incident-escalation.js";
+import fixture3 from "./fixtures/routing/invoice-approval.js";
+import fixture4 from "./fixtures/routing/loan-application-underwriting.js";
+import fixture5 from "./fixtures/routing/patient-intake-scheduling.js";
+import fixture6 from "./fixtures/routing/pharma-batch-disposition.js";
+import fixture7 from "./fixtures/routing/warehouse-reorder.js";
 
 /** Readability regressions from normalized flowchart specs. */
 export const routingFixtures = {

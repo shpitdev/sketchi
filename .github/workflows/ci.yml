@@ -33,6 +33,10 @@ jobs:
         run: pnpm run test:tools
       - name: Run canonical workspace gates
         run: pnpm nx run-many -t typecheck,test,build
+      - name: Smoke-test built scenario CLI under plain Node
+        run: |
+          node packages/diagram/scenarios/dist/cli.js --list
+          node packages/diagram/scenarios/dist/cli.js --scenario sketchi-onboarding-decision-flow --fixture
       - name: Lint, format, and custom-rule checks
         run: pnpm run check
       - name: Verify stable native TypeScript lane

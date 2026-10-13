@@ -1,0 +1,119 @@
+export default {
+	id: "warehouse-reorder-flow",
+	title: "Warehouse reorder flow",
+	nodes: [
+		{
+			id: "count",
+			label: "Stock count updated",
+			kind: "start",
+		},
+		{
+			id: "reorder_check",
+			label: "Inventory below reorder point?",
+			kind: "decision",
+		},
+		{
+			id: "monitor",
+			label: "Monitor stock",
+			kind: "process",
+		},
+		{
+			id: "monitor_end",
+			label: "Stock monitoring continues",
+			kind: "end",
+		},
+		{
+			id: "check_supplier",
+			label: "Check supplier availability",
+			kind: "process",
+		},
+		{
+			id: "supplier_check",
+			label: "Supplier available?",
+			kind: "decision",
+		},
+		{
+			id: "substitute",
+			label: "Use substitute supplier",
+			kind: "process",
+		},
+		{
+			id: "create_po",
+			label: "Create purchase order",
+			kind: "process",
+		},
+		{
+			id: "await_delivery",
+			label: "Await delivery",
+			kind: "process",
+		},
+		{
+			id: "reorder_end",
+			label: "Reorder cycle complete",
+			kind: "end",
+		},
+	],
+	edges: [
+		{
+			id: "e1",
+			source: "count",
+			target: "reorder_check",
+		},
+		{
+			id: "e2",
+			source: "reorder_check",
+			target: "monitor",
+			label: "No",
+		},
+		{
+			id: "e3",
+			source: "monitor",
+			target: "monitor_end",
+		},
+		{
+			id: "e4",
+			source: "reorder_check",
+			target: "check_supplier",
+			label: "Yes",
+		},
+		{
+			id: "e5",
+			source: "check_supplier",
+			target: "supplier_check",
+		},
+		{
+			id: "e6",
+			source: "supplier_check",
+			target: "create_po",
+			label: "Yes",
+		},
+		{
+			id: "e7",
+			source: "supplier_check",
+			target: "substitute",
+			label: "No",
+		},
+		{
+			id: "e8",
+			source: "substitute",
+			target: "create_po",
+		},
+		{
+			id: "e9",
+			source: "create_po",
+			target: "await_delivery",
+		},
+		{
+			id: "e10",
+			source: "await_delivery",
+			target: "reorder_end",
+		},
+	],
+	layout: {
+		direction: "TB",
+	},
+	style: {
+		accentColor: "#8f707f",
+		backgroundColor: "#fffdf8",
+	},
+} as const;

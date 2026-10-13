@@ -1,0 +1,136 @@
+export default {
+	id: "content-moderation-flow",
+	title: "Content moderation flow",
+	nodes: [
+		{
+			id: "report",
+			label: "Report received",
+			kind: "start",
+		},
+		{
+			id: "scan",
+			label: "Automated scan runs",
+			kind: "process",
+		},
+		{
+			id: "severe",
+			label: "Severe harm detected?",
+			kind: "decision",
+		},
+		{
+			id: "remove",
+			label: "Remove content",
+			kind: "process",
+		},
+		{
+			id: "escalate",
+			label: "Escalate to safety",
+			kind: "process",
+		},
+		{
+			id: "violation",
+			label: "Policy violation?",
+			kind: "decision",
+		},
+		{
+			id: "restore_none",
+			label: "Restore content",
+			kind: "end",
+		},
+		{
+			id: "review",
+			label: "Human review",
+			kind: "process",
+		},
+		{
+			id: "action",
+			label: "Action needed?",
+			kind: "decision",
+		},
+		{
+			id: "limit",
+			label: "Limit content",
+			kind: "end",
+		},
+		{
+			id: "restore_review",
+			label: "Restore content",
+			kind: "end",
+		},
+		{
+			id: "closed_severe",
+			label: "Severe case closed",
+			kind: "end",
+		},
+	],
+	edges: [
+		{
+			id: "edge-1",
+			source: "report",
+			target: "scan",
+		},
+		{
+			id: "edge-2",
+			source: "scan",
+			target: "severe",
+		},
+		{
+			id: "edge-3",
+			source: "severe",
+			target: "remove",
+			label: "Yes",
+		},
+		{
+			id: "edge-4",
+			source: "severe",
+			target: "violation",
+			label: "No",
+		},
+		{
+			id: "edge-5",
+			source: "remove",
+			target: "escalate",
+		},
+		{
+			id: "edge-6",
+			source: "escalate",
+			target: "closed_severe",
+		},
+		{
+			id: "edge-7",
+			source: "violation",
+			target: "restore_none",
+			label: "No",
+		},
+		{
+			id: "edge-8",
+			source: "violation",
+			target: "review",
+			label: "Yes",
+		},
+		{
+			id: "edge-9",
+			source: "review",
+			target: "action",
+		},
+		{
+			id: "edge-10",
+			source: "action",
+			target: "limit",
+			label: "Yes",
+		},
+		{
+			id: "edge-11",
+			source: "action",
+			target: "restore_review",
+			label: "No",
+		},
+	],
+	layout: {
+		direction: "TB",
+	},
+	style: {
+		accentColor: "#8f707f",
+		backgroundColor: "#fffdf8",
+	},
+} as const;

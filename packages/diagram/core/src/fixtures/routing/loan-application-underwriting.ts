@@ -1,0 +1,126 @@
+export default {
+	id: "loan-underwriting",
+	title: "Loan Application Underwriting",
+	nodes: [
+		{
+			id: "submit",
+			label: "Application submitted",
+			kind: "start",
+		},
+		{
+			id: "verify_id",
+			label: "Verify identity",
+			kind: "process",
+		},
+		{
+			id: "id_ok",
+			label: "Identity verified?",
+			kind: "decision",
+		},
+		{
+			id: "credit_review",
+			label: "Credit review",
+			kind: "process",
+		},
+		{
+			id: "credit_ok",
+			label: "Credit acceptable?",
+			kind: "decision",
+		},
+		{
+			id: "manual_uw",
+			label: "Manual underwriting",
+			kind: "process",
+		},
+		{
+			id: "exception",
+			label: "Exception approved?",
+			kind: "decision",
+		},
+		{
+			id: "income",
+			label: "Income verification",
+			kind: "process",
+		},
+		{
+			id: "approve",
+			label: "Loan approved",
+			kind: "end",
+		},
+		{
+			id: "decline",
+			label: "Decline application",
+			kind: "end",
+		},
+	],
+	edges: [
+		{
+			id: "e1",
+			source: "submit",
+			target: "verify_id",
+		},
+		{
+			id: "e2",
+			source: "verify_id",
+			target: "id_ok",
+		},
+		{
+			id: "e3",
+			source: "id_ok",
+			target: "credit_review",
+			label: "Yes",
+		},
+		{
+			id: "e4",
+			source: "id_ok",
+			target: "decline",
+			label: "No",
+		},
+		{
+			id: "e5",
+			source: "credit_review",
+			target: "credit_ok",
+		},
+		{
+			id: "e6",
+			source: "credit_ok",
+			target: "income",
+			label: "Yes",
+		},
+		{
+			id: "e7",
+			source: "credit_ok",
+			target: "manual_uw",
+			label: "No",
+		},
+		{
+			id: "e8",
+			source: "manual_uw",
+			target: "exception",
+		},
+		{
+			id: "e9",
+			source: "exception",
+			target: "income",
+			label: "Yes",
+		},
+		{
+			id: "e10",
+			source: "exception",
+			target: "decline",
+			label: "No",
+		},
+		{
+			id: "e11",
+			source: "income",
+			target: "approve",
+		},
+	],
+	layout: {
+		direction: "TB",
+	},
+	style: {
+		accentColor: "#8f707f",
+		backgroundColor: "#fffdf8",
+	},
+} as const;
