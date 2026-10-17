@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.14.0
+
+### Minor Changes
+
+- [#404](https://github.com/shpitdev/sketchi/pull/404) [`e8518bb`](https://github.com/shpitdev/sketchi/commit/e8518bb84d83247b844328a9e0f520d0a787314e) Thanks [@anandpant](https://github.com/anandpant)! - Render timelines on a time-scaled axis with humanized dates, alternating labels, axis breaks and wrapped rows, and accept phases (`end`), milestones, lanes, a stated `today`, year or month precision, and zoned instants.
+
 ## 0.13.0
 
 ### Minor Changes
