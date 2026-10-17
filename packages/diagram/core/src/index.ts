@@ -13,3 +13,4 @@ export * from "./text-metrics.js";
 export * from "./routing-fixtures.js";
 
 export * from "./types/timeline.js";
+export * from "./routing-quality.js";

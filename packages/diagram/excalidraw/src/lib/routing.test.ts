@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	parseFlowchartDiagram,
 	parseIntermediateDiagram,
 	segmentsFromPoints,
 	segmentsOverlapInterior,
@@ -9,7 +10,12 @@ import {
 	pharmaBatchDispositionFlowchart,
 } from "@sketchi/diagram-core";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
-import { convertSceneToExcalidraw, createExcalidrawFile, validateExcalidrawScene } from "./convert";
+import {
+	convertSceneToExcalidraw,
+	createExcalidrawFile,
+	exportedRoutingQualityFindings,
+	validateExcalidrawScene,
+} from "./convert";
 
 describe.each(
 	Object.entries({ ...routingFixtures, flowchartFixture, pharmaBatchDispositionFlowchart }),
@@ -17,6 +23,104 @@ describe.each(
 	it("preserves binding, text fit, and non-overlapping segments", () => {
 		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(fixture));
 		expect(validateExcalidrawScene(scene).issues).toEqual([]);
+	});
+
+	it("exports no endpoint jogs, near-coincident corridors or touching arrowheads", () => {
+		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(fixture));
+		const file = createExcalidrawFile(scene);
+		expect(
+			exportedRoutingQualityFindings({ ...scene, elements: file.elements }).map(
+				(finding) => finding.message,
+			),
+		).toEqual([]);
+	});
+});
+
+describe.each(["TB", "BT", "LR", "RL"] as const)(
+	"polish never costs a valid export: %s",
+	(direction) => {
+		it("keeps a corridor lane shift from overlapping a later route", () => {
+			// Review repro: shifting one lane clear of a neighbor left a later edge only an overlap.
+			const decisions = new Set(["n0", "n3", "n6", "n9"]);
+			const scene = convertSceneToExcalidraw(
+				renderIntermediateDiagram(
+					parseIntermediateDiagram({
+						...flowchartFixture,
+						nodes: ["n0", "n1", "n2", "n3", "n4", "n5", "n6", "n8", "n9"].map((id) => ({
+							id,
+							label: `Stage ${id.slice(1)}`,
+							kind: decisions.has(id) ? "decision" : "process",
+						})),
+						edges: [
+							["n0", "n8", "No"],
+							["n1", "n2"],
+							["n1", "n5"],
+							["n3", "n6", "No"],
+							["n5", "n6"],
+						].map(([source, target, label], index) => ({
+							id: `e${index}`,
+							source: source!,
+							target: target!,
+							...(label ? { label } : {}),
+						})),
+						layout: { ...flowchartFixture.layout, direction, edgeRouting: "orthogonal" },
+					}),
+				),
+			);
+			expect(validateExcalidrawScene(scene).issues).toEqual([]);
+		});
+	},
+);
+
+describe.each(["TB", "BT"] as const)("wide decision export: %s", (direction) => {
+	it("keeps six long-labeled branch stubs clear of the next rank", () => {
+		// Review repro: label room on a shared decision side pushed mandatory stubs into nodes.
+		const branches = [0, 1, 2, 3, 4, 5];
+		const scene = convertSceneToExcalidraw(
+			renderIntermediateDiagram(
+				parseFlowchartDiagram({
+					id: "six-branches",
+					title: "Six branches",
+					type: "flowchart",
+					nodes: [
+						{ id: "start", label: "Start", kind: "start" },
+						{ id: "route", label: "Route request", kind: "decision" },
+						...branches.map((i) => ({ id: `p${i}`, label: `Process ${i}`, kind: "process" })),
+						{ id: "end", label: "End", kind: "end" },
+					],
+					edges: [
+						{ id: "in", source: "start", target: "route" },
+						...branches.flatMap((i) => [
+							{
+								id: `b${i}`,
+								source: "route",
+								target: `p${i}`,
+								label: `Details were received and are now ready for further review ${i}`,
+							},
+							{ id: `x${i}`, source: `p${i}`, target: "end" },
+						]),
+					],
+					layout: { direction, edgeRouting: "orthogonal" },
+				}),
+			),
+		);
+		expect(validateExcalidrawScene(scene).issues).toEqual([]);
+	});
+});
+
+describe.each(["TB", "BT", "LR", "RL"] as const)("polished fan-in export: %s", (direction) => {
+	it.each([
+		"release-fan-in",
+		"stability-fan-in",
+		"renewal-retry",
+		"cancellation-convergence",
+	] as const)("exports %s without reader-scale routing defects", (name) => {
+		const fixture = routingFixtures[name];
+		const scene = convertSceneToExcalidraw(
+			renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }),
+		);
+		expect(validateExcalidrawScene(scene).issues).toEqual([]);
+		expect(exportedRoutingQualityFindings(scene).map((finding) => finding.message)).toEqual([]);
 	});
 });
 

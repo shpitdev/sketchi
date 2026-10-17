@@ -17,6 +17,9 @@ import {
 	fnv1a32,
 	type AxisAlignedSegment,
 	isSharedBoundStem,
+	routingQualityFindings,
+	type RoutingQualityFinding,
+	routingQualityScale,
 	segmentCrossesBoundsInterior,
 	segmentsFromPoints,
 	segmentsOverlapInterior,
@@ -1135,6 +1138,47 @@ function fixedPointResolvesToEndpoint(
 	return (
 		near(bounds.x + fixedX * bounds.width, point.x) &&
 		near(bounds.y + fixedY * bounds.height, point.y)
+	);
+}
+
+function absoluteArrowPoints(element: ExcalidrawElement): { x: number; y: number }[] {
+	const x = numericValue(element.x) ?? 0;
+	const y = numericValue(element.y) ?? 0;
+	return Array.isArray(element.points)
+		? element.points
+				.map(finitePointTuple)
+				.filter((point): point is [number, number] => point !== null)
+				.map(([px, py]) => ({ x: x + px, y: y + py }))
+		: [];
+}
+
+/**
+ * Reader-scale routing polish on the exported geometry: endpoint jogs,
+ * near-coincident corridors and touching arrowheads, judged at the size of the
+ * PNG a reader sees.
+ */
+export function exportedRoutingQualityFindings(scene: ExcalidrawScene): RoutingQualityFinding[] {
+	const elements = scene.elements.filter((element) => element.isDeleted !== true);
+	const arrows = elements.filter((element) => element.type === "arrow");
+	const corners = elements.flatMap((element) => {
+		if (element.type === "arrow" || element.type === "line") return absoluteArrowPoints(element);
+		const bounds = elementBounds(element);
+		return bounds ? [bounds, { x: bounds.x + bounds.width, y: bounds.y + bounds.height }] : [];
+	});
+	const xs = corners.map((point) => point.x);
+	const ys = corners.map((point) => point.y);
+	return routingQualityFindings(
+		arrows.map((element) => ({
+			id: element.id,
+			points: absoluteArrowPoints(element),
+			sourceId: bindingElementId(element, "startBinding"),
+			targetId: bindingElementId(element, "endBinding"),
+			endArrowhead: element.endArrowhead !== null && element.endArrowhead !== undefined,
+		})),
+		routingQualityScale({
+			width: Math.max(...xs) - Math.min(...xs),
+			height: Math.max(...ys) - Math.min(...ys),
+		}),
 	);
 }
 

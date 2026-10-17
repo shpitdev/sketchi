@@ -89,11 +89,12 @@ const denseRelease = parseIntermediateDiagram({
 });
 
 describe("routing work", () => {
-	// Measured: 8.28M checks TB and 1.78M LR. Rescanning every routed segment on
-	// each grid-search step (aa01b3f1) took 29.4M TB and 6.2M LR.
+	// Measured: 3.30M checks TB and 3.05M LR with A* grid search, aligned ports and
+	// corridor-aware fallbacks. Rescanning every routed segment on each grid-search
+	// step (aa01b3f1) took 29.4M TB.
 	it.each([
-		["TB", 12_000_000],
-		["LR", 3_000_000],
+		["TB", 6_000_000],
+		["LR", 9_000_000],
 	] as const)("bounds segment checks for a dense %s release flow", (direction, limit) => {
 		work.checks = 0;
 		const scene = renderIntermediateDiagram({

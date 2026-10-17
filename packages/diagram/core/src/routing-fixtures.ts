@@ -15,9 +15,33 @@ import feedbackChain from "./fixtures/routing/feedback-chain.js";
 import multiStageRework from "./fixtures/routing/multi-stage-rework.js";
 import twoStageRetry from "./fixtures/routing/two-stage-retry.js";
 import sharedFeedbackReturns from "./fixtures/routing/shared-feedback-returns.js";
+import releaseFanIn from "./fixtures/routing/release-fan-in.js";
+import stabilityFanIn from "./fixtures/routing/stability-fan-in.js";
+import renewalRetry from "./fixtures/routing/renewal-retry.js";
+import cancellationConvergence from "./fixtures/routing/cancellation-convergence.js";
 
 /** Readability regressions from normalized flowchart specs. */
 export const routingFixtures = {
+	"release-fan-in": parseFlowchartDiagram({
+		...releaseFanIn,
+		type: "flowchart",
+		layout: { direction: "TB", edgeRouting: "orthogonal" },
+	}),
+	"stability-fan-in": parseFlowchartDiagram({
+		...stabilityFanIn,
+		type: "flowchart",
+		layout: { direction: "TB", edgeRouting: "orthogonal" },
+	}),
+	"renewal-retry": parseFlowchartDiagram({
+		...renewalRetry,
+		type: "flowchart",
+		layout: { direction: "TB", edgeRouting: "orthogonal" },
+	}),
+	"cancellation-convergence": parseFlowchartDiagram({
+		...cancellationConvergence,
+		type: "flowchart",
+		layout: { direction: "TB", edgeRouting: "orthogonal" },
+	}),
 	"shared-feedback-returns": parseFlowchartDiagram({
 		...sharedFeedbackReturns,
 		type: "flowchart",

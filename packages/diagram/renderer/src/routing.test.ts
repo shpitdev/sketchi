@@ -8,7 +8,11 @@ import {
 	segmentsOverlapInterior,
 	boundLabelWidth,
 	wrapTextToWidth,
+	parseFlowchartDiagram,
 	parseIntermediateDiagram,
+	candidateRouteQuality,
+	routingQualityFindings,
+	routingQualityScale,
 } from "@sketchi/diagram-core";
 import { renderIntermediateDiagram, type NodeSceneElement, type ScenePoint } from "./scene";
 
@@ -468,6 +472,191 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("feedback ports: %s", (directio
 					.filter((a) => a.targetNodeId === target.nodeId)
 					.map((a) => side(target, a.points.at(-1)!)),
 			).not.toContain(side(target, feedback.points.at(-1)!));
+		},
+	);
+});
+
+/**
+ * Endpoint jogs, near-coincident corridors, touching arrowheads and lines through
+ * another arrow's head, judged at reader scale.
+ */
+function readerFindings(scene: ReturnType<typeof renderIntermediateDiagram>): string[] {
+	const nodes = scene.elements.filter((e) => e.type === "node");
+	const arrows = scene.elements.filter((e) => e.type === "arrow");
+	const xs = [
+		...nodes.flatMap((n) => [n.x, n.x + n.width]),
+		...arrows.flatMap((a) => a.points.map((p) => p.x)),
+	];
+	const ys = [
+		...nodes.flatMap((n) => [n.y, n.y + n.height]),
+		...arrows.flatMap((a) => a.points.map((p) => p.y)),
+	];
+	const scale = routingQualityScale({
+		width: Math.max(...xs) - Math.min(...xs),
+		height: Math.max(...ys) - Math.min(...ys),
+	});
+	const routes = arrows.map((a) => ({
+		id: a.edgeId,
+		points: a.points,
+		sourceId: a.sourceNodeId,
+		targetId: a.targetNodeId,
+	}));
+	const score = candidateRouteQuality(routes, scale);
+	return [
+		...routingQualityFindings(routes, scale).map((finding) => finding.message),
+		...routes
+			.filter((route) => score(route).arrowheadsCrossed > 0)
+			.map((route) => `${route.id} passes through another arrowhead`),
+	];
+}
+
+const directions = ["TB", "BT", "LR", "RL"] as const;
+// Rendering is deterministic, so each fixture and direction renders once for every check.
+const rendered = new Map<string, ReturnType<typeof renderIntermediateDiagram>>();
+const render = (
+	fixture: (typeof routingFixtures)[keyof typeof routingFixtures],
+	direction: string,
+) => {
+	const key = `${fixture.id}:${direction}`;
+	if (!rendered.has(key))
+		rendered.set(
+			key,
+			renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }),
+		);
+	return rendered.get(key)!;
+};
+
+describe("reader-scale routing polish", () => {
+	it.each(Object.keys(routingFixtures))(
+		"keeps %s free of jogs, near-coincident corridors and touching arrowheads",
+		(name) => {
+			expect(
+				readerFindings(render(routingFixtures[name as keyof typeof routingFixtures], "TB")),
+			).toEqual([]);
+		},
+	);
+
+	describe.each(directions)("%s", (direction) => {
+		it.each([
+			"release-fan-in",
+			"stability-fan-in",
+			"renewal-retry",
+			"cancellation-convergence",
+		] as const)("keeps %s polished in every direction", (name) => {
+			expect(readerFindings(render(routingFixtures[name], direction))).toEqual([]);
+		});
+
+		// Known residuals in mirrored layouts; a count may only fall.
+		const residuals: Partial<Record<string, Partial<Record<(typeof directions)[number], number>>>> =
+			{
+				"data-import-validation": { BT: 1, RL: 1 },
+				"feedback-skip-stubs": { LR: 1, RL: 1 },
+				"invoice-approval": { BT: 2 },
+				"pharma-batch-disposition": { LR: 1, RL: 1 },
+				"warehouse-reorder": { RL: 1 },
+			};
+		it.each(Object.keys(routingFixtures))("does not add reader-scale defects to %s", (name) => {
+			expect(
+				readerFindings(render(routingFixtures[name as keyof typeof routingFixtures], direction))
+					.length,
+			).toBeLessThanOrEqual(residuals[name]?.[direction] ?? 0);
+		});
+
+		it("keeps a centered straight spine and lands the loop clear of it", () => {
+			for (const [name, spine, loop] of [
+				["stability-fan-in", "classify", "retry"],
+				["renewal-retry", "bill", "retry"],
+			] as const) {
+				const scene = render(routingFixtures[name], direction);
+				const arrows = scene.elements.filter((e) => e.type === "arrow");
+				const nodes = scene.elements.filter((e) => e.type === "node");
+				const straight = arrows.find((a) => a.edgeId === spine)!;
+				const returning = arrows.find((a) => a.edgeId === loop)!;
+				const target = nodes.find((n) => n.nodeId === straight.targetNodeId)!;
+				const end = straight.points.at(-1)!;
+				expect(straight.points, `${name}:${spine}`).toHaveLength(2);
+				expect(
+					direction === "TB" || direction === "BT"
+						? end.x - (target.x + target.width / 2)
+						: end.y - (target.y + target.height / 2),
+					`${name}:${spine} centered`,
+				).toBeCloseTo(0, 6);
+				const arrival = returning.points.at(-1)!;
+				expect(
+					side(target, arrival) !== side(target, end) ||
+						Math.hypot(arrival.x - end.x, arrival.y - end.y) >= 36 - 0.001,
+					`${name}:${loop} clear of ${spine}`,
+				).toBe(true);
+			}
+		});
+
+		it("separates every arrival at three-way, two-way and convergent fan-ins", () => {
+			for (const [name, target, count] of [
+				["stability-fan-in", "stable", 3],
+				["release-fan-in", "release", 2],
+				["cancellation-convergence", "confirm", 2],
+			] as const) {
+				const scene = render(routingFixtures[name], direction);
+				const arrivals = scene.elements
+					.filter((e) => e.type === "arrow" && e.targetNodeId === target)
+					.map((a) => (a.type === "arrow" ? a.points.at(-1)! : { x: 0, y: 0 }));
+				expect(arrivals).toHaveLength(count);
+				for (const [i, p] of arrivals.entries())
+					for (const q of arrivals.slice(i + 1))
+						expect(Math.hypot(p.x - q.x, p.y - q.y), name).toBeGreaterThanOrEqual(36 - 0.001);
+			}
+		});
+	});
+});
+
+describe.each(["LR", "RL", "TB", "BT"] as const)("direct decision ports: %s", (direction) => {
+	it.each(["straight", "curved"] as const)(
+		"leaves and enters every %s node outward instead of cutting back through it",
+		(edgeRouting) => {
+			// Review repro: mirrored decision vertices sent a direct branch back through its diamond.
+			const scene = renderIntermediateDiagram(
+				parseFlowchartDiagram({
+					id: "retry-decisions",
+					title: "Retry decisions",
+					type: "flowchart",
+					nodes: [
+						{ id: "n0", label: "Stage 0", kind: "start" },
+						{ id: "n1", label: "Escalate to on-call engineer 1", kind: "decision" },
+						{ id: "n2", label: "Stage 2", kind: "end" },
+						{ id: "n3", label: "Approve 3", kind: "decision" },
+						{ id: "n4", label: "Stage 4", kind: "end" },
+					],
+					edges: [
+						{ id: "e0", source: "n0", target: "n1" },
+						{ id: "e1", source: "n1", target: "n2", label: "No" },
+						{ id: "e2", source: "n1", target: "n3", label: "Retry" },
+						{ id: "e3", source: "n3", target: "n4", label: "Yes" },
+						{ id: "e4", source: "n3", target: "n1", label: "No" },
+					],
+					layout: { direction, edgeRouting },
+				}),
+			);
+			const nodes = scene.elements.filter((e) => e.type === "node");
+			const inward: string[] = [];
+			for (const arrow of scene.elements.filter((e) => e.type === "arrow"))
+				for (const [nodeId, point, next] of [
+					[arrow.sourceNodeId, arrow.points[0], arrow.points[1]!],
+					[arrow.targetNodeId, arrow.points.at(-1)!, arrow.points.at(-2)!],
+				] as const) {
+					const node = nodes.find((n) => n.nodeId === nodeId)!;
+					const x =
+						(point.x + (next.x - point.x) * 1e-4 - node.x - node.width / 2) / (node.width / 2);
+					const y =
+						(point.y + (next.y - point.y) * 1e-4 - node.y - node.height / 2) / (node.height / 2);
+					const extent =
+						node.shape === "diamond"
+							? Math.abs(x) + Math.abs(y)
+							: node.shape === "ellipse"
+								? Math.hypot(x, y)
+								: Math.max(Math.abs(x), Math.abs(y));
+					if (extent < 1 - 1e-6) inward.push(`${arrow.edgeId}:${nodeId}`);
+				}
+			expect(inward).toEqual([]);
 		},
 	);
 });

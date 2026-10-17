@@ -6,6 +6,8 @@ import {
 	canvasNodeIconBand,
 	type AxisAlignedSegment,
 	segmentCrossesBoundsInterior,
+	isSharedBoundStem,
+	segmentOverlapLength,
 	segmentsFromPoints,
 	segmentsOverlapInterior,
 	type CanvasConnectorElement,
@@ -26,6 +28,10 @@ import {
 	boundLabelWidth,
 	type IntermediateDiagram,
 	parseIntermediateDiagram,
+	candidateRouteQuality,
+	routingCorridorGap,
+	routingQualityFindings,
+	routingQualityScale,
 	wrapTextToUnits,
 } from "@sketchi/diagram-core";
 
@@ -64,6 +70,8 @@ const PORT_SPACING = 18;
 const PORT_PADDING = 16;
 const RANK_SWEEP_COUNT = 4;
 const ROUTE_STUB_LENGTH = 36;
+/** Grid-search expansions spent looking for a lane clear of a near-parallel neighbor. */
+const CORRIDOR_SEARCH_STEPS = 5_000;
 
 type ConnectionEdge = "top" | "right" | "bottom" | "left";
 
@@ -422,8 +430,21 @@ function orderedRankShapes(
 function positionNodes(
 	diagram: IntermediateDiagram,
 	minimumSizes: ReadonlyMap<string, { width: number; height: number }> = new Map(),
+	stubReach: ReadonlyMap<string, number> = new Map(),
 ): NodeSceneElement[] {
 	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
+	// Neighbors in a rank keep room for the stubs on their facing sides, so a long
+	// labeled stub never reaches the next node or meets its stub head-on.
+	const [lowSide, highSide]: readonly [ConnectionEdge, ConnectionEdge] = vertical
+		? ["left", "right"]
+		: ["top", "bottom"];
+	const gapBetween = (left: NodeSceneElement, right: NodeSceneElement) =>
+		Math.max(
+			HORIZONTAL_GAP,
+			(stubReach.get(portKey(left.nodeId, highSide)) ?? 0) +
+				(stubReach.get(portKey(right.nodeId, lowSide)) ?? 0) +
+				PORT_SPACING,
+		);
 	const buckets = edgeBuckets(diagram.edges);
 	const shapesByNodeId = new Map(
 		diagram.nodes.map((node) => {
@@ -473,7 +494,9 @@ function positionNodes(
 	const rankMetrics = ranks.map(([rank, shapes]) => {
 		const breadth = shapes.reduce(
 			(sum, shape, index) =>
-				sum + (vertical ? shape.width : shape.height) + (index > 0 ? HORIZONTAL_GAP : 0),
+				sum +
+				(vertical ? shape.width : shape.height) +
+				(index > 0 ? gapBetween(shapes[index - 1]!, shape) : 0),
 			0,
 		);
 		const depth = Math.max(...shapes.map((shape) => (vertical ? shape.height : shape.width)));
@@ -484,24 +507,37 @@ function positionNodes(
 	let rankOffset = PADDING;
 	const positioned: NodeSceneElement[] = [];
 
-	for (const metric of rankMetrics) {
+	// Consecutive ranks keep room for the stubs on the sides that face each other.
+	const forwardSide: ConnectionEdge =
+		diagram.layout.direction === "TB"
+			? "bottom"
+			: diagram.layout.direction === "BT"
+				? "top"
+				: diagram.layout.direction === "LR"
+					? "right"
+					: "left";
+	const reachOf = (shapes: readonly NodeSceneElement[], side: ConnectionEdge) =>
+		Math.max(0, ...shapes.map((shape) => stubReach.get(portKey(shape.nodeId, side)) ?? 0));
+	for (const [rankIndex, metric] of rankMetrics.entries()) {
 		let breadthOffset = PADDING + Math.max(0, maxBreadth - metric.breadth) / 2;
 
-		for (const shape of metric.shapes) {
+		for (const [index, shape] of metric.shapes.entries()) {
+			const next = metric.shapes[index + 1];
+			const gap = next ? gapBetween(shape, next) : 0;
 			if (vertical) {
 				positioned.push({
 					...shape,
 					x: breadthOffset,
 					y: rankOffset + Math.max(0, metric.depth - shape.height) / 2,
 				});
-				breadthOffset += shape.width + HORIZONTAL_GAP;
+				breadthOffset += shape.width + gap;
 			} else {
 				positioned.push({
 					...shape,
 					x: rankOffset + Math.max(0, metric.depth - shape.width) / 2,
 					y: breadthOffset,
 				});
-				breadthOffset += shape.height + HORIZONTAL_GAP;
+				breadthOffset += shape.height + gap;
 			}
 		}
 
@@ -525,7 +561,14 @@ function positionNodes(
 								ROUTE_STUB_LENGTH * 2,
 						),
 				);
-		rankOffset += metric.depth + Math.max(VERTICAL_GAP, labelGap);
+		const next = rankMetrics[rankIndex + 1];
+		const stubGap =
+			next && stubReach.size > 0
+				? reachOf(metric.shapes, forwardSide) +
+					reachOf(next.shapes, OPPOSITE_EDGE[forwardSide]) +
+					PORT_SPACING
+				: 0;
+		rankOffset += metric.depth + Math.max(VERTICAL_GAP, labelGap, stubGap);
 	}
 
 	if (diagram.layout.direction === "BT") {
@@ -716,7 +759,10 @@ function portOffset(index: number, count: number): number {
 	return (index - (count - 1) / 2) * PORT_SPACING;
 }
 
-function portOffsetsForRoutes(routes: readonly RoutedEdge[]): Map<string, number> {
+function portOffsetsForRoutes(
+	routes: readonly RoutedEdge[],
+	sharedDecisionPitch = false,
+): Map<string, number> {
 	const connectionsByPort = new Map<
 		string,
 		Array<{ edgeId: string; endpoint: "source" | "target"; coordinate: number }>
@@ -756,8 +802,11 @@ function portOffsetsForRoutes(routes: readonly RoutedEdge[]): Map<string, number
 		const labeled = departures
 			.map((c) => routes.find((r) => r.edge.id === c.edgeId)!)
 			.filter((r) => r.edge.label);
+		// Decision branches usually get a vertex each; two labeled ones sharing a side need room.
 		const pitch =
-			departures.length > 1 && labeled.length > 0 && labeled[0]!.source.kind !== "decision"
+			departures.length > 1 &&
+			labeled.length > 0 &&
+			(labeled[0]!.source.kind !== "decision" || (sharedDecisionPitch && labeled.length > 1))
 				? Math.max(
 						PORT_SPACING,
 						...labeled.map((r) => {
@@ -780,6 +829,274 @@ function portOffsetsForRoutes(routes: readonly RoutedEdge[]): Map<string, number
 			});
 	}
 
+	return offsets;
+}
+
+/** Arrowheads are about 17 units wide; this keeps a visible gap beside an arrival. */
+const ARRIVAL_SPACING = 36;
+const OPPOSITE_EDGE: Readonly<Record<ConnectionEdge, ConnectionEdge>> = {
+	top: "bottom",
+	right: "left",
+	bottom: "top",
+	left: "right",
+};
+const EDGE_NORMAL: Readonly<Record<ConnectionEdge, ScenePoint>> = {
+	top: { x: 0, y: -1 },
+	right: { x: 1, y: 0 },
+	bottom: { x: 0, y: 1 },
+	left: { x: -1, y: 0 },
+};
+
+interface PortSlot {
+	readonly endpoint: "source" | "target";
+	readonly key: string;
+	readonly route: RoutedEdge;
+}
+
+function slotSide(slot: PortSlot): ConnectionEdge {
+	return slot.endpoint === "source" ? slot.route.sourceEdge : slot.route.targetEdge;
+}
+
+function slotAxis(side: ConnectionEdge): "x" | "y" {
+	return side === "top" || side === "bottom" ? "x" : "y";
+}
+
+function portLimit(node: NodeSceneElement, side: ConnectionEdge): number {
+	return (slotAxis(side) === "x" ? node.width : node.height) / 2 - PORT_PADDING;
+}
+
+function slotStubLength(slot: PortSlot, point: ScenePoint): number {
+	return slot.endpoint === "source"
+		? sourceStubLength(slot.route, point, ROUTE_STUB_LENGTH)
+		: endpointClearance(slot.route.target, point, slot.route.targetEdge, ROUTE_STUB_LENGTH);
+}
+
+/**
+ * Pool adjacent violators with each block held inside its bounds: the closest
+ * nondecreasing sequence that respects nondecreasing lower and upper bounds.
+ */
+function boundedNondecreasingFit(
+	values: readonly number[],
+	low: readonly number[],
+	high: readonly number[],
+): number[] {
+	const blocks: { count: number; high: number; low: number; sum: number; value: number }[] = [];
+	for (const [index, value] of values.entries()) {
+		blocks.push({
+			count: 1,
+			high: high[index]!,
+			low: low[index]!,
+			sum: value,
+			value: clamp(value, low[index]!, Math.max(low[index]!, high[index]!)),
+		});
+		while (blocks.length > 1 && blocks.at(-2)!.value > blocks.at(-1)!.value) {
+			const last = blocks.pop()!;
+			const block = blocks.at(-1)!;
+			block.count += last.count;
+			block.sum += last.sum;
+			block.low = Math.max(block.low, last.low);
+			block.high = Math.min(block.high, last.high);
+			block.value = clamp(block.sum / block.count, block.low, Math.max(block.low, block.high));
+		}
+	}
+	return blocks.flatMap((block) => Array<number>(block.count).fill(block.value));
+}
+
+interface PortPreference {
+	/** Offset to stay near when nothing pins the port. */
+	readonly desired: number;
+	readonly high: number;
+	readonly low: number;
+	/** Straight anchors and pinned vertices (2) win over L-route bounds (1). */
+	readonly priority: number;
+	/** For an L-shaped route: travel direction along the side times its distance ahead. */
+	readonly lane?: number;
+}
+
+const FREE_PORT: PortPreference = { desired: 0, high: Infinity, low: -Infinity, priority: 0 };
+
+/**
+ * Ordered offsets on one side, at least `gaps` apart and near their desired
+ * offsets. Bounds are kept by priority while they stay jointly satisfiable. A
+ * side that cannot hold every gap is centered and widened by the capacity pass.
+ */
+function spreadPorts(
+	preferences: readonly PortPreference[],
+	gaps: readonly number[],
+	limit: number,
+): number[] {
+	const before = preferences.map((_, index) =>
+		gaps.slice(0, index).reduce((sum, gap) => sum + gap, 0),
+	);
+	const total = before.at(-1) ?? 0;
+	if (total > 2 * limit) return before.map((offset) => offset - total / 2);
+	// Work in gap-free coordinates, where ordered ports with gaps become nondecreasing.
+	const low = preferences.map(() => -Infinity);
+	const high = preferences.map(() => Infinity);
+	const envelope = () => {
+		const lows = low.map((value, index) => Math.max(value - before[index]!, -limit));
+		const highs = high.map((value, index) => Math.min(value - before[index]!, limit - total));
+		for (let index = 1; index < lows.length; index += 1)
+			lows[index] = Math.max(lows[index]!, lows[index - 1]!);
+		for (let index = highs.length - 2; index >= 0; index -= 1)
+			highs[index] = Math.min(highs[index]!, highs[index + 1]!);
+		return { highs, lows };
+	};
+	const constrained = preferences
+		.map((preference, index) => ({ index, priority: preference.priority }))
+		.filter(({ priority }) => priority > 0)
+		.sort((a, b) => b.priority - a.priority || a.index - b.index);
+	for (const { index } of constrained) {
+		low[index] = preferences[index]!.low;
+		high[index] = preferences[index]!.high;
+		const { highs, lows } = envelope();
+		if (lows.some((value, at) => value > highs[at]! + AXIS_ALIGNED_EPSILON)) {
+			low[index] = -Infinity;
+			high[index] = Infinity;
+		}
+	}
+	const { highs, lows } = envelope();
+	return boundedNondecreasingFit(
+		preferences.map((preference, index) => preference.desired - before[index]!),
+		lows,
+		highs,
+	).map((value, index) => value + before[index]!);
+}
+
+/**
+ * Where a port lets its edge leave or arrive without a jog: past the other end's
+ * stub for an L-shaped route, or straight across from a facing port. A lone port
+ * on a diamond or ellipse keeps its vertex unless it faces another lone one.
+ */
+function slotPreference(
+	slot: PortSlot,
+	offsets: ReadonlyMap<string, number>,
+	slotsBySide: ReadonlyMap<string, readonly PortSlot[]>,
+): PortPreference {
+	const other: PortSlot = {
+		endpoint: slot.endpoint === "source" ? "target" : "source",
+		key: connectionKey({
+			edgeId: slot.route.edge.id,
+			endpoint: slot.endpoint === "source" ? "target" : "source",
+		}),
+		route: slot.route,
+	};
+	const node = slot.route[slot.endpoint];
+	const side = slotSide(slot);
+	const otherSide = slotSide(other);
+	const axis = slotAxis(side);
+	const normal = EDGE_NORMAL[side];
+	const here = pointOnEdge(node, side, offsets.get(slot.key) ?? 0);
+	const there = pointOnEdge(slot.route[other.endpoint], otherSide, offsets.get(other.key) ?? 0);
+	const ahead = (there.x - here.x) * normal.x + (there.y - here.y) * normal.y;
+	if (slotAxis(otherSide) !== axis && ahead >= slotStubLength(slot, here)) {
+		const reach = pointAwayFromEdge(there, otherSide, slotStubLength(other, there));
+		const toward = EDGE_NORMAL[otherSide][axis];
+		const bound = reach[axis] - center(node)[axis];
+		return {
+			desired: 0,
+			high: toward < 0 ? bound : Infinity,
+			lane: toward * ahead,
+			low: toward > 0 ? bound : -Infinity,
+			priority: 1,
+		};
+	}
+	const lone = (target: PortSlot, sideOfTarget: ConnectionEdge) =>
+		target.route[target.endpoint].shape !== "rectangle" &&
+		slotsBySide.get(portKey(target.route[target.endpoint].nodeId, sideOfTarget))?.length === 1;
+	const facing = otherSide === OPPOSITE_EDGE[side] && ahead > 0;
+	if (lone(slot, side) && !(facing && slot.endpoint === "target" && lone(other, otherSide)))
+		return { desired: 0, high: 0, low: 0, priority: 2 };
+	const straight = there[axis] - center(node)[axis];
+	return facing && Math.abs(straight) <= portLimit(node, side)
+		? { desired: straight, high: straight, low: straight, priority: 2 }
+		: FREE_PORT;
+}
+
+/**
+ * Side order that avoids crossings: by the far node along the side, except that
+ * L-shaped arrivals travelling the same way nest, the farthest cross run outermost.
+ */
+function orderedSlots(
+	slots: readonly PortSlot[],
+	preferences: ReadonlyMap<PortSlot, PortPreference>,
+): PortSlot[] {
+	const far = (slot: PortSlot) =>
+		center(slot.route[slot.endpoint === "source" ? "target" : "source"])[slotAxis(slotSide(slot))];
+	const ordered = [...slots].sort((a, b) => far(a) - far(b));
+	for (const toward of [1, -1]) {
+		const lanes = ordered
+			.map((slot, index) => ({ index, lane: preferences.get(slot)!.lane, slot }))
+			.filter(({ lane }) => lane !== undefined && Math.sign(lane) === toward);
+		const nested = [...lanes].sort((a, b) => a.lane! - b.lane!);
+		lanes.forEach(({ index }, at) => {
+			ordered[index] = nested[at]!.slot;
+		});
+	}
+	return ordered;
+}
+
+/**
+ * Orthogonal port offsets that keep edges straight into their arrowheads. Sides
+ * are revisited a few times so facing ports settle on one shared coordinate.
+ */
+function alignedPortOffsets(
+	routes: readonly RoutedEdge[],
+	sharedDecisionPitch: boolean,
+): Map<string, number> {
+	const offsets = portOffsetsForRoutes(routes, sharedDecisionPitch);
+	const slotsBySide = new Map<string, PortSlot[]>();
+	for (const route of routes)
+		for (const endpoint of ["source", "target"] as const) {
+			const key = portKey(
+				route[endpoint].nodeId,
+				endpoint === "source" ? route.sourceEdge : route.targetEdge,
+			);
+			slotsBySide.set(key, [
+				...(slotsBySide.get(key) ?? []),
+				{ endpoint, key: connectionKey({ edgeId: route.edge.id, endpoint }), route },
+			]);
+		}
+	// Crowded sides settle first; lone ports then line up with them.
+	const sides = [...slotsBySide.values()].sort((a, b) => b.length - a.length);
+	for (let sweep = 0; sweep < 3; sweep += 1)
+		for (const unordered of sides) {
+			const side = slotSide(unordered[0]!);
+			const node = unordered[0]!.route[unordered[0]!.endpoint];
+			const preferences = new Map(
+				unordered.map((slot) => [slot, slotPreference(slot, offsets, slotsBySide)]),
+			);
+			const slots = orderedSlots(unordered, preferences);
+			const departures = slots.filter((slot) => slot.endpoint === "source");
+			const labeled = departures.filter((slot) => slot.route.edge.label);
+			const labelPitch =
+				departures.length > 1 &&
+				labeled.length > 0 &&
+				(labeled[0]!.route.source.kind !== "decision" ||
+					(sharedDecisionPitch && labeled.length > 1))
+					? Math.max(
+							...labeled.map((slot) => {
+								const metrics = branchLabelMetrics(slot.route.edge.label!);
+								return (slotAxis(side) === "x" ? metrics.width : metrics.height) + 24;
+							}),
+						)
+					: 0;
+			const positions = spreadPorts(
+				slots.map((slot) => preferences.get(slot)!),
+				slots
+					.slice(1)
+					.map((slot, index) =>
+						Math.max(
+							labelPitch,
+							slot.endpoint === "target" || slots[index]!.endpoint === "target"
+								? ARRIVAL_SPACING
+								: PORT_SPACING,
+						),
+					),
+				portLimit(node, side),
+			);
+			slots.forEach((slot, index) => offsets.set(slot.key, positions[index]!));
+		}
 	return offsets;
 }
 
@@ -929,6 +1246,7 @@ function assignDirectFeedbackPorts(
 	routes: RoutedEdge[],
 	diagram: IntermediateDiagram,
 	nodes: readonly NodeSceneElement[],
+	repairForward = false,
 ): { offsets: Map<string, number>; minimumSizes: Map<string, { width: number; height: number }> } {
 	const minimumSizes = new Map<string, { width: number; height: number }>();
 	const buckets = edgeBuckets(diagram.edges);
@@ -940,7 +1258,21 @@ function assignDirectFeedbackPorts(
 	// Reserve forward endpoints too: later feedback side changes must not move defaults
 	// onto endpoints that an earlier candidate already checked and selected.
 	const chosenOffsets = portOffsetsForRoutes(routes);
-	for (const route of routes.filter((r) => feedback.has(r.edge.id))) {
+	// With repair on, a forward line that crosses a node or turns back into its own
+	// node gets the same obstacle-safe port search as feedback.
+	const blocked = (route: RoutedEdge) => {
+		const { start, end } = routeEndpoints(route, chosenOffsets);
+		return (
+			!directEndpointFacesOut(route.source, route.sourceEdge, start, end) ||
+			!directEndpointFacesOut(route.target, route.targetEdge, end, start) ||
+			nodes.some(
+				(n) => n !== route.source && n !== route.target && directSegmentCrossesNode(start, end, n),
+			)
+		);
+	};
+	for (const route of routes.filter(
+		(r) => feedback.has(r.edge.id) || (repairForward && blocked(r)),
+	)) {
 		const original = { sourceEdge: route.sourceEdge, targetEdge: route.targetEdge };
 		const sourceKey = connectionKey({ edgeId: route.edge.id, endpoint: "source" });
 		const targetKey = connectionKey({ edgeId: route.edge.id, endpoint: "target" });
@@ -1026,7 +1358,13 @@ function assignDirectFeedbackPorts(
 			}
 			if (found) break;
 		}
-		if (!found) {
+		if (!found && !feedback.has(route.edge.id)) {
+			Object.assign(route, fallback?.sides ?? original);
+			if (fallback) {
+				chosenOffsets.set(sourceKey, fallback.sourceOffset);
+				chosenOffsets.set(targetKey, fallback.targetOffset);
+			}
+		} else if (!found) {
 			Object.assign(route, fallback?.sides ?? original);
 			if (fallback) {
 				chosenOffsets.set(sourceKey, fallback.sourceOffset);
@@ -1053,6 +1391,39 @@ function assignDirectFeedbackPorts(
 	return { offsets: chosenOffsets, minimumSizes };
 }
 
+/** How far the reserved endpoint stubs reach past each node side's bounding box. */
+function stubReachForRoutes(
+	routes: readonly RoutedEdge[],
+	portOffsets: ReadonlyMap<string, number>,
+): Map<string, number> {
+	const reach = new Map<string, number>();
+	for (const route of routes) {
+		const { start, end } = routeEndpoints(route, portOffsets);
+		for (const [node, side, length] of [
+			[route.source, route.sourceEdge, sourceStubLength(route, start, ROUTE_STUB_LENGTH)],
+			[
+				route.target,
+				route.targetEdge,
+				endpointClearance(route.target, end, route.targetEdge, ROUTE_STUB_LENGTH),
+			],
+		] as const) {
+			const point = node === route.source ? start : end;
+			const tip = pointAwayFromEdge(point, side, length);
+			const beyond =
+				side === "left"
+					? node.x - tip.x
+					: side === "right"
+						? tip.x - node.x - node.width
+						: side === "top"
+							? node.y - tip.y
+							: tip.y - node.y - node.height;
+			const key = portKey(node.nodeId, side);
+			reach.set(key, Math.max(reach.get(key) ?? 0, beyond));
+		}
+	}
+	return reach;
+}
+
 /** Reserve fixed endpoint approaches before any route can occupy a later route's stub. */
 function endpointStubsForRoutes(
 	routes: readonly RoutedEdge[],
@@ -1070,6 +1441,7 @@ function endpointStubsForRoutes(
 		return [
 			{
 				...arrow,
+				endArrowhead: null,
 				points: [
 					start,
 					pointAwayFromEdge(
@@ -1100,12 +1472,13 @@ function arrowForRoute(
 	portOffsets: ReadonlyMap<string, number>,
 	shapes: readonly NodeSceneElement[],
 	existingArrows: readonly ArrowSceneElement[],
+	options: RouteOptions,
 ): ArrowSceneElement {
 	const { edge } = route;
 	const { start: portedStart, end: portedEnd } = routeEndpoints(route, portOffsets);
 	const points =
 		edgeRouting === "orthogonal"
-			? exteriorLaneRoute(route, portedStart, portedEnd, shapes, existingArrows)
+			? exteriorLaneRoute(route, portedStart, portedEnd, shapes, existingArrows, options)
 			: compactPoints([portedStart, portedEnd]);
 
 	return {
@@ -1375,27 +1748,86 @@ function pointAwayFromEdge(point: ScenePoint, edge: ConnectionEdge, distance: nu
 	}
 }
 
+/** Optional routing passes for one layout attempt. */
+interface RouteOptions {
+	/** Reader scale for jog, corridor and arrowhead scoring; absent for the plain router. */
+	readonly readerScale?: number;
+	/** Guide the grid search toward the arrival with an admissible distance bound. */
+	readonly guided: boolean;
+}
+
+/**
+ * Arrows routed so far (with reserved stubs), prepared once per edge for scoring
+ * candidates. Without a reader scale, candidates are scored as the plain router.
+ */
+interface RoutedSoFar {
+	readonly quality?: ReturnType<typeof candidateRouteQuality>;
+	readonly segments: readonly RouteSegment[];
+}
+
+function routedSoFar(
+	arrows: readonly ArrowSceneElement[],
+	readerScale: number | undefined,
+): RoutedSoFar {
+	return {
+		...(readerScale === undefined
+			? {}
+			: {
+					quality: candidateRouteQuality(
+						arrows.map((arrow) => ({
+							id: arrow.id,
+							points: arrow.points,
+							sourceId: arrow.sourceNodeId,
+							targetId: arrow.targetNodeId,
+							endArrowhead: arrow.endArrowhead !== null,
+						})),
+						readerScale,
+					),
+				}),
+		segments: existingRouteSegments(arrows),
+	};
+}
+
+function routeBendCount(points: readonly ScenePoint[]): number {
+	return segmentsFromPoints(points).filter(
+		(segment, index, segments) =>
+			index > 0 && segment.orientation !== segments[index - 1]!.orientation,
+	).length;
+}
+
 function chooseBestRoute(
 	candidates: readonly [ScenePoint, ...ScenePoint[]][],
 	shapes: readonly NodeSceneElement[],
 	ignoredNodeIds: ReadonlySet<string>,
 	route: RoutedEdge,
-	existingSegments: readonly RouteSegment[],
+	routed: RoutedSoFar,
 ): [ScenePoint, ...ScenePoint[]] {
 	const first = candidates[0];
 	if (!first) {
 		return [{ x: 0, y: 0 }];
 	}
 
-	const routeScore = (candidate: [ScenePoint, ...ScenePoint[]]): readonly number[] => [
-		-endpointStubScore(candidate, route),
-		routeNodeCrossingCount(candidate, shapes, ignoredNodeIds),
-		routeSelfOverlapCount(candidate, route),
-		routeArrowOverlapCount(candidate, existingSegments, route),
-		routeBacktrackDistance(candidate),
-		routeTargetOvershootDistance(candidate),
-		routeLength(candidate),
-	];
+	const routeScore = (candidate: [ScenePoint, ...ScenePoint[]]): readonly number[] => {
+		const quality = routed.quality?.({
+			id: `edge:${route.edge.id}`,
+			points: candidate,
+			sourceId: route.edge.source,
+			targetId: route.edge.target,
+		}) ?? { arrowheadsCrossed: 0, corridors: 0, jogs: 0 };
+		return [
+			-endpointStubScore(candidate, route),
+			routeNodeCrossingCount(candidate, shapes, ignoredNodeIds),
+			routeSelfOverlapCount(candidate, route),
+			routeArrowOverlapCount(candidate, routed.segments, route),
+			quality.corridors,
+			quality.arrowheadsCrossed,
+			routeBacktrackDistance(candidate),
+			routeTargetOvershootDistance(candidate),
+			quality.jogs,
+			routeLength(candidate),
+			routed.quality ? routeBendCount(candidate) : 0,
+		];
+	};
 	const isLowerScore = (candidate: readonly number[], best: readonly number[]) => {
 		for (let index = 0; index < candidate.length; index += 1) {
 			const difference = (candidate[index] ?? 0) - (best[index] ?? 0);
@@ -1447,11 +1879,33 @@ function sourceStubLength(route: RoutedEdge, point: ScenePoint, distance: number
 	return endpointClearance(route.source, point, route.sourceEdge, Math.max(distance, labelSpace));
 }
 
+/**
+ * Decision branches take distinct vertices: the two lateral vertices for the
+ * outer branches and the forward vertex for an aligned or middle branch. LR and
+ * RL mirror TB and BT only when `mirrored`: orthogonal stubs carry a branch out
+ * of its vertex before turning, but a direct line from a top or bottom vertex
+ * could cut back through the diamond.
+ */
 function assignDecisionSides(
 	routes: RoutedEdge[],
 	direction: IntermediateDiagram["layout"]["direction"],
+	mirrored = false,
 ): void {
-	if (direction !== "TB" && direction !== "BT") return;
+	const vertical = direction === "TB" || direction === "BT";
+	if (!vertical && !mirrored) return;
+	const across = vertical ? "x" : "y";
+	const along = vertical ? "y" : "x";
+	const [low, high]: readonly [ConnectionEdge, ConnectionEdge] = vertical
+		? ["left", "right"]
+		: ["top", "bottom"];
+	const forward: ConnectionEdge =
+		direction === "TB"
+			? "bottom"
+			: direction === "BT"
+				? "top"
+				: direction === "LR"
+					? "right"
+					: "left";
 	for (const source of new Set(
 		routes.filter((r) => r.source.kind === "decision").map((r) => r.source),
 	)) {
@@ -1459,36 +1913,32 @@ function assignDecisionSides(
 			.filter((r) => r.source === source)
 			.sort(
 				(a, b) =>
-					center(a.target).x - center(b.target).x ||
-					center(a.target).y - center(b.target).y ||
+					center(a.target)[across] - center(b.target)[across] ||
+					center(a.target)[along] - center(b.target)[along] ||
 					a.index - b.index,
 			);
 		if (branches.length < 2) continue;
 		branches.forEach((route, index) => {
 			const alignedBranch = branches
-				.filter((r) => Math.abs(center(r.target).x - center(source).x) < 1)
+				.filter((r) => Math.abs(center(r.target)[across] - center(source)[across]) < 1)
 				.sort(
 					(a, b) =>
-						Math.abs(center(a.target).y - center(source).y) -
-						Math.abs(center(b.target).y - center(source).y),
+						Math.abs(center(a.target)[along] - center(source)[along]) -
+						Math.abs(center(b.target)[along] - center(source)[along]),
 				)[0];
 			const aligned = branches.length === 2 && route === alignedBranch;
 			const otherAligned = branches.length === 2 && alignedBranch !== undefined && !aligned;
 			route.sourceEdge = aligned
-				? direction === "TB"
-					? "bottom"
-					: "top"
+				? forward
 				: otherAligned
-					? center(route.target).x < center(source).x
-						? "left"
-						: "right"
+					? center(route.target)[across] < center(source)[across]
+						? low
+						: high
 					: index === 0
-						? "left"
+						? low
 						: index === branches.length - 1
-							? "right"
-							: direction === "TB"
-								? "bottom"
-								: "top";
+							? high
+							: forward;
 		});
 	}
 }
@@ -1633,10 +2083,11 @@ function branchLabels(
 }
 
 /**
- * Count overlaps for one grid step without scanning every routed segment: only
- * segments on the step's fixed coordinate can overlap it.
+ * Count, for one grid step, the routed segments it overlaps and those it runs
+ * beside closer than `gap`, without scanning every segment: only segments near
+ * the step's fixed coordinate qualify.
  */
-function segmentOverlapLookup(segments: readonly RouteSegment[]) {
+function segmentOverlapLookup(segments: readonly RouteSegment[], gap: number) {
 	const byOrientation = new Map<AxisAlignedSegment["orientation"], RouteSegment[]>([
 		["horizontal", []],
 		["vertical", []],
@@ -1644,36 +2095,46 @@ function segmentOverlapLookup(segments: readonly RouteSegment[]) {
 	for (const segment of segments) byOrientation.get(segment.orientation)!.push(segment);
 	for (const list of byOrientation.values())
 		list.sort((a, b) => a.staticCoordinate - b.staticCoordinate);
-	return (candidate: AxisAlignedSegment, arrowId: string): number => {
+	return (candidate: AxisAlignedSegment, arrowId: string): { beside: number; overlaps: number } => {
 		const list = byOrientation.get(candidate.orientation)!;
 		// Widen the window past the overlap tolerance; segmentsOverlapInterior decides.
-		const min = candidate.staticCoordinate - 2 * AXIS_ALIGNED_EPSILON;
-		const max = candidate.staticCoordinate + 2 * AXIS_ALIGNED_EPSILON;
+		const reach = Math.max(gap, 2 * AXIS_ALIGNED_EPSILON);
 		let low = 0;
 		let high = list.length;
 		while (low < high) {
 			const middle = (low + high) >> 1;
-			if (list[middle]!.staticCoordinate < min) low = middle + 1;
+			if (list[middle]!.staticCoordinate < candidate.staticCoordinate - reach) low = middle + 1;
 			else high = middle;
 		}
-		let count = 0;
-		for (let index = low; index < list.length && list[index]!.staticCoordinate <= max; index += 1)
-			if (list[index]!.arrowId !== arrowId && segmentsOverlapInterior(candidate, list[index]!))
-				count += 1;
-		return count;
+		let overlaps = 0;
+		let beside = 0;
+		for (
+			let index = low;
+			index < list.length && list[index]!.staticCoordinate <= candidate.staticCoordinate + reach;
+			index += 1
+		) {
+			const segment = list[index]!;
+			if (segment.arrowId === arrowId) continue;
+			if (segmentsOverlapInterior(candidate, segment)) overlaps += 1;
+			else if (
+				Math.abs(segment.staticCoordinate - candidate.staticCoordinate) < gap &&
+				segmentOverlapLength(candidate, segment) > AXIS_ALIGNED_EPSILON
+			)
+				beside += 1;
+		}
+		return { beside, overlaps };
 	};
 }
 
 /**
- * Binary-heap open list for the grid search. It pops the cheapest step and, among
- * equal costs, the most recently queued one: the order a stable descending sort
- * followed by pop() gives, without re-sorting the whole list on every step.
+ * Binary-heap open list for the grid search. It pops the lowest estimate and,
+ * among equal estimates, the most recently queued step.
  */
-function stepQueue<T extends { readonly cost: number }>() {
+function stepQueue<T extends { readonly estimate: number }>() {
 	const heap: { item: T; order: number }[] = [];
 	let queued = 0;
 	const before = (a: { item: T; order: number }, b: { item: T; order: number }) =>
-		a.item.cost < b.item.cost || (a.item.cost === b.item.cost && a.order > b.order);
+		a.item.estimate < b.item.estimate || (a.item.estimate === b.item.estimate && a.order > b.order);
 	const swap = (i: number, j: number) => {
 		[heap[i], heap[j]] = [heap[j]!, heap[i]!];
 	};
@@ -1711,6 +2172,43 @@ function stepQueue<T extends { readonly cost: number }>() {
 	};
 }
 
+/**
+ * Variants of a route whose middle runs move just clear of a parallel neighbor
+ * they would otherwise read as one line with. The endpoint stubs stay fixed.
+ */
+function lanesClearOfNeighbors(
+	points: readonly [ScenePoint, ...ScenePoint[]],
+	segments: readonly RouteSegment[],
+	route: RoutedEdge,
+	gap: number,
+): [ScenePoint, ...ScenePoint[]][] {
+	const arrowId = `edge:${route.edge.id}`;
+	const variants: [ScenePoint, ...ScenePoint[]][] = [];
+	for (const run of segmentsFromPoints(points)) {
+		if (run.isFirstSegment || run.isLastSegment) continue;
+		for (const other of segments) {
+			if (
+				other.arrowId === arrowId ||
+				other.orientation !== run.orientation ||
+				Math.abs(other.staticCoordinate - run.staticCoordinate) >= gap ||
+				segmentOverlapLength(run, other) <= AXIS_ALIGNED_EPSILON
+			)
+				continue;
+			for (const lane of [other.staticCoordinate - gap - 1, other.staticCoordinate + gap + 1]) {
+				const moved = points.map((point, index) =>
+					index === run.segmentIndex || index === run.segmentIndex + 1
+						? run.orientation === "horizontal"
+							? { x: point.x, y: lane }
+							: { x: lane, y: point.y }
+						: point,
+				);
+				variants.push(compactPoints(moved));
+			}
+		}
+	}
+	return variants;
+}
+
 /** A visibility grid is the fallback when one exterior lane cannot clear every obstacle. */
 function obstacleRoute(
 	start: ScenePoint,
@@ -1721,13 +2219,22 @@ function obstacleRoute(
 	route: RoutedEdge,
 	arrows: readonly ArrowSceneElement[],
 	arrowSegments: readonly RouteSegment[],
+	corridorGap = 0,
+	maxSteps = Infinity,
+	guided = true,
 ): [ScenePoint, ...ScenePoint[]] | undefined {
+	// With a corridor gap, also offer lanes far enough from each routed point to read apart.
+	const lanes = (coordinate: number) =>
+		[...new Set([PORT_SPACING, Math.max(PORT_SPACING, corridorGap + 1)])].flatMap((offset) => [
+			coordinate - offset,
+			coordinate + offset,
+		]);
 	const xs = [
 		...new Set([
 			startStub.x,
 			endStub.x,
 			...shapes.flatMap((s) => [s.x - PORT_SPACING, s.x + s.width + PORT_SPACING]),
-			...arrows.flatMap((a) => a.points.flatMap((p) => [p.x - PORT_SPACING, p.x + PORT_SPACING])),
+			...arrows.flatMap((a) => a.points.flatMap((p) => lanes(p.x))),
 		]),
 	].sort((a, b) => a - b);
 	const ys = [
@@ -1735,24 +2242,41 @@ function obstacleRoute(
 			startStub.y,
 			endStub.y,
 			...shapes.flatMap((s) => [s.y - PORT_SPACING, s.y + s.height + PORT_SPACING]),
-			...arrows.flatMap((a) => a.points.flatMap((p) => [p.y - PORT_SPACING, p.y + PORT_SPACING])),
+			...arrows.flatMap((a) => a.points.flatMap((p) => lanes(p.y))),
 		]),
 	].sort((a, b) => a - b);
 	const key = (x: number, y: number, axis: number) => (x * ys.length + y) * 2 + axis;
 	const arrowId = `edge:${route.edge.id}`;
-	const overlaps = segmentOverlapLookup(arrowSegments);
+	const nearby = segmentOverlapLookup(arrowSegments, corridorGap);
 	const stubs = [...segmentsFromPoints([start, startStub]), ...segmentsFromPoints([endStub, end])];
-	type Step = { x: number; y: number; axis: number; cost: number; previous?: Step };
+	type Step = {
+		x: number;
+		y: number;
+		axis: number;
+		cost: number;
+		estimate: number;
+		previous?: Step;
+	};
+	// Every step costs at least its length, so the Manhattan distance to the arrival
+	// stub never overestimates: A* finds the same lowest cost while expanding less.
+	// Unguided, the search expands in pure cost order like the plain router.
+	const remaining = (x: number, y: number) =>
+		guided ? Math.abs(xs[x]! - endStub.x) + Math.abs(ys[y]! - endStub.y) : 0;
+	const initialX = xs.indexOf(startStub.x);
+	const initialY = ys.indexOf(startStub.y);
 	const initial: Step = {
-		x: xs.indexOf(startStub.x),
-		y: ys.indexOf(startStub.y),
+		x: initialX,
+		y: initialY,
 		axis: start.x === startStub.x ? 1 : 0,
 		cost: 0,
+		estimate: remaining(initialX, initialY),
 	};
 	const pending = stepQueue<Step>();
 	pending.push(initial);
 	const costs = new Map<number, number>([[key(initial.x, initial.y, initial.axis), 0]]);
-	while (pending.size) {
+	// Each grid edge's obstacle test and length, computed once however often it is relaxed.
+	const edgeCosts = new Map<number, number | undefined>();
+	for (let steps = 0; pending.size && steps < maxSteps; steps += 1) {
 		const current = pending.pop();
 		if (current.cost !== costs.get(key(current.x, current.y, current.axis))) continue;
 		const point = { x: xs[current.x]!, y: ys[current.y]! };
@@ -1781,21 +2305,30 @@ function obstacleRoute(
 				y = current.y + dy;
 			if (x < 0 || y < 0 || x >= xs.length || y >= ys.length) continue;
 			const next = { x: xs[x]!, y: ys[y]! };
-			const segment = segmentsFromPoints([point, next], 0)[0]!;
-			if (shapes.some((shape) => segmentCrossesBoundsInterior(segment, shape))) continue;
-			// Neither the departure nor the arrival may double back over its port stub.
-			if (stubs.some((stub) => segmentsOverlapInterior(segment, stub))) continue;
-			const step = segmentsFromPoints([point, next])[0];
-			const cost =
-				current.cost +
-				Math.abs(next.x - point.x) +
-				Math.abs(next.y - point.y) +
-				(axis === current.axis ? 0 : 24) +
-				(step ? overlaps(step, arrowId) : 0) * 10000;
+			const gridEdge = (Math.min(x, current.x) * ys.length + Math.min(y, current.y)) * 2 + axis;
+			if (!edgeCosts.has(gridEdge)) {
+				const segment = segmentsFromPoints([point, next], 0)[0]!;
+				const step = segmentsFromPoints([point, next])[0];
+				const { beside, overlaps } = step ? nearby(step, arrowId) : { beside: 0, overlaps: 0 };
+				edgeCosts.set(
+					gridEdge,
+					shapes.some((shape) => segmentCrossesBoundsInterior(segment, shape)) ||
+						// Neither the departure nor the arrival may double back over its port stub.
+						stubs.some((stub) => segmentsOverlapInterior(segment, stub))
+						? undefined
+						: Math.abs(next.x - point.x) +
+								Math.abs(next.y - point.y) +
+								overlaps * 10000 +
+								beside * 1000,
+				);
+			}
+			const edgeCost = edgeCosts.get(gridEdge);
+			if (edgeCost === undefined) continue;
+			const cost = current.cost + edgeCost + (axis === current.axis ? 0 : 24);
 			const id = key(x, y, axis);
 			if (cost >= (costs.get(id) ?? Infinity)) continue;
 			costs.set(id, cost);
-			pending.push({ x, y, axis, cost, previous: current });
+			pending.push({ x, y, axis, cost, estimate: cost + remaining(x, y), previous: current });
 		}
 	}
 	return undefined;
@@ -1807,6 +2340,7 @@ function exteriorLaneRoute(
 	end: ScenePoint,
 	shapes: readonly NodeSceneElement[],
 	existingArrows: readonly ArrowSceneElement[],
+	{ readerScale, guided }: RouteOptions,
 ): [ScenePoint, ...ScenePoint[]] {
 	const horizontalDominant = Math.abs(end.x - start.x) >= Math.abs(end.y - start.y);
 	const ignoredNodeIds = new Set([route.source.nodeId, route.target.nodeId]);
@@ -1846,7 +2380,11 @@ function exteriorLaneRoute(
 	const preferredLocalY = useUpperLane ? localUpperLaneY : localLowerLaneY;
 	const alternateLocalY = useUpperLane ? localLowerLaneY : localUpperLaneY;
 	const localStubDistance = ROUTE_STUB_LENGTH + (route.index % 4) * PORT_SPACING;
-	const stubDistances = [localStubDistance];
+	// Staggered stubs separate parallel lanes; the plain stub can turn clear of nearby arrowheads.
+	const stubDistances =
+		readerScale === undefined
+			? [localStubDistance]
+			: [...new Set([localStubDistance, ROUTE_STUB_LENGTH])];
 	const routeForVerticalLane = (laneX: number, stubDistance: number) => {
 		const startStub =
 			stubDistance > 0
@@ -1942,13 +2480,31 @@ function exteriorLaneRoute(
 		),
 	];
 
-	const existingSegments = existingRouteSegments(existingArrows);
-	const best = chooseBestRoute(candidates, shapes, ignoredNodeIds, route, existingSegments);
-	if (
+	const routed = routedSoFar(existingArrows, readerScale);
+	const first = chooseBestRoute(candidates, shapes, ignoredNodeIds, route, routed);
+	const gap = readerScale === undefined ? 0 : routingCorridorGap(readerScale);
+	const best = gap
+		? chooseBestRoute(
+				[first, ...lanesClearOfNeighbors(first, routed.segments, route, gap)],
+				shapes,
+				ignoredNodeIds,
+				route,
+				routed,
+			)
+		: first;
+	const corridors = (points: [ScenePoint, ...ScenePoint[]]) =>
+		routed.quality?.({
+			id: `edge:${route.edge.id}`,
+			points,
+			sourceId: route.edge.source,
+			targetId: route.edge.target,
+		}).corridors ?? 0;
+	const hard =
 		routeNodeCrossingCount(best, shapes, ignoredNodeIds) ||
 		routeSelfOverlapCount(best, route) ||
-		routeArrowOverlapCount(best, existingSegments, route)
-	) {
+		routeArrowOverlapCount(best, routed.segments, route);
+	if (hard || corridors(best)) {
+		// Search lanes that read apart only when a corridor is what remains to fix.
 		const detour = obstacleRoute(
 			start,
 			end,
@@ -1957,12 +2513,228 @@ function exteriorLaneRoute(
 			shapes,
 			route,
 			existingArrows,
-			existingSegments,
+			routed.segments,
+			hard ? 0 : gap,
+			// A corridor is polish: search a bounded neighborhood, never the whole grid.
+			hard ? Infinity : CORRIDOR_SEARCH_STEPS,
+			guided,
 		);
-		if (detour)
-			return chooseBestRoute([best, detour], shapes, ignoredNodeIds, route, existingSegments);
+		if (detour) return chooseBestRoute([best, detour], shapes, ignoredNodeIds, route, routed);
 	}
 	return best;
+}
+
+/** Route every edge in order; each avoids earlier routes and every reserved endpoint stub. */
+function routeAllEdges(
+	routes: readonly RoutedEdge[],
+	edgeRouting: IntermediateDiagram["layout"]["edgeRouting"],
+	portOffsets: ReadonlyMap<string, number>,
+	nodeShapes: readonly NodeSceneElement[],
+	options: RouteOptions,
+	order: readonly number[] = routes.map((_, index) => index),
+): ArrowSceneElement[] {
+	const labelObstacles = branchLabelObstacles(routes, portOffsets);
+	const endpointStubs =
+		edgeRouting === "orthogonal" ? endpointStubsForRoutes(routes, portOffsets) : [];
+	const edgeArrows: ArrowSceneElement[] = [];
+	for (const route of order.map((index) => routes[index]!)) {
+		edgeArrows.push(
+			arrowForRoute(
+				route,
+				edgeRouting,
+				portOffsets,
+				[
+					...nodeShapes,
+					...labelObstacles.filter((label) => label.nodeId !== `branch-label:${route.edge.id}`),
+				],
+				[...endpointStubs, ...edgeArrows],
+				options,
+			),
+		);
+	}
+	// Hand arrows back in edge order so labels and z-order follow the diagram.
+	return routes.map((route) => edgeArrows.find((arrow) => arrow.edgeId === route.edge.id)!);
+}
+
+/** Reroutes allowed after a layout still has an export defect. */
+const MAX_REROUTES = 4;
+
+/**
+ * Rip up and reroute: when routes still overlap or cross a node, route the later
+ * edge of the first defect before the earlier one (or first, for a node crossing)
+ * and keep the order only if the export defects drop.
+ */
+function rerouteDefects(
+	arrows: ArrowSceneElement[],
+	routes: readonly RoutedEdge[],
+	portOffsets: ReadonlyMap<string, number>,
+	nodeShapes: readonly NodeSceneElement[],
+	options: RouteOptions,
+): ArrowSceneElement[] {
+	let defects = exportRouteDefects(arrows, nodeShapes);
+	let order = routes.map((_, index) => index);
+	for (let attempt = 0; attempt < MAX_REROUTES && defects.length > 0; attempt += 1) {
+		const position = (arrowId: string) =>
+			order.findIndex((index) => `edge:${routes[index]!.edge.id}` === arrowId);
+		const [first, second] = defects[0]!;
+		const [earlier, later] =
+			second === undefined
+				? [0, position(first)]
+				: [
+						Math.min(position(first), position(second)),
+						Math.max(position(first), position(second)),
+					];
+		if (later <= earlier) break;
+		const next = [...order];
+		next.splice(earlier, 0, ...next.splice(later, 1));
+		const retry = routeAllEdges(routes, "orthogonal", portOffsets, nodeShapes, options, next);
+		const retryDefects = exportRouteDefects(retry, nodeShapes);
+		if (retryDefects.length >= defects.length) break;
+		[arrows, defects, order] = [retry, retryDefects, next];
+	}
+	return arrows;
+}
+
+/**
+ * A forward edge that hooks sideways just before its arrowhead reads better
+ * entering the free side its last run already approaches. Returns the routes it
+ * moved with their previous sides.
+ */
+function resideHookedArrivals(
+	routes: readonly RoutedEdge[],
+	arrows: readonly ArrowSceneElement[],
+	diagram: IntermediateDiagram,
+	scale: number,
+): { route: RoutedEdge; side: ConnectionEdge }[] {
+	const buckets = edgeBuckets(diagram.edges);
+	const feedback = feedbackEdgeIds(diagram, buckets.incoming, buckets.outgoing);
+	const used = new Set(
+		routes.flatMap((route) => [
+			portKey(route.source.nodeId, route.sourceEdge),
+			portKey(route.target.nodeId, route.targetEdge),
+		]),
+	);
+	const resided: { route: RoutedEdge; side: ConnectionEdge }[] = [];
+	for (const [index, arrow] of arrows.entries()) {
+		const route = routes[index]!;
+		if (feedback.has(route.edge.id)) continue;
+		const hooked = routingQualityFindings([{ id: arrow.id, points: arrow.points }], scale).some(
+			(finding) => finding.kind === "endpoint-jog" && finding.endpoint === "end",
+		);
+		if (!hooked) continue;
+		const segments = segmentsFromPoints(arrow.points);
+		const last = segments.at(-1);
+		const step = segments.findLast((segment) => segment.orientation !== last?.orientation);
+		if (!last || !step) continue;
+		const from = arrow.points[step.segmentIndex]!;
+		const to = arrow.points[step.segmentIndex + 1]!;
+		const side: ConnectionEdge =
+			step.orientation === "horizontal"
+				? to.x > from.x
+					? "left"
+					: "right"
+				: to.y > from.y
+					? "top"
+					: "bottom";
+		if (side === route.targetEdge || used.has(portKey(route.target.nodeId, side))) continue;
+		resided.push({ route, side: route.targetEdge });
+		used.add(portKey(route.target.nodeId, side));
+		route.targetEdge = side;
+	}
+	return resided;
+}
+
+/**
+ * Overlapping segments and segments through unbound nodes, counted as
+ * validateExcalidrawScene counts them on the export: bound stems that leave or
+ * reach one node at one point in one direction may coincide.
+ */
+function exportRouteDefects(
+	arrows: readonly ArrowSceneElement[],
+	nodes: readonly NodeSceneElement[],
+): (readonly [string] | readonly [string, string])[] {
+	const segments = arrows.flatMap((arrow) =>
+		segmentsFromPoints(arrow.points).map((segment) => {
+			const from = arrow.points[segment.segmentIndex]!;
+			const to = arrow.points[segment.segmentIndex + 1]!;
+			return {
+				...segment,
+				arrowId: arrow.id,
+				startBindingId: arrow.sourceNodeId,
+				endBindingId: arrow.targetNodeId,
+				from: segment.orientation === "horizontal" ? from.x : from.y,
+				to: segment.orientation === "horizontal" ? to.x : to.y,
+			};
+		}),
+	);
+	const defects: (readonly [string] | readonly [string, string])[] = [];
+	for (const [index, left] of segments.entries()) {
+		for (const right of segments.slice(index + 1)) {
+			if (left.arrowId === right.arrowId || !segmentsOverlapInterior(left, right)) continue;
+			const departure =
+				left.isFirstSegment && right.isFirstSegment && left.startBindingId === right.startBindingId;
+			const shared =
+				isSharedBoundStem(left, right) &&
+				Math.abs((departure ? left.from : left.to) - (departure ? right.from : right.to)) <=
+					AXIS_ALIGNED_EPSILON &&
+				Math.sign(left.to - left.from) === Math.sign(right.to - right.from);
+			if (!shared) defects.push([left.arrowId, right.arrowId]);
+		}
+		for (const node of nodes)
+			if (
+				node.nodeId !== left.startBindingId &&
+				node.nodeId !== left.endBindingId &&
+				segmentCrossesBoundsInterior(left, node)
+			)
+				defects.push([left.arrowId]);
+	}
+	return defects;
+}
+
+/** Endpoints whose first step heads into their own node instead of away from it. */
+function inwardEndpoints(
+	arrows: readonly ArrowSceneElement[],
+	nodes: readonly NodeSceneElement[],
+): number {
+	const byId = new Map(nodes.map((node) => [node.nodeId, node]));
+	let inward = 0;
+	for (const arrow of arrows)
+		for (const [nodeId, point, next] of [
+			[arrow.sourceNodeId, arrow.points[0], arrow.points[1]],
+			[arrow.targetNodeId, arrow.points.at(-1), arrow.points.at(-2)],
+		] as const) {
+			const node = byId.get(nodeId);
+			if (!node || !point || !next) continue;
+			const step = 0.0001;
+			const x = (point.x + (next.x - point.x) * step - center(node).x) / (node.width / 2);
+			const y = (point.y + (next.y - point.y) * step - center(node).y) / (node.height / 2);
+			const extent =
+				node.shape === "diamond"
+					? Math.abs(x) + Math.abs(y)
+					: node.shape === "ellipse" || node.shape === "circle"
+						? Math.hypot(x, y)
+						: Math.max(Math.abs(x), Math.abs(y));
+			if (extent < 1 - 1e-6) inward += 1;
+		}
+	return inward;
+}
+
+/** Export defects that must not grow, and reader-scale findings to reduce. */
+function routingDefects(
+	arrows: readonly ArrowSceneElement[],
+	nodes: readonly NodeSceneElement[],
+	scale: number,
+): { hard: number; reader: number } {
+	const reader = routingQualityFindings(
+		arrows.map((arrow) => ({
+			id: arrow.id,
+			points: arrow.points,
+			sourceId: arrow.sourceNodeId,
+			targetId: arrow.targetNodeId,
+		})),
+		scale,
+	).length;
+	return { hard: exportRouteDefects(arrows, nodes).length, reader };
 }
 
 function sceneBounds(elements: readonly SceneElement[]): {
@@ -2077,61 +2849,155 @@ function normalizeSceneOrigin(elements: readonly SceneElement[]): SceneElement[]
 	return elements.map((element) => translateElement(element, dx, dy));
 }
 
-export function renderIntermediateDiagram(input: unknown): RenderedDiagramScene {
-	const diagram = parseIntermediateDiagram(input);
+/** Optional layout and routing passes; the plain router (as of #405) has all of them off. */
+interface RoutingPolish {
+	/** Aligned orthogonal ports and mirrored LR/RL decision vertices. */
+	readonly ports: boolean;
+	/** Reader-scale scoring of jogs, corridors and arrowheads, with lane variants. */
+	readonly reader: boolean;
+	/** Moving hooked arrivals to the side their last run approaches. */
+	readonly sides: boolean;
+	/**
+	 * Repairs: room for facing stubs within and between ranks, label room on shared
+	 * decision sides, rip-up and reroute, and a guided grid search.
+	 */
+	readonly repair: boolean;
+}
+
+const PLAIN: RoutingPolish = { ports: false, reader: false, sides: false, repair: false };
+
+/**
+ * Most polished first; each later level drops a pass. The last is the plain
+ * router, so a layout never has more export defects or inward endpoints than
+ * #405 would draw. Straight and curved routing only repair their port choices.
+ */
+function polishLevels(edgeRouting: IntermediateDiagram["layout"]["edgeRouting"]) {
+	return edgeRouting === "orthogonal"
+		? [
+				{ ports: true, reader: true, sides: true, repair: true },
+				{ ports: true, reader: true, sides: false, repair: true },
+				{ ports: true, reader: false, sides: false, repair: true },
+				{ ports: false, reader: false, sides: false, repair: true },
+				PLAIN,
+			]
+		: [{ ...PLAIN, repair: true }, PLAIN];
+}
+
+function layoutDiagram(
+	diagram: IntermediateDiagram,
+	polish: RoutingPolish,
+): {
+	edgeArrows: ArrowSceneElement[];
+	nodeShapes: NodeSceneElement[];
+	routedEdges: RoutedEdge[];
+} {
+	const orthogonal = diagram.layout.edgeRouting === "orthogonal";
+	const offsetsFor = (routes: readonly RoutedEdge[]) =>
+		polish.ports
+			? alignedPortOffsets(routes, polish.repair)
+			: portOffsetsForRoutes(routes, polish.repair);
 	let nodeShapes = positionNodes(diagram);
 	const shapesByNodeId = new Map(nodeShapes.map((shape) => [shape.nodeId, shape]));
 	const routedEdges = diagram.edges.map((edge, index) =>
 		routeForEdge(edge, index, shapesByNodeId, diagram.layout.direction),
 	);
-	assignDecisionSides(routedEdges, diagram.layout.direction);
+	const mirrored = orthogonal && polish.ports;
+	assignDecisionSides(routedEdges, diagram.layout.direction, mirrored);
 	let portOffsets: Map<string, number>;
 	let capacity: Map<string, { width: number; height: number }>;
-	if (diagram.layout.edgeRouting === "orthogonal") {
+	if (orthogonal) {
 		assignFeedbackSides(routedEdges, diagram);
-		portOffsets = portOffsetsForRoutes(routedEdges);
+		portOffsets = offsetsFor(routedEdges);
 		capacity = portCapacityForRoutes(routedEdges, portOffsets);
 	} else {
-		const direct = assignDirectFeedbackPorts(routedEdges, diagram, nodeShapes);
+		const direct = assignDirectFeedbackPorts(routedEdges, diagram, nodeShapes, polish.repair);
 		portOffsets = direct.offsets;
 		capacity = direct.minimumSizes;
 	}
-	if (capacity.size > 0) {
-		nodeShapes = positionNodes(diagram, capacity);
+	const reach =
+		orthogonal && polish.repair
+			? stubReachForRoutes(routedEdges, portOffsets)
+			: new Map<string, number>();
+	if (capacity.size > 0 || reach.size > 0) {
+		nodeShapes = positionNodes(diagram, capacity, reach);
 		const resized = new Map(nodeShapes.map((node) => [node.nodeId, node]));
 		for (const route of routedEdges) {
 			route.source = resized.get(route.source.nodeId)!;
 			route.target = resized.get(route.target.nodeId)!;
-			if (diagram.layout.edgeRouting !== "orthogonal")
+			if (!orthogonal)
 				Object.assign(route, connectionEdges(route.source, route.target, diagram.layout.direction));
 		}
-		if (diagram.layout.edgeRouting === "orthogonal")
-			portOffsets = portOffsetsForRoutes(routedEdges);
+		if (orthogonal) portOffsets = offsetsFor(routedEdges);
 		else {
-			assignDecisionSides(routedEdges, diagram.layout.direction);
-			portOffsets = assignDirectFeedbackPorts(routedEdges, diagram, nodeShapes).offsets;
+			assignDecisionSides(routedEdges, diagram.layout.direction, mirrored);
+			portOffsets = assignDirectFeedbackPorts(
+				routedEdges,
+				diagram,
+				nodeShapes,
+				polish.repair,
+			).offsets;
 		}
 	}
-	const labelObstacles = branchLabelObstacles(routedEdges, portOffsets);
-	const endpointStubs =
-		diagram.layout.edgeRouting === "orthogonal"
-			? endpointStubsForRoutes(routedEdges, portOffsets)
-			: [];
-	const edgeArrows: ArrowSceneElement[] = [];
-	for (const route of routedEdges) {
-		edgeArrows.push(
-			arrowForRoute(
-				route,
-				diagram.layout.edgeRouting,
-				portOffsets,
-				[
-					...nodeShapes,
-					...labelObstacles.filter((label) => label.nodeId !== `branch-label:${route.edge.id}`),
-				],
-				[...endpointStubs, ...edgeArrows],
-			),
-		);
+	// Judge jogs and corridors at the size a reader sees the exported diagram.
+	const scale = routingQualityScale({
+		width:
+			Math.max(...nodeShapes.map((node) => node.x + node.width)) -
+			Math.min(...nodeShapes.map((node) => node.x)),
+		height:
+			Math.max(...nodeShapes.map((node) => node.y + node.height)) -
+			Math.min(...nodeShapes.map((node) => node.y)),
+	});
+	const options: RouteOptions = {
+		guided: polish.repair,
+		...(polish.reader ? { readerScale: scale } : {}),
+	};
+	let edgeArrows = routeAllEdges(
+		routedEdges,
+		diagram.layout.edgeRouting,
+		portOffsets,
+		nodeShapes,
+		options,
+	);
+	if (orthogonal && polish.sides) {
+		const resided = resideHookedArrivals(routedEdges, edgeArrows, diagram, scale);
+		if (resided.length > 0) {
+			const offsets = offsetsFor(routedEdges);
+			const retry = routeAllEdges(routedEdges, "orthogonal", offsets, nodeShapes, options);
+			const [before, after] = [edgeArrows, retry].map((arrows) =>
+				routingDefects(arrows, nodeShapes, scale),
+			);
+			if (after!.hard <= before!.hard && after!.reader < before!.reader)
+				[edgeArrows, portOffsets] = [retry, offsets];
+			else for (const { route, side } of resided) route.targetEdge = side;
+		}
 	}
+	if (orthogonal && polish.repair)
+		edgeArrows = rerouteDefects(edgeArrows, routedEdges, portOffsets, nodeShapes, options);
+	return { edgeArrows, nodeShapes, routedEdges };
+}
+
+export function renderIntermediateDiagram(input: unknown): RenderedDiagramScene {
+	const diagram = parseIntermediateDiagram(input);
+	// Polish must never cost a valid export: drop passes until the export defects and
+	// inward endpoints are as few as the plain router's, preferring more polish on a tie.
+	const [first, ...fallbacks] = polishLevels(diagram.layout.edgeRouting);
+	let layout = layoutDiagram(diagram, first!);
+	// Export defects come first; inward endpoints only break ties.
+	const defectsOf = (attempt: ReturnType<typeof layoutDiagram>) =>
+		[
+			exportRouteDefects(attempt.edgeArrows, attempt.nodeShapes).length,
+			inwardEndpoints(attempt.edgeArrows, attempt.nodeShapes),
+		] as const;
+	const fewer = (a: readonly [number, number], b: readonly [number, number]) =>
+		a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]);
+	let defects = defectsOf(layout);
+	for (const polish of fallbacks) {
+		if (defects[0] === 0 && defects[1] === 0) break;
+		const candidate = layoutDiagram(diagram, polish);
+		const candidateDefects = defectsOf(candidate);
+		if (fewer(candidateDefects, defects)) [layout, defects] = [candidate, candidateDefects];
+	}
+	const { edgeArrows, nodeShapes, routedEdges } = layout;
 	const labels = [...nodeShapes.map(textForNode), ...branchLabels(edgeArrows, routedEdges)];
 	const elements = normalizeSceneOrigin([...edgeArrows, ...nodeShapes, ...labels]);
 	const bounds = sceneBounds(elements);
