@@ -16,7 +16,7 @@ sketchi-code-mode and exposes three tools:
 - docs: how to drive Sketchi, including the diagram spec shape.
 - search: look up the Sketchi API surface before writing a call.
 - execute: run Sketchi code mode, which builds flowcharts, mindmaps, and
-  sequence diagrams, fetches artifacts, and applies diagram patches.
+  sequence diagrams and timelines, fetches artifacts, and applies diagram patches.
 
 This is the recommended entry point for agents. Prefer it over the HTTP
 endpoints below unless you need a single direct call.
@@ -26,10 +26,11 @@ endpoints below unless you need a single direct call.
 POST /api/v1/flowcharts/build
 POST /api/v1/mindmaps/build
 POST /api/v1/sequences/build
+POST /api/v1/timelines/build
 Build one diagram from a typed spec and store the result as an artifact.
 
 POST /api/v1/generate
-Generate a flowchart, mindmap, or sequence diagram from a prompt rather than a
+Generate a flowchart, mindmap, sequence, or timeline diagram from a prompt rather than a
 prebuilt spec. Omit type for model selection, or pass a supported type as an
 authoritative constraint. Unsupported native types return a typed error.
 
@@ -59,3 +60,5 @@ These are stored in the current browser only, not in an account.
 https://sketchi.app/ — what Sketchi is, docs, and per-agent setup.
 https://sketchi.app/llms.txt — the same overview for the main site.
 https://icons.sketchi.app/llms.txt — the public SVG icon library and its API.
+
+Native timelines: use `buildTimeline` (Code Mode) or `generate --type timeline` (CLI). Supply events with unique IDs, labels, and real ISO dates or explicit numeric order; optional concise descriptions are preserved. Dates and order cannot be mixed. Ties retain input order; empty timelines and invalid dates are rejected. The renderer wraps long chronologies. No Gantt durations, resources, or dependency scheduling.

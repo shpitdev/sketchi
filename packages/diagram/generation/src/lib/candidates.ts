@@ -10,6 +10,9 @@ import {
 	MindmapDiagramSchema,
 	SKETCHI_DIAGRAM_STYLE,
 	SequenceDiagramSchema,
+	TimelineDiagramSchema,
+	TimelineValidationError,
+	validateTimelineDiagram,
 	SequenceValidationError,
 	validateFlowchartDiagram,
 	validateMindmapDiagram,
@@ -244,8 +247,17 @@ function schemaIssueDiagnostic(issue: {
 }
 
 function diagramValidationFailure(error: unknown): CandidateParseFailure {
-	if (error instanceof FlowchartValidationError || error instanceof SequenceValidationError) {
-		const family = error instanceof FlowchartValidationError ? "flowchart" : "sequence";
+	if (
+		error instanceof FlowchartValidationError ||
+		error instanceof SequenceValidationError ||
+		error instanceof TimelineValidationError
+	) {
+		const family =
+			error instanceof FlowchartValidationError
+				? "flowchart"
+				: error instanceof TimelineValidationError
+					? "timeline"
+					: "sequence";
 		return {
 			diagnostics: error.issues.map(
 				(entry) => `${family}.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
@@ -337,6 +349,13 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 
 	const repairs: string[] = [];
 	const parsers = {
+		timeline: () =>
+			decodeAndValidate(
+				TimelineDiagramSchema,
+				withSketchiDiagramStyle(titledDiagram),
+				validateTimelineDiagram,
+				intent,
+			),
 		flowchart: () => {
 			const result = decodeAndValidate(
 				FlowchartDiagramSchema,
@@ -500,6 +519,8 @@ function labelsForRequirement(
 	if (diagram.type === "mindmap") {
 		return requirement.target === "topic" ? diagram.nodes.map((node) => node.label) : undefined;
 	}
+	if (diagram.type === "timeline")
+		return requirement.target === "event" ? diagram.events.map((event) => event.label) : undefined;
 	if (requirement.target === "participant") {
 		return diagram.participants.map((participant) => participant.label);
 	}
@@ -530,6 +551,7 @@ function countForRequirement(
 	if (diagram.type === "mindmap") {
 		return target === "topics" ? diagram.nodes.length : undefined;
 	}
+	if (diagram.type === "timeline") return target === "events" ? diagram.events.length : undefined;
 	if (target === "participants") return diagram.participants.length;
 	return target === "messages" ? diagram.messages.length : undefined;
 }

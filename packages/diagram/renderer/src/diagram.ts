@@ -1,3 +1,4 @@
+import { renderTimelineDiagram } from "./timeline.js";
 import type { CanonicalDiagram } from "@sketchi/diagram-core";
 
 import { type RenderedDiagramScene, renderIntermediateDiagram } from "./scene.js";
@@ -9,6 +10,8 @@ export function renderDiagram(diagram: CanonicalDiagram): RenderedDiagramScene {
 		case "flowchart":
 		case "mindmap":
 			return renderIntermediateDiagram(diagram);
+		case "timeline":
+			return renderTimelineDiagram(diagram);
 		case "sequence":
 			return renderSequenceDiagram(diagram);
 	}

@@ -1,4 +1,8 @@
-import type { ExcalidrawFile, PatchableScene } from "@sketchi/diagram-agent";
+import {
+	CANONICAL_DOCUMENT_TYPES,
+	type ExcalidrawFile,
+	type PatchableScene,
+} from "@sketchi/diagram-agent";
 import { Effect, Schema } from "effect";
 
 import type { DiagramDocument } from "./document.js";
@@ -20,7 +24,7 @@ export class DiagramRecordManifest extends Schema.Class<DiagramRecordManifest>(
 )({
 	schemaVersion: Schema.Literal(RECORD_SCHEMA_VERSION),
 	id: Schema.String,
-	type: Schema.Literals(["canvas", "flowchart", "mindmap", "sequence"]),
+	type: Schema.Literals(["canvas", ...CANONICAL_DOCUMENT_TYPES]),
 	title: Schema.String,
 	revision: Schema.Int.check(Schema.isGreaterThan(0)),
 	authority: Schema.Literals(["canonical", "patched", "detached"]).pipe(

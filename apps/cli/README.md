@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Typed, deterministic diagrams from your terminal.</strong><br />
-  Create, inspect, revise, and export local flowcharts, mindmaps, and sequence diagrams—or turn one prompt into validated, editable Excalidraw.
+  Create, inspect, revise, and export local flowcharts, mindmaps, sequence diagrams, and timelines—or turn one prompt into validated, editable Excalidraw.
 </p>
 
 <p align="center">
@@ -53,7 +53,7 @@ sketchi generate --prompt "Map release approval with pass and revise branches"
 
 With no `--prompt`, Sketchi opens a short wizard only when both standard input
 and standard output are human terminals, output is text, and CI is absent. It
-asks for prompt text, flowchart (the default), mind map, or sequence diagram, and where to save the
+asks for prompt text, flowchart (the default), mind map, sequence diagram, or timeline, and where to save the
 PNG. The choices are the current directory, a `diagrams/` folder under exactly
 the directory where Sketchi was run, or a custom path with the same semantics as
 `--dest`. Sketchi does not inspect Git, and it creates `diagrams/` only after
@@ -64,7 +64,7 @@ that wizard question. Explicit `--format png` may proceed; another format or
 Scripts, pipes, redirected streams, CI, and `--output json` never prompt or
 block. They must pass `--prompt`; omitting it retains the deterministic usage
 error. Passing `--prompt` is always direct and noninteractive.
-`--type` accepts only flowchart, mindmap, or sequence and is authoritative.
+`--type` accepts only flowchart, mindmap, sequence, or timeline and is authoritative.
 Without it, the generation model selects one of those from the request; a
 request for any other kind of diagram returns a typed unsupported-type error
 instead of being coerced into a supported one.
@@ -103,7 +103,7 @@ The endpoint defaults to
 `https://playground.sketchi.app/api/v1/canvases/create`; use `--endpoint URL` or
 `SKETCHI_CANVAS_ENDPOINT` only for preview and local testing. The existing
 `create` command remains the separate, strictly offline command for accepted
-flowchart, mindmap, and sequence documents.
+flowchart, mindmap, sequence, and timeline documents.
 
 ## Create and work with a diagram offline
 
@@ -318,3 +318,5 @@ Source, issue tracking, and architecture documentation live in the
 See the [changelog](https://github.com/shpitdev/sketchi/blob/main/apps/cli/CHANGELOG.md)
 for everything that changed, or browse published versions on
 [GitHub Releases](https://github.com/shpitdev/sketchi/releases).
+
+Native timelines: use `buildTimeline` (Code Mode) or `generate --type timeline` (CLI). Supply events with unique IDs, labels, and real ISO dates or explicit numeric order; optional concise descriptions are preserved. Dates and order cannot be mixed. Ties retain input order; empty timelines and invalid dates are rejected. The renderer wraps long chronologies. No Gantt durations, resources, or dependency scheduling.

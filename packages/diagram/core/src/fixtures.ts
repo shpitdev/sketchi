@@ -1,3 +1,4 @@
+import { timelineFixture } from "./types/timeline.js";
 import { flowchartFixture } from "./types/flowchart.js";
 import { mindmapFixture } from "./types/mindmap.js";
 import { sequenceFixture } from "./types/sequence.js";
@@ -8,4 +9,5 @@ export const diagramFixtures: readonly CanonicalDiagram[] = [
 	flowchartFixture,
 	mindmapFixture,
 	sequenceFixture,
+	timelineFixture,
 ];

@@ -1,4 +1,4 @@
-import type { BuildFlowchartResult, BuildSequenceDiagramResult } from "@sketchi/diagram-agent";
+import type { StudioBuildResult } from "./build-result";
 import { DiagramPreview } from "@sketchi/diagram-ui";
 import type { ChatStatus, UIMessage } from "ai";
 import type { RefObject } from "react";
@@ -21,8 +21,6 @@ const STARTERS = [
 	"Diagram a CI/CD pipeline from commit to production",
 	"Show checkout as a sequence diagram: browser, API, payments",
 ];
-
-type StudioBuildResult = BuildFlowchartResult | BuildSequenceDiagramResult;
 
 export interface ReadyPlaygroundArtifact {
 	artifactId: string;
@@ -74,6 +72,8 @@ function resultSummary(result: StudioBuildResult): {
 	}
 	const spec = result.normalizedSpec;
 	if (!spec) return {};
+	if ("events" in spec)
+		return { connectionCount: Math.max(0, spec.events.length - 1), itemCount: spec.events.length };
 	return "participants" in spec
 		? { connectionCount: spec.messages.length, itemCount: spec.participants.length }
 		: { connectionCount: spec.edges.length, itemCount: spec.nodes.length };
@@ -143,6 +143,7 @@ function failureCopy(status: Exclude<StudioBuildResult, { ok: true }>["status"])
 			};
 		case "invalid_flowchart":
 		case "invalid_sequence":
+		case "invalid_timeline":
 			return {
 				message: "This draft needs a clearer structure before it can be drawn.",
 				hint: "Clarify the steps or simplify the connections, then try again.",

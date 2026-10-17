@@ -328,7 +328,7 @@ export const catalog: CatalogEntry[] = [
 		content: [
 			"Sketchi Code Mode MCP is for external agent harnesses: Codex, Claude Code, OpenCode, and similar clients.",
 			"The server exposes a small contract: docs, search, and execute. execute runs JavaScript against a typed sketchi client.",
-			"The public sketchi client has seven operations: buildFlowchart, buildMindmap, buildSequenceDiagram, createCanvas, getArtifact, applyDiagramPatch, and searchIcons.",
+			"The public sketchi client has eight operations: buildFlowchart, buildMindmap, buildSequenceDiagram, buildTimeline, createCanvas, getArtifact, applyDiagramPatch, and searchIcons.",
 			"The final deliverable is the accepted Sketchi artifact bundle: return the artifactId, format list, and Excalidraw/PNG artifact URLs instead of creating a separate Markdown, Mermaid, or prose-only diagram artifact.",
 			"Use docs({ topic }) for full request envelopes and examples. Use search({ query }) to discover operation-specific topics such as patchOperations.",
 			"Studio chat, HTTP, and MCP share the canonical semantic builder request/result contracts. Convex threads and user artifact lineage remain outside this harness surface.",
@@ -345,7 +345,7 @@ export const catalog: CatalogEntry[] = [
 		content: [
 			"execute({ code }) runs an async JavaScript arrow function.",
 			"This matches the Code Mode pattern: typed host tools are exposed as a namespace inside the sandbox, here sketchi.*.",
-			"Cloudflare Code Mode exposes typed namespace methods in generated code; this server follows that shape with sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.buildSequenceDiagram, sketchi.createCanvas, sketchi.getArtifact, sketchi.applyDiagramPatch, and sketchi.searchIcons.",
+			"Cloudflare Code Mode exposes typed namespace methods in generated code; this server follows that shape with sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.buildSequenceDiagram, sketchi.buildTimeline, sketchi.createCanvas, sketchi.getArtifact, sketchi.applyDiagramPatch, and sketchi.searchIcons.",
 			"Pass the function expression itself. A trailing semicolon and outer markdown code fence are accepted, but examples omit them so copied code is canonical.",
 			"Write JavaScript only: no TypeScript annotations, interfaces, generics, imports, or named wrapper functions. Use the canonical shape async () => { const result = await sketchi.buildFlowchart(...); return result; }.",
 			"Do not define a named function and then call it. Put the arrow function body directly in code.",
@@ -353,7 +353,7 @@ export const catalog: CatalogEntry[] = [
 			"The sandbox must not receive secrets, storage bindings, model credentials, or raw network access.",
 			"Call sketchi methods sequentially when possible so a harness can inspect structured failures and retry deliberately.",
 			"For user-facing completion, return the accepted Sketchi artifactId plus Excalidraw and PNG URLs from the MCP result. Do not synthesize a Mermaid or Markdown replacement after Sketchi accepts an artifact.",
-			"The execute result includes builds in call order for every buildFlowchart, buildMindmap, buildSequenceDiagram, and createCanvas attempt, even when code returns custom data, nothing, or an error. Each receipt includes operation, zero-based index, ok/status, issues, and buildId, quality, normalizedSpec, and artifact/partial references when available. Inline exports are not duplicated. result remains the script return value. Retrieval and patch calls are not builds. If the executor times out or aborts while a host build is unfinished, that attempt has status: incomplete and ok: false; its unavailable build fields are omitted.",
+			"The execute result includes builds in call order for every buildFlowchart, buildMindmap, buildSequenceDiagram, buildTimeline, and createCanvas attempt, even when code returns custom data, nothing, or an error. Each receipt includes operation, zero-based index, ok/status, issues, and buildId, quality, normalizedSpec, and artifact/partial references when available. Inline exports are not duplicated. result remains the script return value. Retrieval and patch calls are not builds. If the executor times out or aborts while a host build is unfinished, that attempt has status: incomplete and ok: false; its unavailable build fields are omitted.",
 			"The execute wrapper adds artifactDelivery when it detects an accepted artifact bundle. Prefer returning artifactDelivery directly to the user because it already contains artifactId, format refs, raw Excalidraw/PNG URLs, and final-response instructions.",
 			"When artifactDelivery is available, the MCP text content begins with the exact final answer. Copy that first text block verbatim into chat and stop.",
 			"When artifactDelivery.finalResponseText is present, paste that string as the final chat answer and stop. Do not call file/create/artifact tools, inspect nested inline Excalidraw JSON, or create an Antigravity artifact after that point.",
@@ -481,6 +481,28 @@ export const catalog: CatalogEntry[] = [
 		],
 	},
 	{
+		id: "buildTimeline",
+		kind: "operation",
+		title: "buildTimeline",
+		topic: "buildTimeline",
+		keywords: ["timeline", "chronology", "milestones", "dates", "events", "roadmap"],
+		snippet: "Create a native timeline from dated milestones or explicitly ordered events.",
+		content: [
+			"buildTimeline accepts { spec: { id?, title, events: [{ id, label, date?, order?, description? }] }, options? }. The renderer owns all coordinates and wraps long timelines into alternating rows; no CanvasSpec authoring is needed.",
+			"Use exactly one chronology field per event, consistently: dates for every event, or numeric order for every event without dates. Dates must be real YYYY-MM-DD days or YYYY-MM-DDTHH:mm:ss[.sss]Z UTC instants. Invalid dates, duplicate ids, empty inputs, mixed modes, and more than 60 events are rejected with repair hints.",
+			"Events sort chronologically (not equally spaced by elapsed time); equal dates/orders retain input order. Preserve each source label, date and optional description. Never invent events or dates. Gantt durations, resources and dependency scheduling are not supported.",
+			"Builds return the same quality, normalizedSpec, artifact references, and structured issues as the other native families. Request png in artifactFormats for a hosted PNG; use getArtifact for exports and applyDiagramPatch for scene edits.",
+		].join("\n\n"),
+		examples: [
+			{
+				title: "Release milestones",
+				language: "js",
+				code: `async () => sketchi.buildTimeline({ spec: { title: "Release milestones", events: [{ id: "beta", label: "Public beta", date: "2026-09-15" }, { id: "ga", label: "General availability", date: "2026-10-01" }] }, options: { artifactFormats: ["png", "excalidraw", "scene"] } })`,
+			},
+		],
+	},
+
+	{
 		id: "buildSequenceDiagram",
 		kind: "operation",
 		title: "buildSequenceDiagram",
@@ -576,7 +598,7 @@ export const catalog: CatalogEntry[] = [
 			"Hosted MCP/API responses include url fields for raw artifact downloads. Excalidraw URLs return importable JSON; PNG URLs return image bytes.",
 			"Pass inline: true only when the harness needs scene or Excalidraw JSON in the MCP response.",
 			"To fetch raw artifact bytes, request GET /api/v1/artifacts/{artifactId}?format=excalidraw&raw=true or format=png&raw=true from the Studio API.",
-			"Use the artifactId returned by buildFlowchart, buildMindmap, buildSequenceDiagram, createCanvas, or applyDiagramPatch.",
+			"Use the artifactId returned by buildFlowchart, buildMindmap, buildSequenceDiagram, buildTimeline, createCanvas, or applyDiagramPatch.",
 		].join("\n"),
 	},
 	{
@@ -668,7 +690,7 @@ export const catalog: CatalogEntry[] = [
 		snippet: "First get the semantic graph accepted, then apply visual patches.",
 		content: [
 			"For mixed requests like 'circle connected to a purple decision diamond', split the task.",
-			"Step 1: choose buildFlowchart for a process graph, buildMindmap for a nested topic hierarchy, buildSequenceDiagram for chronological participant interactions, or createCanvas for any other diagram or visualization.",
+			"Step 1: choose buildFlowchart for a process graph, buildMindmap for a nested topic hierarchy, buildSequenceDiagram for chronological participant interactions, buildTimeline for milestones and event chronologies, or createCanvas for any other diagram or visualization.",
 			"Step 2: inspect issues. If not accepted, repair the spec and call the same build operation again.",
 			"Step 3: once accepted, use applyDiagramPatch for circle, diamond, color, movement, rerouteEdges, or replaceText tweaks.",
 			"For broad architecture prompts, keep the first build small and readable: one start, a mostly monotonic spine, a few decision or branch points, and separate terminal nodes for separate outcomes.",
@@ -777,7 +799,7 @@ export const catalog: CatalogEntry[] = [
 		snippet:
 			"When Sketchi accepts an artifact, the final result is that artifact bundle, not a recreated Markdown diagram.",
 		content:
-			"Do not create a Markdown, Mermaid, local file, Antigravity artifact, or prose-only artifact after buildFlowchart, buildMindmap, buildSequenceDiagram, createCanvas, or applyDiagramPatch succeeds. Do not call getArtifact for scene just to make a local summary. Paste execute.artifactDelivery.finalResponseText when present, or return the Sketchi artifactId, available formats, and raw Excalidraw/PNG URLs so the caller can open the actual generated artifact.",
+			"Do not create a Markdown, Mermaid, local file, Antigravity artifact, or prose-only artifact after buildFlowchart, buildMindmap, buildSequenceDiagram, buildTimeline, createCanvas, or applyDiagramPatch succeeds. Do not call getArtifact for scene just to make a local summary. Paste execute.artifactDelivery.finalResponseText when present, or return the Sketchi artifactId, available formats, and raw Excalidraw/PNG URLs so the caller can open the actual generated artifact.",
 	},
 	{
 		id: "raw-excalidraw-non-goal",
@@ -786,7 +808,7 @@ export const catalog: CatalogEntry[] = [
 		topic: "overview",
 		keywords: ["non-goal", "excalidraw", "raw", "json", "structural"],
 		snippet:
-			"Native Excalidraw is an output format. Prefer semantic FlowchartSpec, MindmapSpec, or SequenceDiagramSpec input.",
+			"Native Excalidraw is an output format. Prefer semantic FlowchartSpec, MindmapSpec, SequenceDiagramSpec, or TimelineSpec input.",
 		content:
 			"Do not use native Excalidraw JSON as build input. Use FlowchartSpec, nested MindmapSpec, SequenceDiagramSpec, or the renderer-independent CanvasSpec v1; scene and Excalidraw remain intentional output formats, and applyDiagramPatch handles deterministic edits.",
 	},

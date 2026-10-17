@@ -7,12 +7,15 @@ import {
 	BuildMindmapRequestSchema,
 	BuildMindmapResultSchema,
 	BuildSequenceDiagramRequestSchema,
+	BuildTimelineRequestSchema,
 	BuildSequenceDiagramResultSchema,
+	BuildTimelineResultSchema,
 	CreateCanvasRequestSchema,
 	CreateCanvasResultSchema,
 	FlowchartSpecSchema,
 	MindmapSpecSchema,
 	SequenceDiagramSpecSchema,
+	TimelineSpecSchema,
 	GetArtifactRequestSchema,
 	GetArtifactResultSchema,
 	SearchIconsRequestSchema,
@@ -60,6 +63,18 @@ export const codeModeContracts = {
 			})),
 		}),
 		output: BuildSequenceDiagramResultSchema,
+	},
+	buildTimeline: {
+		input: Schema.Struct({
+			...BuildTimelineRequestSchema.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: TimelineSpecSchema.mapFields(({ id, title, events }) => ({
+				id,
+				title,
+				events,
+			})),
+		}),
+		output: BuildTimelineResultSchema,
 	},
 	createCanvas: {
 		input: CreateCanvasRequestSchema,

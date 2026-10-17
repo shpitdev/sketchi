@@ -7,6 +7,7 @@ import {
 	type BuildFlowchartResult,
 	type BuildMindmapResult,
 	type BuildSequenceDiagramResult,
+	type BuildTimelineResult,
 	type CreateCanvasResult,
 } from "@sketchi/diagram-agent";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -110,6 +111,7 @@ const ExecuteBuildContract = Schema.Struct({
 		"buildFlowchart",
 		"buildMindmap",
 		"buildSequenceDiagram",
+		"buildTimeline",
 		"createCanvas",
 	]),
 	ok: Schema.Boolean,
@@ -136,6 +138,7 @@ type BuildResult =
 	| BuildFlowchartResult
 	| BuildMindmapResult
 	| BuildSequenceDiagramResult
+	| BuildTimelineResult
 	| CreateCanvasResult;
 
 // Receipts carry references, not a second copy of the potentially large inline scene/export.
@@ -203,7 +206,7 @@ function trackSandboxBuilds(code: string): string {
       const trackedSketchi = new Proxy(sketchi, {
         get(target, name) {
           const method = target[name];
-          if (!["buildFlowchart", "buildMindmap", "buildSequenceDiagram", "createCanvas"].includes(name)) return method;
+          if (!["buildFlowchart", "buildMindmap", "buildSequenceDiagram", "buildTimeline", "createCanvas"].includes(name)) return method;
           return (...args) => {
             const pending = method(...args);
             pendingBuilds.push(pending);
@@ -614,6 +617,13 @@ export function makeSketchiCodeModeProvider(
 						correlation,
 					),
 				),
+			buildTimeline: (request, options) =>
+				runToolEffect(
+					withTelemetryCorrelation(
+						build("buildTimeline", withTrailingOptions(request, options)),
+						correlation,
+					),
+				),
 			createCanvas: (request, options) =>
 				runToolEffect(
 					withTelemetryCorrelation(
@@ -666,7 +676,7 @@ const executeDefinition = makeEffectMcpTool("execute", {
 		"Write JavaScript only: no TypeScript syntax, annotations, interfaces, generics, imports, or named wrapper functions.",
 		"Use the canonical shape: async () => { const result = await sketchi.buildFlowchart(...); return result; }",
 		"Code fences and trailing expression semicolons are normalized before execution.",
-		"The sandbox exposes sketchi.createCanvas, sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.buildSequenceDiagram, sketchi.getArtifact, sketchi.applyDiagramPatch, and sketchi.searchIcons.",
+		"The sandbox exposes sketchi.createCanvas, sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.buildSequenceDiagram, sketchi.buildTimeline, sketchi.getArtifact, sketchi.applyDiagramPatch, and sketchi.searchIcons.",
 		"For flowcharts, keep every requested step and decision in a separate node, preserving the prompt's step wording and order. Do not merge steps into compound labels.",
 		"When the prompt names technologies, call sketchi.searchIcons({ q }) for each and set node.icon or sequence participant.icon to { slug } using a matching returned slug. One icon per node: give 'X on Y' separate technology steps. Labels alone do not add logos; check coverage.",
 		"First get the semantic graph accepted, then use patch operations for deterministic visual changes.",

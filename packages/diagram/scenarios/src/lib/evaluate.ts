@@ -1,9 +1,11 @@
+import { timelineScenarioChecks } from "./timeline-scenarios.js";
 import {
 	type CanonicalDiagram,
 	type FlowchartDiagram,
 	type SequenceDiagram,
 	parseFlowchartDiagram,
 	parseSequenceDiagram,
+	parseTimelineDiagram,
 	sequenceActivations,
 } from "@sketchi/diagram-core";
 import {
@@ -666,6 +668,12 @@ export function evaluateScenarioDiagram(
 	candidate: unknown,
 	modelCandidate: unknown = candidate,
 ): ScenarioEvaluation {
+	if (scenario.diagramType === "timeline") {
+		const diagram = parseTimelineDiagram(candidate);
+		const modelDiagram =
+			modelCandidate === candidate ? diagram : parseTimelineDiagram(modelCandidate);
+		return evaluation(scenario.id, diagram, timelineScenarioChecks(scenario, modelDiagram));
+	}
 	if (scenario.diagramType === "sequence") {
 		const diagram = parseSequenceDiagram(candidate);
 		const modelDiagram =

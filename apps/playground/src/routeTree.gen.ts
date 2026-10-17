@@ -30,6 +30,7 @@ import { Route as ApiV1CanvasesCreateRouteImport } from "./routes/api/v1/canvase
 import { Route as ApiV1FlowchartsBuildRouteImport } from "./routes/api/v1/flowcharts/build";
 import { Route as ApiV1MindmapsBuildRouteImport } from "./routes/api/v1/mindmaps/build";
 import { Route as ApiV1SequencesBuildRouteImport } from "./routes/api/v1/sequences/build";
+import { Route as ApiV1TimelinesBuildRouteImport } from "./routes/api/v1/timelines/build";
 import { Route as ApiV1ArtifactsArtifactIdPatchRouteImport } from "./routes/api/v1/artifacts/$artifactId/patch";
 
 const IndexRoute = IndexRouteImport.update({
@@ -141,6 +142,11 @@ const ApiV1SequencesBuildRoute = ApiV1SequencesBuildRouteImport.update({
   path: "/api/v1/sequences/build",
   getParentRoute: () => rootRouteImport,
 } as any);
+const ApiV1TimelinesBuildRoute = ApiV1TimelinesBuildRouteImport.update({
+  id: "/api/v1/timelines/build",
+  path: "/api/v1/timelines/build",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ApiV1ArtifactsArtifactIdPatchRoute =
   ApiV1ArtifactsArtifactIdPatchRouteImport.update({
     id: "/patch",
@@ -170,6 +176,7 @@ export interface FileRoutesByFullPath {
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
   "/api/v1/mindmaps/build": typeof ApiV1MindmapsBuildRoute;
   "/api/v1/sequences/build": typeof ApiV1SequencesBuildRoute;
+  "/api/v1/timelines/build": typeof ApiV1TimelinesBuildRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
 export interface FileRoutesByTo {
@@ -194,6 +201,7 @@ export interface FileRoutesByTo {
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
   "/api/v1/mindmaps/build": typeof ApiV1MindmapsBuildRoute;
   "/api/v1/sequences/build": typeof ApiV1SequencesBuildRoute;
+  "/api/v1/timelines/build": typeof ApiV1TimelinesBuildRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
 export interface FileRoutesById {
@@ -219,6 +227,7 @@ export interface FileRoutesById {
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
   "/api/v1/mindmaps/build": typeof ApiV1MindmapsBuildRoute;
   "/api/v1/sequences/build": typeof ApiV1SequencesBuildRoute;
+  "/api/v1/timelines/build": typeof ApiV1TimelinesBuildRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
 export interface FileRouteTypes {
@@ -245,6 +254,7 @@ export interface FileRouteTypes {
     | "/api/v1/flowcharts/build"
     | "/api/v1/mindmaps/build"
     | "/api/v1/sequences/build"
+    | "/api/v1/timelines/build"
     | "/api/v1/artifacts/$artifactId/patch";
   fileRoutesByTo: FileRoutesByTo;
   to:
@@ -269,6 +279,7 @@ export interface FileRouteTypes {
     | "/api/v1/flowcharts/build"
     | "/api/v1/mindmaps/build"
     | "/api/v1/sequences/build"
+    | "/api/v1/timelines/build"
     | "/api/v1/artifacts/$artifactId/patch";
   id:
     | "__root__"
@@ -293,6 +304,7 @@ export interface FileRouteTypes {
     | "/api/v1/flowcharts/build"
     | "/api/v1/mindmaps/build"
     | "/api/v1/sequences/build"
+    | "/api/v1/timelines/build"
     | "/api/v1/artifacts/$artifactId/patch";
   fileRoutesById: FileRoutesById;
 }
@@ -317,6 +329,7 @@ export interface RootRouteChildren {
   ApiV1FlowchartsBuildRoute: typeof ApiV1FlowchartsBuildRoute;
   ApiV1MindmapsBuildRoute: typeof ApiV1MindmapsBuildRoute;
   ApiV1SequencesBuildRoute: typeof ApiV1SequencesBuildRoute;
+  ApiV1TimelinesBuildRoute: typeof ApiV1TimelinesBuildRoute;
 }
 
 declare module "@tanstack/react-router" {
@@ -468,6 +481,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiV1SequencesBuildRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/api/v1/timelines/build": {
+      id: "/api/v1/timelines/build";
+      path: "/api/v1/timelines/build";
+      fullPath: "/api/v1/timelines/build";
+      preLoaderRoute: typeof ApiV1TimelinesBuildRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/api/v1/artifacts/$artifactId/patch": {
       id: "/api/v1/artifacts/$artifactId/patch";
       path: "/patch";
@@ -524,6 +544,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiV1FlowchartsBuildRoute: ApiV1FlowchartsBuildRoute,
   ApiV1MindmapsBuildRoute: ApiV1MindmapsBuildRoute,
   ApiV1SequencesBuildRoute: ApiV1SequencesBuildRoute,
+  ApiV1TimelinesBuildRoute: ApiV1TimelinesBuildRoute,
 };
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

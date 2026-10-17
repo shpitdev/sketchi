@@ -7,6 +7,9 @@ import {
 	getCanvasValidationIssues,
 	getFlowchartValidationIssues,
 	getSequenceValidationIssues,
+	getTimelineValidationIssues,
+	orderedTimelineEvents,
+	type TimelineDiagram,
 	parseMindmapDiagram,
 	validateFlowchartDiagram,
 	boundLabelWidth,
@@ -27,6 +30,7 @@ import {
 import {
 	renderIntermediateDiagram,
 	renderSequenceDiagram,
+	renderTimelineDiagram,
 	isStructurallyValidSequenceActivation,
 	isStructurallyValidSequenceLifeline,
 	type RenderedDiagramScene,
@@ -53,6 +57,7 @@ import {
 	BuildFlowchartRejected,
 	BuildMindmapRejected,
 	BuildSequenceDiagramRejected,
+	BuildTimelineRejected,
 	CreateCanvasRejected,
 	GetArtifactRejected,
 	ApplyDiagramPatchRejected,
@@ -60,6 +65,7 @@ import {
 	BuildFlowchartRequestSchema,
 	BuildMindmapRequestSchema,
 	BuildSequenceDiagramRequestSchema,
+	BuildTimelineRequestSchema,
 	CreateCanvasRequestSchema,
 	DEFAULT_ICON_SEARCH_LIMIT,
 	SearchIconsRejected,
@@ -76,7 +82,9 @@ import {
 	type BuildFlowchartResult,
 	type BuildMindmapResult,
 	type BuildSequenceDiagramRequest,
+	type BuildTimelineRequest,
 	type BuildSequenceDiagramResult,
+	type BuildTimelineResult,
 	type CreateCanvasResult,
 	CodeModeIssueSchema,
 	type ContractSchemaIssue,
@@ -92,6 +100,7 @@ import {
 	type NormalizedFlowchartSpec,
 	type NormalizedMindmapSpec,
 	type NormalizedSequenceDiagramSpec,
+	type NormalizedTimelineSpec,
 	type PartialArtifactBundle,
 	type PatchableScene,
 	type QualityReport,
@@ -166,6 +175,7 @@ type CodeModeBoundaryOperation =
 	| "buildFlowchart"
 	| "buildMindmap"
 	| "buildSequenceDiagram"
+	| "buildTimeline"
 	| "createCanvas"
 	| "getArtifact"
 	| "searchIcons";
@@ -195,6 +205,7 @@ function artifactKindForOperation(operation: CodeModeBoundaryOperation): string 
 	if (operation === "buildFlowchart") return "flowchart";
 	if (operation === "buildMindmap") return "mindmap";
 	if (operation === "buildSequenceDiagram") return "sequence";
+	if (operation === "buildTimeline") return "timeline";
 	if (operation === "createCanvas") return "canvas";
 	if (operation === "applyDiagramPatch") return "patch";
 	return undefined;
@@ -420,6 +431,41 @@ function mindmapQuality(diagram: MindmapDiagram, threshold: number): QualityRepo
 	};
 }
 
+function normalizeTimelineSpec(spec: BuildTimelineRequest["spec"]): NormalizedTimelineSpec {
+	const title = cleanToolString(spec.title);
+	const diagram: TimelineDiagram = {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-timeline"),
+		title,
+		type: "timeline",
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+		events: spec.events.map((event) => ({ ...event })),
+	};
+	return { id: diagram.id, title, events: orderedTimelineEvents(diagram), style: diagram.style };
+}
+function toTimelineDiagram(spec: NormalizedTimelineSpec): TimelineDiagram {
+	return { ...spec, type: "timeline" };
+}
+function validateNormalizedTimeline(spec: NormalizedTimelineSpec): CodeModeIssue[] {
+	return getTimelineValidationIssues(toTimelineDiagram(spec)).map((entry) =>
+		issue({
+			code: entry.code,
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+function timelineQuality(spec: NormalizedTimelineSpec, threshold: number): QualityReport {
+	return {
+		accepted: 10 >= threshold,
+		score: 10,
+		threshold,
+		summary: { nodeCount: spec.events.length, edgeCount: Math.max(0, spec.events.length - 1) },
+		checks: [],
+	};
+}
+
 function normalizeSequenceDiagramSpec(
 	spec: BuildSequenceDiagramRequest["spec"],
 ): NormalizedSequenceDiagramSpec {
@@ -603,6 +649,15 @@ const BuildSequenceDiagramFailure = workflowFailure(
 	"BuildSequenceDiagramFailure",
 	BuildSequenceDiagramRejected.fields.status,
 	BuildSequenceDiagramRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildTimelineFailure = workflowFailure(
+	"BuildTimelineFailure",
+	BuildTimelineRejected.fields.status,
+	BuildTimelineRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -2321,6 +2376,117 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 	} satisfies Extract<BuildSequenceDiagramResult, { ok: true }>;
 });
 
+const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(BuildTimelineRequestSchema, {
+		errors: "all",
+		reportInput: true,
+	})(input);
+	if (!Result.isSuccess(parsed)) {
+		return yield* new BuildTimelineFailure({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeTimelineSpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedTimeline(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* new BuildTimelineFailure({
+			status: "invalid_timeline",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = timelineQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* new BuildTimelineFailure({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const renderedScene = yield* Effect.try({
+		try: () => renderTimelineDiagram(toTimelineDiagram(normalizedSpec)),
+		catch: (cause) =>
+			new BuildTimelineFailure({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message: cause instanceof Error ? cause.message : "Unable to render timeline scene.",
+							hint: "Repair the event dates and ordering and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildTimeline.render"));
+	const scene = renderedScene;
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* new BuildTimelineFailure({
+			status: "render_failed",
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Split the chronology into smaller timelines and retry buildTimeline.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError(
+			(error) =>
+				new BuildTimelineFailure({
+					status: error.status,
+					context: {
+						...(error.status === "export_failed" ? exportContext : qualityContext),
+						issues: error.issues,
+					},
+				}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildTimelineResult, { ok: true }>;
+});
+
 const RawCreateCanvasInput = Schema.Struct({
 	spec: Schema.Unknown,
 	requestId: Schema.optionalKey(Schema.Unknown),
@@ -2976,6 +3142,9 @@ export const buildSequenceDiagram: (
 	buildSequenceDiagramWorkflow,
 	failureResult,
 );
+
+export const buildTimeline: (input: unknown) => CodeModeWorkflowEffect<BuildTimelineResult> =
+	boundary("buildTimeline", buildTimelineWorkflow, failureResult);
 
 export const createCanvas: (input: unknown) => CodeModeWorkflowEffect<CreateCanvasResult> =
 	boundary("createCanvas", createCanvasWorkflow, failureResult);

@@ -34,7 +34,12 @@ function buildFrom(
 	if (isRecord(value.structuredContent)) return buildFrom(value.structuredContent, diagramType);
 	if (isRecord(value.normalizedSpec) || typeof value.buildId === "string") return value;
 	const returned = isRecord(value.result) ? buildFrom(value.result, diagramType) : undefined;
-	const operation = diagramType === "sequence" ? "buildSequenceDiagram" : "buildFlowchart";
+	const operation =
+		diagramType === "timeline"
+			? "buildTimeline"
+			: diagramType === "sequence"
+				? "buildSequenceDiagram"
+				: "buildFlowchart";
 	const receipts = Array.isArray(value.builds)
 		? value.builds.filter(
 				(build): build is Record<string, unknown> =>
@@ -53,9 +58,13 @@ function buildFrom(
 		(isRecord(returned.normalizedSpec) ||
 			typeof returned.buildId === "string" ||
 			(typeof returned.operation === "string" &&
-				["buildFlowchart", "buildMindmap", "buildSequenceDiagram", "createCanvas"].includes(
-					returned.operation,
-				)))
+				[
+					"buildFlowchart",
+					"buildMindmap",
+					"buildSequenceDiagram",
+					"buildTimeline",
+					"createCanvas",
+				].includes(returned.operation)))
 	)
 		return returned;
 	const explicitRejection = returned
@@ -202,9 +211,11 @@ export function candidateFromMcpResult(
 	return {
 		ok: true,
 		diagram:
-			diagramType === "sequence"
-				? specToSequenceCandidate(build.normalizedSpec)
-				: specToFlowchartCandidate(build.normalizedSpec),
+			diagramType === "timeline"
+				? { ...build.normalizedSpec, type: "timeline" }
+				: diagramType === "sequence"
+					? specToSequenceCandidate(build.normalizedSpec)
+					: specToFlowchartCandidate(build.normalizedSpec),
 		check: {
 			id: "mcp-build-accepted",
 			passed: true,

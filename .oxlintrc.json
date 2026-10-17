@@ -285,7 +285,8 @@
 				"packages/diagram/core/src/types/flowchart.ts",
 				"packages/diagram/core/src/types/flowchart.test.ts",
 				"packages/diagram/core/src/types/mindmap.ts",
-				"packages/diagram/core/src/types/sequence.ts"
+				"packages/diagram/core/src/types/sequence.ts",
+				"packages/diagram/core/src/types/timeline.ts"
 			],
 			"rules": {
 				"eslint/no-restricted-imports": [

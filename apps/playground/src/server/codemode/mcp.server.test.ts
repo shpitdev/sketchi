@@ -707,6 +707,28 @@ describe("Sketchi Code Mode MCP server", () => {
 			},
 		});
 	});
+	it("builds a native timeline and captures its receipt through Code Mode", async () => {
+		const result = await executeSketchiCodeMode(
+			{},
+			{
+				code: `async () => sketchi.buildTimeline({ spec: { title: "Release", events: [{ id: "ship", label: "Ship", date: "2026-10-01" }, { id: "beta", label: "Beta", date: "2026-09-15" }] } })`,
+			},
+			{ executor: createInProcessExecutor() },
+		);
+		expect(result).toMatchObject({
+			ok: true,
+			result: {
+				ok: true,
+				normalizedSpec: {
+					events: [
+						{ id: "beta", date: "2026-09-15" },
+						{ id: "ship", date: "2026-10-01" },
+					],
+				},
+			},
+			builds: [{ operation: "buildTimeline", ok: true }],
+		});
+	});
 	it("exposes createCanvas inside the Code Mode namespace", async () => {
 		const result = await executeSketchiCodeMode(
 			{},

@@ -1,6 +1,14 @@
 import "@tanstack/react-start/server-only";
 
 import {
+	makeStudioTimelineToolExecutor,
+	STUDIO_BUILD_TIMELINE_TOOL_DESCRIPTION,
+	STUDIO_BUILD_TIMELINE_TOOL_NAME,
+	StudioBuildTimelineInputSchema,
+	StudioBuildTimelineOutputSchema,
+} from "./studio-timeline-tool.server";
+
+import {
 	DIAGRAM_AGENT_TEMPERATURE,
 	MAX_AGENT_OUTPUT_TOKENS,
 	MAX_AGENT_STEPS,
@@ -143,6 +151,7 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 		turn,
 	});
 
+	const timelineExecutor = yield* makeStudioTimelineToolExecutor(codeMode.buildTimeline, { turn });
 	return yield* Effect.try({
 		try: () => {
 			const result = streamText({
@@ -150,6 +159,12 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 				system: studioSystemPrompt(logos),
 				messages: modelMessages,
 				tools: {
+					[STUDIO_BUILD_TIMELINE_TOOL_NAME]: tool({
+						description: STUDIO_BUILD_TIMELINE_TOOL_DESCRIPTION,
+						inputSchema: StudioBuildTimelineInputSchema,
+						outputSchema: StudioBuildTimelineOutputSchema,
+						execute: makeStudioBuildToolCallback(timelineExecutor, callbacks.runPromise),
+					}),
 					[STUDIO_BUILD_FLOWCHART_TOOL_NAME]: tool({
 						description: STUDIO_BUILD_FLOWCHART_TOOL_DESCRIPTION,
 						inputSchema: StudioBuildFlowchartInputSchema,

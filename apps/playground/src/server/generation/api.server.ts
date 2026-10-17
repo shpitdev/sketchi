@@ -218,6 +218,7 @@ function buildFailure(result: Extract<BuildResult, { ok: false }>): GenerateFail
 		case "invalid_flowchart":
 		case "invalid_mindmap":
 		case "invalid_sequence":
+		case "invalid_timeline":
 			return failure("invalid_generated_document", issues);
 		case "quality_failed":
 			return failure("quality_failed", issues);
@@ -247,6 +248,8 @@ function buildWithCodeMode(
 			return codeMode.buildFlowchart(request);
 		case "mindmap":
 			return codeMode.buildMindmap(request);
+		case "timeline":
+			return codeMode.buildTimeline(request);
 		case "sequence":
 			return codeMode.buildSequenceDiagram(request);
 	}

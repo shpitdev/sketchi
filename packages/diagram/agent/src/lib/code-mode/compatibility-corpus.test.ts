@@ -115,6 +115,12 @@ const NODE_ICON_ISSUE_CODE_ADDITIONS = new Set([
 	"icon_dropped",
 ]);
 // Sequence size limits (#280) add one issue code; frozen captures predate it.
+const TIMELINE_ISSUE_CODE_ADDITIONS = new Set([
+	"invalid_timeline_date",
+	"duplicate_event_id",
+	"invalid_timeline_order",
+	"timeline_too_large",
+]);
 const SEQUENCE_ISSUE_CODE_ADDITIONS = new Set(["sequence_too_large"]);
 const FLOWCHART_SPEC_NODE_ADDED_FIELDS = new Set(["icon"]);
 const FROZEN_FIXTURE_HASHES = {
@@ -195,7 +201,8 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		CANVAS_PATCH_OPERATION_ADDITIONS.has(value) ||
 		CANVAS_ISSUE_CODE_ADDITIONS.has(value) ||
 		NODE_ICON_ISSUE_CODE_ADDITIONS.has(value) ||
-		SEQUENCE_ISSUE_CODE_ADDITIONS.has(value)
+		SEQUENCE_ISSUE_CODE_ADDITIONS.has(value) ||
+		TIMELINE_ISSUE_CODE_ADDITIONS.has(value)
 	);
 }
 
@@ -1592,7 +1599,8 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 					(code) =>
 						!CANVAS_ISSUE_CODE_ADDITIONS.has(code) &&
 						!NODE_ICON_ISSUE_CODE_ADDITIONS.has(code) &&
-						!SEQUENCE_ISSUE_CODE_ADDITIONS.has(code),
+						!SEQUENCE_ISSUE_CODE_ADDITIONS.has(code) &&
+						!TIMELINE_ISSUE_CODE_ADDITIONS.has(code),
 				)
 				.toSorted(),
 		).toEqual([...directlyReachableCodes, ...boundaryOnlyCodes].toSorted());

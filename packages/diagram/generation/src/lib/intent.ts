@@ -32,6 +32,7 @@ export class CountRequirement extends Schema.Class<CountRequirement>("CountRequi
 		"cycles",
 		"decision_nodes",
 		"messages",
+		"events",
 		"nodes",
 		"participants",
 		"terminal_nodes",
@@ -49,7 +50,7 @@ export class DepthRequirement extends Schema.Class<DepthRequirement>("DepthRequi
 
 export class LabelRequirement extends Schema.Class<LabelRequirement>("LabelRequirement")({
 	kind: Schema.Literal("label"),
-	target: Schema.Literals(["branch", "message", "node", "participant", "topic"]),
+	target: Schema.Literals(["branch", "message", "node", "participant", "topic", "event"]),
 	value: Schema.NonEmptyString,
 }) {}
 
@@ -87,6 +88,7 @@ const FALLBACK_TITLES: Readonly<Record<DiagramGenerationType, string>> = {
 	flowchart: "Generated flowchart",
 	mindmap: "Generated mindmap",
 	sequence: "Generated sequence diagram",
+	timeline: "Generated timeline",
 };
 
 function titleFromId(id: string): string | undefined {

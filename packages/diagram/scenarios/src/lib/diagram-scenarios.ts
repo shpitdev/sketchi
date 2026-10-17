@@ -1,12 +1,14 @@
+import { type TimelineScenario, timelineScenarios } from "./timeline-scenarios.js";
 import { type FlowchartScenario, flowchartScenarios } from "./scenarios.js";
 import { type SequenceScenario, sequenceScenarios } from "./sequence-scenarios.js";
 
 /** A maintained scenario of any canonical family, discriminated by `diagramType`. */
-export type DiagramScenario = FlowchartScenario | SequenceScenario;
+export type DiagramScenario = FlowchartScenario | SequenceScenario | TimelineScenario;
 
 export const diagramScenarios: readonly DiagramScenario[] = [
 	...flowchartScenarios,
 	...sequenceScenarios,
+	...timelineScenarios,
 ];
 
 export function getDiagramScenario(id: string): DiagramScenario {

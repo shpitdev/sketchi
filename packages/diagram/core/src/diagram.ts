@@ -15,22 +15,33 @@ import {
 	SequenceDiagramSchema,
 	validateSequenceDiagram,
 } from "./types/sequence.js";
+import {
+	type TimelineDiagram,
+	TimelineDiagramSchema,
+	validateTimelineDiagram,
+} from "./types/timeline.js";
 import type { DiagramTypeValue } from "./types.js";
 
 /** One diagram of any canonical family, discriminated by `type`. */
-export type CanonicalDiagram = FlowchartDiagram | MindmapDiagram | SequenceDiagram;
+export type CanonicalDiagram =
+	| FlowchartDiagram
+	| MindmapDiagram
+	| SequenceDiagram
+	| TimelineDiagram;
 
 // A family added to DIAGRAM_TYPES without a contract here fails to compile.
 const familySchemas = {
 	flowchart: FlowchartDiagramSchema,
 	mindmap: MindmapDiagramSchema,
 	sequence: SequenceDiagramSchema,
+	timeline: TimelineDiagramSchema,
 } satisfies Record<DiagramTypeValue, Schema.Top>;
 
 export const CanonicalDiagramSchema = Schema.Union([
 	familySchemas.flowchart,
 	familySchemas.mindmap,
 	familySchemas.sequence,
+	familySchemas.timeline,
 ]);
 
 /** Apply the family's semantic validation to an already decoded diagram. */
@@ -40,6 +51,8 @@ export function validateCanonicalDiagram(diagram: CanonicalDiagram): CanonicalDi
 			return validateFlowchartDiagram(diagram);
 		case "mindmap":
 			return validateMindmapDiagram(diagram);
+		case "timeline":
+			return validateTimelineDiagram(diagram);
 		case "sequence":
 			return validateSequenceDiagram(diagram);
 	}

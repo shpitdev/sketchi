@@ -20,6 +20,13 @@ const statusLabels = {
 };
 
 function diagramCounts(diagram: CanonicalDiagram) {
+	if (diagram.type === "timeline")
+		return {
+			nodeCount: diagram.events.length,
+			nodeNoun: "events",
+			edgeCount: Math.max(0, diagram.events.length - 1),
+			edgeNoun: "connections",
+		};
 	return diagram.type === "sequence"
 		? {
 				nodeCount: diagram.participants.length,

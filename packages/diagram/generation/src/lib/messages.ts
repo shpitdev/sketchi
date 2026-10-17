@@ -47,8 +47,8 @@ const COMMON_INSTRUCTIONS = [
 	`Sketchi supports only nativeKind ${listAlternatives(NATIVE_KINDS)}. If the requested kind is ${listAlternatives(UNSUPPORTED_KINDS)}, set nativeKind to null, omit diagram, and never coerce it into a supported kind.`,
 	"When nativeKind is null, return an empty requirements array because there is no native artifact to validate.",
 	"List every measurable scenario requirement once in intent.requirements. Convert counts and minimums into count requirements, hierarchy depth into topic_levels, and required names or branch/message text into label requirements.",
-	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
-	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", or "message".',
+	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
+	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", or "event".',
 	'Use comparator "minimum" for phrases such as "at least" and "exact" for exact counts. Do not invent measurable requirements that the scenario did not request.',
 	"The diagram must satisfy every requirement in the plan. Sketchi deterministically checks the plan against the artifact.",
 ];
@@ -84,6 +84,16 @@ const SEQUENCE_IR_INSTRUCTIONS = [
 
 /** Model-facing IR rules for each canonical family, in registry order. */
 const IR_INSTRUCTIONS = {
+	timeline: {
+		title: "Timeline IR rules",
+		rules: [
+			'Use diagram type "timeline".',
+			"Return events with unique stable id, label, optional concise description, and either date or order.",
+			"Use real YYYY-MM-DD calendar days or YYYY-MM-DDTHH:mm:ss[.sss]Z UTC instants. Preserve supplied dates and events; never invent them.",
+			"Use dates for every event, or numeric order for every event when no calendar dates are supplied. Never mix modes or add durations, resources, or dependencies.",
+			"Chronological sorting is deterministic. Equal dates or orders retain input order. Use 1–60 events.",
+		],
+	},
 	flowchart: { title: "Flowchart IR rules", rules: FLOWCHART_IR_INSTRUCTIONS },
 	mindmap: { title: "Mindmap IR rules", rules: MINDMAP_IR_INSTRUCTIONS },
 	sequence: { title: "Sequence IR rules", rules: SEQUENCE_IR_INSTRUCTIONS },
@@ -91,6 +101,20 @@ const IR_INSTRUCTIONS = {
 
 /** The JSON shape shown for an explicitly requested family. */
 const FAMILY_EXAMPLES = {
+	timeline: {
+		diagram: {
+			id: "release",
+			type: "timeline",
+			events: [
+				{ id: "beta", label: "Beta", date: "2026-09-15" },
+				{ id: "ship", label: "Ship", date: "2026-10-01" },
+			],
+		},
+		requirements: [
+			{ kind: "count", target: "events", comparator: "exact", value: 2 },
+			{ kind: "label", target: "event", value: "Beta" },
+		],
+	},
 	flowchart: {
 		diagram: {
 			id: "short-kebab-case-id",

@@ -34,6 +34,7 @@ export type CodeModeUsageOperation =
 	| "buildFlowchart"
 	| "buildMindmap"
 	| "buildSequenceDiagram"
+	| "buildTimeline"
 	| "createCanvas"
 	| "execute"
 	| "generateDiagram";

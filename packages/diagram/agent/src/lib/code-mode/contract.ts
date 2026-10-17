@@ -384,6 +384,10 @@ export const CODE_MODE_ISSUE_CODES = [
 	"mindmap_too_deep",
 	"mindmap_too_large",
 	"sequence_too_large",
+	"invalid_timeline_date",
+	"duplicate_event_id",
+	"invalid_timeline_order",
+	"timeline_too_large",
 	"request_too_large",
 	"generic_label",
 	"label_too_long",
@@ -650,6 +654,28 @@ export const SequenceDiagramSpecSchema = SequenceDiagramSpec;
 export const SequenceParticipantSpecSchema = SequenceParticipantSpec;
 export const SequenceMessageSpecSchema = SequenceMessageSpec;
 
+/** Author semantic points only; layout and date ordering belong to the renderer. */
+export class TimelineEventSpec extends Schema.Class<TimelineEventSpec>("TimelineEventSpec")(
+	{
+		id: RequiredNonEmptyString,
+		label: RequiredNonEmptyString,
+		date: optionalContract(NonEmptyString),
+		order: optionalContract(FiniteNumber),
+		description: optionalContract(NonEmptyString),
+	},
+	{ identifier: undefined },
+) {}
+export class TimelineSpec extends Schema.Class<TimelineSpec>("TimelineSpec")(
+	{
+		id: optionalContract(NonEmptyString),
+		title: RequiredNonEmptyString,
+		events: requiredArray(nonEmptyArray(TimelineEventSpec)),
+		style: DiagramStyleWithDefault,
+	},
+	{ identifier: undefined },
+) {}
+export const TimelineSpecSchema = TimelineSpec;
+
 const ArtifactFormatsOption = optionalContract(nonEmptyArray(ArtifactFormatSchema));
 const InlineArtifactsOption = optionalContract(
 	Schema.Array(InlineArtifactFormatSchema).pipe(Schema.mutable),
@@ -764,6 +790,23 @@ export const BuildSequenceDiagramToolInputSchema = Schema.Struct({
 	),
 });
 export type BuildSequenceDiagramToolInput = typeof BuildSequenceDiagramToolInputSchema.Type;
+
+export class BuildTimelineRequest extends Schema.Class<BuildTimelineRequest>(
+	"BuildTimelineRequest",
+)(
+	{
+		requestId: optionalContract(NonEmptyString),
+		spec: requiredObject(TimelineSpec),
+		options: optionalContract(BuildFlowchartOptions),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildTimelineRequestSchema = BuildTimelineRequest;
+export const BuildTimelineToolInputSchema = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(TimelineSpec.mapFields(({ id, title, events }) => ({ id, title, events }))),
+});
+export type BuildTimelineToolInput = typeof BuildTimelineToolInputSchema.Type;
 
 export interface MindmapTopicInput {
 	label: string;
@@ -1504,6 +1547,13 @@ const NormalizedSequenceDiagramSpecSchema = Schema.Struct({
 	).pipe(Schema.mutable),
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
+const NormalizedTimelineSpecSchema = Schema.Struct({
+	id: NonEmptyString,
+	title: NonEmptyString,
+	events: Schema.Array(TimelineEventSpec).pipe(Schema.mutable),
+	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
+});
+export type NormalizedTimelineSpec = typeof NormalizedTimelineSpecSchema.Type;
 const QualityCheckSchema = Schema.Struct({
 	code: Schema.String,
 	passed: Schema.Boolean,
@@ -1667,6 +1717,49 @@ export const BuildSequenceDiagramResultSchema = Schema.Union([
 	BuildSequenceDiagramRejected,
 ]);
 export type BuildSequenceDiagramResult = typeof BuildSequenceDiagramResultSchema.Type;
+
+export class BuildTimelineAccepted extends Schema.Class<BuildTimelineAccepted>(
+	"BuildTimelineAccepted",
+)(
+	{
+		ok: booleanLiteral(true),
+		status: stringLiteral("accepted"),
+		buildId: Schema.String,
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: NormalizedTimelineSpecSchema,
+		quality: QualityReportSchema,
+		artifact: ArtifactBundleSchema,
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export class BuildTimelineRejected extends Schema.Class<BuildTimelineRejected>(
+	"BuildTimelineRejected",
+)(
+	{
+		ok: booleanLiteral(false),
+		status: literals([
+			"invalid_input",
+			"invalid_timeline",
+			"quality_failed",
+			"render_failed",
+			"export_failed",
+			"storage_failed",
+		]),
+		buildId: optionalContract(Schema.String),
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: optionalContract(NormalizedTimelineSpecSchema),
+		quality: optionalContract(QualityReportSchema),
+		partial: optionalContract(PartialArtifactBundleSchema),
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildTimelineResultSchema = Schema.Union([
+	BuildTimelineAccepted,
+	BuildTimelineRejected,
+]);
+export type BuildTimelineResult = typeof BuildTimelineResultSchema.Type;
 
 export class GetArtifactAccepted extends Schema.Class<GetArtifactAccepted>("GetArtifactAccepted")(
 	{
