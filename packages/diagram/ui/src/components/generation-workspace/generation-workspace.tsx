@@ -20,12 +20,13 @@ const statusLabels = {
 };
 
 function diagramCounts(diagram: CanonicalDiagram) {
+	// Timeline events sit on an axis rather than connecting; count their phases.
 	if (diagram.type === "timeline")
 		return {
 			nodeCount: diagram.events.length,
 			nodeNoun: "events",
-			edgeCount: Math.max(0, diagram.events.length - 1),
-			edgeNoun: "connections",
+			edgeCount: diagram.events.filter((event) => event.end !== undefined).length,
+			edgeNoun: "phases",
 		};
 	return diagram.type === "sequence"
 		? {
@@ -51,9 +52,11 @@ export function GenerationWorkspace({ diagram, status = "ready" }: GenerationWor
 		const realSceneValidation = validateExcalidrawScene(convertSceneToExcalidraw(scene));
 		const realSceneIssueCount = realSceneValidation.issues.length;
 		const realSceneMessage =
-			realSceneIssueCount === 0
-				? "All arrows are bound"
-				: `${realSceneIssueCount} real-scene issues`;
+			realSceneIssueCount > 0
+				? `${realSceneIssueCount} real-scene issues`
+				: scene.elements.some((element) => element.type === "arrow")
+					? "All arrows are bound"
+					: "No real-scene issues";
 		return {
 			validationMessage,
 			scene,

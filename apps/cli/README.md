@@ -319,4 +319,4 @@ See the [changelog](https://github.com/shpitdev/sketchi/blob/main/apps/cli/CHANG
 for everything that changed, or browse published versions on
 [GitHub Releases](https://github.com/shpitdev/sketchi/releases).
 
-Native timelines: use `buildTimeline` (Code Mode) or `generate --type timeline` (CLI). Supply events with unique IDs, labels, and real ISO dates or explicit numeric order; optional concise descriptions are preserved. Dates and order cannot be mixed. Ties retain input order; empty timelines and invalid dates are rejected. The renderer wraps long chronologies. No Gantt durations, resources, or dependency scheduling.
+Native timelines: use `buildTimeline` (Code Mode) or `generate --type timeline` (CLI). Supply events with unique IDs, labels, and ISO dates at the source's precision (year, month, day, or instant with Z or offset) or explicit numeric order; optional `end` (phase), `kind: "milestone"`, `lane`, `today`, and concise descriptions are preserved. Dates and order cannot be mixed. The renderer spaces events by elapsed time, humanizes dates, and wraps long chronologies. No dependency scheduling.

@@ -6,7 +6,7 @@ vi.mock("@excalidraw/excalidraw", () => ({
 }));
 
 import * as renderer from "@sketchi/diagram-renderer";
-import { flowchartFixture, sequenceFixture } from "@sketchi/diagram-core";
+import { flowchartFixture, sequenceFixture, timelineFixture } from "@sketchi/diagram-core";
 
 import { GenerationWorkspace } from "./generation-workspace";
 
@@ -39,5 +39,14 @@ describe("GenerationWorkspace", () => {
 		expect(screen.getByText("4 messages")).toBeTruthy();
 		expect(screen.getByText("Validated sequence IR")).toBeTruthy();
 		expect(screen.getByText("All arrows are bound")).toBeTruthy();
+	});
+
+	it("counts timeline events and phases, not connectors", () => {
+		render(<GenerationWorkspace diagram={timelineFixture} />);
+
+		expect(screen.getByText("3 events")).toBeTruthy();
+		expect(screen.getByText("0 phases")).toBeTruthy();
+		expect(screen.getByText("Validated timeline IR")).toBeTruthy();
+		expect(screen.getByText("No real-scene issues")).toBeTruthy();
 	});
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Effect, Schema } from "effect";
 import { timelineFixture } from "@sketchi/diagram-core";
 import { validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
-import { buildTimeline, CodeModeRuntimeEnvironment } from "./runtime.js";
+import { applyDiagramPatch, buildTimeline, CodeModeRuntimeEnvironment } from "./runtime.js";
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
 import { BuildTimelineResultSchema } from "./contract.js";
 
@@ -22,7 +22,77 @@ function build(spec: unknown) {
 		),
 	);
 }
+const phasedSpec = {
+	title: "Launch phases",
+	today: "2026-03-10",
+	lanes: ["Product", "Marketing"],
+	events: [
+		{ id: "build", label: "Build", date: "2026-02-16", end: "2026-05-29", lane: "Product" },
+		{ id: "launch", label: "Launch", date: "2026-08-04", kind: "milestone", lane: "Product" },
+		{ id: "blog", label: "Launch blog", date: "2026-08-04", lane: "Marketing" },
+	],
+};
+
 describe("Code Mode native timeline", () => {
+	it("carries spans, milestones, lanes and today into a patchable editable artifact", async () => {
+		const storage = makeMemoryArtifactStorage();
+		const run = <A>(
+			effect: Effect.Effect<A, never, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
+		) =>
+			Effect.runPromise(
+				effect.pipe(
+					Effect.provideService(CodeModeRuntimeEnvironment, {
+						createId: (prefix) => `${prefix}_${Math.random().toString(36).slice(2)}`,
+					}),
+					Effect.provideService(CodeModeArtifactStorage, storage),
+				),
+			);
+		const built = await run(
+			buildTimeline({
+				spec: phasedSpec,
+				options: {
+					inlineArtifacts: ["scene", "excalidraw"],
+					artifactFormats: ["scene", "excalidraw"],
+				},
+			}),
+		);
+		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		expect(built.normalizedSpec).toMatchObject({
+			today: "2026-03-10",
+			lanes: ["Product", "Marketing"],
+			events: phasedSpec.events,
+		});
+		expect(built.quality.summary).toEqual({ nodeCount: 3, edgeCount: 0 });
+		const excalidraw = built.artifact.formats.find((format) => format.format === "excalidraw")
+			?.inline as Parameters<typeof validateExcalidrawScene>[0];
+		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
+		const shapes = excalidraw.elements.filter((element) => element.type !== "text");
+		expect(shapes.some((element) => element.type === "arrow" && element["startBinding"])).toBe(
+			false,
+		);
+		expect(shapes.find((element) => element.id === "node:event:launch")?.type).toBe("diamond");
+		const patched = await run(
+			applyDiagramPatch({
+				source: { artifactId: built.artifact.artifactId },
+				operations: [
+					{
+						op: "setStyle",
+						selector: { nodeIds: ["event:launch"] },
+						style: { fillColor: "#c0392b" },
+					},
+				],
+			}),
+		);
+		expect(patched.ok, JSON.stringify(patched.issues)).toBe(true);
+	});
+	it("rejects a span on an ordered timeline with a structured repair issue", async () => {
+		const result = await build({
+			title: "Ordered",
+			events: [{ id: "a", label: "A", order: 1, end: "2026-01-01" }],
+		});
+		expect(result.ok).toBe(false);
+		expect(result.issues.map((issue) => issue.code)).toContain("invalid_timeline_span");
+	});
 	it("builds chronological events into validated editable exports without losing content", async () => {
 		const result = await build({
 			...timelineFixture,

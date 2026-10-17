@@ -33,6 +33,7 @@ import {
 	renderTimelineDiagram,
 	isStructurallyValidSequenceActivation,
 	isStructurallyValidSequenceLifeline,
+	isStructurallyValidTimelineMarker,
 	type RenderedDiagramScene,
 	type ScenePoint,
 } from "@sketchi/diagram-renderer";
@@ -440,7 +441,14 @@ function normalizeTimelineSpec(spec: BuildTimelineRequest["spec"]): NormalizedTi
 		style: { ...SKETCHI_DIAGRAM_STYLE },
 		events: spec.events.map((event) => ({ ...event })),
 	};
-	return { id: diagram.id, title, events: orderedTimelineEvents(diagram), style: diagram.style };
+	return {
+		id: diagram.id,
+		title,
+		events: orderedTimelineEvents(diagram),
+		...(spec.lanes ? { lanes: [...spec.lanes] } : {}),
+		...(spec.today ? { today: spec.today } : {}),
+		style: diagram.style,
+	};
 }
 function toTimelineDiagram(spec: NormalizedTimelineSpec): TimelineDiagram {
 	return { ...spec, type: "timeline" };
@@ -461,7 +469,7 @@ function timelineQuality(spec: NormalizedTimelineSpec, threshold: number): Quali
 		accepted: 10 >= threshold,
 		score: 10,
 		threshold,
-		summary: { nodeCount: spec.events.length, edgeCount: Math.max(0, spec.events.length - 1) },
+		summary: { nodeCount: spec.events.length, edgeCount: 0 },
 		checks: [],
 	};
 }
@@ -1150,7 +1158,8 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 				...((element.rendererRole === "sequence-lifeline" &&
 					isStructurallyValidSequenceLifeline(scene, element)) ||
 				(element.rendererRole === "sequence-activation" &&
-					isStructurallyValidSequenceActivation(scene, element))
+					isStructurallyValidSequenceActivation(scene, element)) ||
+				(element.rendererRole === "timeline-marker" && isStructurallyValidTimelineMarker(element))
 					? { rendererRole: element.rendererRole }
 					: {}),
 				...(element.textColor ? { textColor: element.textColor } : {}),

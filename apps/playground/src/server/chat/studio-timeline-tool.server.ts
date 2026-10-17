@@ -10,7 +10,7 @@ import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.ser
 import { makeStudioBuildToolExecutor, type StudioBuildTurn } from "./studio-build-tool.server";
 export const STUDIO_BUILD_TIMELINE_TOOL_NAME = "build_timeline" as const;
 export const STUDIO_BUILD_TIMELINE_TOOL_DESCRIPTION =
-	"Build and persist a native timeline from semantic events with dates or explicit order. Preserve every supplied event and date, invent none. Use one consistent chronology mode, no durations/resources/dependencies. The host lays out and wraps the timeline. Repair structured issues, up to three total attempts.";
+	"Build and persist a native timeline from semantic events with dates at the source's precision or explicit order. Preserve every supplied event and date, invent none. Use one consistent chronology mode; optional phases (end), milestones, lanes and a stated today; no dependencies. The host lays out the timeline. Repair structured issues, up to three total attempts.";
 export const StudioBuildTimelineInputSchema = toPlaygroundStandardSchema(
 	BuildTimelineToolInputSchema,
 );

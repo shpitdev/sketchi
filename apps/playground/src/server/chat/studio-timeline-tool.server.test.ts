@@ -66,11 +66,12 @@ it("repairs a timeline through the Studio host and displays its real accepted sc
 		],
 	};
 	const state = deriveBuildState([message], false);
-	expect(
-		state.scene?.elements.some(
-			(element) => element.type === "text" && element.text === "2026-09-15",
-		),
-	).toBe(true);
+	// The accepted scene shows humanized dates, never the raw ISO input.
+	const texts = (state.scene?.elements ?? []).flatMap((element) =>
+		element.type === "text" ? [element.text] : [],
+	);
+	expect(texts).toContain("Sep 15, 2026");
+	expect(texts.some((text) => text.includes("2026-09-15"))).toBe(false);
 	expect(state.artifact?.editUrl).toContain("/artifacts/");
 	expect(state.acceptedResult?.ok).toBe(true);
 });

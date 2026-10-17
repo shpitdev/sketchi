@@ -120,6 +120,9 @@ const TIMELINE_ISSUE_CODE_ADDITIONS = new Set([
 	"duplicate_event_id",
 	"invalid_timeline_order",
 	"timeline_too_large",
+	// Timeline spans and lanes add two more.
+	"invalid_timeline_span",
+	"invalid_timeline_lane",
 ]);
 const SEQUENCE_ISSUE_CODE_ADDITIONS = new Set(["sequence_too_large"]);
 const FLOWCHART_SPEC_NODE_ADDED_FIELDS = new Set(["icon"]);

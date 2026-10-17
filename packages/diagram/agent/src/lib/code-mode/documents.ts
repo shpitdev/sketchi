@@ -105,6 +105,8 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 					id: diagram.id,
 					title: diagram.title,
 					events: diagram.events.map((event) => ({ ...event })),
+					...(diagram.lanes ? { lanes: [...diagram.lanes] } : {}),
+					...(diagram.today ? { today: diagram.today } : {}),
 					style: diagram.style,
 				},
 			};

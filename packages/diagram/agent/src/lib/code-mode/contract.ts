@@ -8,6 +8,7 @@ import {
 	SEQUENCE_MESSAGE_STYLES,
 	SEQUENCE_MESSAGE_TYPES,
 	SKETCHI_DIAGRAM_STYLE,
+	TIMELINE_EVENT_KINDS,
 } from "@sketchi/diagram-core";
 
 import { cleanToolString } from "../clean-tool-string.js";
@@ -388,6 +389,8 @@ export const CODE_MODE_ISSUE_CODES = [
 	"duplicate_event_id",
 	"invalid_timeline_order",
 	"timeline_too_large",
+	"invalid_timeline_span",
+	"invalid_timeline_lane",
 	"request_too_large",
 	"generic_label",
 	"label_too_long",
@@ -660,7 +663,10 @@ export class TimelineEventSpec extends Schema.Class<TimelineEventSpec>("Timeline
 		id: RequiredNonEmptyString,
 		label: RequiredNonEmptyString,
 		date: optionalContract(NonEmptyString),
+		end: optionalContract(NonEmptyString),
 		order: optionalContract(FiniteNumber),
+		kind: optionalContract(literals(TIMELINE_EVENT_KINDS)),
+		lane: optionalContract(NonEmptyString),
 		description: optionalContract(NonEmptyString),
 	},
 	{ identifier: undefined },
@@ -670,6 +676,8 @@ export class TimelineSpec extends Schema.Class<TimelineSpec>("TimelineSpec")(
 		id: optionalContract(NonEmptyString),
 		title: RequiredNonEmptyString,
 		events: requiredArray(nonEmptyArray(TimelineEventSpec)),
+		lanes: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+		today: optionalContract(NonEmptyString),
 		style: DiagramStyleWithDefault,
 	},
 	{ identifier: undefined },
@@ -804,7 +812,15 @@ export class BuildTimelineRequest extends Schema.Class<BuildTimelineRequest>(
 export const BuildTimelineRequestSchema = BuildTimelineRequest;
 export const BuildTimelineToolInputSchema = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(TimelineSpec.mapFields(({ id, title, events }) => ({ id, title, events }))),
+	spec: requiredObject(
+		TimelineSpec.mapFields(({ id, title, events, lanes, today }) => ({
+			id,
+			title,
+			events,
+			lanes,
+			today,
+		})),
+	),
 });
 export type BuildTimelineToolInput = typeof BuildTimelineToolInputSchema.Type;
 
@@ -1551,6 +1567,8 @@ const NormalizedTimelineSpecSchema = Schema.Struct({
 	id: NonEmptyString,
 	title: NonEmptyString,
 	events: Schema.Array(TimelineEventSpec).pipe(Schema.mutable),
+	lanes: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+	today: optionalContract(NonEmptyString),
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedTimelineSpec = typeof NormalizedTimelineSpecSchema.Type;

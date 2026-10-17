@@ -63,17 +63,18 @@ function resultSummary(result: StudioBuildResult): {
 	itemCount?: number;
 	score?: number;
 } {
+	const spec = result.normalizedSpec;
+	// Timeline events sit on an axis; they have no connections to count.
+	const timeline = spec !== undefined && "events" in spec;
 	if (result.quality) {
 		return {
-			connectionCount: result.quality.summary.edgeCount,
+			...(timeline ? {} : { connectionCount: result.quality.summary.edgeCount }),
 			itemCount: result.quality.summary.nodeCount,
 			score: result.quality.score,
 		};
 	}
-	const spec = result.normalizedSpec;
 	if (!spec) return {};
-	if ("events" in spec)
-		return { connectionCount: Math.max(0, spec.events.length - 1), itemCount: spec.events.length };
+	if ("events" in spec) return { itemCount: spec.events.length };
 	return "participants" in spec
 		? { connectionCount: spec.messages.length, itemCount: spec.participants.length }
 		: { connectionCount: spec.edges.length, itemCount: spec.nodes.length };

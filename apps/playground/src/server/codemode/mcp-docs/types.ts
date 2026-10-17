@@ -68,10 +68,12 @@ export const codeModeContracts = {
 		input: Schema.Struct({
 			...BuildTimelineRequestSchema.fields,
 			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: TimelineSpecSchema.mapFields(({ id, title, events }) => ({
+			spec: TimelineSpecSchema.mapFields(({ id, title, events, lanes, today }) => ({
 				id,
 				title,
 				events,
+				lanes,
+				today,
 			})),
 		}),
 		output: BuildTimelineResultSchema,

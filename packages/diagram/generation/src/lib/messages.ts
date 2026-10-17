@@ -89,9 +89,10 @@ const IR_INSTRUCTIONS = {
 		rules: [
 			'Use diagram type "timeline".',
 			"Return events with unique stable id, label, optional concise description, and either date or order.",
-			"Use real YYYY-MM-DD calendar days or YYYY-MM-DDTHH:mm:ss[.sss]Z UTC instants. Preserve supplied dates and events; never invent them.",
-			"Use dates for every event, or numeric order for every event when no calendar dates are supplied. Never mix modes or add durations, resources, or dependencies.",
-			"Chronological sorting is deterministic. Equal dates or orders retain input order. Use 1–60 events.",
+			"Keep each date at the source's precision: YYYY, YYYY-MM, YYYY-MM-DD, or YYYY-MM-DDTHH:mm[:ss] with Z or the stated ±HH:MM offset. Never invent dates or events.",
+			"Use dates for every event, or numeric order for every event when no calendar dates are supplied. Never mix modes or add resources or dependencies.",
+			'Optional: end (inclusive) makes a dated phase; kind "milestone" marks key moments; lane names a track for every event (lanes sets their order); today only when the source states it.',
+			"Equal dates or orders retain input order. Use 1–60 events and at most 6 lanes.",
 		],
 	},
 	flowchart: { title: "Flowchart IR rules", rules: FLOWCHART_IR_INSTRUCTIONS },
