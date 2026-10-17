@@ -1202,9 +1202,21 @@ function routeSegments(input: {
 	}));
 }
 
+/** Segment the routed arrows once per search; candidates and grid steps reuse the result. */
+function existingRouteSegments(existingArrows: readonly ArrowSceneElement[]): RouteSegment[] {
+	return existingArrows.flatMap((arrow) =>
+		routeSegments({
+			arrowId: arrow.id,
+			points: arrow.points,
+			sourceNodeId: arrow.sourceNodeId,
+			targetNodeId: arrow.targetNodeId,
+		}),
+	);
+}
+
 function routeArrowOverlapCount(
 	points: readonly ScenePoint[],
-	existingArrows: readonly ArrowSceneElement[],
+	existingSegments: readonly RouteSegment[],
 	route: RoutedEdge,
 ): number {
 	const candidateSegments = routeSegments({
@@ -1213,14 +1225,6 @@ function routeArrowOverlapCount(
 		sourceNodeId: route.edge.source,
 		targetNodeId: route.edge.target,
 	});
-	const existingSegments = existingArrows.flatMap((arrow) =>
-		routeSegments({
-			arrowId: arrow.id,
-			points: arrow.points,
-			sourceNodeId: arrow.sourceNodeId,
-			targetNodeId: arrow.targetNodeId,
-		}),
-	);
 	let overlapCount = 0;
 
 	for (const candidate of candidateSegments) {
@@ -1376,7 +1380,7 @@ function chooseBestRoute(
 	shapes: readonly NodeSceneElement[],
 	ignoredNodeIds: ReadonlySet<string>,
 	route: RoutedEdge,
-	existingArrows: readonly ArrowSceneElement[],
+	existingSegments: readonly RouteSegment[],
 ): [ScenePoint, ...ScenePoint[]] {
 	const first = candidates[0];
 	if (!first) {
@@ -1387,7 +1391,7 @@ function chooseBestRoute(
 		-endpointStubScore(candidate, route),
 		routeNodeCrossingCount(candidate, shapes, ignoredNodeIds),
 		routeSelfOverlapCount(candidate, route),
-		routeArrowOverlapCount(candidate, existingArrows, route),
+		routeArrowOverlapCount(candidate, existingSegments, route),
 		routeBacktrackDistance(candidate),
 		routeTargetOvershootDistance(candidate),
 		routeLength(candidate),
@@ -1628,6 +1632,85 @@ function branchLabels(
 	return labels;
 }
 
+/**
+ * Count overlaps for one grid step without scanning every routed segment: only
+ * segments on the step's fixed coordinate can overlap it.
+ */
+function segmentOverlapLookup(segments: readonly RouteSegment[]) {
+	const byOrientation = new Map<AxisAlignedSegment["orientation"], RouteSegment[]>([
+		["horizontal", []],
+		["vertical", []],
+	]);
+	for (const segment of segments) byOrientation.get(segment.orientation)!.push(segment);
+	for (const list of byOrientation.values())
+		list.sort((a, b) => a.staticCoordinate - b.staticCoordinate);
+	return (candidate: AxisAlignedSegment, arrowId: string): number => {
+		const list = byOrientation.get(candidate.orientation)!;
+		// Widen the window past the overlap tolerance; segmentsOverlapInterior decides.
+		const min = candidate.staticCoordinate - 2 * AXIS_ALIGNED_EPSILON;
+		const max = candidate.staticCoordinate + 2 * AXIS_ALIGNED_EPSILON;
+		let low = 0;
+		let high = list.length;
+		while (low < high) {
+			const middle = (low + high) >> 1;
+			if (list[middle]!.staticCoordinate < min) low = middle + 1;
+			else high = middle;
+		}
+		let count = 0;
+		for (let index = low; index < list.length && list[index]!.staticCoordinate <= max; index += 1)
+			if (list[index]!.arrowId !== arrowId && segmentsOverlapInterior(candidate, list[index]!))
+				count += 1;
+		return count;
+	};
+}
+
+/**
+ * Binary-heap open list for the grid search. It pops the cheapest step and, among
+ * equal costs, the most recently queued one: the order a stable descending sort
+ * followed by pop() gives, without re-sorting the whole list on every step.
+ */
+function stepQueue<T extends { readonly cost: number }>() {
+	const heap: { item: T; order: number }[] = [];
+	let queued = 0;
+	const before = (a: { item: T; order: number }, b: { item: T; order: number }) =>
+		a.item.cost < b.item.cost || (a.item.cost === b.item.cost && a.order > b.order);
+	const swap = (i: number, j: number) => {
+		[heap[i], heap[j]] = [heap[j]!, heap[i]!];
+	};
+	return {
+		get size() {
+			return heap.length;
+		},
+		push(item: T) {
+			heap.push({ item, order: queued++ });
+			for (let i = heap.length - 1; i > 0;) {
+				const parent = (i - 1) >> 1;
+				if (!before(heap[i]!, heap[parent]!)) break;
+				swap(i, parent);
+				i = parent;
+			}
+		},
+		pop(): T {
+			const top = heap[0]!;
+			const last = heap.pop()!;
+			if (heap.length > 0) {
+				heap[0] = last;
+				for (let i = 0; ;) {
+					const left = 2 * i + 1;
+					const right = left + 1;
+					let next = i;
+					if (left < heap.length && before(heap[left]!, heap[next]!)) next = left;
+					if (right < heap.length && before(heap[right]!, heap[next]!)) next = right;
+					if (next === i) break;
+					swap(i, next);
+					i = next;
+				}
+			}
+			return top.item;
+		},
+	};
+}
+
 /** A visibility grid is the fallback when one exterior lane cannot clear every obstacle. */
 function obstacleRoute(
 	start: ScenePoint,
@@ -1637,6 +1720,7 @@ function obstacleRoute(
 	shapes: readonly NodeSceneElement[],
 	route: RoutedEdge,
 	arrows: readonly ArrowSceneElement[],
+	arrowSegments: readonly RouteSegment[],
 ): [ScenePoint, ...ScenePoint[]] | undefined {
 	const xs = [
 		...new Set([
@@ -1654,7 +1738,10 @@ function obstacleRoute(
 			...arrows.flatMap((a) => a.points.flatMap((p) => [p.y - PORT_SPACING, p.y + PORT_SPACING])),
 		]),
 	].sort((a, b) => a - b);
-	const key = (x: number, y: number, axis: number) => `${x}:${y}:${axis}`;
+	const key = (x: number, y: number, axis: number) => (x * ys.length + y) * 2 + axis;
+	const arrowId = `edge:${route.edge.id}`;
+	const overlaps = segmentOverlapLookup(arrowSegments);
+	const stubs = [...segmentsFromPoints([start, startStub]), ...segmentsFromPoints([endStub, end])];
 	type Step = { x: number; y: number; axis: number; cost: number; previous?: Step };
 	const initial: Step = {
 		x: xs.indexOf(startStub.x),
@@ -1662,11 +1749,11 @@ function obstacleRoute(
 		axis: start.x === startStub.x ? 1 : 0,
 		cost: 0,
 	};
-	const pending = [initial];
-	const costs = new Map<string, number>([[key(initial.x, initial.y, initial.axis), 0]]);
-	while (pending.length) {
-		pending.sort((a, b) => b.cost - a.cost);
-		const current = pending.pop()!;
+	const pending = stepQueue<Step>();
+	pending.push(initial);
+	const costs = new Map<number, number>([[key(initial.x, initial.y, initial.axis), 0]]);
+	while (pending.size) {
+		const current = pending.pop();
 		if (current.cost !== costs.get(key(current.x, current.y, current.axis))) continue;
 		const point = { x: xs[current.x]!, y: ys[current.y]! };
 		if (point.x === endStub.x && point.y === endStub.y) {
@@ -1697,18 +1784,14 @@ function obstacleRoute(
 			const segment = segmentsFromPoints([point, next], 0)[0]!;
 			if (shapes.some((shape) => segmentCrossesBoundsInterior(segment, shape))) continue;
 			// Neither the departure nor the arrival may double back over its port stub.
-			if (
-				[...segmentsFromPoints([start, startStub]), ...segmentsFromPoints([endStub, end])].some(
-					(stub) => segmentsOverlapInterior(segment, stub),
-				)
-			)
-				continue;
+			if (stubs.some((stub) => segmentsOverlapInterior(segment, stub))) continue;
+			const step = segmentsFromPoints([point, next])[0];
 			const cost =
 				current.cost +
 				Math.abs(next.x - point.x) +
 				Math.abs(next.y - point.y) +
 				(axis === current.axis ? 0 : 24) +
-				routeArrowOverlapCount([point, next], arrows, route) * 10000;
+				(step ? overlaps(step, arrowId) : 0) * 10000;
 			const id = key(x, y, axis);
 			if (cost >= (costs.get(id) ?? Infinity)) continue;
 			costs.set(id, cost);
@@ -1859,15 +1942,25 @@ function exteriorLaneRoute(
 		),
 	];
 
-	const best = chooseBestRoute(candidates, shapes, ignoredNodeIds, route, existingArrows);
+	const existingSegments = existingRouteSegments(existingArrows);
+	const best = chooseBestRoute(candidates, shapes, ignoredNodeIds, route, existingSegments);
 	if (
 		routeNodeCrossingCount(best, shapes, ignoredNodeIds) ||
 		routeSelfOverlapCount(best, route) ||
-		routeArrowOverlapCount(best, existingArrows, route)
+		routeArrowOverlapCount(best, existingSegments, route)
 	) {
-		const detour = obstacleRoute(start, end, startStub, endStub, shapes, route, existingArrows);
+		const detour = obstacleRoute(
+			start,
+			end,
+			startStub,
+			endStub,
+			shapes,
+			route,
+			existingArrows,
+			existingSegments,
+		);
 		if (detour)
-			return chooseBestRoute([best, detour], shapes, ignoredNodeIds, route, existingArrows);
+			return chooseBestRoute([best, detour], shapes, ignoredNodeIds, route, existingSegments);
 	}
 	return best;
 }
