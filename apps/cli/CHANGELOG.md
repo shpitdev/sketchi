@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.13.0
+
+### Minor Changes
+
+- [#400](https://github.com/shpitdev/sketchi/pull/400) [`fcf33cb`](https://github.com/shpitdev/sketchi/commit/fcf33cb78c2d34bdea57cbffa9232eb086d96400) Thanks [@anandpant](https://github.com/anandpant)! - Add native timeline creation, generation, storage, and export from semantic events with dates or explicit order.
+
 ## 0.12.0
 
 ### Minor Changes
