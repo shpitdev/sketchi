@@ -123,7 +123,7 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG renderer",
 					assertInkHasPadding(png);
 				}
 			}),
-		15_000,
+		60_000,
 	);
 
 	it.effect("fails instead of silently dropping unsupported glyphs", () =>

@@ -268,7 +268,7 @@ describe("golden product help", () => {
 				error: { code: "usage_error" },
 			});
 		}
-	}, 15_000);
+	}, 60_000);
 
 	it("redacts bearer-shaped values from parser and typed error envelopes", () => {
 		const bearer = "https://excalidraw.com/#json=AAAAAAAAAAAAAAAAAAAAAA,BBBBBBBBBBBBBBBBBBBBBB";

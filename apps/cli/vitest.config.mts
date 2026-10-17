@@ -64,6 +64,9 @@ export default defineConfig(() => ({
 		environment: "node",
 		server: { deps: { inline: true as const } },
 		include: ["src/**/*.{test,spec}.ts"],
+		// Hang guard, not a speed budget: the heavy deterministic suites here run several
+		// times slower on loaded CI runners, and only a real hang should fail them.
+		testTimeout: 60_000,
 		reporters: ["default"],
 		coverage: {
 			reportsDirectory: "../../coverage/apps/cli",

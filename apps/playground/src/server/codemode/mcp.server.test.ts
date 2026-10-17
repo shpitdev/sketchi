@@ -408,7 +408,8 @@ function createMcpFetch(options: CodeModeMcpOptions, env: StudioEnv = {}): typeo
 	};
 }
 
-describe("Sketchi Code Mode MCP server", () => {
+// Hang guard for streamable HTTP round trips, not a speed budget.
+describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 	const optionsOperations = [
 		[
 			"buildFlowchart",

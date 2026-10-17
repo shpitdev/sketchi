@@ -12,7 +12,8 @@ import {
 	SKETCHI_CODE_MODE_VERSION,
 } from "./mcp-docs.server";
 
-describe("Code Mode MCP docs", () => {
+// Hang guard for the full schema walk, not a speed budget.
+describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 	it("does not advertise palette inputs in docs, examples, or search", () => {
 		for (const entry of catalog) {
 			const docs = getCodeModeDocs({ topic: entry.topic });

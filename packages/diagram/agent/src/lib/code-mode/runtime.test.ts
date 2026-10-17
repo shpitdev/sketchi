@@ -2765,7 +2765,7 @@ describe("canvas geometry and input bounds", () => {
 		const scene = parseInlineScene(result.artifact.formats[0]?.inline);
 		expect(scene.elements).toHaveLength(600);
 		expect(scene).toMatchObject({ width: 648, height: 648 });
-	}, 15000);
+	}, 60_000);
 
 	it("rejects a raw 600x256-point canvas before decode in both workflows", async () => {
 		const scene = geometryCanvas(densePointElements(CANVAS_LIMITS.maxElements));

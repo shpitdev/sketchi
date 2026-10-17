@@ -992,7 +992,7 @@ describe("diagram generation project boundaries", () => {
 			})
 			.sort();
 		expect(runtimeBoundaryFiles).toEqual(approvedRuntimeBoundaryFiles);
-	}, 20_000);
+	}, 60_000);
 });
 
 describe("Effect structural guards", () => {

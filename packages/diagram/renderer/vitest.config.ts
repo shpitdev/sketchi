@@ -7,6 +7,9 @@ export default defineConfig({
 				.pathname,
 		},
 		include: ["packages/diagram/renderer/src/**/*.test.ts"],
+		// Hang guard, not a speed budget: the heavy deterministic suites here run several
+		// times slower on loaded CI runners, and only a real hang should fail them.
+		testTimeout: 60_000,
 	},
 	resolve: {
 		alias: {

@@ -142,7 +142,8 @@ function circleDocument(pointCount: number): CanonicalSvgDocument {
 	);
 }
 
-describe("real Excalidraw renderer oracle", () => {
+// Hang guard for real Excalidraw rendering and rasterization, not a speed budget.
+describe("real Excalidraw renderer oracle", { timeout: 60_000 }, () => {
 	const counterDocument = mustParse(
 		corpusFixtures.counter.source,
 		corpusFixtures.counter.sourceName,

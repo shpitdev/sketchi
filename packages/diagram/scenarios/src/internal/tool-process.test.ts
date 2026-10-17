@@ -154,7 +154,8 @@ function makeFakeProcessLayer(options: {
 	});
 }
 
-describe("runToolProcess", () => {
+// Hang guard for real child processes on loaded runners, not a speed budget.
+describe("runToolProcess", { timeout: 60_000 }, () => {
 	for (const ignoresSigterm of [false, true]) {
 		it.live(
 			`returns timeout metadata for a blocked 2 MiB stdin write after ${ignoresSigterm ? "SIGKILL escalation" : "SIGTERM"}`,

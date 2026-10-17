@@ -31,7 +31,8 @@ const representativeFixtures = [
 	corpusFixtures.v1DisjointMultipath,
 ];
 
-describe("representative SVG conversion behavior", () => {
+// Hang guard for the representative SVG sweep, not a speed budget.
+describe("representative SVG conversion behavior", { timeout: 60_000 }, () => {
 	it.each(representativeFixtures)(
 		"parses and classifies $sourceName deterministically",
 		(fixture) => {

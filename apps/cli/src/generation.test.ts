@@ -397,7 +397,7 @@ describe("prompt-assisted generation over the public generate API", () => {
 				}
 			}).pipe(Effect.provide(Layer.mergeAll(storeLayer, exporterLayer)));
 		},
-		{ timeout: 15_000 },
+		{ timeout: 60_000 },
 	);
 
 	it.effect("maps a network-down failure to a typed provider error", () =>

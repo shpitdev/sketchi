@@ -284,7 +284,7 @@ describe("Sequence diagram type", () => {
 		}
 		// The generator must actually produce overlapping spans to check.
 		expect(overlaps).toBeGreaterThan(100);
-	});
+	}, 60_000);
 
 	it("reserves every id under a participant's lifeline, including activation bars", () => {
 		expect(

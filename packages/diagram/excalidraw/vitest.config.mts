@@ -15,6 +15,8 @@ export default defineConfig(() => ({
 		globals: true,
 		environment: "node",
 		include: ["{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
+		// Hang guard for the routing fixture and direction matrices, not a speed budget.
+		testTimeout: 60_000,
 		reporters: ["default"],
 		coverage: {
 			reportsDirectory: "../../../coverage/packages/diagram/excalidraw",

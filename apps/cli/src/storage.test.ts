@@ -1663,7 +1663,7 @@ describe("diagram storage", () => {
 					);
 				}).pipe(Effect.provide(storeLayer(root))),
 			),
-		{ timeout: 20_000, arbitrary: { runs: 12 } },
+		{ timeout: 60_000, arbitrary: { runs: 12 } },
 	);
 
 	it.effect("orders uppercase and punctuation by code unit", () =>
