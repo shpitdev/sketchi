@@ -23,6 +23,10 @@
 			"dependsOn": ["^build"]
 		},
 		"test": {
+			"inputs": ["default", "^production"],
+			"dependsOn": ["^build"]
+		},
+		"test-browser": {
 			"inputs": ["default", "^production"]
 		},
 		"typecheck": {

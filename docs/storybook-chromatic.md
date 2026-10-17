@@ -69,8 +69,9 @@ published URL under `/mcp`.
 
 ## CI Contract
 
-The required `ci / required` job runs the full workspace
-`typecheck,test,build` matrix and always builds `diagram-ui` Storybook.
+The required `ci / required` check runs the Nx-affected
+`typecheck,test,build` graph and builds `diagram-ui` Storybook whenever
+`diagram-ui` is affected.
 Chromatic remains an explicit, token-backed publishing target rather than a
 required pull-request check.
 

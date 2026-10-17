@@ -40,6 +40,13 @@ Before pushing, run the affected checks:
 - `pnpm run check`
 - `pnpm nx build-storybook diagram-ui` when `diagram-ui` is affected
 
+CI runs only the Nx-affected graph plus the key repository checks, so these stay
+local proof when their inputs change:
+
+- `pnpm nx affected -t test-browser --base=origin/main` (browser-mode suites; never run in CI)
+- `pnpm nx run svg-excalidraw:corpus-renderer`
+- `pnpm run test:wrangler-dry-runs` after app builds
+
 For routing and rendering changes, replay the relevant scenarios against the PR's preview MCP with the scenario CLI and inspect a few real PNGs before merging.
 
 For UI-affecting changes, verify the changed flow against the real page.

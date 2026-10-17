@@ -89,9 +89,13 @@ jobs:
   verify:
     needs: guard
     if: ${{ needs.guard.outputs.publish == 'true' }}
+    # ci.yml jobs declare actions: read for nx-set-shas, so the caller must grant it.
     permissions:
       contents: read
+      actions: read
     uses: ./.github/workflows/ci.yml
+    with:
+      all-projects: true
 
   publish:
     needs: [guard, verify]

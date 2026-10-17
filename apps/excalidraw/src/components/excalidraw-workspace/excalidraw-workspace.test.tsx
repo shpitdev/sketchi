@@ -51,7 +51,8 @@ describe("ExcalidrawWorkspace", () => {
 		await waitFor(() => {
 			expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"id": "onboarding-flow"'));
 		});
-		expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy();
+		// The feedback renders after the clipboard promise settles, not when writeText is called.
+		expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
 
 		const download = screen.getByRole("link", { name: "Download scene" });
 		expect(download.getAttribute("download")).toBe("onboarding-flow.excalidraw.json");

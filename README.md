@@ -304,8 +304,9 @@ docs/                             architecture, boundaries, and runbooks
 pnpm, Nx, and the root TypeScript solution all cover the same package-backed
 projects. Nx tags plus Oxlint enforce package/app, runtime/eval, persistence/UI,
 and explicit composition boundaries across source, config, and Storybook
-files. Required CI also dry-runs every mapped Worker from its generated build
-configuration; see the
+files. Every pull request deploys each mapped Worker as a real preview, and
+`pnpm run test:wrangler-dry-runs` dry-runs them locally from their generated
+build configuration; see the
 [architecture guide](docs/architecture.md#workspace-enforcement).
 
 ## Documentation

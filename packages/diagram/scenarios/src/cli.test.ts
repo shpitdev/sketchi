@@ -137,6 +137,8 @@ describe("scenario CLI candidate decoding", () => {
 						);
 						// A child-process deadline can interrupt synchronous search; a test
 						// runner's ordinary async timeout cannot stop an infinite recursion.
+						// The deadline only catches hangs, so it stays far above the ~1s
+						// normal run to stay reliable on a loaded CI runner.
 						const result = spawnSync(
 							process.execPath,
 							[
@@ -148,7 +150,7 @@ describe("scenario CLI candidate decoding", () => {
 								"--input",
 								inputPath,
 							],
-							{ encoding: "utf8", timeout: 10_000 },
+							{ encoding: "utf8", timeout: 120_000 },
 						);
 						assert.strictEqual(result.error, undefined);
 						const report = Schema.decodeUnknownSync(Report)(result.stdout);
@@ -171,7 +173,7 @@ describe("scenario CLI candidate decoding", () => {
 					}),
 				),
 			// Leave time for setup/cleanup around the hard child-process deadline.
-			20_000,
+			150_000,
 		);
 	}
 

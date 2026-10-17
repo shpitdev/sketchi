@@ -1,13 +1,22 @@
 name: ci
 
+# CI double-checks the key gates; full proof runs locally (see AGENTS.md).
+# Pull requests and pushes to main run only the Nx-affected graph. Browser-mode
+# suites (`test-browser` targets), the SVG corpus renderer, and Wrangler dry-runs
+# are local proof; every same-repository PR also gets real Worker preview deploys.
 on:
   pull_request:
   push:
     branches:
       - main
-  # release.yml calls this as the pre-publish gate so the release runs the exact
-  # same checks as a pull request, with no second copy of the step list to drift.
+  # release.yml calls this as the pre-publish gate with all-projects, so a
+  # release builds and tests the full graph with no second copy of the steps.
   workflow_call:
+    inputs:
+      all-projects:
+        description: Run every project instead of the Nx-affected graph.
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -15,44 +24,113 @@ permissions:
 env:
   NX_DAEMON: "false"
   NX_TUI: "false"
+  CI_ALL_PROJECTS: ${{ inputs.all-projects == true }}
 
 jobs:
-  required:
+  test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # nx-set-shas reads the last successful main run.
+      actions: read
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: ./.github/actions/setup-workspace
-      - name: Install Chromium for real browser-backed tests
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Verify deploy, onboarding, and cutover contracts
-        run: pnpm run test:deploy-scripts
-      - name: Verify repository tooling contracts
-        run: pnpm run test:tools
-      - name: Run canonical workspace gates
-        run: pnpm nx run-many -t typecheck,test,build
+      - uses: nrwl/nx-set-shas@e602fada7ad5987b0f7b1905e7a99ea1c661514c # v5.1.0
+        if: env.CI_ALL_PROJECTS != 'true'
+      - name: Test affected projects
+        run: |
+          if [[ "$CI_ALL_PROJECTS" == "true" ]]; then
+            pnpm nx run-many -t test --parallel=4
+          else
+            pnpm nx affected -t test --parallel=4
+          fi
+
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: ./.github/actions/setup-workspace
+      - uses: nrwl/nx-set-shas@e602fada7ad5987b0f7b1905e7a99ea1c661514c # v5.1.0
+        if: env.CI_ALL_PROJECTS != 'true'
+      - name: Select conditional gates
+        id: scope
+        run: node scripts/ci-scope.mjs
+      - name: Typecheck and build affected projects
+        run: |
+          if [[ "$CI_ALL_PROJECTS" == "true" ]]; then
+            pnpm nx run-many -t typecheck,typecheck-native,build
+          else
+            pnpm nx affected -t typecheck,typecheck-native,build
+          fi
+      - name: Verify root TypeScript project references
+        if: steps.scope.outputs.code == 'true'
+        run: pnpm exec tsc6 -b --pretty false
+      - name: Build canonical diagram UI Storybook
+        if: steps.scope.outputs.storybook == 'true'
+        run: pnpm nx build-storybook diagram-ui
+
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: ./.github/actions/setup-workspace
+      - name: Lint, format, and custom-rule checks
+        run: pnpm run check
+      # `pnpm run check` already built every package, including the scenarios CLI.
       - name: Smoke-test built scenario CLI under plain Node
         run: |
           node packages/diagram/scenarios/dist/cli.js --list
           node packages/diagram/scenarios/dist/cli.js --scenario sketchi-onboarding-decision-flow --fixture
-      - name: Lint, format, and custom-rule checks
-        run: pnpm run check
-      - name: Verify stable native TypeScript lane
-        run: pnpm nx run-many -t typecheck-native
-      - name: Dry-run every Worker deployment
-        run: pnpm run test:wrangler-dry-runs
-      - name: Verify root TypeScript project references
-        run: pnpm exec tsc6 -b --pretty false
-      - name: Build canonical diagram UI Storybook
-        run: pnpm nx build-storybook diagram-ui
-      - name: Run SVG corpus renderer
-        run: pnpm nx run svg-excalidraw:corpus-renderer
-      - name: Upload SVG corpus renderer report
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - name: Verify deploy, onboarding, and cutover contracts
+        run: pnpm run test:deploy-scripts
+      - name: Verify repository tooling contracts
+        run: |
+          pnpm exec tsc -p tools/tsconfig.json --noEmit
+          pnpm exec vitest run --config tools/vitest.config.mts --exclude tools/project-graph.test.ts
+
+  graph:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          name: svg-native-corpus-${{ github.event.pull_request.head.sha || github.sha }}
-          path: .memory/svg-native-corpus
-          if-no-files-found: error
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: ./.github/actions/setup-workspace
+      - uses: nrwl/nx-set-shas@e602fada7ad5987b0f7b1905e7a99ea1c661514c # v5.1.0
+        if: env.CI_ALL_PROJECTS != 'true'
+      - name: Select conditional gates
+        id: scope
+        run: node scripts/ci-scope.mjs
+      - name: Verify workspace project graph contracts
+        if: steps.scope.outputs.code == 'true'
+        run: pnpm exec vitest run --config tools/vitest.config.mts tools/project-graph.test.ts
+
+  # The single required status check.
+  required:
+    if: always()
+    needs: [test, build, checks, graph]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every CI job to pass
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "CI job results: $RESULTS"
+          for result in $RESULTS; do
+            [[ "$result" == "success" ]] || exit 1
+          done
