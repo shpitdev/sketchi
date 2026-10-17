@@ -24,7 +24,7 @@ export default defineConfig(() => ({
 		},
 		setupFiles: ["./tests/setup-excalidraw.ts"],
 		include: ["{src,tests}/**/*.{test,spec}.{ts,mts,tsx}"],
-		exclude: ["tests/browser-determinism.test.ts", "tests/native-corpus-renderer.test.ts"],
+		exclude: ["tests/native-corpus-renderer.test.ts"],
 		reporters: ["default"],
 		coverage: {
 			reportsDirectory: "../../coverage/packages/svg-excalidraw",

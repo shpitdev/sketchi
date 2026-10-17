@@ -175,7 +175,8 @@
 						"allow": [
 							"^\\.\\./\\.\\./scripts/lib/worker-apps\\.mjs$",
 							"^(\\.\\./){2,4}scripts/lib/excalidraw-fonts\\.mjs$",
-							"^\\.\\./\\.\\./tools/local-dev-ports$"
+							"^\\.\\./\\.\\./tools/local-dev-ports$",
+							"^\\.\\./\\.\\./tools/testing/browserbase$"
 						],
 						"depConstraints": [
 							{

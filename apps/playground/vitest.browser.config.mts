@@ -1,12 +1,11 @@
 import tailwindcss from "@tailwindcss/vite";
-import { playwright } from "@vitest/browser-playwright";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 import { excalidrawFonts } from "../../scripts/lib/excalidraw-fonts.mjs";
+import { browserbase } from "../../tools/testing/browserbase";
 
 const source = (path: string) => new URL(path, import.meta.url).pathname;
-const executablePath = process.env["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"];
 
 export default defineConfig({
 	cacheDir: source("../../node_modules/.vite/apps/playground-browser"),
@@ -59,14 +58,13 @@ export default defineConfig({
 	test: {
 		name: "playground-browser",
 		watch: false,
-		attachmentsDir: "../../.memory/vitest-attachments/playground",
+		attachmentsDir: source("../../.memory/vitest-attachments/playground"),
 		include: ["apps/playground/src/**/*.browser.test.tsx"],
 		browser: {
 			enabled: true,
 			headless: true,
-			provider: playwright(
-				executablePath === undefined ? {} : { launchOptions: { executablePath } },
-			),
+			// Remote Browserbase Chromium; no local browser binary.
+			provider: browserbase(),
 			instances: [{ browser: "chromium" }],
 			viewport: { height: 577, width: 1280 },
 		},

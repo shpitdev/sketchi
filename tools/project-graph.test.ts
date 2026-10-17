@@ -206,6 +206,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"tools/generation-reliability-probe.ts": 5,
 	"tools/harness-eval.ts": 8,
 	"tools/sketchi-generators/src/generators/diagram-type/diagram-type.spec.ts": 6,
+	"tools/testing/browserbase.ts": 29,
 	"tools/sketchi-generators/src/generators/diagram-type/diagram-type.ts": 3,
 	"tools/sketchi-generators/src/generators/ui-component/ui-component.spec.ts": 3,
 	"tools/sketchi-generators/src/generators/ui-component/ui-component.ts": 3,

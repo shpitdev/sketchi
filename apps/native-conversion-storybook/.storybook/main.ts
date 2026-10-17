@@ -9,7 +9,7 @@ const config: StorybookConfig = {
 		"../../excalidraw/src/components/svg-icon-workspace/*.stories.tsx",
 	],
 	staticDirs: ["../../icons/public"],
-	addons: ["@storybook/addon-vitest", "@storybook/addon-mcp"],
+	addons: ["@storybook/addon-mcp"],
 	framework: {
 		name: "@storybook/react-vite",
 		options: {

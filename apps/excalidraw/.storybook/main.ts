@@ -4,7 +4,7 @@ import { excalidrawFonts } from "../../../scripts/lib/excalidraw-fonts.mjs";
 
 const config: StorybookConfig = {
 	stories: ["../src/**/*.stories.tsx"],
-	addons: ["@storybook/addon-vitest", "@storybook/addon-mcp"],
+	addons: ["@storybook/addon-mcp"],
 	framework: {
 		name: "@storybook/react-vite",
 		options: {

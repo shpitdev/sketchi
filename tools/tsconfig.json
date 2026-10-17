@@ -16,5 +16,5 @@
       "@sketchi/observability": ["../packages/observability/src/index.ts"]
     }
   },
-  "include": ["*.ts", "*.mts", "oxlint/*.ts"]
+  "include": ["*.ts", "*.mts", "oxlint/*.ts", "testing/browserbase.ts"]
 }

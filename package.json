@@ -77,7 +77,6 @@
 		"@oxlint/plugins": "1.87.0",
 		"@rspack/core": "2.2.8",
 		"@storybook/addon-mcp": "10.6.1",
-		"@storybook/addon-vitest": "10.6.1",
 		"@storybook/react-vite": "10.6.1",
 		"@swc-node/register": "1.12.1",
 		"@swc/cli": "0.8.1",

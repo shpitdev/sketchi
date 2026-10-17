@@ -27,7 +27,7 @@
 			"dependsOn": ["^build"]
 		},
 		"test-browser": {
-			"inputs": ["default", "^production"]
+			"inputs": ["default", "^production", "{workspaceRoot}/tools/testing/browserbase.ts"]
 		},
 		"typecheck": {
 			"inputs": ["default", "^production"],

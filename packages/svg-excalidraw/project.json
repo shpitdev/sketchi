@@ -20,13 +20,6 @@
 				"command": "vitest run --config packages/svg-excalidraw/vitest.config.mts"
 			}
 		},
-		"test-browser": {
-			"executor": "nx:run-commands",
-			"inputs": ["default", "^production", "{workspaceRoot}/packages/icons/catalog/svg/**/*.svg"],
-			"options": {
-				"command": "vitest run --config packages/svg-excalidraw/vitest.browser.config.mts"
-			}
-		},
 		"corpus-renderer": {
 			"executor": "nx:run-commands",
 			"outputs": ["{workspaceRoot}/.memory/svg-native-corpus"],

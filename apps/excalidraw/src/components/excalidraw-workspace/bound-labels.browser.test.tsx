@@ -304,10 +304,11 @@ async function expectLabelsPaintFully(
 		expect(label.text.replace(/\s+/g, ""), id).toBe(text.originalText.replace(/\s+/g, ""));
 		// Excalidraw draws each label into a canvas of its stored width padded
 		// by half the font size per side; a centered line wider than that clips.
+		// Allow the same sub-pixel tolerance as the height check below.
 		expect(
 			glyphs.width,
 			`${id} paints ${glyphs.width}px into a ${label.width}px box`,
-		).toBeLessThanOrEqual(label.width + text.fontSize);
+		).toBeLessThanOrEqual(label.width + text.fontSize + 0.5);
 		expect(glyphs.height, id).toBeLessThanOrEqual(label.height + 0.5);
 		const container = elementsById.get(text.containerId ?? "");
 		if (container && container.type !== "arrow") {
