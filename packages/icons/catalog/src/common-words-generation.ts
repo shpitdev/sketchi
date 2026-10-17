@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
 import type { SearchableIcon } from "./search.js";
-import { termTokens } from "./text-match.js";
+import { termTokens } from "./terms.js";
 
 /**
  * SCOWL size 50 is the common-English cut: it holds "stream", "segment",

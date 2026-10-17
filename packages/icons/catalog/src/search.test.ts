@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SketchiIcon } from "./manifest";
-import { iconSearchRank, searchIcons } from "./search";
+import { iconSearchRank, PARTIAL_QUERY_RANK, searchIcons } from "./search";
 
 function icon(
 	slug: string,
@@ -124,5 +124,51 @@ describe("ranked icon search", () => {
 
 	it("returns no match instead of treating unrelated terms as collection hits", () => {
 		expect(iconSearchRank(icon("vercel", "Vercel", "hosting"), "missing")).toBeNull();
+	});
+
+	it("falls back to the icons a query's parts name, product mark before vendor", () => {
+		const icons = [
+			icon("cloudflare", "Cloudflare", "cloud-vendors"),
+			icon("google", "Google", "cloud-vendors"),
+			icon("gemini", "Gemini", "ai-model-families"),
+			icon("workersai", "Workersai", "ai-infrastructure"),
+			icon("flyio", "Flyio", "cloud-hosting-paas"),
+		];
+		const ranked = (query: string) =>
+			searchIcons(icons, { query }).map(({ icon: match, rank }) => [match.slug, rank]);
+
+		expect(ranked("Cloudflare Workers")).toEqual([["cloudflare", PARTIAL_QUERY_RANK]]);
+		expect(ranked("cloudflare workers ai")).toEqual([
+			["workersai", PARTIAL_QUERY_RANK],
+			["cloudflare", PARTIAL_QUERY_RANK],
+		]);
+		// "google" is common English, but a vendor mark still stands for it.
+		expect(ranked("Google Gemini")).toEqual([
+			["gemini", PARTIAL_QUERY_RANK],
+			["google", PARTIAL_QUERY_RANK],
+		]);
+		expect(ranked("Fly.io Machines")).toEqual([["flyio", PARTIAL_QUERY_RANK]]);
+		expect(searchIcons(icons, { collection: "ai-model-families", query: "google gemini" })).toEqual(
+			[{ icon: icons[2], rank: PARTIAL_QUERY_RANK }],
+		);
+	});
+
+	it("never falls back on generic words that happen to name a brand", () => {
+		const icons = [
+			icon("edge", "Edge", "developer-clients"),
+			icon("lambda", "Lambda", "ai-infrastructure"),
+			icon("vercel", "Vercel", "cloud-hosting-paas"),
+			icon("aws", "AWS", "cloud-vendors"),
+		];
+		const slugs = (query: string) =>
+			searchIcons(icons, { query }).map(({ icon: match }) => match.slug);
+
+		expect(slugs("Vercel Edge Functions")).toEqual(["vercel"]);
+		expect(slugs("AWS Lambda")).toEqual(["aws"]);
+		expect(slugs("edge functions")).toEqual([]);
+		expect(slugs("lambda function")).toEqual([]);
+		// Whole-query matches never reach the fallback.
+		expect(slugs("edge")).toEqual(["edge"]);
+		expect(slugs("lambda")).toEqual(["lambda"]);
 	});
 });

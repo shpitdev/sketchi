@@ -1,45 +1,9 @@
-import commonWordsJson from "./generated/common-words.json" with { type: "json" };
 import { searchIcons, type SearchableIcon } from "./search.js";
+import { isDistinctiveWord, termTokens, wordsOf } from "./terms.js";
 
 /** Most catalog terms a prompt can offer one diagram. */
 export const MAX_TEXT_ICON_MATCHES = 24;
 const MAX_PHRASE_TOKENS = 4;
-
-/**
- * Generic technical words in catalog terms that the SCOWL list lacks or ranks
- * as uncommon ("api", "onboarding", "observability"). They are treated like
- * English words: alone, they never name a product unless cased as a name.
- */
-const COMMON_TECH_WORDS = [
-	"antigravity",
-	"api",
-	"dataflow",
-	"datastore",
-	"datastream",
-	"filestore",
-	"genomics",
-	"json",
-	"memorystore",
-	"meta",
-	"nitro",
-	"observability",
-	"onboarding",
-	"ontology",
-	"profiler",
-	"pubsub",
-	"pwa",
-	"remix",
-	"serverless",
-	"submodel",
-	"turbo",
-];
-
-/**
- * Catalog-term words that are common English (SCOWL size 50, generated with
- * the catalog) or generic technical words. "Linear", "Render", "Stream", and
- * "Segment" are products, but in prose they are usually just words.
- */
-const COMMON_WORDS: ReadonlySet<string> = new Set([...commonWordsJson, ...COMMON_TECH_WORDS]);
 
 /** One word of free text, with the context that decides how much it says. */
 interface TextToken {
@@ -65,19 +29,6 @@ export interface IconMention<Icon extends SearchableIcon = SearchableIcon> {
 }
 
 const SEGMENT_BREAK = /(?<=[.!?:])\s+|\n+/u;
-const WORD = /[A-Za-z0-9.+#]+/gu;
-
-function wordsOf(segment: string): string[] {
-	return [...segment.matchAll(WORD)]
-		.map(([word]) => word.replace(/^\.+|\.+$/gu, ""))
-		.filter(Boolean);
-}
-
-/** Word tokens lowercased, as catalog terms are indexed. */
-export function termTokens(value: string): string[] {
-	return wordsOf(value).map((word) => word.toLocaleLowerCase());
-}
-
 function isCapitalized(word: string): boolean {
 	return /^[A-Z]/u.test(word) && /[a-z]/u.test(word);
 }
@@ -102,11 +53,7 @@ function tokenize(text: string): TextToken[] {
 }
 
 function isDistinctive(token: TextToken): boolean {
-	return (
-		/[0-9.+#]/u.test(token.raw) ||
-		/[a-z][A-Z]/u.test(token.raw) ||
-		(token.lower.length >= 3 && !COMMON_WORDS.has(token.lower))
-	);
+	return /[a-z][A-Z]/u.test(token.raw) || isDistinctiveWord(token.lower);
 }
 
 /** A capitalized everyday word, where capitals can only mean a name. */

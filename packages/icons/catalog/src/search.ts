@@ -1,4 +1,5 @@
 import { formatCollectionLabel, type SketchiIcon } from "./manifest.js";
+import { isDistinctiveWord, termTokens } from "./terms.js";
 
 export interface IconSearchOptions {
 	readonly collection?: string;
@@ -79,15 +80,105 @@ export function iconSearchRank(icon: SearchableIcon, normalizedQuery: string): n
 	return combinedRank;
 }
 
+/** Rank of a match on part of the query, below every whole-query tier. */
+export const PARTIAL_QUERY_RANK = 6;
+
+/** Longest part of a query matched against whole catalog terms. */
+const MAX_PARTIAL_TOKENS = 4;
+
+/** Cloud vendors, whose marks stand in for products the catalog lacks. */
+const VENDOR_COLLECTIONS: ReadonlySet<string> = new Set(["cloud-platforms", "cloud-vendors"]);
+
+/** A term without spacing or punctuation: "Fly.io", "fly io", and "flyio" agree. */
+function compactTerm(value: string): string {
+	return value.toLocaleLowerCase().replace(/[^a-z0-9+#]/gu, "");
+}
+
+const termIndexes = new WeakMap<readonly SearchableIcon[], Map<string, SearchableIcon[]>>();
+
+/** Icons by compacted slug, name, and alias, built once per icon list. */
+function compactTermIndex<Icon extends SearchableIcon>(
+	icons: readonly Icon[],
+): Map<string, Icon[]> {
+	const cached = termIndexes.get(icons);
+	if (cached) return cached as Map<string, Icon[]>;
+	const index = new Map<string, Icon[]>();
+	for (const icon of icons) {
+		for (const term of new Set([icon.slug, icon.name, ...icon.aliases].map(compactTerm))) {
+			if (!term) continue;
+			const entries = index.get(term) ?? [];
+			entries.push(icon);
+			index.set(term, entries);
+		}
+	}
+	termIndexes.set(icons, index);
+	return index;
+}
+
+interface PartialMatch<Icon> {
+	readonly icon: Icon;
+	readonly length: number;
+	readonly start: number;
+	readonly termRank: number;
+	readonly vendor: boolean;
+}
+
+/**
+ * Icons named by part of a query that matches no icon as a whole, as in
+ * "Cloudflare Workers" or "AWS Lambda". A part must equal an icon's slug,
+ * name, or alias, and must hold a distinctive word unless it names a cloud
+ * vendor ("google", "amazon"); so "Edge" or "Lambda" inside a product name
+ * never draw a browser or a GPU cloud. Longer parts rank first, then a
+ * product's own mark above its vendor's, then query order.
+ */
+function partialQueryMatches<Icon extends SearchableIcon>(
+	icons: readonly Icon[],
+	query: string,
+	collection: string | undefined,
+): RankedIcon<Icon>[] {
+	const tokens = termTokens(query);
+	const index = compactTermIndex(icons);
+	const matches = new Map<string, PartialMatch<Icon>>();
+	for (let length = Math.min(MAX_PARTIAL_TOKENS, tokens.length); length > 0; length -= 1) {
+		for (let start = 0; start + length <= tokens.length; start += 1) {
+			const part = tokens.slice(start, start + length);
+			const distinctive = part.some(isDistinctiveWord);
+			for (const icon of index.get(compactTerm(part.join(""))) ?? []) {
+				const vendor = VENDOR_COLLECTIONS.has(icon.collection);
+				if (matches.has(icon.slug) || (!distinctive && !vendor)) continue;
+				if (collection && icon.collection !== collection) continue;
+				const termRank = iconSearchTermRank(icon, part.join(" ")) ?? PARTIAL_QUERY_RANK;
+				matches.set(icon.slug, { icon, length, start, termRank, vendor });
+			}
+		}
+	}
+	return [...matches.values()]
+		.sort(
+			(left, right) =>
+				right.length - left.length ||
+				Number(left.vendor) - Number(right.vendor) ||
+				left.start - right.start ||
+				left.termRank - right.termRank ||
+				left.icon.name.localeCompare(right.icon.name) ||
+				left.icon.slug.localeCompare(right.icon.slug),
+		)
+		.map(({ icon }) => ({ icon, rank: PARTIAL_QUERY_RANK }));
+}
+
+/**
+ * Catalog icons ranked by exact slug, name prefix, alias, substring, then
+ * collection. A query no icon matches as a whole falls back to the icons its
+ * parts name (see partialQueryMatches); nothing credible returns [].
+ */
 export function searchIcons<Icon extends SearchableIcon = SketchiIcon>(
 	icons: readonly Icon[],
 	options: IconSearchOptions = {},
 ): readonly RankedIcon<Icon>[] {
 	const normalizedQuery = normalizeIconQuery(options.query ?? "");
 	const collection = options.collection?.trim();
-	const limit = options.limit ?? Number.POSITIVE_INFINITY;
+	const limit = Math.max(0, options.limit ?? Number.POSITIVE_INFINITY);
 
-	return icons
+	const ranked = icons
 		.flatMap((icon) => {
 			if (collection && icon.collection !== collection) {
 				return [];
@@ -100,6 +191,8 @@ export function searchIcons<Icon extends SearchableIcon = SketchiIcon>(
 				left.rank - right.rank ||
 				left.icon.name.localeCompare(right.icon.name) ||
 				left.icon.slug.localeCompare(right.icon.slug),
-		)
-		.slice(0, Math.max(0, limit));
+		);
+	return (
+		ranked.length > 0 ? ranked : partialQueryMatches(icons, normalizedQuery, collection)
+	).slice(0, limit);
 }
