@@ -1,6 +1,7 @@
 import {
 	CANVAS_NODE_ICON,
 	CANVAS_SPEC_VERSION,
+	AXIS_ALIGNED_EPSILON,
 	canvasBoundTextBox,
 	canvasNodeIconBand,
 	type AxisAlignedSegment,
@@ -418,18 +419,27 @@ function orderedRankShapes(
 	return rankedShapes;
 }
 
-function positionNodes(diagram: IntermediateDiagram): NodeSceneElement[] {
+function positionNodes(
+	diagram: IntermediateDiagram,
+	minimumSizes: ReadonlyMap<string, { width: number; height: number }> = new Map(),
+): NodeSceneElement[] {
 	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
 	const buckets = edgeBuckets(diagram.edges);
 	const shapesByNodeId = new Map(
 		diagram.nodes.map((node) => {
-			const shape = createNodeShape(node);
+			const originalShape = createNodeShape(node);
+			const minimum = minimumSizes.get(node.id);
+			const shape = {
+				...originalShape,
+				width: Math.max(originalShape.width, minimum?.width ?? 0),
+				height: Math.max(originalShape.height, minimum?.height ?? 0),
+			};
 			// Allocate enough port capacity before ranking; clamping must never merge endpoints.
 			const connections =
 				(buckets.incoming.get(node.id)?.length ?? 0) + (buckets.outgoing.get(node.id)?.length ?? 0);
 			const outgoing = buckets.outgoing.get(node.id) ?? [];
 			const pitch =
-				node.kind !== "decision" && outgoing.filter((e) => e.label).length > 1
+				node.kind !== "decision" && outgoing.length > 1 && outgoing.some((e) => e.label)
 					? Math.max(
 							PORT_SPACING,
 							...outgoing.map((e) => {
@@ -742,12 +752,12 @@ function portOffsetsForRoutes(routes: readonly RoutedEdge[]): Map<string, number
 
 	const offsets = new Map<string, number>();
 	for (const connections of connectionsByPort.values()) {
-		const labeled = connections
-			.filter((c) => c.endpoint === "source")
+		const departures = connections.filter((c) => c.endpoint === "source");
+		const labeled = departures
 			.map((c) => routes.find((r) => r.edge.id === c.edgeId)!)
 			.filter((r) => r.edge.label);
 		const pitch =
-			labeled.length > 1 && labeled[0]!.source.kind !== "decision"
+			departures.length > 1 && labeled.length > 0 && labeled[0]!.source.kind !== "decision"
 				? Math.max(
 						PORT_SPACING,
 						...labeled.map((r) => {
@@ -798,6 +808,292 @@ function routeForEdge(
 	};
 }
 
+function routeEndpoints(
+	route: RoutedEdge,
+	portOffsets: ReadonlyMap<string, number>,
+): { start: ScenePoint; end: ScenePoint } {
+	const { edge, source, sourceEdge, target, targetEdge } = route;
+	return {
+		start: pointOnEdge(
+			source,
+			sourceEdge,
+			portOffsets.get(connectionKey({ edgeId: edge.id, endpoint: "source" })) ?? 0,
+		),
+		end: pointOnEdge(
+			target,
+			targetEdge,
+			portOffsets.get(connectionKey({ edgeId: edge.id, endpoint: "target" })) ?? 0,
+		),
+	};
+}
+
+/** Size the dimension along each assigned side before offsets can be clamped. */
+function portCapacityForRoutes(
+	routes: readonly RoutedEdge[],
+	offsets: ReadonlyMap<string, number>,
+): Map<string, { width: number; height: number }> {
+	const sizes = new Map<string, { width: number; height: number }>();
+	for (const route of routes) {
+		for (const endpoint of ["source", "target"] as const) {
+			const node = route[endpoint];
+			const side = endpoint === "source" ? route.sourceEdge : route.targetEdge;
+			const dimension = side === "top" || side === "bottom" ? "width" : "height";
+			const required =
+				2 *
+				(PORT_PADDING +
+					Math.abs(offsets.get(connectionKey({ edgeId: route.edge.id, endpoint })) ?? 0));
+			if (required <= (sizes.get(node.nodeId)?.[dimension] ?? node[dimension])) continue;
+			const size = sizes.get(node.nodeId) ?? { width: node.width, height: node.height };
+			size[dimension] = required;
+			sizes.set(node.nodeId, size);
+		}
+	}
+	return sizes;
+}
+
+/** A direct segment has no intermediate bends; test diagonals as well as axis-aligned lines. */
+function directSegmentCrossesNode(
+	start: ScenePoint,
+	end: ScenePoint,
+	node: NodeSceneElement,
+): boolean {
+	let enter = 0,
+		leave = 1;
+	for (const [coordinate, size] of [
+		["x", "width"],
+		["y", "height"],
+	] as const) {
+		const minimum = node[coordinate] + AXIS_ALIGNED_EPSILON;
+		const maximum = node[coordinate] + node[size] - AXIS_ALIGNED_EPSILON;
+		const delta = end[coordinate] - start[coordinate];
+		if (Math.abs(delta) <= AXIS_ALIGNED_EPSILON) {
+			if (start[coordinate] <= minimum || start[coordinate] >= maximum) return false;
+		} else {
+			const a = (minimum - start[coordinate]) / delta;
+			const b = (maximum - start[coordinate]) / delta;
+			enter = Math.max(enter, Math.min(a, b));
+			leave = Math.min(leave, Math.max(a, b));
+		}
+	}
+	return enter < leave;
+}
+
+function directEndpointFacesOut(
+	node: NodeSceneElement,
+	side: ConnectionEdge,
+	point: ScenePoint,
+	other: ScenePoint,
+): boolean {
+	const x = (point.x - center(node).x) / (node.width / 2);
+	const y = (point.y - center(node).y) / (node.height / 2);
+	const normal =
+		node.shape === "ellipse" || node.shape === "circle"
+			? { x: x / node.width, y: y / node.height }
+			: node.shape === "diamond"
+				? { x: Math.sign(x) / node.width, y: Math.sign(y) / node.height }
+				: {
+						x: side === "left" ? -1 : side === "right" ? 1 : 0,
+						y: side === "top" ? -1 : side === "bottom" ? 1 : 0,
+					};
+	return (
+		(normal.x * (other.x - point.x) + normal.y * (other.y - point.y)) /
+			Math.hypot(normal.x, normal.y) >=
+		-AXIS_ALIGNED_EPSILON
+	);
+}
+
+/** Collinear overlap also matters for diagonal direct edges, not just orthogonal segments. */
+function directSegmentsOverlap(
+	start: ScenePoint,
+	end: ScenePoint,
+	a: ScenePoint,
+	b: ScenePoint,
+): boolean {
+	const dx = end.x - start.x,
+		dy = end.y - start.y,
+		length = Math.hypot(dx, dy);
+	if (length <= AXIS_ALIGNED_EPSILON) return false;
+	const distance = (p: ScenePoint) =>
+		Math.abs(dx * (p.y - start.y) - dy * (p.x - start.x)) / length;
+	if (distance(a) > AXIS_ALIGNED_EPSILON || distance(b) > AXIS_ALIGNED_EPSILON) return false;
+	const projection = (p: ScenePoint) => ((p.x - start.x) * dx + (p.y - start.y) * dy) / length;
+	const from = projection(a),
+		to = projection(b);
+	return (
+		Math.min(length, Math.max(from, to)) - Math.max(0, Math.min(from, to)) > AXIS_ALIGNED_EPSILON
+	);
+}
+
+/** Keep facing ports unless a direct feedback segment needs an obstacle-safe boundary pair. */
+function assignDirectFeedbackPorts(
+	routes: RoutedEdge[],
+	diagram: IntermediateDiagram,
+	nodes: readonly NodeSceneElement[],
+): { offsets: Map<string, number>; minimumSizes: Map<string, { width: number; height: number }> } {
+	const minimumSizes = new Map<string, { width: number; height: number }>();
+	const buckets = edgeBuckets(diagram.edges);
+	const feedback = feedbackEdgeIds(diagram, buckets.incoming, buckets.outgoing);
+	const sides: ConnectionEdge[] =
+		diagram.layout.direction === "TB" || diagram.layout.direction === "BT"
+			? ["right", "left", "top", "bottom"]
+			: ["bottom", "top", "left", "right"];
+	// Reserve forward endpoints too: later feedback side changes must not move defaults
+	// onto endpoints that an earlier candidate already checked and selected.
+	const chosenOffsets = portOffsetsForRoutes(routes);
+	for (const route of routes.filter((r) => feedback.has(r.edge.id))) {
+		const original = { sourceEdge: route.sourceEdge, targetEdge: route.targetEdge };
+		const sourceKey = connectionKey({ edgeId: route.edge.id, endpoint: "source" });
+		const targetKey = connectionKey({ edgeId: route.edge.id, endpoint: "target" });
+		let fallback:
+			| { sides: typeof original; sourceOffset: number; targetOffset: number }
+			| undefined;
+		const sidePairs = [
+			original,
+			...sides.map((side) => ({ sourceEdge: side, targetEdge: side })),
+			...sides.flatMap((sourceEdge) => sides.map((targetEdge) => ({ sourceEdge, targetEdge }))),
+		];
+		// Try every ordinary port pair before using inset boundary extremes.
+		const candidates = [false, true].flatMap((spread) =>
+			sidePairs.map((pair) => ({ ...pair, spread })),
+		);
+		let found = false;
+		for (const candidate of candidates) {
+			Object.assign(route, { sourceEdge: candidate.sourceEdge, targetEdge: candidate.targetEdge });
+			const offsets = new Map(chosenOffsets);
+			const alternatives = (node: NodeSceneElement, side: ConnectionEdge, key: string) => {
+				const limit =
+					(side === "top" || side === "bottom" ? node.width : node.height) / 2 - PORT_PADDING;
+				return candidate.spread ? [offsets.get(key) ?? 0, -limit, limit] : [offsets.get(key) ?? 0];
+			};
+			const sourceOffsets = alternatives(route.source, route.sourceEdge, sourceKey);
+			const targetOffsets = alternatives(route.target, route.targetEdge, targetKey);
+			for (const sourceOffset of sourceOffsets) {
+				for (const targetOffset of targetOffsets) {
+					offsets.set(sourceKey, sourceOffset);
+					offsets.set(targetKey, targetOffset);
+					const { start, end } = routeEndpoints(route, offsets);
+					if (
+						!directEndpointFacesOut(route.source, route.sourceEdge, start, end) ||
+						!directEndpointFacesOut(route.target, route.targetEdge, end, start)
+					)
+						continue;
+					if (
+						nodes.some(
+							(n) =>
+								n !== route.source && n !== route.target && directSegmentCrossesNode(start, end, n),
+						)
+					)
+						continue;
+					if (
+						routes.some((other) => {
+							if (other === route) return false;
+							const { start: a, end: b } = routeEndpoints(other, offsets);
+							const sharedPoint = [
+								[route.source, start, other.source, a],
+								[route.source, start, other.target, b],
+								[route.target, end, other.source, a],
+								[route.target, end, other.target, b],
+							] as const;
+							return (
+								sharedPoint.some(
+									([node, p, otherNode, q]) =>
+										node === otherNode && Math.hypot(p.x - q.x, p.y - q.y) <= AXIS_ALIGNED_EPSILON,
+								) || directSegmentsOverlap(start, end, a, b)
+							);
+						})
+					)
+						continue;
+					const labelObstacles = branchLabelObstacles(routes, offsets);
+					const ownLabel = labelObstacles.find(
+						(label) => label.nodeId === `branch-label:${route.edge.id}`,
+					);
+					if (ownLabel && directSegmentCrossesNode(start, end, ownLabel)) continue;
+					fallback ??= { sides: candidate, sourceOffset, targetOffset };
+					if (
+						labelObstacles.some(
+							(label) =>
+								label.nodeId !== `branch-label:${route.edge.id}` &&
+								directSegmentCrossesNode(start, end, label),
+						)
+					)
+						continue;
+					chosenOffsets.set(sourceKey, sourceOffset);
+					chosenOffsets.set(targetKey, targetOffset);
+					found = true;
+					break;
+				}
+				if (found) break;
+			}
+			if (found) break;
+		}
+		if (!found) {
+			Object.assign(route, fallback?.sides ?? original);
+			if (fallback) {
+				chosenOffsets.set(sourceKey, fallback.sourceOffset);
+				chosenOffsets.set(targetKey, fallback.targetOffset);
+			} else {
+				const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
+				const coordinate = vertical ? "x" : "y",
+					dimension = vertical ? "width" : "height";
+				const origin = center(route.source)[coordinate];
+				const extent = Math.max(
+					...nodes.flatMap((n) => [
+						Math.abs(n[coordinate] - origin),
+						Math.abs(n[coordinate] + n[dimension] - origin),
+					]),
+				);
+				minimumSizes.set(route.source.nodeId, {
+					width: route.source.width,
+					height: route.source.height,
+					[dimension]: 2 * (extent + PORT_PADDING + PORT_SPACING),
+				});
+			}
+		}
+	}
+	return { offsets: chosenOffsets, minimumSizes };
+}
+
+/** Reserve fixed endpoint approaches before any route can occupy a later route's stub. */
+function endpointStubsForRoutes(
+	routes: readonly RoutedEdge[],
+	portOffsets: ReadonlyMap<string, number>,
+): ArrowSceneElement[] {
+	return routes.flatMap((route): ArrowSceneElement[] => {
+		const { start, end } = routeEndpoints(route, portOffsets);
+		const arrow = {
+			type: "arrow" as const,
+			id: `edge:${route.edge.id}`,
+			edgeId: route.edge.id,
+			sourceNodeId: route.edge.source,
+			targetNodeId: route.edge.target,
+		};
+		return [
+			{
+				...arrow,
+				points: [
+					start,
+					pointAwayFromEdge(
+						start,
+						route.sourceEdge,
+						sourceStubLength(route, start, ROUTE_STUB_LENGTH),
+					),
+				],
+			},
+			{
+				...arrow,
+				points: [
+					pointAwayFromEdge(
+						end,
+						route.targetEdge,
+						endpointClearance(route.target, end, route.targetEdge, ROUTE_STUB_LENGTH),
+					),
+					end,
+				],
+			},
+		];
+	});
+}
+
 function arrowForRoute(
 	route: RoutedEdge,
 	edgeRouting: IntermediateDiagram["layout"]["edgeRouting"],
@@ -805,17 +1101,8 @@ function arrowForRoute(
 	shapes: readonly NodeSceneElement[],
 	existingArrows: readonly ArrowSceneElement[],
 ): ArrowSceneElement {
-	const { edge, source, sourceEdge, target, targetEdge } = route;
-	const portedStart = pointOnEdge(
-		source,
-		sourceEdge,
-		portOffsets.get(connectionKey({ edgeId: edge.id, endpoint: "source" })) ?? 0,
-	);
-	const portedEnd = pointOnEdge(
-		target,
-		targetEdge,
-		portOffsets.get(connectionKey({ edgeId: edge.id, endpoint: "target" })) ?? 0,
-	);
+	const { edge } = route;
+	const { start: portedStart, end: portedEnd } = routeEndpoints(route, portOffsets);
 	const points =
 		edgeRouting === "orthogonal"
 			? exteriorLaneRoute(route, portedStart, portedEnd, shapes, existingArrows)
@@ -1202,6 +1489,54 @@ function assignDecisionSides(
 	}
 }
 
+/** Feedback uses a lateral lane, not the forward departure/arrival side. */
+function assignFeedbackSides(routes: RoutedEdge[], diagram: IntermediateDiagram): void {
+	const buckets = edgeBuckets(diagram.edges);
+	const feedback = feedbackEdgeIds(diagram, buckets.incoming, buckets.outgoing);
+	const horizontal = diagram.layout.direction === "LR" || diagram.layout.direction === "RL";
+	for (const route of routes.filter((r) => feedback.has(r.edge.id))) {
+		const before = horizontal
+			? center(route.source).y < center(route.target).y
+			: center(route.source).x < center(route.target).x;
+		const lateral: ConnectionEdge[] = horizontal
+			? before
+				? ["top", "bottom"]
+				: ["bottom", "top"]
+			: before
+				? ["left", "right"]
+				: ["right", "left"];
+		const candidates: ConnectionEdge[] = [
+			...lateral,
+			...(horizontal ? (["left", "right"] as const) : (["top", "bottom"] as const)),
+		];
+		const departures = new Set(
+			routes.filter((r) => r !== route && r.source === route.target).map((r) => r.sourceEdge),
+		);
+		const arrivals = new Set(
+			routes.filter((r) => r !== route && r.target === route.source).map((r) => r.targetEdge),
+		);
+		const targetArrivals = new Set(
+			routes.filter((r) => r !== route && r.target === route.target).map((r) => r.targetEdge),
+		);
+		const siblingDepartures = new Set(
+			routes.filter((r) => r !== route && r.source === route.source).map((r) => r.sourceEdge),
+		);
+		const sourceCandidates =
+			route.source.kind === "decision" ? [route.sourceEdge, ...candidates] : candidates;
+		route.targetEdge =
+			candidates.find((side) => !departures.has(side) && !targetArrivals.has(side)) ??
+			candidates.find((side) => !departures.has(side)) ??
+			route.targetEdge;
+		route.sourceEdge =
+			sourceCandidates.find(
+				(side) =>
+					!arrivals.has(side) &&
+					(route.source.kind !== "decision" || !siblingDepartures.has(side)) &&
+					(route.source !== route.target || side !== route.targetEdge),
+			) ?? route.sourceEdge;
+	}
+}
+
 function branchLabelMetrics(label: string, maxWidth = 160): { width: number; height: number } {
 	const text = wrapTextToWidth(label, maxWidth, 13);
 	return {
@@ -1308,6 +1643,7 @@ function obstacleRoute(
 			startStub.x,
 			endStub.x,
 			...shapes.flatMap((s) => [s.x - PORT_SPACING, s.x + s.width + PORT_SPACING]),
+			...arrows.flatMap((a) => a.points.flatMap((p) => [p.x - PORT_SPACING, p.x + PORT_SPACING])),
 		]),
 	].sort((a, b) => a - b);
 	const ys = [
@@ -1315,6 +1651,7 @@ function obstacleRoute(
 			startStub.y,
 			endStub.y,
 			...shapes.flatMap((s) => [s.y - PORT_SPACING, s.y + s.height + PORT_SPACING]),
+			...arrows.flatMap((a) => a.points.flatMap((p) => [p.y - PORT_SPACING, p.y + PORT_SPACING])),
 		]),
 	].sort((a, b) => a - b);
 	const key = (x: number, y: number, axis: number) => `${x}:${y}:${axis}`;
@@ -1649,14 +1986,44 @@ function normalizeSceneOrigin(elements: readonly SceneElement[]): SceneElement[]
 
 export function renderIntermediateDiagram(input: unknown): RenderedDiagramScene {
 	const diagram = parseIntermediateDiagram(input);
-	const nodeShapes = positionNodes(diagram);
+	let nodeShapes = positionNodes(diagram);
 	const shapesByNodeId = new Map(nodeShapes.map((shape) => [shape.nodeId, shape]));
 	const routedEdges = diagram.edges.map((edge, index) =>
 		routeForEdge(edge, index, shapesByNodeId, diagram.layout.direction),
 	);
 	assignDecisionSides(routedEdges, diagram.layout.direction);
-	const portOffsets = portOffsetsForRoutes(routedEdges);
+	let portOffsets: Map<string, number>;
+	let capacity: Map<string, { width: number; height: number }>;
+	if (diagram.layout.edgeRouting === "orthogonal") {
+		assignFeedbackSides(routedEdges, diagram);
+		portOffsets = portOffsetsForRoutes(routedEdges);
+		capacity = portCapacityForRoutes(routedEdges, portOffsets);
+	} else {
+		const direct = assignDirectFeedbackPorts(routedEdges, diagram, nodeShapes);
+		portOffsets = direct.offsets;
+		capacity = direct.minimumSizes;
+	}
+	if (capacity.size > 0) {
+		nodeShapes = positionNodes(diagram, capacity);
+		const resized = new Map(nodeShapes.map((node) => [node.nodeId, node]));
+		for (const route of routedEdges) {
+			route.source = resized.get(route.source.nodeId)!;
+			route.target = resized.get(route.target.nodeId)!;
+			if (diagram.layout.edgeRouting !== "orthogonal")
+				Object.assign(route, connectionEdges(route.source, route.target, diagram.layout.direction));
+		}
+		if (diagram.layout.edgeRouting === "orthogonal")
+			portOffsets = portOffsetsForRoutes(routedEdges);
+		else {
+			assignDecisionSides(routedEdges, diagram.layout.direction);
+			portOffsets = assignDirectFeedbackPorts(routedEdges, diagram, nodeShapes).offsets;
+		}
+	}
 	const labelObstacles = branchLabelObstacles(routedEdges, portOffsets);
+	const endpointStubs =
+		diagram.layout.edgeRouting === "orthogonal"
+			? endpointStubsForRoutes(routedEdges, portOffsets)
+			: [];
 	const edgeArrows: ArrowSceneElement[] = [];
 	for (const route of routedEdges) {
 		edgeArrows.push(
@@ -1668,7 +2035,7 @@ export function renderIntermediateDiagram(input: unknown): RenderedDiagramScene 
 					...nodeShapes,
 					...labelObstacles.filter((label) => label.nodeId !== `branch-label:${route.edge.id}`),
 				],
-				edgeArrows,
+				[...endpointStubs, ...edgeArrows],
 			),
 		);
 	}

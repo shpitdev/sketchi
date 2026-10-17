@@ -890,6 +890,8 @@ interface ArrowSegment extends AxisAlignedSegment {
 	arrowId: string;
 	startBindingId: string | null;
 	endBindingId: string | null;
+	startCoordinate: number;
+	endCoordinate: number;
 }
 
 function arrowSegments(element: ExcalidrawElement): ArrowSegment[] {
@@ -908,7 +910,32 @@ function arrowSegments(element: ExcalidrawElement): ArrowSegment[] {
 		arrowId: element.id,
 		startBindingId,
 		endBindingId,
+		startCoordinate:
+			segment.orientation === "horizontal"
+				? points[segment.segmentIndex]!.x
+				: points[segment.segmentIndex]!.y,
+		endCoordinate:
+			segment.orientation === "horizontal"
+				? points[segment.segmentIndex + 1]!.x
+				: points[segment.segmentIndex + 1]!.y,
 	}));
+}
+
+/** A common binding alone cannot exempt unrelated portions of two routes. */
+function sharesDirectedEndpoint(left: ArrowSegment, right: ArrowSegment): boolean {
+	if (!isSharedBoundStem(left, right)) return false;
+	const departure =
+		left.isFirstSegment &&
+		right.isFirstSegment &&
+		left.startBindingId !== null &&
+		left.startBindingId === right.startBindingId;
+	const leftEndpoint = departure ? left.startCoordinate : left.endCoordinate;
+	const rightEndpoint = departure ? right.startCoordinate : right.endCoordinate;
+	return (
+		Math.abs(leftEndpoint - rightEndpoint) <= AXIS_ALIGNED_EPSILON &&
+		Math.sign(left.endCoordinate - left.startCoordinate) ===
+			Math.sign(right.endCoordinate - right.startCoordinate)
+	);
 }
 
 function overlappingArrowSegments(
@@ -932,7 +959,7 @@ function overlappingArrowSegments(
 
 			if (
 				left.arrowId === right.arrowId ||
-				isSharedBoundStem(left, right) ||
+				sharesDirectedEndpoint(left, right) ||
 				!segmentsOverlapInterior(left, right)
 			) {
 				continue;

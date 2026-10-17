@@ -383,7 +383,7 @@ describe("renderIntermediateDiagram", () => {
 		);
 	});
 
-	it("keeps upward return edges on the closest vertical ports", () => {
+	it("keeps upward returns separate from forward ports without overlapping their routes", () => {
 		const scene = renderIntermediateDiagram(
 			parseFlowchartDiagram({
 				id: "procurement-vendor-approval",
@@ -526,15 +526,16 @@ describe("renderIntermediateDiagram", () => {
 
 		const start = returnArrow.points[0];
 		const end = returnArrow.points[returnArrow.points.length - 1];
-		const lowestPoint = Math.max(...returnArrow.points.map((point) => point.y));
 
 		if (!start || !end) {
 			throw new Error("Expected return route points.");
 		}
 
-		expect(start.y).toBe(renegotiateTerms.y);
-		expect(end.y).toBe(legalReview.y + legalReview.height);
-		expect(lowestPoint).toBeLessThanOrEqual(renegotiateTerms.y);
+		// The return must not share the top arrival or the bottom forward departure.
+		expect(start.y).toBeGreaterThan(renegotiateTerms.y);
+		expect(start.y).toBeLessThan(renegotiateTerms.y + renegotiateTerms.height);
+		expect(end.y).toBeGreaterThan(legalReview.y);
+		expect(end.y).toBeLessThan(legalReview.y + legalReview.height);
 		expect(testRouteSelfOverlapCount(returnArrow.points)).toBe(0);
 		expect(testRouteOverlapCount(returnArrow.points, legalToDecisionArrow.points)).toBe(0);
 		expect(testRouteOverlapCount(returnArrow.points, renegotiateEntryArrow.points)).toBe(0);

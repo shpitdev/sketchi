@@ -38,6 +38,234 @@ const fourBranches = parseIntermediateDiagram({
 	],
 	edges: ["d", "b", "a", "c"].map((id) => ({ id, source: "decision", target: id, label: id })),
 });
+
+describe.each(["TB", "BT", "LR", "RL"] as const)("settled direct feedback: %s", (direction) => {
+	it.each(["straight", "curved"] as const)("reserves every final %s endpoint", (edgeRouting) => {
+		for (const minimal of [false, true]) {
+			const workflow = routingFixtures["shared-feedback-returns"];
+			const fixture = {
+				...workflow,
+				nodes: minimal ? workflow.nodes.filter((n) => n.kind === "process") : workflow.nodes,
+				edges: workflow.edges
+					.filter((e) => !minimal || (e.id !== "entry" && e.id !== "release"))
+					.map(({ label: _label, ...edge }) => edge),
+				layout: { direction, edgeRouting },
+			};
+			const scene = renderIntermediateDiagram(fixture);
+			const arrows = scene.elements.filter((e) => e.type === "arrow");
+			expect(scene.elements.filter((e) => e.type === "node")).toHaveLength(minimal ? 4 : 6);
+			expect(arrows).toHaveLength(minimal ? 6 : 8);
+			const endpoints = arrows.flatMap((a) => [
+				{ node: a.sourceNodeId, point: a.points[0], id: `${a.edgeId}:source` },
+				{ node: a.targetNodeId, point: a.points.at(-1)!, id: `${a.edgeId}:target` },
+			]);
+			for (const [i, a] of endpoints.entries())
+				for (const b of endpoints.slice(i + 1))
+					if (a.node === b.node)
+						expect(
+							Math.hypot(a.point.x - b.point.x, a.point.y - b.point.y),
+							`${a.id}/${b.id}`,
+						).toBeGreaterThan(0.01);
+		}
+	});
+	it.each(["straight", "curved"] as const)(
+		"keeps the exported-size own label clear of %s feedback",
+		(edgeRouting) => {
+			for (const minimal of [false, true]) {
+				const workflow = routingFixtures["shared-feedback-returns"];
+				const scene = renderIntermediateDiagram({
+					...workflow,
+					nodes: minimal ? workflow.nodes.filter((n) => n.kind === "process") : workflow.nodes,
+					edges: workflow.edges
+						.filter(
+							(e) =>
+								e.id !== "ba" &&
+								e.id !== "da" &&
+								(!minimal || (e.id !== "entry" && e.id !== "release")),
+						)
+						.map((e) => (e.id === "ca" ? { ...e, label: "Revisit earlier stage now" } : e)),
+					layout: { direction, edgeRouting },
+				});
+				const arrow = scene.elements.find((e) => e.type === "arrow" && e.edgeId === "ca")!;
+				const label = scene.elements.find((e) => e.type === "text" && e.id === "edge:ca:label")!;
+				if (arrow.type !== "arrow" || label.type !== "text")
+					throw new Error("Missing labeled return");
+				const text = wrapTextToWidth(label.text, label.maxWidth ?? 160, label.fontSize),
+					width = boundLabelWidth(text, label.fontSize, label.maxWidth ?? 160),
+					height = Math.ceil(text.split("\n").length * label.fontSize * 1.35);
+				for (const [i, start] of arrow.points.slice(0, -1).entries()) {
+					const end = arrow.points[i + 1]!;
+					for (let step = 1; step < 1000; step++) {
+						const x = start.x + ((end.x - start.x) * step) / 1000,
+							y = start.y + ((end.y - start.y) * step) / 1000;
+						expect(
+							x > label.x - width / 2 + 0.01 &&
+								x < label.x + width / 2 - 0.01 &&
+								y > label.y - height / 2 + 0.01 &&
+								y < label.y + height / 2 - 0.01,
+						).toBe(false);
+					}
+				}
+			}
+		},
+	);
+});
+
+describe.each(["TB", "BT", "LR", "RL"] as const)("direct return corridors: %s", (direction) => {
+	it.each(["straight", "curved"] as const)(
+		"keeps both %s returns distinct with mixed or absent labels",
+		(edgeRouting) => {
+			for (const labeled of [false, true]) {
+				const fixture = routingFixtures["two-stage-retry"];
+				const scene = renderIntermediateDiagram({
+					...fixture,
+					edges: fixture.edges.map((e) =>
+						e.id === "e5" && labeled ? { ...e, label: "Retry" } : e,
+					),
+					layout: { direction, edgeRouting },
+				});
+				const arrows = scene.elements.filter((e) => e.type === "arrow");
+				const nodes = scene.elements.filter((e) => e.type === "node");
+				expect(nodes).toHaveLength(6);
+				expect(arrows).toHaveLength(7);
+				const returns = arrows.filter((e) => e.edgeId === "e5" || e.edgeId === "e6");
+				expect(new Set(returns.map((a) => JSON.stringify(a.points[0]))).size).toBe(2);
+				for (const [i, a] of arrows.entries()) {
+					for (const b of arrows.slice(i + 1))
+						for (const x of segmentsFromPoints(a.points))
+							for (const y of segmentsFromPoints(b.points))
+								expect(segmentsOverlapInterior(x, y), `${a.edgeId}/${b.edgeId}`).toBe(false);
+					const [start, end] = a.points;
+					for (let step = 1; step < 100; step++) {
+						const x = start.x + ((end!.x - start.x) * step) / 100,
+							y = start.y + ((end!.y - start.y) * step) / 100;
+						for (const n of nodes)
+							expect(
+								x > n.x + 0.01 &&
+									x < n.x + n.width - 0.01 &&
+									y > n.y + 0.01 &&
+									y < n.y + n.height - 0.01,
+								`${a.edgeId}/${n.nodeId}`,
+							).toBe(false);
+					}
+				}
+			}
+		},
+	);
+});
+
+describe.each(["TB", "BT", "LR", "RL"] as const)("feedback capacity: %s", (direction) => {
+	it("keeps all four mixed-label returns at distinct ports", () => {
+		const fixture = routingFixtures["multi-stage-rework"];
+		const scene = renderIntermediateDiagram({
+			...fixture,
+			layout: { ...fixture.layout, direction },
+		});
+		const arrows = scene.elements.filter((e) => e.type === "arrow");
+		const returns = arrows.filter((a) => a.edgeId.startsWith("back"));
+		expect(scene.elements.filter((e) => e.type === "node")).toHaveLength(7);
+		expect(arrows).toHaveLength(10);
+		expect(returns).toHaveLength(4);
+		expect(new Set(returns.map((a) => JSON.stringify(a.points[0]))).size).toBe(4);
+		for (const [i, a] of returns.entries())
+			for (const b of returns.slice(i + 1)) {
+				expect(
+					Math.hypot(a.points[0].x - b.points[0].x, a.points[0].y - b.points[0].y),
+				).toBeGreaterThanOrEqual(18);
+				for (const x of segmentsFromPoints(a.points))
+					for (const y of segmentsFromPoints(b.points))
+						expect(segmentsOverlapInterior(x, y)).toBe(false);
+			}
+	});
+	it.each(["straight", "curved"] as const)("keeps %s retry clear of every stage", (edgeRouting) => {
+		const workflow = routingFixtures["feedback-chain"];
+		for (const minimal of [false, true]) {
+			const fixture = minimal
+				? {
+						...workflow,
+						nodes: workflow.nodes.filter((n) => n.kind === "process"),
+						edges: workflow.edges.filter((e) => e.id !== "start" && e.id !== "end"),
+					}
+				: workflow;
+			const scene = renderIntermediateDiagram({ ...fixture, layout: { direction, edgeRouting } });
+			const nodes = scene.elements.filter((e) => e.type === "node");
+			const arrows = scene.elements.filter((e) => e.type === "arrow");
+			expect(nodes).toHaveLength(minimal ? 3 : 5);
+			expect(arrows).toHaveLength(minimal ? 3 : 5);
+			const [start, end] = arrows.find((e) => e.edgeId === "ca")!.points;
+			for (let i = 1; i < 100; i++) {
+				const x = start.x + ((end!.x - start.x) * i) / 100;
+				const y = start.y + ((end!.y - start.y) * i) / 100;
+				for (const n of nodes)
+					expect(x > n.x && x < n.x + n.width && y > n.y && y < n.y + n.height, n.nodeId).toBe(
+						false,
+					);
+			}
+		}
+	});
+});
+
+describe.each(["TB", "BT", "LR", "RL"] as const)("direct feedback: %s", (direction) => {
+	it.each(["straight", "curved"] as const)(
+		"keeps %s feedback outside both bound nodes",
+		(edgeRouting) => {
+			const fixture = routingFixtures["review-feedback"];
+			const scene = renderIntermediateDiagram({ ...fixture, layout: { direction, edgeRouting } });
+			const feedback = scene.elements.find((e) => e.type === "arrow" && e.edgeId === "feedback")!;
+			if (feedback.type !== "arrow") throw new Error("Missing feedback arrow");
+			const source = scene.elements.find(
+				(e) => e.type === "node" && e.nodeId === feedback.sourceNodeId,
+			)!;
+			const target = scene.elements.find(
+				(e) => e.type === "node" && e.nodeId === feedback.targetNodeId,
+			)!;
+			if (source.type !== "node" || target.type !== "node") throw new Error("Missing bound nodes");
+			const start = feedback.points[0],
+				end = feedback.points.at(-1)!;
+			function leavesNode(node: NodeSceneElement, p: ScenePoint, q: ScenePoint) {
+				switch (side(node, p)) {
+					case "left":
+						return q.x < p.x;
+					case "right":
+						return q.x > p.x;
+					case "top":
+						return q.y < p.y;
+					case "bottom":
+						return q.y > p.y;
+				}
+			}
+			expect(leavesNode(source, start, end)).toBe(true);
+			expect(leavesNode(target, end, start)).toBe(true);
+		},
+	);
+});
+
+it.each(["straight", "curved"] as const)(
+	"keeps %s feedback clear of the existing No label",
+	(edgeRouting) => {
+		const scene = renderIntermediateDiagram({
+			...routingFixtures["review-feedback"],
+			layout: { direction: "TB", edgeRouting },
+		});
+		const feedback = scene.elements.find((e) => e.type === "arrow" && e.edgeId === "feedback")!;
+		const label = scene.elements.find((e) => e.type === "text" && e.id === "edge:no:label")!;
+		if (feedback.type !== "arrow" || label.type !== "text")
+			throw new Error("Missing feedback or label");
+		const width = boundLabelWidth(
+			wrapTextToWidth(label.text, label.maxWidth ?? 160, label.fontSize),
+			label.fontSize,
+			label.maxWidth ?? 160,
+		);
+		const [start, end] = feedback.points;
+		for (let i = 1; i < 100; i++) {
+			const x = start.x + ((end!.x - start.x) * i) / 100;
+			const y = start.y + ((end!.y - start.y) * i) / 100;
+			expect(
+				x > label.x - width / 2 && x < label.x + width / 2 && y > label.y - 9 && y < label.y + 9,
+			).toBe(false);
+		}
+	},
+);
 const manyInputs = parseIntermediateDiagram({
 	...flowchartFixture,
 	nodes: [
@@ -61,6 +289,15 @@ describe.each(Object.entries(fixtures))("%s", (_name, fixture) => {
 	const scene = renderIntermediateDiagram(fixture);
 	const nodes = scene.elements.filter((e) => e.type === "node");
 	const arrows = scene.elements.filter((e) => e.type === "arrow");
+	it("has no coincident interiors between directed routes", () => {
+		const failures: string[] = [];
+		for (const [i, a] of arrows.entries())
+			for (const b of arrows.slice(i + 1))
+				for (const x of segmentsFromPoints(a.points))
+					for (const y of segmentsFromPoints(b.points))
+						if (segmentsOverlapInterior(x, y)) failures.push(`${a.edgeId}/${b.edgeId}`);
+		expect(failures).toEqual([]);
+	});
 
 	it("avoids all node interiors except the perpendicular endpoint stubs", () => {
 		const failures: string[] = [];
@@ -188,4 +425,49 @@ describe.each(Object.entries(fixtures))("%s", (_name, fixture) => {
 		}
 		expect(failures).toEqual([]);
 	});
+});
+
+describe.each(["TB", "BT", "LR", "RL"] as const)("feedback ports: %s", (direction) => {
+	it.each(["review-feedback", "wait-retry", "decision-feedback"] as const)(
+		"separates the %s return from forward departures and arrivals",
+		(name) => {
+			const fixture = routingFixtures[name];
+			const scene = renderIntermediateDiagram({
+				...fixture,
+				layout: { ...fixture.layout, direction },
+			});
+			const nodes = scene.elements.filter((e) => e.type === "node");
+			const arrows = scene.elements.filter((e) => e.type === "arrow");
+			const feedback = arrows.find((a) => a.edgeId === "feedback")!;
+			const target = nodes.find((n) => n.nodeId === feedback.targetNodeId)!;
+			const source = nodes.find((n) => n.nodeId === feedback.sourceNodeId)!;
+			const forward = arrows.filter((a) => a !== feedback);
+			const overlaps = arrows.flatMap((a, i) =>
+				arrows
+					.slice(i + 1)
+					.filter((b) =>
+						segmentsFromPoints(a.points).some((x) =>
+							segmentsFromPoints(b.points).some((y) => segmentsOverlapInterior(x, y)),
+						),
+					)
+					.map((b) => `${a.edgeId}/${b.edgeId}`),
+			);
+			expect(overlaps).toEqual([]);
+			expect(
+				forward
+					.filter((a) => a.sourceNodeId === target.nodeId)
+					.map((a) => side(target, a.points[0])),
+			).not.toContain(side(target, feedback.points.at(-1)!));
+			expect(
+				forward
+					.filter((a) => a.targetNodeId === source.nodeId)
+					.map((a) => side(source, a.points.at(-1)!)),
+			).not.toContain(side(source, feedback.points[0]));
+			expect(
+				forward
+					.filter((a) => a.targetNodeId === target.nodeId)
+					.map((a) => side(target, a.points.at(-1)!)),
+			).not.toContain(side(target, feedback.points.at(-1)!));
+		},
+	);
 });
