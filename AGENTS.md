@@ -11,33 +11,40 @@ Convex, Vercel, Bun, or Turborepo stack.
 - Prefer readable, tested package boundaries over compatibility layers.
 - Treat diagram generation as product-critical infrastructure: deterministic inputs, typed intermediate representation, functional tests, and Storybook coverage.
 - Delete obsolete approaches when replacing them. Do not carry parallel systems unless a migration step explicitly requires it.
+- Generation cost is product quality. A diagram that reads badly is a failure, and so is one that takes excess tokens, tool calls, retries or wall time to produce. Measure both before claiming an improvement.
 
 ## Delegated agents
 
-- Use Codex `gpt-6.1-sol` for planning, implementation, and independent review,
-  with reasoning effort set explicitly for the task; use `gpt-6-astra` for
-  harder slices.
-- Fable may act as the primary delivery orchestrator from the canonical root.
-  In that role it may inspect repository and external state, maintain coordination
-  artifacts, create and clean Herdr worktrees, launch and steer agents, route
-  review findings, run proof, manage GitHub issues and Graphite PRs, merge green
-  slices, and verify main and production/runtime surfaces.
-- Keep implementation and independent review delegated to separate Codex
-  `gpt-6.1-sol` (or `gpt-6-astra`) agents with explicit reasoning effort. Fable should remain the
-  coordinator and must not directly implement product/source/test changes or
-  substitute its own assessment for the required independent review.
+- A Claude orchestrator in the canonical root plans the work, creates and cleans
+  Herdr worktrees, launches and steers agents, routes review findings, manages
+  GitHub issues and Graphite PRs, merges green slices, and verifies main and
+  production. It does not implement product, source or test changes itself.
+- Implementation: one Claude Opus 5.5 agent per slice (`--model claude-opus-5-5`)
+  in its own Herdr worktree, with effort set explicitly (`high`, or `xhigh` for
+  routing and layout).
+- Independent review: a Codex `gpt-6.1-sol` session separate from the author,
+  with reasoning effort set explicitly, running `codex review --base <parent>`.
+  Findings go back to the implementer once; the orchestrator then decides.
+- Browser and render verification: Codex `gpt-6.1-sol`.
+- Never select a Fable model.
 
 ## Proof
 
-Before pushing meaningful changes, run:
+Prove changes locally. CI is a lean double check of the key items and of merge
+conflicts, not the place for heavy suites or timing-sensitive tests. If you find
+yourself fighting CI, verify the change locally and slim CI instead of adding to it.
 
-- `pnpm nx run-many -t typecheck,test,build`
+Before pushing, run the affected checks:
+
+- `pnpm nx affected -t typecheck,test,build --base=origin/main`
 - `pnpm run check`
-- `pnpm nx build-storybook diagram-ui`
+- `pnpm nx build-storybook diagram-ui` when `diagram-ui` is affected
 
-For UI-affecting changes, run the web app locally and verify the changed flow against the real page.
+For routing and rendering changes, replay the relevant scenarios against the PR's preview MCP with the scenario CLI and inspect a few real PNGs before merging.
 
-For end-to-end checks, prefer exercising the real deployed or local surface through an actual browser (Chrome/TabEx where a true browser is required; otherwise `agent-browser`) instead of relying only on in-process or mocked tests.
+For UI-affecting changes, verify the changed flow against the real page.
+
+Never install or run a local Chromium. For real-page checks, use `agent-browser -p browserbase` against the PR preview or production. A browser test that is genuinely valuable calls Browserbase over its API instead of a local browser.
 
 ## Temporary Artifacts
 
