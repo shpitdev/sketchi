@@ -135,6 +135,29 @@ export function specToSequenceCandidate(spec: unknown): unknown {
 	};
 }
 
+const operationFamilies: Readonly<Record<string, string>> = {
+	buildFlowchart: "flowchart",
+	buildMindmap: "mindmap",
+	buildSequenceDiagram: "sequence",
+	buildTimeline: "timeline",
+	createCanvas: "canvas",
+};
+
+/** The family a build produced, from its operation or, failing that, a canvas spec. */
+function builtDiagramType(
+	build: Record<string, unknown>,
+	spec: Record<string, unknown>,
+): { readonly family: string; readonly label: string } | undefined {
+	const operation = typeof build.operation === "string" ? build.operation : undefined;
+	const family =
+		operation && Object.hasOwn(operationFamilies, operation)
+			? operationFamilies[operation]
+			: undefined;
+	if (operation && family) return { family, label: operation };
+	if (spec.kind === "canvas") return { family: "canvas", label: "a canvas spec" };
+	return undefined;
+}
+
 type McpScenarioCandidate =
 	| { readonly ok: true; readonly diagram: unknown; readonly check: ScenarioCheck }
 	| { readonly ok: false; readonly check: ScenarioCheck };
@@ -207,6 +230,19 @@ export function candidateFromMcpResult(
 	}
 	if (!isRecord(build.normalizedSpec)) {
 		return rejected("MCP build has no normalizedSpec object to grade.");
+	}
+	const builtType = builtDiagramType(build, build.normalizedSpec);
+	if (builtType && builtType.family !== diagramType) {
+		// A well-formed build of another family is a wrong answer, not ungradable
+		// input; its spec cannot be scored by this scenario's checks.
+		return {
+			ok: false,
+			check: {
+				id: "diagram-type",
+				passed: false,
+				message: `Expected native ${diagramType}, got ${builtType.label}.`,
+			},
+		};
 	}
 	return {
 		ok: true,

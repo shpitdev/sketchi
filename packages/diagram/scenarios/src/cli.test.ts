@@ -325,6 +325,93 @@ describe("scenario CLI candidate decoding", () => {
 		);
 	}
 
+	const canvasSpec = {
+		kind: "canvas",
+		version: 1,
+		diagramId: "packages",
+		title: "Package interactions",
+		width: 400,
+		height: 200,
+		elements: [{ type: "node", id: "app", nodeId: "app", x: 0, y: 0, width: 120, height: 60 }],
+		layers: [],
+		layouts: [],
+		zOrder: ["app"],
+	};
+	const sequenceSpec = getSequenceScenario("checkout-payment-sequence").expectedDiagram;
+	for (const [scenarioId, operation, spec, message] of [
+		[
+			"repo-package-interaction-flow",
+			"createCanvas",
+			canvasSpec,
+			"Expected native flowchart, got createCanvas.",
+		],
+		[
+			"repo-package-interaction-flow",
+			undefined,
+			canvasSpec,
+			"Expected native flowchart, got a canvas spec.",
+		],
+		[
+			"incident-escalation",
+			"buildMindmap",
+			{ id: "m", title: "M", root: { id: "root", label: "Root" } },
+			"Expected native flowchart, got buildMindmap.",
+		],
+		[
+			"checkout-payment-sequence",
+			"buildFlowchart",
+			scenario.expectedDiagram,
+			"Expected native sequence, got buildFlowchart.",
+		],
+		[
+			"release-milestones-timeline",
+			"buildSequenceDiagram",
+			sequenceSpec,
+			"Expected native timeline, got buildSequenceDiagram.",
+		],
+	] as const) {
+		it.live(
+			`reports a ${operation ?? "canvas spec"} build for ${scenarioId} as a wrong diagram type`,
+			() =>
+				withCandidate("", (directory) =>
+					Effect.gen(function* () {
+						const build = {
+							index: 0,
+							...(operation ? { operation } : {}),
+							ok: true,
+							status: "accepted",
+							buildId: "build_wrong_type",
+							normalizedSpec: spec,
+							issues: [],
+						};
+						const inputPath = path.join(directory, "execute.json");
+						const reportPath = path.join(directory, "report.json");
+						yield* Effect.tryPromise(() =>
+							writeFile(
+								inputPath,
+								JSON.stringify({ ok: true, result: build, logs: [], builds: [build] }),
+							),
+						);
+						yield* runScenarioCli([
+							"--scenario",
+							scenarioId,
+							"--input",
+							inputPath,
+							"--report-out",
+							reportPath,
+						]);
+						const report = yield* Schema.decodeUnknownEffect(Report)(
+							yield* Effect.tryPromise(() => readFile(reportPath, "utf8")),
+						);
+						assert.isFalse(report.ok);
+						assert.isUndefined(report.error);
+						assert.deepStrictEqual(report.checks, [{ id: "diagram-type", passed: false, message }]);
+						assert.strictEqual(process.exitCode, 1);
+					}),
+				),
+		);
+	}
+
 	it.live("accepts bare IR emitted by an offline generator command", () =>
 		withCandidate("", (directory) =>
 			Effect.gen(function* () {
