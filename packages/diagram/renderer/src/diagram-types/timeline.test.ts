@@ -39,6 +39,12 @@ function box(element: CanvasTextElement) {
 	};
 }
 
+/** Rows of a wrapped timeline: every row but the last ends in a continuation on each lane. */
+const rows = (scene: RenderedDiagramScene) =>
+	lines(scene).filter((line) => line.id.startsWith("continue-out:0:")).length + 1;
+/** Aspect of the hosted PNG, which frames the drawing 20px out instead of the scene's 40. */
+const exportAspect = (scene: RenderedDiagramScene) => (scene.width - 40) / (scene.height - 40);
+
 /** Labels never overlap each other, and no stem or axis runs through a label. */
 function expectReadableLayout(scene: RenderedDiagramScene) {
 	expect(getCanvasValidationIssues(scene)).toEqual([]);
@@ -194,8 +200,24 @@ function expectHonestMarkers(diagram: TimelineDiagram, scene: RenderedDiagramSce
 	}
 }
 
-/** Deterministic pseudo-random timelines that mix clusters, ties, phases, lanes and today. */
-function randomTimelines(count: number) {
+/** Whether phases cover the chronology from its first start to its last, leaving no gap to break or cut. */
+function phasesCoverEveryGap(diagram: TimelineDiagram) {
+	const periods = diagram.events.map(periodOf);
+	const last = Math.max(...periods.map((period) => period.start));
+	let covered = Math.min(...periods.map((period) => period.start));
+	for (const phase of diagram.events
+		.filter((event) => event.end !== undefined)
+		.map(periodOf)
+		.toSorted((a, b) => a.start - b.start))
+		if (phase.start <= covered) covered = Math.max(covered, phase.end);
+	return covered > last;
+}
+
+/**
+ * Deterministic pseudo-random timelines that mix clusters, ties, phases, lanes
+ * and today, over `horizon` days.
+ */
+function randomTimelines(count: number, horizon = 90) {
 	let seed = 20261017;
 	const random = () => {
 		seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
@@ -216,10 +238,10 @@ function randomTimelines(count: number) {
 		new Date(Date.UTC(2026, 0, 1 + offset)).toISOString().slice(0, 10);
 	return Array.from({ length: count }, (_, index) => {
 		const lanes = pick([[], [], ["Eng"], ["Eng", "Ops"], ["Eng", "Ops", "Sales"]]);
-		const offsets = Array.from({ length: 3 }, () => Math.floor(random() * 60));
+		const offsets = Array.from({ length: 3 }, () => Math.floor((random() * horizon * 2) / 3));
 		const events = Array.from({ length: 2 + Math.floor(random() * 11) }, (_, event) => {
 			const start =
-				random() < 0.6 ? pick(offsets) + Math.floor(random() * 3) : Math.floor(random() * 90);
+				random() < 0.6 ? pick(offsets) + Math.floor(random() * 3) : Math.floor(random() * horizon);
 			const span = random() < 0.25;
 			return {
 				id: `e${event}`,
@@ -234,9 +256,9 @@ function randomTimelines(count: number) {
 			};
 		});
 		return timeline(events, {
-			id: `fuzz-${index}`,
+			id: `fuzz-${horizon}d-${index}`,
 			...(lanes.length ? { lanes } : {}),
-			...(random() < 0.3 ? { today: day(Math.floor(random() * 90)) } : {}),
+			...(random() < 0.3 ? { today: day(Math.floor(random() * horizon)) } : {}),
 		});
 	});
 }
@@ -412,7 +434,7 @@ describe("native timeline layout", () => {
 		expectReadableLayout(scene);
 	});
 
-	it("draws a 162-day gap 23 times a 7-day one and breaks only the gap it cannot draw", () => {
+	it("breaks the widest gaps of a too-wide row and keeps the rest to scale", () => {
 		const diagram = timeline([
 			{ id: "a", label: "v0.1", date: "2026-01-05" },
 			{ id: "b", label: "v0.2", date: "2026-01-12" },
@@ -421,13 +443,46 @@ describe("native timeline layout", () => {
 			{ id: "e", label: "v2.0", date: "2028-03-01" },
 		]);
 		const scene = renderDiagram(diagram);
+		// Drawn to scale, the 162-day gap is 23 weeks wide and the row runs past 4:1.
+		expect(rows(scene)).toBe(1);
+		expect(exportAspect(scene)).toBeLessThanOrEqual(3.5);
 		const gaps = expectToScale(diagram, scene);
-		expect(gaps.map((gap) => gap.broken)).toEqual([false, false, false, true]);
-		expect(gaps[2]!.drawn / gaps[0]!.drawn).toBeCloseTo(162 / 7, 6);
-		expect(lines(scene).filter((line) => line.id.startsWith("break:"))).toHaveLength(2);
-		// The break stands in for more time than the drawn 162 days, yet draws shorter.
-		expect(gaps[3]!.drawn).toBeLessThan(gaps[2]!.drawn);
+		expect(gaps.map((gap) => gap.broken)).toEqual([false, false, true, true]);
+		expect(gaps[1]!.drawn / gaps[0]!.drawn).toBeCloseTo(1, 6);
+		expect(lines(scene).filter((line) => line.id.startsWith("break:"))).toHaveLength(4);
+		expectHonestMarkers(diagram, scene);
 		expectReadableLayout(scene);
+	});
+
+	it("keeps the breaks of a row that still exceeds the cap and cannot wrap", () => {
+		// Two phases cannot wrap, and Beta keeps its true length past the cap.
+		const diagram = timeline([
+			{ id: "a", label: "Alpha", date: "2026-01-01", end: "2026-01-03" },
+			{ id: "b", label: "Beta", date: "2026-06-12", end: "2027-04-08" },
+		]);
+		const scene = renderDiagram(diagram);
+		expect(rows(scene)).toBe(1);
+		const gaps = expectToScale(diagram, scene);
+		expect(gaps.map((gap) => gap.broken)).toEqual([false, true, false]);
+		// The break draws the 160 days between the phases at a fraction of their scale.
+		const rate = gaps[0]!.drawn / gaps[0]!.elapsed;
+		expect(gaps[1]!.drawn).toBeLessThan((gaps[1]!.elapsed * rate) / 4);
+		expectHonestMarkers(diagram, scene);
+		expectReadableLayout(scene);
+	});
+
+	it("draws a long gap to scale while the row stays within the cap", () => {
+		const diagram = timeline([
+			{ id: "a", label: "v0.1", date: "2026-01-05" },
+			{ id: "b", label: "v0.2", date: "2026-01-12" },
+			{ id: "c", label: "v0.3", date: "2026-01-19" },
+			{ id: "d", label: "v1.0", date: "2026-04-06" },
+		]);
+		const scene = renderDiagram(diagram);
+		expect(exportAspect(scene)).toBeLessThanOrEqual(3.5);
+		const gaps = expectToScale(diagram, scene);
+		expect(gaps.map((gap) => gap.broken)).toEqual([false, false, false]);
+		expect(gaps[2]!.drawn / gaps[0]!.drawn).toBeCloseTo(11, 6);
 	});
 
 	it("breaks each outsized gap where it falls and keeps every other gap to scale", () => {
@@ -642,11 +697,17 @@ describe("native timeline layout", () => {
 	});
 
 	it("never needs an unchecked placement across generated timelines", () => {
-		for (const diagram of randomTimelines(160)) {
+		for (const diagram of [...randomTimelines(160), ...randomTimelines(80, 2000)]) {
 			const scene = renderDiagram(diagram);
 			expectReadableLayout(scene);
 			expectToScale(diagram, scene);
 			expectHonestMarkers(diagram, scene);
+			// A single row stays within the cap unless phases cover every gap, so
+			// nothing may break or wrap.
+			if (rows(scene) === 1 && !phasesCoverEveryGap(diagram))
+				expect(exportAspect(scene), `${diagram.id} is too wide for one row`).toBeLessThanOrEqual(
+					3.5 + 0.02,
+				);
 		}
 	});
 });

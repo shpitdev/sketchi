@@ -215,7 +215,7 @@ describe("prompt-grounded timeline scenarios", () => {
 		const scenario = byId("library-releases-timeline");
 		const scene = renderDiagram(scenario.expectedDiagram);
 		expect(timelineSpacingCheck(scenario, scenario.expectedDiagram, scene).passed).toBe(true);
-		// Draw v1.0 at about 5x a 7-day gap after v0.3, as before, with no break there.
+		// Draw v1.0 at about 5x a 7-day gap after v0.3, with the break there removed.
 		const position = (id: string) => {
 			const marker = scene.elements.find(
 				(element) => element.type === "node" && element.nodeId === `event:${id}`,
@@ -240,7 +240,15 @@ describe("prompt-grounded timeline scenarios", () => {
 				: element.type === "line" && element.id.startsWith("break:")
 					? tick(element.id, element.points[0].x + shift, element.points[1].x + shift)
 					: element;
-		const compressed = { ...scene, elements: scene.elements.map(moved) };
+		const beforeV10 = (element: Element) =>
+			element.type === "line" &&
+			element.id.startsWith("break:") &&
+			element.points[0].x > position("v03") &&
+			element.points[0].x < position("v10");
+		const compressed = {
+			...scene,
+			elements: scene.elements.filter((element) => !beforeV10(element)).map(moved),
+		};
 		const check = timelineSpacingCheck(scenario, scenario.expectedDiagram, compressed);
 		expect(check.passed).toBe(false);
 		expect(check.message).toContain("v03 → v10");
