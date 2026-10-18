@@ -80,17 +80,20 @@ export interface CanvasIconAsset {
 
 /**
  * Structural shapes renderers derive: sequence lifelines and activation bars,
- * and timeline event markers and span bars. They carry no bound label or icon
- * and are not obstacles for connectors.
+ * timeline event markers and span bars, and chart data marks (bars, slices,
+ * point markers and legend keys). They carry no bound label or icon and are
+ * not obstacles for connectors.
  */
 export const CANVAS_RENDERER_ROLES = [
 	"sequence-lifeline",
 	"sequence-activation",
 	"timeline-marker",
+	"chart-mark",
 ] as const;
 export type CanvasRendererRole = (typeof CANVAS_RENDERER_ROLES)[number];
 
 const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
+	"chart-mark": "Chart mark",
 	"sequence-activation": "Sequence activation",
 	"sequence-lifeline": "Sequence lifeline",
 	"timeline-marker": "Timeline marker",

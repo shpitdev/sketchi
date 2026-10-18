@@ -13,6 +13,9 @@ import {
 	TimelineDiagramSchema,
 	TimelineValidationError,
 	validateTimelineDiagram,
+	ChartDiagramSchema,
+	ChartValidationError,
+	validateChartDiagram,
 	SequenceValidationError,
 	validateFlowchartDiagram,
 	validateMindmapDiagram,
@@ -250,14 +253,17 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 	if (
 		error instanceof FlowchartValidationError ||
 		error instanceof SequenceValidationError ||
-		error instanceof TimelineValidationError
+		error instanceof TimelineValidationError ||
+		error instanceof ChartValidationError
 	) {
 		const family =
 			error instanceof FlowchartValidationError
 				? "flowchart"
 				: error instanceof TimelineValidationError
 					? "timeline"
-					: "sequence";
+					: error instanceof ChartValidationError
+						? "chart"
+						: "sequence";
 		return {
 			diagnostics: error.issues.map(
 				(entry) => `${family}.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
@@ -349,6 +355,13 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 
 	const repairs: string[] = [];
 	const parsers = {
+		chart: () =>
+			decodeAndValidate(
+				ChartDiagramSchema,
+				withSketchiDiagramStyle(titledDiagram),
+				validateChartDiagram,
+				intent,
+			),
 		timeline: () =>
 			decodeAndValidate(
 				TimelineDiagramSchema,
@@ -521,6 +534,12 @@ function labelsForRequirement(
 	}
 	if (diagram.type === "timeline")
 		return requirement.target === "event" ? diagram.events.map((event) => event.label) : undefined;
+	if (diagram.type === "chart")
+		return requirement.target === "category"
+			? diagram.categories
+			: requirement.target === "series"
+				? diagram.series.flatMap((series) => (series.name === undefined ? [] : [series.name]))
+				: undefined;
 	if (requirement.target === "participant") {
 		return diagram.participants.map((participant) => participant.label);
 	}
@@ -552,6 +571,8 @@ function countForRequirement(
 		return target === "topics" ? diagram.nodes.length : undefined;
 	}
 	if (diagram.type === "timeline") return target === "events" ? diagram.events.length : undefined;
+	if (diagram.type === "chart")
+		return target === "categories" ? diagram.categories.length : undefined;
 	if (target === "participants") return diagram.participants.length;
 	return target === "messages" ? diagram.messages.length : undefined;
 }

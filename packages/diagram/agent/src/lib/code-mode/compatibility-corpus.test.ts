@@ -131,6 +131,15 @@ const GROUP_ISSUE_CODE_ADDITIONS = new Set([
 	"unknown_node_group",
 	"empty_group",
 ]);
+// Native charts add their semantic validation codes.
+const CHART_ISSUE_CODE_ADDITIONS = new Set([
+	"chart_too_large",
+	"chart_series_mismatch",
+	"duplicate_chart_category",
+	"invalid_chart_series",
+	"invalid_chart_value",
+	"invalid_chart_option",
+]);
 const FLOWCHART_SPEC_NODE_ADDED_FIELDS = new Set(["icon", "group"]);
 // Flowchart groups add an optional groups list to the spec.
 const FLOWCHART_SPEC_ADDED_FIELDS = new Set(["groups"]);
@@ -214,7 +223,8 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		NODE_ICON_ISSUE_CODE_ADDITIONS.has(value) ||
 		SEQUENCE_ISSUE_CODE_ADDITIONS.has(value) ||
 		TIMELINE_ISSUE_CODE_ADDITIONS.has(value) ||
-		GROUP_ISSUE_CODE_ADDITIONS.has(value)
+		GROUP_ISSUE_CODE_ADDITIONS.has(value) ||
+		CHART_ISSUE_CODE_ADDITIONS.has(value)
 	);
 }
 
@@ -1622,7 +1632,8 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 						!NODE_ICON_ISSUE_CODE_ADDITIONS.has(code) &&
 						!SEQUENCE_ISSUE_CODE_ADDITIONS.has(code) &&
 						!TIMELINE_ISSUE_CODE_ADDITIONS.has(code) &&
-						!GROUP_ISSUE_CODE_ADDITIONS.has(code),
+						!GROUP_ISSUE_CODE_ADDITIONS.has(code) &&
+						!CHART_ISSUE_CODE_ADDITIONS.has(code),
 				)
 				.toSorted(),
 		).toEqual([...directlyReachableCodes, ...boundaryOnlyCodes].toSorted());

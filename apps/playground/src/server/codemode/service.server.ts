@@ -6,6 +6,7 @@ import {
 	buildMindmap,
 	buildSequenceDiagram,
 	buildTimeline,
+	buildChart,
 	CodeModeArtifactStorage,
 	CodeModeRuntimeEnvironment,
 	getArtifact,
@@ -19,6 +20,7 @@ import {
 	type BuildMindmapResult,
 	type BuildSequenceDiagramResult,
 	type BuildTimelineResult,
+	type BuildChartResult,
 	type CodeModeArtifactStorageError,
 	type CodeModeArtifactStorageShape,
 	type CodeModeRuntimeOptions,
@@ -60,6 +62,9 @@ export interface PlaygroundCodeModeShape {
 	readonly buildTimeline: (
 		input: unknown,
 	) => Effect.Effect<BuildTimelineResult, never, CodeModeRequestContext>;
+	readonly buildChart: (
+		input: unknown,
+	) => Effect.Effect<BuildChartResult, never, CodeModeRequestContext>;
 	readonly createCanvas: (
 		input: unknown,
 	) => Effect.Effect<CreateCanvasResult, never, CodeModeRequestContext>;
@@ -184,6 +189,9 @@ export const PlaygroundCodeModeLive = Layer.effect(
 			),
 			buildTimeline: Effect.fn("playground.codeMode.buildTimeline")((input) =>
 				provideRequestCodeMode(buildTimeline(input)),
+			),
+			buildChart: Effect.fn("playground.codeMode.buildChart")((input) =>
+				provideRequestCodeMode(buildChart(input)),
 			),
 			createCanvas: Effect.fn("playground.codeMode.createCanvas")((input) =>
 				provideRequestCodeMode(createCanvas(input)),

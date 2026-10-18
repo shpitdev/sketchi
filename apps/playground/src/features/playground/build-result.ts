@@ -4,11 +4,14 @@ import {
 	BuildSequenceDiagramResultSchema,
 	BuildTimelineResultSchema,
 	BuildTimelineToolInputSchema,
+	BuildChartResultSchema,
+	BuildChartToolInputSchema,
 	BuildSequenceDiagramToolInputSchema,
 	RenderedDiagramSceneSchema,
 	type BuildFlowchartResult,
 	type BuildSequenceDiagramResult,
 	type BuildTimelineResult,
+	type BuildChartResult,
 } from "@sketchi/diagram-agent";
 import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import { Result, Schema } from "effect";
@@ -21,9 +24,18 @@ type MessagePart = UIMessage["parts"][number];
 export type StudioBuildResult =
 	| BuildFlowchartResult
 	| BuildSequenceDiagramResult
-	| BuildTimelineResult;
+	| BuildTimelineResult
+	| BuildChartResult;
 
 const BUILD_TOOLS = {
+	"tool-build_chart": {
+		family: "chart",
+		decodeResult: Schema.decodeUnknownResult(BuildChartResultSchema),
+		labels: (input: unknown) => {
+			const decoded = Schema.decodeUnknownResult(BuildChartToolInputSchema)(input);
+			return Result.isSuccess(decoded) ? [...decoded.success.spec.categories] : [];
+		},
+	},
 	"tool-build_timeline": {
 		family: "timeline",
 		decodeResult: Schema.decodeUnknownResult(BuildTimelineResultSchema),
@@ -84,6 +96,7 @@ const FAMILY_NAMES: Readonly<Record<DiagramToolFamily, string>> = {
 	flowchart: "flowchart",
 	sequence: "sequence diagram",
 	timeline: "timeline",
+	chart: "chart",
 };
 
 /**

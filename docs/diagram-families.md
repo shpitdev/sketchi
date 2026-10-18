@@ -1,7 +1,7 @@
 # Adding a diagram family
 
 Sketchi supports a fixed set of canonical diagram families: flowchart, mindmap,
-sequence, and timeline. `DIAGRAM_TYPES` in `packages/diagram/core/src/types.ts` is the
+sequence, timeline, and chart. `DIAGRAM_TYPES` in `packages/diagram/core/src/types.ts` is the
 registry. A family is supported only when it completes every stage below, and
 only supported families are advertised. Everything else, such as ER or
 swimlane, fails with a typed `unsupported_diagram_type` and is never coerced

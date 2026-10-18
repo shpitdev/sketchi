@@ -5,6 +5,8 @@ import {
 	CANVAS_NODE_ICON,
 	CANVAS_RENDERER_ROLES,
 	CANVAS_SPEC_VERSION,
+	CHART_KINDS,
+	CHART_ORIENTATIONS,
 	SEQUENCE_MESSAGE_STYLES,
 	SEQUENCE_MESSAGE_TYPES,
 	SKETCHI_DIAGRAM_STYLE,
@@ -394,6 +396,12 @@ export const CODE_MODE_ISSUE_CODES = [
 	"timeline_too_large",
 	"invalid_timeline_span",
 	"invalid_timeline_lane",
+	"chart_too_large",
+	"chart_series_mismatch",
+	"duplicate_chart_category",
+	"invalid_chart_series",
+	"invalid_chart_value",
+	"invalid_chart_option",
 	"request_too_large",
 	"generic_label",
 	"label_too_long",
@@ -700,6 +708,33 @@ export class TimelineSpec extends Schema.Class<TimelineSpec>("TimelineSpec")(
 ) {}
 export const TimelineSpecSchema = TimelineSpec;
 
+/** Author categories and values only; scales, ticks and label placement belong to the renderer. */
+export class ChartSeriesSpec extends Schema.Class<ChartSeriesSpec>("ChartSeriesSpec")(
+	{
+		name: optionalContract(NonEmptyString),
+		values: requiredArray(Schema.Array(FiniteNumber).pipe(Schema.mutable)),
+	},
+	{ identifier: undefined },
+) {}
+export class ChartSpec extends Schema.Class<ChartSpec>("ChartSpec")(
+	{
+		id: optionalContract(NonEmptyString),
+		title: RequiredNonEmptyString,
+		kind: literals(CHART_KINDS),
+		categories: requiredArray(nonEmptyArray(NonEmptyString)),
+		series: requiredArray(nonEmptyArray(ChartSeriesSpec)),
+		unit: optionalContract(NonEmptyString),
+		categoryAxisTitle: optionalContract(NonEmptyString),
+		valueAxisTitle: optionalContract(NonEmptyString),
+		stacked: optionalContract(Schema.Boolean),
+		donut: optionalContract(Schema.Boolean),
+		orientation: optionalContract(literals(CHART_ORIENTATIONS)),
+		style: DiagramStyleWithDefault,
+	},
+	{ identifier: undefined },
+) {}
+export const ChartSpecSchema = ChartSpec;
+
 const ArtifactFormatsOption = optionalContract(nonEmptyArray(ArtifactFormatSchema));
 const InlineArtifactsOption = optionalContract(
 	Schema.Array(InlineArtifactFormatSchema).pipe(Schema.mutable),
@@ -839,6 +874,23 @@ export const BuildTimelineToolInputSchema = Schema.Struct({
 	),
 });
 export type BuildTimelineToolInput = typeof BuildTimelineToolInputSchema.Type;
+
+export class BuildChartRequest extends Schema.Class<BuildChartRequest>("BuildChartRequest")(
+	{
+		requestId: optionalContract(NonEmptyString),
+		spec: requiredObject(ChartSpec),
+		options: optionalContract(BuildFlowchartOptions),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildChartRequestSchema = BuildChartRequest;
+/** The chart spec a model authors; style is always the Sketchi palette. */
+export const ChartToolSpecSchema = ChartSpec.mapFields(({ style: _style, ...fields }) => fields);
+export const BuildChartToolInputSchema = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(ChartToolSpecSchema),
+});
+export type BuildChartToolInput = typeof BuildChartToolInputSchema.Type;
 
 export interface MindmapTopicInput {
 	label: string;
@@ -1589,6 +1641,13 @@ const NormalizedTimelineSpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedTimelineSpec = typeof NormalizedTimelineSpecSchema.Type;
+const NormalizedChartSpecSchema = ChartSpec.mapFields((fields) => ({
+	...fields,
+	id: NonEmptyString,
+	title: NonEmptyString,
+	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
+}));
+export type NormalizedChartSpec = typeof NormalizedChartSpecSchema.Type;
 const QualityCheckSchema = Schema.Struct({
 	code: Schema.String,
 	passed: Schema.Boolean,
@@ -1795,6 +1854,42 @@ export const BuildTimelineResultSchema = Schema.Union([
 	BuildTimelineRejected,
 ]);
 export type BuildTimelineResult = typeof BuildTimelineResultSchema.Type;
+
+export class BuildChartAccepted extends Schema.Class<BuildChartAccepted>("BuildChartAccepted")(
+	{
+		ok: booleanLiteral(true),
+		status: stringLiteral("accepted"),
+		buildId: Schema.String,
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: NormalizedChartSpecSchema,
+		quality: QualityReportSchema,
+		artifact: ArtifactBundleSchema,
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export class BuildChartRejected extends Schema.Class<BuildChartRejected>("BuildChartRejected")(
+	{
+		ok: booleanLiteral(false),
+		status: literals([
+			"invalid_input",
+			"invalid_chart",
+			"quality_failed",
+			"render_failed",
+			"export_failed",
+			"storage_failed",
+		]),
+		buildId: optionalContract(Schema.String),
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: optionalContract(NormalizedChartSpecSchema),
+		quality: optionalContract(QualityReportSchema),
+		partial: optionalContract(PartialArtifactBundleSchema),
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildChartResultSchema = Schema.Union([BuildChartAccepted, BuildChartRejected]);
+export type BuildChartResult = typeof BuildChartResultSchema.Type;
 
 export class GetArtifactAccepted extends Schema.Class<GetArtifactAccepted>("GetArtifactAccepted")(
 	{

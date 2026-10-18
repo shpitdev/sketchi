@@ -11,6 +11,20 @@ import { type DiagramScenario, getDiagramScenario } from "./diagram-scenarios.js
 
 /** The typed intent plan a well-behaved model would author for the scenario. */
 function fixtureRequirements(scenario: DiagramScenario): readonly Record<string, unknown>[] {
+	if (scenario.diagramType === "chart")
+		return [
+			{
+				kind: "count",
+				target: "categories",
+				comparator: "exact",
+				value: scenario.expectedDiagram.categories.length,
+			},
+			...scenario.expectedDiagram.categories.map((category) => ({
+				kind: "label",
+				target: "category",
+				value: category,
+			})),
+		];
 	if (scenario.diagramType === "timeline")
 		return [
 			{

@@ -3,7 +3,7 @@
  * pipeline stage in docs/diagram-families.md; type-structure.test.ts and the
  * family pipeline test fail when one is missing.
  */
-export const DIAGRAM_TYPES = ["flowchart", "mindmap", "sequence", "timeline"] as const;
+export const DIAGRAM_TYPES = ["flowchart", "mindmap", "sequence", "timeline", "chart"] as const;
 
 export type DiagramTypeValue = (typeof DIAGRAM_TYPES)[number];
 

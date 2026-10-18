@@ -6,6 +6,7 @@ import {
 	type BuildMindmapResult,
 	type BuildSequenceDiagramResult,
 	type BuildTimelineResult,
+	type BuildChartResult,
 	type CreateCanvasResult,
 	type StoredArtifactFormat,
 } from "@sketchi/diagram-agent";
@@ -51,6 +52,7 @@ function requestTooLargeResult(
 		| "Mindmap"
 		| "Sequence diagram"
 		| "Timeline"
+		| "Chart"
 		| "Artifact patch",
 ) {
 	return {
@@ -172,6 +174,7 @@ type BuildResult =
 	| BuildMindmapResult
 	| BuildSequenceDiagramResult
 	| BuildTimelineResult
+	| BuildChartResult
 	| CreateCanvasResult;
 
 type BuildOperation =
@@ -179,6 +182,7 @@ type BuildOperation =
 	| "buildMindmap"
 	| "buildSequenceDiagram"
 	| "buildTimeline"
+	| "buildChart"
 	| "createCanvas";
 
 function makeBuildHandler({
@@ -187,7 +191,7 @@ function makeBuildHandler({
 	run,
 }: {
 	readonly operation: BuildOperation;
-	readonly label: "Flowchart" | "Mindmap" | "Sequence diagram" | "Timeline" | "Canvas";
+	readonly label: "Flowchart" | "Mindmap" | "Sequence diagram" | "Timeline" | "Chart" | "Canvas";
 	readonly run: (
 		codeMode: Context.Service.Shape<typeof PlaygroundCodeMode>,
 		input: unknown,
@@ -253,6 +257,11 @@ export const handleBuildTimelineRequest = makeBuildHandler({
 	operation: "buildTimeline",
 	label: "Timeline",
 	run: (codeMode, input) => codeMode.buildTimeline(input),
+});
+export const handleBuildChartRequest = makeBuildHandler({
+	operation: "buildChart",
+	label: "Chart",
+	run: (codeMode, input) => codeMode.buildChart(input),
 });
 export const handleCreateCanvasRequest = makeBuildHandler({
 	operation: "createCanvas",

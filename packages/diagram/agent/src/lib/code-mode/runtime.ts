@@ -8,7 +8,9 @@ import {
 	getFlowchartValidationIssues,
 	getSequenceValidationIssues,
 	getTimelineValidationIssues,
+	getChartValidationIssues,
 	orderedTimelineEvents,
+	type ChartDiagram,
 	type TimelineDiagram,
 	parseMindmapDiagram,
 	validateFlowchartDiagram,
@@ -31,8 +33,10 @@ import {
 	renderIntermediateDiagram,
 	renderSequenceDiagram,
 	renderTimelineDiagram,
+	renderChartDiagram,
 	isStructurallyValidSequenceActivation,
 	isStructurallyValidSequenceLifeline,
+	isStructurallyValidChartMark,
 	isStructurallyValidTimelineMarker,
 	type RenderedDiagramScene,
 	type ScenePoint,
@@ -59,6 +63,7 @@ import {
 	BuildMindmapRejected,
 	BuildSequenceDiagramRejected,
 	BuildTimelineRejected,
+	BuildChartRejected,
 	CreateCanvasRejected,
 	GetArtifactRejected,
 	ApplyDiagramPatchRejected,
@@ -67,6 +72,7 @@ import {
 	BuildMindmapRequestSchema,
 	BuildSequenceDiagramRequestSchema,
 	BuildTimelineRequestSchema,
+	BuildChartRequestSchema,
 	CreateCanvasRequestSchema,
 	DEFAULT_ICON_SEARCH_LIMIT,
 	SearchIconsRejected,
@@ -84,8 +90,10 @@ import {
 	type BuildMindmapResult,
 	type BuildSequenceDiagramRequest,
 	type BuildTimelineRequest,
+	type BuildChartRequest,
 	type BuildSequenceDiagramResult,
 	type BuildTimelineResult,
+	type BuildChartResult,
 	type CreateCanvasResult,
 	CodeModeIssueSchema,
 	type ContractSchemaIssue,
@@ -102,6 +110,7 @@ import {
 	type NormalizedMindmapSpec,
 	type NormalizedSequenceDiagramSpec,
 	type NormalizedTimelineSpec,
+	type NormalizedChartSpec,
 	type PartialArtifactBundle,
 	type PatchableScene,
 	type QualityReport,
@@ -177,6 +186,7 @@ type CodeModeBoundaryOperation =
 	| "buildMindmap"
 	| "buildSequenceDiagram"
 	| "buildTimeline"
+	| "buildChart"
 	| "createCanvas"
 	| "getArtifact"
 	| "searchIcons";
@@ -207,6 +217,7 @@ function artifactKindForOperation(operation: CodeModeBoundaryOperation): string 
 	if (operation === "buildMindmap") return "mindmap";
 	if (operation === "buildSequenceDiagram") return "sequence";
 	if (operation === "buildTimeline") return "timeline";
+	if (operation === "buildChart") return "chart";
 	if (operation === "createCanvas") return "canvas";
 	if (operation === "applyDiagramPatch") return "patch";
 	return undefined;
@@ -474,6 +485,57 @@ function timelineQuality(spec: NormalizedTimelineSpec, threshold: number): Quali
 	};
 }
 
+function normalizeChartSpec(spec: BuildChartRequest["spec"]): NormalizedChartSpec {
+	const title = cleanToolString(spec.title);
+	const optionalText = (value: string | undefined) => {
+		const cleaned = cleanOptional(value);
+		return cleaned === undefined ? undefined : cleaned;
+	};
+	const unit = optionalText(spec.unit);
+	const categoryAxisTitle = optionalText(spec.categoryAxisTitle);
+	const valueAxisTitle = optionalText(spec.valueAxisTitle);
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-chart"),
+		title,
+		kind: spec.kind,
+		categories: spec.categories.map(cleanToolString),
+		series: spec.series.map((series) => {
+			const name = optionalText(series.name);
+			return { ...(name ? { name } : {}), values: [...series.values] };
+		}),
+		...(unit ? { unit } : {}),
+		...(categoryAxisTitle ? { categoryAxisTitle } : {}),
+		...(valueAxisTitle ? { valueAxisTitle } : {}),
+		...(spec.stacked !== undefined ? { stacked: spec.stacked } : {}),
+		...(spec.donut !== undefined ? { donut: spec.donut } : {}),
+		...(spec.orientation ? { orientation: spec.orientation } : {}),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+function toChartDiagram(spec: NormalizedChartSpec): ChartDiagram {
+	return { ...spec, type: "chart" };
+}
+function validateNormalizedChart(spec: NormalizedChartSpec): CodeModeIssue[] {
+	return getChartValidationIssues(toChartDiagram(spec)).map((entry) =>
+		issue({
+			code: entry.code,
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+function chartQuality(spec: NormalizedChartSpec, threshold: number): QualityReport {
+	return {
+		accepted: 10 >= threshold,
+		score: 10,
+		threshold,
+		summary: { nodeCount: spec.categories.length * spec.series.length, edgeCount: 0 },
+		checks: [],
+	};
+}
+
 function normalizeSequenceDiagramSpec(
 	spec: BuildSequenceDiagramRequest["spec"],
 ): NormalizedSequenceDiagramSpec {
@@ -666,6 +728,15 @@ const BuildTimelineFailure = workflowFailure(
 	"BuildTimelineFailure",
 	BuildTimelineRejected.fields.status,
 	BuildTimelineRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildChartFailure = workflowFailure(
+	"BuildChartFailure",
+	BuildChartRejected.fields.status,
+	BuildChartRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -1167,7 +1238,9 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 					isStructurallyValidSequenceLifeline(scene, element)) ||
 				(element.rendererRole === "sequence-activation" &&
 					isStructurallyValidSequenceActivation(scene, element)) ||
-				(element.rendererRole === "timeline-marker" && isStructurallyValidTimelineMarker(element))
+				(element.rendererRole === "timeline-marker" &&
+					isStructurallyValidTimelineMarker(element)) ||
+				(element.rendererRole === "chart-mark" && isStructurallyValidChartMark(element))
 					? { rendererRole: element.rendererRole }
 					: {}),
 				...(element.textColor ? { textColor: element.textColor } : {}),
@@ -2504,6 +2577,114 @@ const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(funct
 	} satisfies Extract<BuildTimelineResult, { ok: true }>;
 });
 
+const buildChartWorkflow = Effect.fn("codeMode.buildChart.workflow")(function* (input: unknown) {
+	const parsed = Schema.decodeUnknownResult(BuildChartRequestSchema, {
+		errors: "all",
+		reportInput: true,
+	})(input);
+	if (!Result.isSuccess(parsed)) {
+		return yield* new BuildChartFailure({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeChartSpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedChart(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* new BuildChartFailure({
+			status: "invalid_chart",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = chartQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* new BuildChartFailure({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* Effect.try({
+		try: () => renderChartDiagram(toChartDiagram(normalizedSpec)),
+		catch: (cause) =>
+			new BuildChartFailure({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message: cause instanceof Error ? cause.message : "Unable to render chart scene.",
+							hint: "Repair the categories and series values and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildChart.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* new BuildChartFailure({
+			status: "render_failed",
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Use fewer categories or series and retry buildChart.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError(
+			(error) =>
+				new BuildChartFailure({
+					status: error.status,
+					context: {
+						...(error.status === "export_failed" ? exportContext : qualityContext),
+						issues: error.issues,
+					},
+				}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildChartResult, { ok: true }>;
+});
+
 const RawCreateCanvasInput = Schema.Struct({
 	spec: Schema.Unknown,
 	requestId: Schema.optionalKey(Schema.Unknown),
@@ -3162,6 +3343,13 @@ export const buildSequenceDiagram: (
 
 export const buildTimeline: (input: unknown) => CodeModeWorkflowEffect<BuildTimelineResult> =
 	boundary("buildTimeline", buildTimelineWorkflow, failureResult);
+
+/** A bar, line or pie chart from categories and named series of numbers. */
+export const buildChart: (input: unknown) => CodeModeWorkflowEffect<BuildChartResult> = boundary(
+	"buildChart",
+	buildChartWorkflow,
+	failureResult,
+);
 
 export const createCanvas: (input: unknown) => CodeModeWorkflowEffect<CreateCanvasResult> =
 	boundary("createCanvas", createCanvasWorkflow, failureResult);

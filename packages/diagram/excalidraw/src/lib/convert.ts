@@ -346,7 +346,10 @@ function shapeElement(input: {
 			height: input.shape.height,
 			backgroundColor: input.shape.fillColor ?? "transparent",
 			boundElements: input.arrowIds.map((id) => ({ id, type: "arrow" })),
-			customData: { sketchiShape: "polygon" },
+			customData: {
+				sketchiShape: "polygon",
+				...(input.shape.rendererRole ? { sketchiRendererRole: input.shape.rendererRole } : {}),
+			},
 			endArrowhead: null,
 			endBinding: null,
 			lastCommittedPoint: null,
@@ -367,7 +370,9 @@ function shapeElement(input: {
 		height,
 		backgroundColor: input.shape.fillColor ?? "transparent",
 		boundElements: boundElements.length > 0 ? boundElements : null,
-		roundness: shapeType === "rectangle" ? { type: 3 } : null,
+		// Chart bars keep square corners, so their ends sit exactly at their values.
+		roundness:
+			shapeType === "rectangle" && input.shape.rendererRole !== "chart-mark" ? { type: 3 } : null,
 		strokeColor: input.shape.strokeColor ?? input.scene.accentColor,
 		...(input.shape.rendererRole
 			? { customData: { sketchiRendererRole: input.shape.rendererRole } }

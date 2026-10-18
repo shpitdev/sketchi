@@ -28,6 +28,13 @@ function diagramCounts(diagram: CanonicalDiagram) {
 			edgeCount: diagram.events.filter((event) => event.end !== undefined).length,
 			edgeNoun: "phases",
 		};
+	if (diagram.type === "chart")
+		return {
+			nodeCount: diagram.categories.length,
+			nodeNoun: diagram.kind === "pie" ? "slices" : "categories",
+			edgeCount: diagram.series.length,
+			edgeNoun: "series",
+		};
 	return diagram.type === "sequence"
 		? {
 				nodeCount: diagram.participants.length,

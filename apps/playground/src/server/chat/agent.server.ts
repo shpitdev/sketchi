@@ -7,6 +7,13 @@ import {
 	StudioBuildTimelineInputSchema,
 	StudioBuildTimelineOutputSchema,
 } from "./studio-timeline-tool.server";
+import {
+	makeStudioChartToolExecutor,
+	STUDIO_BUILD_CHART_TOOL_DESCRIPTION,
+	STUDIO_BUILD_CHART_TOOL_NAME,
+	StudioBuildChartInputSchema,
+	StudioBuildChartOutputSchema,
+} from "./studio-chart-tool.server";
 
 import {
 	DIAGRAM_AGENT_TEMPERATURE,
@@ -152,6 +159,7 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 	});
 
 	const timelineExecutor = yield* makeStudioTimelineToolExecutor(codeMode.buildTimeline, { turn });
+	const chartExecutor = yield* makeStudioChartToolExecutor(codeMode.buildChart, { turn });
 	return yield* Effect.try({
 		try: () => {
 			const result = streamText({
@@ -164,6 +172,12 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 						inputSchema: StudioBuildTimelineInputSchema,
 						outputSchema: StudioBuildTimelineOutputSchema,
 						execute: makeStudioBuildToolCallback(timelineExecutor, callbacks.runPromise),
+					}),
+					[STUDIO_BUILD_CHART_TOOL_NAME]: tool({
+						description: STUDIO_BUILD_CHART_TOOL_DESCRIPTION,
+						inputSchema: StudioBuildChartInputSchema,
+						outputSchema: StudioBuildChartOutputSchema,
+						execute: makeStudioBuildToolCallback(chartExecutor, callbacks.runPromise),
 					}),
 					[STUDIO_BUILD_FLOWCHART_TOOL_NAME]: tool({
 						description: STUDIO_BUILD_FLOWCHART_TOOL_DESCRIPTION,

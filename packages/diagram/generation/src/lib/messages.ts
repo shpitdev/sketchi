@@ -47,8 +47,8 @@ const COMMON_INSTRUCTIONS = [
 	`Sketchi supports only nativeKind ${listAlternatives(NATIVE_KINDS)}. If the requested kind is ${listAlternatives(UNSUPPORTED_KINDS)}, set nativeKind to null, omit diagram, and never coerce it into a supported kind.`,
 	"When nativeKind is null, return an empty requirements array because there is no native artifact to validate.",
 	"List every measurable scenario requirement once in intent.requirements. Convert counts and minimums into count requirements, hierarchy depth into topic_levels, and required names or branch/message text into label requirements.",
-	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
-	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", or "event".',
+	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
+	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", or "series".',
 	'Use comparator "minimum" for phrases such as "at least" and "exact" for exact counts. Do not invent measurable requirements that the scenario did not request.',
 	"The diagram must satisfy every requirement in the plan. Sketchi deterministically checks the plan against the artifact.",
 ];
@@ -96,6 +96,17 @@ const IR_INSTRUCTIONS = {
 			"Equal dates or orders retain input order. Use 1–60 events and at most 6 lanes.",
 		],
 	},
+	chart: {
+		title: "Chart IR rules",
+		rules: [
+			'Use diagram type "chart".',
+			'Set kind to "bar", "line", or "pie". Use a chart only for numeric data; never supply coordinates.',
+			"Return categories (x-axis labels, or pie slice names) and series: [{ name, values }] with exactly one value per category, in category order. Name every series when there are several.",
+			"Copy every number, category, series name, unit, and axis title from the source; never invent or round data.",
+			'Optional: unit ("$", "$M", "%", "ms"), categoryAxisTitle and valueAxisTitle (bar and line), stacked: true (bar), orientation "horizontal" (bar), donut: true (pie).',
+			"A pie has exactly one series of non-negative values and at most 8 slices. Bars and lines allow negative values, up to 40 categories and 6 series.",
+		],
+	},
 	flowchart: { title: "Flowchart IR rules", rules: FLOWCHART_IR_INSTRUCTIONS },
 	mindmap: { title: "Mindmap IR rules", rules: MINDMAP_IR_INSTRUCTIONS },
 	sequence: { title: "Sequence IR rules", rules: SEQUENCE_IR_INSTRUCTIONS },
@@ -115,6 +126,20 @@ const FAMILY_EXAMPLES = {
 		requirements: [
 			{ kind: "count", target: "events", comparator: "exact", value: 2 },
 			{ kind: "label", target: "event", value: "Beta" },
+		],
+	},
+	chart: {
+		diagram: {
+			id: "quarterly-revenue",
+			type: "chart",
+			kind: "bar",
+			categories: ["Q1", "Q2"],
+			series: [{ name: "Revenue", values: [42, 51] }],
+			unit: "$M",
+		},
+		requirements: [
+			{ kind: "count", target: "categories", comparator: "exact", value: 2 },
+			{ kind: "label", target: "category", value: "Q1" },
 		],
 	},
 	flowchart: {

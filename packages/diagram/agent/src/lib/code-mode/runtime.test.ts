@@ -11,7 +11,9 @@ import {
 	FlowchartDiagramSchema,
 	SKETCHI_DIAGRAM_STYLE,
 	getFlowchartValidationIssues,
+	parseChartDiagram,
 } from "@sketchi/diagram-core";
+import { renderChartDiagram } from "@sketchi/diagram-renderer";
 import {
 	CodeModeArtifactStorageError,
 	CodeModeArtifactStorage,
@@ -2029,6 +2031,47 @@ describe("Code Mode runtime", () => {
 		).toMatchObject({
 			elements: expect.arrayContaining([expect.objectContaining({ id: "arrow:message-1-a-c" })]),
 		});
+	});
+
+	it("keeps chart marks unlabeled through a patch", async () => {
+		const scene = renderChartDiagram(
+			parseChartDiagram({
+				id: "revenue",
+				title: "Revenue",
+				type: "chart",
+				kind: "bar",
+				categories: ["Q1", "Q2"],
+				series: [{ name: "Revenue with a long series name", values: [4, 0.1] }],
+			}),
+		);
+		const result = await createTestRuntime().applyDiagramPatch({
+			source: { scene },
+			operations: [
+				{
+					op: "setStyle",
+					selector: { nodeIds: ["chart:bar:0:0"] },
+					style: { fillColor: "#e34948" },
+				},
+			],
+			options: {
+				artifactFormats: ["scene", "excalidraw"],
+				inlineArtifacts: ["scene", "excalidraw"],
+			},
+		});
+
+		expectPatchOk(result);
+		const patched = parseInlineScene(
+			result.artifact.formats.find(({ format }) => format === "scene")?.inline,
+		);
+		const bars = patched.elements.filter(
+			(element) => element.type === "node" && element.nodeId.startsWith("chart:bar:"),
+		);
+		expect(bars).toHaveLength(2);
+		for (const bar of bars) expect(bar).toMatchObject({ rendererRole: "chart-mark" });
+		expect(bars[0]).toMatchObject({ fillColor: "#e34948" });
+		expect(
+			JSON.stringify(result.artifact.formats.find(({ format }) => format === "excalidraw")?.inline),
+		).not.toContain("__sketchi_node_label__");
 	});
 
 	it("strips a spoofed lifeline role from an ordinary inline node", async () => {

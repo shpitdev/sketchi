@@ -7,6 +7,7 @@ import {
 	flowchartFixture,
 	mindmapFixture,
 	pharmaBatchDispositionFlowchart,
+	parseChartDiagram,
 	parseFlowchartDiagram,
 	parseSequenceDiagram,
 	sequenceFixture,
@@ -14,7 +15,11 @@ import {
 	getCanvasValidationIssues,
 	groupFixtures,
 } from "@sketchi/diagram-core";
-import { renderIntermediateDiagram, renderSequenceDiagram } from "@sketchi/diagram-renderer";
+import {
+	renderChartDiagram,
+	renderIntermediateDiagram,
+	renderSequenceDiagram,
+} from "@sketchi/diagram-renderer";
 
 import {
 	convertSceneToExcalidraw,
@@ -2017,5 +2022,51 @@ describe("group frames", () => {
 				message: 'Arrow "edge:through" passes through shape "group:team".',
 			},
 		]);
+	});
+});
+
+describe("chart marks", () => {
+	const chart = (input: object) =>
+		renderChartDiagram(parseChartDiagram({ id: "chart", title: "Chart", type: "chart", ...input }));
+
+	it("exports bars with square corners and no generated labels", () => {
+		const converted = convertSceneToExcalidraw(
+			chart({ kind: "bar", categories: ["A", "B"], series: [{ values: [3, -2] }] }),
+		);
+		expect(validateExcalidrawScene(converted)).toEqual({ ok: true, issues: [] });
+		const bars = converted.elements.filter((element) => element.id.startsWith("node:chart:bar:"));
+		expect(bars).toHaveLength(2);
+		for (const bar of bars) {
+			expect(bar.type).toBe("rectangle");
+			expect(bar.roundness).toBeNull();
+			expect(bar.roughness).toBe(0);
+			expect(bar.boundElements).toBeNull();
+			expect(bar.customData).toEqual({ sketchiRendererRole: "chart-mark" });
+		}
+		expect(
+			converted.elements.some((element) => element.id.includes("__sketchi_node_label__")),
+		).toBe(false);
+	});
+
+	it("exports pie slices as closed filled polygons that keep their role", () => {
+		const converted = convertSceneToExcalidraw(
+			chart({ kind: "pie", donut: true, categories: ["A", "B"], series: [{ values: [3, 1] }] }),
+		);
+		expect(validateExcalidrawScene(converted)).toEqual({ ok: true, issues: [] });
+		const slices = converted.elements.filter((element) =>
+			element.id.startsWith("node:chart:slice:"),
+		);
+		expect(slices).toHaveLength(2);
+		for (const slice of slices) {
+			const points = slice.points as [number, number][];
+			expect(slice.type).toBe("line");
+			expect(slice.roundness).toBeNull();
+			expect(points[0]).toEqual(points.at(-1));
+			expect(slice.backgroundColor).not.toBe("transparent");
+			expect(slice.customData).toEqual({
+				sketchiShape: "polygon",
+				sketchiRendererRole: "chart-mark",
+			});
+		}
 	});
 });

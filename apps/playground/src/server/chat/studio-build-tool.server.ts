@@ -32,7 +32,11 @@ export interface StudioBuildToolExecutor<Input, Result, E = never, R = never> {
 	readonly execute: (input: Input) => Effect.Effect<Result, E, R>;
 }
 
-type StudioBuildOperation = "buildFlowchart" | "buildSequenceDiagram" | "buildTimeline";
+type StudioBuildOperation =
+	| "buildFlowchart"
+	| "buildSequenceDiagram"
+	| "buildTimeline"
+	| "buildChart";
 
 /**
  * One agent turn's build budget, shared by every Studio build tool: one

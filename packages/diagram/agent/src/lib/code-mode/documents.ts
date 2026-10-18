@@ -2,6 +2,7 @@ import { type CanonicalDiagram, DIAGRAM_TYPES, type DiagramTypeValue } from "@sk
 import type { Effect } from "effect";
 
 import {
+	type BuildChartResult,
 	type BuildFlowchartOptions,
 	type BuildFlowchartResult,
 	type BuildMindmapResult,
@@ -12,6 +13,7 @@ import {
 	type MindmapTopicInput,
 	SequenceDiagramSpec,
 	TimelineSpec,
+	ChartSpec,
 } from "./contract.js";
 import type { CodeModeArtifactStorage } from "./artifacts.js";
 import {
@@ -19,6 +21,7 @@ import {
 	buildMindmap,
 	buildSequenceDiagram,
 	buildTimeline,
+	buildChart,
 	type CodeModeRuntimeEnvironment,
 } from "./runtime.js";
 
@@ -31,6 +34,7 @@ export const CANONICAL_DOCUMENT_SPECS = {
 	mindmap: MindmapSpec,
 	sequence: SequenceDiagramSpec,
 	timeline: TimelineSpec,
+	chart: ChartSpec,
 } as const satisfies Record<DiagramTypeValue, unknown>;
 
 /** A canonical diagram document: a family and its authoring spec. */
@@ -45,7 +49,8 @@ export type CanonicalBuildResult =
 	| BuildFlowchartResult
 	| BuildMindmapResult
 	| BuildSequenceDiagramResult
-	| BuildTimelineResult;
+	| BuildTimelineResult
+	| BuildChartResult;
 
 export function isCanonicalDocumentType(value: unknown): value is DiagramTypeValue {
 	return CANONICAL_DOCUMENT_TYPES.some((type) => type === value);
@@ -70,6 +75,8 @@ export function buildCanonicalDocument(
 			return buildSequenceDiagram(request);
 		case "timeline":
 			return buildTimeline(request);
+		case "chart":
+			return buildChart(request);
 	}
 }
 
@@ -98,6 +105,17 @@ function mindmapRoot(diagram: Extract<CanonicalDiagram, { type: "mindmap" }>): M
  */
 export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): CanonicalDiagramDocument {
 	switch (diagram.type) {
+		case "chart": {
+			const { type: _type, ...spec } = diagram;
+			return {
+				type: "chart",
+				spec: {
+					...spec,
+					categories: [...spec.categories],
+					series: spec.series.map((series) => ({ ...series, values: [...series.values] })),
+				},
+			};
+		}
 		case "timeline":
 			return {
 				type: "timeline",

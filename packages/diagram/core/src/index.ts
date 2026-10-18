@@ -15,5 +15,6 @@ export * from "./label-fixtures.js";
 export * from "./group-fixtures.js";
 
 export * from "./types/timeline.js";
+export * from "./types/chart.js";
 export * from "./routing-quality.js";
 export * from "./group-regions.js";

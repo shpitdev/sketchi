@@ -1,3 +1,4 @@
+import { renderChartDiagram } from "./chart.js";
 import { renderTimelineDiagram } from "./timeline.js";
 import type { CanonicalDiagram } from "@sketchi/diagram-core";
 
@@ -14,5 +15,7 @@ export function renderDiagram(diagram: CanonicalDiagram): RenderedDiagramScene {
 			return renderTimelineDiagram(diagram);
 		case "sequence":
 			return renderSequenceDiagram(diagram);
+		case "chart":
+			return renderChartDiagram(diagram);
 	}
 }

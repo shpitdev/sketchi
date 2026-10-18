@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 
+import { type ChartDiagram, ChartDiagramSchema, validateChartDiagram } from "./types/chart.js";
 import {
 	type FlowchartDiagram,
 	FlowchartDiagramSchema,
@@ -27,7 +28,8 @@ export type CanonicalDiagram =
 	| FlowchartDiagram
 	| MindmapDiagram
 	| SequenceDiagram
-	| TimelineDiagram;
+	| TimelineDiagram
+	| ChartDiagram;
 
 // A family added to DIAGRAM_TYPES without a contract here fails to compile.
 const familySchemas = {
@@ -35,6 +37,7 @@ const familySchemas = {
 	mindmap: MindmapDiagramSchema,
 	sequence: SequenceDiagramSchema,
 	timeline: TimelineDiagramSchema,
+	chart: ChartDiagramSchema,
 } satisfies Record<DiagramTypeValue, Schema.Top>;
 
 export const CanonicalDiagramSchema = Schema.Union([
@@ -42,6 +45,7 @@ export const CanonicalDiagramSchema = Schema.Union([
 	familySchemas.mindmap,
 	familySchemas.sequence,
 	familySchemas.timeline,
+	familySchemas.chart,
 ]);
 
 /** Apply the family's semantic validation to an already decoded diagram. */
@@ -55,6 +59,8 @@ export function validateCanonicalDiagram(diagram: CanonicalDiagram): CanonicalDi
 			return validateTimelineDiagram(diagram);
 		case "sequence":
 			return validateSequenceDiagram(diagram);
+		case "chart":
+			return validateChartDiagram(diagram);
 	}
 }
 

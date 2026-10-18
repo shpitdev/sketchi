@@ -33,7 +33,7 @@ scene representations.
 
 ## What Sketchi Does
 
-- Creates hosted flowcharts, mindmaps, sequence diagrams, and timelines from natural-language prompts.
+- Creates hosted flowcharts, mindmaps, sequence diagrams, timelines, and bar, line, and pie charts from natural-language prompts.
 - Produces validated, editable Excalidraw scenes instead of opaque images.
 - Exposes Code Mode through MCP and versioned HTTP artifact endpoints.
 - Keeps layout, bindings, wrapping, and scene conversion deterministic in code.
@@ -68,7 +68,7 @@ Explicit `--type` and file `--dest` values preset their wizard questions;
 interactive generation remains PNG-only, so other formats and `--dest -` also
 require `--prompt`.
 Without `--type`, the model selects a supported native type. Explicit flowchart,
-mindmap, sequence, or timeline selection is authoritative; ER, architecture, swimlane, and
+mindmap, sequence, timeline, or chart selection is authoritative; ER, architecture, swimlane, and
 state-machine requests fail clearly instead of being coerced.
 The default file is `<generated-id>.png` in the current directory. Use
 `--format excalidraw` or `--format scene` for another artifact, and `--dest`
@@ -149,7 +149,7 @@ model candidate → typed diagram IR → deterministic scene → Excalidraw arti
 | `packages/svg-excalidraw`     | Native SVG-to-Excalidraw conversion and library serialization   |
 
 The first high-reliability target is decision-heavy flowchart generation.
-`flowchart`, `mindmap`, `sequence`, and `timeline` are explicit diagram families; unsupported families do
+`flowchart`, `mindmap`, `sequence`, `timeline`, and `chart` are explicit diagram families; unsupported families do
 not silently fall back to a generic template. See the full
 [architecture guide](docs/architecture.md) and the
 [MCP-first generation boundary](docs/mcp-first-generation.md).
@@ -323,3 +323,5 @@ build configuration; see the
 MIT. See [LICENSE](LICENSE).
 
 Native timelines: use `buildTimeline` (Code Mode) or `generate --type timeline` (CLI). Supply events with unique IDs, labels, and ISO dates at the source's precision (year, month, day, or instant with Z or offset) or explicit numeric order; optional `end` (phase), `kind: "milestone"`, `lane`, `today`, and concise descriptions are preserved. Dates and order cannot be mixed. The renderer spaces events by elapsed time, humanizes dates, and wraps long chronologies. No dependency scheduling.
+
+Native charts: use `buildChart` (Code Mode) or `generate --type chart` (CLI). Supply `kind` (`bar`, `line`, or `pie`), `categories`, and `series: [{ name, values }]` with one value per category; optional `unit`, `categoryAxisTitle`, `valueAxisTitle`, `stacked` and `orientation` (bars), and `donut` (pies). The renderer draws nice-tick axes from zero for bars, value and percentage labels, a legend for several series, and leader lines for thin pie slices. Never supply coordinates.

@@ -13,6 +13,9 @@ import {
 	BuildTimelineRequestSchema,
 	BuildSequenceDiagramResultSchema,
 	BuildTimelineResultSchema,
+	BuildChartRequestSchema,
+	BuildChartResultSchema,
+	ChartToolSpecSchema,
 	CodeModeIssueCodeSchema,
 	CodeModeIssueRefSchema,
 	CodeModeIssueSchema,
@@ -87,6 +90,14 @@ export const codeModeContracts = {
 			})),
 		}),
 		output: BuildTimelineResultSchema,
+	},
+	buildChart: {
+		input: Schema.Struct({
+			...BuildChartRequestSchema.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: ChartToolSpecSchema,
+		}),
+		output: BuildChartResultSchema,
 	},
 	createCanvas: {
 		input: CreateCanvasRequestSchema,

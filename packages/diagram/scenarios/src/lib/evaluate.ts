@@ -1,4 +1,11 @@
 import {
+	chartClearRulesCheck,
+	chartDrawnDataCheck,
+	chartGeometryCheck,
+	chartPieLabelCheck,
+	chartScenarioChecks,
+} from "./chart-scenarios.js";
+import {
 	timelineGapOrderCheck,
 	timelineScenarioChecks,
 	timelineSpacingCheck,
@@ -10,6 +17,7 @@ import {
 	parseFlowchartDiagram,
 	parseSequenceDiagram,
 	parseTimelineDiagram,
+	parseChartDiagram,
 	sequenceActivations,
 } from "@sketchi/diagram-core";
 import {
@@ -712,6 +720,22 @@ export function evaluateScenarioDiagram(
 	candidate: unknown,
 	modelCandidate: unknown = candidate,
 ): ScenarioEvaluation {
+	if (scenario.diagramType === "chart") {
+		const diagram = parseChartDiagram(candidate);
+		const modelDiagram = modelCandidate === candidate ? diagram : parseChartDiagram(modelCandidate);
+		// Geometry reads the drawn scene, so it scores the returned diagram.
+		return evaluation(
+			scenario.id,
+			diagram,
+			chartScenarioChecks(scenario, modelDiagram),
+			(scene) => [
+				chartGeometryCheck(diagram, scene),
+				chartDrawnDataCheck(scenario, diagram, scene),
+				chartClearRulesCheck(scene),
+				...(diagram.kind === "pie" ? [chartPieLabelCheck(diagram, scene)] : []),
+			],
+		);
+	}
 	if (scenario.diagramType === "timeline") {
 		const diagram = parseTimelineDiagram(candidate);
 		const modelDiagram =

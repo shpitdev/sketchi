@@ -35,11 +35,13 @@ function buildFrom(
 	if (isRecord(value.normalizedSpec) || typeof value.buildId === "string") return value;
 	const returned = isRecord(value.result) ? buildFrom(value.result, diagramType) : undefined;
 	const operation =
-		diagramType === "timeline"
-			? "buildTimeline"
-			: diagramType === "sequence"
-				? "buildSequenceDiagram"
-				: "buildFlowchart";
+		diagramType === "chart"
+			? "buildChart"
+			: diagramType === "timeline"
+				? "buildTimeline"
+				: diagramType === "sequence"
+					? "buildSequenceDiagram"
+					: "buildFlowchart";
 	const receipts = Array.isArray(value.builds)
 		? value.builds.filter(
 				(build): build is Record<string, unknown> =>
@@ -63,6 +65,7 @@ function buildFrom(
 					"buildMindmap",
 					"buildSequenceDiagram",
 					"buildTimeline",
+					"buildChart",
 					"createCanvas",
 				].includes(returned.operation)))
 	)
@@ -141,6 +144,7 @@ const operationFamilies: Readonly<Record<string, string>> = {
 	buildMindmap: "mindmap",
 	buildSequenceDiagram: "sequence",
 	buildTimeline: "timeline",
+	buildChart: "chart",
 	createCanvas: "canvas",
 };
 
@@ -248,11 +252,13 @@ export function candidateFromMcpResult(
 	return {
 		ok: true,
 		diagram:
-			diagramType === "timeline"
-				? { ...build.normalizedSpec, type: "timeline" }
-				: diagramType === "sequence"
-					? specToSequenceCandidate(build.normalizedSpec)
-					: specToFlowchartCandidate(build.normalizedSpec),
+			diagramType === "chart"
+				? { ...build.normalizedSpec, type: "chart" }
+				: diagramType === "timeline"
+					? { ...build.normalizedSpec, type: "timeline" }
+					: diagramType === "sequence"
+						? specToSequenceCandidate(build.normalizedSpec)
+						: specToFlowchartCandidate(build.normalizedSpec),
 		check: {
 			id: "mcp-build-accepted",
 			passed: true,

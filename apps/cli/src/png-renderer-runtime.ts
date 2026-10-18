@@ -399,7 +399,14 @@ function loadExcalidraw() {
 	return excalidrawModule;
 }
 
+/** Charts draw their own title in the scene; a second banner would repeat it. */
+function bannerTitle(scene: PngRenderInput["scene"]): string | undefined {
+	if (!scene || scene.elements.some((element) => element.id === "chart:title")) return undefined;
+	return scene.title;
+}
+
 export async function renderPngBytes(input: PngRenderInput): Promise<Uint8Array> {
+	const title = bannerTitle(input.scene);
 	const decodedExcalidraw = Schema.decodeUnknownResult(ExcalidrawFileSchema, {
 		errors: "all",
 		reportInput: true,
@@ -416,8 +423,10 @@ export async function renderPngBytes(input: PngRenderInput): Promise<Uint8Array>
 		});
 	}
 	const sizeFailure =
-		renderLimitDiagnostic(decodedExcalidraw.success.elements, input.scene ? TITLE_HEIGHT : 0) ??
-		renderFilesDiagnostic(decodedExcalidraw.success.files, decodedExcalidraw.success.elements);
+		renderLimitDiagnostic(
+			decodedExcalidraw.success.elements,
+			title !== undefined ? TITLE_HEIGHT : 0,
+		) ?? renderFilesDiagnostic(decodedExcalidraw.success.files, decodedExcalidraw.success.elements);
 	if (sizeFailure) {
 		throw HeadlessPngRenderError.make({
 			cause: new Error(sizeFailure.message),
@@ -435,7 +444,7 @@ export async function renderPngBytes(input: PngRenderInput): Promise<Uint8Array>
 		});
 	}
 	const textValues = [
-		...(input.scene ? [input.scene.title] : []),
+		...(title !== undefined ? [title] : []),
 		...decodedExcalidraw.success.elements.flatMap((element) =>
 			"text" in element && typeof element["text"] === "string" ? [element["text"]] : [],
 		),
@@ -493,8 +502,8 @@ export async function renderPngBytes(input: PngRenderInput): Promise<Uint8Array>
 		reuseImages: false,
 		skipInliningFonts: true,
 	});
-	if (input.scene) {
-		addTitle(svg, input.scene.title, input.scene.backgroundColor);
+	if (input.scene && title !== undefined) {
+		addTitle(svg, title, input.scene.backgroundColor);
 	}
 	const baseSvgWidth = Number.parseFloat(svg.getAttribute("width") ?? "");
 	const baseSvgHeight = Number.parseFloat(svg.getAttribute("height") ?? "");

@@ -59,6 +59,7 @@ export function codeModeFailure(
 					"invalid_mindmap",
 					"invalid_sequence",
 					"invalid_timeline",
+					"invalid_chart",
 					"quality_failed",
 				];
 	if (validationStatuses.includes(result.status))

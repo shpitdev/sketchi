@@ -64,17 +64,18 @@ function resultSummary(result: StudioBuildResult): {
 	score?: number;
 } {
 	const spec = result.normalizedSpec;
-	// Timeline events sit on an axis; they have no connections to count.
-	const timeline = spec !== undefined && "events" in spec;
+	// Timeline events and chart values sit on axes; they have no connections to count.
+	const unconnected = spec !== undefined && ("events" in spec || "categories" in spec);
 	if (result.quality) {
 		return {
-			...(timeline ? {} : { connectionCount: result.quality.summary.edgeCount }),
+			...(unconnected ? {} : { connectionCount: result.quality.summary.edgeCount }),
 			itemCount: result.quality.summary.nodeCount,
 			score: result.quality.score,
 		};
 	}
 	if (!spec) return {};
 	if ("events" in spec) return { itemCount: spec.events.length };
+	if ("categories" in spec) return { itemCount: spec.categories.length * spec.series.length };
 	return "participants" in spec
 		? { connectionCount: spec.messages.length, itemCount: spec.participants.length }
 		: { connectionCount: spec.edges.length, itemCount: spec.nodes.length };
@@ -145,6 +146,7 @@ function failureCopy(status: Exclude<StudioBuildResult, { ok: true }>["status"])
 		case "invalid_flowchart":
 		case "invalid_sequence":
 		case "invalid_timeline":
+		case "invalid_chart":
 			return {
 				message: "This draft needs a clearer structure before it can be drawn.",
 				hint: "Clarify the steps or simplify the connections, then try again.",

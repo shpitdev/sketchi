@@ -28,8 +28,9 @@ const BUILDERS = {
 	buildMindmap: "a nested topic hierarchy",
 	buildSequenceDiagram: "time-ordered messages between participants",
 	buildTimeline: "dated or ordered events, milestones and phases",
+	buildChart: "bar, line or pie charts of numbers across categories",
 	createCanvas:
-		"hand-placed CanvasSpec, only for layouts no builder above covers (ERD, chart, dashboard, wireframe)",
+		"hand-placed CanvasSpec, only for layouts no builder above covers (ERD, dashboard, wireframe)",
 };
 const HELPERS = {
 	searchIcons:
@@ -423,7 +424,7 @@ export const catalog: CatalogEntry[] = [
 			OPERATION_LIST,
 			"Write JavaScript only: no TypeScript annotations, interfaces, generics, imports, or named wrapper functions. Pass the arrow function itself, for example async () => { const result = await sketchi.buildFlowchart(...); return result; }. An outer code fence and a trailing semicolon are accepted.",
 			"The sandbox has no secrets, storage bindings, model credentials, or network access. Call sketchi methods sequentially when possible so failures can be inspected and retried deliberately.",
-			"The response is { ok, result, logs, builds, artifactDelivery?, finalResponseText?, error? }. result is the script return value. builds lists every buildFlowchart, buildMindmap, buildSequenceDiagram, buildTimeline, and createCanvas attempt in call order, even when the script returns other data, nothing, or an error. Each receipt has operation, zero-based index, ok, status, and issues, plus buildId, quality, normalizedSpec, and artifact or partial references when available; inline exports are not duplicated. Retrieval and patch calls are not builds. A build still running when the executor times out or aborts has status: incomplete and ok: false.",
+			"The response is { ok, result, logs, builds, artifactDelivery?, finalResponseText?, error? }. result is the script return value. builds lists every buildFlowchart, buildMindmap, buildSequenceDiagram, buildTimeline, buildChart, and createCanvas attempt in call order, even when the script returns other data, nothing, or an error. Each receipt has operation, zero-based index, ok, status, and issues, plus buildId, quality, normalizedSpec, and artifact or partial references when available; inline exports are not duplicated. Retrieval and patch calls are not builds. A build still running when the executor times out or aborts has status: incomplete and ok: false.",
 			"When the script returns an accepted artifact, execute adds artifactDelivery (artifactId, format refs, raw Excalidraw/PNG URLs, and final-response instructions) and puts its finalResponseText first in the text content. Copy that text verbatim as the final chat answer and stop.",
 			"For user-facing completion, return the accepted Sketchi artifactId plus Excalidraw and PNG URLs. Do not synthesize a Mermaid or Markdown replacement after Sketchi accepts an artifact. Do not call file/create/artifact tools, inspect nested inline Excalidraw JSON, or create an Antigravity artifact after that point.",
 			"",
@@ -547,6 +548,39 @@ export const catalog: CatalogEntry[] = [
 		],
 	},
 	{
+		id: "buildChart",
+		kind: "operation",
+		title: "buildChart",
+		topic: "buildChart",
+		keywords: [
+			"chart",
+			"bar",
+			"line",
+			"pie",
+			"donut",
+			"graph",
+			"plot",
+			"data",
+			"values",
+			"percent",
+		],
+		snippet: "Create a native bar, line or pie chart from categories and series of numbers.",
+		content: [
+			"buildChart accepts { spec: { id?, title, kind, categories, series: [{ name?, values }], unit?, categoryAxisTitle?, valueAxisTitle?, stacked?, donut?, orientation? }, options? }. The renderer owns layout: nice ticks, value labels, legend and pie leader lines.",
+			'kind "bar" compares categories (stacked: true stacks the series; long names turn bars horizontal, or set orientation), "line" shows change across ordered categories, "pie" splits one whole (donut: true for a ring).',
+			"Give every series exactly one value per category, in category order, and name every series when there are several. A pie has one series of non-negative values and at most 8 slices; bars and lines take negatives, up to 40 categories and 6 series.",
+			'Copy every number, category, series name, unit and axis title from the prompt; invent none. unit labels ticks and values: currency symbols lead ("$", "$M"), others follow ("%", "ms", "k").',
+			operationTypes("buildChart"),
+		].join("\n\n"),
+		examples: [
+			{
+				title: "Grouped bars",
+				language: "js",
+				code: `async () => sketchi.buildChart({ spec: { title: "Quarterly revenue", kind: "bar", categories: ["Q1", "Q2"], series: [{ name: "2025", values: [42, 51] }, { name: "2026", values: [48, 57] }], unit: "$M", valueAxisTitle: "Revenue" }, options: ${DELIVERY_OPTIONS} })`,
+			},
+		],
+	},
+	{
 		id: "buildSequenceDiagram",
 		kind: "operation",
 		title: "buildSequenceDiagram",
@@ -596,7 +630,6 @@ export const catalog: CatalogEntry[] = [
 			"arbitrary",
 			"erd",
 			"dashboard",
-			"chart",
 			"wireframe",
 			"grid",
 			"layers",
@@ -604,9 +637,9 @@ export const catalog: CatalogEntry[] = [
 			"polygon",
 		],
 		snippet:
-			"Hand-place a layout no builder covers (ERD, chart, dashboard, wireframe) as a versioned CanvasSpec.",
+			"Hand-place a layout no builder covers (ERD, dashboard, wireframe) as a versioned CanvasSpec.",
 		content: [
-			"Use createCanvas only for layouts no builder covers, such as ERDs, charts, dashboards and wireframes. Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); topic hierarchies, participant interactions and chronologies have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
+			"Use createCanvas only for layouts no builder covers, such as ERDs, dashboards and wireframes. Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); topic hierarchies, participant interactions, chronologies and bar, line or pie charts have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
 			"CanvasSpec supports bound and standalone text, rectangle/ellipse/diamond/circle/polygon shapes, lines and bound connectors with arrowheads, frames, groups, layers, explicit back-to-front zOrder, and deterministic row/column/grid/stack/align/distribute layouts.",
 			"Every element needs a unique stable id. Connectors bind through shape nodeId values; line bindings and text containers use element ids.",
 			"Generic validation enforces size, reference, geometry, and composition invariants. Intentional overlap is allowed.",
@@ -726,7 +759,7 @@ export const catalog: CatalogEntry[] = [
 		snippet: "First get the semantic graph accepted, then apply visual patches.",
 		content: [
 			"For mixed requests like 'circle connected to a purple decision diamond', split the task:",
-			"1. Choose buildFlowchart for a process graph, buildMindmap for a nested topic hierarchy, buildSequenceDiagram for chronological participant interactions, buildTimeline for milestones and event chronologies, or createCanvas only for layouts no builder covers.",
+			"1. Choose buildFlowchart for a process graph, buildMindmap for a nested topic hierarchy, buildSequenceDiagram for chronological participant interactions, buildTimeline for milestones and event chronologies, buildChart for numbers compared across categories, or createCanvas only for layouts no builder covers.",
 			"2. Inspect issues. If the build is not accepted, repair the spec and call the same build operation again.",
 			"3. Once accepted, use applyDiagramPatch for circle, diamond, color, movement, rerouteEdges, or replaceText tweaks.",
 			"4. Return the accepted build or patch; do not fetch the scene just to summarize it. Paste artifactDelivery.finalResponseText when present, otherwise the artifactId and Excalidraw/PNG URLs. Do not create a second Markdown, Mermaid, local file, or Antigravity artifact.",
@@ -836,7 +869,7 @@ export const catalog: CatalogEntry[] = [
 		snippet:
 			"When Sketchi accepts an artifact, the final result is that artifact bundle, not a recreated Markdown diagram.",
 		content:
-			"Do not create a Markdown, Mermaid, local file, Antigravity artifact, or prose-only artifact after buildFlowchart, buildMindmap, buildSequenceDiagram, buildTimeline, createCanvas, or applyDiagramPatch succeeds. Do not call getArtifact for scene just to make a local summary. Paste execute.artifactDelivery.finalResponseText when present, or return the Sketchi artifactId, available formats, and raw Excalidraw/PNG URLs so the caller can open the actual generated artifact.",
+			"Do not create a Markdown, Mermaid, local file, Antigravity artifact, or prose-only artifact after buildFlowchart, buildMindmap, buildSequenceDiagram, buildTimeline, buildChart, createCanvas, or applyDiagramPatch succeeds. Do not call getArtifact for scene just to make a local summary. Paste execute.artifactDelivery.finalResponseText when present, or return the Sketchi artifactId, available formats, and raw Excalidraw/PNG URLs so the caller can open the actual generated artifact.",
 	},
 	{
 		id: "raw-excalidraw-non-goal",
@@ -845,9 +878,9 @@ export const catalog: CatalogEntry[] = [
 		topic: "overview",
 		keywords: ["non-goal", "excalidraw", "raw", "json", "structural"],
 		snippet:
-			"Native Excalidraw is an output format. Prefer semantic FlowchartSpec, MindmapSpec, SequenceDiagramSpec, or TimelineSpec input.",
+			"Native Excalidraw is an output format. Prefer semantic FlowchartSpec, MindmapSpec, SequenceDiagramSpec, TimelineSpec, or ChartSpec input.",
 		content:
-			"Do not use native Excalidraw JSON as build input. Use FlowchartSpec, nested MindmapSpec, SequenceDiagramSpec, TimelineSpec, or the renderer-independent CanvasSpec v1; scene and Excalidraw remain intentional output formats, and applyDiagramPatch handles deterministic edits.",
+			"Do not use native Excalidraw JSON as build input. Use FlowchartSpec, nested MindmapSpec, SequenceDiagramSpec, TimelineSpec, ChartSpec, or the renderer-independent CanvasSpec v1; scene and Excalidraw remain intentional output formats, and applyDiagramPatch handles deterministic edits.",
 	},
 	{
 		id: "managed-thread-non-goal",
