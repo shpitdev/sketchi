@@ -96,11 +96,57 @@ export function boundLabelWidth(text: string, fontSize: number, maxWidth: number
 	return Math.max(1, Math.min(maxWidth, Math.ceil(estimate)), Math.ceil(estimate - fontSize));
 }
 
-function splitLongWord(word: string, maxUnits: number): string[] {
+/**
+ * Stored width of a label wrapped by `wrapTextToWidth`. A line wider than
+ * `maxWidth` holds a word that must not break, and Excalidraw re-wraps unbound
+ * text to its stored width on edit, so the box holds the whole estimate.
+ */
+export function wrappedLabelWidth(text: string, fontSize: number, maxWidth: number): number {
+	return Math.max(
+		boundLabelWidth(text, fontSize, maxWidth),
+		Math.ceil(estimateTextWidth(text, fontSize)),
+	);
+}
+
+/**
+ * Widest word kept whole on an oversized line. Latin words and identifiers up to
+ * this width never break, so their label box grows instead; longer tokens such
+ * as URLs break at deliberate boundaries.
+ */
+export const LONG_WORD_UNITS = 24 * DEFAULT_GLYPH_UNITS;
+
+/** Wide glyphs and emoji are break opportunities on both sides. */
+function breaksAround(cluster: string): boolean {
+	return clusterUnits(cluster) > DEFAULT_GLYPH_UNITS;
+}
+
+/** Runs of unbreakable clusters, with each wide glyph or emoji standing alone. */
+function wordAtoms(word: string): string[] {
+	const atoms: string[] = [];
+	let run = "";
+	for (const cluster of clusters(word)) {
+		if (!breaksAround(cluster)) {
+			run += cluster;
+			continue;
+		}
+		if (run) atoms.push(run);
+		atoms.push(cluster);
+		run = "";
+	}
+	if (run) atoms.push(run);
+	return atoms;
+}
+
+/** Pieces ending after `/ - _ .` or before a lower-to-upper camelCase step. */
+function tokenPieces(token: string): string[] {
+	return token.split(/(?<=[/\-_.])(?=.)|(?<=\p{Ll})(?=\p{Lu})/u);
+}
+
+function splitClusters(text: string, maxUnits: number): string[] {
 	const chunks: string[] = [];
 	let current = "";
 	let currentUnits = 0;
-	for (const cluster of clusters(word)) {
+	for (const cluster of clusters(text)) {
 		const units = clusterUnits(cluster);
 		if (current && currentUnits + units > maxUnits) {
 			chunks.push(current);
@@ -114,6 +160,43 @@ function splitLongWord(word: string, maxUnits: number): string[] {
 		chunks.push(current);
 	}
 	return chunks;
+}
+
+/** An unbreakable run too wide for a line: whole when it fits the long-word bound. */
+function splitToken(token: string, maxUnits: number): string[] {
+	const bound = Math.max(maxUnits, LONG_WORD_UNITS);
+	if (textLineUnits(token) <= bound) return [token];
+	return tokenPieces(token).flatMap((piece) =>
+		textLineUnits(piece) <= bound ? [piece] : splitClusters(piece, maxUnits),
+	);
+}
+
+/**
+ * A space-free word wider than a line breaks only between wide glyphs or emoji
+ * (the correct opportunity for unspaced CJK) and, for very long tokens, at
+ * deliberate boundaries; Latin words stay whole.
+ */
+function splitLongWord(word: string, maxUnits: number): string[] {
+	const pieces = wordAtoms(word).flatMap((atom) =>
+		textLineUnits(atom) > maxUnits ? splitToken(atom, maxUnits) : [atom],
+	);
+	const lines: string[] = [];
+	let current = "";
+	for (const piece of pieces) {
+		if (textLineUnits(piece) > maxUnits) {
+			if (current) lines.push(current);
+			lines.push(piece);
+			current = "";
+			continue;
+		}
+		if (current && textLineUnits(current + piece) > maxUnits) {
+			lines.push(current);
+			current = "";
+		}
+		current += piece;
+	}
+	if (current) lines.push(current);
+	return lines;
 }
 
 function wrapLine(line: string, maxUnits: number): string[] {
@@ -152,8 +235,9 @@ function wrapLine(line: string, maxUnits: number): string[] {
 }
 
 /**
- * Greedy word wrap at spaces; words wider than a line break between grapheme
- * clusters, which is also the correct break opportunity for unspaced CJK text.
+ * Greedy word wrap at spaces. A word wider than a line keeps its Latin runs
+ * whole up to `LONG_WORD_UNITS`, so the line (and the box sized from it) grows
+ * past `maxUnits`; wide glyphs and emoji break between clusters.
  */
 export function wrapTextToUnits(text: string, maxUnits: number): string {
 	return text

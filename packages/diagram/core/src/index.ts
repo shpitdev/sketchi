@@ -11,6 +11,7 @@ export * from "./segments.js";
 export * from "./hash.js";
 export * from "./text-metrics.js";
 export * from "./routing-fixtures.js";
+export * from "./label-fixtures.js";
 
 export * from "./types/timeline.js";
 export * from "./routing-quality.js";

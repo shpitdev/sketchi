@@ -25,7 +25,7 @@ import {
 	type DiagramNode,
 	estimateTextWidth,
 	wrapTextToWidth,
-	boundLabelWidth,
+	wrappedLabelWidth,
 	type IntermediateDiagram,
 	parseIntermediateDiagram,
 	candidateRouteQuality,
@@ -702,7 +702,7 @@ function rankLayout(
 							(edge) =>
 								branchLabelMetrics(
 									edge.label!,
-									shapesByNodeId.get(edge.source)?.kind === "decision" ? 80 : 160,
+									shapesByNodeId.get(edge.source)?.kind === "decision",
 								).width +
 								16 +
 								ROUTE_STUB_LENGTH * 2,
@@ -2304,11 +2304,10 @@ function endpointClearance(
 function sourceStubLength(route: RoutedEdge, point: ScenePoint, distance: number): number {
 	const labelSpace = route.edge.label
 		? route.sourceEdge === "left" || route.sourceEdge === "right"
-			? branchLabelMetrics(route.edge.label, route.source.kind === "decision" ? 80 : 160).width + 16
+			? branchLabelMetrics(route.edge.label, route.source.kind === "decision").width + 16
 			: Math.max(
 					40,
-					branchLabelMetrics(route.edge.label, route.source.kind === "decision" ? 80 : 160).height +
-						24,
+					branchLabelMetrics(route.edge.label, route.source.kind === "decision").height + 24,
 				)
 		: 0;
 	return endpointClearance(route.source, point, route.sourceEdge, Math.max(distance, labelSpace));
@@ -2426,12 +2425,24 @@ function assignFeedbackSides(routes: RoutedEdge[], diagram: IntermediateDiagram)
 	}
 }
 
-function branchLabelMetrics(label: string, maxWidth = 160): { width: number; height: number } {
+function freeLabelSize(label: string, maxWidth: number): { width: number; height: number } {
 	const text = wrapTextToWidth(label, maxWidth, 13);
 	return {
-		width: boundLabelWidth(text, 13, maxWidth),
+		width: wrappedLabelWidth(text, 13, maxWidth),
 		height: Math.ceil(text.split("\n").length * 13 * 1.35),
 	};
+}
+
+/** Decision branch labels wrap narrow to stay compact beside their vertex. */
+function branchLabelMaxWidth(fromDecision: boolean | undefined): number {
+	return fromDecision ? 80 : 160;
+}
+
+function branchLabelMetrics(
+	label: string,
+	fromDecision = false,
+): { width: number; height: number } {
+	return freeLabelSize(label, branchLabelMaxWidth(fromDecision));
 }
 
 function branchLabelPosition(route: RoutedEdge, start: ScenePoint): ScenePoint {
@@ -2446,16 +2457,12 @@ function branchLabelPosition(route: RoutedEdge, start: ScenePoint): ScenePoint {
 			(start.x + stub.x) / 2 +
 			(horizontal
 				? 0
-				: branchLabelMetrics(route.edge.label ?? "", route.source.kind === "decision" ? 80 : 160)
-						.width /
-						2 +
+				: branchLabelMetrics(route.edge.label ?? "", route.source.kind === "decision").width / 2 +
 					8),
 		y:
 			(start.y + stub.y) / 2 -
 			(horizontal
-				? branchLabelMetrics(route.edge.label ?? "", route.source.kind === "decision" ? 80 : 160)
-						.height /
-						2 +
+				? branchLabelMetrics(route.edge.label ?? "", route.source.kind === "decision").height / 2 +
 					5
 				: 0),
 	};
@@ -2474,10 +2481,7 @@ function branchLabelObstacles(
 				offsets.get(connectionKey({ edgeId: route.edge.id, endpoint: "source" })) ?? 0,
 			);
 			const position = branchLabelPosition(route, start);
-			const metrics = branchLabelMetrics(
-				route.edge.label!,
-				route.source.kind === "decision" ? 80 : 160,
-			);
+			const metrics = branchLabelMetrics(route.edge.label!, route.source.kind === "decision");
 			const width = metrics.width + 12;
 			return {
 				...route.source,
@@ -2492,15 +2496,166 @@ function branchLabelObstacles(
 		});
 }
 
-/** Unbound, grouped text keeps its authored stub position through Excalidraw export. */
+/** Clearance a label box keeps from its own line, and the wider one from other lines. */
+const LABEL_LINE_CLEARANCE = 3;
+const LABEL_OTHER_LINE_CLEARANCE = 8;
+/** Route length from the source within which a label may slide to stay clear. */
+const LABEL_SLIDE_LENGTH = 240;
+const LABEL_SLIDE_STEP = 12;
+
+interface LabelBox {
+	readonly x: number;
+	readonly y: number;
+	readonly width: number;
+	readonly height: number;
+}
+
+function labelBox(position: ScenePoint, size: { width: number; height: number }): LabelBox {
+	return {
+		x: position.x - size.width / 2,
+		y: position.y - size.height / 2,
+		width: size.width,
+		height: size.height,
+	};
+}
+
+/** The box point nearest a shape's center decides overlap with its true outline. */
+function boxOverlapsShape(box: LabelBox, shape: NodeSceneElement): boolean {
+	const [cx, cy] = [shape.x + shape.width / 2, shape.y + shape.height / 2];
+	const dx = Math.max(box.x, Math.min(cx, box.x + box.width)) - cx;
+	const dy = Math.max(box.y, Math.min(cy, box.y + box.height)) - cy;
+	const [u, v] = [Math.abs(dx) / (shape.width / 2), Math.abs(dy) / (shape.height / 2)];
+	if (shape.shape === "diamond") return u + v < 1;
+	if (shape.shape === "ellipse" || shape.shape === "circle") return u * u + v * v < 1;
+	return u < 1 && v < 1;
+}
+
+function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
+	return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+function padBox(box: LabelBox, padding: number): LabelBox {
+	return {
+		x: box.x - padding,
+		y: box.y - padding,
+		width: box.width + 2 * padding,
+		height: box.height + 2 * padding,
+	};
+}
+
+/**
+ * Lines, nodes and other labels a label box touches. Other edges keep a wider
+ * berth, so a label never reads as belonging to the line beside it.
+ */
+function labelConflicts(
+	box: LabelBox,
+	own: readonly AxisAlignedSegment[],
+	segments: readonly AxisAlignedSegment[],
+	nodes: readonly NodeSceneElement[],
+	others: readonly LabelBox[],
+): number {
+	const near = padBox(box, LABEL_LINE_CLEARANCE);
+	const far = padBox(box, LABEL_OTHER_LINE_CLEARANCE);
+	return (
+		own.filter((segment) => segmentCrossesBoundsInterior(segment, near)).length +
+		segments.filter((segment) => segmentCrossesBoundsInterior(segment, far)).length +
+		nodes.filter((node) => boxOverlapsShape(box, node)).length +
+		others.filter((other) => boxesOverlap(near, other)).length
+	);
+}
+
+/**
+ * Positions beside the final route, nearest the source first: each axis-aligned
+ * run within `LABEL_SLIDE_LENGTH` of the source, on either side, as the stub
+ * label sits beside its stub.
+ */
+function labelSlidePositions(
+	points: readonly ScenePoint[],
+	size: { width: number; height: number },
+): ScenePoint[] {
+	const positions: ScenePoint[] = [];
+	let travelled = 0;
+	for (const segment of segmentsFromPoints(points)) {
+		if (travelled > LABEL_SLIDE_LENGTH) break;
+		const start = points[segment.segmentIndex]!;
+		const end = points[segment.segmentIndex + 1]!;
+		const length = segment.max - segment.min;
+		const horizontal = segment.orientation === "horizontal";
+		const along = horizontal ? size.width / 2 + 4 : size.height / 2 + 4;
+		for (
+			let offset = Math.min(along, length / 2);
+			offset <= length - Math.min(along, length / 2);
+			offset += LABEL_SLIDE_STEP
+		) {
+			if (travelled + offset > LABEL_SLIDE_LENGTH) break;
+			const t = offset / length;
+			const point = { x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t };
+			for (const side of [1, -1])
+				positions.push(
+					horizontal
+						? { x: point.x, y: point.y - side * (size.height / 2 + 5) }
+						: { x: point.x + side * (size.width / 2 + 8), y: point.y },
+				);
+		}
+		travelled += length;
+	}
+	return positions;
+}
+
+/**
+ * Unbound, grouped text keeps its authored position through Excalidraw export.
+ * Each label starts beside its source stub, where routing reserved room for it;
+ * one that the final routes, a node or another label still touch slides along
+ * its own route, nearest its source first, to the first clear spot.
+ */
 function branchLabels(
 	arrows: ArrowSceneElement[],
 	routes: readonly RoutedEdge[],
+	nodes: readonly NodeSceneElement[],
 ): TextSceneElement[] {
 	const labels: TextSceneElement[] = [];
+	const segments = arrows.map((arrow) => segmentsFromPoints(arrow.points));
+	const placed: { box: LabelBox; index: number }[] = [];
+	const sizes = arrows.map((arrow, index) =>
+		arrow.label
+			? branchLabelMetrics(arrow.label, routes[index]?.source.kind === "decision")
+			: undefined,
+	);
+	const positions = arrows.map((arrow, index) =>
+		arrow.label ? branchLabelPosition(routes[index]!, arrow.points[0]) : undefined,
+	);
 	for (const [index, arrow] of arrows.entries()) {
-		if (!arrow.label) continue;
-		const position = branchLabelPosition(routes[index]!, arrow.points[0]);
+		const size = sizes[index];
+		const stub = positions[index];
+		if (!size || !stub) continue;
+		const others = positions.flatMap((position, other) =>
+			position && other !== index && !placed.some((label) => label.index === other)
+				? [labelBox(position, sizes[other]!)]
+				: [],
+		);
+		const conflicts = (position: ScenePoint) =>
+			labelConflicts(
+				labelBox(position, size),
+				segments[index]!,
+				segments.flatMap((other, at) => (at === index ? [] : other)),
+				nodes,
+				[...others, ...placed.map((label) => label.box)],
+			);
+		let position = stub;
+		if (conflicts(stub) > 0) {
+			let fewest = conflicts(stub);
+			for (const candidate of labelSlidePositions(arrow.points, size)) {
+				const count = conflicts(candidate);
+				if (count < fewest) [position, fewest] = [candidate, count];
+				if (fewest === 0) break;
+			}
+		}
+		positions[index] = position;
+		placed.push({ box: labelBox(position, size), index });
+	}
+	for (const [index, arrow] of arrows.entries()) {
+		const position = positions[index];
+		if (!arrow.label || !position) continue;
 		const groupIds = [`branch:${arrow.edgeId}`];
 		labels.push({
 			type: "text",
@@ -2509,7 +2664,7 @@ function branchLabels(
 			fontSize: 13,
 			x: position.x,
 			y: position.y,
-			maxWidth: routes[index]?.source.kind === "decision" ? 80 : 160,
+			maxWidth: branchLabelMaxWidth(routes[index]?.source.kind === "decision"),
 			groupIds,
 		});
 		arrows[index] = { ...arrow, groupIds };
@@ -3489,7 +3644,7 @@ function drawnSize(
 		]),
 		...arrows.flatMap((arrow) => arrow.points),
 		...labels.flatMap((label) => {
-			const { width, height } = branchLabelMetrics(label.text, label.maxWidth);
+			const { width, height } = freeLabelSize(label.text, label.maxWidth ?? 160);
 			return [
 				{ x: label.x - width / 2, y: label.y - height / 2 },
 				{ x: label.x + width / 2, y: label.y + height / 2 },
@@ -3645,7 +3800,7 @@ export function renderIntermediateDiagram(input: unknown): RenderedDiagramScene 
 	// A flow too long for its breadth wraps when the wrapped layout routes no worse.
 	// Its size includes the branch labels, as the exported PNG does.
 	const size = drawnSize(best.layout.nodeShapes, best.layout.edgeArrows, [
-		...branchLabels([...best.layout.edgeArrows], best.layout.routedEdges),
+		...branchLabels([...best.layout.edgeArrows], best.layout.routedEdges, best.layout.nodeShapes),
 	]);
 	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
 	const [along, across] = vertical ? [size.height, size.width] : [size.width, size.height];
@@ -3666,7 +3821,10 @@ export function renderIntermediateDiagram(input: unknown): RenderedDiagramScene 
 	}
 	const { layout } = best;
 	const { edgeArrows, nodeShapes, routedEdges } = layout;
-	const labels = [...nodeShapes.map(textForNode), ...branchLabels(edgeArrows, routedEdges)];
+	const labels = [
+		...nodeShapes.map(textForNode),
+		...branchLabels(edgeArrows, routedEdges, nodeShapes),
+	];
 	const elements = normalizeSceneOrigin([...edgeArrows, ...nodeShapes, ...labels]);
 	const bounds = sceneBounds(elements);
 	const zOrder = [

@@ -24,6 +24,7 @@ import {
 	segmentsFromPoints,
 	segmentsOverlapInterior,
 	SKETCHI_DIAGRAM_PALETTE,
+	wrappedLabelWidth,
 	wrapTextToWidth,
 } from "@sketchi/diagram-core";
 import { generateKeyBetween } from "fractional-indexing";
@@ -224,7 +225,9 @@ function textElement(input: {
 	const text = input.wrap
 		? wrapTextToWidth(input.text, input.maxWidth, input.fontSize)
 		: input.text;
-	const width = boundLabelWidth(text, input.fontSize, input.maxWidth);
+	const width = input.wrap
+		? wrappedLabelWidth(text, input.fontSize, input.maxWidth)
+		: boundLabelWidth(text, input.fontSize, input.maxWidth);
 	const height = textHeight(text, input.fontSize);
 	const verticalAlign = input.element?.verticalAlign;
 

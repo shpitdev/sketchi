@@ -4,8 +4,10 @@ import {
 	boundLabelWidth,
 	DEFAULT_GLYPH_UNITS,
 	estimateTextWidth,
+	LONG_WORD_UNITS,
 	textLineUnits,
 	wrapTextToUnits,
+	wrappedLabelWidth,
 	wrapTextToWidth,
 } from "./text-metrics";
 
@@ -65,9 +67,45 @@ describe("label text metrics", () => {
 		);
 	});
 
+	it("keeps Latin words whole and grows the line past its width instead", () => {
+		// Decision branch labels wrap at 80px of 13px text: nine default glyphs.
+		expect(wrapTextToWidth("Acceptable", 80, 13)).toBe("Acceptable");
+		expect(wrapTextToWidth("Unacceptable", 80, 13)).toBe("Unacceptable");
+		expect(wrapTextToWidth("No — unresolved", 80, 13)).toBe("No —\nunresolved");
+		expect(wrapTextToWidth("Acceptable credit", 80, 13)).toBe("Acceptable\ncredit");
+		expect(wrapTextToUnits("buildSequenceDiagram renderer-independent", EIGHTEEN_GLYPHS)).toBe(
+			"buildSequenceDiagram\nrenderer-independent",
+		);
+	});
+
+	it("breaks tokens past the long-word bound at deliberate boundaries", () => {
+		expect(wrapTextToWidth("https://example.com/api/v1/artifacts/download", 160, 13)).toBe(
+			"https://example.\ncom/api/v1/\nartifacts/download",
+		);
+		expect(wrapTextToUnits("exportToExcalidrawScene(spec)", EIGHTEEN_GLYPHS)).toBe(
+			"exportToExcalidraw\nScene(spec)",
+		);
+		// Up to 24 glyphs a token stays whole; past that, with no boundary, it splits.
+		expect(LONG_WORD_UNITS).toBe(24 * DEFAULT_GLYPH_UNITS);
+		expect(wrapTextToUnits("a".repeat(24), EIGHTEEN_GLYPHS)).toBe("a".repeat(24));
+		expect(wrapTextToUnits("a".repeat(25), EIGHTEEN_GLYPHS)).toBe(
+			`${"a".repeat(18)}\n${"a".repeat(7)}`,
+		);
+	});
+
+	it("sizes a wrapped label to hold a word wider than its line", () => {
+		// Excalidraw re-wraps unbound text to its stored width on edit.
+		expect(boundLabelWidth("Unacceptable", 13, 80)).toBe(84);
+		expect(wrappedLabelWidth("Unacceptable", 13, 80)).toBe(97);
+		expect(wrappedLabelWidth("Accept", 13, 80)).toBe(boundLabelWidth("Accept", 13, 80));
+	});
+
 	it("breaks unspaced CJK between glyphs and keeps authored line breaks", () => {
 		expect(wrapTextToUnits("品質保証レビュー承認待ち", 1000)).toBe("品質保証レビュー承認\n待ち");
 		expect(wrapTextToUnits("one\ntwo", EIGHTEEN_GLYPHS)).toBe("one\ntwo");
+		// Wide glyphs and emoji stay break opportunities beside whole Latin runs.
+		expect(wrapTextToUnits("品質QAレビュー承認", 400)).toBe("品質QA\nレビュー\n承認");
+		expect(wrapTextToUnits("Ship 🚀🚀 release", 300)).toBe("Ship\n🚀🚀\nrelease");
 	});
 
 	it("never splits a surrogate pair", () => {

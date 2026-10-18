@@ -8,6 +8,7 @@ import {
 	sequenceActivations,
 	sequenceLifelineId,
 	validateSequenceDiagram,
+	estimateTextWidth,
 	wrapTextToWidth,
 } from "@sketchi/diagram-core";
 import type {
@@ -20,7 +21,8 @@ import type {
 const PADDING = 48;
 const HEADER_WIDTH = 180;
 const HEADER_HEIGHT = 72;
-const HEADER_LABEL_WIDTH = HEADER_WIDTH - 24;
+const HEADER_LABEL_PADDING = 24;
+const HEADER_LABEL_WIDTH = HEADER_WIDTH - HEADER_LABEL_PADDING;
 const PARTICIPANT_GAP = 140;
 const MESSAGE_GAP = 88;
 const MESSAGE_TOP_GAP = 64;
@@ -150,13 +152,21 @@ export function isStructurallyValidSequenceActivation(
  */
 export function renderSequenceDiagram(diagram: SequenceDiagram): RenderedDiagramScene {
 	const input = validateSequenceDiagram(diagram);
-	const columnStep = HEADER_WIDTH + PARTICIPANT_GAP;
 	const headerLabelById = new Map(
 		input.participants.map((participant) => [
 			participant.id,
 			wrapTextToWidth(participant.label, HEADER_LABEL_WIDTH, LABEL_FONT_SIZE),
 		]),
 	);
+	// Whole words may wrap wider than a header; every header widens to the
+	// widest label so columns stay even, and the lifelines re-space with them.
+	const headerWidth = Math.max(
+		HEADER_WIDTH,
+		...[...headerLabelById.values()].map(
+			(label) => Math.ceil(estimateTextWidth(label, LABEL_FONT_SIZE)) + HEADER_LABEL_PADDING,
+		),
+	);
+	const columnStep = headerWidth + PARTICIPANT_GAP;
 	// Size the shared header row before laying out lifelines and message lanes;
 	// a participant logo sits above its label inside the header.
 	const headerHeight = input.participants.reduce(
@@ -187,7 +197,7 @@ export function renderSequenceDiagram(diagram: SequenceDiagram): RenderedDiagram
 
 	input.participants.forEach((participant, index) => {
 		const x = PADDING + index * columnStep;
-		const centerX = x + HEADER_WIDTH / 2;
+		const centerX = x + headerWidth / 2;
 		centerXByParticipant.set(participant.id, centerX);
 		headers.push({
 			type: "node",
@@ -200,7 +210,7 @@ export function renderSequenceDiagram(diagram: SequenceDiagram): RenderedDiagram
 			shape: "rectangle",
 			x,
 			y: headerY,
-			width: HEADER_WIDTH,
+			width: headerWidth,
 			height: headerHeight,
 			label: headerLabelById.get(participant.id) ?? participant.label,
 		});
@@ -212,7 +222,7 @@ export function renderSequenceDiagram(diagram: SequenceDiagram): RenderedDiagram
 			y: headerY + headerHeight / 2,
 			text: headerLabelById.get(participant.id) ?? participant.label,
 			fontSize: LABEL_FONT_SIZE,
-			maxWidth: HEADER_LABEL_WIDTH,
+			maxWidth: headerWidth - HEADER_LABEL_PADDING,
 			// The logo sits at the top of the header; the label stacks beneath it.
 			...(participant.icon ? { verticalAlign: "bottom" as const } : {}),
 		});
@@ -298,6 +308,19 @@ export function renderSequenceDiagram(diagram: SequenceDiagram): RenderedDiagram
 		};
 	};
 
+	/**
+	 * Excalidraw centers a bound label on a three-point arrow's middle point, and
+	 * on a two-point arrow's midpoint. A message spanning an even number of
+	 * columns has its midpoint on a lifeline it passes, so a middle point moves
+	 * its label to the gap on the source side of that lifeline.
+	 */
+	const labelPoint = (sourceCenter: number, targetCenter: number, y: number) => {
+		const span = Math.round(Math.abs(targetCenter - sourceCenter) / columnStep);
+		if (span < 2 || span % 2 === 1) return [];
+		const midpoint = (sourceCenter + targetCenter) / 2;
+		return [{ x: midpoint - (Math.sign(targetCenter - sourceCenter) * columnStep) / 2, y }];
+	};
+
 	const messageArrows: ArrowSceneElement[] = input.messages.map((message, index) => {
 		// Validation guarantees both participants exist and differ.
 		const sourceCenter = centerXByParticipant.get(message.source) ?? 0;
@@ -317,6 +340,7 @@ export function renderSequenceDiagram(diagram: SequenceDiagram): RenderedDiagram
 				: {}),
 			points: [
 				{ x: source.x, y },
+				...labelPoint(sourceCenter, targetCenter, y),
 				{ x: target.x, y },
 			],
 			label: message.label,
@@ -338,7 +362,7 @@ export function renderSequenceDiagram(diagram: SequenceDiagram): RenderedDiagram
 		version: CANVAS_SPEC_VERSION,
 		diagramId: input.id,
 		title: input.title,
-		width: PADDING * 2 + HEADER_WIDTH + Math.max(0, input.participants.length - 1) * columnStep,
+		width: PADDING * 2 + headerWidth + Math.max(0, input.participants.length - 1) * columnStep,
 		height: lifelineY + lifelineHeight + PADDING,
 		accentColor: input.style.accentColor,
 		backgroundColor: input.style.backgroundColor,

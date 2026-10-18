@@ -5,6 +5,7 @@ import {
 	apiRequestSequence,
 	deployWebhookLogoSequence,
 	embedCanvasIcons,
+	estimateTextWidth,
 	getCanvasValidationIssues,
 	parseSequenceDiagram,
 	sequenceFixture,
@@ -55,6 +56,76 @@ function unvalidated(overrides: Partial<SequenceDiagram>): SequenceDiagram {
 }
 
 describe("sequence diagram renderer", () => {
+	it("widens every header to its longest whole word and re-spaces the lifelines", () => {
+		const scene = renderSequenceDiagram(
+			parseSequenceDiagram({
+				...sequence,
+				participants: [
+					{ id: "customer", label: "Customer" },
+					{ id: "store", label: "AuthenticationController" },
+					{ id: "payments", label: "Payments" },
+				],
+			}),
+		);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+		const headers = scene.elements.filter(
+			(e): e is NodeSceneElement =>
+				e.type === "node" &&
+				!e.rendererRole &&
+				sequence.participants.some((p) => p.id === e.nodeId),
+		);
+		const label = scene.elements.find((e) => e.id === "label:store");
+		expect(label?.type === "text" && label.text).toBe("AuthenticationController");
+		const width = Math.ceil(estimateTextWidth("AuthenticationController", 14)) + 24;
+		expect(headers.map((header) => header.width)).toEqual([width, width, width]);
+		// Columns keep their gap, and each lifeline stays centered under its header.
+		expect(headers[1]!.x - headers[0]!.x).toBe(width + 140);
+		for (const header of headers) {
+			const lifeline = scene.elements.find((e) => e.id === `node:${header.nodeId}:lifeline`);
+			expect(lifeline?.type === "node" && lifeline.x + lifeline.width / 2).toBe(
+				header.x + header.width / 2,
+			);
+		}
+	});
+
+	it("labels a message clear of the lifelines it passes", () => {
+		// Excalidraw centers a bound label on a three-point arrow's middle point and a
+		// two-point arrow's midpoint; Receipt spans two columns, so its midpoint would
+		// sit on the Store lifeline.
+		const scene = renderSequenceDiagram(
+			parseSequenceDiagram({
+				...sequence,
+				participants: [...sequence.participants, { id: "bank", label: "Bank" }],
+				messages: [
+					...sequence.messages,
+					{ id: "settle", source: "customer", target: "bank", label: "Settle" },
+				],
+			}),
+		);
+		const lifelines = scene.elements
+			.filter((e) => e.type === "node" && e.nodeId.endsWith(":lifeline"))
+			.map((e) => (e.type === "node" ? e.x + e.width / 2 : 0));
+		const labelPoint = (points: readonly { x: number; y: number }[]) =>
+			points.length % 2 === 1
+				? points[(points.length - 1) / 2]!
+				: {
+						x: (points[points.length / 2 - 1]!.x + points[points.length / 2]!.x) / 2,
+						y: points[0]!.y,
+					};
+		for (const id of ["start", "charge", "receipt", "settle"]) {
+			const { points } = arrow(scene, id);
+			expect(new Set(points.map((point) => point.y)).size).toBe(1);
+			const { x } = labelPoint(points);
+			// Wrapped arrow labels are at most 160px wide; a column step is 320px.
+			for (const lifeline of lifelines) expect(Math.abs(x - lifeline)).toBeGreaterThanOrEqual(80);
+		}
+		// Receipt's label sits in the gap beside its source, Payments.
+		const receipt = arrow(scene, "receipt").points;
+		expect(receipt).toHaveLength(3);
+		expect(receipt[1]!.x).toBe((lifelines[2]! + lifelines[1]!) / 2);
+		expect(arrow(scene, "settle").points).toHaveLength(2);
+	});
+
 	it("renders the canonical fixture through the family dispatch", () => {
 		const scene = renderDiagram(sequenceFixture);
 		expect(scene).toEqual(renderSequenceDiagram(sequenceFixture));

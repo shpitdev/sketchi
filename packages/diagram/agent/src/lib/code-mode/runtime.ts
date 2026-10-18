@@ -12,7 +12,7 @@ import {
 	type TimelineDiagram,
 	parseMindmapDiagram,
 	validateFlowchartDiagram,
-	boundLabelWidth,
+	wrappedLabelWidth,
 	wrapTextToWidth,
 	type FlowchartDiagram,
 	type FlowchartValidationIssueRef,
@@ -1375,7 +1375,7 @@ function syncArrowLabel(scene: PatchableScene, arrow: PatchableArrow): void {
 		const next = arrow.points.find((point) => point.x !== start.x || point.y !== start.y);
 		if (!next) return;
 		const text = wrapTextToWidth(label.text, label.maxWidth ?? 160, label.fontSize);
-		const width = boundLabelWidth(text, label.fontSize, label.maxWidth ?? 160);
+		const width = wrappedLabelWidth(text, label.fontSize, label.maxWidth ?? 160);
 		const height = Math.ceil(text.split("\n").length * label.fontSize * 1.35);
 		label.x = (start.x + next.x) / 2 + (start.x === next.x ? width / 2 + 8 : 0);
 		label.y = (start.y + next.y) / 2 - (start.y === next.y ? height / 2 + 5 : 0);

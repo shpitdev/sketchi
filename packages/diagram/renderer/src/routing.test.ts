@@ -6,7 +6,7 @@ import {
 	segmentsFromPoints,
 	segmentCrossesBoundsInterior,
 	segmentsOverlapInterior,
-	boundLabelWidth,
+	wrappedLabelWidth,
 	wrapTextToWidth,
 	parseFlowchartDiagram,
 	parseIntermediateDiagram,
@@ -15,6 +15,20 @@ import {
 	routingQualityScale,
 } from "@sketchi/diagram-core";
 import { renderIntermediateDiagram, type NodeSceneElement, type ScenePoint } from "./scene";
+
+/** The stored, wrapped box of a free edge label, as the Excalidraw adapter writes it. */
+function renderedLabelBox(label: {
+	text: string;
+	fontSize: number;
+	maxWidth?: number;
+	x: number;
+	y: number;
+}) {
+	const text = wrapTextToWidth(label.text, label.maxWidth ?? 160, label.fontSize);
+	const width = wrappedLabelWidth(text, label.fontSize, label.maxWidth ?? 160);
+	const height = Math.ceil(text.split("\n").length * label.fontSize * 1.35);
+	return { x: label.x - width / 2, y: label.y - height / 2, width, height };
+}
 
 // Infer the port side independently from the router, including curved boundaries.
 function side(node: NodeSceneElement, p: ScenePoint) {
@@ -94,19 +108,17 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("settled direct feedback: %s", 
 				const label = scene.elements.find((e) => e.type === "text" && e.id === "edge:ca:label")!;
 				if (arrow.type !== "arrow" || label.type !== "text")
 					throw new Error("Missing labeled return");
-				const text = wrapTextToWidth(label.text, label.maxWidth ?? 160, label.fontSize),
-					width = boundLabelWidth(text, label.fontSize, label.maxWidth ?? 160),
-					height = Math.ceil(text.split("\n").length * label.fontSize * 1.35);
+				const box = renderedLabelBox(label);
 				for (const [i, start] of arrow.points.slice(0, -1).entries()) {
 					const end = arrow.points[i + 1]!;
 					for (let step = 1; step < 1000; step++) {
 						const x = start.x + ((end.x - start.x) * step) / 1000,
 							y = start.y + ((end.y - start.y) * step) / 1000;
 						expect(
-							x > label.x - width / 2 + 0.01 &&
-								x < label.x + width / 2 - 0.01 &&
-								y > label.y - height / 2 + 0.01 &&
-								y < label.y + height / 2 - 0.01,
+							x > box.x + 0.01 &&
+								x < box.x + box.width - 0.01 &&
+								y > box.y + 0.01 &&
+								y < box.y + box.height - 0.01,
 						).toBe(false);
 					}
 				}
@@ -255,18 +267,12 @@ it.each(["straight", "curved"] as const)(
 		const label = scene.elements.find((e) => e.type === "text" && e.id === "edge:no:label")!;
 		if (feedback.type !== "arrow" || label.type !== "text")
 			throw new Error("Missing feedback or label");
-		const width = boundLabelWidth(
-			wrapTextToWidth(label.text, label.maxWidth ?? 160, label.fontSize),
-			label.fontSize,
-			label.maxWidth ?? 160,
-		);
+		const box = renderedLabelBox(label);
 		const [start, end] = feedback.points;
 		for (let i = 1; i < 100; i++) {
 			const x = start.x + ((end!.x - start.x) * i) / 100;
 			const y = start.y + ((end!.y - start.y) * i) / 100;
-			expect(
-				x > label.x - width / 2 && x < label.x + width / 2 && y > label.y - 9 && y < label.y + 9,
-			).toBe(false);
+			expect(x > box.x && x < box.x + box.width && y > box.y && y < box.y + box.height).toBe(false);
 		}
 	},
 );
@@ -388,7 +394,7 @@ describe.each(Object.entries(fixtures))("%s", (_name, fixture) => {
 			}
 	});
 
-	it("places branch labels on their first outward stub, clear of nodes and other arrows", () => {
+	it("places branch labels beside their own route, clear of nodes and every arrow", () => {
 		const failures: string[] = [];
 		for (const a of arrows) {
 			const edge = fixture.edges.find((e) => e.id === a.edgeId);
@@ -398,24 +404,23 @@ describe.each(Object.entries(fixtures))("%s", (_name, fixture) => {
 				failures.push(`${a.edgeId}:missing positioned label`);
 				continue;
 			}
-			const text = wrapTextToWidth(label.text, label.maxWidth ?? 160, label.fontSize);
-			const width = boundLabelWidth(text, label.fontSize, label.maxWidth ?? 160);
-			const box = { x: label.x - width / 2, y: label.y - 9, width, height: 18 };
-			const p = a.points[0],
-				q = a.points[1]!;
+			const box = renderedLabelBox(label);
 			const cx = box.x + box.width / 2,
 				cy = box.y + box.height / 2;
-			if (
-				p.y === q.y
-					? Math.abs(cy - p.y) > box.height / 2 + 6 ||
-						cx < Math.min(p.x, q.x) ||
-						cx > Math.max(p.x, q.x)
-					: Math.abs(cx - p.x) > box.width / 2 + 12 ||
-						cy < Math.min(p.y, q.y) ||
-						cy > Math.max(p.y, q.y)
-			)
-				failures.push(`${a.edgeId}:not on stub`);
-			for (const b of arrows.filter((b) => b !== a))
+			// Beside one of its own runs, as a stub label sits beside its stub.
+			const beside = a.points.slice(1).some((q, i) => {
+				const p = a.points[i]!;
+				return p.y === q.y
+					? Math.abs(cy - p.y) <= box.height / 2 + 6 &&
+							cx >= Math.min(p.x, q.x) &&
+							cx <= Math.max(p.x, q.x)
+					: p.x === q.x &&
+							Math.abs(cx - p.x) <= box.width / 2 + 12 &&
+							cy >= Math.min(p.y, q.y) &&
+							cy <= Math.max(p.y, q.y);
+			});
+			if (!beside) failures.push(`${a.edgeId}:not beside its route`);
+			for (const b of arrows)
 				if (segmentsFromPoints(b.points).some((s) => segmentCrossesBoundsInterior(s, box)))
 					failures.push(`${a.edgeId}:label hits ${b.edgeId}`);
 			for (const n of nodes)
