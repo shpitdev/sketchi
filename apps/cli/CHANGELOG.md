@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.16.0
+
+### Minor Changes
+
+- [#437](https://github.com/shpitdev/sketchi/pull/437) [`b78af27`](https://github.com/shpitdev/sketchi/commit/b78af2768cf4321d479283c334be898c3e899784) Thanks [@anandpant](https://github.com/anandpant)! - Add native bar, line and pie charts: `sketchi create` accepts `{"type":"chart"}` documents and `generate --type chart` builds them from a prompt. The renderer draws nice-tick axes, grouped or stacked bars that handle negative values, multi-series lines with distinct markers, and pies or donuts whose percentage labels move outside on leader lines for thin slices. Chart PNGs no longer get a second title banner.
+
 ## 0.15.1
 
 ### Patch Changes
