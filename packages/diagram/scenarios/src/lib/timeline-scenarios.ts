@@ -8,7 +8,12 @@ import {
 	type TimelineEvent,
 	type TimelineEventKind,
 } from "@sketchi/diagram-core";
-import { readTimelineGaps, type RenderedDiagramScene } from "@sketchi/diagram-renderer";
+import {
+	readTimelineAxis,
+	readTimelineGaps,
+	readTimelineMomentGaps,
+	type RenderedDiagramScene,
+} from "@sketchi/diagram-renderer";
 import type { DiagramScenarioDifficulty } from "./scenarios.js";
 import type { ScenarioCheck } from "./evaluate.js";
 
@@ -326,6 +331,20 @@ export function timelineScenarioChecks(
 /** Drawn gaps may differ from one shared scale by this fraction. */
 const SPACING_TOLERANCE = 0.05;
 
+/** Each matched model event's moment by the prompt's own dates. */
+function promptMoments(scenario: TimelineScenario, diagram: TimelineDiagram) {
+	const matched = matchTimelineEvents(scenario, orderedTimelineEvents(diagram));
+	return new Map(
+		scenario.assertions.events.flatMap((expected, index) => {
+			const event = matched[index];
+			const start = expected.date === undefined ? undefined : parseTimelineDate(expected.date);
+			if (!event || !start) return [];
+			const end = expected.end === undefined ? undefined : parseTimelineDate(expected.end);
+			return [[event.id, { start: start.start, ...(end ? { end: end.end } : {}) }] as const];
+		}),
+	);
+}
+
 /**
  * Dated prompts: every drawn gap between the prompt's events is to one scale,
  * measured against the prompt's own dates, unless an axis break marks that gap.
@@ -335,16 +354,7 @@ export function timelineSpacingCheck(
 	diagram: TimelineDiagram,
 	scene: RenderedDiagramScene,
 ): ScenarioCheck {
-	const matched = matchTimelineEvents(scenario, orderedTimelineEvents(diagram));
-	const moments = new Map(
-		scenario.assertions.events.flatMap((expected, index) => {
-			const event = matched[index];
-			const start = expected.date === undefined ? undefined : parseTimelineDate(expected.date);
-			if (!event || !start) return [];
-			const end = expected.end === undefined ? undefined : parseTimelineDate(expected.end);
-			return [[event.id, { start: start.start, ...(end ? { end: end.end } : {}) }] as const];
-		}),
-	);
+	const moments = promptMoments(scenario, diagram);
 	const gaps = readTimelineGaps(scene, moments).filter((gap) => !gap.broken);
 	const rates = gaps.map((gap) => gap.drawn / gap.elapsed);
 	const low = Math.min(...rates);
@@ -360,4 +370,80 @@ export function timelineSpacingCheck(
 			? `${gaps.length} unbroken gap(s) are drawn to one scale of the prompt's real time.`
 			: `Unbroken gaps differ from one time scale by ${Math.round((high / low - 1) * 100)}% (${worst?.from} → ${worst?.to}); compress a gap only with an axis break there.`,
 	};
+}
+
+/** A break's stated time may differ from its gap's by this rounding. */
+const BREAK_LABEL_TOLERANCE = 0.25;
+
+/**
+ * Dated prompts: gaps between the prompt's events, across lanes, are drawn in
+ * the order of their real elapsed time, broken or not, and every axis break
+ * states the time it leaves out. A break that stretches a gap past the shared
+ * scale, to make room for crowded labels, stays out of the order.
+ */
+export function timelineGapOrderCheck(
+	scenario: TimelineScenario,
+	diagram: TimelineDiagram,
+	scene: RenderedDiagramScene,
+): ScenarioCheck {
+	const gaps = readTimelineMomentGaps(scene, promptMoments(scenario, diagram));
+	const rate = Math.max(
+		0,
+		...gaps.filter((gap) => !gap.breaks.length).map((gap) => gap.drawn / gap.elapsed),
+	);
+	const ordered = gaps.filter(
+		(gap) => !gap.breaks.length || !rate || gap.drawn <= gap.elapsed * rate * 1.01,
+	);
+	const name = (gap: (typeof gaps)[number]) => `${gap.from} → ${gap.to}`;
+	const result = (passed: boolean, message: string): ScenarioCheck => ({
+		id: "timeline-gap-order",
+		passed,
+		message,
+	});
+	// Half again the time beside a break must draw longer, not just as long.
+	for (const longer of ordered)
+		for (const shorter of ordered)
+			if (
+				longer.elapsed > shorter.elapsed &&
+				(longer.drawn < shorter.drawn - 0.5 ||
+					(longer.elapsed >= 1.5 * shorter.elapsed &&
+						(longer.breaks.length > 0 || shorter.breaks.length > 0) &&
+						longer.drawn < shorter.drawn + 1))
+			)
+				return result(
+					false,
+					`${name(longer)} has more time than ${name(shorter)} but draws no longer; break long gaps on an increasing scale.`,
+				);
+	const lanes = readTimelineAxis(scene);
+	const breaks = lanes.flatMap((lane) => lane.breaks);
+	const bars = lanes.flatMap((lane) =>
+		[...lane.markers.values()].flatMap((marker) =>
+			marker.end === undefined ? [] : [{ start: marker.start, end: marker.end }],
+		),
+	);
+	const unlabeled = breaks.find((mark) => mark.duration === undefined);
+	if (unlabeled)
+		return result(
+			false,
+			`An axis break${unlabeled.label ? ` labeled "${unlabeled.label}"` : ""} does not state the time it leaves out.`,
+		);
+	for (const gap of gaps)
+		for (const mark of gap.breaks) {
+			const ratio = mark.duration! / gap.elapsed;
+			// Today, a phase's label stem or a second break splits the gap, so its
+			// break states only a part of it.
+			const part =
+				gap.today ||
+				gap.breaks.length > 1 ||
+				bars.some((bar) => bar.start < mark.at && bar.end > mark.at);
+			if (ratio > 1 + BREAK_LABEL_TOLERANCE || (!part && ratio < 1 - BREAK_LABEL_TOLERANCE))
+				return result(
+					false,
+					`The break in ${name(gap)} states "${mark.label}", not its real time.`,
+				);
+		}
+	return result(
+		true,
+		`${gaps.length} gap(s) are drawn in elapsed order, and ${breaks.length} break mark(s) state their time.`,
+	);
 }

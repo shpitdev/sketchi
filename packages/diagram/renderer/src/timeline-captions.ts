@@ -139,3 +139,44 @@ export function timelineCaptions(diagram: TimelineDiagram): TimelineCaptions {
 		...(today ? { today: `Today · ${format(today, multiYear)}` } : {}),
 	};
 }
+
+const SECOND = 1_000;
+const MINUTE = 60 * SECOND;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+const YEAR = 365.2425 * DAY;
+
+/** Milliseconds in each unit a break states its time in. */
+export const TIMELINE_DURATION_UNITS = {
+	millisecond: 1,
+	second: SECOND,
+	minute: MINUTE,
+	hour: HOUR,
+	day: DAY,
+	month: YEAR / 12,
+	year: YEAR,
+} as const;
+
+/**
+ * A span of time in the unit a reader would use for it, rounded: `99
+ * milliseconds`, `1.5 seconds`, `45 minutes`, `36 hours`, `24 days`,
+ * `5 months`, `4.3 years`.
+ */
+export function timelineDurationCaption(milliseconds: number): string {
+	const count = (value: number, unit: keyof typeof TIMELINE_DURATION_UNITS) =>
+		`${value} ${unit}${value === 1 ? "" : "s"}`;
+	const whole = (unit: keyof typeof TIMELINE_DURATION_UNITS) =>
+		count(Math.max(1, Math.round(milliseconds / TIMELINE_DURATION_UNITS[unit])), unit);
+	// Under ten of a unit, one decimal keeps the rounding within 5%.
+	const tenths = (unit: "second" | "year") => {
+		const value = milliseconds / TIMELINE_DURATION_UNITS[unit];
+		return count(value < 10 ? Math.round(value * 10) / 10 : Math.round(value), unit);
+	};
+	if (milliseconds < SECOND) return whole("millisecond");
+	if (milliseconds < 2 * MINUTE) return tenths("second");
+	if (milliseconds < 2 * HOUR) return whole("minute");
+	if (milliseconds < 2 * DAY) return whole("hour");
+	if (milliseconds < 60 * DAY) return whole("day");
+	if (milliseconds < 2 * YEAR) return whole("month");
+	return tenths("year");
+}

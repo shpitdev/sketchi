@@ -11,8 +11,9 @@ import {
 	type TimelineDiagram,
 } from "@sketchi/diagram-core";
 import { renderDiagram } from "../diagram.js";
+import { timelineDurationCaption } from "../timeline-captions.js";
 import type { RenderedDiagramScene } from "../scene.js";
-import { readTimelineAxis, readTimelineGaps } from "../timeline-readout.js";
+import { readTimelineAxis, readTimelineGaps, readTimelineMomentGaps } from "../timeline-readout.js";
 
 function timeline(events: unknown[], extra: Record<string, unknown> = {}) {
 	return parseTimelineDiagram({ id: "t", title: "T", type: "timeline", events, ...extra });
@@ -105,6 +106,69 @@ function expectToScale(diagram: TimelineDiagram, scene = renderDiagram(diagram))
 	return gaps;
 }
 
+/**
+ * Gaps between moments on any lane are drawn in elapsed order, broken or not,
+ * and every break states, rounded, the time of the gap it stands in. Returns
+ * the gaps.
+ */
+function expectGapOrder(diagram: TimelineDiagram, scene: RenderedDiagramScene) {
+	const moments = new Map<string, { start: number; end?: number }>(
+		diagram.events.map((event) => {
+			const { start, end } = periodOf(event);
+			return [event.id, event.end === undefined ? { start } : { start, end }];
+		}),
+	);
+	const gaps = readTimelineMomentGaps(scene, moments);
+	// A break that makes room for crowded neighbors stretches its gap past the
+	// shared scale instead of compressing it, so it stays out of the order.
+	const rate = Math.max(
+		0,
+		...gaps.filter((gap) => !gap.breaks.length).map((gap) => gap.drawn / gap.elapsed),
+	);
+	const ordered = gaps.filter(
+		(gap) => !gap.breaks.length || !rate || gap.drawn <= gap.elapsed * rate * 1.01,
+	);
+	for (const longer of ordered)
+		for (const shorter of ordered)
+			if (longer.elapsed > shorter.elapsed) {
+				const name = `${diagram.id}: ${longer.from} → ${longer.to} against ${shorter.from} → ${shorter.to}`;
+				expect(longer.drawn, name).toBeGreaterThanOrEqual(shorter.drawn - 1e-6);
+				// Half again the time beside a break draws visibly longer.
+				if (
+					longer.elapsed >= 1.5 * shorter.elapsed &&
+					(longer.breaks.length || shorter.breaks.length)
+				)
+					expect(longer.drawn - shorter.drawn, name).toBeGreaterThanOrEqual(12 - 1e-6);
+			}
+	for (const lane of readTimelineAxis(scene))
+		for (const mark of lane.breaks)
+			expect(mark.duration, `${diagram.id}: break "${mark.label}"`).toBeDefined();
+	const bars = readTimelineAxis(scene).flatMap((lane) =>
+		[...lane.markers.values()].flatMap((marker) =>
+			marker.end === undefined ? [] : [{ start: marker.start, end: marker.end }],
+		),
+	);
+	for (const gap of gaps)
+		for (const mark of gap.breaks) {
+			const ratio = mark.duration! / gap.elapsed;
+			expect(ratio, `${diagram.id}: ${gap.from} → ${gap.to} labeled "${mark.label}"`).toBeLessThan(
+				1.25,
+			);
+			// A Today line, a phase's label stem or a second break splits the gap, so
+			// its label states a part of it.
+			const split =
+				gap.today ||
+				gap.breaks.length > 1 ||
+				bars.some((bar) => bar.start < mark.at && bar.end > mark.at);
+			if (!split)
+				expect(
+					ratio,
+					`${diagram.id}: ${gap.from} → ${gap.to} labeled "${mark.label}"`,
+				).toBeGreaterThan(0.75);
+		}
+	return gaps;
+}
+
 const periodOf = (event: TimelineDiagram["events"][number]) => ({
 	start: parseTimelineDate(event.date!)!.start,
 	end: parseTimelineDate(event.end ?? event.date!)!.end,
@@ -134,7 +198,7 @@ function expectHonestMarkers(diagram: TimelineDiagram, scene: RenderedDiagramSce
 				: [],
 		),
 	);
-	for (const at of lanes.flatMap((lane) => lane.breaks)) {
+	for (const { at } of lanes.flatMap((lane) => lane.breaks)) {
 		for (const point of points)
 			expect(
 				Math.abs(point.at - at),
@@ -215,9 +279,9 @@ function phasesCoverEveryGap(diagram: TimelineDiagram) {
 
 /**
  * Deterministic pseudo-random timelines that mix clusters, ties, phases, lanes
- * and today, over `horizon` days.
+ * and today, over `horizon` days, or hours as instants.
  */
-function randomTimelines(count: number, horizon = 90) {
+function randomTimelines(count: number, horizon = 90, unit: "day" | "hour" = "day") {
 	let seed = 20261017;
 	const random = () => {
 		seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
@@ -235,7 +299,9 @@ function randomTimelines(count: number, horizon = 90) {
 		"GA",
 	];
 	const day = (offset: number) =>
-		new Date(Date.UTC(2026, 0, 1 + offset)).toISOString().slice(0, 10);
+		unit === "day"
+			? new Date(Date.UTC(2026, 0, 1 + offset)).toISOString().slice(0, 10)
+			: new Date(Date.UTC(2026, 0, 1, offset)).toISOString();
 	return Array.from({ length: count }, (_, index) => {
 		const lanes = pick([[], [], ["Eng"], ["Eng", "Ops"], ["Eng", "Ops", "Sales"]]);
 		const offsets = Array.from({ length: 3 }, () => Math.floor((random() * horizon * 2) / 3));
@@ -256,7 +322,7 @@ function randomTimelines(count: number, horizon = 90) {
 			};
 		});
 		return timeline(events, {
-			id: `fuzz-${horizon}d-${index}`,
+			id: `fuzz-${horizon}${unit[0]}-${index}`,
 			...(lanes.length ? { lanes } : {}),
 			...(random() < 0.3 ? { today: day(Math.floor(random() * horizon)) } : {}),
 		});
@@ -434,7 +500,7 @@ describe("native timeline layout", () => {
 		expectReadableLayout(scene);
 	});
 
-	it("breaks the widest gaps of a too-wide row and keeps the rest to scale", () => {
+	it("breaks the widest gaps of a too-wide row, in elapsed order and labeled with their time", () => {
 		const diagram = timeline([
 			{ id: "a", label: "v0.1", date: "2026-01-05" },
 			{ id: "b", label: "v0.2", date: "2026-01-12" },
@@ -445,11 +511,20 @@ describe("native timeline layout", () => {
 		const scene = renderDiagram(diagram);
 		// Drawn to scale, the 162-day gap is 23 weeks wide and the row runs past 4:1.
 		expect(rows(scene)).toBe(1);
-		expect(exportAspect(scene)).toBeLessThanOrEqual(3.5);
+		expect(exportAspect(scene)).toBeLessThanOrEqual(2.5);
 		const gaps = expectToScale(diagram, scene);
 		expect(gaps.map((gap) => gap.broken)).toEqual([false, false, true, true]);
 		expect(gaps[1]!.drawn / gaps[0]!.drawn).toBeCloseTo(1, 6);
-		expect(lines(scene).filter((line) => line.id.startsWith("break:"))).toHaveLength(4);
+		// The 610-day break draws visibly longer than the 162-day one, which
+		// draws longer than either week.
+		expect(gaps[2]!.drawn).toBeGreaterThan(gaps[1]!.drawn);
+		expect(gaps[3]!.drawn / gaps[2]!.drawn).toBeGreaterThan(1.5);
+		expect(
+			texts(scene)
+				.filter((element) => element.id.startsWith("break-label:"))
+				.map((element) => element.text),
+		).toEqual(["5 months", "20 months"]);
+		expectGapOrder(diagram, scene);
 		expectHonestMarkers(diagram, scene);
 		expectReadableLayout(scene);
 	});
@@ -485,7 +560,7 @@ describe("native timeline layout", () => {
 		expect(gaps[2]!.drawn / gaps[0]!.drawn).toBeCloseTo(11, 6);
 	});
 
-	it("breaks each outsized gap where it falls and keeps every other gap to scale", () => {
+	it("breaks each outsized gap, and every gap a break would halve, where it falls", () => {
 		const diagram = timeline([
 			{ id: "a", label: "Kickoff", date: "2026-01-05" },
 			{ id: "b", label: "Design review", date: "2026-01-06" },
@@ -497,9 +572,71 @@ describe("native timeline layout", () => {
 		]);
 		const scene = renderDiagram(diagram);
 		const gaps = expectToScale(diagram, scene);
-		expect(gaps.map((gap) => gap.broken)).toEqual([false, false, true, false, false, true]);
+		// Two weeks would draw longer than the shortest break, so it breaks too.
+		expect(gaps.map((gap) => gap.broken)).toEqual([false, false, true, false, true, true]);
 		expect(gaps[1]!.drawn / gaps[0]!.drawn).toBeCloseTo(3, 6);
-		expect(gaps[4]!.drawn / gaps[0]!.drawn).toBeCloseTo(14, 6);
+		expect(gaps[3]!.drawn / gaps[0]!.drawn).toBeCloseTo(2, 6);
+		expect(gaps[4]!.drawn).toBeLessThan(gaps[2]!.drawn);
+		expect(gaps[2]!.drawn).toBeLessThan(gaps[5]!.drawn);
+		expect(
+			texts(scene)
+				.filter((element) => element.id.startsWith("break-label:"))
+				.map((element) => element.text),
+		).toEqual(["14 months", "14 days", "4.3 years"]);
+		expectGapOrder(diagram, scene);
+		expectReadableLayout(scene);
+	});
+
+	it("states each break's time in the unit a reader would use", () => {
+		const minute = 60_000;
+		const day = 1_440 * minute;
+		expect(
+			[
+				1,
+				99,
+				1_500,
+				12_400,
+				0.5 * minute,
+				45 * minute,
+				36 * 60 * minute,
+				day,
+				24 * day,
+				162 * day,
+				610 * day,
+				1_566 * day,
+				4_400 * day,
+			].map(timelineDurationCaption),
+		).toEqual([
+			"1 millisecond",
+			"99 milliseconds",
+			"1.5 seconds",
+			"12 seconds",
+			"30 seconds",
+			"45 minutes",
+			"36 hours",
+			"24 hours",
+			"24 days",
+			"5 months",
+			"20 months",
+			"4.3 years",
+			"12 years",
+		]);
+	});
+
+	it("states a break under a second in milliseconds", () => {
+		const diagram = timeline([
+			{ id: "a", label: "Request", date: "2026-10-12T09:00:00.000Z" },
+			{ id: "b", label: "Cache hit", date: "2026-10-12T09:00:00.001Z" },
+			{ id: "c", label: "Render", date: "2026-10-12T09:00:00.002Z" },
+			{ id: "d", label: "Response", date: "2026-10-12T09:00:00.101Z" },
+		]);
+		const scene = renderDiagram(diagram);
+		expect(
+			texts(scene)
+				.filter((element) => element.id.startsWith("break-label:"))
+				.map((element) => element.text),
+		).toEqual(["99 milliseconds"]);
+		expectGapOrder(diagram, scene);
 		expectReadableLayout(scene);
 	});
 
@@ -697,11 +834,16 @@ describe("native timeline layout", () => {
 	});
 
 	it("never needs an unchecked placement across generated timelines", () => {
-		for (const diagram of [...randomTimelines(160), ...randomTimelines(80, 2000)]) {
+		for (const diagram of [
+			...randomTimelines(160),
+			...randomTimelines(80, 2000),
+			...randomTimelines(40, 2000, "hour"),
+		]) {
 			const scene = renderDiagram(diagram);
 			expectReadableLayout(scene);
 			expectToScale(diagram, scene);
 			expectHonestMarkers(diagram, scene);
+			expectGapOrder(diagram, scene);
 			// A single row stays within the cap unless phases cover every gap, so
 			// nothing may break or wrap.
 			if (rows(scene) === 1 && !phasesCoverEveryGap(diagram))

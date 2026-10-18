@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { TimelineDiagram } from "@sketchi/diagram-core";
 import { renderDiagram, type RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import { evaluateScenarioDiagram } from "./evaluate.js";
-import { timelineScenarios, timelineSpacingCheck } from "./timeline-scenarios.js";
+import {
+	timelineGapOrderCheck,
+	timelineScenarios,
+	timelineSpacingCheck,
+} from "./timeline-scenarios.js";
 
 type Event = TimelineDiagram["events"][number];
 const withEvent = (
@@ -202,14 +206,65 @@ describe("prompt-grounded timeline scenarios", () => {
 		);
 		expect(evaluateScenarioDiagram(outage, utc).ok).toBe(true);
 	});
-	it("checks every dated scenario's drawn spacing against the prompt's real time", () => {
+	it("checks every dated scenario's drawn spacing and gap order against the prompt's real time", () => {
 		for (const scenario of timelineScenarios) {
-			const spacing = evaluateScenarioDiagram(scenario, scenario.expectedDiagram).checks.find(
-				(check) => check.id === "timeline-spacing",
-			);
+			const { checks } = evaluateScenarioDiagram(scenario, scenario.expectedDiagram);
 			const dated = scenario.expectedDiagram.events.some((event) => event.date !== undefined);
-			expect(spacing?.passed, scenario.id).toBe(dated ? true : undefined);
+			for (const id of ["timeline-spacing", "timeline-gap-order"])
+				expect(checks.find((check) => check.id === id)?.passed, `${scenario.id} ${id}`).toBe(
+					dated ? true : undefined,
+				);
 		}
+	});
+	it("library-releases rejects equal breaks for unequal gaps and breaks that hide their time", () => {
+		const scenario = byId("library-releases-timeline");
+		const scene = renderDiagram(scenario.expectedDiagram);
+		const check = (candidate: RenderedDiagramScene) =>
+			timelineGapOrderCheck(scenario, scenario.expectedDiagram, candidate);
+		expect(check(scene)).toMatchObject({ passed: true });
+		const texts = scene.elements.filter((element) => element.type === "text");
+		expect(
+			texts
+				.filter((element) => element.id.startsWith("break-label:"))
+				.map((element) => element.text),
+		).toEqual(["5 months", "20 months"]);
+		type Element = RenderedDiagramScene["elements"][number];
+		const markerX = (id: string) => {
+			const marker = scene.elements.find(
+				(element) => element.type === "node" && element.nodeId === `event:${id}`,
+			)!;
+			return marker.type === "node" ? marker.x : 0;
+		};
+		// As #422 drew it: the 610-day gap no longer than the 162-day one.
+		const shift = markerX("v10") - markerX("v03") - (markerX("v20") - markerX("v10"));
+		const equal = {
+			...scene,
+			elements: scene.elements.map((element): Element =>
+				element.type === "node" && element.nodeId === "event:v20"
+					? { ...element, x: element.x + shift }
+					: element,
+			),
+		};
+		expect(check(equal)).toMatchObject({ passed: false });
+		expect(check(equal).message).toContain(
+			"v10 → v20 has more time than v03 → v10 but draws no longer",
+		);
+		const unlabeled = {
+			...scene,
+			elements: scene.elements.filter((element) => !element.id.startsWith("break-label:")),
+		};
+		expect(check(unlabeled)).toMatchObject({ passed: false });
+		expect(check(unlabeled).message).toContain("does not state the time");
+		const mislabeled = {
+			...scene,
+			elements: scene.elements.map((element): Element =>
+				element.type === "text" && element.text === "20 months"
+					? { ...element, text: "5 months" }
+					: element,
+			),
+		};
+		expect(check(mislabeled)).toMatchObject({ passed: false });
+		expect(check(mislabeled).message).toContain('v10 → v20 states "5 months"');
 	});
 	it("library-releases rejects a gap compressed without a break and accepts one marked by a break", () => {
 		const scenario = byId("library-releases-timeline");

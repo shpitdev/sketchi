@@ -18,7 +18,7 @@ import type {
 	SceneElement,
 	TextSceneElement,
 } from "./scene.js";
-import { timelineCaptions } from "./timeline-captions.js";
+import { timelineCaptions, timelineDurationCaption } from "./timeline-captions.js";
 
 export const TIMELINE_MARKER_ROLE = "timeline-marker";
 
@@ -52,7 +52,20 @@ const MIN_MARKER_GAP = 28;
 const CAPTION_SLACK = MIN_MARKER_GAP / 2 - 2;
 const AXIS_OVERHANG = 24;
 const CONTINUATION_LENGTH = 32;
-const BREAK_HALF_GAP = 4;
+/** A break's duration sits on the axis, with its ticks this far out from the text. */
+const BREAK_LABEL_PAD = 6;
+const BREAK_FONT_SIZE = 13;
+/** How far a break tick leans either side of where it crosses the axis. */
+const BREAK_TICK_RUN = 3;
+/** A break keeps at least this far from any marker's center. */
+const BREAK_CLEARANCE = DIAMOND_SIZE / 2 + 7;
+/** Each doubling of the time a break leaves out adds this share of a break. */
+const BREAK_GROWTH = 0.5;
+/** The longest break draws at most this multiple of the shortest. */
+const MAX_BREAK_RATIO = 2;
+/** A gap with this multiple of another's time draws at least VISIBLE_STEP longer. */
+const VISIBLE_RATIO = 1.5;
+const VISIBLE_STEP = 12;
 /** A wrapped row ends at least this far past its last marker. */
 const ROW_TAIL = MIN_MARKER_GAP / 2;
 const LANE_GAP = 28;
@@ -141,8 +154,8 @@ interface Cut {
 	readonly key: number;
 	readonly low: number;
 	readonly high: number;
-	/** After a break the next row resumes at its first event, not where this one ends. */
-	readonly resume: number | undefined;
+	/** A cut in a broken gap ends the row past the whole break. */
+	readonly broken: boolean;
 }
 
 interface LaneRowLayout {
@@ -306,8 +319,8 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 
 	// Spacing: one scale for the whole chronology, about one comfortable label
 	// pitch per item and raised until same-lane neighbors clear each other. A gap
-	// that scale would draw too long becomes a marked axis break of fixed length;
-	// nothing else is drawn off scale.
+	// that scale would draw too long becomes a marked axis break that states the
+	// time it leaves out; nothing else is drawn off scale.
 	const unit = Math.min(
 		128,
 		Math.max(72, Math.round((median(items.map((item) => item.width)) + BLOCK_GAP_X) / 2 + 8)),
@@ -317,6 +330,32 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 	const insideSpan = (key: number) =>
 		items.some((item) => item.span && item.startKey <= key && item.endKey > key);
 	const gaps = anchors.slice(1).map((anchor, key) => anchor.time - anchors[key]!.time);
+	// A break writes its duration on the axis between its two ticks.
+	const breakLabels = new Map<number, { readonly text: string; readonly half: number }>();
+	const breakLabel = (key: number) => {
+		let label = breakLabels.get(key);
+		if (!label) {
+			const text = timelineDurationCaption(gaps[key]!);
+			label = {
+				text,
+				half: boundLabelWidth(text, BREAK_FONT_SIZE, TEXT_WIDTH) / 2 + BREAK_LABEL_PAD,
+			};
+			breakLabels.set(key, label);
+		}
+		return label;
+	};
+	/** Free axis a break needs between the markers either side of it. */
+	const breakRoom = (key: number) => 2 * (breakLabel(key).half + BREAK_TICK_RUN + BREAK_CLEARANCE);
+	// Moments the reader measures between: event dates and phase ends on any
+	// lane, each at its first anchor. Today, phase stems and fanned-out ties fall
+	// inside these gaps.
+	const momentKeys = [
+		...new Set(
+			items
+				.flatMap((item) => [item.startKey, item.endKey])
+				.map((key) => anchors.findIndex((anchor) => anchor.time === anchors[key]!.time)),
+		),
+	].toSorted((a, b) => a - b);
 	// `forced` gaps break even when the scale could draw them.
 	const space = (forced: ReadonlySet<number>): Spacing => {
 		const breaks = new Set(forced);
@@ -357,7 +396,10 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 		// starts past every earlier marker on any lane, so all of them stay on
 		// its near side.
 		const tieStep = Math.max(MIN_MARKER_GAP, ...constraints.map((constraint) => constraint.min));
-		const place = (scale: number) => {
+		// While the scale settles, every break is one break length past the
+		// farthest earlier marker. `lengths` then sets each one's final length,
+		// measured from its own moment.
+		const place = (scale: number, lengths?: ReadonlyMap<number, number>) => {
 			const placed = [0];
 			let moment = 0;
 			let reach = 0;
@@ -365,7 +407,11 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 				const anchor = anchors[key + 1]!;
 				if (anchor.tie > 0) placed.push(moment + anchor.tie * tieStep);
 				else {
-					moment = breaks.has(key) ? reach + breakLength : moment + gap * scale;
+					moment = !breaks.has(key)
+						? moment + gap * scale
+						: lengths
+							? Math.max(moment + lengths.get(key)!, reach + Math.max(breakLength, breakRoom(key)))
+							: reach + breakLength;
 					placed.push(moment);
 				}
 				reach = Math.max(reach, placed[key + 1]!);
@@ -407,8 +453,11 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 				),
 			);
 			scale = Math.min(needed, maxScale);
+			// Once anything breaks, so does every gap a break would shorten by at
+			// least its own length. Breaks then draw longer than any unbroken gap.
+			const longest = breaks.size ? 2 * breakLength : maxGap;
 			const added = gaps.flatMap((gap, key) =>
-				!breaks.has(key) && gap * scale > maxGap && !insideSpan(key) ? [key] : [],
+				!breaks.has(key) && gap * scale > longest && !insideSpan(key) ? [key] : [],
 			);
 			// A neighbor still too close gets a break on the longest gap between
 			// them instead of a silent stretch.
@@ -424,26 +473,97 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 			if (!added.length) break;
 			for (const key of added) breaks.add(key);
 		}
-		return { x: place(scale), breaks };
+		if (!breaks.size) return { x: place(scale), breaks };
+		// Breaks draw on a log scale from the shortest gap a break compresses,
+		// which draws as long as the longest unbroken gap, or one break length.
+		// Each doubling of the time left out adds half that, and the longest
+		// break draws at most twice the shortest. A break that only makes
+		// room for crowded neighbors draws the base length.
+		const base = Math.max(
+			breakLength,
+			...gaps.map((gap, key) => (breaks.has(key) || insideSpan(key) ? 0 : gap * scale)),
+		);
+		const compressed = [...breaks].filter((key) => gaps[key]! * scale >= breakLength);
+		const shortest = Math.min(...compressed.map((key) => gaps[key]!));
+		const doublings = Math.log2(Math.max(...compressed.map((key) => gaps[key]!)) / shortest);
+		const growth = Math.min(
+			BREAK_GROWTH,
+			doublings > 0 ? (MAX_BREAK_RATIO - 1) / doublings : Infinity,
+		);
+		const lengths = new Map(
+			[...breaks].map((key) => [
+				key,
+				base * (1 + growth * Math.log2(Math.max(1, gaps[key]! / shortest))),
+			]),
+		);
+		// Then the gaps between moments are put in elapsed order: a gap with a
+		// compressing break grows to the longest gap with less time in it, and
+		// draws visibly longer than any with a third less. It shrinks the same
+		// way below unbroken gaps with more time, as far as its break has room.
+		// A gap stretched for crowded neighbors draws longer than its time at
+		// scale, so it stays out of the order and its label says how short it is.
+		let x = place(scale, lengths);
+		const compressing = new Set(compressed);
+		const segments = momentKeys.slice(1).flatMap((to, index) => {
+			const from = momentKeys[index]!;
+			const keys = gaps.slice(from, to).map((_, offset) => from + offset);
+			const broken = keys.filter((key) => compressing.has(key)).at(-1);
+			if (broken === undefined && keys.some((key) => breaks.has(key))) return [];
+			return [{ from, to, elapsed: anchors[to]!.time - anchors[from]!.time, broken }];
+		});
+		const drawn = (segment: (typeof segments)[number]) => x[segment.to]! - x[segment.from]!;
+		for (const segment of segments.toSorted((a, b) => a.elapsed - b.elapsed)) {
+			if (segment.broken === undefined) continue;
+			const { elapsed } = segment;
+			const floor = Math.max(
+				...segments.map((other) =>
+					other.elapsed * VISIBLE_RATIO <= elapsed
+						? drawn(other) + VISIBLE_STEP
+						: other.elapsed < elapsed
+							? drawn(other)
+							: 0,
+				),
+			);
+			const ceiling = Math.min(
+				...segments.map((other) =>
+					other.broken !== undefined
+						? Infinity
+						: other.elapsed >= elapsed * VISIBLE_RATIO
+							? drawn(other) - VISIBLE_STEP
+							: other.elapsed > elapsed
+								? drawn(other)
+								: Infinity,
+				),
+			);
+			const target = Math.min(Math.max(drawn(segment), floor), ceiling);
+			if (Math.abs(target - drawn(segment)) < 1e-9) continue;
+			const key = segment.broken;
+			const moment = anchors.findIndex((anchor) => anchor.time === anchors[key]!.time);
+			lengths.set(key, x[key + 1]! - x[moment]! + target - drawn(segment));
+			x = place(scale, lengths);
+		}
+		return { x, breaks };
 	};
 
 	// Rows wrap one continuous axis like lines of text. A row may end anywhere in
 	// a gap that no span crosses, and the next row resumes at that same moment,
-	// so the gap's length is split across the two rows and stays to scale. A row
-	// that ends in a break shows the break at its end and resumes at the next
-	// event. Cuts prefer breaks, then wide gaps.
+	// so the gap's length is split across the two rows and keeps its drawn
+	// length. A row that ends in a break shows the whole break, with its
+	// duration, before its dashed arrow. Cuts prefer breaks, then wide gaps.
 	const axisPlan = ({ x, breaks }: Spacing) => {
 		const reachBefore = x.map((_, key) => Math.max(...x.slice(0, key + 1)));
 		const reachAfter = x.map((_, key) => Math.min(...x.slice(key)));
+		// A break sits midway between the farthest earlier marker and the next one.
+		const breakX = (key: number) => (reachBefore[key]! + x[key + 1]!) / 2;
 		const cuts = anchors.slice(0, -1).flatMap((_, key): Cut[] => {
 			if (insideSpan(key)) return [];
+			const high = reachAfter[key + 1]! - ROW_TAIL;
 			if (breaks.has(key)) {
-				const end = reachBefore[key]! + AXIS_OVERHANG + BREAK_HALF_GAP;
-				return [{ key, low: end, high: end, resume: reachAfter[key + 1]! - AXIS_OVERHANG }];
+				const low = breakX(key) + breakLabel(key).half + BREAK_TICK_RUN + ROW_TAIL / 2;
+				return [{ key, low, high: Math.max(low, high), broken: true }];
 			}
 			const low = reachBefore[key]! + ROW_TAIL;
-			const high = reachAfter[key + 1]! - ROW_TAIL;
-			return low <= high ? [{ key, low, high, resume: undefined }] : [];
+			return low <= high ? [{ key, low, high, broken: false }] : [];
 		});
 		const rowsFor = (count: number): Row[] => {
 			const length = x[x.length - 1]!;
@@ -461,7 +581,7 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 							at,
 							cost:
 								Math.abs(at - ideal) -
-								(cut.resume === undefined ? 0 : unit) -
+								(cut.broken ? unit : 0) -
 								Math.min(cut.high - cut.low, 2 * unit) / 4,
 						};
 					})
@@ -469,7 +589,7 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 				if (!choice) break;
 				rows.push({ first, last: choice.cut.key, start, end: choice.at });
 				first = choice.cut.key + 1;
-				start = choice.cut.resume ?? choice.at;
+				start = choice.at;
 			}
 			rows.push({ first, last: anchors.length - 1, start, end: Math.max(...x) + AXIS_OVERHANG });
 			return rows;
@@ -500,8 +620,6 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 			const rowLayouts = rows.map((row, rowIndex) => {
 				const offset = row.start - (rowIndex > 0 ? CONTINUATION_LENGTH : 0);
 				const localX = (key: number) => x[key]! - offset;
-				// The farthest any marker up to this anchor reaches, on any lane.
-				const reachX = (key: number) => reachBefore[key]! - offset;
 				const todayX =
 					todayKey !== undefined && todayKey >= row.first && todayKey <= row.last
 						? localX(todayKey)
@@ -520,7 +638,7 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 				return {
 					row,
 					localX,
-					reachX,
+					breakX: (key: number) => breakX(key) - offset,
 					todayX,
 					lanes,
 					axisStart: row.start - offset,
@@ -589,20 +707,16 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 				const suffix = `${laneIndex}:${rowIndex}`;
 				// Long rough strokes double up; structural lines draw clean.
 				const stroke = { strokeColor: tone.stroke, strokeWidth: 2 as const, roughness: 0 as const };
-				// Axis segments between breaks, then break ticks and row continuations.
-				// A row that ends in a break draws it at its end, before the continuation.
-				const breakXs = [...breaks]
+				// Axis segments between breaks, then break ticks around each break's
+				// duration, and row continuations. A row that ends in a break draws all
+				// of it before the continuation.
+				const rowBreaks = [...breaks]
 					.toSorted((a, b) => a - b)
-					.filter((key) => key >= rowLayout.row.first && key < rowLayout.row.last)
-					.map((key) => left + (rowLayout.reachX(key) + rowLayout.localX(key + 1)) / 2)
-					.concat(
-						continued && breaks.has(rowLayout.row.last)
-							? [left + rowLayout.axisEnd - BREAK_HALF_GAP]
-							: [],
-					);
+					.filter((key) => key >= rowLayout.row.first && key <= rowLayout.row.last)
+					.map((key) => ({ x: left + rowLayout.breakX(key), ...breakLabel(key) }));
 				const stops = [
 					left + rowLayout.axisStart,
-					...breakXs.flatMap((breakX) => [breakX - BREAK_HALF_GAP, breakX + BREAK_HALF_GAP]),
+					...rowBreaks.flatMap((entry) => [entry.x - entry.half, entry.x + entry.half]),
 					left + rowLayout.axisEnd,
 				];
 				for (let segment = 0; segment < stops.length; segment += 2)
@@ -618,21 +732,31 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 							),
 							back,
 						);
-				breakXs.forEach((breakX, index) =>
-					[-1, 1].forEach((side) =>
+				rowBreaks.forEach((entry, index) => {
+					for (const side of [-1, 1])
 						push(
 							line(
 								`break:${suffix}:${index}:${side < 0 ? "a" : "b"}`,
 								[
-									{ x: breakX + side * BREAK_HALF_GAP - 3, y: axisY + 7 },
-									{ x: breakX + side * BREAK_HALF_GAP + 3, y: axisY - 7 },
+									{ x: entry.x + side * entry.half - BREAK_TICK_RUN, y: axisY + 7 },
+									{ x: entry.x + side * entry.half + BREAK_TICK_RUN, y: axisY - 7 },
 								],
 								stroke,
 							),
 							front,
+						);
+					push(
+						text(
+							`break-label:${suffix}:${index}`,
+							entry.text,
+							entry.x,
+							axisY,
+							BREAK_FONT_SIZE,
+							tone.ink,
 						),
-					),
-				);
+						front,
+					);
+				});
 				if (resumed)
 					push(
 						line(

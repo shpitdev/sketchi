@@ -1,4 +1,8 @@
-import { timelineScenarioChecks, timelineSpacingCheck } from "./timeline-scenarios.js";
+import {
+	timelineGapOrderCheck,
+	timelineScenarioChecks,
+	timelineSpacingCheck,
+} from "./timeline-scenarios.js";
 import {
 	type CanonicalDiagram,
 	type FlowchartDiagram,
@@ -718,7 +722,13 @@ export function evaluateScenarioDiagram(
 			scenario.id,
 			diagram,
 			timelineScenarioChecks(scenario, modelDiagram),
-			(scene) => (dated ? [timelineSpacingCheck(scenario, diagram, scene)] : []),
+			(scene) =>
+				dated
+					? [
+							timelineSpacingCheck(scenario, diagram, scene),
+							timelineGapOrderCheck(scenario, diagram, scene),
+						]
+					: [],
 		);
 	}
 	if (scenario.diagramType === "sequence") {

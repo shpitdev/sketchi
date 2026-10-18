@@ -1,5 +1,6 @@
 import type { RenderedDiagramScene } from "./scene.js";
 import { TIMELINE_MARKER_ROLE } from "./timeline.js";
+import { TIMELINE_DURATION_UNITS } from "./timeline-captions.js";
 
 export interface TimelineMarkerReadout {
 	/** Where the event starts: a point marker's center or a bar's left edge. */
@@ -8,11 +9,31 @@ export interface TimelineMarkerReadout {
 	readonly end?: number;
 }
 
+export interface TimelineBreakReadout {
+	/** The middle of the break on the unwrapped axis. */
+	readonly at: number;
+	/** The duration written between its ticks, if any. */
+	readonly label?: string;
+	/** The milliseconds that label states, when it reads as a duration. */
+	readonly duration?: number;
+}
+
+/** Milliseconds a label such as `99 milliseconds`, `5 months` or `4.3 years` states. */
+function statedDuration(label: string): number | undefined {
+	const match = /^(\d+(?:\.\d+)?) ([a-z]+?)s?$/u.exec(label);
+	const unit = match?.[2];
+	return unit !== undefined && Object.hasOwn(TIMELINE_DURATION_UNITS, unit)
+		? Number(match![1]) * TIMELINE_DURATION_UNITS[unit as keyof typeof TIMELINE_DURATION_UNITS]
+		: undefined;
+}
+
 export interface TimelineLaneReadout {
 	/** Markers by event id, on the lane's axis unwrapped across rows. */
 	readonly markers: ReadonlyMap<string, TimelineMarkerReadout>;
-	/** Axis break marks on the same unwrapped axis. */
-	readonly breaks: readonly number[];
+	/** Axis breaks on the same unwrapped axis. */
+	readonly breaks: readonly TimelineBreakReadout[];
+	/** The Today line on the same unwrapped axis. */
+	readonly today?: number;
 }
 
 /**
@@ -26,6 +47,8 @@ export function readTimelineAxis(scene: RenderedDiagramScene): readonly Timeline
 	>();
 	const ends = new Map<string, number>();
 	const breakTicks = new Map<string, { key: string; x: number }[]>();
+	const breakLabels = new Map<string, string>();
+	const todays = new Map<number, number>();
 	const markers: { id: string; x: number; y: number; width: number; bar: boolean }[] = [];
 	for (const element of scene.elements) {
 		if (element.type === "node" && element.rendererRole === TIMELINE_MARKER_ROLE) {
@@ -36,6 +59,11 @@ export function readTimelineAxis(scene: RenderedDiagramScene): readonly Timeline
 				width: element.width,
 				bar: element.shape === "rectangle",
 			});
+			continue;
+		}
+		if (element.type === "text") {
+			const label = /^break-label:(\d+:\d+:\d+)$/.exec(element.id);
+			if (label) breakLabels.set(`break:${label[1]}`, element.text);
 			continue;
 		}
 		if (element.type !== "line") continue;
@@ -55,6 +83,8 @@ export function readTimelineAxis(scene: RenderedDiagramScene): readonly Timeline
 			});
 			continue;
 		}
+		const today = /^today:(\d+)$/.exec(element.id);
+		if (today) todays.set(Number(today[1]), first.x);
 		const out = /^continue-out:(\d+:\d+)$/.exec(element.id);
 		if (out) ends.set(out[1]!, first.x);
 		const tick = /^break:(\d+:\d+):\d+:[ab]$/.exec(element.id);
@@ -81,10 +111,18 @@ export function readTimelineAxis(scene: RenderedDiagramScene): readonly Timeline
 			const ticks = breakTicks.get(entry.key) ?? [];
 			const marks = new Map<string, number[]>();
 			for (const tick of ticks) marks.set(tick.key, [...(marks.get(tick.key) ?? []), tick.x]);
-			return [...marks.values()].map((xs) =>
-				at(entry, xs.reduce((sum, value) => sum + value, 0) / xs.length),
-			);
+			return [...marks].map(([key, xs]): TimelineBreakReadout => {
+				const label = breakLabels.get(key);
+				const duration = label === undefined ? undefined : statedDuration(label);
+				return {
+					at: at(entry, xs.reduce((sum, value) => sum + value, 0) / xs.length),
+					...(label === undefined ? {} : { label }),
+					...(duration === undefined ? {} : { duration }),
+				};
+			});
 		});
+		const todayRow = unwrapped.find((entry) => todays.has(entry.row));
+		const today = todayRow ? at(todayRow, todays.get(todayRow.row)!) : undefined;
 		const owned = new Map<string, TimelineMarkerReadout>();
 		for (const marker of markers) {
 			// A marker belongs to the nearest axis at or above it: bars stack below theirs.
@@ -100,7 +138,7 @@ export function readTimelineAxis(scene: RenderedDiagramScene): readonly Timeline
 					: { start: at(row, marker.x + marker.width / 2) },
 			);
 		}
-		return { markers: owned, breaks };
+		return { markers: owned, breaks, ...(today === undefined ? {} : { today }) };
 	});
 }
 
@@ -147,8 +185,62 @@ export function readTimelineGaps(
 				to: point.id,
 				elapsed: time - previousTime,
 				drawn: point.at - previous.at,
-				broken: lane.breaks.some((at) => at > previous.at && at < point.at),
+				broken: lane.breaks.some((mark) => mark.at > previous.at && mark.at < point.at),
 			};
 		});
+	});
+}
+
+export interface TimelineMomentGapReadout {
+	/** Event ids at each end; a phase's end reads as `<id>:end`. */
+	readonly from: string;
+	readonly to: string;
+	/** Elapsed time, in the moments' unit. */
+	readonly elapsed: number;
+	/** Drawn length along the unwrapped axis. */
+	readonly drawn: number;
+	/** Breaks inside the gap, read on the first lane: every lane draws the same ones. */
+	readonly breaks: readonly TimelineBreakReadout[];
+	/** The Today line falls inside the gap. */
+	readonly today: boolean;
+}
+
+/**
+ * Consecutive gaps between distinct moments across every lane, as a reader
+ * compares them on the shared time axis. Simultaneous events read at the
+ * leftmost marker.
+ */
+export function readTimelineMomentGaps(
+	scene: RenderedDiagramScene,
+	moments: ReadonlyMap<string, { readonly start: number; readonly end?: number }>,
+): TimelineMomentGapReadout[] {
+	const lanes = readTimelineAxis(scene);
+	const points = new Map<number, { id: string; at: number }>();
+	const add = (time: number, id: string, at: number) => {
+		const found = points.get(time);
+		if (!found || at < found.at) points.set(time, { id, at });
+	};
+	for (const lane of lanes)
+		for (const [id, marker] of lane.markers) {
+			const moment = moments.get(id);
+			if (!moment) continue;
+			add(moment.start, id, marker.start);
+			if (moment.end !== undefined && marker.end !== undefined)
+				add(moment.end, `${id}:end`, marker.end);
+		}
+	const breaks = lanes[0]?.breaks ?? [];
+	const today = lanes[0]?.today;
+	const sorted = [...points.entries()].toSorted(([a], [b]) => a - b);
+	return sorted.slice(1).map(([time, point], index) => {
+		const [previousTime, previous] = sorted[index]!;
+		const inside = (at: number) => at > previous.at && at < point.at;
+		return {
+			from: previous.id,
+			to: point.id,
+			elapsed: time - previousTime,
+			drawn: point.at - previous.at,
+			breaks: breaks.filter((mark) => inside(mark.at)),
+			today: today !== undefined && inside(today),
+		};
 	});
 }
