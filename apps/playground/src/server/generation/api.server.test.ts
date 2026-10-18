@@ -161,6 +161,47 @@ describe("public generate endpoint", () => {
 		expect(diagram.excalidraw).toBeTruthy();
 	});
 
+	it("generates a native state machine whose transitions omit ids", async () => {
+		const env: StudioEnv = {
+			AI: fakeAiGateway(
+				generationText({
+					id: "turnstile",
+					title: "Turnstile",
+					type: "state-machine",
+					initial: "locked",
+					states: [
+						{ id: "locked", label: "Locked" },
+						{ id: "unlocked", label: "Unlocked" },
+					],
+					transitions: [
+						{ source: "locked", target: "unlocked", event: "coin", guard: "valid" },
+						{ source: "unlocked", target: "locked", event: "push" },
+						{ source: "locked", target: "locked", event: "push", action: "alarm" },
+					],
+				}),
+			),
+		};
+		const response = await generateRequest(env, {
+			prompt: "Draw a coin turnstile state machine",
+			type: "state-machine",
+		});
+
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as {
+			diagram: {
+				document: { type: string; spec: { transitions: ReadonlyArray<{ id: string }> } };
+				scene: unknown;
+			};
+		};
+		expect(body.diagram.document.type).toBe("state-machine");
+		expect(body.diagram.document.spec.transitions.map((transition) => transition.id)).toEqual([
+			"locked-unlocked",
+			"unlocked-locked",
+			"locked-locked",
+		]);
+		expect(body.diagram.scene).toBeTruthy();
+	});
+
 	it("lets the model select a native type when type is omitted", async () => {
 		const env: StudioEnv = { AI: fakeAiGateway(generationText(sequenceIr)) };
 		const response = await generateRequest(env, {
@@ -174,7 +215,7 @@ describe("public generate endpoint", () => {
 		expect(body.diagram.document.type).toBe("sequence");
 	});
 
-	it.each(["er", "architecture", "swimlane", "state-machine"])(
+	it.each(["er", "architecture", "swimlane"])(
 		"fails clearly when model-selected %s generation is unsupported",
 		async (requestedKind) => {
 			const env: StudioEnv = {
@@ -199,7 +240,7 @@ describe("public generate endpoint", () => {
 		},
 	);
 
-	it.each(["er", "architecture", "swimlane", "state-machine"])(
+	it.each(["er", "architecture", "swimlane"])(
 		"rejects explicit unsupported type %s before provider dispatch",
 		async (type) => {
 			let dispatched = false;

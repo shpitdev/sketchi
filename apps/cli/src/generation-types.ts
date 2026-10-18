@@ -9,6 +9,7 @@ const GENERATION_TYPE_CHOICES = {
 	flowchart: { label: "Flowchart", hint: "best for processes and decisions" },
 	mindmap: { label: "Mind map", hint: "best for ideas and topics" },
 	sequence: { label: "Sequence diagram", hint: "best for ordered participant interactions" },
+	"state-machine": { label: "State machine", hint: "best for states, events and lifecycles" },
 } as const satisfies Record<GenerationType, { readonly hint: string; readonly label: string }>;
 
 /** Wizard options in registry order, one per canonical family. */

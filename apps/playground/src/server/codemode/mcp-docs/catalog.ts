@@ -29,6 +29,7 @@ const BUILDERS = {
 	buildSequenceDiagram: "time-ordered messages between participants",
 	buildTimeline: "dated or ordered events, milestones and phases",
 	buildChart: "bar, line or pie charts of numbers across categories",
+	buildStateMachine: "states and the events, guards and actions that move between them",
 	createCanvas:
 		"hand-placed CanvasSpec, only for layouts no builder above covers (ERD, dashboard, wireframe)",
 };
@@ -577,6 +578,36 @@ export const catalog: CatalogEntry[] = [
 				title: "Grouped bars",
 				language: "js",
 				code: `async () => sketchi.buildChart({ spec: { title: "Quarterly revenue", kind: "bar", categories: ["Q1", "Q2"], series: [{ name: "2025", values: [42, 51] }, { name: "2026", values: [48, 57] }], unit: "$M", valueAxisTitle: "Revenue" }, options: ${DELIVERY_OPTIONS} })`,
+			},
+		],
+	},
+	{
+		id: "buildStateMachine",
+		kind: "operation",
+		title: "buildStateMachine",
+		topic: "buildStateMachine",
+		keywords: [
+			"state machine",
+			"state diagram",
+			"states",
+			"transitions",
+			"lifecycle",
+			"events",
+			"guards",
+			"statechart",
+		],
+		snippet: "Create a native state machine from states and the transitions between them.",
+		content: [
+			"buildStateMachine accepts { spec: { id?, title, initial, states: [{ id, label?, kind?, parent?, initial? }], transitions: [{ id?, source, target, event?, guard?, action? }], layout?: { direction } }, options? }. Omit layout to let the renderer pick LR or TB.",
+			'initial is the top-level state the machine starts in. kind "final" is an end bullseye and needs no label; kind "choice" is a diamond whose outgoing transitions each carry a guard; one may be "else". States other states name as parent form a composite, drawn as a frame around them: give it initial, its first substate. Composites do not nest.',
+			"A transition is drawn event [guard] / action; write the guard without brackets. It may leave or enter a composite, or return to its own state. Every state must be reachable from initial, and final states have no outgoing transitions.",
+			operationTypes("buildStateMachine"),
+		].join("\n\n"),
+		examples: [
+			{
+				title: "Media player with a composite state",
+				language: "js",
+				code: `async () => sketchi.buildStateMachine({ spec: { title: "Media player", initial: "stopped", states: [{ id: "stopped", label: "Stopped" }, { id: "active", label: "Active", initial: "playing" }, { id: "playing", label: "Playing", parent: "active" }, { id: "paused", label: "Paused", parent: "active" }, { id: "ejected", kind: "final" }], transitions: [{ source: "stopped", target: "active", event: "play" }, { source: "playing", target: "paused", event: "pause" }, { source: "paused", target: "playing", event: "resume" }, { source: "playing", target: "playing", event: "seek", action: "jump" }, { source: "active", target: "stopped", event: "stop" }, { source: "stopped", target: "ejected", event: "eject", guard: "tray open" }] }, options: ${DELIVERY_OPTIONS} })`,
 			},
 		],
 	},

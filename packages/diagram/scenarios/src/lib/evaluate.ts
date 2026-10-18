@@ -10,12 +10,14 @@ import {
 	timelineScenarioChecks,
 	timelineSpacingCheck,
 } from "./timeline-scenarios.js";
+import { stateMachineScenarioChecks } from "./state-machine-scenarios.js";
 import {
 	type CanonicalDiagram,
 	type FlowchartDiagram,
 	type SequenceDiagram,
 	parseFlowchartDiagram,
 	parseSequenceDiagram,
+	parseStateMachineDiagram,
 	parseTimelineDiagram,
 	parseChartDiagram,
 	sequenceActivations,
@@ -754,6 +756,12 @@ export function evaluateScenarioDiagram(
 						]
 					: [],
 		);
+	}
+	if (scenario.diagramType === "state-machine") {
+		const diagram = parseStateMachineDiagram(candidate);
+		const modelDiagram =
+			modelCandidate === candidate ? diagram : parseStateMachineDiagram(modelCandidate);
+		return evaluation(scenario.id, diagram, stateMachineScenarioChecks(scenario, modelDiagram));
 	}
 	if (scenario.diagramType === "sequence") {
 		const diagram = parseSequenceDiagram(candidate);

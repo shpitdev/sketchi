@@ -220,6 +220,7 @@ function buildFailure(result: Extract<BuildResult, { ok: false }>): GenerateFail
 		case "invalid_sequence":
 		case "invalid_timeline":
 		case "invalid_chart":
+		case "invalid_state_machine":
 			return failure("invalid_generated_document", issues);
 		case "quality_failed":
 			return failure("quality_failed", issues);
@@ -255,6 +256,8 @@ function buildWithCodeMode(
 			return codeMode.buildChart(request);
 		case "sequence":
 			return codeMode.buildSequenceDiagram(request);
+		case "state-machine":
+			return codeMode.buildStateMachine(request);
 	}
 }
 

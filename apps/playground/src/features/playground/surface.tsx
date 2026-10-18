@@ -76,6 +76,8 @@ function resultSummary(result: StudioBuildResult): {
 	if (!spec) return {};
 	if ("events" in spec) return { itemCount: spec.events.length };
 	if ("categories" in spec) return { itemCount: spec.categories.length * spec.series.length };
+	if ("states" in spec)
+		return { connectionCount: spec.transitions.length, itemCount: spec.states.length };
 	return "participants" in spec
 		? { connectionCount: spec.messages.length, itemCount: spec.participants.length }
 		: { connectionCount: spec.edges.length, itemCount: spec.nodes.length };
@@ -147,6 +149,7 @@ function failureCopy(status: Exclude<StudioBuildResult, { ok: true }>["status"])
 		case "invalid_sequence":
 		case "invalid_timeline":
 		case "invalid_chart":
+		case "invalid_state_machine":
 			return {
 				message: "This draft needs a clearer structure before it can be drawn.",
 				hint: "Clarify the steps or simplify the connections, then try again.",

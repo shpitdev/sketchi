@@ -15,8 +15,9 @@ sketchi-code-mode and exposes three tools:
 
 - docs: how to drive Sketchi, including the diagram spec shape.
 - search: look up the Sketchi API surface before writing a call.
-- execute: run Sketchi code mode, which builds flowcharts, mindmaps,
-  sequence diagrams, timelines and charts, fetches artifacts, and applies diagram patches.
+- execute: run Sketchi code mode, which builds flowcharts, mindmaps, sequence
+  diagrams, timelines, charts and state machines, fetches artifacts, and applies
+  diagram patches.
 
 This is the recommended entry point for agents. Prefer it over the HTTP
 endpoints below unless you need a single direct call.
@@ -28,10 +29,11 @@ POST /api/v1/mindmaps/build
 POST /api/v1/sequences/build
 POST /api/v1/timelines/build
 POST /api/v1/charts/build
+POST /api/v1/state-machines/build
 Build one diagram from a typed spec and store the result as an artifact.
 
 POST /api/v1/generate
-Generate a flowchart, mindmap, sequence, timeline, or chart diagram from a prompt rather than a
+Generate a flowchart, mindmap, sequence, timeline, chart, or state-machine diagram from a prompt rather than a
 prebuilt spec. Omit type for model selection, or pass a supported type as an
 authoritative constraint. Unsupported native types return a typed error.
 
@@ -65,3 +67,5 @@ https://icons.sketchi.app/llms.txt — the public SVG icon library and its API.
 Native timelines: use `buildTimeline` (Code Mode) or `generate --type timeline` (CLI). Supply events with unique IDs, labels, and ISO dates at the source's precision (year, month, day, or instant with Z or offset) or explicit numeric order; optional `end` (phase), `kind: "milestone"`, `lane`, `today`, and concise descriptions are preserved. Dates and order cannot be mixed. The renderer spaces events by elapsed time, humanizes dates, and wraps long chronologies. No dependency scheduling.
 
 Native charts: use `buildChart` (Code Mode) or `generate --type chart` (CLI). Supply `kind` (`bar`, `line`, or `pie`), `categories`, and `series: [{ name, values }]` with one value per category; optional `unit`, `categoryAxisTitle`, `valueAxisTitle`, `stacked` and `orientation` (bars), and `donut` (pies). The renderer draws nice-tick axes from zero for bars, value and percentage labels, a legend for several series, and leader lines for thin pie slices. Never supply coordinates.
+
+Native state machines: use `buildStateMachine` (Code Mode) or `generate --type state-machine` (CLI). Supply `initial`, states with unique ids and labels (`kind: "final"` for an end, `"choice"` for a guarded branch; states naming a `parent` form a composite with its own `initial`), and transitions with `source`, `target` and optional `event`, `guard` and `action`, drawn as `event [guard] / action`. Self-loops and transitions into or out of a composite are supported; composites do not nest.

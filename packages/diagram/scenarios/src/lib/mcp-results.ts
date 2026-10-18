@@ -41,7 +41,9 @@ function buildFrom(
 				? "buildTimeline"
 				: diagramType === "sequence"
 					? "buildSequenceDiagram"
-					: "buildFlowchart";
+					: diagramType === "state-machine"
+						? "buildStateMachine"
+						: "buildFlowchart";
 	const receipts = Array.isArray(value.builds)
 		? value.builds.filter(
 				(build): build is Record<string, unknown> =>
@@ -66,6 +68,7 @@ function buildFrom(
 					"buildSequenceDiagram",
 					"buildTimeline",
 					"buildChart",
+					"buildStateMachine",
 					"createCanvas",
 				].includes(returned.operation)))
 	)
@@ -145,6 +148,7 @@ const operationFamilies: Readonly<Record<string, string>> = {
 	buildSequenceDiagram: "sequence",
 	buildTimeline: "timeline",
 	buildChart: "chart",
+	buildStateMachine: "state-machine",
 	createCanvas: "canvas",
 };
 
@@ -256,9 +260,11 @@ export function candidateFromMcpResult(
 				? { ...build.normalizedSpec, type: "chart" }
 				: diagramType === "timeline"
 					? { ...build.normalizedSpec, type: "timeline" }
-					: diagramType === "sequence"
-						? specToSequenceCandidate(build.normalizedSpec)
-						: specToFlowchartCandidate(build.normalizedSpec),
+					: diagramType === "state-machine"
+						? { ...build.normalizedSpec, type: "state-machine" }
+						: diagramType === "sequence"
+							? specToSequenceCandidate(build.normalizedSpec)
+							: specToFlowchartCandidate(build.normalizedSpec),
 		check: {
 			id: "mcp-build-accepted",
 			passed: true,

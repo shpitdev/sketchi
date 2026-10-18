@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Typed, deterministic diagrams from your terminal.</strong><br />
-  Create, inspect, revise, and export local flowcharts, mindmaps, sequence diagrams, timelines, and charts—or turn one prompt into validated, editable Excalidraw.
+  Create, inspect, revise, and export local flowcharts, mindmaps, sequence diagrams, timelines, charts, and state machines—or turn one prompt into validated, editable Excalidraw.
 </p>
 
 <p align="center">
@@ -53,7 +53,7 @@ sketchi generate --prompt "Map release approval with pass and revise branches"
 
 With no `--prompt`, Sketchi opens a short wizard only when both standard input
 and standard output are human terminals, output is text, and CI is absent. It
-asks for prompt text, flowchart (the default), mind map, sequence diagram, timeline, or chart, and where to save the
+asks for prompt text, flowchart (the default), mind map, sequence diagram, timeline, chart, or state machine, and where to save the
 PNG. The choices are the current directory, a `diagrams/` folder under exactly
 the directory where Sketchi was run, or a custom path with the same semantics as
 `--dest`. Sketchi does not inspect Git, and it creates `diagrams/` only after
@@ -64,7 +64,7 @@ that wizard question. Explicit `--format png` may proceed; another format or
 Scripts, pipes, redirected streams, CI, and `--output json` never prompt or
 block. They must pass `--prompt`; omitting it retains the deterministic usage
 error. Passing `--prompt` is always direct and noninteractive.
-`--type` accepts only flowchart, mindmap, sequence, timeline, or chart and is authoritative.
+`--type` accepts only flowchart, mindmap, sequence, timeline, chart, or state-machine and is authoritative.
 Without it, the generation model selects one of those from the request; a
 request for any other kind of diagram returns a typed unsupported-type error
 instead of being coerced into a supported one.
@@ -103,7 +103,7 @@ The endpoint defaults to
 `https://playground.sketchi.app/api/v1/canvases/create`; use `--endpoint URL` or
 `SKETCHI_CANVAS_ENDPOINT` only for preview and local testing. The existing
 `create` command remains the separate, strictly offline command for accepted
-flowchart, mindmap, sequence, timeline, and chart documents.
+flowchart, mindmap, sequence, timeline, chart, and state-machine documents.
 
 ## Create and work with a diagram offline
 
@@ -322,3 +322,5 @@ for everything that changed, or browse published versions on
 Native timelines: use `buildTimeline` (Code Mode) or `generate --type timeline` (CLI). Supply events with unique IDs, labels, and ISO dates at the source's precision (year, month, day, or instant with Z or offset) or explicit numeric order; optional `end` (phase), `kind: "milestone"`, `lane`, `today`, and concise descriptions are preserved. Dates and order cannot be mixed. The renderer spaces events by elapsed time, humanizes dates, and wraps long chronologies. No dependency scheduling.
 
 Native charts: use `buildChart` (Code Mode) or `generate --type chart` (CLI). Supply `kind` (`bar`, `line`, or `pie`), `categories`, and `series: [{ name, values }]` with one value per category; optional `unit`, `categoryAxisTitle`, `valueAxisTitle`, `stacked` and `orientation` (bars), and `donut` (pies). The renderer draws nice-tick axes from zero for bars, value and percentage labels, a legend for several series, and leader lines for thin pie slices. Never supply coordinates.
+
+Native state machines: use `buildStateMachine` (Code Mode) or `generate --type state-machine` (CLI). Supply `initial`, states with unique ids and labels (`kind: "final"` for an end, `"choice"` for a guarded branch; states naming a `parent` form a composite with its own `initial`), and transitions with `source`, `target` and optional `event`, `guard` and `action`, drawn as `event [guard] / action`. Self-loops and transitions into or out of a composite are supported; composites do not nest.

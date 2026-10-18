@@ -7,6 +7,7 @@ import {
 	getCanvasValidationIssues,
 	getFlowchartValidationIssues,
 	getSequenceValidationIssues,
+	getStateMachineValidationIssues,
 	getTimelineValidationIssues,
 	getChartValidationIssues,
 	orderedTimelineEvents,
@@ -22,6 +23,8 @@ import {
 	type CanvasValidationIssue,
 	type SequenceDiagram,
 	type SequenceValidationIssueCode,
+	type StateMachineDiagram,
+	type StateMachineValidationIssueCode,
 } from "@sketchi/diagram-core";
 import {
 	convertSceneToExcalidraw,
@@ -32,6 +35,7 @@ import {
 import {
 	renderIntermediateDiagram,
 	renderSequenceDiagram,
+	renderStateMachineDiagram,
 	renderTimelineDiagram,
 	renderChartDiagram,
 	isStructurallyValidSequenceActivation,
@@ -63,6 +67,7 @@ import {
 	BuildFlowchartRejected,
 	BuildMindmapRejected,
 	BuildSequenceDiagramRejected,
+	BuildStateMachineRejected,
 	BuildTimelineRejected,
 	BuildChartRejected,
 	CreateCanvasRejected,
@@ -72,6 +77,7 @@ import {
 	BuildFlowchartRequestSchema,
 	BuildMindmapRequestSchema,
 	BuildSequenceDiagramRequestSchema,
+	BuildStateMachineRequestSchema,
 	BuildTimelineRequestSchema,
 	BuildChartRequestSchema,
 	CreateCanvasRequestSchema,
@@ -90,9 +96,11 @@ import {
 	type BuildFlowchartResult,
 	type BuildMindmapResult,
 	type BuildSequenceDiagramRequest,
+	type BuildStateMachineRequest,
 	type BuildTimelineRequest,
 	type BuildChartRequest,
 	type BuildSequenceDiagramResult,
+	type BuildStateMachineResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type CreateCanvasResult,
@@ -110,6 +118,7 @@ import {
 	type NormalizedFlowchartSpec,
 	type NormalizedMindmapSpec,
 	type NormalizedSequenceDiagramSpec,
+	type NormalizedStateMachineSpec,
 	type NormalizedTimelineSpec,
 	type NormalizedChartSpec,
 	type PartialArtifactBundle,
@@ -186,6 +195,7 @@ type CodeModeBoundaryOperation =
 	| "buildFlowchart"
 	| "buildMindmap"
 	| "buildSequenceDiagram"
+	| "buildStateMachine"
 	| "buildTimeline"
 	| "buildChart"
 	| "createCanvas"
@@ -219,6 +229,7 @@ function artifactKindForOperation(operation: CodeModeBoundaryOperation): string 
 	if (operation === "buildSequenceDiagram") return "sequence";
 	if (operation === "buildTimeline") return "timeline";
 	if (operation === "buildChart") return "chart";
+	if (operation === "buildStateMachine") return "state-machine";
 	if (operation === "createCanvas") return "canvas";
 	if (operation === "applyDiagramPatch") return "patch";
 	return undefined;
@@ -621,6 +632,85 @@ function sequenceQuality(spec: NormalizedSequenceDiagramSpec, threshold: number)
 	};
 }
 
+function normalizeStateMachineSpec(
+	spec: BuildStateMachineRequest["spec"],
+): NormalizedStateMachineSpec {
+	const title = cleanToolString(spec.title);
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-state-machine"),
+		title,
+		initial: cleanToolString(spec.initial),
+		states: spec.states.map((state) => ({
+			id: cleanToolString(state.id),
+			...optional("label", state.label),
+			...(state.kind ? { kind: state.kind } : {}),
+			...optional("parent", state.parent),
+			...optional("initial", state.initial),
+		})),
+		transitions: spec.transitions.map((transition, index) => ({
+			id:
+				cleanOptional(transition.id) ??
+				`transition-${index + 1}-${slugify(transition.source)}-${slugify(transition.target)}`,
+			source: cleanToolString(transition.source),
+			target: cleanToolString(transition.target),
+			...optional("event", transition.event),
+			...optional("guard", transition.guard),
+			...optional("action", transition.action),
+		})),
+		...(spec.layout ? { layout: { direction: spec.layout.direction } } : {}),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+function toStateMachineDiagram(spec: NormalizedStateMachineSpec): StateMachineDiagram {
+	return { ...spec, type: "state-machine" };
+}
+
+/** Code Mode's published issue codes for diagram-core's state-machine invariants. */
+const STATE_MACHINE_ISSUE_CODES = {
+	state_machine_too_large: "state_machine_too_large",
+	invalid_state_id: "invalid_state",
+	duplicate_state_id: "duplicate_node_id",
+	duplicate_transition_id: "duplicate_edge_id",
+	missing_state_label: "invalid_state",
+	unknown_initial_state: "unknown_initial_state",
+	unknown_parent_state: "invalid_composite",
+	nested_composite: "invalid_composite",
+	missing_transition_source: "missing_edge_source",
+	missing_transition_target: "missing_edge_target",
+	final_has_outgoing: "final_has_outgoing",
+	composite_member_transition: "invalid_composite",
+	missing_composite_initial: "invalid_composite",
+	underbranched_choice: "underbranched_choice",
+	unguarded_choice_branch: "unlabeled_decision_branch",
+	unreachable_state: "unreachable_node",
+} as const satisfies Record<StateMachineValidationIssueCode, CodeModeIssueCode>;
+
+function validateNormalizedStateMachine(spec: NormalizedStateMachineSpec): CodeModeIssue[] {
+	return getStateMachineValidationIssues(toStateMachineDiagram(spec)).map((entry) =>
+		issue({
+			code: STATE_MACHINE_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+
+function stateMachineQuality(spec: NormalizedStateMachineSpec, threshold: number): QualityReport {
+	const score = 10;
+	return {
+		accepted: score >= threshold,
+		score,
+		threshold,
+		summary: { nodeCount: spec.states.length, edgeCount: spec.transitions.length },
+		checks: [],
+	};
+}
+
 export class CodeModeArtifactRenderFailed extends Schema.TaggedError<CodeModeArtifactRenderFailed>()(
 	"CodeModeArtifactRenderFailed",
 	{ cause: Schema.Defect(), message: Schema.String },
@@ -720,6 +810,15 @@ const BuildSequenceDiagramFailure = workflowFailure(
 	"BuildSequenceDiagramFailure",
 	BuildSequenceDiagramRejected.fields.status,
 	BuildSequenceDiagramRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildStateMachineFailure = workflowFailure(
+	"BuildStateMachineFailure",
+	BuildStateMachineRejected.fields.status,
+	BuildStateMachineRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -2468,6 +2567,116 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 	} satisfies Extract<BuildSequenceDiagramResult, { ok: true }>;
 });
 
+const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(BuildStateMachineRequestSchema, {
+		errors: "all",
+		reportInput: true,
+	})(input);
+	if (!Result.isSuccess(parsed)) {
+		return yield* new BuildStateMachineFailure({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeStateMachineSpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedStateMachine(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* new BuildStateMachineFailure({
+			status: "invalid_state_machine",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = stateMachineQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* new BuildStateMachineFailure({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* Effect.try({
+		try: () => renderStateMachineDiagram(toStateMachineDiagram(normalizedSpec)),
+		catch: (cause) =>
+			new BuildStateMachineFailure({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message:
+								cause instanceof Error ? cause.message : "Unable to render state machine scene.",
+							hint: "Repair the state and transition structure and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildStateMachine.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* new BuildStateMachineFailure({
+			status: "render_failed",
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Shorten state labels or split the machine and retry buildStateMachine.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError(
+			(error) =>
+				new BuildStateMachineFailure({
+					status: error.status,
+					context: {
+						...(error.status === "export_failed" ? exportContext : qualityContext),
+						issues: error.issues,
+					},
+				}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildStateMachineResult, { ok: true }>;
+});
+
 const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(function* (
 	input: unknown,
 ) {
@@ -3340,6 +3549,14 @@ export const buildSequenceDiagram: (
 ) => CodeModeWorkflowEffect<BuildSequenceDiagramResult> = boundary(
 	"buildSequenceDiagram",
 	buildSequenceDiagramWorkflow,
+	failureResult,
+);
+
+export const buildStateMachine: (
+	input: unknown,
+) => CodeModeWorkflowEffect<BuildStateMachineResult> = boundary(
+	"buildStateMachine",
+	buildStateMachineWorkflow,
 	failureResult,
 );
 

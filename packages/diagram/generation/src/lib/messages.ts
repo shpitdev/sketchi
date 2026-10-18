@@ -47,8 +47,8 @@ const COMMON_INSTRUCTIONS = [
 	`Sketchi supports only nativeKind ${listAlternatives(NATIVE_KINDS)}. If the requested kind is ${listAlternatives(UNSUPPORTED_KINDS)}, set nativeKind to null, omit diagram, and never coerce it into a supported kind.`,
 	"When nativeKind is null, return an empty requirements array because there is no native artifact to validate.",
 	"List every measurable scenario requirement once in intent.requirements. Convert counts and minimums into count requirements, hierarchy depth into topic_levels, and required names or branch/message text into label requirements.",
-	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
-	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", or "series".',
+	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
+	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", "series", "state", or "transition".',
 	'Use comparator "minimum" for phrases such as "at least" and "exact" for exact counts. Do not invent measurable requirements that the scenario did not request.',
 	"The diagram must satisfy every requirement in the plan. Sketchi deterministically checks the plan against the artifact.",
 ];
@@ -110,6 +110,17 @@ const IR_INSTRUCTIONS = {
 	flowchart: { title: "Flowchart IR rules", rules: FLOWCHART_IR_INSTRUCTIONS },
 	mindmap: { title: "Mindmap IR rules", rules: MINDMAP_IR_INSTRUCTIONS },
 	sequence: { title: "Sequence IR rules", rules: SEQUENCE_IR_INSTRUCTIONS },
+	"state-machine": {
+		title: "State machine IR rules",
+		rules: [
+			'Use diagram type "state-machine".',
+			"Return initial (the id of the top-level state the machine starts in), states, and transitions.",
+			'Every state has a unique id without ":" and a label. kind "final" marks an end state and needs no label; kind "choice" is a branch point whose outgoing transitions each carry a guard; one may be "else".',
+			"A composite state is a state other states name as parent; give it initial, the substate it starts in. Composites do not nest.",
+			"Every transition has a unique id, source, target, and optional event, guard (the condition, without brackets) and action. A transition may leave or enter a composite, or return to its own state.",
+			"Every state must be reachable from initial. Final states have no outgoing transitions.",
+		],
+	},
 } as const satisfies Record<DiagramTypeValue, { title: string; rules: readonly string[] }>;
 
 /** The JSON shape shown for an explicitly requested family. */
@@ -201,6 +212,34 @@ const FAMILY_EXAMPLES = {
 		requirements: [
 			{ kind: "count", target: "messages", comparator: "minimum", value: 4 },
 			{ kind: "label", target: "participant", value: "Service" },
+		],
+	},
+	"state-machine": {
+		diagram: {
+			id: "short-kebab-case-id",
+			type: "state-machine",
+			initial: "pending",
+			states: [
+				{ id: "pending", label: "Pending" },
+				{ id: "paid", label: "Paid" },
+				{ id: "done", kind: "final" },
+			],
+			transitions: [
+				{
+					id: "pay",
+					source: "pending",
+					target: "paid",
+					event: "pay",
+					guard: "card valid",
+					action: "charge",
+				},
+				{ id: "remind", source: "pending", target: "pending", event: "timeout" },
+				{ id: "close", source: "paid", target: "done" },
+			],
+		},
+		requirements: [
+			{ kind: "count", target: "states", comparator: "minimum", value: 3 },
+			{ kind: "label", target: "transition", value: "pay" },
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { diagram: object; requirements: readonly object[] }>;

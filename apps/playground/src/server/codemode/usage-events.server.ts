@@ -36,6 +36,7 @@ export type CodeModeUsageOperation =
 	| "buildSequenceDiagram"
 	| "buildTimeline"
 	| "buildChart"
+	| "buildStateMachine"
 	| "createCanvas"
 	| "execute"
 	| "generateDiagram";

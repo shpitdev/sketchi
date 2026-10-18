@@ -36,6 +36,7 @@ const tanstackFullPathSnapshot = [
 	"/api/v1/generate",
 	"/api/v1/mindmaps/build",
 	"/api/v1/sequences/build",
+	"/api/v1/state-machines/build",
 	"/api/v1/timelines/build",
 	"/artifacts/$artifactId",
 	"/artifacts/$artifactId/edit",

@@ -36,7 +36,8 @@ type StudioBuildOperation =
 	| "buildFlowchart"
 	| "buildSequenceDiagram"
 	| "buildTimeline"
-	| "buildChart";
+	| "buildChart"
+	| "buildStateMachine";
 
 /**
  * One agent turn's build budget, shared by every Studio build tool: one

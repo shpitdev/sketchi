@@ -4,12 +4,14 @@ import {
 	DIAGRAM_TYPES,
 	DiagramValidationError,
 	isDiagramIconSlug,
-	type FlowchartDiagram,
 	FlowchartDiagramSchema,
 	FlowchartValidationError,
 	MindmapDiagramSchema,
 	SKETCHI_DIAGRAM_STYLE,
 	SequenceDiagramSchema,
+	StateMachineDiagramSchema,
+	StateMachineValidationError,
+	stateTransitionLabel,
 	TimelineDiagramSchema,
 	TimelineValidationError,
 	validateTimelineDiagram,
@@ -20,6 +22,7 @@ import {
 	validateFlowchartDiagram,
 	validateMindmapDiagram,
 	validateSequenceDiagram,
+	validateStateMachineDiagram,
 } from "@sketchi/diagram-core";
 import { Result, Schema, SchemaIssue } from "effect";
 
@@ -195,6 +198,42 @@ function normalizeGeneratedSequenceInput(input: unknown, diagnostics: string[]):
 	};
 }
 
+/**
+ * Number transitions the model left without ids, by source and target, and
+ * drop empty event, guard and action strings, which mean "none".
+ */
+function normalizeGeneratedStateMachineInput(input: unknown): unknown {
+	const styled = withSketchiDiagramStyle(input);
+	if (!isUnknownRecord(styled) || !Array.isArray(styled["transitions"])) return styled;
+	const used = new Set(
+		styled["transitions"].flatMap((transition) =>
+			isUnknownRecord(transition) && typeof transition["id"] === "string" ? [transition["id"]] : [],
+		),
+	);
+	return {
+		...styled,
+		transitions: styled["transitions"].map((transition) => {
+			if (!isUnknownRecord(transition)) return transition;
+			const cleaned = Object.fromEntries(
+				Object.entries(transition).filter(
+					([key, value]) =>
+						!(
+							["event", "guard", "action"].includes(key) &&
+							typeof value === "string" &&
+							!value.trim()
+						),
+				),
+			);
+			if (typeof cleaned["id"] === "string" && cleaned["id"].length > 0) return cleaned;
+			const base = `${String(cleaned["source"])}-${String(cleaned["target"])}`;
+			let id = base;
+			for (let suffix = 2; used.has(id); suffix += 1) id = `${base}-${suffix}`;
+			used.add(id);
+			return { ...cleaned, id };
+		}),
+	};
+}
+
 function firstString(values: readonly unknown[]): string | undefined {
 	return values.find((value): value is string => typeof value === "string");
 }
@@ -254,7 +293,8 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 		error instanceof FlowchartValidationError ||
 		error instanceof SequenceValidationError ||
 		error instanceof TimelineValidationError ||
-		error instanceof ChartValidationError
+		error instanceof ChartValidationError ||
+		error instanceof StateMachineValidationError
 	) {
 		const family =
 			error instanceof FlowchartValidationError
@@ -263,7 +303,9 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 					? "timeline"
 					: error instanceof ChartValidationError
 						? "chart"
-						: "sequence";
+						: error instanceof StateMachineValidationError
+							? "state-machine"
+							: "sequence";
 		return {
 			diagnostics: error.issues.map(
 				(entry) => `${family}.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
@@ -393,6 +435,13 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 						validateMindmapDiagram,
 						intent,
 					),
+		"state-machine": () =>
+			decodeAndValidate(
+				StateMachineDiagramSchema,
+				normalizeGeneratedStateMachineInput(titledDiagram),
+				validateStateMachineDiagram,
+				intent,
+			),
 		sequence: () => {
 			const result = decodeAndValidate(
 				SequenceDiagramSchema,
@@ -465,7 +514,14 @@ export function candidateFromText(
 	};
 }
 
-function flowchartCycleRank(diagram: FlowchartDiagram): number {
+/**
+ * Independent loops in a graph: per strongly connected component, its internal
+ * edges minus its nodes plus one. A self-loop is a loop of its own.
+ */
+function cycleRank(diagram: {
+	readonly edges: readonly { readonly source: string; readonly target: string }[];
+	readonly nodes: readonly { readonly id: string }[];
+}): number {
 	const adjacency = new Map<string, string[]>();
 	for (const node of diagram.nodes) adjacency.set(node.id, []);
 	for (const edge of diagram.edges) adjacency.get(edge.source)?.push(edge.target);
@@ -540,6 +596,17 @@ function labelsForRequirement(
 			: requirement.target === "series"
 				? diagram.series.flatMap((series) => (series.name === undefined ? [] : [series.name]))
 				: undefined;
+	if (diagram.type === "state-machine") {
+		if (requirement.target === "state")
+			return diagram.states.flatMap((state) => (state.label ? [state.label] : []));
+		// A transition is named by its event or by its whole label.
+		if (requirement.target === "transition")
+			return diagram.transitions.flatMap((transition) => [
+				...(transition.event ? [transition.event] : []),
+				stateTransitionLabel(transition),
+			]);
+		return undefined;
+	}
 	if (requirement.target === "participant") {
 		return diagram.participants.map((participant) => participant.label);
 	}
@@ -562,7 +629,7 @@ function countForRequirement(
 			case "terminal_nodes":
 				return diagram.nodes.filter((node) => node.kind === "end").length;
 			case "cycles":
-				return flowchartCycleRank(diagram);
+				return cycleRank(diagram);
 			default:
 				return undefined;
 		}
@@ -573,6 +640,14 @@ function countForRequirement(
 	if (diagram.type === "timeline") return target === "events" ? diagram.events.length : undefined;
 	if (diagram.type === "chart")
 		return target === "categories" ? diagram.categories.length : undefined;
+	if (diagram.type === "state-machine")
+		return target === "states"
+			? diagram.states.length
+			: target === "transitions"
+				? diagram.transitions.length
+				: target === "cycles"
+					? cycleRank({ nodes: diagram.states, edges: diagram.transitions })
+					: undefined;
 	if (target === "participants") return diagram.participants.length;
 	return target === "messages" ? diagram.messages.length : undefined;
 }

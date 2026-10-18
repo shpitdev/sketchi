@@ -7,11 +7,13 @@ import {
 	type BuildFlowchartResult,
 	type BuildMindmapResult,
 	type BuildSequenceDiagramResult,
+	type BuildStateMachineResult,
 	type BuildTimelineResult,
 	FlowchartSpec,
 	MindmapSpec,
 	type MindmapTopicInput,
 	SequenceDiagramSpec,
+	StateMachineSpec,
 	TimelineSpec,
 	ChartSpec,
 } from "./contract.js";
@@ -20,6 +22,7 @@ import {
 	buildFlowchart,
 	buildMindmap,
 	buildSequenceDiagram,
+	buildStateMachine,
 	buildTimeline,
 	buildChart,
 	type CodeModeRuntimeEnvironment,
@@ -35,6 +38,7 @@ export const CANONICAL_DOCUMENT_SPECS = {
 	sequence: SequenceDiagramSpec,
 	timeline: TimelineSpec,
 	chart: ChartSpec,
+	"state-machine": StateMachineSpec,
 } as const satisfies Record<DiagramTypeValue, unknown>;
 
 /** A canonical diagram document: a family and its authoring spec. */
@@ -50,7 +54,8 @@ export type CanonicalBuildResult =
 	| BuildMindmapResult
 	| BuildSequenceDiagramResult
 	| BuildTimelineResult
-	| BuildChartResult;
+	| BuildChartResult
+	| BuildStateMachineResult;
 
 export function isCanonicalDocumentType(value: unknown): value is DiagramTypeValue {
 	return CANONICAL_DOCUMENT_TYPES.some((type) => type === value);
@@ -77,6 +82,8 @@ export function buildCanonicalDocument(
 			return buildTimeline(request);
 		case "chart":
 			return buildChart(request);
+		case "state-machine":
+			return buildStateMachine(request);
 	}
 }
 
@@ -166,6 +173,19 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 					title: diagram.title,
 					root: mindmapRoot(diagram),
 					layout: { direction: diagram.layout.direction === "RL" ? "RL" : "LR" },
+					style: diagram.style,
+				},
+			};
+		case "state-machine":
+			return {
+				type: "state-machine",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					initial: diagram.initial,
+					states: diagram.states.map((state) => ({ ...state })),
+					transitions: diagram.transitions.map((transition) => ({ ...transition })),
+					...(diagram.layout ? { layout: { direction: diagram.layout.direction } } : {}),
 					style: diagram.style,
 				},
 			};

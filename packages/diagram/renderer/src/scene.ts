@@ -3154,7 +3154,36 @@ function sourceStubLength(route: RoutedEdge, point: ScenePoint, distance: number
 						branchLabelMetrics(route.edge.label, branches(route.source.kind)).height + 24,
 					)
 			: 0;
-	return endpointClearance(route.source, point, route.sourceEdge, Math.max(distance, labelSpace));
+	return endpointClearance(
+		route.source,
+		point,
+		route.sourceEdge,
+		Math.max(distance, Math.min(labelSpace, choiceStubRoom(route, point))),
+	);
+}
+
+/**
+ * How far a choice's departure stub may run before it passes the
+ * stub its target arrives by from the facing side, which would force the line
+ * to double back. A label longer than that slides along the line instead.
+ */
+function choiceStubRoom(route: RoutedEdge, point: ScenePoint): number {
+	if (route.source.kind !== "choice" || route.targetEdge !== OPPOSITE_EDGE[route.sourceEdge])
+		return Infinity;
+	const normal = EDGE_NORMAL[route.sourceEdge];
+	const axis = normal.x === 0 ? "y" : "x";
+	const size = axis === "x" ? "width" : "height";
+	const sign = normal[axis];
+	// A line that can run straight into its target never doubles back.
+	const [across, breadth] = axis === "x" ? (["y", "height"] as const) : (["x", "width"] as const);
+	if (
+		point[across] >= route.target[across] &&
+		point[across] <= route.target[across] + route.target[breadth]
+	)
+		return Infinity;
+	const near = sign > 0 ? route.target[axis] : route.target[axis] + route.target[size];
+	const ahead = (near - point[axis]) * sign - ROUTE_STUB_LENGTH - PORT_SPACING;
+	return ahead > ROUTE_STUB_LENGTH ? ahead : Infinity;
 }
 
 /**
@@ -4847,7 +4876,7 @@ function pathCrossings(a: readonly ScenePoint[], b: readonly ScenePoint[], from 
 }
 
 /** Interior crossings between different arrows. */
-function arrowCrossings(arrows: readonly ArrowSceneElement[]): number {
+export function arrowCrossings(arrows: readonly ArrowSceneElement[]): number {
 	return arrows.reduce(
 		(sum, arrow, index) =>
 			sum +

@@ -60,6 +60,7 @@ export function codeModeFailure(
 					"invalid_sequence",
 					"invalid_timeline",
 					"invalid_chart",
+					"invalid_state_machine",
 					"quality_failed",
 				];
 	if (validationStatuses.includes(result.status))

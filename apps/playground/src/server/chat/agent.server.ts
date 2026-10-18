@@ -48,6 +48,13 @@ import {
 	StudioBuildSequenceOutputSchema,
 } from "./studio-sequence-tool.server";
 import { makeStudioBuildTurn } from "./studio-build-tool.server";
+import {
+	makeStudioStateMachineToolExecutor,
+	STUDIO_BUILD_STATE_MACHINE_TOOL_DESCRIPTION,
+	STUDIO_BUILD_STATE_MACHINE_TOOL_NAME,
+	StudioBuildStateMachineInputSchema,
+	StudioBuildStateMachineOutputSchema,
+} from "./studio-state-machine-tool.server";
 
 export class StudioAgentRequestError extends Schema.TaggedError<StudioAgentRequestError>()(
 	"StudioAgentRequestError",
@@ -160,6 +167,10 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 
 	const timelineExecutor = yield* makeStudioTimelineToolExecutor(codeMode.buildTimeline, { turn });
 	const chartExecutor = yield* makeStudioChartToolExecutor(codeMode.buildChart, { turn });
+	const stateMachineExecutor = yield* makeStudioStateMachineToolExecutor(
+		codeMode.buildStateMachine,
+		{ turn },
+	);
 	return yield* Effect.try({
 		try: () => {
 			const result = streamText({
@@ -184,6 +195,12 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 						inputSchema: StudioBuildFlowchartInputSchema,
 						outputSchema: StudioBuildFlowchartOutputSchema,
 						execute: makeStudioBuildToolCallback(flowchartExecutor, callbacks.runPromise),
+					}),
+					[STUDIO_BUILD_STATE_MACHINE_TOOL_NAME]: tool({
+						description: STUDIO_BUILD_STATE_MACHINE_TOOL_DESCRIPTION,
+						inputSchema: StudioBuildStateMachineInputSchema,
+						outputSchema: StudioBuildStateMachineOutputSchema,
+						execute: makeStudioBuildToolCallback(stateMachineExecutor, callbacks.runPromise),
 					}),
 					[STUDIO_BUILD_SEQUENCE_TOOL_NAME]: tool({
 						description: STUDIO_BUILD_SEQUENCE_TOOL_DESCRIPTION,

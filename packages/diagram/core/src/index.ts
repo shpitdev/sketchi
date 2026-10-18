@@ -18,3 +18,4 @@ export * from "./types/timeline.js";
 export * from "./types/chart.js";
 export * from "./routing-quality.js";
 export * from "./group-regions.js";
+export * from "./types/state-machine.js";

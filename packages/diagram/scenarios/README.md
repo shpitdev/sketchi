@@ -41,6 +41,12 @@ and the eval harness use it.
 - Sequence scenarios check participants, required messages and their
   chronological order, calls answered by returns (activation bars), and that
   no return is stray.
+- State-machine scenarios check every stated state and the composite it sits
+  in, the initial state, each composite's initial substate, and every stated
+  transition between the right states with its event, guard and action in
+  their own fields. A transition into or out of a composite must start or end
+  at the composite itself. A named end matches a labeled final state or a state
+  with a transition into a final.
 
 Checks that measure the model (logos, sequence structure) score the model's own
 diagram from before candidate enforcement, so a repair never hides a model

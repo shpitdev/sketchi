@@ -13,7 +13,6 @@ export const UnsupportedDiagramIntentKindSchema = Schema.Literals([
 	"er",
 	"architecture",
 	"swimlane",
-	"state-machine",
 ]);
 export type UnsupportedDiagramIntentKind = typeof UnsupportedDiagramIntentKindSchema.Type;
 
@@ -36,8 +35,10 @@ export class CountRequirement extends Schema.Class<CountRequirement>("CountRequi
 		"events",
 		"nodes",
 		"participants",
+		"states",
 		"terminal_nodes",
 		"topics",
+		"transitions",
 	]),
 	value: Schema.Int.check(Schema.isGreaterThan(0)),
 }) {}
@@ -60,6 +61,8 @@ export class LabelRequirement extends Schema.Class<LabelRequirement>("LabelRequi
 		"event",
 		"category",
 		"series",
+		"state",
+		"transition",
 	]),
 	value: Schema.NonEmptyString,
 }) {}
@@ -100,6 +103,7 @@ const FALLBACK_TITLES: Readonly<Record<DiagramGenerationType, string>> = {
 	sequence: "Generated sequence diagram",
 	timeline: "Generated timeline",
 	chart: "Generated chart",
+	"state-machine": "Generated state machine",
 };
 
 function titleFromId(id: string): string | undefined {

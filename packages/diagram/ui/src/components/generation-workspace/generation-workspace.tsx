@@ -35,6 +35,13 @@ function diagramCounts(diagram: CanonicalDiagram) {
 			edgeCount: diagram.series.length,
 			edgeNoun: "series",
 		};
+	if (diagram.type === "state-machine")
+		return {
+			nodeCount: diagram.states.length,
+			nodeNoun: "states",
+			edgeCount: diagram.transitions.length,
+			edgeNoun: "transitions",
+		};
 	return diagram.type === "sequence"
 		? {
 				nodeCount: diagram.participants.length,

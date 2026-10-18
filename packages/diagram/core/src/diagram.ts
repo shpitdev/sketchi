@@ -21,6 +21,11 @@ import {
 	TimelineDiagramSchema,
 	validateTimelineDiagram,
 } from "./types/timeline.js";
+import {
+	type StateMachineDiagram,
+	StateMachineDiagramSchema,
+	validateStateMachineDiagram,
+} from "./types/state-machine.js";
 import type { DiagramTypeValue } from "./types.js";
 
 /** One diagram of any canonical family, discriminated by `type`. */
@@ -29,7 +34,8 @@ export type CanonicalDiagram =
 	| MindmapDiagram
 	| SequenceDiagram
 	| TimelineDiagram
-	| ChartDiagram;
+	| ChartDiagram
+	| StateMachineDiagram;
 
 // A family added to DIAGRAM_TYPES without a contract here fails to compile.
 const familySchemas = {
@@ -38,6 +44,7 @@ const familySchemas = {
 	sequence: SequenceDiagramSchema,
 	timeline: TimelineDiagramSchema,
 	chart: ChartDiagramSchema,
+	"state-machine": StateMachineDiagramSchema,
 } satisfies Record<DiagramTypeValue, Schema.Top>;
 
 export const CanonicalDiagramSchema = Schema.Union([
@@ -46,6 +53,7 @@ export const CanonicalDiagramSchema = Schema.Union([
 	familySchemas.sequence,
 	familySchemas.timeline,
 	familySchemas.chart,
+	familySchemas["state-machine"],
 ]);
 
 /** Apply the family's semantic validation to an already decoded diagram. */
@@ -61,6 +69,8 @@ export function validateCanonicalDiagram(diagram: CanonicalDiagram): CanonicalDi
 			return validateSequenceDiagram(diagram);
 		case "chart":
 			return validateChartDiagram(diagram);
+		case "state-machine":
+			return validateStateMachineDiagram(diagram);
 	}
 }
 

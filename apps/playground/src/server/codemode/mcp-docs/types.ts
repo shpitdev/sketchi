@@ -10,6 +10,8 @@ import {
 	BuildMindmapRequestSchema,
 	BuildMindmapResultSchema,
 	BuildSequenceDiagramRequestSchema,
+	BuildStateMachineRequestSchema,
+	BuildStateMachineResultSchema,
 	BuildTimelineRequestSchema,
 	BuildSequenceDiagramResultSchema,
 	BuildTimelineResultSchema,
@@ -26,6 +28,7 @@ import {
 	FlowchartSpecSchema,
 	MindmapSpecSchema,
 	SequenceDiagramSpecSchema,
+	StateMachineSpecSchema,
 	TimelineSpecSchema,
 	GetArtifactRequestSchema,
 	GetArtifactResultSchema,
@@ -98,6 +101,23 @@ export const codeModeContracts = {
 			spec: ChartToolSpecSchema,
 		}),
 		output: BuildChartResultSchema,
+	},
+	buildStateMachine: {
+		input: Schema.Struct({
+			...BuildStateMachineRequestSchema.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: StateMachineSpecSchema.mapFields(
+				({ id, title, initial, states, transitions, layout }) => ({
+					id,
+					title,
+					initial,
+					states,
+					transitions,
+					layout,
+				}),
+			),
+		}),
+		output: BuildStateMachineResultSchema,
 	},
 	createCanvas: {
 		input: CreateCanvasRequestSchema,

@@ -5,6 +5,7 @@ import {
 	type BuildFlowchartResult,
 	type BuildMindmapResult,
 	type BuildSequenceDiagramResult,
+	type BuildStateMachineResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type CreateCanvasResult,
@@ -53,6 +54,7 @@ function requestTooLargeResult(
 		| "Sequence diagram"
 		| "Timeline"
 		| "Chart"
+		| "State machine"
 		| "Artifact patch",
 ) {
 	return {
@@ -175,6 +177,7 @@ type BuildResult =
 	| BuildSequenceDiagramResult
 	| BuildTimelineResult
 	| BuildChartResult
+	| BuildStateMachineResult
 	| CreateCanvasResult;
 
 type BuildOperation =
@@ -183,6 +186,7 @@ type BuildOperation =
 	| "buildSequenceDiagram"
 	| "buildTimeline"
 	| "buildChart"
+	| "buildStateMachine"
 	| "createCanvas";
 
 function makeBuildHandler({
@@ -191,7 +195,14 @@ function makeBuildHandler({
 	run,
 }: {
 	readonly operation: BuildOperation;
-	readonly label: "Flowchart" | "Mindmap" | "Sequence diagram" | "Timeline" | "Chart" | "Canvas";
+	readonly label:
+		| "Flowchart"
+		| "Mindmap"
+		| "Sequence diagram"
+		| "Timeline"
+		| "Chart"
+		| "State machine"
+		| "Canvas";
 	readonly run: (
 		codeMode: Context.Service.Shape<typeof PlaygroundCodeMode>,
 		input: unknown,
@@ -262,6 +273,11 @@ export const handleBuildChartRequest = makeBuildHandler({
 	operation: "buildChart",
 	label: "Chart",
 	run: (codeMode, input) => codeMode.buildChart(input),
+});
+export const handleBuildStateMachineRequest = makeBuildHandler({
+	operation: "buildStateMachine",
+	label: "State machine",
+	run: (codeMode, input) => codeMode.buildStateMachine(input),
 });
 export const handleCreateCanvasRequest = makeBuildHandler({
 	operation: "createCanvas",

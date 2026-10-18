@@ -39,6 +39,18 @@ function fixtureRequirements(scenario: DiagramScenario): readonly Record<string,
 				value: event.label,
 			})),
 		];
+	if (scenario.diagramType === "state-machine")
+		return [
+			{
+				kind: "count",
+				target: "states",
+				comparator: "minimum",
+				value: scenario.expectedDiagram.states.length,
+			},
+			...scenario.expectedDiagram.states.flatMap((state) =>
+				state.label ? [{ kind: "label", target: "state", value: state.label } as const] : [],
+			),
+		];
 	if (scenario.diagramType === "sequence") {
 		return [
 			{

@@ -140,6 +140,15 @@ const CHART_ISSUE_CODE_ADDITIONS = new Set([
 	"invalid_chart_value",
 	"invalid_chart_option",
 ]);
+// State machines add six issue codes.
+const STATE_MACHINE_ISSUE_CODE_ADDITIONS = new Set([
+	"state_machine_too_large",
+	"invalid_state",
+	"unknown_initial_state",
+	"invalid_composite",
+	"final_has_outgoing",
+	"underbranched_choice",
+]);
 const FLOWCHART_SPEC_NODE_ADDED_FIELDS = new Set(["icon", "group"]);
 // Flowchart groups add an optional groups list to the spec.
 const FLOWCHART_SPEC_ADDED_FIELDS = new Set(["groups"]);
@@ -224,7 +233,8 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		SEQUENCE_ISSUE_CODE_ADDITIONS.has(value) ||
 		TIMELINE_ISSUE_CODE_ADDITIONS.has(value) ||
 		GROUP_ISSUE_CODE_ADDITIONS.has(value) ||
-		CHART_ISSUE_CODE_ADDITIONS.has(value)
+		CHART_ISSUE_CODE_ADDITIONS.has(value) ||
+		STATE_MACHINE_ISSUE_CODE_ADDITIONS.has(value)
 	);
 }
 
@@ -1633,7 +1643,8 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 						!SEQUENCE_ISSUE_CODE_ADDITIONS.has(code) &&
 						!TIMELINE_ISSUE_CODE_ADDITIONS.has(code) &&
 						!GROUP_ISSUE_CODE_ADDITIONS.has(code) &&
-						!CHART_ISSUE_CODE_ADDITIONS.has(code),
+						!CHART_ISSUE_CODE_ADDITIONS.has(code) &&
+						!STATE_MACHINE_ISSUE_CODE_ADDITIONS.has(code),
 				)
 				.toSorted(),
 		).toEqual([...directlyReachableCodes, ...boundaryOnlyCodes].toSorted());

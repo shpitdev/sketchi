@@ -88,6 +88,42 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG renderer",
 		}),
 	);
 
+	it.effect("exports a state machine whose transitions bind to a composite frame", () =>
+		Effect.gen(function* () {
+			const builder = yield* DiagramBuilder;
+			const renderer = yield* CliPngRenderer;
+			const built = yield* builder.build(
+				canonicalDocument({
+					type: "state-machine",
+					spec: {
+						title: "Media player",
+						initial: "stopped",
+						states: [
+							{ id: "stopped", label: "Stopped" },
+							{ id: "active", label: "Active", initial: "playing" },
+							{ id: "playing", label: "Playing", parent: "active" },
+							{ id: "paused", label: "Paused", parent: "active" },
+						],
+						transitions: [
+							{ source: "stopped", target: "active", event: "play" },
+							{ source: "playing", target: "paused", event: "pause" },
+							{ source: "paused", target: "playing", event: "resume" },
+							{ source: "active", target: "stopped", event: "stop" },
+						],
+					},
+				}),
+			);
+			const frame = built.excalidraw.elements.find((element) => element["type"] === "frame")!;
+			assert.lengthOf(frame["boundElements"] as unknown[], 2);
+			const png = yield* renderer.renderPng({
+				scene: built.scene,
+				excalidraw: built.excalidraw,
+			});
+			assert.isAbove(png.byteLength, 1_000);
+			assertInkHasPadding(png);
+		}),
+	);
+
 	it.effect("grows the canvas for a wide title without clipping ink", () =>
 		Effect.gen(function* () {
 			const builder = yield* DiagramBuilder;

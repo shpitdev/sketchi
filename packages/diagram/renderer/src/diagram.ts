@@ -4,6 +4,7 @@ import type { CanonicalDiagram } from "@sketchi/diagram-core";
 
 import { type RenderedDiagramScene, renderIntermediateDiagram } from "./scene.js";
 import { renderSequenceDiagram } from "./sequence.js";
+import { renderStateMachineDiagram } from "./state-machine.js";
 
 /** Render any canonical diagram with its family's renderer. */
 export function renderDiagram(diagram: CanonicalDiagram): RenderedDiagramScene {
@@ -17,5 +18,7 @@ export function renderDiagram(diagram: CanonicalDiagram): RenderedDiagramScene {
 			return renderSequenceDiagram(diagram);
 		case "chart":
 			return renderChartDiagram(diagram);
+		case "state-machine":
+			return renderStateMachineDiagram(diagram);
 	}
 }

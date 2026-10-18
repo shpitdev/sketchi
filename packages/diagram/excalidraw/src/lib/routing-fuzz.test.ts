@@ -543,7 +543,33 @@ function longTokenDiagrams(count: number) {
 				return { id: `s${i}`, source: `n${source}`, target: `n${target}`, label: label() };
 			}),
 		};
-		return { flowchart, mindmap, timeline, sequence };
+		const stateMachine = {
+			id: `state-${index}`,
+			title: label(),
+			type: "state-machine",
+			initial: "n0",
+			states: [
+				...ids.map((id, i) => ({
+					id,
+					label: label(),
+					...(i >= 2 && i < 4 ? { parent: "composite" } : {}),
+				})),
+				{ id: "composite", label: label(), initial: ids[2] ?? "n2" },
+				{ id: "end", kind: "final" },
+			].filter((state) => state.id !== "composite" || ids.length > 2),
+			transitions: [
+				...ids.slice(1).map((id, i) => ({
+					id: `t${i}`,
+					source: ids[i]!,
+					target: i >= 1 && i < 3 && ids.length > 2 ? (i === 1 ? "composite" : id) : id,
+					event: label(),
+					...(i % 2 === 0 ? { guard: label() } : { action: label() }),
+				})),
+				{ id: "loop", source: "n0", target: "n0", event: label() },
+				{ id: "done", source: ids.at(-1)!, target: "end" },
+			],
+		};
+		return { flowchart, mindmap, timeline, sequence, "state-machine": stateMachine };
 	});
 }
 
@@ -551,7 +577,7 @@ describe("text fit fuzz", () => {
 	// Every family sizes its containers to whole words: no validator issue and no
 	// word broken across lines in the export.
 	const diagrams = longTokenDiagrams(24);
-	it.each(["flowchart", "mindmap", "timeline", "sequence"] as const)(
+	it.each(["flowchart", "mindmap", "timeline", "sequence", "state-machine"] as const)(
 		"fits long words and identifiers in every %s",
 		(family) => {
 			const failures = diagrams.flatMap((specs, index) => {
@@ -562,6 +588,11 @@ describe("text fit fuzz", () => {
 					[
 						...("nodes" in diagram ? diagram.nodes : []),
 						...("participants" in diagram ? diagram.participants : []),
+						...("states" in diagram
+							? diagram.states.flatMap((state) =>
+									state.label ? [{ id: state.id, label: state.label }] : [],
+								)
+							: []),
 					].map((node) => [`node:${node.id}`, node.label]),
 				);
 				return [

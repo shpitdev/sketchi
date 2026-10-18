@@ -10,6 +10,8 @@ import {
 	SEQUENCE_MESSAGE_STYLES,
 	SEQUENCE_MESSAGE_TYPES,
 	SKETCHI_DIAGRAM_STYLE,
+	STATE_MACHINE_DIRECTIONS,
+	STATE_MACHINE_STATE_KINDS,
 	TIMELINE_EVENT_KINDS,
 } from "@sketchi/diagram-core";
 
@@ -402,6 +404,12 @@ export const CODE_MODE_ISSUE_CODES = [
 	"invalid_chart_series",
 	"invalid_chart_value",
 	"invalid_chart_option",
+	"state_machine_too_large",
+	"invalid_state",
+	"unknown_initial_state",
+	"invalid_composite",
+	"final_has_outgoing",
+	"underbranched_choice",
 	"request_too_large",
 	"generic_label",
 	"label_too_long",
@@ -735,6 +743,61 @@ export class ChartSpec extends Schema.Class<ChartSpec>("ChartSpec")(
 ) {}
 export const ChartSpecSchema = ChartSpec;
 
+/**
+ * The authoring form of diagram-core's canonical StateMachineDiagram:
+ * transition ids are optional and style is defaulted. buildStateMachine
+ * normalizes it into the core contract, which owns every invariant.
+ */
+export class StateMachineStateSpec extends Schema.Class<StateMachineStateSpec>(
+	"StateMachineStateSpec",
+)(
+	{
+		id: RequiredNonEmptyString,
+		label: optionalContract(NonEmptyString),
+		kind: optionalContract(literals(STATE_MACHINE_STATE_KINDS)),
+		parent: optionalContract(NonEmptyString),
+		initial: optionalContract(NonEmptyString),
+	},
+	{ identifier: undefined },
+) {}
+
+export class StateMachineTransitionSpec extends Schema.Class<StateMachineTransitionSpec>(
+	"StateMachineTransitionSpec",
+)(
+	{
+		id: optionalContract(NonEmptyString),
+		source: RequiredNonEmptyString,
+		target: RequiredNonEmptyString,
+		event: optionalContract(NonEmptyString),
+		guard: optionalContract(NonEmptyString),
+		action: optionalContract(NonEmptyString),
+	},
+	{ identifier: undefined },
+) {}
+
+export class StateMachineSpecLayout extends Schema.Class<StateMachineSpecLayout>(
+	"StateMachineSpecLayout",
+)({ direction: literals(STATE_MACHINE_DIRECTIONS) }, { identifier: undefined }) {}
+
+const stateMachineTransitionsDefault: Array<typeof StateMachineTransitionSpec.Encoded> = [];
+const StateMachineTransitionsWithDefault = Schema.Array(StateMachineTransitionSpec)
+	.pipe(Schema.mutable)
+	.annotate({ default: stateMachineTransitionsDefault })
+	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(stateMachineTransitionsDefault)));
+export class StateMachineSpec extends Schema.Class<StateMachineSpec>("StateMachineSpec")(
+	{
+		id: optionalContract(NonEmptyString),
+		title: RequiredNonEmptyString,
+		initial: RequiredNonEmptyString,
+		states: requiredArray(nonEmptyArray(StateMachineStateSpec)),
+		transitions: StateMachineTransitionsWithDefault,
+		layout: optionalContract(StateMachineSpecLayout),
+		style: DiagramStyleWithDefault,
+	},
+	{ identifier: undefined },
+) {}
+export const StateMachineSpecSchema = StateMachineSpec;
+
 const ArtifactFormatsOption = optionalContract(nonEmptyArray(ArtifactFormatSchema));
 const InlineArtifactsOption = optionalContract(
 	Schema.Array(InlineArtifactFormatSchema).pipe(Schema.mutable),
@@ -891,6 +954,32 @@ export const BuildChartToolInputSchema = Schema.Struct({
 	spec: requiredObject(ChartToolSpecSchema),
 });
 export type BuildChartToolInput = typeof BuildChartToolInputSchema.Type;
+
+export class BuildStateMachineRequest extends Schema.Class<BuildStateMachineRequest>(
+	"BuildStateMachineRequest",
+)(
+	{
+		requestId: optionalContract(NonEmptyString),
+		spec: requiredObject(StateMachineSpec),
+		options: optionalContract(BuildFlowchartOptions),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildStateMachineRequestSchema = BuildStateMachineRequest;
+export const BuildStateMachineToolInputSchema = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(
+		StateMachineSpec.mapFields(({ id, title, initial, states, transitions, layout }) => ({
+			id,
+			title,
+			initial,
+			states,
+			transitions,
+			layout,
+		})),
+	),
+});
+export type BuildStateMachineToolInput = typeof BuildStateMachineToolInputSchema.Type;
 
 export interface MindmapTopicInput {
 	label: string;
@@ -1642,6 +1731,18 @@ const NormalizedTimelineSpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedTimelineSpec = typeof NormalizedTimelineSpecSchema.Type;
+const NormalizedStateMachineSpecSchema = Schema.Struct({
+	id: NonEmptyString,
+	title: NonEmptyString,
+	initial: NonEmptyString,
+	states: Schema.Array(StateMachineStateSpec).pipe(Schema.mutable),
+	transitions: Schema.Array(
+		StateMachineTransitionSpec.mapFields((fields) => ({ ...fields, id: NonEmptyString })),
+	).pipe(Schema.mutable),
+	layout: optionalContract(StateMachineSpecLayout),
+	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
+});
+export type NormalizedStateMachineSpec = typeof NormalizedStateMachineSpecSchema.Type;
 const NormalizedChartSpecSchema = ChartSpec.mapFields((fields) => ({
 	...fields,
 	id: NonEmptyString,
@@ -1891,6 +1992,49 @@ export class BuildChartRejected extends Schema.Class<BuildChartRejected>("BuildC
 ) {}
 export const BuildChartResultSchema = Schema.Union([BuildChartAccepted, BuildChartRejected]);
 export type BuildChartResult = typeof BuildChartResultSchema.Type;
+
+export class BuildStateMachineAccepted extends Schema.Class<BuildStateMachineAccepted>(
+	"BuildStateMachineAccepted",
+)(
+	{
+		ok: booleanLiteral(true),
+		status: stringLiteral("accepted"),
+		buildId: Schema.String,
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: NormalizedStateMachineSpecSchema,
+		quality: QualityReportSchema,
+		artifact: ArtifactBundleSchema,
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export class BuildStateMachineRejected extends Schema.Class<BuildStateMachineRejected>(
+	"BuildStateMachineRejected",
+)(
+	{
+		ok: booleanLiteral(false),
+		status: literals([
+			"invalid_input",
+			"invalid_state_machine",
+			"quality_failed",
+			"render_failed",
+			"export_failed",
+			"storage_failed",
+		]),
+		buildId: optionalContract(Schema.String),
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: optionalContract(NormalizedStateMachineSpecSchema),
+		quality: optionalContract(QualityReportSchema),
+		partial: optionalContract(PartialArtifactBundleSchema),
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildStateMachineResultSchema = Schema.Union([
+	BuildStateMachineAccepted,
+	BuildStateMachineRejected,
+]);
+export type BuildStateMachineResult = typeof BuildStateMachineResultSchema.Type;
 
 export class GetArtifactAccepted extends Schema.Class<GetArtifactAccepted>("GetArtifactAccepted")(
 	{
