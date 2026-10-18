@@ -15,6 +15,7 @@ import { PlaygroundRequestCallbacks, runPlaygroundEffect } from "../runtime/runt
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 import { PlaygroundCodeMode } from "./service.server";
 import {
+	formatCodeModeDocs,
 	getCodeModeDocs,
 	CodeModeDocsRequestSchema,
 	CodeModeDocsResultSchema,
@@ -783,6 +784,17 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 				"keep every requested step and decision in a separate node",
 			);
 			expect(executeTool?.description).toContain("preserving the prompt's step wording and order");
+			// Every request pays for tools/list; family types and guidance come from docs({ topic }).
+			expect(executeTool?.description).not.toMatch(/^type /m);
+			expect(
+				JSON.stringify(
+					tools.tools.map(({ name, description, inputSchema }) => ({
+						name,
+						description,
+						inputSchema,
+					})),
+				).length,
+			).toBeLessThan(5_000);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,
@@ -837,16 +849,19 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 				isError: true,
 			});
 
-			const docs = structuredContent(
-				await client.callTool({
-					name: "docs",
-					arguments: { topic: "agentSequence" },
-				}),
-			);
+			const docsResponse = await client.callTool({
+				name: "docs",
+				arguments: { topic: "agentSequence" },
+			});
+			const docs = structuredContent(docsResponse);
 			expect(docs).toMatchObject({
 				topic: "agentSequence",
 			});
 			expect(JSON.stringify(docs)).toContain("buildFlowchart");
+			// Models read docs as plain text rather than escaped JSON; structured content keeps the envelope.
+			expect(textContent(docsResponse)).toEqual([
+				formatCodeModeDocs(getCodeModeDocs({ topic: "agentSequence" })),
+			]);
 
 			const search = structuredContent(
 				await client.callTool({
@@ -962,6 +977,15 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		}
 	});
 
+	function withInlineExcalidraw(code: string | undefined) {
+		const delivery = 'artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: []';
+		expect(code).toContain(delivery);
+		return code?.replace(
+			delivery,
+			'artifactFormats: ["scene", "excalidraw"], inlineArtifacts: ["excalidraw"]',
+		);
+	}
+
 	it.each([
 		["buildFlowchart", ["vercel", "nextjs"]],
 		["buildSequenceDiagram", ["github", "cloudflare", "docker"]],
@@ -981,8 +1005,8 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 					},
 				},
 			},
-			// PNG requires the hosted browser binding; this test exercises semantic and Excalidraw output.
-			{ code: code?.replace('["scene", "excalidraw", "png"]', '["scene", "excalidraw"]') },
+			// PNG requires the hosted browser binding, and the inline export proves each logo is drawn.
+			{ code: withInlineExcalidraw(code) },
 			{ executor: createInProcessExecutor() },
 		);
 		expect(output.ok).toBe(true);

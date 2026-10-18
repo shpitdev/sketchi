@@ -31,10 +31,11 @@ import {
 	CodeModeDocsResultSchema,
 	CodeModeSearchRequestSchema,
 	CodeModeSearchResultSchema,
+	formatCodeModeDocs,
 	getCodeModeDocs,
 	searchCodeModeDocs,
-	SKETCHI_CODE_MODE_TYPES,
 	SKETCHI_CODE_MODE_VERSION,
+	SKETCHI_EXECUTE_DESCRIPTION,
 } from "./mcp-docs.server";
 import { createEffectMcpServer, makeEffectMcpTool } from "./effect-mcp-adapter.server";
 import { prewarmPngRendererOnSessionStart } from "./mcp-session-prewarm.server";
@@ -238,30 +239,23 @@ function finalResponseTextFromResult(value: Record<string, unknown>) {
 	);
 }
 
-function jsonResult(
+/** Calling models read every text block; JSON stays compact because indentation is paid in tokens. */
+function toolResult(
 	value: Record<string, unknown>,
-	options: { includeFinalResponseText?: boolean } = {},
+	text: readonly string[] = [JSON.stringify(value)],
 ) {
-	const finalResponseText = options.includeFinalResponseText
-		? finalResponseTextFromResult(value)
-		: undefined;
 	return {
-		content: [
-			...(finalResponseText
-				? [
-						{
-							type: "text" as const,
-							text: finalResponseText,
-						},
-					]
-				: []),
-			{
-				type: "text" as const,
-				text: JSON.stringify(value, null, 2),
-			},
-		],
+		content: text.map((block) => ({ type: "text" as const, text: block })),
 		structuredContent: value,
 	};
+}
+
+function executeResult(value: Record<string, unknown>) {
+	const finalResponseText = finalResponseTextFromResult(value);
+	return toolResult(value, [
+		...(finalResponseText ? [finalResponseText] : []),
+		JSON.stringify(value),
+	]);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -649,14 +643,18 @@ export function makeSketchiCodeModeProvider(
 
 const docs = makeEffectMcpTool("docs", {
 	title: "Sketchi Code Mode docs",
-	description: "Read the harness-first Sketchi Code Mode MCP contract and usage guidance.",
+	description:
+		"Read the request type, rules and a runnable example for a sketchi operation, or the overview, issues, patchOperations and examples topics.",
 	inputSchema: CodeModeDocsRequestSchema,
 	outputSchema: CodeModeDocsResultSchema,
 	annotations: {
 		readOnlyHint: true,
 		idempotentHint: true,
 	},
-}).bind((input) => jsonResult(getCodeModeDocs(input)));
+}).bind((input) => {
+	const docs = getCodeModeDocs(input);
+	return toolResult(docs, [formatCodeModeDocs(docs)]);
+});
 
 const search = makeEffectMcpTool("search", {
 	title: "Search Sketchi Code Mode docs",
@@ -668,27 +666,11 @@ const search = makeEffectMcpTool("search", {
 		readOnlyHint: true,
 		idempotentHint: true,
 	},
-}).bind((input) => jsonResult(searchCodeModeDocs(input)));
+}).bind((input) => toolResult(searchCodeModeDocs(input)));
 
 const executeDefinition = makeEffectMcpTool("execute", {
 	title: "Execute Sketchi Code Mode",
-	description: [
-		"Run an async JavaScript arrow function for an external agent harness.",
-		"Write JavaScript only: no TypeScript syntax, annotations, interfaces, generics, imports, or named wrapper functions.",
-		"Use the canonical shape: async () => { const result = await sketchi.buildFlowchart(...); return result; }",
-		"Code fences and trailing expression semicolons are normalized before execution.",
-		"The sandbox exposes sketchi.createCanvas, sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.buildSequenceDiagram, sketchi.buildTimeline, sketchi.getArtifact, sketchi.applyDiagramPatch, and sketchi.searchIcons.",
-		"For flowcharts, keep every requested step and decision in a separate node, preserving the prompt's step wording and order. Do not merge steps into compound labels.",
-		"When the prompt names technologies, call sketchi.searchIcons({ q }) for each and set node.icon or sequence participant.icon to { slug } using a matching returned slug. One icon per node: give 'X on Y' separate technology steps. Labels alone do not add logos; check coverage.",
-		"First get the semantic graph accepted, then use patch operations for deterministic visual changes.",
-		"For final user-facing output, return accepted Sketchi artifact ids, format refs, and Excalidraw/PNG URLs. Do not recreate accepted diagrams as Markdown or Mermaid artifacts.",
-		"When artifactDelivery is available, the first text content block is the final user-facing answer; copy it verbatim and stop.",
-		"structuredContent.builds records every semantic or canvas build attempt in call order, independently of the script return value in result, without duplicating inline exports.",
-		"When execute returns artifactDelivery, paste artifactDelivery.finalResponseText as the final chat response and stop.",
-		"Do not call write_to_file/Create, create an Antigravity artifact, or inspect nested inline JSON after artifactDelivery is present.",
-		"",
-		SKETCHI_CODE_MODE_TYPES,
-	].join("\n"),
+	description: SKETCHI_EXECUTE_DESCRIPTION,
 	inputSchema: ExecuteRequestSchema,
 	outputSchema: ExecuteResultSchema,
 	annotations: {
@@ -704,11 +686,7 @@ export function createSketchiMcpServer(
 	options: CodeModeMcpOptions = {},
 ): Server {
 	const execute = executeDefinition.bind((input) =>
-		runToolEffect(executeSketchiCodeMode(input, runToolEffect, options)).then((result) =>
-			jsonResult(result, {
-				includeFinalResponseText: true,
-			}),
-		),
+		runToolEffect(executeSketchiCodeMode(input, runToolEffect, options)).then(executeResult),
 	);
 
 	return createEffectMcpServer({

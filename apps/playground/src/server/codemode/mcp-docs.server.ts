@@ -86,6 +86,7 @@ export type SearchResult = typeof CodeModeSearchResultContract.Type & Record<str
 export const SKETCHI_CODE_MODE_VERSION = "2026-09-04";
 
 export { default as SKETCHI_CODE_MODE_TYPES } from "./mcp-docs/code-mode-types.generated.txt?raw";
+export { EXECUTE_TOOL_DESCRIPTION as SKETCHI_EXECUTE_DESCRIPTION } from "./mcp-docs/catalog";
 
 function docsEntryForTopic(topic: DocsResult["topic"]): CatalogEntry {
 	const fallback = catalog.find((entry) => entry.id === "overview");
@@ -131,6 +132,16 @@ export function getCodeModeDocs(input: CodeModeDocsRequest): DocsResult {
 		examples: entry.examples ?? [],
 		version: SKETCHI_CODE_MODE_VERSION,
 	};
+}
+
+/** Models read docs as text: types and examples escaped inside a JSON string cost tokens and clarity. */
+export function formatCodeModeDocs(docs: DocsResult): string {
+	return [
+		docs.content,
+		...docs.examples.map(
+			(example) => `Example: ${example.title}\n\`\`\`${example.language}\n${example.code}\n\`\`\``,
+		),
+	].join("\n\n");
 }
 
 export function searchCodeModeDocs(input: CodeModeSearchRequest): SearchResult {

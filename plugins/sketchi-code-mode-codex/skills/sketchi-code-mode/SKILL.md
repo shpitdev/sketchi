@@ -40,7 +40,7 @@ async () => {
     },
     options: {
       artifactFormats: ["scene", "excalidraw", "png"],
-      inlineArtifacts: ["excalidraw"],
+      inlineArtifacts: [],
     },
   });
 
@@ -63,7 +63,7 @@ async () => {
     ],
     options: {
       artifactFormats: ["scene", "excalidraw", "png"],
-      inlineArtifacts: ["scene", "excalidraw"],
+      inlineArtifacts: [],
     },
   });
 

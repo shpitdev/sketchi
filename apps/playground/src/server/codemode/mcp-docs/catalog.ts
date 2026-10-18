@@ -3,8 +3,11 @@ import {
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_ISSUES,
 	FLOWCHART_MAX_NODES,
+	SEQUENCE_MAX_MESSAGES,
+	SEQUENCE_MAX_PARTICIPANTS,
 } from "@sketchi/diagram-core";
 import SKETCHI_CODE_MODE_TYPES from "./code-mode-types.generated.txt?raw";
+import type { CodeModeOperation } from "./types";
 import type { CodeExample, DocsResult, SearchHit } from "../mcp-docs.server";
 
 export interface CatalogEntry {
@@ -18,6 +21,89 @@ export interface CatalogEntry {
 	examples?: CodeExample[];
 }
 
+/** One line per operation. Every request carries this index, so family detail lives in docs topics. */
+const BUILDERS = {
+	buildFlowchart:
+		"process steps and decisions, including how systems or packages interact along a request or data flow",
+	buildMindmap: "a nested topic hierarchy",
+	buildSequenceDiagram: "time-ordered messages between participants",
+	buildTimeline: "dated or ordered events, milestones and phases",
+	createCanvas:
+		"hand-placed CanvasSpec, only for layouts no builder above covers (ERD, chart, dashboard, wireframe)",
+};
+const HELPERS = {
+	searchIcons:
+		"searchIcons({ q, limit? }) resolves to { icons: [{ slug, name, collection }] }: exact logo slugs for named technologies",
+	getArtifact: "getArtifact({ artifactId, format?, inline? }) reads a stored artifact",
+	applyDiagramPatch:
+		'applyDiagramPatch applies deterministic style, shape, text, move or structural edits to an accepted artifact; docs({ topic: "applyDiagramPatch" })',
+};
+// Adding an operation without a summary fails typechecking, so the index cannot go stale.
+const OPERATION_SUMMARIES: Record<CodeModeOperation, string> = { ...BUILDERS, ...HELPERS };
+const OPERATIONS = Object.keys(OPERATION_SUMMARIES) as CodeModeOperation[];
+const OPERATION_INDEX = [
+	'Builders. Before the first call, read docs({ topic: "<builder>" }) for its request type, rules and example:',
+	...Object.entries(BUILDERS).map(([operation, summary]) => `- ${operation}: ${summary}`),
+	"Helpers:",
+	...Object.values(HELPERS).map((summary) => `- ${summary}`),
+].join("\n");
+const OPERATION_LIST = OPERATIONS.map((operation) => `sketchi.${operation}`).join(", ");
+
+const DECLARATIONS = new Map(
+	SKETCHI_CODE_MODE_TYPES.split("\n\n").flatMap((block) => {
+		const name = /^type (\w+) = /.exec(block)?.[1];
+		return name ? [[name, block.trim()] as const] : [];
+	}),
+);
+
+/**
+ * Generated declarations for the named types and everything they reference. Depth-first order reads
+ * top-down: each declaration precedes the types it references.
+ */
+function typesFor(...names: string[]): string {
+	const included = new Map<string, string>();
+	const visit = (name: string) => {
+		const declaration = DECLARATIONS.get(name);
+		if (!declaration) throw new Error(`Generated Code Mode types are missing ${name}.`);
+		if (included.has(name)) return;
+		included.set(name, declaration);
+		for (const [reference] of declaration.slice(`type ${name} = `.length).matchAll(/\b[A-Z]\w*/g)) {
+			if (DECLARATIONS.has(reference)) visit(reference);
+		}
+	};
+	for (const name of names) visit(name);
+	return [...included.values()].join("\n");
+}
+
+/** Reference types go after the guidance so models weigh the rules first. */
+function operationTypes(operation: CodeModeOperation): string {
+	const name = operation.charAt(0).toUpperCase() + operation.slice(1);
+	return `Request type:\nsketchi.${operation}(input: ${name}Request)\n${typesFor(`${name}Request`)}`;
+}
+
+const DELIVERY_OPTIONS = `{ artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [] }`;
+
+const FLOWCHART_FIDELITY =
+	"For flowcharts, keep every requested step and decision in a separate node, preserving the prompt's step wording and order. Do not merge steps into compound labels.";
+
+const LOGO_RULE =
+	"When the prompt names technologies, call sketchi.searchIcons({ q }) for each and set node.icon or sequence participant.icon to { slug } using a matching returned slug. One icon per node: give 'X on Y' separate technology steps. Labels alone do not add logos; check coverage.";
+
+export const EXECUTE_TOOL_DESCRIPTION = [
+	"Run JavaScript against the typed sketchi client. code is one async arrow function:",
+	"async () => { const built = await sketchi.buildFlowchart({ spec, options }); return built; }",
+	"Write JavaScript only: no TypeScript syntax, imports, or named wrapper functions. Code fences and a trailing semicolon are stripped.",
+	"",
+	OPERATION_INDEX,
+	"",
+	`- ${FLOWCHART_FIDELITY}`,
+	`- ${LOGO_RULE}`,
+	`- Pass options: ${DELIVERY_OPTIONS} to get Excalidraw and PNG URLs without inline JSON.`,
+	'- Builds resolve to { ok: true, status: "accepted", artifact: { artifactId, formats }, normalizedSpec, quality, issues } or { ok: false, status, issues: [{ code, message, hint, ref? }] }. On ok: false, repair the spec from each issue hint and build again. Patch only accepted artifacts.',
+	"- Return the accepted build or patch result. execute then adds artifactDelivery and puts its finalResponseText first in the text content: copy it verbatim as the final answer and stop. Do not recreate the diagram as Markdown, Mermaid, a local file (write_to_file/Create) or an Antigravity artifact, and do not inspect inline JSON.",
+	'- structuredContent.builds records every build attempt in call order, whatever the script returns. docs({ topic: "execute" }) has every generated declaration, including results.',
+].join("\n");
+
 const PATCH_OPERATION_SUMMARY = [
 	"- setDefaultStyle: set fallback strokeColor, fillColor, textColor, or backgroundColor for the scene.",
 	"- setStyle: style selected nodes, edges, labels, or scopes.",
@@ -29,22 +115,6 @@ const PATCH_OPERATION_SUMMARY = [
 	"- reorder: move existing ids in the explicit back-to-front zOrder.",
 	"- group/ungroup: add or remove stable composition group ids.",
 ].join("\n");
-
-const PATCH_REQUEST_TYPE = SKETCHI_CODE_MODE_TYPES.split("\n\n").find((declaration) =>
-	declaration.startsWith("type ApplyDiagramPatchRequest = "),
-);
-if (!PATCH_REQUEST_TYPE)
-	throw new Error("Generated Code Mode types are missing the patch request.");
-
-const PATCH_REQUEST_SHAPE = `${PATCH_REQUEST_TYPE}
-
-// Primary public path:
-{
-  source: { artifactId: "<artifact id from buildFlowchart or applyDiagramPatch>" },
-  intent: "short human reason for the edit",
-  operations: [{ op: "replaceText", selector: { nodeIds: ["ship"] }, text: "Ship to production" }],
-  options: { inlineArtifacts: ["scene", "excalidraw"] }
-}`;
 
 const PATCH_OPERATIONS_EXAMPLE = `[
   { op: "setDefaultStyle", style: { strokeColor: "#111827", fillColor: "#ffffff", textColor: "#111827" } },
@@ -63,19 +133,12 @@ const PATCH_OPERATIONS_EXAMPLE = `[
 
 const FULL_PATCH_REQUEST_EXAMPLE = `{
   source: { artifactId: built.artifact.artifactId },
+  intent: "Highlight the gate and rename the release step",
   operations: [
-    {
-      op: "setStyle",
-      selector: { nodeIds: ["gate"] },
-      style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" }
-    },
-    {
-      op: "replaceText",
-      selector: { nodeIds: ["ship"] },
-      text: "Ship to production"
-    }
+    { op: "setStyle", selector: { nodeIds: ["gate"] }, style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" } },
+    { op: "replaceText", selector: { nodeIds: ["ship"] }, text: "Ship to production" }
   ],
-  options: { inlineArtifacts: ["scene", "excalidraw"], preserveConnectivity: true }
+  options: { artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [], preserveConnectivity: true }
 }`;
 
 const ACCEPTANCE_LOOP_EXAMPLE = `async () => {
@@ -98,7 +161,7 @@ const ACCEPTANCE_LOOP_EXAMPLE = `async () => {
 
   if (!built.ok) return built;
 
-  const patched = await sketchi.applyDiagramPatch({
+  return sketchi.applyDiagramPatch({
     source: { artifactId: built.artifact.artifactId },
     intent: "Make the decision node a purple diamond after the graph is accepted.",
     operations: [
@@ -113,14 +176,8 @@ const ACCEPTANCE_LOOP_EXAMPLE = `async () => {
         shape: "diamond",
       },
     ],
-    options: {
-      artifactFormats: ["scene", "excalidraw", "png"],
-      inlineArtifacts: ["scene", "excalidraw"],
-    },
+    options: ${DELIVERY_OPTIONS},
   });
-
-  if (!patched.ok) return patched;
-  return patched;
 }`;
 
 const HOSTED_APP_LOGOS_EXAMPLE = `async () => {
@@ -141,7 +198,7 @@ const HOSTED_APP_LOGOS_EXAMPLE = `async () => {
       ],
       edges: [{ source: "host", target: "page" }, { source: "page", target: "done" }]
     },
-    options: { artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: ["excalidraw"] }
+    options: ${DELIVERY_OPTIONS}
   });
 }`;
 
@@ -165,7 +222,7 @@ const SEQUENCE_LOGOS_EXAMPLE = `async () => {
         { source: "cloudflare", target: "github", label: "202 Accepted", type: "return" }
       ]
     },
-    options: { artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: ["excalidraw"] }
+    options: ${DELIVERY_OPTIONS}
   });
 }`;
 
@@ -183,7 +240,7 @@ const SEQUENCE_DIAGRAM_EXAMPLE = `async () => sketchi.buildSequenceDiagram({
       { source: "payments", target: "store", label: "Approved", type: "return" }
     ]
   },
-  options: { artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: ["excalidraw"] }
+  options: ${DELIVERY_OPTIONS}
 })`;
 
 const CREATE_CANVAS_EXAMPLE = `async () => sketchi.createCanvas({
@@ -201,7 +258,7 @@ const CREATE_CANVAS_EXAMPLE = `async () => sketchi.createCanvas({
     layouts: [{ type: "row", ids: ["users", "orders", "items"], x: 80, y: 80, gap: 80 }],
     zOrder: ["users", "orders", "items", "users-orders", "orders-items"]
   },
-  options: { artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: ["excalidraw"] }
+  options: ${DELIVERY_OPTIONS}
 })`;
 
 const CIRCLE_TO_DIAMOND_EXAMPLE = `async () => {
@@ -225,7 +282,7 @@ const CIRCLE_TO_DIAMOND_EXAMPLE = `async () => {
 
   if (!built.ok) return built;
 
-  const patched = await sketchi.applyDiagramPatch({
+  return sketchi.applyDiagramPatch({
     source: { artifactId: built.artifact.artifactId },
     operations: [
       { op: "setShape", selector: { nodeIds: ["circle"] }, shape: "circle" },
@@ -236,14 +293,8 @@ const CIRCLE_TO_DIAMOND_EXAMPLE = `async () => {
         style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" },
       },
     ],
-    options: {
-      artifactFormats: ["scene", "excalidraw", "png"],
-      inlineArtifacts: ["scene", "excalidraw"],
-    },
+    options: ${DELIVERY_OPTIONS},
   });
-
-  if (!patched.ok) return patched;
-  return patched;
 }`;
 
 const INVALID_FIRST_EXAMPLE = `async () => {
@@ -296,7 +347,7 @@ const REPLACE_TEXT_EXAMPLE = `async () => {
 
   if (!built.ok) return built;
 
-  const patched = await sketchi.applyDiagramPatch({
+  return sketchi.applyDiagramPatch({
     source: { artifactId: built.artifact.artifactId },
     intent: "Rename the final state without rebuilding structure.",
     operations: [
@@ -306,14 +357,8 @@ const REPLACE_TEXT_EXAMPLE = `async () => {
         text: "Ship to production",
       },
     ],
-    options: {
-      artifactFormats: ["scene", "excalidraw", "png"],
-      inlineArtifacts: ["excalidraw"],
-    },
+    options: ${DELIVERY_OPTIONS},
   });
-
-  if (!patched.ok) return patched;
-  return patched;
 }`;
 
 export const catalog: CatalogEntry[] = [
@@ -326,12 +371,12 @@ export const catalog: CatalogEntry[] = [
 		snippet:
 			"Use this MCP for external agent harnesses. It exposes docs, search, and execute only.",
 		content: [
-			"Sketchi Code Mode MCP is for external agent harnesses: Codex, Claude Code, OpenCode, and similar clients.",
-			"The server exposes a small contract: docs, search, and execute. execute runs JavaScript against a typed sketchi client.",
-			"The public sketchi client has eight operations: buildFlowchart, buildMindmap, buildSequenceDiagram, buildTimeline, createCanvas, getArtifact, applyDiagramPatch, and searchIcons.",
-			"The final deliverable is the accepted Sketchi artifact bundle: return the artifactId, format list, and Excalidraw/PNG artifact URLs instead of creating a separate Markdown, Mermaid, or prose-only diagram artifact.",
-			"Use docs({ topic }) for full request envelopes and examples. Use search({ query }) to discover operation-specific topics such as patchOperations.",
-			"Studio chat, HTTP, and MCP share the canonical semantic builder request/result contracts. Convex threads and user artifact lineage remain outside this harness surface.",
+			"Sketchi Code Mode MCP is for external agent harnesses such as Codex, Claude Code, and OpenCode. It exposes docs, search, and execute; execute runs JavaScript against a typed sketchi client.",
+			`The sketchi client has ${OPERATIONS.length} operations: ${OPERATIONS.join(", ")}.`,
+			OPERATION_INDEX,
+			"search({ query }) finds other topics such as patchOperations and issue repair hints.",
+			"The deliverable is the accepted Sketchi artifact: paste artifactDelivery.finalResponseText, or return the artifactId, formats, and Excalidraw/PNG URLs. Do not recreate it as Markdown, Mermaid, or prose.",
+			"Studio chat, HTTP, and MCP share these builder request and result contracts. Sketchi-managed threads and artifact lineage are outside this surface.",
 		].join("\n"),
 	},
 	{
@@ -343,21 +388,15 @@ export const catalog: CatalogEntry[] = [
 		snippet:
 			"Run an async JavaScript arrow function with the typed sketchi builders, createCanvas, artifact retrieval, and patching operations.",
 		content: [
-			"execute({ code }) runs an async JavaScript arrow function.",
-			"This matches the Code Mode pattern: typed host tools are exposed as a namespace inside the sandbox, here sketchi.*.",
-			"Cloudflare Code Mode exposes typed namespace methods in generated code; this server follows that shape with sketchi.buildFlowchart, sketchi.buildMindmap, sketchi.buildSequenceDiagram, sketchi.buildTimeline, sketchi.createCanvas, sketchi.getArtifact, sketchi.applyDiagramPatch, and sketchi.searchIcons.",
-			"Pass the function expression itself. A trailing semicolon and outer markdown code fence are accepted, but examples omit them so copied code is canonical.",
-			"Write JavaScript only: no TypeScript annotations, interfaces, generics, imports, or named wrapper functions. Use the canonical shape async () => { const result = await sketchi.buildFlowchart(...); return result; }.",
-			"Do not define a named function and then call it. Put the arrow function body directly in code.",
-			"Inside code, use a semantic builder for its supported diagram family, or sketchi.createCanvas(input) for arbitrary typed scenes such as ERDs, architecture maps, timelines, charts, dashboards, and wireframes; then retrieve or patch the accepted artifact as needed.",
-			"The sandbox must not receive secrets, storage bindings, model credentials, or raw network access.",
-			"Call sketchi methods sequentially when possible so a harness can inspect structured failures and retry deliberately.",
-			"For user-facing completion, return the accepted Sketchi artifactId plus Excalidraw and PNG URLs from the MCP result. Do not synthesize a Mermaid or Markdown replacement after Sketchi accepts an artifact.",
-			"The execute result includes builds in call order for every buildFlowchart, buildMindmap, buildSequenceDiagram, buildTimeline, and createCanvas attempt, even when code returns custom data, nothing, or an error. Each receipt includes operation, zero-based index, ok/status, issues, and buildId, quality, normalizedSpec, and artifact/partial references when available. Inline exports are not duplicated. result remains the script return value. Retrieval and patch calls are not builds. If the executor times out or aborts while a host build is unfinished, that attempt has status: incomplete and ok: false; its unavailable build fields are omitted.",
-			"The execute wrapper adds artifactDelivery when it detects an accepted artifact bundle. Prefer returning artifactDelivery directly to the user because it already contains artifactId, format refs, raw Excalidraw/PNG URLs, and final-response instructions.",
-			"When artifactDelivery is available, the MCP text content begins with the exact final answer. Copy that first text block verbatim into chat and stop.",
-			"When artifactDelivery.finalResponseText is present, paste that string as the final chat answer and stop. Do not call file/create/artifact tools, inspect nested inline Excalidraw JSON, or create an Antigravity artifact after that point.",
+			"execute({ code }) runs one async JavaScript arrow function. Following the Code Mode pattern, typed host tools are exposed inside the sandbox as the sketchi namespace:",
+			OPERATION_LIST,
+			"Write JavaScript only: no TypeScript annotations, interfaces, generics, imports, or named wrapper functions. Pass the arrow function itself, for example async () => { const result = await sketchi.buildFlowchart(...); return result; }. An outer code fence and a trailing semicolon are accepted.",
+			"The sandbox has no secrets, storage bindings, model credentials, or network access. Call sketchi methods sequentially when possible so failures can be inspected and retried deliberately.",
+			"The response is { ok, result, logs, builds, artifactDelivery?, finalResponseText?, error? }. result is the script return value. builds lists every buildFlowchart, buildMindmap, buildSequenceDiagram, buildTimeline, and createCanvas attempt in call order, even when the script returns other data, nothing, or an error. Each receipt has operation, zero-based index, ok, status, and issues, plus buildId, quality, normalizedSpec, and artifact or partial references when available; inline exports are not duplicated. Retrieval and patch calls are not builds. A build still running when the executor times out or aborts has status: incomplete and ok: false.",
+			"When the script returns an accepted artifact, execute adds artifactDelivery (artifactId, format refs, raw Excalidraw/PNG URLs, and final-response instructions) and puts its finalResponseText first in the text content. Copy that text verbatim as the final chat answer and stop.",
+			"For user-facing completion, return the accepted Sketchi artifactId plus Excalidraw and PNG URLs. Do not synthesize a Mermaid or Markdown replacement after Sketchi accepts an artifact. Do not call file/create/artifact tools, inspect nested inline Excalidraw JSON, or create an Antigravity artifact after that point.",
 			"",
+			"Generated declarations for every operation:",
 			SKETCHI_CODE_MODE_TYPES,
 		].join("\n"),
 		examples: [
@@ -387,26 +426,32 @@ export const catalog: CatalogEntry[] = [
 			"bounded",
 			"24",
 			"64",
+			"architecture",
+			"packages",
+			"system",
+			"request",
 		],
 		snippet: "Create the semantic flowchart first. Fix issues before styling or shape changes.",
 		content: [
 			"buildFlowchart accepts a compact FlowchartSpec: title, nodes, edges, and optional layout. Builds use the fixed Sketchi palette.",
 			"Keep every requested step and decision in a separate node, preserving the prompt's step wording and order. Use plain step labels; do not merge a destination with its next action or replace a named step with a paraphrase.",
-			'Request envelope: { spec: FlowchartSpec, options?: { artifactFormats?: ["scene", "excalidraw", "png"], inlineArtifacts?: ["scene", "excalidraw"], minQualityScore?: number } }.',
-			'For normal harness output, request artifactFormats: ["scene", "excalidraw", "png"] and inlineArtifacts: ["excalidraw"]. The scene is an internal patch source; Excalidraw and PNG are the user-facing artifacts.',
-			"Request png when the agent needs hosted visual proof. PNG artifacts are stored binary outputs and are never inlined in MCP JSON responses.",
+			"Label steps and decisions with the prompt's own words, including how it phrases each decision, and keep every decision it states as a decision node. Only when two labels would be identical, add the distinguishing words the prompt itself uses.",
+			"Use one node per outcome the prompt names: point every branch that reaches the same named outcome at that one node, and do not add end nodes the prompt does not name.",
+			'Do not add loops, steps, or edges the prompt does not state. A step that repeats an earlier step ("send another ...", "try again", "retry", "resubmit") continues that cycle: draw it as the earlier step or as a step that loops back to the decision after it, never as an end. Only a new, unrepeated final step with no stated next step is that branch\'s end node (kind: "end").',
 			"Use stable node ids. Decision nodes need meaningful labeled outgoing branches, usually yes/no.",
 			'Brand logos: when a node is about a named technology (GitHub, Docker, Postgres), call sketchi.searchIcons({ q: "docker" }) and set that node\'s icon to { slug } with an exact returned slug. The logo is drawn above the label. Never guess a slug: unknown slugs are dropped with an unknown_icon warning, and logos that cannot be drawn are dropped with icon_dropped. Neither fails the build.',
 			"Logo guidance applies only to technologies named in the prompt. Each node holds one icon. For X on Y, preserve both technologies as separate meaningful steps and attach each logo to its own node. Do not hide the host only in the title or combine both brands under one icon. Keep the requested step order and stay within graph limits.",
 			"Before building, compare the named technologies with the icons assigned to nodes. A label or successful search alone does not attach a logo; omitted icons produce no warning. If no matching logo exists, keep the technology label and report the unavailable logo instead of substituting another brand.",
 			`Flowcharts are bounded to ${FLOWCHART_MAX_NODES} nodes and ${FLOWCHART_MAX_EDGES} edges. Larger graphs fail with flowchart_too_large before render or persistence.`,
 			"Every node must be reachable from the single start, and every reachable node must be able to reach an end. Closed cycles fail with nonterminating_node; retry loops remain valid when they retain an eventual exit to an end.",
-			"Studio HTTP build requests are bounded to 256 KiB, including streamed bodies without Content-Length. Oversized requests return HTTP 413 with request_too_large in the normal failure envelope.",
-			"For export-ready visual proof, prefer monotonic flowchart graphs: avoid long back-edges, loops to earlier nodes, or reusing the same terminal node for both early and late outcomes. Use distinct terminal nodes when branches resolve at different depths.",
+			"For export-ready visual proof, prefer monotonic flowchart graphs: avoid long back-edges and loops to earlier nodes that the prompt does not state.",
 			"For broad or vague repo/system architecture prompts, summarize into 8-14 high-signal nodes. Prefer a single readable spine with short side branches over a dense dependency graph with one node per package or many crossing links.",
 			"When a prompt asks how packages or systems interact, group related packages into layers and show the main flow of responsibility. Use labels/descriptions for detail instead of adding every possible transitive edge.",
+			"Keep every package and component the prompt names under its own name; summarizing drops unnamed detail and never renames or generalizes named parts.",
 			"If buildFlowchart returns ok: false, repair the spec from issues and call buildFlowchart again.",
 			"Do not use applyDiagramPatch until buildFlowchart returns an accepted artifact.",
+			"",
+			operationTypes("buildFlowchart"),
 		].join("\n"),
 		examples: [
 			{
@@ -430,32 +475,9 @@ export const catalog: CatalogEntry[] = [
 			'Use a returned slug as a FlowchartSpec node icon ({ icon: { slug: "docker" } }), a SequenceDiagramSpec participant icon ({ icon: { slug: "docker" } }), or a CanvasSpec node icon ({ icon: { slug: "docker", size: 28 } }).',
 			"Only compact brand marks are searchable: wordmarks and very large SVGs are excluded because they cannot be drawn inside a node.",
 			"Search once per technology, then build. Do not invent slugs; a slug that searchIcons did not return is dropped with an unknown_icon warning.",
+			"",
+			operationTypes("searchIcons"),
 		].join("\n"),
-		examples: [
-			{
-				title: "Flowchart with logos",
-				language: "js",
-				code: `async () => {
-  const docker = await sketchi.searchIcons({ q: "docker", limit: 1 });
-  const github = await sketchi.searchIcons({ q: "github", limit: 1 });
-  return sketchi.buildFlowchart({
-    spec: {
-      title: "Deploy pipeline",
-      nodes: [
-        { id: "push", label: "Push to GitHub", kind: "start", icon: { slug: github.icons[0].slug } },
-        { id: "build", label: "Build the image", kind: "process", icon: { slug: docker.icons[0].slug } },
-        { id: "ship", label: "Ship", kind: "end" }
-      ],
-      edges: [
-        { source: "push", target: "build" },
-        { source: "build", target: "ship" }
-      ]
-    },
-    options: { artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: ["excalidraw"] }
-  });
-}`,
-			},
-		],
 	},
 	{
 		id: "buildMindmap",
@@ -468,15 +490,16 @@ export const catalog: CatalogEntry[] = [
 			"buildMindmap accepts a semantic MindmapSpec with one nested root topic. Do not supply coordinates, edges, or Excalidraw JSON. Builds use the fixed Sketchi palette.",
 			"The semantic-input restriction does not limit outputs: scene, Excalidraw, and PNG remain intentional output formats selected through artifact options.",
 			"Children remain in caller order and receive deterministic path identifiers such as topic-0-1-0.",
-			'Request envelope: { spec: MindmapSpec, options?: { artifactFormats?: ["scene", "excalidraw", "png"], inlineArtifacts?: ["scene", "excalidraw"], minQualityScore?: number } }.',
 			"Use nested children to express branches and depth. The public boundary supports LR or RL hierarchy layout.",
 			"If buildMindmap returns ok: false, repair the hierarchy from its typed issues and retry before patching.",
+			"",
+			operationTypes("buildMindmap"),
 		].join("\n"),
 		examples: [
 			{
 				title: "Product launch mindmap",
 				language: "js",
-				code: `async () => sketchi.buildMindmap({\n  spec: {\n    title: "Product launch",\n    root: { label: "Launch", children: [\n      { label: "Product", children: [{ label: "Scope" }, { label: "Quality" }] },\n      { label: "Go to market", children: [{ label: "Docs" }, { label: "Enablement" }] }\n    ] }\n  },\n  options: { artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: ["excalidraw"] }\n})`,
+				code: `async () => sketchi.buildMindmap({\n  spec: {\n    title: "Product launch",\n    root: { label: "Launch", children: [\n      { label: "Product", children: [{ label: "Scope" }, { label: "Quality" }] },\n      { label: "Go to market", children: [{ label: "Docs" }, { label: "Enablement" }] }\n    ] }\n  },\n  options: ${DELIVERY_OPTIONS}\n})`,
 			},
 		],
 	},
@@ -502,16 +525,16 @@ export const catalog: CatalogEntry[] = [
 			"Use dates for every event, or numeric order for every event without dates. Keep source precision: YYYY, YYYY-MM, YYYY-MM-DD, or YYYY-MM-DDTHH:mm[:ss] with Z or ±HH:MM. Never invent events or dates.",
 			'Optional: end (inclusive, dated only) draws a phase; kind: "milestone" draws a diamond; lane puts every event on a labeled track (lanes sets order, max 6); today draws a Today marker only when supplied. No dependencies.',
 			"Results match the other native builders. Request png in artifactFormats for a hosted PNG.",
+			operationTypes("buildTimeline"),
 		].join("\n\n"),
 		examples: [
 			{
 				title: "Launch phases",
 				language: "js",
-				code: `async () => sketchi.buildTimeline({ spec: { title: "Launch", events: [{ id: "beta", label: "Beta", date: "2026-06-01", end: "2026-07-31" }, { id: "ga", label: "GA", date: "2026-08-04", kind: "milestone" }] }, options: { artifactFormats: ["png", "excalidraw", "scene"] } })`,
+				code: `async () => sketchi.buildTimeline({ spec: { title: "Launch", events: [{ id: "beta", label: "Beta", date: "2026-06-01", end: "2026-07-31" }, { id: "ga", label: "GA", date: "2026-08-04", kind: "milestone" }] }, options: ${DELIVERY_OPTIONS} })`,
 			},
 		],
 	},
-
 	{
 		id: "buildSequenceDiagram",
 		kind: "operation",
@@ -534,10 +557,10 @@ export const catalog: CatalogEntry[] = [
 			"Participant order is preserved left-to-right. Message order is preserved top-to-bottom.",
 			'A message with type "return" from the callee back to its caller answers the latest open call between them; Sketchi draws the callee\'s activation bar from that call to its return, nesting re-entrant calls. Calls nobody answers draw no bar.',
 			"Every message source and target must reference a declared participant id. Self-referential messages are rejected with structured issues and repair hints.",
-			"A sequence diagram may have at most 12 participants and 40 messages; larger ones are rejected with sequence_too_large.",
+			`A sequence diagram may have at most ${SEQUENCE_MAX_PARTICIPANTS} participants and ${SEQUENCE_MAX_MESSAGES} messages; larger ones are rejected with sequence_too_large.`,
 			"For every named technology participant (e.g. GitHub, Cloudflare Worker, Docker), call sketchi.searchIcons and set participant.icon to { slug } using a matching returned slug. Labels alone do not add logos, and omitted icons produce no warning. Leave human actors unbranded; a technology logo is drawn in the participant header and exported as an Excalidraw image. Unknown slugs are dropped with an unknown_icon warning, never a failed build.",
-			'Request envelope: { spec: SequenceDiagramSpec, options?: { artifactFormats?: ["scene", "excalidraw", "png"], inlineArtifacts?: ["scene", "excalidraw"], minQualityScore?: number } }.',
-			"Request scene, Excalidraw, and PNG for full artifact delivery; inline Excalidraw when the harness needs importable JSON in the response.",
+			"",
+			operationTypes("buildSequenceDiagram"),
 		].join("\n"),
 		examples: [
 			{
@@ -561,8 +584,6 @@ export const catalog: CatalogEntry[] = [
 			"canvas",
 			"arbitrary",
 			"erd",
-			"architecture",
-			"timeline",
 			"dashboard",
 			"chart",
 			"wireframe",
@@ -572,16 +593,18 @@ export const catalog: CatalogEntry[] = [
 			"polygon",
 		],
 		snippet:
-			"Create an arbitrary visualization from the versioned, renderer-independent CanvasSpec IR.",
+			"Hand-place a layout no builder covers (ERD, chart, dashboard, wireframe) as a versioned CanvasSpec.",
 		content: [
-			"createCanvas is the one general-purpose host function for agent-authored diagrams and visualizations. It accepts CanvasSpec v1, never raw Excalidraw JSON.",
+			"Use createCanvas only for layouts no builder covers, such as ERDs, charts, dashboards and wireframes. Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); topic hierarchies, participant interactions and chronologies have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
 			"CanvasSpec supports bound and standalone text, rectangle/ellipse/diamond/circle/polygon shapes, lines and bound connectors with arrowheads, frames, groups, layers, explicit back-to-front zOrder, and deterministic row/column/grid/stack/align/distribute layouts.",
 			"Every element needs a unique stable id. Connectors bind through shape nodeId values; line bindings and text containers use element ids.",
 			"Generic validation enforces size, reference, geometry, and composition invariants. Intentional overlap is allowed.",
 			"CanvasSpec does not accept SVG, HTML, scripts, data URLs, external URLs, or executable payloads. Use only the typed primitives in the contract.",
 			"Limits: 600 elements, 64 layers, 128 layout primitives, 256 points per element, 16 groups per element, 4096 characters per text element, 16384 canvas units per dimension, and 1.5 MB serialized input.",
 			"Use applyDiagramPatch structural operations for iterative edits without regenerating the whole scene.",
-			"The repository examples include executable ERD, architecture, timeline, dashboard/chart, wireframe, and dense 120-element cases.",
+			"The repository examples include executable ERD, dashboard/chart, wireframe, and dense 120-element cases.",
+			"",
+			operationTypes("createCanvas"),
 		].join("\n"),
 		examples: [
 			{
@@ -600,15 +623,12 @@ export const catalog: CatalogEntry[] = [
 		snippet:
 			"Retrieve scene, Excalidraw, or hosted PNG artifacts by artifactId after build or patch acceptance.",
 		content: [
-			"getArtifact reads a stored artifact by artifactId.",
-			"Derived artifacts return provenance.sourceArtifactId for the artifact they were patched from; root artifacts omit provenance.",
-			'Request envelope: { artifactId: string, format?: "scene" | "excalidraw" | "png", inline?: boolean }.',
-			"Use format: 'scene' for the compact Sketchi patch source and format: 'excalidraw' for an importable Excalidraw file JSON envelope with type, version, source, elements, appState, and files.",
-			"Use format: 'png' for hosted visual proof. PNG is binary and is returned as metadata from getArtifact, never as inline payload.",
-			"Hosted MCP/API responses include url fields for raw artifact downloads. Excalidraw URLs return importable JSON; PNG URLs return image bytes.",
-			"Pass inline: true only when the harness needs scene or Excalidraw JSON in the MCP response.",
-			"To fetch raw artifact bytes, request GET /api/v1/artifacts/{artifactId}?format=excalidraw&raw=true or format=png&raw=true from the Studio API.",
-			"Use the artifactId returned by buildFlowchart, buildMindmap, buildSequenceDiagram, buildTimeline, createCanvas, or applyDiagramPatch.",
+			"- Reads a stored artifact by the artifactId a build or applyDiagramPatch returned. Do not fetch an accepted artifact just to summarize it; the build result is already the deliverable.",
+			"- format 'scene' is the compact Sketchi patch source; 'excalidraw' is an importable Excalidraw file JSON envelope with type, version, source, elements, appState, and files; 'png' is hosted visual proof, returned as metadata and never inline.",
+			"- Hosted responses include url fields for raw artifact downloads: GET /api/v1/artifacts/{artifactId}?format=excalidraw&raw=true returns importable JSON and format=png&raw=true returns image bytes. Pass inline: true only when the harness needs scene or Excalidraw JSON in the response.",
+			"- Patched artifacts return provenance.sourceArtifactId; root artifacts omit provenance.",
+			"",
+			operationTypes("getArtifact"),
 		].join("\n"),
 	},
 	{
@@ -619,16 +639,15 @@ export const catalog: CatalogEntry[] = [
 		keywords: ["patch", "style", "shape", "selector", "color", "translate", "text", "reroute"],
 		snippet: "Apply deterministic visual or structural changes to an accepted artifact.",
 		content: [
-			"applyDiagramPatch modifies styling, shape, text, layout translation, and edge routes.",
-			"Request envelope:",
-			PATCH_REQUEST_SHAPE,
-			"Selectors can target nodeIds, edgeIds, labels, element ids, kinds, or broad scopes.",
+			'Primary path: source: { artifactId: "<accepted artifact id>" }, a short intent, and operations.',
 			`Supported operation names: ${DIAGRAM_PATCH_OPERATION_NAMES.join(", ")}.`,
 			PATCH_OPERATION_SUMMARY,
-			"For a CanvasSpec, insert, remove, replace, reorder, group, and ungroup support iterative structural editing. Stable ids are mandatory; connectivity is preserved unless options.preserveConnectivity is false.",
-			"For color changes, use 6-digit hex strings such as #7c3aed.",
-			"For hosted visual proof after a patch, include png in artifactFormats and fetch the raw Studio API artifact bytes.",
-			"If export returns arrow_overlap, first rebuild the FlowchartSpec into a cleaner DAG. rerouteEdges preserves connectivity, but it cannot reliably fix a graph with a long upward return edge.",
+			"- Selectors target nodeIds, edgeIds, labels, element ids, kinds, or broad scopes. Colors are 6-digit hex strings such as #7c3aed for strokeColor, fillColor, textColor, and backgroundColor.",
+			"- For a CanvasSpec, insert, remove, replace, reorder, group, and ungroup support iterative structural editing. Stable ids are mandatory; connectivity is preserved unless options.preserveConnectivity is false.",
+			"- For hosted visual proof after a patch, include png in artifactFormats.",
+			"- If export returns arrow_overlap, rebuild the FlowchartSpec as a cleaner DAG first; rerouteEdges preserves connectivity but cannot reliably fix a long upward return edge.",
+			"",
+			operationTypes("applyDiagramPatch"),
 		].join("\n"),
 		examples: [
 			{
@@ -669,14 +688,10 @@ export const catalog: CatalogEntry[] = [
 		content: [
 			`Allowed op values: ${DIAGRAM_PATCH_OPERATION_NAMES.join(", ")}.`,
 			PATCH_OPERATION_SUMMARY,
-			"",
 			"Use replaceText for label edits. Do not use setText, setLabel, rename, relabel, text, updateLabel, or setNodeLabel.",
-			"Op-specific shapes:",
-			PATCH_REQUEST_SHAPE,
-			"Selection-based operations use nodeIds, edgeIds, ids, labels, kinds, or scope. Structural insert/replace/reorder/group operations use stable element ids directly.",
-			"For style patches, node and edge colors use strokeColor, fillColor, textColor, and backgroundColor.",
-			"If a shape change causes arrow_overlap or text_overflow during export, retry with rerouteEdges, translate, or rebuild the FlowchartSpec with more space.",
-			"For complex flowcharts, the most reliable repair is usually structural: keep edges flowing in the declared layout direction and avoid connecting a bottom node back to an early terminal.",
+			'Selection-based operations use nodeIds, edgeIds, ids, labels, kinds, or scope. Structural insert/replace/reorder/group operations use stable element ids directly. The example below shows every operation\'s fields; docs({ topic: "applyDiagramPatch" }) has the full request type.',
+			"Style patches use strokeColor, fillColor, textColor, and backgroundColor.",
+			"If a shape change causes arrow_overlap or text_overflow during export, retry with rerouteEdges or translate, or rebuild the FlowchartSpec with more space. For complex flowcharts the most reliable repair is structural: keep edges flowing in the layout direction and avoid connecting a bottom node back to an early terminal.",
 		].join("\n"),
 		examples: [
 			{
@@ -699,13 +714,12 @@ export const catalog: CatalogEntry[] = [
 		keywords: ["sequence", "repair", "retry", "loop", "style after graph"],
 		snippet: "First get the semantic graph accepted, then apply visual patches.",
 		content: [
-			"For mixed requests like 'circle connected to a purple decision diamond', split the task.",
-			"Step 1: choose buildFlowchart for a process graph, buildMindmap for a nested topic hierarchy, buildSequenceDiagram for chronological participant interactions, buildTimeline for milestones and event chronologies, or createCanvas for any other diagram or visualization.",
-			"Step 2: inspect issues. If not accepted, repair the spec and call the same build operation again.",
-			"Step 3: once accepted, use applyDiagramPatch for circle, diamond, color, movement, rerouteEdges, or replaceText tweaks.",
+			"For mixed requests like 'circle connected to a purple decision diamond', split the task:",
+			"1. Choose buildFlowchart for a process graph, buildMindmap for a nested topic hierarchy, buildSequenceDiagram for chronological participant interactions, buildTimeline for milestones and event chronologies, or createCanvas only for layouts no builder covers.",
+			"2. Inspect issues. If the build is not accepted, repair the spec and call the same build operation again.",
+			"3. Once accepted, use applyDiagramPatch for circle, diamond, color, movement, rerouteEdges, or replaceText tweaks.",
+			"4. Return the accepted build or patch; do not fetch the scene just to summarize it. Paste artifactDelivery.finalResponseText when present, otherwise the artifactId and Excalidraw/PNG URLs. Do not create a second Markdown, Mermaid, local file, or Antigravity artifact.",
 			"For broad architecture prompts, keep the first build small and readable: one start, a mostly monotonic spine, a few decision or branch points, and separate terminal nodes for separate outcomes.",
-			"Step 4: after an accepted build or patch, do not fetch the scene just to make a local summary. The accepted artifact bundle is already the deliverable.",
-			"Step 5: if the execute response includes artifactDelivery.finalResponseText, paste that finalResponseText in chat and stop. Otherwise return the accepted Sketchi artifactId and Excalidraw/PNG URLs. Do not create a second Markdown, Mermaid, local file, or Antigravity artifact that duplicates the diagram.",
 		].join("\n"),
 		examples: [
 			{
@@ -738,17 +752,19 @@ export const catalog: CatalogEntry[] = [
 		snippet:
 			"Structured issues include code, stage, ref, message, and hint. Repair from those fields.",
 		content: [
-			"All rejected operations return structured issues with code, severity, stage, ref, message, and hint.",
-			"input-stage issues usually mean the request shape is wrong. Fix the referenced path.",
-			"flowchart-stage issues mean node ids, edges, starts, ends, or decision branches are invalid.",
-			`flowchart_too_large means the graph exceeds ${FLOWCHART_MAX_NODES} nodes or ${FLOWCHART_MAX_EDGES} edges.`,
-			"nonterminating_node means a reachable node cannot reach any end. Add an eventual exit; bounded retry loops with an exit are valid.",
-			"request_too_large means a Studio HTTP build request exceeded 256 KiB and was rejected with 413 before render or persistence.",
-			`Flowchart semantic issue arrays are capped deterministically at ${FLOWCHART_MAX_ISSUES} entries. Repair the returned issues before retrying.`,
-			"mindmap-stage issues mean the topic hierarchy exceeds structural limits or is not a valid rooted tree.",
-			"quality-stage issues mean the diagram is technically valid but too weak or generic. Improve labels and branching.",
-			"patch issues such as unknown_patch_target mean the selector does not match the accepted artifact.",
-			"unsupported_patch_operation on operations.[n].op means the op name is not supported; use patchOperations or the issue hint to pick an allowed value.",
+			"Rejected operations return structured issues with code, severity, stage, ref, message, and hint. Repair from the hint and ref, then retry.",
+			"- input: the request shape is wrong; fix the referenced path.",
+			"- flowchart: node ids, edges, starts, ends, or decision branches are invalid.",
+			`- flowchart_too_large: the graph exceeds ${FLOWCHART_MAX_NODES} nodes or ${FLOWCHART_MAX_EDGES} edges.`,
+			"- nonterminating_node: a reachable node cannot reach any end. Add an eventual exit; bounded retry loops with an exit are valid.",
+			"- request_too_large: a Studio HTTP build request exceeded 256 KiB and was rejected with 413 before render or persistence.",
+			`- Flowchart semantic issue arrays are capped deterministically at ${FLOWCHART_MAX_ISSUES} entries.`,
+			"- mindmap: the topic hierarchy exceeds structural limits or is not a valid rooted tree.",
+			"- quality: the diagram is valid but too weak or generic; improve labels and branching.",
+			"- unknown_patch_target: the patch selector does not match the accepted artifact.",
+			"- unsupported_patch_operation on operations.[n].op: use an allowed op from patchOperations or the issue hint.",
+			"",
+			typesFor("Issue"),
 		].join("\n"),
 		examples: [
 			{
@@ -820,7 +836,7 @@ export const catalog: CatalogEntry[] = [
 		snippet:
 			"Native Excalidraw is an output format. Prefer semantic FlowchartSpec, MindmapSpec, SequenceDiagramSpec, or TimelineSpec input.",
 		content:
-			"Do not use native Excalidraw JSON as build input. Use FlowchartSpec, nested MindmapSpec, SequenceDiagramSpec, or the renderer-independent CanvasSpec v1; scene and Excalidraw remain intentional output formats, and applyDiagramPatch handles deterministic edits.",
+			"Do not use native Excalidraw JSON as build input. Use FlowchartSpec, nested MindmapSpec, SequenceDiagramSpec, TimelineSpec, or the renderer-independent CanvasSpec v1; scene and Excalidraw remain intentional output formats, and applyDiagramPatch handles deterministic edits.",
 	},
 	{
 		id: "managed-thread-non-goal",

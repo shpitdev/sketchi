@@ -17,7 +17,7 @@ When the user asks to use `sketchi-code-mode`, use the configured MCP server too
 ```js
 options: {
   artifactFormats: ["scene", "excalidraw", "png"],
-  inlineArtifacts: ["excalidraw"],
+  inlineArtifacts: [],
 }
 ```
 

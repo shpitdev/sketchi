@@ -3,13 +3,14 @@ import { readFileSync } from "node:fs";
 
 import ts from "typescript";
 import { catalog } from "./mcp-docs/catalog";
-import { generateCodeModeTypes, jsonSchemaType } from "./mcp-docs/types";
+import { CODE_MODE_OPERATIONS, generateCodeModeTypes, jsonSchemaType } from "./mcp-docs/types";
 import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagram-agent";
 import {
 	getCodeModeDocs,
 	searchCodeModeDocs,
 	SKETCHI_CODE_MODE_TYPES,
 	SKETCHI_CODE_MODE_VERSION,
+	SKETCHI_EXECUTE_DESCRIPTION,
 } from "./mcp-docs.server";
 
 // Hang guard for the full schema walk, not a speed budget.
@@ -163,17 +164,37 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 				},
 				"Test",
 			),
-		).toBe('{ "label": string; }');
+		).toBe("{ label: string; }");
 		expect(
 			jsonSchemaType(
 				{
 					type: "object",
 					additionalProperties: false,
-					properties: { label: { type: "number" } },
+					properties: { label: { type: "number" }, "data-id": { type: "string" } },
 				},
 				"Test",
 			),
-		).toBe('{ "label"?: number; }');
+		).toBe('{ label?: number; "data-id"?: string; }');
+		// JSON spells non-finite numbers as strings; sandbox values are plain numbers.
+		expect(
+			jsonSchemaType(
+				{ anyOf: [{ type: "number" }, { type: "string", enum: ["NaN", "Infinity", "-Infinity"] }] },
+				"Test",
+			),
+		).toBe("number");
+		const shared = new Map([['{"type":"string"}', "Label"]]);
+		expect(
+			jsonSchemaType(
+				{
+					type: "object",
+					additionalProperties: false,
+					properties: { label: { type: "string" } },
+					required: ["label"],
+				},
+				"Test",
+				shared,
+			),
+		).toBe("{ label: Label; }");
 		expect(() => jsonSchemaType({ type: "future" }, "Test")).toThrow(
 			"Unsupported Code Mode JSON Schema type",
 		);
@@ -235,6 +256,18 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			expect.arrayContaining(["buildFlowchart", "issues"]),
 		);
 
+		// Package and system interaction prompts are flowcharts, not hand-placed canvases.
+		const architectureResults = searchCodeModeDocs({
+			query: "architecture packages agent core renderer excalidraw hosted artifact response",
+		});
+		expect(architectureResults.results[0]?.id).toBe("buildFlowchart");
+		expect(SKETCHI_EXECUTE_DESCRIPTION).toMatch(
+			/- buildFlowchart: [^\n]*systems or packages interact/,
+		);
+		expect(SKETCHI_EXECUTE_DESCRIPTION).toMatch(
+			/- createCanvas: [^\n]*only for layouts no builder/,
+		);
+
 		const sequenceResults = searchCodeModeDocs({
 			query: "chronological participant lifeline messages",
 		});
@@ -260,7 +293,51 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		expect(docs.content).toContain("24 nodes");
 		expect(docs.content).toContain("64 edges");
 		expect(docs.content).toContain("nonterminating_node");
-		expect(docs.content).toContain("request_too_large");
+		// The 256 KiB limit applies to Studio HTTP requests, so it lives with the other issue hints.
+		expect(getCodeModeDocs({ topic: "issues" }).content).toContain("request_too_large");
+	});
+
+	it("keeps tools/list small and serves each family's generated types on demand", () => {
+		const declarations = SKETCHI_CODE_MODE_TYPES.split("\n\n");
+		const declaration = (name: string) => {
+			const found = declarations.find((block) => block.startsWith(`type ${name} = `));
+			if (!found) throw new Error(`Missing generated declaration ${name}`);
+			return found.trim();
+		};
+		// Every request pays for the execute description, so it carries no type declarations.
+		expect(SKETCHI_EXECUTE_DESCRIPTION).not.toMatch(/^type /m);
+		expect(SKETCHI_EXECUTE_DESCRIPTION.length).toBeLessThan(3_500);
+		const overview = getCodeModeDocs({ topic: "overview" }).content;
+		expect(overview).toContain(`${CODE_MODE_OPERATIONS.length} operations:`);
+		for (const operation of CODE_MODE_OPERATIONS) {
+			expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(operation);
+			expect(overview).toContain(operation);
+		}
+		for (const [topic, types] of [
+			["buildFlowchart", ["BuildFlowchartRequest", "BuildOptions"]],
+			["buildMindmap", ["BuildMindmapRequest", "BuildMindmapRequest___schema0"]],
+			["buildSequenceDiagram", ["BuildSequenceDiagramRequest"]],
+			["buildTimeline", ["BuildTimelineRequest"]],
+			["createCanvas", ["CreateCanvasRequest", "CanvasSpecInput", "CanvasElement"]],
+			["getArtifact", ["GetArtifactRequest"]],
+			["applyDiagramPatch", ["ApplyDiagramPatchRequest", "DiagramSelector"]],
+			["issues", ["Issue", "IssueCode", "IssueRef"]],
+		] as const) {
+			const content = getCodeModeDocs({ topic }).content;
+			for (const name of types) expect(content, `${topic} ${name}`).toContain(declaration(name));
+		}
+		expect(getCodeModeDocs({ topic: "execute" }).content).toContain(SKETCHI_CODE_MODE_TYPES);
+		// Guidance comes first so models weigh it before the reference types.
+		for (const topic of ["buildFlowchart", "buildSequenceDiagram", "createCanvas"] as const) {
+			const [guidance] = getCodeModeDocs({ topic }).content.split("Request type:");
+			expect(guidance?.trim(), topic).not.toBe("");
+		}
+		// Inline exports are paid for on every later turn; examples deliver URLs instead.
+		for (const entry of catalog) {
+			for (const example of entry.examples ?? []) {
+				expect(example.code, example.title).not.toMatch(/inlineArtifacts: \[\s*"/);
+			}
+		}
 	});
 
 	it("documents patch envelopes and operation names for harness discovery", () => {
