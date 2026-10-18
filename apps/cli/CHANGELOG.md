@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.17.0
+
+### Minor Changes
+
+- [#439](https://github.com/shpitdev/sketchi/pull/439) [`fd92ae1`](https://github.com/shpitdev/sketchi/commit/fd92ae12eb8c7b26fc75bcbb6aa62878c57ca5bd) Thanks [@anandpant](https://github.com/anandpant)! - Add native state machines: `sketchi create` builds `{ "type": "state-machine", "spec": { "title", "initial", "states", "transitions" } }` documents offline, and `sketchi generate --type state-machine` generates them. States may be final or choices, states that name a `parent` form a composite drawn as a frame, and transitions are drawn `event [guard] / action`, including self-loops and transitions into or out of a composite.
+
 ## 0.16.0
 
 ### Minor Changes
