@@ -1137,6 +1137,7 @@ export class FrameSceneElement extends Schema.Class<FrameSceneElement>("FrameSce
 		...CanvasStrokeFields,
 		type: stringLiteral("frame"),
 		id: RequiredNonEmptyString,
+		nodeId: optionalContract(NonEmptyString),
 		name: optionalContract(NonEmptyString).pipe(Schema.mutableKey),
 		x: FiniteNumber.pipe(Schema.mutableKey),
 		y: FiniteNumber.pipe(Schema.mutableKey),

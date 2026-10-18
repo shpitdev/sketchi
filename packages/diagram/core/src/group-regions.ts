@@ -123,7 +123,13 @@ export function groupRegionIssues(scene: CanvasSpec): GroupRegionIssue[] {
 	if (frames.length === 0) return [];
 	const issues: GroupRegionIssue[] = [];
 	const nodes = scene.elements.flatMap((element) => (element.type === "node" ? [element] : []));
-	const frameOfNode = new Map(nodes.map((node) => [node.nodeId, node.frameId]));
+	// An edge that starts or ends at a composite's frame belongs to that frame too.
+	const frameOfNode = new Map([
+		...nodes.map((node) => [node.nodeId, node.frameId] as const),
+		...frames.flatMap((frame) =>
+			frame.nodeId === undefined ? [] : [[frame.nodeId, frame.id] as const],
+		),
+	]);
 	const names = new Map(frames.map((frame) => [frame.id, canvasFrameNameBox(frame)]));
 	const outlines = new Map(frames.map((frame) => [frame.id, outline(frame)]));
 	for (const frame of frames) {

@@ -87,6 +87,13 @@ interface RoutedEdge {
 	index: number;
 	/** A wrap continuation's lane between its bands, across the flow. */
 	lane?: number;
+	/**
+	 * One line of a paired transition and its return: -1 runs on the low side of
+	 * the pair (left or above) and +1 on the high side, its label beside it there.
+	 */
+	pair?: -1 | 1;
+	/** The side of its line a label sits on, when not the default: -1 left or above, +1 right or below. */
+	labelSide?: -1 | 1;
 	source: NodeSceneElement;
 	sourceEdge: ConnectionEdge;
 	target: NodeSceneElement;
@@ -157,12 +164,41 @@ function boundTextContainerSize(
 	return { width, height };
 }
 
+/**
+ * Edge of the round markers state machines draw: an initial pseudostate's dot
+ * and a final state's bullseye. Each carries exactly one transition, so it
+ * keeps one port per side and never widens for more.
+ */
+const MARKER_SIZE: Readonly<Record<string, number>> = { initial: 20, final: 28 };
+/** A state is a compact rounded box; an unlabeled choice is a small diamond. */
+const STATE_MIN_WIDTH = 136;
+const STATE_MIN_HEIGHT = 56;
+const CHOICE_SIZE = 44;
+
+/** An unlabeled choice stays a square diamond as it grows for its ports. */
+function squareChoice<T extends { width: number; height: number }>(shape: T, breadth: number): T {
+	const edge = Math.max(shape.width, shape.height, breadth);
+	return { ...shape, width: edge, height: edge };
+}
+
+function markerSize(node: { readonly kind?: string | undefined }): number | undefined {
+	return node.kind === undefined ? undefined : MARKER_SIZE[node.kind];
+}
+
+/** Nodes that branch on labeled outgoing edges: flowchart decisions and state-machine choices. */
+function branches(kind: string | undefined): boolean {
+	return kind === "decision" || kind === "choice";
+}
+
 function shapeForNode(node: DiagramNode): NodeSceneShape {
 	const kind = node.kind?.toLowerCase();
 	if (kind === "start" || kind === "end") {
 		return "ellipse";
 	}
-	if (kind === "decision") {
+	if (kind === "initial" || kind === "final") {
+		return "circle";
+	}
+	if (branches(kind)) {
 		return "diamond";
 	}
 	return "rectangle";
@@ -170,6 +206,22 @@ function shapeForNode(node: DiagramNode): NodeSceneShape {
 
 function createNodeShape(node: DiagramNode): NodeSceneElement {
 	const shape = shapeForNode(node);
+	const marker = markerSize(node);
+	if (marker !== undefined || (node.kind === "choice" && !node.label)) {
+		const size = marker ?? CHOICE_SIZE;
+		return {
+			type: "node",
+			id: `node:${node.id}`,
+			nodeId: node.id,
+			...(node.kind ? { kind: node.kind } : {}),
+			shape,
+			x: 0,
+			y: 0,
+			width: size,
+			height: size,
+			label: "",
+		};
+	}
 	const labelMetrics = measureLabel(
 		node.label,
 		shape === "diamond" ? MAX_DIAMOND_LABEL_LINE_UNITS : MAX_LABEL_LINE_UNITS,
@@ -183,6 +235,8 @@ function createNodeShape(node: DiagramNode): NodeSceneElement {
 		icon || shape === "diamond"
 			? boundTextContainerSize(shape, labelMetrics, icon)
 			: { height: 0, width: 0 };
+	const [minWidth, minHeight] =
+		node.kind === "state" ? [STATE_MIN_WIDTH, STATE_MIN_HEIGHT] : [MIN_NODE_WIDTH, MIN_NODE_HEIGHT];
 
 	return {
 		type: "node",
@@ -193,10 +247,10 @@ function createNodeShape(node: DiagramNode): NodeSceneElement {
 		shape,
 		x: 0,
 		y: 0,
-		width: Math.max(MIN_NODE_WIDTH, labelMetrics.width + shapeWidthPad, boundText.width),
+		width: Math.max(minWidth, labelMetrics.width + shapeWidthPad, boundText.width),
 		height: icon
-			? Math.max(MIN_NODE_HEIGHT, boundText.height)
-			: Math.max(MIN_NODE_HEIGHT, labelMetrics.height + shapeHeightPad, boundText.height),
+			? Math.max(minHeight, boundText.height)
+			: Math.max(minHeight, labelMetrics.height + shapeHeightPad, boundText.height),
 		label: labelMetrics.text,
 	};
 }
@@ -313,6 +367,8 @@ interface GroupFrame {
 }
 
 interface GroupLayout {
+	/** Groups that edges start or end at, such as a composite state's transitions. */
+	readonly composites: ReadonlySet<string>;
 	readonly frames: readonly GroupFrame[];
 	readonly groupOf: ReadonlyMap<string, string>;
 }
@@ -322,6 +378,12 @@ interface GroupLayout {
  * and a top level where every group is one block among the ungrouped nodes.
  */
 interface GroupStructure {
+	/**
+	 * Groups an edge starts or ends at by naming the group's id where a node id
+	 * would be. Such an edge joins the group's frame, as a transition into or out
+	 * of a composite state does.
+	 */
+	readonly composites: ReadonlySet<string>;
 	/** The edges between top-level units, in the order of the top level's edges. */
 	readonly crossEdges: readonly DiagramEdge[];
 	readonly groupOf: ReadonlyMap<string, string>;
@@ -357,15 +419,28 @@ function groupStructure(diagram: IntermediateDiagram): GroupStructure | undefine
 			node.group !== undefined && declared.has(node.group) ? [[node.id, node.group] as const] : [],
 		),
 	);
+	const nodeIds = new Set(diagram.nodes.map((node) => node.id));
+	const composites = new Set(
+		diagram.edges.flatMap((edge) =>
+			[edge.source, edge.target].filter((id) => !nodeIds.has(id) && declared.has(id)),
+		),
+	);
 	const unitOf = (nodeId: string) => {
 		const group = groupOf.get(nodeId);
-		return group === undefined ? nodeId : groupUnitId(group);
+		return group !== undefined
+			? groupUnitId(group)
+			: composites.has(nodeId)
+				? groupUnitId(nodeId)
+				: nodeId;
 	};
 	// Inside a group, loops break where the whole flow breaks them, so a group
 	// reads in the same direction as the diagram around it.
 	const buckets = edgeBuckets(diagram.edges);
 	const global = feedbackEdgeIds(diagram, buckets.incoming, buckets.outgoing);
-	const feedback = new Set<string>();
+	// A self-loop runs against the flow wherever it is.
+	const feedback = new Set(
+		diagram.edges.flatMap((edge) => (edge.source === edge.target ? [edge.id] : [])),
+	);
 	const nested = groups.map((group) => {
 		const edges = diagram.edges.filter(
 			(edge) => groupOf.get(edge.source) === group.id && groupOf.get(edge.target) === group.id,
@@ -420,7 +495,7 @@ function groupStructure(diagram: IntermediateDiagram): GroupStructure | undefine
 	flowFeedbacks.set(top, topFeedback);
 	for (const id of topFeedback) feedback.add(id);
 	flowFeedbacks.set(diagram, feedback);
-	const structure = { crossEdges, groupOf, groups: nested, top };
+	const structure = { composites, crossEdges, groupOf, groups: nested, top };
 	groupStructures.set(diagram, structure);
 	return structure;
 }
@@ -796,11 +871,13 @@ function rankLayout(
 				height: Math.max(originalShape.height, minimum?.height ?? 0),
 			};
 			// Allocate enough port capacity before ranking; clamping must never merge endpoints.
+			// A self-loop takes a corner of its own, and a marker keeps one port per side.
+			const outgoing = (buckets.outgoing.get(node.id) ?? []).filter((e) => e.target !== node.id);
 			const connections =
-				(buckets.incoming.get(node.id)?.length ?? 0) + (buckets.outgoing.get(node.id)?.length ?? 0);
-			const outgoing = buckets.outgoing.get(node.id) ?? [];
+				(buckets.incoming.get(node.id) ?? []).filter((e) => e.source !== node.id).length +
+				outgoing.length;
 			const pitch =
-				node.kind !== "decision" && outgoing.length > 1 && outgoing.some((e) => e.label)
+				!branches(node.kind) && outgoing.length > 1 && outgoing.some((e) => e.label)
 					? Math.max(
 							PORT_SPACING,
 							...outgoing.map((e) => {
@@ -809,15 +886,29 @@ function rankLayout(
 							}),
 						)
 					: PORT_SPACING;
-			const portBreadth = PORT_PADDING * 2 + Math.max(0, connections - 1) * pitch;
+			// A state keeps room beside each labeled departure for its label alone.
+			const labeled = outgoing.filter((e) => e.label);
+			const portBreadth =
+				markerSize(node) !== undefined
+					? 0
+					: node.kind === "state"
+						? PORT_PADDING * 2 +
+							labeled.reduce((sum, e) => {
+								const metrics = branchLabelMetrics(e.label!);
+								return sum + (vertical ? metrics.width : metrics.height) + 24;
+							}, 0) +
+							Math.max(0, connections - labeled.length - 1) * ARRIVAL_SPACING
+						: PORT_PADDING * 2 + Math.max(0, connections - 1) * pitch;
 			return [
 				node.id,
-				{
-					...shape,
-					...(vertical
-						? { width: Math.max(shape.width, portBreadth) }
-						: { height: Math.max(shape.height, portBreadth) }),
-				},
+				node.kind === "choice" && !node.label
+					? squareChoice(shape, portBreadth)
+					: {
+							...shape,
+							...(vertical
+								? { width: Math.max(shape.width, portBreadth) }
+								: { height: Math.max(shape.height, portBreadth) }),
+						},
 			];
 		}),
 	);
@@ -858,14 +949,15 @@ function rankLayout(
 					0,
 					...diagram.edges
 						.filter(
-							(edge) => metric.shapes.some((shape) => shape.nodeId === edge.source) && edge.label,
+							(edge) =>
+								metric.shapes.some((shape) => shape.nodeId === edge.source) &&
+								edge.label &&
+								edge.source !== edge.target,
 						)
 						.map(
 							(edge) =>
-								branchLabelMetrics(
-									edge.label!,
-									shapesByNodeId.get(edge.source)?.kind === "decision",
-								).width +
+								branchLabelMetrics(edge.label!, branches(shapesByNodeId.get(edge.source)?.kind))
+									.width +
 								16 +
 								ROUTE_STUB_LENGTH * 2,
 						),
@@ -1019,7 +1111,7 @@ function planWrap(diagram: IntermediateDiagram, reorder: boolean): Wrap {
 			!feedbackEdges.has(edge.id) &&
 			rankOf(edge.source) === metric.rank &&
 			rankOf(edge.target) === metric.rank + 1 &&
-			nodeKinds.get(edge.source) !== "decision"
+			!branches(nodeKinds.get(edge.source))
 		)
 			continuationAfter.set(index, edge.id);
 	}
@@ -1286,6 +1378,17 @@ function positionGroupedNodes(
 			width: Math.max(
 				content.width + padding.left + padding.right,
 				labelWidth + 2 * CANVAS_FRAME_NAME.clearance + 16,
+				// A composite's own ports on its top sit right of its name.
+				(stubReach.get(portKey(group.id, "top")) ?? 0) > 0 && structure.composites.has(group.id)
+					? labelWidth +
+							2 * CANVAS_FRAME_NAME.clearance +
+							2 * PORT_SPACING +
+							PORT_PADDING +
+							structure.crossEdges.filter(
+								(edge) => edge.source === group.id || edge.target === group.id,
+							).length *
+								ARRIVAL_SPACING
+					: 0,
 			),
 		};
 	});
@@ -1311,8 +1414,14 @@ function positionGroupedNodes(
 							block.padding.right +
 							slack;
 		for (const side of ["top", "right", "bottom", "left"] as const) {
+			// A composite's own stubs start at its frame, under the band for its name.
+			const own = structure.composites.has(block.group.id)
+				? (stubReach.get(portKey(block.group.id, side)) ?? 0) -
+					(side === "top" ? GROUP_LABEL_BAND : 0)
+				: 0;
 			const beyond = Math.max(
 				0,
+				own,
 				...block.nodes.map(
 					(node) => (stubReach.get(portKey(node.nodeId, side)) ?? 0) - margin(node, side),
 				),
@@ -1365,7 +1474,10 @@ function positionGroupedNodes(
 			labelBox: canvasFrameNameBox({ ...box, name: group.label }),
 		};
 	});
-	return { groups: { frames, groupOf: structure.groupOf }, nodes };
+	return {
+		groups: { composites: structure.composites, frames, groupOf: structure.groupOf },
+		nodes,
+	};
 }
 
 /**
@@ -1397,9 +1509,13 @@ function alignUnits(
 		}, 0);
 	const order = [...ranks.keys()].sort((a, b) => a - b);
 	const anchor = order.reduce((best, rank) => (breadth(rank) > breadth(best) ? rank : best));
-	const nodeById = (id: string) =>
-		[...units.values()].flatMap((unit) => unit.nodes).find((node) => node.nodeId === id)!;
-	const middle = (node: NodeSceneElement) => node[across] + node[size] / 2;
+	// An edge ends at a member or, for a composite, at the group's frame.
+	const middle = (id: string) => {
+		const box = structure.composites.has(id)
+			? units.get(groupUnitId(id))!.frame!
+			: [...units.values()].flatMap((unit) => unit.nodes).find((node) => node.nodeId === id)!;
+		return box[across] + box[size] / 2;
+	};
 	const shift = (id: string, delta: number) => {
 		const unit = units.get(id)!;
 		unit.nodes = unit.nodes.map((node) => ({ ...node, [across]: node[across] + delta }));
@@ -1418,7 +1534,7 @@ function alignUnits(
 		// The real edge joins members, not their blocks.
 		const real = crossEdges[top.edges.indexOf(edge)]!;
 		const [mine, theirs] = forward ? [real.target, real.source] : [real.source, real.target];
-		shift(id, middle(nodeById(theirs)) - middle(nodeById(mine)));
+		shift(id, middle(theirs) - middle(mine));
 	};
 	for (const rank of order.filter((rank) => rank > anchor)) align(rank, rank - 1, true);
 	for (const rank of order.filter((rank) => rank < anchor).reverse()) align(rank, rank + 1, false);
@@ -1437,6 +1553,22 @@ function obstacleBox(id: string, box: Box): NodeSceneElement {
 		width: box.width,
 		height: box.height,
 	};
+}
+
+/** The frames edges start or end at, as shapes routes leave and arrive at. */
+function compositeShapes(groups: GroupLayout | undefined): NodeSceneElement[] {
+	return (groups?.frames ?? []).flatMap((frame) =>
+		groups!.composites.has(frame.id)
+			? [
+					{
+						...obstacleBox(frame.elementId, frame.box),
+						kind: "composite",
+						label: frame.label,
+						nodeId: frame.id,
+					},
+				]
+			: [],
+	);
 }
 
 /** Each frame with the band above it, for sizing what is drawn. */
@@ -1644,9 +1776,9 @@ function connectionEdges(
 		};
 	}
 
-	const longDownwardDecisionBranch = sourceKind === "decision" && dy > source.height + VERTICAL_GAP;
+	const longDownwardDecisionBranch = branches(sourceKind) && dy > source.height + VERTICAL_GAP;
 
-	if (sourceKind === "decision" && dy > 0 && (dx !== 0 || longDownwardDecisionBranch)) {
+	if (branches(sourceKind) && dy > 0 && (dx !== 0 || longDownwardDecisionBranch)) {
 		return {
 			sourceEdge: dx < 0 ? "left" : "right",
 			targetEdge: "top",
@@ -1751,6 +1883,34 @@ function portOffset(index: number, count: number): number {
 	return (index - (count - 1) / 2) * PORT_SPACING;
 }
 
+function isSelfLoop(route: RoutedEdge): boolean {
+	return route.edge.source === route.edge.target;
+}
+
+/** A self-loop's ports sit toward the corner between its two sides. */
+function loopCorner(route: RoutedEdge, endpoint: "source" | "target"): number {
+	const [side, other] =
+		endpoint === "source"
+			? [route.sourceEdge, route.targetEdge]
+			: [route.targetEdge, route.sourceEdge];
+	return EDGE_NORMAL[other][slotAxis(side)];
+}
+
+/**
+ * Where an endpoint's far end lies along its side, which orders the ports on
+ * that side: past the corner a self-loop turns around.
+ */
+function farCoordinate(route: RoutedEdge, endpoint: "source" | "target"): number {
+	const side = endpoint === "source" ? route.sourceEdge : route.targetEdge;
+	if (isSelfLoop(route)) return loopCorner(route, endpoint) * 1e9;
+	return center(endpoint === "source" ? route.target : route.source)[slotAxis(side)];
+}
+
+/** Lines of a pair side by side in pair order; every other line ranks 0. */
+function pairRank(routes: readonly RoutedEdge[], edgeId: string): number {
+	return routes.find((route) => route.edge.id === edgeId)?.pair ?? 0;
+}
+
 function portOffsetsForRoutes(
 	routes: readonly RoutedEdge[],
 	sharedDecisionPitch = false,
@@ -1769,10 +1929,7 @@ function portOffsetsForRoutes(
 			{
 				edgeId: route.edge.id,
 				endpoint: "source",
-				coordinate:
-					route.sourceEdge === "top" || route.sourceEdge === "bottom"
-						? center(route.target).x
-						: center(route.target).y,
+				coordinate: farCoordinate(route, "source"),
 			},
 		]);
 		connectionsByPort.set(targetPortKey, [
@@ -1780,10 +1937,7 @@ function portOffsetsForRoutes(
 			{
 				edgeId: route.edge.id,
 				endpoint: "target",
-				coordinate:
-					route.targetEdge === "top" || route.targetEdge === "bottom"
-						? center(route.source).x
-						: center(route.source).y,
+				coordinate: farCoordinate(route, "target"),
 			},
 		]);
 	}
@@ -1798,7 +1952,7 @@ function portOffsetsForRoutes(
 		const pitch =
 			departures.length > 1 &&
 			labeled.length > 0 &&
-			(labeled[0]!.source.kind !== "decision" || (sharedDecisionPitch && labeled.length > 1))
+			(!branches(labeled[0]!.source.kind) || (sharedDecisionPitch && labeled.length > 1))
 				? Math.max(
 						PORT_SPACING,
 						...labeled.map((r) => {
@@ -1812,7 +1966,10 @@ function portOffsetsForRoutes(
 					)
 				: PORT_SPACING;
 		connections
-			.sort((a, b) => a.coordinate - b.coordinate)
+			.sort(
+				(a, b) =>
+					a.coordinate - b.coordinate || pairRank(routes, a.edgeId) - pairRank(routes, b.edgeId),
+			)
 			.forEach((connection, index) => {
 				offsets.set(
 					connectionKey(connection),
@@ -1965,6 +2122,27 @@ function slotPreference(
 	offsets: ReadonlyMap<string, number>,
 	slotsBySide: ReadonlyMap<string, readonly PortSlot[]>,
 ): PortPreference {
+	const preference = lineSlotPreference(slot, offsets, slotsBySide);
+	const node = slot.route[slot.endpoint];
+	if (node.kind !== "composite" || slotSide(slot) !== "top") return preference;
+	// A composite's frame carries its name above its top-left corner; ports on
+	// its top keep right of the name.
+	const name = canvasFrameNameBox({ ...node, name: node.label });
+	const low = name.x + name.width + PORT_SPACING - center(node).x;
+	return {
+		...preference,
+		desired: Math.max(low, preference.desired),
+		low: Math.max(low, preference.low),
+		high: Math.max(low, preference.high),
+		priority: 3,
+	};
+}
+
+function lineSlotPreference(
+	slot: PortSlot,
+	offsets: ReadonlyMap<string, number>,
+	slotsBySide: ReadonlyMap<string, readonly PortSlot[]>,
+): PortPreference {
 	const other: PortSlot = {
 		endpoint: slot.endpoint === "source" ? "target" : "source",
 		key: connectionKey({
@@ -1978,6 +2156,10 @@ function slotPreference(
 	const otherSide = slotSide(other);
 	const axis = slotAxis(side);
 	const normal = EDGE_NORMAL[side];
+	if (isSelfLoop(slot.route)) {
+		const corner = loopCorner(slot.route, slot.endpoint) * Math.max(0, portLimit(node, side));
+		return { desired: corner, high: corner, low: corner, priority: 2 };
+	}
 	const here = pointOnEdge(node, side, offsets.get(slot.key) ?? 0);
 	const there = pointOnEdge(slot.route[other.endpoint], otherSide, offsets.get(other.key) ?? 0);
 	const ahead = (there.x - here.x) * normal.x + (there.y - here.y) * normal.y;
@@ -2020,7 +2202,7 @@ function orderedSlots(
 ): PortSlot[] {
 	const far = (slot: PortSlot) => {
 		const endpoint = slot.endpoint === "source" ? "target" : "source";
-		if (!byApproach) return center(slot.route[endpoint])[slotAxis(slotSide(slot))];
+		if (!byApproach || isSelfLoop(slot.route)) return farCoordinate(slot.route, slot.endpoint);
 		const node = slot.route[endpoint];
 		const side = endpoint === "source" ? slot.route.sourceEdge : slot.route.targetEdge;
 		const key = connectionKey({ edgeId: slot.route.edge.id, endpoint });
@@ -2031,7 +2213,9 @@ function orderedSlots(
 		);
 		return departure[slotAxis(slotSide(slot))];
 	};
-	const ordered = [...slots].sort((a, b) => far(a) - far(b));
+	const ordered = [...slots].sort(
+		(a, b) => far(a) - far(b) || (a.route.pair ?? 0) - (b.route.pair ?? 0),
+	);
 	for (const toward of [1, -1]) {
 		const lanes = ordered
 			.map((slot, index) => ({ index, lane: preferences.get(slot)!.lane, slot }))
@@ -2081,8 +2265,7 @@ function alignedPortOffsets(
 			const labelPitch =
 				departures.length > 1 &&
 				labeled.length > 0 &&
-				(labeled[0]!.route.source.kind !== "decision" ||
-					(sharedDecisionPitch && labeled.length > 1))
+				(!branches(labeled[0]!.route.source.kind) || (sharedDecisionPitch && labeled.length > 1))
 					? Math.max(
 							...labeled.map((slot) => {
 								const metrics = branchLabelMetrics(slot.route.edge.label!);
@@ -2090,13 +2273,14 @@ function alignedPortOffsets(
 							}),
 						)
 					: 0;
+			if (node.kind === "state") outerLabelSides(slots);
 			const positions = spreadPorts(
 				slots.map((slot) => preferences.get(slot)!),
 				slots
 					.slice(1)
 					.map((slot, index) =>
 						Math.max(
-							labelPitch,
+							node.kind === "state" ? stateLabelGap(slots[index]!, slot, side) : labelPitch,
 							slot.endpoint === "target" || slots[index]!.endpoint === "target"
 								? ARRIVAL_SPACING
 								: PORT_SPACING,
@@ -2107,6 +2291,44 @@ function alignedPortOffsets(
 			slots.forEach((slot, index) => offsets.set(slot.key, positions[index]!));
 		}
 	return offsets;
+}
+
+/**
+ * A state's outermost departures on a side carry their labels outside the
+ * others: the lowest toward the low end (left or above), the highest toward the
+ * high end, so neighboring lines need no room for a label between them.
+ */
+function outerLabelSides(slots: readonly PortSlot[]): void {
+	for (const [index, slot] of slots.entries()) {
+		const { route } = slot;
+		if (slot.endpoint !== "source" || route.pair !== undefined || isSelfLoop(route)) continue;
+		const outer = index === 0 ? -1 : index === slots.length - 1 ? 1 : undefined;
+		if (slots.length > 1 && outer !== undefined) route.labelSide = outer;
+		else delete route.labelSide;
+	}
+}
+
+/** The side of its line a route's label sits on: right of a vertical stub, above a horizontal one. */
+function labelSideOf(route: RoutedEdge): -1 | 1 {
+	const horizontal = route.sourceEdge === "left" || route.sourceEdge === "right";
+	return route.labelSide ?? route.pair ?? (horizontal ? -1 : 1);
+}
+
+/**
+ * Room a state keeps between two neighboring ports on one side for the labels
+ * that sit between them: a departure's label lies right of a vertical stub and
+ * above a horizontal one, or on its own side of a pair.
+ */
+function stateLabelGap(low: PortSlot, high: PortSlot, side: ConnectionEdge): number {
+	const reach = (slot: PortSlot, toward: -1 | 1) => {
+		const { route } = slot;
+		const vertical = slotAxis(side) === "x";
+		if (slot.endpoint !== "source" || !route.edge.label || isSelfLoop(route)) return 0;
+		if (labelSideOf(route) !== toward) return 0;
+		const metrics = branchLabelMetrics(route.edge.label, branches(route.source.kind));
+		return (vertical ? metrics.width : metrics.height) + 24;
+	};
+	return Math.max(reach(low, 1), reach(high, -1));
 }
 
 function routeForEdge(
@@ -2166,6 +2388,8 @@ function portCapacityForRoutes(
 	for (const route of routes) {
 		for (const endpoint of ["source", "target"] as const) {
 			const node = route[endpoint];
+			// A marker keeps its size; its one transition takes the middle of a side.
+			if (markerSize(node) !== undefined) continue;
 			const side = endpoint === "source" ? route.sourceEdge : route.targetEdge;
 			const dimension = side === "top" || side === "bottom" ? "width" : "height";
 			const required =
@@ -2175,7 +2399,7 @@ function portCapacityForRoutes(
 			if (required <= (sizes.get(node.nodeId)?.[dimension] ?? node[dimension])) continue;
 			const size = sizes.get(node.nodeId) ?? { width: node.width, height: node.height };
 			size[dimension] = required;
-			sizes.set(node.nodeId, size);
+			sizes.set(node.nodeId, node.kind === "choice" && !node.label ? squareChoice(size, 0) : size);
 		}
 	}
 	return sizes;
@@ -2431,6 +2655,23 @@ function stubReachForRoutes(
 							: tip.y - node.y - node.height;
 			const key = portKey(node.nodeId, side);
 			reach.set(key, Math.max(reach.get(key) ?? 0, beyond));
+		}
+		// A self-loop's label sits outside its loop.
+		if (route.edge.label && isSelfLoop(route)) {
+			const node = route.source;
+			const box = labelBox(
+				branchLabelPosition(route, start),
+				branchLabelMetrics(route.edge.label, branches(node.kind)),
+			);
+			for (const [side, beyond] of [
+				["left", node.x - box.x],
+				["right", box.x + box.width - node.x - node.width],
+				["top", node.y - box.y],
+				["bottom", box.y + box.height - node.y - node.height],
+			] as const) {
+				const key = portKey(node.nodeId, side);
+				if (beyond > 0) reach.set(key, Math.max(reach.get(key) ?? 0, beyond));
+			}
 		}
 	}
 	return reach;
@@ -2903,14 +3144,16 @@ function endpointClearance(
 }
 
 function sourceStubLength(route: RoutedEdge, point: ScenePoint, distance: number): number {
-	const labelSpace = route.edge.label
-		? route.sourceEdge === "left" || route.sourceEdge === "right"
-			? branchLabelMetrics(route.edge.label, route.source.kind === "decision").width + 16
-			: Math.max(
-					40,
-					branchLabelMetrics(route.edge.label, route.source.kind === "decision").height + 24,
-				)
-		: 0;
+	// A self-loop's label sits outside its loop, not beside its stub.
+	const labelSpace =
+		route.edge.label && !isSelfLoop(route)
+			? route.sourceEdge === "left" || route.sourceEdge === "right"
+				? branchLabelMetrics(route.edge.label, branches(route.source.kind)).width + 16
+				: Math.max(
+						40,
+						branchLabelMetrics(route.edge.label, branches(route.source.kind)).height + 24,
+					)
+			: 0;
 	return endpointClearance(route.source, point, route.sourceEdge, Math.max(distance, labelSpace));
 }
 
@@ -2942,7 +3185,7 @@ function assignDecisionSides(
 					? "right"
 					: "left";
 	for (const source of new Set(
-		routes.filter((r) => r.source.kind === "decision").map((r) => r.source),
+		routes.filter((r) => branches(r.source.kind)).map((r) => r.source),
 	)) {
 		const branches = routes
 			.filter((r) => r.source === source)
@@ -2985,7 +3228,7 @@ function assignFeedbackSides(
 	directionOf: (route: RoutedEdge) => LayoutDirection = () => diagram.layout.direction,
 ): void {
 	const feedback = flowFeedback(diagram);
-	for (const route of routes.filter((r) => feedback.has(r.edge.id))) {
+	for (const route of routes.filter((r) => feedback.has(r.edge.id) && !isSelfLoop(r))) {
 		const direction = directionOf(route);
 		const horizontal = direction === "LR" || direction === "RL";
 		const before = horizontal
@@ -3014,8 +3257,9 @@ function assignFeedbackSides(
 		const siblingDepartures = new Set(
 			routes.filter((r) => r !== route && r.source === route.source).map((r) => r.sourceEdge),
 		);
-		const sourceCandidates =
-			route.source.kind === "decision" ? [route.sourceEdge, ...candidates] : candidates;
+		const sourceCandidates = branches(route.source.kind)
+			? [route.sourceEdge, ...candidates]
+			: candidates;
 		route.targetEdge =
 			candidates.find((side) => !departures.has(side) && !targetArrivals.has(side)) ??
 			candidates.find((side) => !departures.has(side)) ??
@@ -3024,9 +3268,89 @@ function assignFeedbackSides(
 			sourceCandidates.find(
 				(side) =>
 					!arrivals.has(side) &&
-					(route.source.kind !== "decision" || !siblingDepartures.has(side)) &&
+					(!branches(route.source.kind) || !siblingDepartures.has(side)) &&
 					(route.source !== route.target || side !== route.targetEdge),
 			) ?? route.sourceEdge;
+	}
+}
+
+/**
+ * A self-loop leaves a side across the flow and returns into the side the flow
+ * enters by, drawn as a loop around the corner between them: clear of the
+ * departures and their labels on the side the flow leaves by. It takes the
+ * side across the flow with fewer other ends, and a node's next loop the next
+ * free corner.
+ */
+function assignLoopSides(
+	routes: RoutedEdge[],
+	directionOf: (route: RoutedEdge) => LayoutDirection,
+): void {
+	const taken = new Map<string, Set<string>>();
+	for (const route of routes.filter(isSelfLoop)) {
+		const direction = directionOf(route);
+		const entry = OPPOSITE_EDGE[FORWARD_SIDE[direction]];
+		const across: readonly ConnectionEdge[] =
+			direction === "TB" || direction === "BT" ? ["right", "left"] : ["bottom", "top"];
+		const ends = (side: ConnectionEdge) =>
+			routes.filter(
+				(other) =>
+					!isSelfLoop(other) &&
+					((other.source === route.source && other.sourceEdge === side) ||
+						(other.target === route.source && other.targetEdge === side)),
+			).length;
+		const lateral = [...across].sort((a, b) => ends(a) - ends(b));
+		const corners = [
+			...lateral.map((side) => [side, entry] as const),
+			...lateral.map((side) => [side, FORWARD_SIDE[direction]] as const),
+		];
+		const used = taken.get(route.source.nodeId) ?? new Set<string>();
+		const [sourceEdge, targetEdge] =
+			corners.find(([side, other]) => !used.has(`${side}:${other}`)) ?? corners[0]!;
+		used.add(`${sourceEdge}:${targetEdge}`);
+		taken.set(route.source.nodeId, used);
+		route.sourceEdge = sourceEdge;
+		route.targetEdge = targetEdge;
+	}
+}
+
+/**
+ * A return whose transition runs the other way between the same two nodes, with
+ * nothing between them, runs back alongside it between the sides they face
+ * each other with, so the pair reads as one two-way link. The transition runs
+ * on the low side (left or above) and the return on the high side, each label
+ * outside the pair.
+ */
+function assignPairedReturns(
+	routes: RoutedEdge[],
+	feedback: ReadonlySet<string>,
+	nodes: readonly NodeSceneElement[],
+	groups: GroupLayout | undefined,
+): void {
+	for (const route of routes) {
+		if (!feedback.has(route.edge.id) || isSelfLoop(route)) continue;
+		const forward = routes.find(
+			(other) =>
+				other.pair === undefined &&
+				!feedback.has(other.edge.id) &&
+				other.source === route.target &&
+				other.target === route.source &&
+				other.targetEdge === OPPOSITE_EDGE[other.sourceEdge],
+		);
+		if (!forward) continue;
+		const [from, to] = [center(route.source), center(route.target)];
+		const ends = new Set([route.source.nodeId, route.target.nodeId]);
+		const owners = new Set([...ends].map((id) => groups?.groupOf.get(id) ?? id));
+		const between = [
+			...nodes.filter((node) => !ends.has(node.nodeId)),
+			...(groups?.frames ?? [])
+				.filter((frame) => !owners.has(frame.id))
+				.map((frame) => obstacleBox(frame.elementId, frame.box)),
+		];
+		if (between.some((node) => directSegmentCrossesNode(from, to, node))) continue;
+		route.sourceEdge = forward.targetEdge;
+		route.targetEdge = forward.sourceEdge;
+		forward.pair = -1;
+		route.pair = 1;
 	}
 }
 
@@ -3051,25 +3375,32 @@ function branchLabelMetrics(
 }
 
 function branchLabelPosition(route: RoutedEdge, start: ScenePoint): ScenePoint {
+	const size = branchLabelMetrics(route.edge.label ?? "", branches(route.source.kind));
 	const stub = pointAwayFromEdge(
 		start,
 		route.sourceEdge,
 		sourceStubLength(route, start, ROUTE_STUB_LENGTH),
 	);
 	const horizontal = route.sourceEdge === "left" || route.sourceEdge === "right";
+	if (isSelfLoop(route)) {
+		// Outside the loop, beside its outer run: from the stub's tip to the stub
+		// of the side it returns into.
+		const entry = pointAwayFromEdge(
+			pointOnEdge(route.target, route.targetEdge),
+			route.targetEdge,
+			ROUTE_STUB_LENGTH,
+		);
+		const outward = EDGE_NORMAL[route.sourceEdge];
+		return horizontal
+			? { x: stub.x + outward.x * (size.width / 2 + 8), y: (stub.y + entry.y) / 2 }
+			: { x: (stub.x + entry.x) / 2, y: stub.y + outward.y * (size.height / 2 + 5) };
+	}
+	// A label sits above a horizontal stub and right of a vertical one, unless its
+	// line is one of a pair, which keeps its label on its own side.
+	const side = labelSideOf(route);
 	return {
-		x:
-			(start.x + stub.x) / 2 +
-			(horizontal
-				? 0
-				: branchLabelMetrics(route.edge.label ?? "", route.source.kind === "decision").width / 2 +
-					8),
-		y:
-			(start.y + stub.y) / 2 -
-			(horizontal
-				? branchLabelMetrics(route.edge.label ?? "", route.source.kind === "decision").height / 2 +
-					5
-				: 0),
+		x: (start.x + stub.x) / 2 + (horizontal ? 0 : side * (size.width / 2 + 8)),
+		y: (start.y + stub.y) / 2 + (horizontal ? side * (size.height / 2 + 5) : 0),
 	};
 }
 
@@ -3086,7 +3417,7 @@ function branchLabelObstacles(
 				offsets.get(connectionKey({ edgeId: route.edge.id, endpoint: "source" })) ?? 0,
 			);
 			const position = branchLabelPosition(route, start);
-			const metrics = branchLabelMetrics(route.edge.label!, route.source.kind === "decision");
+			const metrics = branchLabelMetrics(route.edge.label!, branches(route.source.kind));
 			const width = metrics.width + 12;
 			return {
 				...route.source,
@@ -3099,6 +3430,32 @@ function branchLabelObstacles(
 				shape: "rectangle",
 			};
 		});
+}
+
+/**
+ * The corner each self-loop turns around, from its two ports out past its
+ * stubs, as a box every other route keeps out of, so no line runs through the
+ * loop or between it and its label.
+ */
+function loopObstacles(
+	routes: readonly RoutedEdge[],
+	offsets: ReadonlyMap<string, number>,
+): NodeSceneElement[] {
+	return routes.filter(isSelfLoop).map((route) => {
+		const { start, end } = routeEndpoints(route, offsets);
+		const points = [
+			start,
+			end,
+			pointAwayFromEdge(start, route.sourceEdge, sourceStubLength(route, start, ROUTE_STUB_LENGTH)),
+			pointAwayFromEdge(
+				end,
+				route.targetEdge,
+				endpointClearance(route.target, end, route.targetEdge, ROUTE_STUB_LENGTH),
+			),
+		];
+		const box = boundsOf(points.map((point) => ({ ...point, width: 0, height: 0 })));
+		return obstacleBox(`loop:${route.edge.id}`, padBox(box, PORT_SPACING / 2));
+	});
 }
 
 /** Clearance a label box keeps from its own line, and the wider one from other lines. */
@@ -3231,9 +3588,7 @@ function branchLabels(
 	const outlines = (groups?.frames ?? []).flatMap((frame) => frameOutline(frame.box));
 	const placed: { box: LabelBox; index: number }[] = [];
 	const sizes = arrows.map((arrow, index) =>
-		arrow.label
-			? branchLabelMetrics(arrow.label, routes[index]?.source.kind === "decision")
-			: undefined,
+		arrow.label ? branchLabelMetrics(arrow.label, branches(routes[index]?.source.kind)) : undefined,
 	);
 	const positions = arrows.map((arrow, index) =>
 		arrow.label ? branchLabelPosition(routes[index]!, arrow.points[0]) : undefined,
@@ -3278,7 +3633,7 @@ function branchLabels(
 			fontSize: 13,
 			x: position.x,
 			y: position.y,
-			maxWidth: branchLabelMaxWidth(routes[index]?.source.kind === "decision"),
+			maxWidth: branchLabelMaxWidth(branches(routes[index]?.source.kind)),
 			groupIds,
 		});
 		arrows[index] = { ...arrow, groupIds };
@@ -3758,7 +4113,10 @@ function routeAllEdges(
 	options: RouteOptions,
 	order: readonly number[] = routes.map((_, index) => index),
 ): ArrowSceneElement[] {
-	const labelObstacles = branchLabelObstacles(routes, portOffsets);
+	const labelObstacles = [
+		...branchLabelObstacles(routes, portOffsets),
+		...loopObstacles(routes, portOffsets),
+	];
 	const endpointStubs =
 		edgeRouting === "orthogonal" ? endpointStubsForRoutes(routes, portOffsets) : [];
 	// Frame outlines are lines routes keep apart from, as from each other.
@@ -3772,7 +4130,11 @@ function routeAllEdges(
 				portOffsets,
 				[
 					...nodeShapes,
-					...labelObstacles.filter((label) => label.nodeId !== `branch-label:${route.edge.id}`),
+					...labelObstacles.filter(
+						(label) =>
+							label.nodeId !== `branch-label:${route.edge.id}` &&
+							label.nodeId !== `loop:${route.edge.id}`,
+					),
 					...groupObstacles(options.groups, route),
 				],
 				[...outlines, ...endpointStubs, ...edgeArrows],
@@ -4120,6 +4482,64 @@ function polishLevels(edgeRouting: IntermediateDiagram["layout"]["edgeRouting"])
 		: [{ ...PLAIN, repair: true }, PLAIN];
 }
 
+/**
+ * Slide each marker (an initial dot or a final bullseye) across the flow until
+ * it lines up with the port its one transition uses at the other end, so the
+ * transition runs straight, wherever that spot is clear of every other node
+ * and group and inside the marker's own group.
+ */
+function alignMarkers(
+	routes: RoutedEdge[],
+	nodes: NodeSceneElement[],
+	groups: GroupLayout | undefined,
+	portOffsets: ReadonlyMap<string, number>,
+): NodeSceneElement[] {
+	const moved = new Map<string, NodeSceneElement>();
+	for (const marker of nodes) {
+		if (markerSize(marker) === undefined) continue;
+		const own = routes.filter((route) => route.source === marker || route.target === marker);
+		const route = own[0];
+		if (own.length !== 1 || !route || isSelfLoop(route)) continue;
+		const endpoint = route.source === marker ? "target" : "source";
+		const other = route[endpoint];
+		const side = endpoint === "source" ? route.sourceEdge : route.targetEdge;
+		if ((endpoint === "source" ? route.targetEdge : route.sourceEdge) !== OPPOSITE_EDGE[side])
+			continue;
+		const axis = slotAxis(side);
+		const size = axis === "x" ? "width" : "height";
+		const port = pointOnEdge(
+			other,
+			side,
+			portOffsets.get(connectionKey({ edgeId: route.edge.id, endpoint })) ?? 0,
+		);
+		const shifted = { ...marker, [axis]: port[axis] - marker[size] / 2 };
+		const room = padBox(shifted, PORT_SPACING);
+		const group = groups?.groupOf.get(marker.nodeId);
+		const frame = groups?.frames.find((candidate) => candidate.id === group);
+		const clear =
+			nodes.every(
+				(node) => node === marker || !boxesOverlap(room, moved.get(node.nodeId) ?? node),
+			) &&
+			(groups?.frames ?? []).every(
+				(candidate) =>
+					candidate === frame ||
+					(!boxesOverlap(room, candidate.box) && !boxesOverlap(room, candidate.labelBox)),
+			) &&
+			(!frame ||
+				(room.x >= frame.box.x &&
+					room.y >= frame.box.y &&
+					room.x + room.width <= frame.box.x + frame.box.width &&
+					room.y + room.height <= frame.box.y + frame.box.height));
+		if (clear) moved.set(marker.nodeId, shifted);
+	}
+	if (moved.size === 0) return nodes;
+	for (const route of routes) {
+		route.source = moved.get(route.source.nodeId) ?? route.source;
+		route.target = moved.get(route.target.nodeId) ?? route.target;
+	}
+	return nodes.map((node) => moved.get(node.nodeId) ?? node);
+}
+
 /** Each continuation runs midway between the bands it joins. */
 function assignContinuationLanes(
 	routes: readonly RoutedEdge[],
@@ -4251,7 +4671,9 @@ function layoutDiagramOnce(
 				mirror,
 			);
 	};
-	const shapesByNodeId = new Map(nodeShapes.map((shape) => [shape.nodeId, shape]));
+	const shapesByNodeId = new Map(
+		[...nodeShapes, ...compositeShapes(groups)].map((shape) => [shape.nodeId, shape]),
+	);
 	const routedEdges = diagram.edges.map((edge, index) =>
 		routeForEdge(edge, index, shapesByNodeId, edgeDirection(edge), wrap.continuations.has(edge.id)),
 	);
@@ -4260,7 +4682,10 @@ function layoutDiagramOnce(
 	let portOffsets: Map<string, number>;
 	let capacity: Map<string, { width: number; height: number }>;
 	if (orthogonal) {
+		assignLoopSides(routedEdges, (route) => edgeDirection(route.edge));
 		assignFeedbackSides(routedEdges, diagram, (route) => edgeDirection(route.edge));
+		if (graphOptions.get(diagram)?.pairedReturns)
+			assignPairedReturns(routedEdges, flowFeedback(diagram), nodeShapes, groups);
 		portOffsets = offsetsFor(routedEdges);
 		capacity = portCapacityForRoutes(routedEdges, portOffsets);
 	} else {
@@ -4275,7 +4700,9 @@ function layoutDiagramOnce(
 			: new Map<string, number>();
 	if (capacity.size > 0 || reach.size > 0) {
 		({ groups, nodes: nodeShapes } = positionLayout(diagram, capacity, reach, arrangement, slack));
-		const resized = new Map(nodeShapes.map((node) => [node.nodeId, node]));
+		const resized = new Map(
+			[...nodeShapes, ...compositeShapes(groups)].map((node) => [node.nodeId, node]),
+		);
 		for (const route of routedEdges) {
 			route.source = resized.get(route.source.nodeId)!;
 			route.target = resized.get(route.target.nodeId)!;
@@ -4293,6 +4720,7 @@ function layoutDiagramOnce(
 			).offsets;
 		}
 	}
+	nodeShapes = alignMarkers(routedEdges, nodeShapes, groups, portOffsets);
 	assignContinuationLanes(routedEdges, nodeShapes, wrap);
 	// Judge jogs and corridors at the size a reader sees the exported diagram.
 	const drawn = [...nodeShapes, ...groupBlocks(groups)];
@@ -4487,6 +4915,75 @@ function routesNoWorse(
 	);
 }
 
+/** Shapes each marker kind draws as: a final's core is the filled dot inside its ring. */
+const MARKER_SHAPES: Readonly<Record<string, NodeSceneShape>> = {
+	initial: "circle",
+	final: "circle",
+	"final-core": "circle",
+	choice: "diamond",
+};
+
+/** What each marker is, for readers of the scene; markers never draw it. */
+const MARKER_NAMES: Readonly<Record<string, string>> = {
+	initial: "Initial state",
+	final: "Final state",
+	"final-core": "Final state",
+	choice: "Choice",
+};
+
+/**
+ * A state marker keeps its role while it still reads as one: a marker kind in
+ * its own shape, without an icon. A choice grows with its branches, so its
+ * size never decides.
+ */
+export function isStructurallyValidStateMarker(element: {
+	readonly icon?: unknown;
+	readonly kind?: string;
+	readonly shape: string;
+}): boolean {
+	return (
+		element.kind !== undefined &&
+		MARKER_SHAPES[element.kind] === element.shape &&
+		element.icon === undefined
+	);
+}
+
+/** A final bullseye's filled core: a fifth of its ring's edge from the ring. */
+const FINAL_CORE_INSET = 6;
+
+/**
+ * Draw a pseudostate as a marker: the initial dot filled, the final bullseye a
+ * ring with a filled core grouped to it, a choice an empty diamond. A marker
+ * draws no label; its name stays on the shape. Other nodes draw as laid out.
+ */
+function drawnMarker(shape: NodeSceneElement, accent: string): NodeSceneElement[] {
+	if (shape.label) return [shape];
+	const marker = {
+		...shape,
+		label: MARKER_NAMES[shape.kind ?? ""] ?? "Marker",
+		rendererRole: "state-marker" as const,
+	};
+	if (shape.kind === "initial") return [{ ...marker, fillColor: accent, fillStyle: "solid" }];
+	if (shape.kind !== "final") return [marker];
+	const groupIds = [`marker:${shape.nodeId}`, ...(shape.groupIds ?? [])];
+	return [
+		{ ...marker, groupIds },
+		{
+			...marker,
+			id: `${shape.id}:core`,
+			nodeId: `${shape.nodeId}:core`,
+			kind: "final-core",
+			groupIds,
+			x: shape.x + FINAL_CORE_INSET,
+			y: shape.y + FINAL_CORE_INSET,
+			width: shape.width - 2 * FINAL_CORE_INSET,
+			height: shape.height - 2 * FINAL_CORE_INSET,
+			fillColor: accent,
+			fillStyle: "solid",
+		},
+	];
+}
+
 /**
  * Draw each group as an Excalidraw frame named by its label, and make every
  * member a child of it: nodes and their labels always, and a group's own edges
@@ -4543,6 +5040,8 @@ function withGroupFrames(
 			type: "frame",
 			id: frame.elementId,
 			name: frame.label,
+			// Edges into and out of a composite bind to its frame.
+			...(groups.composites.has(frame.id) ? { nodeId: frame.id } : {}),
 			...frame.box,
 		})),
 		labels: drawn.labels.map((label) => {
@@ -4558,8 +5057,32 @@ function withGroupFrames(
 	};
 }
 
+/** Choices a family's renderer makes for its graph; flowcharts and mindmaps make none. */
+export interface GraphRenderOptions {
+	/**
+	 * Draw an edge and its return between the same two nodes as a parallel pair
+	 * (orthogonal routing), as state machines draw a transition and its return.
+	 */
+	readonly pairedReturns?: boolean;
+}
+
+const graphOptions = new WeakMap<IntermediateDiagram, GraphRenderOptions>();
+
 export function renderIntermediateDiagram(input: unknown): RenderedDiagramScene {
-	const diagram = parseIntermediateDiagram(input);
+	return renderGraphDiagram(parseIntermediateDiagram(input));
+}
+
+/**
+ * Lay out and route an already validated graph. Families that build their own
+ * graph call this directly: a state machine's graph has self-loops, edges that
+ * start or end at a group (a composite state) and nodes without labels (its
+ * pseudostates), which the graph contract alone does not accept.
+ */
+export function renderGraphDiagram(
+	diagram: IntermediateDiagram,
+	options: GraphRenderOptions = {},
+): RenderedDiagramScene {
+	graphOptions.set(diagram, options);
 	// Export defects come first; inward endpoints only break ties.
 	const defectsOf = (attempt: DiagramLayout) =>
 		[
@@ -4648,17 +5171,15 @@ export function renderIntermediateDiagram(input: unknown): RenderedDiagramScene 
 		arrows: routedArrows,
 		frames: [] as FrameSceneElement[],
 		labels: [
-			...layout.nodeShapes.map(textForNode),
+			// Pseudostates draw no label.
+			...layout.nodeShapes.filter((shape) => shape.label).map(textForNode),
 			...branchLabels(routedArrows, routedEdges, layout.nodeShapes, groups),
 		],
 		nodes: layout.nodeShapes,
 	};
-	const {
-		arrows: edgeArrows,
-		frames,
-		labels,
-		nodes: nodeShapes,
-	} = groups ? withGroupFrames(groups, drawn) : drawn;
+	const framed = groups ? withGroupFrames(groups, drawn) : drawn;
+	const { arrows: edgeArrows, frames, labels } = framed;
+	const nodeShapes = framed.nodes.flatMap((shape) => drawnMarker(shape, diagram.style.accentColor));
 	const elements = normalizeSceneOrigin([...frames, ...edgeArrows, ...nodeShapes, ...labels]);
 	const bounds = sceneBounds(elements);
 	const zOrder = [

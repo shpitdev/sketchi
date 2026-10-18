@@ -10,7 +10,7 @@ import {
 import {
 	AXIS_ALIGNED_EPSILON,
 	boundLabelWidth,
-	CANVAS_RENDERER_ROLES,
+	CANVAS_CROSSABLE_RENDERER_ROLES,
 	canvasBoundTextBox,
 	canvasBoundTextInset,
 	canvasNodeIconBox,
@@ -393,7 +393,12 @@ function arrowElement(input: {
 }): ExcalidrawElement {
 	const start = input.arrow.points[0];
 	const end = lastArrowPoint(input.arrow);
-	const elbowed = input.arrow.points.length > 2;
+	// Excalidraw resolves a straight arrow's binding against its target's outline,
+	// which a frame lacks; an elbow arrow keeps its fixed point on a moved frame.
+	const elbowed =
+		input.arrow.points.length > 2 ||
+		input.sourceShape?.type === "frame" ||
+		input.targetShape?.type === "frame";
 
 	return {
 		...elementBase(input.arrow.id, input.arrow),
@@ -527,11 +532,17 @@ function arrowLabelElement(input: { arrow: ArrowSceneElement }): ExcalidrawEleme
 
 function collectBoundArrowsByElement(
 	nodes: readonly NodeSceneElement[],
+	frames: readonly FrameSceneElement[],
 	arrows: readonly ArrowSceneElement[],
 	lines: readonly LineSceneElement[],
 ): Map<string, string[]> {
 	const result = new Map<string, string[]>();
-	const elementIdByNodeId = new Map(nodes.map((node) => [node.nodeId, node.id]));
+	const elementIdByNodeId = new Map([
+		...nodes.map((node) => [node.nodeId, node.id] as const),
+		...frames.flatMap((frame) =>
+			frame.nodeId === undefined ? [] : [[frame.nodeId, frame.id] as const],
+		),
+	]);
 
 	for (const arrow of arrows) {
 		for (const nodeId of [arrow.sourceNodeId, arrow.targetNodeId]) {
@@ -576,8 +587,15 @@ function applyLayerSemantics(scene: RenderedDiagramScene): SceneElement[] {
 		const layer = element.layerId ? layersById.get(element.layerId) : undefined;
 		return layer?.visible !== false;
 	});
+	// Connectors end at nodes, or at frames that carry a node id (composite states).
 	const visibleNodeIds = new Set(
-		layerVisibleElements.flatMap((element) => (element.type === "node" ? [element.nodeId] : [])),
+		layerVisibleElements.flatMap((element) =>
+			element.type === "node"
+				? [element.nodeId]
+				: element.type === "frame" && element.nodeId !== undefined
+					? [element.nodeId]
+					: [],
+		),
 	);
 	const connectionSafeElements = layerVisibleElements.filter(
 		(element) =>
@@ -684,7 +702,12 @@ function buildElements(
 	}
 	const arrows = sourceElements.filter(isArrow);
 	const lines = sourceElements.filter(isLine);
-	const arrowsByElement = collectBoundArrowsByElement(nodes, arrows, lines);
+	const arrowsByElement = collectBoundArrowsByElement(
+		nodes,
+		sourceElements.filter(isFrame),
+		arrows,
+		lines,
+	);
 	const shapeElementsByNodeId = new Map<string, ExcalidrawElement>();
 	const elements: ExcalidrawElement[] = [];
 	for (const node of nodes) {
@@ -724,6 +747,8 @@ function buildElements(
 		renderedFrame.boundElements = arrowIds.length
 			? arrowIds.map((id) => ({ id, type: "arrow" }))
 			: null;
+		// A composite state's transitions bind to its frame.
+		if (frame.nodeId !== undefined) shapeElementsByNodeId.set(frame.nodeId, renderedFrame);
 		elements.push(renderedFrame);
 	}
 
@@ -1079,7 +1104,7 @@ function isSequenceStructureShape(element: ExcalidrawElement): boolean {
 	const customData = element.customData;
 	if (customData === null || typeof customData !== "object") return false;
 	const role = (customData as Record<string, unknown>)["sketchiRendererRole"];
-	return CANVAS_RENDERER_ROLES.some((candidate) => candidate === role);
+	return CANVAS_CROSSABLE_RENDERER_ROLES.some((candidate) => candidate === role);
 }
 
 function arrowEndpoint(element: ExcalidrawElement, key: BindingKey) {

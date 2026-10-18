@@ -80,22 +80,37 @@ export interface CanvasIconAsset {
 
 /**
  * Structural shapes renderers derive: sequence lifelines and activation bars,
- * timeline event markers and span bars, and chart data marks (bars, slices,
- * point markers and legend keys). They carry no bound label or icon and are
- * not obstacles for connectors.
+ * timeline event markers and span bars, chart data marks (bars, slices,
+ * point markers and legend keys), and state-machine pseudostates (an initial
+ * dot, a final bullseye, an unlabeled choice). They carry no bound label or
+ * icon.
  */
 export const CANVAS_RENDERER_ROLES = [
 	"sequence-lifeline",
 	"sequence-activation",
 	"timeline-marker",
 	"chart-mark",
+	"state-marker",
 ] as const;
 export type CanvasRendererRole = (typeof CANVAS_RENDERER_ROLES)[number];
+
+/**
+ * Roles connectors may cross: lifelines, activation bars, timeline markers and
+ * chart marks. A state marker is an end of its transitions and an obstacle to
+ * every other.
+ */
+export const CANVAS_CROSSABLE_RENDERER_ROLES: readonly CanvasRendererRole[] = [
+	"sequence-lifeline",
+	"sequence-activation",
+	"timeline-marker",
+	"chart-mark",
+];
 
 const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
 	"chart-mark": "Chart mark",
 	"sequence-activation": "Sequence activation",
 	"sequence-lifeline": "Sequence lifeline",
+	"state-marker": "State marker",
 	"timeline-marker": "Timeline marker",
 };
 
@@ -165,6 +180,11 @@ export interface CanvasLineElement extends CanvasElementComposition, CanvasStrok
 export interface CanvasFrameElement extends CanvasElementComposition, CanvasStrokeStyleFields {
 	readonly type: "frame";
 	readonly id: string;
+	/**
+	 * The node id connectors use to start or end at this frame, as transitions
+	 * into and out of a composite state do. Unique among node ids.
+	 */
+	readonly nodeId?: string;
 	readonly name?: string;
 	readonly x: number;
 	readonly y: number;
@@ -695,8 +715,13 @@ export function getCanvasValidationIssues(canvas: CanvasSpec): CanvasValidationI
 	const shapes = canvas.elements.filter(
 		(element): element is CanvasShapeElement => element.type === "node",
 	);
-	const shapesByNodeId = new Map(shapes.map((element) => [element.nodeId, element]));
-	const duplicateNodeId = findDuplicate(shapes.map((element) => element.nodeId));
+	const endpoints = connectorEndpoints(canvas.elements);
+	const duplicateNodeId = findDuplicate([
+		...shapes.map((element) => element.nodeId),
+		...canvas.elements.flatMap((element) =>
+			element.type === "frame" && element.nodeId !== undefined ? [element.nodeId] : [],
+		),
+	]);
 	if (duplicateNodeId) {
 		issues.push({
 			code: "invalid_binding",
@@ -788,7 +813,7 @@ export function getCanvasValidationIssues(canvas: CanvasSpec): CanvasValidationI
 			}
 		}
 		if (element.type === "arrow") {
-			if (!shapesByNodeId.has(element.sourceNodeId)) {
+			if (!endpoints.has(element.sourceNodeId)) {
 				issues.push({
 					code: "invalid_binding",
 					elementId: element.id,
@@ -796,7 +821,7 @@ export function getCanvasValidationIssues(canvas: CanvasSpec): CanvasValidationI
 					path: `elements[${index}].sourceNodeId`,
 				});
 			}
-			if (!shapesByNodeId.has(element.targetNodeId)) {
+			if (!endpoints.has(element.targetNodeId)) {
 				issues.push({
 					code: "invalid_binding",
 					elementId: element.id,
@@ -1115,12 +1140,23 @@ function boundEndpointToward(
 	};
 }
 
-function synchronizeBindings(elements: readonly CanvasElement[]): CanvasElement[] {
-	const shapesByNodeId = new Map(
-		elements
-			.filter((element): element is CanvasShapeElement => element.type === "node")
-			.map((element) => [element.nodeId, element]),
+/** What a connector can start or end at, by node id: nodes and frames that carry one. */
+export function connectorEndpoints(
+	elements: readonly CanvasElement[],
+): Map<string, CanvasShapeElement | CanvasFrameElement> {
+	return new Map(
+		elements.flatMap((element): (readonly [string, CanvasShapeElement | CanvasFrameElement])[] =>
+			element.type === "node"
+				? [[element.nodeId, element]]
+				: element.type === "frame" && element.nodeId !== undefined
+					? [[element.nodeId, element]]
+					: [],
+		),
 	);
+}
+
+function synchronizeBindings(elements: readonly CanvasElement[]): CanvasElement[] {
+	const shapesByNodeId = connectorEndpoints(elements);
 	const boundableElementsById = new Map<string, BoundableCanvasElement>();
 	for (const element of elements) {
 		if (element.type === "node" || element.type === "frame") {

@@ -37,6 +37,7 @@ import {
 	isStructurallyValidSequenceActivation,
 	isStructurallyValidSequenceLifeline,
 	isStructurallyValidChartMark,
+	isStructurallyValidStateMarker,
 	isStructurallyValidTimelineMarker,
 	type RenderedDiagramScene,
 	type ScenePoint,
@@ -1240,7 +1241,8 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 					isStructurallyValidSequenceActivation(scene, element)) ||
 				(element.rendererRole === "timeline-marker" &&
 					isStructurallyValidTimelineMarker(element)) ||
-				(element.rendererRole === "chart-mark" && isStructurallyValidChartMark(element))
+				(element.rendererRole === "chart-mark" && isStructurallyValidChartMark(element)) ||
+				(element.rendererRole === "state-marker" && isStructurallyValidStateMarker(element))
 					? { rendererRole: element.rendererRole }
 					: {}),
 				...(element.textColor ? { textColor: element.textColor } : {}),

@@ -12,7 +12,11 @@ import {
 	segmentCrossesBoundsInterior,
 	segmentsFromPoints,
 } from "@sketchi/diagram-core";
-import { renderDiagram, renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import {
+	renderDiagram,
+	renderGraphDiagram,
+	renderIntermediateDiagram,
+} from "@sketchi/diagram-renderer";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "./convert";
 
 type Kind = "start" | "process" | "decision" | "end";
@@ -850,4 +854,173 @@ describe("grouped routing fuzz", () => {
 			}
 		},
 	);
+});
+
+const EVENTS = [
+	"pay",
+	"cancel / refund",
+	"timeout [retries < 3]",
+	"[approved]",
+	"ship / notify customer",
+	"reject [stock missing] / restock",
+	"tick",
+	"return [within 30 days] / refund",
+];
+
+/**
+ * Random graphs as a state machine draws them: an initial dot, a chain of
+ * states with some returns (pairs), self-loops, a choice with guarded branches,
+ * finals, and sometimes a composite state with its own initial dot and
+ * transitions into and out of its frame.
+ */
+function randomStateGraphs(count: number, start = 20261021) {
+	let seed = start;
+	const random = () => {
+		seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+		return seed / 2_147_483_648;
+	};
+	const pick = <T>(values: readonly T[]) => values[Math.floor(random() * values.length)]!;
+	return Array.from({ length: count }, (_, index) => {
+		const size = 3 + Math.floor(random() * 7);
+		const states = Array.from({ length: size }, (_, i) => `s${i}`);
+		const composite = size >= 5 && random() < 0.5;
+		const members = composite ? states.slice(2, 4) : [];
+		const node = (id: string, label: string, kind: string, group?: string) => ({
+			id,
+			label,
+			kind,
+			metadata: {},
+			...(group ? { group } : {}),
+		});
+		const nodes = [
+			node("init", "", "initial"),
+			...(composite ? [node("c-init", "", "initial", "c")] : []),
+			...states.map((id) =>
+				node(id, `${pick(WORDS)} ${id}`, "state", members.includes(id) ? "c" : undefined),
+			),
+		];
+		const edges: { id: string; source: string; target: string; label?: string; metadata: {} }[] =
+			[];
+		const add = (source: string, target: string, label?: string) =>
+			edges.push({
+				id: `e${edges.length}`,
+				source,
+				target,
+				metadata: {},
+				...(label ? { label } : {}),
+			});
+		add("init", "s0");
+		if (composite) add("c-init", members[0]!);
+		for (let i = 0; i + 1 < size; i += 1) {
+			// The composite is entered and left at its frame, its members linked inside.
+			const [from, to] = [states[i]!, states[i + 1]!];
+			if (composite && members.includes(to) && !members.includes(from))
+				add(from, "c", pick(EVENTS));
+			else if (composite && members.includes(from) && !members.includes(to))
+				add("c", to, pick(EVENTS));
+			else add(from, to, pick(EVENTS));
+			if (random() < 0.3 && !(composite && members.includes(from) !== members.includes(to)))
+				add(to, from, pick(EVENTS));
+		}
+		for (const id of states) if (random() < 0.25) add(id, id, pick(EVENTS));
+		if (size >= 4 && random() < 0.5) {
+			nodes.push(node("choice", "", "choice"));
+			const from = members.includes(states[1]!) ? "c" : states[1]!;
+			add(from, "choice", pick(EVENTS));
+			add("choice", states.at(-1)!, "[yes]");
+			add("choice", "s0", "[else]");
+		}
+		for (const [i, id] of [states.at(-1)!, ...(random() < 0.5 ? [states[0]!] : [])].entries()) {
+			nodes.push(node(`end${i}`, "", "final"));
+			add(id, `end${i}`);
+		}
+		return {
+			id: `state-${index}`,
+			title: `State ${index}`,
+			type: "flowchart",
+			style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
+			metadata: {},
+			nodes,
+			edges,
+			...(composite ? { groups: [{ id: "c", label: pick(GROUP_LABELS) }] } : {}),
+		};
+	});
+}
+
+/**
+ * Crossings and reader-scale findings ("crossings/findings") each random state
+ * graph drew when state graphs were added, in order. None may draw more.
+ */
+const STATE_ROUTING: Readonly<Record<"TB" | "BT" | "LR" | "RL", string>> = {
+	TB: "0/0 0/0 1/0 0/0 1/0 0/0 2/1 5/0 0/0 0/0 0/0 1/0 0/0 0/0 0/0 3/0 1/1 1/0 0/0 0/0 0/0 0/0 0/0 2/0 0/0 1/1 1/0 0/0 0/0 3/1 0/0 0/0 0/0 1/0 2/0 3/1 0/0 1/1 4/1 3/0",
+	BT: "0/0 0/0 0/0 0/0 0/0 0/0 2/1 3/0 0/0 0/0 0/0 0/1 0/0 0/0 0/0 1/0 4/1 0/0 0/0 0/0 0/0 0/1 1/1 2/0 0/0 1/0 0/2 0/0 0/0 0/1 0/0 0/0 0/0 1/0 2/0 3/0 0/0 0/0 1/1 0/0",
+	LR: "0/0 0/0 1/1 0/0 1/0 0/0 0/0 2/4 0/0 0/0 0/0 3/0 1/2 0/0 0/0 1/2 2/5 2/1 0/0 0/0 0/0 2/1 1/5 0/0 0/0 2/1 1/2 0/0 0/0 1/0 0/0 0/0 1/0 1/1 2/1 1/3 0/0 0/1 4/0 1/1",
+	RL: "0/0 0/0 0/1 0/0 0/0 0/0 0/0 2/3 0/0 0/0 0/0 0/0 0/1 0/0 0/0 2/4 2/4 3/2 0/0 0/0 0/0 1/3 1/2 0/0 0/0 1/1 1/1 1/0 0/0 0/3 0/0 0/0 1/0 1/1 1/1 3/4 0/0 0/1 3/1 0/1",
+};
+
+describe("state graph fuzz", () => {
+	// 40 graphs x 4 directions. Self-loops, paired returns, choices and
+	// transitions into and out of a composite's frame all export valid and bound,
+	// with their groups whole and labels whole and clear.
+	const graphs = randomStateGraphs(40);
+	describe.each(["TB", "BT", "LR", "RL"] as const)("%s", (direction) => {
+		it("exports every state graph valid, bound, grouped and labeled clear", () => {
+			const failures = graphs.flatMap((graph, index) => {
+				const scene = renderGraphDiagram(
+					{ ...graph, layout: { direction, edgeRouting: "orthogonal" } } as never,
+					{ pairedReturns: true },
+				);
+				const exported = convertSceneToExcalidraw(scene);
+				const byId = new Map(exported.elements.map((element) => [element.id, element]));
+				const binding = (arrow: ExportedElement, key: "startBinding" | "endBinding") =>
+					(arrow[key] as { elementId?: string } | null)?.elementId;
+				const unbound = scene.elements.flatMap((element) => {
+					if (element.type !== "arrow") return [];
+					const arrow = byId.get(element.id);
+					const ends = arrow ? [binding(arrow, "startBinding"), binding(arrow, "endBinding")] : [];
+					const expected = [element.sourceNodeId, element.targetNodeId].map((id) =>
+						id === "c" ? "group:c" : `node:${id}`,
+					);
+					// A frame keeps a bound arrow's end only as an elbow arrow's fixed point.
+					const straightToFrame = expected.includes("group:c") && arrow?.["elbowed"] !== true;
+					return JSON.stringify(ends) === JSON.stringify(expected) && !straightToFrame
+						? []
+						: [
+								`${element.id} binds ${JSON.stringify(ends)}${straightToFrame ? " as a straight arrow" : ""}`,
+							];
+				});
+				const authored = new Map(graph.nodes.map((node) => [`node:${node.id}`, node.label]));
+				return [
+					...validateExcalidrawScene(exported).issues.map((issue) => issue.message),
+					...groupRegionIssues(scene).map((issue) => issue.message),
+					...getCanvasValidationIssues(scene).map((issue) => issue.message),
+					...labelDefects(exported.elements, authored),
+					...unbound,
+				].map((failure) => `${index}: ${failure}`);
+			});
+			expect(failures).toEqual([]);
+		}, 60_000);
+
+		it("draws no state graph with more crossings or reader-scale findings than when they were added", () => {
+			const counts = graphs.map((graph) =>
+				routingCounts(
+					renderGraphDiagram(
+						{ ...graph, layout: { direction, edgeRouting: "orthogonal" } } as never,
+						{ pairedReturns: true },
+					),
+				),
+			);
+			if (process.env.PRINT_STATE_ROUTING)
+				console.log(direction, counts.map((c) => `${c.crossings}/${c.findings}`).join(" "));
+			const pinned = STATE_ROUTING[direction].split(" ").map((pair) => pair.split("/").map(Number));
+			expect(
+				counts.flatMap(({ crossings, findings }, index) => {
+					const [pinnedCrossings, pinnedFindings] = pinned[index] ?? [];
+					return crossings > pinnedCrossings! || findings > pinnedFindings!
+						? [`${index}: ${pinnedCrossings}/${pinnedFindings} -> ${crossings}/${findings}`]
+						: [];
+				}),
+			).toEqual([]);
+		}, 60_000);
+	});
 });
