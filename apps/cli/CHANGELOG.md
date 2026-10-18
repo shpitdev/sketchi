@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.15.1
+
+### Patch Changes
+
+- [#438](https://github.com/shpitdev/sketchi/pull/438) [`84b6ce3`](https://github.com/shpitdev/sketchi/commit/84b6ce3d4fa91516125e5ef1fb0a03ced7a2125f) Thanks [@anandpant](https://github.com/anandpant)! - Timeline axis breaks now state the time they leave out, such as `5 months` or `4.3 years`, and a break over a longer gap draws longer, so compressed spacing still reads in the order of real time.
+
 ## 0.15.0
 
 ### Minor Changes
