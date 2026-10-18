@@ -50,9 +50,21 @@ export class DiagramIconRef extends Schema.Class<DiagramIconRef>("DiagramIconRef
 }) {}
 export const DiagramIconRefSchema = DiagramIconRef;
 
+/**
+ * A labeled region that holds nodes together, such as a team, a zone, or a
+ * phase. Nodes join one by setting `group` to its id. Groups are flat: a group
+ * never contains another group.
+ */
+export class DiagramGroup extends Schema.Class<DiagramGroup>("DiagramGroup")({
+	id: NonEmptyString,
+	label: NonEmptyString,
+}) {}
+export const DiagramGroupSchema = DiagramGroup;
+
 export class DiagramNode extends Schema.Class<DiagramNode>("DiagramNode")({
 	id: NonEmptyString,
 	label: NonEmptyString,
+	/** The id of the declared group this node belongs to. */
 	group: Schema.optional(NonEmptyString),
 	kind: Schema.optional(NonEmptyString),
 	icon: Schema.optional(DiagramIconRef),
@@ -89,6 +101,7 @@ export class IntermediateDiagram extends Schema.Class<IntermediateDiagram>("Inte
 	type: withDefault(GraphDiagramTypeSchema, "flowchart"),
 	nodes: Schema.Array(DiagramNode).pipe(Schema.mutable).check(Schema.isMinLength(1)),
 	edges: withDefault(Schema.Array(DiagramEdge).pipe(Schema.mutable), []),
+	groups: Schema.optional(Schema.Array(DiagramGroup).pipe(Schema.mutable)),
 	layout: withDefault(DiagramLayout, {
 		direction: "LR",
 		edgeRouting: "orthogonal",
@@ -130,6 +143,22 @@ export function validateIntermediateDiagram(diagram: IntermediateDiagram): Inter
 
 	if (duplicateEdgeId) {
 		throw new DiagramValidationError(`Duplicate edge id "${duplicateEdgeId}" is not allowed.`);
+	}
+
+	const duplicateGroupId = findDuplicate((diagram.groups ?? []).map((group) => group.id));
+
+	if (duplicateGroupId) {
+		throw new DiagramValidationError(`Duplicate group id "${duplicateGroupId}" is not allowed.`);
+	}
+
+	const groupIds = new Set((diagram.groups ?? []).map((group) => group.id));
+
+	for (const node of diagram.nodes) {
+		if (node.group !== undefined && !groupIds.has(node.group)) {
+			throw new DiagramValidationError(
+				`Node "${node.id}" references missing group "${node.group}".`,
+			);
+		}
 	}
 
 	const nodeIds = new Set(diagram.nodes.map((node) => node.id));

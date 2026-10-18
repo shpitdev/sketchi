@@ -125,6 +125,12 @@ const TIMELINE_ISSUE_CODE_ADDITIONS = new Set([
 	"invalid_timeline_lane",
 ]);
 const SEQUENCE_ISSUE_CODE_ADDITIONS = new Set(["sequence_too_large"]);
+// Flowchart groups add three issue codes.
+const GROUP_ISSUE_CODE_ADDITIONS = new Set([
+	"duplicate_group_id",
+	"unknown_node_group",
+	"empty_group",
+]);
 const FLOWCHART_SPEC_NODE_ADDED_FIELDS = new Set(["icon"]);
 const FROZEN_FIXTURE_HASHES = {
 	v1: "c668b53ee90043a06c640d06cc28253496d50e7431c916b523fcd4157b91ae55",
@@ -205,7 +211,8 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		CANVAS_ISSUE_CODE_ADDITIONS.has(value) ||
 		NODE_ICON_ISSUE_CODE_ADDITIONS.has(value) ||
 		SEQUENCE_ISSUE_CODE_ADDITIONS.has(value) ||
-		TIMELINE_ISSUE_CODE_ADDITIONS.has(value)
+		TIMELINE_ISSUE_CODE_ADDITIONS.has(value) ||
+		GROUP_ISSUE_CODE_ADDITIONS.has(value)
 	);
 }
 
@@ -1603,7 +1610,8 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 						!CANVAS_ISSUE_CODE_ADDITIONS.has(code) &&
 						!NODE_ICON_ISSUE_CODE_ADDITIONS.has(code) &&
 						!SEQUENCE_ISSUE_CODE_ADDITIONS.has(code) &&
-						!TIMELINE_ISSUE_CODE_ADDITIONS.has(code),
+						!TIMELINE_ISSUE_CODE_ADDITIONS.has(code) &&
+						!GROUP_ISSUE_CODE_ADDITIONS.has(code),
 				)
 				.toSorted(),
 		).toEqual([...directlyReachableCodes, ...boundaryOnlyCodes].toSorted());

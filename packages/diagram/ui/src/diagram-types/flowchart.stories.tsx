@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import {
 	flowchartFixture,
+	groupFixtures,
 	pharmaBatchDispositionFlowchart,
 	routingFixtures,
 } from "@sketchi/diagram-core";
@@ -28,6 +29,18 @@ export const PharmaBatchDisposition: Story = {
 	args: {
 		diagram: pharmaBatchDispositionFlowchart,
 	},
+};
+
+export const GroupedApproval: Story = {
+	args: { diagram: groupFixtures["grouped-approval"] },
+};
+
+export const GroupedThreeZoneService: Story = {
+	args: { diagram: groupFixtures["three-zone-service"] },
+};
+
+export const GroupedMixedMembership: Story = {
+	args: { diagram: groupFixtures["mixed-membership"] },
 };
 
 export const RoutingContentModeration: Story = {

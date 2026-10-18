@@ -12,6 +12,7 @@ import {
 	sequenceFixture,
 	type CanvasSpec,
 	getCanvasValidationIssues,
+	groupFixtures,
 } from "@sketchi/diagram-core";
 import { renderIntermediateDiagram, renderSequenceDiagram } from "@sketchi/diagram-renderer";
 
@@ -1915,5 +1916,106 @@ describe("bound label first paint", () => {
 			containerId: null,
 			text: "Escalate to the\nquality manager for\nfinal disposition",
 		});
+	});
+});
+
+describe("group frames", () => {
+	it("exports each group as a named frame that holds its members", () => {
+		const exported = convertSceneToExcalidraw(
+			renderIntermediateDiagram(groupFixtures["grouped-approval"]),
+		);
+		const frames = exported.elements.filter((element) => element.type === "frame");
+		expect(frames.map((frame) => [frame.id, frame.name])).toEqual([
+			["group:employee", "Employee"],
+			["group:manager", "Manager"],
+			["group:finance", "Finance"],
+		]);
+		const frameOf = (id: string) => exported.elements.find((element) => element.id === id)?.frameId;
+		expect(frameOf("node:submit")).toBe("group:employee");
+		expect(frameOf("label:submit")).toBe("group:employee");
+		expect(frameOf("node:approved")).toBe("group:manager");
+		expect(frameOf("node:incurred")).toBeNull();
+		// A group's own edge belongs to it; an edge between groups belongs to neither.
+		expect(frameOf("edge:e7")).toBe("group:finance");
+		expect(frameOf("edge:e2")).toBeNull();
+		expect(validateExcalidrawScene(exported)).toEqual({ ok: true, issues: [] });
+	});
+
+	it("lets an arrow cross only the frames that hold one of its ends", () => {
+		const node = (id: string, x: number, y: number, frameId?: string) => ({
+			type: "node" as const,
+			id: `node:${id}`,
+			nodeId: id,
+			shape: "rectangle" as const,
+			x,
+			y,
+			width: 100,
+			height: 60,
+			label: id,
+			...(frameId ? { frameId } : {}),
+		});
+		const scene = convertSceneToExcalidraw({
+			kind: "canvas",
+			version: 1,
+			diagramId: "frames",
+			title: "Frames",
+			width: 900,
+			height: 400,
+			accentColor: "#111827",
+			backgroundColor: "#ffffff",
+			elements: [
+				{ type: "frame", id: "group:team", name: "Team", x: 300, y: 40, width: 200, height: 300 },
+				node("inside", 350, 60, "group:team"),
+				node("left", 40, 70),
+				node("right", 700, 70),
+				node("below-left", 40, 260),
+				node("below-right", 700, 260),
+				{
+					type: "arrow",
+					id: "edge:into",
+					edgeId: "into",
+					sourceNodeId: "left",
+					targetNodeId: "inside",
+					points: [
+						{ x: 140, y: 90 },
+						{ x: 350, y: 90 },
+					],
+				},
+				{
+					type: "arrow",
+					id: "edge:through",
+					edgeId: "through",
+					sourceNodeId: "below-left",
+					targetNodeId: "below-right",
+					points: [
+						{ x: 140, y: 290 },
+						{ x: 700, y: 290 },
+					],
+				},
+			],
+			layers: [],
+			layouts: [],
+			zOrder: [
+				"group:team",
+				"node:inside",
+				"node:left",
+				"node:right",
+				"node:below-left",
+				"node:below-right",
+				"edge:into",
+				"edge:through",
+			],
+		});
+		expect(
+			validateExcalidrawScene(scene).issues.filter(
+				(issue) => issue.code === "arrow-segment-through-node",
+			),
+		).toEqual([
+			{
+				code: "arrow-segment-through-node",
+				elementId: "edge:through",
+				message: 'Arrow "edge:through" passes through shape "group:team".',
+			},
+		]);
 	});
 });

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { DiagramValidationError } from "../intermediate";
 import {
 	FLOWCHART_MAX_EDGES,
+	FLOWCHART_MAX_GROUPS,
 	FLOWCHART_MAX_ISSUES,
 	FLOWCHART_MAX_NODES,
 	FlowchartDiagramSchema,
@@ -233,5 +234,67 @@ describe("parseFlowchartDiagram", () => {
 				],
 			}),
 		).toThrow(FlowchartValidationError);
+	});
+});
+
+describe("flowchart groups", () => {
+	const grouped = {
+		...flowchartFixture,
+		groups: [
+			{ id: "intake", label: "Intake" },
+			{ id: "authoring", label: "Authoring" },
+		],
+		nodes: flowchartFixture.nodes.map((node) =>
+			node.id === "prompt" || node.id === "requirements"
+				? { ...node, group: "intake" }
+				: node.id === "draft"
+					? { ...node, group: "authoring" }
+					: node,
+		),
+	};
+
+	it("accepts declared groups with grouped and ungrouped nodes", () => {
+		const diagram = parseFlowchartDiagram(grouped);
+		expect(diagram.groups?.map((group) => group.id)).toEqual(["intake", "authoring"]);
+		expect(diagram.nodes.map((node) => node.group)).toEqual([
+			"intake",
+			"intake",
+			undefined,
+			"authoring",
+			undefined,
+		]);
+	});
+
+	it("names each group problem with a repair hint", () => {
+		const issues = validationIssues({
+			...grouped,
+			groups: [
+				...grouped.groups,
+				{ id: "intake", label: "Twice" },
+				{ id: "spare", label: "Spare" },
+			],
+			nodes: grouped.nodes.map((node) =>
+				node.id === "review" ? { ...node, group: "Intake" } : node,
+			),
+		});
+		expect(issues.map((issue) => [issue.code, issue.ref])).toEqual([
+			["duplicate_group_id", { kind: "group", id: "intake", path: "groups" }],
+			["unknown_node_group", { kind: "node", id: "review", path: "nodes.group" }],
+			["empty_group", { kind: "group", id: "spare", path: "groups" }],
+		]);
+		expect(issues[1]?.hint).toBe(
+			'Set group to a declared group id ("intake", "authoring", "spare") or declare "Intake" in groups.',
+		);
+	});
+
+	it("bounds the number of groups", () => {
+		const nodes = linearFlowchart(FLOWCHART_MAX_GROUPS + 1).nodes;
+		const issues = validationIssues({
+			...linearFlowchart(FLOWCHART_MAX_GROUPS + 1),
+			groups: nodes.map((node) => ({ id: `g-${node.id}`, label: `Team ${node.id}` })),
+			nodes: nodes.map((node) => ({ ...node, group: `g-${node.id}` })),
+		});
+		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_too_large"]);
+		expect(issues[0]?.ref).toEqual({ kind: "diagram", id: "linear-9", path: "groups" });
 	});
 });

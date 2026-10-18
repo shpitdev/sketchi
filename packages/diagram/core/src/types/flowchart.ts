@@ -11,6 +11,7 @@ export const flowchartDiagramType = "flowchart" as const;
 
 export const FLOWCHART_MAX_NODES = 24;
 export const FLOWCHART_MAX_EDGES = 64;
+export const FLOWCHART_MAX_GROUPS = 8;
 export const FLOWCHART_MAX_ISSUES = 20;
 
 export const FlowchartValidationIssueCodeSchema = Schema.Literals([
@@ -31,12 +32,15 @@ export const FlowchartValidationIssueCodeSchema = Schema.Literals([
 	"duplicate_decision_branch_label",
 	"nonterminating_node",
 	"flowchart_too_large",
+	"duplicate_group_id",
+	"unknown_node_group",
+	"empty_group",
 ]);
 
 export class FlowchartValidationIssueRef extends Schema.Class<FlowchartValidationIssueRef>(
 	"FlowchartValidationIssueRef",
 )({
-	kind: Schema.Literals(["diagram", "node", "edge"]),
+	kind: Schema.Literals(["diagram", "node", "edge", "group"]),
 	id: Schema.optional(Schema.NonEmptyString),
 	path: Schema.optional(Schema.NonEmptyString),
 }) {}
@@ -181,6 +185,47 @@ export function getFlowchartValidationIssues(
 			ref: { kind: "diagram", id: diagram.id, path: "edges" },
 			message: `Flowchart has ${diagram.edges.length} edges; the supported maximum is ${FLOWCHART_MAX_EDGES}.`,
 			hint: "Split the workflow or remove lower-signal connections.",
+		});
+	}
+
+	const groups = diagram.groups ?? [];
+	if (groups.length > FLOWCHART_MAX_GROUPS) {
+		issues.push({
+			code: "flowchart_too_large",
+			ref: { kind: "diagram", id: diagram.id, path: "groups" },
+			message: `Flowchart has ${groups.length} groups; the supported maximum is ${FLOWCHART_MAX_GROUPS}.`,
+			hint: "Merge related groups or leave minor steps ungrouped.",
+		});
+	}
+	for (const groupId of duplicateValues(groups.map((group) => group.id))) {
+		issues.push({
+			code: "duplicate_group_id",
+			ref: { kind: "group", id: groupId, path: "groups" },
+			message: `Group id "${groupId}" is used more than once.`,
+			hint: "Give every group a stable unique id.",
+		});
+	}
+	const groupIds = new Set(groups.map((group) => group.id));
+	for (const node of diagram.nodes) {
+		if (node.group !== undefined && !groupIds.has(node.group)) {
+			issues.push({
+				code: "unknown_node_group",
+				ref: { kind: "node", id: node.id, path: "nodes.group" },
+				message: `Node "${node.id}" references undeclared group "${node.group}".`,
+				hint:
+					groupIds.size > 0
+						? `Set group to a declared group id (${[...groupIds].map((id) => `"${id}"`).join(", ")}) or declare "${node.group}" in groups.`
+						: `Declare "${node.group}" in groups as { id, label }, or remove the node's group.`,
+			});
+		}
+	}
+	const memberGroups = new Set(diagram.nodes.map((node) => node.group));
+	for (const group of groups.filter((group) => !memberGroups.has(group.id))) {
+		issues.push({
+			code: "empty_group",
+			ref: { kind: "group", id: group.id, path: "groups" },
+			message: `Group "${group.id}" has no nodes.`,
+			hint: "Set group on the nodes it holds, or remove the group.",
 		});
 	}
 

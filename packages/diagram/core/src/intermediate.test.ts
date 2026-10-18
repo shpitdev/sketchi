@@ -115,6 +115,34 @@ describe("parseIntermediateDiagram", () => {
 		).toThrow(DiagramValidationError);
 	});
 
+	it("keeps declared groups and rejects references to undeclared or duplicate ones", () => {
+		const grouped = parseIntermediateDiagram({
+			...flowchartFixture,
+			groups: [{ id: "intake", label: "Intake" }],
+			nodes: flowchartFixture.nodes.map((node, index) =>
+				index < 2 ? { ...node, group: "intake" } : node,
+			),
+		});
+		expect(grouped.groups).toEqual([{ id: "intake", label: "Intake" }]);
+		expect(grouped.nodes.filter((node) => node.group === "intake")).toHaveLength(2);
+		expect(parseIntermediateDiagram(flowchartFixture).groups).toBeUndefined();
+		expect(() =>
+			parseIntermediateDiagram({
+				...flowchartFixture,
+				nodes: flowchartFixture.nodes.map((node) => ({ ...node, group: "intake" })),
+			}),
+		).toThrow('Node "prompt" references missing group "intake".');
+		expect(() =>
+			parseIntermediateDiagram({
+				...flowchartFixture,
+				groups: [
+					{ id: "intake", label: "Intake" },
+					{ id: "intake", label: "Intake again" },
+				],
+			}),
+		).toThrow('Duplicate group id "intake" is not allowed.');
+	});
+
 	it("rejects edges that reference missing nodes", () => {
 		expect(() =>
 			parseIntermediateDiagram({

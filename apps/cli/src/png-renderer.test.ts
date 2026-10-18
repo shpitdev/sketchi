@@ -126,6 +126,44 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG renderer",
 		60_000,
 	);
 
+	it.effect("paints group frames and their names without measuring text", () =>
+		Effect.gen(function* () {
+			const builder = yield* DiagramBuilder;
+			const renderer = yield* CliPngRenderer;
+			const built = yield* builder.build(canonicalDocument(flowchartInput));
+			const first = built.excalidraw.elements.find((element) => element["type"] === "ellipse")!;
+			const framed = (name: string) => ({
+				...built.excalidraw,
+				elements: [
+					{
+						...first,
+						id: "group:team",
+						type: "frame",
+						name,
+						x: Number(first["x"]) - 40,
+						y: Number(first["y"]) - 40,
+						width: Number(first["width"]) + 80,
+						height: Number(first["height"]) + 80,
+						boundElements: null,
+						frameId: null,
+						groupIds: [],
+					},
+					...built.excalidraw.elements.map((element) =>
+						element["id"] === first["id"] ? { ...element, frameId: "group:team" } : element,
+					),
+				],
+			});
+			const named = yield* renderer.renderPng({ excalidraw: framed("Team") });
+			const unnamed = yield* renderer.renderPng({ excalidraw: framed("") });
+			assert.deepStrictEqual(named, yield* renderer.renderPng({ excalidraw: framed("Team") }));
+			// The name is painted above the frame, so the export grows to hold it.
+			assert.isAbove(inkBounds(named).height, inkBounds(unnamed).height);
+			assertInkHasPadding(named);
+			// A name of wide glyphs is measured, not estimated, so it is not cut off.
+			assertInkHasPadding(yield* renderer.renderPng({ excalidraw: framed("W".repeat(50)) }));
+		}),
+	);
+
 	it.effect("fails instead of silently dropping unsupported glyphs", () =>
 		Effect.gen(function* () {
 			const builder = yield* DiagramBuilder;

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
 	candidateRouteQuality,
 	getCanvasValidationIssues,
+	groupFixtures,
+	groupRegionIssues,
 	labelFixtures,
 	parseCanonicalDiagram,
 	parseFlowchartDiagram,
@@ -698,4 +700,154 @@ describe("routing fuzz", () => {
 			60_000,
 		);
 	});
+});
+
+const GROUP_LABELS = [
+	"Finance",
+	"QA",
+	"Private subnet",
+	"Customer support desk",
+	"Legal and compliance review board",
+	"WWW NETWORK OPERATIONS AND WEB WORKERS",
+];
+
+/**
+ * The random flowcharts above with groups: one to four per flowchart, holding
+ * runs of steps in flow order or, in about a third, steps scattered through the
+ * flow, with about a quarter of the steps left ungrouped.
+ */
+function randomGroupedFlowcharts(count: number, start: number) {
+	let seed = start;
+	const random = () => {
+		seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+		return seed / 2_147_483_648;
+	};
+	return randomFlowcharts(count, start).map((spec) => {
+		const groupCount = 1 + Math.floor(random() * 4);
+		const scattered = random() < 0.3;
+		const membership = spec.nodes.map((_, index) =>
+			random() < 0.25
+				? undefined
+				: scattered
+					? Math.floor(random() * groupCount)
+					: Math.min(groupCount - 1, Math.floor((index / spec.nodes.length) * groupCount)),
+		);
+		return {
+			...spec,
+			groups: Array.from({ length: groupCount }, (_, group) => ({
+				id: `g${group}`,
+				label: GROUP_LABELS[Math.floor(random() * GROUP_LABELS.length)]!,
+			})).filter((_, group) => membership.includes(group)),
+			nodes: spec.nodes.map((node, index) =>
+				membership[index] === undefined ? node : { ...node, group: `g${membership[index]}` },
+			),
+		};
+	});
+}
+
+/**
+ * Crossings and reader-scale findings ("crossings/findings") the grouped
+ * layout draws for each grouped flowchart, in order, when groups were added.
+ * No grouped flowchart may draw more of either.
+ */
+const GROUPED_ROUTING: Readonly<Record<"TB" | "BT" | "LR" | "RL", string>> = {
+	TB: "11/0 1/0 4/0 23/6 11/2 3/3 2/0 9/0 54/14 2/1 22/13 118/37 9/1 116/44 26/6 18/1 13/0 18/11 7/1 23/7 65/21 84/22 23/4 0/0 65/15 50/8 10/3 56/8 51/6 0/0",
+	BT: "10/1 1/0 5/0 15/4 3/2 6/2 3/0 9/0 52/22 0/0 23/15 123/46 9/1 110/44 24/8 19/1 8/2 20/6 6/5 26/7 85/22 76/23 19/0 0/0 69/17 52/8 6/1 57/11 63/14 3/0",
+	LR: "8/4 1/0 2/0 25/6 9/5 5/3 2/0 6/6 66/20 3/1 25/8 114/42 8/1 105/100 27/3 13/4 4/2 18/10 8/2 19/12 44/7 84/29 22/1 0/0 80/36 48/56 6/0 44/12 54/16 1/1",
+	RL: "7/3 1/0 3/5 31/9 10/5 7/4 3/0 6/4 66/23 1/1 23/8 128/47 9/3 107/103 34/4 18/4 4/2 18/10 11/4 23/13 51/4 85/25 19/4 0/0 79/34 72/13 9/4 44/15 63/23 1/1",
+};
+
+describe("grouped routing fuzz", () => {
+	// 30 grouped flowcharts x 4 directions, each rendered once. Every export is valid, each group's
+	// frame holds exactly its members and stays apart from the others, no edge
+	// passes through a group it does not belong to or runs along a frame, a
+	// group's own edges stay inside it, and group names stay clear of edges and
+	// labels. Branch labels on these dense random graphs are judged as the label
+	// fuzz judges ungrouped ones; grouped, they draw no more defects in total.
+	const flowcharts = randomGroupedFlowcharts(30, 20261020);
+	const scenes = new Map<string, ReturnType<typeof renderIntermediateDiagram>[]>();
+	const rendered = (direction: "TB" | "BT" | "LR" | "RL") => {
+		if (!scenes.has(direction))
+			scenes.set(
+				direction,
+				flowcharts.map((spec) =>
+					renderIntermediateDiagram(
+						parseFlowchartDiagram({
+							...spec,
+							type: "flowchart",
+							layout: { direction, edgeRouting: "orthogonal" },
+						}),
+					),
+				),
+			);
+		return scenes.get(direction)!;
+	};
+
+	describe.each(["TB", "BT", "LR", "RL"] as const)("%s", (direction) => {
+		it("exports every grouped flowchart with its groups whole, apart and clear", () => {
+			const failures = flowcharts.flatMap((spec, index) => {
+				const scene = rendered(direction)[index]!;
+				const exported = convertSceneToExcalidraw(scene);
+				const members = new Map<string, string>(
+					spec.nodes.flatMap((node) =>
+						"group" in node ? [[`node:${node.id}`, `group:${node.group}`] as const] : [],
+					),
+				);
+				return [
+					...validateExcalidrawScene(exported).issues.map((issue) => issue.message),
+					...groupRegionIssues(scene).map((issue) => issue.message),
+					...getCanvasValidationIssues(scene).map((issue) => issue.message),
+					...exported.elements
+						.filter(
+							(element) =>
+								element.type === "ellipse" ||
+								element.type === "rectangle" ||
+								element.type === "diamond",
+						)
+						.flatMap((element) =>
+							(members.get(element.id) ?? null) === element.frameId
+								? []
+								: [`${element.id} in frame ${String(element.frameId)}`],
+						),
+				].map((failure) => `${index}: ${failure}`);
+			});
+			expect(failures).toEqual([]);
+		}, 60_000);
+
+		it("draws no grouped flowchart with more crossings or reader-scale findings than when groups were added", () => {
+			const counts = rendered(direction).map((scene) => routingCounts(scene));
+			const pinned = GROUPED_ROUTING[direction]
+				.split(" ")
+				.map((pair) => pair.split("/").map(Number));
+			expect(
+				counts.flatMap(({ crossings, findings }, index) => {
+					const [pinnedCrossings, pinnedFindings] = pinned[index] ?? [];
+					return crossings > pinnedCrossings! || findings > pinnedFindings!
+						? [`${index}: ${pinnedCrossings}/${pinnedFindings} -> ${crossings}/${findings}`]
+						: [];
+				}),
+			).toEqual([]);
+		}, 60_000);
+	});
+
+	it.each(Object.keys(groupFixtures) as (keyof typeof groupFixtures)[])(
+		"exports the %s fixture with its groups whole, apart and clear",
+		(name) => {
+			for (const direction of ["TB", "BT", "LR", "RL"] as const) {
+				const scene = renderIntermediateDiagram({
+					...groupFixtures[name],
+					layout: { direction, edgeRouting: "orthogonal" },
+				});
+				const exported = convertSceneToExcalidraw(scene);
+				const authored = new Map(
+					groupFixtures[name].nodes.map((node) => [`node:${node.id}`, node.label]),
+				);
+				expect([
+					...validateExcalidrawScene(exported).issues,
+					...groupRegionIssues(scene),
+					...labelDefects(exported.elements, authored),
+				]).toEqual([]);
+			}
+		},
+	);
 });

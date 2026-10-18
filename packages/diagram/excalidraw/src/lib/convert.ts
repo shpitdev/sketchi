@@ -1011,6 +1011,11 @@ function arrowSegmentsThroughShapes(
 ): ExcalidrawSceneValidationIssue[] {
 	const segments = elements.filter((element) => element.type === "arrow").flatMap(arrowSegments);
 	const shapes = elements.filter(isBindableShape);
+	const frameOf = new Map(
+		elements.flatMap((element) =>
+			typeof element.frameId === "string" ? [[element.id, element.frameId] as const] : [],
+		),
+	);
 	const issues: ExcalidrawSceneValidationIssue[] = [];
 	const seen = new Set<string>();
 
@@ -1019,7 +1024,8 @@ function arrowSegmentsThroughShapes(
 			if (
 				isSequenceStructureShape(shape) ||
 				shape.id === segment.startBindingId ||
-				shape.id === segment.endBindingId
+				shape.id === segment.endBindingId ||
+				containsArrowEnd(shape, segment, frameOf)
 			) {
 				continue;
 			}
@@ -1044,6 +1050,23 @@ function arrowSegmentsThroughShapes(
 	}
 
 	return issues;
+}
+
+/**
+ * A frame holds an arrow that belongs to it or is bound to one of its children:
+ * that arrow has to cross into the frame. Every other frame stays an obstacle.
+ */
+function containsArrowEnd(
+	shape: ExcalidrawElement,
+	segment: ArrowSegment,
+	frameOf: ReadonlyMap<string, string>,
+): boolean {
+	return (
+		shape.type === "frame" &&
+		[segment.arrowId, segment.startBindingId, segment.endBindingId].some(
+			(id) => id !== null && frameOf.get(id) === shape.id,
+		)
+	);
 }
 
 /** Messages may cross other participants' lifelines and activation bars. */

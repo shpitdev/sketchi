@@ -17,6 +17,11 @@ declare const __SKETCHI_EXCALIFONT_BASE64__: ReadonlyArray<string>;
 declare const __SKETCHI_RESVG_WASM_BASE64__: string;
 
 const TITLE_FONT_SIZE = 24;
+/** Excalidraw's frame name style (FRAME_STYLE): 14 px, 1.25 line height, 3 px above the frame. */
+const FRAME_NAME_FONT_SIZE = 14;
+const FRAME_NAME_LINE_HEIGHT = 1.25;
+const FRAME_NAME_OFFSET = 3;
+const FRAME_NAME_COLOR = "#999999";
 const TITLE_HEIGHT = 64;
 const TITLE_HORIZONTAL_PADDING = 20;
 const TITLE_VERTICAL_PADDING = 16;
@@ -239,26 +244,27 @@ const fontOptions: ResvgRenderOptions = {
 	textRendering: 2,
 };
 
-function measureTitleWidth(title: string): number {
-	const measurementWidth = Math.max(1, [...title].length * TITLE_FONT_SIZE * 2);
+/** Painted width of one line of Excalifont text, as resvg draws it. */
+function measureTextWidth(value: string, fontSize: number): number {
+	const measurementWidth = Math.max(1, [...value].length * fontSize * 2);
 	const measurement = document.createElementNS(SVG_NAMESPACE, "svg");
 	measurement.setAttribute("xmlns", SVG_NAMESPACE);
 	measurement.setAttribute("width", String(measurementWidth));
-	measurement.setAttribute("height", String(TITLE_HEIGHT));
+	measurement.setAttribute("height", String(fontSize * 3));
 	const text = document.createElementNS(SVG_NAMESPACE, "text");
 	text.setAttribute("x", String(measurementWidth / 2));
-	text.setAttribute("y", String(TITLE_FONT_SIZE + TITLE_VERTICAL_PADDING));
+	text.setAttribute("y", String(fontSize * 2));
 	text.setAttribute("font-family", "Excalifont");
-	text.setAttribute("font-size", String(TITLE_FONT_SIZE));
+	text.setAttribute("font-size", String(fontSize));
 	text.setAttribute("font-weight", "normal");
 	text.setAttribute("text-anchor", "middle");
-	text.textContent = title;
+	text.textContent = value;
 	measurement.appendChild(text);
 
 	const rasterizer = new Resvg(measurement.outerHTML, fontOptions);
 	try {
 		const bounds = rasterizer.getBBox();
-		if (!bounds) throw new Error("Unable to measure the title bounds.");
+		if (!bounds) throw new Error("Unable to measure the text bounds.");
 		try {
 			return bounds.width;
 		} finally {
@@ -267,6 +273,10 @@ function measureTitleWidth(title: string): number {
 	} finally {
 		rasterizer.free();
 	}
+}
+
+function measureTitleWidth(title: string): number {
+	return measureTextWidth(title, TITLE_FONT_SIZE);
 }
 
 function addTitle(svg: SVGSVGElement, title: string, backgroundColor: string): void {
@@ -310,6 +320,66 @@ function addTitle(svg: SVGSVGElement, title: string, backgroundColor: string): v
 	const firstGraphic = [...svg.children].find((child) => child.tagName.toLowerCase() !== "defs");
 	svg.insertBefore(background, firstGraphic ?? null);
 	svg.appendChild(text);
+}
+
+type ExcalidrawJsonElement = { readonly [key: string]: unknown };
+
+/**
+ * Excalidraw measures each frame's name when it exports, which the headless
+ * DOM refuses. Draw the names as stored text where Excalidraw paints them,
+ * above each frame's top-left corner, sized to their measured width so the
+ * export holds them whole, and turn Excalidraw's own frame names off.
+ */
+function withFrameNames(elements: readonly ExcalidrawJsonElement[]): ExcalidrawJsonElement[] {
+	const names = elements.flatMap((element): ExcalidrawJsonElement[] => {
+		if (element["type"] !== "frame" || element["isDeleted"] === true) return [];
+		const name = typeof element["name"] === "string" ? element["name"] : "Frame";
+		const x = Number(element["x"]);
+		const y = Number(element["y"]);
+		if (!Number.isFinite(x) || !Number.isFinite(y) || name === "") return [];
+		const height = FRAME_NAME_FONT_SIZE * FRAME_NAME_LINE_HEIGHT;
+		const id = `${String(element["id"])}:name`;
+		return [
+			{
+				id,
+				type: "text",
+				x,
+				y: y - FRAME_NAME_OFFSET - height,
+				width: Math.ceil(measureTextWidth(name, FRAME_NAME_FONT_SIZE)),
+				height,
+				angle: 0,
+				strokeColor: FRAME_NAME_COLOR,
+				backgroundColor: "transparent",
+				fillStyle: "solid",
+				strokeWidth: 1,
+				strokeStyle: "solid",
+				roughness: 0,
+				opacity: 100,
+				groupIds: [],
+				frameId: null,
+				index: null,
+				roundness: null,
+				seed: 1,
+				version: 1,
+				versionNonce: 1,
+				isDeleted: false,
+				boundElements: null,
+				updated: 1,
+				link: null,
+				locked: true,
+				text: name,
+				originalText: name,
+				fontSize: FRAME_NAME_FONT_SIZE,
+				fontFamily: 5,
+				textAlign: "left",
+				verticalAlign: "top",
+				containerId: null,
+				autoResize: true,
+				lineHeight: FRAME_NAME_LINE_HEIGHT,
+			},
+		];
+	});
+	return [...elements, ...names];
 }
 
 let resvgInitialization: Promise<void> | undefined;
@@ -369,6 +439,9 @@ export async function renderPngBytes(input: PngRenderInput): Promise<Uint8Array>
 		...decodedExcalidraw.success.elements.flatMap((element) =>
 			"text" in element && typeof element["text"] === "string" ? [element["text"]] : [],
 		),
+		...decodedExcalidraw.success.elements.flatMap((element) =>
+			element["type"] === "frame" && typeof element["name"] === "string" ? [element["name"]] : [],
+		),
 	];
 	for (const text of textValues) {
 		const unsupported = unsupportedGlyph(text);
@@ -388,9 +461,15 @@ export async function renderPngBytes(input: PngRenderInput): Promise<Uint8Array>
 		initializeResvg(),
 	]);
 	const restored = await loadFromBlob(
-		new Blob([JSON.stringify(decodedExcalidraw.success)], {
-			type: MIME_TYPES.excalidraw,
-		}),
+		new Blob(
+			[
+				JSON.stringify({
+					...decodedExcalidraw.success,
+					elements: withFrameNames(decodedExcalidraw.success.elements),
+				}),
+			],
+			{ type: MIME_TYPES.excalidraw },
+		),
 		null,
 		null,
 	);
@@ -398,6 +477,7 @@ export async function renderPngBytes(input: PngRenderInput): Promise<Uint8Array>
 		elements: withSelectorSafeImageIds(restored.elements),
 		appState: {
 			...restored.appState,
+			frameRendering: { enabled: true, clip: true, name: false, outline: true },
 			exportBackground: true,
 			exportEmbedScene: false,
 			exportScale: 1,
