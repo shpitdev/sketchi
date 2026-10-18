@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.14.1
+
+### Patch Changes
+
+- [#420](https://github.com/shpitdev/sketchi/pull/420) [`7672606`](https://github.com/shpitdev/sketchi/commit/7672606b227fba4e274c117d9de5e05da63124a2) Thanks [@anandpant](https://github.com/anandpant)! - Render PNGs of drawings that contain frames: each frame's name is painted above it instead of failing the offline export.
+
 ## 0.14.0
 
 ### Minor Changes
