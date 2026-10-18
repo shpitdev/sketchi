@@ -50,6 +50,8 @@ const MIN_NODE_HEIGHT = 72;
 const HORIZONTAL_GAP = 112;
 const VERTICAL_GAP = 96;
 const PADDING = 48;
+/** Sketchi PNG export padding per side (browser-renderer EXPORT_PADDING). */
+const EXPORT_PADDING = 20;
 const NODE_LABEL_FONT_SIZE = 14;
 const NODE_LABEL_LINE_HEIGHT = 1.35;
 const NODE_LABEL_HORIZONTAL_PADDING = 36;
@@ -78,6 +80,8 @@ type ConnectionEdge = "top" | "right" | "bottom" | "left";
 interface RoutedEdge {
 	edge: DiagramEdge;
 	index: number;
+	/** A wrap continuation's lane between its bands, across the flow. */
+	lane?: number;
 	source: NodeSceneElement;
 	sourceEdge: ConnectionEdge;
 	target: NodeSceneElement;
@@ -354,6 +358,7 @@ function orderedRankShapes(
 	rankByNodeId: ReadonlyMap<string, number>,
 	buckets: EdgeBuckets,
 	feedbackEdges: ReadonlySet<string>,
+	reorder = false,
 ): Map<number, NodeSceneElement[]> {
 	const nodeOrder = nodeOrderMap(diagram.nodes);
 	const rankedShapes = new Map<number, NodeSceneElement[]>();
@@ -424,14 +429,187 @@ function orderedRankShapes(
 		}
 	}
 
-	return rankedShapes;
+	return reorder
+		? reduceRankCrossings(rankedShapes, diagram, rankByNodeId, feedbackEdges)
+		: rankedShapes;
 }
 
-function positionNodes(
+/** Sweeps of barycentric reordering and adjacent swaps between rank layers. */
+const CROSSING_SWEEPS = 8;
+/**
+ * Crossing repairs (reordered ranks, moved arrivals) each route the diagram once
+ * more; denser diagrams keep a single routing pass.
+ */
+const CROSSING_REPAIR_MAX_EDGES = 24;
+/** Reduced rank orders by diagram; they depend on the graph, not on node sizes. */
+const reducedOrders = new WeakMap<IntermediateDiagram, ReadonlyMap<number, readonly string[]>>();
+
+/**
+ * Reorder ranks where that removes crossings the barycenter pass leaves: loops
+ * count as forward edges, and an edge that skips ranks counts at every rank it
+ * passes. A layout changes only when the layered crossings strictly drop.
+ */
+function reduceRankCrossings(
+	rankedShapes: Map<number, NodeSceneElement[]>,
 	diagram: IntermediateDiagram,
-	minimumSizes: ReadonlyMap<string, { width: number; height: number }> = new Map(),
-	stubReach: ReadonlyMap<string, number> = new Map(),
-): NodeSceneElement[] {
+	rankByNodeId: ReadonlyMap<string, number>,
+	feedbackEdges: ReadonlySet<string>,
+): Map<number, NodeSceneElement[]> {
+	let reduced = reducedOrders.get(diagram);
+	if (!reduced) {
+		reduced = reducedRankOrder(
+			new Map(
+				[...rankedShapes].map(([rank, shapes]) => [rank, shapes.map((shape) => shape.nodeId)]),
+			),
+			diagram,
+			rankByNodeId,
+			feedbackEdges,
+		);
+		reducedOrders.set(diagram, reduced);
+	}
+	const shapes = new Map([...rankedShapes.values()].flat().map((shape) => [shape.nodeId, shape]));
+	return new Map(
+		[...rankedShapes.keys()].map((rank) => [
+			rank,
+			(reduced.get(rank) ?? []).flatMap((id) => (shapes.has(id) ? [shapes.get(id)!] : [])),
+		]),
+	);
+}
+
+function reducedRankOrder(
+	order: Map<number, string[]>,
+	diagram: IntermediateDiagram,
+	rankByNodeId: ReadonlyMap<string, number>,
+	feedbackEdges: ReadonlySet<string>,
+): ReadonlyMap<number, readonly string[]> {
+	// Links between consecutive ranks, keyed by the upper rank. Virtual nodes carry
+	// skipping edges through the ranks between their ends.
+	const links = new Map<number, (readonly [string, string])[]>();
+	const virtual = new Set<string>();
+	const link = (upper: string, lower: string, rank: number) =>
+		links.set(rank, [...(links.get(rank) ?? []), [upper, lower]]);
+	for (const edge of diagram.edges) {
+		const [from, to] = feedbackEdges.has(edge.id)
+			? [edge.target, edge.source]
+			: [edge.source, edge.target];
+		const [upper, lower] =
+			(rankByNodeId.get(from) ?? 0) <= (rankByNodeId.get(to) ?? 0) ? [from, to] : [to, from];
+		const top = rankByNodeId.get(upper) ?? 0;
+		const bottom = rankByNodeId.get(lower) ?? 0;
+		if (top === bottom) continue;
+		let previous = upper;
+		for (let rank = top + 1; rank < bottom; rank += 1) {
+			// A virtual node starts under its upper neighbor's relative position.
+			const id = `\u0000${edge.id}\u0000${rank}`;
+			virtual.add(id);
+			const above = order.get(rank - 1)!;
+			const ids = order.get(rank)!;
+			ids.splice(Math.round(((above.indexOf(previous) + 0.5) / above.length) * ids.length), 0, id);
+			link(previous, id, rank - 1);
+			previous = id;
+		}
+		link(previous, lower, bottom - 1);
+	}
+	const position = new Map<string, number>();
+	const place = (rank: number) => order.get(rank)?.forEach((id, index) => position.set(id, index));
+	const ranks = [...order.keys()].sort((a, b) => a - b);
+	ranks.forEach(place);
+	const between = (rank: number) => {
+		const pairs = links.get(rank) ?? [];
+		let crossings = 0;
+		for (const [index, [upper, lower]] of pairs.entries())
+			for (const [otherUpper, otherLower] of pairs.slice(index + 1))
+				if (
+					(position.get(upper)! - position.get(otherUpper)!) *
+						(position.get(lower)! - position.get(otherLower)!) <
+					0
+				)
+					crossings += 1;
+		return crossings;
+	};
+	const total = () => ranks.reduce((sum, rank) => sum + between(rank), 0);
+	const initial = total();
+	const real = () =>
+		new Map([...order].map(([rank, ids]) => [rank, ids.filter((id) => !virtual.has(id))]));
+	const plain = real();
+	if (initial === 0) return plain;
+
+	const neighbors = new Map<string, { above: string[]; below: string[] }>();
+	for (const pairs of links.values())
+		for (const [upper, lower] of pairs) {
+			const up = neighbors.get(upper) ?? { above: [], below: [] };
+			up.below.push(lower);
+			neighbors.set(upper, up);
+			const down = neighbors.get(lower) ?? { above: [], below: [] };
+			down.above.push(upper);
+			neighbors.set(lower, down);
+		}
+	let best = { crossings: initial, order: plain };
+	for (let sweep = 0; sweep < CROSSING_SWEEPS && best.crossings > 0; sweep += 1) {
+		const downward = sweep % 2 === 0;
+		for (const rank of downward ? ranks.slice(1) : ranks.slice(0, -1).reverse()) {
+			const ids = order.get(rank)!;
+			const key = new Map(
+				ids.map((id, index) => {
+					const around = (downward ? neighbors.get(id)?.above : neighbors.get(id)?.below) ?? [];
+					return [
+						id,
+						around.length > 0
+							? around.reduce((sum, other) => sum + position.get(other)!, 0) / around.length
+							: index,
+					];
+				}),
+			);
+			ids.sort((a, b) => key.get(a)! - key.get(b)!);
+			place(rank);
+		}
+		// Swap neighbors in a rank while that removes crossings with the ranks beside it.
+		for (let improved = true; improved;) {
+			improved = false;
+			for (const rank of ranks) {
+				const ids = order.get(rank)!;
+				for (let index = 0; index + 1 < ids.length; index += 1) {
+					const before = between(rank - 1) + between(rank);
+					[ids[index], ids[index + 1]] = [ids[index + 1]!, ids[index]!];
+					place(rank);
+					if (between(rank - 1) + between(rank) < before) improved = true;
+					else {
+						[ids[index], ids[index + 1]] = [ids[index + 1]!, ids[index]!];
+						place(rank);
+					}
+				}
+			}
+		}
+		const crossings = total();
+		if (crossings < best.crossings) best = { crossings, order: real() };
+	}
+	return best.order;
+}
+
+interface RankMetric {
+	readonly breadth: number;
+	readonly depth: number;
+	readonly rank: number;
+	readonly shapes: readonly NodeSceneElement[];
+}
+
+const FORWARD_SIDE: Readonly<Record<IntermediateDiagram["layout"]["direction"], ConnectionEdge>> = {
+	TB: "bottom",
+	BT: "top",
+	LR: "right",
+	RL: "left",
+};
+
+/**
+ * Ranks in flow order, each with its nodes ordered across the rank, its breadth
+ * across the flow, its depth along it and the gap that follows it.
+ */
+function rankLayout(
+	diagram: IntermediateDiagram,
+	minimumSizes: ReadonlyMap<string, { width: number; height: number }>,
+	stubReach: ReadonlyMap<string, number>,
+	reorder = false,
+) {
 	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
 	// Neighbors in a rank keep room for the stubs on their facing sides, so a long
 	// labeled stub never reaches the next node or meets its stub head-on.
@@ -489,9 +667,10 @@ function positionNodes(
 		rankByNodeId,
 		buckets,
 		feedbackEdges,
+		reorder,
 	);
 	const ranks = Array.from(rankedShapes.entries()).sort(([left], [right]) => left - right);
-	const rankMetrics = ranks.map(([rank, shapes]) => {
+	const rankMetrics: RankMetric[] = ranks.map(([rank, shapes]) => {
 		const breadth = shapes.reduce(
 			(sum, shape, index) =>
 				sum +
@@ -503,44 +682,12 @@ function positionNodes(
 
 		return { breadth, depth, rank, shapes };
 	});
-	const maxBreadth = Math.max(...rankMetrics.map((metric) => metric.breadth));
-	let rankOffset = PADDING;
-	const positioned: NodeSceneElement[] = [];
 
 	// Consecutive ranks keep room for the stubs on the sides that face each other.
-	const forwardSide: ConnectionEdge =
-		diagram.layout.direction === "TB"
-			? "bottom"
-			: diagram.layout.direction === "BT"
-				? "top"
-				: diagram.layout.direction === "LR"
-					? "right"
-					: "left";
+	const forwardSide = FORWARD_SIDE[diagram.layout.direction];
 	const reachOf = (shapes: readonly NodeSceneElement[], side: ConnectionEdge) =>
 		Math.max(0, ...shapes.map((shape) => stubReach.get(portKey(shape.nodeId, side)) ?? 0));
-	for (const [rankIndex, metric] of rankMetrics.entries()) {
-		let breadthOffset = PADDING + Math.max(0, maxBreadth - metric.breadth) / 2;
-
-		for (const [index, shape] of metric.shapes.entries()) {
-			const next = metric.shapes[index + 1];
-			const gap = next ? gapBetween(shape, next) : 0;
-			if (vertical) {
-				positioned.push({
-					...shape,
-					x: breadthOffset,
-					y: rankOffset + Math.max(0, metric.depth - shape.height) / 2,
-				});
-				breadthOffset += shape.width + gap;
-			} else {
-				positioned.push({
-					...shape,
-					x: rankOffset + Math.max(0, metric.depth - shape.width) / 2,
-					y: breadthOffset,
-				});
-				breadthOffset += shape.height + gap;
-			}
-		}
-
+	const gapAfter = rankMetrics.map((metric, rankIndex) => {
 		// Horizontal labels lengthen the departure stub. Reserve room for the
 		// opposing arrival stub and a routing lane instead of forcing them to overlap.
 		const labelGap = vertical
@@ -568,7 +715,272 @@ function positionNodes(
 					reachOf(next.shapes, OPPOSITE_EDGE[forwardSide]) +
 					PORT_SPACING
 				: 0;
-		rankOffset += metric.depth + Math.max(VERTICAL_GAP, labelGap, stubGap);
+		return Math.max(VERTICAL_GAP, labelGap, stubGap);
+	});
+
+	return {
+		feedbackEdges,
+		gapAfter,
+		gapBetween,
+		highSide,
+		lowSide,
+		rankByNodeId,
+		rankMetrics,
+		reachOf,
+		vertical,
+	};
+}
+
+/**
+ * Where a long flow wraps into further rows (LR and RL) or columns (TB and BT).
+ * Bands are runs of whole ranks; each reads in the requested direction, and one
+ * continuation edge carries the flow from a band's last rank to the next band.
+ */
+interface Wrap {
+	readonly bandOf: ReadonlyMap<string, number>;
+	readonly continuations: ReadonlySet<string>;
+}
+
+const NO_WRAP: Wrap = { bandOf: new Map(), continuations: new Set() };
+/** Shorter flows never wrap; each band keeps at least two ranks. */
+const WRAP_MIN_RANKS = 5;
+/** A flow wraps when it runs at least this many times longer than it is broad... */
+const WRAP_EXTREME_ASPECT = 4;
+/**
+ * ...or about 2.5 times once fitting it to a 2000 px screen would shrink its
+ * text: a row below about 24 px. A column reads naturally top to bottom, so it
+ * wraps short of 4:1 only once its text would fall below 14 px...
+ */
+const WRAP_ASPECT = 2.45;
+const WRAP_MIN_LENGTH = 1200;
+const FITTED_LONG_SIDE = 2000;
+const WRAP_MIN_COLUMN_TEXT = 14;
+/** ...into the fewest bands that bring it within this, if any do. */
+const WRAP_TARGET_ASPECT = 2;
+const MAX_BANDS = 6;
+/** Bands sit farther apart than ranks so each reads as its own row or column. */
+const BAND_GAP = 144;
+
+/**
+ * Whole-layout choices, each kept only if it routes no worse than the layout
+ * without it. With all of them off, the layout is the polished router's alone.
+ */
+interface Arrangement {
+	/**
+	 * Order arrivals on a side by where each route leaves its source, and move an
+	 * arrival crossed on its final approach to the side it comes from.
+	 */
+	readonly crossingRepair: boolean;
+	/** Reorder ranks to remove the layered crossings the barycenter pass leaves. */
+	readonly reorder: boolean;
+	readonly wrap: Wrap;
+}
+
+const PLAIN_ARRANGEMENT: Arrangement = { crossingRepair: false, reorder: false, wrap: NO_WRAP };
+
+/** Whether reordering ranks for fewer layered crossings changes this diagram's order. */
+function reordersRanks(diagram: IntermediateDiagram): boolean {
+	const [plain, reordered] = [false, true].map((reorder) =>
+		rankLayout(diagram, new Map(), new Map(), reorder)
+			.rankMetrics.map((metric) => metric.shapes.map((shape) => shape.nodeId).join("\n"))
+			.join("\n\n"),
+	);
+	return plain !== reordered;
+}
+
+/** Width over height, either way up, of content this size in a padded export. */
+function exportAspect(along: number, across: number): number {
+	const [long, short] = along > across ? [along, across] : [across, along];
+	return (long + 2 * EXPORT_PADDING) / (short + 2 * EXPORT_PADDING);
+}
+
+/**
+ * Bands for a flow whose single row or column is too long for its breadth,
+ * cutting only where exactly one forward edge joins a rank to the next. No loop
+ * or skipping edge spans a cut, so each band holds whole branches and the next
+ * band starts at a single node. Orthogonal routing only: a straight continuation
+ * would cut through the band it skips back across.
+ */
+function planWrap(diagram: IntermediateDiagram, reorder: boolean): Wrap {
+	if (diagram.layout.edgeRouting !== "orthogonal") return NO_WRAP;
+	const { feedbackEdges, gapAfter, rankByNodeId, rankMetrics } = rankLayout(
+		diagram,
+		new Map(),
+		new Map(),
+		reorder,
+	);
+	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
+	const flow = (from: number, to: number) =>
+		rankMetrics.slice(from, to + 1).reduce((sum, metric) => sum + metric.depth, 0) +
+		gapAfter.slice(from, to).reduce((sum, gap) => sum + gap, 0);
+	const breadth = (from: number, to: number) =>
+		Math.max(...rankMetrics.slice(from, to + 1).map((metric) => metric.breadth));
+	const last = rankMetrics.length - 1;
+	const natural = exportAspect(flow(0, last), breadth(0, last));
+	if (rankMetrics.length < WRAP_MIN_RANKS || flow(0, last) <= breadth(0, last)) return NO_WRAP;
+
+	const nodeKinds = new Map(diagram.nodes.map((node) => [node.id, node.kind]));
+	const rankOf = (nodeId: string) => rankByNodeId.get(nodeId) ?? 0;
+	const continuationAfter = new Map<number, string>();
+	for (const [index, metric] of rankMetrics.entries()) {
+		const spanning = diagram.edges.filter(
+			(edge) =>
+				Math.min(rankOf(edge.source), rankOf(edge.target)) <= metric.rank &&
+				Math.max(rankOf(edge.source), rankOf(edge.target)) > metric.rank,
+		);
+		const [edge] = spanning;
+		if (
+			spanning.length === 1 &&
+			edge &&
+			!feedbackEdges.has(edge.id) &&
+			rankOf(edge.source) === metric.rank &&
+			rankOf(edge.target) === metric.rank + 1 &&
+			nodeKinds.get(edge.source) !== "decision"
+		)
+			continuationAfter.set(index, edge.id);
+	}
+
+	// A band also holds the stubs of the continuations into and out of it.
+	const edgeLabels = new Map(diagram.edges.map((edge) => [edge.id, edge.label]));
+	const bandLength = (from: number, to: number) => {
+		const label = edgeLabels.get(continuationAfter.get(to) ?? "");
+		const metrics = label ? branchLabelMetrics(label) : undefined;
+		const departure =
+			to === last
+				? 0
+				: Math.max(
+						ROUTE_STUB_LENGTH,
+						metrics ? (vertical ? Math.max(40, metrics.height + 24) : metrics.width + 16) : 0,
+					);
+		return flow(from, to) + (from > 0 ? ROUTE_STUB_LENGTH : 0) + departure;
+	};
+
+	// Band ends: a clean cut or the last rank. Each band keeps at least two ranks.
+	const ends = [...continuationAfter.keys(), last].sort((a, b) => a - b);
+	let chosen: { aspect: number; ends: readonly number[] } | undefined;
+	for (let bands = 2; bands <= Math.min(MAX_BANDS, ends.length); bands += 1) {
+		// Balance band lengths: the shortest longest band, then the least sum of squares.
+		type Partition = { ends: number[]; longest: number; squares: number };
+		let partitions = new Map<number, Partition>();
+		for (const end of ends)
+			if (end >= 1 && end < last)
+				partitions.set(end, {
+					ends: [end],
+					longest: bandLength(0, end),
+					squares: bandLength(0, end) ** 2,
+				});
+		for (let band = 2; band <= bands; band += 1) {
+			const next = new Map<number, Partition>();
+			for (const end of ends) {
+				if (band === bands ? end !== last : end === last) continue;
+				for (const [previous, partition] of [...partitions].reverse()) {
+					if (end < previous + 2) continue;
+					const length = bandLength(previous + 1, end);
+					const candidate = {
+						ends: [...partition.ends, end],
+						longest: Math.max(partition.longest, length),
+						squares: partition.squares + length ** 2,
+					};
+					const best = next.get(end);
+					if (
+						!best ||
+						candidate.longest < best.longest ||
+						(candidate.longest === best.longest && candidate.squares < best.squares)
+					)
+						next.set(end, candidate);
+				}
+			}
+			partitions = next;
+		}
+		const partition = partitions.get(last);
+		if (!partition) continue;
+		const starts = [0, ...partition.ends.slice(0, -1).map((end) => end + 1)];
+		const across =
+			starts.reduce((sum, start, band) => sum + breadth(start, partition.ends[band]!), 0) +
+			(bands - 1) * BAND_GAP;
+		const aspect = exportAspect(partition.longest, across);
+		if (!chosen || aspect < chosen.aspect) chosen = { aspect, ends: partition.ends };
+		if (aspect <= WRAP_TARGET_ASPECT) break;
+	}
+	if (!chosen || chosen.aspect >= natural) return NO_WRAP;
+
+	const bandOf = new Map<string, number>();
+	let band = 0;
+	for (const [index, metric] of rankMetrics.entries()) {
+		for (const shape of metric.shapes) bandOf.set(shape.nodeId, band);
+		if (chosen.ends.includes(index) && index !== last) band += 1;
+	}
+	return {
+		bandOf,
+		continuations: new Set(
+			chosen.ends.filter((end) => end !== last).map((end) => continuationAfter.get(end)!),
+		),
+	};
+}
+
+function positionNodes(
+	diagram: IntermediateDiagram,
+	minimumSizes: ReadonlyMap<string, { width: number; height: number }> = new Map(),
+	stubReach: ReadonlyMap<string, number> = new Map(),
+	{ reorder, wrap }: Arrangement = PLAIN_ARRANGEMENT,
+): NodeSceneElement[] {
+	const { gapAfter, gapBetween, highSide, lowSide, rankMetrics, reachOf, vertical } = rankLayout(
+		diagram,
+		minimumSizes,
+		stubReach,
+		reorder,
+	);
+	const bands: { index: number; metric: RankMetric }[][] = [];
+	for (const [index, metric] of rankMetrics.entries()) {
+		const band = wrap.bandOf.get(metric.shapes[0]!.nodeId) ?? 0;
+		(bands[band] ??= []).push({ index, metric });
+	}
+	const positioned: NodeSceneElement[] = [];
+	let bandOffset = PADDING;
+	for (const [bandIndex, band] of bands.entries()) {
+		const bandBreadth = Math.max(...band.map(({ metric }) => metric.breadth));
+		let rankOffset = PADDING;
+		for (const { index, metric } of band) {
+			let breadthOffset = bandOffset + Math.max(0, bandBreadth - metric.breadth) / 2;
+
+			for (const [shapeIndex, shape] of metric.shapes.entries()) {
+				const next = metric.shapes[shapeIndex + 1];
+				if (vertical) {
+					positioned.push({
+						...shape,
+						x: breadthOffset,
+						y: rankOffset + Math.max(0, metric.depth - shape.height) / 2,
+					});
+					breadthOffset += shape.width;
+				} else {
+					positioned.push({
+						...shape,
+						x: rankOffset + Math.max(0, metric.depth - shape.width) / 2,
+						y: breadthOffset,
+					});
+					breadthOffset += shape.height;
+				}
+				if (next) breadthOffset += gapBetween(shape, next);
+			}
+			rankOffset += metric.depth + gapAfter[index]!;
+		}
+		// The next band leaves a lane for the continuation clear of both bands' stubs.
+		const next = bands[bandIndex + 1];
+		if (next)
+			bandOffset +=
+				bandBreadth +
+				Math.max(
+					BAND_GAP,
+					reachOf(
+						band.flatMap(({ metric }) => metric.shapes),
+						highSide,
+					) +
+						reachOf(
+							next.flatMap(({ metric }) => metric.shapes),
+							lowSide,
+						) +
+						2 * ROUTE_STUB_LENGTH,
+				);
 	}
 
 	if (diagram.layout.direction === "BT") {
@@ -1014,15 +1426,31 @@ function slotPreference(
 }
 
 /**
- * Side order that avoids crossings: by the far node along the side, except that
- * L-shaped arrivals travelling the same way nest, the farthest cross run outermost.
+ * Side order that avoids crossings: by the far node along the side or, `byApproach`,
+ * by where each route leaves the far node past its stub, so a decision branch
+ * leaving a vertex beside a node in line with this one lands on the side it
+ * approaches from. L-shaped arrivals travelling the same way nest, the farthest
+ * cross run outermost.
  */
 function orderedSlots(
 	slots: readonly PortSlot[],
 	preferences: ReadonlyMap<PortSlot, PortPreference>,
+	offsets: ReadonlyMap<string, number>,
+	byApproach: boolean,
 ): PortSlot[] {
-	const far = (slot: PortSlot) =>
-		center(slot.route[slot.endpoint === "source" ? "target" : "source"])[slotAxis(slotSide(slot))];
+	const far = (slot: PortSlot) => {
+		const endpoint = slot.endpoint === "source" ? "target" : "source";
+		if (!byApproach) return center(slot.route[endpoint])[slotAxis(slotSide(slot))];
+		const node = slot.route[endpoint];
+		const side = endpoint === "source" ? slot.route.sourceEdge : slot.route.targetEdge;
+		const key = connectionKey({ edgeId: slot.route.edge.id, endpoint });
+		const departure = pointAwayFromEdge(
+			pointOnEdge(node, side, offsets.get(key) ?? 0),
+			side,
+			ROUTE_STUB_LENGTH,
+		);
+		return departure[slotAxis(slotSide(slot))];
+	};
 	const ordered = [...slots].sort((a, b) => far(a) - far(b));
 	for (const toward of [1, -1]) {
 		const lanes = ordered
@@ -1043,6 +1471,7 @@ function orderedSlots(
 function alignedPortOffsets(
 	routes: readonly RoutedEdge[],
 	sharedDecisionPitch: boolean,
+	byApproach = false,
 ): Map<string, number> {
 	const offsets = portOffsetsForRoutes(routes, sharedDecisionPitch);
 	const slotsBySide = new Map<string, PortSlot[]>();
@@ -1066,7 +1495,7 @@ function alignedPortOffsets(
 			const preferences = new Map(
 				unordered.map((slot) => [slot, slotPreference(slot, offsets, slotsBySide)]),
 			);
-			const slots = orderedSlots(unordered, preferences);
+			const slots = orderedSlots(unordered, preferences, offsets, byApproach);
 			const departures = slots.filter((slot) => slot.endpoint === "source");
 			const labeled = departures.filter((slot) => slot.route.edge.label);
 			const labelPitch =
@@ -1105,6 +1534,7 @@ function routeForEdge(
 	index: number,
 	shapesByNodeId: ReadonlyMap<string, NodeSceneElement>,
 	direction: IntermediateDiagram["layout"]["direction"],
+	continuation = false,
 ): RoutedEdge {
 	const source = shapesByNodeId.get(edge.source);
 	const target = shapesByNodeId.get(edge.target);
@@ -1113,7 +1543,10 @@ function routeForEdge(
 		throw new Error(`Cannot render edge "${edge.id}" with unresolved nodes.`);
 	}
 
-	const { sourceEdge, targetEdge } = connectionEdges(source, target, direction);
+	// A continuation leaves forward and arrives forward, like the line break it is.
+	const { sourceEdge, targetEdge } = continuation
+		? { sourceEdge: FORWARD_SIDE[direction], targetEdge: OPPOSITE_EDGE[FORWARD_SIDE[direction]] }
+		: connectionEdges(source, target, direction);
 
 	return {
 		edge,
@@ -1754,6 +2187,8 @@ interface RouteOptions {
 	readonly readerScale?: number;
 	/** Guide the grid search toward the arrival with an admissible distance bound. */
 	readonly guided: boolean;
+	/** Band of each node in a wrapped layout; exterior lanes stay beside their own band. */
+	readonly bandOf?: ReadonlyMap<string, number>;
 }
 
 /**
@@ -2340,14 +2775,17 @@ function exteriorLaneRoute(
 	end: ScenePoint,
 	shapes: readonly NodeSceneElement[],
 	existingArrows: readonly ArrowSceneElement[],
-	{ readerScale, guided }: RouteOptions,
+	{ readerScale, guided, bandOf }: RouteOptions,
 ): [ScenePoint, ...ScenePoint[]] {
 	const horizontalDominant = Math.abs(end.x - start.x) >= Math.abs(end.y - start.y);
 	const ignoredNodeIds = new Set([route.source.nodeId, route.target.nodeId]);
-	const minX = Math.min(...shapes.map((shape) => shape.x));
-	const maxX = Math.max(...shapes.map((shape) => shape.x + shape.width));
-	const minY = Math.min(...shapes.map((shape) => shape.y));
-	const maxY = Math.max(...shapes.map((shape) => shape.y + shape.height));
+	const band = bandOf?.get(route.source.nodeId);
+	const extent =
+		band === undefined ? shapes : shapes.filter((shape) => bandOf!.get(shape.nodeId) === band);
+	const minX = Math.min(...extent.map((shape) => shape.x));
+	const maxX = Math.max(...extent.map((shape) => shape.x + shape.width));
+	const minY = Math.min(...extent.map((shape) => shape.y));
+	const maxY = Math.max(...extent.map((shape) => shape.y + shape.height));
 	const useLeftLane =
 		route.sourceEdge === "left" ||
 		route.targetEdge === "left" ||
@@ -2471,7 +2909,16 @@ function exteriorLaneRoute(
 		route.targetEdge,
 		endpointClearance(route.target, end, route.targetEdge, ROUTE_STUB_LENGTH),
 	);
+	const continuation =
+		route.lane === undefined
+			? []
+			: stubDistances.map((distance) =>
+					route.sourceEdge === "top" || route.sourceEdge === "bottom"
+						? routeForVerticalLane(route.lane!, distance)
+						: routeForHorizontalLane(route.lane!, distance),
+				);
 	const candidates = [
+		...continuation,
 		compactPoints([start, end]),
 		compactPoints([start, startStub, { x: startStub.x, y: endStub.y }, endStub, end]),
 		compactPoints([start, startStub, { x: endStub.x, y: startStub.y }, endStub, end]),
@@ -2596,15 +3043,16 @@ function rerouteDefects(
 }
 
 /**
- * A forward edge that hooks sideways just before its arrowhead reads better
- * entering the free side its last run already approaches. Returns the routes it
- * moved with their previous sides.
+ * A forward edge that hooks sideways just before its arrowhead, or crosses
+ * another arrow on its final approach, reads better entering the free side its
+ * last run already approaches. Returns the routes it moved with their previous sides.
  */
-function resideHookedArrivals(
+function resideArrivals(
 	routes: readonly RoutedEdge[],
 	arrows: readonly ArrowSceneElement[],
 	diagram: IntermediateDiagram,
 	scale: number,
+	trigger: "hooked" | "crossed",
 ): { route: RoutedEdge; side: ConnectionEdge }[] {
 	const buckets = edgeBuckets(diagram.edges);
 	const feedback = feedbackEdgeIds(diagram, buckets.incoming, buckets.outgoing);
@@ -2618,10 +3066,17 @@ function resideHookedArrivals(
 	for (const [index, arrow] of arrows.entries()) {
 		const route = routes[index]!;
 		if (feedback.has(route.edge.id)) continue;
-		const hooked = routingQualityFindings([{ id: arrow.id, points: arrow.points }], scale).some(
-			(finding) => finding.kind === "endpoint-jog" && finding.endpoint === "end",
-		);
-		if (!hooked) continue;
+		const moves =
+			trigger === "hooked"
+				? routingQualityFindings([{ id: arrow.id, points: arrow.points }], scale).some(
+						(finding) => finding.kind === "endpoint-jog" && finding.endpoint === "end",
+					)
+				: arrows.some(
+						(other) =>
+							other !== arrow &&
+							pathCrossings(arrow.points, other.points, arrow.points.length - 3) > 0,
+					);
+		if (!moves) continue;
 		const segments = segmentsFromPoints(arrow.points);
 		const last = segments.at(-1);
 		const step = segments.findLast((segment) => segment.orientation !== last?.orientation);
@@ -2883,9 +3338,29 @@ function polishLevels(edgeRouting: IntermediateDiagram["layout"]["edgeRouting"])
 		: [{ ...PLAIN, repair: true }, PLAIN];
 }
 
+/** Each continuation runs midway between the bands it joins. */
+function assignContinuationLanes(
+	routes: readonly RoutedEdge[],
+	nodes: readonly NodeSceneElement[],
+	wrap: Wrap,
+): void {
+	for (const route of routes) {
+		if (!wrap.continuations.has(route.edge.id)) continue;
+		const band = wrap.bandOf.get(route.source.nodeId) ?? 0;
+		const across = route.sourceEdge === "top" || route.sourceEdge === "bottom" ? "x" : "y";
+		const size = across === "x" ? "width" : "height";
+		const inBand = (index: number) =>
+			nodes.filter((node) => (wrap.bandOf.get(node.nodeId) ?? 0) === index);
+		const end = Math.max(...inBand(band).map((node) => node[across] + node[size]));
+		const start = Math.min(...inBand(band + 1).map((node) => node[across]));
+		route.lane = (end + start) / 2;
+	}
+}
+
 function layoutDiagram(
 	diagram: IntermediateDiagram,
 	polish: RoutingPolish,
+	arrangement: Arrangement = PLAIN_ARRANGEMENT,
 ): {
 	edgeArrows: ArrowSceneElement[];
 	nodeShapes: NodeSceneElement[];
@@ -2894,12 +3369,19 @@ function layoutDiagram(
 	const orthogonal = diagram.layout.edgeRouting === "orthogonal";
 	const offsetsFor = (routes: readonly RoutedEdge[]) =>
 		polish.ports
-			? alignedPortOffsets(routes, polish.repair)
+			? alignedPortOffsets(routes, polish.repair, arrangement.crossingRepair)
 			: portOffsetsForRoutes(routes, polish.repair);
-	let nodeShapes = positionNodes(diagram);
+	const { wrap } = arrangement;
+	let nodeShapes = positionNodes(diagram, new Map(), new Map(), arrangement);
 	const shapesByNodeId = new Map(nodeShapes.map((shape) => [shape.nodeId, shape]));
 	const routedEdges = diagram.edges.map((edge, index) =>
-		routeForEdge(edge, index, shapesByNodeId, diagram.layout.direction),
+		routeForEdge(
+			edge,
+			index,
+			shapesByNodeId,
+			diagram.layout.direction,
+			wrap.continuations.has(edge.id),
+		),
 	);
 	const mirrored = orthogonal && polish.ports;
 	assignDecisionSides(routedEdges, diagram.layout.direction, mirrored);
@@ -2919,7 +3401,7 @@ function layoutDiagram(
 			? stubReachForRoutes(routedEdges, portOffsets)
 			: new Map<string, number>();
 	if (capacity.size > 0 || reach.size > 0) {
-		nodeShapes = positionNodes(diagram, capacity, reach);
+		nodeShapes = positionNodes(diagram, capacity, reach, arrangement);
 		const resized = new Map(nodeShapes.map((node) => [node.nodeId, node]));
 		for (const route of routedEdges) {
 			route.source = resized.get(route.source.nodeId)!;
@@ -2938,6 +3420,7 @@ function layoutDiagram(
 			).offsets;
 		}
 	}
+	assignContinuationLanes(routedEdges, nodeShapes, wrap);
 	// Judge jogs and corridors at the size a reader sees the exported diagram.
 	const scale = routingQualityScale({
 		width:
@@ -2950,6 +3433,7 @@ function layoutDiagram(
 	const options: RouteOptions = {
 		guided: polish.repair,
 		...(polish.reader ? { readerScale: scale } : {}),
+		...(wrap.continuations.size > 0 ? { bandOf: wrap.bandOf } : {}),
 	};
 	let edgeArrows = routeAllEdges(
 		routedEdges,
@@ -2959,7 +3443,7 @@ function layoutDiagram(
 		options,
 	);
 	if (orthogonal && polish.sides) {
-		const resided = resideHookedArrivals(routedEdges, edgeArrows, diagram, scale);
+		const resided = resideArrivals(routedEdges, edgeArrows, diagram, scale, "hooked");
 		if (resided.length > 0) {
 			const offsets = offsetsFor(routedEdges);
 			const retry = routeAllEdges(routedEdges, "orthogonal", offsets, nodeShapes, options);
@@ -2970,18 +3454,153 @@ function layoutDiagram(
 				[edgeArrows, portOffsets] = [retry, offsets];
 			else for (const { route, side } of resided) route.targetEdge = side;
 		}
+		// Then arrivals crossed on their final approach, kept only if crossings drop
+		// and nothing else grows.
+		const crossed = arrangement.crossingRepair
+			? resideArrivals(routedEdges, edgeArrows, diagram, scale, "crossed")
+			: [];
+		if (crossed.length > 0) {
+			const offsets = offsetsFor(routedEdges);
+			const retry = routeAllEdges(routedEdges, "orthogonal", offsets, nodeShapes, options);
+			if (
+				exportRouteDefects(retry, nodeShapes).length <=
+					exportRouteDefects(edgeArrows, nodeShapes).length &&
+				routesNoWorse({ edgeArrows: retry, nodeShapes }, { edgeArrows, nodeShapes }, true)
+			)
+				[edgeArrows, portOffsets] = [retry, offsets];
+			else for (const { route, side } of crossed) route.targetEdge = side;
+		}
 	}
 	if (orthogonal && polish.repair)
 		edgeArrows = rerouteDefects(edgeArrows, routedEdges, portOffsets, nodeShapes, options);
 	return { edgeArrows, nodeShapes, routedEdges };
 }
 
+/** Size of the nodes, arrows and any free labels drawn. */
+function drawnSize(
+	nodes: readonly NodeSceneElement[],
+	arrows: readonly ArrowSceneElement[],
+	labels: readonly TextSceneElement[] = [],
+): { width: number; height: number } {
+	const points = [
+		...nodes.flatMap((node) => [
+			{ x: node.x, y: node.y },
+			{ x: node.x + node.width, y: node.y + node.height },
+		]),
+		...arrows.flatMap((arrow) => arrow.points),
+		...labels.flatMap((label) => {
+			const { width, height } = branchLabelMetrics(label.text, label.maxWidth);
+			return [
+				{ x: label.x - width / 2, y: label.y - height / 2 },
+				{ x: label.x + width / 2, y: label.y + height / 2 },
+			];
+		}),
+	];
+	return {
+		width:
+			Math.max(...points.map((point) => point.x)) - Math.min(...points.map((point) => point.x)),
+		height:
+			Math.max(...points.map((point) => point.y)) - Math.min(...points.map((point) => point.y)),
+	};
+}
+
+/** Interior crossings of the axis-aligned segments of `a`, from segment `from` on, with those of `b`. */
+function pathCrossings(a: readonly ScenePoint[], b: readonly ScenePoint[], from = 0): number {
+	const between = (value: number, p: number, q: number) =>
+		value > Math.min(p, q) + AXIS_ALIGNED_EPSILON && value < Math.max(p, q) - AXIS_ALIGNED_EPSILON;
+	const horizontal = (p: ScenePoint, q: ScenePoint) =>
+		Math.abs(p.y - q.y) <= AXIS_ALIGNED_EPSILON && Math.abs(p.x - q.x) > AXIS_ALIGNED_EPSILON;
+	const vertical = (p: ScenePoint, q: ScenePoint) =>
+		Math.abs(p.x - q.x) <= AXIS_ALIGNED_EPSILON && Math.abs(p.y - q.y) > AXIS_ALIGNED_EPSILON;
+	let crossings = 0;
+	for (let i = Math.max(0, from); i < a.length - 1; i += 1)
+		for (let j = 0; j < b.length - 1; j += 1) {
+			const [p, q, r, u] = [a[i]!, a[i + 1]!, b[j]!, b[j + 1]!];
+			const [across, along] =
+				horizontal(p, q) && vertical(r, u)
+					? [
+							[p, q],
+							[r, u],
+						]
+					: vertical(p, q) && horizontal(r, u)
+						? [
+								[r, u],
+								[p, q],
+							]
+						: [];
+			if (
+				across &&
+				along &&
+				between(along[0]!.x, across[0]!.x, across[1]!.x) &&
+				between(across[0]!.y, along[0]!.y, along[1]!.y)
+			)
+				crossings += 1;
+		}
+	return crossings;
+}
+
+/** Interior crossings between different arrows. */
+function arrowCrossings(arrows: readonly ArrowSceneElement[]): number {
+	return arrows.reduce(
+		(sum, arrow, index) =>
+			sum +
+			arrows
+				.slice(index + 1)
+				.reduce((pair, other) => pair + pathCrossings(arrow.points, other.points), 0),
+		0,
+	);
+}
+
+/**
+ * Reader-scale findings as the routing tests count them: jogs, near-coincident
+ * corridors, touching arrowheads and lines through another arrowhead, at the
+ * export size of everything drawn.
+ */
+function readerFindingCount(
+	arrows: readonly ArrowSceneElement[],
+	nodes: readonly NodeSceneElement[],
+): number {
+	const scale = routingQualityScale(drawnSize(nodes, arrows));
+	const routes = arrows.map((arrow) => ({
+		id: arrow.id,
+		points: arrow.points,
+		sourceId: arrow.sourceNodeId,
+		targetId: arrow.targetNodeId,
+	}));
+	const quality = candidateRouteQuality(routes, scale);
+	return (
+		routingQualityFindings(routes, scale).length +
+		routes.filter((route) => quality(route).arrowheadsCrossed > 0).length
+	);
+}
+
+/**
+ * Neither more crossings (or, when `fewerCrossings`, strictly fewer) nor more
+ * reader-scale findings, each judged at its own export size, and no newly
+ * extreme or longer aspect.
+ */
+function routesNoWorse(
+	candidate: Pick<ReturnType<typeof layoutDiagram>, "edgeArrows" | "nodeShapes">,
+	current: Pick<ReturnType<typeof layoutDiagram>, "edgeArrows" | "nodeShapes">,
+	fewerCrossings = false,
+): boolean {
+	const [crossings, currentCrossings] = [candidate, current].map((layout) =>
+		arrowCrossings(layout.edgeArrows),
+	);
+	const [aspect, currentAspect] = [candidate, current].map((layout) => {
+		const { width, height } = drawnSize(layout.nodeShapes, layout.edgeArrows);
+		return exportAspect(width, height);
+	});
+	return (
+		(fewerCrossings ? crossings! < currentCrossings! : crossings! <= currentCrossings!) &&
+		(aspect! < WRAP_ASPECT || aspect! <= currentAspect! + AXIS_ALIGNED_EPSILON) &&
+		readerFindingCount(candidate.edgeArrows, candidate.nodeShapes) <=
+			readerFindingCount(current.edgeArrows, current.nodeShapes)
+	);
+}
+
 export function renderIntermediateDiagram(input: unknown): RenderedDiagramScene {
 	const diagram = parseIntermediateDiagram(input);
-	// Polish must never cost a valid export: drop passes until the export defects and
-	// inward endpoints are as few as the plain router's, preferring more polish on a tie.
-	const [first, ...fallbacks] = polishLevels(diagram.layout.edgeRouting);
-	let layout = layoutDiagram(diagram, first!);
 	// Export defects come first; inward endpoints only break ties.
 	const defectsOf = (attempt: ReturnType<typeof layoutDiagram>) =>
 		[
@@ -2990,13 +3609,62 @@ export function renderIntermediateDiagram(input: unknown): RenderedDiagramScene 
 		] as const;
 	const fewer = (a: readonly [number, number], b: readonly [number, number]) =>
 		a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]);
-	let defects = defectsOf(layout);
-	for (const polish of fallbacks) {
-		if (defects[0] === 0 && defects[1] === 0) break;
-		const candidate = layoutDiagram(diagram, polish);
-		const candidateDefects = defectsOf(candidate);
-		if (fewer(candidateDefects, defects)) [layout, defects] = [candidate, candidateDefects];
+	// Polish must never cost a valid export: drop passes until the export defects and
+	// inward endpoints are as few as the plain router's, preferring more polish on a tie.
+	const levels = polishLevels(diagram.layout.edgeRouting);
+	const settle = (arrangement: Arrangement) => {
+		const [first, ...fallbacks] = levels;
+		let layout = layoutDiagram(diagram, first!, arrangement);
+		let defects = defectsOf(layout);
+		for (const polish of fallbacks) {
+			if (defects[0] === 0 && defects[1] === 0) break;
+			const candidate = layoutDiagram(diagram, polish, arrangement);
+			const candidateDefects = defectsOf(candidate);
+			if (fewer(candidateDefects, defects)) [layout, defects] = [candidate, candidateDefects];
+		}
+		return { arrangement, defects, layout };
+	};
+	let best = settle(PLAIN_ARRANGEMENT);
+	// Another arrangement is tried at full polish only, and kept when it has no more
+	// defects and routes no worse (or, `fewerCrossings`, with strictly fewer crossings).
+	const consider = (arrangement: Arrangement, fewerCrossings: boolean) => {
+		const layout = layoutDiagram(diagram, levels[0]!, arrangement);
+		const defects = defectsOf(layout);
+		if (!fewer(best.defects, defects) && routesNoWorse(layout, best.layout, fewerCrossings))
+			best = { arrangement, defects, layout };
+	};
+	const orthogonal = diagram.layout.edgeRouting === "orthogonal";
+	// Crossing repairs are tried only where the polished router crossed: arrival
+	// order and moved arrivals stay when they route no worse, and reordered ranks
+	// only when they route with fewer crossings.
+	const repairable = orthogonal && diagram.edges.length <= CROSSING_REPAIR_MAX_EDGES;
+	if (repairable && arrowCrossings(best.layout.edgeArrows) > 0)
+		consider({ ...best.arrangement, crossingRepair: true }, false);
+	if (repairable && arrowCrossings(best.layout.edgeArrows) > 0 && reordersRanks(diagram))
+		consider({ ...best.arrangement, reorder: true }, true);
+	// A flow too long for its breadth wraps when the wrapped layout routes no worse.
+	// Its size includes the branch labels, as the exported PNG does.
+	const size = drawnSize(best.layout.nodeShapes, best.layout.edgeArrows, [
+		...branchLabels([...best.layout.edgeArrows], best.layout.routedEdges),
+	]);
+	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
+	const [along, across] = vertical ? [size.height, size.width] : [size.width, size.height];
+	const aspect = (along + 2 * EXPORT_PADDING) / (across + 2 * EXPORT_PADDING);
+	const fittedText =
+		(NODE_LABEL_FONT_SIZE * FITTED_LONG_SIDE) / (Math.max(along, across) + 2 * EXPORT_PADDING);
+	const tooLong =
+		aspect >= WRAP_EXTREME_ASPECT ||
+		(aspect >= WRAP_ASPECT &&
+			(vertical ? fittedText < WRAP_MIN_COLUMN_TEXT : along >= WRAP_MIN_LENGTH));
+	const wrap = orthogonal && tooLong ? planWrap(diagram, best.arrangement.reorder) : NO_WRAP;
+	// A wrapped layout may need crossing repairs of its own; it tries them first.
+	for (const crossingRepair of repairable && !best.arrangement.crossingRepair
+		? [true, false]
+		: [best.arrangement.crossingRepair]) {
+		if (wrap.continuations.size === 0 || best.arrangement.wrap === wrap) break;
+		consider({ ...best.arrangement, crossingRepair, wrap }, false);
 	}
+	const { layout } = best;
 	const { edgeArrows, nodeShapes, routedEdges } = layout;
 	const labels = [...nodeShapes.map(textForNode), ...branchLabels(edgeArrows, routedEdges)];
 	const elements = normalizeSceneOrigin([...edgeArrows, ...nodeShapes, ...labels]);

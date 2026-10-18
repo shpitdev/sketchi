@@ -19,9 +19,27 @@ import releaseFanIn from "./fixtures/routing/release-fan-in.js";
 import stabilityFanIn from "./fixtures/routing/stability-fan-in.js";
 import renewalRetry from "./fixtures/routing/renewal-retry.js";
 import cancellationConvergence from "./fixtures/routing/cancellation-convergence.js";
+import packageChain from "./fixtures/routing/package-chain.js";
+import scopeBypass from "./fixtures/routing/scope-bypass.js";
+import rolloutFailures from "./fixtures/routing/rollout-failures.js";
 
 /** Readability regressions from normalized flowchart specs. */
 export const routingFixtures = {
+	"package-chain": parseFlowchartDiagram({
+		...packageChain,
+		type: "flowchart",
+		layout: { direction: "TB", edgeRouting: "orthogonal" },
+	}),
+	"scope-bypass": parseFlowchartDiagram({
+		...scopeBypass,
+		type: "flowchart",
+		layout: { direction: "TB", edgeRouting: "orthogonal" },
+	}),
+	"rollout-failures": parseFlowchartDiagram({
+		...rolloutFailures,
+		type: "flowchart",
+		layout: { direction: "TB", edgeRouting: "orthogonal" },
+	}),
 	"release-fan-in": parseFlowchartDiagram({
 		...releaseFanIn,
 		type: "flowchart",
