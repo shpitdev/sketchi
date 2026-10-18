@@ -83,7 +83,7 @@ const Report = Schema.fromJsonString(
 
 describe("scenario CLI candidate decoding", () => {
 	for (const [bridgeLabel, connected] of [
-		["artifact", false],
+		["Excalidraw export", false],
 		["agent", true],
 		["Unrelated work", true],
 	] as const) {
@@ -100,15 +100,15 @@ describe("scenario CLI candidate decoding", () => {
 								...Array.from({ length: 21 }, (_, index) => ({
 									id: `p${index}`,
 									// The negative path cannot complete the later steps before
-									// crossing its artifact barrier and going back to core.
+									// crossing its export barrier and going back to core.
 									label:
 										!connected && index >= 6
-											? "agent core"
-											: "agent core renderer Excalidraw export artifact",
+											? "agent core diagram model"
+											: "agent core diagram model renderer Excalidraw export",
 									kind: "process",
 								})),
 								{ id: "bridge", label: bridgeLabel, kind: "process" },
-								{ id: "end", label: "Hosted response", kind: "end" },
+								{ id: "end", label: "Hosted artifact response", kind: "end" },
 							],
 							edges: [
 								{ id: "a", source: "start", target: "p0" },

@@ -83,6 +83,11 @@ interface FlowchartScenarioDefinition {
 	diagramId?: string;
 	difficulty: DiagramScenarioDifficulty;
 	edges: readonly FlowchartEdgeDefinition[];
+	/**
+	 * Fixture nodes that continue the start step's entry chain, in order. They
+	 * draw the stated first event across nodes and are not separate steps.
+	 */
+	entry?: readonly string[];
 	id: string;
 	logos?: readonly DiagramScenarioLogo[];
 	nodes: readonly FlowchartNodeDefinition[];
@@ -148,7 +153,12 @@ function buildAssertions(
 	const requiredNodeKinds = FLOWCHART_NODE_KIND_ORDER.filter((kind) => nodeKinds.has(kind));
 	const nodesById = new Map(diagram.nodes.map((node) => [node.id, node]));
 	const promptWords = new Set(flowchartLabelWords(definition.prompt));
-	const requiredNodes = definition.nodes.map(([id, label, kind, labels]) => {
+	// An entry chain is one start step; edges leaving it leave from that step.
+	const entry = new Set(definition.entry ?? []);
+	const startId = diagram.nodes.find((node) => node.kind === "start")!.id;
+	const entryLabel = [startId, ...entry].map((id) => nodesById.get(id)!.label).join(" → ");
+	const stepOf = (id: string) => (entry.has(id) ? startId : id);
+	const requiredNodes = definition.nodes.flatMap(([id, label, kind, labels]) => {
 		for (const alternative of labels) {
 			const words = flowchartLabelWords(alternative);
 			if (words.length === 0 || words.some((word) => !promptWords.has(word))) {
@@ -157,23 +167,26 @@ function buildAssertions(
 				);
 			}
 		}
-		return { id, label, kind, labels };
+		if (entry.has(id)) return [];
+		return [{ id, label: id === startId && entry.size > 0 ? entryLabel : label, kind, labels }];
 	});
 
 	return {
-		minEdgeCount: diagram.edges.length,
-		minNodeCount: diagram.nodes.length,
+		minEdgeCount: diagram.edges.length - entry.size,
+		minNodeCount: diagram.nodes.length - entry.size,
 		requiredIconSlugs: unique(diagram.nodes.flatMap((node) => (node.icon ? [node.icon.slug] : []))),
 		requiredBranchLabels: unique(
 			diagram.edges.map((edge) => edge.label).filter((label): label is string => Boolean(label)),
 		),
-		requiredEdges: definition.edges.map(([id, sourceId, targetId, label, labels]) => {
-			const source = nodesById.get(sourceId);
-			const target = nodesById.get(targetId);
-
-			if (!source || !target) {
+		requiredEdges: definition.edges.flatMap(([id, from, to, label, labels]) => {
+			if (!nodesById.has(from) || !nodesById.has(to)) {
 				throw new Error(`Scenario "${diagram.id}" has unresolved assertion edge "${id}".`);
 			}
+			const sourceId = stepOf(from);
+			const targetId = stepOf(to);
+			if (sourceId === targetId) return [];
+			const source = requiredNodes.find((node) => node.id === sourceId)!;
+			const target = requiredNodes.find((node) => node.id === targetId)!;
 
 			// Contextual outcomes are explicit per connection, never global yes/no synonyms.
 			for (const alternative of labels ?? []) {
@@ -186,13 +199,15 @@ function buildAssertions(
 				}
 			}
 
-			return {
-				sourceId,
-				sourceLabel: source.label,
-				targetId,
-				targetLabel: target.label,
-				...(label ? { label, labels: labels ?? [label] } : {}),
-			};
+			return [
+				{
+					sourceId,
+					sourceLabel: source.label,
+					targetId,
+					targetLabel: target.label,
+					...(label ? { label, labels: labels ?? [label] } : {}),
+				},
+			];
 		}),
 		requiredNodeKinds,
 		requiredNodes,
@@ -291,25 +306,25 @@ const flowchartScenarioDefinitions = [
 		difficulty: "standard",
 		tags: ["repo", "packages", "harness", "code-mode", "vague-prompt"],
 		description:
-			"A vague package-interaction request recast as a directed flowchart so harnesses preserve concrete package boundaries instead of inventing a Mermaid dependency report.",
+			"A vague package-interaction request recast as a directed flowchart so harnesses keep the six stated stages in order instead of inventing a Mermaid dependency report.",
 		prompt:
 			"Create a diagram that showcases how the various packages in this repo interact. Show the high-level path from an app request through the agent, core diagram model, renderer, Excalidraw export, and hosted artifact response.",
+		// The six stages the prompt states, in its order. The prompt names no
+		// packages, so package names or an artifact store are not required.
 		nodes: [
-			["app-request", "App or MCP request", "start", ["app request", "request"]],
-			["diagram-agent", "diagram-agent orchestrates", "process", ["agent"]],
-			["diagram-core", "diagram-core validates IR", "process", ["core"]],
-			["diagram-renderer", "diagram-renderer lays out scene", "process", ["renderer"]],
-			["diagram-excalidraw", "diagram-excalidraw exports file", "process", ["Excalidraw export"]],
-			["artifact-store", "Artifact store saves formats", "process", ["artifact"]],
-			["studio-api", "Studio API returns artifact URLs", "end", ["response", "artifact"]],
+			["app-request", "App request", "start", ["app request", "request"]],
+			["agent", "Agent", "process", ["agent"]],
+			["core", "Core diagram model", "process", ["core diagram model"]],
+			["renderer", "Renderer", "process", ["renderer"]],
+			["excalidraw-export", "Excalidraw export", "process", ["Excalidraw export"]],
+			["artifact-response", "Hosted artifact response", "end", ["hosted artifact response"]],
 		],
 		edges: [
-			["request-agent", "app-request", "diagram-agent"],
-			["agent-core", "diagram-agent", "diagram-core"],
-			["core-renderer", "diagram-core", "diagram-renderer"],
-			["renderer-excalidraw", "diagram-renderer", "diagram-excalidraw"],
-			["excalidraw-store", "diagram-excalidraw", "artifact-store"],
-			["store-api", "artifact-store", "studio-api"],
+			["request-agent", "app-request", "agent"],
+			["agent-core", "agent", "core"],
+			["core-renderer", "core", "renderer"],
+			["renderer-export", "renderer", "excalidraw-export"],
+			["export-response", "excalidraw-export", "artifact-response"],
 		],
 	},
 	{
@@ -519,7 +534,7 @@ const flowchartScenarioDefinitions = [
 			["stable-monitor", "stable", "monitor", "yes", ["yes", "stable"]],
 			["stable-escalate", "stable", "escalate-failure", "no", ["no", "unstable"]],
 			["monitor-resolved", "monitor", "resolved-success"],
-			["escalate-recollect", "escalate-failure", "collect-evidence", "reassess"],
+			["escalate-recollect", "escalate-failure", "collect-evidence"],
 		],
 	},
 	{
@@ -1538,20 +1553,22 @@ const flowchartScenarioDefinitions = [
 			{ aliases: ["OpenAI"], name: "OpenAI", slug: "openai" },
 			{ name: "Sentry", slug: "sentry" },
 		],
+		// The prompt's first event, `A Next.js page on Vercel receives the
+		// question`, states no order between Vercel and the page: one entry step
+		// that names both, drawn as one node or a short entry chain.
+		entry: ["page"],
 		nodes: [
 			[
 				"request",
-				"Next.js page receives question",
+				"Request reaches Vercel",
 				"start",
 				[
-					"Next.js page receives question",
-					"Next.js page receives the question",
-					"receives question",
-					"receives the question",
+					"Next.js page on Vercel receives question",
+					"Next.js page on Vercel receives the question",
 				],
-				"nextjs",
+				"vercel",
 			],
-			["edge", "Vercel routes the request", "process", ["Vercel"], "vercel"],
+			["page", "Next.js page receives question", "process", ["Next.js page"], "nextjs"],
 			[
 				"cache",
 				"Cached in Redis?",
@@ -1614,8 +1631,8 @@ const flowchartScenarioDefinitions = [
 			],
 		],
 		edges: [
-			["request-edge", "request", "edge"],
-			["edge-cache", "edge", "cache"],
+			["request-page", "request", "page"],
+			["page-cache", "page", "cache"],
 			["cache-hit", "cache", "cached", "hit"],
 			["cache-miss", "cache", "model", "miss"],
 			["model-store", "model", "store"],

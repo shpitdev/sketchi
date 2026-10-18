@@ -20,7 +20,12 @@ import { termTokens } from "@sketchi/icon-catalog";
 import type { DiagramScenario } from "./diagram-scenarios.js";
 import type { FlowchartScenario, DiagramScenarioLogo } from "./scenarios.js";
 import type { SequenceScenario, SequenceScenarioMessage } from "./sequence-scenarios.js";
-import { flowchartLabelMatches } from "./flowchart-labels.js";
+import {
+	type BranchMatcher,
+	type ExpectedEdge,
+	type FlowchartConnection,
+	matchFlowchartSteps,
+} from "./flowchart-matching.js";
 
 export interface ScenarioCheck {
 	id: string;
@@ -41,8 +46,6 @@ export interface ScenarioEvaluation {
 function normalizeLabel(label: string): string {
 	return label.trim().toLowerCase();
 }
-
-type FlowchartConnection = Pick<FlowchartDiagram["edges"][number], "source" | "target" | "label">;
 
 const MAX_INTERMEDIATE_NODES = 2;
 
@@ -75,8 +78,9 @@ function scenarioConnections(
 
 function edgeMatchesExpected(
 	connections: readonly FlowchartConnection[],
-	expected: FlowchartScenario["assertions"]["requiredEdges"][number],
+	expected: ExpectedEdge,
 	matchedNodes: ReadonlyMap<string, ReadonlySet<string>>,
+	branchMatches: BranchMatcher,
 	paths?: { fromStart: ReadonlySet<string>; toEnd: ReadonlySet<string> },
 ): boolean {
 	return connections.some(
@@ -84,7 +88,7 @@ function edgeMatchesExpected(
 			matchedNodes.get(expected.sourceId)?.has(edge.source) &&
 			matchedNodes.get(expected.targetId)?.has(edge.target) &&
 			(!paths || (paths.fromStart.has(edge.source) && paths.toEnd.has(edge.target))) &&
-			(!expected.labels || flowchartLabelMatches(edge.label ?? "", expected.labels)),
+			branchMatches(edge, expected),
 	);
 }
 
@@ -93,14 +97,13 @@ function scenarioPathFinder(
 	scenario: FlowchartScenario,
 	diagram: FlowchartDiagram,
 	paths: readonly FlowchartConnection[],
+	branchMatches: BranchMatcher,
 ) {
 	const kinds = new Map(scenario.assertions.requiredNodes.map((node) => [node.id, node.kind]));
 	// Branch matching does not depend on ownership; do it once, not per search state.
 	const connections = paths.map((edge) => ({
 		edge,
-		expected: scenario.assertions.requiredEdges.filter(
-			(expected) => !expected.labels || flowchartLabelMatches(edge.label ?? "", expected.labels),
-		),
+		expected: scenario.assertions.requiredEdges.filter((expected) => branchMatches(edge, expected)),
 	}));
 	return (
 		owners: ReadonlyMap<string, string>,
@@ -150,6 +153,7 @@ function connectedStepOwners(
 	connections: readonly FlowchartConnection[],
 	matchedNodes: ReadonlyMap<string, ReadonlySet<string>>,
 	findPaths: ReturnType<typeof scenarioPathFinder>,
+	branchMatches: BranchMatcher,
 ): { owners: Map<string, string> | undefined; exhausted: boolean } {
 	const choices = scenario.assertions.requiredEdges.map((expected) => ({
 		expected,
@@ -157,7 +161,7 @@ function connectedStepOwners(
 			(edge) =>
 				matchedNodes.get(expected.sourceId)?.has(edge.source) &&
 				matchedNodes.get(expected.targetId)?.has(edge.target) &&
-				(!expected.labels || flowchartLabelMatches(edge.label ?? "", expected.labels)),
+				branchMatches(edge, expected),
 		),
 	}));
 	const domains = new Map<string, string[]>();
@@ -344,34 +348,8 @@ export function scenarioLogoChecks(
 }
 
 function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram): ScenarioCheck[] {
-	// An action immediately before its sole terminal end represents the same
-	// end step. Never accept starts/decisions, branches, or intervening work.
-	const terminalActions = new Set(
-		diagram.nodes
-			.filter((node) => {
-				if (node.kind !== "process") return false;
-				const outgoing = diagram.edges.filter((edge) => edge.source === node.id);
-				if (outgoing.length !== 1) return false;
-				const target = diagram.nodes.find((candidate) => candidate.id === outgoing[0]!.target);
-				return target?.kind === "end" && !diagram.edges.some((edge) => edge.source === target.id);
-			})
-			.map((node) => node.id),
-	);
-	const matchedNodes = new Map(
-		scenario.assertions.requiredNodes.map((expected) => [
-			expected.id,
-			new Set(
-				diagram.nodes
-					.filter(
-						(node) =>
-							(node.kind === expected.kind ||
-								(expected.kind === "end" && terminalActions.has(node.id))) &&
-							flowchartLabelMatches(node.label, expected.labels),
-					)
-					.map((node) => node.id),
-			),
-		]),
-	);
+	// Counts, wiring, and ownership use the graph with merged checks split.
+	const { matchedNodes, graph, branchMatches } = matchFlowchartSteps(scenario, diagram);
 	// A node-only maximum matching supplies useful failure diagnostics if no
 	// consistent connected assignment exists; successful checks use edge witnesses.
 	const owners = new Map<string, string>();
@@ -388,11 +366,11 @@ function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram)
 		return false;
 	}
 	for (const step of scenario.assertions.requiredNodes) assignStep(step.id, new Set());
-	const connections = scenarioConnections(diagram, matchedNodes);
-	const findPaths = scenarioPathFinder(scenario, diagram, connections);
+	const connections = scenarioConnections(graph, matchedNodes);
+	const findPaths = scenarioPathFinder(scenario, graph, connections, branchMatches);
 	const connectedSearch =
 		owners.size === scenario.assertions.requiredNodes.length
-			? connectedStepOwners(scenario, connections, matchedNodes, findPaths)
+			? connectedStepOwners(scenario, connections, matchedNodes, findPaths, branchMatches)
 			: undefined;
 	const selectedOwners = connectedSearch?.owners ?? owners;
 	for (const [stepId, nodes] of matchedNodes) {
@@ -415,20 +393,17 @@ function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram)
 	);
 	const distinctSteps = new Set(selectedOwners.values());
 	const paths = findPaths(selectedOwners);
-	const branchLabels = diagram.edges
-		.map((edge) => edge.label)
-		.filter((label): label is string => Boolean(label));
 	const nodeKinds = new Set(diagram.nodes.map((node) => node.kind));
 
 	return [
 		{
 			id: "min-node-count",
-			passed: diagram.nodes.length >= scenario.assertions.minNodeCount,
+			passed: graph.nodes.length >= scenario.assertions.minNodeCount,
 			message: `Expected at least ${scenario.assertions.minNodeCount} nodes.`,
 		},
 		{
 			id: "min-edge-count",
-			passed: diagram.edges.length >= scenario.assertions.minEdgeCount,
+			passed: graph.edges.length >= scenario.assertions.minEdgeCount,
 			message: `Expected at least ${scenario.assertions.minEdgeCount} edges.`,
 		},
 		...scenario.assertions.requiredNodeKinds.map((kind) => ({
@@ -443,18 +418,17 @@ function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram)
 		})),
 		...scenario.assertions.requiredBranchLabels.map((label) => ({
 			id: `branch-label:${label}`,
-			passed: branchLabels.some((branch) =>
-				flowchartLabelMatches(
-					branch,
-					scenario.assertions.requiredEdges
-						.filter((edge) => edge.label === label)
-						.flatMap((edge) => edge.labels ?? []),
-				),
+			passed: graph.edges.some(
+				(edge) =>
+					Boolean(edge.label) &&
+					scenario.assertions.requiredEdges.some(
+						(expected) => expected.label === label && branchMatches(edge, expected),
+					),
 			),
 			message: `Expected a decision branch label like "${label}" or its alternatives.`,
 		})),
 		...scenario.assertions.requiredEdges.map((edge) => {
-			const passed = edgeMatchesExpected(connections, edge, ownedNodes, paths);
+			const passed = edgeMatchesExpected(connections, edge, ownedNodes, branchMatches, paths);
 			return {
 				id: `edge:${edge.sourceLabel}->${edge.targetLabel}${edge.label ? `:${edge.label}` : ""}`,
 				passed,

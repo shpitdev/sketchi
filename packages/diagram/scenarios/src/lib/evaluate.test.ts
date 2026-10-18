@@ -469,7 +469,8 @@ describe("diagram scenario evaluation", () => {
 				...scenario.expectedDiagram,
 				nodes: scenario.expectedDiagram.nodes.map((node) => ({
 					...node,
-					label: labels.get(node.id) ?? "",
+					// Entry-chain nodes continue the start step and keep their label.
+					label: labels.get(node.id) ?? node.label,
 				})),
 			});
 			expect(
@@ -995,10 +996,11 @@ describe("diagram scenario evaluation", () => {
 		expect(flowchartScenarios.length).toBeGreaterThanOrEqual(20);
 
 		for (const scenario of flowchartScenarios) {
+			// Edges inside an entry chain belong to its start step.
 			expect(
 				scenario.assertions.requiredEdges,
 				`${scenario.id}: every expected edge should become a semantic assertion`,
-			).toHaveLength(scenario.expectedDiagram.edges.length);
+			).toHaveLength(scenario.assertions.minEdgeCount);
 
 			const result = evaluateScenarioFixture(scenario);
 

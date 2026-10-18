@@ -52,15 +52,31 @@ Each fixture node declares any-of label alternatives using words from its
 scenario prompt. The catalog validates that grounding when loaded. A model
 node must match an alternative **and that step's node kind**. An expected end
 step also accepts a process whose sole outgoing edge leads directly to an end
-node; no decision/start substitute, intermediate work, or additional continuation
-is allowed. All canonical graph validation and exclusive ownership checks remain.
+node, or a process whose every outgoing edge loops back to work it came from
+(`Request a receipt → Receipt attached?`): the prompt states the action, not
+that nothing follows it. No decision/start substitute or intervening work is
+allowed, and a stated loop drawn as a terminal end (`Send another reminder` as
+an end) still fails. An expected start step also accepts a start node plus up
+to two plain, single-input actions after it, matched on their combined labels
+and owned by the last one, so `Question arrives → Vercel hosts the page →
+Next.js page receives the question` is the stated `Next.js page on Vercel
+receives the question`. A fixture `entry` lists the fixture nodes that draw
+such a first event. All canonical graph validation and exclusive ownership
+checks remain.
 Case, punctuation, hyphens, and whitespace are normalized. Every content-word
 lemma in an alternative must appear in a single label clause, in any order.
 Unnegated qualifier segments may combine across parentheses, colons, and commas:
 `Monitoring (low severity)` and `Monitoring: low-severity incident` both match
 `monitoring low severity`. A segment containing any negator is a hard boundary;
 its words cannot contribute to a positive alternative, nor can matching jump
-across it. Semicolons and other sentence/action separators do not combine clauses.
+across it. A subordinate clause (`after`, `because`, `if`, `once`, `when`)
+starts its own segment, so `Roll back the feature after failed internal checks`
+still matches `roll back`. `without` also starts its own (negated) segment, so
+`Decline application without exception approval` matches `decline
+application` and `Incident resolved without further impact` matches
+`resolved`, while `Proceed without review` still fails `review`. A negator
+before the action (`Do not roll back after failed checks`) still rejects it.
+Semicolons and other sentence/action separators do not combine clauses.
 Whole words prevent `ineligible` from satisfying `eligible`.
 
 Action steps require action-bearing alternatives (`acknowledges`, not just
@@ -69,15 +85,29 @@ Named stages or destinations use their names when the prompt supplies no
 action, rather than inventing a fixture-only verb. Decision alternatives
 retain the prompt's criterion, such as `scope clear` or `payment succeeds`.
 
-`flowchart-labels.ts` lists the finite lemma table used on both sides:
-`comms` → `communications`, `rollback` → `roll back`, `retesting` → `retest`,
-and explicit inflections such as `classifies` → `classify`, `refunded` → `refund`,
-`verification` → `verify`, `uploaded` → `upload`, and `payment`/`paid` → `pay`.
-Thus `Verify income` matches `income verification`, and `Expense paid` matches
-`payment`. The explicit stopword set removes articles, auxiliaries, conjunctions,
-and common prepositions, but retains criterion/condition words and negators.
-Stopword-only alternatives never match. There is no suffix guessing, general
-prefix, fuzzy, or semantic matcher; sequence and logo matching are unchanged.
+Both sides reduce words to a shared inflection stem in three stages: a
+plural or third-person `-s`/`-es`/`-ies`, then `-ed`/`-ied`/`-ing`, then a
+final `ie` → `y` or silent `e`. A stage that would leave under two letters or
+produce an operator word is skipped and stops the rest, so every form of a word
+lands on the same stem. Thus `Does a known fix exist?` matches `known fix
+exists`, `Identify a business need` matches `need identified`, `Nurse triages`
+matches `nurse triage`, and `cookies`/`cookie`, `settings`/`setting` and
+`use`/`uses`/`used`/`using` each share a stem. Operator words (stopwords,
+negators, auxiliary gaps, conjunctions, subordinators, `yes`) keep their exact
+form, and stemming never turns a content word into one. `flowchart-labels.ts` keeps a finite table for
+what the stemmer cannot reach: derivations and irregular forms (`verification`
+→ `verify`, `payment`/`paid` → `pay`, `sent` → `send`, `approval` →
+`approve`), the compound `rollback` → `roll back`, `comms` → `communications`,
+and inflected negators (`failed` → `fail`, `skipped` → `skip`). Thus `Verify
+income` matches `income verification`, and `Expense paid` matches `payment`.
+The explicit stopword set removes articles, auxiliaries, conjunctions, and
+common prepositions, but retains criterion/condition words and negators.
+Stopword-only alternatives never match. Every content word of an alternative,
+including named entities such as `OpenAI` or `Redis`, must still appear: extra
+modifiers are fine (`Roll back the unhealthy canary`), missing words are not
+(`Call the model`, `Roll back the release`). Beyond the stemmer there is no
+general prefix, fuzzy, synonym, or semantic matcher; sequence and logo
+matching are unchanged.
 Adjacent `not`, `no`, `never`, `without`, `cannot`, and explicit ignore/skip/omit
 forms reject a match. Contracted negatives such as `isn't` normalize to `not`;
 `fails to` and `unable to` also reject a positive action. The guard examines
@@ -121,6 +151,40 @@ out of the source, not on a later edge. Contextual outcomes are finite, explicit
 alternatives on that connection, validated against prompt words with the same
 lemma table: `Acceptable`/`Unacceptable` for credit, `High`/`Low` for priority,
 and `Matched`/`Not matched` for PO matching. They are not global yes/no synonyms.
+A required `yes`/`no` branch also accepts a restatement of its decision's
+criterion (the fixture decision label): every content word must come from the
+criterion, and the caption must carry the outcome, either the criterion's
+predicate (its last content word) or, for `no`, `fail`. A subject alone
+(`Canary`, `Scan`) states no outcome. A `no` restatement has exactly one
+negation (a negator or the `un`/`in` prefixed predicate), a `yes` restatement
+has none, and double negations (`Not failed`, `Not unhealthy`) are rejected. For `Canary healthy?`,
+`Healthy` answers yes and `Not healthy`, `Unhealthy` answer no; for `Tests
+pass?`, `Pass` answers yes and `Fail` answers no. `Healthy` on the rollback
+edge still fails.
+
+A **dimension question** answered by its branch values is the same decision:
+`Risk level?` with `High risk`/`Low risk` (or `High`/`Low`) matches `Risk
+high?`. The question must share a criterion word with an alternative, its label
+plus one outgoing branch label must match the alternative, and its own label
+must not already match any required step (a check drawn as its decision is
+handled below). On a dimension question,
+the branch that completes the criterion answers yes and any other value
+answers no, so `High risk → Reset password` still fails.
+
+A **value question** asks about one of a decision's stated values: on `Cache
+hit?`, `Yes` answers the `hit` branch and `No` answers the only other value,
+`miss`. It applies only to two-value decisions.
+
+A **branch target qualified by its decision** carries its qualifier on the
+branch: `Severity? → Monitoring` on the `Low` branch is `Monitoring low
+severity`. The target and the branch must each supply a criterion word, the
+target's own label must name no step, and the wrong branch (`Medium`) fails.
+
+A **check drawn as its decision** keeps both steps when its branches state
+exactly the next decision's outcomes: `Check supplier availability` with
+`Available`/`Unavailable` is split into the check and `Supplier available?`
+before matching, and node/edge minimums count both. Bare `Yes`/`No`, or
+outcomes of a different decision, still fail both steps.
 Multiple model nodes may match one step, allowing separate resolved/review
 end nodes per path. Every required step must have a distinct matching node,
 and **all required edges must fit the same exclusive node ownership**. The

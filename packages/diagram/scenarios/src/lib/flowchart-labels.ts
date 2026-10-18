@@ -1,136 +1,36 @@
-/** Finite flowchart lemmas and catalog aliases; no suffix guessing or fuzzy matching. */
+/**
+ * Derivations, irregular forms, and operator inflections that the regular
+ * inflection stemmer below cannot reach. No fuzzy or semantic matching.
+ */
 const WORD_ALIASES = new Map([
+	["fails", "fail"],
+	["failed", "fail"],
+	["failing", "fail"],
+	["ignores", "ignore"],
+	["ignored", "ignore"],
+	["skips", "skip"],
+	["skipped", "skip"],
+	["omits", "omit"],
+	["omitted", "omit"],
 	["comms", "communications"],
 	["rollback", "roll back"],
-	["retesting", "retest"],
-	["classifies", "classify"],
-	["refunded", "refund"],
-	["rejected", "reject"],
-	["returns", "return"],
-	["triaged", "triage"],
-	["alarms", "alarm"],
-	["declared", "declare"],
-	["monitoring", "monitor"],
-	["escalates", "escalate"],
-	["parsing", "parse"],
-	["parsed", "parse"],
-	["suppliers", "supplier"],
-	["exceptions", "exception"],
-	["matches", "match"],
-	["limits", "limit"],
-	["deduplicates", "deduplicate"],
-	["importing", "import"],
-	["approved", "approve"],
 	["approval", "approve"],
-	["approves", "approve"],
-	["declines", "decline"],
-	["retains", "retain"],
 	["succeeds", "succeed"],
 	["succeeded", "succeed"],
-	["pauses", "pause"],
-	["extracts", "extract"],
-	["drafts", "draft"],
-	["reviews", "review"],
 	["investigation", "investigate"],
-	["exports", "export"],
-	["pages", "page"],
 	["sent", "send"],
-	["verifies", "verify"],
 	["inspection", "inspect"],
-	["creates", "create"],
-	["created", "create"],
-	["acknowledges", "acknowledge"],
-	["mitigates", "mitigate"],
-	["sends", "send"],
-	["notified", "notify"],
-	["collected", "collect"],
-	["matched", "match"],
-	["scheduled", "schedule"],
-	["enabled", "enable"],
 	["internally", "internal"],
-	["completes", "complete"],
-	["requests", "request"],
-	["requested", "request"],
-	["collects", "collect"],
-	["schedules", "schedule"],
-	["accepts", "accept"],
 	["escalation", "escalate"],
-	["restores", "restore"],
 	["successful", "succeed"],
-	["resetting", "reset"],
-	["resets", "reset"],
-	["clicked", "click"],
-	["creating", "create"],
-	["verified", "verify"],
-	["declined", "decline"],
-	["retained", "retain"],
-	["releases", "release"],
-	["quotes", "quote"],
-	["seats", "seat"],
-	["responds", "respond"],
-	["removes", "remove"],
-	["keeps", "keep"],
-	["runs", "run"],
-	["passing", "pass"],
-	["deploys", "deploy"],
-	["rejects", "reject"],
-	["charges", "charge"],
-	["retries", "retry"],
-	["builds", "build"],
-	["receives", "receive"],
-	["received", "receive"],
-	["returned", "return"],
-	["cached", "cache"],
-	["stored", "store"],
-	["logs", "log"],
-	["returning", "return"],
 	["verification", "verify"],
-	["verifying", "verify"],
-	["uploaded", "upload"],
-	["uploads", "upload"],
-	["uploading", "upload"],
 	["payment", "pay"],
 	["payments", "pay"],
 	["paid", "pay"],
-	["pays", "pay"],
-	["paying", "pay"],
-	["submitted", "submit"],
-	["submits", "submit"],
-	["submitting", "submit"],
 	["submission", "submit"],
-	["blocks", "block"],
-	["blocked", "block"],
-	["deployed", "deploy"],
-	["resolved", "resolve"],
-	["resolves", "resolve"],
-	["resolving", "resolve"],
-	["validated", "validate"],
-	["validates", "validate"],
 	["validation", "validate"],
-	["parses", "parse"],
-	["checked", "check"],
-	["checks", "check"],
-	["reviewed", "review"],
-	["reviewing", "review"],
-	["accepted", "accept"],
-	["inspected", "inspect"],
-	["inspecting", "inspect"],
 	["successfully", "succeed"],
-	["packaging", "package"],
-	["packaged", "package"],
-	["passes", "pass"],
-	["passed", "pass"],
-	["attached", "attach"],
 	["attachment", "attach"],
-	["merged", "merge"],
-	["merges", "merge"],
-	["records", "record"],
-	["duplicates", "duplicate"],
-	["expenses", "expense"],
-	["errors", "error"],
-	["invoices", "invoice"],
-	["parties", "party"],
-	["scans", "scan"],
 ]);
 
 /** Flowchart-only normalization; sequence and logo matching keep their own rules. */
@@ -143,9 +43,59 @@ export function flowchartLabelWords(label: string): string[] {
 		)
 		.split(/[^\p{L}\p{N}]+/u)
 		.filter(Boolean)
-		.flatMap((word) => (WORD_ALIASES.get(word) ?? word).split(" "));
+		.flatMap((word) => (WORD_ALIASES.get(word) ?? word).split(" "))
+		.map(inflectionStem);
 }
 
+/**
+ * Reduce a word to a shared inflection stem in three stages, so singular,
+ * plural, past, and gerund forms meet: `exists`/`exist`,
+ * `identified`/`identify`, `settings`/`setting`, `cookies`/`cookie`,
+ * `uses`/`used`/`using`/`use`. (1) Strip a plural or third-person `-s`,
+ * `-es`, or `-ies`. (2) Strip `-ed`, `-ied`, or `-ing`. (3) Turn a final `ie`
+ * into `y`, or drop a final silent `e`. A stage that would leave under two
+ * letters or produce an operator word is skipped, and later stages stop, so
+ * every form of a word stops at the same point. Derivations (`verification`,
+ * `payment`) and irregular forms (`sent`, `paid`) stay in WORD_ALIASES, and
+ * operator words keep their exact form for the negation rules below.
+ */
+function inflectionStem(word: string): string {
+	if (!/^\p{Ll}+$/u.test(word) || OPERATOR_WORDS.has(word)) return word;
+	const stages: readonly ((stem: string) => string)[] = [
+		(stem) =>
+			stem.endsWith("ies")
+				? `${stem.slice(0, -3)}y`
+				: /(?:ss|x|z|ch|sh)es$/u.test(stem)
+					? stem.slice(0, -2)
+					: /[^su]s$/u.test(stem) && !stem.endsWith("is")
+						? stem.slice(0, -1)
+						: stem,
+		(stem) =>
+			stem.endsWith("ied")
+				? `${stem.slice(0, -3)}y`
+				: /[^e]ed$/u.test(stem)
+					? undouble(stem.slice(0, -2))
+					: stem.endsWith("ing")
+						? undouble(stem.slice(0, -3))
+						: stem,
+		(stem) =>
+			stem.endsWith("ie") ? `${stem.slice(0, -2)}y` : stem.endsWith("e") ? stem.slice(0, -1) : stem,
+	];
+	let stem = word;
+	for (const stage of stages) {
+		const next = stage(stem);
+		if (next.length < 2 || OPERATOR_WORDS.has(next)) break;
+		stem = next;
+	}
+	return stem;
+}
+
+/** `stopped` → `stop`, but `rolled`, `passed`, `added`, `staffed` keep their pair. */
+function undouble(stem: string): string {
+	return /([^aeioulszfd])\1$/u.test(stem) ? stem.slice(0, -1) : stem;
+}
+
+// Inflected operators (`failed`, `skips`) reach this set through WORD_ALIASES.
 const NEGATORS = new Set([
 	"not",
 	"no",
@@ -153,17 +103,9 @@ const NEGATORS = new Set([
 	"without",
 	"cannot",
 	"ignore",
-	"ignores",
-	"ignored",
 	"skip",
-	"skips",
-	"skipped",
 	"omit",
-	"omits",
-	"omitted",
 	"fail",
-	"fails",
-	"failed",
 	"unable",
 ]);
 
@@ -232,6 +174,26 @@ const STOPWORDS = new Set([
 
 const NEGATION_BOUNDARIES = new Set(["and", "or", "then", "but", "so", "otherwise"]);
 
+// A subordinate clause or `without` phrase qualifies the action before it: in
+// `Roll back the feature after failed internal checks` the failure negates the
+// checks, and in `Decline application without exception approval` the
+// `without` negates the approval, not the decline. Neither lifts a negator
+// that precedes the required words.
+const SUBORDINATORS = new Set(["after", "because", "if", "once", "when"]);
+const SEGMENT_STARTS = new Set([...NEGATION_BOUNDARIES, ...SUBORDINATORS, "without"]);
+
+// Operator words keep their exact form: stemming must never turn a content
+// word into one of them, nor change an operator the negation rules match.
+// `yes` stays whole as the bare branch answer.
+const OPERATOR_WORDS = new Set([
+	...NEGATORS,
+	...NEGATION_GAPS,
+	...STOPWORDS,
+	...NEGATION_BOUNDARIES,
+	...SUBORDINATORS,
+	"yes",
+]);
+
 /** Every content-word lemma must occur, in any order, without unrequested negation. */
 export function flowchartLabelMatches(label: string, alternatives: readonly string[]): boolean {
 	let clause = 0;
@@ -270,7 +232,7 @@ export function flowchartLabelMatches(label: string, alternatives: readonly stri
 	for (const entry of clauses) {
 		const segments: string[][] = [[]];
 		for (const word of entry.words) {
-			if (NEGATION_BOUNDARIES.has(word)) segments.push([]);
+			if (SEGMENT_STARTS.has(word)) segments.push([]);
 			segments.at(-1)!.push(word);
 		}
 		for (const segment of segments) {
@@ -342,4 +304,40 @@ export function flowchartLabelMatches(label: string, alternatives: readonly stri
 			);
 		});
 	});
+}
+
+/**
+ * A yes/no branch may restate its decision's criterion instead of answering
+ * yes or no: `Healthy`, `Not healthy` or `Unhealthy` for `Canary healthy?`;
+ * `Pass` or `Fail` for `Tests pass?`. Every content word must come from the
+ * criterion, and the caption must carry the outcome: the criterion's
+ * predicate (its last content word, `healthy`) or, for "no", `fail`. A
+ * subject alone (`Canary`) states no outcome. A "no" restatement has exactly
+ * one negation (a negator or an un-/in- prefixed predicate); a "yes" one has
+ * none. Double negations (`Not failed`, `Not unhealthy`) are rejected rather
+ * than composed.
+ */
+export function flowchartBranchRestates(
+	label: string,
+	criterion: string,
+	answer: "yes" | "no",
+): boolean {
+	const criterionWords = flowchartLabelWords(criterion).filter((word) => !STOPWORDS.has(word));
+	const predicate = criterionWords.at(-1);
+	const words = flowchartLabelWords(label).filter((word) => !STOPWORDS.has(word));
+	if (predicate === undefined || words.length === 0) return false;
+	let negations = 0;
+	let outcome = false;
+	for (const word of words) {
+		if (NEGATORS.has(word)) {
+			negations += 1;
+			if (word === "fail") outcome = true;
+		} else if (/^(?:un|in)/u.test(word) && word.slice(2) === predicate) {
+			negations += 1;
+			outcome = true;
+		} else if (criterionWords.includes(word)) {
+			if (word === predicate) outcome = true;
+		} else return false;
+	}
+	return outcome && negations === (answer === "no" ? 1 : 0);
 }
