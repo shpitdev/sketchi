@@ -1,15 +1,18 @@
 import "@tanstack/react-start/server-only";
 
-import type { Browser, BrowserWorker } from "@cloudflare/playwright";
 import type { CodeModeArtifactRenderer } from "@sketchi/diagram-agent";
 import { recordMetric } from "@sketchi/observability";
-import { Cause, Clock, Context, Effect, Exit, Layer, Metric, Schedule, Schema } from "effect";
+import { Clock, Context, Effect, Layer, Metric, Schema } from "effect";
 
-export type CloudflareBrowserRunBinding = BrowserWorker;
+import {
+	BrowserRenderingFailure,
+	browserFailure,
+	browserRenderingRetrySchedule,
+	type PngRenderRequest,
+} from "./browser-render-pool.server";
+import type { PngRenderResult } from "./png-renderer-object.server";
 
 export const BROWSER_RENDER_TIMEOUT_MS = 60_000;
-const EXPORT_SCALE = 2;
-const EXPORT_PADDING = 20;
 /**
  * Browser Rendering loads the export harness over the public internet, so this
  * fallback origin must be the public product host rather than the Worker
@@ -30,34 +33,12 @@ const browserRenderingTimeouts = Metric.counter("sketchi_browser_rendering_timeo
 	description: "Browser Rendering timeouts",
 	incremental: true,
 });
-const browserRenderingRetries = Metric.counter("sketchi_browser_rendering_retries", {
-	description: "Browser Rendering transient session retries",
-	incremental: true,
-});
 const browserRenderingDuration = Metric.histogram("sketchi_browser_rendering_duration_ms", {
 	description: "Browser Rendering duration in milliseconds",
 	boundaries: Metric.boundariesFromIterable([
 		50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 30_000, 60_000,
 	]),
 });
-
-const BrowserRenderingOperationSchema = Schema.Literals([
-	"base64",
-	"evaluate",
-	"goto",
-	"launch",
-	"newPage",
-	"waitForHarness",
-]);
-
-export class BrowserRenderingFailure extends Schema.TaggedError<BrowserRenderingFailure>()(
-	"BrowserRenderingFailure",
-	{
-		cause: Schema.Defect(),
-		message: Schema.String,
-		operation: BrowserRenderingOperationSchema,
-	},
-) {}
 
 export class BrowserRenderingTimeout extends Schema.TaggedError<BrowserRenderingTimeout>()(
 	"BrowserRenderingTimeout",
@@ -67,6 +48,14 @@ export class BrowserRenderingTimeout extends Schema.TaggedError<BrowserRendering
 	},
 ) {}
 
+/** The `CODEMODE_PNG_RENDERER` Durable Object namespace, narrowed to what the Worker calls. */
+export interface CodeModePngRendererNamespace {
+	getByName(name: string): {
+		renderPng(request: PngRenderRequest): Promise<PngRenderResult>;
+		prewarm(harnessUrl: string): Promise<void> | void;
+	};
+}
+
 export interface CloudflareBrowserRunRendererOptions {
 	assetOrigin?: string;
 }
@@ -75,11 +64,13 @@ export interface CloudflareBrowserRunArtifactRenderer extends CodeModeArtifactRe
 	readonly renderPng: (
 		input: Parameters<CodeModeArtifactRenderer["renderPng"]>[0],
 	) => Effect.Effect<ArrayBuffer | Uint8Array, BrowserRenderingFailure | BrowserRenderingTimeout>;
+	/** Asks the renderer to open a harness page if it has none. Failures only reach telemetry. */
+	readonly prewarm: Effect.Effect<void>;
 }
 
 export interface PlaygroundBrowserRenderingShape {
 	readonly renderer: (
-		binding: CloudflareBrowserRunBinding,
+		renderers: CodeModePngRendererNamespace,
 		options?: CloudflareBrowserRunRendererOptions,
 	) => CloudflareBrowserRunArtifactRenderer;
 }
@@ -93,179 +84,51 @@ export const PlaygroundBrowserRenderingLive = Layer.succeed(PlaygroundBrowserRen
 	renderer: createCloudflareBrowserRunArtifactRenderer,
 });
 
-type BrowserRenderingOperation =
-	| "base64"
-	| "evaluate"
-	| "goto"
-	| "launch"
-	| "newPage"
-	| "waitForHarness";
-
-function browserFailure(operation: BrowserRenderingOperation) {
-	return (cause: unknown) =>
-		BrowserRenderingFailure.make({
-			cause,
-			message: cause instanceof Error ? cause.message : "Browser Rendering failed.",
-			operation,
-		});
-}
-
-function isTransientSessionFailure(error: BrowserRenderingFailure): boolean {
-	return (
-		error.operation !== "evaluate" &&
-		error.operation !== "base64" &&
-		!(error.cause instanceof Error && error.cause.name === "TimeoutError") &&
-		!/timeout|timed out/i.test(error.message) &&
-		/Browser not running|unhealthy|code: 410|code: 429|code: 5\d\d|Unable to connect|WebSocket/i.test(
-			error.message,
-		)
-	);
-}
-
-const browserRenderingRetrySchedule = Schedule.exponential(250, 3).pipe(
-	Schedule.upTo({ times: 2 }),
-	Schedule.setInputType<BrowserRenderingFailure>(),
-	Schedule.while(({ input }) => isTransientSessionFailure(input)),
-	Schedule.tap(({ input: error, attempt }) =>
-		Effect.gen(function* () {
-			yield* recordMetric(browserRenderingRetries, 1, {
-				operation: error.operation,
-				failureCategory: error._tag,
-				surface: "browser_rendering",
-			});
-			yield* Effect.logWarning("Retrying Browser Rendering session", {
-				attempt,
-				operation: error.operation,
-				failure_category: error._tag,
-			});
-		}),
-	),
-);
-
-function tryBrowserPromise<A>(
-	operation: Exclude<BrowserRenderingOperation, "base64">,
-	run: (signal: AbortSignal) => Promise<A>,
-) {
-	return Effect.tryPromise({
-		try: run,
-		catch: browserFailure(operation),
-	}).pipe(
-		Effect.withSpan(`playground.browserRendering.${operation}`),
-		Effect.annotateSpans({ operation }),
-	);
-}
-
-function closeBrowser(browser: Browser, exit: Exit.Exit<unknown, unknown>): Effect.Effect<void> {
-	const interrupted = Exit.isFailure(exit) && Cause.hasInterrupts(exit.cause);
-	return Effect.tryPromise({
-		try: () =>
-			browser.close(interrupted ? { reason: "Code Mode PNG render interrupted" } : undefined),
-		catch: (cause) => cause,
-	}).pipe(
-		Effect.catch((cause) =>
-			Effect.logWarning("Browser Rendering session cleanup failed", {
-				error_tag: cause instanceof Error ? cause.name : "BrowserCleanupFailure",
-				operation: "close",
-			}),
-		),
-		Effect.asVoid,
-	);
-}
-
-export function withScopedBrowserSession<A, E>(
-	acquire: Effect.Effect<Browser, BrowserRenderingFailure>,
-	use: (browser: Browser) => Effect.Effect<A, E>,
-): Effect.Effect<A, E | BrowserRenderingFailure> {
-	return Effect.scoped(
-		Effect.gen(function* () {
-			const browser = yield* Effect.acquireRelease(acquire, closeBrowser, {
-				interruptible: true,
-			});
-			return yield* use(browser);
-		}),
-	);
-}
-
+/**
+ * Renders through the `CodeModePngRenderer` Durable Object for the harness
+ * URL, which keeps warm Browser Run pages between requests.
+ */
 export function createCloudflareBrowserRunArtifactRenderer(
-	browserBinding: CloudflareBrowserRunBinding,
+	renderers: CodeModePngRendererNamespace,
 	options: CloudflareBrowserRunRendererOptions = {},
 ): CloudflareBrowserRunArtifactRenderer {
 	const harnessUrl = new URL(HARNESS_PATH, options.assetOrigin ?? DEFAULT_ASSET_ORIGIN).toString();
 
 	return {
+		prewarm: Effect.tryPromise({
+			try: async () => renderers.getByName(harnessUrl).prewarm(harnessUrl),
+			catch: browserFailure("durableObject"),
+		}).pipe(
+			Effect.withSpan("playground.browserRendering.prewarm"),
+			Effect.annotateSpans({ operation: "prewarm" }),
+			Effect.ignore,
+		),
 		renderPng: Effect.fn("playground.browserRendering.renderPng")((input) => {
-			const render = withScopedBrowserSession(
-				tryBrowserPromise("launch", async (signal) => {
-					const { launch } = await import("@cloudflare/playwright");
-					return launch(browserBindingWithSignal(browserBinding, signal), {
-						keep_alive: 10_000,
-					});
-				}),
-				(browser) =>
-					Effect.gen(function* () {
-						const page = yield* tryBrowserPromise("newPage", () => browser.newPage());
-						yield* tryBrowserPromise("goto", () =>
-							page.goto(harnessUrl, { waitUntil: "domcontentloaded" }),
-						);
-						yield* tryBrowserPromise("waitForHarness", () =>
-							page.waitForFunction(
-								"window.sketchiExportReady === true || Boolean(window.sketchiExportError)",
-							),
-						);
-
-						const harnessError = yield* tryBrowserPromise("evaluate", () =>
-							page.evaluate("window.sketchiExportError || null"),
-						);
-						if (typeof harnessError === "string" && harnessError.length > 0) {
-							return yield* Effect.fail(
-								BrowserRenderingFailure.make({
-									cause: new Error(harnessError),
-									message: harnessError,
-									operation: "evaluate",
-								}),
-							);
-						}
-
-						const pngBase64 = yield* tryBrowserPromise("evaluate", () =>
-							page.evaluate(
-								async ({ backgroundColor, excalidraw, padding, scale }) => {
-									const harness = globalThis as unknown as {
-										sketchiExportPng: (
-											scene: unknown,
-											exportOptions: {
-												backgroundColor: string;
-												padding: number;
-												scale: number;
-											},
-										) => Promise<string>;
-									};
-
-									return harness.sketchiExportPng(excalidraw, {
-										backgroundColor,
-										padding,
-										scale,
-									});
-								},
-								{
-									backgroundColor: input.scene.backgroundColor,
-									excalidraw: input.excalidraw,
-									padding: EXPORT_PADDING,
-									scale: EXPORT_SCALE,
-								},
-							),
-						);
-
-						return yield* Effect.try({
-							try: () => base64ToArrayBuffer(pngBase64),
-							catch: browserFailure("base64"),
-						}).pipe(
-							Effect.withSpan("playground.browserRendering.base64"),
-							Effect.annotateSpans({ operation: "base64" }),
-						);
+			const render = Effect.tryPromise({
+				try: () =>
+					renderers.getByName(harnessUrl).renderPng({
+						harnessUrl,
+						backgroundColor: input.scene.backgroundColor,
+						excalidraw: input.excalidraw,
 					}),
-			).pipe(
-				// Retry the entire scope so each acquired browser closes before a fresh launch.
+				catch: browserFailure("durableObject"),
+			}).pipe(
 				Effect.retry(browserRenderingRetrySchedule),
+				Effect.flatMap((result) =>
+					result._tag === "Rendered"
+						? Effect.succeed(result)
+						: Effect.fail(
+								BrowserRenderingFailure.make({
+									cause: new Error(result.message),
+									message: result.message,
+									operation: result.operation,
+								}),
+							),
+				),
+				Effect.tap((result) =>
+					Effect.annotateCurrentSpan({ cache_mode: result.coldStart ? "cold" : "warm" }),
+				),
+				Effect.map((result) => result.png),
 				Effect.timeout(BROWSER_RENDER_TIMEOUT_MS),
 				Effect.catchTag("TimeoutError", () =>
 					Effect.fail(
@@ -328,29 +191,4 @@ export function createCloudflareBrowserRunArtifactRenderer(
 			});
 		}),
 	};
-}
-
-function browserBindingWithSignal(
-	browserBinding: CloudflareBrowserRunBinding,
-	signal: AbortSignal,
-): CloudflareBrowserRunBinding {
-	return {
-		fetch: (request, init) =>
-			browserBinding.fetch(request, {
-				...init,
-				signal,
-			}),
-	};
-}
-
-function base64ToArrayBuffer(value: string): ArrayBuffer {
-	const binary = atob(value);
-	const buffer = new ArrayBuffer(binary.length);
-	const bytes = new Uint8Array(buffer);
-
-	for (let index = 0; index < binary.length; index += 1) {
-		bytes[index] = binary.charCodeAt(index);
-	}
-
-	return buffer;
 }

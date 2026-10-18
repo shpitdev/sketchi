@@ -2,13 +2,13 @@ declare module "cloudflare:workers" {
   import type { CodeModeObjectBucket } from "@sketchi/diagram-agent";
   import type { CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
   import type { CodeModeUsagePipelineBinding } from "./server/bindings/studio-env.server";
-  import type { CloudflareBrowserRunBinding } from "./server/codemode/browser-renderer.server";
+  import type { CodeModePngRendererNamespace } from "./server/codemode/browser-renderer.server";
   import type { PlaygroundAssetsBinding } from "./server/codemode/icon-catalog.server";
 
   export const env: {
     AI?: CloudflareAiGatewayProvider;
     ASSETS?: PlaygroundAssetsBinding;
-    BROWSER?: CloudflareBrowserRunBinding;
+    CODEMODE_PNG_RENDERER?: CodeModePngRendererNamespace;
     CODEMODE_USAGE_EVENTS?: CodeModeUsagePipelineBinding;
     CODEMODE_USAGE_ISSUES?: CodeModeUsagePipelineBinding;
     LOADER?: unknown;
@@ -19,4 +19,10 @@ declare module "cloudflare:workers" {
   };
 
   export function waitUntil(promise: Promise<unknown>): void;
+
+  export abstract class DurableObject<Env = unknown> {
+    protected readonly ctx: unknown;
+    protected readonly env: Env;
+    constructor(ctx: unknown, env: Env);
+  }
 }

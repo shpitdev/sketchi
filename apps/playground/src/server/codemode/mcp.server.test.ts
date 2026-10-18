@@ -1,6 +1,4 @@
 import { setImmediate } from "node:timers";
-import type { Browser } from "@cloudflare/playwright";
-import { launch } from "@cloudflare/playwright";
 import validationFixtures from "./fixtures/mcp-validation-issues-v2.json";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -37,21 +35,19 @@ import {
 	type SketchiCodeModeProvider,
 } from "./mcp.server";
 
-vi.mock("@cloudflare/playwright", () => ({ launch: vi.fn() }));
-
-function stubPngRenderer() {
-	vi.mocked(launch).mockImplementation(
-		async () =>
-			({
-				close: vi.fn(async () => {}),
-				newPage: async () => ({
-					goto: vi.fn(async () => {}),
-					waitForFunction: vi.fn(async () => {}),
-					evaluate: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(btoa("PNG")),
-				}),
-			}) as unknown as Browser,
-	);
-	return { BROWSER: { fetch }, SKETCHI_ARTIFACTS: new MemoryBucket() };
+function stubPngRenderer(): StudioEnv {
+	const pngRenderer = {
+		renderPng: async () => ({
+			_tag: "Rendered" as const,
+			coldStart: false,
+			png: new Uint8Array([80, 78, 71]).buffer,
+		}),
+		prewarm: () => {},
+	};
+	return {
+		CODEMODE_PNG_RENDERER: { getByName: () => pngRenderer },
+		SKETCHI_ARTIFACTS: new MemoryBucket(),
+	};
 }
 
 function testBoundary(env: StudioEnv, request: Request) {

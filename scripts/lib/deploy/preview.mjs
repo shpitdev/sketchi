@@ -106,6 +106,7 @@ export function validatePreviewConfig(config, projectId) {
 		"ai",
 		"browser",
 		"worker_loaders",
+		"durable_objects",
 		"observability",
 		"r2_buckets",
 		"pipelines",
@@ -114,11 +115,14 @@ export function validatePreviewConfig(config, projectId) {
 		if (!allowed.has(field))
 			throw new Error(`Review Preview isolation before adding previews.${field}.`);
 	}
-	for (const field of ["ai", "browser", "worker_loaders"]) {
-		const required = config[field];
+	// Wrangler gives every Preview its own Durable Object namespace, so these
+	// bindings carry no production state and must match production exactly.
+	for (const field of ["ai", "browser", "worker_loaders", "durable_objects"]) {
+		const bindings = (value) => (field === "durable_objects" ? (value?.bindings ?? []) : value);
+		const required = bindings(config[field]);
 		if (
 			(Array.isArray(required) ? required.length > 0 : required) &&
-			JSON.stringify(previews[field]) !== JSON.stringify(required)
+			JSON.stringify(bindings(previews[field])) !== JSON.stringify(required)
 		) {
 			throw new Error(`Preview runtime binding ${field} must be configured explicitly.`);
 		}

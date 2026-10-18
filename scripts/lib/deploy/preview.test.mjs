@@ -121,6 +121,9 @@ test("Preview validation rejects production targets, missing bindings, and unrev
 			delete config.previews.ai;
 		},
 		(config) => {
+			delete config.previews.durable_objects;
+		},
+		(config) => {
 			config.previews.services = [{ binding: "AUTH", service: "production-auth" }];
 		},
 	]) {

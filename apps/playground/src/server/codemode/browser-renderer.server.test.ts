@@ -1,43 +1,22 @@
-import type { Browser } from "@cloudflare/playwright";
-import { launch } from "@cloudflare/playwright";
-import { assert, describe, it } from "@effect/vitest";
+import { assert, describe, expect, it } from "@effect/vitest";
 import {
 	makeTelemetryTestSink,
 	makeWorkersTelemetryLayer,
 	type TelemetryMetricEvent,
-	type TelemetryLogEvent,
 	type TelemetrySpanEvent,
 } from "@sketchi/observability";
-import { Cause, Clock, Effect, Exit, Fiber } from "effect";
 import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
+import { Cause, Effect, Exit, Fiber } from "effect";
 import { TestClock } from "effect/testing";
-import { beforeEach, expect, vi } from "vitest";
+import { vi } from "vitest";
 
+import type { PngRenderRequest } from "./browser-render-pool.server";
 import {
 	BROWSER_RENDER_TIMEOUT_MS,
 	createCloudflareBrowserRunArtifactRenderer,
-	withScopedBrowserSession,
-	type CloudflareBrowserRunBinding,
+	type CodeModePngRendererNamespace,
 } from "./browser-renderer.server";
-
-vi.mock("@cloudflare/playwright", () => ({
-	launch: vi.fn(),
-}));
-
-const browserBinding: CloudflareBrowserRunBinding = { fetch };
-const transientMessage =
-	"Unable to connect to browser: code: 410: message: Browser not running (state: unhealthy)";
-
-function mockBrowser() {
-	const page = {
-		goto: vi.fn(async () => {}),
-		waitForFunction: vi.fn(async () => {}),
-		evaluate: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(btoa("PNG")),
-	};
-	const close = vi.fn(async () => {});
-	const newPage = vi.fn(async () => page);
-	return { browser: { close, newPage } as unknown as Browser, close, newPage, page };
-}
+import type { PngRenderResult } from "./png-renderer-object.server";
 
 function renderInput(): {
 	scene: RenderedDiagramScene;
@@ -65,228 +44,50 @@ function renderInput(): {
 	};
 }
 
-describe("Cloudflare Browser Rendering Code Mode renderer", () => {
-	const launchMock = vi.mocked(launch);
+function rendered(coldStart = false): PngRenderResult {
+	return { _tag: "Rendered", coldStart, png: new Uint8Array([80, 78, 71]).buffer };
+}
 
-	beforeEach(() => {
-		launchMock.mockReset();
+function fakeRenderers(renderPng: (request: PngRenderRequest) => Promise<PngRenderResult>) {
+	const renderPngMock = vi.fn(renderPng);
+	const prewarm = vi.fn((_harnessUrl: string) => {});
+	const getByName = vi.fn((_name: string) => ({ renderPng: renderPngMock, prewarm }));
+	const renderers: CodeModePngRendererNamespace = { getByName };
+	return { getByName, prewarm, renderPng: renderPngMock, renderers };
+}
+
+function restartedObjectError(): Error {
+	return Object.assign(new Error("Durable Object reset because its code was updated."), {
+		retryable: true,
 	});
+}
 
-	it.effect("retries an unhealthy launch with backoff and retry telemetry", () => {
+describe("Cloudflare Browser Run Code Mode renderer", () => {
+	it.effect("renders through the Durable Object for the harness URL with telemetry", () => {
 		const { probe, sink } = makeTelemetryTestSink();
 		return Effect.gen(function* () {
-			const { browser, close } = mockBrowser();
-			launchMock.mockRejectedValueOnce(new Error(transientMessage)).mockResolvedValue(browser);
-			const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
-			const fiber = yield* Effect.forkChild(renderer.renderPng(renderInput()));
-			yield* TestClock.adjust(249);
-			expect(launchMock).toHaveBeenCalledTimes(1);
-			yield* TestClock.adjust(1);
-			const png = yield* Fiber.join(fiber);
-			expect(new Uint8Array(png)).toEqual(new Uint8Array([80, 78, 71]));
-			expect(launchMock).toHaveBeenCalledTimes(2);
-			expect(close).toHaveBeenCalledTimes(1);
-			const retries = probe.events.filter(
-				(event): event is TelemetryMetricEvent =>
-					event.event === "effect.metric" && event.metric === "sketchi_browser_rendering_retries",
-			);
-			expect(retries).toHaveLength(1);
-			expect(retries[0]).toMatchObject({
-				value: 1,
-				attributes: { operation: "launch", failure_category: "BrowserRenderingFailure" },
-			});
-			const warnings = probe.events.filter(
-				(event): event is TelemetryLogEvent =>
-					event.event === "effect.log" && event.level === "Warn",
-			);
-			expect(warnings).toHaveLength(1);
-			expect(warnings[0]).toMatchObject({
-				message: "Retrying Browser Rendering session",
-				fields: { operation: "launch", failure_category: "BrowserRenderingFailure", attempt: 1 },
-			});
-		}).pipe(
-			Effect.provide(
-				makeWorkersTelemetryLayer({ resource: { serviceName: "sketchi-browser-test" }, sink }),
-			),
-		);
-	});
-
-	it.effect("does not retry a non-transient launch failure", () =>
-		Effect.gen(function* () {
-			launchMock.mockRejectedValue(new Error("Invalid browser binding"));
-			const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
-			const error = yield* Effect.flip(renderer.renderPng(renderInput()));
-			expect(error).toMatchObject({ _tag: "BrowserRenderingFailure", operation: "launch" });
-			expect(launchMock).toHaveBeenCalledTimes(1);
-		}),
-	);
-
-	it.effect("surfaces the third transient failure after 250ms and 750ms backoffs", () =>
-		Effect.gen(function* () {
-			launchMock.mockRejectedValue(new Error(transientMessage));
-			const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
-			const fiber = yield* Effect.forkChild(Effect.flip(renderer.renderPng(renderInput())));
-			yield* TestClock.adjust(250);
-			expect(launchMock).toHaveBeenCalledTimes(2);
-			yield* TestClock.adjust(749);
-			expect(launchMock).toHaveBeenCalledTimes(2);
-			yield* TestClock.adjust(1);
-			const error = yield* Fiber.join(fiber);
-			expect(error).toMatchObject({
-				_tag: "BrowserRenderingFailure",
-				operation: "launch",
-				message: transientMessage,
-			});
-			expect(launchMock).toHaveBeenCalledTimes(3);
-		}),
-	);
-
-	for (const operation of ["newPage", "goto", "waitForHarness"] as const) {
-		it.effect(`closes the failed ${operation} session before launching a fresh browser`, () =>
-			Effect.gen(function* () {
-				const first = mockBrowser();
-				const second = mockBrowser();
-				const failing =
-					operation === "newPage"
-						? first.newPage
-						: operation === "goto"
-							? first.page.goto
-							: first.page.waitForFunction;
-				failing.mockRejectedValueOnce(new Error("WebSocket connection closed"));
-				launchMock.mockResolvedValueOnce(first.browser).mockImplementationOnce(async () => {
-					expect(first.close).toHaveBeenCalledTimes(1);
-					return second.browser;
-				});
-				const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
-				const fiber = yield* Effect.forkChild(renderer.renderPng(renderInput()));
-				yield* TestClock.adjust(250);
-				yield* Fiber.join(fiber);
-				expect(launchMock).toHaveBeenCalledTimes(2);
-				expect(second.close).toHaveBeenCalledTimes(1);
-			}),
-		);
-	}
-
-	for (const operation of ["evaluate", "base64", "timeout"] as const) {
-		it.effect(`does not retry a deterministic ${operation} failure`, () =>
-			Effect.gen(function* () {
-				const { browser, close, page } = mockBrowser();
-				if (operation === "evaluate") page.evaluate.mockReset().mockResolvedValue(transientMessage);
-				if (operation === "base64")
-					page.evaluate.mockReset().mockResolvedValueOnce(null).mockResolvedValueOnce("%");
-				if (operation === "timeout")
-					page.waitForFunction.mockRejectedValue(
-						Object.assign(new Error("WebSocket timed out"), { name: "TimeoutError" }),
-					);
-				launchMock.mockResolvedValue(browser);
-				const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
-				const error = yield* Effect.flip(renderer.renderPng(renderInput()));
-				expect(error).toMatchObject({
-					_tag: "BrowserRenderingFailure",
-					operation: operation === "timeout" ? "waitForHarness" : operation,
-				});
-				expect(launchMock).toHaveBeenCalledTimes(1);
-				expect(close).toHaveBeenCalledTimes(1);
-			}),
-		);
-	}
-
-	for (const end of ["timeout", "interruption"] as const) {
-		it.effect(`closes a retried session on ${end} without resetting the deadline`, () =>
-			Effect.gen(function* () {
-				const { browser, close, page } = mockBrowser();
-				const waitStarted = Promise.withResolvers<void>();
-				page.waitForFunction.mockImplementation(
-					() => new Promise<void>(() => waitStarted.resolve()),
-				);
-				launchMock.mockRejectedValueOnce(new Error(transientMessage)).mockResolvedValue(browser);
-				const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
-				const startedAt = yield* Clock.currentTimeMillis;
-				const fiber = yield* Effect.forkChild(renderer.renderPng(renderInput()));
-				yield* TestClock.adjust(250);
-				yield* Effect.promise(() => waitStarted.promise);
-				if (end === "timeout") {
-					yield* TestClock.adjust(BROWSER_RENDER_TIMEOUT_MS - 250);
-				} else {
-					yield* Fiber.interrupt(fiber);
-				}
-				const exit = yield* Fiber.await(fiber);
-				assert.isTrue(Exit.isFailure(exit));
-				if (Exit.isFailure(exit)) {
-					if (end === "timeout") {
-						const failure = Cause.findError(exit.cause);
-						expect(failure).toMatchObject({
-							_tag: "Success",
-							success: { _tag: "BrowserRenderingTimeout" },
-						});
-						expect((yield* Clock.currentTimeMillis) - startedAt).toBe(BROWSER_RENDER_TIMEOUT_MS);
-					} else {
-						assert.isTrue(Cause.hasInterrupts(exit.cause));
-					}
-				}
-				expect(launchMock).toHaveBeenCalledTimes(2);
-				expect(close).toHaveBeenCalledTimes(1);
-				expect(close).toHaveBeenCalledWith({ reason: "Code Mode PNG render interrupted" });
-			}),
-		);
-	}
-
-	it.effect("interruption during backoff does not launch another session", () =>
-		Effect.gen(function* () {
-			const { browser, close, page } = mockBrowser();
-			page.goto.mockRejectedValue(new Error(transientMessage));
-			launchMock.mockResolvedValue(browser);
-			const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
-			const fiber = yield* Effect.forkChild(renderer.renderPng(renderInput()));
-			yield* TestClock.adjust(249);
-			expect(close).toHaveBeenCalledTimes(1);
-			yield* Fiber.interrupt(fiber);
-			yield* TestClock.adjust(1_000);
-			expect(launchMock).toHaveBeenCalledTimes(1);
-		}),
-	);
-
-	it.effect("renders through the harness with boundary telemetry", () => {
-		const { probe, sink } = makeTelemetryTestSink();
-		const telemetryLayer = makeWorkersTelemetryLayer({
-			resource: { serviceName: "sketchi-browser-test" },
-			sink,
-		});
-		return Effect.gen(function* () {
-			let visitedUrl = "";
-			const close = vi.fn(async () => {});
-			const page = {
-				goto: vi.fn(async (value: string) => {
-					visitedUrl = value;
-				}),
-				waitForFunction: vi.fn(async () => {}),
-				evaluate: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(btoa("PNG")),
-			};
-			launchMock.mockResolvedValue({
-				close,
-				newPage: vi.fn(async () => page),
-			} as unknown as Browser);
-
-			const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding, {
+			const { getByName, renderPng, renderers } = fakeRenderers(async () => rendered(true));
+			const renderer = createCloudflareBrowserRunArtifactRenderer(renderers, {
 				assetOrigin: "https://studio.test",
 			});
-			const png = yield* renderer.renderPng(renderInput());
+			const input = renderInput();
 
-			expect(visitedUrl).toBe("https://studio.test/codemode-export-harness");
+			const png = yield* renderer.renderPng(input);
+
 			expect(new Uint8Array(png)).toEqual(new Uint8Array([80, 78, 71]));
-			expect(close).toHaveBeenCalledTimes(1);
-			const spans = probe.events.filter(
-				(event): event is TelemetrySpanEvent => event.event === "effect.span",
+			expect(getByName).toHaveBeenCalledWith("https://studio.test/codemode-export-harness");
+			expect(renderPng).toHaveBeenCalledWith({
+				harnessUrl: "https://studio.test/codemode-export-harness",
+				backgroundColor: "#ffffff",
+				excalidraw: input.excalidraw,
+			});
+			const span = probe.events.find(
+				(event): event is TelemetrySpanEvent =>
+					event.event === "effect.span" && event.name === "playground.browserRendering.renderPng",
 			);
+			expect(span?.attributes["cache_mode"]).toBe("cold");
 			const metrics = probe.events.filter(
 				(event): event is TelemetryMetricEvent => event.event === "effect.metric",
-			);
-			assert.isTrue(
-				spans.some(
-					(span) =>
-						span.name === "playground.browserRendering.goto" &&
-						span.attributes["operation"] === "goto",
-				),
 			);
 			assert.deepInclude(
 				metrics.find((metric) => metric.metric === "sketchi_browser_rendering_requests")
@@ -297,69 +98,106 @@ describe("Cloudflare Browser Rendering Code Mode renderer", () => {
 					surface: "browser_rendering",
 				},
 			);
-		}).pipe(Effect.provide(telemetryLayer));
+		}).pipe(
+			Effect.provide(
+				makeWorkersTelemetryLayer({ resource: { serviceName: "sketchi-browser-test" }, sink }),
+			),
+		);
 	});
 
-	it.effect("closes on a typed page failure", () =>
+	it.effect("defaults the harness to the public product host", () =>
 		Effect.gen(function* () {
-			const close = vi.fn(async () => {});
-			launchMock.mockResolvedValue({
-				close,
-				newPage: vi.fn(async () => {
-					throw new Error("new page failed");
-				}),
-			} as unknown as Browser);
-
-			const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
-			const error = yield* Effect.flip(renderer.renderPng(renderInput()));
-
-			assert.strictEqual(error._tag, "BrowserRenderingFailure");
-			if (error._tag === "BrowserRenderingFailure") {
-				assert.strictEqual(error.operation, "newPage");
-			}
-			expect(close).toHaveBeenCalledTimes(1);
-		}),
-	);
-
-	it.effect("closes when scoped use defects", () =>
-		Effect.gen(function* () {
-			const close = vi.fn(async () => {});
-			const browser = { close } as unknown as Browser;
-			const exit = yield* Effect.exit(
-				withScopedBrowserSession(Effect.succeed(browser), () =>
-					Effect.die(new Error("render defect")),
-				),
+			const { getByName, renderers } = fakeRenderers(async () => rendered());
+			yield* createCloudflareBrowserRunArtifactRenderer(renderers).renderPng(renderInput());
+			expect(getByName).toHaveBeenCalledWith(
+				"https://playground.sketchi.app/codemode-export-harness",
 			);
-
-			assert.isTrue(Exit.isFailure(exit));
-			if (Exit.isFailure(exit)) {
-				assert.isTrue(Cause.hasDies(exit.cause));
-			}
-			expect(close).toHaveBeenCalledTimes(1);
 		}),
 	);
 
-	it.effect("times out with a typed failure and closes promptly", () =>
+	it.effect("maps a failed render to a typed failure without retrying", () =>
 		Effect.gen(function* () {
-			const waitStarted = Promise.withResolvers<void>();
-			const close = vi.fn(async () => {});
-			const page = {
-				goto: vi.fn(async () => {}),
-				waitForFunction: vi.fn(
-					() =>
-						new Promise<void>(() => {
-							waitStarted.resolve();
-						}),
-				),
-				evaluate: vi.fn(),
-			};
-			launchMock.mockResolvedValue({
-				close,
-				newPage: vi.fn(async () => page),
-			} as unknown as Browser);
-			const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
-			const fiber = yield* Effect.forkChild(renderer.renderPng(renderInput()));
-			yield* Effect.promise(() => waitStarted.promise);
+			const { renderPng, renderers } = fakeRenderers(async () => ({
+				_tag: "Failed",
+				message: "Browser not running (state: unhealthy)",
+				operation: "launch",
+			}));
+			const error = yield* Effect.flip(
+				createCloudflareBrowserRunArtifactRenderer(renderers).renderPng(renderInput()),
+			);
+			expect(error).toMatchObject({
+				_tag: "BrowserRenderingFailure",
+				operation: "launch",
+				message: "Browser not running (state: unhealthy)",
+			});
+			expect(renderPng).toHaveBeenCalledTimes(1);
+		}),
+	);
+
+	it.effect("retries a call interrupted by a Durable Object restart", () =>
+		Effect.gen(function* () {
+			const { renderPng, renderers } = fakeRenderers(async () => rendered());
+			renderPng.mockRejectedValueOnce(restartedObjectError());
+			const fiber = yield* Effect.forkChild(
+				createCloudflareBrowserRunArtifactRenderer(renderers).renderPng(renderInput()),
+			);
+			yield* TestClock.adjust(250);
+			const png = yield* Fiber.join(fiber);
+			expect(new Uint8Array(png)).toEqual(new Uint8Array([80, 78, 71]));
+			expect(renderPng).toHaveBeenCalledTimes(2);
+		}),
+	);
+
+	it.effect("does not retry an overloaded Durable Object", () =>
+		Effect.gen(function* () {
+			const { renderPng, renderers } = fakeRenderers(async () => {
+				throw Object.assign(restartedObjectError(), { overloaded: true });
+			});
+			const error = yield* Effect.flip(
+				createCloudflareBrowserRunArtifactRenderer(renderers).renderPng(renderInput()),
+			);
+			expect(error).toMatchObject({ _tag: "BrowserRenderingFailure", operation: "durableObject" });
+			expect(renderPng).toHaveBeenCalledTimes(1);
+		}),
+	);
+
+	it.effect("prewarms the Durable Object for the harness URL", () =>
+		Effect.gen(function* () {
+			const { getByName, prewarm, renderers } = fakeRenderers(async () => rendered());
+			yield* createCloudflareBrowserRunArtifactRenderer(renderers, {
+				assetOrigin: "https://studio.test",
+			}).prewarm;
+			expect(getByName).toHaveBeenCalledWith("https://studio.test/codemode-export-harness");
+			expect(prewarm).toHaveBeenCalledWith("https://studio.test/codemode-export-harness");
+		}),
+	);
+
+	it.effect("keeps a failed prewarm out of the caller's error channel", () =>
+		Effect.gen(function* () {
+			const { prewarm, renderers } = fakeRenderers(async () => rendered());
+			prewarm.mockImplementation(() => {
+				throw new Error("Durable Object overloaded");
+			});
+			const exit = yield* Effect.exit(
+				createCloudflareBrowserRunArtifactRenderer(renderers).prewarm,
+			);
+			assert.isTrue(Exit.isSuccess(exit));
+		}),
+	);
+
+	it.effect("times out with a typed failure", () =>
+		Effect.gen(function* () {
+			const callStarted = Promise.withResolvers<void>();
+			const { renderers } = fakeRenderers(
+				() =>
+					new Promise<PngRenderResult>(() => {
+						callStarted.resolve();
+					}),
+			);
+			const fiber = yield* Effect.forkChild(
+				createCloudflareBrowserRunArtifactRenderer(renderers).renderPng(renderInput()),
+			);
+			yield* Effect.promise(() => callStarted.promise);
 			yield* TestClock.adjust(BROWSER_RENDER_TIMEOUT_MS);
 			const exit = yield* Fiber.await(fiber);
 
@@ -371,41 +209,6 @@ describe("Cloudflare Browser Rendering Code Mode renderer", () => {
 					assert.strictEqual(failure.success._tag, "BrowserRenderingTimeout");
 				}
 			}
-			expect(close).toHaveBeenCalledTimes(1);
-		}),
-	);
-
-	it.effect("closes and releases the scope on interruption", () =>
-		Effect.gen(function* () {
-			const waitStarted = Promise.withResolvers<void>();
-			const close = vi.fn(async () => {});
-			const page = {
-				goto: vi.fn(async () => {}),
-				waitForFunction: vi.fn(
-					() =>
-						new Promise<void>(() => {
-							waitStarted.resolve();
-						}),
-				),
-				evaluate: vi.fn(),
-			};
-			launchMock.mockResolvedValue({
-				close,
-				newPage: vi.fn(async () => page),
-			} as unknown as Browser);
-			const renderer = createCloudflareBrowserRunArtifactRenderer(browserBinding);
-			const fiber = yield* Effect.forkChild(renderer.renderPng(renderInput()));
-			yield* Effect.promise(() => waitStarted.promise);
-			yield* Fiber.interrupt(fiber);
-			const exit = yield* Fiber.await(fiber);
-
-			assert.isTrue(Exit.isFailure(exit));
-			if (Exit.isFailure(exit)) {
-				assert.isTrue(Cause.hasInterrupts(exit.cause));
-			}
-			expect(close).toHaveBeenCalledWith({
-				reason: "Code Mode PNG render interrupted",
-			});
 		}),
 	);
 });

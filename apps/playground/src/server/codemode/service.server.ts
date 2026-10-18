@@ -69,6 +69,12 @@ export interface PlaygroundCodeModeShape {
 	readonly searchIcons: (
 		input: unknown,
 	) => Effect.Effect<SearchIconsResult, never, CodeModeRequestContext>;
+	/** Opens a PNG export page ahead of a session's first export. */
+	readonly prewarmPngRenderer: Effect.Effect<
+		void,
+		never,
+		PlaygroundBindings | PlaygroundRequestMetadata
+	>;
 	readonly readStoredArtifact: (
 		artifactId: string,
 		format: ArtifactFormat,
@@ -146,10 +152,10 @@ export const PlaygroundCodeModeLive = Layer.effect(
 					createId: ids.create,
 					artifactUrl: (input) => artifactUrl(metadata.origin, input),
 					...(env.ASSETS ? { icons: playgroundIconCatalog(env.ASSETS, metadata.origin) } : {}),
-					...(env.BROWSER
+					...(env.CODEMODE_PNG_RENDERER
 						? {
 								renderer: browserRendering.renderer(
-									env.BROWSER,
+									env.CODEMODE_PNG_RENDERER,
 									rendererOptions(env, metadata.origin),
 								),
 							}
@@ -188,6 +194,16 @@ export const PlaygroundCodeModeLive = Layer.effect(
 			searchIcons: Effect.fn("playground.codeMode.searchIcons")((input) =>
 				provideRequestCodeMode(searchIcons(input)),
 			),
+			prewarmPngRenderer: Effect.gen(function* () {
+				const env = yield* PlaygroundBindings;
+				const metadata = yield* PlaygroundRequestMetadata;
+				if (env.CODEMODE_PNG_RENDERER) {
+					yield* browserRendering.renderer(
+						env.CODEMODE_PNG_RENDERER,
+						rendererOptions(env, metadata.origin),
+					).prewarm;
+				}
+			}).pipe(Effect.withSpan("playground.codeMode.prewarmPngRenderer")),
 			readStoredArtifact: Effect.fn("playground.codeMode.readStoredArtifact")(
 				function* (artifactId, format) {
 					const env = yield* PlaygroundBindings;

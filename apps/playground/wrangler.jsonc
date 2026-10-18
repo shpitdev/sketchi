@@ -3,7 +3,7 @@
 	"name": "sketchi-studio",
 	"compatibility_date": "2026-06-06",
 	"compatibility_flags": ["nodejs_compat"],
-	"main": "@tanstack/react-start/server-entry",
+	"main": "./src/worker-entry.ts",
 	"assets": {
 		"binding": "ASSETS"
 	},
@@ -18,6 +18,21 @@
 	"worker_loaders": [
 		{
 			"binding": "LOADER"
+		}
+	],
+	// Holds warm Browser Run pages for Code Mode PNG export between requests.
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "CODEMODE_PNG_RENDERER",
+				"class_name": "CodeModePngRenderer"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["CodeModePngRenderer"]
 		}
 	],
 	"observability": {
@@ -67,6 +82,14 @@
 				"binding": "LOADER"
 			}
 		],
+		"durable_objects": {
+			"bindings": [
+				{
+					"name": "CODEMODE_PNG_RENDERER",
+					"class_name": "CodeModePngRenderer"
+				}
+			]
+		},
 		"observability": {
 			"enabled": true
 		},
