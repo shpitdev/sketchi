@@ -783,11 +783,16 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(executeTool?.description).toContain(
 				"Keep every requested step and decision in a separate node, preserving the prompt's step wording and order.",
 			);
-			// Every request pays for tools/list. Only flowcharts, most requests, skip docs({ topic }).
+			// Every request pays for tools/list. Flowcharts, most requests, carry their full topic;
+			// charts and state machines carry one compact line each. All three skip docs({ topic }).
 			expect(executeTool?.description).toContain(
 				getCodeModeDocs({ topic: "buildFlowchart" }).content,
 			);
 			expect(executeTool?.description).not.toMatch(/^type Build(?!Flowchart|Options)/m);
+			expect(executeTool?.description).toMatch(
+				/^- buildChart: .*series: \[\{ name\?, values: number\[\] \}\]/m,
+			);
+			expect(executeTool?.description).toMatch(/^- buildStateMachine: .*one may be "else"/m);
 			expect(
 				JSON.stringify(
 					tools.tools.map(({ name, description, inputSchema }) => ({
@@ -796,7 +801,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(9_000);
+			).toBeLessThan(9_600);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,

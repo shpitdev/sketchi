@@ -305,7 +305,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			return found.trim();
 		};
 		// Every request pays for the execute description. It carries the buildFlowchart topic verbatim,
-		// so flowcharts skip the docs turn, and no other family's types: about 1.5k o200k tokens.
+		// so flowcharts skip the docs turn, and no other family's types: about 1.8k o200k tokens.
 		const flowchartDocs = getCodeModeDocs({ topic: "buildFlowchart" }).content;
 		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
 			`buildFlowchart (no docs call needed):\n${flowchartDocs}`,
@@ -318,11 +318,48 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			"type BuildFlowchartRequest",
 			"type BuildOptions",
 		]);
-		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain("buildFlowchart needs no docs call");
+		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
+			"buildFlowchart, buildChart and buildStateMachine need no docs call",
+		);
 		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
 			'Before the first call to any other builder, read docs({ topic: "<builder>" })',
 		);
-		expect(SKETCHI_EXECUTE_DESCRIPTION.length).toBeLessThan(7_500);
+		// Charts and state machines skip the docs turn on one compact line each, about 130 o200k
+		// tokens apiece, not their full topics.
+		const indexLine = (operation: string) =>
+			SKETCHI_EXECUTE_DESCRIPTION.split("\n").find((line) => line.startsWith(`- ${operation}: `));
+		expect(indexLine("buildChart")).toBe(
+			'- buildChart: bar, line or pie charts of numbers across categories. spec: { title, kind: "bar" | "line" | "pie", categories: string[], series: [{ name?, values: number[] }], unit? ("$M", "%"), categoryAxisTitle?, valueAxisTitle?, stacked? (bar), donut? (pie), orientation? ("horizontal", bar) }. Give every series exactly one value per category, in category order, and name every series when there are several. A pie has one series of non-negative values, at most 8 slices and no axis titles. Copy every number, category, series name, unit and axis title from the prompt; invent none.',
+		);
+		expect(indexLine("buildStateMachine")).toBe(
+			'- buildStateMachine: states and the events, guards and actions that move between them. spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets; one may be "else". kind "final" (label optional) ends the machine and nothing leaves it. A state that ends the machine but has other outgoing transitions also gets a transition to a final state.',
+		);
+		const chartDocs = getCodeModeDocs({ topic: "buildChart" }).content;
+		const stateMachineDocs = getCodeModeDocs({ topic: "buildStateMachine" }).content;
+		expect(SKETCHI_EXECUTE_DESCRIPTION).not.toContain(chartDocs.split("\n\n")[0]);
+		expect(SKETCHI_EXECUTE_DESCRIPTION).not.toContain(stateMachineDocs.split("\n\n")[0]);
+		// Models that still call docs get the same guidance.
+		expect(chartDocs.split("Request type:")[0]).toMatchInlineSnapshot(`
+			"buildChart accepts { spec: { id?, title, kind, categories, series: [{ name?, values }], unit?, categoryAxisTitle?, valueAxisTitle?, stacked?, donut?, orientation? }, options? }. The renderer owns layout: nice ticks, value labels, legend and pie leader lines.
+
+			kind "bar" compares categories (stacked: true stacks the series; long names turn bars horizontal, or set orientation), "line" shows change across ordered categories, "pie" splits one whole (donut: true for a ring).
+
+			Give every series exactly one value per category, in category order, and name every series when there are several. A pie has one series of non-negative values and at most 8 slices; bars and lines take negatives, up to 40 categories and 6 series.
+
+			Copy every number, category, series name, unit and axis title from the prompt; invent none. unit labels ticks and values: currency symbols lead ("$", "$M"), others follow ("%", "ms", "k").
+
+			"
+		`);
+		expect(stateMachineDocs.split("Request type:")[0]).toMatchInlineSnapshot(`
+			"buildStateMachine accepts { spec: { id?, title, initial, states: [{ id, label?, kind?, parent?, initial? }], transitions: [{ id?, source, target, event?, guard?, action? }], layout?: { direction } }, options? }. Omit layout to let the renderer pick LR or TB.
+
+			initial is the top-level state the machine starts in. kind "final" is an end bullseye and needs no label; kind "choice" is a diamond whose outgoing transitions each carry a guard; one may be "else". States other states name as parent form a composite, drawn as a frame around them: give it initial, its first substate. Composites do not nest.
+
+			A transition is drawn event [guard] / action; write the guard without brackets. It may leave or enter a composite, or return to its own state. Every state must be reachable from initial, and final states have no outgoing transitions. A state that ends the machine but has other outgoing transitions also gets a transition to a final state.
+
+			"
+		`);
+		expect(SKETCHI_EXECUTE_DESCRIPTION.length).toBeLessThan(8_400);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		expect(overview).toContain(`${CODE_MODE_OPERATIONS.length} operations:`);
 		for (const operation of CODE_MODE_OPERATIONS) {

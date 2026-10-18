@@ -43,19 +43,37 @@ const HELPERS = {
 // Adding an operation without a summary fails typechecking, so the index cannot go stale.
 const OPERATION_SUMMARIES: Record<CodeModeOperation, string> = { ...BUILDERS, ...HELPERS };
 const OPERATIONS = Object.keys(OPERATION_SUMMARIES) as CodeModeOperation[];
-const operationIndex = (buildersHeading: string) =>
+const operationIndex = (
+	buildersHeading: string,
+	summaries: Record<keyof typeof BUILDERS, string> = BUILDERS,
+) =>
 	[
 		buildersHeading,
-		...Object.entries(BUILDERS).map(([operation, summary]) => `- ${operation}: ${summary}`),
+		...Object.entries(summaries).map(([operation, summary]) => `- ${operation}: ${summary}`),
 		"Helpers:",
 		...Object.values(HELPERS).map((summary) => `- ${summary}`),
 	].join("\n");
 const OPERATION_INDEX = operationIndex(
 	'Builders. Before the first call, read docs({ topic: "<builder>" }) for its request type, rules and example:',
 );
+/** Shared by the buildChart topic and the compact buildChart line in the execute description. */
+const CHART_SERIES_RULE =
+	"Give every series exactly one value per category, in category order, and name every series when there are several.";
+/** Shared by the buildStateMachine topic and its compact line in the execute description. */
+const STATE_MACHINE_END_RULE =
+	"A state that ends the machine but has other outgoing transitions also gets a transition to a final state.";
+const CHART_COPY_RULE =
+	"Copy every number, category, series name, unit and axis title from the prompt; invent none.";
 // Most requests are flowcharts, so the execute description carries that topic and saves a turn.
+// Charts and state machines save the same turn with one compact line each: the spec plus the rules
+// behind most first-try failures. Repair hints cover the rest.
 const EXECUTE_OPERATION_INDEX = operationIndex(
-	'Builders. buildFlowchart needs no docs call: its rules and request type end this description. Before the first call to any other builder, read docs({ topic: "<builder>" }) for its request type, rules and example:',
+	'Builders. buildFlowchart, buildChart and buildStateMachine need no docs call: the chart and state machine specs are on their lines and buildFlowchart\'s rules end this description. Before the first call to any other builder, read docs({ topic: "<builder>" }) for its request type, rules and example:',
+	{
+		...BUILDERS,
+		buildChart: `${BUILDERS.buildChart}. spec: { title, kind: "bar" | "line" | "pie", categories: string[], series: [{ name?, values: number[] }], unit? ("$M", "%"), categoryAxisTitle?, valueAxisTitle?, stacked? (bar), donut? (pie), orientation? ("horizontal", bar) }. ${CHART_SERIES_RULE} A pie has one series of non-negative values, at most 8 slices and no axis titles. ${CHART_COPY_RULE}`,
+		buildStateMachine: `${BUILDERS.buildStateMachine}. spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets; one may be "else". kind "final" (label optional) ends the machine and nothing leaves it. ${STATE_MACHINE_END_RULE}`,
+	},
 );
 const OPERATION_LIST = OPERATIONS.map((operation) => `sketchi.${operation}`).join(", ");
 
@@ -569,8 +587,8 @@ export const catalog: CatalogEntry[] = [
 		content: [
 			"buildChart accepts { spec: { id?, title, kind, categories, series: [{ name?, values }], unit?, categoryAxisTitle?, valueAxisTitle?, stacked?, donut?, orientation? }, options? }. The renderer owns layout: nice ticks, value labels, legend and pie leader lines.",
 			'kind "bar" compares categories (stacked: true stacks the series; long names turn bars horizontal, or set orientation), "line" shows change across ordered categories, "pie" splits one whole (donut: true for a ring).',
-			"Give every series exactly one value per category, in category order, and name every series when there are several. A pie has one series of non-negative values and at most 8 slices; bars and lines take negatives, up to 40 categories and 6 series.",
-			'Copy every number, category, series name, unit and axis title from the prompt; invent none. unit labels ticks and values: currency symbols lead ("$", "$M"), others follow ("%", "ms", "k").',
+			`${CHART_SERIES_RULE} A pie has one series of non-negative values and at most 8 slices; bars and lines take negatives, up to 40 categories and 6 series.`,
+			`${CHART_COPY_RULE} unit labels ticks and values: currency symbols lead ("$", "$M"), others follow ("%", "ms", "k").`,
 			operationTypes("buildChart"),
 		].join("\n\n"),
 		examples: [
@@ -600,7 +618,7 @@ export const catalog: CatalogEntry[] = [
 		content: [
 			"buildStateMachine accepts { spec: { id?, title, initial, states: [{ id, label?, kind?, parent?, initial? }], transitions: [{ id?, source, target, event?, guard?, action? }], layout?: { direction } }, options? }. Omit layout to let the renderer pick LR or TB.",
 			'initial is the top-level state the machine starts in. kind "final" is an end bullseye and needs no label; kind "choice" is a diamond whose outgoing transitions each carry a guard; one may be "else". States other states name as parent form a composite, drawn as a frame around them: give it initial, its first substate. Composites do not nest.',
-			"A transition is drawn event [guard] / action; write the guard without brackets. It may leave or enter a composite, or return to its own state. Every state must be reachable from initial, and final states have no outgoing transitions.",
+			`A transition is drawn event [guard] / action; write the guard without brackets. It may leave or enter a composite, or return to its own state. Every state must be reachable from initial, and final states have no outgoing transitions. ${STATE_MACHINE_END_RULE}`,
 			operationTypes("buildStateMachine"),
 		].join("\n\n"),
 		examples: [
