@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.15.0
+
+### Minor Changes
+
+- [#421](https://github.com/shpitdev/sketchi/pull/421) [`5299529`](https://github.com/shpitdev/sketchi/commit/529952956fcc4c9afe48bead342fa55236ccb353) Thanks [@anandpant](https://github.com/anandpant)! - Draw flowchart groups: declare `groups: [{ id, label }]` and set a node's `group` to put related steps in a labeled region, such as a team, a network zone or a phase. Each group exports as an Excalidraw frame named by its label.
+
 ## 0.14.1
 
 ### Patch Changes
