@@ -2,14 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
 	boundLabelWidth,
 	getCanvasValidationIssues,
+	parseTimelineDate,
 	parseTimelineDiagram,
 	timelineFixture,
 	type CanvasLineElement,
 	type CanvasShapeElement,
 	type CanvasTextElement,
+	type TimelineDiagram,
 } from "@sketchi/diagram-core";
 import { renderDiagram } from "../diagram.js";
 import type { RenderedDiagramScene } from "../scene.js";
+import { readTimelineAxis, readTimelineGaps } from "../timeline-readout.js";
 
 function timeline(events: unknown[], extra: Record<string, unknown> = {}) {
 	return parseTimelineDiagram({ id: "t", title: "T", type: "timeline", events, ...extra });
@@ -71,6 +74,123 @@ function expectReadableLayout(scene: RenderedDiagramScene) {
 		for (const other of stems)
 			if (other !== own && Math.abs(other.points[0].y - own.points[0].y) < 30)
 				expect(distance(own) < distance(other), `${caption.id} sits nearer ${other.id}`).toBe(true);
+	}
+}
+
+/** Every gap without a break mark is drawn at one shared scale. Returns the gaps. */
+function expectToScale(diagram: TimelineDiagram, scene = renderDiagram(diagram)) {
+	const moments = new Map(
+		diagram.events.map((event) => [
+			event.id,
+			{
+				start: parseTimelineDate(event.date!)!.start,
+				...(event.end ? { end: parseTimelineDate(event.end)!.end } : {}),
+			},
+		]),
+	);
+	const gaps = readTimelineGaps(scene, moments);
+	const rates = gaps.filter((gap) => !gap.broken).map((gap) => gap.drawn / gap.elapsed);
+	for (const [index, gap] of gaps.entries())
+		if (!gap.broken)
+			expect(
+				Math.abs(gap.drawn / gap.elapsed / rates[0]! - 1),
+				`${diagram.id} ${gap.from} → ${gap.to} (gap ${index}) is off scale`,
+			).toBeLessThan(1e-6);
+	return gaps;
+}
+
+const periodOf = (event: TimelineDiagram["events"][number]) => ({
+	start: parseTimelineDate(event.date!)!.start,
+	end: parseTimelineDate(event.end ?? event.date!)!.end,
+});
+
+/**
+ * Breaks stay clear of every point marker, on any lane, and never fall between
+ * simultaneous markers. A marker shares a bar only when it is dated inside that phase.
+ */
+function expectHonestMarkers(diagram: TimelineDiagram, scene: RenderedDiagramScene) {
+	const lanes = readTimelineAxis(scene);
+	const nodes = new Map(
+		markers(scene).map((element) => [element.nodeId.slice("event:".length), element]),
+	);
+	const events = new Map(diagram.events.map((event) => [event.id, event]));
+	const points = lanes.flatMap((lane) =>
+		[...lane.markers].flatMap(([id, marker]) =>
+			marker.end === undefined
+				? [
+						{
+							id,
+							at: marker.start,
+							half: nodes.get(id)!.width / 2,
+							time: periodOf(events.get(id)!).start,
+						},
+					]
+				: [],
+		),
+	);
+	for (const at of lanes.flatMap((lane) => lane.breaks)) {
+		for (const point of points)
+			expect(
+				Math.abs(point.at - at),
+				`${diagram.id}: a break at ${at.toFixed(1)} crosses ${point.id}`,
+			).toBeGreaterThanOrEqual(point.half + 7);
+		for (const time of new Set(points.map((point) => point.time))) {
+			const sides = new Set(
+				points.filter((point) => point.time === time).map((point) => point.at < at),
+			);
+			expect(sides.size, `${diagram.id}: a break splits the markers at ${time}`).toBe(1);
+		}
+	}
+	const axisYs = lines(scene)
+		.filter((line) => line.id.startsWith("axis:"))
+		.map((line) => line.points[0].y);
+	// The axis a marker hangs from: the nearest at or above its center.
+	const axisOf = (node: CanvasShapeElement) =>
+		Math.max(...axisYs.filter((y) => y <= node.y + node.height / 2 + 0.5));
+	for (const lane of lanes) {
+		const ids = [...lane.markers.keys()];
+		// When an unrelated marker spans a phase's x-range, every phase on that lane leaves the axis.
+		const barIds = ids.filter((id) => events.get(id)!.end !== undefined);
+		const crowded = barIds.some((barId) => {
+			const bar = nodes.get(barId)!;
+			const phase = periodOf(events.get(barId)!);
+			return ids.some((id) => {
+				const point = nodes.get(id)!;
+				const time = periodOf(events.get(id)!).start;
+				return (
+					events.get(id)!.end === undefined &&
+					axisOf(point) === axisOf(bar) &&
+					(time < phase.start || time >= phase.end) &&
+					point.x < bar.x + bar.width - 0.5 &&
+					bar.x < point.x + point.width - 0.5
+				);
+			});
+		});
+		if (crowded)
+			for (const barId of barIds) {
+				const bar = nodes.get(barId)!;
+				expect(
+					axisYs.some((y) => Math.abs(bar.y + bar.height / 2 - y) < 0.5),
+					`${diagram.id}: ${barId} stays on the axis while its lane's phases moved below`,
+				).toBe(false);
+			}
+		for (const barId of ids.filter((id) => events.get(id)!.end !== undefined)) {
+			const bar = nodes.get(barId)!;
+			const phase = periodOf(events.get(barId)!);
+			for (const pointId of ids.filter((id) => events.get(id)!.end === undefined)) {
+				const point = nodes.get(pointId)!;
+				const time = periodOf(events.get(pointId)!).start;
+				if (time >= phase.start && time < phase.end) continue;
+				const overlaps =
+					point.x < bar.x + bar.width - 0.5 &&
+					bar.x < point.x + point.width - 0.5 &&
+					point.y < bar.y + bar.height - 0.5 &&
+					bar.y < point.y + point.height - 0.5;
+				expect(overlaps, `${diagram.id}: ${pointId} overlaps the unrelated phase ${barId}`).toBe(
+					false,
+				);
+			}
+		}
 	}
 }
 
@@ -292,21 +412,89 @@ describe("native timeline layout", () => {
 		expectReadableLayout(scene);
 	});
 
-	it("marks an outsized gap with an axis break instead of empty axis", () => {
-		const scene = renderDiagram(
-			timeline([
-				{ id: "a", label: "v0.1", date: "2026-01-05" },
-				{ id: "b", label: "v0.2", date: "2026-01-12" },
-				{ id: "c", label: "v0.3", date: "2026-01-19" },
-				{ id: "d", label: "v1.0", date: "2026-06-30" },
-				{ id: "e", label: "v2.0", date: "2028-03-01" },
-			]),
-		);
+	it("draws a 162-day gap 23 times a 7-day one and breaks only the gap it cannot draw", () => {
+		const diagram = timeline([
+			{ id: "a", label: "v0.1", date: "2026-01-05" },
+			{ id: "b", label: "v0.2", date: "2026-01-12" },
+			{ id: "c", label: "v0.3", date: "2026-01-19" },
+			{ id: "d", label: "v1.0", date: "2026-06-30" },
+			{ id: "e", label: "v2.0", date: "2028-03-01" },
+		]);
+		const scene = renderDiagram(diagram);
+		const gaps = expectToScale(diagram, scene);
+		expect(gaps.map((gap) => gap.broken)).toEqual([false, false, false, true]);
+		expect(gaps[2]!.drawn / gaps[0]!.drawn).toBeCloseTo(162 / 7, 6);
 		expect(lines(scene).filter((line) => line.id.startsWith("break:"))).toHaveLength(2);
-		const [a, b, , d, e] = ["a", "b", "c", "d", "e"].map((id) => centerX(marker(scene, id)));
-		expect(d! - b!).toBeGreaterThan(2 * (b! - a!));
-		expect(e! - d!).toBeLessThan(d! - a!);
+		// The break stands in for more time than the drawn 162 days, yet draws shorter.
+		expect(gaps[3]!.drawn).toBeLessThan(gaps[2]!.drawn);
 		expectReadableLayout(scene);
+	});
+
+	it("breaks each outsized gap where it falls and keeps every other gap to scale", () => {
+		const diagram = timeline([
+			{ id: "a", label: "Kickoff", date: "2026-01-05" },
+			{ id: "b", label: "Design review", date: "2026-01-06" },
+			{ id: "c", label: "Prototype", date: "2026-01-09" },
+			{ id: "d", label: "Pilot", date: "2027-03-01" },
+			{ id: "e", label: "Pilot review", date: "2027-03-03" },
+			{ id: "f", label: "Rollout", date: "2027-03-17" },
+			{ id: "g", label: "Sunset", date: "2031-06-30" },
+		]);
+		const scene = renderDiagram(diagram);
+		const gaps = expectToScale(diagram, scene);
+		expect(gaps.map((gap) => gap.broken)).toEqual([false, false, true, false, false, true]);
+		expect(gaps[1]!.drawn / gaps[0]!.drawn).toBeCloseTo(3, 6);
+		expect(gaps[4]!.drawn / gaps[0]!.drawn).toBeCloseTo(14, 6);
+		expectReadableLayout(scene);
+	});
+
+	it("keeps breaks clear of simultaneous markers on any lane", () => {
+		const diagram = timeline(
+			[
+				{ id: "a0", label: "A0", date: "2026-01-01", lane: "A" },
+				{ id: "a1", label: "A1", date: "2026-01-01", lane: "A" },
+				{ id: "a2", label: "A2", date: "2026-01-01", lane: "A" },
+				{ id: "b0", label: "Phase", date: "2026-01-01", end: "2026-12-31", lane: "B" },
+				{ id: "b1", label: "B1", date: "2026-01-02", lane: "B" },
+				{ id: "b2", label: "B2", date: "2026-01-03", lane: "B" },
+			],
+			{ lanes: ["A", "B"] },
+		);
+		const scene = renderDiagram(diagram);
+		expect(lines(scene).some((line) => line.id.startsWith("break:"))).toBe(true);
+		expectHonestMarkers(diagram, scene);
+		expectToScale(diagram, scene);
+		expectReadableLayout(scene);
+	});
+
+	it("keeps a milestone just past a phase off that phase's bar, without moving its date", () => {
+		const diagram = timeline(
+			[
+				{ id: "discovery", label: "Discovery", date: "2026-01-05", end: "2026-02-13" },
+				{ id: "freeze", label: "Design freeze", date: "2026-02-13", kind: "milestone" },
+				{ id: "build", label: "Build", date: "2026-02-16", end: "2026-05-29" },
+				{ id: "beta", label: "Beta", date: "2026-06-01", end: "2026-07-31" },
+				{ id: "launch", label: "Launch", date: "2026-08-04", kind: "milestone" },
+			],
+			{ today: "2026-03-10" },
+		);
+		const scene = renderDiagram(diagram);
+		expectHonestMarkers(diagram, scene);
+		expectToScale(diagram, scene);
+		expectReadableLayout(scene);
+		// The lane's phases move below the axis together; the milestones stay on it.
+		const bars = ["discovery", "build", "beta"].map((id) => marker(scene, id));
+		const freeze = marker(scene, "freeze");
+		expect(new Set(bars.map((bar) => bar.y)).size).toBe(1);
+		expect(bars[0]!.y).toBeGreaterThan(freeze.y + freeze.height / 2);
+		expect(marker(scene, "launch").y).toBe(freeze.y);
+		expect(scene.width / scene.height).toBeLessThan(3);
+		// Build spans Today, so its label hangs from the longer side, clear of the line.
+		const todayX = lines(scene).find((line) => line.id === "today:0")!.points[0].x;
+		for (const element of texts(scene).filter((entry) => entry.id.endsWith("event:build"))) {
+			const { left, right } = box(element);
+			expect(todayX < left || todayX > right, `${element.id} crosses Today`).toBe(true);
+		}
 	});
 
 	it("wraps a long chronology into left-to-right rows that continue the axis", () => {
@@ -395,20 +583,23 @@ describe("native timeline layout", () => {
 				),
 			),
 		);
-		expectReadableLayout(
-			renderDiagram(
-				timeline(
-					Array.from({ length: 60 }, (_, index) => ({
-						id: `e${index}`,
-						label: `Release ${index + 1}`,
-						date: new Date(Date.UTC(2026, 0, 1 + index * 6 + (index % 7) * 3))
-							.toISOString()
-							.slice(0, 10),
-						...(index % 4 === 0 ? { description: "Shipped to all regions." } : {}),
-					})),
-				),
-			),
+		const releases = timeline(
+			Array.from({ length: 60 }, (_, index) => ({
+				id: `e${index}`,
+				label: `Release ${index + 1}`,
+				date: new Date(Date.UTC(2026, 0, 1 + index * 6 + (index % 7) * 3))
+					.toISOString()
+					.slice(0, 10),
+				...(index % 4 === 0 ? { description: "Shipped to all regions." } : {}),
+			})),
 		);
+		const wrapped = renderDiagram(releases);
+		expectReadableLayout(wrapped);
+		// Gaps split across a row wrap stay to scale too.
+		expect(
+			lines(wrapped).filter((line) => line.id.startsWith("continue-out:")).length,
+		).toBeGreaterThan(0);
+		expect(expectToScale(releases, wrapped).every((gap) => !gap.broken)).toBe(true);
 	});
 
 	it("re-spaces a phase label that would crowd simultaneous events instead of crossing stems", () => {
@@ -451,6 +642,11 @@ describe("native timeline layout", () => {
 	});
 
 	it("never needs an unchecked placement across generated timelines", () => {
-		for (const diagram of randomTimelines(160)) expectReadableLayout(renderDiagram(diagram));
+		for (const diagram of randomTimelines(160)) {
+			const scene = renderDiagram(diagram);
+			expectReadableLayout(scene);
+			expectToScale(diagram, scene);
+			expectHonestMarkers(diagram, scene);
+		}
 	});
 });

@@ -1,4 +1,4 @@
-import { timelineScenarioChecks } from "./timeline-scenarios.js";
+import { timelineScenarioChecks, timelineSpacingCheck } from "./timeline-scenarios.js";
 import {
 	type CanonicalDiagram,
 	type FlowchartDiagram,
@@ -478,10 +478,11 @@ function evaluation(
 	scenarioId: string,
 	diagram: CanonicalDiagram,
 	familyChecks: readonly ScenarioCheck[],
+	sceneChecks: (scene: RenderedDiagramScene) => readonly ScenarioCheck[] = () => [],
 ): ScenarioEvaluation {
 	const scene = renderDiagram(diagram);
 	const { check, excalidrawScene, excalidrawValidation } = excalidrawCheck(scene);
-	const checks = [...familyChecks, check];
+	const checks = [...familyChecks, ...sceneChecks(scene), check];
 	return {
 		checks,
 		diagram,
@@ -646,7 +647,14 @@ export function evaluateScenarioDiagram(
 		const diagram = parseTimelineDiagram(candidate);
 		const modelDiagram =
 			modelCandidate === candidate ? diagram : parseTimelineDiagram(modelCandidate);
-		return evaluation(scenario.id, diagram, timelineScenarioChecks(scenario, modelDiagram));
+		// Spacing reads the drawn scene, so it scores the returned diagram.
+		const dated = scenario.assertions.events.some((event) => event.date !== undefined);
+		return evaluation(
+			scenario.id,
+			diagram,
+			timelineScenarioChecks(scenario, modelDiagram),
+			(scene) => (dated ? [timelineSpacingCheck(scenario, diagram, scene)] : []),
+		);
 	}
 	if (scenario.diagramType === "sequence") {
 		const diagram = parseSequenceDiagram(candidate);

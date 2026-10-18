@@ -3,3 +3,4 @@ export * from "./scene.js";
 export * from "./sequence.js";
 
 export * from "./timeline.js";
+export * from "./timeline-readout.js";

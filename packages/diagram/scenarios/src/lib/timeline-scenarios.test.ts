@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineDiagram } from "@sketchi/diagram-core";
+import { renderDiagram, type RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import { evaluateScenarioDiagram } from "./evaluate.js";
-import { timelineScenarios } from "./timeline-scenarios.js";
+import { timelineScenarios, timelineSpacingCheck } from "./timeline-scenarios.js";
 
 type Event = TimelineDiagram["events"][number];
 const withEvent = (
@@ -200,5 +201,59 @@ describe("prompt-grounded timeline scenarios", () => {
 			(event) => ({ ...event, date: "2026-11-03T18:58:00Z" }),
 		);
 		expect(evaluateScenarioDiagram(outage, utc).ok).toBe(true);
+	});
+	it("checks every dated scenario's drawn spacing against the prompt's real time", () => {
+		for (const scenario of timelineScenarios) {
+			const spacing = evaluateScenarioDiagram(scenario, scenario.expectedDiagram).checks.find(
+				(check) => check.id === "timeline-spacing",
+			);
+			const dated = scenario.expectedDiagram.events.some((event) => event.date !== undefined);
+			expect(spacing?.passed, scenario.id).toBe(dated ? true : undefined);
+		}
+	});
+	it("library-releases rejects a gap compressed without a break and accepts one marked by a break", () => {
+		const scenario = byId("library-releases-timeline");
+		const scene = renderDiagram(scenario.expectedDiagram);
+		expect(timelineSpacingCheck(scenario, scenario.expectedDiagram, scene).passed).toBe(true);
+		// Draw v1.0 at about 5x a 7-day gap after v0.3, as before, with no break there.
+		const position = (id: string) => {
+			const marker = scene.elements.find(
+				(element) => element.type === "node" && element.nodeId === `event:${id}`,
+			)!;
+			return marker.type === "node" ? marker.x : 0;
+		};
+		const week = position("v02") - position("v01");
+		const shift = position("v03") + 5 * week - position("v10");
+		type Element = RenderedDiagramScene["elements"][number];
+		type Line = Extract<Element, { type: "line" }>;
+		const tick = (id: string, from: number, to: number): Line => ({
+			type: "line",
+			id,
+			points: [
+				{ x: from, y: 0 },
+				{ x: to, y: 0 },
+			],
+		});
+		const moved = (element: Element): Element =>
+			element.type === "node" && (element.nodeId === "event:v10" || element.nodeId === "event:v20")
+				? { ...element, x: element.x + shift }
+				: element.type === "line" && element.id.startsWith("break:")
+					? tick(element.id, element.points[0].x + shift, element.points[1].x + shift)
+					: element;
+		const compressed = { ...scene, elements: scene.elements.map(moved) };
+		const check = timelineSpacingCheck(scenario, scenario.expectedDiagram, compressed);
+		expect(check.passed).toBe(false);
+		expect(check.message).toContain("v03 → v10");
+		// The same compression with a break drawn in that gap is honest.
+		const breakAt = (position("v03") + position("v10") + shift) / 2;
+		const marked = {
+			...compressed,
+			elements: [
+				...compressed.elements,
+				tick("break:0:0:9:a", breakAt - 7, breakAt - 1),
+				tick("break:0:0:9:b", breakAt + 1, breakAt + 7),
+			],
+		};
+		expect(timelineSpacingCheck(scenario, scenario.expectedDiagram, marked).passed).toBe(true);
 	});
 });

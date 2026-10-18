@@ -8,6 +8,7 @@ import {
 	type TimelineEvent,
 	type TimelineEventKind,
 } from "@sketchi/diagram-core";
+import { readTimelineGaps, type RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import type { DiagramScenarioDifficulty } from "./scenarios.js";
 import type { ScenarioCheck } from "./evaluate.js";
 
@@ -228,28 +229,40 @@ function sameTimelineDate(actual: string | undefined, expected: string): boolean
 	return Boolean(a && b && a.granularity === b.granularity && a.start === b.start);
 }
 
+const normalize = (label: string) =>
+	label
+		.toLowerCase()
+		.replace(/[^\p{L}\p{N}]+/gu, " ")
+		.trim();
+
+/** Each prompt event's distinct model event, in prompt order, matched by label. */
+function matchTimelineEvents(
+	scenario: TimelineScenario,
+	actual: readonly TimelineEvent[],
+): (TimelineEvent | undefined)[] {
+	const used = new Set<string>();
+	return scenario.assertions.events.map((expected) => {
+		const event = actual.find(
+			(candidate) =>
+				!used.has(candidate.id) &&
+				expected.labels.some((label) => normalize(candidate.label).includes(normalize(label))),
+		);
+		if (event) used.add(event.id);
+		return event;
+	});
+}
+
 /** Match each prompt event to a distinct model event, with its actual date/order. */
 export function timelineScenarioChecks(
 	scenario: TimelineScenario,
 	diagram: TimelineDiagram,
 ): ScenarioCheck[] {
 	const actual = orderedTimelineEvents(diagram);
-	const normalize = (label: string) =>
-		label
-			.toLowerCase()
-			.replace(/[^\p{L}\p{N}]+/gu, " ")
-			.trim();
-	const used = new Set<string>();
+	const matched = matchTimelineEvents(scenario, actual);
 	let previous: TimelineEvent | undefined;
 	let ordered = true;
 	const checks = scenario.assertions.events.map((expected, index) => {
-		const found = actual.findIndex(
-			(event) =>
-				!used.has(event.id) &&
-				expected.labels.some((label) => normalize(event.label).includes(normalize(label))),
-		);
-		const event = actual[found];
-		if (event) used.add(event.id);
+		const event = matched[index];
 		// Simultaneous events may appear in either order.
 		if (!event || (previous && timelineEventTime(event) < timelineEventTime(previous)))
 			ordered = false;
@@ -308,4 +321,43 @@ export function timelineScenarioChecks(
 					},
 				]),
 	];
+}
+
+/** Drawn gaps may differ from one shared scale by this fraction. */
+const SPACING_TOLERANCE = 0.05;
+
+/**
+ * Dated prompts: every drawn gap between the prompt's events is to one scale,
+ * measured against the prompt's own dates, unless an axis break marks that gap.
+ */
+export function timelineSpacingCheck(
+	scenario: TimelineScenario,
+	diagram: TimelineDiagram,
+	scene: RenderedDiagramScene,
+): ScenarioCheck {
+	const matched = matchTimelineEvents(scenario, orderedTimelineEvents(diagram));
+	const moments = new Map(
+		scenario.assertions.events.flatMap((expected, index) => {
+			const event = matched[index];
+			const start = expected.date === undefined ? undefined : parseTimelineDate(expected.date);
+			if (!event || !start) return [];
+			const end = expected.end === undefined ? undefined : parseTimelineDate(expected.end);
+			return [[event.id, { start: start.start, ...(end ? { end: end.end } : {}) }] as const];
+		}),
+	);
+	const gaps = readTimelineGaps(scene, moments).filter((gap) => !gap.broken);
+	const rates = gaps.map((gap) => gap.drawn / gap.elapsed);
+	const low = Math.min(...rates);
+	const high = Math.max(...rates);
+	const typical = rates.toSorted((a, b) => a - b)[Math.floor(rates.length / 2)]!;
+	const offness = rates.map((rate) => Math.abs(Math.log(rate / typical)));
+	const worst = gaps[offness.indexOf(Math.max(...offness))];
+	const passed = gaps.length < 2 || (low > 0 && high / low <= 1 + SPACING_TOLERANCE);
+	return {
+		id: "timeline-spacing",
+		passed,
+		message: passed
+			? `${gaps.length} unbroken gap(s) are drawn to one scale of the prompt's real time.`
+			: `Unbroken gaps differ from one time scale by ${Math.round((high / low - 1) * 100)}% (${worst?.from} → ${worst?.to}); compress a gap only with an axis break there.`,
+	};
 }

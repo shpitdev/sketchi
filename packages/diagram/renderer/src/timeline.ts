@@ -53,11 +53,12 @@ const CAPTION_SLACK = MIN_MARKER_GAP / 2 - 2;
 const AXIS_OVERHANG = 24;
 const CONTINUATION_LENGTH = 32;
 const BREAK_HALF_GAP = 4;
+/** A wrapped row ends at least this far past its last marker. */
+const ROW_TAIL = MIN_MARKER_GAP / 2;
 const LANE_GAP = 28;
 const ROW_GAP = 48;
 const HEADER_GAP = 18;
 const TODAY_LABEL_GAP = 6;
-const BREAK_RATIO = 6;
 /** How much farther out a stacked bar's label may sit to stay on its own side. */
 const STACKED_LABEL_BIAS = 120;
 const TARGET_ASPECT = 2;
@@ -119,6 +120,18 @@ interface Placement {
 interface Row {
 	readonly first: number;
 	readonly last: number;
+	/** Where the row's solid axis starts and ends, on the unwrapped axis. */
+	readonly start: number;
+	readonly end: number;
+}
+
+/** Where a row may end inside the gap after anchor `key`. */
+interface Cut {
+	readonly key: number;
+	readonly low: number;
+	readonly high: number;
+	/** After a break the next row resumes at its first event, not where this one ends. */
+	readonly resume: number | undefined;
 }
 
 interface LaneRowLayout {
@@ -166,6 +179,15 @@ function median(values: readonly number[]): number {
 	return sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
 }
 
+/** The middle of the widest stretch of `from`..`to` that no taken moment splits. */
+function widestMiddle(from: number, to: number, taken: readonly number[]): number {
+	const stops = [from, ...taken.filter((at) => at > from && at < to), to].toSorted((a, b) => a - b);
+	let best = { from, to: from };
+	for (const [index, at] of stops.slice(1).entries())
+		if (at - stops[index]! > best.to - best.from) best = { from: stops[index]!, to: at };
+	return (best.from + best.to) / 2;
+}
+
 /** Rendered timelines: a time-scaled axis per lane with labels on both sides. */
 export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagramScene {
 	const input = validateTimelineDiagram(diagram);
@@ -189,32 +211,54 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 		anchorKeys.push(anchor);
 		return anchorKeys.length - 1;
 	};
-	// Simultaneous points on one lane get separate anchors; across lanes they align.
-	const ties = new Map<string, number>();
-	const rawItems = events.map((event, index) => {
-		const start = dated ? parseTimelineDate(event.date!)! : undefined;
-		const end = event.end === undefined ? undefined : parseTimelineDate(event.end)!;
-		const time = start ? start.start : (event.order ?? index);
-		const span = end !== undefined;
-		const tieOf = (at: number) => {
-			const tieKey = `${event.lane ?? ""}\u0000${at}`;
-			const tie = ties.get(tieKey) ?? 0;
-			ties.set(tieKey, tie + 1);
-			return tie;
-		};
-		// A phase's label hangs from its own anchor at the midpoint, spaced like a point.
-		const stemTime = end ? (time + end.end) / 2 : time;
-		const stem = keyOf({ time: stemTime, tie: tieOf(stemTime) });
-		return {
-			event,
-			index,
-			span,
-			start: span ? keyOf({ time, tie: 0 }) : stem,
-			end: end ? keyOf({ time: end.end, tie: 0 }) : undefined,
-			stem,
-		};
-	});
 	const todayDate = input.today === undefined ? undefined : parseTimelineDate(input.today);
+	// Simultaneous points on one lane get separate anchors; across lanes they align.
+	// Points take the first ties, so a marker sits at its own moment. A phase's
+	// label hangs from its midpoint, or from the middle of its widest stretch
+	// free of other stems when the midpoint is taken.
+	const ties = new Map<string, number>();
+	const taken = new Map<string, number[]>();
+	const rawItems = [false, true]
+		.flatMap((spans) =>
+			events.flatMap((event, index) => {
+				const span = event.end !== undefined;
+				if (span !== spans) return [];
+				const start = dated ? parseTimelineDate(event.date!)! : undefined;
+				const end = event.end === undefined ? undefined : parseTimelineDate(event.end)!;
+				const time = start ? start.start : (event.order ?? index);
+				const lane = event.lane ?? "";
+				const tieOf = (at: number) => {
+					const tieKey = `${lane}\u0000${at}`;
+					const tie = ties.get(tieKey) ?? 0;
+					ties.set(tieKey, tie + 1);
+					taken.set(lane, [...(taken.get(lane) ?? []), at]);
+					return tie;
+				};
+				const midpoint = end ? (time + end.end) / 2 : time;
+				// The Today line crosses every tier, so a phase around it hangs its
+				// label from the longer side.
+				const today = todayDate && end && todayDate.start > time && todayDate.start < end.end;
+				const stemTime =
+					end && (today || ties.has(`${lane}\u0000${midpoint}`))
+						? widestMiddle(time, end.end, [
+								...(taken.get(lane) ?? []),
+								...(today ? [todayDate.start] : []),
+							])
+						: midpoint;
+				const stem = keyOf({ time: stemTime, tie: tieOf(stemTime) });
+				return [
+					{
+						event,
+						index,
+						span,
+						start: span ? keyOf({ time, tie: 0 }) : stem,
+						end: end ? keyOf({ time: end.end, tie: 0 }) : undefined,
+						stem,
+					},
+				];
+			}),
+		)
+		.toSorted((a, b) => a.index - b.index);
 	const todayRawKey = todayDate ? keyOf({ time: todayDate.start, tie: 0 }) : undefined;
 	const order = anchorKeys
 		.map((anchor, key) => ({ anchor, key }))
@@ -249,43 +293,28 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 	});
 	const todayKey = todayRawKey === undefined ? undefined : rank.get(todayRawKey);
 
-	// Spacing: about one comfortable label pitch per item, distributed by
-	// elapsed time; outsized gaps become marked axis breaks.
+	// Spacing: one scale for the whole chronology, about one comfortable label
+	// pitch per item and raised until same-lane neighbors clear each other. A gap
+	// that scale would draw too long becomes a marked axis break of fixed length;
+	// nothing else is drawn off scale.
 	const unit = Math.min(
 		128,
 		Math.max(72, Math.round((median(items.map((item) => item.width)) + BLOCK_GAP_X) / 2 + 8)),
 	);
-	const x = Array.from({ length: anchors.length }, () => 0);
+	const breakLength = 1.5 * unit;
+	let x = Array.from({ length: anchors.length }, () => 0);
 	const breaks = new Set<number>();
+	// A phase keeps its true length, so no break falls inside one unless nothing else fits.
+	const insideSpan = (key: number) =>
+		items.some((item) => item.span && item.startKey <= key && item.endKey > key);
 	if (!dated) {
 		anchors.forEach((_, key) => (x[key] = key * unit));
 	} else if (anchors.length > 1) {
 		const gaps = anchors.slice(1).map((anchor, key) => anchor.time - anchors[key]!.time);
 		const total = gaps.reduce((sum, gap) => sum + gap, 0);
 		const target = items.length * unit;
-		const maxGap = 3 * unit;
-		const breakLength = 1.5 * unit;
-		let scale = total > 0 ? target / total : 0;
-		// Only an outlier breaks: long on the page and far beyond the typical gap.
-		// A phase keeps its true length, so no break falls inside one.
-		const insideSpan = (key: number) =>
-			items.some((item) => item.span && item.startKey <= key && item.endKey > key);
-		gaps.forEach((gap, key) => {
-			const others = gaps.filter((other, index) => index !== key && other > 0);
-			if (
-				gap * scale > maxGap &&
-				(!others.length || gap > BREAK_RATIO * median(others)) &&
-				!insideSpan(key)
-			)
-				breaks.add(key);
-		});
-		const kept = gaps.reduce((sum, gap, key) => sum + (breaks.has(key) ? 0 : gap), 0);
-		if (breaks.size && kept > 0)
-			scale = Math.min(scale * 2, Math.max(scale, (target - breaks.size * breakLength) / kept));
-		gaps.forEach((gap, key) => {
-			x[key + 1] =
-				x[key]! + (anchors[key + 1]!.tie > 0 ? 0 : breaks.has(key) ? breakLength : gap * scale);
-		});
+		const maxGap = 10 * unit;
+		const comfortable = total > 0 ? target / total : 0;
 		// Minimum distances: stems on a lane stay apart, bars stay visible. A stem
 		// sits farther from the previous one than the next label's inset, so that
 		// label always fits flagged rightward without covering an earlier stem.
@@ -309,72 +338,158 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 			),
 			...items
 				.filter((item) => item.span)
-				.flatMap((item) => [
-					{ from: item.startKey, to: item.endKey, min: MIN_BAR_WIDTH },
-					// A marker just outside a bar stays clear of its end.
-					...items
-						.filter((point) => !point.span && point.lane === item.lane)
-						.flatMap((point) =>
-							anchors[point.startKey]!.time >= anchors[item.endKey]!.time
-								? [{ from: item.endKey, to: point.startKey, min: DIAMOND_SIZE / 2 + 4 }]
-								: anchors[point.startKey]!.time < anchors[item.startKey]!.time
-									? [{ from: point.startKey, to: item.startKey, min: DIAMOND_SIZE / 2 + 4 }]
-									: [],
-						),
-				]),
-		]
-			.filter((constraint) => constraint.to > constraint.from)
-			.toSorted((a, b) => a.to - b.to || a.from - b.from);
-		for (const { from, to, min } of constraints) {
-			const distance = x[to]! - x[from]!;
-			if (distance >= min) continue;
-			const stretch = distance > 0 ? min / distance : 0;
-			for (let key = from + 1; key < x.length; key += 1)
-				x[key] =
-					key < to
-						? distance > 0
-							? x[from]! + (x[key]! - x[from]!) * stretch
-							: x[from]!
-						: x[key]! + min - distance;
+				// A marker may touch a bar's end, as a marker inside a bar sits on it.
+				.map((item) => ({ from: item.startKey, to: item.endKey, min: MIN_BAR_WIDTH })),
+		].filter((constraint) => constraint.to > constraint.from);
+		// Simultaneous events fan out right of their true position, so the next
+		// moment is still measured from where this one really falls. A break
+		// starts past every earlier marker on any lane, so all of them stay on
+		// its near side.
+		const tieStep = Math.max(MIN_MARKER_GAP, ...constraints.map((constraint) => constraint.min));
+		const place = (scale: number) => {
+			const placed = [0];
+			let moment = 0;
+			let reach = 0;
+			gaps.forEach((gap, key) => {
+				const anchor = anchors[key + 1]!;
+				if (anchor.tie > 0) placed.push(moment + anchor.tie * tieStep);
+				else {
+					moment = breaks.has(key) ? reach + breakLength : moment + gap * scale;
+					placed.push(moment);
+				}
+				reach = Math.max(reach, placed[key + 1]!);
+			});
+			return placed;
+		};
+		// Distances are affine in the scale, so each constraint sets a minimum scale.
+		const distances = () => {
+			const [at0, at1] = [place(0), place(1)];
+			return constraints.map(({ from, to, min }) => {
+				const fixed = at0[to]! - at0[from]!;
+				return { from, to, min, fixed, perScale: at1[to]! - at0[to]! - (at1[from]! - at0[from]!) };
+			});
+		};
+		// A phase cannot break, so its bar stops growing at twice an outsized gap.
+		// Past that, neighbors too close to draw get a break between them.
+		const longestSpan = Math.max(
+			0,
+			...items
+				.filter((item) => item.span)
+				.map((item) => anchors[item.endKey]!.time - anchors[item.startKey]!.time),
+		);
+		const maxScale = longestSpan > 0 ? Math.max(comfortable, (2 * maxGap) / longestSpan) : Infinity;
+		let scale = comfortable;
+		for (;;) {
+			const kept = gaps.reduce((sum, gap, key) => sum + (breaks.has(key) ? 0 : gap), 0);
+			const relaxed =
+				breaks.size && kept > 0
+					? Math.min(
+							comfortable * 2,
+							Math.max(comfortable, (target - breaks.size * breakLength) / kept),
+						)
+					: comfortable;
+			const measured = distances();
+			const needed = Math.max(
+				relaxed,
+				...measured.map(({ min, fixed, perScale }) =>
+					perScale > 0 && fixed < min ? (min - fixed) / perScale : 0,
+				),
+			);
+			scale = Math.min(needed, maxScale);
+			const added = gaps.flatMap((gap, key) =>
+				!breaks.has(key) && gap * scale > maxGap && !insideSpan(key) ? [key] : [],
+			);
+			// A neighbor still too close gets a break on the longest gap between
+			// them instead of a silent stretch.
+			for (const { from, to, min, fixed, perScale } of measured)
+				if (fixed + perScale * scale < min - 1e-6) {
+					const range = gaps
+						.map((gap, key) => ({ gap, key }))
+						.slice(from, to)
+						.filter(({ gap, key }) => gap > 0 && !breaks.has(key));
+					const widest = range.toSorted((a, b) => b.gap - a.gap || a.key - b.key)[0];
+					if (widest) added.push(widest.key);
+				}
+			if (!added.length) break;
+			for (const key of added) breaks.add(key);
 		}
+		x = place(scale);
 	}
 
-	// Row cuts fall between anchors that no span crosses, preferring breaks.
-	const cuttable = anchors
-		.slice(0, -1)
-		.flatMap((_, key) =>
-			items.some((item) => item.span && item.startKey <= key && item.endKey > key) ? [] : [key],
-		);
+	// Rows wrap one continuous axis like lines of text. A row may end anywhere in
+	// a gap that no span crosses, and the next row resumes at that same moment,
+	// so the gap's length is split across the two rows and stays to scale. A row
+	// that ends in a break shows the break at its end and resumes at the next
+	// event. Cuts prefer breaks, then wide gaps.
+	const reachBefore = x.map((_, key) => Math.max(...x.slice(0, key + 1)));
+	const reachAfter = x.map((_, key) => Math.min(...x.slice(key)));
+	const cuts = anchors.slice(0, -1).flatMap((_, key): Cut[] => {
+		if (insideSpan(key)) return [];
+		if (breaks.has(key)) {
+			const end = reachBefore[key]! + AXIS_OVERHANG + BREAK_HALF_GAP;
+			return [{ key, low: end, high: end, resume: reachAfter[key + 1]! - AXIS_OVERHANG }];
+		}
+		const low = reachBefore[key]! + ROW_TAIL;
+		const high = reachAfter[key + 1]! - ROW_TAIL;
+		return low <= high ? [{ key, low, high, resume: undefined }] : [];
+	});
 	const rowsFor = (count: number): Row[] => {
 		const length = x[x.length - 1]!;
 		const rows: Row[] = [];
 		let first = 0;
+		let start = -AXIS_OVERHANG;
 		for (let row = 1; row < count; row += 1) {
 			const ideal = (length * row) / count;
-			const choice = cuttable
-				.filter((key) => key >= first && key < anchors.length - 1)
-				.map((key) => ({
-					key,
-					cost:
-						Math.abs((x[key]! + x[key + 1]!) / 2 - ideal) -
-						(breaks.has(key) ? unit : 0) -
-						(x[key + 1]! - x[key]!) / 4,
-				}))
-				.toSorted((a, b) => a.cost - b.cost || a.key - b.key)[0];
+			const choice = cuts
+				.filter((cut) => cut.key >= first)
+				.map((cut) => {
+					const at = Math.min(cut.high, Math.max(cut.low, ideal));
+					return {
+						cut,
+						at,
+						cost:
+							Math.abs(at - ideal) -
+							(cut.resume === undefined ? 0 : unit) -
+							Math.min(cut.high - cut.low, 2 * unit) / 4,
+					};
+				})
+				.toSorted((a, b) => a.cost - b.cost || a.cut.key - b.cut.key)[0];
 			if (!choice) break;
-			rows.push({ first, last: choice.key });
-			first = choice.key + 1;
+			rows.push({ first, last: choice.cut.key, start, end: choice.at });
+			first = choice.cut.key + 1;
+			start = choice.cut.resume ?? choice.at;
 		}
-		rows.push({ first, last: anchors.length - 1 });
+		rows.push({ first, last: anchors.length - 1, start, end: Math.max(...x) + AXIS_OVERHANG });
 		return rows;
 	};
 
+	// A marker dated outside a phase but drawn over its bar would read as part of
+	// it. Then every phase on that lane moves to a track below the axis, so the
+	// lane's bars stay together and no date moves. A marker dated inside its own
+	// phase may sit on the bar.
+	const belowAxis = new Set(
+		items.flatMap((bar) => {
+			if (!bar.span) return [];
+			const right = x[bar.startKey]! + Math.max(MIN_BAR_WIDTH, x[bar.endKey]! - x[bar.startKey]!);
+			return items.some(
+				(point) =>
+					!point.span &&
+					point.lane === bar.lane &&
+					(point.startKey < bar.startKey || point.startKey >= bar.endKey) &&
+					x[point.startKey]! + markerHalf(point) > x[bar.startKey]! &&
+					x[point.startKey]! - markerHalf(point) < right,
+			)
+				? [bar.lane]
+				: [];
+		}),
+	);
 	const layout = (rows: readonly Row[]) => {
 		const laneCount = Math.max(1, laneNames.length);
 		const rowLayouts = rows.map((row, rowIndex) => {
-			const offset =
-				x[row.first]! - (rowIndex > 0 ? CONTINUATION_LENGTH + AXIS_OVERHANG : AXIS_OVERHANG);
+			const offset = row.start - (rowIndex > 0 ? CONTINUATION_LENGTH : 0);
 			const localX = (key: number) => x[key]! - offset;
+			// The farthest any marker up to this anchor reaches, on any lane.
+			const reachX = (key: number) => reachBefore[key]! - offset;
 			const todayX =
 				todayKey !== undefined && todayKey >= row.first && todayKey <= row.last
 					? localX(todayKey)
@@ -386,15 +501,17 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 					),
 					localX,
 					todayX,
+					belowAxis.has(lane) ? 1 : 0,
 				),
 			);
 			return {
 				row,
 				localX,
+				reachX,
 				todayX,
 				lanes,
-				axisStart: rowIndex > 0 ? CONTINUATION_LENGTH : 0,
-				axisEnd: localX(row.last) + AXIS_OVERHANG,
+				axisStart: row.start - offset,
+				axisEnd: row.end - offset,
 			};
 		});
 		return rowLayouts;
@@ -456,26 +573,34 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 				// Long rough strokes double up; structural lines draw clean.
 				const stroke = { strokeColor: tone.stroke, strokeWidth: 2 as const, roughness: 0 as const };
 				// Axis segments between breaks, then break ticks and row continuations.
+				// A row that ends in a break draws it at its end, before the continuation.
 				const breakXs = [...breaks]
+					.toSorted((a, b) => a - b)
 					.filter((key) => key >= rowLayout.row.first && key < rowLayout.row.last)
-					.map((key) => left + (rowLayout.localX(key) + rowLayout.localX(key + 1)) / 2);
+					.map((key) => left + (rowLayout.reachX(key) + rowLayout.localX(key + 1)) / 2)
+					.concat(
+						continued && breaks.has(rowLayout.row.last)
+							? [left + rowLayout.axisEnd - BREAK_HALF_GAP]
+							: [],
+					);
 				const stops = [
 					left + rowLayout.axisStart,
 					...breakXs.flatMap((breakX) => [breakX - BREAK_HALF_GAP, breakX + BREAK_HALF_GAP]),
 					left + rowLayout.axisEnd,
 				];
 				for (let segment = 0; segment < stops.length; segment += 2)
-					push(
-						line(
-							`axis:${suffix}${segment ? `:${segment / 2}` : ""}`,
-							[
-								{ x: stops[segment]!, y: axisY },
-								{ x: stops[segment + 1]!, y: axisY },
-							],
-							stroke,
-						),
-						back,
-					);
+					if (stops[segment + 1]! > stops[segment]!)
+						push(
+							line(
+								`axis:${suffix}${segment ? `:${segment / 2}` : ""}`,
+								[
+									{ x: stops[segment]!, y: axisY },
+									{ x: stops[segment + 1]!, y: axisY },
+								],
+								stroke,
+							),
+							back,
+						);
 				breakXs.forEach((breakX, index) =>
 					[-1, 1].forEach((side) =>
 						push(
@@ -487,7 +612,7 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 								],
 								stroke,
 							),
-							back,
+							front,
 						),
 					),
 				);
@@ -763,15 +888,22 @@ const PLACEMENT_STRATEGIES: readonly PlacementStrategy[] = [
 	{ lookahead: false, coverPenalty: 240 },
 ];
 
+function markerHalf(item: Item): number {
+	return item.span
+		? BAR_HEIGHT / 2
+		: (item.event.kind === "milestone" ? DIAMOND_SIZE : DOT_SIZE) / 2;
+}
+
 /** The shallowest of a few deterministic greedy placements. */
 function placeLane(
 	items: readonly Item[],
 	localX: (key: number) => number,
 	todayX: number | undefined,
+	lowest: number,
 ): LaneRowLayout {
 	let best: LaneRowLayout | undefined;
 	for (const strategy of PLACEMENT_STRATEGIES) {
-		const layout = placeLaneWith(items, localX, todayX, strategy);
+		const layout = placeLaneWith(items, localX, todayX, lowest, strategy);
 		if (!best || layout.above + layout.below < best.above + best.below) best = layout;
 	}
 	return best!;
@@ -787,16 +919,18 @@ function placeLaneWith(
 	items: readonly Item[],
 	localX: (key: number) => number,
 	todayX: number | undefined,
+	lowest: number,
 	strategy: PlacementStrategy,
 ): LaneRowLayout {
-	// Overlapping spans stack into tracks below the axis line.
+	// Overlapping spans stack into tracks below the axis line, from `lowest` down.
 	const trackEnds: number[] = [];
 	const trackOf = new Map<Item, number>();
 	for (const item of items
 		.filter((entry) => entry.span)
 		.toSorted((a, b) => a.startKey - b.startKey)) {
-		let track = trackEnds.findIndex((end) => end <= item.startKey);
-		if (track < 0) track = trackEnds.length;
+		let track = trackEnds.findIndex((end, index) => index >= lowest && end <= item.startKey);
+		if (track < 0) track = Math.max(lowest, trackEnds.length);
+		while (trackEnds.length < track) trackEnds.push(-Infinity);
 		trackEnds[track] = item.endKey;
 		trackOf.set(item, track);
 	}
@@ -912,9 +1046,6 @@ function placeLaneWith(
 		blocks[side].push({ left, right: left + item.width, near, far: near + item.height });
 		stems[side].push({ x: stemX, reach: near });
 		const track = trackOf.get(item) ?? 0;
-		const markerHalf = item.span
-			? BAR_HEIGHT / 2
-			: (item.event.kind === "milestone" ? DIAMOND_SIZE : DOT_SIZE) / 2;
 		const trackOffset = track * (BAR_HEIGHT + BAR_TRACK_GAP);
 		placements.push({
 			item,
@@ -922,7 +1053,7 @@ function placeLaneWith(
 			side,
 			near,
 			left,
-			stemStart: side > 0 ? trackOffset + markerHalf : markerHalf - trackOffset,
+			stemStart: side > 0 ? trackOffset + markerHalf(item) : markerHalf(item) - trackOffset,
 			track,
 		});
 		preferred = -side as -1 | 1;
