@@ -4,6 +4,7 @@ import {
 	flowchartBranchRestates,
 	flowchartLabelMatches,
 	flowchartLabelWords,
+	flowchartObjectPhraseMatches,
 } from "./flowchart-labels";
 
 describe("prompt-grounded flowchart labels", () => {
@@ -202,5 +203,35 @@ describe("prompt-grounded flowchart labels", () => {
 
 	it("keeps yes whole", () => {
 		expect(flowchartLabelWords("Yes")).toEqual(["yes"]);
+	});
+
+	it.each([
+		["Routine appointment", ["schedules a routine appointment"]],
+		["Appointment, routine", ["schedule routine appointment"]],
+		["Nurse triage", ["perform nurse triage"]],
+		["Intake information", ["collects intake information"]],
+		["Answer in Redis", ["store the answer in Redis"]],
+	])("accepts %s as the object of a dropped leading verb", (label, alternatives) => {
+		expect(flowchartObjectPhraseMatches(label, alternatives)).toBe(true);
+	});
+
+	it.each([
+		["Appointment", ["schedule routine appointment"]],
+		["Cancel routine appointment", ["schedule routine appointment"]],
+		["Routine appointment booked", ["schedule routine appointment"]],
+		["No routine appointment", ["schedule routine appointment"]],
+		["Routine appointment?", ["schedule routine appointment"]],
+		["Is the answer cached?", ["return cached answer"]],
+		["Answer", ["store the answer in Redis"]],
+		["Redis", ["store the answer in Redis"]],
+		["Canary", ["deploy canary"]],
+		["Triage", ["perform nurse triage"]],
+		["Low severity", ["monitoring low severity"]],
+		["Day appointment", ["same-day appointment"]],
+		["Back canary", ["roll back the canary"]],
+		["Substitute supplier", ["unavailable suppliers use a substitute supplier"]],
+		["Party waitlist", ["if not, add the party to the waitlist"]],
+	])("rejects %s: not exactly the object of a listed leading verb", (label, alternatives) => {
+		expect(flowchartObjectPhraseMatches(label, alternatives)).toBe(false);
 	});
 });

@@ -4,6 +4,7 @@ import {
 	flowchartBranchRestates,
 	flowchartLabelMatches,
 	flowchartLabelWords,
+	flowchartObjectPhraseMatches,
 } from "./flowchart-labels.js";
 import type { FlowchartScenario } from "./scenarios.js";
 
@@ -29,6 +30,15 @@ const MAX_ENTRY_NODES = 2;
 
 function question(label: string): string {
 	return label.replaceAll("?", "");
+}
+
+/** The label names the step, or for an action, its object without the leading verb. */
+function namesStepLabel(label: string, step: RequiredStep): boolean {
+	return (
+		flowchartLabelMatches(label, step.labels) ||
+		((step.kind === "process" || step.kind === "end") &&
+			flowchartObjectPhraseMatches(label, step.labels))
+	);
 }
 
 /** The text shares a content word with one of the alternatives. */
@@ -141,8 +151,7 @@ export function matchFlowchartSteps(
 		}
 		return false;
 	};
-	const namesStep = (label: string) =>
-		requiredNodes.some((step) => flowchartLabelMatches(label, step.labels));
+	const namesStep = (label: string) => requiredNodes.some((step) => namesStepLabel(label, step));
 	// An expected end also accepts an action that represents it: one whose sole
 	// edge leads to a terminal end, or one whose every edge loops back to work
 	// it came from (a retry after `Request more details`). Never a start or
@@ -167,7 +176,7 @@ export function matchFlowchartSteps(
 			step.id,
 			new Set(
 				graph.nodes
-					.filter((node) => kindFits(node, step) && flowchartLabelMatches(node.label, step.labels))
+					.filter((node) => kindFits(node, step) && namesStepLabel(node.label, step))
 					.map((node) => node.id),
 			),
 		]),

@@ -306,6 +306,66 @@ export function flowchartLabelMatches(label: string, alternatives: readonly stri
 	});
 }
 
+// Action verbs a step label may drop while keeping the step's object. A
+// finite list, so a leading noun (`Nurse triage`, `Monitoring low severity`)
+// or a compound (`Same-day appointment`) is never taken for a dropped verb.
+const LEADING_ACTION_VERBS = new Set(
+	[
+		"add",
+		"call",
+		"check",
+		"collect",
+		"create",
+		"log",
+		"match",
+		"perform",
+		"present",
+		"quote",
+		"remove",
+		"request",
+		"return",
+		"run",
+		"schedule",
+		"send",
+		"ship",
+		"show",
+		"store",
+		"use",
+		"verify",
+	].map(inflectionStem),
+);
+
+/**
+ * An action step may be drawn as the noun phrase left when its leading verb is
+ * dropped: `Routine appointment` for `schedules a routine appointment`. The
+ * alternative must start with a LEADING_ACTION_VERBS verb followed by at least
+ * two plain object words, and the label's content words must be exactly
+ * those object words, in any order. A question (`Is the answer cached?`), a
+ * lone noun (`Appointment`), a different verb (`Cancel routine appointment`),
+ * extra words, and negation all fail.
+ */
+export function flowchartObjectPhraseMatches(
+	label: string,
+	alternatives: readonly string[],
+): boolean {
+	if (label.includes("?")) return false;
+	const labelWords = new Set(flowchartLabelWords(label).filter((word) => !STOPWORDS.has(word)));
+	return alternatives.some((alternative) => {
+		const [verb, ...object] = flowchartLabelWords(alternative).filter(
+			(word) => !STOPWORDS.has(word),
+		);
+		const phrase = new Set(object);
+		return (
+			verb !== undefined &&
+			LEADING_ACTION_VERBS.has(verb) &&
+			phrase.size >= 2 &&
+			!object.some((word) => OPERATOR_WORDS.has(word)) &&
+			labelWords.size === phrase.size &&
+			[...phrase].every((word) => labelWords.has(word))
+		);
+	});
+}
+
 /**
  * A yes/no branch may restate its decision's criterion instead of answering
  * yes or no: `Healthy`, `Not healthy` or `Unhealthy` for `Canary healthy?`;

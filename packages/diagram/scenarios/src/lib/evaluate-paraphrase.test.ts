@@ -152,7 +152,62 @@ function incidentEscalationEdges(monitoringBranch: string): EdgeSpec[] {
 	];
 }
 
+function patientIntake(routine: string) {
+	return flow(
+		"patient-intake-scheduling",
+		[
+			["request", "start", "Patient requests an appointment"],
+			["intake", "process", "Clinic collects intake information"],
+			["urgent", "decision", "Are there urgent symptoms?"],
+			["triage", "process", "Nurse triage"],
+			["same-day", "end", "Same-day appointment"],
+			["insurance", "decision", "Is insurance valid?"],
+			["routine", "end", routine],
+			["self-pay", "decision", "Does the patient accept self-pay?"],
+			["billing", "end", "Refer to billing"],
+		],
+		[
+			["request", "intake"],
+			["intake", "urgent"],
+			["urgent", "triage", "Yes"],
+			["urgent", "insurance", "No"],
+			["triage", "same-day"],
+			["insurance", "routine", "Valid"],
+			["insurance", "self-pay", "Invalid"],
+			["self-pay", "routine", "Yes"],
+			["self-pay", "billing", "No"],
+		],
+	);
+}
+
 describe("paraphrased generations pass", () => {
+	it.each(["Routine appointment", "Appointment (routine)", "Routine care"])(
+		"accepts %s: the stated step without its leading verb",
+		(routine) => {
+			expect(failed(patientIntake(routine))).toEqual([]);
+		},
+	);
+
+	it("keeps a question that restates a step's object as the decision", () => {
+		const nodes = AI_APP_TAIL.map((node): NodeSpec =>
+			node[0] === "cache" ? ["cache", "decision", "Is the answer cached?"] : node,
+		);
+		const edges = aiAppTailEdges("page", "Cache hit", "Cache miss");
+		expect(
+			failed(
+				flow(
+					"ai-app-stack-logos",
+					[
+						["vercel", "start", "Receive the request on Vercel", "vercel"],
+						["page", "process", "Next.js page receives the question", "nextjs"],
+						...nodes,
+					],
+					[["vercel", "page"], ...edges],
+				),
+			),
+		).toEqual([]);
+	});
+
 	it("accepts a dimension question with value branches as the stated decision", () => {
 		const result = flow(
 			"password-reset-security",
@@ -542,6 +597,13 @@ describe("paraphrased generations pass", () => {
 });
 
 describe("real losses still fail", () => {
+	it.each(["Appointment", "Cancel routine appointment", "No routine appointment", "Routine visit"])(
+		"fails %s for the stated routine appointment",
+		(routine) => {
+			expect(failed(patientIntake(routine))).toContain("node-label:Schedule routine appointment");
+		},
+	);
+
 	it.each([
 		["tests-block", "Not failed", "edge:Tests pass?->Block release:no"],
 		["canary-rollback", "Not unhealthy", "edge:Canary healthy?->Rollback canary:no"],

@@ -84,6 +84,15 @@ Action steps require action-bearing alternatives (`acknowledges`, not just
 Named stages or destinations use their names when the prompt supplies no
 action, rather than inventing a fixture-only verb. Decision alternatives
 retain the prompt's criterion, such as `scope clear` or `payment succeeds`.
+A process or end step also accepts the noun phrase left when an alternative's
+leading action verb is dropped: `Routine appointment` for `schedules a routine
+appointment`, `Nurse triage` for `perform nurse triage`. The verb must come
+from a finite list in `flowchart-labels.ts`, at least two object words must
+remain, and the label's content words must be exactly those object words.
+A question, a lone noun (`Appointment`), a different verb (`Cancel routine
+appointment`), extra words, a dropped named entity (`Answer` for `store the
+answer in Redis`), and negation still fail. Starts, decisions, branches, and
+edges never drop words this way.
 
 Both sides reduce words to a shared inflection stem in three stages: a
 plural or third-person `-s`/`-es`/`-ies`, then `-ed`/`-ied`/`-ing`, then a
