@@ -526,6 +526,16 @@ export class FlowchartSpecNode extends Schema.Class<FlowchartSpecNode>("Flowchar
 		kind: FlowchartNodeKindSchema,
 		description: optionalContract(NonEmptyString),
 		icon: optionalContract(NodeIconSpec),
+		group: optionalContract(NonEmptyString),
+	},
+	{ identifier: undefined },
+) {}
+
+/** A labeled region that holds the nodes whose group is its id. */
+export class FlowchartSpecGroup extends Schema.Class<FlowchartSpecGroup>("FlowchartSpecGroup")(
+	{
+		id: RequiredNonEmptyString,
+		label: RequiredNonEmptyString,
 	},
 	{ identifier: undefined },
 ) {}
@@ -602,12 +612,14 @@ export class FlowchartSpec extends Schema.Class<FlowchartSpec>("FlowchartSpec")(
 		title: RequiredNonEmptyString,
 		nodes: requiredArray(nonEmptyArray(FlowchartSpecNode)),
 		edges: FlowchartEdgesWithDefault,
+		groups: optionalContract(Schema.Array(FlowchartSpecGroup).pipe(Schema.mutable)),
 		layout: FlowchartLayoutWithDefault,
 		style: DiagramStyleWithDefault,
 	},
 	{ identifier: undefined },
 ) {}
 export const FlowchartSpecSchema = FlowchartSpec;
+export const FlowchartSpecGroupSchema = FlowchartSpecGroup;
 export const FlowchartSpecNodeSchema = FlowchartSpecNode;
 export const FlowchartSpecEdgeSchema = FlowchartSpecEdge;
 export const FlowchartSpecLayoutSchema = FlowchartSpecLayout;
@@ -1545,6 +1557,7 @@ const NormalizedFlowchartSpecSchema = Schema.Struct({
 			id: NonEmptyString,
 		})),
 	).pipe(Schema.mutable),
+	groups: Schema.optionalKey(Schema.Array(FlowchartSpecGroup).pipe(Schema.mutable)),
 	layout: Schema.Struct({ direction: FlowchartDirection }),
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });

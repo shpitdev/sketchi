@@ -122,6 +122,7 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 						kind: node.kind,
 						...(node.description ? { description: node.description } : {}),
 						...(node.icon ? { icon: { slug: node.icon.slug } } : {}),
+						...(node.group ? { group: node.group } : {}),
 					})),
 					edges: diagram.edges.map((edge) => ({
 						id: edge.id,
@@ -129,6 +130,9 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 						target: edge.target,
 						...(edge.label ? { label: edge.label } : {}),
 					})),
+					...(diagram.groups
+						? { groups: diagram.groups.map((group) => ({ id: group.id, label: group.label })) }
+						: {}),
 					layout: {
 						direction:
 							diagram.layout.direction === "LR" || diagram.layout.direction === "RL" ? "LR" : "TB",

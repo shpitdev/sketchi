@@ -18,6 +18,7 @@ import { renderDiagram, type RenderedDiagramScene } from "@sketchi/diagram-rende
 import { termTokens } from "@sketchi/icon-catalog";
 
 import type { DiagramScenario } from "./diagram-scenarios.js";
+import { flowchartLabelMatches } from "./flowchart-labels.js";
 import type { FlowchartScenario, DiagramScenarioLogo } from "./scenarios.js";
 import type { SequenceScenario, SequenceScenarioMessage } from "./sequence-scenarios.js";
 import {
@@ -347,6 +348,69 @@ export function scenarioLogoChecks(
 	];
 }
 
+/**
+ * Group checks on the model's own groups: each group the prompt states exists
+ * under one of its prompt-grounded labels and holds every node of every step
+ * the prompt puts in it, stated groups stay distinct, and steps the prompt
+ * keeps outside every group belong to none.
+ */
+function flowchartGroupChecks(
+	scenario: FlowchartScenario,
+	graph: FlowchartDiagram,
+	ownedNodes: ReadonlyMap<string, ReadonlySet<string>>,
+): ScenarioCheck[] {
+	const { requiredGroups, requiredNodes, ungroupedSteps } = scenario.assertions;
+	if (requiredGroups.length === 0 && ungroupedSteps.length === 0) return [];
+	const groupOf = new Map(graph.nodes.map((node) => [node.id, node.group]));
+	const stepLabel = (id: string) => requiredNodes.find((step) => step.id === id)?.label ?? id;
+	const owned = (stepId: string) => [...(ownedNodes.get(stepId) ?? [])];
+	const matched = requiredGroups.map((expected) => {
+		const named = (graph.groups ?? []).filter((group) =>
+			flowchartLabelMatches(group.label, expected.labels),
+		);
+		const group = named.find((candidate) =>
+			expected.members.every(
+				(member) =>
+					owned(member).length > 0 &&
+					owned(member).every((node) => groupOf.get(node) === candidate.id),
+			),
+		);
+		return { expected, group, named };
+	});
+	const found = matched.flatMap(({ group }) => (group ? [group.id] : []));
+	return [
+		...matched.flatMap(({ expected, group, named }) => [
+			{
+				id: `group:${expected.label}`,
+				passed: named.length > 0,
+				message: `Expected a group labeled like ${expected.labels.join(" | ")}.`,
+			},
+			{
+				id: `group-members:${expected.label}`,
+				passed: group !== undefined,
+				message: `Expected the "${expected.label}" group to hold ${expected.members
+					.map((member) => `"${stepLabel(member)}"`)
+					.join(", ")}.`,
+			},
+		]),
+		...(requiredGroups.length > 1
+			? [
+					{
+						id: "groups-distinct",
+						passed: new Set(found).size === found.length,
+						message: "Expected each stated group to be a group of its own.",
+					},
+				]
+			: []),
+		...ungroupedSteps.map((step) => ({
+			id: `ungrouped:${stepLabel(step)}`,
+			passed:
+				owned(step).length > 0 && owned(step).every((node) => groupOf.get(node) === undefined),
+			message: `Expected "${stepLabel(step)}" outside every group.`,
+		})),
+	];
+}
+
 function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram): ScenarioCheck[] {
 	// Counts, wiring, and ownership use the graph with merged checks split.
 	const { matchedNodes, graph, branchMatches } = matchFlowchartSteps(scenario, diagram);
@@ -439,6 +503,7 @@ function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram)
 						: ""),
 			};
 		}),
+		...flowchartGroupChecks(scenario, graph, ownedNodes),
 	];
 }
 

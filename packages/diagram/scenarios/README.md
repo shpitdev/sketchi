@@ -36,7 +36,8 @@ pnpm nx scenario diagram-scenarios -- --scenario pharma-batch-disposition --fixt
 and the eval harness use it.
 
 - Flowchart scenarios check prompt-grounded steps, node kinds, branches, bounded
-  connections, and logos.
+  connections, and logos. Group scenarios also check that each stated group holds
+  its steps and that steps the prompt keeps outside every group stay ungrouped.
 - Sequence scenarios check participants, required messages and their
   chronological order, calls answered by returns (activation bars), and that
   no return is stray.

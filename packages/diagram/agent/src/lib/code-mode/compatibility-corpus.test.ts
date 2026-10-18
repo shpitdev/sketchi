@@ -131,7 +131,9 @@ const GROUP_ISSUE_CODE_ADDITIONS = new Set([
 	"unknown_node_group",
 	"empty_group",
 ]);
-const FLOWCHART_SPEC_NODE_ADDED_FIELDS = new Set(["icon"]);
+const FLOWCHART_SPEC_NODE_ADDED_FIELDS = new Set(["icon", "group"]);
+// Flowchart groups add an optional groups list to the spec.
+const FLOWCHART_SPEC_ADDED_FIELDS = new Set(["groups"]);
 const FROZEN_FIXTURE_HASHES = {
 	v1: "c668b53ee90043a06c640d06cc28253496d50e7431c916b523fcd4157b91ae55",
 	v2: "52858006d02386fa0aac993ce35afca219aaae9860144836b0884e7770f948d9",
@@ -229,6 +231,13 @@ function isFlowchartSpecNodeSchemaProperties(value: Record<string, unknown>): bo
 	return (
 		!Object.hasOwn(value, "type") &&
 		["id", "label", "kind", "description"].every((key) => Object.hasOwn(value, key))
+	);
+}
+
+function isFlowchartSpecSchemaProperties(value: Record<string, unknown>): boolean {
+	return (
+		!Object.hasOwn(value, "type") &&
+		["title", "nodes", "edges", "layout"].every((key) => Object.hasOwn(value, key))
 	);
 }
 
@@ -371,7 +380,9 @@ function withoutPostBaselineSceneFields(value: unknown, isSchemaProperties = fal
 		? CANVAS_ELEMENT_SCHEMA_ADDED_FIELDS[schemaType]
 		: isSchemaProperties && isFlowchartSpecNodeSchemaProperties(value)
 			? FLOWCHART_SPEC_NODE_ADDED_FIELDS
-			: undefined;
+			: isSchemaProperties && isFlowchartSpecSchemaProperties(value)
+				? FLOWCHART_SPEC_ADDED_FIELDS
+				: undefined;
 	return Object.fromEntries(
 		Object.entries(value).flatMap(([key, nested]) =>
 			isSchemaProperties && (POST_BASELINE_SCENE_FIELDS.has(key) || addedElementFields?.has(key))

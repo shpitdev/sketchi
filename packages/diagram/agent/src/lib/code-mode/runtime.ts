@@ -868,6 +868,14 @@ function flowchartSchemaRef(
 			path: specPath,
 		};
 	}
+	if (collection === "groups" && typeof index === "number") {
+		const groupId = spec.groups?.[index]?.id;
+		return {
+			kind: "group",
+			...(groupId ? { id: groupId } : {}),
+			path: specPath,
+		};
+	}
 	return { kind: "diagram", id: spec.id, path: specPath };
 }
 

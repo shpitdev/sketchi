@@ -34,6 +34,9 @@ stage exists.
 | maintained scenarios | `packages/diagram/scenarios`: scenarios with checks scored on the model's own diagram, registered in `diagramScenarios` or the reliability scenarios. | pipeline test |
 | Storybook story | `packages/diagram/ui/src/diagram-types/<name>.stories.tsx`. | `type-structure.test.ts`, pipeline test |
 
+Groups (labeled regions around related steps) are a flowchart feature, not a
+family; see `docs/flowchart-groups.md`.
+
 Surfaces that offer a family to people also need updating: the playground
 generate API (`apps/playground/src/server/generation/api.server.ts`), Studio
 chat build tools (`apps/playground/src/server/chat/`), and `llms.txt`. Add

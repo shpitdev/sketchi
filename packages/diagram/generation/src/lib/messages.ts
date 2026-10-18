@@ -61,6 +61,7 @@ const FLOWCHART_IR_INSTRUCTIONS = [
 	"Every decision node must have at least two outgoing edges with non-empty unique labels.",
 	"For each retry, return, or feedback loop, include a real back-edge to an earlier distinct process or decision. Never target start and never use a self-loop.",
 	"Edges must use existing node ids.",
+	'Only when the scenario groups steps (teams, zones, phases), add groups [{ "id", "label" }] and set each member node\'s group to a group id. Leave other nodes ungrouped; groups do not nest.',
 	'Use layout { "direction": "TB", "edgeRouting": "orthogonal" } unless the scenario says otherwise.',
 ];
 

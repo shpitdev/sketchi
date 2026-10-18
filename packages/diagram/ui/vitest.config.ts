@@ -10,6 +10,9 @@ export default defineConfig({
 			reportsDirectory: new URL("../../../coverage/packages/diagram/ui", import.meta.url).pathname,
 		},
 		include: ["packages/diagram/ui/src/**/*.test.tsx"],
+		// Hang guard, not a speed budget: the full scenario suite renders every
+		// scenario in jsdom and runs several times slower on loaded CI runners.
+		testTimeout: 60_000,
 	},
 	resolve: {
 		alias: {

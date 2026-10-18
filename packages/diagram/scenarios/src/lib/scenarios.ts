@@ -18,6 +18,19 @@ export interface FlowchartScenarioAssertions {
 	requiredNodes: FlowchartScenarioRequiredNode[];
 	/** Fixture wording for diagnostic IDs and fixture intent, not label matching. */
 	requiredNodeLabels: string[];
+	/** Groups the prompt states, each with the steps it holds. */
+	requiredGroups: FlowchartScenarioRequiredGroup[];
+	/** Steps the prompt keeps outside every group. */
+	ungroupedSteps: string[];
+}
+
+export interface FlowchartScenarioRequiredGroup {
+	id: string;
+	label: string;
+	/** Prompt-grounded alternatives for the group's label. */
+	labels: readonly string[];
+	/** Required step ids the group holds. */
+	members: readonly string[];
 }
 
 export interface FlowchartScenarioRequiredNode {
@@ -70,6 +83,13 @@ type FlowchartNodeDefinition = readonly [
 	icon?: string,
 ];
 
+type FlowchartGroupDefinition = readonly [
+	id: string,
+	label: string,
+	labels: readonly [string, ...string[]],
+	members: readonly [string, ...string[]],
+];
+
 type FlowchartEdgeDefinition = readonly [
 	id: string,
 	source: string,
@@ -82,18 +102,24 @@ interface FlowchartScenarioDefinition {
 	description: string;
 	diagramId?: string;
 	difficulty: DiagramScenarioDifficulty;
+	/** The prompt's stated reading direction; top to bottom by default. */
+	direction?: "LR" | "TB";
 	edges: readonly FlowchartEdgeDefinition[];
 	/**
 	 * Fixture nodes that continue the start step's entry chain, in order. They
 	 * draw the stated first event across nodes and are not separate steps.
 	 */
 	entry?: readonly string[];
+	/** Groups the prompt states and the fixture nodes each holds. */
+	groups?: readonly FlowchartGroupDefinition[];
 	id: string;
 	logos?: readonly DiagramScenarioLogo[];
 	nodes: readonly FlowchartNodeDefinition[];
 	prompt: string;
 	tags: readonly string[];
 	title: string;
+	/** Fixture nodes the prompt keeps outside every group. */
+	ungrouped?: readonly string[];
 }
 
 const DEFAULT_STYLE = SKETCHI_DIAGRAM_STYLE;
@@ -121,15 +147,24 @@ function unique(values: readonly string[]): string[] {
 }
 
 function buildExpectedDiagram(definition: FlowchartScenarioDefinition): FlowchartDiagram {
+	const groupOf = new Map(
+		(definition.groups ?? []).flatMap(([group, , , members]) =>
+			members.map((member) => [member, group] as const),
+		),
+	);
 	return parseFlowchartDiagram({
 		id: definition.diagramId ?? definition.id,
 		title: definition.title,
 		type: "flowchart",
+		...(definition.groups
+			? { groups: definition.groups.map(([id, label]) => ({ id, label })) }
+			: {}),
 		nodes: definition.nodes.map(([id, label, kind, _labels, icon]) => ({
 			id,
 			label,
 			kind,
 			...(icon ? { icon: { slug: icon } } : {}),
+			...(groupOf.has(id) ? { group: groupOf.get(id) } : {}),
 		})),
 		edges: definition.edges.map(([id, source, target, label]) => ({
 			id,
@@ -138,7 +173,7 @@ function buildExpectedDiagram(definition: FlowchartScenarioDefinition): Flowchar
 			...(label ? { label } : {}),
 		})),
 		layout: {
-			direction: "TB",
+			direction: definition.direction ?? "TB",
 			edgeRouting: "orthogonal",
 		},
 		style: DEFAULT_STYLE,
@@ -212,6 +247,18 @@ function buildAssertions(
 		requiredNodeKinds,
 		requiredNodes,
 		requiredNodeLabels: diagram.nodes.map((node) => node.label),
+		requiredGroups: (definition.groups ?? []).map(([id, label, labels, members]) => {
+			for (const alternative of labels) {
+				const words = flowchartLabelWords(alternative);
+				if (words.length === 0 || words.some((word) => !promptWords.has(word))) {
+					throw new Error(
+						`Scenario "${definition.id}" group "${id}" has an ungrounded alternative "${alternative}".`,
+					);
+				}
+			}
+			return { id, label, labels, members: [...new Set(members.map(stepOf))] };
+		}),
+		ungroupedSteps: [...new Set((definition.ungrouped ?? []).map(stepOf))],
 	};
 }
 
@@ -1639,6 +1686,121 @@ const flowchartScenarioDefinitions = [
 			["store-log", "store", "log"],
 			["log-answer", "log", "answer"],
 		],
+	},
+	{
+		id: "grouped-expense-approval",
+		title: "Grouped expense approval",
+		difficulty: "standard",
+		tags: ["groups", "approval", "loop"],
+		description:
+			"An approval process grouped by team, with a rejection loop back into the first team's group.",
+		prompt:
+			"Create a flowchart of an expense approval process grouped by team. In the Employee group, the employee submits an expense report, which starts the flow. In the Manager group, the manager reviews the report and decides whether it is approved. A rejected report goes back to the Employee group, where the employee revises the report and resubmits it for review. In the Finance group, finance verifies the receipts and then pays the employee, which ends the flow.",
+		nodes: [
+			[
+				"submit",
+				"Submit expense report",
+				"start",
+				["submits an expense report", "submit expense report"],
+			],
+			["review", "Review the report", "process", ["reviews the report", "review report"]],
+			["approved", "Approved?", "decision", ["approved"]],
+			["revise", "Revise the report", "process", ["revises the report", "revise report"]],
+			["verify", "Verify receipts", "process", ["verifies the receipts", "verify receipts"]],
+			["pay", "Pay the employee", "end", ["pays the employee", "pay employee"]],
+		],
+		edges: [
+			["submit-review", "submit", "review"],
+			["review-approved", "review", "approved"],
+			["approved-verify", "approved", "verify", "yes", ["yes", "approved"]],
+			["approved-revise", "approved", "revise", "no", ["no", "rejected"]],
+			["revise-review", "revise", "review"],
+			["verify-pay", "verify", "pay"],
+		],
+		groups: [
+			["employee", "Employee", ["employee"], ["submit", "revise"]],
+			["manager", "Manager", ["manager"], ["review", "approved"]],
+			["finance", "Finance", ["finance"], ["verify", "pay"]],
+		],
+	},
+	{
+		id: "three-zone-request-path",
+		title: "Three-zone request path",
+		difficulty: "standard",
+		tags: ["groups", "zones", "architecture", "left-to-right"],
+		direction: "LR",
+		description:
+			"A request path through three network zones, with a cache decision that can end the flow early.",
+		prompt:
+			"Create a left-to-right flowchart of a web request crossing three network zones. In the Public internet zone, the browser sends a request, which starts the flow. In the DMZ, the CDN checks its cache and decides whether there is a cache hit. A hit returns the cached page and ends the flow. On a miss, the WAF filters the request. In the Private subnet zone, the API server handles the request and queries the database, and then the response is returned, which ends the flow.",
+		nodes: [
+			[
+				"request",
+				"Browser sends request",
+				"start",
+				["browser sends a request", "browser sends request"],
+			],
+			["cache", "CDN checks cache", "process", ["CDN checks its cache", "CDN checks cache"]],
+			["hit", "Cache hit?", "decision", ["cache hit"]],
+			["cached", "Return cached page", "end", ["returns the cached page", "cached page"]],
+			["waf", "WAF filters request", "process", ["WAF filters the request", "WAF filters"]],
+			[
+				"api",
+				"API server handles request",
+				"process",
+				["API server handles the request", "API server"],
+			],
+			["db", "Query the database", "process", ["queries the database", "query database"]],
+			["response", "Response returned", "end", ["response is returned", "response returned"]],
+		],
+		edges: [
+			["request-cache", "request", "cache"],
+			["cache-hit", "cache", "hit"],
+			["hit-cached", "hit", "cached", "hit"],
+			["hit-waf", "hit", "waf", "miss"],
+			["waf-api", "waf", "api"],
+			["api-db", "api", "db"],
+			["db-response", "db", "response"],
+		],
+		groups: [
+			["internet", "Public internet", ["public internet", "internet"], ["request"]],
+			["dmz", "DMZ", ["dmz"], ["cache", "hit", "waf"]],
+			["private", "Private subnet", ["private subnet", "private"], ["api", "db"]],
+		],
+	},
+	{
+		id: "mixed-fulfilment-groups",
+		title: "Order fulfilment with grouped and ungrouped steps",
+		difficulty: "standard",
+		tags: ["groups", "mixed-membership", "decision"],
+		description:
+			"Only some steps belong to groups: intake and the fraud decision stay outside, while warehouse and carrier work is grouped.",
+		prompt:
+			"Create a flowchart for order fulfilment where only the warehouse and carrier steps are grouped. An order is placed, which starts the flow, and a fraud check decides whether it passes; these two steps stay outside any group. A failed check cancels the order. In the Warehouse group, staff pick the items, pack the order, and print the shipping label. In the Carrier group, the carrier collects the parcel and delivers it to the customer, which ends the flow.",
+		nodes: [
+			["order", "Order placed", "start", ["order is placed", "order placed"]],
+			["fraud", "Fraud check passed?", "decision", ["fraud check", "passes"]],
+			["cancel", "Cancel the order", "end", ["cancels the order", "cancel order"]],
+			["pick", "Pick the items", "process", ["pick the items", "pick items"]],
+			["pack", "Pack the order", "process", ["pack the order", "pack order"]],
+			["label", "Print shipping label", "process", ["print the shipping label", "shipping label"]],
+			["collect", "Collect the parcel", "process", ["collects the parcel", "collect parcel"]],
+			["deliver", "Deliver to customer", "end", ["delivers it to the customer", "deliver"]],
+		],
+		edges: [
+			["order-fraud", "order", "fraud"],
+			["fraud-pick", "fraud", "pick", "yes", ["yes", "passes"]],
+			["fraud-cancel", "fraud", "cancel", "no", ["no", "failed"]],
+			["pick-pack", "pick", "pack"],
+			["pack-label", "pack", "label"],
+			["label-collect", "label", "collect"],
+			["collect-deliver", "collect", "deliver"],
+		],
+		groups: [
+			["warehouse", "Warehouse", ["warehouse"], ["pick", "pack", "label"]],
+			["carrier", "Carrier", ["carrier"], ["collect", "deliver"]],
+		],
+		ungrouped: ["order", "fraud"],
 	},
 ] satisfies readonly FlowchartScenarioDefinition[];
 
