@@ -41,12 +41,20 @@ const HELPERS = {
 // Adding an operation without a summary fails typechecking, so the index cannot go stale.
 const OPERATION_SUMMARIES: Record<CodeModeOperation, string> = { ...BUILDERS, ...HELPERS };
 const OPERATIONS = Object.keys(OPERATION_SUMMARIES) as CodeModeOperation[];
-const OPERATION_INDEX = [
+const operationIndex = (buildersHeading: string) =>
+	[
+		buildersHeading,
+		...Object.entries(BUILDERS).map(([operation, summary]) => `- ${operation}: ${summary}`),
+		"Helpers:",
+		...Object.values(HELPERS).map((summary) => `- ${summary}`),
+	].join("\n");
+const OPERATION_INDEX = operationIndex(
 	'Builders. Before the first call, read docs({ topic: "<builder>" }) for its request type, rules and example:',
-	...Object.entries(BUILDERS).map(([operation, summary]) => `- ${operation}: ${summary}`),
-	"Helpers:",
-	...Object.values(HELPERS).map((summary) => `- ${summary}`),
-].join("\n");
+);
+// Most requests are flowcharts, so the execute description carries that topic and saves a turn.
+const EXECUTE_OPERATION_INDEX = operationIndex(
+	'Builders. buildFlowchart needs no docs call: its rules and request type end this description. Before the first call to any other builder, read docs({ topic: "<builder>" }) for its request type, rules and example:',
+);
 const OPERATION_LIST = OPERATIONS.map((operation) => `sketchi.${operation}`).join(", ");
 
 const DECLARATIONS = new Map(
@@ -83,8 +91,28 @@ function operationTypes(operation: CodeModeOperation): string {
 
 const DELIVERY_OPTIONS = `{ artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [] }`;
 
-const FLOWCHART_FIDELITY =
-	"For flowcharts, keep every requested step and decision in a separate node, preserving the prompt's step wording and order. Do not merge steps into compound labels.";
+/** The buildFlowchart topic, also carried verbatim by the execute description. */
+const FLOWCHART_DOCS = [
+	"buildFlowchart accepts a compact FlowchartSpec: title, nodes, edges, and optional layout. Builds use the fixed Sketchi palette.",
+	"Keep every requested step and decision in a separate node, preserving the prompt's step wording and order. Use plain step labels; do not merge a destination with its next action or replace a named step with a paraphrase.",
+	"Label steps and decisions with the prompt's own words, including how it phrases each decision, and keep every decision it states as a decision node. Only when two labels would be identical, add the distinguishing words the prompt itself uses.",
+	"Use one node per outcome the prompt names: point every branch that reaches the same named outcome at that one node, and do not add end nodes the prompt does not name.",
+	'Do not add loops, steps, or edges the prompt does not state. A step that repeats an earlier step ("send another ...", "try again", "retry", "resubmit") continues that cycle: draw it as the earlier step or as a step that loops back to the decision after it, never as an end. Only a new, unrepeated final step with no stated next step is that branch\'s end node (kind: "end").',
+	"Use stable node ids. Decision nodes need meaningful labeled outgoing branches, usually yes/no.",
+	'Brand logos: when a node is about a named technology (GitHub, Docker, Postgres), call sketchi.searchIcons({ q: "docker" }) and set that node\'s icon to { slug } with an exact returned slug. The logo is drawn above the label. Never guess a slug: unknown slugs are dropped with an unknown_icon warning, and logos that cannot be drawn are dropped with icon_dropped. Neither fails the build.',
+	"Logo guidance applies only to technologies named in the prompt. Each node holds one icon. For X on Y, preserve both technologies as separate meaningful steps and attach each logo to its own node. Do not hide the host only in the title or combine both brands under one icon. Keep the requested step order and stay within graph limits.",
+	"Before building, compare the named technologies with the icons assigned to nodes. A label or successful search alone does not attach a logo; omitted icons produce no warning. If no matching logo exists, keep the technology label and report the unavailable logo instead of substituting another brand.",
+	`Flowcharts are bounded to ${FLOWCHART_MAX_NODES} nodes and ${FLOWCHART_MAX_EDGES} edges. Larger graphs fail with flowchart_too_large before render or persistence.`,
+	"Every node must be reachable from the single start, and every reachable node must be able to reach an end. Closed cycles fail with nonterminating_node; retry loops remain valid when they retain an eventual exit to an end.",
+	"For export-ready visual proof, prefer monotonic flowchart graphs: avoid long back-edges and loops to earlier nodes that the prompt does not state.",
+	"For broad or vague repo/system architecture prompts, summarize into 8-14 high-signal nodes. Prefer a single readable spine with short side branches over a dense dependency graph with one node per package or many crossing links.",
+	"When a prompt asks how packages or systems interact, group related packages into layers and show the main flow of responsibility. Use labels/descriptions for detail instead of adding every possible transitive edge.",
+	"Keep every package and component the prompt names under its own name; summarizing drops unnamed detail and never renames or generalizes named parts.",
+	"If buildFlowchart returns ok: false, repair the spec from issues and call buildFlowchart again.",
+	"Do not use applyDiagramPatch until buildFlowchart returns an accepted artifact.",
+	"",
+	operationTypes("buildFlowchart"),
+].join("\n");
 
 const LOGO_RULE =
 	"When the prompt names technologies, call sketchi.searchIcons({ q }) for each and set node.icon or sequence participant.icon to { slug } using a matching returned slug. One icon per node: give 'X on Y' separate technology steps. Labels alone do not add logos; check coverage.";
@@ -94,14 +122,16 @@ export const EXECUTE_TOOL_DESCRIPTION = [
 	"async () => { const built = await sketchi.buildFlowchart({ spec, options }); return built; }",
 	"Write JavaScript only: no TypeScript syntax, imports, or named wrapper functions. Code fences and a trailing semicolon are stripped.",
 	"",
-	OPERATION_INDEX,
+	EXECUTE_OPERATION_INDEX,
 	"",
-	`- ${FLOWCHART_FIDELITY}`,
 	`- ${LOGO_RULE}`,
 	`- Pass options: ${DELIVERY_OPTIONS} to get Excalidraw and PNG URLs without inline JSON.`,
 	'- Builds resolve to { ok: true, status: "accepted", artifact: { artifactId, formats }, normalizedSpec, quality, issues } or { ok: false, status, issues: [{ code, message, hint, ref? }] }. On ok: false, repair the spec from each issue hint and build again. Patch only accepted artifacts.',
 	"- Return the accepted build or patch result. execute then adds artifactDelivery and puts its finalResponseText first in the text content: copy it verbatim as the final answer and stop. Do not recreate the diagram as Markdown, Mermaid, a local file (write_to_file/Create) or an Antigravity artifact, and do not inspect inline JSON.",
 	'- structuredContent.builds records every build attempt in call order, whatever the script returns. docs({ topic: "execute" }) has every generated declaration, including results.',
+	"",
+	"buildFlowchart (no docs call needed):",
+	FLOWCHART_DOCS,
 ].join("\n");
 
 const PATCH_OPERATION_SUMMARY = [
@@ -432,27 +462,7 @@ export const catalog: CatalogEntry[] = [
 			"request",
 		],
 		snippet: "Create the semantic flowchart first. Fix issues before styling or shape changes.",
-		content: [
-			"buildFlowchart accepts a compact FlowchartSpec: title, nodes, edges, and optional layout. Builds use the fixed Sketchi palette.",
-			"Keep every requested step and decision in a separate node, preserving the prompt's step wording and order. Use plain step labels; do not merge a destination with its next action or replace a named step with a paraphrase.",
-			"Label steps and decisions with the prompt's own words, including how it phrases each decision, and keep every decision it states as a decision node. Only when two labels would be identical, add the distinguishing words the prompt itself uses.",
-			"Use one node per outcome the prompt names: point every branch that reaches the same named outcome at that one node, and do not add end nodes the prompt does not name.",
-			'Do not add loops, steps, or edges the prompt does not state. A step that repeats an earlier step ("send another ...", "try again", "retry", "resubmit") continues that cycle: draw it as the earlier step or as a step that loops back to the decision after it, never as an end. Only a new, unrepeated final step with no stated next step is that branch\'s end node (kind: "end").',
-			"Use stable node ids. Decision nodes need meaningful labeled outgoing branches, usually yes/no.",
-			'Brand logos: when a node is about a named technology (GitHub, Docker, Postgres), call sketchi.searchIcons({ q: "docker" }) and set that node\'s icon to { slug } with an exact returned slug. The logo is drawn above the label. Never guess a slug: unknown slugs are dropped with an unknown_icon warning, and logos that cannot be drawn are dropped with icon_dropped. Neither fails the build.',
-			"Logo guidance applies only to technologies named in the prompt. Each node holds one icon. For X on Y, preserve both technologies as separate meaningful steps and attach each logo to its own node. Do not hide the host only in the title or combine both brands under one icon. Keep the requested step order and stay within graph limits.",
-			"Before building, compare the named technologies with the icons assigned to nodes. A label or successful search alone does not attach a logo; omitted icons produce no warning. If no matching logo exists, keep the technology label and report the unavailable logo instead of substituting another brand.",
-			`Flowcharts are bounded to ${FLOWCHART_MAX_NODES} nodes and ${FLOWCHART_MAX_EDGES} edges. Larger graphs fail with flowchart_too_large before render or persistence.`,
-			"Every node must be reachable from the single start, and every reachable node must be able to reach an end. Closed cycles fail with nonterminating_node; retry loops remain valid when they retain an eventual exit to an end.",
-			"For export-ready visual proof, prefer monotonic flowchart graphs: avoid long back-edges and loops to earlier nodes that the prompt does not state.",
-			"For broad or vague repo/system architecture prompts, summarize into 8-14 high-signal nodes. Prefer a single readable spine with short side branches over a dense dependency graph with one node per package or many crossing links.",
-			"When a prompt asks how packages or systems interact, group related packages into layers and show the main flow of responsibility. Use labels/descriptions for detail instead of adding every possible transitive edge.",
-			"Keep every package and component the prompt names under its own name; summarizing drops unnamed detail and never renames or generalizes named parts.",
-			"If buildFlowchart returns ok: false, repair the spec from issues and call buildFlowchart again.",
-			"Do not use applyDiagramPatch until buildFlowchart returns an accepted artifact.",
-			"",
-			operationTypes("buildFlowchart"),
-		].join("\n"),
+		content: FLOWCHART_DOCS,
 		examples: [
 			{
 				title: "Separate application and hosting logos",

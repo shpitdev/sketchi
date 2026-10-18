@@ -304,9 +304,25 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			if (!found) throw new Error(`Missing generated declaration ${name}`);
 			return found.trim();
 		};
-		// Every request pays for the execute description, so it carries no type declarations.
-		expect(SKETCHI_EXECUTE_DESCRIPTION).not.toMatch(/^type /m);
-		expect(SKETCHI_EXECUTE_DESCRIPTION.length).toBeLessThan(3_500);
+		// Every request pays for the execute description. It carries the buildFlowchart topic verbatim,
+		// so flowcharts skip the docs turn, and no other family's types: about 1.5k o200k tokens.
+		const flowchartDocs = getCodeModeDocs({ topic: "buildFlowchart" }).content;
+		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
+			`buildFlowchart (no docs call needed):\n${flowchartDocs}`,
+		);
+		expect(SKETCHI_EXECUTE_DESCRIPTION.endsWith(flowchartDocs)).toBe(true);
+		for (const name of ["BuildFlowchartRequest", "BuildOptions"]) {
+			expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(`\n${declaration(name)}`);
+		}
+		expect(SKETCHI_EXECUTE_DESCRIPTION.match(/^type \w+/gm)).toEqual([
+			"type BuildFlowchartRequest",
+			"type BuildOptions",
+		]);
+		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain("buildFlowchart needs no docs call");
+		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
+			'Before the first call to any other builder, read docs({ topic: "<builder>" })',
+		);
+		expect(SKETCHI_EXECUTE_DESCRIPTION.length).toBeLessThan(7_500);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		expect(overview).toContain(`${CODE_MODE_OPERATIONS.length} operations:`);
 		for (const operation of CODE_MODE_OPERATIONS) {

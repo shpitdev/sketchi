@@ -781,11 +781,13 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(executeTool?.description).toContain("sequence participant.icon");
 			expect(executeTool?.description).toContain("When the prompt names technologies");
 			expect(executeTool?.description).toContain(
-				"keep every requested step and decision in a separate node",
+				"Keep every requested step and decision in a separate node, preserving the prompt's step wording and order.",
 			);
-			expect(executeTool?.description).toContain("preserving the prompt's step wording and order");
-			// Every request pays for tools/list; family types and guidance come from docs({ topic }).
-			expect(executeTool?.description).not.toMatch(/^type /m);
+			// Every request pays for tools/list. Only flowcharts, most requests, skip docs({ topic }).
+			expect(executeTool?.description).toContain(
+				getCodeModeDocs({ topic: "buildFlowchart" }).content,
+			);
+			expect(executeTool?.description).not.toMatch(/^type Build(?!Flowchart|Options)/m);
 			expect(
 				JSON.stringify(
 					tools.tools.map(({ name, description, inputSchema }) => ({
@@ -794,7 +796,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(5_000);
+			).toBeLessThan(9_000);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,
