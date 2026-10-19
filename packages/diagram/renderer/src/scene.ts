@@ -6,7 +6,11 @@ import {
 	canvasNodeIconBand,
 	type AxisAlignedSegment,
 	CANVAS_FRAME_NAME,
+	CANVAS_SHAPE_CURVE,
+	canvasComposedOutlinePoint,
 	canvasFrameNameBox,
+	type CanvasComposedShapeKind,
+	isCanvasComposedShape,
 	canvasFrameNameWidth,
 	GROUP_OUTLINE_CLEARANCE,
 	segmentCrossesBoundsInterior,
@@ -28,6 +32,8 @@ import {
 	type DiagramEdge,
 	type DiagramGroup,
 	type DiagramNode,
+	type DiagramZoneKind,
+	boundLabelWidth,
 	estimateTextWidth,
 	wrapTextToWidth,
 	wrappedLabelWidth,
@@ -68,11 +74,19 @@ const MAX_DIAMOND_LABEL_LINE_UNITS = 12 * DEFAULT_GLYPH_UNITS;
 /** Logo edge per shape; smaller marks keep start/end and decision nodes compact. */
 const NODE_ICON_SIZE: Readonly<Record<NodeSceneShape, number>> = {
 	circle: 24,
+	bucket: 28,
+	cylinder: 28,
 	diamond: 20,
+	document: 28,
 	ellipse: 24,
+	pipe: 28,
 	polygon: 28,
 	rectangle: 28,
 };
+/** The canvas shape each infrastructure node shape draws as. */
+const COMPOSED_SHAPES: Readonly<
+	Record<NonNullable<DiagramNode["shape"]>, CanvasComposedShapeKind>
+> = { database: "cylinder", queue: "pipe", document: "document", storage: "bucket" };
 const PORT_SPACING = 18;
 const PORT_PADDING = 16;
 const RANK_SWEEP_COUNT = 4;
@@ -202,6 +216,7 @@ function branches(kind: string | undefined): boolean {
 }
 
 function shapeForNode(node: DiagramNode): NodeSceneShape {
+	if (node.shape !== undefined) return COMPOSED_SHAPES[node.shape];
 	const kind = node.kind?.toLowerCase();
 	if (kind === "start" || kind === "end") {
 		return "ellipse";
@@ -242,12 +257,21 @@ function createNodeShape(
 		shape === "diamond" ? MAX_DIAMOND_LABEL_LINE_UNITS : lineUnits,
 	);
 	const icon = node.icon ? { slug: node.icon.slug, size: NODE_ICON_SIZE[shape] } : undefined;
-	const shapeWidthPad = shape === "diamond" ? 32 : shape === "ellipse" ? 20 : 0;
-	const shapeHeightPad = shape === "diamond" ? 32 : 0;
-	// Logo nodes and diamonds must fit Excalidraw's edit-time text box; other
-	// plain nodes keep their padded label box, which already contains it.
+	// A composed shape keeps its label's padding clear of the curves at its ends.
+	const curve = isCanvasComposedShape(shape) ? CANVAS_SHAPE_CURVE[shape] : 0;
+	const shapeWidthPad =
+		shape === "diamond" ? 32 : shape === "ellipse" ? 20 : shape === "pipe" ? 4 * curve : 0;
+	const shapeHeightPad =
+		shape === "diamond"
+			? 32
+			: shape === "cylinder" || shape === "document" || shape === "bucket"
+				? 3 * curve
+				: 0;
+	// Logo nodes, diamonds and composed shapes must fit Excalidraw's edit-time
+	// text box; other plain nodes keep their padded label box, which already
+	// contains it.
 	const boundText =
-		icon || shape === "diamond"
+		icon || shape === "diamond" || curve > 0
 			? boundTextContainerSize(shape, labelMetrics, icon)
 			: { height: 0, width: 0 };
 	const [minWidth, minHeight] =
@@ -357,6 +381,42 @@ function flowFeedback(diagram: IntermediateDiagram): ReadonlySet<string> {
 	return feedback;
 }
 
+/**
+ * Member pairs a zone's level ranks in order though no edge of its own joins
+ * them: one that leaves the zone, then one reached back from outside it, as
+ * workers fed by a queue the zone's API publishes to. The later member ranks
+ * no earlier, so it sits beside the other, near where the loop leaves.
+ */
+const levelPrecedence = new WeakMap<IntermediateDiagram, readonly (readonly [string, string])[]>();
+
+/** Ranks lifted so each level pair's later member ranks no earlier than the first. */
+function liftRanks(
+	diagram: IntermediateDiagram,
+	ranks: Map<string, number>,
+	feedback: ReadonlySet<string>,
+): Map<string, number> {
+	const pairs = levelPrecedence.get(diagram);
+	if (!pairs) return ranks;
+	for (let changed = true, round = 0; changed && round <= diagram.nodes.length; round += 1) {
+		changed = false;
+		for (const [before, after] of pairs)
+			if (ranks.get(after)! < ranks.get(before)!) {
+				ranks.set(after, ranks.get(before)!);
+				changed = true;
+			}
+		for (const edge of diagram.edges)
+			if (
+				!feedback.has(edge.id) &&
+				edge.source !== edge.target &&
+				ranks.get(edge.target)! < ranks.get(edge.source)! + 1
+			) {
+				ranks.set(edge.target, ranks.get(edge.source)! + 1);
+				changed = true;
+			}
+	}
+	return ranks;
+}
+
 /** Inner padding of a group's frame around its members. */
 const GROUP_PADDING = 40;
 /** The band above each frame that keeps Excalidraw's frame name clear. */
@@ -364,6 +424,15 @@ const GROUP_LABEL_BAND = 28;
 /** Thickness of the walls that keep a group's own edges inside its frame. */
 const GROUP_WALL = 4;
 const GROUP_UNIT_PREFIX = "\u0000group:";
+/**
+ * A zone's inner padding, slimmer than a frame's so nested zones stay compact,
+ * and the header strip across its top that holds its label, which sits this
+ * far in from the zone's left side.
+ */
+const ZONE_PADDING = 24;
+const ZONE_HEADER = 36;
+const ZONE_LABEL_INSET = 12;
+const ZONE_LABEL_FONT_SIZE = CANVAS_FRAME_NAME.fontSize;
 
 interface Box {
 	readonly x: number;
@@ -377,20 +446,55 @@ interface GroupFrame {
 	readonly box: Box;
 	readonly elementId: string;
 	readonly id: string;
+	/** A zone's kind, which sets its outline and fill. */
+	readonly kind?: DiagramZoneKind;
 	readonly label: string;
 	readonly labelBox: Box;
 }
 
 interface GroupLayout {
+	/** Groups whose members read across the diagram's flow. */
+	readonly across: ReadonlySet<string>;
 	/** Groups that edges start or end at, such as a composite state's transitions. */
 	readonly composites: ReadonlySet<string>;
+	/** Groups outermost first, so each draws over the zone around it. */
 	readonly frames: readonly GroupFrame[];
 	readonly groupOf: ReadonlyMap<string, string>;
+	/** The group each nested zone sits inside, by group id. */
+	readonly parentOf: ReadonlyMap<string, string>;
+	/** Groups draw as zones, each label in a header strip inside it, instead of frames. */
+	readonly zoned: boolean;
+}
+
+/** A group and every group around it, innermost first. */
+function groupChain(groups: GroupLayout, groupId: string | undefined): string[] {
+	const chain: string[] = [];
+	for (let id = groupId; id !== undefined; id = groups.parentOf.get(id)) chain.push(id);
+	return chain;
+}
+
+/** The innermost group holding both nodes, if any. */
+function sharedGroup(groups: GroupLayout, left: string, right: string): string | undefined {
+	const outer = new Set(groupChain(groups, groups.groupOf.get(right)));
+	return groupChain(groups, groups.groupOf.get(left)).find((id) => outer.has(id));
+}
+
+/** One group's level of a grouped layout: its members, its nested groups and the edges between them. */
+interface GroupLevel {
+	/** The same members and edges, read across the diagram's flow. */
+	readonly across: IntermediateDiagram;
+	/** Nested groups, laid out as blocks among the members. */
+	readonly children: readonly string[];
+	/** Members, or nested groups, with an edge leaving the group. */
+	readonly crossing: ReadonlySet<string>;
+	readonly diagram: IntermediateDiagram;
+	readonly group: DiagramGroup;
 }
 
 /**
- * A grouped diagram as nested layouts: each group's members and internal edges,
- * and a top level where every group is one block among the ungrouped nodes.
+ * A grouped diagram as nested layouts: each group's members, nested groups and
+ * internal edges, and a top level where every outermost group is one block
+ * among the ungrouped nodes.
  */
 interface GroupStructure {
 	/**
@@ -402,13 +506,11 @@ interface GroupStructure {
 	/** The edges between top-level units, in the order of the top level's edges. */
 	readonly crossEdges: readonly DiagramEdge[];
 	readonly groupOf: ReadonlyMap<string, string>;
-	readonly groups: readonly {
-		/** The same members and edges, read across the diagram's flow. */
-		readonly across: IntermediateDiagram;
-		readonly diagram: IntermediateDiagram;
-		readonly group: DiagramGroup;
-	}[];
+	/** Each group's level, in declared order. */
+	readonly groups: readonly GroupLevel[];
+	readonly parentOf: ReadonlyMap<string, string>;
 	readonly top: IntermediateDiagram;
+	readonly zoned: boolean;
 }
 
 const groupStructures = new WeakMap<IntermediateDiagram, GroupStructure | null>();
@@ -421,14 +523,26 @@ function groupUnitId(groupId: string): string {
 function groupStructure(diagram: IntermediateDiagram): GroupStructure | undefined {
 	const cached = groupStructures.get(diagram);
 	if (cached !== undefined) return cached ?? undefined;
-	const groups = (diagram.groups ?? []).filter((group) =>
-		diagram.nodes.some((node) => node.group === group.id),
+	const declaredParent = new Map(
+		(diagram.groups ?? []).flatMap((group) =>
+			group.parent === undefined ? [] : [[group.id, group.parent] as const],
+		),
 	);
+	// A group holds nodes itself or through the groups nested in it.
+	const holding = new Set<string>();
+	for (const node of diagram.nodes)
+		for (let id = node.group; id !== undefined && !holding.has(id); id = declaredParent.get(id))
+			holding.add(id);
+	const groups = (diagram.groups ?? []).filter((group) => holding.has(group.id));
 	if (groups.length === 0) {
 		groupStructures.set(diagram, null);
 		return undefined;
 	}
 	const declared = new Set(groups.map((group) => group.id));
+	const parentOf = new Map(
+		[...declaredParent].filter(([id, parent]) => declared.has(id) && declared.has(parent)),
+	);
+	const zoned = groups.some((group) => group.parent !== undefined || group.kind !== undefined);
 	const groupOf = new Map(
 		diagram.nodes.flatMap((node) =>
 			node.group !== undefined && declared.has(node.group) ? [[node.id, node.group] as const] : [],
@@ -440,14 +554,33 @@ function groupStructure(diagram: IntermediateDiagram): GroupStructure | undefine
 			[edge.source, edge.target].filter((id) => !nodeIds.has(id) && declared.has(id)),
 		),
 	);
-	const unitOf = (nodeId: string) => {
-		const group = groupOf.get(nodeId);
-		return group !== undefined
-			? groupUnitId(group)
-			: composites.has(nodeId)
-				? groupUnitId(nodeId)
-				: nodeId;
+	// The groups around a node or composite, innermost first.
+	const chainOf = (id: string) => {
+		const chain: string[] = [];
+		for (
+			let group = composites.has(id) ? id : groupOf.get(id);
+			group !== undefined;
+			group = parentOf.get(group)
+		)
+			chain.push(group);
+		return chain;
 	};
+	// What a node is at a level (a group's, or the top level's when undefined):
+	// itself when it is a direct member, else the block of the nested group that
+	// holds it; undefined when the level does not hold it. A composite is a block
+	// around its group's level, never inside it.
+	const unitAt = (level: string | undefined, id: string) => {
+		const chain = chainOf(id);
+		const index = level === undefined ? chain.length : chain.indexOf(level);
+		if (index < 0 || (index === 0 && composites.has(id))) return undefined;
+		return index === 0 ? id : groupUnitId(chain[index - 1]!);
+	};
+	const unitNode = (group: DiagramGroup, unit: string): DiagramNode => ({
+		id: unit,
+		label: group.label,
+		kind: "process",
+		metadata: {},
+	});
 	// Inside a group, loops break where the whole flow breaks them, so a group
 	// reads in the same direction as the diagram around it.
 	const buckets = edgeBuckets(diagram.edges);
@@ -456,14 +589,28 @@ function groupStructure(diagram: IntermediateDiagram): GroupStructure | undefine
 	const feedback = new Set(
 		diagram.edges.flatMap((edge) => (edge.source === edge.target ? [edge.id] : [])),
 	);
-	const nested = groups.map((group) => {
-		const edges = diagram.edges.filter(
-			(edge) => groupOf.get(edge.source) === group.id && groupOf.get(edge.target) === group.id,
-		);
+	const nested = groups.map((group): GroupLevel => {
+		const children = groups.filter((child) => parentOf.get(child.id) === group.id);
+		const edges = diagram.edges.flatMap((edge) => {
+			const [source, target] = [unitAt(group.id, edge.source), unitAt(group.id, edge.target)];
+			if (source === undefined || target === undefined) return [];
+			// An edge inside one nested group belongs to that group's level.
+			if (source === target && source !== edge.source) return [];
+			return [
+				source === edge.source && target === edge.target ? edge : { ...edge, source, target },
+			];
+		});
+		const units: DiagramNode[] = [];
+		for (const node of diagram.nodes) {
+			const unit = unitAt(group.id, node.id);
+			if (unit === undefined || units.some((placed) => placed.id === unit)) continue;
+			const child = children.find((candidate) => groupUnitId(candidate.id) === unit);
+			units.push(child ? unitNode(child, unit) : node);
+		}
 		const inner = {
 			...diagram,
 			groups: [],
-			nodes: diagram.nodes.filter((node) => groupOf.get(node.id) === group.id),
+			nodes: units,
 			edges,
 		} as IntermediateDiagram;
 		const across = {
@@ -471,38 +618,64 @@ function groupStructure(diagram: IntermediateDiagram): GroupStructure | undefine
 			layout: { ...diagram.layout, direction: ACROSS_DIRECTION[diagram.layout.direction] },
 		} as IntermediateDiagram;
 		const innerFeedback = new Set(edges.flatMap((edge) => (global.has(edge.id) ? [edge.id] : [])));
+		// Folding nested groups into blocks can close loops of its own; they break
+		// where a walk of the level does.
+		if (children.length > 0) {
+			const rest = { ...inner, edges: edges.filter((edge) => !innerFeedback.has(edge.id)) };
+			const restBuckets = edgeBuckets(rest.edges);
+			for (const id of feedbackEdgeIds(rest, restBuckets.incoming, restBuckets.outgoing))
+				innerFeedback.add(id);
+		}
 		flowFeedbacks.set(inner, innerFeedback);
 		flowFeedbacks.set(across, innerFeedback);
 		for (const id of innerFeedback) feedback.add(id);
-		return { across, diagram: inner, group };
+		if (zoned) {
+			const pairs = loopsThroughOutside(diagram, inner, innerFeedback, (id) =>
+				unitAt(group.id, id),
+			);
+			if (pairs.length > 0) {
+				levelPrecedence.set(inner, pairs);
+				levelPrecedence.set(across, pairs);
+			}
+		}
+		const crossing = new Set(
+			diagram.edges.flatMap((edge) => {
+				const [source, target] = [unitAt(group.id, edge.source), unitAt(group.id, edge.target)];
+				return source === undefined && target !== undefined
+					? [target]
+					: target === undefined && source !== undefined
+						? [source]
+						: [];
+			}),
+		);
+		return { across, children: children.map((child) => child.id), crossing, diagram: inner, group };
 	});
 	const units: DiagramNode[] = [];
 	const placed = new Set<string>();
 	for (const node of diagram.nodes) {
-		const unit = unitOf(node.id);
+		const unit = unitAt(undefined, node.id)!;
 		if (placed.has(unit)) continue;
 		placed.add(unit);
-		const group = groupOf.get(node.id);
+		const outermost = chainOf(node.id).at(-1);
 		units.push(
-			group === undefined
+			outermost === undefined
 				? node
-				: {
-						id: unit,
-						label: groups.find((candidate) => candidate.id === group)!.label,
-						kind: "process",
-						metadata: {},
-					},
+				: unitNode(
+						groups.find((candidate) => candidate.id === outermost)!,
+						unit,
+					),
 		);
 	}
-	const crossEdges = diagram.edges.filter((edge) => unitOf(edge.source) !== unitOf(edge.target));
+	const topUnit = (id: string) => unitAt(undefined, id) ?? id;
+	const crossEdges = diagram.edges.filter((edge) => topUnit(edge.source) !== topUnit(edge.target));
 	const top = {
 		...diagram,
 		groups: [],
 		nodes: units,
 		edges: crossEdges.map((edge) => ({
 			...edge,
-			source: unitOf(edge.source),
-			target: unitOf(edge.target),
+			source: topUnit(edge.source),
+			target: topUnit(edge.target),
 		})),
 	} as IntermediateDiagram;
 	const topBuckets = edgeBuckets(top.edges);
@@ -510,9 +683,64 @@ function groupStructure(diagram: IntermediateDiagram): GroupStructure | undefine
 	flowFeedbacks.set(top, topFeedback);
 	for (const id of topFeedback) feedback.add(id);
 	flowFeedbacks.set(diagram, feedback);
-	const structure = { composites, crossEdges, groupOf, groups: nested, top };
+	const structure = {
+		composites,
+		crossEdges,
+		groupOf,
+		groups: nested,
+		parentOf,
+		top,
+		zoned,
+	};
 	groupStructures.set(diagram, structure);
 	return structure;
+}
+
+/**
+ * A level's member pairs that leave it and come back: an edge out of the level
+ * whose path, through nodes outside it alone, reaches an edge back in. Each
+ * pair stays only while its later member does not already lead to the first,
+ * so the level's ranks keep no loop.
+ */
+function loopsThroughOutside(
+	diagram: IntermediateDiagram,
+	level: IntermediateDiagram,
+	feedback: ReadonlySet<string>,
+	unitOf: (id: string) => string | undefined,
+): (readonly [string, string])[] {
+	const inside = (id: string) => unitOf(id) !== undefined;
+	const outgoing = new Map<string, string[]>();
+	for (const edge of diagram.edges)
+		if (!inside(edge.source) && !inside(edge.target))
+			outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), edge.target]);
+	const reachedFrom = (start: string) => {
+		const reached = new Set([start]);
+		for (const id of reached) for (const next of outgoing.get(id) ?? []) reached.add(next);
+		return reached;
+	};
+	const after = new Map<string, string[]>();
+	for (const edge of level.edges)
+		if (!feedback.has(edge.id))
+			after.set(edge.source, [...(after.get(edge.source) ?? []), edge.target]);
+	const leads = (from: string, to: string) => {
+		const reached = new Set([from]);
+		for (const id of reached) for (const next of after.get(id) ?? []) reached.add(next);
+		return reached.has(to);
+	};
+	const pairs: (readonly [string, string])[] = [];
+	for (const out of diagram.edges) {
+		if (!inside(out.source) || inside(out.target)) continue;
+		const reached = reachedFrom(out.target);
+		for (const back of diagram.edges) {
+			if (inside(back.source) || !inside(back.target) || !reached.has(back.source)) continue;
+			const [first, later] = [unitOf(out.source)!, unitOf(back.target)!];
+			if (first === later || pairs.some(([a, b]) => a === first && b === later)) continue;
+			if (leads(later, first)) continue;
+			pairs.push([first, later]);
+			after.set(first, [...(after.get(first) ?? []), later]);
+		}
+	}
+	return pairs;
 }
 
 function insertByNodeOrder(
@@ -944,7 +1172,11 @@ function rankLayout(
 	const buckets = edgeBuckets(diagram.edges);
 	const shapesByNodeId = sizedShapes(diagram, minimumSizes, buckets, vertical);
 	const feedbackEdges = flowFeedback(diagram);
-	const rankByNodeId = rankNodes(diagram, buckets, feedbackEdges);
+	const rankByNodeId = liftRanks(
+		diagram,
+		rankNodes(diagram, buckets, feedbackEdges),
+		feedbackEdges,
+	);
 	const rankedShapes = orderedRankShapes(
 		diagram,
 		shapesByNodeId,
@@ -1024,6 +1256,12 @@ function rankLayout(
 interface Wrap {
 	readonly bandOf: ReadonlyMap<string, number>;
 	readonly continuations: ReadonlySet<string>;
+	/**
+	 * Each band ends along the flow under the rank that leads into it, as far as
+	 * the longest band allows, so a short band hangs under the steps that reach
+	 * it instead of back at the start (zoned levels).
+	 */
+	readonly under?: boolean;
 }
 
 const NO_WRAP: Wrap = { bandOf: new Map(), continuations: new Set() };
@@ -1064,7 +1302,8 @@ interface Arrangement {
 	readonly crossingRepair: boolean;
 	/**
 	 * Lay each group's members out across the flow, so a long grouped flow reads
-	 * as a row of columns (or a column of rows) instead of one long strip.
+	 * as a row of columns (or a column of rows) instead of one long strip. Zones
+	 * never turn: they keep the diagram's direction.
 	 */
 	readonly groupsAcross?: boolean;
 	/** Reorder ranks to remove the layered crossings the barycenter pass leaves. */
@@ -1076,7 +1315,12 @@ interface Arrangement {
 	/** Sides edges leave or arrive by in place of the assigned ones, chosen to remove crossings. */
 	readonly sides?: SideOverrides;
 	readonly wrap: Wrap;
+	/** Bands of a zoned flow's levels, by group id or TOP_LEVEL (see planZoneWraps). */
+	readonly zoneWraps?: ReadonlyMap<string, Wrap>;
 }
+
+/** The top level of a zoned flow among its levels' wraps; no group id is empty. */
+const TOP_LEVEL = "";
 
 /** Each overridden edge's departure and arrival sides, by edge id. */
 type SideOverrides = ReadonlyMap<
@@ -1120,20 +1364,39 @@ function exportAspect(along: number, across: number): number {
 	return (long + 2 * EXPORT_PADDING) / (short + 2 * EXPORT_PADDING);
 }
 
+/** How one level of a zoned flow wraps (see planZoneWraps). */
+interface ZoneWrapOptions {
+	/** Exactly this many bands. */
+	readonly bands: number;
+	/** Each block's size, by unit id. */
+	readonly sizes: ReadonlyMap<string, { width: number; height: number }>;
+	/** How many ranks of the whole flow a unit stands for: a zone, those it holds. */
+	readonly weights: ReadonlyMap<string, number>;
+}
+
 /**
  * Bands for a flow whose single row or column is too long for its breadth,
  * cutting only where exactly one forward edge joins a rank to the next. No loop
  * or skipping edge spans a cut, so each band holds whole branches and the next
  * band starts at a single node. Orthogonal routing only: a straight continuation
  * would cut through the band it skips back across.
+ *
+ * One level of a zoned flow wraps the same way, its zones whole ranks of it.
+ * There a cut may carry several edges, each joining the two ranks it separates,
+ * since zoned routes are searched around every zone rather than run in one lane.
  */
-function planWrap(diagram: IntermediateDiagram, reorder: boolean, balance = 0): Wrap {
+function planWrap(
+	diagram: IntermediateDiagram,
+	reorder: boolean,
+	balance = 0,
+	zone?: ZoneWrapOptions,
+): Wrap {
 	// A band cut must not split a group; grouped flows stay in one band.
 	if (diagram.layout.edgeRouting !== "orthogonal" || groupStructure(diagram) || laned(diagram))
 		return NO_WRAP;
 	const { feedbackEdges, gapAfter, rankByNodeId, rankMetrics } = rankLayout(
 		diagram,
-		new Map(),
+		zone?.sizes ?? new Map(),
 		new Map(),
 		reorder,
 	);
@@ -1145,7 +1408,15 @@ function planWrap(diagram: IntermediateDiagram, reorder: boolean, balance = 0): 
 		Math.max(...rankMetrics.slice(from, to + 1).map((metric) => metric.breadth));
 	const last = rankMetrics.length - 1;
 	const natural = exportAspect(flow(0, last), breadth(0, last));
-	if (rankMetrics.length < WRAP_MIN_RANKS || flow(0, last) <= breadth(0, last)) return NO_WRAP;
+	// Ranks of the whole flow from one rank to another: a zone counts those it holds.
+	const weight = (index: number) =>
+		Math.max(...rankMetrics[index]!.shapes.map((shape) => zone?.weights.get(shape.nodeId) ?? 1));
+	const ranks = (from: number, to: number) => {
+		let sum = 0;
+		for (let index = from; index <= to; index += 1) sum += weight(index);
+		return sum;
+	};
+	if (ranks(0, last) < WRAP_MIN_RANKS || flow(0, last) <= breadth(0, last)) return NO_WRAP;
 
 	const nodeKinds = new Map(diagram.nodes.map((node) => [node.id, node.kind]));
 	const rankOf = (nodeId: string) => rankByNodeId.get(nodeId) ?? 0;
@@ -1158,12 +1429,15 @@ function planWrap(diagram: IntermediateDiagram, reorder: boolean, balance = 0): 
 		);
 		const [edge] = spanning;
 		if (
-			spanning.length === 1 &&
+			(zone ? spanning.length >= 1 : spanning.length === 1) &&
 			edge &&
-			!feedbackEdges.has(edge.id) &&
-			rankOf(edge.source) === metric.rank &&
-			rankOf(edge.target) === metric.rank + 1 &&
-			!branches(nodeKinds.get(edge.source))
+			spanning.every(
+				(candidate) =>
+					!feedbackEdges.has(candidate.id) &&
+					rankOf(candidate.source) === metric.rank &&
+					rankOf(candidate.target) === metric.rank + 1 &&
+					!branches(nodeKinds.get(candidate.source)),
+			)
 		)
 			continuationAfter.set(index, edge.id);
 	}
@@ -1183,15 +1457,17 @@ function planWrap(diagram: IntermediateDiagram, reorder: boolean, balance = 0): 
 		return flow(from, to) + (from > 0 ? ROUTE_STUB_LENGTH : 0) + departure;
 	};
 
-	// Band ends: a clean cut or the last rank. Each band keeps at least two ranks.
+	// Band ends: a clean cut or the last rank. Each band keeps at least two ranks;
+	// a zoned band hangs under the steps that reach it, so it may hold one.
 	const ends = [...continuationAfter.keys(), last].sort((a, b) => a - b);
+	const minimum = zone ? 1 : 2;
 	// An even wrap keeps every band at least `balance` of the longest, so no band
 	// stands short beside a long one with empty space past its end.
 	const evenPartition = (bands: number) => {
 		let best: { ends: number[]; longest: number; squares: number } | undefined;
 		const visit = (cuts: number[], previous: number) => {
 			if (cuts.length === bands - 1) {
-				if (last < previous + 2) return;
+				if (ranks(previous + 1, last) < minimum) return;
 				const bounds = [...cuts, last];
 				const lengths = bounds.map((end, band) =>
 					bandLength(band === 0 ? 0 : bounds[band - 1]! + 1, end),
@@ -1203,18 +1479,23 @@ function planWrap(diagram: IntermediateDiagram, reorder: boolean, balance = 0): 
 					best = { ends: bounds, longest, squares };
 				return;
 			}
-			for (const end of ends) if (end !== last && end >= previous + 2) visit([...cuts, end], end);
+			for (const end of ends)
+				if (end !== last && end > previous && ranks(previous + 1, end) >= minimum)
+					visit([...cuts, end], end);
 		};
 		visit([], -1);
 		return best;
 	};
 	let chosen: { aspect: number; ends: readonly number[] } | undefined;
-	for (let bands = 2; bands <= Math.min(MAX_BANDS, ends.length); bands += 1) {
+	const [fewest, most] = zone
+		? [zone.bands, Math.min(zone.bands, ends.length)]
+		: [2, Math.min(MAX_BANDS, ends.length)];
+	for (let bands = fewest; bands <= most; bands += 1) {
 		// Balance band lengths: the shortest longest band, then the least sum of squares.
 		type Partition = { ends: number[]; longest: number; squares: number };
 		let partitions = new Map<number, Partition>();
 		for (const end of ends)
-			if (end >= 1 && end < last)
+			if (ranks(0, end) >= minimum && end < last)
 				partitions.set(end, {
 					ends: [end],
 					longest: bandLength(0, end),
@@ -1225,7 +1506,7 @@ function planWrap(diagram: IntermediateDiagram, reorder: boolean, balance = 0): 
 			for (const end of ends) {
 				if (band === bands ? end !== last : end === last) continue;
 				for (const [previous, partition] of [...partitions].reverse()) {
-					if (end < previous + 2) continue;
+					if (end <= previous || ranks(previous + 1, end) < minimum) continue;
 					const length = bandLength(previous + 1, end);
 					const candidate = {
 						ends: [...partition.ends, end],
@@ -1266,14 +1547,156 @@ function planWrap(diagram: IntermediateDiagram, reorder: boolean, balance = 0): 
 		continuations: new Set(
 			chosen.ends.filter((end) => end !== last).map((end) => continuationAfter.get(end)!),
 		),
+		...(zone ? { under: true } : {}),
 	};
 }
 
+/**
+ * How many ranks of the whole flow each zone's block stands for: the ranks of
+ * its own flow, a nested zone counting its own, and never fewer than two, since
+ * a zone with its header reads as a block of its own rather than a stray step.
+ */
+function zoneFlowRanks(structure: GroupStructure): Map<string, number> {
+	const levels = new Map(structure.groups.map((level) => [level.group.id, level]));
+	const weights = new Map<string, number>();
+	const weigh = (level: GroupLevel): number => {
+		for (const child of level.children) weigh(levels.get(child)!);
+		const { rankMetrics } = rankLayout(level.diagram, new Map(), new Map());
+		const ranks = rankMetrics.reduce(
+			(sum, metric) =>
+				sum + Math.max(...metric.shapes.map((shape) => weights.get(shape.nodeId) ?? 1)),
+			0,
+		);
+		weights.set(groupUnitId(level.group.id), Math.max(2, ranks));
+		return ranks;
+	};
+	for (const level of structure.groups) if (!structure.parentOf.has(level.group.id)) weigh(level);
+	return weights;
+}
+
+/** Single-level zoned wrap plans laid out beside the first, since a plan may route worse. */
+const ZONE_WRAP_ALTERNATIVES = 2;
+/** Times a zoned flow still too long after a wrap plans again from it. */
+const ZONE_WRAP_ROUNDS = 2;
+
+/**
+ * Bands for a zoned flow too long for its breadth, best first. Each level (the
+ * top level or one zone's members) wraps as a plain flow does, in the stated
+ * direction, its zones whole ranks of it (planWrap). Levels wrap one at a time:
+ * each time the level and band count that bring the whole diagram within
+ * WRAP_TARGET_ASPECT with the fewest bands or, if none does, nearest it, while
+ * that keeps helping. The single-level plans that come next are alternatives,
+ * since a plan may route worse than the layout it replaces. Planning routes
+ * nothing: it measures the unrouted layout, scaled by how far the routed one
+ * (`drawn`) outgrows it, since routes widen zones for their stubs.
+ */
+function planZoneWraps(
+	diagram: IntermediateDiagram,
+	structure: GroupStructure,
+	arrangement: Arrangement,
+	balance: number,
+	drawn: { readonly width: number; readonly height: number },
+): ReadonlyMap<string, Wrap>[] {
+	const levels = new Map<string, IntermediateDiagram>([
+		[TOP_LEVEL, structure.top],
+		...structure.groups.map((level) => [level.group.id, level.diagram] as const),
+	]);
+	const weights = zoneFlowRanks(structure);
+	const unrouted = (zoneWraps: ReadonlyMap<string, Wrap>) => {
+		const placed = positionLayout(diagram, new Map(), new Map(), { ...arrangement, zoneWraps });
+		return { bounds: boundsOf([...placed.nodes, ...groupBlocks(placed.groups)]), placed };
+	};
+	let wraps = new Map(arrangement.zoneWraps ?? []);
+	const start = unrouted(wraps);
+	const [growX, growY] = [drawn.width / start.bounds.width, drawn.height / start.bounds.height];
+	const predict = (zoneWraps: ReadonlyMap<string, Wrap>) => {
+		const { bounds, placed } = unrouted(zoneWraps);
+		return { aspect: exportAspect(bounds.width * growX, bounds.height * growY), placed };
+	};
+	type Plan = { aspect: number; bands: number; next: Map<string, Wrap>; placed: PositionedLayout };
+	// Plans within the target first, fewest bands then squarest; then the squarest.
+	const rank = (left: Plan, right: Plan) => {
+		const [inLeft, inRight] = [left, right].map((plan) => plan.aspect <= WRAP_TARGET_ASPECT);
+		if (inLeft !== inRight) return inLeft ? -1 : 1;
+		return inLeft
+			? left.bands - right.bands || left.aspect - right.aspect
+			: left.aspect - right.aspect;
+	};
+	const planned = wraps.size;
+	let current = predict(wraps);
+	const alternatives: Map<string, Wrap>[] = [];
+	while (current.aspect > WRAP_TARGET_ASPECT) {
+		const sizes = new Map<string, { width: number; height: number }>([
+			...current.placed.nodes.map((node) => [node.nodeId, node] as const),
+			...(current.placed.groups?.frames ?? []).map(
+				(frame) => [groupUnitId(frame.id), frame.box] as const,
+			),
+		]);
+		const plans: Plan[] = [];
+		for (const [id, level] of levels) {
+			if (wraps.has(id)) continue;
+			for (let bands = 2; bands <= MAX_BANDS; bands += 1) {
+				const wrap = planWrap(level, arrangement.reorder, balance, { bands, sizes, weights });
+				if (wrap.bandOf.size === 0) continue;
+				const next = new Map([...wraps, [id, wrap]]);
+				plans.push({ ...predict(next), bands, next });
+				if (plans.at(-1)!.aspect <= WRAP_TARGET_ASPECT) break;
+			}
+		}
+		const helping = plans.filter((plan) => plan.aspect < current.aspect).sort(rank);
+		const [chosen] = helping;
+		if (!chosen) break;
+		if (wraps.size === planned)
+			alternatives.push(...helping.slice(1, 1 + ZONE_WRAP_ALTERNATIVES).map((plan) => plan.next));
+		wraps = chosen.next;
+		current = chosen;
+	}
+	return wraps.size > planned ? [wraps, ...alternatives] : [];
+}
+
+/** How far along the flow each band starts, for a wrap whose bands hang under their entries. */
+function bandsUnder(
+	diagram: IntermediateDiagram,
+	bands: readonly (readonly { index: number; metric: RankMetric }[])[],
+	gapAfter: readonly number[],
+	bandOf: ReadonlyMap<string, number>,
+): number[] {
+	// Where each rank ends along the flow, within its band.
+	const end = new Map<string, number>();
+	const lengths = bands.map((band) => {
+		let offset = 0;
+		for (const { index, metric } of band) {
+			for (const shape of metric.shapes) end.set(shape.nodeId, offset + metric.depth);
+			offset += metric.depth + gapAfter[index]!;
+		}
+		return offset - gapAfter[band.at(-1)!.index]!;
+	});
+	const longest = Math.max(...lengths);
+	// A band ends under the last rank that leads into it, within the longest band.
+	const shifts = [0];
+	for (let band = 1; band < bands.length; band += 1) {
+		const entries = diagram.edges.flatMap((edge) =>
+			bandOf.get(edge.source) === band - 1 && bandOf.get(edge.target) === band
+				? [end.get(edge.source)! + shifts[band - 1]! - lengths[band]!]
+				: [],
+		);
+		shifts.push(Math.max(0, Math.min(Math.max(0, ...entries), longest - lengths[band]!)));
+	}
+	return shifts;
+}
+
+/**
+ * `centers` holds, by unit id, how far a zone block's members sit across the
+ * flow from the block's middle, where its header strip (or a side widened for
+ * its name) pushes them. A block alone in its rank is placed by its members, so
+ * a flow running through nested zones stays straight.
+ */
 function positionNodes(
 	diagram: IntermediateDiagram,
 	minimumSizes: ReadonlyMap<string, { width: number; height: number }> = new Map(),
 	stubReach: ReadonlyMap<string, number> = new Map(),
 	{ reorder, wrap }: Arrangement = PLAIN_ARRANGEMENT,
+	centers: ReadonlyMap<string, number> = new Map(),
 ): NodeSceneElement[] {
 	const { gapAfter, gapBetween, highSide, lowSide, rankMetrics, reachOf, vertical } = rankLayout(
 		diagram,
@@ -1287,12 +1710,17 @@ function positionNodes(
 		(bands[band] ??= []).push({ index, metric });
 	}
 	const positioned: NodeSceneElement[] = [];
+	const bandShift = wrap.under ? bandsUnder(diagram, bands, gapAfter, wrap.bandOf) : [];
 	let bandOffset = PADDING;
 	for (const [bandIndex, band] of bands.entries()) {
 		const bandBreadth = Math.max(...band.map(({ metric }) => metric.breadth));
-		let rankOffset = PADDING;
+		let rankOffset = PADDING + (bandShift[bandIndex] ?? 0);
 		for (const { index, metric } of band) {
-			let breadthOffset = bandOffset + Math.max(0, bandBreadth - metric.breadth) / 2;
+			const [alone] = metric.shapes.length === 1 ? metric.shapes : [];
+			let breadthOffset =
+				bandOffset +
+				Math.max(0, bandBreadth - metric.breadth) / 2 -
+				(alone ? (centers.get(alone.nodeId) ?? 0) : 0);
 
 			for (const [shapeIndex, shape] of metric.shapes.entries()) {
 				const next = metric.shapes[shapeIndex + 1];
@@ -1388,10 +1816,11 @@ function boundsOf(shapes: readonly Box[]): Box {
 /**
  * Lay out each group's members as a flow of their own, then the top level with
  * every group as one block among the ungrouped nodes, so a group's members stay
- * together and no two groups, or a group and an outside node, overlap. Each
- * block keeps a band above its frame for the frame's name. Vertical flows enter
- * and leave a group through its top, so there the frame widens until the top
- * row's ports clear its name.
+ * together and no two groups, or a group and an outside node, overlap. A nested
+ * group is one block in its parent's flow the same way, laid out first. Each
+ * frame keeps a band above it for its name, and each zone a header strip
+ * inside its top for its label. Vertical flows enter and leave a group through
+ * its top, so there the group widens until the top row's ports clear its name.
  */
 function positionGroupedNodes(
 	diagram: IntermediateDiagram,
@@ -1402,14 +1831,34 @@ function positionGroupedNodes(
 	slack: ReadonlyMap<string, number>,
 ): PositionedLayout {
 	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
-	// Members whose edges leave the group cross its frame.
-	const crossing = new Set(structure.crossEdges.flatMap((edge) => [edge.source, edge.target]));
-	const blocks = structure.groups.map(({ across, diagram: along, group }) => {
-		const inner = arrangement.groupsAcross ? across : along;
-		const nodes = positionNodes(inner, minimumSizes, stubReach, {
-			...PLAIN_ARRANGEMENT,
-			reorder: arrangement.reorder,
-		});
+	const { zoned } = structure;
+	// A frame's name sits in a band above it; a zone's label in a strip inside it.
+	const band = zoned ? 0 : GROUP_LABEL_BAND;
+	const sizes = new Map(minimumSizes);
+	const reach = new Map(stubReach);
+	const levels = new Map(structure.groups.map((level) => [level.group.id, level]));
+	const blocks = new Map<string, GroupBlock>();
+	// How far each zone block's members sit across the flow from its middle.
+	const centers = new Map<string, number>();
+	// Zones keep the diagram's direction at every level; flat groups may turn.
+	const turned: ReadonlySet<string> =
+		arrangement.groupsAcross && !zoned
+			? new Set(structure.groups.map((level) => level.group.id))
+			: new Set();
+	const layOut = ({ across, children, crossing, diagram: along, group }: GroupLevel) => {
+		for (const child of children) layOut(levels.get(child)!);
+		const inner = turned.has(group.id) ? across : along;
+		const nodes = positionNodes(
+			inner,
+			sizes,
+			reach,
+			{
+				...PLAIN_ARRANGEMENT,
+				reorder: arrangement.reorder,
+				wrap: arrangement.zoneWraps?.get(group.id) ?? NO_WRAP,
+			},
+			centers,
+		);
 		const content = boundsOf(nodes);
 		// How far a member's stubs reach past the content on each side.
 		const inset = (node: NodeSceneElement, side: ConnectionEdge) =>
@@ -1424,29 +1873,29 @@ function positionGroupedNodes(
 		// edges can turn inside it.
 		const pad = (side: ConnectionEdge) =>
 			Math.max(
-				GROUP_PADDING,
+				zoned ? ZONE_PADDING : GROUP_PADDING,
 				...nodes.map(
-					(node) =>
-						(stubReach.get(portKey(node.nodeId, side)) ?? 0) - inset(node, side) + PORT_SPACING,
+					(node) => (reach.get(portKey(node.nodeId, side)) ?? 0) - inset(node, side) + PORT_SPACING,
 				),
 			) + (slack.get(group.id) ?? 0);
 		const labelWidth = canvasFrameNameWidth(group.label);
+		// Where the name ends, measured from the frame's left side.
+		const nameEnd = zoned
+			? ZONE_LABEL_INSET + labelWidth + CANVAS_FRAME_NAME.clearance
+			: labelWidth + 2 * CANVAS_FRAME_NAME.clearance;
 		const ports = nodes
 			.filter((node) => crossing.has(node.nodeId) && inset(node, "top") <= AXIS_ALIGNED_EPSILON)
 			.map((node) => node.x - content.x + node.width / 2 - 2 * PORT_SPACING);
 		const padding = {
-			top: pad("top"),
+			top: pad("top") + (zoned ? ZONE_HEADER : 0),
 			bottom: pad("bottom"),
 			right: pad("right"),
 			left:
 				vertical && ports.length > 0
-					? Math.max(
-							pad("left"),
-							labelWidth + 2 * CANVAS_FRAME_NAME.clearance + PORT_SPACING - Math.min(...ports),
-						)
+					? Math.max(pad("left"), nameEnd + PORT_SPACING - Math.min(...ports))
 					: pad("left"),
 		};
-		return {
+		const block: GroupBlock = {
 			content,
 			group,
 			height: content.height + padding.top + padding.bottom,
@@ -1454,7 +1903,7 @@ function positionGroupedNodes(
 			padding,
 			width: Math.max(
 				content.width + padding.left + padding.right,
-				labelWidth + 2 * CANVAS_FRAME_NAME.clearance + 16,
+				zoned ? nameEnd + ZONE_LABEL_INSET : labelWidth + 2 * CANVAS_FRAME_NAME.clearance + 16,
 				// A composite's own ports on its top sit right of its name.
 				(stubReach.get(portKey(group.id, "top")) ?? 0) > 0 && structure.composites.has(group.id)
 					? labelWidth +
@@ -1468,60 +1917,71 @@ function positionGroupedNodes(
 					: 0,
 			),
 		};
-	});
-	const sizes = new Map(minimumSizes);
-	const reach = new Map(stubReach);
-	for (const block of blocks) {
-		const unit = groupUnitId(block.group.id);
-		sizes.set(unit, { width: block.width, height: block.height + GROUP_LABEL_BAND });
+		blocks.set(group.id, block);
+		const unit = groupUnitId(group.id);
+		sizes.set(unit, { width: block.width, height: block.height + band });
+		if (zoned)
+			centers.set(
+				unit,
+				vertical
+					? (block.padding.left - block.padding.right) / 2
+					: (block.padding.top - block.padding.bottom) / 2,
+			);
 		// A member's stub reaches past the block only by what its frame's padding leaves.
-		const slack =
+		const spare =
 			(block.width - block.content.width - block.padding.left - block.padding.right) / 2;
 		const margin = (node: NodeSceneElement, side: ConnectionEdge) =>
 			side === "top"
-				? node.y - block.content.y + block.padding.top + GROUP_LABEL_BAND
+				? node.y - block.content.y + block.padding.top + band
 				: side === "bottom"
 					? block.content.y + block.content.height - node.y - node.height + block.padding.bottom
 					: side === "left"
-						? node.x - block.content.x + block.padding.left + slack
+						? node.x - block.content.x + block.padding.left + spare
 						: block.content.x +
 							block.content.width -
 							node.x -
 							node.width +
 							block.padding.right +
-							slack;
+							spare;
 		for (const side of ["top", "right", "bottom", "left"] as const) {
 			// A composite's own stubs start at its frame, under the band for its name.
-			const own = structure.composites.has(block.group.id)
-				? (stubReach.get(portKey(block.group.id, side)) ?? 0) -
-					(side === "top" ? GROUP_LABEL_BAND : 0)
+			const own = structure.composites.has(group.id)
+				? (stubReach.get(portKey(group.id, side)) ?? 0) - (side === "top" ? band : 0)
 				: 0;
 			const beyond = Math.max(
 				0,
 				own,
-				...block.nodes.map(
-					(node) => (stubReach.get(portKey(node.nodeId, side)) ?? 0) - margin(node, side),
-				),
+				...nodes.map((node) => (reach.get(portKey(node.nodeId, side)) ?? 0) - margin(node, side)),
 			);
 			if (beyond > 0) reach.set(portKey(unit, side), beyond);
 		}
-	}
-	const top = positionNodes(structure.top, sizes, reach, { ...arrangement, wrap: NO_WRAP });
-	// Each top-level unit: an ungrouped node, or a group's members and frame.
-	const units = new Map<string, { frame?: Box; nodes: NodeSceneElement[] }>();
+	};
+	for (const level of structure.groups) if (!structure.parentOf.has(level.group.id)) layOut(level);
+	const topWrap = arrangement.zoneWraps?.get(TOP_LEVEL) ?? NO_WRAP;
+	const top = positionNodes(
+		structure.top,
+		sizes,
+		reach,
+		{ ...arrangement, wrap: topWrap },
+		centers,
+	);
+	// Each top-level unit: an ungrouped node, or a group's members and frames.
+	const units = new Map<string, PlacedUnit>();
 	for (const shape of top) {
 		if (!shape.nodeId.startsWith(GROUP_UNIT_PREFIX)) units.set(shape.nodeId, { nodes: [shape] });
 	}
-	for (const block of blocks) {
-		const unitId = groupUnitId(block.group.id);
-		const unit = top.find((shape) => shape.nodeId === unitId)!;
+	const boxes = new Map<string, Box>();
+	// Place a block in its unit's box, then each nested block in its own.
+	const place = (groupId: string, unit: Box, placed: NodeSceneElement[]) => {
+		const block = blocks.get(groupId)!;
 		const frame = {
 			x: unit.x,
-			y: unit.y + GROUP_LABEL_BAND,
+			y: unit.y + band,
 			width: unit.width,
-			height: unit.height - GROUP_LABEL_BAND,
+			height: unit.height - band,
 		};
-		// A block the top level widened for ports keeps its padding and centers the rest.
+		boxes.set(groupId, frame);
+		// A block the level around it widened for ports keeps its padding and centers the rest.
 		const dx =
 			frame.x +
 			block.padding.left +
@@ -1532,28 +1992,115 @@ function positionGroupedNodes(
 			block.padding.top +
 			(frame.height - block.content.height - block.padding.top - block.padding.bottom) / 2 -
 			block.content.y;
+		for (const node of block.nodes) {
+			const moved = { ...node, x: node.x + dx, y: node.y + dy };
+			if (node.nodeId.startsWith(GROUP_UNIT_PREFIX))
+				place(node.nodeId.slice(GROUP_UNIT_PREFIX.length), moved, placed);
+			else placed.push(moved);
+		}
+		return frame;
+	};
+	for (const level of structure.groups) {
+		if (structure.parentOf.has(level.group.id)) continue;
+		const unitId = groupUnitId(level.group.id);
+		const unit = top.find((shape) => shape.nodeId === unitId)!;
+		const nodes: NodeSceneElement[] = [];
+		const frame = place(level.group.id, unit, nodes);
+		const nested = structure.groups.flatMap(({ group }) =>
+			group.id !== level.group.id && groupRoot(structure, group.id) === level.group.id
+				? [group.id]
+				: [],
+		);
 		units.set(unitId, {
 			frame,
-			nodes: block.nodes.map((node) => ({ ...node, x: node.x + dx, y: node.y + dy })),
+			...(nested.length > 0
+				? { nested: new Map(nested.map((id) => [id, boxes.get(id)!] as const)) }
+				: {}),
+			nodes,
 		});
 	}
-	alignUnits(structure, units, vertical);
+	alignUnits(structure, units, vertical, topWrap.bandOf);
+	for (const [unitId, unit] of units) {
+		if (unit.frame) boxes.set(unitId.slice(GROUP_UNIT_PREFIX.length), unit.frame);
+		for (const [id, box] of unit.nested ?? []) boxes.set(id, box);
+	}
 	const nodes = [...units.values()].flatMap((unit) => unit.nodes);
 	const order = nodeOrderMap(diagram.nodes);
 	nodes.sort((left, right) => order.get(left.nodeId)! - order.get(right.nodeId)!);
-	const frames = blocks.map(({ group }): GroupFrame => {
-		const box = units.get(groupUnitId(group.id))!.frame!;
+	const depth = (id: string) => groupRoots(structure, id).length;
+	const frames = (
+		zoned
+			? [...structure.groups].sort((left, right) => depth(left.group.id) - depth(right.group.id))
+			: structure.groups
+	).map(({ group }): GroupFrame => {
+		const box = boxes.get(group.id)!;
 		return {
 			box,
 			elementId: `group:${group.id}`,
 			id: group.id,
+			...(zoned && group.kind !== undefined ? { kind: group.kind } : {}),
 			label: group.label,
-			labelBox: canvasFrameNameBox({ ...box, name: group.label }),
+			labelBox: zoned
+				? zoneLabelBox(box, group.label)
+				: canvasFrameNameBox({ ...box, name: group.label }),
 		};
 	});
 	return {
-		groups: { composites: structure.composites, frames, groupOf: structure.groupOf },
+		groups: {
+			across: turned,
+			composites: structure.composites,
+			frames,
+			groupOf: structure.groupOf,
+			parentOf: structure.parentOf,
+			zoned,
+		},
 		nodes,
+	};
+}
+
+/** A group laid out on its own, before the level around it places it. */
+interface GroupBlock {
+	readonly content: Box;
+	readonly group: DiagramGroup;
+	readonly height: number;
+	readonly nodes: readonly NodeSceneElement[];
+	readonly padding: {
+		readonly top: number;
+		readonly right: number;
+		readonly bottom: number;
+		readonly left: number;
+	};
+	readonly width: number;
+}
+
+/** A top-level unit as placed: an ungrouped node, or a group's members, frame and nested frames. */
+interface PlacedUnit {
+	frame?: Box;
+	nested?: Map<string, Box>;
+	nodes: NodeSceneElement[];
+}
+
+/** A group and every group around it, innermost first. */
+function groupRoots(structure: GroupStructure, groupId: string): string[] {
+	const chain: string[] = [];
+	for (let id: string | undefined = groupId; id !== undefined; id = structure.parentOf.get(id))
+		chain.push(id);
+	return chain;
+}
+
+/** The outermost group around a group. */
+function groupRoot(structure: GroupStructure, groupId: string): string {
+	return groupRoots(structure, groupId).at(-1)!;
+}
+
+/** Where a zone's label is painted in its header strip, padded by its clearance. */
+function zoneLabelBox(box: Box, label: string): Box {
+	const { clearance, height } = CANVAS_FRAME_NAME;
+	return {
+		x: box.x + ZONE_LABEL_INSET - clearance,
+		y: box.y + (ZONE_HEADER - height) / 2 - clearance,
+		width: canvasFrameNameWidth(label) + 2 * clearance,
+		height: height + 2 * clearance,
 	};
 }
 
@@ -1566,8 +2113,9 @@ function positionGroupedNodes(
  */
 function alignUnits(
 	structure: GroupStructure,
-	units: Map<string, { frame?: Box; nodes: NodeSceneElement[] }>,
+	units: Map<string, PlacedUnit>,
 	vertical: boolean,
+	bandOf: ReadonlyMap<string, number> = new Map(),
 ): void {
 	const { crossEdges, top } = structure;
 	const feedback = flowFeedback(top);
@@ -1579,6 +2127,20 @@ function alignUnits(
 	}
 	const across = vertical ? "x" : "y";
 	const size = vertical ? "width" : "height";
+	// Each band's reach across the flow, so bands keep the gaps they were laid out with.
+	const bandCount = Math.max(0, ...bandOf.values()) + 1;
+	const extent = (band: number) => {
+		const boxes = [...units]
+			.filter(([id]) => (bandOf.get(id) ?? 0) === band)
+			.map(([, unit]) => unit.frame ?? unit.nodes[0]!);
+		return {
+			start: Math.min(...boxes.map((box) => box[across])),
+			end: Math.max(...boxes.map((box) => box[across] + box[size])),
+		};
+	};
+	const bandGaps = Array.from({ length: bandCount }, (_, band) =>
+		band === 0 ? 0 : extent(band).start - extent(band - 1).end,
+	);
 	const breadth = (rank: number) =>
 		(ranks.get(rank) ?? []).reduce((sum, id) => {
 			const unit = units.get(id)!;
@@ -1597,10 +2159,15 @@ function alignUnits(
 		const unit = units.get(id)!;
 		unit.nodes = unit.nodes.map((node) => ({ ...node, [across]: node[across] + delta }));
 		if (unit.frame) unit.frame = { ...unit.frame, [across]: unit.frame[across] + delta };
+		for (const [nested, box] of unit.nested ?? [])
+			unit.nested!.set(nested, { ...box, [across]: box[across] + delta });
 	};
+	const bandOfRank = (rank: number) => bandOf.get(ranks.get(rank)?.[0] ?? "") ?? 0;
 	const align = (rank: number, neighbor: number, forward: boolean) => {
 		const [id] = ranks.get(rank) ?? [];
 		if (!id || ranks.get(rank)!.length !== 1) return;
+		// A wrapped rank lines up only with ranks in its own band.
+		if (bandOfRank(rank) !== bandOfRank(neighbor)) return;
 		const edge = top.edges.find(
 			(candidate) =>
 				!feedback.has(candidate.id) &&
@@ -1613,8 +2180,62 @@ function alignUnits(
 		const [mine, theirs] = forward ? [real.target, real.source] : [real.source, real.target];
 		shift(id, middle(theirs) - middle(mine));
 	};
-	for (const rank of order.filter((rank) => rank > anchor)) align(rank, rank - 1, true);
-	for (const rank of order.filter((rank) => rank < anchor).reverse()) align(rank, rank + 1, false);
+	// Zones gather a rank of several units under the members they join: each
+	// unit in order of where its edges land, a loop back into a zone pulling
+	// twice as hard so it stays short, and the rank centered on them all.
+	const gather = (rank: number) => {
+		const ids = ranks.get(rank)!;
+		if (!structure.zoned || ids.length < 2) return;
+		const box = (id: string) => units.get(id)!.frame ?? units.get(id)!.nodes[0]!;
+		const pulls = new Map(
+			ids.map((id) => [
+				id,
+				top.edges.flatMap((edge, index) => {
+					const real = crossEdges[index]!;
+					const [mine, theirs] =
+						edge.source === id ? [real.source, real.target] : [real.target, real.source];
+					if (
+						(edge.source !== id && edge.target !== id) ||
+						ids.includes(edge.source === id ? edge.target : edge.source)
+					)
+						return [];
+					void mine;
+					const at = middle(theirs);
+					return feedback.has(edge.id) && edge.source === id ? [at, at] : [at];
+				}),
+			]),
+		);
+		const placed = [...ids].sort((a, b) => box(a)[across] - box(b)[across]);
+		const mean = (values: readonly number[]) =>
+			values.reduce((sum, value) => sum + value, 0) / values.length;
+		const keyOf = (id: string) =>
+			pulls.get(id)!.length > 0 ? mean(pulls.get(id)!) : box(id)[across] + box(id)[size] / 2;
+		const wanted = [...placed].sort((a, b) => keyOf(a) - keyOf(b));
+		const gaps = placed.slice(1).map((id, index) => {
+			const previous = box(placed[index]!);
+			return box(id)[across] - previous[across] - previous[size];
+		});
+		const all = ids.flatMap((id) => pulls.get(id)!);
+		const span =
+			wanted.reduce((sum, id) => sum + box(id)[size], 0) + gaps.reduce((sum, gap) => sum + gap, 0);
+		let at = all.length > 0 ? mean(all) - span / 2 : box(placed[0]!)[across];
+		for (const [index, id] of wanted.entries()) {
+			shift(id, at - box(id)[across]);
+			at += box(id)[size] + (gaps[index] ?? 0);
+		}
+	};
+	for (const rank of order.filter((rank) => rank > anchor)) {
+		align(rank, rank - 1, true);
+		gather(rank);
+	}
+	for (const rank of order.filter((rank) => rank < anchor).reverse()) {
+		align(rank, rank + 1, false);
+		gather(rank);
+	}
+	for (let band = 1; band < bandCount; band += 1) {
+		const delta = extent(band - 1).end + bandGaps[band]! - extent(band).start;
+		for (const [id] of units) if ((bandOf.get(id) ?? 0) === band) shift(id, delta);
+	}
 }
 
 /** Inner padding of a lane across the flow, around its steps. */
@@ -2234,29 +2855,33 @@ function compositeShapes(groups: GroupLayout | undefined): NodeSceneElement[] {
 	);
 }
 
-/** Each frame with the band above it, for sizing what is drawn. */
+/** Each frame with the band above it, or each zone, for sizing what is drawn. */
 function groupBlocks(groups: GroupLayout | undefined): NodeSceneElement[] {
+	const band = groups?.zoned ? 0 : GROUP_LABEL_BAND;
 	return (groups?.frames ?? []).map((frame) =>
 		obstacleBox(frame.elementId, {
 			...frame.box,
-			y: frame.box.y - GROUP_LABEL_BAND,
-			height: frame.box.height + GROUP_LABEL_BAND,
+			y: frame.box.y - band,
+			height: frame.box.height + band,
 		}),
 	);
 }
 
 /**
  * What a route must not cross besides nodes and branch labels: every group's
- * name, every group neither end belongs to, and, for a group's own edge, walls
- * around its frame so the edge stays inside.
+ * name, every group neither end sits in, and, for an edge inside a group, walls
+ * around the innermost group holding both ends so the edge stays inside.
  */
 function groupObstacles(groups: GroupLayout | undefined, route: RoutedEdge): NodeSceneElement[] {
 	if (!groups) return [];
-	const source = groups.groupOf.get(route.source.nodeId);
-	const target = groups.groupOf.get(route.target.nodeId);
+	const ends = new Set([
+		...groupChain(groups, groups.groupOf.get(route.source.nodeId)),
+		...groupChain(groups, groups.groupOf.get(route.target.nodeId)),
+	]);
+	const shared = sharedGroup(groups, route.source.nodeId, route.target.nodeId);
 	return groups.frames.flatMap((frame) => {
 		const label = obstacleBox(`group-label:${frame.id}`, frame.labelBox);
-		if (frame.id === source && frame.id === target) {
+		if (frame.id === shared) {
 			const { x, y, width, height } = frame.box;
 			const wall = GROUP_WALL;
 			return [
@@ -2287,9 +2912,7 @@ function groupObstacles(groups: GroupLayout | undefined, route: RoutedEdge): Nod
 				}),
 			];
 		}
-		return frame.id === source || frame.id === target
-			? [label]
-			: [label, obstacleBox(frame.elementId, frame.box)];
+		return ends.has(frame.id) ? [label] : [label, obstacleBox(frame.elementId, frame.box)];
 	});
 }
 
@@ -2305,14 +2928,19 @@ const LANE_OUTLINE = `${GROUP_OUTLINE}lane:`;
  */
 const LANE_OUTLINE_CLEARANCE = 24;
 
-/** Each frame's outline as an unbound, headless line for routes to keep apart from. */
+/**
+ * Each frame's outline as an unbound, headless line for routes to keep apart
+ * from. A zone's outline is crisp and thin like a lane's boundary, so routes
+ * keep a lane's room from it wherever they can.
+ */
 function groupOutlineLines(groups: GroupLayout | undefined): ArrowSceneElement[] {
 	return (groups?.frames ?? []).map((frame) => {
 		const { x, y, width, height } = frame.box;
+		const id = `${GROUP_OUTLINE}${frame.id}`;
 		return {
 			type: "arrow",
-			id: `${GROUP_OUTLINE}${frame.id}`,
-			edgeId: `${GROUP_OUTLINE}${frame.id}`,
+			id,
+			edgeId: id,
 			sourceNodeId: "",
 			targetNodeId: "",
 			endArrowhead: null,
@@ -2348,9 +2976,9 @@ function insideBox(point: ScenePoint, box: Box): boolean {
 }
 
 /**
- * Routes that misread a group: through a group neither end belongs to, along or
- * hard beside a frame's outline, across a group's name, or a group's own edge
- * leaving it.
+ * Routes that misread a group: through a group neither end sits in, along or
+ * hard beside a frame's outline, across a group's name, or an edge leaving a
+ * group that holds both its ends.
  */
 function groupRouteDefects(
 	arrows: readonly ArrowSceneElement[],
@@ -2360,10 +2988,15 @@ function groupRouteDefects(
 	const outlines = groups.frames.map((frame) => frameOutline(frame.box));
 	for (const arrow of arrows) {
 		const segments = segmentsFromPoints(arrow.points);
-		const source = groups.groupOf.get(arrow.sourceNodeId);
-		const target = groups.groupOf.get(arrow.targetNodeId);
+		const ends = new Set([
+			...groupChain(groups, groups.groupOf.get(arrow.sourceNodeId)),
+			...groupChain(groups, groups.groupOf.get(arrow.targetNodeId)),
+		]);
+		const holding = new Set(
+			groupChain(groups, sharedGroup(groups, arrow.sourceNodeId, arrow.targetNodeId)),
+		);
 		for (const [index, frame] of groups.frames.entries()) {
-			const own = frame.id === source || frame.id === target;
+			const own = ends.has(frame.id);
 			if (
 				segments.some(
 					(segment) =>
@@ -2377,9 +3010,7 @@ function groupRouteDefects(
 								segmentOverlapLength(edge, segment) > GROUP_OUTLINE_CLEARANCE,
 						),
 				) ||
-				(frame.id === source &&
-					frame.id === target &&
-					arrow.points.some((point) => !insideBox(point, frame.box)))
+				(holding.has(frame.id) && arrow.points.some((point) => !insideBox(point, frame.box)))
 			)
 				defects.push([arrow.id]);
 		}
@@ -2805,6 +3436,25 @@ function connectionEdges(
 	return { sourceEdge: "top", targetEdge: "bottom" };
 }
 
+/**
+ * Whether a side curves, so a lone line meets it at its middle: every side of a
+ * diamond or ellipse, a cylinder's lid and foot, a pipe's ends, a document's foot.
+ */
+function curvedSide(shape: NodeSceneElement, side: ConnectionEdge): boolean {
+	switch (shape.shape) {
+		case "rectangle":
+			return false;
+		case "cylinder":
+			return side === "top" || side === "bottom";
+		case "pipe":
+			return side === "left" || side === "right";
+		case "document":
+			return side === "bottom";
+		default:
+			return true;
+	}
+}
+
 function clamp(value: number, min: number, max: number): number {
 	return Math.min(max, Math.max(min, value));
 }
@@ -2819,6 +3469,13 @@ function constrainedPortOffset(shape: NodeSceneElement, edge: ConnectionEdge, of
 }
 
 function pointOnEdge(shape: NodeSceneElement, edge: ConnectionEdge, portOffset = 0): ScenePoint {
+	// A composed shape's sides curve or taper in from its box: lines end on them.
+	if (isCanvasComposedShape(shape.shape))
+		return canvasComposedOutlinePoint(
+			{ ...shape, shape: shape.shape },
+			edge,
+			pointOnEdge({ ...shape, shape: "rectangle" }, edge, portOffset),
+		);
 	const offset = constrainedPortOffset(shape, edge, portOffset);
 	const centerPoint = center(shape);
 	const halfWidth = shape.width / 2;
@@ -3185,7 +3842,7 @@ function lineSlotPreference(
 		};
 	}
 	const lone = (target: PortSlot, sideOfTarget: ConnectionEdge) =>
-		target.route[target.endpoint].shape !== "rectangle" &&
+		curvedSide(target.route[target.endpoint], sideOfTarget) &&
 		slotsBySide.get(portKey(target.route[target.endpoint].nodeId, sideOfTarget))?.length === 1;
 	const facing = otherSide === OPPOSITE_EDGE[side] && ahead > 0;
 	if (lone(slot, side) && !(facing && slot.endpoint === "target" && lone(other, otherSide)))
@@ -3831,6 +4488,32 @@ function keepsClearOf(shape: NodeSceneElement, ignoredNodeIds: ReadonlySet<strin
 	return shape.id.startsWith("node:") && !ignoredNodeIds.has(shape.nodeId);
 }
 
+/** Runs that lie along a drawn node's border, other than its own ends' nodes. */
+function routeBorderRunCount(
+	points: readonly ScenePoint[],
+	shapes: readonly NodeSceneElement[],
+	ignoredNodeIds: ReadonlySet<string>,
+): number {
+	return segmentsFromPoints(points).filter((segment) =>
+		shapes.some(
+			(shape) => keepsClearOf(shape, ignoredNodeIds) && segmentAlongBorder(segment, shape),
+		),
+	).length;
+}
+
+/** Whether a run lies on one of a box's sides, overlapping it. */
+function segmentAlongBorder(segment: AxisAlignedSegment, box: Box): boolean {
+	const horizontal = segment.orientation === "horizontal";
+	const [low, size, along, length] = horizontal
+		? [box.y, box.height, box.x, box.width]
+		: [box.x, box.width, box.y, box.height];
+	return (
+		(Math.abs(segment.staticCoordinate - low) <= AXIS_ALIGNED_EPSILON ||
+			Math.abs(segment.staticCoordinate - low - size) <= AXIS_ALIGNED_EPSILON) &&
+		Math.min(segment.max, along + length) - Math.max(segment.min, along) > AXIS_ALIGNED_EPSILON
+	);
+}
+
 function routeNodeCrossingCount(
 	points: readonly ScenePoint[],
 	shapes: readonly NodeSceneElement[],
@@ -4308,6 +4991,7 @@ function chooseBestRoute(
 	ignoredNodeIds: ReadonlySet<string>,
 	route: RoutedEdge,
 	routed: RoutedSoFar,
+	borders = false,
 ): [ScenePoint, ...ScenePoint[]] {
 	const first = candidates[0];
 	if (!first) {
@@ -4324,6 +5008,7 @@ function chooseBestRoute(
 		return [
 			-endpointStubScore(candidate, route),
 			routeNodeCrossingCount(candidate, shapes, ignoredNodeIds),
+			...(borders ? [routeBorderRunCount(candidate, shapes, ignoredNodeIds)] : []),
 			routeSelfOverlapCount(candidate, route),
 			routeArrowOverlapCount(candidate, routed.segments, route),
 			routeOutlineBesideCount(candidate, routed.outlines),
@@ -4540,6 +5225,7 @@ function assignFeedbackSides(
 		const sourceCandidates = branches(route.source.kind)
 			? [route.sourceEdge, ...candidates]
 			: candidates;
+
 		route.targetEdge =
 			candidates.find((side) => !departures.has(side) && !targetArrivals.has(side)) ??
 			candidates.find((side) => !departures.has(side)) ??
@@ -4619,7 +5305,9 @@ function assignPairedReturns(
 		if (!forward) continue;
 		const [from, to] = [center(route.source), center(route.target)];
 		const ends = new Set([route.source.nodeId, route.target.nodeId]);
-		const owners = new Set([...ends].map((id) => groups?.groupOf.get(id) ?? id));
+		const owners = new Set(
+			[...ends].flatMap((id) => (groups ? groupChain(groups, groups.groupOf.get(id) ?? id) : [id])),
+		);
 		const between = [
 			...nodes.filter((node) => !ends.has(node.nodeId)),
 			...(groups?.frames ?? [])
@@ -5208,6 +5896,7 @@ function obstacleRoute(
 	maxSteps = Infinity,
 	guided = true,
 	crossings?: CrossingLookup,
+	borders = false,
 ): [ScenePoint, ...ScenePoint[]] | undefined {
 	// With a corridor gap, also offer lanes far enough from each routed point to read apart.
 	const lanes = (coordinate: number) =>
@@ -5268,6 +5957,21 @@ function obstacleRoute(
 		cost: 0,
 		estimate: remaining(initialX, initialY),
 	};
+	// The shapes each grid line runs through the interior of, found on the line's
+	// first step: a step along a line can cross only those, so it tests no other.
+	const through = (lines: readonly number[], axis: "x" | "y") => {
+		const size = axis === "x" ? "width" : "height";
+		const found: (readonly NodeSceneElement[] | undefined)[] = [];
+		// With borders held, a line on a node's side passes along it too.
+		const margin = borders ? -AXIS_ALIGNED_EPSILON : AXIS_ALIGNED_EPSILON;
+		return (index: number) =>
+			(found[index] ??= shapes.filter(
+				(shape) =>
+					lines[index]! > shape[axis] + margin &&
+					lines[index]! < shape[axis] + shape[size] - margin,
+			));
+	};
+	const [throughX, throughY] = [through(xs, "x"), through(ys, "y")];
 	const pending = stepQueue<Step>();
 	pending.push(initial);
 	const costs = new Map<number, number>([[key(initial.x, initial.y, initial.axis), 0]]);
@@ -5311,7 +6015,11 @@ function obstacleRoute(
 				const lane = step && nearLane ? nearLane(step, arrowId) : undefined;
 				edgeCosts.set(
 					gridEdge,
-					shapes.some((shape) => segmentCrossesBoundsInterior(segment, shape)) ||
+					(axis === 0 ? throughY(current.y) : throughX(current.x)).some(
+						(shape) =>
+							segmentCrossesBoundsInterior(segment, shape) ||
+							(borders && shape.id.startsWith("node:") && segmentAlongBorder(segment, shape)),
+					) ||
 						// Neither the departure nor the arrival may double back over its port stub.
 						stubs.some((stub) => segmentsOverlapInterior(segment, stub))
 						? undefined
@@ -5350,7 +6058,7 @@ function exteriorLaneRoute(
 	end: ScenePoint,
 	shapes: readonly NodeSceneElement[],
 	existingArrows: readonly ArrowSceneElement[],
-	{ avoidCrossings, readerScale, guided, bandOf, lanes: laneLayout }: RouteOptions,
+	{ avoidCrossings, readerScale, guided, bandOf, groups, lanes: laneLayout }: RouteOptions,
 ): [ScenePoint, ...ScenePoint[]] {
 	const horizontalDominant = Math.abs(end.x - start.x) >= Math.abs(end.y - start.y);
 	const ignoredNodeIds = new Set([route.source.nodeId, route.target.nodeId]);
@@ -5513,7 +6221,9 @@ function exteriorLaneRoute(
 	];
 
 	const routed = routedSoFar(existingArrows, readerScale, avoidCrossings);
-	const first = chooseBestRoute(candidates, shapes, ignoredNodeIds, route, routed);
+	// Among zones, a run along a node's border reads as part of the node.
+	const strict = groups?.zoned === true;
+	const first = chooseBestRoute(candidates, shapes, ignoredNodeIds, route, routed, strict);
 	const gap = readerScale === undefined ? 0 : routingCorridorGap(readerScale);
 	const best = gap
 		? chooseBestRoute(
@@ -5522,6 +6232,7 @@ function exteriorLaneRoute(
 				ignoredNodeIds,
 				route,
 				routed,
+				strict,
 			)
 		: first;
 	const corridors = (points: [ScenePoint, ...ScenePoint[]]) =>
@@ -5531,6 +6242,8 @@ function exteriorLaneRoute(
 			sourceId: route.edge.source,
 			targetId: route.edge.target,
 		}).corridors ?? 0;
+	// A run along a node's border, like a corridor, is polish: a bounded search fixes it.
+	const border = strict && routeBorderRunCount(best, shapes, ignoredNodeIds) > 0;
 	const hard =
 		routeNodeCrossingCount(best, shapes, ignoredNodeIds) ||
 		routeSelfOverlapCount(best, route) ||
@@ -5541,7 +6254,7 @@ function exteriorLaneRoute(
 	const wanders =
 		route.pinned !== undefined &&
 		routeBacktrackDistance(best) + routeTargetOvershootDistance(best) > 0;
-	if (hard || corridors(best) || wanders) {
+	if (hard || border || corridors(best) || wanders) {
 		// Search lanes that read apart only when a corridor is what remains to fix.
 		const detour = obstacleRoute(
 			start,
@@ -5558,8 +6271,10 @@ function exteriorLaneRoute(
 			hard ? Infinity : CORRIDOR_SEARCH_STEPS,
 			guided,
 			routed.crossings,
+			strict,
 		);
-		if (detour) return chooseBestRoute([best, detour], shapes, ignoredNodeIds, route, routed);
+		if (detour)
+			return chooseBestRoute([best, detour], shapes, ignoredNodeIds, route, routed, strict);
 	}
 	return best;
 }
@@ -5776,6 +6491,21 @@ function inwardEndpoints(
 			const node = byId.get(nodeId);
 			if (!node || !point || !next) continue;
 			const step = 0.0001;
+			// A composed shape's end sits on its drawn outline, inside its box: its
+			// first step heads in when it closes on the box's middle.
+			if (isCanvasComposedShape(node.shape)) {
+				const toward = (from: ScenePoint) =>
+					Math.max(
+						Math.abs(from.x - center(node).x) / (node.width / 2),
+						Math.abs(from.y - center(node).y) / (node.height / 2),
+					);
+				const moved = {
+					x: point.x + (next.x - point.x) * step,
+					y: point.y + (next.y - point.y) * step,
+				};
+				if (toward(moved) < toward(point) - 1e-9) inward += 1;
+				continue;
+			}
 			const x = (point.x + (next.x - point.x) * step - center(node).x) / (node.width / 2);
 			const y = (point.y + (next.y - point.y) * step - center(node).y) / (node.height / 2);
 			const extent =
@@ -5989,13 +6719,14 @@ function alignMarkers(
 		const room = padBox(shifted, PORT_SPACING);
 		const group = groups?.groupOf.get(marker.nodeId);
 		const frame = groups?.frames.find((candidate) => candidate.id === group);
+		const around = new Set(groups ? groupChain(groups, group) : []);
 		const clear =
 			nodes.every(
 				(node) => node === marker || !boxesOverlap(room, moved.get(node.nodeId) ?? node),
 			) &&
 			(groups?.frames ?? []).every(
 				(candidate) =>
-					candidate === frame ||
+					around.has(candidate.id) ||
 					(!boxesOverlap(room, candidate.box) && !boxesOverlap(room, candidate.labelBox)),
 			) &&
 			(!frame ||
@@ -6011,6 +6742,27 @@ function alignMarkers(
 		route.target = moved.get(route.target.nodeId) ?? route.target;
 	}
 	return nodes.map((node) => moved.get(node.nodeId) ?? node);
+}
+
+/** The edges that cross a cut of a wrapped zoned level, by edge id. */
+function zoneCutEdges(
+	diagram: IntermediateDiagram,
+	zoneWraps: ReadonlyMap<string, Wrap> | undefined,
+): ReadonlySet<string> {
+	const structure = zoneWraps ? groupStructure(diagram) : undefined;
+	if (!structure || !zoneWraps) return new Set();
+	const levels = new Map<string, IntermediateDiagram>([
+		[TOP_LEVEL, structure.top],
+		...structure.groups.map((level) => [level.group.id, level.diagram] as const),
+	]);
+	return new Set(
+		[...zoneWraps].flatMap(([level, { bandOf }]) =>
+			levels
+				.get(level)!
+				.edges.filter((edge) => (bandOf.get(edge.source) ?? 0) !== (bandOf.get(edge.target) ?? 0))
+				.map((edge) => edge.id),
+		),
+	);
 }
 
 /** Each continuation runs midway between the bands it joins. */
@@ -6071,8 +6823,16 @@ function crowdedGroups(layout: DiagramLayout): Set<string> {
 	for (const label of labels) {
 		const arrow = arrows.get(label.id.slice(0, -":label".length));
 		const group = arrow ? groups.groupOf.get(arrow.sourceNodeId) : undefined;
-		if (group === undefined) continue;
 		const box = labelBox(label, freeLabelSize(label.text, label.maxWidth ?? 160));
+		// A label touching a zone it does not start in crowds that zone too.
+		if (groups.zoned)
+			for (const frame of groups.frames)
+				if (
+					frameOutline(frame.box).some((edge) => segmentCrossesBoundsInterior(edge, box)) ||
+					boxesOverlap(box, frame.labelBox)
+				)
+					crowded.add(frame.id);
+		if (group === undefined) continue;
 		if (
 			outlines.some((edge) => segmentCrossesBoundsInterior(edge, box)) ||
 			groups.frames.some((frame) => boxesOverlap(box, frame.labelBox))
@@ -6174,6 +6934,7 @@ function layoutDiagramOnce(
 				: portOffsetsForRoutes(routes, polish.repair),
 		);
 	const { wrap } = arrangement;
+	const zoneCuts = zoneCutEdges(diagram, arrangement.zoneWraps);
 	let {
 		groups,
 		lanes,
@@ -6183,12 +6944,14 @@ function layoutDiagramOnce(
 		: positionLayout(diagram, new Map(), new Map(), arrangement, slack);
 	// Groups laid out across the flow read in their own direction inside.
 	const { direction } = diagram.layout;
-	const acrossOf = (nodeId: string) =>
-		arrangement.groupsAcross ? groups?.groupOf.get(nodeId) : undefined;
+	// A node reads in its group's direction, and an edge in the direction of the
+	// innermost group holding both its ends.
+	const turned = (group: string | undefined) =>
+		group !== undefined && groups !== undefined && groups.across.has(group);
 	const nodeDirection = (nodeId: string) =>
-		acrossOf(nodeId) === undefined ? direction : ACROSS_DIRECTION[direction];
+		turned(groups?.groupOf.get(nodeId)) ? ACROSS_DIRECTION[direction] : direction;
 	const edgeDirection = (edge: DiagramEdge) =>
-		acrossOf(edge.source) !== undefined && acrossOf(edge.source) === acrossOf(edge.target)
+		groups && turned(sharedGroup(groups, edge.source, edge.target))
 			? ACROSS_DIRECTION[direction]
 			: direction;
 	const assignSides = (routes: RoutedEdge[], mirror: boolean) => {
@@ -6205,6 +6968,22 @@ function layoutDiagramOnce(
 	const routedEdges = diagram.edges.map((edge, index) =>
 		routeForEdge(edge, index, shapesByNodeId, edgeDirection(edge), wrap.continuations.has(edge.id)),
 	);
+	// A zoned level's band hangs under the steps that reach it: an edge into it
+	// leaves forward when its target lies ahead, else toward the band, and turns
+	// into it from the side it hangs from.
+	for (const route of routedEdges)
+		if (zoneCuts.has(route.edge.id)) {
+			const { source, target } = route;
+			const ahead = {
+				LR: target.x >= source.x + source.width,
+				RL: target.x + target.width <= source.x,
+				TB: target.y >= source.y + source.height,
+				BT: target.y + target.height <= source.y,
+			}[direction];
+			const toward = FORWARD_SIDE[ACROSS_DIRECTION[direction]];
+			route.sourceEdge = ahead ? FORWARD_SIDE[direction] : toward;
+			route.targetEdge = OPPOSITE_EDGE[toward];
+		}
 	if (endRun) for (const route of routedEdges) route.endRun = endRun;
 	if (lanes) assignLaneSides(routedEdges, lanes);
 	const mirrored = orthogonal && polish.ports;
@@ -6275,6 +7054,7 @@ function layoutDiagramOnce(
 	nodeShapes = alignMarkers(routedEdges, nodeShapes, groups, portOffsets);
 	if (lanes) assignLaneContinuations(routedEdges, lanes, wrap);
 	else assignContinuationLanes(routedEdges, nodeShapes, wrap);
+
 	// Judge jogs and corridors at the size a reader sees the exported diagram.
 	const drawn = [...nodeShapes, ...groupBlocks(groups), ...laneBlocks(lanes)];
 	const scale = routingQualityScale({
@@ -6470,6 +7250,7 @@ export function arrowCrossings(arrows: readonly ArrowSceneElement[], runs = true
 function readerFindingCount(
 	arrows: readonly ArrowSceneElement[],
 	nodes: readonly NodeSceneElement[],
+	jogs = true,
 ): number {
 	const scale = routingQualityScale(drawnSize(nodes, arrows));
 	const routes = arrows.map((arrow) => ({
@@ -6480,15 +7261,18 @@ function readerFindingCount(
 	}));
 	const quality = candidateRouteQuality(routes, scale);
 	return (
-		routingQualityFindings(routes, scale).length +
-		routes.filter((route) => quality(route).arrowheadsCrossed > 0).length
+		routingQualityFindings(routes, scale).filter(
+			(finding) => jogs || finding.kind !== "endpoint-jog",
+		).length + routes.filter((route) => quality(route).arrowheadsCrossed > 0).length
 	);
 }
 
 /**
  * Neither more crossings (or, when `fewerCrossings`, strictly fewer) nor more
  * reader-scale findings, each judged at its own export size, and no newly
- * extreme or longer aspect, unless `narrower` and only narrower.
+ * extreme or longer aspect, unless `narrower` and only narrower. Without
+ * `jogs`, a jog beside a port does not count, being minor next to the extreme
+ * aspect a zoned wrap removes.
  */
 function routesNoWorse(
 	candidate: Pick<DiagramLayout, "edgeArrows" | "groups" | "lanes" | "nodeShapes">,
@@ -6496,6 +7280,7 @@ function routesNoWorse(
 	fewerCrossings = false,
 	runs = true,
 	narrower = false,
+	jogs = true,
 ): boolean {
 	const [crossings, currentCrossings] = [candidate, current].map((layout) =>
 		arrowCrossings(layout.edgeArrows, runs),
@@ -6517,16 +7302,16 @@ function routesNoWorse(
 			aspect! <= currentAspect! + AXIS_ALIGNED_EPSILON ||
 			// Narrower without growing longer: its text fits no smaller.
 			(narrower && longSide(size!) <= longSide(currentSize!) + AXIS_ALIGNED_EPSILON)) &&
-		readerFindingCount(candidate.edgeArrows, [
-			...candidate.nodeShapes,
-			...groupBlocks(candidate.groups),
-			...laneBlocks(candidate.lanes),
-		]) <=
-			readerFindingCount(current.edgeArrows, [
-				...current.nodeShapes,
-				...groupBlocks(current.groups),
-				...laneBlocks(current.lanes),
-			])
+		readerFindingCount(
+			candidate.edgeArrows,
+			[...candidate.nodeShapes, ...groupBlocks(candidate.groups), ...laneBlocks(candidate.lanes)],
+			jogs,
+		) <=
+			readerFindingCount(
+				current.edgeArrows,
+				[...current.nodeShapes, ...groupBlocks(current.groups), ...laneBlocks(current.lanes)],
+				jogs,
+			)
 	);
 }
 
@@ -7059,6 +7844,85 @@ function laneElements(lanes: LaneLayout): (NodeSceneElement | TextSceneElement)[
 	});
 }
 
+/** A zone label's ink: quieter than the steps, which read first. */
+const ZONE_LABEL_COLOR = "#4c4639";
+/** Fills that set a subnet or a namespace apart from the zone around it. */
+const ZONE_FILL: Readonly<Partial<Record<DiagramZoneKind, string>>> = {
+	subnet: "#f6f1e7",
+	namespace: "#efe6ec",
+};
+
+/**
+ * How each kind of zone draws: outer boundaries (a cloud or a data center) in
+ * dark ink, a region dashed, an availability or network zone dotted, a VPC or
+ * a cluster in a heavier line, and a subnet or a namespace filled.
+ */
+function zoneStyle(
+	kind: DiagramZoneKind | undefined,
+	accent: string,
+): Pick<
+	NodeSceneElement,
+	"fillColor" | "fillStyle" | "strokeColor" | "strokeStyle" | "strokeWidth"
+> {
+	const fill = kind === undefined ? undefined : ZONE_FILL[kind];
+	return {
+		strokeColor: kind === "cloud" || kind === "datacenter" ? ZONE_LABEL_COLOR : accent,
+		strokeStyle:
+			kind === "cloud" || kind === "region" || kind === "namespace"
+				? "dashed"
+				: kind === "zone"
+					? "dotted"
+					: "solid",
+		strokeWidth:
+			kind === "cloud" || kind === "datacenter" || kind === "vpc" || kind === "cluster" ? 2 : 1,
+		...(fill ? { fillColor: fill, fillStyle: "solid" as const } : {}),
+	};
+}
+
+/**
+ * Each zone as locked shapes under the diagram, outermost first: its outline,
+ * styled by its kind, and its label at the left of the header strip across its
+ * top. Locked, they stay put while steps move across them in the editor.
+ */
+function zoneElements(
+	groups: GroupLayout,
+	accent: string,
+): (NodeSceneElement | TextSceneElement)[] {
+	return groups.frames.flatMap((frame): (NodeSceneElement | TextSceneElement)[] => {
+		const maxWidth = Math.max(1, frame.box.width - 2 * ZONE_LABEL_INSET);
+		return [
+			{
+				type: "node",
+				id: frame.elementId,
+				nodeId: frame.elementId,
+				kind: frame.kind ?? "zone",
+				rendererRole: "zone",
+				shape: "rectangle",
+				...frame.box,
+				label: frame.label,
+				...zoneStyle(frame.kind, accent),
+				roughness: 0,
+				locked: true,
+			},
+			{
+				type: "text",
+				id: `zone-label:${frame.id}`,
+				x:
+					frame.box.x +
+					ZONE_LABEL_INSET +
+					boundLabelWidth(frame.label, ZONE_LABEL_FONT_SIZE, maxWidth) / 2,
+				y: frame.box.y + ZONE_HEADER / 2,
+				text: frame.label,
+				fontSize: ZONE_LABEL_FONT_SIZE,
+				maxWidth,
+				textAlign: "left",
+				textColor: ZONE_LABEL_COLOR,
+				locked: true,
+			},
+		];
+	});
+}
+
 /**
  * Draw each group as an Excalidraw frame named by its label, and make every
  * member a child of it: nodes and their labels always, and a group's own edges
@@ -7233,37 +8097,40 @@ export function renderGraphDiagram(
 		consider({ ...best.arrangement, reorder: true }, true);
 	// A flow too long for its breadth wraps when the wrapped layout routes no worse.
 	// Its size includes the branch labels, as the exported PNG does.
-	const size = drawnSize(
-		[
-			...best.layout.nodeShapes,
-			...groupBlocks(best.layout.groups),
-			...laneBlocks(best.layout.lanes),
-		],
-		best.layout.edgeArrows,
-		[
-			...branchLabels(
-				[...best.layout.edgeArrows],
-				best.layout.routedEdges,
-				best.layout.nodeShapes,
-				best.layout.groups,
-				false,
-				best.layout.lanes,
-			),
-		],
-	);
 	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
-	const [along, across] = vertical ? [size.height, size.width] : [size.width, size.height];
-	const aspect = (along + 2 * EXPORT_PADDING) / (across + 2 * EXPORT_PADDING);
-	const fittedText =
-		(NODE_LABEL_FONT_SIZE * FITTED_LONG_SIDE) / (Math.max(along, across) + 2 * EXPORT_PADDING);
-	const tooLong =
-		aspect >= WRAP_EXTREME_ASPECT ||
-		(aspect >= WRAP_ASPECT && (vertical || along >= WRAP_MIN_LENGTH));
-	// A column short of 4:1 whose text stays readable wraps only into even columns.
-	const balance =
-		vertical && aspect < WRAP_EXTREME_ASPECT && fittedText >= WRAP_MIN_COLUMN_TEXT
-			? WRAP_COLUMN_BALANCE
-			: 0;
+	const lengthOf = (layout: DiagramLayout) => {
+		const size = drawnSize(
+			[...layout.nodeShapes, ...groupBlocks(layout.groups), ...laneBlocks(layout.lanes)],
+			layout.edgeArrows,
+			[
+				...branchLabels(
+					[...layout.edgeArrows],
+					layout.routedEdges,
+					layout.nodeShapes,
+					layout.groups,
+					false,
+					layout.lanes,
+				),
+			],
+		);
+		const [along, across] = vertical ? [size.height, size.width] : [size.width, size.height];
+		const aspect = (along + 2 * EXPORT_PADDING) / (across + 2 * EXPORT_PADDING);
+		const fittedText =
+			(NODE_LABEL_FONT_SIZE * FITTED_LONG_SIDE) / (Math.max(along, across) + 2 * EXPORT_PADDING);
+		return {
+			aspect,
+			// A column short of 4:1 whose text stays readable wraps only into even columns.
+			balance:
+				vertical && aspect < WRAP_EXTREME_ASPECT && fittedText >= WRAP_MIN_COLUMN_TEXT
+					? WRAP_COLUMN_BALANCE
+					: 0,
+			size,
+			tooLong:
+				aspect >= WRAP_EXTREME_ASPECT ||
+				(aspect >= WRAP_ASPECT && (vertical || along >= WRAP_MIN_LENGTH)),
+		};
+	};
+	const { aspect, balance, tooLong } = lengthOf(best.layout);
 	// Lanes wrap into pools only past the extreme aspect: a pool split apart reads
 	// worse than one long pool.
 	const wrap =
@@ -7283,12 +8150,67 @@ export function renderGraphDiagram(
 	}
 	// A grouped flow never wraps, since a band cut would split a group; a long one
 	// lays its groups across the flow instead, when that routes no worse.
-	const groupsAcross = arranged && orthogonal && tooLong && groupStructure(diagram) !== undefined;
+	// Zones never do: across the flow, a zone's members would contradict the
+	// direction the diagram states.
+	const structure = groupStructure(diagram);
+	const groupsAcross =
+		arranged && orthogonal && tooLong && structure !== undefined && !structure.zoned;
 	for (const crossingRepair of repairable && !best.arrangement.crossingRepair
 		? [true, false]
 		: [best.arrangement.crossingRepair]) {
 		if (!groupsAcross || best.arrangement.groupsAcross) break;
 		consider({ ...best.arrangement, crossingRepair, groupsAcross: true }, false);
+	}
+	// A zoned flow wraps instead, level by level, each band reading in the stated
+	// direction (planZoneWraps). Of the plans that route no worse, the first with
+	// no more crossings or reader findings than before is kept, else the one with
+	// the fewest crossings, then findings, then the squarest; one still too long
+	// plans again from the wrap it kept.
+	const zoneScore = (layout: DiagramLayout) => [
+		arrowCrossings(layout.edgeArrows, false),
+		readerFindingCount(layout.edgeArrows, [...layout.nodeShapes, ...groupBlocks(layout.groups)]),
+		lengthOf(layout).aspect,
+	];
+	const lower = (left: readonly number[], right: readonly number[]) => {
+		const index = left.findIndex((value, at) => value !== right[at]);
+		return index >= 0 && left[index]! < right[index]!;
+	};
+	for (
+		let round = 0;
+		round < ZONE_WRAP_ROUNDS && arranged && orthogonal && structure?.zoned;
+		round += 1
+	) {
+		const length = lengthOf(best.layout);
+		if (!length.tooLong) break;
+		const kept = best;
+		let chosen: (typeof best & { score: number[] }) | undefined;
+		for (const zoneWraps of planZoneWraps(
+			diagram,
+			structure,
+			kept.arrangement,
+			length.balance,
+			length.size,
+		)) {
+			const arrangement = {
+				...kept.arrangement,
+				crossingRepair: repairable || kept.arrangement.crossingRepair,
+				zoneWraps,
+			};
+			const layout = layoutDiagram(diagram, levels[0]!, arrangement);
+			const defects = defectsOf(layout);
+			if (
+				fewer(kept.defects, defects) ||
+				!routesNoWorse(layout, kept.layout, false, false, false, false)
+			)
+				continue;
+			const score = zoneScore(layout);
+			if (!chosen || lower(score, chosen.score)) chosen = { arrangement, defects, layout, score };
+			// A plan with no more crossings or reader findings than before needs no rival.
+			const [crossings, findings] = zoneScore(kept.layout);
+			if (score[0]! <= crossings! && score[1]! <= findings!) break;
+		}
+		if (!chosen) break;
+		best = chosen;
 	}
 	// In lanes a step takes lines in and sends them out by different sides, when
 	// that routes no worse.
@@ -7311,11 +8233,16 @@ export function renderGraphDiagram(
 		],
 		nodes: layout.nodeShapes,
 	};
-	const framed = groups ? withGroupFrames(groups, drawn) : drawn;
+	const framed = groups && !groups.zoned ? withGroupFrames(groups, drawn) : drawn;
 	const { arrows: edgeArrows, frames, labels } = framed;
 	const nodeShapes = framed.nodes.flatMap((shape) => drawnMarker(shape, diagram.style.accentColor));
-	// Lanes sit under everything, each band, then its header and the header's name.
-	const lane = lanes ? laneElements(lanes) : [];
+	// Lanes sit under everything, each band, then its header and the header's name;
+	// zones likewise, outermost first, each outline then its label.
+	const lane = lanes
+		? laneElements(lanes)
+		: groups?.zoned
+			? zoneElements(groups, diagram.style.accentColor)
+			: [];
 	const elements = normalizeSceneOrigin([
 		...lane,
 		...frames,

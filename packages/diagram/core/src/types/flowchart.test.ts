@@ -1,9 +1,10 @@
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { DiagramValidationError } from "../intermediate";
+import { DiagramValidationError, parseIntermediateDiagram } from "../intermediate";
 import {
 	FLOWCHART_MAX_EDGES,
+	FLOWCHART_MAX_GROUP_DEPTH,
 	FLOWCHART_MAX_GROUPS,
 	FLOWCHART_MAX_LANES,
 	FLOWCHART_MAX_ISSUES,
@@ -297,6 +298,99 @@ describe("flowchart groups", () => {
 		});
 		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_too_large"]);
 		expect(issues[0]?.ref).toEqual({ kind: "diagram", id: "linear-9", path: "groups" });
+	});
+});
+
+describe("flowchart zones", () => {
+	const zoned = {
+		...flowchartFixture,
+		groups: [
+			{ id: "region", label: "us-east-1", kind: "region" },
+			{ id: "vpc", label: "VPC", kind: "vpc", parent: "region" },
+			{ id: "public", label: "Public subnet", kind: "subnet", parent: "vpc" },
+		],
+		nodes: flowchartFixture.nodes.map((node) =>
+			node.id === "requirements"
+				? { ...node, group: "public", shape: "document" }
+				: node.id === "draft"
+					? { ...node, group: "region", shape: "database" }
+					: node,
+		),
+	};
+
+	it("accepts zones nested through parent, holding nodes directly or through nested zones", () => {
+		const diagram = parseFlowchartDiagram(zoned);
+		expect(diagram.groups?.map((group) => [group.id, group.parent, group.kind])).toEqual([
+			["region", undefined, "region"],
+			["vpc", "region", "vpc"],
+			["public", "vpc", "subnet"],
+		]);
+		expect(diagram.nodes.find((node) => node.id === "draft")?.shape).toBe("database");
+	});
+
+	it("rejects an unknown zone kind or node shape at the schema", () => {
+		for (const input of [
+			{ ...zoned, groups: [{ id: "region", label: "Region", kind: "galaxy" }] },
+			{ ...zoned, nodes: [{ ...zoned.nodes[0], shape: "hexagon" }, ...zoned.nodes.slice(1)] },
+		])
+			expect(() => parseFlowchartDiagram(input)).toThrow(/Expected/);
+	});
+
+	it("names each nesting problem with a repair hint", () => {
+		const issues = validationIssues({
+			...zoned,
+			groups: [
+				{ id: "region", label: "us-east-1", parent: "vpc" },
+				{ id: "vpc", label: "VPC", parent: "region" },
+				{ id: "public", label: "Public subnet", parent: "cloud" },
+				// Under the loop, not in it: not named.
+				{ id: "private", label: "Private subnet", parent: "vpc" },
+			],
+			nodes: zoned.nodes.map((node) =>
+				node.id === "clear" ? { ...node, shape: "queue", group: "private" } : node,
+			),
+		});
+		expect(issues.map((issue) => [issue.code, issue.ref])).toEqual([
+			["group_cycle", { kind: "group", id: "region", path: "groups.parent" }],
+			["group_cycle", { kind: "group", id: "vpc", path: "groups.parent" }],
+			["unknown_group_parent", { kind: "group", id: "public", path: "groups.parent" }],
+			["shaped_decision", { kind: "node", id: "clear", path: "nodes.shape" }],
+		]);
+		expect(issues[0]?.message).toBe(
+			'Group "region" is nested inside itself through "region" in "vpc" in "region".',
+		);
+		expect(issues[2]?.hint).toBe(
+			'Set parent to the id of the declared group that encloses it ("region", "vpc", "public", "private"), or remove parent.',
+		);
+		expect(() =>
+			parseIntermediateDiagram({ ...zoned, groups: [{ id: "a", label: "A", parent: "a" }] }),
+		).toThrow('Group "a" is nested inside itself.');
+	});
+
+	it("bounds how deep zones nest", () => {
+		const groups = Array.from({ length: FLOWCHART_MAX_GROUP_DEPTH + 1 }, (_, index) => ({
+			id: `z${index}`,
+			label: `Zone ${index}`,
+			...(index > 0 ? { parent: `z${index - 1}` } : {}),
+		}));
+		const deep = {
+			...zoned,
+			groups,
+			nodes: zoned.nodes.map((node) =>
+				node.id === "draft" ? { ...node, group: groups.at(-1)!.id } : { ...node, group: undefined },
+			),
+		};
+		expect(validationIssues(deep).map((issue) => [issue.code, issue.ref?.path])).toEqual([
+			["flowchart_too_large", "groups.parent"],
+		]);
+		expect(
+			validationIssues({
+				...deep,
+				groups: groups
+					.slice(1)
+					.map((group, index) => (index === 0 ? { id: group.id, label: group.label } : group)),
+			}),
+		).toEqual([]);
 	});
 });
 

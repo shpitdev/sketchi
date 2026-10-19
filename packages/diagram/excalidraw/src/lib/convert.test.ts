@@ -14,6 +14,7 @@ import {
 	type CanvasSpec,
 	getCanvasValidationIssues,
 	groupFixtures,
+	zoneFixtures,
 } from "@sketchi/diagram-core";
 import {
 	renderChartDiagram,
@@ -2046,6 +2047,139 @@ describe("group frames", () => {
 				message: 'Arrow "edge:through" passes through shape "group:team".',
 			},
 		]);
+	});
+});
+
+describe("architecture zones and infrastructure shapes", () => {
+	const aws = renderIntermediateDiagram(zoneFixtures["aws-three-tier"]);
+	const exported = convertSceneToExcalidraw(aws);
+	const byId = new Map(exported.elements.map((element) => [element.id, element]));
+
+	it("exports zones as locked, square, crossable rectangles under a locked label", () => {
+		const vpc = byId.get("group:vpc")!;
+		expect(vpc).toMatchObject({
+			type: "rectangle",
+			locked: true,
+			roundness: null,
+			strokeStyle: "solid",
+			customData: { sketchiRendererRole: "zone" },
+		});
+		expect(byId.get("zone-label:vpc")).toMatchObject({
+			type: "text",
+			containerId: null,
+			locked: true,
+			text: "VPC 10.0.0.0/16",
+			textAlign: "left",
+		});
+		expect(exported.elements.some((element) => element.type === "frame")).toBe(false);
+		expect(validateExcalidrawScene(exported).issues).toEqual([]);
+	});
+
+	it("draws a database as a bindable box under the strokes of a cylinder, grouped together", () => {
+		const box = byId.get("node:rds")!;
+		expect(box).toMatchObject({
+			type: "rectangle",
+			strokeColor: "transparent",
+			backgroundColor: "transparent",
+			customData: { sketchiShape: "cylinder" },
+			groupIds: ["node:rds:shape"],
+		});
+		const arrow = exported.elements.find((element) => element.id === "edge:e4")!;
+		expect(arrow["endBinding"]).toMatchObject({ elementId: "node:rds" });
+		const label = exported.elements.find(
+			(element) => element.type === "text" && element["containerId"] === "node:rds",
+		)!;
+		expect(label["groupIds"]).toEqual(["node:rds:shape"]);
+		const strokes = exported.elements.filter((element) =>
+			element.id.startsWith("node:rds:stroke-"),
+		);
+		// The lid's back and front, both sides and the foot.
+		expect(strokes.map((stroke) => [stroke.type, stroke["roundness"], stroke["groupIds"]])).toEqual(
+			[
+				["line", { type: 2 }, ["node:rds:shape"]],
+				["line", { type: 2 }, ["node:rds:shape"]],
+				["line", null, ["node:rds:shape"]],
+				["line", null, ["node:rds:shape"]],
+				["line", { type: 2 }, ["node:rds:shape"]],
+			],
+		);
+		// Every stroke stays within the box arrows bind to.
+		for (const stroke of strokes)
+			for (const [x, y] of stroke["points"] as [number, number][]) {
+				expect((stroke["x"] as number) + x).toBeGreaterThanOrEqual((box["x"] as number) - 0.01);
+				expect((stroke["y"] as number) + y).toBeLessThanOrEqual(
+					(box["y"] as number) + (box["height"] as number) + 0.01,
+				);
+			}
+	});
+
+	it("fills a composed shape's outline when the node asks for a fill", () => {
+		const scene = {
+			...aws,
+			elements: aws.elements.map((element) =>
+				element.id === "node:rds" && element.type === "node"
+					? { ...element, fillColor: "#efe6ec" }
+					: element,
+			),
+		};
+		const filled = convertSceneToExcalidraw(scene).elements.filter((element) =>
+			element.id.startsWith("node:rds:stroke-"),
+		);
+		expect(filled[0]).toMatchObject({ backgroundColor: "#efe6ec", strokeColor: "transparent" });
+		const points = filled[0]!["points"] as [number, number][];
+		expect(points.at(-1)).toEqual(points[0]);
+		expect(filled).toHaveLength(6);
+	});
+
+	it("binds a line to a bucket's tapered side, not its box", () => {
+		const scene = renderIntermediateDiagram(
+			parseFlowchartDiagram({
+				id: "bucket",
+				title: "Bucket",
+				type: "flowchart",
+				layout: { direction: "LR", edgeRouting: "orthogonal" },
+				nodes: [
+					{ id: "api", label: "API service", kind: "start" },
+					{ id: "assets", label: "Assets bucket", kind: "end", shape: "storage" },
+				],
+				edges: [{ id: "e1", source: "api", target: "assets" }],
+			}),
+		);
+		const exported = convertSceneToExcalidraw(scene);
+		expect(validateExcalidrawScene(exported).issues).toEqual([]);
+		const box = exported.elements.find((element) => element.id === "node:assets")!;
+		const arrow = exported.elements.find((element) => element.id === "edge:e1")!;
+		const points = arrow["points"] as [number, number][];
+		const end = points.at(-1)!;
+		// The line ends in from the box, on the side the bucket leans in by.
+		expect((arrow["x"] as number) + end[0]).toBeGreaterThan((box["x"] as number) + 1);
+		// Stopped at the box's edge instead, it no longer lands on the shape.
+		const short = {
+			...arrow,
+			points: [...points.slice(0, -1), [(box["x"] as number) - (arrow["x"] as number), end[1]]],
+		};
+		expect(
+			validateExcalidrawScene({
+				...exported,
+				elements: exported.elements.map((element) => (element.id === "edge:e1" ? short : element)),
+			}).issues.map((issue) => issue.code),
+		).toContain("arrow-endpoint-off-shape");
+	});
+
+	it("exports queues and documents as valid composed shapes", () => {
+		const hybrid = convertSceneToExcalidraw(
+			renderIntermediateDiagram(zoneFixtures["hybrid-cloud"]),
+		);
+		const shapes = new Map(
+			hybrid.elements.flatMap((element) =>
+				element.customData && typeof element.customData === "object"
+					? [[element.id, (element.customData as Record<string, unknown>)["sketchiShape"]]]
+					: [],
+			),
+		);
+		expect(shapes.get("node:orders")).toBe("pipe");
+		expect(shapes.get("node:invoice")).toBe("document");
+		expect(validateExcalidrawScene(hybrid).issues).toEqual([]);
 	});
 });
 

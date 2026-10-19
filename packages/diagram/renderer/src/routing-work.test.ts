@@ -11,6 +11,8 @@ import {
 	laneStressFixtures,
 	orgChartEr,
 	parseIntermediateDiagram,
+	zoneFixtures,
+	zoneStressFixtures,
 } from "@sketchi/diagram-core";
 import { describe, expect, it, vi } from "vitest";
 import { renderIntermediateDiagram } from "./scene";
@@ -189,5 +191,30 @@ describe("swimlane routing work", () => {
 		expect(small).toBeGreaterThan(0);
 		expect(small).toBeLessThan(2_500_000);
 		expect(large).toBeLessThan(6_000_000);
+	});
+});
+
+describe("zone routing work", () => {
+	// Measured: 1.58M checks for the four zone fixtures in LR and TB, and 13.9M for
+	// the two stress cases (zones four deep across two availability zones, and
+	// thirty services in eight zones), each wrapped where too long for one row or
+	// column. Testing each grid step only against the shapes its line runs through
+	// took the stress cases from 27.5M.
+	it("bounds segment checks for the zone fixtures and stress cases", () => {
+		const render = (fixtures: Record<string, diagramCore.IntermediateDiagram>) => {
+			work.checks = 0;
+			for (const fixture of Object.values(fixtures))
+				for (const direction of ["LR", "TB"] as const)
+					renderIntermediateDiagram({
+						...fixture,
+						layout: { direction, edgeRouting: "orthogonal" },
+					});
+			return work.checks;
+		};
+		const small = render(zoneFixtures);
+		const large = render(zoneStressFixtures);
+		expect(small).toBeGreaterThan(0);
+		expect(small).toBeLessThan(2_000_000);
+		expect(large).toBeLessThan(15_000_000);
 	});
 });

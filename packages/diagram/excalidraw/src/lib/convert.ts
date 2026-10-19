@@ -14,7 +14,11 @@ import {
 	canvasBoundTextBox,
 	canvasBoundTextInset,
 	canvasNodeIconBox,
+	canvasComposedOnOutline,
+	canvasShapeOutline,
+	canvasShapeStrokes,
 	fnv1a32,
+	isCanvasComposedShape,
 	type AxisAlignedSegment,
 	isSharedBoundStem,
 	routingQualityFindings,
@@ -286,9 +290,59 @@ function iconFile(id: string, svg: string): ExcalidrawBinaryFile {
 	};
 }
 
-/** Group that moves a node's shape, label, and logo together. */
+/** Group that moves a node's shape, label, logo and outline strokes together. */
 function logoGroupId(node: NodeSceneElement): string {
-	return `${node.id}:logo`;
+	return isCanvasComposedShape(node.shape) ? `${node.id}:shape` : `${node.id}:logo`;
+}
+
+/**
+ * The strokes that draw a composed shape (a cylinder, pipe or document) over
+ * its bindable box, each a line, smooth along an arc; under them, when the
+ * node asks for a fill, its outline as one filled line with no stroke. None of
+ * them binds, so lines meet the shape only at its box.
+ */
+function shapeStrokeElements(input: {
+	id: (index: number) => string;
+	scene: RenderedDiagramScene;
+	shape: NodeSceneElement;
+}): ExcalidrawElement[] {
+	const { shape } = input;
+	if (!isCanvasComposedShape(shape.shape)) return [];
+	const composed = { ...shape, shape: shape.shape };
+	const strokes = [
+		...(shape.fillColor
+			? [{ fill: shape.fillColor, points: canvasShapeOutline(composed), smooth: false }]
+			: []),
+		...canvasShapeStrokes(composed).map((stroke) => ({ ...stroke, fill: undefined })),
+	];
+	return strokes.map((stroke, index) => {
+		const [start] = stroke.points;
+		const xs = stroke.points.map((point) => point.x);
+		const ys = stroke.points.map((point) => point.y);
+		return {
+			...elementBase(input.id(index), shape),
+			groupIds: [logoGroupId(shape), ...(shape.groupIds ?? [])],
+			type: "line",
+			x: start!.x,
+			y: start!.y,
+			width: Math.max(...xs) - Math.min(...xs),
+			height: Math.max(...ys) - Math.min(...ys),
+			backgroundColor: stroke.fill ?? "transparent",
+			boundElements: null,
+			customData: { sketchiShapeStroke: shape.shape },
+			endArrowhead: null,
+			endBinding: null,
+			lastCommittedPoint: null,
+			points: stroke.points.map((point) => [point.x - start!.x, point.y - start!.y]),
+			// Hand-drawn jitter along a short arc reads as a dent; the outline stays
+			// crisp unless the node asks for a rougher hand.
+			roughness: shape.roughness ?? 0,
+			roundness: stroke.smooth ? { type: 2 } : null,
+			startArrowhead: null,
+			startBinding: null,
+			strokeColor: stroke.fill ? "transparent" : (shape.strokeColor ?? input.scene.accentColor),
+		};
+	});
 }
 
 function iconImageElement(input: {
@@ -362,6 +416,23 @@ function shapeElement(input: {
 		};
 	}
 
+	// A composed shape's box only binds its label and lines; its strokes draw it.
+	if (isCanvasComposedShape(input.shape.shape))
+		return {
+			...elementBase(input.shape.id, input.shape),
+			groupIds: [logoGroupId(input.shape), ...(input.shape.groupIds ?? [])],
+			type: "rectangle",
+			x: input.shape.x,
+			y: input.shape.y,
+			width: input.shape.width,
+			height,
+			backgroundColor: "transparent",
+			boundElements: boundElements.length > 0 ? boundElements : null,
+			customData: { sketchiShape: input.shape.shape },
+			roundness: null,
+			strokeColor: "transparent",
+		};
+
 	return {
 		...elementBase(input.shape.id, input.shape),
 		type: shapeType,
@@ -382,7 +453,8 @@ function shapeElement(input: {
 			input.shape.rendererRole !== "er-table" &&
 			input.shape.rendererRole !== "class-box" &&
 			input.shape.rendererRole !== "swimlane" &&
-			input.shape.rendererRole !== "swimlane-header"
+			input.shape.rendererRole !== "swimlane-header" &&
+			input.shape.rendererRole !== "zone"
 				? { type: 3 }
 				: null,
 		strokeColor: input.shape.strokeColor ?? input.scene.accentColor,
@@ -708,6 +780,23 @@ function iconElementId(node: NodeSceneElement, usedElementIds: Set<string>): str
 	return id;
 }
 
+/** An id for a composed shape's stroke, unique in the scene. */
+function strokeElementId(
+	node: NodeSceneElement,
+	index: number,
+	usedElementIds: Set<string>,
+): string {
+	const baseId = `${node.id}:stroke-${index}`;
+	let id = baseId;
+	let suffix = 2;
+	while (usedElementIds.has(id)) {
+		id = `${baseId}-${suffix}`;
+		suffix += 1;
+	}
+	usedElementIds.add(id);
+	return id;
+}
+
 function buildElements(
 	scene: RenderedDiagramScene,
 	sourceElements: readonly SceneElement[],
@@ -746,6 +835,16 @@ function buildElements(
 
 		shapeElementsByNodeId.set(node.nodeId, shape);
 		elements.push(shape);
+		if (isCanvasComposedShape(node.shape)) {
+			const strokes = shapeStrokeElements({
+				id: (index) => strokeElementId(node, index, usedElementIds),
+				scene,
+				shape: node,
+			});
+			for (const stroke of strokes) generatedSourceIds.set(stroke.id, node.id);
+			elements.push(...strokes);
+			logoNodesById.set(node.id, node);
+		}
 
 		const asset =
 			node.icon && scene.icons && Object.hasOwn(scene.icons, node.icon.slug)
@@ -1192,6 +1291,15 @@ function pointOnShapeBoundary(point: { x: number; y: number }, shape: Excalidraw
 
 	if (!bounds) {
 		return false;
+	}
+
+	// A composed shape's box only binds; a line ends on the outline its strokes draw.
+	const composed =
+		shape.customData && typeof shape.customData === "object"
+			? (shape.customData as Record<string, unknown>)["sketchiShape"]
+			: undefined;
+	if (typeof composed === "string" && isCanvasComposedShape(composed)) {
+		return canvasComposedOnOutline({ ...bounds, shape: composed }, point);
 	}
 
 	if (shape.type === "diamond") {

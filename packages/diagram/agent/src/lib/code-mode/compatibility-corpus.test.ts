@@ -57,7 +57,9 @@ const CANVAS_SPEC_ADDED_FIELDS = new Set([
 	"layouts",
 	"zOrder",
 ]);
-const CANVAS_SHAPE_ADDITIONS = new Set(["polygon"]);
+// Infrastructure shapes add the cylinder, pipe, document and bucket a database, a queue, a
+// document and object storage draw as.
+const CANVAS_SHAPE_ADDITIONS = new Set(["polygon", "cylinder", "pipe", "document", "bucket"]);
 const CANVAS_SCHEMA_ENUM_ADDITIONS = new Set(["canvas", "element", "layer"]);
 const CANVAS_ELEMENT_SCHEMA_ADDED_FIELDS = {
 	node: new Set([
@@ -143,6 +145,8 @@ const LANE_ISSUE_ADDITIONS = new Set([
 	"lanes_with_groups",
 	"lane",
 ]);
+// Nested zones and infrastructure shapes add three issue codes and the zone renderer role.
+const ZONE_ADDITIONS = new Set(["unknown_group_parent", "group_cycle", "shaped_decision", "zone"]);
 // Native charts add their semantic validation codes.
 const CHART_ISSUE_CODE_ADDITIONS = new Set([
 	"chart_too_large",
@@ -304,6 +308,7 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		TIMELINE_ISSUE_CODE_ADDITIONS.has(value) ||
 		GROUP_ISSUE_CODE_ADDITIONS.has(value) ||
 		LANE_ISSUE_ADDITIONS.has(value) ||
+		ZONE_ADDITIONS.has(value) ||
 		CHART_ISSUE_CODE_ADDITIONS.has(value) ||
 		STATE_MACHINE_ISSUE_CODE_ADDITIONS.has(value) ||
 		GANTT_ISSUE_CODE_ADDITIONS.has(value) ||
@@ -1729,6 +1734,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 						!TIMELINE_ISSUE_CODE_ADDITIONS.has(code) &&
 						!GROUP_ISSUE_CODE_ADDITIONS.has(code) &&
 						!LANE_ISSUE_ADDITIONS.has(code) &&
+						!ZONE_ADDITIONS.has(code) &&
 						!CHART_ISSUE_CODE_ADDITIONS.has(code) &&
 						!STATE_MACHINE_ISSUE_CODE_ADDITIONS.has(code) &&
 						!GANTT_ISSUE_CODE_ADDITIONS.has(code) &&

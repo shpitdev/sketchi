@@ -12,6 +12,8 @@ export const flowchartDiagramType = "flowchart" as const;
 export const FLOWCHART_MAX_NODES = 24;
 export const FLOWCHART_MAX_EDGES = 64;
 export const FLOWCHART_MAX_GROUPS = 8;
+/** Zones nest at most this deep: a cloud, a region, a VPC and a subnet. */
+export const FLOWCHART_MAX_GROUP_DEPTH = 4;
 export const FLOWCHART_MAX_LANES = 8;
 export const FLOWCHART_MAX_ISSUES = 20;
 
@@ -36,6 +38,9 @@ export const FlowchartValidationIssueCodeSchema = Schema.Literals([
 	"duplicate_group_id",
 	"unknown_node_group",
 	"empty_group",
+	"unknown_group_parent",
+	"group_cycle",
+	"shaped_decision",
 	"duplicate_lane_id",
 	"unknown_node_lane",
 	"empty_lane",
@@ -170,6 +175,63 @@ function reachableFrom(
 }
 
 /**
+ * Nesting problems, each with its repair: a parent nobody declared, a group
+ * inside itself, and zones nested deeper than FLOWCHART_MAX_GROUP_DEPTH.
+ */
+function groupNestingIssues(diagram: FlowchartDiagram): FlowchartValidationIssue[] {
+	const groups = diagram.groups ?? [];
+	const groupIds = new Set(groups.map((group) => group.id));
+	const parentOf = new Map(
+		groups.flatMap((group) =>
+			group.parent !== undefined && groupIds.has(group.parent)
+				? [[group.id, group.parent] as const]
+				: [],
+		),
+	);
+	const issues: FlowchartValidationIssue[] = [];
+	let deepest = 0;
+	for (const group of groups) {
+		if (group.parent !== undefined && !groupIds.has(group.parent)) {
+			issues.push({
+				code: "unknown_group_parent",
+				ref: { kind: "group", id: group.id, path: "groups.parent" },
+				message: `Group "${group.id}" references undeclared parent group "${group.parent}".`,
+				hint: `Set parent to the id of the declared group that encloses it (${[...groupIds].map((id) => `"${id}"`).join(", ")}), or remove parent.`,
+			});
+			continue;
+		}
+		const chain = [group.id];
+		let looped = false;
+		for (let ancestor = parentOf.get(group.id); ancestor !== undefined;) {
+			if (chain.includes(ancestor)) {
+				looped = true;
+				// A group under a loop is not in it; only the groups in the loop are named.
+				if (ancestor === group.id)
+					issues.push({
+						code: "group_cycle",
+						ref: { kind: "group", id: group.id, path: "groups.parent" },
+						message: `Group "${group.id}" is nested inside itself through ${[...chain, ancestor].map((id) => `"${id}"`).join(" in ")}.`,
+						hint: "Set each group's parent to the group that encloses it; the outermost group has no parent.",
+					});
+				break;
+			}
+			chain.push(ancestor);
+			ancestor = parentOf.get(ancestor);
+		}
+		if (!looped) deepest = Math.max(deepest, chain.length);
+	}
+	if (deepest > FLOWCHART_MAX_GROUP_DEPTH) {
+		issues.push({
+			code: "flowchart_too_large",
+			ref: { kind: "diagram", id: diagram.id, path: "groups.parent" },
+			message: `Groups nest ${deepest} deep; the supported maximum is ${FLOWCHART_MAX_GROUP_DEPTH}.`,
+			hint: "Drop an intermediate zone, or merge a zone into its parent.",
+		});
+	}
+	return issues;
+}
+
+/**
  * Lane problems, each with its repair: too many lanes, a repeated lane id, a
  * node in an undeclared lane or in none, a lane with no nodes, and lanes
  * declared together with groups.
@@ -299,7 +361,11 @@ export function getFlowchartValidationIssues(
 			});
 		}
 	}
-	const memberGroups = new Set(diagram.nodes.map((node) => node.group));
+	issues.push(...groupNestingIssues(diagram));
+	const memberGroups = new Set([
+		...diagram.nodes.map((node) => node.group),
+		...groups.map((group) => group.parent),
+	]);
 	for (const group of groups.filter((group) => !memberGroups.has(group.id))) {
 		issues.push({
 			code: "empty_group",
@@ -307,6 +373,16 @@ export function getFlowchartValidationIssues(
 			message: `Group "${group.id}" has no nodes.`,
 			hint: "Set group on the nodes it holds, or remove the group.",
 		});
+	}
+	for (const node of diagram.nodes) {
+		if (node.kind === "decision" && node.shape !== undefined) {
+			issues.push({
+				code: "shaped_decision",
+				ref: { kind: "node", id: node.id, path: "nodes.shape" },
+				message: `Decision node "${node.id}" cannot draw as a ${node.shape}.`,
+				hint: "Remove shape from the decision; a decision always draws as a diamond.",
+			});
+		}
 	}
 
 	issues.push(...laneIssues(diagram));

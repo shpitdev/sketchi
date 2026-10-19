@@ -31,3 +31,5 @@ export * from "./lane-fixtures.js";
 export * from "./lane-regions.js";
 export * from "./types/org-chart.js";
 export * from "./org-chart-fixtures.js";
+export * from "./zone-fixtures.js";
+export * from "./zone-regions.js";

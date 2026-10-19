@@ -12,7 +12,7 @@ Pass this to `sketchi create --json`, or its `spec` to `sketchi.buildFlowchart`.
 
 - `groups` declares `{ id, label }` regions, at most 8. Group ids are unique.
 - A node joins a group by setting `group` to a declared id. Nodes without `group` stay outside every group, and a flowchart can mix both.
-- Groups are flat: a group never contains another group.
+- A group with neither `parent` nor `kind` draws as a frame, as below. Groups that nest or name what they stand for draw as zones; see [architecture zones](./flowchart-zones.md).
 
 Builds reject a node whose `group` names no declared group (`unknown_node_group`, with the declared ids in its hint), a repeated group id (`duplicate_group_id`) and a group with no nodes (`empty_group`).
 

@@ -6,6 +6,7 @@ import {
 	laneFixtures,
 	pharmaBatchDispositionFlowchart,
 	routingFixtures,
+	zoneFixtures,
 } from "@sketchi/diagram-core";
 
 import { GenerationWorkspace } from "../components/generation-workspace";
@@ -54,6 +55,18 @@ export const SwimlaneHiring: Story = {
 
 export const SwimlaneIncidentResponse: Story = {
 	args: { diagram: laneFixtures["incident-response"] },
+};
+
+export const ZonesAwsThreeTier: Story = {
+	args: { diagram: zoneFixtures["aws-three-tier"] },
+};
+
+export const ZonesKubernetesCluster: Story = {
+	args: { diagram: zoneFixtures["kubernetes-cluster"] },
+};
+
+export const ZonesHybridCloud: Story = {
+	args: { diagram: zoneFixtures["hybrid-cloud"] },
 };
 
 export const RoutingContentModeration: Story = {

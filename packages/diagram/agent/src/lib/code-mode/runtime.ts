@@ -1820,7 +1820,9 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 				(element.rendererRole === "er-table" && isStructurallyValidErTable(element)) ||
 				(element.rendererRole === "er-optional" && isStructurallyValidErOptional(element)) ||
 				(element.rendererRole === "class-box" && isStructurallyValidClassBox(element)) ||
-				((element.rendererRole === "swimlane" || element.rendererRole === "swimlane-header") &&
+				((element.rendererRole === "swimlane" ||
+					element.rendererRole === "swimlane-header" ||
+					element.rendererRole === "zone") &&
 					element.shape === "rectangle" &&
 					!element.icon)
 					? { rendererRole: element.rendererRole }

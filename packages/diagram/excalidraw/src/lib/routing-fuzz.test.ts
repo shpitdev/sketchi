@@ -14,6 +14,9 @@ import {
 	routingQualityScale,
 	segmentCrossesBoundsInterior,
 	segmentsFromPoints,
+	zoneFixtures,
+	zoneRegionIssues,
+	zoneStressFixtures,
 } from "@sketchi/diagram-core";
 import {
 	renderDiagram,
@@ -402,7 +405,13 @@ function labelDefects(
 	};
 	const texts = elements.filter((e) => e.type === "text");
 	const labels = texts.filter((e) => !e.containerId);
-	const shapes = elements.filter((e) => ["rectangle", "diamond", "ellipse"].includes(e.type));
+	// A zone is a region labels sit in, not a shape they cover.
+	const shapes = elements.filter(
+		(e) =>
+			["rectangle", "diamond", "ellipse"].includes(e.type) &&
+			(e.customData as { sketchiRendererRole?: string } | undefined)?.sketchiRendererRole !==
+				"zone",
+	);
 	const arrows = elements.filter((e) => e.type === "arrow");
 	const defects = texts.flatMap((text) =>
 		midWordBreaks(
@@ -968,6 +977,185 @@ describe("grouped routing fuzz", () => {
 				]).toEqual([]);
 			}
 		},
+	);
+});
+
+const ZONE_KINDS = [
+	"cloud",
+	"datacenter",
+	"region",
+	"zone",
+	"vpc",
+	"subnet",
+	"cluster",
+	"namespace",
+	undefined,
+] as const;
+const ZONE_SHAPES = ["database", "queue", "document", "storage"] as const;
+
+/**
+ * The random flowcharts above in nested zones: two to eight zones, each inside
+ * an earlier one about two times in three (never past four deep), with random
+ * kinds. Steps sit in runs of flow order in a zone, any zone, or no zone; a
+ * fifth of the non-decision steps draw as a database, a queue, a document or a bucket.
+ * Zones that hold no step, directly or through another zone, are dropped.
+ */
+function randomZonedFlowcharts(count: number, start: number) {
+	let seed = start;
+	const random = () => {
+		seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+		return seed / 2_147_483_648;
+	};
+	return randomFlowcharts(count, start).map((spec) => {
+		const zoneCount = 2 + Math.floor(random() * 7);
+		const parents: (number | undefined)[] = [];
+		const depthOf = (zone: number): number =>
+			parents[zone] === undefined ? 1 : 1 + depthOf(parents[zone]);
+		for (let zone = 0; zone < zoneCount; zone += 1) {
+			const candidates = parents.flatMap((_, earlier) => (depthOf(earlier) < 4 ? [earlier] : []));
+			parents.push(
+				zone > 0 && candidates.length > 0 && random() < 0.67
+					? candidates[Math.floor(random() * candidates.length)]
+					: undefined,
+			);
+		}
+		const membership = spec.nodes.map((_, index) =>
+			random() < 0.2
+				? undefined
+				: random() < 0.6
+					? Math.min(zoneCount - 1, Math.floor((index / spec.nodes.length) * zoneCount))
+					: Math.floor(random() * zoneCount),
+		);
+		const held = new Set<number>();
+		for (const zone of membership)
+			for (let id = zone; id !== undefined; id = parents[id]) held.add(id);
+		return {
+			...spec,
+			groups: parents.flatMap((parent, zone) => {
+				if (!held.has(zone)) return [];
+				const kind = ZONE_KINDS[Math.floor(random() * ZONE_KINDS.length)];
+				return [
+					{
+						id: `z${zone}`,
+						label: GROUP_LABELS[Math.floor(random() * GROUP_LABELS.length)]!,
+						...(parent === undefined ? {} : { parent: `z${parent}` }),
+						...(kind ? { kind } : {}),
+					},
+				];
+			}),
+			nodes: spec.nodes.map((node, index) => ({
+				...node,
+				...(membership[index] === undefined ? {} : { group: `z${membership[index]}` }),
+				...(node.kind !== "decision" && random() < 0.2
+					? { shape: ZONE_SHAPES[Math.floor(random() * ZONE_SHAPES.length)] }
+					: {}),
+			})),
+		};
+	});
+}
+
+/**
+ * Crossings and reader-scale findings ("crossings/findings") each zoned
+ * flowchart draws, counted as for MAIN_ROUTING, since zones too long for one
+ * row or column wrap and each zone sits by its members (totals within 1% of
+ * the first pins). No zoned flowchart may draw more of either, nor all of them
+ * more crossings in total.
+ */
+const ZONED_ROUTING: Readonly<Record<"TB" | "BT" | "LR" | "RL", string>> = {
+	TB: "97/31 0/0 17/3 30/5 36/7 36/12 7/0 12/1 68/24 32/8 0/0 28/12 22/5 0/0 0/0 41/9 0/0 0/0 36/24 173/65 77/21 98/44 60/11 33/11 1/0 22/2 138/59 0/0 86/25 62/12",
+	BT: "99/26 0/0 16/2 30/8 21/6 42/7 1/0 9/0 61/25 44/9 0/0 30/16 22/11 0/0 0/0 47/8 0/0 0/0 37/14 184/64 79/24 92/45 60/15 35/16 1/0 14/2 146/59 0/0 94/30 54/7",
+	LR: "77/42 0/1 11/6 23/3 30/12 45/11 11/4 5/4 73/21 37/9 0/1 27/11 24/14 0/0 0/1 44/12 0/0 0/0 38/31 202/68 79/28 102/41 74/25 34/23 0/0 8/2 136/61 0/1 104/34 44/26",
+	RL: "65/49 0/0 10/5 21/7 28/8 49/12 8/4 3/3 72/34 41/7 0/1 25/6 22/17 0/0 0/1 49/10 0/0 0/0 38/22 175/55 86/33 84/41 77/26 35/20 0/0 14/12 157/79 0/1 89/31 44/23",
+};
+
+/**
+ * Branch labels on these dense random graphs that still touch a zone's outline
+ * or label, pinned as known, as the label fuzz pins its label defects: a long
+ * decision label wedged between its diamond and a zone a loop enters.
+ */
+const ZONED_LABEL_DEFECTS: Readonly<Record<"TB" | "BT" | "LR" | "RL", readonly string[]>> = {
+	TB: [],
+	BT: [
+		'6: Text "edge:e2:label" covers the label or outline of zone "group:z0".',
+		'23: Text "edge:e19:label" covers the label or outline of zone "group:z6".',
+	],
+	LR: [],
+	RL: [],
+};
+
+describe("zoned routing fuzz", () => {
+	// Full proof: 30 zoned flowcharts x 4 directions, each rendered once. Every export is valid, every
+	// step sits in its zone and every zone in its parent, zones that do not nest
+	// stay apart, no edge passes through a zone neither end sits in, runs along an
+	// outline or crosses a label, and an edge whose ends share a zone stays inside it.
+	const flowcharts = randomZonedFlowcharts(FULL ? 30 : 4, 20261019);
+	const scenes = new Map<string, ReturnType<typeof renderIntermediateDiagram>[]>();
+	const parsed = (direction: "TB" | "BT" | "LR" | "RL") =>
+		flowcharts.map((spec) =>
+			parseFlowchartDiagram({
+				...spec,
+				type: "flowchart",
+				layout: { direction, edgeRouting: "orthogonal" },
+			}),
+		);
+	const rendered = (direction: "TB" | "BT" | "LR" | "RL") => {
+		if (!scenes.has(direction))
+			scenes.set(
+				direction,
+				parsed(direction).map((diagram) => renderIntermediateDiagram(diagram)),
+			);
+		return scenes.get(direction)!;
+	};
+
+	describe.each(["TB", "BT", "LR", "RL"] as const)("%s", (direction) => {
+		it("exports every zoned flowchart with its zones nested, apart and clear", () => {
+			const diagrams = parsed(direction);
+			const failures = rendered(direction).flatMap((scene, index) =>
+				[
+					...validateExcalidrawScene(convertSceneToExcalidraw(scene)).issues.map(
+						(issue) => issue.message,
+					),
+					...diagonalRuns(scene),
+					...zoneRegionIssues(scene, diagrams[index]!).map((issue) => issue.message),
+					...getCanvasValidationIssues(scene).map((issue) => issue.message),
+				].map((failure) => `${index}: ${failure}`),
+			);
+			expect(
+				failures.filter((failure) => !ZONED_LABEL_DEFECTS[direction].includes(failure)),
+			).toEqual([]);
+		}, 120_000);
+
+		it("draws no zoned flowchart with more crossings or reader-scale findings than pinned", () => {
+			const counts = rendered(direction).map((scene) => routingCounts(scene));
+			if (process.env.PRINT_ROUTING)
+				console.log(
+					"PIN zoned",
+					direction,
+					counts.map((c) => `${c.crossings}/${c.findings}`).join(" "),
+				);
+			expect(worseThanPinned("zoned", counts, ZONED_ROUTING[direction], false)).toEqual([]);
+		}, 120_000);
+	});
+
+	it.each([...Object.keys(zoneFixtures), ...(FULL ? Object.keys(zoneStressFixtures) : [])])(
+		"exports the %s fixture with its zones nested, apart and clear",
+		(name) => {
+			const fixture = { ...zoneFixtures, ...zoneStressFixtures }[name]!;
+			for (const direction of ["TB", "BT", "LR", "RL"] as const) {
+				const scene = renderIntermediateDiagram({
+					...fixture,
+					layout: { direction, edgeRouting: "orthogonal" },
+				});
+				const exported = convertSceneToExcalidraw(scene);
+				const authored = new Map(fixture.nodes.map((node) => [`node:${node.id}`, node.label]));
+				expect([
+					...validateExcalidrawScene(exported).issues,
+					...zoneRegionIssues(scene, fixture),
+					...labelDefects(exported.elements, authored),
+				]).toEqual([]);
+			}
+		},
+		120_000,
 	);
 });
 

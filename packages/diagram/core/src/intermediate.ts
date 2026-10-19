@@ -51,13 +51,36 @@ export class DiagramIconRef extends Schema.Class<DiagramIconRef>("DiagramIconRef
 export const DiagramIconRefSchema = DiagramIconRef;
 
 /**
- * A labeled region that holds nodes together, such as a team, a zone, or a
- * phase. Nodes join one by setting `group` to its id. Groups are flat: a group
- * never contains another group.
+ * What a group stands for in an architecture: a provider's cloud or an
+ * on-premises data center, a region, an availability or network zone, a VPC
+ * and its subnets, or a cluster and its namespaces. Each draws its own way.
+ */
+export const DIAGRAM_ZONE_KINDS = [
+	"cloud",
+	"datacenter",
+	"region",
+	"zone",
+	"vpc",
+	"subnet",
+	"cluster",
+	"namespace",
+] as const;
+export const DiagramZoneKindSchema = Schema.Literals(DIAGRAM_ZONE_KINDS);
+export type DiagramZoneKind = typeof DiagramZoneKindSchema.Type;
+
+/**
+ * A labeled region that holds nodes together, such as a team, a phase, or a
+ * zone of an architecture. Nodes join one by setting `group` to its id, and a
+ * group sits inside another by setting `parent` to that group's id. A group
+ * with a parent or a kind draws as a zone: an outline styled by its kind, with
+ * its label in a header strip inside it. Other groups draw as frames.
  */
 export class DiagramGroup extends Schema.Class<DiagramGroup>("DiagramGroup")({
 	id: NonEmptyString,
 	label: NonEmptyString,
+	/** The id of the declared group this group sits inside. */
+	parent: Schema.optional(NonEmptyString),
+	kind: Schema.optional(DiagramZoneKindSchema),
 }) {}
 export const DiagramGroupSchema = DiagramGroup;
 
@@ -72,6 +95,15 @@ export class DiagramLane extends Schema.Class<DiagramLane>("DiagramLane")({
 }) {}
 export const DiagramLaneSchema = DiagramLane;
 
+/**
+ * Shapes an infrastructure node draws as in place of its kind's: a database
+ * cylinder, a queue lying on its side, a document with a wavy foot, or object
+ * storage as a bucket.
+ */
+export const DIAGRAM_NODE_SHAPES = ["database", "queue", "document", "storage"] as const;
+export const DiagramNodeShapeSchema = Schema.Literals(DIAGRAM_NODE_SHAPES);
+export type DiagramNodeShape = typeof DiagramNodeShapeSchema.Type;
+
 export class DiagramNode extends Schema.Class<DiagramNode>("DiagramNode")({
 	id: NonEmptyString,
 	label: NonEmptyString,
@@ -80,6 +112,7 @@ export class DiagramNode extends Schema.Class<DiagramNode>("DiagramNode")({
 	/** The id of the declared lane this node sits in. */
 	lane: Schema.optional(NonEmptyString),
 	kind: Schema.optional(NonEmptyString),
+	shape: Schema.optional(DiagramNodeShapeSchema),
 	icon: Schema.optional(DiagramIconRef),
 	metadata: withDefault(Metadata, {}),
 }) {}
@@ -166,6 +199,27 @@ export function validateIntermediateDiagram(diagram: IntermediateDiagram): Inter
 	}
 
 	const groupIds = new Set((diagram.groups ?? []).map((group) => group.id));
+	const parentOf = new Map(
+		(diagram.groups ?? []).flatMap((group) =>
+			group.parent === undefined ? [] : [[group.id, group.parent] as const],
+		),
+	);
+
+	for (const [groupId, parent] of parentOf) {
+		if (!groupIds.has(parent)) {
+			throw new DiagramValidationError(
+				`Group "${groupId}" references missing parent group "${parent}".`,
+			);
+		}
+		const seen = new Set([groupId]);
+		for (let ancestor = parentOf.get(groupId); ancestor !== undefined;) {
+			if (seen.has(ancestor)) {
+				throw new DiagramValidationError(`Group "${groupId}" is nested inside itself.`);
+			}
+			seen.add(ancestor);
+			ancestor = parentOf.get(ancestor);
+		}
+	}
 
 	for (const node of diagram.nodes) {
 		if (node.group !== undefined && !groupIds.has(node.group)) {

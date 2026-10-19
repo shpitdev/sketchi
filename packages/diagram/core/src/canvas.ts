@@ -59,7 +59,266 @@ export const CANVAS_ARROWHEADS = [
 	"diamond_outline",
 ] as const;
 export type CanvasArrowhead = (typeof CANVAS_ARROWHEADS)[number] | null;
-export type CanvasShapeKind = "rectangle" | "ellipse" | "diamond" | "circle" | "polygon";
+export type CanvasShapeKind =
+	| "rectangle"
+	| "ellipse"
+	| "diamond"
+	| "circle"
+	| "polygon"
+	| CanvasComposedShapeKind;
+
+/**
+ * Shapes Excalidraw has no element for: a cylinder (a database), a pipe (a
+ * cylinder on its side, a queue), a document (a page with a wavy foot) and a
+ * bucket (a cylinder tapering to its foot, object storage).
+ * Adapters draw each as a bindable box under strokes of its own outline.
+ */
+export const CANVAS_COMPOSED_SHAPES = ["cylinder", "pipe", "document", "bucket"] as const;
+export type CanvasComposedShapeKind = (typeof CANVAS_COMPOSED_SHAPES)[number];
+
+export function isCanvasComposedShape(shape: string): shape is CanvasComposedShapeKind {
+	return (CANVAS_COMPOSED_SHAPES as readonly string[]).includes(shape);
+}
+
+/**
+ * How far a composed shape's curves reach into its box: a cylinder's lid and
+ * foot (half the lid's height), a pipe's ends, a document's wave.
+ */
+export const CANVAS_SHAPE_CURVE: Readonly<Record<CanvasComposedShapeKind, number>> = {
+	cylinder: 12,
+	pipe: 12,
+	document: 5,
+	bucket: 12,
+};
+
+/** How far a bucket's foot draws in from each side, as a share of its width. */
+const BUCKET_TAPER = 0.08;
+
+/** How far a bucket's sides lean in at its foot. */
+function bucketTaper(width: number): number {
+	return Math.round(width * BUCKET_TAPER);
+}
+
+/** One stroke of a composed shape's outline; smooth strokes curve through their points. */
+export interface CanvasShapeStroke {
+	readonly points: readonly CanvasPoint[];
+	readonly smooth: boolean;
+}
+
+/** Points along part of an ellipse, from angle `from` to `to` (radians, y down). */
+function arcPoints(
+	cx: number,
+	cy: number,
+	rx: number,
+	ry: number,
+	from: number,
+	to: number,
+	steps = 12,
+): CanvasPoint[] {
+	return Array.from({ length: steps + 1 }, (_, step) => {
+		const angle = from + ((to - from) * step) / steps;
+		return {
+			x: Math.round((cx + rx * Math.cos(angle)) * 100) / 100,
+			y: Math.round((cy + ry * Math.sin(angle)) * 100) / 100,
+		};
+	});
+}
+
+/** The two arcs and two straight sides of a cylinder lying along an axis. */
+function cylinderParts(
+	node: Pick<CanvasShapeElement, "height" | "width" | "x" | "y">,
+	curve: number,
+	upright: boolean,
+	steps = 12,
+	taper = 0,
+) {
+	const { x, y, width, height } = node;
+	const cx = x + width / 2;
+	const cy = y + height / 2;
+	if (upright) {
+		const top = y + curve;
+		const foot = y + height - curve;
+		return {
+			// The lid's back and front, then the foot's front, narrower by the taper.
+			back: arcPoints(cx, top, width / 2, curve, 0, -Math.PI, steps),
+			front: arcPoints(cx, top, width / 2, curve, Math.PI, 0, steps),
+			end: arcPoints(cx, foot, width / 2 - taper, curve, Math.PI, 0, steps),
+			sides: [
+				[
+					{ x, y: top },
+					{ x: x + taper, y: foot },
+				],
+				[
+					{ x: x + width, y: top },
+					{ x: x + width - taper, y: foot },
+				],
+			],
+		};
+	}
+	const near = x + width - curve;
+	const far = x + curve;
+	return {
+		// The near face's back and front, then the far end.
+		back: arcPoints(near, cy, curve, height / 2, -Math.PI / 2, Math.PI / 2, steps),
+		front: arcPoints(near, cy, curve, height / 2, -Math.PI / 2, -(3 * Math.PI) / 2, steps),
+		end: arcPoints(far, cy, curve, height / 2, Math.PI / 2, (3 * Math.PI) / 2, steps),
+		sides: [
+			[
+				{ x: far, y },
+				{ x: near, y },
+			],
+			[
+				{ x: far, y: y + height },
+				{ x: near, y: y + height },
+			],
+		],
+	};
+}
+
+/** A document's foot: two waves, down at the corners and the middle, right to left. */
+function documentFoot(
+	node: Pick<CanvasShapeElement, "height" | "width" | "x" | "y">,
+	curve: number,
+): CanvasPoint[] {
+	const { x, y, width, height } = node;
+	const steps = 16;
+	return Array.from({ length: steps + 1 }, (_, step) => {
+		const t = 1 - step / steps;
+		return {
+			x: Math.round((x + width * t) * 100) / 100,
+			y: Math.round((y + height - curve * (1 - Math.cos(4 * Math.PI * t))) * 100) / 100,
+		};
+	});
+}
+
+/**
+ * The strokes that draw a composed shape over its box, in absolute points:
+ * each straight side alone and each arc a smooth stroke of its own, so no
+ * curve overshoots where a side meets an arc. A cylinder draws its lid's back
+ * and front, its sides and its foot; a pipe its near face, its sides and its
+ * far end; a document its sides and top, then its wavy foot. A line meeting
+ * the middle of a curved side meets the stroke there.
+ */
+export function canvasShapeStrokes(
+	node: Pick<CanvasShapeElement, "height" | "width" | "x" | "y"> & {
+		readonly shape: CanvasComposedShapeKind;
+	},
+): CanvasShapeStroke[] {
+	const { x, y, width, height } = node;
+	const curve = CANVAS_SHAPE_CURVE[node.shape];
+	if (node.shape === "document")
+		return [
+			{
+				points: [
+					{ x, y: y + height },
+					{ x, y },
+					{ x: x + width, y },
+					{ x: x + width, y: y + height },
+				],
+				smooth: false,
+			},
+			{ points: documentFoot(node, curve), smooth: true },
+		];
+	const parts = cylinderParts(
+		node,
+		curve,
+		node.shape !== "pipe",
+		12,
+		node.shape === "bucket" ? bucketTaper(width) : 0,
+	);
+	return [
+		{ points: parts.back, smooth: true },
+		{ points: parts.front, smooth: true },
+		...parts.sides.map((points) => ({ points, smooth: false })),
+		{ points: parts.end, smooth: true },
+	];
+}
+
+/** A box side a line meets. */
+export type CanvasSide = "top" | "right" | "bottom" | "left";
+
+/**
+ * Where a composed shape's drawn outline meets the line through a point on its
+ * box's side, square to that side: a cylinder's lid or foot, a pipe's end, a
+ * document's wave or a bucket's tapered side, in from the box. Lines end there,
+ * so they meet the shape a reader sees.
+ */
+export function canvasComposedOutlinePoint(
+	node: Pick<CanvasShapeElement, "height" | "width" | "x" | "y"> & {
+		readonly shape: CanvasComposedShapeKind;
+	},
+	side: CanvasSide,
+	point: CanvasPoint,
+): CanvasPoint {
+	const { x, y, width, height } = node;
+	const curve = CANVAS_SHAPE_CURVE[node.shape];
+	const cx = x + width / 2;
+	const cy = y + height / 2;
+	// How far an ellipse of this half-width bulges past its middle line at an offset.
+	const bulge = (offset: number, half: number) =>
+		curve * Math.sqrt(Math.max(0, 1 - (Math.min(Math.abs(offset), half) / half) ** 2));
+	if (node.shape === "pipe") {
+		if (side === "left") return { x: x + curve - bulge(point.y - cy, height / 2), y: point.y };
+		if (side === "right")
+			return { x: x + width - curve + bulge(point.y - cy, height / 2), y: point.y };
+		return point;
+	}
+	if (node.shape === "document") {
+		if (side !== "bottom") return point;
+		const t = Math.min(1, Math.max(0, (point.x - x) / width));
+		return { x: point.x, y: y + height - curve * (1 - Math.cos(4 * Math.PI * t)) };
+	}
+	const taper = node.shape === "bucket" ? bucketTaper(width) : 0;
+	const [top, foot] = [y + curve, y + height - curve];
+	if (side === "top") return { x: point.x, y: top - bulge(point.x - cx, width / 2) };
+	if (side === "bottom") return { x: point.x, y: foot + bulge(point.x - cx, width / 2 - taper) };
+	if (taper === 0) return point;
+	const lean = (taper * (Math.min(foot, Math.max(top, point.y)) - top)) / (foot - top);
+	return { x: side === "left" ? x + lean : x + width - lean, y: point.y };
+}
+
+/** Whether a point lies on a composed shape's drawn outline, within a tolerance. */
+export function canvasComposedOnOutline(
+	node: Pick<CanvasShapeElement, "height" | "width" | "x" | "y"> & {
+		readonly shape: CanvasComposedShapeKind;
+	},
+	point: CanvasPoint,
+	tolerance = 1,
+): boolean {
+	const outline = canvasShapeOutline(node);
+	return outline.slice(1).some((to, index) => {
+		const from = outline[index]!;
+		const [dx, dy] = [to.x - from.x, to.y - from.y];
+		const t = Math.max(
+			0,
+			Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / (dx * dx + dy * dy || 1)),
+		);
+		return Math.hypot(point.x - from.x - t * dx, point.y - from.y - t * dy) <= tolerance;
+	});
+}
+
+/**
+ * A composed shape's outline as one closed polygon, finely stepped, for the
+ * fill a node asks for under its strokes.
+ */
+export function canvasShapeOutline(
+	node: Pick<CanvasShapeElement, "height" | "width" | "x" | "y"> & {
+		readonly shape: CanvasComposedShapeKind;
+	},
+): CanvasPoint[] {
+	const { x, y, width } = node;
+	const curve = CANVAS_SHAPE_CURVE[node.shape];
+	if (node.shape === "document")
+		return [{ x, y }, { x: x + width, y }, ...documentFoot(node, curve), { x, y }];
+	const { back, end } = cylinderParts(
+		node,
+		curve,
+		node.shape !== "pipe",
+		24,
+		node.shape === "bucket" ? bucketTaper(width) : 0,
+	);
+	return [...back, ...end, back[0]!];
+}
 
 export interface CanvasPoint {
 	readonly x: number;
@@ -103,11 +362,13 @@ export interface CanvasIconAsset {
  * dot, a final bullseye, an unlabeled choice), Gantt task bars and
  * milestones, entity-relationship tables (a table's outline and its name
  * band) and optional-end rings, class boxes (a class's outline, name band
- * and methods compartment), and swimlanes (a lane's band and its header).
+ * and methods compartment), swimlanes (a lane's band and its header), and
+ * architecture zones (a region, VPC, subnet or cluster outline).
  * They carry no icon, and only a table's or a class's name band and a lane's
  * header carry a bound label.
  */
 export const CANVAS_RENDERER_ROLES = [
+	"zone",
 	"sequence-lifeline",
 	"sequence-activation",
 	"timeline-marker",
@@ -125,7 +386,8 @@ export type CanvasRendererRole = (typeof CANVAS_RENDERER_ROLES)[number];
 /**
  * Roles connectors may cross: lifelines, activation bars, timeline markers,
  * chart marks, the ring that marks an optional relationship end, which sits on
- * its own line, and a swimlane's band, which every handoff crosses. A state
+ * its own line, a swimlane's band, which every handoff crosses, and a zone,
+ * which every line into or out of it crosses. A state
  * marker or Gantt mark is an end of its own connectors and an obstacle to
  * every other, as are a table and a lane's header.
  */
@@ -136,6 +398,7 @@ export const CANVAS_CROSSABLE_RENDERER_ROLES: readonly CanvasRendererRole[] = [
 	"chart-mark",
 	"er-optional",
 	"swimlane",
+	"zone",
 ];
 
 const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
@@ -150,6 +413,7 @@ const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
 	swimlane: "Swimlane",
 	"swimlane-header": "Swimlane header",
 	"timeline-marker": "Timeline marker",
+	zone: "Zone",
 };
 
 export interface CanvasShapeElement extends CanvasElementComposition, CanvasStrokeStyleFields {
@@ -432,6 +696,11 @@ export function canvasBoundTextInset(
 	if (node.shape === "diamond") {
 		return { x: padding + node.width / 4, y: padding + node.height / 4 };
 	}
+	if (node.shape === "pipe") return { x: padding + 2 * CANVAS_SHAPE_CURVE.pipe, y: padding };
+	if (node.shape === "bucket")
+		return { x: padding + bucketTaper(node.width), y: padding + 2 * CANVAS_SHAPE_CURVE.bucket };
+	if (node.shape === "cylinder" || node.shape === "document")
+		return { x: padding, y: padding + 2 * CANVAS_SHAPE_CURVE[node.shape] };
 	return { x: padding, y: padding };
 }
 
@@ -456,6 +725,23 @@ export function canvasBoundTextBox(node: Pick<CanvasShapeElement, "height" | "sh
 			height: Math.round(node.height / 2) - padding,
 		};
 	}
+	// A composed shape's label stays clear of its curves, which reach in from
+	// both ends, so Excalidraw's centered label never meets them.
+	if (node.shape === "pipe")
+		return {
+			width: node.width - padding - 4 * CANVAS_SHAPE_CURVE.pipe,
+			height: node.height - padding,
+		};
+	if (node.shape === "cylinder" || node.shape === "document")
+		return {
+			width: node.width - padding,
+			height: node.height - padding - 4 * CANVAS_SHAPE_CURVE[node.shape],
+		};
+	if (node.shape === "bucket")
+		return {
+			width: node.width - padding - 2 * bucketTaper(node.width),
+			height: node.height - padding - 4 * CANVAS_SHAPE_CURVE.bucket,
+		};
 	return { width: node.width - padding, height: node.height - padding };
 }
 
@@ -538,9 +824,10 @@ function nodeLabelOverflows(
 	// otherwise outgrow its padded canvas; that growth must still fit.
 	const paintedBox = boundLabelWidth(text, fontSize, maxWidth) - fontSize;
 	if (paintedBox + 24 > element.width) return true;
-	if (icon) {
+	if (icon || isCanvasComposedShape(element.shape)) {
 		// A logo node's label must fit Excalidraw's bound-text box under the logo
-		// band; plain labels keep the original padded-box rule.
+		// band, and a composed shape's must clear its curves; plain labels keep
+		// the original padded-box rule.
 		const boundText = canvasBoundTextBox(element);
 		return (
 			estimatedWidth > boundText.width || textHeight + canvasNodeIconBand(icon) > boundText.height
@@ -1166,20 +1453,27 @@ function elementCenter(element: CanvasElementBounds): CanvasPoint {
 	};
 }
 
-function boundEndpointToward(source: CanvasElementBounds, targetCenter: CanvasPoint): CanvasPoint {
+function boundEndpointToward(
+	source: CanvasElementBounds | BoundableCanvasElement,
+	targetCenter: CanvasPoint,
+): CanvasPoint {
 	const sourceCenter = elementCenter(source);
 	const dx = targetCenter.x - sourceCenter.x;
 	const dy = targetCenter.y - sourceCenter.y;
-	if (Math.abs(dx) >= Math.abs(dy)) {
-		return {
-			x: dx >= 0 ? source.x + source.width : source.x,
-			y: sourceCenter.y,
-		};
-	}
-	return {
-		x: sourceCenter.x,
-		y: dy >= 0 ? source.y + source.height : source.y,
-	};
+	const [side, point]: readonly [CanvasSide, CanvasPoint] =
+		Math.abs(dx) >= Math.abs(dy)
+			? [
+					dx >= 0 ? "right" : "left",
+					{ x: dx >= 0 ? source.x + source.width : source.x, y: sourceCenter.y },
+				]
+			: [
+					dy >= 0 ? "bottom" : "top",
+					{ x: sourceCenter.x, y: dy >= 0 ? source.y + source.height : source.y },
+				];
+	// A composed shape's side is a curve or a taper drawn in from its box.
+	return "type" in source && source.type === "node" && isCanvasComposedShape(source.shape)
+		? canvasComposedOutlinePoint({ ...source, shape: source.shape }, side, point)
+		: point;
 }
 
 /** How far a connector's end may sit off its element's outline and still be bound to it. */
@@ -1192,6 +1486,12 @@ function onOutline(point: CanvasPoint, element: BoundableCanvasElement): boolean
 	const dx = (point.x - element.x - a) / a;
 	const dy = (point.y - element.y - b) / b;
 	const shape = element.type === "node" ? element.shape : "rectangle";
+	if (element.type === "node" && isCanvasComposedShape(element.shape))
+		return canvasComposedOnOutline(
+			{ ...element, shape: element.shape },
+			point,
+			OUTLINE_TOLERANCE + 0.5,
+		);
 	const off = OUTLINE_TOLERANCE / Math.min(a, b);
 	if (shape === "ellipse" || shape === "circle") return Math.abs(Math.hypot(dx, dy) - 1) <= off;
 	if (shape === "diamond") return Math.abs(Math.abs(dx) + Math.abs(dy) - 1) <= off;
