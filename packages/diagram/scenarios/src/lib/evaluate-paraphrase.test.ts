@@ -657,6 +657,29 @@ describe("real losses still fail", () => {
 		expect(failed(result)).toContain("node-label:Renderer");
 	});
 
+	it("accepts the stated final outcome drawn as a plain action and its end", () => {
+		const split = (stored: string, end: string) => {
+			const stages: NodeSpec[] = [
+				...REPO_STAGES.filter(([id]) => id !== "response"),
+				["hosted", "process", stored],
+				["response", "end", end],
+			];
+			return failed(
+				flow(
+					"repo-package-interaction-flow",
+					stages,
+					stages.slice(1).map(([id], index) => [stages[index]![0], id]),
+				),
+			);
+		};
+		expect(split("Hosted artifact", "Artifact response")).toEqual([]);
+		// The combined labels must still name the outcome.
+		expect(split("Hosted artifact", "Done")).toContain("node-label:Hosted artifact response");
+		expect(split("Store artifact", "Artifact response")).toContain(
+			"node-label:Hosted artifact response",
+		);
+	});
+
 	it("fails a first event that drops Vercel", () => {
 		const result = flow(
 			"ai-app-stack-logos",
@@ -902,5 +925,35 @@ describe("decisions asked by their opposite condition", () => {
 		expect(
 			failed(invert("feature-flag-rollout", "internal-healthy", "Internal checks failed?", true)),
 		).toContain("node-label:Internal healthy?");
+	});
+
+	it("accepts threshold branches captioned by the comparison's two sides", () => {
+		const nodes: NodeSpec[] = [
+			["recv", "start", "Invoice is received"],
+			["match", "process", "Match invoice to purchase order"],
+			["m", "decision", "Does the invoice match?"],
+			["exc", "process", "Route to exception review"],
+			["res", "decision", "Is the exception resolved?"],
+			["rej", "end", "Reject invoice"],
+			["thr", "decision", "Is the amount over the approval threshold?"],
+			["dir", "process", "Director approval"],
+			["pay", "end", "Schedule payment"],
+		];
+		const edges = (over: string, under: string): EdgeSpec[] => [
+			["recv", "match"],
+			["match", "m"],
+			["m", "exc", "no"],
+			["m", "thr", "yes"],
+			["exc", "res"],
+			["res", "rej", "no"],
+			["res", "thr", "yes"],
+			["thr", "dir", over],
+			["thr", "pay", under],
+			["dir", "pay"],
+		];
+		expect(failed(flow("invoice-approval", nodes, edges("Over", "Under")))).toEqual([]);
+		expect(failed(flow("invoice-approval", nodes, edges("Under", "Over")))).toContain(
+			"edge:Amount over threshold?->Director approval:yes",
+		);
 	});
 });

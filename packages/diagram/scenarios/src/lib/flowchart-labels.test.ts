@@ -154,6 +154,11 @@ describe("prompt-grounded flowchart labels", () => {
 		["Failed scan", "Security scan clean?", "no"],
 		["Does not exist", "Account exists?", "no"],
 		["Invalid", "Insurance valid?", "no"],
+		["Over", "Amount over threshold?", "yes"],
+		["Under", "Amount over threshold?", "no"],
+		["Under threshold", "Amount over threshold?", "no"],
+		["Not over", "Amount over threshold?", "no"],
+		["Above", "Inventory below the reorder point?", "no"],
 	] as const)("accepts %s as the criterion answer to %s: %s", (label, criterion, answer) => {
 		expect(flowchartBranchRestates(label, criterion, answer)).toBe(true);
 	});
@@ -172,6 +177,11 @@ describe("prompt-grounded flowchart labels", () => {
 		["Scan", "Security scan clean?", "yes"],
 		["Not canary", "Canary healthy?", "no"],
 		["", "Canary healthy?", "yes"],
+		["Over", "Amount over threshold?", "no"],
+		["Under", "Amount over threshold?", "yes"],
+		["Not under", "Amount over threshold?", "no"],
+		["Under", "Canary healthy?", "no"],
+		["Amount", "Amount over threshold?", "yes"],
 	] as const)("rejects %s as the criterion answer to %s: %s", (label, criterion, answer) => {
 		expect(flowchartBranchRestates(label, criterion, answer)).toBe(false);
 	});

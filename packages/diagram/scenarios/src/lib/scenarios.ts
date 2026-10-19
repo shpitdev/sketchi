@@ -2206,7 +2206,7 @@ const flowchartScenarioDefinitions = [
 			{ collection: "data-storage", name: "Rabbitmq", slug: "rabbitmq" },
 		],
 		nodes: [
-			["browser", "Browser request", "start", ["browser request"]],
+			["browser", "Browser request", "start", ["browser request", "browser"]],
 			["ingress", "Ingress controller", "process", ["ingress controller"]],
 			["websvc", "Web service", "process", ["web service"]],
 			["webpods", "Web pods", "process", ["web pods"]],

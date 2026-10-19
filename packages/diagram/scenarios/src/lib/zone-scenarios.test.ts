@@ -144,6 +144,18 @@ describe("zone scenarios", () => {
 		).toEqual(["ungrouped:RabbitMQ queue"]);
 	});
 
+	it("accepts the browser named as the entry component of the request it starts", () => {
+		const diagram = expected("kubernetes-cluster-zones");
+		const entry = (label: string) => ({
+			...diagram,
+			nodes: diagram.nodes.map((node) => (node.id === "browser" ? { ...node, label } : node)),
+		});
+		expect(failed("kubernetes-cluster-zones", entry("Browser"))).toEqual([]);
+		expect(failed("kubernetes-cluster-zones", entry("Client"))).toContain(
+			"node-label:Browser request",
+		);
+	});
+
 	it("grounds a product's own logo named by its abbreviation, and only that", () => {
 		const diagram = expected("kubernetes-cluster-zones");
 		const withIcon = (slug: string, node = "ingress") =>

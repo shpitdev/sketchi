@@ -26,7 +26,7 @@ export interface FlowchartStepMatches {
 	readonly branchMatches: BranchMatcher;
 }
 
-const MAX_ENTRY_NODES = 2;
+const MAX_CHAIN_NODES = 2;
 
 function question(label: string): string {
 	return label.replaceAll("?", "");
@@ -211,7 +211,7 @@ export function matchFlowchartSteps(
 	// Their combined labels must match; the chain's last node owns the step.
 	for (const start of graph.nodes.filter((node) => node.kind === "start")) {
 		const chain = [start];
-		while (chain.length <= MAX_ENTRY_NODES) {
+		while (chain.length <= MAX_CHAIN_NODES) {
 			const next = outgoing(chain.at(-1)!.id);
 			const node = next.length === 1 && !next[0]!.label ? byId.get(next[0]!.target) : undefined;
 			if (node?.kind !== "process" || incoming(node.id).length !== 1 || namesStep(node.label)) {
@@ -222,6 +222,30 @@ export function matchFlowchartSteps(
 			for (const step of requiredNodes) {
 				if (step.kind === "start" && flowchartLabelMatches(combined, step.labels)) {
 					matchedNodes.get(step.id)!.add(node.id);
+				}
+			}
+		}
+	}
+
+	// Likewise the stated final outcome may be drawn as up to two plain actions
+	// and a terminal end (`Hosted artifact → Artifact response`). Their combined
+	// labels must match; the end owns the step.
+	for (const end of graph.nodes.filter(
+		(node) => node.kind === "end" && outgoing(node.id).length === 0,
+	)) {
+		const chain = [end];
+		while (chain.length <= MAX_CHAIN_NODES) {
+			const previous = incoming(chain[0]!.id);
+			const node =
+				previous.length === 1 && !previous[0]!.label ? byId.get(previous[0]!.source) : undefined;
+			if (node?.kind !== "process" || outgoing(node.id).length !== 1 || namesStep(node.label)) {
+				break;
+			}
+			chain.unshift(node);
+			const combined = chain.map((entry) => question(entry.label)).join(" ");
+			for (const step of requiredNodes) {
+				if (step.kind === "end" && flowchartLabelMatches(combined, step.labels)) {
+					matchedNodes.get(step.id)!.add(end.id);
 				}
 			}
 		}

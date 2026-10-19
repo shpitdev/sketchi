@@ -366,14 +366,32 @@ export function flowchartObjectPhraseMatches(
 	});
 }
 
+// A comparison criterion's opposite side: `Under` answers no to `Amount over threshold?`.
+const COMPARATOR_OPPOSITES: ReadonlyMap<string, readonly string[]> = new Map(
+	(
+		[
+			["over", ["under", "below"]],
+			["under", ["over", "above"]],
+			["above", ["below", "under"]],
+			["below", ["above", "over"]],
+			["more", ["less", "fewer"]],
+			["less", ["more", "greater"]],
+			["fewer", ["more"]],
+			["greater", ["less", "smaller"]],
+		] as const
+	).map(([word, opposites]) => [inflectionStem(word), opposites.map(inflectionStem)]),
+);
+
 /**
  * A yes/no branch may restate its decision's criterion instead of answering
  * yes or no: `Healthy`, `Not healthy` or `Unhealthy` for `Canary healthy?`;
- * `Pass` or `Fail` for `Tests pass?`. Every content word must come from the
- * criterion, and the caption must carry the outcome: the criterion's
- * predicate (its last content word, `healthy`) or, for "no", `fail`. A
- * subject alone (`Canary`) states no outcome. A "no" restatement has exactly
- * one negation (a negator or an un-/in- prefixed predicate); a "yes" one has
+ * `Pass` or `Fail` for `Tests pass?`; `Over` or `Under` for `Amount over
+ * threshold?`. Every content word must come from the criterion, and the
+ * caption must carry the outcome: the criterion's predicate (its last content
+ * word, `healthy`), its comparator (`over`) or, for "no", `fail` or the
+ * comparator's opposite (`under`). A subject alone (`Canary`) states no
+ * outcome. A "no" restatement has exactly one negation (a negator, an
+ * un-/in- prefixed predicate or an opposite comparator); a "yes" one has
  * none. Double negations (`Not failed`, `Not unhealthy`) are rejected rather
  * than composed.
  */
@@ -396,7 +414,14 @@ export function flowchartBranchRestates(
 			negations += 1;
 			outcome = true;
 		} else if (criterionWords.includes(word)) {
-			if (word === predicate) outcome = true;
+			if (word === predicate || COMPARATOR_OPPOSITES.has(word)) outcome = true;
+		} else if (
+			criterionWords.some((criterionWord) =>
+				COMPARATOR_OPPOSITES.get(criterionWord)?.includes(word),
+			)
+		) {
+			negations += 1;
+			outcome = true;
 		} else return false;
 	}
 	return outcome && negations === (answer === "no" ? 1 : 0);
