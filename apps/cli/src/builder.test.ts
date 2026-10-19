@@ -73,6 +73,41 @@ layer(builderLayer)("Effect-native Code Mode builder layer", (it) => {
 		}),
 	);
 
+	it.effect("builds a flowchart document's nested zones and shapes into zones and a cylinder", () =>
+		Effect.gen(function* () {
+			const builder = yield* DiagramBuilder;
+			const built = yield* builder.build(
+				canonicalDocument({
+					type: "flowchart",
+					spec: {
+						title: "Web app in a VPC",
+						groups: [
+							{ id: "vpc", label: "VPC", kind: "vpc" },
+							{ id: "private", label: "Private subnet", kind: "subnet", parent: "vpc" },
+						],
+						nodes: [
+							{ id: "users", label: "Users", kind: "start" },
+							{ id: "api", label: "API service", kind: "process", group: "private" },
+							{ id: "db", label: "Orders database", kind: "end", shape: "database", group: "vpc" },
+						],
+						edges: [
+							{ source: "users", target: "api" },
+							{ source: "api", target: "db" },
+						],
+					},
+				}),
+			);
+			assert.deepStrictEqual(
+				built.scene.elements.flatMap((element) =>
+					element.type === "node" && element.rendererRole === "zone" ? [element.label] : [],
+				),
+				["VPC", "Private subnet"],
+			);
+			const db = built.scene.elements.find((element) => element.id === "node:db");
+			assert.strictEqual(db?.type === "node" ? db.shape : undefined, "cylinder");
+		}),
+	);
+
 	it.effect("maps Code Mode quality failures to typed CLI validation", () =>
 		Effect.gen(function* () {
 			const builder = yield* DiagramBuilder;

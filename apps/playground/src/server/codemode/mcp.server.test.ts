@@ -804,7 +804,8 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 				/^- buildClassDiagram: .*"composition" or "aggregation": from is the whole/m,
 			);
 			expect(codeDescription).toMatch(/^- buildOrgChart: .*manager is the id they report to/m);
-			// The head retains builder names; summaries ride on the code parameter.
+			// The head retains builder names; summaries ride on the code parameter. Nested zones
+			// and infrastructure shapes add three spec fields and their shape and logo rules.
 			expect(
 				JSON.stringify(
 					tools.tools.map(({ name, description, inputSchema }) => ({
@@ -813,7 +814,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(12_900);
+			).toBeLessThan(13_650);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,

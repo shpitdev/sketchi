@@ -572,6 +572,45 @@ describe("Code Mode API handlers", () => {
 		);
 	});
 
+	it("builds a flowchart's nested zones and node shapes", async () => {
+		const spec = approvalSpec();
+		const response = await handleBuildFlowchartRequest(
+			{},
+			postRequest("https://studio.test/api/v1/flowcharts/build", {
+				spec: {
+					...spec,
+					groups: [
+						{ id: "region", label: "us-east-1", kind: "region" },
+						{ id: "vpc", label: "VPC", kind: "vpc", parent: "region" },
+					],
+					nodes: spec.nodes.map((node) =>
+						node.id === "approve"
+							? { ...node, group: "vpc" }
+							: node.id === "done"
+								? { ...node, group: "region", shape: "database" }
+								: node,
+					),
+				},
+				options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+			}),
+		);
+
+		expect(response.status).toBe(200);
+		const built = (await response.json()) as {
+			artifact: {
+				formats: {
+					format: string;
+					inline?: { elements: { rendererRole?: string; shape?: string }[] };
+				}[];
+			};
+			normalizedSpec: { groups?: { parent?: string }[] };
+		};
+		expect(built.normalizedSpec.groups?.[1]?.parent).toBe("region");
+		const scene = built.artifact.formats.find((format) => format.format === "scene")?.inline;
+		expect(scene?.elements.filter((element) => element.rendererRole === "zone")).toHaveLength(2);
+		expect(scene?.elements.filter((element) => element.shape === "cylinder")).toHaveLength(1);
+	});
+
 	it("returns a structured 422 instead of a render 500 for a whitespace-only flowchart title", async () => {
 		const response = await handleBuildFlowchartRequest(
 			{},

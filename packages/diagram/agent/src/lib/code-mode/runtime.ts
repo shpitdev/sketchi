@@ -4424,10 +4424,11 @@ const searchIconsWorkflow = Effect.fn("codeMode.searchIcons.workflow")(function*
 		ok: true,
 		status: "accepted",
 		query,
-		icons: icons.map(({ collection, name, slug }) => ({
+		icons: icons.map(({ collection, match, name, slug }) => ({
 			collection,
 			name,
 			slug,
+			match,
 		})),
 		issues: environment.icons
 			? []

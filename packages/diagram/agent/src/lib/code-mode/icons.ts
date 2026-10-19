@@ -7,9 +7,11 @@ import {
 	type DroppedCanvasIcon,
 } from "@sketchi/diagram-core";
 import {
+	iconMatch,
 	isNodeLogoEligible,
 	normalizeNodeLogoSvg,
 	searchIcons,
+	type IconMatch,
 	type SketchiIcon,
 } from "@sketchi/icon-catalog";
 import { Effect, Schema } from "effect";
@@ -41,8 +43,14 @@ export class CodeModeIconLoadError extends Schema.TaggedError<CodeModeIconLoadEr
 export interface CodeModeIconCatalog {
 	/** The eligible node-logo mark for an exact slug. */
 	readonly get: (slug: string) => CodeModeCatalogIcon | undefined;
-	/** Ranked node-logo search, shared with icons.sketchi.app. */
-	readonly search: (query: string, limit: number) => readonly CodeModeCatalogIcon[];
+	/**
+	 * Ranked node-logo search, shared with icons.sketchi.app, each result with
+	 * how it answers the query: the product's own mark, its vendor's, or weak.
+	 */
+	readonly search: (
+		query: string,
+		limit: number,
+	) => readonly (CodeModeCatalogIcon & { readonly match: IconMatch })[];
 	/** Raw SVG source for an eligible mark. */
 	readonly loadSvg: (icon: CodeModeCatalogIcon) => Effect.Effect<string, CodeModeIconLoadError>;
 	/**
@@ -66,7 +74,10 @@ export function makeCodeModeIconCatalog(options: {
 	return {
 		get: (slug) => bySlug.get(slug),
 		search: (query, limit) =>
-			searchIcons(eligible, { limit, query }).map(({ icon }) => catalogIcon(icon)),
+			searchIcons(eligible, { limit, query }).map(({ icon }) => ({
+				...catalogIcon(icon),
+				match: iconMatch(icon, query),
+			})),
 		loadSvg: options.loadSvg,
 		slugLookup: options.slugLookup,
 	};

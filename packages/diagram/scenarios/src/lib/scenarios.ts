@@ -1,4 +1,6 @@
 import {
+	type DiagramNodeShape,
+	type DiagramZoneKind,
 	type FlowchartDiagram,
 	type FlowchartNodeKind,
 	SKETCHI_DIAGRAM_STYLE,
@@ -40,8 +42,12 @@ export interface FlowchartScenarioRequiredGroup {
 	label: string;
 	/** Prompt-grounded alternatives for the group's label. */
 	labels: readonly string[];
-	/** Required step ids the group holds. */
+	/** Required step ids the group holds, directly or in a group nested in it. */
 	members: readonly string[];
+	/** The stated group this zone sits inside, at any depth. */
+	parent?: string;
+	/** The kinds that read as what the prompt calls this zone. */
+	kinds?: readonly DiagramZoneKind[];
 }
 
 export interface FlowchartScenarioRequiredNode {
@@ -51,6 +57,10 @@ export interface FlowchartScenarioRequiredNode {
 	labels: readonly string[];
 	/** Prompt-grounded alternatives for a yes/no decision asked by its opposite condition. */
 	inverseLabels?: readonly string[];
+	/** The infrastructure shape the prompt makes this step: a database, queue or document. */
+	shape?: DiagramNodeShape;
+	/** Every shape that reads as what the prompt calls this step, `shape` first. */
+	shapes?: readonly DiagramNodeShape[];
 }
 
 export interface FlowchartScenarioRequiredEdge {
@@ -96,14 +106,28 @@ type FlowchartNodeDefinition = readonly [
 	icon?: string,
 ];
 
+/** A zone's place in the prompt's architecture: the stated group around it and what it is. */
+interface FlowchartZoneDefinition {
+	readonly parent?: string;
+	/** Kinds that read as what the prompt calls the zone; the first is the fixture's. */
+	readonly kinds?: readonly [DiagramZoneKind, ...DiagramZoneKind[]];
+}
+
+/** A group, its direct members (none for a zone that holds only zones), and its zone. */
 type FlowchartGroupDefinition = readonly [
+	id: string,
+	label: string,
+	labels: readonly [string, ...string[]],
+	members: readonly string[],
+	zone?: FlowchartZoneDefinition,
+];
+
+type FlowchartLaneDefinition = readonly [
 	id: string,
 	label: string,
 	labels: readonly [string, ...string[]],
 	members: readonly [string, ...string[]],
 ];
-
-type FlowchartLaneDefinition = FlowchartGroupDefinition;
 
 type FlowchartEdgeDefinition = readonly [
 	id: string,
@@ -138,6 +162,13 @@ interface FlowchartScenarioDefinition {
 	inverse?: Readonly<Record<string, readonly [string, ...string[]]>>;
 	logos?: readonly DiagramScenarioLogo[];
 	nodes: readonly FlowchartNodeDefinition[];
+	/**
+	 * The infrastructure shape the prompt makes each such fixture node, or the
+	 * shapes that each read as what it calls the node, the fixture's first.
+	 */
+	shapes?: Readonly<
+		Record<string, DiagramNodeShape | readonly [DiagramNodeShape, ...DiagramNodeShape[]]>
+	>;
 	prompt: string;
 	tags: readonly string[];
 	title: string;
@@ -152,6 +183,15 @@ const FLOWCHART_NODE_KIND_ORDER: readonly FlowchartNodeKind[] = [
 	"decision",
 	"end",
 ];
+
+/** The shapes that read as what the prompt calls a fixture node, the fixture's first. */
+function shapesOf(
+	definition: FlowchartScenarioDefinition,
+	id: string,
+): readonly [DiagramNodeShape, ...DiagramNodeShape[]] | undefined {
+	const shapes = definition.shapes?.[id];
+	return shapes === undefined ? undefined : typeof shapes === "string" ? [shapes] : shapes;
+}
 
 function unique(values: readonly string[]): string[] {
 	const seen = new Set<string>();
@@ -185,7 +225,14 @@ function buildExpectedDiagram(definition: FlowchartScenarioDefinition): Flowchar
 		title: definition.title,
 		type: "flowchart",
 		...(definition.groups
-			? { groups: definition.groups.map(([id, label]) => ({ id, label })) }
+			? {
+					groups: definition.groups.map(([id, label, , , zone]) => ({
+						id,
+						label,
+						...(zone?.parent ? { parent: zone.parent } : {}),
+						...(zone?.kinds ? { kind: zone.kinds[0] } : {}),
+					})),
+				}
 			: {}),
 		...(definition.lanes ? { lanes: definition.lanes.map(([id, label]) => ({ id, label })) } : {}),
 		nodes: definition.nodes.map(([id, label, kind, _labels, icon]) => ({
@@ -195,6 +242,7 @@ function buildExpectedDiagram(definition: FlowchartScenarioDefinition): Flowchar
 			...(icon ? { icon: { slug: icon } } : {}),
 			...(groupOf.has(id) ? { group: groupOf.get(id) } : {}),
 			...(laneOf.has(id) ? { lane: laneOf.get(id) } : {}),
+			...(shapesOf(definition, id) ? { shape: shapesOf(definition, id)![0] } : {}),
 		})),
 		edges: definition.edges.map(([id, source, target, label]) => ({
 			id,
@@ -245,6 +293,7 @@ function buildAssertions(
 			}
 		}
 		if (entry.has(id)) return [];
+		const shaped = shapesOf(definition, id);
 		return [
 			{
 				id,
@@ -252,9 +301,16 @@ function buildAssertions(
 				kind,
 				labels,
 				...(inverseLabels ? { inverseLabels } : {}),
+				...(shaped ? { shape: shaped[0], shapes: shaped } : {}),
 			},
 		];
 	});
+	// A zone holds its own members and every member of the zones nested in it.
+	const groups = definition.groups ?? [];
+	const heldBy = (groupId: string): string[] => [
+		...(groups.find(([id]) => id === groupId)?.[3] ?? []),
+		...groups.flatMap(([id, , , , zone]) => (zone?.parent === groupId ? heldBy(id) : [])),
+	];
 
 	return {
 		minEdgeCount: diagram.edges.length - entry.size,
@@ -297,7 +353,7 @@ function buildAssertions(
 		requiredNodeKinds,
 		requiredNodes,
 		requiredNodeLabels: diagram.nodes.map((node) => node.label),
-		requiredGroups: (definition.groups ?? []).map(([id, label, labels, members]) => {
+		requiredGroups: groups.map(([id, label, labels, , zone]) => {
 			for (const alternative of labels) {
 				const words = flowchartLabelWords(alternative);
 				if (words.length === 0 || words.some((word) => !promptWords.has(word))) {
@@ -306,7 +362,17 @@ function buildAssertions(
 					);
 				}
 			}
-			return { id, label, labels, members: [...new Set(members.map(stepOf))] };
+			const members = [...new Set(heldBy(id).map(stepOf))];
+			if (members.length === 0)
+				throw new Error(`Scenario "${definition.id}" group "${id}" holds no step.`);
+			return {
+				id,
+				label,
+				labels,
+				members,
+				...(zone?.parent ? { parent: zone.parent } : {}),
+				...(zone?.kinds ? { kinds: zone.kinds } : {}),
+			};
 		}),
 		ungroupedSteps: [...new Set((definition.ungrouped ?? []).map(stepOf))],
 		requiredLanes: (definition.lanes ?? []).map(([id, label, labels, members]) => {
@@ -2028,6 +2094,218 @@ const flowchartScenarioDefinitions = [
 			["sre", "SRE", ["sre"], ["investigate", "mitigate"]],
 			["comms", "Comms", ["comms"], ["status", "publish"]],
 		],
+	},
+	{
+		id: "aws-three-tier-zones",
+		title: "AWS three-tier app in nested zones",
+		difficulty: "standard",
+		tags: ["zones", "nesting", "architecture", "shapes", "left-to-right"],
+		direction: "LR",
+		description:
+			"A three-tier AWS app: a load balancer in a public subnet, two services in a private subnet and a database in a database subnet, inside a VPC in a region, with a bucket in the region outside the VPC.",
+		prompt:
+			"Draw our AWS setup as a left-to-right architecture diagram. Users send requests, which starts the flow, to an Application Load Balancer in a public subnet. The load balancer routes requests to two ECS services in a private subnet, the web service and the API service. Both services query an RDS PostgreSQL database in a database subnet, which ends the flow, and the API service also stores uploads in an S3 bucket, which ends the flow too. All three subnets sit inside a VPC, and the VPC and the S3 bucket sit inside the us-east-1 region.",
+		logos: [
+			{ aliases: ["AWS", "amazon", "amazon web services"], name: "AWS", slug: "aws" },
+			{
+				aliases: ["PostgreSQL", "postgres", "postgres sql", "psql"],
+				name: "PostgreSQL",
+				slug: "postgresql",
+			},
+		],
+		nodes: [
+			["users", "Users send requests", "start", ["users send requests", "users"]],
+			[
+				"alb",
+				"Application Load Balancer",
+				"process",
+				["Application Load Balancer", "load balancer"],
+			],
+			["web", "ECS web service", "process", ["web service"]],
+			["api", "ECS API service", "process", ["API service"]],
+			[
+				"rds",
+				"RDS PostgreSQL database",
+				"end",
+				["RDS PostgreSQL database", "RDS PostgreSQL", "PostgreSQL database"],
+			],
+			["s3", "S3 bucket", "end", ["S3 bucket", "stores uploads"]],
+		],
+		edges: [
+			["users-alb", "users", "alb"],
+			["alb-web", "alb", "web"],
+			["alb-api", "alb", "api"],
+			["web-rds", "web", "rds"],
+			["api-rds", "api", "rds"],
+			["api-s3", "api", "s3"],
+		],
+		groups: [
+			["region", "us-east-1", ["us-east-1"], ["s3"], { kinds: ["region"] }],
+			["vpc", "VPC", ["vpc"], [], { parent: "region", kinds: ["vpc"] }],
+			[
+				"public",
+				"Public subnet",
+				["public subnet", "public"],
+				["alb"],
+				{ parent: "vpc", kinds: ["subnet"] },
+			],
+			[
+				"private",
+				"Private subnet",
+				["private subnet", "private"],
+				["web", "api"],
+				{ parent: "vpc", kinds: ["subnet"] },
+			],
+			[
+				"data",
+				"Database subnet",
+				["database subnet"],
+				["rds"],
+				{ parent: "vpc", kinds: ["subnet"] },
+			],
+		],
+		ungrouped: ["users"],
+		shapes: { rds: "database", s3: "storage" },
+	},
+	{
+		id: "kubernetes-cluster-zones",
+		title: "Kubernetes cluster with namespaces",
+		difficulty: "standard",
+		tags: ["zones", "nesting", "architecture", "shapes", "kubernetes"],
+		description:
+			"Services and pods in three namespaces of a cluster, with a managed database and a message queue outside the cluster.",
+		prompt:
+			"Draw our Kubernetes architecture from top to bottom. A browser request starts the flow and reaches the ingress controller in the ingress namespace of our GKE cluster. The ingress controller forwards it to the web service in the frontend namespace, which sends it to the web pods in the same namespace. The web pods call the API service in the backend namespace, which sends it to the API pods there. The API pods write orders to a Cloud SQL database outside the cluster, which ends the flow, and publish jobs to a RabbitMQ queue, also outside the cluster. Worker pods in the backend namespace consume jobs from the queue and write results to the same database.",
+		logos: [
+			{ aliases: ["Kubernetes", "k8s", "kube"], name: "Kubernetes", slug: "kubernetes" },
+			{ name: "Gke", slug: "gke" },
+			{ name: "Cloud SQL", slug: "cloud-sql" },
+			{ name: "Rabbitmq", slug: "rabbitmq" },
+		],
+		nodes: [
+			["browser", "Browser request", "start", ["browser request"]],
+			["ingress", "Ingress controller", "process", ["ingress controller"]],
+			["websvc", "Web service", "process", ["web service"]],
+			["webpods", "Web pods", "process", ["web pods"]],
+			["apisvc", "API service", "process", ["API service"]],
+			["apipods", "API pods", "process", ["API pods"]],
+			["queue", "RabbitMQ queue", "process", ["RabbitMQ queue", "RabbitMQ"]],
+			["workers", "Worker pods", "process", ["worker pods"]],
+			["db", "Cloud SQL database", "end", ["Cloud SQL database", "Cloud SQL"]],
+		],
+		edges: [
+			["browser-ingress", "browser", "ingress"],
+			["ingress-websvc", "ingress", "websvc"],
+			["websvc-webpods", "websvc", "webpods"],
+			["webpods-apisvc", "webpods", "apisvc"],
+			["apisvc-apipods", "apisvc", "apipods"],
+			["apipods-db", "apipods", "db"],
+			["apipods-queue", "apipods", "queue"],
+			["queue-workers", "queue", "workers"],
+			["workers-db", "workers", "db"],
+		],
+		groups: [
+			["cluster", "GKE cluster", ["GKE cluster", "cluster"], [], { kinds: ["cluster"] }],
+			[
+				"edge",
+				"Ingress namespace",
+				["ingress namespace", "ingress"],
+				["ingress"],
+				{ parent: "cluster", kinds: ["namespace"] },
+			],
+			[
+				"frontend",
+				"Frontend namespace",
+				["frontend namespace", "frontend"],
+				["websvc", "webpods"],
+				{ parent: "cluster", kinds: ["namespace"] },
+			],
+			[
+				"backend",
+				"Backend namespace",
+				["backend namespace", "backend"],
+				["apisvc", "apipods", "workers"],
+				{ parent: "cluster", kinds: ["namespace"] },
+			],
+		],
+		ungrouped: ["browser", "queue", "db"],
+		shapes: { queue: "queue", db: "database" },
+	},
+	{
+		id: "hybrid-cloud-zones",
+		title: "Hybrid on-prem and cloud setup",
+		difficulty: "challenge",
+		tags: ["zones", "nesting", "architecture", "shapes", "hybrid", "left-to-right"],
+		direction: "LR",
+		description:
+			"An on-prem data center joined by a VPN to a cloud VPC four zones deep, where orders queue for a sync function that writes a table and archives invoices.",
+		prompt:
+			"Draw our hybrid setup from left to right. In the corporate network of our on-prem data center, office staff start the flow by entering orders in the legacy ERP, which also runs on the corporate network. The ERP stores records in an Oracle database in the data center, which ends the flow, and sends orders through a site-to-site VPN gateway in our production VPC. The VPN gateway passes them to the order API in the VPC's private subnet. The VPC sits in the eu-west-1 region of our AWS cloud. The order API puts each order on an order queue in the region, and a sync function takes orders from the queue, writes them to an orders table, which ends the flow, and saves each invoice as a PDF document in the invoice archive, which ends the flow too.",
+		logos: [
+			{ name: "Oracle", slug: "oracle" },
+			{ aliases: ["AWS", "amazon", "amazon web services"], name: "AWS", slug: "aws" },
+		],
+		nodes: [
+			["staff", "Office staff", "start", ["office staff"]],
+			["erp", "Legacy ERP", "process", ["legacy ERP", "ERP"]],
+			["oracle", "Oracle database", "end", ["Oracle database"]],
+			["vpn", "Site-to-site VPN gateway", "process", ["site-to-site VPN gateway", "VPN gateway"]],
+			["api", "Order API", "process", ["order API"]],
+			["queue", "Order queue", "process", ["order queue"]],
+			["sync", "Sync function", "process", ["sync function"]],
+			["table", "Orders table", "end", ["orders table"]],
+			["archive", "Invoice archive", "end", ["invoice archive"]],
+		],
+		edges: [
+			["staff-erp", "staff", "erp"],
+			["erp-oracle", "erp", "oracle"],
+			["erp-vpn", "erp", "vpn"],
+			["vpn-api", "vpn", "api"],
+			["api-queue", "api", "queue"],
+			["queue-sync", "queue", "sync"],
+			["sync-table", "sync", "table"],
+			["sync-archive", "sync", "archive"],
+		],
+		groups: [
+			[
+				"onprem",
+				"On-prem data center",
+				["on-prem data center", "data center"],
+				["oracle"],
+				{ kinds: ["datacenter"] },
+			],
+			["corp", "Corporate network", ["corporate network"], ["staff", "erp"], { parent: "onprem" }],
+			["aws", "AWS cloud", ["AWS cloud", "AWS"], [], { kinds: ["cloud"] }],
+			[
+				"region",
+				"eu-west-1",
+				["eu-west-1"],
+				["queue", "sync", "table", "archive"],
+				{ parent: "aws", kinds: ["region"] },
+			],
+			[
+				"vpc",
+				"Production VPC",
+				["production VPC", "VPC"],
+				["vpn"],
+				{ parent: "region", kinds: ["vpc"] },
+			],
+			[
+				"private",
+				"Private subnet",
+				["private subnet"],
+				["api"],
+				{ parent: "vpc", kinds: ["subnet"] },
+			],
+		],
+		// The prompt saves PDF documents in an archive in a cloud region: a document
+		// stack or an object-storage bucket each reads as that archive.
+		shapes: {
+			oracle: "database",
+			queue: "queue",
+			table: "database",
+			archive: ["document", "storage"],
+		},
 	},
 ] satisfies readonly FlowchartScenarioDefinition[];
 

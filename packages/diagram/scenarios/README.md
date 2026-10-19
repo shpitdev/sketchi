@@ -40,6 +40,10 @@ and the eval harness use it.
   its steps and that steps the prompt keeps outside every group stay ungrouped.
   Swimlane scenarios check that each stated lane holds its steps, that lanes
   keep the stated order, and that each handoff crosses between its two lanes.
+  Zone scenarios check that each stated zone holds its steps (directly or in a
+  zone nested in it), sits inside the zone the prompt puts it in, and has a kind
+  that reads as what the prompt calls it, and that each database, queue or
+  document the prompt states draws as one.
 - Sequence scenarios check participants, required messages and their
   chronological order, calls answered by returns (activation bars), and that
   no return is stray.

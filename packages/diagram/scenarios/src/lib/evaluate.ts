@@ -316,7 +316,39 @@ function connectedStepOwners(
 /** What logo checks need from a scenario. */
 export interface ScenarioLogoExpectations {
 	readonly logos: readonly DiagramScenarioLogo[];
+	/** The prompt, whose product abbreviations also ground their products' logos. */
+	readonly prompt?: string;
 	readonly requiredIconSlugs: readonly string[];
+}
+
+/**
+ * Products a prompt may name only by an abbreviation the catalog does not
+ * list, by full name: the product's own logo is grounded wherever the
+ * abbreviation is, and sits well on a step named by either.
+ */
+const PRODUCT_ABBREVIATIONS: Readonly<Record<string, string>> = {
+	aks: "azure kubernetes service",
+	eks: "elastic kubernetes service",
+	gcs: "google cloud storage",
+	gke: "google kubernetes engine",
+	rds: "relational database service",
+};
+
+/** The logo a prompt's product abbreviation grounds for a slug, if any. */
+function abbreviatedLogo(
+	slug: string,
+	prompt: string | undefined,
+): DiagramScenarioLogo | undefined {
+	if (prompt === undefined) return undefined;
+	const named = new Set(termTokens(prompt));
+	const words = ` ${termTokens(slug.replaceAll("-", " ")).join(" ")} `;
+	for (const [abbreviation, name] of Object.entries(PRODUCT_ABBREVIATIONS))
+		if (
+			named.has(abbreviation) &&
+			(words.includes(` ${abbreviation} `) || words.includes(` ${termTokens(name).join(" ")} `))
+		)
+			return { aliases: [abbreviation], name, slug };
+	return undefined;
 }
 
 /** The label contains one of the logo's names as whole words. */
@@ -340,6 +372,7 @@ export function scenarioLogoChecks(
 	modelDiagram: FlowchartDiagram | SequenceDiagram,
 ): ScenarioCheck[] {
 	const offered = new Map(expected.logos.map((logo) => [logo.slug, logo]));
+	const logoFor = (slug: string) => offered.get(slug) ?? abbreviatedLogo(slug, expected.prompt);
 	// Flowcharts draw logos on nodes; sequence diagrams on participants.
 	const owner = modelDiagram.type === "flowchart" ? "step" : "participant";
 	const elements: readonly {
@@ -349,9 +382,9 @@ export function scenarioLogoChecks(
 	const icons = elements.flatMap((element) =>
 		element.icon ? [{ label: element.label, slug: element.icon.slug }] : [],
 	);
-	const ungrounded = icons.filter((icon) => !offered.has(icon.slug));
+	const ungrounded = icons.filter((icon) => !logoFor(icon.slug));
 	const misplaced = icons.filter((icon) => {
-		const logo = offered.get(icon.slug);
+		const logo = logoFor(icon.slug);
 		return !logo || !labelNamesLogo(icon.label, logo);
 	});
 	return [
@@ -384,8 +417,11 @@ export function scenarioLogoChecks(
 /**
  * Group checks on the model's own groups: each group the prompt states exists
  * under one of its prompt-grounded labels and holds every node of every step
- * the prompt puts in it, stated groups stay distinct, and steps the prompt
- * keeps outside every group belong to none.
+ * the prompt puts in it (directly or in a group nested in it), stated groups
+ * stay distinct, and steps the prompt keeps outside every group belong to
+ * none. A stated zone also sits inside the zone the prompt puts it in and is
+ * of a kind that reads as what the prompt calls it, and a step the prompt
+ * makes a database, queue or document draws as one.
  */
 function flowchartGroupChecks(
 	scenario: FlowchartScenario,
@@ -393,8 +429,17 @@ function flowchartGroupChecks(
 	ownedNodes: ReadonlyMap<string, ReadonlySet<string>>,
 ): ScenarioCheck[] {
 	const { requiredGroups, requiredNodes, ungroupedSteps } = scenario.assertions;
-	if (requiredGroups.length === 0 && ungroupedSteps.length === 0) return [];
+	const shaped = requiredNodes.filter((step) => step.shape !== undefined);
+	if (requiredGroups.length === 0 && ungroupedSteps.length === 0 && shaped.length === 0) return [];
 	const groupOf = new Map(graph.nodes.map((node) => [node.id, node.group]));
+	const groupsById = new Map((graph.groups ?? []).map((group) => [group.id, group]));
+	// A group and every group around it, innermost first; a loop stops the walk.
+	const chain = (groupId: string | undefined) => {
+		const ids: string[] = [];
+		for (let id = groupId; id !== undefined && !ids.includes(id); id = groupsById.get(id)?.parent)
+			ids.push(id);
+		return ids;
+	};
 	const stepLabel = (id: string) => requiredNodes.find((step) => step.id === id)?.label ?? id;
 	const owned = (stepId: string) => [...(ownedNodes.get(stepId) ?? [])];
 	const matched = requiredGroups.map((expected) => {
@@ -405,27 +450,63 @@ function flowchartGroupChecks(
 			expected.members.every(
 				(member) =>
 					owned(member).length > 0 &&
-					owned(member).every((node) => groupOf.get(node) === candidate.id),
+					owned(member).every((node) => chain(groupOf.get(node)).includes(candidate.id)),
 			),
 		);
 		return { expected, group, named };
 	});
 	const found = matched.flatMap(({ group }) => (group ? [group.id] : []));
+	// Where a zone sits and what it is read off the group that holds its steps,
+	// else the first group under its label, so a misplaced step fails only its
+	// zone's members.
+	const zoneOf = (entry: (typeof matched)[number] | undefined) => entry?.group ?? entry?.named[0];
+	const matchedId = (stated: string) =>
+		zoneOf(matched.find(({ expected }) => expected.id === stated))?.id;
 	return [
-		...matched.flatMap(({ expected, group, named }) => [
-			{
-				id: `group:${expected.label}`,
-				passed: named.length > 0,
-				message: `Expected a group labeled like ${expected.labels.join(" | ")}.`,
-			},
-			{
-				id: `group-members:${expected.label}`,
-				passed: group !== undefined,
-				message: `Expected the "${expected.label}" group to hold ${expected.members
-					.map((member) => `"${stepLabel(member)}"`)
-					.join(", ")}.`,
-			},
-		]),
+		...matched.flatMap((entry) => {
+			const { expected, group, named } = entry;
+			const zone = zoneOf(entry);
+			return [
+				{
+					id: `group:${expected.label}`,
+					passed: named.length > 0,
+					message: `Expected a group labeled like ${expected.labels.join(" | ")}.`,
+				},
+				{
+					id: `group-members:${expected.label}`,
+					passed: group !== undefined,
+					message: `Expected the "${expected.label}" group to hold ${expected.members
+						.map((member) => `"${stepLabel(member)}"`)
+						.join(", ")}.`,
+				},
+				...(expected.parent === undefined
+					? []
+					: [
+							{
+								id: `zone-parent:${expected.label}`,
+								passed:
+									zone !== undefined &&
+									matchedId(expected.parent) !== undefined &&
+									chain(zone.parent).includes(matchedId(expected.parent)!),
+								message: `Expected the "${expected.label}" zone inside the "${
+									requiredGroups.find((candidate) => candidate.id === expected.parent)?.label ??
+									expected.parent
+								}" zone.`,
+							},
+						]),
+				...(expected.kinds === undefined
+					? []
+					: [
+							{
+								id: `zone-kind:${expected.label}`,
+								passed:
+									zone?.kind !== undefined &&
+									(expected.kinds as readonly string[]).includes(zone.kind),
+								message: `Expected the "${expected.label}" zone to be of kind ${expected.kinds.join(" | ")}.`,
+							},
+						]),
+			];
+		}),
 		...(requiredGroups.length > 1
 			? [
 					{
@@ -441,6 +522,19 @@ function flowchartGroupChecks(
 				owned(step).length > 0 && owned(step).every((node) => groupOf.get(node) === undefined),
 			message: `Expected "${stepLabel(step)}" outside every group.`,
 		})),
+		...shaped.map((step) => {
+			const shapes = step.shapes ?? [step.shape!];
+			return {
+				id: `shape:${step.label}`,
+				passed: graph.nodes.some(
+					(node) =>
+						owned(step.id).includes(node.id) &&
+						node.shape !== undefined &&
+						shapes.includes(node.shape),
+				),
+				message: `Expected "${step.label}" to draw as a ${shapes.join(" or ")}.`,
+			};
+		}),
 	];
 }
 
@@ -961,7 +1055,11 @@ export function evaluateScenarioDiagram(
 		return evaluation(scenario.id, diagram, [
 			...sequenceScenarioChecks(scenario, modelDiagram),
 			...scenarioLogoChecks(
-				{ logos: scenario.logos, requiredIconSlugs: scenario.assertions.requiredIconSlugs },
+				{
+					logos: scenario.logos,
+					prompt: scenario.prompt,
+					requiredIconSlugs: scenario.assertions.requiredIconSlugs,
+				},
 				modelDiagram,
 			),
 		]);
@@ -974,6 +1072,7 @@ export function evaluateScenarioDiagram(
 		...scenarioLogoChecks(
 			{
 				logos: scenario.logos,
+				prompt: scenario.prompt,
 				requiredIconSlugs: scenario.assertions.requiredIconSlugs,
 			},
 			modelDiagram,

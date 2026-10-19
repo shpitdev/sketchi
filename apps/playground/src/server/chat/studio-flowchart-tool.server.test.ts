@@ -170,6 +170,40 @@ describe("Studio build_flowchart host", () => {
 		expect(scene.elements.filter((element) => element.rendererRole === "swimlane")).toHaveLength(2);
 	});
 
+	it("keeps nested zones and node shapes through Studio's tool schema and builds them", async () => {
+		const groups = [
+			{ id: "vpc", label: "VPC", kind: "vpc" as const },
+			{ id: "private", label: "Private subnet", kind: "subnet" as const, parent: "vpc" },
+		];
+		const spec = acceptedSpec();
+		const zoned = {
+			...spec,
+			groups,
+			nodes: spec.nodes.map((node) =>
+				node.id === "publish"
+					? { ...node, group: "private", shape: "document" as const }
+					: node.id === "revise"
+						? { ...node, group: "vpc" }
+						: node,
+			),
+		};
+		const validated = await StudioBuildFlowchartInputSchema["~standard"].validate({ spec: zoned });
+		if (!("value" in validated)) throw new Error(JSON.stringify(validated.issues));
+		expect(validated.value.spec).toMatchObject({ groups });
+
+		const executor = await Effect.runPromise(
+			makeStudioFlowchartToolExecutor(deterministicRuntime(countingStore())),
+		);
+		const built = await Effect.runPromise(executor.execute(validated.value));
+		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		expect(built.normalizedSpec.groups).toEqual(groups);
+		const scene = built.artifact.formats.find((format) => format.format === "scene")?.inline as {
+			elements: { rendererRole?: string; shape?: string }[];
+		};
+		expect(scene.elements.filter((element) => element.rendererRole === "zone")).toHaveLength(2);
+		expect(scene.elements.filter((element) => element.shape === "document")).toHaveLength(1);
+	});
+
 	it("injects artifact options instead of exposing them to the model", async () => {
 		let request: typeof BuildFlowchartRequestSchema.Type | undefined;
 		const executor = await Effect.runPromise(

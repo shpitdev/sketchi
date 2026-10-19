@@ -425,7 +425,8 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			"
 		`);
 		// Family summaries now live beside the specs, outside the truncated head.
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(10_000);
+		// Nested zones, infrastructure shapes and their logo rule add spec fields and docs (#476).
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(10_650);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		for (const line of overview
 			.split("\n")

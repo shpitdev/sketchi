@@ -7,6 +7,8 @@ import {
 	CANVAS_COMPOSED_SHAPES,
 	CANVAS_RENDERER_ROLES,
 	CANVAS_SPEC_VERSION,
+	DIAGRAM_NODE_SHAPES,
+	DIAGRAM_ZONE_KINDS,
 	CHART_KINDS,
 	CHART_ORIENTATIONS,
 	CLASS_KINDS,
@@ -577,6 +579,7 @@ export class FlowchartSpecNode extends Schema.Class<FlowchartSpecNode>("Flowchar
 		icon: optionalContract(NodeIconSpec),
 		group: optionalContract(NonEmptyString),
 		lane: optionalContract(NonEmptyString),
+		shape: optionalContract(literals(DIAGRAM_NODE_SHAPES)),
 	},
 	{ identifier: undefined },
 ) {}
@@ -590,11 +593,16 @@ export class FlowchartSpecLane extends Schema.Class<FlowchartSpecLane>("Flowchar
 	{ identifier: undefined },
 ) {}
 
-/** A labeled region that holds the nodes whose group is its id. */
+/**
+ * A labeled region that holds the nodes whose group is its id, inside the group
+ * named by parent; kind says what an architecture zone stands for.
+ */
 export class FlowchartSpecGroup extends Schema.Class<FlowchartSpecGroup>("FlowchartSpecGroup")(
 	{
 		id: RequiredNonEmptyString,
 		label: RequiredNonEmptyString,
+		parent: optionalContract(NonEmptyString),
+		kind: optionalContract(literals(DIAGRAM_ZONE_KINDS)),
 	},
 	{ identifier: undefined },
 ) {}
@@ -2768,6 +2776,8 @@ export class SearchIconsMatch extends Schema.Class<SearchIconsMatch>("SearchIcon
 		slug: Schema.String,
 		name: Schema.String,
 		collection: Schema.String,
+		/** exact: the product's own mark; vendor: its vendor's or platform's; weak: fuzzier. */
+		match: literals(["exact", "vendor", "weak"]),
 	},
 	{ identifier: undefined },
 ) {}

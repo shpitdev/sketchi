@@ -203,7 +203,8 @@ const CANVAS_ARROWHEAD_ADDITIONS = new Set([
 	"triangle_outline",
 	"diamond_outline",
 ]);
-const FLOWCHART_SPEC_NODE_ADDED_FIELDS = new Set(["icon", "group", "lane"]);
+// Logos, groups, lanes and infrastructure shapes each add an optional node field.
+const FLOWCHART_SPEC_NODE_ADDED_FIELDS = new Set(["icon", "group", "lane", "shape"]);
 // Flowchart groups and lanes each add an optional list to the spec.
 const FLOWCHART_SPEC_ADDED_FIELDS = new Set(["groups", "lanes"]);
 const FROZEN_FIXTURE_HASHES = {

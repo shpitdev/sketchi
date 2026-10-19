@@ -409,9 +409,20 @@ describe("searchIcons", () => {
 			ok: true,
 			status: "accepted",
 			query: "Git",
-			icons: [{ collection: "devtools-ci", name: "GitHub", slug: "github" }],
+			icons: [{ collection: "devtools-ci", name: "GitHub", slug: "github", match: "weak" }],
 			issues: [],
 		});
+	});
+
+	it("tags each result with how it answers the query", async () => {
+		const tagged = async (q: string) => {
+			const result = await runtime().searchIcons({ q });
+			if (!result.ok) throw new Error(`searchIcons rejected ${q}.`);
+			return result.icons.map(({ match, slug }) => [slug, match]);
+		};
+
+		expect(await tagged("GitHub")).toEqual([["github", "exact"]]);
+		expect(await tagged("git")).toEqual([["github", "weak"]]);
 	});
 
 	it("rejects malformed requests with input issues", async () => {

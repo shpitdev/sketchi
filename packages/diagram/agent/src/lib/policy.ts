@@ -35,7 +35,7 @@ FLOWCHART CRAFT
 - Use exactly one "start" node and at least one "end" node. Use "decision" for branch points and "process" for every other step.
 - Every decision needs at least 2 outgoing edges with distinct labels such as "yes" and "no". Every node must be reachable from start and able to reach an end. Loops are valid only when an exit path remains.
 - Keep the graph at 24 nodes and 64 edges or fewer. direction is "TB" for step-by-step flows and "LR" for pipelines and lifecycles.
-- When the user groups steps by team, zone, or phase, declare groups [{ "id", "label" }] and set each member node's group to its id. Leave other nodes ungrouped. Groups do not nest.
+- When the user groups steps by team, zone, or phase, declare groups [{ "id", "label" }] and set each member node's group to its innermost group's id. Leave other nodes ungrouped. A group inside another (a subnet in a VPC) sets "parent", and "kind" when the user names what a zone is. Set "shape", also on a start or end: "database" for databases, "document" for files, archives and reports, "queue" for queues, streams and topics, "storage" for buckets and object stores; only users stay ellipses. In an architecture the entry is the start and each sink an end.
 - For swimlanes, a process across actors or roles, declare lanes [{ "id", "label" }] in the user's order and set every node's lane to its actor. Lanes take no groups.
 - Tool-call hygiene: every field is its own clean string. Node and edge ids must be unique, and every edge source/target must exactly equal an existing node id.
 

@@ -166,6 +166,45 @@ function partialQueryMatches<Icon extends SearchableIcon>(
 }
 
 /**
+ * How a result answers its query: exact when the query names this icon (the
+ * product's own mark), vendor when the icon names only part of the query (a
+ * vendor's or platform's mark for one of its products, "aws" for "Amazon S3",
+ * "kubernetes" for "Kubernetes pods"), weak for anything fuzzier.
+ */
+export type IconMatch = "exact" | "vendor" | "weak";
+
+/** Words a query may add to a product's name without naming another product. */
+const GENERIC_QUERY_WORDS: ReadonlySet<string> = new Set([
+	"app",
+	"cluster",
+	"database",
+	"db",
+	"icon",
+	"logo",
+	"server",
+	"service",
+]);
+
+export function iconMatch(icon: SearchableIcon, query: string): IconMatch {
+	const tokens = termTokens(query);
+	const named = [tokens, tokens.filter((token) => !GENERIC_QUERY_WORDS.has(token))].map((words) =>
+		compactTerm(words.join("")),
+	);
+	const terms = [icon.slug, icon.name, ...icon.aliases];
+	if (terms.some((term) => named.includes(compactTerm(term)))) return "exact";
+	const parts = new Set(
+		tokens.flatMap((_, start) =>
+			tokens
+				.slice(start)
+				.map((__, end) => compactTerm(tokens.slice(start, start + end + 1).join(""))),
+		),
+	);
+	return terms.some((term) => compactTerm(term) !== "" && parts.has(compactTerm(term)))
+		? "vendor"
+		: "weak";
+}
+
+/**
  * Catalog icons ranked by exact slug, name prefix, alias, substring, then
  * collection. A query no icon matches as a whole falls back to the icons its
  * parts name (see partialQueryMatches); nothing credible returns [].
