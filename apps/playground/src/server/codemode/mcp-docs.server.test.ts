@@ -264,10 +264,16 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			query: "architecture packages agent core renderer excalidraw hosted artifact response",
 		});
 		expect(architectureResults.results[0]?.id).toBe("buildFlowchart");
-		expect(SKETCHI_EXECUTE_DESCRIPTION).toMatch(
+		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
+			"Use buildFlowchart for system/package interactions.",
+		);
+		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
+			"createCanvas is a last resort for layouts no builder covers.",
+		);
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).toMatch(
 			/- buildFlowchart: [^\n]*systems or packages interact/,
 		);
-		expect(SKETCHI_EXECUTE_DESCRIPTION).toMatch(
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).toMatch(
 			/- createCanvas: [^\n]*only for layouts no builder/,
 		);
 
@@ -312,9 +318,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		// code parameter carries each builder's spec and rules once, so no client pays for them twice.
 		expect(EXECUTE_DESCRIPTION_WINDOW).toBe(4096);
 		expect(EXECUTE_DESCRIPTION_LEGACY_WINDOW).toBe(2048);
-		expect(SKETCHI_EXECUTE_DESCRIPTION.length).toBeLessThanOrEqual(
-			EXECUTE_DESCRIPTION_LEGACY_WINDOW,
-		);
+		expect(SKETCHI_EXECUTE_DESCRIPTION.length).toBeLessThanOrEqual(1_600);
 		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
 			'The code parameter gives each one\'s spec and rules, so only createCanvas needs docs({ topic: "createCanvas" }) first',
 		);
@@ -334,7 +338,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		// Every other builder but createCanvas skips the docs turn on one compact line, not its topic.
 		const codeLine = (operation: string) =>
 			SKETCHI_EXECUTE_CODE_DESCRIPTION.split("\n").find((line) =>
-				line.startsWith(`- ${operation}: `),
+				line.startsWith(`- ${operation}: spec: `),
 			);
 		expect(codeLine("buildChart")).toBe(
 			'- buildChart: spec: { title, kind: "bar" | "line" | "pie", categories: string[], series: [{ name?, values: number[] }], unit? ("$M", "%"), categoryAxisTitle?, valueAxisTitle?, stacked? (bar), donut? (pie), orientation? ("horizontal", bar) }. Give every series exactly one value per category, in category order, and name every series when there are several. A pie has one series of non-negative values, at most 8 slices and no axis titles. Copy every number, category, series name, unit and axis title from the prompt; invent none.',
@@ -411,10 +415,14 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 
 			"
 		`);
-		// Gantt, ER and class diagrams each add one compact line, and lanes one flowchart
-		// line and two fields.
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(8_800);
+		// Family summaries now live beside the specs, outside the truncated head.
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(9_700);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
+		for (const line of overview
+			.split("\n")
+			.filter((line) => /^- (build\w+|createCanvas):/.test(line))) {
+			expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).toContain(line);
+		}
 		expect(overview).toContain(`${CODE_MODE_OPERATIONS.length} operations:`);
 		for (const operation of CODE_MODE_OPERATIONS) {
 			expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(operation);

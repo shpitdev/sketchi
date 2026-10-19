@@ -21,7 +21,7 @@ export interface CatalogEntry {
 	examples?: CodeExample[];
 }
 
-/** One line per operation. Every request carries this index, so family detail lives in docs topics. */
+/** Family summaries shared by the docs index and the execute code parameter. */
 const BUILDERS = {
 	buildFlowchart:
 		"process steps and decisions, including how systems or packages interact along a request or data flow",
@@ -133,7 +133,7 @@ function operationTypes(operation: CodeModeOperation): string {
 
 const DELIVERY_OPTIONS = `{ artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [] }`;
 
-/** The buildFlowchart topic, also carried verbatim by the execute description. */
+/** The buildFlowchart topic, also carried verbatim by the execute code parameter. */
 const FLOWCHART_DOCS = [
 	"buildFlowchart accepts a compact FlowchartSpec: title, nodes, edges, and optional layout. Builds use the fixed Sketchi palette.",
 	"Keep every requested step and decision in a separate node, preserving the prompt's step wording and order. Use plain step labels; do not merge a destination with its next action or replace a named step with a paraphrase.",
@@ -165,8 +165,8 @@ const LOGO_RULE =
 /** Fits EXECUTE_DESCRIPTION_LEGACY_WINDOW, so every Claude Code version reads all of it. */
 export const EXECUTE_TOOL_DESCRIPTION = [
 	"Run JavaScript against the typed sketchi client. code is one async arrow function in plain JavaScript (no TypeScript, imports or named wrappers): async () => sketchi.buildFlowchart({ spec, options }), with options as the code parameter shows",
-	'Builders. The code parameter gives each one\'s spec and rules, so only createCanvas needs docs({ topic: "createCanvas" }) first:',
-	...Object.entries(BUILDERS).map(([operation, summary]) => `- ${operation}: ${summary}`),
+	`Builders: ${Object.keys(BUILDERS).join(", ")}. The code parameter gives each one's spec and rules, so only createCanvas needs docs({ topic: "createCanvas" }) first.`,
+	"Use buildFlowchart for system/package interactions. createCanvas is a last resort for layouts no builder covers.",
 	"Helpers:",
 	...EXECUTE_HELPERS.map((summary) => `- ${summary}`),
 	`- ${LOGO_RULE}`,
@@ -177,6 +177,9 @@ export const EXECUTE_TOOL_DESCRIPTION = [
 /** Parameter descriptions are not truncated, so the fast path and the full flowchart topic live here. */
 export const EXECUTE_CODE_DESCRIPTION = [
 	`One async arrow function. Call sketchi.<builder>({ spec, options: ${DELIVERY_OPTIONS} }) for Excalidraw and PNG URLs.`,
+	"",
+	"Builders:",
+	...Object.entries(BUILDERS).map(([operation, summary]) => `- ${operation}: ${summary}`),
 	"",
 	"buildFlowchart:",
 	FLOWCHART_DOCS,

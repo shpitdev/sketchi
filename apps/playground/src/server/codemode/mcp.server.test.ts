@@ -782,7 +782,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(executeTool?.description).toContain("When the prompt names technologies");
 			// Every request pays for tools/list. Claude Code cuts the description at 4096 characters in
 			// upfront mode but keeps parameter descriptions, so the builder specs ride on code.
-			expect(executeTool?.description?.length).toBeLessThanOrEqual(2048);
+			expect(executeTool?.description?.length).toBeLessThanOrEqual(1_600);
 			const codeDescription = String(
 				Reflect.get(executeTool?.inputSchema.properties?.code ?? {}, "description"),
 			);
@@ -803,7 +803,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(codeDescription).toMatch(
 				/^- buildClassDiagram: .*"composition" or "aggregation": from is the whole/m,
 			);
-			// Swimlanes add one flowchart line and two request fields.
+			// The head retains builder names; summaries ride on the code parameter.
 			expect(
 				JSON.stringify(
 					tools.tools.map(({ name, description, inputSchema }) => ({
@@ -812,7 +812,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(12_250);
+			).toBeLessThan(12_500);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,
