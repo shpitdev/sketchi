@@ -207,7 +207,13 @@ function labelBox(label: {
 	return { x: label.x - width / 2, y: label.y - height / 2, width, height };
 }
 
-/** Labels not clearly nearer their own line than any other: less than half again as near. */
+/** Room every other line keeps from a label past its own line's distance. */
+const LABEL_OWN_MARGIN = 8;
+
+/**
+ * Labels not clearly nearer their own line than any other: less than half again
+ * as near, or nearer than their own line's distance plus `LABEL_OWN_MARGIN`.
+ */
 function ambiguousLabels(scene: RenderedDiagramScene): string[] {
 	const arrows = arrowsOf(scene);
 	const distance = (box: ReturnType<typeof labelBox>, points: readonly Point[]) =>
@@ -228,7 +234,7 @@ function ambiguousLabels(scene: RenderedDiagramScene): string[] {
 		const nearest = Math.min(
 			...arrows.filter((arrow) => arrow !== own).map((arrow) => distance(box, arrow.points)),
 		);
-		return nearest < 1.5 * mine
+		return nearest < Math.max(1.5 * mine, mine + LABEL_OWN_MARGIN)
 			? [`${own.edgeId}: ${mine.toFixed(0)} px own, ${nearest.toFixed(0)} px other`]
 			: [];
 	});

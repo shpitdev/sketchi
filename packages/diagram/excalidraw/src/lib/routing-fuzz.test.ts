@@ -441,6 +441,52 @@ function labelDefects(
 	return defects;
 }
 
+/** Room a label keeps from any other line past its distance from its own. */
+const LABEL_OWN_MARGIN = 8;
+
+/**
+ * Edge labels that read as another line's, as `<edge>><other edge>`: an
+ * unbound edge label whose box sits no clearer of some other arrow than of its
+ * own, by `LABEL_OWN_MARGIN`.
+ */
+function detachedLabels(elements: readonly ExportedElement[]): string[] {
+	const arrows = elements.filter((e) => e.type === "arrow");
+	const segments = (arrow: ExportedElement) => {
+		const points = (arrow.points as [number, number][]).map(([x, y]) => ({
+			x: (arrow.x as number) + x,
+			y: (arrow.y as number) + y,
+		}));
+		return points.slice(1).map((q, i) => [points[i]!, q] as const);
+	};
+	return elements.flatMap((label) => {
+		const own = arrows.find((arrow) => `${arrow.id}:label` === label.id);
+		if (label.type !== "text" || label.containerId || !own) return [];
+		const [x, y, width, height] = [label.x, label.y, label.width, label.height] as [
+			number,
+			number,
+			number,
+			number,
+		];
+		const distance = (arrow: ExportedElement) =>
+			Math.min(
+				...segments(arrow).map(([p, q]) =>
+					Math.hypot(
+						Math.max(0, x - Math.max(p.x, q.x), Math.min(p.x, q.x) - x - width),
+						Math.max(0, y - Math.max(p.y, q.y), Math.min(p.y, q.y) - y - height),
+					),
+				),
+			);
+		const mine = distance(own);
+		return arrows.flatMap((arrow) => {
+			if (arrow === own) return [];
+			const other = distance(arrow);
+			return other < mine + LABEL_OWN_MARGIN
+				? [`${own.id.slice("edge:".length)}>${arrow.id.slice("edge:".length)}`]
+				: [];
+		});
+	});
+}
+
 /**
  * Label defects the fuzz still draws: routes that run back across their own
  * source run, and crowded fan-ins where no spot within reach of the source is
@@ -472,6 +518,19 @@ const KNOWN_LABEL_DEFECTS: Readonly<Record<"TB" | "BT" | "LR" | "RL", readonly s
 	],
 };
 
+/**
+ * Labels the label fuzz still sets no clearer of another line than of their
+ * own, as `<flowchart>:<edge>><other edge>`: dense fan-ins whose lines run
+ * between labels, and labels a crossing line already marks above. Main set 143
+ * here. Never more than these.
+ */
+const KNOWN_DETACHED_LABELS: Readonly<Record<"TB" | "BT" | "LR" | "RL", string>> = {
+	TB: "4:e12>e10 11:e11>e15 16:e26>e13 16:e33>e20 19:e11>e7 19:e11>e16 19:e14>e5 19:e15>e7 19:e17>e5 19:e17>e14 24:e7>e6",
+	BT: "11:e11>e15 16:e27>e13 16:e27>e22 16:e33>e22 16:e33>e27",
+	LR: "0:e13>e20 0:e19>e22 0:e26>e23 6:e11>e9 16:e22>e24 16:e24>e22 16:e26>e13 19:e11>e5 29:e28>e20",
+	RL: "0:e13>e20 0:e19>e22 0:e20>e22 0:e26>e23 6:e11>e1 6:e11>e12 8:e19>e21 13:e22>e18 14:e7>e16 16:e22>e24 16:e24>e22 16:e33>e20 19:e11>e5 23:e14>e10 29:e28>e20",
+};
+
 describe("label fuzz", () => {
 	// Long words and multi-line labels: words stay whole and every edge label stays
 	// clear of every line, node and label, in every direction.
@@ -494,6 +553,28 @@ describe("label fuzz", () => {
 			[],
 		);
 	});
+
+	// Every edge label sits nearer its own line than any other, by a clear margin.
+	it.each(["TB", "BT", "LR", "RL"] as const)(
+		"sets %s labels nearer their own line than any other",
+		(direction) => {
+			const known = KNOWN_DETACHED_LABELS[direction].split(" ");
+			const detached = flowcharts.flatMap((spec, index) =>
+				detachedLabels(
+					convertSceneToExcalidraw(
+						renderIntermediateDiagram(
+							parseFlowchartDiagram({
+								...spec,
+								type: "flowchart",
+								layout: { direction, edgeRouting: "orthogonal" },
+							}),
+						),
+					).elements,
+				).map((label) => `${index}:${label}`),
+			);
+			expect(detached.filter((label) => !known.includes(label))).toEqual([]);
+		},
+	);
 });
 
 describe.each(["TB", "BT", "LR", "RL"] as const)("label fixtures: %s", (direction) => {
@@ -1471,6 +1552,20 @@ const STATE_ROUTING: Readonly<Record<"TB" | "BT" | "LR" | "RL", string>> = {
 	RL: "0/0 0/0 0/1 0/0 0/0 0/0 0/0 2/3 0/0 0/0 0/0 0/0 0/1 0/0 0/0 2/4 2/4 3/2 0/0 0/0 0/0 1/3 1/2 0/0 0/0 1/1 1/1 1/0 0/0 0/3 0/0 0/0 1/0 1/1 1/1 3/4 0/0 0/1 3/1 0/1",
 };
 
+/**
+ * State graph labels still set no clearer of another line than of their own,
+ * as for KNOWN_DETACHED_LABELS. Main set 47, among them return labels under
+ * another transition's run. Graph 6 hooks a line around its final marker along
+ * a self-loop's label, and graph 34 leaves a composite's frame beside a label
+ * inside it. Never more than these.
+ */
+const KNOWN_DETACHED_STATE_LABELS: Readonly<Record<"TB" | "BT" | "LR" | "RL", string>> = {
+	TB: "",
+	BT: "",
+	LR: "6:e3>e5 34:e5>e6",
+	RL: "6:e3>e5 34:e5>e4",
+};
+
 describe("state graph fuzz", () => {
 	// Full proof: 40 graphs x 4 directions. Self-loops, paired returns, choices and
 	// transitions into and out of a composite's frame all export valid and bound,
@@ -1513,6 +1608,21 @@ describe("state graph fuzz", () => {
 				].map((failure) => `${index}: ${failure}`);
 			});
 			expect(failures).toEqual([]);
+		}, 60_000);
+
+		it("sets every state graph label nearer its own line than any other", () => {
+			const known = KNOWN_DETACHED_STATE_LABELS[direction].split(" ");
+			const detached = graphs.flatMap((graph, index) =>
+				detachedLabels(
+					convertSceneToExcalidraw(
+						renderGraphDiagram(
+							{ ...graph, layout: { direction, edgeRouting: "orthogonal" } } as never,
+							{ pairedReturns: true },
+						),
+					).elements,
+				).map((label) => `${index}:${label}`),
+			);
+			expect(detached.filter((label) => !known.includes(label))).toEqual([]);
 		}, 60_000);
 
 		it("draws no state graph with more crossings or reader-scale findings than main", () => {

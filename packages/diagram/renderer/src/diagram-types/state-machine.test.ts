@@ -8,6 +8,7 @@ import {
 	parseStateMachineDiagram,
 	type StateMachineDiagram,
 	stateMachineFixture,
+	wrappedLabelWidth,
 } from "@sketchi/diagram-core";
 
 import { renderDiagram } from "../diagram.js";
@@ -38,6 +39,29 @@ describe("StateMachine renderer", () => {
 			2.5,
 		);
 	});
+
+	it.each(["order-lifecycle", "order-lifecycle-ended"] as const)(
+		"sets round-16 %s's return label beside its own line, clear of the cancel run",
+		(name) => {
+			const scene = renderDiagram(crossingStateMachines[name]);
+			const label = scene.elements.find(
+				(element) => element.type === "text" && element.text === "return to sender",
+			)!;
+			const back = arrows(scene).find((arrow) => arrow.edgeId === "transition-6-shipped-paid")!;
+			const cancel = arrows(scene).find((arrow) => arrow.edgeId === "transition-4-paid-cancelled")!;
+			if (label.type !== "text") throw new Error("expected the return label");
+			const width = wrappedLabelWidth(label.text, label.fontSize, label.maxWidth ?? 160);
+			const [left, top] = [label.x - width / 2, label.y - (label.fontSize * 1.35) / 2];
+			// Right of its upward line, its text starting at that line.
+			expect(left - back.points[0].x).toBe(8);
+			expect(label.textAlign).toBe("left");
+			// The cancel run that crossed above it turns well clear of it.
+			const run = cancel.points.find(
+				(point, index) => index > 0 && point.y === cancel.points[index - 1]!.y,
+			)!;
+			expect(top - run.y).toBeGreaterThanOrEqual(8 + 8 + 6);
+		},
+	);
 
 	it("keeps the captured media-player ended marker anonymous", () => {
 		const scene = renderDiagram(crossingStateMachines["media-player"]);

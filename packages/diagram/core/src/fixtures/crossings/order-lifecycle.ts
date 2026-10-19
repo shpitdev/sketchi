@@ -1,4 +1,8 @@
-/** An order lifecycle with two cancellations converging on Cancelled. From a generated eval sample. */
+/**
+ * An order lifecycle with two cancellations converging on Cancelled. From a
+ * generated eval sample, and the capture round 16 drew most often, its return
+ * label under the Paid to Cancelled run.
+ */
 export default {
 	id: "order-lifecycle",
 	title: "Order lifecycle",

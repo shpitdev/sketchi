@@ -10,6 +10,7 @@ import mediaPlayer from "./fixtures/crossings/media-player.js";
 import mediaPlayerEnded from "./fixtures/crossings/media-player-ended.js";
 import namedFinalRetry from "./fixtures/crossings/named-final-retry.js";
 import orderLifecycle from "./fixtures/crossings/order-lifecycle.js";
+import orderLifecycleEnded from "./fixtures/crossings/order-lifecycle-ended.js";
 import patientIntakeScheduling from "./fixtures/crossings/patient-intake-scheduling.js";
 import procurementVendorApproval from "./fixtures/crossings/procurement-vendor-approval.js";
 import procurementVendorApprovalLegal from "./fixtures/crossings/procurement-vendor-approval-legal.js";
@@ -51,13 +52,15 @@ function stateMachine(fixture: object) {
 }
 
 /**
- * Generated state machines whose layouts drew avoidable crossings or a guard
- * label between two lines, each laid out in whichever direction reads better.
+ * Generated state machines whose layouts drew avoidable crossings, a guard
+ * label between two lines or a return label nearer another line than its own,
+ * each laid out in whichever direction reads better.
  */
 export const crossingStateMachines = {
 	"media-player": stateMachine(mediaPlayer),
 	"media-player-ended": stateMachine(mediaPlayerEnded),
 	"connection-retry": stateMachine(connectionRetry),
 	"order-lifecycle": stateMachine(orderLifecycle),
+	"order-lifecycle-ended": stateMachine(orderLifecycleEnded),
 	"named-final-retry": stateMachine(namedFinalRetry),
 };

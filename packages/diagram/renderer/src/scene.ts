@@ -5510,15 +5510,49 @@ function labelConflicts(
 	);
 }
 
+/** Distance from a label box to the nearest of some lines. */
+function nearestLine(box: LabelBox, lines: readonly AxisAlignedSegment[]): number {
+	return Math.min(Infinity, ...lines.map((segment) => boxSegmentDistance(box, segment)));
+}
+
+/**
+ * How much nearer a label box sits to another line than it may: a label reads
+ * as its own line's only when every other line is further by the wider berth.
+ */
+function labelShortfall(
+	box: LabelBox,
+	own: readonly AxisAlignedSegment[],
+	segments: readonly AxisAlignedSegment[],
+): number {
+	return Math.max(
+		0,
+		nearestLine(box, own) + LABEL_OTHER_LINE_CLEARANCE - nearestLine(box, segments),
+	);
+}
+
 /** Whether a label box sits no clearer of another line than of its own: it could belong to either. */
 function labelAmbiguous(
 	box: LabelBox,
 	own: readonly AxisAlignedSegment[],
 	segments: readonly AxisAlignedSegment[],
 ): boolean {
-	const nearest = (lines: readonly AxisAlignedSegment[]) =>
-		Math.min(Infinity, ...lines.map((segment) => boxSegmentDistance(box, segment)));
-	return nearest(segments) < nearest(own) + LABEL_OTHER_LINE_CLEARANCE;
+	return labelShortfall(box, own, segments) > 0;
+}
+
+/**
+ * Text beside a vertical run aligns toward it. Widths are estimated wide, so
+ * centered text would paint further from its line than placement measured.
+ */
+function labelAlign(
+	box: LabelBox,
+	own: readonly AxisAlignedSegment[],
+): TextSceneElement["textAlign"] | undefined {
+	const [nearest] = own.toSorted((a, b) => boxSegmentDistance(box, a) - boxSegmentDistance(box, b));
+	if (!nearest || nearest.orientation !== "vertical") return undefined;
+	if (nearest.max <= box.y || nearest.min >= box.y + box.height) return undefined;
+	if (box.x >= nearest.staticCoordinate) return "left";
+	if (box.x + box.width <= nearest.staticCoordinate) return "right";
+	return undefined;
 }
 
 /**
@@ -5591,7 +5625,19 @@ function branchLabels(
 	return placedBranchLabels(arrows, routes, shapes, groups, unambiguous, lanes).labels;
 }
 
-/** Branch labels placed as drawn, and how many lines, nodes or labels they still touch. */
+/** A drawn label nearer another line than it may be, by `shortfall`. */
+interface LabelShortfall {
+	readonly box: LabelBox;
+	/** Distance from the label to its own line. */
+	readonly own: number;
+	readonly index: number;
+	readonly shortfall: number;
+}
+
+/**
+ * Branch labels placed as drawn, how many lines, nodes or labels they still
+ * touch, and those that sit nearer another line than they may.
+ */
 function placedBranchLabels(
 	arrows: ArrowSceneElement[],
 	routes: readonly RoutedEdge[],
@@ -5599,7 +5645,7 @@ function placedBranchLabels(
 	groups?: GroupLayout,
 	unambiguous = true,
 	lanes?: LaneLayout,
-): { labels: TextSceneElement[]; touches: number } {
+): { labels: TextSceneElement[]; touches: number; shortfalls: LabelShortfall[] } {
 	const labels: TextSceneElement[] = [];
 	let touches = 0;
 	const segments = arrows.map((arrow) => segmentsFromPoints(arrow.points));
@@ -5648,23 +5694,42 @@ function placedBranchLabels(
 				if (count < fewest) [position, fewest] = [candidate, count];
 				if (fewest === 0) break;
 			}
-		else if (unambiguous && labelAmbiguous(labelBox(stub, size), segments[index]!, lines))
-			// A clear label that could belong to another line moves only to a spot
-			// that is plainly its own and clear of everything with room to spare.
+		else if (unambiguous && labelAmbiguous(labelBox(stub, size), segments[index]!, lines)) {
+			// A clear label that could belong to another line moves to a spot that is
+			// plainly its own and clear of everything with room to spare, or else to
+			// the clear spot that sits least near another line.
+			const shortfall = (candidate: ScenePoint) =>
+				labelShortfall(labelBox(candidate, size), segments[index]!, lines);
+			const slides = labelSlidePositions(arrow.points, size, labelRuns(routes[index]));
 			position =
-				labelSlidePositions(arrow.points, size, labelRuns(routes[index])).find(
+				slides.find(
 					(candidate) =>
-						conflicts(candidate, LABEL_MOVE_MARGIN) === 0 &&
-						!labelAmbiguous(labelBox(candidate, size), segments[index]!, lines),
-				) ?? stub;
+						conflicts(candidate, LABEL_MOVE_MARGIN) === 0 && shortfall(candidate) === 0,
+				) ??
+				slides
+					.filter((candidate) => conflicts(candidate) === 0)
+					.reduce(
+						(best, candidate) => (shortfall(candidate) < shortfall(best) ? candidate : best),
+						stub,
+					);
+		}
 		touches += fewest;
 		positions[index] = position;
 		placed.push({ box: labelBox(position, size), index });
 	}
+	const shortfalls: LabelShortfall[] = [];
 	for (const [index, arrow] of arrows.entries()) {
 		const position = positions[index];
 		if (!arrow.label || !position) continue;
+		const box = labelBox(position, sizes[index]!);
+		const own = segments[index]!;
+		const shortfall = labelShortfall(box, own, [
+			...segments.flatMap((other, at) => (at === index ? [] : other)),
+			...outlines,
+		]);
+		if (shortfall > 0) shortfalls.push({ box, own: nearestLine(box, own), index, shortfall });
 		const groupIds = [`branch:${arrow.edgeId}`];
+		const textAlign = labelAlign(box, own);
 		labels.push({
 			type: "text",
 			id: `${arrow.id}:label`,
@@ -5673,11 +5738,12 @@ function placedBranchLabels(
 			x: position.x,
 			y: position.y,
 			maxWidth: branchLabelMaxWidth(branches(routes[index]?.source.kind)),
+			...(textAlign ? { textAlign } : {}),
 			groupIds,
 		});
 		arrows[index] = { ...arrow, groupIds };
 	}
-	return { labels, touches };
+	return { labels, touches, shortfalls };
 }
 
 /**
@@ -7370,6 +7436,119 @@ function clearOutlines(layout: DiagramLayout): DiagramLayout {
 	return arrows === layout.edgeArrows ? layout : { ...layout, edgeArrows: arrows };
 }
 
+/** Passes over the drawn labels in which other routes move clear of them. */
+const LABEL_CLEARING_ROUNDS = 3;
+
+/**
+ * Variants of a route whose middle runs that pass nearer a label than its own
+ * line move clear of it by the wider berth, to either side of the label. A run
+ * moves whole, from turn to turn, and the endpoint stubs stay as they were.
+ */
+function runsClearOfLabel(
+	points: readonly [ScenePoint, ...ScenePoint[]],
+	label: LabelShortfall,
+): [ScenePoint, ...ScenePoint[]][] {
+	const { box, own } = label;
+	const corners = straightRuns(points);
+	const variants: [ScenePoint, ...ScenePoint[]][] = [];
+	// Past the berth by the room a moved label keeps first, so the label plainly
+	// reads as its own line's, then by a pixel where that room is not free.
+	for (const berth of [LABEL_MOVE_MARGIN, 1].map((past) => own + LABEL_OTHER_LINE_CLEARANCE + past))
+		for (const run of segmentsFromPoints(corners)) {
+			if (run.isFirstSegment || run.isLastSegment || boxSegmentDistance(box, run) >= berth)
+				continue;
+			const [low, size] =
+				run.orientation === "horizontal" ? [box.y, box.height] : [box.x, box.width];
+			for (const lane of [low - berth, low + size + berth]) {
+				const moved = corners.map((point, index) =>
+					index === run.segmentIndex || index === run.segmentIndex + 1
+						? run.orientation === "horizontal"
+							? { x: point.x, y: lane }
+							: { x: lane, y: point.y }
+						: point,
+				);
+				if (keepsStubs(corners, moved)) variants.push(compactPoints(moved));
+			}
+		}
+	return variants;
+}
+
+/**
+ * The drawn layout with other routes moved clear of each label that sits
+ * nearer one of them than its own line, so no label reads as another line's.
+ * A run moves just clear by the wider berth, kept only where the labels fall
+ * short by less and the move draws no more export defects, crossings,
+ * reader-scale findings, inward endpoints, runs beside an outline or labels
+ * touching anything.
+ */
+function clearLabels(layout: DiagramLayout): DiagramLayout {
+	const { groups, lanes, nodeShapes, routedEdges } = layout;
+	let arrows = layout.edgeArrows;
+	const placed = (candidate: readonly ArrowSceneElement[]) =>
+		placedBranchLabels([...candidate], routedEdges, nodeShapes, groups, true, lanes);
+	if (placed(arrows).shortfalls.length === 0) return layout;
+	const drawn = [...nodeShapes, ...groupBlocks(groups), ...laneBlocks(lanes)];
+	const near = (candidate: readonly ArrowSceneElement[]) =>
+		candidate.reduce(
+			(total, arrow) =>
+				total +
+				routeClearanceCount(
+					arrow.points,
+					nodeShapes,
+					new Set([arrow.sourceNodeId, arrow.targetNodeId]),
+				),
+			0,
+		);
+	const score = (candidate: readonly ArrowSceneElement[]) => {
+		const labels = placed(candidate);
+		return {
+			labels,
+			shortfall: labels.shortfalls.reduce((total, label) => total + label.shortfall, 0),
+			touches: labels.touches,
+			crossings: arrowCrossings(candidate),
+			defects: exportRouteDefects(candidate, nodeShapes, groups, lanes).length,
+			findings: readerFindingCount(candidate, drawn),
+			// Frames and lanes widen the reader scale; a move must read no worse without them either.
+			nodeFindings: readerFindingCount(candidate, nodeShapes),
+			inward: inwardEndpoints(candidate, nodeShapes),
+			near: near(candidate),
+		};
+	};
+	let current = score(arrows);
+	for (let round = 0; round < LABEL_CLEARING_ROUNDS && current.shortfall > 0; round += 1) {
+		let moved = false;
+		for (const label of current.labels.shortfalls) {
+			for (const [index, arrow] of arrows.entries()) {
+				if (index === label.index) continue;
+				for (const points of runsClearOfLabel(arrow.points, label)) {
+					if (!orthogonalRoute(points)) continue;
+					const candidate = arrows.map((other, at) =>
+						at === index ? { ...other, points } : other,
+					);
+					const next = score(candidate);
+					if (
+						next.shortfall < current.shortfall &&
+						next.defects <= current.defects &&
+						next.crossings <= current.crossings &&
+						next.findings <= current.findings &&
+						next.nodeFindings <= current.nodeFindings &&
+						next.inward <= current.inward &&
+						next.near <= current.near &&
+						next.touches <= current.touches
+					) {
+						[arrows, current, moved] = [candidate, next, true];
+						break;
+					}
+				}
+				if (moved) break;
+			}
+			if (moved) break;
+		}
+		if (!moved) break;
+	}
+	return arrows === layout.edgeArrows ? layout : { ...layout, edgeArrows: arrows };
+}
+
 /** Layouts the crossing repair may try beyond the arrangements, each with one side change. */
 const CROSSING_MOVES = 6;
 /**
@@ -8281,7 +8460,7 @@ export function renderGraphDiagram(
 				best = previous;
 		}
 	}
-	const layout = orthogonal ? clearOutlines(best.layout) : best.layout;
+	const layout = orthogonal ? clearLabels(clearOutlines(best.layout)) : best.layout;
 	const { groups, lanes, routedEdges } = layout;
 	const routedArrows = [...layout.edgeArrows];
 	const drawn = {
