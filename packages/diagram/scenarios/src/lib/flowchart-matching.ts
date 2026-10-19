@@ -23,6 +23,8 @@ export interface FlowchartStepMatches {
 	readonly matchedNodes: Map<string, Set<string>>;
 	/** The model diagram with merged check-decisions split into their two steps. */
 	readonly graph: FlowchartDiagram;
+	/** Loop witnesses are semantic steps, not additional drawn nodes or edges. */
+	readonly loopSplitCount: number;
 	readonly branchMatches: BranchMatcher;
 }
 
@@ -53,6 +55,20 @@ function namesStepLabel(label: string, step: RequiredStep): boolean {
 	});
 	return (
 		flowchartLabelMatches(label, labels) || (action && flowchartObjectPhraseMatches(label, labels))
+	);
+}
+
+/** Only waiting/retrying actions can live on a return edge, never arbitrary work. */
+function isLoopAction(step: RequiredStep): boolean {
+	if (step.kind !== "process") return false;
+	const [verb, next, ...rest] = flowchartLabelWords(step.label);
+	return (
+		verb === "wait" ||
+		verb === "retry" ||
+		verb === "poll" ||
+		(verb === "keep" && next === "wait") ||
+		(verb === "try" && next === "again") ||
+		(verb === "check" && [next, ...rest].includes("again"))
 	);
 }
 
@@ -148,7 +164,9 @@ export function matchFlowchartSteps(
 	diagram: FlowchartDiagram,
 ): FlowchartStepMatches {
 	const { requiredEdges, requiredNodes } = scenario.assertions;
-	const { graph, splits } = splitMergedChecks(scenario, diagram);
+	const splitChecks = splitMergedChecks(scenario, diagram);
+	let { graph } = splitChecks;
+	const { splits } = splitChecks;
 	const byId = new Map(graph.nodes.map((node) => [node.id, node]));
 	const outgoing = (id: string) => graph.edges.filter((edge) => edge.source === id);
 	const incoming = (id: string) => graph.edges.filter((edge) => edge.target === id);
@@ -354,5 +372,75 @@ export function matchFlowchartSteps(
 			? completes
 			: !completes && !flowchartLabelMatches(label, ["yes"]);
 	};
-	return { matchedNodes, graph, branchMatches };
+	// A named waiting/retrying action may be the caption on a back-edge instead
+	// of a box. Split only a scenario-stated return to its preceding decision or
+	// check, on the right branch, with a cycle in both the scenario and model.
+	// Synthetic ownership keeps all existing distinct-step/path checks intact.
+	const isCheck = (step: RequiredStep | undefined) =>
+		step?.kind === "decision" ||
+		(step?.kind === "process" && flowchartLabelWords(step.label)[0] === "check");
+	const taken = new Set([...graph.nodes, ...graph.edges].map((entry) => entry.id));
+	const fresh = (base: string) => {
+		let id = base;
+		for (let index = 2; taken.has(id); index += 1) id = `${base}-${index}`;
+		taken.add(id);
+		return id;
+	};
+	for (const edge of graph.edges) {
+		if (!edge.label || !reaches(edge.target, edge.source)) continue;
+		const loopSteps = requiredNodes.filter((step) => {
+			if (!isLoopAction(step) || !namesStepLabel(edge.label!, step)) return false;
+			const previous = requiredEdges.filter((expected) => expected.targetId === step.id);
+			const next = requiredEdges.filter((expected) => expected.sourceId === step.id);
+			if (previous.length !== 1 || next.length !== 1) return false;
+			const before = previous[0]!;
+			const after = next[0]!;
+			if (
+				!isCheck(steps.get(before.sourceId)) ||
+				!isCheck(steps.get(after.targetId)) ||
+				!matchedNodes.get(before.sourceId)?.has(edge.source) ||
+				!matchedNodes.get(after.targetId)?.has(edge.target) ||
+				!branchMatches(edge, before)
+			)
+				return false;
+			const reachable = new Set([after.targetId]);
+			for (const id of reachable) {
+				for (const expected of requiredEdges) {
+					if (expected.sourceId === id && expected.targetId !== step.id) {
+						reachable.add(expected.targetId);
+					}
+				}
+			}
+			return reachable.has(before.sourceId);
+		});
+		if (loopSteps.length === 0) continue;
+		const id = fresh(`${edge.id}#loop-step`);
+		const source = byId.get(edge.source);
+		const node: FlowchartNode = {
+			id,
+			kind: "process",
+			label: edge.label,
+			metadata: {},
+			...(source?.lane === undefined ? {} : { lane: source.lane }),
+			...(source?.group === undefined ? {} : { group: source.group }),
+		};
+		byId.set(id, node);
+		graph = {
+			...graph,
+			nodes: [...graph.nodes, node],
+			edges: [
+				...graph.edges.map((candidate) =>
+					candidate.id === edge.id ? { ...candidate, target: id } : candidate,
+				),
+				{ id: fresh(`${edge.id}#loop-return`), source: id, target: edge.target, metadata: {} },
+			],
+		};
+		for (const step of loopSteps) matchedNodes.get(step.id)!.add(id);
+	}
+	return {
+		matchedNodes,
+		graph,
+		branchMatches,
+		loopSplitCount: graph.nodes.length - splitChecks.graph.nodes.length,
+	};
 }

@@ -1,0 +1,602 @@
+[
+	{
+		"sample": 1,
+		"runId": "20261019-213638-p35y",
+		"spec": {
+			"id": "restaurant-waitlist",
+			"title": "Restaurant Waitlist",
+			"nodes": [
+				{
+					"id": "arrive",
+					"label": "Party arrives",
+					"kind": "start"
+				},
+				{
+					"id": "quote",
+					"label": "Host quotes a wait time",
+					"kind": "process"
+				},
+				{
+					"id": "avail",
+					"label": "Is a table available?",
+					"kind": "decision"
+				},
+				{
+					"id": "seat",
+					"label": "Seat the party",
+					"kind": "end"
+				},
+				{
+					"id": "add",
+					"label": "Add the party to the waitlist",
+					"kind": "process"
+				},
+				{
+					"id": "notify",
+					"label": "Party is notified",
+					"kind": "process"
+				},
+				{
+					"id": "resp",
+					"label": "Does the party respond?",
+					"kind": "decision"
+				},
+				{
+					"id": "remove",
+					"label": "Remove the party from the list",
+					"kind": "end"
+				},
+				{
+					"id": "ready",
+					"label": "Is the table ready?",
+					"kind": "decision"
+				}
+			],
+			"edges": [
+				{
+					"id": "edge-1",
+					"source": "arrive",
+					"target": "quote"
+				},
+				{
+					"id": "edge-2",
+					"source": "quote",
+					"target": "avail"
+				},
+				{
+					"id": "edge-3",
+					"source": "avail",
+					"target": "seat",
+					"label": "yes"
+				},
+				{
+					"id": "edge-4",
+					"source": "avail",
+					"target": "add",
+					"label": "no"
+				},
+				{
+					"id": "edge-5",
+					"source": "add",
+					"target": "notify"
+				},
+				{
+					"id": "edge-6",
+					"source": "notify",
+					"target": "resp"
+				},
+				{
+					"id": "edge-7",
+					"source": "resp",
+					"target": "remove",
+					"label": "no"
+				},
+				{
+					"id": "edge-8",
+					"source": "resp",
+					"target": "ready",
+					"label": "yes"
+				},
+				{
+					"id": "edge-9",
+					"source": "ready",
+					"target": "seat",
+					"label": "yes"
+				},
+				{
+					"id": "edge-10",
+					"source": "ready",
+					"target": "resp",
+					"label": "no, keep waiting"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		}
+	},
+	{
+		"sample": 2,
+		"runId": "20261019-213638-qzd0",
+		"spec": {
+			"id": "restaurant-waitlist",
+			"title": "Restaurant Waitlist",
+			"nodes": [
+				{
+					"id": "arrive",
+					"label": "Party arrives",
+					"kind": "start"
+				},
+				{
+					"id": "quote",
+					"label": "Host quotes wait time",
+					"kind": "process"
+				},
+				{
+					"id": "avail",
+					"label": "Is a table available?",
+					"kind": "decision"
+				},
+				{
+					"id": "seat",
+					"label": "Seat the party",
+					"kind": "end"
+				},
+				{
+					"id": "add",
+					"label": "Add party to waitlist",
+					"kind": "process"
+				},
+				{
+					"id": "notify",
+					"label": "Party is notified",
+					"kind": "process"
+				},
+				{
+					"id": "resp",
+					"label": "Does the party respond?",
+					"kind": "decision"
+				},
+				{
+					"id": "remove",
+					"label": "Remove party from list",
+					"kind": "end"
+				},
+				{
+					"id": "ready",
+					"label": "Is the table ready?",
+					"kind": "decision"
+				}
+			],
+			"edges": [
+				{
+					"id": "edge-1",
+					"source": "arrive",
+					"target": "quote"
+				},
+				{
+					"id": "edge-2",
+					"source": "quote",
+					"target": "avail"
+				},
+				{
+					"id": "edge-3",
+					"source": "avail",
+					"target": "seat",
+					"label": "yes"
+				},
+				{
+					"id": "edge-4",
+					"source": "avail",
+					"target": "add",
+					"label": "no"
+				},
+				{
+					"id": "edge-5",
+					"source": "add",
+					"target": "notify"
+				},
+				{
+					"id": "edge-6",
+					"source": "notify",
+					"target": "resp"
+				},
+				{
+					"id": "edge-7",
+					"source": "resp",
+					"target": "remove",
+					"label": "no"
+				},
+				{
+					"id": "edge-8",
+					"source": "resp",
+					"target": "ready",
+					"label": "yes"
+				},
+				{
+					"id": "edge-9",
+					"source": "ready",
+					"target": "seat",
+					"label": "ready"
+				},
+				{
+					"id": "edge-10",
+					"source": "ready",
+					"target": "resp",
+					"label": "not ready"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		}
+	},
+	{
+		"sample": 3,
+		"runId": "20261019-213638-e1l9",
+		"spec": {
+			"id": "restaurant-waitlist",
+			"title": "Restaurant Waitlist",
+			"nodes": [
+				{
+					"id": "arrive",
+					"label": "Party arrives",
+					"kind": "start"
+				},
+				{
+					"id": "quote",
+					"label": "Host quotes a wait time",
+					"kind": "process"
+				},
+				{
+					"id": "avail",
+					"label": "Is a table available?",
+					"kind": "decision"
+				},
+				{
+					"id": "seat",
+					"label": "Seat the party",
+					"kind": "end"
+				},
+				{
+					"id": "add",
+					"label": "Add party to waitlist",
+					"kind": "process"
+				},
+				{
+					"id": "notify",
+					"label": "Party is notified",
+					"kind": "process"
+				},
+				{
+					"id": "resp",
+					"label": "Does the party respond?",
+					"kind": "decision"
+				},
+				{
+					"id": "remove",
+					"label": "Remove party from list",
+					"kind": "end"
+				},
+				{
+					"id": "ready",
+					"label": "Is the table ready?",
+					"kind": "decision"
+				}
+			],
+			"edges": [
+				{
+					"id": "edge-1",
+					"source": "arrive",
+					"target": "quote"
+				},
+				{
+					"id": "edge-2",
+					"source": "quote",
+					"target": "avail"
+				},
+				{
+					"id": "edge-3",
+					"source": "avail",
+					"target": "seat",
+					"label": "yes"
+				},
+				{
+					"id": "edge-4",
+					"source": "avail",
+					"target": "add",
+					"label": "no"
+				},
+				{
+					"id": "edge-5",
+					"source": "add",
+					"target": "notify"
+				},
+				{
+					"id": "edge-6",
+					"source": "notify",
+					"target": "resp"
+				},
+				{
+					"id": "edge-7",
+					"source": "resp",
+					"target": "remove",
+					"label": "no"
+				},
+				{
+					"id": "edge-8",
+					"source": "resp",
+					"target": "ready",
+					"label": "yes"
+				},
+				{
+					"id": "edge-9",
+					"source": "ready",
+					"target": "seat",
+					"label": "yes"
+				},
+				{
+					"id": "edge-10",
+					"source": "ready",
+					"target": "resp",
+					"label": "no (keep waiting)"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		}
+	},
+	{
+		"sample": 4,
+		"runId": "20261019-213638-boof",
+		"spec": {
+			"id": "restaurant-waitlist",
+			"title": "Restaurant Waitlist",
+			"nodes": [
+				{
+					"id": "arrive",
+					"label": "Party arrives",
+					"kind": "start"
+				},
+				{
+					"id": "quote",
+					"label": "Host quotes a wait time",
+					"kind": "process"
+				},
+				{
+					"id": "avail",
+					"label": "Is a table available?",
+					"kind": "decision"
+				},
+				{
+					"id": "seat",
+					"label": "Seat the party",
+					"kind": "end"
+				},
+				{
+					"id": "add",
+					"label": "Add party to the waitlist",
+					"kind": "process"
+				},
+				{
+					"id": "notify",
+					"label": "Party is notified",
+					"kind": "process"
+				},
+				{
+					"id": "resp",
+					"label": "Does the party respond?",
+					"kind": "decision"
+				},
+				{
+					"id": "remove",
+					"label": "Remove party from the list",
+					"kind": "end"
+				},
+				{
+					"id": "ready",
+					"label": "Is the table ready?",
+					"kind": "decision"
+				}
+			],
+			"edges": [
+				{
+					"id": "edge-1",
+					"source": "arrive",
+					"target": "quote"
+				},
+				{
+					"id": "edge-2",
+					"source": "quote",
+					"target": "avail"
+				},
+				{
+					"id": "edge-3",
+					"source": "avail",
+					"target": "seat",
+					"label": "yes"
+				},
+				{
+					"id": "edge-4",
+					"source": "avail",
+					"target": "add",
+					"label": "no"
+				},
+				{
+					"id": "edge-5",
+					"source": "add",
+					"target": "notify"
+				},
+				{
+					"id": "edge-6",
+					"source": "notify",
+					"target": "resp"
+				},
+				{
+					"id": "edge-7",
+					"source": "resp",
+					"target": "remove",
+					"label": "no"
+				},
+				{
+					"id": "edge-8",
+					"source": "resp",
+					"target": "ready",
+					"label": "yes"
+				},
+				{
+					"id": "edge-9",
+					"source": "ready",
+					"target": "seat",
+					"label": "yes"
+				},
+				{
+					"id": "edge-10",
+					"source": "ready",
+					"target": "resp",
+					"label": "no, keep waiting"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		}
+	},
+	{
+		"sample": 5,
+		"runId": "20261019-213638-qk7r",
+		"spec": {
+			"id": "restaurant-waitlist",
+			"title": "Restaurant Waitlist",
+			"nodes": [
+				{
+					"id": "arrive",
+					"label": "Party arrives",
+					"kind": "start"
+				},
+				{
+					"id": "quote",
+					"label": "Host quotes a wait time",
+					"kind": "process"
+				},
+				{
+					"id": "avail",
+					"label": "Is a table available?",
+					"kind": "decision"
+				},
+				{
+					"id": "seat",
+					"label": "Seat the party",
+					"kind": "end"
+				},
+				{
+					"id": "add",
+					"label": "Add the party to the waitlist",
+					"kind": "process"
+				},
+				{
+					"id": "notify",
+					"label": "Party is notified",
+					"kind": "process"
+				},
+				{
+					"id": "resp",
+					"label": "Does the party respond?",
+					"kind": "decision"
+				},
+				{
+					"id": "remove",
+					"label": "Remove the party from the list",
+					"kind": "end"
+				},
+				{
+					"id": "ready",
+					"label": "Is the table ready?",
+					"kind": "decision"
+				}
+			],
+			"edges": [
+				{
+					"id": "edge-1",
+					"source": "arrive",
+					"target": "quote"
+				},
+				{
+					"id": "edge-2",
+					"source": "quote",
+					"target": "avail"
+				},
+				{
+					"id": "edge-3",
+					"source": "avail",
+					"target": "seat",
+					"label": "yes"
+				},
+				{
+					"id": "edge-4",
+					"source": "avail",
+					"target": "add",
+					"label": "no"
+				},
+				{
+					"id": "edge-5",
+					"source": "add",
+					"target": "notify"
+				},
+				{
+					"id": "edge-6",
+					"source": "notify",
+					"target": "resp"
+				},
+				{
+					"id": "edge-7",
+					"source": "resp",
+					"target": "remove",
+					"label": "no"
+				},
+				{
+					"id": "edge-8",
+					"source": "resp",
+					"target": "ready",
+					"label": "yes"
+				},
+				{
+					"id": "edge-9",
+					"source": "ready",
+					"target": "seat",
+					"label": "yes"
+				},
+				{
+					"id": "edge-10",
+					"source": "ready",
+					"target": "resp",
+					"label": "no (keep waiting)"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		}
+	}
+]
