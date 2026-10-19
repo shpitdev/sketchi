@@ -1,5 +1,7 @@
 import "@tanstack/react-start/server-only";
 
+import { isDeepStrictEqual } from "node:util";
+
 import {
 	CodeModeIssueSchema,
 	type ArtifactBundle,
@@ -190,6 +192,27 @@ function buildReceipt(operation: BuildOperation, index: number, result: BuildRes
 				: {}),
 		issues,
 	});
+}
+
+// Match the entire returned value, not just its ID: scripts may edit or extend a build.
+// Comparing against the reference-only receipt also preserves explicitly requested inline exports.
+function compactBuildResult(value: unknown, builds: readonly ExecuteBuild[]): unknown {
+	if (!isRecord(value) || builds.length === 0) return value;
+	const returned = structuredClone(value);
+	for (const build of builds) {
+		const { index: _index, operation: _operation, ...receipt } = build;
+		// Pre-ID failures stay full so readers retain their diagnostics and provenance.
+		if (!build.buildId) continue;
+		if (!isDeepStrictEqual(returned, receipt)) continue;
+		const png = build.artifact?.formats.find((format) => format.format === "png")?.url;
+		return {
+			buildId: build.buildId,
+			ok: build.ok,
+			...(build.artifact?.artifactId ? { artifactId: build.artifact.artifactId } : {}),
+			...(png ? { png } : {}),
+		};
+	}
+	return value;
 }
 
 const ExecuteResultContract = Schema.Struct({
@@ -561,7 +584,11 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 				? Effect.forEach(pendingBuilds, (completion) => completion, { discard: true })
 				: Effect.void,
 		),
-		Effect.map((output) => ({ ...output, builds: [...builds].sort((a, b) => a.index - b.index) })),
+		Effect.map((output) => ({
+			...output,
+			...("result" in output ? { result: compactBuildResult(output.result, builds) } : {}),
+			builds: [...builds].sort((a, b) => a.index - b.index),
+		})),
 		(executionEffect) =>
 			withTelemetryCorrelation(executionEffect, {
 				attemptId: usageContext.attemptId,

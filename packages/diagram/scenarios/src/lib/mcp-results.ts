@@ -28,14 +28,17 @@ function matchesRejectedReceipt(
 }
 
 /** Prefer a returned build's matching receipt; otherwise use the last attempt, not success. */
-function buildFrom(
+export function buildResultFromMcp(
 	value: Record<string, unknown>,
 	diagramType?: DiagramScenario["diagramType"],
 ): Record<string, unknown> {
 	if (value.ok === false || value.isError === true) return value;
-	if (isRecord(value.structuredContent)) return buildFrom(value.structuredContent, diagramType);
+	if (isRecord(value.structuredContent))
+		return buildResultFromMcp(value.structuredContent, diagramType);
 	if (isRecord(value.normalizedSpec) || typeof value.buildId === "string") return value;
-	const returned = isRecord(value.result) ? buildFrom(value.result, diagramType) : undefined;
+	const returned = isRecord(value.result)
+		? buildResultFromMcp(value.result, diagramType)
+		: undefined;
 	const operation =
 		diagramType === "gantt"
 			? "buildGantt"
@@ -101,7 +104,7 @@ function buildFrom(
 /** Extract the build spec from a build, execute payload, or MCP tool result. */
 export function normalizedSpecFrom(value: unknown): unknown {
 	if (!isRecord(value)) return undefined;
-	const build = buildFrom(value);
+	const build = buildResultFromMcp(value);
 	return isRecord(build.normalizedSpec) ? build.normalizedSpec : undefined;
 }
 
@@ -256,7 +259,7 @@ export function candidateFromMcpResult(
 	) {
 		return undefined;
 	}
-	const build = buildFrom(value, diagramType);
+	const build = buildResultFromMcp(value, diagramType);
 	if (build.ok === false || build.isError === true) {
 		return rejected(
 			`MCP execute/build failed${typeof build.status === "string" ? ` (${build.status})` : ""}. ${failureDetails(build)}`.trim(),

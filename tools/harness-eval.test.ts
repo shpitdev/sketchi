@@ -669,6 +669,51 @@ describe("harness-eval", () => {
 		});
 	});
 
+	it.each([0, 1])(
+		"resolves compact execute references to receipt %i for grading and reports",
+		(selectedIndex) => {
+			const scenario = getFlowchartScenario("sketchi-onboarding-decision-flow");
+			const first = {
+				...acceptedMcpOutput.result,
+				normalizedSpec: scenario.expectedDiagram,
+				operation: "buildFlowchart",
+				index: 0,
+			};
+			const rebuilt = {
+				...first,
+				buildId: "build_rebuilt",
+				index: 1,
+				normalizedSpec: { ...scenario.expectedDiagram, id: "rebuilt", title: "Rebuilt" },
+				quality: { accepted: true, score: 9 },
+				artifact: { ...first.artifact, artifactId: "artifact_rebuilt" },
+			};
+			const builds = [first, rebuilt];
+			const selected = builds[selectedIndex]!;
+			const payload = {
+				ok: true,
+				result: { buildId: selected.buildId, ok: true, artifactId: selected.artifact.artifactId },
+				builds,
+				artifactDelivery: { ...selected.artifact },
+			};
+			for (const wrapped of [
+				payload,
+				{ structuredContent: payload },
+				{ content: [{ type: "text", text: JSON.stringify(payload) }] },
+			]) {
+				const proof = summarizeHarnessStdout("", [wrapped]).mcpArtifacts[0];
+				expect(proof).toMatchObject({
+					artifactId: selected.artifact.artifactId,
+					buildId: selected.buildId,
+					qualityScore: selected.quality.score,
+					normalizedSpec: selected.normalizedSpec,
+				});
+				expect(evaluateHarnessJson(scenario, { normalizedSpec: proof?.normalizedSpec }).ok).toBe(
+					true,
+				);
+			}
+		},
+	);
+
 	it("extracts MCP proof from artifactDelivery when nested result proof is absent", () => {
 		const stdout = [
 			JSON.stringify({

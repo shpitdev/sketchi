@@ -6,6 +6,7 @@ import { getDiagramScenario } from "./diagram-scenarios.js";
 import { evaluateScenarioDiagram } from "./evaluate.js";
 import {
 	candidateFromMcpResult,
+	buildResultFromMcp,
 	normalizedSpecFrom,
 	specToSequenceCandidate,
 } from "./mcp-results.js";
@@ -62,6 +63,38 @@ describe("MCP scenario adapter", () => {
 		expect(candidateFromMcpResult(value, "flowchart")).toMatchObject({ ok: false });
 		expect(normalizedSpecFrom(value)).toEqual(receipt.normalizedSpec);
 	});
+	it.each([true, false])(
+		"resolves a compact buildId reference before a later attempt (ok=%s)",
+		(ok) => {
+			const receipt = {
+				...flowchart.result,
+				ok,
+				buildId: "returned-build",
+				operation: "buildFlowchart",
+				quality: { accepted: ok, score: ok ? 10 : 0 },
+			};
+			const value = {
+				ok: true,
+				result: { buildId: receipt.buildId, ok, artifactId: "returned-artifact" },
+				builds: [
+					receipt,
+					{
+						...receipt,
+						ok: true,
+						buildId: "later-build",
+						normalizedSpec: { id: "wrong" },
+						quality: { accepted: true },
+					},
+				],
+			};
+			expect(buildResultFromMcp(value)).toEqual(receipt);
+			expect(normalizedSpecFrom({ structuredContent: value })).toEqual(receipt.normalizedSpec);
+			expect(candidateFromMcpResult({ structuredContent: value }, "flowchart")).toMatchObject({
+				ok,
+			});
+		},
+	);
+
 	it("does not substitute a different build or diagram family's receipt for an explicit summary", () => {
 		const value = {
 			ok: true,

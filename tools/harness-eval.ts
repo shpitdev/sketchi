@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { NodeRuntime } from "@effect/platform-node";
 import {
 	evaluateScenarioDiagram,
+	buildResultFromMcp,
 	normalizedSpecFrom,
 	specToFlowchartCandidate,
 	flowchartScenarios,
@@ -1056,16 +1057,13 @@ function parseJsonPayload(value: unknown): readonly unknown[] {
 }
 
 function acceptedBuildResultFrom(value: unknown): Record<string, unknown> | undefined {
-	if (!isRecord(value)) {
-		return undefined;
-	}
-	if (isRecord(value.artifact) && value.ok === true) {
-		return value;
-	}
-	if (value.ok === true && stringValue(value.artifactId) && Array.isArray(value.formats)) {
-		return value;
-	}
-	return acceptedBuildResultFrom(value.result);
+	if (!isRecord(value)) return undefined;
+	// Execute may return only a buildId reference; grading and reporting need its full receipt.
+	const result = buildResultFromMcp(value);
+	if (result.ok !== true) return undefined;
+	if (isRecord(result.artifact)) return result;
+	if (stringValue(result.artifactId) && Array.isArray(result.formats)) return result;
+	return undefined;
 }
 
 function compactArtifactResultFrom(value: unknown): Record<string, unknown> | undefined {

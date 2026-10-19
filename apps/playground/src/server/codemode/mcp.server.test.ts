@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Context, Effect, Option, Schema } from "effect";
 
 import type { CodeModeObjectBucket, CodeModeObjectBucketObject } from "@sketchi/diagram-agent";
+import { normalizedSpecFrom } from "@sketchi/diagram-scenarios";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
 import { PlaygroundRequestMetadata } from "../runtime/context.server";
@@ -572,7 +573,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			},
 			{ executor: createInProcessExecutor() },
 		);
-		expect(output.result).toMatchObject({
+		expect(output.builds[0]).toMatchObject({
 			ok: true,
 			artifact: {
 				formats: [
@@ -681,11 +682,14 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		);
 		expect(result).toMatchObject({
 			ok: true,
-			result: {
-				ok: true,
-				status: "accepted",
-				normalizedSpec: { root: { id: "topic-0" } },
-			},
+			builds: [
+				{
+					ok: true,
+					status: "accepted",
+					normalizedSpec: { root: { id: "topic-0" } },
+				},
+			],
+			result: { buildId: expect.any(String), ok: true, artifactId: expect.any(String) },
 		});
 	});
 	it("exposes buildSequenceDiagram inside the Code Mode namespace", async () => {
@@ -696,13 +700,16 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		);
 		expect(result).toMatchObject({
 			ok: true,
-			result: {
-				ok: true,
-				status: "accepted",
-				normalizedSpec: {
-					participants: [{ id: "client" }, { id: "api" }, { id: "store" }],
+			builds: [
+				{
+					ok: true,
+					status: "accepted",
+					normalizedSpec: {
+						participants: [{ id: "client" }, { id: "api" }, { id: "store" }],
+					},
 				},
-			},
+			],
+			result: { buildId: expect.any(String), ok: true, artifactId: expect.any(String) },
 		});
 	});
 	it("builds a native timeline and captures its receipt through Code Mode", async () => {
@@ -715,16 +722,19 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		);
 		expect(result).toMatchObject({
 			ok: true,
-			result: {
-				ok: true,
-				normalizedSpec: {
-					events: [
-						{ id: "beta", date: "2026-09-15" },
-						{ id: "ship", date: "2026-10-01" },
-					],
+			builds: [
+				{
+					operation: "buildTimeline",
+					ok: true,
+					normalizedSpec: {
+						events: [
+							{ id: "beta", date: "2026-09-15" },
+							{ id: "ship", date: "2026-10-01" },
+						],
+					},
 				},
-			},
-			builds: [{ operation: "buildTimeline", ok: true }],
+			],
+			result: { buildId: expect.any(String), ok: true, artifactId: expect.any(String) },
 		});
 	});
 	it("exposes createCanvas inside the Code Mode namespace", async () => {
@@ -1174,6 +1184,167 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			await client.close();
 		}
 	});
+
+	it.each([
+		"built",
+		"JSON.parse(JSON.stringify(built))",
+		"Object.fromEntries(Object.entries(built).reverse())",
+	])(
+		"deduplicates a returned build (%s) without losing the consumer contract",
+		async (returned) => {
+			const output = await executeSketchiCodeMode(
+				stubPngRenderer(),
+				{
+					code: `async () => { const built = await sketchi.buildFlowchart({ spec: { title: "Receipt contract", nodes: [{id:"a",label:"Start",kind:"start"},{id:"b",label:"Finish",kind:"end"}], edges:[{source:"a",target:"b"}] }, options: { artifactFormats: ["scene", "png"] } }); return ${returned}; }`,
+				},
+				{ executor: createInProcessExecutor() },
+			);
+			const build = output.builds[0];
+			expect(build).toMatchObject({
+				ok: true,
+				buildId: expect.any(String),
+				normalizedSpec: expect.any(Object),
+				quality: { accepted: true, score: expect.any(Number) },
+				artifact: {
+					artifactId: expect.any(String),
+					formats: expect.arrayContaining([
+						expect.objectContaining({ format: "png", url: expect.any(String) }),
+					]),
+				},
+			});
+			expect(output.result).toEqual({
+				buildId: build?.buildId,
+				ok: true,
+				artifactId: build?.artifact?.artifactId,
+				png: output.artifactDelivery?.pngUrl,
+			});
+			expect(output.artifactDelivery?.artifactId).toBe(build?.artifact?.artifactId);
+			expect(JSON.stringify(output).match(/"normalizedSpec":/g)).toHaveLength(1);
+		},
+	);
+
+	it.each([
+		[
+			'return { built, note: "custom" };',
+			{ note: "custom", built: expect.objectContaining({ normalizedSpec: expect.any(Object) }) },
+		],
+		[
+			'built.normalizedSpec.title = "changed"; return built;',
+			{ normalizedSpec: { title: "changed" } },
+		],
+		[
+			'return { ...built, ok: false, reason: "custom error" };',
+			{ ok: false, reason: "custom error" },
+		],
+		['return await sketchi.searchIcons({q:""});', { ok: false, issues: expect.any(Array) }],
+	])("preserves non-duplicate script returns: %s", async (ending, expected) => {
+		const output = await executeSketchiCodeMode(
+			{},
+			{ code: `async () => { const built = await (${BUILD_MINDMAP_CODE})(); ${ending} }` },
+			{ executor: createInProcessExecutor() },
+		);
+		expect(output.result).toMatchObject(expected);
+		expect(output.builds[0]?.normalizedSpec).toMatchObject({ title: "Code Mode mindmap" });
+	});
+
+	it.each([false, true])(
+		"preserves rejected build detection with executor error=%s",
+		async (executorError) => {
+			const executor = createInProcessExecutor();
+			const output = await executeSketchiCodeMode(
+				{},
+				{ code: `async () => sketchi.buildFlowchart({spec:{}})` },
+				{
+					executor: {
+						async execute(code, providers) {
+							const output = await executor.execute(code, providers);
+							return { ...output, ...(executorError ? { error: "after build" } : {}) };
+						},
+					},
+				},
+			);
+			expect(output.ok).toBe(!executorError);
+			expect(output.result).toMatchObject({
+				ok: false,
+				status: "invalid_input",
+				issues: output.builds[0]?.issues,
+			});
+			expect(output.builds[0]).toMatchObject({
+				ok: false,
+				status: "invalid_input",
+				issues: expect.any(Array),
+			});
+		},
+	);
+
+	it("preserves array return values and every rejected-build detection path", async () => {
+		const output = await executeSketchiCodeMode(
+			{},
+			{
+				code: `async () => [await sketchi.buildFlowchart({spec:{}}), {ok:false, reason:"custom error"}]`,
+			},
+			{ executor: createInProcessExecutor() },
+		);
+		expect(output).toMatchObject({
+			ok: true,
+			result: [
+				{ ok: false, issues: expect.any(Array) },
+				{ ok: false, reason: "custom error" },
+			],
+			builds: [{ ok: false, issues: expect.any(Array) }],
+		});
+	});
+
+	it("references the returned earlier build rather than the last receipt", async () => {
+		const output = await executeSketchiCodeMode(
+			{},
+			{
+				code: `async () => { const first = await (${BUILD_MINDMAP_CODE})(); await (${BUILD_SEQUENCE_CODE})(); return first; }`,
+			},
+			{ executor: createInProcessExecutor() },
+		);
+		expect(output.builds).toHaveLength(2);
+		expect(output.result).toMatchObject({
+			buildId: output.builds[0]?.buildId,
+			ok: true,
+			artifactId: output.builds[0]?.artifact?.artifactId,
+		});
+		expect(output.artifactDelivery?.artifactId).toBe(output.builds[0]?.artifact?.artifactId);
+	});
+
+	it.each(["first", "rebuilt"])(
+		"resolves the returned %s receipt after build -> patch -> rebuild",
+		async (returned) => {
+			const output = await executeSketchiCodeMode(
+				stubPngRenderer(),
+				{
+					code: `async () => {
+			const first = await sketchi.buildFlowchart({spec:{title:"First build",nodes:[{id:"a",label:"Start",kind:"start"},{id:"b",label:"Finish",kind:"end"}],edges:[{source:"a",target:"b"}]},options:{artifactFormats:["scene","excalidraw","png"]}});
+			if(!first.ok) return first;
+			const patched = await sketchi.applyDiagramPatch({source:{artifactId:first.artifact.artifactId},operations:[{op:"setStyle",selector:{nodeIds:["b"]},style:{strokeColor:"#7c3aed"}}],options:{artifactFormats:["scene","png"]}});
+			if(!patched.ok) return patched;
+			const rebuilt = await sketchi.buildFlowchart({spec:{...first.normalizedSpec,title:"Rebuilt"},options:{artifactFormats:["scene","png"]}});
+			return ${returned};
+		}`,
+				},
+				{ executor: createInProcessExecutor() },
+			);
+			const selected = output.builds[returned === "first" ? 0 : 1];
+			expect(output.builds).toHaveLength(2);
+			expect(output.builds.every((build) => build.ok)).toBe(true);
+			expect(output.result).toEqual({
+				buildId: selected?.buildId,
+				ok: true,
+				artifactId: selected?.artifact?.artifactId,
+				png: output.artifactDelivery?.pngUrl,
+			});
+			expect(output.artifactDelivery?.artifactId).toBe(selected?.artifact?.artifactId);
+			expect(normalizedSpecFrom(output)).toEqual(selected?.normalizedSpec);
+			expect(normalizedSpecFrom(output)).toMatchObject({
+				title: returned === "first" ? "First build" : "Rebuilt",
+			});
+		},
+	);
 
 	it("reports every build over MCP when the script returns unrelated data", async () => {
 		const bucket = new MemoryBucket();
