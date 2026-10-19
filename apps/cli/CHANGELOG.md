@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.25.1
+
+### Patch Changes
+
+- [#483](https://github.com/shpitdev/sketchi/pull/483) [`6f23984`](https://github.com/shpitdev/sketchi/commit/6f23984070a5805f60f98139f991c640cc9742d1) Thanks [@anandpant](https://github.com/anandpant)! - Vendor logos follow the label: a cloud vendor's or platform's logo (`aws`, `cloudflare`, `kubernetes`, `gke`) stays on a flowchart node or sequence participant whose label names that vendor ("Cloudflare Workers", "AWS Lambda", "GKE cluster") and is dropped with an `icon_dropped` warning elsewhere ("Ingress controller", or "S3 bucket" with `aws`). A product's own logo is never touched.
+
 ## 0.25.0
 
 ### Minor Changes
