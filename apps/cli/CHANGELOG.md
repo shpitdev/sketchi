@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.21.1
+
+### Patch Changes
+
+- [#465](https://github.com/shpitdev/sketchi/pull/465) [`07d7273`](https://github.com/shpitdev/sketchi/commit/07d72739ce4c450173505d7a0bbc7654c7212b42) Thanks [@anandpant](https://github.com/anandpant)! - Gantt dependency arrows read cleaner on dense plans. Arrows out of one task leave it down a shared trunk and branch off instead of crossing, a successor that starts under its predecessor's end takes a straight drop or a single elbow rather than a small step before the arrowhead, arrivals into one task spread above and below its middle, and arrows keep off the edges of bars they pass.
+
 ## 0.21.0
 
 ### Minor Changes
