@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.19.0
+
+### Minor Changes
+
+- [#450](https://github.com/shpitdev/sketchi/pull/450) [`5a82007`](https://github.com/shpitdev/sketchi/commit/5a82007ed648c9b12c67cff2635a8089c58d0162) Thanks [@anandpant](https://github.com/anandpant)! - Add native Gantt charts: `sketchi create` builds `{ "type": "gantt", "spec": { "title", "tasks" } }` documents offline, and `sketchi generate --type gantt` generates them. Tasks take a start day and an end day or a duration in calendar days, and may be milestones, sit under phases, record progress, and depend on other tasks finishing first. The chart draws a to-scale date axis, a date column, and dependency arrows routed clear of every bar and label.
+
 ## 0.18.0
 
 ### Minor Changes
