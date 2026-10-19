@@ -1,5 +1,7 @@
 // oxlint-disable-next-line @nx/enforce-module-boundaries -- shared test-only migration of immutable receipts; never imported by runtime code
 import { normalizeRoutingAgainstFrozen } from "../../../../../tools/testing/routing-compatibility.mjs";
+// oxlint-disable-next-line @nx/enforce-module-boundaries -- shared test-only migration of immutable receipts; never imported by runtime code
+import { normalizeMindmapLayoutAgainstFrozen } from "../../../../../tools/testing/mindmap-compatibility.mjs";
 import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -490,7 +492,10 @@ describe("exact-base Code Mode HTTP artifact compatibility corpus", () => {
 			`${JSON.stringify(
 				normalizeCanvasMigrationAgainstExactBase(
 					normalizeSketchiPaletteAgainstExactBase(
-						normalizeRoutingAgainstFrozen(corpus, exactBase),
+						normalizeRoutingAgainstFrozen(
+							normalizeMindmapLayoutAgainstFrozen(corpus, exactBase),
+							exactBase,
+						),
 						exactBase,
 					),
 					exactBase,

@@ -41,6 +41,11 @@ and the eval harness use it.
 - Sequence scenarios check participants, required messages and their
   chronological order, calls answered by returns (activation bars), and that
   no return is stray.
+- Mindmap scenarios check the central topic, every stated topic under its
+  stated parent, and no topic the prompt never states. Drawn topics are matched
+  to stated ones top down, each taking the best unclaimed match under the topic
+  its parent took. A layout check reads the drawn scene: no overlapping topics,
+  crossing curves, or curve through a topic.
 - State-machine scenarios check every stated state and the composite it sits
   in, the initial state, each composite's initial substate, and every stated
   transition between the right states with its event, guard and action in

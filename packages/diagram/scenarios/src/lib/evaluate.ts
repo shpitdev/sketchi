@@ -11,11 +11,13 @@ import {
 	timelineSpacingCheck,
 } from "./timeline-scenarios.js";
 import { stateMachineScenarioChecks } from "./state-machine-scenarios.js";
+import { mindmapLayoutCheck, mindmapScenarioChecks } from "./mindmap-scenarios.js";
 import {
 	type CanonicalDiagram,
 	type FlowchartDiagram,
 	type SequenceDiagram,
 	parseFlowchartDiagram,
+	parseMindmapDiagram,
 	parseSequenceDiagram,
 	parseStateMachineDiagram,
 	parseTimelineDiagram,
@@ -755,6 +757,18 @@ export function evaluateScenarioDiagram(
 							timelineGapOrderCheck(scenario, diagram, scene),
 						]
 					: [],
+		);
+	}
+	if (scenario.diagramType === "mindmap") {
+		const diagram = parseMindmapDiagram(candidate);
+		const modelDiagram =
+			modelCandidate === candidate ? diagram : parseMindmapDiagram(modelCandidate);
+		// The layout check reads the drawn scene, so it scores the returned diagram.
+		return evaluation(
+			scenario.id,
+			diagram,
+			mindmapScenarioChecks(scenario, modelDiagram),
+			(scene) => [mindmapLayoutCheck(scene)],
 		);
 	}
 	if (scenario.diagramType === "state-machine") {

@@ -2,10 +2,11 @@ import {
 	flowchartFixture,
 	type IntermediateDiagram,
 	mindmapFixture,
+	parseMindmapDiagram,
 	pharmaBatchDispositionFlowchart,
 } from "@sketchi/diagram-core";
 import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import { renderIntermediateDiagram, renderMindmapDiagram } from "@sketchi/diagram-renderer";
 import { copyText, ExcalidrawSceneCanvas } from "@sketchi/diagram-ui";
 import { useMemo, useState } from "react";
 
@@ -49,7 +50,14 @@ export function ExcalidrawWorkspace({
 		copyFeedback && copyFeedback.diagramId === active?.id ? copyFeedback.state : "idle";
 
 	const scene = useMemo(
-		() => (active ? convertSceneToExcalidraw(renderIntermediateDiagram(active)) : null),
+		() =>
+			active
+				? convertSceneToExcalidraw(
+						active.type === "mindmap"
+							? renderMindmapDiagram(parseMindmapDiagram(active))
+							: renderIntermediateDiagram(active),
+					)
+				: null,
 		[active],
 	);
 

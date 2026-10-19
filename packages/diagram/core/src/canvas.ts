@@ -6,6 +6,7 @@
  * PNG, or another render target without changing the authored scene.
  */
 
+import { cubicConnectorPoints } from "./curves.js";
 import { isDiagramIconSlug } from "./icon.js";
 import { boundLabelWidth, estimateTextWidth } from "./text-metrics.js";
 
@@ -156,6 +157,11 @@ export interface CanvasConnectorElement extends CanvasElementComposition, Canvas
 	readonly endArrowhead?: CanvasArrowhead;
 	readonly textColor?: string;
 	readonly points: [CanvasPoint, ...CanvasPoint[]];
+	/**
+	 * Draw a smooth curve through the points, as mindmap branches do, instead
+	 * of an orthogonal route through its corners.
+	 */
+	readonly curved?: boolean;
 	readonly label?: string;
 }
 
@@ -1114,17 +1120,14 @@ function compileLayout(elements: readonly CanvasElement[], layout: CanvasLayout)
 
 type BoundableCanvasElement = CanvasShapeElement | CanvasFrameElement;
 
-function elementCenter(element: BoundableCanvasElement): CanvasPoint {
+function elementCenter(element: CanvasElementBounds): CanvasPoint {
 	return {
 		x: element.x + element.width / 2,
 		y: element.y + element.height / 2,
 	};
 }
 
-function boundEndpointToward(
-	source: BoundableCanvasElement,
-	targetCenter: CanvasPoint,
-): CanvasPoint {
+function boundEndpointToward(source: CanvasElementBounds, targetCenter: CanvasPoint): CanvasPoint {
 	const sourceCenter = elementCenter(source);
 	const dx = targetCenter.x - sourceCenter.x;
 	const dy = targetCenter.y - sourceCenter.y;
@@ -1138,6 +1141,52 @@ function boundEndpointToward(
 		x: sourceCenter.x,
 		y: dy >= 0 ? source.y + source.height : source.y,
 	};
+}
+
+/** How far a connector's end may sit off its element's outline and still be bound to it. */
+const OUTLINE_TOLERANCE = 0.5;
+
+/** A point on an element's drawn outline: its ellipse, its diamond, or the box of any other shape. */
+function onOutline(point: CanvasPoint, element: BoundableCanvasElement): boolean {
+	const a = element.width / 2;
+	const b = element.height / 2;
+	const dx = (point.x - element.x - a) / a;
+	const dy = (point.y - element.y - b) / b;
+	const shape = element.type === "node" ? element.shape : "rectangle";
+	const off = OUTLINE_TOLERANCE / Math.min(a, b);
+	if (shape === "ellipse" || shape === "circle") return Math.abs(Math.hypot(dx, dy) - 1) <= off;
+	if (shape === "diamond") return Math.abs(Math.abs(dx) + Math.abs(dy) - 1) <= off;
+	const within = (value: number, low: number, high: number) =>
+		value >= low - OUTLINE_TOLERANCE && value <= high + OUTLINE_TOLERANCE;
+	const near = (value: number, edge: number) => Math.abs(value - edge) <= OUTLINE_TOLERANCE;
+	return (
+		(within(point.y, element.y, element.y + element.height) &&
+			(near(point.x, element.x) || near(point.x, element.x + element.width))) ||
+		(within(point.x, element.x, element.x + element.width) &&
+			(near(point.y, element.y) || near(point.y, element.y + element.height)))
+	);
+}
+
+/**
+ * A curve from one element to another, as a curved connector carries it: from
+ * the middle of the side each faces the other by, leaving and arriving square
+ * to that side, so it never runs back through either.
+ */
+export function curvedConnectorBetween(
+	source: CanvasElementBounds,
+	target: CanvasElementBounds,
+): [CanvasPoint, ...CanvasPoint[]] {
+	const start = boundEndpointToward(source, elementCenter(target));
+	const end = boundEndpointToward(target, elementCenter(source));
+	const sourceCenter = elementCenter(source);
+	const targetCenter = elementCenter(target);
+	const horizontal =
+		Math.abs(targetCenter.x - sourceCenter.x) >= Math.abs(targetCenter.y - sourceCenter.y);
+	const axis = horizontal ? "x" : "y";
+	const reach = (end[axis] - start[axis]) / 2;
+	const along = (point: CanvasPoint, distance: number): CanvasPoint =>
+		horizontal ? { x: point.x + distance, y: point.y } : { x: point.x, y: point.y + distance };
+	return cubicConnectorPoints([start, along(start, reach), along(end, -reach), end]);
 }
 
 /** What a connector can start or end at, by node id: nodes and frames that carry one. */
@@ -1168,6 +1217,14 @@ function synchronizeBindings(elements: readonly CanvasElement[]): CanvasElement[
 			const source = shapesByNodeId.get(element.sourceNodeId);
 			const target = shapesByNodeId.get(element.targetNodeId);
 			if (!source || !target) return element;
+			// A curve still bound at both ends keeps its shape; one whose ends moved is redrawn.
+			if (element.curved) {
+				const start = element.points[0];
+				const end = element.points[element.points.length - 1] ?? start;
+				return onOutline(start, source) && onOutline(end, target)
+					? element
+					: { ...element, points: curvedConnectorBetween(source, target) };
+			}
 			return {
 				...element,
 				points: [

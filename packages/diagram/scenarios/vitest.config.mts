@@ -19,6 +19,9 @@ export default defineConfig(() => ({
 		globals: true,
 		environment: "node",
 		include: ["src/**/*.test.ts"],
+		// Hang guard, not a speed budget: evaluate.test.ts runs every maintained scenario through
+		// the deterministic pipeline, which took 5.3s on a loaded CI runner against 0.5s alone.
+		testTimeout: 60_000,
 		reporters: ["default"],
 		coverage: {
 			reportsDirectory: "../../../coverage/packages/diagram/scenarios",

@@ -27,7 +27,8 @@ preview and local testing.
 - Shapes: rectangle, ellipse, diamond, circle, and polygon.
 - Standalone or bound text with font, alignment, color, and width controls.
 - Lines, polylines, and bound connectors with independently selected endpoint
-  arrowheads.
+  arrowheads. A connector with `curved: true` draws a smooth curve through its
+  points, as mindmap branches do, instead of an orthogonal route.
 - Frames, nested group identifiers, layers, locking, opacity, and explicit
   back-to-front `zOrder`.
 - Deterministic row, column, grid, stack, align, and distribute layout

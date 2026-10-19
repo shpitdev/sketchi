@@ -11,9 +11,15 @@ import {
 	FlowchartDiagramSchema,
 	SKETCHI_DIAGRAM_STYLE,
 	getFlowchartValidationIssues,
+	mindmapFixture,
 	parseChartDiagram,
 } from "@sketchi/diagram-core";
-import { renderChartDiagram } from "@sketchi/diagram-renderer";
+import {
+	mindmapLayoutIssues,
+	renderChartDiagram,
+	renderMindmapDiagram,
+	type RenderedDiagramScene,
+} from "@sketchi/diagram-renderer";
 import {
 	CodeModeArtifactStorageError,
 	CodeModeArtifactStorage,
@@ -2711,6 +2717,59 @@ function densePointElements(count: number): CanvasSpec["elements"] {
 		],
 	}));
 }
+
+describe("curved mindmap connectors", () => {
+	const curves = (scene: RenderedDiagramScene) =>
+		scene.elements.flatMap((element) =>
+			element.type === "arrow" && element.curved ? [element] : [],
+		);
+	/** A returned scene, checked against the scene contract and typed as the renderer draws it. */
+	const sceneOf = (value: unknown): RenderedDiagramScene => {
+		parseInlineScene(value);
+		return value as RenderedDiagramScene;
+	};
+	/** Every step of the route runs along an axis, as an orthogonal reroute does. */
+	const orthogonal = (points: readonly { x: number; y: number }[]) =>
+		points.every(
+			(point, index) =>
+				index === 0 || point.x === points[index - 1]!.x || point.y === points[index - 1]!.y,
+		);
+
+	it("keeps a mindmap's curves when its scene is reused as a canvas", async () => {
+		const scene = renderMindmapDiagram(mindmapFixture);
+		const result = await createTestRuntime().createCanvas({ spec: scene });
+		if (!result.ok) throw new Error(`Expected accepted canvas: ${JSON.stringify(result.issues)}`);
+		const canvas = sceneOf(result.normalizedSpec);
+		expect(mindmapLayoutIssues(canvas)).toEqual([]);
+		expect(curves(canvas).map((arrow) => arrow.points)).toEqual(
+			curves(scene).map((arrow) => arrow.points),
+		);
+	});
+
+	it("redraws the curves of a moved branch as curves clear of every topic", async () => {
+		const scene = renderMindmapDiagram(mindmapFixture);
+		const result = await createTestRuntime().applyDiagramPatch({
+			source: { scene },
+			operations: [
+				{
+					op: "translate",
+					selector: { nodeIds: ["topic-0-1", "topic-0-1-0", "topic-0-1-1"] },
+					dx: 0,
+					dy: 80,
+				},
+			],
+			options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+		});
+		expectPatchOk(result);
+		const patched = sceneOf(result.artifact.formats[0]?.inline);
+		const moved = curves(patched).filter((arrow) =>
+			["topic-0-1", "topic-0-1-0", "topic-0-1-1"].includes(arrow.targetNodeId),
+		);
+		expect(moved).toHaveLength(3);
+		for (const arrow of moved) expect(orthogonal(arrow.points), arrow.id).toBe(false);
+		expect(mindmapLayoutIssues(patched)).toEqual([]);
+	});
+});
 
 describe("canvas geometry and input bounds", () => {
 	it.each([

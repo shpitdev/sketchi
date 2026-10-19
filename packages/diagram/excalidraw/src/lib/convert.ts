@@ -395,10 +395,12 @@ function arrowElement(input: {
 	const end = lastArrowPoint(input.arrow);
 	// Excalidraw resolves a straight arrow's binding against its target's outline,
 	// which a frame lacks; an elbow arrow keeps its fixed point on a moved frame.
+	// A curved connector stays a curved arrow through its points.
 	const elbowed =
-		input.arrow.points.length > 2 ||
-		input.sourceShape?.type === "frame" ||
-		input.targetShape?.type === "frame";
+		input.arrow.curved !== true &&
+		(input.arrow.points.length > 2 ||
+			input.sourceShape?.type === "frame" ||
+			input.targetShape?.type === "frame");
 
 	return {
 		...elementBase(input.arrow.id, input.arrow),
@@ -1197,6 +1199,17 @@ function fixedPointResolvesToEndpoint(
 	);
 }
 
+/** A non-elbow arrow Excalidraw draws as a smooth curve through its points. */
+function isCurved(element: ExcalidrawElement): boolean {
+	const roundness = element.roundness;
+	return (
+		element.elbowed !== true &&
+		roundness !== null &&
+		typeof roundness === "object" &&
+		(roundness as { type?: unknown }).type === 2
+	);
+}
+
 function absoluteArrowPoints(element: ExcalidrawElement): { x: number; y: number }[] {
 	const x = numericValue(element.x) ?? 0;
 	const y = numericValue(element.y) ?? 0;
@@ -1268,7 +1281,7 @@ export function validateExcalidrawScene(scene: ExcalidrawScene): ExcalidrawScene
 			const isElbowed = element.elbowed === true;
 			const points = Array.isArray(element.points) ? element.points : [];
 
-			if (points.length > 2 && !isElbowed) {
+			if (points.length > 2 && !isElbowed && !isCurved(element)) {
 				issues.push({
 					code: "invalid-elbow-binding",
 					elementId: element.id,

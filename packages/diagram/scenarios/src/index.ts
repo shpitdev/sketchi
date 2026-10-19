@@ -8,6 +8,7 @@ export * from "./lib/prompt.js";
 export * from "./lib/scenarios.js";
 export * from "./lib/sequence-scenarios.js";
 export * from "./lib/state-machine-scenarios.js";
+export * from "./lib/mindmap-scenarios.js";
 
 export * from "./lib/timeline-scenarios.js";
 export * from "./lib/chart-scenarios.js";

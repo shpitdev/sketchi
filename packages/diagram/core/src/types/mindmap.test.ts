@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { parseIntermediateDiagram } from "../intermediate";
-import { mindmapFixture, mindmapDiagramType, parseMindmapDiagram } from "./mindmap";
+import {
+	mindmapDiagramFromTree,
+	mindmapFixture,
+	mindmapDiagramType,
+	parseMindmapDiagram,
+} from "./mindmap";
 
 describe("Mindmap diagram type", () => {
 	it("has a typed fixture that satisfies the intermediate diagram contract", () => {
@@ -46,5 +51,24 @@ describe("Mindmap diagram type", () => {
 				),
 			}),
 		).toThrow(/metadata must match|contiguous sibling ordering/);
+	});
+
+	it("builds the canonical map of a nested topic tree", () => {
+		expect(
+			mindmapDiagramFromTree({
+				id: mindmapFixture.id,
+				title: mindmapFixture.title,
+				root: {
+					label: "Public mindmaps",
+					children: [
+						{
+							label: "Semantic input",
+							children: [{ label: "Nested topics" }, { label: "Stable ordering" }],
+						},
+						{ label: "Artifact output", children: [{ label: "Scene" }, { label: "Excalidraw" }] },
+					],
+				},
+			}),
+		).toEqual(mindmapFixture);
 	});
 });

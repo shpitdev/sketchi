@@ -5,6 +5,8 @@ import {
 	CANVAS_SPEC_VERSION,
 	compileCanvasSpec,
 	getCanvasValidationIssues,
+	type CanvasConnectorElement,
+	type CanvasShapeElement,
 	type CanvasSpec,
 } from "./canvas";
 
@@ -696,5 +698,74 @@ describe("CanvasSpec", () => {
 			message: "CanvasSpec must contain at least one element.",
 			path: "elements",
 		});
+	});
+});
+
+describe("curved connectors", () => {
+	const center: CanvasShapeElement = {
+		type: "node",
+		id: "node:center",
+		nodeId: "center",
+		shape: "ellipse",
+		x: 100,
+		y: 100,
+		width: 200,
+		height: 80,
+		label: "Center",
+	};
+	const branch: CanvasShapeElement = {
+		type: "node",
+		id: "node:branch",
+		nodeId: "branch",
+		shape: "rectangle",
+		x: 400,
+		y: 0,
+		width: 120,
+		height: 40,
+		label: "Branch",
+	};
+	// Leaves the ellipse up and to the right, off its four cardinal points, and
+	// arrives level at the branch's left edge.
+	const curve: CanvasConnectorElement = {
+		type: "arrow",
+		id: "edge:branch",
+		edgeId: "branch",
+		sourceNodeId: "center",
+		targetNodeId: "branch",
+		curved: true,
+		points: [
+			{ x: 200 + 100 * Math.cos(-Math.PI / 3), y: 140 + 40 * Math.sin(-Math.PI / 3) },
+			{ x: 300, y: 60 },
+			{ x: 360, y: 25 },
+			{ x: 400, y: 20 },
+		],
+	};
+	const curveIn = (canvas: CanvasSpec) =>
+		canvas.elements.find((element) => element.id === curve.id) as CanvasConnectorElement;
+
+	it("keeps a curve still bound at both ends as drawn", () => {
+		const compiled = compileCanvasSpec(baseCanvas({ elements: [center, branch, curve] }));
+		expect(curveIn(compiled).points).toEqual(curve.points);
+	});
+
+	it("redraws a curve whose ends moved, square to the sides that face each other", () => {
+		// A row layout moves the branch below and right of the center.
+		const compiled = compileCanvasSpec(
+			baseCanvas({
+				elements: [center, branch, curve],
+				layouts: [{ type: "row", ids: ["node:center", "node:branch"], x: 100, y: 300, gap: 80 }],
+			}),
+		);
+		const moved = compiled.elements.find(
+			(element) => element.id === branch.id,
+		) as CanvasShapeElement;
+		const points = curveIn(compiled).points;
+		// From the center's right vertex to the branch's left edge, leaving and arriving level.
+		expect(points[0]).toEqual({ x: 300, y: 340 });
+		expect(points.at(-1)).toEqual({ x: moved.x, y: moved.y + moved.height / 2 });
+		expect(points.length).toBeGreaterThan(2);
+		expect(points.every((point, index) => index === 0 || point.x >= points[index - 1]!.x)).toBe(
+			true,
+		);
 	});
 });

@@ -104,6 +104,52 @@ export function parseMindmapDiagram(input: unknown): MindmapDiagram {
 	return validateMindmapDiagram(Schema.decodeUnknownSync(MindmapDiagram, { errors: "all" })(input));
 }
 
+/** A topic and its ordered children, as authors nest them. */
+export interface MindmapTopicTree {
+	readonly label: string;
+	readonly children?: readonly MindmapTopicTree[] | undefined;
+}
+
+/**
+ * The canonical mindmap of a nested topic tree. Each topic's id is its path
+ * from the root (`topic-0-1` is the root's second child) and the branch into it
+ * is `branch-0-1`; depth and sibling order come from the nesting.
+ */
+export function mindmapDiagramFromTree(tree: {
+	readonly id: string;
+	readonly title: string;
+	readonly root: MindmapTopicTree;
+	readonly direction?: "LR" | "RL";
+	readonly style?: { readonly accentColor: string; readonly backgroundColor: string };
+}): MindmapDiagram {
+	const nodes: Record<string, unknown>[] = [];
+	const edges: Record<string, unknown>[] = [];
+	const visit = (topic: MindmapTopicTree, path: readonly number[], parentId?: string) => {
+		const suffix = path.join("-");
+		const depth = path.length - 1;
+		const metadata = { depth, siblingIndex: path.at(-1)! };
+		nodes.push({
+			id: `topic-${suffix}`,
+			label: topic.label,
+			kind: depth === 0 ? "root" : "topic",
+			metadata,
+		});
+		if (parentId)
+			edges.push({ id: `branch-${suffix}`, source: parentId, target: `topic-${suffix}`, metadata });
+		topic.children?.forEach((child, index) => visit(child, [...path, index], `topic-${suffix}`));
+	};
+	visit(tree.root, [0]);
+	return parseMindmapDiagram({
+		id: tree.id,
+		title: tree.title,
+		type: mindmapDiagramType,
+		nodes,
+		edges,
+		layout: { direction: tree.direction ?? "LR", edgeRouting: "curved" },
+		...(tree.style ? { style: { ...tree.style } } : {}),
+	});
+}
+
 export const mindmapFixture = parseMindmapDiagram({
 	id: "public-mindmap-capability",
 	title: "Public mindmap generation",

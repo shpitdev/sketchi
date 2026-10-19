@@ -39,6 +39,20 @@ function fixtureRequirements(scenario: DiagramScenario): readonly Record<string,
 				value: event.label,
 			})),
 		];
+	if (scenario.diagramType === "mindmap")
+		return [
+			{
+				kind: "count",
+				target: "topics",
+				comparator: "exact",
+				value: scenario.expectedDiagram.nodes.length,
+			},
+			...scenario.expectedDiagram.nodes.map((node) => ({
+				kind: "label",
+				target: "topic",
+				value: node.label,
+			})),
+		];
 	if (scenario.diagramType === "state-machine")
 		return [
 			{

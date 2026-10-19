@@ -1,4 +1,5 @@
 import { type ChartScenario, chartScenarios } from "./chart-scenarios.js";
+import { type MindmapScenario, mindmapScenarios } from "./mindmap-scenarios.js";
 import { type TimelineScenario, timelineScenarios } from "./timeline-scenarios.js";
 import { type FlowchartScenario, flowchartScenarios } from "./scenarios.js";
 import { type SequenceScenario, sequenceScenarios } from "./sequence-scenarios.js";
@@ -10,7 +11,8 @@ export type DiagramScenario =
 	| SequenceScenario
 	| TimelineScenario
 	| ChartScenario
-	| StateMachineScenario;
+	| StateMachineScenario
+	| MindmapScenario;
 
 export const diagramScenarios: readonly DiagramScenario[] = [
 	...flowchartScenarios,
@@ -18,6 +20,7 @@ export const diagramScenarios: readonly DiagramScenario[] = [
 	...timelineScenarios,
 	...chartScenarios,
 	...stateMachineScenarios,
+	...mindmapScenarios,
 ];
 
 export function getDiagramScenario(id: string): DiagramScenario {

@@ -8,6 +8,7 @@ import {
 	getCanvasValidationIssues,
 } from "@sketchi/diagram-core";
 
+import { renderMindmapDiagram } from "./mindmap";
 import { type ArrowSceneElement, renderIntermediateDiagram, type NodeSceneElement } from "./scene";
 import { renderSequenceDiagram } from "./sequence";
 
@@ -15,7 +16,7 @@ describe("geometry bounds regressions", () => {
 	it("keeps renderer-produced flowchart, mindmap, and sequence labels valid", () => {
 		const scenes = [
 			renderIntermediateDiagram(flowchartFixture),
-			renderIntermediateDiagram(mindmapFixture),
+			renderMindmapDiagram(mindmapFixture),
 			renderIntermediateDiagram(pharmaBatchDispositionFlowchart),
 			renderSequenceDiagram({
 				type: "sequence",

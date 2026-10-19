@@ -1,5 +1,7 @@
 // oxlint-disable-next-line @nx/enforce-module-boundaries -- shared test-only migration of immutable receipts; never imported by runtime code
 import { normalizeRoutingAgainstFrozen } from "../../../../../../tools/testing/routing-compatibility.mjs";
+// oxlint-disable-next-line @nx/enforce-module-boundaries -- shared test-only migration of immutable receipts; never imported by runtime code
+import { normalizeMindmapLayoutAgainstFrozen } from "../../../../../../tools/testing/mindmap-compatibility.mjs";
 import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Context, Effect, Schema } from "effect";
@@ -46,7 +48,7 @@ import {
 	type CodeModeRuntimeOptions,
 } from "./runtime";
 
-const POST_BASELINE_SCENE_FIELDS = new Set(["rendererRole", "strokeStyle"]);
+const POST_BASELINE_SCENE_FIELDS = new Set(["rendererRole", "strokeStyle", "curved"]);
 const CANVAS_SPEC_ADDED_FIELDS = new Set([
 	"kind",
 	"version",
@@ -500,6 +502,11 @@ vi.mock("@sketchi/diagram-renderer", async (importOriginal) => {
 			const failure = renderFailure.get();
 			if (failure) throw new Error(failure);
 			return actual.renderIntermediateDiagram(input);
+		},
+		renderMindmapDiagram: (input: Parameters<typeof actual.renderMindmapDiagram>[0]) => {
+			const failure = renderFailure.get();
+			if (failure) throw new Error(failure);
+			return actual.renderMindmapDiagram(input);
 		},
 	};
 });
@@ -1633,7 +1640,10 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 		expect(
 			normalizeCanvasMigrationAgainstFrozen(
 				normalizeBrandPaletteAgainstFrozen(
-					normalizeRoutingAgainstFrozen(normalizedCorpus, frozen),
+					normalizeRoutingAgainstFrozen(
+						normalizeMindmapLayoutAgainstFrozen(normalizedCorpus, frozen),
+						frozen,
+					),
 					frozen,
 				),
 				frozen,
@@ -1694,7 +1704,13 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 		expect(
 			normalizeCanvasMigrationAgainstFrozen(
 				normalizeFlowchartKindHintAgainstFrozen(
-					normalizeBrandPaletteAgainstFrozen(normalizeRoutingAgainstFrozen(corpus, frozen), frozen),
+					normalizeBrandPaletteAgainstFrozen(
+						normalizeRoutingAgainstFrozen(
+							normalizeMindmapLayoutAgainstFrozen(corpus, frozen),
+							frozen,
+						),
+						frozen,
+					),
 					frozen,
 				),
 				frozen,

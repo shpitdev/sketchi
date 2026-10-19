@@ -4,6 +4,7 @@ import {
 	FlowchartDiagramSchema,
 	SKETCHI_DIAGRAM_STYLE,
 	compileCanvasSpec,
+	curvedConnectorBetween,
 	getCanvasValidationIssues,
 	getFlowchartValidationIssues,
 	getSequenceValidationIssues,
@@ -13,7 +14,7 @@ import {
 	orderedTimelineEvents,
 	type ChartDiagram,
 	type TimelineDiagram,
-	parseMindmapDiagram,
+	mindmapDiagramFromTree,
 	validateFlowchartDiagram,
 	wrappedLabelWidth,
 	wrapTextToWidth,
@@ -34,6 +35,7 @@ import {
 } from "@sketchi/diagram-excalidraw";
 import {
 	renderIntermediateDiagram,
+	renderMindmapDiagram,
 	renderSequenceDiagram,
 	renderStateMachineDiagram,
 	renderTimelineDiagram,
@@ -397,39 +399,12 @@ function validateNormalizedMindmap(spec: NormalizedMindmapSpec): CodeModeIssue[]
 }
 
 function toMindmapDiagram(spec: NormalizedMindmapSpec): MindmapDiagram {
-	const nodes: Array<Record<string, unknown>> = [];
-	const edges: Array<Record<string, unknown>> = [];
-	const visit = (
-		topic: NormalizedMindmapSpec["root"],
-		depth: number,
-		siblingIndex: number,
-		parentId?: string,
-	) => {
-		nodes.push({
-			id: topic.id,
-			label: topic.label,
-			kind: depth === 0 ? "root" : "topic",
-			metadata: { depth, siblingIndex },
-		});
-		if (parentId) {
-			edges.push({
-				id: `branch-${topic.id.slice("topic-".length)}`,
-				source: parentId,
-				target: topic.id,
-				metadata: { depth, siblingIndex },
-			});
-		}
-		topic.children.forEach((child, index) => visit(child, depth + 1, index, topic.id));
-	};
-	visit(spec.root, 0, 0);
-	return parseMindmapDiagram({
+	return mindmapDiagramFromTree({
 		id: spec.id,
 		title: spec.title,
-		type: "mindmap",
-		nodes,
-		edges,
-		layout: { direction: spec.layout.direction, edgeRouting: "curved" },
-		style: { ...SKETCHI_DIAGRAM_STYLE },
+		root: spec.root,
+		direction: spec.layout.direction,
+		style: SKETCHI_DIAGRAM_STYLE,
 	});
 }
 
@@ -1841,6 +1816,12 @@ function rerouteArrow(scene: PatchableScene, arrow: PatchableArrow): CodeModeIss
 		];
 	}
 
+	// A curved connector, a mindmap branch, is redrawn as a curve, not an elbow.
+	if (arrow.curved) {
+		arrow.points = curvedConnectorBetween(source, target).map((point) => ({ ...point }));
+		syncArrowLabel(scene, arrow);
+		return [];
+	}
 	const start = edgePoint(source, target, "source");
 	const end = edgePoint(target, source, "target");
 	const vertical = Math.abs(end.y - start.y) >= Math.abs(end.x - start.x);
@@ -2406,7 +2387,7 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(functio
 	}
 
 	const scene = yield* Effect.try({
-		try: () => renderIntermediateDiagram(diagram),
+		try: () => renderMindmapDiagram(diagram),
 		catch: (cause) =>
 			new BuildMindmapFailure({
 				status: "render_failed",

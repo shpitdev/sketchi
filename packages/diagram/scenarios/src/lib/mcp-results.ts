@@ -1,3 +1,5 @@
+import { type MindmapTopicTree, mindmapDiagramFromTree } from "@sketchi/diagram-core";
+
 import type { DiagramScenario } from "./diagram-scenarios.js";
 import type { ScenarioCheck } from "./evaluate.js";
 
@@ -43,7 +45,9 @@ function buildFrom(
 					? "buildSequenceDiagram"
 					: diagramType === "state-machine"
 						? "buildStateMachine"
-						: "buildFlowchart";
+						: diagramType === "mindmap"
+							? "buildMindmap"
+							: "buildFlowchart";
 	const receipts = Array.isArray(value.builds)
 		? value.builds.filter(
 				(build): build is Record<string, unknown> =>
@@ -127,6 +131,18 @@ export function specToFlowchartCandidate(spec: unknown): unknown {
 		layout: { direction: layout.direction ?? "TB", edgeRouting: "orthogonal" },
 		style: spec.style,
 	};
+}
+
+/** Map a Code Mode mindmap's nested topics to the canonical mindmap IR. */
+export function specToMindmapCandidate(spec: unknown): unknown {
+	if (!isRecord(spec) || !isRecord(spec.root)) return spec;
+	const layout = isRecord(spec.layout) ? spec.layout : {};
+	return mindmapDiagramFromTree({
+		id: typeof spec.id === "string" ? spec.id : "mindmap",
+		title: typeof spec.title === "string" ? spec.title : "Mindmap",
+		root: spec.root as unknown as MindmapTopicTree,
+		...(layout.direction === "RL" ? { direction: "RL" as const } : {}),
+	});
 }
 
 /** Sequence normalized specs already carry canonical participants and messages. */
@@ -262,9 +278,11 @@ export function candidateFromMcpResult(
 					? { ...build.normalizedSpec, type: "timeline" }
 					: diagramType === "state-machine"
 						? { ...build.normalizedSpec, type: "state-machine" }
-						: diagramType === "sequence"
-							? specToSequenceCandidate(build.normalizedSpec)
-							: specToFlowchartCandidate(build.normalizedSpec),
+						: diagramType === "mindmap"
+							? specToMindmapCandidate(build.normalizedSpec)
+							: diagramType === "sequence"
+								? specToSequenceCandidate(build.normalizedSpec)
+								: specToFlowchartCandidate(build.normalizedSpec),
 		check: {
 			id: "mcp-build-accepted",
 			passed: true,

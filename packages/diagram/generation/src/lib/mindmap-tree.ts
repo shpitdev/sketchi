@@ -1,7 +1,7 @@
 import {
 	type MindmapDiagram,
+	mindmapDiagramFromTree,
 	SKETCHI_DIAGRAM_STYLE,
-	parseMindmapDiagram,
 } from "@sketchi/diagram-core";
 import { Schema } from "effect";
 
@@ -43,43 +43,11 @@ export class GeneratedMindmapTree extends Schema.Class<GeneratedMindmapTree>(
 
 /** Derive graph identity and parentage from the model's nested hierarchy. */
 export function generatedMindmapTreeToDiagram(tree: GeneratedMindmapTree): MindmapDiagram {
-	const nodes: Array<Record<string, unknown>> = [];
-	const edges: Array<Record<string, unknown>> = [];
-
-	const visit = (
-		topic: GeneratedMindmapTopic,
-		path: readonly number[],
-		depth: number,
-		siblingIndex: number,
-		parentId?: string,
-	): void => {
-		const suffix = path.join("-");
-		const id = `topic-${suffix}`;
-		nodes.push({
-			id,
-			kind: depth === 0 ? "root" : "topic",
-			label: topic.label,
-			metadata: { depth, siblingIndex },
-		});
-		if (parentId) {
-			edges.push({
-				id: `branch-${suffix}`,
-				metadata: { depth, siblingIndex },
-				source: parentId,
-				target: id,
-			});
-		}
-		topic.children.forEach((child, index) => visit(child, [...path, index], depth + 1, index, id));
-	};
-
-	visit(tree.root, [0], 0, 0);
-	return parseMindmapDiagram({
-		edges,
+	return mindmapDiagramFromTree({
 		id: tree.id,
-		layout: tree.layout,
-		nodes,
-		style: { ...SKETCHI_DIAGRAM_STYLE },
 		title: tree.title,
-		type: tree.type,
+		root: tree.root,
+		direction: tree.layout.direction,
+		style: SKETCHI_DIAGRAM_STYLE,
 	});
 }

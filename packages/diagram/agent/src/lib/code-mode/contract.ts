@@ -1189,6 +1189,7 @@ export class ArrowSceneElement extends Schema.Class<ArrowSceneElement>("ArrowSce
 		endArrowhead: optionalContract(CanvasArrowhead).pipe(Schema.mutableKey),
 		textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
 		points: requiredArray(CanvasPointList).pipe(Schema.mutableKey),
+		curved: optionalContract(Schema.Boolean).pipe(Schema.mutableKey),
 		label: optionalContract(NonEmptyString).pipe(Schema.mutableKey),
 	},
 	{ identifier: undefined },

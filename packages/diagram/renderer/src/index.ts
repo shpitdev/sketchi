@@ -1,4 +1,6 @@
 export * from "./diagram.js";
+export * from "./mindmap.js";
+export * from "./mindmap-readout.js";
 export * from "./scene.js";
 export * from "./sequence.js";
 export * from "./state-machine.js";

@@ -18,6 +18,7 @@ import {
 import {
 	renderChartDiagram,
 	renderIntermediateDiagram,
+	renderMindmapDiagram,
 	renderSequenceDiagram,
 } from "@sketchi/diagram-renderer";
 
@@ -623,11 +624,33 @@ describe("convertSceneToExcalidraw", () => {
 		expect(validateExcalidrawScene(exported)).toEqual({ ok: true, issues: [] });
 	});
 
-	it("exports the horizontal mindmap fixture with valid arrow bindings", () => {
-		const exported = convertSceneToExcalidraw(renderIntermediateDiagram(mindmapFixture));
+	it("exports mindmap branches as curved arrows bound to both topics", () => {
+		const exported = convertSceneToExcalidraw(renderMindmapDiagram(mindmapFixture));
 		expect(validateExcalidrawScene(exported)).toEqual({ ok: true, issues: [] });
-		expect(exported.elements.filter((element) => element.type === "arrow")).toHaveLength(
-			mindmapFixture.edges.length,
+		const arrows = exported.elements.filter((element) => element.type === "arrow");
+		expect(arrows).toHaveLength(mindmapFixture.edges.length);
+		const byId = new Map(exported.elements.map((element) => [element.id, element]));
+		for (const arrow of arrows) {
+			// Excalidraw draws a smooth curve through the points and keeps it a curve on edit.
+			expect(arrow).toMatchObject({ elbowed: false, roundness: { type: 2 }, endArrowhead: null });
+			expect(Array.isArray(arrow.points) && arrow.points.length).toBeGreaterThan(2);
+			for (const binding of ["startBinding", "endBinding"] as const) {
+				const target = byId.get((arrow[binding] as { elementId: string }).elementId);
+				expect(target?.boundElements).toContainEqual({ id: arrow.id, type: "arrow" });
+			}
+		}
+		// The central topic is an ellipse; each main branch moves as one Excalidraw group.
+		expect(byId.get("node:topic-0")).toMatchObject({ type: "ellipse" });
+		expect(byId.get("node:topic-0-0-1")?.groupIds).toEqual(["branch:topic-0-0"]);
+		expect(byId.get("label:topic-0-0-1")?.groupIds).toEqual(["branch:topic-0-0"]);
+	});
+
+	it("still reports a multi-point arrow that is neither an elbow nor a curve", () => {
+		const exported = convertSceneToExcalidraw(renderMindmapDiagram(mindmapFixture));
+		const curve = exported.elements.find((element) => element.id === "edge:branch-0-0-0")!;
+		curve.roundness = null;
+		expect(validateExcalidrawScene(exported).issues).toContainEqual(
+			expect.objectContaining({ code: "invalid-elbow-binding", elementId: "edge:branch-0-0-0" }),
 		);
 	});
 

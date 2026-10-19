@@ -1,6 +1,10 @@
 import { flowchartDiagramFromSpec, type FlowchartSpec } from "@sketchi/diagram-agent";
 import { mindmapFixture } from "@sketchi/diagram-core";
-import { renderIntermediateDiagram, type RenderedDiagramScene } from "@sketchi/diagram-renderer";
+import {
+	renderIntermediateDiagram,
+	renderMindmapDiagram,
+	type RenderedDiagramScene,
+} from "@sketchi/diagram-renderer";
 import { ArtifactCanvas } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
@@ -28,7 +32,7 @@ const EXAMPLES: Record<string, CuratedExample> = {
 	"public-mindmap": {
 		title: "Public mindmap generation",
 		blurb: "Generated from a semantic nested topic hierarchy — pan and zoom to inspect it.",
-		scene: renderIntermediateDiagram(mindmapFixture),
+		scene: renderMindmapDiagram(mindmapFixture),
 	},
 	"how-it-works": {
 		title: "How Sketchi works",
