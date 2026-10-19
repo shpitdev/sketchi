@@ -49,6 +49,13 @@ function diagramCounts(diagram: CanonicalDiagram) {
 			edgeCount: diagram.transitions.length,
 			edgeNoun: "transitions",
 		};
+	if (diagram.type === "er")
+		return {
+			nodeCount: diagram.entities.length,
+			nodeNoun: "entities",
+			edgeCount: diagram.relationships.length,
+			edgeNoun: "relationships",
+		};
 	return diagram.type === "sequence"
 		? {
 				nodeCount: diagram.participants.length,

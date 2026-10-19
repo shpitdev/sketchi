@@ -47,8 +47,8 @@ const COMMON_INSTRUCTIONS = [
 	`Sketchi supports only nativeKind ${listAlternatives(NATIVE_KINDS)}. If the requested kind is ${listAlternatives(UNSUPPORTED_KINDS)}, set nativeKind to null, omit diagram, and never coerce it into a supported kind.`,
 	"When nativeKind is null, return an empty requirements array because there is no native artifact to validate.",
 	"List every measurable scenario requirement once in intent.requirements. Convert counts and minimums into count requirements, hierarchy depth into topic_levels, and required names or branch/message text into label requirements.",
-	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", "tasks", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
-	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", "series", "state", "transition", "task", or "phase".',
+	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", "tasks", "entities", "relationships", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
+	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", "series", "state", "transition", "task", "phase", "entity", or "field".',
 	'Use comparator "minimum" for phrases such as "at least" and "exact" for exact counts. Do not invent measurable requirements that the scenario did not request.',
 	"The diagram must satisfy every requirement in the plan. Sketchi deterministically checks the plan against the artifact.",
 ];
@@ -129,6 +129,17 @@ const IR_INSTRUCTIONS = {
 			"Copy every task, date, duration, dependency, milestone, phase and percent from the source; invent none. Compute a date only from a stated start plus a stated duration.",
 			"Optional: dependsOn lists the ids of tasks that must finish first; phase names a header for every task (phases sets their order); progress is percent complete; today only when stated.",
 			"Use 1–60 tasks, at most 12 phases, and no dependency cycles.",
+		],
+	},
+	er: {
+		title: "ER IR rules",
+		rules: [
+			'Use diagram type "er".',
+			"Use it for database schemas and entity-relationship diagrams; never supply coordinates.",
+			'Return entities: [{ id, name?, fields }]. Ids hold no dot or space; name defaults to the id. Each field is one string "name type markers": "id uuid PK", "customer_id uuid FK", "email text UK", "note text?" (nullable), with type optional.',
+			'Return relationships: [{ id, from, to, fromCardinality, toCardinality, label? }]. from and to name an entity, or "entity.field" for the key column at each end: "orders.customer_id" to "customers.id".',
+			'Each cardinality is "one", "zero-or-one", "many", "one-or-many" or "zero-or-many": how many rows of that end relate to one row of the other end.',
+			"Copy every entity, field, type, key, nullable marker and cardinality the source states; invent none. Mark every key column PK, FK or UK as stated.",
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { title: string; rules: readonly string[] }>;
@@ -281,6 +292,30 @@ const FAMILY_EXAMPLES = {
 			{ kind: "label", target: "task", value: "Design" },
 		],
 	},
+	er: {
+		diagram: {
+			id: "short-kebab-case-id",
+			type: "er",
+			entities: [
+				{ id: "customers", fields: ["id uuid PK", "email text UK"] },
+				{ id: "orders", fields: ["id uuid PK", "customer_id uuid FK", "shipped_at date?"] },
+			],
+			relationships: [
+				{
+					id: "places",
+					from: "customers.id",
+					to: "orders.customer_id",
+					fromCardinality: "one",
+					toCardinality: "zero-or-many",
+					label: "places",
+				},
+			],
+		},
+		requirements: [
+			{ kind: "count", target: "entities", comparator: "exact", value: 2 },
+			{ kind: "label", target: "entity", value: "orders" },
+		],
+	},
 } as const satisfies Record<DiagramTypeValue, { diagram: object; requirements: readonly object[] }>;
 
 function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
@@ -330,9 +365,9 @@ function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
 			},
 		};
 		const unsupportedExample = {
-			title: "Customer order relationships",
+			title: "Order service architecture",
 			intent: {
-				requestedKind: "er",
+				requestedKind: "architecture",
 				nativeKind: null,
 				requirements: [],
 			},

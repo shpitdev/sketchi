@@ -62,6 +62,7 @@ export function codeModeFailure(
 					"invalid_chart",
 					"invalid_state_machine",
 					"invalid_gantt",
+					"invalid_er_diagram",
 					"quality_failed",
 				];
 	if (validationStatuses.includes(result.status))

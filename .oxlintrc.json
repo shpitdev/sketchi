@@ -290,7 +290,8 @@
 				"packages/diagram/core/src/types/timeline.ts",
 				"packages/diagram/core/src/types/chart.ts",
 				"packages/diagram/core/src/types/state-machine.ts",
-				"packages/diagram/core/src/types/gantt.ts"
+				"packages/diagram/core/src/types/gantt.ts",
+				"packages/diagram/core/src/types/er.ts"
 			],
 			"rules": {
 				"eslint/no-restricted-imports": [

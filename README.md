@@ -33,7 +33,7 @@ scene representations.
 
 ## What Sketchi Does
 
-- Creates hosted flowcharts, mindmaps, sequence diagrams, timelines, state machines, Gantt charts, and bar, line, and pie charts from natural-language prompts.
+- Creates hosted flowcharts, mindmaps, sequence diagrams, timelines, state machines, Gantt charts, ER diagrams, and bar, line, and pie charts from natural-language prompts.
 - Produces validated, editable Excalidraw scenes instead of opaque images.
 - Exposes Code Mode through MCP and versioned HTTP artifact endpoints.
 - Keeps layout, bindings, wrapping, and scene conversion deterministic in code.
@@ -68,7 +68,7 @@ Explicit `--type` and file `--dest` values preset their wizard questions;
 interactive generation remains PNG-only, so other formats and `--dest -` also
 require `--prompt`.
 Without `--type`, the model selects a supported native type. Explicit flowchart,
-mindmap, sequence, timeline, chart, state-machine, or gantt selection is authoritative; ER, architecture, and
+mindmap, sequence, timeline, chart, state-machine, gantt, or er selection is authoritative; architecture and
 swimlane requests fail clearly instead of being coerced.
 The default file is `<generated-id>.png` in the current directory. Use
 `--format excalidraw` or `--format scene` for another artifact, and `--dest`
@@ -149,7 +149,7 @@ model candidate → typed diagram IR → deterministic scene → Excalidraw arti
 | `packages/svg-excalidraw`     | Native SVG-to-Excalidraw conversion and library serialization   |
 
 The first high-reliability target is decision-heavy flowchart generation.
-`flowchart`, `mindmap`, `sequence`, `timeline`, `chart`, `state-machine`, and `gantt` are explicit diagram families; unsupported families do
+`flowchart`, `mindmap`, `sequence`, `timeline`, `chart`, `state-machine`, `gantt`, and `er` are explicit diagram families; unsupported families do
 not silently fall back to a generic template. See the full
 [architecture guide](docs/architecture.md) and the
 [MCP-first generation boundary](docs/mcp-first-generation.md).
@@ -329,3 +329,5 @@ Native charts: use `buildChart` (Code Mode) or `generate --type chart` (CLI). Su
 Native state machines: use `buildStateMachine` (Code Mode) or `generate --type state-machine` (CLI). Supply `initial`, states with unique ids and labels (`kind: "final"` for an end, `"choice"` for a guarded branch; states naming a `parent` form a composite with its own `initial`), and transitions with `source`, `target` and optional `event`, `guard` and `action`, drawn as `event [guard] / action`. Self-loops and transitions into or out of a composite are supported; composites do not nest.
 
 Native Gantt charts: use `buildGantt` (Code Mode) or `generate --type gantt` (CLI). Supply tasks with unique ids, labels, a `start` day (`YYYY-MM-DD`) and either `end` (last day, inclusive) or `duration` (calendar days); `milestone: true` draws a diamond. Optional `dependsOn` (finish-to-start predecessor ids), `phase` on every task (`phases` sets their order), `progress` (percent) and `today`. The renderer draws a to-scale date axis with day, week, month, quarter or year ticks, one row per task under phase headers, a date column, and dependency arrows routed clear of every bar and label. Never supply coordinates.
+
+Native ER diagrams: use `buildErDiagram` (Code Mode) or `generate --type er` (CLI). Supply entities with unique ids (no dots) and fields written `"name type markers"` (`"id uuid PK"`, `"customer_id uuid FK"`, `"email text UK"`, `"note text?"` for nullable), and relationships whose `from` and `to` name `entity.field` or an entity, each end with a cardinality (`one`, `zero-or-one`, `many`, `one-or-many` or `zero-or-many`) and an optional label. The renderer draws each entity as a table and each relationship as an orthogonal line between the rows it joins, with crow's-foot ends; it owns every coordinate.

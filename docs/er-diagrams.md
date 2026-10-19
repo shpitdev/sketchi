@@ -1,0 +1,32 @@
+# ER diagrams
+
+An ER diagram draws a database schema: tables with their columns and keys, and the relationships between them, each end marked with its cardinality in crow's-foot notation. It is a canonical family (`er`), built with `sketchi.buildErDiagram`, Studio's `build_er_diagram`, `POST /api/v1/er-diagrams/build`, `sketchi create`, or `generate --type er`.
+
+```json
+{"type":"er","spec":{"title":"Shop","entities":[{"id":"customers","fields":["id uuid PK","email text UK"]},{"id":"orders","fields":["id uuid PK","customer_id uuid FK","shipped_at date?"]}],"relationships":[{"from":"orders.customer_id","to":"customers.id","fromCardinality":"zero-or-many","toCardinality":"one","label":"places"}]}}
+```
+
+## Contract
+
+- An entity has a unique `id` (no dot, colon or space), an optional `name` (the id when omitted) and `fields`. A field has a `name`, an optional `type` and the markers `pk`, `fk`, `unique` and `nullable`. Code Mode and generation also read a field written on one line, `"name type markers"`: `"order_id uuid PK FK"`, `"email text UK"`, `"note text?"` for nullable. Markers close the line, `NOT NULL` is dropped, and the type is whatever lies between.
+- A relationship has `from`, `to`, `fromCardinality`, `toCardinality` and an optional `label`. Each end names an entity or, when the relationship runs through a column, `entity.field`: the foreign key at one end and the key it references at the other. An end without a field, opposite one with a field, attaches to its entity's single primary key.
+- Each cardinality is how many rows of that end's entity relate to one row of the other: `one`, `zero-or-one`, `many`, `one-or-many` or `zero-or-many`. An order has one customer and a customer zero or many orders: from `orders.customer_id` (`zero-or-many`) to `customers.id` (`one`). Code Mode reads aliases such as `1`, `0..1`, `*`, `1..*`, `0..*` and `one or more`, and `source`/`target` for `from`/`to`.
+- At most 30 entities, 40 fields per entity, 240 fields and 60 relationships, names and types of at most 64 characters. Ends must name existing entities and fields, names may not repeat, a primary key is never nullable, and a self-reference runs between two different fields. Each rejection carries a repair hint.
+
+## Layout
+
+- The family places its own tables and the graph router routes the lines. Tables stand in columns; each relationship runs between neighboring columns where it can, the referenced table left of the one holding the foreign key. A local search balances that against columns no taller, and a layout no wider, than about 1.6 to 1 allows, and against many lines leaving one side of a table, so a hub spreads its links over both sides.
+- Columns are ordered to cut crossings (barycenter sweeps, then swaps of neighbors), then tables slide so the rows a relationship joins sit level. A link that skips a column holds a corridor between the tables of each column it passes, level with the row it leaves, and nearly level links snap level, pushing the tables packed beside them along.
+- Several placements are routed in full (the cheapest columns, the same aiming nearer square, one grown from the most linked table, and one keeping linked tables out of a shared column; schemas over 24 tables try the first two), and the renderer keeps the one with the fewest crossings, reader findings, detours and excess over 2.5 to 1.
+- Each end is pinned to the side of its table at its field's row, or at the name band for a relationship between whole entities, at a port of its own: no two lines share a run or a head. Ends on one side of a row spread across it, lines climbing on the upper ports and lines dropping on the lower ones, so none crosses another, and each turns at a run of its own from the column's edge, the farthest first. A line alone on its row meets its partner's port level where it can, so lines between level rows run straight.
+- A row side holding three or more ends hands its farthest-reaching ones to the row's free side, where they wrap around the table; the renderer keeps that only when the result scores better.
+- A relationship within a column, or from a table to itself, loops on the side where fewer other lines leave the column between its two rows, turning at its own slot among that row's lines and outside any shorter loop it spans.
+- Every line keeps a straight run of at least 48 units at each end, so the crow's foot and any ring sit on a straight line; a label sits past that run.
+
+## Excalidraw
+
+Each table is a group: a square-cornered outline (the shape every relationship binds to), a name band with the entity name as bound text, and one multi-line text per column (keys, field names, types) at a line height of two, so each field is one 28-unit row. Both table shapes carry the `er-table` role. Relationships are elbow arrows bound to their tables at fixed points on their rows, so moving a table keeps each end on its row. Heads are Excalidraw's own: `crowfoot_one` for one, `crowfoot_many` for many, `crowfoot_one_or_many` for one or many. Zero-or-one and zero-or-many have no native head: they draw the bar or foot plus a ring on the line past it, a small circle with the `er-optional` role grouped with its table, which other lines may cross.
+
+## Scenarios
+
+Maintained scenarios: `shop-orders-er` (a shop with a composite key and a nullable timestamp), `course-enrollment-er` (many-to-many through a join table), `org-chart-er` (a self-reference with an optional manager) and `saas-workspace-er` (twelve tables, fifteen relationships). Their `--input` checks require every stated entity, every field with its type and exact PK, FK, UK and nullable markers, no entity or relationship the prompt does not state, and every relationship between the right entities through the right fields with the right cardinality at each end, written either way round. A drawn check confirms the scene shows every table, field, marker and crow's-foot end the diagram states.

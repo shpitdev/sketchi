@@ -7,6 +7,7 @@ import {
 	buildSequenceDiagram,
 	buildStateMachine,
 	buildGantt,
+	buildErDiagram,
 	buildTimeline,
 	buildChart,
 	CodeModeArtifactStorage,
@@ -23,6 +24,7 @@ import {
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
 	type BuildGanttResult,
+	type BuildErDiagramResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type CodeModeArtifactStorageError,
@@ -75,6 +77,9 @@ export interface PlaygroundCodeModeShape {
 	readonly buildGantt: (
 		input: unknown,
 	) => Effect.Effect<BuildGanttResult, never, CodeModeRequestContext>;
+	readonly buildErDiagram: (
+		input: unknown,
+	) => Effect.Effect<BuildErDiagramResult, never, CodeModeRequestContext>;
 	readonly createCanvas: (
 		input: unknown,
 	) => Effect.Effect<CreateCanvasResult, never, CodeModeRequestContext>;
@@ -208,6 +213,9 @@ export const PlaygroundCodeModeLive = Layer.effect(
 			),
 			buildGantt: Effect.fn("playground.codeMode.buildGantt")((input) =>
 				provideRequestCodeMode(buildGantt(input)),
+			),
+			buildErDiagram: Effect.fn("playground.codeMode.buildErDiagram")((input) =>
+				provideRequestCodeMode(buildErDiagram(input)),
 			),
 			createCanvas: Effect.fn("playground.codeMode.createCanvas")((input) =>
 				provideRequestCodeMode(createCanvas(input)),

@@ -5,6 +5,7 @@ import { mindmapFixture } from "./types/mindmap.js";
 import { sequenceFixture } from "./types/sequence.js";
 import { stateMachineFixture } from "./types/state-machine.js";
 import { ganttFixture } from "./types/gantt.js";
+import { erFixture } from "./types/er.js";
 import type { CanonicalDiagram } from "./diagram.js";
 
 /** One maintained fixture per canonical family. */
@@ -16,4 +17,5 @@ export const diagramFixtures: readonly CanonicalDiagram[] = [
 	chartFixture,
 	stateMachineFixture,
 	ganttFixture,
+	erFixture,
 ];

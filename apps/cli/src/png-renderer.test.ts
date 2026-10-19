@@ -124,6 +124,48 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG renderer",
 		}),
 	);
 
+	it.effect("exports an ER diagram whose tables move whole and whose lines keep their rows", () =>
+		Effect.gen(function* () {
+			const builder = yield* DiagramBuilder;
+			const renderer = yield* CliPngRenderer;
+			const built = yield* builder.build(
+				canonicalDocument({
+					type: "er",
+					spec: {
+						title: "Org chart",
+						entities: [
+							{
+								id: "employees",
+								fields: ["id int PK", "manager_id int? FK", "department_id int FK"],
+							},
+							{ id: "departments", fields: ["id int PK", "name text UK"] },
+						],
+						relationships: [
+							{
+								from: "employees.manager_id",
+								to: "employees.id",
+								fromCardinality: "zero-or-many",
+								toCardinality: "zero-or-one",
+							},
+							{
+								from: "employees.department_id",
+								to: "departments.id",
+								fromCardinality: "one-or-many",
+								toCardinality: "one",
+							},
+						],
+					},
+				}),
+			);
+			const arrows = built.excalidraw.elements.filter((element) => element["type"] === "arrow");
+			assert.lengthOf(arrows, 2);
+			for (const arrow of arrows) assert.isTrue(arrow["elbowed"]);
+			const png = yield* renderer.renderPng({ scene: built.scene, excalidraw: built.excalidraw });
+			assert.isAbove(png.byteLength, 1_000);
+			assertInkHasPadding(png);
+		}),
+	);
+
 	it.effect("grows the canvas for a wide title without clipping ink", () =>
 		Effect.gen(function* () {
 			const builder = yield* DiagramBuilder;

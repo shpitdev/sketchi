@@ -15,6 +15,8 @@ import {
 	BuildGanttRequestSchema,
 	BuildGanttResultSchema,
 	GanttToolSpecSchema,
+	BuildErDiagramRequestSchema,
+	BuildErDiagramResultSchema,
 	BuildTimelineRequestSchema,
 	BuildSequenceDiagramResultSchema,
 	BuildTimelineResultSchema,
@@ -28,6 +30,7 @@ import {
 	CreateCanvasRequestSchema,
 	CreateCanvasResultSchema,
 	DiagramSelectorSchema,
+	ErToolSpecSchema,
 	FlowchartSpecSchema,
 	MindmapSpecSchema,
 	SequenceDiagramSpecSchema,
@@ -129,6 +132,14 @@ export const codeModeContracts = {
 			spec: GanttToolSpecSchema,
 		}),
 		output: BuildGanttResultSchema,
+	},
+	buildErDiagram: {
+		input: Schema.Struct({
+			...BuildErDiagramRequestSchema.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: ErToolSpecSchema,
+		}),
+		output: BuildErDiagramResultSchema,
 	},
 	createCanvas: {
 		input: CreateCanvasRequestSchema,

@@ -57,6 +57,12 @@ and the eval harness use it.
   drawn bars back off the axis gridlines, require every label, date caption,
   phase header and dependency arrow, and fail any collision between text,
   marks, rules and arrows.
+- ER scenarios check every stated entity, each of its fields with its type and
+  its exact PK, FK, UK and nullable markers, and every stated relationship
+  between the right entities through the right fields with the right
+  cardinality at each end, in either direction. No entity or relationship the
+  prompt does not state may appear, and the drawn scene must show every table,
+  field, marker and crow's-foot end the diagram states.
 
 Checks that measure the model (logos, sequence structure) score the model's own
 diagram from before candidate enforcement, so a repair never hides a model

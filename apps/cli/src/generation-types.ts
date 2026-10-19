@@ -11,6 +11,7 @@ const GENERATION_TYPE_CHOICES = {
 	sequence: { label: "Sequence diagram", hint: "best for ordered participant interactions" },
 	"state-machine": { label: "State machine", hint: "best for states, events and lifecycles" },
 	gantt: { label: "Gantt chart", hint: "best for scheduled tasks, dependencies and milestones" },
+	er: { label: "ER diagram", hint: "best for database tables, keys and relationships" },
 } as const satisfies Record<GenerationType, { readonly hint: string; readonly label: string }>;
 
 /** Wizard options in registry order, one per canonical family. */

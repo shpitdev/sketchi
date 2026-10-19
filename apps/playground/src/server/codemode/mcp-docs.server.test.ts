@@ -354,6 +354,9 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		expect(codeLine("buildGantt")).toBe(
 			'- buildGantt: spec: { title, tasks: [{ id, label, start: "YYYY-MM-DD", end? (last day) | duration? (days), milestone?: true, phase?, dependsOn?: [ids finishing first], progress?: % }], phases?, today? }. Pass a stated duration as duration, not a computed end. Copy every task, date, dependency, milestone and phase from the prompt; invent none.',
 		);
+		expect(codeLine("buildErDiagram")).toBe(
+			'- buildErDiagram: spec: { title, entities: [{ id, fields: ["id uuid PK", "customer_id uuid FK", "email text UK", "note text?"] }], relationships: [{ from: "orders.customer_id", to: "customers.id", fromCardinality: "zero-or-many", toCardinality: "one", label? }] }. Cardinalities: "one", "zero-or-one", "many", "one-or-many", "zero-or-many", each how many rows of its end match one row of the other. Copy every table, field, type, key and cardinality stated.',
+		);
 		expect(codeLine("createCanvas")).toBeUndefined();
 		for (const topic of ["buildMindmap", "buildSequenceDiagram", "buildTimeline"] as const) {
 			const guidance = getCodeModeDocs({ topic }).content.split("\n")[0]!;
@@ -363,6 +366,11 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		const stateMachineDocs = getCodeModeDocs({ topic: "buildStateMachine" }).content;
 		const ganttDocs = getCodeModeDocs({ topic: "buildGantt" }).content;
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(ganttDocs.split("\n\n")[0]);
+		const erDocs = getCodeModeDocs({ topic: "buildErDiagram" }).content;
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(erDocs.split("\n\n")[0]);
+		expect(erDocs.split("Request type:")[0]).toContain(
+			'An order has one customer and a customer zero or many orders: from "orders.customer_id", fromCardinality "zero-or-many", to "customers.id", toCardinality "one".',
+		);
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(chartDocs.split("\n\n")[0]);
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(stateMachineDocs.split("\n\n")[0]);
 		// Models that still call docs get the same guidance.
@@ -395,7 +403,8 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 
 			"
 		`);
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(7_600);
+		// Gantt and ER each add one compact line.
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(8_100);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		expect(overview).toContain(`${CODE_MODE_OPERATIONS.length} operations:`);
 		for (const operation of CODE_MODE_OPERATIONS) {
@@ -408,6 +417,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			["buildSequenceDiagram", ["BuildSequenceDiagramRequest"]],
 			["buildTimeline", ["BuildTimelineRequest"]],
 			["buildGantt", ["BuildGanttRequest"]],
+			["buildErDiagram", ["BuildErDiagramRequest"]],
 			["createCanvas", ["CreateCanvasRequest", "CanvasSpecInput", "CanvasElement"]],
 			["getArtifact", ["GetArtifactRequest"]],
 			["applyDiagramPatch", ["ApplyDiagramPatchRequest", "DiagramSelector"]],

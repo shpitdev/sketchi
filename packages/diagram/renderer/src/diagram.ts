@@ -7,6 +7,7 @@ import { renderMindmapDiagram } from "./mindmap.js";
 import { type RenderedDiagramScene, renderIntermediateDiagram } from "./scene.js";
 import { renderSequenceDiagram } from "./sequence.js";
 import { renderStateMachineDiagram } from "./state-machine.js";
+import { renderErDiagram } from "./er.js";
 
 /** Render any canonical diagram with its family's renderer. */
 export function renderDiagram(diagram: CanonicalDiagram): RenderedDiagramScene {
@@ -25,5 +26,7 @@ export function renderDiagram(diagram: CanonicalDiagram): RenderedDiagramScene {
 			return renderStateMachineDiagram(diagram);
 		case "gantt":
 			return renderGanttDiagram(diagram);
+		case "er":
+			return renderErDiagram(diagram);
 	}
 }

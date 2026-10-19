@@ -1,0 +1,818 @@
+import {
+	type CanvasArrowhead,
+	type ErCardinality,
+	type ErDiagram,
+	type ErEntity,
+	type ErRelationship,
+	erEntityName,
+	erFieldKeys,
+	erNameKey,
+	estimateTextWidth,
+	type IntermediateDiagram,
+	parseErEnd,
+	routingQualityFindings,
+	routingQualityScale,
+} from "@sketchi/diagram-core";
+
+import {
+	ER_FAN_STEP,
+	type ErLayoutLink,
+	type ErPlacement,
+	type ErPlacementOptions,
+	placeErTables,
+} from "./er-layout.js";
+import {
+	arrowCrossings,
+	type ArrowSceneElement,
+	type GraphAnchor,
+	type NodeSceneElement,
+	type RenderedDiagramScene,
+	renderGraphDiagram,
+	type SceneElement,
+	type TextSceneElement,
+} from "./scene.js";
+
+/** The band at a table's top that carries its name. */
+const HEADER_HEIGHT = 40;
+const NAME_FONT_SIZE = 16;
+/** Field rows: one line of 14 px text each, a line height of 2 apart. */
+const FIELD_FONT_SIZE = 14;
+const ROW_HEIGHT = 28;
+const BODY_PADDING = 6;
+const CELL_PADDING = 14;
+const KEY_GAP = 8;
+const TYPE_GAP = 16;
+const MIN_TABLE_WIDTH = 160;
+/**
+ * Straight run at each end of a relationship: room for Excalidraw's crow's
+ * foot or bar (20 units, drawn at full size on a last run of 40 or more) and,
+ * past it, the ring of an optional end.
+ */
+const END_RUN = 48;
+const RING_SIZE = 12;
+/** A ring's center sits this far along its line from the table. */
+const RING_DISTANCE = 32;
+/** Past this, a layout's export reads poorly; a candidate pays for any excess. */
+const READABLE_ASPECT = 2.5;
+const HEADER_FILL = "#efe6ec";
+const KEY_COLOR = "#6a4e5c";
+const TYPE_COLOR = "#6f6656";
+
+/** The head each end draws; an optional end adds a ring past it. */
+const ER_ARROWHEADS: Readonly<Record<ErCardinality, CanvasArrowhead>> = {
+	one: "crowfoot_one",
+	"zero-or-one": "crowfoot_one",
+	many: "crowfoot_many",
+	"one-or-many": "crowfoot_one_or_many",
+	"zero-or-many": "crowfoot_many",
+};
+
+function optional(cardinality: ErCardinality): boolean {
+	return cardinality === "zero-or-one" || cardinality === "zero-or-many";
+}
+
+function single(cardinality: ErCardinality): boolean {
+	return cardinality === "one" || cardinality === "zero-or-one";
+}
+
+/** A table's size and the text of its three columns: keys, field names and types. */
+interface Table {
+	readonly entity: ErEntity;
+	readonly name: string;
+	readonly width: number;
+	readonly height: number;
+	readonly keys: readonly string[];
+	readonly names: readonly string[];
+	readonly types: readonly string[];
+	readonly keyWidth: number;
+	readonly nameWidth: number;
+	readonly typeWidth: number;
+	/** Each field's row middle from the table's top, by its name's key. */
+	readonly rows: ReadonlyMap<string, number>;
+}
+
+const columnWidth = (lines: readonly string[]) =>
+	Math.ceil(Math.max(0, ...lines.map((line) => estimateTextWidth(line, FIELD_FONT_SIZE))));
+
+function rowMiddle(index: number): number {
+	return HEADER_HEIGHT + BODY_PADDING + (index + 0.5) * ROW_HEIGHT;
+}
+
+function tableOf(entity: ErEntity): Table {
+	const name = erEntityName(entity);
+	const keys = entity.fields.map((field) => erFieldKeys(field).join(" "));
+	// A nullable field reads `type?`, or `name?` when it has no type.
+	const names = entity.fields.map(
+		(field) => `${field.name.trim()}${field.nullable && !field.type ? "?" : ""}`,
+	);
+	const types = entity.fields.map((field) =>
+		field.type ? `${field.type}${field.nullable ? "?" : ""}` : "",
+	);
+	const [keyWidth, nameWidth, typeWidth] = [keys, names, types].map(columnWidth) as [
+		number,
+		number,
+		number,
+	];
+	const body =
+		CELL_PADDING +
+		keyWidth +
+		(keyWidth > 0 ? KEY_GAP : 0) +
+		nameWidth +
+		(typeWidth > 0 ? TYPE_GAP + typeWidth : 0) +
+		CELL_PADDING;
+	const header = Math.ceil(estimateTextWidth(name, NAME_FONT_SIZE)) + 2 * CELL_PADDING;
+	return {
+		entity,
+		name,
+		width: Math.max(MIN_TABLE_WIDTH, body, header),
+		height:
+			entity.fields.length > 0
+				? HEADER_HEIGHT + 2 * BODY_PADDING + entity.fields.length * ROW_HEIGHT
+				: HEADER_HEIGHT,
+		keys,
+		names,
+		types,
+		keyWidth,
+		nameWidth,
+		typeWidth,
+		rows: new Map(entity.fields.map((field, index) => [erNameKey(field.name), rowMiddle(index)])),
+	};
+}
+
+/** One end of a relationship as drawn: its table, the height it attaches at and its head. */
+interface End {
+	readonly entity: string;
+	readonly y: number;
+	readonly cardinality: ErCardinality;
+}
+
+/** A relationship oriented from its referenced (parent) end to the end holding the key (child). */
+interface Link {
+	readonly relationship: ErRelationship;
+	readonly parent: End;
+	readonly child: End;
+}
+
+/**
+ * Orient a relationship parent first: the one end of a one-to-many, the end
+ * whose field is a plain primary key in a one-to-one, otherwise as written.
+ */
+function linkOf(relationship: ErRelationship, tables: ReadonlyMap<string, Table>): Link {
+	const [from, to] = [parseErEnd(relationship.from), parseErEnd(relationship.to)];
+	const field = (end: typeof from) =>
+		end.field === undefined
+			? undefined
+			: tables
+					.get(end.entity)!
+					.entity.fields.find((candidate) => erNameKey(candidate.name) === erNameKey(end.field!));
+	// An end without a field, opposite one with a field, attaches at its table's single primary key.
+	const y = (end: typeof from, other: typeof from) => {
+		const table = tables.get(end.entity)!;
+		if (end.field !== undefined) return table.rows.get(erNameKey(end.field))!;
+		const keys = table.entity.fields.filter((candidate) => candidate.pk);
+		if (other.field !== undefined && keys.length === 1)
+			return table.rows.get(erNameKey(keys[0]!.name))!;
+		return HEADER_HEIGHT / 2;
+	};
+	const ends = {
+		from: { entity: from.entity, y: y(from, to), cardinality: relationship.fromCardinality },
+		to: { entity: to.entity, y: y(to, from), cardinality: relationship.toCardinality },
+	};
+	const plainKey = (end: typeof from) => {
+		const found = field(end);
+		return found !== undefined && found.pk === true && found.fk !== true;
+	};
+	const fromIsParent =
+		single(relationship.fromCardinality) !== single(relationship.toCardinality)
+			? single(relationship.fromCardinality)
+			: !(plainKey(to) && !plainKey(from));
+	return fromIsParent
+		? { relationship, parent: ends.from, child: ends.to }
+		: { relationship, parent: ends.to, child: ends.from };
+}
+
+interface PinnedEnd {
+	readonly link: Link;
+	readonly end: "parent" | "child";
+	side: GraphAnchor["side"];
+	/** The middle of the row or name band the end attaches to, from its table's top. */
+	readonly row: number;
+	/** Its port on that row. */
+	y: number;
+}
+
+/**
+ * Ports on one side of a row sit at most this far apart, so two optional
+ * ends' rings clear each other, and this far inside the row's band, so no
+ * port reads as the line between two rows.
+ */
+const PORT_STEP = 14;
+const PORT_MARGIN = 5;
+/** A row side holding more ends than this hands its farthest to the row's free side. */
+const CROWDED_ROW = 2;
+
+type Boxes = ReadonlyMap<
+	string,
+	{ readonly x: number; readonly y: number; readonly width: number; readonly height: number }
+>;
+
+/** Where an end's row or band sits on the canvas. */
+function rowOf(end: PinnedEnd, boxes: Boxes): number {
+	return boxes.get(end.link[end.end].entity)!.y + end.row;
+}
+
+/** Where an end's port sits on the canvas. */
+function portOf(end: PinnedEnd, boxes: Boxes): number {
+	return boxes.get(end.link[end.end].entity)!.y + end.y;
+}
+
+function sameColumn(boxes: Boxes, a: PinnedEnd, b: PinnedEnd): boolean {
+	const [first, second] = [boxes.get(a.link[a.end].entity)!, boxes.get(b.link[b.end].entity)!];
+	return Math.abs(first.x + first.width / 2 - (second.x + second.width / 2)) < 0.5;
+}
+
+/**
+ * How far an end's table side stands inside its column's outer edge: runs
+ * count from that edge, so lines of narrower tables turn in line with the rest.
+ */
+function insetOf(end: PinnedEnd, boxes: Boxes): number {
+	const box = boxes.get(end.link[end.end].entity)!;
+	const column = [...boxes.values()].filter(
+		(other) => Math.abs(other.x + other.width / 2 - (box.x + box.width / 2)) < 0.5,
+	);
+	return end.side === "left"
+		? box.x - Math.min(...column.map((other) => other.x))
+		: Math.max(...column.map((other) => other.x + other.width)) - (box.x + box.width);
+}
+
+function partnerOf(ends: readonly PinnedEnd[], end: PinnedEnd): PinnedEnd {
+	return ends.find((other) => other.link === end.link && other !== end)!;
+}
+
+/** The ends on each side of each row; ends over a table's top stand apart. */
+function rowGroups(ends: readonly PinnedEnd[]): PinnedEnd[][] {
+	const rows = new Map<string, PinnedEnd[]>();
+	for (const end of ends) {
+		if (end.side === "top") continue;
+		const key = `${end.link[end.end].entity}\u0000${end.side}\u0000${end.row}`;
+		rows.set(key, [...(rows.get(key) ?? []), end]);
+	}
+	return [...rows.values()];
+}
+
+/**
+ * Ends crowding one side of a row spill to its other side while that holds
+ * fewer, the farthest reaching first: a line climbing past its table's top,
+ * or dropping past its bottom, wraps around the table and clears the rest.
+ * Loops keep their side. Reports whether any end moved.
+ */
+function spillCrowdedRows(ends: readonly PinnedEnd[], boxes: Boxes): boolean {
+	let spilled = false;
+	for (const row of rowGroups(ends)) {
+		if (row.length <= CROWDED_ROW) continue;
+		const [entity, side] = [row[0]!.link[row[0]!.end].entity, row[0]!.side];
+		const box = boxes.get(entity)!;
+		const opposite = side === "left" ? "right" : "left";
+		let across = ends.filter(
+			(end) =>
+				end.link[end.end].entity === entity && end.side === opposite && end.row === row[0]!.row,
+		).length;
+		const reach = (end: PinnedEnd) => {
+			const target = rowOf(partnerOf(ends, end), boxes);
+			return Math.max(box.y - END_RUN - target, target - (box.y + box.height + END_RUN));
+		};
+		const movable = row
+			.filter((end) => partnerOf(ends, end).side !== end.side && reach(end) > 0)
+			.sort((a, b) => reach(b) - reach(a));
+		let here = row.length;
+		for (const end of movable) {
+			if (here - across < 2) break;
+			end.side = opposite;
+			here -= 1;
+			across += 1;
+			spilled = true;
+		}
+	}
+	return spilled;
+}
+
+/**
+ * Every end has a port of its own, so no two lines share a run or a head.
+ * Ends on one side of a row spread across its band: lines climbing take the
+ * upper ports, the farthest topmost, and lines dropping the lower ones, so
+ * none crosses another. Lines climbing turn at runs of their own from the
+ * column's edge, the farthest first so the nearer nest inside it; so do
+ * lines dropping. An end alone on its row then meets its partner's port
+ * level where that port lies within its row, so a line between level rows
+ * runs straight.
+ */
+function spreadPorts(ends: readonly PinnedEnd[], boxes: Boxes): Map<PinnedEnd, number> {
+	const rows = rowGroups(ends);
+	const half = (end: PinnedEnd) =>
+		(end.row === HEADER_HEIGHT / 2 ? HEADER_HEIGHT : ROW_HEIGHT) / 2 - PORT_MARGIN;
+	const runs = new Map<PinnedEnd, number>();
+	for (const row of rows) {
+		if (row.length < 2) continue;
+		const rise = (end: PinnedEnd) => rowOf(partnerOf(ends, end), boxes) - rowOf(end, boxes);
+		const ups = row.filter((end) => rise(end) < 0).sort((a, b) => rise(a) - rise(b));
+		const downs = row.filter((end) => rise(end) > 0).sort((a, b) => rise(a) - rise(b));
+		const order = [...ups, ...row.filter((end) => rise(end) === 0), ...downs];
+		const step = Math.min(PORT_STEP, (2 * half(row[0]!)) / (order.length - 1));
+		order.forEach((end, slot) => {
+			end.y = end.row + (slot - (order.length - 1) / 2) * step;
+		});
+		const run = (end: PinnedEnd, slot: number) =>
+			runs.set(end, insetOf(end, boxes) + END_RUN + slot * ER_FAN_STEP);
+		ups.forEach(run);
+		downs.toReversed().forEach(run);
+	}
+	for (const row of rows) {
+		if (row.length > 1) continue;
+		const end = row[0]!;
+		const partner = partnerOf(ends, end);
+		if (partner.side === end.side || partner.side === "top") continue;
+		const port = portOf(partner, boxes) - (rowOf(end, boxes) - end.row);
+		if (Math.abs(port - end.row) <= half(end)) end.y = port;
+	}
+	return runs;
+}
+
+/** Each end of a placement's links, on the side the placement gives it. */
+function pinnedEnds(links: readonly Link[], placement: ErPlacement): PinnedEnd[] {
+	const ends: PinnedEnd[] = links.flatMap((link) => {
+		const sides = placement.sides.get(link.relationship.id)!;
+		return (["parent", "child"] as const).map((end) => ({
+			link,
+			end,
+			side: sides[end],
+			row: link[end].y,
+			y: link[end].y,
+		}));
+	});
+	// A loop whose two ends would meet leaves its table's side and returns over its top.
+	for (const link of links) {
+		if (link.parent.entity !== link.child.entity) continue;
+		const [parent, child] = ends.filter((end) => end.link === link);
+		if (parent && child && parent.row === child.row) child.side = "top";
+	}
+	return ends;
+}
+
+/** Give each end its port and route the placement's links between them. */
+function routedScene(
+	diagram: ErDiagram,
+	tables: ReadonlyMap<string, Table>,
+	links: readonly Link[],
+	placement: ErPlacement,
+	ends: readonly PinnedEnd[],
+): RenderedDiagramScene {
+	const runs = spreadPorts(ends, placement.boxes);
+	loopRuns(ends, placement.boxes, runs);
+	const anchors = new Map<string, GraphAnchor>(
+		ends.map((end) => {
+			const table = tables.get(end.link[end.end].entity)!;
+			const offset =
+				end.side === "top"
+					? (parentSide(ends, end.link) === "left" ? -1 : 1) * (table.width / 2 - 2 * CELL_PADDING)
+					: end.y - table.height / 2;
+			const run = runs.get(end);
+			return [
+				`${end.link.relationship.id}:${end.end === "parent" ? "source" : "target"}`,
+				{ side: end.side, offset, ...(run === undefined ? {} : { run }) },
+			] as const;
+		}),
+	);
+	const graph = {
+		id: diagram.id,
+		title: diagram.title,
+		type: "flowchart",
+		nodes: diagram.entities.map((entity) => ({
+			id: entity.id,
+			label: erEntityName(entity),
+			kind: "entity",
+			metadata: {},
+		})),
+		edges: links.map((link) => ({
+			id: link.relationship.id,
+			source: link.parent.entity,
+			target: link.child.entity,
+			metadata: {},
+			...(link.relationship.label ? { label: link.relationship.label } : {}),
+		})),
+		layout: { direction: "LR", edgeRouting: "orthogonal" },
+		style: diagram.style,
+		metadata: {},
+	} satisfies IntermediateDiagram;
+	return renderGraphDiagram(graph, { placement: placement.boxes, anchors, endRun: END_RUN });
+}
+
+/**
+ * Placements to try, each routed in full: the cheapest columns, the same aiming
+ * nearer square, from a start centered on the most linked table, and keeping
+ * linked tables out of a shared column. Larger schemas try the first two only.
+ */
+const PLACEMENTS: readonly ErPlacementOptions[] = [
+	{},
+	{ aspect: 1.1 },
+	{ start: "hub" },
+	{ start: "hub", aspect: 1.1 },
+	{ sameColumn: 5 },
+];
+const LARGE_SCHEMA = 24;
+const PLACEMENT_MARGIN = 0.75;
+
+/**
+ * Crossings plus reader-scale findings, judged at the scene's export size, any
+ * too-long side, and half a point per two ports bunched closer than a step.
+ */
+function routedCost(scene: RenderedDiagramScene): number {
+	const arrows = scene.elements.filter((e): e is ArrowSceneElement => e.type === "arrow");
+	const aspect = Math.max(scene.width / scene.height, scene.height / scene.width);
+	return (
+		arrowCrossings(arrows) +
+		routingQualityFindings(
+			arrows.map((arrow) => ({
+				id: arrow.id,
+				points: arrow.points,
+				sourceId: arrow.sourceNodeId,
+				targetId: arrow.targetNodeId,
+			})),
+			routingQualityScale({ width: scene.width, height: scene.height }),
+		).length +
+		(aspect > READABLE_ASPECT ? 4 * (aspect - READABLE_ASPECT) : 0) +
+		arrows.reduce((sum, arrow) => sum + detour(arrow), 0) +
+		bunchedPorts(arrows) / 2
+	);
+}
+
+/** Pairs of neighboring ports on one side of a table nearer than a port step. */
+function bunchedPorts(arrows: readonly ArrowSceneElement[]): number {
+	const sides = new Map<string, number[]>();
+	for (const arrow of arrows)
+		for (const [node, point] of [
+			[arrow.sourceNodeId, arrow.points[0]],
+			[arrow.targetNodeId, arrow.points.at(-1)!],
+		] as const) {
+			const key = `${node}\u0000${Math.round(point.x)}`;
+			sides.set(key, [...(sides.get(key) ?? []), point.y]);
+		}
+	let pairs = 0;
+	for (const ports of sides.values()) {
+		ports.sort((a, b) => a - b);
+		for (const [index, port] of ports.slice(1).entries())
+			if (port - ports[index]! < PORT_STEP - 0.01) pairs += 1;
+	}
+	return pairs;
+}
+
+/** How much longer than the way between its ends a line runs, past a little slack. */
+function detour(arrow: ArrowSceneElement): number {
+	const [start, end] = [arrow.points[0], arrow.points.at(-1)!];
+	let length = 0;
+	for (const [index, point] of arrow.points.slice(1).entries())
+		length +=
+			Math.abs(point.x - arrow.points[index]!.x) + Math.abs(point.y - arrow.points[index]!.y);
+	const direct = Math.abs(end.x - start.x) + Math.abs(end.y - start.y);
+	return Math.max(0, length / (direct + 2 * END_RUN + 200) - 1);
+}
+
+/** Route each distinct candidate placement and keep the one that crosses least. */
+function bestScene(
+	diagram: ErDiagram,
+	tables: ReadonlyMap<string, Table>,
+	links: readonly Link[],
+): RenderedDiagramScene {
+	const labelWidth = (label: string | undefined) =>
+		label ? Math.min(160, Math.ceil(estimateTextWidth(label, 13))) : 0;
+	const layoutLinks: ErLayoutLink[] = links.map((link) => ({
+		id: link.relationship.id,
+		parent: link.parent.entity,
+		child: link.child.entity,
+		parentY: link.parent.y,
+		childY: link.child.y,
+		labelWidth: labelWidth(link.relationship.label),
+	}));
+	const layoutTables = [...tables.values()].map((table) => ({
+		id: table.entity.id,
+		width: table.width,
+		height: table.height,
+	}));
+	const options = diagram.entities.length > LARGE_SCHEMA ? PLACEMENTS.slice(0, 2) : PLACEMENTS;
+	const tried = new Set<string>();
+	let best: { cost: number; scene: RenderedDiagramScene; placement: ErPlacement } | undefined;
+	for (const option of options) {
+		const placement = placeErTables(layoutTables, layoutLinks, END_RUN, option);
+		const key = JSON.stringify([...placement.boxes, ...placement.sides]);
+		if (tried.has(key)) continue;
+		tried.add(key);
+		const scene = routedScene(diagram, tables, links, placement, pinnedEnds(links, placement));
+		const cost = routedCost(scene);
+		// Another placement must beat the cheapest columns clearly, not by a fraction.
+		if (!best || cost < best.cost - PLACEMENT_MARGIN) best = { cost, scene, placement };
+		if (cost === 0) break;
+	}
+	// The chosen placement also tries its crowded rows spilled to their free sides.
+	const { placement } = best!;
+	const ends = pinnedEnds(links, placement);
+	if (spillCrowdedRows(ends, placement.boxes)) {
+		const scene = routedScene(diagram, tables, links, placement, ends);
+		if (routedCost(scene) < best!.cost) return scene;
+	}
+	return best!.scene;
+}
+
+/**
+ * A loop between two tables of one column, or from a table to itself, turns
+ * at one line for both its ends: at its own slot's run from the column's edge,
+ * so it nests among the row's other lines, and outside any shorter loop on
+ * that side whose rows it spans.
+ */
+function loopRuns(ends: readonly PinnedEnd[], boxes: Boxes, runs: Map<PinnedEnd, number>): void {
+	const loops = ends
+		.filter((end) => end.end === "parent")
+		.flatMap((parent) => {
+			const child = partnerOf(ends, parent);
+			const sameSide = parent.side === child.side && parent.side !== "top";
+			return sameSide && sameColumn(boxes, parent, child) ? [{ parent, child }] : [];
+		})
+		.sort(
+			(a, b) =>
+				Math.abs(portOf(a.parent, boxes) - portOf(a.child, boxes)) -
+				Math.abs(portOf(b.parent, boxes) - portOf(b.child, boxes)),
+		);
+	const placed: {
+		readonly end: PinnedEnd;
+		readonly top: number;
+		readonly bottom: number;
+		readonly tip: number;
+	}[] = [];
+	for (const { parent, child } of loops) {
+		const [from, to] = [
+			boxes.get(parent.link.parent.entity)!,
+			boxes.get(parent.link.child.entity)!,
+		];
+		const slot = (end: PinnedEnd) =>
+			(runs.get(end) ?? insetOf(end, boxes) + END_RUN) - insetOf(end, boxes);
+		const run = Math.max(slot(parent), slot(child));
+		const [top, bottom] = [portOf(parent, boxes), portOf(child, boxes)].sort((a, b) => a - b) as [
+			number,
+			number,
+		];
+		const inner = placed.filter(
+			(loop) =>
+				loop.end.side === parent.side &&
+				sameColumn(boxes, loop.end, parent) &&
+				loop.top <= bottom &&
+				top <= loop.bottom,
+		);
+		if (parent.side === "left") {
+			const tip = Math.min(
+				from.x - insetOf(parent, boxes) - run,
+				...inner.map((loop) => loop.tip - ER_FAN_STEP),
+			);
+			runs.set(parent, from.x - tip);
+			runs.set(child, to.x - tip);
+			placed.push({ end: parent, top, bottom, tip });
+		} else {
+			const tip = Math.max(
+				from.x + from.width + insetOf(parent, boxes) + run,
+				...inner.map((loop) => loop.tip + ER_FAN_STEP),
+			);
+			runs.set(parent, tip - from.x - from.width);
+			runs.set(child, tip - to.x - to.width);
+			placed.push({ end: parent, top, bottom, tip });
+		}
+	}
+}
+
+function parentSide(ends: readonly PinnedEnd[], link: Link): GraphAnchor["side"] {
+	return ends.find((end) => end.link === link && end.end === "parent")?.side ?? "right";
+}
+
+/** A table's elements: its outline, its name band, and a text per column of its rows. */
+function tableElements(
+	table: Table,
+	box: NodeSceneElement,
+	diagram: ErDiagram,
+): { readonly nodes: NodeSceneElement[]; readonly texts: TextSceneElement[] } {
+	const { id } = table.entity;
+	const groupIds = [`table:${id}`];
+	const outline: NodeSceneElement = {
+		type: "node",
+		id: `node:${id}`,
+		nodeId: id,
+		kind: "entity",
+		rendererRole: "er-table",
+		shape: "rectangle",
+		x: box.x,
+		y: box.y,
+		width: table.width,
+		height: table.height,
+		label: table.name,
+		fillColor: diagram.style.backgroundColor,
+		fillStyle: "solid",
+		groupIds,
+	};
+	const band: NodeSceneElement = {
+		type: "node",
+		id: `node:${id}:header`,
+		nodeId: `${id}:header`,
+		kind: "entity-name",
+		rendererRole: "er-table",
+		shape: "rectangle",
+		x: box.x,
+		y: box.y,
+		width: table.width,
+		height: HEADER_HEIGHT,
+		label: table.name,
+		fillColor: HEADER_FILL,
+		fillStyle: "solid",
+		groupIds,
+	};
+	const texts: TextSceneElement[] = [
+		{
+			type: "text",
+			id: `label:${id}:header`,
+			containerId: band.id,
+			x: box.x + table.width / 2,
+			y: box.y + HEADER_HEIGHT / 2,
+			text: table.name,
+			fontSize: NAME_FONT_SIZE,
+			maxWidth: table.width - 2 * CELL_PADDING,
+			groupIds,
+		},
+	];
+	if (table.entity.fields.length > 0) {
+		const top = box.y + HEADER_HEIGHT + BODY_PADDING;
+		const height = table.entity.fields.length * ROW_HEIGHT;
+		// Converted text is centered on its point; each column starts at its left edge.
+		const column = (
+			suffix: string,
+			lines: readonly string[],
+			left: number,
+			width: number,
+			textColor?: string,
+		): TextSceneElement => ({
+			type: "text",
+			id: `text:${id}:${suffix}`,
+			x: left + width / 2,
+			y: top + height / 2,
+			text: lines.join("\n"),
+			fontSize: FIELD_FONT_SIZE,
+			lineHeight: ROW_HEIGHT / FIELD_FONT_SIZE,
+			maxWidth: width,
+			textAlign: "left",
+			...(textColor ? { textColor } : {}),
+			groupIds,
+		});
+		let left = box.x + CELL_PADDING;
+		if (table.keyWidth > 0) {
+			texts.push(column("keys", table.keys, left, table.keyWidth, KEY_COLOR));
+			left += table.keyWidth + KEY_GAP;
+		}
+		texts.push(column("fields", table.names, left, table.nameWidth));
+		if (table.typeWidth > 0)
+			texts.push(
+				column(
+					"types",
+					table.types,
+					left + table.nameWidth + TYPE_GAP,
+					table.typeWidth,
+					TYPE_COLOR,
+				),
+			);
+	}
+	return { nodes: [outline, band], texts };
+}
+
+/** The ring an optional end draws on its line, past its bar or foot, grouped with its table. */
+function ring(
+	arrow: ArrowSceneElement,
+	at: "start" | "end",
+	entity: string,
+	index: number,
+	diagram: ErDiagram,
+	distance = RING_DISTANCE,
+): NodeSceneElement {
+	const points = arrow.points;
+	const [tip, next] = at === "start" ? [points[0], points[1]] : [points.at(-1)!, points.at(-2)];
+	const length = next ? Math.hypot(next.x - tip.x, next.y - tip.y) : 1;
+	const [dx, dy] = next ? [(next.x - tip.x) / length, (next.y - tip.y) / length] : [1, 0];
+	const center = { x: tip.x + dx * distance, y: tip.y + dy * distance };
+	return {
+		type: "node",
+		id: `node:${entity}:optional:${index}`,
+		nodeId: `${entity}:optional:${index}`,
+		kind: "optional",
+		rendererRole: "er-optional",
+		shape: "circle",
+		x: center.x - RING_SIZE / 2,
+		y: center.y - RING_SIZE / 2,
+		width: RING_SIZE,
+		height: RING_SIZE,
+		label: "Optional end",
+		fillColor: diagram.style.backgroundColor,
+		fillStyle: "solid",
+		strokeColor: diagram.style.accentColor,
+		groupIds: [`table:${entity}`],
+	};
+}
+
+/**
+ * Render an ER diagram: each entity a table (its name over a row per field,
+ * with key markers and types in their own columns), each relationship an
+ * orthogonal line from row to row with a crow's-foot end at each table.
+ */
+export function renderErDiagram(diagram: ErDiagram): RenderedDiagramScene {
+	const tables = new Map(diagram.entities.map((entity) => [entity.id, tableOf(entity)]));
+	const links = diagram.relationships.map((relationship) => linkOf(relationship, tables));
+	const scene = bestScene(diagram, tables, links);
+	const boxes = new Map(
+		scene.elements.flatMap((element) =>
+			element.type === "node" ? [[element.nodeId, element] as const] : [],
+		),
+	);
+	const drawnTables = diagram.entities.map((entity) =>
+		tableElements(tables.get(entity.id)!, boxes.get(entity.id)!, diagram),
+	);
+	const linkById = new Map(links.map((link) => [link.relationship.id, link]));
+	const rings: NodeSceneElement[] = [];
+	const touches = (drawn: NodeSceneElement) =>
+		rings.some((other) => Math.hypot(other.x - drawn.x, other.y - drawn.y) < RING_SIZE + 2);
+	const arrows = scene.elements.flatMap((element): ArrowSceneElement[] => {
+		if (element.type !== "arrow") return [];
+		const link = linkById.get(element.edgeId)!;
+		for (const [at, end] of [
+			["start", link.parent],
+			["end", link.child],
+		] as const) {
+			if (!optional(end.cardinality)) continue;
+			// A ring that would touch a neighbor's moves further along its own first run.
+			const [tip, next] =
+				at === "start"
+					? [element.points[0], element.points[1]!]
+					: [element.points.at(-1)!, element.points.at(-2)!];
+			const run = Math.hypot(next.x - tip.x, next.y - tip.y);
+			let drawn = ring(element, at, end.entity, rings.length, diagram);
+			for (
+				let distance = RING_DISTANCE + RING_SIZE + 2;
+				touches(drawn) && distance + RING_SIZE <= run;
+				distance += RING_SIZE + 2
+			)
+				drawn = ring(element, at, end.entity, rings.length, diagram, distance);
+			rings.push(drawn);
+		}
+		return [
+			{
+				...element,
+				startArrowhead: ER_ARROWHEADS[link.parent.cardinality],
+				endArrowhead: ER_ARROWHEADS[link.child.cardinality],
+			},
+		];
+	});
+	const labels = scene.elements.filter(
+		(element): element is TextSceneElement =>
+			element.type === "text" && element.containerId === undefined,
+	);
+	const elements: SceneElement[] = [
+		...drawnTables.flatMap((table) => [...table.nodes, ...table.texts]),
+		...arrows,
+		...rings,
+		...labels,
+	];
+	return {
+		...scene,
+		elements,
+		zOrder: elements.map((element) => element.id),
+	};
+}
+
+/** A table's outline or name band keeps its role while it is still a plain rectangle. */
+export function isStructurallyValidErTable(element: {
+	readonly icon?: unknown;
+	readonly id: string;
+	readonly nodeId: string;
+	readonly shape: string;
+}): boolean {
+	return (
+		element.shape === "rectangle" &&
+		element.icon === undefined &&
+		element.id === `node:${element.nodeId}`
+	);
+}
+
+/** An optional-end ring keeps its role while it is still a small round mark. */
+export function isStructurallyValidErOptional(element: {
+	readonly height: number;
+	readonly icon?: unknown;
+	readonly nodeId: string;
+	readonly shape: string;
+	readonly width: number;
+}): boolean {
+	return (
+		(element.shape === "circle" || element.shape === "ellipse") &&
+		element.icon === undefined &&
+		element.nodeId.includes(":optional:") &&
+		Math.max(element.width, element.height) <= 2 * RING_SIZE
+	);
+}

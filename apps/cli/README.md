@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Typed, deterministic diagrams from your terminal.</strong><br />
-  Create, inspect, revise, and export local flowcharts, mindmaps, sequence diagrams, timelines, charts, state machines, and Gantt charts—or turn one prompt into validated, editable Excalidraw.
+  Create, inspect, revise, and export local flowcharts, mindmaps, sequence diagrams, timelines, charts, state machines, Gantt charts, and ER diagrams—or turn one prompt into validated, editable Excalidraw.
 </p>
 
 <p align="center">
@@ -53,7 +53,7 @@ sketchi generate --prompt "Map release approval with pass and revise branches"
 
 With no `--prompt`, Sketchi opens a short wizard only when both standard input
 and standard output are human terminals, output is text, and CI is absent. It
-asks for prompt text, flowchart (the default), mind map, sequence diagram, timeline, chart, state machine, or Gantt chart, and where to save the
+asks for prompt text, flowchart (the default), mind map, sequence diagram, timeline, chart, state machine, Gantt chart, or ER diagram, and where to save the
 PNG. The choices are the current directory, a `diagrams/` folder under exactly
 the directory where Sketchi was run, or a custom path with the same semantics as
 `--dest`. Sketchi does not inspect Git, and it creates `diagrams/` only after
@@ -64,7 +64,7 @@ that wizard question. Explicit `--format png` may proceed; another format or
 Scripts, pipes, redirected streams, CI, and `--output json` never prompt or
 block. They must pass `--prompt`; omitting it retains the deterministic usage
 error. Passing `--prompt` is always direct and noninteractive.
-`--type` accepts only flowchart, mindmap, sequence, timeline, chart, state-machine, or gantt and is authoritative.
+`--type` accepts only flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, or er and is authoritative.
 Without it, the generation model selects one of those from the request; a
 request for any other kind of diagram returns a typed unsupported-type error
 instead of being coerced into a supported one.
@@ -103,7 +103,7 @@ The endpoint defaults to
 `https://playground.sketchi.app/api/v1/canvases/create`; use `--endpoint URL` or
 `SKETCHI_CANVAS_ENDPOINT` only for preview and local testing. The existing
 `create` command remains the separate, strictly offline command for accepted
-flowchart, mindmap, sequence, timeline, chart, state-machine, and gantt documents.
+flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, and er documents.
 
 ## Create and work with a diagram offline
 
@@ -326,3 +326,5 @@ Native charts: use `buildChart` (Code Mode) or `generate --type chart` (CLI). Su
 Native state machines: use `buildStateMachine` (Code Mode) or `generate --type state-machine` (CLI). Supply `initial`, states with unique ids and labels (`kind: "final"` for an end, `"choice"` for a guarded branch; states naming a `parent` form a composite with its own `initial`), and transitions with `source`, `target` and optional `event`, `guard` and `action`, drawn as `event [guard] / action`. Self-loops and transitions into or out of a composite are supported; composites do not nest.
 
 Native Gantt charts: use `buildGantt` (Code Mode) or `generate --type gantt` (CLI). Supply tasks with unique ids, labels, a `start` day (`YYYY-MM-DD`) and either `end` (last day, inclusive) or `duration` (calendar days); `milestone: true` draws a diamond. Optional `dependsOn` (finish-to-start predecessor ids), `phase` on every task (`phases` sets their order), `progress` (percent) and `today`. The renderer draws a to-scale date axis with day, week, month, quarter or year ticks, one row per task under phase headers, a date column, and dependency arrows routed clear of every bar and label. Never supply coordinates.
+
+Native ER diagrams: use `buildErDiagram` (Code Mode) or `generate --type er` (CLI). Supply entities with unique ids (no dots) and fields written `"name type markers"` (`"id uuid PK"`, `"customer_id uuid FK"`, `"email text UK"`, `"note text?"` for nullable), and relationships whose `from` and `to` name `entity.field` or an entity, each end with a cardinality (`one`, `zero-or-one`, `many`, `one-or-many` or `zero-or-many`) and an optional label. The renderer draws each entity as a table and each relationship as an orthogonal line between the rows it joins, with crow's-foot ends; it owns every coordinate.

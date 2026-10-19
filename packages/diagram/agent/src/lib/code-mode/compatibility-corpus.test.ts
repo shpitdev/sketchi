@@ -163,7 +163,14 @@ const GANTT_ISSUE_CODE_ADDITIONS = new Set([
 	"gantt_dependency_cycle",
 	"gantt_schedule_conflict",
 ]);
-// Entity-relationship ends add crow's-foot arrowheads.
+// ER diagrams add five issue codes and crow's-foot arrowheads.
+const ER_ISSUE_CODE_ADDITIONS = new Set([
+	"er_too_large",
+	"invalid_entity",
+	"invalid_field",
+	"unknown_relationship_field",
+	"invalid_relationship",
+]);
 const CANVAS_ARROWHEAD_ADDITIONS = new Set([
 	"crowfoot_one",
 	"crowfoot_many",
@@ -276,6 +283,7 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		CHART_ISSUE_CODE_ADDITIONS.has(value) ||
 		STATE_MACHINE_ISSUE_CODE_ADDITIONS.has(value) ||
 		GANTT_ISSUE_CODE_ADDITIONS.has(value) ||
+		ER_ISSUE_CODE_ADDITIONS.has(value) ||
 		CANVAS_ARROWHEAD_ADDITIONS.has(value)
 	);
 }
@@ -1696,7 +1704,8 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 						!GROUP_ISSUE_CODE_ADDITIONS.has(code) &&
 						!CHART_ISSUE_CODE_ADDITIONS.has(code) &&
 						!STATE_MACHINE_ISSUE_CODE_ADDITIONS.has(code) &&
-						!GANTT_ISSUE_CODE_ADDITIONS.has(code),
+						!GANTT_ISSUE_CODE_ADDITIONS.has(code) &&
+						!ER_ISSUE_CODE_ADDITIONS.has(code),
 				)
 				.toSorted(),
 		).toEqual([...directlyReachableCodes, ...boundaryOnlyCodes].toSorted());

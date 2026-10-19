@@ -39,7 +39,7 @@
     "content": [
       {
         "type": "text",
-        "text": "MCP error -32602: Input validation error: Invalid arguments for tool docs: [\n  {\n    \"path\": [\n      \"topic\"\n    ],\n    \"message\": \"Expected \\\"overview\\\" | \\\"execute\\\" | \\\"buildFlowchart\\\" | \\\"buildMindmap\\\" | \\\"buildSequenceDiagram\\\" | \\\"buildTimeline\\\" | \\\"buildChart\\\" | \\\"buildStateMachine\\\" | \\\"buildGantt\\\" | \\\"createCanvas\\\" | \\\"getArtifact\\\" | \\\"applyDiagramPatch\\\" | \\\"patchOperations\\\" | \\\"agentSequence\\\" | \\\"issues\\\" | \\\"examples\\\"\"\n  }\n]"
+        "text": "MCP error -32602: Input validation error: Invalid arguments for tool docs: [\n  {\n    \"path\": [\n      \"topic\"\n    ],\n    \"message\": \"Expected \\\"overview\\\" | \\\"execute\\\" | \\\"buildFlowchart\\\" | \\\"buildMindmap\\\" | \\\"buildSequenceDiagram\\\" | \\\"buildTimeline\\\" | \\\"buildChart\\\" | \\\"buildStateMachine\\\" | \\\"buildGantt\\\" | \\\"buildErDiagram\\\" | \\\"createCanvas\\\" | \\\"getArtifact\\\" | \\\"applyDiagramPatch\\\" | \\\"patchOperations\\\" | \\\"agentSequence\\\" | \\\"issues\\\" | \\\"examples\\\"\"\n  }\n]"
       }
     ],
     "isError": true

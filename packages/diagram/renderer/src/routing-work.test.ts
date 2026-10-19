@@ -2,11 +2,15 @@ import * as diagramCore from "@sketchi/diagram-core";
 import {
 	crossingFixtures,
 	crossingStateMachines,
+	erFixture,
+	erStressFixtures,
 	flowchartFixture,
+	orgChartEr,
 	parseIntermediateDiagram,
 } from "@sketchi/diagram-core";
 import { describe, expect, it, vi } from "vitest";
 import { renderIntermediateDiagram } from "./scene";
+import { renderErDiagram } from "./er";
 import { renderStateMachineDiagram } from "./state-machine";
 
 // Count the segment geometry checks the router makes through diagram-core. The
@@ -123,5 +127,22 @@ describe("crossing repair work", () => {
 		for (const fixture of Object.values(crossingFixtures)) renderIntermediateDiagram(fixture);
 		for (const machine of Object.values(crossingStateMachines)) renderStateMachineDiagram(machine);
 		expect(work.checks).toBeLessThan(8_500_000);
+	});
+});
+
+describe("ER routing work", () => {
+	// Measured: 7.1k checks for the two fixtures and 3.46M for the twenty-table
+	// marketplace, its candidate placements each routed in full.
+	it("bounds segment checks for typical schemas and the twenty-table stress schema", () => {
+		work.checks = 0;
+		renderErDiagram(erFixture);
+		renderErDiagram(orgChartEr);
+		const small = work.checks;
+		work.checks = 0;
+		renderErDiagram(erStressFixtures.marketplace);
+		const large = work.checks;
+		expect(small).toBeGreaterThan(0);
+		expect(small).toBeLessThan(50_000);
+		expect(large).toBeLessThan(6_000_000);
 	});
 });

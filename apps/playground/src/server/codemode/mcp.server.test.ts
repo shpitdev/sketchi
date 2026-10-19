@@ -799,6 +799,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 				/^- buildChart: .*series: \[\{ name\?, values: number\[\] \}\]/m,
 			);
 			expect(codeDescription).toMatch(/^- buildStateMachine: .*one may be "else"/m);
+			expect(codeDescription).toMatch(/^- buildErDiagram: .*fromCardinality: "zero-or-many"/m);
 			expect(
 				JSON.stringify(
 					tools.tools.map(({ name, description, inputSchema }) => ({
@@ -807,7 +808,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(10_800);
+			).toBeLessThan(11_400);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,

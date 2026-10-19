@@ -9,6 +9,7 @@ import {
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
 	type BuildGanttResult,
+	type BuildErDiagramResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type CreateCanvasResult,
@@ -121,6 +122,7 @@ const ExecuteBuildContract = Schema.Struct({
 		"buildChart",
 		"buildStateMachine",
 		"buildGantt",
+		"buildErDiagram",
 		"createCanvas",
 	]),
 	ok: Schema.Boolean,
@@ -151,6 +153,7 @@ type BuildResult =
 	| BuildChartResult
 	| BuildStateMachineResult
 	| BuildGanttResult
+	| BuildErDiagramResult
 	| CreateCanvasResult;
 
 // Receipts carry references, not a second copy of the potentially large inline scene/export.
@@ -218,7 +221,7 @@ function trackSandboxBuilds(code: string): string {
       const trackedSketchi = new Proxy(sketchi, {
         get(target, name) {
           const method = target[name];
-          if (!["buildFlowchart", "buildMindmap", "buildSequenceDiagram", "buildTimeline", "buildChart", "buildStateMachine", "buildGantt", "createCanvas"].includes(name)) return method;
+          if (!["buildFlowchart", "buildMindmap", "buildSequenceDiagram", "buildTimeline", "buildChart", "buildStateMachine", "buildGantt", "buildErDiagram", "createCanvas"].includes(name)) return method;
           return (...args) => {
             const pending = method(...args);
             pendingBuilds.push(pending);
@@ -647,6 +650,13 @@ export function makeSketchiCodeModeProvider(
 				runToolEffect(
 					withTelemetryCorrelation(
 						build("buildGantt", withTrailingOptions(request, options)),
+						correlation,
+					),
+				),
+			buildErDiagram: (request, options) =>
+				runToolEffect(
+					withTelemetryCorrelation(
+						build("buildErDiagram", withTrailingOptions(request, options)),
 						correlation,
 					),
 				),

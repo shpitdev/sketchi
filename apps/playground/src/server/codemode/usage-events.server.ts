@@ -38,6 +38,7 @@ export type CodeModeUsageOperation =
 	| "buildChart"
 	| "buildStateMachine"
 	| "buildGantt"
+	| "buildErDiagram"
 	| "createCanvas"
 	| "execute"
 	| "generateDiagram";

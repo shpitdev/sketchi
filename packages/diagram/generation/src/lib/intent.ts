@@ -9,11 +9,7 @@ export type DiagramGenerationType = DiagramTypeValue;
  * Kinds a model may recognize but Sketchi does not draw. Promoting one to a
  * canonical family means removing it here (docs/diagram-families.md).
  */
-export const UnsupportedDiagramIntentKindSchema = Schema.Literals([
-	"er",
-	"architecture",
-	"swimlane",
-]);
+export const UnsupportedDiagramIntentKindSchema = Schema.Literals(["architecture", "swimlane"]);
 export type UnsupportedDiagramIntentKind = typeof UnsupportedDiagramIntentKindSchema.Type;
 
 export const DiagramIntentKindSchema = Schema.Union([
@@ -31,10 +27,12 @@ export class CountRequirement extends Schema.Class<CountRequirement>("CountRequi
 		"categories",
 		"cycles",
 		"decision_nodes",
+		"entities",
 		"messages",
 		"events",
 		"nodes",
 		"participants",
+		"relationships",
 		"states",
 		"tasks",
 		"terminal_nodes",
@@ -66,6 +64,8 @@ export class LabelRequirement extends Schema.Class<LabelRequirement>("LabelRequi
 		"transition",
 		"task",
 		"phase",
+		"entity",
+		"field",
 	]),
 	value: Schema.NonEmptyString,
 }) {}
@@ -108,6 +108,7 @@ const FALLBACK_TITLES: Readonly<Record<DiagramGenerationType, string>> = {
 	chart: "Generated chart",
 	"state-machine": "Generated state machine",
 	gantt: "Generated Gantt chart",
+	er: "Generated ER diagram",
 };
 
 function titleFromId(id: string): string | undefined {

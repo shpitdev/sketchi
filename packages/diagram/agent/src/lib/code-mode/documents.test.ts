@@ -19,7 +19,8 @@ describe("canonical diagram documents", () => {
 		expect(CANONICAL_DOCUMENT_TYPES).toEqual(DIAGRAM_TYPES);
 		expect(Object.keys(CANONICAL_DOCUMENT_SPECS).sort()).toEqual([...DIAGRAM_TYPES].sort());
 		expect(isCanonicalDocumentType("sequence")).toBe(true);
-		expect(isCanonicalDocumentType("er")).toBe(false);
+		expect(isCanonicalDocumentType("er")).toBe(true);
+		expect(isCanonicalDocumentType("swimlane")).toBe(false);
 	});
 
 	it("keeps flowchart logos and maps vertical and horizontal directions", () => {

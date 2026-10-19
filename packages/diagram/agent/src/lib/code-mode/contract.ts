@@ -8,6 +8,7 @@ import {
 	CANVAS_SPEC_VERSION,
 	CHART_KINDS,
 	CHART_ORIENTATIONS,
+	ER_CARDINALITIES,
 	SEQUENCE_MESSAGE_STYLES,
 	SEQUENCE_MESSAGE_TYPES,
 	SKETCHI_DIAGRAM_STYLE,
@@ -418,6 +419,11 @@ export const CODE_MODE_ISSUE_CODES = [
 	"invalid_gantt_progress",
 	"gantt_dependency_cycle",
 	"gantt_schedule_conflict",
+	"er_too_large",
+	"invalid_entity",
+	"invalid_field",
+	"unknown_relationship_field",
+	"invalid_relationship",
 	"request_too_large",
 	"generic_label",
 	"label_too_long",
@@ -833,6 +839,65 @@ export class GanttSpec extends Schema.Class<GanttSpec>("GanttSpec")(
 	{ identifier: undefined },
 ) {}
 export const GanttSpecSchema = GanttSpec;
+/**
+ * The authoring form of diagram-core's canonical ErDiagram: a field may be one
+ * string (`"id uuid PK"`), relationship ids are optional and style is
+ * defaulted. buildErDiagram normalizes it into the core contract, which owns
+ * every invariant.
+ */
+export class ErFieldSpec extends Schema.Class<ErFieldSpec>("ErFieldSpec")(
+	{
+		name: RequiredNonEmptyString,
+		type: optionalContract(NonEmptyString),
+		pk: optionalContract(Schema.Boolean),
+		fk: optionalContract(Schema.Boolean),
+		unique: optionalContract(Schema.Boolean),
+		nullable: optionalContract(Schema.Boolean),
+	},
+	{ identifier: undefined },
+) {}
+
+const erFieldsDefault: Array<string | typeof ErFieldSpec.Encoded> = [];
+export class ErEntitySpec extends Schema.Class<ErEntitySpec>("ErEntitySpec")(
+	{
+		id: RequiredNonEmptyString,
+		name: optionalContract(NonEmptyString),
+		fields: Schema.Array(Schema.Union([NonEmptyString, ErFieldSpec]))
+			.pipe(Schema.mutable)
+			.annotate({ default: erFieldsDefault })
+			.pipe(Schema.withDecodingDefaultKey(Effect.succeed(erFieldsDefault))),
+	},
+	{ identifier: undefined },
+) {}
+
+export class ErRelationshipSpec extends Schema.Class<ErRelationshipSpec>("ErRelationshipSpec")(
+	{
+		id: optionalContract(NonEmptyString),
+		from: RequiredNonEmptyString,
+		to: RequiredNonEmptyString,
+		fromCardinality: literals(ER_CARDINALITIES),
+		toCardinality: literals(ER_CARDINALITIES),
+		label: optionalContract(NonEmptyString),
+	},
+	{ identifier: undefined },
+) {}
+
+const erRelationshipsDefault: Array<typeof ErRelationshipSpec.Encoded> = [];
+const ErRelationshipsWithDefault = Schema.Array(ErRelationshipSpec)
+	.pipe(Schema.mutable)
+	.annotate({ default: erRelationshipsDefault })
+	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(erRelationshipsDefault)));
+export class ErSpec extends Schema.Class<ErSpec>("ErSpec")(
+	{
+		id: optionalContract(NonEmptyString),
+		title: RequiredNonEmptyString,
+		entities: requiredArray(nonEmptyArray(ErEntitySpec)),
+		relationships: ErRelationshipsWithDefault,
+		style: DiagramStyleWithDefault,
+	},
+	{ identifier: undefined },
+) {}
+export const ErSpecSchema = ErSpec;
 
 const ArtifactFormatsOption = optionalContract(nonEmptyArray(ArtifactFormatSchema));
 const InlineArtifactsOption = optionalContract(
@@ -1033,6 +1098,24 @@ export const BuildGanttToolInputSchema = Schema.Struct({
 	spec: requiredObject(GanttToolSpecSchema),
 });
 export type BuildGanttToolInput = typeof BuildGanttToolInputSchema.Type;
+export class BuildErDiagramRequest extends Schema.Class<BuildErDiagramRequest>(
+	"BuildErDiagramRequest",
+)(
+	{
+		requestId: optionalContract(NonEmptyString),
+		spec: requiredObject(ErSpec),
+		options: optionalContract(BuildFlowchartOptions),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildErDiagramRequestSchema = BuildErDiagramRequest;
+/** The ER spec a model authors; style is always the Sketchi palette. */
+export const ErToolSpecSchema = ErSpec.mapFields(({ style: _style, ...fields }) => fields);
+export const BuildErDiagramToolInputSchema = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(ErToolSpecSchema),
+});
+export type BuildErDiagramToolInput = typeof BuildErDiagramToolInputSchema.Type;
 
 export interface MindmapTopicInput {
 	label: string;
@@ -1805,6 +1888,22 @@ const NormalizedGanttSpecSchema = GanttSpec.mapFields((fields) => ({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 }));
 export type NormalizedGanttSpec = typeof NormalizedGanttSpecSchema.Type;
+const NormalizedErSpecSchema = Schema.Struct({
+	id: NonEmptyString,
+	title: NonEmptyString,
+	entities: Schema.Array(
+		Schema.Struct({
+			id: NonEmptyString,
+			name: optionalContract(NonEmptyString),
+			fields: Schema.Array(ErFieldSpec).pipe(Schema.mutable),
+		}),
+	).pipe(Schema.mutable),
+	relationships: Schema.Array(
+		ErRelationshipSpec.mapFields((fields) => ({ ...fields, id: NonEmptyString })),
+	).pipe(Schema.mutable),
+	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
+});
+export type NormalizedErSpec = typeof NormalizedErSpecSchema.Type;
 const NormalizedChartSpecSchema = ChartSpec.mapFields((fields) => ({
 	...fields,
 	id: NonEmptyString,
@@ -2133,6 +2232,48 @@ export class BuildGanttRejected extends Schema.Class<BuildGanttRejected>("BuildG
 ) {}
 export const BuildGanttResultSchema = Schema.Union([BuildGanttAccepted, BuildGanttRejected]);
 export type BuildGanttResult = typeof BuildGanttResultSchema.Type;
+export class BuildErDiagramAccepted extends Schema.Class<BuildErDiagramAccepted>(
+	"BuildErDiagramAccepted",
+)(
+	{
+		ok: booleanLiteral(true),
+		status: stringLiteral("accepted"),
+		buildId: Schema.String,
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: NormalizedErSpecSchema,
+		quality: QualityReportSchema,
+		artifact: ArtifactBundleSchema,
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export class BuildErDiagramRejected extends Schema.Class<BuildErDiagramRejected>(
+	"BuildErDiagramRejected",
+)(
+	{
+		ok: booleanLiteral(false),
+		status: literals([
+			"invalid_input",
+			"invalid_er_diagram",
+			"quality_failed",
+			"render_failed",
+			"export_failed",
+			"storage_failed",
+		]),
+		buildId: optionalContract(Schema.String),
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: optionalContract(NormalizedErSpecSchema),
+		quality: optionalContract(QualityReportSchema),
+		partial: optionalContract(PartialArtifactBundleSchema),
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildErDiagramResultSchema = Schema.Union([
+	BuildErDiagramAccepted,
+	BuildErDiagramRejected,
+]);
+export type BuildErDiagramResult = typeof BuildErDiagramResultSchema.Type;
 
 export class GetArtifactAccepted extends Schema.Class<GetArtifactAccepted>("GetArtifactAccepted")(
 	{

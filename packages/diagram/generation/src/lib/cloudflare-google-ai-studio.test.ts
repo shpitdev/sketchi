@@ -78,7 +78,7 @@ describe("Google AI Studio boundaries", () => {
 									text: JSON.stringify({
 										title: "Unsupported",
 										intent: {
-											requestedKind: "er",
+											requestedKind: "architecture",
 											nativeKind: null,
 											requirements: [],
 										},

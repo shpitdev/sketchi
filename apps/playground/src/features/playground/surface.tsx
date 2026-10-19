@@ -83,6 +83,8 @@ function resultSummary(result: StudioBuildResult): {
 			connectionCount: spec.tasks.reduce((count, task) => count + (task.dependsOn?.length ?? 0), 0),
 			itemCount: spec.tasks.length,
 		};
+	if ("entities" in spec)
+		return { connectionCount: spec.relationships.length, itemCount: spec.entities.length };
 	return "participants" in spec
 		? { connectionCount: spec.messages.length, itemCount: spec.participants.length }
 		: { connectionCount: spec.edges.length, itemCount: spec.nodes.length };
@@ -156,6 +158,7 @@ function failureCopy(status: Exclude<StudioBuildResult, { ok: true }>["status"])
 		case "invalid_chart":
 		case "invalid_state_machine":
 		case "invalid_gantt":
+		case "invalid_er_diagram":
 			return {
 				message: "This draft needs a clearer structure before it can be drawn.",
 				hint: "Clarify the steps or simplify the connections, then try again.",

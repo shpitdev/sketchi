@@ -1,9 +1,9 @@
 # Adding a diagram family
 
 Sketchi supports a fixed set of canonical diagram families: flowchart, mindmap,
-sequence, timeline, chart, state-machine, and gantt. `DIAGRAM_TYPES` in `packages/diagram/core/src/types.ts` is the
+sequence, timeline, chart, state-machine, gantt, and er. `DIAGRAM_TYPES` in `packages/diagram/core/src/types.ts` is the
 registry. A family is supported only when it completes every stage below, and
-only supported families are advertised. Everything else, such as ER or
+only supported families are advertised. Everything else, such as architecture or
 swimlane, fails with a typed `unsupported_diagram_type` and is never coerced
 into another family.
 
@@ -36,7 +36,8 @@ stage exists.
 
 Groups (labeled regions around related steps) are a flowchart feature, not a
 family; see `docs/flowchart-groups.md`. State machines reuse them for composite
-states; see `docs/state-machines.md`.
+states; see `docs/state-machines.md`. ER diagrams place their own tables and
+route on the graph router with pinned row ends; see `docs/er-diagrams.md`.
 
 Surfaces that offer a family to people also need updating: the playground
 generate API (`apps/playground/src/server/generation/api.server.ts`), Studio

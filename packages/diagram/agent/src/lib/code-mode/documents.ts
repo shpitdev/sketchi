@@ -9,7 +9,9 @@ import {
 	type BuildMindmapResult,
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
+	type BuildErDiagramResult,
 	type BuildTimelineResult,
+	ErSpec,
 	FlowchartSpec,
 	MindmapSpec,
 	type MindmapTopicInput,
@@ -25,6 +27,7 @@ import {
 	buildMindmap,
 	buildSequenceDiagram,
 	buildStateMachine,
+	buildErDiagram,
 	buildTimeline,
 	buildChart,
 	buildGantt,
@@ -43,6 +46,7 @@ export const CANONICAL_DOCUMENT_SPECS = {
 	chart: ChartSpec,
 	"state-machine": StateMachineSpec,
 	gantt: GanttSpec,
+	er: ErSpec,
 } as const satisfies Record<DiagramTypeValue, unknown>;
 
 /** A canonical diagram document: a family and its authoring spec. */
@@ -60,7 +64,8 @@ export type CanonicalBuildResult =
 	| BuildTimelineResult
 	| BuildChartResult
 	| BuildStateMachineResult
-	| BuildGanttResult;
+	| BuildGanttResult
+	| BuildErDiagramResult;
 
 export function isCanonicalDocumentType(value: unknown): value is DiagramTypeValue {
 	return CANONICAL_DOCUMENT_TYPES.some((type) => type === value);
@@ -91,6 +96,8 @@ export function buildCanonicalDocument(
 			return buildStateMachine(request);
 		case "gantt":
 			return buildGantt(request);
+		case "er":
+			return buildErDiagram(request);
 	}
 }
 
@@ -207,6 +214,20 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 					states: diagram.states.map((state) => ({ ...state })),
 					transitions: diagram.transitions.map((transition) => ({ ...transition })),
 					...(diagram.layout ? { layout: { direction: diagram.layout.direction } } : {}),
+					style: diagram.style,
+				},
+			};
+		case "er":
+			return {
+				type: "er",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					entities: diagram.entities.map((entity) => ({
+						...entity,
+						fields: entity.fields.map((field) => ({ ...field })),
+					})),
+					relationships: diagram.relationships.map((relationship) => ({ ...relationship })),
 					style: diagram.style,
 				},
 			};

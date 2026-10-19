@@ -31,8 +31,9 @@ const BUILDERS = {
 	buildChart: "bar, line or pie charts of numbers across categories",
 	buildStateMachine: "states and the events, guards and actions that move between them",
 	buildGantt: "Gantt charts of dated tasks, durations, dependencies and milestones",
+	buildErDiagram: "database schemas: tables, fields, keys and relationships",
 	createCanvas:
-		"hand-placed CanvasSpec, only for layouts no builder above covers (ERD, dashboard, wireframe)",
+		"hand-placed CanvasSpec, only for layouts no builder above covers (dashboard, wireframe)",
 };
 const HELPERS = {
 	searchIcons:
@@ -63,6 +64,10 @@ const STATE_MACHINE_END_RULE =
 /** Shared by the buildGantt topic and its compact line in the execute description. */
 const GANTT_DATE_RULE =
 	"Pass a stated duration as duration, not a computed end. Copy every task, date, dependency, milestone and phase from the prompt; invent none.";
+
+/** Shared by the buildErDiagram topic and its compact line in the execute description. */
+const ER_CARDINALITY_RULE =
+	'Cardinalities: "one", "zero-or-one", "many", "one-or-many", "zero-or-many", each how many rows of its end match one row of the other.';
 const CHART_COPY_RULE =
 	"Copy every number, category, series name, unit and axis title from the prompt; invent none.";
 /**
@@ -80,6 +85,7 @@ const FAST_PATH = {
 	buildStateMachine: `spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets; one may be "else". kind "final" (label optional) ends the machine and nothing leaves it. ${STATE_MACHINE_END_RULE}`,
 	buildMindmap: `spec: { title, root: { label, children?: [{ label, children? }] }, layout?: { direction: "LR" | "RL" } }. Children keep their order.`,
 	buildGantt: `spec: { title, tasks: [{ id, label, start: "YYYY-MM-DD", end? (last day) | duration? (days), milestone?: true, phase?, dependsOn?: [ids finishing first], progress?: % }], phases?, today? }. ${GANTT_DATE_RULE}`,
+	buildErDiagram: `spec: { title, entities: [{ id, fields: ["id uuid PK", "customer_id uuid FK", "email text UK", "note text?"] }], relationships: [{ from: "orders.customer_id", to: "customers.id", fromCardinality: "zero-or-many", toCardinality: "one", label? }] }. ${ER_CARDINALITY_RULE} Copy every table, field, type, key and cardinality stated.`,
 } satisfies Record<Exclude<keyof typeof BUILDERS, "buildFlowchart" | "createCanvas">, string>;
 const EXECUTE_HELPERS = [
 	HELPERS.searchIcons,
@@ -318,18 +324,18 @@ const SEQUENCE_DIAGRAM_EXAMPLE = `async () => sketchi.buildSequenceDiagram({
 
 const CREATE_CANVAS_EXAMPLE = `async () => sketchi.createCanvas({
   spec: {
-    kind: "canvas", version: 1, diagramId: "erd", title: "Commerce ERD",
+    kind: "canvas", version: 1, diagramId: "signup-wireframe", title: "Signup wireframe",
     width: 960, height: 560, accentColor: "#1f2937", backgroundColor: "#ffffff",
-    layers: [{ id: "entities", name: "Entities" }, { id: "relations", name: "Relations" }],
+    layers: [{ id: "screens", name: "Screens" }, { id: "flow", name: "Flow" }],
     elements: [
-      { type: "node", id: "users", nodeId: "users", shape: "rectangle", x: 80, y: 80, width: 220, height: 160, label: "users\\nid PK\\nemail UNIQUE", layerId: "entities", fillColor: "#dbeafe" },
-      { type: "node", id: "orders", nodeId: "orders", shape: "rectangle", x: 380, y: 80, width: 220, height: 160, label: "orders\\nid PK\\nuser_id FK", layerId: "entities", fillColor: "#dcfce7" },
-      { type: "node", id: "items", nodeId: "items", shape: "rectangle", x: 680, y: 80, width: 220, height: 160, label: "order_items\\norder_id FK\\nsku", layerId: "entities", fillColor: "#fef3c7" },
-      { type: "arrow", id: "users-orders", edgeId: "users-orders", sourceNodeId: "users", targetNodeId: "orders", points: [{x:300,y:160},{x:380,y:160}], label: "1:N", layerId: "relations", startArrowhead: "bar", endArrowhead: "arrow" },
-      { type: "arrow", id: "orders-items", edgeId: "orders-items", sourceNodeId: "orders", targetNodeId: "items", points: [{x:600,y:160},{x:680,y:160}], label: "1:N", layerId: "relations", startArrowhead: "bar", endArrowhead: "arrow" }
+      { type: "node", id: "form", nodeId: "form", shape: "rectangle", x: 80, y: 80, width: 220, height: 160, label: "Signup form\\nEmail\\nPassword", layerId: "screens", fillColor: "#dbeafe" },
+      { type: "node", id: "verify", nodeId: "verify", shape: "rectangle", x: 380, y: 80, width: 220, height: 160, label: "Check your inbox\\nResend link", layerId: "screens", fillColor: "#dcfce7" },
+      { type: "node", id: "welcome", nodeId: "welcome", shape: "rectangle", x: 680, y: 80, width: 220, height: 160, label: "Welcome\\nStart tour", layerId: "screens", fillColor: "#fef3c7" },
+      { type: "arrow", id: "form-verify", edgeId: "form-verify", sourceNodeId: "form", targetNodeId: "verify", points: [{x:300,y:160},{x:380,y:160}], label: "submit", layerId: "flow" },
+      { type: "arrow", id: "verify-welcome", edgeId: "verify-welcome", sourceNodeId: "verify", targetNodeId: "welcome", points: [{x:600,y:160},{x:680,y:160}], label: "open link", layerId: "flow" }
     ],
-    layouts: [{ type: "row", ids: ["users", "orders", "items"], x: 80, y: 80, gap: 80 }],
-    zOrder: ["users", "orders", "items", "users-orders", "orders-items"]
+    layouts: [{ type: "row", ids: ["form", "verify", "welcome"], x: 80, y: 80, gap: 80 }],
+    zOrder: ["form", "verify", "welcome", "form-verify", "verify-welcome"]
   },
   options: ${DELIVERY_OPTIONS}
 })`;
@@ -683,6 +689,37 @@ export const catalog: CatalogEntry[] = [
 		],
 	},
 	{
+		id: "buildErDiagram",
+		kind: "operation",
+		title: "buildErDiagram",
+		topic: "buildErDiagram",
+		keywords: [
+			"er diagram",
+			"erd",
+			"entity relationship",
+			"database schema",
+			"tables",
+			"foreign key",
+			"crow's foot",
+			"data model",
+		],
+		snippet: "Create a native ER diagram from entities, their fields and keys, and relationships.",
+		content: [
+			"buildErDiagram accepts { spec: { id?, title, entities: [{ id, name?, fields }], relationships: [{ id?, from, to, fromCardinality, toCardinality, label? }] }, options? }. The renderer draws each entity as a table and each relationship as a crow's-foot line between the rows it joins.",
+			'A field is one string "name type markers", type optional: "id uuid PK", "order_id uuid PK FK", "email text UK", "note text?" (nullable). Entity ids hold no dot or space; name defaults to the id.',
+			`from and to name "entity.field", the foreign key at one end and the key it references at the other, or an entity alone. ${ER_CARDINALITY_RULE} An order has one customer and a customer zero or many orders: from "orders.customer_id", fromCardinality "zero-or-many", to "customers.id", toCardinality "one".`,
+			"Copy every table, field, type, key, nullable marker and cardinality the prompt states; invent none.",
+			operationTypes("buildErDiagram"),
+		].join("\n\n"),
+		examples: [
+			{
+				title: "Customers and orders",
+				language: "js",
+				code: `async () => sketchi.buildErDiagram({ spec: { title: "Shop", entities: [{ id: "customers", fields: ["id uuid PK", "email text UK"] }, { id: "orders", fields: ["id uuid PK", "customer_id uuid FK", "shipped_at date?"] }], relationships: [{ from: "orders.customer_id", to: "customers.id", fromCardinality: "zero-or-many", toCardinality: "one", label: "places" }] }, options: ${DELIVERY_OPTIONS} })`,
+			},
+		],
+	},
+	{
 		id: "buildSequenceDiagram",
 		kind: "operation",
 		title: "buildSequenceDiagram",
@@ -739,22 +776,22 @@ export const catalog: CatalogEntry[] = [
 			"polygon",
 		],
 		snippet:
-			"Hand-place a layout no builder covers (ERD, dashboard, wireframe) as a versioned CanvasSpec.",
+			"Hand-place a layout no builder covers (dashboard, wireframe) as a versioned CanvasSpec.",
 		content: [
-			"Use createCanvas only for layouts no builder covers, such as ERDs, dashboards and wireframes. Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); topic hierarchies, participant interactions, chronologies and bar, line or pie charts have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
+			"Use createCanvas only for layouts no builder covers, such as dashboards and wireframes. Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); database schemas are ER diagrams (buildErDiagram); topic hierarchies, participant interactions, chronologies and bar, line or pie charts have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
 			"CanvasSpec supports bound and standalone text, rectangle/ellipse/diamond/circle/polygon shapes, lines and bound connectors with arrowheads, frames, groups, layers, explicit back-to-front zOrder, and deterministic row/column/grid/stack/align/distribute layouts.",
 			"Every element needs a unique stable id. Connectors bind through shape nodeId values; line bindings and text containers use element ids.",
 			"Generic validation enforces size, reference, geometry, and composition invariants. Intentional overlap is allowed.",
 			"CanvasSpec does not accept SVG, HTML, scripts, data URLs, external URLs, or executable payloads. Use only the typed primitives in the contract.",
 			"Limits: 600 elements, 64 layers, 128 layout primitives, 256 points per element, 16 groups per element, 4096 characters per text element, 16384 canvas units per dimension, and 1.5 MB serialized input.",
 			"Use applyDiagramPatch structural operations for iterative edits without regenerating the whole scene.",
-			"The repository examples include executable ERD, dashboard/chart, wireframe, and dense 120-element cases.",
+			"The repository examples include executable dashboard/chart, wireframe, and dense 120-element cases.",
 			"",
 			operationTypes("createCanvas"),
 		].join("\n"),
 		examples: [
 			{
-				title: "Commerce ERD with layers, bindings, layout, and z-order",
+				title: "Signup wireframe with layers, bindings, layout, and z-order",
 				language: "js",
 				code: CREATE_CANVAS_EXAMPLE,
 			},
@@ -956,7 +993,7 @@ export const catalog: CatalogEntry[] = [
 				code: SEQUENCE_DIAGRAM_EXAMPLE,
 			},
 			{
-				title: "Commerce ERD through createCanvas",
+				title: "Signup wireframe through createCanvas",
 				language: "js",
 				code: CREATE_CANVAS_EXAMPLE,
 			},

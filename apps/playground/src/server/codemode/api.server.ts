@@ -7,6 +7,7 @@ import {
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
 	type BuildGanttResult,
+	type BuildErDiagramResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type CreateCanvasResult,
@@ -57,6 +58,7 @@ function requestTooLargeResult(
 		| "Chart"
 		| "State machine"
 		| "Gantt chart"
+		| "ER diagram"
 		| "Artifact patch",
 ) {
 	return {
@@ -181,6 +183,7 @@ type BuildResult =
 	| BuildChartResult
 	| BuildStateMachineResult
 	| BuildGanttResult
+	| BuildErDiagramResult
 	| CreateCanvasResult;
 
 type BuildOperation =
@@ -191,6 +194,7 @@ type BuildOperation =
 	| "buildChart"
 	| "buildStateMachine"
 	| "buildGantt"
+	| "buildErDiagram"
 	| "createCanvas";
 
 function makeBuildHandler({
@@ -207,6 +211,7 @@ function makeBuildHandler({
 		| "Chart"
 		| "State machine"
 		| "Gantt chart"
+		| "ER diagram"
 		| "Canvas";
 	readonly run: (
 		codeMode: Context.Service.Shape<typeof PlaygroundCodeMode>,
@@ -288,6 +293,11 @@ export const handleBuildGanttRequest = makeBuildHandler({
 	operation: "buildGantt",
 	label: "Gantt chart",
 	run: (codeMode, input) => codeMode.buildGantt(input),
+});
+export const handleBuildErDiagramRequest = makeBuildHandler({
+	operation: "buildErDiagram",
+	label: "ER diagram",
+	run: (codeMode, input) => codeMode.buildErDiagram(input),
 });
 export const handleCreateCanvasRequest = makeBuildHandler({
 	operation: "createCanvas",

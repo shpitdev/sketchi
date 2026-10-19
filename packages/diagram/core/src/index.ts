@@ -23,3 +23,5 @@ export * from "./routing-quality.js";
 export * from "./group-regions.js";
 export * from "./types/state-machine.js";
 export * from "./types/gantt.js";
+export * from "./types/er.js";
+export * from "./er-fixtures.js";

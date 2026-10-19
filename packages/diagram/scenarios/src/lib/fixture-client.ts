@@ -79,6 +79,20 @@ function fixtureRequirements(scenario: DiagramScenario): readonly Record<string,
 				state.label ? [{ kind: "label", target: "state", value: state.label } as const] : [],
 			),
 		];
+	if (scenario.diagramType === "er")
+		return [
+			{
+				kind: "count",
+				target: "entities",
+				comparator: "exact",
+				value: scenario.expectedDiagram.entities.length,
+			},
+			...scenario.expectedDiagram.entities.map((entity) => ({
+				kind: "label",
+				target: "entity",
+				value: entity.name ?? entity.id,
+			})),
+		];
 	if (scenario.diagramType === "sequence") {
 		return [
 			{

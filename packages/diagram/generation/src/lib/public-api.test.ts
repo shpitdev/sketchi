@@ -209,7 +209,9 @@ describe("diagram generation prompt mapping", () => {
 
 		expect(messages.user).toContain("Supported response example:");
 		expect(messages.user).toContain("Unsupported response example:");
-		expect(messages.user).toContain('"requestedKind":"er","nativeKind":null,"requirements":[]');
+		expect(messages.user).toContain(
+			'"requestedKind":"architecture","nativeKind":null,"requirements":[]',
+		);
 		expect(messages.user).not.toContain(
 			'"requirements":["typed count, depth, or label requirements"]',
 		);
@@ -1234,14 +1236,16 @@ layer(compactingRepairClientLayer)("repair-introduced violations", (it) => {
 });
 
 const unsupportedRepairText = JSON.stringify({
-	title: "Order data model",
-	intent: { requestedKind: "er", nativeKind: null, requirements: [] },
+	title: "Order service architecture",
+	intent: { requestedKind: "architecture", nativeKind: null, requirements: [] },
 });
 let unsupportedRepairCalls = 0;
 const unsupportedRepairRun = vi.fn<CloudflareAiGateway["run"]>(async () => {
 	unsupportedRepairCalls += 1;
 	return geminiTextResponse(
-		unsupportedRepairCalls === 1 ? '{"intent":{"requestedKind":"er"' : unsupportedRepairText,
+		unsupportedRepairCalls === 1
+			? '{"intent":{"requestedKind":"architecture"'
+			: unsupportedRepairText,
 	);
 });
 const unsupportedRepairClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
@@ -1270,8 +1274,8 @@ layer(unsupportedRepairClientLayer)("unsupported semantic repair", (it) => {
 			const candidate = yield* client.generate({
 				model: "google/gemini-3.1-flash-lite",
 				prompt: {
-					id: "unsupported-er-repair",
-					request: "Create an entity relationship diagram for orders.",
+					id: "unsupported-architecture-repair",
+					request: "Create an architecture diagram for the order service.",
 				},
 			});
 
@@ -1279,7 +1283,7 @@ layer(unsupportedRepairClientLayer)("unsupported semantic repair", (it) => {
 			assert.isUndefined(candidate.diagram);
 			assert.isUndefined(candidate.error);
 			assert.strictEqual(candidate.text, unsupportedRepairText);
-			assert.strictEqual(candidate.intent?.requestedKind, "er");
+			assert.strictEqual(candidate.intent?.requestedKind, "architecture");
 			assert.isNull(candidate.intent?.nativeKind);
 			expect(candidate.diagnostics).toEqual(
 				expect.arrayContaining([

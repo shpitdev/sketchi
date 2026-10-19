@@ -202,6 +202,57 @@ describe("public generate endpoint", () => {
 		expect(body.diagram.scene).toBeTruthy();
 	});
 
+	it("generates a native ER diagram from one-line fields and unnumbered relationships", async () => {
+		const env: StudioEnv = {
+			AI: fakeAiGateway(
+				generationText({
+					id: "shop",
+					title: "Shop",
+					type: "er",
+					entities: [
+						{ id: "customers", fields: ["id uuid PK", "email text UK"] },
+						{ id: "orders", fields: ["id uuid PK", "customer_id uuid FK", "shipped_at date?"] },
+					],
+					relationships: [
+						{
+							from: "orders.customer_id",
+							to: "customers.id",
+							fromCardinality: "0..*",
+							toCardinality: "exactly one",
+						},
+					],
+				}),
+			),
+		};
+		const response = await generateRequest(env, { prompt: "Draw the shop schema", type: "er" });
+
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as {
+			diagram: {
+				document: {
+					type: string;
+					spec: {
+						entities: ReadonlyArray<{ fields: ReadonlyArray<Record<string, unknown>> }>;
+						relationships: ReadonlyArray<Record<string, unknown>>;
+					};
+				};
+				scene: unknown;
+			};
+		};
+		expect(body.diagram.document.type).toBe("er");
+		expect(body.diagram.document.spec.entities[1]?.fields[2]).toEqual({
+			name: "shipped_at",
+			type: "date",
+			nullable: true,
+		});
+		expect(body.diagram.document.spec.relationships[0]).toMatchObject({
+			id: "orders-customer_id-customers-id",
+			fromCardinality: "zero-or-many",
+			toCardinality: "one",
+		});
+		expect(body.diagram.scene).toBeTruthy();
+	});
+
 	it("lets the model select a native type when type is omitted", async () => {
 		const env: StudioEnv = { AI: fakeAiGateway(generationText(sequenceIr)) };
 		const response = await generateRequest(env, {
@@ -215,7 +266,7 @@ describe("public generate endpoint", () => {
 		expect(body.diagram.document.type).toBe("sequence");
 	});
 
-	it.each(["er", "architecture", "swimlane"])(
+	it.each(["architecture", "swimlane"])(
 		"fails clearly when model-selected %s generation is unsupported",
 		async (requestedKind) => {
 			const env: StudioEnv = {
@@ -240,7 +291,7 @@ describe("public generate endpoint", () => {
 		},
 	);
 
-	it.each(["er", "architecture", "swimlane"])(
+	it.each(["architecture", "swimlane"])(
 		"rejects explicit unsupported type %s before provider dispatch",
 		async (type) => {
 			let dispatched = false;
