@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.25.0
+
+### Minor Changes
+
+- [#476](https://github.com/shpitdev/sketchi/pull/476) [`0ecd7b5`](https://github.com/shpitdev/sketchi/commit/0ecd7b5ecb7215a1421d757126d42a6144239bdf) Thanks [@anandpant](https://github.com/anandpant)! - Draw architecture diagrams: a flowchart spec's groups nest through `parent` (a subnet in a VPC in a region) and say what they stand for through `kind` (`cloud`, `datacenter`, `region`, `zone`, `vpc`, `subnet`, `cluster` or `namespace`), and a node's `shape` draws it as a `database` cylinder, a `queue`, a `document` or a `storage` bucket. Zones come out as styled, locked rectangles with their labels in a header strip, children inside their parents, and edges cross zone outlines without running along them. `sketchi create` builds them offline, and `sketchi generate` nests zones when a prompt describes an architecture.
+
 ## 0.24.0
 
 ### Minor Changes
