@@ -381,7 +381,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 
 			"
 		`);
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(7_200);
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(7_400);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		expect(overview).toContain(`${CODE_MODE_OPERATIONS.length} operations:`);
 		for (const operation of CODE_MODE_OPERATIONS) {

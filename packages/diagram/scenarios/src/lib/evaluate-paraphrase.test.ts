@@ -818,3 +818,89 @@ describe("real losses still fail", () => {
 		);
 	});
 });
+
+describe("decisions asked by their opposite condition", () => {
+	/** The fixture with one decision relabeled and, optionally, its yes and no swapped. */
+	function invert(scenarioId: string, nodeId: string, label: string, swap: boolean) {
+		const scenario = getFlowchartScenario(scenarioId);
+		const swapped: Record<string, string> = { yes: "no", no: "yes" };
+		return evaluateScenarioDiagram(scenario, {
+			...scenario.expectedDiagram,
+			nodes: scenario.expectedDiagram.nodes.map((node) =>
+				node.id === nodeId ? { ...node, label } : node,
+			),
+			edges: scenario.expectedDiagram.edges.map((edge) =>
+				swap && edge.source === nodeId && edge.label
+					? { ...edge, label: swapped[edge.label] }
+					: edge,
+			),
+		});
+	}
+
+	const INVERTED = [
+		["expense-reimbursement", "receipt-attached", "Receipt missing?"],
+		["expense-reimbursement", "receipt-attached", "Is the receipt missing?"],
+		["invoice-approval", "po-matches", "Does the invoice not match the PO?"],
+		["data-import-validation", "parse-success", "Parsing failed?"],
+		["password-reset-security", "account-exists", "Account does not exist?"],
+		["password-reset-security", "link-clicked", "Link not clicked?"],
+		["loan-application-underwriting", "identity-verified", "Identity verification failed?"],
+		["bug-report-routing", "reproduced", "Cannot be reproduced?"],
+		["ci-release-gate", "tests-pass", "Tests failed?"],
+		["ci-release-gate", "scan-clean", "Security scan failed?"],
+		["procurement-vendor-approval", "risk-acceptable", "Risk not acceptable?"],
+	] as const;
+
+	it.each(INVERTED)("%s accepts %s asked as %s with swapped answers", (scenario, node, label) => {
+		expect(failed(invert(scenario, node, label, true))).toEqual([]);
+	});
+
+	it.each(INVERTED)("%s fails %s asked as %s with unswapped answers", (scenario, node, label) => {
+		expect(failed(invert(scenario, node, label, false))).not.toEqual([]);
+	});
+
+	it("accepts the observed Sonnet captions: yes to the request, 'no, attached' to the check", () => {
+		const nodes: NodeSpec[] = [
+			["s", "start", "Expense is submitted"],
+			["d1", "decision", "Receipt missing?"],
+			["rr", "end", "Request a receipt"],
+			["pc", "process", "Run policy check"],
+			["d2", "decision", "Within policy?"],
+			["ma", "process", "Manager approval"],
+			["pay", "end", "Payment"],
+			["fe", "process", "Finance exception review"],
+			["d3", "decision", "Exception approved?"],
+			["rej", "end", "Reject the expense"],
+		];
+		const edges = (missing: string, attached: string): EdgeSpec[] => [
+			["s", "d1"],
+			["d1", "rr", missing],
+			["d1", "pc", attached],
+			["pc", "d2"],
+			["d2", "ma", "yes"],
+			["ma", "pay"],
+			["d2", "fe", "no"],
+			["fe", "d3"],
+			["d3", "ma", "approved"],
+			["d3", "rej", "rejected"],
+		];
+		expect(failed(flow("expense-reimbursement", nodes, edges("yes", "no, attached")))).toEqual([]);
+		expect(failed(flow("expense-reimbursement", nodes, edges("Missing", "Not missing")))).toEqual(
+			[],
+		);
+		// Stated outcomes keep their meaning: "attached" on the request branch is still wrong.
+		expect(failed(flow("expense-reimbursement", nodes, edges("attached", "missing")))).toContain(
+			"edge:Receipt attached?->Request receipt:no",
+		);
+	});
+
+	it("keeps decisions without a stated opposite condition strict", () => {
+		// The prompt asks "whether the exception is resolved", so that is the decision.
+		expect(
+			failed(invert("invoice-approval", "exception-resolved", "Exception unresolved?", true)),
+		).toContain("node-label:Exception resolved?");
+		expect(
+			failed(invert("feature-flag-rollout", "internal-healthy", "Internal checks failed?", true)),
+		).toContain("node-label:Internal healthy?");
+	});
+});

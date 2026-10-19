@@ -789,6 +789,10 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(codeDescription).toContain(
 				"Keep every requested step and decision in a separate node, preserving the prompt's step wording and order.",
 			);
+			// Without this, Sonnet folds "check supplier availability" into "Supplier available?".
+			expect(codeDescription).toContain(
+				'A stated check or verification ("verify the signature", "stock is checked") is its own process node before the decision that reads its result; "check whether X" alone is just that decision.',
+			);
 			expect(codeDescription).toContain(getCodeModeDocs({ topic: "buildFlowchart" }).content);
 			expect(codeDescription).not.toMatch(/^type Build(?!Flowchart|Options)/m);
 			expect(codeDescription).toMatch(
@@ -803,7 +807,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(10_200);
+			).toBeLessThan(10_400);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,

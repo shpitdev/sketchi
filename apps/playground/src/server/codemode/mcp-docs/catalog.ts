@@ -122,6 +122,7 @@ const DELIVERY_OPTIONS = `{ artifactFormats: ["scene", "excalidraw", "png"], inl
 const FLOWCHART_DOCS = [
 	"buildFlowchart accepts a compact FlowchartSpec: title, nodes, edges, and optional layout. Builds use the fixed Sketchi palette.",
 	"Keep every requested step and decision in a separate node, preserving the prompt's step wording and order. Use plain step labels; do not merge a destination with its next action or replace a named step with a paraphrase.",
+	'A stated check or verification ("verify the signature", "stock is checked") is its own process node before the decision that reads its result; "check whether X" alone is just that decision.',
 	"Label steps and decisions with the prompt's own words, including how it phrases each decision, and keep every decision it states as a decision node. Only when two labels would be identical, add the distinguishing words the prompt itself uses.",
 	"Use one node per outcome the prompt names: point every branch that reaches the same named outcome at that one node, and do not add end nodes the prompt does not name.",
 	'Do not add loops, steps, or edges the prompt does not state. A step that repeats an earlier step ("send another ...", "try again", "retry", "resubmit") continues that cycle: draw it as the earlier step or as a step that loops back to the decision after it, never as an end. Only a new, unrepeated final step with no stated next step is that branch\'s end node (kind: "end").',

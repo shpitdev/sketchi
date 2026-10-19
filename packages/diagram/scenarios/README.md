@@ -191,6 +191,16 @@ A **value question** asks about one of a decision's stated values: on `Cache
 hit?`, `Yes` answers the `hit` branch and `No` answers the only other value,
 `miss`. It applies only to two-value decisions.
 
+A **decision asked by its opposite condition** is the same decision with yes
+and no swapped. It applies only to yes/no decisions the prompt states through
+their branches, opposite condition first, never as a question: `If the receipt
+is missing` lets `Receipt missing?` stand for `Receipt attached?`, so its `Yes`
+answers the `no` branch to `Request receipt`. The scenario lists those
+prompt-grounded alternatives in `inverse`. Stated outcomes keep their meaning
+(`Attached` still answers yes), and unswapped answers fail. A decision the
+prompt asks (`decide whether the exception is resolved`) accepts no opposite
+form.
+
 A **branch target qualified by its decision** carries its qualifier on the
 branch: `Severity? → Monitoring` on the `Low` branch is `Monitoring low
 severity`. The target and the branch must each supply a criterion word, the

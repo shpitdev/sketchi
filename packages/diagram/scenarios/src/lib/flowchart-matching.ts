@@ -151,7 +151,27 @@ export function matchFlowchartSteps(
 		}
 		return false;
 	};
-	const namesStep = (label: string) => requiredNodes.some((step) => namesStepLabel(label, step));
+	// A decision asked by its opposite condition (`Receipt missing?` for
+	// `Receipt attached?`) is that decision with its yes and no swapped.
+	const inverted = new Map<string, Set<string>>();
+	for (const step of requiredNodes) {
+		if (!step.inverseLabels) continue;
+		for (const node of graph.nodes) {
+			if (
+				node.kind === "decision" &&
+				!namesStepLabel(node.label, step) &&
+				flowchartLabelMatches(node.label, step.inverseLabels)
+			) {
+				inverted.set(node.id, new Set([...(inverted.get(node.id) ?? []), step.id]));
+			}
+		}
+	}
+	const namesStep = (label: string) =>
+		requiredNodes.some(
+			(step) =>
+				namesStepLabel(label, step) ||
+				(step.inverseLabels !== undefined && flowchartLabelMatches(label, step.inverseLabels)),
+		);
 	// An expected end also accepts an action that represents it: one whose sole
 	// edge leads to a terminal end, or one whose every edge loops back to work
 	// it came from (a retry after `Request more details`). Never a start or
@@ -182,6 +202,9 @@ export function matchFlowchartSteps(
 		]),
 	);
 	for (const [split, step] of splits) matchedNodes.get(step)!.add(split);
+	for (const [node, stepIds] of inverted) {
+		for (const step of stepIds) matchedNodes.get(step)!.add(node);
+	}
 
 	// The stated first event may be drawn as a start plus up to two plain
 	// actions (`Request reaches Vercel → Next.js page receives the question`).
@@ -254,10 +277,20 @@ export function matchFlowchartSteps(
 	const branchMatches: BranchMatcher = (edge, expected) => {
 		if (!expected.labels) return true;
 		const label = edge.label ?? "";
+		const source = question(byId.get(edge.source)?.label ?? "");
+		if (inverted.get(edge.source)?.has(expected.sourceId) && isYesNo(expected.label)) {
+			// Stated outcomes (`attached`, `missing`) keep their meaning; answers swap.
+			const answer = expected.label === "yes" ? "no" : "yes";
+			const stated = expected.labels.filter((alternative) => !isYesNo(alternative));
+			return (
+				(stated.length > 0 && flowchartLabelMatches(label, stated)) ||
+				flowchartLabelMatches(label, [answer]) ||
+				flowchartBranchRestates(label, source, answer)
+			);
+		}
 		if (flowchartLabelMatches(label, expected.labels)) return true;
 		const decision = steps.get(expected.sourceId);
 		if (!label || decision?.kind !== "decision") return false;
-		const source = question(byId.get(edge.source)?.label ?? "");
 		if (!isYesNo(expected.label)) {
 			// A value question (`Cache hit?`) answers yes for the value it names
 			// and no for the only other value (`miss`).

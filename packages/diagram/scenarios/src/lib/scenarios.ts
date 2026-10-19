@@ -38,6 +38,8 @@ export interface FlowchartScenarioRequiredNode {
 	kind: FlowchartNodeKind;
 	label: string;
 	labels: readonly string[];
+	/** Prompt-grounded alternatives for a yes/no decision asked by its opposite condition. */
+	inverseLabels?: readonly string[];
 }
 
 export interface FlowchartScenarioRequiredEdge {
@@ -113,6 +115,12 @@ interface FlowchartScenarioDefinition {
 	/** Groups the prompt states and the fixture nodes each holds. */
 	groups?: readonly FlowchartGroupDefinition[];
 	id: string;
+	/**
+	 * Yes/no decisions the prompt states only through their branches, opposite
+	 * condition first (`If the receipt is missing` for `Receipt attached?`). A
+	 * model may ask that opposite question; its yes answers the decision's no.
+	 */
+	inverse?: Readonly<Record<string, readonly [string, ...string[]]>>;
 	logos?: readonly DiagramScenarioLogo[];
 	nodes: readonly FlowchartNodeDefinition[];
 	prompt: string;
@@ -194,7 +202,19 @@ function buildAssertions(
 	const entryLabel = [startId, ...entry].map((id) => nodesById.get(id)!.label).join(" → ");
 	const stepOf = (id: string) => (entry.has(id) ? startId : id);
 	const requiredNodes = definition.nodes.flatMap(([id, label, kind, labels]) => {
-		for (const alternative of labels) {
+		const inverseLabels = definition.inverse?.[id];
+		if (
+			inverseLabels &&
+			(kind !== "decision" ||
+				definition.edges.some(
+					([, source, , branch]) => source === id && branch !== "yes" && branch !== "no",
+				))
+		) {
+			throw new Error(
+				`Scenario "${definition.id}" inverts "${id}", which is not a yes/no decision.`,
+			);
+		}
+		for (const alternative of [...labels, ...(inverseLabels ?? [])]) {
 			const words = flowchartLabelWords(alternative);
 			if (words.length === 0 || words.some((word) => !promptWords.has(word))) {
 				throw new Error(
@@ -203,7 +223,15 @@ function buildAssertions(
 			}
 		}
 		if (entry.has(id)) return [];
-		return [{ id, label: id === startId && entry.size > 0 ? entryLabel : label, kind, labels }];
+		return [
+			{
+				id,
+				label: id === startId && entry.size > 0 ? entryLabel : label,
+				kind,
+				labels,
+				...(inverseLabels ? { inverseLabels } : {}),
+			},
+		];
 	});
 
 	return {
@@ -593,6 +621,9 @@ const flowchartScenarioDefinitions = [
 			"A finance approval process with PO matching, exception resolution, and threshold approval.",
 		prompt:
 			"Create an invoice approval flowchart. An invoice is received and matched to a purchase order. If it does not match, route it to exception review and decide whether the exception is resolved. Unresolved exceptions reject the invoice. Resolved or matched invoices decide whether the amount is over the approval threshold. Amounts over threshold require director approval before payment. Amounts under threshold schedule payment directly.",
+		inverse: {
+			"po-matches": ["does not match"],
+		},
 		nodes: [
 			[
 				"invoice-received",
@@ -829,6 +860,9 @@ const flowchartScenarioDefinitions = [
 			"A data import pipeline with parse, schema, duplicate handling, and rejection branches.",
 		prompt:
 			"Create a data import validation flowchart. A file is uploaded and parsed. If parsing fails, reject the file. If parsing succeeds, validate the schema. Invalid schema returns mapping errors. Valid schema deduplicates records. If duplicates are found, merge duplicates before importing. If not, import records directly.",
+		inverse: {
+			"parse-success": ["parsing fails"],
+		},
 		nodes: [
 			["file-uploaded", "File uploaded", "start", ["file uploaded", "file is uploaded"]],
 			["parse-file", "Parse file", "process", ["parse file", "file parsed"]],
@@ -885,6 +919,10 @@ const flowchartScenarioDefinitions = [
 			"A security-sensitive reset flow with generic responses, token expiry, and step-up verification.",
 		prompt:
 			"Create a password reset security flowchart. A reset is requested. If the account does not exist, show a generic response. If it exists, send the reset email and wait for the link click. If the link is not clicked, expire the token. If clicked, run a risk check. High risk requires step-up verification before resetting the password. Low risk resets the password directly.",
+		inverse: {
+			"account-exists": ["account does not exist"],
+			"link-clicked": ["link is not clicked"],
+		},
 		nodes: [
 			["reset-requested", "Reset requested", "start", ["reset requested", "reset is requested"]],
 			["account-exists", "Account exists?", "decision", ["account exists"]],
@@ -1007,6 +1045,9 @@ const flowchartScenarioDefinitions = [
 			"A loan application flow with identity verification, credit review, manual underwriting, and exception approval.",
 		prompt:
 			"Create a loan application underwriting flowchart. An application is submitted and identity is verified. Failed identity verification declines the application. Verified identity goes to credit review. Acceptable credit moves to income verification. Unacceptable credit goes to manual underwriting, where an exception approval decision either continues to income verification or declines. Income verification approves the loan.",
+		inverse: {
+			"identity-verified": ["failed identity verification"],
+		},
 		nodes: [
 			[
 				"application-submitted",
@@ -1151,6 +1192,9 @@ const flowchartScenarioDefinitions = [
 			"An engineering triage flow with reproducibility, security impact, priority routing, and release outcomes.",
 		prompt:
 			"Create a bug report routing flowchart. A bug is filed and the team tries to reproduce it. If it cannot be reproduced, request more details. If reproduced, decide whether it has security impact. Security issues go to security triage, then a hotfix branch, then release fix. Non-security issues decide whether priority is high. High priority goes to the sprint backlog and releases a fix. Low priority goes to the regular backlog.",
+		inverse: {
+			reproduced: ["cannot be reproduced"],
+		},
 		nodes: [
 			["bug-filed", "Bug filed", "start", ["bug filed", "bug is filed"]],
 			["reproduce", "Reproduce issue", "process", ["reproduce"]],
@@ -1202,6 +1246,9 @@ const flowchartScenarioDefinitions = [
 			"An expense reimbursement flow with missing receipt, policy exception, and approval outcomes.",
 		prompt:
 			"Create an expense reimbursement flowchart. An expense is submitted. If the receipt is missing, request a receipt. If attached, run a policy check. Expenses within policy go to manager approval and then payment. Out-of-policy expenses go to finance exception review. Approved exceptions go to manager approval; rejected exceptions reject the expense.",
+		inverse: {
+			"receipt-attached": ["receipt missing", "receipt is missing"],
+		},
 		nodes: [
 			[
 				"expense-submitted",
@@ -1331,6 +1378,10 @@ const flowchartScenarioDefinitions = [
 			"A release pipeline with tests, build, security scan, canary, promote, and rollback paths.",
 		prompt:
 			"Create a CI release gate flowchart. A commit is merged and the test suite runs. Failed tests block release. Passing tests build an artifact and run a security scan. A failed scan blocks release. A clean scan deploys a canary. If the canary is healthy, promote to production. If not, roll back the canary.",
+		inverse: {
+			"tests-pass": ["failed tests"],
+			"scan-clean": ["failed scan"],
+		},
 		nodes: [
 			["commit-merged", "Commit merged", "start", ["commit merged", "commit is merged"]],
 			[
@@ -1396,6 +1447,9 @@ const flowchartScenarioDefinitions = [
 			"A procurement workflow with preferred vendor routing, risk assessment, legal review, and renegotiation loop.",
 		prompt:
 			"Create a procurement vendor approval flowchart. A business need is identified and quotes are collected. If there is a preferred vendor, go to risk assessment. If not, run a competitive bid first and then risk assessment. Risk that is not acceptable rejects the vendor. Acceptable risk goes to legal review. If legal approves, create the contract. If legal does not approve, renegotiate terms and repeat legal review.",
+		inverse: {
+			"risk-acceptable": ["risk that is not acceptable"],
+		},
 		nodes: [
 			["need-identified", "Need identified", "start", ["need identified", "need is identified"]],
 			[
