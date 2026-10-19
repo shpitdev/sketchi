@@ -14,7 +14,7 @@ export interface GanttAxisCell {
 /** A to-scale date axis: tick cells, the context band above them, and days per pixel. */
 export interface GanttAxis {
 	readonly unit: GanttTickUnit;
-	/** Units per tick: 1 for days to quarters; 1, 2, 5 or 10 for years. */
+	/** Units per tick: 1 for days to quarters; 1, 2, 5, 10, 20, 25 or 50 for years. */
 	readonly step: number;
 	/** Aligned to tick boundaries, so the cells cover the plan's span exactly. */
 	readonly start: number;
@@ -31,8 +31,8 @@ export const GANTT_TICK_FONT_SIZE = 12;
 export const GANTT_BAND_FONT_SIZE = 13;
 /** A tick label needs this much room in its cell beyond its own width. */
 const TICK_LABEL_PAD = 8;
-/** Plots spread toward this width, and a day never draws wider than the cap. */
-const TARGET_PLOT_WIDTH = 960;
+/** Plots spread toward this width unless asked for less, and a day never draws wider than the cap. */
+export const GANTT_PLOT_WIDTH = 960;
 const MAX_PX_PER_DAY = 56;
 /** Past this many cells, ticks coarsen even when labels still fit. */
 const MAX_CELLS = 36;
@@ -75,6 +75,9 @@ const TICKS: readonly { readonly unit: GanttTickUnit; readonly step: number }[] 
 	{ unit: "year", step: 2 },
 	{ unit: "year", step: 5 },
 	{ unit: "year", step: 10 },
+	{ unit: "year", step: 20 },
+	{ unit: "year", step: 25 },
+	{ unit: "year", step: 50 },
 ];
 
 /** The tick boundary on or before `day`. */
@@ -148,14 +151,15 @@ function cellsOf(
 
 /**
  * Choose the finest tick whose every label fits its cell at a scale that
- * spreads the aligned span toward the target width. The span `[start, end)`
+ * spreads the aligned span toward `width`. The span `[start, end)`
  * is in days; the axis starts and ends on tick boundaries around it.
  */
-export function ganttAxis(start: number, end: number): GanttAxis {
+export function ganttAxis(start: number, end: number, width = GANTT_PLOT_WIDTH): GanttAxis {
 	const last = Math.max(end, start + 1);
 	for (const { unit, step } of TICKS) {
-		// Only the coarsest tick may run past the cells an axis can label; validated plans keep it short.
-		const coarsest = unit === "year" && step === 10;
+		// Only the coarsest tick may run past the cells an axis can label, or past their labels' room:
+		// a valid plan spans at most a century, which half-century cells label on any plot 640 px wide.
+		const coarsest = unit === "year" && step === 50;
 		const cells = cellsOf(
 			start,
 			last,
@@ -167,7 +171,7 @@ export function ganttAxis(start: number, end: number): GanttAxis {
 		if (!cells) continue;
 		const axisStart = cells[0]!.start;
 		const axisEnd = cells.at(-1)!.end;
-		const pxPerDay = Math.min(MAX_PX_PER_DAY, TARGET_PLOT_WIDTH / (axisEnd - axisStart));
+		const pxPerDay = Math.min(MAX_PX_PER_DAY, width / (axisEnd - axisStart));
 		const fits = cells.every(
 			(cell) =>
 				estimateTextWidth(cell.label, GANTT_TICK_FONT_SIZE) + TICK_LABEL_PAD <=
@@ -209,7 +213,7 @@ export function ganttAxis(start: number, end: number): GanttAxis {
 			})),
 		};
 	}
-	throw new Error("unreachable: ten-year ticks always fit");
+	throw new Error("unreachable: half-century ticks always fit");
 }
 
 /** Shorter band labels for a band too narrow for its full label: `Mar` for `Mar 2026`, `’26` for `2026`. */

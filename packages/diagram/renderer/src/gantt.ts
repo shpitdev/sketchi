@@ -15,10 +15,11 @@ import {
 	type TimelineDiagram,
 } from "@sketchi/diagram-core";
 
-import { CHART_SERIES_COLORS, textOn, textOnFills } from "./chart.js";
+import { CHART_SERIES_COLORS } from "./chart.js";
 import {
 	GANTT_BAND_FONT_SIZE,
 	GANTT_TICK_FONT_SIZE,
+	GANTT_PLOT_WIDTH,
 	ganttAxis,
 	ganttBandLabels,
 	type GanttAxis,
@@ -86,6 +87,7 @@ const INK = SKETCHI_DIAGRAM_PALETTE.ink;
 const MUTED_INK = "#4c4639";
 const GRID_COLOR = "#e6dfd2";
 const MINOR_GRID_COLOR = "#f0ebe1";
+const ROW_RULE_COLOR = "#ebe4d8";
 const BAND_GRID_COLOR = "#cbbfa9";
 const AXIS_COLOR = "#8c826f";
 const ARROW_COLOR = "#5c5345";
@@ -104,25 +106,29 @@ const BAR_HEIGHT = 22;
 const MILESTONE_SIZE = 26;
 export const GANTT_MIN_BAR_WIDTH = 2;
 const MIN_BAR_WIDTH = GANTT_MIN_BAR_WIDTH;
-/** A label sits inside its bar only with this much room on each side. */
-const INSIDE_PAD = 7;
-const LABEL_GAP = 8;
 const CAPTION_GAP = 10;
 /** The date column ends this far left of the plot. */
 const COLUMN_GAP = 16;
+/** Names end at least this far left of the date column. */
+const NAME_GAP = 20;
+/** Under a phase header, task names sit this far in from its name. */
+const NAME_INDENT = 12;
 /** A corridor between the date column and the axis start, free for dependencies. */
 const PLOT_INSET = 24;
 /** Marks keep at least this far right of the corridor's last column. */
 const CORRIDOR_MARK_GAP = 2;
-/** Outside labels wrap at word boundaries past this width. */
-const LABEL_MAX_WIDTH = 280;
+/** Task names wrap at word boundaries past this width, phase names past this one. */
+const NAME_MAX_WIDTH = 260;
 const PHASE_MAX_WIDTH = 220;
 const HEADER_ROW_HEIGHT = 22;
 const TITLE_GAP = 14;
 const TODAY_ROW_HEIGHT = 18;
+/** A short chart's plot narrows, down to this, to keep the chart no wider than this times its height. */
+const MIN_PLOT_WIDTH = 640;
+const MAX_ASPECT = 2.2;
 /** Charts this tall repeat the axis under their rows. */
 const BOTTOM_AXIS_ROWS = 16;
-/** Routes keep this far above and below bars, farther beside them, and this far from text. */
+/** Routes keep this far above and below bars, and farther beside them. */
 const BAR_CLEARANCE = 4;
 const BAR_SIDE_CLEARANCE = 8;
 /** A route keeps this far off its own predecessor and successor, but for its runs out of and into them. */
@@ -138,7 +144,6 @@ const OUTLINE_STEP = 3;
 const ENTRY_SPACING = 11;
 /** Arrow shafts and heads keep this far from the Today line. */
 const TODAY_CLEARANCE = 5;
-const TEXT_CLEARANCE = 3;
 /**
  * Excalidraw sizes an arrowhead by its last run, so a dependency ends in a run
  * of its entry's approach length and heads draw alike.
@@ -435,11 +440,6 @@ interface TaskLayout {
 	readonly color: string;
 	readonly label: Measured;
 	readonly caption: Measured;
-	/** Mark extent along x. */
-	readonly left: number;
-	readonly right: number;
-	/** Inside the bar when the label fits, else beside its right end, so the start stays free for dependencies. */
-	readonly placement: "inside" | "right";
 	readonly height: number;
 }
 
@@ -453,6 +453,10 @@ interface Row {
 
 /** How far into a bar its top and bottom entries sit. */
 const ENTRY_INSETS = [7, 19, 31];
+/** A route out of a bar's right end may turn this soon to drop straight into a successor just past it. */
+const SHORT_LEAD = 3;
+/** Bars narrower than this keep their right end closed: it sits beside their arrivals' arrowheads. */
+const RIGHT_EXIT_WIDTH = 8;
 /** Exits in line with a successor's entries sit this close to the bar's end, at this cost. */
 const ELBOW_EXIT_REACH = 32;
 const ELBOW_EXIT_COST = 3;
@@ -511,6 +515,17 @@ function sourcePorts(
 			// The left half, where dependencies arrive, only when the rest is taken.
 			{ x: center - quarter, y: box.bottom - quarter, direction: 1, cost: 16 + away(1) },
 			{ x: center - quarter, y: box.top + quarter, direction: 3, cost: 16 + away(3) },
+			// Points on the lower and upper edges in line with the successor or a bar beside the way.
+			...aside
+				.filter((x) => x > box.left + 2 && x < box.right - 2)
+				.flatMap((x): RoutePort[] => {
+					const rise = quarter * 2 - Math.abs(x - center);
+					const cost = (x < center ? 16 : 6) + ELBOW_EXIT_COST;
+					return [
+						{ x, y: middle + rise, direction: 1, cost: cost + away(1) },
+						{ x, y: middle - rise, direction: 3, cost: cost + away(3) },
+					];
+				}),
 		];
 	}
 	// Exits sit apart near the bar's end, so routes leaving one bar never share a run; a short bar
@@ -548,7 +563,10 @@ function sourcePorts(
 			{ x, y: box.bottom, direction: 1, cost: away(1) + ELBOW_EXIT_COST },
 			{ x, y: box.top, direction: 3, cost: away(3) + ELBOW_EXIT_COST },
 		]),
-		{ x: box.right, y: middle, direction: 0, cost: 2 },
+		// Out of its right end, unless the bar is a sliver whose arrivals land right beside it.
+		...(box.right - box.left >= RIGHT_EXIT_WIDTH
+			? [{ x: box.right, y: middle, direction: 0, cost: 2 } satisfies RoutePort]
+			: []),
 		...xs.map((x, index): RoutePort => ({
 			x,
 			y: box.top,
@@ -560,8 +578,8 @@ function sourcePorts(
 
 /**
  * Where a dependency may enter its successor: the left end, or the top or
- * bottom near the bar's start, or a milestone's vertices. `align` adds a port
- * straight below or above the predecessor's milestone. A successor that awaits
+ * bottom near the bar's start, or a milestone's vertices. `align` adds ports
+ * straight below or above where the predecessor's route turns. A successor that awaits
  * more dependencies (`crowded`) is entered from the left above and below its
  * middle, so another arrival fits beside, the upper one first from above.
  */
@@ -569,7 +587,7 @@ function targetPorts(
 	box: Box,
 	milestone: boolean,
 	below: boolean,
-	align?: number,
+	align: readonly number[] = [],
 	crowded = false,
 ): RoutePort[] {
 	const middle = (box.top + box.bottom) / 2;
@@ -598,8 +616,7 @@ function targetPorts(
 	// Entries sit an arrowhead's width apart, so several can arrive at once.
 	const insets = ENTRY_INSETS.filter((inset) => box.left + inset <= box.right - 3);
 	const xs = insets.length ? insets.map((inset) => box.left + inset) : [(box.left + box.right) / 2];
-	const aligned =
-		align !== undefined && align > box.left + 1 && align < box.right - 1 ? [align] : [];
+	const aligned = align.filter((x) => x > box.left + 1 && x < box.right - 1);
 	return [
 		{ x: box.left, y: middle, direction: 0, cost: crowded ? SIDE_ENTRY_COST : 0 },
 		// Further arrivals from the left land above and below the middle.
@@ -1103,40 +1120,17 @@ function layoutAt(
 		...all.map((schedule) => (schedule.milestone ? schedule.start + 1 : schedule.end)),
 		today === undefined ? -Infinity : today + 1,
 	);
-	const axis = ganttAxis(first, last);
-	// The axis starts a corridor's width into the plot, so dependencies can always pass left of every
-	// mark: further still when a milestone in the axis's first days would reach into it.
-	const overhang = Math.max(
-		0,
-		...all.map((schedule) =>
-			schedule.milestone
-				? MILESTONE_SIZE / 2 +
-					CORRIDOR_MARK_GAP -
-					(schedule.start + 0.5 - axis.start) * axis.pxPerDay
-				: 0,
-		),
-	);
-	const xOf = (day: number) => PLOT_INSET + overhang + (day - axis.start) * axis.pxPerDay;
-	const plotWidth = xOf(axis.end);
 	const captions = ganttCaptions(diagram);
-
 	const taskLayout = (task: GanttTask, color: string): TaskLayout => {
-		const schedule = schedules.get(task.id)!;
-		const caption = measure(captions.tasks.get(task.id)!, CAPTION_FONT);
-		// A milestone marks the middle of its day, like Today.
-		const left = schedule.milestone
-			? xOf(schedule.start + 0.5) - MILESTONE_SIZE / 2
-			: xOf(schedule.start);
-		// A bar draws at least MIN_BAR_WIDTH wide, so a one-day task on a multi-year axis stays visible.
-		const right = schedule.milestone
-			? xOf(schedule.start + 0.5) + MILESTONE_SIZE / 2
-			: Math.max(xOf(schedule.end), xOf(schedule.start) + MIN_BAR_WIDTH);
-		const single = measure(task.label, LABEL_FONT);
-		const inside = !schedule.milestone && single.width + 2 * INSIDE_PAD <= right - left;
-		const label = inside ? single : wrapped(task.label, LABEL_MAX_WIDTH, LABEL_FONT);
-		const placement = inside ? "inside" : "right";
-		const height = Math.max(rowHeight, label.height + 2 * ROW_PAD);
-		return { task, schedule, color, label, caption, left, right, placement, height };
+		const label = wrapped(task.label, NAME_MAX_WIDTH, LABEL_FONT);
+		return {
+			task,
+			schedule: schedules.get(task.id)!,
+			color,
+			label,
+			caption: measure(captions.tasks.get(task.id)!, CAPTION_FONT),
+			height: Math.max(rowHeight, label.height + 2 * ROW_PAD),
+		};
 	};
 
 	// Rows top to bottom, under their phase headers.
@@ -1160,15 +1154,57 @@ function layoutAt(
 	const rowsTop = 0;
 	const rowsBottom = y;
 	const taskRows = rows.filter((row) => row.kind === "task").length;
-	// Dates sit in a column left of the plot: a phase's name and span on its header row, each task's dates on its row.
+	/*
+	 * A table left of the plot names every row, so the plot holds only bars, diamonds and the
+	 * dependencies between them: a name column, indented under phase headers, and a date column
+	 * ending just before the plot. A phase's header row names it and states its span.
+	 */
+	const indent = rows.some((row) => row.kind === "phase") ? NAME_INDENT : 0;
+	const namesWidth = Math.max(...rows.map((row) => (row.task ? indent + row.task.label.width : 0)));
+	const datesWidth = Math.max(
+		...rows.map((row) => (row.task ? row.task.caption : row.phase!.caption).width),
+	);
 	const columnWidth = Math.max(
+		namesWidth + NAME_GAP + datesWidth,
 		...rows.map((row) =>
-			row.task
-				? row.task.caption.width
-				: row.phase!.name.width + CAPTION_GAP + row.phase!.caption.width,
+			row.phase ? row.phase.name.width + CAPTION_GAP + row.phase.caption.width : 0,
 		),
 	);
 	const columnLeft = -COLUMN_GAP - columnWidth;
+	// A short chart narrows its plot, so the chart stays no wider than MAX_ASPECT times its height.
+	const height =
+		Math.ceil(diagram.title.length ? TITLE_FONT * LINE_HEIGHT : 0) +
+		TITLE_GAP +
+		(today === undefined ? 0 : TODAY_ROW_HEIGHT) +
+		2 * HEADER_ROW_HEIGHT +
+		rowsBottom +
+		(taskRows >= BOTTOM_AXIS_ROWS ? 2 * HEADER_ROW_HEIGHT : 0) +
+		2 * PADDING;
+	const axis = ganttAxis(
+		first,
+		last,
+		Math.max(
+			MIN_PLOT_WIDTH,
+			Math.min(
+				GANTT_PLOT_WIDTH,
+				MAX_ASPECT * height - 2 * PADDING - columnWidth - COLUMN_GAP - PLOT_INSET,
+			),
+		),
+	);
+	// The axis starts a corridor's width into the plot, so dependencies can always pass left of every
+	// mark: further still when a milestone in the axis's first days would reach into it.
+	const overhang = Math.max(
+		0,
+		...all.map((schedule) =>
+			schedule.milestone
+				? MILESTONE_SIZE / 2 +
+					CORRIDOR_MARK_GAP -
+					(schedule.start + 0.5 - axis.start) * axis.pxPerDay
+				: 0,
+		),
+	);
+	const xOf = (day: number) => PLOT_INSET + overhang + (day - axis.start) * axis.pxPerDay;
+	const plotWidth = xOf(axis.end);
 
 	const builder = new SceneBuilder();
 	const obstacles: RouteObstacle[] = [
@@ -1198,23 +1234,34 @@ function layoutAt(
 		builder.text(
 			`gantt:phase-caption:${index}`,
 			caption,
-			columnLeft + name.width + CAPTION_GAP,
+			-COLUMN_GAP - caption.width,
 			middle - caption.height / 2,
 			CAPTION_FONT,
 			MUTED_INK,
-			"left",
+			"right",
 			group,
 		);
 	}
 
-	// Bars, milestones, labels and dates.
+	// Bars and milestones in the plot; names and dates in the table.
 	for (const row of rows) {
 		if (row.kind !== "task") continue;
 		const layout = row.task!;
-		const { task, schedule, color, label, caption, left, right, placement } = layout;
+		const { task, schedule, color, label, caption } = layout;
 		const middle = row.top + row.height / 2;
+		// A milestone marks the middle of its day, like Today. A bar draws at least MIN_BAR_WIDTH
+		// wide, so a one-day task on a multi-year axis stays visible.
+		const left = schedule.milestone
+			? xOf(schedule.start + 0.5) - MILESTONE_SIZE / 2
+			: xOf(schedule.start);
+		const right = schedule.milestone
+			? xOf(schedule.start + 0.5) + MILESTONE_SIZE / 2
+			: Math.max(xOf(schedule.end), xOf(schedule.start) + MIN_BAR_WIDTH);
 		const nodeId = `gantt:task:${task.id}`;
+		// A bar and its completed part move together, and a row's name and dates together, so a bar
+		// dragged to new dates in Excalidraw leaves the table as it is.
 		const group = { groupIds: [nodeId] };
+		const cells = { groupIds: [`gantt:row:${task.id}`] };
 		const markBox: Box = schedule.milestone
 			? {
 					left,
@@ -1255,30 +1302,16 @@ function layoutAt(
 				`${task.label} · ${progress}%`,
 				{ fillColor: done, strokeColor: done, ...group },
 			);
-		const labelMiddle = middle;
-		const labelLeft = placement === "inside" ? left + INSIDE_PAD : right + LABEL_GAP;
-		const labelBox = builder.text(
+		builder.text(
 			`gantt:label:${task.id}`,
 			label,
-			labelLeft,
-			labelMiddle - label.height / 2,
+			columnLeft + indent,
+			middle - label.height / 2,
 			LABEL_FONT,
-			placement === "inside" ? (progress > 0 ? textOnFills([color, done]) : textOn(color)) : INK,
+			INK,
 			"left",
-			group,
+			cells,
 		);
-		// An outside label and the gap to its mark form one obstacle, so no route threads between
-		// them; its clearance stops at the mark, which stays enterable however thin it is.
-		if (placement !== "inside")
-			obstacles.push({
-				box: {
-					left: markBox.right + TEXT_CLEARANCE,
-					right: labelBox.right,
-					top: labelBox.top,
-					bottom: labelBox.bottom,
-				},
-				clearance: TEXT_CLEARANCE,
-			});
 		builder.text(
 			`gantt:caption:${task.id}`,
 			caption,
@@ -1287,7 +1320,7 @@ function layoutAt(
 			CAPTION_FONT,
 			MUTED_INK,
 			"right",
-			group,
+			cells,
 		);
 	}
 
@@ -1463,7 +1496,15 @@ function layoutAt(
 			target,
 			targetMilestone,
 			below,
-			sourceMilestone ? center(source) : undefined,
+			// Straight below or above the predecessor's diamond, or, near the successor's start, below
+			// or above where a route out of its bar's right end turns, so a successor starting at the
+			// bar's end takes one elbow.
+			sourceMilestone
+				? [center(source)]
+				: source.right - source.left >= RIGHT_EXIT_WIDTH &&
+					  source.right + ROUTE_LEAD <= target.left + ENTRY_INSETS.at(-1)!
+					? [source.right + ROUTE_LEAD]
+					: [],
 			(pending.get(dependency.to)! > 1 || taken.length > 0) &&
 				(!targetMilestone || split.has(dependency.to)),
 		);
@@ -1586,21 +1627,51 @@ function layoutAt(
 			sources: [
 				// Where earlier routes leave the predecessor, so this one may share their trunk.
 				...trunkPorts.values(),
+				// Out of a bar's right end with a shorter lead, to turn straight into a successor's top or
+				// bottom entry just past it: a tiny successor starting at the bar's end takes one elbow.
+				...(sourceMilestone || source.right - source.left < RIGHT_EXIT_WIDTH
+					? []
+					: (targetMilestone
+							? [center(target)]
+							: ENTRY_INSETS.some((inset) => target.left + inset <= target.right - 3)
+								? ENTRY_INSETS.filter((inset) => target.left + inset <= target.right - 3).map(
+										(inset) => target.left + inset,
+									)
+								: [center(target)]
+						)
+							.filter((x) => x - source.right >= SHORT_LEAD && x - source.right < ROUTE_LEAD)
+							.map((x): RoutePort => ({
+								x: source.right,
+								y: (source.top + source.bottom) / 2,
+								direction: 0,
+								cost: 2,
+								lead: x - source.right,
+							}))),
 				...sourcePorts(
 					source,
 					sourceMilestone,
 					below,
 					targetMilestone ? center(target) : undefined,
 					// Exits from which a route drops straight into the successor's top or bottom entries,
-					// or turns once into its side entries.
-					targetMilestone
-						? [target.left - ELBOW_RUN, target.left + (target.right - target.left) / 4 - ELBOW_RUN]
-						: [
-								target.left - ELBOW_RUN,
-								...ENTRY_INSETS.filter((inset) => target.left + inset <= target.right - 3).map(
-									(inset) => target.left + inset,
-								),
-							],
+					// turns once into its side entries, or passes straight down beside another bar.
+					[
+						...(targetMilestone
+							? [
+									target.left - ELBOW_RUN,
+									target.left + (target.right - target.left) / 4 - ELBOW_RUN,
+								]
+							: [
+									target.left - ELBOW_RUN,
+									...ENTRY_INSETS.filter((inset) => target.left + inset <= target.right - 3).map(
+										(inset) => target.left + inset,
+									),
+								]),
+						...[...markBoxes].flatMap(([id, box]) =>
+							id === dependency.from || id === dependency.to
+								? []
+								: [box.left - BAR_SIDE_CLEARANCE, box.right + BAR_SIDE_CLEARANCE],
+						),
+					],
 				),
 			],
 			targets: open,
@@ -1976,14 +2047,16 @@ function layoutAt(
 	const bandEdges = new Set([axis.start, axis.end, ...axis.bands.map((band) => band.start)]);
 	const tickDays = [...axis.cells.map((cell) => cell.start), axis.end];
 	const wantsBottom = taskRows >= BOTTOM_AXIS_ROWS;
-	const plans = [
-		{ grid: tickDays, minor: true, bottom: wantsBottom },
-		{ grid: tickDays, minor: false, bottom: wantsBottom },
-		{ grid: tickDays, minor: false, bottom: false },
-		{ grid: tickDays.filter((day) => bandEdges.has(day)), minor: false, bottom: wantsBottom },
-		{ grid: tickDays.filter((day) => bandEdges.has(day)), minor: false, bottom: false },
-		{ grid: [axis.start, axis.end], minor: false, bottom: false },
-	];
+	const plans = [true, false].flatMap((rowRules) =>
+		[
+			{ grid: tickDays, minor: true, bottom: wantsBottom },
+			{ grid: tickDays, minor: false, bottom: wantsBottom },
+			{ grid: tickDays, minor: false, bottom: false },
+			{ grid: tickDays.filter((day) => bandEdges.has(day)), minor: false, bottom: wantsBottom },
+			{ grid: tickDays.filter((day) => bandEdges.has(day)), minor: false, bottom: false },
+			{ grid: [axis.start, axis.end], minor: false, bottom: false },
+		].map((plan) => ({ ...plan, rowRules })),
+	);
 	const rulesFor = (plan: (typeof plans)[number]): LineSceneElement[] => {
 		const gridTop = rowsTop - HEADER_ROW_HEIGHT;
 		const gridBottom = plan.bottom ? rowsBottom + HEADER_ROW_HEIGHT : rowsBottom;
@@ -2005,6 +2078,22 @@ function layoutAt(
 			...style,
 		});
 		return [
+			// Rules between rows, from the table across the plot, so each name reads against its bar.
+			...(plan.rowRules
+				? [...rows.slice(1).map((row) => row.top), rowsBottom].map(
+						(y, index): LineSceneElement => ({
+							type: "line",
+							id: `gantt:row-rule:${index}`,
+							points: [
+								{ x: round(columnLeft), y: round(y) },
+								{ x: round(plotWidth), y: round(y) },
+							],
+							roughness: 0,
+							strokeWidth: 1,
+							strokeColor: ROW_RULE_COLOR,
+						}),
+					)
+				: []),
 			...(plan.minor
 				? axis.minor.map((day) =>
 						rule(`gantt:minor:${formatGanttDay(day)}`, xOf(day), rowsTop, rowsBottom, {
@@ -2059,6 +2148,7 @@ function layoutAt(
 		(id) =>
 			id.startsWith("gantt:grid:") ||
 			id.startsWith("gantt:minor:") ||
+			id.startsWith("gantt:row-rule:") ||
 			id.startsWith("gantt:axis") ||
 			id.startsWith("gantt:band-edge"),
 	);

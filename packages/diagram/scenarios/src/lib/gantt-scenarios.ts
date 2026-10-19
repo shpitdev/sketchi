@@ -804,7 +804,7 @@ function segmentEnters(box: Box, from: { x: number; y: number }, to: { x: number
 }
 
 /**
- * Nothing collides: no text overlaps other text or a mark it does not label,
+ * Nothing collides: no text overlaps other text or a mark,
  * no dependency runs through a mark or text, and no gridline, axis or Today
  * line crosses text.
  */
@@ -847,16 +847,14 @@ export function ganttClearanceCheck(scene: RenderedDiagramScene): ScenarioCheck 
 				other.top < text.bottom - 0.5
 			)
 				problems.push(`${text.id} overlaps ${other.id}`);
-		for (const mark of marks) {
-			// A task's label sits inside its own bar and the bar's completed part.
-			const own = text.id === `gantt:label:${mark.id.replace(/^gantt:(task|progress):/u, "")}`;
-			const overlaps =
+		for (const mark of marks)
+			if (
 				text.left < mark.right - 0.5 &&
 				mark.left < text.right - 0.5 &&
 				text.top < mark.bottom - 0.5 &&
-				mark.top < text.bottom - 0.5;
-			if (overlaps && !own) problems.push(`${text.id} overlaps ${mark.id}`);
-		}
+				mark.top < text.bottom - 0.5
+			)
+				problems.push(`${text.id} overlaps ${mark.id}`);
 	});
 	for (const element of scene.elements) {
 		if (element.type === "arrow") {

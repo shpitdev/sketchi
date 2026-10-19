@@ -26,6 +26,8 @@ export interface RoutePort extends RoutePoint {
 	readonly direction: RouteDirection;
 	/** Preference: added to the route's cost when it uses this port. */
 	readonly cost: number;
+	/** How far a route leaves a source port straight before it may turn: ROUTE_LEAD unless set. */
+	readonly lead?: number;
 }
 
 export interface RouteObstacle {
@@ -439,7 +441,7 @@ function prepareSearch(request: RouteRequest, window: Window, packing: Packing):
 	const { separation } = packing;
 	const pastTrunk = request.pastTrunk ?? new Map<RouteObstacle, RouteSegment>();
 	const obstacles = [...request.obstacles, ...pastTrunk.keys()];
-	const leads = request.sources.map((port) => step(port, port.direction, ROUTE_LEAD));
+	const leads = request.sources.map((port) => step(port, port.direction, port.lead ?? ROUTE_LEAD));
 	const approaches = request.targets.map((port) =>
 		step(port, ((port.direction + 2) % 4) as RouteDirection, routeApproach(port.direction)),
 	);
@@ -748,7 +750,7 @@ function prepareSearch(request: RouteRequest, window: Window, packing: Packing):
 			const node = key(lead);
 			if (node === undefined || !free(port, lead, true, true)) return;
 			const id = state(node, port.direction, FIRST);
-			const cost = port.cost + ROUTE_LEAD;
+			const cost = port.cost + (port.lead ?? ROUTE_LEAD);
 			if (cost < costOf(id)) {
 				stamp[id] = epoch;
 				best[id] = cost;
@@ -900,7 +902,8 @@ function straightRoute(request: RouteRequest): RoutePoint[] | undefined {
 				source.direction % 2 === 0
 					? Math.abs(source.y - target.y) < 0.01
 					: Math.abs(source.x - target.x) < 0.01;
-			if (!inLine || length < ROUTE_LEAD + routeApproach(target.direction)) continue;
+			if (!inLine || length < (source.lead ?? ROUTE_LEAD) + routeApproach(target.direction))
+				continue;
 			const blocked =
 				request.obstacles.some(
 					(obstacle) => !obstacle.own && blocksSegment(obstacle, source, target),

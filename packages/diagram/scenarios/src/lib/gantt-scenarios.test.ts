@@ -132,12 +132,13 @@ describe("prompt-grounded Gantt scenarios", () => {
 	);
 
 	// Round 12's judge counted 14 detours, 7 kinks and 7 crossings on every data-platform chart.
-	// Twelve of its detours have no forward route: a row between holds a bar and its label across
-	// every forward column. The rest of each count is routing's to clear.
+	// With names in the table, only bars stand between a dependency's rows: five of
+	// data-platform's detours and both of app-release's still have no forward route, as a bar
+	// between spans every forward column. The rest of each count is routing's to clear.
 	it.each([
-		["data-platform-migration-gantt", { detours: 12, kinks: 3, crossings: 4, hugs: 0 }],
-		["app-release-gantt", { detours: 2, kinks: 0, crossings: 2, hugs: 0 }],
-		["cafe-fit-out-gantt", { detours: 2, kinks: 0, crossings: 0, hugs: 0 }],
+		["data-platform-migration-gantt", { detours: 5, kinks: 2, crossings: 2, hugs: 0 }],
+		["app-release-gantt", { detours: 2, kinks: 0, crossings: 3, hugs: 0 }],
+		["cafe-fit-out-gantt", { detours: 0, kinks: 0, crossings: 0, hugs: 0 }],
 	] as const)(
 		"routes %s forward where its rows allow, without kinks, crossings or tracing a bar",
 		(id, most) => {

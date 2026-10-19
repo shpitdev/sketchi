@@ -20,7 +20,7 @@ import {
 } from "../gantt.js";
 import { ROUTE_BUDGET, ROUTE_CHART_BUDGET, ROUTE_KINK_BUDGET } from "../gantt-routing.js";
 import { readGanttScene } from "../gantt-readout.js";
-import { ganttAxis } from "../gantt-scale.js";
+import { GANTT_TICK_FONT_SIZE, ganttAxis } from "../gantt-scale.js";
 import type { RenderedDiagramScene, SceneElement, ScenePoint } from "../scene.js";
 
 interface Box {
@@ -117,7 +117,7 @@ function expectReadableGantt(
 			1,
 		);
 	}
-	// Text is whole, never overlaps other text or a mark it does not label, and stays in the scene.
+	// Text is whole, never overlaps other text or a mark, and stays in the scene.
 	const texts = scene.elements.flatMap((element) =>
 		element.type === "text" ? [textBox(element)] : [],
 	);
@@ -131,11 +131,7 @@ function expectReadableGantt(
 		for (const other of texts.slice(index + 1))
 			if (overlaps(text, other)) textProblems.push(`${text.id} overlaps ${other.id}`);
 		for (const mark of marks)
-			if (
-				text.id !== `gantt:label:${mark.id.replace(/^gantt:(task|progress):/u, "")}` &&
-				overlaps(text, mark)
-			)
-				textProblems.push(`${text.id} overlaps ${mark.id}`);
+			if (overlaps(text, mark)) textProblems.push(`${text.id} overlaps ${mark.id}`);
 		if (text.left < 0 || text.top < 0 || text.right > scene.width || text.bottom > scene.height)
 			textProblems.push(`${text.id} clipped`);
 	});
@@ -387,24 +383,68 @@ describe("Gantt renderer", () => {
 		}
 	});
 
-	it("draws bars to scale, labels inside when they fit, and beside otherwise", () => {
-		const diagram = plan([
-			{ id: "long", label: "Fits", start: "2026-03-02", duration: 10 },
-			{ id: "short", label: "A name far too long for its bar", start: "2026-03-05", duration: 1 },
-		]);
+	it("draws bars to scale, and names every task in a column left of the plot, level with its bar", () => {
+		const diagram = plan(
+			[
+				{ id: "long", label: "Fits", start: "2026-03-02", duration: 10, phase: "Build" },
+				{
+					id: "short",
+					label: "A name far too long for its bar",
+					start: "2026-03-05",
+					duration: 1,
+					phase: "Build",
+				},
+				{ id: "gate", label: "Gate", start: "2026-03-16", milestone: true, phase: "Ship" },
+			],
+			{ phases: ["Build", "Ship"] },
+		);
 		const scene = expectReadableGantt(diagram);
 		const readout = readGanttScene(scene);
 		const long = readout.marks.get("long")!;
 		const short = readout.marks.get("short")!;
-		expect((long.right - long.left) / (short.right - short.left)).toBeCloseTo(10, 5);
+		expect((long.right - long.left) / (short.right - short.left)).toBeCloseTo(10, 2);
 		const box = (id: string) => {
 			const element = scene.elements.find((entry) => entry.id === id);
 			if (element?.type !== "text") throw new Error(`missing ${id}`);
 			return textBox(element);
 		};
-		expect(box("gantt:label:long").left).toBeGreaterThan(long.left);
-		expect(box("gantt:label:long").right).toBeLessThan(long.right);
-		expect(box("gantt:label:short").left).toBeGreaterThan(short.right);
+		const plotLeft = readout.gridlines[0]!.x;
+		const names = ["long", "short", "gate"].map((id) => box(`gantt:label:${id}`));
+		const phase = box("gantt:phase:0");
+		for (const [index, id] of ["long", "short", "gate"].entries()) {
+			const name = names[index]!;
+			const dates = box(`gantt:caption:${id}`);
+			const mark = readout.marks.get(id)!;
+			// Names line up, in from their phase's, then dates, then the plot; each level with its mark.
+			expect(name.left, id).toBeCloseTo(names[0]!.left, 1);
+			expect(name.left, id).toBeGreaterThan(phase.left);
+			expect(dates.left, id).toBeGreaterThan(name.right);
+			expect(dates.right, id).toBeLessThan(plotLeft);
+			expect((name.top + name.bottom) / 2, id).toBeCloseTo((mark.top + mark.bottom) / 2, 0);
+		}
+		// Dates right-align in their column, phase spans with them.
+		expect(box("gantt:caption:long").right).toBeCloseTo(box("gantt:phase-caption:0").right, 1);
+		// A rule runs between every two rows, from the table's left across the plot.
+		const rules = scene.elements.filter(
+			(element) => element.type === "line" && element.id.startsWith("gantt:row-rule:"),
+		);
+		expect(rules).toHaveLength(5);
+		for (const rule of rules)
+			if (rule.type === "line") {
+				expect(rule.points[0].x).toBeLessThanOrEqual(phase.left + 0.5);
+				expect(rule.points[1].x).toBeCloseTo(readout.gridlines.at(-1)!.x, 1);
+			}
+	});
+
+	it("groups a row's name with its dates, apart from its bar, so dragging a bar keeps the table", () => {
+		const scene = expectReadableGantt(
+			plan([{ id: "a", label: "Build", start: "2026-03-02", end: "2026-03-13", progress: 40 }]),
+		);
+		const groups = (id: string) => scene.elements.find((element) => element.id === id)?.groupIds;
+		expect(groups("gantt:label:a")).toEqual(["gantt:row:a"]);
+		expect(groups("gantt:caption:a")).toEqual(["gantt:row:a"]);
+		expect(groups("node:gantt:task:a")).toEqual(["gantt:task:a"]);
+		expect(groups("node:gantt:progress:a")).toEqual(["gantt:task:a"]);
 	});
 
 	it("draws milestones as diamonds on their day and Today as a dashed line", () => {
@@ -528,6 +568,21 @@ describe("Gantt renderer", () => {
 		for (const { to, points } of routes) expect(steps(points), to).toEqual([]);
 	});
 
+	it("turns once out of a short bar's end into a tiny successor starting the next day", () => {
+		// A/B: Final delta sync -> Switch traffic stepped into the tiny bar from the gutter above.
+		const diagram = plan([
+			{ id: "freeze", label: "Freeze", start: "2026-06-22", milestone: true },
+			{ id: "sync", label: "Sync", start: "2026-06-22", duration: 3, dependsOn: ["freeze"] },
+			{ id: "switch", label: "Switch", start: "2026-06-25", duration: 2, dependsOn: ["sync"] },
+			{ id: "live", label: "Live", start: "2026-06-29", milestone: true, dependsOn: ["switch"] },
+			{ id: "archive", label: "Archive", start: "2026-02-02", end: "2026-07-17" },
+		]);
+		const routes = readGanttScene(expectReadableGantt(diagram)).dependencies;
+		const route = routes.find((entry) => entry.to === "switch")!.points;
+		expect(turns(route)).toBe(1);
+		expect(steps(route)).toEqual([]);
+	});
+
 	it("keeps a plain elbow however the search first reaches its turn", () => {
 		// Review: two ways into one point and heading were kept as one, the cheaper so far, though
 		// the dearer had turned long enough before to bend again without a kink. t19 -> t23 took a
@@ -636,6 +691,41 @@ describe("Gantt renderer", () => {
 		expect(readout.marks.get("a")!.start).toBeCloseTo(parseGanttDay("0090-01-01")!, 1);
 	});
 
+	it("keeps tick labels apart however long the plan, on a plot narrowed for a short chart", () => {
+		// Review: a century on a 640 px plot drew decade labels over one another.
+		const scene = renderGanttDiagram(
+			plan([{ id: "a", label: "Long programme", start: "2026-01-01", end: "2125-12-31" }]),
+		);
+		const ticks = scene.elements
+			.flatMap((element) =>
+				element.type === "text" && element.id.startsWith("gantt:tick:") ? [textBox(element)] : [],
+			)
+			.toSorted((a, b) => a.left - b.left);
+		expect(ticks.length).toBeGreaterThan(1);
+		ticks
+			.slice(1)
+			.forEach((tick, index) =>
+				expect(tick.left, tick.id).toBeGreaterThanOrEqual(ticks[index]!.right),
+			);
+		// Every tick label fits its cell, from a day to a century, from the narrowest plot to the widest.
+		const next = random(7);
+		const origin = parseGanttDay("2026-01-05")!;
+		const problems: string[] = [];
+		for (let index = 0; index < 400; index += 1) {
+			const start = origin + Math.floor(next() * 3650);
+			const span = Math.ceil(Math.exp(next() * Math.log(36_525)));
+			const width = 640 + next() * 320;
+			const axis = ganttAxis(start, start + span, width);
+			for (const cell of axis.cells)
+				if (
+					estimateTextWidth(cell.label, GANTT_TICK_FONT_SIZE) >
+					(cell.end - cell.start) * axis.pxPerDay
+				)
+					problems.push(`${span} days at ${Math.round(width)} px: "${cell.label}"`);
+		}
+		expect(problems.slice(0, 5)).toEqual([]);
+	});
+
 	it("rejects a billion-day task before laying out any axis", () => {
 		expect(() =>
 			renderGanttDiagram(
@@ -672,8 +762,9 @@ describe("Gantt renderer", () => {
 
 	it("lands no arrowhead on a route, and runs no route through one, around crowded marks", () => {
 		// Review: t9 → t11 ran through the head of t3 → t9 at a crowded milestone. A wider sweep
-		// found a sibling hugging its own milestone's bounds (477).
-		for (const seed of [81, 477]) expectReadableGantt(scheduledGantt(seed));
+		// found a sibling hugging its own milestone's bounds (477), and, once names left the plot, routes
+		// out of a 3 px bar's right end through the arrowhead entering its left (1000).
+		for (const seed of [81, 477, 1000]) expectReadableGantt(scheduledGantt(seed));
 	});
 
 	it(

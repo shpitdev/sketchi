@@ -33,7 +33,7 @@ export const AppRelease: Story = {
 	args: { diagram: scenarioDiagram("app-release-gantt") },
 };
 
-/** Phases with their spans in the date column, and a Today line. */
+/** Names indented under phases, with phase spans in the date column, and a Today line. */
 export const PhasesAndToday: Story = {
 	args: { diagram: scenarioDiagram("cafe-fit-out-gantt") },
 };
@@ -43,7 +43,7 @@ export const LongPlan: Story = {
 	args: { diagram: scenarioDiagram("data-platform-migration-gantt") },
 };
 
-/** A multi-year roadmap reads in quarters, and long names wrap beside short bars. */
+/** A multi-year roadmap reads in quarters, and long names wrap in the name column. */
 export const MultiYearRoadmap: Story = {
 	args: {
 		diagram: parseGanttDiagram({
