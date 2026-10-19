@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.22.0
+
+### Minor Changes
+
+- [#463](https://github.com/shpitdev/sketchi/pull/463) [`32d4ced`](https://github.com/shpitdev/sketchi/commit/32d4cedbe55dfc0ec4a4af56bfbff39b5a90dc72) Thanks [@anandpant](https://github.com/anandpant)! - Draw swimlane flowcharts: a flowchart spec's `lanes: [{ id, label }]` and each node's `lane` draw one full-length band per actor, in order, with its name in a header. Steps sit in their lane's band, a handoff to the neighboring lane runs straight across the boundary, and lanes come out as locked shapes in Excalidraw, so steps stay free to move. `sketchi create` builds them offline, and `sketchi generate` adds lanes when a prompt describes a process across actors.
+
 ## 0.21.1
 
 ### Patch Changes
