@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.21.0
+
+### Minor Changes
+
+- [#464](https://github.com/shpitdev/sketchi/pull/464) [`b689eb5`](https://github.com/shpitdev/sketchi/commit/b689eb599566f0a5a8cf1651b6608b3ad88a008c) Thanks [@anandpant](https://github.com/anandpant)! - Add native UML class diagrams: `sketchi create` builds `{ "type": "class", "spec": { "title", "classes", "relationships" } }` documents offline, and `sketchi generate --type class` generates them. Each class draws as a box of three compartments: its name under any `«interface»`, `«abstract»` or `«enumeration»` keyword, its attributes and its methods, with visibility and `{static}` or `{abstract}` markers. Superclasses and interfaces stand above the classes that extend or implement them. Relationships draw with their UML heads: hollow triangles for inheritance and (dashed) realization, filled and hollow diamonds for composition and aggregation, open arrows for navigable associations and (dashed) dependencies, with multiplicities and roles beside their ends. Members may be written on one line, as in `"+ area(): double"`.
+
 ## 0.20.0
 
 ### Minor Changes
