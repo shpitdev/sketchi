@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.17.2
+
+### Patch Changes
+
+- [#448](https://github.com/shpitdev/sketchi/pull/448) [`3c60efa`](https://github.com/shpitdev/sketchi/commit/3c60efadd4aacc90c453a4049a82aee48e57f827) Thanks [@anandpant](https://github.com/anandpant)! - Top-to-bottom flowcharts that run about 2.5 times taller than they are wide now wrap into side-by-side columns, as left-to-right flows already wrap into rows, when the flow splits into columns of similar height; a tall flow then exports closer to square with larger text. A flow whose only split would leave a short column beside a long one stays one column.
+
 ## 0.17.1
 
 ### Patch Changes
