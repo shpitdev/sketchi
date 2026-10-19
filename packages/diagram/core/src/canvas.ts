@@ -41,7 +41,21 @@ export const CANVAS_NODE_ICON = Object.freeze({
 
 export type CanvasStrokeStyle = "dashed" | "dotted" | "solid";
 export type CanvasFillStyle = "cross-hatch" | "hachure" | "solid";
-export type CanvasArrowhead = "arrow" | "bar" | "circle" | "diamond" | "triangle" | null;
+/**
+ * Excalidraw's own heads. The crow's-foot ones mark entity-relationship ends:
+ * a bar for one, a foot for many, and a bar with a foot for one or many.
+ */
+export const CANVAS_ARROWHEADS = [
+	"arrow",
+	"bar",
+	"circle",
+	"diamond",
+	"triangle",
+	"crowfoot_one",
+	"crowfoot_many",
+	"crowfoot_one_or_many",
+] as const;
+export type CanvasArrowhead = (typeof CANVAS_ARROWHEADS)[number] | null;
 export type CanvasShapeKind = "rectangle" | "ellipse" | "diamond" | "circle" | "polygon";
 
 export interface CanvasPoint {
@@ -83,8 +97,10 @@ export interface CanvasIconAsset {
  * Structural shapes renderers derive: sequence lifelines and activation bars,
  * timeline event markers and span bars, chart data marks (bars, slices,
  * point markers and legend keys), state-machine pseudostates (an initial
- * dot, a final bullseye, an unlabeled choice), and Gantt task bars and
- * milestones. They carry no bound label or icon.
+ * dot, a final bullseye, an unlabeled choice), Gantt task bars and
+ * milestones, and entity-relationship tables (a table's outline and its name
+ * band) and optional-end rings. They carry no icon, and only a table's name
+ * band carries a bound label.
  */
 export const CANVAS_RENDERER_ROLES = [
 	"sequence-lifeline",
@@ -93,23 +109,29 @@ export const CANVAS_RENDERER_ROLES = [
 	"chart-mark",
 	"state-marker",
 	"gantt-mark",
+	"er-table",
+	"er-optional",
 ] as const;
 export type CanvasRendererRole = (typeof CANVAS_RENDERER_ROLES)[number];
 
 /**
- * Roles connectors may cross: lifelines, activation bars, timeline markers and
- * chart marks. A state marker or Gantt mark is an end of its own connectors
- * and an obstacle to every other.
+ * Roles connectors may cross: lifelines, activation bars, timeline markers,
+ * chart marks, and the ring that marks an optional relationship end, which
+ * sits on its own line. A state marker or Gantt mark is an end of its own
+ * connectors and an obstacle to every other, as is a table.
  */
 export const CANVAS_CROSSABLE_RENDERER_ROLES: readonly CanvasRendererRole[] = [
 	"sequence-lifeline",
 	"sequence-activation",
 	"timeline-marker",
 	"chart-mark",
+	"er-optional",
 ];
 
 const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
 	"chart-mark": "Chart mark",
+	"er-optional": "Optional relationship end",
+	"er-table": "Entity table",
 	"gantt-mark": "Gantt mark",
 	"sequence-activation": "Sequence activation",
 	"sequence-lifeline": "Sequence lifeline",
@@ -144,6 +166,8 @@ export interface CanvasTextElement extends CanvasElementComposition {
 	readonly text: string;
 	readonly fontSize: number;
 	readonly fontFamily?: "hand" | "mono" | "sans";
+	/** Line height as a multiple of the font size; 1.35 when omitted. */
+	readonly lineHeight?: number;
 	readonly maxWidth?: number;
 	readonly textAlign?: "center" | "left" | "right";
 	readonly verticalAlign?: "bottom" | "middle" | "top";
@@ -923,7 +947,7 @@ function elementBounds(element: PositionedCanvasElement): CanvasElementBounds {
 			x: element.x,
 			y: element.y,
 			width: element.maxWidth ?? estimateTextWidth(element.text, element.fontSize),
-			height: lines.length * element.fontSize * 1.35,
+			height: lines.length * element.fontSize * (element.lineHeight ?? 1.35),
 		};
 	}
 	return {

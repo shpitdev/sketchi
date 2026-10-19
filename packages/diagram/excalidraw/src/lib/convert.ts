@@ -190,8 +190,8 @@ function elementBase(id: string, element?: RenderedDiagramScene["elements"][numb
 	};
 }
 
-function textHeight(text: string, fontSize: number): number {
-	return Math.ceil(text.split("\n").length * fontSize * TEXT_LINE_HEIGHT);
+function textHeight(text: string, fontSize: number, lineHeight = TEXT_LINE_HEIGHT): number {
+	return Math.ceil(text.split("\n").length * fontSize * lineHeight);
 }
 
 /** Excalidraw computeBoundTextPosition for top- and bottom-aligned labels. */
@@ -228,7 +228,8 @@ function textElement(input: {
 	const width = input.wrap
 		? wrappedLabelWidth(text, input.fontSize, input.maxWidth)
 		: boundLabelWidth(text, input.fontSize, input.maxWidth);
-	const height = textHeight(text, input.fontSize);
+	const lineHeight = input.element?.lineHeight ?? TEXT_LINE_HEIGHT;
+	const height = textHeight(text, input.fontSize, lineHeight);
 	const verticalAlign = input.element?.verticalAlign;
 
 	return {
@@ -248,7 +249,7 @@ function textElement(input: {
 		fontFamily:
 			input.element?.fontFamily === "mono" ? 3 : input.element?.fontFamily === "sans" ? 2 : 5,
 		fontSize: input.fontSize,
-		lineHeight: TEXT_LINE_HEIGHT,
+		lineHeight,
 		originalText: input.text,
 		roundness: null,
 		strokeColor: input.textColor ?? DEFAULT_TEXT_COLOR,
@@ -370,11 +371,14 @@ function shapeElement(input: {
 		height,
 		backgroundColor: input.shape.fillColor ?? "transparent",
 		boundElements: boundElements.length > 0 ? boundElements : null,
-		// Chart and Gantt bars keep square corners, so their ends sit exactly at their values and dates.
+		// Chart and Gantt bars keep square corners, so their ends sit exactly at their
+		// values and dates, and a table's outline and name band keep theirs, so the
+		// band fills its top.
 		roundness:
 			shapeType === "rectangle" &&
 			input.shape.rendererRole !== "chart-mark" &&
-			input.shape.rendererRole !== "gantt-mark"
+			input.shape.rendererRole !== "gantt-mark" &&
+			input.shape.rendererRole !== "er-table"
 				? { type: 3 }
 				: null,
 		strokeColor: input.shape.strokeColor ?? input.scene.accentColor,
@@ -382,6 +386,15 @@ function shapeElement(input: {
 			? { customData: { sketchiRendererRole: input.shape.rendererRole } }
 			: {}),
 	};
+}
+
+function isTableShape(element: ExcalidrawElement | undefined): boolean {
+	const customData = element?.customData;
+	return (
+		customData !== null &&
+		typeof customData === "object" &&
+		(customData as Record<string, unknown>)["sketchiRendererRole"] === "er-table"
+	);
 }
 
 function lastArrowPoint(arrow: ArrowSceneElement) {
@@ -398,13 +411,15 @@ function arrowElement(input: {
 	const start = input.arrow.points[0];
 	const end = lastArrowPoint(input.arrow);
 	// Excalidraw resolves a straight arrow's binding against its target's outline,
-	// which a frame lacks; an elbow arrow keeps its fixed point on a moved frame.
-	// A curved connector stays a curved arrow through its points.
+	// which a frame lacks, and re-aims it at a table's middle; an elbow arrow keeps
+	// its fixed point on a moved frame, and on the row of a moved table. A curved
+	// connector stays a curved arrow through its points.
 	const elbowed =
 		input.arrow.curved !== true &&
 		(input.arrow.points.length > 2 ||
-			input.sourceShape?.type === "frame" ||
-			input.targetShape?.type === "frame");
+			[input.sourceShape, input.targetShape].some(
+				(shape) => shape?.type === "frame" || isTableShape(shape),
+			));
 
 	return {
 		...elementBase(input.arrow.id, input.arrow),

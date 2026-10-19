@@ -96,6 +96,12 @@ interface RoutedEdge {
 	pair?: -1 | 1;
 	/** The side of its line a label sits on, when not the default: -1 left or above, +1 right or below. */
 	labelSide?: -1 | 1;
+	/** Ends a family pinned, with their offsets along their sides; nothing moves them. */
+	pinned?: { source?: number; target?: number };
+	/** Straight run kept at each end before the line turns or carries its label. */
+	endRun?: number;
+	/** A pinned end's own straight run, in place of the end run. */
+	runs?: { source?: number; target?: number };
 	source: NodeSceneElement;
 	sourceEdge: ConnectionEdge;
 	target: NodeSceneElement;
@@ -111,6 +117,9 @@ interface RouteSegment extends AxisAlignedSegment {
 	arrowId: string;
 	startBindingId: string;
 	endBindingId: string;
+	/** Where the segment starts and ends along its orientation, in route order. */
+	from: number;
+	to: number;
 }
 
 type VisitState = "visited" | "visiting";
@@ -2058,7 +2067,7 @@ function portLimit(node: NodeSceneElement, side: ConnectionEdge): number {
 function slotStubLength(slot: PortSlot, point: ScenePoint): number {
 	return slot.endpoint === "source"
 		? sourceStubLength(slot.route, point, ROUTE_STUB_LENGTH)
-		: endpointClearance(slot.route.target, point, slot.route.targetEdge, ROUTE_STUB_LENGTH);
+		: targetStubLength(slot.route, point, ROUTE_STUB_LENGTH);
 }
 
 /**
@@ -2678,11 +2687,7 @@ function stubReachForRoutes(
 		const { start, end } = routeEndpoints(route, portOffsets);
 		for (const [node, side, length] of [
 			[route.source, route.sourceEdge, sourceStubLength(route, start, ROUTE_STUB_LENGTH)],
-			[
-				route.target,
-				route.targetEdge,
-				endpointClearance(route.target, end, route.targetEdge, ROUTE_STUB_LENGTH),
-			],
+			[route.target, route.targetEdge, targetStubLength(route, end, ROUTE_STUB_LENGTH)],
 		] as const) {
 			const point = node === route.source ? start : end;
 			const tip = pointAwayFromEdge(point, side, length);
@@ -2748,11 +2753,7 @@ function endpointStubsForRoutes(
 			{
 				...arrow,
 				points: [
-					pointAwayFromEdge(
-						end,
-						route.targetEdge,
-						endpointClearance(route.target, end, route.targetEdge, ROUTE_STUB_LENGTH),
-					),
+					pointAwayFromEdge(end, route.targetEdge, targetStubLength(route, end, ROUTE_STUB_LENGTH)),
 					end,
 				],
 			},
@@ -2770,10 +2771,13 @@ function arrowForRoute(
 ): ArrowSceneElement {
 	const { edge } = route;
 	const { start: portedStart, end: portedEnd } = routeEndpoints(route, portOffsets);
-	const points =
+	const routed =
 		edgeRouting === "orthogonal"
 			? exteriorLaneRoute(route, portedStart, portedEnd, shapes, existingArrows, options)
 			: compactPoints([portedStart, portedEnd]);
+	// A pinned line keeps only its corners, so a stem it shares with another line
+	// stays one run from the shared port, as the export validator reads it.
+	const points = route.pinned ? compactPoints(straightRuns(routed)) : routed;
 
 	return {
 		type: "arrow",
@@ -2925,12 +2929,20 @@ function routeSegments(input: {
 	sourceNodeId: string;
 	targetNodeId: string;
 }): RouteSegment[] {
-	return segmentsFromPoints(input.points).map((segment) => ({
-		...segment,
-		arrowId: input.arrowId,
-		startBindingId: input.sourceNodeId,
-		endBindingId: input.targetNodeId,
-	}));
+	return segmentsFromPoints(input.points).map((segment) => {
+		const [from, to] = [
+			input.points[segment.segmentIndex]!,
+			input.points[segment.segmentIndex + 1]!,
+		];
+		return {
+			...segment,
+			arrowId: input.arrowId,
+			startBindingId: input.sourceNodeId,
+			endBindingId: input.targetNodeId,
+			from: segment.orientation === "horizontal" ? from.x : from.y,
+			to: segment.orientation === "horizontal" ? to.x : to.y,
+		};
+	});
 }
 
 /** Segment the routed arrows once per search; candidates and grid steps reuse the result. */
@@ -2960,7 +2972,11 @@ function routeArrowOverlapCount(
 
 	for (const candidate of candidateSegments) {
 		for (const existing of existingSegments) {
-			if (candidate.arrowId === existing.arrowId || !segmentsOverlapInterior(candidate, existing)) {
+			if (
+				candidate.arrowId === existing.arrowId ||
+				!segmentsOverlapInterior(candidate, existing) ||
+				(route.pinned !== undefined && sharedPinnedStem(candidate, existing))
+			) {
 				continue;
 			}
 
@@ -2969,6 +2985,21 @@ function routeArrowOverlapCount(
 	}
 
 	return overlapCount;
+}
+
+/**
+ * Stems that leave or reach one node at one point in one direction, as lines
+ * pinned to the same port do: the export validator lets them coincide.
+ */
+function sharedPinnedStem(left: RouteSegment, right: RouteSegment): boolean {
+	const departure =
+		left.isFirstSegment && right.isFirstSegment && left.startBindingId === right.startBindingId;
+	return (
+		isSharedBoundStem(left, right) &&
+		Math.abs((departure ? left.from : left.to) - (departure ? right.from : right.to)) <=
+			AXIS_ALIGNED_EPSILON &&
+		Math.sign(left.to - left.from) === Math.sign(right.to - right.from)
+	);
 }
 
 function routeSelfOverlapCount(points: readonly ScenePoint[], route: RoutedEdge): number {
@@ -3365,6 +3396,21 @@ function endpointClearance(
 	}
 }
 
+/** The straight run a line keeps at one end: the end's own when pinned with one. */
+function endRunOf(route: RoutedEdge, endpoint: "source" | "target"): number {
+	return route.runs?.[endpoint] ?? route.endRun ?? 0;
+}
+
+/** An arrival's stub: at least `distance`, and the end run its line keeps. */
+function targetStubLength(route: RoutedEdge, point: ScenePoint, distance: number): number {
+	return endpointClearance(
+		route.target,
+		point,
+		route.targetEdge,
+		Math.max(distance, endRunOf(route, "target")),
+	);
+}
+
 function sourceStubLength(route: RoutedEdge, point: ScenePoint, distance: number): number {
 	// A self-loop's label sits outside its loop, not beside its stub.
 	const labelSpace =
@@ -3376,11 +3422,15 @@ function sourceStubLength(route: RoutedEdge, point: ScenePoint, distance: number
 						branchLabelMetrics(route.edge.label, branches(route.source.kind)).height + 24,
 					)
 			: 0;
+	// A label sits past the end run.
 	return endpointClearance(
 		route.source,
 		point,
 		route.sourceEdge,
-		Math.max(distance, Math.min(labelSpace, choiceStubRoom(route, point))),
+		Math.max(
+			distance,
+			endRunOf(route, "source") + Math.min(labelSpace, choiceStubRoom(route, point)),
+		),
 	);
 }
 
@@ -3647,11 +3697,13 @@ function branchLabelPosition(route: RoutedEdge, start: ScenePoint): ScenePoint {
 			: { x: (stub.x + entry.x) / 2, y: stub.y + outward.y * (size.height / 2 + 5) };
 	}
 	// A label sits above a horizontal stub and right of a vertical one, unless its
-	// line is one of a pair, which keeps its label on its own side.
+	// line is one of a pair, which keeps its label on its own side. It starts past
+	// the end run, clear of any end marker.
 	const side = labelSideOf(route);
+	const from = pointAwayFromEdge(start, route.sourceEdge, endRunOf(route, "source"));
 	return {
-		x: (start.x + stub.x) / 2 + (horizontal ? 0 : side * (size.width / 2 + 8)),
-		y: (start.y + stub.y) / 2 + (horizontal ? side * (size.height / 2 + 5) : 0),
+		x: (from.x + stub.x) / 2 + (horizontal ? 0 : side * (size.width / 2 + 8)),
+		y: (from.y + stub.y) / 2 + (horizontal ? side * (size.height / 2 + 5) : 0),
 	};
 }
 
@@ -3698,11 +3750,7 @@ function loopObstacles(
 			start,
 			end,
 			pointAwayFromEdge(start, route.sourceEdge, sourceStubLength(route, start, ROUTE_STUB_LENGTH)),
-			pointAwayFromEdge(
-				end,
-				route.targetEdge,
-				endpointClearance(route.target, end, route.targetEdge, ROUTE_STUB_LENGTH),
-			),
+			pointAwayFromEdge(end, route.targetEdge, targetStubLength(route, end, ROUTE_STUB_LENGTH)),
 		];
 		const box = boundsOf(points.map((point) => ({ ...point, width: 0, height: 0 })));
 		return obstacleBox(`loop:${route.edge.id}`, padBox(box, PORT_SPACING / 2));
@@ -3810,8 +3858,10 @@ function labelAmbiguous(
 function labelSlidePositions(
 	points: readonly ScenePoint[],
 	size: { width: number; height: number },
+	runs: { readonly start: number; readonly end: number } = { start: 0, end: 0 },
 ): ScenePoint[] {
 	const positions: ScenePoint[] = [];
+	const total = routeLength(points);
 	let travelled = 0;
 	for (const segment of segmentsFromPoints(points)) {
 		if (travelled > LABEL_SLIDE_LENGTH) break;
@@ -3826,6 +3876,12 @@ function labelSlidePositions(
 			offset += LABEL_SLIDE_STEP
 		) {
 			if (travelled + offset > LABEL_SLIDE_LENGTH) break;
+			// A label beside a run keeps clear of the end runs and their markers.
+			if (
+				(runs.start > 0 && travelled + offset - along < runs.start) ||
+				(runs.end > 0 && travelled + offset + along > total - runs.end)
+			)
+				continue;
 			const t = offset / length;
 			const point = { x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t };
 			for (const side of [1, -1])
@@ -3838,6 +3894,13 @@ function labelSlidePositions(
 		travelled += length;
 	}
 	return positions;
+}
+
+/** The end runs a label keeps clear of, from its line's start and end. */
+function labelRuns(route: RoutedEdge | undefined): { start: number; end: number } {
+	return route
+		? { start: endRunOf(route, "source"), end: endRunOf(route, "target") }
+		: { start: 0, end: 0 };
 }
 
 /**
@@ -3900,7 +3963,7 @@ function placedBranchLabels(
 		let position = stub;
 		let fewest = conflicts(stub);
 		if (fewest > 0)
-			for (const candidate of labelSlidePositions(arrow.points, size)) {
+			for (const candidate of labelSlidePositions(arrow.points, size, labelRuns(routes[index]))) {
 				const count = conflicts(candidate);
 				if (count < fewest) [position, fewest] = [candidate, count];
 				if (fewest === 0) break;
@@ -3909,7 +3972,7 @@ function placedBranchLabels(
 			// A clear label that could belong to another line moves only to a spot
 			// that is plainly its own and clear of everything with room to spare.
 			position =
-				labelSlidePositions(arrow.points, size).find(
+				labelSlidePositions(arrow.points, size, labelRuns(routes[index])).find(
 					(candidate) =>
 						conflicts(candidate, LABEL_MOVE_MARGIN) === 0 &&
 						!labelAmbiguous(labelBox(candidate, size), segments[index]!, lines),
@@ -4349,11 +4412,7 @@ function exteriorLaneRoute(
 				: start;
 		const endStub =
 			stubDistance > 0
-				? pointAwayFromEdge(
-						end,
-						route.targetEdge,
-						endpointClearance(route.target, end, route.targetEdge, stubDistance),
-					)
+				? pointAwayFromEdge(end, route.targetEdge, targetStubLength(route, end, stubDistance))
 				: end;
 
 		return compactPoints([
@@ -4376,11 +4435,7 @@ function exteriorLaneRoute(
 				: start;
 		const endStub =
 			stubDistance > 0
-				? pointAwayFromEdge(
-						end,
-						route.targetEdge,
-						endpointClearance(route.target, end, route.targetEdge, stubDistance),
-					)
+				? pointAwayFromEdge(end, route.targetEdge, targetStubLength(route, end, stubDistance))
 				: end;
 
 		return compactPoints([
@@ -4422,7 +4477,7 @@ function exteriorLaneRoute(
 	const endStub = pointAwayFromEdge(
 		end,
 		route.targetEdge,
-		endpointClearance(route.target, end, route.targetEdge, ROUTE_STUB_LENGTH),
+		targetStubLength(route, end, ROUTE_STUB_LENGTH),
 	);
 	const continuation =
 		route.lane === undefined
@@ -4432,11 +4487,25 @@ function exteriorLaneRoute(
 						? routeForVerticalLane(route.lane!, distance)
 						: routeForHorizontalLane(route.lane!, distance),
 				);
+	// A pinned line between facing sides may step across midway, a bend clear of
+	// both ports rather than a jog beside one.
+	const facing = route.pinned !== undefined && route.targetEdge === OPPOSITE_EDGE[route.sourceEdge];
+	const middle =
+		route.sourceEdge === "left" || route.sourceEdge === "right"
+			? [
+					{ x: (startStub.x + endStub.x) / 2, y: startStub.y },
+					{ x: (startStub.x + endStub.x) / 2, y: endStub.y },
+				]
+			: [
+					{ x: startStub.x, y: (startStub.y + endStub.y) / 2 },
+					{ x: endStub.x, y: (startStub.y + endStub.y) / 2 },
+				];
 	const candidates = [
 		...continuation,
 		compactPoints([start, end]),
 		compactPoints([start, startStub, { x: startStub.x, y: endStub.y }, endStub, end]),
 		compactPoints([start, startStub, { x: endStub.x, y: startStub.y }, endStub, end]),
+		...(facing ? [compactPoints([start, startStub, ...middle, endStub, end])] : []),
 		...lanes.flatMap(([lane, generator]) =>
 			stubDistances.map((distance) => generator(lane, distance)),
 		),
@@ -4466,7 +4535,12 @@ function exteriorLaneRoute(
 		routeSelfOverlapCount(best, route) ||
 		routeArrowOverlapCount(best, routed.segments, route) ||
 		routeOutlineBesideCount(best, routed.outlines);
-	if (hard || corridors(best)) {
+	// A pinned line that runs out past its target, around everything between, may
+	// find a way between the nodes instead.
+	const wanders =
+		route.pinned !== undefined &&
+		routeBacktrackDistance(best) + routeTargetOvershootDistance(best) > 0;
+	if (hard || corridors(best) || wanders) {
 		// Search lanes that read apart only when a corridor is what remains to fix.
 		const detour = obstacleRoute(
 			start,
@@ -4598,7 +4672,7 @@ function resideArrivals(
 	const resided: { route: RoutedEdge; side: ConnectionEdge }[] = [];
 	for (const [index, arrow] of arrows.entries()) {
 		const route = routes[index]!;
-		if (feedback.has(route.edge.id)) continue;
+		if (feedback.has(route.edge.id) || route.pinned?.target !== undefined) continue;
 		const moves =
 			trigger === "hooked"
 				? routingQualityFindings([{ id: arrow.id, points: arrow.points }], scale).some(
@@ -5030,6 +5104,47 @@ function layoutDiagram(
 	return layout;
 }
 
+/** Each node at the box its family placed it in. */
+function placedNodes(
+	diagram: IntermediateDiagram,
+	placement: NonNullable<GraphRenderOptions["placement"]>,
+): NodeSceneElement[] {
+	return diagram.nodes.map((node) => {
+		const box = placement.get(node.id);
+		if (!box) throw new Error(`Cannot render node "${node.id}" without a placement.`);
+		return { ...createNodeShape(node), x: box.x, y: box.y, width: box.width, height: box.height };
+	});
+}
+
+/** Pin each anchored end to its side; its offset then overrides any the router computes. */
+function pinAnchors(
+	routes: readonly RoutedEdge[],
+	anchors: ReadonlyMap<string, GraphAnchor>,
+): void {
+	for (const route of routes)
+		for (const endpoint of ["source", "target"] as const) {
+			const anchor = anchors.get(connectionKey({ edgeId: route.edge.id, endpoint }));
+			if (!anchor) continue;
+			if (endpoint === "source") route.sourceEdge = anchor.side;
+			else route.targetEdge = anchor.side;
+			route.pinned = { ...route.pinned, [endpoint]: anchor.offset };
+			if (anchor.run !== undefined) route.runs = { ...route.runs, [endpoint]: anchor.run };
+		}
+}
+
+function withPinnedOffsets(
+	routes: readonly RoutedEdge[],
+	offsets: Map<string, number>,
+): Map<string, number> {
+	for (const route of routes)
+		for (const endpoint of ["source", "target"] as const) {
+			const offset = route.pinned?.[endpoint];
+			if (offset !== undefined)
+				offsets.set(connectionKey({ edgeId: route.edge.id, endpoint }), offset);
+		}
+	return offsets;
+}
+
 function layoutDiagramOnce(
 	diagram: IntermediateDiagram,
 	polish: RoutingPolish,
@@ -5037,18 +5152,18 @@ function layoutDiagramOnce(
 	slack: ReadonlyMap<string, number>,
 ): DiagramLayout {
 	const orthogonal = diagram.layout.edgeRouting === "orthogonal";
+	const { anchors, endRun, placement } = graphOptions.get(diagram) ?? {};
 	const offsetsFor = (routes: readonly RoutedEdge[]) =>
-		polish.ports
-			? alignedPortOffsets(routes, polish.repair, arrangement.crossingRepair)
-			: portOffsetsForRoutes(routes, polish.repair);
+		withPinnedOffsets(
+			routes,
+			polish.ports
+				? alignedPortOffsets(routes, polish.repair, arrangement.crossingRepair)
+				: portOffsetsForRoutes(routes, polish.repair),
+		);
 	const { wrap } = arrangement;
-	let { groups, nodes: nodeShapes } = positionLayout(
-		diagram,
-		new Map(),
-		new Map(),
-		arrangement,
-		slack,
-	);
+	let { groups, nodes: nodeShapes }: PositionedLayout = placement
+		? { nodes: placedNodes(diagram, placement) }
+		: positionLayout(diagram, new Map(), new Map(), arrangement, slack);
 	// Groups laid out across the flow read in their own direction inside.
 	const { direction } = diagram.layout;
 	const acrossOf = (nodeId: string) =>
@@ -5073,6 +5188,7 @@ function layoutDiagramOnce(
 	const routedEdges = diagram.edges.map((edge, index) =>
 		routeForEdge(edge, index, shapesByNodeId, edgeDirection(edge), wrap.continuations.has(edge.id)),
 	);
+	if (endRun) for (const route of routedEdges) route.endRun = endRun;
 	const mirrored = orthogonal && polish.ports;
 	assignSides(routedEdges, mirrored);
 	let portOffsets: Map<string, number>;
@@ -5087,6 +5203,7 @@ function layoutDiagramOnce(
 			if (sides?.sourceEdge) route.sourceEdge = sides.sourceEdge;
 			if (sides?.targetEdge) route.targetEdge = sides.targetEdge;
 		}
+		if (anchors) pinAnchors(routedEdges, anchors);
 		portOffsets = offsetsFor(routedEdges);
 		capacity = portCapacityForRoutes(routedEdges, portOffsets);
 	} else {
@@ -5094,12 +5211,13 @@ function layoutDiagramOnce(
 		portOffsets = direct.offsets;
 		capacity = direct.minimumSizes;
 	}
-	// A grouped layout always sizes its frames to hold their members' stubs.
+	// A grouped layout always sizes its frames to hold their members' stubs; a
+	// placed one keeps the room its family left.
 	const reach =
-		orthogonal && (polish.repair || groups)
+		orthogonal && !placement && (polish.repair || groups)
 			? stubReachForRoutes(routedEdges, portOffsets)
 			: new Map<string, number>();
-	if (capacity.size > 0 || reach.size > 0) {
+	if (!placement && (capacity.size > 0 || reach.size > 0)) {
 		({ groups, nodes: nodeShapes } = positionLayout(diagram, capacity, reach, arrangement, slack));
 		const resized = new Map(
 			[...nodeShapes, ...compositeShapes(groups)].map((node) => [node.nodeId, node]),
@@ -5524,7 +5642,8 @@ function crossingMoves(
 	const lateral = (side: ConnectionEdge) => slotAxis(side) === along;
 	const mirror = (side: ConnectionEdge) => (lateral(side) ? OPPOSITE_EDGE[side] : side);
 	const feedback = flowFeedback(diagram);
-	const movable = (route: RoutedEdge) => !isSelfLoop(route) && route.pair === undefined;
+	const movable = (route: RoutedEdge) =>
+		!isSelfLoop(route) && route.pair === undefined && route.pinned === undefined;
 	const sideKey = (endpoint: "source" | "target") =>
 		endpoint === "source" ? ("sourceEdge" as const) : ("targetEdge" as const);
 	// A side along the flow faces the other end; either side across it will do.
@@ -5638,9 +5757,12 @@ function screenedCrossings(settled: SettledLayout, move: SideMove, polish: Routi
 	const { layout } = settled;
 	if (!layout.portOffsets || !layout.routeOptions) return 0;
 	const routes = layout.routedEdges.map((route) => ({ ...route, ...move.get(route.edge.id) }));
-	const offsets = polish.ports
-		? alignedPortOffsets(routes, polish.repair, settled.arrangement.crossingRepair)
-		: portOffsetsForRoutes(routes, polish.repair);
+	const offsets = withPinnedOffsets(
+		routes,
+		polish.ports
+			? alignedPortOffsets(routes, polish.repair, settled.arrangement.crossingRepair)
+			: portOffsetsForRoutes(routes, polish.repair),
+	);
 	const moved = new Set(
 		routes.flatMap((route) =>
 			move.has(route.edge.id) ||
@@ -5881,6 +6003,17 @@ function withGroupFrames(
 	};
 }
 
+/** A point on a node's side a line's end is pinned to: its offset from the middle of that side. */
+export interface GraphAnchor {
+	readonly side: "top" | "right" | "bottom" | "left";
+	readonly offset: number;
+	/**
+	 * This end's straight run, in place of `endRun`. Lines that share a port take
+	 * different runs, so each leaves the shared stem at a point of its own.
+	 */
+	readonly run?: number;
+}
+
 /** Choices a family's renderer makes for its graph; flowcharts and mindmaps make none. */
 export interface GraphRenderOptions {
 	/**
@@ -5888,6 +6021,24 @@ export interface GraphRenderOptions {
 	 * (orthogonal routing), as state machines draw a transition and its return.
 	 */
 	readonly pairedReturns?: boolean;
+	/**
+	 * The family's own placement, each node's box by node id, drawn as given: the
+	 * router only routes. The family leaves room between nodes for the lines.
+	 */
+	readonly placement?: ReadonlyMap<
+		string,
+		{ readonly x: number; readonly y: number; readonly width: number; readonly height: number }
+	>;
+	/**
+	 * Line ends pinned to a point, by `<edgeId>:source` or `<edgeId>:target`
+	 * (orthogonal routing). Ends pinned to the same point share their stub.
+	 */
+	readonly anchors?: ReadonlyMap<string, GraphAnchor>;
+	/**
+	 * Straight run every line keeps at each end before it turns or carries its
+	 * label, so markers drawn at its ends (crow's feet) sit on a straight line.
+	 */
+	readonly endRun?: number;
 }
 
 const graphOptions = new WeakMap<IntermediateDiagram, GraphRenderOptions>();
@@ -5931,6 +6082,8 @@ export function renderGraphDiagram(
 		return { arrangement, defects, layout };
 	};
 	let best = settle(PLAIN_ARRANGEMENT);
+	// A placed graph keeps its family's arrangement.
+	const arranged = options.placement === undefined;
 	// Another arrangement is tried at full polish only, and kept when it has no more
 	// defects and routes no worse (or, `fewerCrossings`, with strictly fewer crossings).
 	const consider = (arrangement: Arrangement, fewerCrossings: boolean) => {
@@ -5943,7 +6096,7 @@ export function renderGraphDiagram(
 	// Crossing repairs are tried only where the polished router crossed: arrival
 	// order and moved arrivals stay when they route no worse, and reordered ranks
 	// only when they route with fewer crossings.
-	const repairable = orthogonal && diagram.edges.length <= CROSSING_REPAIR_MAX_EDGES;
+	const repairable = arranged && orthogonal && diagram.edges.length <= CROSSING_REPAIR_MAX_EDGES;
 	if (repairable && arrowCrossings(best.layout.edgeArrows, false) > 0)
 		consider({ ...best.arrangement, crossingRepair: true }, false);
 	if (repairable && arrowCrossings(best.layout.edgeArrows, false) > 0 && reordersRanks(diagram))
@@ -5977,7 +6130,9 @@ export function renderGraphDiagram(
 			? WRAP_COLUMN_BALANCE
 			: 0;
 	const wrap =
-		orthogonal && tooLong ? planWrap(diagram, best.arrangement.reorder, balance) : NO_WRAP;
+		arranged && orthogonal && tooLong
+			? planWrap(diagram, best.arrangement.reorder, balance)
+			: NO_WRAP;
 	// A wrapped layout may need crossing repairs of its own; it tries them first.
 	for (const crossingRepair of repairable && !best.arrangement.crossingRepair
 		? [true, false]
@@ -5987,7 +6142,7 @@ export function renderGraphDiagram(
 	}
 	// A grouped flow never wraps, since a band cut would split a group; a long one
 	// lays its groups across the flow instead, when that routes no worse.
-	const groupsAcross = orthogonal && tooLong && groupStructure(diagram) !== undefined;
+	const groupsAcross = arranged && orthogonal && tooLong && groupStructure(diagram) !== undefined;
 	for (const crossingRepair of repairable && !best.arrangement.crossingRepair
 		? [true, false]
 		: [best.arrangement.crossingRepair]) {

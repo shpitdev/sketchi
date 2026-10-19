@@ -2094,3 +2094,141 @@ describe("chart marks", () => {
 		}
 	});
 });
+
+describe("entity tables and crow's-foot ends", () => {
+	/** Two tables a relationship joins row to row, an optional end ringed on its line. */
+	const scene: CanvasSpec = {
+		kind: "canvas",
+		version: 1,
+		diagramId: "tables",
+		title: "Tables",
+		width: 700,
+		height: 300,
+		accentColor: "#8f707f",
+		backgroundColor: "#fffdf8",
+		elements: [
+			...(["customers", "orders"] as const).flatMap((id, index) => {
+				const x = 40 + index * 400;
+				return [
+					{
+						type: "node" as const,
+						id: `node:${id}`,
+						nodeId: id,
+						rendererRole: "er-table" as const,
+						shape: "rectangle" as const,
+						x,
+						y: 40,
+						width: 200,
+						height: 108,
+						label: id,
+						groupIds: [`table:${id}`],
+					},
+					{
+						type: "node" as const,
+						id: `node:${id}:header`,
+						nodeId: `${id}:header`,
+						rendererRole: "er-table" as const,
+						shape: "rectangle" as const,
+						x,
+						y: 40,
+						width: 200,
+						height: 40,
+						label: id,
+						fillColor: "#efe6ec",
+						groupIds: [`table:${id}`],
+					},
+					{
+						type: "text" as const,
+						id: `label:${id}:header`,
+						containerId: `node:${id}:header`,
+						x: x + 100,
+						y: 60,
+						text: id,
+						fontSize: 16,
+						maxWidth: 172,
+						groupIds: [`table:${id}`],
+					},
+					{
+						type: "text" as const,
+						id: `text:${id}:fields`,
+						x: x + 14 + 40,
+						y: 86 + 28,
+						text: "id\ncustomer_id",
+						fontSize: 14,
+						lineHeight: 2,
+						textAlign: "left" as const,
+						maxWidth: 80,
+						groupIds: [`table:${id}`],
+					},
+				];
+			}),
+			{
+				type: "arrow",
+				id: "edge:places",
+				edgeId: "places",
+				sourceNodeId: "customers",
+				targetNodeId: "orders",
+				startArrowhead: "crowfoot_one",
+				endArrowhead: "crowfoot_many",
+				points: [
+					{ x: 240, y: 100 },
+					{ x: 440, y: 100 },
+				],
+			},
+			{
+				type: "node",
+				id: "node:orders:optional:0",
+				nodeId: "orders:optional:0",
+				rendererRole: "er-optional",
+				shape: "circle",
+				x: 402,
+				y: 94,
+				width: 12,
+				height: 12,
+				label: "Optional end",
+				fillColor: "#fffdf8",
+				fillStyle: "solid",
+				groupIds: ["table:orders"],
+			},
+		],
+		layers: [],
+		layouts: [],
+		zOrder: [],
+	};
+	const exported = () => {
+		const withOrder = { ...scene, zOrder: scene.elements.map((element) => element.id) };
+		expect(getCanvasValidationIssues(withOrder)).toEqual([]);
+		return convertSceneToExcalidraw(withOrder);
+	};
+	const element = (id: string) => exported().elements.find((candidate) => candidate.id === id)!;
+
+	it("keeps a table's outline and name band square, so the band fills its top", () => {
+		expect(element("node:orders")).toMatchObject({ type: "rectangle", roundness: null });
+		expect(element("node:orders:header")).toMatchObject({ type: "rectangle", roundness: null });
+	});
+
+	it("exports crow's-foot heads and binds a straight line to its rows as an elbow arrow", () => {
+		const arrow = element("edge:places");
+		expect(arrow).toMatchObject({
+			startArrowhead: "crowfoot_one",
+			endArrowhead: "crowfoot_many",
+			elbowed: true,
+		});
+		// The row sits 60 of the table's 108 units down; a moved table keeps it there.
+		expect((arrow["startBinding"] as { fixedPoint: number[] }).fixedPoint).toEqual([1, 60 / 108]);
+		expect((arrow["endBinding"] as { fixedPoint: number[] }).fixedPoint).toEqual([0, 60 / 108]);
+	});
+
+	it("keeps a column's rows at its line height", () => {
+		expect(element("text:orders:fields")).toMatchObject({
+			lineHeight: 2,
+			height: 2 * 14 * 2,
+			y: 114 - 28,
+			textAlign: "left",
+		});
+	});
+
+	it("lets a line cross the ring of its own optional end and nothing else", () => {
+		expect(validateExcalidrawScene(exported())).toEqual({ ok: true, issues: [] });
+	});
+});

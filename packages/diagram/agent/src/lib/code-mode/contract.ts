@@ -3,6 +3,7 @@ import type { StandardJSONSchemaV1, StandardSchemaV1 } from "@standard-schema/sp
 import {
 	CANVAS_LIMITS,
 	CANVAS_NODE_ICON,
+	CANVAS_ARROWHEADS,
 	CANVAS_RENDERER_ROLES,
 	CANVAS_SPEC_VERSION,
 	CHART_KINDS,
@@ -1141,7 +1142,7 @@ const CanvasStrokeFields = {
 	strokeWidth: optionalContract(literals([1, 2, 4])).pipe(Schema.mutableKey),
 };
 
-const CanvasArrowhead = Schema.NullOr(literals(["arrow", "bar", "circle", "diamond", "triangle"]));
+const CanvasArrowhead = Schema.NullOr(literals(CANVAS_ARROWHEADS));
 
 const CanvasPointList = Schema.Array(ScenePoint)
 	.pipe(Schema.mutable)
@@ -1221,6 +1222,7 @@ export class TextSceneElement extends Schema.Class<TextSceneElement>("TextSceneE
 		text: RequiredNonEmptyString.pipe(Schema.mutableKey),
 		fontSize: PositiveNumber,
 		fontFamily: optionalContract(literals(["hand", "mono", "sans"])),
+		lineHeight: optionalContract(PositiveNumber),
 		maxWidth: optionalContract(PositiveNumber),
 		textAlign: optionalContract(literals(["center", "left", "right"])),
 		verticalAlign: optionalContract(literals(["bottom", "middle", "top"])),

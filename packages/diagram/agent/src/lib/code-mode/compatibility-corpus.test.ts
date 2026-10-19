@@ -81,6 +81,7 @@ const CANVAS_ELEMENT_SCHEMA_ADDED_FIELDS = {
 		"opacity",
 		"zIndex",
 		"fontFamily",
+		"lineHeight",
 		"textAlign",
 		"verticalAlign",
 	]),
@@ -161,6 +162,12 @@ const GANTT_ISSUE_CODE_ADDITIONS = new Set([
 	"invalid_gantt_progress",
 	"gantt_dependency_cycle",
 	"gantt_schedule_conflict",
+]);
+// Entity-relationship ends add crow's-foot arrowheads.
+const CANVAS_ARROWHEAD_ADDITIONS = new Set([
+	"crowfoot_one",
+	"crowfoot_many",
+	"crowfoot_one_or_many",
 ]);
 const FLOWCHART_SPEC_NODE_ADDED_FIELDS = new Set(["icon", "group"]);
 // Flowchart groups add an optional groups list to the spec.
@@ -268,7 +275,8 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		GROUP_ISSUE_CODE_ADDITIONS.has(value) ||
 		CHART_ISSUE_CODE_ADDITIONS.has(value) ||
 		STATE_MACHINE_ISSUE_CODE_ADDITIONS.has(value) ||
-		GANTT_ISSUE_CODE_ADDITIONS.has(value)
+		GANTT_ISSUE_CODE_ADDITIONS.has(value) ||
+		CANVAS_ARROWHEAD_ADDITIONS.has(value)
 	);
 }
 
