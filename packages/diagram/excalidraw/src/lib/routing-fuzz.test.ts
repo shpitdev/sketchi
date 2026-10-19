@@ -180,6 +180,38 @@ const PLAIN_DIRECT_FAILURES: Readonly<Record<"TB" | "BT" | "LR" | "RL", readonly
 };
 
 /** Interior crossings between arrows and reader-scale findings, as the layout guards count them. */
+type Point = { x: number; y: number };
+
+/** Arrows with a run that is neither horizontal nor vertical, which no orthogonal route has. */
+function diagonalRuns(scene: ReturnType<typeof renderIntermediateDiagram>): string[] {
+	return scene.elements.flatMap((element) =>
+		element.type === "arrow" &&
+		element.points.some(
+			(point, index) =>
+				index > 0 &&
+				Math.abs(point.x - element.points[index - 1]!.x) > 0.01 &&
+				Math.abs(point.y - element.points[index - 1]!.y) > 0.01,
+		)
+			? [`${element.id} runs diagonally`]
+			: [],
+	);
+}
+
+/** A route's corners alone, so a line crossing it where it runs straight on counts once. */
+function corners(points: readonly Point[]): Point[] {
+	return points.filter((p, i) => {
+		const [a, b] = [points[i - 1], points[i + 1]];
+		return (
+			!a ||
+			!b ||
+			!(
+				(Math.abs(a.x - p.x) < 0.01 && Math.abs(p.x - b.x) < 0.01) ||
+				(Math.abs(a.y - p.y) < 0.01 && Math.abs(p.y - b.y) < 0.01)
+			)
+		);
+	});
+}
+
 function routingCounts(scene: ReturnType<typeof renderIntermediateDiagram>) {
 	const nodes = scene.elements.flatMap((e) => (e.type === "node" ? [e] : []));
 	const arrows = scene.elements.flatMap((e) => (e.type === "arrow" ? [e] : []));
@@ -208,12 +240,13 @@ function routingCounts(scene: ReturnType<typeof renderIntermediateDiagram>) {
 	const vertical = (p: { x: number; y: number }, q: { x: number; y: number }) =>
 		Math.abs(p.x - q.x) < 0.01 && Math.abs(p.y - q.y) > 0.01;
 	let crossings = 0;
-	for (const [index, a] of arrows.entries())
-		for (const b of arrows.slice(index + 1))
-			for (const [i, p] of a.points.slice(0, -1).entries())
-				for (const [j, r] of b.points.slice(0, -1).entries()) {
-					const q = a.points[i + 1]!;
-					const u = b.points[j + 1]!;
+	const runs = arrows.map((arrow) => corners(arrow.points));
+	for (const [index, a] of runs.entries())
+		for (const b of runs.slice(index + 1))
+			for (const [i, p] of a.slice(0, -1).entries())
+				for (const [j, r] of b.slice(0, -1).entries()) {
+					const q = a[i + 1]!;
+					const u = b[j + 1]!;
 					const [h0, h1, v0, v1] =
 						horizontal(p, q) && vertical(r, u)
 							? [p, q, r, u]
@@ -232,25 +265,50 @@ function routingCounts(scene: ReturnType<typeof renderIntermediateDiagram>) {
 }
 
 /**
- * Crossings and reader-scale findings ("crossings/findings") main (44f7c09e)
- * draws for each flowchart above, routed orthogonally, in order. Layout and
+ * Graphs drawn with more crossings or findings than pinned ("crossings/findings"
+ * per graph, in order), and the whole set when its crossings are not fewer in
+ * total than pinned.
+ */
+function worseThanPinned(
+	set: string,
+	counts: readonly { crossings: number; findings: number }[],
+	pins: string,
+): string[] {
+	const pinned = pins.split(" ").map((pair) => pair.split("/").map(Number));
+	const failures = counts.flatMap(({ crossings, findings }, index) => {
+		const [pinnedCrossings, pinnedFindings] = pinned[index]!;
+		return crossings > pinnedCrossings! || findings > pinnedFindings!
+			? [`${set} ${index}: ${pinnedCrossings}/${pinnedFindings} -> ${crossings}/${findings}`]
+			: [];
+	});
+	const total = counts.reduce((sum, { crossings }) => sum + crossings, 0);
+	const pinnedTotal = pinned.reduce((sum, [crossings]) => sum + crossings!, 0);
+	return pinnedTotal > 0 && total >= pinnedTotal
+		? [...failures, `${set}: ${total} crossings in total, pinned ${pinnedTotal}`]
+		: failures;
+}
+
+/**
+ * Crossings and reader-scale findings ("crossings/findings") main (fd92ae12)
+ * draws for each flowchart above, routed orthogonally, in order, counting a
+ * line that crosses a route where the route runs straight on. Layout and
  * crossing repairs are kept only when they route no worse, so no flowchart may
- * draw more of either.
+ * draw more of either, and together they draw fewer crossings.
  */
 const MAIN_ROUTING: Readonly<
 	Record<"flowcharts" | "longFlows", Readonly<Record<"TB" | "BT" | "LR" | "RL", string>>>
 > = {
 	flowcharts: {
-		TB: "131/61 32/2 1/0 20/1 20/3 0/0 4/0 22/1 29/16 15/0 8/2 25/1 0/0 4/0 18/1 8/2 3/0 2/0 1/0 0/0 3/0 0/0 22/3 68/4 17/2 58/22 19/0 42/3 58/8 11/0 73/3 4/0 87/25 42/4 1/0 2/0 36/7 16/6 5/1 52/11",
-		BT: "130/17 31/1 1/0 16/3 16/7 0/0 3/0 13/0 25/7 16/2 4/3 25/1 0/0 1/0 18/1 18/2 6/1 1/0 1/0 0/0 6/0 0/0 23/5 68/6 17/4 64/19 25/7 40/3 56/7 15/5 76/7 3/0 102/34 37/4 1/0 2/0 46/11 16/7 5/1 39/0",
-		LR: "148/34 43/9 1/0 24/4 30/9 0/0 3/1 18/6 33/28 13/2 7/2 37/13 0/0 4/0 8/3 18/5 2/3 2/0 3/1 0/0 6/1 0/0 23/4 89/21 34/16 81/11 18/3 42/75 48/16 12/1 78/14 6/0 65/18 25/7 1/0 4/1 55/16 23/12 6/4 38/10",
-		RL: "129/36 28/13 1/0 14/2 28/8 0/0 2/1 11/5 22/8 16/3 7/2 37/10 0/0 4/0 8/3 18/5 5/1 1/0 3/1 0/0 6/1 0/0 18/4 91/26 34/16 82/10 25/11 42/75 37/17 14/9 78/14 2/0 88/14 22/7 1/0 4/1 57/13 22/12 6/4 42/4",
+		TB: "136/61 26/0 1/0 19/1 24/3 0/0 4/0 12/0 30/16 12/0 4/0 27/1 0/0 2/0 14/0 11/2 1/0 2/0 2/0 0/0 5/0 0/0 22/3 72/4 20/2 59/22 19/0 45/3 60/8 7/0 78/3 4/0 91/25 29/3 1/0 2/0 37/7 15/6 4/1 33/7",
+		BT: "135/17 33/0 1/0 14/2 18/7 0/0 1/0 9/0 28/7 14/0 5/3 26/1 0/0 1/0 14/0 21/2 3/0 1/0 2/0 0/0 3/0 0/0 15/0 72/6 18/4 68/19 21/1 42/3 57/7 16/5 81/7 3/0 106/34 35/3 1/0 2/0 47/11 15/7 4/1 41/0",
+		LR: "150/34 31/5 1/0 22/3 28/8 0/0 3/1 19/6 34/28 14/1 7/2 39/13 0/0 4/0 8/3 18/5 2/3 2/0 3/1 0/0 3/1 0/0 22/3 96/21 21/5 81/11 12/2 46/75 50/16 12/1 80/14 5/0 68/18 26/7 2/0 4/1 58/16 24/12 6/4 37/10",
+		RL: "129/36 30/6 1/0 14/2 25/8 0/0 2/1 11/5 24/8 16/2 7/2 39/10 0/0 4/0 8/3 18/5 6/1 1/0 3/1 0/0 3/1 0/0 18/4 96/26 19/7 82/10 16/5 46/75 40/17 15/9 80/14 1/0 92/14 23/7 2/0 4/1 58/13 23/12 6/4 42/4",
 	},
 	longFlows: {
-		TB: "0/0 0/0 1/0 2/0 1/1 1/0 0/0 0/0 0/0 2/0 0/0 1/0 0/0 0/0 0/0 1/0 0/0 1/0 0/0 3/0 2/0 2/1 0/0 1/0 0/0 0/0 0/0 2/2 0/0 0/0",
-		BT: "0/0 0/0 0/0 1/0 0/0 0/0 0/0 0/0 0/0 2/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 3/0 2/0 2/1 0/0 1/0 0/0 0/0 0/0 0/0 0/0 0/0",
-		LR: "0/0 0/0 1/0 2/2 3/0 1/0 0/0 0/0 0/0 2/1 0/0 0/0 0/0 0/0 0/0 1/0 0/0 0/0 0/0 3/2 0/0 2/2 0/0 0/0 0/0 0/0 0/0 1/3 0/0 0/0",
-		RL: "0/0 0/0 1/0 1/2 0/0 1/0 0/0 0/0 0/0 3/1 0/0 0/0 0/0 0/0 0/0 1/0 0/0 0/0 0/0 4/3 0/0 2/2 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0",
+		TB: "0/0 0/0 1/0 2/0 1/0 1/0 0/0 0/0 0/0 2/0 0/0 1/0 0/0 0/0 0/0 1/0 0/0 1/0 0/0 4/0 2/0 2/1 0/0 1/0 0/0 0/0 0/0 2/0 0/0 0/0",
+		BT: "0/0 0/0 0/0 1/0 0/0 0/0 0/0 0/0 0/0 2/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 4/0 2/0 2/1 0/0 1/0 0/0 0/0 0/0 0/0 0/0 0/0",
+		LR: "0/0 0/0 1/0 2/1 1/0 1/0 0/0 0/0 0/0 1/0 0/0 0/0 0/0 0/0 0/0 1/0 0/0 0/0 0/0 2/2 0/0 2/2 0/0 0/0 0/0 0/0 0/0 2/2 0/0 0/0",
+		RL: "0/0 0/0 1/0 1/1 0/0 1/0 0/0 0/0 0/0 2/1 0/0 0/0 0/0 0/0 0/0 1/0 0/0 0/0 0/0 4/3 0/0 2/2 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0",
 	},
 };
 
@@ -630,9 +688,11 @@ describe("routing fuzz", () => {
 				type: "flowchart",
 				layout: { direction, edgeRouting },
 			});
-			const issues = validateExcalidrawScene(
-				convertSceneToExcalidraw(renderIntermediateDiagram(diagram)),
-			).issues;
+			const scene = renderIntermediateDiagram(diagram);
+			const issues = [
+				...validateExcalidrawScene(convertSceneToExcalidraw(scene)).issues,
+				...(edgeRouting === "orthogonal" ? diagonalRuns(scene) : []),
+			];
 			return issues.length > 0 ? [index] : [];
 		});
 
@@ -659,7 +719,9 @@ describe("routing fuzz", () => {
 				return direction === "TB" || direction === "LR" ? value : -value;
 			};
 			return {
-				issues: validateExcalidrawScene(convertSceneToExcalidraw(scene)).issues.length,
+				issues:
+					validateExcalidrawScene(convertSceneToExcalidraw(scene)).issues.length +
+					diagonalRuns(scene).length,
 				wrapped: spec.edges.some(
 					(edge) => edge.id.startsWith("s") && along(edge.target) < along(edge.source),
 				),
@@ -674,11 +736,8 @@ describe("routing fuzz", () => {
 				["longFlows", longFlows],
 			] as const
 		).flatMap(([set, specs]) => {
-			const pinned = MAIN_ROUTING[set][direction]
-				.split(" ")
-				.map((pair) => pair.split("/").map(Number));
-			return specs.flatMap((spec, index) => {
-				const { crossings, findings } = routingCounts(
+			const counts = specs.map((spec) =>
+				routingCounts(
 					renderIntermediateDiagram(
 						parseFlowchartDiagram({
 							...spec,
@@ -686,13 +745,30 @@ describe("routing fuzz", () => {
 							layout: { direction, edgeRouting: "orthogonal" },
 						}),
 					),
+				),
+			);
+			if (process.env.PRINT_ROUTING)
+				console.log(
+					"PIN",
+					set,
+					direction,
+					counts.map((c) => `${c.crossings}/${c.findings}`).join(" "),
 				);
-				const [mainCrossings, mainFindings] = pinned[index]!;
-				return crossings > mainCrossings! || findings > mainFindings!
-					? [`${set} ${index}: ${mainCrossings}/${mainFindings} -> ${crossings}/${findings}`]
-					: [];
-			});
+			return worseThanPinned(set, counts, MAIN_ROUTING[set][direction]);
 		});
+
+	it("keeps every run of the review's clearance case horizontal or vertical", () => {
+		// Seed 20261020, case 4, TB: moving one of two collinear runs clear of a
+		// node once turned the stub beside it diagonal.
+		const scene = renderIntermediateDiagram(
+			parseFlowchartDiagram({
+				...randomFlowcharts(40, 20261020)[4]!,
+				type: "flowchart",
+				layout: { direction: "TB", edgeRouting: "orthogonal" },
+			}),
+		);
+		expect(diagonalRuns(scene)).toEqual([]);
+	});
 
 	it("routes the review's fan-in case no worse than main in RL", () => {
 		// Seed 143289, case 33: an unguarded arrival order drew 8 crossings and 4 findings.
@@ -714,7 +790,7 @@ describe("routing fuzz", () => {
 			expect(worseThanMain(direction)).toEqual([]);
 		}, 60_000);
 
-		it("exports every random flowchart without validator issues when routed orthogonally", () => {
+		it("exports every random flowchart orthogonal and without validator issues when routed orthogonally", () => {
 			expect(failures(direction, "orthogonal")).toEqual([]);
 		}, 60_000);
 
@@ -781,15 +857,16 @@ function randomGroupedFlowcharts(count: number, start: number) {
 }
 
 /**
- * Crossings and reader-scale findings ("crossings/findings") the grouped
- * layout draws for each grouped flowchart, in order, when groups were added.
- * No grouped flowchart may draw more of either.
+ * Crossings and reader-scale findings ("crossings/findings") main (fd92ae12)
+ * draws for each grouped flowchart, in order, counted as for MAIN_ROUTING. No
+ * grouped flowchart may draw more of either, and together they draw fewer
+ * crossings.
  */
 const GROUPED_ROUTING: Readonly<Record<"TB" | "BT" | "LR" | "RL", string>> = {
-	TB: "11/0 1/0 4/0 23/6 11/2 3/3 2/0 9/0 54/14 2/1 22/13 118/37 9/1 116/44 26/6 18/1 13/0 18/11 7/1 23/7 65/21 84/22 23/4 0/0 65/15 50/8 10/3 56/8 51/6 0/0",
-	BT: "10/1 1/0 5/0 15/4 3/2 6/2 3/0 9/0 52/22 0/0 23/15 123/46 9/1 110/44 24/8 19/1 8/2 20/6 6/5 26/7 85/22 76/23 19/0 0/0 69/17 52/8 6/1 57/11 63/14 3/0",
-	LR: "8/4 1/0 2/0 25/6 9/5 5/3 2/0 6/6 66/20 3/1 25/8 114/42 8/1 105/100 27/3 13/4 4/2 18/10 8/2 19/12 44/7 84/29 22/1 0/0 80/36 48/56 6/0 44/12 54/16 1/1",
-	RL: "7/3 1/0 3/5 31/9 10/5 7/4 3/0 6/4 66/23 1/1 23/8 128/47 9/3 107/103 34/4 18/4 4/2 18/10 11/4 23/13 51/4 85/25 19/4 0/0 79/34 72/13 9/4 44/15 63/23 1/1",
+	TB: "11/0 1/0 5/0 23/6 12/2 3/3 2/0 10/0 59/14 2/1 24/13 122/37 9/1 119/44 26/6 19/1 13/0 20/11 7/1 24/7 67/21 87/22 23/4 0/0 66/15 51/8 10/3 57/8 51/6 0/0",
+	BT: "10/1 1/0 5/0 15/4 3/2 6/2 3/0 9/0 54/22 0/0 25/15 126/46 9/1 113/44 24/8 19/1 8/2 20/6 6/5 27/7 85/22 78/23 19/0 0/0 70/17 53/8 7/1 58/11 63/14 4/0",
+	LR: "9/4 1/0 2/0 26/6 10/5 5/3 2/0 6/6 66/20 3/1 27/8 117/42 8/1 108/100 31/3 14/4 5/2 19/10 8/2 19/12 45/7 88/29 22/1 0/0 80/36 53/56 6/0 48/12 55/16 1/1",
+	RL: "8/3 1/0 3/5 32/9 11/5 7/4 3/0 6/4 66/23 1/1 28/8 129/47 9/3 110/103 36/4 18/4 4/2 19/10 12/4 25/13 53/4 87/25 19/4 0/0 79/34 74/13 9/4 45/15 65/23 1/1",
 };
 
 describe("grouped routing fuzz", () => {
@@ -830,6 +907,7 @@ describe("grouped routing fuzz", () => {
 				);
 				return [
 					...validateExcalidrawScene(exported).issues.map((issue) => issue.message),
+					...diagonalRuns(scene),
 					...groupRegionIssues(scene).map((issue) => issue.message),
 					...getCanvasValidationIssues(scene).map((issue) => issue.message),
 					...exported.elements
@@ -849,19 +927,15 @@ describe("grouped routing fuzz", () => {
 			expect(failures).toEqual([]);
 		}, 60_000);
 
-		it("draws no grouped flowchart with more crossings or reader-scale findings than when groups were added", () => {
+		it("draws no grouped flowchart with more crossings or reader-scale findings than main", () => {
 			const counts = rendered(direction).map((scene) => routingCounts(scene));
-			const pinned = GROUPED_ROUTING[direction]
-				.split(" ")
-				.map((pair) => pair.split("/").map(Number));
-			expect(
-				counts.flatMap(({ crossings, findings }, index) => {
-					const [pinnedCrossings, pinnedFindings] = pinned[index] ?? [];
-					return crossings > pinnedCrossings! || findings > pinnedFindings!
-						? [`${index}: ${pinnedCrossings}/${pinnedFindings} -> ${crossings}/${findings}`]
-						: [];
-				}),
-			).toEqual([]);
+			if (process.env.PRINT_ROUTING)
+				console.log(
+					"PIN grouped",
+					direction,
+					counts.map((c) => `${c.crossings}/${c.findings}`).join(" "),
+				);
+			expect(worseThanPinned("grouped", counts, GROUPED_ROUTING[direction])).toEqual([]);
 		}, 60_000);
 	});
 
@@ -980,7 +1054,8 @@ function randomStateGraphs(count: number, start = 20261021) {
 
 /**
  * Crossings and reader-scale findings ("crossings/findings") each random state
- * graph drew when state graphs were added, in order. None may draw more.
+ * graph draws on main (fd92ae12), in order, counted as for MAIN_ROUTING. None
+ * may draw more, and together they draw fewer crossings.
  */
 const STATE_ROUTING: Readonly<Record<"TB" | "BT" | "LR" | "RL", string>> = {
 	TB: "0/0 0/0 1/0 0/0 1/0 0/0 2/1 5/0 0/0 0/0 0/0 1/0 0/0 0/0 0/0 3/0 1/1 1/0 0/0 0/0 0/0 0/0 0/0 2/0 0/0 1/1 1/0 0/0 0/0 3/1 0/0 0/0 0/0 1/0 2/0 3/1 0/0 1/1 4/1 3/0",
@@ -1023,6 +1098,7 @@ describe("state graph fuzz", () => {
 				const authored = new Map(graph.nodes.map((node) => [`node:${node.id}`, node.label]));
 				return [
 					...validateExcalidrawScene(exported).issues.map((issue) => issue.message),
+					...diagonalRuns(scene),
 					...groupRegionIssues(scene).map((issue) => issue.message),
 					...getCanvasValidationIssues(scene).map((issue) => issue.message),
 					...labelDefects(exported.elements, authored),
@@ -1032,7 +1108,7 @@ describe("state graph fuzz", () => {
 			expect(failures).toEqual([]);
 		}, 60_000);
 
-		it("draws no state graph with more crossings or reader-scale findings than when they were added", () => {
+		it("draws no state graph with more crossings or reader-scale findings than main", () => {
 			const counts = graphs.map((graph) =>
 				routingCounts(
 					renderGraphDiagram(
@@ -1041,17 +1117,13 @@ describe("state graph fuzz", () => {
 					),
 				),
 			);
-			if (process.env.PRINT_STATE_ROUTING)
-				console.log(direction, counts.map((c) => `${c.crossings}/${c.findings}`).join(" "));
-			const pinned = STATE_ROUTING[direction].split(" ").map((pair) => pair.split("/").map(Number));
-			expect(
-				counts.flatMap(({ crossings, findings }, index) => {
-					const [pinnedCrossings, pinnedFindings] = pinned[index] ?? [];
-					return crossings > pinnedCrossings! || findings > pinnedFindings!
-						? [`${index}: ${pinnedCrossings}/${pinnedFindings} -> ${crossings}/${findings}`]
-						: [];
-				}),
-			).toEqual([]);
+			if (process.env.PRINT_ROUTING)
+				console.log(
+					"PIN state",
+					direction,
+					counts.map((c) => `${c.crossings}/${c.findings}`).join(" "),
+				);
+			expect(worseThanPinned("state", counts, STATE_ROUTING[direction])).toEqual([]);
 		}, 60_000);
 	});
 });

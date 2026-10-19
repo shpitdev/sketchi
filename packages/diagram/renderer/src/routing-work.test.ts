@@ -1,7 +1,13 @@
 import * as diagramCore from "@sketchi/diagram-core";
-import { flowchartFixture, parseIntermediateDiagram } from "@sketchi/diagram-core";
+import {
+	crossingFixtures,
+	crossingStateMachines,
+	flowchartFixture,
+	parseIntermediateDiagram,
+} from "@sketchi/diagram-core";
 import { describe, expect, it, vi } from "vitest";
 import { renderIntermediateDiagram } from "./scene";
+import { renderStateMachineDiagram } from "./state-machine";
 
 // Count the segment geometry checks the router makes through diagram-core. The
 // count is deterministic, so it bounds routing work without a wall-clock timer.
@@ -104,5 +110,18 @@ describe("routing work", () => {
 		expect(scene.elements.filter((element) => element.type === "arrow")).toHaveLength(32);
 		expect(work.checks).toBeGreaterThan(0);
 		expect(work.checks).toBeLessThan(limit);
+	});
+});
+
+describe("crossing repair work", () => {
+	// Measured: 7.06M checks for the twelve flowcharts and four state machines
+	// whose crossings the repair removes; main drew them, crossings and all, in
+	// 3.00M. Each side change is screened by rerouting only the edges it touches
+	// before it is laid out in full.
+	it("bounds segment checks for the generated diagrams it repairs", () => {
+		work.checks = 0;
+		for (const fixture of Object.values(crossingFixtures)) renderIntermediateDiagram(fixture);
+		for (const machine of Object.values(crossingStateMachines)) renderStateMachineDiagram(machine);
+		expect(work.checks).toBeLessThan(8_500_000);
 	});
 });

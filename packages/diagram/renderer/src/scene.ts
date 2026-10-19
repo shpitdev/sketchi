@@ -79,6 +79,8 @@ const RANK_SWEEP_COUNT = 4;
 const ROUTE_STUB_LENGTH = 36;
 /** Grid-search expansions spent looking for a lane clear of a near-parallel neighbor. */
 const CORRIDOR_SEARCH_STEPS = 5_000;
+/** Grid-search cost of crossing another arrow: a detour this much longer reads better. */
+const CROSSING_COST = 320;
 
 type ConnectionEdge = "top" | "right" | "bottom" | "left";
 
@@ -1032,8 +1034,18 @@ interface Arrangement {
 	readonly groupsAcross?: boolean;
 	/** Reorder ranks to remove the layered crossings the barycenter pass leaves. */
 	readonly reorder: boolean;
+	/** Route each edge, among otherwise equal lanes, across the fewest arrows routed before it. */
+	readonly avoidCrossings?: boolean;
+	/** Sides edges leave or arrive by in place of the assigned ones, chosen to remove crossings. */
+	readonly sides?: SideOverrides;
 	readonly wrap: Wrap;
 }
+
+/** Each overridden edge's departure and arrival sides, by edge id. */
+type SideOverrides = ReadonlyMap<
+	string,
+	{ readonly sourceEdge?: ConnectionEdge; readonly targetEdge?: ConnectionEdge }
+>;
 
 const PLAIN_ARRANGEMENT: Arrangement = { crossingRepair: false, reorder: false, wrap: NO_WRAP };
 
@@ -2775,6 +2787,52 @@ function pointInsideBounds(point: ScenePoint, shape: NodeSceneElement): boolean 
 	);
 }
 
+/** Room a route keeps from the drawn outline of every node it neither leaves nor enters. */
+const NODE_CLEARANCE = 12;
+
+/**
+ * Whether an axis-aligned segment passes within `clearance` of a shape's drawn
+ * outline: its rectangle, or its ellipse or diamond grown by `clearance`, so a
+ * line never runs tangent to a rounded or pointed node it passes.
+ */
+function segmentNearOutline(
+	segment: AxisAlignedSegment,
+	shape: NodeSceneElement,
+	clearance: number,
+): boolean {
+	const horizontal = segment.orientation === "horizontal";
+	const [halfAlong, halfAcross] = horizontal
+		? [shape.width / 2, shape.height / 2]
+		: [shape.height / 2, shape.width / 2];
+	const middle = horizontal ? shape.x + halfAlong : shape.y + halfAlong;
+	const offset = Math.abs(
+		segment.staticCoordinate - (horizontal ? shape.y + halfAcross : shape.x + halfAcross),
+	);
+	let reach: number;
+	if (shape.shape === "ellipse" || shape.shape === "circle") {
+		const [along, across] = [halfAlong + clearance, halfAcross + clearance];
+		if (offset >= across) return false;
+		reach = along * Math.sqrt(1 - (offset / across) ** 2);
+	} else if (shape.shape === "diamond") {
+		// Each side moves out by the clearance along its normal.
+		const grown = 1 + clearance * Math.hypot(1 / halfAlong, 1 / halfAcross);
+		if (offset >= halfAcross * grown) return false;
+		reach = halfAlong * (grown - offset / halfAcross);
+	} else {
+		if (offset >= halfAcross + clearance) return false;
+		reach = halfAlong + clearance;
+	}
+	return (
+		segment.min < middle + reach - AXIS_ALIGNED_EPSILON &&
+		segment.max > middle - reach + AXIS_ALIGNED_EPSILON
+	);
+}
+
+/** A drawn node a route must keep its clearance from: neither of its own ends, nor a label or frame. */
+function keepsClearOf(shape: NodeSceneElement, ignoredNodeIds: ReadonlySet<string>): boolean {
+	return shape.id.startsWith("node:") && !ignoredNodeIds.has(shape.nodeId);
+}
+
 function routeNodeCrossingCount(
 	points: readonly ScenePoint[],
 	shapes: readonly NodeSceneElement[],
@@ -2795,6 +2853,24 @@ function routeNodeCrossingCount(
 	}
 
 	return crossingCount;
+}
+
+/** Runs of a route that pass within the clearance of a node's outline without crossing it. */
+function routeClearanceCount(
+	points: readonly ScenePoint[],
+	shapes: readonly NodeSceneElement[],
+	ignoredNodeIds: ReadonlySet<string>,
+): number {
+	let near = 0;
+	for (const segment of segmentsFromPoints(points))
+		for (const shape of shapes)
+			if (
+				keepsClearOf(shape, ignoredNodeIds) &&
+				!segmentCrossesBoundsInterior(segment, shape) &&
+				segmentNearOutline(segment, shape, NODE_CLEARANCE)
+			)
+				near += 1;
+	return near;
 }
 
 function routeLength(points: readonly ScenePoint[]): number {
@@ -3011,6 +3087,8 @@ interface RouteOptions {
 	readonly bandOf?: ReadonlyMap<string, number>;
 	/** Group frames a grouped layout draws; routes keep clear of the ones they do not belong to. */
 	readonly groups?: GroupLayout;
+	/** Prefer, among otherwise equal routes, one that crosses fewer routed arrows. */
+	readonly avoidCrossings?: boolean;
 }
 
 /**
@@ -3018,6 +3096,8 @@ interface RouteOptions {
  * candidates. Without a reader scale, candidates are scored as the plain router.
  */
 interface RoutedSoFar {
+	/** Lines of other arrows a route crosses, for reader-scale scoring. */
+	readonly crossings?: CrossingLookup;
 	/** Group frame outlines, which routes cross but never run along. */
 	readonly outlines: readonly RouteSegment[];
 	readonly quality?: ReturnType<typeof candidateRouteQuality>;
@@ -3027,11 +3107,13 @@ interface RoutedSoFar {
 function routedSoFar(
 	arrows: readonly ArrowSceneElement[],
 	readerScale: number | undefined,
+	avoidCrossings = false,
 ): RoutedSoFar {
 	return {
 		...(readerScale === undefined
 			? {}
 			: {
+					...(avoidCrossings ? { crossings: crossingLookup(arrows) } : {}),
 					quality: candidateRouteQuality(
 						arrows.map((arrow) => ({
 							id: arrow.id,
@@ -3045,6 +3127,116 @@ function routedSoFar(
 				}),
 		outlines: existingRouteSegments(arrows.filter((arrow) => arrow.id.startsWith(GROUP_OUTLINE))),
 		segments: existingRouteSegments(arrows),
+	};
+}
+
+/** A straight run of a routed arrow, across which another line would cross it. */
+interface CrossingRun {
+	readonly arrowId: string;
+	/** The coordinate the run keeps: y for a horizontal run, x for a vertical one. */
+	readonly at: number;
+	readonly max: number;
+	readonly min: number;
+}
+
+interface CrossingLookup {
+	/**
+	 * Lines of other arrows that one axis-aligned step crosses. A line exactly at
+	 * the step's higher end counts and one at its lower end does not, so a path
+	 * of steps counts each line it passes once, whichever way it walks.
+	 */
+	readonly step: (
+		orientation: AxisAlignedSegment["orientation"],
+		at: number,
+		from: number,
+		to: number,
+		arrowId: string,
+	) => number;
+	/** Interior crossings of a whole route with the lines of other arrows. */
+	readonly route: (points: readonly ScenePoint[], arrowId: string) => number;
+}
+
+/** Crossing counts against routed arrows, sorted once per route so each query reads only nearby runs. */
+function crossingLookup(arrows: readonly ArrowSceneElement[]): CrossingLookup {
+	const runs: Record<AxisAlignedSegment["orientation"], CrossingRun[]> = {
+		horizontal: [],
+		vertical: [],
+	};
+	for (const arrow of arrows) {
+		if (arrow.id.startsWith(GROUP_OUTLINE)) continue;
+		const points = straightRuns(arrow.points);
+		for (let index = 0; index + 1 < points.length; index += 1) {
+			const [p, q] = [points[index]!, points[index + 1]!];
+			const horizontal = Math.abs(p.y - q.y) <= AXIS_ALIGNED_EPSILON;
+			if (!horizontal && Math.abs(p.x - q.x) > AXIS_ALIGNED_EPSILON) continue;
+			const [low, high] = horizontal ? [p.x, q.x] : [p.y, q.y];
+			if (Math.abs(high - low) <= AXIS_ALIGNED_EPSILON) continue;
+			runs[horizontal ? "horizontal" : "vertical"].push({
+				arrowId: arrow.id,
+				at: horizontal ? p.y : p.x,
+				min: Math.min(low, high),
+				max: Math.max(low, high),
+			});
+		}
+	}
+	for (const list of Object.values(runs)) list.sort((a, b) => a.at - b.at);
+	const count = (
+		orientation: AxisAlignedSegment["orientation"],
+		at: number,
+		low: number,
+		high: number,
+		arrowId: string,
+		includeHigh: boolean,
+	) => {
+		// A step crosses the runs across it whose fixed coordinate it passes.
+		const list = runs[orientation === "horizontal" ? "vertical" : "horizontal"];
+		let start = 0;
+		let end = list.length;
+		while (start < end) {
+			const middle = (start + end) >> 1;
+			if (list[middle]!.at <= low + AXIS_ALIGNED_EPSILON) start = middle + 1;
+			else end = middle;
+		}
+		let crossings = 0;
+		for (let index = start; index < list.length; index += 1) {
+			const run = list[index]!;
+			if (
+				includeHigh ? run.at > high + AXIS_ALIGNED_EPSILON : run.at >= high - AXIS_ALIGNED_EPSILON
+			)
+				break;
+			if (
+				run.arrowId !== arrowId &&
+				at > run.min + AXIS_ALIGNED_EPSILON &&
+				at < run.max - AXIS_ALIGNED_EPSILON
+			)
+				crossings += 1;
+		}
+		return crossings;
+	};
+	return {
+		step: (orientation, at, from, to, arrowId) =>
+			count(orientation, at, Math.min(from, to), Math.max(from, to), arrowId, true),
+		route: (points, arrowId) => {
+			const corners = straightRuns(points);
+			let crossings = 0;
+			for (let index = 0; index + 1 < corners.length; index += 1) {
+				const [p, q] = [corners[index]!, corners[index + 1]!];
+				const horizontal = Math.abs(p.y - q.y) <= AXIS_ALIGNED_EPSILON;
+				if (!horizontal && Math.abs(p.x - q.x) > AXIS_ALIGNED_EPSILON) continue;
+				const [low, high] = horizontal
+					? [Math.min(p.x, q.x), Math.max(p.x, q.x)]
+					: [Math.min(p.y, q.y), Math.max(p.y, q.y)];
+				crossings += count(
+					horizontal ? "horizontal" : "vertical",
+					horizontal ? p.y : p.x,
+					low,
+					high,
+					arrowId,
+					false,
+				);
+			}
+			return crossings;
+		},
 	};
 }
 
@@ -3098,6 +3290,7 @@ function chooseBestRoute(
 			routeOutlineBesideCount(candidate, routed.outlines),
 			quality.corridors,
 			quality.arrowheadsCrossed,
+			routed.crossings?.route(candidate, `edge:${route.edge.id}`) ?? 0,
 			routeBacktrackDistance(candidate),
 			routeTargetOvershootDistance(candidate),
 			quality.jogs,
@@ -3490,6 +3683,8 @@ function loopObstacles(
 /** Clearance a label box keeps from its own line, and the wider one from other lines. */
 const LABEL_LINE_CLEARANCE = 3;
 const LABEL_OTHER_LINE_CLEARANCE = 8;
+/** Room a label moved off an ambiguous spot keeps from everything, past the usual clearances. */
+const LABEL_MOVE_MARGIN = 6;
 /** Route length from the source within which a label may slide to stay clear. */
 const LABEL_SLIDE_LENGTH = 240;
 const LABEL_SLIDE_STEP = 12;
@@ -3534,6 +3729,18 @@ function padBox(box: LabelBox, padding: number): LabelBox {
 	};
 }
 
+/** Distance from a label box to an axis-aligned segment. */
+function boxSegmentDistance(box: LabelBox, segment: AxisAlignedSegment): number {
+	const [x0, x1, y0, y1] =
+		segment.orientation === "horizontal"
+			? [segment.min, segment.max, segment.staticCoordinate, segment.staticCoordinate]
+			: [segment.staticCoordinate, segment.staticCoordinate, segment.min, segment.max];
+	return Math.hypot(
+		Math.max(0, box.x - x1, x0 - box.x - box.width),
+		Math.max(0, box.y - y1, y0 - box.y - box.height),
+	);
+}
+
 /**
  * Lines, nodes and other labels a label box touches. Other edges keep a wider
  * berth, so a label never reads as belonging to the line beside it.
@@ -3553,6 +3760,17 @@ function labelConflicts(
 		nodes.filter((node) => boxOverlapsShape(box, node)).length +
 		others.filter((other) => boxesOverlap(near, other)).length
 	);
+}
+
+/** Whether a label box sits no clearer of another line than of its own: it could belong to either. */
+function labelAmbiguous(
+	box: LabelBox,
+	own: readonly AxisAlignedSegment[],
+	segments: readonly AxisAlignedSegment[],
+): boolean {
+	const nearest = (lines: readonly AxisAlignedSegment[]) =>
+		Math.min(Infinity, ...lines.map((segment) => boxSegmentDistance(box, segment)));
+	return nearest(segments) < nearest(own) + LABEL_OTHER_LINE_CLEARANCE;
 }
 
 /**
@@ -3604,8 +3822,21 @@ function branchLabels(
 	routes: readonly RoutedEdge[],
 	shapes: readonly NodeSceneElement[],
 	groups?: GroupLayout,
+	unambiguous = true,
 ): TextSceneElement[] {
+	return placedBranchLabels(arrows, routes, shapes, groups, unambiguous).labels;
+}
+
+/** Branch labels placed as drawn, and how many lines, nodes or labels they still touch. */
+function placedBranchLabels(
+	arrows: ArrowSceneElement[],
+	routes: readonly RoutedEdge[],
+	shapes: readonly NodeSceneElement[],
+	groups?: GroupLayout,
+	unambiguous = true,
+): { labels: TextSceneElement[]; touches: number } {
 	const labels: TextSceneElement[] = [];
+	let touches = 0;
 	const segments = arrows.map((arrow) => segmentsFromPoints(arrow.points));
 	// Group names are obstacles and frame outlines are lines a label keeps clear of.
 	const nodes = [
@@ -3631,23 +3862,30 @@ function branchLabels(
 				? [labelBox(position, sizes[other]!)]
 				: [],
 		);
-		const conflicts = (position: ScenePoint) =>
-			labelConflicts(
-				labelBox(position, size),
-				segments[index]!,
-				[...segments.flatMap((other, at) => (at === index ? [] : other)), ...outlines],
-				nodes,
-				[...others, ...placed.map((label) => label.box)],
-			);
+		const lines = [...segments.flatMap((other, at) => (at === index ? [] : other)), ...outlines];
+		const conflicts = (position: ScenePoint, margin = 0) =>
+			labelConflicts(padBox(labelBox(position, size), margin), segments[index]!, lines, nodes, [
+				...others,
+				...placed.map((label) => label.box),
+			]);
 		let position = stub;
-		if (conflicts(stub) > 0) {
-			let fewest = conflicts(stub);
+		let fewest = conflicts(stub);
+		if (fewest > 0)
 			for (const candidate of labelSlidePositions(arrow.points, size)) {
 				const count = conflicts(candidate);
 				if (count < fewest) [position, fewest] = [candidate, count];
 				if (fewest === 0) break;
 			}
-		}
+		else if (unambiguous && labelAmbiguous(labelBox(stub, size), segments[index]!, lines))
+			// A clear label that could belong to another line moves only to a spot
+			// that is plainly its own and clear of everything with room to spare.
+			position =
+				labelSlidePositions(arrow.points, size).find(
+					(candidate) =>
+						conflicts(candidate, LABEL_MOVE_MARGIN) === 0 &&
+						!labelAmbiguous(labelBox(candidate, size), segments[index]!, lines),
+				) ?? stub;
+		touches += fewest;
 		positions[index] = position;
 		placed.push({ box: labelBox(position, size), index });
 	}
@@ -3667,7 +3905,7 @@ function branchLabels(
 		});
 		arrows[index] = { ...arrow, groupIds };
 	}
-	return labels;
+	return { labels, touches };
 }
 
 /**
@@ -3797,6 +4035,84 @@ function lanesClearOfNeighbors(
 	return variants;
 }
 
+/**
+ * Variants of a route whose middle runs that pass too close to a node's
+ * outline move just clear of it, to either side of the node. A run moves whole,
+ * from turn to turn, so the runs beside it stay straight, and a variant that
+ * shortens either endpoint stub or turns it back is not offered.
+ */
+function runsClearOfOutlines(
+	points: readonly [ScenePoint, ...ScenePoint[]],
+	shapes: readonly NodeSceneElement[],
+	ignoredNodeIds: ReadonlySet<string>,
+): [ScenePoint, ...ScenePoint[]][] {
+	const corners = straightRuns(points);
+	const variants: [ScenePoint, ...ScenePoint[]][] = [];
+	for (const run of segmentsFromPoints(corners)) {
+		if (run.isFirstSegment || run.isLastSegment) continue;
+		for (const shape of shapes) {
+			if (
+				!keepsClearOf(shape, ignoredNodeIds) ||
+				segmentCrossesBoundsInterior(run, shape) ||
+				!segmentNearOutline(run, shape, NODE_CLEARANCE)
+			)
+				continue;
+			const [low, size] =
+				run.orientation === "horizontal" ? [shape.y, shape.height] : [shape.x, shape.width];
+			for (const lane of [low - NODE_CLEARANCE - 1, low + size + NODE_CLEARANCE + 1]) {
+				const moved = corners.map((point, index) =>
+					index === run.segmentIndex || index === run.segmentIndex + 1
+						? run.orientation === "horizontal"
+							? { x: point.x, y: lane }
+							: { x: lane, y: point.y }
+						: point,
+				);
+				if (keepsStubs(corners, moved)) variants.push(compactPoints(moved));
+			}
+		}
+	}
+	return variants;
+}
+
+/** Whether every run of a route is axis-aligned. */
+function orthogonalRoute(points: readonly ScenePoint[]): boolean {
+	return points.every(
+		(point, index) =>
+			index === 0 ||
+			Math.abs(point.x - points[index - 1]!.x) <= AXIS_ALIGNED_EPSILON ||
+			Math.abs(point.y - points[index - 1]!.y) <= AXIS_ALIGNED_EPSILON,
+	);
+}
+
+/**
+ * Whether a moved route stays orthogonal and still leaves and arrives by its
+ * stubs: its first and last runs keep their direction and at least the
+ * length they had, up to a stub's.
+ */
+function keepsStubs(route: readonly ScenePoint[], moved: readonly ScenePoint[]): boolean {
+	if (moved.length !== route.length || !orthogonalRoute(moved)) return false;
+	const stub = (points: readonly ScenePoint[], from: number, to: number) => ({
+		dx: points[to]!.x - points[from]!.x,
+		dy: points[to]!.y - points[from]!.y,
+	});
+	const last = route.length - 1;
+	return (
+		[
+			[0, 1],
+			[last, last - 1],
+		] as const
+	).every(([from, to]) => {
+		const [before, after] = [stub(route, from, to), stub(moved, from, to)];
+		const length = Math.abs(before.dx) + Math.abs(before.dy);
+		return (
+			Math.sign(after.dx) === Math.sign(before.dx) &&
+			Math.sign(after.dy) === Math.sign(before.dy) &&
+			Math.abs(after.dx) + Math.abs(after.dy) >=
+				Math.min(length, ROUTE_STUB_LENGTH) - AXIS_ALIGNED_EPSILON
+		);
+	});
+}
+
 /** A visibility grid is the fallback when one exterior lane cannot clear every obstacle. */
 function obstacleRoute(
 	start: ScenePoint,
@@ -3811,6 +4127,7 @@ function obstacleRoute(
 	corridorGap = 0,
 	maxSteps = Infinity,
 	guided = true,
+	crossings?: CrossingLookup,
 ): [ScenePoint, ...ScenePoint[]] | undefined {
 	// With a corridor gap, also offer lanes far enough from each routed point to read apart.
 	const lanes = (coordinate: number) =>
@@ -3914,7 +4231,16 @@ function obstacleRoute(
 								Math.abs(next.y - point.y) +
 								overlaps * 10000 +
 								beside * 1000 +
-								(outline ? (outline.beside + outline.overlaps) * 1000 : 0),
+								(outline ? (outline.beside + outline.overlaps) * 1000 : 0) +
+								(crossings && step
+									? crossings.step(
+											step.orientation,
+											step.staticCoordinate,
+											step.min,
+											step.max,
+											arrowId,
+										) * CROSSING_COST
+									: 0),
 				);
 			}
 			const edgeCost = edgeCosts.get(gridEdge);
@@ -3935,7 +4261,7 @@ function exteriorLaneRoute(
 	end: ScenePoint,
 	shapes: readonly NodeSceneElement[],
 	existingArrows: readonly ArrowSceneElement[],
-	{ readerScale, guided, bandOf }: RouteOptions,
+	{ avoidCrossings, readerScale, guided, bandOf }: RouteOptions,
 ): [ScenePoint, ...ScenePoint[]] {
 	const horizontalDominant = Math.abs(end.x - start.x) >= Math.abs(end.y - start.y);
 	const ignoredNodeIds = new Set([route.source.nodeId, route.target.nodeId]);
@@ -4087,7 +4413,7 @@ function exteriorLaneRoute(
 		),
 	];
 
-	const routed = routedSoFar(existingArrows, readerScale);
+	const routed = routedSoFar(existingArrows, readerScale, avoidCrossings);
 	const first = chooseBestRoute(candidates, shapes, ignoredNodeIds, route, routed);
 	const gap = readerScale === undefined ? 0 : routingCorridorGap(readerScale);
 	const best = gap
@@ -4124,9 +4450,10 @@ function exteriorLaneRoute(
 			routed.segments,
 			routed.outlines,
 			hard ? 0 : gap,
-			// A corridor is polish: search a bounded neighborhood, never the whole grid.
+			// A corridor or a crossing is polish: search a bounded neighborhood, never the whole grid.
 			hard ? Infinity : CORRIDOR_SEARCH_STEPS,
 			guided,
+			routed.crossings,
 		);
 		if (detour) return chooseBestRoute([best, detour], shapes, ignoredNodeIds, route, routed);
 	}
@@ -4141,6 +4468,7 @@ function routeAllEdges(
 	nodeShapes: readonly NodeSceneElement[],
 	options: RouteOptions,
 	order: readonly number[] = routes.map((_, index) => index),
+	fixed: ReadonlyMap<string, ArrowSceneElement> = new Map(),
 ): ArrowSceneElement[] {
 	const labelObstacles = [
 		...branchLabelObstacles(routes, portOffsets),
@@ -4152,6 +4480,11 @@ function routeAllEdges(
 	const outlines = groupOutlineLines(options.groups);
 	const edgeArrows: ArrowSceneElement[] = [];
 	for (const route of order.map((index) => routes[index]!)) {
+		const kept = fixed.get(route.edge.id);
+		if (kept) {
+			edgeArrows.push(kept);
+			continue;
+		}
 		edgeArrows.push(
 			arrowForRoute(
 				route,
@@ -4245,7 +4578,8 @@ function resideArrivals(
 				: arrows.some(
 						(other) =>
 							other !== arrow &&
-							pathCrossings(arrow.points, other.points, arrow.points.length - 3) > 0,
+							// Only a crossing between the turns of the final approach moves it.
+							pathCrossings(arrow.points, other.points, arrow.points.length - 3, false) > 0,
 					);
 		if (!moves) continue;
 		const segments = segmentsFromPoints(arrow.points);
@@ -4592,6 +4926,9 @@ interface DiagramLayout {
 	edgeArrows: ArrowSceneElement[];
 	groups?: GroupLayout;
 	nodeShapes: NodeSceneElement[];
+	/** The port offsets and route options the arrows were last routed with. */
+	portOffsets?: ReadonlyMap<string, number>;
+	routeOptions?: RouteOptions;
 	routedEdges: RoutedEdge[];
 }
 
@@ -4617,7 +4954,8 @@ function crowdedGroups(layout: DiagramLayout): Set<string> {
 				if (group !== undefined) crowded.add(group);
 			}
 		}
-	const labels = branchLabels([...edgeArrows], routedEdges, nodeShapes, groups);
+	// Groups make room for labels as they always have; only the drawn labels avoid ambiguity.
+	const labels = branchLabels([...edgeArrows], routedEdges, nodeShapes, groups, false);
 	const outlines = groups.frames.flatMap((frame) => frameOutline(frame.box));
 	for (const label of labels) {
 		const arrow = arrows.get(label.id.slice(0, -":label".length));
@@ -4715,6 +5053,11 @@ function layoutDiagramOnce(
 		assignFeedbackSides(routedEdges, diagram, (route) => edgeDirection(route.edge));
 		if (graphOptions.get(diagram)?.pairedReturns)
 			assignPairedReturns(routedEdges, flowFeedback(diagram), nodeShapes, groups);
+		for (const route of routedEdges) {
+			const sides = arrangement.sides?.get(route.edge.id);
+			if (sides?.sourceEdge) route.sourceEdge = sides.sourceEdge;
+			if (sides?.targetEdge) route.targetEdge = sides.targetEdge;
+		}
 		portOffsets = offsetsFor(routedEdges);
 		capacity = portCapacityForRoutes(routedEdges, portOffsets);
 	} else {
@@ -4766,6 +5109,7 @@ function layoutDiagramOnce(
 		...(polish.reader ? { readerScale: scale } : {}),
 		...(wrap.continuations.size > 0 ? { bandOf: wrap.bandOf } : {}),
 		...(groups ? { groups } : {}),
+		...(arrangement.avoidCrossings ? { avoidCrossings: true } : {}),
 	};
 	let edgeArrows = routeAllEdges(
 		routedEdges,
@@ -4801,6 +5145,7 @@ function layoutDiagramOnce(
 					{ edgeArrows: retry, ...(groups ? { groups } : {}), nodeShapes },
 					{ edgeArrows, ...(groups ? { groups } : {}), nodeShapes },
 					true,
+					false,
 				)
 			)
 				[edgeArrows, portOffsets] = [retry, offsets];
@@ -4809,7 +5154,14 @@ function layoutDiagramOnce(
 	}
 	if (orthogonal && polish.repair)
 		edgeArrows = rerouteDefects(edgeArrows, routedEdges, portOffsets, nodeShapes, options);
-	return { edgeArrows, ...(groups ? { groups } : {}), nodeShapes, routedEdges };
+	return {
+		edgeArrows,
+		...(groups ? { groups } : {}),
+		nodeShapes,
+		portOffsets,
+		routeOptions: options,
+		routedEdges,
+	};
 }
 
 /** Size of the nodes, arrows and any free labels drawn. */
@@ -4840,8 +5192,39 @@ function drawnSize(
 	};
 }
 
-/** Interior crossings of the axis-aligned segments of `a`, from segment `from` on, with those of `b`. */
-function pathCrossings(a: readonly ScenePoint[], b: readonly ScenePoint[], from = 0): number {
+/**
+ * A route's corners alone: a point that continues a straight run is dropped, so
+ * a line crossing the route there crosses one run, not the end of two.
+ */
+function straightRuns(points: readonly ScenePoint[]): ScenePoint[] {
+	return points.filter((point, index) => {
+		const [before, after] = [points[index - 1], points[index + 1]];
+		return (
+			!before ||
+			!after ||
+			!(
+				(Math.abs(before.x - point.x) <= AXIS_ALIGNED_EPSILON &&
+					Math.abs(point.x - after.x) <= AXIS_ALIGNED_EPSILON) ||
+				(Math.abs(before.y - point.y) <= AXIS_ALIGNED_EPSILON &&
+					Math.abs(point.y - after.y) <= AXIS_ALIGNED_EPSILON)
+			)
+		);
+	});
+}
+
+/**
+ * Interior crossings of the axis-aligned segments of `a`, from point `from` on,
+ * with those of `b`: of their straight runs, or of each segment as routed when
+ * not `runs`, which misses a line crossing where a route runs straight on.
+ */
+function pathCrossings(
+	route: readonly ScenePoint[],
+	other: readonly ScenePoint[],
+	from = 0,
+	runs = true,
+): number {
+	const a = runs ? straightRuns(route.slice(Math.max(0, from))) : route.slice(Math.max(0, from));
+	const b = runs ? straightRuns(other) : other;
 	const between = (value: number, p: number, q: number) =>
 		value > Math.min(p, q) + AXIS_ALIGNED_EPSILON && value < Math.max(p, q) - AXIS_ALIGNED_EPSILON;
 	const horizontal = (p: ScenePoint, q: ScenePoint) =>
@@ -4849,7 +5232,7 @@ function pathCrossings(a: readonly ScenePoint[], b: readonly ScenePoint[], from 
 	const vertical = (p: ScenePoint, q: ScenePoint) =>
 		Math.abs(p.x - q.x) <= AXIS_ALIGNED_EPSILON && Math.abs(p.y - q.y) > AXIS_ALIGNED_EPSILON;
 	let crossings = 0;
-	for (let i = Math.max(0, from); i < a.length - 1; i += 1)
+	for (let i = 0; i < a.length - 1; i += 1)
 		for (let j = 0; j < b.length - 1; j += 1) {
 			const [p, q, r, u] = [a[i]!, a[i + 1]!, b[j]!, b[j + 1]!];
 			const [across, along] =
@@ -4875,14 +5258,18 @@ function pathCrossings(a: readonly ScenePoint[], b: readonly ScenePoint[], from 
 	return crossings;
 }
 
-/** Interior crossings between different arrows. */
-export function arrowCrossings(arrows: readonly ArrowSceneElement[]): number {
+/**
+ * Interior crossings between different arrows. Not `runs`, it counts as the
+ * arrangements always have, missing a line crossing where a route runs
+ * straight on past a point it was routed through.
+ */
+export function arrowCrossings(arrows: readonly ArrowSceneElement[], runs = true): number {
 	return arrows.reduce(
 		(sum, arrow, index) =>
 			sum +
 			arrows
 				.slice(index + 1)
-				.reduce((pair, other) => pair + pathCrossings(arrow.points, other.points), 0),
+				.reduce((pair, other) => pair + pathCrossings(arrow.points, other.points, 0, runs), 0),
 		0,
 	);
 }
@@ -4913,26 +5300,32 @@ function readerFindingCount(
 /**
  * Neither more crossings (or, when `fewerCrossings`, strictly fewer) nor more
  * reader-scale findings, each judged at its own export size, and no newly
- * extreme or longer aspect.
+ * extreme or longer aspect, unless `narrower` and only narrower.
  */
 function routesNoWorse(
 	candidate: Pick<DiagramLayout, "edgeArrows" | "groups" | "nodeShapes">,
 	current: Pick<DiagramLayout, "edgeArrows" | "groups" | "nodeShapes">,
 	fewerCrossings = false,
+	runs = true,
+	narrower = false,
 ): boolean {
 	const [crossings, currentCrossings] = [candidate, current].map((layout) =>
-		arrowCrossings(layout.edgeArrows),
+		arrowCrossings(layout.edgeArrows, runs),
 	);
-	const [aspect, currentAspect] = [candidate, current].map((layout) => {
-		const { width, height } = drawnSize(
-			[...layout.nodeShapes, ...groupBlocks(layout.groups)],
-			layout.edgeArrows,
-		);
-		return exportAspect(width, height);
-	});
+	const [size, currentSize] = [candidate, current].map((layout) =>
+		drawnSize([...layout.nodeShapes, ...groupBlocks(layout.groups)], layout.edgeArrows),
+	);
+	const [aspect, currentAspect] = [size!, currentSize!].map(({ width, height }) =>
+		exportAspect(width, height),
+	);
+	const longSide = ({ width, height }: { width: number; height: number }) =>
+		Math.max(width, height);
 	return (
 		(fewerCrossings ? crossings! < currentCrossings! : crossings! <= currentCrossings!) &&
-		(aspect! < WRAP_ASPECT || aspect! <= currentAspect! + AXIS_ALIGNED_EPSILON) &&
+		(aspect! < WRAP_ASPECT ||
+			aspect! <= currentAspect! + AXIS_ALIGNED_EPSILON ||
+			// Narrower without growing longer: its text fits no smaller.
+			(narrower && longSide(size!) <= longSide(currentSize!) + AXIS_ALIGNED_EPSILON)) &&
 		readerFindingCount(candidate.edgeArrows, [
 			...candidate.nodeShapes,
 			...groupBlocks(candidate.groups),
@@ -4942,6 +5335,379 @@ function routesNoWorse(
 				...groupBlocks(current.groups),
 			])
 	);
+}
+
+/**
+ * The drawn layout with each run that passes too close to a node's outline
+ * moved just clear of it, where the route stays orthogonal and the move draws
+ * no more export defects, crossings, reader-scale findings, inward endpoints
+ * or labels touching anything. Runs only after every other choice, so no
+ * other route moves.
+ */
+function clearOutlines(layout: DiagramLayout): DiagramLayout {
+	const { groups, nodeShapes, routedEdges } = layout;
+	let arrows = layout.edgeArrows;
+	const drawn = [...nodeShapes, ...groupBlocks(groups)];
+	const score = (candidate: readonly ArrowSceneElement[]) => ({
+		crossings: arrowCrossings(candidate),
+		defects: exportRouteDefects(candidate, nodeShapes, groups).length,
+		findings: readerFindingCount(candidate, drawn),
+		inward: inwardEndpoints(candidate, nodeShapes),
+		labels: placedBranchLabels([...candidate], routedEdges, nodeShapes, groups).touches,
+	});
+	let current: ReturnType<typeof score> | undefined;
+	for (const [index, arrow] of layout.edgeArrows.entries()) {
+		const ends = new Set([arrow.sourceNodeId, arrow.targetNodeId]);
+		const near = routeClearanceCount(arrow.points, nodeShapes, ends);
+		if (near === 0) continue;
+		current ??= score(arrows);
+		for (const points of runsClearOfOutlines(arrow.points, nodeShapes, ends)) {
+			if (!orthogonalRoute(points) || routeClearanceCount(points, nodeShapes, ends) >= near)
+				continue;
+			const candidate = arrows.map((other, at) => (at === index ? { ...other, points } : other));
+			const next = score(candidate);
+			if (
+				next.defects <= current.defects &&
+				next.crossings <= current.crossings &&
+				next.findings <= current.findings &&
+				next.inward <= current.inward &&
+				next.labels <= current.labels
+			) {
+				[arrows, current] = [candidate, next];
+				break;
+			}
+		}
+	}
+	return arrows === layout.edgeArrows ? layout : { ...layout, edgeArrows: arrows };
+}
+
+/** Layouts the crossing repair may try beyond the arrangements, each with one side change. */
+const CROSSING_MOVES = 6;
+/**
+ * A layout with more crossings than this is too tangled for side changes to
+ * untangle within the moves; the repair leaves it as the arrangements drew it.
+ */
+const CROSSING_REPAIR_MAX_CROSSINGS = 6;
+/** Moves tried around the remaining crossings before the repair gives up on them. */
+const ROUND_MOVES = 3;
+/** Side changes screened by routing only the edges they touch. */
+const SCREENED_MOVES = 24;
+/**
+ * Routes that hook around one of their own ends: past its stubs, a run passes
+ * close beside the node it leaves or enters, on a side other than the one it
+ * leaves or enters by.
+ */
+function hookedRoutes(layout: DiagramLayout): number {
+	return layout.edgeArrows.filter((arrow, index) => {
+		const route = layout.routedEdges[index]!;
+		const runs = segmentsFromPoints(straightRuns(arrow.points)).slice(1, -1);
+		return (["source", "target"] as const).some((endpoint) => {
+			const node = route[endpoint];
+			const side = endpoint === "source" ? route.sourceEdge : route.targetEdge;
+			return runs.some((run) => {
+				const [low, size, alongLow, alongSize] =
+					run.orientation === "horizontal"
+						? [node.y, node.height, node.x, node.width]
+						: [node.x, node.width, node.y, node.height];
+				const beside =
+					run.staticCoordinate < low
+						? low - run.staticCoordinate
+						: run.staticCoordinate - low - size;
+				const passed: ConnectionEdge =
+					run.orientation === "horizontal"
+						? run.staticCoordinate < low
+							? "top"
+							: "bottom"
+						: run.staticCoordinate < low
+							? "left"
+							: "right";
+				return (
+					passed !== side &&
+					beside > 0 &&
+					beside < 2 * ROUTE_STUB_LENGTH &&
+					run.min < alongLow + alongSize &&
+					run.max > alongLow
+				);
+			});
+		});
+	}).length;
+}
+
+interface SettledLayout {
+	readonly arrangement: Arrangement;
+	readonly defects: readonly [number, number];
+	readonly layout: DiagramLayout;
+}
+
+/** Each crossing between two arrows, by arrow index, with where it lies. */
+function crossingPairs(
+	arrows: readonly ArrowSceneElement[],
+): { first: number; second: number; at: ScenePoint }[] {
+	const runs = arrows.map((arrow) => straightRuns(arrow.points));
+	const pairs: { first: number; second: number; at: ScenePoint }[] = [];
+	const between = (value: number, p: number, q: number) =>
+		value > Math.min(p, q) + AXIS_ALIGNED_EPSILON && value < Math.max(p, q) - AXIS_ALIGNED_EPSILON;
+	for (const [first, a] of runs.entries())
+		for (const [offset, b] of runs.slice(first + 1).entries())
+			for (let i = 0; i + 1 < a.length; i += 1)
+				for (let j = 0; j + 1 < b.length; j += 1) {
+					const [p, q, r, u] = [a[i]!, a[i + 1]!, b[j]!, b[j + 1]!];
+					const [h, v] =
+						Math.abs(p.y - q.y) <= AXIS_ALIGNED_EPSILON &&
+						Math.abs(r.x - u.x) <= AXIS_ALIGNED_EPSILON
+							? [
+									[p, q],
+									[r, u],
+								]
+							: Math.abs(p.x - q.x) <= AXIS_ALIGNED_EPSILON &&
+								  Math.abs(r.y - u.y) <= AXIS_ALIGNED_EPSILON
+								? [
+										[r, u],
+										[p, q],
+									]
+								: [];
+					if (h && v && between(v[0]!.x, h[0]!.x, h[1]!.x) && between(h[0]!.y, v[0]!.y, v[1]!.y))
+						pairs.push({ first, second: first + 1 + offset, at: { x: v[0]!.x, y: h[0]!.y } });
+				}
+	return pairs;
+}
+
+type SideMove = Map<string, { sourceEdge?: ConnectionEdge; targetEdge?: ConnectionEdge }>;
+
+/**
+ * Side changes that may remove a crossing between two routes: a loop moved to
+ * one side of the flow with both its ends there, the two routes trading sides
+ * at a node they share, a decision's branches trading vertices, and each end
+ * moved to another side, the end nearest the crossing first. No line leaves or
+ * arrives by a side along the flow that faces away from its other end, so none
+ * leaves a node backward or arrives from beyond it.
+ */
+function crossingMoves(
+	first: RoutedEdge,
+	second: RoutedEdge,
+	at: ScenePoint,
+	diagram: IntermediateDiagram,
+	portOffsets: ReadonlyMap<string, number>,
+	routes: readonly RoutedEdge[],
+): SideMove[] {
+	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
+	const along = vertical ? "y" : "x";
+	const lateral = (side: ConnectionEdge) => slotAxis(side) === along;
+	const mirror = (side: ConnectionEdge) => (lateral(side) ? OPPOSITE_EDGE[side] : side);
+	const feedback = flowFeedback(diagram);
+	const movable = (route: RoutedEdge) => !isSelfLoop(route) && route.pair === undefined;
+	const sideKey = (endpoint: "source" | "target") =>
+		endpoint === "source" ? ("sourceEdge" as const) : ("targetEdge" as const);
+	// A side along the flow faces the other end; either side across it will do.
+	const natural = (route: RoutedEdge, endpoint: "source" | "target", side: ConnectionEdge) => {
+		if (lateral(side)) return true;
+		const here = center(route[endpoint])[along];
+		const there = center(route[endpoint === "source" ? "target" : "source"])[along];
+		return EDGE_NORMAL[side][along] * (there - here) > AXIS_ALIGNED_EPSILON;
+	};
+	const moves: SideMove[] = [];
+	const add = (move: SideMove) => {
+		const valid = [...move].every(([id, change]) => {
+			const route = routes.find((candidate) => candidate.edge.id === id)!;
+			return (
+				natural(route, "source", change.sourceEdge ?? route.sourceEdge) &&
+				natural(route, "target", change.targetEdge ?? route.targetEdge)
+			);
+		});
+		if (valid) moves.push(move);
+	};
+	// A loop runs back along one side of the flow or the other, both ends on that side.
+	const sidesAcross: readonly ConnectionEdge[] = vertical ? ["left", "right"] : ["top", "bottom"];
+	for (const route of [first, second].filter(movable)) {
+		if (!feedback.has(route.edge.id)) continue;
+		for (const side of [...sidesAcross].sort((a, b) =>
+			a === mirror(route.sourceEdge) ? -1 : b === mirror(route.sourceEdge) ? 1 : 0,
+		))
+			if (route.sourceEdge !== side || route.targetEdge !== side)
+				add(new Map([[route.edge.id, { sourceEdge: side, targetEdge: side }]]));
+	}
+	if (movable(first) && movable(second))
+		for (const a of ["source", "target"] as const)
+			for (const b of ["source", "target"] as const) {
+				const [sideA, sideB] = [first[sideKey(a)], second[sideKey(b)]];
+				if (first[a].nodeId !== second[b].nodeId || sideA === sideB) continue;
+				add(
+					new Map([
+						[first.edge.id, { [sideKey(a)]: sideB }],
+						[second.edge.id, { [sideKey(b)]: sideA }],
+					]),
+				);
+			}
+	// A decision's branches trade vertices among themselves.
+	for (const source of new Set([first, second].map((route) => route.source))) {
+		if (!branches(source.kind)) continue;
+		const own = routes.filter(
+			(route) => route.source === source && movable(route) && !feedback.has(route.edge.id),
+		);
+		if (own.length < 2 || own.length > 3) continue;
+		const permutations = (sides: readonly ConnectionEdge[]): ConnectionEdge[][] =>
+			sides.length <= 1
+				? [[...sides]]
+				: sides.flatMap((side, index) =>
+						permutations([...sides.slice(0, index), ...sides.slice(index + 1)]).map((rest) => [
+							side,
+							...rest,
+						]),
+					);
+		for (const order of permutations(own.map((route) => route.sourceEdge))) {
+			const move: SideMove = new Map(
+				own.flatMap((route, index) =>
+					order[index] === route.sourceEdge ? [] : [[route.edge.id, { sourceEdge: order[index]! }]],
+				),
+			);
+			if (move.size > 0) add(move);
+		}
+	}
+	const ends = [first, second]
+		.filter(movable)
+		.flatMap((route) =>
+			(["source", "target"] as const).map((endpoint) => {
+				const { start, end } = routeEndpoints(route, portOffsets);
+				const port = endpoint === "source" ? start : end;
+				return { endpoint, route, distance: Math.abs(port.x - at.x) + Math.abs(port.y - at.y) };
+			}),
+		)
+		.sort((a, b) => a.distance - b.distance);
+	for (const { endpoint, route } of ends) {
+		const current = route[sideKey(endpoint)];
+		// The side that faces the route's other end first, then its mirror.
+		const here = center(route[endpoint]);
+		const there = center(route[endpoint === "source" ? "target" : "source"]);
+		const facing: ConnectionEdge =
+			Math.abs(there.x - here.x) > Math.abs(there.y - here.y)
+				? there.x > here.x
+					? "right"
+					: "left"
+				: there.y > here.y
+					? "bottom"
+					: "top";
+		for (const side of new Set([
+			facing,
+			mirror(current),
+			"top",
+			"right",
+			"bottom",
+			"left",
+		] as const))
+			if (side !== current) add(new Map([[route.edge.id, { [sideKey(endpoint)]: side }]]));
+	}
+	return moves;
+}
+
+/**
+ * Crossings a side change would leave if only the routes it touches moved: the
+ * moved edges and every edge whose port shifts route again around the others
+ * as they lie, then the edges they now cross route again around them. A cheap
+ * first look before a move is laid out in full.
+ */
+function screenedCrossings(settled: SettledLayout, move: SideMove, polish: RoutingPolish): number {
+	const { layout } = settled;
+	if (!layout.portOffsets || !layout.routeOptions) return 0;
+	const routes = layout.routedEdges.map((route) => ({ ...route, ...move.get(route.edge.id) }));
+	const offsets = polish.ports
+		? alignedPortOffsets(routes, polish.repair, settled.arrangement.crossingRepair)
+		: portOffsetsForRoutes(routes, polish.repair);
+	const moved = new Set(
+		routes.flatMap((route) =>
+			move.has(route.edge.id) ||
+			(["source", "target"] as const).some((endpoint) => {
+				const key = connectionKey({ edgeId: route.edge.id, endpoint });
+				return offsets.get(key) !== layout.portOffsets!.get(key);
+			})
+				? [route.edge.id]
+				: [],
+		),
+	);
+	// The routes kept as they lie come first; the rerouted ones avoid them in edge order.
+	const reroute = (arrows: readonly ArrowSceneElement[], again: ReadonlySet<string>) => {
+		const fixed = new Map(
+			arrows.flatMap((arrow) => (again.has(arrow.edgeId) ? [] : [[arrow.edgeId, arrow] as const])),
+		);
+		const order = routes
+			.map((route, index) => ({ index, again: again.has(route.edge.id) }))
+			.sort((a, b) => Number(a.again) - Number(b.again))
+			.map(({ index }) => index);
+		return routeAllEdges(
+			routes,
+			"orthogonal",
+			offsets,
+			layout.nodeShapes,
+			{ ...layout.routeOptions!, avoidCrossings: true },
+			order,
+			fixed,
+		);
+	};
+	const first = reroute(layout.edgeArrows, moved);
+	const crossed = new Set(
+		crossingPairs(first).flatMap(({ first: a, second: b }) => {
+			const [left, right] = [routes[a]!.edge.id, routes[b]!.edge.id];
+			return moved.has(left) === moved.has(right) ? [] : [moved.has(left) ? right : left];
+		}),
+	);
+	if (crossed.size === 0) return arrowCrossings(first);
+	return Math.min(arrowCrossings(first), arrowCrossings(reroute(first, crossed)));
+}
+
+/**
+ * Crossings the arrangements leave: try side changes near each crossing and
+ * keep one when the layout then routes with strictly fewer crossings and is
+ * otherwise no worse, until no crossing is left or the moves run out.
+ */
+function repairCrossings(
+	diagram: IntermediateDiagram,
+	polish: RoutingPolish,
+	settled: SettledLayout,
+	defectsOf: (layout: DiagramLayout) => readonly [number, number],
+	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
+): SettledLayout {
+	let best = settled;
+	const tried = new Set<string>();
+
+	let [layouts, screens] = [CROSSING_MOVES, SCREENED_MOVES];
+	for (let improved = true; improved && layouts > 0;) {
+		improved = false;
+		const crossings = arrowCrossings(best.layout.edgeArrows);
+		const moves = crossingPairs(best.layout.edgeArrows).flatMap(({ first, second, at }) =>
+			crossingMoves(
+				best.layout.routedEdges[first]!,
+				best.layout.routedEdges[second]!,
+				at,
+				diagram,
+				best.layout.portOffsets ?? new Map(),
+				best.layout.routedEdges,
+			),
+		);
+		let round = ROUND_MOVES;
+		for (const move of moves) {
+			if (layouts === 0 || round === 0 || screens === 0) break;
+			const sides = new Map(best.arrangement.sides);
+			for (const [id, change] of move) sides.set(id, { ...sides.get(id), ...change });
+			const key = JSON.stringify([...sides].sort(([a], [b]) => (a < b ? -1 : 1)));
+			if (tried.has(key)) continue;
+			tried.add(key);
+			screens -= 1;
+			if (screenedCrossings(best, move, polish) >= crossings) continue;
+			[layouts, round] = [layouts - 1, round - 1];
+			const arrangement = { ...best.arrangement, sides, avoidCrossings: true };
+			const layout = layoutDiagram(diagram, polish, arrangement);
+			const defects = defectsOf(layout);
+			if (
+				!fewer(best.defects, defects) &&
+				routesNoWorse(layout, best.layout, true, true, true) &&
+				hookedRoutes(layout) <= hookedRoutes(best.layout)
+			) {
+				best = { arrangement, defects, layout };
+				improved = true;
+				break;
+			}
+		}
+	}
+	return best;
 }
 
 /** Shapes each marker kind draws as: a final's core is the filled dot inside its ring. */
@@ -5141,7 +5907,7 @@ export function renderGraphDiagram(
 	const consider = (arrangement: Arrangement, fewerCrossings: boolean) => {
 		const layout = layoutDiagram(diagram, levels[0]!, arrangement);
 		const defects = defectsOf(layout);
-		if (!fewer(best.defects, defects) && routesNoWorse(layout, best.layout, fewerCrossings))
+		if (!fewer(best.defects, defects) && routesNoWorse(layout, best.layout, fewerCrossings, false))
 			best = { arrangement, defects, layout };
 	};
 	const orthogonal = diagram.layout.edgeRouting === "orthogonal";
@@ -5149,9 +5915,9 @@ export function renderGraphDiagram(
 	// order and moved arrivals stay when they route no worse, and reordered ranks
 	// only when they route with fewer crossings.
 	const repairable = orthogonal && diagram.edges.length <= CROSSING_REPAIR_MAX_EDGES;
-	if (repairable && arrowCrossings(best.layout.edgeArrows) > 0)
+	if (repairable && arrowCrossings(best.layout.edgeArrows, false) > 0)
 		consider({ ...best.arrangement, crossingRepair: true }, false);
-	if (repairable && arrowCrossings(best.layout.edgeArrows) > 0 && reordersRanks(diagram))
+	if (repairable && arrowCrossings(best.layout.edgeArrows, false) > 0 && reordersRanks(diagram))
 		consider({ ...best.arrangement, reorder: true }, true);
 	// A flow too long for its breadth wraps when the wrapped layout routes no worse.
 	// Its size includes the branch labels, as the exported PNG does.
@@ -5164,6 +5930,7 @@ export function renderGraphDiagram(
 				best.layout.routedEdges,
 				best.layout.nodeShapes,
 				best.layout.groups,
+				false,
 			),
 		],
 	);
@@ -5193,7 +5960,11 @@ export function renderGraphDiagram(
 		if (!groupsAcross || best.arrangement.groupsAcross) break;
 		consider({ ...best.arrangement, crossingRepair, groupsAcross: true }, false);
 	}
-	const { layout } = best;
+	// Crossings the arrangements leave are repaired where few enough to untangle.
+	const crossings = arrowCrossings(best.layout.edgeArrows);
+	if (repairable && crossings > 0 && crossings <= CROSSING_REPAIR_MAX_CROSSINGS)
+		best = repairCrossings(diagram, levels[0]!, best, defectsOf, fewer);
+	const layout = orthogonal ? clearOutlines(best.layout) : best.layout;
 	const { groups, routedEdges } = layout;
 	const routedArrows = [...layout.edgeArrows];
 	const drawn = {

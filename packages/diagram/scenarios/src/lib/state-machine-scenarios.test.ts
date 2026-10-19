@@ -41,22 +41,15 @@ describe("prompt-grounded state-machine scenarios", () => {
 		).toBe(true);
 	});
 
-	it("draws no more crossings than pinned", () => {
-		// Two crossings are avoidable and left to the crossings slice (#433): the
-		// media player's eject runs through its stop return, and the connection's
-		// timeout into the retry choice crosses the retry back to Connecting. Both
-		// come from rank order, not from ports or sides.
-		const pinned: Readonly<Record<string, number>> = {
-			"order-lifecycle-state-machine": 0,
-			"media-player-state-machine": 1,
-			"turnstile-state-machine": 0,
-			"connection-retry-state-machine": 1,
-		};
+	it("draws every scenario without crossings", () => {
+		// The media player's eject once ran through its stop return, and the
+		// connection's timeout into the retry choice crossed the retry back to
+		// Connecting; both now leave and arrive by sides that cross nothing.
 		for (const entry of stateMachineScenarios) {
 			const arrows = renderDiagram(entry.expectedDiagram).elements.filter(
 				(element): element is ArrowSceneElement => element.type === "arrow",
 			);
-			expect(arrowCrossings(arrows), entry.id).toBeLessThanOrEqual(pinned[entry.id]!);
+			expect(arrowCrossings(arrows), entry.id).toBe(0);
 		}
 	});
 

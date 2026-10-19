@@ -50,9 +50,19 @@ function exportAspect(scene: ReturnType<typeof renderIntermediateDiagram>): numb
 	return Math.max(width / height, height / width);
 }
 
-/** Interior crossings between the axis-aligned segments of different arrows. */
+/** A route's corners alone, so a line crossing it where it runs straight on counts once. */
+function corners(points: readonly ScenePoint[]): ScenePoint[] {
+	return points.filter((p, i) => {
+		const [a, b] = [points[i - 1], points[i + 1]];
+		return !a || !b || !((a.x === p.x && p.x === b.x) || (a.y === p.y && p.y === b.y));
+	});
+}
+
+/** Interior crossings between the axis-aligned runs of different arrows. */
 function crossings(scene: ReturnType<typeof renderIntermediateDiagram>): string[] {
-	const arrows = arrowsOf(scene).flatMap((a) => (a.type === "arrow" ? [a] : []));
+	const arrows = arrowsOf(scene).flatMap((a) =>
+		a.type === "arrow" ? [{ ...a, points: corners(a.points) }] : [],
+	);
 	const found: string[] = [];
 	const inside = (value: number, p: number, q: number) =>
 		value > Math.min(p, q) + 0.01 && value < Math.max(p, q) - 0.01;
