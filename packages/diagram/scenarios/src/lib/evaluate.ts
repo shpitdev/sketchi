@@ -431,8 +431,23 @@ function flowchartGroupChecks(
 	const { requiredGroups, requiredNodes, ungroupedSteps } = scenario.assertions;
 	const shaped = requiredNodes.filter((step) => step.shape !== undefined);
 	if (requiredGroups.length === 0 && ungroupedSteps.length === 0 && shaped.length === 0) return [];
+	// The canonical schema makes groups and lanes mutually exclusive.
+	const groups = [
+		...(graph.groups ?? []).map((group) => ({
+			...group,
+			lane: false,
+		})),
+		...(graph.lanes ?? []).map((lane) => ({
+			id: lane.id,
+			label: lane.label,
+			parent: undefined,
+			kind: undefined,
+			lane: true,
+		})),
+	];
 	const groupOf = new Map(graph.nodes.map((node) => [node.id, node.group]));
-	const groupsById = new Map((graph.groups ?? []).map((group) => [group.id, group]));
+	const laneOf = new Map(graph.nodes.map((node) => [node.id, node.lane]));
+	const groupsById = new Map(groups.map((group) => [group.id, group]));
 	// A group and every group around it, innermost first; a loop stops the walk.
 	const chain = (groupId: string | undefined) => {
 		const ids: string[] = [];
@@ -443,14 +458,19 @@ function flowchartGroupChecks(
 	const stepLabel = (id: string) => requiredNodes.find((step) => step.id === id)?.label ?? id;
 	const owned = (stepId: string) => [...(ownedNodes.get(stepId) ?? [])];
 	const matched = requiredGroups.map((expected) => {
-		const named = (graph.groups ?? []).filter((group) =>
-			flowchartLabelMatches(group.label, expected.labels),
+		const named = groups.filter(
+			(group) =>
+				(!group.lane || expected.allowLane) && flowchartLabelMatches(group.label, expected.labels),
 		);
 		const group = named.find((candidate) =>
 			expected.members.every(
 				(member) =>
 					owned(member).length > 0 &&
-					owned(member).every((node) => chain(groupOf.get(node)).includes(candidate.id)),
+					owned(member).every((node) =>
+						candidate.lane
+							? laneOf.get(node) === candidate.id
+							: chain(groupOf.get(node)).includes(candidate.id),
+					),
 			),
 		);
 		return { expected, group, named };
@@ -519,7 +539,10 @@ function flowchartGroupChecks(
 		...ungroupedSteps.map((step) => ({
 			id: `ungrouped:${stepLabel(step)}`,
 			passed:
-				owned(step).length > 0 && owned(step).every((node) => groupOf.get(node) === undefined),
+				owned(step).length > 0 &&
+				owned(step).every(
+					(node) => groupOf.get(node) === undefined && laneOf.get(node) === undefined,
+				),
 			message: `Expected "${stepLabel(step)}" outside every group.`,
 		})),
 		...shaped.map((step) => {

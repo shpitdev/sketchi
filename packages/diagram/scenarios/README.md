@@ -38,6 +38,15 @@ and the eval harness use it.
 - Flowchart scenarios check prompt-grounded steps, node kinds, branches, bounded
   connections, and logos. Group scenarios also check that each stated group holds
   its steps and that steps the prompt keeps outside every group stay ungrouped.
+  Role/team groups accept either frames or swimlanes (`roleGroups` in the scenario
+  definition); explicit zones and regions still require groups. A helper's
+  purpose is not a performed step:
+  `Resubmit report for review` does not own `Review report`, but a separately
+  stated resubmit step must still sit in its stated group. Only the action word
+  must occur outside a `for` purpose; object words may occur inside it, so
+  `Enable flag for internal users` still names `enabled internally`.
+  All nodes that really name a stated step are checked, not just one convenient
+  edge witness.
   Swimlane scenarios check that each stated lane holds its steps, that lanes
   keep the stated order, and that each handoff crosses between its two lanes.
   Zone scenarios check that each stated zone holds its steps (directly or in a

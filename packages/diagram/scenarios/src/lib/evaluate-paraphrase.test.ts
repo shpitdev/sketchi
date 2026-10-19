@@ -33,6 +33,26 @@ function failed(result: ReturnType<typeof flow>): string[] {
 	return result.checks.filter((check) => !check.passed).map((check) => check.id);
 }
 
+describe("action paraphrases with objects in for-clauses", () => {
+	it.each([
+		["feature-flag-rollout", "enable-internal", "Enable flag for internal users"],
+		["feature-flag-rollout", "enable-beta", "Enable flag for beta cohort"],
+		["feature-flag-rollout", "ramp-all", "Ramp up for all users"],
+		["patient-intake-scheduling", "collect-info", "Collect information for intake"],
+		["password-reset-security", "send-email", "Send email for password reset"],
+		["customer-offboarding-retention", "close-account", "Close account (not eligible for offer)"],
+	])("preserves all checks in %s: %s labeled %s", (id, nodeId, label) => {
+		const scenario = getFlowchartScenario(id);
+		const result = evaluateScenarioDiagram(scenario, {
+			...scenario.expectedDiagram,
+			nodes: scenario.expectedDiagram.nodes.map((node) =>
+				node.id === nodeId ? { ...node, label } : node,
+			),
+		});
+		expect(result.checks.filter((check) => !check.passed)).toEqual([]);
+	});
+});
+
 const PASSWORD_RESET_NODES: readonly NodeSpec[] = [
 	["requested", "start", "A reset is requested"],
 	["account", "decision", "Does the account exist?"],

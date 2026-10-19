@@ -34,10 +34,25 @@ function question(label: string): string {
 
 /** The label names the step, or for an action, its object without the leading verb. */
 function namesStepLabel(label: string, step: RequiredStep): boolean {
+	// An action's purpose is not another performed step: "Resubmit report for
+	// review" must not own "Review report". Require the alternative's leading
+	// action word outside that purpose, but match its objects against the full
+	// label: "Enable flag for internal users" still names "enabled internally".
+	// Preserve subject prefixes and later punctuation-separated actions.
+	const action = step.kind === "process" || step.kind === "end";
+	const performed = label.replace(/\bfor\b[^,;.!?]*/giu, "");
+	const performedWords = new Set(flowchartLabelWords(performed));
+	const labels = step.labels.filter((alternative) => {
+		const verb = flowchartLabelWords(alternative)[0];
+		return (
+			!action ||
+			performed === label ||
+			(verb !== undefined && performedWords.has(verb)) ||
+			flowchartObjectPhraseMatches(label, [alternative])
+		);
+	});
 	return (
-		flowchartLabelMatches(label, step.labels) ||
-		((step.kind === "process" || step.kind === "end") &&
-			flowchartObjectPhraseMatches(label, step.labels))
+		flowchartLabelMatches(label, labels) || (action && flowchartObjectPhraseMatches(label, labels))
 	);
 }
 

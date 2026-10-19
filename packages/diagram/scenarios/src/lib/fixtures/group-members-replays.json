@@ -1,0 +1,557 @@
+[
+	{
+		"id": "s2-prod-g/grouped-expense-approval-1",
+		"spec": {
+			"id": "expense-approval-process",
+			"title": "Expense Approval Process",
+			"nodes": [
+				{
+					"id": "submit",
+					"label": "Employee submits expense report",
+					"kind": "start",
+					"group": "employee"
+				},
+				{
+					"id": "review",
+					"label": "Manager reviews the report",
+					"kind": "process",
+					"group": "manager"
+				},
+				{
+					"id": "approved",
+					"label": "Is the report approved?",
+					"kind": "decision",
+					"group": "manager"
+				},
+				{
+					"id": "revise",
+					"label": "Employee revises the report",
+					"kind": "process",
+					"group": "employee"
+				},
+				{
+					"id": "resubmit",
+					"label": "Employee resubmits the report for review",
+					"kind": "process",
+					"group": "employee"
+				},
+				{
+					"id": "verify",
+					"label": "Finance verifies the receipts",
+					"kind": "process",
+					"group": "finance"
+				},
+				{
+					"id": "pay",
+					"label": "Finance pays the employee",
+					"kind": "end",
+					"group": "finance"
+				}
+			],
+			"edges": [
+				{
+					"id": "edge-1",
+					"source": "submit",
+					"target": "review"
+				},
+				{
+					"id": "edge-2",
+					"source": "review",
+					"target": "approved"
+				},
+				{
+					"id": "edge-3",
+					"source": "approved",
+					"target": "verify",
+					"label": "yes"
+				},
+				{
+					"id": "edge-4",
+					"source": "approved",
+					"target": "revise",
+					"label": "no"
+				},
+				{
+					"id": "edge-5",
+					"source": "revise",
+					"target": "resubmit"
+				},
+				{
+					"id": "edge-6",
+					"source": "resubmit",
+					"target": "review"
+				},
+				{
+					"id": "edge-7",
+					"source": "verify",
+					"target": "pay"
+				}
+			],
+			"groups": [
+				{
+					"id": "employee",
+					"label": "Employee"
+				},
+				{
+					"id": "manager",
+					"label": "Manager"
+				},
+				{
+					"id": "finance",
+					"label": "Finance"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		}
+	},
+	{
+		"id": "s2-wk2-g/grouped-expense-approval-1",
+		"spec": {
+			"id": "expense-approval-process",
+			"title": "Expense Approval Process",
+			"nodes": [
+				{
+					"id": "submit",
+					"label": "Employee submits an expense report",
+					"kind": "start",
+					"group": "employee"
+				},
+				{
+					"id": "review",
+					"label": "Manager reviews the report",
+					"kind": "process",
+					"group": "manager"
+				},
+				{
+					"id": "approved",
+					"label": "Is the report approved?",
+					"kind": "decision",
+					"group": "manager"
+				},
+				{
+					"id": "revise",
+					"label": "Employee revises the report",
+					"kind": "process",
+					"group": "employee"
+				},
+				{
+					"id": "resubmit",
+					"label": "Employee resubmits the report for review",
+					"kind": "process",
+					"group": "employee"
+				},
+				{
+					"id": "verify",
+					"label": "Finance verifies the receipts",
+					"kind": "process",
+					"group": "finance"
+				},
+				{
+					"id": "pay",
+					"label": "Finance pays the employee",
+					"kind": "end",
+					"group": "finance"
+				}
+			],
+			"edges": [
+				{
+					"id": "edge-1",
+					"source": "submit",
+					"target": "review"
+				},
+				{
+					"id": "edge-2",
+					"source": "review",
+					"target": "approved"
+				},
+				{
+					"id": "edge-3",
+					"source": "approved",
+					"target": "verify",
+					"label": "yes"
+				},
+				{
+					"id": "edge-4",
+					"source": "approved",
+					"target": "revise",
+					"label": "no"
+				},
+				{
+					"id": "edge-5",
+					"source": "revise",
+					"target": "resubmit"
+				},
+				{
+					"id": "edge-6",
+					"source": "resubmit",
+					"target": "review"
+				},
+				{
+					"id": "edge-7",
+					"source": "verify",
+					"target": "pay"
+				}
+			],
+			"groups": [
+				{
+					"id": "employee",
+					"label": "Employee"
+				},
+				{
+					"id": "manager",
+					"label": "Manager"
+				},
+				{
+					"id": "finance",
+					"label": "Finance"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		}
+	},
+	{
+		"id": "s2-wk2-g/grouped-expense-approval-2",
+		"spec": {
+			"id": "expense-approval-process",
+			"title": "Expense Approval Process",
+			"nodes": [
+				{
+					"id": "submit",
+					"label": "Submit expense report",
+					"kind": "start",
+					"group": "employee"
+				},
+				{
+					"id": "review",
+					"label": "Review report",
+					"kind": "process",
+					"group": "manager"
+				},
+				{
+					"id": "approved",
+					"label": "Is the report approved?",
+					"kind": "decision",
+					"group": "manager"
+				},
+				{
+					"id": "revise",
+					"label": "Revise report",
+					"kind": "process",
+					"group": "employee"
+				},
+				{
+					"id": "resubmit",
+					"label": "Resubmit report for review",
+					"kind": "process",
+					"group": "employee"
+				},
+				{
+					"id": "verify",
+					"label": "Verify receipts",
+					"kind": "process",
+					"group": "finance"
+				},
+				{
+					"id": "pay",
+					"label": "Pay employee",
+					"kind": "end",
+					"group": "finance"
+				}
+			],
+			"edges": [
+				{
+					"id": "edge-1",
+					"source": "submit",
+					"target": "review"
+				},
+				{
+					"id": "edge-2",
+					"source": "review",
+					"target": "approved"
+				},
+				{
+					"id": "edge-3",
+					"source": "approved",
+					"target": "verify",
+					"label": "yes"
+				},
+				{
+					"id": "edge-4",
+					"source": "approved",
+					"target": "revise",
+					"label": "no"
+				},
+				{
+					"id": "edge-5",
+					"source": "revise",
+					"target": "resubmit"
+				},
+				{
+					"id": "edge-6",
+					"source": "resubmit",
+					"target": "review"
+				},
+				{
+					"id": "edge-7",
+					"source": "verify",
+					"target": "pay"
+				}
+			],
+			"groups": [
+				{
+					"id": "employee",
+					"label": "Employee"
+				},
+				{
+					"id": "manager",
+					"label": "Manager"
+				},
+				{
+					"id": "finance",
+					"label": "Finance"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		}
+	},
+	{
+		"id": "s2-wk2-g/grouped-expense-approval-5",
+		"spec": {
+			"id": "expense-approval-process",
+			"title": "Expense Approval Process",
+			"nodes": [
+				{
+					"id": "submit",
+					"label": "Submit expense report",
+					"kind": "start",
+					"group": "emp"
+				},
+				{
+					"id": "review",
+					"label": "Review report",
+					"kind": "process",
+					"group": "mgr"
+				},
+				{
+					"id": "approved",
+					"label": "Is the report approved?",
+					"kind": "decision",
+					"group": "mgr"
+				},
+				{
+					"id": "revise",
+					"label": "Revise report",
+					"kind": "process",
+					"group": "emp"
+				},
+				{
+					"id": "resubmit",
+					"label": "Resubmit report for review",
+					"kind": "process",
+					"group": "emp"
+				},
+				{
+					"id": "verify",
+					"label": "Verify receipts",
+					"kind": "process",
+					"group": "fin"
+				},
+				{
+					"id": "pay",
+					"label": "Pay employee",
+					"kind": "end",
+					"group": "fin"
+				}
+			],
+			"edges": [
+				{
+					"id": "edge-1",
+					"source": "submit",
+					"target": "review"
+				},
+				{
+					"id": "edge-2",
+					"source": "review",
+					"target": "approved"
+				},
+				{
+					"id": "edge-3",
+					"source": "approved",
+					"target": "verify",
+					"label": "yes"
+				},
+				{
+					"id": "edge-4",
+					"source": "approved",
+					"target": "revise",
+					"label": "no"
+				},
+				{
+					"id": "edge-5",
+					"source": "revise",
+					"target": "resubmit"
+				},
+				{
+					"id": "edge-6",
+					"source": "resubmit",
+					"target": "review"
+				},
+				{
+					"id": "edge-7",
+					"source": "verify",
+					"target": "pay"
+				}
+			],
+			"groups": [
+				{
+					"id": "emp",
+					"label": "Employee"
+				},
+				{
+					"id": "mgr",
+					"label": "Manager"
+				},
+				{
+					"id": "fin",
+					"label": "Finance"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		}
+	},
+	{
+		"id": "eval-20261019-202040-pyx1/20261019-202040-62r9",
+		"spec": {
+			"id": "expense-approval-process",
+			"title": "Expense Approval Process",
+			"nodes": [
+				{
+					"id": "submit",
+					"label": "Submit an expense report",
+					"kind": "start",
+					"lane": "employee"
+				},
+				{
+					"id": "review",
+					"label": "Review the report",
+					"kind": "process",
+					"lane": "manager"
+				},
+				{
+					"id": "approved",
+					"label": "Is the report approved?",
+					"kind": "decision",
+					"lane": "manager"
+				},
+				{
+					"id": "revise",
+					"label": "Revise the report",
+					"kind": "process",
+					"lane": "employee"
+				},
+				{
+					"id": "resubmit",
+					"label": "Resubmit it for review",
+					"kind": "process",
+					"lane": "employee"
+				},
+				{
+					"id": "verify",
+					"label": "Verify the receipts",
+					"kind": "process",
+					"lane": "finance"
+				},
+				{
+					"id": "pay",
+					"label": "Pay the employee",
+					"kind": "end",
+					"lane": "finance"
+				}
+			],
+			"edges": [
+				{
+					"id": "edge-1",
+					"source": "submit",
+					"target": "review"
+				},
+				{
+					"id": "edge-2",
+					"source": "review",
+					"target": "approved"
+				},
+				{
+					"id": "edge-3",
+					"source": "approved",
+					"target": "revise",
+					"label": "Rejected"
+				},
+				{
+					"id": "edge-4",
+					"source": "revise",
+					"target": "resubmit"
+				},
+				{
+					"id": "edge-5",
+					"source": "resubmit",
+					"target": "review"
+				},
+				{
+					"id": "edge-6",
+					"source": "approved",
+					"target": "verify",
+					"label": "Approved"
+				},
+				{
+					"id": "edge-7",
+					"source": "verify",
+					"target": "pay"
+				}
+			],
+			"lanes": [
+				{
+					"id": "employee",
+					"label": "Employee"
+				},
+				{
+					"id": "manager",
+					"label": "Manager"
+				},
+				{
+					"id": "finance",
+					"label": "Finance"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		}
+	}
+]

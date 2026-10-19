@@ -44,6 +44,8 @@ export interface FlowchartScenarioRequiredGroup {
 	labels: readonly string[];
 	/** Required step ids the group holds, directly or in a group nested in it. */
 	members: readonly string[];
+	/** Role/team grouping may be drawn with swimlanes; zones and regions may not. */
+	allowLane?: boolean;
 	/** The stated group this zone sits inside, at any depth. */
 	parent?: string;
 	/** The kinds that read as what the prompt calls this zone. */
@@ -152,6 +154,8 @@ interface FlowchartScenarioDefinition {
 	entry?: readonly string[];
 	/** Groups the prompt states and the fixture nodes each holds. */
 	groups?: readonly FlowchartGroupDefinition[];
+	/** The prompt groups by actor/team rather than architectural containment. */
+	roleGroups?: boolean;
 	/** Lanes the prompt states, in its order, and the fixture nodes each holds. */
 	lanes?: readonly FlowchartLaneDefinition[];
 	id: string;
@@ -371,6 +375,7 @@ function buildAssertions(
 				label,
 				labels,
 				members,
+				...(definition.roleGroups ? { allowLane: true } : {}),
 				...(zone?.parent ? { parent: zone.parent } : {}),
 				...(zone?.kinds ? { kinds: zone.kinds } : {}),
 			};
@@ -1854,6 +1859,7 @@ const flowchartScenarioDefinitions = [
 	},
 	{
 		id: "grouped-expense-approval",
+		roleGroups: true,
 		title: "Grouped expense approval",
 		difficulty: "standard",
 		tags: ["groups", "approval", "loop"],
@@ -1935,6 +1941,7 @@ const flowchartScenarioDefinitions = [
 	},
 	{
 		id: "mixed-fulfilment-groups",
+		roleGroups: true,
 		title: "Order fulfilment with grouped and ungrouped steps",
 		difficulty: "standard",
 		tags: ["groups", "mixed-membership", "decision"],
