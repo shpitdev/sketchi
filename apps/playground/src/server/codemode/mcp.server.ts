@@ -37,6 +37,7 @@ import {
 	getCodeModeDocs,
 	searchCodeModeDocs,
 	SKETCHI_CODE_MODE_VERSION,
+	SKETCHI_EXECUTE_CODE_DESCRIPTION,
 	SKETCHI_EXECUTE_DESCRIPTION,
 } from "./mcp-docs.server";
 import { createEffectMcpServer, makeEffectMcpTool } from "./effect-mcp-adapter.server";
@@ -81,7 +82,7 @@ const ExecuteRequestContract = Schema.Struct({
 		Schema.isMinLength(1, {
 			message: "Too small: expected string to have >=1 characters",
 		}),
-	),
+	).annotate({ description: SKETCHI_EXECUTE_CODE_DESCRIPTION }),
 });
 export const ExecuteRequestSchema = toPlaygroundStandardSchema(ExecuteRequestContract);
 

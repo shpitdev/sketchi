@@ -10,7 +10,10 @@ import {
 	searchCodeModeDocs,
 	SKETCHI_CODE_MODE_TYPES,
 	SKETCHI_CODE_MODE_VERSION,
+	SKETCHI_EXECUTE_CODE_DESCRIPTION,
 	SKETCHI_EXECUTE_DESCRIPTION,
+	EXECUTE_DESCRIPTION_LEGACY_WINDOW,
+	EXECUTE_DESCRIPTION_WINDOW,
 } from "./mcp-docs.server";
 
 // Hang guard for the full schema walk, not a speed budget.
@@ -304,40 +307,59 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			if (!found) throw new Error(`Missing generated declaration ${name}`);
 			return found.trim();
 		};
-		// Every request pays for the execute description. It carries the buildFlowchart topic verbatim,
-		// so flowcharts skip the docs turn, and no other family's types: about 1.8k o200k tokens.
-		const flowchartDocs = getCodeModeDocs({ topic: "buildFlowchart" }).content;
-		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
-			`buildFlowchart (no docs call needed):\n${flowchartDocs}`,
+		// Claude Code cuts upfront-loaded tool descriptions at 4096 characters (2048 before v2.1.296)
+		// but not parameter descriptions. The description is a head that fits the older window; the
+		// code parameter carries each builder's spec and rules once, so no client pays for them twice.
+		expect(EXECUTE_DESCRIPTION_WINDOW).toBe(4096);
+		expect(EXECUTE_DESCRIPTION_LEGACY_WINDOW).toBe(2048);
+		expect(SKETCHI_EXECUTE_DESCRIPTION.length).toBeLessThanOrEqual(
+			EXECUTE_DESCRIPTION_LEGACY_WINDOW,
 		);
-		expect(SKETCHI_EXECUTE_DESCRIPTION.endsWith(flowchartDocs)).toBe(true);
+		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
+			'The code parameter gives each one\'s spec and rules, so only createCanvas needs docs({ topic: "createCanvas" }) first',
+		);
+		expect(SKETCHI_EXECUTE_DESCRIPTION).not.toMatch(/^type \w+/m);
+		expect(SKETCHI_EXECUTE_DESCRIPTION).not.toContain("spec: {");
+		// The code parameter carries the buildFlowchart topic verbatim, its generated request type and
+		// no other family's types.
+		const flowchartDocs = getCodeModeDocs({ topic: "buildFlowchart" }).content;
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).toContain(`buildFlowchart:\n${flowchartDocs}\n`);
 		for (const name of ["BuildFlowchartRequest", "BuildOptions"]) {
-			expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(`\n${declaration(name)}`);
+			expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).toContain(`\n${declaration(name)}`);
 		}
-		expect(SKETCHI_EXECUTE_DESCRIPTION.match(/^type \w+/gm)).toEqual([
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.match(/^type \w+/gm)).toEqual([
 			"type BuildFlowchartRequest",
 			"type BuildOptions",
 		]);
-		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
-			"buildFlowchart, buildChart and buildStateMachine need no docs call",
+		// Every other builder but createCanvas skips the docs turn on one compact line, not its topic.
+		const codeLine = (operation: string) =>
+			SKETCHI_EXECUTE_CODE_DESCRIPTION.split("\n").find((line) =>
+				line.startsWith(`- ${operation}: `),
+			);
+		expect(codeLine("buildChart")).toBe(
+			'- buildChart: spec: { title, kind: "bar" | "line" | "pie", categories: string[], series: [{ name?, values: number[] }], unit? ("$M", "%"), categoryAxisTitle?, valueAxisTitle?, stacked? (bar), donut? (pie), orientation? ("horizontal", bar) }. Give every series exactly one value per category, in category order, and name every series when there are several. A pie has one series of non-negative values, at most 8 slices and no axis titles. Copy every number, category, series name, unit and axis title from the prompt; invent none.',
 		);
-		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
-			'Before the first call to any other builder, read docs({ topic: "<builder>" })',
+		expect(codeLine("buildTimeline")).toBe(
+			'- buildTimeline: spec: { title, events: [{ id, label, date?, end?, order?, kind?: "milestone", lane? }], lanes?: string[], today? }. Dates keep the prompt\'s precision (YYYY, YYYY-MM, YYYY-MM-DD or ISO time); without dates, give every event a numeric order. end draws a phase, lane a labeled track; today only when given. Invent no events or dates.',
 		);
-		// Charts and state machines skip the docs turn on one compact line each, about 130 o200k
-		// tokens apiece, not their full topics.
-		const indexLine = (operation: string) =>
-			SKETCHI_EXECUTE_DESCRIPTION.split("\n").find((line) => line.startsWith(`- ${operation}: `));
-		expect(indexLine("buildChart")).toBe(
-			'- buildChart: bar, line or pie charts of numbers across categories. spec: { title, kind: "bar" | "line" | "pie", categories: string[], series: [{ name?, values: number[] }], unit? ("$M", "%"), categoryAxisTitle?, valueAxisTitle?, stacked? (bar), donut? (pie), orientation? ("horizontal", bar) }. Give every series exactly one value per category, in category order, and name every series when there are several. A pie has one series of non-negative values, at most 8 slices and no axis titles. Copy every number, category, series name, unit and axis title from the prompt; invent none.',
+		expect(codeLine("buildSequenceDiagram")).toBe(
+			'- buildSequenceDiagram: spec: { title, participants: [{ id, label, icon?: { slug } }], messages: [{ source, target, label, type?: "return", style?: "dashed" }] }. Order is kept. Every reply the prompt states is its own type: "return" message from the callee back to its caller; it answers the latest open call between them, and calls nobody answers draw no bar. source and target are distinct participant ids.',
 		);
-		expect(indexLine("buildStateMachine")).toBe(
-			'- buildStateMachine: states and the events, guards and actions that move between them. spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets; one may be "else". kind "final" (label optional) ends the machine and nothing leaves it. A state that ends the machine but has other outgoing transitions also gets a transition to a final state.',
+		expect(codeLine("buildStateMachine")).toBe(
+			'- buildStateMachine: spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets; one may be "else". kind "final" (label optional) ends the machine and nothing leaves it. A state that ends the machine but has other outgoing transitions also gets a transition to a final state.',
 		);
+		expect(codeLine("buildMindmap")).toBe(
+			'- buildMindmap: spec: { title, root: { label, children?: [{ label, children? }] }, layout?: { direction: "LR" | "RL" } }. Children keep their order.',
+		);
+		expect(codeLine("createCanvas")).toBeUndefined();
+		for (const topic of ["buildMindmap", "buildSequenceDiagram", "buildTimeline"] as const) {
+			const guidance = getCodeModeDocs({ topic }).content.split("\n")[0]!;
+			expect(SKETCHI_EXECUTE_CODE_DESCRIPTION, topic).not.toContain(guidance);
+		}
 		const chartDocs = getCodeModeDocs({ topic: "buildChart" }).content;
 		const stateMachineDocs = getCodeModeDocs({ topic: "buildStateMachine" }).content;
-		expect(SKETCHI_EXECUTE_DESCRIPTION).not.toContain(chartDocs.split("\n\n")[0]);
-		expect(SKETCHI_EXECUTE_DESCRIPTION).not.toContain(stateMachineDocs.split("\n\n")[0]);
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(chartDocs.split("\n\n")[0]);
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(stateMachineDocs.split("\n\n")[0]);
 		// Models that still call docs get the same guidance.
 		expect(chartDocs.split("Request type:")[0]).toMatchInlineSnapshot(`
 			"buildChart accepts { spec: { id?, title, kind, categories, series: [{ name?, values }], unit?, categoryAxisTitle?, valueAxisTitle?, stacked?, donut?, orientation? }, options? }. The renderer owns layout: nice ticks, value labels, legend and pie leader lines.
@@ -359,7 +381,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 
 			"
 		`);
-		expect(SKETCHI_EXECUTE_DESCRIPTION.length).toBeLessThan(8_400);
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(7_200);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		expect(overview).toContain(`${CODE_MODE_OPERATIONS.length} operations:`);
 		for (const operation of CODE_MODE_OPERATIONS) {

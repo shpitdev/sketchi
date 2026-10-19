@@ -775,24 +775,26 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 				required: ["code"],
 				type: "object",
 			});
-			expect(executeTool?.description).toContain("Write JavaScript only");
+			expect(executeTool?.description).toContain("plain JavaScript (no TypeScript");
 			expect(executeTool?.description).toContain("async () =>");
 			expect(executeTool?.description).toContain("artifactDelivery");
 			expect(executeTool?.description).toContain("sequence participant.icon");
 			expect(executeTool?.description).toContain("When the prompt names technologies");
-			expect(executeTool?.description).toContain(
+			// Every request pays for tools/list. Claude Code cuts the description at 4096 characters in
+			// upfront mode but keeps parameter descriptions, so the builder specs ride on code.
+			expect(executeTool?.description?.length).toBeLessThanOrEqual(2048);
+			const codeDescription = String(
+				Reflect.get(executeTool?.inputSchema.properties?.code ?? {}, "description"),
+			);
+			expect(codeDescription).toContain(
 				"Keep every requested step and decision in a separate node, preserving the prompt's step wording and order.",
 			);
-			// Every request pays for tools/list. Flowcharts, most requests, carry their full topic;
-			// charts and state machines carry one compact line each. All three skip docs({ topic }).
-			expect(executeTool?.description).toContain(
-				getCodeModeDocs({ topic: "buildFlowchart" }).content,
-			);
-			expect(executeTool?.description).not.toMatch(/^type Build(?!Flowchart|Options)/m);
-			expect(executeTool?.description).toMatch(
+			expect(codeDescription).toContain(getCodeModeDocs({ topic: "buildFlowchart" }).content);
+			expect(codeDescription).not.toMatch(/^type Build(?!Flowchart|Options)/m);
+			expect(codeDescription).toMatch(
 				/^- buildChart: .*series: \[\{ name\?, values: number\[\] \}\]/m,
 			);
-			expect(executeTool?.description).toMatch(/^- buildStateMachine: .*one may be "else"/m);
+			expect(codeDescription).toMatch(/^- buildStateMachine: .*one may be "else"/m);
 			expect(
 				JSON.stringify(
 					tools.tools.map(({ name, description, inputSchema }) => ({
@@ -801,7 +803,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(9_600);
+			).toBeLessThan(10_200);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,

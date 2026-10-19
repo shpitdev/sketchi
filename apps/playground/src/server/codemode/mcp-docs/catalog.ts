@@ -43,13 +43,10 @@ const HELPERS = {
 // Adding an operation without a summary fails typechecking, so the index cannot go stale.
 const OPERATION_SUMMARIES: Record<CodeModeOperation, string> = { ...BUILDERS, ...HELPERS };
 const OPERATIONS = Object.keys(OPERATION_SUMMARIES) as CodeModeOperation[];
-const operationIndex = (
-	buildersHeading: string,
-	summaries: Record<keyof typeof BUILDERS, string> = BUILDERS,
-) =>
+const operationIndex = (buildersHeading: string) =>
 	[
 		buildersHeading,
-		...Object.entries(summaries).map(([operation, summary]) => `- ${operation}: ${summary}`),
+		...Object.entries(BUILDERS).map(([operation, summary]) => `- ${operation}: ${summary}`),
 		"Helpers:",
 		...Object.values(HELPERS).map((summary) => `- ${summary}`),
 	].join("\n");
@@ -64,17 +61,27 @@ const STATE_MACHINE_END_RULE =
 	"A state that ends the machine but has other outgoing transitions also gets a transition to a final state.";
 const CHART_COPY_RULE =
 	"Copy every number, category, series name, unit and axis title from the prompt; invent none.";
-// Most requests are flowcharts, so the execute description carries that topic and saves a turn.
-// Charts and state machines save the same turn with one compact line each: the spec plus the rules
-// behind most first-try failures. Repair hints cover the rest.
-const EXECUTE_OPERATION_INDEX = operationIndex(
-	'Builders. buildFlowchart, buildChart and buildStateMachine need no docs call: the chart and state machine specs are on their lines and buildFlowchart\'s rules end this description. Before the first call to any other builder, read docs({ topic: "<builder>" }) for its request type, rules and example:',
-	{
-		...BUILDERS,
-		buildChart: `${BUILDERS.buildChart}. spec: { title, kind: "bar" | "line" | "pie", categories: string[], series: [{ name?, values: number[] }], unit? ("$M", "%"), categoryAxisTitle?, valueAxisTitle?, stacked? (bar), donut? (pie), orientation? ("horizontal", bar) }. ${CHART_SERIES_RULE} A pie has one series of non-negative values, at most 8 slices and no axis titles. ${CHART_COPY_RULE}`,
-		buildStateMachine: `${BUILDERS.buildStateMachine}. spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets; one may be "else". kind "final" (label optional) ends the machine and nothing leaves it. ${STATE_MACHINE_END_RULE}`,
-	},
-);
+/**
+ * Claude Code cuts upfront-loaded MCP tool descriptions and server instructions at this many
+ * characters (2048 before v2.1.296), but not parameter descriptions. The execute description is a
+ * head that fits the older window; the code parameter carries every builder's spec and rules.
+ */
+export const EXECUTE_DESCRIPTION_WINDOW = 4096;
+export const EXECUTE_DESCRIPTION_LEGACY_WINDOW = 2048;
+/** One compact line per builder after buildFlowchart, whose full topic the code parameter carries. */
+const FAST_PATH = {
+	buildChart: `spec: { title, kind: "bar" | "line" | "pie", categories: string[], series: [{ name?, values: number[] }], unit? ("$M", "%"), categoryAxisTitle?, valueAxisTitle?, stacked? (bar), donut? (pie), orientation? ("horizontal", bar) }. ${CHART_SERIES_RULE} A pie has one series of non-negative values, at most 8 slices and no axis titles. ${CHART_COPY_RULE}`,
+	buildTimeline: `spec: { title, events: [{ id, label, date?, end?, order?, kind?: "milestone", lane? }], lanes?: string[], today? }. Dates keep the prompt's precision (YYYY, YYYY-MM, YYYY-MM-DD or ISO time); without dates, give every event a numeric order. end draws a phase, lane a labeled track; today only when given. Invent no events or dates.`,
+	buildSequenceDiagram: `spec: { title, participants: [{ id, label, icon?: { slug } }], messages: [{ source, target, label, type?: "return", style?: "dashed" }] }. Order is kept. Every reply the prompt states is its own type: "return" message from the callee back to its caller; it answers the latest open call between them, and calls nobody answers draw no bar. source and target are distinct participant ids.`,
+	buildStateMachine: `spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets; one may be "else". kind "final" (label optional) ends the machine and nothing leaves it. ${STATE_MACHINE_END_RULE}`,
+	buildMindmap: `spec: { title, root: { label, children?: [{ label, children? }] }, layout?: { direction: "LR" | "RL" } }. Children keep their order.`,
+} satisfies Record<Exclude<keyof typeof BUILDERS, "buildFlowchart" | "createCanvas">, string>;
+const EXECUTE_HELPERS = [
+	HELPERS.searchIcons,
+	HELPERS.getArtifact,
+	'applyDiagramPatch edits an accepted artifact; docs({ topic: "applyDiagramPatch" })',
+];
+
 const OPERATION_LIST = OPERATIONS.map((operation) => `sketchi.${operation}`).join(", ");
 
 const DECLARATIONS = new Map(
@@ -136,23 +143,32 @@ const FLOWCHART_DOCS = [
 ].join("\n");
 
 const LOGO_RULE =
-	"When the prompt names technologies, call sketchi.searchIcons({ q }) for each and set node.icon or sequence participant.icon to { slug } using a matching returned slug. One icon per node: give 'X on Y' separate technology steps. Labels alone do not add logos; check coverage.";
+	"When the prompt names technologies, call sketchi.searchIcons({ q }) for each and set node.icon or sequence participant.icon to { slug } from a matching slug. One icon per node, so 'X on Y' is two steps; labels alone add no logo.";
 
+/** Fits EXECUTE_DESCRIPTION_LEGACY_WINDOW, so every Claude Code version reads all of it. */
 export const EXECUTE_TOOL_DESCRIPTION = [
-	"Run JavaScript against the typed sketchi client. code is one async arrow function:",
-	"async () => { const built = await sketchi.buildFlowchart({ spec, options }); return built; }",
-	"Write JavaScript only: no TypeScript syntax, imports, or named wrapper functions. Code fences and a trailing semicolon are stripped.",
-	"",
-	EXECUTE_OPERATION_INDEX,
-	"",
+	"Run JavaScript against the typed sketchi client. code is one async arrow function in plain JavaScript (no TypeScript, imports or named wrappers): async () => sketchi.buildFlowchart({ spec, options }), with options as the code parameter shows",
+	'Builders. The code parameter gives each one\'s spec and rules, so only createCanvas needs docs({ topic: "createCanvas" }) first:',
+	...Object.entries(BUILDERS).map(([operation, summary]) => `- ${operation}: ${summary}`),
+	"Helpers:",
+	...EXECUTE_HELPERS.map((summary) => `- ${summary}`),
 	`- ${LOGO_RULE}`,
-	`- Pass options: ${DELIVERY_OPTIONS} to get Excalidraw and PNG URLs without inline JSON.`,
-	'- Builds resolve to { ok: true, status: "accepted", artifact: { artifactId, formats }, normalizedSpec, quality, issues } or { ok: false, status, issues: [{ code, message, hint, ref? }] }. On ok: false, repair the spec from each issue hint and build again. Patch only accepted artifacts.',
-	"- Return the accepted build or patch result. execute then adds artifactDelivery and puts its finalResponseText first in the text content: copy it verbatim as the final answer and stop. Do not recreate the diagram as Markdown, Mermaid, a local file (write_to_file/Create) or an Antigravity artifact, and do not inspect inline JSON.",
-	'- structuredContent.builds records every build attempt in call order, whatever the script returns. docs({ topic: "execute" }) has every generated declaration, including results.',
+	"- Builds resolve to { ok: true, artifact, normalizedSpec, issues } or { ok: false, issues: [{ code, message, hint }] }; on ok: false, fix the spec from each hint and build again.",
+	"- Return the accepted result: execute adds artifactDelivery.finalResponseText; copy it verbatim as the final answer and stop, never recreating the diagram as Markdown, Mermaid, a file or an Antigravity artifact.",
+].join("\n");
+
+/** Parameter descriptions are not truncated, so the fast path and the full flowchart topic live here. */
+export const EXECUTE_CODE_DESCRIPTION = [
+	`One async arrow function. Call every builder as sketchi.<builder>({ spec, options: ${DELIVERY_OPTIONS} }) to get Excalidraw and PNG URLs without inline JSON. Each builder's spec and the rules that make it build first try:`,
 	"",
-	"buildFlowchart (no docs call needed):",
+	"buildFlowchart:",
 	FLOWCHART_DOCS,
+	"",
+	"Other builders:",
+	...Object.entries(FAST_PATH).map(([operation, line]) => `- ${operation}: ${line}`),
+	"",
+	"- Run logo searches and the build in one execute script: await the searches, then set each icon from a returned slug.",
+	'- structuredContent.builds records every build attempt in call order, whatever the script returns. docs({ topic: "execute" }) has every generated declaration, including results.',
 ].join("\n");
 
 const PATCH_OPERATION_SUMMARY = [
