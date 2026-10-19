@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Context, Effect, Schema } from "effect";
 import { readFile } from "node:fs/promises";
 import { CANVAS_LIMITS } from "@sketchi/diagram-core";
+import { FLOWCHART_NODE_KIND_HINT } from "../flowchart/node-kinds.js";
 
 import {
 	ARTIFACT_MIME_TYPES,
@@ -192,6 +193,26 @@ function normalizeBrandPaletteAgainstFrozen(value: unknown, frozen: unknown): un
 		normalized = normalized.replaceAll("#8f707f", "#7c3aed");
 	}
 	return normalized.replaceAll("#fffdf8", "#ffffff").replaceAll("#1a1712", "#1e1e1e");
+}
+
+// Flowchart node kind issues name the allowed kinds; frozen captures carry the generic hint.
+function normalizeFlowchartKindHintAgainstFrozen(value: unknown, frozen: unknown): unknown {
+	if (Array.isArray(value) && Array.isArray(frozen)) {
+		return value.map((item, index) => normalizeFlowchartKindHintAgainstFrozen(item, frozen[index]));
+	}
+	if (isRecord(value) && isRecord(frozen)) {
+		return Object.fromEntries(
+			Object.entries(value).map(([key, nested]) => [
+				key,
+				normalizeFlowchartKindHintAgainstFrozen(nested, frozen[key]),
+			]),
+		);
+	}
+	return value === FLOWCHART_NODE_KIND_HINT &&
+		typeof frozen === "string" &&
+		/^Fix spec\.nodes\.\[\d+\]\.kind so it matches the Code Mode API contract\.$/.test(frozen)
+		? frozen
+		: value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -861,7 +882,8 @@ async function buildIssueCompatibilityMatrix(sourceScene: typeof RenderedDiagram
 	});
 	const invalidEnum = await flowchart({
 		...base,
-		nodes: base.nodes.map((node) => (node.id === "done" ? { ...node, kind: "terminal" } : node)),
+		// "terminal" now resolves by position, so an unrecognized kind keeps the invalid_enum capture.
+		nodes: base.nodes.map((node) => (node.id === "done" ? { ...node, kind: "subroutine" } : node)),
 	});
 	const invalidColor = await flowchart({
 		...base,
@@ -1671,7 +1693,10 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 		);
 		expect(
 			normalizeCanvasMigrationAgainstFrozen(
-				normalizeBrandPaletteAgainstFrozen(normalizeRoutingAgainstFrozen(corpus, frozen), frozen),
+				normalizeFlowchartKindHintAgainstFrozen(
+					normalizeBrandPaletteAgainstFrozen(normalizeRoutingAgainstFrozen(corpus, frozen), frozen),
+					frozen,
+				),
 				frozen,
 			),
 		).toEqual(frozen);

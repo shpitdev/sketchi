@@ -129,6 +129,7 @@ import { embedSceneIcons, resolveNodeIcons, type CodeModeIconCatalog } from "./i
 import { cleanToolString } from "../clean-tool-string.js";
 import { assessFlowchartQuality } from "../flowchart/quality.js";
 import { flowchartDiagramInput, normalizeFlowchartSpec } from "../flowchart/spec.js";
+import { FLOWCHART_NODE_KIND_HINT, resolveFlowchartNodeKinds } from "../flowchart/node-kinds.js";
 
 const DEFAULT_BUILD_FORMATS: ArtifactFormat[] = ["excalidraw", "scene"];
 const DEFAULT_INLINE_FORMATS: InlineArtifactFormat[] = ["scene"];
@@ -949,7 +950,18 @@ function hintForContractIssue(path: string): string {
 	return `Fix ${path} so it matches the Code Mode API contract.`;
 }
 
-function inputIssues(error: ContractSchemaError): CodeModeIssue[] {
+const FLOWCHART_NODE_KIND_PATH = /^spec\.nodes\.\[\d+\]\.kind$/;
+
+function flowchartHintForContractIssue(path: string): string {
+	return FLOWCHART_NODE_KIND_PATH.test(path)
+		? FLOWCHART_NODE_KIND_HINT
+		: hintForContractIssue(path);
+}
+
+function inputIssues(
+	error: ContractSchemaError,
+	hintFor: (path: string) => string = hintForContractIssue,
+): CodeModeIssue[] {
 	const issues = error.issues.slice(0, MAX_INPUT_ISSUES).map((contractIssue) => {
 		const path = pathForContractIssue(contractIssue.path);
 		return issue({
@@ -957,7 +969,7 @@ function inputIssues(error: ContractSchemaError): CodeModeIssue[] {
 			stage: "input",
 			ref: { kind: "request", path },
 			message: contractIssue.message,
-			hint: hintForContractIssue(path),
+			hint: hintFor(path),
 		});
 	});
 	if (error.issues.length > MAX_INPUT_ISSUES) {
@@ -3065,12 +3077,15 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 	const parsed = Schema.decodeUnknownResult(BuildFlowchartRequestSchema, {
 		errors: "all",
 		reportInput: true,
-	})(input);
+	})(resolveFlowchartNodeKinds(input));
 	if (!Result.isSuccess(parsed)) {
 		return yield* new BuildFlowchartFailure({
 			status: "invalid_input",
 			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+				issues: inputIssues(
+					formatContractSchemaError(parsed.failure),
+					flowchartHintForContractIssue,
+				),
 			},
 		});
 	}
