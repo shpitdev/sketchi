@@ -1003,14 +1003,20 @@ const WRAP_MIN_RANKS = 5;
 /** A flow wraps when it runs at least this many times longer than it is broad... */
 const WRAP_EXTREME_ASPECT = 4;
 /**
- * ...or about 2.5 times once fitting it to a 2000 px screen would shrink its
- * text: a row below about 24 px. A column reads naturally top to bottom, so it
- * wraps short of 4:1 only once its text would fall below 14 px...
+ * ...or about 2.5 times: a column always, since a tall export shrinks to fit
+ * a screen's height, and a row once fitting it to a 2000 px screen would
+ * shrink its text below about 24 px...
  */
 const WRAP_ASPECT = 2.45;
 const WRAP_MIN_LENGTH = 1200;
 const FITTED_LONG_SIDE = 2000;
+/**
+ * A column short of 4:1 whose text fits a screen at 14 px or more wraps only
+ * when each new column is at least this much of the longest, so no short
+ * column sits beside a long one, reached by a connector across empty space.
+ */
 const WRAP_MIN_COLUMN_TEXT = 14;
+const WRAP_COLUMN_BALANCE = 0.6;
 /** ...into the fewest bands that bring it within this, if any do. */
 const WRAP_TARGET_ASPECT = 2;
 const MAX_BANDS = 6;
@@ -1088,7 +1094,7 @@ function exportAspect(along: number, across: number): number {
  * band starts at a single node. Orthogonal routing only: a straight continuation
  * would cut through the band it skips back across.
  */
-function planWrap(diagram: IntermediateDiagram, reorder: boolean): Wrap {
+function planWrap(diagram: IntermediateDiagram, reorder: boolean, balance = 0): Wrap {
 	// A band cut must not split a group; grouped flows stay in one band.
 	if (diagram.layout.edgeRouting !== "orthogonal" || groupStructure(diagram)) return NO_WRAP;
 	const { feedbackEdges, gapAfter, rankByNodeId, rankMetrics } = rankLayout(
@@ -1145,6 +1151,29 @@ function planWrap(diagram: IntermediateDiagram, reorder: boolean): Wrap {
 
 	// Band ends: a clean cut or the last rank. Each band keeps at least two ranks.
 	const ends = [...continuationAfter.keys(), last].sort((a, b) => a - b);
+	// An even wrap keeps every band at least `balance` of the longest, so no band
+	// stands short beside a long one with empty space past its end.
+	const evenPartition = (bands: number) => {
+		let best: { ends: number[]; longest: number; squares: number } | undefined;
+		const visit = (cuts: number[], previous: number) => {
+			if (cuts.length === bands - 1) {
+				if (last < previous + 2) return;
+				const bounds = [...cuts, last];
+				const lengths = bounds.map((end, band) =>
+					bandLength(band === 0 ? 0 : bounds[band - 1]! + 1, end),
+				);
+				const longest = Math.max(...lengths);
+				if (Math.min(...lengths) < balance * longest) return;
+				const squares = lengths.reduce((sum, length) => sum + length ** 2, 0);
+				if (!best || longest < best.longest || (longest === best.longest && squares < best.squares))
+					best = { ends: bounds, longest, squares };
+				return;
+			}
+			for (const end of ends) if (end !== last && end >= previous + 2) visit([...cuts, end], end);
+		};
+		visit([], -1);
+		return best;
+	};
 	let chosen: { aspect: number; ends: readonly number[] } | undefined;
 	for (let bands = 2; bands <= Math.min(MAX_BANDS, ends.length); bands += 1) {
 		// Balance band lengths: the shortest longest band, then the least sum of squares.
@@ -1180,7 +1209,7 @@ function planWrap(diagram: IntermediateDiagram, reorder: boolean): Wrap {
 			}
 			partitions = next;
 		}
-		const partition = partitions.get(last);
+		const partition = balance > 0 ? evenPartition(bands) : partitions.get(last);
 		if (!partition) continue;
 		const starts = [0, ...partition.ends.slice(0, -1).map((end) => end + 1)];
 		const across =
@@ -5941,9 +5970,14 @@ export function renderGraphDiagram(
 		(NODE_LABEL_FONT_SIZE * FITTED_LONG_SIDE) / (Math.max(along, across) + 2 * EXPORT_PADDING);
 	const tooLong =
 		aspect >= WRAP_EXTREME_ASPECT ||
-		(aspect >= WRAP_ASPECT &&
-			(vertical ? fittedText < WRAP_MIN_COLUMN_TEXT : along >= WRAP_MIN_LENGTH));
-	const wrap = orthogonal && tooLong ? planWrap(diagram, best.arrangement.reorder) : NO_WRAP;
+		(aspect >= WRAP_ASPECT && (vertical || along >= WRAP_MIN_LENGTH));
+	// A column short of 4:1 whose text stays readable wraps only into even columns.
+	const balance =
+		vertical && aspect < WRAP_EXTREME_ASPECT && fittedText >= WRAP_MIN_COLUMN_TEXT
+			? WRAP_COLUMN_BALANCE
+			: 0;
+	const wrap =
+		orthogonal && tooLong ? planWrap(diagram, best.arrangement.reorder, balance) : NO_WRAP;
 	// A wrapped layout may need crossing repairs of its own; it tries them first.
 	for (const crossingRepair of repairable && !best.arrangement.crossingRepair
 		? [true, false]

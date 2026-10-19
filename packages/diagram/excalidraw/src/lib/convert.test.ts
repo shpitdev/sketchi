@@ -684,8 +684,9 @@ describe("convertSceneToExcalidraw", () => {
 		expect(scene.appState.zoom).toEqual({
 			value: expect.any(Number),
 		});
+		// The tall column wraps into two, so it opens larger than it once did.
 		expect((scene.appState.zoom as { value: number }).value).toBeGreaterThanOrEqual(0.42);
-		expect((scene.appState.zoom as { value: number }).value).toBeLessThanOrEqual(0.5);
+		expect((scene.appState.zoom as { value: number }).value).toBeLessThanOrEqual(0.7);
 	});
 
 	it("keeps wrapped flowchart text inside real shape containers", () => {

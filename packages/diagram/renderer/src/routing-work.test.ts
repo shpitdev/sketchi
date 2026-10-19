@@ -114,9 +114,9 @@ describe("routing work", () => {
 });
 
 describe("crossing repair work", () => {
-	// Measured: 7.06M checks for the twelve flowcharts and four state machines
-	// whose crossings the repair removes; main drew them, crossings and all, in
-	// 3.00M. Each side change is screened by rerouting only the edges it touches
+	// Measured: 6.78M checks for the twelve flowcharts and four state machines
+	// whose crossings the repair removes, tall columns wrapped; main drew them,
+	// crossings and all, in 3.00M. Each side change is screened by rerouting only the edges it touches
 	// before it is laid out in full.
 	it("bounds segment checks for the generated diagrams it repairs", () => {
 		work.checks = 0;

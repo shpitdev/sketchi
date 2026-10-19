@@ -225,24 +225,6 @@ describe("long flows wrap into bands that read in the requested direction", () =
 		expect(new Set(nodesOf(scene).map((node) => Math.round(center(node)[across]))).size).toBe(1);
 	});
 
-	it.each(["TB", "BT"] as const)(
-		"keeps a five-step column that fits a screen in %s",
-		(direction) => {
-			// Every edge runs forward along the flow only when nothing wrapped.
-			const scene = rendered("scope-bypass", direction);
-			const { along, sign } = axes(direction);
-			const nodes = new Map(nodesOf(scene).map((node) => [node.nodeId, node]));
-			for (const arrow of arrowsOf(scene)) {
-				if (arrow.type !== "arrow") continue;
-				expect(
-					sign *
-						(center(nodes.get(arrow.targetNodeId)!)[along] -
-							center(nodes.get(arrow.sourceNodeId)!)[along]),
-				).toBeGreaterThan(0);
-			}
-		},
-	);
-
 	it.each(["LR", "RL"] as const)("wraps the same five steps from an 8:1 row in %s", (direction) => {
 		expect(exportAspect(rendered("scope-bypass", direction))).toBeLessThan(2.5);
 	});
@@ -329,32 +311,77 @@ function runsForward(scene: ReturnType<typeof renderIntermediateDiagram>, direct
 	);
 }
 
-describe("tall columns stay one column until their text would be too small", () => {
+/** A CI release gate as a generated sample drew it: its only clean cut falls three steps from the end. */
+const ciReleaseGate = parseFlowchartDiagram({
+	...flowchartFixture,
+	type: "flowchart",
+	id: "ci-release-gate",
+	nodes: [
+		["commit", "A commit is merged", "start"],
+		["tests", "Test suite runs", "process"],
+		["test-result", "Tests pass?", "decision"],
+		["block", "Block release", "end"],
+		["artifact", "Build an artifact", "process"],
+		["scan", "Run a security scan", "process"],
+		["scan-result", "Clean scan?", "decision"],
+		["canary", "Deploy a canary", "process"],
+		["health", "Canary is healthy?", "decision"],
+		["production", "Promote to production", "end"],
+		["rollback", "Roll back the canary", "end"],
+	].map(([id, label, kind]) => ({ id: id!, label: label!, kind })),
+	edges: [
+		["commit", "tests"],
+		["tests", "test-result"],
+		["test-result", "block", "Failed tests"],
+		["test-result", "artifact", "Passing tests"],
+		["artifact", "scan"],
+		["scan", "scan-result"],
+		["scan-result", "block", "Failed scan"],
+		["scan-result", "canary", "Clean scan"],
+		["canary", "health"],
+		["health", "production", "Yes"],
+		["health", "rollback", "No"],
+	].map(([source, target, label], index) => ({
+		id: `edge-${index + 1}`,
+		source: source!,
+		target: target!,
+		...(label ? { label } : {}),
+	})),
+});
+
+describe("tall columns wrap into even columns at about 2.5:1, as rows do", () => {
 	it.each(["TB", "BT"] as const)(
-		"keeps loan underwriting at about 3:1 with 18 px text in one column in %s",
+		"keeps a column in one when its only cut would leave a short column beside a long one in %s",
 		(direction) => {
-			const scene = rendered("loan-application-underwriting", direction);
-			expect(runsForward(scene, direction)).toBe(true);
-			expect(exportAspect(scene)).toBeGreaterThan(2.5);
+			// Loan underwriting cuts two steps from the start, the release gate three
+			// from the end, and five steps cut two from three: a short column would
+			// stand beside a long one, reached by a connector across empty space.
+			for (const scene of [
+				rendered("loan-application-underwriting", direction),
+				rendered("scope-bypass", direction),
+				render(ciReleaseGate, direction),
+			])
+				expect(runsForward(scene, direction)).toBe(true);
 		},
 	);
 
 	it.each(["TB", "BT"] as const)(
-		"keeps four gates at about 3.2:1 in one column in %s",
+		"wraps four and five gates, from about 3.2:1 and 4:1, into even columns in %s",
 		(direction) => {
-			expect(runsForward(render(gatedRelease(4), direction), direction)).toBe(true);
+			for (const checks of [4, 5]) {
+				const scene = render(gatedRelease(checks), direction);
+				expect(runsForward(scene, direction)).toBe(false);
+				expect(exportAspect(scene)).toBeLessThan(2.5);
+				expect(getCanvasValidationIssues(scene)).toEqual([]);
+			}
 		},
 	);
 
-	it.each(["TB", "BT"] as const)(
-		"wraps five gates, whose text would fall below 14 px, into columns in %s",
-		(direction) => {
-			const scene = render(gatedRelease(5), direction);
-			expect(runsForward(scene, direction)).toBe(false);
-			expect(exportAspect(scene)).toBeLessThan(2.5);
-			expect(getCanvasValidationIssues(scene)).toEqual([]);
-		},
-	);
+	it.each(["TB", "BT"] as const)("keeps a column under 2.5:1 in one column in %s", (direction) => {
+		const scene = rendered("content-moderation", direction);
+		expect(exportAspect(scene)).toBeLessThan(2.5);
+		expect(runsForward(scene, direction)).toBe(true);
+	});
 });
 
 describe("avoidable crossings", () => {
