@@ -143,6 +143,21 @@ describe("prompt-grounded state-machine scenarios", () => {
 				withTransition(player, stop.id, (transition) => ({ ...transition, source: "playing" })),
 			),
 		).toEqual(["transition:5"]);
+		// Play aimed at Playing, the substate Active starts in, enters Active all the same.
+		const play = player.transitions.find((t) => t.event === "play")!;
+		expect(
+			failed(
+				"media-player-state-machine",
+				withTransition(player, play.id, (transition) => ({ ...transition, target: "playing" })),
+			),
+		).toEqual([]);
+		// Aimed at Paused, a substate Active does not start in, it misses Active.
+		expect(
+			failed(
+				"media-player-state-machine",
+				withTransition(player, play.id, (transition) => ({ ...transition, target: "paused" })),
+			),
+		).toEqual(["transition:1"]);
 	});
 
 	it("checks self-loops and accepts a labeled final for a named end", () => {

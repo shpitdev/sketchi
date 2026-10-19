@@ -20,8 +20,11 @@ import {
 /** The machine's own initial pseudostate; state ids never contain ":". */
 const INITIAL_ID = ":initial";
 
-/** A layout whose exported long side runs past this many times its short side reads poorly. */
-const READABLE_ASPECT = 2.5;
+/**
+ * A layout whose exported long side runs past 2.5 times its short side reads poorly. Export padding
+ * and font metrics stretch a scene slightly, so a scene must stay under 2.2 to export under 2.5.
+ */
+const READABLE_ASPECT = 2.2;
 
 /**
  * The graph a state machine draws: an initial dot into the starting state, a

@@ -105,6 +105,26 @@ function endsIn(state: StateMachineState, diagram: StateMachineDiagram): boolean
 	);
 }
 
+/**
+ * A transition enters the expected state when it targets that state or, for a composite, the
+ * substate the composite starts in: entering a composite lands in its initial substate either way.
+ */
+function entersTarget(
+	state: StateMachineState,
+	expected: StateMachineScenarioState,
+	diagram: StateMachineDiagram,
+	byId: ReadonlyMap<string, StateMachineState>,
+): boolean {
+	if (stateMatches(state, expected, diagram)) return true;
+	if (expected.initial === undefined || state.parent === undefined) return false;
+	const composite = byId.get(state.parent);
+	return (
+		composite !== undefined &&
+		composite.initial === state.id &&
+		stateMatches(composite, expected, diagram)
+	);
+}
+
 function describe(key: string, expected: StateMachineScenarioState | undefined): string {
 	return expected?.labels?.join("|") ?? expected?.kind ?? key;
 }
@@ -199,7 +219,7 @@ export function stateMachineScenarioChecks(
 					byId.has(transition.source) &&
 					byId.has(transition.target) &&
 					stateMatches(byId.get(transition.source)!, source, diagram) &&
-					stateMatches(byId.get(transition.target)!, target, diagram) &&
+					entersTarget(byId.get(transition.target)!, target, diagram, byId) &&
 					(expected.source !== expected.target || transition.source === transition.target) &&
 					(expected.event === undefined || matchesAny(transition.event, expected.event)) &&
 					(expected.guard === undefined || matchesAny(transition.guard, expected.guard)) &&
