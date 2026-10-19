@@ -1,4 +1,5 @@
 import { renderChartDiagram } from "./chart.js";
+import { renderGanttDiagram } from "./gantt.js";
 import { renderTimelineDiagram } from "./timeline.js";
 import type { CanonicalDiagram } from "@sketchi/diagram-core";
 
@@ -22,5 +23,7 @@ export function renderDiagram(diagram: CanonicalDiagram): RenderedDiagramScene {
 			return renderChartDiagram(diagram);
 		case "state-machine":
 			return renderStateMachineDiagram(diagram);
+		case "gantt":
+			return renderGanttDiagram(diagram);
 	}
 }

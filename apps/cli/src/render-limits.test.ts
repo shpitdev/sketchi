@@ -20,6 +20,31 @@ describe("PNG render limits", () => {
 		assert.strictEqual(MAX_RENDER_CANVAS_AREA, 6_291_456);
 	});
 
+	it("measures unrotated elements by their own extent, and rotated ones by their radius", () => {
+		// A tall Gantt gridline beside a wide axis: the drawing is 2,400 × 1,800.
+		const tall = [
+			{ x: 0, y: 0, width: 2_400, height: 0, angle: 0 },
+			{ x: 1_200, y: 0, width: 0, height: 1_800, angle: 0 },
+			// An elbow route's points stay inside the drawing even past its start-to-end box.
+			{
+				x: 100,
+				y: 100,
+				width: 10,
+				height: 10,
+				angle: 0,
+				points: [
+					[0, 0],
+					[-90, 0],
+					[-90, 10],
+					[10, 10],
+				],
+			},
+		];
+		assert.isUndefined(renderLimitDiagnostic(tall));
+		const rotated = renderLimitDiagnostic(tall.map((element) => ({ ...element, angle: 0.3 })));
+		assert.strictEqual(rotated?.code, "canvas_area");
+	});
+
 	it("reduces export scale to keep raster allocation bounded", () => {
 		const scale = adaptivePngExportScale(2_000, 4_000);
 		assert.isNumber(scale);

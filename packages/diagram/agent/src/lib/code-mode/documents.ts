@@ -3,6 +3,7 @@ import type { Effect } from "effect";
 
 import {
 	type BuildChartResult,
+	type BuildGanttResult,
 	type BuildFlowchartOptions,
 	type BuildFlowchartResult,
 	type BuildMindmapResult,
@@ -16,6 +17,7 @@ import {
 	StateMachineSpec,
 	TimelineSpec,
 	ChartSpec,
+	GanttSpec,
 } from "./contract.js";
 import type { CodeModeArtifactStorage } from "./artifacts.js";
 import {
@@ -25,6 +27,7 @@ import {
 	buildStateMachine,
 	buildTimeline,
 	buildChart,
+	buildGantt,
 	type CodeModeRuntimeEnvironment,
 } from "./runtime.js";
 
@@ -39,6 +42,7 @@ export const CANONICAL_DOCUMENT_SPECS = {
 	timeline: TimelineSpec,
 	chart: ChartSpec,
 	"state-machine": StateMachineSpec,
+	gantt: GanttSpec,
 } as const satisfies Record<DiagramTypeValue, unknown>;
 
 /** A canonical diagram document: a family and its authoring spec. */
@@ -55,7 +59,8 @@ export type CanonicalBuildResult =
 	| BuildSequenceDiagramResult
 	| BuildTimelineResult
 	| BuildChartResult
-	| BuildStateMachineResult;
+	| BuildStateMachineResult
+	| BuildGanttResult;
 
 export function isCanonicalDocumentType(value: unknown): value is DiagramTypeValue {
 	return CANONICAL_DOCUMENT_TYPES.some((type) => type === value);
@@ -84,6 +89,8 @@ export function buildCanonicalDocument(
 			return buildChart(request);
 		case "state-machine":
 			return buildStateMachine(request);
+		case "gantt":
+			return buildGantt(request);
 	}
 }
 
@@ -112,6 +119,20 @@ function mindmapRoot(diagram: Extract<CanonicalDiagram, { type: "mindmap" }>): M
  */
 export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): CanonicalDiagramDocument {
 	switch (diagram.type) {
+		case "gantt": {
+			const { type: _type, ...spec } = diagram;
+			return {
+				type: "gantt",
+				spec: {
+					...spec,
+					tasks: spec.tasks.map((task) => ({
+						...task,
+						...(task.dependsOn ? { dependsOn: [...task.dependsOn] } : {}),
+					})),
+					...(spec.phases ? { phases: [...spec.phases] } : {}),
+				},
+			};
+		}
 		case "chart": {
 			const { type: _type, ...spec } = diagram;
 			return {

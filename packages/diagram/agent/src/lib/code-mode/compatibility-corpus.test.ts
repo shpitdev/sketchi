@@ -152,6 +152,16 @@ const STATE_MACHINE_ISSUE_CODE_ADDITIONS = new Set([
 	"final_has_outgoing",
 	"underbranched_choice",
 ]);
+// Gantt charts add six semantic issue codes and a schedule-conflict warning.
+const GANTT_ISSUE_CODE_ADDITIONS = new Set([
+	"gantt_too_large",
+	"invalid_gantt_date",
+	"invalid_gantt_span",
+	"invalid_gantt_phase",
+	"invalid_gantt_progress",
+	"gantt_dependency_cycle",
+	"gantt_schedule_conflict",
+]);
 const FLOWCHART_SPEC_NODE_ADDED_FIELDS = new Set(["icon", "group"]);
 // Flowchart groups add an optional groups list to the spec.
 const FLOWCHART_SPEC_ADDED_FIELDS = new Set(["groups"]);
@@ -257,7 +267,8 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		TIMELINE_ISSUE_CODE_ADDITIONS.has(value) ||
 		GROUP_ISSUE_CODE_ADDITIONS.has(value) ||
 		CHART_ISSUE_CODE_ADDITIONS.has(value) ||
-		STATE_MACHINE_ISSUE_CODE_ADDITIONS.has(value)
+		STATE_MACHINE_ISSUE_CODE_ADDITIONS.has(value) ||
+		GANTT_ISSUE_CODE_ADDITIONS.has(value)
 	);
 }
 
@@ -1676,7 +1687,8 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 						!TIMELINE_ISSUE_CODE_ADDITIONS.has(code) &&
 						!GROUP_ISSUE_CODE_ADDITIONS.has(code) &&
 						!CHART_ISSUE_CODE_ADDITIONS.has(code) &&
-						!STATE_MACHINE_ISSUE_CODE_ADDITIONS.has(code),
+						!STATE_MACHINE_ISSUE_CODE_ADDITIONS.has(code) &&
+						!GANTT_ISSUE_CODE_ADDITIONS.has(code),
 				)
 				.toSorted(),
 		).toEqual([...directlyReachableCodes, ...boundaryOnlyCodes].toSorted());

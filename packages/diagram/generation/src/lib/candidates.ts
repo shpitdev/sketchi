@@ -17,6 +17,9 @@ import {
 	validateTimelineDiagram,
 	ChartDiagramSchema,
 	ChartValidationError,
+	GanttDiagramSchema,
+	GanttValidationError,
+	validateGanttDiagram,
 	validateChartDiagram,
 	SequenceValidationError,
 	validateFlowchartDiagram,
@@ -294,7 +297,8 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 		error instanceof SequenceValidationError ||
 		error instanceof TimelineValidationError ||
 		error instanceof ChartValidationError ||
-		error instanceof StateMachineValidationError
+		error instanceof StateMachineValidationError ||
+		error instanceof GanttValidationError
 	) {
 		const family =
 			error instanceof FlowchartValidationError
@@ -305,7 +309,9 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 						? "chart"
 						: error instanceof StateMachineValidationError
 							? "state-machine"
-							: "sequence";
+							: error instanceof GanttValidationError
+								? "gantt"
+								: "sequence";
 		return {
 			diagnostics: error.issues.map(
 				(entry) => `${family}.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
@@ -435,6 +441,13 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 						validateMindmapDiagram,
 						intent,
 					),
+		gantt: () =>
+			decodeAndValidate(
+				GanttDiagramSchema,
+				withSketchiDiagramStyle(titledDiagram),
+				validateGanttDiagram,
+				intent,
+			),
 		"state-machine": () =>
 			decodeAndValidate(
 				StateMachineDiagramSchema,
@@ -596,6 +609,12 @@ function labelsForRequirement(
 			: requirement.target === "series"
 				? diagram.series.flatMap((series) => (series.name === undefined ? [] : [series.name]))
 				: undefined;
+	if (diagram.type === "gantt")
+		return requirement.target === "task"
+			? diagram.tasks.map((task) => task.label)
+			: requirement.target === "phase"
+				? diagram.tasks.flatMap((task) => (task.phase === undefined ? [] : [task.phase]))
+				: undefined;
 	if (diagram.type === "state-machine") {
 		if (requirement.target === "state")
 			return diagram.states.flatMap((state) => (state.label ? [state.label] : []));
@@ -640,6 +659,7 @@ function countForRequirement(
 	if (diagram.type === "timeline") return target === "events" ? diagram.events.length : undefined;
 	if (diagram.type === "chart")
 		return target === "categories" ? diagram.categories.length : undefined;
+	if (diagram.type === "gantt") return target === "tasks" ? diagram.tasks.length : undefined;
 	if (diagram.type === "state-machine")
 		return target === "states"
 			? diagram.states.length

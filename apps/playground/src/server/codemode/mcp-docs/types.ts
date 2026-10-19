@@ -12,6 +12,9 @@ import {
 	BuildSequenceDiagramRequestSchema,
 	BuildStateMachineRequestSchema,
 	BuildStateMachineResultSchema,
+	BuildGanttRequestSchema,
+	BuildGanttResultSchema,
+	GanttToolSpecSchema,
 	BuildTimelineRequestSchema,
 	BuildSequenceDiagramResultSchema,
 	BuildTimelineResultSchema,
@@ -118,6 +121,14 @@ export const codeModeContracts = {
 			),
 		}),
 		output: BuildStateMachineResultSchema,
+	},
+	buildGantt: {
+		input: Schema.Struct({
+			...BuildGanttRequestSchema.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: GanttToolSpecSchema,
+		}),
+		output: BuildGanttResultSchema,
 	},
 	createCanvas: {
 		input: CreateCanvasRequestSchema,

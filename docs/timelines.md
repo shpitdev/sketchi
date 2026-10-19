@@ -1,6 +1,6 @@
 # Native timelines
 
-Use `timeline` for release milestones, incident chronologies, roadmaps, phased plans, and company histories. Gantt resources and dependency scheduling are out of scope.
+Use `timeline` for release milestones, incident chronologies, roadmaps, phased plans, and company histories. For tasks with durations and dependencies, use `gantt` ([Gantt charts](gantt.md)).
 
 ```json
 {"type":"timeline","spec":{"title":"Launch","today":"2026-03-10","events":[{"id":"build","label":"Build","date":"2026-02-16","end":"2026-05-29"},{"id":"beta","label":"Public beta","date":"2026-06-01","description":"Collect feedback from early users."},{"id":"ga","label":"General availability","date":"2026-08-04","kind":"milestone"}]}}

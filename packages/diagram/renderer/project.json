@@ -19,6 +19,12 @@
 				"command": "vitest run --config packages/diagram/renderer/vitest.config.ts"
 			}
 		},
+		"gantt-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "GANTT_FUZZ_SEEDS=300 vitest run --config packages/diagram/renderer/vitest.config.ts packages/diagram/renderer/src/diagram-types/gantt.test.ts -t \"seeded fuzz\""
+			}
+		},
 		"typecheck": {
 			"executor": "nx:run-commands",
 			"options": {

@@ -35,6 +35,13 @@ function diagramCounts(diagram: CanonicalDiagram) {
 			edgeCount: diagram.series.length,
 			edgeNoun: "series",
 		};
+	if (diagram.type === "gantt")
+		return {
+			nodeCount: diagram.tasks.length,
+			nodeNoun: "tasks",
+			edgeCount: diagram.tasks.reduce((count, task) => count + (task.dependsOn?.length ?? 0), 0),
+			edgeNoun: "dependencies",
+		};
 	if (diagram.type === "state-machine")
 		return {
 			nodeCount: diagram.states.length,

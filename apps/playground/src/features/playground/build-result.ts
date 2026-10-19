@@ -4,6 +4,8 @@ import {
 	BuildSequenceDiagramResultSchema,
 	BuildStateMachineResultSchema,
 	BuildStateMachineToolInputSchema,
+	BuildGanttResultSchema,
+	BuildGanttToolInputSchema,
 	BuildTimelineResultSchema,
 	BuildTimelineToolInputSchema,
 	BuildChartResultSchema,
@@ -13,6 +15,7 @@ import {
 	type BuildFlowchartResult,
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
+	type BuildGanttResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 } from "@sketchi/diagram-agent";
@@ -29,7 +32,8 @@ export type StudioBuildResult =
 	| BuildSequenceDiagramResult
 	| BuildTimelineResult
 	| BuildChartResult
-	| BuildStateMachineResult;
+	| BuildStateMachineResult
+	| BuildGanttResult;
 
 const BUILD_TOOLS = {
 	"tool-build_chart": {
@@ -74,6 +78,14 @@ const BUILD_TOOLS = {
 				: [];
 		},
 	},
+	"tool-build_gantt": {
+		family: "gantt",
+		decodeResult: Schema.decodeUnknownResult(BuildGanttResultSchema),
+		labels: (input: unknown) => {
+			const decoded = Schema.decodeUnknownResult(BuildGanttToolInputSchema)(input);
+			return Result.isSuccess(decoded) ? decoded.success.spec.tasks.map((task) => task.label) : [];
+		},
+	},
 	"tool-build_state_machine": {
 		family: "state-machine",
 		decodeResult: Schema.decodeUnknownResult(BuildStateMachineResultSchema),
@@ -112,6 +124,7 @@ const FAMILY_NAMES: Readonly<Record<DiagramToolFamily, string>> = {
 	timeline: "timeline",
 	chart: "chart",
 	"state-machine": "state machine",
+	gantt: "Gantt chart",
 };
 
 /**

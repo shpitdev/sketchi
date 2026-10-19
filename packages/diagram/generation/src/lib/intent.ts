@@ -36,6 +36,7 @@ export class CountRequirement extends Schema.Class<CountRequirement>("CountRequi
 		"nodes",
 		"participants",
 		"states",
+		"tasks",
 		"terminal_nodes",
 		"topics",
 		"transitions",
@@ -63,6 +64,8 @@ export class LabelRequirement extends Schema.Class<LabelRequirement>("LabelRequi
 		"series",
 		"state",
 		"transition",
+		"task",
+		"phase",
 	]),
 	value: Schema.NonEmptyString,
 }) {}
@@ -104,6 +107,7 @@ const FALLBACK_TITLES: Readonly<Record<DiagramGenerationType, string>> = {
 	timeline: "Generated timeline",
 	chart: "Generated chart",
 	"state-machine": "Generated state machine",
+	gantt: "Generated Gantt chart",
 };
 
 function titleFromId(id: string): string | undefined {

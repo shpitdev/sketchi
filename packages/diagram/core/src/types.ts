@@ -10,6 +10,7 @@ export const DIAGRAM_TYPES = [
 	"timeline",
 	"chart",
 	"state-machine",
+	"gantt",
 ] as const;
 
 export type DiagramTypeValue = (typeof DIAGRAM_TYPES)[number];

@@ -52,6 +52,11 @@ and the eval harness use it.
   their own fields. A transition into or out of a composite must start or end
   at the composite itself. A named end matches a labeled final state or a state
   with a transition into a final.
+- Gantt scenarios check every stated task with its dates, milestone, phase,
+  progress and dependencies, and no invented dependency. Scene checks read the
+  drawn bars back off the axis gridlines, require every label, date caption,
+  phase header and dependency arrow, and fail any collision between text,
+  marks, rules and arrows.
 
 Checks that measure the model (logos, sequence structure) score the model's own
 diagram from before candidate enforcement, so a repair never hides a model

@@ -410,6 +410,13 @@ export const CODE_MODE_ISSUE_CODES = [
 	"invalid_composite",
 	"final_has_outgoing",
 	"underbranched_choice",
+	"gantt_too_large",
+	"invalid_gantt_date",
+	"invalid_gantt_span",
+	"invalid_gantt_phase",
+	"invalid_gantt_progress",
+	"gantt_dependency_cycle",
+	"gantt_schedule_conflict",
 	"request_too_large",
 	"generic_label",
 	"label_too_long",
@@ -798,6 +805,34 @@ export class StateMachineSpec extends Schema.Class<StateMachineSpec>("StateMachi
 ) {}
 export const StateMachineSpecSchema = StateMachineSpec;
 
+/** Author dates, durations and dependencies only; the axis, rows and routes belong to the renderer. */
+export class GanttTaskSpec extends Schema.Class<GanttTaskSpec>("GanttTaskSpec")(
+	{
+		id: RequiredNonEmptyString,
+		label: RequiredNonEmptyString,
+		start: RequiredNonEmptyString,
+		end: optionalContract(NonEmptyString),
+		duration: optionalContract(FiniteNumber),
+		milestone: optionalContract(Schema.Boolean),
+		phase: optionalContract(NonEmptyString),
+		dependsOn: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+		progress: optionalContract(FiniteNumber),
+	},
+	{ identifier: undefined },
+) {}
+export class GanttSpec extends Schema.Class<GanttSpec>("GanttSpec")(
+	{
+		id: optionalContract(NonEmptyString),
+		title: RequiredNonEmptyString,
+		tasks: requiredArray(nonEmptyArray(GanttTaskSpec)),
+		phases: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+		today: optionalContract(NonEmptyString),
+		style: DiagramStyleWithDefault,
+	},
+	{ identifier: undefined },
+) {}
+export const GanttSpecSchema = GanttSpec;
+
 const ArtifactFormatsOption = optionalContract(nonEmptyArray(ArtifactFormatSchema));
 const InlineArtifactsOption = optionalContract(
 	Schema.Array(InlineArtifactFormatSchema).pipe(Schema.mutable),
@@ -980,6 +1015,23 @@ export const BuildStateMachineToolInputSchema = Schema.Struct({
 	),
 });
 export type BuildStateMachineToolInput = typeof BuildStateMachineToolInputSchema.Type;
+
+export class BuildGanttRequest extends Schema.Class<BuildGanttRequest>("BuildGanttRequest")(
+	{
+		requestId: optionalContract(NonEmptyString),
+		spec: requiredObject(GanttSpec),
+		options: optionalContract(BuildFlowchartOptions),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildGanttRequestSchema = BuildGanttRequest;
+/** The Gantt spec a model authors; style is always the Sketchi palette. */
+export const GanttToolSpecSchema = GanttSpec.mapFields(({ style: _style, ...fields }) => fields);
+export const BuildGanttToolInputSchema = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(GanttToolSpecSchema),
+});
+export type BuildGanttToolInput = typeof BuildGanttToolInputSchema.Type;
 
 export interface MindmapTopicInput {
 	label: string;
@@ -1744,6 +1796,13 @@ const NormalizedStateMachineSpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedStateMachineSpec = typeof NormalizedStateMachineSpecSchema.Type;
+const NormalizedGanttSpecSchema = GanttSpec.mapFields((fields) => ({
+	...fields,
+	id: NonEmptyString,
+	title: NonEmptyString,
+	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
+}));
+export type NormalizedGanttSpec = typeof NormalizedGanttSpecSchema.Type;
 const NormalizedChartSpecSchema = ChartSpec.mapFields((fields) => ({
 	...fields,
 	id: NonEmptyString,
@@ -2036,6 +2095,42 @@ export const BuildStateMachineResultSchema = Schema.Union([
 	BuildStateMachineRejected,
 ]);
 export type BuildStateMachineResult = typeof BuildStateMachineResultSchema.Type;
+
+export class BuildGanttAccepted extends Schema.Class<BuildGanttAccepted>("BuildGanttAccepted")(
+	{
+		ok: booleanLiteral(true),
+		status: stringLiteral("accepted"),
+		buildId: Schema.String,
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: NormalizedGanttSpecSchema,
+		quality: QualityReportSchema,
+		artifact: ArtifactBundleSchema,
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export class BuildGanttRejected extends Schema.Class<BuildGanttRejected>("BuildGanttRejected")(
+	{
+		ok: booleanLiteral(false),
+		status: literals([
+			"invalid_input",
+			"invalid_gantt",
+			"quality_failed",
+			"render_failed",
+			"export_failed",
+			"storage_failed",
+		]),
+		buildId: optionalContract(Schema.String),
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: optionalContract(NormalizedGanttSpecSchema),
+		quality: optionalContract(QualityReportSchema),
+		partial: optionalContract(PartialArtifactBundleSchema),
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildGanttResultSchema = Schema.Union([BuildGanttAccepted, BuildGanttRejected]);
+export type BuildGanttResult = typeof BuildGanttResultSchema.Type;
 
 export class GetArtifactAccepted extends Schema.Class<GetArtifactAccepted>("GetArtifactAccepted")(
 	{

@@ -47,6 +47,39 @@ function isGeometry(value: unknown): value is ElementGeometry {
 	);
 }
 
+/**
+ * The exact extent of an element drawn without rotation: its points for lines
+ * and arrows, whose routes may leave the start-to-end box, else its box.
+ * Undefined for a rotated element.
+ */
+function unrotatedExtent(
+	element: ElementGeometry & { readonly angle?: unknown; readonly points?: unknown },
+): { left: number; top: number; right: number; bottom: number } | undefined {
+	if (element.angle !== undefined && element.angle !== 0) return undefined;
+	const points = Array.isArray(element.points)
+		? element.points.filter(
+				(point): point is [number, number] =>
+					Array.isArray(point) &&
+					typeof point[0] === "number" &&
+					Number.isFinite(point[0]) &&
+					typeof point[1] === "number" &&
+					Number.isFinite(point[1]),
+			)
+		: [];
+	const xs = [element.x, element.x + element.width, ...points.map((point) => element.x + point[0])];
+	const ys = [
+		element.y,
+		element.y + element.height,
+		...points.map((point) => element.y + point[1]),
+	];
+	return {
+		left: Math.min(...xs),
+		top: Math.min(...ys),
+		right: Math.max(...xs),
+		bottom: Math.max(...ys),
+	};
+}
+
 function isUnknownRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -89,8 +122,16 @@ export function renderLimitDiagnostic(
 			);
 		}
 
-		// A rotation-independent radius deliberately overestimates the element's
-		// axis-aligned extent, keeping the pre-raster allocation guard fail-closed.
+		const extent = unrotatedExtent(element);
+		if (extent) {
+			minimumX = Math.min(minimumX, extent.left);
+			minimumY = Math.min(minimumY, extent.top);
+			maximumX = Math.max(maximumX, extent.right);
+			maximumY = Math.max(maximumY, extent.bottom);
+			continue;
+		}
+		// A rotation-independent radius deliberately overestimates a rotated
+		// element's axis-aligned extent, keeping the pre-raster allocation guard fail-closed.
 		const radius = Math.hypot(width, height) / 2;
 		const centerX = element.x + element.width / 2;
 		const centerY = element.y + element.height / 2;

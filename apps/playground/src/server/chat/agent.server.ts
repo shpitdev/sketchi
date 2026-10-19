@@ -55,6 +55,13 @@ import {
 	StudioBuildStateMachineInputSchema,
 	StudioBuildStateMachineOutputSchema,
 } from "./studio-state-machine-tool.server";
+import {
+	makeStudioGanttToolExecutor,
+	STUDIO_BUILD_GANTT_TOOL_DESCRIPTION,
+	STUDIO_BUILD_GANTT_TOOL_NAME,
+	StudioBuildGanttInputSchema,
+	StudioBuildGanttOutputSchema,
+} from "./studio-gantt-tool.server";
 
 export class StudioAgentRequestError extends Schema.TaggedError<StudioAgentRequestError>()(
 	"StudioAgentRequestError",
@@ -171,6 +178,7 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 		codeMode.buildStateMachine,
 		{ turn },
 	);
+	const ganttExecutor = yield* makeStudioGanttToolExecutor(codeMode.buildGantt, { turn });
 	return yield* Effect.try({
 		try: () => {
 			const result = streamText({
@@ -201,6 +209,12 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 						inputSchema: StudioBuildStateMachineInputSchema,
 						outputSchema: StudioBuildStateMachineOutputSchema,
 						execute: makeStudioBuildToolCallback(stateMachineExecutor, callbacks.runPromise),
+					}),
+					[STUDIO_BUILD_GANTT_TOOL_NAME]: tool({
+						description: STUDIO_BUILD_GANTT_TOOL_DESCRIPTION,
+						inputSchema: StudioBuildGanttInputSchema,
+						outputSchema: StudioBuildGanttOutputSchema,
+						execute: makeStudioBuildToolCallback(ganttExecutor, callbacks.runPromise),
 					}),
 					[STUDIO_BUILD_SEQUENCE_TOOL_NAME]: tool({
 						description: STUDIO_BUILD_SEQUENCE_TOOL_DESCRIPTION,

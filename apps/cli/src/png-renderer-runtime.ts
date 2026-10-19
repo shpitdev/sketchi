@@ -399,9 +399,13 @@ function loadExcalidraw() {
 	return excalidrawModule;
 }
 
-/** Charts draw their own title in the scene; a second banner would repeat it. */
+/** Charts and Gantt charts draw their own title in the scene; a second banner would repeat it. */
 function bannerTitle(scene: PngRenderInput["scene"]): string | undefined {
-	if (!scene || scene.elements.some((element) => element.id === "chart:title")) return undefined;
+	if (
+		!scene ||
+		scene.elements.some((element) => element.id === "chart:title" || element.id === "gantt:title")
+	)
+		return undefined;
 	return scene.title;
 }
 

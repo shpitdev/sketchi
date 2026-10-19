@@ -10,3 +10,6 @@ export * from "./timeline-readout.js";
 export * from "./chart.js";
 export * from "./chart-scale.js";
 export * from "./chart-readout.js";
+export * from "./gantt.js";
+export * from "./gantt-scale.js";
+export * from "./gantt-readout.js";

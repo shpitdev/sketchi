@@ -30,6 +30,7 @@ const BUILDERS = {
 	buildTimeline: "dated or ordered events, milestones and phases",
 	buildChart: "bar, line or pie charts of numbers across categories",
 	buildStateMachine: "states and the events, guards and actions that move between them",
+	buildGantt: "Gantt charts of dated tasks, durations, dependencies and milestones",
 	createCanvas:
 		"hand-placed CanvasSpec, only for layouts no builder above covers (ERD, dashboard, wireframe)",
 };
@@ -59,6 +60,9 @@ const CHART_SERIES_RULE =
 /** Shared by the buildStateMachine topic and its compact line in the execute description. */
 const STATE_MACHINE_END_RULE =
 	"A state that ends the machine but has other outgoing transitions also gets a transition to a final state.";
+/** Shared by the buildGantt topic and its compact line in the execute description. */
+const GANTT_DATE_RULE =
+	"Pass a stated duration as duration, not a computed end. Copy every task, date, dependency, milestone and phase from the prompt; invent none.";
 const CHART_COPY_RULE =
 	"Copy every number, category, series name, unit and axis title from the prompt; invent none.";
 /**
@@ -75,6 +79,7 @@ const FAST_PATH = {
 	buildSequenceDiagram: `spec: { title, participants: [{ id, label, icon?: { slug } }], messages: [{ source, target, label, type?: "return", style?: "dashed" }] }. Order is kept. Every reply the prompt states is its own type: "return" message from the callee back to its caller; it answers the latest open call between them, and calls nobody answers draw no bar. source and target are distinct participant ids.`,
 	buildStateMachine: `spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets; one may be "else". kind "final" (label optional) ends the machine and nothing leaves it. ${STATE_MACHINE_END_RULE}`,
 	buildMindmap: `spec: { title, root: { label, children?: [{ label, children? }] }, layout?: { direction: "LR" | "RL" } }. Children keep their order.`,
+	buildGantt: `spec: { title, tasks: [{ id, label, start: "YYYY-MM-DD", end? (last day) | duration? (days), milestone?: true, phase?, dependsOn?: [ids finishing first], progress?: % }], phases?, today? }. ${GANTT_DATE_RULE}`,
 } satisfies Record<Exclude<keyof typeof BUILDERS, "buildFlowchart" | "createCanvas">, string>;
 const EXECUTE_HELPERS = [
 	HELPERS.searchIcons,
@@ -613,6 +618,37 @@ export const catalog: CatalogEntry[] = [
 				title: "Grouped bars",
 				language: "js",
 				code: `async () => sketchi.buildChart({ spec: { title: "Quarterly revenue", kind: "bar", categories: ["Q1", "Q2"], series: [{ name: "2025", values: [42, 51] }, { name: "2026", values: [48, 57] }], unit: "$M", valueAxisTitle: "Revenue" }, options: ${DELIVERY_OPTIONS} })`,
+			},
+		],
+	},
+	{
+		id: "buildGantt",
+		kind: "operation",
+		title: "buildGantt",
+		topic: "buildGantt",
+		keywords: [
+			"gantt",
+			"project plan",
+			"schedule",
+			"tasks",
+			"dependencies",
+			"milestones",
+			"durations",
+			"roadmap",
+		],
+		snippet:
+			"Create a native Gantt chart from dated tasks, durations, dependencies and milestones.",
+		content: [
+			"buildGantt accepts { spec: { id?, title, tasks: [{ id, label, start, end?, duration?, milestone?, phase?, dependsOn?, progress? }], phases?, today? }, options? }. The renderer owns layout: a to-scale date axis, one row per task under phase headers, and dependency arrows.",
+			"start and end are YYYY-MM-DD; end is the last day, inclusive. Give end or duration (calendar days counting start), not both. milestone: true draws a diamond on start. dependsOn lists finish-to-start predecessor ids, without cycles. Give every task a phase or none (phases sets their order). progress is percent done; today only when stated. Up to 60 tasks and 12 phases.",
+			`${GANTT_DATE_RULE} A task that starts before a predecessor finishes still builds, with a gantt_schedule_conflict warning.`,
+			operationTypes("buildGantt"),
+		].join("\n\n"),
+		examples: [
+			{
+				title: "Release plan",
+				language: "js",
+				code: `async () => sketchi.buildGantt({ spec: { title: "Release plan", tasks: [{ id: "design", label: "Design", start: "2026-03-02", end: "2026-03-06" }, { id: "build", label: "Build", start: "2026-03-09", duration: 10, dependsOn: ["design"] }, { id: "launch", label: "Launch", start: "2026-03-19", milestone: true, dependsOn: ["build"] }] }, options: ${DELIVERY_OPTIONS} })`,
 			},
 		],
 	},

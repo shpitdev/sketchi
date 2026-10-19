@@ -37,17 +37,19 @@ function buildFrom(
 	if (isRecord(value.normalizedSpec) || typeof value.buildId === "string") return value;
 	const returned = isRecord(value.result) ? buildFrom(value.result, diagramType) : undefined;
 	const operation =
-		diagramType === "chart"
-			? "buildChart"
-			: diagramType === "timeline"
-				? "buildTimeline"
-				: diagramType === "sequence"
-					? "buildSequenceDiagram"
-					: diagramType === "state-machine"
-						? "buildStateMachine"
-						: diagramType === "mindmap"
-							? "buildMindmap"
-							: "buildFlowchart";
+		diagramType === "gantt"
+			? "buildGantt"
+			: diagramType === "chart"
+				? "buildChart"
+				: diagramType === "timeline"
+					? "buildTimeline"
+					: diagramType === "sequence"
+						? "buildSequenceDiagram"
+						: diagramType === "state-machine"
+							? "buildStateMachine"
+							: diagramType === "mindmap"
+								? "buildMindmap"
+								: "buildFlowchart";
 	const receipts = Array.isArray(value.builds)
 		? value.builds.filter(
 				(build): build is Record<string, unknown> =>
@@ -73,6 +75,7 @@ function buildFrom(
 					"buildTimeline",
 					"buildChart",
 					"buildStateMachine",
+					"buildGantt",
 					"createCanvas",
 				].includes(returned.operation)))
 	)
@@ -165,6 +168,7 @@ const operationFamilies: Readonly<Record<string, string>> = {
 	buildTimeline: "timeline",
 	buildChart: "chart",
 	buildStateMachine: "state-machine",
+	buildGantt: "gantt",
 	createCanvas: "canvas",
 };
 
@@ -272,17 +276,19 @@ export function candidateFromMcpResult(
 	return {
 		ok: true,
 		diagram:
-			diagramType === "chart"
-				? { ...build.normalizedSpec, type: "chart" }
-				: diagramType === "timeline"
-					? { ...build.normalizedSpec, type: "timeline" }
-					: diagramType === "state-machine"
-						? { ...build.normalizedSpec, type: "state-machine" }
-						: diagramType === "mindmap"
-							? specToMindmapCandidate(build.normalizedSpec)
-							: diagramType === "sequence"
-								? specToSequenceCandidate(build.normalizedSpec)
-								: specToFlowchartCandidate(build.normalizedSpec),
+			diagramType === "gantt"
+				? { ...build.normalizedSpec, type: "gantt" }
+				: diagramType === "chart"
+					? { ...build.normalizedSpec, type: "chart" }
+					: diagramType === "timeline"
+						? { ...build.normalizedSpec, type: "timeline" }
+						: diagramType === "state-machine"
+							? { ...build.normalizedSpec, type: "state-machine" }
+							: diagramType === "mindmap"
+								? specToMindmapCandidate(build.normalizedSpec)
+								: diagramType === "sequence"
+									? specToSequenceCandidate(build.normalizedSpec)
+									: specToFlowchartCandidate(build.normalizedSpec),
 		check: {
 			id: "mcp-build-accepted",
 			passed: true,

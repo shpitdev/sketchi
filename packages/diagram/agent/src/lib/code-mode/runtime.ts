@@ -11,7 +11,11 @@ import {
 	getStateMachineValidationIssues,
 	getTimelineValidationIssues,
 	getChartValidationIssues,
+	getGanttValidationIssues,
+	ganttScheduleConflicts,
 	orderedTimelineEvents,
+	type GanttDiagram,
+	type GanttValidationIssueCode,
 	type ChartDiagram,
 	type TimelineDiagram,
 	mindmapDiagramFromTree,
@@ -40,6 +44,8 @@ import {
 	renderStateMachineDiagram,
 	renderTimelineDiagram,
 	renderChartDiagram,
+	renderGanttDiagram,
+	isStructurallyValidGanttMark,
 	isStructurallyValidSequenceActivation,
 	isStructurallyValidSequenceLifeline,
 	isStructurallyValidChartMark,
@@ -72,6 +78,7 @@ import {
 	BuildStateMachineRejected,
 	BuildTimelineRejected,
 	BuildChartRejected,
+	BuildGanttRejected,
 	CreateCanvasRejected,
 	GetArtifactRejected,
 	ApplyDiagramPatchRejected,
@@ -82,6 +89,7 @@ import {
 	BuildStateMachineRequestSchema,
 	BuildTimelineRequestSchema,
 	BuildChartRequestSchema,
+	BuildGanttRequestSchema,
 	CreateCanvasRequestSchema,
 	DEFAULT_ICON_SEARCH_LIMIT,
 	SearchIconsRejected,
@@ -101,10 +109,12 @@ import {
 	type BuildStateMachineRequest,
 	type BuildTimelineRequest,
 	type BuildChartRequest,
+	type BuildGanttRequest,
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
+	type BuildGanttResult,
 	type CreateCanvasResult,
 	CodeModeIssueSchema,
 	type ContractSchemaIssue,
@@ -123,6 +133,7 @@ import {
 	type NormalizedStateMachineSpec,
 	type NormalizedTimelineSpec,
 	type NormalizedChartSpec,
+	type NormalizedGanttSpec,
 	type PartialArtifactBundle,
 	type PatchableScene,
 	type QualityReport,
@@ -201,6 +212,7 @@ type CodeModeBoundaryOperation =
 	| "buildStateMachine"
 	| "buildTimeline"
 	| "buildChart"
+	| "buildGantt"
 	| "createCanvas"
 	| "getArtifact"
 	| "searchIcons";
@@ -232,6 +244,7 @@ function artifactKindForOperation(operation: CodeModeBoundaryOperation): string 
 	if (operation === "buildSequenceDiagram") return "sequence";
 	if (operation === "buildTimeline") return "timeline";
 	if (operation === "buildChart") return "chart";
+	if (operation === "buildGantt") return "gantt";
 	if (operation === "buildStateMachine") return "state-machine";
 	if (operation === "createCanvas") return "canvas";
 	if (operation === "applyDiagramPatch") return "patch";
@@ -520,6 +533,80 @@ function chartQuality(spec: NormalizedChartSpec, threshold: number): QualityRepo
 		score: 10,
 		threshold,
 		summary: { nodeCount: spec.categories.length * spec.series.length, edgeCount: 0 },
+		checks: [],
+	};
+}
+
+function normalizeGanttSpec(spec: BuildGanttRequest["spec"]): NormalizedGanttSpec {
+	const title = cleanToolString(spec.title);
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-gantt"),
+		title,
+		tasks: spec.tasks.map((task) => {
+			const phase = cleanOptional(task.phase);
+			return {
+				...task,
+				id: cleanToolString(task.id),
+				label: cleanToolString(task.label),
+				start: cleanToolString(task.start),
+				...(task.end !== undefined ? { end: cleanToolString(task.end) } : {}),
+				...(phase !== undefined ? { phase } : {}),
+				...(task.dependsOn ? { dependsOn: task.dependsOn.map(cleanToolString) } : {}),
+			};
+		}),
+		...(spec.phases ? { phases: spec.phases.map(cleanToolString) } : {}),
+		...(spec.today ? { today: cleanToolString(spec.today) } : {}),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+function toGanttDiagram(spec: NormalizedGanttSpec): GanttDiagram {
+	return { ...spec, type: "gantt" };
+}
+/** Code Mode's published issue codes for diagram-core's Gantt invariants. */
+const GANTT_ISSUE_CODES = {
+	gantt_too_large: "gantt_too_large",
+	duplicate_task_id: "duplicate_node_id",
+	invalid_gantt_date: "invalid_gantt_date",
+	invalid_gantt_span: "invalid_gantt_span",
+	invalid_gantt_phase: "invalid_gantt_phase",
+	invalid_gantt_progress: "invalid_gantt_progress",
+	missing_dependency: "missing_edge_source",
+	self_dependency: "self_loop",
+	gantt_dependency_cycle: "gantt_dependency_cycle",
+} as const satisfies Record<GanttValidationIssueCode, CodeModeIssueCode>;
+function validateNormalizedGantt(spec: NormalizedGanttSpec): CodeModeIssue[] {
+	return getGanttValidationIssues(toGanttDiagram(spec)).map((entry) =>
+		issue({
+			code: GANTT_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+/** Successors that start before a predecessor finishes still build; the warning names the date to check. */
+function ganttScheduleWarnings(spec: NormalizedGanttSpec): CodeModeIssue[] {
+	return ganttScheduleConflicts(toGanttDiagram(spec)).map((conflict) =>
+		issue({
+			code: "gantt_schedule_conflict",
+			severity: "warning",
+			stage: "input",
+			ref: { kind: "request", path: `spec.${conflict.path}` },
+			message: `Task "${conflict.task}" starts before "${conflict.dependsOn}" finishes on ${conflict.finishes}.`,
+			hint: `Keep dates the prompt states; otherwise start "${conflict.task}" after ${conflict.finishes}.`,
+		}),
+	);
+}
+function ganttQuality(spec: NormalizedGanttSpec, threshold: number): QualityReport {
+	return {
+		accepted: 10 >= threshold,
+		score: 10,
+		threshold,
+		summary: {
+			nodeCount: spec.tasks.length,
+			edgeCount: spec.tasks.reduce((count, task) => count + (task.dependsOn?.length ?? 0), 0),
+		},
 		checks: [],
 	};
 }
@@ -813,6 +900,15 @@ const BuildChartFailure = workflowFailure(
 	"BuildChartFailure",
 	BuildChartRejected.fields.status,
 	BuildChartRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildGanttFailure = workflowFailure(
+	"BuildGanttFailure",
+	BuildGanttRejected.fields.status,
+	BuildGanttRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -1328,6 +1424,7 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 				(element.rendererRole === "timeline-marker" &&
 					isStructurallyValidTimelineMarker(element)) ||
 				(element.rendererRole === "chart-mark" && isStructurallyValidChartMark(element)) ||
+				(element.rendererRole === "gantt-mark" && isStructurallyValidGanttMark(element)) ||
 				(element.rendererRole === "state-marker" && isStructurallyValidStateMarker(element))
 					? { rendererRole: element.rendererRole }
 					: {}),
@@ -2889,6 +2986,114 @@ const buildChartWorkflow = Effect.fn("codeMode.buildChart.workflow")(function* (
 	} satisfies Extract<BuildChartResult, { ok: true }>;
 });
 
+const buildGanttWorkflow = Effect.fn("codeMode.buildGantt.workflow")(function* (input: unknown) {
+	const parsed = Schema.decodeUnknownResult(BuildGanttRequestSchema, {
+		errors: "all",
+		reportInput: true,
+	})(input);
+	if (!Result.isSuccess(parsed)) {
+		return yield* new BuildGanttFailure({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeGanttSpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedGantt(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* new BuildGanttFailure({
+			status: "invalid_gantt",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = ganttQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* new BuildGanttFailure({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* Effect.try({
+		try: () => renderGanttDiagram(toGanttDiagram(normalizedSpec)),
+		catch: (cause) =>
+			new BuildGanttFailure({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message: cause instanceof Error ? cause.message : "Unable to render Gantt scene.",
+							hint: "Repair the tasks' dates and dependencies and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildGantt.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* new BuildGanttFailure({
+			status: "render_failed",
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Use fewer tasks or dependencies and retry buildGantt.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError(
+			(error) =>
+				new BuildGanttFailure({
+					status: error.status,
+					context: {
+						...(error.status === "export_failed" ? exportContext : qualityContext),
+						issues: error.issues,
+					},
+				}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: ganttScheduleWarnings(normalizedSpec),
+	} satisfies Extract<BuildGanttResult, { ok: true }>;
+});
+
 const RawCreateCanvasInput = Schema.Struct({
 	spec: Schema.Unknown,
 	requestId: Schema.optionalKey(Schema.Unknown),
@@ -3563,6 +3768,13 @@ export const buildTimeline: (input: unknown) => CodeModeWorkflowEffect<BuildTime
 export const buildChart: (input: unknown) => CodeModeWorkflowEffect<BuildChartResult> = boundary(
 	"buildChart",
 	buildChartWorkflow,
+	failureResult,
+);
+
+/** A Gantt chart from dated tasks, milestones, phases and finish-to-start dependencies. */
+export const buildGantt: (input: unknown) => CodeModeWorkflowEffect<BuildGanttResult> = boundary(
+	"buildGantt",
+	buildGanttWorkflow,
 	failureResult,
 );
 

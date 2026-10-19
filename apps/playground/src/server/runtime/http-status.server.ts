@@ -8,6 +8,7 @@ const FAILURE_HTTP_STATUS = {
 	invalid_timeline: 422,
 	invalid_chart: 422,
 	invalid_state_machine: 422,
+	invalid_gantt: 422,
 	invalid_canvas: 422,
 	invalid_generated_document: 422,
 	quality_failed: 422,

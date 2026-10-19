@@ -351,6 +351,9 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		expect(codeLine("buildMindmap")).toBe(
 			'- buildMindmap: spec: { title, root: { label, children?: [{ label, children? }] }, layout?: { direction: "LR" | "RL" } }. Children keep their order.',
 		);
+		expect(codeLine("buildGantt")).toBe(
+			'- buildGantt: spec: { title, tasks: [{ id, label, start: "YYYY-MM-DD", end? (last day) | duration? (days), milestone?: true, phase?, dependsOn?: [ids finishing first], progress?: % }], phases?, today? }. Pass a stated duration as duration, not a computed end. Copy every task, date, dependency, milestone and phase from the prompt; invent none.',
+		);
 		expect(codeLine("createCanvas")).toBeUndefined();
 		for (const topic of ["buildMindmap", "buildSequenceDiagram", "buildTimeline"] as const) {
 			const guidance = getCodeModeDocs({ topic }).content.split("\n")[0]!;
@@ -358,6 +361,8 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		}
 		const chartDocs = getCodeModeDocs({ topic: "buildChart" }).content;
 		const stateMachineDocs = getCodeModeDocs({ topic: "buildStateMachine" }).content;
+		const ganttDocs = getCodeModeDocs({ topic: "buildGantt" }).content;
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(ganttDocs.split("\n\n")[0]);
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(chartDocs.split("\n\n")[0]);
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(stateMachineDocs.split("\n\n")[0]);
 		// Models that still call docs get the same guidance.
@@ -381,7 +386,16 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 
 			"
 		`);
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(7_400);
+		expect(ganttDocs.split("Request type:")[0]).toMatchInlineSnapshot(`
+			"buildGantt accepts { spec: { id?, title, tasks: [{ id, label, start, end?, duration?, milestone?, phase?, dependsOn?, progress? }], phases?, today? }, options? }. The renderer owns layout: a to-scale date axis, one row per task under phase headers, and dependency arrows.
+
+			start and end are YYYY-MM-DD; end is the last day, inclusive. Give end or duration (calendar days counting start), not both. milestone: true draws a diamond on start. dependsOn lists finish-to-start predecessor ids, without cycles. Give every task a phase or none (phases sets their order). progress is percent done; today only when stated. Up to 60 tasks and 12 phases.
+
+			Pass a stated duration as duration, not a computed end. Copy every task, date, dependency, milestone and phase from the prompt; invent none. A task that starts before a predecessor finishes still builds, with a gantt_schedule_conflict warning.
+
+			"
+		`);
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(7_600);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		expect(overview).toContain(`${CODE_MODE_OPERATIONS.length} operations:`);
 		for (const operation of CODE_MODE_OPERATIONS) {
@@ -393,6 +407,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			["buildMindmap", ["BuildMindmapRequest", "BuildMindmapRequest___schema0"]],
 			["buildSequenceDiagram", ["BuildSequenceDiagramRequest"]],
 			["buildTimeline", ["BuildTimelineRequest"]],
+			["buildGantt", ["BuildGanttRequest"]],
 			["createCanvas", ["CreateCanvasRequest", "CanvasSpecInput", "CanvasElement"]],
 			["getArtifact", ["GetArtifactRequest"]],
 			["applyDiagramPatch", ["ApplyDiagramPatchRequest", "DiagramSelector"]],

@@ -13,6 +13,12 @@ import {
 import { stateMachineScenarioChecks } from "./state-machine-scenarios.js";
 import { mindmapLayoutCheck, mindmapScenarioChecks } from "./mindmap-scenarios.js";
 import {
+	ganttClearanceCheck,
+	ganttDrawnDataCheck,
+	ganttGeometryCheck,
+	ganttScenarioChecks,
+} from "./gantt-scenarios.js";
+import {
 	type CanonicalDiagram,
 	type FlowchartDiagram,
 	type SequenceDiagram,
@@ -22,6 +28,7 @@ import {
 	parseStateMachineDiagram,
 	parseTimelineDiagram,
 	parseChartDiagram,
+	parseGanttDiagram,
 	sequenceActivations,
 } from "@sketchi/diagram-core";
 import {
@@ -737,6 +744,21 @@ export function evaluateScenarioDiagram(
 				chartDrawnDataCheck(scenario, diagram, scene),
 				chartClearRulesCheck(scene),
 				...(diagram.kind === "pie" ? [chartPieLabelCheck(diagram, scene)] : []),
+			],
+		);
+	}
+	if (scenario.diagramType === "gantt") {
+		const diagram = parseGanttDiagram(candidate);
+		const modelDiagram = modelCandidate === candidate ? diagram : parseGanttDiagram(modelCandidate);
+		// Geometry, drawn data and clearance read the drawn scene, so they score the returned diagram.
+		return evaluation(
+			scenario.id,
+			diagram,
+			ganttScenarioChecks(scenario, modelDiagram),
+			(scene) => [
+				ganttGeometryCheck(diagram, scene),
+				ganttDrawnDataCheck(scenario, diagram, scene),
+				ganttClearanceCheck(scene),
 			],
 		);
 	}

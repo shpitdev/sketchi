@@ -82,9 +82,9 @@ export interface CanvasIconAsset {
 /**
  * Structural shapes renderers derive: sequence lifelines and activation bars,
  * timeline event markers and span bars, chart data marks (bars, slices,
- * point markers and legend keys), and state-machine pseudostates (an initial
- * dot, a final bullseye, an unlabeled choice). They carry no bound label or
- * icon.
+ * point markers and legend keys), state-machine pseudostates (an initial
+ * dot, a final bullseye, an unlabeled choice), and Gantt task bars and
+ * milestones. They carry no bound label or icon.
  */
 export const CANVAS_RENDERER_ROLES = [
 	"sequence-lifeline",
@@ -92,13 +92,14 @@ export const CANVAS_RENDERER_ROLES = [
 	"timeline-marker",
 	"chart-mark",
 	"state-marker",
+	"gantt-mark",
 ] as const;
 export type CanvasRendererRole = (typeof CANVAS_RENDERER_ROLES)[number];
 
 /**
  * Roles connectors may cross: lifelines, activation bars, timeline markers and
- * chart marks. A state marker is an end of its transitions and an obstacle to
- * every other.
+ * chart marks. A state marker or Gantt mark is an end of its own connectors
+ * and an obstacle to every other.
  */
 export const CANVAS_CROSSABLE_RENDERER_ROLES: readonly CanvasRendererRole[] = [
 	"sequence-lifeline",
@@ -109,6 +110,7 @@ export const CANVAS_CROSSABLE_RENDERER_ROLES: readonly CanvasRendererRole[] = [
 
 const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
 	"chart-mark": "Chart mark",
+	"gantt-mark": "Gantt mark",
 	"sequence-activation": "Sequence activation",
 	"sequence-lifeline": "Sequence lifeline",
 	"state-marker": "State marker",

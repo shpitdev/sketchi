@@ -47,8 +47,8 @@ const COMMON_INSTRUCTIONS = [
 	`Sketchi supports only nativeKind ${listAlternatives(NATIVE_KINDS)}. If the requested kind is ${listAlternatives(UNSUPPORTED_KINDS)}, set nativeKind to null, omit diagram, and never coerce it into a supported kind.`,
 	"When nativeKind is null, return an empty requirements array because there is no native artifact to validate.",
 	"List every measurable scenario requirement once in intent.requirements. Convert counts and minimums into count requirements, hierarchy depth into topic_levels, and required names or branch/message text into label requirements.",
-	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
-	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", "series", "state", or "transition".',
+	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", "tasks", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
+	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", "series", "state", "transition", "task", or "phase".',
 	'Use comparator "minimum" for phrases such as "at least" and "exact" for exact counts. Do not invent measurable requirements that the scenario did not request.',
 	"The diagram must satisfy every requirement in the plan. Sketchi deterministically checks the plan against the artifact.",
 ];
@@ -119,6 +119,16 @@ const IR_INSTRUCTIONS = {
 			"A composite state is a state other states name as parent; give it initial, the substate it starts in. Composites do not nest.",
 			"Every transition has a unique id, source, target, and optional event, guard (the condition, without brackets) and action. A transition may leave or enter a composite, or return to its own state.",
 			"Every state must be reachable from initial. Final states have no outgoing transitions.",
+		],
+	},
+	gantt: {
+		title: "Gantt IR rules",
+		rules: [
+			'Use diagram type "gantt".',
+			"Return tasks with unique id, label, start (YYYY-MM-DD), and end (last day, inclusive) or duration (calendar days counting start). A milestone is milestone: true with start only. Never supply coordinates.",
+			"Copy every task, date, duration, dependency, milestone, phase and percent from the source; invent none. Compute a date only from a stated start plus a stated duration.",
+			"Optional: dependsOn lists the ids of tasks that must finish first; phase names a header for every task (phases sets their order); progress is percent complete; today only when stated.",
+			"Use 1–60 tasks, at most 12 phases, and no dependency cycles.",
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { title: string; rules: readonly string[] }>;
@@ -240,6 +250,35 @@ const FAMILY_EXAMPLES = {
 		requirements: [
 			{ kind: "count", target: "states", comparator: "minimum", value: 3 },
 			{ kind: "label", target: "transition", value: "pay" },
+		],
+	},
+	gantt: {
+		diagram: {
+			id: "short-kebab-case-id",
+			type: "gantt",
+			tasks: [
+				{ id: "design", label: "Design", start: "2026-03-02", end: "2026-03-06", phase: "Build" },
+				{
+					id: "api",
+					label: "API",
+					start: "2026-03-09",
+					duration: 10,
+					phase: "Build",
+					dependsOn: ["design"],
+				},
+				{
+					id: "launch",
+					label: "Launch",
+					start: "2026-03-19",
+					milestone: true,
+					phase: "Ship",
+					dependsOn: ["api"],
+				},
+			],
+		},
+		requirements: [
+			{ kind: "count", target: "tasks", comparator: "exact", value: 3 },
+			{ kind: "label", target: "task", value: "Design" },
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { diagram: object; requirements: readonly object[] }>;

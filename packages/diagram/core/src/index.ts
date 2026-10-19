@@ -22,3 +22,4 @@ export * from "./types/chart.js";
 export * from "./routing-quality.js";
 export * from "./group-regions.js";
 export * from "./types/state-machine.js";
+export * from "./types/gantt.js";

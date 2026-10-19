@@ -25,6 +25,20 @@ function fixtureRequirements(scenario: DiagramScenario): readonly Record<string,
 				value: category,
 			})),
 		];
+	if (scenario.diagramType === "gantt")
+		return [
+			{
+				kind: "count",
+				target: "tasks",
+				comparator: "exact",
+				value: scenario.expectedDiagram.tasks.length,
+			},
+			...scenario.expectedDiagram.tasks.map((task) => ({
+				kind: "label",
+				target: "task",
+				value: task.label,
+			})),
+		];
 	if (scenario.diagramType === "timeline")
 		return [
 			{

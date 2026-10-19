@@ -370,9 +370,13 @@ function shapeElement(input: {
 		height,
 		backgroundColor: input.shape.fillColor ?? "transparent",
 		boundElements: boundElements.length > 0 ? boundElements : null,
-		// Chart bars keep square corners, so their ends sit exactly at their values.
+		// Chart and Gantt bars keep square corners, so their ends sit exactly at their values and dates.
 		roundness:
-			shapeType === "rectangle" && input.shape.rendererRole !== "chart-mark" ? { type: 3 } : null,
+			shapeType === "rectangle" &&
+			input.shape.rendererRole !== "chart-mark" &&
+			input.shape.rendererRole !== "gantt-mark"
+				? { type: 3 }
+				: null,
 		strokeColor: input.shape.strokeColor ?? input.scene.accentColor,
 		...(input.shape.rendererRole
 			? { customData: { sketchiRendererRole: input.shape.rendererRole } }

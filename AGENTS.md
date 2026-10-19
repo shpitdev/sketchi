@@ -47,6 +47,7 @@ local proof when their inputs change:
   Browserbase remote browser; needs `BROWSERBASE_API_KEY` and
   `BROWSERBASE_PROJECT_ID`; never run in CI)
 - `pnpm nx run svg-excalidraw:corpus-renderer`
+- `pnpm nx run diagram-renderer:gantt-fuzz` (300 plans per Gantt fuzz; CI runs 4)
 - `pnpm run test:wrangler-dry-runs` after app builds
 
 For routing and rendering changes, replay the relevant scenarios against the PR's preview MCP with the scenario CLI and inspect a few real PNGs before merging.

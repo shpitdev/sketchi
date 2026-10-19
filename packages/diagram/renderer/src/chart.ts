@@ -28,6 +28,7 @@ import type {
 	ScenePoint,
 	TextSceneElement,
 } from "./scene.js";
+import { breakRulesUnderText } from "./scene-rules.js";
 
 export const CHART_MARK_ROLE = "chart-mark";
 
@@ -187,9 +188,15 @@ function contrast(a: number, b: number): number {
 }
 
 /** Ink or white, whichever contrasts more with the fill. */
-function textOn(fill: string): string {
+export function textOn(fill: string): string {
 	const background = luminance(fill);
 	return contrast(background, luminance(INK)) >= contrast(background, 1) ? INK : "#ffffff";
+}
+
+/** Ink or white, whichever keeps the better worst contrast across several fills a text spans. */
+export function textOnFills(fills: readonly string[]): string {
+	const worst = (text: number) => Math.min(...fills.map((fill) => contrast(luminance(fill), text)));
+	return worst(luminance(INK)) >= worst(1) ? INK : "#ffffff";
 }
 
 /** Pies need one color per slice; seven slices skip violet, which sits too close to blue at the seam. */
@@ -221,56 +228,12 @@ class SceneBuilder {
 	 * baseline or axis ever crosses a label. Each kept stretch keeps the rule's style.
 	 */
 	breakRulesUnderText(isRule: (id: string) => boolean, clearance = 2): void {
-		const boxes = this.textBoxes.map((entry) => entry.box);
-		const replaced = new Map<string, LineSceneElement[]>();
-		for (const element of this.elements) {
-			if (element.type !== "line" || !isRule(element.id) || element.points.length !== 2) continue;
-			const [a, b] = element.points;
-			const horizontal = Math.abs(a.y - b.y) < 0.01;
-			if (!horizontal && Math.abs(a.x - b.x) >= 0.01) continue;
-			const fixed = horizontal ? a.y : a.x;
-			const start = horizontal ? Math.min(a.x, b.x) : Math.min(a.y, b.y);
-			const end = horizontal ? Math.max(a.x, b.x) : Math.max(a.y, b.y);
-			const blocked = boxes
-				.filter((box) =>
-					horizontal
-						? box.top - clearance < fixed && fixed < box.bottom + clearance
-						: box.left - clearance < fixed && fixed < box.right + clearance,
-				)
-				.map((box) =>
-					horizontal
-						? [box.left - clearance, box.right + clearance]
-						: [box.top - clearance, box.bottom + clearance],
-				)
-				.filter(([low, high]) => high! > start && low! < end)
-				.toSorted((left, right) => left[0]! - right[0]!);
-			if (!blocked.length) continue;
-			const pieces: [number, number][] = [];
-			let cursor = start;
-			for (const [low, high] of blocked) {
-				if (low! > cursor) pieces.push([cursor, Math.min(low!, end)]);
-				cursor = Math.max(cursor, high!);
-			}
-			if (cursor < end) pieces.push([cursor, end]);
-			replaced.set(
-				element.id,
-				pieces
-					.filter(([low, high]) => high - low >= 1)
-					.map(([low, high], index) => ({
-						...element,
-						id: index === 0 ? element.id : `${element.id}:${index}`,
-						points: horizontal
-							? [
-									{ x: round(low), y: fixed },
-									{ x: round(high), y: fixed },
-								]
-							: [
-									{ x: fixed, y: round(low) },
-									{ x: fixed, y: round(high) },
-								],
-					})),
-			);
-		}
+		const replaced = breakRulesUnderText(
+			this.elements,
+			this.textBoxes.map((entry) => entry.box),
+			isRule,
+			clearance,
+		);
 		if (!replaced.size) return;
 		const elements = this.elements.flatMap((element) => replaced.get(element.id) ?? [element]);
 		this.elements.splice(0, this.elements.length, ...elements);

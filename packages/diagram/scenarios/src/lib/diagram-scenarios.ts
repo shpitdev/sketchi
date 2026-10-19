@@ -4,6 +4,7 @@ import { type TimelineScenario, timelineScenarios } from "./timeline-scenarios.j
 import { type FlowchartScenario, flowchartScenarios } from "./scenarios.js";
 import { type SequenceScenario, sequenceScenarios } from "./sequence-scenarios.js";
 import { type StateMachineScenario, stateMachineScenarios } from "./state-machine-scenarios.js";
+import { type GanttScenario, ganttScenarios } from "./gantt-scenarios.js";
 
 /** A maintained scenario of any canonical family, discriminated by `diagramType`. */
 export type DiagramScenario =
@@ -12,7 +13,8 @@ export type DiagramScenario =
 	| TimelineScenario
 	| ChartScenario
 	| StateMachineScenario
-	| MindmapScenario;
+	| MindmapScenario
+	| GanttScenario;
 
 export const diagramScenarios: readonly DiagramScenario[] = [
 	...flowchartScenarios,
@@ -21,6 +23,7 @@ export const diagramScenarios: readonly DiagramScenario[] = [
 	...chartScenarios,
 	...stateMachineScenarios,
 	...mindmapScenarios,
+	...ganttScenarios,
 ];
 
 export function getDiagramScenario(id: string): DiagramScenario {
