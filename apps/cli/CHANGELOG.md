@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.23.0
+
+### Minor Changes
+
+- [#469](https://github.com/shpitdev/sketchi/pull/469) [`cce6c8a`](https://github.com/shpitdev/sketchi/commit/cce6c8a1117ced72b1cd407e0fcb976232872a2e) Thanks [@anandpant](https://github.com/anandpant)! - Gantt charts name every task in a table left of the plot: a name column, indented under phase headers, beside the date column, with a light rule between rows so each name reads against its bar. The plot holds only bars, diamonds and dependency arrows, so arrows take forward routes where names once stood in the way. In Excalidraw, a bar dragged to new dates leaves its name and dates in the table.
+
 ## 0.22.0
 
 ### Minor Changes
