@@ -22,6 +22,17 @@ export interface FlowchartScenarioAssertions {
 	requiredGroups: FlowchartScenarioRequiredGroup[];
 	/** Steps the prompt keeps outside every group. */
 	ungroupedSteps: string[];
+	/** Lanes the prompt states, in its order, each with the steps it holds. */
+	requiredLanes: FlowchartScenarioRequiredLane[];
+}
+
+export interface FlowchartScenarioRequiredLane {
+	id: string;
+	label: string;
+	/** Prompt-grounded alternatives for the lane's label. */
+	labels: readonly string[];
+	/** Required step ids the lane holds. */
+	members: readonly string[];
 }
 
 export interface FlowchartScenarioRequiredGroup {
@@ -92,6 +103,8 @@ type FlowchartGroupDefinition = readonly [
 	members: readonly [string, ...string[]],
 ];
 
+type FlowchartLaneDefinition = FlowchartGroupDefinition;
+
 type FlowchartEdgeDefinition = readonly [
 	id: string,
 	source: string,
@@ -114,6 +127,8 @@ interface FlowchartScenarioDefinition {
 	entry?: readonly string[];
 	/** Groups the prompt states and the fixture nodes each holds. */
 	groups?: readonly FlowchartGroupDefinition[];
+	/** Lanes the prompt states, in its order, and the fixture nodes each holds. */
+	lanes?: readonly FlowchartLaneDefinition[];
 	id: string;
 	/**
 	 * Yes/no decisions the prompt states only through their branches, opposite
@@ -160,6 +175,11 @@ function buildExpectedDiagram(definition: FlowchartScenarioDefinition): Flowchar
 			members.map((member) => [member, group] as const),
 		),
 	);
+	const laneOf = new Map(
+		(definition.lanes ?? []).flatMap(([lane, , , members]) =>
+			members.map((member) => [member, lane] as const),
+		),
+	);
 	return parseFlowchartDiagram({
 		id: definition.diagramId ?? definition.id,
 		title: definition.title,
@@ -167,12 +187,14 @@ function buildExpectedDiagram(definition: FlowchartScenarioDefinition): Flowchar
 		...(definition.groups
 			? { groups: definition.groups.map(([id, label]) => ({ id, label })) }
 			: {}),
+		...(definition.lanes ? { lanes: definition.lanes.map(([id, label]) => ({ id, label })) } : {}),
 		nodes: definition.nodes.map(([id, label, kind, _labels, icon]) => ({
 			id,
 			label,
 			kind,
 			...(icon ? { icon: { slug: icon } } : {}),
 			...(groupOf.has(id) ? { group: groupOf.get(id) } : {}),
+			...(laneOf.has(id) ? { lane: laneOf.get(id) } : {}),
 		})),
 		edges: definition.edges.map(([id, source, target, label]) => ({
 			id,
@@ -287,6 +309,17 @@ function buildAssertions(
 			return { id, label, labels, members: [...new Set(members.map(stepOf))] };
 		}),
 		ungroupedSteps: [...new Set((definition.ungrouped ?? []).map(stepOf))],
+		requiredLanes: (definition.lanes ?? []).map(([id, label, labels, members]) => {
+			for (const alternative of labels) {
+				const words = flowchartLabelWords(alternative);
+				if (words.length === 0 || words.some((word) => !promptWords.has(word))) {
+					throw new Error(
+						`Scenario "${definition.id}" lane "${id}" has an ungrounded alternative "${alternative}".`,
+					);
+				}
+			}
+			return { id, label, labels, members: [...new Set(members.map(stepOf))] };
+		}),
 	};
 }
 
@@ -1855,6 +1888,146 @@ const flowchartScenarioDefinitions = [
 			["carrier", "Carrier", ["carrier"], ["collect", "deliver"]],
 		],
 		ungrouped: ["order", "fraud"],
+	},
+	{
+		id: "swimlane-order-fulfilment",
+		title: "Order fulfilment swimlanes",
+		difficulty: "standard",
+		tags: ["lanes", "handoffs", "decision", "left-to-right"],
+		direction: "LR",
+		description:
+			"Order fulfilment across four lanes, with straight handoffs between neighbors and an invoice that crosses from the last lane to the first and back.",
+		prompt:
+			"Create a left-to-right swimlane flowchart of order fulfilment with lanes for Customer, Sales, Warehouse and Finance, in that order. The customer places an order, which starts the flow. Sales reviews the order and decides whether the items are in stock. If not, sales notifies the customer of a backorder, which ends the flow. If they are, the warehouse picks the items, packs the order and ships it. Finance then sends the invoice, the customer pays the invoice, and finance records the payment, which ends the flow.",
+		nodes: [
+			["place", "Place order", "start", ["places an order", "place order"]],
+			["review", "Review the order", "process", ["reviews the order", "review order"]],
+			["stock", "Items in stock?", "decision", ["items are in stock", "in stock"]],
+			[
+				"backorder",
+				"Notify customer of backorder",
+				"end",
+				["notifies the customer of a backorder", "backorder"],
+			],
+			["pick", "Pick the items", "process", ["picks the items", "pick items"]],
+			["pack", "Pack the order", "process", ["packs the order", "pack order"]],
+			["ship", "Ship the order", "process", ["ships it", "ship"]],
+			["invoice", "Send the invoice", "process", ["sends the invoice", "send invoice"]],
+			["pay", "Pay the invoice", "process", ["pays the invoice", "pay invoice"]],
+			["record", "Record the payment", "end", ["records the payment", "record payment"]],
+		],
+		edges: [
+			["place-review", "place", "review"],
+			["review-stock", "review", "stock"],
+			["stock-backorder", "stock", "backorder", "no", ["no", "not"]],
+			["stock-pick", "stock", "pick", "yes", ["yes", "in stock"]],
+			["pick-pack", "pick", "pack"],
+			["pack-ship", "pack", "ship"],
+			["ship-invoice", "ship", "invoice"],
+			["invoice-pay", "invoice", "pay"],
+			["pay-record", "pay", "record"],
+		],
+		lanes: [
+			["customer", "Customer", ["customer"], ["place", "pay"]],
+			["sales", "Sales", ["sales"], ["review", "stock", "backorder"]],
+			["warehouse", "Warehouse", ["warehouse"], ["pick", "pack", "ship"]],
+			["finance", "Finance", ["finance"], ["invoice", "record"]],
+		],
+	},
+	{
+		id: "swimlane-hiring",
+		title: "Hiring process swimlanes",
+		difficulty: "standard",
+		tags: ["lanes", "handoffs", "decision", "loop"],
+		description:
+			"Hiring across three lanes, with a rejection handed back to the candidate and another interview round looping back across lanes.",
+		prompt:
+			"Create a swimlane flowchart of a hiring process with lanes for the Candidate, the Recruiter and the Hiring manager, in that order. The candidate submits an application, which starts the flow. The recruiter screens the application and decides whether the candidate is qualified. An unqualified candidate receives a rejection, which ends the flow. For a qualified candidate, the recruiter schedules an interview, the candidate attends the interview, and the hiring manager assesses the candidate and decides whether to hire. If the manager wants another round, the flow returns to scheduling an interview. On a hire, the recruiter sends an offer and the candidate accepts the offer, which ends the flow.",
+		nodes: [
+			["apply", "Submit application", "start", ["submits an application", "submit application"]],
+			[
+				"screen",
+				"Screen the application",
+				"process",
+				["screens the application", "screen application"],
+			],
+			["qualified", "Qualified?", "decision", ["qualified"]],
+			["reject", "Receive rejection", "end", ["receives a rejection", "rejection"]],
+			[
+				"schedule",
+				"Schedule interview",
+				"process",
+				["schedules an interview", "schedule interview"],
+			],
+			["attend", "Attend interview", "process", ["attends the interview", "attend interview"]],
+			["assess", "Assess the candidate", "process", ["assesses the candidate", "assess candidate"]],
+			["hire", "Hire?", "decision", ["hire"]],
+			["offer", "Send offer", "process", ["sends an offer", "send offer"]],
+			["accept", "Accept offer", "end", ["accepts the offer", "accept offer"]],
+		],
+		edges: [
+			["apply-screen", "apply", "screen"],
+			["screen-qualified", "screen", "qualified"],
+			["qualified-reject", "qualified", "reject", "no", ["no", "unqualified"]],
+			["qualified-schedule", "qualified", "schedule", "yes", ["yes", "qualified"]],
+			["schedule-attend", "schedule", "attend"],
+			["attend-assess", "attend", "assess"],
+			["assess-hire", "assess", "hire"],
+			["hire-offer", "hire", "offer", "yes", ["yes", "hire"]],
+			["hire-schedule", "hire", "schedule", "no", ["no", "another round"]],
+			["offer-accept", "offer", "accept"],
+		],
+		lanes: [
+			["candidate", "Candidate", ["candidate"], ["apply", "reject", "attend", "accept"]],
+			["recruiter", "Recruiter", ["recruiter"], ["screen", "qualified", "schedule", "offer"]],
+			["manager", "Hiring manager", ["hiring manager", "manager"], ["assess", "hire"]],
+		],
+	},
+	{
+		id: "swimlane-incident-response",
+		title: "Incident response swimlanes",
+		difficulty: "standard",
+		tags: ["lanes", "handoffs", "loop", "left-to-right"],
+		direction: "LR",
+		description:
+			"Incident response across three lanes, with a handoff that skips a lane and an unresolved incident looping back to the SRE.",
+		prompt:
+			"Create a left-to-right swimlane flowchart of incident response with lanes for On-call, SRE and Comms, in that order. An alert fires, which starts the flow, and the on-call engineer triages the alert and pages the SRE. The SRE investigates the incident and applies a mitigation. Comms then posts a status update. The on-call engineer checks whether the incident is resolved. If it is not, the flow loops back to the SRE investigating the incident. Once it is resolved, comms publishes the resolution, which ends the flow.",
+		nodes: [
+			["alert", "Alert fires", "start", ["alert fires"]],
+			["triage", "Triage the alert", "process", ["triages the alert", "triage alert"]],
+			["page", "Page the SRE", "process", ["pages the SRE", "page SRE"]],
+			[
+				"investigate",
+				"Investigate the incident",
+				"process",
+				["investigates the incident", "investigate"],
+			],
+			["mitigate", "Apply a mitigation", "process", ["applies a mitigation", "mitigation"]],
+			["status", "Post status update", "process", ["posts a status update", "status update"]],
+			["resolved", "Incident resolved?", "decision", ["incident is resolved", "resolved"]],
+			[
+				"publish",
+				"Publish the resolution",
+				"end",
+				["publishes the resolution", "publish resolution"],
+			],
+		],
+		edges: [
+			["alert-triage", "alert", "triage"],
+			["triage-page", "triage", "page"],
+			["page-investigate", "page", "investigate"],
+			["investigate-mitigate", "investigate", "mitigate"],
+			["mitigate-status", "mitigate", "status"],
+			["status-resolved", "status", "resolved"],
+			["resolved-investigate", "resolved", "investigate", "no", ["no", "not"]],
+			["resolved-publish", "resolved", "publish", "yes", ["yes", "resolved"]],
+		],
+		lanes: [
+			["oncall", "On-call", ["on-call", "on call"], ["alert", "triage", "page", "resolved"]],
+			["sre", "SRE", ["sre"], ["investigate", "mitigate"]],
+			["comms", "Comms", ["comms"], ["status", "publish"]],
+		],
 	},
 ] satisfies readonly FlowchartScenarioDefinition[];
 

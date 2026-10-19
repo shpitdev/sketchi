@@ -193,9 +193,9 @@ const CANVAS_ARROWHEAD_ADDITIONS = new Set([
 	"triangle_outline",
 	"diamond_outline",
 ]);
-const FLOWCHART_SPEC_NODE_ADDED_FIELDS = new Set(["icon", "group"]);
-// Flowchart groups add an optional groups list to the spec.
-const FLOWCHART_SPEC_ADDED_FIELDS = new Set(["groups"]);
+const FLOWCHART_SPEC_NODE_ADDED_FIELDS = new Set(["icon", "group", "lane"]);
+// Flowchart groups and lanes each add an optional list to the spec.
+const FLOWCHART_SPEC_ADDED_FIELDS = new Set(["groups", "lanes"]);
 const FROZEN_FIXTURE_HASHES = {
 	v1: "c668b53ee90043a06c640d06cc28253496d50e7431c916b523fcd4157b91ae55",
 	v2: "52858006d02386fa0aac993ce35afca219aaae9860144836b0884e7770f948d9",

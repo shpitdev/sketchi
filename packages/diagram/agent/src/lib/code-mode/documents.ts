@@ -183,6 +183,7 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 						...(node.description ? { description: node.description } : {}),
 						...(node.icon ? { icon: { slug: node.icon.slug } } : {}),
 						...(node.group ? { group: node.group } : {}),
+						...(node.lane ? { lane: node.lane } : {}),
 					})),
 					edges: diagram.edges.map((edge) => ({
 						id: edge.id,
@@ -192,6 +193,9 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 					})),
 					...(diagram.groups
 						? { groups: diagram.groups.map((group) => ({ id: group.id, label: group.label })) }
+						: {}),
+					...(diagram.lanes
+						? { lanes: diagram.lanes.map((lane) => ({ id: lane.id, label: lane.label })) }
 						: {}),
 					layout: {
 						direction:

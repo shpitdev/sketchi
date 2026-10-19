@@ -132,6 +132,7 @@ export function specToFlowchartCandidate(spec: unknown): unknown {
 		type: "flowchart",
 		nodes: spec.nodes,
 		...(spec.groups === undefined ? {} : { groups: spec.groups }),
+		...(spec.lanes === undefined ? {} : { lanes: spec.lanes }),
 		edges: Array.isArray(spec.edges)
 			? spec.edges.map((edge, index) =>
 					isRecord(edge) ? { ...edge, id: cleanEdgeId(edge.id) ?? `edge-${index + 1}` } : edge,

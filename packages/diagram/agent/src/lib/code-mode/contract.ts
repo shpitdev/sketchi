@@ -569,6 +569,16 @@ export class FlowchartSpecNode extends Schema.Class<FlowchartSpecNode>("Flowchar
 		description: optionalContract(NonEmptyString),
 		icon: optionalContract(NodeIconSpec),
 		group: optionalContract(NonEmptyString),
+		lane: optionalContract(NonEmptyString),
+	},
+	{ identifier: undefined },
+) {}
+
+/** A swimlane for one actor, holding the nodes whose lane is its id; lanes keep their order. */
+export class FlowchartSpecLane extends Schema.Class<FlowchartSpecLane>("FlowchartSpecLane")(
+	{
+		id: RequiredNonEmptyString,
+		label: RequiredNonEmptyString,
 	},
 	{ identifier: undefined },
 ) {}
@@ -655,6 +665,7 @@ export class FlowchartSpec extends Schema.Class<FlowchartSpec>("FlowchartSpec")(
 		nodes: requiredArray(nonEmptyArray(FlowchartSpecNode)),
 		edges: FlowchartEdgesWithDefault,
 		groups: optionalContract(Schema.Array(FlowchartSpecGroup).pipe(Schema.mutable)),
+		lanes: optionalContract(Schema.Array(FlowchartSpecLane).pipe(Schema.mutable)),
 		layout: FlowchartLayoutWithDefault,
 		style: DiagramStyleWithDefault,
 	},
@@ -662,6 +673,7 @@ export class FlowchartSpec extends Schema.Class<FlowchartSpec>("FlowchartSpec")(
 ) {}
 export const FlowchartSpecSchema = FlowchartSpec;
 export const FlowchartSpecGroupSchema = FlowchartSpecGroup;
+export const FlowchartSpecLaneSchema = FlowchartSpecLane;
 export const FlowchartSpecNodeSchema = FlowchartSpecNode;
 export const FlowchartSpecEdgeSchema = FlowchartSpecEdge;
 export const FlowchartSpecLayoutSchema = FlowchartSpecLayout;
@@ -1045,12 +1057,15 @@ export class BuildFlowchartRequest extends Schema.Class<BuildFlowchartRequest>(
 	{ identifier: undefined },
 ) {}
 
+/** The spec Studio's model writes: every authoring field but the fixed palette. */
 const FlowchartToolSpecContract = FlowchartSpec.mapFields(
-	({ id, title, nodes, edges, layout }) => ({
+	({ id, title, nodes, edges, groups, lanes, layout }) => ({
 		id,
 		title,
 		nodes,
 		edges,
+		groups,
+		lanes,
 		layout,
 	}),
 );
@@ -1961,6 +1976,7 @@ const NormalizedFlowchartSpecSchema = Schema.Struct({
 		})),
 	).pipe(Schema.mutable),
 	groups: Schema.optionalKey(Schema.Array(FlowchartSpecGroup).pipe(Schema.mutable)),
+	lanes: Schema.optionalKey(Schema.Array(FlowchartSpecLane).pipe(Schema.mutable)),
 	layout: Schema.Struct({ direction: FlowchartDirection }),
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });

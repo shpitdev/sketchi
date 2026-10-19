@@ -1397,6 +1397,14 @@ function flowchartSchemaRef(
 			path: specPath,
 		};
 	}
+	if (collection === "lanes" && typeof index === "number") {
+		const laneId = spec.lanes?.[index]?.id;
+		return {
+			kind: "lane",
+			...(laneId ? { id: laneId } : {}),
+			path: specPath,
+		};
+	}
 	return { kind: "diagram", id: spec.id, path: specPath };
 }
 

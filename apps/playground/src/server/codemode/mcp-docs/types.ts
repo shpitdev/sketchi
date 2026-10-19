@@ -52,12 +52,13 @@ export const codeModeContracts = {
 		input: Schema.Struct({
 			...BuildFlowchartRequestSchema.fields,
 			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: FlowchartSpecSchema.mapFields(({ id, title, nodes, edges, groups, layout }) => ({
+			spec: FlowchartSpecSchema.mapFields(({ id, title, nodes, edges, groups, lanes, layout }) => ({
 				id,
 				title,
 				nodes,
 				edges,
 				groups,
+				lanes,
 				layout,
 			})),
 		}),

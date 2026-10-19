@@ -133,6 +133,43 @@ describe("Studio build_flowchart host", () => {
 		expect(invalidRepair).toHaveProperty("issues");
 	});
 
+	it("keeps declared lanes and groups through Studio's tool schema and builds them", async () => {
+		const properties = (
+			StudioBuildFlowchartInputSchema["~standard"].jsonSchema.input({
+				target: "draft-2020-12",
+			}) as { properties: { spec: { properties: Record<string, unknown> } } }
+		).properties.spec.properties;
+		expect(Object.keys(properties)).toEqual(expect.arrayContaining(["groups", "lanes"]));
+
+		const lanes = [
+			{ id: "author", label: "Author" },
+			{ id: "reviewer", label: "Reviewer" },
+		];
+		const spec = acceptedSpec();
+		const laned = {
+			...spec,
+			lanes,
+			nodes: spec.nodes.map((node) => ({
+				...node,
+				lane: node.id === "review" ? "reviewer" : "author",
+			})),
+		};
+		const validated = await StudioBuildFlowchartInputSchema["~standard"].validate({ spec: laned });
+		if (!("value" in validated)) throw new Error(JSON.stringify(validated.issues));
+		expect(validated.value.spec).toMatchObject({ lanes });
+
+		const executor = await Effect.runPromise(
+			makeStudioFlowchartToolExecutor(deterministicRuntime(countingStore())),
+		);
+		const built = await Effect.runPromise(executor.execute(validated.value));
+		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		expect(built.normalizedSpec.lanes).toEqual(lanes);
+		const scene = built.artifact.formats.find((format) => format.format === "scene")?.inline as {
+			elements: { rendererRole?: string }[];
+		};
+		expect(scene.elements.filter((element) => element.rendererRole === "swimlane")).toHaveLength(2);
+	});
+
 	it("injects artifact options instead of exposing them to the model", async () => {
 		let request: typeof BuildFlowchartRequestSchema.Type | undefined;
 		const executor = await Effect.runPromise(

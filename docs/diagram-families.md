@@ -35,7 +35,8 @@ stage exists.
 | Storybook story | `packages/diagram/ui/src/diagram-types/<name>.stories.tsx`. | `type-structure.test.ts`, pipeline test |
 
 Groups (labeled regions around related steps) are a flowchart feature, not a
-family; see `docs/flowchart-groups.md`. State machines reuse them for composite
+family; see `docs/flowchart-groups.md`. So are swimlanes (one band per actor);
+see `docs/flowchart-lanes.md`. State machines reuse them for composite
 states; see `docs/state-machines.md`. ER diagrams place their own tables and
 route on the graph router with pinned row ends; see `docs/er-diagrams.md`.
 Class diagrams place their boxes in rows, superclasses above, and route the

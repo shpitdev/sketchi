@@ -42,6 +42,7 @@ export function normalizeFlowchartSpec(spec: FlowchartSpec): NormalizedFlowchart
 			...(node.description ? { description: cleanToolString(node.description) } : {}),
 			...(node.icon ? { icon: { slug: cleanToolString(node.icon.slug) } } : {}),
 			...(node.group ? { group: cleanToolString(node.group) } : {}),
+			...(node.lane ? { lane: cleanToolString(node.lane) } : {}),
 		})),
 		edges: spec.edges.map((edge, index) => ({
 			id: cleanOptional(edge.id) ?? `edge-${index + 1}`,
@@ -54,6 +55,14 @@ export function normalizeFlowchartSpec(spec: FlowchartSpec): NormalizedFlowchart
 					groups: spec.groups.map((group) => ({
 						id: cleanToolString(group.id),
 						label: cleanToolString(group.label),
+					})),
+				}
+			: {}),
+		...(spec.lanes
+			? {
+					lanes: spec.lanes.map((lane) => ({
+						id: cleanToolString(lane.id),
+						label: cleanToolString(lane.label),
 					})),
 				}
 			: {}),
@@ -72,6 +81,7 @@ export function flowchartDiagramInput(spec: NormalizedFlowchartSpec) {
 		nodes: spec.nodes.map((node) => ({ ...node, metadata: {} })),
 		edges: spec.edges.map((edge) => ({ ...edge, metadata: {} })),
 		...(spec.groups ? { groups: spec.groups.map((group) => ({ ...group })) } : {}),
+		...(spec.lanes ? { lanes: spec.lanes.map((lane) => ({ ...lane })) } : {}),
 		layout: {
 			direction: spec.layout.direction,
 			edgeRouting: ORTHOGONAL_ROUTING,

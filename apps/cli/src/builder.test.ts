@@ -44,6 +44,35 @@ layer(builderLayer)("Effect-native Code Mode builder layer", (it) => {
 		}),
 	);
 
+	it.effect("builds a flowchart document's declared lanes into lane bands", () =>
+		Effect.gen(function* () {
+			const builder = yield* DiagramBuilder;
+			const built = yield* builder.build(
+				canonicalDocument({
+					type: "flowchart",
+					spec: {
+						title: "Ticket handling",
+						lanes: [
+							{ id: "customer", label: "Customer" },
+							{ id: "support", label: "Support" },
+						],
+						nodes: [
+							{ id: "open", label: "Open a ticket", kind: "start", lane: "customer" },
+							{ id: "answer", label: "Answer the ticket", kind: "end", lane: "support" },
+						],
+						edges: [{ source: "open", target: "answer" }],
+					},
+				}),
+			);
+			assert.deepStrictEqual(
+				built.scene.elements.flatMap((element) =>
+					element.type === "node" && element.rendererRole === "swimlane" ? [element.label] : [],
+				),
+				["Customer", "Support"],
+			);
+		}),
+	);
+
 	it.effect("maps Code Mode quality failures to typed CLI validation", () =>
 		Effect.gen(function* () {
 			const builder = yield* DiagramBuilder;

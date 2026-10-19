@@ -411,8 +411,9 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 
 			"
 		`);
-		// Gantt, ER and class diagrams each add one compact line.
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(8_600);
+		// Gantt, ER and class diagrams each add one compact line, and lanes one flowchart
+		// line and two fields.
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(8_800);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		expect(overview).toContain(`${CODE_MODE_OPERATIONS.length} operations:`);
 		for (const operation of CODE_MODE_OPERATIONS) {

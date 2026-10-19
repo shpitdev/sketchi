@@ -438,6 +438,119 @@ function flowchartGroupChecks(
 	];
 }
 
+/**
+ * Lane checks on the model's own lanes: each lane the prompt states exists
+ * under one of its prompt-grounded labels and holds every node of every step
+ * the prompt puts in it, stated lanes stay distinct and keep the prompt's
+ * order, and every stated handoff between two lanes leaves the one for the
+ * other, directly or through unmatched steps in either of those two lanes.
+ */
+function flowchartLaneChecks(
+	scenario: FlowchartScenario,
+	graph: FlowchartDiagram,
+	ownedNodes: ReadonlyMap<string, ReadonlySet<string>>,
+): ScenarioCheck[] {
+	const { requiredEdges, requiredLanes, requiredNodes } = scenario.assertions;
+	if (requiredLanes.length === 0) return [];
+	const lanes = graph.lanes ?? [];
+	const laneOf = new Map(graph.nodes.map((node) => [node.id, node.lane]));
+	const stepLabel = (id: string) => requiredNodes.find((step) => step.id === id)?.label ?? id;
+	const owned = (stepId: string) => [...(ownedNodes.get(stepId) ?? [])];
+	const matched = requiredLanes.map((expected) => {
+		const named = lanes.filter((lane) => flowchartLabelMatches(lane.label, expected.labels));
+		const lane = named.find((candidate) =>
+			expected.members.every(
+				(member) =>
+					owned(member).length > 0 &&
+					owned(member).every((node) => laneOf.get(node) === candidate.id),
+			),
+		);
+		return { expected, lane, named };
+	});
+	const found = matched.flatMap(({ lane }) => (lane ? [lane.id] : []));
+	const positions = found.map((id) => lanes.findIndex((lane) => lane.id === id));
+	// Each stated step's drawn lane, by the stated lane it belongs to.
+	const drawnLane = new Map(
+		matched.flatMap(({ expected, lane }) =>
+			lane ? expected.members.map((member) => [member, lane.id] as const) : [],
+		),
+	);
+	const statedLane = new Map(
+		requiredLanes.flatMap((expected) =>
+			expected.members.map((member) => [member, expected.id] as const),
+		),
+	);
+	const claimed = new Set([...ownedNodes.values()].flatMap((nodes) => [...nodes]));
+	const outgoing = new Map<string, string[]>();
+	for (const edge of graph.edges)
+		outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), edge.target]);
+	const handoffs = requiredEdges.filter(
+		(edge) =>
+			statedLane.has(edge.sourceId) &&
+			statedLane.has(edge.targetId) &&
+			statedLane.get(edge.sourceId) !== statedLane.get(edge.targetId),
+	);
+	const handsOff = (sourceId: string, targetId: string) => {
+		const ends = [drawnLane.get(sourceId), drawnLane.get(targetId)];
+		if (ends.includes(undefined)) return false;
+		const targets = new Set(owned(targetId));
+		let frontier = owned(sourceId);
+		const seen = new Set(frontier);
+		for (let hop = 0; hop <= MAX_INTERMEDIATE_NODES && frontier.length > 0; hop += 1) {
+			const next: string[] = [];
+			for (const node of frontier)
+				for (const target of outgoing.get(node) ?? []) {
+					if (targets.has(target)) return true;
+					if (seen.has(target) || claimed.has(target) || !ends.includes(laneOf.get(target)))
+						continue;
+					seen.add(target);
+					next.push(target);
+				}
+			frontier = next;
+		}
+		return false;
+	};
+	return [
+		...matched.flatMap(({ expected, lane, named }) => [
+			{
+				id: `lane:${expected.label}`,
+				passed: named.length > 0,
+				message: `Expected a lane labeled like ${expected.labels.join(" | ")}.`,
+			},
+			{
+				id: `lane-members:${expected.label}`,
+				passed: lane !== undefined,
+				message: `Expected the "${expected.label}" lane to hold ${expected.members
+					.map((member) => `"${stepLabel(member)}"`)
+					.join(", ")}.`,
+			},
+		]),
+		...(requiredLanes.length > 1
+			? [
+					{
+						id: "lanes-distinct",
+						passed: new Set(found).size === found.length,
+						message: "Expected each stated lane to be a lane of its own.",
+					},
+					{
+						id: "lanes-ordered",
+						passed:
+							found.length === requiredLanes.length &&
+							positions.every((position, index) => index === 0 || position > positions[index - 1]!),
+						message: `Expected the lanes in the stated order: ${requiredLanes
+							.map((lane) => lane.label)
+							.join(", ")}.`,
+					},
+				]
+			: []),
+		...handoffs.map((edge) => ({
+			id: `handoff:${edge.sourceLabel}->${edge.targetLabel}`,
+			passed: handsOff(edge.sourceId, edge.targetId),
+			message: `Expected "${edge.sourceLabel}" to hand off to "${edge.targetLabel}" from its lane into the other.`,
+		})),
+	];
+}
+
 function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram): ScenarioCheck[] {
 	// Counts, wiring, and ownership use the graph with merged checks split.
 	const { matchedNodes, graph, branchMatches } = matchFlowchartSteps(scenario, diagram);
@@ -531,6 +644,7 @@ function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram)
 			};
 		}),
 		...flowchartGroupChecks(scenario, graph, ownedNodes),
+		...flowchartLaneChecks(scenario, graph, ownedNodes),
 	];
 }
 

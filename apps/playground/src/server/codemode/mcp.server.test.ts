@@ -803,6 +803,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(codeDescription).toMatch(
 				/^- buildClassDiagram: .*"composition" or "aggregation": from is the whole/m,
 			);
+			// Swimlanes add one flowchart line and two request fields.
 			expect(
 				JSON.stringify(
 					tools.tools.map(({ name, description, inputSchema }) => ({
@@ -811,7 +812,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(12_000);
+			).toBeLessThan(12_250);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,

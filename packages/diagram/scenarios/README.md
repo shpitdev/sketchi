@@ -38,6 +38,8 @@ and the eval harness use it.
 - Flowchart scenarios check prompt-grounded steps, node kinds, branches, bounded
   connections, and logos. Group scenarios also check that each stated group holds
   its steps and that steps the prompt keeps outside every group stay ungrouped.
+  Swimlane scenarios check that each stated lane holds its steps, that lanes
+  keep the stated order, and that each handoff crosses between its two lanes.
 - Sequence scenarios check participants, required messages and their
   chronological order, calls answered by returns (activation bars), and that
   no return is stray.

@@ -538,6 +538,40 @@ describe("Code Mode API handlers", () => {
 		});
 	});
 
+	it("builds a flowchart's declared lanes into lane bands", async () => {
+		const spec = approvalSpec();
+		const response = await handleBuildFlowchartRequest(
+			{},
+			postRequest("https://studio.test/api/v1/flowcharts/build", {
+				spec: {
+					...spec,
+					lanes: [
+						{ id: "requester", label: "Requester" },
+						{ id: "approver", label: "Approver" },
+					],
+					nodes: spec.nodes.map((node) => ({
+						...node,
+						lane: node.id === "approve" ? "approver" : "requester",
+					})),
+				},
+				options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+			}),
+		);
+
+		expect(response.status).toBe(200);
+		const built = (await response.json()) as {
+			artifact: {
+				formats: { format: string; inline?: { elements: { rendererRole?: string }[] } }[];
+			};
+			normalizedSpec: { lanes?: unknown[] };
+		};
+		expect(built.normalizedSpec.lanes).toHaveLength(2);
+		const scene = built.artifact.formats.find((format) => format.format === "scene")?.inline;
+		expect(scene?.elements.filter((element) => element.rendererRole === "swimlane")).toHaveLength(
+			2,
+		);
+	});
+
 	it("returns a structured 422 instead of a render 500 for a whitespace-only flowchart title", async () => {
 		const response = await handleBuildFlowchartRequest(
 			{},
