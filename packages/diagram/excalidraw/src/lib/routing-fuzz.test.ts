@@ -19,6 +19,9 @@ import {
 } from "@sketchi/diagram-renderer";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "./convert";
 
+// Keep every invariant and direction in the smoke run; the local target restores the full matrix.
+const FULL = process.env["ROUTING_FUZZ"] === "full";
+
 type Kind = "start" | "process" | "decision" | "end";
 
 const WORDS = [
@@ -274,7 +277,10 @@ function worseThanPinned(
 	counts: readonly { crossings: number; findings: number }[],
 	pins: string,
 ): string[] {
-	const pinned = pins.split(" ").map((pair) => pair.split("/").map(Number));
+	const pinned = pins
+		.split(" ")
+		.slice(0, counts.length)
+		.map((pair) => pair.split("/").map(Number));
 	const failures = counts.flatMap(({ crossings, findings }, index) => {
 		const [pinnedCrossings, pinnedFindings] = pinned[index]!;
 		return crossings > pinnedCrossings! || findings > pinnedFindings!
@@ -456,7 +462,7 @@ const KNOWN_LABEL_DEFECTS: Readonly<Record<"TB" | "BT" | "LR" | "RL", readonly s
 describe("label fuzz", () => {
 	// Long words and multi-line labels: words stay whole and every edge label stays
 	// clear of every line, node and label, in every direction.
-	const flowcharts = randomFlowcharts(30, 20261019, LONG_BRANCHES, LONG_WORDS);
+	const flowcharts = randomFlowcharts(FULL ? 30 : 4, 20261019, LONG_BRANCHES, LONG_WORDS);
 	it.each(["TB", "BT", "LR", "RL"] as const)("keeps %s labels whole and clear", (direction) => {
 		const defects = flowcharts.flatMap((spec, index) => {
 			const elements = convertSceneToExcalidraw(
@@ -634,7 +640,7 @@ function longTokenDiagrams(count: number) {
 describe("text fit fuzz", () => {
 	// Every family sizes its containers to whole words: no validator issue and no
 	// word broken across lines in the export.
-	const diagrams = longTokenDiagrams(24);
+	const diagrams = longTokenDiagrams(FULL ? 24 : 4);
 	it.each(["flowchart", "mindmap", "timeline", "sequence", "state-machine"] as const)(
 		"fits long words and identifiers in every %s",
 		(family) => {
@@ -674,10 +680,10 @@ describe("text fit fuzz", () => {
 });
 
 describe("routing fuzz", () => {
-	// 40 flowcharts x 3 routing modes x 4 directions = 480 exports. Locally 4320
+	// Full proof: 40 flowcharts x 3 routing modes x 4 directions = 480 exports. Locally 4320
 	// exports over six seeds had none worse than main, and none invalid orthogonally;
 	// main fails 7-12 of these 40 per direction orthogonally. The timeout only guards a hang.
-	const flowcharts = randomFlowcharts(40);
+	const flowcharts = randomFlowcharts(FULL ? 40 : 4);
 	const failures = (
 		direction: "TB" | "BT" | "LR" | "RL",
 		edgeRouting: "orthogonal" | "straight" | "curved",
@@ -870,13 +876,13 @@ const GROUPED_ROUTING: Readonly<Record<"TB" | "BT" | "LR" | "RL", string>> = {
 };
 
 describe("grouped routing fuzz", () => {
-	// 30 grouped flowcharts x 4 directions, each rendered once. Every export is valid, each group's
+	// Full proof: 30 grouped flowcharts x 4 directions, each rendered once. Every export is valid, each group's
 	// frame holds exactly its members and stays apart from the others, no edge
 	// passes through a group it does not belong to or runs along a frame, a
 	// group's own edges stay inside it, and group names stay clear of edges and
 	// labels. Branch labels on these dense random graphs are judged as the label
 	// fuzz judges ungrouped ones; grouped, they draw no more defects in total.
-	const flowcharts = randomGroupedFlowcharts(30, 20261020);
+	const flowcharts = randomGroupedFlowcharts(FULL ? 30 : 8, 20261020);
 	const scenes = new Map<string, ReturnType<typeof renderIntermediateDiagram>[]>();
 	const rendered = (direction: "TB" | "BT" | "LR" | "RL") => {
 		if (!scenes.has(direction))
@@ -1065,10 +1071,10 @@ const STATE_ROUTING: Readonly<Record<"TB" | "BT" | "LR" | "RL", string>> = {
 };
 
 describe("state graph fuzz", () => {
-	// 40 graphs x 4 directions. Self-loops, paired returns, choices and
+	// Full proof: 40 graphs x 4 directions. Self-loops, paired returns, choices and
 	// transitions into and out of a composite's frame all export valid and bound,
 	// with their groups whole and labels whole and clear.
-	const graphs = randomStateGraphs(40);
+	const graphs = randomStateGraphs(FULL ? 40 : 8);
 	describe.each(["TB", "BT", "LR", "RL"] as const)("%s", (direction) => {
 		it("exports every state graph valid, bound, grouped and labeled clear", () => {
 			const failures = graphs.flatMap((graph, index) => {

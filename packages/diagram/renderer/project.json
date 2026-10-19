@@ -36,6 +36,18 @@
 			"options": {
 				"command": "tsc -p packages/diagram/renderer/tsconfig.json --noEmit"
 			}
+		},
+		"chart-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "CHART_FUZZ_SEEDS=300 vitest run --config packages/diagram/renderer/vitest.config.ts packages/diagram/renderer/src/diagram-types/chart.test.ts -t \"seeded fuzz\""
+			}
+		},
+		"mindmap-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "MINDMAP_FUZZ_SEEDS=2000 vitest run --config packages/diagram/renderer/vitest.config.ts packages/diagram/renderer/src/mindmap-fuzz.test.ts"
+			}
 		}
 	}
 }

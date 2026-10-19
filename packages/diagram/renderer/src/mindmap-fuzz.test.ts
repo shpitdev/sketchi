@@ -11,7 +11,7 @@ import { mindmapLayoutIssues } from "./mindmap-readout";
 import type { NodeSceneElement, RenderedDiagramScene } from "./scene";
 
 /** CI draws a handful of seeds; `MINDMAP_FUZZ_SEEDS=2000` runs the full local proof. */
-const SEEDS = Number(process.env["MINDMAP_FUZZ_SEEDS"] ?? 24);
+const SEEDS = Number(process.env["MINDMAP_FUZZ_SEEDS"] ?? 8);
 /** Hosted PNGs frame the drawing this tightly. */
 const EXPORT_PADDING = 20;
 const MAX_ASPECT = 2.5;

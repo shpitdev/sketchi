@@ -44,9 +44,9 @@ jobs:
       - name: Test affected projects
         run: |
           if [[ "$CI_ALL_PROJECTS" == "true" ]]; then
-            pnpm nx run-many -t test --parallel=4
+            pnpm nx run-many -t test --parallel=4 --outputStyle=static
           else
-            pnpm nx affected -t test --parallel=4
+            pnpm nx affected -t test --parallel=4 --outputStyle=static
           fi
 
   build:

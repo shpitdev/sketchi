@@ -48,6 +48,11 @@ local proof when their inputs change:
   `BROWSERBASE_PROJECT_ID`; never run in CI)
 - `pnpm nx run svg-excalidraw:corpus-renderer`
 - `pnpm nx run diagram-renderer:gantt-fuzz` (300 plans per Gantt fuzz; CI runs 4)
+- `pnpm nx run diagram-renderer:chart-fuzz` (300 chart seeds; CI runs 1–12 plus decimal seed 27)
+- `pnpm nx run diagram-renderer:mindmap-fuzz` (2,000 mindmap seeds; CI runs 8)
+- `pnpm nx run diagram-excalidraw:routing-fuzz` (full flowchart, grouped, state, label and text-fit matrices; CI samples 4–8 cases, retaining all 30 wrapping cases)
+- `pnpm nx run diagram-excalidraw:er-fuzz` (240 schemas; CI runs 16)
+- `pnpm nx run diagram-excalidraw:class-fuzz` (240 models and 120 text-fit rounds; CI runs 16 and 12)
 - `pnpm run test:wrangler-dry-runs` after app builds
 
 For routing and rendering changes, replay the relevant scenarios against the PR's preview MCP with the scenario CLI and inspect a few real PNGs before merging.

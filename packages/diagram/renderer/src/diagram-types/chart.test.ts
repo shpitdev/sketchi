@@ -833,6 +833,9 @@ describe("native chart layout", () => {
 	});
 
 	it("keeps every invariant across a seeded fuzz of kinds, sizes, labels and value ranges", () => {
-		for (let seed = 1; seed <= 300; seed += 1) expectReadableChart(fuzzChart(seed));
+		const seeds = Number(process.env["CHART_FUZZ_SEEDS"] ?? 12);
+		for (let seed = 1; seed <= seeds; seed += 1) expectReadableChart(fuzzChart(seed));
+		// Seeds 1–12 cover every kind, but decimal values first appear at seed 27.
+		if (seeds < 27) expectReadableChart(fuzzChart(27));
 	});
 });

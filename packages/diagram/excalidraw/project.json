@@ -30,6 +30,24 @@
 			"options": {
 				"command": "tsc -p packages/diagram/excalidraw/tsconfig.json --noEmit"
 			}
+		},
+		"routing-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "ROUTING_FUZZ=full vitest run --config packages/diagram/excalidraw/vitest.config.mts packages/diagram/excalidraw/src/lib/routing-fuzz.test.ts"
+			}
+		},
+		"er-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "ER_FUZZ=full vitest run --config packages/diagram/excalidraw/vitest.config.mts packages/diagram/excalidraw/src/lib/er-fuzz.test.ts"
+			}
+		},
+		"class-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "CLASS_FUZZ=full vitest run --config packages/diagram/excalidraw/vitest.config.mts packages/diagram/excalidraw/src/lib/class-fuzz.test.ts"
+			}
 		}
 	}
 }
