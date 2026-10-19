@@ -98,7 +98,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		const sequenceDocs = getCodeModeDocs({ topic: "buildSequenceDiagram" });
 		expect(sequenceDocs.content).toContain("preserved left-to-right");
 		expect(sequenceDocs.content).toContain("preserved top-to-bottom");
-		expect(sequenceDocs.content).toContain("Self-referential messages");
+		expect(sequenceDocs.content).toContain("A self-message (source equals target)");
 		expect(sequenceDocs.examples[0]?.code).toContain("sketchi.buildSequenceDiagram");
 		const canvasDocs = getCodeModeDocs({ topic: "createCanvas" });
 		expect(canvasDocs.content).toContain("never raw Excalidraw JSON");
@@ -347,7 +347,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			'- buildTimeline: spec: { title, events: [{ id, label, date?, end?, order?, kind?: "milestone", lane? }], lanes?: string[], today? }. Dates keep the prompt\'s precision (YYYY, YYYY-MM, YYYY-MM-DD or ISO time); without dates, give every event a numeric order. end draws a phase, lane a labeled track; today only when given. Invent no events or dates.',
 		);
 		expect(codeLine("buildSequenceDiagram")).toBe(
-			'- buildSequenceDiagram: spec: { title, participants: [{ id, label, icon?: { slug } }], messages: [{ source, target, label, type?: "return", style?: "dashed" }] }. Order is kept. Every reply the prompt states, including a redirect back to the caller, is its own type: "return" message from the callee back to its caller; it answers the latest open call between them, and calls nobody answers draw no bar. source and target are distinct participant ids, so an action inside one participant ("the user logs in") is a message from the participant that triggers it.',
+			'- buildSequenceDiagram: spec: { title, participants: [{ id, label, icon?: { slug } }], messages: [{ source, target, label, type?: "return", style?: "dashed" }] }. Order is kept. Every reply the prompt states, including a redirect back to the caller, is its own type: "return" message from the callee back to its caller; it answers the latest open call between them, and calls nobody answers draw no bar. A participant\'s own step (validating, retrying) is a self-message with source = target.',
 		);
 		expect(codeLine("buildStateMachine")).toBe(
 			'- buildStateMachine: spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. A regular state label defaults to its id verbatim. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets; one may be "else". kind "final" (label optional) ends the machine and nothing leaves it. A state that ends the machine but has other outgoing transitions also gets a transition to a final state.',

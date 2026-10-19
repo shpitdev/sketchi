@@ -13,6 +13,8 @@ import type { DiagramScenarioDifficulty, DiagramScenarioLogo } from "./scenarios
  */
 export interface SequenceScenarioMessage {
 	readonly label?: readonly string[];
+	/** The message must be a self-message: its source participant is its target. */
+	readonly self?: true;
 	readonly source: readonly string[];
 	readonly target: readonly string[];
 	readonly type?: SequenceMessageType;
@@ -274,6 +276,52 @@ const sequenceScenarioDefinitions = [
 					type: "return",
 				},
 				{ source: ["checkout"], target: ["fulfillment"], label: ["ship", "fulfil"] },
+			],
+		},
+	},
+	{
+		id: "password-login-self-check-sequence",
+		title: "Password login with a credential check",
+		difficulty: "standard",
+		tags: ["sequence", "auth", "self-message"],
+		description:
+			"The auth service checks the credentials and signs the token itself, so both steps are self-messages inside its answer to the browser.",
+		prompt:
+			"Sequence diagram of a password login. The Browser submits the username and password to the Auth Service. The Auth Service validates the credentials itself, then asks the User Store for the user record and gets the record back. The Auth Service signs a session token itself and returns the session cookie to the Browser.",
+		participants: [
+			["browser", "Browser"],
+			["auth", "Auth Service"],
+			["users", "User Store"],
+		],
+		messages: [
+			["submit", "browser", "auth", "Submit credentials"],
+			["validate", "auth", "auth", "Validate credentials"],
+			["load-user", "auth", "users", "Load user record"],
+			["user-record", "users", "auth", "User record", "return"],
+			["sign-token", "auth", "auth", "Sign session token"],
+			["session", "auth", "browser", "Session cookie", "return"],
+		],
+		assertions: {
+			minAnsweredCalls: 2,
+			minMessageCount: 6,
+			minParticipantCount: 3,
+			requiredParticipants: [["browser"], ["auth"], ["user"]],
+			orderedMessages: [
+				{
+					source: ["browser"],
+					target: ["auth"],
+					label: ["credential", "password", "log", "sign", "submit"],
+				},
+				{ source: ["auth"], target: ["auth"], self: true, label: ["valid", "verif", "check"] },
+				{ source: ["auth"], target: ["user"], label: ["user", "record", "load", "fetch"] },
+				{ source: ["user"], target: ["auth"], type: "return" },
+				{ source: ["auth"], target: ["auth"], self: true, label: ["token", "sign"] },
+				{
+					source: ["auth"],
+					target: ["browser"],
+					label: ["session", "cookie"],
+					type: "return",
+				},
 			],
 		},
 	},

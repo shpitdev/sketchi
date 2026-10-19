@@ -1,4 +1,4 @@
-import { restoreElements } from "@excalidraw/excalidraw";
+import { exportToSvg, restoreElements } from "@excalidraw/excalidraw";
 import type {
 	ExcalidrawElement,
 	ExcalidrawTextElement,
@@ -10,7 +10,7 @@ import {
 	parseFlowchartDiagram,
 	parseIntermediateDiagram,
 } from "@sketchi/diagram-core";
-import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
+import { convertSceneToExcalidraw, createExcalidrawFile } from "@sketchi/diagram-excalidraw";
 import { renderIntermediateDiagram, renderSequenceDiagram } from "@sketchi/diagram-renderer";
 import { ExcalidrawSceneCanvas } from "@sketchi/diagram-ui";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
@@ -162,6 +162,29 @@ const sequence = renderSequenceDiagram({
 		{ id: "cjk", label: "品質保証レビュー承認待ち部門" },
 	],
 	messages: [{ id: "submit", source: "qa", target: "cjk", label: "Submit batch 🚀" }],
+	style: { accentColor: "#111827", backgroundColor: "#ffffff" },
+});
+
+/** Self-messages: a self-call nested in an active bar and a self-return on an idle lifeline. */
+const selfMessages = renderSequenceDiagram({
+	type: "sequence",
+	id: "self-messages",
+	title: "Self-messages",
+	participants: [
+		{ id: "browser", label: "Browser" },
+		{ id: "idp", label: "Identity Provider" },
+	],
+	messages: [
+		{ id: "authorize", source: "browser", target: "idp", label: "Authorize" },
+		{
+			id: "validate",
+			source: "idp",
+			target: "idp",
+			label: "Validate the user's credentials and MFA code",
+		},
+		{ id: "code", source: "idp", target: "browser", label: "Code", type: "return" },
+		{ id: "retry", source: "browser", target: "browser", label: "Retry", type: "return" },
+	],
 	style: { accentColor: "#111827", backgroundColor: "#ffffff" },
 });
 
@@ -334,6 +357,11 @@ async function expectLabelsPaintFully(
 		const text = elementsById.get(id) as ExcalidrawTextElement;
 		const target = text.containerId ?? id;
 		const center = paintedCenter(label, elementsById.get(target));
+		// Center the target so no toolbar covers it on a tall scene.
+		await act(async () => {
+			api.scrollToContent(elementsById.get(target), { animate: false });
+		});
+		await nextFrames();
 		const { scrollX, scrollY, zoom } = api.getAppState();
 
 		await userEvent.click(canvas, {
@@ -370,7 +398,51 @@ describe("Excalidraw labels", () => {
 	it("paint long sequence participant headers fully", async () => {
 		await expectLabelsPaintFully(convertSceneToExcalidraw(sequence), 3);
 	}, 60_000);
+
+	it("paint sequence self-message labels fully on their loops", async () => {
+		await expectLabelsPaintFully(convertSceneToExcalidraw(selfMessages), 6);
+	}, 60_000);
 });
+
+it("keeps sequence self-message loops bound through reload and inside the export", async () => {
+	const scene = convertSceneToExcalidraw(selfMessages);
+	const file = JSON.parse(JSON.stringify(createExcalidrawFile(scene))) as {
+		elements: ExcalidrawElement[];
+	};
+	const restored = restoreElements(file.elements, null, { repairBindings: true });
+	const byId = new Map(restored.map((element) => [element.id, element]));
+	for (const id of ["arrow:validate", "arrow:retry"]) {
+		const emitted = scene.elements.find((element) => element.id === id);
+		const loop = byId.get(id);
+		if (loop?.type !== "arrow" || !emitted) throw new Error(`Missing ${id}.`);
+		// Excalidraw keeps the loop's route, elbow and both bindings on reload.
+		expect("elbowed" in loop && loop.elbowed, id).toBe(true);
+		expect(loop.points, id).toEqual(emitted.points);
+		expect(loop.startBinding?.elementId, id).toBe(
+			(emitted.startBinding as { elementId: string }).elementId,
+		);
+		expect(loop.endBinding?.elementId, id).toBe(
+			(emitted.endBinding as { elementId: string }).elementId,
+		);
+		// Its label is free text grouped with it, so the two move together.
+		expect(byId.get(`${id}:label`)?.groupIds, id).toEqual(loop.groupIds);
+		expect(loop.groupIds, id).toHaveLength(1);
+	}
+
+	// The export's bounds hold the loop labels, which sit right of their loops.
+	const svg = await exportToSvg({
+		elements: restored,
+		appState: { exportBackground: true, exportPadding: 0, viewBackgroundColor: "#ffffff" },
+		files: null,
+	});
+	const left = Math.min(...restored.map((element) => element.x));
+	for (const id of ["arrow:validate:label", "arrow:retry:label"]) {
+		const label = byId.get(id);
+		if (!label) throw new Error(`Missing ${id}.`);
+		const right = label.x + label.width;
+		expect(Number(svg.getAttribute("width")), id).toBeGreaterThanOrEqual(right - left);
+	}
+}, 30_000);
 
 it("moves authored branch labels with a source node dragged on the real canvas", async () => {
 	await page.viewport(1280, 960);

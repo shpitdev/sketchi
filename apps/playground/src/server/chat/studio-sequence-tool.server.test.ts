@@ -117,21 +117,21 @@ describe("Studio build_sequence_diagram host", () => {
 	it("returns repairable issues, then stops after the attempt budget", async () => {
 		const runtime = deterministicRuntime();
 		const executor = await Effect.runPromise(makeStudioSequenceToolExecutor(runtime.build));
-		const selfMessage: StudioBuildSequenceInput = {
+		const strayMessage: StudioBuildSequenceInput = {
 			spec: {
 				...checkout.spec,
-				messages: [{ id: "loop", source: "api", target: "api", label: "Retry" }],
+				messages: [{ id: "lost", source: "api", target: "ghost", label: "Retry" }],
 			},
 		};
 
-		const rejected = await Effect.runPromise(executor.execute(selfMessage));
+		const rejected = await Effect.runPromise(executor.execute(strayMessage));
 		expect(rejected).toMatchObject({
 			ok: false,
 			status: "invalid_sequence",
-			issues: [expect.objectContaining({ code: "self_loop" })],
+			issues: [expect.objectContaining({ code: "missing_edge_target" })],
 		});
-		await Effect.runPromise(executor.execute(selfMessage));
-		await Effect.runPromise(executor.execute(selfMessage));
+		await Effect.runPromise(executor.execute(strayMessage));
+		await Effect.runPromise(executor.execute(strayMessage));
 		const capped = await Effect.runPromise(executor.execute(checkout));
 		expect(capped).toMatchObject({
 			ok: false,
@@ -175,12 +175,12 @@ describe("Studio build_sequence_diagram host", () => {
 		const sequence = await Effect.runPromise(
 			makeStudioSequenceToolExecutor(runtime.build, { turn }),
 		);
-		const selfMessage: StudioBuildSequenceInput = {
-			spec: { ...checkout.spec, messages: [{ source: "api", target: "api", label: "Retry" }] },
+		const strayMessage: StudioBuildSequenceInput = {
+			spec: { ...checkout.spec, messages: [{ source: "api", target: "ghost", label: "Retry" }] },
 		};
 
-		await Effect.runPromise(sequence.execute(selfMessage));
-		await Effect.runPromise(sequence.execute(selfMessage));
+		await Effect.runPromise(sequence.execute(strayMessage));
+		await Effect.runPromise(sequence.execute(strayMessage));
 		await Effect.runPromise(flowchart.execute({ spec: { ...releaseFlow.spec, edges: [] } }));
 		const capped = await Effect.runPromise(sequence.execute(checkout));
 

@@ -44,7 +44,10 @@ export class SequenceParticipant extends Schema.Class<SequenceParticipant>("Sequ
 }) {}
 export const SequenceParticipantSchema = SequenceParticipant;
 
-/** One message row. Array order is chronological order. */
+/**
+ * One message row. Array order is chronological order. A message whose source
+ * is its target is a self-message: the participant acting on itself.
+ */
 export class SequenceMessage extends Schema.Class<SequenceMessage>("SequenceMessage")({
 	id: Schema.NonEmptyString,
 	source: Schema.NonEmptyString,
@@ -85,7 +88,6 @@ export const SequenceValidationIssueCodeSchema = Schema.Literals([
 	"duplicate_message_id",
 	"missing_message_source",
 	"missing_message_target",
-	"self_message",
 ]);
 export type SequenceValidationIssueCode = typeof SequenceValidationIssueCodeSchema.Type;
 
@@ -172,14 +174,6 @@ export function getSequenceValidationIssues(diagram: SequenceDiagram): SequenceV
 				hint: "Use the id of a participant declared in participants.",
 			});
 		}
-		if (message.source === message.target) {
-			issues.push({
-				code: "self_message",
-				path: `messages.[${index}]`,
-				message: `Message "${message.id}" is self-referential.`,
-				hint: "Choose a different target participant; self messages are not supported.",
-			});
-		}
 	});
 	return issues.slice(0, SEQUENCE_MAX_ISSUES);
 }
@@ -206,11 +200,13 @@ export interface SequenceActivation {
  * Pair each return with the latest unanswered call from its target to its
  * source. Calls nobody answers (fire-and-forget) and returns without an open
  * call open no span; answering one call leaves every other open call open.
+ * Self-messages take no part: they neither open a call nor answer one.
  */
 export function sequenceActivations(diagram: SequenceDiagram): SequenceActivation[] {
 	const open = new Map<string, { caller: string; index: number; messageId: string }[]>();
 	const spans: Omit<SequenceActivation, "depth">[] = [];
 	diagram.messages.forEach((message, index) => {
+		if (message.source === message.target) return;
 		if (message.type !== "return") {
 			open.set(message.target, [
 				...(open.get(message.target) ?? []),
@@ -345,5 +341,31 @@ export const deployWebhookLogoSequence = parseSequenceDiagram({
 		{ id: "build", source: "worker", target: "docker", label: "Build image" },
 		{ id: "digest", source: "docker", target: "worker", label: "Image digest", type: "return" },
 		{ id: "accepted", source: "worker", target: "github", label: "202 Accepted", type: "return" },
+	],
+});
+
+/** Self-messages: consecutive checks inside an active bar, and a retry on an idle lifeline. */
+export const selfMessageSequence = parseSequenceDiagram({
+	id: "self-message-sequence",
+	title: "Login with credential checks",
+	type: sequenceDiagramType,
+	participants: [
+		{ id: "browser", label: "Browser" },
+		{ id: "idp", label: "Identity Provider" },
+		{ id: "users", label: "User Directory" },
+	],
+	messages: [
+		{ id: "sign-in", source: "browser", target: "idp", label: "Sign in" },
+		{ id: "validate", source: "idp", target: "idp", label: "Validate credentials" },
+		{
+			id: "mfa",
+			source: "idp",
+			target: "idp",
+			label: "Check the one-time code against the enrolled authenticator",
+		},
+		{ id: "lookup", source: "idp", target: "users", label: "Look up user" },
+		{ id: "profile", source: "users", target: "idp", label: "Profile", type: "return" },
+		{ id: "session", source: "idp", target: "browser", label: "Session", type: "return" },
+		{ id: "refresh", source: "browser", target: "browser", label: "Refresh the page" },
 	],
 });

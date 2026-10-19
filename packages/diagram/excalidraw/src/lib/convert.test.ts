@@ -10,6 +10,7 @@ import {
 	parseChartDiagram,
 	parseFlowchartDiagram,
 	parseSequenceDiagram,
+	selfMessageSequence,
 	sequenceFixture,
 	type CanvasSpec,
 	getCanvasValidationIssues,
@@ -1801,6 +1802,80 @@ describe("convertSceneToExcalidraw", () => {
 		);
 	});
 
+	it("exports a self-message as an elbow loop bound to its bars with its label beside it", () => {
+		const diagram = parseSequenceDiagram({
+			id: "oauth-self",
+			title: "OAuth with credential check",
+			type: "sequence",
+			participants: [
+				{ id: "browser", label: "Browser" },
+				{ id: "idp", label: "Identity Provider" },
+			],
+			messages: [
+				{ id: "authorize", source: "browser", target: "idp", label: "Authorize" },
+				{ id: "validate", source: "idp", target: "idp", label: "Validate the user's credentials" },
+				{ id: "code", source: "idp", target: "browser", label: "Code", type: "return" },
+				{ id: "retry", source: "browser", target: "browser", label: "Retry", type: "return" },
+			],
+		});
+		const scene = convertSceneToExcalidraw(renderSequenceDiagram(diagram));
+		expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
+		// A reload reads the same scene back from the file.
+		const reloaded = JSON.parse(JSON.stringify(createExcalidrawFile(scene))) as {
+			elements: ExcalidrawElement[];
+		};
+		expect(validateExcalidrawScene({ ...scene, elements: reloaded.elements })).toEqual({
+			ok: true,
+			issues: [],
+		});
+
+		const element = (id: string) => {
+			const found = scene.elements.find((candidate) => candidate.id === id);
+			if (!found) throw new Error(`Missing ${id}.`);
+			return found;
+		};
+		const loop = element("arrow:validate");
+		expect(loop).toMatchObject({
+			type: "arrow",
+			elbowed: true,
+			startBinding: {
+				elementId: "node:idp:lifeline:activation:authorize",
+				fixedPoint: [1, expect.any(Number)],
+			},
+			endBinding: {
+				elementId: "node:idp:lifeline:activation:validate",
+				fixedPoint: [1, expect.any(Number)],
+			},
+			boundElements: null,
+		});
+		expect(element("node:idp:lifeline:activation:validate").boundElements).toEqual(
+			expect.arrayContaining([{ id: "arrow:validate", type: "arrow" }]),
+		);
+		// The label is free text right of the loop's outer leg, grouped with the
+		// loop so they move together, and keeps its stored wrap on edit.
+		const points = loop.points as [number, number][];
+		const label = element("arrow:validate:label");
+		expect(label).toMatchObject({
+			type: "text",
+			containerId: null,
+			autoResize: false,
+			groupIds: loop.groupIds,
+		});
+		expect(loop.groupIds).toEqual(["message:validate"]);
+		expect(label.x as number).toBeGreaterThan((loop.x as number) + points[1]![0]);
+		const loopTop = (loop.y as number) + points[1]![1];
+		const loopBottom = (loop.y as number) + points[2]![1];
+		expect(label.y as number).toBeGreaterThanOrEqual(loopTop);
+		expect((label.y as number) + (label.height as number)).toBeLessThanOrEqual(loopBottom);
+		// The idle browser's self-return loops on its lifeline.
+		expect(element("arrow:retry")).toMatchObject({
+			elbowed: true,
+			strokeStyle: "dashed",
+			startBinding: { elementId: "node:browser:lifeline" },
+			endBinding: { elementId: "node:browser:lifeline" },
+		});
+	});
+
 	it("exports activation bars as unlabeled bound shapes that other messages may cross", () => {
 		const nested = parseSequenceDiagram({
 			id: "oauth",
@@ -1821,7 +1896,7 @@ describe("convertSceneToExcalidraw", () => {
 				{ id: "session", source: "api", target: "client", label: "Session", type: "return" },
 			],
 		});
-		for (const diagram of [sequenceFixture, apiRequestSequence, nested]) {
+		for (const diagram of [sequenceFixture, apiRequestSequence, selfMessageSequence, nested]) {
 			const scene = convertSceneToExcalidraw(renderSequenceDiagram(diagram));
 			expect(validateExcalidrawScene(scene), diagram.id).toEqual({ ok: true, issues: [] });
 		}

@@ -374,8 +374,8 @@ describe("pure candidate behavior", () => {
 		});
 
 		expect(candidate.diagram).toBeUndefined();
+		// The worker's self-message is valid; only the unknown target is reported.
 		expect(candidate.diagnostics).toEqual([
-			'sequence.self_message: Message "retry" is self-referential. Hint: Choose a different target participant; self messages are not supported.',
 			'sequence.missing_message_target: Message target "billing" is not a participant. Hint: Use the id of a participant declared in participants.',
 		]);
 	});

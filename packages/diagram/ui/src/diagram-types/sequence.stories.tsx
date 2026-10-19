@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { apiRequestSequence, sequenceFixture } from "@sketchi/diagram-core";
+import { apiRequestSequence, selfMessageSequence, sequenceFixture } from "@sketchi/diagram-core";
 
 import { GenerationWorkspace } from "../components/generation-workspace";
 import "../styles.css";
@@ -23,5 +23,11 @@ export const Ready: Story = {};
 export const ApiRequestWithCacheMiss: Story = {
 	args: {
 		diagram: apiRequestSequence,
+	},
+};
+
+export const SelfMessages: Story = {
+	args: {
+		diagram: selfMessageSequence,
 	},
 };

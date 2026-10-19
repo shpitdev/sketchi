@@ -2170,22 +2170,19 @@ describe("Code Mode runtime", () => {
 		).toHaveLength(3);
 	});
 
-	it("returns repairable issues for invalid participant references and self messages", async () => {
+	it("returns repairable issues for invalid participant references", async () => {
 		const spec = checkoutSequenceSpec();
 		const result = await createTestRuntime().buildSequenceDiagram({
 			spec: {
 				...spec,
-				messages: [
-					{ source: "missing", target: "store", label: "Unknown sender" },
-					{ source: "store", target: "store", label: "Self message" },
-				],
+				messages: [{ source: "missing", target: "store", label: "Unknown sender" }],
 			},
 		});
 
 		expect(result).toMatchObject({
 			ok: false,
 			status: "invalid_sequence",
-			issues: expect.arrayContaining([
+			issues: [
 				expect.objectContaining({
 					code: "missing_edge_source",
 					ref: { kind: "request", path: "spec.messages.[0].source" },
@@ -2193,12 +2190,23 @@ describe("Code Mode runtime", () => {
 					// Published Code Mode wording names the request field.
 					hint: "Use the id of a participant declared in spec.participants.",
 				}),
-				expect.objectContaining({
-					code: "self_loop",
-					hint: expect.stringContaining("different target"),
-				}),
-			]),
+			],
 		});
+	});
+
+	it("builds a self-message as a loop on its participant's lifeline", async () => {
+		const spec = checkoutSequenceSpec();
+		const result = await createTestRuntime().buildSequenceDiagram({
+			spec: {
+				...spec,
+				messages: [
+					...spec.messages,
+					{ source: "store", target: "store", label: "Recalculate totals" },
+				],
+			},
+		});
+
+		expect(result).toMatchObject({ ok: true });
 	});
 
 	it("rejects oversized sequence diagrams with sequence_too_large", async () => {

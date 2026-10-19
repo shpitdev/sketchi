@@ -146,6 +146,44 @@ describe("sequence eval matching", () => {
 	});
 });
 
+describe("sequence self-message evals", () => {
+	const scenario = getSequenceScenario("password-login-self-check-sequence");
+	const expected = scenario.expectedDiagram;
+
+	it("draws each self-message as a loop that opens and answers no call", () => {
+		const evaluation = evaluateScenarioFixture(scenario);
+		expect(evaluation.checks.filter((check) => !check.passed)).toEqual([]);
+		for (const id of ["validate", "sign-token"]) {
+			const loop = evaluation.scene.elements.find(
+				(element) => element.type === "arrow" && element.edgeId === id,
+			);
+			expect(loop?.type === "arrow" && loop.points.length, id).toBe(4);
+		}
+	});
+
+	it("fails the self-message check when the auth service asks another participant to validate", () => {
+		expect(
+			failedChecks(scenario.id, {
+				...expected,
+				messages: expected.messages.map((message) =>
+					message.id === "validate" ? { ...message, target: "users" } : message,
+				),
+			}),
+		).toEqual(["message:2", "message-order"]);
+	});
+
+	it("fails returns-answer-calls when a self-message is drawn as a return", () => {
+		expect(
+			failedChecks(scenario.id, {
+				...expected,
+				messages: expected.messages.map((message) =>
+					message.id === "sign-token" ? { ...message, type: "return" as const } : message,
+				),
+			}),
+		).toEqual(["returns-answer-calls"]);
+	});
+});
+
 describe("sequence participant logo evals", () => {
 	const scenario = getSequenceScenario("deploy-webhook-logos-sequence");
 	const withIcons = (icons: Record<string, string | undefined>): SequenceDiagram => ({

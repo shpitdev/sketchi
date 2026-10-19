@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
 	type SequenceDiagram,
-	SequenceValidationError,
 	apiRequestSequence,
 	deployWebhookLogoSequence,
 	embedCanvasIcons,
@@ -182,14 +181,155 @@ describe("sequence diagram renderer", () => {
 		).toHaveLength(3);
 	});
 
-	it("rejects self messages with the core validation error", () => {
-		expect(() =>
-			renderSequenceDiagram(
-				unvalidated({
-					messages: [{ id: "self", source: "store", target: "store", label: "Retry" }],
-				}),
-			),
-		).toThrow(SequenceValidationError);
+	it("draws a self-message as a loop out of its lifeline and back on its own row", () => {
+		const plain = renderSequenceDiagram(sequence);
+		const scene = renderSequenceDiagram(
+			parseSequenceDiagram({
+				...sequence,
+				messages: [
+					sequence.messages[0]!,
+					{ id: "retry", source: "payments", target: "payments", label: "Retry charge" },
+					...sequence.messages.slice(1),
+				],
+			}),
+		);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+		const loop = arrow(scene, "retry");
+		const lifeline = scene.elements.find((element) => element.id === "node:payments:lifeline");
+		if (lifeline?.type !== "node") throw new Error("Missing the payments lifeline.");
+		const lifelineRight = lifeline.x + lifeline.width;
+		// Out of the lifeline's right edge, out, down and back into its own bar.
+		const [start, out, down, end] = loop.points;
+		expect(loop.points).toHaveLength(4);
+		expect(loop.sourceNodeId).toBe("payments:lifeline");
+		expect(start).toEqual({ x: lifelineRight, y: start.y });
+		expect(out!.y).toBe(start.y);
+		expect(down!.x).toBe(out!.x);
+		expect(end!.y).toBe(down!.y);
+		const bar = activationBars(scene).find(
+			(candidate) => candidate.nodeId === "payments:lifeline:activation:retry",
+		);
+		if (!bar) throw new Error("Missing the self-call bar.");
+		expect(loop.targetNodeId).toBe(bar.nodeId);
+		expect(end!.x).toBe(bar.x + bar.width);
+		expect(bar.y).toBeLessThan(end!.y);
+		expect(bar.y + bar.height).toBeGreaterThan(end!.y);
+		expect(isStructurallyValidSequenceActivation(scene, bar)).toBe(true);
+		// The label is a free text beside the loop's outer leg, grouped with the
+		// loop, and the loop is as tall as the label.
+		const label = scene.elements.find((element) => element.id === "arrow:retry:label");
+		if (label?.type !== "text") throw new Error("Missing the loop label.");
+		const width = estimateTextWidth("Retry charge", 13);
+		expect(label.containerId).toBeUndefined();
+		expect(label.groupIds).toEqual(loop.groupIds);
+		expect(label.x - width / 2).toBeGreaterThan(out!.x);
+		expect(label.y).toBe((start.y + down!.y) / 2);
+		expect(down!.y - start.y).toBeGreaterThanOrEqual(Math.ceil(13 * 1.35));
+		// Messages keep their order, and rows after the loop shift by its height.
+		expect(
+			scene.elements.flatMap((element) => (element.type === "arrow" ? [element.edgeId] : [])),
+		).toEqual(["start", "retry", "charge", "receipt"]);
+		const loopHeight = down!.y - start.y;
+		expect(start.y).toBe(arrow(plain, "charge").points[0].y);
+		expect(arrow(scene, "charge").points[0].y).toBe(
+			arrow(plain, "receipt").points[0].y + loopHeight,
+		);
+		expect(scene.height).toBe(plain.height + 88 + loopHeight);
+		// The last column's loop label stays inside the scene.
+		expect(scene.width).toBeGreaterThanOrEqual(label.x + width / 2 + 48);
+	});
+
+	it("widens the gap after a participant so a deeply nested self-message label clears the next lifeline", () => {
+		const calls = Array.from({ length: 19 }, (_, index) => ({
+			id: `call-${index}`,
+			source: "b",
+			target: "a",
+			label: `Call ${index}`,
+		}));
+		const scene = renderSequenceDiagram(
+			parseSequenceDiagram({
+				id: "deep-self",
+				title: "Deep self-message",
+				type: "sequence",
+				participants: [
+					{ id: "a", label: "A" },
+					{ id: "b", label: "B" },
+				],
+				messages: [
+					...calls,
+					{ id: "validate", source: "a", target: "a", label: "ValidateCredentialsToken" },
+					...calls.toReversed().map((call) => ({
+						id: `reply-${call.id}`,
+						source: "a",
+						target: "b",
+						label: `Reply ${call.label}`,
+						type: "return" as const,
+					})),
+				],
+			}),
+		);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+		const label = scene.elements.find((element) => element.id === "arrow:validate:label");
+		const lifeline = scene.elements.find((element) => element.id === "node:b:lifeline");
+		if (label?.type !== "text" || lifeline?.type !== "node") throw new Error("Missing elements.");
+		const right = label.x + estimateTextWidth("ValidateCredentialsToken", 13) / 2;
+		expect(right).toBeLessThan(lifeline.x);
+		// Only the gap after the deeply nested participant widens.
+		const header = (id: string) =>
+			scene.elements.find(
+				(element): element is NodeSceneElement => element.type === "node" && element.nodeId === id,
+			);
+		expect(header("b")!.x - header("a")!.x).toBeGreaterThan(header("a")!.width + 140);
+	});
+
+	it("nests a self-call's bar inside the active bar and attaches the loop to both", () => {
+		const scene = renderSequenceDiagram(
+			parseSequenceDiagram({
+				id: "oauth-self",
+				title: "OAuth with credential check",
+				type: "sequence",
+				participants: [
+					{ id: "browser", label: "Browser" },
+					{ id: "idp", label: "Identity Provider" },
+				],
+				messages: [
+					{ id: "authorize", source: "browser", target: "idp", label: "Authorize" },
+					{ id: "validate", source: "idp", target: "idp", label: "Validate credentials" },
+					{ id: "audit", source: "idp", target: "idp", label: "Audit", type: "return" },
+					{ id: "code", source: "idp", target: "browser", label: "Code", type: "return" },
+				],
+			}),
+		);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+		const bar = (call: string) => {
+			const found = activationBars(scene).find(
+				(candidate) => candidate.nodeId === `idp:lifeline:activation:${call}`,
+			);
+			if (!found) throw new Error(`Missing bar for ${call}.`);
+			return found;
+		};
+		expect(activationBars(scene).map((candidate) => candidate.nodeId)).toEqual([
+			"idp:lifeline:activation:authorize",
+			"idp:lifeline:activation:validate",
+		]);
+		const outer = bar("authorize");
+		const inner = bar("validate");
+		expect(inner.x - outer.x).toBe(outer.width / 2);
+		expect(inner.y).toBeGreaterThan(outer.y);
+		expect(inner.y + inner.height).toBeLessThan(outer.y + outer.height);
+		const validate = arrow(scene, "validate");
+		expect([validate.sourceNodeId, validate.targetNodeId]).toEqual([outer.nodeId, inner.nodeId]);
+		expect(validate.points[0].x).toBe(outer.x + outer.width);
+		expect(validate.points.at(-1)?.x).toBe(inner.x + inner.width);
+		// A self-return draws a dashed loop on the active bar and opens no bar.
+		const audit = arrow(scene, "audit");
+		expect([audit.sourceNodeId, audit.targetNodeId]).toEqual([outer.nodeId, outer.nodeId]);
+		expect(audit.strokeStyle).toBe("dashed");
+		// The outer bar still closes on the IdP's return to the browser.
+		expect(arrow(scene, "code").sourceNodeId).toBe(outer.nodeId);
+		for (const candidate of activationBars(scene)) {
+			expect(isStructurallyValidSequenceActivation(scene, candidate)).toBe(true);
+		}
 	});
 
 	it("rejects participant ids that collide with generated lifelines", () => {

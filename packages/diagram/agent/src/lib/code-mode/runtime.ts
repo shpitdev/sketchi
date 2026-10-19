@@ -701,7 +701,6 @@ const SEQUENCE_ISSUE_CODES = {
 	duplicate_message_id: "duplicate_edge_id",
 	missing_message_source: "missing_edge_source",
 	missing_message_target: "missing_edge_target",
-	self_message: "self_loop",
 } as const satisfies Record<SequenceValidationIssueCode, CodeModeIssueCode>;
 
 /**

@@ -852,14 +852,16 @@ function sequenceMessageMatches(
 		matchesAny(labels.get(message.source) ?? "", expected.source) &&
 		matchesAny(labels.get(message.target) ?? "", expected.target) &&
 		matchesAny(message.label, expected.label) &&
-		(expected.type === undefined || (message.type ?? "message") === expected.type)
+		(expected.type === undefined || (message.type ?? "message") === expected.type) &&
+		(expected.self !== true || message.source === message.target)
 	);
 }
 
 function describeSequenceMessage(expected: SequenceScenarioMessage): string {
 	const label = expected.label ? ` "${expected.label.join("|")}"` : "";
 	const type = expected.type === "return" ? " return" : "";
-	return `${expected.source.join("|")} -> ${expected.target.join("|")}${type}${label}`;
+	const self = expected.self ? " self-message" : "";
+	return `${expected.source.join("|")} -> ${expected.target.join("|")}${self}${type}${label}`;
 }
 
 /**

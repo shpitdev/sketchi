@@ -62,7 +62,6 @@ describe("Sequence diagram type", () => {
 					...sequenceFixture.messages,
 					{ id: "charge", source: "ghost", target: "store", label: "Unknown sender" },
 					{ id: "loop", source: "store", target: "nowhere", label: "Unknown target" },
-					{ id: "self", source: "store", target: "store", label: "Self message" },
 				],
 			}),
 		).toEqual([
@@ -70,8 +69,34 @@ describe("Sequence diagram type", () => {
 			["duplicate_message_id", "messages.[4].id"],
 			["missing_message_source", "messages.[4].source"],
 			["missing_message_target", "messages.[5].target"],
-			["self_message", "messages.[6]"],
 		]);
+	});
+
+	it("accepts a self-message and never pairs it with a call or a return", () => {
+		const diagram = parseSequenceDiagram({
+			id: "oauth-self",
+			title: "OAuth with credential check",
+			type: "sequence",
+			participants: [
+				{ id: "browser", label: "Browser" },
+				{ id: "idp", label: "Identity Provider" },
+			],
+			messages: [
+				{ id: "authorize", source: "browser", target: "idp", label: "Authorize" },
+				{ id: "validate", source: "idp", target: "idp", label: "Validate credentials" },
+				{ id: "checked", source: "idp", target: "idp", label: "Valid", type: "return" },
+				{ id: "code", source: "idp", target: "browser", label: "Code", type: "return" },
+			],
+		});
+		expect(issueCodes(diagram)).toEqual([]);
+		// The self-return answers neither the self-call nor the browser's call,
+		// and the browser's call stays open until the IdP answers it.
+		expect(
+			sequenceActivations(diagram).map(({ callMessageId, returnMessageId }) => [
+				callMessageId,
+				returnMessageId,
+			]),
+		).toEqual([["authorize", "code"]]);
 	});
 
 	it("rejects participant ids that collide with generated lifelines", () => {
