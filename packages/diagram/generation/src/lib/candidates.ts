@@ -3,11 +3,16 @@ import {
 	CanonicalDiagramSchema,
 	DIAGRAM_TYPES,
 	DiagramValidationError,
+	ClassDiagramSchema,
+	classNodeName,
+	ClassValidationError,
 	ErDiagramSchema,
 	erEntityName,
 	ErValidationError,
 	isDiagramIconSlug,
+	resolveClassShorthand,
 	resolveErShorthand,
+	validateClassDiagram,
 	validateErDiagram,
 	FlowchartDiagramSchema,
 	FlowchartValidationError,
@@ -274,6 +279,39 @@ function normalizeGeneratedErInput(input: unknown): unknown {
 	};
 }
 
+/**
+ * Read one-line members, kind and multiplicity aliases, and number
+ * relationships the model left without ids, by their kind and two ends.
+ */
+function normalizeGeneratedClassInput(input: unknown): unknown {
+	const resolved = resolveClassShorthand(withSketchiDiagramStyle(input));
+	if (!isUnknownRecord(resolved) || !Array.isArray(resolved["relationships"])) return resolved;
+	const used = new Set(
+		resolved["relationships"].flatMap((relationship) =>
+			isUnknownRecord(relationship) && typeof relationship["id"] === "string"
+				? [relationship["id"]]
+				: [],
+		),
+	);
+	return {
+		...resolved,
+		relationships: resolved["relationships"].map((relationship) => {
+			if (!isUnknownRecord(relationship)) return relationship;
+			if (typeof relationship["id"] === "string" && relationship["id"].length > 0)
+				return relationship;
+			const base =
+				`${String(relationship["from"])}-${String(relationship["kind"])}-${String(relationship["to"])}`.replace(
+					/[^\w-]+/gu,
+					"-",
+				);
+			let id = base;
+			for (let suffix = 2; used.has(id); suffix += 1) id = `${base}-${suffix}`;
+			used.add(id);
+			return { ...relationship, id };
+		}),
+	};
+}
+
 function firstString(values: readonly unknown[]): string | undefined {
 	return values.find((value): value is string => typeof value === "string");
 }
@@ -336,7 +374,8 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 		error instanceof ChartValidationError ||
 		error instanceof StateMachineValidationError ||
 		error instanceof GanttValidationError ||
-		error instanceof ErValidationError
+		error instanceof ErValidationError ||
+		error instanceof ClassValidationError
 	) {
 		const family =
 			error instanceof FlowchartValidationError
@@ -351,7 +390,9 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 								? "gantt"
 								: error instanceof ErValidationError
 									? "er"
-									: "sequence";
+									: error instanceof ClassValidationError
+										? "class"
+										: "sequence";
 		return {
 			diagnostics: error.issues.map(
 				(entry) => `${family}.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
@@ -500,6 +541,13 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 				ErDiagramSchema,
 				normalizeGeneratedErInput(titledDiagram),
 				validateErDiagram,
+				intent,
+			),
+		class: () =>
+			decodeAndValidate(
+				ClassDiagramSchema,
+				normalizeGeneratedClassInput(titledDiagram),
+				validateClassDiagram,
 				intent,
 			),
 		sequence: () => {
@@ -673,6 +721,15 @@ function labelsForRequirement(
 			]);
 		return undefined;
 	}
+	if (diagram.type === "class") {
+		if (requirement.target === "class") return diagram.classes.map(classNodeName);
+		if (requirement.target === "member")
+			return diagram.classes.flatMap((node) => [
+				...node.attributes.map((attribute) => attribute.name),
+				...node.methods.map((method) => method.name),
+			]);
+		return undefined;
+	}
 	if (diagram.type === "er") {
 		if (requirement.target === "entity") return diagram.entities.map(erEntityName);
 		if (requirement.target === "field")
@@ -721,6 +778,12 @@ function countForRequirement(
 				: target === "cycles"
 					? cycleRank({ nodes: diagram.states, edges: diagram.transitions })
 					: undefined;
+	if (diagram.type === "class")
+		return target === "classes"
+			? diagram.classes.length
+			: target === "relationships"
+				? diagram.relationships.length
+				: undefined;
 	if (diagram.type === "er")
 		return target === "entities"
 			? diagram.entities.length

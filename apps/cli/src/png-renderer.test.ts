@@ -166,6 +166,48 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG renderer",
 		}),
 	);
 
+	it.effect("exports a class diagram whose lines bind elbowed with their UML heads", () =>
+		Effect.gen(function* () {
+			const builder = yield* DiagramBuilder;
+			const renderer = yield* CliPngRenderer;
+			const built = yield* builder.build(
+				canonicalDocument({
+					type: "class",
+					spec: {
+						title: "Shapes",
+						classes: [
+							{ id: "Shape", kind: "abstract", methods: ["+ area(): double {abstract}"] },
+							{ id: "Circle", attributes: ["- radius: double"], methods: ["+ area(): double"] },
+							{ id: "Canvas", methods: ["+ add(shape: Shape): void"] },
+						],
+						relationships: [
+							{ kind: "inheritance", from: "Circle", to: "Shape" },
+							{
+								kind: "aggregation",
+								from: "Canvas",
+								to: "Shape",
+								fromMultiplicity: "1",
+								toMultiplicity: "0..*",
+							},
+						],
+					},
+				}),
+			);
+			const arrows = built.excalidraw.elements.filter((element) => element["type"] === "arrow");
+			assert.lengthOf(arrows, 2);
+			for (const arrow of arrows) assert.isTrue(arrow["elbowed"]);
+			assert.sameMembers(
+				arrows.map(
+					(arrow) => `${String(arrow["startArrowhead"])}>${String(arrow["endArrowhead"])}`,
+				),
+				["null>triangle_outline", "diamond_outline>null"],
+			);
+			const png = yield* renderer.renderPng({ scene: built.scene, excalidraw: built.excalidraw });
+			assert.isAbove(png.byteLength, 1_000);
+			assertInkHasPadding(png);
+		}),
+	);
+
 	it.effect("grows the canvas for a wide title without clipping ink", () =>
 		Effect.gen(function* () {
 			const builder = yield* DiagramBuilder;

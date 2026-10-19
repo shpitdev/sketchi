@@ -8,6 +8,7 @@ import { type RenderedDiagramScene, renderIntermediateDiagram } from "./scene.js
 import { renderSequenceDiagram } from "./sequence.js";
 import { renderStateMachineDiagram } from "./state-machine.js";
 import { renderErDiagram } from "./er.js";
+import { renderClassDiagram } from "./class-diagram.js";
 
 /** Render any canonical diagram with its family's renderer. */
 export function renderDiagram(diagram: CanonicalDiagram): RenderedDiagramScene {
@@ -28,5 +29,7 @@ export function renderDiagram(diagram: CanonicalDiagram): RenderedDiagramScene {
 			return renderGanttDiagram(diagram);
 		case "er":
 			return renderErDiagram(diagram);
+		case "class":
+			return renderClassDiagram(diagram);
 	}
 }

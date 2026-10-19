@@ -5,6 +5,7 @@ export * from "./scene.js";
 export * from "./sequence.js";
 export * from "./state-machine.js";
 export * from "./er.js";
+export * from "./class-diagram.js";
 
 export * from "./timeline.js";
 export * from "./timeline-readout.js";

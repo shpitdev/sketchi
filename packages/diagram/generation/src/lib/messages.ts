@@ -47,8 +47,8 @@ const COMMON_INSTRUCTIONS = [
 	`Sketchi supports only nativeKind ${listAlternatives(NATIVE_KINDS)}. If the requested kind is ${listAlternatives(UNSUPPORTED_KINDS)}, set nativeKind to null, omit diagram, and never coerce it into a supported kind.`,
 	"When nativeKind is null, return an empty requirements array because there is no native artifact to validate.",
 	"List every measurable scenario requirement once in intent.requirements. Convert counts and minimums into count requirements, hierarchy depth into topic_levels, and required names or branch/message text into label requirements.",
-	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", "tasks", "entities", "relationships", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
-	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", "series", "state", "transition", "task", "phase", "entity", or "field".',
+	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", "tasks", "entities", "classes", "relationships", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
+	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", "series", "state", "transition", "task", "phase", "entity", "field", "class", or "member".',
 	'Use comparator "minimum" for phrases such as "at least" and "exact" for exact counts. Do not invent measurable requirements that the scenario did not request.',
 	"The diagram must satisfy every requirement in the plan. Sketchi deterministically checks the plan against the artifact.",
 ];
@@ -140,6 +140,18 @@ const IR_INSTRUCTIONS = {
 			'Return relationships: [{ id, from, to, fromCardinality, toCardinality, label? }]. from and to name an entity, or "entity.field" for the key column at each end: "orders.customer_id" to "customers.id".',
 			'Each cardinality is "one", "zero-or-one", "many", "one-or-many" or "zero-or-many": how many rows of that end relate to one row of the other end.',
 			"Copy every entity, field, type, key, nullable marker and cardinality the source states; invent none. Mark every key column PK, FK or UK as stated.",
+		],
+	},
+	class: {
+		title: "Class diagram IR rules",
+		rules: [
+			'Use diagram type "class".',
+			"Use it for UML class diagrams and object-oriented designs; never supply coordinates.",
+			'Return classes: [{ id, name?, kind?, stereotype?, attributes, methods }]. kind is "abstract", "interface" or "enum" (its values are attributes), or omitted for a class. Ids hold no colon or space; name defaults to the id.',
+			'Write each member as UML does: attributes "- radius: double", "+ count: int {static}"; methods "+ area(): double", "+ draw(ctx: Canvas): void {abstract}". Visibility is +, -, # or ~.',
+			'Return relationships: [{ id, kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }]. kind "inheritance" or "realization": from extends or implements to; "composition" or "aggregation": from is the whole; "association"; "dependency": from uses to.',
+			'Multiplicities ("1", "0..1", "*", "1..*"), roles and navigable (an open arrow at to) go on compositions, aggregations and associations only; a composition\'s whole is "1" or "0..1". Interfaces extend only interfaces, and inheritance never cycles.',
+			"Copy every class, member, relationship, multiplicity and role the source states; invent none.",
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { title: string; rules: readonly string[] }>;
@@ -314,6 +326,33 @@ const FAMILY_EXAMPLES = {
 		requirements: [
 			{ kind: "count", target: "entities", comparator: "exact", value: 2 },
 			{ kind: "label", target: "entity", value: "orders" },
+		],
+	},
+	class: {
+		diagram: {
+			id: "short-kebab-case-id",
+			type: "class",
+			classes: [
+				{ id: "Shape", kind: "abstract", methods: ["+ area(): double {abstract}"] },
+				{ id: "Circle", attributes: ["- radius: double"], methods: ["+ area(): double"] },
+				{ id: "Canvas", methods: ["+ add(shape: Shape): void"] },
+			],
+			relationships: [
+				{ id: "circle-is-shape", kind: "inheritance", from: "Circle", to: "Shape" },
+				{
+					id: "canvas-holds",
+					kind: "aggregation",
+					from: "Canvas",
+					to: "Shape",
+					fromMultiplicity: "1",
+					toMultiplicity: "0..*",
+					toRole: "shapes",
+				},
+			],
+		},
+		requirements: [
+			{ kind: "count", target: "classes", comparator: "exact", value: 3 },
+			{ kind: "label", target: "class", value: "Circle" },
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { diagram: object; requirements: readonly object[] }>;

@@ -25,6 +25,7 @@ export class CountRequirement extends Schema.Class<CountRequirement>("CountRequi
 	kind: Schema.Literal("count"),
 	target: Schema.Literals([
 		"categories",
+		"classes",
 		"cycles",
 		"decision_nodes",
 		"entities",
@@ -66,6 +67,8 @@ export class LabelRequirement extends Schema.Class<LabelRequirement>("LabelRequi
 		"phase",
 		"entity",
 		"field",
+		"class",
+		"member",
 	]),
 	value: Schema.NonEmptyString,
 }) {}
@@ -109,6 +112,7 @@ const FALLBACK_TITLES: Readonly<Record<DiagramGenerationType, string>> = {
 	"state-machine": "Generated state machine",
 	gantt: "Generated Gantt chart",
 	er: "Generated ER diagram",
+	class: "Generated class diagram",
 };
 
 function titleFromId(id: string): string | undefined {

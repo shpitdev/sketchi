@@ -357,6 +357,14 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		expect(codeLine("buildErDiagram")).toBe(
 			'- buildErDiagram: spec: { title, entities: [{ id, fields: ["id uuid PK", "customer_id uuid FK", "email text UK", "note text?"] }], relationships: [{ from: "orders.customer_id", to: "customers.id", fromCardinality: "zero-or-many", toCardinality: "one", label? }] }. Cardinalities: "one", "zero-or-one", "many", "one-or-many", "zero-or-many", each how many rows of its end match one row of the other. Copy every table, field, type, key and cardinality stated.',
 		);
+		expect(codeLine("buildClassDiagram")).toBe(
+			'- buildClassDiagram: spec: { title, classes: [{ id, kind?: "abstract" | "interface" | "enum", attributes?: ["- id: UUID"], methods?: ["+ area(): double {abstract}"] }], relationships: [{ kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }] }. kind "inheritance" or "realization": from extends or implements to; "composition" or "aggregation": from is the whole; "association"; "dependency": from uses to. Multiplicities ("1", "0..*") and roles go on compositions, aggregations and associations only. Copy every class, member and relationship stated.',
+		);
+		const classDocs = getCodeModeDocs({ topic: "buildClassDiagram" }).content;
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(classDocs.split("\n\n")[0]);
+		expect(classDocs.split("Request type:")[0]).toContain(
+			'A member is one string as UML writes it: attributes "- radius: double"',
+		);
 		expect(codeLine("createCanvas")).toBeUndefined();
 		for (const topic of ["buildMindmap", "buildSequenceDiagram", "buildTimeline"] as const) {
 			const guidance = getCodeModeDocs({ topic }).content.split("\n")[0]!;
@@ -403,8 +411,8 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 
 			"
 		`);
-		// Gantt and ER each add one compact line.
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(8_100);
+		// Gantt, ER and class diagrams each add one compact line.
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(8_600);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		expect(overview).toContain(`${CODE_MODE_OPERATIONS.length} operations:`);
 		for (const operation of CODE_MODE_OPERATIONS) {
@@ -418,6 +426,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			["buildTimeline", ["BuildTimelineRequest"]],
 			["buildGantt", ["BuildGanttRequest"]],
 			["buildErDiagram", ["BuildErDiagramRequest"]],
+			["buildClassDiagram", ["BuildClassDiagramRequest"]],
 			["createCanvas", ["CreateCanvasRequest", "CanvasSpecInput", "CanvasElement"]],
 			["getArtifact", ["GetArtifactRequest"]],
 			["applyDiagramPatch", ["ApplyDiagramPatchRequest", "DiagramSelector"]],

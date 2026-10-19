@@ -10,7 +10,9 @@ import {
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
 	type BuildErDiagramResult,
+	type BuildClassDiagramResult,
 	type BuildTimelineResult,
+	ClassSpec,
 	ErSpec,
 	FlowchartSpec,
 	MindmapSpec,
@@ -28,6 +30,7 @@ import {
 	buildSequenceDiagram,
 	buildStateMachine,
 	buildErDiagram,
+	buildClassDiagram,
 	buildTimeline,
 	buildChart,
 	buildGantt,
@@ -47,6 +50,7 @@ export const CANONICAL_DOCUMENT_SPECS = {
 	"state-machine": StateMachineSpec,
 	gantt: GanttSpec,
 	er: ErSpec,
+	class: ClassSpec,
 } as const satisfies Record<DiagramTypeValue, unknown>;
 
 /** A canonical diagram document: a family and its authoring spec. */
@@ -65,7 +69,8 @@ export type CanonicalBuildResult =
 	| BuildChartResult
 	| BuildStateMachineResult
 	| BuildGanttResult
-	| BuildErDiagramResult;
+	| BuildErDiagramResult
+	| BuildClassDiagramResult;
 
 export function isCanonicalDocumentType(value: unknown): value is DiagramTypeValue {
 	return CANONICAL_DOCUMENT_TYPES.some((type) => type === value);
@@ -98,6 +103,8 @@ export function buildCanonicalDocument(
 			return buildGantt(request);
 		case "er":
 			return buildErDiagram(request);
+		case "class":
+			return buildClassDiagram(request);
 	}
 }
 
@@ -226,6 +233,24 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 					entities: diagram.entities.map((entity) => ({
 						...entity,
 						fields: entity.fields.map((field) => ({ ...field })),
+					})),
+					relationships: diagram.relationships.map((relationship) => ({ ...relationship })),
+					style: diagram.style,
+				},
+			};
+		case "class":
+			return {
+				type: "class",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					classes: diagram.classes.map((node) => ({
+						...node,
+						attributes: node.attributes.map((attribute) => ({ ...attribute })),
+						methods: node.methods.map((method) => ({
+							...method,
+							params: method.params.map((param) => ({ ...param })),
+						})),
 					})),
 					relationships: diagram.relationships.map((relationship) => ({ ...relationship })),
 					style: diagram.style,

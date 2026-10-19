@@ -39,6 +39,7 @@ export type CodeModeUsageOperation =
 	| "buildStateMachine"
 	| "buildGantt"
 	| "buildErDiagram"
+	| "buildClassDiagram"
 	| "createCanvas"
 	| "execute"
 	| "generateDiagram";

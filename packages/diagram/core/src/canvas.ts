@@ -43,7 +43,8 @@ export type CanvasStrokeStyle = "dashed" | "dotted" | "solid";
 export type CanvasFillStyle = "cross-hatch" | "hachure" | "solid";
 /**
  * Excalidraw's own heads. The crow's-foot ones mark entity-relationship ends:
- * a bar for one, a foot for many, and a bar with a foot for one or many.
+ * a bar for one, a foot for many, and a bar with a foot for one or many. The
+ * hollow triangle and diamond mark UML generalization and aggregation.
  */
 export const CANVAS_ARROWHEADS = [
 	"arrow",
@@ -54,6 +55,8 @@ export const CANVAS_ARROWHEADS = [
 	"crowfoot_one",
 	"crowfoot_many",
 	"crowfoot_one_or_many",
+	"triangle_outline",
+	"diamond_outline",
 ] as const;
 export type CanvasArrowhead = (typeof CANVAS_ARROWHEADS)[number] | null;
 export type CanvasShapeKind = "rectangle" | "ellipse" | "diamond" | "circle" | "polygon";
@@ -98,9 +101,10 @@ export interface CanvasIconAsset {
  * timeline event markers and span bars, chart data marks (bars, slices,
  * point markers and legend keys), state-machine pseudostates (an initial
  * dot, a final bullseye, an unlabeled choice), Gantt task bars and
- * milestones, and entity-relationship tables (a table's outline and its name
- * band) and optional-end rings. They carry no icon, and only a table's name
- * band carries a bound label.
+ * milestones, entity-relationship tables (a table's outline and its name
+ * band) and optional-end rings, and class boxes (a class's outline, name band
+ * and methods compartment). They carry no icon, and only a table's or a
+ * class's name band carries a bound label.
  */
 export const CANVAS_RENDERER_ROLES = [
 	"sequence-lifeline",
@@ -111,6 +115,7 @@ export const CANVAS_RENDERER_ROLES = [
 	"gantt-mark",
 	"er-table",
 	"er-optional",
+	"class-box",
 ] as const;
 export type CanvasRendererRole = (typeof CANVAS_RENDERER_ROLES)[number];
 
@@ -130,6 +135,7 @@ export const CANVAS_CROSSABLE_RENDERER_ROLES: readonly CanvasRendererRole[] = [
 
 const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
 	"chart-mark": "Chart mark",
+	"class-box": "Class box",
 	"er-optional": "Optional relationship end",
 	"er-table": "Entity table",
 	"gantt-mark": "Gantt mark",

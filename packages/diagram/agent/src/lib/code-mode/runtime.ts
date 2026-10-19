@@ -12,6 +12,11 @@ import {
 	getErValidationIssues,
 	parseErFieldShorthand,
 	resolveErShorthand,
+	getClassValidationIssues,
+	parseClassAttributeShorthand,
+	parseClassMethodShorthand,
+	parseClassParameterShorthand,
+	resolveClassShorthand,
 	getTimelineValidationIssues,
 	getChartValidationIssues,
 	getGanttValidationIssues,
@@ -35,6 +40,8 @@ import {
 	type StateMachineValidationIssueCode,
 	type ErDiagram,
 	type ErValidationIssueCode,
+	type ClassDiagram,
+	type ClassValidationIssueCode,
 } from "@sketchi/diagram-core";
 import {
 	convertSceneToExcalidraw,
@@ -48,6 +55,7 @@ import {
 	renderSequenceDiagram,
 	renderStateMachineDiagram,
 	renderErDiagram,
+	renderClassDiagram,
 	renderTimelineDiagram,
 	renderChartDiagram,
 	renderGanttDiagram,
@@ -58,6 +66,7 @@ import {
 	isStructurallyValidStateMarker,
 	isStructurallyValidErOptional,
 	isStructurallyValidErTable,
+	isStructurallyValidClassBox,
 	isStructurallyValidTimelineMarker,
 	type RenderedDiagramScene,
 	type ScenePoint,
@@ -85,6 +94,7 @@ import {
 	BuildSequenceDiagramRejected,
 	BuildStateMachineRejected,
 	BuildErDiagramRejected,
+	BuildClassDiagramRejected,
 	BuildTimelineRejected,
 	BuildChartRejected,
 	BuildGanttRejected,
@@ -97,6 +107,7 @@ import {
 	BuildSequenceDiagramRequestSchema,
 	BuildStateMachineRequestSchema,
 	BuildErDiagramRequestSchema,
+	BuildClassDiagramRequestSchema,
 	BuildTimelineRequestSchema,
 	BuildChartRequestSchema,
 	BuildGanttRequestSchema,
@@ -118,12 +129,14 @@ import {
 	type BuildSequenceDiagramRequest,
 	type BuildStateMachineRequest,
 	type BuildErDiagramRequest,
+	type BuildClassDiagramRequest,
 	type BuildTimelineRequest,
 	type BuildChartRequest,
 	type BuildGanttRequest,
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
 	type BuildErDiagramResult,
+	type BuildClassDiagramResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type BuildGanttResult,
@@ -144,6 +157,7 @@ import {
 	type NormalizedSequenceDiagramSpec,
 	type NormalizedStateMachineSpec,
 	type NormalizedErSpec,
+	type NormalizedClassSpec,
 	type NormalizedTimelineSpec,
 	type NormalizedChartSpec,
 	type NormalizedGanttSpec,
@@ -224,6 +238,7 @@ type CodeModeBoundaryOperation =
 	| "buildSequenceDiagram"
 	| "buildStateMachine"
 	| "buildErDiagram"
+	| "buildClassDiagram"
 	| "buildTimeline"
 	| "buildChart"
 	| "buildGantt"
@@ -261,6 +276,7 @@ function artifactKindForOperation(operation: CodeModeBoundaryOperation): string 
 	if (operation === "buildGantt") return "gantt";
 	if (operation === "buildStateMachine") return "state-machine";
 	if (operation === "buildErDiagram") return "er";
+	if (operation === "buildClassDiagram") return "class";
 	if (operation === "createCanvas") return "canvas";
 	if (operation === "applyDiagramPatch") return "patch";
 	return undefined;
@@ -886,6 +902,127 @@ function resolveErRequest(input: unknown): unknown {
 	return { ...input, spec: resolveErShorthand(input.spec) };
 }
 
+function normalizeClassSpec(spec: BuildClassDiagramRequest["spec"]): NormalizedClassSpec {
+	const title = cleanToolString(spec.title);
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	const flag = (key: string, value: boolean | undefined) => (value ? { [key]: true } : {});
+	// An omitted id takes the next `relationship-<n>` no relationship claims explicitly.
+	const used = new Set(
+		spec.relationships.flatMap((relationship) => cleanOptional(relationship.id) ?? []),
+	);
+	const relationshipId = (index: number) => {
+		let number = index + 1;
+		while (used.has(`relationship-${number}`)) number += 1;
+		used.add(`relationship-${number}`);
+		return `relationship-${number}`;
+	};
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-class-diagram"),
+		title,
+		classes: spec.classes.map((node) => ({
+			id: cleanToolString(node.id),
+			...optional("name", node.name),
+			...(node.kind ? { kind: node.kind } : {}),
+			...optional("stereotype", node.stereotype),
+			attributes: node.attributes.map((input) => {
+				const attribute =
+					typeof input === "string" ? parseClassAttributeShorthand(cleanToolString(input)) : input;
+				return {
+					name: cleanToolString(attribute.name),
+					...optional("type", attribute.type),
+					...(attribute.visibility ? { visibility: attribute.visibility } : {}),
+					...flag("static", attribute.static),
+				};
+			}),
+			methods: node.methods.map((input) => {
+				const method =
+					typeof input === "string" ? parseClassMethodShorthand(cleanToolString(input)) : input;
+				return {
+					name: cleanToolString(method.name),
+					params: method.params.map((param) => {
+						const read =
+							typeof param === "string"
+								? parseClassParameterShorthand(cleanToolString(param))
+								: param;
+						return { name: cleanToolString(read.name), ...optional("type", read.type) };
+					}),
+					...optional("returns", method.returns),
+					...(method.visibility ? { visibility: method.visibility } : {}),
+					...flag("static", method.static),
+					...flag("abstract", method.abstract),
+				};
+			}),
+		})),
+		relationships: spec.relationships.map((relationship, index) => ({
+			id: cleanOptional(relationship.id) ?? relationshipId(index),
+			kind: relationship.kind,
+			from: cleanToolString(relationship.from),
+			to: cleanToolString(relationship.to),
+			...optional("fromMultiplicity", relationship.fromMultiplicity),
+			...optional("toMultiplicity", relationship.toMultiplicity),
+			...optional("fromRole", relationship.fromRole),
+			...optional("toRole", relationship.toRole),
+			...(relationship.navigable === undefined ? {} : { navigable: relationship.navigable }),
+			...optional("label", relationship.label),
+		})),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+function toClassDiagram(spec: NormalizedClassSpec): ClassDiagram {
+	return { ...spec, type: "class" };
+}
+
+/** Code Mode's published issue codes for diagram-core's class diagram invariants. */
+const CLASS_ISSUE_CODES = {
+	class_too_large: "class_too_large",
+	invalid_class_id: "invalid_class",
+	duplicate_class_id: "duplicate_node_id",
+	duplicate_class_name: "invalid_class",
+	duplicate_member: "invalid_member",
+	class_text_too_long: "label_too_long",
+	duplicate_relationship_id: "duplicate_edge_id",
+	missing_relationship_class: "missing_edge_target",
+	inheritance_cycle: "invalid_generalization",
+	invalid_inheritance: "invalid_generalization",
+	invalid_realization: "invalid_generalization",
+	invalid_multiplicity: "invalid_relationship",
+	misplaced_end_label: "invalid_relationship",
+} as const satisfies Record<ClassValidationIssueCode, CodeModeIssueCode>;
+
+function validateNormalizedClass(spec: NormalizedClassSpec): CodeModeIssue[] {
+	return getClassValidationIssues(toClassDiagram(spec)).map((entry) =>
+		issue({
+			code:
+				entry.code === "missing_relationship_class" && entry.path.endsWith(".from")
+					? "missing_edge_source"
+					: CLASS_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+
+function classQuality(spec: NormalizedClassSpec, threshold: number): QualityReport {
+	const score = 10;
+	return {
+		accepted: score >= threshold,
+		score,
+		threshold,
+		summary: { nodeCount: spec.classes.length, edgeCount: spec.relationships.length },
+		checks: [],
+	};
+}
+
+/** Read one-line members, kind and multiplicity aliases and from/to aliases before the request is decoded. */
+function resolveClassRequest(input: unknown): unknown {
+	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
+	return { ...input, spec: resolveClassShorthand(input.spec) };
+}
+
 export class CodeModeArtifactRenderFailed extends Schema.TaggedError<CodeModeArtifactRenderFailed>()(
 	"CodeModeArtifactRenderFailed",
 	{ cause: Schema.Defect(), message: Schema.String },
@@ -1003,6 +1140,15 @@ const BuildErDiagramFailure = workflowFailure(
 	"BuildErDiagramFailure",
 	BuildErDiagramRejected.fields.status,
 	BuildErDiagramRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildClassDiagramFailure = workflowFailure(
+	"BuildClassDiagramFailure",
+	BuildClassDiagramRejected.fields.status,
+	BuildClassDiagramRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -1548,7 +1694,8 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 				(element.rendererRole === "gantt-mark" && isStructurallyValidGanttMark(element)) ||
 				(element.rendererRole === "state-marker" && isStructurallyValidStateMarker(element)) ||
 				(element.rendererRole === "er-table" && isStructurallyValidErTable(element)) ||
-				(element.rendererRole === "er-optional" && isStructurallyValidErOptional(element))
+				(element.rendererRole === "er-optional" && isStructurallyValidErOptional(element)) ||
+				(element.rendererRole === "class-box" && isStructurallyValidClassBox(element))
 					? { rendererRole: element.rendererRole }
 					: {}),
 				...(element.textColor ? { textColor: element.textColor } : {}),
@@ -2999,6 +3146,116 @@ const buildErDiagramWorkflow = Effect.fn("codeMode.buildErDiagram.workflow")(fun
 	} satisfies Extract<BuildErDiagramResult, { ok: true }>;
 });
 
+const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(BuildClassDiagramRequestSchema, {
+		errors: "all",
+		reportInput: true,
+	})(resolveClassRequest(input));
+	if (!Result.isSuccess(parsed)) {
+		return yield* new BuildClassDiagramFailure({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeClassSpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedClass(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* new BuildClassDiagramFailure({
+			status: "invalid_class_diagram",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = classQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* new BuildClassDiagramFailure({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* Effect.try({
+		try: () => renderClassDiagram(toClassDiagram(normalizedSpec)),
+		catch: (cause) =>
+			new BuildClassDiagramFailure({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message:
+								cause instanceof Error ? cause.message : "Unable to render class diagram scene.",
+							hint: "Repair the classes and relationships and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildClassDiagram.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* new BuildClassDiagramFailure({
+			status: "render_failed",
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Shorten class or member names, or split the model, and retry buildClassDiagram.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError(
+			(error) =>
+				new BuildClassDiagramFailure({
+					status: error.status,
+					context: {
+						...(error.status === "export_failed" ? exportContext : qualityContext),
+						issues: error.issues,
+					},
+				}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildClassDiagramResult, { ok: true }>;
+});
+
 const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(function* (
 	input: unknown,
 ) {
@@ -3995,6 +4252,14 @@ export const buildStateMachine: (
 
 export const buildErDiagram: (input: unknown) => CodeModeWorkflowEffect<BuildErDiagramResult> =
 	boundary("buildErDiagram", buildErDiagramWorkflow, failureResult);
+
+export const buildClassDiagram: (
+	input: unknown,
+) => CodeModeWorkflowEffect<BuildClassDiagramResult> = boundary(
+	"buildClassDiagram",
+	buildClassDiagramWorkflow,
+	failureResult,
+);
 
 export const buildTimeline: (input: unknown) => CodeModeWorkflowEffect<BuildTimelineResult> =
 	boundary("buildTimeline", buildTimelineWorkflow, failureResult);

@@ -12,6 +12,7 @@ export const DIAGRAM_TYPES = [
 	"state-machine",
 	"gantt",
 	"er",
+	"class",
 ] as const;
 
 export type DiagramTypeValue = (typeof DIAGRAM_TYPES)[number];

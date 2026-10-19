@@ -13,6 +13,7 @@ import {
 import { stateMachineScenarioChecks } from "./state-machine-scenarios.js";
 import { mindmapLayoutCheck, mindmapScenarioChecks } from "./mindmap-scenarios.js";
 import { erDrawnCheck, erScenarioChecks } from "./er-scenarios.js";
+import { classClearanceCheck, classDrawnCheck, classScenarioChecks } from "./class-scenarios.js";
 import {
 	ganttClearanceCheck,
 	ganttDrawnDataCheck,
@@ -28,6 +29,7 @@ import {
 	parseSequenceDiagram,
 	parseStateMachineDiagram,
 	parseErDiagram,
+	parseClassDiagram,
 	parseTimelineDiagram,
 	parseChartDiagram,
 	parseGanttDiagram,
@@ -808,6 +810,17 @@ export function evaluateScenarioDiagram(
 		return evaluation(scenario.id, diagram, erScenarioChecks(scenario, modelDiagram), (scene) => [
 			erDrawnCheck(diagram, scene),
 		]);
+	}
+	if (scenario.diagramType === "class") {
+		const diagram = parseClassDiagram(candidate);
+		const modelDiagram = modelCandidate === candidate ? diagram : parseClassDiagram(modelCandidate);
+		// The drawing and its clearance read the scene, so they score the returned diagram.
+		return evaluation(
+			scenario.id,
+			diagram,
+			classScenarioChecks(scenario, modelDiagram),
+			(scene) => [classDrawnCheck(diagram, scene), classClearanceCheck(scene)],
+		);
 	}
 	if (scenario.diagramType === "sequence") {
 		const diagram = parseSequenceDiagram(candidate);

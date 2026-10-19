@@ -800,6 +800,9 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			);
 			expect(codeDescription).toMatch(/^- buildStateMachine: .*one may be "else"/m);
 			expect(codeDescription).toMatch(/^- buildErDiagram: .*fromCardinality: "zero-or-many"/m);
+			expect(codeDescription).toMatch(
+				/^- buildClassDiagram: .*"composition" or "aggregation": from is the whole/m,
+			);
 			expect(
 				JSON.stringify(
 					tools.tools.map(({ name, description, inputSchema }) => ({
@@ -808,7 +811,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(11_400);
+			).toBeLessThan(12_000);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,

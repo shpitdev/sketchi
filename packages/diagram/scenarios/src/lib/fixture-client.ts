@@ -93,6 +93,20 @@ function fixtureRequirements(scenario: DiagramScenario): readonly Record<string,
 				value: entity.name ?? entity.id,
 			})),
 		];
+	if (scenario.diagramType === "class")
+		return [
+			{
+				kind: "count",
+				target: "classes",
+				comparator: "exact",
+				value: scenario.expectedDiagram.classes.length,
+			},
+			...scenario.expectedDiagram.classes.map((node) => ({
+				kind: "label",
+				target: "class",
+				value: node.name ?? node.id,
+			})),
+		];
 	if (scenario.diagramType === "sequence") {
 		return [
 			{

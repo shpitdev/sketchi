@@ -32,8 +32,8 @@ const BUILDERS = {
 	buildStateMachine: "states and the events, guards and actions that move between them",
 	buildGantt: "Gantt charts of dated tasks, durations, dependencies and milestones",
 	buildErDiagram: "database schemas: tables, fields, keys and relationships",
-	createCanvas:
-		"hand-placed CanvasSpec, only for layouts no builder above covers (dashboard, wireframe)",
+	buildClassDiagram: "UML classes, members and relationships",
+	createCanvas: "hand-placed CanvasSpec, only for layouts no builder covers (dashboard, wireframe)",
 };
 const HELPERS = {
 	searchIcons:
@@ -68,6 +68,9 @@ const GANTT_DATE_RULE =
 /** Shared by the buildErDiagram topic and its compact line in the execute description. */
 const ER_CARDINALITY_RULE =
 	'Cardinalities: "one", "zero-or-one", "many", "one-or-many", "zero-or-many", each how many rows of its end match one row of the other.';
+/** Shared by the buildClassDiagram topic and its compact line in the execute description. */
+const CLASS_KIND_RULE =
+	'kind "inheritance" or "realization": from extends or implements to; "composition" or "aggregation": from is the whole; "association"; "dependency": from uses to. Multiplicities ("1", "0..*") and roles go on compositions, aggregations and associations only.';
 const CHART_COPY_RULE =
 	"Copy every number, category, series name, unit and axis title from the prompt; invent none.";
 /**
@@ -86,6 +89,7 @@ const FAST_PATH = {
 	buildMindmap: `spec: { title, root: { label, children?: [{ label, children? }] }, layout?: { direction: "LR" | "RL" } }. Children keep their order.`,
 	buildGantt: `spec: { title, tasks: [{ id, label, start: "YYYY-MM-DD", end? (last day) | duration? (days), milestone?: true, phase?, dependsOn?: [ids finishing first], progress?: % }], phases?, today? }. ${GANTT_DATE_RULE}`,
 	buildErDiagram: `spec: { title, entities: [{ id, fields: ["id uuid PK", "customer_id uuid FK", "email text UK", "note text?"] }], relationships: [{ from: "orders.customer_id", to: "customers.id", fromCardinality: "zero-or-many", toCardinality: "one", label? }] }. ${ER_CARDINALITY_RULE} Copy every table, field, type, key and cardinality stated.`,
+	buildClassDiagram: `spec: { title, classes: [{ id, kind?: "abstract" | "interface" | "enum", attributes?: ["- id: UUID"], methods?: ["+ area(): double {abstract}"] }], relationships: [{ kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }] }. ${CLASS_KIND_RULE} Copy every class, member and relationship stated.`,
 } satisfies Record<Exclude<keyof typeof BUILDERS, "buildFlowchart" | "createCanvas">, string>;
 const EXECUTE_HELPERS = [
 	HELPERS.searchIcons,
@@ -720,6 +724,37 @@ export const catalog: CatalogEntry[] = [
 		],
 	},
 	{
+		id: "buildClassDiagram",
+		kind: "operation",
+		title: "buildClassDiagram",
+		topic: "buildClassDiagram",
+		keywords: [
+			"class diagram",
+			"uml",
+			"classes",
+			"interface",
+			"inheritance",
+			"composition",
+			"aggregation",
+			"object model",
+		],
+		snippet: "Create a native UML class diagram from classes, their members, and relationships.",
+		content: [
+			"buildClassDiagram accepts { spec: { id?, title, classes: [{ id, name?, kind?, stereotype?, attributes, methods }], relationships: [{ id?, kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }] }, options? }. The renderer draws each class as a box of name, attributes and methods, superclasses and interfaces above the classes that extend or implement them, and each relationship with its UML line and head.",
+			'A member is one string as UML writes it: attributes "- radius: double", "+ count: int {static}"; methods "+ area(): double", "+ draw(ctx: Canvas): void {abstract}". Visibility is +, -, # or ~. kind is "abstract", "interface" or "enum" (its values are attributes), or omitted for a class. Class ids hold no colon or space; name defaults to the id.',
+			`${CLASS_KIND_RULE} navigable: true puts an open arrow at to. A composition's whole is "1" or "0..1". Interfaces extend only interfaces, classes implement them, and no inheritance cycles.`,
+			"Copy every class, member, relationship, multiplicity and role the prompt states; invent none.",
+			operationTypes("buildClassDiagram"),
+		].join("\n\n"),
+		examples: [
+			{
+				title: "Shapes and a canvas",
+				language: "js",
+				code: `async () => sketchi.buildClassDiagram({ spec: { title: "Shapes", classes: [{ id: "Shape", kind: "abstract", attributes: ["# x: double"], methods: ["+ area(): double {abstract}"] }, { id: "Circle", attributes: ["- radius: double"], methods: ["+ area(): double"] }, { id: "Canvas", methods: ["+ add(s: Shape): void"] }], relationships: [{ kind: "inheritance", from: "Circle", to: "Shape" }, { kind: "aggregation", from: "Canvas", to: "Shape", fromMultiplicity: "1", toMultiplicity: "0..*", toRole: "shapes" }] }, options: ${DELIVERY_OPTIONS} })`,
+			},
+		],
+	},
+	{
 		id: "buildSequenceDiagram",
 		kind: "operation",
 		title: "buildSequenceDiagram",
@@ -778,7 +813,7 @@ export const catalog: CatalogEntry[] = [
 		snippet:
 			"Hand-place a layout no builder covers (dashboard, wireframe) as a versioned CanvasSpec.",
 		content: [
-			"Use createCanvas only for layouts no builder covers, such as dashboards and wireframes. Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); database schemas are ER diagrams (buildErDiagram); topic hierarchies, participant interactions, chronologies and bar, line or pie charts have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
+			"Use createCanvas only for layouts no builder covers, such as dashboards and wireframes. Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); database schemas are ER diagrams (buildErDiagram); object models are class diagrams (buildClassDiagram); topic hierarchies, participant interactions, chronologies and bar, line or pie charts have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
 			"CanvasSpec supports bound and standalone text, rectangle/ellipse/diamond/circle/polygon shapes, lines and bound connectors with arrowheads, frames, groups, layers, explicit back-to-front zOrder, and deterministic row/column/grid/stack/align/distribute layouts.",
 			"Every element needs a unique stable id. Connectors bind through shape nodeId values; line bindings and text containers use element ids.",
 			"Generic validation enforces size, reference, geometry, and composition invariants. Intentional overlap is allowed.",

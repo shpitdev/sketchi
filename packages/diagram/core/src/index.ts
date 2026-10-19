@@ -25,3 +25,5 @@ export * from "./types/state-machine.js";
 export * from "./types/gantt.js";
 export * from "./types/er.js";
 export * from "./er-fixtures.js";
+export * from "./types/class.js";
+export * from "./class-fixtures.js";

@@ -1,5 +1,7 @@
 import * as diagramCore from "@sketchi/diagram-core";
 import {
+	classFixture,
+	classStressFixtures,
 	crossingFixtures,
 	crossingStateMachines,
 	erFixture,
@@ -11,6 +13,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import { renderIntermediateDiagram } from "./scene";
 import { renderErDiagram } from "./er";
+import { renderClassDiagram } from "./class-diagram";
 import { renderStateMachineDiagram } from "./state-machine";
 
 // Count the segment geometry checks the router makes through diagram-core. The
@@ -144,5 +147,22 @@ describe("ER routing work", () => {
 		expect(small).toBeGreaterThan(0);
 		expect(small).toBeLessThan(50_000);
 		expect(large).toBeLessThan(6_000_000);
+	});
+});
+
+describe("class diagram routing work", () => {
+	// Measured: 8.9k checks for the shapes and self-reference models and 363k for the
+	// twenty-class library, its candidate placements each routed in full.
+	it("bounds segment checks for a small model and the twenty-class stress model", () => {
+		work.checks = 0;
+		renderClassDiagram(classFixture);
+		renderClassDiagram(classStressFixtures.selfReference);
+		const small = work.checks;
+		work.checks = 0;
+		renderClassDiagram(classStressFixtures.library);
+		const large = work.checks;
+		expect(small).toBeGreaterThan(0);
+		expect(small).toBeLessThan(30_000);
+		expect(large).toBeLessThan(1_500_000);
 	});
 });

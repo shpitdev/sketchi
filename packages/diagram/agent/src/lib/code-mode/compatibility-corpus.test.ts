@@ -171,10 +171,19 @@ const ER_ISSUE_CODE_ADDITIONS = new Set([
 	"unknown_relationship_field",
 	"invalid_relationship",
 ]);
+// Class diagrams add four issue codes; their ends add hollow triangle and diamond heads.
+const CLASS_ISSUE_CODE_ADDITIONS = new Set([
+	"class_too_large",
+	"invalid_class",
+	"invalid_member",
+	"invalid_generalization",
+]);
 const CANVAS_ARROWHEAD_ADDITIONS = new Set([
 	"crowfoot_one",
 	"crowfoot_many",
 	"crowfoot_one_or_many",
+	"triangle_outline",
+	"diamond_outline",
 ]);
 const FLOWCHART_SPEC_NODE_ADDED_FIELDS = new Set(["icon", "group"]);
 // Flowchart groups add an optional groups list to the spec.
@@ -284,6 +293,7 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		STATE_MACHINE_ISSUE_CODE_ADDITIONS.has(value) ||
 		GANTT_ISSUE_CODE_ADDITIONS.has(value) ||
 		ER_ISSUE_CODE_ADDITIONS.has(value) ||
+		CLASS_ISSUE_CODE_ADDITIONS.has(value) ||
 		CANVAS_ARROWHEAD_ADDITIONS.has(value)
 	);
 }
@@ -1705,7 +1715,8 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 						!CHART_ISSUE_CODE_ADDITIONS.has(code) &&
 						!STATE_MACHINE_ISSUE_CODE_ADDITIONS.has(code) &&
 						!GANTT_ISSUE_CODE_ADDITIONS.has(code) &&
-						!ER_ISSUE_CODE_ADDITIONS.has(code),
+						!ER_ISSUE_CODE_ADDITIONS.has(code) &&
+						!CLASS_ISSUE_CODE_ADDITIONS.has(code),
 				)
 				.toSorted(),
 		).toEqual([...directlyReachableCodes, ...boundaryOnlyCodes].toSorted());

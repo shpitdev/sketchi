@@ -56,6 +56,13 @@ function diagramCounts(diagram: CanonicalDiagram) {
 			edgeCount: diagram.relationships.length,
 			edgeNoun: "relationships",
 		};
+	if (diagram.type === "class")
+		return {
+			nodeCount: diagram.classes.length,
+			nodeNoun: "classes",
+			edgeCount: diagram.relationships.length,
+			edgeNoun: "relationships",
+		};
 	return diagram.type === "sequence"
 		? {
 				nodeCount: diagram.participants.length,

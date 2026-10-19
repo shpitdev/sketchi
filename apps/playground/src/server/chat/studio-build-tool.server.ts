@@ -39,7 +39,8 @@ type StudioBuildOperation =
 	| "buildChart"
 	| "buildStateMachine"
 	| "buildGantt"
-	| "buildErDiagram";
+	| "buildErDiagram"
+	| "buildClassDiagram";
 
 /**
  * One agent turn's build budget, shared by every Studio build tool: one

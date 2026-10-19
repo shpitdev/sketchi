@@ -10,6 +10,7 @@ export * from "./lib/sequence-scenarios.js";
 export * from "./lib/state-machine-scenarios.js";
 export * from "./lib/mindmap-scenarios.js";
 export * from "./lib/er-scenarios.js";
+export * from "./lib/class-scenarios.js";
 
 export * from "./lib/timeline-scenarios.js";
 export * from "./lib/chart-scenarios.js";

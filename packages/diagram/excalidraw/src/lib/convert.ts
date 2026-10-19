@@ -372,13 +372,14 @@ function shapeElement(input: {
 		backgroundColor: input.shape.fillColor ?? "transparent",
 		boundElements: boundElements.length > 0 ? boundElements : null,
 		// Chart and Gantt bars keep square corners, so their ends sit exactly at their
-		// values and dates, and a table's outline and name band keep theirs, so the
-		// band fills its top.
+		// values and dates, and a table's or class's outline and name band keep theirs,
+		// so the band fills its top.
 		roundness:
 			shapeType === "rectangle" &&
 			input.shape.rendererRole !== "chart-mark" &&
 			input.shape.rendererRole !== "gantt-mark" &&
-			input.shape.rendererRole !== "er-table"
+			input.shape.rendererRole !== "er-table" &&
+			input.shape.rendererRole !== "class-box"
 				? { type: 3 }
 				: null,
 		strokeColor: input.shape.strokeColor ?? input.scene.accentColor,
@@ -388,13 +389,12 @@ function shapeElement(input: {
 	};
 }
 
+/** A table or a class box: lines bound to one keep their fixed points when it moves. */
 function isTableShape(element: ExcalidrawElement | undefined): boolean {
 	const customData = element?.customData;
-	return (
-		customData !== null &&
-		typeof customData === "object" &&
-		(customData as Record<string, unknown>)["sketchiRendererRole"] === "er-table"
-	);
+	if (customData === null || typeof customData !== "object") return false;
+	const role = (customData as Record<string, unknown>)["sketchiRendererRole"];
+	return role === "er-table" || role === "class-box";
 }
 
 function lastArrowPoint(arrow: ArrowSceneElement) {
@@ -411,9 +411,10 @@ function arrowElement(input: {
 	const start = input.arrow.points[0];
 	const end = lastArrowPoint(input.arrow);
 	// Excalidraw resolves a straight arrow's binding against its target's outline,
-	// which a frame lacks, and re-aims it at a table's middle; an elbow arrow keeps
-	// its fixed point on a moved frame, and on the row of a moved table. A curved
-	// connector stays a curved arrow through its points.
+	// which a frame lacks, and re-aims it at a table's or class's middle; an elbow
+	// arrow keeps its fixed point on a moved frame, and on the row of a moved table
+	// or the port of a moved class. A curved connector stays a curved arrow through
+	// its points.
 	const elbowed =
 		input.arrow.curved !== true &&
 		(input.arrow.points.length > 2 ||

@@ -28,6 +28,7 @@ import {
 } from "./types/state-machine.js";
 import { type GanttDiagram, GanttDiagramSchema, validateGanttDiagram } from "./types/gantt.js";
 import { type ErDiagram, ErDiagramSchema, validateErDiagram } from "./types/er.js";
+import { type ClassDiagram, ClassDiagramSchema, validateClassDiagram } from "./types/class.js";
 import type { DiagramTypeValue } from "./types.js";
 
 /** One diagram of any canonical family, discriminated by `type`. */
@@ -39,7 +40,8 @@ export type CanonicalDiagram =
 	| ChartDiagram
 	| StateMachineDiagram
 	| GanttDiagram
-	| ErDiagram;
+	| ErDiagram
+	| ClassDiagram;
 
 // A family added to DIAGRAM_TYPES without a contract here fails to compile.
 const familySchemas = {
@@ -51,6 +53,7 @@ const familySchemas = {
 	"state-machine": StateMachineDiagramSchema,
 	gantt: GanttDiagramSchema,
 	er: ErDiagramSchema,
+	class: ClassDiagramSchema,
 } satisfies Record<DiagramTypeValue, Schema.Top>;
 
 export const CanonicalDiagramSchema = Schema.Union([
@@ -62,6 +65,7 @@ export const CanonicalDiagramSchema = Schema.Union([
 	familySchemas["state-machine"],
 	familySchemas.gantt,
 	familySchemas.er,
+	familySchemas.class,
 ]);
 
 /** Apply the family's semantic validation to an already decoded diagram. */
@@ -83,6 +87,8 @@ export function validateCanonicalDiagram(diagram: CanonicalDiagram): CanonicalDi
 			return validateGanttDiagram(diagram);
 		case "er":
 			return validateErDiagram(diagram);
+		case "class":
+			return validateClassDiagram(diagram);
 	}
 }
 

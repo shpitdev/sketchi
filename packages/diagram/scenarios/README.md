@@ -63,6 +63,14 @@ and the eval harness use it.
   cardinality at each end, in either direction. No entity or relationship the
   prompt does not state may appear, and the drawn scene must show every table,
   field, marker and crow's-foot end the diagram states.
+- Class scenarios check every stated class and its kind, every attribute with
+  its type, visibility and static marker, every method with its parameter and
+  return types and its markers, and every stated relationship between the
+  right classes, of the right kind and in the right direction (an association
+  either way), with the multiplicities, roles and navigability it states. No
+  class or relationship the prompt does not state may appear. The drawn scene
+  must show every member, head, dash, multiplicity and role, each label clear
+  of every box, line and other label.
 
 Checks that measure the model (logos, sequence structure) score the model's own
 diagram from before candidate enforcement, so a repair never hides a model

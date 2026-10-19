@@ -8,6 +8,8 @@ import {
 	BuildGanttToolInputSchema,
 	BuildErDiagramResultSchema,
 	BuildErDiagramToolInputSchema,
+	BuildClassDiagramResultSchema,
+	BuildClassDiagramToolInputSchema,
 	BuildTimelineResultSchema,
 	BuildTimelineToolInputSchema,
 	BuildChartResultSchema,
@@ -19,6 +21,7 @@ import {
 	type BuildStateMachineResult,
 	type BuildGanttResult,
 	type BuildErDiagramResult,
+	type BuildClassDiagramResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 } from "@sketchi/diagram-agent";
@@ -37,7 +40,8 @@ export type StudioBuildResult =
 	| BuildChartResult
 	| BuildStateMachineResult
 	| BuildGanttResult
-	| BuildErDiagramResult;
+	| BuildErDiagramResult
+	| BuildClassDiagramResult;
 
 const BUILD_TOOLS = {
 	"tool-build_chart": {
@@ -110,6 +114,16 @@ const BUILD_TOOLS = {
 				: [];
 		},
 	},
+	"tool-build_class_diagram": {
+		family: "class",
+		decodeResult: Schema.decodeUnknownResult(BuildClassDiagramResultSchema),
+		labels: (input: unknown) => {
+			const decoded = Schema.decodeUnknownResult(BuildClassDiagramToolInputSchema)(input);
+			return Result.isSuccess(decoded)
+				? decoded.success.spec.classes.map((node) => node.name ?? node.id)
+				: [];
+		},
+	},
 } as const;
 
 export type DiagramToolPartType = keyof typeof BUILD_TOOLS;
@@ -140,6 +154,7 @@ const FAMILY_NAMES: Readonly<Record<DiagramToolFamily, string>> = {
 	"state-machine": "state machine",
 	gantt: "Gantt chart",
 	er: "ER diagram",
+	class: "class diagram",
 };
 
 /**

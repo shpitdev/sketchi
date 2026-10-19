@@ -16,6 +16,7 @@ const CodeModeDocsTopicContract = Schema.Literals([
 	"buildStateMachine",
 	"buildGantt",
 	"buildErDiagram",
+	"buildClassDiagram",
 	"createCanvas",
 	"getArtifact",
 	"applyDiagramPatch",

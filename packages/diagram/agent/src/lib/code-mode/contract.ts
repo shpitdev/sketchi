@@ -8,6 +8,9 @@ import {
 	CANVAS_SPEC_VERSION,
 	CHART_KINDS,
 	CHART_ORIENTATIONS,
+	CLASS_KINDS,
+	CLASS_RELATIONSHIP_KINDS,
+	CLASS_VISIBILITIES,
 	ER_CARDINALITIES,
 	SEQUENCE_MESSAGE_STYLES,
 	SEQUENCE_MESSAGE_TYPES,
@@ -424,6 +427,10 @@ export const CODE_MODE_ISSUE_CODES = [
 	"invalid_field",
 	"unknown_relationship_field",
 	"invalid_relationship",
+	"class_too_large",
+	"invalid_class",
+	"invalid_member",
+	"invalid_generalization",
 	"request_too_large",
 	"generic_label",
 	"label_too_long",
@@ -899,6 +906,99 @@ export class ErSpec extends Schema.Class<ErSpec>("ErSpec")(
 ) {}
 export const ErSpecSchema = ErSpec;
 
+/**
+ * The authoring form of diagram-core's canonical ClassDiagram: a member may be
+ * one string (`"- radius: double"`, `"+ area(): double"`), relationship ids are
+ * optional and style is defaulted. buildClassDiagram normalizes it into the
+ * core contract, which owns every invariant.
+ */
+export class ClassAttributeSpec extends Schema.Class<ClassAttributeSpec>("ClassAttributeSpec")(
+	{
+		name: RequiredNonEmptyString,
+		type: optionalContract(NonEmptyString),
+		visibility: optionalContract(literals(CLASS_VISIBILITIES)),
+		static: optionalContract(Schema.Boolean),
+	},
+	{ identifier: undefined },
+) {}
+
+export class ClassParameterSpec extends Schema.Class<ClassParameterSpec>("ClassParameterSpec")(
+	{ name: RequiredNonEmptyString, type: optionalContract(NonEmptyString) },
+	{ identifier: undefined },
+) {}
+
+const classParamsDefault: Array<string | typeof ClassParameterSpec.Encoded> = [];
+export class ClassMethodSpec extends Schema.Class<ClassMethodSpec>("ClassMethodSpec")(
+	{
+		name: RequiredNonEmptyString,
+		params: Schema.Array(Schema.Union([NonEmptyString, ClassParameterSpec]))
+			.pipe(Schema.mutable)
+			.annotate({ default: classParamsDefault })
+			.pipe(Schema.withDecodingDefaultKey(Effect.succeed(classParamsDefault))),
+		returns: optionalContract(NonEmptyString),
+		visibility: optionalContract(literals(CLASS_VISIBILITIES)),
+		static: optionalContract(Schema.Boolean),
+		abstract: optionalContract(Schema.Boolean),
+	},
+	{ identifier: undefined },
+) {}
+
+const classAttributesDefault: Array<string | typeof ClassAttributeSpec.Encoded> = [];
+// No member is the same decoded or encoded, so one empty list serves both.
+const classMethodsDefault: never[] = [];
+export class ClassNodeSpec extends Schema.Class<ClassNodeSpec>("ClassNodeSpec")(
+	{
+		id: RequiredNonEmptyString,
+		name: optionalContract(NonEmptyString),
+		kind: optionalContract(literals(CLASS_KINDS)),
+		stereotype: optionalContract(NonEmptyString),
+		attributes: Schema.Array(Schema.Union([NonEmptyString, ClassAttributeSpec]))
+			.pipe(Schema.mutable)
+			.annotate({ default: classAttributesDefault })
+			.pipe(Schema.withDecodingDefaultKey(Effect.succeed(classAttributesDefault))),
+		methods: Schema.Array(Schema.Union([NonEmptyString, ClassMethodSpec]))
+			.pipe(Schema.mutable)
+			.annotate({ default: classMethodsDefault })
+			.pipe(Schema.withDecodingDefaultKey(Effect.succeed(classMethodsDefault))),
+	},
+	{ identifier: undefined },
+) {}
+
+export class ClassRelationshipSpec extends Schema.Class<ClassRelationshipSpec>(
+	"ClassRelationshipSpec",
+)(
+	{
+		id: optionalContract(NonEmptyString),
+		kind: literals(CLASS_RELATIONSHIP_KINDS),
+		from: RequiredNonEmptyString,
+		to: RequiredNonEmptyString,
+		fromMultiplicity: optionalContract(NonEmptyString),
+		toMultiplicity: optionalContract(NonEmptyString),
+		fromRole: optionalContract(NonEmptyString),
+		toRole: optionalContract(NonEmptyString),
+		navigable: optionalContract(Schema.Boolean),
+		label: optionalContract(NonEmptyString),
+	},
+	{ identifier: undefined },
+) {}
+
+const classRelationshipsDefault: Array<typeof ClassRelationshipSpec.Encoded> = [];
+const ClassRelationshipsWithDefault = Schema.Array(ClassRelationshipSpec)
+	.pipe(Schema.mutable)
+	.annotate({ default: classRelationshipsDefault })
+	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(classRelationshipsDefault)));
+export class ClassSpec extends Schema.Class<ClassSpec>("ClassSpec")(
+	{
+		id: optionalContract(NonEmptyString),
+		title: RequiredNonEmptyString,
+		classes: requiredArray(nonEmptyArray(ClassNodeSpec)),
+		relationships: ClassRelationshipsWithDefault,
+		style: DiagramStyleWithDefault,
+	},
+	{ identifier: undefined },
+) {}
+export const ClassSpecSchema = ClassSpec;
+
 const ArtifactFormatsOption = optionalContract(nonEmptyArray(ArtifactFormatSchema));
 const InlineArtifactsOption = optionalContract(
 	Schema.Array(InlineArtifactFormatSchema).pipe(Schema.mutable),
@@ -1116,6 +1216,24 @@ export const BuildErDiagramToolInputSchema = Schema.Struct({
 	spec: requiredObject(ErToolSpecSchema),
 });
 export type BuildErDiagramToolInput = typeof BuildErDiagramToolInputSchema.Type;
+export class BuildClassDiagramRequest extends Schema.Class<BuildClassDiagramRequest>(
+	"BuildClassDiagramRequest",
+)(
+	{
+		requestId: optionalContract(NonEmptyString),
+		spec: requiredObject(ClassSpec),
+		options: optionalContract(BuildFlowchartOptions),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildClassDiagramRequestSchema = BuildClassDiagramRequest;
+/** The class diagram spec a model authors; style is always the Sketchi palette. */
+export const ClassToolSpecSchema = ClassSpec.mapFields(({ style: _style, ...fields }) => fields);
+export const BuildClassDiagramToolInputSchema = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(ClassToolSpecSchema),
+});
+export type BuildClassDiagramToolInput = typeof BuildClassDiagramToolInputSchema.Type;
 
 export interface MindmapTopicInput {
 	label: string;
@@ -1904,6 +2022,30 @@ const NormalizedErSpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedErSpec = typeof NormalizedErSpecSchema.Type;
+const NormalizedClassSpecSchema = Schema.Struct({
+	id: NonEmptyString,
+	title: NonEmptyString,
+	classes: Schema.Array(
+		Schema.Struct({
+			id: NonEmptyString,
+			name: optionalContract(NonEmptyString),
+			kind: optionalContract(literals(CLASS_KINDS)),
+			stereotype: optionalContract(NonEmptyString),
+			attributes: Schema.Array(ClassAttributeSpec).pipe(Schema.mutable),
+			methods: Schema.Array(
+				ClassMethodSpec.mapFields((fields) => ({
+					...fields,
+					params: Schema.Array(ClassParameterSpec).pipe(Schema.mutable),
+				})),
+			).pipe(Schema.mutable),
+		}),
+	).pipe(Schema.mutable),
+	relationships: Schema.Array(
+		ClassRelationshipSpec.mapFields((fields) => ({ ...fields, id: NonEmptyString })),
+	).pipe(Schema.mutable),
+	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
+});
+export type NormalizedClassSpec = typeof NormalizedClassSpecSchema.Type;
 const NormalizedChartSpecSchema = ChartSpec.mapFields((fields) => ({
 	...fields,
 	id: NonEmptyString,
@@ -2274,6 +2416,49 @@ export const BuildErDiagramResultSchema = Schema.Union([
 	BuildErDiagramRejected,
 ]);
 export type BuildErDiagramResult = typeof BuildErDiagramResultSchema.Type;
+
+export class BuildClassDiagramAccepted extends Schema.Class<BuildClassDiagramAccepted>(
+	"BuildClassDiagramAccepted",
+)(
+	{
+		ok: booleanLiteral(true),
+		status: stringLiteral("accepted"),
+		buildId: Schema.String,
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: NormalizedClassSpecSchema,
+		quality: QualityReportSchema,
+		artifact: ArtifactBundleSchema,
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export class BuildClassDiagramRejected extends Schema.Class<BuildClassDiagramRejected>(
+	"BuildClassDiagramRejected",
+)(
+	{
+		ok: booleanLiteral(false),
+		status: literals([
+			"invalid_input",
+			"invalid_class_diagram",
+			"quality_failed",
+			"render_failed",
+			"export_failed",
+			"storage_failed",
+		]),
+		buildId: optionalContract(Schema.String),
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: optionalContract(NormalizedClassSpecSchema),
+		quality: optionalContract(QualityReportSchema),
+		partial: optionalContract(PartialArtifactBundleSchema),
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildClassDiagramResultSchema = Schema.Union([
+	BuildClassDiagramAccepted,
+	BuildClassDiagramRejected,
+]);
+export type BuildClassDiagramResult = typeof BuildClassDiagramResultSchema.Type;
 
 export class GetArtifactAccepted extends Schema.Class<GetArtifactAccepted>("GetArtifactAccepted")(
 	{
