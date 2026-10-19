@@ -803,6 +803,14 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(codeDescription).toContain(
 				'A stated check or verification ("verify the signature", "stock is checked") is its own process node before the decision that reads its result; "check whether X" alone is just that decision.',
 			);
+			// Without this, Sonnet turns "log any errors to Sentry" into an invented `Error?` branch.
+			expect(codeDescription).toContain(
+				'Do not add decisions, loops, steps, or edges the prompt does not state; a step that handles "any errors" or acts "if needed" stays one step in sequence.',
+			);
+			// Without this, Sonnet draws an OAuth redirect as a new call, leaving its request unanswered.
+			expect(codeDescription).toContain(
+				'Every reply the prompt states, including a redirect back to the caller, is its own type: "return" message',
+			);
 			expect(codeDescription).toContain(getCodeModeDocs({ topic: "buildFlowchart" }).content);
 			expect(codeDescription).not.toMatch(/^type Build(?!Flowchart|Options)/m);
 			expect(codeDescription).toMatch(
