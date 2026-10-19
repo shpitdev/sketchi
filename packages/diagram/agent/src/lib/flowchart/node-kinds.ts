@@ -70,7 +70,9 @@ const looseKey = (value: string) =>
  * the start, a node without outgoing edges is an end, and a node with one unlabeled outgoing edge
  * whose label is not a question is a process. Anything else, such as a node with labeled or
  * several outgoing edges, keeps its value so validation asks the caller instead of turning a
- * would-be decision into a step. Edges written { from, to } read as { source, target }.
+ * would-be decision into a step. With another connected end, a non-question process leaf reached
+ * by a labeled decision branch is also an end. Ordinary process chains still need their next edge.
+ * Edges written { from, to } read as { source, target }.
  */
 export function resolveFlowchartNodeKinds(input: unknown): unknown {
 	if (!isRecord(input)) return input;
@@ -100,10 +102,11 @@ export function resolveFlowchartNodeKinds(input: unknown): unknown {
 		of(edge.target).incoming += 1;
 	}
 	const entries = nodes.filter(isRecord).filter((node) => of(node.id).incoming === 0);
-
 	const resolve = (node: LooseNode): unknown => {
 		const authored = node.kind ?? node.type;
 		const { incoming, outgoing, labeledOutgoing } = of(node.id);
+		// Judge the label the build will draw, so a trailing tool-output fragment cannot hide a "?".
+		const question = typeof node.label === "string" && cleanToolString(node.label).endsWith("?");
 		if (typeof authored === "string") {
 			const key = looseKey(authored);
 			const kind = KIND_SYNONYMS[key];
@@ -117,15 +120,47 @@ export function resolveFlowchartNodeKinds(input: unknown): unknown {
 		if (authored !== undefined) return node.kind;
 		if (outgoing === 0 && incoming > 0) return "end";
 		if (incoming === 0 && entries.length === 1 && labeledOutgoing === 0) return "start";
-		// Judge the label the build will draw, so a trailing tool-output fragment cannot hide a "?".
-		const question = typeof node.label === "string" && cleanToolString(node.label).endsWith("?");
 		if (incoming > 0 && outgoing === 1 && labeledOutgoing === 0 && !question) return "process";
 		return undefined;
 	};
 
-	const resolved = nodes.map((node) => {
+	// Resolve existing ends first, including synonyms, type keys and terminals by position. A leaf
+	// converted below cannot establish termination for another leaf, nor can an unconnected end.
+	const kinds = nodes.map((node) => (isRecord(node) ? resolve(node) : undefined));
+	const hasConnectedEnd = nodes.some(
+		(node, index) =>
+			isRecord(node) &&
+			kinds[index] === "end" &&
+			of(node.id).incoming > 0 &&
+			of(node.id).outgoing === 0,
+	);
+	const decisions = new Set(
+		nodes.flatMap((node, index) =>
+			isRecord(node) && kinds[index] === "decision" ? [node.id] : [],
+		),
+	);
+	const branchOutcomes = new Set(
+		edges
+			.filter(
+				(edge) =>
+					decisions.has(edge.source) && typeof edge.label === "string" && edge.label.trim() !== "",
+			)
+			.map((edge) => edge.target),
+	);
+
+	const resolved = nodes.map((node, index) => {
 		if (!isRecord(node)) return node;
-		const kind = resolve(node);
+		let kind = kinds[index];
+		const question = typeof node.label === "string" && cleanToolString(node.label).endsWith("?");
+		if (
+			kind === "process" &&
+			hasConnectedEnd &&
+			branchOutcomes.has(node.id) &&
+			of(node.id).outgoing === 0 &&
+			!question
+		) {
+			kind = "end";
+		}
 		if (kind === node.kind) return node;
 		changed = true;
 		const { type: _type, ...rest } = node;

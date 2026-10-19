@@ -160,7 +160,7 @@ export const EXECUTE_TOOL_DESCRIPTION = [
 
 /** Parameter descriptions are not truncated, so the fast path and the full flowchart topic live here. */
 export const EXECUTE_CODE_DESCRIPTION = [
-	`One async arrow function. Call every builder as sketchi.<builder>({ spec, options: ${DELIVERY_OPTIONS} }) to get Excalidraw and PNG URLs without inline JSON. Each builder's spec and the rules that make it build first try:`,
+	`One async arrow function. Call sketchi.<builder>({ spec, options: ${DELIVERY_OPTIONS} }) for Excalidraw and PNG URLs.`,
 	"",
 	"buildFlowchart:",
 	FLOWCHART_DOCS,

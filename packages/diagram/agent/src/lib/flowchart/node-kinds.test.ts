@@ -34,7 +34,142 @@ const kinds = (input: unknown) =>
 		resolveFlowchartNodeKinds({ spec: input }) as { spec: { nodes: Array<{ kind?: unknown }> } }
 	).spec.nodes.map((node) => node.kind);
 
+const branchOutcomes = (
+	end: Record<string, unknown> = { kind: "end" },
+	label = "Request a receipt",
+) => ({
+	title: "Branch outcomes",
+	nodes: [
+		{ id: "start", label: "Begin", kind: "start" },
+		{ id: "decision", label: "Continue?", kind: "decision" },
+		{ id: "action", label, kind: "process" },
+		{ id: "end", label: "Complete", ...end },
+	],
+	edges: [
+		{ source: "start", target: "decision" },
+		{ source: "decision", target: "action", label: "no" },
+		{ source: "decision", target: "end", label: "yes" },
+	],
+});
+
 describe("flowchart node kinds", () => {
+	it.each(["Request a receipt", "Escalate to provider"])(
+		"builds a terminal action marked process without a repair turn: %s",
+		async (label) => {
+			const built = await build(branchOutcomes({ kind: "end" }, label));
+			if (!built.ok) throw new Error(JSON.stringify(built.issues));
+			expect(built.normalizedSpec.nodes.find((node) => node.id === "action")).toEqual({
+				id: "action",
+				label,
+				kind: "end",
+			});
+			expect(built.normalizedSpec.edges).toHaveLength(3);
+		},
+	);
+
+	it.each([
+		["kind synonym", { kind: "finish" }],
+		["type key", { type: "end" }],
+		["type synonym", { type: "exit" }],
+		["terminal by position", { kind: "terminal" }],
+		["type terminal by position", { type: "terminator" }],
+		["omitted kind resolved by position", {}],
+	])("uses a connected end resolved from %s", async (_name, end) => {
+		const built = await build(branchOutcomes(end));
+		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		expect(
+			built.normalizedSpec.nodes.filter((node) => node.kind === "end").map((node) => node.id),
+		).toEqual(["action", "end"]);
+	});
+
+	it.each(["end", "finish"])(
+		"does not let an unconnected %s suppress missing outgoing edges",
+		async (kind) => {
+			const spec = branchOutcomes();
+			const built = await build({
+				...spec,
+				nodes: spec.nodes.map((node) => (node.id === "end" ? { ...node, kind } : node)),
+				edges: spec.edges.filter((edge) => edge.target !== "end"),
+			});
+			expect(built).toMatchObject({
+				ok: false,
+				status: "invalid_flowchart",
+				issues: expect.arrayContaining([
+					expect.objectContaining({
+						code: "missing_outgoing_edge",
+						ref: { kind: "node", id: "action" },
+					}),
+				]),
+			});
+		},
+	);
+
+	it.each([false, true])(
+		"rejects an unfinished process chain (unconnected end: %s)",
+		async (includeEnd) => {
+			const built = await build({
+				title: "Unfinished chain",
+				nodes: [
+					{ id: "start", label: "Begin", kind: "start" },
+					{ id: "a", label: "A", kind: "process" },
+					{ id: "b", label: "B", kind: "process" },
+					...(includeEnd ? [{ id: "end", label: "Done", kind: "end" }] : []),
+				],
+				edges: [
+					{ source: "start", target: "a" },
+					{ source: "a", target: "b" },
+				],
+			});
+			expect(built).toMatchObject({
+				ok: false,
+				issues: expect.arrayContaining([
+					expect.objectContaining({
+						code: "missing_outgoing_edge",
+						ref: { kind: "node", id: "b" },
+					}),
+				]),
+			});
+			if (!includeEnd)
+				expect(built.issues).toEqual(
+					expect.arrayContaining([expect.objectContaining({ code: "missing_end" })]),
+				);
+		},
+	);
+
+	it.each(["question", "unlabeled branch", "non-decision source", "isolated process", "no end"])(
+		"keeps %s invalid at the build boundary",
+		async (reason) => {
+			const spec = branchOutcomes();
+			const nodes = spec.nodes.map((node) => {
+				if (node.id === "action" && reason === "question") return { ...node, label: "Ready?" };
+				if (node.id === "decision" && reason === "non-decision source")
+					return { ...node, label: "Route", kind: "process" };
+				if (node.id === "end" && reason === "no end") return { ...node, kind: "process" };
+				return node;
+			});
+			const edges = spec.edges.flatMap((edge) => {
+				if (edge.target !== "action") return [edge];
+				if (reason === "isolated process") return [];
+				if (reason === "unlabeled branch") return [{ source: edge.source, target: edge.target }];
+				return [edge];
+			});
+			const built = await build({ ...spec, nodes, edges });
+			expect(built).toMatchObject({
+				ok: false,
+				issues: expect.arrayContaining([
+					expect.objectContaining({
+						code: "missing_outgoing_edge",
+						ref: { kind: "node", id: "action" },
+					}),
+				]),
+			});
+			if (reason === "no end")
+				expect(built.issues).toEqual(
+					expect.arrayContaining([expect.objectContaining({ code: "missing_end" })]),
+				);
+		},
+	);
+
 	it("maps synonyms, a type key and terminal by position", () => {
 		expect(
 			kinds(
