@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.17.1
+
+### Patch Changes
+
+- [#447](https://github.com/shpitdev/sketchi/pull/447) [`1a37c6d`](https://github.com/shpitdev/sketchi/commit/1a37c6d4c231f0c971cfa9a43b45a0ee817ad2bb) Thanks [@anandpant](https://github.com/anandpant)! - Flowcharts and state machines draw fewer crossing lines: where lines still cross after layout, a line may move to another side of its node, a loop to the other side of the flow, or a decision's branches to other vertices, whenever that removes a crossing without adding other defects. Lines also keep a clear gap from every node they pass, rounded and pointed ones included, and a transition's label sits clearly nearer its own line than any other.
+
 ## 0.17.0
 
 ### Minor Changes
