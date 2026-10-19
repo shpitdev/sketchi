@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stateMachineFixture } from "@sketchi/diagram-core";
+import { mediaPlayerStateMachine, stateMachineFixture } from "@sketchi/diagram-core";
 
 import { candidateFromText, enforceCandidateRequestRequirements } from "./candidates.js";
 
@@ -27,6 +27,76 @@ function enforced(cycles: number, transitions = stateMachineFixture.transitions)
 }
 
 describe("state-machine generation", () => {
+	it("accepts omitted state labels through generation and enforces their displayed ids", () => {
+		const diagram = {
+			...mediaPlayerStateMachine,
+			states: mediaPlayerStateMachine.states.map(({ label: _label, ...state }) => state),
+		};
+		const candidate = enforceCandidateRequestRequirements(
+			candidateFromText({
+				model: "fixture",
+				provider: "fixture",
+				text: JSON.stringify({
+					title: diagram.title,
+					intent: {
+						requestedKind: "state-machine",
+						nativeKind: "state-machine",
+						requirements: ["stopped", "active", "playing", "paused"].map((value) => ({
+							kind: "label",
+							target: "state",
+							value,
+						})),
+					},
+					diagram,
+				}),
+			}),
+			request,
+		);
+		expect(candidate.error).toBeUndefined();
+		expect(candidate.diagnostics).toEqual([]);
+		expect(candidate.diagram).toMatchObject(diagram);
+	});
+
+	it.each(["", " ", "\t\n"])("rejects an explicit blank generated label %j", (label) => {
+		const candidate = candidateFromText({
+			model: "fixture",
+			provider: "fixture",
+			text: JSON.stringify({
+				title: mediaPlayerStateMachine.title,
+				intent: { requestedKind: "state-machine", nativeKind: "state-machine", requirements: [] },
+				diagram: {
+					...mediaPlayerStateMachine,
+					states: mediaPlayerStateMachine.states.map((state) =>
+						state.id === "stopped" ? { ...state, label } : state,
+					),
+				},
+			}),
+		});
+		expect(candidate.error).toBeDefined();
+		expect(candidate.diagram).toBeUndefined();
+	});
+
+	it("preserves explicitly generated labels byte for byte", () => {
+		const label = "  Stopped\n  (ready_to_play)  ";
+		const candidate = candidateFromText({
+			model: "fixture",
+			provider: "fixture",
+			text: JSON.stringify({
+				title: mediaPlayerStateMachine.title,
+				intent: { requestedKind: "state-machine", nativeKind: "state-machine", requirements: [] },
+				diagram: {
+					...mediaPlayerStateMachine,
+					states: mediaPlayerStateMachine.states.map((state) =>
+						state.id === "stopped" ? { ...state, label } : state,
+					),
+				},
+			}),
+		});
+		expect(candidate.error).toBeUndefined();
+		if (candidate.diagram?.type !== "state-machine") throw new Error("Expected state machine");
+		expect(candidate.diagram.states[0]?.label).toBe(label);
+	});
+
 	it("counts loops, a self-loop included, toward a cycles requirement", () => {
 		// The fixture has the after-24h self-loop and the shipped/paid return.
 		expect(enforced(2).error).toBeUndefined();

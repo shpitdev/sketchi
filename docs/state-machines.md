@@ -9,7 +9,7 @@ A state machine draws states and the transitions between them: an order's lifecy
 ## Contract
 
 - `initial` names the top-level state the machine starts in. It draws as a filled dot.
-- A state has a unique `id` (no `:`) and a `label`. `kind: "final"` ends the machine and draws as a bullseye; it needs no label. `kind: "choice"` is a branch point drawn as a diamond whose outgoing transitions carry guards.
+- A state has a unique `id` (no `:`) and an optional `label`. Across all surfaces, an omitted regular-state label defaults to the id verbatim, like class and ER names: `waiting_for_payment` stays `waiting_for_payment`. An explicit blank label is invalid. `kind: "final"` ends the machine and draws as a bullseye; it needs no label. `kind: "choice"` is a branch point drawn as a diamond whose outgoing transitions carry guards.
 - States that name another state as `parent` form a composite, drawn as a frame around them. A composite's `initial` names the substate a transition into it enters, drawn as a dot inside the frame. Composites hold states, not other composites.
 - A transition has `source`, `target` and optional `event`, `guard` and `action`, kept as separate fields and drawn as one label, `event [guard] / action`. It may return to its own state, and may leave or enter a composite. In Code Mode its `id` is optional.
 - At most 30 states, 60 transitions and 6 composites. Every state must be reachable from `initial`, a final state has no outgoing transitions, a choice has two or more, each with its own guard (one may be `else`), and a transition into a composite needs the composite's `initial`. Each rejection carries a repair hint.

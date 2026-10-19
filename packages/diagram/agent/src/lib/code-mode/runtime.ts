@@ -9,6 +9,7 @@ import {
 	getFlowchartValidationIssues,
 	getSequenceValidationIssues,
 	getStateMachineValidationIssues,
+	stateLabel,
 	getErValidationIssues,
 	parseErFieldShorthand,
 	resolveErShorthand,
@@ -736,13 +737,17 @@ function normalizeStateMachineSpec(
 		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-state-machine"),
 		title,
 		initial: cleanToolString(spec.initial),
-		states: spec.states.map((state) => ({
-			id: cleanToolString(state.id),
-			...optional("label", state.label),
-			...(state.kind ? { kind: state.kind } : {}),
-			...optional("parent", state.parent),
-			...optional("initial", state.initial),
-		})),
+		states: spec.states.map((state) => {
+			const id = cleanToolString(state.id);
+			const label = stateLabel({ ...state, id });
+			return {
+				id,
+				...(label !== undefined ? { label } : {}),
+				...(state.kind ? { kind: state.kind } : {}),
+				...optional("parent", state.parent),
+				...optional("initial", state.initial),
+			};
+		}),
 		transitions: spec.transitions.map((transition, index) => ({
 			id:
 				cleanOptional(transition.id) ??

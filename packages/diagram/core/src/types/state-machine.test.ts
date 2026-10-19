@@ -8,6 +8,7 @@ import {
 	type StateMachineDiagram,
 	stateMachineDiagramType,
 	stateMachineFixture,
+	stateLabel,
 	stateTransitionLabel,
 } from "./state-machine";
 
@@ -17,6 +18,38 @@ const codes = (input: Partial<StateMachineDiagram>) =>
 	);
 
 describe("StateMachine diagram type", () => {
+	it("accepts missing labels in the canonical core and resolves ids verbatim", () => {
+		const input = {
+			...mediaPlayerStateMachine,
+			states: mediaPlayerStateMachine.states.map(({ label: _label, ...state }) => state),
+		};
+		const parsed = parseCanonicalDiagram(input);
+		expect(parsed).toEqual(input);
+		expect(getStateMachineValidationIssues(input)).toEqual([]);
+		expect(input.states.map(stateLabel)).toEqual(["stopped", "active", "playing", "paused"]);
+		for (const id of ["waiting_for_payment", "payment-received"])
+			expect(stateLabel({ id })).toBe(id);
+		expect(stateLabel({ id: "start", kind: "state" })).toBe("start");
+		for (const kind of ["final", "choice"] as const) {
+			expect(stateLabel({ id: "marker", kind })).toBeUndefined();
+			const label = "  Explicit\nlabel  ";
+			expect(stateLabel({ id: "marker", kind, label })).toBe(label);
+		}
+	});
+
+	it.each(["", " ", "\t\n"])("rejects an explicit blank label %j in the core", (label) => {
+		const input = {
+			...mediaPlayerStateMachine,
+			states: mediaPlayerStateMachine.states.map((state) =>
+				state.id === "stopped" ? { ...state, label } : state,
+			),
+		};
+		expect(() => parseStateMachineDiagram(input)).toThrow(/label/);
+		expect(getStateMachineValidationIssues(input).map((issue) => issue.code)).toContain(
+			"missing_state_label",
+		);
+	});
+
 	it("has typed fixtures that satisfy the canonical diagram contract", () => {
 		expect(stateMachineFixture.type).toBe(stateMachineDiagramType);
 		expect(parseCanonicalDiagram(stateMachineFixture)).toEqual(stateMachineFixture);
@@ -172,10 +205,9 @@ describe("StateMachine diagram type", () => {
 				],
 			}),
 		).toEqual(["underbranched_choice"]);
-		expect(codes({ states: [...mediaPlayerStateMachine.states, { id: "unnamed" }] })).toEqual([
-			"missing_state_label",
-			"unreachable_state",
-		]);
+		expect(
+			codes({ states: [...mediaPlayerStateMachine.states, { id: "unnamed", label: " " }] }),
+		).toEqual(["missing_state_label", "unreachable_state"]);
 		for (const issue of getStateMachineValidationIssues({
 			...mediaPlayerStateMachine,
 			initial: "missing",

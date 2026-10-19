@@ -27,7 +27,7 @@ export type StateMachineStateKind = typeof StateMachineStateKindSchema.Type;
  */
 export class StateMachineState extends Schema.Class<StateMachineState>("StateMachineState")({
 	id: Schema.NonEmptyString,
-	/** Required for a state; a final state or a choice may omit it. */
+	/** Omitted labels default to the id verbatim for regular states only. */
 	label: Schema.optionalKey(Schema.NonEmptyString),
 	kind: Schema.optionalKey(StateMachineStateKindSchema),
 	/** The composite state this state belongs to. */
@@ -115,6 +115,13 @@ export class StateMachineValidationIssue extends Schema.Class<StateMachineValida
 /** The kind a state draws as; states default to "state". */
 export function stateKind(state: Pick<StateMachineState, "kind">): StateMachineStateKind {
 	return state.kind ?? "state";
+}
+
+/** The displayed label, matching class/ER names without humanizing ids or rewriting explicit labels. */
+export function stateLabel(
+	state: Pick<StateMachineState, "id" | "label" | "kind">,
+): string | undefined {
+	return state.label ?? (stateKind(state) === "state" ? state.id : undefined);
 }
 
 /** Ids of the composite states: states some other state names as its parent. */
@@ -217,12 +224,13 @@ export function getStateMachineValidationIssues(
 			});
 		}
 		states.set(state.id, state);
-		if (stateKind(state) === "state" && !state.label) {
+		const label = stateLabel(state);
+		if (label !== undefined && !label.trim()) {
 			issues.push({
 				code: "missing_state_label",
 				path: `states.[${index}].label`,
 				message: `State "${state.id}" has no label.`,
-				hint: "Name the state; only final states and choices may omit a label.",
+				hint: "Omit the label to use the default, or provide a non-blank label.",
 			});
 		}
 	});

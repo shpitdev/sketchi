@@ -2,6 +2,7 @@ import {
 	compositeStateIds,
 	parseStateMachineDiagram,
 	stateKind,
+	stateLabel,
 	type StateMachineDiagram,
 	type StateMachineState,
 	type StateMachineStateKind,
@@ -86,7 +87,7 @@ function stateMatches(
 ): boolean {
 	const kind = stateKind(state);
 	if (expected.labels === undefined) return kind === (expected.kind ?? "state");
-	if (!matchesAny(state.label, expected.labels)) return false;
+	if (!matchesAny(stateLabel(state), expected.labels)) return false;
 	if (expected.kind === "choice") return kind === "choice";
 	if (expected.kind === "final") return kind === "final" || endsIn(state, diagram);
 	return kind === "state" || kind === "final";

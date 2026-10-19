@@ -1,3 +1,4 @@
+import { stateLabel } from "@sketchi/diagram-core";
 import {
 	candidateFromText,
 	DiagramGenerationClient,
@@ -75,9 +76,12 @@ function fixtureRequirements(scenario: DiagramScenario): readonly Record<string,
 				comparator: "minimum",
 				value: scenario.expectedDiagram.states.length,
 			},
-			...scenario.expectedDiagram.states.flatMap((state) =>
-				state.label ? [{ kind: "label", target: "state", value: state.label } as const] : [],
-			),
+			...scenario.expectedDiagram.states.flatMap((state) => {
+				const label = stateLabel(state);
+				return label === undefined
+					? []
+					: [{ kind: "label", target: "state", value: label } as const];
+			}),
 		];
 	if (scenario.diagramType === "er")
 		return [

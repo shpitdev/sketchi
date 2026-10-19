@@ -22,6 +22,7 @@ import {
 	StateMachineDiagramSchema,
 	StateMachineValidationError,
 	stateTransitionLabel,
+	stateLabel,
 	TimelineDiagramSchema,
 	TimelineValidationError,
 	validateTimelineDiagram,
@@ -712,7 +713,10 @@ function labelsForRequirement(
 				: undefined;
 	if (diagram.type === "state-machine") {
 		if (requirement.target === "state")
-			return diagram.states.flatMap((state) => (state.label ? [state.label] : []));
+			return diagram.states.flatMap((state) => {
+				const label = stateLabel(state);
+				return label === undefined ? [] : [label];
+			});
 		// A transition is named by its event or by its whole label.
 		if (requirement.target === "transition")
 			return diagram.transitions.flatMap((transition) => [

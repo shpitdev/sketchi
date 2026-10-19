@@ -56,6 +56,104 @@ const playerSpec = {
 };
 
 describe("Code Mode native state machine", () => {
+	it("builds the exact unlabeled media-player spec from Frontierclimb round 13", async () => {
+		const built = await build({
+			title: "Media player",
+			initial: "Stopped",
+			states: [
+				{ id: "Stopped" },
+				{ id: "Active", initial: "Playing" },
+				{ id: "Playing", parent: "Active" },
+				{ id: "Paused", parent: "Active" },
+				{ id: "End", kind: "final" },
+			],
+			transitions: [
+				{ source: "Stopped", target: "Active", event: "Play" },
+				{ source: "Playing", target: "Paused", event: "pause" },
+				{ source: "Paused", target: "Playing", event: "resume" },
+				{ source: "Playing", target: "Playing", event: "seek", action: "jump to position" },
+				{ source: "Active", target: "Stopped", event: "Stop" },
+				{ source: "Stopped", target: "End", event: "Eject" },
+			],
+		});
+		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		expect(built.normalizedSpec.states).toEqual([
+			{ id: "Stopped", label: "Stopped" },
+			{ id: "Active", label: "Active", initial: "Playing" },
+			{ id: "Playing", label: "Playing", parent: "Active" },
+			{ id: "Paused", label: "Paused", parent: "Active" },
+			{ id: "End", kind: "final" },
+		]);
+		const scene = built.artifact.formats.find((format) => format.format === "scene")!
+			.inline as RenderedDiagramScene;
+		expect(groupRegionIssues(scene)).toEqual([]);
+		expect(scene.elements).toContainEqual(
+			expect.objectContaining({ type: "frame", name: "Active" }),
+		);
+		for (const label of ["Stopped", "Playing", "Paused"])
+			expect(
+				scene.elements.some((element) => element.type === "text" && element.text === label),
+			).toBe(true);
+	});
+
+	it.each([undefined, "state"] as const)(
+		"uses machine-like ids verbatim for kind %s and preserves explicit labels",
+		async (kind) => {
+			const built = await build({
+				title: "Payment",
+				initial: "waiting_for_payment",
+				states: [
+					{ id: "waiting_for_payment", ...(kind ? { kind } : {}) },
+					{ id: "payment-received" },
+					{ id: "done", label: "Payment complete" },
+				],
+				transitions: [
+					{ source: "waiting_for_payment", target: "payment-received" },
+					{ source: "payment-received", target: "done" },
+				],
+			});
+			if (!built.ok) throw new Error(JSON.stringify(built.issues));
+			expect(built.normalizedSpec.states.map((state) => state.label)).toEqual([
+				"waiting_for_payment",
+				"payment-received",
+				"Payment complete",
+			]);
+		},
+	);
+
+	it.each(["  Stopped (ready)  ", "Stopped\nready", String.raw`Stopped\nready`])(
+		"preserves the explicit label %j byte for byte",
+		async (label) => {
+			const built = await build({
+				...playerSpec,
+				states: playerSpec.states.map((state) =>
+					state.id === "stopped" ? { ...state, label } : state,
+				),
+			});
+			if (!built.ok) throw new Error(JSON.stringify(built.issues));
+			expect(built.normalizedSpec.states[0]?.label).toBe(label);
+		},
+	);
+
+	it.each([
+		["", "invalid_input"],
+		["   ", "invalid_state_machine"],
+	])("rejects an explicitly blank label %j instead of defaulting it", async (label, status) => {
+		const built = await build({
+			title: "Blank label",
+			initial: "start",
+			states: [{ id: "start", label }],
+			transitions: [],
+		});
+		expect(built.ok).toBe(false);
+		expect(built.status).toBe(status);
+		expect(built.issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ ref: { kind: "request", path: "spec.states.[0].label" } }),
+			]),
+		);
+	});
+
 	it("builds the documented spec into an editable artifact with a bound composite frame", async () => {
 		const built = await build(playerSpec);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));

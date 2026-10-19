@@ -7,6 +7,7 @@ import {
 	routingQualityScale,
 	type StateMachineDiagram,
 	stateKind,
+	stateLabel,
 	stateTransitionLabel,
 } from "@sketchi/diagram-core";
 
@@ -94,7 +95,7 @@ export function stateMachineGraph(
 			edges.push(edge(fresh(`${state.id}:end`), state.id, `${state.id}:end`));
 			continue;
 		}
-		nodes.push(node(state.id, state.label ?? "", kind, group));
+		nodes.push(node(state.id, stateLabel(state) ?? "", kind, group));
 	}
 	for (const transition of diagram.transitions) {
 		const label = stateTransitionLabel(transition);
@@ -115,7 +116,7 @@ export function stateMachineGraph(
 		edges,
 		groups: diagram.states
 			.filter((state) => composites.has(state.id))
-			.map((state) => ({ id: state.id, label: state.label ?? state.id })),
+			.map((state) => ({ id: state.id, label: stateLabel(state) ?? "" })),
 		layout: { direction, edgeRouting: "orthogonal" },
 		style: diagram.style,
 		metadata: {},

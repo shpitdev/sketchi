@@ -23,6 +23,15 @@ const withTransition = (
 });
 
 describe("prompt-grounded state-machine scenarios", () => {
+	it("checks the core display-name defaults on an unlabeled media-player candidate", () => {
+		const entry = scenario("media-player-state-machine");
+		const diagram = {
+			...entry.expectedDiagram,
+			states: entry.expectedDiagram.states.map(({ label: _label, ...state }) => state),
+		};
+		expect(failed(entry.id, diagram)).toEqual([]);
+	});
+
 	it("covers guards, returns, self-loops, composites, choices and finals", () => {
 		const diagrams = stateMachineScenarios.map((entry) => entry.expectedDiagram);
 		expect(stateMachineScenarios.length).toBeGreaterThanOrEqual(3);

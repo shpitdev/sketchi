@@ -20,6 +20,20 @@ const texts = (scene: RenderedDiagramScene) =>
 	scene.elements.flatMap((element) => (element.type === "text" ? [element.text] : []));
 
 describe("StateMachine renderer", () => {
+	it("draws regular-state ids and composite names without labels", () => {
+		const diagram = parseStateMachineDiagram({
+			...mediaPlayerStateMachine,
+			states: mediaPlayerStateMachine.states.map(({ label: _label, ...state }) => state),
+		});
+		const scene = renderDiagram(diagram);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+		expect(groupRegionIssues(scene)).toEqual([]);
+		expect(texts(scene)).toEqual(expect.arrayContaining(["stopped", "playing", "paused"]));
+		expect(scene.elements).toContainEqual(
+			expect.objectContaining({ type: "frame", name: "active" }),
+		);
+	});
+
 	it("renders each fixture into a valid deterministic scene", () => {
 		for (const diagram of [stateMachineFixture, mediaPlayerStateMachine]) {
 			const scene = renderDiagram(diagram);

@@ -1,3 +1,4 @@
+import { stateLabel } from "@sketchi/diagram-core";
 import {
 	BuildFlowchartRequestSchema,
 	BuildFlowchartResultSchema,
@@ -100,7 +101,10 @@ const BUILD_TOOLS = {
 		labels: (input: unknown) => {
 			const decoded = Schema.decodeUnknownResult(BuildStateMachineToolInputSchema)(input);
 			return Result.isSuccess(decoded)
-				? decoded.success.spec.states.flatMap((state) => (state.label ? [state.label] : []))
+				? decoded.success.spec.states.flatMap((state) => {
+						const label = stateLabel(state);
+						return label === undefined ? [] : [label];
+					})
 				: [];
 		},
 	},
