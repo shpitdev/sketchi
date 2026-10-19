@@ -102,9 +102,10 @@ export interface CanvasIconAsset {
  * point markers and legend keys), state-machine pseudostates (an initial
  * dot, a final bullseye, an unlabeled choice), Gantt task bars and
  * milestones, entity-relationship tables (a table's outline and its name
- * band) and optional-end rings, and class boxes (a class's outline, name band
- * and methods compartment). They carry no icon, and only a table's or a
- * class's name band carries a bound label.
+ * band) and optional-end rings, class boxes (a class's outline, name band
+ * and methods compartment), and swimlanes (a lane's band and its header).
+ * They carry no icon, and only a table's or a class's name band and a lane's
+ * header carry a bound label.
  */
 export const CANVAS_RENDERER_ROLES = [
 	"sequence-lifeline",
@@ -116,14 +117,17 @@ export const CANVAS_RENDERER_ROLES = [
 	"er-table",
 	"er-optional",
 	"class-box",
+	"swimlane",
+	"swimlane-header",
 ] as const;
 export type CanvasRendererRole = (typeof CANVAS_RENDERER_ROLES)[number];
 
 /**
  * Roles connectors may cross: lifelines, activation bars, timeline markers,
- * chart marks, and the ring that marks an optional relationship end, which
- * sits on its own line. A state marker or Gantt mark is an end of its own
- * connectors and an obstacle to every other, as is a table.
+ * chart marks, the ring that marks an optional relationship end, which sits on
+ * its own line, and a swimlane's band, which every handoff crosses. A state
+ * marker or Gantt mark is an end of its own connectors and an obstacle to
+ * every other, as are a table and a lane's header.
  */
 export const CANVAS_CROSSABLE_RENDERER_ROLES: readonly CanvasRendererRole[] = [
 	"sequence-lifeline",
@@ -131,6 +135,7 @@ export const CANVAS_CROSSABLE_RENDERER_ROLES: readonly CanvasRendererRole[] = [
 	"timeline-marker",
 	"chart-mark",
 	"er-optional",
+	"swimlane",
 ];
 
 const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
@@ -142,6 +147,8 @@ const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
 	"sequence-activation": "Sequence activation",
 	"sequence-lifeline": "Sequence lifeline",
 	"state-marker": "State marker",
+	swimlane: "Swimlane",
+	"swimlane-header": "Swimlane header",
 	"timeline-marker": "Timeline marker",
 };
 

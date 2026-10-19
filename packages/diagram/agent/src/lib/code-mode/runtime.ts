@@ -1695,7 +1695,10 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 				(element.rendererRole === "state-marker" && isStructurallyValidStateMarker(element)) ||
 				(element.rendererRole === "er-table" && isStructurallyValidErTable(element)) ||
 				(element.rendererRole === "er-optional" && isStructurallyValidErOptional(element)) ||
-				(element.rendererRole === "class-box" && isStructurallyValidClassBox(element))
+				(element.rendererRole === "class-box" && isStructurallyValidClassBox(element)) ||
+				((element.rendererRole === "swimlane" || element.rendererRole === "swimlane-header") &&
+					element.shape === "rectangle" &&
+					!element.icon)
 					? { rendererRole: element.rendererRole }
 					: {}),
 				...(element.textColor ? { textColor: element.textColor } : {}),

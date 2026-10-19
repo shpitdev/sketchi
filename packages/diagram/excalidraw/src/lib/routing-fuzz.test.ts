@@ -5,6 +5,9 @@ import {
 	groupFixtures,
 	groupRegionIssues,
 	labelFixtures,
+	laneFixtures,
+	laneRegionIssues,
+	laneStressFixtures,
 	parseCanonicalDiagram,
 	parseFlowchartDiagram,
 	routingQualityFindings,
@@ -270,12 +273,13 @@ function routingCounts(scene: ReturnType<typeof renderIntermediateDiagram>) {
 /**
  * Graphs drawn with more crossings or findings than pinned ("crossings/findings"
  * per graph, in order), and the whole set when its crossings are not fewer in
- * total than pinned.
+ * total than pinned, or, not `fewer`, more.
  */
 function worseThanPinned(
 	set: string,
 	counts: readonly { crossings: number; findings: number }[],
 	pins: string,
+	fewer = true,
 ): string[] {
 	const pinned = pins
 		.split(" ")
@@ -289,7 +293,7 @@ function worseThanPinned(
 	});
 	const total = counts.reduce((sum, { crossings }) => sum + crossings, 0);
 	const pinnedTotal = pinned.reduce((sum, [crossings]) => sum + crossings!, 0);
-	return pinnedTotal > 0 && total >= pinnedTotal
+	return pinnedTotal > 0 && (fewer ? total >= pinnedTotal : total > pinnedTotal)
 		? [...failures, `${set}: ${total} crossings in total, pinned ${pinnedTotal}`]
 		: failures;
 }
@@ -961,6 +965,215 @@ describe("grouped routing fuzz", () => {
 					...validateExcalidrawScene(exported).issues,
 					...groupRegionIssues(scene),
 					...labelDefects(exported.elements, authored),
+				]).toEqual([]);
+			}
+		},
+	);
+});
+
+const LANE_LABELS = [
+	"Customer",
+	"Sales",
+	"Hiring manager",
+	"On-call engineer",
+	"Finance and procurement",
+	"QA",
+	"Platform team",
+];
+
+/**
+ * The random flowcharts above with lanes: two to six, each step's lane a walk
+ * from the step before it, mostly to the neighboring lane, sometimes staying
+ * or jumping two, so handoffs run straight, skip lanes and loop back across
+ * them. Lanes no step uses are dropped.
+ */
+function randomLanedFlowcharts(count: number, start: number) {
+	let seed = start;
+	const random = () => {
+		seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+		return seed / 2_147_483_648;
+	};
+	return randomFlowcharts(count, start).map((spec) => {
+		const laneCount = 2 + Math.floor(random() * 5);
+		let lane = 0;
+		const laneOf = spec.nodes.map(() => {
+			const step = random();
+			const move = step < 0.25 ? 0 : step < 0.85 ? 1 : 2;
+			const next = lane + (random() < 0.5 ? move : -move);
+			lane = next < 0 || next >= laneCount ? lane - (next - lane) : next;
+			lane = Math.min(laneCount - 1, Math.max(0, lane));
+			return lane;
+		});
+		const labels = Array.from({ length: laneCount }, (_, index) => ({
+			id: `l${index}`,
+			label: LANE_LABELS[(index + Math.floor(random() * LANE_LABELS.length)) % LANE_LABELS.length]!,
+		}));
+		return {
+			...spec,
+			lanes: labels.filter((_, index) => laneOf.includes(index)),
+			nodes: spec.nodes.map((node, index) => ({ ...node, lane: `l${laneOf[index]}` })),
+		};
+	});
+}
+
+/** Lane bands and headers are background shapes, not the nodes labels keep clear of. */
+function withoutLanes(elements: readonly ExportedElement[]): ExportedElement[] {
+	return elements.filter((element) => {
+		const role = (element.customData as Record<string, unknown> | null | undefined)?.[
+			"sketchiRendererRole"
+		];
+		return role !== "swimlane" && role !== "swimlane-header";
+	});
+}
+
+/**
+ * Label defects the laned fuzz still draws, all on dense random graphs: a
+ * decision with up to six long-labeled branches whose labels find no clear
+ * spot within reach of their source. Never more than these.
+ */
+const KNOWN_LANED_LABEL_DEFECTS: Readonly<Record<"TB" | "BT" | "LR" | "RL", readonly string[]>> = {
+	TB: ["6: edge:e8:label on edge:e10:label", "6: edge:e10:label crossed by edge:e1"],
+	BT: [
+		"14: edge:e28:label crossed by edge:e20",
+		"14: edge:e28:label on node:n12",
+		"20: edge:e19:label on node:n11",
+		"23: edge:e30:label crossed by edge:e30",
+		"27: edge:e4:label on edge:e6:label",
+	],
+	LR: [
+		"0: edge:e20:label crossed by edge:e22",
+		"0: edge:e20:label on node:n7",
+		"1: edge:e27:label crossed by edge:e27",
+		"6: edge:e10:label on a lane boundary",
+		"14: edge:e24:label crossed by edge:e23",
+		"14: edge:e28:label crossed by edge:e20",
+		"18: edge:e2:label crossed by edge:e4",
+		"18: edge:e2:label on a lane boundary",
+		"19: edge:e25:label on node:n12",
+		"20: edge:e19:label on a lane boundary",
+		"23: edge:e30:label crossed by edge:e27",
+		"28: edge:e16:label crossed by edge:e20",
+	],
+	RL: [
+		"0: edge:e20:label crossed by edge:e22",
+		"0: edge:e20:label on node:n7",
+		"6: edge:e10:label crossed by edge:e8",
+		"6: edge:e10:label on node:n1",
+		"8: edge:e7:label on a lane boundary",
+		"11: edge:e14:label crossed by edge:e3",
+		"11: edge:e14:label on node:n3",
+		"14: edge:e28:label crossed by edge:e8",
+		"20: edge:e19:label crossed by edge:e21",
+		"20: edge:e19:label on node:n11",
+		"23: edge:e34:label crossed by edge:e11",
+		"23: edge:e34:label on a lane boundary",
+		"25: edge:e24:label crossed by edge:e26",
+		"28: edge:e7:label on edge:e16:label",
+		"28: edge:e16:label crossed by edge:e7",
+	],
+};
+
+/**
+ * Crossings and reader-scale findings ("crossings/findings") each laned
+ * flowchart draws, in order, counted as for MAIN_ROUTING. No laned flowchart
+ * may draw more of either, and together they draw no more crossings.
+ */
+const LANED_ROUTING: Readonly<Record<"TB" | "BT" | "LR" | "RL", string>> = {
+	TB: "63/8 47/17 4/0 5/0 13/1 0/0 24/0 14/3 0/0 0/0 0/0 29/10 3/0 11/1 86/12 0/0 3/0 0/0 0/0 54/12 24/5 0/0 14/4 109/35 0/0 83/36 18/4 0/0 62/4 0/0",
+	BT: "52/8 42/9 5/0 11/1 15/1 0/0 15/1 13/2 0/0 0/0 0/0 22/14 3/2 7/2 83/15 1/0 1/0 0/0 0/0 40/10 27/7 0/0 14/6 113/36 0/0 109/37 14/4 0/0 57/8 1/0",
+	LR: "64/7 36/20 5/1 3/0 17/0 0/0 20/2 12/4 0/1 0/0 0/0 32/8 3/0 10/5 111/14 0/1 3/0 0/0 0/0 34/5 21/7 0/0 17/3 115/33 0/0 105/43 19/5 1/0 61/11 0/0",
+	RL: "49/7 41/28 5/1 8/1 17/0 0/0 17/3 12/4 0/0 0/0 0/0 16/3 3/0 8/5 99/15 0/1 3/0 0/0 0/0 36/6 22/14 0/0 15/5 99/98 0/0 104/45 18/6 1/0 68/21 0/0",
+};
+
+describe("laned routing fuzz", () => {
+	// 30 laned flowcharts x 4 directions, each rendered once. Every export is valid
+	// and orthogonal, every step sits in its own lane's band, lanes keep their
+	// order and one length, no edge crosses a header, runs along a lane boundary
+	// or leaves the lanes, and labels stay whole and clear of nodes, headers and
+	// boundaries.
+	const flowcharts = randomLanedFlowcharts(30, 20261022);
+	const scenes = new Map<string, ReturnType<typeof renderIntermediateDiagram>[]>();
+	const rendered = (direction: "TB" | "BT" | "LR" | "RL") => {
+		if (!scenes.has(direction))
+			scenes.set(
+				direction,
+				flowcharts.map((spec) =>
+					renderIntermediateDiagram(
+						parseFlowchartDiagram({
+							...spec,
+							type: "flowchart",
+							layout: { direction, edgeRouting: "orthogonal" },
+						}),
+					),
+				),
+			);
+		return scenes.get(direction)!;
+	};
+
+	describe.each(["TB", "BT", "LR", "RL"] as const)("%s", (direction) => {
+		it("exports every laned flowchart with its steps in their lanes and its routes clear", () => {
+			const failures = flowcharts.flatMap((spec, index) => {
+				const scene = rendered(direction)[index]!;
+				return [
+					...validateExcalidrawScene(convertSceneToExcalidraw(scene)).issues.map(
+						(issue) => issue.message,
+					),
+					...diagonalRuns(scene),
+					...laneRegionIssues(scene, spec)
+						.filter((issue) => issue.code !== "label-covered")
+						.map((issue) => issue.message),
+					...getCanvasValidationIssues(scene).map((issue) => issue.message),
+				].map((failure) => `${index}: ${failure}`);
+			});
+			expect(failures).toEqual([]);
+		}, 60_000);
+
+		it("keeps laned labels whole and clear of lines, nodes, headers and boundaries", () => {
+			const defects = flowcharts.flatMap((spec, index) => {
+				const scene = rendered(direction)[index]!;
+				const exported = convertSceneToExcalidraw(scene);
+				const authored = new Map(spec.nodes.map((node) => [`node:${node.id}`, node.label]));
+				return [
+					...labelDefects(withoutLanes(exported.elements), authored),
+					...laneRegionIssues(scene, spec)
+						.filter((issue) => issue.code === "label-covered")
+						.map((issue) => `${issue.elementId} on a lane boundary`),
+				].map((defect) => `${index}: ${defect}`);
+			});
+			if (process.env.PRINT_ROUTING)
+				console.log("LABELS laned", direction, JSON.stringify(defects));
+			expect(
+				defects.filter((defect) => !KNOWN_LANED_LABEL_DEFECTS[direction].includes(defect)),
+			).toEqual([]);
+		}, 60_000);
+
+		it("draws no laned flowchart with more crossings or reader-scale findings than pinned", () => {
+			const counts = rendered(direction).map((scene) => routingCounts(scene));
+			if (process.env.PRINT_ROUTING)
+				console.log(
+					"PIN laned",
+					direction,
+					counts.map((c) => `${c.crossings}/${c.findings}`).join(" "),
+				);
+			expect(worseThanPinned("laned", counts, LANED_ROUTING[direction], false)).toEqual([]);
+		}, 60_000);
+	});
+
+	it.each([...Object.keys(laneFixtures), ...Object.keys(laneStressFixtures)])(
+		"exports the %s lanes valid and clear in every direction",
+		(name) => {
+			const fixture = { ...laneFixtures, ...laneStressFixtures }[name]!;
+			for (const direction of ["TB", "BT", "LR", "RL"] as const) {
+				const scene = renderIntermediateDiagram({
+					...fixture,
+					layout: { direction, edgeRouting: "orthogonal" },
+				});
+				const exported = convertSceneToExcalidraw(scene);
+				const authored = new Map(fixture.nodes.map((node) => [`node:${node.id}`, node.label]));
+				expect([
+					...validateExcalidrawScene(exported).issues,
+					...laneRegionIssues(scene, fixture),
+					...labelDefects(withoutLanes(exported.elements), authored),
 				]).toEqual([]);
 			}
 		},

@@ -215,7 +215,11 @@ function shapeForNode(node: DiagramNode): NodeSceneShape {
 	return "rectangle";
 }
 
-function createNodeShape(node: DiagramNode): NodeSceneElement {
+function createNodeShape(
+	node: DiagramNode,
+	minimumWidth = MIN_NODE_WIDTH,
+	lineUnits = MAX_LABEL_LINE_UNITS,
+): NodeSceneElement {
 	const shape = shapeForNode(node);
 	const marker = markerSize(node);
 	if (marker !== undefined || (node.kind === "choice" && !node.label)) {
@@ -235,7 +239,7 @@ function createNodeShape(node: DiagramNode): NodeSceneElement {
 	}
 	const labelMetrics = measureLabel(
 		node.label,
-		shape === "diamond" ? MAX_DIAMOND_LABEL_LINE_UNITS : MAX_LABEL_LINE_UNITS,
+		shape === "diamond" ? MAX_DIAMOND_LABEL_LINE_UNITS : lineUnits,
 	);
 	const icon = node.icon ? { slug: node.icon.slug, size: NODE_ICON_SIZE[shape] } : undefined;
 	const shapeWidthPad = shape === "diamond" ? 32 : shape === "ellipse" ? 20 : 0;
@@ -247,7 +251,7 @@ function createNodeShape(node: DiagramNode): NodeSceneElement {
 			? boundTextContainerSize(shape, labelMetrics, icon)
 			: { height: 0, width: 0 };
 	const [minWidth, minHeight] =
-		node.kind === "state" ? [STATE_MIN_WIDTH, STATE_MIN_HEIGHT] : [MIN_NODE_WIDTH, MIN_NODE_HEIGHT];
+		node.kind === "state" ? [STATE_MIN_WIDTH, STATE_MIN_HEIGHT] : [minimumWidth, MIN_NODE_HEIGHT];
 
 	return {
 		type: "node",
@@ -849,32 +853,21 @@ const FORWARD_SIDE: Readonly<Record<IntermediateDiagram["layout"]["direction"], 
 };
 
 /**
- * Ranks in flow order, each with its nodes ordered across the rank, its breadth
- * across the flow, its depth along it and the gap that follows it.
+ * Each node's shape, at least its minimum size and wide enough across the flow
+ * for a port per connection, sized before ranking so clamping never merges
+ * endpoints.
  */
-function rankLayout(
+function sizedShapes(
 	diagram: IntermediateDiagram,
 	minimumSizes: ReadonlyMap<string, { width: number; height: number }>,
-	stubReach: ReadonlyMap<string, number>,
-	reorder = false,
-) {
-	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
-	// Neighbors in a rank keep room for the stubs on their facing sides, so a long
-	// labeled stub never reaches the next node or meets its stub head-on.
-	const [lowSide, highSide]: readonly [ConnectionEdge, ConnectionEdge] = vertical
-		? ["left", "right"]
-		: ["top", "bottom"];
-	const gapBetween = (left: NodeSceneElement, right: NodeSceneElement) =>
-		Math.max(
-			HORIZONTAL_GAP,
-			(stubReach.get(portKey(left.nodeId, highSide)) ?? 0) +
-				(stubReach.get(portKey(right.nodeId, lowSide)) ?? 0) +
-				PORT_SPACING,
-		);
-	const buckets = edgeBuckets(diagram.edges);
-	const shapesByNodeId = new Map(
+	buckets: EdgeBuckets,
+	vertical: boolean,
+	minimumWidth = MIN_NODE_WIDTH,
+	lineUnits = MAX_LABEL_LINE_UNITS,
+): Map<string, NodeSceneElement> {
+	return new Map(
 		diagram.nodes.map((node) => {
-			const originalShape = createNodeShape(node);
+			const originalShape = createNodeShape(node, minimumWidth, lineUnits);
 			const minimum = minimumSizes.get(node.id);
 			const shape = {
 				...originalShape,
@@ -923,6 +916,33 @@ function rankLayout(
 			];
 		}),
 	);
+}
+
+/**
+ * Ranks in flow order, each with its nodes ordered across the rank, its breadth
+ * across the flow, its depth along it and the gap that follows it.
+ */
+function rankLayout(
+	diagram: IntermediateDiagram,
+	minimumSizes: ReadonlyMap<string, { width: number; height: number }>,
+	stubReach: ReadonlyMap<string, number>,
+	reorder = false,
+) {
+	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
+	// Neighbors in a rank keep room for the stubs on their facing sides, so a long
+	// labeled stub never reaches the next node or meets its stub head-on.
+	const [lowSide, highSide]: readonly [ConnectionEdge, ConnectionEdge] = vertical
+		? ["left", "right"]
+		: ["top", "bottom"];
+	const gapBetween = (left: NodeSceneElement, right: NodeSceneElement) =>
+		Math.max(
+			HORIZONTAL_GAP,
+			(stubReach.get(portKey(left.nodeId, highSide)) ?? 0) +
+				(stubReach.get(portKey(right.nodeId, lowSide)) ?? 0) +
+				PORT_SPACING,
+		);
+	const buckets = edgeBuckets(diagram.edges);
+	const shapesByNodeId = sizedShapes(diagram, minimumSizes, buckets, vertical);
 	const feedbackEdges = flowFeedback(diagram);
 	const rankByNodeId = rankNodes(diagram, buckets, feedbackEdges);
 	const rankedShapes = orderedRankShapes(
@@ -1051,6 +1071,8 @@ interface Arrangement {
 	readonly reorder: boolean;
 	/** Route each edge, among otherwise equal lanes, across the fewest arrows routed before it. */
 	readonly avoidCrossings?: boolean;
+	/** In lanes, move a departure off a side that lines arrive by. */
+	readonly separateRoles?: boolean;
 	/** Sides edges leave or arrive by in place of the assigned ones, chosen to remove crossings. */
 	readonly sides?: SideOverrides;
 	readonly wrap: Wrap;
@@ -1075,6 +1097,8 @@ const ACROSS_DIRECTION: Readonly<Record<LayoutDirection, LayoutDirection>> = {
 
 /** Whether reordering ranks for fewer layered crossings changes this diagram's order. */
 function reordersRanks(diagram: IntermediateDiagram): boolean {
+	// A laned diagram orders each lane's cells as it lays them out.
+	if (laned(diagram)) return false;
 	const structure = groupStructure(diagram);
 	// A grouped diagram reorders its top level and each group's own ranks.
 	const layouts = structure
@@ -1105,7 +1129,8 @@ function exportAspect(along: number, across: number): number {
  */
 function planWrap(diagram: IntermediateDiagram, reorder: boolean, balance = 0): Wrap {
 	// A band cut must not split a group; grouped flows stay in one band.
-	if (diagram.layout.edgeRouting !== "orthogonal" || groupStructure(diagram)) return NO_WRAP;
+	if (diagram.layout.edgeRouting !== "orthogonal" || groupStructure(diagram) || laned(diagram))
+		return NO_WRAP;
 	const { feedbackEdges, gapAfter, rankByNodeId, rankMetrics } = rankLayout(
 		diagram,
 		new Map(),
@@ -1331,6 +1356,7 @@ function positionNodes(
 /** Node positions and, for a grouped diagram, where each group's frame is drawn. */
 interface PositionedLayout {
 	readonly groups?: GroupLayout;
+	readonly lanes?: LaneLayout;
 	readonly nodes: NodeSceneElement[];
 }
 
@@ -1341,6 +1367,7 @@ function positionLayout(
 	arrangement: Arrangement = PLAIN_ARRANGEMENT,
 	slack: ReadonlyMap<string, number> = new Map(),
 ): PositionedLayout {
+	if (laned(diagram)) return positionLanedNodes(diagram, minimumSizes, stubReach, arrangement.wrap);
 	const structure = groupStructure(diagram);
 	return structure
 		? positionGroupedNodes(diagram, structure, minimumSizes, stubReach, arrangement, slack)
@@ -1590,6 +1617,592 @@ function alignUnits(
 	for (const rank of order.filter((rank) => rank < anchor).reverse()) align(rank, rank + 1, false);
 }
 
+/** Inner padding of a lane across the flow, around its steps. */
+const LANE_PADDING = 32;
+/** Room along the flow before a lane's first steps and after its last. */
+const LANE_END_PADDING = 48;
+/**
+ * Columns of lanes sit at least two stubs apart, closer than ranks: the stubs
+ * and labels between two columns widen the gap as they need.
+ */
+const LANE_COLUMN_GAP = 2 * ROUTE_STUB_LENGTH;
+/** A step in a row of lanes is at least this wide, narrower than elsewhere. */
+const LANE_MIN_NODE_WIDTH = 144;
+/** Room a lane keeps between its boundary and where its steps' lines turn. */
+const LANE_ROOM = 2 * PORT_SPACING;
+const LANE_LABEL_FONT_SIZE = 16;
+/** A horizontal lane's header wraps its name at about fourteen average glyphs. */
+const LANE_LABEL_LINE_UNITS = 14 * DEFAULT_GLYPH_UNITS;
+const LANE_HEADER_PADDING = 16;
+/** A vertical lane's header is at least this tall. */
+const LANE_HEADER_MIN_HEIGHT = 44;
+
+/** One drawn lane: its band from header to far end, and its header strip. */
+interface LaneFrame {
+	readonly box: Box;
+	/** The id the band draws under; its header and name add `:header` and `:label`. */
+	readonly elementId: string;
+	readonly header: Box;
+	readonly id: string;
+	readonly label: string;
+	/** The pool the band belongs to: 0, or a later one of a wrapped diagram. */
+	readonly pool: number;
+	/** The name as the header wraps it. */
+	readonly text: string;
+}
+
+/**
+ * Lanes drawn as full-length bands across the flow, in declared order: rows
+ * stacked top to bottom for LR and RL, columns left to right for TB and BT.
+ * Each starts with a header strip holding its name, on the left of a row or
+ * on top of a column.
+ */
+interface LaneLayout {
+	/** Edges that carry a wrapped flow from one pool to the next. */
+	readonly continuations: ReadonlySet<string>;
+	/** Every lane of every pool, pool by pool in declared order. */
+	readonly frames: readonly LaneFrame[];
+	readonly laneOf: ReadonlyMap<string, string>;
+	/** Every pool together, with the gaps between them. */
+	readonly pool: Box;
+	/** Each full set of lanes; a wrapped diagram draws one per stretch of columns. */
+	readonly pools: readonly Box[];
+	/** Lanes are columns: the flow runs top to bottom or bottom to top. */
+	readonly vertical: boolean;
+}
+
+/** Whether a diagram declares lanes; a laned diagram puts every node in one. */
+function laned(diagram: IntermediateDiagram): boolean {
+	return (diagram.lanes ?? []).length > 0;
+}
+
+/**
+ * The column along the flow each step of a laned diagram takes. A step comes
+ * after every step before it in its own lane and every step that leads to it
+ * from a lane further than the next one. A step reached from the neighboring
+ * lane may share that step's column, so the handoff runs straight across the
+ * boundary between them; a source hands off straight to one step per lane.
+ */
+function laneColumns(diagram: IntermediateDiagram): Map<string, number> {
+	const lanes = diagram.lanes ?? [];
+	const laneIndex = new Map(lanes.map((lane, index) => [lane.id, index]));
+	const laneOf = new Map(
+		diagram.nodes.map((node) => [node.id, laneIndex.get(node.lane ?? "") ?? 0]),
+	);
+	const feedback = flowFeedback(diagram);
+	const forward = diagram.edges.filter(
+		(edge) => !feedback.has(edge.id) && edge.source !== edge.target,
+	);
+	// A source's first forward edge into each neighboring lane may stay in its column.
+	const straight = new Set<string>();
+	const handedOff = new Set<string>();
+	for (const edge of forward) {
+		const [from, to] = [laneOf.get(edge.source)!, laneOf.get(edge.target)!];
+		const key = `${edge.source}\u0000${to}`;
+		if (Math.abs(from - to) !== 1 || handedOff.has(key)) continue;
+		handedOff.add(key);
+		straight.add(edge.id);
+	}
+	const incoming = new Map(diagram.nodes.map((node) => [node.id, [] as DiagramEdge[]]));
+	const outgoing = new Map(diagram.nodes.map((node) => [node.id, [] as DiagramEdge[]]));
+	for (const edge of forward) {
+		incoming.get(edge.target)!.push(edge);
+		outgoing.get(edge.source)!.push(edge);
+	}
+	// Steps in flow order, earliest declared first among those ready.
+	const nodeOrder = nodeOrderMap(diagram.nodes);
+	const waiting = new Map(diagram.nodes.map((node) => [node.id, incoming.get(node.id)!.length]));
+	const ready = diagram.nodes.filter((node) => waiting.get(node.id) === 0).map((node) => node.id);
+	const column = new Map<string, number>();
+	// The latest column each lane reaches on the way to each step, the step's own included.
+	const reached = new Map<string, number[]>();
+	while (ready.length > 0) {
+		ready.sort((a, b) => nodeOrder.get(a)! - nodeOrder.get(b)!);
+		const id = ready.shift()!;
+		const lane = laneOf.get(id)!;
+		const before = lanes.map((_, index) =>
+			Math.max(-1, ...incoming.get(id)!.map((edge) => reached.get(edge.source)![index]!)),
+		);
+		let at = before[lane]! + 1;
+		for (const edge of incoming.get(id)!)
+			at = Math.max(at, column.get(edge.source)! + (straight.has(edge.id) ? 0 : 1));
+		column.set(id, at);
+		before[lane] = at;
+		reached.set(id, before);
+		for (const edge of outgoing.get(id)!) {
+			const left = waiting.get(edge.target)! - 1;
+			waiting.set(edge.target, left);
+			if (left === 0) ready.push(edge.target);
+		}
+	}
+	return column;
+}
+
+/**
+ * A laned diagram's steps and lanes before they are placed: each step's column
+ * and offset across its lane's content, each column's depth and the gap after
+ * it, and each lane's breadth, padding and header. Steps that share a lane and
+ * a column stack across the lane in the order that keeps their edges least
+ * crossed. Lanes take the breadth their busiest column needs, and columns hold
+ * their stubs and labels as ranks do.
+ */
+function laneGeometry(
+	diagram: IntermediateDiagram,
+	minimumSizes: ReadonlyMap<string, { width: number; height: number }>,
+	stubReach: ReadonlyMap<string, number>,
+) {
+	const lanes = diagram.lanes!;
+	const { direction } = diagram.layout;
+	const vertical = direction === "TB" || direction === "BT";
+	const [along, across] = vertical ? (["y", "x"] as const) : (["x", "y"] as const);
+	const [depthOf, breadthOf] = vertical
+		? (["height", "width"] as const)
+		: (["width", "height"] as const);
+	const [lowSide, highSide]: readonly [ConnectionEdge, ConnectionEdge] = vertical
+		? ["left", "right"]
+		: ["top", "bottom"];
+	const forwardSide = FORWARD_SIDE[direction];
+	const backSide = OPPOSITE_EDGE[forwardSide];
+	const reachOf = (nodeId: string, side: ConnectionEdge) =>
+		stubReach.get(portKey(nodeId, side)) ?? 0;
+	const buckets = edgeBuckets(diagram.edges);
+	// Rows of lanes run long, so their steps wrap sooner and keep only the width
+	// their labels need.
+	const shapes = vertical
+		? sizedShapes(diagram, minimumSizes, buckets, vertical)
+		: sizedShapes(
+				diagram,
+				minimumSizes,
+				buckets,
+				vertical,
+				LANE_MIN_NODE_WIDTH,
+				MAX_DIAMOND_LABEL_LINE_UNITS,
+			);
+	const columns = laneColumns(diagram);
+	const laneIndex = new Map(lanes.map((lane, index) => [lane.id, index]));
+	const laneOf = new Map(diagram.nodes.map((node) => [node.id, node.lane!]));
+	const columnCount = Math.max(0, ...columns.values()) + 1;
+
+	// Cells of one lane and one column, stacked across in barycentric order.
+	const cells = lanes.map(() => Array.from({ length: columnCount }, () => [] as string[]));
+	for (const node of diagram.nodes)
+		cells[laneIndex.get(node.lane!)!]![columns.get(node.id)!]!.push(node.id);
+	const feedback = flowFeedback(diagram);
+	const neighbors = new Map(diagram.nodes.map((node) => [node.id, [] as string[]]));
+	for (const edge of diagram.edges) {
+		if (feedback.has(edge.id) || edge.source === edge.target) continue;
+		neighbors.get(edge.source)!.push(edge.target);
+		neighbors.get(edge.target)!.push(edge.source);
+	}
+	const nodeOrder = nodeOrderMap(diagram.nodes);
+	const key = (id: string) => {
+		const cell = cells[laneIndex.get(laneOf.get(id)!)!]![columns.get(id)!]!;
+		return laneIndex.get(laneOf.get(id)!)! + (cell.indexOf(id) + 0.5) / cell.length;
+	};
+	for (let sweep = 0; sweep < RANK_SWEEP_COUNT; sweep += 1)
+		for (const lane of cells)
+			for (const cell of lane) {
+				if (cell.length < 2) continue;
+				const score = new Map(
+					cell.map((id) => {
+						const around = neighbors.get(id)!;
+						return [
+							id,
+							around.length > 0
+								? around.reduce((sum, other) => sum + key(other), 0) / around.length
+								: key(id),
+						];
+					}),
+				);
+				cell.sort((a, b) => score.get(a)! - score.get(b)! || nodeOrder.get(a)! - nodeOrder.get(b)!);
+			}
+
+	// Along the flow: each column's depth and the gap after it, as between ranks.
+	const columnOf = Array.from({ length: columnCount }, (_, index) =>
+		diagram.nodes
+			.filter((node) => columns.get(node.id) === index)
+			.map((node) => shapes.get(node.id)!),
+	);
+	const depth = columnOf.map((column) => Math.max(0, ...column.map((shape) => shape[depthOf])));
+	const reach = (column: readonly NodeSceneElement[], side: ConnectionEdge) =>
+		Math.max(0, ...column.map((shape) => reachOf(shape.nodeId, side)));
+	const gapAfter = columnOf.map((column, index) => {
+		const ids = new Set(column.map((shape) => shape.nodeId));
+		// A label on a line that leaves for a later column lengthens its stub.
+		const labelGap = vertical
+			? 0
+			: Math.max(
+					0,
+					...diagram.edges
+						.filter(
+							(edge) =>
+								ids.has(edge.source) && edge.label && (columns.get(edge.target) ?? 0) > index,
+						)
+						.map(
+							(edge) =>
+								branchLabelMetrics(edge.label!, branches(shapes.get(edge.source)?.kind)).width +
+								16 +
+								ROUTE_STUB_LENGTH * 2,
+						),
+				);
+		const next = columnOf[index + 1];
+		const stubGap =
+			next && stubReach.size > 0
+				? reach(column, forwardSide) + reach(next, backSide) + PORT_SPACING
+				: 0;
+		return Math.max(LANE_COLUMN_GAP, labelGap, stubGap);
+	});
+	// Across the flow: each lane's stacked content, centered cell by cell.
+	const gapBetween = (low: string, high: string) =>
+		Math.max(HORIZONTAL_GAP, reachOf(low, highSide) + reachOf(high, lowSide) + PORT_SPACING);
+	const stackBreadth = (cell: readonly string[]) =>
+		cell.reduce(
+			(sum, id, index) =>
+				sum + shapes.get(id)![breadthOf] + (index > 0 ? gapBetween(cell[index - 1]!, id) : 0),
+			0,
+		);
+	const content = cells.map((lane) => Math.max(0, ...lane.map(stackBreadth)));
+	// Local offsets across each lane's content.
+	const offset = new Map<string, number>();
+	for (const [lane, laneCells] of cells.entries())
+		for (const cell of laneCells) {
+			let at = (content[lane]! - stackBreadth(cell)) / 2;
+			for (const [index, id] of cell.entries()) {
+				if (index > 0) at += gapBetween(cell[index - 1]!, id);
+				offset.set(id, at);
+				at += shapes.get(id)![breadthOf];
+			}
+		}
+	// A lane's padding holds its steps' stubs on the sides that face its edges, with a lane to spare.
+	const padding = cells.map((laneCells, lane) => {
+		const ids = laneCells.flat();
+		const pad = (side: ConnectionEdge) =>
+			Math.max(
+				LANE_PADDING,
+				...ids.map((id) => {
+					const inset =
+						side === lowSide
+							? offset.get(id)!
+							: content[lane]! - offset.get(id)! - shapes.get(id)![breadthOf];
+					return reachOf(id, side) - inset + LANE_ROOM;
+				}),
+			);
+		return { low: pad(lowSide), high: pad(highSide) };
+	});
+
+	// Headers: a row's header is as wide as the widest name; a column's as tall as the tallest.
+	const names = lanes.map((lane) => measureLaneLabel(lane.label));
+	const headerDepth = vertical
+		? 0
+		: Math.max(...names.map((name) => name.textWidth)) + 2 * LANE_HEADER_PADDING;
+	const breadth = cells.map((_, lane) =>
+		Math.max(
+			padding[lane]!.low + content[lane]! + padding[lane]!.high,
+			vertical
+				? measureLaneLabel(lanes[lane]!.label).longestWord + 2 * LANE_HEADER_PADDING
+				: names[lane]!.textHeight + 2 * LANE_HEADER_PADDING,
+		),
+	);
+	const wrapped = lanes.map((lane, index) =>
+		vertical
+			? measureLaneLabel(lane.label, breadth[index]! - 2 * LANE_HEADER_PADDING)
+			: names[index]!,
+	);
+	const headerSize = vertical
+		? Math.max(
+				LANE_HEADER_MIN_HEIGHT,
+				...wrapped.map((name) => name.textHeight + 2 * LANE_HEADER_PADDING),
+			)
+		: Math.ceil(headerDepth);
+
+	const poolBreadth = breadth.reduce((sum, laneBreadth) => sum + laneBreadth, 0);
+	return {
+		along,
+		across,
+		backSide,
+		breadth,
+		columnCount,
+		columnOf,
+		columns,
+		content,
+		depth,
+		depthOf,
+		forwardSide,
+		gapAfter,
+		headerSize,
+		laneIndex,
+		laneOf,
+		offset,
+		padding,
+		poolBreadth,
+		reach,
+		shapes,
+		vertical,
+		wrapped,
+	};
+}
+
+/** Forward edges a pool cut may carry from one pool to the next. */
+const MAX_LANE_CONTINUATIONS = 2;
+
+/**
+ * Pools for a laned flow too long for its breadth: runs of whole columns, each
+ * drawn as a full set of lanes, stacked across the flow. A cut falls between
+ * two columns that no loop spans and at most two forward edges cross, which
+ * then continue from one pool into the next. Pools stay at least two columns
+ * long and as even as the cuts allow, and the fewest pools that bring the
+ * drawing within the target aspect win.
+ */
+function planLaneWrap(diagram: IntermediateDiagram): Wrap {
+	const { columnCount, columns, depth, gapAfter, headerSize, poolBreadth } = laneGeometry(
+		diagram,
+		new Map(),
+		new Map(),
+	);
+	if (columnCount < 2 * 2) return NO_WRAP;
+	const feedback = flowFeedback(diagram);
+	const span = (edge: DiagramEdge) => {
+		const [from, to] = [columns.get(edge.source)!, columns.get(edge.target)!];
+		return [Math.min(from, to), Math.max(from, to)] as const;
+	};
+	// Forward edges crossing the cut after each column, or undefined where a loop spans it.
+	const crossing = Array.from({ length: columnCount - 1 }, (_, cut) => {
+		const spanning = diagram.edges.filter((edge) => {
+			const [low, high] = span(edge);
+			return low <= cut && high > cut;
+		});
+		return spanning.some((edge) => feedback.has(edge.id)) ||
+			spanning.length > MAX_LANE_CONTINUATIONS
+			? undefined
+			: spanning.map((edge) => edge.id);
+	});
+	const length = (from: number, to: number) =>
+		headerSize +
+		2 * LANE_END_PADDING +
+		depth.slice(from, to + 1).reduce((sum, value) => sum + value, 0) +
+		gapAfter.slice(from, to).reduce((sum, value) => sum + value, 0);
+	const last = columnCount - 1;
+	const natural = exportAspect(length(0, last), poolBreadth);
+	type Partition = { cuts: number[]; longest: number; carried: number; squares: number };
+	const better = (a: Partition, b: Partition | undefined) =>
+		!b ||
+		a.longest < b.longest - AXIS_ALIGNED_EPSILON ||
+		(Math.abs(a.longest - b.longest) <= AXIS_ALIGNED_EPSILON &&
+			(a.carried < b.carried || (a.carried === b.carried && a.squares < b.squares)));
+	let chosen: { aspect: number; cuts: readonly number[] } | undefined;
+	for (let pools = 2; pools <= MAX_BANDS; pools += 1) {
+		// Best partitions of the columns up to each end into a number of pools.
+		let partitions = new Map<number, Partition>();
+		for (let end = 1; end < last; end += 1)
+			if (crossing[end] !== undefined)
+				partitions.set(end, {
+					cuts: [end],
+					longest: length(0, end),
+					carried: crossing[end]!.length,
+					squares: length(0, end) ** 2,
+				});
+		for (let pool = 2; pool < pools; pool += 1) {
+			const next = new Map<number, Partition>();
+			for (const [previous, partition] of partitions)
+				for (let end = previous + 2; end < last; end += 1) {
+					if (crossing[end] === undefined) continue;
+					const size = length(previous + 1, end);
+					const candidate = {
+						cuts: [...partition.cuts, end],
+						longest: Math.max(partition.longest, size),
+						carried: partition.carried + crossing[end]!.length,
+						squares: partition.squares + size ** 2,
+					};
+					if (better(candidate, next.get(end))) next.set(end, candidate);
+				}
+			partitions = next;
+		}
+		let best: Partition | undefined;
+		for (const [previous, partition] of partitions) {
+			if (last < previous + 2) continue;
+			const size = length(previous + 1, last);
+			const candidate = {
+				...partition,
+				longest: Math.max(partition.longest, size),
+				squares: partition.squares + size ** 2,
+			};
+			if (better(candidate, best)) best = candidate;
+		}
+		if (!best) continue;
+		const across = pools * poolBreadth + (pools - 1) * lanePoolGap(MAX_LANE_CONTINUATIONS);
+		const aspect = exportAspect(best.longest, across);
+		if (!chosen || aspect < chosen.aspect) chosen = { aspect, cuts: best.cuts };
+		if (aspect <= WRAP_TARGET_ASPECT) break;
+	}
+	if (!chosen || chosen.aspect >= natural) return NO_WRAP;
+	const poolOf = (column: number) => chosen.cuts.filter((cut) => cut < column).length;
+	return {
+		bandOf: new Map(diagram.nodes.map((node) => [node.id, poolOf(columns.get(node.id)!)])),
+		continuations: new Set(chosen.cuts.flatMap((cut) => crossing[cut]!)),
+	};
+}
+
+/** The room between two pools of a wrapped laned diagram, for the continuations between them. */
+function lanePoolGap(continuations: number): number {
+	return Math.max(BAND_GAP, 2 * ROUTE_STUB_LENGTH + (continuations + 1) * PORT_SPACING);
+}
+
+/**
+ * Lay a laned diagram out: each step in its lane's band at its column. A
+ * wrapped one cuts its columns into pools, each a full set of lanes with their
+ * headers, stacked across the flow; every pool runs one length. RL and BT read
+ * their columns backward; headers stay on the left or top.
+ */
+function positionLanedNodes(
+	diagram: IntermediateDiagram,
+	minimumSizes: ReadonlyMap<string, { width: number; height: number }>,
+	stubReach: ReadonlyMap<string, number>,
+	wrap: Wrap = NO_WRAP,
+): PositionedLayout {
+	const lanes = diagram.lanes!;
+	const { direction } = diagram.layout;
+	const {
+		along,
+		across,
+		backSide,
+		breadth,
+		columnCount,
+		columnOf,
+		columns,
+		content,
+		depth,
+		depthOf,
+		forwardSide,
+		gapAfter,
+		headerSize,
+		laneIndex,
+		laneOf,
+		offset,
+		padding,
+		poolBreadth,
+		reach,
+		shapes,
+		vertical,
+		wrapped,
+	} = laneGeometry(diagram, minimumSizes, stubReach);
+	// Each column's pool; a wrap cuts between whole columns.
+	const poolOf = columnOf.map((column) => wrap.bandOf.get(column[0]?.nodeId ?? "") ?? 0);
+	const poolCount = Math.max(0, ...poolOf) + 1;
+	const firstOf = (pool: number) => poolOf.indexOf(pool);
+	const lastOf = (pool: number) => poolOf.lastIndexOf(pool);
+	const pools = Array.from({ length: poolCount }, (_, pool) => pool);
+	// Room before each pool's first column and after its last; reading backward,
+	// the last column sits next to the header.
+	const before = Math.max(
+		LANE_END_PADDING,
+		...pools.map((pool) => reach(columnOf[firstOf(pool)] ?? [], backSide) + LANE_ROOM),
+	);
+	const after = Math.max(
+		LANE_END_PADDING,
+		...pools.map((pool) => reach(columnOf[lastOf(pool)] ?? [], forwardSide) + LANE_ROOM),
+	);
+	const backward = direction === "RL" || direction === "BT";
+	const [leading, trailing] = backward ? [after, before] : [before, after];
+	const poolAlong = PADDING;
+	const bodyStart = poolAlong + headerSize + leading;
+	const columnStart: number[] = [];
+	let cursor = bodyStart;
+	let bodyLength = 0;
+	for (const [index, columnDepth] of depth.entries()) {
+		if (index > 0 && poolOf[index] !== poolOf[index - 1]) cursor = bodyStart;
+		columnStart.push(cursor);
+		cursor += columnDepth;
+		bodyLength = Math.max(bodyLength, cursor - bodyStart);
+		if (index < columnCount - 1 && poolOf[index + 1] === poolOf[index]) cursor += gapAfter[index]!;
+	}
+	const bodyEnd = bodyStart + bodyLength;
+	const poolEnd = bodyEnd + trailing;
+	// Pools stack across the flow, each gap holding the continuations that cross it.
+	const crossing = pools.map((pool) =>
+		[...wrap.continuations].filter((id) => {
+			const edge = diagram.edges.find((candidate) => candidate.id === id);
+			return edge !== undefined && wrap.bandOf.get(edge.source) === pool;
+		}),
+	);
+	const poolStart: number[] = [];
+	cursor = PADDING;
+	for (const pool of pools) {
+		poolStart.push(cursor);
+		cursor += poolBreadth + lanePoolGap(crossing[pool]!.length);
+	}
+	const laneStart = (pool: number, lane: number) =>
+		poolStart[pool]! + breadth.slice(0, lane).reduce((sum, laneBreadth) => sum + laneBreadth, 0);
+	const nodes = diagram.nodes.map((node) => {
+		const shape = shapes.get(node.id)!;
+		const lane = laneIndex.get(node.lane!)!;
+		const column = columns.get(node.id)!;
+		const forwardAlong = columnStart[column]! + (depth[column]! - shape[depthOf]) / 2;
+		const alongAt = backward ? bodyStart + bodyEnd - forwardAlong - shape[depthOf] : forwardAlong;
+		const acrossAt =
+			laneStart(poolOf[column]!, lane) +
+			padding[lane]!.low +
+			(breadth[lane]! - padding[lane]!.low - padding[lane]!.high - content[lane]!) / 2 +
+			offset.get(node.id)!;
+		const placed: NodeSceneElement = { ...shape, [along]: alongAt, [across]: acrossAt };
+		return placed;
+	});
+	const box = (
+		alongFrom: number,
+		alongSize: number,
+		acrossFrom: number,
+		acrossSize: number,
+	): Box =>
+		vertical
+			? { x: acrossFrom, y: alongFrom, width: acrossSize, height: alongSize }
+			: { x: alongFrom, y: acrossFrom, width: alongSize, height: acrossSize };
+	const bases = laneElementBases(lanes, poolCount, new Set(diagram.nodes.map((node) => node.id)));
+	const frames = pools.flatMap((pool) =>
+		lanes.map((lane, index): LaneFrame => ({
+			box: box(poolAlong, poolEnd - poolAlong, laneStart(pool, index), breadth[index]!),
+			elementId: pool === 0 ? bases.get(lane.id)! : `${bases.get(lane.id)!}:${pool + 1}`,
+			header: box(poolAlong, headerSize, laneStart(pool, index), breadth[index]!),
+			id: lane.id,
+			label: lane.label,
+			pool,
+			text: wrapped[index]!.text,
+		})),
+	);
+	const poolBoxes = pools.map((pool) =>
+		box(poolAlong, poolEnd - poolAlong, poolStart[pool]!, poolBreadth),
+	);
+	return {
+		lanes: {
+			continuations: wrap.continuations,
+			frames,
+			laneOf,
+			pool: boundsOf(poolBoxes),
+			pools: poolBoxes,
+			vertical,
+		},
+		nodes,
+	};
+}
+
+/** A lane name wrapped for its header, at a width or the header's usual line length. */
+function measureLaneLabel(
+	label: string,
+	maxWidth?: number,
+): { longestWord: number; text: string; textHeight: number; textWidth: number } {
+	const text =
+		maxWidth === undefined
+			? wrapTextToUnits(label, LANE_LABEL_LINE_UNITS)
+			: wrapTextToWidth(label, maxWidth, LANE_LABEL_FONT_SIZE);
+	const lines = text.split("\n");
+	return {
+		longestWord: Math.max(
+			...label.split(/\s+/u).map((word) => estimateTextWidth(word, LANE_LABEL_FONT_SIZE)),
+		),
+		text,
+		textHeight: Math.ceil(lines.length * LANE_LABEL_FONT_SIZE * NODE_LABEL_LINE_HEIGHT),
+		textWidth: Math.ceil(estimateTextWidth(text, LANE_LABEL_FONT_SIZE)),
+	};
+}
+
 /** A rectangle the router treats like a node it must not cross. */
 function obstacleBox(id: string, box: Box): NodeSceneElement {
 	return {
@@ -1681,6 +2294,16 @@ function groupObstacles(groups: GroupLayout | undefined, route: RoutedEdge): Nod
 }
 
 const GROUP_OUTLINE = "group-outline:";
+/**
+ * Lane boundaries are outlines too, but only the outline clearance holds a
+ * route off them: thin and crisp, a boundary never reads as another arrow.
+ */
+const LANE_OUTLINE = `${GROUP_OUTLINE}lane:`;
+/**
+ * A route keeps this far from a lane boundary it runs along wherever it can;
+ * closer than the outline clearance is a defect.
+ */
+const LANE_OUTLINE_CLEARANCE = 24;
 
 /** Each frame's outline as an unbound, headless line for routes to keep apart from. */
 function groupOutlineLines(groups: GroupLayout | undefined): ArrowSceneElement[] {
@@ -1762,6 +2385,340 @@ function groupRouteDefects(
 		}
 	}
 	return defects;
+}
+
+/** The id a lane's band draws under. */
+function laneElementId(frame: LaneFrame): string {
+	return frame.elementId;
+}
+
+/**
+ * The id each lane's band draws under, by lane id: `lane:` and the lane's id
+ * escaped, so no lane's ids extend another's, then a later pool's number. A
+ * base a diagram node's id already uses takes `@1`, `@2` and so on; escaping
+ * leaves no `:` or `@` in a lane's id, so these never meet another lane's.
+ */
+function laneElementBases(
+	lanes: readonly { readonly id: string }[],
+	pools: number,
+	nodeIds: ReadonlySet<string>,
+): Map<string, string> {
+	const bases = new Map<string, string>();
+	for (const lane of lanes) {
+		const escaped = `lane:${encodeURIComponent(lane.id)}`;
+		const uses = (base: string) =>
+			Array.from({ length: pools }, (_, pool) => (pool === 0 ? base : `${base}:${pool + 1}`)).some(
+				(band) => nodeIds.has(band) || nodeIds.has(`${band}:header`),
+			);
+		let base = escaped;
+		for (let suffix = 1; uses(base); suffix += 1) base = `${escaped}@${suffix}`;
+		bases.set(lane.id, base);
+	}
+	return bases;
+}
+
+/**
+ * What a route must not cross in a laned diagram: every lane's header, and
+ * walls around each pool of lanes, so every line stays inside its pool. Only
+ * a continuation passes between pools.
+ */
+function laneObstacles(lanes: LaneLayout | undefined, continuation = false): NodeSceneElement[] {
+	if (!lanes) return [];
+	const wall = GROUP_WALL;
+	return [
+		...lanes.frames.map((frame) =>
+			obstacleBox(`lane-header:${laneElementId(frame)}`, frame.header),
+		),
+		...(continuation ? [] : lanes.pools).flatMap(({ x, y, width, height }, pool) => [
+			obstacleBox(`lane-wall:${pool}:top`, {
+				x: x - wall,
+				y: y - wall,
+				width: width + 2 * wall,
+				height: wall,
+			}),
+			obstacleBox(`lane-wall:${pool}:bottom`, {
+				x: x - wall,
+				y: y + height,
+				width: width + 2 * wall,
+				height: wall,
+			}),
+			obstacleBox(`lane-wall:${pool}:left`, {
+				x: x - wall,
+				y: y - wall,
+				width: wall,
+				height: height + 2 * wall,
+			}),
+			obstacleBox(`lane-wall:${pool}:right`, {
+				x: x + width,
+				y: y - wall,
+				width: wall,
+				height: height + 2 * wall,
+			}),
+		]),
+	];
+}
+
+/**
+ * Every line a laned diagram draws besides its routes: the boundary between
+ * each two lanes and the lanes' outline across the flow, and the line between
+ * the headers and the lanes' bodies and the outline along it.
+ */
+function laneBoundaries(lanes: LaneLayout): AxisAlignedSegment[] {
+	return lanes.pools.flatMap((pool, index) =>
+		poolBoundaries(
+			pool,
+			lanes.frames.filter((frame) => frame.pool === index),
+			lanes.vertical,
+		),
+	);
+}
+
+function poolBoundaries(
+	pool: Box,
+	frames: readonly LaneFrame[],
+	vertical: boolean,
+): AxisAlignedSegment[] {
+	const header = frames[0]!.header;
+	const acrossLines = [
+		...frames.map((frame) => (vertical ? frame.box.x : frame.box.y)),
+		vertical ? pool.x + pool.width : pool.y + pool.height,
+	];
+	const alongLines = vertical
+		? [pool.y, header.y + header.height, pool.y + pool.height]
+		: [pool.x, header.x + header.width, pool.x + pool.width];
+	return [
+		...acrossLines.flatMap((at) =>
+			segmentsFromPoints(
+				vertical
+					? [
+							{ x: at, y: pool.y },
+							{ x: at, y: pool.y + pool.height },
+						]
+					: [
+							{ x: pool.x, y: at },
+							{ x: pool.x + pool.width, y: at },
+						],
+			),
+		),
+		...alongLines.flatMap((at) =>
+			segmentsFromPoints(
+				vertical
+					? [
+							{ x: pool.x, y: at },
+							{ x: pool.x + pool.width, y: at },
+						]
+					: [
+							{ x: at, y: pool.y },
+							{ x: at, y: pool.y + pool.height },
+						],
+			),
+		),
+	];
+}
+
+/** Each lane boundary as an unbound, headless line for routes to keep apart from. */
+function laneOutlineLines(lanes: LaneLayout | undefined): ArrowSceneElement[] {
+	if (!lanes) return [];
+	return laneBoundaries(lanes).map((segment, index) => {
+		const id = `${LANE_OUTLINE}${index}`;
+		const [from, to] =
+			segment.orientation === "horizontal"
+				? [
+						{ x: segment.min, y: segment.staticCoordinate },
+						{ x: segment.max, y: segment.staticCoordinate },
+					]
+				: [
+						{ x: segment.staticCoordinate, y: segment.min },
+						{ x: segment.staticCoordinate, y: segment.max },
+					];
+		return {
+			type: "arrow",
+			id,
+			edgeId: id,
+			sourceNodeId: "",
+			targetNodeId: "",
+			endArrowhead: null,
+			points: [from, to],
+		};
+	});
+}
+
+/** Routes that misread lanes: across a lane's header, along or hard beside a lane boundary, or out of the lanes. */
+function laneRouteDefects(
+	arrows: readonly ArrowSceneElement[],
+	lanes: LaneLayout,
+): (readonly [string])[] {
+	const boundaries = laneBoundaries(lanes);
+	return arrows.flatMap((arrow) => {
+		const segments = segmentsFromPoints(arrow.points);
+		return segments.some(
+			(segment) =>
+				lanes.frames.some((frame) => segmentCrossesBoundsInterior(segment, frame.header)) ||
+				boundaries.some(
+					(edge) =>
+						edge.orientation === segment.orientation &&
+						Math.abs(edge.staticCoordinate - segment.staticCoordinate) < GROUP_OUTLINE_CLEARANCE &&
+						segmentOverlapLength(edge, segment) > GROUP_OUTLINE_CLEARANCE,
+				),
+		) || arrow.points.some((point) => !insideBox(point, lanes.pool))
+			? [[arrow.id] as const]
+			: [];
+	});
+}
+
+/**
+ * Each branch of a decision in lanes leaves by the vertex that faces its
+ * target: the vertex across the flow toward a target in another lane, or the
+ * forward vertex for one in the decision's own lane. Lanes hold targets where
+ * their actors are, so two may lie on one side. A straight handoff keeps that
+ * vertex first, then the branch furthest back along the flow; of the others,
+ * one running ahead leaves forward, and one looping back leaves by the other
+ * vertex across the flow, to run around rather than double back.
+ */
+function assignLaneBranchSides(
+	routes: readonly RoutedEdge[],
+	lanes: LaneLayout,
+	direction: LayoutDirection,
+): void {
+	const [across, along] = lanes.vertical ? (["x", "y"] as const) : (["y", "x"] as const);
+	const forward = FORWARD_SIDE[direction];
+	const ahead = EDGE_NORMAL[forward][along];
+	const lateral = (sign: number): ConnectionEdge =>
+		lanes.vertical ? (sign < 0 ? "left" : "right") : sign < 0 ? "top" : "bottom";
+	for (const source of new Set(
+		routes.filter((r) => branches(r.source.kind)).map((r) => r.source),
+	)) {
+		const own = routes.filter((route) => route.source === source && !isSelfLoop(route));
+		if (own.length > 3) continue;
+		const sideOf = (route: RoutedEdge) =>
+			lanes.laneOf.get(route.target.nodeId) === lanes.laneOf.get(source.nodeId)
+				? 0
+				: Math.sign(center(route.target)[across] - center(source)[across]);
+		const progress = (route: RoutedEdge) =>
+			(center(route.target)[along] - center(source)[along]) * ahead;
+		const size = lanes.vertical ? "height" : "width";
+		const straight = (route: RoutedEdge) =>
+			Math.min(source[along] + source[size], route.target[along] + route.target[size]) -
+				Math.max(source[along], route.target[along]) >
+			AXIS_ALIGNED_EPSILON;
+		const taken = new Set<ConnectionEdge>();
+		const pending: RoutedEdge[] = [];
+		for (const sign of [-1, 1]) {
+			const wanting = own
+				.filter((route) => sideOf(route) === sign)
+				.sort((a, b) => Number(straight(b)) - Number(straight(a)) || progress(a) - progress(b));
+			if (wanting[0]) {
+				wanting[0].sourceEdge = lateral(sign);
+				taken.add(lateral(sign));
+			}
+			pending.push(...wanting.slice(1));
+		}
+		pending.push(...own.filter((route) => sideOf(route) === 0));
+		for (const route of pending.sort((a, b) => progress(a) - progress(b))) {
+			const sides =
+				progress(route) < 0
+					? [lateral(1), lateral(-1), forward]
+					: [forward, lateral(-1), lateral(1)];
+			route.sourceEdge = sides.find((side) => !taken.has(side)) ?? forward;
+			taken.add(route.sourceEdge);
+		}
+	}
+}
+
+/**
+ * In lanes no step takes lines in and sends lines out by one side: a
+ * departure sharing a side with an arrival moves forward, or else to a side
+ * across the flow, preferring one no other line leaves by.
+ */
+function separateLaneRoles(routes: readonly RoutedEdge[], direction: LayoutDirection): void {
+	const forward = FORWARD_SIDE[direction];
+	const across: readonly ConnectionEdge[] =
+		direction === "TB" || direction === "BT" ? ["left", "right"] : ["top", "bottom"];
+	for (const route of routes) {
+		if (isSelfLoop(route) || route.pinned !== undefined) continue;
+		const node = route.source;
+		const arrives = (side: ConnectionEdge) =>
+			routes.some((other) => other.target === node && other.targetEdge === side);
+		const leaves = (side: ConnectionEdge) =>
+			routes.some((other) => other !== route && other.source === node && other.sourceEdge === side);
+		if (!arrives(route.sourceEdge)) continue;
+		const sides = [forward, ...across].filter((side) => !arrives(side));
+		route.sourceEdge = sides.find((side) => !leaves(side)) ?? sides[0] ?? route.sourceEdge;
+	}
+}
+
+/**
+ * Each continuation of a wrapped laned diagram runs through the gap after its
+ * source's pool, the gap's continuations side by side in edge order.
+ */
+function assignLaneContinuations(
+	routes: readonly RoutedEdge[],
+	lanes: LaneLayout,
+	wrap: Wrap,
+): void {
+	const across = lanes.vertical ? "x" : "y";
+	const size = lanes.vertical ? "width" : "height";
+	const continuations = routes.filter((route) => wrap.continuations.has(route.edge.id));
+	for (const route of continuations) {
+		const pool = wrap.bandOf.get(route.source.nodeId) ?? 0;
+		const [before, after] = [lanes.pools[pool]!, lanes.pools[pool + 1]];
+		if (!after) continue;
+		const sharing = continuations.filter(
+			(other) => (wrap.bandOf.get(other.source.nodeId) ?? 0) === pool,
+		);
+		const middle = (before[across] + before[size] + after[across]) / 2;
+		route.lane = middle + (sharing.indexOf(route) - (sharing.length - 1) / 2) * PORT_SPACING;
+	}
+}
+
+/** The lanes as one block, for sizing what is drawn. */
+function laneBlocks(lanes: LaneLayout | undefined): NodeSceneElement[] {
+	return lanes ? [obstacleBox("lanes", lanes.pool)] : [];
+}
+
+/**
+ * Whether a route hands off straight across a lane boundary: between steps of
+ * two lanes that share their extent along the flow, by the sides that face
+ * each other across it.
+ */
+function straightHandoff(route: RoutedEdge, lanes: LaneLayout): boolean {
+	const { source, target } = route;
+	const [along, size] = lanes.vertical ? (["y", "height"] as const) : (["x", "width"] as const);
+	return (
+		lanes.laneOf.get(source.nodeId) !== lanes.laneOf.get(target.nodeId) &&
+		slotAxis(route.sourceEdge) === along &&
+		route.targetEdge === OPPOSITE_EDGE[route.sourceEdge] &&
+		Math.min(source[along] + source[size], target[along] + target[size]) -
+			Math.max(source[along], target[along]) >
+			AXIS_ALIGNED_EPSILON
+	);
+}
+
+/**
+ * A handoff to a step in the same column of another lane runs straight across
+ * the lane boundary: it leaves and arrives by the sides that face each other
+ * across the flow.
+ */
+function assignLaneSides(routes: readonly RoutedEdge[], lanes: LaneLayout): void {
+	const [along, size] = lanes.vertical ? (["y", "height"] as const) : (["x", "width"] as const);
+	for (const route of routes) {
+		const { source, target } = route;
+		if (
+			isSelfLoop(route) ||
+			lanes.continuations.has(route.edge.id) ||
+			lanes.laneOf.get(source.nodeId) === lanes.laneOf.get(target.nodeId)
+		)
+			continue;
+		const shared =
+			Math.min(source[along] + source[size], target[along] + target[size]) -
+			Math.max(source[along], target[along]);
+		if (shared <= AXIS_ALIGNED_EPSILON) continue;
+		const ahead = lanes.vertical
+			? center(target).x > center(source).x
+			: center(target).y > center(source).y;
+		route.sourceEdge = lanes.vertical ? (ahead ? "right" : "left") : ahead ? "bottom" : "top";
+		route.targetEdge = OPPOSITE_EDGE[route.sourceEdge];
+	}
 }
 
 function textForNode(shape: NodeSceneElement): TextSceneElement {
@@ -2033,6 +2990,8 @@ function portOffsetsForRoutes(
 
 /** Arrowheads are about 17 units wide; this keeps a visible gap beside an arrival. */
 const ARRIVAL_SPACING = 36;
+/** In lanes, where handoffs and loops often meet one step, arrivals on a side sit farther apart. */
+const LANE_ARRIVAL_SPACING = 1.5 * ARRIVAL_SPACING;
 const OPPOSITE_EDGE: Readonly<Record<ConnectionEdge, ConnectionEdge>> = {
 	top: "bottom",
 	right: "left",
@@ -2286,6 +3245,7 @@ function alignedPortOffsets(
 	routes: readonly RoutedEdge[],
 	sharedDecisionPitch: boolean,
 	byApproach = false,
+	arrivalSpacing = ARRIVAL_SPACING,
 ): Map<string, number> {
 	const offsets = portOffsetsForRoutes(routes, sharedDecisionPitch);
 	const slotsBySide = new Map<string, PortSlot[]>();
@@ -2332,7 +3292,7 @@ function alignedPortOffsets(
 						Math.max(
 							node.kind === "state" ? stateLabelGap(slots[index]!, slot, side) : labelPitch,
 							slot.endpoint === "target" || slots[index]!.endpoint === "target"
-								? ARRIVAL_SPACING
+								? arrivalSpacing
 								: PORT_SPACING,
 						),
 					),
@@ -2677,10 +3637,15 @@ function assignDirectFeedbackPorts(
 	return { offsets: chosenOffsets, minimumSizes };
 }
 
-/** How far the reserved endpoint stubs reach past each node side's bounding box. */
+/**
+ * How far the reserved endpoint stubs reach past each node side's bounding
+ * box, and a self-loop's label, or with `labels` every branch label, beside
+ * its stub.
+ */
 function stubReachForRoutes(
 	routes: readonly RoutedEdge[],
 	portOffsets: ReadonlyMap<string, number>,
+	labels = false,
 ): Map<string, number> {
 	const reach = new Map<string, number>();
 	for (const route of routes) {
@@ -2703,7 +3668,7 @@ function stubReachForRoutes(
 			reach.set(key, Math.max(reach.get(key) ?? 0, beyond));
 		}
 		// A self-loop's label sits outside its loop.
-		if (route.edge.label && isSelfLoop(route)) {
+		if (route.edge.label && (labels || isSelfLoop(route))) {
 			const node = route.source;
 			const box = labelBox(
 				branchLabelPosition(route, start),
@@ -3147,6 +4112,8 @@ interface RouteOptions {
 	readonly bandOf?: ReadonlyMap<string, number>;
 	/** Group frames a grouped layout draws; routes keep clear of the ones they do not belong to. */
 	readonly groups?: GroupLayout;
+	/** Lanes a laned layout draws; routes stay inside them, off their headers and boundaries. */
+	readonly lanes?: LaneLayout;
 	/** Prefer, among otherwise equal routes, one that crosses fewer routed arrows. */
 	readonly avoidCrossings?: boolean;
 }
@@ -3165,10 +4132,13 @@ interface RoutedSoFar {
 }
 
 function routedSoFar(
-	arrows: readonly ArrowSceneElement[],
+	routedArrows: readonly ArrowSceneElement[],
 	readerScale: number | undefined,
 	avoidCrossings = false,
 ): RoutedSoFar {
+	const arrows = routedArrows.some((arrow) => arrow.id.startsWith(LANE_OUTLINE))
+		? routedArrows.filter((arrow) => !arrow.id.startsWith(LANE_OUTLINE))
+		: routedArrows;
 	return {
 		...(readerScale === undefined
 			? {}
@@ -3185,7 +4155,9 @@ function routedSoFar(
 						readerScale,
 					),
 				}),
-		outlines: existingRouteSegments(arrows.filter((arrow) => arrow.id.startsWith(GROUP_OUTLINE))),
+		outlines: existingRouteSegments(
+			routedArrows.filter((arrow) => arrow.id.startsWith(GROUP_OUTLINE)),
+		),
 		segments: existingRouteSegments(arrows),
 	};
 }
@@ -3303,17 +4275,24 @@ function crossingLookup(arrows: readonly ArrowSceneElement[]): CrossingLookup {
 /** Runs of a route parallel to a frame outline and closer to it than its clearance. */
 function routeOutlineBesideCount(
 	points: readonly ScenePoint[],
-	outlines: readonly AxisAlignedSegment[],
+	outlines: readonly RouteSegment[],
 ): number {
 	if (outlines.length === 0) return 0;
 	return segmentsFromPoints(points).filter((segment) =>
 		outlines.some(
 			(edge) =>
 				edge.orientation === segment.orientation &&
-				Math.abs(edge.staticCoordinate - segment.staticCoordinate) < GROUP_OUTLINE_CLEARANCE &&
+				Math.abs(edge.staticCoordinate - segment.staticCoordinate) < outlineClearance(edge) &&
 				segmentOverlapLength(edge, segment) > GROUP_OUTLINE_CLEARANCE,
 		),
 	).length;
+}
+
+/** How far a route keeps from an outline it runs along: a lane boundary asks for more room. */
+function outlineClearance(outline: RouteSegment): number {
+	return outline.arrowId.startsWith(LANE_OUTLINE)
+		? LANE_OUTLINE_CLEARANCE
+		: GROUP_OUTLINE_CLEARANCE;
 }
 
 function routeBendCount(points: readonly ScenePoint[]): number {
@@ -3915,8 +4894,9 @@ function branchLabels(
 	shapes: readonly NodeSceneElement[],
 	groups?: GroupLayout,
 	unambiguous = true,
+	lanes?: LaneLayout,
 ): TextSceneElement[] {
-	return placedBranchLabels(arrows, routes, shapes, groups, unambiguous).labels;
+	return placedBranchLabels(arrows, routes, shapes, groups, unambiguous, lanes).labels;
 }
 
 /** Branch labels placed as drawn, and how many lines, nodes or labels they still touch. */
@@ -3926,18 +4906,26 @@ function placedBranchLabels(
 	shapes: readonly NodeSceneElement[],
 	groups?: GroupLayout,
 	unambiguous = true,
+	lanes?: LaneLayout,
 ): { labels: TextSceneElement[]; touches: number } {
 	const labels: TextSceneElement[] = [];
 	let touches = 0;
 	const segments = arrows.map((arrow) => segmentsFromPoints(arrow.points));
-	// Group names are obstacles and frame outlines are lines a label keeps clear of.
+	// Group names and lane headers are obstacles, and frame outlines and lane
+	// boundaries are lines a label keeps clear of.
 	const nodes = [
 		...shapes,
 		...(groups?.frames ?? []).map((frame) =>
 			obstacleBox(`group-label:${frame.id}`, frame.labelBox),
 		),
+		...(lanes?.frames ?? []).map((frame) =>
+			obstacleBox(`lane-header:${laneElementId(frame)}`, frame.header),
+		),
 	];
-	const outlines = (groups?.frames ?? []).flatMap((frame) => frameOutline(frame.box));
+	const outlines = [
+		...(groups?.frames ?? []).flatMap((frame) => frameOutline(frame.box)),
+		...(lanes ? laneBoundaries(lanes) : []),
+	];
 	const placed: { box: LabelBox; index: number }[] = [];
 	const sizes = arrows.map((arrow, index) =>
 		arrow.label ? branchLabelMetrics(arrow.label, branches(routes[index]?.source.kind)) : undefined,
@@ -4246,9 +5234,16 @@ function obstacleRoute(
 	const key = (x: number, y: number, axis: number) => (x * ys.length + y) * 2 + axis;
 	const arrowId = `edge:${route.edge.id}`;
 	const nearby = segmentOverlapLookup(arrowSegments, corridorGap);
+	const [frameOutlines, laneOutlines] = [false, true].map((lane) =>
+		outlineSegments.filter((segment) => segment.arrowId.startsWith(LANE_OUTLINE) === lane),
+	);
 	const nearOutline =
-		outlineSegments.length > 0
-			? segmentOverlapLookup(outlineSegments, GROUP_OUTLINE_CLEARANCE)
+		frameOutlines!.length > 0
+			? segmentOverlapLookup(frameOutlines!, GROUP_OUTLINE_CLEARANCE)
+			: undefined;
+	const nearLane =
+		laneOutlines!.length > 0
+			? segmentOverlapLookup(laneOutlines!, LANE_OUTLINE_CLEARANCE)
 			: undefined;
 	const stubs = [...segmentsFromPoints([start, startStub]), ...segmentsFromPoints([endStub, end])];
 	type Step = {
@@ -4313,6 +5308,7 @@ function obstacleRoute(
 				const step = segmentsFromPoints([point, next])[0];
 				const { beside, overlaps } = step ? nearby(step, arrowId) : { beside: 0, overlaps: 0 };
 				const outline = step && nearOutline ? nearOutline(step, arrowId) : undefined;
+				const lane = step && nearLane ? nearLane(step, arrowId) : undefined;
 				edgeCosts.set(
 					gridEdge,
 					shapes.some((shape) => segmentCrossesBoundsInterior(segment, shape)) ||
@@ -4324,6 +5320,7 @@ function obstacleRoute(
 								overlaps * 10000 +
 								beside * 1000 +
 								(outline ? (outline.beside + outline.overlaps) * 1000 : 0) +
+								(lane ? (lane.beside + lane.overlaps) * 1000 : 0) +
 								(crossings && step
 									? crossings.step(
 											step.orientation,
@@ -4353,7 +5350,7 @@ function exteriorLaneRoute(
 	end: ScenePoint,
 	shapes: readonly NodeSceneElement[],
 	existingArrows: readonly ArrowSceneElement[],
-	{ avoidCrossings, readerScale, guided, bandOf }: RouteOptions,
+	{ avoidCrossings, readerScale, guided, bandOf, lanes: laneLayout }: RouteOptions,
 ): [ScenePoint, ...ScenePoint[]] {
 	const horizontalDominant = Math.abs(end.x - start.x) >= Math.abs(end.y - start.y);
 	const ignoredNodeIds = new Set([route.source.nodeId, route.target.nodeId]);
@@ -4487,9 +5484,13 @@ function exteriorLaneRoute(
 						? routeForVerticalLane(route.lane!, distance)
 						: routeForHorizontalLane(route.lane!, distance),
 				);
-	// A pinned line between facing sides may step across midway, a bend clear of
-	// both ports rather than a jog beside one.
-	const facing = route.pinned !== undefined && route.targetEdge === OPPOSITE_EDGE[route.sourceEdge];
+	// A pinned line, or a handoff straight across a lane boundary, between facing
+	// sides may step across midway, a bend clear of both ports rather than a jog
+	// beside one, or on the boundary.
+	const facing =
+		(route.pinned !== undefined ||
+			(laneLayout !== undefined && straightHandoff(route, laneLayout))) &&
+		route.targetEdge === OPPOSITE_EDGE[route.sourceEdge];
 	const middle =
 		route.sourceEdge === "left" || route.sourceEdge === "right"
 			? [
@@ -4579,8 +5580,10 @@ function routeAllEdges(
 	];
 	const endpointStubs =
 		edgeRouting === "orthogonal" ? endpointStubsForRoutes(routes, portOffsets) : [];
-	// Frame outlines are lines routes keep apart from, as from each other.
-	const outlines = groupOutlineLines(options.groups);
+	// Frame outlines and lane boundaries are lines routes keep apart from, as from each other.
+	const outlines = [...groupOutlineLines(options.groups), ...laneOutlineLines(options.lanes)];
+	const lanes = laneObstacles(options.lanes);
+	const passage = laneObstacles(options.lanes, true);
 	const edgeArrows: ArrowSceneElement[] = [];
 	for (const route of order.map((index) => routes[index]!)) {
 		const kept = fixed.get(route.edge.id);
@@ -4601,6 +5604,7 @@ function routeAllEdges(
 							label.nodeId !== `loop:${route.edge.id}`,
 					),
 					...groupObstacles(options.groups, route),
+					...(options.lanes?.continuations.has(route.edge.id) ? passage : lanes),
 				],
 				[...outlines, ...endpointStubs, ...edgeArrows],
 				options,
@@ -4626,7 +5630,7 @@ function rerouteDefects(
 	nodeShapes: readonly NodeSceneElement[],
 	options: RouteOptions,
 ): ArrowSceneElement[] {
-	let defects = exportRouteDefects(arrows, nodeShapes, options.groups);
+	let defects = exportRouteDefects(arrows, nodeShapes, options.groups, options.lanes);
 	let order = routes.map((_, index) => index);
 	for (let attempt = 0; attempt < MAX_REROUTES && defects.length > 0; attempt += 1) {
 		const position = (arrowId: string) =>
@@ -4643,7 +5647,7 @@ function rerouteDefects(
 		const next = [...order];
 		next.splice(earlier, 0, ...next.splice(later, 1));
 		const retry = routeAllEdges(routes, "orthogonal", portOffsets, nodeShapes, options, next);
-		const retryDefects = exportRouteDefects(retry, nodeShapes, options.groups);
+		const retryDefects = exportRouteDefects(retry, nodeShapes, options.groups, options.lanes);
 		if (retryDefects.length >= defects.length) break;
 		[arrows, defects, order] = [retry, retryDefects, next];
 	}
@@ -4716,6 +5720,7 @@ function exportRouteDefects(
 	arrows: readonly ArrowSceneElement[],
 	nodes: readonly NodeSceneElement[],
 	groups?: GroupLayout,
+	lanes?: LaneLayout,
 ): (readonly [string] | readonly [string, string])[] {
 	const segments = arrows.flatMap((arrow) =>
 		segmentsFromPoints(arrow.points).map((segment) => {
@@ -4752,7 +5757,8 @@ function exportRouteDefects(
 			)
 				defects.push([left.arrowId]);
 	}
-	return groups ? [...defects, ...groupRouteDefects(arrows, groups)] : defects;
+	const grouped = groups ? [...defects, ...groupRouteDefects(arrows, groups)] : defects;
+	return lanes ? [...grouped, ...laneRouteDefects(arrows, lanes)] : grouped;
 }
 
 /** Endpoints whose first step heads into their own node instead of away from it. */
@@ -4789,6 +5795,7 @@ function routingDefects(
 	nodes: readonly NodeSceneElement[],
 	scale: number,
 	groups?: GroupLayout,
+	lanes?: LaneLayout,
 ): { hard: number; reader: number } {
 	const reader = routingQualityFindings(
 		arrows.map((arrow) => ({
@@ -4799,7 +5806,7 @@ function routingDefects(
 		})),
 		scale,
 	).length;
-	return { hard: exportRouteDefects(arrows, nodes, groups).length, reader };
+	return { hard: exportRouteDefects(arrows, nodes, groups, lanes).length, reader };
 }
 
 function sceneBounds(elements: readonly SceneElement[]): {
@@ -5028,6 +6035,7 @@ function assignContinuationLanes(
 interface DiagramLayout {
 	edgeArrows: ArrowSceneElement[];
 	groups?: GroupLayout;
+	lanes?: LaneLayout;
 	nodeShapes: NodeSceneElement[];
 	/** The port offsets and route options the arrows were last routed with. */
 	portOffsets?: ReadonlyMap<string, number>;
@@ -5157,11 +6165,20 @@ function layoutDiagramOnce(
 		withPinnedOffsets(
 			routes,
 			polish.ports
-				? alignedPortOffsets(routes, polish.repair, arrangement.crossingRepair)
+				? alignedPortOffsets(
+						routes,
+						polish.repair,
+						arrangement.crossingRepair,
+						laned(diagram) ? LANE_ARRIVAL_SPACING : ARRIVAL_SPACING,
+					)
 				: portOffsetsForRoutes(routes, polish.repair),
 		);
 	const { wrap } = arrangement;
-	let { groups, nodes: nodeShapes }: PositionedLayout = placement
+	let {
+		groups,
+		lanes,
+		nodes: nodeShapes,
+	}: PositionedLayout = placement
 		? { nodes: placedNodes(diagram, placement) }
 		: positionLayout(diagram, new Map(), new Map(), arrangement, slack);
 	// Groups laid out across the flow read in their own direction inside.
@@ -5189,8 +6206,10 @@ function layoutDiagramOnce(
 		routeForEdge(edge, index, shapesByNodeId, edgeDirection(edge), wrap.continuations.has(edge.id)),
 	);
 	if (endRun) for (const route of routedEdges) route.endRun = endRun;
+	if (lanes) assignLaneSides(routedEdges, lanes);
 	const mirrored = orthogonal && polish.ports;
 	assignSides(routedEdges, mirrored);
+	if (lanes && orthogonal) assignLaneBranchSides(routedEdges, lanes, direction);
 	let portOffsets: Map<string, number>;
 	let capacity: Map<string, { width: number; height: number }>;
 	if (orthogonal) {
@@ -5203,6 +6222,7 @@ function layoutDiagramOnce(
 			if (sides?.sourceEdge) route.sourceEdge = sides.sourceEdge;
 			if (sides?.targetEdge) route.targetEdge = sides.targetEdge;
 		}
+		if (lanes && arrangement.separateRoles) separateLaneRoles(routedEdges, direction);
 		if (anchors) pinAnchors(routedEdges, anchors);
 		portOffsets = offsetsFor(routedEdges);
 		capacity = portCapacityForRoutes(routedEdges, portOffsets);
@@ -5213,12 +6233,24 @@ function layoutDiagramOnce(
 	}
 	// A grouped layout always sizes its frames to hold their members' stubs; a
 	// placed one keeps the room its family left.
+	// A lane keeps room for the lines that turn by its steps; an unlabeled handoff
+	// straight across its boundary turns nowhere.
 	const reach =
-		orthogonal && !placement && (polish.repair || groups)
-			? stubReachForRoutes(routedEdges, portOffsets)
+		orthogonal && !placement && (polish.repair || groups || lanes)
+			? lanes
+				? stubReachForRoutes(
+						routedEdges.filter((route) => route.edge.label || !straightHandoff(route, lanes!)),
+						portOffsets,
+						true,
+					)
+				: stubReachForRoutes(routedEdges, portOffsets)
 			: new Map<string, number>();
 	if (!placement && (capacity.size > 0 || reach.size > 0)) {
-		({ groups, nodes: nodeShapes } = positionLayout(diagram, capacity, reach, arrangement, slack));
+		({
+			groups,
+			lanes,
+			nodes: nodeShapes,
+		} = positionLayout(diagram, capacity, reach, arrangement, slack));
 		const resized = new Map(
 			[...nodeShapes, ...compositeShapes(groups)].map((node) => [node.nodeId, node]),
 		);
@@ -5230,6 +6262,7 @@ function layoutDiagramOnce(
 		}
 		if (orthogonal) portOffsets = offsetsFor(routedEdges);
 		else {
+			if (lanes) assignLaneSides(routedEdges, lanes);
 			assignDecisionSides(routedEdges, diagram.layout.direction, mirrored);
 			portOffsets = assignDirectFeedbackPorts(
 				routedEdges,
@@ -5240,9 +6273,10 @@ function layoutDiagramOnce(
 		}
 	}
 	nodeShapes = alignMarkers(routedEdges, nodeShapes, groups, portOffsets);
-	assignContinuationLanes(routedEdges, nodeShapes, wrap);
+	if (lanes) assignLaneContinuations(routedEdges, lanes, wrap);
+	else assignContinuationLanes(routedEdges, nodeShapes, wrap);
 	// Judge jogs and corridors at the size a reader sees the exported diagram.
-	const drawn = [...nodeShapes, ...groupBlocks(groups)];
+	const drawn = [...nodeShapes, ...groupBlocks(groups), ...laneBlocks(lanes)];
 	const scale = routingQualityScale({
 		width:
 			Math.max(...drawn.map((node) => node.x + node.width)) -
@@ -5256,6 +6290,7 @@ function layoutDiagramOnce(
 		...(polish.reader ? { readerScale: scale } : {}),
 		...(wrap.continuations.size > 0 ? { bandOf: wrap.bandOf } : {}),
 		...(groups ? { groups } : {}),
+		...(lanes ? { lanes } : {}),
 		...(arrangement.avoidCrossings ? { avoidCrossings: true } : {}),
 	};
 	let edgeArrows = routeAllEdges(
@@ -5271,7 +6306,7 @@ function layoutDiagramOnce(
 			const offsets = offsetsFor(routedEdges);
 			const retry = routeAllEdges(routedEdges, "orthogonal", offsets, nodeShapes, options);
 			const [before, after] = [edgeArrows, retry].map((arrows) =>
-				routingDefects(arrows, nodeShapes, scale, groups),
+				routingDefects(arrows, nodeShapes, scale, groups, lanes),
 			);
 			if (after!.hard <= before!.hard && after!.reader < before!.reader)
 				[edgeArrows, portOffsets] = [retry, offsets];
@@ -5286,11 +6321,16 @@ function layoutDiagramOnce(
 			const offsets = offsetsFor(routedEdges);
 			const retry = routeAllEdges(routedEdges, "orthogonal", offsets, nodeShapes, options);
 			if (
-				exportRouteDefects(retry, nodeShapes, groups).length <=
-					exportRouteDefects(edgeArrows, nodeShapes, groups).length &&
+				exportRouteDefects(retry, nodeShapes, groups, lanes).length <=
+					exportRouteDefects(edgeArrows, nodeShapes, groups, lanes).length &&
 				routesNoWorse(
-					{ edgeArrows: retry, ...(groups ? { groups } : {}), nodeShapes },
-					{ edgeArrows, ...(groups ? { groups } : {}), nodeShapes },
+					{
+						edgeArrows: retry,
+						...(groups ? { groups } : {}),
+						...(lanes ? { lanes } : {}),
+						nodeShapes,
+					},
+					{ edgeArrows, ...(groups ? { groups } : {}), ...(lanes ? { lanes } : {}), nodeShapes },
 					true,
 					false,
 				)
@@ -5304,6 +6344,7 @@ function layoutDiagramOnce(
 	return {
 		edgeArrows,
 		...(groups ? { groups } : {}),
+		...(lanes ? { lanes } : {}),
 		nodeShapes,
 		portOffsets,
 		routeOptions: options,
@@ -5450,8 +6491,8 @@ function readerFindingCount(
  * extreme or longer aspect, unless `narrower` and only narrower.
  */
 function routesNoWorse(
-	candidate: Pick<DiagramLayout, "edgeArrows" | "groups" | "nodeShapes">,
-	current: Pick<DiagramLayout, "edgeArrows" | "groups" | "nodeShapes">,
+	candidate: Pick<DiagramLayout, "edgeArrows" | "groups" | "lanes" | "nodeShapes">,
+	current: Pick<DiagramLayout, "edgeArrows" | "groups" | "lanes" | "nodeShapes">,
 	fewerCrossings = false,
 	runs = true,
 	narrower = false,
@@ -5460,7 +6501,10 @@ function routesNoWorse(
 		arrowCrossings(layout.edgeArrows, runs),
 	);
 	const [size, currentSize] = [candidate, current].map((layout) =>
-		drawnSize([...layout.nodeShapes, ...groupBlocks(layout.groups)], layout.edgeArrows),
+		drawnSize(
+			[...layout.nodeShapes, ...groupBlocks(layout.groups), ...laneBlocks(layout.lanes)],
+			layout.edgeArrows,
+		),
 	);
 	const [aspect, currentAspect] = [size!, currentSize!].map(({ width, height }) =>
 		exportAspect(width, height),
@@ -5476,10 +6520,12 @@ function routesNoWorse(
 		readerFindingCount(candidate.edgeArrows, [
 			...candidate.nodeShapes,
 			...groupBlocks(candidate.groups),
+			...laneBlocks(candidate.lanes),
 		]) <=
 			readerFindingCount(current.edgeArrows, [
 				...current.nodeShapes,
 				...groupBlocks(current.groups),
+				...laneBlocks(current.lanes),
 			])
 	);
 }
@@ -5492,15 +6538,16 @@ function routesNoWorse(
  * other route moves.
  */
 function clearOutlines(layout: DiagramLayout): DiagramLayout {
-	const { groups, nodeShapes, routedEdges } = layout;
+	const { groups, lanes, nodeShapes, routedEdges } = layout;
 	let arrows = layout.edgeArrows;
-	const drawn = [...nodeShapes, ...groupBlocks(groups)];
+	const drawn = [...nodeShapes, ...groupBlocks(groups), ...laneBlocks(lanes)];
 	const score = (candidate: readonly ArrowSceneElement[]) => ({
 		crossings: arrowCrossings(candidate),
-		defects: exportRouteDefects(candidate, nodeShapes, groups).length,
+		defects: exportRouteDefects(candidate, nodeShapes, groups, lanes).length,
 		findings: readerFindingCount(candidate, drawn),
 		inward: inwardEndpoints(candidate, nodeShapes),
-		labels: placedBranchLabels([...candidate], routedEdges, nodeShapes, groups).touches,
+		labels: placedBranchLabels([...candidate], routedEdges, nodeShapes, groups, true, lanes)
+			.touches,
 	});
 	let current: ReturnType<typeof score> | undefined;
 	for (const [index, arrow] of layout.edgeArrows.entries()) {
@@ -5654,15 +6701,35 @@ function crossingMoves(
 		return EDGE_NORMAL[side][along] * (there - here) > AXIS_ALIGNED_EPSILON;
 	};
 	const moves: SideMove[] = [];
-	const add = (move: SideMove) => {
-		const valid = [...move].every(([id, change]) => {
+	// In lanes an arrival never shares a side with a departure, so a line into a
+	// step never reads as leaving it.
+	const sideOf = (route: RoutedEdge, endpoint: "source" | "target") =>
+		move.get(route.edge.id)?.[sideKey(endpoint)] ?? route[sideKey(endpoint)];
+	let move: SideMove = new Map();
+	const mixesRoles = () =>
+		[...move.keys()].some((id) => {
 			const route = routes.find((candidate) => candidate.edge.id === id)!;
-			return (
-				natural(route, "source", change.sourceEdge ?? route.sourceEdge) &&
-				natural(route, "target", change.targetEdge ?? route.targetEdge)
-			);
+			return (["source", "target"] as const).some((endpoint) => {
+				const other = endpoint === "source" ? "target" : "source";
+				const node = route[endpoint];
+				const side = sideOf(route, endpoint);
+				return routes.some(
+					(candidate) =>
+						candidate !== route && candidate[other] === node && sideOf(candidate, other) === side,
+				);
+			});
 		});
-		if (valid) moves.push(move);
+	const add = (candidate: SideMove) => {
+		move = candidate;
+		const valid =
+			[...candidate].every(([id, change]) => {
+				const route = routes.find((other) => other.edge.id === id)!;
+				return (
+					natural(route, "source", change.sourceEdge ?? route.sourceEdge) &&
+					natural(route, "target", change.targetEdge ?? route.targetEdge)
+				);
+			}) && !(laned(diagram) && mixesRoles());
+		if (valid) moves.push(candidate);
 	};
 	// A loop runs back along one side of the flow or the other, both ends on that side.
 	const sidesAcross: readonly ConnectionEdge[] = vertical ? ["left", "right"] : ["top", "bottom"];
@@ -5760,7 +6827,12 @@ function screenedCrossings(settled: SettledLayout, move: SideMove, polish: Routi
 	const offsets = withPinnedOffsets(
 		routes,
 		polish.ports
-			? alignedPortOffsets(routes, polish.repair, settled.arrangement.crossingRepair)
+			? alignedPortOffsets(
+					routes,
+					polish.repair,
+					settled.arrangement.crossingRepair,
+					layout.lanes ? LANE_ARRIVAL_SPACING : ARRIVAL_SPACING,
+				)
 			: portOffsetsForRoutes(routes, polish.repair),
 	);
 	const moved = new Set(
@@ -5930,6 +7002,63 @@ function drawnMarker(shape: NodeSceneElement, accent: string): NodeSceneElement[
 	];
 }
 
+/** A lane header's fill: the Sketchi paper tone, so the strip reads apart from the lane. */
+const LANE_HEADER_FILL = "#f6f1e7";
+
+/**
+ * Each lane as locked shapes under the diagram: its band, its header strip and
+ * the header's name. Locked, they stay put while steps move across them in the
+ * editor, and a click on a lane selects nothing.
+ */
+function laneElements(lanes: LaneLayout): (NodeSceneElement | TextSceneElement)[] {
+	return lanes.frames.flatMap((frame): (NodeSceneElement | TextSceneElement)[] => {
+		const id = laneElementId(frame);
+		const header: NodeSceneElement = {
+			type: "node",
+			id: `${id}:header`,
+			nodeId: `${id}:header`,
+			kind: "lane-header",
+			rendererRole: "swimlane-header",
+			shape: "rectangle",
+			...frame.header,
+			label: frame.text,
+			fillColor: LANE_HEADER_FILL,
+			fillStyle: "solid",
+			roughness: 0,
+			strokeWidth: 1,
+			locked: true,
+		};
+		return [
+			{
+				type: "node",
+				id,
+				nodeId: id,
+				kind: "lane",
+				rendererRole: "swimlane",
+				shape: "rectangle",
+				...frame.box,
+				label: frame.label,
+				// Crisp, thin lines: neighbors share one boundary, and the steps read first.
+				roughness: 0,
+				strokeWidth: 1,
+				locked: true,
+			},
+			header,
+			{
+				type: "text",
+				id: `${id}:label`,
+				containerId: header.id,
+				x: header.x + header.width / 2,
+				y: header.y + header.height / 2,
+				text: frame.text,
+				fontSize: LANE_LABEL_FONT_SIZE,
+				maxWidth: Math.max(1, header.width - 2 * LANE_HEADER_PADDING),
+				locked: true,
+			},
+		];
+	});
+}
+
 /**
  * Draw each group as an Excalidraw frame named by its label, and make every
  * member a child of it: nodes and their labels always, and a group's own edges
@@ -6061,7 +7190,8 @@ export function renderGraphDiagram(
 	// Export defects come first; inward endpoints only break ties.
 	const defectsOf = (attempt: DiagramLayout) =>
 		[
-			exportRouteDefects(attempt.edgeArrows, attempt.nodeShapes, attempt.groups).length,
+			exportRouteDefects(attempt.edgeArrows, attempt.nodeShapes, attempt.groups, attempt.lanes)
+				.length,
 			inwardEndpoints(attempt.edgeArrows, attempt.nodeShapes),
 		] as const;
 	const fewer = (a: readonly [number, number], b: readonly [number, number]) =>
@@ -6104,7 +7234,11 @@ export function renderGraphDiagram(
 	// A flow too long for its breadth wraps when the wrapped layout routes no worse.
 	// Its size includes the branch labels, as the exported PNG does.
 	const size = drawnSize(
-		[...best.layout.nodeShapes, ...groupBlocks(best.layout.groups)],
+		[
+			...best.layout.nodeShapes,
+			...groupBlocks(best.layout.groups),
+			...laneBlocks(best.layout.lanes),
+		],
 		best.layout.edgeArrows,
 		[
 			...branchLabels(
@@ -6113,6 +7247,7 @@ export function renderGraphDiagram(
 				best.layout.nodeShapes,
 				best.layout.groups,
 				false,
+				best.layout.lanes,
 			),
 		],
 	);
@@ -6129,9 +7264,15 @@ export function renderGraphDiagram(
 		vertical && aspect < WRAP_EXTREME_ASPECT && fittedText >= WRAP_MIN_COLUMN_TEXT
 			? WRAP_COLUMN_BALANCE
 			: 0;
+	// Lanes wrap into pools only past the extreme aspect: a pool split apart reads
+	// worse than one long pool.
 	const wrap =
 		arranged && orthogonal && tooLong
-			? planWrap(diagram, best.arrangement.reorder, balance)
+			? laned(diagram)
+				? aspect >= WRAP_EXTREME_ASPECT
+					? planLaneWrap(diagram)
+					: NO_WRAP
+				: planWrap(diagram, best.arrangement.reorder, balance)
 			: NO_WRAP;
 	// A wrapped layout may need crossing repairs of its own; it tries them first.
 	for (const crossingRepair of repairable && !best.arrangement.crossingRepair
@@ -6149,12 +7290,16 @@ export function renderGraphDiagram(
 		if (!groupsAcross || best.arrangement.groupsAcross) break;
 		consider({ ...best.arrangement, crossingRepair, groupsAcross: true }, false);
 	}
+	// In lanes a step takes lines in and sends them out by different sides, when
+	// that routes no worse.
+	if (arranged && orthogonal && laned(diagram))
+		consider({ ...best.arrangement, separateRoles: true }, false);
 	// Crossings the arrangements leave are repaired where few enough to untangle.
 	const crossings = arrowCrossings(best.layout.edgeArrows);
 	if (repairable && crossings > 0 && crossings <= CROSSING_REPAIR_MAX_CROSSINGS)
 		best = repairCrossings(diagram, levels[0]!, best, defectsOf, fewer);
 	const layout = orthogonal ? clearOutlines(best.layout) : best.layout;
-	const { groups, routedEdges } = layout;
+	const { groups, lanes, routedEdges } = layout;
 	const routedArrows = [...layout.edgeArrows];
 	const drawn = {
 		arrows: routedArrows,
@@ -6162,16 +7307,25 @@ export function renderGraphDiagram(
 		labels: [
 			// Pseudostates draw no label.
 			...layout.nodeShapes.filter((shape) => shape.label).map(textForNode),
-			...branchLabels(routedArrows, routedEdges, layout.nodeShapes, groups),
+			...branchLabels(routedArrows, routedEdges, layout.nodeShapes, groups, true, lanes),
 		],
 		nodes: layout.nodeShapes,
 	};
 	const framed = groups ? withGroupFrames(groups, drawn) : drawn;
 	const { arrows: edgeArrows, frames, labels } = framed;
 	const nodeShapes = framed.nodes.flatMap((shape) => drawnMarker(shape, diagram.style.accentColor));
-	const elements = normalizeSceneOrigin([...frames, ...edgeArrows, ...nodeShapes, ...labels]);
+	// Lanes sit under everything, each band, then its header and the header's name.
+	const lane = lanes ? laneElements(lanes) : [];
+	const elements = normalizeSceneOrigin([
+		...lane,
+		...frames,
+		...edgeArrows,
+		...nodeShapes,
+		...labels,
+	]);
 	const bounds = sceneBounds(elements);
 	const zOrder = [
+		...lane.map((element) => element.id),
 		...frames.map((element) => element.id),
 		...nodeShapes.map((element) => element.id),
 		...labels.map((element) => element.id),

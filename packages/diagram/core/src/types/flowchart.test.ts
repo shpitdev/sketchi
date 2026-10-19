@@ -5,6 +5,7 @@ import { DiagramValidationError } from "../intermediate";
 import {
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_GROUPS,
+	FLOWCHART_MAX_LANES,
 	FLOWCHART_MAX_ISSUES,
 	FLOWCHART_MAX_NODES,
 	FlowchartDiagramSchema,
@@ -296,5 +297,87 @@ describe("flowchart groups", () => {
 		});
 		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_too_large"]);
 		expect(issues[0]?.ref).toEqual({ kind: "diagram", id: "linear-9", path: "groups" });
+	});
+});
+
+describe("flowchart lanes", () => {
+	const laned = {
+		...flowchartFixture,
+		lanes: [
+			{ id: "author", label: "Author" },
+			{ id: "reviewer", label: "Reviewer" },
+		],
+		nodes: flowchartFixture.nodes.map((node) => ({
+			...node,
+			lane: node.id === "clear" || node.id === "review" ? "reviewer" : "author",
+		})),
+	};
+
+	it("accepts declared lanes that hold every node", () => {
+		const diagram = parseFlowchartDiagram(laned);
+		expect(diagram.lanes?.map((lane) => lane.id)).toEqual(["author", "reviewer"]);
+		expect(diagram.nodes.map((node) => node.lane)).toEqual([
+			"author",
+			"author",
+			"reviewer",
+			"author",
+			"reviewer",
+		]);
+	});
+
+	it("names each lane problem with a repair hint", () => {
+		const issues = validationIssues({
+			...laned,
+			lanes: [...laned.lanes, { id: "author", label: "Twice" }, { id: "spare", label: "Spare" }],
+			groups: [{ id: "team", label: "Team" }],
+			nodes: laned.nodes.map(({ lane, ...node }) =>
+				node.id === "review"
+					? { ...node, lane: "Reviewer" }
+					: node.id === "draft"
+						? node
+						: { ...node, lane },
+			),
+		});
+		expect(issues.map((issue) => [issue.code, issue.ref])).toEqual([
+			["empty_group", { kind: "group", id: "team", path: "groups" }],
+			["lanes_with_groups", { kind: "diagram", id: "onboarding-flow", path: "groups" }],
+			["duplicate_lane_id", { kind: "lane", id: "author", path: "lanes" }],
+			["unknown_node_lane", { kind: "node", id: "draft", path: "nodes.lane" }],
+			["unknown_node_lane", { kind: "node", id: "review", path: "nodes.lane" }],
+			["empty_lane", { kind: "lane", id: "spare", path: "lanes" }],
+		]);
+		expect(issues[3]?.hint).toBe(
+			'Set lane to the declared lane id ("author", "reviewer", "spare") of the actor that does this step.',
+		);
+		expect(issues[4]?.hint).toBe(
+			'Set lane to a declared lane id ("author", "reviewer", "spare") or declare "Reviewer" in lanes.',
+		);
+	});
+
+	it("names a node's lane when no lanes are declared", () => {
+		const issues = validationIssues({
+			...flowchartFixture,
+			nodes: flowchartFixture.nodes.map((node) =>
+				node.id === "review" ? { ...node, lane: "reviewer" } : node,
+			),
+		});
+		expect(issues.map((issue) => [issue.code, issue.ref])).toEqual([
+			["unknown_node_lane", { kind: "node", id: "review", path: "nodes.lane" }],
+		]);
+		expect(issues[0]?.hint).toBe(
+			'Declare "reviewer" in lanes as { id, label }, or remove the node\'s lane.',
+		);
+		expect(validationIssues({ ...flowchartFixture, lanes: [] })).toEqual([]);
+	});
+
+	it("bounds the number of lanes", () => {
+		const nodes = linearFlowchart(FLOWCHART_MAX_LANES + 1).nodes;
+		const issues = validationIssues({
+			...linearFlowchart(FLOWCHART_MAX_LANES + 1),
+			lanes: nodes.map((node) => ({ id: `l-${node.id}`, label: `Actor ${node.id}` })),
+			nodes: nodes.map((node) => ({ ...node, lane: `l-${node.id}` })),
+		});
+		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_too_large"]);
+		expect(issues[0]?.ref).toEqual({ kind: "diagram", id: "linear-9", path: "lanes" });
 	});
 });

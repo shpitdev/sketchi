@@ -135,6 +135,14 @@ const GROUP_ISSUE_CODE_ADDITIONS = new Set([
 	"unknown_node_group",
 	"empty_group",
 ]);
+// Flowchart lanes add four issue codes and a lane issue reference.
+const LANE_ISSUE_ADDITIONS = new Set([
+	"duplicate_lane_id",
+	"unknown_node_lane",
+	"empty_lane",
+	"lanes_with_groups",
+	"lane",
+]);
 // Native charts add their semantic validation codes.
 const CHART_ISSUE_CODE_ADDITIONS = new Set([
 	"chart_too_large",
@@ -289,6 +297,7 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		SEQUENCE_ISSUE_CODE_ADDITIONS.has(value) ||
 		TIMELINE_ISSUE_CODE_ADDITIONS.has(value) ||
 		GROUP_ISSUE_CODE_ADDITIONS.has(value) ||
+		LANE_ISSUE_ADDITIONS.has(value) ||
 		CHART_ISSUE_CODE_ADDITIONS.has(value) ||
 		STATE_MACHINE_ISSUE_CODE_ADDITIONS.has(value) ||
 		GANTT_ISSUE_CODE_ADDITIONS.has(value) ||
@@ -1712,6 +1721,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 						!SEQUENCE_ISSUE_CODE_ADDITIONS.has(code) &&
 						!TIMELINE_ISSUE_CODE_ADDITIONS.has(code) &&
 						!GROUP_ISSUE_CODE_ADDITIONS.has(code) &&
+						!LANE_ISSUE_ADDITIONS.has(code) &&
 						!CHART_ISSUE_CODE_ADDITIONS.has(code) &&
 						!STATE_MACHINE_ISSUE_CODE_ADDITIONS.has(code) &&
 						!GANTT_ISSUE_CODE_ADDITIONS.has(code) &&

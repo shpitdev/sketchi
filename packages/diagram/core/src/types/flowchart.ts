@@ -12,6 +12,7 @@ export const flowchartDiagramType = "flowchart" as const;
 export const FLOWCHART_MAX_NODES = 24;
 export const FLOWCHART_MAX_EDGES = 64;
 export const FLOWCHART_MAX_GROUPS = 8;
+export const FLOWCHART_MAX_LANES = 8;
 export const FLOWCHART_MAX_ISSUES = 20;
 
 export const FlowchartValidationIssueCodeSchema = Schema.Literals([
@@ -35,12 +36,16 @@ export const FlowchartValidationIssueCodeSchema = Schema.Literals([
 	"duplicate_group_id",
 	"unknown_node_group",
 	"empty_group",
+	"duplicate_lane_id",
+	"unknown_node_lane",
+	"empty_lane",
+	"lanes_with_groups",
 ]);
 
 export class FlowchartValidationIssueRef extends Schema.Class<FlowchartValidationIssueRef>(
 	"FlowchartValidationIssueRef",
 )({
-	kind: Schema.Literals(["diagram", "node", "edge", "group"]),
+	kind: Schema.Literals(["diagram", "node", "edge", "group", "lane"]),
 	id: Schema.optional(Schema.NonEmptyString),
 	path: Schema.optional(Schema.NonEmptyString),
 }) {}
@@ -164,6 +169,81 @@ function reachableFrom(
 	return reached;
 }
 
+/**
+ * Lane problems, each with its repair: too many lanes, a repeated lane id, a
+ * node in an undeclared lane or in none, a lane with no nodes, and lanes
+ * declared together with groups.
+ */
+function laneIssues(diagram: FlowchartDiagram): FlowchartValidationIssue[] {
+	const lanes = diagram.lanes ?? [];
+	// Without lanes, a node that names one names a lane nobody declared.
+	if (lanes.length === 0)
+		return diagram.nodes.flatMap((node): FlowchartValidationIssue[] =>
+			node.lane === undefined
+				? []
+				: [
+						{
+							code: "unknown_node_lane",
+							ref: { kind: "node", id: node.id, path: "nodes.lane" },
+							message: `Node "${node.id}" references undeclared lane "${node.lane}".`,
+							hint: `Declare "${node.lane}" in lanes as { id, label }, or remove the node's lane.`,
+						},
+					],
+		);
+	const issues: FlowchartValidationIssue[] = [];
+	if (lanes.length > FLOWCHART_MAX_LANES) {
+		issues.push({
+			code: "flowchart_too_large",
+			ref: { kind: "diagram", id: diagram.id, path: "lanes" },
+			message: `Flowchart has ${lanes.length} lanes; the supported maximum is ${FLOWCHART_MAX_LANES}.`,
+			hint: "Merge related actors into one lane.",
+		});
+	}
+	if ((diagram.groups ?? []).length > 0) {
+		issues.push({
+			code: "lanes_with_groups",
+			ref: { kind: "diagram", id: diagram.id, path: "groups" },
+			message: "A flowchart with lanes cannot also declare groups.",
+			hint: "Keep lanes for the actors and remove groups and every node's group.",
+		});
+	}
+	for (const laneId of duplicateValues(lanes.map((lane) => lane.id))) {
+		issues.push({
+			code: "duplicate_lane_id",
+			ref: { kind: "lane", id: laneId, path: "lanes" },
+			message: `Lane id "${laneId}" is used more than once.`,
+			hint: "Give every lane a stable unique id.",
+		});
+	}
+	const laneIds = new Set(lanes.map((lane) => lane.id));
+	const declared = [...laneIds].map((id) => `"${id}"`).join(", ");
+	for (const node of diagram.nodes) {
+		if (node.lane !== undefined && laneIds.has(node.lane)) continue;
+		issues.push({
+			code: "unknown_node_lane",
+			ref: { kind: "node", id: node.id, path: "nodes.lane" },
+			message:
+				node.lane === undefined
+					? `Node "${node.id}" has no lane.`
+					: `Node "${node.id}" references undeclared lane "${node.lane}".`,
+			hint:
+				node.lane === undefined
+					? `Set lane to the declared lane id (${declared}) of the actor that does this step.`
+					: `Set lane to a declared lane id (${declared}) or declare "${node.lane}" in lanes.`,
+		});
+	}
+	const used = new Set(diagram.nodes.map((node) => node.lane));
+	for (const lane of lanes.filter((lane) => !used.has(lane.id))) {
+		issues.push({
+			code: "empty_lane",
+			ref: { kind: "lane", id: lane.id, path: "lanes" },
+			message: `Lane "${lane.id}" has no nodes.`,
+			hint: "Set lane on the steps this actor does, or remove the lane.",
+		});
+	}
+	return issues;
+}
+
 export function getFlowchartValidationIssues(
 	diagram: FlowchartDiagram,
 ): FlowchartValidationIssue[] {
@@ -228,6 +308,8 @@ export function getFlowchartValidationIssues(
 			hint: "Set group on the nodes it holds, or remove the group.",
 		});
 	}
+
+	issues.push(...laneIssues(diagram));
 
 	for (const nodeId of duplicateValues(diagram.nodes.map((node) => node.id))) {
 		issues.push({

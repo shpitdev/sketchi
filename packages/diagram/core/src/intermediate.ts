@@ -61,11 +61,24 @@ export class DiagramGroup extends Schema.Class<DiagramGroup>("DiagramGroup")({
 }) {}
 export const DiagramGroupSchema = DiagramGroup;
 
+/**
+ * A swimlane: a full-length band for one actor, such as a customer, a team or
+ * a system, drawn in declared order. Nodes join one by setting `lane` to its
+ * id; a diagram with lanes puts every node in one, and declares no groups.
+ */
+export class DiagramLane extends Schema.Class<DiagramLane>("DiagramLane")({
+	id: NonEmptyString,
+	label: NonEmptyString,
+}) {}
+export const DiagramLaneSchema = DiagramLane;
+
 export class DiagramNode extends Schema.Class<DiagramNode>("DiagramNode")({
 	id: NonEmptyString,
 	label: NonEmptyString,
 	/** The id of the declared group this node belongs to. */
 	group: Schema.optional(NonEmptyString),
+	/** The id of the declared lane this node sits in. */
+	lane: Schema.optional(NonEmptyString),
 	kind: Schema.optional(NonEmptyString),
 	icon: Schema.optional(DiagramIconRef),
 	metadata: withDefault(Metadata, {}),
@@ -102,6 +115,7 @@ export class IntermediateDiagram extends Schema.Class<IntermediateDiagram>("Inte
 	nodes: Schema.Array(DiagramNode).pipe(Schema.mutable).check(Schema.isMinLength(1)),
 	edges: withDefault(Schema.Array(DiagramEdge).pipe(Schema.mutable), []),
 	groups: Schema.optional(Schema.Array(DiagramGroup).pipe(Schema.mutable)),
+	lanes: Schema.optional(Schema.Array(DiagramLane).pipe(Schema.mutable)),
 	layout: withDefault(DiagramLayout, {
 		direction: "LR",
 		edgeRouting: "orthogonal",
@@ -158,6 +172,29 @@ export function validateIntermediateDiagram(diagram: IntermediateDiagram): Inter
 			throw new DiagramValidationError(
 				`Node "${node.id}" references missing group "${node.group}".`,
 			);
+		}
+	}
+
+	const lanes = diagram.lanes ?? [];
+	const duplicateLaneId = findDuplicate(lanes.map((lane) => lane.id));
+
+	if (duplicateLaneId) {
+		throw new DiagramValidationError(`Duplicate lane id "${duplicateLaneId}" is not allowed.`);
+	}
+
+	if (lanes.length > 0 && (diagram.groups ?? []).length > 0) {
+		throw new DiagramValidationError("A diagram with lanes cannot also declare groups.");
+	}
+
+	const laneIds = new Set(lanes.map((lane) => lane.id));
+
+	for (const node of diagram.nodes) {
+		if (node.lane !== undefined && !laneIds.has(node.lane)) {
+			throw new DiagramValidationError(`Node "${node.id}" references missing lane "${node.lane}".`);
+		}
+
+		if (node.lane === undefined && laneIds.size > 0) {
+			throw new DiagramValidationError(`Node "${node.id}" has no lane.`);
 		}
 	}
 

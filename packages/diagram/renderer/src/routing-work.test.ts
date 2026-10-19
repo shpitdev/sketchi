@@ -7,6 +7,8 @@ import {
 	erFixture,
 	erStressFixtures,
 	flowchartFixture,
+	laneFixtures,
+	laneStressFixtures,
 	orgChartEr,
 	parseIntermediateDiagram,
 } from "@sketchi/diagram-core";
@@ -164,5 +166,28 @@ describe("class diagram routing work", () => {
 		expect(small).toBeGreaterThan(0);
 		expect(small).toBeLessThan(30_000);
 		expect(large).toBeLessThan(1_500_000);
+	});
+});
+
+describe("swimlane routing work", () => {
+	// Measured: 1.65M checks for the five lane fixtures in LR and TB, and 4.07M
+	// for the two stress cases (six lanes and thirty steps, wrapped into two pools
+	// in LR, and loops across four lanes).
+	it("bounds segment checks for the lane fixtures and stress cases", () => {
+		const render = (fixtures: Record<string, diagramCore.IntermediateDiagram>) => {
+			work.checks = 0;
+			for (const fixture of Object.values(fixtures))
+				for (const direction of ["LR", "TB"] as const)
+					renderIntermediateDiagram({
+						...fixture,
+						layout: { direction, edgeRouting: "orthogonal" },
+					});
+			return work.checks;
+		};
+		const small = render(laneFixtures);
+		const large = render(laneStressFixtures);
+		expect(small).toBeGreaterThan(0);
+		expect(small).toBeLessThan(2_500_000);
+		expect(large).toBeLessThan(6_000_000);
 	});
 });
