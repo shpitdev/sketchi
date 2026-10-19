@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.25.3
+
+### Patch Changes
+
+- [#496](https://github.com/shpitdev/sketchi/pull/496) [`311bd55`](https://github.com/shpitdev/sketchi/commit/311bd5590d683b7e819f797927945476e90dc92c) Thanks [@anandpant](https://github.com/anandpant)! - Transition and flowchart edge labels stay nearer their own line than any other. When another transition's run passes closer to a label than the label's own line, that run moves clear of it, but only where the move adds no crossings or reader findings. Text beside a vertical line now aligns toward that line, so it reads as attached to it. A return label no longer sits under a neighbouring cancellation run, as it did in the order lifecycle.
+
 ## 0.25.2
 
 ### Patch Changes
