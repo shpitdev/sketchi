@@ -8,6 +8,7 @@ import incidentEscalationBridge from "./fixtures/crossings/incident-escalation-b
 import incidentEscalationEarlyBridge from "./fixtures/crossings/incident-escalation-early-bridge.js";
 import mediaPlayer from "./fixtures/crossings/media-player.js";
 import mediaPlayerEnded from "./fixtures/crossings/media-player-ended.js";
+import namedFinalRetry from "./fixtures/crossings/named-final-retry.js";
 import orderLifecycle from "./fixtures/crossings/order-lifecycle.js";
 import patientIntakeScheduling from "./fixtures/crossings/patient-intake-scheduling.js";
 import procurementVendorApproval from "./fixtures/crossings/procurement-vendor-approval.js";
@@ -58,4 +59,5 @@ export const crossingStateMachines = {
 	"media-player-ended": stateMachine(mediaPlayerEnded),
 	"connection-retry": stateMachine(connectionRetry),
 	"order-lifecycle": stateMachine(orderLifecycle),
+	"named-final-retry": stateMachine(namedFinalRetry),
 };

@@ -56,6 +56,264 @@ const playerSpec = {
 };
 
 describe("Code Mode native state machine", () => {
+	it.each([
+		{
+			sample: "20261019-151851-bghl",
+			scenario: "connection-retry-state-machine",
+			labels: ["Failed"],
+			spec: {
+				title: "Network connection",
+				initial: "Disconnected",
+				states: [
+					{
+						id: "Disconnected",
+					},
+					{
+						id: "Connecting",
+					},
+					{
+						id: "Connected",
+						initial: "Idle",
+					},
+					{
+						id: "Idle",
+						parent: "Connected",
+					},
+					{
+						id: "Streaming",
+						parent: "Connected",
+					},
+					{
+						id: "retryChoice",
+						kind: "choice",
+					},
+					{
+						id: "Failed",
+						kind: "final",
+					},
+				],
+				transitions: [
+					{
+						source: "Disconnected",
+						target: "Connecting",
+						event: "Connect",
+					},
+					{
+						source: "Connecting",
+						target: "Connected",
+						event: "handshake ok",
+					},
+					{
+						source: "Connecting",
+						target: "retryChoice",
+						event: "timeout",
+					},
+					{
+						source: "retryChoice",
+						target: "Connecting",
+						guard: "retries < 3",
+						action: "increment retries",
+					},
+					{
+						source: "retryChoice",
+						target: "Failed",
+						guard: "no retries left",
+					},
+					{
+						source: "Idle",
+						target: "Streaming",
+						event: "start stream",
+					},
+					{
+						source: "Streaming",
+						target: "Idle",
+						event: "stop stream",
+					},
+					{
+						source: "Connected",
+						target: "Disconnected",
+						event: "Disconnect",
+					},
+				],
+			},
+		},
+		{
+			sample: "20261019-151851-rrew",
+			scenario: "order-lifecycle-state-machine",
+			labels: ["Cancelled", "Refunded", "Lifecycle ended"],
+			spec: {
+				title: "Order lifecycle",
+				initial: "Pending payment",
+				states: [
+					{
+						id: "Pending payment",
+					},
+					{
+						id: "Paid",
+					},
+					{
+						id: "Shipped",
+					},
+					{
+						id: "Delivered",
+					},
+					{
+						id: "Cancelled",
+						kind: "final",
+					},
+					{
+						id: "Refunded",
+						kind: "final",
+					},
+					{
+						id: "Lifecycle ended",
+						kind: "final",
+					},
+				],
+				transitions: [
+					{
+						source: "Pending payment",
+						target: "Paid",
+						event: "pay",
+						guard: "card valid",
+						action: "charge card",
+					},
+					{
+						source: "Pending payment",
+						target: "Cancelled",
+						event: "cancel",
+					},
+					{
+						source: "Paid",
+						target: "Shipped",
+						event: "ship",
+					},
+					{
+						source: "Paid",
+						target: "Cancelled",
+						event: "cancel",
+						action: "refund payment",
+					},
+					{
+						source: "Shipped",
+						target: "Delivered",
+						event: "deliver",
+					},
+					{
+						source: "Shipped",
+						target: "Paid",
+						event: "return to sender",
+					},
+					{
+						source: "Delivered",
+						target: "Refunded",
+						event: "request return",
+						guard: "within 30 days",
+						action: "issue refund",
+					},
+					{
+						source: "Delivered",
+						target: "Lifecycle ended",
+					},
+				],
+			},
+		},
+		{
+			sample: "20261019-151951-twk8",
+			scenario: "connection-retry-state-machine",
+			labels: ["Failed"],
+			spec: {
+				title: "Network Connection",
+				initial: "Disconnected",
+				states: [
+					{
+						id: "Disconnected",
+					},
+					{
+						id: "Connecting",
+					},
+					{
+						id: "Connected",
+						initial: "Idle",
+					},
+					{
+						id: "Idle",
+						parent: "Connected",
+					},
+					{
+						id: "Streaming",
+						parent: "Connected",
+					},
+					{
+						id: "RetryCheck",
+						label: "Retry check",
+						kind: "choice",
+					},
+					{
+						id: "Failed",
+						kind: "final",
+					},
+				],
+				transitions: [
+					{
+						source: "Disconnected",
+						target: "Connecting",
+						event: "Connect",
+					},
+					{
+						source: "Connecting",
+						target: "Connected",
+						event: "handshake ok",
+					},
+					{
+						source: "Connecting",
+						target: "RetryCheck",
+						event: "timeout",
+					},
+					{
+						source: "RetryCheck",
+						target: "Connecting",
+						guard: "retries < 3",
+						action: "increment retries",
+					},
+					{
+						source: "RetryCheck",
+						target: "Failed",
+						guard: "no retries left",
+					},
+					{
+						source: "Idle",
+						target: "Streaming",
+						event: "start stream",
+					},
+					{
+						source: "Streaming",
+						target: "Idle",
+						event: "stop stream",
+					},
+					{
+						source: "Connected",
+						target: "Disconnected",
+						event: "Disconnect",
+					},
+				],
+			},
+		},
+	])("preserves named finals in exact round-14 sample $sample", async ({ spec, labels }) => {
+		const built = await build(spec);
+		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		const scene = built.artifact.formats.find((format) => format.format === "scene")!
+			.inline as RenderedDiagramScene;
+		for (const label of labels) {
+			expect(built.normalizedSpec.states.find((state) => state.id === label)?.label).toBe(label);
+			expect(scene.elements).toContainEqual(expect.objectContaining({ type: "text", text: label }));
+			expect(scene.elements).toContainEqual(
+				expect.objectContaining({ type: "node", nodeId: `${label}:end`, kind: "final" }),
+			);
+		}
+		expect(groupRegionIssues(scene)).toEqual([]);
+	});
+
 	it("builds the exact unlabeled media-player spec from Frontierclimb round 13", async () => {
 		const built = await build({
 			title: "Media player",

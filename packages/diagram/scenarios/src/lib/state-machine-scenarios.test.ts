@@ -32,6 +32,29 @@ describe("prompt-grounded state-machine scenarios", () => {
 		expect(failed(entry.id, diagram)).toEqual([]);
 	});
 
+	it.each(["connection-retry-state-machine", "order-lifecycle-state-machine"])(
+		"scores named-final defaults just like explicit labels: %s",
+		(id) => {
+			const entry = scenario(id);
+			const diagram = {
+				...entry.expectedDiagram,
+				states: entry.expectedDiagram.states.map(({ label, ...state }) => {
+					if (id.startsWith("order") && ["cancelled", "refunded"].includes(state.id))
+						return { ...state, kind: "final" as const };
+					return state;
+				}),
+				transitions: entry.expectedDiagram.transitions.filter(
+					(transition) =>
+						!(
+							(transition.source === "cancelled" || transition.source === "refunded") &&
+							transition.target === "end"
+						),
+				),
+			};
+			expect(failed(id, diagram)).toEqual([]);
+		},
+	);
+
 	it("covers guards, returns, self-loops, composites, choices and finals", () => {
 		const diagrams = stateMachineScenarios.map((entry) => entry.expectedDiagram);
 		expect(stateMachineScenarios.length).toBeGreaterThanOrEqual(3);

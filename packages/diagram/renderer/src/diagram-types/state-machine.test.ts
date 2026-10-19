@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+	crossingStateMachines,
 	getCanvasValidationIssues,
 	groupRegionIssues,
 	mediaPlayerStateMachine,
@@ -10,7 +11,7 @@ import {
 } from "@sketchi/diagram-core";
 
 import { renderDiagram } from "../diagram.js";
-import type { RenderedDiagramScene } from "../scene.js";
+import { arrowCrossings, type RenderedDiagramScene } from "../scene.js";
 
 const nodes = (scene: RenderedDiagramScene) =>
 	scene.elements.flatMap((element) => (element.type === "node" ? [element] : []));
@@ -20,6 +21,34 @@ const texts = (scene: RenderedDiagramScene) =>
 	scene.elements.flatMap((element) => (element.type === "text" ? [element.text] : []));
 
 describe("StateMachine renderer", () => {
+	it("keeps the round-14 labeled retry choice clear after naming its final", () => {
+		const diagram = crossingStateMachines["named-final-retry"];
+		const scene = renderDiagram(diagram);
+		expect(arrowCrossings(arrows(scene))).toBe(0);
+		// Repair the crossed retry pair, not the unrelated Idle/Streaming pair.
+		const forward = arrows(scene).find((arrow) => arrow.edgeId === "transition-6-idle-streaming")!;
+		const back = arrows(scene).find((arrow) => arrow.edgeId === "transition-7-streaming-idle")!;
+		expect(Math.abs(forward.points[0].x - back.points.at(-1)!.x)).toBeGreaterThanOrEqual(18);
+		expect(forward.points[0].y).toBe(back.points.at(-1)!.y);
+		expect(forward.points.at(-1)!.y).toBe(back.points[0].y);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+		expect(groupRegionIssues(scene)).toEqual([]);
+		expect(texts(scene)).toContain("Failed");
+		expect(Math.max(scene.width / scene.height, scene.height / scene.width)).toBeLessThanOrEqual(
+			2.5,
+		);
+	});
+
+	it("keeps the captured media-player ended marker anonymous", () => {
+		const scene = renderDiagram(crossingStateMachines["media-player"]);
+		expect(nodes(scene).find((node) => node.nodeId === "ended")).toMatchObject({
+			kind: "final",
+			rendererRole: "state-marker",
+		});
+		expect(texts(scene)).not.toContain("ended");
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+	});
+
 	it("draws regular-state ids and composite names without labels", () => {
 		const diagram = parseStateMachineDiagram({
 			...mediaPlayerStateMachine,
@@ -78,27 +107,30 @@ describe("StateMachine renderer", () => {
 		expect([play.targetNodeId, stop.sourceNodeId]).toEqual(["active", "active"]);
 	});
 
-	it("draws a labeled final as its state followed by a bullseye", () => {
-		const diagram: StateMachineDiagram = parseStateMachineDiagram({
-			id: "ticket",
-			title: "Ticket",
-			type: "state-machine",
-			initial: "open",
-			states: [
-				{ id: "open", label: "Open" },
-				{ id: "closed", label: "Closed", kind: "final" },
-			],
-			transitions: [{ id: "resolve", source: "open", target: "closed", event: "resolve" }],
-		});
-		const scene = renderDiagram(diagram);
-		expect(nodes(scene).find((node) => node.nodeId === "closed")).toMatchObject({
-			kind: "state",
-			label: "Closed",
-		});
-		expect(arrows(scene).find((arrow) => arrow.edgeId === "closed:end")?.targetNodeId).toBe(
-			"closed:end",
-		);
-	});
+	it.each(["Closed", undefined])(
+		"draws final label %s as its state followed by a bullseye",
+		(label) => {
+			const diagram: StateMachineDiagram = parseStateMachineDiagram({
+				id: "ticket",
+				title: "Ticket",
+				type: "state-machine",
+				initial: "open",
+				states: [
+					{ id: "open", label: "Open" },
+					{ id: "closed", ...(label ? { label } : {}), kind: "final" },
+				],
+				transitions: [{ id: "resolve", source: "open", target: "closed", event: "resolve" }],
+			});
+			const scene = renderDiagram(diagram);
+			expect(nodes(scene).find((node) => node.nodeId === "closed")).toMatchObject({
+				kind: "state",
+				label: label ?? "closed",
+			});
+			expect(arrows(scene).find((arrow) => arrow.edgeId === "closed:end")?.targetNodeId).toBe(
+				"closed:end",
+			);
+		},
+	);
 
 	it("never lets its own edges collide with authored transition ids", () => {
 		const diagram = parseStateMachineDiagram({

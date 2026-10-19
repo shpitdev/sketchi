@@ -30,11 +30,51 @@ describe("StateMachine diagram type", () => {
 		for (const id of ["waiting_for_payment", "payment-received"])
 			expect(stateLabel({ id })).toBe(id);
 		expect(stateLabel({ id: "start", kind: "state" })).toBe("start");
-		for (const kind of ["final", "choice"] as const) {
+		for (const kind of ["choice"] as const) {
 			expect(stateLabel({ id: "marker", kind })).toBeUndefined();
 			const label = "  Explicit\nlabel  ";
 			expect(stateLabel({ id: "marker", kind, label })).toBe(label);
 		}
+	});
+
+	it("names meaningful finals verbatim but keeps generic end markers anonymous", () => {
+		for (const id of [
+			"Failed",
+			"Cancelled",
+			"Refunded",
+			"Lifecycle ended",
+			"weekend",
+			"endless",
+			"Terminated",
+			"Delivered",
+			"paid-end",
+			"paid_end",
+			"paid end",
+		])
+			expect(stateLabel({ id, kind: "final" })).toBe(id);
+		for (const id of [
+			"end",
+			"FINAL",
+			"Done",
+			"finish",
+			"stop",
+			"ended",
+			"end1",
+			"end2",
+			"endState",
+			"Final State",
+			"exit",
+			"__end__",
+			"finished",
+			"Stopped",
+			"finalStateNode2",
+			"ENDState",
+		])
+			expect(stateLabel({ id, kind: "final" })).toBeUndefined();
+		for (const id of ["Failed", "end", "paid-end"])
+			expect(stateLabel({ id, kind: "final", label: "  Explicit\nlabel  " })).toBe(
+				"  Explicit\nlabel  ",
+			);
 	});
 
 	it.each(["", " ", "\t\n"])("rejects an explicit blank label %j in the core", (label) => {

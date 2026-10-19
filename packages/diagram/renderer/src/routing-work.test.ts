@@ -15,7 +15,7 @@ import {
 	zoneStressFixtures,
 } from "@sketchi/diagram-core";
 import { describe, expect, it, vi } from "vitest";
-import { renderIntermediateDiagram } from "./scene";
+import { arrowCrossings, renderIntermediateDiagram } from "./scene";
 import { renderErDiagram } from "./er";
 import { renderClassDiagram } from "./class-diagram";
 import { renderStateMachineDiagram } from "./state-machine";
@@ -125,15 +125,29 @@ describe("routing work", () => {
 });
 
 describe("crossing repair work", () => {
-	// Measured: 6.78M checks for the twelve flowcharts and four state machines
-	// whose crossings the repair removes, tall columns wrapped; main drew them,
-	// crossings and all, in 3.00M. Each side change is screened by rerouting only the edges it touches
-	// before it is laid out in full.
+	// The generated corpus includes the named-final retry case. Keep the existing
+	// work ceiling: side changes are screened by rerouting only the edges they
+	// touch before laying the diagram out in full.
 	it("bounds segment checks for the generated diagrams it repairs", () => {
 		work.checks = 0;
 		for (const fixture of Object.values(crossingFixtures)) renderIntermediateDiagram(fixture);
 		for (const machine of Object.values(crossingStateMachines)) renderStateMachineDiagram(machine);
 		expect(work.checks).toBeLessThan(8_500_000);
+	});
+});
+
+describe("crossed paired-return work", () => {
+	// Measured: 695,377 checks versus 597,148 paired-only and 807,097 for the
+	// removed whole-machine fallback. Only crossed pairs may lose their lanes.
+	it("bounds the crossed named-final retry repair", () => {
+		work.checks = 0;
+		const scene = renderStateMachineDiagram(crossingStateMachines["named-final-retry"]);
+		expect(
+			scene.elements.some((element) => element.type === "text" && element.text === "Failed"),
+		).toBe(true);
+		expect(work.checks).toBeGreaterThan(0);
+		expect(work.checks).toBeLessThan(800_000);
+		expect(arrowCrossings(scene.elements.filter((element) => element.type === "arrow"))).toBe(0);
 	});
 });
 

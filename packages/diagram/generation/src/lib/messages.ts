@@ -116,7 +116,7 @@ const IR_INSTRUCTIONS = {
 		rules: [
 			'Use diagram type "state-machine".',
 			"Return initial (the id of the top-level state the machine starts in), states, and transitions.",
-			'Every state has a unique id without ":". A regular state label defaults to its id verbatim; explicit labels must not be blank. kind "final" marks an end state and needs no label; kind "choice" is a branch point whose outgoing transitions each carry a guard; one may be "else".',
+			'Every state has a unique id without ":". A regular state label defaults to its id verbatim; explicit labels must not be blank. kind "final" ends the machine: name it when it is a named outcome (for example Failed); generic ends need no name; kind "choice" is a branch point whose outgoing transitions each carry a guard; one may be "else".',
 			"A composite state is a state other states name as parent; give it initial, the substate it starts in. Composites do not nest.",
 			"Every transition has a unique id, source, target, and optional event, guard (the condition, without brackets) and action. A transition may leave or enter a composite, or return to its own state.",
 			"Every state must be reachable from initial. Final states have no outgoing transitions.",

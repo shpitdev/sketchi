@@ -67,7 +67,7 @@ export function stateMachineGraph(
 	const bullseyes = new Map<string, string>();
 	const finals = new Map<string, string[]>();
 	for (const state of diagram.states) {
-		if (stateKind(state) !== "final" || state.label) continue;
+		if (stateKind(state) !== "final" || stateLabel(state) !== undefined) continue;
 		const arrivals = diagram.transitions.filter((transition) => transition.target === state.id);
 		const ids = arrivals.map((_, index) => (index === 0 ? state.id : `${state.id}:${index + 1}`));
 		arrivals.forEach((transition, index) => bullseyes.set(transition.id, ids[index]!));
@@ -85,17 +85,18 @@ export function stateMachineGraph(
 			continue;
 		}
 		const kind = stateKind(state);
-		if (kind === "final" && !state.label) {
+		const label = stateLabel(state);
+		if (kind === "final" && label === undefined) {
 			for (const id of finals.get(state.id)!) nodes.push(node(id, "", "final", group));
 			continue;
 		}
 		if (kind === "final") {
-			nodes.push(node(state.id, state.label!, "state", group));
+			nodes.push(node(state.id, label!, "state", group));
 			nodes.push(node(`${state.id}:end`, "", "final", group));
 			edges.push(edge(fresh(`${state.id}:end`), state.id, `${state.id}:end`));
 			continue;
 		}
-		nodes.push(node(state.id, stateLabel(state) ?? "", kind, group));
+		nodes.push(node(state.id, label ?? "", kind, group));
 	}
 	for (const transition of diagram.transitions) {
 		const label = stateTransitionLabel(transition);

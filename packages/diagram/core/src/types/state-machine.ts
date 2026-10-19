@@ -5,7 +5,7 @@ import { DiagramStyle, DiagramValidationError, SKETCHI_DIAGRAM_STYLE } from "../
 export const stateMachineDiagramType = "state-machine" as const;
 
 /**
- * A named state, an unlabeled final state (drawn as a bullseye) or a choice
+ * A named state, a final state (ending in a bullseye) or a choice
  * pseudostate (a diamond whose outgoing transitions carry guards).
  */
 export const STATE_MACHINE_STATE_KINDS = ["state", "final", "choice"] as const;
@@ -27,7 +27,7 @@ export type StateMachineStateKind = typeof StateMachineStateKindSchema.Type;
  */
 export class StateMachineState extends Schema.Class<StateMachineState>("StateMachineState")({
 	id: Schema.NonEmptyString,
-	/** Omitted labels default to the id verbatim for regular states only. */
+	/** Omitted labels use the id for regular states and meaningfully named finals. */
 	label: Schema.optionalKey(Schema.NonEmptyString),
 	kind: Schema.optionalKey(StateMachineStateKindSchema),
 	/** The composite state this state belongs to. */
@@ -117,11 +117,38 @@ export function stateKind(state: Pick<StateMachineState, "kind">): StateMachineS
 	return state.kind ?? "state";
 }
 
+/** Generic marker vocabulary, not outcome names. Digits and id formatting carry no meaning. */
+const GENERIC_FINAL_WORDS = new Set([
+	"end",
+	"ended",
+	"final",
+	"finish",
+	"finished",
+	"done",
+	"stop",
+	"stopped",
+	"exit",
+	"state",
+	"node",
+]);
+
 /** The displayed label, matching class/ER names without humanizing ids or rewriting explicit labels. */
 export function stateLabel(
 	state: Pick<StateMachineState, "id" | "label" | "kind">,
 ): string | undefined {
-	return state.label ?? (stateKind(state) === "state" ? state.id : undefined);
+	if (state.label !== undefined) return state.label;
+	const kind = stateKind(state);
+	if (kind === "choice") return undefined;
+	if (kind === "final") {
+		const words = state.id
+			.replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2")
+			.replace(/(\p{Lu})(\p{Lu}\p{Ll})/gu, "$1 $2")
+			.split(/[_\s\-\p{N}]+/u)
+			.filter(Boolean);
+		if (words.length > 0 && words.every((word) => GENERIC_FINAL_WORDS.has(word.toLowerCase())))
+			return undefined;
+	}
+	return state.id;
 }
 
 /** Ids of the composite states: states some other state names as its parent. */

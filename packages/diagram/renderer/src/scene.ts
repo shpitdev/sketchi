@@ -1312,6 +1312,8 @@ interface Arrangement {
 	readonly avoidCrossings?: boolean;
 	/** In lanes, move a departure off a side that lines arrive by. */
 	readonly separateRoles?: boolean;
+	/** Only these crossed return pairs may leave their parallel lanes. */
+	readonly unpairedReturns?: ReadonlySet<string>;
 	/** Sides edges leave or arrive by in place of the assigned ones, chosen to remove crossings. */
 	readonly sides?: SideOverrides;
 	readonly wrap: Wrap;
@@ -5291,12 +5293,14 @@ function assignPairedReturns(
 	feedback: ReadonlySet<string>,
 	nodes: readonly NodeSceneElement[],
 	groups: GroupLayout | undefined,
+	unpaired: ReadonlySet<string> | undefined,
 ): void {
 	for (const route of routes) {
-		if (!feedback.has(route.edge.id) || isSelfLoop(route)) continue;
+		if (!feedback.has(route.edge.id) || isSelfLoop(route) || unpaired?.has(route.edge.id)) continue;
 		const forward = routes.find(
 			(other) =>
 				other.pair === undefined &&
+				!unpaired?.has(other.edge.id) &&
 				!feedback.has(other.edge.id) &&
 				other.source === route.target &&
 				other.target === route.source &&
@@ -6995,7 +6999,13 @@ function layoutDiagramOnce(
 		assignLoopSides(routedEdges, (route) => edgeDirection(route.edge));
 		assignFeedbackSides(routedEdges, diagram, (route) => edgeDirection(route.edge));
 		if (graphOptions.get(diagram)?.pairedReturns)
-			assignPairedReturns(routedEdges, flowFeedback(diagram), nodeShapes, groups);
+			assignPairedReturns(
+				routedEdges,
+				flowFeedback(diagram),
+				nodeShapes,
+				groups,
+				arrangement.unpairedReturns,
+			);
 		for (const route of routedEdges) {
 			const sides = arrangement.sides?.get(route.edge.id);
 			if (sides?.sourceEdge) route.sourceEdge = sides.sourceEdge;
@@ -8220,6 +8230,57 @@ export function renderGraphDiagram(
 	const crossings = arrowCrossings(best.layout.edgeArrows);
 	if (repairable && crossings > 0 && crossings <= CROSSING_REPAIR_MAX_CROSSINGS)
 		best = repairCrossings(diagram, levels[0]!, best, defectsOf, fewer);
+	// Only pairs still crossing after the normal repairs may leave their lanes.
+	// One extra ordinary-routing layout is screened by the same export/reader
+	// admission as other candidates. Preserve every unrelated paired lane.
+	if (options.pairedReturns && arrowCrossings(best.layout.edgeArrows) > 0) {
+		const previous = best;
+		const arrows = new Map(best.layout.edgeArrows.map((arrow) => [arrow.edgeId, arrow]));
+		const unpairedReturns = new Set<string>();
+		for (const route of best.layout.routedEdges) {
+			const arrow = arrows.get(route.edge.id);
+			if (
+				route.pair === undefined ||
+				!arrow ||
+				!best.layout.edgeArrows.some(
+					(other) => other !== arrow && arrowCrossings([arrow, other]) > 0,
+				)
+			)
+				continue;
+			for (const member of best.layout.routedEdges)
+				if (
+					member.pair !== undefined &&
+					(member.edge.id === route.edge.id ||
+						(member.edge.source === route.edge.target && member.edge.target === route.edge.source))
+				)
+					unpairedReturns.add(member.edge.id);
+		}
+		if (unpairedReturns.size > 0) {
+			consider({ ...best.arrangement, unpairedReturns }, true);
+			const remaining = arrowCrossings(best.layout.edgeArrows);
+			if (
+				best !== previous &&
+				repairable &&
+				remaining > 0 &&
+				remaining <= CROSSING_REPAIR_MAX_CROSSINGS
+			)
+				best = repairCrossings(diagram, levels[0]!, best, defectsOf, fewer);
+			const keptPairs = new Set(
+				best.layout.routedEdges
+					.filter((route) => route.pair !== undefined)
+					.map((route) => route.edge.id),
+			);
+			if (
+				previous.layout.routedEdges.some(
+					(route) =>
+						route.pair !== undefined &&
+						!unpairedReturns.has(route.edge.id) &&
+						!keptPairs.has(route.edge.id),
+				)
+			)
+				best = previous;
+		}
+	}
 	const layout = orthogonal ? clearOutlines(best.layout) : best.layout;
 	const { groups, lanes, routedEdges } = layout;
 	const routedArrows = [...layout.edgeArrows];

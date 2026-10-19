@@ -210,7 +210,7 @@ export function stateMachineScenarioChecks(
 			diagram.states.some(
 				(state) =>
 					stateKind(state) === "final" &&
-					state.label !== undefined &&
+					stateLabel(state) !== undefined &&
 					stateMatches(state, source, diagram),
 			);
 		const passed =
