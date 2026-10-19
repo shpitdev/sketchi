@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { iconManifest, nodeLogoIcons } from "./catalog";
 import { catalogCommonWords, loadCommonEnglishWords } from "./common-words-generation";
 import { GENERIC_PROMPTS } from "./generic-prompts";
-import { matchIconMentions, matchIconsInText } from "./text-match";
+import { logosNamedInText, matchIconMentions, matchIconsInText } from "./text-match";
 
 function slugs(text: string, limit?: number) {
 	return matchIconsInText(text, nodeLogoIcons, limit).map((icon) => icon.slug);
@@ -84,6 +84,27 @@ describe("matchIconsInText", () => {
 
 	it("offers only node-logo marks when given node-logo icons", () => {
 		expect(slugs("TanStack Query and Zustand on Linux")).toEqual([]);
+	});
+});
+
+describe("logosNamedInText", () => {
+	it("offers each named logo with its aliases and catalog collection", () => {
+		expect(
+			logosNamedInText("Ship to Cloudflare Workers behind a Kubernetes ingress.", nodeLogoIcons),
+		).toEqual([
+			{
+				aliases: ["Cloudflare"],
+				collection: "cloud-vendors",
+				name: "Cloudflare",
+				slug: "cloudflare",
+			},
+			{
+				aliases: ["Kubernetes", "k8s", "kube"],
+				collection: "devtools-ci",
+				name: "Kubernetes",
+				slug: "kubernetes",
+			},
+		]);
 	});
 });
 

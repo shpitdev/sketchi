@@ -84,6 +84,69 @@ describe("placeNodeLogos", () => {
 		expect(result.diagnostics).toEqual([]);
 	});
 
+	describe("vendor logos", () => {
+		const vendors = [
+			{
+				slug: "kubernetes",
+				name: "Kubernetes",
+				aliases: ["k8s", "kube"],
+				collection: "devtools-ci",
+			},
+			{ slug: "aws", name: "AWS", aliases: ["amazon"], collection: "cloud-vendors" },
+			{ slug: "cloudflare", name: "Cloudflare", collection: "cloud-vendors" },
+			{ slug: "docker", name: "Docker", collection: "devtools-ci" },
+		];
+
+		it("drops a vendor logo from a node whose label does not name the vendor", () => {
+			const result = placeNodeLogos(
+				[
+					{ id: "ingress", label: "Ingress controller", icon: { slug: "kubernetes" } },
+					{ id: "build", label: "Build the image", icon: { slug: "docker" } },
+					{ id: "s3", label: "S3 bucket", icon: { slug: "aws" } },
+					{ id: "edge", label: "Edge worker", icon: { slug: "cloudflare" } },
+				],
+				vendors,
+			);
+
+			expect(icons(result.nodes)).toEqual([undefined, "docker", undefined, undefined]);
+			expect(result.diagnostics).toEqual([
+				'icon_dropped: node "ingress" logo "kubernetes" is a vendor logo, but its label "Ingress controller" does not name Kubernetes.',
+				'icon_dropped: node "s3" logo "aws" is a vendor logo, but its label "S3 bucket" does not name AWS.',
+				'icon_dropped: node "edge" logo "cloudflare" is a vendor logo, but its label "Edge worker" does not name Cloudflare.',
+			]);
+		});
+
+		it("keeps a vendor logo on a node whose label names the vendor", () => {
+			const result = placeNodeLogos(
+				[
+					{ id: "ship", label: "Ship to Cloudflare Workers", icon: { slug: "cloudflare" } },
+					{ id: "fn", label: "Amazon Lambda", icon: { slug: "aws" } },
+					{ id: "gke", label: "GKE cluster", icon: { slug: "kubernetes" } },
+				],
+				vendors,
+			);
+
+			expect(icons(result.nodes)).toEqual(["cloudflare", "aws", "kubernetes"]);
+			expect(result.diagnostics).toEqual([]);
+		});
+
+		it("applies the same rule to sequence participants", () => {
+			const result = placeNodeLogos(
+				[
+					{ id: "worker", label: "Cloudflare Worker", icon: { slug: "cloudflare" } },
+					{ id: "queue", label: "Job queue", icon: { slug: "aws" } },
+				],
+				vendors,
+				"participant",
+			);
+
+			expect(icons(result.nodes)).toEqual(["cloudflare", undefined]);
+			expect(result.diagnostics).toEqual([
+				'icon_dropped: participant "queue" logo "aws" is a vendor logo, but its label "Job queue" does not name AWS.',
+			]);
+		});
+	});
+
 	it("leaves nodes unchanged when nothing needs placing", () => {
 		const nodes = [
 			{ id: "push", label: "Push to GitHub", icon: { slug: "github" } },

@@ -139,6 +139,24 @@ describe("generated node icons", () => {
 		]);
 	});
 
+	it("drops a vendor logo from a node whose label does not name the vendor", () => {
+		const enforced = enforceCandidateRequestRequirements(
+			candidate({ push: { slug: "github" }, build: { slug: "kubernetes" } }),
+			request({
+				logos: [
+					{ slug: "github", name: "GitHub", collection: "devtools-ci" },
+					{ slug: "kubernetes", name: "Kubernetes", aliases: ["k8s"], collection: "devtools-ci" },
+				],
+			}),
+		);
+
+		expect(enforced.error).toBeUndefined();
+		expect(nodeIcons(enforced)).toEqual([{ slug: "github" }, undefined, undefined]);
+		expect(enforced.diagnostics).toEqual([
+			'icon_dropped: node "build" logo "kubernetes" is a vendor logo, but its label "Build the image" does not name Kubernetes.',
+		]);
+	});
+
 	it("drops every icon when the prompt offered no logos", () => {
 		const enforced = enforceCandidateRequestRequirements(
 			candidate({ push: { slug: "github" } }),

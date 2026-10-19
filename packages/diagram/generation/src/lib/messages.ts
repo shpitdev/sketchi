@@ -18,6 +18,8 @@ export class DiagramGenerationLogo extends Schema.Class<DiagramGenerationLogo>(
 	"DiagramGenerationLogo",
 )({
 	aliases: Schema.optionalKey(Schema.Array(Schema.String)),
+	/** The catalog collection, which marks cloud vendors. */
+	collection: Schema.optionalKey(Schema.String),
 	name: Schema.String,
 	slug: Schema.String,
 }) {}

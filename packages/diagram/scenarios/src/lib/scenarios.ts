@@ -80,6 +80,7 @@ export type DiagramScenarioDifficulty = "smoke" | "standard" | "challenge";
  */
 export interface DiagramScenarioLogo {
 	readonly aliases?: readonly string[];
+	readonly collection?: string;
 	readonly name: string;
 	readonly slug: string;
 }
@@ -1697,9 +1698,14 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Diagram our deploy pipeline. A push to GitHub starts it, Docker builds the image, and the test suite runs. If the tests pass, ship to Cloudflare Workers; otherwise notify the team and stop.",
 		logos: [
-			{ name: "Github", slug: "github" },
-			{ name: "Docker", slug: "docker" },
-			{ aliases: ["Cloudflare"], name: "Cloudflare", slug: "cloudflare" },
+			{ collection: "devtools-ci", name: "Github", slug: "github" },
+			{ collection: "devtools-ci", name: "Docker", slug: "docker" },
+			{
+				aliases: ["Cloudflare"],
+				collection: "cloud-vendors",
+				name: "Cloudflare",
+				slug: "cloudflare",
+			},
 		],
 		nodes: [
 			["push", "Push to GitHub", "start", ["push to GitHub"], "github"],
@@ -1745,13 +1751,19 @@ const flowchartScenarioDefinitions = [
 		logos: [
 			{
 				aliases: ["Next.js", "next", "next.js"],
+				collection: "frontend-frameworks",
 				name: "Next.js",
 				slug: "nextjs",
 			},
-			{ aliases: ["Vercel", "zeit"], name: "Vercel", slug: "vercel" },
-			{ name: "Redis", slug: "redis" },
-			{ aliases: ["OpenAI"], name: "OpenAI", slug: "openai" },
-			{ name: "Sentry", slug: "sentry" },
+			{
+				aliases: ["Vercel", "zeit"],
+				collection: "cloud-hosting-paas",
+				name: "Vercel",
+				slug: "vercel",
+			},
+			{ collection: "data-storage", name: "Redis", slug: "redis" },
+			{ aliases: ["OpenAI"], collection: "ai-model-labs", name: "OpenAI", slug: "openai" },
+			{ collection: "observability-security", name: "Sentry", slug: "sentry" },
 		],
 		// The prompt's first event, `A Next.js page on Vercel receives the
 		// question`, states no order between Vercel and the page: one entry step
@@ -2106,9 +2118,15 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Draw our AWS setup as a left-to-right architecture diagram. Users send requests, which starts the flow, to an Application Load Balancer in a public subnet. The load balancer routes requests to two ECS services in a private subnet, the web service and the API service. Both services query an RDS PostgreSQL database in a database subnet, which ends the flow, and the API service also stores uploads in an S3 bucket, which ends the flow too. All three subnets sit inside a VPC, and the VPC and the S3 bucket sit inside the us-east-1 region.",
 		logos: [
-			{ aliases: ["AWS", "amazon", "amazon web services"], name: "AWS", slug: "aws" },
+			{
+				aliases: ["AWS", "amazon", "amazon web services"],
+				collection: "cloud-vendors",
+				name: "AWS",
+				slug: "aws",
+			},
 			{
 				aliases: ["PostgreSQL", "postgres", "postgres sql", "psql"],
+				collection: "data-storage",
 				name: "PostgreSQL",
 				slug: "postgresql",
 			},
@@ -2177,10 +2195,15 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Draw our Kubernetes architecture from top to bottom. A browser request starts the flow and reaches the ingress controller in the ingress namespace of our GKE cluster. The ingress controller forwards it to the web service in the frontend namespace, which sends it to the web pods in the same namespace. The web pods call the API service in the backend namespace, which sends it to the API pods there. The API pods write orders to a Cloud SQL database outside the cluster, which ends the flow, and publish jobs to a RabbitMQ queue, also outside the cluster. Worker pods in the backend namespace consume jobs from the queue and write results to the same database.",
 		logos: [
-			{ aliases: ["Kubernetes", "k8s", "kube"], name: "Kubernetes", slug: "kubernetes" },
-			{ name: "Gke", slug: "gke" },
-			{ name: "Cloud SQL", slug: "cloud-sql" },
-			{ name: "Rabbitmq", slug: "rabbitmq" },
+			{
+				aliases: ["Kubernetes", "k8s", "kube"],
+				collection: "devtools-ci",
+				name: "Kubernetes",
+				slug: "kubernetes",
+			},
+			{ collection: "gcp", name: "Gke", slug: "gke" },
+			{ collection: "gcp", name: "Cloud SQL", slug: "cloud-sql" },
+			{ collection: "data-storage", name: "Rabbitmq", slug: "rabbitmq" },
 		],
 		nodes: [
 			["browser", "Browser request", "start", ["browser request"]],
@@ -2242,8 +2265,13 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Draw our hybrid setup from left to right. In the corporate network of our on-prem data center, office staff start the flow by entering orders in the legacy ERP, which also runs on the corporate network. The ERP stores records in an Oracle database in the data center, which ends the flow, and sends orders through a site-to-site VPN gateway in our production VPC. The VPN gateway passes them to the order API in the VPC's private subnet. The VPC sits in the eu-west-1 region of our AWS cloud. The order API puts each order on an order queue in the region, and a sync function takes orders from the queue, writes them to an orders table, which ends the flow, and saves each invoice as a PDF document in the invoice archive, which ends the flow too.",
 		logos: [
-			{ name: "Oracle", slug: "oracle" },
-			{ aliases: ["AWS", "amazon", "amazon web services"], name: "AWS", slug: "aws" },
+			{ collection: "cloud-vendors", name: "Oracle", slug: "oracle" },
+			{
+				aliases: ["AWS", "amazon", "amazon web services"],
+				collection: "cloud-vendors",
+				name: "AWS",
+				slug: "aws",
+			},
 		],
 		nodes: [
 			["staff", "Office staff", "start", ["office staff"]],

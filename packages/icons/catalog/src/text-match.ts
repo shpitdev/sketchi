@@ -134,6 +134,8 @@ export function matchIconsInText<Icon extends SearchableIcon>(
 /** A logo a text names, as generation offers it to a model. */
 export interface NamedLogo {
 	readonly aliases?: readonly string[];
+	/** The catalog collection, which marks cloud vendors (see isVendorLogo). */
+	readonly collection: string;
 	readonly name: string;
 	readonly slug: string;
 }
@@ -146,6 +148,7 @@ export interface NamedLogo {
 export function logosNamedInText(text: string, icons: readonly SearchableIcon[]): NamedLogo[] {
 	return matchIconsInText(text, icons).map((icon) => ({
 		...(icon.aliases.length > 0 ? { aliases: icon.aliases } : {}),
+		collection: icon.collection,
 		name: icon.name,
 		slug: icon.slug,
 	}));
