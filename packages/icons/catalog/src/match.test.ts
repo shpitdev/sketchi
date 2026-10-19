@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { nodeLogoIcons } from "./catalog.js";
-import { iconMatch, searchIcons } from "./search.js";
+import { iconMatch, isStrayVendorLogo, isVendorLogo, searchIcons } from "./search.js";
 
-function matchOf(query: string, slug: string) {
+function iconOf(slug: string) {
 	const icon = nodeLogoIcons.find((candidate) => candidate.slug === slug);
 	if (!icon) throw new Error(`No catalog icon ${slug}.`);
-	return iconMatch(icon, query);
+	return icon;
+}
+
+function matchOf(query: string, slug: string) {
+	return iconMatch(iconOf(slug), query);
 }
 
 describe("icon match quality", () => {
@@ -40,5 +44,50 @@ describe("icon match quality", () => {
 			]);
 		expect(tagged("amazon s3")[0]).toEqual(["aws", "vendor"]);
 		expect(tagged("PostgreSQL")[0]).toEqual(["postgresql", "exact"]);
+	});
+});
+
+describe("vendor logos on labels", () => {
+	const named = (label: string, slug: string) => !isStrayVendorLogo(iconOf(slug), label);
+	const vendor = (slug: string) => isVendorLogo(iconOf(slug));
+
+	it("counts cloud vendors and the platforms the alias table names as vendor logos", () => {
+		expect(["aws", "cloudflare", "googlecloud", "kubernetes", "gke"].map(vendor)).toEqual([
+			true,
+			true,
+			true,
+			true,
+			true,
+		]);
+		expect(["docker", "postgresql", "github", "rabbitmq"].map(vendor)).toEqual([
+			false,
+			false,
+			false,
+			false,
+		]);
+	});
+
+	it("keeps a vendor logo on a label that names the vendor", () => {
+		expect(named("Cloudflare Workers", "cloudflare")).toBe(true);
+		expect(named("Ship to Cloudflare Workers", "cloudflare")).toBe(true);
+		expect(named("AWS Lambda", "aws")).toBe(true);
+		expect(named("Amazon S3 bucket", "aws")).toBe(true);
+		expect(named("GKE cluster", "gke")).toBe(true);
+		expect(named("GKE cluster", "kubernetes")).toBe(true);
+		expect(named("k8s ingress", "kubernetes")).toBe(true);
+		expect(named("GCP project", "googlecloud")).toBe(true);
+	});
+
+	it("drops a vendor logo from a label that does not name the vendor", () => {
+		expect(named("Ingress controller", "kubernetes")).toBe(false);
+		expect(named("Web pods", "gke")).toBe(false);
+		expect(named("S3 bucket", "aws")).toBe(false);
+		expect(named("Deploy", "cloudflare")).toBe(false);
+		expect(named("constructor toString", "aws")).toBe(false);
+	});
+
+	it("never questions a product's own logo", () => {
+		expect(named("Primary database", "postgresql")).toBe(true);
+		expect(named("Build the image", "docker")).toBe(true);
 	});
 });

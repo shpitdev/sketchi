@@ -25,7 +25,10 @@ describe("CLI icon catalog", () => {
 	});
 
 	it("points unknown slugs at the catalog site, not a sandbox operation", () => {
-		const { issues } = resolveNodeIcons([{ id: "build", icon: { slug: "dockr" } }], cliIconCatalog);
+		const { issues } = resolveNodeIcons(
+			[{ id: "build", label: "Build", icon: { slug: "dockr" } }],
+			cliIconCatalog,
+		);
 		expect(issues[0]?.hint).toContain("https://icons.sketchi.app");
 		expect(issues[0]?.hint).not.toContain("searchIcons");
 	});

@@ -9,6 +9,7 @@ import {
 import {
 	iconMatch,
 	isNodeLogoEligible,
+	isStrayVendorLogo,
 	normalizeNodeLogoSvg,
 	searchIcons,
 	type IconMatch,
@@ -51,6 +52,12 @@ export interface CodeModeIconCatalog {
 		query: string,
 		limit: number,
 	) => readonly (CodeModeCatalogIcon & { readonly match: IconMatch })[];
+	/**
+	 * Whether a label leaves a vendor or platform mark unexplained: kubernetes
+	 * on "Ingress controller", not cloudflare on "Cloudflare Workers". A
+	 * product's own mark never is.
+	 */
+	readonly isStrayVendorLogo: (slug: string, label: string) => boolean;
 	/** Raw SVG source for an eligible mark. */
 	readonly loadSvg: (icon: CodeModeCatalogIcon) => Effect.Effect<string, CodeModeIconLoadError>;
 	/**
@@ -70,9 +77,14 @@ export function makeCodeModeIconCatalog(options: {
 	readonly slugLookup: string;
 }): CodeModeIconCatalog {
 	const eligible = options.icons.filter(isNodeLogoEligible);
+	const icons = new Map(eligible.map((icon) => [icon.slug, icon]));
 	const bySlug = new Map(eligible.map((icon) => [icon.slug, catalogIcon(icon)]));
 	return {
 		get: (slug) => bySlug.get(slug),
+		isStrayVendorLogo: (slug, label) => {
+			const icon = icons.get(slug);
+			return icon !== undefined && isStrayVendorLogo(icon, label);
+		},
 		search: (query, limit) =>
 			searchIcons(eligible, { limit, query }).map(({ icon }) => ({
 				...catalogIcon(icon),
@@ -139,13 +151,16 @@ function unknownIconIssue(input: {
 }
 
 /**
- * Keep only icons whose slug names an eligible catalog mark. Anything else is
- * dropped with an unknown_icon warning so the diagram still builds.
+ * Keep only icons whose slug names an eligible catalog mark, and vendor marks
+ * only on labels naming their vendor. Unknown slugs are dropped with an
+ * unknown_icon warning and stray vendor marks with icon_dropped, so the
+ * diagram still builds.
  */
 export function resolveNodeIcons<
 	Node extends {
 		readonly id: string;
 		readonly icon?: { readonly slug: string };
+		readonly label: string;
 	},
 >(
 	nodes: readonly Node[],
@@ -157,16 +172,27 @@ export function resolveNodeIcons<
 	const resolved = nodes.map((node) => {
 		if (!node.icon) return node;
 		const slug = normalizeIconSlug(node.icon.slug);
-		if (isDiagramIconSlug(slug) && catalog?.get(slug)) {
+		const ref = { kind: "node" as const, id: node.id, path: `${owner.path}.icon.slug` };
+		const icon = isDiagramIconSlug(slug) ? catalog?.get(slug) : undefined;
+		if (icon && !catalog?.isStrayVendorLogo(slug, node.label)) {
 			return { ...node, icon: { slug } };
 		}
 		issues.push(
-			unknownIconIssue({
-				catalog,
-				message: `Icon "${node.icon.slug}" on ${owner.noun} "${node.id}" is not a Sketchi node logo; the ${owner.noun} renders without a logo.`,
-				ref: { kind: "node", id: node.id, path: `${owner.path}.icon.slug` },
-				slug,
-			}),
+			icon
+				? {
+						code: "icon_dropped",
+						severity: "warning",
+						stage: "input",
+						ref,
+						message: `Icon "${slug}" on ${owner.noun} "${node.id}" is a vendor logo, but the label "${node.label}" does not name ${icon.name}; the ${owner.noun} renders without a logo.`,
+						hint: `Put a vendor's logo only on a ${owner.noun} whose label names that vendor ("Cloudflare Workers" takes cloudflare); other ${owner.noun}s take their product's own logo or none.`,
+					}
+				: unknownIconIssue({
+						catalog,
+						message: `Icon "${node.icon.slug}" on ${owner.noun} "${node.id}" is not a Sketchi node logo; the ${owner.noun} renders without a logo.`,
+						ref,
+						slug,
+					}),
 		);
 		const { icon: _icon, ...withoutIcon } = node;
 		return withoutIcon as Node;

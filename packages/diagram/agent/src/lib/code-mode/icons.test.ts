@@ -36,6 +36,11 @@ function catalogIcon(
 
 const SOURCES: Record<string, string> = {
 	docker: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M0 0h1"/></svg>',
+	cloudflare:
+		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M0 1h1"/></svg>',
+	aws: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M0 2h1"/></svg>',
+	kubernetes:
+		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M0 3h1"/></svg>',
 	github: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><circle r="1"/></svg>',
 };
 
@@ -47,6 +52,12 @@ function fixtureCatalog(): CodeModeIconCatalog {
 			catalogIcon("broken", "Broken"),
 			catalogIcon("github-text", "GitHub Wordmark", { variant: "text" }),
 			catalogIcon("tanstack", "TanStack", { bytes: 498_897 }),
+			catalogIcon("cloudflare", "Cloudflare", { collection: "cloud-vendors" }),
+			catalogIcon("aws", "AWS", {
+				aliases: ["AWS", "amazon", "amazon web services"],
+				collection: "cloud-vendors",
+			}),
+			catalogIcon("kubernetes", "Kubernetes", { aliases: ["Kubernetes", "k8s", "kube"] }),
 		],
 		slugLookup: "sketchi.searchIcons({ q })",
 		loadSvg: (icon) => {
@@ -226,6 +237,98 @@ describe("buildFlowchart icons", () => {
 			expect.objectContaining({
 				code: "unknown_icon",
 				hint: expect.stringContaining("no icon catalog"),
+			}),
+		]);
+	});
+});
+
+describe("vendor logos", () => {
+	function stackSpec(nodes: ReadonlyArray<readonly [string, string, string]>) {
+		return {
+			title: "Stack",
+			nodes: nodes.map(([id, label, slug], index) => ({
+				id,
+				label,
+				kind: index === 0 ? "start" : index === nodes.length - 1 ? "end" : "process",
+				icon: { slug },
+			})),
+			edges: nodes.slice(1).map(([id], index) => ({ source: nodes[index]?.[0], target: id })),
+		};
+	}
+
+	it("keeps a vendor logo on a node whose label names the vendor", async () => {
+		const result = await runtime().buildFlowchart({
+			spec: stackSpec([
+				["push", "Push to GitHub", "github"],
+				["ship", "Ship to Cloudflare Workers", "cloudflare"],
+				["fn", "AWS Lambda", "aws"],
+			]),
+		});
+		if (!result.ok) throw new Error(JSON.stringify(result.issues));
+
+		expect(result.normalizedSpec.nodes.map((node) => node.icon?.slug)).toEqual([
+			"github",
+			"cloudflare",
+			"aws",
+		]);
+		expect(result.issues).toEqual([]);
+	});
+
+	it("drops a vendor logo from a node whose label does not name the vendor", async () => {
+		const result = await runtime().buildFlowchart({
+			spec: stackSpec([
+				["ingress", "Ingress controller", "kubernetes"],
+				["build", "Build the image", "docker"],
+				["s3", "S3 bucket", "aws"],
+			]),
+		});
+		if (!result.ok) throw new Error(JSON.stringify(result.issues));
+
+		expect(result.normalizedSpec.nodes.map((node) => node.icon?.slug)).toEqual([
+			undefined,
+			"docker",
+			undefined,
+		]);
+		expect(result.issues).toEqual([
+			expect.objectContaining({
+				code: "icon_dropped",
+				severity: "warning",
+				ref: { kind: "node", id: "ingress", path: "nodes.icon.slug" },
+				message: expect.stringContaining('label "Ingress controller" does not name Kubernetes'),
+			}),
+			expect.objectContaining({
+				code: "icon_dropped",
+				ref: { kind: "node", id: "s3", path: "nodes.icon.slug" },
+				message: expect.stringContaining('label "S3 bucket" does not name AWS'),
+			}),
+		]);
+	});
+
+	it("applies the same rule to sequence participants", async () => {
+		const result = await runtime().buildSequenceDiagram({
+			spec: {
+				title: "Deploy webhook",
+				participants: [
+					{ id: "github", label: "GitHub", icon: { slug: "github" } },
+					{ id: "worker", label: "Cloudflare Worker", icon: { slug: "cloudflare" } },
+					{ id: "queue", label: "Job queue", icon: { slug: "aws" } },
+				],
+				messages: [
+					{ source: "github", target: "worker", label: "Push webhook" },
+					{ source: "worker", target: "queue", label: "Enqueue" },
+				],
+			},
+		});
+		if (!result.ok) throw new Error(JSON.stringify(result.issues));
+
+		expect(result.normalizedSpec.participants.map((participant) => participant.icon?.slug)).toEqual(
+			["github", "cloudflare", undefined],
+		);
+		expect(result.issues).toEqual([
+			expect.objectContaining({
+				code: "icon_dropped",
+				ref: { kind: "node", id: "queue", path: "participants.icon.slug" },
+				message: expect.stringContaining('participant "queue"'),
 			}),
 		]);
 	});

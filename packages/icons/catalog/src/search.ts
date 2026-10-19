@@ -205,6 +205,59 @@ export function iconMatch(icon: SearchableIcon, query: string): IconMatch {
 }
 
 /**
+ * Names a label may use for a vendor or platform without its catalog name, and
+ * what each one also names: "GKE cluster" names GKE, Google Cloud, and
+ * Kubernetes. Icons these names reach are platform marks (see isVendorLogo).
+ */
+const VENDOR_NAMES: ReadonlyMap<string, readonly string[]> = new Map([
+	["aks", ["azure", "kubernetes"]],
+	["amazon", ["aws"]],
+	["aws", ["amazon", "amazon web services"]],
+	["eks", ["aws", "kubernetes"]],
+	["gcp", ["google cloud"]],
+	["gke", ["google kubernetes engine", "google cloud", "kubernetes"]],
+	["google cloud", ["gcp"]],
+	["google kubernetes engine", ["gke", "google cloud", "kubernetes"]],
+	["k8s", ["kubernetes"]],
+]);
+
+const VENDOR_NAME_TERMS: ReadonlySet<string> = new Set(
+	[...VENDOR_NAMES].flatMap(([name, implied]) => [name, ...implied].map(compactTerm)),
+);
+
+/**
+ * A cloud vendor's mark, or a platform's (Kubernetes, GKE) that stands in for
+ * the workloads it hosts: logos that belong only on nodes naming them.
+ */
+export function isVendorLogo(icon: SearchableIcon): boolean {
+	return (
+		VENDOR_COLLECTIONS.has(icon.collection) ||
+		[icon.slug, icon.name, ...icon.aliases].some((term) => VENDOR_NAME_TERMS.has(compactTerm(term)))
+	);
+}
+
+/** A label and the vendor names it implies ("AWS Lambda" also names Amazon). */
+function labelNames(label: string): string[] {
+	const tokens = termTokens(label);
+	const implied = tokens.flatMap((_, start) =>
+		tokens.slice(start).flatMap((__, end) => {
+			const part = tokens.slice(start, start + end + 1).join(" ");
+			return VENDOR_NAMES.get(part) ?? [];
+		}),
+	);
+	return [label, ...implied];
+}
+
+/**
+ * Whether a vendor logo sits on a label that does not name its vendor, like
+ * kubernetes on "Ingress controller" or aws on "S3 bucket". A product's own
+ * logo never is; "Cloudflare Workers" keeps cloudflare.
+ */
+export function isStrayVendorLogo(icon: SearchableIcon, label: string): boolean {
+	return isVendorLogo(icon) && labelNames(label).every((name) => iconMatch(icon, name) === "weak");
+}
+
+/**
  * Catalog icons ranked by exact slug, name prefix, alias, substring, then
  * collection. A query no icon matches as a whole falls back to the icons its
  * parts name (see partialQueryMatches); nothing credible returns [].
