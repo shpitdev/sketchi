@@ -76,6 +76,13 @@ import {
 	StudioBuildClassInputSchema,
 	StudioBuildClassOutputSchema,
 } from "./studio-class-tool.server";
+import {
+	makeStudioOrgChartToolExecutor,
+	STUDIO_BUILD_ORG_CHART_TOOL_DESCRIPTION,
+	STUDIO_BUILD_ORG_CHART_TOOL_NAME,
+	StudioBuildOrgChartInputSchema,
+	StudioBuildOrgChartOutputSchema,
+} from "./studio-org-chart-tool.server";
 
 export class StudioAgentRequestError extends Schema.TaggedError<StudioAgentRequestError>()(
 	"StudioAgentRequestError",
@@ -195,6 +202,7 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 	const ganttExecutor = yield* makeStudioGanttToolExecutor(codeMode.buildGantt, { turn });
 	const erExecutor = yield* makeStudioErToolExecutor(codeMode.buildErDiagram, { turn });
 	const classExecutor = yield* makeStudioClassToolExecutor(codeMode.buildClassDiagram, { turn });
+	const orgChartExecutor = yield* makeStudioOrgChartToolExecutor(codeMode.buildOrgChart, { turn });
 	return yield* Effect.try({
 		try: () => {
 			const result = streamText({
@@ -243,6 +251,12 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 						inputSchema: StudioBuildClassInputSchema,
 						outputSchema: StudioBuildClassOutputSchema,
 						execute: makeStudioBuildToolCallback(classExecutor, callbacks.runPromise),
+					}),
+					[STUDIO_BUILD_ORG_CHART_TOOL_NAME]: tool({
+						description: STUDIO_BUILD_ORG_CHART_TOOL_DESCRIPTION,
+						inputSchema: StudioBuildOrgChartInputSchema,
+						outputSchema: StudioBuildOrgChartOutputSchema,
+						execute: makeStudioBuildToolCallback(orgChartExecutor, callbacks.runPromise),
 					}),
 					[STUDIO_BUILD_SEQUENCE_TOOL_NAME]: tool({
 						description: STUDIO_BUILD_SEQUENCE_TOOL_DESCRIPTION,

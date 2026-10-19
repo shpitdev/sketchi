@@ -40,6 +40,7 @@ export type CodeModeUsageOperation =
 	| "buildGantt"
 	| "buildErDiagram"
 	| "buildClassDiagram"
+	| "buildOrgChart"
 	| "createCanvas"
 	| "execute"
 	| "generateDiagram";

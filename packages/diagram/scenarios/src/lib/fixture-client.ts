@@ -111,6 +111,20 @@ function fixtureRequirements(scenario: DiagramScenario): readonly Record<string,
 				value: node.name ?? node.id,
 			})),
 		];
+	if (scenario.diagramType === "org-chart")
+		return [
+			{
+				kind: "count",
+				target: "people",
+				comparator: "exact",
+				value: scenario.expectedDiagram.people.length,
+			},
+			...scenario.expectedDiagram.people.map((person) => ({
+				kind: "label",
+				target: "person",
+				value: person.name,
+			})),
+		];
 	if (scenario.diagramType === "sequence") {
 		return [
 			{

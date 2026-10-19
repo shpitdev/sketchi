@@ -435,6 +435,9 @@ export const CODE_MODE_ISSUE_CODES = [
 	"invalid_class",
 	"invalid_member",
 	"invalid_generalization",
+	"org_chart_too_large",
+	"invalid_person",
+	"invalid_reporting_line",
 	"request_too_large",
 	"generic_label",
 	"label_too_long",
@@ -1016,6 +1019,53 @@ export class ClassSpec extends Schema.Class<ClassSpec>("ClassSpec")(
 ) {}
 export const ClassSpecSchema = ClassSpec;
 
+/**
+ * The authoring form of diagram-core's canonical OrgChartDiagram: dotted-line
+ * ids are optional and style is defaulted. buildOrgChart normalizes it into the
+ * core contract, which owns every invariant.
+ */
+export class OrgPersonSpec extends Schema.Class<OrgPersonSpec>("OrgPersonSpec")(
+	{
+		id: RequiredNonEmptyString,
+		name: RequiredNonEmptyString,
+		title: optionalContract(NonEmptyString),
+		department: optionalContract(NonEmptyString),
+		manager: optionalContract(NonEmptyString),
+		assistant: optionalContract(Schema.Boolean),
+		avatar: optionalContract(Schema.Boolean),
+	},
+	{ identifier: undefined },
+) {}
+
+export class OrgDottedLineSpec extends Schema.Class<OrgDottedLineSpec>("OrgDottedLineSpec")(
+	{
+		id: optionalContract(NonEmptyString),
+		report: RequiredNonEmptyString,
+		manager: RequiredNonEmptyString,
+		label: optionalContract(NonEmptyString),
+	},
+	{ identifier: undefined },
+) {}
+
+const orgDottedLinesDefault: Array<typeof OrgDottedLineSpec.Encoded> = [];
+const OrgDottedLinesWithDefault = Schema.Array(OrgDottedLineSpec)
+	.pipe(Schema.mutable)
+	.annotate({ default: orgDottedLinesDefault })
+	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(orgDottedLinesDefault)));
+export class OrgChartSpec extends Schema.Class<OrgChartSpec>("OrgChartSpec")(
+	{
+		id: optionalContract(NonEmptyString),
+		title: RequiredNonEmptyString,
+		people: requiredArray(nonEmptyArray(OrgPersonSpec)),
+		dottedLines: OrgDottedLinesWithDefault,
+		groupByDepartment: optionalContract(Schema.Boolean),
+		forest: optionalContract(Schema.Boolean),
+		style: DiagramStyleWithDefault,
+	},
+	{ identifier: undefined },
+) {}
+export const OrgChartSpecSchema = OrgChartSpec;
+
 const ArtifactFormatsOption = optionalContract(nonEmptyArray(ArtifactFormatSchema));
 const InlineArtifactsOption = optionalContract(
 	Schema.Array(InlineArtifactFormatSchema).pipe(Schema.mutable),
@@ -1254,6 +1304,26 @@ export const BuildClassDiagramToolInputSchema = Schema.Struct({
 	spec: requiredObject(ClassToolSpecSchema),
 });
 export type BuildClassDiagramToolInput = typeof BuildClassDiagramToolInputSchema.Type;
+export class BuildOrgChartRequest extends Schema.Class<BuildOrgChartRequest>(
+	"BuildOrgChartRequest",
+)(
+	{
+		requestId: optionalContract(NonEmptyString),
+		spec: requiredObject(OrgChartSpec),
+		options: optionalContract(BuildFlowchartOptions),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildOrgChartRequestSchema = BuildOrgChartRequest;
+/** The org chart spec a model authors; style is always the Sketchi palette. */
+export const OrgChartToolSpecSchema = OrgChartSpec.mapFields(
+	({ style: _style, ...fields }) => fields,
+);
+export const BuildOrgChartToolInputSchema = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(OrgChartToolSpecSchema),
+});
+export type BuildOrgChartToolInput = typeof BuildOrgChartToolInputSchema.Type;
 
 export interface MindmapTopicInput {
 	label: string;
@@ -2067,6 +2137,18 @@ const NormalizedClassSpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedClassSpec = typeof NormalizedClassSpecSchema.Type;
+const NormalizedOrgChartSpecSchema = Schema.Struct({
+	id: NonEmptyString,
+	title: NonEmptyString,
+	people: Schema.Array(OrgPersonSpec).pipe(Schema.mutable),
+	dottedLines: Schema.Array(
+		OrgDottedLineSpec.mapFields((fields) => ({ ...fields, id: NonEmptyString })),
+	).pipe(Schema.mutable),
+	groupByDepartment: optionalContract(Schema.Boolean),
+	forest: optionalContract(Schema.Boolean),
+	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
+});
+export type NormalizedOrgChartSpec = typeof NormalizedOrgChartSpecSchema.Type;
 const NormalizedChartSpecSchema = ChartSpec.mapFields((fields) => ({
 	...fields,
 	id: NonEmptyString,
@@ -2480,6 +2562,49 @@ export const BuildClassDiagramResultSchema = Schema.Union([
 	BuildClassDiagramRejected,
 ]);
 export type BuildClassDiagramResult = typeof BuildClassDiagramResultSchema.Type;
+
+export class BuildOrgChartAccepted extends Schema.Class<BuildOrgChartAccepted>(
+	"BuildOrgChartAccepted",
+)(
+	{
+		ok: booleanLiteral(true),
+		status: stringLiteral("accepted"),
+		buildId: Schema.String,
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: NormalizedOrgChartSpecSchema,
+		quality: QualityReportSchema,
+		artifact: ArtifactBundleSchema,
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export class BuildOrgChartRejected extends Schema.Class<BuildOrgChartRejected>(
+	"BuildOrgChartRejected",
+)(
+	{
+		ok: booleanLiteral(false),
+		status: literals([
+			"invalid_input",
+			"invalid_org_chart",
+			"quality_failed",
+			"render_failed",
+			"export_failed",
+			"storage_failed",
+		]),
+		buildId: optionalContract(Schema.String),
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: optionalContract(NormalizedOrgChartSpecSchema),
+		quality: optionalContract(QualityReportSchema),
+		partial: optionalContract(PartialArtifactBundleSchema),
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildOrgChartResultSchema = Schema.Union([
+	BuildOrgChartAccepted,
+	BuildOrgChartRejected,
+]);
+export type BuildOrgChartResult = typeof BuildOrgChartResultSchema.Type;
 
 export class GetArtifactAccepted extends Schema.Class<GetArtifactAccepted>("GetArtifactAccepted")(
 	{

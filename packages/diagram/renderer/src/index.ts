@@ -6,6 +6,9 @@ export * from "./sequence.js";
 export * from "./state-machine.js";
 export * from "./er.js";
 export * from "./class-diagram.js";
+export * from "./org-chart.js";
+export * from "./org-chart-readout.js";
+export type { OrgLayout } from "./org-chart-layout.js";
 
 export * from "./timeline.js";
 export * from "./timeline-readout.js";

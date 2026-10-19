@@ -81,6 +81,20 @@ export interface RouteRequest {
 	/** Nothing routes above top or below bottom. */
 	readonly top: number;
 	readonly bottom: number;
+	/**
+	 * Bounds the wider searches also cover, beyond their reach around the ports, so a
+	 * route can go around a long obstacle far from both ends.
+	 */
+	readonly reach?: { readonly left: number; readonly right: number };
+	/**
+	 * Search the whole wide window from the start, for the route a nearer search would miss:
+	 * one going around what it would otherwise cross.
+	 */
+	readonly wide?: boolean;
+	/** What crossing an earlier route costs in the first searches; CROSSING_COST by default. */
+	readonly crossingCost?: number;
+	/** How many times more a crossing costs while the route heads left; BACK_CROSSING_FACTOR by default. */
+	readonly backCrossingFactor?: number;
 	/** Search steps the whole chart may still spend; shared by its routes. */
 	readonly budget?: { remaining: number };
 	/**
@@ -710,7 +724,9 @@ function prepareSearch(request: RouteRequest, window: Window, packing: Packing):
 		if (!free(point, target, false, trunk, line)) return undefined;
 		// A run heading back left across another route reads as a loop through it.
 		const crossingCost =
-			heading === 2 ? packing.crossingCost * BACK_CROSSING_FACTOR : packing.crossingCost;
+			heading === 2
+				? packing.crossingCost * (request.backCrossingFactor ?? BACK_CROSSING_FACTOR)
+				: packing.crossingCost;
 		return (
 			Math.abs(target.x - point.x) +
 			Math.abs(target.y - point.y) +
@@ -936,7 +952,7 @@ export function routeOrthogonal(request: RouteRequest): RoutePoint[] | undefined
 		separation: ROUTE_SEPARATION,
 		lanes: request.lanes,
 		splits: [0.5],
-		crossingCost: CROSSING_COST,
+		crossingCost: request.crossingCost ?? CROSSING_COST,
 	} satisfies Packing;
 	const { behind } = request;
 	const back: Packing = behind === undefined ? strict : { ...strict, behind };
@@ -949,7 +965,16 @@ export function routeOrthogonal(request: RouteRequest): RoutePoint[] | undefined
 		crossingCost: 2,
 	};
 	const near = around(WINDOW_MARGIN, WINDOW_ROWS);
-	const wide = around(4 * WINDOW_MARGIN, 4 * WINDOW_ROWS);
+	const ported = around(4 * WINDOW_MARGIN, 4 * WINDOW_ROWS);
+	const { reach } = request;
+	const wide: Window = reach
+		? {
+				left: Math.min(ported.left, reach.left),
+				right: Math.max(ported.right, reach.right),
+				top: Math.min(ported.top, request.top),
+				bottom: Math.max(ported.bottom, request.bottom),
+			}
+		: ported;
 	// Once a chart has spent its routing budget, the rest take the caller's last resort.
 	const budget = request.budget;
 	const kinkBudget = request.kinkBudget;
@@ -976,7 +1001,11 @@ export function routeOrthogonal(request: RouteRequest): RoutePoint[] | undefined
 		kinkBudget.remaining -= kinked.expansions;
 		return kinked.points ?? plain.points;
 	};
-	return attempt(near, back, true) ?? attempt(wide, back, true) ?? attempt(wide, dense, false);
+	return (
+		(request.wide ? undefined : attempt(near, back, true)) ??
+		attempt(wide, back, true) ??
+		attempt(wide, dense, false)
+	);
 }
 
 /** What a route's kinks cost: a turn after any run but its first that is shorter than KINK_LENGTH. */

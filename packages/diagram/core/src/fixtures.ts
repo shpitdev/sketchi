@@ -7,6 +7,7 @@ import { stateMachineFixture } from "./types/state-machine.js";
 import { ganttFixture } from "./types/gantt.js";
 import { erFixture } from "./types/er.js";
 import { classFixture } from "./types/class.js";
+import { orgChartFixture } from "./types/org-chart.js";
 import type { CanonicalDiagram } from "./diagram.js";
 
 /** One maintained fixture per canonical family. */
@@ -20,4 +21,5 @@ export const diagramFixtures: readonly CanonicalDiagram[] = [
 	ganttFixture,
 	erFixture,
 	classFixture,
+	orgChartFixture,
 ];

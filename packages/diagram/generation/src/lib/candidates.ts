@@ -10,6 +10,10 @@ import {
 	erEntityName,
 	ErValidationError,
 	isDiagramIconSlug,
+	OrgChartDiagramSchema,
+	OrgChartValidationError,
+	resolveOrgChartShorthand,
+	validateOrgChartDiagram,
 	resolveClassShorthand,
 	resolveErShorthand,
 	validateClassDiagram,
@@ -376,7 +380,8 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 		error instanceof StateMachineValidationError ||
 		error instanceof GanttValidationError ||
 		error instanceof ErValidationError ||
-		error instanceof ClassValidationError
+		error instanceof ClassValidationError ||
+		error instanceof OrgChartValidationError
 	) {
 		const family =
 			error instanceof FlowchartValidationError
@@ -393,7 +398,9 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 									? "er"
 									: error instanceof ClassValidationError
 										? "class"
-										: "sequence";
+										: error instanceof OrgChartValidationError
+											? "org-chart"
+											: "sequence";
 		return {
 			diagnostics: error.issues.map(
 				(entry) => `${family}.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
@@ -549,6 +556,13 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 				ClassDiagramSchema,
 				normalizeGeneratedClassInput(titledDiagram),
 				validateClassDiagram,
+				intent,
+			),
+		"org-chart": () =>
+			decodeAndValidate(
+				OrgChartDiagramSchema,
+				resolveOrgChartShorthand(withSketchiDiagramStyle(titledDiagram)),
+				validateOrgChartDiagram,
 				intent,
 			),
 		sequence: () => {
@@ -734,6 +748,10 @@ function labelsForRequirement(
 			]);
 		return undefined;
 	}
+	if (diagram.type === "org-chart")
+		return requirement.target === "person"
+			? diagram.people.map((person) => person.name)
+			: undefined;
 	if (diagram.type === "er") {
 		if (requirement.target === "entity") return diagram.entities.map(erEntityName);
 		if (requirement.target === "field")
@@ -788,6 +806,7 @@ function countForRequirement(
 			: target === "relationships"
 				? diagram.relationships.length
 				: undefined;
+	if (diagram.type === "org-chart") return target === "people" ? diagram.people.length : undefined;
 	if (diagram.type === "er")
 		return target === "entities"
 			? diagram.entities.length

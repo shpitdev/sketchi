@@ -47,8 +47,8 @@ const COMMON_INSTRUCTIONS = [
 	`Sketchi supports only nativeKind ${listAlternatives(NATIVE_KINDS)}. If the requested kind is ${listAlternatives(UNSUPPORTED_KINDS)}, set nativeKind to null, omit diagram, and never coerce it into a supported kind.`,
 	"When nativeKind is null, return an empty requirements array because there is no native artifact to validate.",
 	"List every measurable scenario requirement once in intent.requirements. Convert counts and minimums into count requirements, hierarchy depth into topic_levels, and required names or branch/message text into label requirements.",
-	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", "tasks", "entities", "classes", "relationships", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
-	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", "series", "state", "transition", "task", "phase", "entity", "field", "class", or "member".',
+	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", "tasks", "entities", "classes", "people", "relationships", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
+	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", "series", "state", "transition", "task", "phase", "entity", "field", "class", "member", or "person".',
 	'Use comparator "minimum" for phrases such as "at least" and "exact" for exact counts. Do not invent measurable requirements that the scenario did not request.',
 	"The diagram must satisfy every requirement in the plan. Sketchi deterministically checks the plan against the artifact.",
 ];
@@ -153,6 +153,18 @@ const IR_INSTRUCTIONS = {
 			'Return relationships: [{ id, kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }]. kind "inheritance" or "realization": from extends or implements to; "composition" or "aggregation": from is the whole; "association"; "dependency": from uses to.',
 			'Multiplicities ("1", "0..1", "*", "1..*"), roles and navigable (an open arrow at to) go on compositions, aggregations and associations only; a composition\'s whole is "1" or "0..1". Interfaces extend only interfaces, and inheritance never cycles.',
 			"Copy every class, member, relationship, multiplicity and role the source states; invent none.",
+		],
+	},
+	"org-chart": {
+		title: "Org chart IR rules",
+		rules: [
+			'Use diagram type "org-chart".',
+			"Use it for org charts and team structures: who reports to whom; never supply coordinates.",
+			"Return people: [{ id, name, title?, department?, manager?, assistant?, avatar? }]. manager is the id of the person they report to; exactly one person, the top, has none, unless the source states separate trees (then set forest: true). Ids hold no colon.",
+			"assistant: true places an assistant beside their manager; an assistant has no reports.",
+			'Return dottedLines: [{ id, report, manager, label? }] for each dotted-line or matrix report the source states: report also answers to manager, outside the solid line. Put the scope or reason the source gives for it ("for clinical systems") in label.',
+			"Set groupByDepartment: true only when the source asks to group departments into regions.",
+			"Copy every person, title, department, reporting line and dotted line the source states; invent none.",
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { title: string; rules: readonly string[] }>;
@@ -354,6 +366,30 @@ const FAMILY_EXAMPLES = {
 		requirements: [
 			{ kind: "count", target: "classes", comparator: "exact", value: 3 },
 			{ kind: "label", target: "class", value: "Circle" },
+		],
+	},
+	"org-chart": {
+		diagram: {
+			id: "short-kebab-case-id",
+			type: "org-chart",
+			people: [
+				{ id: "ceo", name: "Ada Lovelace", title: "CEO" },
+				{
+					id: "ea",
+					name: "Grace Hopper",
+					title: "Executive Assistant",
+					manager: "ceo",
+					assistant: true,
+				},
+				{ id: "cto", name: "Alan Turing", title: "CTO", department: "Engineering", manager: "ceo" },
+				{ id: "cpo", name: "Radia Perlman", title: "CPO", department: "Product", manager: "ceo" },
+				{ id: "ux", name: "Don Norman", title: "Designer", department: "Product", manager: "cpo" },
+			],
+			dottedLines: [{ id: "ux-cto", report: "ux", manager: "cto", label: "design system" }],
+		},
+		requirements: [
+			{ kind: "count", target: "people", comparator: "exact", value: 5 },
+			{ kind: "label", target: "person", value: "Alan Turing" },
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { diagram: object; requirements: readonly object[] }>;

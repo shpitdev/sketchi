@@ -29,6 +29,11 @@ import {
 import { type GanttDiagram, GanttDiagramSchema, validateGanttDiagram } from "./types/gantt.js";
 import { type ErDiagram, ErDiagramSchema, validateErDiagram } from "./types/er.js";
 import { type ClassDiagram, ClassDiagramSchema, validateClassDiagram } from "./types/class.js";
+import {
+	type OrgChartDiagram,
+	OrgChartDiagramSchema,
+	validateOrgChartDiagram,
+} from "./types/org-chart.js";
 import type { DiagramTypeValue } from "./types.js";
 
 /** One diagram of any canonical family, discriminated by `type`. */
@@ -41,7 +46,8 @@ export type CanonicalDiagram =
 	| StateMachineDiagram
 	| GanttDiagram
 	| ErDiagram
-	| ClassDiagram;
+	| ClassDiagram
+	| OrgChartDiagram;
 
 // A family added to DIAGRAM_TYPES without a contract here fails to compile.
 const familySchemas = {
@@ -54,6 +60,7 @@ const familySchemas = {
 	gantt: GanttDiagramSchema,
 	er: ErDiagramSchema,
 	class: ClassDiagramSchema,
+	"org-chart": OrgChartDiagramSchema,
 } satisfies Record<DiagramTypeValue, Schema.Top>;
 
 export const CanonicalDiagramSchema = Schema.Union([
@@ -66,6 +73,7 @@ export const CanonicalDiagramSchema = Schema.Union([
 	familySchemas.gantt,
 	familySchemas.er,
 	familySchemas.class,
+	familySchemas["org-chart"],
 ]);
 
 /** Apply the family's semantic validation to an already decoded diagram. */
@@ -89,6 +97,8 @@ export function validateCanonicalDiagram(diagram: CanonicalDiagram): CanonicalDi
 			return validateErDiagram(diagram);
 		case "class":
 			return validateClassDiagram(diagram);
+		case "org-chart":
+			return validateOrgChartDiagram(diagram);
 	}
 }
 

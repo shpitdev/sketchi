@@ -63,6 +63,15 @@ function diagramCounts(diagram: CanonicalDiagram) {
 			edgeCount: diagram.relationships.length,
 			edgeNoun: "relationships",
 		};
+	if (diagram.type === "org-chart")
+		return {
+			nodeCount: diagram.people.length,
+			nodeNoun: "people",
+			edgeCount:
+				diagram.people.filter((person) => person.manager !== undefined).length +
+				diagram.dottedLines.length,
+			edgeNoun: "reporting lines",
+		};
 	return diagram.type === "sequence"
 		? {
 				nodeCount: diagram.participants.length,

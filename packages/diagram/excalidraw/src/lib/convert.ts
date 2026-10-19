@@ -953,6 +953,8 @@ interface ArrowSegment extends AxisAlignedSegment {
 	endBindingId: string | null;
 	startCoordinate: number;
 	endCoordinate: number;
+	/** The whole route, in scene coordinates. */
+	route: readonly { readonly x: number; readonly y: number }[];
 }
 
 function arrowSegments(element: ExcalidrawElement): ArrowSegment[] {
@@ -979,7 +981,38 @@ function arrowSegments(element: ExcalidrawElement): ArrowSegment[] {
 			segment.orientation === "horizontal"
 				? points[segment.segmentIndex + 1]!.x
 				: points[segment.segmentIndex + 1]!.y,
+		route: points,
 	}));
+}
+
+/**
+ * Arrows that leave one shape at one point may run together before they part,
+ * as the bus from an org chart's manager to their reports does: a run both take
+ * from the same corner in the same direction, after the same route up to it, is
+ * one trunk drawn once.
+ */
+function sharesTrunk(left: ArrowSegment, right: ArrowSegment): boolean {
+	if (
+		left.startBindingId === null ||
+		left.startBindingId !== right.startBindingId ||
+		left.segmentIndex !== right.segmentIndex
+	)
+		return false;
+	for (let index = 0; index <= left.segmentIndex; index += 1) {
+		const a = left.route[index];
+		const b = right.route[index];
+		if (
+			!a ||
+			!b ||
+			Math.abs(a.x - b.x) > AXIS_ALIGNED_EPSILON ||
+			Math.abs(a.y - b.y) > AXIS_ALIGNED_EPSILON
+		)
+			return false;
+	}
+	return (
+		Math.sign(left.endCoordinate - left.startCoordinate) ===
+		Math.sign(right.endCoordinate - right.startCoordinate)
+	);
 }
 
 /** A common binding alone cannot exempt unrelated portions of two routes. */
@@ -1021,6 +1054,7 @@ function overlappingArrowSegments(
 			if (
 				left.arrowId === right.arrowId ||
 				sharesDirectedEndpoint(left, right) ||
+				sharesTrunk(left, right) ||
 				!segmentsOverlapInterior(left, right)
 			) {
 				continue;

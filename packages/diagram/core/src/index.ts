@@ -29,3 +29,5 @@ export * from "./types/class.js";
 export * from "./class-fixtures.js";
 export * from "./lane-fixtures.js";
 export * from "./lane-regions.js";
+export * from "./types/org-chart.js";
+export * from "./org-chart-fixtures.js";

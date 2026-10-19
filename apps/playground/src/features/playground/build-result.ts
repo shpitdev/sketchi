@@ -11,6 +11,8 @@ import {
 	BuildErDiagramToolInputSchema,
 	BuildClassDiagramResultSchema,
 	BuildClassDiagramToolInputSchema,
+	BuildOrgChartResultSchema,
+	BuildOrgChartToolInputSchema,
 	BuildTimelineResultSchema,
 	BuildTimelineToolInputSchema,
 	BuildChartResultSchema,
@@ -23,6 +25,7 @@ import {
 	type BuildGanttResult,
 	type BuildErDiagramResult,
 	type BuildClassDiagramResult,
+	type BuildOrgChartResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 } from "@sketchi/diagram-agent";
@@ -42,7 +45,8 @@ export type StudioBuildResult =
 	| BuildStateMachineResult
 	| BuildGanttResult
 	| BuildErDiagramResult
-	| BuildClassDiagramResult;
+	| BuildClassDiagramResult
+	| BuildOrgChartResult;
 
 const BUILD_TOOLS = {
 	"tool-build_chart": {
@@ -128,6 +132,16 @@ const BUILD_TOOLS = {
 				: [];
 		},
 	},
+	"tool-build_org_chart": {
+		family: "org-chart",
+		decodeResult: Schema.decodeUnknownResult(BuildOrgChartResultSchema),
+		labels: (input: unknown) => {
+			const decoded = Schema.decodeUnknownResult(BuildOrgChartToolInputSchema)(input);
+			return Result.isSuccess(decoded)
+				? decoded.success.spec.people.map((person) => person.name)
+				: [];
+		},
+	},
 } as const;
 
 export type DiagramToolPartType = keyof typeof BUILD_TOOLS;
@@ -159,6 +173,7 @@ const FAMILY_NAMES: Readonly<Record<DiagramToolFamily, string>> = {
 	gantt: "Gantt chart",
 	er: "ER diagram",
 	class: "class diagram",
+	"org-chart": "org chart",
 };
 
 /**

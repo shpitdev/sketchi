@@ -369,6 +369,15 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		expect(classDocs.split("Request type:")[0]).toContain(
 			'A member is one string as UML writes it: attributes "- radius: double"',
 		);
+		// Org charts add a builder name to the head and one compact line here (+385 characters).
+		expect(codeLine("buildOrgChart")).toBe(
+			"- buildOrgChart: spec: { title, people: [{ id, name, title?, department?, manager?, assistant?: true }], dottedLines?: [{ report, manager, label?: stated scope }], groupByDepartment? }. manager is the id they report to; only the top person has none (forest: true for several). Copy every person, title, department and line stated.",
+		);
+		const orgChartDocs = getCodeModeDocs({ topic: "buildOrgChart" }).content;
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(orgChartDocs.split("\n\n")[0]);
+		expect(orgChartDocs.split("Request type:")[0]).toContain(
+			"A dotted line joins report to a second manager outside the solid line",
+		);
 		expect(codeLine("createCanvas")).toBeUndefined();
 		for (const topic of ["buildMindmap", "buildSequenceDiagram", "buildTimeline"] as const) {
 			const guidance = getCodeModeDocs({ topic }).content.split("\n")[0]!;
@@ -416,7 +425,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			"
 		`);
 		// Family summaries now live beside the specs, outside the truncated head.
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(9_700);
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(10_000);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		for (const line of overview
 			.split("\n")
@@ -436,6 +445,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			["buildGantt", ["BuildGanttRequest"]],
 			["buildErDiagram", ["BuildErDiagramRequest"]],
 			["buildClassDiagram", ["BuildClassDiagramRequest"]],
+			["buildOrgChart", ["BuildOrgChartRequest"]],
 			["createCanvas", ["CreateCanvasRequest", "CanvasSpecInput", "CanvasElement"]],
 			["getArtifact", ["GetArtifactRequest"]],
 			["applyDiagramPatch", ["ApplyDiagramPatchRequest", "DiagramSelector"]],

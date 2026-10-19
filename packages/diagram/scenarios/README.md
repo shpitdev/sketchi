@@ -73,6 +73,13 @@ and the eval harness use it.
   class or relationship the prompt does not state may appear. The drawn scene
   must show every member, head, dash, multiplicity and role, each label clear
   of every box, line and other label.
+- Org chart scenarios check every stated person by name with their title and
+  department, the manager each reports to (none for the top), every stated
+  assistant and dotted-line report, and department regions when the prompt
+  asks. No person, assistant or dotted line the prompt does not state may
+  appear. The drawn scene must show every card, name, title, reporting line,
+  dotted line and region, with cards apart and lines orthogonal, through no
+  card and never crossing.
 
 Checks that measure the model (logos, sequence structure) score the model's own
 diagram from before candidate enforcement, so a repair never hides a model

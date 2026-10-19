@@ -13,6 +13,7 @@ export const DIAGRAM_TYPES = [
 	"gantt",
 	"er",
 	"class",
+	"org-chart",
 ] as const;
 
 export type DiagramTypeValue = (typeof DIAGRAM_TYPES)[number];

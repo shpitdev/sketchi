@@ -166,6 +166,44 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG renderer",
 		}),
 	);
 
+	it.effect("exports an org chart whose reporting lines share their manager's bus", () =>
+		Effect.gen(function* () {
+			const builder = yield* DiagramBuilder;
+			const renderer = yield* CliPngRenderer;
+			const built = yield* builder.build(
+				canonicalDocument({
+					type: "org-chart",
+					spec: {
+						title: "Startup team",
+						people: [
+							{ id: "ceo", name: "Ada Lovelace", title: "CEO", avatar: true },
+							{
+								id: "ea",
+								name: "Grace Hopper",
+								title: "Assistant",
+								manager: "ceo",
+								assistant: true,
+							},
+							{ id: "cto", name: "Alan Turing", title: "CTO", manager: "ceo" },
+							{ id: "cpo", name: "Radia Perlman", title: "CPO", manager: "ceo" },
+							{ id: "dev", name: "Ken Thompson", title: "Engineer", manager: "cto" },
+						],
+						dottedLines: [{ report: "dev", manager: "cpo" }],
+					},
+				}),
+			);
+			const arrows = built.excalidraw.elements.filter((element) => element["type"] === "arrow");
+			assert.lengthOf(arrows, 5);
+			assert.sameMembers(
+				arrows.map((arrow) => `${String(arrow["strokeStyle"])}>${String(arrow["endArrowhead"])}`),
+				["solid>null", "solid>null", "solid>null", "solid>null", "dashed>arrow"],
+			);
+			const png = yield* renderer.renderPng({ scene: built.scene, excalidraw: built.excalidraw });
+			assert.isAbove(png.byteLength, 1_000);
+			assertInkHasPadding(png);
+		}),
+	);
+
 	it.effect("exports a class diagram whose lines bind elbowed with their UML heads", () =>
 		Effect.gen(function* () {
 			const builder = yield* DiagramBuilder;

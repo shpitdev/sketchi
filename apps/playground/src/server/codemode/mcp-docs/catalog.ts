@@ -33,6 +33,7 @@ const BUILDERS = {
 	buildGantt: "Gantt charts of dated tasks, durations, dependencies and milestones",
 	buildErDiagram: "database schemas: tables, fields, keys and relationships",
 	buildClassDiagram: "UML classes, members and relationships",
+	buildOrgChart: "org charts of people, titles and reporting lines",
 	createCanvas: "hand-placed CanvasSpec, only for layouts no builder covers (dashboard, wireframe)",
 };
 const HELPERS = {
@@ -71,6 +72,9 @@ const ER_CARDINALITY_RULE =
 /** Shared by the buildClassDiagram topic and its compact line in the execute description. */
 const CLASS_KIND_RULE =
 	'kind "inheritance" or "realization": from extends or implements to; "composition" or "aggregation": from is the whole; "association"; "dependency": from uses to. Multiplicities ("1", "0..*") and roles go on compositions, aggregations and associations only.';
+/** Shared by the buildOrgChart topic and its compact line in the execute description. */
+const ORG_CHART_RULE =
+	"manager is the id they report to; only the top person has none (forest: true for several).";
 const CHART_COPY_RULE =
 	"Copy every number, category, series name, unit and axis title from the prompt; invent none.";
 /**
@@ -90,6 +94,7 @@ const FAST_PATH = {
 	buildGantt: `spec: { title, tasks: [{ id, label, start: "YYYY-MM-DD", end? (last day) | duration? (days), milestone?: true, phase?, dependsOn?: [ids finishing first], progress?: % }], phases?, today? }. ${GANTT_DATE_RULE}`,
 	buildErDiagram: `spec: { title, entities: [{ id, fields: ["id uuid PK", "customer_id uuid FK", "email text UK", "note text?"] }], relationships: [{ from: "orders.customer_id", to: "customers.id", fromCardinality: "zero-or-many", toCardinality: "one", label? }] }. ${ER_CARDINALITY_RULE} Copy every table, field, type, key and cardinality stated.`,
 	buildClassDiagram: `spec: { title, classes: [{ id, kind?: "abstract" | "interface" | "enum", attributes?: ["- id: UUID"], methods?: ["+ area(): double {abstract}"] }], relationships: [{ kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }] }. ${CLASS_KIND_RULE} Copy every class, member and relationship stated.`,
+	buildOrgChart: `spec: { title, people: [{ id, name, title?, department?, manager?, assistant?: true }], dottedLines?: [{ report, manager, label?: stated scope }], groupByDepartment? }. ${ORG_CHART_RULE} Copy every person, title, department and line stated.`,
 } satisfies Record<Exclude<keyof typeof BUILDERS, "buildFlowchart" | "createCanvas">, string>;
 const EXECUTE_HELPERS = [
 	HELPERS.searchIcons,
@@ -759,6 +764,37 @@ export const catalog: CatalogEntry[] = [
 		],
 	},
 	{
+		id: "buildOrgChart",
+		kind: "operation",
+		title: "buildOrgChart",
+		topic: "buildOrgChart",
+		keywords: [
+			"org chart",
+			"organization chart",
+			"team structure",
+			"reporting line",
+			"hierarchy",
+			"manager",
+			"direct reports",
+			"dotted line",
+		],
+		snippet: "Create a native org chart from people, their titles and the managers they report to.",
+		content: [
+			"buildOrgChart accepts { spec: { id?, title, people: [{ id, name, title?, department?, manager?, assistant?, avatar? }], dottedLines?: [{ id?, report, manager, label? }], groupByDepartment?, forest? }, options? }. The renderer draws each person as a card of name, title and department, managers above the reports their bus line feeds, long lists of reports stacked in one or two columns, and each department in a color of its own.",
+			`${ORG_CHART_RULE} No reporting line may cycle. assistant: true draws an assistant beside their manager, off the reporting line; an assistant has no reports. avatar: true draws an initials placeholder. Person ids hold no colon.`,
+			'A dotted line joins report to a second manager outside the solid line, drawn dashed with an arrow at that manager; label carries the scope or reason the prompt states for it ("for clinical systems"), drawn beside the line. groupByDepartment: true draws each department below the top as a labeled region.',
+			"Copy every person, title, department, reporting line and dotted line the prompt states; invent none.",
+			operationTypes("buildOrgChart"),
+		].join("\n\n"),
+		examples: [
+			{
+				title: "A startup with an assistant and a dotted line",
+				language: "js",
+				code: `async () => sketchi.buildOrgChart({ spec: { title: "Startup team", people: [{ id: "ceo", name: "Ada Lovelace", title: "CEO" }, { id: "ea", name: "Grace Hopper", title: "Executive Assistant", manager: "ceo", assistant: true }, { id: "cto", name: "Alan Turing", title: "CTO", department: "Engineering", manager: "ceo" }, { id: "dev", name: "Ken Thompson", title: "Engineer", department: "Engineering", manager: "cto" }, { id: "cpo", name: "Radia Perlman", title: "CPO", department: "Product", manager: "ceo" }], dottedLines: [{ report: "dev", manager: "cpo", label: "platform roadmap" }] }, options: ${DELIVERY_OPTIONS} })`,
+			},
+		],
+	},
+	{
 		id: "buildSequenceDiagram",
 		kind: "operation",
 		title: "buildSequenceDiagram",
@@ -817,7 +853,7 @@ export const catalog: CatalogEntry[] = [
 		snippet:
 			"Hand-place a layout no builder covers (dashboard, wireframe) as a versioned CanvasSpec.",
 		content: [
-			"Use createCanvas only for layouts no builder covers, such as dashboards and wireframes. Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); database schemas are ER diagrams (buildErDiagram); object models are class diagrams (buildClassDiagram); topic hierarchies, participant interactions, chronologies and bar, line or pie charts have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
+			"Use createCanvas only for layouts no builder covers, such as dashboards and wireframes. Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); database schemas are ER diagrams (buildErDiagram); object models are class diagrams (buildClassDiagram); team structures are org charts (buildOrgChart); topic hierarchies, participant interactions, chronologies and bar, line or pie charts have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
 			"CanvasSpec supports bound and standalone text, rectangle/ellipse/diamond/circle/polygon shapes, lines and bound connectors with arrowheads, frames, groups, layers, explicit back-to-front zOrder, and deterministic row/column/grid/stack/align/distribute layouts.",
 			"Every element needs a unique stable id. Connectors bind through shape nodeId values; line bindings and text containers use element ids.",
 			"Generic validation enforces size, reference, geometry, and composition invariants. Intentional overlap is allowed.",

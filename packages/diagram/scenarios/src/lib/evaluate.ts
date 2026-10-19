@@ -15,6 +15,11 @@ import { mindmapLayoutCheck, mindmapScenarioChecks } from "./mindmap-scenarios.j
 import { erDrawnCheck, erScenarioChecks } from "./er-scenarios.js";
 import { classClearanceCheck, classDrawnCheck, classScenarioChecks } from "./class-scenarios.js";
 import {
+	orgChartDrawnCheck,
+	orgChartLayoutCheck,
+	orgChartScenarioChecks,
+} from "./org-chart-scenarios.js";
+import {
 	ganttClearanceCheck,
 	ganttDrawnDataCheck,
 	ganttGeometryCheck,
@@ -30,6 +35,7 @@ import {
 	parseStateMachineDiagram,
 	parseErDiagram,
 	parseClassDiagram,
+	parseOrgChartDiagram,
 	parseTimelineDiagram,
 	parseChartDiagram,
 	parseGanttDiagram,
@@ -934,6 +940,18 @@ export function evaluateScenarioDiagram(
 			diagram,
 			classScenarioChecks(scenario, modelDiagram),
 			(scene) => [classDrawnCheck(diagram, scene), classClearanceCheck(scene)],
+		);
+	}
+	if (scenario.diagramType === "org-chart") {
+		const diagram = parseOrgChartDiagram(candidate);
+		const modelDiagram =
+			modelCandidate === candidate ? diagram : parseOrgChartDiagram(modelCandidate);
+		// The drawing and its layout read the scene, so they score the returned diagram.
+		return evaluation(
+			scenario.id,
+			diagram,
+			orgChartScenarioChecks(scenario, modelDiagram),
+			(scene) => [orgChartDrawnCheck(diagram, scene), orgChartLayoutCheck(scene)],
 		);
 	}
 	if (scenario.diagramType === "sequence") {

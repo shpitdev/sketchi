@@ -224,6 +224,7 @@ function buildFailure(result: Extract<BuildResult, { ok: false }>): GenerateFail
 		case "invalid_gantt":
 		case "invalid_er_diagram":
 		case "invalid_class_diagram":
+		case "invalid_org_chart":
 			return failure("invalid_generated_document", issues);
 		case "quality_failed":
 			return failure("quality_failed", issues);
@@ -267,6 +268,8 @@ function buildWithCodeMode(
 			return codeMode.buildErDiagram(request);
 		case "class":
 			return codeMode.buildClassDiagram(request);
+		case "org-chart":
+			return codeMode.buildOrgChart(request);
 	}
 }
 

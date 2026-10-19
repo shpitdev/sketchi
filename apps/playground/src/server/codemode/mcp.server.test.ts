@@ -803,6 +803,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(codeDescription).toMatch(
 				/^- buildClassDiagram: .*"composition" or "aggregation": from is the whole/m,
 			);
+			expect(codeDescription).toMatch(/^- buildOrgChart: .*manager is the id they report to/m);
 			// The head retains builder names; summaries ride on the code parameter.
 			expect(
 				JSON.stringify(
@@ -812,7 +813,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(12_500);
+			).toBeLessThan(12_900);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,

@@ -292,7 +292,8 @@
 				"packages/diagram/core/src/types/state-machine.ts",
 				"packages/diagram/core/src/types/gantt.ts",
 				"packages/diagram/core/src/types/er.ts",
-				"packages/diagram/core/src/types/class.ts"
+				"packages/diagram/core/src/types/class.ts",
+				"packages/diagram/core/src/types/org-chart.ts"
 			],
 			"rules": {
 				"eslint/no-restricted-imports": [

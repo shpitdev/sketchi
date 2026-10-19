@@ -9,6 +9,7 @@ import { renderSequenceDiagram } from "./sequence.js";
 import { renderStateMachineDiagram } from "./state-machine.js";
 import { renderErDiagram } from "./er.js";
 import { renderClassDiagram } from "./class-diagram.js";
+import { renderOrgChartDiagram } from "./org-chart.js";
 
 /** Render any canonical diagram with its family's renderer. */
 export function renderDiagram(diagram: CanonicalDiagram): RenderedDiagramScene {
@@ -31,5 +32,7 @@ export function renderDiagram(diagram: CanonicalDiagram): RenderedDiagramScene {
 			return renderErDiagram(diagram);
 		case "class":
 			return renderClassDiagram(diagram);
+		case "org-chart":
+			return renderOrgChartDiagram(diagram);
 	}
 }

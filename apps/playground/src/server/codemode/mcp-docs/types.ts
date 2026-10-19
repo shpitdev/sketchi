@@ -20,6 +20,9 @@ import {
 	BuildClassDiagramRequestSchema,
 	BuildClassDiagramResultSchema,
 	ClassToolSpecSchema,
+	BuildOrgChartRequestSchema,
+	BuildOrgChartResultSchema,
+	OrgChartToolSpecSchema,
 	BuildTimelineRequestSchema,
 	BuildSequenceDiagramResultSchema,
 	BuildTimelineResultSchema,
@@ -152,6 +155,14 @@ export const codeModeContracts = {
 			spec: ClassToolSpecSchema,
 		}),
 		output: BuildClassDiagramResultSchema,
+	},
+	buildOrgChart: {
+		input: Schema.Struct({
+			...BuildOrgChartRequestSchema.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: OrgChartToolSpecSchema,
+		}),
+		output: BuildOrgChartResultSchema,
 	},
 	createCanvas: {
 		input: CreateCanvasRequestSchema,

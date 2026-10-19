@@ -11,6 +11,7 @@ import {
 	type BuildStateMachineResult,
 	type BuildErDiagramResult,
 	type BuildClassDiagramResult,
+	type BuildOrgChartResult,
 	type BuildTimelineResult,
 	ClassSpec,
 	ErSpec,
@@ -22,6 +23,7 @@ import {
 	TimelineSpec,
 	ChartSpec,
 	GanttSpec,
+	OrgChartSpec,
 } from "./contract.js";
 import type { CodeModeArtifactStorage } from "./artifacts.js";
 import {
@@ -31,6 +33,7 @@ import {
 	buildStateMachine,
 	buildErDiagram,
 	buildClassDiagram,
+	buildOrgChart,
 	buildTimeline,
 	buildChart,
 	buildGantt,
@@ -51,6 +54,7 @@ export const CANONICAL_DOCUMENT_SPECS = {
 	gantt: GanttSpec,
 	er: ErSpec,
 	class: ClassSpec,
+	"org-chart": OrgChartSpec,
 } as const satisfies Record<DiagramTypeValue, unknown>;
 
 /** A canonical diagram document: a family and its authoring spec. */
@@ -70,7 +74,8 @@ export type CanonicalBuildResult =
 	| BuildStateMachineResult
 	| BuildGanttResult
 	| BuildErDiagramResult
-	| BuildClassDiagramResult;
+	| BuildClassDiagramResult
+	| BuildOrgChartResult;
 
 export function isCanonicalDocumentType(value: unknown): value is DiagramTypeValue {
 	return CANONICAL_DOCUMENT_TYPES.some((type) => type === value);
@@ -105,6 +110,8 @@ export function buildCanonicalDocument(
 			return buildErDiagram(request);
 		case "class":
 			return buildClassDiagram(request);
+		case "org-chart":
+			return buildOrgChart(request);
 	}
 }
 
@@ -257,6 +264,21 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 						})),
 					})),
 					relationships: diagram.relationships.map((relationship) => ({ ...relationship })),
+					style: diagram.style,
+				},
+			};
+		case "org-chart":
+			return {
+				type: "org-chart",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					people: diagram.people.map((person) => ({ ...person })),
+					dottedLines: diagram.dottedLines.map((line) => ({ ...line })),
+					...(diagram.groupByDepartment === undefined
+						? {}
+						: { groupByDepartment: diagram.groupByDepartment }),
+					...(diagram.forest === undefined ? {} : { forest: diagram.forest }),
 					style: diagram.style,
 				},
 			};

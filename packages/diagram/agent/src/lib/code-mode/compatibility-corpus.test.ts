@@ -186,6 +186,12 @@ const CLASS_ISSUE_CODE_ADDITIONS = new Set([
 	"invalid_member",
 	"invalid_generalization",
 ]);
+// Org charts add three issue codes.
+const ORG_CHART_ISSUE_CODE_ADDITIONS = new Set([
+	"org_chart_too_large",
+	"invalid_person",
+	"invalid_reporting_line",
+]);
 const CANVAS_ARROWHEAD_ADDITIONS = new Set([
 	"crowfoot_one",
 	"crowfoot_many",
@@ -303,6 +309,7 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		GANTT_ISSUE_CODE_ADDITIONS.has(value) ||
 		ER_ISSUE_CODE_ADDITIONS.has(value) ||
 		CLASS_ISSUE_CODE_ADDITIONS.has(value) ||
+		ORG_CHART_ISSUE_CODE_ADDITIONS.has(value) ||
 		CANVAS_ARROWHEAD_ADDITIONS.has(value)
 	);
 }
@@ -1726,7 +1733,8 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 						!STATE_MACHINE_ISSUE_CODE_ADDITIONS.has(code) &&
 						!GANTT_ISSUE_CODE_ADDITIONS.has(code) &&
 						!ER_ISSUE_CODE_ADDITIONS.has(code) &&
-						!CLASS_ISSUE_CODE_ADDITIONS.has(code),
+						!CLASS_ISSUE_CODE_ADDITIONS.has(code) &&
+						!ORG_CHART_ISSUE_CODE_ADDITIONS.has(code),
 				)
 				.toSorted(),
 		).toEqual([...directlyReachableCodes, ...boundaryOnlyCodes].toSorted());
