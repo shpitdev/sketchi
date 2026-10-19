@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.25.2
+
+### Patch Changes
+
+- [#492](https://github.com/shpitdev/sketchi/pull/492) [`e811feb`](https://github.com/shpitdev/sketchi/commit/e811feb20bb24f3a942a2130f6d7aafe94570ad2) Thanks [@anandpant](https://github.com/anandpant)! - Sequence diagrams accept self-messages: a message whose source is its target, such as an identity provider validating credentials or a service retrying. It draws as a loop out of the participant's lifeline and back on its own row, with its label clear of the lifeline, and a self-call returns into a short nested activation bar. Self-messages never open or answer a call between participants. Diagrams without self-messages render exactly as before.
+
 ## 0.25.1
 
 ### Patch Changes
