@@ -41,7 +41,9 @@ function schema(
 
 /**
  * Schemas that stress the ER layout: twenty tables and over a hundred fields,
- * tables that reference themselves, and join tables fanning out from one hub.
+ * tables that reference themselves, join tables fanning out from one hub, and
+ * a twelve-table workspace whose two hubs each hold four or five ends on one
+ * key row.
  */
 export const erStressFixtures = {
 	marketplace: schema(
@@ -186,6 +188,53 @@ export const erStressFixtures = {
 			["tags.id", "user_tags.tag_id", "one", "zero-or-many"],
 			["events.id", "event_tags.event_id", "one", "zero-or-many"],
 			["tags.id", "event_tags.tag_id", "one", "zero-or-many"],
+		],
+	),
+	saasWorkspace: schema(
+		"saas-workspace",
+		"SaaS workspace",
+		[
+			["organizations", ["id uuid PK", "name text"]],
+			["users", ["id uuid PK", "email text UK", "name text"]],
+			["memberships", ["organization_id uuid PK FK", "user_id uuid PK FK", "role text"]],
+			["projects", ["id uuid PK", "organization_id uuid FK", "name text"]],
+			[
+				"tasks",
+				["id uuid PK", "project_id uuid FK", "assignee_id uuid? FK", "title text", "due_on date?"],
+			],
+			["comments", ["id uuid PK", "task_id uuid FK", "author_id uuid FK", "body text"]],
+			["labels", ["id uuid PK", "organization_id uuid FK", "name text"]],
+			["task_labels", ["task_id uuid PK FK", "label_id uuid PK FK"]],
+			["plans", ["id uuid PK", "name text UK", "monthly_price numeric"]],
+			[
+				"subscriptions",
+				["id uuid PK", "organization_id uuid FK UK", "plan_id uuid FK", "renews_on date"],
+			],
+			[
+				"invoices",
+				["id uuid PK", "subscription_id uuid FK", "amount numeric", "paid_at timestamptz?"],
+			],
+			[
+				"api_keys",
+				["id uuid PK", "organization_id uuid FK", "created_by uuid FK", "token_hash text UK"],
+			],
+		],
+		[
+			["organizations.id", "memberships.organization_id", "one", "one-or-many"],
+			["users.id", "memberships.user_id", "one", "zero-or-many"],
+			["organizations.id", "projects.organization_id", "one", "zero-or-many"],
+			["projects.id", "tasks.project_id", "one", "zero-or-many"],
+			["users.id", "tasks.assignee_id", "zero-or-one", "zero-or-many"],
+			["tasks.id", "comments.task_id", "one", "zero-or-many"],
+			["users.id", "comments.author_id", "one", "zero-or-many"],
+			["organizations.id", "labels.organization_id", "one", "zero-or-many"],
+			["tasks.id", "task_labels.task_id", "one", "zero-or-many"],
+			["labels.id", "task_labels.label_id", "one", "zero-or-many"],
+			["organizations.id", "subscriptions.organization_id", "one", "zero-or-one"],
+			["plans.id", "subscriptions.plan_id", "one", "zero-or-many"],
+			["subscriptions.id", "invoices.subscription_id", "one", "zero-or-many"],
+			["organizations.id", "api_keys.organization_id", "one", "zero-or-many"],
+			["users.id", "api_keys.created_by", "one", "zero-or-many"],
 		],
 	),
 } as const satisfies Record<string, ErDiagram>;

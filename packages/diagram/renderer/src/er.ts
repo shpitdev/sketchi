@@ -52,8 +52,8 @@ const END_RUN = 48;
 const RING_SIZE = 12;
 /** A ring's center sits this far along its line from the table. */
 const RING_DISTANCE = 32;
-/** Past this, a layout's export reads poorly; a candidate pays for any excess. */
-const READABLE_ASPECT = 2.5;
+/** Past this, a layout's export reads as a strip; a candidate pays for any excess. */
+const READABLE_ASPECT = 2;
 const HEADER_FILL = "#efe6ec";
 const KEY_COLOR = "#6a4e5c";
 const TYPE_COLOR = "#6f6656";
@@ -202,12 +202,17 @@ interface PinnedEnd {
 }
 
 /**
- * Ports on one side of a row sit at most this far apart, so two optional
- * ends' rings clear each other, and this far inside the row's band, so no
- * port reads as the line between two rows.
+ * Ports on one side of a row sit at most this far apart, so two ends' bars
+ * or feet (Excalidraw draws each 17 across) stand clear of each other, and
+ * this far inside the row's band, so no port reads as the line between two
+ * rows. Two ends share a row's side cleanly; a third bunches them.
  */
-const PORT_STEP = 14;
-const PORT_MARGIN = 5;
+const PORT_STEP = 22;
+const PORT_MARGIN = 3;
+/** How far across its line an end's bar or foot reaches, with a hair to spare (Excalidraw: 20 sin 25°). */
+const MARK_REACH = 9;
+/** The router holds each port this far from its side's corners (scene's port padding). */
+const CORNER_CLEARANCE = 16;
 /** A row side holding more ends than this hands its farthest to the row's free side. */
 const CROWDED_ROW = 2;
 
@@ -226,9 +231,19 @@ function portOf(end: PinnedEnd, boxes: Boxes): number {
 	return boxes.get(end.link[end.end].entity)!.y + end.y;
 }
 
+/**
+ * Whether two tables stand in one column: their middles meet, give or take
+ * the half unit a column's rounding leaves between tables of odd widths.
+ */
+function sharesColumn(
+	first: { readonly x: number; readonly width: number },
+	second: { readonly x: number; readonly width: number },
+): boolean {
+	return Math.abs(first.x + first.width / 2 - (second.x + second.width / 2)) < 1;
+}
+
 function sameColumn(boxes: Boxes, a: PinnedEnd, b: PinnedEnd): boolean {
-	const [first, second] = [boxes.get(a.link[a.end].entity)!, boxes.get(b.link[b.end].entity)!];
-	return Math.abs(first.x + first.width / 2 - (second.x + second.width / 2)) < 0.5;
+	return sharesColumn(boxes.get(a.link[a.end].entity)!, boxes.get(b.link[b.end].entity)!);
 }
 
 /**
@@ -237,9 +252,7 @@ function sameColumn(boxes: Boxes, a: PinnedEnd, b: PinnedEnd): boolean {
  */
 function insetOf(end: PinnedEnd, boxes: Boxes): number {
 	const box = boxes.get(end.link[end.end].entity)!;
-	const column = [...boxes.values()].filter(
-		(other) => Math.abs(other.x + other.width / 2 - (box.x + box.width / 2)) < 0.5,
-	);
+	const column = [...boxes.values()].filter((other) => sharesColumn(other, box));
 	return end.side === "left"
 		? box.x - Math.min(...column.map((other) => other.x))
 		: Math.max(...column.map((other) => other.x + other.width)) - (box.x + box.width);
@@ -334,7 +347,70 @@ function spreadPorts(ends: readonly PinnedEnd[], boxes: Boxes): Map<PinnedEnd, n
 		const port = portOf(partner, boxes) - (rowOf(end, boxes) - end.row);
 		if (Math.abs(port - end.row) <= half(end)) end.y = port;
 	}
+	// An end alone on its row turns at the end run from its column's edge too,
+	// clear of the marks on any wider table's side in that column.
+	for (const end of ends)
+		if (end.side !== "top" && !runs.has(end) && insetOf(end, boxes) > 0)
+			runs.set(end, insetOf(end, boxes) + END_RUN);
+	const sides = new Map<string, PinnedEnd[]>();
+	for (const end of ends) {
+		if (end.side === "top") continue;
+		const key = `${end.link[end.end].entity}\u0000${end.side}`;
+		sides.set(key, [...(sides.get(key) ?? []), end]);
+	}
+	for (const side of sides.values()) {
+		const { height } = boxes.get(side[0]!.link[side[0]!.end].entity)!;
+		keepClear(
+			side.sort((a, b) => a.row - b.row || a.y - b.y),
+			(end) => Math.max(end.row - half(end), CORNER_CLEARANCE),
+			(end) => Math.min(end.row + half(end), height - CORNER_CLEARANCE),
+		);
+	}
 	return runs;
+}
+
+/**
+ * Hold the ports down one side of a table apart: ports of neighboring rows at
+ * least a mark's reach apart, so no end's bar or foot reaches across another
+ * row's line, and ports of one row as far apart as every port fitting within
+ * its own row's band then allows, up to a port step. Each port moves from
+ * where its row put it only as far as that takes, and none comes nearer a
+ * corner than the router allows. `side` runs top to bottom.
+ */
+function keepClear(
+	side: readonly PinnedEnd[],
+	lowest: (end: PinnedEnd) => number,
+	highest: (end: PinnedEnd) => number,
+): void {
+	if (side.length < 2) return;
+	const apart = (gap: number, index: number) =>
+		side[index]!.row === side[index - 1]!.row ? gap : Math.max(gap, MARK_REACH);
+	const fits = (gap: number) => {
+		let port = -Infinity;
+		for (const [index, end] of side.entries()) {
+			port = Math.max(lowest(end), index > 0 ? port + apart(gap, index) : port);
+			if (port > highest(end) + 1e-9) return false;
+		}
+		return true;
+	};
+	let [low, high] = [0, PORT_STEP];
+	if (fits(high)) low = high;
+	else
+		for (let round = 0; round < 24; round += 1) {
+			const middle = (low + high) / 2;
+			if (fits(middle)) low = middle;
+			else high = middle;
+		}
+	// The lowest each port may sit and still leave room for the ports below it.
+	const latest = side.map(highest);
+	for (let index = side.length - 2; index >= 0; index -= 1)
+		latest[index] = Math.min(latest[index]!, latest[index + 1]! - apart(low, index + 1));
+	let previous = -Infinity;
+	for (const [index, end] of side.entries()) {
+		const earliest = index > 0 ? previous + apart(low, index) : -Infinity;
+		end.y = Math.min(Math.max(end.y, lowest(end), earliest), latest[index]!);
+		previous = end.y;
+	}
 }
 
 /** Each end of a placement's links, on the side the placement gives it. */
@@ -407,23 +483,25 @@ function routedScene(
 }
 
 /**
- * Placements to try, each routed in full: the cheapest columns, the same aiming
- * nearer square, from a start centered on the most linked table, and keeping
- * linked tables out of a shared column. Larger schemas try the first two only.
+ * Placements to try, each routed in full: from a layered start and from one
+ * centered on the most linked table, each aiming at a few shapes from wide to
+ * tall, and one that stacks linked tables freely, which suits a schema of a
+ * few tables. Larger schemas try the first two only.
  */
 const PLACEMENTS: readonly ErPlacementOptions[] = [
-	{},
-	{ aspect: 1.1 },
-	{ start: "hub" },
-	{ start: "hub", aspect: 1.1 },
-	{ sameColumn: 5 },
+	...(["layered", "hub"] as const).flatMap((start) =>
+		[1.6, 1.1, 0.7, 0.5].map((aspect) => ({ start, aspect, sameColumn: 1 })),
+	),
+	{ aspect: 0.5, sameColumn: 0 },
 ];
 const LARGE_SCHEMA = 24;
 const PLACEMENT_MARGIN = 0.75;
 
 /**
  * Crossings plus reader-scale findings, judged at the scene's export size, any
- * too-long side, and half a point per two ports bunched closer than a step.
+ * too-long side, each bunch of ports closer than a step, and each end that
+ * wraps around its own table, about what a reader counts as a flaw each; and
+ * a little for each table a line within a column runs past.
  */
 function routedCost(scene: RenderedDiagramScene): number {
 	const arrows = scene.elements.filter((e): e is ArrowSceneElement => e.type === "arrow");
@@ -441,11 +519,72 @@ function routedCost(scene: RenderedDiagramScene): number {
 		).length +
 		(aspect > READABLE_ASPECT ? 4 * (aspect - READABLE_ASPECT) : 0) +
 		arrows.reduce((sum, arrow) => sum + detour(arrow), 0) +
-		bunchedPorts(arrows) / 2
+		bunchedPorts(arrows) +
+		wraps(scene, arrows) +
+		PASSED_TABLE * passedTables(scene, arrows)
 	);
 }
 
-/** Pairs of neighboring ports on one side of a table nearer than a port step. */
+/** Cost of each table a line within a column runs past beside it. */
+const PASSED_TABLE = 0.25;
+
+/**
+ * Tables a line between two tables of one column runs past: those standing
+ * between its two in that column, each a stretch the reader follows beside.
+ */
+function passedTables(scene: RenderedDiagramScene, arrows: readonly ArrowSceneElement[]): number {
+	const boxes = scene.elements.flatMap((element) => (element.type === "node" ? [element] : []));
+	const byId = new Map(boxes.map((box) => [box.nodeId, box]));
+	let count = 0;
+	for (const arrow of arrows) {
+		const [source, target] = [byId.get(arrow.sourceNodeId), byId.get(arrow.targetNodeId)];
+		if (!source || !target || source === target) continue;
+		if (!(source.x < target.x + target.width && target.x < source.x + source.width)) continue;
+		const [low, high] = [
+			Math.min(source.y + source.height, target.y + target.height),
+			Math.max(source.y, target.y),
+		];
+		count += boxes.filter(
+			(box) =>
+				box !== source &&
+				box !== target &&
+				box.y >= low &&
+				box.y + box.height <= high &&
+				box.x < Math.max(source.x + source.width, target.x + target.width) &&
+				Math.min(source.x, target.x) < box.x + box.width,
+		).length;
+	}
+	return count;
+}
+
+/**
+ * Ends that leave their table on the side away from a table in another
+ * column, so the line wraps around its own table to get there.
+ */
+function wraps(scene: RenderedDiagramScene, arrows: readonly ArrowSceneElement[]): number {
+	const boxes = new Map(
+		scene.elements.flatMap((element) =>
+			element.type === "node" ? [[element.nodeId, element] as const] : [],
+		),
+	);
+	let count = 0;
+	for (const arrow of arrows) {
+		const [source, target] = [boxes.get(arrow.sourceNodeId), boxes.get(arrow.targetNodeId)];
+		if (!source || !target) continue;
+		if (source.x < target.x + target.width && target.x < source.x + source.width) continue;
+		for (const [tip, next, other] of [
+			[arrow.points[0], arrow.points[1]!, arrow.points.at(-1)!],
+			[arrow.points.at(-1)!, arrow.points.at(-2)!, arrow.points[0]],
+		] as const)
+			if ((next.x - tip.x) * (other.x - tip.x) < 0) count += 1;
+	}
+	return count;
+}
+
+/**
+ * Runs of ports on one side of a table nearer than a port step: a reader
+ * sees each run as one bunch of marks, a little worse for each further port.
+ */
 function bunchedPorts(arrows: readonly ArrowSceneElement[]): number {
 	const sides = new Map<string, number[]>();
 	for (const arrow of arrows)
@@ -456,13 +595,17 @@ function bunchedPorts(arrows: readonly ArrowSceneElement[]): number {
 			const key = `${node}\u0000${Math.round(point.x)}`;
 			sides.set(key, [...(sides.get(key) ?? []), point.y]);
 		}
-	let pairs = 0;
+	let bunches = 0;
 	for (const ports of sides.values()) {
 		ports.sort((a, b) => a - b);
-		for (const [index, port] of ports.slice(1).entries())
-			if (port - ports[index]! < PORT_STEP - 0.01) pairs += 1;
+		let inBunch = false;
+		for (const [index, port] of ports.slice(1).entries()) {
+			const near = port - ports[index]! < PORT_STEP - 0.01;
+			if (near) bunches += inBunch ? 0.25 : 1;
+			inBunch = near;
+		}
 	}
-	return pairs;
+	return bunches;
 }
 
 /** How much longer than the way between its ends a line runs, past a little slack. */
@@ -499,7 +642,9 @@ function bestScene(
 	}));
 	const options = diagram.entities.length > LARGE_SCHEMA ? PLACEMENTS.slice(0, 2) : PLACEMENTS;
 	const tried = new Set<string>();
-	let best: { cost: number; scene: RenderedDiagramScene; placement: ErPlacement } | undefined;
+	let best:
+		| { cost: number; score: number; scene: RenderedDiagramScene; placement: ErPlacement }
+		| undefined;
 	for (const option of options) {
 		const placement = placeErTables(layoutTables, layoutLinks, END_RUN, option);
 		const key = JSON.stringify([...placement.boxes, ...placement.sides]);
@@ -507,8 +652,9 @@ function bestScene(
 		tried.add(key);
 		const scene = routedScene(diagram, tables, links, placement, pinnedEnds(links, placement));
 		const cost = routedCost(scene);
-		// Another placement must beat the cheapest columns clearly, not by a fraction.
-		if (!best || cost < best.cost - PLACEMENT_MARGIN) best = { cost, scene, placement };
+		// Another placement must beat the first, layered one clearly, not by a fraction.
+		const score = best ? cost : cost - PLACEMENT_MARGIN;
+		if (!best || score < best.score) best = { cost, score, scene, placement };
 		if (cost === 0) break;
 	}
 	// The chosen placement also tries its crowded rows spilled to their free sides.

@@ -182,6 +182,75 @@ function routingCounts(scene: RenderedDiagramScene) {
 	};
 }
 
+/**
+ * Ends whose bar or foot another line runs through, other than a neighbor's
+ * on the same row of the same table: Excalidraw draws each head min(20, run / 2)
+ * long and 20 sin 25° either side of its line. A row holding more ends than
+ * its band spaces a mark apart may bunch them, but no line from another row,
+ * or passing by, may cross a mark.
+ */
+function foreignMarks(scene: RenderedDiagramScene): string[] {
+	const arrows = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
+	const tables = new Map(
+		scene.elements.flatMap((element) =>
+			element.type === "node" && element.id === `node:${element.nodeId}`
+				? [[element.nodeId, element] as const]
+				: [],
+		),
+	);
+	const rowAt = (node: string, y: number) => {
+		const box = tables.get(node)!;
+		return y - box.y < 40 ? -1 : Math.floor((y - box.y - 46) / 28);
+	};
+	const through = (
+		points: readonly { x: number; y: number }[],
+		box: { x0: number; x1: number; y0: number; y1: number },
+	) =>
+		points.slice(1).some((q, index) => {
+			const p = points[index]!;
+			return (
+				Math.max(p.x, q.x) > box.x0 + 0.01 &&
+				Math.min(p.x, q.x) < box.x1 - 0.01 &&
+				Math.max(p.y, q.y) > box.y0 + 0.01 &&
+				Math.min(p.y, q.y) < box.y1 - 0.01
+			);
+		});
+	return arrows.flatMap((arrow) =>
+		(
+			[
+				[arrow.points[0], arrow.points[1]!, arrow.sourceNodeId],
+				[arrow.points.at(-1)!, arrow.points.at(-2)!, arrow.targetNodeId],
+			] as const
+		).flatMap(([tip, next, node]) => {
+			const run = Math.hypot(next.x - tip.x, next.y - tip.y);
+			const size = Math.min(20, run / 2);
+			const reach = size * Math.sin((25 * Math.PI) / 180);
+			const [dx, dy] = [(next.x - tip.x) / run, (next.y - tip.y) / run];
+			const box = {
+				x0: Math.min(tip.x, tip.x + dx * size) - Math.abs(dy) * reach,
+				x1: Math.max(tip.x, tip.x + dx * size) + Math.abs(dy) * reach,
+				y0: Math.min(tip.y, tip.y + dy * size) - Math.abs(dx) * reach,
+				y1: Math.max(tip.y, tip.y + dy * size) + Math.abs(dx) * reach,
+			};
+			return arrows.flatMap((other) => {
+				if (other === arrow || !through(other.points, box)) return [];
+				const neighbor = (
+					[
+						[other.points[0], other.sourceNodeId],
+						[other.points.at(-1)!, other.targetNodeId],
+					] as const
+				).some(
+					([point, otherNode]) =>
+						otherNode === node &&
+						Math.abs(point.x - tip.x) < 0.5 &&
+						rowAt(node, point.y) === rowAt(node, tip.y),
+				);
+				return neighbor ? [] : [`${arrow.edgeId}'s mark at ${node} crossed by ${other.edgeId}`];
+			});
+		}),
+	);
+}
+
 /** Everything the export validator, the canvas validator or the layout guards would flag. */
 function defects(diagram: ErDiagram): string[] {
 	const scene = renderDiagram(diagram);
@@ -230,6 +299,7 @@ function defects(diagram: ErDiagram): string[] {
 		...overlapping,
 		...diagonal,
 		...unwrapped,
+		...foreignMarks(scene),
 	];
 }
 
@@ -239,7 +309,7 @@ function defects(diagram: ErDiagram): string[] {
  * may draw more crossings, nor more crossings and findings together, and
  * together they may draw no more of either.
  */
-const ER_ROUTING = "4/3 0/0 0/0 0/0 0/0 2/2 0/0 1/0 0/0 0/0 0/2 0/0 1/1 3/1 0/0 2/0";
+const ER_ROUTING = "1/2 0/0 0/0 0/0 0/0 1/0 0/0 0/1 0/0 0/0 0/0 1/0 0/0 0/0 0/0 0/0";
 
 /** Schemas checked in CI; the full fuzz runs locally with ER_FUZZ=full (and any ER_FUZZ_SEED). */
 const CI_SCHEMAS = 16;
@@ -251,7 +321,7 @@ describe("ER routing fuzz", () => {
 		Number(process.env["ER_FUZZ_SEED"] ?? 20261019),
 	);
 
-	it("exports every random schema valid, orthogonal, unwrapped and with tables apart", () => {
+	it("exports every random schema valid, orthogonal, unwrapped, with tables and marks apart", () => {
 		const failures = schemas.flatMap((schema, index) =>
 			defects(schema).map((defect) => `${index}: ${defect}`),
 		);

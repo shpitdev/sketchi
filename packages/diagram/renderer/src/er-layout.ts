@@ -2,8 +2,10 @@
  * Where an ER diagram's tables go. Tables stand in columns, and each
  * relationship runs between neighboring columns where it can, its referenced
  * table to the left of the one that holds the foreign key. Columns stay about
- * as tall as the whole layout is wide over 1.6, and tables slide up or down so
- * the rows a relationship joins sit level and its line runs straight.
+ * as tall as the whole layout is wide over its aspect, tables move between
+ * columns while that leaves fewer crossings once each column is ordered, and
+ * tables slide up or down so the rows a relationship joins sit level and its
+ * line runs straight.
  */
 
 /** A table to place: its size. */
@@ -32,9 +34,9 @@ export type ErSide = "left" | "right";
 
 /**
  * Choices behind one candidate placement. The renderer routes a few and keeps
- * the one that crosses least: the cheapest columns from a layered start; the
- * same from a start centered on the most linked table, its links spread to both
- * sides; and one that keeps linked tables out of a shared column.
+ * the one that reads best: columns from a layered start or from one centered
+ * on the most linked table, its links spread to both sides, each aiming at a
+ * shape, and one that lets linked tables share a column freely.
  */
 export interface ErPlacementOptions {
 	readonly start?: "layered" | "hub";
@@ -75,6 +77,10 @@ const OVERFLOW = 1.5;
  * spreads its links over both sides instead of fanning them all from one.
  */
 const FAN = 0.4;
+/** Cost of each end past the second on one side of one row, where their marks would bunch. */
+const CROWD = 1;
+/** Cost of each crossing the order within columns leaves. */
+const CROSSING = 1;
 /** How much wider than its target a layout may run before its width costs anything. */
 const WIDTH_ALLOWANCE = 1.25;
 /** A gap between columns as the column search estimates it. */
@@ -82,6 +88,8 @@ const ESTIMATED_GAP = 150;
 /** How much further each line turning the same way out of one row runs before it turns, so none share a vertical run. */
 export const ER_FAN_STEP = 32;
 const MAX_ROUNDS = 40;
+/** Rounds of the column search that counts crossings, each ordering every candidate's columns. */
+const CROSSING_ROUNDS = 8;
 const ORDER_SWEEPS = 8;
 const ALIGN_SWEEPS = 12;
 
@@ -192,17 +200,22 @@ function layoutCost(
 ): number {
 	let cost = 0;
 	// Links leaving each side of each table: right toward later columns, left toward earlier.
-	const sides = new Map<string, number>();
-	const leave = (node: number, toward: number) => {
-		const side = `${node}:${toward >= column[node]! ? "right" : "left"}`;
+	const sides = new Map<number, number>();
+	const rows = new Map<number, number>();
+	const leave = (node: number, toward: number, y: number) => {
+		const side = 2 * node + (toward >= column[node]! ? 1 : 0);
 		sides.set(side, (sides.get(side) ?? 0) + 1);
+		// Rows sit whole or half pixels from their table's top.
+		const row = side * 1e6 + Math.round(2 * y);
+		rows.set(row, (rows.get(row) ?? 0) + 1);
 	};
-	for (const { parent, child } of graph.pairs) {
+	for (const { parent, child, link } of graph.pairs) {
 		cost += linkCost(column[parent]!, column[child]!, sameColumn);
-		leave(parent, column[child]!);
-		leave(child, column[parent]!);
+		leave(parent, column[child]!, link.parentY);
+		leave(child, column[parent]!, link.childY);
 	}
 	for (const count of sides.values()) cost += (FAN * count * (count - 1)) / 2;
+	for (const count of rows.values()) cost += CROWD * Math.max(0, count - 2);
 	const heights = new Map<number, number>();
 	const widths = new Map<number, number>();
 	for (const [node, table] of graph.tables.entries()) {
@@ -275,37 +288,65 @@ function hubColumns(graph: Graph): number[] {
 	return column.map((value) => value ?? 0);
 }
 
-/** Move one table at a time to the column that lowers the cost most, until none does. */
-function assignColumns(graph: Graph, options: ErPlacementOptions): number[] {
-	const target = targetFor(graph, options.aspect);
-	const sameColumn = options.sameColumn ?? SAME_COLUMN;
-	const column = options.start === "hub" ? hubColumns(graph) : initialColumns(graph);
+/**
+ * Move one table at a time to the column that lowers `cost` most, until none
+ * does or the rounds run out: each table tries the columns near its own and
+ * its neighbors', an unlinked table any column.
+ */
+function descend(
+	graph: Graph,
+	column: number[],
+	rounds: number,
+	cost: (column: readonly number[]) => number,
+): void {
 	const neighbors = neighborSets(graph);
 	const visitOrder = graph.tables
 		.map((_, node) => node)
 		.sort((a, b) => neighbors[b]!.size - neighbors[a]!.size || a - b);
-	let cost = layoutCost(graph, column, target, sameColumn);
-	for (let round = 0; round < MAX_ROUNDS; round += 1) {
+	let current = cost(column);
+	for (let round = 0; round < rounds; round += 1) {
 		let improved = false;
 		for (const node of visitOrder) {
-			const current = column[node]!;
-			const candidates = new Set([current - 2, current - 1, current + 1, current + 2]);
+			const from = column[node]!;
+			const candidates = new Set([from - 2, from - 1, from + 1, from + 2]);
 			for (const other of neighbors[node]!)
 				for (const delta of [-1, 0, 1]) candidates.add(column[other]! + delta);
-			// An unlinked table may join any column.
 			if (neighbors[node]!.size === 0) for (const value of column) candidates.add(value);
-			candidates.delete(current);
-			let best = current;
+			candidates.delete(from);
+			let best = from;
 			for (const candidate of [...candidates].sort((a, b) => a - b)) {
 				column[node] = candidate;
-				const next = layoutCost(graph, column, target, sameColumn);
-				if (next < cost - 1e-9) [best, cost] = [candidate, next];
+				const next = cost(column);
+				if (next < current - 1e-9) [best, current] = [candidate, next];
 			}
 			column[node] = best;
-			if (best !== current) improved = true;
+			if (best !== from) improved = true;
 		}
 		if (!improved) break;
 	}
+}
+
+/**
+ * Columns for each table: the cheapest by the links' spans, sides and the
+ * layout's shape, then the cheapest once the crossings left after ordering
+ * each candidate's columns count too.
+ */
+function assignColumns(graph: Graph, options: ErPlacementOptions): number[] {
+	const target = targetFor(graph, options.aspect);
+	const sameColumn = options.sameColumn ?? SAME_COLUMN;
+	const column = options.start === "hub" ? hubColumns(graph) : initialColumns(graph);
+	descend(graph, column, MAX_ROUNDS, (values) => layoutCost(graph, values, target, sameColumn));
+	const crossings = new Map<string, number>();
+	descend(graph, column, CROSSING_ROUNDS, (values) => {
+		const compacted = compact(values);
+		const key = compacted.join(",");
+		let count = crossings.get(key);
+		if (count === undefined) {
+			count = orderColumns(layersOf(graph, compacted), false).crossings;
+			crossings.set(key, count);
+		}
+		return layoutCost(graph, values, target, sameColumn) + CROSSING * count;
+	});
 	return compact(column);
 }
 
@@ -378,31 +419,63 @@ function stackOffsets(layers: Layers, items: readonly number[]): number[] {
 /** Stack each column's items in order, gap apart, centered on 0. */
 function stacked(layers: Layers, columns: readonly number[][]): number[] {
 	const top = layers.column.map(() => 0);
-	for (const items of columns) {
-		const offsets = stackOffsets(layers, items);
-		const height = items.length > 0 ? offsets.at(-1)! + layers.height[items.at(-1)!]! : 0;
-		for (const [index, item] of items.entries()) top[item] = offsets[index]! - height / 2;
-	}
+	for (const items of columns) restack(layers, top, items);
 	return top;
 }
 
-/** Segments crossing between neighboring columns, each drawn straight from end to end. */
+/** Stack one column's items in order, gap apart, centered on 0. */
+function restack(layers: Layers, top: number[], items: readonly number[]): void {
+	const offsets = stackOffsets(layers, items);
+	const height = items.length > 0 ? offsets.at(-1)! + layers.height[items.at(-1)!]! : 0;
+	for (const [index, item] of items.entries()) top[item] = offsets[index]! - height / 2;
+}
+
+/**
+ * Segments crossing between neighboring columns, each drawn straight from end
+ * to end, and the lines each link within a column crosses: those leaving the
+ * column between its two rows, on the side with fewer of them.
+ */
 function orderCrossings(layers: Layers, top: readonly number[]): number {
-	const runs = new Map<number, { left: number; right: number }[]>();
+	const runs = new Map<number, number[]>();
+	// Where segments leave each column, by side: column * 2 toward the column before, + 1 after.
+	const ends = new Map<number, number[]>();
+	const loops: number[] = [];
+	const leave = (column: number, after: boolean, y: number) => {
+		const key = 2 * column + (after ? 1 : 0);
+		const list = ends.get(key);
+		if (list) list.push(y);
+		else ends.set(key, [y]);
+	};
 	for (const { a, b, aY, bY } of layers.segments) {
 		const [ca, cb] = [layers.column[a]!, layers.column[b]!];
-		if (ca === cb) continue;
-		const [gap, left, right] =
-			ca < cb ? [ca, top[a]! + aY, top[b]! + bY] : [cb, top[b]! + bY, top[a]! + aY];
-		const list = runs.get(gap) ?? [];
-		list.push({ left, right });
-		runs.set(gap, list);
+		const [ya, yb] = [top[a]! + aY, top[b]! + bY];
+		if (ca === cb) {
+			loops.push(ca, Math.min(ya, yb), Math.max(ya, yb));
+			continue;
+		}
+		leave(ca, cb > ca, ya);
+		leave(cb, ca > cb, yb);
+		const gap = Math.min(ca, cb);
+		const list = runs.get(gap);
+		const run = ca < cb ? [ya, yb] : [yb, ya];
+		if (list) list.push(...run);
+		else runs.set(gap, run);
 	}
 	let crossings = 0;
 	for (const list of runs.values())
-		for (const [index, run] of list.entries())
-			for (const other of list.slice(index + 1))
-				if ((run.left - other.left) * (run.right - other.right) < 0) crossings += 1;
+		for (let index = 0; index < list.length; index += 2)
+			for (let other = index + 2; other < list.length; other += 2)
+				if ((list[index]! - list[other]!) * (list[index + 1]! - list[other + 1]!) < 0)
+					crossings += 1;
+	for (let index = 0; index < loops.length; index += 3) {
+		const [column, low, high] = [loops[index]!, loops[index + 1]!, loops[index + 2]!];
+		const crossed = (after: number) => {
+			let count = 0;
+			for (const y of ends.get(2 * column + after) ?? []) if (y > low && y < high) count += 1;
+			return count;
+		};
+		crossings += Math.min(crossed(0), crossed(1));
+	}
 	return crossings;
 }
 
@@ -419,10 +492,15 @@ function neighborsOf(layers: Layers) {
 interface Stack {
 	readonly columns: readonly number[][];
 	readonly top: number[];
+	readonly crossings: number;
 }
 
-/** Order each column by where its items' neighbors sit, keeping the order with the fewest crossings. */
-function orderColumns(layers: Layers): Stack {
+/**
+ * Order each column by where its items' neighbors sit, keeping the order with
+ * the fewest crossings, then, with `swaps`, swap neighbors while that removes
+ * more; the column search leaves the swaps out to stay quick.
+ */
+function orderColumns(layers: Layers, swaps = true): Stack {
 	const count = Math.max(...layers.column) + 1;
 	let columns = Array.from({ length: count }, () => [] as number[]);
 	for (const [item, at] of layers.column.entries()) columns[at]!.push(item);
@@ -450,7 +528,7 @@ function orderColumns(layers: Layers): Stack {
 			columns[at] = [...columns[at]!].sort(
 				(a, b) => key.get(a)! - key.get(b)! || top[a]! - top[b]!,
 			);
-			top = stacked(layers, columns);
+			restack(layers, top, columns[at]);
 		}
 		const crossings = orderCrossings(layers, top);
 		if (crossings < best.crossings)
@@ -460,7 +538,7 @@ function orderColumns(layers: Layers): Stack {
 	// Then swap neighbors in a column while that removes crossings.
 	top = stacked(layers, columns);
 	let crossings = orderCrossings(layers, top);
-	for (let improved = crossings > 0; improved;) {
+	for (let improved = swaps && crossings > 0; improved;) {
 		improved = false;
 		for (const items of columns)
 			for (let index = 0; index + 1 < items.length; index += 1) {
@@ -472,7 +550,7 @@ function orderColumns(layers: Layers): Stack {
 				} else [items[index], items[index + 1]] = [items[index + 1]!, items[index]!];
 			}
 	}
-	return { columns, top: stacked(layers, columns) };
+	return { columns, top: stacked(layers, columns), crossings };
 }
 
 /**
