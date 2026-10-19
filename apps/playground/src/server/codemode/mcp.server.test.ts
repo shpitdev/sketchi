@@ -811,6 +811,10 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(codeDescription).toContain(
 				'Every reply the prompt states, including a redirect back to the caller, is its own type: "return" message',
 			);
+			// Without this, Sonnet boxes nodes stated "outside the cluster" in an invented "Outside" zone.
+			expect(codeDescription).toContain(
+				'others stay ungrouped, with no invented group such as "External" or "Outside".',
+			);
 			expect(codeDescription).toContain(getCodeModeDocs({ topic: "buildFlowchart" }).content);
 			expect(codeDescription).not.toMatch(/^type Build(?!Flowchart|Options)/m);
 			expect(codeDescription).toMatch(
