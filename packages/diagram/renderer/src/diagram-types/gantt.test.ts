@@ -18,7 +18,7 @@ import {
 	layoutGanttDiagram,
 	renderGanttDiagram,
 } from "../gantt.js";
-import { ROUTE_BUDGET, ROUTE_CHART_BUDGET } from "../gantt-routing.js";
+import { ROUTE_BUDGET, ROUTE_CHART_BUDGET, ROUTE_KINK_BUDGET } from "../gantt-routing.js";
 import { readGanttScene } from "../gantt-readout.js";
 import { ganttAxis } from "../gantt-scale.js";
 import type { RenderedDiagramScene, SceneElement, ScenePoint } from "../scene.js";
@@ -77,19 +77,19 @@ function expectReadableGantt(
 	const context = diagram.id;
 	expect(getCanvasValidationIssues(scene), context).toEqual([]);
 	// Routing work is bounded however crowded the plan: per layout, each dependency is placed,
-	// tried once more in another arrival order, and rerouted at most twice, within the chart's and
-	// the repairs' search budgets (each may overrun by one route's last search); a chart whose
-	// routes still meet is laid out at most twice more.
+	// tried in at most two more arrival plans, and rerouted at most twice, within the chart's and
+	// the repairs' search budgets (each may overrun by one route's last search) and the budget for
+	// weighing kinks; a chart whose routes still meet is laid out at most twice more.
 	const dependencyCount = diagram.tasks.reduce(
 		(sum, task) => sum + (task.dependsOn?.length ?? 0),
 		0,
 	);
 	expect(work.layouts, `${context} layouts`).toBeLessThanOrEqual(3);
 	expect(work.placements, `${context} placements`).toBeLessThanOrEqual(
-		4 * dependencyCount * work.layouts,
+		5 * dependencyCount * work.layouts,
 	);
 	expect(work.expansions, `${context} search steps`).toBeLessThanOrEqual(
-		(ROUTE_CHART_BUDGET + REPAIR_BUDGET + 2 * ROUTE_BUDGET) * work.layouts,
+		(ROUTE_CHART_BUDGET + REPAIR_BUDGET + 2 * ROUTE_BUDGET + ROUTE_KINK_BUDGET) * work.layouts,
 	);
 	const readout = readGanttScene(scene);
 	// Ticks are nice and cover the plan; bars sit on their dates.
@@ -282,6 +282,50 @@ function distinctProblems(scene: RenderedDiagramScene, strict: boolean): string[
 	return problems;
 }
 
+/** Pairs of routes that cross: a run of one through the interior of a run of the other. */
+function crossings(routes: readonly { from: string; to: string; points: readonly ScenePoint[] }[]) {
+	const runsOf = (points: readonly ScenePoint[]) =>
+		points.slice(1).map((to, index) => ({ from: points[index]!, to }));
+	return routes.flatMap((route, index) =>
+		routes.slice(index + 1).flatMap((other) =>
+			runsOf(route.points).some((a) =>
+				runsOf(other.points).some((b) => {
+					if (isHorizontal(a) === isHorizontal(b)) return false;
+					const [h, v] = isHorizontal(a) ? [a, b] : [b, a];
+					return (
+						v.from.x > Math.min(h.from.x, h.to.x) + 0.5 &&
+						v.from.x < Math.max(h.from.x, h.to.x) - 0.5 &&
+						h.from.y > Math.min(v.from.y, v.to.y) + 0.5 &&
+						h.from.y < Math.max(v.from.y, v.to.y) - 0.5
+					);
+				}),
+			)
+				? [`${route.from}->${route.to} crosses ${other.from}->${other.to}`]
+				: [],
+		),
+	);
+}
+
+/** How often a route turns. */
+function turns(points: readonly ScenePoint[]): number {
+	const runs = points.slice(1).map((to, index) => ({ from: points[index]!, to }));
+	return runs.filter(
+		(run, index) => index > 0 && isHorizontal(run) !== isHorizontal(runs[index - 1]!),
+	).length;
+}
+
+/** Steps in a route: a run shorter than 28 px between two parallel runs. */
+function steps(points: readonly ScenePoint[]): number[] {
+	const runs = points.slice(1).map((to, index) => ({ from: points[index]!, to }));
+	return runs.flatMap((run, index) => {
+		const [before, after] = [runs[index - 1], runs[index + 1]];
+		const length = Math.abs(run.to.x - run.from.x) + Math.abs(run.to.y - run.from.y);
+		return before && after && isHorizontal(before) === isHorizontal(after) && length < 28
+			? [Math.round(length * 10) / 10]
+			: [];
+	});
+}
+
 /**
  * Whether a route doubles back: some run goes left of both its predecessor's start and the
  * corridor just before its successor's start.
@@ -448,6 +492,49 @@ describe("Gantt renderer", () => {
 			},
 		]);
 		expectReadableGantt(diagram);
+	});
+
+	it("runs dependencies out of one milestone down one trunk, branching off without crossing", () => {
+		// Review: three routes out of a sign-off milestone each found their own way down and crossed
+		// twice.
+		const diagram = plan([
+			{ id: "prep", label: "Preparation work", start: "2026-03-02", end: "2026-03-13" },
+			{ id: "gate", label: "Gate", start: "2026-03-16", milestone: true, dependsOn: ["prep"] },
+			{ id: "c1", label: "Catalog", start: "2026-03-18", duration: 10, dependsOn: ["gate"] },
+			{ id: "c2", label: "Orders", start: "2026-03-18", duration: 20, dependsOn: ["gate"] },
+			{ id: "c3", label: "Clickstream", start: "2026-03-23", duration: 8, dependsOn: ["gate"] },
+		]);
+		const routes = readGanttScene(expectReadableGantt(diagram)).dependencies;
+		const fanned = routes.filter((route) => route.from === "gate");
+		for (const route of fanned) {
+			expect(route.points[0], route.to).toEqual(fanned[0]!.points[0]);
+			expect(turns(route.points), route.to).toBe(1);
+		}
+		expect(crossings(routes)).toEqual([]);
+	});
+
+	it("drops straight into a successor starting under its predecessor's end, or turns once into its side", () => {
+		// Review: these drew a small step just before each arrowhead.
+		const diagram = plan([
+			{ id: "a", label: "Workstream 1", start: "2026-01-05", duration: 4 },
+			{ id: "b", label: "Workstream 2", start: "2026-01-08", duration: 6, dependsOn: ["a"] },
+			{ id: "c", label: "Architecture", start: "2026-01-26", duration: 10, dependsOn: ["b"] },
+			{ id: "d", label: "Approved", start: "2026-02-06", milestone: true, dependsOn: ["c"] },
+		]);
+		const routes = readGanttScene(expectReadableGantt(diagram)).dependencies;
+		const route = (to: string) => routes.find((entry) => entry.to === to)!.points;
+		expect(turns(route("b")), "a->b").toBe(0);
+		expect(turns(route("d")), "c->d").toBe(1);
+		for (const { to, points } of routes) expect(steps(points), to).toEqual([]);
+	});
+
+	it("keeps a plain elbow however the search first reaches its turn", () => {
+		// Review: two ways into one point and heading were kept as one, the cheaper so far, though
+		// the dearer had turned long enough before to bend again without a kink. t19 -> t23 took a
+		// 25 px step that a cheaper route avoided.
+		const routes = readGanttScene(expectReadableGantt(scheduledGantt(4))).dependencies;
+		const route = routes.find((entry) => entry.from === "t19" && entry.to === "t23")!;
+		expect(steps(route.points)).toEqual([]);
 	});
 
 	it("groups rows under phase headers in phase order, with phase spans in the date column", () => {

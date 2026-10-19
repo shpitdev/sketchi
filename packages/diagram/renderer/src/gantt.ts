@@ -29,10 +29,14 @@ import {
 	ROUTE_BUDGET,
 	ROUTE_CHART_BUDGET,
 	ROUTE_CHART_BUDGET_PER_ROUTE,
+	ROUTE_KINK_BUDGET,
+	ROUTE_KINK_BUDGET_PER_ROUTE,
 	ROUTE_LEAD,
 	ROUTE_VERTICAL_APPROACH,
+	collinear,
 	routeApproach,
 	routeHead,
+	routeKinkCost,
 	routeOrthogonal,
 	routeSegments,
 	type RouteDirection,
@@ -447,6 +451,16 @@ interface Row {
 	readonly phase?: { readonly index: number; readonly name: Measured; readonly caption: Measured };
 }
 
+/** How far into a bar its top and bottom entries sit. */
+const ENTRY_INSETS = [7, 19, 31];
+/** Exits in line with a successor's entries sit this close to the bar's end, at this cost. */
+const ELBOW_EXIT_REACH = 32;
+const ELBOW_EXIT_COST = 3;
+/**
+ * A route that turns once into a side entry runs this far into it: past the arrowhead's kept
+ * clearance, so routes out of the same predecessor may pass its turn on their shared trunk.
+ */
+const ELBOW_RUN = 19;
 /** Ports cost more where they point away from the other end, so routes leave and enter facing it. */
 const AWAY_COST = 40;
 /** Entering a bar through its top or bottom rather than at its start from the left. */
@@ -464,9 +478,17 @@ const HEAD_KEEP_OUT = 40;
 /**
  * Where a dependency may leave its predecessor: the bottom or top near the
  * bar's end, its right end, or a milestone's vertices. `align` adds a port
- * straight above or below the successor's milestone.
+ * straight above or below the successor's milestone, and `aside` ports near
+ * the bar's end in line with the successor's entries, from which a route drops
+ * straight into its top or bottom, or turns once into its side.
  */
-function sourcePorts(box: Box, milestone: boolean, below: boolean, align?: number): RoutePort[] {
+function sourcePorts(
+	box: Box,
+	milestone: boolean,
+	below: boolean,
+	align?: number,
+	aside: readonly number[] = [],
+): RoutePort[] {
 	const middle = (box.top + box.bottom) / 2;
 	const away = (direction: 1 | 3) => ((direction === 1) === below ? 0 : AWAY_COST);
 	if (milestone) {
@@ -505,6 +527,12 @@ function sourcePorts(box: Box, milestone: boolean, below: boolean, align?: numbe
 				: [(box.left + box.right) / 2];
 	const aligned =
 		align !== undefined && align > box.left + 1 && align < box.right - 1 ? [align] : [];
+	const elbows = aside.filter(
+		(x) =>
+			x >= Math.max(box.left + 2, box.right - ELBOW_EXIT_REACH) &&
+			x <= box.right - 2 &&
+			xs.every((other) => Math.abs(other - x) >= 1),
+	);
 	return [
 		...aligned.flatMap((x): RoutePort[] => [
 			{ x, y: box.bottom, direction: 1, cost: away(1) },
@@ -516,6 +544,10 @@ function sourcePorts(box: Box, milestone: boolean, below: boolean, align?: numbe
 			direction: 1,
 			cost: away(1) + index * 3,
 		})),
+		...elbows.flatMap((x): RoutePort[] => [
+			{ x, y: box.bottom, direction: 1, cost: away(1) + ELBOW_EXIT_COST },
+			{ x, y: box.top, direction: 3, cost: away(3) + ELBOW_EXIT_COST },
+		]),
 		{ x: box.right, y: middle, direction: 0, cost: 2 },
 		...xs.map((x, index): RoutePort => ({
 			x,
@@ -529,43 +561,53 @@ function sourcePorts(box: Box, milestone: boolean, below: boolean, align?: numbe
 /**
  * Where a dependency may enter its successor: the left end, or the top or
  * bottom near the bar's start, or a milestone's vertices. `align` adds a port
- * straight below or above the predecessor's milestone.
+ * straight below or above the predecessor's milestone. A successor that awaits
+ * more dependencies (`crowded`) is entered from the left above and below its
+ * middle, so another arrival fits beside, the upper one first from above.
  */
-function targetPorts(box: Box, milestone: boolean, below: boolean, align?: number): RoutePort[] {
+function targetPorts(
+	box: Box,
+	milestone: boolean,
+	below: boolean,
+	align?: number,
+	crowded = false,
+): RoutePort[] {
 	const middle = (box.top + box.bottom) / 2;
 	// Entering downward through the top suits a predecessor above.
 	const away = (direction: 1 | 3) => ((direction === 1) === below ? 0 : AWAY_COST);
+	/** Beside the middle: the side nearer the predecessor first. */
+	const beside = (side: -1 | 1) => ((side === -1) === below ? 0 : 4);
 	if (milestone) {
 		const center = (box.left + box.right) / 2;
 		const quarter = (box.right - box.left) / 4;
 		return [
-			{ x: box.left, y: middle, direction: 0, cost: 0 },
+			{ x: box.left, y: middle, direction: 0, cost: crowded ? 16 : 0 },
 			{ x: center, y: box.top, direction: 1, cost: 2 + away(1) },
 			{ x: center, y: box.bottom, direction: 3, cost: 2 + away(3) },
 			// The left half only: the right half is where dependencies leave.
-			...[-1, 1].map((side): RoutePort => ({
+			...([-1, 1] as const).map((side): RoutePort => ({
 				x: box.left + quarter,
 				y: middle + side * quarter,
 				direction: 0,
-				cost: 16,
+				cost: crowded ? beside(side) : 16,
 			})),
 			{ x: center - quarter, y: box.top + quarter, direction: 1, cost: 16 + away(1) },
 			{ x: center - quarter, y: box.bottom - quarter, direction: 3, cost: 16 + away(3) },
 		];
 	}
 	// Entries sit an arrowhead's width apart, so several can arrive at once.
-	const insets = [7, 19, 31].filter((inset) => box.left + inset <= box.right - 3);
+	const insets = ENTRY_INSETS.filter((inset) => box.left + inset <= box.right - 3);
 	const xs = insets.length ? insets.map((inset) => box.left + inset) : [(box.left + box.right) / 2];
 	const aligned =
 		align !== undefined && align > box.left + 1 && align < box.right - 1 ? [align] : [];
 	return [
-		{ x: box.left, y: middle, direction: 0, cost: 0 },
+		{ x: box.left, y: middle, direction: 0, cost: crowded ? SIDE_ENTRY_COST : 0 },
 		// Further arrivals from the left land above and below the middle.
-		...[-1, 1].map((side): RoutePort => ({
+		...([-1, 1] as const).map((side): RoutePort => ({
 			x: box.left,
 			y: middle + side * SIDE_ENTRY_OFFSET,
 			direction: 0,
-			cost: SIDE_ENTRY_COST,
+			cost: crowded ? beside(side) : SIDE_ENTRY_COST,
 		})),
 		...aligned.flatMap((x): RoutePort[] => [
 			{ x, y: box.top, direction: 1, cost: away(1) },
@@ -637,8 +679,9 @@ function outlinePorts(box: Box, milestone: boolean, below: boolean): RoutePort[]
 const REPAIR_PASSES = 2;
 /** Search steps the repair passes may spend, on top of the chart's budget. */
 export const REPAIR_BUDGET = 48_000;
-/** How arrival orders compare once their conflicts tie: length, plus this per bend. */
+/** How arrival orders compare once their conflicts tie: length, plus this per bend and per crossing. */
 const REORDER_BEND_COST = 24;
+const REORDER_CROSSING_COST = 60;
 /** Arrivals into one successor are tried in the other order once they detour this far in all. */
 const REORDER_DETOUR = 60;
 /**
@@ -672,9 +715,13 @@ function routeConflicts(
 	const head = conflictHead(b, strictly);
 	const runs = routeSegments(a);
 	const others = routeSegments(b);
+	// Routes out of one predecessor may share a trunk: carrying on along it, a route passes behind
+	// a sibling's arrowhead, not through it.
+	const trunk = kin.leaving && collinear(runs[0]!.from, runs[0]!.to, others[0]);
+	const arrowhead = trunk ? conflictHead(b, true) : head;
 	let count = 0;
 	runs.forEach((run, index) => {
-		if (segmentEnters(run, head)) count += 1;
+		if (segmentEnters(run, index === 0 ? arrowhead : head)) count += 1;
 		others.forEach((other, at) => {
 			const shared =
 				(kin.leaving && index === 0 && at === 0) ||
@@ -696,6 +743,27 @@ function overlapOf(a: RouteSegment, b: RouteSegment): number {
 	const [aLow, aHigh] = span(a);
 	const [bLow, bHigh] = span(b);
 	return Math.min(aHigh!, bHigh!) - Math.max(aLow!, bLow!);
+}
+
+/** Which way a run heads. */
+function routeDirection({ from, to }: RouteSegment): RouteDirection {
+	if (Math.abs(from.y - to.y) < 0.01) return to.x > from.x ? 0 : 2;
+	return to.y > from.y ? 1 : 3;
+}
+
+/** Whether two runs cross: one passes through the other's interior, not at either's end. */
+function runsCross(a: RouteSegment, b: RouteSegment): boolean {
+	const horizontal = (run: RouteSegment) => Math.abs(run.from.y - run.to.y) < 0.01;
+	if (horizontal(a) === horizontal(b)) return false;
+	const [level, upright] = horizontal(a) ? [a, b] : [b, a];
+	const x = upright.from.x;
+	const y = level.from.y;
+	return (
+		x > Math.min(level.from.x, level.to.x) + 0.01 &&
+		x < Math.max(level.from.x, level.to.x) - 0.01 &&
+		y > Math.min(upright.from.y, upright.to.y) + 0.01 &&
+		y < Math.max(upright.from.y, upright.to.y) - 0.01
+	);
 }
 
 /** Whether a route's run enters a box's interior. */
@@ -887,10 +955,17 @@ function corridorRoute(ends: {
 				)
 					.filter((x) => x >= source.left + 0.5 && x <= source.right - 0.5)
 					.map((x) => ({ x, y: side === 1 ? source.bottom : source.top }));
-	const below = nearest(ends.sourceRow.top + ends.sourceRow.height, 8).filter(
+	// Whole-pixel gutter heights first; half and tenth pixels only when a crowded gutter leaves
+	// nothing else.
+	const heights = (at: number) => [
+		...nearest(at, 8),
+		...nearest(at, 8, CORRIDOR_FINE_STEP),
+		...nearest(at + 0.1, 8, 0.1),
+	];
+	const below = heights(ends.sourceRow.top + ends.sourceRow.height).filter(
 		(y) => y >= source.bottom + 2 && y <= ends.rowsBottom - 1,
 	);
-	const above = nearest(ends.sourceRow.top, 8).filter(
+	const above = heights(ends.sourceRow.top).filter(
 		(y) => y <= source.top - 2 && y >= ends.rowsTop + 1,
 	);
 	const corridorMiddle = PLOT_INSET / 2;
@@ -1217,6 +1292,7 @@ function layoutAt(
 	}
 
 	// Dependencies: elbow arrows from each predecessor's end into its successor's start.
+	const bars = [...markBoxes].filter(([id]) => !schedules.get(id)!.milestone);
 	const rowOf = new Map(
 		rows.flatMap((row, index) => (row.task ? [[row.task.task.id, index] as const] : [])),
 	);
@@ -1250,19 +1326,36 @@ function layoutAt(
 	// Routes out of one predecessor, or into one successor, may run beside each other.
 	const leaving = new Map<string, RouteSegment[]>();
 	const arriving = new Map<string, RouteSegment[]>();
-	// Each arrowhead, and a longer stretch behind a side entry's, that other routes keep out of.
-	const heads: RouteObstacle[] = [];
-	const keepOuts: RouteObstacle[] = [];
+	/**
+	 * Each arrowhead, and a longer stretch behind a side entry's, that other routes keep out of, by
+	 * the predecessor whose route it ends: that predecessor's other routes keep out of the
+	 * arrowhead alone while they share its trunk.
+	 */
+	interface HeadKeepOut {
+		readonly from: string;
+		readonly trunk: RouteSegment;
+		readonly keepOut: RouteObstacle;
+		readonly arrowhead: RouteObstacle;
+	}
+	const heads: HeadKeepOut[] = [];
+	const keepOuts: HeadKeepOut[] = [];
 	const lastRuns = new Set<RouteSegment>();
 	const firstRuns = new Set<RouteSegment>();
 	// Each task's left entry stays free for its own dependencies until they are all routed.
 	const pending = new Map<string, number>();
+	// Milestones whose arrivals take the entries above and below their left vertex first.
+	const split = new Set<string>();
 	// Routing work is bounded per route and per chart; past either, routes take the corridor.
 	const chartBudget = Math.min(
 		ROUTE_CHART_BUDGET,
 		Math.max(ROUTE_BUDGET, dependencies.length * ROUTE_CHART_BUDGET_PER_ROUTE),
 	);
 	const budget = { remaining: chartBudget };
+	const kinkChartBudget = Math.min(
+		ROUTE_KINK_BUDGET,
+		dependencies.length * ROUTE_KINK_BUDGET_PER_ROUTE,
+	);
+	const kinkBudget = { remaining: kinkChartBudget };
 	let placements = 0;
 	let corridors = 0;
 	// Which way each task's own dependencies leave it: down to successors below, up to those above.
@@ -1279,16 +1372,27 @@ function layoutAt(
 		firstRuns.add(segments[0]!);
 		leaving.set(dependency.from, [...(leaving.get(dependency.from) ?? []), ...segments]);
 		arriving.set(dependency.to, [...(arriving.get(dependency.to) ?? []), ...segments]);
-		heads.push({ box: conflictHead(points), clearance: 0 });
+		const arrowhead = { box: conflictHead(points, true), clearance: 0 };
+		heads.push({
+			from: dependency.from,
+			trunk: segments[0]!,
+			keepOut: { box: conflictHead(points), clearance: 0 },
+			arrowhead,
+		});
 		keepOuts.push({
-			box: routeHead(
-				points,
-				Math.abs(points.at(-1)!.y - points.at(-2)!.y) < 0.01
-					? HEAD_KEEP_OUT
-					: ROUTE_VERTICAL_APPROACH,
-				HEAD_CLEARANCE,
-			),
-			clearance: 0,
+			from: dependency.from,
+			trunk: segments[0]!,
+			keepOut: {
+				box: routeHead(
+					points,
+					Math.abs(points.at(-1)!.y - points.at(-2)!.y) < 0.01
+						? HEAD_KEEP_OUT
+						: ROUTE_VERTICAL_APPROACH,
+					HEAD_CLEARANCE,
+				),
+				clearance: 0,
+			},
+			arrowhead,
 		});
 		pending.set(dependency.to, pending.get(dependency.to)! - 1);
 		entries.set(dependency.to, [...(entries.get(dependency.to) ?? []), points.at(-1)!]);
@@ -1329,7 +1433,9 @@ function layoutAt(
 					y: middle + offset,
 				}));
 		const taken = entries.get(id) ?? [];
-		return sides
+		// With more than one arrival, the entries above and below the middle come first.
+		const [middleSide, ...besides] = sides;
+		return (count + taken.length > 1 ? [...besides, middleSide!] : sides)
 			.filter((side) => taken.every((point) => Math.hypot(point.x - side.x, point.y - side.y) >= 3))
 			.slice(0, count)
 			.map((side) => ({
@@ -1358,6 +1464,8 @@ function layoutAt(
 			targetMilestone,
 			below,
 			sourceMilestone ? center(source) : undefined,
+			(pending.get(dependency.to)! > 1 || taken.length > 0) &&
+				(!targetMilestone || split.has(dependency.to)),
 		);
 		const clearOfToday = (port: RoutePort) =>
 			todayX === undefined ||
@@ -1440,6 +1548,18 @@ function layoutAt(
 			tiers
 				.map(([candidates, usable]) => candidates.filter(usable))
 				.find((usable) => usable.length > 0) ?? ports;
+		// The first runs of earlier routes out of the same predecessor, and where they leave it.
+		const trunks = (leaving.get(dependency.from) ?? []).filter((segment) => firstRuns.has(segment));
+		const trunkPorts = new Map(
+			trunks.map((segment): [string, RoutePort] => {
+				const direction = routeDirection(segment);
+				const away = direction % 2 === 1 && (direction === 1) !== below;
+				return [
+					`${segment.from.x},${segment.from.y},${direction}`,
+					{ ...segment.from, direction, cost: away ? AWAY_COST : 0 },
+				];
+			}),
+		);
 		// Bars, labels and the plot's edge never move; arrowheads and reserved entries grow as routes land.
 		const fixed: RouteObstacle[] = [
 			...[...markBoxes].flatMap(([id, box]): RouteObstacle[] =>
@@ -1463,16 +1583,30 @@ function layoutAt(
 			...obstacles,
 		];
 		const routeRequest = {
-			sources: sourcePorts(
-				source,
-				sourceMilestone,
-				below,
-				targetMilestone ? center(target) : undefined,
-			),
+			sources: [
+				// Where earlier routes leave the predecessor, so this one may share their trunk.
+				...trunkPorts.values(),
+				...sourcePorts(
+					source,
+					sourceMilestone,
+					below,
+					targetMilestone ? center(target) : undefined,
+					// Exits from which a route drops straight into the successor's top or bottom entries,
+					// or turns once into its side entries.
+					targetMilestone
+						? [target.left - ELBOW_RUN, target.left + (target.right - target.left) / 4 - ELBOW_RUN]
+						: [
+								target.left - ELBOW_RUN,
+								...ENTRY_INSETS.filter((inset) => target.left + inset <= target.right - 3).map(
+									(inset) => target.left + inset,
+								),
+							],
+				),
+			],
 			targets: open,
 			obstacles: [
 				...fixed,
-				...keepOuts,
+				...keepOuts.map((head) => (head.from === dependency.from ? head.arrowhead : head.keepOut)),
 				...[...pending.keys()].flatMap((id) =>
 					id === dependency.to ? [] : reservedEntries(id).map((box) => ({ box, clearance: 0 })),
 				),
@@ -1492,16 +1626,34 @@ function layoutAt(
 				...(arriving.get(dependency.to) ?? []),
 			]),
 			lastRuns,
+			trunks: new Set(trunks),
+			pastTrunk: new Map(
+				keepOuts.flatMap((head) =>
+					head.from === dependency.from ? [[head.keepOut, head.trunk] as const] : [],
+				),
+			),
+			edges: bars.flatMap(([id, box]) =>
+				id === dependency.from || id === dependency.to ? [] : [box],
+			),
 			top: rowsTop + 1,
 			bottom: rowsBottom - 1,
 			budget: own,
+			kinkBudget,
 		};
 		// Boxed in, a route may pass closer behind other arrowheads and through reserved entries.
 		const searched =
 			routeOrthogonal(routeRequest) ??
 			routeOrthogonal({
 				...routeRequest,
-				obstacles: [...fixed, ...heads],
+				obstacles: [
+					...fixed,
+					...heads.map((head) => (head.from === dependency.from ? head.arrowhead : head.keepOut)),
+				],
+				pastTrunk: new Map(
+					heads.flatMap((head) =>
+						head.from === dependency.from ? [[head.keepOut, head.trunk] as const] : [],
+					),
+				),
 			});
 		pool.remaining -= granted - own.remaining;
 		if (!searched) corridors += 1;
@@ -1516,11 +1668,9 @@ function layoutAt(
 				rowsTop,
 				rowsBottom,
 				routed,
-				heads,
+				heads: heads.map((head) => head.keepOut),
 				taken,
-				siblings: new Set(
-					(leaving.get(dependency.from) ?? []).filter((segment) => firstRuns.has(segment)),
-				),
+				siblings: new Set(trunks),
 			})
 		);
 	};
@@ -1564,39 +1714,84 @@ function layoutAt(
 			(total, { from, to }) => total + Math.abs(to.x - from.x) + Math.abs(to.y - from.y),
 			0,
 		);
-	/** How routes read: their conflicts first, then their length and bends. */
+	/** How often a route crosses the others. */
+	const crossingsOf = (index: number) => {
+		const runs = routeSegments(placed[index]!);
+		let count = 0;
+		placed.forEach((other, at) => {
+			if (at === index || !other) return;
+			for (const theirs of routeSegments(other))
+				for (const run of runs) if (runsCross(run, theirs)) count += 1;
+		});
+		return count;
+	};
+	/** How routes read: their conflicts first, then their length, bends, kinks and crossings. */
 	const standing = (indices: readonly number[]) => ({
 		conflicts: indices.reduce((sum, index) => sum + conflicts(index), 0),
 		drawn: indices.reduce((sum, index) => {
 			const points = placed[index]!;
-			return sum + lengthOf(points) + REORDER_BEND_COST * (points.length - 2);
+			return (
+				sum +
+				lengthOf(points) +
+				REORDER_BEND_COST * (points.length - 2) +
+				routeKinkCost(points) +
+				REORDER_CROSSING_COST * crossingsOf(index)
+			);
 		}, 0),
 	});
 	const better = (a: ReturnType<typeof standing>, b: ReturnType<typeof standing>) =>
 		a.conflicts < b.conflicts || (a.conflicts === b.conflicts && a.drawn < b.drawn - 1e-6);
-	// Only arrivals that detour or conflict are worth trying in the other order.
+	// Only arrivals that detour, cross or conflict are worth trying in another order.
 	const strained = (indices: readonly number[]) =>
-		indices.some((index) => conflicts(index) > 0) ||
+		indices.some((index) => conflicts(index) > 0 || crossingsOf(index) > 0) ||
 		indices.reduce((sum, index) => {
 			const points = placed[index]!;
 			const [start, end] = [points[0]!, points.at(-1)!];
 			return sum + lengthOf(points) - Math.abs(end.x - start.x) - Math.abs(end.y - start.y);
 		}, 0) > REORDER_DETOUR;
-	for (const indices of arrivals.values()) {
-		// Without search budget left, the other order could only take the corridor.
-		if (budget.remaining <= 0) break;
+	for (const [target, indices] of arrivals) {
 		if (indices.length < 2 || !strained(indices)) continue;
-		const kept = indices.map((index) => placed[index]);
-		const before = standing(indices);
-		for (const index of indices) placed[index] = undefined;
-		rebuild();
-		for (const index of indices.toReversed()) {
-			const points = place(dependencies[index]!);
-			placed[index] = points;
-			add(dependencies[index]!, points);
+		// The other order; into a milestone, also the entries above and below its left vertex first.
+		const plans = [
+			{ order: indices.toReversed(), split: false },
+			...(schedules.get(target)!.milestone ? [{ order: indices, split: true }] : []),
+		];
+		let kept = {
+			routes: indices.map((index) => placed[index]),
+			standing: standing(indices),
+			split: false,
+		};
+		for (const plan of plans) {
+			// Without search budget left, another plan could only take the corridor.
+			if (budget.remaining <= 0) break;
+			// The entries beside a milestone's vertex are worth trying only while arrivals still
+			// cross or kink.
+			if (plan.split) {
+				indices.forEach((index, at) => (placed[index] = kept.routes[at]));
+				const troubled = indices.some(
+					(index) => crossingsOf(index) > 0 || routeKinkCost(placed[index]!) > 0,
+				);
+				if (!troubled) break;
+			}
+			for (const index of indices) placed[index] = undefined;
+			rebuild();
+			if (plan.split) split.add(target);
+			for (const index of plan.order) {
+				const points = place(dependencies[index]!);
+				placed[index] = points;
+				add(dependencies[index]!, points);
+			}
+			split.delete(target);
+			const tried = standing(indices);
+			if (better(tried, kept.standing))
+				kept = {
+					routes: indices.map((index) => placed[index]),
+					standing: tried,
+					split: plan.split,
+				};
 		}
-		if (!better(standing(indices), before))
-			indices.forEach((index, at) => (placed[index] = kept[at]));
+		indices.forEach((index, at) => (placed[index] = kept.routes[at]));
+		if (kept.split) split.add(target);
 		rebuild();
 	}
 	// Repairs draw on their own budget, so a chart that spent its own can still clear a conflict.
@@ -1903,7 +2098,13 @@ function layoutAt(
 		work: {
 			layouts: 1,
 			placements,
-			expansions: chartBudget - budget.remaining + REPAIR_BUDGET - repairBudget.remaining,
+			expansions:
+				chartBudget -
+				budget.remaining +
+				REPAIR_BUDGET -
+				repairBudget.remaining +
+				kinkChartBudget -
+				kinkBudget.remaining,
 			corridors,
 			conflicts: placed.reduce(
 				(sum, points, index) =>
