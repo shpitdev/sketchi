@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.23.1
+
+### Patch Changes
+
+- [#473](https://github.com/shpitdev/sketchi/pull/473) [`3e86361`](https://github.com/shpitdev/sketchi/commit/3e86361da7c5e95e842f8d440eb79036c9acd4bb) Thanks [@anandpant](https://github.com/anandpant)! - ER diagrams of larger schemas read cleaner. Tables move between columns while that leaves fewer crossings, so a hub such as an organizations table sits among its children with links on both sides. Two relationship ends on one side of a row now stand far enough apart that their bars and feet no longer run together, lines no longer wrap around their own table to reach a neighbor, and small schemas stack their tables instead of running out to a wide strip.
+
 ## 0.23.0
 
 ### Minor Changes
