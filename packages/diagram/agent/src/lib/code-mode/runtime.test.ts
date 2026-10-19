@@ -850,6 +850,7 @@ describe("Code Mode runtime", () => {
 
 		const inlineScene = built.artifact.formats.find((format) => format.format === "scene")?.inline;
 		expect(parseInlineScene(inlineScene).elements.length).toBeGreaterThan(0);
+		expect(built.artifact).not.toHaveProperty("preview");
 
 		const excalidraw = await runtime.getArtifact({
 			artifactId: built.artifact.artifactId,
@@ -1332,6 +1333,7 @@ describe("Code Mode runtime", () => {
 					shape: "diamond",
 				},
 			],
+			options: { inlineArtifacts: ["scene"] },
 		});
 
 		expectPatchOk(patched);
@@ -1477,6 +1479,7 @@ describe("Code Mode runtime", () => {
 					style: { strokeColor: "#7c3aed", textColor: "#7c3aed" },
 				},
 			],
+			options: { inlineArtifacts: ["scene"] },
 		});
 
 		expectPatchOk(patched);
@@ -1499,7 +1502,10 @@ describe("Code Mode runtime", () => {
 
 	it("keeps positioned branch labels associated through edge patches", async () => {
 		const runtime = createTestRuntime();
-		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+		const built = await runtime.buildFlowchart({
+			spec: approvalSpec(),
+			options: { inlineArtifacts: ["scene"] },
+		});
 		expectBuildOk(built);
 		const patched = await runtime.applyDiagramPatch({
 			source: { artifactId: built.artifact.artifactId },
@@ -1513,6 +1519,7 @@ describe("Code Mode runtime", () => {
 				{ op: "replaceText", selector: { labels: ["yes"], scope: "edges" }, text: "Approved" },
 				{ op: "setStyle", selector: { scope: "edges" }, style: { textColor: "#7c3aed" } },
 			],
+			options: { inlineArtifacts: ["scene"] },
 		});
 		expectPatchOk(patched);
 		const scene = parseInlineScene(
@@ -1527,7 +1534,7 @@ describe("Code Mode runtime", () => {
 		const removed = await runtime.applyDiagramPatch({
 			source: { scene },
 			operations: [{ op: "remove", selector: { ids: [arrow!.id] } }],
-			options: { preserveConnectivity: false },
+			options: { inlineArtifacts: ["scene"], preserveConnectivity: false },
 		});
 		expectPatchOk(removed);
 		const remaining = parseInlineScene(
@@ -1600,6 +1607,7 @@ describe("Code Mode runtime", () => {
 					text: "Ship to production",
 				},
 			],
+			options: { inlineArtifacts: ["scene"] },
 		});
 
 		expectPatchOk(patched);
@@ -1692,7 +1700,10 @@ describe("Code Mode runtime", () => {
 
 	it("rejects an object-store scene whose source manifest was not published", async () => {
 		const sourceRuntime = createTestRuntime();
-		const built = await sourceRuntime.buildFlowchart({ spec: approvalSpec() });
+		const built = await sourceRuntime.buildFlowchart({
+			spec: approvalSpec(),
+			options: { inlineArtifacts: ["scene"] },
+		});
 		expectBuildOk(built);
 		const sourceScene = parseInlineScene(
 			built.artifact.formats.find((format) => format.format === "scene")?.inline,

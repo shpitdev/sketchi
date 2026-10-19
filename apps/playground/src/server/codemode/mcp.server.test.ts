@@ -1046,6 +1046,89 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		expect(serialized.match(/"type":"image"/g)).toHaveLength(slugs.length);
 	});
 
+	describe("logo payloads in execute results", () => {
+		// Two nodes share the docker logo: each image may appear once, never per node or per copy.
+		function logoFlowchartCode(options: string) {
+			return `async () => sketchi.buildFlowchart({
+  spec: {
+    title: "Deploy pipeline",
+    nodes: [
+      { id: "push", label: "Push to GitHub", kind: "start", icon: { slug: "github" } },
+      { id: "build", label: "Build the Docker image", kind: "process", icon: { slug: "docker" } },
+      { id: "ship", label: "Ship the Docker image", kind: "end", icon: { slug: "docker" } }
+    ],
+    edges: [{ source: "push", target: "build" }, { source: "build", target: "ship" }]
+  },
+  options: ${options}
+})`;
+		}
+
+		async function executeText(code: string) {
+			const bucket = new MemoryBucket();
+			const server = await createSketchiMcpServer(
+				{
+					SKETCHI_ARTIFACTS: bucket,
+					ASSETS: {
+						fetch: async (input) =>
+							new Response(
+								`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>${new URL(input instanceof Request ? input.url : input).pathname}</title><path d="M0 0H24V24H0Z"/></svg>`,
+							),
+					},
+				},
+				{ executor: createInProcessExecutor() },
+			);
+			const client = new Client({ name: "logo-payload-test", version: "1" });
+			const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+			await server.connect(serverTransport);
+			await client.connect(clientTransport);
+			try {
+				const response = await client.callTool({ name: "execute", arguments: { code } });
+				expect(structuredContent(response)).toMatchObject({ ok: true, result: { ok: true } });
+				return { bucket, text: textContent(response).join("\n") };
+			} finally {
+				await client.close();
+				await server.close();
+			}
+		}
+
+		const count = (text: string, needle: string) => text.split(needle).length - 1;
+
+		it("returns artifact URLs and logo slugs without image bytes by default", async () => {
+			const { bucket, text } = await executeText(
+				logoFlowchartCode('{ artifactFormats: ["scene", "excalidraw"] }'),
+			);
+
+			expect(count(text, "<svg")).toBe(0);
+			expect(count(text, "data:image/")).toBe(0);
+			expect(text).toContain('"icon":{"slug":"docker"}');
+			expect(text).toContain("format=excalidraw&raw=true");
+			// The stored exports still draw every logo.
+			const stored = [...bucket.objects].filter(([key]) => !key.includes("usage"));
+			const excalidraw = stored.find(([key]) => key.endsWith("/excalidraw.json"))?.[1];
+			const scene = stored.find(([key]) => key.endsWith("/scene.json"))?.[1];
+			if (typeof excalidraw !== "string" || typeof scene !== "string") {
+				throw new Error("Missing stored exports");
+			}
+			expect(count(excalidraw, '"type":"image"')).toBe(3);
+			expect(count(excalidraw, "data:image/svg+xml")).toBe(2);
+			expect(count(scene, "<svg")).toBe(2);
+		});
+
+		it.each([
+			["scene", "<svg"],
+			["excalidraw", "data:image/svg+xml"],
+		])("inlines each image once when the script opts into %s", async (format, needle) => {
+			const { text } = await executeText(
+				logoFlowchartCode(
+					`{ artifactFormats: ["scene", "excalidraw"], inlineArtifacts: ["${format}"] }`,
+				),
+			);
+
+			expect(count(text, needle)).toBe(2);
+			expect(count(text, "<svg") + count(text, "data:image/")).toBe(2);
+		});
+	});
+
 	it("serves docs, search, and execute over the streamable HTTP MCP route", async () => {
 		const client = new Client({
 			name: "sketchi-codemode-http-test-client",

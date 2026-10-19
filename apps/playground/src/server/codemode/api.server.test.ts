@@ -538,6 +538,49 @@ describe("Code Mode API handlers", () => {
 		});
 	});
 
+	it("inlines the scene by default over HTTP, with each logo once", async () => {
+		const response = await handleBuildFlowchartRequest(
+			{
+				ASSETS: {
+					fetch: async (input) =>
+						new Response(
+							`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>${new URL(input instanceof Request ? input.url : input).pathname}</title><path d="M0 0H24V24H0Z"/></svg>`,
+						),
+				},
+			},
+			postRequest("https://studio.test/api/v1/flowcharts/build", {
+				spec: {
+					title: "Deploy pipeline",
+					nodes: [
+						{ id: "push", label: "Push to GitHub", kind: "start", icon: { slug: "github" } },
+						{
+							id: "build",
+							label: "Build the Docker image",
+							kind: "process",
+							icon: { slug: "docker" },
+						},
+						{ id: "ship", label: "Ship the Docker image", kind: "end", icon: { slug: "docker" } },
+					],
+					edges: [
+						{ source: "push", target: "build" },
+						{ source: "build", target: "ship" },
+					],
+				},
+			}),
+		);
+
+		expect(response.status).toBe(200);
+		const text = await response.text();
+		const built = JSON.parse(text) as {
+			artifact: { formats: { format: string; inline?: { icons?: object } }[] };
+		};
+		const scene = built.artifact.formats.find((format) => format.format === "scene");
+		expect(Object.keys(scene?.inline?.icons ?? {}).sort()).toEqual(["docker", "github"]);
+		expect(built.artifact).not.toHaveProperty("preview");
+		expect(text.split("<svg").length - 1).toBe(2);
+		expect(text).not.toContain("data:image/");
+	});
+
 	it("builds a flowchart's declared lanes into lane bands", async () => {
 		const spec = approvalSpec();
 		const response = await handleBuildFlowchartRequest(

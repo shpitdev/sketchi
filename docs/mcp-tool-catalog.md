@@ -816,7 +816,6 @@ interface ArtifactBundle {
   diagramId: string;
   formats: ArtifactFormatRef[];
   provenance?: ArtifactProvenance;
-  preview?: ArtifactFormatRef;
 }
 
 interface ArtifactProvenance {
@@ -867,10 +866,14 @@ dev fallbacks only; deployed Workers should use the R2-compatible binding.
 responses; fetch raw bytes from the Studio API with
 `GET /api/v1/artifacts/{artifactId}?format=png&raw=true`.
 
-Native Excalidraw JSON should not be inlined by default. It is large and noisy,
-and most agents should not inspect or rewrite it directly. Prefer inline
-`scene` data for agent inspection and signed or refreshed artifact access for
-native Excalidraw.
+MCP `execute` results go to a model, so Code Mode builds and patches run
+there inline nothing unless `inlineArtifacts` asks for it: a result names each
+logo by its slug and never carries its SVG. The HTTP API keeps the defaults
+above. An inline format carries each logo once:
+the scene's `icons` map holds one SVG per slug and the Excalidraw `files` map
+one image per distinct logo. Native Excalidraw JSON is large and noisy, and
+most agents should not inspect or rewrite it directly; read stored formats
+through their URLs or `getArtifact` instead.
 
 ## `getArtifact`
 

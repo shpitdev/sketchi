@@ -269,6 +269,26 @@ function normalizeFlowchartKindHintAgainstFrozen(value: unknown, frozen: unknown
 		: value;
 }
 
+// Artifact bundles no longer repeat the scene format as `preview`; frozen captures carry it.
+function normalizeArtifactPreviewAgainstFrozen(value: unknown, frozen: unknown): unknown {
+	if (Array.isArray(value) && Array.isArray(frozen)) {
+		return value.map((item, index) => normalizeArtifactPreviewAgainstFrozen(item, frozen[index]));
+	}
+	if (!isRecord(value) || !isRecord(frozen)) return value;
+	const normalized = Object.fromEntries(
+		Object.entries(value).map(([key, nested]) => [
+			key,
+			normalizeArtifactPreviewAgainstFrozen(nested, frozen[key]),
+		]),
+	);
+	const scene = Array.isArray(value["formats"])
+		? value["formats"].find((format) => isRecord(format) && format["format"] === "scene")
+		: undefined;
+	return Object.hasOwn(frozen, "preview") && !Object.hasOwn(value, "preview") && scene
+		? { ...normalized, preview: scene }
+		: normalized;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -1697,10 +1717,13 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 			},
 		};
 		expect(
-			normalizeCanvasMigrationAgainstFrozen(
-				normalizeBrandPaletteAgainstFrozen(
-					normalizeRoutingAgainstFrozen(
-						normalizeMindmapLayoutAgainstFrozen(normalizedCorpus, frozen),
+			normalizeArtifactPreviewAgainstFrozen(
+				normalizeCanvasMigrationAgainstFrozen(
+					normalizeBrandPaletteAgainstFrozen(
+						normalizeRoutingAgainstFrozen(
+							normalizeMindmapLayoutAgainstFrozen(normalizedCorpus, frozen),
+							frozen,
+						),
 						frozen,
 					),
 					frozen,

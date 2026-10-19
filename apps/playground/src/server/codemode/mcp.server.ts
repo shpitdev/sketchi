@@ -589,6 +589,17 @@ function withTrailingOptions(request: unknown, options: unknown): unknown {
 	return { ...request, options: { ...options, ...request.options } };
 }
 
+/**
+ * Execute results go to a model, which reads artifact URLs and issues, not
+ * exports: unlike the HTTP API, inline nothing unless the script asks.
+ */
+function withModelDelivery(request: unknown): unknown {
+	if (!isRecord(request)) return request;
+	if (request.options !== undefined && !isRecord(request.options)) return request;
+	if (request.options?.inlineArtifacts !== undefined) return request;
+	return { ...request, options: { ...request.options, inlineArtifacts: [] } };
+}
+
 export function makeSketchiCodeModeProvider(
 	codeMode: Context.Service.Shape<typeof PlaygroundCodeMode>,
 	runToolEffect: PlaygroundRequestRunner,
@@ -602,7 +613,7 @@ export function makeSketchiCodeModeProvider(
 		const settled = yield* Deferred.make<void>();
 		observer?.started(index, operation, Deferred.await(settled));
 		return yield* Effect.gen(function* () {
-			const result = yield* codeMode[operation](request);
+			const result = yield* codeMode[operation](withModelDelivery(request));
 			observer?.completed(buildReceipt(operation, index, result));
 			return result;
 		}).pipe(Effect.ensuring(Deferred.succeed(settled, undefined)));
@@ -692,7 +703,7 @@ export function makeSketchiCodeModeProvider(
 			applyDiagramPatch: (request, options) =>
 				runToolEffect(
 					withTelemetryCorrelation(
-						codeMode.applyDiagramPatch(withTrailingOptions(request, options)),
+						codeMode.applyDiagramPatch(withModelDelivery(withTrailingOptions(request, options))),
 						correlation,
 					),
 				),

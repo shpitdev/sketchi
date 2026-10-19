@@ -183,6 +183,28 @@ function normalizeSketchiPaletteAgainstExactBase(value: unknown, exactBase: unkn
 	return normalized.replaceAll("#fffdf8", "#ffffff").replaceAll("#1a1712", "#1e1e1e");
 }
 
+// Artifact bundles no longer repeat the scene format as `preview`; the exact base did.
+function normalizeArtifactPreviewAgainstExactBase(value: unknown, exactBase: unknown): unknown {
+	if (Array.isArray(value) && Array.isArray(exactBase)) {
+		return value.map((item, index) =>
+			normalizeArtifactPreviewAgainstExactBase(item, exactBase[index]),
+		);
+	}
+	if (!isRecord(value) || !isRecord(exactBase)) return value;
+	const normalized = Object.fromEntries(
+		Object.entries(value).map(([key, entry]) => [
+			key,
+			normalizeArtifactPreviewAgainstExactBase(entry, exactBase[key]),
+		]),
+	);
+	const scene = Array.isArray(value["formats"])
+		? value["formats"].find((format) => isRecord(format) && format["format"] === "scene")
+		: undefined;
+	return Object.hasOwn(exactBase, "preview") && !Object.hasOwn(value, "preview") && scene
+		? { ...normalized, preview: scene }
+		: normalized;
+}
+
 function normalizeCanvasMigrationAgainstExactBase(value: unknown, exactBase: unknown): unknown {
 	if (Array.isArray(value) && Array.isArray(exactBase)) {
 		return value.map((entry, index) =>
@@ -490,10 +512,13 @@ describe("exact-base Code Mode HTTP artifact compatibility corpus", () => {
 		const exactBase = withApprovedSceneWidths(JSON.parse(await readFile(fixturePath, "utf8")));
 		expect(
 			`${JSON.stringify(
-				normalizeCanvasMigrationAgainstExactBase(
-					normalizeSketchiPaletteAgainstExactBase(
-						normalizeRoutingAgainstFrozen(
-							normalizeMindmapLayoutAgainstFrozen(corpus, exactBase),
+				normalizeArtifactPreviewAgainstExactBase(
+					normalizeCanvasMigrationAgainstExactBase(
+						normalizeSketchiPaletteAgainstExactBase(
+							normalizeRoutingAgainstFrozen(
+								normalizeMindmapLayoutAgainstFrozen(corpus, exactBase),
+								exactBase,
+							),
 							exactBase,
 						),
 						exactBase,

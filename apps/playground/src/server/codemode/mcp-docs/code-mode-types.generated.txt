@@ -28,7 +28,7 @@ type Quality = { accepted: boolean; score: number; threshold: number; summary: {
 
 type ArtifactFormatRef = { format: "excalidraw" | "scene" | "png"; mimeType: string; url?: string; expiresAt?: string; inline?: unknown; sizeBytes?: number; };
 
-type Artifact = { artifactId: string; diagramId: string; formats: Array<ArtifactFormatRef>; provenance?: { sourceArtifactId: string; }; preview?: ArtifactFormatRef; };
+type Artifact = { artifactId: string; diagramId: string; formats: Array<ArtifactFormatRef>; provenance?: { sourceArtifactId: string; }; };
 
 type PartialArtifact = { artifactId?: string; diagramId?: string; formats?: Array<ArtifactFormatRef>; };
 

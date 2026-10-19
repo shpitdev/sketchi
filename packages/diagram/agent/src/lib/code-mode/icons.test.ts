@@ -10,8 +10,10 @@ import {
 	applyDiagramPatch,
 	buildFlowchart,
 	buildSequenceDiagram,
+	type CodeModeArtifactRenderer,
 	CodeModeRuntimeEnvironment,
 	createCanvas,
+	getArtifact,
 	makeCodeModeRuntimeEnvironmentLayer,
 	searchIcons,
 } from "./runtime";
@@ -75,12 +77,16 @@ function fixtureCatalog(): CodeModeIconCatalog {
 	});
 }
 
-function runtime(icons: CodeModeIconCatalog | null = fixtureCatalog()) {
+function runtime(
+	icons: CodeModeIconCatalog | null = fixtureCatalog(),
+	renderer?: CodeModeArtifactRenderer,
+) {
 	const storage = makeMemoryArtifactStorage();
 	let id = 0;
 	const environment = makeCodeModeRuntimeEnvironmentLayer({
 		createId: (prefix) => `${prefix}-${(id += 1)}`,
 		...(icons ? { icons } : {}),
+		...(renderer ? { renderer } : {}),
 	});
 	const provide = <A>(
 		program: Effect.Effect<A, never, CodeModeArtifactStorage | CodeModeRuntimeEnvironment>,
@@ -96,6 +102,7 @@ function runtime(icons: CodeModeIconCatalog | null = fixtureCatalog()) {
 		buildFlowchart: (input: unknown) => provide(buildFlowchart(input)),
 		buildSequenceDiagram: (input: unknown) => provide(buildSequenceDiagram(input)),
 		createCanvas: (input: unknown) => provide(createCanvas(input)),
+		getArtifact: (input: unknown) => provide(getArtifact(input)),
 		searchIcons: (input: unknown) => provide(searchIcons(input)),
 	};
 }
@@ -239,6 +246,81 @@ describe("buildFlowchart icons", () => {
 				hint: expect.stringContaining("no icon catalog"),
 			}),
 		]);
+	});
+});
+
+describe("logo payloads in build results", () => {
+	// Two nodes share the docker logo, so each image may appear once, not per node.
+	const spec = deploySpec({ push: "github", build: "docker", ship: "docker" });
+	const svgCount = (value: unknown) => JSON.stringify(value).split("<svg").length - 1;
+	const dataUrlCount = (value: unknown) => JSON.stringify(value).split("data:image/").length - 1;
+
+	it("returns slugs and references, not image bytes, when nothing is inlined", async () => {
+		const rendered: unknown[] = [];
+		const icons = runtime(fixtureCatalog(), {
+			renderPng: (input) => {
+				rendered.push(input);
+				return Effect.succeed(new Uint8Array([137, 80, 78, 71]));
+			},
+		});
+		const result = await icons.buildFlowchart({
+			spec,
+			options: { artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [] },
+		});
+		if (!result.ok) throw new Error(JSON.stringify(result.issues));
+
+		expect(svgCount(result)).toBe(0);
+		expect(dataUrlCount(result)).toBe(0);
+		expect(result.artifact.formats.map((format) => "inline" in format)).toEqual([
+			false,
+			false,
+			false,
+		]);
+		expect(result.normalizedSpec.nodes.map((node) => node.icon?.slug)).toEqual([
+			"github",
+			"docker",
+			"docker",
+		]);
+
+		// The stored artifacts and the PNG renderer still get every logo.
+		const scene = await icons.getArtifact({
+			artifactId: result.artifact.artifactId,
+			format: "scene",
+			inline: true,
+		});
+		if (!scene.ok) throw new Error(JSON.stringify(scene.issues));
+		expect(
+			Object.keys(inlineScene({ ok: true, artifact: { formats: [scene] } }).icons ?? {}).sort(),
+		).toEqual(["docker", "github"]);
+		const excalidraw = await icons.getArtifact({
+			artifactId: result.artifact.artifactId,
+			format: "excalidraw",
+			inline: true,
+		});
+		if (!excalidraw.ok) throw new Error(JSON.stringify(excalidraw.issues));
+		const file = excalidraw.inline as { elements: { type: string }[]; files: object };
+		expect(file.elements.filter((element) => element.type === "image")).toHaveLength(3);
+		expect(dataUrlCount(file.files)).toBe(2);
+		expect(rendered).toHaveLength(1);
+		expect(svgCount(rendered[0])).toBeGreaterThanOrEqual(2);
+	});
+
+	it.each([
+		["the default scene", undefined, svgCount],
+		["scene", ["scene"], svgCount],
+		["excalidraw", ["excalidraw"], dataUrlCount],
+	] as const)("inlines each image once for %s", async (_name, inlineArtifacts, count) => {
+		const result = await runtime().buildFlowchart({
+			spec,
+			options: {
+				artifactFormats: ["scene", "excalidraw"],
+				...(inlineArtifacts ? { inlineArtifacts } : {}),
+			},
+		});
+		if (!result.ok) throw new Error(JSON.stringify(result.issues));
+
+		expect(count(result)).toBe(2);
+		expect(svgCount(result) + dataUrlCount(result)).toBe(2);
 	});
 });
 

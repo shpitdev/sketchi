@@ -2043,7 +2043,6 @@ export interface ArtifactBundle {
 	readonly diagramId: string;
 	readonly formats: ArtifactFormatRef[];
 	readonly provenance?: ArtifactProvenance;
-	readonly preview?: ArtifactFormatRef;
 }
 
 export interface PartialArtifactBundle {
@@ -2203,7 +2202,6 @@ const ArtifactBundleSchema = Schema.Struct({
 	diagramId: Schema.String,
 	formats: Schema.Array(ArtifactFormatRefSchema).pipe(Schema.mutable),
 	provenance: optionalContract(ArtifactProvenance),
-	preview: optionalContract(ArtifactFormatRefSchema),
 });
 const PartialArtifactBundleSchema = Schema.Struct({
 	artifactId: optionalContract(Schema.String),

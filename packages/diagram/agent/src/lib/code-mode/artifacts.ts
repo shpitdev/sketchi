@@ -124,13 +124,11 @@ function bundleFromFormats(input: {
 	formats: ArtifactFormatRef[];
 	provenance?: ArtifactProvenance;
 }): ArtifactBundle {
-	const preview = input.formats.find((format) => format.format === "scene");
 	return {
 		artifactId: input.artifactId,
 		diagramId: input.diagramId,
 		formats: input.formats,
 		...(input.provenance ? { provenance: input.provenance } : {}),
-		...(preview ? { preview } : {}),
 	};
 }
 

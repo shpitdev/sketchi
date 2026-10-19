@@ -2707,26 +2707,20 @@ function withArtifactUrls(
 			format: formatRef.format,
 		}),
 	}));
-	const preview = artifact.preview
-		? formats.find((formatRef) => formatRef.format === artifact.preview?.format)
-		: undefined;
-
-	return {
-		...artifact,
-		formats,
-		...(preview ? { preview } : {}),
-	};
+	return { ...artifact, formats };
 }
 
+/** The unstored scene of a failed export, with logo slugs but not their SVG bytes. */
 function scenePartial(scene: RenderedDiagramScene): PartialArtifactBundle {
+	const inline = withoutIconAssets(scene);
 	return {
 		diagramId: scene.diagramId,
 		formats: [
 			{
 				format: "scene",
 				mimeType: ARTIFACT_MIME_TYPES.scene,
-				inline: scene,
-				sizeBytes: jsonSizeBytes(scene),
+				inline,
+				sizeBytes: jsonSizeBytes(inline),
 			},
 		],
 	};
