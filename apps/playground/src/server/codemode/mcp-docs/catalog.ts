@@ -150,8 +150,8 @@ const FLOWCHART_DOCS = [
 	"Name technologies in node labels; a description draws as a small subtitle under the label, for detail.",
 	`Only when the prompt groups steps (teams, zones, phases), declare groups: [{ id, label }] and set each member's group to its innermost group id; others stay ungrouped. Nested zones set parent (subnet in VPC) and kind. Set shape, even on a start or end: "database" databases; "document" files, archives, reports; "queue" queues, streams, topics; "storage" buckets, object stores. Only users stay ellipses. An architecture starts at its entry and ends at each sink.`,
 	"For swimlanes, a process across actors or roles, declare lanes: [{ id, label }] in the prompt's order and set each node's lane to its actor; lanes take no groups.",
-	'Brand logos: for a node naming a technology, search its intended label (e.g. sketchi.searchIcons({ q: "Docker builds the image" })) and set node.icon to { slug } from a result marked attach: true. The logo is drawn above the label. Never guess a slug: unknown slugs are dropped with an unknown_icon warning, and logos that cannot be drawn are dropped with icon_dropped. Neither fails the build.',
-	`Logo guidance applies only to technologies named in the prompt. Search with the intended node label; attach results marked attach: true to the node you searched for. Each node holds one icon. For X on Y, preserve both technologies as separate meaningful steps and attach each logo to its own node. Do not hide the host only in the title or combine both brands under one icon. Keep the requested step order and stay within graph limits.`,
+	'Brand logos: for a node naming a technology, search its intended label (e.g. sketchi.searchIcons({ q: "Docker builds the image" })) and set node.icon to { slug } with a returned slug, following the match rule below. The logo is drawn above the label. Never guess a slug: unknown slugs are dropped with an unknown_icon warning, and logos that cannot be drawn are dropped with icon_dropped. Neither fails the build.',
+	`Logo guidance applies only to technologies named in the prompt. Search with the intended node label. Attach match: "exact" to the node naming that product and "vendor" only to a node whose label names the vendor (Cloudflare Workers takes cloudflare, Ingress controller no kubernetes); never "weak". Each node holds one icon. For X on Y, preserve both technologies as separate meaningful steps and attach each logo to its own node. Do not hide the host only in the title or combine both brands under one icon. Keep the requested step order and stay within graph limits.`,
 	"Before building, compare the named technologies with the icons assigned to nodes. A label or successful search alone does not attach a logo; omitted icons produce no warning. If no matching logo exists, keep the technology label and report the unavailable logo instead of substituting another brand.",
 	`Flowcharts are bounded to ${FLOWCHART_MAX_NODES} nodes and ${FLOWCHART_MAX_EDGES} edges. Larger graphs fail with flowchart_too_large before render or persistence.`,
 	"Every node must be reachable from the single start, and every reachable node must be able to reach an end. Closed cycles fail with nonterminating_node; retry loops remain valid when they retain an eventual exit to an end.",
@@ -163,7 +163,7 @@ const FLOWCHART_DOCS = [
 ].join("\n");
 
 const LOGO_RULE =
-	"When the prompt names technologies, search each node or sequence participant label with sketchi.searchIcons({ q }); set node.icon or sequence participant.icon to { slug } from a result marked attach: true. One icon per node, so 'X on Y' is two steps; labels alone add no logo.";
+	"When the prompt names technologies, search each node or sequence participant label with sketchi.searchIcons({ q }); read the results, then set node.icon or sequence participant.icon to { slug } from a matching returned slug. One icon per node, so 'X on Y' is two steps; labels alone add no logo.";
 
 /** Fits EXECUTE_DESCRIPTION_LEGACY_WINDOW, so every Claude Code version reads all of it. */
 export const EXECUTE_TOOL_DESCRIPTION = [
@@ -190,7 +190,7 @@ export const EXECUTE_CODE_DESCRIPTION = [
 	"Other builders:",
 	...Object.entries(FAST_PATH).map(([operation, line]) => `- ${operation}: ${line}`),
 	"",
-	"- Run logo searches and the build in one execute script: await the searches, then set each icon from an attach: true result.",
+	"- Read the logo search results before building; set each icon from a returned slug following the match rule above.",
 	'- structuredContent.builds records every build attempt in call order, whatever the script returns. docs({ topic: "execute" }) has every generated declaration, including results.',
 ].join("\n");
 
@@ -541,7 +541,7 @@ export const catalog: CatalogEntry[] = [
 		snippet: "Find exact logo slugs for nodes and sequence participants before building.",
 		content: [
 			"searchIcons({ q, limit? }) ranks the Sketchi logo catalog by exact slug, name prefix, alias, then substring. Aliases such as k8s and psql work.",
-			"It returns { ok: true, query, icons: [{ slug, name, collection, match, attach }] }. Attach results marked attach: true to the node you searched for. limit defaults to 10 and is capped at 25.",
+			"It returns { ok: true, query, icons: [{ slug, name, collection, match, attach }] }. Read the matches before building: exact belongs on the node naming that product; vendor only on a label naming the vendor; never weak. limit defaults to 10 and is capped at 25.",
 			'Use a returned slug as a FlowchartSpec node icon ({ icon: { slug: "docker" } }), a SequenceDiagramSpec participant icon ({ icon: { slug: "docker" } }), or a CanvasSpec node icon ({ icon: { slug: "docker", size: 28 } }).',
 			"Only compact brand marks are searchable: wordmarks and very large SVGs are excluded because they cannot be drawn inside a node.",
 			"Search each intended node or participant label, then build. Do not invent slugs; a slug that searchIcons did not return is dropped with an unknown_icon warning.",
@@ -815,7 +815,7 @@ export const catalog: CatalogEntry[] = [
 			'A message with type "return" from the callee back to its caller answers the latest open call between them; Sketchi draws the callee\'s activation bar from that call to its return, nesting re-entrant calls. Calls nobody answers draw no bar.',
 			"Every message source and target must reference a declared participant id. A self-message (source equals target) draws as a loop on that participant's lifeline; a self-call returns into a short nested activation bar, and self-messages never answer or open a call between participants.",
 			`A sequence diagram may have at most ${SEQUENCE_MAX_PARTICIPANTS} participants and ${SEQUENCE_MAX_MESSAGES} messages; larger ones are rejected with sequence_too_large.`,
-			"For every participant whose label names a technology (e.g. GitHub, Cloudflare Worker, Docker), call sketchi.searchIcons({ q: participant.label }) and set participant.icon to { slug } from a result marked attach: true. Labels alone do not add logos, and omitted icons produce no warning. Leave human actors unbranded; a technology logo is drawn in the participant header and exported as an Excalidraw image. Unknown slugs are dropped with an unknown_icon warning, never a failed build.",
+			"For every participant whose label names a technology (e.g. GitHub, Cloudflare Worker, Docker), call sketchi.searchIcons({ q: participant.label }) and read the matches, then set participant.icon to { slug }: exact on the participant naming that product, vendor only when its label names the vendor, never weak. Labels alone do not add logos, and omitted icons produce no warning. Leave human actors unbranded; a technology logo is drawn in the participant header and exported as an Excalidraw image. Unknown slugs are dropped with an unknown_icon warning, never a failed build.",
 			"",
 			operationTypes("buildSequenceDiagram"),
 		].join("\n"),
