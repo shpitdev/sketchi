@@ -11,6 +11,7 @@ import type { CodeModeObjectBucket, CodeModeObjectBucketObject } from "@sketchi/
 import { normalizedSpecFrom } from "@sketchi/diagram-scenarios";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
+import type { PngRenderResult } from "./png-renderer-object.server";
 import { PlaygroundRequestMetadata } from "../runtime/context.server";
 import { PlaygroundRequestCallbacks, runPlaygroundEffect } from "../runtime/runtime.server";
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
@@ -37,9 +38,9 @@ import {
 	type SketchiCodeModeProvider,
 } from "./mcp.server";
 
-function stubPngRenderer(): StudioEnv {
+function stubPngRenderer() {
 	const pngRenderer = {
-		renderPng: async () => ({
+		renderPng: async (): Promise<PngRenderResult> => ({
 			_tag: "Rendered" as const,
 			coldStart: false,
 			png: new Uint8Array([80, 78, 71]).buffer,
@@ -52,9 +53,13 @@ function stubPngRenderer(): StudioEnv {
 	};
 }
 
-function testBoundary(env: StudioEnv, request: Request) {
+// Accepted MCP builds now depend on the hosted PNG renderer. Stub that external
+// boundary by default; failure-path tests opt out explicitly.
+function testBoundary(env: StudioEnv, request: Request, pngRenderer = true) {
 	return {
-		env,
+		env: pngRenderer
+			? { CODEMODE_PNG_RENDERER: stubPngRenderer().CODEMODE_PNG_RENDERER, ...env }
+			: env,
 		request,
 		platform: {
 			waitUntilPromise: (promise: Promise<unknown>) => {
@@ -88,14 +93,14 @@ function createSketchiMcpServer(
 function executeSketchiCodeMode(
 	env: StudioEnv,
 	input: unknown,
-	options: CodeModeMcpOptions & { origin?: string; request?: Request } = {},
+	options: CodeModeMcpOptions & { origin?: string; request?: Request; pngRenderer?: boolean } = {},
 ) {
 	const request =
 		options.request ??
 		new Request(`${options.origin ?? "https://studio.test"}/mcp`, {
 			method: "POST",
 		});
-	const boundary = testBoundary(env, request);
+	const boundary = testBoundary(env, request, options.pngRenderer);
 	return runPlaygroundEffect(
 		Effect.gen(function* () {
 			const callbacks = yield* PlaygroundRequestCallbacks;
@@ -445,6 +450,73 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			},
 		],
 		[
+			"buildTimeline",
+			{ spec: { title: "Release", events: [{ id: "ship", label: "Ship", date: "2026-10-01" }] } },
+		],
+		[
+			"buildChart",
+			{
+				spec: {
+					title: "Sales",
+					kind: "bar",
+					categories: ["Q1", "Q2"],
+					series: [{ name: "Sales", values: [1, 2] }],
+				},
+			},
+		],
+		[
+			"buildStateMachine",
+			{
+				spec: {
+					title: "Connection",
+					initial: "Idle",
+					states: [{ id: "Idle" }, { id: "Done", kind: "final" }],
+					transitions: [{ source: "Idle", target: "Done", event: "finish" }],
+				},
+			},
+		],
+		[
+			"buildGantt",
+			{
+				spec: {
+					title: "Release plan",
+					tasks: [{ id: "build", label: "Build", start: "2026-10-01", duration: 3 }],
+				},
+			},
+		],
+		[
+			"buildErDiagram",
+			{
+				spec: {
+					title: "Customers",
+					entities: [{ id: "customers", fields: ["id uuid PK", "email text UK"] }],
+					relationships: [],
+				},
+			},
+		],
+		[
+			"buildClassDiagram",
+			{
+				spec: {
+					title: "Account",
+					classes: [{ id: "Account", attributes: ["- id: UUID"] }],
+					relationships: [],
+				},
+			},
+		],
+		[
+			"buildOrgChart",
+			{
+				spec: {
+					title: "Team",
+					people: [
+						{ id: "lead", name: "Lead" },
+						{ id: "dev", name: "Developer", manager: "lead" },
+					],
+				},
+			},
+		],
+		[
 			"createCanvas",
 			{
 				spec: {
@@ -494,6 +566,270 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			return sketchi.${operation}(request, ${trailing});
 		}`;
 	}
+
+	it.each(optionsOperations)(
+		"delivers a default PNG for accepted %s calls without options",
+		async (operation, request) => {
+			const output = await executeSketchiCodeMode(
+				stubPngRenderer(),
+				{ code: optionsCode(operation, request, "undefined") },
+				{ executor: createInProcessExecutor() },
+			);
+			expect(output.artifactDelivery?.formats.map(({ format }) => format)).toEqual([
+				"scene",
+				"excalidraw",
+				"png",
+			]);
+			expect(output.finalResponseText).toContain(`PNG URL: ${output.artifactDelivery?.pngUrl}`);
+			expect(output.finalResponseText).not.toContain("unavailable");
+		},
+	);
+
+	it.each(optionsOperations)(
+		"keeps accepted %s artifacts when default PNG rendering fails",
+		async (operation, request) => {
+			const env = stubPngRenderer();
+			env.CODEMODE_PNG_RENDERER.getByName = () => ({
+				prewarm: () => {},
+				renderPng: async () => ({
+					_tag: "Failed",
+					operation: "launch",
+					message: "Browser Run 429",
+				}),
+			});
+			const output = await executeSketchiCodeMode(
+				env,
+				{ code: optionsCode(operation, request, "undefined") },
+				{ executor: createInProcessExecutor() },
+			);
+			expect(output.ok).toBe(true);
+			expect(output.builds.every((build) => build.ok && build.status === "accepted")).toBe(true);
+			expect(output.artifactDelivery?.artifactId).toEqual(expect.any(String));
+			expect(output.artifactDelivery?.formats.map(({ format }) => format)).toEqual([
+				"scene",
+				"excalidraw",
+			]);
+			expect(output.artifactDelivery?.excalidrawUrl).toContain("format=excalidraw");
+			expect(output.artifactDelivery?.pngUrl).toBeUndefined();
+			const issues =
+				operation === "applyDiagramPatch" && isRecord(output.result)
+					? output.result.issues
+					: output.builds[0]?.issues;
+			expect(issues).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						code: "png_unavailable",
+						severity: "warning",
+						message: expect.stringContaining("Browser Run 429"),
+					}),
+				]),
+			);
+			expect(output.finalResponseText).toContain("PNG unavailable");
+			// Artifact URLs must reference real stored exports, not partial unstored scenes.
+			expect(
+				[...env.SKETCHI_ARTIFACTS.objects.keys()].some(
+					(key) =>
+						key.includes(output.artifactDelivery?.artifactId ?? "missing") &&
+						key.endsWith("excalidraw.json"),
+				),
+			).toBe(true);
+		},
+	);
+
+	it("keeps explicit PNG rendering failures strict", async () => {
+		const env = stubPngRenderer();
+		env.CODEMODE_PNG_RENDERER.getByName = () => ({
+			prewarm: () => {},
+			renderPng: async () => ({
+				_tag: "Failed",
+				operation: "evaluate",
+				message: "Renderer failed",
+			}),
+		});
+		const output = await executeSketchiCodeMode(
+			env,
+			{
+				code: optionsCode(
+					"buildFlowchart",
+					optionsOperations[0][1],
+					'{ artifactFormats: ["scene", "excalidraw", "png"] }',
+				),
+			},
+			{ executor: createInProcessExecutor() },
+		);
+		expect(output.builds[0]).toMatchObject({
+			ok: false,
+			status: "export_failed",
+			issues: expect.arrayContaining([
+				expect.objectContaining({ code: "render_failed", severity: "error" }),
+			]),
+		});
+		expect(output.artifactDelivery).toBeUndefined();
+		expect(output.finalResponseText).toContain("PNG unavailable");
+	});
+
+	it("expires a genuinely stalled renderer within one shared budget and keeps both builds accepted", async () => {
+		const renderPng = vi.fn(() => new Promise<PngRenderResult>(() => {}));
+		const started = performance.now();
+		const output = await executeSketchiCodeMode(
+			{ CODEMODE_PNG_RENDERER: { getByName: () => ({ prewarm: () => {}, renderPng }) } },
+			{
+				code: `async () => { await sketchi.buildFlowchart(${JSON.stringify(optionsOperations[0][1])}); return sketchi.buildFlowchart(${JSON.stringify(optionsOperations[0][1])}); }`,
+			},
+			{ executor: createInProcessExecutor() },
+		);
+		expect(performance.now() - started).toBeLessThan(30_000);
+		expect(renderPng).toHaveBeenCalledTimes(1);
+		expect(output.builds).toHaveLength(2);
+		for (const build of output.builds)
+			expect(build).toMatchObject({
+				ok: true,
+				status: "accepted",
+				issues: expect.arrayContaining([
+					expect.objectContaining({
+						code: "png_unavailable",
+						message: expect.stringContaining("budget"),
+					}),
+				]),
+			});
+		expect(output.artifactDelivery?.excalidrawUrl).toEqual(expect.any(String));
+		expect(output.finalResponseText).toContain("PNG unavailable");
+	});
+
+	it.each(["first", "retry"])(
+		"only reports PNG availability for the delivered %s build",
+		async (delivered) => {
+			const env = stubPngRenderer();
+			const good = env.CODEMODE_PNG_RENDERER.getByName().renderPng;
+			let calls = 0;
+			env.CODEMODE_PNG_RENDERER.getByName = () => ({
+				prewarm: () => {},
+				renderPng: async () => {
+					if (++calls === 1) throw new Error("Browser unavailable");
+					return good();
+				},
+			});
+			const output = await executeSketchiCodeMode(
+				env,
+				{
+					code: `async () => { const first = await sketchi.buildFlowchart(${JSON.stringify(optionsOperations[0][1])}); const retry = await sketchi.buildFlowchart(${JSON.stringify(optionsOperations[0][1])}); return ${delivered}; }`,
+				},
+				{ executor: createInProcessExecutor() },
+			);
+			expect(output.builds[0]?.issues).toEqual(
+				expect.arrayContaining([expect.objectContaining({ code: "png_unavailable" })]),
+			);
+			if (delivered === "retry") {
+				expect(output.artifactDelivery?.pngUrl).toEqual(expect.any(String));
+				expect(output.finalResponseText).not.toContain("PNG unavailable");
+			} else {
+				expect(output.artifactDelivery?.pngUrl).toBeUndefined();
+				expect(output.finalResponseText).toContain("PNG unavailable");
+			}
+		},
+	);
+
+	it.each([
+		{ spec: {} },
+		{
+			spec: {
+				title: "Underbranched",
+				nodes: [
+					{ id: "a", label: "Start", kind: "start" },
+					{ id: "b", label: "Continue?", kind: "decision" },
+					{ id: "c", label: "Finish", kind: "end" },
+				],
+				edges: [
+					{ source: "a", target: "b" },
+					{ source: "b", target: "c", label: "yes" },
+				],
+			},
+		},
+		{ spec: { title: "Invalid", nodes: [{ id: "a", label: "Only", kind: "start" }], edges: [] } },
+	])("does not invoke PNG rendering for rejected or invalid builds", async (request) => {
+		const renderPng = vi.fn(async () => {
+			throw new Error("Rejected builds must not render PNG");
+		});
+		const output = await executeSketchiCodeMode(
+			{
+				...stubPngRenderer(),
+				CODEMODE_PNG_RENDERER: { getByName: () => ({ renderPng, prewarm: () => {} }) },
+			},
+			{ code: `async () => sketchi.buildFlowchart(${JSON.stringify(request)})` },
+			{ executor: createInProcessExecutor() },
+		);
+		expect(output.builds[0]?.ok).toBe(false);
+		expect(renderPng).not.toHaveBeenCalled();
+		expect(output.artifactDelivery).toBeUndefined();
+	});
+
+	it.each([
+		'{ inlineArtifacts: ["scene"] }',
+		"{ artifactFormats: undefined, inlineArtifacts: [] }",
+	])("keeps default PNG when only inline delivery is specified: %s", async (options) => {
+		const output = await executeSketchiCodeMode(
+			{},
+			{ code: optionsCode("buildFlowchart", optionsOperations[0][1], options) },
+			{ executor: createInProcessExecutor() },
+		);
+		expect(output.artifactDelivery?.pngUrl).toBeDefined();
+	});
+
+	it("does not render PNG when an explicit format list omits it", async () => {
+		const renderPng = vi.fn(async () => {
+			throw new Error("PNG was not requested");
+		});
+		const output = await executeSketchiCodeMode(
+			{ CODEMODE_PNG_RENDERER: { getByName: () => ({ renderPng, prewarm: () => {} }) } },
+			{
+				code: optionsCode(
+					"buildFlowchart",
+					optionsOperations[0][1],
+					'{ artifactFormats: ["scene", "excalidraw"] }',
+				),
+			},
+			{ executor: createInProcessExecutor() },
+		);
+		expect(output.builds[0]?.ok).toBe(true);
+		expect(output.artifactDelivery?.pngUrl).toBeUndefined();
+		expect(output.finalResponseText).not.toContain("PNG unavailable");
+		expect(renderPng).not.toHaveBeenCalled();
+	});
+
+	it("does not attach a failed explicit patch warning to an earlier delivered artifact", async () => {
+		const env = stubPngRenderer();
+		const goodRender = env.CODEMODE_PNG_RENDERER.getByName().renderPng;
+		let calls = 0;
+		env.CODEMODE_PNG_RENDERER.getByName = () => ({
+			prewarm: () => {},
+			renderPng: async () => {
+				if (++calls === 1) return goodRender();
+				throw new Error("Patch renderer disconnected");
+			},
+		});
+		const output = await executeSketchiCodeMode(
+			env,
+			{
+				code: `async () => { const built = await sketchi.buildFlowchart(${JSON.stringify(optionsOperations[0][1])}); const patched = await sketchi.applyDiagramPatch({ source: { artifactId: built.artifact.artifactId }, operations: [{ op: "setStyle", selector: { nodeIds: ["end"] }, style: { strokeColor: "#7c3aed" } }], options: { artifactFormats: ["scene", "excalidraw", "png"] } }); return { built, patched }; }`,
+			},
+			{ executor: createInProcessExecutor() },
+		);
+		expect(output.result).toMatchObject({
+			patched: {
+				ok: false,
+				status: "export_failed",
+				issues: expect.arrayContaining([
+					expect.objectContaining({
+						severity: "warning",
+						message: expect.stringContaining("PNG unavailable"),
+					}),
+				]),
+			},
+		});
+		expect(output.artifactDelivery?.pngUrl).toBeDefined();
+		expect(output.finalResponseText).not.toContain("PNG unavailable");
+		expect(output.artifactDelivery?.finalResponseText).toBe(output.finalResponseText);
+	});
 
 	it.each(optionsOperations)(
 		"honors trailing PNG options for %s through execute",
@@ -577,12 +913,13 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			ok: true,
 			artifact: {
 				formats: [
-					expect.objectContaining({ format: "excalidraw" }),
 					expect.objectContaining({ format: "scene" }),
+					expect.objectContaining({ format: "excalidraw" }),
+					expect.objectContaining({ format: "png" }),
 				],
 			},
 		});
-		expect(output.artifactDelivery?.pngUrl).toBeUndefined();
+		expect(output.artifactDelivery?.pngUrl).toBeDefined();
 	});
 
 	it("reports a repairable export failure when trailing PNG options have no renderer", async () => {
@@ -595,7 +932,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 					'{ artifactFormats: ["scene", "png"] }',
 				),
 			},
-			{ executor: createInProcessExecutor() },
+			{ executor: createInProcessExecutor(), pngRenderer: false },
 		);
 		expect(output.result).toMatchObject({
 			ok: false,
@@ -605,7 +942,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			]),
 		});
 		expect(output.artifactDelivery?.pngUrl).toBeUndefined();
-		expect(output.finalResponseText).toBeUndefined();
+		expect(output.finalResponseText).toContain("PNG unavailable");
 	});
 
 	it("preserves the MCP request trace in provider callbacks", async () => {

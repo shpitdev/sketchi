@@ -167,7 +167,7 @@ const LOGO_RULE =
 
 /** Fits EXECUTE_DESCRIPTION_LEGACY_WINDOW, so every Claude Code version reads all of it. */
 export const EXECUTE_TOOL_DESCRIPTION = [
-	"Run JavaScript against the typed sketchi client. code is one async arrow function in plain JavaScript (no TypeScript, imports or named wrappers): async () => sketchi.buildFlowchart({ spec, options }), with options as the code parameter shows",
+	"Run JavaScript against the typed sketchi client. code is one async arrow function in plain JavaScript (no TypeScript, imports or named wrappers): async () => sketchi.buildFlowchart({ spec })",
 	`Builders: ${Object.keys(BUILDERS).join(", ")}. The code parameter gives each one's spec and rules, so only createCanvas needs docs({ topic: "createCanvas" }) first.`,
 	"Use buildFlowchart for system/package interactions. createCanvas is a last resort for layouts no builder covers.",
 	"Helpers:",
@@ -179,7 +179,7 @@ export const EXECUTE_TOOL_DESCRIPTION = [
 
 /** Parameter descriptions are not truncated, so the fast path and the full flowchart topic live here. */
 export const EXECUTE_CODE_DESCRIPTION = [
-	`One async arrow function. Call sketchi.<builder>({ spec, options: ${DELIVERY_OPTIONS} }) for Excalidraw and PNG URLs.`,
+	"One async arrow function: sketchi.<builder>({ spec }). Excalidraw and PNG URLs are default for accepted builds and patches.",
 	"",
 	"Builders:",
 	...Object.entries(BUILDERS).map(([operation, summary]) => `- ${operation}: ${summary}`),
@@ -594,7 +594,7 @@ export const catalog: CatalogEntry[] = [
 			"buildTimeline accepts { spec: { id?, title, events: [{ id, label, date?, end?, order?, kind?, lane?, description? }], lanes?, today? }, options? }. The renderer owns layout: a time-scaled axis, alternating labels and wrapped rows.",
 			"Use dates for every event, or numeric order for every event without dates. Keep source precision: YYYY, YYYY-MM, YYYY-MM-DD, or YYYY-MM-DDTHH:mm[:ss] with Z or ±HH:MM. Never invent events or dates.",
 			'Optional: end (inclusive, dated only) draws a phase; kind: "milestone" draws a diamond; lane puts every event on a labeled track (lanes sets order, max 6); today draws a Today marker only when supplied. No dependencies.',
-			"Results match the other native builders. Request png in artifactFormats for a hosted PNG.",
+			"Results match the other native builders, including a hosted PNG by default in execute.",
 			operationTypes("buildTimeline"),
 		].join("\n\n"),
 		examples: [
@@ -900,7 +900,7 @@ export const catalog: CatalogEntry[] = [
 			PATCH_OPERATION_SUMMARY,
 			"- Selectors target nodeIds, edgeIds, labels, element ids, kinds, or broad scopes. Colors are 6-digit hex strings such as #7c3aed for strokeColor, fillColor, textColor, and backgroundColor.",
 			"- For a CanvasSpec, insert, remove, replace, reorder, group, and ungroup support iterative structural editing. Stable ids are mandatory; connectivity is preserved unless options.preserveConnectivity is false.",
-			"- For hosted visual proof after a patch, include png in artifactFormats.",
+			"- Execute includes hosted visual proof (PNG) after an accepted patch by default; explicit artifactFormats override this.",
 			"- If export returns arrow_overlap, rebuild the FlowchartSpec as a cleaner DAG first; rerouteEdges preserves connectivity but cannot reliably fix a long upward return edge.",
 			"",
 			operationTypes("applyDiagramPatch"),

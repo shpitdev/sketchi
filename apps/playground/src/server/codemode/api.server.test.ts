@@ -574,6 +574,7 @@ describe("Code Mode API handlers", () => {
 		const built = JSON.parse(text) as {
 			artifact: { formats: { format: string; inline?: { icons?: object } }[] };
 		};
+		expect(built.artifact.formats.map(({ format }) => format)).toEqual(["excalidraw", "scene"]);
 		const scene = built.artifact.formats.find((format) => format.format === "scene");
 		expect(Object.keys(scene?.inline?.icons ?? {}).sort()).toEqual(["docker", "github"]);
 		expect(built.artifact).not.toHaveProperty("preview");

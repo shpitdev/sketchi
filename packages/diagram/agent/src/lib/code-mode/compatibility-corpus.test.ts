@@ -336,6 +336,8 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		ER_ISSUE_CODE_ADDITIONS.has(value) ||
 		CLASS_ISSUE_CODE_ADDITIONS.has(value) ||
 		ORG_CHART_ISSUE_CODE_ADDITIONS.has(value) ||
+		// MCP best-effort PNG delivery (#499) adds one warning; frozen APIs remain strict.
+		value === "png_unavailable" ||
 		CANVAS_ARROWHEAD_ADDITIONS.has(value)
 	);
 }
@@ -1764,7 +1766,8 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 						!GANTT_ISSUE_CODE_ADDITIONS.has(code) &&
 						!ER_ISSUE_CODE_ADDITIONS.has(code) &&
 						!CLASS_ISSUE_CODE_ADDITIONS.has(code) &&
-						!ORG_CHART_ISSUE_CODE_ADDITIONS.has(code),
+						!ORG_CHART_ISSUE_CODE_ADDITIONS.has(code) &&
+						code !== "png_unavailable",
 				)
 				.toSorted(),
 		).toEqual([...directlyReachableCodes, ...boundaryOnlyCodes].toSorted());

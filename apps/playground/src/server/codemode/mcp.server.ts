@@ -17,10 +17,12 @@ import {
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type CreateCanvasResult,
+	type ApplyDiagramPatchResult,
+	type CodeModeIssue,
 } from "@sketchi/diagram-agent";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { withTelemetryCorrelation, type TelemetryCorrelationInput } from "@sketchi/observability";
-import { Context, Deferred, Effect, Schema } from "effect";
+import { Clock, Context, Deferred, Effect, Schema } from "effect";
 
 import {
 	PlaygroundBindings,
@@ -33,7 +35,11 @@ import {
 	type PlaygroundRequestRunner,
 } from "../runtime/runtime.server";
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
-import { PlaygroundCodeMode } from "./service.server";
+import {
+	PlaygroundCodeMode,
+	PlaygroundDefaultPngDelivery,
+	type CodeModeRequestContext,
+} from "./service.server";
 import {
 	CodeModeDocsRequestSchema,
 	CodeModeDocsResultSchema,
@@ -149,6 +155,7 @@ interface BuildObserver {
 		completion: Effect.Effect<void>,
 	): void;
 	completed(build: ExecuteBuild): void;
+	pngUnavailable(artifactId: string, message: string): void;
 }
 type BuildOperation = ExecuteBuild["operation"];
 type BuildResult =
@@ -377,6 +384,22 @@ function fallbackArtifactUrl(
 	return url.toString();
 }
 
+function returnedPngFailureText(value: unknown): string | undefined {
+	if (!isRecord(value)) return undefined;
+	if (value.ok === false && value.status === "export_failed" && Array.isArray(value.issues)) {
+		const failure = value.issues.find(
+			(issue) => isRecord(issue) && issue.code === "render_failed" && issue.stage === "export",
+		);
+		if (isRecord(failure))
+			return `PNG unavailable: ${stringValue(failure.message) ?? "Rendering failed."} ${stringValue(failure.hint) ?? "Retry the request."}`;
+	}
+	return (
+		returnedPngFailureText(value.result) ??
+		returnedPngFailureText(value.patched) ??
+		returnedPngFailureText(value.built)
+	);
+}
+
 function artifactDeliveryResponseText(input: {
 	artifactId: string;
 	diagramId?: string;
@@ -507,6 +530,8 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 	const startedAt = yield* clock.nowMillis;
 	const builds: ExecuteBuild[] = [];
 	const pendingBuilds: Effect.Effect<void>[] = [];
+	const pngWarnings = new Map<string, string>();
+	const pngDeadlineMillis = (yield* Clock.currentTimeMillis) + 15_000;
 
 	const executed: SketchiCodeModeExecuteOutput = yield* Effect.gen(function* () {
 		const parsed = yield* Effect.try({
@@ -537,7 +562,11 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 							completed: (build) => {
 								builds[build.index] = build;
 							},
+							pngUnavailable: (artifactId, message) => {
+								pngWarnings.set(artifactId, message);
+							},
 						},
+						pngDeadlineMillis,
 					),
 				]),
 			catch: (cause) =>
@@ -547,14 +576,22 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 					stage: "execute",
 				}),
 		});
-		const artifactDelivery = artifactDeliveryFrom(execution.result, {
+		const delivery = artifactDeliveryFrom(execution.result, {
 			origin: metadata.origin,
 		});
+		const pngNote = delivery
+			? pngWarnings.get(delivery.artifactId)
+			: returnedPngFailureText(execution.result);
+		const artifactDelivery =
+			delivery && pngNote
+				? { ...delivery, finalResponseText: `${delivery.finalResponseText}\n${pngNote}` }
+				: delivery;
+		const finalResponseText = artifactDelivery?.finalResponseText ?? pngNote;
 
 		if (execution.error) {
 			return {
 				...(artifactDelivery ? { artifactDelivery } : {}),
-				...(artifactDelivery ? { finalResponseText: artifactDelivery.finalResponseText } : {}),
+				...(finalResponseText ? { finalResponseText } : {}),
 				ok: false,
 				error: execution.error,
 				logs: execution.logs ?? [],
@@ -564,7 +601,7 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 
 		return {
 			...(artifactDelivery ? { artifactDelivery } : {}),
-			...(artifactDelivery ? { finalResponseText: artifactDelivery.finalResponseText } : {}),
+			...(finalResponseText ? { finalResponseText } : {}),
 			ok: true,
 			result: execution.result,
 			logs: execution.logs ?? [],
@@ -618,13 +655,23 @@ function withTrailingOptions(request: unknown, options: unknown): unknown {
 
 /**
  * Execute results go to a model, which reads artifact URLs and issues, not
- * exports: unlike the HTTP API, inline nothing unless the script asks.
+ * exports: unlike the HTTP API, inline nothing and include PNG by default.
+ * Builders reject invalid specs and quality/export validation failures before
+ * rendering PNG. Explicit format lists still win, including an empty list.
  */
 function withModelDelivery(request: unknown): unknown {
 	if (!isRecord(request)) return request;
 	if (request.options !== undefined && !isRecord(request.options)) return request;
-	if (request.options?.inlineArtifacts !== undefined) return request;
-	return { ...request, options: { ...request.options, inlineArtifacts: [] } };
+	return {
+		...request,
+		options: {
+			...request.options,
+			...(request.options?.artifactFormats === undefined
+				? { artifactFormats: ["scene", "excalidraw", "png"] }
+				: {}),
+			...(request.options?.inlineArtifacts === undefined ? { inlineArtifacts: [] } : {}),
+		},
+	};
 }
 
 export function makeSketchiCodeModeProvider(
@@ -632,15 +679,72 @@ export function makeSketchiCodeModeProvider(
 	runToolEffect: PlaygroundRequestRunner,
 	correlation: TelemetryCorrelationInput = {},
 	observer?: BuildObserver,
+	defaultPngDeadline?: number,
 ): SketchiCodeModeProvider {
 	let nextBuildIndex = 0;
+	const deliver = Effect.fnUntraced(function* <A extends BuildResult | ApplyDiagramPatchResult, R>(
+		request: unknown,
+		workflow: Effect.Effect<A, never, R>,
+	) {
+		const warnings: CodeModeIssue[] = [];
+		const defaulted =
+			isRecord(request) &&
+			(request.options === undefined ||
+				(isRecord(request.options) && request.options.artifactFormats === undefined));
+		if (defaulted) defaultPngDeadline ??= (yield* Clock.currentTimeMillis) + 15_000;
+		const result = yield* workflow.pipe(
+			Effect.provideService(
+				PlaygroundDefaultPngDelivery,
+				defaulted && defaultPngDeadline !== undefined
+					? {
+							deadlineMillis: defaultPngDeadline,
+							onUnavailable: (message: string) =>
+								warnings.push({
+									code: "png_unavailable",
+									severity: "warning",
+									stage: "export",
+									message: `PNG unavailable: ${message}`,
+									hint: "Scene and Excalidraw are available; retry for a PNG.",
+								}),
+						}
+					: undefined,
+			),
+		);
+		if (result.ok) {
+			if (warnings.length)
+				observer?.pngUnavailable(
+					result.artifact.artifactId,
+					"PNG unavailable; scene and Excalidraw are available. Retry for a PNG.",
+				);
+			return { ...result, issues: [...result.issues, ...warnings] };
+		}
+		// Explicit PNG requests retain export_failed and the original error.
+		if (result.status !== "export_failed") return result;
+		return {
+			...result,
+			issues: [
+				...result.issues,
+				...result.issues
+					.filter((issue) => issue.code === "render_failed" && issue.stage === "export")
+					.map((issue) => ({
+						...issue,
+						code: "png_unavailable" as const,
+						severity: "warning" as const,
+						message: `PNG unavailable: ${issue.message}`,
+					})),
+			],
+		};
+	});
 	// Keep receipt capture inside the existing request callback span.
 	const build = Effect.fnUntraced(function* (operation: BuildOperation, request: unknown) {
 		const index = nextBuildIndex++;
 		const settled = yield* Deferred.make<void>();
 		observer?.started(index, operation, Deferred.await(settled));
 		return yield* Effect.gen(function* () {
-			const result = yield* codeMode[operation](withModelDelivery(request));
+			const result = yield* deliver<BuildResult, CodeModeRequestContext>(
+				request,
+				codeMode[operation](withModelDelivery(request)),
+			);
 			observer?.completed(buildReceipt(operation, index, result));
 			return result;
 		}).pipe(Effect.ensuring(Deferred.succeed(settled, undefined)));
@@ -730,7 +834,10 @@ export function makeSketchiCodeModeProvider(
 			applyDiagramPatch: (request, options) =>
 				runToolEffect(
 					withTelemetryCorrelation(
-						codeMode.applyDiagramPatch(withModelDelivery(withTrailingOptions(request, options))),
+						deliver(
+							withTrailingOptions(request, options),
+							codeMode.applyDiagramPatch(withModelDelivery(withTrailingOptions(request, options))),
+						),
 						correlation,
 					),
 				),

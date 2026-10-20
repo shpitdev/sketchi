@@ -54,7 +54,7 @@ import {
 } from "./browser-renderer.server";
 import { playgroundIconCatalog } from "./icon-catalog.server";
 
-type CodeModeRequestContext = PlaygroundBindings | PlaygroundIds | PlaygroundRequestMetadata;
+export type CodeModeRequestContext = PlaygroundBindings | PlaygroundIds | PlaygroundRequestMetadata;
 
 export interface PlaygroundCodeModeShape {
 	readonly applyDiagramPatch: (
@@ -110,6 +110,12 @@ export interface PlaygroundCodeModeShape {
 		format: ArtifactFormat,
 	) => Effect.Effect<StoredArtifactFormat | null, CodeModeArtifactStorageError, PlaygroundBindings>;
 }
+
+/** Optional transport delivery policy, not a public request option or runtime authority. */
+export const PlaygroundDefaultPngDelivery = Context.Reference<CodeModeRuntimeOptions["defaultPng"]>(
+	"@sketchi/playground/DefaultPngDelivery",
+	{ defaultValue: () => undefined },
+);
 
 export class PlaygroundCodeMode extends Context.Service<
 	PlaygroundCodeMode,
@@ -178,8 +184,10 @@ export const PlaygroundCodeModeLive = Layer.effect(
 				const ids = yield* PlaygroundIds;
 				const metadata = yield* PlaygroundRequestMetadata;
 				const storage = artifactStoreForBindings(env, localStorage);
+				const defaultPng = yield* PlaygroundDefaultPngDelivery;
 				const runtimeEnvironment: Context.Service.Shape<typeof CodeModeRuntimeEnvironment> = {
 					createId: ids.create,
+					...(defaultPng ? { defaultPng } : {}),
 					artifactUrl: (input) => artifactUrl(metadata.origin, input),
 					...(env.ASSETS ? { icons: playgroundIconCatalog(env.ASSETS, metadata.origin) } : {}),
 					...(env.CODEMODE_PNG_RENDERER

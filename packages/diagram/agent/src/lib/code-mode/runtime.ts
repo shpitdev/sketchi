@@ -216,13 +216,18 @@ export interface CodeModeRuntimeOptions {
 	/** Node-logo catalog; without one, every node icon is dropped with a warning. */
 	icons?: CodeModeIconCatalog;
 	renderer?: CodeModeArtifactRenderer;
+	/** Internal per-call policy for optional default PNGs; explicit exports remain strict. */
+	defaultPng?: {
+		deadlineMillis: number;
+		onUnavailable: (message: string) => void;
+	};
 	artifactUrl?: (input: { artifactId: string; format: ArtifactFormat }) => string;
 }
 
 export class CodeModeRuntimeEnvironment extends Context.Service<
 	CodeModeRuntimeEnvironment,
 	Required<Pick<CodeModeRuntimeOptions, "createId">> &
-		Pick<CodeModeRuntimeOptions, "artifactUrl" | "icons" | "renderer">
+		Pick<CodeModeRuntimeOptions, "artifactUrl" | "icons" | "renderer" | "defaultPng">
 >()("@sketchi/diagram-agent/CodeModeRuntimeEnvironment") {}
 
 export const CodeModeRuntimeEnvironmentLive = Layer.succeed(CodeModeRuntimeEnvironment, {
@@ -234,6 +239,7 @@ export function makeCodeModeRuntimeEnvironmentLayer(options: CodeModeRuntimeOpti
 		createId: options.createId ?? defaultCreateId,
 		...(options.icons ? { icons: options.icons } : {}),
 		...(options.renderer ? { renderer: options.renderer } : {}),
+		...(options.defaultPng ? { defaultPng: options.defaultPng } : {}),
 		...(options.artifactUrl ? { artifactUrl: options.artifactUrl } : {}),
 	});
 }
@@ -1594,11 +1600,36 @@ const storedArtifactsForFormats = Effect.fn("codeMode.artifacts.exportFormats")(
 	scene: RenderedDiagramScene;
 	excalidraw: ExcalidrawScene;
 	renderer?: CodeModeArtifactRenderer | undefined;
+	defaultPng?: CodeModeRuntimeOptions["defaultPng"];
 }) {
 	const artifacts: StoredArtifactFormat[] = [];
 
 	for (const format of input.formats) {
-		const data = yield* dataForArtifactFormat(input, format);
+		let data: unknown;
+		if (format === "png" && input.defaultPng) {
+			// One deadline spans all optional exports in the execute script, including
+			// renderer retries/queueing. Keep time for the remaining formats and storage.
+			const remaining = input.defaultPng.deadlineMillis - (yield* Clock.currentTimeMillis);
+			if (remaining <= 0) {
+				input.defaultPng.onUnavailable("Default PNG delivery budget exhausted.");
+				continue;
+			}
+			const rendered = yield* dataForArtifactFormat(input, format).pipe(
+				Effect.timeout(remaining),
+				Effect.result,
+			);
+			if (Result.isFailure(rendered)) {
+				input.defaultPng.onUnavailable(
+					rendered.failure._tag === "TimeoutError"
+						? "Default PNG rendering exceeded its delivery budget."
+						: rendered.failure.message,
+				);
+				continue;
+			}
+			data = rendered.success;
+		} else {
+			data = yield* dataForArtifactFormat(input, format);
+		}
 		artifacts.push({
 			format,
 			mimeType: ARTIFACT_MIME_TYPES[format],
@@ -2781,6 +2812,7 @@ const exportAndStoreScene = Effect.fn("codeMode.artifacts.exportAndStore")(funct
 		scene: input.scene,
 		excalidraw,
 		renderer: environment.renderer,
+		defaultPng: environment.defaultPng,
 	}).pipe(
 		Effect.mapError(
 			(error) =>

@@ -449,6 +449,7 @@ export const CODE_MODE_ISSUE_CODES = [
 	"label_too_long",
 	"quality_below_threshold",
 	"render_failed",
+	"png_unavailable",
 	"text_overflow",
 	"arrow_binding_invalid",
 	"arrow_overlap",
