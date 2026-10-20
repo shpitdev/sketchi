@@ -1,0 +1,36 @@
+/** The incident flow with the fix branch and the bridge sharing one resolve step, whose yes branch once ran through the escalation's arrowhead above the bridge. From a generated eval sample (Sonnet, round 19, sample 3). */
+export default {
+	id: "incident-escalation-flowchart",
+	title: "Incident Escalation Flowchart",
+	nodes: [
+		{ id: "alert", label: "Monitoring creates an alert", kind: "start" },
+		{ id: "ack", label: "Responder acknowledges the alert", kind: "process" },
+		{ id: "sev", label: "Severity?", kind: "decision" },
+		{ id: "bridge", label: "Incident bridge", kind: "process" },
+		{ id: "mitigate", label: "Mitigate impact", kind: "process" },
+		{ id: "comms", label: "Send customer communications", kind: "process" },
+		{ id: "resolve", label: "Resolve the incident", kind: "end" },
+		{ id: "triage", label: "Triage queue", kind: "process" },
+		{ id: "fix", label: "Is there a fix?", kind: "decision" },
+		{ id: "mon", label: "Monitoring", kind: "process" },
+		{ id: "resolved", label: "Resolved", kind: "end" },
+	],
+	edges: [
+		{ id: "edge-1", source: "alert", target: "ack" },
+		{ id: "edge-2", source: "ack", target: "sev" },
+		{ id: "edge-3", source: "sev", target: "bridge", label: "high" },
+		{ id: "edge-4", source: "sev", target: "triage", label: "medium" },
+		{ id: "edge-5", source: "sev", target: "mon", label: "low" },
+		{ id: "edge-6", source: "bridge", target: "mitigate" },
+		{ id: "edge-7", source: "mitigate", target: "comms" },
+		{ id: "edge-8", source: "comms", target: "resolve" },
+		{ id: "edge-9", source: "triage", target: "fix" },
+		{ id: "edge-10", source: "fix", target: "resolve", label: "yes" },
+		{ id: "edge-11", source: "fix", target: "bridge", label: "no, escalate" },
+		{ id: "edge-12", source: "mon", target: "resolved" },
+	],
+	style: {
+		accentColor: "#8f707f",
+		backgroundColor: "#fffdf8",
+	},
+} as const;

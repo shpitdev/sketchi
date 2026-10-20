@@ -7,6 +7,7 @@ import groupedExpenseApproval from "./fixtures/crossings/grouped-expense-approva
 import incidentEscalation from "./fixtures/crossings/incident-escalation.js";
 import incidentEscalationBridge from "./fixtures/crossings/incident-escalation-bridge.js";
 import incidentEscalationEarlyBridge from "./fixtures/crossings/incident-escalation-early-bridge.js";
+import incidentEscalationSharedResolve from "./fixtures/crossings/incident-escalation-shared-resolve.js";
 import mediaPlayer from "./fixtures/crossings/media-player.js";
 import mediaPlayerEnded from "./fixtures/crossings/media-player-ended.js";
 import namedFinalRetry from "./fixtures/crossings/named-final-retry.js";
@@ -37,6 +38,7 @@ export const crossingFixtures = {
 	"incident-escalation": flowchart(incidentEscalation),
 	"incident-escalation-bridge": flowchart(incidentEscalationBridge),
 	"incident-escalation-early-bridge": flowchart(incidentEscalationEarlyBridge),
+	"incident-escalation-shared-resolve": flowchart(incidentEscalationSharedResolve),
 	"subscription-renewal-dunning": flowchart(subscriptionRenewalDunning),
 	"subscription-renewal-grace": flowchart(subscriptionRenewalGrace),
 	"patient-intake-scheduling": flowchart(patientIntakeScheduling),

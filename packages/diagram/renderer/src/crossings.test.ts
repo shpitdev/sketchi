@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+	candidateRouteQuality,
 	crossingFixtures,
 	crossingStateMachines,
 	routingFixtures,
+	routingQualityScale,
 	wrappedLabelWidth,
 	wrapTextToWidth,
 } from "@sketchi/diagram-core";
@@ -128,6 +130,25 @@ function outlineGaps(scene: RenderedDiagramScene): { edge: string; gap: number; 
 	);
 }
 
+/**
+ * Lines that pass through or touch another line's arrowhead at the size a
+ * reader sees the export: a head a line runs through reads as pointing that
+ * line into the head's target.
+ */
+function arrowheadsCrossed(scene: RenderedDiagramScene): string[] {
+	const routes = arrowsOf(scene).map((arrow) => ({
+		id: arrow.edgeId,
+		points: arrow.points,
+		sourceId: arrow.sourceNodeId,
+		targetId: arrow.targetNodeId,
+		endArrowhead: arrow.endArrowhead !== null,
+	}));
+	const quality = candidateRouteQuality(routes, routingQualityScale(scene));
+	return routes.flatMap((route) =>
+		quality(route).arrowheadsCrossed > 0 ? [`${route.id} runs through an arrowhead`] : [],
+	);
+}
+
 /** Room every line keeps from the outline of a node it passes. */
 const NODE_CLEARANCE = 12;
 
@@ -139,6 +160,7 @@ const CROSSINGS: Readonly<Record<keyof typeof crossingFixtures, readonly [number
 	"incident-escalation": [3, 1],
 	"incident-escalation-bridge": [3, 2],
 	"incident-escalation-early-bridge": [3, 1],
+	"incident-escalation-shared-resolve": [2, 1],
 	"subscription-renewal-dunning": [2, 0],
 	"subscription-renewal-grace": [2, 0],
 	"patient-intake-scheduling": [1, 0],
@@ -164,6 +186,25 @@ describe("avoidable crossings in generated flowcharts", () => {
 		expect(crossings(scenes.get(name)!).length).toBeLessThanOrEqual(now);
 		expect(now).toBeLessThanOrEqual(Math.max(0, main - 1));
 	});
+
+	it.each(flowcharts)("keeps every line of %s clear of every other line's arrowhead", (name) => {
+		expect(arrowheadsCrossed(scenes.get(name)!)).toEqual([]);
+	});
+
+	it.each(["TB", "BT", "LR", "RL"] as const)(
+		"keeps every line of each crossing fixture clear of other arrowheads in %s",
+		(direction) => {
+			const crossed = flowcharts.flatMap((name) =>
+				arrowheadsCrossed(
+					renderIntermediateDiagram({
+						...crossingFixtures[name],
+						layout: { direction, edgeRouting: "orthogonal" },
+					}),
+				).map((finding) => `${name}: ${finding}`),
+			);
+			expect(crossed).toEqual([]);
+		},
+	);
 
 	it("keeps each line clear of every node it passes, rounded and pointed nodes included", () => {
 		const close = flowcharts.flatMap((name) =>

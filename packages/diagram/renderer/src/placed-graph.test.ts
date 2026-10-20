@@ -183,3 +183,55 @@ describe("placed graphs", () => {
 			).toBe(false);
 	});
 });
+
+describe("lines kept clear of arrowheads in a placed graph", () => {
+	// The #509 review's seven placed boxes: on main e10 runs through another
+	// line's head inside an 872 x 780 drawing. Routing it clear of heads must not
+	// stretch the drawing, which shrinks every label in the fitted PNG.
+	it("never lengthens the drawing to clear a head", () => {
+		const box = (x: number, y: number) => ({ x, y, width: 184, height: 72 });
+		const scene = renderGraphDiagram(
+			{
+				id: "placed-heads",
+				title: "Placed",
+				type: "flowchart",
+				nodes: ["n0", "n1", "n2", "n3", "n4", "n5", "n6"].map((id) => ({
+					id,
+					label: `Node ${id.slice(1)}`,
+					kind: "process",
+					metadata: {},
+				})),
+				edges: (
+					[
+						["n0", "n1"],
+						["n1", "n2"],
+						["n2", "n3"],
+						["n3", "n4"],
+						["n4", "n5"],
+						["n5", "n6"],
+						["n0", "n4"],
+						["n1", "n0"],
+						["n2", "n0"],
+						["n3", "n1"],
+						["n6", "n4"],
+					] as const
+				).map(([source, target], index) => ({ id: `e${index}`, source, target, metadata: {} })),
+				layout: { direction: "TB", edgeRouting: "orthogonal" },
+				style: SKETCHI_DIAGRAM_STYLE,
+				metadata: {},
+			},
+			{
+				placement: new Map([
+					["n0", box(0, 480)],
+					["n1", box(0, 0)],
+					["n2", box(260, 320)],
+					["n3", box(260, 0)],
+					["n4", box(0, 320)],
+					["n5", box(520, 0)],
+					["n6", box(0, 160)],
+				]),
+			},
+		);
+		expect(Math.max(scene.width, scene.height)).toBeLessThanOrEqual(872);
+	});
+});

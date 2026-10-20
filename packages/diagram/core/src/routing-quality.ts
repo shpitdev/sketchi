@@ -17,6 +17,11 @@ export interface RoutingQualityArrow {
 	readonly targetId?: string | null;
 	/** Excalidraw draws an "arrow" head at the last point unless this is false. */
 	readonly endArrowhead?: boolean;
+	/**
+	 * The length of the final run the head will be drawn on, when it is longer
+	 * than these points' last segment: a stub reserved for a line not yet routed.
+	 */
+	readonly headRun?: number;
 }
 
 export interface RoutingQualityFinding {
@@ -206,7 +211,7 @@ function arrowhead(arrow: RoutingQualityArrow): Point[] | undefined {
 	const previous = points.at(-2);
 	if (!tip || !previous) return undefined;
 	const length = Math.hypot(tip.x - previous.x, tip.y - previous.y);
-	const size = Math.min(ARROWHEAD_SIZE, length / 2);
+	const size = Math.min(ARROWHEAD_SIZE, Math.max(length, arrow.headRun ?? 0) / 2);
 	const ux = (tip.x - previous.x) / length;
 	const uy = (tip.y - previous.y) / length;
 	const wing = (angle: number) => ({
@@ -304,6 +309,35 @@ function segmentTriangleDistance(a: Point, b: Point, triangle: readonly Point[])
 		);
 	}
 	return distance;
+}
+
+/**
+ * How many placed arrowheads, other than those of `id`, the segment from one
+ * point to another passes through or comes within the reader's arrowhead gap of.
+ */
+export function arrowheadsNear(
+	placed: readonly RoutingQualityArrow[],
+	scale: number,
+): (from: Point, to: Point, id: string) => number {
+	const reach = ARROWHEAD_GAP_PX / scale + STROKE_WIDTH;
+	const heads = placed.flatMap((arrow) => {
+		const head = arrowhead(arrow);
+		return head ? [{ bounds: boxOf(head, reach), head, id: arrow.id }] : [];
+	});
+	return (from, to, id) => {
+		const bounds = boxOf([from, to]);
+		// A line's reserved stub and its routed line share one head.
+		const near = new Set<string>();
+		for (const head of heads)
+			if (
+				head.id !== id &&
+				!near.has(head.id) &&
+				boxesMeet(bounds, head.bounds) &&
+				(segmentTriangleDistance(from, to, head.head) - STROKE_WIDTH) * scale < ARROWHEAD_GAP_PX
+			)
+				near.add(head.id);
+		return near.size;
+	};
 }
 
 /**

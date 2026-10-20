@@ -40,6 +40,7 @@ import {
 	wrappedLabelWidth,
 	type IntermediateDiagram,
 	parseIntermediateDiagram,
+	arrowheadsNear,
 	candidateRouteQuality,
 	routingCorridorGap,
 	routingQualityFindings,
@@ -92,6 +93,8 @@ const PORT_SPACING = 18;
 const PORT_PADDING = 16;
 const RANK_SWEEP_COUNT = 4;
 const ROUTE_STUB_LENGTH = 36;
+/** Excalidraw draws an arrowhead this long, at most half its final run. */
+const ARROWHEAD_LENGTH = 25;
 /** Grid-search expansions spent looking for a lane clear of a near-parallel neighbor. */
 const CORRIDOR_SEARCH_STEPS = 5_000;
 /** Grid-search cost of crossing another arrow: a detour this much longer reads better. */
@@ -1440,6 +1443,11 @@ interface Arrangement {
 	readonly reorder: boolean;
 	/** Route each edge, among otherwise equal lanes, across the fewest arrows routed before it. */
 	readonly avoidCrossings?: boolean;
+	/**
+	 * Route each edge clear of other lines' arrowheads before anything but a node
+	 * or an overlap: a line through a head reads as pointing into its target.
+	 */
+	readonly clearHeads?: boolean;
 	/** In lanes, move a departure off a side that lines arrive by. */
 	readonly separateRoles?: boolean;
 	/** Only these crossed return pairs may leave their parallel lanes. */
@@ -4543,6 +4551,9 @@ function stubReachForRoutes(
 	return reach;
 }
 
+/** Arrival stubs reserved for lines not yet routed; their heads are drawn full size. */
+const reservedArrivals = new WeakSet<ArrowSceneElement>();
+
 /** Reserve fixed endpoint approaches before any route can occupy a later route's stub. */
 function endpointStubsForRoutes(
 	routes: readonly RoutedEdge[],
@@ -4557,6 +4568,14 @@ function endpointStubsForRoutes(
 			sourceNodeId: route.edge.source,
 			targetNodeId: route.edge.target,
 		};
+		const arrival: ArrowSceneElement = {
+			...arrow,
+			points: [
+				pointAwayFromEdge(end, route.targetEdge, targetStubLength(route, end, ROUTE_STUB_LENGTH)),
+				end,
+			],
+		};
+		reservedArrivals.add(arrival);
 		return [
 			{
 				...arrow,
@@ -4570,13 +4589,7 @@ function endpointStubsForRoutes(
 					),
 				],
 			},
-			{
-				...arrow,
-				points: [
-					pointAwayFromEdge(end, route.targetEdge, targetStubLength(route, end, ROUTE_STUB_LENGTH)),
-					end,
-				],
-			},
+			arrival,
 		];
 	});
 }
@@ -4997,6 +5010,8 @@ interface RouteOptions {
 	readonly lanes?: LaneLayout;
 	/** Prefer, among otherwise equal routes, one that crosses fewer routed arrows. */
 	readonly avoidCrossings?: boolean;
+	/** Keep clear of other lines' arrowheads first (see Arrangement.clearHeads). */
+	readonly clearHeads?: boolean;
 }
 
 /**
@@ -5006,6 +5021,8 @@ interface RouteOptions {
 interface RoutedSoFar {
 	/** Lines of other arrows a route crosses, for reader-scale scoring. */
 	readonly crossings?: CrossingLookup;
+	/** Other arrows' heads one step passes through or touches, when routes keep clear of heads first. */
+	readonly heads?: ReturnType<typeof arrowheadsNear>;
 	/** Group frame outlines, which routes cross but never run along. */
 	readonly outlines: readonly RouteSegment[];
 	readonly quality?: ReturnType<typeof candidateRouteQuality>;
@@ -5016,25 +5033,27 @@ function routedSoFar(
 	routedArrows: readonly ArrowSceneElement[],
 	readerScale: number | undefined,
 	avoidCrossings = false,
+	clearHeads = false,
 ): RoutedSoFar {
 	const arrows = routedArrows.some((arrow) => arrow.id.startsWith(LANE_OUTLINE))
 		? routedArrows.filter((arrow) => !arrow.id.startsWith(LANE_OUTLINE))
 		: routedArrows;
+	const scored = arrows.map((arrow) => ({
+		id: arrow.id,
+		points: arrow.points,
+		sourceId: arrow.sourceNodeId,
+		targetId: arrow.targetNodeId,
+		endArrowhead: arrow.endArrowhead !== null,
+		// A reserved arrival stub stands for a line whose head is drawn full size.
+		...(clearHeads && reservedArrivals.has(arrow) ? { headRun: 2 * ARROWHEAD_LENGTH } : {}),
+	}));
 	return {
 		...(readerScale === undefined
 			? {}
 			: {
 					...(avoidCrossings ? { crossings: crossingLookup(arrows) } : {}),
-					quality: candidateRouteQuality(
-						arrows.map((arrow) => ({
-							id: arrow.id,
-							points: arrow.points,
-							sourceId: arrow.sourceNodeId,
-							targetId: arrow.targetNodeId,
-							endArrowhead: arrow.endArrowhead !== null,
-						})),
-						readerScale,
-					),
+					...(clearHeads ? { heads: arrowheadsNear(scored, readerScale) } : {}),
+					quality: candidateRouteQuality(scored, readerScale),
 				}),
 		outlines: existingRouteSegments(
 			routedArrows.filter((arrow) => arrow.id.startsWith(GROUP_OUTLINE)),
@@ -5209,9 +5228,10 @@ function chooseBestRoute(
 			...(borders ? [routeBorderRunCount(candidate, shapes, ignoredNodeIds)] : []),
 			routeSelfOverlapCount(candidate, route),
 			routeArrowOverlapCount(candidate, routed.segments, route),
+			routed.heads ? quality.arrowheadsCrossed : 0,
 			routeOutlineBesideCount(candidate, routed.outlines),
 			quality.corridors,
-			quality.arrowheadsCrossed,
+			routed.heads ? 0 : quality.arrowheadsCrossed,
 			routed.crossings?.route(candidate, `edge:${route.edge.id}`) ?? 0,
 			routeBacktrackDistance(candidate),
 			routeTargetOvershootDistance(candidate),
@@ -6189,6 +6209,7 @@ function obstacleRoute(
 	guided = true,
 	crossings?: CrossingLookup,
 	borders = false,
+	heads?: RoutedSoFar["heads"],
 ): [ScenePoint, ...ScenePoint[]] | undefined {
 	// With a corridor gap, also offer lanes far enough from each routed point to read apart.
 	const lanes = (coordinate: number) =>
@@ -6321,6 +6342,8 @@ function obstacleRoute(
 								beside * 1000 +
 								(outline ? (outline.beside + outline.overlaps) * 1000 : 0) +
 								(lane ? (lane.beside + lane.overlaps) * 1000 : 0) +
+								// Through another line's head costs as much as overlapping it.
+								(heads ? heads(point, next, arrowId) * 10000 : 0) +
 								(crossings && step
 									? crossings.step(
 											step.orientation,
@@ -6350,7 +6373,15 @@ function exteriorLaneRoute(
 	end: ScenePoint,
 	shapes: readonly NodeSceneElement[],
 	existingArrows: readonly ArrowSceneElement[],
-	{ avoidCrossings, readerScale, guided, bandOf, groups, lanes: laneLayout }: RouteOptions,
+	{
+		avoidCrossings,
+		clearHeads,
+		readerScale,
+		guided,
+		bandOf,
+		groups,
+		lanes: laneLayout,
+	}: RouteOptions,
 ): [ScenePoint, ...ScenePoint[]] {
 	const horizontalDominant = Math.abs(end.x - start.x) >= Math.abs(end.y - start.y);
 	const ignoredNodeIds = new Set([route.source.nodeId, route.target.nodeId]);
@@ -6512,7 +6543,7 @@ function exteriorLaneRoute(
 		),
 	];
 
-	const routed = routedSoFar(existingArrows, readerScale, avoidCrossings);
+	const routed = routedSoFar(existingArrows, readerScale, avoidCrossings, clearHeads);
 	// Among zones, a run along a node's border reads as part of the node.
 	const strict = groups?.zoned === true;
 	const first = chooseBestRoute(candidates, shapes, ignoredNodeIds, route, routed, strict);
@@ -6527,26 +6558,27 @@ function exteriorLaneRoute(
 				strict,
 			)
 		: first;
-	const corridors = (points: [ScenePoint, ...ScenePoint[]]) =>
+	const quality = (points: [ScenePoint, ...ScenePoint[]]) =>
 		routed.quality?.({
 			id: `edge:${route.edge.id}`,
 			points,
 			sourceId: route.edge.source,
 			targetId: route.edge.target,
-		}).corridors ?? 0;
+		}) ?? { arrowheadsCrossed: 0, corridors: 0, jogs: 0 };
 	// A run along a node's border, like a corridor, is polish: a bounded search fixes it.
 	const border = strict && routeBorderRunCount(best, shapes, ignoredNodeIds) > 0;
 	const hard =
 		routeNodeCrossingCount(best, shapes, ignoredNodeIds) ||
 		routeSelfOverlapCount(best, route) ||
 		routeArrowOverlapCount(best, routed.segments, route) ||
+		(routed.heads !== undefined && quality(best).arrowheadsCrossed) ||
 		routeOutlineBesideCount(best, routed.outlines);
 	// A pinned line that runs out past its target, around everything between, may
 	// find a way between the nodes instead.
 	const wanders =
 		route.pinned !== undefined &&
 		routeBacktrackDistance(best) + routeTargetOvershootDistance(best) > 0;
-	if (hard || border || corridors(best) || wanders) {
+	if (hard || border || quality(best).corridors || wanders) {
 		// Search lanes that read apart only when a corridor is what remains to fix.
 		const detour = obstacleRoute(
 			start,
@@ -6564,6 +6596,7 @@ function exteriorLaneRoute(
 			guided,
 			routed.crossings,
 			strict,
+			routed.heads,
 		);
 		if (detour)
 			return chooseBestRoute([best, detour], shapes, ignoredNodeIds, route, routed, strict);
@@ -7460,6 +7493,7 @@ function layoutDiagramOnce(
 		...(groups ? { groups } : {}),
 		...(lanes ? { lanes } : {}),
 		...(arrangement.avoidCrossings ? { avoidCrossings: true } : {}),
+		...(arrangement.clearHeads ? { clearHeads: true } : {}),
 	};
 	let edgeArrows = routeAllEdges(
 		routedEdges,
@@ -7652,6 +7686,38 @@ function readerFindingCount(
 		routingQualityFindings(routes, scale).filter(
 			(finding) => jogs || finding.kind !== "endpoint-jog",
 		).length + routes.filter((route) => quality(route).arrowheadsCrossed > 0).length
+	);
+}
+
+/**
+ * Lines that run more than twice the orthogonal distance between their ends,
+ * plus a node and the padding either side of it: a reader takes them for detours.
+ */
+function detouredLines(arrows: readonly ArrowSceneElement[]): number {
+	return arrows.filter((arrow) => {
+		const [start, end] = [arrow.points[0], arrow.points.at(-1)!];
+		const direct = Math.abs(end.x - start.x) + Math.abs(end.y - start.y);
+		return routeLength(arrow.points) > 2 * direct + MIN_NODE_HEIGHT + 2 * PADDING;
+	}).length;
+}
+
+/** Edges whose lines pass through or touch another line's arrowhead, judged at the export size. */
+function headCrossers(layout: DiagramLayout): Set<string> {
+	const nodes = [...layout.nodeShapes, ...groupBlocks(layout.groups), ...laneBlocks(layout.lanes)];
+	const routes = layout.edgeArrows.map((arrow) => ({
+		id: arrow.id,
+		edgeId: arrow.edgeId,
+		points: arrow.points,
+		sourceId: arrow.sourceNodeId,
+		targetId: arrow.targetNodeId,
+		endArrowhead: arrow.endArrowhead !== null,
+	}));
+	const quality = candidateRouteQuality(
+		routes,
+		routingQualityScale(drawnSize(nodes, layout.edgeArrows)),
+	);
+	return new Set(
+		routes.filter((route) => quality(route).arrowheadsCrossed > 0).map((route) => route.edgeId),
 	);
 }
 
@@ -8840,7 +8906,93 @@ export function renderGraphDiagram(
 				best = previous;
 		}
 	}
-	const layout = orthogonal ? clearLabels(clearOutlines(best.layout)) : best.layout;
+	const finished = (settled: DiagramLayout) =>
+		orthogonal ? clearLabels(clearOutlines(settled)) : settled;
+	let layout = finished(best.layout);
+	// A line through another line's arrowhead reads as pointing into that head's
+	// target. Where one is left, the lines through a head are routed again after
+	// all the others, clear of heads first, and, in a graph few enough edges to
+	// repair, every line is. Of these, the clearest is kept that draws fewer
+	// lines through a head, no more export defects, crossings, reader findings,
+	// detours or crowded labels, and no longer a drawing: a narrower one may read
+	// past 2.45:1, but a longer one would shrink all its text.
+	const labelsOf = ({ edgeArrows, groups, lanes, nodeShapes, routedEdges }: DiagramLayout) => {
+		const { shortfalls, touches } = placedBranchLabels(
+			[...edgeArrows],
+			routedEdges,
+			nodeShapes,
+			groups,
+			true,
+			lanes,
+		);
+		return [touches, shortfalls.reduce((total, label) => total + label.shortfall, 0)];
+	};
+	// The drawing's long side, labels included: a longer one shrinks all its text.
+	const longSide = (settled: DiagramLayout) => {
+		const { width, height } = drawnSize(
+			[...settled.nodeShapes, ...groupBlocks(settled.groups), ...laneBlocks(settled.lanes)],
+			settled.edgeArrows,
+			branchLabels(
+				[...settled.edgeArrows],
+				settled.routedEdges,
+				settled.nodeShapes,
+				settled.groups,
+				true,
+				settled.lanes,
+			),
+		);
+		return Math.max(width, height);
+	};
+	const clearer = (candidate: DiagramLayout) => {
+		const [defects, current] = [candidate, layout].map(defectsOf);
+		const [labels, currentLabels] = [candidate, layout].map(labelsOf);
+		return (
+			!fewer(current!, defects!) &&
+			headCrossers(candidate).size < headCrossers(layout).size &&
+			routesNoWorse(candidate, layout, false, true, true) &&
+			longSide(candidate) <= longSide(layout) + AXIS_ALIGNED_EPSILON &&
+			detouredLines(candidate.edgeArrows) <= detouredLines(layout.edgeArrows) &&
+			labels!.every((count, index) => count <= currentLabels![index]!)
+		);
+	};
+	const crossers = orthogonal ? headCrossers(layout) : new Set<string>();
+	const clearings: DiagramLayout[] = [];
+	if (crossers.size > 0 && layout.portOffsets && layout.routeOptions) {
+		const { edgeArrows, nodeShapes, portOffsets, routeOptions, routedEdges } = layout;
+		const order = routedEdges.map((_, index) => index);
+		const last = (index: number) => (crossers.has(routedEdges[index]!.edge.id) ? 1 : 0);
+		clearings.push(
+			finished({
+				...layout,
+				edgeArrows: routeAllEdges(
+					routedEdges,
+					"orthogonal",
+					portOffsets,
+					nodeShapes,
+					{ ...routeOptions, clearHeads: true },
+					order.sort((a, b) => last(a) - last(b)),
+					new Map(
+						edgeArrows.filter((arrow) => !crossers.has(arrow.edgeId)).map((a) => [a.edgeId, a]),
+					),
+				),
+			}),
+		);
+	}
+	if (repairable && crossers.size > 0) {
+		const arrangement = { ...best.arrangement, clearHeads: true };
+		const attempt = layoutDiagram(diagram, levels[0]!, arrangement);
+		clearings.push(
+			finished(repaired({ arrangement, defects: defectsOf(attempt), layout: attempt }).layout),
+		);
+	}
+	// The clearest: fewest lines through a head, then crossings, then findings.
+	const clearness = (candidate: DiagramLayout) => [
+		headCrossers(candidate).size,
+		...routed(candidate, true),
+	];
+	const kept = layout;
+	for (const candidate of clearings.filter(clearer))
+		if (layout === kept || lower(clearness(candidate), clearness(layout))) layout = candidate;
 	const { groups, lanes, routedEdges } = layout;
 	const routedArrows = [...layout.edgeArrows];
 	const descriptions = new Map(

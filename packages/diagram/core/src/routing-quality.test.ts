@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+	arrowheadsNear,
 	candidateRouteQuality,
 	routingQualityFindings,
 	routingQualityScale,
@@ -129,5 +130,29 @@ describe("candidate route quality", () => {
 		const score = candidateRouteQuality([arrow("down", [0, 0], [0, 200])], 1);
 		expect(score(arrow("across", [-100, 195], [100, 195])).arrowheadsCrossed).toBe(1);
 		expect(score(arrow("across", [-100, 120], [100, 120])).arrowheadsCrossed).toBe(0);
+	});
+});
+
+describe("arrowheads near a step", () => {
+	it("counts each other line's head a step passes through once, its own never", () => {
+		const near = arrowheadsNear(
+			[
+				{ ...arrow("down", [0, 0], [0, 36]), endArrowhead: false },
+				arrow("down", [0, 100], [0, 200]),
+				arrow("left", [100, 190], [10, 190]),
+			],
+			1,
+		);
+		expect(near({ x: -100, y: 190 }, { x: 100, y: 190 }, "across")).toBe(2);
+		expect(near({ x: -100, y: 190 }, { x: 100, y: 190 }, "down")).toBe(1);
+		expect(near({ x: -100, y: 120 }, { x: 100, y: 120 }, "across")).toBe(0);
+	});
+
+	it("draws a reserved stub's head full size", () => {
+		const stub = arrow("stub", [0, 164], [0, 200]);
+		const step = [{ x: -100, y: 170 }, { x: 100, y: 170 }, "across"] as const;
+		// A 36-unit stub draws an 18-unit head; its line, once routed, draws 25.
+		expect(arrowheadsNear([stub], 1)(...step)).toBe(0);
+		expect(arrowheadsNear([{ ...stub, headRun: 50 }], 1)(...step)).toBe(1);
 	});
 });

@@ -360,11 +360,11 @@ function routingCounts(scene: ReturnType<typeof renderIntermediateDiagram>) {
 					if (h0 && h1 && v0 && v1 && inside(v0.x, h0.x, h1.x) && inside(h0.y, v0.y, v1.y))
 						crossings += 1;
 				}
+	const heads = routes.filter((route) => quality(route).arrowheadsCrossed > 0).length;
 	return {
 		crossings,
-		findings:
-			routingQualityFindings(routes, scale).length +
-			routes.filter((route) => quality(route).arrowheadsCrossed > 0).length,
+		findings: routingQualityFindings(routes, scale).length + heads,
+		heads,
 	};
 }
 
@@ -394,6 +394,55 @@ function worseThanPinned(
 	return pinnedTotal > 0 && (fewer ? total >= pinnedTotal : total > pinnedTotal)
 		? [...failures, `${set}: ${total} crossings in total, pinned ${pinnedTotal}`]
 		: failures;
+}
+
+/**
+ * Lines through another line's arrowhead each graph draws, by set and
+ * direction, in order; sets not listed (long flows, state graphs) draw none.
+ * Main (7460cf29) drew 597 over these sets, now 407: the lines through a head
+ * are routed again last, clear of heads first, or, in a graph few enough edges
+ * to repair, every line is, each kept only where it routes no worse and draws
+ * no longer. A graph may draw no more than pinned.
+ */
+const HEADS: Readonly<Record<string, Readonly<Record<"TB" | "BT" | "LR" | "RL", string>>>> = {
+	flowcharts: {
+		TB: "1 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 2 0 0 0 0 0 0 2 0 0 0 0 0 0 0",
+		BT: "3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0",
+		LR: "4 1 0 0 0 0 0 0 3 0 0 1 0 0 0 1 0 0 0 0 0 0 1 3 0 0 0 22 0 0 1 0 4 0 0 0 0 0 0 0",
+		RL: "0 1 0 0 0 0 0 0 0 0 0 1 0 0 1 1 0 0 0 0 0 0 0 1 0 0 0 22 1 0 1 0 3 0 0 0 0 0 0 1",
+	},
+	grouped: {
+		TB: "0 0 0 0 0 0 0 0 2 0 2 4 0 3 0 0 0 0 0 0 0 0 0 0 0 1 0 2 0 0",
+		BT: "0 0 0 0 0 0 0 0 0 0 2 7 0 4 1 0 0 0 0 2 0 0 0 0 1 1 0 2 1 0",
+		LR: "0 0 0 0 0 0 0 0 2 0 2 1 0 23 0 0 0 0 0 3 0 4 1 0 5 10 0 2 0 0",
+		RL: "0 0 0 0 0 0 0 0 3 0 1 0 1 23 1 0 0 0 0 0 0 5 0 0 4 0 0 2 0 0",
+	},
+	zoned: {
+		TB: "2 0 0 0 1 0 0 0 1 0 0 0 0 0 0 0 0 0 1 6 0 4 1 2 0 0 1 0 1 0",
+		BT: "4 0 0 0 0 0 0 0 1 0 0 0 3 0 0 1 0 0 2 7 0 4 4 0 0 0 0 0 4 0",
+		LR: "0 0 0 0 0 0 0 0 2 0 0 0 0 0 0 2 0 0 0 6 0 4 0 3 0 0 0 0 0 0",
+		RL: "6 0 0 1 0 0 0 0 2 0 0 0 0 0 0 2 0 0 2 1 3 4 4 3 0 0 5 0 2 1",
+	},
+	laned: {
+		TB: "0 4 0 0 0 0 0 1 0 0 0 0 0 0 2 0 0 0 0 0 2 0 0 5 0 7 0 0 1 0",
+		BT: "0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 1 0 0 0 5 0 4 0 0 0 0",
+		LR: "2 2 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0 0 6 0 6 0 0 0 0",
+		RL: "1 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 2 0 1 29 0 0 0 0 2 0",
+	},
+};
+
+/** Graphs that draw more lines through another line's arrowhead than pinned. */
+function moreHeadsThanPinned(
+	set: string,
+	direction: "TB" | "BT" | "LR" | "RL",
+	counts: readonly { heads: number }[],
+): string[] {
+	const pinned = HEADS[set]?.[direction].split(" ").map(Number) ?? [];
+	return counts.flatMap(({ heads }, index) =>
+		heads > (pinned[index] ?? 0)
+			? [`${set} ${index}: ${pinned[index] ?? 0} -> ${heads} lines through an arrowhead`]
+			: [],
+	);
 }
 
 /**
@@ -1055,9 +1104,12 @@ describe("routing fuzz", () => {
 					"PIN",
 					set,
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}`).join(" "),
+					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}`).join(" "),
 				);
-			return worseThanPinned(set, counts, MAIN_ROUTING[set][direction]);
+			return [
+				...worseThanPinned(set, counts, MAIN_ROUTING[set][direction]),
+				...moreHeadsThanPinned(set, direction, counts),
+			];
 		});
 
 	it("keeps every run of the review's clearance case horizontal or vertical", () => {
@@ -1071,6 +1123,19 @@ describe("routing fuzz", () => {
 			}),
 		);
 		expect(diagonalRuns(scene)).toEqual([]);
+	});
+
+	it("never lengthens the drawing of the #509 review's flowchart to clear an arrowhead", () => {
+		// Seed 20261017, case 47, LR: main draws it 2357.5 x 1650 with a line
+		// through a head; routing that line clear once stretched it to 2418.
+		const scene = renderIntermediateDiagram(
+			parseFlowchartDiagram({
+				...randomFlowcharts(48)[47]!,
+				type: "flowchart",
+				layout: { direction: "LR", edgeRouting: "orthogonal" },
+			}),
+		);
+		expect(Math.max(scene.width, scene.height)).toBeLessThanOrEqual(2357.5);
 	});
 
 	it("routes the review's fan-in case no worse than main in RL", () => {
@@ -1263,9 +1328,10 @@ describe("grouped routing fuzz", () => {
 				console.log(
 					"PIN grouped",
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}`).join(" "),
+					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}`).join(" "),
 				);
 			expect(worseThanPinned("grouped", counts, GROUPED_ROUTING[direction])).toEqual([]);
+			expect(moreHeadsThanPinned("grouped", direction, counts)).toEqual([]);
 		}, 60_000);
 	});
 
@@ -1442,9 +1508,10 @@ describe("zoned routing fuzz", () => {
 				console.log(
 					"PIN zoned",
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}`).join(" "),
+					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}`).join(" "),
 				);
 			expect(worseThanPinned("zoned", counts, ZONED_ROUTING[direction], false)).toEqual([]);
+			expect(moreHeadsThanPinned("zoned", direction, counts)).toEqual([]);
 		}, 120_000);
 	});
 
@@ -1544,8 +1611,7 @@ const KNOWN_LANED_LABEL_DEFECTS: Readonly<Record<"TB" | "BT" | "LR" | "RL", read
 		"0: edge:e20:label on node:n7",
 		"1: edge:e27:label crossed by edge:e27",
 		"6: edge:e10:label on a lane boundary",
-		"14: edge:e24:label crossed by edge:e23",
-		"14: edge:e28:label crossed by edge:e20",
+		"14: edge:e28:label on a lane boundary",
 		"18: edge:e2:label crossed by edge:e4",
 		"18: edge:e2:label on a lane boundary",
 		"19: edge:e25:label on node:n12",
@@ -1561,7 +1627,7 @@ const KNOWN_LANED_LABEL_DEFECTS: Readonly<Record<"TB" | "BT" | "LR" | "RL", read
 		"8: edge:e7:label on a lane boundary",
 		"11: edge:e14:label crossed by edge:e3",
 		"11: edge:e14:label on node:n3",
-		"14: edge:e28:label crossed by edge:e8",
+		"14: edge:e28:label crossed by edge:e28",
 		"20: edge:e19:label crossed by edge:e21",
 		"20: edge:e19:label on node:n11",
 		"23: edge:e34:label crossed by edge:e11",
@@ -1652,9 +1718,10 @@ describe("laned routing fuzz", () => {
 				console.log(
 					"PIN laned",
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}`).join(" "),
+					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}`).join(" "),
 				);
 			expect(worseThanPinned("laned", counts, LANED_ROUTING[direction], false)).toEqual([]);
+			expect(moreHeadsThanPinned("laned", direction, counts)).toEqual([]);
 		}, 60_000);
 	});
 
@@ -1868,9 +1935,10 @@ describe("state graph fuzz", () => {
 				console.log(
 					"PIN state",
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}`).join(" "),
+					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}`).join(" "),
 				);
 			expect(worseThanPinned("state", counts, STATE_ROUTING[direction])).toEqual([]);
+			expect(moreHeadsThanPinned("state", direction, counts)).toEqual([]);
 		}, 60_000);
 	});
 });
