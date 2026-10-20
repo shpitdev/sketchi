@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.25.6
+
+### Patch Changes
+
+- [#504](https://github.com/shpitdev/sketchi/pull/504) [`a0cf902`](https://github.com/shpitdev/sketchi/commit/a0cf9020ad87e17a8df5e251dfc1777d11cde281) Thanks [@anandpant](https://github.com/anandpant)! - A composite state with no initial entry now starts in its first listed regular substate. The build returns a non-blocking warning naming the composite and chosen substate; an explicit initial still takes precedence and invalid entries are rejected.
+
 ## 0.25.5
 
 ### Patch Changes
