@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.25.8
+
+### Patch Changes
+
+- [#509](https://github.com/shpitdev/sketchi/pull/509) [`40a394b`](https://github.com/shpitdev/sketchi/commit/40a394bed4f756686ee8b8f6a6f1885d200a4bf4) Thanks [@anandpant](https://github.com/anandpant)! - A flowchart or state-machine line no longer runs through another line's arrowhead, where that reads as pointing the line into the head's target. When a layout still draws one, the lines through a head are routed again after every other line, clear of arrowheads first, and in a graph of up to 24 edges every line is; the clearer layout is kept when it draws no more crossings, reader findings or crowded labels and no longer a drawing.
+
 ## 0.25.7
 
 ### Patch Changes
