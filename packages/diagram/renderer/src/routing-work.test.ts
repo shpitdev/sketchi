@@ -106,9 +106,10 @@ const denseRelease = parseIntermediateDiagram({
 });
 
 describe("routing work", () => {
-	// Measured: 3.30M checks TB and 3.05M LR with A* grid search, aligned ports and
-	// corridor-aware fallbacks. Rescanning every routed segment on each grid-search
-	// step (aa01b3f1) took 29.4M TB.
+	// Measured: 3.65M checks TB and 5.07M LR with A* grid search, aligned ports,
+	// corridor-aware fallbacks and the drawn layout's arrival polish (3.40M and
+	// 3.19M before it). Rescanning every routed segment on each grid-search step
+	// (aa01b3f1) took 29.4M TB.
 	it.each([
 		["TB", 6_000_000],
 		["LR", 9_000_000],
@@ -125,16 +126,17 @@ describe("routing work", () => {
 });
 
 describe("crossing repair work", () => {
-	// The generated corpus includes the named-final retry case. Keep the existing
-	// work ceiling: side changes are screened by rerouting only the edges they
-	// touch before laying the diagram out in full. Measured 8.88M: 7.98M for the
-	// rest, 0.48M to lay out the shared-resolve incident as before and 0.42M to
-	// route its lines clear of the escalation's arrowhead.
+	// The generated corpus includes the named-final retry case. Side changes are
+	// screened by rerouting only the edges they touch before laying the diagram
+	// out in full. Measured 14.46M: 8.88M as before, the rest to choose decision
+	// branch vertices (each candidate completed through the arrowhead repair, and
+	// tried wherever a decision's branches were flawed before the crossing repair
+	// moved them), screen moves onto a decision's free vertex and polish arrivals.
 	it("bounds segment checks for the generated diagrams it repairs", () => {
 		work.checks = 0;
 		for (const fixture of Object.values(crossingFixtures)) renderIntermediateDiagram(fixture);
 		for (const machine of Object.values(crossingStateMachines)) renderStateMachineDiagram(machine);
-		expect(work.checks).toBeLessThan(9_300_000);
+		expect(work.checks).toBeLessThan(15_000_000);
 	});
 });
 
@@ -212,11 +214,12 @@ describe("swimlane routing work", () => {
 });
 
 describe("zone routing work", () => {
-	// Measured: 1.58M checks for the four zone fixtures in LR and TB, and 13.9M for
+	// Measured: 2.08M checks for the four zone fixtures in LR and TB, and 16.3M for
 	// the two stress cases (zones four deep across two availability zones, and
 	// thirty services in eight zones), each wrapped where too long for one row or
-	// column. Testing each grid step only against the shapes its line runs through
-	// took the stress cases from 27.5M.
+	// column; 1.96M and 14.6M before the drawn layout's arrival polish. Testing
+	// each grid step only against the shapes its line runs through took the
+	// stress cases from 27.5M.
 	it("bounds segment checks for the zone fixtures and stress cases", () => {
 		const render = (fixtures: Record<string, diagramCore.IntermediateDiagram>) => {
 			work.checks = 0;
@@ -231,7 +234,7 @@ describe("zone routing work", () => {
 		const small = render(zoneFixtures);
 		const large = render(zoneStressFixtures);
 		expect(small).toBeGreaterThan(0);
-		expect(small).toBeLessThan(2_000_000);
-		expect(large).toBeLessThan(15_000_000);
+		expect(small).toBeLessThan(2_300_000);
+		expect(large).toBeLessThan(18_000_000);
 	});
 });

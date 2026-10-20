@@ -160,7 +160,7 @@ const CROSSINGS: Readonly<Record<keyof typeof crossingFixtures, readonly [number
 	"incident-escalation": [3, 1],
 	"incident-escalation-bridge": [3, 2],
 	"incident-escalation-early-bridge": [3, 1],
-	"incident-escalation-shared-resolve": [2, 1],
+	"incident-escalation-shared-resolve": [2, 0],
 	"subscription-renewal-dunning": [2, 0],
 	"subscription-renewal-grace": [2, 0],
 	"patient-intake-scheduling": [1, 0],

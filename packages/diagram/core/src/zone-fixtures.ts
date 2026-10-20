@@ -2,6 +2,7 @@ import { parseIntermediateDiagram, type IntermediateDiagram } from "./intermedia
 import { parseFlowchartDiagram } from "./types/flowchart.js";
 import awsThreeTier from "./fixtures/zones/aws-three-tier.js";
 import awsThreeTierDescribed from "./fixtures/zones/aws-three-tier-described.js";
+import awsThreeTierQueries from "./fixtures/zones/aws-three-tier-queries.js";
 import hybridCloud from "./fixtures/zones/hybrid-cloud.js";
 import hybridCloudDescribed from "./fixtures/zones/hybrid-cloud-described.js";
 import hybridCloudLabeled from "./fixtures/zones/hybrid-cloud-labeled.js";
@@ -44,6 +45,12 @@ export const describedHybridFlowchart = flowchart(hybridCloudDescribed);
  * a logo too.
  */
 export const describedArchitectureFlowchart = flowchart(awsThreeTierDescribed);
+
+/**
+ * The AWS three-tier app with labeled lines, both services querying the
+ * database and the users above the region, as a generated sample drew it.
+ */
+export const queriedArchitectureFlowchart = flowchart(awsThreeTierQueries);
 
 /** Zones of the thirty-node stress case, each with its parent and kind. */
 const STRESS_ZONES = [

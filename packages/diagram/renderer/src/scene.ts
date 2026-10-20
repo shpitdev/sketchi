@@ -95,6 +95,8 @@ const RANK_SWEEP_COUNT = 4;
 const ROUTE_STUB_LENGTH = 36;
 /** Excalidraw draws an arrowhead this long, at most half its final run. */
 const ARROWHEAD_LENGTH = 25;
+/** Its wings fan 20 degrees off its line. */
+const ARROWHEAD_WING = (20 * Math.PI) / 180;
 /** Grid-search expansions spent looking for a lane clear of a near-parallel neighbor. */
 const CORRIDOR_SEARCH_STEPS = 5_000;
 /** Grid-search cost of crossing another arrow: a detour this much longer reads better. */
@@ -5064,6 +5066,8 @@ interface RouteOptions {
 	readonly avoidCrossings?: boolean;
 	/** Keep clear of other lines' arrowheads first (see Arrangement.clearHeads). */
 	readonly clearHeads?: boolean;
+	/** Offer any line between facing sides a step midway, as the drawn layout's polish does. */
+	readonly midway?: boolean;
 }
 
 /**
@@ -5788,6 +5792,40 @@ function labelConflicts(
 	);
 }
 
+/** The box an arrow's head is drawn in, wings and stroke included. */
+function arrowheadBox(arrow: ArrowSceneElement): NodeSceneElement | undefined {
+	if (arrow.endArrowhead === null) return undefined;
+	const [previous, tip] = [arrow.points.at(-2), arrow.points.at(-1)];
+	if (!previous || !tip) return undefined;
+	const length = Math.hypot(tip.x - previous.x, tip.y - previous.y);
+	if (length <= 0) return undefined;
+	const size = Math.min(ARROWHEAD_LENGTH, length / 2);
+	const [back, across] = [size * Math.cos(ARROWHEAD_WING), size * Math.sin(ARROWHEAD_WING) + 1];
+	const [ux, uy] = [(tip.x - previous.x) / length, (tip.y - previous.y) / length];
+	const xs = [tip.x, tip.x - ux * back - uy * across, tip.x - ux * back + uy * across];
+	const ys = [tip.y, tip.y - uy * back + ux * across, tip.y - uy * back - ux * across];
+	return obstacleBox(`arrowhead:${arrow.id}`, {
+		x: Math.min(...xs) - 1,
+		y: Math.min(...ys) - 1,
+		width: Math.max(...xs) - Math.min(...xs) + 2,
+		height: Math.max(...ys) - Math.min(...ys) + 2,
+	});
+}
+
+/** A label beside a straight line, pushed out across it past its own arrowhead's wing. */
+function clearOfHead(
+	stub: ScenePoint,
+	arrow: ArrowSceneElement,
+	head: NodeSceneElement | undefined,
+): ScenePoint[] {
+	const [start, next] = arrow.points;
+	if (!head || !next || arrow.points.length !== 2) return [];
+	const reach = (Math.abs(start.x - next.x) <= AXIS_ALIGNED_EPSILON ? head.width : head.height) / 2;
+	return Math.abs(start.x - next.x) <= AXIS_ALIGNED_EPSILON
+		? [{ x: stub.x + Math.sign(stub.x - start.x) * (reach + LABEL_LINE_CLEARANCE), y: stub.y }]
+		: [{ x: stub.x, y: stub.y + Math.sign(stub.y - start.y) * (reach + LABEL_LINE_CLEARANCE) }];
+}
+
 /** Distance from a label box to the nearest of some lines. */
 function nearestLine(box: LabelBox, lines: readonly AxisAlignedSegment[]): number {
 	return Math.min(Infinity, ...lines.map((segment) => boxSegmentDistance(box, segment)));
@@ -5966,15 +6004,22 @@ function placedBranchLabels(
 				: [],
 		);
 		const lines = [...segments.flatMap((other, at) => (at === index ? [] : other)), ...outlines];
+		// Its own line's arrowhead is an obstacle too: on a short line a wing
+		// would reach its text.
+		const head = arrowheadBox(arrow);
+		const obstacles = head ? [...nodes, head] : nodes;
 		const conflicts = (position: ScenePoint, margin = 0) =>
-			labelConflicts(padBox(labelBox(position, size), margin), segments[index]!, lines, nodes, [
+			labelConflicts(padBox(labelBox(position, size), margin), segments[index]!, lines, obstacles, [
 				...others,
 				...placed.map((label) => label.box),
 			]);
 		let position = stub;
 		let fewest = conflicts(stub);
 		if (fewest > 0)
-			for (const candidate of labelSlidePositions(arrow.points, size, labelRuns(routes[index]))) {
+			for (const candidate of [
+				...labelSlidePositions(arrow.points, size, labelRuns(routes[index])),
+				...clearOfHead(stub, arrow, head),
+			]) {
 				const count = conflicts(candidate);
 				if (count < fewest) [position, fewest] = [candidate, count];
 				if (fewest === 0) break;
@@ -6433,6 +6478,7 @@ function exteriorLaneRoute(
 		bandOf,
 		groups,
 		lanes: laneLayout,
+		midway,
 	}: RouteOptions,
 ): [ScenePoint, ...ScenePoint[]] {
 	const horizontalDominant = Math.abs(end.x - start.x) >= Math.abs(end.y - start.y);
@@ -6567,13 +6613,14 @@ function exteriorLaneRoute(
 					: routeForHorizontalLane(bandLane.at, distance),
 			)
 		: [];
-	// A pinned line, or a handoff straight across a lane boundary, between facing
-	// sides may step across midway, a bend clear of both ports rather than a jog
-	// beside one, or on the boundary.
+	// A pinned line, a handoff straight across a lane boundary, or, in the
+	// drawn layout's polish, any line between facing sides may step across
+	// midway, a bend clear of both ports rather than a jog beside one, or on
+	// a lane boundary.
 	const facing =
+		route.targetEdge === OPPOSITE_EDGE[route.sourceEdge] &&
 		(route.pinned !== undefined ||
-			(laneLayout !== undefined && straightHandoff(route, laneLayout))) &&
-		route.targetEdge === OPPOSITE_EDGE[route.sourceEdge];
+			(laneLayout !== undefined ? straightHandoff(route, laneLayout) : midway === true));
 	const middle =
 		route.sourceEdge === "left" || route.sourceEdge === "right"
 			? [
@@ -6747,24 +6794,42 @@ function rerouteDefects(
 }
 
 /**
- * A forward edge that hooks sideways just before its arrowhead, or crosses
- * another arrow on its final approach, reads better entering the free side its
- * last run already approaches. Returns the routes it moved with their previous sides.
+ * A forward edge that hooks sideways just before its arrowhead, crosses
+ * another arrow on its final approach, or, `cornered`, turns over its target's
+ * corner from beyond it into a side another line meets the target by, reads
+ * better entering the free side its last run already approaches. Returns the
+ * routes it moved with their previous sides.
  */
 function resideArrivals(
 	routes: readonly RoutedEdge[],
 	arrows: readonly ArrowSceneElement[],
 	diagram: IntermediateDiagram,
 	scale: number,
-	trigger: "hooked" | "crossed",
+	trigger: "hooked" | "crossed" | "cornered",
 ): { route: RoutedEdge; side: ConnectionEdge }[] {
 	const feedback = flowFeedback(diagram);
-	const used = new Set(
-		routes.flatMap((route) => [
+	const ends = new Map<string, number>();
+	for (const route of routes)
+		for (const key of [
 			portKey(route.source.nodeId, route.sourceEdge),
 			portKey(route.target.nodeId, route.targetEdge),
-		]),
-	);
+		])
+			ends.set(key, (ends.get(key) ?? 0) + 1);
+	const used = new Set(ends.keys());
+	// The last run before the stub starts beyond the target, past a short stub.
+	const turnsCorner = (route: RoutedEdge, arrow: ArrowSceneElement) => {
+		if ((ends.get(portKey(route.target.nodeId, route.targetEdge)) ?? 0) < 2) return false;
+		const corners = straightRuns(arrow.points);
+		if (corners.length < 3) return false;
+		const [from, turn, end] = corners.slice(-3) as [ScenePoint, ScenePoint, ScenePoint];
+		if (Math.abs(end.x - turn.x) + Math.abs(end.y - turn.y) >= 2 * ROUTE_STUB_LENGTH) return false;
+		const { target } = route;
+		const [at, low, size] =
+			Math.abs(from.y - turn.y) <= AXIS_ALIGNED_EPSILON
+				? [from.x, target.x, target.width]
+				: [from.y, target.y, target.height];
+		return at < low - AXIS_ALIGNED_EPSILON || at > low + size + AXIS_ALIGNED_EPSILON;
+	};
 	const resided: { route: RoutedEdge; side: ConnectionEdge }[] = [];
 	for (const [index, arrow] of arrows.entries()) {
 		const route = routes[index]!;
@@ -6774,12 +6839,14 @@ function resideArrivals(
 				? routingQualityFindings([{ id: arrow.id, points: arrow.points }], scale).some(
 						(finding) => finding.kind === "endpoint-jog" && finding.endpoint === "end",
 					)
-				: arrows.some(
-						(other) =>
-							other !== arrow &&
-							// Only a crossing between the turns of the final approach moves it.
-							pathCrossings(arrow.points, other.points, arrow.points.length - 3, false) > 0,
-					);
+				: trigger === "cornered"
+					? turnsCorner(route, arrow)
+					: arrows.some(
+							(other) =>
+								other !== arrow &&
+								// Only a crossing between the turns of the final approach moves it.
+								pathCrossings(arrow.points, other.points, arrow.points.length - 3, false) > 0,
+						);
 		if (!moves) continue;
 		const segments = segmentsFromPoints(arrow.points);
 		const last = segments.at(-1);
@@ -7250,11 +7317,14 @@ function assignContinuationLanes(
 }
 
 interface DiagramLayout {
+	/** Whether arrivals on a side are ordered by where their routes leave (Arrangement.crossingRepair). */
+	byApproach?: boolean;
 	edgeArrows: ArrowSceneElement[];
 	groups?: GroupLayout;
 	lanes?: LaneLayout;
 	nodeShapes: NodeSceneElement[];
-	/** The port offsets and route options the arrows were last routed with. */
+	/** The polish, port offsets and route options the arrows were last routed with. */
+	polish?: RoutingPolish;
 	portOffsets?: ReadonlyMap<string, number>;
 	routeOptions?: RouteOptions;
 	routedEdges: RoutedEdge[];
@@ -7460,6 +7530,26 @@ function pinAnchors(
 		}
 }
 
+/** Port offsets at a polish: aligned, ordered by approach where `byApproach`, then pinned. */
+function portOffsetsAt(
+	routes: readonly RoutedEdge[],
+	polish: RoutingPolish,
+	byApproach: boolean,
+	laned: boolean,
+): Map<string, number> {
+	return withPinnedOffsets(
+		routes,
+		polish.ports
+			? alignedPortOffsets(
+					routes,
+					polish.repair,
+					byApproach,
+					laned ? LANE_ARRIVAL_SPACING : ARRIVAL_SPACING,
+				)
+			: portOffsetsForRoutes(routes, polish.repair),
+	);
+}
+
 function withPinnedOffsets(
 	routes: readonly RoutedEdge[],
 	offsets: Map<string, number>,
@@ -7482,17 +7572,7 @@ function layoutDiagramOnce(
 	const orthogonal = diagram.layout.edgeRouting === "orthogonal";
 	const { anchors, endRun, placement } = graphOptions.get(diagram) ?? {};
 	const offsetsFor = (routes: readonly RoutedEdge[]) =>
-		withPinnedOffsets(
-			routes,
-			polish.ports
-				? alignedPortOffsets(
-						routes,
-						polish.repair,
-						arrangement.crossingRepair,
-						laned(diagram) ? LANE_ARRIVAL_SPACING : ARRIVAL_SPACING,
-					)
-				: portOffsetsForRoutes(routes, polish.repair),
-		);
+		portOffsetsAt(routes, polish, arrangement.crossingRepair, laned(diagram));
 	const { wrap } = arrangement;
 	const zoneCuts = zoneCutEdges(diagram, arrangement.zoneWraps);
 	let {
@@ -7698,10 +7778,12 @@ function layoutDiagramOnce(
 	if (orthogonal && polish.repair)
 		edgeArrows = rerouteDefects(edgeArrows, routedEdges, portOffsets, nodeShapes, options);
 	return {
+		byApproach: arrangement.crossingRepair,
 		edgeArrows,
 		...(groups ? { groups } : {}),
 		...(lanes ? { lanes } : {}),
 		nodeShapes,
+		polish,
 		portOffsets,
 		routeOptions: options,
 		routedEdges,
@@ -8189,6 +8271,7 @@ function crossingMoves(
 	diagram: IntermediateDiagram,
 	portOffsets: ReadonlyMap<string, number>,
 	routes: readonly RoutedEdge[],
+	groups: GroupLayout | undefined,
 ): SideMove[] {
 	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
 	const along = vertical ? "y" : "x";
@@ -8259,31 +8342,40 @@ function crossingMoves(
 					]),
 				);
 			}
-	// A decision's branches trade vertices among themselves.
-	for (const source of new Set([first, second].map((route) => route.source))) {
-		if (!branches(source.kind)) continue;
-		const own = routes.filter(
-			(route) => route.source === source && movable(route) && !feedback.has(route.edge.id),
-		);
-		if (own.length < 2 || own.length > 3) continue;
-		const permutations = (sides: readonly ConnectionEdge[]): ConnectionEdge[][] =>
-			sides.length <= 1
-				? [[...sides]]
-				: sides.flatMap((side, index) =>
-						permutations([...sides.slice(0, index), ...sides.slice(index + 1)]).map((rest) => [
-							side,
-							...rest,
-						]),
-					);
-		for (const order of permutations(own.map((route) => route.sourceEdge))) {
-			const move: SideMove = new Map(
-				own.flatMap((route, index) =>
-					order[index] === route.sourceEdge ? [] : [[route.edge.id, { sourceEdge: order[index]! }]],
-				),
+	// A decision's branches trade vertices among themselves, and, after every
+	// other move, take its free vertex.
+	const decisionMoves = (free: boolean) => {
+		for (const source of new Set([first, second].map((route) => route.source))) {
+			if (!branches(source.kind)) continue;
+			const own = routes.filter(
+				(route) => route.source === source && movable(route) && !feedback.has(route.edge.id),
 			);
-			if (move.size > 0) add(move);
+			if (own.length < 2 || own.length > 3) continue;
+			const current = own.map((route) => route.sourceEdge);
+			const taken = new Set(
+				routes
+					.filter((route) => route.source === source && !own.includes(route) && !isSelfLoop(route))
+					.map((route) => route.sourceEdge),
+			);
+			const vertices = free
+				? branchVertices(nodeFlow(diagram, groups, source.nodeId)).filter(
+						(side) => !taken.has(side),
+					)
+				: current;
+			for (const order of sideAssignments(vertices, own.length)) {
+				if (free && order.every((side) => current.includes(side))) continue;
+				const move: SideMove = new Map(
+					own.flatMap((route, index) =>
+						order[index] === route.sourceEdge
+							? []
+							: [[route.edge.id, { sourceEdge: order[index]! }]],
+					),
+				);
+				if (move.size > 0) add(move);
+			}
 		}
-	}
+	};
+	decisionMoves(false);
 	const ends = [first, second]
 		.filter(movable)
 		.flatMap((route) =>
@@ -8317,6 +8409,7 @@ function crossingMoves(
 		] as const))
 			if (side !== current) add(new Map([[route.edge.id, { [sideKey(endpoint)]: side }]]));
 	}
+	if (!laned(diagram)) decisionMoves(true);
 	return moves;
 }
 
@@ -8330,16 +8423,11 @@ function screenedCrossings(settled: SettledLayout, move: SideMove, polish: Routi
 	const { layout } = settled;
 	if (!layout.portOffsets || !layout.routeOptions) return 0;
 	const routes = layout.routedEdges.map((route) => ({ ...route, ...move.get(route.edge.id) }));
-	const offsets = withPinnedOffsets(
+	const offsets = portOffsetsAt(
 		routes,
-		polish.ports
-			? alignedPortOffsets(
-					routes,
-					polish.repair,
-					settled.arrangement.crossingRepair,
-					layout.lanes ? LANE_ARRIVAL_SPACING : ARRIVAL_SPACING,
-				)
-			: portOffsetsForRoutes(routes, polish.repair),
+		polish,
+		settled.arrangement.crossingRepair,
+		layout.lanes !== undefined,
 	);
 	const moved = new Set(
 		routes.flatMap((route) =>
@@ -8409,6 +8497,7 @@ function repairCrossings(
 				diagram,
 				best.layout.portOffsets ?? new Map(),
 				best.layout.routedEdges,
+				best.layout.groups,
 			),
 		);
 		let round = ROUND_MOVES;
@@ -8437,6 +8526,573 @@ function repairCrossings(
 		}
 	}
 	return best;
+}
+
+/** Whether the first score that differs is lower in `left`. */
+function lowerScore(left: readonly number[], right: readonly number[]): boolean {
+	const index = left.findIndex((value, at) => value !== right[at]);
+	return index >= 0 && left[index]! < right[index]!;
+}
+
+/** The direction a node reads in: across the flow inside a group laid out across it. */
+function nodeFlow(
+	diagram: IntermediateDiagram,
+	groups: GroupLayout | undefined,
+	nodeId: string,
+): LayoutDirection {
+	const group = groups?.groupOf.get(nodeId);
+	return group !== undefined && groups!.across.has(group)
+		? ACROSS_DIRECTION[diagram.layout.direction]
+		: diagram.layout.direction;
+}
+
+/** The vertices a decision's forward branches may leave by: across the flow either way, and forward. */
+function branchVertices(direction: LayoutDirection): readonly ConnectionEdge[] {
+	const [low, high]: readonly ConnectionEdge[] =
+		direction === "TB" || direction === "BT" ? ["left", "right"] : ["top", "bottom"];
+	return [low!, FORWARD_SIDE[direction], high!];
+}
+
+/** Whether a line leaving its source by this side starts away from its target. */
+function leavesAway(route: RoutedEdge, side: ConnectionEdge): boolean {
+	const normal = EDGE_NORMAL[side];
+	const [axis, size] = normal.x === 0 ? (["y", "height"] as const) : (["x", "width"] as const);
+	return (
+		(center(route.target)[axis] - center(route.source)[axis]) * normal[axis] <
+		-route.source[size] / 2
+	);
+}
+
+/**
+ * Lines that step back out from the side they arrive by just before turning
+ * into it: past a run toward the target, a short run away from the side, one
+ * along it and the stub, so the line dips beyond the side and hooks back in.
+ */
+function dippedArrivals(arrows: readonly ArrowSceneElement[]): Set<string> {
+	return new Set(
+		arrows.flatMap((arrow) => {
+			const corners = straightRuns(arrow.points);
+			if (corners.length < 5) return [];
+			const [from, out, along, end] = corners.slice(-4) as [
+				ScenePoint,
+				ScenePoint,
+				ScenePoint,
+				ScenePoint,
+			];
+			const stub = { x: end.x - along.x, y: end.y - along.y };
+			const away = { x: out.x - from.x, y: out.y - from.y };
+			return stub.x * away.x + stub.y * away.y < 0 &&
+				Math.abs(away.x) + Math.abs(away.y) < 2 * ROUTE_STUB_LENGTH
+				? [arrow.edgeId]
+				: [];
+		}),
+	);
+}
+
+/** Every injective assignment of `count` items to the given sides, in order. */
+function sideAssignments(sides: readonly ConnectionEdge[], count: number): ConnectionEdge[][] {
+	if (count === 0) return [[]];
+	return sides.flatMap((side, index) =>
+		sideAssignments([...sides.slice(0, index), ...sides.slice(index + 1)], count - 1).map(
+			(rest) => [side, ...rest],
+		),
+	);
+}
+
+/** A settled layout carried through its repairs, finished as it is drawn. */
+interface CompletedLayout {
+	readonly layout: DiagramLayout;
+	readonly settled: SettledLayout;
+}
+
+/** Branch-side assignments laid out per decision, and of those, completed. */
+const BRANCH_SCREENS = 2;
+const BRANCH_COMPLETIONS = 1;
+
+/**
+ * How far a branch leaving by this vertex runs at least: its stub, then
+ * straight across and along to its target's middle.
+ */
+function branchReach(route: RoutedEdge, side: ConnectionEdge): number {
+	const out = pointAwayFromEdge(pointOnEdge(route.source, side), side, ROUTE_STUB_LENGTH);
+	const end = center(route.target);
+	return ROUTE_STUB_LENGTH + Math.abs(end.x - out.x) + Math.abs(end.y - out.y);
+}
+
+/**
+ * A decision's forward branches leave by whichever of its lateral and forward
+ * vertices route them best together. Where one of them doubles back around
+ * its decision, detours or dips into its target as drawn, or two of them
+ * cross, the other assignments of the branches to those vertices that double
+ * back no more and reach their targets most directly are laid out. The best
+ * of those, arranged with no more crossings, detours and dips, is completed
+ * like the drawn layout and kept when it has fewer crossings, then fewer
+ * detours and dips, then shorter lines (a loop shows in the length it adds),
+ * no more export defects, and draws no more reader findings, lines through a
+ * head, hooks or crowded labels, and no longer a drawing.
+ */
+function chooseBranchSides(
+	diagram: IntermediateDiagram,
+	polish: RoutingPolish,
+	arranged: SettledLayout,
+	drawn: CompletedLayout,
+	complete: (
+		settled: SettledLayout,
+		hopeless?: (layout: DiagramLayout) => boolean,
+	) => CompletedLayout,
+	defectsOf: (layout: DiagramLayout) => readonly [number, number],
+	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
+): CompletedLayout {
+	const feedback = flowFeedback(diagram);
+	const { continuations } = arranged.arrangement.wrap;
+	// A loop shows in the length it adds.
+	const score = (layout: DiagramLayout) => [
+		arrowCrossings(layout.edgeArrows),
+		detouredLines(layout.edgeArrows) + dippedArrivals(layout.edgeArrows).size,
+		layout.edgeArrows.reduce((sum, arrow) => sum + routeLength(arrow.points), 0),
+	];
+	const noWorse = (candidate: DiagramLayout, current: DiagramLayout) => {
+		const [labels, currentLabels] = [candidate, current].map(labelCrowding);
+		return (
+			!fewer(defectsOf(current), defectsOf(candidate)) &&
+			routesNoWorse(candidate, current, false, true) &&
+			headCrossers(candidate).size <= headCrossers(current).size &&
+			hookedRoutes(candidate) <= hookedRoutes(current) &&
+			labels!.every((count, index) => count <= currentLabels![index]!) &&
+			reads(candidate, current)
+		);
+	};
+	// No longer a drawing, and no longer for its breadth unless shorter.
+	const reads = (candidate: DiagramLayout, current: DiagramLayout) => {
+		const [size, currentSize] = [candidate, current].map(drawnExtent);
+		const [long, currentLong] = [size!, currentSize!].map(({ width, height }) =>
+			Math.max(width, height),
+		);
+		return (
+			long! <= currentLong! + AXIS_ALIGNED_EPSILON &&
+			(long! < currentLong! - AXIS_ALIGNED_EPSILON ||
+				exportAspect(size!.width, size!.height) <=
+					exportAspect(currentSize!.width, currentSize!.height) + AXIS_ALIGNED_EPSILON)
+		);
+	};
+	let [base, best] = [arranged, drawn];
+	let bestScore = score(best.layout);
+	const decisions = new Set(
+		drawn.layout.routedEdges
+			.filter((route) => branches(route.source.kind))
+			.map((route) => route.source.nodeId),
+	);
+	for (const decision of decisions) {
+		const { groups, routedEdges } = best.layout;
+		const departures = routedEdges.filter(
+			(route) => route.source.nodeId === decision && !isSelfLoop(route),
+		);
+		const own = departures.filter(
+			(route) =>
+				!feedback.has(route.edge.id) &&
+				route.pinned === undefined &&
+				route.pair === undefined &&
+				!continuations.has(route.edge.id),
+		);
+		if (own.length < 2 || own.length > 3) continue;
+		const ids = new Set(own.map((route) => route.edge.id));
+		const arrangedScore = score(base.layout);
+		const looping = (order: readonly ConnectionEdge[]) =>
+			own.filter((route, index) => leavesAway(route, order[index]!)).length;
+		// As drawn, or as arranged before a crossing repair moved them.
+		// As drawn, or as arranged before a crossing repair moved them.
+		const [loops, flawed] = [best.layout, base.layout]
+			.map((layout) => {
+				const lines = layout.edgeArrows.filter((arrow) => ids.has(arrow.edgeId));
+				const count = layout.routedEdges.filter(
+					(route) => ids.has(route.edge.id) && leavesAway(route, route.sourceEdge),
+				).length;
+				const flaw =
+					count > 0 ||
+					detouredLines(lines) > 0 ||
+					dippedArrivals(lines).size > 0 ||
+					arrowCrossings(lines) > 0;
+				return [count, flaw] as const;
+			})
+			.reduce(([count, flaw], [next, nextFlaw]) => [Math.max(count, next), flaw || nextFlaw]);
+		if (!flawed) continue;
+		const taken = new Set(
+			departures.filter((route) => !ids.has(route.edge.id)).map((route) => route.sourceEdge),
+		);
+		const vertices = branchVertices(nodeFlow(diagram, groups, decision)).filter(
+			(side) => !taken.has(side),
+		);
+		// Only the assignments that reach their targets most directly are laid out.
+		const reach = (order: readonly ConnectionEdge[]) =>
+			own.reduce((sum, route, index) => sum + branchReach(route, order[index]!), 0);
+		const arrangedCandidates = sideAssignments(vertices, own.length)
+			.filter(
+				(order) =>
+					looping(order) <= loops && order.some((side, index) => side !== own[index]!.sourceEdge),
+			)
+			.sort((a, b) => reach(a) - reach(b))
+			.slice(0, BRANCH_SCREENS)
+			.map((order) => {
+				const sides = new Map(base.arrangement.sides);
+				own.forEach((route, index) =>
+					sides.set(route.edge.id, { ...sides.get(route.edge.id), sourceEdge: order[index]! }),
+				);
+				const arrangement = { ...base.arrangement, sides };
+				const layout = layoutDiagram(diagram, polish, arrangement);
+				return { arrangement, defects: defectsOf(layout), layout, score: score(layout) };
+			})
+			// Before its repairs, it must cross and flaw no more than the arranged layout did.
+			.filter((candidate) => !lowerScore(arrangedScore.slice(0, 2), candidate.score.slice(0, 2)))
+			.sort((a, b) => (lowerScore(a.score, b.score) ? -1 : lowerScore(b.score, a.score) ? 1 : 0))
+			.slice(0, BRANCH_COMPLETIONS);
+		let chosen: { base: SettledLayout; drawn: CompletedLayout; score: number[] } | undefined;
+		for (const { score: _, ...settled } of arrangedCandidates) {
+			const candidate = complete(settled, (layout) =>
+				lowerScore((chosen?.score ?? bestScore).slice(0, 2), score(layout).slice(0, 2)),
+			);
+			const candidateScore = score(candidate.layout);
+			if (
+				lowerScore(candidateScore, chosen?.score ?? bestScore) &&
+				noWorse(candidate.layout, best.layout)
+			)
+				chosen = { base: settled, drawn: candidate, score: candidateScore };
+		}
+		if (chosen) [base, best, bestScore] = [chosen.base, chosen.drawn, chosen.score];
+	}
+	return best;
+}
+
+/**
+ * The drawn layout with its arrivals polished. An arrival that turns over its
+ * target's corner, from beyond the target, into a side another line meets it
+ * by, or that dips past its side and hooks back in, enters by the side its
+ * approach faces instead, where that side is free or flat with only arrivals;
+ * and every line between facing sides that jogs beside a port may step across
+ * midway. Only those lines, and lines whose ports shift, route again around
+ * the others as they lie. Kept when it draws fewer reader findings or dips,
+ * or bends those lines less, without lengthening them, and has no more export
+ * defects and draws no more crossings, reader findings, lines through a head,
+ * hooks, detours, dips or crowded labels, and no longer a drawing.
+ */
+function polishArrivals(
+	diagram: IntermediateDiagram,
+	layout: DiagramLayout,
+	finished: (layout: DiagramLayout) => DiagramLayout,
+	defectsOf: (layout: DiagramLayout) => readonly [number, number],
+	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
+): DiagramLayout {
+	const { edgeArrows, lanes, nodeShapes, polish, portOffsets, routeOptions } = layout;
+	if (!polish?.sides || !portOffsets || !routeOptions?.readerScale || lanes) return layout;
+	const routes = layout.routedEdges.map((route) => ({ ...route }));
+	const drawn = [...nodeShapes, ...groupBlocks(layout.groups)];
+	const scale = routingQualityScale(drawnSize(drawn, edgeArrows));
+	const changed = new Set(
+		resideArrivals(routes, edgeArrows, diagram, scale, "cornered").map(
+			({ route }) => route.edge.id,
+		),
+	);
+	const feedback = flowFeedback(diagram);
+	const dipped = dippedArrivals(edgeArrows);
+	for (const [index, arrow] of edgeArrows.entries()) {
+		const route = routes[index]!;
+		if (
+			!dipped.has(arrow.edgeId) ||
+			feedback.has(route.edge.id) ||
+			route.pinned?.target !== undefined
+		)
+			continue;
+		const [before, from] = straightRuns(arrow.points).slice(-5) as [ScenePoint, ScenePoint];
+		const side: ConnectionEdge =
+			Math.abs(before.y - from.y) <= AXIS_ALIGNED_EPSILON
+				? from.x > before.x
+					? "left"
+					: "right"
+				: from.y > before.y
+					? "top"
+					: "bottom";
+		const others = routes.filter(
+			(other) =>
+				other !== route &&
+				((other.source === route.target && other.sourceEdge === side) ||
+					(other.target === route.target && other.targetEdge === side)),
+		);
+		if (
+			side === route.targetEdge ||
+			(others.length > 0 &&
+				(curvedSide(route.target, side) || others.some((other) => other.source === route.target)))
+		)
+			continue;
+		route.targetEdge = side;
+		changed.add(route.edge.id);
+	}
+	// A line that starts in line with the free side of its target it faces,
+	// nothing between, drops straight into it.
+	for (const [index, arrow] of edgeArrows.entries()) {
+		const route = routes[index]!;
+		const side = OPPOSITE_EDGE[route.sourceEdge];
+		const { target } = route;
+		if (
+			route.targetEdge === side ||
+			changed.has(route.edge.id) ||
+			feedback.has(route.edge.id) ||
+			route.pinned?.target !== undefined ||
+			isSelfLoop(route) ||
+			routes.some(
+				(other) =>
+					(other.target === target && other.targetEdge === side) ||
+					(other.source === target && other.sourceEdge === side),
+			)
+		)
+			continue;
+		const start = arrow.points[0];
+		const axis = slotAxis(side);
+		const [low, size] = axis === "x" ? [target.x, target.width] : [target.y, target.height];
+		const end = pointOnEdge(target, side, start[axis] - low - size / 2);
+		if (
+			start[axis] <= low + PORT_PADDING ||
+			start[axis] >= low + size - PORT_PADDING ||
+			EDGE_NORMAL[side][axis === "x" ? "y" : "x"] *
+				(start[axis === "x" ? "y" : "x"] - end[axis === "x" ? "y" : "x"]) <=
+				0 ||
+			nodeShapes.some(
+				(node) =>
+					node.nodeId !== route.source.nodeId &&
+					node.nodeId !== target.nodeId &&
+					directSegmentCrossesNode(start, end, node),
+			)
+		)
+			continue;
+		route.targetEdge = side;
+		changed.add(route.edge.id);
+	}
+	for (const finding of routingQualityFindings(
+		edgeArrows.map((arrow) => ({ id: arrow.edgeId, points: arrow.points })),
+		scale,
+	))
+		if (finding.kind === "endpoint-jog") {
+			const route = routes.find((candidate) => candidate.edge.id === finding.arrowIds[0])!;
+			if (route.targetEdge === OPPOSITE_EDGE[route.sourceEdge]) changed.add(route.edge.id);
+		}
+	if (changed.size === 0) return layout;
+	const offsets = portOffsetsAt(routes, polish, layout.byApproach ?? false, false);
+	const again = new Set(
+		routes.flatMap((route) =>
+			changed.has(route.edge.id) ||
+			(["source", "target"] as const).some((endpoint) => {
+				const key = connectionKey({ edgeId: route.edge.id, endpoint });
+				return offsets.get(key) !== portOffsets.get(key);
+			})
+				? [route.edge.id]
+				: [],
+		),
+	);
+	// The lines kept as they lie come first; the others route around them in edge order.
+	const order = routes
+		.map((route, index) => ({ again: again.has(route.edge.id), index }))
+		.sort((a, b) => Number(a.again) - Number(b.again))
+		.map(({ index }) => index);
+	const candidate = finished({
+		...layout,
+		edgeArrows: routeAllEdges(
+			routes,
+			"orthogonal",
+			offsets,
+			nodeShapes,
+			{ ...routeOptions, midway: true },
+			order,
+			new Map(edgeArrows.filter((arrow) => !again.has(arrow.edgeId)).map((a) => [a.edgeId, a])),
+		),
+		portOffsets: offsets,
+		routedEdges: routes,
+	});
+	const lines = (arrows: readonly ArrowSceneElement[]) =>
+		arrows
+			.filter((arrow) => changed.has(arrow.edgeId))
+			.reduce(
+				(sum, arrow) => ({
+					bends: sum.bends + routeBendCount(arrow.points),
+					length: sum.length + routeLength(arrow.points),
+				}),
+				{ bends: 0, length: 0 },
+			);
+	const [before, after] = [lines(edgeArrows), lines(candidate.edgeArrows)];
+	const [findings, currentFindings] = [candidate, layout].map((settled) =>
+		readerFindingCount(settled.edgeArrows, [...settled.nodeShapes, ...groupBlocks(settled.groups)]),
+	);
+	const [dips, currentDips] = [candidate, layout].map(
+		(settled) => dippedArrivals(settled.edgeArrows).size,
+	);
+	return (findings! < currentFindings! || dips! < currentDips! || after.bends < before.bends) &&
+		after.length <= before.length + AXIS_ALIGNED_EPSILON &&
+		drawsNoWorse(candidate, layout, defectsOf, fewer)
+		? candidate
+		: layout;
+}
+
+/**
+ * Whether a route swings out past the box its two ends span, a stub's length
+ * or more each way.
+ */
+function swingsOut(points: readonly ScenePoint[]): boolean {
+	const [start, end] = [points[0]!, points.at(-1)!];
+	const direct = Math.abs(end.x - start.x) + Math.abs(end.y - start.y);
+	return (
+		routeLength(points) >= direct + 2 * ROUTE_STUB_LENGTH &&
+		points.some(
+			(point) =>
+				point.x < Math.min(start.x, end.x) - AXIS_ALIGNED_EPSILON ||
+				point.x > Math.max(start.x, end.x) + AXIS_ALIGNED_EPSILON ||
+				point.y < Math.min(start.y, end.y) - AXIS_ALIGNED_EPSILON ||
+				point.y > Math.max(start.y, end.y) + AXIS_ALIGNED_EPSILON,
+		)
+	);
+}
+
+/** Arrival ports tried along a side, as fractions of its reach: the middle and either end. */
+const ARRIVAL_PORT_STEPS = [0, -1, 1];
+
+/**
+ * The drawn layout with each line between facing sides that bends more than
+ * twice, out past its ends, into a flat side it alone arrives by moved along
+ * that side to the port from which it routes with the fewest bends, then the
+ * shortest line: a port aligned with the line's start that a group's name or
+ * another obstacle blocks sends the line around instead. Only that line routes again, around
+ * the others as they lie, kept when it bends less without lengthening and
+ * the layout draws no worse.
+ */
+function straightenArrivals(
+	layout: DiagramLayout,
+	finished: (layout: DiagramLayout) => DiagramLayout,
+	defectsOf: (layout: DiagramLayout) => readonly [number, number],
+	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
+): DiagramLayout {
+	const { lanes, nodeShapes, polish, routeOptions, routedEdges } = layout;
+	if (!polish?.sides || !layout.portOffsets || !routeOptions?.readerScale || lanes) return layout;
+	let current = layout;
+	for (const [index, route] of routedEdges.entries()) {
+		const line = current.edgeArrows[index]!;
+		const { target, targetEdge } = route;
+		if (
+			targetEdge !== OPPOSITE_EDGE[route.sourceEdge] ||
+			route.pinned?.target !== undefined ||
+			routeBendCount(line.points) <= 2 ||
+			// Only a line that swings out past its ends goes around its port.
+			!swingsOut(line.points) ||
+			curvedSide(target, targetEdge) ||
+			routedEdges.some(
+				(other) =>
+					other !== route &&
+					((other.target === target && other.targetEdge === targetEdge) ||
+						(other.source === target && other.sourceEdge === targetEdge)),
+			)
+		)
+			continue;
+		const key = connectionKey({ edgeId: route.edge.id, endpoint: "target" });
+		const reach = portLimit(target, targetEdge);
+		const fixed = new Map(
+			current.edgeArrows.filter((arrow) => arrow !== line).map((arrow) => [arrow.edgeId, arrow]),
+		);
+		const order = routedEdges
+			.map((_, at) => at)
+			.sort((a, b) => Number(a === index) - Number(b === index));
+		const ports = ARRIVAL_PORT_STEPS.flatMap((step) => {
+			const offset = step * reach;
+			if (Math.abs(offset - (current.portOffsets!.get(key) ?? 0)) <= AXIS_ALIGNED_EPSILON)
+				return [];
+			const offsets = new Map(current.portOffsets).set(key, offset);
+			const arrows = routeAllEdges(
+				routedEdges,
+				"orthogonal",
+				offsets,
+				nodeShapes,
+				{ ...routeOptions, midway: true },
+				order,
+				fixed,
+			);
+			const points = arrows[index]!.points;
+			const [bends, length] = [routeBendCount(points), routeLength(points)];
+			return bends < routeBendCount(line.points) &&
+				length <= routeLength(line.points) + AXIS_ALIGNED_EPSILON
+				? [{ arrows, bends, length, offsets }]
+				: [];
+		});
+		// The straightest port, where it crosses no more lines and draws no worse.
+		const straightest = ports.sort((a, b) => a.bends - b.bends || a.length - b.length)[0];
+		if (!straightest || arrowCrossings(straightest.arrows) > arrowCrossings(current.edgeArrows))
+			continue;
+		const candidate = finished({
+			...current,
+			edgeArrows: straightest.arrows,
+			portOffsets: straightest.offsets,
+		});
+		if (drawsNoWorse(candidate, current, defectsOf, fewer)) current = candidate;
+	}
+	return current;
+}
+
+/**
+ * No more export defects, and no more crossings, reader findings, lines
+ * through a head, hooks, detours, dips or crowded labels, and no newly
+ * extreme aspect or longer a drawing.
+ */
+function drawsNoWorse(
+	candidate: DiagramLayout,
+	current: DiagramLayout,
+	defectsOf: (layout: DiagramLayout) => readonly [number, number],
+	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
+): boolean {
+	const [labels, currentLabels] = [candidate, current].map(labelCrowding);
+	return (
+		!fewer(defectsOf(current), defectsOf(candidate)) &&
+		routesNoWorse(candidate, current, false, true) &&
+		headCrossers(candidate).size <= headCrossers(current).size &&
+		hookedRoutes(candidate) <= hookedRoutes(current) &&
+		detouredLines(candidate.edgeArrows) <= detouredLines(current.edgeArrows) &&
+		dippedArrivals(candidate.edgeArrows).size <= dippedArrivals(current.edgeArrows).size &&
+		labels!.every((count, index) => count <= currentLabels![index]!) &&
+		drawnLongSide(candidate) <= drawnLongSide(current) + AXIS_ALIGNED_EPSILON
+	);
+}
+
+/** Branch labels touching anything, then how far the labels fall short of their room. */
+function labelCrowding({
+	edgeArrows,
+	groups,
+	lanes,
+	nodeShapes,
+	routedEdges,
+}: DiagramLayout): [number, number] {
+	const { shortfalls, touches } = placedBranchLabels(
+		[...edgeArrows],
+		routedEdges,
+		nodeShapes,
+		groups,
+		true,
+		lanes,
+	);
+	return [touches, shortfalls.reduce((total, label) => total + label.shortfall, 0)];
+}
+
+/** The drawing's width and height, labels included. */
+function drawnExtent(settled: DiagramLayout): { width: number; height: number } {
+	return drawnSize(
+		[...settled.nodeShapes, ...groupBlocks(settled.groups), ...laneBlocks(settled.lanes)],
+		settled.edgeArrows,
+		branchLabels(
+			[...settled.edgeArrows],
+			settled.routedEdges,
+			settled.nodeShapes,
+			settled.groups,
+			true,
+			settled.lanes,
+		),
+	);
+}
+
+/** The drawing's long side, labels included: a longer one shrinks all its text. */
+function drawnLongSide(settled: DiagramLayout): number {
+	const { width, height } = drawnExtent(settled);
+	return Math.max(width, height);
 }
 
 /** Shapes each marker kind draws as: a final's core is the filled dot inside its ring. */
@@ -8937,10 +9593,6 @@ export function renderGraphDiagram(
 		readerFindingCount(layout.edgeArrows, [...layout.nodeShapes, ...groupBlocks(layout.groups)]),
 		lengthOf(layout).aspect,
 	];
-	const lower = (left: readonly number[], right: readonly number[]) => {
-		const index = left.findIndex((value, at) => value !== right[at]);
-		return index >= 0 && left[index]! < right[index]!;
-	};
 	for (
 		let round = 0;
 		round < ZONE_WRAP_ROUNDS && arranged && orthogonal && structure?.zoned;
@@ -8978,7 +9630,8 @@ export function renderGraphDiagram(
 			)
 				continue;
 			const score = zoneScore(layout);
-			if (!chosen || lower(score, chosen.score)) chosen = { arrangement, defects, layout, score };
+			if (!chosen || lowerScore(score, chosen.score))
+				chosen = { arrangement, defects, layout, score };
 			// A plan with no more crossings or reader findings than before needs no rival.
 			const [crossings, findings] = zoneScore(kept.layout);
 			if (score[0]! <= crossings! && score[1]! <= findings!) break;
@@ -9024,215 +9677,223 @@ export function renderGraphDiagram(
 			? repairCrossings(diagram, levels[0]!, settled, defectsOf, fewer)
 			: settled;
 	};
-	const unrepaired = best;
-	best = repaired(best);
-	// Continuations through the gap between bands that still cross after the
-	// repairs give way to continuations around the ends of the bands, repaired
-	// the same way, where those route no worse and end with strictly fewer
-	// crossings or reader findings.
-	const { wrap: gapWrap } = unrepaired.arrangement;
-	if (
-		repairable &&
-		!laned(diagram) &&
-		gapWrap.continuations.size > 0 &&
-		!gapWrap.lineBreaks &&
-		arrowCrossings(best.layout.edgeArrows) > 0
-	) {
-		const arrangement = { ...unrepaired.arrangement, wrap: { ...gapWrap, lineBreaks: true } };
-		const layout = layoutDiagram(diagram, levels[0]!, arrangement);
-		const around = repaired({ arrangement, defects: defectsOf(layout), layout });
-		if (!fewer(best.defects, around.defects) && cleaner(around.layout, best.layout, true))
-			best = around;
-	}
-	// Only pairs still crossing after the normal repairs may leave their lanes.
-	// One extra ordinary-routing layout is screened by the same export/reader
-	// admission as other candidates. Preserve every unrelated paired lane.
-	if (options.pairedReturns && arrowCrossings(best.layout.edgeArrows) > 0) {
-		const previous = best;
-		const arrows = new Map(best.layout.edgeArrows.map((arrow) => [arrow.edgeId, arrow]));
-		const unpairedReturns = new Set<string>();
-		for (const route of best.layout.routedEdges) {
-			const arrow = arrows.get(route.edge.id);
-			if (
-				route.pair === undefined ||
-				!arrow ||
-				!best.layout.edgeArrows.some(
-					(other) => other !== arrow && arrowCrossings([arrow, other]) > 0,
-				)
-			)
-				continue;
-			for (const member of best.layout.routedEdges)
-				if (
-					member.pair !== undefined &&
-					(member.edge.id === route.edge.id ||
-						(member.edge.source === route.edge.target && member.edge.target === route.edge.source))
-				)
-					unpairedReturns.add(member.edge.id);
-		}
-		if (unpairedReturns.size > 0) {
-			consider({ ...best.arrangement, unpairedReturns }, true);
-			const remaining = arrowCrossings(best.layout.edgeArrows);
-			if (
-				best !== previous &&
-				repairable &&
-				remaining > 0 &&
-				remaining <= CROSSING_REPAIR_MAX_CROSSINGS
-			)
-				best = repairCrossings(diagram, levels[0]!, best, defectsOf, fewer);
-			const keptPairs = new Set(
-				best.layout.routedEdges
-					.filter((route) => route.pair !== undefined)
-					.map((route) => route.edge.id),
-			);
-			if (
-				previous.layout.routedEdges.some(
-					(route) =>
-						route.pair !== undefined &&
-						!unpairedReturns.has(route.edge.id) &&
-						!keptPairs.has(route.edge.id),
-				)
-			)
-				best = previous;
-		}
-	}
 	const finished = (settled: DiagramLayout) =>
 		orthogonal ? clearLabels(clearOutlines(settled)) : settled;
-	let layout = finished(best.layout);
-	const crowding = ({ edgeArrows, groups, lanes, nodeShapes, routedEdges }: DiagramLayout) => {
-		const { shortfalls, touches } = placedBranchLabels(
-			[...edgeArrows],
-			routedEdges,
-			nodeShapes,
-			groups,
-			true,
-			lanes,
-		);
-		return [touches, shortfalls.reduce((total, label) => total + label.shortfall, 0)];
-	};
-	// A plain column, or a laned flow, still too long for its breadth, which no
-	// wrap shortened, tightens along the flow. In lanes, a handoff to a lane
-	// further than the next first stays in its source's column where the lanes
-	// between are empty there (laneColumns). Then rank or column gaps draw as
-	// short as the lines in them allow (compactGaps), or, failing that, only
-	// those lines cross straight. Each is kept when it reads shorter, routes no
-	// worse, lengthens, hooks or detours no line and crowds no label more. Lanes
-	// tighten only while no line runs through an arrowhead, before or after: the
-	// head repair below reroutes such a line, and closed-up lanes leave it less
-	// room to.
-	const tightenable = () =>
-		arranged &&
-		orthogonal &&
-		(laned(diagram) || (vertical && !structure)) &&
-		best.arrangement.wrap.continuations.size === 0 &&
-		lengthOf(layout).aspect >= COMPACT_ASPECT &&
-		(!laned(diagram) || headCrossers(layout).size === 0);
-	const tighten = (arrangement: Arrangement) => {
-		const attempt = layoutDiagram(diagram, levels[0]!, arrangement);
-		const compact = repaired({ arrangement, defects: defectsOf(attempt), layout: attempt });
-		const candidate = finished(compact.layout);
-		const lengths = new Map(
-			layout.edgeArrows.map((arrow) => [arrow.id, routeLength(arrow.points)]),
-		);
+	let layout: DiagramLayout;
+	// Repairs, then the finished layout, tightened where it runs long and with
+	// its lines cleared of other lines' arrowheads.
+	const complete = (
+		unrepaired: SettledLayout,
+		hopeless?: (layout: DiagramLayout) => boolean,
+	): CompletedLayout => {
+		best = unrepaired;
+		best = repaired(best);
+		// Continuations through the gap between bands that still cross after the
+		// repairs give way to continuations around the ends of the bands, repaired
+		// the same way, where those route no worse and end with strictly fewer
+		// crossings or reader findings.
+		const { wrap: gapWrap } = unrepaired.arrangement;
 		if (
-			!fewer(best.defects, compact.defects) &&
-			routesNoWorse(candidate, layout, false, true) &&
-			candidate.edgeArrows.every(
-				(arrow) => routeLength(arrow.points) <= lengths.get(arrow.id)! + AXIS_ALIGNED_EPSILON,
-			) &&
-			(!laned(diagram) || headCrossers(candidate).size === 0) &&
-			hookedRoutes(candidate) <= hookedRoutes(layout) &&
-			detouredLines(candidate.edgeArrows) <= detouredLines(layout.edgeArrows) &&
-			crowding(candidate).every((count, index) => count <= crowding(layout)[index]!) &&
-			lengthOf(candidate).aspect < lengthOf(layout).aspect
+			repairable &&
+			!laned(diagram) &&
+			gapWrap.continuations.size > 0 &&
+			!gapWrap.lineBreaks &&
+			arrowCrossings(best.layout.edgeArrows) > 0
 		) {
-			best = compact;
-			layout = candidate;
-			return true;
+			const arrangement = { ...unrepaired.arrangement, wrap: { ...gapWrap, lineBreaks: true } };
+			const layout = layoutDiagram(diagram, levels[0]!, arrangement);
+			const around = repaired({ arrangement, defects: defectsOf(layout), layout });
+			if (!fewer(best.defects, around.defects) && cleaner(around.layout, best.layout, true))
+				best = around;
 		}
-		return false;
-	};
-	if (laned(diagram) && tightenable()) {
-		const through = laneColumns(diagram, true);
-		if ([...laneColumns(diagram)].some(([id, column]) => through.get(id) !== column))
-			tighten({ ...best.arrangement, throughHandoffs: true });
-	}
-	for (const straight of tightenable() ? [false, true] : []) {
-		const gaps = compactGaps(diagram, layout, best.arrangement, straight);
-		if (gaps.size > 0 && tighten({ ...best.arrangement, compactGaps: gaps })) break;
-	}
-	// A line through another line's arrowhead reads as pointing into that head's
-	// target. Where one is left, the lines through a head are routed again after
-	// all the others, clear of heads first, and, in a graph few enough edges to
-	// repair, every line is. Of these, the clearest is kept that draws fewer
-	// lines through a head, no more export defects, crossings, reader findings,
-	// detours or crowded labels, and no longer a drawing: a narrower one may read
-	// past 2.45:1, but a longer one would shrink all its text.
-	// The drawing's long side, labels included: a longer one shrinks all its text.
-	const longSide = (settled: DiagramLayout) => {
-		const { width, height } = drawnSize(
-			[...settled.nodeShapes, ...groupBlocks(settled.groups), ...laneBlocks(settled.lanes)],
-			settled.edgeArrows,
-			branchLabels(
-				[...settled.edgeArrows],
-				settled.routedEdges,
-				settled.nodeShapes,
-				settled.groups,
-				true,
-				settled.lanes,
-			),
-		);
-		return Math.max(width, height);
-	};
-	const clearer = (candidate: DiagramLayout) => {
-		const [defects, current] = [candidate, layout].map(defectsOf);
-		const [labels, currentLabels] = [candidate, layout].map(crowding);
-		return (
-			!fewer(current!, defects!) &&
-			headCrossers(candidate).size < headCrossers(layout).size &&
-			routesNoWorse(candidate, layout, false, true, true) &&
-			longSide(candidate) <= longSide(layout) + AXIS_ALIGNED_EPSILON &&
-			detouredLines(candidate.edgeArrows) <= detouredLines(layout.edgeArrows) &&
-			labels!.every((count, index) => count <= currentLabels![index]!)
-		);
-	};
-	const crossers = orthogonal ? headCrossers(layout) : new Set<string>();
-	const clearings: DiagramLayout[] = [];
-	if (crossers.size > 0 && layout.portOffsets && layout.routeOptions) {
-		const { edgeArrows, nodeShapes, portOffsets, routeOptions, routedEdges } = layout;
-		const order = routedEdges.map((_, index) => index);
-		const last = (index: number) => (crossers.has(routedEdges[index]!.edge.id) ? 1 : 0);
-		clearings.push(
-			finished({
-				...layout,
-				edgeArrows: routeAllEdges(
-					routedEdges,
-					"orthogonal",
-					portOffsets,
-					nodeShapes,
-					{ ...routeOptions, clearHeads: true },
-					order.sort((a, b) => last(a) - last(b)),
-					new Map(
-						edgeArrows.filter((arrow) => !crossers.has(arrow.edgeId)).map((a) => [a.edgeId, a]),
+		// Only pairs still crossing after the normal repairs may leave their lanes.
+		// One extra ordinary-routing layout is screened by the same export/reader
+		// admission as other candidates. Preserve every unrelated paired lane.
+		if (options.pairedReturns && arrowCrossings(best.layout.edgeArrows) > 0) {
+			const previous = best;
+			const arrows = new Map(best.layout.edgeArrows.map((arrow) => [arrow.edgeId, arrow]));
+			const unpairedReturns = new Set<string>();
+			for (const route of best.layout.routedEdges) {
+				const arrow = arrows.get(route.edge.id);
+				if (
+					route.pair === undefined ||
+					!arrow ||
+					!best.layout.edgeArrows.some(
+						(other) => other !== arrow && arrowCrossings([arrow, other]) > 0,
+					)
+				)
+					continue;
+				for (const member of best.layout.routedEdges)
+					if (
+						member.pair !== undefined &&
+						(member.edge.id === route.edge.id ||
+							(member.edge.source === route.edge.target &&
+								member.edge.target === route.edge.source))
+					)
+						unpairedReturns.add(member.edge.id);
+			}
+			if (unpairedReturns.size > 0) {
+				consider({ ...best.arrangement, unpairedReturns }, true);
+				const remaining = arrowCrossings(best.layout.edgeArrows);
+				if (
+					best !== previous &&
+					repairable &&
+					remaining > 0 &&
+					remaining <= CROSSING_REPAIR_MAX_CROSSINGS
+				)
+					best = repairCrossings(diagram, levels[0]!, best, defectsOf, fewer);
+				const keptPairs = new Set(
+					best.layout.routedEdges
+						.filter((route) => route.pair !== undefined)
+						.map((route) => route.edge.id),
+				);
+				if (
+					previous.layout.routedEdges.some(
+						(route) =>
+							route.pair !== undefined &&
+							!unpairedReturns.has(route.edge.id) &&
+							!keptPairs.has(route.edge.id),
+					)
+				)
+					best = previous;
+			}
+		}
+		layout = finished(best.layout);
+		// A rival already beaten as repaired needs no tightening or head repair.
+		if (hopeless?.(layout)) return { layout, settled: best };
+		// A plain column, or a laned flow, still too long for its breadth, which no
+		// wrap shortened, tightens along the flow. In lanes, a handoff to a lane
+		// further than the next first stays in its source's column where the lanes
+		// between are empty there (laneColumns). Then rank or column gaps draw as
+		// short as the lines in them allow (compactGaps), or, failing that, only
+		// those lines cross straight. Each is kept when it reads shorter, routes no
+		// worse, lengthens, hooks or detours no line and crowds no label more. Lanes
+		// tighten only while no line runs through an arrowhead, before or after: the
+		// head repair below reroutes such a line, and closed-up lanes leave it less
+		// room to.
+		const tightenable = () =>
+			arranged &&
+			orthogonal &&
+			(laned(diagram) || (vertical && !structure)) &&
+			best.arrangement.wrap.continuations.size === 0 &&
+			lengthOf(layout).aspect >= COMPACT_ASPECT &&
+			(!laned(diagram) || headCrossers(layout).size === 0);
+		const tighten = (arrangement: Arrangement) => {
+			const attempt = layoutDiagram(diagram, levels[0]!, arrangement);
+			const compact = repaired({ arrangement, defects: defectsOf(attempt), layout: attempt });
+			const candidate = finished(compact.layout);
+			const lengths = new Map(
+				layout.edgeArrows.map((arrow) => [arrow.id, routeLength(arrow.points)]),
+			);
+			if (
+				!fewer(best.defects, compact.defects) &&
+				routesNoWorse(candidate, layout, false, true) &&
+				candidate.edgeArrows.every(
+					(arrow) => routeLength(arrow.points) <= lengths.get(arrow.id)! + AXIS_ALIGNED_EPSILON,
+				) &&
+				(!laned(diagram) || headCrossers(candidate).size === 0) &&
+				hookedRoutes(candidate) <= hookedRoutes(layout) &&
+				detouredLines(candidate.edgeArrows) <= detouredLines(layout.edgeArrows) &&
+				labelCrowding(candidate).every((count, index) => count <= labelCrowding(layout)[index]!) &&
+				lengthOf(candidate).aspect < lengthOf(layout).aspect
+			) {
+				best = compact;
+				layout = candidate;
+				return true;
+			}
+			return false;
+		};
+		if (laned(diagram) && tightenable()) {
+			const through = laneColumns(diagram, true);
+			if ([...laneColumns(diagram)].some(([id, column]) => through.get(id) !== column))
+				tighten({ ...best.arrangement, throughHandoffs: true });
+		}
+		for (const straight of tightenable() ? [false, true] : []) {
+			const gaps = compactGaps(diagram, layout, best.arrangement, straight);
+			if (gaps.size > 0 && tighten({ ...best.arrangement, compactGaps: gaps })) break;
+		}
+		// A line through another line's arrowhead reads as pointing into that head's
+		// target. Where one is left, the lines through a head are routed again after
+		// all the others, clear of heads first, and, in a graph few enough edges to
+		// repair, every line is. Of these, the clearest is kept that draws fewer
+		// lines through a head, no more export defects, crossings, reader findings,
+		// detours or crowded labels, and no longer a drawing: a narrower one may read
+		// past 2.45:1, but a longer one would shrink all its text.
+		const clearer = (candidate: DiagramLayout) => {
+			const [defects, current] = [candidate, layout].map(defectsOf);
+			const [labels, currentLabels] = [candidate, layout].map(labelCrowding);
+			return (
+				!fewer(current!, defects!) &&
+				headCrossers(candidate).size < headCrossers(layout).size &&
+				routesNoWorse(candidate, layout, false, true, true) &&
+				drawnLongSide(candidate) <= drawnLongSide(layout) + AXIS_ALIGNED_EPSILON &&
+				detouredLines(candidate.edgeArrows) <= detouredLines(layout.edgeArrows) &&
+				labels!.every((count, index) => count <= currentLabels![index]!)
+			);
+		};
+		const crossers = orthogonal ? headCrossers(layout) : new Set<string>();
+		const clearings: DiagramLayout[] = [];
+		if (crossers.size > 0 && layout.portOffsets && layout.routeOptions) {
+			const { edgeArrows, nodeShapes, portOffsets, routeOptions, routedEdges } = layout;
+			const order = routedEdges.map((_, index) => index);
+			const last = (index: number) => (crossers.has(routedEdges[index]!.edge.id) ? 1 : 0);
+			clearings.push(
+				finished({
+					...layout,
+					edgeArrows: routeAllEdges(
+						routedEdges,
+						"orthogonal",
+						portOffsets,
+						nodeShapes,
+						{ ...routeOptions, clearHeads: true },
+						order.sort((a, b) => last(a) - last(b)),
+						new Map(
+							edgeArrows.filter((arrow) => !crossers.has(arrow.edgeId)).map((a) => [a.edgeId, a]),
+						),
 					),
-				),
-			}),
+				}),
+			);
+		}
+		if (repairable && crossers.size > 0) {
+			const arrangement = { ...best.arrangement, clearHeads: true };
+			const attempt = layoutDiagram(diagram, levels[0]!, arrangement);
+			clearings.push(
+				finished(repaired({ arrangement, defects: defectsOf(attempt), layout: attempt }).layout),
+			);
+		}
+		// The clearest: fewest lines through a head, then crossings, then findings.
+		const clearness = (candidate: DiagramLayout) => [
+			headCrossers(candidate).size,
+			...routed(candidate, true),
+		];
+		const kept = layout;
+		for (const candidate of clearings.filter(clearer))
+			if (layout === kept || lowerScore(clearness(candidate), clearness(layout)))
+				layout = candidate;
+		return { layout, settled: best };
+	};
+	const beforeRepairs = best;
+	({ layout, settled: best } = complete(beforeRepairs));
+	// A decision's branches leave by the vertices that route them best together.
+	if (repairable && !laned(diagram))
+		({ layout, settled: best } = chooseBranchSides(
+			diagram,
+			levels[0]!,
+			beforeRepairs,
+			{ layout, settled: best },
+			complete,
+			defectsOf,
+			fewer,
+		));
+	// Last, lines that turn over a corner into a crowded side, dip into their
+	// target or jog beside a port are polished where that draws no worse.
+	if (orthogonal)
+		layout = straightenArrivals(
+			polishArrivals(diagram, layout, finished, defectsOf, fewer),
+			finished,
+			defectsOf,
+			fewer,
 		);
-	}
-	if (repairable && crossers.size > 0) {
-		const arrangement = { ...best.arrangement, clearHeads: true };
-		const attempt = layoutDiagram(diagram, levels[0]!, arrangement);
-		clearings.push(
-			finished(repaired({ arrangement, defects: defectsOf(attempt), layout: attempt }).layout),
-		);
-	}
-	// The clearest: fewest lines through a head, then crossings, then findings.
-	const clearness = (candidate: DiagramLayout) => [
-		headCrossers(candidate).size,
-		...routed(candidate, true),
-	];
-	const kept = layout;
-	for (const candidate of clearings.filter(clearer))
-		if (layout === kept || lower(clearness(candidate), clearness(layout))) layout = candidate;
 	const { groups, lanes, routedEdges } = layout;
 	const routedArrows = [...layout.edgeArrows];
 	const descriptions = new Map(

@@ -3,11 +3,14 @@ import { parseStateMachineDiagram, stateMachineDiagramType } from "./types/state
 import connectionRetry from "./fixtures/crossings/connection-retry.js";
 import connectionRetryDisconnect from "./fixtures/crossings/connection-retry-disconnect.js";
 import contentModeration from "./fixtures/crossings/content-moderation.js";
+import expenseOutOfPolicy from "./fixtures/crossings/expense-out-of-policy.js";
 import groupedExpenseApproval from "./fixtures/crossings/grouped-expense-approval.js";
 import incidentEscalation from "./fixtures/crossings/incident-escalation.js";
 import incidentEscalationBridge from "./fixtures/crossings/incident-escalation-bridge.js";
 import incidentEscalationEarlyBridge from "./fixtures/crossings/incident-escalation-early-bridge.js";
+import incidentEscalationQueue from "./fixtures/crossings/incident-escalation-queue.js";
 import incidentEscalationSharedResolve from "./fixtures/crossings/incident-escalation-shared-resolve.js";
+import incidentEscalationStraightEscalation from "./fixtures/crossings/incident-escalation-straight-escalation.js";
 import mediaPlayer from "./fixtures/crossings/media-player.js";
 import mediaPlayerEnded from "./fixtures/crossings/media-player-ended.js";
 import namedFinalRetry from "./fixtures/crossings/named-final-retry.js";
@@ -48,6 +51,18 @@ export const crossingFixtures = {
 	"restaurant-waitlist-recheck": flowchart(restaurantWaitlistRecheck),
 	"grouped-expense-approval": flowchart(groupedExpenseApproval),
 	"content-moderation": flowchart(contentModeration),
+};
+
+/**
+ * Live samples whose branches read badly in other ways: an incident flow whose
+ * crossings a joint choice of its decisions' vertices removes, one whose
+ * escalation should drop straight into the bridge below, and an expense flow
+ * whose short branch set its label against its own arrowhead.
+ */
+export const sideFixtures = {
+	"incident-escalation-queue": flowchart(incidentEscalationQueue),
+	"incident-escalation-straight-escalation": flowchart(incidentEscalationStraightEscalation),
+	"expense-out-of-policy": flowchart(expenseOutOfPolicy),
 };
 
 function stateMachine(fixture: object) {
