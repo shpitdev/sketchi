@@ -126,6 +126,21 @@ branches, intermediate work, and other targets still fail. Matching splits this
 edge into a distinct semantic outcome witness, inheriting the decision's lane
 and group without padding drawn node/edge minimums. No other outcome is opted in.
 
+`invoice-approval` opts only the unlabeled `director-approval -> schedule-payment`
+connection into an equivalent `payment` outcome. The finite positive vocabulary
+accepts payment/pay/paid with make, process, issue, release, send or schedule,
+optionally naming the invoice or saying "after approval". Other content words
+(including rejection, hold, pending, review or approval without "after") fail.
+This vocabulary is not a global alias or a prompt-word alternative.
+
+The payment node must be a terminal end, or a process whose single edge leads
+directly to a terminal end that is not another stated outcome (such as rejection).
+No intervening work or branches qualify. The threshold decision's payment
+branch uses its original matching rules. Actual nodes retain lane/group and
+share the outcome's ownership. Only newly accepted duplicate equivalents are
+deducted from minimum node counts; existing canonical matches are unchanged.
+No synthetic steps are added.
+
 Case, punctuation, hyphens, and whitespace are normalized. Every content-word
 lemma in an alternative must appear in a single label clause, in any order.
 Unnegated qualifier segments may combine across parentheses, colons, and commas:

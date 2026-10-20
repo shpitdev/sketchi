@@ -1,0 +1,250 @@
+[
+	{
+		"runId": "20261020-062333-znlv",
+		"spec": {
+			"id": "invoice-approval",
+			"title": "Invoice Approval",
+			"nodes": [
+				{
+					"id": "start",
+					"label": "Invoice is received",
+					"kind": "start"
+				},
+				{
+					"id": "match",
+					"label": "Match invoice to purchase order",
+					"kind": "process"
+				},
+				{
+					"id": "m",
+					"label": "Does the invoice match?",
+					"kind": "decision"
+				},
+				{
+					"id": "exc",
+					"label": "Route to exception review",
+					"kind": "process"
+				},
+				{
+					"id": "res",
+					"label": "Is the exception resolved?",
+					"kind": "decision"
+				},
+				{
+					"id": "rej",
+					"label": "Reject the invoice",
+					"kind": "end"
+				},
+				{
+					"id": "thr",
+					"label": "Is the amount over the approval threshold?",
+					"kind": "decision"
+				},
+				{
+					"id": "dir",
+					"label": "Director approval",
+					"kind": "process"
+				},
+				{
+					"id": "pay",
+					"label": "Make payment",
+					"kind": "end"
+				},
+				{
+					"id": "sch",
+					"label": "Schedule payment",
+					"kind": "end"
+				}
+			],
+			"edges": [
+				{
+					"id": "edge-1",
+					"source": "start",
+					"target": "match"
+				},
+				{
+					"id": "edge-2",
+					"source": "match",
+					"target": "m"
+				},
+				{
+					"id": "edge-3",
+					"source": "m",
+					"target": "exc",
+					"label": "no"
+				},
+				{
+					"id": "edge-4",
+					"source": "m",
+					"target": "thr",
+					"label": "yes"
+				},
+				{
+					"id": "edge-5",
+					"source": "exc",
+					"target": "res"
+				},
+				{
+					"id": "edge-6",
+					"source": "res",
+					"target": "rej",
+					"label": "no"
+				},
+				{
+					"id": "edge-7",
+					"source": "res",
+					"target": "thr",
+					"label": "yes"
+				},
+				{
+					"id": "edge-8",
+					"source": "thr",
+					"target": "dir",
+					"label": "yes"
+				},
+				{
+					"id": "edge-9",
+					"source": "thr",
+					"target": "sch",
+					"label": "no"
+				},
+				{
+					"id": "edge-10",
+					"source": "dir",
+					"target": "pay"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		}
+	},
+	{
+		"runId": "20261020-062333-571p",
+		"spec": {
+			"id": "invoice-approval",
+			"title": "Invoice Approval",
+			"nodes": [
+				{
+					"id": "recv",
+					"label": "Invoice is received",
+					"kind": "start"
+				},
+				{
+					"id": "match",
+					"label": "Match invoice to purchase order",
+					"kind": "process"
+				},
+				{
+					"id": "ismatch",
+					"label": "Does the invoice match?",
+					"kind": "decision"
+				},
+				{
+					"id": "exc",
+					"label": "Route to exception review",
+					"kind": "process"
+				},
+				{
+					"id": "res",
+					"label": "Is the exception resolved?",
+					"kind": "decision"
+				},
+				{
+					"id": "rej",
+					"label": "Reject invoice",
+					"kind": "end"
+				},
+				{
+					"id": "thr",
+					"label": "Is the amount over the approval threshold?",
+					"kind": "decision"
+				},
+				{
+					"id": "dir",
+					"label": "Director approval",
+					"kind": "process"
+				},
+				{
+					"id": "pay",
+					"label": "Payment",
+					"kind": "end"
+				},
+				{
+					"id": "sched",
+					"label": "Schedule payment",
+					"kind": "end"
+				}
+			],
+			"edges": [
+				{
+					"id": "edge-1",
+					"source": "recv",
+					"target": "match"
+				},
+				{
+					"id": "edge-2",
+					"source": "match",
+					"target": "ismatch"
+				},
+				{
+					"id": "edge-3",
+					"source": "ismatch",
+					"target": "exc",
+					"label": "no"
+				},
+				{
+					"id": "edge-4",
+					"source": "ismatch",
+					"target": "thr",
+					"label": "yes"
+				},
+				{
+					"id": "edge-5",
+					"source": "exc",
+					"target": "res"
+				},
+				{
+					"id": "edge-6",
+					"source": "res",
+					"target": "rej",
+					"label": "no"
+				},
+				{
+					"id": "edge-7",
+					"source": "res",
+					"target": "thr",
+					"label": "yes"
+				},
+				{
+					"id": "edge-8",
+					"source": "thr",
+					"target": "dir",
+					"label": "yes"
+				},
+				{
+					"id": "edge-9",
+					"source": "thr",
+					"target": "sched",
+					"label": "no"
+				},
+				{
+					"id": "edge-10",
+					"source": "dir",
+					"target": "pay"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		}
+	}
+]

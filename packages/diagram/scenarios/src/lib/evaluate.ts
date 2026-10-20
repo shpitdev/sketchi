@@ -676,10 +676,8 @@ function flowchartLaneChecks(
 
 function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram): ScenarioCheck[] {
 	// Preserve merged-check accounting, but never pad counts with edge-step witnesses.
-	const { matchedNodes, graph, branchMatches, edgeStepCount } = matchFlowchartSteps(
-		scenario,
-		diagram,
-	);
+	const { matchedNodes, graph, branchMatches, edgeStepCount, redundantOutcomeNodeCount } =
+		matchFlowchartSteps(scenario, diagram);
 	// A node-only maximum matching supplies useful failure diagnostics if no
 	// consistent connected assignment exists; successful checks use edge witnesses.
 	const owners = new Map<string, string>();
@@ -728,7 +726,9 @@ function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram)
 	return [
 		{
 			id: "min-node-count",
-			passed: graph.nodes.length - edgeStepCount >= scenario.assertions.minNodeCount,
+			passed:
+				graph.nodes.length - edgeStepCount - redundantOutcomeNodeCount >=
+				scenario.assertions.minNodeCount,
 			message: `Expected at least ${scenario.assertions.minNodeCount} nodes.`,
 		},
 		{

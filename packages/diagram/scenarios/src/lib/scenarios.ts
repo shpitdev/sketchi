@@ -52,6 +52,13 @@ export interface FlowchartScenarioRequiredGroup {
 	kinds?: readonly DiagramZoneKind[];
 }
 
+interface EquivalentOutcome {
+	/** Only this stated, unlabeled connection may use the equivalent outcome. */
+	sourceId: string;
+	/** Finite semantic vocabulary, not ordinary prompt-word alternatives. */
+	kind: "payment";
+}
+
 export interface FlowchartScenarioRequiredNode {
 	id: string;
 	kind: FlowchartNodeKind;
@@ -59,6 +66,8 @@ export interface FlowchartScenarioRequiredNode {
 	labels: readonly string[];
 	/** Explicit opt-in: this outcome may be the decision branch into this shared end step. */
 	sharedEndId?: string;
+	/** Explicit equivalent terminal outcome, scoped to one stated predecessor. */
+	equivalentOutcome?: EquivalentOutcome;
 	/** Prompt-grounded alternatives for a yes/no decision asked by its opposite condition. */
 	inverseLabels?: readonly string[];
 	/** The infrastructure shape the prompt makes this step: a database, queue or document. */
@@ -169,6 +178,8 @@ interface FlowchartScenarioDefinition {
 	inverse?: Readonly<Record<string, readonly [string, ...string[]]>>;
 	/** Outcome step id to shared end step id; no other outcome may fold into a branch. */
 	sharedEnds?: Readonly<Record<string, string>>;
+	/** End step id to a finite equivalent outcome on one unlabeled connection. */
+	outcomes?: Readonly<Record<string, EquivalentOutcome>>;
 	logos?: readonly DiagramScenarioLogo[];
 	nodes: readonly FlowchartNodeDefinition[];
 	/**
@@ -282,6 +293,20 @@ function buildAssertions(
 	const stepOf = (id: string) => (entry.has(id) ? startId : id);
 	const requiredNodes = definition.nodes.flatMap(([id, label, kind, labels]) => {
 		const inverseLabels = definition.inverse?.[id];
+		const equivalentOutcome = definition.outcomes?.[id];
+		if (
+			equivalentOutcome &&
+			(kind !== "end" ||
+				nodesById.get(equivalentOutcome.sourceId)?.kind !== "process" ||
+				!definition.edges.some(
+					([, source, target, branch]) =>
+						source === equivalentOutcome.sourceId && target === id && branch === undefined,
+				))
+		) {
+			throw new Error(
+				`Scenario "${definition.id}" outcome "${id}" needs a process-to-end connection.`,
+			);
+		}
 		if (
 			inverseLabels &&
 			(kind !== "decision" ||
@@ -310,6 +335,7 @@ function buildAssertions(
 				kind,
 				labels,
 				...(inverseLabels ? { inverseLabels } : {}),
+				...(equivalentOutcome ? { equivalentOutcome } : {}),
 				...(definition.sharedEnds?.[id] ? { sharedEndId: definition.sharedEnds[id] } : {}),
 				...(shaped ? { shape: shaped[0], shapes: shaped } : {}),
 			},
@@ -724,6 +750,7 @@ const flowchartScenarioDefinitions = [
 	},
 	{
 		id: "invoice-approval",
+		outcomes: { "schedule-payment": { sourceId: "director-approval", kind: "payment" } },
 		title: "Invoice approval",
 		difficulty: "challenge",
 		tags: ["finance", "approval", "exception"],

@@ -25,10 +25,28 @@ export interface FlowchartStepMatches {
 	readonly graph: FlowchartDiagram;
 	/** Edge-step witnesses are semantic steps, not additional drawn nodes or edges. */
 	readonly edgeStepCount: number;
+	/** Equivalent drawn outcomes represent one stated node, not extra minimum-count credit. */
+	readonly redundantOutcomeNodeCount: number;
 	readonly branchMatches: BranchMatcher;
 }
 
 const MAX_CHAIN_NODES = 2;
+
+// An explicit semantic outcome has a closed vocabulary. Merely containing
+// "payment" does not make a rejection, hold, approval or request a payment.
+// Normalize inflections, but do not add these verbs as global label aliases.
+const PAYMENT_OUTCOME_WORDS = new Set(
+	flowchartLabelWords(
+		"pay invoice make made process issue release send schedule a an the is are was were be been has have",
+	),
+);
+
+function namesPaymentOutcome(label: string): boolean {
+	// The retained "Payment released after approval" keeps its stated context.
+	// Approval on its own is not a performed payment.
+	const words = flowchartLabelWords(label.replace(/\bafter\s+(?:director\s+)?approval\b/giu, ""));
+	return words.includes("pay") && words.every((word) => PAYMENT_OUTCOME_WORDS.has(word));
+}
 
 function question(label: string): string {
 	return label.replaceAll("?", "");
@@ -331,7 +349,14 @@ export function matchFlowchartSteps(
 	}
 
 	const steps = new Map(requiredNodes.map((step) => [step.id, step]));
+	// A newly accepted equivalent is a witness for one connection, not a
+	// global alias that another predecessor can use (even at a shared target).
+	const equivalentTargets = new Map<string, { sourceId: string; targetId: string }>();
 	const branchMatches: BranchMatcher = (edge, expected) => {
+		const equivalent = equivalentTargets.get(edge.target);
+		if (equivalent?.targetId === expected.targetId && equivalent.sourceId !== expected.sourceId) {
+			return false;
+		}
 		if (!expected.labels) return true;
 		const label = edge.label ?? "";
 		const source = question(byId.get(edge.source)?.label ?? "");
@@ -425,6 +450,45 @@ export function matchFlowchartSteps(
 		};
 		for (const step of edgeSteps) matchedNodes.get(step.id)!.add(id);
 	};
+	// Only the explicitly opted-in process-to-end connection may use the finite
+	// equivalent outcome. Never apply it to another predecessor or a decision
+	// branch. Keep actual lane/group ownership and existing match accounting.
+	let redundantOutcomeNodeCount = 0;
+	for (const step of requiredNodes) {
+		const outcome = step.equivalentOutcome;
+		if (step.kind !== "end" || !outcome) continue;
+		const before = requiredEdges.find(
+			(expected) =>
+				expected.sourceId === outcome.sourceId && expected.targetId === step.id && !expected.labels,
+		);
+		if (!before || steps.get(before.sourceId)?.kind !== "process") continue;
+		const matches = matchedNodes.get(step.id)!;
+		const existingCount = matches.size;
+		for (const node of graph.nodes) {
+			const next = outgoing(node.id);
+			const end = next.length === 1 ? byId.get(next[0]!.target) : undefined;
+			const terminal = node.kind === "end" && next.length === 0;
+			const terminalAction =
+				node.kind === "process" &&
+				end?.kind === "end" &&
+				outgoing(end.id).length === 0 &&
+				!requiredNodes.some(
+					(other) => other.id !== step.id && matchedNodes.get(other.id)?.has(end.id),
+				);
+			if (
+				matches.has(node.id) ||
+				!(terminal || terminalAction) ||
+				!namesPaymentOutcome(node.label) ||
+				!incoming(node.id).some((edge) => matchedNodes.get(before.sourceId)?.has(edge.source))
+			)
+				continue;
+			matches.add(node.id);
+			equivalentTargets.set(node.id, { sourceId: before.sourceId, targetId: step.id });
+		}
+		// Deduct only newly accepted equivalents; canonical matches retain their
+		// pre-existing credit. Without a canonical match, one equivalent is needed.
+		redundantOutcomeNodeCount += Math.max(0, matches.size - Math.max(1, existingCount));
+	}
 	// Only opted-in outcomes may share an end. The stated decision supplies
 	// the condition for a bare yes/hit; a longer caption must name the outcome.
 	// The matching graph keeps the outcome distinct without adding drawn counts.
@@ -500,5 +564,6 @@ export function matchFlowchartSteps(
 		graph,
 		branchMatches,
 		edgeStepCount: graph.nodes.length - splitChecks.graph.nodes.length,
+		redundantOutcomeNodeCount,
 	};
 }
