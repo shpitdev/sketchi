@@ -232,7 +232,7 @@ export interface PngRenderRequest {
 
 /** Where one export spent its time in the pool, in milliseconds. */
 export interface PngRenderTiming {
-	/** Waiting for a page, less any time spent waiting for that page to open. */
+	/** Waiting for a free page, and any stale-page retries. */
 	readonly queueMs: number;
 	/** Waiting for the page this export got to open; 0 when one was ready. */
 	readonly openMs: number;
@@ -392,27 +392,16 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 								),
 							);
 							const exportedAt = yield* Clock.currentTimeMillis;
-							const waitMs = acquiredAt - startedAt;
 							// A page another caller started opening may finish within a shorter wait.
-							const openMs = coldStart ? Math.min(harness.openMs, waitMs) : 0;
-							const timing: PngRenderTiming = {
-								queueMs: waitMs - openMs,
-								openMs,
-								exportMs: exportedAt - acquiredAt,
-							};
-							yield* Effect.annotateCurrentSpan({
-								cache_mode: coldStart ? "cold" : "warm",
-								queue_ms: timing.queueMs,
-								open_ms: timing.openMs,
-								export_ms: timing.exportMs,
-							});
-							return { png, coldStart, timing } satisfies RenderedPng;
+							const openMs = coldStart ? Math.min(harness.openMs, acquiredAt - startedAt) : 0;
+							return { png, coldStart, openMs, exportMs: exportedAt - acquiredAt };
 						}),
 					);
 
 				return BrowserRenderPool.of({
 					renderPng: Effect.fn("playground.browserRendering.renderPool")(function* (request) {
-						return yield* renderOnce(request).pipe(
+						const startedAt = yield* Clock.currentTimeMillis;
+						const { png, coldStart, openMs, exportMs } = yield* renderOnce(request).pipe(
 							Effect.retry({
 								times: 2,
 								while: (error) => error._tag === "StaleHarnessPage",
@@ -421,6 +410,20 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 								Effect.fail(browserFailure("evaluate")(error.cause)),
 							),
 						);
+						const finishedAt = yield* Clock.currentTimeMillis;
+						// Queue time is everything else: waiting for a page, and any stale-page retries.
+						const timing: PngRenderTiming = {
+							queueMs: finishedAt - startedAt - openMs - exportMs,
+							openMs,
+							exportMs,
+						};
+						yield* Effect.annotateCurrentSpan({
+							cache_mode: coldStart ? "cold" : "warm",
+							queue_ms: timing.queueMs,
+							open_ms: timing.openMs,
+							export_ms: timing.exportMs,
+						});
+						return { png, coldStart, timing } satisfies RenderedPng;
 					}),
 					prewarm: Effect.fn("playground.browserRendering.prewarm")(function* (harnessUrl) {
 						if (prewarming.has(harnessUrl) || (pageCounts.get(harnessUrl) ?? 0) > 0) {
