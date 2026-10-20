@@ -4,6 +4,7 @@ import type { Browser, BrowserWorker, Page } from "@cloudflare/playwright";
 import { recordMetric } from "@sketchi/observability";
 import {
 	Cause,
+	Clock,
 	Context,
 	Duration,
 	Effect,
@@ -152,6 +153,8 @@ interface HarnessPage {
 	readonly page: Page;
 	/** Pool sequence number taken when the page finished opening. */
 	openedAt: number;
+	/** How long the page took to open, launch retries included. */
+	openMs: number;
 	/** Set when an export hung, so the page is not reused. */
 	abandoned: boolean;
 }
@@ -196,7 +199,7 @@ const launchHarnessPage = Effect.fnUntraced(function* (
 	const page = yield* prepareHarnessPage(browser, harnessUrl).pipe(
 		Effect.onExit((exit) => (Exit.isSuccess(exit) ? Effect.void : closeBrowser(browser, exit))),
 	);
-	return { browser, page, openedAt: 0, abandoned: false } satisfies HarnessPage;
+	return { browser, page, openedAt: 0, openMs: 0, abandoned: false } satisfies HarnessPage;
 });
 
 function openHarnessPage(binding: CloudflareBrowserRunBinding, harnessUrl: string) {
@@ -227,10 +230,21 @@ export interface PngRenderRequest {
 	readonly excalidraw: unknown;
 }
 
+/** Where one export spent its time in the pool, in milliseconds. */
+export interface PngRenderTiming {
+	/** Waiting for a page, less any time spent waiting for that page to open. */
+	readonly queueMs: number;
+	/** Waiting for the page this export got to open; 0 when one was ready. */
+	readonly openMs: number;
+	/** The browser export and the PNG decode. */
+	readonly exportMs: number;
+}
+
 export interface RenderedPng {
 	readonly png: ArrayBuffer;
 	/** True when this export waited for a page to open rather than finding one ready. */
 	readonly coldStart: boolean;
+	readonly timing: PngRenderTiming;
 }
 
 const exportHarnessPng = Effect.fnUntraced(function* (
@@ -333,12 +347,12 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 							acquire: Effect.acquireRelease(countPages(harnessUrl, 1), () =>
 								countPages(harnessUrl, -1),
 							).pipe(
-								Effect.andThen(openHarnessPage(binding, harnessUrl)),
-								Effect.tap((harness) =>
-									Effect.sync(() => {
-										harness.openedAt = ++sequence;
-									}),
-								),
+								Effect.andThen(Effect.timed(openHarnessPage(binding, harnessUrl))),
+								Effect.map(([openDuration, harness]) => {
+									harness.openedAt = ++sequence;
+									harness.openMs = Duration.toMillis(openDuration);
+									return harness;
+								}),
 							),
 							min: 0,
 							max: MAX_HARNESS_PAGES,
@@ -351,8 +365,10 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 					Effect.scoped(
 						Effect.gen(function* () {
 							const requestedAt = ++sequence;
+							const startedAt = yield* Clock.currentTimeMillis;
 							const pages = yield* RcMap.get(pagesByHarness, request.harnessUrl);
 							const harness = yield* Pool.get(pages);
+							const acquiredAt = yield* Clock.currentTimeMillis;
 							// Browser Run may have closed an idle session; replace it.
 							if (!isLive(harness)) {
 								yield* Pool.invalidate(pages, harness);
@@ -375,7 +391,22 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 									},
 								),
 							);
-							return { png, coldStart } satisfies RenderedPng;
+							const exportedAt = yield* Clock.currentTimeMillis;
+							const waitMs = acquiredAt - startedAt;
+							// A page another caller started opening may finish within a shorter wait.
+							const openMs = coldStart ? Math.min(harness.openMs, waitMs) : 0;
+							const timing: PngRenderTiming = {
+								queueMs: waitMs - openMs,
+								openMs,
+								exportMs: exportedAt - acquiredAt,
+							};
+							yield* Effect.annotateCurrentSpan({
+								cache_mode: coldStart ? "cold" : "warm",
+								queue_ms: timing.queueMs,
+								open_ms: timing.openMs,
+								export_ms: timing.exportMs,
+							});
+							return { png, coldStart, timing } satisfies RenderedPng;
 						}),
 					);
 

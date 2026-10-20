@@ -16,6 +16,7 @@ import {
 	BROWSER_KEEP_ALIVE_MS,
 	HARNESS_OPEN_TIMEOUT_MS,
 	HARNESS_PAGE_IDLE_TTL,
+	MAX_HARNESS_PAGES,
 	PNG_EXPORT_TIMEOUT_MS,
 	type CloudflareBrowserRunBinding,
 	type PngRenderRequest,
@@ -127,6 +128,74 @@ describe("Browser Run harness page pool", () => {
 
 			expect(fast.coldStart).toBe(true);
 			expect(launchMock).toHaveBeenCalledTimes(2);
+		}).pipe(Effect.provide(poolLayer)),
+	);
+
+	it.effect("splits a cold export into open and export time, and a warm one into export", () =>
+		Effect.gen(function* () {
+			const session = mockBrowser();
+			const launchStarted = Promise.withResolvers<void>();
+			const finishLaunch = Promise.withResolvers<Browser>();
+			const exportStarted = Promise.withResolvers<void>();
+			const finishExport = Promise.withResolvers<string>();
+			launchMock.mockImplementationOnce(() => {
+				launchStarted.resolve();
+				return finishLaunch.promise;
+			});
+			session.page.evaluate.mockImplementation(async (script: unknown) => {
+				if (typeof script === "string") return null;
+				exportStarted.resolve();
+				return finishExport.promise;
+			});
+
+			const coldFiber = yield* Effect.forkChild(renderPng(request()));
+			yield* Effect.promise(() => launchStarted.promise);
+			yield* TestClock.adjust(900);
+			finishLaunch.resolve(session.browser);
+			yield* Effect.promise(() => exportStarted.promise);
+			yield* TestClock.adjust(250);
+			finishExport.resolve(btoa("PNG"));
+			const cold = yield* Fiber.join(coldFiber);
+			const warm = yield* renderPng(request());
+
+			expect(cold.timing).toEqual({ queueMs: 0, openMs: 900, exportMs: 250 });
+			expect(warm.timing).toEqual({ queueMs: 0, openMs: 0, exportMs: 0 });
+		}).pipe(Effect.provide(poolLayer)),
+	);
+
+	it.effect("counts the wait for a busy page as queue time", () =>
+		Effect.gen(function* () {
+			const finishExports = Promise.withResolvers<string>();
+			let exporting = 0;
+			const allBusy = Promise.withResolvers<void>();
+			launchMock.mockImplementation(async () => {
+				const session = mockBrowser();
+				session.page.evaluate.mockImplementation(async (script: unknown) => {
+					if (typeof script === "string") return null;
+					if (++exporting === MAX_HARNESS_PAGES) allBusy.resolve();
+					return finishExports.promise;
+				});
+				return session.browser;
+			});
+
+			const busy = yield* Effect.forkChild(
+				Effect.all(
+					Array.from({ length: MAX_HARNESS_PAGES }, () => renderPng(request())),
+					{
+						concurrency: "unbounded",
+					},
+				),
+			);
+			yield* Effect.promise(() => allBusy.promise);
+			const queuedFiber = yield* Effect.forkChild(renderPng(request()));
+			yield* TestClock.adjust(300);
+			finishExports.resolve(btoa("PNG"));
+			yield* Fiber.join(busy);
+			const queued = yield* Fiber.join(queuedFiber);
+
+			expect(queued.coldStart).toBe(false);
+			expect(queued.timing).toEqual({ queueMs: 300, openMs: 0, exportMs: 0 });
+			expect(launchMock).toHaveBeenCalledTimes(MAX_HARNESS_PAGES);
 		}).pipe(Effect.provide(poolLayer)),
 	);
 

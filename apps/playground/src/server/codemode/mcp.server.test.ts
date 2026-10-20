@@ -44,6 +44,7 @@ function stubPngRenderer() {
 			_tag: "Rendered" as const,
 			coldStart: false,
 			png: new Uint8Array([80, 78, 71]).buffer,
+			timing: { queueMs: 0, openMs: 0, exportMs: 0 },
 		}),
 		prewarm: () => {},
 	};
