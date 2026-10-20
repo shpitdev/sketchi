@@ -56,6 +56,97 @@ const playerSpec = {
 };
 
 describe("Code Mode native state machine", () => {
+	it("reports a clear error when a composite has no regular child", async () => {
+		const result = await build({
+			title: "No entry",
+			initial: "active",
+			states: [{ id: "active" }, { id: "done", kind: "final", parent: "active" }],
+			transitions: [],
+		});
+		expect(result.ok).toBe(false);
+		expect(result.issues).toContainEqual(
+			expect.objectContaining({
+				code: "invalid_composite",
+				message: 'Composite "active" has no regular substate to enter.',
+			}),
+		);
+	});
+
+	it("accepts Sonnet round 18 first build and reports the chosen composite entry", async () => {
+		// eval-20261020-030559-j3ng, sample 1, run 20261020-030559-2azp.
+		const built = await build({
+			title: "Media Player",
+			initial: "Stopped",
+			states: [
+				{
+					id: "Stopped",
+				},
+				{
+					id: "Active",
+				},
+				{
+					id: "Playing",
+					parent: "Active",
+				},
+				{
+					id: "Paused",
+					parent: "Active",
+				},
+				{
+					id: "End",
+					kind: "final",
+				},
+			],
+			transitions: [
+				{
+					source: "Stopped",
+					target: "Active",
+					event: "play",
+				},
+				{
+					source: "Playing",
+					target: "Paused",
+					event: "pause",
+				},
+				{
+					source: "Paused",
+					target: "Playing",
+					event: "resume",
+				},
+				{
+					source: "Playing",
+					target: "Playing",
+					event: "seek",
+					action: "jump to position",
+				},
+				{
+					source: "Active",
+					target: "Stopped",
+					event: "stop",
+				},
+				{
+					source: "Stopped",
+					target: "End",
+					event: "eject",
+				},
+			],
+		});
+		expect(built.ok, JSON.stringify(built.issues)).toBe(true);
+		if (!built.ok) return;
+		expect(built.normalizedSpec.states.find((state) => state.id === "Active")?.initial).toBe(
+			"Playing",
+		);
+		expect(built.issues).toEqual([
+			expect.objectContaining({
+				code: "composite_initial_defaulted",
+				severity: "warning",
+				message:
+					'Composite "Active" has no initial; defaulted to its first listed regular substate "Playing".',
+			}),
+		]);
+		expect(() => Schema.decodeUnknownSync(BuildStateMachineResultSchema)(built)).not.toThrow();
+	});
+
 	it.each([
 		{
 			sample: "20261019-151851-bghl",
@@ -507,6 +598,21 @@ describe("Code Mode native state machine", () => {
 		expect(built.normalizedSpec.transitions).toEqual(mediaPlayerStateMachine.transitions);
 	});
 
+	it.each([" ", "missing", "stopped", "active", "ejected"])(
+		"does not default an explicit invalid composite entry %j",
+		async (initial) => {
+			const result = await build({
+				...playerSpec,
+				states: playerSpec.states.map((state) =>
+					state.id === "active" ? { ...state, initial } : state,
+				),
+			});
+			expect(result.ok).toBe(false);
+			expect(result.issues.map((entry) => entry.code)).toContain("unknown_initial_state");
+			expect(result.issues.map((entry) => entry.code)).not.toContain("composite_initial_defaulted");
+		},
+	);
+
 	it.each([
 		[{ initial: "nowhere" }, "unknown_initial_state"],
 		[{ initial: "playing" }, "unknown_initial_state"],
@@ -514,10 +620,10 @@ describe("Code Mode native state machine", () => {
 			{
 				states: [
 					...playerSpec.states.filter((state) => state.id !== "active"),
-					{ id: "active", label: "Active" },
+					{ id: "active", label: "Active", initial: "stopped" },
 				],
 			},
-			"invalid_composite",
+			"unknown_initial_state",
 		],
 		[
 			{

@@ -32,7 +32,7 @@ export class StateMachineState extends Schema.Class<StateMachineState>("StateMac
 	kind: Schema.optionalKey(StateMachineStateKindSchema),
 	/** The composite state this state belongs to. */
 	parent: Schema.optionalKey(Schema.NonEmptyString),
-	/** For a composite: the substate a transition into the composite enters. */
+	/** For a composite: entry substate; omitted values use the first listed regular child. */
 	initial: Schema.optionalKey(Schema.NonEmptyString),
 }) {}
 export const StateMachineStateSchema = StateMachineState;
@@ -151,6 +151,59 @@ export function stateLabel(
 	return state.id;
 }
 
+/** Explicit entries win; otherwise use the first regular child in authored state order. */
+export function stateInitial(
+	state: Pick<StateMachineState, "id" | "initial">,
+	states: readonly StateMachineState[],
+): string | undefined {
+	return (
+		state.initial ??
+		states.find((child) => child.parent === state.id && stateKind(child) === "state")?.id
+	);
+}
+
+/** Materialize the core entry default without changing authored input or explicit entries. */
+export function resolveStateMachineInitials<T extends Pick<StateMachineDiagram, "states">>(
+	diagram: T,
+): T {
+	return {
+		...diagram,
+		states: diagram.states.map((state) => {
+			const initial = stateInitial(state, diagram.states);
+			return state.initial === undefined && initial !== undefined ? { ...state, initial } : state;
+		}),
+	};
+}
+
+export const StateMachineDefaultWarningSchema = Schema.Struct({
+	code: Schema.Literal("composite_initial_defaulted"),
+	severity: Schema.Literal("warning"),
+	path: Schema.NonEmptyString,
+	message: Schema.NonEmptyString,
+	hint: Schema.NonEmptyString,
+});
+export type StateMachineDefaultWarning = typeof StateMachineDefaultWarningSchema.Type;
+
+/** Non-blocking defaults, separate from semantic errors so all consumers can expose them. */
+export function getStateMachineDefaultWarnings(
+	diagram: Pick<StateMachineDiagram, "states">,
+): StateMachineDefaultWarning[] {
+	return diagram.states.flatMap((state, index) => {
+		const initial = stateInitial(state, diagram.states);
+		return state.initial === undefined && initial !== undefined
+			? [
+					{
+						code: "composite_initial_defaulted" as const,
+						severity: "warning" as const,
+						path: `states.[${index}].initial`,
+						message: `Composite "${state.id}" has no initial; defaulted to its first listed regular substate "${initial}".`,
+						hint: `Set initial on "${state.id}" explicitly if "${initial}" is not the intended entry.`,
+					},
+				]
+			: [];
+	});
+}
+
 /** Ids of the composite states: states some other state names as its parent. */
 export function compositeStateIds(diagram: Pick<StateMachineDiagram, "states">): Set<string> {
 	return new Set(diagram.states.flatMap((state) => (state.parent ? [state.parent] : [])));
@@ -205,6 +258,7 @@ function reachableStates(diagram: StateMachineDiagram): Set<string> {
 export function getStateMachineValidationIssues(
 	diagram: StateMachineDiagram,
 ): StateMachineValidationIssue[] {
+	diagram = resolveStateMachineInitials(diagram);
 	const issues: StateMachineValidationIssue[] = [];
 	const composites = compositeStateIds(diagram);
 	if (diagram.states.length > STATE_MACHINE_MAX_STATES) {
@@ -281,6 +335,15 @@ export function getStateMachineValidationIssues(
 				});
 			}
 		}
+		if (composites.has(state.id) && state.initial === undefined) {
+			issues.push({
+				code: "missing_composite_initial",
+				path: `states.[${index}].initial`,
+				message: `Composite "${state.id}" has no regular substate to enter.`,
+				hint: `Add a regular substate whose parent is "${state.id}", or set initial explicitly to an intended choice substate.`,
+			});
+		}
+
 		if (state.initial !== undefined) {
 			const child = states.get(state.initial);
 			if (!child || child.parent !== state.id || stateKind(child) === "final") {
@@ -295,14 +358,6 @@ export function getStateMachineValidationIssues(
 	});
 
 	const initial = states.get(diagram.initial);
-	if (initial && composites.has(initial.id) && initial.initial === undefined) {
-		issues.push({
-			code: "missing_composite_initial",
-			path: "initial",
-			message: `The machine starts in composite "${initial.id}", which has no initial substate.`,
-			hint: `Set initial on "${initial.id}" to the substate it starts in.`,
-		});
-	}
 	if (!initial || initial.parent !== undefined || stateKind(initial) === "final") {
 		issues.push({
 			code: "unknown_initial_state",
@@ -364,14 +419,6 @@ export function getStateMachineValidationIssues(
 				hint: "Connect substates to each other, or the composite to a state outside it.",
 			});
 		}
-		if (target && composites.has(target.id) && target.initial === undefined) {
-			issues.push({
-				code: "missing_composite_initial",
-				path: `transitions.[${index}].target`,
-				message: `Transition "${transition.id}" enters composite "${target.id}", which has no initial substate.`,
-				hint: `Set initial on "${target.id}" to the substate it enters first, or target that substate.`,
-			});
-		}
 	});
 
 	diagram.states.forEach((state, index) => {
@@ -427,7 +474,7 @@ export function validateStateMachineDiagram(diagram: StateMachineDiagram): State
 	if (issues.length > 0) {
 		throw new StateMachineValidationError(issues);
 	}
-	return diagram;
+	return resolveStateMachineInitials(diagram);
 }
 
 export function parseStateMachineDiagram(input: unknown): StateMachineDiagram {

@@ -1,3 +1,4 @@
+import { mediaPlayerStateMachine } from "@sketchi/diagram-core";
 import type { CloudflareAiGateway, CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
 import { describe, expect, it } from "vitest";
 
@@ -117,6 +118,34 @@ function generateRequest(env: StudioEnv, body: unknown): Promise<Response> {
 }
 
 describe("public generate endpoint", () => {
+	it("returns composite-entry warnings without blocking or retrying generation", async () => {
+		let calls = 0;
+		const diagram = {
+			...mediaPlayerStateMachine,
+			states: mediaPlayerStateMachine.states.map(({ initial: _initial, ...state }) => state),
+		};
+		const env: StudioEnv = {
+			AI: fakeAiGateway(generationText(diagram), () => {
+				calls += 1;
+			}),
+		};
+		const response = await generateRequest(env, { prompt: "Media player", type: "state-machine" });
+		const body = (await response.json()) as {
+			ok: boolean;
+			issues?: { code: string; severity: string; message: string }[];
+		};
+		expect(response.status).toBe(200);
+		expect(body.ok).toBe(true);
+		expect(calls).toBe(1);
+		expect(body.issues).toEqual([
+			expect.objectContaining({
+				code: "composite_initial_defaulted",
+				severity: "warning",
+				message: expect.stringContaining('"playing"'),
+			}),
+		]);
+	});
+
 	it("generates and returns a built flowchart with inline artifacts", async () => {
 		const env: StudioEnv = { AI: fakeAiGateway(generationText(flowchartIr)) };
 		const response = await generateRequest(env, {

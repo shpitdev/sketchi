@@ -156,12 +156,13 @@ const CHART_ISSUE_CODE_ADDITIONS = new Set([
 	"invalid_chart_value",
 	"invalid_chart_option",
 ]);
-// State machines add six issue codes.
+// State machines add semantic issue codes and the omitted-entry warning.
 const STATE_MACHINE_ISSUE_CODE_ADDITIONS = new Set([
 	"state_machine_too_large",
 	"invalid_state",
 	"unknown_initial_state",
 	"invalid_composite",
+	"composite_initial_defaulted",
 	"final_has_outgoing",
 	"underbranched_choice",
 ]);

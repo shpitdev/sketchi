@@ -27,6 +27,9 @@ import {
 	StateMachineValidationError,
 	stateTransitionLabel,
 	stateLabel,
+	getStateMachineDefaultWarnings,
+	StateMachineDefaultWarningSchema,
+	type StateMachineDefaultWarning,
 	TimelineDiagramSchema,
 	TimelineValidationError,
 	validateTimelineDiagram,
@@ -80,6 +83,7 @@ export class DiagramGenerationCandidate extends Schema.Class<DiagramGenerationCa
 )({
 	cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
 	diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
+	warnings: Schema.optionalKey(Schema.Array(StateMachineDefaultWarningSchema).pipe(Schema.mutable)),
 	diagram: Schema.optional(CanonicalDiagramSchema),
 	durationMs: Schema.optional(Schema.Number),
 	error: Schema.optional(Schema.String),
@@ -96,6 +100,7 @@ export class DiagramGenerationCandidateSummary extends Schema.Class<DiagramGener
 )({
 	cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
 	diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
+	warnings: Schema.optionalKey(Schema.Array(StateMachineDefaultWarningSchema).pipe(Schema.mutable)),
 	diagramText: Schema.optional(Schema.String),
 	diagramValid: Schema.Boolean,
 	durationMs: Schema.optional(Schema.Number),
@@ -349,6 +354,7 @@ interface CandidateParseFailure {
 }
 
 interface CandidateParseSuccess {
+	readonly warnings?: StateMachineDefaultWarning[];
 	/** Non-fatal repairs applied while decoding. */
 	readonly diagnostics?: readonly string[];
 	readonly diagram?: CanonicalDiagram;
@@ -491,6 +497,7 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 	};
 
 	const repairs: string[] = [];
+	const warnings: StateMachineDefaultWarning[] = [];
 	const parsers = {
 		chart: () =>
 			decodeAndValidate(
@@ -537,13 +544,18 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 				validateGanttDiagram,
 				intent,
 			),
-		"state-machine": () =>
-			decodeAndValidate(
+		"state-machine": () => {
+			const result = decodeAndValidate(
 				StateMachineDiagramSchema,
 				normalizeGeneratedStateMachineInput(titledDiagram),
-				validateStateMachineDiagram,
+				(diagram) => {
+					warnings.push(...getStateMachineDefaultWarnings(diagram));
+					return validateStateMachineDiagram(diagram);
+				},
 				intent,
-			),
+			);
+			return result.success && warnings.length > 0 ? { ...result, warnings } : result;
+		},
 		er: () =>
 			decodeAndValidate(
 				ErDiagramSchema,
@@ -624,6 +636,7 @@ export function candidateFromText(
 		return {
 			...input,
 			diagnostics,
+			...(parsed.warnings?.length ? { warnings: parsed.warnings } : {}),
 			...(parsed.diagram ? { diagram: parsed.diagram } : {}),
 			intent: parsed.intent,
 		};
@@ -983,6 +996,7 @@ export function summarizeGenerationCandidate(
 ): DiagramGenerationCandidateSummary {
 	return {
 		diagnostics: candidate.diagnostics,
+		...(candidate.warnings?.length ? { warnings: candidate.warnings } : {}),
 		...(candidate.diagram ? { diagramText: JSON.stringify(candidate.diagram, null, 2) } : {}),
 		diagramValid: Boolean(candidate.diagram) && !candidate.error,
 		model: candidate.model,

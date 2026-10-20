@@ -223,3 +223,25 @@ export function builtDiagram(
 		...(options.png ? { png: options.png } : {}),
 	};
 }
+
+/** Omitted composite entry exercises the CLI warning path through canonical input. */
+export const compositeStateMachineInput = {
+	type: "state-machine",
+	spec: {
+		id: "composite-player",
+		title: "Media player",
+		initial: "stopped",
+		states: [
+			{ id: "stopped" },
+			{ id: "active" },
+			{ id: "playing", parent: "active" },
+			{ id: "paused", parent: "active" },
+		],
+		transitions: [
+			{ source: "stopped", target: "active", event: "play" },
+			{ source: "playing", target: "paused", event: "pause" },
+			{ source: "paused", target: "playing", event: "resume" },
+			{ source: "active", target: "stopped", event: "stop" },
+		],
+	},
+};

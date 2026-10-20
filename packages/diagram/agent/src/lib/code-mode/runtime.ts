@@ -10,6 +10,8 @@ import {
 	getSequenceValidationIssues,
 	getStateMachineValidationIssues,
 	stateLabel,
+	resolveStateMachineInitials,
+	getStateMachineDefaultWarnings,
 	getErValidationIssues,
 	parseErFieldShorthand,
 	resolveErShorthand,
@@ -764,7 +766,7 @@ function normalizeStateMachineSpec(
 				...(label !== undefined ? { label } : {}),
 				...(state.kind ? { kind: state.kind } : {}),
 				...optional("parent", state.parent),
-				...optional("initial", state.initial),
+				...(state.initial !== undefined ? { initial: cleanToolString(state.initial) } : {}),
 			};
 		}),
 		transitions: spec.transitions.map((transition, index) => ({
@@ -3116,7 +3118,15 @@ const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow
 	const environment = yield* CodeModeRuntimeEnvironment;
 	const request = parsed.success;
 	const buildId = yield* Effect.sync(() => environment.createId("build"));
-	const normalizedSpec = normalizeStateMachineSpec(request.spec);
+	const authoredSpec = normalizeStateMachineSpec(request.spec);
+	const warnings = getStateMachineDefaultWarnings(authoredSpec).map((entry) =>
+		issue({
+			...entry,
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+		}),
+	);
+	const normalizedSpec = resolveStateMachineInitials(authoredSpec);
 	const baseContext = {
 		buildId,
 		...responseRequestId(request.requestId),
@@ -3203,7 +3213,7 @@ const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow
 		normalizedSpec,
 		quality,
 		artifact,
-		issues: [],
+		issues: warnings,
 	} satisfies Extract<BuildStateMachineResult, { ok: true }>;
 });
 

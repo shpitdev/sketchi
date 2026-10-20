@@ -3,6 +3,7 @@ import "@tanstack/react-start/server-only";
 import {
 	type BuildFlowchartOptions,
 	type CanonicalBuildResult,
+	type CodeModeIssue,
 	type CanonicalDiagramDocument,
 	canonicalDocumentFromDiagram,
 } from "@sketchi/diagram-agent";
@@ -59,6 +60,7 @@ interface GenerateFailure {
 }
 
 interface GenerateSuccess {
+	readonly issues: ReadonlyArray<CodeModeIssue>;
 	readonly ok: true;
 	readonly status: "generated";
 	readonly diagram: {
@@ -460,6 +462,17 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 	const success: GenerateSuccess = {
 		ok: true,
 		status: "generated",
+		issues: [
+			...(candidate.warnings ?? []).map((warning): CodeModeIssue => ({
+				code: warning.code,
+				severity: warning.severity,
+				stage: "input",
+				ref: { kind: "request", path: `spec.${warning.path}` },
+				message: warning.message,
+				hint: warning.hint,
+			})),
+			...buildResult.issues.filter((entry) => entry.severity === "warning"),
+		],
 		diagram: {
 			document: { type, spec },
 			scene,

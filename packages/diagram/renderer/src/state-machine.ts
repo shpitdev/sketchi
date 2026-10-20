@@ -7,6 +7,7 @@ import {
 	routingQualityScale,
 	type StateMachineDiagram,
 	stateKind,
+	stateInitial,
 	stateLabel,
 	stateTransitionLabel,
 } from "@sketchi/diagram-core";
@@ -76,11 +77,10 @@ export function stateMachineGraph(
 	for (const state of diagram.states) {
 		const group = state.parent;
 		if (composites.has(state.id)) {
-			if (state.initial) {
+			const initial = stateInitial(state, diagram.states);
+			if (initial !== undefined) {
 				nodes.push(node(`${state.id}${INITIAL_ID}`, "", "initial", state.id));
-				edges.push(
-					edge(fresh(`${state.id}${INITIAL_ID}`), `${state.id}${INITIAL_ID}`, state.initial),
-				);
+				edges.push(edge(fresh(`${state.id}${INITIAL_ID}`), `${state.id}${INITIAL_ID}`, initial));
 			}
 			continue;
 		}

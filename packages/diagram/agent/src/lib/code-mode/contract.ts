@@ -423,6 +423,7 @@ export const CODE_MODE_ISSUE_CODES = [
 	"invalid_state",
 	"unknown_initial_state",
 	"invalid_composite",
+	"composite_initial_defaulted",
 	"final_has_outgoing",
 	"underbranched_choice",
 	"gantt_too_large",

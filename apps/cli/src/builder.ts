@@ -39,6 +39,7 @@ export const DiagramBuilderLive = Layer.effect(
 			const { scene, excalidraw } = yield* decodeInlineArtifacts(result.artifact, "build");
 			return {
 				id,
+				warnings: result.issues.filter((entry) => entry.severity === "warning"),
 				type: document.type,
 				title: document.spec.title,
 				document,

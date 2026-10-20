@@ -240,6 +240,7 @@ function storedData(diagram: StoredDiagram) {
 		storagePath: storageLocation(diagram.manifest.id),
 		revisions: revisionLocations(diagram),
 		document: diagram.document,
+		...(diagram.warnings?.length ? { warnings: diagram.warnings } : {}),
 	};
 }
 
@@ -264,6 +265,12 @@ const readLinkInput = Effect.fn("sketchi.cli.pull.readLink")(function* (link: st
 	)).trim();
 });
 
+function warningLines(diagram: StoredDiagram): string[] {
+	return (diagram.warnings ?? []).map(
+		(warning) => `warning (${warning.code}): ${warning.message} ${warning.hint}`,
+	);
+}
+
 function summaryText(action: "created" | "edited" | "patched", diagram: StoredDiagram): string {
 	return [
 		`${action}: ${diagram.manifest.id}`,
@@ -274,6 +281,7 @@ function summaryText(action: "created" | "edited" | "patched", diagram: StoredDi
 		`document authoritative: ${String(diagram.authority === "canonical")}`,
 		`formats: ${diagram.manifest.formats.join(",")}`,
 		`storage: ${storageLocation(diagram.manifest.id)}`,
+		...warningLines(diagram),
 	].join("\n");
 }
 
@@ -308,6 +316,7 @@ function generatedArtifactText(result: GenerateCommandResult): string {
 		return [
 			`created: ${result.generated.diagram.manifest.id}`,
 			`artifact: ${result.artifact.destination}`,
+			...warningLines(result.generated.diagram),
 			"next:",
 			`  sketchi show ${result.generated.diagram.manifest.id}`,
 			`  sketchi export ${result.generated.diagram.manifest.id} --format excalidraw --dest ${result.generated.diagram.manifest.id}.excalidraw`,

@@ -22,6 +22,14 @@ const texts = (scene: RenderedDiagramScene) =>
 	scene.elements.flatMap((element) => (element.type === "text" ? [element.text] : []));
 
 describe("StateMachine renderer", () => {
+	it("draws the same composite entry arrow when initial is omitted", () => {
+		const omitted = {
+			...mediaPlayerStateMachine,
+			states: mediaPlayerStateMachine.states.map(({ initial: _initial, ...state }) => state),
+		};
+		expect(renderDiagram(omitted)).toEqual(renderDiagram(mediaPlayerStateMachine));
+	});
+
 	it("keeps the round-14 labeled retry choice clear after naming its final", () => {
 		const diagram = crossingStateMachines["named-final-retry"];
 		const scene = renderDiagram(diagram);

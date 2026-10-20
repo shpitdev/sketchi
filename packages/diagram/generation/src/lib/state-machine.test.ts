@@ -27,6 +27,34 @@ function enforced(cycles: number, transitions = stateMachineFixture.transitions)
 }
 
 describe("state-machine generation", () => {
+	it("materializes omitted composite entries and returns a non-blocking warning", () => {
+		const candidate = candidateFromText({
+			model: "fixture",
+			provider: "fixture",
+			text: JSON.stringify({
+				title: "Player",
+				intent: { requestedKind: "state-machine", nativeKind: "state-machine", requirements: [] },
+				diagram: {
+					...mediaPlayerStateMachine,
+					states: mediaPlayerStateMachine.states.map(({ initial: _initial, ...state }) => state),
+				},
+			}),
+		});
+		expect(candidate.error).toBeUndefined();
+		expect(candidate.diagram).toMatchObject({
+			states: expect.arrayContaining([{ id: "active", label: "Active", initial: "playing" }]),
+		});
+		expect(candidate.diagnostics).toEqual([]);
+		expect(candidate.warnings).toEqual([
+			expect.objectContaining({
+				code: "composite_initial_defaulted",
+				severity: "warning",
+				message:
+					'Composite "active" has no initial; defaulted to its first listed regular substate "playing".',
+			}),
+		]);
+	});
+
 	it("accepts omitted state labels through generation and enforces their displayed ids", () => {
 		const diagram = {
 			...mediaPlayerStateMachine,

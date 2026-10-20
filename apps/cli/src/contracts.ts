@@ -1,6 +1,7 @@
 import {
 	CANONICAL_DOCUMENT_TYPES,
 	type ExcalidrawFile,
+	type CodeModeIssue,
 	type PatchableScene,
 } from "@sketchi/diagram-agent";
 import { Effect, Schema } from "effect";
@@ -34,6 +35,7 @@ export class DiagramRecordManifest extends Schema.Class<DiagramRecordManifest>(
 }) {}
 
 export interface BuiltDiagram {
+	readonly warnings?: ReadonlyArray<CodeModeIssue>;
 	readonly id: string;
 	readonly type: DiagramDocument["type"];
 	readonly title: string;
@@ -54,6 +56,8 @@ export interface PatchedDiagramArtifacts {
 }
 
 export interface StoredDiagram {
+	/** Warnings for this invocation; not persisted as record state. */
+	readonly warnings?: ReadonlyArray<CodeModeIssue>;
 	readonly manifest: DiagramRecordManifest;
 	readonly document: DiagramDocument;
 	readonly revisions: ReadonlyArray<string>;

@@ -18,7 +18,12 @@ import {
 } from "./generation.js";
 import { DiagramStore } from "./storage.js";
 import { CliPngRendererLive } from "./png-renderer.js";
-import { flowchartInput, mindmapInput, sequenceInput } from "./__tests__/fixtures.js";
+import {
+	compositeStateMachineInput,
+	flowchartInput,
+	mindmapInput,
+	sequenceInput,
+} from "./__tests__/fixtures.js";
 
 const builderLayer = DiagramBuilderLive.pipe(
 	Layer.provide(
@@ -40,6 +45,7 @@ async function buildSuccessBody(input: unknown): Promise<string> {
 			return {
 				ok: true,
 				status: "generated",
+				issues: built.warnings ?? [],
 				diagram: {
 					document: built.document,
 					scene: built.scene,
@@ -69,6 +75,7 @@ function stored(diagram: BuiltDiagram): StoredDiagram {
 		authority: "canonical",
 		document: diagram.document,
 		revisions: [],
+		...(diagram.warnings?.length ? { warnings: diagram.warnings } : {}),
 	};
 }
 
@@ -173,6 +180,18 @@ function runGenerate(
 }
 
 describe("prompt-assisted generation over the public generate API", () => {
+	it.effect("surfaces generate API warnings without rejecting or losing them at storage", () =>
+		Effect.gen(function* () {
+			const body = yield* Effect.promise(() => buildSuccessBody(compositeStateMachineInput));
+			stubFetch(() => new Response(body, { status: 200 }));
+			const created: BuiltDiagram[] = [];
+			const result = yield* runGenerate(created, "state-machine");
+			assert.strictEqual(created[0]?.warnings?.[0]?.code, "composite_initial_defaulted");
+			assert.strictEqual(result.diagram.warnings?.[0]?.severity, "warning");
+			assert.include(result.diagram.warnings?.[0]?.message ?? "", '"playing"');
+		}),
+	);
+
 	it.effect("keeps response-stream I/O failures in the network exit class", () =>
 		Effect.gen(function* () {
 			globalThis.fetch = () =>

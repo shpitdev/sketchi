@@ -1,6 +1,7 @@
 import {
 	type CANONICAL_DOCUMENT_TYPES,
 	ExcalidrawFileSchema,
+	CodeModeIssueSchema,
 	RenderedDiagramSceneSchema,
 	type ExcalidrawFile,
 	type PatchableScene,
@@ -140,6 +141,7 @@ const PresentValue = Schema.Unknown.check(Schema.makeFilter((value) => value !==
 
 const GenerateApiSuccess = Schema.Struct({
 	ok: Schema.Literal(true),
+	issues: Schema.optionalKey(Schema.Array(CodeModeIssueSchema)),
 	diagram: Schema.Struct({
 		document: PresentValue,
 		scene: PresentValue,
@@ -212,7 +214,7 @@ const requestGeneration = Effect.fn("sketchi.cli.generate.request")(
 			return yield* endpointFailure(response.status, body);
 		}
 		const success = yield* decodeSuccessBody(text).pipe(Effect.mapError(malformedResponse));
-		return { ...success.diagram, ...success.generation };
+		return { ...success.diagram, ...success.generation, issues: success.issues ?? [] };
 	},
 	Effect.timeoutOrElse({
 		duration: API_REQUEST_TIMEOUT,
@@ -237,6 +239,7 @@ export const generateDiagram = Effect.fn("sketchi.cli.generate")(function* (
 
 	const built: BuiltDiagram = {
 		id,
+		warnings: response.issues.filter((entry) => entry.severity === "warning"),
 		type: document.type,
 		title: document.spec.title,
 		document,

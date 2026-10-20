@@ -998,6 +998,7 @@ const DiagramStoreLive = Layer.effect(
 								yield* fs.rename(stage, destination);
 								return {
 									manifest,
+									...(diagram.warnings?.length ? { warnings: diagram.warnings } : {}),
 									document: diagram.document,
 									revisions: [],
 									authority: "canonical",
@@ -1043,6 +1044,11 @@ const DiagramStoreLive = Layer.effect(
 					}),
 				(stage, _current, manifest) =>
 					writeBuilt(stage, diagram).pipe(Effect.as({ manifest, document: diagram.document })),
+			).pipe(
+				Effect.map((stored) => ({
+					...stored,
+					...(diagram.warnings?.length ? { warnings: diagram.warnings } : {}),
+				})),
 			),
 		);
 

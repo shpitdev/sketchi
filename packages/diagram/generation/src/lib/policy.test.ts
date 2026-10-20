@@ -1,8 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
-import { parseFlowchartDiagram } from "@sketchi/diagram-core";
+import { mediaPlayerStateMachine, parseFlowchartDiagram } from "@sketchi/diagram-core";
 import { Effect } from "effect";
 
-import type { DiagramGenerationCandidate, DiagramGenerationRequest } from "./candidates.js";
+import {
+	candidateFromText,
+	type DiagramGenerationCandidate,
+	type DiagramGenerationRequest,
+} from "./candidates.js";
 import { runDiagramGenerationWithPolicy } from "./policy.js";
 
 const request: DiagramGenerationRequest = {
@@ -73,6 +77,56 @@ function runRepairs(initialDiagnostics: string[]) {
 }
 
 describe("generation repair prompts", () => {
+	it.effect("keeps default warnings non-blocking and out of actual repair diagnostics", () =>
+		Effect.gen(function* () {
+			for (const requireMissingLabel of [false, true]) {
+				const requests: DiagramGenerationRequest[] = [];
+				const candidate = candidateFromText({
+					model: "fixture-model",
+					provider: "fixture",
+					text: JSON.stringify({
+						title: "Player",
+						intent: {
+							requestedKind: "state-machine",
+							nativeKind: "state-machine",
+							requirements: requireMissingLabel
+								? [{ kind: "label", target: "state", value: "Missing outcome" }]
+								: [],
+						},
+						diagram: {
+							...mediaPlayerStateMachine,
+							states: mediaPlayerStateMachine.states.map(
+								({ initial: _initial, ...state }) => state,
+							),
+						},
+					}),
+				});
+				const result = yield* runDiagramGenerationWithPolicy(
+					(input) => {
+						requests.push(input);
+						return Effect.succeed(candidate);
+					},
+					{ ...request, prompt: { ...request.prompt, requestedType: "state-machine" } },
+					"fixture",
+					{
+						concurrency: 1,
+						maxRepairAttempts: 1,
+						maxRetries: 0,
+						requestTimeoutMs: 1000,
+						retryDelayMs: 1,
+					},
+				);
+				expect(requests).toHaveLength(requireMissingLabel ? 2 : 1);
+				expect(result.warnings?.[0]?.code).toBe("composite_initial_defaulted");
+				if (requireMissingLabel) {
+					expect(requests[1]?.prompt.request).toContain("Missing outcome");
+					expect(requests[1]?.prompt.request).not.toContain("composite_initial_defaulted");
+					expect(requests[1]?.prompt.request).not.toContain("defaulted to its first");
+				} else expect(result.error).toBeUndefined();
+			}
+		}),
+	);
+
 	for (const initialDiagnostics of [
 		["output_truncated: Regenerate the complete diagram."],
 		[

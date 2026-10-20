@@ -8,6 +8,7 @@ import { Effect, Layer } from "effect";
 import { DiagramBuilder, DiagramBuilderLive } from "./builder.js";
 import {
 	canonicalDocument,
+	compositeStateMachineInput,
 	flowchartInput,
 	mindmapInput,
 	sequenceInput,
@@ -25,6 +26,15 @@ const builderLayer = DiagramBuilderLive.pipe(
 );
 
 layer(builderLayer)("Effect-native Code Mode builder layer", (it) => {
+	it.effect("retains accepted composite-default warnings for CLI reporting", () =>
+		Effect.gen(function* () {
+			const builder = yield* DiagramBuilder;
+			const built = yield* builder.build(canonicalDocument(compositeStateMachineInput));
+			assert.strictEqual(built.warnings?.[0]?.code, "composite_initial_defaulted");
+			assert.include(built.warnings?.[0]?.message ?? "", '"playing"');
+		}),
+	);
+
 	it.effect("builds every canonical document type into stored offline artifacts", () =>
 		Effect.gen(function* () {
 			const builder = yield* DiagramBuilder;

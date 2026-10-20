@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { parseCanonicalDiagram } from "../diagram";
 import {
 	getStateMachineValidationIssues,
+	getStateMachineDefaultWarnings,
 	mediaPlayerStateMachine,
 	parseStateMachineDiagram,
 	type StateMachineDiagram,
@@ -18,6 +19,112 @@ const codes = (input: Partial<StateMachineDiagram>) =>
 	);
 
 describe("StateMachine diagram type", () => {
+	it("skips final and choice children for defaults but preserves explicit choice entry", () => {
+		const input = {
+			id: "composite-entry",
+			title: "Composite entry",
+			type: "state-machine",
+			initial: "active",
+			states: [
+				{ id: "active" },
+				{ id: "done", kind: "final", parent: "active" },
+				{ id: "choose", kind: "choice", parent: "active" },
+				{ id: "ready", parent: "active" },
+			],
+			transitions: [
+				{ id: "check", source: "ready", target: "choose" },
+				{ id: "retry", source: "choose", target: "ready", guard: "retry" },
+				{ id: "end", source: "choose", target: "done", guard: "else" },
+			],
+		};
+		expect(parseStateMachineDiagram(input).states[0]?.initial).toBe("ready");
+		expect(getStateMachineDefaultWarnings(parseStateMachineDiagram(input))).toEqual([]);
+		const explicit = {
+			...input,
+			states: input.states.map((state) =>
+				state.id === "active" ? { ...state, initial: "choose" } : state,
+			),
+		};
+		expect(parseStateMachineDiagram(explicit).states[0]?.initial).toBe("choose");
+		for (const states of [input.states.slice(0, 2), input.states.slice(0, 3)]) {
+			expect(() => parseStateMachineDiagram({ ...input, states, transitions: [] })).toThrow(
+				/Composite "active" has no regular substate to enter/,
+			);
+		}
+	});
+
+	it("defaults in authored child order, preserves explicit entries, and does not mutate input", () => {
+		const input = {
+			...mediaPlayerStateMachine,
+			states: mediaPlayerStateMachine.states.map(({ initial: _initial, ...state }) => state),
+		};
+		const parsed = parseCanonicalDiagram(input);
+		expect(parsed).toMatchObject({
+			states: [
+				input.states[0],
+				{ ...input.states[1], initial: "playing" },
+				input.states[2],
+				input.states[3],
+			],
+		});
+		expect(input.states[1]).not.toHaveProperty("initial");
+		expect(getStateMachineValidationIssues(input)).toEqual([]);
+		expect(getStateMachineDefaultWarnings(input)).toEqual([
+			expect.objectContaining({
+				code: "composite_initial_defaulted",
+				path: "states.[1].initial",
+				message:
+					'Composite "active" has no initial; defaulted to its first listed regular substate "playing".',
+			}),
+		]);
+		const reversed = { ...input, states: [input.states[3]!, ...input.states.slice(0, 3)] };
+		expect(
+			parseStateMachineDiagram(reversed).states.find((state) => state.id === "active")?.initial,
+		).toBe("paused");
+		const explicit = {
+			...input,
+			states: input.states.map((state) =>
+				state.id === "active" ? { ...state, initial: "paused" } : state,
+			),
+		};
+		expect(parseStateMachineDiagram(explicit).states[1]?.initial).toBe("paused");
+		expect(getStateMachineDefaultWarnings(explicit)).toEqual([]);
+	});
+
+	it("does not repair invalid explicit entries, empty composites or an explicit final entry", () => {
+		for (const initial of ["missing", "stopped", "active"]) {
+			const input = {
+				...mediaPlayerStateMachine,
+				states: mediaPlayerStateMachine.states.map((state) =>
+					state.id === "active" ? { ...state, initial } : state,
+				),
+			};
+			expect(() => parseStateMachineDiagram(input)).toThrow(/not one of its substates/);
+			expect(getStateMachineDefaultWarnings(input)).toEqual([]);
+		}
+		const empty = {
+			...mediaPlayerStateMachine,
+			states: mediaPlayerStateMachine.states.filter((state) => !state.parent),
+			transitions: [mediaPlayerStateMachine.transitions[0]!],
+		};
+		expect(() => parseStateMachineDiagram(empty)).toThrow(/not one of its substates/);
+		expect(getStateMachineDefaultWarnings(empty)).toEqual([]);
+		const finalFirst = {
+			...mediaPlayerStateMachine,
+			states: mediaPlayerStateMachine.states.map((state) =>
+				state.id === "active"
+					? { id: "active", initial: "playing" }
+					: state.id === "playing"
+						? { ...state, kind: "final" as const }
+						: state,
+			),
+		};
+		expect(getStateMachineValidationIssues(finalFirst).map((issue) => issue.code)).toContain(
+			"unknown_initial_state",
+		);
+		expect(() => parseStateMachineDiagram(finalFirst)).toThrow(/not one of its substates/);
+	});
+
 	it("accepts missing labels in the canonical core and resolves ids verbatim", () => {
 		const input = {
 			...mediaPlayerStateMachine,
@@ -139,7 +246,7 @@ describe("StateMachine diagram type", () => {
 				],
 			}),
 		).toEqual(["unreachable_state"]);
-		// Starting in a composite enters it, so it needs an initial substate.
+		// Starting in a composite enters its default first substate.
 		expect(
 			codes({
 				initial: "active",
@@ -152,7 +259,7 @@ describe("StateMachine diagram type", () => {
 					{ id: "resume", source: "stopped", target: "playing", event: "resume" },
 				],
 			}),
-		).toEqual(["missing_composite_initial"]);
+		).toEqual([]);
 	});
 
 	it("requires a guard on every branch of a choice, with at most one else", () => {
@@ -201,10 +308,10 @@ describe("StateMachine diagram type", () => {
 		expect(
 			codes({
 				states: mediaPlayerStateMachine.states.map((state) =>
-					state.id === "active" ? { id: "active", label: "Active" } : state,
+					state.id === "active" ? { ...state, initial: "stopped" } : state,
 				),
 			}),
-		).toContain("missing_composite_initial");
+		).toContain("unknown_initial_state");
 		expect(
 			codes({
 				transitions: [
