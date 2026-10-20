@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.25.13
+
+### Patch Changes
+
+- [#524](https://github.com/shpitdev/sketchi/pull/524) [`9b76e52`](https://github.com/shpitdev/sketchi/commit/9b76e52fd3a2f015475b9be45a869cba10c6899d) Thanks [@anandpant](https://github.com/anandpant)! - A decision's branches now leave by the vertices that route them best together. Where a branch would double back around its decision, detour, dip into its target or cross a sibling branch, either as drawn or as first arranged before the crossing repair moved it, the other ways of assigning the branches to the decision's side and forward vertices are laid out, and the one with the fewest crossings, then detours and dips, then the shortest lines is kept when it draws no worse and no longer or narrower for its length. Incident flows whose severity check reaches the bridge around the fix check now draw one crossing where they drew two, and an escalation from the fix check drops straight into the bridge below it instead of swinging into its side. A line that turns over its target's corner into a side another line already enters now enters the free side it approaches, a line that dipped past a database's foot steps across midway into its near side, a line that swung around a zone's name drops in clear of it, and a short branch's label sits clear of its own arrowhead's wing.
+
 ## 0.25.12
 
 ### Patch Changes
