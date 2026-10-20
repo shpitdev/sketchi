@@ -347,6 +347,31 @@ function readBinaryArtifact(
 	});
 }
 
+
+// PROBE ONLY (do not merge): R2 write timings, read back into execute logs.
+type R2Probe = { writeMs: number; puts: { format: string; bytes: number; startMs: number; ms: number }[] };
+const r2Probes = ((globalThis as { __sketchiR2Probe?: Map<string, R2Probe> }).__sketchiR2Probe ??=
+	new Map<string, R2Probe>());
+function probedPut(
+	probe: R2Probe,
+	t0: number,
+	format: string,
+	bytes: number,
+	put: () => Promise<unknown>,
+): () => Promise<unknown> {
+	return async () => {
+		const startedAt = Date.now();
+		try {
+			return await put();
+		} finally {
+			probe.puts.push({ format, bytes, startMs: startedAt - t0, ms: Date.now() - startedAt });
+		}
+	};
+}
+function probeBytes(body: CodeModeObjectBucketBody): number {
+	return typeof body === "string" ? new TextEncoder().encode(body).byteLength : body.byteLength;
+}
+
 export function makeObjectBucketArtifactStorage(
 	bucket: CodeModeObjectBucket,
 	options: ObjectBucketArtifactStorageOptions = {},
@@ -436,14 +461,17 @@ export function makeObjectBucketArtifactStorage(
 			// fresh and reaches no caller until this write succeeds, so no reader can
 			// fetch the manifest before every format it lists has landed. A failed PUT
 			// fails the write and the id is never returned.
+			const probe: R2Probe = { writeMs: 0, puts: [] };
+			const t0 = Date.now();
 			yield* Effect.forEach(
 				objects,
 				(object) =>
 					Effect.tryPromise({
-						try: () =>
+						try: probedPut(probe, t0, object.format, object.bodyBytes, () =>
 							bucket.put(keyForArtifact(prefix, input.artifactId, object.format), object.body, {
 								httpMetadata: { contentType: object.contentType },
 							}),
+						),
 						catch: storageError("write"),
 					}).pipe(
 						Effect.withSpan("codeMode.artifacts.r2.put", {
@@ -456,6 +484,8 @@ export function makeObjectBucketArtifactStorage(
 					),
 				{ concurrency: "unbounded", discard: true },
 			);
+			probe.writeMs = Date.now() - t0;
+			r2Probes.set(input.artifactId, probe);
 
 			const formats = input.formats.map((artifact) => artifactRef(artifact, input.inlineFormats));
 			return bundleFromFormats({
