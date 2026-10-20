@@ -74,8 +74,17 @@ export interface RouteRequest {
 	 * as their shared trunk.
 	 */
 	readonly pastTrunk?: ReadonlyMap<RouteObstacle, RouteSegment>;
+	/**
+	 * Last runs of earlier routes into this route's successor. Its run into a target port may touch
+	 * one, so it can join that run and share its entry.
+	 */
+	readonly joins?: ReadonlySet<RouteSegment>;
 	/** Bars whose top and bottom edges runs keep off: running close along one costs extra. */
 	readonly edges?: readonly RouteBox[];
+	/** Bars whose ends runs keep SIDE_DISTANCE clear of: running closer beside one costs extra. */
+	readonly sides?: readonly RouteBox[];
+	/** Bars a route may pass beside on its way: it may run SIDE_DISTANCE clear of their ends. */
+	readonly besides?: readonly RouteBox[];
 	/** The last runs of earlier routes: crossing one, even behind its arrowhead, costs more. */
 	readonly lastRuns?: ReadonlySet<RouteSegment>;
 	/** Nothing routes above top or below bottom. */
@@ -97,6 +106,8 @@ export interface RouteRequest {
 	readonly backCrossingFactor?: number;
 	/** Search steps the whole chart may still spend; shared by its routes. */
 	readonly budget?: { remaining: number };
+	/** The most steps any one search may take: MAX_EXPANSIONS unless set lower. */
+	readonly limit?: number;
 	/**
 	 * Search steps the whole chart may still spend weighing kinks, apart from its routing budget:
 	 * a route found with kinks searches again for a cheaper one under kink costs while it lasts.
@@ -132,7 +143,7 @@ const BESIDE_COST = 2;
  * A turn after a run shorter than this, other than the first, reads as a kink: a step or hook
  * rather than an elbow. It costs extra, so routes take a plain elbow where one exists.
  */
-const KINK_LENGTH = 28;
+export const KINK_LENGTH = 28;
 const KINK_COST = 40;
 /** A search weighing kinks may take this many times the steps its plain search took. */
 const KINK_SEARCH_FACTOR = 2;
@@ -142,6 +153,13 @@ export const ROUTE_KINK_BUDGET = 48_000;
 /** Runs this close along a bar's top or bottom edge read as tracing it, and cost extra per pixel. */
 const EDGE_DISTANCE = 7;
 const EDGE_COST = 2;
+/**
+ * Runs beside a bar's end read as tracing it closer than this, about half a bar height: they cost
+ * SIDE_COST per pixel of the bar's height they pass, more than the run a route rounding a bar adds
+ * to clear it this far.
+ */
+export const SIDE_DISTANCE = 15;
+const SIDE_COST = 1;
 /** Crossing another route while heading back left costs this many times more. */
 const BACK_CROSSING_FACTOR = 8;
 /** Crossing another route's last run, which leads the eye into its arrowhead, counts this many times. */
@@ -469,13 +487,18 @@ function prepareSearch(request: RouteRequest, window: Window, packing: Packing):
 			box.bottom >= window.top - reach &&
 			box.top <= window.bottom + reach,
 	);
-	const edges = inWindow
-		.filter(({ box }) => box.bottom >= window.top && box.top <= window.bottom)
-		.flatMap(({ box, clearance, sideClearance }) => [
-			box.left - Math.max(sideClearance ?? clearance, ROUTE_SEPARATION),
-			box.right + Math.max(sideClearance ?? clearance, ROUTE_SEPARATION),
-		])
-		.filter((x) => x >= window.left && x <= window.right);
+	const edges = [
+		...inWindow
+			.filter(({ box }) => box.bottom >= window.top && box.top <= window.bottom)
+			.flatMap(({ box, clearance, sideClearance }) => [
+				box.left - Math.max(sideClearance ?? clearance, ROUTE_SEPARATION),
+				box.right + Math.max(sideClearance ?? clearance, ROUTE_SEPARATION),
+			]),
+		// And where a route clears the end of a bar it passes by SIDE_DISTANCE.
+		...(request.besides ?? [])
+			.filter((box) => box.bottom >= window.top && box.top <= window.bottom)
+			.flatMap((box) => [box.left - SIDE_DISTANCE, box.right + SIDE_DISTANCE]),
+	].filter((x) => x >= window.left && x <= window.right);
 	// Several columns past everything in the window, so detours around it never queue for one.
 	const portXs = portPoints.map((point) => point.x);
 	const farLeft = Math.max(window.left, Math.min(...portXs, ...edges)) - 8;
@@ -525,7 +548,7 @@ function prepareSearch(request: RouteRequest, window: Window, packing: Packing):
 		obstacles: RouteObstacle[];
 		routed: RouteSegment[];
 		beside: RouteSegment[];
-		/** Bars a horizontal line runs close along. */
+		/** Bars a line runs close along, or beside the ends of. */
 		edges: RouteBox[];
 	};
 	const nearEdges = (request.edges ?? []).filter(
@@ -534,6 +557,13 @@ function prepareSearch(request: RouteRequest, window: Window, packing: Packing):
 			box.left <= window.right &&
 			box.bottom >= window.top - EDGE_DISTANCE &&
 			box.top <= window.bottom + EDGE_DISTANCE,
+	);
+	const nearSides = (request.sides ?? []).filter(
+		(box) =>
+			box.right >= window.left - SIDE_DISTANCE &&
+			box.left <= window.right + SIDE_DISTANCE &&
+			box.bottom >= window.top &&
+			box.top <= window.bottom,
 	);
 	const rowLines = new Map<number, Line>();
 	const columnLines = new Map<number, Line>();
@@ -567,7 +597,11 @@ function prepareSearch(request: RouteRequest, window: Window, packing: Packing):
 								(at <= box.top && box.top - at < EDGE_DISTANCE) ||
 								(at >= box.bottom && at - box.bottom < EDGE_DISTANCE),
 						)
-					: [],
+					: nearSides.filter(
+							(box) =>
+								(at <= box.left && box.left - at < SIDE_DISTANCE - 0.01) ||
+								(at >= box.right && at - box.right < SIDE_DISTANCE - 0.01),
+						),
 			};
 			cache.set(at, found);
 		}
@@ -603,17 +637,22 @@ function prepareSearch(request: RouteRequest, window: Window, packing: Packing):
 			return false;
 		return !line.routed.some(
 			(segment) =>
-				!(trunk && request.trunks?.has(segment)) && alongside(from, to, segment, separation),
+				!(trunk && request.trunks?.has(segment)) &&
+				!(port && request.joins?.has(segment)) &&
+				alongside(from, to, segment, separation),
 		);
 	};
-	/** How far a horizontal run lies close along a bar's top or bottom edge. */
+	/** How far a run lies close along a bar's top or bottom edge, or beside one of its ends. */
 	const edgeLength = (from: RoutePoint, to: RoutePoint, line = lineOf(from, to)) => {
 		if (line.edges.length === 0) return 0;
-		const low = Math.min(from.x, to.x);
-		const high = Math.max(from.x, to.x);
+		const runHorizontal = Math.abs(from.y - to.y) < 0.01;
+		const low = runHorizontal ? Math.min(from.x, to.x) : Math.min(from.y, to.y);
+		const high = runHorizontal ? Math.max(from.x, to.x) : Math.max(from.y, to.y);
 		let length = 0;
 		for (const box of line.edges)
-			length += Math.max(0, Math.min(high, box.right) - Math.max(low, box.left));
+			length += runHorizontal
+				? Math.max(0, Math.min(high, box.right) - Math.max(low, box.left))
+				: Math.max(0, Math.min(high, box.bottom) - Math.max(low, box.top));
 		return length;
 	};
 	const crossings = (from: RoutePoint, to: RoutePoint, line = lineOf(from, to)) => {
@@ -731,7 +770,7 @@ function prepareSearch(request: RouteRequest, window: Window, packing: Packing):
 			Math.abs(target.x - point.x) +
 			Math.abs(target.y - point.y) +
 			behindCost(point, target) +
-			EDGE_COST * edgeLength(point, target, line) +
+			(heading % 2 === 0 ? EDGE_COST : SIDE_COST) * edgeLength(point, target, line) +
 			(crossingCost ? crossings(point, target, line) * crossingCost : 0) +
 			BESIDE_COST * besideLength(point, target, line)
 		);
@@ -925,7 +964,10 @@ function straightRoute(request: RouteRequest): RoutePoint[] | undefined {
 					(obstacle) => !obstacle.own && blocksSegment(obstacle, source, target),
 				) ||
 				request.routed.some(
-					(segment) => !request.trunks?.has(segment) && alongside(source, target, segment),
+					(segment) =>
+						!request.trunks?.has(segment) &&
+						!request.joins?.has(segment) &&
+						alongside(source, target, segment),
 				);
 			const cost = source.cost + target.cost + length;
 			if (!blocked && (!best || cost < best.cost)) best = { cost, points: [source, target] };
@@ -988,7 +1030,7 @@ export function routeOrthogonal(request: RouteRequest): RoutePoint[] | undefined
 	const attempt = (window: Window, packing: Packing, weighKinks: boolean) => {
 		if (budget && budget.remaining <= 0) return undefined;
 		const run = prepareSearch(request, window, packing);
-		const plain = run(false, Infinity, MAX_EXPANSIONS);
+		const plain = run(false, Infinity, Math.min(MAX_EXPANSIONS, request.limit ?? MAX_EXPANSIONS));
 		if (budget) budget.remaining -= plain.expansions;
 		if (!plain.points) return undefined;
 		const kinks = routeKinkCost(plain.points);

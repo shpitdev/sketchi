@@ -60,6 +60,46 @@ describe("Gantt export", () => {
 		});
 	});
 
+	it("exports a dependency that joined another's last run as one stem into one arrowhead", () => {
+		// Two arrivals that need the one clear entry into their successor share its last run.
+		const diagram = parseGanttDiagram({
+			id: "shared-entry",
+			title: "Shared entry",
+			type: "gantt",
+			tasks: [
+				{ id: "catalog", label: "Catalog", start: "2026-05-04", end: "2026-05-22" },
+				{ id: "orders", label: "Orders", start: "2026-05-04", end: "2026-06-05" },
+				{ id: "clicks", label: "Clickstream", start: "2026-05-11", duration: 20 },
+				{ id: "dashboards", label: "Dashboards", start: "2026-06-01", end: "2026-06-12" },
+				{
+					id: "validation",
+					label: "Validation",
+					start: "2026-06-08",
+					end: "2026-06-19",
+					dependsOn: ["catalog", "orders"],
+				},
+				{ id: "programme", label: "Programme", start: "2026-01-05", end: "2026-07-31" },
+			],
+		});
+		const scene = convertSceneToExcalidraw(renderDiagram(diagram));
+		expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
+		const arrivals = scene.elements.filter(
+			(element) => element.type === "arrow" && element.id.endsWith(":validation"),
+		);
+		const ends = arrivals.map((arrow) => {
+			const [x, y] = (arrow.points as [number, number][]).at(-1)!;
+			return { x: (arrow.x as number) + x, y: (arrow.y as number) + y };
+		});
+		expect(ends[0]).toEqual(ends[1]);
+		// Stems that part even 2 px before their ends still lie on one another.
+		const [, later] = arrivals;
+		const points = later!.points as [number, number][];
+		later!.points = [...points.slice(0, -1), [points.at(-1)![0], points.at(-1)![1] - 2]];
+		expect(validateExcalidrawScene(scene).issues).toContainEqual(
+			expect.objectContaining({ code: "overlapping-arrow-segment" }),
+		);
+	});
+
 	it("exports a milestone that waits on 19 parallel tasks, each arrow on its own path", () => {
 		const diagram = parseGanttDiagram({
 			id: "fan-in",

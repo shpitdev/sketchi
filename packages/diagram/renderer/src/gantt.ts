@@ -25,6 +25,7 @@ import {
 	type GanttAxis,
 } from "./gantt-scale.js";
 import {
+	KINK_LENGTH,
 	ROUTE_APPROACH,
 	ROUTE_SEPARATION,
 	ROUTE_BUDGET,
@@ -34,6 +35,7 @@ import {
 	ROUTE_KINK_BUDGET_PER_ROUTE,
 	ROUTE_LEAD,
 	ROUTE_VERTICAL_APPROACH,
+	SIDE_DISTANCE,
 	collinear,
 	routeApproach,
 	routeHead,
@@ -44,6 +46,7 @@ import {
 	type RouteObstacle,
 	type RoutePoint,
 	type RoutePort,
+	type RouteRequest,
 	type RouteSegment,
 } from "./gantt-routing.js";
 import type {
@@ -114,7 +117,7 @@ const NAME_GAP = 20;
 /** Under a phase header, task names sit this far in from its name. */
 const NAME_INDENT = 12;
 /** A corridor between the date column and the axis start, free for dependencies. */
-const PLOT_INSET = 24;
+const CORRIDOR_WIDTH = 24;
 /** Marks keep at least this far right of the corridor's last column. */
 const CORRIDOR_MARK_GAP = 2;
 /** Task names wrap at word boundaries past this width, phase names past this one. */
@@ -131,6 +134,19 @@ const BOTTOM_AXIS_ROWS = 16;
 /** Routes keep this far above and below bars, and farther beside them. */
 const BAR_CLEARANCE = 4;
 const BAR_SIDE_CLEARANCE = 8;
+/**
+ * Laid out clear, the axis starts past the corridor and a bar's side clearance, so routes down it
+ * keep clear of every mark; else it starts right after the corridor, as before.
+ */
+const PLOT_INSET = CORRIDOR_WIDTH + BAR_SIDE_CLEARANCE;
+/**
+ * Columns where a route passes straight beside a bar: as close as it may and, laid out `forward`,
+ * well clear of its end.
+ */
+function besideBar(box: Box, forward: boolean): number[] {
+	const close = [box.left - BAR_SIDE_CLEARANCE, box.right + BAR_SIDE_CLEARANCE];
+	return forward ? [box.left - SIDE_DISTANCE, ...close, box.right + SIDE_DISTANCE] : close;
+}
 /** A route keeps this far off its own predecessor and successor, but for its runs out of and into them. */
 const OWN_CLEARANCE = 3;
 /** A bar's further side entries sit this far above and below its middle, and cost this much. */
@@ -453,6 +469,8 @@ interface Row {
 
 /** How far into a bar its top and bottom entries sit. */
 const ENTRY_INSETS = [7, 19, 31];
+/** How far back from a bar's end its bottom and top exits sit. */
+const EXIT_INSETS = [6, 16, 26];
 /** A route out of a bar's right end may turn this soon to drop straight into a successor just past it. */
 const SHORT_LEAD = 3;
 /** Bars narrower than this keep their right end closed: it sits beside their arrivals' arrowheads. */
@@ -469,6 +487,13 @@ const ELBOW_RUN = 19;
 const AWAY_COST = 40;
 /** Entering a bar through its top or bottom rather than at its start from the left. */
 const TOP_ENTRY_COST = 20;
+/**
+ * Entering a diamond on its upper or lower edge beside the vertex, in line with a bar it passed:
+ * as dear as a bend, so a route takes a vertex wherever one is in reach.
+ */
+const EDGE_ENTRY_COST = 24;
+/** Edge entries keep this far in from a diamond's side vertices, where dependencies leave and arrive. */
+const EDGE_ENTRY_INSET = 4;
 /** A route may jog this far behind its predecessor's start and still count as going forward. */
 const FORWARD_SLACK = 16;
 /** Other routes keep this far from an arrowhead, and a new arrowhead this far from other routes. */
@@ -530,7 +555,7 @@ function sourcePorts(
 	}
 	// Exits sit apart near the bar's end, so routes leaving one bar never share a run; a short bar
 	// packs them closer.
-	const insets = [6, 16, 26].filter((inset) => box.right - inset >= box.left + 3);
+	const insets = EXIT_INSETS.filter((inset) => box.right - inset >= box.left + 3);
 	const packed = Array.from({ length: 6 }, (_, index) => box.right - 6 - 2.5 * index).filter(
 		(x) => x >= box.left + 2,
 	);
@@ -579,9 +604,11 @@ function sourcePorts(
 /**
  * Where a dependency may enter its successor: the left end, or the top or
  * bottom near the bar's start, or a milestone's vertices. `align` adds ports
- * straight below or above where the predecessor's route turns. A successor that awaits
- * more dependencies (`crowded`) is entered from the left above and below its
- * middle, so another arrival fits beside, the upper one first from above.
+ * straight below or above where the predecessor's route turns, and on a diamond's
+ * upper and lower edges beside its vertices, where a route passing a bar drops
+ * onto it. A successor that awaits more dependencies (`crowded`) is entered from
+ * the left above and below its middle, so another arrival fits beside, the upper
+ * one first from above.
  */
 function targetPorts(
 	box: Box,
@@ -598,6 +625,13 @@ function targetPorts(
 	if (milestone) {
 		const center = (box.left + box.right) / 2;
 		const quarter = (box.right - box.left) / 4;
+		// Along the upper and lower edges, clear of the side vertices; dearer past their middles.
+		const rise = (x: number) =>
+			((box.bottom - box.top) / 2) * (1 - Math.abs(x - center) / (2 * quarter));
+		const edges = align.filter(
+			(x) => Math.abs(x - center) >= 1 && Math.abs(x - center) <= 2 * quarter - EDGE_ENTRY_INSET,
+		);
+		const edgeCost = (x: number) => EDGE_ENTRY_COST + (Math.abs(x - center) > quarter ? 6 : 0);
 		return [
 			{ x: box.left, y: middle, direction: 0, cost: crowded ? 16 : 0 },
 			{ x: center, y: box.top, direction: 1, cost: 2 + away(1) },
@@ -611,6 +645,10 @@ function targetPorts(
 			})),
 			{ x: center - quarter, y: box.top + quarter, direction: 1, cost: 16 + away(1) },
 			{ x: center - quarter, y: box.bottom - quarter, direction: 3, cost: 16 + away(3) },
+			...edges.flatMap((x): RoutePort[] => [
+				{ x, y: middle - rise(x), direction: 1, cost: edgeCost(x) + away(1) },
+				{ x, y: middle + rise(x), direction: 3, cost: edgeCost(x) + away(3) },
+			]),
 		];
 	}
 	// Entries sit an arrowhead's width apart, so several can arrive at once.
@@ -719,9 +757,82 @@ function conflictHead(points: readonly RoutePoint[], strictly = false): Box {
 	return routeHead(points, side ? HEAD_KEEP_OUT : CONFLICT_HEAD, CONFLICT_MARGIN);
 }
 
+/** A route sharing another's last run into their successor pays this on top of the run it shares. */
+const JOIN_COST = 48;
+/**
+ * Search steps a chart may spend, per dependency and at most, apart from its routing budget, on
+ * routes that join another's last run or hooks run on to their successor's start; one such search
+ * may take JOIN_SEARCH.
+ */
+export const JOIN_BUDGET_PER_ROUTE = 1_000;
+export const JOIN_BUDGET = 24_000;
+const JOIN_SEARCH = 1_000;
+/** A route joins another's last run from the side this far at least before its end, clear of its arrowhead. */
+const JOIN_HEAD_GAP = ROUTE_VERTICAL_APPROACH + HEAD_CLEARANCE + ROUTE_SEPARATION;
+
+/**
+ * Where a route may join an earlier route's last run into the same successor and share its
+ * entry: in line with that run at its start, or from either side where a vertical one crosses a
+ * gutter, short of its arrowhead. Each costs JOIN_COST and the length left to share.
+ */
+function joinPorts(run: RouteSegment, gutters: readonly number[]): RoutePort[] {
+	const direction = routeDirection(run);
+	const shared = (point: RoutePoint) => Math.abs(run.to.x - point.x) + Math.abs(run.to.y - point.y);
+	const ports: RoutePort[] = [{ ...run.from, direction, cost: JOIN_COST + shared(run.from) }];
+	if (direction % 2 === 0) return ports;
+	for (const y of gutters) {
+		const point = { x: run.from.x, y };
+		if (
+			(y - run.from.y) * (run.to.y - y) <= 0 ||
+			Math.abs(y - run.from.y) < ROUTE_SEPARATION ||
+			shared(point) < JOIN_HEAD_GAP
+		)
+			continue;
+		const cost = JOIN_COST + shared(point);
+		ports.push({ ...point, direction: 0, cost }, { ...point, direction: 2, cost });
+	}
+	return ports;
+}
+
+/** A route ending where it joins another's last run, carried on along that run into its entry. */
+function joined(points: RoutePoint[], joins: readonly RouteSegment[]): RoutePoint[] {
+	const end = points.at(-1)!;
+	const within = (value: number, from: number, to: number) =>
+		value >= Math.min(from, to) - 0.01 && value <= Math.max(from, to) + 0.01;
+	const run = joins.find(
+		({ from, to }) =>
+			Math.hypot(to.x - end.x, to.y - end.y) > 1 &&
+			within(end.x, from.x, to.x) &&
+			within(end.y, from.y, to.y),
+	);
+	if (!run) return points;
+	// In line with the run, the route's last run carries on; from the side, it turns into it.
+	return collinear(points.at(-2)!, end, run)
+		? [...points.slice(0, -1), run.to]
+		: [...points, run.to];
+}
+
+/** Whether a route doubles back: a run heading against an earlier run along the same axis. */
+function doublesBack(points: readonly RoutePoint[]): boolean {
+	const headings = new Set<RouteDirection>();
+	for (const run of routeSegments(points)) {
+		const direction = routeDirection(run);
+		if (headings.has(((direction + 2) % 4) as RouteDirection)) return true;
+		headings.add(direction);
+	}
+	return false;
+}
+
+/** Whether two routes end at one point, where one joined the other's last run. */
+function sharedEnd(a: readonly RoutePoint[], b: readonly RoutePoint[]): boolean {
+	const [end, other] = [a.at(-1)!, b.at(-1)!];
+	return Math.hypot(end.x - other.x, end.y - other.y) < 0.01;
+}
+
 /**
  * How often route `a` passes route `b`'s arrowhead or lies along one of its runs. Routes out of
- * one predecessor may share their first runs, and routes into one successor their last.
+ * one predecessor may share their first runs, and routes into one successor their last, as far
+ * as one arrowhead when one joined the other's.
  */
 function routeConflicts(
 	a: readonly RoutePoint[],
@@ -736,9 +847,11 @@ function routeConflicts(
 	// a sibling's arrowhead, not through it.
 	const trunk = kin.leaving && collinear(runs[0]!.from, runs[0]!.to, others[0]);
 	const arrowhead = trunk ? conflictHead(b, true) : head;
+	const joint = kin.arriving && sharedEnd(a, b);
 	let count = 0;
 	runs.forEach((run, index) => {
-		if (segmentEnters(run, index === 0 ? arrowhead : head)) count += 1;
+		const last = index === runs.length - 1;
+		if (!(joint && last) && segmentEnters(run, index === 0 ? arrowhead : head)) count += 1;
 		others.forEach((other, at) => {
 			const shared =
 				(kin.leaving && index === 0 && at === 0) ||
@@ -850,6 +963,8 @@ function escapeId(id: string): string {
 
 /** Corridor routes try offsets this far apart, nearest the preferred one first. */
 const CORRIDOR_STEP = 1;
+/** The corridor's first column, clear of the date column's edge. */
+const CORRIDOR_LEFT = 1.5;
 /** Gaps a corridor route keeps from earlier routes, widest first; it settles for the widest it can keep. */
 const CORRIDOR_GAPS = [2.5, 2, 0.3, 0.05, 0];
 /** Exits along a short predecessor are tried this close together. */
@@ -888,11 +1003,14 @@ function runsBeside(from: RoutePoint, to: RoutePoint, segment: RouteSegment, gap
  * The last resort when the search finds no route within its budget: down from the
  * predecessor's end into the gutter below its row, left to the corridor before the
  * axis, along it to the successor's row, and right into the successor's start.
- * Gutters, the corridor and a row's stretch before its task hold no bars or text.
+ * Gutters, the corridor and a row's stretch before its task hold no bars or text; the
+ * route keeps as clear of the bars and diamonds beside them as a searched route does.
  * Each run takes the nearest offset that keeps clear of earlier routes and
  * arrowheads, or failing that the nearest that at least never lies on a route.
  */
 function corridorRoute(ends: {
+	/** Marks its gutter run keeps above or below: every mark but its own, laid out clear. */
+	readonly marks: readonly Box[];
 	readonly source: Box;
 	readonly sourceMilestone: boolean;
 	readonly sourceRow: Row;
@@ -979,19 +1097,36 @@ function corridorRoute(ends: {
 		...nearest(at, 8, CORRIDOR_FINE_STEP),
 		...nearest(at + 0.1, 8, 0.1),
 	];
+	const corridorMiddle = CORRIDOR_WIDTH / 2;
+	// A gutter run from the exit to the corridor keeps above or below every mark it passes.
+	const clearOfMarks = (y: number, exitX: number) =>
+		ends.marks.every(
+			(box) =>
+				box.right <= CORRIDOR_LEFT ||
+				box.left >= exitX ||
+				y <= box.top - BAR_CLEARANCE ||
+				y >= box.bottom + BAR_CLEARANCE,
+		);
 	const below = heights(ends.sourceRow.top + ends.sourceRow.height).filter(
 		(y) => y >= source.bottom + 2 && y <= ends.rowsBottom - 1,
 	);
 	const above = heights(ends.sourceRow.top).filter(
 		(y) => y <= source.top - 2 && y >= ends.rowsTop + 1,
 	);
-	const corridorMiddle = PLOT_INSET / 2;
 	// The exit first, judged along its gutter's middle to the corridor; then the gutter height
 	// that suits it.
-	const exits = [
-		...along(1).map((point) => [point, below] as const),
-		...along(-1).map((point) => [point, above] as const),
-	].filter(([, gutters]) => gutters.length > 0);
+	const exitsBy = (clear: boolean) =>
+		[
+			...along(1).map(
+				(point) => [point, below.filter((y) => !clear || clearOfMarks(y, point.x))] as const,
+			),
+			...along(-1).map(
+				(point) => [point, above.filter((y) => !clear || clearOfMarks(y, point.x))] as const,
+			),
+		].filter(([, gutters]) => gutters.length > 0);
+	// Gutter heights clear of the marks beside them where any exit has one; else any height.
+	const clearExits = exitsBy(true);
+	const exits = clearExits.length > 0 ? clearExits : exitsBy(false);
 	const [exit, gutters] = choose(exits, ([point, gutters]) => [
 		[point, { x: point.x, y: gutters[0]! }, true],
 		[
@@ -1031,10 +1166,11 @@ function corridorRoute(ends: {
 		},
 	);
 	// Half-pixel columns first; tenths only when a crowded corridor leaves nothing else.
+	const reach = corridorMiddle - CORRIDOR_LEFT;
 	const corridor = choose(
 		[
-			...nearest(corridorMiddle, corridorMiddle - 1.5, CORRIDOR_FINE_STEP),
-			...nearest(corridorMiddle + 0.1, corridorMiddle - 1.5, 0.1),
+			...nearest(corridorMiddle, reach, CORRIDOR_FINE_STEP),
+			...nearest(corridorMiddle + 0.1, reach - 0.1, 0.1),
 		],
 		(x) => [
 			[
@@ -1076,41 +1212,194 @@ export function renderGanttDiagram(input: GanttDiagram): RenderedDiagramScene {
 	return layoutGanttDiagram(input).scene;
 }
 
+/** A layout tried, with how its routes read: how often they cross, and what else a reader would flag. */
+interface LayoutTry {
+	readonly scene: RenderedDiagramScene;
+	readonly work: GanttRoutingWork;
+	readonly crossings: number;
+	readonly findings: Findings;
+	/** Whether every run keeps a bar's clearance from the marks it passes but doesn't connect to. */
+	readonly clear: boolean;
+}
+
+/** What a reader would flag in a layout's routes, by kind. */
+interface Findings {
+	/** Runs through another's arrowhead or along another route. */
+	readonly conflicts: number;
+	/** Routes the search found no way for, drawn down the corridor. */
+	readonly fallbacks: number;
+	/** Routes that double back. */
+	readonly detours: number;
+	/** Short runs between turns, away from a route's ends. */
+	readonly kinks: number;
+	/** Zig-zags beside a route's ends. */
+	readonly jogs: number;
+	/** Runs beside the end of a bar a route doesn't connect to, closer than SIDE_DISTANCE. */
+	readonly traces: number;
+}
+
 /**
- * A Gantt chart's scene and the routing work its layout took. When routes still pass another's
- * arrowhead or lie along it, the chart is laid out again with roomier rows, whose wider gutters
- * hold more lanes, and the layout with the fewest such conflicts is kept.
+ * A zig-zag's middle run shorter than JOG_LENGTH reads as a port jog within JOG_REACH of a route's
+ * end: about 90 px in the delivered PNG, which draws the scene about twice its size.
+ */
+const JOG_LENGTH = 40;
+const JOG_REACH = 46;
+/** A forward layout may draw this many more findings of one kind than the earlier way, no more in all. */
+const FINDING_TOLERANCE = 1;
+
+/** What a reader would flag in a layout's routes. */
+function findingsOf(
+	routes: readonly { readonly from: string; readonly to: string; readonly points: RoutePoint[] }[],
+	bars: readonly (readonly [string, Box])[],
+	conflicts: number,
+	fallbacks: WeakSet<RoutePoint[]>,
+): Findings {
+	let [detours, kinks, jogs, traces, corridor] = [0, 0, 0, 0, 0];
+	for (const { from, to, points } of routes) {
+		if (fallbacks.has(points)) corridor += 1;
+		if (doublesBack(points)) detours += 1;
+		const runs = routeSegments(points);
+		const lengths = runs.map(({ from: a, to: b }) => Math.abs(b.x - a.x) + Math.abs(b.y - a.y));
+		const total = lengths.reduce((sum, length) => sum + length, 0);
+		let along = lengths[0] ?? 0;
+		for (let index = 1; index < runs.length - 1; index += 1) {
+			const length = lengths[index]!;
+			const nearEnd = along <= JOG_REACH || total - along - length <= JOG_REACH;
+			if (nearEnd && length < JOG_LENGTH) jogs += 1;
+			else if (length < KINK_LENGTH) kinks += 1;
+			along += length;
+		}
+		for (const { from: a, to: b } of runs) {
+			if (Math.abs(a.x - b.x) >= 0.01) continue;
+			for (const [id, box] of bars)
+				if (
+					id !== from &&
+					id !== to &&
+					Math.min(Math.abs(a.x - box.left), Math.abs(a.x - box.right)) < SIDE_DISTANCE - 0.01 &&
+					Math.min(Math.max(a.y, b.y), box.bottom) - Math.max(Math.min(a.y, b.y), box.top) > 1
+				)
+					traces += 1;
+		}
+	}
+	return { conflicts, fallbacks: corridor, detours, kinks, jogs, traces };
+}
+
+/**
+ * Whether a forward layout reads no worse than the earlier one: its routes cross no more often,
+ * and draw no more findings in all, and at most FINDING_TOLERANCE more of any one kind.
+ */
+function noWorse(forward: LayoutTry, earlier: LayoutTry): boolean {
+	const kinds = Object.keys(forward.findings) as (keyof Findings)[];
+	const total = (findings: Findings) => kinds.reduce((sum, kind) => sum + findings[kind], 0);
+	return (
+		forward.crossings <= earlier.crossings &&
+		total(forward.findings) <= total(earlier.findings) &&
+		kinds.every((kind) => forward.findings[kind] <= earlier.findings[kind] + FINDING_TOLERANCE)
+	);
+}
+
+/**
+ * Whether every run keeps BAR_SIDE_CLEARANCE beside, and BAR_CLEARANCE above and below, each bar
+ * and diamond it passes but doesn't connect to.
+ */
+function keepsClear(
+	routes: readonly { readonly from: string; readonly to: string; readonly points: RoutePoint[] }[],
+	marks: ReadonlyMap<string, Box>,
+): boolean {
+	return routes.every(({ from, to, points }) =>
+		routeSegments(points).every(({ from: a, to: b }) => {
+			const vertical = Math.abs(a.x - b.x) < 0.01;
+			return [...marks].every(([id, box]) => {
+				if (id === from || id === to) return true;
+				const shared = vertical
+					? Math.min(Math.max(a.y, b.y), box.bottom) - Math.max(Math.min(a.y, b.y), box.top)
+					: Math.min(Math.max(a.x, b.x), box.right) - Math.max(Math.min(a.x, b.x), box.left);
+				if (shared <= 1) return true;
+				const gap = vertical
+					? Math.max(box.left - a.x, a.x - box.right)
+					: Math.max(box.top - a.y, a.y - box.bottom);
+				return gap >= (vertical ? BAR_SIDE_CLEARANCE : BAR_CLEARANCE) - 0.02;
+			});
+		}),
+	);
+}
+
+/** Whether a layout's routes neither cross nor draw any finding. */
+function clean(layout: LayoutTry): boolean {
+	return layout.crossings === 0 && Object.values(layout.findings).every((count) => count === 0);
+}
+
+/** How a layout routes: with the forward choices or as before them, and clear of every mark or as before. */
+interface Choices {
+	readonly forward: boolean;
+	readonly clear: boolean;
+}
+const FORWARD: Choices = { forward: true, clear: true };
+const EARLIER: Choices = { forward: false, clear: false };
+const EARLIER_CLEAR: Choices = { forward: false, clear: true };
+
+/**
+ * A Gantt chart's scene and the routing work its layout took. The chart is laid out forward first;
+ * unless that layout reads clean, it is laid out the earlier way too, and again keeping clear of
+ * every mark where that way runs too close to one. The forward layout is kept unless that earlier
+ * one crosses less often or draws fewer findings. When the kept layout's routes still pass
+ * another's arrowhead or lie along it, the chart is laid out again that way with roomier rows,
+ * whose wider gutters hold more lanes, and the layout with the fewest such conflicts is kept.
  */
 export function layoutGanttDiagram(input: GanttDiagram): {
 	readonly scene: RenderedDiagramScene;
 	readonly work: GanttRoutingWork;
 } {
 	const diagram = validateGanttDiagram(input);
-	let best = layoutAt(diagram, ROW_HEIGHT);
-	let work = best.work;
+	const tried: LayoutTry[] = [layoutAt(diagram, ROW_HEIGHT, FORWARD)];
+	let best = tried[0]!;
+	let choices = FORWARD;
+	if (!clean(best)) {
+		let earlier = layoutAt(diagram, ROW_HEIGHT, EARLIER);
+		let earlierChoices = EARLIER;
+		tried.push(earlier);
+		if (!earlier.clear) {
+			earlier = layoutAt(diagram, ROW_HEIGHT, EARLIER_CLEAR);
+			earlierChoices = EARLIER_CLEAR;
+			tried.push(earlier);
+		}
+		if (earlier.clear && !noWorse(best, earlier)) {
+			best = earlier;
+			choices = earlierChoices;
+		}
+	}
 	for (const extra of ROOMY_ROWS) {
 		// A few conflicts may clear with more room; a tangle of them would not, and costs a layout each.
 		if (best.work.conflicts === 0 || best.work.conflicts > ROOMY_CONFLICTS) break;
-		const roomier = layoutAt(diagram, ROW_HEIGHT + extra);
-		work = {
-			layouts: work.layouts + 1,
-			placements: work.placements + roomier.work.placements,
-			expansions: work.expansions + roomier.work.expansions,
-			corridors: roomier.work.corridors,
-			conflicts: roomier.work.conflicts,
-		};
+		const roomier = layoutAt(diagram, ROW_HEIGHT + extra, choices);
+		tried.push(roomier);
 		if (roomier.work.conflicts < best.work.conflicts) best = roomier;
 	}
 	return {
 		scene: best.scene,
-		work: { ...work, corridors: best.work.corridors, conflicts: best.work.conflicts },
+		work: {
+			layouts: tried.length,
+			placements: tried.reduce((sum, { work }) => sum + work.placements, 0),
+			expansions: tried.reduce((sum, { work }) => sum + work.expansions, 0),
+			corridors: best.work.corridors,
+			conflicts: best.work.conflicts,
+		},
 	};
 }
 
+/**
+ * One layout of a chart at a row height. Laid out `forward`, routes keep SIDE_DISTANCE clear of
+ * the bars they pass, drop onto a diamond's edge past a bar near its vertex, join an earlier
+ * arrival's last run rather than double back, and hook back to their successor's start; else they
+ * route as before those choices, which the forward layout must not do worse than. Laid out
+ * `clear`, fallback routes down the corridor keep a bar's clearance from every mark too.
+ */
 function layoutAt(
 	diagram: GanttDiagram,
 	rowHeight: number,
-): { readonly scene: RenderedDiagramScene; readonly work: GanttRoutingWork } {
+	{ forward, clear }: Choices,
+): LayoutTry {
+	const inset = clear ? PLOT_INSET : CORRIDOR_WIDTH;
 	const schedules = new Map(diagram.tasks.map((task) => [task.id, ganttTaskSchedule(task)!]));
 	const groups = ganttRows(diagram);
 	const today = diagram.today === undefined ? undefined : parseGanttDay(diagram.today);
@@ -1187,7 +1476,7 @@ function layoutAt(
 			MIN_PLOT_WIDTH,
 			Math.min(
 				GANTT_PLOT_WIDTH,
-				MAX_ASPECT * height - 2 * PADDING - columnWidth - COLUMN_GAP - PLOT_INSET,
+				MAX_ASPECT * height - 2 * PADDING - columnWidth - COLUMN_GAP - inset,
 			),
 		),
 	);
@@ -1203,7 +1492,7 @@ function layoutAt(
 				: 0,
 		),
 	);
-	const xOf = (day: number) => PLOT_INSET + overhang + (day - axis.start) * axis.pxPerDay;
+	const xOf = (day: number) => inset + overhang + (day - axis.start) * axis.pxPerDay;
 	const plotWidth = xOf(axis.end);
 
 	const builder = new SceneBuilder();
@@ -1329,7 +1618,8 @@ function layoutAt(
 	const rowOf = new Map(
 		rows.flatMap((row, index) => (row.task ? [[row.task.task.id, index] as const] : [])),
 	);
-	const lanes = rows.slice(1).flatMap((row) => LANE_OFFSETS.map((offset) => row.top + offset));
+	const gutters = rows.slice(1).map((row) => row.top);
+	const lanes = gutters.flatMap((gutter) => LANE_OFFSETS.map((offset) => gutter + offset));
 	const denseLanes = rows
 		.slice(1)
 		.flatMap((row) => [...LANE_OFFSETS, ...DENSE_LANE_OFFSETS].map((offset) => row.top + offset));
@@ -1389,8 +1679,12 @@ function layoutAt(
 		dependencies.length * ROUTE_KINK_BUDGET_PER_ROUTE,
 	);
 	const kinkBudget = { remaining: kinkChartBudget };
+	const joinChartBudget = Math.min(JOIN_BUDGET, dependencies.length * JOIN_BUDGET_PER_ROUTE);
+	const joinBudget = { remaining: joinChartBudget };
 	let placements = 0;
 	let corridors = 0;
+	// Routes the search found no way for, drawn down the corridor instead.
+	const fallbacks = new WeakSet<RoutePoint[]>();
 	// Which way each task's own dependencies leave it: down to successors below, up to those above.
 	const exitSides = new Map<string, Set<RouteDirection>>();
 	for (const { from, to } of dependencies)
@@ -1490,6 +1784,11 @@ function layoutAt(
 		const targetMilestone = schedules.get(dependency.to)!.milestone;
 		const below = rowOf.get(dependency.to)! > rowOf.get(dependency.from)!;
 		const center = (box: Box) => (box.left + box.right) / 2;
+		/** Whether a task's row lies strictly between the predecessor's and the successor's. */
+		const between = (id: string) =>
+			(rowOf.get(id)! - rowOf.get(dependency.from)!) *
+				(rowOf.get(dependency.to)! - rowOf.get(id)!) >
+			0;
 		// Each dependency enters its successor at its own point, clear of the others and of Today.
 		const taken = entries.get(dependency.to) ?? [];
 		const ports = targetPorts(
@@ -1498,13 +1797,21 @@ function layoutAt(
 			below,
 			// Straight below or above the predecessor's diamond, or, near the successor's start, below
 			// or above where a route out of its bar's right end turns, so a successor starting at the
-			// bar's end takes one elbow.
-			sourceMilestone
-				? [center(source)]
-				: source.right - source.left >= RIGHT_EXIT_WIDTH &&
-					  source.right + ROUTE_LEAD <= target.left + ENTRY_INSETS.at(-1)!
-					? [source.right + ROUTE_LEAD]
-					: [],
+			// bar's end takes one elbow. A diamond is also entered on its edge beside a bar in the rows
+			// between that a route drops past, however near that bar ends to its vertex.
+			targetMilestone
+				? [
+						...(sourceMilestone ? [center(source)] : []),
+						...[...markBoxes].flatMap(([id, box]) =>
+							forward && between(id) ? besideBar(box, forward) : [],
+						),
+					]
+				: sourceMilestone
+					? [center(source)]
+					: source.right - source.left >= RIGHT_EXIT_WIDTH &&
+						  source.right + ROUTE_LEAD <= target.left + ENTRY_INSETS.at(-1)!
+						? [source.right + ROUTE_LEAD]
+						: [],
 			(pending.get(dependency.to)! > 1 || taken.length > 0) &&
 				(!targetMilestone || split.has(dependency.to)),
 		);
@@ -1589,6 +1896,20 @@ function layoutAt(
 			tiers
 				.map(([candidates, usable]) => candidates.filter(usable))
 				.find((usable) => usable.length > 0) ?? ports;
+		// The last runs of earlier routes into the same successor, which this one may join to share
+		// their entry where its own would cost a detour: those heading its way, at or past where it
+		// can leave its predecessor.
+		const leaves = sourceMilestone
+			? center(source) - (source.right - source.left) / 4
+			: Math.max(source.left + 2, source.right - EXIT_INSETS.at(-1)!);
+		const joins = (arriving.get(dependency.to) ?? []).filter((segment) => {
+			const direction = routeDirection(segment);
+			return (
+				lastRuns.has(segment) &&
+				segment.from.x >= leaves - 0.5 &&
+				(direction % 2 === 0 || (direction === 1) === below)
+			);
+		});
 		// The first runs of earlier routes out of the same predecessor, and where they leave it.
 		const trunks = (leaving.get(dependency.from) ?? []).filter((segment) => firstRuns.has(segment));
 		const trunkPorts = new Map(
@@ -1667,9 +1988,7 @@ function layoutAt(
 									),
 								]),
 						...[...markBoxes].flatMap(([id, box]) =>
-							id === dependency.from || id === dependency.to
-								? []
-								: [box.left - BAR_SIDE_CLEARANCE, box.right + BAR_SIDE_CLEARANCE],
+							id === dependency.from || id === dependency.to ? [] : besideBar(box, forward),
 						),
 					],
 				),
@@ -1706,16 +2025,24 @@ function layoutAt(
 			edges: bars.flatMap(([id, box]) =>
 				id === dependency.from || id === dependency.to ? [] : [box],
 			),
+			...(forward
+				? {
+						sides: bars.flatMap(([id, box]) =>
+							id === dependency.from || id === dependency.to ? [] : [box],
+						),
+						besides: bars.flatMap(([id, box]) => (between(id) ? [box] : [])),
+					}
+				: {}),
 			top: rowsTop + 1,
 			bottom: rowsBottom - 1,
 			budget: own,
 			kinkBudget,
 		};
 		// Boxed in, a route may pass closer behind other arrowheads and through reserved entries.
-		const searched =
-			routeOrthogonal(routeRequest) ??
+		const search = (request: RouteRequest) =>
+			routeOrthogonal(request) ??
 			routeOrthogonal({
-				...routeRequest,
+				...request,
 				obstacles: [
 					...fixed,
 					...heads.map((head) => (head.from === dependency.from ? head.arrowhead : head.keepOut)),
@@ -1726,24 +2053,135 @@ function layoutAt(
 					),
 				),
 			});
+		const alone = search(routeRequest);
+		/*
+		 * A route that doubles back into its own entry may instead join the last run of an earlier
+		 * arrival and share its entry, when that costs less and runs forward. A join is worth a search
+		 * only where a route can reach it without doubling back: down or up a column it can leave its
+		 * predecessor by, or one beside a mark, clear of every mark between, then on into the join.
+		 */
+		const clearDown = (x: number, to: number) =>
+			[...markBoxes].every(
+				([id, box]) =>
+					id === dependency.from ||
+					id === dependency.to ||
+					x <= box.left - BAR_SIDE_CLEARANCE ||
+					x >= box.right + BAR_SIDE_CLEARANCE ||
+					(below
+						? box.top - BAR_CLEARANCE >= to || box.bottom <= source.bottom
+						: box.bottom + BAR_CLEARANCE <= to || box.top >= source.top),
+			);
+		const columns = [
+			...sourcePorts(source, sourceMilestone, below).map((port) => port.x),
+			source.right + ROUTE_LEAD,
+			...[...markBoxes].flatMap(([, box]) => besideBar(box, forward)),
+		];
+		const reachable = ({ x, y, direction }: RoutePort) =>
+			direction % 2 === 1
+				? x >= leaves - 0.5 && clearDown(x, y)
+				: columns.some(
+						(column) =>
+							column >= leaves - 0.5 &&
+							column <= source.right + ROUTE_LEAD + 0.5 &&
+							(direction === 0 ? column <= x - ROUTE_APPROACH : column >= x + ROUTE_APPROACH) &&
+							clearDown(column, y),
+					);
+		// Its share of the run lies along no other route: none but those ending where the run does.
+		const alongNone = (port: RoutePort, run: RouteSegment) =>
+			!routed.some(
+				(segment) =>
+					segment !== run &&
+					!(
+						lastRuns.has(segment) &&
+						Math.hypot(segment.to.x - run.to.x, segment.to.y - run.to.y) < 0.01
+					) &&
+					runsBeside(port, run.to, segment, ROUTE_SEPARATION),
+			);
+		const joinTargets =
+			forward && alone && doublesBack(alone)
+				? joins.flatMap((run) =>
+						joinPorts(run, gutters).filter((port) => reachable(port) && alongNone(port, run)),
+					)
+				: [];
+		let shared: RoutePoint[] | undefined;
+		if (joinTargets.length > 0 && joinBudget.remaining > 0) {
+			const allowed = Math.min(JOIN_SEARCH, joinBudget.remaining);
+			const steps = { remaining: allowed };
+			shared = search({
+				...routeRequest,
+				targets: [...open, ...joinTargets],
+				joins: new Set(joins),
+				budget: steps,
+				limit: allowed,
+				// Plain searches only: weighing kinks draws on the chart's own budget.
+				kinkBudget: { remaining: 0 },
+			});
+			joinBudget.remaining -= allowed - steps.remaining;
+		}
+		const merged = shared && joined(shared, joins);
+		const chosen = merged && !doublesBack(merged) ? merged : alone;
+		// A hook back into a later top or bottom entry runs on along its gutter to an entry nearer the
+		// successor's start where it can, so its last turn keeps clear of its arrowhead: the last
+		// arrival only, as an earlier one would take the entry a later one drops straight into.
+		const onToStart = (points: RoutePoint[]): RoutePoint[] => {
+			if (points.length < 4 || pending.get(dependency.to)! > 1 || !doublesBack(points))
+				return points;
+			const [corner, turn, end] = points.slice(-3) as [RoutePoint, RoutePoint, RoutePoint];
+			if (
+				Math.abs(turn.x - end.x) >= 0.01 ||
+				Math.abs(corner.y - turn.y) >= 0.01 ||
+				turn.x >= corner.x - 0.01
+			)
+				return points;
+			const direction = end.y > turn.y ? 1 : 3;
+			const earlier = open
+				.filter(
+					(port) =>
+						port.direction === direction && Math.abs(port.y - end.y) < 0.01 && port.x < end.x - 1,
+				)
+				.toSorted((a, b) => a.x - b.x);
+			for (const port of earlier) {
+				if (joinBudget.remaining <= 0) break;
+				const allowed = Math.min(JOIN_SEARCH, joinBudget.remaining);
+				const steps = { remaining: allowed };
+				const extended = routeOrthogonal({
+					...routeRequest,
+					sources: [{ ...corner, direction: 2, cost: 0 }],
+					targets: [port],
+					budget: steps,
+					limit: allowed,
+					kinkBudget: { remaining: 0 },
+				});
+				joinBudget.remaining -= allowed - steps.remaining;
+				if (extended?.length === 3 && Math.abs(extended[1]!.y - corner.y) < 0.01)
+					return [...points.slice(0, -2), extended[1]!, port];
+			}
+			return points;
+		};
+		const searched = chosen && (forward ? onToStart(chosen) : chosen);
 		pool.remaining -= granted - own.remaining;
-		if (!searched) corridors += 1;
-		return (
-			searched ??
-			corridorRoute({
-				source,
-				sourceMilestone,
-				sourceRow: rows[rowOf.get(dependency.from)!]!,
-				target,
-				targetMilestone,
-				rowsTop,
-				rowsBottom,
-				routed,
-				heads: heads.map((head) => head.keepOut),
-				taken,
-				siblings: new Set(trunks),
-			})
-		);
+		if (searched) return searched;
+		corridors += 1;
+		const fallback = corridorRoute({
+			marks: clear
+				? [...markBoxes].flatMap(([id, box]) =>
+						id === dependency.from || id === dependency.to ? [] : [box],
+					)
+				: [],
+			source,
+			sourceMilestone,
+			sourceRow: rows[rowOf.get(dependency.from)!]!,
+			target,
+			targetMilestone,
+			rowsTop,
+			rowsBottom,
+			routed,
+			heads: heads.map((head) => head.keepOut),
+			taken,
+			siblings: new Set(trunks),
+		});
+		fallbacks.add(fallback);
+		return fallback;
 	};
 	dependencies.forEach((dependency, index) => {
 		const points = place(dependency);
@@ -2170,6 +2608,16 @@ function layoutAt(
 		}
 		return { ...element, x: round(element.x + dx), y: round(element.y + dy) };
 	});
+	const conflicted = placed.reduce(
+		(sum, points, index) =>
+			sum +
+			placed.reduce(
+				(pairs, other, at) =>
+					at === index ? pairs : pairs + routeConflicts(points!, other!, kinOf(index, at), true),
+				0,
+			),
+		0,
+	);
 	return {
 		scene: {
 			kind: "canvas",
@@ -2185,6 +2633,17 @@ function layoutAt(
 			layouts: [],
 			zOrder: builder.zOrder(),
 		},
+		crossings: placed.reduce((sum, _, index) => sum + crossingsOf(index), 0) / 2,
+		findings: findingsOf(
+			placed.map((points, index) => ({ ...dependencies[index]!, points: points! })),
+			bars,
+			conflicted,
+			fallbacks,
+		),
+		clear: keepsClear(
+			placed.map((points, index) => ({ ...dependencies[index]!, points: points! })),
+			markBoxes,
+		),
 		work: {
 			layouts: 1,
 			placements,
@@ -2194,20 +2653,11 @@ function layoutAt(
 				REPAIR_BUDGET -
 				repairBudget.remaining +
 				kinkChartBudget -
-				kinkBudget.remaining,
+				kinkBudget.remaining +
+				joinChartBudget -
+				joinBudget.remaining,
 			corridors,
-			conflicts: placed.reduce(
-				(sum, points, index) =>
-					sum +
-					placed.reduce(
-						(pairs, other, at) =>
-							at === index
-								? pairs
-								: pairs + routeConflicts(points!, other!, kinOf(index, at), true),
-						0,
-					),
-				0,
-			),
+			conflicts: conflicted,
 		},
 	};
 }

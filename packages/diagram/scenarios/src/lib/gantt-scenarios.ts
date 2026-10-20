@@ -909,12 +909,28 @@ function sideBySide(a: Run, b: Run, gap: number): number {
 	return Math.min(aHigh!, bHigh!) - Math.max(aLow!, bLow!);
 }
 
+/** Where a route's last straight stretch begins: the index of its first run in line with its last. */
+function stemStart(runs: readonly Run[]): number {
+	const level = (run: Run) => Math.abs(run.from.y - run.to.y) < 0.01;
+	let index = runs.length - 1;
+	while (
+		index > 0 &&
+		level(runs[index - 1]!) === level(runs[index]!) &&
+		(level(runs[index]!)
+			? Math.abs(runs[index - 1]!.from.y - runs[index]!.from.y) < 0.01
+			: Math.abs(runs[index - 1]!.from.x - runs[index]!.from.x) < 0.01)
+	)
+		index -= 1;
+	return index;
+}
+
 /**
  * Dependencies that read ambiguously: a route through another's arrowhead, two routes on one
  * line (routes out of one predecessor may share their first run, and routes into one successor
- * their last), or a loop back behind a predecessor its successor alone waits on, in the next row
- * and starting after it ends, which always has a forward route unless the predecessor is a
- * sliver crowded by its other dependencies.
+ * their last, all of it and their arrowhead when one joined the other's), or a loop back behind
+ * a predecessor its successor alone waits on, in the next row and starting after it ends, which
+ * always has a forward route unless the predecessor is a sliver crowded by its other
+ * dependencies.
  */
 function ganttRouteProblems(scene: RenderedDiagramScene, marks: readonly Box[]): string[] {
 	const arrows = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
@@ -942,7 +958,16 @@ function ganttRouteProblems(scene: RenderedDiagramScene, marks: readonly Box[]):
 		for (const other of arrows) {
 			if (other === arrow) continue;
 			const theirs = runs(other.points);
-			if (theirs.some((run) => segmentEnters(head, run.from, run.to)))
+			const otherEnd = other.points.at(-1)!;
+			// One route joined the other's last run: both end in one arrowhead.
+			const joint =
+				arrow.targetNodeId === other.targetNodeId &&
+				Math.hypot(end.x - otherEnd.x, end.y - otherEnd.y) < 0.01;
+			if (
+				theirs.some(
+					(run, at) => !(joint && at >= stemStart(theirs)) && segmentEnters(head, run.from, run.to),
+				)
+			)
 				problems.push(`${other.id} runs through the head of ${arrow.id}`);
 			if (other.id < arrow.id) continue;
 			const together = own.some((run, index) =>
@@ -950,8 +975,8 @@ function ganttRouteProblems(scene: RenderedDiagramScene, marks: readonly Box[]):
 					const leaving = arrow.sourceNodeId === other.sourceNodeId && index === 0 && at === 0;
 					const arriving =
 						arrow.targetNodeId === other.targetNodeId &&
-						index === own.length - 1 &&
-						at === theirs.length - 1;
+						((index === own.length - 1 && at === theirs.length - 1) ||
+							(joint && index >= stemStart(own) && at >= stemStart(theirs)));
 					return !leaving && !arriving && sideBySide(run, them, 2) > 1;
 				}),
 			);

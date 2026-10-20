@@ -1131,6 +1131,38 @@ function sharesDirectedEndpoint(left: ArrowSegment, right: ArrowSegment): boolea
 	);
 }
 
+/**
+ * Arrows bound into one shape at one point may share their whole last straight stretch, as a Gantt
+ * dependency that joins another's last run into their successor does: both segments lie on it and
+ * head the same way.
+ */
+function sharesArrivalStem(left: ArrowSegment, right: ArrowSegment): boolean {
+	const [leftEnd, rightEnd] = [left.route.at(-1), right.route.at(-1)];
+	if (
+		left.endBindingId === null ||
+		left.endBindingId !== right.endBindingId ||
+		!leftEnd ||
+		!rightEnd ||
+		Math.abs(leftEnd.x - rightEnd.x) > AXIS_ALIGNED_EPSILON ||
+		Math.abs(leftEnd.y - rightEnd.y) > AXIS_ALIGNED_EPSILON
+	)
+		return false;
+	const onStem = (segment: ArrowSegment) =>
+		segment.route
+			.slice(segment.segmentIndex)
+			.every((point) =>
+				segment.orientation === "horizontal"
+					? Math.abs(point.y - segment.route[segment.segmentIndex]!.y) <= AXIS_ALIGNED_EPSILON
+					: Math.abs(point.x - segment.route[segment.segmentIndex]!.x) <= AXIS_ALIGNED_EPSILON,
+			);
+	return (
+		onStem(left) &&
+		onStem(right) &&
+		Math.sign(left.endCoordinate - left.startCoordinate) ===
+			Math.sign(right.endCoordinate - right.startCoordinate)
+	);
+}
+
 function overlappingArrowSegments(
 	elements: readonly ExcalidrawElement[],
 ): ExcalidrawSceneValidationIssue[] {
@@ -1154,6 +1186,7 @@ function overlappingArrowSegments(
 				left.arrowId === right.arrowId ||
 				sharesDirectedEndpoint(left, right) ||
 				sharesTrunk(left, right) ||
+				sharesArrivalStem(left, right) ||
 				!segmentsOverlapInterior(left, right)
 			) {
 				continue;

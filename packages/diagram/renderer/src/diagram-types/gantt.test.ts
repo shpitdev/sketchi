@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { renderDiagram } from "../diagram.js";
 import {
 	GANTT_MIN_BAR_WIDTH,
+	JOIN_BUDGET,
 	REPAIR_BUDGET,
 	ganttCaptions,
 	layoutGanttDiagram,
@@ -78,18 +79,21 @@ function expectReadableGantt(
 	expect(getCanvasValidationIssues(scene), context).toEqual([]);
 	// Routing work is bounded however crowded the plan: per layout, each dependency is placed,
 	// tried in at most two more arrival plans, and rerouted at most twice, within the chart's and
-	// the repairs' search budgets (each may overrun by one route's last search) and the budget for
-	// weighing kinks; a chart whose routes still meet is laid out at most twice more.
+	// the repairs' search budgets (each may overrun by one route's last search) and the budgets for
+	// weighing kinks and joining another route's last run. A chart whose first layout doesn't read
+	// clean is laid out the earlier way too, and once more clear of every mark where that way runs
+	// too close to one; one whose routes still meet is laid out at most twice more.
 	const dependencyCount = diagram.tasks.reduce(
 		(sum, task) => sum + (task.dependsOn?.length ?? 0),
 		0,
 	);
-	expect(work.layouts, `${context} layouts`).toBeLessThanOrEqual(3);
+	expect(work.layouts, `${context} layouts`).toBeLessThanOrEqual(5);
 	expect(work.placements, `${context} placements`).toBeLessThanOrEqual(
 		5 * dependencyCount * work.layouts,
 	);
 	expect(work.expansions, `${context} search steps`).toBeLessThanOrEqual(
-		(ROUTE_CHART_BUDGET + REPAIR_BUDGET + 2 * ROUTE_BUDGET + ROUTE_KINK_BUDGET) * work.layouts,
+		(ROUTE_CHART_BUDGET + REPAIR_BUDGET + 2 * ROUTE_BUDGET + ROUTE_KINK_BUDGET + JOIN_BUDGET) *
+			work.layouts,
 	);
 	const readout = readGanttScene(scene);
 	// Ticks are nice and cover the plan; bars sit on their dates.
@@ -165,8 +169,47 @@ function expectReadableGantt(
 				crossings.push(`${element.id} crosses ${text.id}`);
 	}
 	expect(crossings, context).toEqual([]);
+	expect(clearanceProblems(arrows, marks), context).toEqual([]);
 	expect(distinctProblems(scene, distinct), context).toEqual([]);
 	return scene;
+}
+
+/** Runs keep at least this far beside the ends of the bars and diamonds they pass, and this far above and below them. */
+const MARK_SIDE_GAP = 8;
+const MARK_GAP = 4;
+
+/**
+ * Runs that come closer to a bar or diamond they pass but don't connect to than its clearance:
+ * a vertical run beside its end, over the height they share, or a horizontal run above or below
+ * it, over the width they share.
+ */
+function clearanceProblems(
+	arrows: readonly Extract<SceneElement, { type: "arrow" }>[],
+	marks: readonly Box[],
+): string[] {
+	const problems: string[] = [];
+	for (const arrow of arrows) {
+		const ends = new Set([arrow.sourceNodeId, arrow.targetNodeId]);
+		arrow.points.slice(1).forEach((to, index) => {
+			const from = arrow.points[index]!;
+			const vertical = Math.abs(from.x - to.x) < 0.01;
+			for (const mark of marks) {
+				if (ends.has(mark.id)) continue;
+				const shared = vertical
+					? Math.min(Math.max(from.y, to.y), mark.bottom) -
+						Math.max(Math.min(from.y, to.y), mark.top)
+					: Math.min(Math.max(from.x, to.x), mark.right) -
+						Math.max(Math.min(from.x, to.x), mark.left);
+				if (shared <= 1) continue;
+				const gap = vertical
+					? Math.max(mark.left - from.x, from.x - mark.right)
+					: Math.max(mark.top - from.y, from.y - mark.bottom);
+				if (gap < (vertical ? MARK_SIDE_GAP : MARK_GAP) - 0.02)
+					problems.push(`${arrow.id} runs ${gap.toFixed(1)} px from ${mark.id}`);
+			}
+		});
+	}
+	return problems;
 }
 
 /** Arrows keep this far from another arrow's head, and from the end of its last run. */
@@ -193,12 +236,26 @@ function sideBySide(a: Run, b: Run, gap: number): number {
 	return Math.min(aHigh!, bHigh!) - Math.max(aLow!, bLow!);
 }
 
+/** Where a route's last straight stretch begins: the index of its first run in line with its last. */
+function stemStart(runs: readonly Run[]): number {
+	let index = runs.length - 1;
+	while (
+		index > 0 &&
+		isHorizontal(runs[index - 1]!) === isHorizontal(runs[index]!) &&
+		(isHorizontal(runs[index]!)
+			? Math.abs(runs[index - 1]!.from.y - runs[index]!.from.y) < 0.01
+			: Math.abs(runs[index - 1]!.from.x - runs[index]!.from.x) < 0.01)
+	)
+		index -= 1;
+	return index;
+}
+
 /**
  * Every dependency reads as its own line: no other route comes near its arrowhead, no two
  * routes run together, and none runs along the edge of its own predecessor or successor.
  * Routes out of one predecessor may share their first run, and routes into one successor their
- * last, as Excalidraw's bound stems allow. Unless `strict`, only lying exactly on another route
- * counts.
+ * last, as Excalidraw's bound stems allow; one that joined another's last run shares its arrowhead
+ * too. Unless `strict`, only lying exactly on another route counts.
  */
 function distinctProblems(scene: RenderedDiagramScene, strict: boolean): string[] {
 	const problems: string[] = [];
@@ -234,9 +291,15 @@ function distinctProblems(scene: RenderedDiagramScene, strict: boolean): string[
 		};
 		for (const { arrow: other, runs: otherRuns } of arrows) {
 			if (other === arrow) continue;
+			const otherEnd = other.points.at(-1)!;
+			// One route joined the other's last run: both end in one arrowhead.
+			const joint =
+				arrow.targetNodeId === other.targetNodeId &&
+				Math.hypot(end.x - otherEnd.x, end.y - otherEnd.y) < 0.01;
 			otherRuns.forEach((run, at) => {
 				if (
 					strict &&
+					!(joint && at >= stemStart(otherRuns)) &&
 					Math.max(run.from.x, run.to.x) > head.left &&
 					Math.min(run.from.x, run.to.x) < head.right &&
 					Math.max(run.from.y, run.to.y) > head.top &&
@@ -247,8 +310,8 @@ function distinctProblems(scene: RenderedDiagramScene, strict: boolean): string[
 					const leaving = arrow.sourceNodeId === other.sourceNodeId && index === 0 && at === 0;
 					const arriving =
 						arrow.targetNodeId === other.targetNodeId &&
-						index === runs.length - 1 &&
-						at === otherRuns.length - 1;
+						((index === runs.length - 1 && at === otherRuns.length - 1) ||
+							(joint && index >= stemStart(runs) && at >= stemStart(otherRuns)));
 					if (!leaving && !arriving && sideBySide(own, run, strict ? 2 : 0.01) > 1)
 						problems.push(`${arrow.id} runs along ${other.id}`);
 				});
@@ -320,6 +383,19 @@ function steps(points: readonly ScenePoint[]): number[] {
 			? [Math.round(length * 10) / 10]
 			: [];
 	});
+}
+
+/** Whether a route hooks: some run heads against an earlier run along the same axis. */
+function hooks(points: readonly ScenePoint[]): boolean {
+	const headings = new Set<string>();
+	for (const [index, to] of points.slice(1).entries()) {
+		const from = points[index]!;
+		const heading =
+			Math.abs(from.y - to.y) < 0.01 ? Math.sign(to.x - from.x) * 2 : Math.sign(to.y - from.y);
+		if (headings.has(String(-heading))) return true;
+		headings.add(String(heading));
+	}
+	return false;
 }
 
 /**
@@ -581,6 +657,118 @@ describe("Gantt renderer", () => {
 		const route = routes.find((entry) => entry.to === "switch")!.points;
 		expect(turns(route)).toBe(1);
 		expect(steps(route)).toEqual([]);
+	});
+
+	it("drops onto a milestone's edge past a bar that ends just short of its vertex", () => {
+		// Round 18: Finance reports -> Wave 1 sign-off passed Wave 1 validation, which ends 2 px short
+		// of the diamond's vertex, and hooked back to that vertex.
+		const diagram = plan([
+			{ id: "finance", label: "Finance reports", start: "2026-04-13", duration: 15 },
+			{ id: "validation", label: "Wave 1 validation", start: "2026-04-20", end: "2026-04-30" },
+			{
+				id: "signoff",
+				label: "Sign-off",
+				start: "2026-05-01",
+				milestone: true,
+				dependsOn: ["finance", "validation"],
+			},
+			{ id: "programme", label: "Programme", start: "2026-01-05", end: "2026-07-31" },
+		]);
+		const readout = readGanttScene(expectReadableGantt(diagram));
+		const route = readout.dependencies.find((entry) => entry.from === "finance")!.points;
+		expect(hooks(route)).toBe(false);
+		expect(turns(route)).toBe(1);
+		const end = route.at(-1)!;
+		const signoff = readout.marks.get("signoff")!;
+		expect(end.x).toBeGreaterThan(readout.marks.get("validation")!.right);
+		expect(end.x).toBeLessThan(signoff.right);
+		expect(end.y).toBeLessThan((signoff.top + signoff.bottom) / 2);
+	});
+
+	it("joins another arrival's last run when the one clear entry into their successor is taken", () => {
+		// Round 18: Migrate catalog -> Wave 2 validation ran around its successor and up into its
+		// bottom, as Migrate order history's route took the one top entry clear of the bars between.
+		const diagram = plan([
+			{ id: "catalog", label: "Catalog", start: "2026-05-04", end: "2026-05-22" },
+			{ id: "orders", label: "Orders", start: "2026-05-04", end: "2026-06-05" },
+			{ id: "clicks", label: "Clickstream", start: "2026-05-11", duration: 20 },
+			{
+				id: "dashboards",
+				label: "Dashboards",
+				start: "2026-06-01",
+				end: "2026-06-12",
+				dependsOn: ["clicks"],
+			},
+			{
+				id: "validation",
+				label: "Validation",
+				start: "2026-06-08",
+				end: "2026-06-19",
+				dependsOn: ["catalog", "orders"],
+			},
+			{ id: "programme", label: "Programme", start: "2026-01-05", end: "2026-07-31" },
+		]);
+		const readout = readGanttScene(expectReadableGantt(diagram));
+		const arrivals = readout.dependencies.filter((entry) => entry.to === "validation");
+		for (const { from, points } of arrivals) {
+			expect(hooks(points), from).toBe(false);
+			expect(turns(points), from).toBe(1);
+		}
+		// One arrowhead: the later route carries on along the earlier one's last run.
+		expect(arrivals[0]!.points.at(-1)).toEqual(arrivals[1]!.points.at(-1));
+	});
+
+	it("hooks around a bar over its successor's start half a bar height clear of it, back to the start", () => {
+		// Round 18: Data lake storage -> Monitoring turned 14 px past Orchestration's end, only to keep
+		// its run back to Monitoring's start 28 px long; at 8 px, judges read a route rounding a bar
+		// as tracing its edge.
+		const diagram = plan([
+			{ id: "lake", label: "Lake", start: "2026-03-02", end: "2026-03-13" },
+			{ id: "orchestration", label: "Orchestration", start: "2026-03-02", end: "2026-03-20" },
+			{
+				id: "monitoring",
+				label: "Monitoring",
+				start: "2026-03-16",
+				duration: 7,
+				dependsOn: ["lake"],
+			},
+			{ id: "programme", label: "Programme", start: "2026-01-05", end: "2026-07-31" },
+		]);
+		const readout = readGanttScene(expectReadableGantt(diagram));
+		const [route] = readout.dependencies;
+		const blocker = readout.marks.get("orchestration")!;
+		const monitoring = readout.marks.get("monitoring")!;
+		// Orchestration covers every column from Lake's end to Monitoring's start: the route must hook.
+		expect(hooks(route!.points)).toBe(true);
+		const turn = Math.max(...route!.points.map((point) => point.x));
+		expect(turn - blocker.right).toBeGreaterThanOrEqual(14.5);
+		expect(turn - blocker.right).toBeLessThanOrEqual(15.5);
+		expect(route!.points.at(-1)!.x - monitoring.left).toBeLessThanOrEqual(8);
+	});
+
+	it("keeps fallback routes down the corridor a bar's clearance from the bars at the axis start", () => {
+		// Review (PR #506): fallback routes down the corridor ran 1.5 px beside bars starting on the
+		// axis's first day, and their gutter runs 1 px above others.
+		expectReadableGantt(fuzzGantt(62), { distinct: false });
+	});
+
+	it("keeps a crowded plan's fallback routes apart and clear of its marks, without roomier layouts", () => {
+		// Review (PR #506): with every search spent, t2 -> t29 fell back down the corridor 1.5 px from
+		// t8 -> t28 for 1,600 px, and two roomier layouts tried in vain to clear it. The earlier
+		// routing's own fallbacks here ran 2 px from bars at the axis start, so it is laid out once more
+		// clear of them.
+		const scene = expectReadableGantt(fuzzGantt(464));
+		expect(readGanttScene(scene).dependencies.length).toBeGreaterThan(40);
+		const { work } = layoutGanttDiagram(fuzzGantt(464));
+		expect(work.layouts).toBeLessThanOrEqual(3);
+		expect(work.conflicts).toBe(0);
+	});
+
+	it("crosses no more often than the earlier routing where its forward choices would", () => {
+		// Review (PR #506): scheduled-188's routes crossed in 26 pairs where the earlier routing's
+		// crossed in 16.
+		const routes = readGanttScene(expectReadableGantt(scheduledGantt(188))).dependencies;
+		expect(crossings(routes).length).toBeLessThanOrEqual(16);
 	});
 
 	it("keeps a plain elbow however the search first reaches its turn", () => {
